@@ -1,0 +1,52 @@
+apt-get install rrdtool
+
+if RRDs.pm is missing apt-get install librrds-perl
+apt-get collectd
+
+Zum weiterlesen
+Messdaten mit RRDtool und Perl verwalten http://www.linux-magazin.de/Artikel/ausgabe/2004/06/perl/perl.html
+
+my example:
+
+   RRDs::create($DB, "--step=300",       #300 = every 5 min
+      "DS:innen:GAUGE:1800:-30.0:70.0",  #FHT80 room temperature
+      "DS:bad:GAUGE:1800:-30.0:70.0",    #HMS100TF bath temperature
+      "DS:wasser:GAUGE:1800:-30.0:70.0", #HMS100T water temperature
+      "RRA:AVERAGE:0.5:1:288", 
+      "RRA:MAX:0.5:12:168", 
+      "RRA:MIN:0.5:12:168",
+      "RRA:AVERAGE:0.5:288:365") or die "Create error: ($RRDs::error)"; 
+
+Modification on collection.cgi
+
+		temperature => [
+			'DEF:temp_avg={file}:bad:AVERAGE',
+			'DEF:temp_min={file}:bad:MIN',
+			'DEF:temp_max={file}:bad:MAX',
+			'DEF:i_avg={file}:innen:AVERAGE',
+			'DEF:i_min={file}:innen:MIN',
+			'DEF:i_max={file}:innen:MAX',
+			'DEF:w_avg={file}:wasser:AVERAGE',
+			'DEF:w_min={file}:wasser:MIN',
+			'DEF:w_max={file}:wasser:MAX',
+			"AREA:temp_max#$HalfBlue",
+			"AREA:temp_min#$Canvas",
+			"LINE1:temp_avg#$FullRed:Bad",
+			'GPRINT:temp_min:MIN:%4.1lf Min,',
+			'GPRINT:temp_avg:AVERAGE:%4.1lf Avg,',
+			'GPRINT:temp_max:MAX:%4.1lf Max,',
+			'GPRINT:temp_avg:LAST:%4.1lf zuletzt\l',
+			"LINE2:i_avg#$FullGreen:Innen",
+			'GPRINT:i_min:MIN:%4.1lf Min,',
+			'GPRINT:i_avg:AVERAGE:%4.1lf Avg,',
+			'GPRINT:i_max:MAX:%4.1lf Max,',
+			'GPRINT:i_avg:LAST:%4.1lf zuletzt\l',
+			"LINE3:w_avg#$FullBlue:Wasser",
+			'GPRINT:w_min:MIN:%4.1lf Min,',
+			'GPRINT:w_avg:AVERAGE:%4.1lf Avg,',
+			'GPRINT:w_max:MAX:%4.1lf Max,',
+			'GPRINT:w_avg:LAST:%4.1lf zuletzt\l'
+			
+		],
+
+

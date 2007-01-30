@@ -1,0 +1,72 @@
+#
+# fhem.pl configfile
+# 
+# We have 2 rollades (which are connected via the FS20MS). Button 3 on the
+# FS20S20 should activate both rollades. There are three solutions:
+# 1. Builtin commands
+# 2. Perl expression
+# 3. Shell script (realized via external script at the end of this file)
+
+
+# Common part
+logfile /tmp/fhem-%Y-%m.log
+savefile /tmp/fhem.save     # where to save the state of the devices
+verbose 3                   # "normal" verbosity
+port 7072                   # our TCP/IP port (working from localhost only)
+modpath .                   # where our FHEM directory is
+define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
+
+
+define roll1 FS20 7777 02   # type FS20, transmitter code 7777, button 3
+define roll2 FS20 7777 03   # type FS20, transmitter code 7777, button 4
+define btn3  FS20 8765 03   # define a button from the FS20S20
+setstate roll1 off          # initial state is closed
+
+# Note: Only one of the methods should be used
+
+# Method 1a: builtin commands. Note the double ;
+notifyon btn3 set roll1 %;; set roll2 %
+
+# Method 1b: shorter:
+notifyon btn3 set roll1,roll2 %
+
+# Method 2a: perl.
+notifyon btn3 { fhz "set roll1 %;; set roll2 %" }
+
+# Method 2b: perl. open the rollades only to a certain amount if they are
+# closed. Else do the required command.
+notifyon btn3 {\
+  if("%" eq "on" && $value{roll1} eq "off") {\
+    fhz "set roll1 on-for-timer 10";;\
+    fhz "set roll2 on-for-timer 16";;\
+  } else { \
+    fhz "set roll1,roll2 %"\
+  } \
+}
+
+# Method 3: shell. The script follows after "quit". Dont forget to chmod u+x it.
+notifyon btn3 "/usr/local/bin/roll.sh %"
+
+quit                        # Ignore the rest of this file
+
+#!/bin/sh
+#
+# roll1 needs 10 sec to open to a certain level, roll2 16 sec. The following
+# shell script opens both of them when called woth "on", and closes both of
+# them else. We rely on the fact, that the FS20MS switches off after ca 60s.
+#
+# Note that for greater time values the FS20 timer gets inaccurate, you
+# can use something like 
+#    $fhz 7072 "set roll1 on; at +00:00:21 set roll1 on"
+# instead.
+#
+
+fhz=/usr/local/bin/fhem.pl
+
+if test $1 = "on"; then
+  $fhz 7072 "set roll1 on-for-timer 10
+  $fhz 7072 "set roll2 on-for-timer 16
+else
+  $fhz 7072 "set roll1,roll2 off"
+fi
+

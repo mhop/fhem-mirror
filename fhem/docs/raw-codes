@@ -1,0 +1,16 @@
+On the telnet prompt do: 
+  {FhzDecode("<code>")}
+where <code> is one of:
+
+81xx04xx0101a0011234030011	FS20 dev: 1234  button: 03 on  (11)
+81xx04xx0101a0011234030000	FS20 dev: 1234  button: 03 off (00)
+
+810d04xx4027a001de53187654321f	KS300: Raincounter hex:123 (ca 75l/m2),
+				Wind 45.6 km/h Humidity: 78%, Temp: 13.5
+				Unknown fields: d,e,f
+{FhzDecode("810d04xx4027a001de53187654321f")}
+
+810e04d70213a001b16d000003000000  RM100-2 smoke on
+810e04d70213a001b16d000000000000  RM100-2 smoke off
+
+81xx04xx0101a00180c2030011	FS20 dev: 1234  button: 03 on  (11)

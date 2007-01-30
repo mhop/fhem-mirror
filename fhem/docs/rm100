@@ -1,0 +1,28 @@
+
+810e041f0213a001d396000000000000
+
+// Reset:
+810e04ea0293a001ae06000000000000
+// Normal:
+810e046a0213a001ae06000000000000
+
+==========
+810e04ba0293a001b1d3000000000000
+810e04a90293a0016a09000000000000
+
+By andikt:
+// Batteries are inserted into the smoke detector
+810e04540293a001b16d000000000000
+[the same comes 10 times]
+
+// No smoke applied, status messages each 30min
+810e04d40213a001b16d000000000000
+
+// Smoke applied, detector beeps loud
+810e04d70213a001b16d000003000000
+
+// no more smoke, detector stops beeping, red LED flashes for some more
+// seconds
+810e04d40213a001b16d000000000000
+
+

@@ -1,0 +1,30 @@
+#
+# fhem.pl configfile
+# 
+# Define an FHT80b device. You have to know its transmitter code,
+# or set verbose to 4 and wait for a while watching the log.
+#
+# wz stands for "wohnzimmer".
+# After about 5-10 minutes, check if "list wz" returns something meaningful
+#
+
+logfile /tmp/fhem-%Y-%m.log
+savefile /tmp/fhem.save     # where to save the state of the devices
+verbose 3                   # "normal" verbosity
+port 7072                   # our TCP/IP port (working from localhost only)
+modpath .                   # where our FHEM directory is
+define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
+
+define wz FHT 3232          # type FHT, transmitter code 3232 (default value)
+
+#########################
+# Some documentation suggests that the FHZ time should be set every minute.
+# I only set it once a day.
+at *03:30:00 set FHZ time
+
+#########################
+# If you wish to have up-to date information on certain strange parameters
+# then comment out the line below. My devices send a message when a value
+# changes, and send measured-temp, actuator and state messages regularly.
+# Be patient: the reply comes in 5-10 minutes.
+at *04:00:00 set wz refreshvalues

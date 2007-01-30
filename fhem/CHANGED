@@ -1,0 +1,301 @@
+- 2005-10-27 (1.3)
+  - Bugfix: multiple at commands at the same time.</pre>
+
+- 2005-11-10 (1.4)
+  - Reformatting the package and the documentation
+  - New links
+
+- 2005-12-26 (1.5)
+  - "modularized" in preparation for the FHZ80B -> each device has a type
+  - added relative "at" commands (with +HH:MM:SS)
+  - multiple commands on one line separated with ;
+  - sleeping 0.22 seconds after an ST command
+  - some commands/syntax changed:
+    - switch => set
+    - device => fhzdevice
+    - define <name> ... => define <name> <type> ...
+  - the state of the devices and the at commands are saved
+  - at start always sending a "set 0001 00 01" to enable the FHZ receiever.
+    This is a workaround.
+  - doc rewrite, examples directory
+
+- 2006-01-03 (1.6)
+  - signal handling (to save the state on shutdown)
+  - module FHZ addded (for the FHZ1000PC device itself)
+  - added the get function (to make the initialization prettier)
+  - the module ST was renamed to FS20
+  - FS20 timer commands added
+  - modules command removed (we are loading everything from the modpath
+    directory)
+  - FHT80b module added (yes, it is already useful, you can set
+    and view a lot of values)
+  - documentation adapted
+  - Added a TODO file
+
+- 2006-01-04 (1.7)
+  - the at command can be used to execute something repeatedly with *
+  - ntfy can filter on device or on device+event with a regexp
+  - checking the delete and notify regexps if they make sense
+  - the FHT init string is now a set command (refreshvalues)
+  - shutdown saves the detailed device information too
+
+- 2006-01-05 (1.8)
+  - Bugfix: detailed FS20 status was not set from external event
+  - Bugfix: setstate for FS20 returned the last state set
+  - Bugfix: undefined FS20 devices (can) crash the server
+  - HMS module added by Martin Mueller
+    (currently supporting the HMS100T & HMS100TF)
+  - Log modules added, the first one being a simple FileLog
+    (inspired by Martin Mueller)
+  - A little  gnuplot script to display temperature and actuator changes
+
+- 2006-02-10 (1.9)
+  (aka as the Juergen release)
+  - The FHZ1300 is reported to work
+  - Bugfix: spaces before comment in the config file should be ignored
+  - added FS20STR codes to 10_FS20.pm
+  - names restricted to A-Za-z0-9.:- (especially _ is not allowed)
+  - delete calles now an UndefFn in the module
+  - implementation of FS20 function group/local master/global master
+  - the list command tells you the definition of the device too
+
+- 2006-02-12 (1.9a)
+  - Bugfix: wrong rights for HMS and wrong place for readonly
+    (thanks to Juergen)
+
+- 2006-02-12 (1.9b)
+  - Bugfix: Fixing the same bug again (thanks to Martin)
+
+- 2006-04-02 (2.0)
+  - XmlList and webfrontend/pgm1 programs from Raoul Matthiessen
+  - list tries to display the state and not the last command
+  - Both log facilities (FileLog and Log) take wildcards
+    (week, year, month, etc) to make logfile rotating easier
+  - webfrontend/pgm2
+
+- 2006-04-15 (2.1)
+  - webfrontend/pgm2 changes:
+    - make it work on Asus dsl-routers (no "use warnings")
+    - css/readonly configurable
+    - Formatting for HMS data
+  - comments can be added to each device (setstate <dev> comment:xxx)
+  - testbed to dry-test functionality (test directory)
+  - added an empty hull for the KS300 weather module
+  - added undocumented "exec" function to call arbitrary program parts
+    for debugging. Example: exec FhzDecode("81xx04xx0101a0011234030011");
+  - webfrontend/pgm3, contributed by Martin Haas
+  - fixed pgm1: changing values should work now
+
+- 2006-05-20 (2.2)
+  - FHZ1300 support verified (+ doc changes)
+  - KS300 support added (with Temperature, Humidity, Wind speed, Rain).
+    Not verified/undecoded: subzero temp, weak battery, Is-raining flag,
+    wind speed > 100km/h
+  - webpgm2 log fix for "offed" FHT devices (with no actuator data)
+  - webpgm3 upgrade (by Martin Haas, see webpgm/pgm3/docs/CHANGES for details)
+  - HMS logging/state format changed to make it similar to KS300
+  - added HMS100WD (thanks to Sascha Pollok)
+  - ntfy/logging changed to be able to notify for multiple attributes
+    arriving in one message
+  - central FHTcode settable (see commandref.html)
+  - optionally listen for non-local requests (port <num> global)
+  - unknown logging
+  - FAQ
+
+- 2006-6-22 (2.3)
+  - CRC checking (i.e. ignoring messages with bad CRC, message on verbose 4)
+  - contrib/checkmesg.pl added to check message consistency (debugging)
+  - FHT: unknown_aa, unknown_ba codes added. What they are for?
+  - Empty modpath / no modpath error messages added (some user think modpath is
+    superfluous)
+  - Unparsed messages (verbose 5) now printed as hex
+  - Try to reattach to the usb device if it disappears: no need to
+    restart the server if the device is pulled out from the USB socket and
+    plugged in again (old versions go into a busy loop here).
+  - Supressing the seldom (ca 1 out of 700) short KS300 messages.
+    (not sure how to interpret them)
+  - Added KS300 "israining" status flag. Note: this not always triggers when it
+    is raining, but there seems to be a correlation. To be evaluated in more
+    detail.
+  - notifyon can now execute "private" perl code as well (updated
+    commandref.html, added the file example/99_PRIV.pm)
+  - another "perl code" example is logging the data into the database
+    (with DBI), see the file contrib/91_DbLog.pm. Tested with an Oracle DB.
+  - logs added to the xmllist
+  - FHT80b: Fix measured-temp over 25.5 (handling the tempadd messages better)
+
+- 2006-07-23 (2.4)
+  - contrib/four2hex (to convert between ELV and our codes) by Peter Stark
+  - make dist added to set version (it won't work in a released version)
+  - reload function to reload (private) perl modules
+  - 20_FHT.pm fix: undef occures once without old data
+  - "setstate comment" is replaced with the attr command (i.e. attribute).
+    The corresponding xmllist COMMENT tag is replaced with the ATTR tag.
+    Devices or logs can have attr definitions.
+  - webfrontend/pgm2 (fhzweb.pl) updated to handle "room" attributes(showing
+    only devices in this room).
+  - version 0.4.2 of webfrontend/pgm3 integrated.
+  - contrib/ks300avg.pl to compute daily and monthly avarage values.
+  - the 40_KS300.pm module is computing daily and monthly avarages for the
+    temp/hum and wind values and sum of the rain. The cum_day and cum_month
+    state variables are used as helper values.  To log the avarage use the
+    .*avg.* regexp. The regexp for the intraday log will trigger it also.
+  - Added the contrib file garden.pl as a more complex example: garden
+    irrigation. The program computes the time for irrigation from the avarage
+    temperature reported by the ks300-2.
+  - Enable uppercase hex codes (Bug reported by STefan Mayer)
+  - Renamed the unknown_XX FHT80b codes to code_XXXXXX, this will produce
+    "Undefined type" messages when reading the old save file
+  - RM100-2 added (thanks for the codes from andikt).
+
+- 2006-08-13 (2.5)
+  Special thanks to STefan Mayer for a lot of suggestions and bug reports
+  - If a command is enclosed in {}, then it will be evaluated as a perl
+    expression, if it is enclosed in "" then it is a shell command, else it is
+    a "normal" fhz1000 command.
+    "at" and "notifyon" follow this convention too.
+    Note: a shell command will always be issued in the background.
+  - won't die anymore if the at spec contains an unknown command
+  - rereadcfg added. Sending a HUP should work better now
+  - escaping % and @ in the notify argument is now possible with %% or @@
+  - new command trigger to test notify commands
+  - where you could specify an fhz command, now you can specify a list of
+    them, separated by ";". Escape is ;;
+  - KS300 sometimes reports "negative" rain when it begins to rain.  Filter
+    such values. israining is set when the raincounter changed or the ks300
+    israining bit is set.
+  - sleep command, with millisecond accuracy
+  - HMS 100MG support by Peter Stark.
+  - Making FHT and FS20 messages more uniform
+  - contrib/fs20_holidays.sh by STefan Mayer
+    (simulate presence while on holiday)
+  - webfrontends/pgm4 by STefan Mayer: fs20.php
+  - KS300 avg. monthly values fixed (hopefully)
+  - deleted undocumented "exec" function (you can write it now as {...})
+
+- 2006-09-08 (2.6)
+  - bugfix:  updated the examples (hint from Juergen)
+  - bugfix:  leading and trailing whitespaces in commands are ignored now
+  - feature: making life easier for perl oneliners: see commandref.html
+             (motivated by STefans suggestions)
+  - feature: include command and multiline commands in the configfiles (\)
+  - bugfix:  web/pgm2 KS300 rain plot knows about the avg data
+  - bugfix:  the FHT > 25.5 problem. Needs to be tested.
+  - feature: log unknown devices (peters idea, see notifyon description)
+  - feature: HMS wildcard device id for all HMS devices. See the define/HMS
+             section in the commandref.html for details.
+	     NOTE: the wildcard for RM100-2 changed from 1001 to 1003.
+	     (peters idea)
+  - feature: rolwzo_no_off.sh contrib file (for those who were already closed
+             out by automatically closing rollades, by Martin)
+  - feature: the current version (0.4.5) of the pgm3 from Martin.
+
+- 2006-09-13 (2.6a)
+  - bugfix:  the FHT > 25.5 problem again. A never ending story.
+
+- 2006-10-03 (2.7)
+  - bugfix:  Another try on the > 25.5 problem. (Peters suggestion)
+  - feature: 99_ALARM.pm from Martin (in the contrib directory)
+  - feature: HMS100TFK von Peter P.
+  - feature: attribute loglevel
+  - feature: attribute dummy
+  - feature: attr command documented
+  - feature: the current version (0.5a) of the pgm3 from Martin.
+
+- 2006-11-08 (2.8)
+  - feature: store oldvalue for triggers. perl only. requested by peter.
+  - feature: inform cmd. Patch by Martin. There are many Martins around here :-)
+  - bugfix:  XML: fix & and < and co
+  - bugfix:  Accept KS300 negative temperature values
+  - change:  the FS20 msg "rain-msg" is called now "activate"
+  - feature: start/stop rc script from Stefan (in the contrib directory)
+  - feature: attribute extra_notify: setting the device will trigger a notify
+  - feature: optional repeat count for the at command
+  - feature: skip_next attribute for the at command
+  - feature: WS300 support by Martin. Check the contrib/ws300 directory.
+  - bugfix:  91_DbLog.pm: retry if the connection is broken by Peter
+  - feature: Martin's pgm3-0.5.2 (see the CHANGELOG on his webpage)
+  - feature: RRD logging example by Peter (in the contrib/rrd directory)
+
+- 2006-11-19 (2.9)
+  - bugfix:  fhz1000.pl dies at startup if the savefile does not exist
+  - bugfix:  oldvalue hash is not initialized at startup (peter, Nov 09)
+  - feature: Notify reorganization (requested by juergen and matthias) :
+    - inform will be notified on both real events and set or trigger commands
+    - filelogs will additionally be notified on set or trigger commands
+    - the extra_notify flag is gone: it is default now, there is a
+      do_not_notify flag for the opposite behaviour.
+  - feature: at timespec as a function. Example: at +*{sunset()} 
+    commandref.html and examples revisited.
+  - feature: 99_SUNRISE.pm added to use with the new at functionality
+    (replaces the old 99_SUNSET.pm)
+  - feature: webpgm2 "everything" room, at/notify section, arbitrary command
+  - bugfix:  resetting the KS300
+  - feature: updated ws300pc (from martin klerx, Nov 08)
+  - bugfix:  parsing timed commands implemented => thermo-off,thermo-on and
+             activate replaced with timed off-for-timer,on-for-timer and
+	     on-old-for-timer (reported by martin klerx, Nov 08)
+  - feature: pidfile (requested by peter, Nov 10)
+  - bugfix:  function 81 is not allowed
+
+- 2006-11-27 (2.9a)
+  - bugfix:  FileLog+Unknown device generates undefined messages
+  - bugfix:  trigger with unknown device generates undefined messages
+
+- 2006-12-28 (3.0)
+  - bugfix:  KS300: Make the temperature negative, not the humidity
+  - bugfix:  generate correct xmllist even with fhzdev none (Martin, 12.12)
+  - feature: one set command can handle multiple devices (range and enumeration)
+  - feature: new FS20 command on-till
+  - feature: perl: the current state is stored in the %value hash
+  - feature: perl: sunset renamed to sunset_rel, sunset_abs added (for on-till)
+  - feature: perl: isday function added
+  - feature: follow-on-for-timer attribute added to set the state to off
+  - bugfix:  the ws300pc negative-temp bugfix included (from Martin Klerx)
+  - feature: version 0.6.2 of the webpgm3 included (from Martin Haas)
+
+- 2007-01-08 (3.1)
+  - bugfix:  delete checks the arg first "exactly", then as a regexp
+  - bugfix:  sun*_rel does not work correctly with offset (Martin)
+  - feature: FAQ entry on how to install the sunrise stuff.
+  - feature: the inner core is modified to be able to handle
+             more than one "IO" device, i.e multiple FHZ at the same time,
+	     or FHZ + FS10 + WS300. Consequences:
+    - "fhzdev <usbdevice>" replaced with "define <FHZNAME> FHZ <usbdevice>"
+    - "sendraw <fn> <code>" replaced with "set <FHZNAME> raw <fn> <code>"
+    - module function parameters changed (for module developers)
+    - set FHZ activefor dev
+    - select instead sleep after sending FHZ commands
+    - the at timer is more exact (around 1msec instead of 1 sec)
+    - ignoring FS20 device 0001/00/00
+  - feature: contrib/serial.pm to debug serial devices.
+  - feature: WS300 integrated: no external program needed (Martin)
+  - feature: updated to pgm3-0.7.0, see the CHANGELOG at Martins site
+
+- 2007-01-14 (3.2)
+  - bugfix:  example $state changed to $value (remco)
+  - bugfix:  sun*_rel does not work correctly with offset (Sebastian)
+  - feature: new HMS100TF codes (Sebastian)
+  - feature: logging unknown HMS with both unique and class ID (Sebastian)
+  - feature: WS300: "Wetter-Willi-Status", rain_raw/rain_cum added, historic
+             data (changes by Martin & Markus)
+  - bugfix:  broken rereadcfg / CommandChain after init
+             (reported by Sebastian and Peter)
+  - bugfix:  sunrise_coord returned "3", which is irritating
+
+- 2007-01-25 (3.3)
+  - bugfix:  50_WS300.pm fix from Martin
+  - bugfix:  pidfile does not work as expected (reported by Martin)
+  - bugfix:  %U in the log-filename is wrong (bugreport by Juergen)
+  - feature: %V added to the log-filename
+  - feature: KS300 wind calibration possibility added
+  - feature: (software) filtering repeater messages (suggested by Martin)
+  - feature: the "client" fhz1000.pl can address another host
+  - bugfix:  empty FHT battery is not reported (by Holger)
+  - feature: new FHT codes, e.g. month/day/hour/minute setting (by Holger)
+
+- ==DATE== (3.4)
+  - bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.02
+  - bugfix:  allow numbers greater then 9 in at +{<number>}
+  - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.02)
+  - feature: renamed fhz1000 to fhem

@@ -1,0 +1,23 @@
+Four2hex was written to convert the housecode based on digits ranging from 1
+to 4 into hex code and vica versa. 
+Four2hex is freeware based on the GNU Public license.
+
+To built it:
+$ make four2hex
+
+Install it to /usr/local/bin:
+$ su
+# make install
+
+
+Here an example from "four"-based to hex:
+$ four2hex 12341234
+1b1b
+
+Here an example in the other (reverse) direction:
+$ four2hex -r 1b1b
+12341234
+
+Enjoy.
+Peter Stark, (Peter dot stark at t-online dot de)
+

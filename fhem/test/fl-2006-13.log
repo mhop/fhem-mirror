@@ -1,0 +1,423 @@
+2006-03-30_14:38:26 fl day-temp: 21.5 (Celsius)
+2006-03-30_14:38:26 fl night-temp: 18.0 (Celsius)
+2006-03-30_14:38:26 fl windowopen-temp: 12.0 (Celsius)
+2006-03-30_14:38:27 fl desired-temp: 21.5 (Celsius)
+2006-03-30_14:38:28 fl measured-temp: 21.8 (Celsius)
+2006-03-30_14:38:28 fl measured-temp: 21.8 (Celsius)
+2006-03-30_14:50:02 fl day-temp: 21.5 (Celsius)
+2006-03-30_14:50:02 fl night-temp: 18.0 (Celsius)
+2006-03-30_14:50:03 fl windowopen-temp: 12.0 (Celsius)
+2006-03-30_14:50:04 fl desired-temp: 21.5 (Celsius)
+2006-03-30_14:50:04 fl measured-temp: 21.7 (Celsius)
+2006-03-30_14:50:05 fl measured-temp: 21.7 (Celsius)
+2006-03-30_14:52:06 fl measured-temp: 21.7 (Celsius)
+2006-03-30_14:52:07 fl measured-temp: 21.7 (Celsius)
+2006-03-30_14:53:43 fl actuator: 06%
+2006-03-30_14:57:35 fl actuator: 08%
+2006-03-30_15:04:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_15:04:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_15:05:19 fl actuator: 08%
+2006-03-30_15:07:15 fl actuator: 08%
+2006-03-30_15:20:48 fl measured-temp: 21.5 (Celsius)
+2006-03-30_15:20:48 fl measured-temp: 21.5 (Celsius)
+2006-03-30_15:20:49 fl measured-temp: 21.5 (Celsius)
+2006-03-30_15:38:12 fl measured-temp: 21.5 (Celsius)
+2006-03-30_15:38:12 fl measured-temp: 21.5 (Celsius)
+2006-03-30_15:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_15:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_15:53:39 fl actuator: 08%
+2006-03-30_15:57:31 fl actuator: 08%
+2006-03-30_16:04:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_16:04:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_16:05:15 fl actuator: 08%
+2006-03-30_16:07:11 fl actuator: 08%
+2006-03-30_16:20:44 fl measured-temp: 21.5 (Celsius)
+2006-03-30_16:20:44 fl measured-temp: 21.5 (Celsius)
+2006-03-30_16:38:08 fl measured-temp: 21.5 (Celsius)
+2006-03-30_16:38:08 fl measured-temp: 21.5 (Celsius)
+2006-03-30_16:47:47 fl actuator: 09%
+2006-03-30_16:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_16:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_16:53:35 fl actuator: 07%
+2006-03-30_16:57:27 fl actuator: 07%
+2006-03-30_17:04:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_17:04:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_17:05:11 fl actuator: 07%
+2006-03-30_17:07:07 fl actuator: 09%
+2006-03-30_17:20:40 fl measured-temp: 21.5 (Celsius)
+2006-03-30_17:20:40 fl measured-temp: 21.5 (Celsius)
+2006-03-30_17:38:04 fl measured-temp: 21.5 (Celsius)
+2006-03-30_17:38:04 fl measured-temp: 21.5 (Celsius)
+2006-03-30_17:47:43 fl actuator: 09%
+2006-03-30_17:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_17:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_17:53:31 fl actuator: 09%
+2006-03-30_17:57:23 fl actuator: 09%
+2006-03-30_18:04:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_18:04:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_18:05:07 fl actuator: 09%
+2006-03-30_18:20:36 fl measured-temp: 21.5 (Celsius)
+2006-03-30_18:20:36 fl measured-temp: 21.5 (Celsius)
+2006-03-30_18:38:00 fl measured-temp: 21.6 (Celsius)
+2006-03-30_18:38:00 fl measured-temp: 21.6 (Celsius)
+2006-03-30_18:47:39 fl actuator: 09%
+2006-03-30_18:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_18:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_18:53:27 fl actuator: 09%
+2006-03-30_18:57:19 fl actuator: 09%
+2006-03-30_19:05:04 fl measured-temp: 21.5 (Celsius)
+2006-03-30_19:05:04 fl measured-temp: 21.5 (Celsius)
+2006-03-30_19:20:32 fl measured-temp: 21.5 (Celsius)
+2006-03-30_19:20:32 fl measured-temp: 21.5 (Celsius)
+2006-03-30_19:37:56 fl measured-temp: 21.6 (Celsius)
+2006-03-30_19:37:56 fl measured-temp: 21.6 (Celsius)
+2006-03-30_19:47:35 fl actuator: 07%
+2006-03-30_19:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_19:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_19:53:23 fl actuator: 07%
+2006-03-30_19:57:15 fl actuator: 07%
+2006-03-30_20:05:00 fl measured-temp: 21.5 (Celsius)
+2006-03-30_20:05:00 fl measured-temp: 21.5 (Celsius)
+2006-03-30_20:20:28 fl measured-temp: 21.7 (Celsius)
+2006-03-30_20:20:28 fl measured-temp: 21.7 (Celsius)
+2006-03-30_20:37:52 fl measured-temp: 21.8 (Celsius)
+2006-03-30_20:37:52 fl measured-temp: 21.8 (Celsius)
+2006-03-30_20:47:31 fl actuator: 05%
+2006-03-30_20:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_20:52:07 fl measured-temp: 21.6 (Celsius)
+2006-03-30_20:53:19 fl actuator: 06%
+2006-03-30_20:57:11 fl actuator: 08%
+2006-03-30_21:04:56 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:04:57 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:20:24 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:20:25 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:37:47 fl actuator: 10%
+2006-03-30_21:37:48 fl measured-temp: 21.4 (Celsius)
+2006-03-30_21:37:49 fl measured-temp: 21.4 (Celsius)
+2006-03-30_21:47:27 fl actuator: 10%
+2006-03-30_21:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:52:08 fl measured-temp: 21.5 (Celsius)
+2006-03-30_21:53:15 fl actuator: 09%
+2006-03-30_21:57:07 fl actuator: 09%
+2006-03-30_22:04:52 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:04:53 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:20:20 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:20:21 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:37:44 fl actuator: 09%
+2006-03-30_22:37:44 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:37:45 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:47:24 fl actuator: 09%
+2006-03-30_22:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:52:07 fl measured-temp: 21.5 (Celsius)
+2006-03-30_22:53:12 fl actuator: 09%
+2006-03-30_23:01:07 fl desired-temp: 18.0 (Celsius)
+2006-03-30_23:04:48 fl measured-temp: 21.5 (Celsius)
+2006-03-30_23:04:49 fl measured-temp: 21.5 (Celsius)
+2006-03-30_23:20:16 fl measured-temp: 21.5 (Celsius)
+2006-03-30_23:20:17 fl measured-temp: 21.5 (Celsius)
+2006-03-30_23:37:40 fl actuator: 00%
+2006-03-30_23:37:40 fl measured-temp: 21.4 (Celsius)
+2006-03-30_23:37:41 fl measured-temp: 21.4 (Celsius)
+2006-03-30_23:47:20 fl actuator: 00%
+2006-03-30_23:52:07 fl measured-temp: 21.4 (Celsius)
+2006-03-30_23:52:07 fl measured-temp: 21.4 (Celsius)
+2006-03-30_23:53:08 fl actuator: 00%
+2006-03-31_00:04:44 fl measured-temp: 21.3 (Celsius)
+2006-03-31_00:04:45 fl measured-temp: 21.3 (Celsius)
+2006-03-31_00:20:12 fl measured-temp: 21.3 (Celsius)
+2006-03-31_00:20:13 fl measured-temp: 21.3 (Celsius)
+2006-03-31_00:37:36 fl actuator: 00%
+2006-03-31_00:37:36 fl measured-temp: 21.2 (Celsius)
+2006-03-31_00:37:37 fl measured-temp: 21.2 (Celsius)
+2006-03-31_00:37:37 fl measured-temp: 21.2 (Celsius)
+2006-03-31_00:47:16 fl actuator: 00%
+2006-03-31_00:53:04 fl measured-temp: 21.2 (Celsius)
+2006-03-31_00:53:05 fl measured-temp: 21.2 (Celsius)
+2006-03-31_01:04:40 fl measured-temp: 21.2 (Celsius)
+2006-03-31_01:04:41 fl measured-temp: 21.2 (Celsius)
+2006-03-31_01:20:08 fl measured-temp: 21.1 (Celsius)
+2006-03-31_01:20:09 fl measured-temp: 21.1 (Celsius)
+2006-03-31_01:37:32 fl actuator: 00%
+2006-03-31_01:37:32 fl measured-temp: 21.1 (Celsius)
+2006-03-31_01:37:33 fl measured-temp: 21.1 (Celsius)
+2006-03-31_01:47:12 fl actuator: 00%
+2006-03-31_01:53:01 fl measured-temp: 21.1 (Celsius)
+2006-03-31_01:53:01 fl measured-temp: 21.1 (Celsius)
+2006-03-31_01:53:01 fl measured-temp: 21.1 (Celsius)
+2006-03-31_02:04:37 fl measured-temp: 21.0 (Celsius)
+2006-03-31_02:04:37 fl measured-temp: 21.0 (Celsius)
+2006-03-31_02:20:07 fl measured-temp: 21.0 (Celsius)
+2006-03-31_02:20:07 fl measured-temp: 21.0 (Celsius)
+2006-03-31_02:27:48 fl actuator: 00%
+2006-03-31_02:37:28 fl actuator: 00%
+2006-03-31_02:37:29 fl measured-temp: 21.0 (Celsius)
+2006-03-31_02:37:29 fl measured-temp: 21.0 (Celsius)
+2006-03-31_02:47:08 fl actuator: 00%
+2006-03-31_02:52:57 fl measured-temp: 20.9 (Celsius)
+2006-03-31_02:52:57 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:04:33 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:04:33 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:04:33 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:20:07 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:20:08 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:27:44 fl actuator: 00%
+2006-03-31_03:37:24 fl actuator: 00%
+2006-03-31_03:37:25 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:37:25 fl measured-temp: 20.9 (Celsius)
+2006-03-31_03:52:53 fl measured-temp: 20.8 (Celsius)
+2006-03-31_03:52:53 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:04:29 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:04:29 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:12:12 fl actuator: 00%
+2006-03-31_04:12:24 fl day-temp: 21.5 (Celsius)
+2006-03-31_04:12:24 fl night-temp: 18.0 (Celsius)
+2006-03-31_04:12:24 fl night-temp: 18.0 (Celsius)
+2006-03-31_04:12:25 fl windowopen-temp: 12.0 (Celsius)
+2006-03-31_04:12:26 fl desired-temp: 18.0 (Celsius)
+2006-03-31_04:12:26 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:12:27 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:14:08 fl actuator: 00%
+2006-03-31_04:16:04 fl actuator: 00%
+2006-03-31_04:20:07 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:20:07 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:27:40 fl actuator: 00%
+2006-03-31_04:37:20 fl actuator: 00%
+2006-03-31_04:37:21 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:37:21 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:37:21 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:37:22 fl measured-temp: 20.8 (Celsius)
+2006-03-31_04:52:49 fl measured-temp: 20.7 (Celsius)
+2006-03-31_04:52:49 fl measured-temp: 20.7 (Celsius)
+2006-03-31_05:04:25 fl measured-temp: 20.7 (Celsius)
+2006-03-31_05:04:25 fl measured-temp: 20.7 (Celsius)
+2006-03-31_05:20:07 fl measured-temp: 20.7 (Celsius)
+2006-03-31_05:20:08 fl measured-temp: 20.7 (Celsius)
+2006-03-31_05:21:48 fl actuator: 00%
+2006-03-31_05:27:36 fl actuator: 00%
+2006-03-31_05:37:16 fl actuator: 00%
+2006-03-31_05:37:17 fl measured-temp: 20.6 (Celsius)
+2006-03-31_05:37:17 fl measured-temp: 20.6 (Celsius)
+2006-03-31_05:52:45 fl measured-temp: 20.6 (Celsius)
+2006-03-31_05:52:45 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:01:07 fl desired-temp: 21.5 (Celsius)
+2006-03-31_06:02:24 fl actuator: 25%
+2006-03-31_06:04:21 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:04:21 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:20:08 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:20:08 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:21:44 fl actuator: 25%
+2006-03-31_06:27:32 fl actuator: 25%
+2006-03-31_06:37:12 fl actuator: 25%
+2006-03-31_06:37:13 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:37:13 fl measured-temp: 20.6 (Celsius)
+2006-03-31_06:52:41 fl measured-temp: 20.5 (Celsius)
+2006-03-31_06:52:41 fl measured-temp: 20.5 (Celsius)
+2006-03-31_07:04:17 fl measured-temp: 20.6 (Celsius)
+2006-03-31_07:04:17 fl measured-temp: 20.6 (Celsius)
+2006-03-31_07:17:48 fl actuator: 30%
+2006-03-31_07:20:07 fl measured-temp: 20.9 (Celsius)
+2006-03-31_07:20:08 fl measured-temp: 20.9 (Celsius)
+2006-03-31_07:21:40 fl actuator: 24%
+2006-03-31_07:27:28 fl actuator: 24%
+2006-03-31_07:37:08 fl actuator: 24%
+2006-03-31_07:37:09 fl measured-temp: 21.1 (Celsius)
+2006-03-31_07:37:09 fl measured-temp: 21.1 (Celsius)
+2006-03-31_07:52:37 fl measured-temp: 21.2 (Celsius)
+2006-03-31_07:52:37 fl measured-temp: 21.2 (Celsius)
+2006-03-31_07:52:38 fl measured-temp: 21.2 (Celsius)
+2006-03-31_08:04:13 fl measured-temp: 21.3 (Celsius)
+2006-03-31_08:04:13 fl measured-temp: 21.3 (Celsius)
+2006-03-31_08:17:44 fl actuator: 17%
+2006-03-31_08:20:07 fl measured-temp: 21.3 (Celsius)
+2006-03-31_08:20:08 fl measured-temp: 21.3 (Celsius)
+2006-03-31_08:21:36 fl actuator: 17%
+2006-03-31_08:27:24 fl actuator: 18%
+2006-03-31_08:39:01 fl measured-temp: 21.7 (Celsius)
+2006-03-31_08:39:01 fl measured-temp: 21.7 (Celsius)
+2006-03-31_08:40:56 fl actuator: 10%
+2006-03-31_08:42:52 fl actuator: 08%
+2006-03-31_08:44:48 fl actuator: 08%
+2006-03-31_08:46:44 fl actuator: 08%
+2006-03-31_08:52:33 fl measured-temp: 21.8 (Celsius)
+2006-03-31_08:52:33 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:04:09 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:04:09 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:17:40 fl actuator: 07%
+2006-03-31_09:20:07 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:20:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:21:32 fl actuator: 07%
+2006-03-31_09:27:20 fl actuator: 07%
+2006-03-31_09:38:57 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:38:57 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:52:29 fl measured-temp: 21.8 (Celsius)
+2006-03-31_09:52:29 fl measured-temp: 21.8 (Celsius)
+2006-03-31_10:04:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_10:04:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_10:17:36 fl actuator: 08%
+2006-03-31_10:20:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_10:20:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_10:21:28 fl actuator: 08%
+2006-03-31_10:27:16 fl actuator: 08%
+2006-03-31_10:38:53 fl measured-temp: 21.7 (Celsius)
+2006-03-31_10:38:53 fl measured-temp: 21.7 (Celsius)
+2006-03-31_10:52:25 fl measured-temp: 21.7 (Celsius)
+2006-03-31_10:52:25 fl measured-temp: 21.7 (Celsius)
+2006-03-31_11:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_11:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_11:17:32 fl actuator: 09%
+2006-03-31_11:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_11:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_11:21:24 fl actuator: 09%
+2006-03-31_11:27:12 fl actuator: 09%
+2006-03-31_11:38:49 fl measured-temp: 21.8 (Celsius)
+2006-03-31_11:38:49 fl measured-temp: 21.8 (Celsius)
+2006-03-31_11:52:21 fl measured-temp: 21.8 (Celsius)
+2006-03-31_11:52:21 fl measured-temp: 21.8 (Celsius)
+2006-03-31_12:04:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_12:04:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_12:07:48 fl actuator: 05%
+2006-03-31_12:17:28 fl actuator: 04%
+2006-03-31_12:20:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_12:20:08 fl measured-temp: 21.8 (Celsius)
+2006-03-31_12:21:20 fl actuator: 04%
+2006-03-31_12:27:08 fl actuator: 06%
+2006-03-31_12:38:45 fl measured-temp: 21.7 (Celsius)
+2006-03-31_12:38:45 fl measured-temp: 21.7 (Celsius)
+2006-03-31_12:52:17 fl measured-temp: 21.6 (Celsius)
+2006-03-31_12:52:17 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:05:48 fl actuator: 08%
+2006-03-31_13:07:44 fl actuator: 08%
+2006-03-31_13:17:24 fl actuator: 08%
+2006-03-31_13:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:21:16 fl actuator: 08%
+2006-03-31_13:38:41 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:38:41 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:52:13 fl measured-temp: 21.6 (Celsius)
+2006-03-31_13:52:13 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:05:44 fl actuator: 07%
+2006-03-31_14:07:40 fl actuator: 07%
+2006-03-31_14:17:20 fl actuator: 07%
+2006-03-31_14:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:21:12 fl actuator: 07%
+2006-03-31_14:38:37 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:38:37 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:52:09 fl measured-temp: 21.6 (Celsius)
+2006-03-31_14:52:09 fl measured-temp: 21.6 (Celsius)
+2006-03-31_15:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_15:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_15:05:40 fl actuator: 07%
+2006-03-31_15:07:36 fl actuator: 07%
+2006-03-31_15:17:16 fl actuator: 07%
+2006-03-31_15:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_15:20:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_15:21:08 fl actuator: 07%
+2006-03-31_15:38:33 fl measured-temp: 21.7 (Celsius)
+2006-03-31_15:38:34 fl measured-temp: 21.7 (Celsius)
+2006-03-31_15:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_15:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:05:36 fl actuator: 06%
+2006-03-31_16:07:32 fl actuator: 06%
+2006-03-31_16:17:12 fl actuator: 06%
+2006-03-31_16:21:05 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:21:06 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:38:29 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:38:30 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_16:57:49 fl actuator: 06%
+2006-03-31_17:04:08 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:04:08 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:05:33 fl actuator: 08%
+2006-03-31_17:07:29 fl actuator: 08%
+2006-03-31_17:17:09 fl actuator: 08%
+2006-03-31_17:21:01 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:21:02 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:38:25 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:38:26 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:52:08 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:52:08 fl measured-temp: 21.5 (Celsius)
+2006-03-31_17:57:45 fl actuator: 09%
+2006-03-31_18:04:08 fl measured-temp: 21.4 (Celsius)
+2006-03-31_18:04:08 fl measured-temp: 21.4 (Celsius)
+2006-03-31_18:05:29 fl actuator: 09%
+2006-03-31_18:07:25 fl actuator: 10%
+2006-03-31_18:20:57 fl measured-temp: 21.4 (Celsius)
+2006-03-31_18:20:58 fl measured-temp: 21.4 (Celsius)
+2006-03-31_18:38:21 fl measured-temp: 21.6 (Celsius)
+2006-03-31_18:38:22 fl measured-temp: 21.6 (Celsius)
+2006-03-31_18:52:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_18:52:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_18:53:49 fl actuator: 04%
+2006-03-31_18:57:41 fl actuator: 04%
+2006-03-31_19:04:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_19:04:09 fl measured-temp: 21.7 (Celsius)
+2006-03-31_19:04:09 fl measured-temp: 21.7 (Celsius)
+2006-03-31_19:05:25 fl actuator: 06%
+2006-03-31_19:07:21 fl actuator: 06%
+2006-03-31_19:20:53 fl measured-temp: 21.6 (Celsius)
+2006-03-31_19:20:54 fl measured-temp: 21.6 (Celsius)
+2006-03-31_19:38:17 fl measured-temp: 21.6 (Celsius)
+2006-03-31_19:38:18 fl measured-temp: 21.6 (Celsius)
+2006-03-31_19:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_19:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_19:53:45 fl actuator: 07%
+2006-03-31_19:57:37 fl actuator: 07%
+2006-03-31_20:04:08 fl measured-temp: 21.5 (Celsius)
+2006-03-31_20:04:08 fl measured-temp: 21.5 (Celsius)
+2006-03-31_20:05:21 fl actuator: 07%
+2006-03-31_20:07:17 fl actuator: 07%
+2006-03-31_20:20:49 fl measured-temp: 21.6 (Celsius)
+2006-03-31_20:20:50 fl measured-temp: 21.6 (Celsius)
+2006-03-31_20:38:13 fl measured-temp: 21.7 (Celsius)
+2006-03-31_20:38:14 fl measured-temp: 21.7 (Celsius)
+2006-03-31_20:52:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_20:52:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_20:53:41 fl actuator: 03%
+2006-03-31_20:57:33 fl actuator: 03%
+2006-03-31_21:04:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_21:04:08 fl measured-temp: 21.7 (Celsius)
+2006-03-31_21:05:17 fl actuator: 03%
+2006-03-31_21:07:13 fl actuator: 03%
+2006-03-31_21:20:46 fl measured-temp: 21.6 (Celsius)
+2006-03-31_21:20:46 fl measured-temp: 21.6 (Celsius)
+2006-03-31_21:38:10 fl measured-temp: 21.6 (Celsius)
+2006-03-31_21:38:10 fl measured-temp: 21.6 (Celsius)
+2006-03-31_21:47:49 fl actuator: 04%
+2006-03-31_21:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_21:52:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_21:53:37 fl actuator: 04%
+2006-03-31_21:57:29 fl actuator: 04%
+2006-03-31_22:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_22:04:08 fl measured-temp: 21.6 (Celsius)
+2006-03-31_22:05:13 fl actuator: 04%
+2006-03-31_22:07:09 fl actuator: 04%
+2006-03-31_22:20:42 fl measured-temp: 21.5 (Celsius)
+2006-03-31_22:20:42 fl measured-temp: 21.5 (Celsius)
+2006-03-31_22:38:06 fl measured-temp: 21.4 (Celsius)
+2006-03-31_22:38:06 fl measured-temp: 21.4 (Celsius)
+2006-03-31_22:47:45 fl actuator: 08%
+2006-03-31_22:52:08 fl measured-temp: 21.4 (Celsius)
+2006-03-31_22:52:08 fl measured-temp: 21.4 (Celsius)
+2006-03-31_22:53:33 fl actuator: 08%
+2006-03-31_22:57:25 fl actuator: 08%
+2006-03-31_23:04:08 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:04:08 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:05:09 fl actuator: 08%
+2006-03-31_23:20:38 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:20:38 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:38:02 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:38:02 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:47:41 fl actuator: 08%
+2006-03-31_23:51:34 fl desired-temp: 18.0 (Celsius)
+2006-03-31_23:53:30 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:53:30 fl measured-temp: 21.4 (Celsius)
+2006-03-31_23:57:21 fl actuator: 00%

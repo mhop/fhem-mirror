@@ -1,0 +1,379 @@
+<HTML>
+<HEAD>
+	<TITLE>Home Facility Management</TITLE>
+	<STYLE>
+
+	BODY {
+		font-size:8pt;
+		font-family:Helvetica,Arial, Sans Serif;
+		padding-bottom:0px;
+		background-color:#E1E1E1;
+
+	}
+
+	TD {
+	        font-size:8pt;
+	        font-family:Helvetica,Arial, Sans Serif;
+	        padding-bottom:0px;
+			vertical-align:top;
+			padding-right:15px;
+			padding-top:3px;
+	}
+
+	.odd {
+	        background-color:#D5D6D7;
+	}
+	.even {
+
+	}
+
+	TABLE {
+		border-spacing:0px;
+	}
+	</STYLE>
+
+</HEAD>
+
+<SCRIPT>
+
+	var zebra = ["odd", "even"];
+
+	function loadXml(url, func) {
+		var request = null;
+
+		if (url.indexOf("?") >= 0)
+			url += "&foo=" + Math.random();
+		else
+			url += "?foo=" + Math.random();
+
+	    if (window.XMLHttpRequest) {
+	    	request = new XMLHttpRequest();
+	    } else if (window.ActiveXObject) {
+	      try {
+		request = new ActiveXObject("Msxml2.XMLHTTP");
+		if (request.overrideMimeType) {
+		  request.overrideMimeType('text/xml');
+		}
+	      } catch (e) {
+		try {
+		  request = new ActiveXObject("Microsoft.XMLHTTP");
+		}
+		catch (e) {}
+	      }
+	    }
+
+	    if (!request) {
+	      alert('Cannot create an XMLHTTP instance');
+	      return false;
+	    }
+	    request.onreadystatechange = function() {func(request);};
+	    request.open('GET', url, true);
+	    request.send(null);
+	}
+
+	function getChildByAttributeValue(parentNode, attrName, attrValue) {
+		for (var child = parentNode.firstChild; child != null; child = child.nextSibling) {
+			if (child.nodeType != 1)
+				continue;
+			if (child.getAttribute(attrName) == attrValue)
+				return child;
+		}
+		return null;
+	}
+
+	function setFS20(name, cmd) {
+		loadXml("/cgi-bin/hfm_set.pl?action=setFS20&name=" + name + "&cmd=" + cmd,reloadDoc);
+	}
+	
+	function setTemp(name, tempToSet) {
+		var select = document.getElementById(name);
+		var degreeToSet=null;
+		for (var option = select.firstChild; option != null; option = option.nextSibling){
+			if (option.selected) {
+				degreeToSet = option.value;
+			}
+		}
+		if (!degreeToSet)
+			return;
+		if (confirm("Set new temperature " + degreeToSet + "C\n for '"+name+ "'?")) {	
+		
+			loadXml(
+				  "/cgi-bin/hfm_set.pl"
+				+ "?action=setFHT"
+				+ "&name=" + name 
+				+ "&tempToSet=" + tempToSet
+				+ "&degreeToSet=" + degreeToSet,
+				reloadDoc);
+		}
+
+		
+	}
+
+	var maxReloads = 24*60; // one day
+	var timeoutId = -1;
+	function reloadDoc(request) {
+        if(!request || request.readyState == 4 ) {
+			loadXml("/cgi-bin/hfm_get.pl",handleLoadFhzData);
+			if (maxReloads-- >0) {
+				clearTimeout(timeoutId);
+				timeoutId = setTimeout("reloadDoc()", 60*1000); // one minute
+			}
+		}
+	}
+
+	function createAnchor(deviceClass, id, onclickHandler, txt) {
+		var a = document.createElement("A");
+		a.appendChild(document.createTextNode(txt));
+		a.setAttribute("href", "javascript:;");
+		a.setAttribute("id", id);
+		a.setAttribute("href", "javascript:;");
+		a.onclick=onclickHandler;
+		return a;
+	}
+
+	function drawFs20Devices(devices, htmlElem) {
+
+		var rowCount=0;
+		var table = document.createElement("TABLE");
+		var tbody = document.createElement("TBODY");
+		var tr = document.createElement("TR");
+		var td;
+		var a;
+
+		tr.setAttribute("className", zebra[(rowCount++)%2]);
+
+		htmlElem.appendChild(table);
+		table.appendChild(tbody);
+		tbody.appendChild(tr);
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.appendChild(document.createTextNode("Name"));
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.appendChild(document.createTextNode("Status"));
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.appendChild(document.createTextNode("Kommando"));
+		td.setAttribute("colSpan", "4");
+
+		for (var device=devices.firstChild; device != null; device=device.nextSibling) {
+			if (device.nodeType != 1)
+				continue;
+
+			tr = document.createElement("TR");
+			tbody.appendChild(tr);
+			tr.setAttribute("className", zebra[(rowCount++)%2]);
+
+			td = document.createElement("TD");
+			td.appendChild(document.createTextNode(device.getAttribute("name")));
+			tr.appendChild(td);
+
+			td = document.createElement("TD");
+			td.appendChild(document.createTextNode(device.getAttribute("state")));
+			tr.appendChild(td);
+
+			td = document.createElement("TD");
+			a = createAnchor(
+					"FS20",
+					device.getAttribute("name"),
+					function(){setFS20(this.id, "on");},
+					"on"
+				);
+			td.appendChild(a);
+			tr.appendChild(td);
+
+			td = document.createElement("TD");
+			a = createAnchor(
+					"FS20",
+					device.getAttribute("name"),
+					function(){setFS20(this.id, "off");},
+					"off"
+				);
+			td.appendChild(a);
+			tr.appendChild(td);
+		}
+	}
+
+	function getDegree(device, name) {
+		var stateChild = getChildByAttributeValue(device, "name", name);
+		if (stateChild) {
+			var degree = new Number(
+								stateChild.getAttribute("value").replace(/[^.0-9]*/g, "")
+							);												
+			return degree;
+		}	
+		return -1.0;
+	}				
+
+	function drawFhtDevices(devices, htmlElem) {
+		var rowCount=0;
+		var table = document.createElement("TABLE");
+		var tbody = document.createElement("TBODY");
+		var tr = document.createElement("TR");
+		var td;
+		var a;
+
+		tr.setAttribute("className", zebra[(rowCount++)%2]);
+		htmlElem.appendChild(table);
+		table.appendChild(tbody);
+		tbody.appendChild(tr);
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "Name";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "Mode";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML =  "Actuator";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "desired<BR>temperture";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "measured<BR>temperture";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "day<BR>temperture";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "night<BR>temperture";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.innerHTML = "window open<BR>temperture";
+
+		td = document.createElement("TD");
+		tr.appendChild(td);
+		td.appendChild(document.createTextNode("state"));
+
+
+		for (var device=devices.firstChild; device != null; device=device.nextSibling) {
+			if (device.nodeType != 1)
+				continue;
+
+			var deviceName = device.getAttribute("name");
+			
+			tr = document.createElement("TR");
+			tbody.appendChild(tr);
+			tr.setAttribute("className", zebra[(rowCount++)%2]);
+
+			td = document.createElement("TD");
+			td.appendChild(document.createTextNode(deviceName));
+			tr.appendChild(td);
+
+			var desiredTemp = getDegree(device,"desired-temp");
+			var measuredTemp = getDegree(device,"measured-temp");
+			var nightTemp = getDegree(device,"night-temp");
+			var dayTemp = getDegree(device,"day-temp");
+			var windowOpenTemp = getDegree(device,"windowopen-temp");
+
+			var fhtStates = ["mode", "actuator", "desired-temp", "measured-temp", "day-temp", "night-temp", "windowopen-temp", "state"];
+			for (var i=0; i < fhtStates.length; i++) {
+				var stateChild = getChildByAttributeValue(device, "name", fhtStates[i]);
+				td = document.createElement("TD");
+				tr.appendChild(td);
+				if (stateChild)  {
+					var value = stateChild.getAttribute("value");
+					value = value.replace(/ \(Celsius\)/,"&deg;");
+					value = value.replace(/,/,"<BR>");
+
+					if (fhtStates[i] == "desired-temp") {
+						var select = document.createElement("SELECT");						
+						td.appendChild(select);
+						select.setAttribute("id", deviceName);
+						select.onchange = function() {
+							setTemp(this.id, "desired-temp");
+						};
+						for (var degree=8.0; degree <= 30.0; degree += 0.5) {
+							var option = document.createElement("OPTION");							
+							option.setAttribute("value", "" + degree);
+							option.appendChild(document.createTextNode(""+degree));
+							if (degree==desiredTemp) {							
+								option.setAttribute("selected", "true");
+							}	
+							select.appendChild(option);	
+						}
+						if (desiredTemp.valueOf()==dayTemp.valueOf()) {
+							td.appendChild(
+								document.createTextNode("day")
+							);	
+						} else if (desiredTemp.valueOf()==nightTemp.valueOf()) {
+							td.appendChild(
+								document.createTextNode("night")
+							);
+						} else if (desiredTemp.valueOf()==windowOpenTemp.valueOf()) {
+							td.appendChild(
+								document.createTextNode("windowopen")
+							);
+						} else {
+							td.appendChild(
+								document.createTextNode("n/a")
+							);
+						} 								
+					} else {
+						td.innerHTML = value;
+					}
+				}
+			}
+		}
+	}
+
+
+
+
+	function handleLoadFhzData(request) {
+		if(request.readyState == 4 && request.status==200) {
+			var xmldoc = request.responseXML;
+			var root = xmldoc.documentElement;
+
+			for (var devices = root.firstChild; devices != null; devices = devices.nextSibling) {
+
+				if (devices.nodeType != 1)
+					continue;
+
+				var nodeName = devices.nodeName;
+
+				var htmlElem = document.getElementById(nodeName);
+
+				if (htmlElem != null) {
+					while (htmlElem.firstChild)
+						htmlElem.removeChild(htmlElem.firstChild);
+
+					if ("FS20_DEVICES" == nodeName) {
+						drawFs20Devices(devices, htmlElem);
+					} else if ("FHT_DEVICES" == nodeName) {
+						drawFhtDevices(devices, htmlElem);
+					}
+				}
+			}
+		}
+	}
+
+
+
+
+function init() {
+	reloadDoc();
+}
+
+</SCRIPT>
+<BODY onload="init();">
+	<TABLE><TBODY>
+		<TR><TD><BR><B>FS20 Devices</B><BR></TD></TR>
+		<TR><TD id="FS20_DEVICES"></TD></TR>
+  		<TR><TD><BR><B>FHT Devices</B><BR></TD></TR>
+        <TR><TD id="FHT_DEVICES"></TD></TR>
+	</TBODY></TABLE>
+</BODY>
+</HTML>

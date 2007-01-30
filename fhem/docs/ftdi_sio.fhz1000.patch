@@ -1,0 +1,44 @@
+*** orig/drivers/usb/serial/ftdi_sio.c	2004-12-14 02:54:04.000000000 +0100
+--- linux/drivers/usb/serial/ftdi_sio.c	2004-12-13 19:04:24.000000000 +0100
+*************** static struct usb_device_id id_table_8U2
+*** 350,355 ****
+--- 350,356 ----
+  	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_3, 0, 0x3ff) },
+  	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_4, 0, 0x3ff) },
+  	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_UO100_PID, 0, 0x3ff) },
++ 	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_FHZ1000_PID, 0, 0x3ff) },
+  	{ }						/* Terminating entry */
+  };
+  
+*************** static struct usb_device_id id_table_FT2
+*** 431,436 ****
+--- 432,438 ----
+  	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_3, 0x400, 0xffff) },
+  	{ USB_DEVICE_VER(FTDI_VID, PROTEGO_SPECIAL_4, 0x400, 0xffff) },
+  	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_UO100_PID, 0x400, 0xffff) },
++ 	{ USB_DEVICE_VER(FTDI_VID, FTDI_ELV_FHZ1000_PID, 0x400, 0xffff) },
+  	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU20_0_PID) },
+  	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU40_1_PID) },
+  	{ }						/* Terminating entry */
+*************** static __devinitdata struct usb_device_i
+*** 531,536 ****
+--- 533,539 ----
+  	{ USB_DEVICE(FTDI_VID, PROTEGO_SPECIAL_3) },
+  	{ USB_DEVICE(FTDI_VID, PROTEGO_SPECIAL_4) },
+  	{ USB_DEVICE(FTDI_VID, FTDI_ELV_UO100_PID) },
++ 	{ USB_DEVICE(FTDI_VID, FTDI_ELV_FHZ1000_PID) },
+  	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU20_0_PID) },
+  	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU40_1_PID) },
+  	{ }						/* Terminating entry */
+*** orig/drivers/usb/serial/ftdi_sio.h	2004-12-14 02:54:04.000000000 +0100
+--- linux/drivers/usb/serial/ftdi_sio.h	2004-12-13 19:03:21.000000000 +0100
+***************
+*** 143,148 ****
+--- 143,149 ----
+  
+  /* ELV USB Module UO100 (PID sent by Stefan Frings) */
+  #define FTDI_ELV_UO100_PID	0xFB58	/* Product Id */
++ #define FTDI_ELV_FHZ1000_PID	0xF06F	/* Product Id */
+  
+  /*
+   * Definitions for ID TECH (www.idt-net.com) devices

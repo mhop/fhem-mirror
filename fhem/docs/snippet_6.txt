@@ -1,0 +1,127 @@
+S20-Funkschaltsystem
+
+1. Protokoll
+
+1.1. Datenrahmen:
+
+  Hauscode 16 bit
+  Adresse 8 bit
+  Befehl 8 bit (16bit, wenn im ersten Befehlsbyte das Erweiterungsbit gesetzt
+  ist.)
+  Quersumme 8 bit
+
+1.1.1. Hauscode:
+  0-65535
+  Hauscode1: 8bit (High-Byte)
+  Hauscode2: 8bit (Low-Byte)
+   
+1.1.2. Adresse:
+  High-Nibble (4bit): Adreß-Gruppe (Bank / Raum)
+  15 = Master- / Funktionsgruppen-Bereich
+  0-14 = Adreßraum für Einzeladressen
+  Low-Nibble (4bit): Unter-Adresse
+  15 = alle der Adreß-Gruppe (lokal Master)
+  0-14 = Einzel-Adresse / Adresse der Funktionsgruppe
+
+  Das High-Nibble wählt die Adreß-Gruppe aus. Es stehen 15 Adreß-Gruppen zur
+  Verfügung.  Die Adreß-Gruppe 15 wählt den Master- bzw.
+  Funktionsgruppen-Adreßbereich aus.  Das Low-Nibble bestimmt innerhalb der
+  gewählten Adreß-Gruppe die anzusprechende Unter-Adresse.  Zum Ausführen einer
+  globalen Master-Funktion müssen High- und Low-Nibble der Adresse 15 sein!
+
+
+  Reihenfolge der Eingabe und Speicherung von Hauscode und Adresse beim Setup
+  von Sendern:
+  1. HC1: [A1|A0|B1|B0|C1|C0|D1|D0]
+  2. HC2: [E1|E0|F1|F0|G1|G0|H1|H0]
+  3. Adr: [I1|I0|J1|J0|K1|K0|L1|L0]
+
+1.1.3. Befehl:
+  Unteren 5 bit:
+  0 00h aus
+  1 01h an, 6,25% Einschalten auf Helligkeitsstufe 1 (min.)
+  2 02h an, 12,5%
+  ...
+  15 0fh an, 93,75%
+  16 10h an, 100% Einschalten auf Helligkeitsstufe 16 (max.)
+
+  17 11h an, alter Wert Auf letztem Helligkeitswert einschalten
+  18 12h toggle Wechsel zwischen aus und an, alter Wert
+  19 13h dim up Eine Helligkeitsstufe heller
+  20 14h dim down Eine Helligkeitsstufe dunkler
+  21 15h dim up and down ..., + bis max, kurz warten, - bis min, kurz warten, 
+  22 16h timeset Timerprogrammierung (Start, Ende)
+  23 17h send status Nur bei bidirektionalen Komponenten!
+  24 18h aus, für Timerzeit
+  25 19h an, 100%, für Timerzeit
+  26 1ah an, alter Wert, für Timerzeit
+  27 1bh reset (auf Auslieferzustand)
+  28 1ch frei
+  29 1dh frei
+  30 1eh frei
+  31 1fh frei
+
+  Bit 5: Erweiterungsbit (0 = ohne, 1 = Erweiterungsbyte zwischen Befehl und
+  Quersumme)
+  Bit 6: bidirektionaler Befehl (normal = 0)
+  Bit 7: Antwort eines Empfängers (normal = 0)
+
+  Erweiterungsbyte bei gesetztem Erweiterungsbit:
+  Ist im ersten Befehlsbyte das Erweiterungsbit gesetzt, wird ein
+  Erweiterungsbyte eingeschoben.
+
+  Für die Befehle 0 bis 18  und 24 bis 26 gilt folgende Codierung des
+  Erweiterungsbytes:
+  Das Byte gibt die einmalige Zeitdauer für den Timer in Schritten von 0,25s an.
+
+  Bei Befehl 22 wird der Timer des Empfängers fest auf den übertragenen
+  Timerwert gestellt.
+  Das Low-Nibble gibt den Zahlenwert an. Ist es Null (= 0), wird die
+  Timerfunktion ignoriert und der Verbraucher dauerhaft/sofort geschaltet.
+
+  Das High-Nibble dient als Multiplikator mit dem Faktor 2^x. Es sind nur Werte
+  kleiner oder gleich 12 sinnvoll. Größere Werte werden auf 12 begrenzt!
+
+  Zeit = 2^(High-Nibble) * Low-Nibble * 0,25s
+  Die maximale Zeitdauer beträgt damit ca. 4,25Std, die minimale 0,25s, sofern
+  dies jeweils von den Empfängern bis zu den angegebenen Grenzen unterstützt
+  wird.
+
+1.1.4. Quersumme
+
+  8bit-Summe aus 6, Hauscode, Adresse und Befehl (und Erweiterungsbyte) bilden
+  Werden Repeater verwendet, so treten auch um 1 oder 2 erhöhte Quersummen auf,
+  die von den Empfängern im Normalfall akzeptiert werden sollten. Wurde von
+  einem Empfänger bis 1,6s vor einem Repeater-Befehl ein normaler Befehl
+  empfangen, so wird der Repeater-Befehl ignoriert.
+
+
+1.1.5. Komplette Übertragung:
+  Synchr, HC1, Parity, HC2, Parity, Adresse, Parity, Befehl, Parity, Quersumme, Parity, EOT
+  13 bit    8 bit   1 bit    8 bit   1 bit      8 bit      1 bit     8 bit     1 bit         8 bit          1 bit    1 bit
+
+  oder:
+  Synchr, HC1, Parity, HC2, Parity, Adr, Parity, Bef1, Parity, Bef2, Par, Quersumme, Par, EOT
+  13 bit     8 bit  1 bit    8 bit   1 bit   8 bit   1 bit   8 bit    1 bit   8 bit  1 bit        8 bit      1 bit  1 bit
+
+  Übertragung beginnt mit MSB.
+
+  Die Übertragung für ein komplettes Datenpaket mit 1 Befehl dauert 47,6ms bis
+  65,6ms.
+
+  Wird an der Hand-FB eine Taste < 400ms gedrückt, so wird beim Loslassen
+  folgendes gesendet: DAT, 10msPAUSE, DAT, 10msPAUSE, DAT, 110msPAUSE
+
+  Wird eine Taste an der Hand-FB länger als 400ms gedrückt, so wird alle 250ms
+  folgendes gesendet: DAT, 10msPAUSE, DAT
+
+
+  Im AUS-Zustand schaltet ein Dimmer bei EIN mit alter Helligkeit ein.
+  Im AUS-Zustand schaltet ein Dimmer bei DIMUP mit voller Helligkeit ein.
+  Im EIN-Zustand wird bei DIMUP eine Stufe aufgedimmt.
+
+  Alle Befehle dürfen von Empfängern immer nur 1x ausgewertet werden. Gesendet
+wird der Befehl 3x mit einer Pause von 10ms. Dim-Befehle werden nur 2x mit
+einer Pause von ca. 10ms und 130ms gesendet. Nach einem erkannten Befehl
+ignorieren die Empfänger für 120ms weitere Befehle. Befehle von Repeatern
+werden für 1,6s ignoriert.
