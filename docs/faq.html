@@ -1,0 +1,163 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>FHEM FAQ</title>
+</head>
+
+<body style="background-color: white;">
+
+<h2>FHEM FAQ</h2>
+
+<b>I get "undefined" messages in the log after upgrading fhem.pl</b>
+<ul>
+   Stop fhem.pl, delete the previous .save file and restart fhem.pl.
+   If the problem still exists, send a bugreport.
+</ul>
+
+<b>I switched on a FS20 device directly (without the remote), but
+   the fhem.pl did not noticed it.<br>Is it a bug?</b>
+<ul>
+   The protocol used by the FS20 family is quite simple: it is </b>not</b>
+   encrypted in any way, and there is no feedback to the sender.  So if you
+   push any buttons on a pure receiver, no radio waves will be sent out, and
+   the FHZ1000 won't notice anything. The FHZ1000PC does not even know if
+   somebody received its message, it simply sends it out 3 times and hopes
+   for good luck.<br>
+   To answer the question: it is not a bug :-)
+</ul>
+
+<b>I have some FS20/FHT/HMS devices.<br>
+   How do I know their housecode?</b><br>
+<ul>
+   If you already programmed some devices, then just start fhem.pl with one
+   of the example configuration files, and watch the log.  When activating a
+   deivce (e.g. with the remote) then it will be logged as an unknown device
+   with the housecode. Note: the verbose level must be 3 or higher.  KS300
+   devices do not have a proper code, so you can use anything.
+</ul>
+
+<b>I have the code for my devices in the ELV notation, which contains 1,2,3 and
+   4, but you require a hex code.<br>
+   How should I convert it?</b>
+<ul>
+   The code used by ELV is in the "quaternal" (?) system plus one added to each
+   digit, so you can even use the 4 button remote for programming. To convert,
+   you have two choices: the program four2hex in the contrib directory, or the
+   good old unix program bc.
+   <ul>
+     <li>From  quaternal (ELV Remote) to hex (fhem.pl):<br>
+	 <pre>
+	 % bc
+	 obase=16
+	 ibase=4
+	 &lt;elv number&gt;</pre>
+	 where &lt;elv number&gt; is the number used on the remote, but 1
+	 substracted from every digit (so each digit is between 0 and 3).</li>
+
+     <li>From hex (fhem.pl) to quaternal (ELV Remote):<br>
+	 <pre>
+         % bc
+	 ibase=16
+	 obase=4
+	 &lt;hex number&gt;</pre>
+	 Now add 1 to each digit of the result, and prepend it with 1's if
+	 it has less than 4 digits.</li> </ul>
+
+
+</ul>
+
+<b>I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.<br>
+Help me!</b>
+<ul>
+   The FHT80b's are talking to a single FHZ1XXX device, which has a unique
+   "FHTcode". You have two choices: if you know the old FHTcode, then you can
+   set it,  or you can tell the FHT80b to forget the old FHZ, and start talking
+   with the new one.
+   <ul>
+     <li>Set the FHTcode: The problem with this method is that I don't know how
+     to read out the value, we just can change it with<br>
+     <code>set FHZ FHTcode &lt;hex-code&gt;</code></li>
+     <li>Resync the FHT80b: Press PROG until "Sond" appears, then select "CEnt"
+     with the wheel, press PROG again, Select "nA" with the wheel, press PROG
+     again.</li>
+
+   </ul>
+</ul>
+
+<b>I can specify an optional ml/raincounter for a KS300.<br>
+Why do you think that 255 should be the default?</b>
+<ul>
+   The manual talks about 0.3l resolution, but I wanted to calibrate my device.
+   So I filled a plastic bottle with 0.5 liter water from the measuring cup,
+   drilled a small hole in the bottom of the bottle, let the water flow slowly
+   in the KS300 rain-cup, and looked at the counter after the bottle was empty.<br>
+
+   The raincounter was incremented by 130 ticks. The diameter of my KS300
+   rain-cup is 13.9 cm, the area ca 151.75 cm<sup>2</sup>, which
+   is ca 1/65.9 m<sup>2</sup>.
+   The 0.5 liter corresponds to 32.95 liter per m<sup>2</sup>. 130 ticks
+   correspond to 32.95 l/m<sum>2</sup> -> 1 tick is ca 253 ml. I estimate
+   the error margin to +/- 2%<br>
+
+   You are welcome to do your own experiments, I am interested in the results.
+</ul>
+
+<b>The time specification of the builtin at command is not very flexible.<br>
+Please add day/month/weekday to it.</b>
+<ul>
+  I think the command is complex and flexible enough. Use a perl expression
+  for this functionality like (described in the commandref.html):
+  <pre>at *07:00:00 { fhz "set lamp on" if($we) }</pre>
+</ul>
+
+
+<b>I defined my FS20STR as an FHT device, but I do not get any data from it.</b>
+<ul>
+   The FS20STR is an FS20 device, even if it looks like an FHT80b.
+   You'll get "only" on-for-timer and off-fot-timer events sent.
+</ul>
+
+<b>How to convert the FHT8b code seen in its display to the hex code needed by fhem.pl?</b>
+<ul>
+   Convert the first 2 digits first from decimal to hex, then the next two. Example:<br>
+	 <pre>
+         % bc
+	 set obase=16
+	 &lt;first two digits&gt;
+	 &lt;last two digits&gt;</pre>
+   E.g The FHT8b code 1121 is 0b15 for the fhem.pl
+</ul>
+
+<b>I'd like to use this sunrise/sunset stuff, can you help me?</b>
+<ul>
+   First you (most probably) have to install the DateTime::Event::Sunrise perl
+   module, as it is not part of the standard distributions. If it is not
+   installed and you copy the contrib/99_SUNRISE.pm into your module (FHEM)
+   directory, then the program will not start up, telling you that this module
+   is missing.
+   The (IMHO) easiest way to install it is via the following command (probably
+   as root):<br>
+   <pre>
+   perl -MCPAN -e shell
+   cpan> install DateTime::Event::Sunrise</pre>
+   This will fetch the module from a CPAN archive, compile it and install it,
+   and will do the same with each perl module which is needed by this one.<br>
+   
+   Next look for the geographic coordinates of your home, e.g with a GPS
+   receiver or with googleearth. Compute the latitude/longitude as needed, and
+   enter them in your init file (fhem.cfg) with the command:
+   <pre>{sunrise_coord("<latitude>", "<longitude>", "Europe/Berlin") }</pre>
+   If you are living in a different timezone, then change the string above
+   according to the <code>perldoc DateTime</code> manpage.<br>
+
+   Now copy the contrib/99_SUNRISE.pm file into your module directory, and
+   restart the program. If everything is ok, typing
+   <pre>{ sunrise_abs() }</pre>
+   in the telnet prompt, will return the time of the sunrise today, in a
+   HH:MM:SS format.
+</ul>
+
+</body>
+</html>

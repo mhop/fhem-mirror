@@ -1,0 +1,49 @@
+#
+# fhem.pl configfile
+# Logging FS20/KS300 data
+# See the file fht.gnuplot for displaying the logged data (or webfrontend/pgm2)
+#
+
+logfile /tmp/fhem-%Y-%m.log
+savefile /tmp/fhem.save     # where to save the state of the devices
+verbose 3                   # "normal" verbosity
+port 7072                   # our TCP/IP port (working from localhost only)
+modpath .                   # where our FHEM directory is
+define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
+
+define wz FHT 3232          # type FHT, transmitter code 3232 (default value)
+define ks1 KS300 1234 250   # type KS300, with 250ml rain / counter
+
+
+#########################
+# Log temperature and actuator changes into a file, its name changes weekly
+define wzlog  FileLog /var/tmp/wz-%Y-%U.log wz:.*(temp|actuator).*
+
+# ks300 log
+define kslog  FileLog /var/log/wz-%Y-%U.log ks1:.*H:.*
+define avglog FileLog /var/log/avg.log ks1:.*avg.*
+
+##############################
+# Alternative log method. It does the same, but it is somewhat slower as it
+# starts the shellscript below. Don't forget the "", as some values contain
+# paranthesis, and your shell will probably bark.
+notifyon wz:temp.* "/usr/local/bin/log.sh @ "@ %""
+
+##############################
+# If using the frontends pgm2 or pgm3, then you can put the devices
+# into separate rooms, see the corresponding README:
+attr wz     room InDoor
+attr wzlog  room InDoor
+attr ks1    room OutDoor
+attr kslog  room OutDoor
+attr avglog room OutDoor
+
+quit
+
+#########################
+And here is /usr/local/bin/log.sh, don't forget chmod +x
+
+#!/bin/sh
+fname=$1
+shift
+echo `date +"%Y-%m-%d_%H:%M:%S"` "$*" >> /var/log/$fname.log

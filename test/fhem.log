@@ -1,0 +1,12 @@
+2007.01.16 11:59:19 1: FHZ device is none, FHZ1000 commands will be echoed only
+2007.01.16 11:59:19 1: Asking the FHT device wz/1235 to send its data
+2007.01.16 11:59:19 2: FHT set wz refreshvalues
+2007.01.16 11:59:19 1: Can't open /tmp/fhz1000-2.1/test/wz-2007-03.log
+2007.01.16 11:59:19 0: Server started (version =VERS= from =DATE=, pid 31112)
+2007.01.16 12:00:00 0: Server shutdown
+2007.01.16 12:00:09 1: FHZ device is none, FHZ1000 commands will be echoed only
+2007.01.16 12:00:09 1: Asking the FHT device wz/1235 to send its data
+2007.01.16 12:00:09 2: FHT set wz refreshvalues
+2007.01.16 12:00:09 1: Can't open /tmp/fhz1000-2.1/test/wz-2007-03.log
+2007.01.16 12:00:09 0: Server started (version =VERS= from =DATE=, pid 31142)
+2007.01.16 12:00:24 0: Server shutdown

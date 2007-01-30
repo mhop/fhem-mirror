@@ -1,0 +1,102 @@
+// Init FHZ1000PC (Studio) mit FHT80b und HMS
+<- 81 06 c9 2c 02 01 1f 0a 
+-> 81 0b c9 fb 01 02 1f 02 78 07 b6 22 80 
+<- 81 08 04 ba c9 01 84 5e 0b 03 
+-> 81 0a c9 ea 01 02 84 01 03 01 5b 03 
+<- 81 05 04 50 c9 01 86
+<- 81 0b 04 __ 02 01 83 HH HH 65 ff 66 ff // FHT80b 1
+<- 81 0b 04 __ 02 01 83 HH HH 65 ff 66 ff // FHT80b 2
+<- 81 06 04 62 c9 01 96 02 
+<- 81 0a c9 af 02 01 61 05 0a 0e 16 18 // Datum Uhrzeit
+
+// Init FHZ1000PC (Standard) mit FHT80b und HMS
+<- 81 06 c9 82 02 01 1f 60
+-> 81 0b c9 61 01 02 1f 02 78 07 1c 22 80
+<- 81 08 04 af c9 01 84 57 02 08
+-> 81 0f c9 __ 01 02 84 01 08 07 80 xx xx xx xx 51 0f // Seriennummer
+<- 81 05 04 50 c9 01 86
+<- 81 0b 04 __ 02 01 83 HH HH 65 ff 66 ff // FHT80b 1
+<- 81 05 04 60 c9 01 96
+<- 81 0a c9 __ 02 01 61 jj mm tt ss mm // Datum Uhrzeit
+<- 81 05 04 4f c9 01 85 // Speicherabfrage
+-> 81 07 c9 ac 01 02 85 01 23 // 23 ?bytes? frei
+<- 81 0b 04 __ 02 01 83 HH HH 65 ff 66 ff // FHT80b 2
+<- 81 05 04 4f c9 01 85 // Speicherabfrage
+-> 81 07 c9 a5 01 02 85 01 1c // 1c ?bytes? frei
+
+// FHZ1000PC
+<- 81 0a c9 __ 02 01 61 jj mm tt ss mm // Uhrzeit 50 mal am Anfang einer Minute
+
+<- 81 05 04 4f c9 01 85 // Speicherabfrage
+-> 81 07 c9 __ 01 02 85 01 xx // xx = ?bytes? frei 
+
+// FHT80b
+// SB=StartByte LL=Laenge TT=TelegrammType BC=BlockCheck ST=Status
+// HH=Hauscode
+// SB LL TT BC             CODE  FUNKT ST Param
+-> 81 0c 04 __ 09 09 a0 01 HH HH 00 00 _6 xx // Istwert Stellantrieb
+-> 81 0c 04 __ 09 09 a0 01 HH HH 00 00 2c xx // Synczeit
+-> 81 0c 04 __ 09 09 a0 01 HH HH 14 00 69 xx // Montag von1  in 1/6 Stunde (10 Min.)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 15 00 69 xx // Montag bis1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 16 00 69 xx // Montag von2 (90 = frei)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 17 00 69 xx // Montag bis2
+-> 81 0c 04 __ 09 09 a0 01 HH HH 18 00 69 xx // Dienstag von1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 19 00 69 xx // bis 1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1a 00 69 xx // von2
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1b 00 69 xx // bis2
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1c 00 69 xx //Mittwoch von1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1d 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1e 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1f 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 20 00 69 xx // Donnerstag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 21 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 22 00 69 xx
+-> 81 0c 04 __ 09 09 a0 01 HH HH 23 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 24 00 69 xx // Freitag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 25 00 69 xx
+-> 81 0c 04 __ 09 09 a0 01 HH HH 26 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 27 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 28 00 69 xx // Samstag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 29 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2a 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2b 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2c 00 69 xx // Sonntag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2d 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2e 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2f 00 69 xx
+-> 81 0c 04 __ 09 09 a0 01 HH HH 3e 00 69 xx // 0=auto 1=manuell 2=Urlaub
+-> 81 0c 04 __ 09 09 a0 01 HH HH 3f 00 69 xx // Urlaub Endeuhrzeit oder Endetag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 40 00 69 xx // Urlaub Endetag 10=heute 11=morgen 0x=Endemonat
+-> 81 0c 04 __ 09 09 a0 01 HH HH 41 00 69 xx // aktuelle Solltemperatur (x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 42 00 69 xx // ist Temperatur (x/10)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 43 00 69 xx // ?????
+-> 81 0c 04 __ 09 09 a0 01 HH HH 44 00 69 xx // bit0=Batterie 0=OK 1=leer bit5=Fenster 0=zu 1=offen
+-> 81 0c 04 __ 09 09 a0 01 HH HH 4b 00 67 xx // ?????
+-> 81 0c 04 __ 09 09 a0 01 HH HH 82 00 69 xx // Tag Temperatur (x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 84 00 69 xx // Nacht Temperatur (x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 85 00 69 04 // ????? 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 8a 00 69 xx // Fenster offen Temperatur (x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 7e 00 67 xx // ?????
+
+<- 81 09 04 __ 02 01 83 HH HH 3e xx  // Modus setzen 00=auto 01=manu 02=Urlaub
+-> 81 0b 04 __ 84 09 83 01 HH HH 3e xx yy // Übernahmequittung yy=Speicherstelle 
+<- 81 09 04 __ 02 01 83 HH HH 41 xx  // Solltemp setzen (x=soll/0.5)
+Die anderen Register können genauso verändert werden.
+
+//HMS100TF
+-> 81 0e 04 __ 05 10 a0 01 HH HH 00 00 ss tt gu ff  // Temp = (utt*0.04) Feuchte = (ffg*100/4096)
+ 
+						    // Status bit7=Negative Temp.  bit6=Batterie
+
+//ST-2
+<- 81 09 04 __ 02 01 01 a0 01 HH HH xx yy // xx=Taste yy=Funktion
+//Funktionen
+00	Aus
+01-10	Dimmen direkt
+11	Ein
+12	Dimmen Eintastenmodus
+13	Dimmen runter
+14	Dimmen rauf
+15	Umschalten
+16	Timerprogrammierung start/stop
+1b	Auslieferungszustand

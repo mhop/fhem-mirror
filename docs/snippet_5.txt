@@ -1,0 +1,60 @@
+Fs20-Codes
+  0 Aus
+  1..15 setze auf Helligkeit
+  16 An auf max
+  17 An alter wert
+  18 Toggel
+  19 Dim UP
+  20 Dim Down
+  21 DIM up/down
+  22 Prog.Modus/Zeit-Messung
+  23 Adressmeldung / Nix
+  24 Sofort Aus - Timer, sofort wieder an, evtl slow off
+  25 Sofort Max - timer, sofort aus
+  26 Sofort An alter Wert - timer, sofort aus
+  27 ?? AUS - RESET?
+  28 ?
+  29 ?
+  30 sofort Max, timer, dann sofort alter wert
+  31 sofort An alter Wert, nach Timer - sofort Aus
+
+  32-47 S auf Helligkeit mit Speed S
+  48 S An auf max,
+  49 S An alter wert
+  50 T Toggel fuer T, dann alter Wert
+  51 T Dim up, T ?
+  52 T Dim down, T ?
+  53 T Dim up/down, T ?
+  54 T Programmiere Einschaltzeit
+  55 ?
+  56 T Aus fuer EinT
+  57 T Ein Max fuer T, dann alter Wert
+  58 T Ein alter Wert fuer T, dann AUS
+  59 ??? RESET
+  60 T Progr. Einschalt-Speed mit T
+  61 T Progr. Ausschalt-Speed mit T
+  62 T Ein Max fuer T, dann alter Wert
+  63 T Alter Wert fuer T, dann wieder aktueller Wert
+
+  S und T Argumente 2. Byte. Zeit T=0: endlos
+
+Übrigens ein paar Anfänge zum HMS-Protokoll:
+adr1 adr2 typ arg1 arg2/seqnr arg3
+
+  typ:
+  0 temp/feucht hms100tf
+  1 temp hms100t
+  2 Wasser hms100w/wd
+  3 Rauch hms100rm
+  4 TuerFenster hms100tfk
+  5 TuerFenster hms100tfk
+  6 Gas hms100 MG/PG/CO
+  7 Gas hms100 MG/PG/CO
+  8 Gas hms100 MG/PG/CO
+  9-13 unbekannt
+  14 hms100 FI
+  15 ?
+  +16 ??
+  +32 Batteriewarnung
+  +64 neue Batterie
+  +128 Vorzeichen

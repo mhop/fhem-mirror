@@ -1,0 +1,60 @@
+// FHT80b
+// SB=StartByte LL=Laenge TT=TelegrammType CC=CRC ST=Status HH=Hauscode
+
+// SB LL TT CC             CODE  FUNKT ST Param
+-> 81 0c 04 __ 09 09 a0 01 HH HH 00 00 _6 xx // Istwert Stellantrieb 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 00 00 2c xx // Synczeit ???
+-> 81 0c 04 __ 09 09 a0 01 HH HH 14 00 69 xx // Montag von1  in 1/6
+Stunde (10 Min.)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 15 00 69 xx // Montag bis1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 16 00 69 xx // Montag von2 (90 = frei)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 17 00 69 xx // Montag bis2
+-> 81 0c 04 __ 09 09 a0 01 HH HH 18 00 69 xx // Dienstag von1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 19 00 69 xx // bis 1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1a 00 69 xx // von2
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1b 00 69 xx // bis2
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1c 00 69 xx // Mittwoch von1
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1d 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1e 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 1f 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 20 00 69 xx // Donnerstag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 21 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 22 00 69 xx
+-> 81 0c 04 __ 09 09 a0 01 HH HH 23 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 24 00 69 xx // Freitag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 25 00 69 xx
+-> 81 0c 04 __ 09 09 a0 01 HH HH 26 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 27 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 28 00 69 xx // Samstag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 29 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2a 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2b 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2c 00 69 xx // Sonntag
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2d 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2e 00 69 xx 
+-> 81 0c 04 __ 09 09 a0 01 HH HH 2f 00 69 xx
+-> 81 0c 04 __ 09 09 a0 01 HH HH 3e 00 69 xx // 0=auto 1=manuell
+2=Urlaub lang, 3=Urlaub kurz
+-> 81 0c 04 __ 09 09 a0 01 HH HH 3f 00 69 xx // für Mode3 Uhrzeit, für
+Mode2 Endtag des Monats
+-> 81 0c 04 __ 09 09 a0 01 HH HH 40 00 69 xx // für Mode3 Resttage ab
+aktuellem Datum, für Mode2 Endmonat
+-> 81 0c 04 __ 09 09 a0 01 HH HH 41 00 69 xx // aktuelle Solltemperatur
+(x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 42 00 69 xx // ist Temperatur (Teil 1)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 43 00 69 xx // Ist-Temperatur (Teil 2)
+(Die Ermittlung der Temperatur erfolgt nach der Formel Ist-Temp = (Teil2
+* 255 +Teil1) / 10)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 44 00 69 xx // Status (Bit0=LowBatt,
+Bit1=Untertemperatur, Bit4=Störung Fenterkontakt, Bit5=Fenster auf)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 45 00 69 xx // Manuelle Temperatur ??
+        
+-> 81 0c 04 __ 09 09 a0 01 HH HH 4b 00 67 xx // ?????
+-> 81 0c 04 __ 09 09 a0 01 HH HH 7e 00 67 xx // ?????
+-> 81 0c 04 __ 09 09 a0 01 HH HH 82 00 69 xx // Komfort-Temperatur
+(x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 84 00 69 xx // Absenk-Temperatur
+(x*0.5)
+-> 81 0c 04 __ 09 09 a0 01 HH HH 85 00 69 04 // Alarm-Temp.-Differenz
+-> 81 0c 04 __ 09 09 a0 01 HH HH 8a 00 69 xx // Fenster offen Temperatur
+(x*0.5)

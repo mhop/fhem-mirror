@@ -1,0 +1,21 @@
+- 91_DbLog.pm
+  Example to log data in a (DBI supported) database (MySQL, Oracle, etc)
+- 99_ALARM.pm
+  Example for a Low Budget ALARM System by Martin
+- checkmsg.pl
+  Check cwthe CRC of an FS20 hex message
+- fhem
+  RC script by Stefan to be put into /etc/init.d and then symlinked
+  to /etc/rc3.d or similar.
+- four2hex
+  Convert housecode from  ELV notation (4) to fhem.pl notation (hex)
+- fs20_holidays.sh
+  STefan's "presence simulator" for holidays
+- garden.pl
+  Garden irrigation regulator with weather dependency (KS300 temp + rain)
+- ks300avg.pl
+  Computing daily/monthly avarage values from a KS300 log
+- rolwzo_not_off.sh
+  Martin's "don't lock me out" program: look at the comment
+- rrd
+  Peter's RRD support. See the HOWTO

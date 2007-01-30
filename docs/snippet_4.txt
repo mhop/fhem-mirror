@@ -1,0 +1,39 @@
+  fs20:
+  Modulation: 100% Amplitude, also pulse und spaces
+
+  Keine festen Bitraster, ein Bit besteht immer aus pulse UND space
+
+  Bit 0: pulse+space insgesamt ca 800us,
+  Bit 1: ca. 1200us
+
+  Beginn einer Uebertragung: ca 20 Startbits 0, zum Start eine 1
+
+  dann Uebertragung der Datenbytes jeweils 8 Bit + Pruefbit:
+  msb
+  ...
+  lsb
+  pruefbit = xor-Verknuepfung der Datenbits.
+
+  Die Uebertragung hat folgenden Aufbau:
+  1. hausadr1
+  2. hausadr0
+  3. adr
+  4. cmd
+  5. arg1
+  ...
+  n-1. argn optional
+  n. pruefbyte
+
+  pruefbyte = unterste 8 Bit aus summe aller bytes 1..n-1 +6
+
+  Hauscode=hausadr1*256 + hausadr
+
+  Dass ein hauscode 11111111 tatsaechlich fuer 0 steht, ist wohl klar.
+
+  cmd 0..31: Keine Argumente
+  cmd 32..63: Ein Argumentbyte
+  Jede Uebertragung wird 3* ausgesendet.
+
+
+  Grueße,
+  automat
