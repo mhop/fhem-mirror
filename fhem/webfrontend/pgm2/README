@@ -1,0 +1,20 @@
+See the main doc (fhem.html) for the first documentation and installation.
+
+If you want to show anly a part of your devices on a single screen
+(i.e divide them into separate rooms), then assign each device the
+room attribute in the config file:
+
+  attr ks300     room garden
+  attr ks300-log room garden
+
+The attribute of the FHZ device will be used as title on the first
+screen, which shows the list of all rooms. Devices in the room
+"hidden" will not be shown. Devices without a room attribute go
+to the room "misc".
+
+To configure the absicondir and relicondir correctly, look into the
+httpd.conf file (probably /etc/httpd/conf/httpd.conf), and check the
+line which looks like:
+ Alias /icons/ "/home/httpd/icons/"
+relicondir will then be /icons, and absicondir /home/httpd/icons.
+

@@ -1,0 +1,51 @@
+<?php
+
+echo "
+<style type='text/css'>
+<!--
+/* General layout */
+A:link        { font-weight: normal; text-decoration: none; color: #005177; }
+A:visited     { text-decoration: none; color: #005177; font-weight: normal; }
+A:hover       { text-decoration: none; color: #CC3333; }
+BODY          { scrollbar-face-color: #AFC6DB; scrollbar-shadow-color: #000000; scrollbar-highlight-color: #DEE7EF;
+                scrollbar-3dlight-color: #FFFFFF; scrollbar-darkshadow-color: #AFC6DB;
+                scrollbar-track-color: #F5F5F5; scrollbar-arrow-color: ##DEE7EF; font-family: Verdana, Helvetica, Arial; 
+                font-size:12px; margin-top: 0; margin-left: 0; margin-right: 0; padding-top: 0; padding-left: 0; 
+                padding-right: 0; }
+TD            { font-family: Verdana, Helvetica, Arial; color: #000000; font-size:11px}
+input         { background-color: #DEE7EF; font-family: Verdana, Helvetica, Arial; font-size: 9pt; color: #000000; }
+textarea      { background-color: #DEE7EF; font-family: Verdana, Helvetica, Arial; font-size: 9pt; color: #000000; }
+select        { background-color: #AFC6DB; font-family: Verdana, Helvetica, Arial; font-size: 7pt; color: #000000; }
+
+/* YaBB navigation links */
+.nav          { font-size: 10px; text-decoration: none; color: #000000; }
+.nav:link     { font-size: 10px; text-decoration: none; color: #000000; }
+.nav:visited  { font-size: 10px; text-decoration: none; color: #000000; }
+.nav:hover    { font-size: 10px; text-decoration: none; color: #6394BD; font-weight: bold; text-decoration: underline; }
+
+/* YaBB alternating bgcolors */
+.windowbg     { background-color: #AFC6DB; font-size: 11px; font-family: Verdana; color: #000000; }
+.windowbg2    { background-color: #F8F8F8; font-size: 11px; font-family: Verdana; color: #000000; }
+.windowbg3    { background-color: #6394BD; font-size: 11px; font-family: Verdana; color: #000000; }
+
+/* Misc./title/category colors */
+.hr           { color: #6394BD;}
+.titlebg      { background-color: #6E94B7; color: #FFFFFF; }
+.text1        { font-style: normal; font-weight: bold; font-size: 12px; color: #FFFFFF; }
+.catbg        { background-color: #DEE7EF; color: #000000; font-weight: bold; font-size: 13px; }
+.bordercolor  { background-color: #6394BD; }
+
+/* Image fonts */
+.imgbg        { font-style: normal; font-size: 10px; color: #005177; }
+.imgcatbg     { font-style: normal; font-size: 10px; color: #005177; font-weight: bold; }
+.imgtitlebg   { font-style: normal; font-size: 10px; color: #FFFFFF;  font-weight: bold; }
+.imgwindowbg  { font-style: normal; font-size: 9px; color: #005177; }
+.imgmenu      { font-style: normal; font-size: 11px; color: #D4AD00; font-weight: bold; letter-spacing: 0.1em; }
+
+/* Post quote/code colors */
+.quote        { font-size: 10px; font-family: Verdana, Helvetica, Arial; color: #000000; background-color: #DEE7EF; }
+.code         { font-size: 10px; font-family: Courier New; color: #000000; background-color: #CCCCCC; }
+-->
+</style>
+";
+?>

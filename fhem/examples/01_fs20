@@ -1,0 +1,18 @@
+#
+# fhem.pl configfile
+# 
+# Define a lamp (which is plugged in via an FS20ST).
+# To program the FS20ST, start the server, plug the FS20ST in pressing its
+# button, and then execute   fhem.pl 7072 "set lamp on" 
+#
+
+# Common part
+logfile /tmp/fhem-%Y-%m.log
+savefile /tmp/fhem.save     # where to save the state of the devices
+verbose 3                   # "normal" verbosity (min 1, max 5)
+port 7072                   # our TCP/IP port (working from localhost only)
+modpath .                   # where our FHEM directory is
+define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
+
+
+define lamp FS20 8765 01    # type FS20, transmitter code 8765, button 2

@@ -1,0 +1,5 @@
+Gnuplot is now automatically supported for HMS, KS300 and FHT.
+
+If you really want to change the graphics then look at the include/gnuplot.php
+
+######################################################################
