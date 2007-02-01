@@ -14,7 +14,7 @@ If you wish to contribute to the project, then
    % cvs update
 - make your changes
 - test if it is working (Really !!!)
-- make an entry in the CHANGES file, giving your changes a "title".
+- make an entry in the CHANGED file, giving your changes a "title".
 - describe your changes in the file HISTORY, and dont forget to mention your
   name and the date of change
 - it makes sense to do a "cvs diff" before checking in the stuff with

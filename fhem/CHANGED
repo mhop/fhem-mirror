@@ -300,3 +300,4 @@
   - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.02)
   - feature: renamed fhz1000 to fhem
   - feature: added HISTORY and README.DEV
+  - doc:     Added description of attribute "model".
