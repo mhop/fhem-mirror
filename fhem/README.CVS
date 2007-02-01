@@ -1,0 +1,28 @@
+The source of this project is hosted on Berlios, if you wish you can get
+the latest version with the following commands:
+  cvs -d:pserver:anonymous@cvs.fhem.berlios.de:/cvsroot/fhem login
+  cvs -z3 -d:pserver:anonymous@cvs.fhem.berlios.de:/cvsroot/fhem co fhem
+
+If you wish to contribute to the project, then
+- create a berlios account 
+- send an email to the project manager
+  (right know this is r dot koenig at koeniglich dot de)
+- check out the source with
+   % cvs -z3 -d<berlios-uid>@cvs.berlios.de:/cvsroot/fhem co fhem
+- if it is already checked out, it makes sense to do an update before
+  implementinng your changes:
+   % cvs update
+- make your changes
+- test if it is working (Really !!!)
+- make an entry in the CHANGES file, giving your changes a "title".
+- describe your changes in the file HISTORY, and dont forget to mention your
+  name and the date of change
+- it makes sense to do a "cvs diff" before checking in the stuff with
+    cvs commit
+- if you do complex/nontrivial changes affecting more than one file, then 
+  please tag the whole software before and after the change with:
+  - before: % cvs tag <berlios-uid>_<date_as_YYYYMMDD>_0
+  - after:  % cvs tag <berlios-uid>_<date_as_YYYYMMDD>_1
+  You can increase the counter for bugfixing. Dont forget to mention the 
+  tagname in the HISTORY file. Tagging helps to remove more complex changes or
+  to merge them in other releases/branches.

@@ -11,7 +11,7 @@
 # Uncomment the following if you want to create a postscript file
 # and comment out the  pause at the end
 #set terminal postscript color "Helvetica" 11
-#set output 'saplogins-lrn.ps'
+#set output 'fht.ps'
 
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
