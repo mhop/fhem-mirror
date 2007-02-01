@@ -5,12 +5,12 @@ the latest version with the following commands:
 
 If you wish to contribute to the project, then
 - create a berlios account 
-- send an email to the project manager
+- send an email to the project manager to add you as developer to the project
   (right know this is r dot koenig at koeniglich dot de)
 - check out the source with
    % cvs -z3 -d<berlios-uid>@cvs.berlios.de:/cvsroot/fhem co fhem
 - if it is already checked out, it makes sense to do an update before
-  implementinng your changes:
+  implementing your changes:
    % cvs update
 - make your changes
 - test if it is working (Really !!!)
