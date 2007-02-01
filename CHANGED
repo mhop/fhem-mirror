@@ -299,3 +299,4 @@
   - bugfix:  allow numbers greater then 9 in at +{<number>}
   - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.02)
   - feature: renamed fhz1000 to fhem
+  - feature: added HISTORY and README.DEV
