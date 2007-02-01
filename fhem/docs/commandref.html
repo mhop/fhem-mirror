@@ -214,6 +214,20 @@ split in multiple lines<br><br>
         seconds, fractions are allowed. It affects installations with more then
         one FHZ device or repeater, see the entry above.
 	</li>
+    <li>model<br>
+        The model attribute denotes the model type of the device.
+        The attributes will (currently) not be used by the fhem.pl directly.
+        It can be used by e.g. external programs or web interfaces to
+        distinguish classes of devices and send the appropriate commands
+        (e.g. "on" or "off" to a fs20st, "dim..%" to fs20du etc.).
+        The spelling of the model names are as quoted on the printed
+        documentation which comes which each device. This name is used
+        without blanks in all lower-case letters. Valid characters should be
+        <code>a-z 0-9</code> and <code>-</code> (dash),
+        other characters should be ommited
+        (<code>fht80b, fs20du, fs20led, fs20piri, fs20s20, fs20s4a,
+         fs20st fs20ts, hms100mg, rm100-2uni-s,</code> etc.).
+	</li>
   </ul>
 
   Examples:
@@ -221,6 +235,7 @@ split in multiple lines<br><br>
     <code>attr lamp room kitchen</code><br>
     <code>attr lamp dummy</code><br>
     <code>attr lamp loglevel 6</code><br>
+    <code>attr lamp model fs20du</code><br>
     <code>del attr lamp</code><br>
     <code>at *23:00:10 set lamp off</code><br>
     <code>attr at lamp.off skip_next</code><br>
