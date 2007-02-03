@@ -859,10 +859,11 @@ CommandAt($$)
   my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
   return $err if($err);
 
-Log 1, "$rel, $rep, $cnt, $tspec";
   $rel = "" if(!defined($rel));
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
+  Log 1, "$rel, $rep, $cnt, $tspec";
+
   my $ot = time;
   my @lt = localtime($ot);
   my $nt = $ot;
