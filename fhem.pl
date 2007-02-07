@@ -713,6 +713,7 @@ CommandShutdown($$)
   my ($cl, $param) = @_;
   Log 0, "Server shutdown";
   DoSavefile();
+  unlink($pidfilename) if($pidfilename);
   exit(0);
 }
 

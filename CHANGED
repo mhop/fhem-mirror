@@ -301,3 +301,6 @@
   - feature: renamed fhz1000 to fhem
   - feature: added HISTORY and README.DEV
   - doc:     Added description of attribute "model".
+  - bugfix:  delete the pidfile when terminating. (reported by Martin and Peter)
+  - TODO: feature: add direction to the logs
+  - TODO: bugfix: more thorough serial line initialization
