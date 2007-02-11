@@ -10,3 +10,7 @@
     of devices.
   - em1010.pl added to the contrib directory. It seems that we are able
     to read out the EM1010PC. Not verified with multiple devices.
+
+- Pest, Thu Feb 11 23:35 MET 2007
+  - Added doc/linux.html (multiple USDB devices, udev links)
+  - Linked fhem.html and commandref.html to linux.html

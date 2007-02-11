@@ -1,0 +1,110 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>fhem.pl - Hints for GNU/Linux</title>
+</head>
+
+<body style="background-color: white;">
+
+<h2>fhem.pl - Hints for GNU/Linux</h2>
+
+<p><b><a name="onedevice">One device</a></b><br>
+If you connect one USB device (FHZ1000PC, FHZ1300PC, EM1010PC, WS300, ...)
+to your GNU/Linux server you can use the regular <i>ftdi_sio</i> kernel module.
+However, it may not recognize our device. Therefore you need to get the
+<i>vendor</i> and <i>product</i> codes:
+<code><br>
+# lsusb<br>
+...<br>
+Bus 002 Device 002: ID <b>0403</b>:<b>e0e8</b> Future Technology Devices International, Ltd <br>
+...<br>
+</code><br>
+Now you need to edit your <code>/etc/modprobe.conf</code> or
+<code>/etc/modprobe.conf.local</code> file (depending on your distribution).
+Add the following line to it:<br>
+
+<code><br>
+options ftdi_sio vendor=0x<b>0403</b> product=0x<b>e0e8</b><br>
+</code><br>
+Replace the vendor and product code with the output of the <i>lsusb</i> command.
+The you load the module using:<br>
+<code><br>
+# modprobe ftdi_sio<br>
+</code><br>
+
+<p><b><a name="multipledevices">Multiple devices</a></b><br>
+If you're using multiple USB devices (FHZ1000PC, FHZ1300PC, EM1010PC, WS300, ...)
+you cannot use the methode above. You need to modify the ftdi_sio kernel module
+to make it work. The following example was done with openSuSE 10.1:<br>
+You need to have the kernel-source-<i>version</i> RPM of your
+current kernel (see output of <code>uname -r</code>) installed.<br>
+<code><br>
+# cd /usr/src/linux<br>
+# make cloneconfig<br>
+# make modules_prepare<br>
+# cp /boot/symvers-2.6.*-default.gz /usr/src/linux<br>
+# mv symvers-2.6.*-default.gz Module.symvers.gz<br>
+# gunzip /usr/src/linux/Module.symvers.gz<br>
+# make modules_prepare<br>
+# cd drivers/usb/serial<br>
+</code>
+For the EM1010PC you (may) need to add the following line:
+<code><br>
+# vi ftdi_sio.h<br>
+...<br>
+#define FTDI_ELV_WS500_PID 0xE0E9   /* PC-Wetterstation (WS 500) */<br>
+<b>#define FTDI_ELV_EM1010PC_PID 0xE0EF   /* EM 1010 PC */</b><br>
+</code><br>
+Now we need to uncomment some lines to enable all of our devices.
+<code><br>
+# vi ftdi_sio.c<br>
+...<br>
+ { USB_DEVICE(FTDI_VID, FTDI_ELV_WS300PC_PID) }, <br>
+ { USB_DEVICE(FTDI_VID, FTDI_ELV_FHZ1300PC_PID) },<br>
+ { USB_DEVICE(FTDI_VID, FTDI_ELV_WS500_PID) }, <br>
+ { USB_DEVICE(FTDI_VID, FTDI_ELV_EM1010PC_PID) },<br>
+...<br>
+</code><br>
+Remove the <b>/*</b> and <b>*/</b> of your devices and save the file.
+<code><br>
+# cd /usr/src/linux<br>
+# make modules<br>
+...</code> This may take a while. Go read a book, have lunch or ...<br>
+<code><br>
+# cd /lib/modules/<i>yourKernelVerion</i>/kernel/drivers/usb/serial<br>
+# cp ftdi_sio.ko ftdi_sio.ko_backup<br>
+# cp /usr/src/linux/drivers/usb/serial/ftdi_sio.ko .<br>
+</code><br>
+To make it become active you may need to stop applications (like fhem) who
+are using the /dev/ttyUSB device and unload the module and load it again.<br>
+<code><br>
+# rmmod ftdi_so<br>
+# modprobe ftdi_so<br>
+</code><br>
+You should now see multiple ttyUSB devices:
+<code><br>
+# ls -l /dev/ttyUSB*<br>
+crw-rw---- 1 root uucp 188, 0 2007-02-11 23:00 /dev/ttyUSB0<br>
+crw-rw---- 1 root uucp 188, 1 2007-02-11 23:00 /dev/ttyUSB1<br>
+</code><br>
+
+<p><b><a name="devicelinks">Device links</a></b><br>
+If you're using multiple USB devices (FHZ, EM, WS...) it might occur that the
+enumeration of the /dev/ttyUSB<i>n</i> numbers get mixed up if one of the
+device is missing or after a reboot.<br>
+Starting with kernel 2.6 the UDEV implements means for using virtual names
+instead of the bare numbers.<br>
+Edit the file <code>/etc/udev/rules.d/50-udev-default.rules</code>
+and append the following lines in the block labled as <i>serial devices</i>:
+<br>
+<code>
+KERNEL=="ttyUSB*", SYSFS{product}=="ELV FHZ 1300 PC", SYMLINK+="elv_fhz1300pc"<br>
+KERNEL=="ttyUSB*", SYSFS{product}=="ELV EM 1010 PC", SYMLINK+="elv_em1010pc"<br>
+</code><br>
+Now you need to reboot your box (unfortunalty) and once the system has come up
+again you can use the device paths <code><b>/dev/elv_fhz1300pc</b></code> or
+<code><b>/dev/elv_em1010pc</b></code> in your FHEM configuration file.
+</body>
+</html>
