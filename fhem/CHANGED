@@ -306,3 +306,4 @@
   - feature: defattr (default attribute for following defines)
   - feature: added em1010.pl to the contrib directory
   - TODO: bugfix: more thorough serial line initialization
+  - doc:     added linux.html (multiple devices, udev-links)
