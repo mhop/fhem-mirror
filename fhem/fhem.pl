@@ -63,6 +63,7 @@ sub XmlEscape($);
 
 sub CommandAt($$);
 sub CommandAttr($$);
+sub CommandDefAttr($$);
 sub CommandDefine($$);
 sub CommandDelete($$);
 sub CommandFhzDev($$);
@@ -115,6 +116,7 @@ my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my $modpath_set;                # Check if modpath was used, and report if not.
 my $global_cl;			# To use from perl snippets
 my $devcount = 0;		# To sort the devices
+my %defattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $init_done = 0;
@@ -128,6 +130,8 @@ my %cmds = (
 	    Hlp=>"<timespec> <command>,issue a command at a given time" },
   "attr"    => { Fn=>"CommandAttr", 
 	    Hlp=>"<devname> <attrname> <attrvalue>,set attributes for <devname>" },
+  "defattr" => { Fn=>"CommandDefAttr", 
+	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a code" },
   "delete"  => { Fn=>"CommandDelete",
@@ -863,7 +867,6 @@ CommandAt($$)
   $rel = "" if(!defined($rel));
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
-  Log 1, "$rel, $rep, $cnt, $tspec";
 
   my $ot = time;
   my @lt = localtime($ot);
@@ -929,7 +932,13 @@ CommandDefine($$)
   no strict "refs";
   $ret = &{$fnname}(\%hash, @a);
   use strict "refs";
-  delete $ghash->{$a[0]} if($ret);
+  if($ret) {
+    delete $ghash->{$a[0]}
+  } else {
+    foreach my $da (sort keys (%defattr)) {     # Default attributes
+      CommandAttr($cl, "$a[0] $da $defattr{$da}");
+    }
+  }
   return $ret;
 }
 
@@ -1333,6 +1342,22 @@ CommandAttr($$)
   } else {
     $attr{$a[0]}{$a[1]} = "1";
   }
+  return undef;
+}
+
+sub
+CommandDefAttr($$)
+{
+  my ($cl, $param) = @_;
+
+  my @a = split(" ", $param, 2);
+  if(int(@a) == 0) {
+    %defattr = ();
+  } elsif(int(@a) == 1) {
+    $defattr{$a[0]} = 1;
+  } else {
+    $defattr{$a[0]} = $a[1];
+  } 
   return undef;
 }
 

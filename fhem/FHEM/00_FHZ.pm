@@ -35,7 +35,7 @@ my %setnrparam = (
   "time"     => 0,
   "initHMS"  => 0,
   "initFS20" => 0,
-  "FHTcode"  => 0,
+  "FHTcode"  => 1,
   "activefor"=> 1,
   "raw"      => 2,
 );
@@ -84,7 +84,7 @@ FHZ_Set($@)
   return "Need one to three parameter" if(@a > 4);
   return "invalid parameter, use one of:\n  " . join("\n  ", sort keys %sets)
   	if(!defined($sets{$a[1]}));
-  return "Wrong number of parameters, need " . ($setnrparam{$a[1]} + 2)
+  return "Wrong number of parameters for $a[1], need " . ($setnrparam{$a[1]}+2)
   	if(@a != ($setnrparam{$a[1]} + 2));
 
   my ($fn, $arg) = split(" ", $sets{$a[1]});
