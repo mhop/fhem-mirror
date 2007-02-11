@@ -228,6 +228,11 @@ split in multiple lines<br><br>
         (<code>fht80b, fs20du, fs20led, fs20piri, fs20s20, fs20s4a,
          fs20st fs20ts, hms100mg, rm100-2uni-s,</code> etc.).
 	</li>
+    <li>showtime<br>
+        Used in the webfrontend pgm2 to show the time of last activity
+        instead of the state in the summary view. Useful e.g. for FS20 PIRI
+        devices.
+	</li>
   </ul>
 
   Examples:
@@ -246,7 +251,37 @@ split in multiple lines<br><br>
   Notes:<br>
   <ul>
     <li>There is no way to delete a single attribute.</li>
-  </ul> </ul>
+  </ul>
+</ul>
+
+<a name="defattr"></a>
+<h3>defattr</h3>
+<ul>
+  <code>defattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
+
+  <br>Set the default attribute. Each device defined from now on will receive
+  this attribute (see the <a href="#at">at</a> for details on attribute names
+  and values).<br>
+  If no attrname is specified, then the default attribute list will be deleted.
+  <br><br>
+
+  Example to set the attribute "room kitchen" and "loglevel 4" to
+  each of the lamps:
+  <ul>
+    <code>defattr room kitchen</code><br>
+    <code>defattr loglevel 4</code><br>
+    <code>define lamp1 FS20 1234 11</code><br>
+    <code>define lamp2 FS20 1234 12</code><br>
+    <code>define lamp3 FS20 1234 13</code><br>
+    <code>defattr</code><br>
+  </ul>
+  <br>
+
+  Notes:<br>
+  <ul>
+    <li>There is no way to delete a single default-attribute from the list</li>
+  </ul>
+</ul>
 
 
 

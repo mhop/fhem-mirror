@@ -295,12 +295,14 @@
   - feature: new FHT codes, e.g. month/day/hour/minute setting (by Holger)
 
 - ==DATE== (3.4)
-  - bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.02
+  - bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.01
   - bugfix:  allow numbers greater then 9 in at +{<number>}
-  - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.02)
+  - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.01)
   - feature: renamed fhz1000 to fhem
   - feature: added HISTORY and README.DEV
   - doc:     Added description of attribute "model".
   - bugfix:  delete the pidfile when terminating. (reported by Martin and Peter)
-  - TODO: feature: add direction to the logs
+  - feature: attribute showtime in web-pgm2 (show time instead of state)
+  - feature: defattr (default attribute for following defines)
+  - feature: added em1010.pl to the contrib directory
   - TODO: bugfix: more thorough serial line initialization

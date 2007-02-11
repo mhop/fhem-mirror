@@ -3,3 +3,10 @@
 
 - Pest, Thu Feb  1 20:45 MET 2007
   Added description for attribute "model" in commandref.html
+
+- Rudi, Sun Feb 11 18:56:05 MET 2007
+  - showtime added for pgm2 (useful for FS20 piri display)
+  - defattr command added, it makes easier to assign room, type, etc for a group
+    of devices.
+  - em1010.pl added to the contrib directory. It seems that we are able
+    to read out the EM1010PC. Not verified with multiple devices.

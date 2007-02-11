@@ -1,4 +1,4 @@
-#Mon Jan  8 10:37:18 2007
+#Thu Feb  8 15:09:20 2007
 setstate FHZ fhtbuf: 1c
 setstate FHZ 2006-02-12 14:03:39   fhtbuf          23
 setstate FHZ 2006-03-26 08:47:36   init2           deadbeefdeadbe
@@ -33,18 +33,13 @@ setstate fl 2006-03-26 08:50:55   windowopen-temp 12.0 (Celsius)
 setstate fl 2006-03-29 23:04:27   measured-temp   21.6 (Celsius)
 setstate floor-lamp on
 setstate floor-lamp 2006-03-29 12:05:34 on
-setstate ks1 T: 26.5  H: 24  W: 0.0  R: 12.1
-setstate ks1 2006-05-11 17:41:11   wind            0.0 (km/h)
-setstate ks1 2006-05-11 17:41:11   rain            12.1 (l/m2)
-setstate ks1 2006-05-11 17:41:11   temperature     26.5 (Celsius)
-setstate ks1 2006-05-11 17:41:11   humidity        24 (%)
 setstate marqee on
 setstate marqee 2006-04-01 12:46:02 on
 setstate tf1 T: 20.3  H: 31.3  Bat: ok
 setstate tf1 2006-04-11 09:48:48   battery         Bat: ok
 setstate tf1 2006-04-11 09:48:48   type            HMS100TF
-setstate tf1 2006-04-11 09:48:48   temperature     20.3 (Celsius)
 setstate tf1 2006-04-11 09:48:48   humidity        31.3 (%)
+setstate tf1 2006-04-11 09:48:48   temperature     20.3 (Celsius)
 setstate window-lamp on
 setstate window-lamp 2006-03-29 12:05:34 on
 setstate wz measured-temp: 22.4 (Celsius)
