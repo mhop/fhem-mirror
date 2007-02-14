@@ -29,9 +29,11 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
 	$white = ImageColorAllocate($im, 255, 255, 255);
 	$gray= ImageColorAllocate($im, 133, 133, 133);
+	#$lightgray= ImageColorAllocate($im, 200, 198, 222);
 	$red = ImageColorAllocate($im, 255, 0, 0);
 	$green = ImageColorAllocate($im, 0, 255, 0);
 	$yellow= ImageColorAllocate($im, 255, 255, 0);
+	$lightyellow= ImageColorAllocate($im, 255, 247,222 );
 	$orange= ImageColorAllocate($im, 255, 230, 25);
 
 
@@ -44,6 +46,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$actuator=0;
 	$actuator_date="unknown";
 	$counter=count($array);
+	$arraydesired=array();
 
 	#echo $counter; exit;
 	
@@ -65,10 +68,13 @@ setlocale (LC_ALL, 'de_DE.utf8');
 			$oldmin=$array[$x][14]; 
 			$oldhour=$array[$x][12]; 
 			array_push( $_SESSION["arraydata"],array($date,$type,$temp));
+			array_push( $arraydesired,$desired_temp);
+
 		}
      	}
 
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
+	$reversedesired = array_reverse($arraydesired);
 	$xold=$imgmaxxfht;
 	
 	if ( $imgmaxxfht > count ($resultreverse) )
@@ -101,15 +107,21 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	if ( ($parts[0] != $olddate) )
 	{
 		$olddate=$parts[0];
+		#ImageLine($im, $imgmaxxfht-$x, 0,$imgmaxxfht-$x , $imgmaxyfht, $bg1p);
 		ImageLine($im, $imgmaxxfht-$x, 0,$imgmaxxfht-$x , $imgmaxyfht, $bg1p);
 	};
 	$y = round($imgmaxyfht-(($resultreverse[$x][2]-$mintemp)*$fac));
+	$y2 = round($imgmaxyfht-(($reversedesired[$x]-$mintemp)*$fac));
+	#ImageLine($im, $imgmaxxfht-$x, $y2, $xold, $yold2, $bg1p);
+	if ($show_desiredtemp == 1) ImageLine($im, $imgmaxxfht-$x+1, $y2, $xold, $yold2, $lightyellow);
 	ImageLine($im, $imgmaxxfht-$x, $y, $xold, $yold, $red);
 	$xold=$imgmaxxfht-$x;
 	$yold=$y;
+	$yold2=$y2;
 	};
 	
 	#print_r($resultreverse);
+	#print_r($reversedesired);
 	#exit;
 	ImageLine($im, $imgmaxxfht-$x, 0,$imgmaxxfht-$x , $imgmaxyfht, $yellow);
 ###ttf
@@ -117,8 +129,8 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$fontsize=7;
         $txtcolor=$bg3p; 
         ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
-	#setlocale (LC_ALL, 'de_DE.UTF-8');
 	$text=$resultreverse[0][2]." &#176;C";
+
         ImageTTFText ($im, 9, 0, 90, 35, $txtcolor, $fontttfb, $text);
         
 	$text= $drawfht;

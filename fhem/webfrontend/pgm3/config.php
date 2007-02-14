@@ -5,11 +5,12 @@
 
 
 ###### required settings
-	$fhz1000="localhost"; 			# on which machine is fhz1000 runnning??
-						# if it is not localhost then the fhz1000.cfg must
-						# run global: "port <nr> global"
-	$fhz1000port="7072";			# port of fhz1000.pl
-	$logpath="/var/tmp";			# where are your logs?
+	$fhz1000="localhost"; #only php5 ! On which machine is fhz1000 runnning??
+					# if it is not localhost then the fhz1000.cfg must
+					# run global: "port <nr> global"
+	$fhz1000port="7072";		# port of fhz1000.pl
+	$logpath="/var/tmp";		# where are your logs?
+	$fhz1000_pl="/home/FHZ/fhz1000/fhz1000.pl"; #only required if you are using PHP4
 
 ##################################################################################
 ###### nice to have
@@ -34,27 +35,17 @@
 
 
 
-## HMS-Devices
-	$imgmaxxhms=620;  #Size of the pictures. Default:  620 for faster systems else 380
-        $imgmaxyhms=52;
-	$logrotateHMSlines=1200; 		# automatic Logrotate; $logrotate must be 'yes'. 
-						# Default:1200
-						# read docs/logrotate if you want adjust it manually!
-						# otherwise the system will slow down
-						# pgm3 (user www-data) needs the rights to write the logs
-						# from fhz1000.pl (user = ???)
 
-## FHT-Devices
-	$imgmaxxfht=450;  #Size of the pictures Default: 450 for faster systems else 380
-        $imgmaxyfht=52;
-	$logrotateFHTlines=4300; 		# automatic Logrotate; $logrotate must be 'yes'.
-						# Default:4300
-						# read docs/logrotate if you want adjust it manually!
-						# otherwise the system will slow down
-						# pgm3 (user www-data) needs the rights to write the logs
-						# from fhz1000.pl (user = ???)
+##############################################################################################
+## FHZ-DEVICES
+	$show_general=1; 		#field to type FHZ1000-orders 0/1 Default:1
+	$show_fs20pulldown=1; 		#Pull-Down for the FS20 Devices 0/1 Default:1
+	$show_fhtpulldown=1; 		#Pull-Down for the FHT-Devices 0/1 Default:1
 
 
+
+
+##############################################################################################
 ## FS20-Device, adjust it if you have e.g. long titles
 	$imgmaxxfs20=85;  		#Size of the pictures, default=85
         $imgmaxyfs20=85; 		# default=85 
@@ -66,7 +57,7 @@
 	$txtroom=""; 			# default=""; example: $txtroom="room: ";
 					# room hidden will not be shown
 
-
+##############################################################################################
 ## ROOMS adjust it if you have e.g. long titles
 	$showroombuttons=1; 		#default 1  Values 0/1
 	$imgmaxxroom=$imgmaxxfs20;  	#Size of the pictures, default=$imgmaxxfs20
@@ -74,9 +65,32 @@
 	$roomfontsizetitel=10;  	# default=9
 	$roommaxiconperline=$fs20maxiconperline; # default=$fs20maxiconperline
 
+##############################################################################################
+## FHT-Devices
+	$imgmaxxfht=450;  #Size of the pictures Default: 450 for faster systems else 380
+        $imgmaxyfht=52;
+	$show_desiredtemp=1;			# show the desired_temp as a graphic (0/1)
+	$logrotateFHTlines=4300; 		# automatic Logrotate; $logrotate must be 'yes'.
+						# Default:4300
+						# read docs/logrotate if you want adjust it manually!
+						# otherwise the system will slow down
+						# pgm3 (user www-data) needs the rights to write the logs
+						# from fhz1000.pl (user = ???)
 
 
 
+##############################################################################################
+## HMS-Devices
+	$imgmaxxhms=620;  #Size of the pictures. Default:  620 for faster systems else 380
+        $imgmaxyhms=52;
+	$logrotateHMSlines=1200; 		# automatic Logrotate; $logrotate must be 'yes'. 
+						# Default:1200
+						# read docs/logrotate if you want adjust it manually!
+						# otherwise the system will slow down
+						# pgm3 (user www-data) needs the rights to write the logs
+						# from fhz1000.pl (user = ???)
+
+##############################################################################################
 ## KS300-Device
 	$imgmaxxks=620;  		#Size of the pictures  Default: 620 for faster systems else 380
 
@@ -91,21 +105,17 @@
 					# from fhz1000.pl (user = ???)
 
 
-## FHZ-DEVICES
-	$show_general=1; 		#field to type FHZ1000-orders 0/1 Default:1
-	$show_fs20pulldown=1; 		#Pull-Down for the FS20 Devices 0/1 Default:1
-	$show_fhtpulldown=1; 		#Pull-Down for the FHT-Devices 0/1 Default:1
 
 
 
-
+##############################################################################################
 ## misc
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
 	$taillogorder="/usr/bin/tail -20 $logpath/fhz1000.log"; 
 
 
 
-## show Information at startup. Activate it by deleting the '#'
+## show Information at startup. 
 	$showLOGS='no';			#show the LOGS at startup. Default: no Values: yes/no
 	$showAT='yes';			#show the AT_JOBS at startup. Default: yes Values: yes/no
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
@@ -113,8 +123,8 @@
 
 
 
-	$urlreload=60;			# Automatic reloading page [sec]. Default fast: 60 slow:90
-	$titel="PHP-Webmachine for fhz1000.pl :-)"; #feel free to create an own title
+	$urlreload=90;			# Automatic reloading page [sec]. Default fast: 60 slow:90
+	$titel="PHP-Webmachine for fhem :-)"; #feel free to create an own title
 	$timeformat="Y-m-d H:i:s";
 	$bodybg="bgcolor='#F5F5F5'"; 
 	$bg1="bgcolor='#6E94B7'";
