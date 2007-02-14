@@ -244,6 +244,7 @@ getDevStatus()
   }
   printf("     Readings  (off 02): %d\n",   w($d,2));
   printf("     Nr devs   (off 05): %d\n",   b($d,6));
+  printf("     puls/5min (off 13): %d\n",   w($d,13));
   printf("     Startblk  (off 18): %d\n",   b($d,18)+13);
   printf("     Alarm     (off 45): %d W\n", w($d,45));
   printf("     PRICE     (off 47): %0.2f (EUR/KWH)\n",   w($d,47)/10000);
