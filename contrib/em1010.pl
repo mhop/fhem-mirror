@@ -286,6 +286,7 @@ getDevData()
   my $end = $start + int(($nrreadings-1)/64)*$step;
   my $offset = ($nrreadings%64)*4+4;
   my $div = w($d,49)/10;
+  $div = 1 if($div == 0);
 
   #printf("Total $nrreadings, $start - $end, Nr $step, Off: $offset\n");
 
