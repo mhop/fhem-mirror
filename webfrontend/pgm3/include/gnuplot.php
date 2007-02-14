@@ -55,7 +55,7 @@ EOD;
         Case FHT:   ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'  
-		set yrange [16:31]
+		set yrange [15:31]
 		set grid ytics
 		set y2label 'Actuator (%)'
 		set y2range [0:70]
