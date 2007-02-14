@@ -39,7 +39,7 @@ include "config.php";
 include "include/gnuplot.php";
 
 
-$pgm3version='0.7.0';
+$pgm3version='0.7.0b';
 
 	
 	$Action		=	$_POST['Action'];
@@ -156,7 +156,9 @@ switch ($Action):
 	Case exec:
 		if ($kioskmode=='off') 
 		{
-			$order=str_replace("FFF","+",$order);
+			$order=str_replace("\\","",$order);
+			$order=str_replace("@","+",$order);
+	#		echo $order; exit;
 			execFHZ($order,$fhz1000,$fhz1000port);
 		}
 		header("Location:  $forwardurl&errormessage=$errormessage");
@@ -189,6 +191,17 @@ if ($taillog==1) exec($taillogorder,$tailoutput);
 function execFHZ($order,$machine,$port)
 {
 global $errormessage;
+
+$version = explode('.', phpversion());
+
+if ( $version[0] == 4 )
+{
+	include "config.php";
+	$order="$fhz1000_pl $port '$order'";  #PHP4, only localhost
+         exec($order,$errormessage);
+}
+else
+{
 $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
         if (!$fp) {
            echo "$errstr ($errno)<br />\n";
@@ -197,14 +210,26 @@ $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
                	$errormessage= fgets($fp, 1024);
            fclose($fp);
         }
+}
 return $errormessage;
 }
 
 
 ###### make an array from the xmllist
-	unset($output);
-	$stack = array();
-	$output=array();
+unset($output);
+$stack = array();
+$output=array();
+
+
+$version = explode('.', phpversion());
+
+if ( $version[0] == 4 )
+{
+        $xmllist="$fhz1000_pl $fhz1000port xmllist";
+        exec($xmllist,$output);
+}
+else
+{
 	$fp = stream_socket_client("tcp://$fhz1000:$fhz1000port", $errno, $errstr, 30);
 	if (!$fp) {
 	   echo "$errstr ($errno)<br />\n";
@@ -216,6 +241,7 @@ return $errormessage;
 	   }
 	   fclose($fp);
 	}
+}
 
 
 
@@ -738,14 +764,8 @@ xml_parser_free($xml_parser);
 				$command=$stack[0][children][$i][children][$j][attrs][command];
 				$next=$stack[0][children][$i][children][$j][attrs][next];
 				$order=$command;
-				$order=str_replace("+","\FFF",$order); #workaround
-				$order=str_replace("*","\*",$order);
-				$order=str_replace("$","\\$",$order);
-				$order=str_replace("(","\(",$order);
-				$order=str_replace(")","\)",$order);
-				$order=str_replace("{","\{",$order);
-				$order=str_replace("}","\}",$order);
-				$order='del at ^'.$order.'$';
+				$order=str_replace("+","@",$order);
+				$order='del at '.$order;
 				if ($next != '') {$nexttxt='('.$next .')';} else {$nexttxt='';};
 			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del</a></td><td colspan=2>$command $nexttxt</td></tr>";
 			 }
