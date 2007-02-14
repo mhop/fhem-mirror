@@ -39,7 +39,7 @@ include "config.php";
 include "include/gnuplot.php";
 
 
-$pgm3version='0.7.0b';
+$pgm3version='0.7.1';
 
 	
 	$Action		=	$_POST['Action'];
