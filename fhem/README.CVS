@@ -26,3 +26,32 @@ If you wish to contribute to the project, then
   You can increase the counter for bugfixing. Dont forget to mention the 
   tagname in the HISTORY file. Tagging helps to remove more complex changes or
   to merge them in other releases/branches.
+
+
+Some useful CVS commands/flags for the beginner:
+
+
+# Get the newest stuff from the server and merge it into your changes.
+# Watch out for lines beginning with C (collisions), edit them  immediately
+# after check out, and look for ==== 
+# Without -d new directories won't be checked out
+cvs update -d . 
+
+# Before checking in, make sure you changed only what you intended:
+cvs diff filename
+
+# Add new file. "-kb" adds binary files. Forgetting -kb will cause
+# problems if somebody is checking out on a different OS (windows)
+# Note: it is complicated to rename files in CVS, so think twice about
+# filenames before adding them. e.g. do not use version names in them.
+cvs add [-kb] filename
+
+# Look at the change history
+cvs log <filename>
+
+# Commit changes. Set the EDITOR environment variable to use your editor.
+cvs commit .
+
+# Check which files were changed. Type ^C when it asks you to really release it.
+# (is there a more elegant way?)
+cvs release .
