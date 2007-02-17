@@ -55,3 +55,11 @@ cvs commit .
 # Check which files were changed. Type ^C when it asks you to really release it.
 # (is there a more elegant way?)
 cvs release .
+
+# We recommend to set some options in our ~/.cvsrc file:
+cvs -q
+update -d
+# The 'cvs -q' option will suppress some output e.g. during update
+# only the updated and unknown files etc. are displayed (not every
+# folder etc.).
+# The 'update -d' will automatically create folders as required.
