@@ -104,4 +104,3 @@ Changelog
 -- Bugfix: DEL Button for at-Jobs now works
 -- Now you can use php4 OR php5 (php5 is recommended)
 -- Feature: php-Pictures of FHT now inclusive "desired-temp"
-

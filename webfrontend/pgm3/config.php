@@ -27,7 +27,7 @@
 	# this is only possible, if the webserver (e.g.wwwrun) has the rights ro write the
 	# files from fh1000.pl. If you want that then run fhz1000.pl as wwwrun too.
 	# if 'yes' then only the needed lines are in the logfiles, the rest will be deleted.
-	$logrotate='no';	# yes/no default='no'
+	$logrotate='yes';	# yes/no default='no'
 
 
 ## Kioskmode. Only show but don't switch anything. Values: on/off
@@ -70,6 +70,8 @@
 	$imgmaxxfht=450;  #Size of the pictures Default: 450 for faster systems else 380
         $imgmaxyfht=52;
 	$show_desiredtemp=1;			# show the desired_temp as a graphic (0/1)
+	$FHTyrange='15:31';			# Temperature in gnuplot. Default 15 to 31 (Celsius)
+	$FHTy2range='0:70';			# Actuator in gnuplot. Default 0 to 70 (Percent)
 	$logrotateFHTlines=4300; 		# automatic Logrotate; $logrotate must be 'yes'.
 						# Default:4300
 						# read docs/logrotate if you want adjust it manually!

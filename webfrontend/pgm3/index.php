@@ -39,7 +39,7 @@ include "config.php";
 include "include/gnuplot.php";
 
 
-$pgm3version='0.7.1';
+$pgm3version='0.7.2cvs';
 
 	
 	$Action		=	$_POST['Action'];
@@ -562,7 +562,7 @@ xml_parser_free($xml_parser);
 			 	
 				if ($showfht==$FHTdev and $showgnuplot == 1)
 			 	{   
-                                 	drawgnuplot($FHTdev,"FHT",$gnuplot,$pictype,$logpath);
+                                 	drawgnuplot($FHTdev,"FHT",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range);
 					$FHTdev1=$FHTdev.'1';
                                 	echo "<tr><td colspan=5 align=center><img src='tmp/$FHTdev.$pictype'><br>
 					<img src='tmp/$FHTdev1.$pictype'>
@@ -622,7 +622,7 @@ xml_parser_free($xml_parser);
 			<td $bg2 colspan=2><img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		
 		if ($showhmsgnu == $HMSdev and $showgnuplot == 1)
-                                { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath);
+                                { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0);
 				$HMSdev1=$HMSdev.'1';
                                 echo "<tr><td colspan=5 align=center><img src='tmp/$HMSdev.$pictype'><br>
 					<img src='tmp/$HMSdev1.$pictype'>
@@ -689,8 +689,8 @@ xml_parser_free($xml_parser);
 			 echo "</td></tr>";
 			if (($showks == $KSdev) and  $showgnuplot=='1')
 				 {
-				if ($kstyp=="1")drawgnuplot($KSdev,"KS300_t1",$gnuplot,$pictype,$logpath);
-				else  drawgnuplot($KSdev,"KS300_t2",$gnuplot,$pictype,$logpath);
+				if ($kstyp=="1")drawgnuplot($KSdev,"KS300_t1",$gnuplot,$pictype,$logpath,0,0);
+				else  drawgnuplot($KSdev,"KS300_t2",$gnuplot,$pictype,$logpath,0,0);
 				$KSdev1=$KSdev.'1';
 				echo "<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
 					<img src='tmp/$KSdev1.$pictype'>
