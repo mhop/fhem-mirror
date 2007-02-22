@@ -6,7 +6,7 @@
 ################
 
 
-function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath)
+function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHTy2range)
 {
 
 	$IN="$gnudraw ($gnutyp)";
@@ -55,10 +55,10 @@ EOD;
         Case FHT:   ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'  
-		set yrange [15:31]
+		set yrange [$FHTyrange]
 		set grid ytics
 		set y2label 'Actuator (%)'
-		set y2range [0:70]
+		set y2range [$FHTy2range]
 		";
 		$gplotmaintmp = <<<EOD
 
