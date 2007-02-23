@@ -71,7 +71,14 @@ Remove the <b>/*</b> and <b>*/</b> of your devices and save the file.
 <code><br>
 # cd /usr/src/linux<br>
 # make modules<br>
-...</code> This may take a while. Go read a book, have lunch or ...<br>
+...</code> This may take a while. Go read a book, have lunch or ...<br><br>
+<table border=1><tr><td>
+If you have a less powerfull machine like the ARM-Based NSLU2 then it is sufficient to only build the required module:<br>
+<code># mv Module.symvers Module.symvers.notneeded<br>
+# make M=drivers/usb/serial</code>
+</td></tr></table><br>
+
+
 <code><br>
 # cd /lib/modules/<i>yourKernelVerion</i>/kernel/drivers/usb/serial<br>
 # cp ftdi_sio.ko ftdi_sio.ko_backup<br>
