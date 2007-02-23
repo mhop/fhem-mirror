@@ -14,3 +14,6 @@
 - Pest, Thu Feb 11 23:35 MET 2007
   - Added doc/linux.html (multiple USDB devices, udev links)
   - Linked fhem.html and commandref.html to linux.html
+
+- Martin Haas, Fri Feb 23 10:18 MET 2007
+  - ARM-Section (NSLU2) added to doc/linux.html
