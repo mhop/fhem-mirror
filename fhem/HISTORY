@@ -17,3 +17,6 @@
 
 - Martin Haas, Fri Feb 23 10:18 MET 2007
   - ARM-Section (NSLU2) added to doc/linux.html
+
+- Pest, Sat Feb 24 18:30 MET 2007
+  - doc/linux.html: Module build re-written.
