@@ -68,17 +68,34 @@ Now we need to uncomment some lines to enable all of our devices.
 ...<br>
 </code><br>
 Remove the <b>/*</b> and <b>*/</b> of your devices and save the file.
-<code><br>
+<br>
+<code>
 # cd /usr/src/linux<br>
-# make modules<br>
-...</code> This may take a while. Go read a book, have lunch or ...<br><br>
-<table border=1><tr><td>
-If you have a less powerfull machine like the ARM-Based NSLU2 then it is sufficient to only build the required module:<br>
-<code># mv Module.symvers Module.symvers.notneeded<br>
+</code>
+Now you have 3 choices:<br>
+<table border=1>
+<tr><td>
+<code>
+# mv Module.symvers Module.symvers.notneeded<br>
 # make M=drivers/usb/serial</code>
-</td></tr></table><br>
-
-
+<td>
+... to build the modules for all of <i>usb serial</i>.<br>
+If you have a less powerfull machine like the ARM-Based NSLU2 then it is sufficient to only build the required module.
+</td></tr>
+<td><code>
+# make modules</code>
+</td><td>
+... to build all modules (takes a long time).
+</td></tr>
+<tr><td>
+<code>
+# make driver/usb/serial/ftdi_sio.ko
+</code>
+</td><td>
+... to build just the <i>ftdi_sio.ko</i> module. However, this does not seem to be working always.
+</td></tr>
+</table>
+Once you have the module:<br>
 <code><br>
 # cd /lib/modules/<i>yourKernelVerion</i>/kernel/drivers/usb/serial<br>
 # cp ftdi_sio.ko ftdi_sio.ko_backup<br>
