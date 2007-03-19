@@ -60,6 +60,7 @@ sub TimeNow();
 sub WriteStatefile();
 sub XmlEscape($);
 sub fhem($);
+sub doGlobalDef($);
 
 sub CommandAttr($$);
 sub CommandDefAttr($$);
@@ -72,6 +73,7 @@ sub CommandInclude($$);
 sub CommandInform($$);
 sub CommandList($$);
 sub CommandRereadCfg($$);
+sub CommandRename($$);
 sub CommandQuit($$);
 sub CommandSave($$);
 sub CommandSet($$);
@@ -129,6 +131,7 @@ my %defattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $init_done = 0;
+my $reread_active = 0;
 my $AttrList = "room";
 
 
@@ -136,15 +139,7 @@ $modules{Internal}{ORDER} = -1;
 $modules{Internal}{AttrList} = "configfile logfile modpath " .
                         "pidfilename port statefile userattr verbose:1,2,3,4,5 version";
 
-$defs{global}{NR}    = $devcount++;
-$defs{global}{TYPE}  = "Internal";
-$defs{global}{STATE} = "Internal";
-$defs{global}{DEF}   = "<no definition>";
-
-CommandAttr(undef, "global verbose 3");
-CommandAttr(undef, "global configfile $ARGV[0]");
-CommandAttr(undef, "global logfile -");
-CommandAttr(undef, "global version =VERS= from =DATE=");
+doGlobalDef($ARGV[0]);
 
 my %cmds = (
   "?"       => { Fn=>"CommandHelp",
@@ -173,6 +168,8 @@ my %cmds = (
 	    Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
 	    Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
+  "rename"  => { Fn=>"CommandRename",
+	    Hlp=>"<old> <new>,rename a definition" },
   "rereadcfg"  => { Fn=>"CommandRereadCfg",
 	    Hlp=>",reread the config file" },
   "save"    => { Fn=>"CommandSave", 
@@ -604,14 +601,20 @@ CommandRereadCfg($$)
     return $ret if($ret);
   }
 
+  my $cfgfile = $attr{global}{configfile};
   %defs = ();
   %attr = ();
+  doGlobalDef($cfgfile);
 
-  my $ret;
-  $ret = CommandInclude($cl, $attr{global}{configfile});
-  return $ret if($ret);
-  $ret = CommandInclude($cl, $attr{global}{statefile})
-                if($attr{global}{statefile} && -r $attr{global}{statefile});
+
+  $reread_active=1;
+
+  my $ret = CommandInclude($cl, $cfgfile);
+  if(!$ret && $attr{global}{statefile} && -r $attr{global}{statefile}) {
+    $ret = CommandInclude($cl, $attr{global}{statefile});
+  }
+
+  $reread_active=0;
   return $ret;
 }
 
@@ -916,6 +919,7 @@ CommandDelete($$)
 {
   my ($cl, $def) = @_;
 
+  return "Please define $def first" if(!defined($defs{$def}));
   my $ret = CallFn($def, "UndefFn", $defs{$def}, $def);
   return $ret if($ret);
 
@@ -1107,6 +1111,26 @@ CommandReload($$)
   return undef;
 }
 
+#####################################
+sub
+CommandRename($$)
+{
+  my ($cl, $param) = @_;
+  my ($old, $new) = split(" ", $param);
+
+  return "Please define $old first" if(!defined($defs{$old}));
+  return "Invalid characters in name (not A-Za-z0-9.:-): $new"
+                        if($new !~ m/^[a-z0-9.:_-]*$/i);
+  return "Cannot rename global" if($old eq "global");
+
+  $defs{$new} = $defs{$old};
+  delete($defs{$old});
+
+  $attr{$new} = $attr{$old};
+  delete($attr{$old});
+
+  return undef;
+}
 
 #####################################
 sub
@@ -1163,6 +1187,8 @@ CommandAttr($$)
 
   ################
   elsif($a[1] eq "port") {
+
+    return undef if($reread_active);
     my ($port, $global) = split(" ", $a[2]);
     if($global && $global ne "global") {
       return "Bad syntax, usage: attr global port <portnumber> [global]";
@@ -1174,9 +1200,10 @@ CommandAttr($$)
           LocalPort    => $port,
           Listen       => 10,
           ReuseAddr    => 1);
-    if($ret) {
-      return $ret if($init_done);
-      die "Can't open server port at $port\n";
+    if(!$server2) {
+      Log 1, "Can't open server port at $port: $!\n";
+      return "$!" if($init_done);
+      die "Can't open server port at $port: $!\n";
     }
     close($server) if($server);
     $server = $server2;
@@ -1550,3 +1577,19 @@ fhem($)
   return AnalyzeCommandChain($global_cl, $param);
 }
 
+sub
+doGlobalDef($)
+{
+  my ($arg) = @_;
+
+  $devcount = 0;
+  $defs{global}{NR}    = $devcount++;
+  $defs{global}{TYPE}  = "Internal";
+  $defs{global}{STATE} = "Internal";
+  $defs{global}{DEF}   = "<no definition>";
+
+  CommandAttr(undef, "global verbose 3");
+  CommandAttr(undef, "global configfile $arg");
+  CommandAttr(undef, "global logfile -");
+  CommandAttr(undef, "global version =VERS= from =DATE=");
+}
