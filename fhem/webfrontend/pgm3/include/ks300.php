@@ -67,6 +67,8 @@ $avgmonth=$_GET['avgmonth'];
 
 			}
 		}
+		#WS300 has Willi instead other things
+		if ($r=="Willi:") {$willi=1;};
 
 		$resultreverse = array_reverse($arraydata);
 		$xold=$imgmaxxks;
@@ -181,13 +183,13 @@ $avgmonth=$_GET['avgmonth'];
 
 	$imh=$im;
 
-#wind
+#wind/Air Pressure
 	$im = ImageCreateTrueColor($imgmaxxks,$imgmaxyks);
 	ImageFill($im, 0, 0, $bg2p);
 	ImageRectangle($im, 0, 0, $imgmaxxks-1, $imgmaxyks-1, $white);
 
 	$oldmin=0; //only the data from every 10min
-	$min=120;
+	$min=120000;
 	$max=-100;
 
 	for ($x = 0; $x <= $maxdata; $x++)
@@ -219,16 +221,16 @@ $avgmonth=$_GET['avgmonth'];
 	};
 	};
 	ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
-		$text="Wind";
+		if (isset($willi)) $text="Air Pressure"; else $text="Wind";
 		$fontsize=7;
         	$txtcolor=$bg3p; 
         	ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
 	$fontsize=9;
-	$text=$temp." km/h";
+	if (isset($willi)) $text=$temp." hPa"; else $text=$temp." km/h";
         ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	
-	if ($showbft==1)
+	if (($showbft==1) and (! isset($willi)))
 	{
 	$text="( ".bft($temp)."  Bft)";
         ImageTTFText ($im, $fontsize, 0, 150, 35, $txtcolor, $fontttfb, $text);
@@ -242,7 +244,10 @@ $avgmonth=$_GET['avgmonth'];
 
 	$imw=$im;
 
-#rain
+#rain/willi
+
+if (! isset($willi))
+{
 	$im = ImageCreateTrueColor($imgmaxxks,$imgmaxyks);
 	ImageFill($im, 0, 0, $bg2p);
 	ImageRectangle($im, 0, 0, $imgmaxxks-1, $imgmaxyks-1, $white);
@@ -315,7 +320,62 @@ $avgmonth=$_GET['avgmonth'];
 	$text=$room;
         ImageTTFText ($im, $fontsize, 0,  7, 47, $txtcolor, $fontttf, $text);
 	$imr=$im;
+}
+else # Willi:
+{
+	$im = ImageCreateTrueColor($imgmaxxks,$imgmaxyks);
+	ImageFill($im, 0, 0, $bg2p);
+	ImageRectangle($im, 0, 0, $imgmaxxks-1, $imgmaxyks-1, $white);
 
+	$oldmin=0; //only the data from every 10min
+	$min=120000;
+	$max=-100;
+
+	for ($x = 0; $x <= $maxdata; $x++)
+        {
+	$temp=$resultreverse[$x][4];
+	if ( $temp > $max ) $max=$temp;
+	if ( $temp < $min and ($temp != '')) $min=$temp;
+	}
+	$temp=$resultreverse[0][4];
+	$tempdiff=$max-$min;
+	if ($tempdiff==0) $tempdiff=1;
+	$fac=$imgmaxyks/$tempdiff;
+
+
+	$xold=$imgmaxxks;
+	$yold=round($imgmaxyks-(($resultreverse[0][4]-$min)*$fac));
+
+	for ($x = 0; $x < count($resultreverse); $x++)
+        {
+	$y = round($imgmaxyks-(($resultreverse[$x][4]-$min)*$fac));
+	ImageLine($im, $imgmaxxks-$x, $y, $xold, $yold, $red);
+	$xold=$imgmaxxks-$x;
+	$yold=$y;
+ 	$parts = explode("_", $resultreverse[$x][0]);
+	if ( ($parts[0] != $olddate) )
+	{
+		$olddate=$parts[0];
+		ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $bg1p);
+	};
+	};
+	ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
+		$text="Willi";
+		$fontsize=7;
+        	$txtcolor=$bg3p; 
+        	ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+	$fontsize=9;
+	$text=$temp;
+        ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
+	$fontsize=7;
+	
+	$text2="min= $min max= $max";
+        ImageTTFText ($im, $fontsize, 0, 60, 47, $txtcolor, $fontttf, $text2);
+	$text=$resultreverse[0][0];
+        ImageTTFText ($im, $fontsize, 0,  $imgmaxxks-130, 15, $txtcolor, $fontttf, $text);
+
+	$imr=$im;
+}
 
 
 

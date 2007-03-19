@@ -1,7 +1,7 @@
 <?php
 
 ##################################################################################
-#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
+#### pgm3 -- a PHP-webfrontend for fhem.pl
 
 
 ###### required settings
@@ -10,7 +10,7 @@
 					# run global: "port <nr> global"
 	$fhz1000port="7072";		# port of fhz1000.pl
 	$logpath="/var/tmp";		# where are your logs?
-	$fhz1000_pl="/home/FHZ/fhz1000/fhz1000.pl"; #only required if you are using PHP4
+	$fhz1000_pl="/home/FHEM/fhem/fhem.pl"; #only required if you are using PHP4
 
 ##################################################################################
 ###### nice to have
@@ -113,7 +113,7 @@
 ##############################################################################################
 ## misc
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
-	$taillogorder="/usr/bin/tail -20 $logpath/fhz1000.log"; 
+	$taillogorder="/usr/bin/tail -20 $logpath/fhem.log"; 
 
 
 
