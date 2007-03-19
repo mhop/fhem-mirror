@@ -1,7 +1,5 @@
 #!/usr/bin/perl
 
-my $version = "=VERS= from =DATE=";
-
 ################################################################
 #
 #  Copyright notice
@@ -42,76 +40,87 @@ use Time::HiRes qw(gettimeofday);
 ##################################################
 # Forward declarations
 #
-sub AnalyzeInput($);
 sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
-sub IOWrite($@);
+sub AnalyzeInput($);
 sub AssignIoPort($);
-sub InternalTimer($$$);
-sub fhz($);
+sub CallFn(@);
 sub CommandChain($$);
 sub DoClose($);
+sub GetLogLevel(@);
 sub HandleTimeout();
+sub IOWrite($@);
+sub InternalTimer($$$);
 sub Log($$);
 sub OpenLogfile($);
 sub ResolveDateWildcards($@);
+sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
-sub DoSavefile();
-sub SemicolonEscape($);
+sub WriteStatefile();
 sub XmlEscape($);
+sub fhem($);
 
-sub CommandAt($$);
 sub CommandAttr($$);
 sub CommandDefAttr($$);
 sub CommandDefine($$);
+sub CommandDelAttr($$);
 sub CommandDelete($$);
-sub CommandFhzDev($$);
 sub CommandGet($$);
 sub CommandHelp($$);
 sub CommandInclude($$);
 sub CommandInform($$);
 sub CommandList($$);
-sub CommandLogfile($$);
-sub CommandModpath($$);
-sub CommandNotifyon($$);
-sub CommandPidfile($$);
-sub CommandPort($$);
 sub CommandRereadCfg($$);
 sub CommandQuit($$);
-sub CommandSavefile($$);
+sub CommandSave($$);
 sub CommandSet($$);
 sub CommandSetstate($$);
 sub CommandSleep($$);
 sub CommandShutdown($$);
-sub CommandVerbose($$);
 sub CommandXmlList($$);
 sub CommandTrigger($$);
 
 ##################################################
 # Variables:
 # global, to be able to access them from modules
+
+#Special values in %modules (used if set):
+# DefFn    - define a "device" of this type
+# UndefFn  - clean up at delete
+# ParseFn  - Interpret a raw message
+# ListFn   - details for this "device"
+# SetFn    - set/activate this device
+# GetFn    - get some data from this device
+# StateFn  - set local info for this device, do not activate anything
+# TimeFn   - if the TRIGGERTIME of a device is reached, call this function
+# NotifyFn - call this if some device changed its properties
+# ReadFn - Reading from a filedescriptor (see FHZ/WS300)
+
+#Special values in %defs:
+# TYPE    - The name of the module it belongs to
+# STATE   - Oneliner describing its state
+# NR      - its "serial" number
+# DEF     - its definition
+# READINGS- The readings. Each value has a "VAL" and a "TIME" component.
+# FD      - FileDescriptor. If set, it will be integrated into the global select
+# IODev   - attached to io device
+# CHANGED - Currently changed attributes of this device. Used by NotifyFn
+# VOLATILE- Set if the definition should be saved to the "statefile"
+
+use vars qw(%modules);		# List of loaded modules (device/log/etc)
 use vars qw(%defs);		# FHEM device/button definitions
-use vars qw(%logs);		# Log channels
 use vars qw(%attr);		# Attributes
+
 use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
-use vars qw(%devmods);		# List of loaded device modules
-
-my %ntfy;
-my %at;
+use vars qw($nextat);           # used by the at module
 
 my $server;			# Server socket
-my $verbose = 0;
-my $logfile;			# logfile name, if its "-" then wont background
 my $currlogfile;		# logfile, without wildcards
-my $logopened;
+my $logopened = 0;              # logfile opened or using stdout
 my %client;			# Client array
-my %logmods;			# List of loaded logger modules
-my $savefile = "";		# Save ste info and at cmd's here
-my $nextat;
 my $rcvdquit;			# Used for quit handling in init files
-my $configfile=$ARGV[0];
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my $modpath_set;                # Check if modpath was used, and report if not.
 my $global_cl;			# To use from perl snippets
@@ -120,22 +129,36 @@ my %defattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $init_done = 0;
-my $pidfilename;
+my $AttrList = "room";
 
+
+$modules{Internal}{ORDER} = -1;
+$modules{Internal}{AttrList} = "configfile logfile modpath " .
+                        "pidfilename port statefile userattr verbose:1,2,3,4,5 version";
+
+$defs{global}{NR}    = $devcount++;
+$defs{global}{TYPE}  = "Internal";
+$defs{global}{STATE} = "Internal";
+$defs{global}{DEF}   = "<no definition>";
+
+CommandAttr(undef, "global verbose 3");
+CommandAttr(undef, "global configfile $ARGV[0]");
+CommandAttr(undef, "global logfile -");
+CommandAttr(undef, "global version =VERS= from =DATE=");
 
 my %cmds = (
   "?"       => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
-  "at"      => { Fn=>"CommandAt",
-	    Hlp=>"<timespec> <command>,issue a command at a given time" },
-  "attr"    => { Fn=>"CommandAttr", 
-	    Hlp=>"<devname> <attrname> <attrvalue>,set attributes for <devname>" },
+  "attr" => { Fn=>"CommandAttr", 
+	    Hlp=>"<name> <attrname> [<attrvalue>],set attributes for <name>" },
   "defattr" => { Fn=>"CommandDefAttr", 
 	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "define"  => { Fn=>"CommandDefine",
-	    Hlp=>"<name> <type> <options>,define a code" },
+	    Hlp=>"<name> <type> <options>,define a device/at/notifyon entity" },
+  "delattr" => { Fn=>"CommandDelAttr", 
+	    Hlp=>"<name> [<attrname>],delete attribute <attrname> for <name>" },
   "delete"  => { Fn=>"CommandDelete",
-	    Hlp=>"{def|ntfy|at} name,delete the corresponding definition"},
+	    Hlp=>"name,delete the corresponding definition"},
   "get"     => { Fn=>"CommandGet", 
 	    Hlp=>"<name> <type dependent>,request data from <name>" },
   "help"    => { Fn=>"CommandHelp",
@@ -146,24 +169,14 @@ my %cmds = (
 	    Hlp=>"{on|off},echo all commands and events to this client" },
   "list"    => { Fn=>"CommandList",
 	    Hlp=>"[device],list definitions and status info" },
-  "logfile" => { Fn=>"CommandLogfile", 
-	    Hlp=>"filename,use - for stdout" },
-  "modpath" => { Fn=>"CommandModpath",
-	    Hlp=>"<path>,the directory where the FHEM subdir is" },
-  "notifyon"=> { Fn=>"CommandNotifyon",
-	    Hlp=>"<name> <shellcmd>,exec <shellcmd> when recvd signal for <name>" },
-  "pidfile" => { Fn=>"CommandPidfile", 
-	    Hlp=>"filename,write the process id into the pidfile" },
-  "port"    => { Fn=>"CommandPort",
-	    Hlp=>"<port> [global],TCP/IP port for the server" },
   "quit"    => { Fn=>"CommandQuit",
 	    Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
 	    Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
   "rereadcfg"  => { Fn=>"CommandRereadCfg",
 	    Hlp=>",reread the config file" },
-  "savefile"=> { Fn=>"CommandSavefile", 
-	    Hlp=>"<filename>,on shutdown save all states and at entries" },
+  "save"    => { Fn=>"CommandSave", 
+	    Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet", 
 	    Hlp=>"<name> <type dependent>,transmit code for <name>" },
   "setstate"=> { Fn=>"CommandSetstate", 
@@ -174,8 +187,6 @@ my %cmds = (
             Hlp=>"<usecs>,sleep for usecs" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<dev> <state>,trigger notify command" },
-  "verbose" => { Fn=>"CommandVerbose",
-	    Hlp=>"<level>,verbosity level, 0-5" },
   "xmllist" => { Fn=>"CommandXmlList",
             Hlp=>",list definitions and status info as xml" },
 );
@@ -201,39 +212,47 @@ if(int(@ARGV) == 2) {
   $server = IO::Socket::INET->new(PeerAddr => $addr);
   die "Can't connect to $addr\n" if(!$server);
   syswrite($server, "$ARGV[1] ; quit\n");
-  my $err = 0;
   while(sysread($server, $buf, 256) > 0) {
     print($buf);
-    $err = 1;
   }
-  exit($err);
+  exit(0);
 }
+# End of client code
+###################################################
 
-my $ret = CommandInclude(undef, $configfile);
+my $ret = CommandInclude(undef, $attr{global}{configfile});
 die($ret) if($ret);
 
-if($logfile ne "-") {
+# Go to background if the logfile is a real file (not stdout)
+if($attr{global}{logfile} ne "-") {
   defined(my $pid = fork) || die "Can't fork: $!";
   exit(0) if $pid;
 }
 
 die("No modpath specified in the configfile.\n") if(!$modpath_set);
+die("No port specified in the configfile.\n") if(!$server);
 
-if($savefile && -r $savefile) {
-  $ret = CommandInclude(undef, $savefile);
+if($attr{global}{statefile} && -r $attr{global}{statefile}) {
+  $ret = CommandInclude(undef, $attr{global}{statefile});
   die($ret) if($ret);
 }
 SignalHandling();
 
-
-Log 0, "Server started (version $version, pid $$)";
+Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
 ################################################
 # Main loop
 
 $init_done = 1;
-CommandPidfile(undef, $pidfilename) if($pidfilename);
+my $pfn = $attr{global}{pidfilename};
+if($pfn) {
+  return "$pfn: $!" if(!open(PID, ">$pfn"));
+  print PID $$ . "\n";
+  close(PID);
+}
 
+
+# Main Loop
 while (1) {
   my ($rout, $rin) = ('', '');
 
@@ -258,9 +277,7 @@ while (1) {
   # Message from the hardware (FHZ1000/WS3000/etc)
   foreach my $p (keys %defs) {
     next if(!$defs{$p}{FD} || !vec($rout, $defs{$p}{FD}, 1));
-    no strict "refs";
-    &{$devmods{$defs{$p}{TYPE}}{ReadFn}}($defs{$p});
-    use strict "refs";
+    CallFn($p, "ReadFn", $defs{$p});
   }
   
   if(vec($rout, $server->fileno(), 1)) {
@@ -298,6 +315,9 @@ while (1) {
 }
 
 ################################################
+#Functions ahead, no more "plain" code
+
+################################################
 sub
 IsDummy($)
 {
@@ -309,13 +329,13 @@ IsDummy($)
 
 ################################################
 sub
-GetLogLevel($)
+GetLogLevel(@)
 {
-  my $dev = shift;
+  my ($dev,$deflev) = @_;
 
   return $attr{$dev}{loglevel}
   	if(defined($attr{$dev}) && defined($attr{$dev}{loglevel}));
-  return 2;
+  return defined($deflev) ? $deflev : 2;
 }
 
 
@@ -325,16 +345,17 @@ Log($$)
 {
   my ($loglevel, $text) = @_;
 
-  return if($loglevel > $verbose);
+  return if($loglevel > $attr{global}{verbose});
 
   my @t = localtime;
-  my $nfile = ResolveDateWildcards($logfile, @t);
+  my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
   OpenLogfile($nfile) if($currlogfile && $currlogfile ne $nfile);
+
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
         $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
 
 #  my ($seconds, $microseconds) = gettimeofday();
-#  $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d.%03d",
+#  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d.%03d",
 #        $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0], $microseconds/1000);
 
   if($logopened) {
@@ -371,7 +392,7 @@ IOWrite($@)
   }
 
   no strict "refs";
-  &{$devmods{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
+  &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
   use strict "refs";
 }
 
@@ -396,6 +417,7 @@ AnalyzeInput($)
 }
 
 #####################################
+# i.e. split a line by ; (escape ;;), and execute each
 sub
 AnalyzeCommandChain($$)
 {
@@ -407,15 +429,6 @@ AnalyzeCommandChain($$)
     AnalyzeCommand($c, $subcmd);
     last if($c && !defined($client{$c}));	 # quit
   }
-}
-
-#####################################
-# Used from perl oneliners inside of scripts
-sub
-fhz($)
-{
-  my $param = shift;
-  return AnalyzeCommandChain($global_cl, $param);
 }
 
 #####################################
@@ -461,7 +474,6 @@ AnalyzeCommand($$)
 
   $cmd =~ s/^[ \t]*//;
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
-
   return if(!$fn);
 
   #############
@@ -484,10 +496,12 @@ AnalyzeCommand($$)
     }
     return;
   }
+
   $param = "" if(!defined($param));
   no strict "refs";
   my $ret = &{$cmds{$fn}{Fn} }($cl, $param);
   use strict "refs";
+
   if($ret) {
     if($cl) {
       syswrite($client{$cl}{fd}, $ret . "\n");
@@ -517,6 +531,7 @@ CommandHelp($$)
   return $str;
 }
 
+#####################################
 sub
 CommandInclude($$)
 {
@@ -541,28 +556,6 @@ CommandInclude($$)
   return undef;
 }
 
-#####################################
-sub
-CommandPort($$)
-{
-  my ($cl, $arg) = @_;
-
-  my ($port, $global) = split(" ", $arg);
-  if($global && $global ne "global") {
-    return "Bad syntax, usage: port <portnumber> [global]";
-  }
-
-  close($server) if($server);
-  $server = IO::Socket::INET->new(
-	Proto        => 'tcp',
-	LocalHost    => ($global ? undef : "localhost"),
-	LocalPort    => $port,
-	Listen       => 10,
-	ReuseAddr    => 1);
-
-  die "Can't open server port at $port\n" if(!$server);
-  return undef;
-}
 
 #####################################
 sub
@@ -570,7 +563,7 @@ OpenLogfile($)
 {
   my $param = shift;
 
-  close(LOG) if($logfile);
+  close(LOG);
   $logopened=0;
   $currlogfile = $param;
   if($currlogfile eq "-") {
@@ -597,34 +590,6 @@ OpenLogfile($)
   return undef;
 }
 
-#####################################
-sub
-CommandLogfile($$)
-{
-  my ($cl, $param) = @_;
-
-  $logfile = $param;
-
-  my @t = localtime;
-  my $ret = OpenLogfile(ResolveDateWildcards($param, @t));
-  die($ret) if($ret);
-  return undef;
-}
-
-
-
-#####################################
-sub
-CommandVerbose($$)
-{
-  my ($cl, $param) = @_;
-  if($param =~ m/^[0-5]$/) {
-    $verbose = $param;
-    return undef;
-  } else {
-    return "Valid value for verbose are 0,1,2,3,4,5";
-  }
-}
 
 #####################################
 sub
@@ -632,26 +597,21 @@ CommandRereadCfg($$)
 {
   my ($cl, $param) = @_;
 
-  return "RereadCfg: No parameters are accepted" if($param);
-  DoSavefile();
+  WriteStatefile();
 
   foreach my $d (keys %defs) {
-    no strict "refs";
-    my $ret = &{$devmods{$defs{$d}{TYPE}}{UndefFn}}($defs{$d}, $d);
-    use strict "refs";
+    my $ret = CallFn($d, "UndefFn", $defs{$d}, $d);
     return $ret if($ret);
   }
 
   %defs = ();
-  %logs = ();
   %attr = ();
-  %ntfy = ();
-  %at   = ();
 
   my $ret;
-  $ret = CommandInclude($cl, $configfile);
+  $ret = CommandInclude($cl, $attr{global}{configfile});
   return $ret if($ret);
-  $ret = CommandInclude($cl, $savefile) if($savefile);
+  $ret = CommandInclude($cl, $attr{global}{statefile})
+                if($attr{global}{statefile} && -r $attr{global}{statefile});
   return $ret;
 }
 
@@ -673,41 +633,96 @@ CommandQuit($$)
 
 #####################################
 sub
-DoSavefile()
+WriteStatefile()
 {
-  return if(!$savefile);
-  if(!open(SFH, ">$savefile")) {
-    Log 1, "Cannot open $savefile: $!";
-    return;
+  return if(!$attr{global}{statefile});
+  if(!open(SFH, ">$attr{global}{statefile}")) {
+    my $msg = "Cannot open $attr{global}{statefile}: $!";
+    Log 1, $msg;
+    return $msg;
   }
 
   my $t = localtime;
   print SFH "#$t\n";
 
   foreach my $d (sort keys %defs) {
-    my $t = $defs{$d}{TYPE};
+    print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n"
+        if($defs{$d}{VOLATILE});
     print SFH "setstate $d $defs{$d}{STATE}\n"
-      if($defs{$d}{STATE} && $defs{$d}{STATE} ne "unknown");
+        if($defs{$d}{STATE} && $defs{$d}{STATE} ne "unknown");
 
     #############
     # Now the detailed list
-    no strict "refs";
-    my $str = &{$devmods{$defs{$d}{TYPE}}{ListFn}}($defs{$d});
-    use strict "refs";
-    next if($str =~ m/^No information about/);
-
-    foreach my $l (split("\n", $str)) {
-      print SFH "setstate $d $l\n"
+    my $r = $defs{$d}{READINGS};
+    if($r) {
+      foreach my $c (sort keys %{$r}) {
+        print SFH "setstate $d $r->{$c}{TIME} $c $r->{$c}{VAL}\n";
+      }
     }
-
-  }
-
-  foreach my $t (sort keys %at) {
-    # $t =~ s/_/ /g; # Why is this here?
-    print SFH "at $t\n";
   }
 
   close(SFH);
+}
+
+#####################################
+sub
+CommandSave($$)
+{
+  my ($cl, $param) = @_;
+  my $ret = WriteStatefile();
+
+  $param = $attr{global}{configfile} if(!$param);
+  return "No configfile attribute set and no argument specified" if(!$param);
+  if(!open(SFH, ">$param")) {
+    return "Cannot open $param: $!";
+  }
+
+  # Sort the devices by room
+  my (%rooms, %savefirst);
+  foreach my $d (sort keys %defs) {
+    next if($d eq "global");
+    my $r = ($attr{$d} && $attr{$d}{room}) ? $attr{$d}{room} : "~";
+    $rooms{$r}{$d} = 1;
+    $savefirst{$d} = $r if($attr{$d} && $attr{$d}{savefirst});
+  }
+
+  # First the global definitions
+  my $t = localtime;
+  print SFH "#$t\n\n";
+  print SFH "attr global userattr $attr{global}{userattr}\n"
+                                if($attr{global}{userattr});
+  foreach my $a (sort keys %{$attr{global}}) {
+    next if($a eq "configfile" || $a eq "version" || $a eq "userattr");
+    print SFH "attr global $a $attr{global}{$a}\n";
+  }
+  print SFH "\n";
+
+  # then the "important" ones (FHZ, WS300Device)
+  foreach my $d (sort keys %savefirst) {
+    my $r = $savefirst{$d};
+    delete $rooms{$r}{$d};
+    delete $rooms{$r} if(int(%{$rooms{$r}}) == 0);
+    print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n";
+    foreach my $a (sort keys %{$attr{$d}}) {
+      next if($a eq "savefirst");
+      print SFH "attr $d $a $attr{$d}{$a}\n";
+    }
+  }
+
+  foreach my $r (sort keys %rooms) {
+    print SFH "\ndefattr" . ($r ne "~" ? " room $r" : "") . "\n";
+    foreach my $d (sort keys %{$rooms{$r}} ) {
+      next if($defs{$d}{VOLATILE});
+      print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n";
+      foreach my $a (sort keys %{$attr{$d}}) {
+        next if($a eq "room");
+        print SFH "attr $d $a $attr{$d}{$a}\n";
+      }
+    }
+  }
+
+  close(SFH);
+  return undef;
 }
 
 #####################################
@@ -716,26 +731,11 @@ CommandShutdown($$)
 {
   my ($cl, $param) = @_;
   Log 0, "Server shutdown";
-  DoSavefile();
-  unlink($pidfilename) if($pidfilename);
+  WriteStatefile();
+  unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
   exit(0);
 }
 
-#####################################
-sub
-CommandNotifyon($$)
-{
-  my ($cl, $param) = @_;
-
-  my @a = split("[ \t]", $param, 2);
-
-  # Checking for misleading regexps
-  eval { "Hallo" =~ m/^$a[0]$/ };
-  return "Bad regexp: $@" if($@);
-
-  $ntfy{$a[0]} = SemicolonEscape($a[1]);
-  return undef;
-}
 
 #####################################
 sub
@@ -744,11 +744,8 @@ DoSet(@)
   my @a = @_;
 
   my $dev = $a[0];
-  my $ret;
-  no strict "refs";
-  $ret = &{$devmods{$defs{$dev}{TYPE}}{SetFn}}($defs{$dev}, @a);
-  use strict "refs";
-
+  return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
+  my $ret = CallFn($dev, "SetFn", $defs{$dev}, @a);
   return $ret if($ret);
 
   shift @a;
@@ -761,7 +758,9 @@ CommandSet($$)
 {
   my ($cl, $param) = @_;
   my @a = split("[ \t][ \t]*", $param);
-  return "Usage: set <name> <type-dependent-options>" if(int(@a) < 1);
+  return "Usage: set <name> <type-dependent-options>\n" .
+         "       <name> can be an enumeration (separated by comma)\n" .
+         "       or a range (separated by -)" if(int(@a)<1);
 
   my $dev = $a[0];
   my @rets;
@@ -809,18 +808,13 @@ CommandGet($$)
   return "Usage: get <name> <type-dependent-options>" if(int(@a) < 1);
   my $dev = $a[0];
   return "Please define $dev first ($param)" if(!defined($defs{$dev}));
+  return "No get implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{GetFn});
 
-  ########################
-  # Type specific set
-  my $ret;
-  no strict "refs";
-  $ret = &{$devmods{$defs{$a[0]}{TYPE}}{GetFn}}($defs{$dev}, @a);
-  use strict "refs";
-
-  return $ret;
+  return CallFn($a[0], "GetFn", $defs{$dev}, @a);
 }
 
 #####################################
+# Parse a timespec: Either HH:MM:SS or HH:MM or { perfunc() }
 sub
 GetTimeSpec($)
 {
@@ -840,7 +834,7 @@ GetTimeSpec($)
       ($hr, $min, $sec) = ($1, $2, 0);
     } else {
       $tspec = "<empty string>" if(!$tspec);
-      return ("the at function must return a timespec HH:MM:SS and not $tspec.",
+      return ("the at function \"$fn\" must return a timespec and not $tspec.",
       		undef, undef, undef, undef);
     }
   } else {
@@ -850,90 +844,45 @@ GetTimeSpec($)
   return (undef, $hr, $min, $sec, $fn);
 }
 
-#####################################
-sub
-CommandAt($$)
-{
-  my ($cl, $def) = @_;
-  my ($tm, $command) = split("[ \t]+", $def, 2);
-
-  return "Usage: at <timespec> <fhem-command>" if(!$command);
-  return "Wrong timespec, use \"[+][*[{count}]]<time or func>\""
-                                        if($tm !~ m/^(\+)?(\*({\d+})?)?(.*)$/);
-  my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
-  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($tspec);
-  return $err if($err);
-
-  $rel = "" if(!defined($rel));
-  $rep = "" if(!defined($rep));
-  $cnt = "" if(!defined($cnt));
-
-  my $ot = time;
-  my @lt = localtime($ot);
-  my $nt = $ot;
-
-  $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0]) 	# Midnight for absolute time
-  			if($rel ne "+");
-  $nt += ($hr*3600+$min*60+$sec); # Plus relative time
-  $nt += 86400 if($ot >= $nt);# Do it tomorrow...
-
-  @lt = localtime($nt);
-  my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
-
-  if($rep) {	# Setting the number of repetitions
-    $cnt =~ s/[{}]//g;
-    return undef if($cnt eq "0");
-    $cnt = 0 if(!$cnt);
-    $cnt--;
-    $at{$def}{REP} = $cnt;
-  }
-  $at{$def}{NTM} = $ntm if($rel eq "+" || $fn);
-  $at{$def}{TIM} = $nt;
-  $at{$def}{CMD} = SemicolonEscape($command);
-  $nextat = $nt if(!$nextat || $nextat > $nt);
-
-  return undef;
-}
-
 
 #####################################
 sub
 CommandDefine($$)
 {
   my ($cl, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+  my @a = split("[ \t][ \t]*", $def, 3);
 
   return "Usage: define <name> <type> <type dependent arguments>"
   					if(int(@a) < 2);
-  return "Unknown type $a[1]"
-  	if(!defined($devmods{$a[1]}) && !defined($logmods{$a[1]}));
-  return "$a[0] already defined" if(defined($defs{$a[0]}));
-  return "Only following characters are allowed in a name: A-Za-z0-9-.:"
-        if($a[0] !~ m/^[a-z0-9.:-]*$/i);
+
+  # Return a list of modules
+  if(!$modules{$a[1]} || !$modules{$a[1]}{DefFn}) {
+    my @m;
+    foreach my $i (sort keys %modules) {
+      push @m, $i if($modules{$i}{DefFn})
+    }
+    return "Unknown argument $a[1], choose one of " . join(" ",@m);
+  }
+
+  return "$a[0] already defined, delete it first" if(defined($defs{$a[0]}));
+  return "Invalid characters in name (not A-Za-z0-9.:-): $a[0]"
+                        if($a[0] !~ m/^[a-z0-9.:_-]*$/i);
 
   my %hash;
 
   $hash{NAME}  = $a[0];
   $hash{TYPE}  = $a[1];
   $hash{STATE} = "???";
-  $hash{DEF}   = $def;
+  $hash{DEF}   = $a[2];
   $hash{NR}    = $devcount++;
 
-  # If the device wants to issue initialization gets/sets, then it should be 
+  # If the device wants to issue initialization gets/sets, then it needs to be 
   # in the global hash.
-  my $ghash = (defined($devmods{$a[1]}) ? \%defs : \%logs);
-  $ghash->{$a[0]} = \%hash;
+  $defs{$a[0]} = \%hash;
 
-  ########################
-  # Type specific define
-  my $ret;
-  my $fnname = ($devmods{$a[1]} ? $devmods{$a[1]}{DefFn} :
-                                  $logmods{$a[1]}{DefFn} );
-  no strict "refs";
-  $ret = &{$fnname}(\%hash, @a);
-  use strict "refs";
+  my $ret = CallFn($a[0], "DefFn", \%hash, $def);
   if($ret) {
-    delete $ghash->{$a[0]}
+    delete $defs{$a[0]}
   } else {
     foreach my $da (sort keys (%defattr)) {     # Default attributes
       CommandAttr($cl, "$a[0] $da $defattr{$da}");
@@ -951,7 +900,7 @@ AssignIoPort($)
 
   # Set the I/O device
   for my $p (sort { $defs{$b}{NR} cmp $defs{$a}{NR} } keys %defs) {
-    my $cl = $devmods{$defs{$p}{TYPE}}{Clients};
+    my $cl = $modules{$defs{$p}{TYPE}}{Clients};
     if(defined($cl) && $cl =~ m/:$hash->{TYPE}:/) {
       $hash->{IODev} = $defs{$p};
       last;
@@ -960,149 +909,94 @@ AssignIoPort($)
   Log 3, "No I/O device found for $hash->{NAME}" if(!$hash->{IODev});
 }
 
-#############
-# internal
-sub
-DoDel($$$)
-{
-  my($hash, $type, $v) = @_;
-
-  if($type eq "def") {
-    no strict "refs";
-    my $ret = &{$devmods{$hash->{$v}{TYPE}}{UndefFn}}($hash->{$v}, $v);
-    use strict "refs";
-    return $ret if($ret);
-    delete($attr{$v});
-  }
-  delete($hash->{$v});
-  return undef;
-}
 
 #############
 sub
 CommandDelete($$)
 {
   my ($cl, $def) = @_;
-  my @a = split("[ \t]+", $def, 2);
-  my $hash;
 
-  my $arg = $a[1];
-  if($a[0] eq "def") {
-    $hash = \%defs;
-  } elsif($a[0] eq "ntfy") {
-    $hash = \%ntfy;
-  } elsif($a[0] eq "at") {
-    $hash = \%at;
-    $arg =~ s/ \([0-2][0-9]:[0-5][0-9]:[0-5][0-9]\)$//;
-  } elsif($a[0] eq "attr") {
-    $hash = \%attr;
-  } else {
-    return "Unknown delete category, use one of def, ntfy or at";
-  }
+  my $ret = CallFn($def, "UndefFn", $defs{$def}, $def);
+  return $ret if($ret);
 
-  my $found;
-
-  if(defined($hash->{$arg})) {
-
-    my $ret = DoDel($hash, $a[0], $arg);
-    return $ret if($ret);
-    $found = 1;
-
-  } else {
-
-    # Checking for misleading regexps
-    eval { "Hallo" =~ m/$arg/ };
-    return "Bad argument: $@" if($@);
-
-    foreach my $v (keys %{ $hash }) {
-      if($v =~ m/$arg/) {
-	my $ret = DoDel($hash, $a[0], $v);
-	return $ret if($ret);
-	$found = 1;
-      }
-    }
-
-    ##############
-    # Handle the logs too
-    if(!$found && $a[0] eq "def") {
-      foreach my $v (keys %logs) {
-	if($v =~ m/$arg/) {
-	  no strict "refs";
-	  my $ret = &{$logmods{$logs{$v}{TYPE}}{UndefFn}}($logs{$v}, $v);
-	  use strict "refs";
-	  return $ret if($ret);
-	  delete($logs{$v});
-	  $found = 1;
-	}
-      }
-    }
-  }
-
-  return "No $a[0] values matched $a[1]" if(!$found);
+  delete($attr{$def});
+  delete($defs{$def});
 
   return undef;
 }
+
+#############
+sub
+CommandDelAttr($$)
+{
+  my ($cl, $def) = @_;
+
+  my @a = split(" ", $def, 2);
+  return "Usage: delattr <name> [<attrname>]" if(@a < 1);
+  return "Cannot delete global parameters" if($a[0] eq "global");
+  return "No definition found for $a[0]\n" if(!$defs{$a[0]});
+
+  $ret = CallFn($a[0], "AttrFn", "del", @a);
+  return $ret if($ret);
+
+  if(@a == 1) {
+    delete($attr{$a[0]});
+    return undef;
+  }
+  return "Attribute not defined"
+                if(!defined($attr{$a[0]}) || !defined($attr{$a[0]}{$a[1]}));
+  delete($attr{$a[0]}{$a[1]});
+  return undef;
+}
+
 
 #####################################
 sub
 CommandList($$)
 {
   my ($cl, $param) = @_;
-  my $str;
+  my $str = "";
 
   if(!$param) {
 
     $str = "\nType list <name> for detailed info.\n";
     my $lt = "";
-    			# Sort first by type then by name
-    for my $d (sort { my $x = $devmods{$defs{$a}{TYPE}}{ORDER} cmp
-		  	      $devmods{$defs{$b}{TYPE}}{ORDER};
+
+    # Sort first by type then by name
+    for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
+		  	      $modules{$defs{$b}{TYPE}}{ORDER};
 		         $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
       my $t = $defs{$d}{TYPE};
-      $str .= "\n$t devices:\n" if($t ne $lt);
+      $str .= "\n$t:\n" if($t ne $lt);
       $str .= sprintf("  %-20s (%s)\n", $d, $defs{$d}{STATE});
       $lt = $t;
-    }
-    $str .= "\n";
-
-    $str .= "NotifyOn:\n";
-    for my $n (sort keys %ntfy) {
-      $str .= sprintf("  %-20s %s\n", $n, $ntfy{$n});
-    }
-    $str .= "\n";
-
-    $str .= "At:\n";
-    for my $i (sort keys %at) {
-      if($at{$i}{NTM}) {
-        $str .= "  $i ($at{$i}{NTM})\n";
-      } else {
-        $str .= "  $i\n";
-      }
-    }
-    $str .= "\n";
-
-    $str .= "Logs:\n";
-    for my $i (sort keys %logs) {
-      $str .= "  " . $logs{$i}{DEF} . "\n";
     }
 
   } else {
 
-    my @a = split(" ", $param);
-    return "Usage: list [name]" if(@a > 1);
-    return "No device named $a[0] found" if(!defined($defs{$a[0]}));
+    return "No device named $param found" if(!defined($defs{$param}));
+    my $d = $defs{$param};
 
-    no strict "refs";
-    $str = "\n";
-    $str .= "Definition: $defs{$a[0]}{DEF}\n";
-    $str .= "Attached I/O device: $defs{$a[0]}{IODev}{NAME}\n"
-    					if($defs{$a[0]}{IODev});
-    foreach my $c (sort keys %{$attr{$a[0]}}) {
-      $str .= "$c $attr{$a[0]}{$c}\n";
+    $str .= "Internals:\n";
+    foreach my $c (sort keys %{$d}) {
+      next if(ref($d->{$c}));
+      $str .= sprintf("  %-10s %s\n", $c, $d->{$c});
     }
-    $str .= &{$devmods{$defs{$a[0]}{TYPE}}{ListFn}}($defs{$a[0]});
-    use strict "refs";
-    
+    $str .= sprintf("  %-10s %s\n", "IODev", $d->{IODev}{NAME}) if($d->{IODev});
+
+    $str .= "Attributes:\n";
+    foreach my $c (sort keys %{$attr{$param}}) {
+      $str .= sprintf("  %-10s %s\n", $c, $attr{$param}{$c});
+    }
+
+    my $r = $d->{READINGS};
+    if($r) {
+      $str .= "Readings:\n";
+      foreach my $c (sort keys %{$r}) {
+        $str .= sprintf("  %-19s   %-15s %s\n",$r->{$c}{TIME},$c,$r->{$c}{VAL});
+      }
+    }
+
   }
 
   return $str;
@@ -1114,6 +1008,7 @@ sub
 XmlEscape($)
 {
   my $a = shift;
+  return "" if(!$a);
   $a =~ s/&/&amp;/g;
   $a =~ s/"/&quot;/g;
   $a =~ s/</&lt;/g;
@@ -1130,90 +1025,52 @@ CommandXmlList($$)
   my $str = "<FHZINFO>\n";
   my $lt = "";
 
+  for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
+    		            $modules{$defs{$b}{TYPE}}{ORDER};
+    		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
 
-  for my $d (sort { my $x =
-  		$devmods{$defs{$a}{TYPE}}{ORDER} cmp
-    		$devmods{$defs{$b}{TYPE}}{ORDER};
-    		$x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
-
-      my $t = $defs{$d}{TYPE};
-
+      my $p = $defs{$d};
+      my $t = $p->{TYPE};
 
       if($t ne $lt) {
-        $str .= "\t</${lt}_DEVICES>\n" if($lt);
-        $str .= "\t<${t}_DEVICES>\n";
+        $str .= "\t</${lt}_LIST>\n" if($lt);
+        $str .= "\t<${t}_LIST>\n";
       }
       $lt = $t;
 
-      no strict "refs";
-      my @lines = split("\n", &{$devmods{$t}{ListFn}}($defs{$d}));
-      use strict "refs";
+      my $a1 = XmlEscape($p->{STATE});
+      my $a2 = CommandSet(undef, "$d ?");
+      $a2 =~ s/.*choose one of //;
+      $a2 = "" if($a2 =~ /^No set implemented for/);
+      $a2 = XmlEscape($a2);
+      my $a3 = XmlEscape(getAllAttr($d));
 
-      my $def = XmlEscape($defs{$d}{DEF});
-      my $xmld = XmlEscape($d);
-      my $xmls = XmlEscape($defs{$d}{STATE});
+      $str .= "\t\t<$t name=\"$d\" state=\"$a1\" sets=\"$a2\" attrs=\"$a3\">\n";
 
-      $def =~ s/ +/ /g;
-      $str .= "\t\t<$t name=\"$xmld\" definition=\"$def\" state=\"$xmls\"";
-      my $multiline = (int(@lines) || defined($attr{$d}));
-      $str .= ($multiline ? ">\n" : "/>\n");
+      foreach my $c (sort keys %{$p}) {
+        next if(ref($p->{$c}));
+        $str .= sprintf("\t\t\t<INT key=\"%s\" value=\"%s\"/>\n",
+                        XmlEscape($c), XmlEscape($p->{$c}));
+      }
+      $str .= sprintf("\t\t\t<INT key=\"IODev\" value=\"%s\"/>\n",
+                                        $p->{IODev}{NAME}) if($p->{IODev});
 
       foreach my $c (sort keys %{$attr{$d}}) {
-        my $xc = XmlEscape($c);
-        my $xv = XmlEscape($attr{$d}{$c});
-	$str .= "\t\t\t<ATTR key=\"$xc\" value=\"$xv\"/>\n";
+        $str .= sprintf("\t\t\t<ATTR key=\"%s\" value=\"%s\"/>\n",
+                        XmlEscape($c), XmlEscape($attr{$d}{$c}));
       }
 
-      foreach my $l (@lines) {
-        my ($date, $time, $attr, $val) = split(" ", $l, 4);
-	$val = "" if(!$val);
-        $attr = XmlEscape($attr);
-        $val  = XmlEscape($val);
-	$str .= "\t\t\t<STATE name=\"$attr\" " .
-      		"value=\"$val\" measured=\"$date $time\"/>\n";
+      my $r = $p->{READINGS};
+      if($r) {
+        foreach my $c (sort keys %{$r}) {
+	  $str .=
+            sprintf("\t\t\t<STATE key=\"%s\" value=\"%s\" measured=\"%s\"/>\n",
+                XmlEscape($c), XmlEscape($r->{$c}{VAL}), $r->{$c}{TIME});
+        }
       }
-      $str .= "\t\t</$t>\n" if($multiline);
+      $str .= "\t\t</$t>\n";
   }
-  $str .= "\t</${lt}_DEVICES>\n" if($lt);
-
-  $lt = "";
-  for my $i (sort keys %logs) {
-    $str .= "\t<LOGS>\n" if(!$lt);
-    $lt = XmlEscape($logs{$i}{DEF});
-    my @a = split(" ", $lt, 2);
-    $str .= "\t\t<LOG name=\"$a[0]\" definition=\"$lt\"/>\n";
-    foreach my $a (sort keys %{$attr{$i}}) {
-      my $xa = XmlEscape($a);
-      my $v = XmlEscape($attr{$i}{$a});
-      $str .= "\t\t\t<ATTR key=\"$xa\" value=\"$v\"/>\n";
-    }
-  }
-  $str .= "\t</LOGS>\n" if($lt);
-
-  $str .= "\t<NOTIFICATIONS>\n";
-  for my $n (sort keys %ntfy) {
-    my $xn = XmlEscape($n);
-    my $cmd = XmlEscape($ntfy{$n});
-    $str .= "\t\t<NOTIFY_ON event=\"$xn\" command=\"$cmd\"/>\n";
-  }
-  $str .= "\t</NOTIFICATIONS>\n";
-
-
-  $str .= "\t<AT_JOBS>\n";
-  for my $i (sort keys %at) {
-    my $cmd = XmlEscape($i);
-    if($at{$i}{NTM}) {
-      $str .= "\t\t<AT command=\"$cmd\" next=\"$at{$i}{NTM}\"/>\n";
-    } else {
-      $str .= "\t\t<AT command=\"$cmd\"/>\n";
-    }
-    foreach my $c (sort keys %{$attr{$i}}) {
-      my $xc = XmlEscape($c);
-      my $v = XmlEscape($attr{$i}{$c});
-      $str .= "\t\t\t<ATTR key=\"$xc\" value=\"$v\"/>\n";
-    }
-  }
-  $str .= "\t</AT_JOBS>\n";
+  $str .= "\t</${lt}_LIST>\n" if($lt);
   $str .= "</FHZINFO>\n";
   return $str;
 }
@@ -1245,54 +1102,23 @@ CommandReload($$)
   }
   use strict "refs";
 
-  $devmods{$m} = \%hash if($hash{Category} eq "DEV");
-  $logmods{$m} = \%hash if($hash{Category} eq "LOG");
+  $modules{$m} = \%hash;
 
   return undef;
 }
 
+
 #####################################
 sub
-CommandModpath($$)
+getAllAttr($)
 {
-  my ($cl, $param) = @_;
-
-  return "modpath must point to a directory where the FHEM subdir is"
-  	if(! -d "$param/FHEM");
-  my $modpath = "$param/FHEM";
-
-  opendir(DH, $modpath) || return "Can't read $modpath: $!";
-
-  my $counter = 0;
-  foreach my $m (sort grep(/^[0-9][0-9].*\.pm$/,readdir(DH))) {
-
-    $counter++;
-    Log 5, "Loading $m";
-    require "$modpath/$m";
-
-    next if($m !~ m/([0-9][0-9])_(.*)\.pm$/);
-
-    $m = $2;
-    my %hash;
-    $hash{ORDER} = $1;
-
-    no strict "refs";
-    my $ret = &{ "${m}_Initialize" }(\%hash);
-    use strict "refs";
-
-    $devmods{$m} = \%hash if($hash{Category} eq "DEV");
-    $logmods{$m} = \%hash if($hash{Category} eq "LOG");
-  }
-  closedir(DH);
-
-  if(!$counter) {
-    return "No modules found, " .
-    		"point modpath to a directory where the FHEM subdir is";
-  }
-
-  $modpath_set = $param;
-
-  return undef;
+  my $d = shift;
+  my $list = $AttrList;
+  $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList}
+        if($modules{$defs{$d}{TYPE}}{AttrList});
+  $list .= " " . $attr{global}{userattr}
+        if($attr{global}{userattr});
+  return $list;
 }
 
 #####################################
@@ -1303,48 +1129,107 @@ CommandAttr($$)
   my $ret = undef;
   
   my @a = split(" ", $param, 3);
-  return "Usage: attr [<devname>|at] <attrname> [<attrvalue>]" if(@a < 2);
-  return "Usage: attr at <at-spec> <attrname>" if(@a < 3 && $a[0] eq "at");
+  return "Usage: attr <name> <attrname> [<attrvalue>]" if(@a < 2);
 
-  my $have = 0;
+  return "Please define $a[0] first: no definition found"
+    if(!defined($defs{$a[0]}));
 
-  if($a[0] eq "at") {				# "at" special
+  my $list = getAllAttr($a[0]);
+  return "Unknown argument $a[1], choose one of $list" if($a[1] eq "?");
+  return "Unknown attribute $a[1], use attr global userattr"
+                if(" $list " !~ m/ ${a[1]}[ :;]/);
 
-    my $arg = $a[1];
-    $arg =~ s/ \([0-2][0-9]:[0-5][0-9]:[0-5][0-9]\)$//;
 
-    if(defined($at{$arg})) {		# First the exact version
-      $attr{$arg}{$a[2]} = "1";
-    } else {				# then the regexp
-      # Checking for misleading regexps
-      eval { "Hallo" =~ m/$arg/ };
-      return "Bad argument: $@" if($@);
-      foreach my $a (keys %at) {
-	if($a =~ m/$arg/) {
-	  $attr{$a}{$a[2]} = "1";
-	  $have = 1;
-	  last;
-	}
-      }
-    }
-    return "No at spec found" if(!$have);
-    return undef;
-  }
-
-  $have = 1 if(defined($defs{$a[0]}));
-  $have = 1 if(defined($logs{$a[0]}));
-
-  return "Please define $a[0] first: no device or log definition found"
-    if(!$have);
+  $ret = CallFn($a[0], "AttrFn", "set", @a);
+  return $ret if($ret);
 
   if(defined($a[2])) {
     $attr{$a[0]}{$a[1]} = $a[2];
   } else {
     $attr{$a[0]}{$a[1]} = "1";
   }
+
+  return if($a[0] ne "global"); # Global specials ahead
+
+  ################
+  if($a[1] eq "logfile") {
+    my @t = localtime;
+    my $ret = OpenLogfile(ResolveDateWildcards($a[2], @t));
+    if($ret) {
+      return $ret if($init_done);
+      die($ret);
+    }
+  }
+
+  ################
+  elsif($a[1] eq "port") {
+    my ($port, $global) = split(" ", $a[2]);
+    if($global && $global ne "global") {
+      return "Bad syntax, usage: attr global port <portnumber> [global]";
+    }
+
+    my $server2 = IO::Socket::INET->new(
+          Proto        => 'tcp',
+          LocalHost    => ($global ? undef : "localhost"),
+          LocalPort    => $port,
+          Listen       => 10,
+          ReuseAddr    => 1);
+    if($ret) {
+      return $ret if($init_done);
+      die "Can't open server port at $port\n";
+    }
+    close($server) if($server);
+    $server = $server2;
+  }
+
+  ################
+  elsif($a[1] eq "verbose") {
+    if($a[2] =~ m/^[0-5]$/) {
+      return undef;
+    } else {
+      $attr{global}{verbose} = 3;
+      return "Valid value for verbose are 0,1,2,3,4,5";
+    }
+  }
+
+  elsif($a[1] eq "modpath") {
+    return "modpath must point to a directory where the FHEM subdir is"
+  	if(! -d "$a[2]/FHEM");
+    my $modpath = "$a[2]/FHEM";
+
+    opendir(DH, $modpath) || return "Can't read $modpath: $!";
+    my $counter = 0;
+
+    foreach my $m (sort grep(/^[0-9][0-9].*\.pm$/,readdir(DH))) {
+
+      $counter++;
+      Log 5, "Loading $m";
+      require "$modpath/$m";
+
+      next if($m !~ m/^([0-9]+)_(.*)\.pm$/);
+      $m = $2;
+      $modules{$m}{ORDER} = $1;
+
+      no strict "refs";
+      &{ "${m}_Initialize" }($modules{$m});
+      use strict "refs";
+    }
+    closedir(DH);
+
+    if(!$counter) {
+      return "No modules found, " .
+                  "point modpath to a directory where the FHEM subdir is";
+    }
+
+    $modpath_set = $a[2];
+  }
+
   return undef;
 }
 
+
+#####################################
+# Default Attr
 sub
 CommandDefAttr($$)
 {
@@ -1372,48 +1257,35 @@ CommandSetstate($$)
   return "Usage: setstate <name> <state>" if(@a != 2);
   return "Please define $a[0] first" if(!defined($defs{$a[0]}));
 
+  my $d = $defs{$a[0]};
+
   # Detailed state with timestamp
   if($a[1] =~ m/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /) {
     my @b = split(" ", $a[1], 4);
-    no strict "refs";
-    $ret = &{$devmods{$defs{$a[0]}{TYPE}}{StateFn}}
-    			($defs{$a[0]}, "$b[0] $b[1]", $b[2], $b[3]);
-    use strict "refs";
-    $oldvalue{$a[0]}{TIME} = "$b[0] $b[1]";
+
+    if(@b == 3) {       # Compatibility mode
+      $b[3] = $b[2];
+      $b[2] = "state";
+    }
+
+    my $tim = "$b[0] $b[1]";
+    $ret = CallFn($a[0], "StateFn", $d, $tim, $b[2], $b[3]);
+    return $ret if($ret);
+
+    next if($d->{READINGS}{$b[2]} && $d->{READINGS}{$b[2]}{TIME} ge $tim);
+
+    $d->{READINGS}{$b[2]}{VAL} = $b[3];
+    $d->{READINGS}{$b[2]}{TIME} = $tim;
+
+    $oldvalue{$a[0]}{TIME} = $tim;
     $oldvalue{$a[0]}{VAL} = $b[2];
+
   } else {
-    $defs{$a[0]}{STATE} = $a[1];
+    $d->{STATE} = $a[1];
   }
   
   return $ret;
 }
-
-#####################################
-sub
-CommandSavefile($$)
-{
-  my ($cl, $param) = @_;
-  
-  $savefile = $param;
-  return undef;
-}
-
-#####################################
-sub
-CommandPidfile($$)
-{
-  my ($cl, $param) = @_;
-  
-  $pidfilename = $param;
-  return undef if(!$init_done);
-
-  return "$param: $!" if(!open(PID, ">$param"));
-  print PID $$ . "\n";
-  close(PID);
-
-  return undef;
-}
-
 
 #####################################
 sub
@@ -1469,34 +1341,21 @@ HandleTimeout()
   return ($nextat-$now) if($now < $nextat);
 
   $nextat = 0;
-  foreach my $i (keys %at) {
-    if($now >= $at{$i}{TIM}) {
-      my $skip = (defined($attr{$i}) && defined($attr{$i}{skip_next}));
+  foreach my $i (keys %defs) {
+    next if(!$defs{$i}{TRIGGERTIME});
 
-      if($skip) {
-        delete $attr{$i}{skip_next};
-      } else {
-        AnalyzeCommandChain(undef, $at{$i}{CMD});
-      }
-
-      my $count = $at{$i}{REP};
-      delete $at{$i};
-      if($count) {
-	$i =~ s/{\d+}/{$count}/ if($i =~ m/^\+?\*{/);	# Replace the count }
-        CommandAt(undef, $i);	# Recompute the next TIM
-      }
-
+    if($now >= $defs{$i}{TRIGGERTIME}) {
+      CallFn($i, "TimeFn", $i);
     } else {
-
-      $nextat = $at{$i}{TIM} if(!$nextat || $nextat > $at{$i}{TIM});
-
+      $nextat = $defs{$i}{TRIGGERTIME}
+        if(!$nextat || $nextat > $defs{$i}{TRIGGERTIME});
     }
   }
 
   #############
   # Check the internal list.
   foreach my $i (keys %intAt) {
-    my $tim = $intAt{$i}{TIM};
+    my $tim = $intAt{$i}{TRIGGERTIME};
     if($tim <= $now) {
       no strict "refs";
       &{$intAt{$i}{FN}}($intAt{$i}{ARG});
@@ -1526,7 +1385,7 @@ InternalTimer($$$)
     return;
   }
 
-  $intAt{$intAtCnt}{TIM} = $tim;
+  $intAt{$intAtCnt}{TRIGGERTIME} = $tim;
   $intAt{$intAtCnt}{FN} = $fn;
   $intAt{$intAtCnt}{ARG} = $arg;
   $intAtCnt++;
@@ -1558,16 +1417,23 @@ TimeNow()
       $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
 }
 
+sub
+FmtTime($)
+{
+  my @t = localtime(shift);
+  return sprintf("%02d:%02d:%02d", $t[2], $t[1], $t[0]);
+}
+
 #####################################
 sub
 CommandChain($$)
 {
   my ($retry, $list) = @_;
-  my $ov = $verbose;
+  my $ov = $attr{global}{verbose};
   my $oid = $init_done;
 
   $init_done = 0;
-  $verbose = 1;
+  $attr{global}{verbose} = 1;
   foreach my $cmd (@{$list}) {
     for(my $n = 0; $n < $retry; $n++) {
       Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
@@ -1575,7 +1441,7 @@ CommandChain($$)
       last if(!$ret || $ret !~ m/Timeout/);
     }
   }
-  $verbose = $ov;
+  $attr{global}{verbose} = $ov;
   $init_done = $oid;
 }
 
@@ -1628,35 +1494,14 @@ DoTrigger($$)
   Log 5, "Triggering $dev";
 
   my $max = int(@{$defs{$dev}{CHANGED}});
-  my $ret = "";
 
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
+  ################
+  # Inform
   for(my $i = 0; $i < $max; $i++) {
     my $state = $defs{$dev}{CHANGED}[$i];
     my $fe = "$dev:$state";
-
-    ################
-    # Notify
-    foreach my $n (sort keys %ntfy) {
-      if($dev =~ m/^$n$/ || $fe =~ m/^$n$/) {
-	my $exec = $ntfy{$n};
-
-	$exec =~ s/%%/____/g;
-	$exec =~ s/%/$state/g;
-	$exec =~ s/____/%/g;
-
-	$exec =~ s/@@/____/g;
-	$exec =~ s/@/$dev/g;
-	$exec =~ s/____/@/g;
-
-	my $r = AnalyzeCommandChain(undef, $exec);
-	$ret .= " $r" if($r);
-      }
-    }
-
-    ################
-    # Inform
     foreach my $c (keys %client) {
       next if(!$client{$c}{inform});
       syswrite($client{$c}{fd}, "$defs{$dev}{TYPE} $dev $state\n");
@@ -1665,12 +1510,10 @@ DoTrigger($$)
 
 
   ################
-  # Log modules
-  foreach my $l (sort keys %logs) {
-    my $t = $logs{$l}{TYPE};
-    no strict "refs";
-    &{$logmods{$t}{LogFn}}($logs{$l}, $defs{$dev});
-    use strict "refs";
+  # Log/notify modules
+  my $ret = "";
+  foreach my $n (sort keys %defs) {
+    $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
   }
 
   ####################
@@ -1684,3 +1527,26 @@ DoTrigger($$)
   Log 3, "NTFY return: $ret" if($ret);
   return $ret;
 }
+
+sub
+CallFn(@)
+{
+  my $d = shift;
+  my $n = shift;
+  my $fn = $modules{$defs{$d}{TYPE}}{$n};
+  return "" if(!$fn);
+  no strict "refs";
+  my $ret = &{$fn}(@_);
+  use strict "refs";
+  return $ret;
+}
+
+#####################################
+# Used from perl oneliners inside of scripts
+sub
+fhem($)
+{
+  my $param = shift;
+  return AnalyzeCommandChain($global_cl, $param);
+}
+

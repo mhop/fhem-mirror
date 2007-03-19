@@ -7,12 +7,12 @@
 #
 
 # Common part
-logfile /tmp/fhem-%Y-%m.log
-savefile /tmp/fhem.save     # where to save the state of the devices
-verbose 3                   # "normal" verbosity (min 1, max 5)
-port 7072                   # our TCP/IP port (working from localhost only)
-modpath .                   # where our FHEM directory is
-define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
+attr global logfile /tmp/fhem-%Y-%m.log
+attr global statefile /tmp/fhem.save   # where to save the state of the devices
+attr global verbose 3                  # "normal" verbosity (min 1, max 5)
+attr global port 7072                  # our TCP/IP port (localhost only)
+attr global modpath .                  # where our FHEM directory is
 
+define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
 
 define lamp FS20 8765 01    # type FS20, transmitter code 8765, button 2

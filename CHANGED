@@ -305,5 +305,16 @@
   - feature: attribute showtime in web-pgm2 (show time instead of state)
   - feature: defattr (default attribute for following defines)
   - feature: added em1010.pl to the contrib directory
-  - TODO: bugfix: more thorough serial line initialization
   - doc:     added linux.html (multiple devices, udev-links)
+  - REORGANIZATION:
+    - at/notify "renamed" to "define <name> at/notify"
+    - logfile/modpath/pidfile/port/verbose "renamed" to "attr global xxx"
+    - savefile renamed to "attr global statefile"
+    - save command added, it writes the configfile and the statefile
+    - delattr added
+    - list/xmllist format changed
+    - disable attribute for at/notify/filelog
+    See HISTORY for details and reasoning
+  - TODO: bugfix: more thorough serial line initialization
+
+- RENAME

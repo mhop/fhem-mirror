@@ -30,8 +30,6 @@ sub
 SUNRISE_Initialize($)
 {
   my ($hash) = @_;
-
-  $hash->{Category} = "none";
 }
 
 

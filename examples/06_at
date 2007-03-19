@@ -3,37 +3,37 @@
 
 ##################################
 # absolute ones:
-at 17:00:00 set lamp on                            # fhz command
-at 17:00:00 { Log 1, "Teetime" }                   # Perl command
-at 17:00:00 "/bin/echo "Teetime" > /dev/console"   # shell command
-at *17:00:00 set lamp on                           # repeat every day
+define a1 at 17:00:00 set lamp on                            # fhem command
+define a2 at 17:00:00 { Log 1, "Teetime" }                   # Perl command
+define a3 at 17:00:00 "/bin/echo "Teetime" > /dev/console"   # shell command
+define a4 at *17:00:00 set lamp on                           # repeat every day
 
 ##################################
 # relative ones
-at +00:00:10 set lamp on                  # switch the lamp on in 10 seconds
-at +00:00:02 set lamp on-for-timer 1      # Blink once in 2 seconds
-at +*{3}00:00:02 set lamp on-for-timer 1   # Blink 3 times
+define a5 at +00:00:10 set lamp on           # switch the lamp on in 10 seconds
+define a6 at +00:00:02 set lamp on-for-timer 1       # Blink once in 2 seconds
+define a7 at +*{3}00:00:02 set lamp on-for-timer 1   # Blink 3 times
 
 ##################################
 # Switch the lamp on from sunset to 11 PM each day
 # You have to install 99_SUNRISE.pm in the FHEM directory to have sunset()
 # We have to use the relative versions, as the next event is computed now
 { sunrise_coord("8.686", "50.112", "Europe/Berlin") }
-at +*{sunset_rel()} set lamp on
-at *23:00:00 set lamp off
+define a8 at +*{sunset_rel()} set lamp on
+define a9 at *23:00:00 set lamp off
 
 ##################################
 # A more elegant solution, which even works if sunset is after 23:00
-at +*{sunset_rel()} set lamp on-till 23:00
+define a10 at +*{sunset_rel()} set lamp on-till 23:00
 
 ##################################
 # Only do this on weekend. For the preset perl variables see commandref.html
-at +*{sunset_rel()} { fhz("set lamp on-till 23:00") if($we) }
+define a11 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
 
 ##################################
 # Switch lamp1 and lamp2 on from 7:00 till 10 minutes after sunrise
-at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
+define a12 at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
 
 ##################################
 # Blink 3 times if the piri sends a command
-notify piri:on.* at +*{3}00:00:02 set lamp on-for-timer 1
+define n1 notify piri:on.* define a13 at +*{3}00:00:02 set lamp on-for-timer 1
