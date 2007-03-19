@@ -39,7 +39,6 @@ package main;
 use strict;
 use warnings;
 
-my %readings;
 my %defptr;
 my $DeviceName="";
 my $inbuf="";
@@ -64,8 +63,6 @@ WS300_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Category} = "DEV";
-  
   # Provider
   $hash->{Clients} = ":WS300:";
   $hash->{ReadFn} = "WS300_Read";        
@@ -74,12 +71,11 @@ WS300_Initialize($)
   $hash->{Match}     = "^WS300.*";
   $hash->{SetFn}     = "WS300_Set";
   $hash->{GetFn}     = "WS300_Get";
-  $hash->{StateFn}   = "WS300_SetState";
-  $hash->{ListFn}    = "WS300_List";
   $hash->{DefFn}     = "WS300_Define";
   $hash->{UndefFn}   = "WS300_Undef";
   $hash->{ParseFn}   = "WS300_Parse";
   $hash->{ReadFn}    = "WS300_Read";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 loglevel:0,1,2,3,4,5,6";
 }
 
 ###################################
@@ -101,7 +97,7 @@ WS300_Set($@)
 ###################################
 sub
 WS300_Get(@)
-{ 
+{
   my ($hash, @a) = @_;
   if($hash->{NAME} eq "WS300Device")
   {
@@ -114,64 +110,27 @@ WS300_Get(@)
 
 #####################################
 sub
-WS300_SetState($$$$)
+WS300_Define($$)
 {
-  my ($hash, $tim, $vt, $val) = @_;
-  
-  return undef if(!defined($hash->{SENSOR}));
-  
-  my $n = $hash->{SENSOR};
-  if(!$readings{$n}{$vt} || $readings{$n}{$vt}{TIM} lt $tim) {
-    $readings{$n}{$vt}{TIM} = $tim;
-    $readings{$n}{$vt}{VAL} = $val;
-  }
-  return undef;
-}
-
-#####################################
-sub
-WS300_List($)
-{
-  my ($hash) = @_;
-  my $str = "";
-
-  return "No information about $hash->{NAME}" if(!defined($hash->{SENSOR}));
-  my $n = $hash->{SENSOR};
-  if(!defined($readings{$n})) 
-  {
-    $str .= "No information about " . $hash->{NAME} . "\n";
-  } 
-  else 
-  {
-    foreach my $m (keys %{ $readings{$n} }) 
-    {
-      $str .= sprintf("%-19s   %-15s %s\n",$readings{$n}{$m}{TIM}, $m, $readings{$n}{$m}{VAL});
-    }
-  }
-  return $str;
-
-}
-
-#####################################
-sub
-WS300_Define($@)
-{
-  my ($hash, @a) = @_;
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
 
   if($a[0] eq "WS300Device")
   {
+    $defptr{10} = $hash;
     return "wrong syntax: define WS300Device WS300 <DeviceName>" if(int(@a) < 3);
     $DeviceName = $a[2];
     $hash->{STATE} = "Initializing";
     $hash->{SENSOR} = 10;
-    $readings{10}{WS300Device}{VAL} = "Initializing";
-    $readings{10}{WS300Device}{TIM} = TimeNow;    
+    $hash->{READINGS}{WS300Device}{VAL} = "Initializing";
+    $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
+
     my $po = new Device::SerialPort ($a[2]);
     if(!$po)
     {
       $hash->{STATE} = "error opening device";
-      $readings{10}{WS300Device}{VAL} = "error opening device";
-      $readings{10}{WS300Device}{TIM} = TimeNow;    
+      $hash->{READINGS}{WS300Device}{VAL} = "error opening device";
+      $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
       Log 1,"Error opening WS300 Device $a[2]";
       return "Can't open $a[2]: $!\n";
     }
@@ -188,15 +147,15 @@ WS300_Define($@)
     $hash->{PortObj} = $po;
     $hash->{DeviceName} = $a[2];    
     $hash->{STATE} = "opened";
-    $readings{10}{WS300Device}{VAL} = "opened";
-    $readings{10}{WS300Device}{TIM} = TimeNow;    
-    CommandAt($hash,"+*00:00:05 get WS300Device data");
+    $hash->{READINGS}{WS300Device}{VAL} = "opened";
+    $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
+    CommandDefine(undef,"WS300Device_timer at +*00:00:05 get WS300Device data");
     Log 1,"WS300 Device $a[2] opened";
+    $attr{$a[0]}{savefirst} = 1;
     return undef;
   }
   return "wrong syntax: define <name> WS300 <sensor (0-9)>\n0-7=ASH2200\n8=KS300\n9=WS300" if(int(@a) < 3);
   return "no device: define WS300Device WS300 <DeviceName> first" if($DeviceName eq "");
-  $a[2] = lc($a[2]);
   return "Define $a[0]: wrong sensor number." if($a[2] !~ m/^[0-9]$/);
   $hash->{SENSOR} = $a[2];
   $defptr{$a[2]} = $hash;
@@ -294,9 +253,10 @@ WS300_Parse($)
       }
       else
       {
-        $readings{$s}{$txt[0]}{VAL} = 0 if(!$readings{$s});
-        $ref = $readings{$s};
         $def = $defptr{$s};
+        $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
+        $ref = $def->{READINGS};
+
         $t = hex($a[$p].$a[$p+1].$a[$p+2].$a[$p+3]);
         $t -= 65535 if( $t > 32767 );
         $t /= 10.0;
@@ -318,25 +278,25 @@ WS300_Parse($)
           $def->{CHANGED}[0] = $val;
           $def->{CHANGETIME}[0] = $tm;
           # temperatur
-          $ref->{$txt[0]}{TIM} = $tm;
+          $ref->{$txt[0]}{TIME} = $tm;
           $value = "$t $sfx[0]";
           $ref->{$txt[0]}{VAL} = $value;
           $def->{CHANGED}[1] = "$txt[0]: $value";
           $def->{CHANGETIME}[1] = $tm;
           # humidity
-          $ref->{$txt[1]}{TIM} = $tm;
+          $ref->{$txt[1]}{TIME} = $tm;
           $value = "$h $sfx[1]";
           $ref->{$txt[1]}{VAL} = $value;
           $def->{CHANGED}[2] = "$txt[1]: $value";
           $def->{CHANGETIME}[2] = $tm;
           # battery
-          $ref->{$txt[5]}{TIM} = $tm;
+          $ref->{$txt[5]}{TIME} = $tm;
           $value = "$b $sfx[5]";
           $ref->{$txt[5]}{VAL} = $value;
           $def->{CHANGED}[3] = "$txt[5]: $value";
           $def->{CHANGETIME}[3] = $tm;
           # lost receives
-          $ref->{$txt[6]}{TIM} = $tm;
+          $ref->{$txt[6]}{TIME} = $tm;
           $value = "$l $sfx[6]";
           $ref->{$txt[6]}{VAL} = $value;
           $def->{CHANGED}[4] = "$txt[6]: $value";
@@ -353,49 +313,49 @@ WS300_Parse($)
           $def->{CHANGED}[0] = $val;
           $def->{CHANGETIME}[0] = $tm;
           # temperature
-          $ref->{$txt[0]}{TIM} = $tm;
+          $ref->{$txt[0]}{TIME} = $tm;
           $value = "$t $sfx[0]";
           $ref->{$txt[0]}{VAL} = $value;
           $def->{CHANGED}[1] = "$txt[0]: $value";
           $def->{CHANGETIME}[1] = $tm;
           # humidity
-          $ref->{$txt[1]}{TIM} = $tm;
+          $ref->{$txt[1]}{TIME} = $tm;
           $value = "$h $sfx[1]";
           $ref->{$txt[1]}{VAL} = $value;
           $def->{CHANGED}[2] = "$txt[1]: $value";
           $def->{CHANGETIME}[2] = $tm;
           # wind
-          $ref->{$txt[2]}{TIM} = $tm;
+          $ref->{$txt[2]}{TIME} = $tm;
           $value = "$wind $sfx[2]";
           $ref->{$txt[2]}{VAL} = $value;
           $def->{CHANGED}[3] = "$txt[2]: $value";
           $def->{CHANGETIME}[3] = $tm;
           #rain counter
-          $ref->{$txt[3]}{TIM} = $tm;
+          $ref->{$txt[3]}{TIME} = $tm;
           $value = "$rainc $sfx[3]";
           $ref->{$txt[3]}{VAL} = $value;
           $def->{CHANGED}[4] = "$txt[3]: $value";
           $def->{CHANGETIME}[4] = $tm;
           # is raining
-          $ref->{$txt[4]}{TIM} = $tm;
+          $ref->{$txt[4]}{TIME} = $tm;
           $value = "$ir $sfx[4]";
           $ref->{$txt[4]}{VAL} = $value;
           $def->{CHANGED}[5] = "$txt[4]: $value";
           $def->{CHANGETIME}[5] = $tm;
           # battery
-          $ref->{$txt[5]}{TIM} = $tm;
+          $ref->{$txt[5]}{TIME} = $tm;
           $value = "$b $sfx[5]";
           $ref->{$txt[5]}{VAL} = $value;
           $def->{CHANGED}[6] = "$txt[5]: $value";
           $def->{CHANGETIME}[6] = $tm;
           # lost receives
-          $ref->{$txt[6]}{TIM} = $tm;
+          $ref->{$txt[6]}{TIME} = $tm;
           $value = "$l $sfx[6]";
           $ref->{$txt[6]}{VAL} = $value;
           $def->{CHANGED}[7] = "$txt[6]: $value";
           $def->{CHANGETIME}[7] = $tm;
           # rain cumulative
-          $ref->{$txt[8]}{TIM} = $tm;
+          $ref->{$txt[8]}{TIME} = $tm;
           $value = "$rain $sfx[8]";
           $ref->{$txt[8]}{VAL} = $value;
           $def->{CHANGED}[8] = "$txt[8]: $value";
@@ -417,17 +377,17 @@ WS300_Parse($)
             $rain_hour = sprintf("%.1f",$rain_hour);
             $rain_day = sprintf("%.1f",$rain_day);
             $rain_month = sprintf("%.1f",$rain_month);
-            $ref->{acthour}{TIM} = $tm;
+            $ref->{acthour}{TIME} = $tm;
             $ref->{acthour}{VAL} = "$acthour";
-            $ref->{$txt[9]}{TIM} = $tm;
+            $ref->{$txt[9]}{TIME} = $tm;
             $ref->{$txt[9]}{VAL} = $rain_hour;
             $def->{CHANGED}[9] = "$txt[9]: $rain_hour $sfx[9]";
             $def->{CHANGETIME}[9] = $tm;
-            $ref->{$txt[10]}{TIM} = $tm;
+            $ref->{$txt[10]}{TIME} = $tm;
             $ref->{$txt[10]}{VAL} = $rain_day;
             $def->{CHANGED}[10] = "$txt[10]: $rain_day $sfx[10]";
             $def->{CHANGETIME}[10] = $tm;
-            $ref->{$txt[11]}{TIM} = $tm;
+            $ref->{$txt[11]}{TIME} = $tm;
             $ref->{$txt[11]}{VAL} = $rain_month;
             $def->{CHANGED}[11] = "$txt[11]: $rain_month $sfx[11]";
             $def->{CHANGETIME}[11] = $tm;
@@ -436,14 +396,14 @@ WS300_Parse($)
           if($actday != $lt[3])
           {
             $actday = $lt[3];
-            $ref->{actday}{TIM} = $tm;
+            $ref->{actday}{TIME} = $tm;
             $ref->{actday}{VAL} = "$actday";
             $rain_day=0;
           }
           if($actmonth != $lt[4]+1)
           {
             $actmonth = $lt[4]+1;
-            $ref->{actmonth}{TIM} = $tm;
+            $ref->{actmonth}{TIME} = $tm;
             $ref->{actmonth}{VAL} = "$actmonth";
             $rain_month=0;
           }
@@ -457,17 +417,17 @@ WS300_Parse($)
             $rain_month = sprintf("%.1f",$rain_month);
             $oldrain = $rain;
 
-            $ref->{acthour}{TIM} = $tm;
+            $ref->{acthour}{TIME} = $tm;
             $ref->{acthour}{VAL} = "$acthour";
-            $ref->{$txt[9]}{TIM} = $tm;
+            $ref->{$txt[9]}{TIME} = $tm;
             $ref->{$txt[9]}{VAL} = $rain_hour;
             $def->{CHANGED}[9] = "$txt[9]: $rain_hour $sfx[9]";
             $def->{CHANGETIME}[9] = $tm;
-            $ref->{$txt[10]}{TIM} = $tm;
+            $ref->{$txt[10]}{TIME} = $tm;
             $ref->{$txt[10]}{VAL} = $rain_day;
             $def->{CHANGED}[10] = "$txt[10]: $rain_day $sfx[10]";
             $def->{CHANGETIME}[10] = $tm;
-            $ref->{$txt[11]}{TIM} = $tm;
+            $ref->{$txt[11]}{TIME} = $tm;
             $ref->{$txt[11]}{VAL} = $rain_month;
             $def->{CHANGED}[11] = "$txt[11]: $rain_month $sfx[11]";
             $def->{CHANGETIME}[11] = $tm;
@@ -484,9 +444,10 @@ WS300_Parse($)
   }
   else
   {
-    $readings{9}{$txt[0]}{VAL} = 0 if(!$readings{9});
-    $ref = $readings{9};
     $def = $defptr{9};
+    $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
+    $ref = $def->{READINGS};
+
     $t = hex($a[62+$offs].$a[63+$offs].$a[64+$offs].$a[65+$offs]);
     $t -= 65535 if( $t > 32767 );
     $t /= 10.0;
@@ -497,25 +458,25 @@ WS300_Parse($)
     $def->{CHANGED}[0] = $val;
     $def->{CHANGETIME}[0] = $tm;
     # temperature
-    $ref->{$txt[0]}{TIM} = $tm;
+    $ref->{$txt[0]}{TIME} = $tm;
     $value = "$t $sfx[0]";
     $ref->{$txt[0]}{VAL} = $value;
     $def->{CHANGED}[1] = "$txt[0]: $value";
     $def->{CHANGETIME}[1] = $tm;
     # humidity
-    $ref->{$txt[1]}{TIM} = $tm;
+    $ref->{$txt[1]}{TIME} = $tm;
     $value = "$h $sfx[1]";
     $ref->{$txt[1]}{VAL} = $value;
     $def->{CHANGED}[2] = "$txt[1]: $value";
     $def->{CHANGETIME}[2] = $tm;
     # pressure
-    $ref->{$txt[7]}{TIM} = $tm;
+    $ref->{$txt[7]}{TIME} = $tm;
     $value = "$press $sfx[7]";
     $ref->{$txt[7]}{VAL} = $value;
     $def->{CHANGED}[3] = "$txt[7]: $value";
     $def->{CHANGETIME}[3] = $tm;
     # willi
-    $ref->{willi}{TIM} = $tm;
+    $ref->{willi}{TIME} = $tm;
     $value = "$willi";
     $ref->{willi}{VAL} = $value;
     $def->{CHANGED}[4] = "willi: $value";
@@ -569,8 +530,8 @@ NEXTPOLL:
     Log 1, "USB device $devname disconnected, waiting to reappear";
     $hash->{PortObj}->close();
     $hash->{STATE} = "disconnected";
-    $readings{10}{WS300Device}{VAL} = "disconnected";
-    $readings{10}{WS300Device}{TIM} = TimeNow;    
+    $hash->{READINGS}{WS300Device}{VAL} = "disconnected";
+    $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
     sleep(1);
     my $po = new Device::SerialPort($devname);
     if($po) 
@@ -588,8 +549,8 @@ NEXTPOLL:
       Log 1, "USB device $devname reappeared";
       $hash->{PortObj} = $po;
       $hash->{STATE} = "opened";
-      $readings{10}{WS300Device}{VAL} = "opened";
-      $readings{10}{WS300Device}{TIM} = TimeNow;    
+      $hash->{READINGS}{WS300Device}{VAL} = "opened";
+      $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
       $polling=0;
       return;
     }
@@ -651,8 +612,8 @@ NEXTPOLL:
     if($errcount == 10)
     {
       $hash->{STATE} = "timeout";
-      $readings{10}{WS300Device}{VAL} = "timeout";
-      $readings{10}{WS300Device}{TIM} = TimeNow;    
+      $hash->{READINGS}{WS300Device}{VAL} = "timeout";
+      $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
       $errcount++;
     }
     Log 1,"WS300: no data" if($rcount == 0);
@@ -663,8 +624,8 @@ NEXTPOLL:
   if($hash->{STATE} ne "connected" && $errcount > 10)
   {
     $hash->{STATE} = "connected";
-    $readings{10}{WS300Device}{VAL} = "connected";
-    $readings{10}{WS300Device}{TIM} = TimeNow;    
+    $hash->{READINGS}{WS300Device}{VAL} = "connected";
+    $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
   }
   $errcount = 0;
   $ic = ord(substr($inbuf,0,1));

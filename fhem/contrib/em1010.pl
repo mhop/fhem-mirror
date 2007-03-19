@@ -246,9 +246,10 @@ getDevStatus()
   printf("     Nr devs   (off 05): %d\n",   b($d,6));
   printf("     puls/5min (off 13): %d\n",   w($d,13));
   printf("     Startblk  (off 18): %d\n",   b($d,18)+13);
-  printf("     Alarm, PA (off 45): %d W\n", w($d,45));
-  printf("     PRICE, CF (off 47): %0.2f (EUR/KWH)\n",   w($d,47)/10000);
-  printf("     R/KW, EC  (off 49): %d\n",   w($d,49)/10);
+  printf("     cur.power (off 33): %.3f kW\n", w($d,33) * 2 / 300);
+  printf("     Alarm PA  (off 45): %d W\n", w($d,45));
+  printf("     Price CF  (off 47): %0.2f (EUR/KWH)\n",   w($d,47)/10000);
+  printf("     R/KW  EC  (off 49): %d\n",   w($d,49)/10);
   hexdump($d);
 }
 
@@ -268,6 +269,8 @@ getDevPage()
 sub
 getDevData()
 {
+  my $smooth = 1; # Set this to 0 to get the "real" values
+
   die "Usage: getDevData devicenumber (1-12)\n" if(@ARGV != 3);
   my $d = getData(sprintf("7a%02x",$ARGV[2]-1));
 
@@ -284,23 +287,39 @@ getDevData()
   my $step = b($d,6);
   my $start =  b($d,18)+13;
   my $end = $start + int(($nrreadings-1)/64)*$step;
-  my $offset = ($nrreadings%64)*4+4;
   my $div = w($d,49)/10;
-  $div = 1 if($div == 0);
 
-  #printf("Total $nrreadings, $start - $end, Nr $step, Off: $offset\n");
+  #printf("Total $nrreadings, $start - $end, Nr $step\n");
 
-  my $now = time();
-  for(my $p = $end; $p >= $start; $p -= $step) {
+  my $tm = time()-(($nrreadings-1)*300);
+  my $backlog = 0;
+  for(my $p = $start; $p <= $end; $p += $step) {
     #printf("Get page $p\n");
+
     $d = getData(sprintf("52%02x%02x00000801", $p%256, int($p/256)));
+
     #hexdump($d);
-    $offset = 260 if($p != $end);
-    while($offset >= 8) {
-      printf("%s %0.3f kWh (%d)\n",
-        maketime($now), w($d,$offset)*12/$div, w($d,$offset+2));
-      $offset -=4;
-      $now -= 300;
+
+    my $max = (($p == $end) ? ($nrreadings%64)*4+4 : 260);
+    my $step = b($d, 6);
+
+    for(my $off = 8; $off <= $max; $off += 4) {
+      $backlog++;
+      if($smooth && (w($d,$off+2) == 0xffff)) { # "smoothing"
+        next;
+      } else {
+	my $v = w($d,$off)*12/$div/$backlog;
+	my $f1 = b($d,$off+2);
+	my $f2 = b($d,$off+3);
+	my $f3 = w($d,$off+2);
+
+        while($backlog--) {
+	  printf("%s %0.3f kWh (%d %d %d)\n", maketime($tm), $v,
+		    ($backlog?-1:$f1), ($backlog?-1:$f2), ($backlog?-1:$f3));
+	  $tm += 300;
+	}
+	$backlog = 0;
+      }
     }
   }
 }
@@ -378,9 +397,12 @@ setTime()
   my @d = split("-", $ARGV[2]);
   my @t = split(":", $ARGV[3]);
 
-  my $d = getData(sprintf("73%02x%02x%02x00%02x%02x%02x",
+  my $s = sprintf("73%02x%02x%02x00%02x%02x%02x",
         $d[2],$d[1],$d[0]-2000+0xd0,
-        $t[0],$t[1],$2[2]));
+        $t[0],$t[1],$t[2]);
+  print("-> $s\n");
+
+  my $d = getData($s);
   if(b($d,0) == 6) {
     print("OK");
   } else {

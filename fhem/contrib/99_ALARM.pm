@@ -31,8 +31,7 @@ use warnings;
 sub
 ALARM_Initialize($$)
 {
-  my ($hash, $init) = @_;
-  $hash->{Type} = "none";
+  my ($hash) = @_;
 }
 
 
