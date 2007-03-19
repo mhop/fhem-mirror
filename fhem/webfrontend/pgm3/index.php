@@ -1,6 +1,6 @@
 <?php
 
-#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
+#### pgm3 -- a PHP-webfrontend for fhem.pl 
 
 ################################################################
 #
@@ -39,7 +39,7 @@ include "config.php";
 include "include/gnuplot.php";
 
 
-$pgm3version='0.7.2cvs';
+$pgm3version='0.8.0cvs';
 
 	
 	$Action		=	$_POST['Action'];
@@ -235,6 +235,7 @@ else
 	   echo "$errstr ($errno)<br />\n";
 	} else {
 	   fwrite($fp, "xmllist\r\n;quit\r\n");
+#	   $fp=str_replace("DEVICES","LIST",$fp);	
 	   while (!feof($fp)) {
 	       $outputvar = fgets($fp, 1024);
 		array_push($output,$outputvar);
@@ -242,6 +243,10 @@ else
 	   fclose($fp);
 	}
 }
+
+#workaround for older fhz1000-Versions
+
+
 
 
 
@@ -302,7 +307,7 @@ xml_parser_free($xml_parser);
       if ($showroombuttons==1)
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
-	      if ($stack[0][children][$i][name]=='FS20_DEVICES')
+	      if (substr($stack[0][children][$i][name],0,5)=='FS20_')
 	      {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -322,7 +327,7 @@ xml_parser_free($xml_parser);
 		  	 if ((! in_array($fs20devxml,$fs20devs)) AND ( $room != 'hidden')) array_push($fs20devs,$fs20devxml);
 			}
 	      }#FS20
-	       elseif ($stack[0][children][$i][name]=='FHT_DEVICES')
+	       elseif (substr($stack[0][children][$i][name],0,4)=='FHT_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -339,7 +344,7 @@ xml_parser_free($xml_parser);
 			  	 if ((! in_array($fhtdevxml,$fhtdevs)) AND ( $room != 'hidden')) array_push($fhtdevs,$fhtdevxml);
 			 }
 		} #FHT
-	       elseif ($stack[0][children][$i][name]=='HMS_DEVICES')
+	       elseif (substr($stack[0][children][$i][name],0,4)=='HMS_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -352,7 +357,7 @@ xml_parser_free($xml_parser);
 				}
 		       }
 	       } # HMS
-	       elseif ($stack[0][children][$i][name]=='KS300_DEVICES')
+	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -464,7 +469,7 @@ xml_parser_free($xml_parser);
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
 	############################
-	      if ($stack[0][children][$i][name]=='FS20_DEVICES')
+	      if (substr($stack[0][children][$i][name],0,5)=='FS20_')
 	      {
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
@@ -505,7 +510,7 @@ xml_parser_free($xml_parser);
 			 	echo "</td></tr>";
 	       }
 	############################
-	       elseif ($stack[0][children][$i][name]=='FHT_DEVICES')
+	       elseif (substr($stack[0][children][$i][name],0,4)=='FHT_')
 	       {
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
@@ -584,7 +589,7 @@ xml_parser_free($xml_parser);
 		}
 	       }
 	############################
-	       elseif ($stack[0][children][$i][name]=='HMS_DEVICES')
+	       elseif (substr($stack[0][children][$i][name],0,4)=='HMS_')
 	       {
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
@@ -597,7 +602,7 @@ xml_parser_free($xml_parser);
 				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="room") 
 					{$room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 					}
-				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][name]=="type") 
+				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="type") 
 					{$type=$stack[0][children][$i][children][$j][children][$k][attrs][value];};
 				}
 		 if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
@@ -633,8 +638,9 @@ xml_parser_free($xml_parser);
 		       }
 	       }
 	############################
-	       elseif ($stack[0][children][$i][name]=='KS300_DEVICES')
+	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_' or substr($stack[0][children][$i][name],0,6)=='WS300_')
 	       {
+			if ($stack[0][children][$i][name]=='WS300_LIST') $willi=1;
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
 	      		echo "$type</font></td></tr>";
@@ -676,11 +682,17 @@ xml_parser_free($xml_parser);
                                        <input type=submit value='hide'></form></td>";}
                          else
                                 {echo "<tr valign=center><td align=center $bg2 valign=center>
-                                       <form action=$forwardurl method='POST'>
-                                       <input type=hidden name=Action value=showks><br>Temp./Hum.<br>
-					<input type=radio name=kstyp value=\"1\" checked><br><br>Wind/Rain<br>
-					<input type=radio name=kstyp value=\"2\"><br><br>
-                                        <input type=hidden name=showroom value=$showroom>
+                                       <form action=$forwardurl method='POST'>";
+
+					if (! isset ($willi)) 
+					{
+                                        echo "<input type=hidden name=Action value=showks><br>Temp./Hum.<br>
+						<input type=radio name=kstyp value=\"1\" checked><br><br>Wind/Rain<br>
+				 		<input type=radio name=kstyp value=\"2\"><br><br>";
+					}
+					else echo "<input type=hidden name=kstyp value=\"1\" checked>";
+
+                                        echo "<input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showks value=$KSdev>
                                        <input type=submit value='show'></form></td>";
                          };
@@ -701,7 +713,7 @@ xml_parser_free($xml_parser);
 			}
 		}
 	############################
-	       elseif ($stack[0][children][$i][name]=='LOGS')
+	       elseif ($stack[0][children][$i][name]=='LOGS'or $stack[0][children][$i][name]=='FileLog_LIST')
 	       {
 		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
 			<table  cellspacing='0' cellpadding='0' width='100%'>
@@ -716,16 +728,24 @@ xml_parser_free($xml_parser);
 		if (isset ($showlogs))
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
+			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+			{
+			   	$check=$stack[0][children][$i][children][$j][children][$k][attrs][key];
+			 	if ($check=='DEF')
+			  	{
+				$value=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+			  	}	
+			}
 			 	$name=$stack[0][children][$i][children][$j][attrs][name];
-				$definition=$stack[0][children][$i][children][$j][attrs][definition];
-				if ($definition != "")
-			 	{echo "<tr><td colspan=2 border=0>Log:</td>
-					<td colspan=2 border=0>$definition</td></tr>";
-				}
+				#$definition=$stack[0][children][$i][children][$j][attrs][definition];
+				#if ($definition != "")
+			 	echo "<tr><td colspan=2 border=0>Log:</td>
+					<td colspan=2 border=0>$value / $name </td></tr>";
+				
 			 }
 		} 
 	############################
-	       elseif ($stack[0][children][$i][name]=='NOTIFICATIONS')
+	       elseif ($stack[0][children][$i][name]=='NOTIFICATIONS' or $stack[0][children][$i][name]=='notify_LIST')
 	       {
 		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
 			<table  cellspacing='0' cellpadding='0' width='100%'>
@@ -739,14 +759,20 @@ xml_parser_free($xml_parser);
 		if (isset ($shownoti))
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
-			 	$event=$stack[0][children][$i][children][$j][attrs][event];
-				$command=$stack[0][children][$i][children][$j][attrs][command];
-				$measured=$stack[0][children][$i][children][$j][children][0][attrs][measured];
-			 	echo "<tr><td colspan=2>Notification:</td><td colspan=2>$event $command</td></tr>";
+			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+			{
+			   	$check=$stack[0][children][$i][children][$j][children][$k][attrs][key];
+			 	if ($check=='DEF')
+			  	{
+				$value=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+			  	}	
+			}
+			 	$name=$stack[0][children][$i][children][$j][attrs][name];
+			 	echo "<tr><td colspan=2>Notification:</td><td colspan=2>$value / $name</td></tr>";
 			 }
 		} 
 	############################
-	       elseif ($stack[0][children][$i][name]=='AT_JOBS')
+	       elseif ($stack[0][children][$i][name]=='AT_JOBS' or $stack[0][children][$i][name]=='at_LIST')
 	       {
 		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
 			<table  cellspacing='0' cellpadding='0' width='100%'>
@@ -761,13 +787,24 @@ xml_parser_free($xml_parser);
 		if (isset ($showat))
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
-				$command=$stack[0][children][$i][children][$j][attrs][command];
-				$next=$stack[0][children][$i][children][$j][attrs][next];
+				#$command=$stack[0][children][$i][children][$j][attrs][command];
+				$command=$stack[0][children][$i][children][$j][attrs][name];
+				#$next=$stack[0][children][$i][children][$j][attrs][next];
+				$next=$stack[0][children][$i][children][$j][attrs][state];
 				$order=$command;
-				$order=str_replace("+","@",$order);
-				$order='del at '.$order;
-				if ($next != '') {$nexttxt='('.$next .')';} else {$nexttxt='';};
-			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del</a></td><td colspan=2>$command $nexttxt</td></tr>";
+			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+			{
+			   	$check=$stack[0][children][$i][children][$j][children][$k][attrs][key];
+			 	if ($check=='DEF')
+			  	{
+				$value=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+			  	}	
+			}
+
+				#$order=str_replace("+","@",$order);
+				$order='delete '.$order;
+				#if ($next != '') {$nexttxt='('.$next .')';} else {$nexttxt='';};
+			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del</a></td><td colspan=2>$value / $next / $command</td></tr>";
 			 }
 		} 
 	};

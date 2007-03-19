@@ -1,23 +1,24 @@
-##############################################
+#############################################
 # Low Budget ALARM System
 ##############################################
-# ATTENTION! This is more a toy than a real alarm system! You must know what you do! 
+# ATTENTION! This is more a toy than a professional alarm system! 
+# You must know what you do! 
 ##############################################
 #  
 # Concept:
 # 1x Signal Light (FS20 allight) to show the status (activated/deactivated)
-# 1x Sirene (FS20 alsir1)
+# 2x Sirene (in/out) (FS20 alsir1 alsir2 )
 # 2x PIRI-2 (FS20 piriu pirio)
 # 1x Sender (FS20 alsw) to activate/deactivate the system. 
-# Tip: use the KeyMatic CAC with pin code
-# optional a normal sender (not a Keymatic CAC) FS20 alsw2
+# Tip: use the KeyMatic CAC with pin code or
+# optional a normal sender (FS20 alsw2)
 # 
 # Add something like the following lines to the configuration file :
 #   	notifyon alsw {MyAlsw()}
 #   	notifyon alsw2 {MyAlswNoPin()}
 #	notifyon piriu {MyAlarm()}
 #	notifyon pirio {MyAlarm()}
-# and put this file in the <modpath>/FHEM directory.
+# and put this file in the <modpath>/FHZ1000 directory.
 #
 # Martin Haas
 ##############################################
@@ -28,11 +29,10 @@ use strict;
 use warnings;
 
 sub
-ALARM_Initialize($)
+ALARM_Initialize($$)
 {
-  my ($hash) = @_;
-
-  $hash->{Category} = "none";
+  my ($hash, $init) = @_;
+  $hash->{Type} = "none";
 }
 
 
@@ -42,25 +42,23 @@ sub
 MyAlsw()
 {
   my $ON="set allight on; setstate alsw on";
-  my $OFF1="set allight off";
-  my $OFF2="set alsir1 off";
-  my $OFF3="setstate alsw off";
+  my $OFF="set allight off; set alsir1 off; set alsir2 off; setstate alsw off";
 
 	if ( -e "/var/tmp/alertsystem")
 	{		
 		unlink "/var/tmp/alertsystem";
+		#Paranoia
 		for (my $i = 0; $i < 2; $i++ )
 		{
-                                fhz "$OFF1";
-                                fhz "$OFF2";
-                                fhz "$OFF3";
+                                fhem "$OFF";
 		};
                 Log 2, "alarm system is OFF";
 	} else	{
 		system "touch /var/tmp/alertsystem";
+		#Paranoia
 		for (my $i = 0; $i < 2; $i++ )
 		{
-                         fhz "$ON"
+                         fhem "$ON"
 		}
                 Log 2, "alarm system is ON";
 	};
@@ -81,7 +79,6 @@ my $timedout=5;
         {
                 for (my $i = 1; $i < 4; $i++ )
                 {
-                        system "touch /var/tmp/alontest$i";
                         system "touch -t 200601010101 /var/tmp/alontest$i";
                 }
         }
@@ -97,15 +94,14 @@ my $timedout=5;
                         if  ( $testx > $timedout )
                         {
                                 system "touch /var/tmp/alontest$i";
-                                Log 2, "test$i: more than $timedout sec\n";
-                                die;
+                                die "test$i: more than $timedout sec";
                         }
                 }
         system "touch -t 200601010101 /var/tmp/alontest*";
         Log 2, "ok, let's switch the alarm system...";
 
 #if you only allow to activate (and not deactivate) with this script:
-# if ( -e "/var/tmp/alertsystem") { die; };
+	# if ( -e "/var/tmp/alertsystem") { die "deactivating alarm system not allowed"};
 
 	MyAlsw();
 }
@@ -123,29 +119,30 @@ MyAlarm()
         if ( -e "/var/tmp/alertsystem")
         {
 
-
-                my $timer=180;  # time until the sirene will be quit
+                my $timer=180;  # time until the sirene will be quiet
                 my $ON1="set alsir1 on-for-timer $timer";
+                my $ON2="set alsir2 on-for-timer $timer";
 
 
                 #Paranoia
-                for (my $i = 1; $i < 3; $i++ )
+                for (my $i = 0; $i < 2; $i++ )
                 {
-                        fhz "$ON1";
+                        fhem "$ON1";
+                        fhem "$ON2";
                 }
-                Log 2, "ALARM! $ON1" ;
+                Log 2, "ALARM! #################" ;
 
 
                 # have fun
-                my @lights=("stuwz1", "stuwz2", "stunacht", "stonacht", "stoliba");
+                my @lights=("stuwz1", "stuwz2", "nachto", "nachtu", "stoliba" ,"stlileo");
                 my @rollos=("rolu4", "rolu5", "roloadi", "rololeo", "roloco", "rolowz", "rolunik1", "rolunik2");
 
                 foreach my $light (@lights) {
-                        fhz "set $light on"
+                        fhem "set $light on"
                 }
 
                 foreach my $rollo (@rollos) {
-                        fhz "set $rollo on"
+                        fhem "set $rollo on"
                 }
         }
 }

@@ -1,2 +1,6 @@
 - Martin 2007-02-22 
   - Now you can adjust the range of the Gnuplot-pictures of FHT in the config.php
+
+- Martin 2007-03-19
+  - Feature: WS300 ist now supported
+  - Adjusted to new structure of FHEM (IT NEEDS now FHZ1000/FHEM >= v3.4!)
