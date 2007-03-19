@@ -44,7 +44,6 @@ my %codes = (
   "^8501..\$" => "fhtbuf",
 );
 
-my %readings;
 my $def;
 my %msghist;		# Used when more than one FHZ is attached
 my $msgcount = 0;
@@ -56,8 +55,6 @@ FHZ_Initialize($)
 {
   my ($hash) = @_;
 
-
-  $hash->{Category}= "DEV";
 
 # Provider
   $hash->{ReadFn}  = "FHZ_Read";
@@ -71,8 +68,8 @@ FHZ_Initialize($)
   $hash->{GetFn}   = "FHZ_Get";
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{StateFn} = "FHZ_SetState";
-  $hash->{ListFn}  = "FHZ_List";
   $hash->{ParseFn} = "FHZ_Parse";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -81,16 +78,18 @@ FHZ_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return "Need one to three parameter" if(@a > 4);
-  return "invalid parameter, use one of:\n  " . join("\n  ", sort keys %sets)
+  return "Need one to three parameter" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
   	if(!defined($sets{$a[1]}));
+  return "Need one to three parameter" if(@a > 4);
   return "Wrong number of parameters for $a[1], need " . ($setnrparam{$a[1]}+2)
   	if(@a != ($setnrparam{$a[1]} + 2));
 
   my ($fn, $arg) = split(" ", $sets{$a[1]});
 
   my $v = join(" ", @a);
-  Log GetLogLevel("FHZ"), "FHZ set $v";
+  my $name = $hash->{NAME};
+  Log GetLogLevel($name,2), "FHZ set $name $v";
 
   if($a[1] eq "activefor") {
 
@@ -98,7 +97,7 @@ FHZ_Set($@)
     return "device $a[2] unknown" if(!defined($dhash));
 
     return "Cannot handle $dhash->{TYPE} devices"
-    		if($devmods{FHZ}->{Clients} !~ m/:$dhash->{TYPE}:/);
+    		if($modules{FHZ}->{Clients} !~ m/:$dhash->{TYPE}:/);
 
     $dhash->{IODev} = $hash;
     return undef;
@@ -133,15 +132,14 @@ FHZ_Get($@)
   my ($hash, @a) = @_;
 
   return "\"get FHZ\" needs only one parameter" if(@a != 2);
-  if(!defined($gets{$a[1]})) {
-    return "Unknown set value $a[1], please specify one of: " .
-    		join(" ", sort(keys %gets));
-  }
+  return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
+  	if(!defined($gets{$a[1]}));
 
   my ($fn, $arg) = split(" ", $gets{$a[1]});
 
   my $v = join(" ", @a);
-  Log GetLogLevel("FHZ"), "FHZ get $v";
+  my $name = $hash->{NAME};
+  Log GetLogLevel($name,2), "FHZ get $name $v";
 
   FHZ_Write($hash, $fn, $arg) if(!IsDummy("FHZ"));
 
@@ -157,24 +155,10 @@ FHZ_Get($@)
   } else {
     $v = substr($msg, 12);
   }
-  $readings{$a[1]}{VAL} = $v;
-  $readings{$a[1]}{TIM} = TimeNow();
+  $hash->{READINGS}{$a[1]}{VAL} = $v;
+  $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
 
   return "$a[0] $a[1] => $v";
-}
-
-#####################################
-sub
-FHZ_List($)
-{
-  my ($hash) = @_;
-
-  my $str = "";
-  foreach my $m (sort keys %readings) {
-    $str .= sprintf("%-19s   %-15s %s\n",
-    		$readings{$m}{TIM},$m,$readings{$m}{VAL});
-  }
-  return $str;
 }
 
 #####################################
@@ -184,11 +168,6 @@ FHZ_SetState($$$$)
   my ($hash, $tim, $vt, $val) = @_;
 
   return "Undefined value $vt" if(!defined($gets{$vt}));
-
-  if(!$readings{$vt} || $readings{$vt}{TIM} lt $tim) {
-    $readings{$vt}{TIM} = $tim;
-    $readings{$vt}{VAL} = $val;
-  }
   return undef;
 }
 
@@ -216,7 +195,8 @@ DoInit($)
 sub
 FHZ_Define($$)
 {
-  my ($hash, @a) = @_;
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
 
   $hash->{STATE} = "Initialized";
 
@@ -224,6 +204,8 @@ FHZ_Define($$)
   delete $hash->{FD};
 
   my $dev = $a[2];
+  $attr{$a[0]}{savefirst} = 1;
+
   if($dev eq "none") {
     Log 1, "FHZ device is none, commands will be echoed only";
     return undef;
@@ -252,12 +234,14 @@ sub
 FHZ_Undef($$)
 {
   my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+
   foreach my $d (keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
        $defs{$d}{IODev} == $hash)
       {
-        Log 4, "deleting port for $d";
+        Log GetLogLevel($name,2), "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -275,6 +259,7 @@ FHZ_Parse($$)
   $msg = substr($msg, 12);	# The first 12 bytes are not really interesting
 
   my $type = "";
+  my $name = $hash->{NAME};
   foreach my $c (keys %codes) {
     if($msg =~ m/$c/) {
       $type = $codes{$c};
@@ -283,7 +268,7 @@ FHZ_Parse($$)
   }
 
   if(!$type) {
-    Log 4, "FHZ unknown: $omsg";
+    Log 4, "FHZ $name unknown: $omsg";
     $def->{CHANGED}[0] = "$msg";
     return $hash->{NAME};
   }
@@ -293,7 +278,7 @@ FHZ_Parse($$)
     $msg = substr($msg, 4, 2);
   }
 
-  Log 4, "FHZ $type: $msg)";
+  Log 4, "FHZ $name $type: $msg)";
   $def->{CHANGED}[0] = "$type: $msg";
   return $hash->{NAME};
 }
@@ -355,7 +340,7 @@ FHZ_ReadAnswer($$)
 
     my $len = ord(substr($mfhzdata,1,1)) + 2;
     if($len>20) {
-      Log 1, "Oversized message (" . unpack('H*',$mfhzdata) .
+      Log 4, "Oversized message (" . unpack('H*',$mfhzdata) .
       				"), dropping it ...";
       return undef;
     }
@@ -438,7 +423,7 @@ FHZ_Read($)
   my ($hash) = @_;
 
   my $buf = $hash->{PortObj}->input();
-  my $iohash = $devmods{$hash->{TYPE}};
+  my $iohash = $modules{$hash->{TYPE}};
   my $name = $hash->{NAME};
 
   ###########
@@ -531,12 +516,12 @@ FHZ_Read($)
 
 
       my @found;
-      foreach my $m (sort { $devmods{$a}{ORDER} cmp $devmods{$b}{ORDER} }
-			    keys %devmods) {
+      foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
+			    keys %modules) {
 	next if($iohash->{Clients} !~ m/:$m:/);
-	next if($dmsg !~ m/$devmods{$m}{Match}/i);
+	next if($dmsg !~ m/$modules{$m}{Match}/i);
 	no strict "refs";
-	@found = &{$devmods{$m}{ParseFn}}($hash,$dmsg);
+	@found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
 	use strict "refs";
 	last if(int(@found));
       }

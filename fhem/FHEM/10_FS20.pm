@@ -45,8 +45,44 @@ my %readonly = (
 
 use vars qw(%fs20_c2b);		# Peter would like to access it from outside
 my %defptr;
-my %readings;
 my %follow;
+my $fs20_simple ="off off-for-timer on on-for-timer on-till reset timer toggle";
+my %models = (
+    fs20hgs	=> 'sender',
+    fs20hgs	=> 'sender',
+    fs20pira	=> 'sender',
+    fs20piri	=> 'sender',
+    fs20s20	=> 'sender',
+    fs20s4	=> 'sender',
+    fs20s4a	=> 'sender',
+    fs20s4m	=> 'sender',
+    fs20s4u	=> 'sender',
+    fs20s4ub	=> 'sender',
+    fs20sd	=> 'sender',
+    fs20sn	=> 'sender',
+    fs20sr	=> 'sender',
+    fs20ss	=> 'sender',
+    fs20str	=> 'sender',
+    fs20tfk	=> 'sender',
+    fs20tfk	=> 'sender',
+    fs20tk	=> 'sender',
+    fs20uts	=> 'sender',
+    fs20ze	=> 'sender',
+
+    fs20as1	=> 'simple',
+    fs20as4	=> 'simple',
+    fs20di	=> 'dimmer',
+    fs20du	=> 'dimmer',
+    fs20ms2	=> 'simple',
+    fs20rst	=> 'simple',
+    fs20sa	=> 'simple',
+    fs20sig	=> 'simple',
+    fs20st	=> 'simple',
+    fs20sv	=> 'simple',
+    fs20sv	=> 'simple',
+    fs20usr	=> 'simple',
+);
+
 
 sub
 FS20_Initialize($)
@@ -58,38 +94,14 @@ FS20_Initialize($)
   }
   $fs20_c2b{"on-till"} = 99;
 
-  $hash->{Category}  = "DEV";
-
   $hash->{Match}     = "^81..(04|0c)..0101a001";
   $hash->{SetFn}     = "FS20_Set";
-  $hash->{GetFn}     = "FS20_Get";
-  $hash->{ListFn}    = "FS20_List";
   $hash->{StateFn}   = "FS20_SetState";
   $hash->{DefFn}     = "FS20_Define";
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
-}
+  $hash->{AttrList}  = "follow-on-for-timer:1,0 do_not_notify:1,0 dummy:1,0 showtime:1,0 model;fs20hgs,fs20hgs,fs20pira,fs20piri,fs20s20,fs20s4,fs20s4a,fs20s4m,fs20s4u,fs20s4ub,fs20sd,fs20sn,fs20sr,fs20ss,fs20str,fs20tfk,fs20tfk,fs20tk,fs20uts,fs20ze,fs20as1,fs20as4,fs20di,fs20du,fs20ms2,fs20rst,fs20sa,fs20sig,fs20st,fs20sv,fs20sv,fs20usr loglevel:0,1,2,3,4,5,6";
 
-###################################
-sub
-FS20_Get($@)
-{
-  my ($hash, @a) = @_;
-  return "No get function implemented";
-}
-
-###################################
-sub
-FS20_List($)
-{
-  my ($hash) = @_;
-
-  my $n = $hash->{NAME};
-  if(!defined($readings{$n})) {
-    return "No information about $n\n";
-  } else {
-    return sprintf("%-19s %s\n", $readings{$n}{TIM}, $readings{$n}{VAL});
-  }
 }
 
 #####################################
@@ -98,13 +110,8 @@ FS20_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
-  return "Undefined value $vt" if(!defined($fs20_c2b{$vt}));
-
-  my $name = $hash->{NAME};
-  if(!$readings{$name} || $readings{$name}{TIM} lt $tim) {
-    $readings{$name}{TIM} = $tim;
-    $readings{$name}{VAL} = $vt;
-  }
+  $val = $1 if($val =~ m/^\(.*\) \d+$/);
+  return "Undefined value $val" if(!defined($fs20_c2b{$val}));
   return undef;
 }
 
@@ -128,7 +135,8 @@ Do_On_Till($@)
 
   my @b = ($a[0], "on");
   FS20_Set($hash, @b);
-  CommandAt(undef, "$hms_till set $a[0] off");
+  CommandDefine(undef, $hash->{NAME} . "_till at $hms_till set $a[0] off");
+
 }
 
 
@@ -145,8 +153,18 @@ FS20_Set($@)
 
   my $c = $fs20_c2b{$a[1]};
   if(!defined($c)) {
-    return "Unknown set value $a[1], please specify one of:\n  " .
-    		join("\n  ", sort(keys %fs20_c2b));
+
+    # Model specific set arguments
+    if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"model"})) {
+      my $mt = $models{$attr{$a[0]}{"model"}};
+      return "Unknown argument $a[1], choose one of "
+                                               if($mt && $mt eq "sender");
+      return "Unknown argument $a[1], choose one of $fs20_simple"
+                                               if($mt && $mt eq "simple");
+    }
+    return "Unknown argument $a[1], choose one of " .
+                                join(" ", sort keys %fs20_c2b);
+
   }
 
   return Do_On_Till($hash, @a) if($a[1] eq "on-till");
@@ -154,7 +172,7 @@ FS20_Set($@)
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
   my $v = join(" ", @a);
-  Log GetLogLevel($a[0]), "FS20 set $v";
+  Log GetLogLevel($a[0],2), "FS20 set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   my $val;
@@ -175,7 +193,7 @@ FS20_Set($@)
 	if($val >= $a[2]) {
           if($val != $a[2]) {
             $ret = "FS20 Setting timeout to $val from $a[2]";
-            Log GetLogLevel($a[0]), $ret;
+            Log GetLogLevel($a[0],2), $ret;
 	  }
 	  $c .= sprintf("%x%x", $i, $j);
 	  last LOOP;
@@ -200,7 +218,7 @@ FS20_Set($@)
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
     $follow{$a[0]} = $to;
     Log 4, "Follow: +$to setstate $a[0] off";
-    CommandAt(undef, "+$to setstate $a[0] off");
+    CommandDefine(undef, $a[0] . "_timer at +$to setstate $a[0] off");
   }
 
   ##########################
@@ -208,23 +226,25 @@ FS20_Set($@)
   my $code = "$hash->{XMIT} $hash->{BTN}";
   my $tn = TimeNow();
   foreach my $n (keys %{ $defptr{$code} }) {
-    $defptr{$code}{$n}->{CHANGED}[0] = $v;
-    $defptr{$code}{$n}->{STATE} = $v;
-    $readings{$n}{TIM} = $tn;
-    $readings{$n}{VAL} = $v;
-  }
-  
 
+    my $lh = $defptr{$code}{$n};
+    $lh->{CHANGED}[0] = $v;
+    $lh->{STATE} = $v;
+    $lh->{READINGS}{state}{TIME} = $tn;
+    $lh->{READINGS}{state}{VAL} = $v;
+  }
   return $ret;
 }
 
 #############################
 sub
-FS20_Define($@)
+FS20_Define($$)
 {
-  my ($hash, @a) = @_;
-  my $u =
-  "wrong syntax: define <name> FS20 housecode addr [fg addr] [lm addr] [gm FF]";
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
+
+  my $u = "wrong syntax: define <name> FS20 housecode " .
+                        "addr [fg addr] [lm addr] [gm FF]";
 
   return $u if(int(@a) < 4);
   return "Define $a[0]: wrong housecode format: specify a 4 digit hex value"
@@ -287,7 +307,6 @@ FS20_Parse($)
   my $btn = substr($msg, 20, 2);
   my $cde = substr($msg, 24, 2);
 
-  my $def = $defptr{"$dev $btn"};
 
   my $dur = 0;
   my $cx = hex($cde);
@@ -302,15 +321,17 @@ FS20_Parse($)
   my $v = $codes{$cde};
   $v = "unknown:$cde" if(!defined($v));
   $v .= " $dur" if($dur);
-  if($def) {
 
+  my $def = $defptr{"$dev $btn"};
+  if($def) {
     my @list;
     foreach my $n (keys %{ $def }) {
-      $readings{$n}{TIM} = TimeNow();
-      $readings{$n}{VAL} = $v;
-      $def->{$n}->{CHANGED}[0] = $v;
-      $def->{$n}->{STATE} = $v;
-      Log GetLogLevel($n), "FS20 $n $v";
+      my $lh = $def->{$n};
+      $lh->{CHANGED}[0] = $v;
+      $lh->{STATE} = $v;
+      $lh->{READINGS}{state}{TIME} = TimeNow();
+      $lh->{READINGS}{state}{VAL} = $v;
+      Log GetLogLevel($n,2), "FS20 $n $v";
       push(@list, $n);
     }
     return @list;

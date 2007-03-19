@@ -20,11 +20,11 @@ You can use all of the following commands in in two ways:
     <br>
     A minimal configuration file would look like:
     <pre>
-      <a href="#logfile">logfile</a> /tmp/fhem.log
-      <a href="#savefile">savefile</a> /tmp/fhem.save  
-      <a href="#verbose">verbose</a> 3                   
-      <a href="#port">port</a> 7072                   
-      <a href="#modpath">modpath</a> .                   
+      attr global <a href="#logfile">logfile</a> /tmp/fhem.log
+      attr global <a href="#statefile">statefile</a> /tmp/fhem.save  
+      attr global <a href="#verbose">verbose</a> 3                   
+      attr global <a href="#port">port</a> 7072                   
+      attr global <a href="#modpath">modpath</a> /usr/local/lib
       <a href="#define">define</a> FHZ FHZ /dev/tts/USB0        
 
       <a href="#define">define</a> lamp FS20 8765 01</pre>
@@ -47,28 +47,28 @@ You can use all of the following commands in in two ways:
     </li>
 </ul>
 
-There are three types of commands: "fhz" commands (described in this document),
+There are three types of commands: "fhem" commands (described in this document),
 shell commands (they must be enclosed in double quotes ") and perl expressions
 (enclosed in curly brackets {}). shell commands or perl expressions are needed for
-complex <a href="#at">at</a> or <a href="#notifyon">notifyon</a> arguments.<br><br>
+complex <a href="#at">at</a> or <a href="#notify">notify</a> arguments.<br><br>
 
 Shell commands will be executed in the
-background, the perl program and the fhz commands will be executed in the main
+background, the perl program and the fhem commands will be executed in the main
 "thread".
 In order to make perl expressions easier to write, some special functions and
 variables are available. See the section <a href="#perl">Perl special</a> for a
 description.
-To trigger "fhz" commands from a shell script, use the client form of
+To trigger "fhem" commands from a shell script, use the client form of
 fhem.pl (described above).<br><br>
 
-Multiple fhz commands are separated by semicolon (;). In order to use semicolon
+Multiple fhem commands are separated by semicolon (;). In order to use semicolon
 in perl code or shell programs, they have to be escaped by the double semicolon
 (;;).<br><br>
 
 Commands can be either typed in plain, or read from a file (e.g. the
 configuration file at startup). The commands are either executed directly, or
 later if they are arguments to the <a href="#at">at</a> and <a
-href="#notifyon">notifyon</a> fhz commands.<br><br>
+href="#notify">notify</a> fhem commands.<br><br>
 
 If commands are read from a file, then a line ending with \ will be
 concatenated with the next one, so long lines (e.g. perl oneliners) can be
@@ -85,136 +85,174 @@ split in multiple lines<br><br>
 </ul>
 
 
-<a name="at"></a>
-<h3>at</h3>
-<ul>
-  <code>at &lt;timespec&gt; &lt;command&gt;</code><br>
-  <br>
-  Start an arbitrary fhem.pl command at a later time.
-  <code>&lt;timespec&gt;</code> format: [+][*]HH:MM:SS<br>
-  The optional <code>+</code> indicates that the specification is
-  <i>relative</i>(i.e. it will be added to the current time).<br>
-  The optional <code>*</code> indicates that the command should be
-  executed <i>repeatedly</i>.<br>
-  The optional <code>{N}</code> after the * indicates,that the command
-  should be repeated <i>N-times</i> only.<br>
-  <br>
-
-  Examples:
-  <PRE>
-  # absolute ones:
-  at 17:00:00 set lamp on                            # fhz command
-  at 17:00:00 { Log 1, "Teetime" }                   # Perl command
-  at 17:00:00 "/bin/echo "Teetime" > /dev/console"   # shell command
-  at *17:00:00 set lamp on                           # repeat every day
-
-  # relative ones
-  at +00:00:10 set lamp on                  # switch the lamp on in 10 seconds
-  at +00:00:02 set lamp on-for-timer 1      # Blink once in 2 seconds
-  at +*{3}00:00:02 set lamp on-for-timer 1   # Blink 3 times
-
-  # Blink 3 times if the piri sends a command
-  notify piri:on.* at +*{3}00:00:02 set lamp on-for-timer 1
-
-  # Switch the lamp on from sunset to 11 PM 
-  # Copy 99_SUNRISE.pm in the FHEM directory to have sunset_rel()
-  { sunrise_coord("8.686", "50.112", "Europe/Berlin") }
-  at +*{sunset_rel()} set lamp on
-  at *23:00:00 set lamp off
-
-  # More elegant version, works for sunset > 23:00 too
-  at +*{sunset_rel()} set lamp on-till 23:00
-
-  # Only do this on weekend
-  at +*{sunset_rel()} { fhz("set lamp on-till 23:00") if($we) }
-
-  # Switch lamp1 and lamp2 on from 7:00 till 10 minutes after sunrise
-  at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
-
-  # Switch the lamp off 2 minutes after sunrise each day
-  at +*{sunrise_rel(+120)} set lamp on
-  </PRE>
-
-  Notes:<br>
-  <ul>
-    <li>if no <code>*</code> is specified, then a command will be executed
-        only once, and then the <code>at</code> entry will be deleted.</li>
-    <li>if the current time is greater then the time specified, then the
-	command will be executed tomorrow. This is why the relative forms
-	of the sunset/sunrise functions should be used with the relative
-	(+) flag</li>
-    <li>the <code><a href="#delete">delete</a></code> argument for at is the
-        complete line as it appears in <code><a href="#list">list</a></code>
-	(with spaces), but you can use regexps.</li>
-    <li>In order to use the sunrise_rel()/sunset_rel() functions, copy the
-	99_SUNRISE.pm file from the contrib into the modules (FHEM)
-	directory, and put { sunrise_coord(long, lat, tz) } into your config
-	file, as in the above example. If you are not using sunrise_coord, then
-	the coordinates for Frankfurt am Main, Germany will be used.
-	You also have to install the Datetime::Event::Sunrise perl module.
-	</li>
-    <li>do not place <code>at</code> commands in the config file if you
-	specified a <code><a href="#savefile">savefile</a></code>, as all
-	<code>at</code> commands will be saved there too, and then defined
-	twice at startup. <code>at</code> is intended to be inserted by
-	hand or by cronjobs.</li>
-    <li>For more complex date handling you either have to call fhem from
-        cron or filter the date in a perl expression, see the last example and
-        the section <a href="#perl">Perl special</a>.
-	</li>
-  </ul> </ul>
 
 <a name="attr"></a>
 <h3>attr</h3>
 <ul>
-  <code>attr &lt;devname&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+  <code>attr &lt;name&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
   or <br>
   <code>attr at &lt;at-spec-regexp&gt; &lt;attribute&gt; </code><br>
 
-  <br>Set a device,log or at attribute. There are some special attributes used
-  by the fhem.pl itself or the web-frontends, but you can define your own to
-  use them in other applications.<br><br>
+  <br>Set an attribute to something defined by <a href="#define">define</a>.
+  There are some special attributes used by the fhem.pl itself or the
+  web-frontends, but you can define your own to use them in other applications.
+  You have to define them first with <a href="#userattr">userattr</a>, see
+  below.<br>
 
-  Recognized attributes:<br>
+  Use "attr &lt;name&gt; ?" to get a list of possible attributes.
+  <br><br>
+
+  Following are attributes of the global device:<br>
+
   <ul>
+
+    <a name="configfile"></a>
+    <li>configfile<br>
+        Contains the name of the configuration file. If <a
+        href="#save">save</a> is called without argument, then the output will
+        be written to this file.
+	</li><br>
+
+    <a name="logfile"></a>
+    <li>logfile<br>
+        Specify the logfile to write.  You can use "-" for
+        stdout, in this case the server won't background itself.<br>
+        The logfile name can also take wildcards for easier logfile rotation,
+        see the <a href="#FileLog">FileLog</a> section.
+        </li><br>
+
+    <a name="modpath"></a>
+    <li>modpath<br>
+        Specify the path to the modules directory <code>FHEM</code>. The path
+        should <b>not</b> contain the directory FHEM. Every file there with the
+        name pattern &lt;number&gt;_&lt;name&gt;.pm will be loaded in the order
+        of the number.
+        </li><br>
+
+    <a name="pidfilename"></a>
+    <li>pidfilename<br>
+        Write the process id of the perl process to the specified file. The
+        server runs as a daemon, and some distributions would like to check by
+        the pid if we are still running. The file will be deleted upon
+        shutdown.
+        </li><br>
+
+    <a name="pidfilename"></a>
+    <li>pidfilename<br>
+        Works for the global "device"<br>
+        </li><br>
+
+    <a name="port"></a>
+    <li>port<br>
+        Listen on the TCP/IP port <code>&lt;number&gt;</code> for incoming
+        connections. To offer at least a little bit of security, the server
+        will only listen for connections from the localhost per default. If
+        there is a second value  "global" then the server will listen for
+        non-localhost connections too.
+        </li><br>
+
+    <a name="statefile"></a>
+    <li>statefile<br>
+        Set the filename where the state and certain <a href="#at">at</a>
+        information will be saved before shutdown. If it is not specified, then
+        no information will be saved.
+        </li><br>
+
+    <a name="userattr"></a>
+    <li>userattr<br>
+        A space separated list which contains the names of additional
+        attributes. Without specifying them you will not be able to set them
+        (in order to prevent typos).
+	</li><br>
+
+    <a name="verbose"></a>
+    <li>verbose<br>
+        Set the verbosity level. Possible values:
+        <ul>
+          <li>0 - it will only tell you when the server was started, or
+          stopped</li>
+          <li>1 - it logs all error messages or unknown packets</li>
+          <li>2 - it logs all signals received or sent in a "digested"
+          format,</li>
+          <li>3 - it logs the signals for undefined devices,</li>
+          <li>4 - it logs the TCP/IP connections and the called programs with
+          parameters,</li>
+          <li>5 - is for debugging.</li>
+        </ul>
+        Recommended level is 3 for normal use.
+        </li>
+  </ul>
+
+  <br>
+  Attributes used by all devices:
+  <ul>
+    <a name="room"></a>
     <li>room<br>
         Filter/group devices. Recognized by web-pgm2 and web-pgm3.
-	Devices in the room hidden will not appear in the web output.</li>
+	Devices in the room hidden will not appear in the web output.</li><br>
+
+    <a name="showtime"></a>
+    <li>showtime<br>
+        Used in the webfrontend pgm2 to show the time of last activity
+        instead of the state in the summary view. Useful e.g. for FS20 PIRI
+        devices.
+	</li>
+  </ul>
+
+  <br>
+  Attributes used by selected devices:
+  <ul>
+    <a name="disable"></a>
+    <li>disable<br>
+        Can be applied to at/notify/FileLog devices.<br>
+	Disables the corresponding at/notify or FileLog device. Note:
+        If applied to an <a href="#at">at</a>, the command will not be executed,
+        but the next time will be computed.</li><br>
+
+    <a name="do_not_notify"></a>
+    <li>do_not_notify<br>
+        Can be applied to FHZ/FS20/FHT/HMS/KS300/WS300 devices.<br>
+	Disable FileLog/notify/inform notification for a device. This affects
+	the received signal, the set and trigger commands.</li><br>
+
+    <a name="dummy"></a>
+    <li>dummy<br>
+        Can be applied to FS20/FHT devices.<br>
+	Set the device attribute dummy to define devices which should not
+	output any radio signals. Associated notifys will be executed if
+	the signal is received. Used e.g. to react to a code from a sender, but
+	it will not emit radio signal if triggered in the web frontend.
+	Implemented for FS20 and FHT devices.</li><br>
+
+    <a name="filtertimeout"></a>
+    <li>filtertimeout<br>
+        Can be applied to FHZ devices.<br>
+        Ignore duplicate messages for this amount of time. The time is in
+        seconds, fractions are allowed. It affects installations with more then
+        one FHZ device or repeater, see the <a href="#repeater">repeater</a>
+        entry.
+	</li><br>
+
+    <a name="follow-on-for-timer"></a>
+    <li>follow-on-for-timer<br>
+        Can be applied to FS20 devices.<br>
+	the program automatically schedules a "setstate off" for the time
+	specified as argument to the on-for-timer command (for the specified
+	device only).
+	</li><br>
+
+    <a name="loglevel"></a>
     <li>loglevel<br>
+        Can be applied to FHZ/FS20/FHT/HMS/KS300/WS300 devices.<br>
 	Set the device loglevel to e.g. 6 if you do not wish messages from a
 	given device to appear in the global logfile (FHZ/FS20/FHT).  E.g. to
 	set the FHT time, you should schedule "set FHZ time" every minute, but
 	this in turn makes your logfile unreadable.  These messages will not be
-	generated if the FHZ attribute loglevel is set to 6.</li>
-    <li>dummy<br>
-	Set the device attribute dummy to define devices which should not
-	output any radio signals. Associated notifyons will be executed if
-	the signal is received. Used e.g. to react to a code from a sender, but
-	it will not emit radio signal if triggered in the web frontend.
-	Implemented for FS20 and FHT devices.</li>
-    <li>do_not_notify<br>
-	Disable FileLog/notify/inform notification for a device. This affects
-	the received signal, the set and trigger commands.</li>
-    <li>skip_next<br>
-	Used for at commands: skip the execution of the command the next time.
-	</li>
-    <li>follow-on-for-timer<br>
-	the program automatically schedules a "setstate off" for the time
-	specified as argument to the on-for-timer command (for the specified
-	device only).
-	</li>
-    <li>repeater<br>
-        Set the attribute "repeater" for an FHZ device to 1 to ignore events
-        received from a FS20 repeater. In fact we are not sure that they are
-        repeater messages, we just ignore messages which were sent out by our
-        device for the next 3 seconds (see the next attribute)
-	</li>
-    <li>filtertimeout<br>
-        Ignore duplicate messages for this amount of time. The time is in
-        seconds, fractions are allowed. It affects installations with more then
-        one FHZ device or repeater, see the entry above.
-	</li>
+	generated if the FHZ attribute loglevel is set to 6.</li><br>
+
+    <a name="model"></a>
     <li>model<br>
+        Can be applied to FHZ/FS20/FHT/HMS/KS300/WS300 devices.<br>
         The model attribute denotes the model type of the device.
         The attributes will (currently) not be used by the fhem.pl directly.
         It can be used by e.g. external programs or web interfaces to
@@ -224,34 +262,84 @@ split in multiple lines<br><br>
         documentation which comes which each device. This name is used
         without blanks in all lower-case letters. Valid characters should be
         <code>a-z 0-9</code> and <code>-</code> (dash),
-        other characters should be ommited
-        (<code>fht80b, fs20du, fs20led, fs20piri, fs20s20, fs20s4a,
-         fs20st fs20ts, hms100mg, rm100-2uni-s,</code> etc.).
-	</li>
-    <li>showtime<br>
-        Used in the webfrontend pgm2 to show the time of last activity
-        instead of the state in the summary view. Useful e.g. for FS20 PIRI
-        devices.
-	</li>
+        other characters should be ommited. Here is a list of "official"
+        devices:<br>
+        <ul>
+        <li>FHT: fht80b</li>
+        <li>FS20: 
+          fs20hgs
+          fs20hgs
+          fs20pira
+          fs20piri
+          fs20s20
+          fs20s4
+          fs20s4a
+          fs20s4m
+          fs20s4u
+          fs20s4ub
+          fs20sd
+          fs20sn
+          fs20sr
+          fs20ss
+          fs20str
+          fs20tfk
+          fs20tfk
+          fs20tk
+          fs20uts
+          fs20ze
+
+          fs20as1
+          fs20as4
+          fs20di
+          fs20du
+          fs20ms2
+          fs20rst
+          fs20sa
+          fs20sig
+          fs20st
+          fs20sv
+          fs20sv
+          fs20usr
+
+        </li>
+
+        <li>HMS: hms100-t hms100-tf hms100-wd hms100-mg hms100-tfk rm100-2</li>
+        <li>KS300: ks300</li>
+        <li>WS300: ws300pc</li>
+        <li>EM1010: em1010pc</li>
+        <ul>
+	</li><br>
+
+    <a name="repeater"></a>
+    <li>repeater<br>
+        Can be applied to FHZ devices.<br>
+        Set the attribute "repeater" for an FHZ device to 1 to ignore events
+        received from a FS20 repeater. In fact we are not sure that they are
+        repeater messages, we just ignore messages which were sent out by our
+        device for the next 3 seconds (see the next attribute)
+	</li><br>
+
+    <a name="skip_next"></a>
+    <li>skip_next<br>
+        Can be applied to at devices.<br>
+	Used for at commands: skip the execution of the command the next time.
+	</li><br>
+
   </ul>
 
   Examples:
   <ul>
+    <code>attr global verbose 3</code><br>
     <code>attr lamp room kitchen</code><br>
     <code>attr lamp dummy</code><br>
     <code>attr lamp loglevel 6</code><br>
-    <code>attr lamp model fs20du</code><br>
-    <code>del attr lamp</code><br>
-    <code>at *23:00:10 set lamp off</code><br>
-    <code>attr at lamp.off skip_next</code><br>
-
   </ul>
   <br>
 
   Notes:<br>
-  <ul>
-    <li>There is no way to delete a single attribute.</li>
   </ul>
+    <li>See <a href="#delattr">delattr</a> to delete attributes.</li>
+  <ul>
 </ul>
 
 <a name="defattr"></a>
@@ -260,8 +348,8 @@ split in multiple lines<br><br>
   <code>defattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
 
   <br>Set the default attribute. Each device defined from now on will receive
-  this attribute (see the <a href="#at">at</a> for details on attribute names
-  and values).<br>
+  this attribute (see the <a href="#attr">attr</a> entry for details on
+  attribute names and values).<br>
   If no attrname is specified, then the default attribute list will be deleted.
   <br><br>
 
@@ -293,9 +381,11 @@ split in multiple lines<br><br>
   Define a device. You need devices if you want to manipulate them (e.g.
   set on/off), and the logfile is also more readable if it contains e.g.
   "lamp off" instead of "Device 5673, Button 00, Code 00 (off)". <br>
+  Use "define &lt;name&gt; ?" to get a list of possible types.
   <br>
 
-  Type FHZ:
+  <a name="FHZ"></a>
+  <h4>Type FHZ</h4>
   <ul>
     <code>define &lt;name&gt; FHZ &lt;serial-device&gt;</code> <br>
     <br>
@@ -319,7 +409,8 @@ split in multiple lines<br><br>
   </ul>
   <br>
 
-  Type FS20:
+  <a name="FS20"></a>
+  <h4>Type FS20</h4>
   <ul>
     <code>define &lt;name&gt; FS20 &lt;housecode&gt; &lt;button&gt;
     [fg &lt;fgaddr&gt;] [lm &lt;lmaddr&gt;] [gm FF] </code>
@@ -343,7 +434,8 @@ split in multiple lines<br><br>
   </ul>
   <br>
 
-  Type FHT:
+  <a name="FHT"></a>
+  <h4>Type FHT</h4>
   <ul>
     <code>define &lt;name&gt; FHT &lt;housecode&gt;</code>
     <br><br>
@@ -361,7 +453,8 @@ split in multiple lines<br><br>
   </ul>
   <br>
 
-  Type HMS:
+  <a name="HMS"></a>
+  <h4>Type HMS</h4>
   <ul>
     <code>define &lt;name&gt; HMS &lt;housecode&gt;</code>
     <br><br>
@@ -403,7 +496,8 @@ split in multiple lines<br><br>
   </ul>
   <br>
 
-  Type KS300:
+  <a name="KS300"></a>
+  <h4>Type KS300</h4>
   <ul>
     <code>define &lt;name&gt; KS300 &lt;housecode&gt; [ml/raincounter [wind-factor]]</code>
     <br><br>
@@ -423,7 +517,8 @@ split in multiple lines<br><br>
   </ul>
   <br>
 
-  Type WS300:
+  <a name="WS300"></a>
+  <h4>Type WS300</h4>
   <ul>
     <code>define WS300Device WS300 &lt;serial device&gt;<br>
     or<br>
@@ -449,7 +544,8 @@ split in multiple lines<br><br>
   <br>
 
 
-  Type FileLog:
+  <a name="FileLog"></a>
+  <h4>Type FileLog</h4>
   <ul>
     <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt;</code>
     <br><br>
@@ -480,37 +576,178 @@ split in multiple lines<br><br>
     </ul>
     <br>
   </ul>
+
+  <a name="at"></a>
+  <h4>Type at</h4>
+  <ul>
+    <code>define &lt;name&gt; at &lt;timespec&gt; &lt;command&gt;</code><br>
+    <br>
+    Start an arbitrary fhem.pl command at a later time.<br>
+    <code>&lt;timespec&gt;</code> format: [+][*{N}]&lt;timedet&gt;<br>
+    <ul>
+      The optional <code>+</code> indicates that the specification is
+      <i>relative</i>(i.e. it will be added to the current time).<br>
+      The optional <code>*</code> indicates that the command should be
+      executed <i>repeatedly</i>.<br>
+      The optional <code>{N}</code> after the * indicates,that the command
+      should be repeated <i>N-times</i> only.<br>
+      &lt;timedet&gt; is either HH:MM, HH:MM:SS or {perlfunc()}, where perlfunc
+      must return a HH:MM or HH:MM:SS date.
+    </ul>
+    <br>
+
+    Examples:
+    <PRE>
+    # absolute ones:
+    define a1 at 17:00:00 set lamp on                            # fhem command
+    define a2 at 17:00:00 { Log 1, "Teetime" }                   # Perl command
+    define a3 at 17:00:00 "/bin/echo "Teetime" > /dev/console"   # shell command
+    define a4 at *17:00:00 set lamp on                           # every day
+
+    # relative ones
+    define a5 at +00:00:10 set lamp on                  # switch the lamp on in 10 seconds
+    define a6 at +00:00:02 set lamp on-for-timer 1      # Blink once in 2 seconds
+    define a7 at +*{3}00:00:02 set lamp on-for-timer 1  # Blink 3 times
+
+    # Blink 3 times if the piri sends a command
+    define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
+
+    # Switch the lamp on from sunset to 11 PM 
+    # Copy 99_SUNRISE.pm in the FHEM directory to have sunset_rel()
+    { sunrise_coord("8.686", "50.112", "Europe/Berlin") }
+    define a9 at +*{sunset_rel()} set lamp on
+    define a10 at *23:00:00 set lamp off
+
+    # More elegant version, works for sunset > 23:00 too
+    define a11 at +*{sunset_rel()} set lamp on-till 23:00
+
+    # Only do this on weekend
+    define a12 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
+
+    # Switch lamp1 and lamp2 on from 7:00 till 10 minutes after sunrise
+    define a13 at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
+
+    # Switch the lamp off 2 minutes after sunrise each day
+    define a14 at +*{sunrise_rel(+120)} set lamp on
+    </PRE>
+
+    Notes:<br>
+    <ul>
+      <li>if no <code>*</code> is specified, then a command will be executed
+          only once, and then the <code>at</code> entry will be deleted.  In
+          this case the command will be saved to the statefile (as it
+          considered volatile, i.e. entered by cronjob) and not to the
+          configfile (see the <a href="#save">save</a> command.)
+          </li>
+
+      <li>if the current time is greater then the time specified, then the
+          command will be executed tomorrow. This is why the relative forms
+          of the sunset/sunrise functions should be used with the relative
+          (+) flag</li>
+
+      <li>In order to use the sunrise_rel()/sunset_rel() functions, copy the
+          99_SUNRISE.pm file from the contrib into the modules (FHEM)
+          directory, and put { sunrise_coord(long, lat, tz) } into your config
+          file, as in the above example. If you are not using sunrise_coord, then
+          the coordinates for Frankfurt am Main, Germany will be used.
+          You also have to install the Datetime::Event::Sunrise perl module.
+          </li>
+
+      <li>For even more complex date handling you either have to call fhem from
+          cron or filter the date in a perl expression, see the last example and
+          the section <a href="#perl">Perl special</a>.
+          </li>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="notify"></a>
+  <h4>Type notify</h4>
+  <ul>
+    <code>define &lt;name&gt; notify &lt;pattern&gt; &lt;command&gt;</code>
+    <br><br>
+    Execute a command when received an event for the <a
+
+    href="#define">definition</a> <code>&lt;pattern&gt;</code>. If
+    &lt;command&gt; is enclosed in {}, then it is a perl expression, if it is
+    enclosed in "", then it is a shell command, else it is a "plain" fhem.pl
+    command (chain).  See the <a href="#trigger">trigger</a> command for
+    testing it.
+
+    Examples:
+    <ul>
+      <code>notify btn3 set lamp %</code><br>
+      <code>notify btn3 { fhem "set lamp %" }</code><br>
+      <code>notify btn3 "/usr/local/bin/setlamp "%""</code><br>
+      <code>notify btn3 set lamp1 %;;set lamp2 %</code><br>
+      <code>notify wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
+      <code>notify .*H:.* {DbLog("@","%")}</code><br>
+      <code>notify UNDEFINED "send-me-mail.sh "%""</code><br>
+    </ul>
+    <br>
+
+    Notes:
+    <ul>
+      <li>The character <code>%</code> will be replaced with the received event,
+      e.g. with <code>on</code> or <code>off</code> or <code>measured-temp: 21.7
+      (Celsius)</code><br> It is advisable to put the <code>%</code> into double
+      quotes, else the shell may get a syntax error.<br>
+      To use % or @ in the text itself, use the double mode (%% or @@)</li>
+          
+      <li>The character <code>@</code> will be replaced with the device
+      name.</li>
+
+      <li><code>&lt;pattern&gt;</code> may also be a compound of
+      <code>definition:event</code> to filter for events.</li>
+
+      <li><code>&lt;pattern&gt;</code> must completely (!)
+      match either the device name, or the compound of the device name and the
+      event.  The event is either the string you see in the <a
+      href="#list">list</a> output in paranthesis after the device name, or the
+      string you see when you do a detailed list of the device.</li>
+
+      <li>To use database logging, copy the file contrib/91_DbLog.p into your
+      modules directory, and change the $dbconn parameter in the file.</li>
+
+      <li>Each undefined device (FS20, HMS, FHT) will be reported with the
+      device name "UNDEFINED". The % parameter will contain the type (FS20,
+      HMS100T, etc) and device number, separated by a space.</li>
+
+    </ul>
+
+  </ul>
+
 </ul>
 
+
+<a name="delattr"></a>
+<h3>delattr</h3>
+<ul>
+  <code>delattr &lt;name&gt; [&lt;attrname&gt;]</code> <br>
+  <br>
+  Delete either a single attribute (see the <a href="#attr">attr</a> command)
+  or all attributes for a device (if no &lt;attrname&gt; is defined).<br>
+
+  Examples:
+  <ul>
+    <code>delattr lamp follow-on-for-timer</code><br>
+    <code>delattr lamp</code><br>
+  </ul>
+  <br>
+</ul>
 
 <a name="delete"></a>
 <h3>delete</h3>
 <ul>
-  <code>delete {def|ntfy|at} &lt;name&gt;</code> <br>
+  <code>delete &lt;name&gt;</code> <br>
   <br>
-  Delete a <a href="#define">definition</a>, a <a href="#notifyon">
-  notifyon</a> setting or an <a href="#at">at</a> command.<br>
-  The <code>&lt;name&gt;</code> argument has to be the first column of
-  the <a href="#list">list</a> output (as in case of at least <code>at</code>
-  it is not obvious).
-  <br><br>
-
+  Delete something created with the <a href="#define">define</a> command.
+  <br>
   Examples:
   <ul>
-    <code>delete def lamp</code><br>
-    <code>delete at 22:15:00 set lamp off</code>
+    <code>delete lamp</code><br>
   </ul>
   <br>
-
-  Notes:
-  <ul>
-    <li>The program first tries to find the exact <code>&lt;name&gt;</code>, if
-    it is not found, then it will try it as a regexp, so you can also specify
-    <code>delete at .*lamp.*</code> to delete the at command above.</li>
-
-    <li>Do not use doubleqoutes (&quote;) in <code>&lt;name&gt;</code>, only if
-    you used them in your definition.
-  </ul>
 </ul>
 
 <a name="get"></a>
@@ -519,8 +756,7 @@ split in multiple lines<br><br>
   <code>get &lt;name&gt; &lt;type-specific&gt;</code>
   <br><br>
   Ask a value directly from the device, and wait for an answer. In general, you
-  can get a list of possible commands by<br><code>get &lt;device&gt;
-  help</code>
+  can get a list of possible commands by<br><code>get &lt;device&gt; ?</code>
   <br>
   Right now only the FHZ module supports this function.
 
@@ -539,17 +775,15 @@ split in multiple lines<br><br>
     <ul>
       <li>There is only one FHZ device (called FHZ), it is created automatically
           at startup. </li>
-      <li>The mentioned codes are needed for initializing the FHZ1000</li>
+      <li>The mentioned codes are needed for initializing the FHZ1X00</li>
       <li>The answer for a command is also displayed by <code>list FHZ</code>
           </li>
       <li>
-	  <code>fhtbuf</code> should be incorporated later in the FHT
-	  module:<br> the FHZ1000PC has a message buffer for the FHT, as it
+	  The FHZ1000PC has a message buffer for the FHT, as it
 	  only can send messages to it every 2 (or so) minutes. If the buffer
 	  is full, then newly issued ones will be dropped. <code>fhtbuf</code>
 	  returns the free memory in this buffer (in hex), my maximum is 2c (42
 	  bytes).</code></li>
-
     </ul>
   </ul>
 </ul>
@@ -581,7 +815,7 @@ split in multiple lines<br><br>
 <ul>
   <code>list [name]</code>
   <br><br>
-  Output a list of all definitions, all notifyon settings and all at
+  Output a list of all definitions, all notify settings and all at
   entries. This is one of the few commands which return a string in a
   normal case.
   <br><br>
@@ -590,185 +824,80 @@ split in multiple lines<br><br>
 
   Type list <name> for detailed info.
 
-  FHZ devices:
-    FHZ                  (Last msg: Initialized)
+  Internal:
+    global               (Internal)
 
-  FS20 devices:
-    Btn3                 (Last msg: off)
-    Roll1                (Last msg: on-for-timer 11)
-    Stehlampe            (Last msg: off)
+  FHZ:
+    FHZ                  (fhtbuf: 23)
 
-  FHT devices:
-    fl                   (Last msg: state: Bat: ok, Window: closed)
-    wz                   (Last msg: actuator: 07%)
+  FS20:
+    Btn4                 (on-old-for-timer)
+    Roll1                (on)
+    Stehlampe            (off)
 
-  NotifyOn:
-    Btn3                 /usr/local/bin/setroll %
+  FHT:
+    fl                   (measured-temp: 21.1 (Celsius))
 
-  At:
-    +*{sunrise_rel(+10)} set Roll1 on-for-timer 10 (07:43:56)
+  KS300:
+    out1                 (T: 2.9  H: 74  W: 2.2  R: 8.2  IR: no)
 
+  at:
+    at_rollup            (Next: 07:00:00)
 
-  Logs:
-    wzlog FileLog /var/tmp/wz.log wz:.*(temp|actuator).*
+  notify:
+    ntfy_btn4            (active)
+
+  FileLog:
+    avglog               (active)
+
   </code></pre>
   If specifying <code>name</code>, then a detailed status for <code>name</code>
   will be displayed, e.g.:
-  <pre><code>  FHZ> list wz
+  <pre><code>  FHZ> list fl
 
-  2006-01-03 18:28:27   actuator        07%
-  2006-01-03 18:26:32   mon-from1       06:00
-  2006-01-03 18:26:33   mon-to1         23:00
-  2006-01-03 18:26:34   tue-from1       06:00
-  2006-01-03 18:26:34   tue-to1         23:00
-  2006-01-03 18:26:35   wed-from1       06:00
-  2006-01-03 18:26:35   wed-to1         23:00
-  2006-01-03 18:26:37   thu-from1       06:00
-  2006-01-03 18:26:37   thu-to1         23:00
-  2006-01-03 18:26:38   fri-from1       06:00
-  2006-01-03 18:26:38   fri-to1         23:00
-  2006-01-03 18:26:39   sat-from1       06:00
-  2006-01-03 18:26:40   sat-to1         23:50
-  2006-01-03 18:26:41   sun-from1       06:00
-  2006-01-03 18:26:41   sun-to1         23:00
-  2006-01-03 18:26:45   mode            manual
-  2006-01-03 18:26:44   desired-temp    21.5 (Celsius)
-  2006-01-03 18:26:45   measured-temp   22.0 (Celsius)
-  2006-01-03 18:26:46   state           Bat: ok, Window: closed
-  2006-01-03 18:24:37   init            255
-  2006-01-03 18:26:42   day-temp        21.0 (Celsius)
-  2006-01-03 18:26:42   night-temp      17.0 (Celsius)
-  2006-01-03 18:26:43   unknown_85      4
-  2006-01-03 18:26:43   windowopen-temp 12.0 (Celsius)
+  Internals:
+    CODE       5102
+    DEF        5102
+    NAME       fl
+    NR         15
+    STATE      measured-temp: 21.1 (Celsius)
+    TYPE       FHT
+    IODev      FHZ
+  Attributes:
+    room       Heizung
+  Readings:
+    2006-11-02 09:45:56   actuator        19%
+    2006-10-28 15:10:58   code_0000aa     17
+    2006-10-07 10:52:09   code_0000ba     0
+    2006-11-02 10:40:08   code_4b004b     0
+    2006-11-02 08:24:46   code_7e0067     0
+    2006-11-02 04:13:35   day-temp        21.0 (Celsius)
+    2006-11-02 06:03:37   desired-temp    21.0 (Celsius)
+    2006-11-02 04:13:31   fri-from1       06:00
+    2006-11-02 04:13:31   fri-to1         23:50
+    2006-11-02 04:11:30   init            255
+    2006-11-02 10:40:06   measured-high   0
+    2006-11-02 10:40:06   measured-low    211
+    2006-11-02 10:40:06   measured-temp   21.1 (Celsius)
+    2006-11-02 04:13:39   mode            auto
+    2006-11-02 04:13:25   mon-from1       06:00
+    2006-11-02 04:13:25   mon-to1         23:00
+    2006-11-02 04:13:35   night-temp      18.0 (Celsius)
+    2006-11-02 04:13:32   sat-from1       08:00
+    2006-11-02 04:13:33   sat-to1         23:50
+    2006-11-02 10:40:07   state           Bat: ok, Window: closed
+    2006-11-02 04:13:34   sun-from1       08:00
+    2006-11-02 04:13:34   sun-to1         23:00
+    2006-11-02 04:13:29   thu-from1       06:00
+    2006-11-02 04:13:29   thu-to1         23:00
+    2006-11-02 04:13:26   tue-from1       06:00
+    2006-11-02 04:13:26   tue-to1         23:00
+    2006-11-02 04:13:36   unknown_85      4
+    2006-11-02 04:13:27   wed-from1       06:00
+    2006-11-02 04:13:28   wed-to1         23:00
+    2006-11-02 04:13:36   windowopen-temp 12.0 (Celsius)
+
   </code></pre>
-
-</ul>
-
-
-
-<a name="logfile"></a>
-<h3>logfile</h3>
-<ul>
-  <code>logfile</code>
-  <br><br>
-  Specify the logfile to write. Specify this as the first command in the
-  configfile as everything gets logged in the logfile. You can use "-" for
-  stdout, in this case the server won't background itself.<br>
-  The logfile name can also take wildcards for easier logfile rotation,
-  see the FileLog section of the <a href="#define">define</a> command.
-  <br><br>
-
-  Examples:
-  <ul><code>
-    logfile /var/log/fhem<br>
-    logfile /var/log/fhem-%Y-%m.log
-  </code></ul>
-</ul>
-
-
-<a name="modpath"></a>
-<h3>modpath</h3>
-<ul>
-  <code>modpath &lt;path&gt;</code>
-  <br><br>
-  Specify the path to the modules directory <code>FHEM</code>. The path
-  should <b>not</b> contain the directory FHEM. Every module there will
-  be loaded.
-  <br><br>
-
-  Example:
-  <ul>
-    <code>modpath /usr/local/lib</code>
-  </ul>
-</ul>
-
-
-<a name="notifyon"></a>
-<h3>notifyon</h3>
-<ul>
-  <code>notifyon &lt;name&gt; &lt;command&gt;</code>
-  <br><br>
-  Execute a command when received an event for the <a
-  href="#define">definition</a> <code>&lt;name&gt;</code>.  As with normal
-  commands, if it is enclosed in {}, then it is a perl expression, if it is
-  enclosed in "", then it is a shell command, else it is a "plain" fhem.pl
-  command (chain).  See the <a href="#trigger">trigger</a> command for testing
-  it.
-
-  Examples:
-  <ul>
-    <code>notifyon btn3 set lamp %</code><br>
-    <code>notifyon btn3 { fhz "set lamp %" }</code><br>
-    <code>notifyon btn3 "/usr/local/bin/setlamp "%""</code><br>
-    <code>notifyon btn3 set lamp1 %;;set lamp2 %</code><br>
-    <code>notifyon wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
-    <code>notifyon .*H:.* {DbLog("@","%")}</code><br>
-    <code>notifyon UNDEFINED "send-me-mail.sh "%""</code><br>
-  </ul>
-  <br>
-
-  Notes:
-  <ul>
-    <li>The character <code>%</code> will be replaced with the received event,
-    e.g. with <code>on</code> or <code>off</code> or <code>measured-temp: 21.7
-    (Celsius)</code><br> It is advisable to put the <code>%</code> into double
-    quotes, else the shell may get a syntax error.<br>
-    To use % or @ in the text itself, use the double mode (%% or @@)</li>
-	
-    <li>The character <code>@</code> will be replaced with the device
-    name.</li>
-
-    <li><code>&lt;name&gt;</code> may also be a compound of
-    <code>definition:event</code> to filter for events.</li>
-
-    <li><code>&lt;name&gt;</code> is in fact a regexp. It must completely (!)
-    match either the device name, or the compound of the device name and the
-    event.  The event is either the string you see in the <a
-    href="#list">list</a> output in paranthesis after the device name, or the
-    string you see when you do a detailed list of the device.</li>
-
-    <li>To use database logging, copy the file contrib/91_DbLog.p into your
-    modules directory, and change the $dbconn parameter in the file.</li>
-
-    <li>Each undefined device (FS20, HMS, FHT) will be reported with the device
-    name "UNDEFINED". The % parameter will contain the type (FS20, HMS100T,
-    etc) and device number, separated by a space.</li>
-
-  </ul>
-
-</ul>
-
-<a name="pidfile"></a>
-<h3>pidfile</h3>
-<ul>
-  <code>pidfile &lt;filename&gt;</code>
-  <br><br>
-  Write the process id of the perl process to the specified file. We are
-  running as a daemon, and some distributions would like to check by the pid if
-  we are still runnning.
-  <br><br>
-  Example:
-  <ul>
-    <code>pidfile /var/run/fhem.pid</code>
-  </ul>
-</ul>
-
-
-
-<a name="port"></a>
-<h3>port</h3>
-<ul>
-  <code>port &lt;number&gt; [&lt;global&gt;]</code>
-  <br><br>
-  Listen on the TCP/IP port <code>&lt;number&gt;</code> for incoming
-  connections. To offer at least a little bit of security, the server will only
-  listen for connections from the localhost per default. The optional global
-  parameters enables listening for non-localhost connections too.
-  <br><br>
-  Example:
-  <ul>
-    <code>port 7072</code>
-  </ul>
 </ul>
 
 
@@ -816,20 +945,14 @@ split in multiple lines<br><br>
   </ul>
 </ul>
 
-
-<a name="savefile"></a>
-<h3>savefile</h3>
+<a name="save"></a>
+<h3>save</h3>
 <ul>
-  <code>savefile &lt;filename&gt;</code>
+  <code>save [&lt;configfile&gt;]</code>
   <br><br>
-  Set the filename where the state and <a href="#at">at</a> information will
-  be saved before shutdown. If not setting it, then no information will be
-  saved.
-  <br><br>
-  Example:
-  <ul>
-    <code>savefile /var/tmp/fhem.save</code>
-  </ul>
+  Save first the <a href="#statefile">statefile</a>, then the 
+  <a href="#configfile">configfile</a> information. If a parameter is specified,
+  it will be used instead the global configfile attribute.<br>
 </ul>
 
 
@@ -838,8 +961,8 @@ split in multiple lines<br><br>
 <ul>
   <code>set &lt;name&gt; &lt;type-specific&gt;</code>
   <br><br>
-  Set parameters of a device / send signals to a device. In general, you can
-  get a list of possible commands by<br><code>set &lt;device&gt; help</code>
+  Set parameters of a device / send signals to a device. You can
+  get a list of possible commands by<br><code>set &lt;name&gt; ?</code>
   <br>
   Instead of &lt;name&gt; you can also use an enumeration (separated by comma)
   or ranges (separated by -), see the FS20 examples.
@@ -858,19 +981,21 @@ split in multiple lines<br><br>
       raw</pre>
     Notes:
     <ul>
-      <li>use activefor if you have multiple FHZ devices, and you want to change the association
-          of an FS20 or FHT device (i.e. which device will send out the messages).</li>
+      <li>use activefor if you have multiple FHZ devices, and you want to
+      change the association of an FS20 or FHT device (i.e. which device will
+      send out the messages).</li>
       <li>raw is used to send out "raw" FS20/FHT messages.  See the doc
           directory for some examples</li>
-      <li>In order to set the time of your FHT's, schedule this command every minute:<br>
-	  <code>at +*00:01:00 set FHZ time</code><br>
-	  See the <a href="#attr">attr<a> command to prevent logging of this command.
+      <li>In order to set the time of your FHT's, schedule this command every
+      minute:<br>
+	  <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
+	  See the <a href="#loglevel">loglevel<a> to prevent logging of
+          this command.
 	  </li>
-      <li>FHTcode is a two digit hex number (from 00 to 63?) and sets the central
-	  FHT code, which is used by the FHT devices. After changing it, you
-	  <b>must</b> reprogram each FHT80b with: PROG (until Sond appears), then
-	  select CEnt, Prog, Select nA.</li>
-
+      <li>FHTcode is a two digit hex number (from 00 to 63?) and sets the
+          central FHT code, which is used by the FHT devices. After changing
+          it, you <b>must</b> reprogram each FHT80b with: PROG (until Sond
+          appears), then select CEnt, Prog, Select nA.</li>
     </ul>
   </ul>
 
@@ -936,13 +1061,13 @@ split in multiple lines<br><br>
 	  </li>
       <li>The <code>time</code> argument ranges from 0.25sec to 4 hours and
           16 minutes.
-	  As the time is encoded in one byte (there are only 112 distinct
-	  values), the resolution gets coarse with larger values. The program
+	  As the time is encoded in one byte there are only 112 distinct
+	  values, the resolution gets coarse with larger values. The program
 	  will report the used timeout if the specified one cannot be set
 	  exactly.  The resolution is 0.25 sec from 0 to 4 sec, 0.5 sec from 4
 	  to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
-	  precision for large values, use the <a href="#at">at</a> command
-	  which has a 1 sec resolution.</li>
+          precision for large values, use <a href="#at">at</a> which has a 1
+          sec resolution.</li>
       <li>If the attribute follow-on-for-timer is set for the device and the
           on-for-timer command is sent to the device with a time parameter,
           the program automatically schedules a "setstate off" for the
@@ -1003,7 +1128,7 @@ split in multiple lines<br><br>
     refreshvalues</pre>
     Notes:
     <ul>
-      <li>All <code>*-temp</code> valuetypes need a temperature
+      <li>All <code>*-temp</code> values need a temperature
           as argument, which will be rounded to 0.5 Celsius</li>
       <li><code>mode</code> is one of <code>auto, manual or holiday</code></li>
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
@@ -1014,9 +1139,6 @@ split in multiple lines<br><br>
           plea to the FHT device, so it may send its parameters. If you want
 	  to get these values regularly, then schedule:<br>
 	  <code>at +*01:00:00 set &lt;name&gt; refreshvalues</code><br>
-	  My two FHT devices send the actuator, measured-temp and state
-	  regularly, and everything else if it changes, so I do not schedule
-	  this normally.
 	  </li>
       <li>The FHT is very economical (or lazy), it receives messages from the
           FHZ1000 every 2 minutes (or so). Don't be surprized if your command
@@ -1026,7 +1148,7 @@ split in multiple lines<br><br>
     </ul>
   </ul>
 
-  <h4>Type FHT:</h4>
+  <h4>Type WS300:</h4>
   <ul>
     <code>set WS300Device  &lt;interval(min.)&gt; &lt;height(m)&gt; &lt;rainvalume(ml)&gt;
     <br><br>
@@ -1041,30 +1163,21 @@ split in multiple lines<br><br>
 <ul>
   <code>setstate &lt;name&gt; &lt;value&gt;</code>
   <br><br>
-  Set the "Last msg" for the <a href="#define">definition</a>
-  <code>&lt;name&gt;</code> shown in the <a href="#list">list</a> command
+  Set the "STATE" for <code>&lt;name&gt;</code> as shown in paranthesis in the
+  <a href="#list">list</a> command
   to <code>&lt;value&gt;</code> without sending any signals to the device
-  itself. This command is also used in the <a href="#savefile">savefile</a>.
-  <br>
-  Setting/changing arbitrary comments is possible, if the value begins with
-  <b>comment:</b>. To delete the comment, set it with an empty value,
-  see below.
+  itself. This command is also used in the <a href="#statefile">statefile</a>.
   <br><br>
   Examples:
   <ul>
     <pre>
     setstate lamp on
-    setstate lamp comment:location sleeping room
-    setstate lamp comment:location</code> # deletes the comment</pre>
   </ul>
   <br>
   Note:
   <ul>
-    <li>You even may set the detailed state (i.e. what you get when you call
-        <code>list &lt;name;&gt;</code> by specifying <code>"&lt;time&gt;
-	&lt;attribute&gt; &lt;value&gt;"</code>. Take a look at the
-	<code><a href="#savefile">savefile</a></code>
-	after devices reported values for an example.</li>
+    <li>The statefile uses another version of this command, don't be surprised.
+	</li>
   </ul>
 </ul>
 
@@ -1074,7 +1187,7 @@ split in multiple lines<br><br>
 <ul>
   <code>shutdown</code>
   <br><br>
-  Shut down the server (after saving the <a href="#savefile">state information
+  Shut down the server (after saving the <a href="#statefile">state information
   </a>)
   <br><br>
   Example:
@@ -1089,7 +1202,7 @@ split in multiple lines<br><br>
 <ul>
   <code>trigger &lt;dev&gt; &lt;state&gt;</code>
   <br><br>
-  Trigger a <a href="#notifyon">notifyon</a> command.
+  Trigger a <a href="#notify">notify</a> definition.
   <br><br>
   Example:
   <ul>
@@ -1107,7 +1220,7 @@ split in multiple lines<br><br>
   Example:
   <ul>
     <code>sleep 0.5</code><br>
-    <code>notifyon btn3 set lamp toggle;;sleep 0.5;;set lamp toggle</code>
+    <code>notify btn3 set lamp toggle;;sleep 0.5;;set lamp toggle</code>
   </ul>
   <br>
   Note: As the server is <b>not</b> multithreaded, everything is blocked for
@@ -1115,44 +1228,25 @@ split in multiple lines<br><br>
 
 </ul>
 
-<a name="verbose"></a>
-<h3>verbose</h3>
-<ul>
-  <code>verbose &lt;level&gt;</code>
-  <br><br>
-  Set the verbosity level. Possible values:
-  <ul>
-    <li>0 - it will only tell you when the server was started, or stopped</li>
-    <li>1 - it logs all error messages or unknown packets</li>
-    <li>2 - it logs all signals received or sent in a "digested" format,</li>
-    <li>3 - it logs the signals for undefined devices,</li>
-    <li>4 - it logs the TCP/IP connections and the called programs with parameters,</li>
-    <li>5 - is for debugging.</li>
-  </ul>
-  Recommended level is 3 for normal use.
-  <br><br>
-  Example:
-  <ul>
-    <code>verbose 3</code>
-  </ul>
-</ul>
 
 <a name="xmllist"></a>
 <h3>xmllist</h3>
 <ul>
   <code>xmllist</code>
   <br><br>
-  Returns an XML tree of all definitions, all notifyon settings and all at
+  Returns an XML tree of all definitions, all notify settings and all at
   entries. It is not intended for human consumption.
   <br><br>
   Example:
   <pre>  FHZ> xmllist
-    &lt;FHZINFO&gt
-	&lt;FHZ_DEVICES&gt
-	    &lt;FHZ name="FHZ" definition="FHZ FHZ" state="fhtbuf: 1c"&gt
-                &lt;STATE name="fhtbuf" value="23" measured="2006-02-12 14:03:39"/&gt;
-		&lt;STATE name="serial" value="136e21bc" measured="2006-03-26 08:47:36"/&gt;
-    [...]
+  &lt;FHZINFO&gt;
+          &lt;internal_LIST&gt;
+                  &lt;internal name="global" state="internal" sets="" attrs="room configfile logfile modpath pidfilename port statefile userattr verbose version"&gt;
+                          &lt;INT key="DEF" value="&lt;no definition&gt;"/&gt;
+                          &lt;INT key="NR" value="0"/&gt;
+                          &lt;INT key="STATE" value="internal"/&gt;
+      [...]
+
   </pre>
 </ul>
 
@@ -1160,12 +1254,12 @@ split in multiple lines<br><br>
 <a name="perl"></a>
 <h3>Perl specials</h3>
 <ul>
-   <li>To use fhz commands from the perl expression, use the function "fhz",
-   which takes a string argument, this string will be evaluated as an fhz
+   <li>To use fhem commands from the perl expression, use the function "fhem",
+   which takes a string argument, this string will be evaluated as an fhem
    command chain.<br>
    Example:
    <ul>
-     notifyon piri:on { fhz "set light on" }
+     define n1 notify piri:on { fhem "set light on" }
    </ul>
    </li>
    <li>
@@ -1177,22 +1271,22 @@ split in multiple lines<br><br>
    $wday == 6), and 0 otherwise.
    Example:
    <ul>
-   notifyon piri:on { if($hour &gt; 18 || $hour &lt; 5) { fhz "set light on" } }
+   define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) { fhem "set light on" } }
    </ul>
 
    </li>
 
    <li>
      <b>Note</b>: do not forget to escape the semicolon (;) with two semicolons
-     (;;), else your perl code will be interpreted as an fhz command and you
+     (;;), else your perl code will be interpreted as an fhem command and you
      most certainly get syntax errors.
    </li>
 
    <li>
      The current value (the string you see in paranthesis in the output of the
-     list command) is available in the <code>value</code> hash, to access it,
+     list command) is available in the <code>value</code> hash; to access it
      use $value{&lt;devicename&gt;}<br>
-     If you need the old value (and time) of the currentliy triggered device,
+     If you need the old value (and time) of the currently triggered device,
      then you can access it with <code>$oldvalue{$dev}{TIME}</code> and
      <code>$oldvalue{$dev}{VAL}</code>.<br>
    </li>
@@ -1218,8 +1312,6 @@ split in multiple lines<br><br>
      argument to the on-till argument of the set command.<br>
      isday returns 1 if the sun is visible, and 0 else.
    </li>
-
-
 
 </ul>
 

@@ -32,8 +32,6 @@ DbLog_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Category} = "none";
-
   # Lets connect here, so we see the error at startup
   DbConnect();
 }

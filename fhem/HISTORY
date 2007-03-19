@@ -15,6 +15,40 @@
   - Added doc/linux.html (multiple USDB devices, udev links)
   - Linked fhem.html and commandref.html to linux.html
 
+- rudi, Sun Mar  4 11:18:10 MET 2007
+  Reorganization. Goal: making attribute adding/deleting more uniform
+  ("at/notify" and other device differences), and making web-configuration
+  possible (i.e. saving the configfile, list of possible devices etc).
+
+  Internal changes:
+  - %logmods,%devmods moved to %modules. Makes things more uniform
+  - %logs merged into %defs
+  - local state info (%readings) changed to global ($defs{$d}{READINGS})
+    -> No need for the listfn function in each module
+    -> User written scripts can more easily analyze device states
+
+  User visible changes:
+  - at/notify "renamed" to "define <name> at/notify", both moved to external
+    modules. Now it is possible
+    - to have a further "at" or "notify" modules
+      (notify & filelog use the same interface)
+    - to have more than one notify for the same event
+    - to delete at commands without strange escapes.
+      The delete syntax changed (no more def/at/ntfy needed)
+    - at/notify can have attributes
+    Drawback: each at and notify must have a name, which is strange first.
+  - logfile/modpath/pidfile/port/verbose "renamed" to "attr global xxx"
+    Dumping and extending these attributes is easier, no special handling
+    required in the web-frontend.
+  - savefile renamed to "attr global statefile"
+  - configfile global attribute added.
+  - save command added, it writes the statefile and then the configfile.
+  - delattr added to delete single attributes
+  - list/xmllist format changed, they contain more information.
+  - "define/set/get/attr name ?" returns a list of possible arguments
+    in the same format. This data is contained in the xmllist.
+  - disable attribute for at/notify/filelog
+
 - Martin Haas, Fri Feb 23 10:18 MET 2007
   - ARM-Section (NSLU2) added to doc/linux.html
 
