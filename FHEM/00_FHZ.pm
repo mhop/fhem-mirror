@@ -236,7 +236,7 @@ FHZ_Undef($$)
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
-  foreach my $d (keys %defs) {
+  foreach my $d (sort keys %defs) {
     if(defined($defs{$d}) &&
        defined($defs{$d}{IODev}) &&
        $defs{$d}{IODev} == $hash)
@@ -245,7 +245,7 @@ FHZ_Undef($$)
         delete $defs{$d}{IODev};
       }
   }
-  $hash->{PortObj}->close();
+  $hash->{PortObj}->close() if($hash->{PortObj});
   return undef;
 }
 

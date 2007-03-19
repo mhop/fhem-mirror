@@ -15,7 +15,13 @@
   - Added doc/linux.html (multiple USDB devices, udev links)
   - Linked fhem.html and commandref.html to linux.html
 
-- rudi, Sun Mar  4 11:18:10 MET 2007
+- Martin Haas, Fri Feb 23 10:18 MET 2007
+  - ARM-Section (NSLU2) added to doc/linux.html
+
+- Pest, Sat Feb 24 18:30 MET 2007
+  - doc/linux.html: Module build re-written.
+
+- Rudi, Sun Mar  4 11:18:10 MET 2007
   Reorganization. Goal: making attribute adding/deleting more uniform
   ("at/notify" and other device differences), and making web-configuration
   possible (i.e. saving the configfile, list of possible devices etc).
@@ -48,9 +54,4 @@
   - "define/set/get/attr name ?" returns a list of possible arguments
     in the same format. This data is contained in the xmllist.
   - disable attribute for at/notify/filelog
-
-- Martin Haas, Fri Feb 23 10:18 MET 2007
-  - ARM-Section (NSLU2) added to doc/linux.html
-
-- Pest, Sat Feb 24 18:30 MET 2007
-  - doc/linux.html: Module build re-written.
+  - rename added
