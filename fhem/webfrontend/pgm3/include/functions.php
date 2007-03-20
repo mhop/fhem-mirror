@@ -38,4 +38,14 @@ function bft($windspeed)        # wind speed in Beaufort
 }
 
 
+function randdefine()
+{
+	$rand1 = rand(500,20000);
+        $rand2 = rand(500,20000);
+        $rq = md5($rand1.$rand2);
+        $randdefine=substr($rq,0,5);
+return ($randdefine);
+}
+
+
 ?>
