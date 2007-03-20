@@ -34,6 +34,24 @@ $xrange="set xrange ['$xrange2':'$xrange1']
 
 
 switch ($gnutyp):
+        Case WS300_t1:  ############################################
+		$gplotmain="
+		set ylabel 'Temperature (Celsius)'
+		set y2label 'Humidity (%)'
+		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 3,\
+     		'$logfile' using 1:6 axes x1y2 title 'Rel. Humidity (%)' with lines
+		";
+		break;
+
+        Case WS300_t2:  ############################################
+$gplotmain=<<<EOD
+set ylabel "Air Pressure (hPa)"
+set y2label "Willi"
+plot "< grep -v avg $logfile" using 1:8 axes x1y1 title 'Air Pressure' with lines, \
+"< grep -v avg $logfile" using 1:10 axes x1y2 title 'Willi' with lines
+EOD;
+		break;
+
         Case KS300_t1:  ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'

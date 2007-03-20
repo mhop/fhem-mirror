@@ -105,7 +105,8 @@ Changelog
 -- Now you can use php4 OR php5 (php5 is recommended)
 -- Feature: php-Pictures of FHT now inclusive "desired-temp"
 
-2007-03-19 (0.8.0)
+==DATE== (0.8.0)
 -- Feature: Now you can adjust the range of the Gnuplot-pictures of FHT in the config.php
 -- Feature: WS300 is now supported
--- Internal: Adjusted to the new internal structure of FHEM. YOU MUST HAVE FHEM >=3.4.
+-- Internal: Adjusted to the new internal structure of FHEM. YOU MUST HAVE FHEM >=4.0
+-- Internal: random-device for one-time at-order (define <randdev> at set ...)

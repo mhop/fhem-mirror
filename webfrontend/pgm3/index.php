@@ -1,6 +1,6 @@
 <?php
 
-#### pgm3 -- a PHP-webfrontend for fhem.pl 
+#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
 
 ################################################################
 #
@@ -37,6 +37,7 @@
 error_reporting(E_ALL ^ E_NOTICE);
 include "config.php";
 include "include/gnuplot.php";
+include "include/functions.php";
 
 
 $pgm3version='0.8.0cvs';
@@ -158,16 +159,19 @@ switch ($Action):
 		{
 			$order=str_replace("\\","",$order);
 			$order=str_replace("@","+",$order);
-	#		echo $order; exit;
 			execFHZ($order,$fhz1000,$fhz1000port);
 		}
 		header("Location:  $forwardurl&errormessage=$errormessage");
 		break;
 	Case exec2:
+		if ($atorder=='at') 
+		{ $atorder='define '.randdefine().' '.$atorder; }
 		$order="$atorder $attime set $fs20dev $orderpulldown $valuetime";
 		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
 		header("Location:  $forwardurl");
 	Case exec3:
+		if ($atorder=='at') 
+		{ $atorder='define '.randdefine().' '.$atorder; }
 		$order="$atorder $attime set $fhtdev $orderpulldown $valuetime";
 		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
 	Case execfht:
@@ -235,7 +239,6 @@ else
 	   echo "$errstr ($errno)<br />\n";
 	} else {
 	   fwrite($fp, "xmllist\r\n;quit\r\n");
-#	   $fp=str_replace("DEVICES","LIST",$fp);	
 	   while (!feof($fp)) {
 	       $outputvar = fgets($fp, 1024);
 		array_push($output,$outputvar);
@@ -640,34 +643,25 @@ xml_parser_free($xml_parser);
 	############################
 	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_' or substr($stack[0][children][$i][name],0,6)=='WS300_')
 	       {
-			if ($stack[0][children][$i][name]=='WS300_LIST') $willi=1;
 			$type=$stack[0][children][$i][name];
-			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
-	      		echo "$type</font></td></tr>";
-		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
-			 {
-			 $KSdev=$stack[0][children][$i][children][$j][attrs][name];
-			$room='';
-			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
-			{
-			   $check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
-			 if ($check='STATE')
-			  {
-			   	$name=$stack[0][children][$i][children][$j][children][$k][attrs][name];
-				$value=$stack[0][children][$i][children][$j][children][$k][attrs][value];
-				$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
-				if ($name=='temperature')  {$KSmeasured=$measured;}
-				elseif ($name=='avg_month') {$KSavgmonth=$value;}
-				elseif ($name=='avg_day') {$KSavgday=$value;};
-			  }
-			 if ($check='ATTR')
-			  {
-				if (($stack[0][children][$i][children][$j][children][$k][attrs][key])=='room')
-				{
-			  	  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
-				}
-			  }
-			}
+                        echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
+                        echo "$type</font></td></tr>";
+                        for($j=0; $j < count($stack[0][children][$i][children]); $j++)
+                         {
+                         $KSdev=$stack[0][children][$i][children][$j][attrs][name];
+                        $room='';
+                        for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+                        {
+                           $check=$stack[0][children][$i][children][$j][children][$k][attrs][key];
+                           $check2=$stack[0][children][$i][children][$j][children][$k][attrs][name];
+                         if ($check=='room')  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+
+                         if ($check2=='avg_month') $KSavgmonth=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+                         elseif ($check2=='avg_day') $KSavgday=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+                         elseif ($check2=='temperature') $KSmeasured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
+                         elseif ($check2=='willi') $willi=1;
+                        }
+
 		 	if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
 		 	{
 			 $Xks=$imgmaxxks;
@@ -681,37 +675,43 @@ xml_parser_free($xml_parser);
                                         <input type=hidden name=showks value=''>
                                        <input type=submit value='hide'></form></td>";}
                          else
-                                {echo "<tr valign=center><td align=center $bg2 valign=center>
+					{echo "<tr valign=center><td align=center $bg2 valign=center>
                                        <form action=$forwardurl method='POST'>";
 
-					if (! isset ($willi)) 
-					{
                                         echo "<input type=hidden name=Action value=showks><br>Temp./Hum.<br>
-						<input type=radio name=kstyp value=\"1\" checked><br><br>Wind/Rain<br>
-				 		<input type=radio name=kstyp value=\"2\"><br><br>";
-					}
-					else echo "<input type=hidden name=kstyp value=\"1\" checked>";
+                                                <input type=radio name=kstyp value=\"1\" checked><br><br>";
+                                        if (! isset ($willi)) echo "Wind/Rain<br>"; else  echo "Air Pressure/ Willi<br>";
+                                        echo "<input type=radio name=kstyp value=\"2\"><br><br>";
 
                                         echo "<input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showks value=$KSdev>
                                        <input type=submit value='show'></form></td>";
                          };
-			 echo "<td $bg2<font  $fontcolor3><b>  $KSdev</font></b> </td><td $bg2 center=align colspan=2>";
-			 echo "<img src='include/ks300.php?drawks=$KSdev&room=$room&avgmonth=$KSavgmonth&avgday=$KSavgday' width='$Xks' height='$Yks'>";
-			 echo "</td></tr>";
-			if (($showks == $KSdev) and  $showgnuplot=='1')
-				 {
-				if ($kstyp=="1")drawgnuplot($KSdev,"KS300_t1",$gnuplot,$pictype,$logpath,0,0);
-				else  drawgnuplot($KSdev,"KS300_t2",$gnuplot,$pictype,$logpath,0,0);
-				$KSdev1=$KSdev.'1';
-				echo "<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
-					<img src='tmp/$KSdev1.$pictype'>
-					</td></tr>";
-			}
 
-			}
-			}
-		}
+			 echo "<td $bg2<font  $fontcolor3><b>  $KSdev</font></b> </td><td $bg2 center=align colspan=2>";
+                         echo "<img src='include/ks300.php?drawks=$KSdev&room=$room&avgmonth=$KSavgmonth&avgday=$KSavgday' width='$Xks' height='$Yks'>";
+                         echo "</td></tr>";
+                         if (! isset ($willi)) $drawtype="KS300"; else $drawtype="WS300";
+                        if (($showks == $KSdev) and  $showgnuplot=='1')
+                                 {
+                                if ($kstyp=="1")
+                                {
+                                        drawgnuplot($KSdev,$drawtype."_t1",$gnuplot,$pictype,$logpath,0,0);
+                                }
+                                else
+                                {
+                                        drawgnuplot($KSdev,$drawtype."_t2",$gnuplot,$pictype,$logpath,0,0);
+                                }
+                                $KSdev1=$KSdev.'1';
+                                echo "<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
+                                        <img src='tmp/$KSdev1.$pictype'>
+                                        </td></tr>";
+                        }
+
+                        }
+                        }
+                }
+			 
 	############################
 	       elseif ($stack[0][children][$i][name]=='LOGS'or $stack[0][children][$i][name]=='FileLog_LIST')
 	       {
@@ -737,8 +737,6 @@ xml_parser_free($xml_parser);
 			  	}	
 			}
 			 	$name=$stack[0][children][$i][children][$j][attrs][name];
-				#$definition=$stack[0][children][$i][children][$j][attrs][definition];
-				#if ($definition != "")
 			 	echo "<tr><td colspan=2 border=0>Log:</td>
 					<td colspan=2 border=0>$value / $name </td></tr>";
 				
@@ -787,9 +785,7 @@ xml_parser_free($xml_parser);
 		if (isset ($showat))
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
-				#$command=$stack[0][children][$i][children][$j][attrs][command];
 				$command=$stack[0][children][$i][children][$j][attrs][name];
-				#$next=$stack[0][children][$i][children][$j][attrs][next];
 				$next=$stack[0][children][$i][children][$j][attrs][state];
 				$order=$command;
 			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
@@ -801,9 +797,7 @@ xml_parser_free($xml_parser);
 			  	}	
 			}
 
-				#$order=str_replace("+","@",$order);
 				$order='delete '.$order;
-				#if ($next != '') {$nexttxt='('.$next .')';} else {$nexttxt='';};
 			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del</a></td><td colspan=2>$value / $next / $command</td></tr>";
 			 }
 		} 
