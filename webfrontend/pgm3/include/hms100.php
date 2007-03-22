@@ -47,6 +47,7 @@ $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HM
 	$mintemp=100;
 	$maxtemp=-100;
 	$counter=count($array);
+	#if ($maxcountHMS <  $counter)  {$counter=$maxcountHMS;};
 	
 	#Logrotate
 	if ((($logrotateHMSlines+100) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateHMSlines);
@@ -94,7 +95,8 @@ if ( $type == "HMS100T" or $type == "HMS100TF" )  ## hms100t-Device.
 	 ###################
 	
 
-	for ($x = 0; $x <= $_SESSION["maxdata"]; $x++)
+	if ($maxcountHMS <   $_SESSION["maxdata"])  {$anzlines=$maxcountHMS;} else {$anzlines= $_SESSION["maxdata"];}
+	for ($x = 0; $x < $anzlines; $x++)
 
         {
  		$parts = explode("_", $resultreverse[$x][0]);
@@ -109,6 +111,7 @@ if ( $type == "HMS100T" or $type == "HMS100TF" )  ## hms100t-Device.
 		$yold=$y;
 	};
 	ImageLine($im, $imgmaxxhms-$x, 0,$imgmaxxhms-$x , $imgmaxyhms, $yellow);
+	ImageLine($im, $imgmaxxhms-$maxcountHMS, 0,$imgmaxxhms-$maxcountHMS , $imgmaxyhms, $white);
 	$tempTEMP=$temp;
 }; #HMS100T
 
@@ -121,7 +124,8 @@ if ( $type == "HMS100TF")  ## hms100tf-Device.
 	$min=100;
 	$max=-100;
 
-	for ($x = 0; $x <= $_SESSION["maxdata"]; $x++)
+	if ($maxcountHMS <   $_SESSION["maxdata"])  {$anzlines=$maxcountHMS;} else {$anzlines= $_SESSION["maxdata"];}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$temp=$resultreverse[$x][2];
 	if ( $temp > $max ) $max=$temp;
@@ -135,7 +139,9 @@ if ( $type == "HMS100TF")  ## hms100tf-Device.
 	$xold=$imgmaxxhms;
 	$yold=round($imgmaxyhms-(($resultreverse[0][2]-$min)*$fac));
 
-	for ($x = 0; $x < count($resultreverse); $x++)
+	if ($maxcountHMS <   $_SESSION["maxdata"])  {$anzlines=$maxcountHMS;} else {$anzlines= $_SESSION["maxdata"];}
+	for ($x = 0; $x < $anzlines; $x++)
+	#for ($x = 0; $x < count($resultreverse); $x++)
         {
 		$y = round($imgmaxyhms-(($resultreverse[$x][2]-$min)*$fac));
 		ImageLine($im, $imgmaxxhms-$x, $y, $xold, $yold, $white);
@@ -180,17 +186,17 @@ if ( $type == "HMS100T" or $type == "HMS100TF" )
 	$text="Temperature";
 	$fontsize=7;
         $txtcolor=$bg3p; 
-        ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
         $txtcolor=$bg3p; 
 	$fontsize=9;
 	$text=$tempTEMP." &#176;C";
 	$tvalue=$tempTEMP;
-        ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, $fontsize, 0, 90-$XcorrectMainTextHMS, 37, $txtcolor, $fontttfb, $text);
 
         $txtcolor=$bg3p; 
 	$fontsize=7;
 	$text="min= $mintemp max= $maxtemp";
-        ImageTTFText ($im,  $fontsize, 0, 62, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, 67-$XcorrectMainTextHMS, 49, $txtcolor, $fontttf, $text);
 	$text=$resultreverse[0][0];
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxhms-127,  13, $txtcolor, $fontttf, $text);
 };
@@ -199,10 +205,10 @@ if ( $type == "HMS100T" or $type == "HMS100TF" )
         $txtcolor=$bg3p; 
 	$fontsize=9;
 	$text= $drawhms;
-        ImageTTFText ($im, 8, 0, 80, 18, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, 8, 0,90-$XcorrectMainTextHMS, 22, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	$text=$txtroom.$room;
-        ImageTTFText ($im,  $fontsize, 0, 5,  $imgmaxyhms-7, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, 3,  $imgmaxyhms-7, $txtcolor, $fontttf, $text);
 	$text=$type;
         ImageTTFText ($im,  $fontsize, 0, 5,  $imgmaxyhms-17, $txtcolor, $fontttf, $text);
 
@@ -232,8 +238,8 @@ if ( $type == "HMS100WD" or $type == "HMS100MG" or $type == "HMS100W"
         else
         { $_SESSION["maxdata"] = $imgmaxxhms; };
 
-   for ($x = 0; $x < $_SESSION["maxdata"]-1; $x++)
-
+	if ($maxcountHMS <   $_SESSION["maxdata"])  {$anzlines=$maxcountHMS;} else {$anzlines= $_SESSION["maxdata"];}
+	for ($x = 0; $x < $anzlines; $x++)
         {
                 $parts = explode("_", $resultreverse[$x][0]);
                 if ( ($parts[0] != $olddate) )

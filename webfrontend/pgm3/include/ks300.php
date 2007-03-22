@@ -13,7 +13,7 @@ $drawks=$_GET['drawks'];
 $room=$_GET['room'];
 $avgday=$_GET['avgday'];
 $avgmonth=$_GET['avgmonth'];
-
+#$drawks="ks300";
 
         $file="$logpath/$drawks.log";
         if (! file_exists($file)) show_error($file,$drawks,$imgmaxxks,$imgmaxyks);
@@ -94,8 +94,8 @@ $avgmonth=$_GET['avgmonth'];
 		$yold=round($imgmaxyks-(($resultreverse[0][1]-$mintemp)*$fac));
 	        ###################
 	
-		
-		for ($x = 0; $x <= $maxdata; $x++)
+		if ($maxcountKS < $maxdata) {$anzlines=$maxcountKS;}	else {$anzlines=$maxdata;}
+		for ($x = 0; $x < $anzlines; $x++)
 		{
 		$y = round($imgmaxyks-(($resultreverse[$x][1]-$mintemp)*$fac));
 		ImageLine($im, $imgmaxxks-$x, $y, $xold, $yold, $red);
@@ -109,6 +109,7 @@ $avgmonth=$_GET['avgmonth'];
 		};
 		};
 		ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
+		ImageLine($im, $imgmaxxks-$maxcountKS, 0,$imgmaxxks-$maxcountKS , $imgmaxyks, $white);
 		if ($mintemp < 0) 
 		{
 			$y = round($imgmaxyks-((0-$mintemp)*$fac));
@@ -117,15 +118,15 @@ $avgmonth=$_GET['avgmonth'];
 		$text="Temperature";
 		$fontsize=7;
         	$txtcolor=$bg3p; 
-        	ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+        	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
 	$text=$temp." &#176;C";
-        ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, $fontsize, 0, 90-$XcorrectMainTextKS, 37, $txtcolor, $fontttfb, $text);
 	$text= $drawks;
-        ImageTTFText ($im, 8, 0, 80, 18, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, 8, 0,  90-$XcorrectMainTextKS, 22, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	$text="min= $mintemp max= $maxtemp";
-        ImageTTFText ($im, $fontsize, 0, 60, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0, 67-$XcorrectMainTextKS, 49, $txtcolor, $fontttf, $text);
 		$imt=$im;
 
 #humidity
@@ -140,7 +141,8 @@ $avgmonth=$_GET['avgmonth'];
 	$min=100;
 	$max=-100;
 
-	for ($x = 0; $x <= $maxdata-1; $x++)
+	if ($maxcountKS < $maxdata) {$anzlines=$maxcountKS;}	else {$anzlines=$maxdata;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$temp=$resultreverse[$x][2];
 	if ( $temp > $max ) $max=$temp;
@@ -156,7 +158,9 @@ $avgmonth=$_GET['avgmonth'];
 	$yold=round($imgmaxyks-(($resultreverse[0][2]-$min)*$fac));
 
 	$olddate = ($resultreverse[0][0][9]);
-	for ($x = 0; $x < count($resultreverse); $x++)
+	$countresultrev=count($resultreverse);
+	if ($maxcountKS < $countresultrev) {$anzlines=$maxcountKS;}else {$anzlines=$countresultrev;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$y = round($imgmaxyks-(($resultreverse[$x][2]-$min)*$fac));
 	ImageLine($im, $imgmaxxks-$x, $y, $xold, $yold, $red);
@@ -170,16 +174,17 @@ $avgmonth=$_GET['avgmonth'];
 	};
 	};
 	ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
+	ImageLine($im, $imgmaxxks-$maxcountKS, 0,$imgmaxxks-$maxcountKS , $imgmaxyks, $white);
 		$text="Humidity";
 		$fontsize=7;
         	$txtcolor=$bg3p; 
-        	ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+        	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
 	$text=$temp." %";
-        ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, $fontsize, 0,  90-$XcorrectMainText, 37, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	$text="min= $min max= $max";
-        ImageTTFText ($im, $fontsize, 0, 60, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0,  67-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
 
 	$imh=$im;
 
@@ -192,7 +197,8 @@ $avgmonth=$_GET['avgmonth'];
 	$min=120000;
 	$max=-100;
 
-	for ($x = 0; $x <= $maxdata; $x++)
+	if ($maxcountKS < $maxdata) {$anzlines=$maxcountKS;}	else {$anzlines=$maxdata;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$temp=$resultreverse[$x][3];
 	if ( $temp > $max ) $max=$temp;
@@ -207,7 +213,9 @@ $avgmonth=$_GET['avgmonth'];
 	$xold=$imgmaxxks;
 	$yold=round($imgmaxyks-(($resultreverse[0][3]-$min)*$fac));
 
-	for ($x = 0; $x < count($resultreverse); $x++)
+	$countresultrev=count($resultreverse);
+	if ($maxcountKS < $countresultrev) {$anzlines=$maxcountKS;}else {$anzlines=$countresultrev;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$y = round($imgmaxyks-(($resultreverse[$x][3]-$min)*$fac));
 	ImageLine($im, $imgmaxxks-$x, $y, $xold, $yold, $red);
@@ -221,26 +229,27 @@ $avgmonth=$_GET['avgmonth'];
 	};
 	};
 	ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
+	ImageLine($im, $imgmaxxks-$maxcountKS, 0,$imgmaxxks-$maxcountKS , $imgmaxyks, $white);
 		if (isset($willi)) $text="Air Pressure"; else $text="Wind";
 		$fontsize=7;
         	$txtcolor=$bg3p; 
-        	ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+        	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
 	if (isset($willi)) $text=$temp." hPa"; else $text=$temp." km/h";
-        ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, $fontsize, 0, 80-$XcorrectMainTextKS, 37, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	
 	if (($showbft==1) and (! isset($willi)))
 	{
 	$text="( ".bft($temp)."  Bft)";
-        ImageTTFText ($im, $fontsize, 0, 150, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, $fontsize, 0, 140-$XcorrectMainTextKS, 37, $txtcolor, $fontttfb, $text);
         $text2="min= $min  max= $max (".bft($max)." Bft)";
 	}
 	else
 	{
 	$text2="min= $min max= $max";
 	}
-        ImageTTFText ($im, $fontsize, 0, 60, 47, $txtcolor, $fontttf, $text2);
+        ImageTTFText ($im, $fontsize, 0, 57-$XcorrectMainTextKS, 49, $txtcolor, $fontttf, $text2);
 
 	$imw=$im;
 
@@ -256,7 +265,8 @@ if (! isset($willi))
 	$min=120;
 	$max=-100;
 
-	for ($x = 0; $x <= $maxdata; $x++)
+	if ($maxcountKS < $maxdata) {$anzlines=$maxcountKS;}	else {$anzlines=$maxdata;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$temp=$resultreverse[$x][4];
 	if ( $temp > $max ) $max=$temp;
@@ -272,7 +282,8 @@ if (! isset($willi))
 	$xold=$imgmaxxks;
 	$yold=round($imgmaxyks-(($resultreverse[0][4]-$min)*$fac));
 
-	for ($x = 0; $x <= $maxdata; $x++)
+	if ($maxcountKS < $maxdata) {$anzlines=$maxcountKS;}	else {$anzlines=$maxdata;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
  	$parts = explode("_", $resultreverse[$x][0]);
 	if ( ($parts[0] != $olddate) )
@@ -293,6 +304,7 @@ if (! isset($willi))
 	
 	};
 	ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
+	ImageLine($im, $imgmaxxks-$maxcountKS, 0,$imgmaxxks-$maxcountKS , $imgmaxyks, $white);
 	$fontsize=7;
 	$text="Is raining:";
         ImageTTFText ($im, $fontsize, 0, 50, 14, $txtcolor, $fontttf, $text);
@@ -304,21 +316,21 @@ if (! isset($willi))
 		$text="Rain";
 		$fontsize=7;
         	$txtcolor=$bg3p; 
-        	ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+        	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
 	$text=$temp." l/m2";
-        ImageTTFText ($im, $fontsize, 0, 80, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, $fontsize, 0, 90-$XcorrectMainTextKS, 37, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	$text="min= $min max= $max";
         ImageTTFText ($im, $fontsize, 0,  $imgmaxxks-130, 30, $txtcolor, $fontttf, $text);
 	$text=$resultreverse[0][0];
         ImageTTFText ($im, $fontsize, 0,  $imgmaxxks-130, 15, $txtcolor, $fontttf, $text);
 	$text="avg_day: ".$avgday;
-        ImageTTFText ($im, $fontsize, 0,  70, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0,  70, 49, $txtcolor, $fontttf, $text);
 	$text="avg_mon: ".$avgmonth;
-        ImageTTFText ($im, $fontsize, 0,  320, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0,  320, 49, $txtcolor, $fontttf, $text);
 	$text=$room;
-        ImageTTFText ($im, $fontsize, 0,  7, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0,  3, 49, $txtcolor, $fontttf, $text);
 	$imr=$im;
 }
 else # Willi:
@@ -331,7 +343,8 @@ else # Willi:
 	$min=120000;
 	$max=-100;
 
-	for ($x = 0; $x <= $maxdata; $x++)
+	if ($maxcountKS < $maxdata) {$anzlines=$maxcountKS;}	else {$anzlines=$maxdata;}
+	for ($x = 0; $x < $anzlines; $x++)
         {
 	$temp=$resultreverse[$x][4];
 	if ( $temp > $max ) $max=$temp;
@@ -360,6 +373,7 @@ else # Willi:
 	};
 	};
 	ImageLine($im, $imgmaxxks-$x, 0,$imgmaxxks-$x , $imgmaxyks, $yellow);
+	ImageLine($im, $imgmaxxks-$maxcountKS, 0,$imgmaxxks-$maxcountKS , $imgmaxyks, $white);
 		$text="Willi";
 		$fontsize=7;
         	$txtcolor=$bg3p; 
@@ -373,7 +387,8 @@ else # Willi:
         ImageTTFText ($im, $fontsize, 0, 60, 47, $txtcolor, $fontttf, $text2);
 	$text=$resultreverse[0][0];
         ImageTTFText ($im, $fontsize, 0,  $imgmaxxks-130, 15, $txtcolor, $fontttf, $text);
-
+	$text=$room;
+        ImageTTFText ($im, $fontsize, 0,  7, 47, $txtcolor, $fontttf, $text);
 	$imr=$im;
 }
 
