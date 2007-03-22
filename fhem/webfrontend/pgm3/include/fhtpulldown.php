@@ -12,7 +12,7 @@
 
 		echo "
 		<tr>
-		<td colspan=3 align=right $bg2><font $fontcolor3>FHT: </font></td><td align=left $bg2><font $fontcolor3>
+		<td colspan=2 align=right $bg2><font $fontcolor3>FHT: </font></td><td align=left $bg2><font $fontcolor3>
 		<form action=$forwardurl method='POST'>";
 		#<input type=hidden name=showfht value=$showfht>
 		#<input type=hidden name=showhms value=$showhms>
@@ -86,7 +86,7 @@
 				echo "<option>$m.0</option>";
 				echo "<option>$m.5</option>";
 			}
-		
+		if (isset($valuetime))	echo"<option selected>$valuetime</option>";
 		echo"</select>";
 
 		#$order="$atorder $attime set $fhtdev $orderpulldown $valuetime";

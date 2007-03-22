@@ -141,7 +141,7 @@ $pgm3version='0.8.0cvs';
 	if (isset ($showat)) { $forwardurl=$forwardurl.'&showat';};
 	if (isset ($showhist)) { $forwardurl=$forwardurl.'&showhist';};
 	if (isset ($showmenu)) 
-	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&showmenu='.$showmenu.'&showroom='.$showroom;}
+	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&valuetime='.$valuetime.'&showmenu='.$showmenu.'&showroom='.$showroom;}
 	unset($link);
 	if (isset ($showlogs)) $link=$link.'&showlogs'; 
 	if (isset ($shownoti)) $link=$link.'&shownoti'; 
@@ -384,6 +384,7 @@ xml_parser_free($xml_parser);
 
 #print_r($rooms); echo "Count: $countrooms"; exit;
 #print_r($fs20devs);  exit;
+#echo count($stack[0][children]);exit;
 
 # Print Array on Screen
 
@@ -428,22 +429,26 @@ xml_parser_free($xml_parser);
 	echo "</font></td></tr>";
 
 
-	if (($show_general=='1') AND ($showmenu=='1'))
-	{echo "
+	if ($showmenu=='1')
+	{
+		if ($show_general=='1') 
+		{echo "
 		<tr>
-		<td colspan=3 align=right $bg2><font  $fontcolor3>
-		General: </font></td><td align=left $bg2><font $fontcolor3>	
+		<td colspan=2 align=right $bg2><font  $fontcolor3> General: </font></td>
+		<td align=left $bg2 colspan=2><font $fontcolor3>
 		<form action=$forwardurl method='POST'>
 		<input type=text name=order size=30>
 		<input type=hidden name=showfht value=$showfht>
 		<input type=hidden name=showhms value=$showhms>
 		<input type=hidden name=showmenu value=$showmenu>
 		<input type=hidden name=Action value=exec>
-		<input type=submit value='go!'></form></td></tr>";
-	};
+		<input type=submit value='go!'></form></td>
+		</tr>";
+		};
 	
-	if (($show_fs20pulldown=='1') AND ($showmenu=='1')) include 'include/fs20pulldown.php';
-	if (($show_fhtpulldown=='1') AND ($showmenu=='1')) include 'include/fhtpulldown.php';
+	if ($show_fs20pulldown=='1') include 'include/fs20pulldown.php';
+	if ($show_fhtpulldown=='1') include 'include/fhtpulldown.php';
+	};
 
 	############################ ROOMS
 	if (($showroombuttons==1) and (count($rooms)>1))
@@ -468,6 +473,13 @@ xml_parser_free($xml_parser);
 	}	
 
 #####################################################################################################################
+
+	##### Check Version of FHEM
+	      if (! ($stack[0][children][0][name]=='Internal_LIST')) ##older FHZ100 have no Internal_LIST
+		{echo "Error!! You need at least FHEM-4.0 to run this pgm3!!";}
+
+
+
 	##### Let's go.... :-)))))
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
@@ -538,7 +550,9 @@ xml_parser_free($xml_parser);
 				       <input type=hidden name=Action value=hide>
 				       <input type=hidden name=showfht value=none>
 			 		<input type=hidden name=showroom value=$showroom>
-				       <input type=submit value='hide'></form>";}
+				       <input type=submit value='hide'></form>
+					<a href=$forwardurl&showmenu=1&fhtdev=$FHTdev&orderpulldown=desired-temp&valuetime=20.0>adjust</a></td>";
+			 	}
 			 else
 			 	{echo "<tr valign=center><td align=center $bg2 valign=center> 
 				       <form action=$forwardurl method='POST'>
@@ -546,24 +560,11 @@ xml_parser_free($xml_parser);
 				       <input type=hidden name=showfht value=$FHTdev>
 			 		<input type=hidden name=showroom value=$showroom>
 		    	      	       <input type=hidden name=showhms value=$showhms>
-				       <input type=submit value='show'></form></td>";
-			 };
-			 echo "<td align=center valign=center $bg2><b>
-			 <font  $fontcolor3>$FHTdev</font></b></td><td $bg2 align=center valign=center>
-			 <form action=$forwardurl method='POST'><font  $fontcolor3>desired-temp</font> 
-			 <input type=hidden name=Action value=execfht>
-			 <input type=hidden name=showfht value=$showfht>
-			 <input type=hidden name=showroom value=$showroom>
-		   	 <input type=hidden name=showhms value=$showhms>
-			 <input type=hidden name=dofht value=$FHTdev>";
-			 echo "<select name=temp size=1>
-			 <option>12.0</option><option>17.0</option><option>18.0</option>
-			 <option>19.0</option><option>20.0</option><option>21.0</option><option selected>22.0</option>
-			 <option>23.0</option><option>24.0</option><option>25.0</option><option>26.0</option></select>
-			 <input type=submit value=go></form></td>
-			 ";
+				       <input type=submit value='show'></form>
+					<a href=$forwardurl&showmenu=1&fhtdev=$FHTdev&orderpulldown=desired-temp&valuetime=20.0>adjust</a></td>";
+			 	};
 				   
-				echo "<td $bg2> 
+				echo "<td $bg2 colspan='3'> 
 				<img src='include/fht.php?drawfht=$FHTdev&room=$room' width='$imgmaxxfht' height='$imgmaxyfht'>
 				</td>";
 				echo "</tr>";
@@ -577,16 +578,18 @@ xml_parser_free($xml_parser);
                                         </td></tr>
 			 		      <tr><td colspan=4><hr color='#AFC6DB'></td></tr>";
 				}
+				if ( $showfht==$FHTdev)
+				{
+				echo "<tr><td colspan=4><table border=0><tr>";
 			 	for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
 				{
-				  if ( $showfht==$FHTdev)
-				   {
-				   	$name=$stack[0][children][$i][children][$j][children][$k][attrs][name];
+				   	$name=$stack[0][children][$i][children][$j][children][$k][attrs][key];
 					$value=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 					$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
-			        	echo "<tr><td colspan=1> $FHTdev (FHT): </td><td>$name</td><td>$value
-					      </td><td>$measured</td></tr>";
+			        	echo "<td><tr><td colspan=1> $FHTdev (FHT): </td><td>$name</td><td>$value
+					      </td><td>$measured</td></tr></td>";
 				   }
+				echo "</tr></table></td></tr>";
 				}
 			}
 		}
@@ -613,21 +616,20 @@ xml_parser_free($xml_parser);
 			$HMSdev=$stack[0][children][$i][children][$j][attrs][name];
 			if ($type=="HMS100T" or $type=="HMS100TF")
 			{
-			if ($showhmsgnu== $HMSdev)
-			{$formvalue="hide";$gnuvalue="";}
+			if ($showhmsgnu== $HMSdev) {$formvalue="hide";$gnuvalue="";}
 			else {$formvalue="show";$gnuvalue=$HMSdev;};
-			echo "</td></tr><tr valign=center><td align=center $bg2 valign=center>
+			echo "<tr valign=center><td align=center $bg2 valign=center>
                                        <form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=showhmsgnu>
                                         <input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showhmsgnu value=$gnuvalue>
-                                       <input type=submit value='$formvalue'></form></td><td $bg2>";
+                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=2>";
 				
 			}
 			else
-		 	echo "</td></tr><tr><td $bg2 colspan=2>";
-		       	echo "<font  $fontcolor3><b> $HMSdev</b></font> </td>
-			<td $bg2 colspan=2><img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
+		 	{echo "<tr><td $bg2 colspan=3>";}
+		       	
+			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		
 		if ($showhmsgnu == $HMSdev and $showgnuplot == 1)
                                 { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0);
@@ -655,7 +657,11 @@ xml_parser_free($xml_parser);
                            $check=$stack[0][children][$i][children][$j][children][$k][attrs][key];
                            $check2=$stack[0][children][$i][children][$j][children][$k][attrs][name];
                          if ($check=='room')  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
-
+                         elseif ($check=='willi') $willi=1;
+                         elseif ($check=='avg_day') $KSavgday=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+                         elseif ($check=='temperature') $KSmeasured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
+                         elseif ($check=='avg_month') $KSavgmonth=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+				#  for older versions...
                          if ($check2=='avg_month') $KSavgmonth=$stack[0][children][$i][children][$j][children][$k][attrs][value];
                          elseif ($check2=='avg_day') $KSavgday=$stack[0][children][$i][children][$j][children][$k][attrs][value];
                          elseif ($check2=='temperature') $KSmeasured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
@@ -688,7 +694,7 @@ xml_parser_free($xml_parser);
                                        <input type=submit value='show'></form></td>";
                          };
 
-			 echo "<td $bg2<font  $fontcolor3><b>  $KSdev</font></b> </td><td $bg2 center=align colspan=2>";
+			 echo "<td $bg2 center=align colspan=3>";
                          echo "<img src='include/ks300.php?drawks=$KSdev&room=$room&avgmonth=$KSavgmonth&avgday=$KSavgday' width='$Xks' height='$Yks'>";
                          echo "</td></tr>";
                          if (! isset ($willi)) $drawtype="KS300"; else $drawtype="WS300";
