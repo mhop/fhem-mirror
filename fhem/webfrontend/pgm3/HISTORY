@@ -4,3 +4,9 @@
 - Martin 2007-03-19
   - Feature: WS300 ist now supported
   - Adjusted to new structure of FHEM (IT NEEDS now FHZ1000/FHEM >= v3.4!)
+
+- Martin 2007-03-22
+  - New arrangement of the graphics.
+  - Better support for WS300
+  - FHT-Pulldown will now be called by the button "adjust"
+  - FHT-PHP-Grafics now with temperature, desired-temp and actuator

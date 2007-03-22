@@ -35,6 +35,8 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$yellow= ImageColorAllocate($im, 255, 255, 0);
 	$lightyellow= ImageColorAllocate($im, 255, 247,222 );
 	$orange= ImageColorAllocate($im, 255, 230, 25);
+	$actuatorcolor =  ImageColorAllocate($im, $actR, $actG, $actB);
+	$desiredcolor =  ImageColorAllocate($im, $desR, $desG, $desB);
 
 
 	ImageFill($im, 0, 0, $bg2p);
@@ -47,6 +49,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$actuator_date="unknown";
 	$counter=count($array);
 	$arraydesired=array();
+	$arrayactuator=array();
 
 	#echo $counter; exit;
 	
@@ -69,12 +72,14 @@ setlocale (LC_ALL, 'de_DE.utf8');
 			$oldhour=$array[$x][12]; 
 			array_push( $_SESSION["arraydata"],array($date,$type,$temp));
 			array_push( $arraydesired,$desired_temp);
+			array_push( $arrayactuator,$actuator);
 
 		}
      	}
 
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
 	$reversedesired = array_reverse($arraydesired);
+	$reverseactuator = array_reverse($arrayactuator);
 	$xold=$imgmaxxfht;
 	
 	if ( $imgmaxxfht > count ($resultreverse) )
@@ -95,68 +100,75 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$tempdiff=$maxtemp-$mintemp;
 	if ($tempdiff==0) $tempdiff=1;
 	$fac=$imgmaxyfht/$tempdiff;
+	$fac2=$imgmaxyfht/100;
 	$yold=round($imgmaxyfht-(($resultreverse[0][1]-$mintemp)*$fac));
 	###################
 
 
-	
-	for ($x = 0; $x < $_SESSION["maxdata"]; $x++)
+
+	if ($maxcount > $_SESSION["maxdata"]) {$counter=$_SESSION["maxdata"];} else {$counter=$maxcount;};
+	for ($x = 0; $x < $counter; $x++)
 
         {
  	$parts = explode("_", $resultreverse[$x][0]);
 	if ( ($parts[0] != $olddate) )
 	{
 		$olddate=$parts[0];
-		#ImageLine($im, $imgmaxxfht-$x, 0,$imgmaxxfht-$x , $imgmaxyfht, $bg1p);
 		ImageLine($im, $imgmaxxfht-$x, 0,$imgmaxxfht-$x , $imgmaxyfht, $bg1p);
 	};
 	$y = round($imgmaxyfht-(($resultreverse[$x][2]-$mintemp)*$fac));
 	$y2 = round($imgmaxyfht-(($reversedesired[$x]-$mintemp)*$fac));
-	#ImageLine($im, $imgmaxxfht-$x, $y2, $xold, $yold2, $bg1p);
-	if ($show_desiredtemp == 1) ImageLine($im, $imgmaxxfht-$x+1, $y2, $xold, $yold2, $lightyellow);
+	$y3 = round($imgmaxyfht-(($reverseactuator[$x])*$fac2));
+	if ($show_actuator== 1) ImageLine($im, $imgmaxxfht-$x+1, $y3, $xold, $yold3, $actuatorcolor);
+	if ($show_desiredtemp == 1) ImageLine($im, $imgmaxxfht-$x+1, $y2, $xold, $yold2, $desiredcolor);
 	ImageLine($im, $imgmaxxfht-$x, $y, $xold, $yold, $red);
 	$xold=$imgmaxxfht-$x;
 	$yold=$y;
 	$yold2=$y2;
+	$yold3=$y3;
 	};
 	
 	#print_r($resultreverse);
 	#print_r($reversedesired);
 	#exit;
 	ImageLine($im, $imgmaxxfht-$x, 0,$imgmaxxfht-$x , $imgmaxyfht, $yellow);
+	ImageLine($im, $imgmaxxfht-$maxcount, 0,$imgmaxxfht-$maxcount , $imgmaxyfht, $white);
 ###ttf
+	
+#	$text2=$resultreverse[0][0];
 	$text="Temperature";
 	$fontsize=7;
         $txtcolor=$bg3p; 
-        ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$text=$resultreverse[0][2]." &#176;C";
 
-        ImageTTFText ($im, 9, 0, 90, 35, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, 9, 0, 90-$XcorrectMainText, 37, $txtcolor, $fontttfb, $text);
         
 	$text= $drawfht;
-        ImageTTFText ($im, 8, 0, 90, 18, $txtcolor, $fontttfb, $text);
+        ImageTTFText ($im, 8, 0, 90-$XcorrectMainText, 22, $txtcolor, $fontttfb, $text);
         $txtcolor=$bg3p; 
 	$fontsize=7;
 	$text="min= $mintemp max= $maxtemp";
-        ImageTTFText ($im,  $fontsize, 0, 67, 47, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, 67-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
         
 	$text=$txtroom.$room;
-        ImageTTFText ($im,  $fontsize, 0, 5,  $imgmaxyfht-7, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, 3,  49, $txtcolor, $fontttf, $text);
         
 	$text="desired-temp: $desired_temp";
-        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230, 23, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
         
-	$text=$desired_date;
-        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127, 23, $txtcolor, $fontttf, $text);
+	#$text=$desired_date;
+        #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
         
 	$text="Actuator [%]: $actuator";
-        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230, 33, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         	
-	$text=$actuator_date;
-        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127, 33, $txtcolor, $fontttf, $text);
+	#$text=$actuator_date;
+        #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         
 	$text=$resultreverse[0][0];
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127, 13, $txtcolor, $fontttf, $text);
+        #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 13, $txtcolor, $fontttf, $text);
 
 	header("Content-type: image/png");
 	imagePng($im);

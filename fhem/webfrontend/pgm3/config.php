@@ -1,16 +1,16 @@
 <?php
 
 ##################################################################################
-#### pgm3 -- a PHP-webfrontend for fhem.pl
+#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
 
 
 ###### required settings
-	$fhz1000="localhost"; #only php5 ! On which machine is fhz1000 runnning??
+	$fhz1000="fhz"; #only php5 ! On which machine is fhz1000 runnning??
 					# if it is not localhost then the fhz1000.cfg must
 					# run global: "port <nr> global"
 	$fhz1000port="7072";		# port of fhz1000.pl
 	$logpath="/var/tmp";		# where are your logs?
-	$fhz1000_pl="/home/FHEM/fhem/fhem.pl"; #only required if you are using PHP4
+	$fhz1000_pl="/home/FHZ/fhz1000/fhz1000.pl"; #only required if you are using PHP4
 
 ##################################################################################
 ###### nice to have
@@ -67,11 +67,17 @@
 
 ##############################################################################################
 ## FHT-Devices
-	$imgmaxxfht=450;  #Size of the pictures Default: 450 for faster systems else 380
+	$imgmaxxfht=685;  #Size of the pictures Default: 685 
         $imgmaxyfht=52;
 	$show_desiredtemp=1;			# show the desired_temp as a graphic (0/1)
+	$desR='255'; $desG='255'; $desB='255';	# Color of desired-temp-line Red/Green/Blue (Default: 255/255/255)	
+	$show_actuator=1;			# show the actuator-value as a graphic (0/1)
+	$actR='255'; $actG='247'; $actB='200';	# Color of Actuator-line Red/Green/Blue (Default: 255/247/200)	
 	$FHTyrange='15:31';			# Temperature in gnuplot. Default 15 to 31 (Celsius)
 	$FHTy2range='0:70';			# Actuator in gnuplot. Default 0 to 70 (Percent)
+	$maxcount='460';			# Maximum count of pixel (from right to left) (Default:460)
+   	$XcorrectDate=325;			# Text of e.g. Date from the right side (Default:325)
+   	$XcorrectMainText=35;			# Text of main text from the right side (Default: 35)
 	$logrotateFHTlines=4300; 		# automatic Logrotate; $logrotate must be 'yes'.
 						# Default:4300
 						# read docs/logrotate if you want adjust it manually!
@@ -83,8 +89,10 @@
 
 ##############################################################################################
 ## HMS-Devices
-	$imgmaxxhms=620;  #Size of the pictures. Default:  620 for faster systems else 380
+	$imgmaxxhms=685;  #Size of the pictures. Default:  685
         $imgmaxyhms=52;
+	$maxcountHMS='525';			# Maximum count of pixel (from right to left) (Default:525)
+   	$XcorrectMainTextHMS=25;		# Text of main text from the right side (Default:)
 	$logrotateHMSlines=1200; 		# automatic Logrotate; $logrotate must be 'yes'. 
 						# Default:1200
 						# read docs/logrotate if you want adjust it manually!
@@ -94,13 +102,15 @@
 
 ##############################################################################################
 ## KS300-Device
-	$imgmaxxks=620;  		#Size of the pictures  Default: 620 for faster systems else 380
+	$imgmaxxks=685;  		#Size of the pictures  Default: 685
 
         $imgmaxyks=52;
 	$showbft=1;                     # Display values additionaly in Beafort. Values: 0 /1 Default:1
+	$maxcountKS='525';		# Maximum count of pixel (from right to left) (Default:525)
+   	$XcorrectMainTextKS=35;		# Text of main text from the right side (Default: 35)
 
 	$logrotateKS300lines=2000; 	# automatic Logrotate; $logrotate must be 'yes'.
-					# Default:1900
+					# Default:2000
 					# read docs/logrotate if you want adjust it manually
 					# otherwise the system will slow down
 					# pgm3 (user www-data) needs the rights to write the logs
