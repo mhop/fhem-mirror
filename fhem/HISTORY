@@ -55,3 +55,12 @@
     in the same format. This data is contained in the xmllist.
   - disable attribute for at/notify/filelog
   - rename added
+
+- Rudi, Tue Mar 27 20:43:15 MEST 2007
+  fhemweb.pl (webpgm2) changes:
+  - adopted to the new syntax
+  - better commandline support (return <pre> formatted)
+  - FileLog attribute logtype added, and 4 logtypes (== gnuplot files)
+    defined: fs20, fht, ks300_1, ks300_2
+  - links in the commandref.html file added
+  - device dependent attribute and set support

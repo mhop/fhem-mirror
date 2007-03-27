@@ -68,12 +68,12 @@ my %models = (
     fs20tk	=> 'sender',
     fs20uts	=> 'sender',
     fs20ze	=> 'sender',
+    fs20ms2	=> 'sender',
 
     fs20as1	=> 'simple',
     fs20as4	=> 'simple',
     fs20di	=> 'dimmer',
     fs20du	=> 'dimmer',
-    fs20ms2	=> 'simple',
     fs20rst	=> 'simple',
     fs20sa	=> 'simple',
     fs20sig	=> 'simple',

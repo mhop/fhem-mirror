@@ -316,5 +316,10 @@
     - disable attribute for at/notify/filelog
     See HISTORY for details and reasoning
   - added rename command
+  - webpgm2 adapted to the new syntax, added device specific attribute
+    and "set" support, gnuplot files are configurable, links to the
+    documentation added.
+    support.
+    
 
   - TODO: bugfix: more thorough serial line initialization
