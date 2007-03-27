@@ -250,6 +250,49 @@ split in multiple lines<br><br>
 	this in turn makes your logfile unreadable.  These messages will not be
 	generated if the FHZ attribute loglevel is set to 6.</li><br>
 
+    <a name="logtype"></a>
+    <li>logtype<br>
+        Can be applied to FileLog devices.<br>
+        Used by the pgm2 webfrontend to offer gnuplot images made from the
+        logs.  The string is made up of tokens separated by comma (,), each
+        token specifies a different gnuplot program. The token may contain a
+        colon (:), the part before the colon defines the name of the program,
+        the part after is the string displayed in the web frontend. Currently
+        following types of gnuplot programs are implemented:<br>
+        <ul>
+           <li>fs20<br>
+               Plots on as 1 and off as 0. The corresponding filelog definition
+               for the device fs20dev is:<br>
+               define FileLog fslog fs20dev /var/log/fs20dev-%Y-%U.log
+               </li>
+           <li>fht<br>
+               Plots the measured-temp/desired-temp/actuator lines. The
+               corresponding filelog definitions (for the FHT device named
+               fht1) looks like:<br>
+               define FileLog fhtlog1 fht1:.*(temp|actuator).*
+               /var/log/fht1-%Y-%U.log
+               </li>
+           <li>ks300_1<br>
+               Plots the temperature and humidity of a ks300. The
+               corresponding filelog definitions (for the KS300 device named
+               ks300) looks like:<br>
+               define FileLog ks300log ks300:.*H:.*
+               /var/log/ks300-%Y-%U.log
+               </li>
+           <li>ks300_2<br>
+               Plots the rain (per hour and per day) and wind values of a
+               ks300. The corresponding filelog definition is the same as
+               above, both programs evaluate the same log.
+               </li>
+        </ul>
+        The corresponding gnuplot files must be installed, see the fhemweb.pl
+        configuration for the destination directory.<br>
+
+        Example:<br>
+           attr fhtlog1 logtype ks300_1:Temp/Hum,ks300_2:Rain/Wind
+    </li><br>
+
+
     <a name="model"></a>
     <li>model<br>
         Can be applied to FHZ/FS20/FHT/HMS/KS300/WS300 devices.<br>
@@ -267,7 +310,6 @@ split in multiple lines<br><br>
         <ul>
         <li>FHT: fht80b</li>
         <li>FS20: 
-          fs20hgs
           fs20hgs
           fs20pira
           fs20piri
@@ -339,7 +381,7 @@ split in multiple lines<br><br>
   Notes:<br>
   </ul>
     <li>See <a href="#delattr">delattr</a> to delete attributes.</li>
-  <ul>
+  </ul>
 </ul>
 
 <a name="defattr"></a>
@@ -967,6 +1009,7 @@ split in multiple lines<br><br>
   Instead of &lt;name&gt; you can also use an enumeration (separated by comma)
   or ranges (separated by -), see the FS20 examples.
 
+  <a name="FHZset"></a>
   <h4>Type FHZ:</h4>
   <ul>
     <code>set FHZ &lt;variable&gt; [&lt;value&gt]</code>
@@ -1000,6 +1043,7 @@ split in multiple lines<br><br>
   </ul>
 
 
+  <a name="FH20set"></a>
   <h4>Type FS20:</h4>
   <ul>
     <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
@@ -1082,6 +1126,7 @@ split in multiple lines<br><br>
   </ul>
 
 
+  <a name="FHTset"></a>
   <h4>Type FHT:</h4>
   <ul>
     <code>set &lt;name&gt; &lt;valuetype&gt; &lt;value&gt;</code>
@@ -1148,6 +1193,7 @@ split in multiple lines<br><br>
     </ul>
   </ul>
 
+  <a name="WS300set"></a>
   <h4>Type WS300:</h4>
   <ul>
     <code>set WS300Device  &lt;interval(min.)&gt; &lt;height(m)&gt; &lt;rainvalume(ml)&gt;

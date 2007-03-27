@@ -1,0 +1,22 @@
+#
+# Display the measured temp and the actuator.
+# FileLog definition: 
+#   define FileLog fhtlog1 fht1:.*(temp|actuator).* /var/log/fht1-%Y-%U.log 
+#
+set terminal png
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<IN>'
+set grid
+
+set ylabel "Temperature (Celsius)"
+set y2label "Actuator (%)"
+plot \
+  "< awk '/measured/{print $1, $4; s=1}' <IN>"\
+     using 1:2 axes x1y1 title 'Measured temperature' with lines,\
+  "< awk '/actuator/ {print $1, $4+0; have=1} /measured/ {s=$1} END { if(!have) print (s, 0)}' <IN>"\
+     using 1:2 axes x1y2 title 'Actuator (%)' with lines

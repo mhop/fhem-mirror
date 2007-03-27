@@ -19,9 +19,13 @@ define ks1 KS300 1234 250   # type KS300, with 250ml rain / counter
 # Log temperature and actuator changes into a file, its name changes weekly
 define wzlog  FileLog /var/tmp/wz-%Y-%U.log wz:.*(temp|actuator).*
 
+# Make it accessible from fhemweb.pl (webpgm2)
+attr wzlog logtype fht:Temp
+
 # ks300 log
 define kslog  FileLog /var/log/wz-%Y-%U.log ks1:.*H:.*
 define avglog FileLog /var/log/avg.log ks1:.*avg.*
+attr kslog logtype ks300_1:Temp/Hum,ks300_2:Rain/Wind
 
 ##############################
 # Alternative log method. It does the same, but it is somewhat slower as it
