@@ -130,18 +130,19 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
   and <a href="pgm2-2.png">temperature logs</a><br><br>
 
   <ul>
-     <li>Copy the file <code>fhemweb.pl</code> to your cgi-bin directory
-	 (/home/httpd/cgi-bin), and all the icons (*.gif) to your httpd icons
-	 directory (/home/httpd/icons).<br>
+     <li>Copy the file fhemweb.pl and *.gplot to your cgi-bin directory
+         (/home/httpd/cgi-bin), the icons (*.gif) to your httpd icons
+         (/home/httpd/icons), and commandref.html to the html directory
+         (/home/httpd/html).<br>
 	 Note: The program looks for icons in the following order:
 	 &lt;device-name&gt;.&lt;state&gt;, &lt;device-name&gt;,
 	 &lt;device-type&gt;.&lt;state&gt;, &lt;device-type&gt;<br>
 	 </li>
      <li>Edit <code>fhemweb.pl</code>, and check the "Config" section.</li>
-     <li>If you want to have access to the FHT temperature logs, then
-	 make sure that gnuplot is installed and you log the temperatures like
-	 in example/04_log. Note: There is still a bug with displaying empty
-	 logfiles.</li>
+     <li>If you want to have access to plotted logs, then make sure that
+         gnuplot is installed and set the logtype for the FileLog device
+         (see commandref.html and example/04_log).
+	 </li>
      <li>Call &lt;your-site&gt;/cgi-bin/fhemweb.pl
   </ul>
   For special features like assigning devices to rooms see the README file.

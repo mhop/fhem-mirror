@@ -135,11 +135,11 @@ my $reread_active = 0;
 my $AttrList = "room";
 
 
-$modules{Internal}{ORDER} = -1;
-$modules{Internal}{AttrList} = "configfile logfile modpath " .
-                        "pidfilename port statefile userattr verbose:1,2,3,4,5 version";
+$modules{_internal_}{ORDER} = -1;
+$modules{_internal_}{AttrList} = "configfile logfile modpath " .
+                        "pidfilename port statefile title userattr " .
+                        "verbose:1,2,3,4,5 version";
 
-doGlobalDef($ARGV[0]);
 
 my %cmds = (
   "?"       => { Fn=>"CommandHelp",
@@ -199,6 +199,8 @@ if(int(@ARGV) != 1 && int(@ARGV) != 2) {
   CommandHelp(undef, undef);
   exit(1);
 }
+
+doGlobalDef($ARGV[0]);
 
 ###################################################
 # Client code
@@ -1584,8 +1586,8 @@ doGlobalDef($)
 
   $devcount = 0;
   $defs{global}{NR}    = $devcount++;
-  $defs{global}{TYPE}  = "Internal";
-  $defs{global}{STATE} = "Internal";
+  $defs{global}{TYPE}  = "_internal_";
+  $defs{global}{STATE} = "<no definition>";
   $defs{global}{DEF}   = "<no definition>";
 
   CommandAttr(undef, "global verbose 3");

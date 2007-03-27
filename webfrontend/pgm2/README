@@ -1,13 +1,13 @@
 See the main doc (fhem.html) for the first documentation and installation.
 
-If you want to show anly a part of your devices on a single screen
+If you want to show only a part of your devices on a single screen
 (i.e divide them into separate rooms), then assign each device the
 room attribute in the config file:
 
   attr ks300     room garden
   attr ks300-log room garden
 
-The attribute of the FHZ device will be used as title on the first
+The attribute title of the global device will be used as title on the first
 screen, which shows the list of all rooms. Devices in the room
 "hidden" will not be shown. Devices without a room attribute go
 to the room "misc".
