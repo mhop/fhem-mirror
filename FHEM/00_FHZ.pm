@@ -89,7 +89,7 @@ FHZ_Set($@)
 
   my $v = join(" ", @a);
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,2), "FHZ set $name $v";
+  Log GetLogLevel($name,2), "FHZ set $v";
 
   if($a[1] eq "activefor") {
 
