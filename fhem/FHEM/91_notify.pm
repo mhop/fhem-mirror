@@ -23,7 +23,7 @@ sub
 notify_Define($$)
 {
   my ($hash, $def) = @_;
-  my ($re, $command) = split("[ \t]+", $def, 2);
+  my ($type, $name, $re, $command) = split("[ \t]+", $def, 4);
   
   # Checking for misleading regexps
   eval { "Hallo" =~ m/^$re$/ };
