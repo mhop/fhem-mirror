@@ -136,7 +136,7 @@ my $AttrList = "room";
 
 
 $modules{_internal_}{ORDER} = -1;
-$modules{_internal_}{AttrList} = "configfile logfile modpath " .
+$modules{_internal_}{AttrList} = "configfile logfile lastinclude modpath " .
                         "pidfilename port statefile title userattr " .
                         "verbose:1,2,3,4,5 version";
 
@@ -535,13 +535,14 @@ sub
 CommandInclude($$)
 {
   my ($cl, $arg) = @_;
-  if(!open(CFG, $arg)) {
+  my $fh;
+  if(!open($fh, $arg)) {
     return "Can't open $arg: $!";
   }
 
   my $bigcmd = "";
   $rcvdquit = 0;
-  while(my $l = <CFG>) {
+  while(my $l = <$fh>) {
     chomp($l);
     if($l =~ m/^(.*)\\$/) {		# Multiline commands
       $bigcmd .= $1;
@@ -551,7 +552,7 @@ CommandInclude($$)
     }
     last if($rcvdquit);
   }
-  close(CFG);
+  close($fh);
   return undef;
 }
 
@@ -706,8 +707,10 @@ CommandSave($$)
   foreach my $d (sort keys %savefirst) {
     my $r = $savefirst{$d};
     delete $rooms{$r}{$d};
-    delete $rooms{$r} if(int(%{$rooms{$r}}) == 0);
-    print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n";
+    delete $rooms{$r} if(! %{$rooms{$r}});
+    my $def = $defs{$d}{DEF};
+    $def =~ s/;/;;/g;
+    print SFH "define $d $defs{$d}{TYPE} $def\n";
     foreach my $a (sort keys %{$attr{$d}}) {
       next if($a eq "savefirst");
       print SFH "attr $d $a $attr{$d}{$a}\n";
@@ -718,13 +721,21 @@ CommandSave($$)
     print SFH "\ndefattr" . ($r ne "~" ? " room $r" : "") . "\n";
     foreach my $d (sort keys %{$rooms{$r}} ) {
       next if($defs{$d}{VOLATILE});
-      print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n";
+      my $def = $defs{$d}{DEF};
+      $def =~ s/;/;;/g;
+      print SFH "define $d $defs{$d}{TYPE} $def\n";
       foreach my $a (sort keys %{$attr{$d}}) {
         next if($a eq "room");
         print SFH "attr $d $a $attr{$d}{$a}\n";
       }
     }
   }
+  
+  print SFH "defattr\n";        # Delete the last default attribute.
+
+  print SFH "include $attr{global}{lastinclude}\n"
+        if($attr{global}{lastinclude});
+
 
   close(SFH);
   return undef;
