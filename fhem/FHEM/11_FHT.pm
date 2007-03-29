@@ -321,14 +321,14 @@ FHT_Parse($$)
 
   } elsif($type eq "measured-low") {
 
-    $def->{READINS}{$type}{TIME} = $tn;
-    $def->{READINS}{$type}{VAL} = $val;
+    $def->{READINGS}{$type}{TIME} = $tn;
+    $def->{READINGS}{$type}{VAL} = $val;
     return "";
 
   } elsif($type eq "measured-high") {
 
-    $def->{READINS}{$type}{TIME} = $tn;
-    $def->{READINS}{$type}{VAL} = $val;
+    $def->{READINGS}{$type}{TIME} = $tn;
+    $def->{READINGS}{$type}{VAL} = $val;
 
     if(defined($def->{READINGS}{"measured-low"}{VAL})) {
 
