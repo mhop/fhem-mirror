@@ -110,7 +110,7 @@ FS20_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
-  $val = $1 if($val =~ m/^\(.*\) \d+$/);
+  $val = $1 if($val =~ m/^(.*) \d+$/);
   return "Undefined value $val" if(!defined($fs20_c2b{$val}));
   return undef;
 }

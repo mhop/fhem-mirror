@@ -1303,8 +1303,8 @@ CommandSetstate($$)
   if($a[1] =~ m/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /) {
     my @b = split(" ", $a[1], 4);
 
-    if(@b == 3) {       # Compatibility mode
-      $b[3] = $b[2];
+    if($defs{$a[0]}{TYPE} eq "FS20" && $b[2] ne "state") { # Compatibility mode
+      $b[3] = $b[2] . ($b[3] ? " $b[3]" : "");
       $b[2] = "state";
     }
 
@@ -1312,13 +1312,13 @@ CommandSetstate($$)
     $ret = CallFn($a[0], "StateFn", $d, $tim, $b[2], $b[3]);
     return $ret if($ret);
 
-    next if($d->{READINGS}{$b[2]} && $d->{READINGS}{$b[2]}{TIME} ge $tim);
+    if(!$d->{READINGS}{$b[2]} || $d->{READINGS}{$b[2]}{TIME} lt $tim) {
+      $d->{READINGS}{$b[2]}{VAL} = $b[3];
+      $d->{READINGS}{$b[2]}{TIME} = $tim;
 
-    $d->{READINGS}{$b[2]}{VAL} = $b[3];
-    $d->{READINGS}{$b[2]}{TIME} = $tim;
-
-    $oldvalue{$a[0]}{TIME} = $tim;
-    $oldvalue{$a[0]}{VAL} = $b[2];
+      $oldvalue{$a[0]}{TIME} = $tim;
+      $oldvalue{$a[0]}{VAL} = $b[2];
+    }
 
   } else {
     $d->{STATE} = $a[1];
