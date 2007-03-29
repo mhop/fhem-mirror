@@ -211,8 +211,10 @@ FHZ_Define($$)
     return undef;
   }
 
+  Log 3, "FHZ opening FHZ device $dev";
   my $po = new Device::SerialPort ($dev);
   return "Can't open $dev: $!\n" if(!$po);
+  Log 3, "FHZ opened FHZ device $dev";
 
   $po->reset_error();
   $po->baudrate(9600);
