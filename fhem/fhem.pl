@@ -788,7 +788,10 @@ CommandSet($$)
   } elsif($dev =~ m/,/) {		 # Enumeration (separated by ,)
 
     foreach my $sdev (split(",", $dev)) {
-      push @rets, "Please define $sdev first" if(!defined($defs{$sdev}));
+      if(!defined($defs{$sdev})) {
+        push @rets, "Please define $sdev first";
+	next;
+      }
       $a[0] = $sdev;
       my $ret = DoSet(@a);
       push @rets, $ret if($ret);
