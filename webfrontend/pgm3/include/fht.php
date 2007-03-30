@@ -154,13 +154,14 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$text=$txtroom.$room;
         ImageTTFText ($im,  $fontsize, 0, 3,  49, $txtcolor, $fontttf, $text);
         
-	$text="desired-temp: $desired_temp";
+	 $text="desired: $desired_temp  ".substr($desired_date,11,5);
+
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
         
 	#$text=$desired_date;
         #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
         
-	$text="Actuator [%]: $actuator";
+	$text="Actuator: $actuator";
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         	
 	#$text=$actuator_date;

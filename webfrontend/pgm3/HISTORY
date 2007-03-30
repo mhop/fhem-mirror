@@ -10,3 +10,6 @@
   - Better support for WS300
   - FHT-Pulldown will now be called by the button "adjust"
   - FHT-PHP-Grafics now with temperature, desired-temp and actuator
+
+- Martin 2007-03-29
+  - release pgm3 for fhem 4.0, pgm3 has now the verson 0.8.0
