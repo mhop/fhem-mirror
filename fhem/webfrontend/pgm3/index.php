@@ -40,7 +40,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='0.8.0cvs';
+$pgm3version='0.8.0';
 
 	
 	$Action		=	$_POST['Action'];
@@ -475,7 +475,7 @@ xml_parser_free($xml_parser);
 #####################################################################################################################
 
 	##### Check Version of FHEM
-	      if (! ($stack[0][children][0][name]=='Internal_LIST')) ##older FHZ100 have no Internal_LIST
+	      if (! ($stack[0][children][0][name]=='_internal__LIST')) ##older FHZ100 have no Internal_LIST
 		{echo "Error!! You need at least FHEM-4.0 to run this pgm3!!";}
 
 

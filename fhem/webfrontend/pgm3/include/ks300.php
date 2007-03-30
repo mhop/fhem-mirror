@@ -59,6 +59,7 @@ $avgmonth=$_GET['avgmonth'];
 				(($array[$x][14] != $oldmin) 
 				or ($array[$x][12] != $oldhour) 
 				or ($x==$counter-1))
+				and ($t!="avg_day")
 				and ($date!="NEWLOGS"))
 			{
 			$oldmin=$array[$x][14]; 
