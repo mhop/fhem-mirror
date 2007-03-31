@@ -223,6 +223,10 @@ FHZ_Define($$)
   $po->stopbits(1);
   $po->handshake('none');
 
+  $po->stty_icanon(0);
+  $po->stty_parmrk(0);
+  $po->stty_icrnl(0);
+
   $hash->{PortObj} = $po;
   $hash->{FD} = $po->FILENO;
   $hash->{DeviceName} = $dev;
