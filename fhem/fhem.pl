@@ -60,6 +60,7 @@ sub TimeNow();
 sub WriteStatefile();
 sub XmlEscape($);
 sub fhem($);
+sub fhz($);
 sub doGlobalDef($);
 
 sub CommandAttr($$);
@@ -781,39 +782,30 @@ CommandSet($$)
   my $dev = $a[0];
   my @rets;
 
-  if(defined($defs{$dev})) {
+  foreach my $sdev (split(",", $dev)) {
 
-    return DoSet(@a);
-
-  } elsif($dev =~ m/,/) {		 # Enumeration (separated by ,)
-
-    foreach my $sdev (split(",", $dev)) {
-      if(!defined($defs{$sdev})) {
-        push @rets, "Please define $sdev first";
-	next;
+    if($sdev =~ m/-/) {		 # Range (separated by -)
+      my @lim = split("-", $sdev);
+      foreach my $sd (sort keys %defs) {
+        next if($sd lt $lim[0] || $sd gt $lim[1]);
+        $a[0] = $sd;
+        my $ret = DoSet(@a);
+        push @rets, $ret if($ret);
       }
-      $a[0] = $sdev;
-      my $ret = DoSet(@a);
-      push @rets, $ret if($ret);
+      next;
     }
-    return join("\n", @rets);
 
-  } elsif($dev =~ m/-/) {		 # Range (separated by -)
-
-    my @lim = split("-", $dev);
-    foreach my $sdev (keys %defs) {
-      next if($sdev lt $lim[0] || $sdev gt $lim[1]);
-      $a[0] = $sdev;
-      my $ret = DoSet(@a);
-      push @rets, $ret if($ret);
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
     }
-    return join("\n", @rets);
 
-  } else {
-
-    return "Please define $dev first ($param)";
+    $a[0] = $sdev;
+    my $ret = DoSet(@a);
+    push @rets, $ret if($ret);
 
   }
+  return join("\n", @rets);
 }
 
 
@@ -1588,6 +1580,14 @@ CallFn(@)
 # Used from perl oneliners inside of scripts
 sub
 fhem($)
+{
+  my $param = shift;
+  return AnalyzeCommandChain($global_cl, $param);
+}
+
+# the "old" name, kept to make upgrade process easier
+sub
+fhz($)
 {
   my $param = shift;
   return AnalyzeCommandChain($global_cl, $param);
