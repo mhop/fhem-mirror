@@ -202,7 +202,8 @@ if ( $version[0] == 4 )
 {
 	include "config.php";
 	$order="$fhz1000_pl $port '$order'";  #PHP4, only localhost
-         exec($order,$errormessage);
+	exec($order,$res);
+        $errormessage = $res[0]; 
 }
 else
 {
