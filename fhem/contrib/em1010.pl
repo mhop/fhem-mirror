@@ -242,14 +242,33 @@ getDevStatus()
     printf("     No device no. $ARGV[2] present\n");
     return;
   }
+  my $pulses=w($d,13);
+  my $ec=w($d,49) / 10;
+  my $cur_energy=0;
+  my $cur_power=0;
+
   printf("     Readings  (off 02): %d\n",   w($d,2));
   printf("     Nr devs   (off 05): %d\n",   b($d,6));
-  printf("     puls/5min (off 13): %d\n",   w($d,13));
+  printf("     puls/5min (off 13): %d\n",   $pulses);
   printf("     Startblk  (off 18): %d\n",   b($d,18)+13);
-  printf("     cur.power (off 33): %.3f kW\n", w($d,33) * 2 / 300);
+  # The data must interpreted depending on the sensor type.
+  # Currently we use the EC value to quess the sensor type.
+  if ($ec eq 0) {
+		# Sensor 5..
+    $cur_energy = w($d,33)/ 1000;
+    $cur_power  = $pulses / 100;
+    printf("     cur.energy(off   ): %.3f kWh/h\n", $cur_energy);
+    printf("     cur.power (off   ): %.3f kW avr.\n", $cur_power);
+  } else {
+	 # Sensor 1..4
+    $cur_energy = $pulses / $ec; # ec = U/kWh
+    $cur_power = w($d,33) / 50; #### Still wrong.
+    printf("     cur.energy(off   ): %.3f kWh\n", $cur_energy);
+    printf("     cur.power (off   ): %.3f kW avr.\n", $cur_power);
+  }
   printf("     Alarm PA  (off 45): %d W\n", w($d,45));
   printf("     Price CF  (off 47): %0.2f (EUR/KWH)\n",   w($d,47)/10000);
-  printf("     R/KW  EC  (off 49): %d\n",   w($d,49)/10);
+  printf("     R/KW  EC  (off 49): %d\n",   $ec);
   hexdump($d);
 }
 
@@ -288,6 +307,9 @@ getDevData()
   my $start =  b($d,18)+13;
   my $end = $start + int(($nrreadings-1)/64)*$step;
   my $div = w($d,49)/10;
+  if ($div eq 0) {
+	$div = 1;
+  }
 
   #printf("Total $nrreadings, $start - $end, Nr $step\n");
 
@@ -308,6 +330,7 @@ getDevData()
       if($smooth && (w($d,$off+2) == 0xffff)) { # "smoothing"
         next;
       } else {
+printf ("%d %d\n", $div, $backlog);
 	my $v = w($d,$off)*12/$div/$backlog;
 	my $f1 = b($d,$off+2);
 	my $f2 = b($d,$off+3);
@@ -366,6 +389,7 @@ setRperKW()
   my $d = $ARGV[2];
   my $v = $ARGV[3];
 
+  $v = $v * 10;
   $d = getData(sprintf("79%02x3102%02x%02x", $d-1, $v%256, int($v/256)));
   if(b($d,0) == 6) {
     print("OK");
@@ -392,10 +416,21 @@ get62()
 sub
 setTime()
 {
-  die "Usage: settime time (as YYYY-MM-DD HH:MM:DD)\n"
-        if(@ARGV != 4);
-  my @d = split("-", $ARGV[2]);
-  my @t = split(":", $ARGV[3]);
+  my $a2 = '';
+  my $a3 = '';
+
+  if (@ARGV == 2) {
+    my @lt = localtime;
+	 $a2 = sprintf ("%04d-%02d-%02d", $lt[5]+1900, $lt[4]+1, $lt[3]);
+	 $a3 = sprintf ("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+  } else {
+    die "Usage: setTime [time] (as YYYY-MM-DD HH:MM:SS, localtime if empty)\n"
+          if(@ARGV != 4);
+	 $a2 = $ARGV[2];
+	 $a3 = $ARGV[3];
+  }
+  my @d = split("-", $a2);
+  my @t = split(":", $a3);
 
   my $s = sprintf("73%02x%02x%02x00%02x%02x%02x",
         $d[2],$d[1],$d[0]-2000+0xd0,
