@@ -85,6 +85,14 @@ w($$)
 
 #########################
 sub
+dw($$)
+{
+  my ($t,$p) = @_;
+  return w($t,$p+2)*65536 + w($t,$p);
+}
+
+#########################
+sub
 docrc($$)
 {
   my ($in, $val) = @_;
@@ -246,26 +254,38 @@ getDevStatus()
   my $ec=w($d,49) / 10;
   my $cur_energy=0;
   my $cur_power=0;
+  my $sum_h_energy=0;
+  my $sum_d_energy=0;
+  my $total_energy=0;
+  my $iec=0;
 
   printf("     Readings  (off 02): %d\n",   w($d,2));
   printf("     Nr devs   (off 05): %d\n",   b($d,6));
   printf("     puls/5min (off 13): %d\n",   $pulses);
   printf("     Startblk  (off 18): %d\n",   b($d,18)+13);
+  #for (my $lauf = 19; $lauf < 45; $lauf += 2) {
+  #	printf("     t wert    (off $lauf): %d\n",   w($d,$lauf));
+  #}
   # The data must interpreted depending on the sensor type.
   # Currently we use the EC value to quess the sensor type.
   if ($ec eq 0) {
 		# Sensor 5..
-    $cur_energy = w($d,33)/ 1000;
+    $iec = 1000;
     $cur_power  = $pulses / 100;
-    printf("     cur.energy(off   ): %.3f kWh/h\n", $cur_energy);
-    printf("     cur.power (off   ): %.3f kW avr.\n", $cur_power);
   } else {
 	 # Sensor 1..4
+    $iec = $ec;
     $cur_energy = $pulses / $ec; # ec = U/kWh
-    $cur_power = w($d,33) / 50; #### Still wrong.
+    $cur_power = $cur_energy / 5 * 60; # 5minute interval scaled to 1h
     printf("     cur.energy(off   ): %.3f kWh\n", $cur_energy);
-    printf("     cur.power (off   ): %.3f kW avr.\n", $cur_power);
   }
+  $sum_h_energy= dw($d,33) / $iec; # 33= pulses this our
+  $sum_d_energy= dw($d,37) / $iec; # 37= pulses today
+  $total_energy= dw($d,41) / $iec; # 41= pulses total
+  printf("     cur.power (off   ): %.3f kW avr.\n", $cur_power);
+  printf("         energy(off 33): %.3f kWh/h\n", $sum_h_energy);
+  printf("         energy(off 37): %.3f kWh/d\n", $sum_d_energy);
+  printf("     ttl energy(off 41): %.3f kWh (total)\n", $total_energy);
   printf("     Alarm PA  (off 45): %d W\n", w($d,45));
   printf("     Price CF  (off 47): %0.2f (EUR/KWH)\n",   w($d,47)/10000);
   printf("     R/KW  EC  (off 49): %d\n",   $ec);
