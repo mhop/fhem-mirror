@@ -13,3 +13,6 @@
 
 - Martin 2007-03-29
   - release pgm3 for fhem 4.0, pgm3 has now the verson 0.8.0
+
+- Martin 2007-04-10
+  - Minor Bugfixes (errormessage for php4, fhs20pulldown)
