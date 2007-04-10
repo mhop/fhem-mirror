@@ -74,3 +74,8 @@
   - setTime: Without argument, now the current time of the PC is used.
   - setRperKW: Factor of 10 required, 75 U/kWh -> 750.
 
+- Pest, Tue Apr 10 20:31:22 MEST 2007
+  em1010.pl:
+  - Introduced new double-word function (dw)
+  - getDevStatus: energy values kWh/h, kWh/d, total.
+
