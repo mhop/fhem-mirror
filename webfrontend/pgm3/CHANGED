@@ -111,3 +111,5 @@ Changelog
 -- Internal: Adjusted to the new internal structure of FHEM. YOU MUST HAVE FHEM >=4.0
 -- Internal: random-device for one-time at-order (define <randdev> at set ...)
 -- Feature: new arrangement of the graphics, FHT-Pulldown will now called by "adjust", FHT-PHP-Graphics now with Temperature/desired-temp and actuator
+-- Bugfix:  $errormessage for php4, fs20pulldown (correct list of options)
+
