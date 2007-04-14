@@ -79,3 +79,5 @@
   - Introduced new double-word function (dw)
   - getDevStatus: energy values kWh/h, kWh/d, total.
 
+- Rudi Sat Apr 14 10:34:36 MEST 2007
+  final documentations, release 4.0. Tagged as FHEM_4_0
