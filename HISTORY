@@ -81,3 +81,6 @@
 
 - Rudi Sat Apr 14 10:34:36 MEST 2007
   final documentations, release 4.0. Tagged as FHEM_4_0
+
+- Pest, Sat Apr 14 14:21:00 MEST 2007
+  - doc: linux.html (private udev-rules, not 50-..., ATTRS)

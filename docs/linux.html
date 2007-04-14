@@ -120,15 +120,23 @@ enumeration of the /dev/ttyUSB<i>n</i> numbers get mixed up if one of the
 device is missing or after a reboot.<br>
 Starting with kernel 2.6 the UDEV implements means for using virtual names
 instead of the bare numbers.<br>
-Edit the file <code>/etc/udev/rules.d/50-udev-default.rules</code>
-and append the following lines in the block labled as <i>serial devices</i>:
+Edit the file <code>/etc/udev/rules.d/10-udev.rules</code> (create if necessary)
+and insert the following lines:
 <br>
+If you use udev prior to version 103:<br>
 <code>
 KERNEL=="ttyUSB*", SYSFS{product}=="ELV FHZ 1300 PC", SYMLINK+="elv_fhz1300pc"<br>
 KERNEL=="ttyUSB*", SYSFS{product}=="ELV EM 1010 PC", SYMLINK+="elv_em1010pc"<br>
 </code><br>
-Now you need to reboot your box (unfortunalty) and once the system has come up
-again you can use the device paths <code><b>/dev/elv_fhz1300pc</b></code> or
+Starting with udev 103 the SYSFS will be replaced by ATTRS:
+<br>
+<code>
+KERNEL=="ttyUSB*", ATTRS{product}=="ELV FHZ 1300 PC", SYMLINK+="elv_fhz1300pc"<br>
+KERNEL=="ttyUSB*", ATTRS{product}=="ELV EM 1010 PC", SYMLINK+="elv_em1010pc"<br>
+</code><br>
+
+Now you need to reload (rmmod/modprobe) the ftdio_sio kernel module to 
+use the device paths <code><b>/dev/elv_fhz1300pc</b></code> or
 <code><b>/dev/elv_em1010pc</b></code> in your FHEM configuration file.
 </body>
 </html>
