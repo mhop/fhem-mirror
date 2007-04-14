@@ -1,37 +1,39 @@
-#Fri Jan 26 10:49:05 2007
-setstate FHZ fhtbuf: 1c
+#Sat Apr 14 10:33:04 2007
+setstate FHZ Initialized
 setstate btn4 off
-setstate btn4 2006-04-15 11:46:39 off
+setstate btn4 2006-04-15 11:46:39 state off
 setstate cellar-lamp on
-setstate cellar-lamp 2006-03-29 12:05:34 on
+setstate cellar-lamp 2006-03-29 12:05:34 state on
 setstate floor-lamp on
-setstate floor-lamp 2007-01-26 10:40:17 on
+setstate floor-lamp 2007-01-26 10:40:17 state on
+setstate global <no definition>
+setstate n_btn4 active
 setstate tf1 HMS100TF: T:  20.3°C, H: 31.3%, Bat: ok
-setstate tf1 2006-04-11 09:48:48   HMS100TF        T:  20.3°C, H: 31.3%, Bat: ok
+setstate tf1 2006-04-11 09:48:48 HMS100TF T:  20.3°C, H: 31.3%, Bat: ok
 setstate window-lamps on
-setstate window-lamps 2006-03-29 12:05:34 on
+setstate window-lamps 2006-03-29 12:05:34 state on
 setstate wz measured-temp: 22.4 (Celsius)
-setstate wz 2006-03-29 23:04:17   actuator        00%
-setstate wz 2006-03-26 08:50:33   mon-from1       06:00
-setstate wz 2006-03-26 08:50:33   mon-to1         23:00
-setstate wz 2006-03-26 08:50:34   tue-from1       06:00
-setstate wz 2006-03-26 08:50:35   tue-to1         23:00
-setstate wz 2006-03-26 08:50:36   wed-from1       06:00
-setstate wz 2006-03-26 08:50:36   wed-to1         23:00
-setstate wz 2006-03-26 08:50:37   thu-from1       06:00
-setstate wz 2006-03-26 08:50:37   thu-to1         23:00
-setstate wz 2006-03-26 08:50:39   fri-from1       06:00
-setstate wz 2006-03-26 08:50:39   fri-to1         23:50
-setstate wz 2006-03-26 08:50:40   sat-from1       06:00
-setstate wz 2006-03-26 08:50:40   sat-to1         23:50
-setstate wz 2006-03-26 08:52:29   sun-from1       06:00
-setstate wz 2006-03-26 08:52:29   sun-to1         23:00
-setstate wz 2006-03-26 08:52:33   mode            auto
-setstate wz 2006-03-29 23:02:48   desired-temp    18.0 (Celsius)
-setstate wz 2006-03-29 22:54:38   state           Bat: ok, Window: closed
-setstate wz 2006-03-26 08:48:38   init            255
-setstate wz 2006-03-26 08:52:30   day-temp        22.0 (Celsius)
-setstate wz 2006-03-26 08:52:31   night-temp      18.0 (Celsius)
-setstate wz 2006-03-26 08:52:31   unknown_85      4
-setstate wz 2006-03-26 08:52:31   windowopen-temp 12.0 (Celsius)
-setstate wz 2006-03-29 22:54:38   measured-temp   22.4 (Celsius)
+setstate wz 2006-03-29 23:04:17 actuator 00%
+setstate wz 2006-03-26 08:52:30 day-temp 22.0 (Celsius)
+setstate wz 2006-03-29 23:02:48 desired-temp 18.0 (Celsius)
+setstate wz 2006-03-26 08:50:39 fri-from1 06:00
+setstate wz 2006-03-26 08:50:39 fri-to1 23:50
+setstate wz 2006-03-26 08:48:38 init 255
+setstate wz 2006-03-29 22:54:38 measured-temp 22.4 (Celsius)
+setstate wz 2006-03-26 08:52:33 mode auto
+setstate wz 2006-03-26 08:50:33 mon-from1 06:00
+setstate wz 2006-03-26 08:50:33 mon-to1 23:00
+setstate wz 2006-03-26 08:52:31 night-temp 18.0 (Celsius)
+setstate wz 2006-03-26 08:50:40 sat-from1 06:00
+setstate wz 2006-03-26 08:50:40 sat-to1 23:50
+setstate wz 2006-03-29 22:54:38 state Bat: ok, Window: closed
+setstate wz 2006-03-26 08:52:29 sun-from1 06:00
+setstate wz 2006-03-26 08:52:29 sun-to1 23:00
+setstate wz 2006-03-26 08:50:37 thu-from1 06:00
+setstate wz 2006-03-26 08:50:37 thu-to1 23:00
+setstate wz 2006-03-26 08:50:34 tue-from1 06:00
+setstate wz 2006-03-26 08:50:35 tue-to1 23:00
+setstate wz 2006-03-26 08:52:31 unknown_85 4
+setstate wz 2006-03-26 08:50:36 wed-from1 06:00
+setstate wz 2006-03-26 08:50:36 wed-to1 23:00
+setstate wz 2006-03-26 08:52:31 windowopen-temp 12.0 (Celsius)
