@@ -294,7 +294,7 @@
   - bugfix:  empty FHT battery is not reported (by Holger)
   - feature: new FHT codes, e.g. month/day/hour/minute setting (by Holger)
 
-- ==DATE== (4.0)
+- 2007-04-14 (4.0)
   - bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.01
   - bugfix:  allow numbers greater then 9 in at +{<number>}
   - feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.01)
@@ -320,3 +320,5 @@
     and "set" support, gnuplot files are configurable, links to the
     documentation added.
   - bugfix: more thorough serial line initialization
+
+- ==DATE== (4.1)
