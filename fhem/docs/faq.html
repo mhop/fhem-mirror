@@ -10,13 +10,88 @@
 
 <h2>FHEM FAQ</h2>
 
-<b>I get "undefined" messages in the log after upgrading fhem.pl</b>
+<a href="#faq1">1. I am using fhem.pl with an fhz1000.pl config file and fhem.pl
+won't start</a><br><br>
+
+<a href="#faq2">2. I get "undefined" messages in the log after upgrading
+fhem.pl</a><br><br>
+
+<a href="#faq3">3. I switched on a FS20 device directly (without the remote),
+but the fhem.pl did not noticed it. Is it a bug?</a><br><br>
+
+<a href="#faq4">4. I have some FS20/FHT/HMS devices. How do I know their
+housecode?</a><br><br>
+
+<a href="#faq5">5. I have the code for my devices in the ELV notation, which
+contains 1,2,3 and 4, but you require a hex code. How should I convert
+it?</a><br><br>
+
+<a href="#faq6">6. I replaced my FHZ1X00PC, now the FHT80b's does not work
+anymore.  Help me!</a><br><br>
+
+<a href="#faq7">7. I can specify an optional ml/raincounter for a KS300.  Why
+do you think that 255 should be the default?</a><br><br>
+
+<a href="#faq8">8. The time specification of the builtin at command is not very
+flexible. Please add day/month/weekday to it.</a><br><br>
+
+<a href="#faq9">9. I defined my FS20STR as an FHT device, but I do not get
+any data from it.</a><br><br>
+
+<a href="#faq10">10. How to convert the FHT8b code seen in its display to the
+hex code needed by fhem.pl?</a><br><br>
+
+<a href="#faq11">11. I'd like to use this sunrise/sunset stuff, can you help
+me?</a><br><br>
+
+<br>
+<br>
+<br>
+<br>
+
+<a name="faq1"></a>
+<b>1. I am using fhem.pl with an fhz1000.pl config file and fhem.pl won't
+start</b>
+
+<ul>
+   The syntax changed, you have to modify you config file:
+   <ul>
+     <li>logfile/modpath/pidfile/port/verbose "renamed" to "attr global xx</li>
+     <ul>
+       <li>change logfile <xxx> to attr global logfile <xxx></li>
+       <li>change modpath <xxx> to attr global modpath <xxx></li>
+       <li>change pidfile <xxx> to attr global pidfile <xxx></li>
+       <li>change port <xxx> to attr global port <xxx></li>
+       <li>change verbose <xxx> to attr global verbose <xxx></li>
+     </ul>
+     <li>savefile renamed to "attr global statefile" (<b>not</b> savefile)</li>
+     <li>at/notify "renamed" to "define  at/notify"<br>
+         This means you have to give a name to each of your at's or
+         notify commands. E.g.:
+     <ul>
+         <li><code>at *07:00 set lamp on</code><br>
+         &nbsp;&nbsp;becomes<br>
+         <code>define wake_me at *07:00 set lamp on</code></li>
+         <li><code>notify fire:on "send_sms"</code><br>
+         &nbsp;&nbsp;becomes<br>
+         <code>define fire_alarm notify fire:on "send_sms"</code><br>
+     </ul>
+     This seems to be tedious at the beginning but you get easy
+     deletion and attribute specification for these commands.
+   </ul>
+</ul>
+
+
+<a name="faq2"></a>
+<b>2. I get "undefined" messages in the log after upgrading fhem.pl</b>
 <ul>
    Stop fhem.pl, delete the previous .save file and restart fhem.pl.
    If the problem still exists, send a bugreport.
 </ul>
 
-<b>I switched on a FS20 device directly (without the remote), but
+
+<a name="faq3"></a>
+<b>3. I switched on a FS20 device directly (without the remote), but
    the fhem.pl did not noticed it.<br>Is it a bug?</b>
 <ul>
    The protocol used by the FS20 family is quite simple: it is </b>not</b>
@@ -28,7 +103,9 @@
    To answer the question: it is not a bug :-)
 </ul>
 
-<b>I have some FS20/FHT/HMS devices.<br>
+
+<a name="faq4"></a>
+<b>4. I have some FS20/FHT/HMS devices.<br>
    How do I know their housecode?</b><br>
 <ul>
    If you already programmed some devices, then just start fhem.pl with one
@@ -38,9 +115,11 @@
    devices do not have a proper code, so you can use anything.
 </ul>
 
-<b>I have the code for my devices in the ELV notation, which contains 1,2,3 and
-   4, but you require a hex code.<br>
-   How should I convert it?</b>
+
+<a name="faq5"></a>
+<b>5. I have the code for my devices in the ELV notation, which contains 1,2,3
+and 4, but you require a hex code.<br> How should I convert it?</b>
+
 <ul>
    The code used by ELV is in the "quaternal" (?) system plus one added to each
    digit, so you can even use the 4 button remote for programming. To convert,
@@ -68,7 +147,9 @@
 
 </ul>
 
-<b>I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.<br>
+
+<a name="faq6"></a>
+<b>6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.<br>
 Help me!</b>
 <ul>
    The FHT80b's are talking to a single FHZ1XXX device, which has a unique
@@ -86,7 +167,9 @@ Help me!</b>
    </ul>
 </ul>
 
-<b>I can specify an optional ml/raincounter for a KS300.<br>
+
+<a name="faq7"></a>
+<b>7. I can specify an optional ml/raincounter for a KS300.<br>
 Why do you think that 255 should be the default?</b>
 <ul>
    The manual talks about 0.3l resolution, but I wanted to calibrate my device.
@@ -104,8 +187,10 @@ Why do you think that 255 should be the default?</b>
    You are welcome to do your own experiments, I am interested in the results.
 </ul>
 
-<b>The time specification of the builtin at command is not very flexible.<br>
-Please add day/month/weekday to it.</b>
+
+<a name="faq8"></a>
+<b>8. The time specification of the builtin at command is not very
+flexible.<br> Please add day/month/weekday to it.</b>
 <ul>
   I think the command is complex and flexible enough. Use a perl expression
   for this functionality like (described in the commandref.html):
@@ -113,13 +198,19 @@ Please add day/month/weekday to it.</b>
 </ul>
 
 
-<b>I defined my FS20STR as an FHT device, but I do not get any data from it.</b>
+<a name="faq9"></a>
+<b>9. I defined my FS20STR as an FHT device, but I do not get any data from
+it.</b>
 <ul>
    The FS20STR is an FS20 device, even if it looks like an FHT80b.
    You'll get "only" on-for-timer and off-for-timer events sent.
 </ul>
 
-<b>How to convert the FHT8b code seen in its display to the hex code needed by fhem.pl?</b>
+
+<a name="faq10"></a>
+<b>10. How to convert the FHT8b code seen in its display to the hex code needed
+by fhem.pl?</b>
+
 <ul>
    Convert the first 2 digits first from decimal to hex, then the next two. Example:<br>
 	 <pre>
@@ -130,7 +221,9 @@ Please add day/month/weekday to it.</b>
    E.g The FHT8b code 1121 is 0b15 for the fhem.pl
 </ul>
 
-<b>I'd like to use this sunrise/sunset stuff, can you help me?</b>
+
+<a name="faq11"></a>
+<b>11. I'd like to use this sunrise/sunset stuff, can you help me?</b>
 <ul>
    First you (most probably) have to install the DateTime::Event::Sunrise perl
    module, as it is not part of the standard distributions. If it is not
