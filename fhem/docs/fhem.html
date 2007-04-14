@@ -10,11 +10,41 @@
 
 
 <h1>FHEM</h1>
-GPL'd FHZ FS20 HMS FHT KS300 WS300 server for linux, formerly known as
+GPL'd FHZ, FS20, FHT, HMS, KS300 and WS300 server for linux, formerly known as
 fhz1000.pl
 
 <h2>News (as of =DATE=, Version =VERS=)</h2>
+
 <ul>
+  <li>bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.01
+  <li>bugfix:  allow numbers greater then 9 in at +{<number>}
+  <li>feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.01)
+  <li>feature: renamed fhz1000 to fhem
+  <li>feature: added HISTORY and README.DEV
+  <li>doc:     Added description of attribute "model".
+  <li>bugfix:  delete the pidfile when terminating. (reported by Martin and Peter)
+  <li>feature: attribute showtime in web-pgm2 (show time instead of state)
+  <li>feature: defattr (default attribute for following defines)
+  <li>feature: added em1010.pl to the contrib directory
+  <li>doc:     added linux.html (multiple devices, udev-links)
+  <li>REORGANIZATION:
+    <ul>
+    <li>at/notify "renamed" to "define <name> at/notify"
+    <li>logfile/modpath/pidfile/port/verbose "renamed" to "attr global xxx"
+    <li>savefile renamed to "attr global statefile"
+    <li>save command added, it writes the configfile and the statefile
+    <li>delattr added
+    <li>list/xmllist format changed
+    <li>disable attribute for at/notify/filelog</li>
+    See HISTORY for details and reasoning and the <a href="faq.html">FAQ</a>
+    for an uprading HOWTO.
+    </ul>
+  <li>added rename command
+  <li>webpgm2 adapted to the new syntax, added device specific attribute
+    and "set" support, gnuplot files are configurable, links to the
+    documentation added.
+  <li>bugfix: more thorough serial line initialization
+
 </ul>
 
 <h2>Description</h2>
@@ -53,12 +83,18 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
   	http://www.koeniglich.de/fhem/fhem.html</a><br>
   Download:  <a href="http://www.koeniglich.de/fhem/fhem-=VERS=.tar.gz">
   	http://www.koeniglich.de/fhem/fhem-=VERS=.tar.gz</a><br>
+  FAQ:  <a href="http://www.koeniglich.de/fhem/faq.html">
+  	http://www.koeniglich.de/fhem/faq.html</a><br>
+  Linux driver installation: <a href="http://www.koeniglich.de/fhem/linux.html">
+  	http://www.koeniglich.de/fhem/linux.html</a><br>
   Google-Group:  <a href="http://groups.google.com/group/FHZ1000-users-on-unix">
   	http://groups.google.com/group/FHZ1000-users-on-unix</a><br>
-  Martins Web frontend: <a href="http://www.martin-haas.de/fhz">
+  Martins Web frontend (webpgm3): <a href="http://www.martin-haas.de/fhz">
   	http://www.martin-haas.de/fhz</a><br>
   fhz1000 on Nas/Routers: <a href="http://www.martin-haas.de/fhz/nslu2fhz">
   	http://www.martin-haas.de/fhz/nslu2fhz</a><br>
+  CVS@berlios: <a href="http://developer.berlios.de/projects/fhem">
+  	http://developer.berlios.de/projects/fhem</a><br>
 
   LinViex (home automation frontend): <a href="http://sourceforge.net/projects/linviex">
   	http://sourceforge.net/projects/linviex</a><br>
@@ -72,19 +108,10 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 <ul>
 
 <h3>Linux driver</h3>
-
-<ul>
-  For kernels newer than 2.6.14 add one of the following lines 
-  to /etc/modprobe.conf:<br>
-  <pre>
-  # FHZ1000 PC
-  options ftdi_sio vendor=0x0403 product=0xf06f
-  # FHZ1300 PC
-  options ftdi_sio vendor=0x0403 product=0xe0e8</pre>
-  If in doubt, look at the id of the device with lsusb.
-  For older kernels apply the patch from the doc directory to your kernel.<br>
-  Recompile your kernel and reboot or load/reload the ftdi_sio module.
-  <br>See also our <a href="linux.html">hints for GNU/Linux</a>.
+  See <a href="http://www.koeniglich.de/fhem/linux.html">
+  	http://www.koeniglich.de/fhem/linux.html</a><br>
+  For kernels older then 2.6.x apply the patch from the doc directory to your
+  kernel, recompile it kernel and reboot or load/reload the ftdi_sio module.
 </ul>
 
 <h3>Perl modules</h3>

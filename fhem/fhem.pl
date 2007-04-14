@@ -1115,6 +1115,7 @@ CommandReload($$)
   use strict "refs";
 
   $modules{$m} = \%hash;
+  $modules{$m}{ORDER} = 99 if(!$modules{$m}{ORDER});
 
   return undef;
 }
