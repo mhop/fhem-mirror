@@ -223,9 +223,15 @@ FHZ_Define($$)
   $po->stopbits(1);
   $po->handshake('none');
 
+  # This part is for some Linux kernel versions whih has strange default
+  # settings.  Device::SerialPort is nice: if the flag is not defined for your
+  # OS then it will be ignored.
   $po->stty_icanon(0);
   $po->stty_parmrk(0);
   $po->stty_icrnl(0);
+  $po->stty_echoe(0);
+  $po->stty_echok(0);
+  $po->stty_echoctl(0);
 
   $hash->{PortObj} = $po;
   $hash->{FD} = $po->FILENO;
