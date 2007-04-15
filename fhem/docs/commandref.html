@@ -732,13 +732,13 @@ split in multiple lines<br><br>
 
     Examples:
     <ul>
-      <code>notify btn3 set lamp %</code><br>
-      <code>notify btn3 { fhem "set lamp %" }</code><br>
-      <code>notify btn3 "/usr/local/bin/setlamp "%""</code><br>
-      <code>notify btn3 set lamp1 %;;set lamp2 %</code><br>
-      <code>notify wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
-      <code>notify .*H:.* {DbLog("@","%")}</code><br>
-      <code>notify UNDEFINED "send-me-mail.sh "%""</code><br>
+      <code>define b3lampV1 notify btn3 set lamp %</code><br>
+      <code>define b3lampV2 notify btn3 { fhem "set lamp %" }</code><br>
+      <code>define b3lampV3 notify btn3 "/usr/local/bin/setlamp "%""</code><br>
+      <code>define b3lampV3 notify btn3 set lamp1 %;;set lamp2 %</code><br>
+      <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
+      <code>define LogHToDB notify .*H:.* {DbLog("@","%")}</code><br>
+      <code>define LogUndef notify UNDEFINED "send-me-mail.sh "%""</code><br>
     </ul>
     <br>
 
