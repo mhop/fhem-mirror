@@ -84,3 +84,6 @@
 
 - Pest, Sat Apr 14 14:21:00 MEST 2007
   - doc: linux.html (private udev-rules, not 50-..., ATTRS)
+
+- Pest, Sun Apr 15 14:54:30 MEST 2007
+  - doc: fhem.pl and commandref.html (notifyon -> notify, correction of examples)

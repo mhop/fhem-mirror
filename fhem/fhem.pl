@@ -150,7 +150,7 @@ my %cmds = (
   "defattr" => { Fn=>"CommandDefAttr", 
 	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "define"  => { Fn=>"CommandDefine",
-	    Hlp=>"<name> <type> <options>,define a device/at/notifyon entity" },
+	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "delattr" => { Fn=>"CommandDelAttr", 
 	    Hlp=>"<name> [<attrname>],delete attribute <attrname> for <name>" },
   "delete"  => { Fn=>"CommandDelete",

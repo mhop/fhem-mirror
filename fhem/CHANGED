@@ -324,3 +324,4 @@
 - ==DATE== (4.1)
   - doc:     linux.html (private udev-rules, not 50-..., ATTRS)
   - bugfix:  setting devices with "-" in their name did not work
+  - doc: fhem.pl and commandref.html (notifyon -> notify, correction of examples)
