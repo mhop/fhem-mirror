@@ -785,6 +785,14 @@ CommandSet($$)
   foreach my $sdev (split(",", $dev)) {
 
     if($sdev =~ m/-/) {		 # Range (separated by -)
+
+      if(defined($defs{$sdev})) {
+        $a[0] = $sdev;
+        my $ret = DoSet(@a);
+        push @rets, $ret if($ret);
+        next;
+      }
+
       my @lim = split("-", $sdev);
       foreach my $sd (sort keys %defs) {
         next if($sd lt $lim[0] || $sd gt $lim[1]);
