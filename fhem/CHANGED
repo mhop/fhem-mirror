@@ -322,4 +322,5 @@
   - bugfix: more thorough serial line initialization
 
 - ==DATE== (4.1)
-  - doc: linux.html (private udev-rules, not 50-..., ATTRS)
+  - doc:     linux.html (private udev-rules, not 50-..., ATTRS)
+  - bugfix:  setting devices with "-" in their name did not work
