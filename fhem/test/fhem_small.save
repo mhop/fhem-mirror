@@ -2,16 +2,16 @@
 setstate FHZ Initialized
 setstate btn4 off
 setstate btn4 2006-04-15 11:46:39 state off
-setstate cellar-lamp on
-setstate cellar-lamp 2006-03-29 12:05:34 state on
-setstate floor-lamp on
-setstate floor-lamp 2007-01-26 10:40:17 state on
+setstate cellar.lamp on
+setstate cellar.lamp 2006-03-29 12:05:34 state on
+setstate floor.lamp on
+setstate floor.lamp 2007-01-26 10:40:17 state on
 setstate global <no definition>
 setstate n_btn4 active
 setstate tf1 HMS100TF: T:  20.3°C, H: 31.3%, Bat: ok
 setstate tf1 2006-04-11 09:48:48 HMS100TF T:  20.3°C, H: 31.3%, Bat: ok
-setstate window-lamps on
-setstate window-lamps 2006-03-29 12:05:34 state on
+setstate window.lamps on
+setstate window.lamps 2006-03-29 12:05:34 state on
 setstate wz measured-temp: 22.4 (Celsius)
 setstate wz 2006-03-29 23:04:17 actuator 00%
 setstate wz 2006-03-26 08:52:30 day-temp 22.0 (Celsius)
