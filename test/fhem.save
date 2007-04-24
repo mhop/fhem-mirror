@@ -1,9 +1,8 @@
-#Sun Apr 22 14:04:14 2007
+#Tue Apr 24 09:13:44 2007
 setstate FHZ fhtbuf: 1c
 setstate FHZ 2006-02-12 14:03:39 fhtbuf 23
 setstate FHZ 2006-03-26 08:47:36 init2 deadbeefdeadbe
 setstate FHZ 2006-03-26 08:47:36 serial deadbeef
-setstate blink Next: 14:04:17
 setstate btn4 on
 setstate btn4 2006-04-12 15:19:33 state on
 setstate cellar on-for-timer 2
