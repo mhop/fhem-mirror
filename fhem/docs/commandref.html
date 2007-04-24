@@ -10,6 +10,32 @@
 
 <h2>fhem.pl command reference</h2>
 
+<a href="#intro">Introduction</a><br>
+<a href="#help">?,help</a><br>
+<a href="#attr">attr</a><br>
+<a href="#defattr">defattr</a><br>
+<a href="#define">define</a><br>
+<a href="#delattr">delattr</a><br>
+<a href="#delete">delete</a><br>
+<a href="#get">get</a><br>
+<a href="#include">include</a><br>
+<a href="#inform">inform</a><br>
+<a href="#list">list</a><br>
+<a href="#modify">modify</a><br>
+<a href="#quit">quit</a><br>
+<a href="#reload">reload</a><br>
+<a href="#rereadcfg">rereadcfg</a><br>
+<a href="#save">save</a><br>
+<a href="#set">set</a><br>
+<a href="#setstate">setstate</a><br>
+<a href="#shutdown">shutdown</a><br>
+<a href="#trigger">trigger</a><br>
+<a href="#sleep">sleep</a><br>
+<a href="#xmllist">xmllist</a><br>
+<a href="#perl">Perl specials</a><br>
+
+<a name="intro"></a>
+<h3>Introduction</h3>
 You can use all of the following commands in in two ways:
 <ul>
 <li>In the configuration file, which must be specified if you startup the
@@ -957,13 +983,33 @@ split in multiple lines<br><br>
 </ul>
 
 
+<a name="modify"></a>
+<h3>modify</h3>
+<ul>
+  <code>modify &lt;name&gt; &lt;type-dependent-options&gt;</code>
+  <br><br>
+  
+  Used to modify some definitions. Useful for changing some <a
+  href="#at">at</a> or <a href="#notify">notify</a> definitions.  If specifying
+  one argument to an at type deinition, only the time part will be changed. In
+  case of a notify type definition, only the regex part will be changed.  All
+  other values (state, attributes, etc) will remain intact.
+  <br><br>
+  Example:
+  <ul>
+    <code>define lampon at 19:00 set lamp on</code><br>
+    <code>modify lampon *19:00</code><br>
+    <code>modify lampon 19:00 set lamp on-for-timer 16</code><br>
+  </ul>
+</ul>
+
 <a name="quit"></a>
 <h3>quit</h3>
 <ul>
   <code>quit</code>
   <br><br>
   If used in a TCP/IP session, terminate the client session.<br>
-  If used in a script, terminate the parsing of the script.
+  If used in a script, terminate the parsing of the current script.
   <br><br>
   Example:
   <ul>

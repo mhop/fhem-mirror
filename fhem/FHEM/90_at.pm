@@ -25,7 +25,14 @@ at_Define($$)
   my ($hash, $def) = @_;
   my ($name, undef, $tm, $command) = split("[ \t]+", $def, 4);
 
-  return "Usage: define <name> at <timespec> <command>" if(!$command);
+  if(!$command) {
+    if($hash->{CMD}) {
+      $command = $hash->{CMD};  # Called from modify
+      $hash->{DEF} = "$tm $command";
+    } else {
+      return "Usage: define <name> at <timespec> <command>";
+    }
+  }
   return "Wrong timespec, use \"[+][*[{count}]]<time or func>\""
                                         if($tm !~ m/^(\+)?(\*({\d+})?)?(.*)$/);
   my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);

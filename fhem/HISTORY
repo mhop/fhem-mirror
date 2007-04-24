@@ -87,3 +87,10 @@
 
 - Pest, Sun Apr 15 14:54:30 MEST 2007
   - doc: fhem.pl and commandref.html (notifyon -> notify, correction of examples)
+
+- Rudi, Tue Apr 24 08:10:43 MEST 2007
+  - feature: modify command added. It helps change e.g. only the time component
+    for an at command, without deleting and creating it again and then
+    reapplying all the attributes.
+  - feature: the "-" character is disallowed in defined names. Use dot (.) or _
+    instead.  The - is used to separate ranges in the set command.
