@@ -73,6 +73,7 @@ sub CommandHelp($$);
 sub CommandInclude($$);
 sub CommandInform($$);
 sub CommandList($$);
+sub CommandModify($$);
 sub CommandRereadCfg($$);
 sub CommandRename($$);
 sub CommandQuit($$);
@@ -165,6 +166,8 @@ my %cmds = (
 	    Hlp=>"{on|off},echo all commands and events to this client" },
   "list"    => { Fn=>"CommandList",
 	    Hlp=>"[device],list definitions and status info" },
+  "modify"  => { Fn=>"CommandModify",
+	    Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
 	    Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
@@ -884,8 +887,8 @@ CommandDefine($$)
   }
 
   return "$a[0] already defined, delete it first" if(defined($defs{$a[0]}));
-  return "Invalid characters in name (not A-Za-z0-9.:-): $a[0]"
-                        if($a[0] !~ m/^[a-z0-9.:_-]*$/i);
+  return "Invalid characters in name (not A-Za-z0-9.:_): $a[0]"
+                        if($a[0] !~ m/^[a-z0-9.:_]*$/i);
 
   my %hash;
 
@@ -907,6 +910,27 @@ CommandDefine($$)
       CommandAttr($cl, "$a[0] $da $defattr{$da}");
     }
   }
+  return $ret;
+}
+
+#####################################
+sub
+CommandModify($$)
+{
+  my ($cl, $def) = @_;
+  my @a = split("[ \t]+", $def, 2);
+
+  return "Usage: modify <name> <type dependent arguments>"
+  					if(int(@a) < 2);
+
+  # Return a list of modules
+  return "Define $a[0] first" if(!defined($defs{$a[0]}));
+  my $hash = $defs{$a[0]};
+
+  my $odef = $hash->{DEF};
+  $hash->{DEF} = $a[1];
+  my $ret = CallFn($a[0], "DefFn", $hash, "$a[0] $hash->{TYPE} $a[1]");
+  $hash->{DEF} = $odef if($ret);
   return $ret;
 }
 

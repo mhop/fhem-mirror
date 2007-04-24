@@ -25,6 +25,14 @@ notify_Define($$)
   my ($hash, $def) = @_;
   my ($type, $name, $re, $command) = split("[ \t]+", $def, 4);
   
+  if(!$command) {
+    if($hash->{CMD}) {
+      $command = $hash->{CMD};  # Called from modify
+      $hash->{DEF} = "$re $command";
+    } else {
+      return "Usage: define <name> notify <regexp> <command>";
+    }
+  }
   # Checking for misleading regexps
   eval { "Hallo" =~ m/^$re$/ };
   return "Bad regexp: $@" if($@);
