@@ -50,7 +50,7 @@ notify_Exec($$)
   my ($log, $dev) = @_;
 
   my $ln = $log->{NAME};
-  return if($attr{$ln} && $attr{$ln}{disable});
+  return "" if($attr{$ln} && $attr{$ln}{disable});
 
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
