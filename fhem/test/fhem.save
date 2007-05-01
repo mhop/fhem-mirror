@@ -1,4 +1,4 @@
-#Tue Apr 24 09:13:44 2007
+#Tue May  1 08:43:03 2007
 setstate FHZ fhtbuf: 1c
 setstate FHZ 2006-02-12 14:03:39 fhtbuf 23
 setstate FHZ 2006-03-26 08:47:36 init2 deadbeefdeadbe
@@ -32,15 +32,17 @@ setstate fl 2006-03-26 08:50:55 unknown_85 4
 setstate fl 2006-03-26 08:50:46 wed-from1 06:00
 setstate fl 2006-03-26 08:50:46 wed-to1 23:00
 setstate fl 2006-03-26 08:50:55 windowopen-temp 12.0 (Celsius)
+setstate floor.lamp ???
 setstate global <no definition>
 setstate marqee on
 setstate marqee 2006-04-01 12:46:02 state on
-setstate n_btn4 active
+setstate n_btn4 disabled
 setstate tf1 T: 20.3  H: 31.3  Bat: ok
 setstate tf1 2006-04-11 09:48:48 battery Bat: ok
 setstate tf1 2006-04-11 09:48:48 humidity 31.3 (%)
 setstate tf1 2006-04-11 09:48:48 temperature 20.3 (Celsius)
 setstate tf1 2006-04-11 09:48:48 type HMS100TF
+setstate window.lamp ???
 setstate wz measured-temp: 22.4 (Celsius)
 setstate wz 2006-03-29 23:04:17 actuator 00%
 setstate wz 2006-03-26 08:52:30 day-temp 22.0 (Celsius)
