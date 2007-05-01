@@ -324,6 +324,8 @@
 - ==DATE== (4.1)
   - doc:     linux.html (private udev-rules, not 50-..., ATTRS)
   - bugfix:  setting devices with "-" in their name did not work
-  - doc:     fhem.pl and commandref.html (notifyon -> notify, correction of examples)
+  - doc:     fhem.pl and commandref.html (notifyon -> notify, correction
+             of examples)
   - feature: modify command added
   - feature: The "-" in the name is not allowed any more
+  - bugfix:  disabled notify causes "uninitialized value" (STefan, 1.5)
