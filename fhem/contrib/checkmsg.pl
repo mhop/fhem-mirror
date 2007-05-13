@@ -6,7 +6,7 @@ print("Prefix is ok (0x81)\n");
 
 my $l = hex(substr($msg, 2, 2));
 my $rl = length($msg)/2-2;
-die("Bad length $l (should be $rl)\n") if($rl != $l);
+die("Bad length $rl (should be $l)\n") if($rl != $l);
 print("Length is ok ($l)\n");
 
 my @data;
