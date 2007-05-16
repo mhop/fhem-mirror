@@ -290,13 +290,14 @@ FS20_Undef($$)
 {
   my ($hash, $name) = @_;
   foreach my $c (keys %{ $hash->{CODE} } ) {
-    delete($defptr{$c}{$name});
+    $c = $hash->{CODE}{$c};
+    delete($defptr{$c}{$name}) if($defptr{$c});
   }
   return undef;
 }
 
 sub
-FS20_Parse($)
+FS20_Parse($$)
 {
   my ($hash, $msg) = @_;
 

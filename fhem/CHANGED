@@ -329,3 +329,4 @@
   - feature: modify command added
   - feature: The "-" in the name is not allowed any more
   - bugfix:  disabled notify causes "uninitialized value" (STefan, 1.5)
+  - bugfix:  deleted FS20 items are still logging (zombie) (Gerhard, 16.5)
