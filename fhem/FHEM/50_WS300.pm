@@ -176,9 +176,9 @@ WS300_Undef($$)
 
 #####################################
 sub
-WS300_Parse($)
+WS300_Parse($$)
 {
-  my $msg = shift;
+  my ($hash, $msg) = @_;
   my $ll = GetLogLevel("WS300Device");
   $ll = 5 if($ll == 2);
 
@@ -639,7 +639,7 @@ NEXTPOLL:
   {
     if($rcount == 42)
     {
-       WS300_Parse($inbuf);
+       WS300_Parse($hash, $inbuf);
        goto NEXTPOLL;
     }
     else
@@ -650,7 +650,7 @@ NEXTPOLL:
   }
   if($ic == 0x33)
   {
-    WS300_Parse($inbuf)	if($rcount == 39);
+    WS300_Parse($hash, $inbuf)	if($rcount == 39);
     $cmd=0x32;
   }
   $polling=0;
