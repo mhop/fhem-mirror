@@ -1581,6 +1581,7 @@ DoTrigger($$)
   # Log/notify modules
   my $ret = "";
   foreach my $n (sort keys %defs) {
+    Log 5, "$dev trigger: Checking $n for notify";
     $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
   }
 

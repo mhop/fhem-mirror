@@ -15,7 +15,7 @@ FileLog_Initialize($)
   $hash->{UndefFn} = "FileLog_Undef";
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
-  $hash->{AttrList} = "disable:0,1 logtype";
+  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir";
 }
 
 
@@ -55,6 +55,13 @@ FileLog_Undef($$)
   return undef;
 }
 
+sub
+HandleArchiving($)
+{
+  my ($log) = @_;
+  if(!
+
+}
 
 #####################################
 sub
@@ -83,6 +90,7 @@ FileLog_Log($$)
       my $cn = ResolveDateWildcards($log->{FILENAME},  @t);
 
       if($cn ne $log->{CURRENT}) { # New logfile
+        HandleArchiving($log);
 	$fh->close();
 	$fh = new IO::File ">>$cn";
 	if(!defined($fh)) {
