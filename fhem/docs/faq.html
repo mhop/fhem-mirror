@@ -44,6 +44,8 @@ hex code needed by fhem.pl?</a><br><br>
 <a href="#faq11">11. I'd like to use this sunrise/sunset stuff, can you help
 me?</a><br><br>
 
+<a href="#faq12">12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</a><br><br>
+
 <br>
 <br>
 <br>
@@ -215,7 +217,7 @@ by fhem.pl?</b>
    Convert the first 2 digits first from decimal to hex, then the next two. Example:<br>
 	 <pre>
          % bc
-	 set obase=16
+	 obase=16
 	 &lt;first two digits&gt;
 	 &lt;last two digits&gt;</pre>
    E.g The FHT8b code 1121 is 0b15 for the fhem.pl
@@ -250,6 +252,34 @@ by fhem.pl?</b>
    <pre>{ sunrise_abs() }</pre>
    in the telnet prompt, will return the time of the sunrise today, in a
    HH:MM:SS format.
+</ul>
+
+<a name="faq12"></a>
+<b>12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</b>
+<ul>
+
+  To get used to the methods, we do it step by step. Telnet to fhem, and type
+  the following:
+
+  <pre>
+  # Check simply the value. It is the same as seen in "list"
+  FHZ> {$value{myfht}}
+  measured-temp: 23.8 (Celsius)
+
+  # Get the second word, so we can compare it.
+  FHZ> { my @a = split(" ", $value{myfht});; $a[1] }
+  23.8 
+
+  # Set the ventilator on now, if its too hot.
+  FHZ> { my @a = split(" ", $value{myfht});; fhem("set ventilator on") if($a[1] > 25.0) }
+
+  # Now do this regularly
+  FHZ> define chilldown at +*00:30:00 { my @a = split(" ", $value{myfht});; fhem("set ventilator on") if($a[1] > 25.0) }
+
+  # An alternative:
+  FHZ> define chilldown at +*00:30:00 { fhem("set ventilator on") if($value{myfht} gt "measured-temp: 25.0") }
+  </pre>
+
 </ul>
 
 </body>
