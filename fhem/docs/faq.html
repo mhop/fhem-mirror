@@ -112,7 +112,7 @@ start</b>
 <ul>
    If you already programmed some devices, then just start fhem.pl with one
    of the example configuration files, and watch the log.  When activating a
-   deivce (e.g. with the remote) then it will be logged as an unknown device
+   device (e.g. with the remote) then it will be logged as an unknown device
    with the housecode. Note: the verbose level must be 3 or higher.  KS300
    devices do not have a proper code, so you can use anything.
 </ul>
@@ -251,7 +251,17 @@ by fhem.pl?</b>
    restart the program. If everything is ok, typing
    <pre>{ sunrise_abs() }</pre>
    in the telnet prompt, will return the time of the sunrise today, in a
-   HH:MM:SS format.
+   HH:MM:SS format.<br><br>
+
+   <b>Note:</b> As fhem.cfg will be overwritten if you use the save command,
+   it is better to put the sunrise_coord command in the "lastinclude" file,
+   e.g. /home/fhem/fhem.cfg.static. This file will be read, if you set the
+   lastinclude attribute:<br><code><br>
+
+   attr global lastinclude /home/fhem/fhem.cfg.static</code><br><br>
+
+   and will not be overwritten by save.
+
 </ul>
 
 <a name="faq12"></a>

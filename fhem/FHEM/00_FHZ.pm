@@ -227,7 +227,7 @@ FHZ_Define($$)
   # settings.  Device::SerialPort is nice: if the flag is not defined for your
   # OS then it will be ignored.
   $po->stty_icanon(0);
-  $po->stty_parmrk(0);
+  #$po->stty_parmrk(0); # The debian standard install does not have it
   $po->stty_icrnl(0);
   $po->stty_echoe(0);
   $po->stty_echok(0);
