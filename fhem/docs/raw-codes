@@ -1,5 +1,8 @@
 On the telnet prompt do: 
-  {FhzDecode("<code>")}
+  {FS20_Parse(undef, "<code>");}
+e.g.
+  {FS20_Parse(undef, "81xx04xx0101a0011234030011")}
+
 where <code> is one of:
 
 81xx04xx0101a0011234030011	FS20 dev: 1234  button: 03 on  (11)

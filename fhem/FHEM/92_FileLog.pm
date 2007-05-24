@@ -15,7 +15,8 @@ FileLog_Initialize($)
   $hash->{UndefFn} = "FileLog_Undef";
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
-  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir";
+  # logtype is used by the frontend
+  $hash->{AttrList} = "disable:0,1 logtype nrarchive archivedir archivecmd";
 }
 
 
@@ -59,6 +60,47 @@ sub
 HandleArchiving($)
 {
   my ($log) = @_;
+  my $ln = $log->{NAME};
+  return if(!$attr{$ln});
+
+  # If there is a command, call that
+  my $cmd = $attr{$ln}{archivecmd};
+  if($cmd) {
+    $cmd =~ s/%/$log->{CURRENT}/g;
+    Log 2, "Archive: calling $cmd"; 
+    system($cmd);
+    return;
+  }
+
+  my $nra = $attr{$ln}{nrarchive};
+  my $ard = $attr{$ln}{archivedir};
+  return if(!defined($nra));
+
+  # If nrarchive is set, then check the last files:
+  # Get a list of files:
+
+  my ($dir, $file);
+  if($log->{FILENAME} =~ m,^(.+)/([^/]+)$,) {
+    ($dir, $file) = ($1, $2);
+  } else {
+    ($dir, $file) = (".", $log->{FILENAME});
+  }
+
+  $file =~ s/%./.+/g;
+  return if(!opendir(DH, $dir));
+  my @files = sort grep {/^$file$/} readdir(DH);
+  closedir(DH);
+
+  my $max = int(@files)-$nra;
+  for(my $i = 0; $i < $max; $i++) {
+    if($ard) {
+      Log 2, "Moving $files[$i] to $ard";
+      rename("$dir/$files[$i]", "$ard/$files[$i]");
+    } else {
+      Log 2, "Deleting $files[$i]";
+      unlink("$dir/$files[$i]");
+    }
+  }
 }
 
 #####################################
@@ -74,11 +116,12 @@ FileLog_Log($$)
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
-
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
+Log 1, "FL: Checking $n:$s against $re";
     $s = "" if(!defined($s));
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
+Log 1, "FL: Logging";
       my $t = TimeNow();
       $t = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
@@ -88,8 +131,8 @@ FileLog_Log($$)
       my $cn = ResolveDateWildcards($log->{FILENAME},  @t);
 
       if($cn ne $log->{CURRENT}) { # New logfile
-        HandleArchiving($log);
 	$fh->close();
+        HandleArchiving($log);
 	$fh = new IO::File ">>$cn";
 	if(!defined($fh)) {
 	  Log(0, "Can't open $cn");

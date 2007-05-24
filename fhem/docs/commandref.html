@@ -144,8 +144,11 @@ split in multiple lines<br><br>
         If this attribute is set, then the last command of the generated
         configfile (see the <a href="#save">save</a> command) will be<br>
         include &lt;lastinclude-value&gt;<br>
-        This file can contain not configurable information, e.g.
-        setting the FHTcode.
+        This file is needed, as the save command will write only defines and
+        attributes to the config file, any other commands / includes will be
+        lost. E.g. it makes sense to set the <a href="FHZset">FHTcode</a> in
+        this file or the coordinates of your house via
+        <a href="#at">sunrise_coord</at>
         </li><br>
 
     <a name="logfile"></a>
@@ -354,6 +357,7 @@ split in multiple lines<br><br>
           fs20pira
           fs20piri
           fs20s20
+          fs20s8
           fs20s4
           fs20s4a
           fs20s4m
@@ -1054,7 +1058,13 @@ split in multiple lines<br><br>
   <br><br>
   Save first the <a href="#statefile">statefile</a>, then the 
   <a href="#configfile">configfile</a> information. If a parameter is specified,
-  it will be used instead the global configfile attribute.<br>
+  it will be used instead the global configfile attribute.<br><br>
+  Notes:
+  <ul>
+    <li>save only writes out definitions and attributes, but no commands
+        which were previously part of the config file. Put such commands in the
+        <a href="#lastinclude">lastinclude</a> file.
+  </ul>
 </ul>
 
 
