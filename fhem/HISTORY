@@ -94,3 +94,7 @@
     reapplying all the attributes.
   - feature: the "-" character is disallowed in defined names. Use dot (.) or _
     instead.  The - is used to separate ranges in the set command.
+
+- Rudi, Sun May 27 12:51:52 MEST 2007
+  - Archiving FileLogs. Added fhemweb.pl (pgm2) code, to show logs from the
+    archive directory. See the attributes archivedir/archivecmd.

@@ -134,7 +134,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $init_done = 0;
 my $reread_active = 0;
-my $AttrList = "room";
+my $AttrList = "room comment";
 
 
 $modules{_internal_}{ORDER} = -1;
