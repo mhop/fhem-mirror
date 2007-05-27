@@ -16,34 +16,6 @@ fhz1000.pl
 <h2>News (as of =DATE=, Version =VERS=)</h2>
 
 <ul>
-  <li>bugfix:  deny at +{3}... (only +*{3} allowed), reported by Bernd, 25.01
-  <li>bugfix:  allow numbers greater then 9 in at +{<number>}
-  <li>feature: new 50_WS300.pm from Martin (bugfix + rain statistics, 26.01)
-  <li>feature: renamed fhz1000 to fhem
-  <li>feature: added HISTORY and README.DEV
-  <li>doc:     Added description of attribute "model".
-  <li>bugfix:  delete the pidfile when terminating. (reported by Martin and Peter)
-  <li>feature: attribute showtime in web-pgm2 (show time instead of state)
-  <li>feature: defattr (default attribute for following defines)
-  <li>feature: added em1010.pl to the contrib directory
-  <li>doc:     added linux.html (multiple devices, udev-links)
-  <li>REORGANIZATION:
-    <ul>
-    <li>at/notify "renamed" to "define <name> at/notify"
-    <li>logfile/modpath/pidfile/port/verbose "renamed" to "attr global xxx"
-    <li>savefile renamed to "attr global statefile"
-    <li>save command added, it writes the configfile and the statefile
-    <li>delattr added
-    <li>list/xmllist format changed
-    <li>disable attribute for at/notify/filelog</li>
-    See HISTORY for details and reasoning and the <a href="faq.html">FAQ</a>
-    for an uprading HOWTO.
-    </ul>
-  <li>added rename command
-  <li>webpgm2 adapted to the new syntax, added device specific attribute
-    and "set" support, gnuplot files are configurable, links to the
-    documentation added.
-  <li>bugfix: more thorough serial line initialization
 
 </ul>
 
@@ -65,6 +37,7 @@ Currently implemented features:<br>
   <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK and RM100-2)</li>
   <li>reading KS300 data</li>
   <li>reading WS300 data</li>
+  <li>reading EM1010PC/EM1000WZ data</li>
   <li>logging events to files (or database), with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
       events</li>

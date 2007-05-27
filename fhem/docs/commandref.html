@@ -647,6 +647,44 @@ split in multiple lines<br><br>
   </ul>
   <br>
 
+  <a name="EM"></a>
+  <h4>Type EM</h4>
+  <ul>
+    <code>define &lt;name&gt; EM &lt;em1010pc-device&gt;</code>
+    <br><br>
+
+    Define a EM1010PC USB device. From the software point of view there should
+    be no problems if you attach/define more than one EM1010PC, but it is
+    unknown if the low-level radio protocol supports this.<br> Currently there
+    is no way to read the internal log of the EM1010PC, use the program
+    em1010.pl in the contrib directory for this purpose.<br><br>
+
+    Examples:
+    <ul>
+      <code>define em EM /dev/elv_em1010pc</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="EMWZ"></a>
+  <h4>Type EMWZ</h4>
+  <ul>
+    <code>define &lt;name&gt; EMWZ &lt;device-number&gt;</code>
+    <br><br>
+
+    Define up two 4 EM1000WZ attached to the EM1010PC. The device number must
+    be between 1 and 4 (else you have a differnt device connected to the
+    EM1010PC). Defining an EMWZ will schedule an internal task, which reads the
+    status of the device every 5 minutes, and triggers notify/filelog commands.
+    <br><br>
+
+    Examples:
+    <ul>
+      <code>define emwz EMWZ 1</code><br>
+    </ul>
+    <br>
+  </ul>
+
 
   <a name="FileLog"></a>
   <h4>Type FileLog</h4>
@@ -877,8 +915,6 @@ split in multiple lines<br><br>
       fhtbuf</pre>
     Notes:
     <ul>
-      <li>There is only one FHZ device (called FHZ), it is created automatically
-          at startup. </li>
       <li>The mentioned codes are needed for initializing the FHZ1X00</li>
       <li>The answer for a command is also displayed by <code>list FHZ</code>
           </li>
@@ -889,6 +925,20 @@ split in multiple lines<br><br>
 	  returns the free memory in this buffer (in hex), my maximum is 2c (42
 	  bytes).</code></li>
     </ul>
+  </ul>
+
+  <h4>Type EM:</h4>
+  <ul>
+    <code>get EM &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is either version or time.
+  </ul>
+
+  <h4>Type EMWZ:</h4>
+  <ul>
+    <code>get EMWZ status</code>
+    <br><br>
+    This is the same command which is scheduled every 5 minutes internally.
   </ul>
 </ul>
 
@@ -1288,6 +1338,28 @@ split in multiple lines<br><br>
     <br><br>
     Set some WS300 configuration parameters.
   </ul>
+
+  <a name="EMWZset"></a>
+  <h4>Type EMWZ:</h4>
+  <ul>
+    <code>set EMWZdevice  &lt;param&gt; &lt;value&gt;<br><br>
+    where param is one of:
+    <ul>
+      <li>rperkw<br>
+          Number of rotations for a KiloWatt of the EM1000WZ device (actually
+          of the device where the EM1000WZ is attached to). Without setting
+          this correctly, all other readings will be incorrect.
+      <li>alarm<br>
+          Alarm in WATT. if you forget to set it, the default value is
+          rediculously low (random), and if a value above this threshold is
+          received, the EM1010PC will start beeping once every minute. It can
+          be very annoying.
+      <li>price<br>
+          The price of one KW in EURO (use e.g. 0.20 for 20 Cents). It is used
+          only on the EM1010PC display, it is of no interest for FHEM.
+    </ul>
+  </ul>
+
 
 </ul>
 

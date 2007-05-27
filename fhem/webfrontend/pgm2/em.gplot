@@ -1,0 +1,19 @@
+############################
+# Display the power reported by the EM1010
+
+
+
+=================
+set terminal png
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+
+set ytics nomirror
+set y2tics
+set title '<IN>'
+set grid
+set ylabel "KW"
+
+plot "<IN>" using 1:4 title 'Power' with lines
