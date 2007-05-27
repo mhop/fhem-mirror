@@ -331,3 +331,4 @@
   - bugfix:  disabled notify causes "uninitialized value" (STefan, 1.5)
   - bugfix:  deleted FS20 items are still logging (zombie) (Gerhard, 16.5)
   - bugfix:  added FS20S8, removed stty_parmrk (Martin, 24.5)
+  - feature: added archivedir/archivecmd to the FileLog

@@ -229,6 +229,10 @@ split in multiple lines<br><br>
   <br>
   Attributes used by all devices:
   <ul>
+    <a name="comment"></a>
+    <li>comment<br>
+        Add an arbitrary comment.
+
     <a name="room"></a>
     <li>room<br>
         Filter/group devices. Recognized by web-pgm2 and web-pgm3.
@@ -243,8 +247,22 @@ split in multiple lines<br><br>
   </ul>
 
   <br>
-  Attributes used by selected devices:
+  Attributes used by some device types:
   <ul>
+    <a name="archivedir"></a> <a name="archivecmd"></a> <a name="nrarchive"></a>
+    <li>archivecmd / archivedir / nrarchive<br>
+        Can be applied to FileLog devices.<br>
+	Before a new FileLog file is opened, the FileLog archiver wil be called.
+        <br>
+
+        If the attribute archivecmd is specified, then it will be started as a
+        shell command (no enclosing " is needed), and each % in the command
+        will be replaced with the name of the old logfile.<br>
+
+        If this attribute is not set, but nrarchive and/or archivecmd is set,
+        then all superfluous logfiles will be moved to archivedir (or deleted if
+        archivedir is not set).</li><br>
+
     <a name="disable"></a>
     <li>disable<br>
         Can be applied to at/notify/FileLog devices.<br>
