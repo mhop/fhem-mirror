@@ -56,6 +56,7 @@ FileLog_Undef($$)
   return undef;
 }
 
+# Make a directory and its parent directories if needed.
 sub
 HandleArchiving($)
 {
@@ -118,10 +119,8 @@ FileLog_Log($$)
   my $max = int(@{$dev->{CHANGED}});
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
-Log 1, "FL: Checking $n:$s against $re";
     $s = "" if(!defined($s));
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
-Log 1, "FL: Logging";
       my $t = TimeNow();
       $t = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
