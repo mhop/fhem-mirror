@@ -98,3 +98,5 @@
 - Rudi, Sun May 27 12:51:52 MEST 2007
   - Archiving FileLogs. Added fhemweb.pl (pgm2) code, to show logs from the
     archive directory. See the attributes archivedir/archivecmd.
+  - Added EM1010PC suppoort (right now only with EM1000WZ). Support added
+    for displaying logs in the fhemweb.pl (webfrontends/pgm2)

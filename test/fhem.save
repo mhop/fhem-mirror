@@ -1,4 +1,4 @@
-#Sun May 27 10:25:14 2007
+#Sun May 27 13:57:55 2007
 setstate FHZ fhtbuf: 1c
 setstate FHZ 2006-02-12 14:03:39 fhtbuf 23
 setstate FHZ 2006-03-26 08:47:36 init2 deadbeefdeadbe
@@ -32,11 +32,13 @@ setstate fl 2006-03-26 08:50:55 unknown_85 4
 setstate fl 2006-03-26 08:50:46 wed-from1 06:00
 setstate fl 2006-03-26 08:50:46 wed-to1 23:00
 setstate fl 2006-03-26 08:50:55 windowopen-temp 12.0 (Celsius)
+setstate fllog active
 setstate floor.lamp ???
 setstate global <no definition>
 setstate marqee on
 setstate marqee 2006-04-01 12:46:02 state on
 setstate n_btn4 disabled
+setstate outlog active
 setstate tf1 T: 20.3  H: 31.3  Bat: ok
 setstate tf1 2006-04-11 09:48:48 battery Bat: ok
 setstate tf1 2006-04-11 09:48:48 humidity 31.3 (%)
@@ -68,3 +70,4 @@ setstate wz 2006-03-26 08:52:31 unknown_85 4
 setstate wz 2006-03-26 08:50:36 wed-from1 06:00
 setstate wz 2006-03-26 08:50:36 wed-to1 23:00
 setstate wz 2006-03-26 08:52:31 windowopen-temp 12.0 (Celsius)
+setstate wzlog active

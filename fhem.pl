@@ -119,6 +119,7 @@ use vars qw(%attr);		# Attributes
 use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
 use vars qw($nextat);           # used by the at module
+use vars qw($init_done);        #
 
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
@@ -132,10 +133,10 @@ my $devcount = 0;		# To sort the devices
 my %defattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
-my $init_done = 0;
 my $reread_active = 0;
 my $AttrList = "room comment";
 
+$init_done = 0;
 
 $modules{_internal_}{ORDER} = -1;
 $modules{_internal_}{AttrList} = "configfile logfile lastinclude modpath " .
@@ -395,8 +396,9 @@ IOWrite($@)
   }
 
   no strict "refs";
-  &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
+  my $ret = &{$modules{$iohash->{TYPE}}{WriteFn}}($iohash, @a);
   use strict "refs";
+  return $ret;
 }
 
 #####################################
