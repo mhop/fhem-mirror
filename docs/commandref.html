@@ -672,19 +672,38 @@ split in multiple lines<br><br>
     <code>define &lt;name&gt; EMWZ &lt;device-number&gt;</code>
     <br><br>
 
-    Define up two 4 EM1000WZ attached to the EM1010PC. The device number must
+    Define up to 4 EM1000WZ attached to the EM1010PC. The device number must
     be between 1 and 4 (else you have a differnt device connected to the
     EM1010PC). Defining an EMWZ will schedule an internal task, which reads the
     status of the device every 5 minutes, and triggers notify/filelog commands.
     <br><br>
 
-    Examples:
+    Example:
     <ul>
       <code>define emwz EMWZ 1</code><br>
     </ul>
     <br>
   </ul>
 
+  <a name="EMEM"></a>
+  <h4>Type EMEM</h4>
+  <ul>
+    <code>define &lt;name&gt; EMEM &lt;device-number&gt;</code>
+    <br><br>
+
+    Define up to 4 EM1000EM attached to the EM1010PC. The device number must
+    be between 5 and 8.
+    Defining an EMEM will schedule an internal task, which reads the
+    status of the device every 5 minutes, and triggers notify/filelog commands.
+    <br>Note: Currently this device does not support a "set" function.
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define emem EMEM 5</code><br>
+    </ul>
+    <br>
+  </ul>
 
   <a name="FileLog"></a>
   <h4>Type FileLog</h4>

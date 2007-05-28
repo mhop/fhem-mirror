@@ -100,3 +100,7 @@
     archive directory. See the attributes archivedir/archivecmd.
   - Added EM1010PC suppoort (right now only with EM1000WZ). Support added
     for displaying logs in the fhemweb.pl (webfrontends/pgm2)
+
+- Pest, Mon May 28 19:39:22 MEST 2007
+  - Added 62_EMEM.pm to support EM1000-EM devices.
+  - doc: Update of commandref.htm (typos and EMEM).
