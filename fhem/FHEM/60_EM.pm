@@ -21,7 +21,7 @@ EM_Initialize($)
 
 # Provider
   $hash->{WriteFn} = "EM_Write";
-  $hash->{Clients} = ":EMWZ:";
+  $hash->{Clients} = ":EMWZ:EMEM:";
 
 # Consumer
   $hash->{DefFn}   = "EM_Define";
