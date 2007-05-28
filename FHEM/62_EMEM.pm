@@ -37,11 +37,10 @@ EMEM_GetStatus($)
 
   my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
   if(!defined($d)) {
-    my $msg = "EMWZ $name read error";
+    my $msg = "EMEM $name read error";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
-
 
   if($d eq ((pack('H*',"00") x 45) . pack('H*',"FF") x 6)) {
     my $msg = "EMEM no device no. $dnr present";
@@ -50,13 +49,6 @@ EMEM_GetStatus($)
   }
 
   my $pulses=w($d,13);
-  my $ec=w($d,49) / 10;
-  if($ec != 0) {
-    my $msg = "EMEM read error";
-    Log GetLogLevel($name,2), $msg;
-    return $msg;
-  }
-
   my $iec = 1000;
   my $cur_power = $pulses / 100;
 
@@ -72,7 +64,6 @@ EMEM_GetStatus($)
   $vals{"power"} = sprintf("%.3f", $cur_power);
   $vals{"alarm_PA"} = w($d,45) . " Watt";
   $vals{"price_CF"} = sprintf("%.3f", w($d,47)/10000);
-  $vals{"RperKW_EC"} = $ec;
 
   my $tn = TimeNow();
   my $idx = 0;
