@@ -35,9 +35,15 @@ EMWZ_GetStatus($)
   }
 
   my $dnr = $hash->{DEVNR};
-  my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
-
   my $name = $hash->{NAME};
+
+  my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
+  if(!defined($d)) {
+    my $msg = "EMWZ $name read error";
+    Log GetLogLevel($name,2), $msg;
+    return $msg;
+  }
+
 
   if($d eq ((pack('H*',"00") x 45) . pack('H*',"FF") x 6)) {
     my $msg = "EMWZ no device no. $dnr present";
@@ -118,6 +124,7 @@ EMWZ_Set($@)
   my $v = $a[2];
   my $d = $hash->{DEVNR};
   my $msg;
+  my $name = $hash->{NAME};
 
   if($a[1] eq "price") {
     $v *= 10000; # Make display and input the same
@@ -132,9 +139,15 @@ EMWZ_Set($@)
   }
 
   my $ret = IOWrite($hash, $msg);
+  if(!defined($d)) {
+    my $msg = "EMWZ $name read error";
+    Log GetLogLevel($name,2), $msg;
+    return $msg;
+  }
+
   if(ord(substr($ret,0,1)) != 6) {
     $ret = "EMWZ Error occured: " .  unpack('H*', $ret);
-    Log GetLogLevel($hash->{NAME},2), $ret;
+    Log GetLogLevel($name,2), $ret;
     return $ret;
   }
 

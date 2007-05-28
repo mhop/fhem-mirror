@@ -93,7 +93,7 @@ sub
 b($$)
 {
   my ($t,$p) = @_;
-  return -1 if(length($t) < $p);
+  return -1 if(!defined($t) || length($t) < $p);
   return ord(substr($t,$p,1));
 }
 
@@ -123,6 +123,8 @@ EM_Get($@)
   if($a[1] eq "time") {
 
     my $d = EmGetData($hash->{DeviceName}, "74");
+    return "Read error" if(!defined($d));
+
     $v = sprintf "%4d-%02d-%02d %02d:%02d:%02d",
               b($d,5)+2006, b($d,4), b($d,3),
               b($d,0), b($d,1), b($d,2);
@@ -130,6 +132,7 @@ EM_Get($@)
   } elsif($a[1] eq "version") {
 
     my $d = EmGetData($hash->{DeviceName},"76");
+    return "Read error" if(!defined($d));
     $v = sprintf "%d.%d", b($d,0), b($d,1);
 
   } else {
