@@ -89,6 +89,7 @@ EMWZ_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power kWh";
+  Log GetLogLevel($name,4), "EMWZ $name: $cur_power kWh / $vals{energy}";
 
   return $hash->{STATE};
 }

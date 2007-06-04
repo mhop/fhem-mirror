@@ -237,7 +237,7 @@ EmGetData($$)
   $serport->stopbits(1);
   $serport->handshake('none');
 
-  Log 5, "EM: Sending " . unpack('H*', $d) . "\n";
+  Log 4, "EM: Sending " . unpack('H*', $d) . "\n";
 
   my $rm = "EM timeout reading the answer";
   for(my $rep = 0; $rep < 3; $rep++) {

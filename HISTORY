@@ -107,3 +107,6 @@
 
 - Pest, Mon May 29 00:07:00 MEST 2007
   - check-in changes of 60_EM.pm to make EMEM work.
+
+- Mon Jun  4 08:23:43 MEST 2007
+  - Small changes for EM logging
