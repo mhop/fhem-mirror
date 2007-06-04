@@ -65,6 +65,7 @@ EMEM_GetStatus($)
   $vals{"alarm_PA"} = w($d,45) . " Watt";
   $vals{"price_CF"} = sprintf("%.3f", w($d,47)/10000);
 
+
   my $tn = TimeNow();
   my $idx = 0;
   foreach my $k (keys %vals) {
@@ -79,6 +80,7 @@ EMEM_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power kWh";
+  Log GetLogLevel($name,4), "EMEM $name: $cur_power kWh / $vals{energy} kWh/h";
 
   return $hash->{STATE};
 }
