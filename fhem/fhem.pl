@@ -186,7 +186,7 @@ my %cmds = (
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>",terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
-            Hlp=>"<usecs>,sleep for usecs" },
+            Hlp=>"<sec>,sleep for sec, 3 decimal places are interpreted" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<dev> <state>,trigger notify command" },
   "xmllist" => { Fn=>"CommandXmlList",

@@ -333,3 +333,4 @@
   - bugfix:  added FS20S8, removed stty_parmrk (Martin, 24.5)
   - feature: added archivedir/archivecmd to the FileLog
   - feature: added EM1010PC/EM1000WZ/EM1000EM support
+  - bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
