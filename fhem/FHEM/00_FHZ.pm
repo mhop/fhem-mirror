@@ -528,6 +528,7 @@ FHZ_Read($)
 
 
       my @found;
+      my $last_module;
       foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
 			    keys %modules) {
 	next if($iohash->{Clients} !~ m/:$m:/);
@@ -535,6 +536,7 @@ FHZ_Read($)
 	no strict "refs";
 	@found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
 	use strict "refs";
+        $last_module = $m;
 	last if(int(@found));
       }
       if(!int(@found)) {
@@ -547,7 +549,7 @@ FHZ_Read($)
       if($found[0] =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
 	my $d = $1;
 	$defs{$d}{NAME} = $1;
-	$defs{$d}{TYPE} = $2;
+	$defs{$d}{TYPE} = $last_module;
 	DoTrigger($d, "$2 $3");
 	delete $defs{$d};
 	goto NEXTMSG;
