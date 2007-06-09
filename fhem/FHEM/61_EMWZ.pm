@@ -61,7 +61,7 @@ EMWZ_GetStatus($)
   my $cur_energy = $pulses / $ec;       # ec = U/kWh
   my $cur_power = $cur_energy / 5 * 60; # 5minute interval scaled to 1h
 
-  if($cur_power > 100) {
+  if($cur_power > 30) { # 20Amp x 3 Phase
     my $msg = "EMWZ Bogus reading: curr. power is reported to be $cur_power";
     Log GetLogLevel($name,2), $msg;
     return $msg;

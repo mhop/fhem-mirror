@@ -53,7 +53,7 @@ EM_Define($$)
 
   Log 3, "EM opening device $dev";
   my $po = new Device::SerialPort ($dev);
-  return "Can't open $dev: $!\n" if(!$po);
+  return "Can't open $dev: $!" if(!$po);
   Log 3, "EM opened device $dev";
   $po->close();
 
@@ -229,7 +229,10 @@ EmGetData($$)
   $d = EmMakeMsg(pack('H*', $d));
 
   my $serport = new Device::SerialPort ($dev);
-  die "Can't open $dev: $!\n" if(!$serport);
+  if(!$serport) {
+    Log 1, "EM: Can't open $dev: $!";
+    return undef;
+  }
   $serport->reset_error();
   $serport->baudrate(38400);
   $serport->databits(8);
@@ -282,6 +285,7 @@ EmGetData($$)
         if(b($retval,1) != 0)         { $rm = "EM Bad second byte"; goto DONE; }
         if(w($retval,2) != $l-7)      { $rm = "EM Length mismatch"; goto DONE; }
         if(!EmCrcCheck($retval,$l-7)) { $rm = "EM Bad CRC";         goto DONE; }
+        $serport->close();
         return substr($retval, 4, $l-7);
       }
     }
