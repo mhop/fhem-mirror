@@ -52,7 +52,7 @@ EMEM_GetStatus($)
   my $iec = 1000;
   my $cur_power = $pulses / 100;
 
-  if($cur_power > 100) {
+  if($cur_power > 30) { # 20Amp x 3 Phase
     my $msg = "EMEM Bogus reading: curr. power is reported to be $cur_power";
     Log GetLogLevel($name,2), $msg;
     return $msg;
