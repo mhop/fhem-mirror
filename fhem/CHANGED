@@ -334,3 +334,4 @@
   - feature: added archivedir/archivecmd to the FileLog
   - feature: added EM1010PC/EM1000WZ/EM1000EM support
   - bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
+  - bugfix:  em1010 and %oldvalue bugs (Peter, 9.6)

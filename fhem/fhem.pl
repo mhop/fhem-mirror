@@ -1169,8 +1169,11 @@ CommandRename($$)
   $defs{$new} = $defs{$old};
   delete($defs{$old});
 
-  $attr{$new} = $attr{$old};
+  $attr{$new} = $attr{$old} if(defined($attr{$old}));
   delete($attr{$old});
+
+  $oldvalue{$new} = $oldvalue{$old} if(defined($oldvalue{$old}));
+  delete($oldvalue{$old});
 
   return undef;
 }
@@ -1345,13 +1348,15 @@ CommandSetstate($$)
     if(!$d->{READINGS}{$b[2]} || $d->{READINGS}{$b[2]}{TIME} lt $tim) {
       $d->{READINGS}{$b[2]}{VAL} = $b[3];
       $d->{READINGS}{$b[2]}{TIME} = $tim;
-
-      $oldvalue{$a[0]}{TIME} = $tim;
-      $oldvalue{$a[0]}{VAL} = $b[2];
     }
 
   } else {
     $d->{STATE} = $a[1];
+
+    $oldvalue{$a[0]}{VAL} = $a[1];
+    # This time is not the correct one, but we do not store a timestamp for
+    # this reading.
+    $oldvalue{$a[0]}{TIME} = TimeNow();
   }
   
   return $ret;
