@@ -110,3 +110,7 @@
 
 - Mon Jun  4 08:23:43 MEST 2007
   - Small changes for EM logging
+
+- Pest Jun 10, 23:16:23 MEST 2007
+  - Set wrong values in 62_EMEM to -1
+
