@@ -114,3 +114,5 @@
 - Pest Jun 10, 23:16:23 MEST 2007
   - Set wrong values in 62_EMEM to -1
 
+- Pest Jun 12, 21:33:00 MEST 2007
+  - in 62_EMEM.pm: added energy_today and energy_total

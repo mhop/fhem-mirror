@@ -62,6 +62,8 @@ EMEM_GetStatus($)
   my %vals;
   $vals{"5min_pulses"} = $pulses;
   $vals{"energy"} = sprintf("%0.3f kWh/h", dw($d,33) / $iec);
+  $vals{"energy_today"} = sprintf("%0.3f kWh/d", dw($d,37) / $iec);
+  $vals{"energy_total"} = sprintf("%0.3f kWh (total)", dw($d,41) / $iec);
   $vals{"power"} = sprintf("%.3f", $cur_power);
   $vals{"alarm_PA"} = w($d,45) . " Watt";
   $vals{"price_CF"} = sprintf("%.3f", w($d,47)/10000);
