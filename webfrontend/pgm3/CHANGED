@@ -113,3 +113,5 @@ Changelog
 -- Feature: new arrangement of the graphics, FHT-Pulldown will now called by "adjust", FHT-PHP-Graphics now with Temperature/desired-temp and actuator
 -- Bugfix:  $errormessage for php4, fs20pulldown (correct list of options)
 
+2007-06-13 (0.8.1)
+-- Bugfix: Section FHZ_DEVICE is now hidden if you dont want neither Pulldowns nor General.
