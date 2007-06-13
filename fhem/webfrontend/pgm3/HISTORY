@@ -16,3 +16,6 @@
 
 - Martin 2007-04-10
   - Minor Bugfixes (errormessage for php4, fhs20pulldown)
+ 
+- Martin 2007-07-13
+  - Section FHZ-DEVICES s now hidden if it is not needed

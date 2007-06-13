@@ -40,7 +40,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='0.8.0';
+$pgm3version='0.8.1';
 
 	
 	$Action		=	$_POST['Action'];
@@ -419,6 +419,8 @@ xml_parser_free($xml_parser);
 		</td></tr>";
 	
 	############################ FHZ
+	if ($show_fs20pulldown==1 or $show_general==1 or $show_fhtpulldown==1)
+	{
 	echo "<tr><td $bg1 colspan=4><font $fontcolor1><table  cellspacing='0' cellpadding='0' width='100%'>
 		<tr><td><font $fontcolor1>FHZ_DEVICE</td><td align=right><font $fontcolor1><b>";
 	if ($showmenu != '1')	
@@ -428,6 +430,7 @@ xml_parser_free($xml_parser);
 
 	echo "</b></font></td></tr></table>";
 	echo "</font></td></tr>";
+	}
 
 
 	if ($showmenu=='1')
