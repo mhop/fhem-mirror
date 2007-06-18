@@ -116,3 +116,6 @@
 
 - Pest Jun 12, 21:33:00 MEST 2007
   - in 62_EMEM.pm: added energy_today and energy_total
+
+- Pest Jun 18, 20:06:23 MEST 2007
+  - in 62_EMEM.pm: Power units removed from value content added to name.
