@@ -60,13 +60,13 @@ EMEM_GetStatus($)
   }
 
   my %vals;
-  $vals{"5min_pulses"} = $pulses;
-  $vals{"energy"} = sprintf("%0.3f kWh/h", dw($d,33) / $iec);
-  $vals{"energy_today"} = sprintf("%0.3f kWh/d", dw($d,37) / $iec);
-  $vals{"energy_total"} = sprintf("%0.3f kWh (total)", dw($d,41) / $iec);
-  $vals{"power"} = sprintf("%.3f", $cur_power);
-  $vals{"alarm_PA"} = w($d,45) . " Watt";
-  $vals{"price_CF"} = sprintf("%.3f", w($d,47)/10000);
+  $vals{"5min_pulses"}        = $pulses;
+  $vals{"energy_kWh_h"}       = sprintf("%0.3f", dw($d,33) / $iec);
+  $vals{"energy_today_kWh_d"} = sprintf("%0.3f", dw($d,37) / $iec);
+  $vals{"energy_total_kWh"}   = sprintf("%0.3f", dw($d,41) / $iec);
+  $vals{"power_kW"}           = sprintf("%.3f", $cur_power);
+  $vals{"alarm_PA_W"}         = w($d,45);
+  $vals{"price_CF"}           = sprintf("%.3f", w($d,47)/10000);
 
 
   my $tn = TimeNow();
@@ -83,7 +83,7 @@ EMEM_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power kWh";
-  Log GetLogLevel($name,4), "EMEM $name: $cur_power kWh / $vals{energy} kWh/h";
+  Log GetLogLevel($name,4), "EMEM $name: $cur_power kW / $vals{energy_kWh_h} kWh/h";
 
   return $hash->{STATE};
 }
