@@ -135,6 +135,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
+my $cvsid = '$Id: fhem.pl,v 1.21 2007-07-01 07:30:48 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1648,5 +1649,5 @@ doGlobalDef($)
   CommandAttr(undef, "global verbose 3");
   CommandAttr(undef, "global configfile $arg");
   CommandAttr(undef, "global logfile -");
-  CommandAttr(undef, "global version =VERS= from =DATE=");
+  CommandAttr(undef, "global version =VERS= from =DATE= ($cvsid)");
 }

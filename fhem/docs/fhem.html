@@ -10,8 +10,8 @@
 
 
 <h1>FHEM</h1>
-GPL'd FHZ, FS20, FHT, HMS, KS300 and WS300 server for linux, formerly known as
-fhz1000.pl
+GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT.
+Formerly known as fhz1000.pl
 
 <h2>News (as of =DATE=, Version =VERS=)</h2>
 
@@ -30,14 +30,19 @@ program or TCP/IP directly, like the supplied web frontends do.<br> <br>
 
 Currently implemented features:<br>
 <ul>
-  <li>reading and sending FS20 events (on/off/dimming, timer commands, etc)<br>
-  <li>support of FS20 address features function group, local and global master
-  <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
-      The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.</li>
-  <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK and RM100-2)</li>
-  <li>reading KS300 data</li>
-  <li>reading WS300 data</li>
-  <li>reading EM1010PC/EM1000WZ data</li>
+  <li>Via the FHZ module (with access to one or more FHZ1000/FHZ1300 device):
+  <ul>
+    <li>reading and sending FS20 events (on/off/dimming, timer commands)<br>
+    <li>support of FS20 address features function group, local and global master
+    <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
+        The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.</li>
+    <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK and RM100-2)</li>
+    <li>reading KS300 data</li>
+  </ul>
+  </li>
+  <li>reading WS300 data, and up to 9 attached devices</li>
+  <li>reading EM1000WZ/EM1000EM data via an attached EM1010PC</li>
+  <li>reading an attached SCIVT device</li>
   <li>logging events to files (or database), with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
       events</li>

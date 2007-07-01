@@ -3,7 +3,7 @@
 
 
 
-=================
+#=================
 set terminal png
 set output '<OUT>.png'
 set xdata time

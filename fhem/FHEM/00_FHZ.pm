@@ -12,7 +12,6 @@ sub FHZ_ReadAnswer($$);
 sub FhzCrc(@);
 sub CheckFhzCrc($);
 
-my $fhzdata = "";
 my $msgstart = pack('H*', "81");# Every msg starts wit this
 
 my %gets = (
@@ -236,6 +235,7 @@ FHZ_Define($$)
   $hash->{PortObj} = $po;
   $hash->{FD} = $po->FILENO;
   $hash->{DeviceName} = $dev;
+  $hash->{PARTIAL} = "";
 
   DoInit($a[0]);
   return undef;
@@ -461,6 +461,7 @@ FHZ_Read($)
     }
   }
 
+  my $fhzdata = $hash->{PARTIAL};
   Log 5, "FHZ/RAW: " . unpack('H*',$buf) .
       " (Unparsed: " . unpack('H*', $fhzdata) . ")";
   $fhzdata .= $buf;
@@ -568,6 +569,7 @@ NEXTMSG:
 
     }
   }
+  $hash->{PARTIAL} = $fhzdata;
 }
 
 1;
