@@ -335,3 +335,4 @@
   - feature: added EM1010PC/EM1000WZ/EM1000EM support
   - bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
   - bugfix:  em1010 and %oldvalue bugs (Peter, 9.6)
+  - bugfix:  SCIVT solar controller (peterp, 1.7)

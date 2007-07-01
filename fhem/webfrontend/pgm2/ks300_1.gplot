@@ -14,6 +14,7 @@ set title '<IN>'
 set grid
 
 set ylabel "Temperature (Celsius)"
-set y2label "Humidity (%)"
+set y2label "Rain (l/m2)"
 plot "<IN>" using 1:4 axes x1y1 title 'Temperature' with lines,\
-     "<IN>" using 1:6 axes x1y2 title 'Rel. Humidity (%)' with lines
+     "<grep -v avg_ <IN> | perl -ane '@a = split(\"[_:]\", $F[0]); if(defined($lh) && $lh ne $a[1]) { printf(\"${ld}_$lh:30:00 %f\n\", $hv); $hv = 0; } if($lv) { $hv += ($F[9]-$lv); } $lh = $a[1]; $ld = $a[0]; $lv = $F[9]; END { printf(\"${ld}_$lh:30:00 %f\n\", $hv) }'" using 1:2 axes x1y2 title 'Rain/h' with histeps,\
+     "<grep -v avg_ <IN> | perl -ane '@a = split(\"[_]\", $F[0]); if(defined($ld) && $ld ne $a[0]) { printf(\"${ld}_12:00:00 %f\n\", $dv); $dv = 0; } if($lv) { $dv += ($F[9]-$lv); } $ld = $a[0]; $lv = $F[9]; END {printf(\"${ld}_12:00:00 %f\n\", $dv)}'" using 1:2 axes x1y2 title 'Rain/day' with histeps
