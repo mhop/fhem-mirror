@@ -88,8 +88,8 @@ EMWZ_GetStatus($)
     DoTrigger($name, undef) if($init_done);
   }
 
-  $hash->{STATE} = "$cur_power kWh";
-  Log GetLogLevel($name,4), "EMWZ $name: $cur_power kWh / $vals{energy}";
+  $hash->{STATE} = "$cur_power kW";
+  Log GetLogLevel($name,4), "EMWZ $name: $cur_power kW / $vals{energy}";
 
   return $hash->{STATE};
 }

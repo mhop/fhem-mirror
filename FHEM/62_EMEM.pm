@@ -82,7 +82,7 @@ EMEM_GetStatus($)
     DoTrigger($name, undef) if($init_done);
   }
 
-  $hash->{STATE} = "$cur_power kWh";
+  $hash->{STATE} = "$cur_power kW";
   Log GetLogLevel($name,4), "EMEM $name: $cur_power kW / $vals{energy_kWh_h} kWh/h";
 
   return $hash->{STATE};
