@@ -31,9 +31,7 @@
 
 use strict;
 use warnings;
-use IO::File;
 use IO::Socket;
-use Net::hostent;
 use Time::HiRes qw(gettimeofday);
 
 
@@ -135,7 +133,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.21 2007-07-01 07:30:48 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.22 2007-08-05 09:48:26 rudolfkoenig Exp $';
 
 $init_done = 0;
 

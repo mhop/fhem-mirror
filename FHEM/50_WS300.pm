@@ -302,7 +302,7 @@ WS300_Parse($$)
           $def->{CHANGED}[4] = "$txt[6]: $value";
           $def->{CHANGETIME}[4] = $tm;
           
-          Log 2,"WS300 $def->{NAME}: $val";
+          Log $ll,"WS300 $def->{NAME}: $val";
           DoTrigger($def->{NAME},undef);
         }
         else
@@ -432,7 +432,7 @@ WS300_Parse($$)
             $def->{CHANGED}[11] = "$txt[11]: $rain_month $sfx[11]";
             $def->{CHANGETIME}[11] = $tm;
           }
-          Log 2,"WS300 $def->{NAME}: $val";
+          Log $ll,"WS300 $def->{NAME}: $val";
           DoTrigger($def->{NAME},undef);
         }
       }
@@ -482,11 +482,12 @@ WS300_Parse($$)
     $def->{CHANGED}[4] = "willi: $value";
     $def->{CHANGETIME}[4] = $tm;
     
-    Log 2,"WS300 $def->{NAME}: $val";
+    Log $ll,"WS300 $def->{NAME}: $val";
     DoTrigger($def->{NAME},undef);
   }
   return undef;
 }
+
 #####################################
 sub
 WS300_Read($)

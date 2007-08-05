@@ -336,3 +336,5 @@
   - bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
   - bugfix:  em1010 and %oldvalue bugs (Peter, 9.6)
   - bugfix:  SCIVT solar controller (peterp, 1.7)
+  - bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
+  - feature: First steps for a Fritz!Box port. See the fritzbox.html
