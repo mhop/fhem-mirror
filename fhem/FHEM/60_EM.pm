@@ -85,7 +85,40 @@ EM_Undef($$)
 sub
 EM_Set($@)
 {
-  return undef;
+  my ($hash, @a) = @_;
+  my $u1 = "Usage: set <name> reset\n" . 
+          "       set <name> time [YYYY-MM-DD HH:MM:SS]";
+
+  return $u1 if(int(@a) < 2);
+  my $msg;
+
+  if($a[1] eq "time") {
+
+    if (int(@a) == 2) {
+      my @lt = localtime;
+      $a[2] = sprintf ("%04d-%02d-%02d", $lt[5]+1900, $lt[4]+1, $lt[3]);
+      $a[3] = sprintf ("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+    } elsif (int(@a) != 4) {
+      return $u1;
+    }
+    my @d = split("-", $a[2]);
+    my @t = split(":", $a[3]);
+    $msg = sprintf("73%02x%02x%02x00%02x%02x%02x",
+          $d[2],$d[1],$d[0]-2000+0xd0, $t[0],$t[1],$t[2]);
+
+  } elsif($a[1] eq "reset") {
+
+    $msg = "4545";
+
+  } else {
+
+    return "Unknown argument $a[1], choose one of reset,time"
+
+  }
+
+  my $d = EmGetData($hash->{DeviceName}, $msg);
+  return "Read error" if(!defined($d));
+  return b($d,0);
 }
 
 #########################

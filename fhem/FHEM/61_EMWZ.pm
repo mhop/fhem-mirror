@@ -119,8 +119,10 @@ sub
 EMWZ_Set($@)
 {
   my ($hash, @a) = @_;
+  my $u = "Usage: set <name> <type> <value>, " .
+                "<type> is one of price,alarm,rperkw";
 
-  return "argument is missing" if(int(@a) != 3);
+  return $u if(int(@a) != 3);
 
   my $v = $a[2];
   my $d = $hash->{DEVNR};
@@ -136,7 +138,7 @@ EMWZ_Set($@)
     $v *= 10; # Make display and input the same
     $msg = sprintf("79%02x3102%02x%02x", $d-1, $v%256, int($v/256));
   } else {
-    return "unknown set value, use one of price,alarm,rperkw";
+    return $u;
   }
 
   my $ret = IOWrite($hash, $msg);
