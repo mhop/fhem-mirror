@@ -119,3 +119,8 @@
 
 - Pest Jun 18, 20:06:23 MEST 2007
   - in 62_EMEM.pm: Power units removed from value content added to name.
+
+- Rudi Sun Aug  5 10:59:51 MEST 2007
+  - WS300 Loglevel changed for KS300 device (from 2 to GetLogLevel or 5)
+  - First version of the FritzBox port: 
+    - Perl binary/ftdi_sio module 
