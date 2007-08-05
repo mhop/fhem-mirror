@@ -124,3 +124,6 @@
   - WS300 Loglevel changed for KS300 device (from 2 to GetLogLevel or 5)
   - First version of the FritzBox port: 
     - Perl binary/ftdi_sio module 
+  - EM: added setTime, reset
+  - docs/fritzbox.html. Note: The fb_fhem_0.1.tar.gz won't be part of CVS
+    as it contains largee binaries (swapfile, perl mipsel executable, etc).

@@ -14,8 +14,24 @@ GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT.
 Formerly known as fhz1000.pl
 
 <h2>News (as of =DATE=, Version =VERS=)</h2>
-
 <ul>
+  <li> doc:     linux.html (private udev-rules, not 50-..., ATTRS)
+  <li> bugfix:  setting devices with "-" in their name did not work
+  <li> doc:     fhem.pl and commandref.html (notifyon -> notify, correction
+                of examples)
+  <li> feature: modify command added
+  <li> feature: The "-" in the name is not allowed any more
+  <li> bugfix:  disabled notify causes "uninitialized value" (STefan, 1.5)
+  <li> bugfix:  deleted FS20 items are still logging (zombie) (Gerhard, 16.5)
+  <li> bugfix:  added FS20S8, removed stty_parmrk (Martin, 24.5)
+  <li> feature: added archivedir/archivecmd to the FileLog
+  <li> feature: added EM1010PC/EM1000WZ/EM1000EM support
+  <li> bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
+  <li> bugfix:  em1010 and %oldvalue bugs (Peter, 9.6)
+  <li> bugfix:  SCIVT solar controller (peterp, 1.7)
+  <li> bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
+  <li> feature: First steps for a Fritz!Box port. See the fritzbox.html
+</ul>
 
 </ul>
 
@@ -69,8 +85,12 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
   	http://groups.google.com/group/FHZ1000-users-on-unix</a><br>
   Martins Web frontend (webpgm3): <a href="http://www.martin-haas.de/fhz">
   	http://www.martin-haas.de/fhz</a><br>
-  fhz1000 on Nas/Routers: <a href="http://www.martin-haas.de/fhz/nslu2fhz">
+  Instructions for Nas/Routers (NSLU2):
+        <a href="http://www.martin-haas.de/fhz/nslu2fhz">
   	http://www.martin-haas.de/fhz/nslu2fhz</a><br>
+  Instructions for the Fritz!Box:
+        <a href="fritzbox.html">
+  	http://www.koeniglich.de/fhem/fritzbox.html</a><br>
   CVS@berlios: <a href="http://developer.berlios.de/projects/fhem">
   	http://developer.berlios.de/projects/fhem</a><br>
 
