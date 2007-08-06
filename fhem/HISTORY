@@ -127,3 +127,7 @@
   - EM: added setTime, reset
   - docs/fritzbox.html. Note: The fb_fhem_0.1.tar.gz won't be part of CVS
     as it contains largee binaries (swapfile, perl mipsel executable, etc).
+
+- Rudi Mon Aug  6 20:15:00 MEST 2007
+  - archiving added to the main logs.
+    NOTE: The FileLog filename (INT attribute) is now also called logfile.

@@ -321,7 +321,7 @@
     documentation added.
   - bugfix: more thorough serial line initialization
 
-- ==DATE== (4.1)
+- 2007-08-05 (4.1)
   - doc:     linux.html (private udev-rules, not 50-..., ATTRS)
   - bugfix:  setting devices with "-" in their name did not work
   - doc:     fhem.pl and commandref.html (notifyon -> notify, correction
@@ -338,3 +338,6 @@
   - bugfix:  SCIVT solar controller (peterp, 1.7)
   - bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
   - feature: First steps for a Fritz!Box port. See the fritzbox.html
+
+- ==DATE== (4.2)
+  - feature: added archivedir/archivecmd to the the main logfile

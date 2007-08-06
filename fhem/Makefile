@@ -2,7 +2,7 @@ BINDIR=/usr/local/bin
 MODDIR=/usr/local/lib
 
 VERS=4.0
-DATE=2007-04-14
+DATE=2007-08-05
 DIR=fhem-$(VERS)
 
 all:

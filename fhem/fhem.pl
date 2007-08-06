@@ -47,6 +47,7 @@ sub CommandChain($$);
 sub DoClose($);
 sub GetLogLevel(@);
 sub HandleTimeout();
+sub HandleArchiving($);
 sub IOWrite($@);
 sub InternalTimer($$$);
 sub Log($$);
@@ -133,13 +134,14 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.22 2007-08-05 09:48:26 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.23 2007-08-06 18:17:28 rudolfkoenig Exp $';
 
 $init_done = 0;
 
 $modules{_internal_}{ORDER} = -1;
 $modules{_internal_}{AttrList} = "configfile logfile lastinclude modpath " .
                         "pidfilename port statefile title userattr " .
+                        "nrarchive archivedir archivecmd " .
                         "verbose:1,2,3,4,5 version";
 
 
@@ -577,6 +579,10 @@ OpenLogfile($)
 
   } else {
     
+    $defs{global}{currentlogfile} = $param;
+    $defs{global}{logfile} = $attr{global}{logfile};
+    HandleArchiving($defs{global});
+
     open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
     # Redirect stdin/stderr
 
@@ -1527,6 +1533,7 @@ ResolveDateWildcards($@)
   return $f if(!$f);
   return $f if($f !~ m/%/);	# Be fast if there is no wildcard
 
+  my $S = sprintf("%02d", $t[0]);      $f =~ s/%S/$S/g;
   my $M = sprintf("%02d", $t[1]);      $f =~ s/%M/$M/g;
   my $H = sprintf("%02d", $t[2]);      $f =~ s/%H/$H/g;
   my $d = sprintf("%02d", $t[3]);      $f =~ s/%d/$d/g;
@@ -1643,9 +1650,59 @@ doGlobalDef($)
   $defs{global}{TYPE}  = "_internal_";
   $defs{global}{STATE} = "<no definition>";
   $defs{global}{DEF}   = "<no definition>";
+  $defs{global}{NAME}  = "global";
 
   CommandAttr(undef, "global verbose 3");
   CommandAttr(undef, "global configfile $arg");
   CommandAttr(undef, "global logfile -");
   CommandAttr(undef, "global version =VERS= from =DATE= ($cvsid)");
 }
+
+# Make a directory and its parent directories if needed.
+sub
+HandleArchiving($)
+{
+  my ($log) = @_;
+  my $ln = $log->{NAME};
+  return if(!$attr{$ln});
+
+  # If there is a command, call that
+  my $cmd = $attr{$ln}{archivecmd};
+  if($cmd) {
+    $cmd =~ s/%/$log->{currentlogfile}/g;
+    Log 2, "Archive: calling $cmd"; 
+    system($cmd);
+    return;
+  }
+
+  my $nra = $attr{$ln}{nrarchive};
+  my $ard = $attr{$ln}{archivedir};
+  return if(!defined($nra));
+
+  # If nrarchive is set, then check the last files:
+  # Get a list of files:
+
+  my ($dir, $file);
+  if($log->{logfile} =~ m,^(.+)/([^/]+)$,) {
+    ($dir, $file) = ($1, $2);
+  } else {
+    ($dir, $file) = (".", $log->{logfile});
+  }
+
+  $file =~ s/%./.+/g;
+  return if(!opendir(DH, $dir));
+  my @files = sort grep {/^$file$/} readdir(DH);
+  closedir(DH);
+
+  my $max = int(@files)-$nra;
+  for(my $i = 0; $i < $max; $i++) {
+    if($ard) {
+      Log 2, "Moving $files[$i] to $ard";
+      rename("$dir/$files[$i]", "$ard/$files[$i]");
+    } else {
+      Log 2, "Deleting $files[$i]";
+      unlink("$dir/$files[$i]");
+    }
+  }
+}
+
