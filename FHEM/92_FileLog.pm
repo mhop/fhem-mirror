@@ -40,8 +40,8 @@ FileLog_Define($@)
 
   $hash->{FH} = $fh;
   $hash->{REGEXP} = $a[3];
-  $hash->{FILENAME} = $a[2];
-  $hash->{CURRENT} = $f;
+  $hash->{logfile} = $a[2];
+  $hash->{currentlogfile} = $f;
   $hash->{STATE} = "active";
 
   return undef;
@@ -54,54 +54,6 @@ FileLog_Undef($$)
   my ($hash, $name) = @_;
   close($hash->{FH});
   return undef;
-}
-
-# Make a directory and its parent directories if needed.
-sub
-HandleArchiving($)
-{
-  my ($log) = @_;
-  my $ln = $log->{NAME};
-  return if(!$attr{$ln});
-
-  # If there is a command, call that
-  my $cmd = $attr{$ln}{archivecmd};
-  if($cmd) {
-    $cmd =~ s/%/$log->{CURRENT}/g;
-    Log 2, "Archive: calling $cmd"; 
-    system($cmd);
-    return;
-  }
-
-  my $nra = $attr{$ln}{nrarchive};
-  my $ard = $attr{$ln}{archivedir};
-  return if(!defined($nra));
-
-  # If nrarchive is set, then check the last files:
-  # Get a list of files:
-
-  my ($dir, $file);
-  if($log->{FILENAME} =~ m,^(.+)/([^/]+)$,) {
-    ($dir, $file) = ($1, $2);
-  } else {
-    ($dir, $file) = (".", $log->{FILENAME});
-  }
-
-  $file =~ s/%./.+/g;
-  return if(!opendir(DH, $dir));
-  my @files = sort grep {/^$file$/} readdir(DH);
-  closedir(DH);
-
-  my $max = int(@files)-$nra;
-  for(my $i = 0; $i < $max; $i++) {
-    if($ard) {
-      Log 2, "Moving $files[$i] to $ard";
-      rename("$dir/$files[$i]", "$ard/$files[$i]");
-    } else {
-      Log 2, "Deleting $files[$i]";
-      unlink("$dir/$files[$i]");
-    }
-  }
 }
 
 #####################################
@@ -127,9 +79,9 @@ FileLog_Log($$)
 
       my $fh = $log->{FH};
       my @t = localtime;
-      my $cn = ResolveDateWildcards($log->{FILENAME},  @t);
+      my $cn = ResolveDateWildcards($log->{logfile},  @t);
 
-      if($cn ne $log->{CURRENT}) { # New logfile
+      if($cn ne $log->{currentlogfile}) { # New logfile
 	$fh->close();
         HandleArchiving($log);
 	$fh = new IO::File ">>$cn";
@@ -137,7 +89,7 @@ FileLog_Log($$)
 	  Log(0, "Can't open $cn");
 	  return;
 	}
-	$log->{CURRENT} = $cn;
+	$log->{currentlogfile} = $cn;
 	$log->{FH} = $fh;
       }
 
