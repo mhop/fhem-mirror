@@ -131,3 +131,6 @@
 - Rudi Mon Aug  6 20:15:00 MEST 2007
   - archiving added to the main logs.
     NOTE: The FileLog filename (INT attribute) is now also called logfile.
+
+- Rudi Wed Aug 29 08:28:34 MEST 2007
+  - archive attributes clarified in the doc

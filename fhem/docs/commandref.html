@@ -252,7 +252,10 @@ split in multiple lines<br><br>
     <a name="archivedir"></a> <a name="archivecmd"></a> <a name="nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
         Can be applied to FileLog devices.<br>
-	Before a new FileLog file is opened, the FileLog archiver wil be called.
+	When a new FileLog file is opened, the FileLog archiver wil be called.
+        This happens only, if the name of the logfile has changed (due to
+        time-specific wildcards, see the <a href="#FileLog">FileLog</a>
+        section), and there is a new entry to be written into the file.
         <br>
 
         If the attribute archivecmd is specified, then it will be started as a
