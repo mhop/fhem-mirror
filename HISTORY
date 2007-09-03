@@ -134,3 +134,7 @@
 
 - Rudi Wed Aug 29 08:28:34 MEST 2007
   - archive attributes clarified in the doc
+
+- Rudi Mon Sep  3 15:47:59 MEST 2007
+  - 99_Sunrise_EL.pm checked in. Replaces 99_Sunrise.pm, and does not need
+    any Date module.

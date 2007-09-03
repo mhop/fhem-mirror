@@ -1,4 +1,4 @@
-#Thu Aug 23 17:16:14 2007
+#Sun Sep  2 16:38:48 2007
 setstate FHZ fhtbuf: 1c
 setstate FHZ 2006-02-12 14:03:39 fhtbuf 23
 setstate FHZ 2006-03-26 08:47:36 init2 deadbeefdeadbe
@@ -68,11 +68,11 @@ setstate wz 2006-03-26 08:52:31 unknown_85 4
 setstate wz 2006-03-26 08:50:36 wed-from1 06:00
 setstate wz 2006-03-26 08:50:36 wed-to1 23:00
 setstate wz 2006-03-26 08:52:31 windowopen-temp 12.0 (Celsius)
-setstate x 13.66 0.0 30 13.62 15.09 -0.2 2.8 
-setstate x 2007-08-23 16:41:19 Is 0.0
-setstate x 2007-08-23 16:41:19 Temp 30
-setstate x 2007-08-23 16:41:19 Vs 13.66
-setstate x 2007-08-23 16:41:19 maxI 2.8
-setstate x 2007-08-23 16:41:19 maxV 15.09
-setstate x 2007-08-23 16:41:19 minI -0.2
-setstate x 2007-08-23 16:41:19 minV 13.62
+setstate x 13.66 0.0 30 13.62 15.09 -0.2 2.8
+setstate x 2007-09-02 10:06:47 Is 0.0
+setstate x 2007-09-02 10:06:47 Temp 30
+setstate x 2007-09-02 10:06:47 Vs 13.66
+setstate x 2007-09-02 10:06:47 maxI 2.8
+setstate x 2007-09-02 10:06:47 maxV 15.09
+setstate x 2007-09-02 10:06:47 minI -0.2
+setstate x 2007-09-02 10:06:47 minV 13.62
