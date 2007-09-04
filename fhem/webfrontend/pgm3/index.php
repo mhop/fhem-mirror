@@ -1,6 +1,6 @@
 <?php
 
-#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
+#### pgm3 -- a PHP-webfrontend for fhem.pl 
 
 ################################################################
 #
@@ -40,7 +40,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='0.8.1';
+$pgm3version='0.8.2';
 
 	
 	$Action		=	$_POST['Action'];
@@ -191,7 +191,7 @@ if (! isset($showroom)) $showroom="ALL";
 if ($taillog==1) exec($taillogorder,$tailoutput);
 
 
-#executes over the network to the fhz1000.pl (or localhost)
+#executes over the network to the fhem.pl (or localhost)
 function execFHZ($order,$machine,$port)
 {
 global $errormessage;
@@ -218,6 +218,18 @@ $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
 }
 return $errormessage;
 }
+
+###### write the header on screen
+ echo "
+         <html>
+	 <head>
+	 <meta http-equiv='refresh' content='$urlreload; URL=$forwardurl'>
+	 <meta http-equiv='pragma' content='no-cache'>
+	 <meta http-equiv='Cache-Control' content='no-cache'>
+ 	 <link rel='shortcut icon' href='include/fs20.ico' >
+	 <title>$titel</title>";
+ 	  include ("include/style.css");	 
+ echo "	 </head>";
 
 
 ###### make an array from the xmllist
@@ -247,8 +259,8 @@ else
 	   fclose($fp);
 	}
 }
-
-#workaround for older fhz1000-Versions
+#print_r($output);
+#exit;
 
 
 
@@ -290,7 +302,7 @@ if (!(list($xml_parser, $live) = new_xml_parser($live))) {
    die("could not parse XML input");
 }
 
-foreach($output as $data) { 
+foreach($output as $data) {
   if (!xml_parse($xml_parser, $data)) {
        die(sprintf("XML error: %s at line %d\n",
                    xml_error_string(xml_get_error_code($xml_parser)),
@@ -299,9 +311,6 @@ foreach($output as $data) {
 }
 
 xml_parser_free($xml_parser);
-
-#for testing
-#print_r($stack);exit;
 
 
 #searching for rooms/fs20
@@ -391,21 +400,11 @@ xml_parser_free($xml_parser);
 
  $now=date($timeformat);
 
- echo "
-         <html>
-	 <head>
-	 <meta http-equiv='refresh' content='$urlreload; URL=$forwardurl'>
-	 <meta http-equiv='pragma' content='no-cache'>
-	 <meta http-equiv='Cache-Control' content='no-cache'>
- 	 <link rel='shortcut icon' href='include/fs20.ico' >
-	 <title>$titel</title>";
- 	  include ("include/style.css");	 
- echo "	 </head>";
 
  echo"      <body $bodybg>
 	$errormessage
-	<table width='800' cellspacing='1' cellpadding='10' border='0' $bgcolor1><tr><td></td></tr></table>
-	<table width='800' cellspacing='1' cellpadding='0' border='0' align='CENTER' $bg4>
+	<table width='$winsize' cellspacing='1' cellpadding='10' border='0' $bgcolor1><tr><td></td></tr></table>
+	<table width='$winsize' cellspacing='1' cellpadding='0' border='0' align='CENTER' $bg4>
 	  <tr> 
 	      <td bgcolor='#6394BD' width='100%'> 
 	      <table bgcolor='#FFFFFF' width='100%' cellspacing='0' cellpadding='0' border='0'>
@@ -631,7 +630,7 @@ xml_parser_free($xml_parser);
 				
 			}
 			else
-		 	{echo "<tr><td $bg2 colspan=3>";}
+		 	{echo "<tr><td $bg2><td $bg2 colspan=2> ";}
 		       	
 			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		

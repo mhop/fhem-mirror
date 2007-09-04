@@ -357,6 +357,7 @@ function show_error_type($imgmaxx,$imgmaxy,$type)
 	include "../config.php";
 	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
  	$text="HMS-Device $type is not supported";
+	if ($type=="HMS_LIST") $text="Waiting for the first message from the HMS-Device...";
         $fontsize=7;
         $txtcolor=$bg3p;
         ImageTTFText ($im, $fontsize, 0, 5, 12, $txtcolor, $fontttf, $text);

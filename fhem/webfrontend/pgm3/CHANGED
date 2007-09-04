@@ -115,3 +115,8 @@ Changelog
 
 2007-06-13 (0.8.1)
 -- Bugfix: Section FHZ_DEVICE is now hidden if you dont want neither Pulldowns nor General.
+
+2007-09-04 (0.8.2)
+-- bugfix: HMS100WD is now aligned with other HMS-Devices
+-- feature: Now there is a warning if there are not sufficient data to draw a gnuplot graph
+-- feature: more information about new HMS-Devices

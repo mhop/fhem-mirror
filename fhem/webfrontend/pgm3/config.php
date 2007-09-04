@@ -27,7 +27,7 @@
 	# this is only possible, if the webserver (e.g.wwwrun) has the rights ro write the
 	# files from fh1000.pl. If you want that then run fhz1000.pl as wwwrun too.
 	# if 'yes' then only the needed lines are in the logfiles, the rest will be deleted.
-	$logrotate='yes';	# yes/no default='no'
+	$logrotate='no';	# yes/no default='no'
 
 
 ## Kioskmode. Only show but don't switch anything. Values: on/off
@@ -51,6 +51,7 @@
         $imgmaxyfs20=85; 		# default=85 
 	$fs20fontsizetitel=10;  	# default=10 
 	$fs20maxiconperline=9; 	# default=9
+
 					#room. Write e.g. "attr rolowz room wzo" 
 					#into your fhz1000.cfg and restart fhz1000.pl
 					# this will be marked on the FS20-Button. 
@@ -62,7 +63,7 @@
 	$showroombuttons=1; 		#default 1  Values 0/1
 	$imgmaxxroom=$imgmaxxfs20;  	#Size of the pictures, default=$imgmaxxfs20
         $imgmaxyroom=30; 		# default=30 
-	$roomfontsizetitel=10;  	# default=9
+	$roomfontsizetitel=9;  	# default=9
 	$roommaxiconperline=$fs20maxiconperline; # default=$fs20maxiconperline
 
 ##############################################################################################
@@ -122,13 +123,14 @@
 ##############################################################################################
 ## misc
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
-	$taillogorder="/usr/bin/tail -20 $logpath/fhem.log"; 
+	$tailcount=20; 			#make shure to have the correct rights. Values: 0/1
+	$taillogorder="/usr/bin/tail -$tailcount $logpath/fhem.log ";
 
 
 
 ## show Information at startup. 
 	$showLOGS='no';			#show the LOGS at startup. Default: no Values: yes/no
-	$showAT='yes';			#show the AT_JOBS at startup. Default: yes Values: yes/no
+	$showAT='no';			#show the AT_JOBS at startup. Default: no Values: yes/no
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
 	$showHIST='yes';		 	#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
 
@@ -137,6 +139,7 @@
 	$urlreload=90;			# Automatic reloading page [sec]. Default fast: 60 slow:90
 	$titel="PHP-Webmachine for fhem :-)"; #feel free to create an own title
 	$timeformat="Y-m-d H:i:s";
+	$winsize=800;			# width of the pgm3
 	$bodybg="bgcolor='#F5F5F5'"; 
 	$bg1="bgcolor='#6E94B7'";
 	$bg2="bgcolor='#AFC6DB'";

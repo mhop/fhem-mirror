@@ -120,6 +120,9 @@ $f2=fopen("tmp/gnu2","w");
 fputs($f2,$message);
 fclose($f2);
 exec("$gnuplot tmp/gnu2",$output);
+$FOUT='tmp/'.$gnudraw1.'.'.$pictype;
+$FS=filesize($FOUT);
+if ($FS == '0')echo "Warning, there are not all required data in the logfile of $gnudraw to create a graph (e.g. actuator, desired-temp...).";
 
 
 };
