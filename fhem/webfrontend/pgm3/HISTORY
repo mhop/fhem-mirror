@@ -19,3 +19,6 @@
  
 - Martin 2007-07-13
   - Section FHZ-DEVICES s now hidden if it is not needed
+
+- Martin 2007-09-04
+  - Small changes in gnuplot.php, config.php, index.php, hms100.php
