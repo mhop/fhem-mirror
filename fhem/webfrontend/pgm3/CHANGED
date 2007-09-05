@@ -120,3 +120,6 @@ Changelog
 -- bugfix: HMS100WD is now aligned with other HMS-Devices
 -- feature: Now there is a warning if there are not sufficient data to draw a gnuplot graph
 -- feature: more information about new HMS-Devices
+
+2007-09-05 (cvs)
+-- feature: gnuplot pictures of FHT without all data (actuator, desired-temp) are shown with only measured temp
