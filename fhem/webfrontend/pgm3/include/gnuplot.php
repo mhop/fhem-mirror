@@ -78,6 +78,10 @@ EOD;
 		set y2label 'Actuator (%)'
 		set y2range [$FHTy2range]
 		";
+		$gplotmain2="
+		set ylabel 'Temperature (Celsius)'  
+		set grid ytics
+		";
 		$gplotmaintmp = <<<EOD
 
 plot "< awk '/measured/{print $1, $4}' $logfile"\
@@ -87,7 +91,14 @@ using 1:2 axes x1y2 title 'Actuator (%)' with steps lw 1,\
 "< awk '/desired/{print $1, $4}'  $logfile"\
 using 1:2 axes x1y1 title 'Desired temperature' with steps
 EOD;
+		
+$gplotmainonlymeasured = <<<EOD
+
+plot "< awk '/measured/{print $1, $4}' $logfile"\
+using 1:2 axes x1y1 title 'Measured temperature' with lines lw 3
+EOD;
 		$gplotmain=$gplotmain.$gplotmaintmp;
+		$gplotmain2=$gplotmain2.$gplotmainonlymeasured;
 		break;
 
         Case HMS100T:  ############################################
@@ -122,7 +133,20 @@ fclose($f2);
 exec("$gnuplot tmp/gnu2",$output);
 $FOUT='tmp/'.$gnudraw1.'.'.$pictype;
 $FS=filesize($FOUT);
-if ($FS == '0')echo "Warning, there are not all required data in the logfile of $gnudraw to create a graph (e.g. actuator, desired-temp...).";
+	if ($FS == '0')
+	{
+		$message=$OUT1.$gplothdr.$gplotmain2;
+		$f1=fopen("tmp/gnu1","w");
+		fputs($f1,$message);
+		fclose($f1);
+		exec("$gnuplot tmp/gnu1",$output);
+		$message=$OUT2.$gplothdr.$xrange.$gplotmain2;
+		$f2=fopen("tmp/gnu2","w");
+		fputs($f2,$message);
+		fclose($f2);
+		exec("$gnuplot tmp/gnu2",$output);
+
+	}
 
 
 };

@@ -22,3 +22,8 @@
 
 - Martin 2007-09-04
   - Small changes in gnuplot.php, config.php, index.php, hms100.php
+
+- Martin 2007-09-05
+  - Change in gnuplot.php: FHT: if there are not sufficient data (e.g. actuator) only measured-temp will be drawn
+
+
