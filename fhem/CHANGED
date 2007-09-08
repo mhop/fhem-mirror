@@ -342,3 +342,4 @@
 - ==DATE== (4.2)
   - feature: added archivedir/archivecmd to the the main logfile
   - feature: 99_Sunrise_EL.pm (does not need any Date modules)
+  - bugfix:  Seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)

@@ -134,7 +134,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.23 2007-08-06 18:17:28 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.24 2007-09-08 11:15:40 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1064,7 +1064,7 @@ XmlEscape($)
   $a =~ s/"/&quot;/g;
   $a =~ s/</&lt;/g;
   $a =~ s/>/&gt;/g;
-  $a =~ s/°/&#b0;/g;
+  $a =~ s/([^ -~])/sprintf("#%02x;", ord($1))/ge;
   return $a;
 }
 
