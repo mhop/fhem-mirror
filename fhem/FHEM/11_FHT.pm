@@ -103,12 +103,11 @@ my %nosetarg = (
   "refreshvalues" => 1,
 );
 
-my %c2m = (0 => "auto", 1 => "manual", 2 => "holiday");
-my %m2c = ("auto" => 0, "manual" => 1, "holiday" => 2);
-
-my %defptr;
+my %c2m = (0 => "auto", 1 => "manual", 2 => "holiday", 3 => "holiday_short");
+my %m2c;                # Reverse c2m
 my %c2b;		# command->button hash (reverse of codes)
 my %c2bset;             # Setteable values
+my %defptr;
 
 
 #####################################
@@ -121,6 +120,9 @@ FHT_Initialize($)
     my $v = $codes{$k};
     $c2b{$v} = $k;
     $c2bset{$v} = substr($k, 0, 2) if(!defined($cantset{$v}));
+  }
+  foreach my $k (keys %c2m) {
+    $m2c{$c2m{$k}} = $k;
   }
   $c2bset{refreshvalues} = "65ff66ff";
 

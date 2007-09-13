@@ -134,7 +134,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.24 2007-09-08 11:15:40 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.25 2007-09-13 07:13:50 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1572,10 +1572,9 @@ DoTrigger($$)
   } elsif(!defined($defs{$dev}{CHANGED})) {
     return "";
   }
-  Log 5, "Triggering $dev";
 
   my $max = int(@{$defs{$dev}{CHANGED}});
-
+  Log 5, "Triggering $dev ($max canges)";
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
   ################
@@ -1592,10 +1591,16 @@ DoTrigger($$)
 
   ################
   # Log/notify modules
-  my $ret = "";
-  foreach my $n (sort keys %defs) {
-    Log 5, "$dev trigger: Checking $n for notify";
-    $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+  # If modifying a device in its own trigger, do not call the triggers from
+  # the inner loop.
+  if(!defined($defs{$dev}{INTRIGGER})) {
+    $defs{$dev}{INTRIGGER}=1;
+    my $ret = "";
+    foreach my $n (sort keys %defs) {
+      Log 5, "$dev trigger: Checking $n for notify";
+      $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+    }
+    delete($defs{$dev}{INTRIGGER});
   }
 
   ####################
@@ -1604,7 +1609,7 @@ DoTrigger($$)
   $oldvalue{$dev}{TIME} = TimeNow();
   $oldvalue{$dev}{VAL} = $defs{$dev}{CHANGED}[0];
 
-  delete($defs{$dev}{CHANGED});
+  delete($defs{$dev}{CHANGED}) if(!defined($defs{$dev}{INTRIGGER}));
 
   Log 3, "NTFY return: $ret" if($ret);
   return $ret;

@@ -1349,6 +1349,9 @@ split in multiple lines<br><br>
     sun-from2
     sun-to2
     mode
+    holiday1
+    holiday2
+    mode
     desired-temp
     day-temp
     night-temp
@@ -1362,7 +1365,18 @@ split in multiple lines<br><br>
     <ul>
       <li>All <code>*-temp</code> values need a temperature
           as argument, which will be rounded to 0.5 Celsius</li>
-      <li><code>mode</code> is one of <code>auto, manual or holiday</code></li>
+      <li><code>mode</code> is one of <code>auto, manual, holiday or
+          holiday_short.<br>If the mode is holiday, then
+            <ul>
+              <li>holiday1 sets the end-day of the holiday</li>
+              <li>holiday2 sets the end-month of the holiday</li>
+            </ul>
+          For holiday_short
+            <ul>
+              <li>holiday1 sets the time, in 10-minute steps</li>
+              <li>holiday2 sets number of days from now on.</li>
+            </ul>
+          </li>
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
 	  spec as argument in the HH:MM format. They define the periods, where
 	  the day-temp is valid. The minute (MM) will be rounded to 10, and
