@@ -138,3 +138,7 @@
 - Rudi Mon Sep  3 15:47:59 MEST 2007
   - 99_Sunrise_EL.pm checked in. Replaces 99_Sunrise.pm, and does not need
     any Date module.
+
+- Rudi Sun Sep  9 08:43:03 MEST 2007
+  - mode holiday_short added + documentation. Not tested.
+    any Date module.
