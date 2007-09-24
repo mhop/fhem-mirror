@@ -134,7 +134,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.25 2007-09-13 07:13:50 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.26 2007-09-24 07:09:17 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -243,18 +243,18 @@ if($attr{global}{statefile} && -r $attr{global}{statefile}) {
 }
 SignalHandling();
 
-Log 0, "Server started (version $attr{global}{version}, pid $$)";
-
 ################################################
 # Main loop
 
-$init_done = 1;
 my $pfn = $attr{global}{pidfilename};
 if($pfn) {
-  return "$pfn: $!" if(!open(PID, ">$pfn"));
+  die "$pfn: $!\n" if(!open(PID, ">$pfn"));
   print PID $$ . "\n";
   close(PID);
 }
+
+$init_done = 1;
+Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
 
 # Main Loop
