@@ -255,7 +255,7 @@ FS20_Define($$)
   $hash->{XMIT} = lc($a[2]);
   $hash->{BTN}  = lc($a[3]);
 
-  my $code = "$a[2] $a[3]";
+  my $code = lc("$a[2] $a[3]");
   my $ncode = 1;
   my $name = $a[0];
 
@@ -277,7 +277,7 @@ FS20_Define($$)
       return $u;
     }
 
-    $code = "$a[2] $a[$i+1]";
+    $code = lc("$a[2] $a[$i+1]");
     $hash->{CODE}{$ncode++} = $code;
     $defptr{$code}{$name}   = $hash;
   }
