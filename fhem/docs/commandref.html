@@ -905,7 +905,33 @@ split in multiple lines<br><br>
       HMS100T, etc) and device number, separated by a space.</li>
 
     </ul>
+  </ul>
 
+  <a name="weblink"></a>
+  <h4>Type weblink</h4>
+  <ul>
+    <code>define &lt;name&gt; weblink [link|fileplot] &lt;argument&gt;</code>
+    <br><br>
+    This is a placeholder used with webpgm2 to be able to integrate links
+    into it, and to be able to put more than one gnuplot picture on one page.
+    It has no set or get methods.
+
+    Examples:
+    <ul>
+      <code>define wl_1 weblink link http://www.fhem.de</code><br>
+      <code>define wl_2 weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
+    </ul>
+    <br>
+
+    Notes:
+    <ul>
+      Normally you won't have to define fileplot weblinks manually, as fhemweb.pl
+      (webpgm2) makes it easy for you, just plot a logfile (see <a
+      href="#logtype">logtype</a>) and convert it to weblink.  Now you can
+      group these weblinks by putting them into rooms.
+      If you convert the current logfile to a weblink, it will always refer to the
+      current file (and not the one you originally specified).
+    </ul>
   </ul>
 
 </ul>

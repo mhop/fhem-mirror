@@ -142,3 +142,8 @@
 - Rudi Sun Sep  9 08:43:03 MEST 2007
   - mode holiday_short added + documentation. Not tested.
     any Date module.
+
+- Rudi Wed Oct  3 18:21:36 MEST 2007
+  - weblinks added. Used by webpgm2 to display more than one plot at once
+  - webpgm2 output reformatted. Using CSS to divide the screen area in 3
+    parts: command line, room-list and rest
