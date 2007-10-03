@@ -261,6 +261,7 @@ EmGetData($$)
   my ($dev, $d) = @_;
   $d = EmMakeMsg(pack('H*', $d));
 
+  return undef if(!$dev);
   my $serport = new Device::SerialPort ($dev);
   if(!$serport) {
     Log 1, "EM: Can't open $dev: $!";

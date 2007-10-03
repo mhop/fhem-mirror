@@ -345,3 +345,5 @@
   - bugfix:  Seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
   - bugfix:  FHT mode holiday_short added (9.9, Dirk)
   - bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)
+  - feature: webpgm2 output reformatted
+  - feature: webpgm2 can display multiple plots.

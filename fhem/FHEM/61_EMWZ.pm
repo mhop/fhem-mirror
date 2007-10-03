@@ -142,7 +142,7 @@ EMWZ_Set($@)
   }
 
   my $ret = IOWrite($hash, $msg);
-  if(!defined($d)) {
+  if(!defined($ret)) {
     my $msg = "EMWZ $name read error";
     Log GetLogLevel($name,2), $msg;
     return $msg;

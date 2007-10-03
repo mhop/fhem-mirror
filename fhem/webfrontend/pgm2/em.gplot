@@ -4,7 +4,7 @@
 
 
 #=================
-set terminal png
+set terminal png size 1024,240 crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
@@ -12,7 +12,7 @@ set xlabel " "
 
 set ytics nomirror
 set y2tics
-set title '<IN>'
+set title '<TL>'
 set grid
 set ylabel "KW"
 

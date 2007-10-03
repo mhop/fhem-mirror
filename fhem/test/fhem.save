@@ -1,9 +1,4 @@
-#Thu Sep 13 09:11:22 2007
-setstate EGRollWzRe on
-setstate EGRollWzRe 2007-09-13 09:10:33 state on
-setstate EGRollWzReSteuerung active
-setstate EGTuerWz1 on
-setstate EGTuerWz1 2007-09-13 09:10:33 state on
+#Tue Oct  2 21:47:26 2007
 setstate FHZ fhtbuf: 1c
 setstate FHZ 2006-02-12 14:03:39 fhtbuf 23
 setstate FHZ 2006-03-26 08:47:36 init2 deadbeefdeadbe
@@ -37,7 +32,8 @@ setstate fl 2006-03-26 08:50:55 unknown_85 4
 setstate fl 2006-03-26 08:50:46 wed-from1 06:00
 setstate fl 2006-03-26 08:50:46 wed-to1 23:00
 setstate fl 2006-03-26 08:50:55 windowopen-temp 12.0 (Celsius)
-setstate floor.lamp ???
+setstate floor.lamp off
+setstate floor.lamp 2007-09-28 22:12:07 state off
 setstate global <no definition>
 setstate marqee on
 setstate marqee 2006-04-01 12:46:02 state on
@@ -74,10 +70,10 @@ setstate wz 2006-03-26 08:50:36 wed-from1 06:00
 setstate wz 2006-03-26 08:50:36 wed-to1 23:00
 setstate wz 2006-03-26 08:52:31 windowopen-temp 12.0 (Celsius)
 setstate x 13.66 0.0 30 13.62 15.09 -0.2 2.8
-setstate x 2007-09-13 09:10:23 Is 0.0
-setstate x 2007-09-13 09:10:23 Temp 30
-setstate x 2007-09-13 09:10:23 Vs 13.66
-setstate x 2007-09-13 09:10:23 maxI 2.8
-setstate x 2007-09-13 09:10:23 maxV 15.09
-setstate x 2007-09-13 09:10:23 minI -0.2
-setstate x 2007-09-13 09:10:23 minV 13.62
+setstate x 2007-10-02 21:46:41 Is 0.0
+setstate x 2007-10-02 21:46:41 Temp 30
+setstate x 2007-10-02 21:46:41 Vs 13.66
+setstate x 2007-10-02 21:46:41 maxI 2.8
+setstate x 2007-10-02 21:46:41 maxV 15.09
+setstate x 2007-10-02 21:46:41 minI -0.2
+setstate x 2007-10-02 21:46:41 minV 13.62
