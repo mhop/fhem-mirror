@@ -61,7 +61,7 @@ my %codes = (
   "840069" => "night-temp",
   "850069" => "unknown_85",
   "8a0069" => "windowopen-temp",
-
+  "00002a" => "lime-protection",
 
   "0000aa" => "code_0000aa",
   "0000ba" => "code_0000ba",
@@ -88,6 +88,7 @@ my %cantset = (
   "measured-low"  => 1,
   "state"         => 1,
   "init"          => 1,
+  "lime-protection"=>1,
 
   "code_0000aa"   => 1,
   "code_0000ba"   => 1,

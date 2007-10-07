@@ -347,3 +347,4 @@
   - bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)
   - feature: webpgm2 output reformatted
   - feature: webpgm2 can display multiple plots.
+  - feature: FHT lime-protection code discovered by Dirk (7.10)
