@@ -311,7 +311,8 @@ FHT_Parse($$)
 
   if($type eq "actuator") {
     $val = sprintf("%02d%%", int(100*$val/255 + 0.5));
-
+  } elsif($type eq "lime-protection") {
+    $val = sprintf("(actuator: %02d%%)", int(100*$val/255 + 0.5));
   } elsif($cde ge "140069" && $cde le "2f0069") {	# Time specs
     Log 5, "FHT $def->{NAME} ($type: $val)";
     return "" if($val == 144);	# Empty, forget it
