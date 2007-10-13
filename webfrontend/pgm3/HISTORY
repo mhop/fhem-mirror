@@ -26,4 +26,7 @@
 - Martin 2007-09-05
   - Change in gnuplot.php: FHT: if there are not sufficient data (e.g. actuator) only measured-temp will be drawn
 
+- Martin 2007-10-13
+  - Now pgm3 shows other logfiles (like from wired devices) too. Changes in index.php, config.php, gnuplot.php, new userdefs.php)
+
 

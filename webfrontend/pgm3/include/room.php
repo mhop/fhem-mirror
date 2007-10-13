@@ -40,7 +40,8 @@ include "../config.php";
 	$textwidth = abs($box[4] - $box[0]);
 	$textheight = abs($box[5] - $box[1]);
 	$xcord = ($imgmaxxroom/2)-($textwidth/2)-2;
-	$ycord = ($imgmaxyroom/2)+($textheight/2);
+#	$ycord = ($imgmaxyroom/2)+($textheight/2);
+	$ycord = ($imgmaxyroom/3+$roomfontsizetitel);
 	ImageTTFText ($im, $roomfontsizetitel, 0, $xcord, $ycord, $txtcolor, $fontttfb, $text);
 
 	header("Content-type: image/png");
