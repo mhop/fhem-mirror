@@ -45,7 +45,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
   	$array = file($file); 
 	$oldmin=0; //only the data from every 10min
 	$oldhour=0; //only the data from every 10min
-	$actuator=0;
+	$actuator="00%";
 	$actuator_date="unknown";
 	$counter=count($array);
 	$arraydesired=array();

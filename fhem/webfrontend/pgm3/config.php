@@ -1,11 +1,11 @@
 <?php
 
 ##################################################################################
-#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
+#### pgm3 -- a PHP-webfrontend for fhem.pl 
 
 
 ###### required settings
-	$fhz1000="localhost"; #only php5 ! On which machine is fhz1000 runnning??
+	$fhz1000="localhost"; #only php5 ! On which machine is fhem runnning??
 					# if it is not localhost then the fhz1000.cfg must
 					# run global: "port <nr> global"
 	$fhz1000port="7072";		# port of fhz1000.pl
@@ -27,7 +27,7 @@
 	# this is only possible, if the webserver (e.g.wwwrun) has the rights ro write the
 	# files from fh1000.pl. If you want that then run fhz1000.pl as wwwrun too.
 	# if 'yes' then only the needed lines are in the logfiles, the rest will be deleted.
-	$logrotate='no';	# yes/no default='no'
+	$logrotate='yes';	# yes/no default='no'
 
 
 ## Kioskmode. Only show but don't switch anything. Values: on/off
@@ -69,7 +69,7 @@
 ##############################################################################################
 
 ## FHT-Devices
-        $imgmaxxfht=725;  #Size of the pictures Default: 725
+        $imgmaxxfht=725;  			#Size of the pictures Default: 725
         $imgmaxyfht=52;
         $show_desiredtemp=1;                    # show the desired_temp as a graphic (0/1)
         $desR='255'; $desG='255'; $desB='255';  # Color of desired-temp-line Red/Green/Blue (Default: 255/255/255) 
@@ -104,6 +104,19 @@
                                                 # from fhz1000.pl (user = ???)
 
 ##############################################################################################
+## SCIVT-Devices
+        $imgmaxxscivt=725;  #Size of the pictures. Default:  725
+        $imgmaxyscivt=52;
+        $maxcountscivt='575';                     # Maximum count of pixel (from right to left) (Default:575)
+        $XcorrectMainTextSCIVT=25;                # Text of main text from the right side (Default:)
+        $logrotateSCIVTlines=1200;                # automatic Logrotate; $logrotate must be 'yes'.
+                                                # Default:1200
+                                                # read docs/logrotate if you want adjust it manually!
+                                                # otherwise the system will slow down
+                                                # pgm3 (user www-data) needs the rights to write the logs
+                                                # from fhz1000.pl (user = ???)
+
+##############################################################################################
 ## KS300-Device
         $imgmaxxks=725;                 #Size of the pictures  Default: 725
 
@@ -112,12 +125,68 @@
         $maxcountKS='575';              # Maximum count of pixel (from right to left) (Default:575)
         $XcorrectMainTextKS=45;         # Text of main text from the right side (Default: 35)
 
-        $logrotateKS300lines=1900;      # automatic Logrotate; $logrotate must be 'yes'.
-                                        # Default:1900
+        $logrotateKS300lines=2100;      # automatic Logrotate; $logrotate must be 'yes'.
+                                        # Default:2100
                                         # read docs/logrotate if you want adjust it manually
                                         # otherwise the system will slow down
                                         # pgm3 (user www-data) needs the rights to write the logs
                                         # from fhz1000.pl (user = ???)
+##############################################################################################
+## user
+# Create your own graphics! If you have separate Programs (e.g. wired devices) then create your own 
+# logfile and tell pgm3  to use it.
+# the logfile must look like this:
+###################################
+# 2007-10-13_13:45:14 solarI Is: 0.0 
+###################################
+# Field1: <date>_<time> 	e.g. 2007-10-13_13:45:14
+# Field2: <name> 		e.g. solar
+# Field3: <free>		this field has no meaning
+# Field4: <value>		e.g. 0.0 this must be a numeric value
+
+	
+ 	$UserDefs=0;                     # Do you want user defined graphics? 1/0 Default: 0
+
+#################
+## Userdef: 0 ## Switch $UserDefs to 1 !! ###
+        $userdef[0]['name']='SolarV';		 #Size of the pictures. Default:  725
+						 # No blanks or other special signs!!
+        $userdef[0]['imagemax']=725;
+        $userdef[0]['imagemay']=52;
+        $userdef[0]['maxcount']=575;                         # Maximum count of pixel (from right to left) (Default:575)
+        $userdef[0]['XcorrectMainText']=25;                  # Text of main text from the right side (Default:)
+        $userdef[0]['logrotatelines']=2200;                  # automatic Logrotate; $logrotate must be 'yes'.
+                                                # Default:2200
+                                                # read docs/logrotate if you want adjust it manually!
+                                                # otherwise the system will slow down
+                                                # pgm3 (user www-data) needs the rights to write the logs
+                                                # from fhz1000.pl (user = ???)
+        $userdef[0]['logpath']=$logpath.'/lse_solarV.log';   # example, path to the logfile with the entrys like above
+        $userdef[0]['room']='user';
+	$userdef[0]['semlong']='Voltage'; 	# Sematic eg. Voltage
+	$userdef[0]['semshort']='V';		# Sematic short e.g. V
+
+#################
+## Userdef: 1
+#        $userdef[1]['name']='Solar I';		 #Size of the pictures. Default:  725
+# .....
+
+
+
+#################
+## Userdef: 1
+
+
+
+
+
+########################
+
+
+
+
+
+
 
 
 ##############################################################################################
@@ -125,12 +194,14 @@
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
 	$tailcount=20; 			#make shure to have the correct rights. Values: 0/1
 	$taillogorder="/usr/bin/tail -$tailcount $logpath/fhem.log ";
+	#$taillogorder="/usr/bin/tail -$tailcount $logpath/fhemjens.log ";
+#	$taillogorder="grep -v comparison $logpath/fhem.log| tail -20"; 
 
 
 
 ## show Information at startup. 
 	$showLOGS='no';			#show the LOGS at startup. Default: no Values: yes/no
-	$showAT='no';			#show the AT_JOBS at startup. Default: no Values: yes/no
+	$showAT='no';			#show the AT_JOBS at startup. Default: yes Values: yes/no
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
 	$showHIST='yes';		 	#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
 
