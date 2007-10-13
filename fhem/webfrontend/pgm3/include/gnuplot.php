@@ -9,8 +9,25 @@
 function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHTy2range)
 {
 
-	$IN="$gnudraw ($gnutyp)";
+	if ($gnutyp=="userdef")
+	{
+		$userdef=$FHTyrange; # workaround
+		$userdefnr=$FHTy2range; # workaround
+		
+		
+		$logfile= $userdef['logpath'];
+        	$drawuserdef=$userdef['name'];
+        	$SemanticLong=$userdef['semlong'];
+        	$SemanticShort=$userdef['semshort'];
+        	$type='UserDef '.$userdefnr;
+		$IN="$gnudraw ($gnutyp $userdefnr)";
+	}	
+	else
+	{
 	$logfile=$logpath."/".$gnudraw.".log";
+	$IN="$gnudraw ($gnutyp)";
+
+	}
 	$gnudraw1=$gnudraw.'1';
 	$OUT1="set output 'tmp/$gnudraw.$pictype'";
 	$OUT2="set output 'tmp/$gnudraw1.$pictype'";
@@ -34,6 +51,15 @@ $xrange="set xrange ['$xrange2':'$xrange1']
 
 
 switch ($gnutyp):
+        Case FS20:  ############################################
+$gplotmain=<<<EOD
+set yrange [-0.2:1.2]
+set ylabel "On/Off"  
+plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title 'On/Off' with steps
+EOD;
+#plot "< awk '{print $1, $3==\"on\"? 1 : 0; }' $logfile" using 1:2 title 'On/Off' with steps
+break;
+
         Case WS300_t1:  ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
@@ -108,6 +134,13 @@ EOD;
 		";
 		break;
 
+        Case userdef:  ############################################
+$gplotmain=<<<EOD
+\n set ylabel '$SemanticLong ( $SemanticShort )'  
+plot "$logfile" using 1:4 axes x1y1 title '$SemanticLong' with lines lw 3
+EOD;
+		break;
+
         Case HMS100TF:  ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
@@ -118,7 +151,6 @@ EOD;
 		break;
 	default:
 endswitch;	
-
 
 $message=$OUT1.$gplothdr.$gplotmain;
 $f1=fopen("tmp/gnu1","w");
@@ -133,7 +165,7 @@ fclose($f2);
 exec("$gnuplot tmp/gnu2",$output);
 $FOUT='tmp/'.$gnudraw1.'.'.$pictype;
 $FS=filesize($FOUT);
-	if ($FS == '0')
+	if (($FS == '0') and ($gnutyp != "userdef"))  ##Grafic mistake (e.G. no actuator). Draw againg without actuator
 	{
 		$message=$OUT1.$gplothdr.$gplotmain2;
 		$f1=fopen("tmp/gnu1","w");

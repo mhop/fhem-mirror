@@ -35,12 +35,13 @@
 ###############################   end of settings
 
 error_reporting(E_ALL ^ E_NOTICE);
+$userdef=array();
 include "config.php";
 include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='0.8.2';
+$pgm3version='0.8.3';
 
 	
 	$Action		=	$_POST['Action'];
@@ -51,6 +52,7 @@ $pgm3version='0.8.2';
 	$showroom	=	$_POST['showroom'];
 	$showmenu	=	$_POST['showmenu'];
 	$showhmsgnu	=	$_POST['showhmsgnu'];
+	$showuserdefgnu	=	$_POST['showuserdefgnu'];
 	$temp		=	$_POST['temp'];
 	$dofht		=	$_POST['dofht'];
 	$orderpulldown	=	$_POST['orderpulldown'];
@@ -64,6 +66,12 @@ $pgm3version='0.8.2';
 
 	if (! isset($showhmsgnu)) $showhmsgnu=$_GET['showhmsgnu'];
 	if ($showhmsgnu=="") unset($showhmsgnu);
+
+	if (! isset($showuserdefgnu)) $showuserdefgnu=$_GET['showuserdefgnu'];
+	if ($showuserdefgnu=="") unset($showuserdefgnu);
+
+	if (! isset($showfs20)) $showfs20=$_GET['showfs20'];
+	if ($showfs20=="") unset($showfs20);
 
 	if (! isset($showfht)) $showfht=$_GET['showfht'];
 	if ($showfht=="") unset($showfht);
@@ -135,11 +143,13 @@ $pgm3version='0.8.2';
 	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&showmenu='.$showmenu.'&showroom='.$showroom;};
 	if (isset ($showks)) { $forwardurl=$forwardurl.'&showks='.$showks.'&kstyp='.$kstyp;};
 	if (isset ($showhmsgnu)) { $forwardurl=$forwardurl.'&showhmsgnu='.$showhmsgnu;};
+	if (isset ($showuserdefgnu)) { $forwardurl=$forwardurl.'&showuserdefgnu='.$showuserdefgnu;};
 	if (isset ($showroom)) { $forwardurl=$forwardurl.'&showroom='.$showroom;};
 	if (isset ($shownoti)) { $forwardurl=$forwardurl.'&shownoti';};
 	if (isset ($showlogs)) { $forwardurl=$forwardurl.'&showlogs';};
 	if (isset ($showat)) { $forwardurl=$forwardurl.'&showat';};
 	if (isset ($showhist)) { $forwardurl=$forwardurl.'&showhist';};
+	if (isset ($showfs20)) { $forwardurl=$forwardurl.'&showfs20='.$showfs20;};
 	if (isset ($showmenu)) 
 	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&valuetime='.$valuetime.'&showmenu='.$showmenu.'&showroom='.$showroom;}
 	unset($link);
@@ -150,6 +160,7 @@ $pgm3version='0.8.2';
 	if (isset ($showmenu)) $link=$link.'&showmenu='.$showmenu; 
 	if (isset ($showfht)) $link=$link.'&showfht='.$showfht; 
 	if (isset ($showhmsgnu)) $link=$link.'&showhmsgnu='.$showhmsgnu; 
+	if (isset ($showuserdefgnu)) $link=$link.'&showuserdefgnu='.$showuserdefgnu; 
 	if (isset ($showks)) $link=$link.'&showks='.$showks; 
 
 
@@ -179,7 +190,7 @@ switch ($Action):
 		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
 		header("Location:  $forwardurl");
 		break;
-	Case showfht|showroom|showks|showhmsgnu|hide:
+	Case showfht|showroom|showks|showhmsgnu|hide|showuserdefgnu:
 		header("Location: $forwardurl");
 		break;
 	default:
@@ -370,6 +381,19 @@ xml_parser_free($xml_parser);
 				}
 		       }
 	       } # HMS
+	       elseif (substr($stack[0][children][$i][name],0,6)=='SCIVT_')
+	       {
+		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
+			 {
+			 	for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+				{
+				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="room") 
+					{$room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+				  	 if (! in_array($room,$rooms)) array_push($rooms,$room);
+					}
+				}
+		       }
+	       } # SCIVT
 	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -388,7 +412,18 @@ xml_parser_free($xml_parser);
 			  }
 			}
 		}
-	} # end searching rooms
+	} # end searching rooms in the array from fhem
+	# user defined rooms?
+	if ($UserDefs==1)
+	{
+		for($i=0; $i < count($userdef); $i++)
+                {
+                         $room=$userdef[$i]['room'];
+		  	if (! in_array($room,$rooms)) array_push($rooms,$room);
+		}
+	}
+
+
 	array_push($rooms,'ALL');
 	sort($rooms);
 
@@ -526,6 +561,15 @@ xml_parser_free($xml_parser);
 			 };
 			 }
 			 	echo "</td></tr>";
+				if (isset($showfs20) and $showgnuplot == 1)
+			 	{   
+                                 	drawgnuplot($showfs20,"FS20",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range);
+					$FS20dev1=$showfs20.'1';
+                                	echo "<tr><td colspan=5 align=center><img src='tmp/$showfs20.$pictype'><br>
+					<img src='tmp/$FS20dev1.$pictype'>
+                                        </td></tr>
+			 		      <tr><td colspan=4><hr color='#AFC6DB'></td></tr>";
+				}
 	       }
 	############################
 	       elseif (substr($stack[0][children][$i][name],0,4)=='FHT_')
@@ -811,6 +855,54 @@ xml_parser_free($xml_parser);
 			 }
 		} 
 	};
+## that is all of fhem
+##################### User defined graphics??
+	if ($UserDefs==1)
+        {
+	 echo "<tr><td $bg1 colspan=4><font $fontcolor1>
+                        <table  cellspacing='0' cellpadding='0' width='100%'>
+                        <tr><td><font $fontcolor1>USER DEFINED</td><td align=right><font $fontcolor1><b>
+			</font></td></tr></table></td></tr>";
+
+		 $type='userdef';
+
+                for($i=0; $i < count($userdef); $i++)
+                {
+                      $room=$userdef[$i]['room'];
+		      $UserDef=$userdef[$i]['name'];
+		      $imgmaxxuserdef=$userdef[$i]['imagemax'];
+		      $imgmaxyuserdef=$userdef[$i]['imagemay'];
+
+
+		 if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
+                 {
+                        if ($showuserdefgnu== $UserDef) {$formvalue="hide";$gnuvalue="";}
+                        else {$formvalue="show";$gnuvalue=$UserDef;};
+                        echo "<tr valign=center><td align=center $bg2 valign=center>
+                                       <form action=$forwardurl method='POST'>
+                                       <input type=hidden name=Action value=showuserdefgnu>
+                                        <input type=hidden name=showroom value=$showroom>
+                                        <input type=hidden name=showuserdefgnu value=$gnuvalue>
+                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=2>";
+
+                        echo "<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
+
+                if ($showuserdefgnu == $UserDef and $showgnuplot == 1)
+                                { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],1);
+                                $UserDef1=$UserDef.'1';
+                                echo "<tr><td colspan=5 align=center><img src='tmp/$UserDef.$pictype'><br>
+                                        <img src='tmp/$UserDef1.$pictype'>
+                                        </td></tr>";
+                }
+                }# /not room hidden
+
+                }
+
+        } #/userdefs
+
+##################### taillog
+
+
 	if ($taillog==1) 
 	{
 		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
