@@ -127,3 +127,6 @@ Changelog
 2007-10-13 (0.8.3)
 -- feature: Now it is possible to attach selfmade logfiles from e.g. wired devices. Everthing is explained in config.php.
 It is not necessary to tell fhem that there are other logs.
+
+2007-10-14 (0.8.4)
+-- feature: User defined logs with several values in one file now supported.

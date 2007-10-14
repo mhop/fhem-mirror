@@ -28,5 +28,6 @@
 
 - Martin 2007-10-13
   - Now pgm3 shows other logfiles (like from wired devices) too. Changes in index.php, config.php, gnuplot.php, new userdefs.php)
-
+- Martin 2007-10-14
+ -  User defined logs with several values in one file now supported. Changes in index.php, gnuplot.php, userdefs.php and config.php.
 
