@@ -1,16 +1,16 @@
 <?php
 
 ##################################################################################
-#### pgm3 -- a PHP-webfrontend for fhem.pl 
+#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
 
 
 ###### required settings
 	$fhz1000="localhost"; #only php5 ! On which machine is fhem runnning??
-					# if it is not localhost then the fhz1000.cfg must
+					# if it is not localhost then the fhem.cfg must
 					# run global: "port <nr> global"
-	$fhz1000port="7072";		# port of fhz1000.pl
+	$fhz1000port="7072";		# port of fhem.pl
 	$logpath="/var/tmp";		# where are your logs?
-	$fhz1000_pl="/home/FHZ/fhz1000/fhz1000.pl"; #only required if you are using PHP4
+	$fhz1000_pl="/home/FHZ/fhem/fhem.pl"; #only required if you are using PHP4
 
 ##################################################################################
 ###### nice to have
@@ -131,52 +131,89 @@
                                         # otherwise the system will slow down
                                         # pgm3 (user www-data) needs the rights to write the logs
                                         # from fhz1000.pl (user = ???)
+
 ##############################################################################################
-## user
+## USERDEF
+#
 # Create your own graphics! If you have separate Programs (e.g. wired devices) then create your own 
 # logfile and tell pgm3  to use it.
-# the logfile must look like this:
-###################################
-# 2007-10-13_13:45:14 solarI Is: 0.0 
-###################################
-# Field1: <date>_<time> 	e.g. 2007-10-13_13:45:14
-# Field2: <name> 		e.g. solar
-# Field3: <free>		this field has no meaning
-# Field4: <value>		e.g. 0.0 this must be a numeric value
+# We only need a data/time-field in the form <date>_<time>, e.g. 2007-10-13_13:45:14
+# and a field with a numeric value e.g. 0.0
 
-	
- 	$UserDefs=0;                     # Do you want user defined graphics? 1/0 Default: 0
+#Example: 
+####################################################
+# 2007-10-13_13:45:14 solarI Is: 0.0 Vs: 4.5 T: 22
+####################################################
+# Field1: 2007-10-13_13:45:14
+# Field2: solarI
+# Field3: Is:
+# Field4: 0.0
+#...
+# Field1 must be the date/time-field. Then tell pgm3 with $userdef[x]['valuefield'] (see below)
+# the field with the needed value. It is possible to create several graphics with on logfile.
 
-#################
-## Userdef: 0 ## Switch $UserDefs to 1 !! ###
-        $userdef[0]['name']='SolarV';		 #Size of the pictures. Default:  725
-						 # No blanks or other special signs!!
-        $userdef[0]['imagemax']=725;
-        $userdef[0]['imagemay']=52;
-        $userdef[0]['maxcount']=575;                         # Maximum count of pixel (from right to left) (Default:575)
-        $userdef[0]['XcorrectMainText']=25;                  # Text of main text from the right side (Default:)
-        $userdef[0]['logrotatelines']=2200;                  # automatic Logrotate; $logrotate must be 'yes'.
-                                                # Default:2200
-                                                # read docs/logrotate if you want adjust it manually!
-                                                # otherwise the system will slow down
-                                                # pgm3 (user www-data) needs the rights to write the logs
-                                                # from fhz1000.pl (user = ???)
-        $userdef[0]['logpath']=$logpath.'/lse_solarV.log';   # example, path to the logfile with the entrys like above
-        $userdef[0]['room']='user';
-	$userdef[0]['semlong']='Voltage'; 	# Sematic eg. Voltage
-	$userdef[0]['semshort']='V';		# Sematic short e.g. V
+
+# Do you want user defined graphics? 1/0 Default: 0	
+$UserDefs=0;
+
+#####################
+## Userdef: 0
+
+# No blanks or other special signs!!
+$userdef[0]['name']='SolarV';	
+
+#In which field are the values?? See the example above
+$userdef[0]['valuefield']=4;	
+
+# example, path to the logfile with the entrys like above
+$userdef[0]['logpath']=$logpath.'/lse_solarV.log';   
+$userdef[0]['room']='user';
+
+# Semantic eg. Voltage
+$userdef[0]['semlong']='Voltage'; 	
+
+# Semantic short e.g. V
+$userdef[0]['semshort']='V';
+
+#Size of the pictures. Default:  725
+$userdef[0]['imagemax']=725;
+$userdef[0]['imagemay']=52;
+
+# Maximum count of pixel (from right to left) (Default:575)
+$userdef[0]['maxcount']=575;
+
+ # Text of main text from the right side (Default:)
+$userdef[0]['XcorrectMainText']=25;               
+
+# automatic Logrotate; $logrotate must be 'yes'.
+# Default:2200
+# read docs/logrotate if you want adjust it manually!
+# otherwise the system will slow down
+# pgm3 (user www-data) needs the rights to write the logs
+# from fhz1000.pl (user = ???)
+$userdef[0]['logrotatelines']=2200;  
+
 
 #################
 ## Userdef: 1
-#        $userdef[1]['name']='Solar I';		 #Size of the pictures. Default:  725
-# .....
-
-
+# 
+#$userdef[1]['name']='';	
+#$userdef[1]['valuefield']=;	
+#$userdef[1]['logpath']='/var/tmp/log.log';   
+#$userdef[1]['room']='';
+#$userdef[1]['semlong']=''; 	
+#$userdef[1]['semshort']='';
+#$userdef[1]['imagemax']=725;
+#$userdef[1]['imagemay']=52;
+#$userdef[1]['maxcount']=575;
+#$userdef[1]['XcorrectMainText']=25;               
+#$userdef[1]['logrotatelines']=2200;  
 
 #################
-## Userdef: 1
-
-
+## Userdef: 2
+#
+#$userdef[2]['name']='';	
+#........ 
 
 
 
@@ -194,8 +231,6 @@
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
 	$tailcount=20; 			#make shure to have the correct rights. Values: 0/1
 	$taillogorder="/usr/bin/tail -$tailcount $logpath/fhem.log ";
-	#$taillogorder="/usr/bin/tail -$tailcount $logpath/fhemjens.log ";
-#	$taillogorder="grep -v comparison $logpath/fhem.log| tail -20"; 
 
 
 

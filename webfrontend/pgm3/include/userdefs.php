@@ -14,9 +14,6 @@ include "functions.php";
 	$userdefnr=$_GET['userdefnr'];
 
 	$room=$userdef[$userdefnr]['room'];
-#echo "Raum: $room"; exit;
-
-
 
 	$file= $userdef[$userdefnr]['logpath'];
 	$drawuserdef=$userdef[$userdefnr]['name'];
@@ -24,6 +21,7 @@ include "functions.php";
 	$imgmaxyuserdef=$userdef[$userdefnr]['imagemay'];
 	$SemanticLong=$userdef[$userdefnr]['semlong'];
 	$SemanticShort=$userdef[$userdefnr]['semshort'];
+	$valuefield=$userdef[$userdefnr]['valuefield'];
 	$type='UserDef '.$userdefnr;
 	$logrotateUSERDEFlines=$userdef[0]['logrotatelines'];
 	$maxcountUSERDEF=$userdef[0]['maxcount'];
@@ -69,13 +67,26 @@ include "functions.php";
 
    	for ($x = 0; $x < $counter; $x++)
 	{
-		list ($date,$userdef,$t,$temp,$h,$hum) = preg_split("/[\s,]+/", $array[$x]);
+		list ($date,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9,$f10) = preg_split("/[\s,]+/", $array[$x]);
 		if  ((($array[$x][14] != $oldmin) or ($array[$x][12] != $oldhour)  or ($x==$counter-1))
 				and ( $date !="NEWLOGS"))
 		{
+
+	switch ($valuefield):
+        	Case 2: $value=$f2;break;
+	        Case 3: $value=$f3;break;
+        	Case 4: $value=$f4;break;
+	        Case 5: $value=$f5;break;
+        	Case 6: $value=$f6;break;
+	        Case 7: $value=$f7;break;
+        	Case 8: $value=$f8;break;
+	        Case 9: $value=$f9;break;
+        	Case 10: $value=$f10;break;
+	endswitch; 
 			$oldmin=$array[$x][14]; 
 			$oldhour=$array[$x][12]; 
-			array_push( $_SESSION["arraydata"],array($date,$temp,$hum));
+			array_push( $_SESSION["arraydata"],array($date,$value));
+			$temp=$value;
 		}
      	}
 
@@ -89,12 +100,12 @@ include "functions.php";
 
 	###################
         ### min/max
-      	$mintemp=100;
-      	$maxtemp=-100;
+      	$mintemp=1000;
+      	$maxtemp=-1000;
       	for ($x = 0; $x <= $_SESSION["maxdata"]; $x++)
       	{
               if ( $resultreverse[$x][1] > $maxtemp ) $maxtemp=$resultreverse[$x][1];
-              if ( ($resultreverse[$x][1] < $mintemp) and ($resultreverse[$x][1]>-100) ) $mintemp=$resultreverse[$x][1];
+              if ( ($resultreverse[$x][1] < $mintemp) and ($resultreverse[$x][1]>-1000) ) $mintemp=$resultreverse[$x][1];
       	}
       	$tempdiff=$maxtemp-$mintemp;
       	if ($tempdiff==0) $tempdiff=1;
