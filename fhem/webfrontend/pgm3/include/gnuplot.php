@@ -19,6 +19,7 @@ function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHT
         	$drawuserdef=$userdef['name'];
         	$SemanticLong=$userdef['semlong'];
         	$SemanticShort=$userdef['semshort'];
+		$valuefield=$userdef['valuefield'];
         	$type='UserDef '.$userdefnr;
 		$IN="$gnudraw ($gnutyp $userdefnr)";
 	}	
@@ -137,7 +138,7 @@ EOD;
         Case userdef:  ############################################
 $gplotmain=<<<EOD
 \n set ylabel '$SemanticLong ( $SemanticShort )'  
-plot "$logfile" using 1:4 axes x1y1 title '$SemanticLong' with lines lw 3
+plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 3
 EOD;
 		break;
 
