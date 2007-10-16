@@ -11,6 +11,15 @@ include "../config.php";
 include "functions.php";
 
 
+#function normalize($piriarray)
+#{
+#	print_r($piriarray);
+#	exit;
+
+#
+#}
+
+
 	$userdefnr=$_GET['userdefnr'];
 
 	$room=$userdef[$userdefnr]['room'];
@@ -23,9 +32,10 @@ include "functions.php";
 	$SemanticShort=$userdef[$userdefnr]['semshort'];
 	$valuefield=$userdef[$userdefnr]['valuefield'];
 	$type='UserDef '.$userdefnr;
-	$logrotateUSERDEFlines=$userdef[0]['logrotatelines'];
-	$maxcountUSERDEF=$userdef[0]['maxcount'];
-	$XcorrectMainTextUSERDEF=$userdef[0]['XcorrectMainText'];
+	$logrotateUSERDEFlines=$userdef[$userdefnr]['logrotatelines'];
+	$maxcountUSERDEF=$userdef[$userdefnr]['maxcount'];
+	$XcorrectMainTextUSERDEF=$userdef[$userdefnr]['XcorrectMainText'];
+	$gnuplottype=$userdef[$userdefnr]['gnuplottype'];
 
 
 
@@ -73,6 +83,7 @@ include "functions.php";
 		{
 
 	switch ($valuefield):
+        	Case 1: $value=$date;break;
         	Case 2: $value=$f2;break;
 	        Case 3: $value=$f3;break;
         	Case 4: $value=$f4;break;
@@ -89,6 +100,8 @@ include "functions.php";
 			$temp=$value;
 		}
      	}
+	
+#	normalize($_SESSION["arraydata"]);
 
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
 	$xold=$imgmaxxuserdef;
@@ -115,6 +128,52 @@ include "functions.php";
 	
 
 	if ($maxcountUSERDEF <   $_SESSION["maxdata"])  {$anzlines=$maxcountUSERDEF;} else {$anzlines= $_SESSION["maxdata"];}
+
+
+if ($gnuplottype=='piri' or $gnuplottype=='fs20')
+{
+			$datumtomorrow= mktime (0,0,0,date("m")  ,date("d")+1,date("Y"));
+			$xrange1= date ("Y-m-d",$datumtomorrow);
+			$datumyesterday= mktime (0,0,0,date("m")  ,date("d")-5,date("Y"));
+			$xrange2= date ("Y-m-d",$datumyesterday);
+			$xrange="set xrange ['$xrange2':'$xrange1']";
+			$gnuplotfile="../tmp/".$drawuserdef;
+			#$gnuplotpng="../tmp/".$drawuserdef.".png";
+			$gnuplotpng=$drawuserdef.".png";
+			
+			$messageA=<<<EOD
+			set output '$gnuplotpng'
+			set terminal png 
+			set xdata time 
+			set timefmt '%Y-%m-%d_%H:%M:%S' 
+			set noytics 
+			unset label
+			$xrange
+			set grid
+			set yrange [-0.3:1.3]
+			set size 0.8,0.15
+			set format x ''
+
+EOD;
+}
+
+
+switch ($gnuplottype):
+        	Case 'piri':
+			$messageB=<<<EOD
+			plot "< awk '{print $1, 1; }' $file "\
+		        using 1:2 title '' with impulses
+EOD;
+			break;
+        	Case 'fs20':
+			$messageB=<<<EOD
+			plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' \
+			$file" using 1:2 title '' with steps
+
+EOD;
+			break;
+
+		default: 
 	for ($x = 0; $x < $anzlines; $x++)
 
         {
@@ -129,12 +188,32 @@ include "functions.php";
 		$xold=$imgmaxxuserdef-$x;
 		$yold=$y;
 	};
-	ImageLine($im, $imgmaxxuserdef-$x, 0,$imgmaxxuserdef-$x , $imgmaxyuserdef, $yellow);
+		ImageLine($im, $imgmaxxuserdef-$x, 0,$imgmaxxuserdef-$x , $imgmaxyuserdef, $yellow);
+	break;
+endswitch;
+
+
+if ($gnuplottype=='piri' or $gnuplottype=='fs20')
+{
+			$message=$messageA.$messageB;
+			$f1=fopen("$gnuplotfile","w");
+			fputs($f1,$message);
+			fclose($f1);
+			exec("$gnuplot $gnuplotfile",$output);
+
+			$w = imagesx($im);
+			$h = imagesy($im);
+
+			$im2 = imagecreatefrompng("$gnuplotpng");
+			$w2 = imagesx($im2);
+			$h2 = imagesy($im2);
+			ImageCopy($im,$im2,150,0,0,10,$w2-10,$h2);
+}
+
+
+
 	ImageLine($im, $imgmaxxuserdef-$maxcountUSERDEF, 0,$imgmaxxuserdef-$maxcountUSERDEF , $imgmaxyuserdef, $white);
 	$tempTEMP=$temp;
-
-
-
 
 
 #############################################################################
