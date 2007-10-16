@@ -63,7 +63,7 @@
 	$showroombuttons=1; 		#default 1  Values 0/1
 	$imgmaxxroom=$imgmaxxfs20;  	#Size of the pictures, default=$imgmaxxfs20
         $imgmaxyroom=30; 		# default=30 
-	$roomfontsizetitel=9;  	# default=9
+	$roomfontsizetitel=10;  	# default=10
 	$roommaxiconperline=$fs20maxiconperline; # default=$fs20maxiconperline
 
 ##############################################################################################
@@ -97,19 +97,6 @@
         $maxcountHMS='575';                     # Maximum count of pixel (from right to left) (Default:575)
         $XcorrectMainTextHMS=25;                # Text of main text from the right side (Default:)
         $logrotateHMSlines=1200;                # automatic Logrotate; $logrotate must be 'yes'.
-                                                # Default:1200
-                                                # read docs/logrotate if you want adjust it manually!
-                                                # otherwise the system will slow down
-                                                # pgm3 (user www-data) needs the rights to write the logs
-                                                # from fhz1000.pl (user = ???)
-
-##############################################################################################
-## SCIVT-Devices
-        $imgmaxxscivt=725;  #Size of the pictures. Default:  725
-        $imgmaxyscivt=52;
-        $maxcountscivt='575';                     # Maximum count of pixel (from right to left) (Default:575)
-        $XcorrectMainTextSCIVT=25;                # Text of main text from the right side (Default:)
-        $logrotateSCIVTlines=1200;                # automatic Logrotate; $logrotate must be 'yes'.
                                                 # Default:1200
                                                 # read docs/logrotate if you want adjust it manually!
                                                 # otherwise the system will slow down
@@ -165,8 +152,12 @@ $userdef[0]['name']='SolarV';
 #In which field are the values?? See the example above
 $userdef[0]['valuefield']=4;	
 
+#Type of Device [temperature | piri] pgm3 will try to generate a gnuplot picture
+$userdef[0]['gnuplottype']='temperature';	
+
 # example, path to the logfile with the entrys like above
 $userdef[0]['logpath']=$logpath.'/lse_solarV.log';   
+
 $userdef[0]['room']='user';
 
 # Semantic eg. Voltage
@@ -199,6 +190,7 @@ $userdef[0]['logrotatelines']=2200;
 # 
 #$userdef[1]['name']='';	
 #$userdef[1]['valuefield']=;	
+#$userdef[1]['gnuplottype']='temperature';	
 #$userdef[1]['logpath']='/var/tmp/log.log';   
 #$userdef[1]['room']='';
 #$userdef[1]['semlong']=''; 	
@@ -209,10 +201,76 @@ $userdef[0]['logrotatelines']=2200;
 #$userdef[1]['XcorrectMainText']=25;               
 #$userdef[1]['logrotatelines']=2200;  
 
-#################
-## Userdef: 2
+########################
+# example: 
+# define piriulog FileLog /var/tmp/piriu.log piriu:.*
+#$userdef[1]['name']='PiriU';	
+#$userdef[1]['valuefield']=3;	
+#$userdef[1]['gnuplottype']='piri';	
+#$userdef[1]['logpath']='/mnt/fhz/piriu.log';   
+#$userdef[1]['room']='wgu';
+#$userdef[1]['semlong']='Bewegungsmelder'; 	
+#$userdef[1]['semshort']='';
+#$userdef[1]['imagemax']=725;
+#$userdef[1]['imagemay']=52;
+#$userdef[1]['maxcount']=575;
+#$userdef[1]['XcorrectMainText']=25;               
+#$userdef[1]['logrotatelines']=2200;  
+
+########################
+# example: 
+# define piriolog FileLog /var/tmp/pirio.log pirio:.*
+#$userdef[2]['name']='PiriO';	
+#$userdef[2]['valuefield']=3;	
+#$userdef[2]['gnuplottype']='piri';	
+#$userdef[2]['logpath']='/mnt/fhz/pirio.log';   
+#$userdef[2]['room']='wgo';
+#$userdef[2]['semlong']='Bewegungsmelder'; 	
+#$userdef[2]['semshort']='';
+#$userdef[2]['imagemax']=725;
+#$userdef[2]['imagemay']=52;
+#$userdef[2]['maxcount']=575;
+#$userdef[2]['XcorrectMainText']=25;               
+#$userdef[2]['logrotatelines']=2200;  
 #
-#$userdef[2]['name']='';	
+
+########################
+# example: 
+#define solarpumpe.log FileLog /var/tmp/solarpumpe.log solarpumpe:.*(on|off).*
+#$userdef[3]['name']='SolarPumpe';	
+#$userdef[3]['valuefield']=3;	
+#$userdef[3]['gnuplottype']='fs20';	
+#$userdef[3]['logpath']='/mnt/fhz/solarpumpe.log';   
+#$userdef[3]['room']='cellar';
+#$userdef[3]['semlong']='Solarpumpe'; 	
+#$userdef[3]['semshort']='';
+#$userdef[3]['imagemax']=725;
+#$userdef[3]['imagemay']=52;
+#$userdef[3]['maxcount']=575;
+#$userdef[3]['XcorrectMainText']=25;               
+#$userdef[3]['logrotatelines']=50;  
+#
+
+##########################
+# example: 
+#define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
+#$userdef[4]['name']='Rolu1';	
+#$userdef[4]['valuefield']=3;	
+#$userdef[4]['gnuplottype']='fs20';	
+#$userdef[4]['logpath']='/mnt/fhz/rolu1.log';   
+#$userdef[4]['room']='wgu';
+#$userdef[4]['semlong']='Rolladen'; 	
+#$userdef[4]['semshort']='';
+#$userdef[4]['imagemax']=725;
+#$userdef[4]['imagemay']=52;
+#$userdef[4]['maxcount']=575;
+#$userdef[4]['XcorrectMainText']=25;               
+#$userdef[4]['logrotatelines']=30;  
+#
+#################
+## Userdef: x
+#
+#$userdef[x]['name']='';	
 #........ 
 
 

@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='0.8.4';
+$pgm3version='0.8.5cvs';
 
 	
 	$Action		=	$_POST['Action'];
@@ -888,7 +888,7 @@ xml_parser_free($xml_parser);
                         echo "<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
 
                 if ($showuserdefgnu == $UserDef and $showgnuplot == 1)
-                                { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],1);
+                                { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],$i);
                                 $UserDef1=$UserDef.'1';
                                 echo "<tr><td colspan=5 align=center><img src='tmp/$UserDef.$pictype'><br>
                                         <img src='tmp/$UserDef1.$pictype'>
