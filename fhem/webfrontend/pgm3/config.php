@@ -152,7 +152,7 @@ $userdef[0]['name']='SolarV';
 #In which field are the values?? See the example above
 $userdef[0]['valuefield']=4;	
 
-#Type of Device [temperature | piri] pgm3 will try to generate a gnuplot picture
+#Type of Device [temperature | piri | fs20] pgm3 will try to generate a gnuplot picture
 $userdef[0]['gnuplottype']='temperature';	
 
 # example, path to the logfile with the entrys like above
