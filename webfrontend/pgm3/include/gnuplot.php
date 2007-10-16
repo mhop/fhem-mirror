@@ -15,6 +15,7 @@ function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHT
 		$userdefnr=$FHTy2range; # workaround
 		
 		
+		$gnuplottype= $userdef['gnuplottype'];
 		$logfile= $userdef['logpath'];
         	$drawuserdef=$userdef['name'];
         	$SemanticLong=$userdef['semlong'];
@@ -22,6 +23,9 @@ function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHT
 		$valuefield=$userdef['valuefield'];
         	$type='UserDef '.$userdefnr;
 		$IN="$gnudraw ($gnutyp $userdefnr)";
+		if ($gnuplottype=='piri') $gnutyp='piri';
+		if ($gnuplottype=='fs20') $gnutyp='FS20';
+		
 	}	
 	else
 	{
@@ -54,11 +58,13 @@ $xrange="set xrange ['$xrange2':'$xrange1']
 switch ($gnutyp):
         Case FS20:  ############################################
 $gplotmain=<<<EOD
+set size 1,0.5
+set noytics 
+set noy2tics 
 set yrange [-0.2:1.2]
 set ylabel "On/Off"  
-plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title 'On/Off' with steps
+plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title '' with steps
 EOD;
-#plot "< awk '{print $1, $3==\"on\"? 1 : 0; }' $logfile" using 1:2 title 'On/Off' with steps
 break;
 
         Case WS300_t1:  ############################################
@@ -138,6 +144,22 @@ EOD;
         Case userdef:  ############################################
 $gplotmain=<<<EOD
 \n set ylabel '$SemanticLong ( $SemanticShort )'  
+set size 1,0.5
+set noytics 
+set noy2tics 
+plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 3
+EOD;
+		break;
+        Case piri:  ############################################
+$gplotmain=<<<EOD
+\n set ylabel '$drawuserdef'  
+set noytics
+set noy2tics
+set size 1,0.5
+set yrange [-1.2:2.2]
+plot "< awk '{print $1, 1; }' $logfile "\
+        using 1:2 title '$drawuserdef' with impulses
+
 plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 3
 EOD;
 		break;

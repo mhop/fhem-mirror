@@ -130,3 +130,6 @@ It is not necessary to tell fhem that there are other logs.
 
 2007-10-14 (0.8.4)
 -- feature: User defined logs with several values in one file now supported.
+
+2007-10-16 (CVS)
+-- feature: User defined graphics now for Piri and FS20 too. Everthing is explained in the config.php.
