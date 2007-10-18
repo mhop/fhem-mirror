@@ -11,15 +11,6 @@ include "../config.php";
 include "functions.php";
 
 
-#function normalize($piriarray)
-#{
-#	print_r($piriarray);
-#	exit;
-
-#
-#}
-
-
 	$userdefnr=$_GET['userdefnr'];
 
 	$room=$userdef[$userdefnr]['room'];
@@ -39,7 +30,6 @@ include "functions.php";
 
 
 
-	#if (! in_array($type,$supported_USERDEF)) show_error_type($imgmaxxuserdef,$imgmaxyuserdef,$type);
         if (! file_exists($file)) show_error($file,$drawuserdef,$imgmaxxuserdef,$imgmaxyuserdef,$type,$userdefnr);
 	
 	$_SESSION["arraydata"] = array();
@@ -101,7 +91,6 @@ include "functions.php";
 		}
      	}
 	
-#	normalize($_SESSION["arraydata"]);
 
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
 	$xold=$imgmaxxuserdef;
@@ -166,9 +155,23 @@ switch ($gnuplottype):
 EOD;
 			break;
         	Case 'fs20':
+			$actdate= date("Y-m-d_H:i:s");
+			$newlastline=$actdate." ".$f2." ".$f3." ".$f4." ".$f5." ".$f6;
+			array_push( $array ,$newlastline);
+			$filename=substr($file,strrpos($file, '/')+1);
+			$filename='../tmp/'.$filename.'.tmp';
+ 			$f1=fopen("$filename","w");
+			 for ($x = 0; $x <= count($array); $x++)
+        		{
+				fputs($f1,$array[$x]);
+			}
+			fputs($f1,"\n");
+                        fclose($f1);
+
+
 			$messageB=<<<EOD
 			plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' \
-			$file" using 1:2 title '' with steps
+			$filename" using 1:2 title '' with steps
 
 EOD;
 			break;

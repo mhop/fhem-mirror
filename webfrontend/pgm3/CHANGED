@@ -133,3 +133,6 @@ It is not necessary to tell fhem that there are other logs.
 
 2007-10-16 (CVS)
 -- feature: User defined graphics now for Piri and FS20 too. Everthing is explained in the config.php.
+
+2007-10-18 (CVS)
+-- feature: User defined graphics for FS20 now with a full picture.

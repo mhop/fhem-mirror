@@ -32,3 +32,5 @@
  -  User defined logs with several values in one file now supported. Changes in index.php, gnuplot.php, userdefs.php and config.php.
 - Martin 2007-10-16
  - User defined graphics now for Piri an FS20 too
+- Martin 2007-10-18
+ - User defined graphics for FS20 improved ("full" picture)
