@@ -31,6 +31,10 @@ Formerly known as fhz1000.pl
   <li> bugfix:  SCIVT solar controller (peterp, 1.7)
   <li> bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
   <li> feature: First steps for a Fritz!Box port. See the fritzbox.html
+  <li>feature: FHT lime-protection code discovered by Dirk (7.10)
+  <li>feature: Softwarebuffer for FHT devices with queuing unsent commands and repeating commands by transmission failure (Dirk 17.10)
+  <li> feature: FHT low temperatur warning and setting for lowtemp-offset (Dirk 17.10)
+  <li>change: Change naming for state into warnings (Dirk 17.10)
 </ul>
 
 </ul>
@@ -51,7 +55,9 @@ Currently implemented features:<br>
     <li>reading and sending FS20 events (on/off/dimming, timer commands)<br>
     <li>support of FS20 address features function group, local and global master
     <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
-        The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.</li>
+        The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.<br />
+        For FHT8b devices, FHEM have an internal software buffer for sending commands step by step. This buffer should prevent lost commands. In case of transmission failures FHEM tries to resend commands. <br />
+    </li>
     <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK and RM100-2)</li>
     <li>reading KS300 data</li>
   </ul>

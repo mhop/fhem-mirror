@@ -68,7 +68,7 @@ FHZ_Initialize($)
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{StateFn} = "FHZ_SetState";
   $hash->{ParseFn} = "FHZ_Parse";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 softbuffer softrepeat softmaxretry";
 }
 
 #####################################
@@ -158,6 +158,24 @@ FHZ_Get($@)
   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
 
   return "$a[0] $a[1] => $v";
+}
+
+#####################################
+# get the FHZ hardwarebuffer without logentry
+# and as decimal value
+sub getFhzBuffer()
+{
+  my $msg = "Timeout";
+
+  while (index($msg,"Timeout") >= 0) {					# try getting FHZ buffer until no Timeout occurs
+    FHZ_Write($defs{FHZ}, "04", "c90185")  if(!IsDummy("FHZ"));
+    $msg = FHZ_ReadAnswer($defs{FHZ}, "fhtbuf");
+  }
+
+  my $v = substr($msg, 16, 2);
+  $v = hex $v;
+
+  return "$v";
 }
 
 #####################################
@@ -346,7 +364,8 @@ FHZ_ReadAnswer($$)
 
     my $buf = $hash->{PortObj}->input();
 
-    Log 5, "FHZ/RAW: " . unpack('H*',$buf);
+#    Log 5, "FHZ/RAW: " . unpack('H*',$buf);
+Log 4, "FHZ/RAW: " . unpack('H*',$buf);
     $mfhzdata .= $buf;
     next if(length($mfhzdata) < 2);
 
