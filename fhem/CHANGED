@@ -348,3 +348,6 @@
   - feature: webpgm2 output reformatted
   - feature: webpgm2 can display multiple plots.
   - feature: FHT lime-protection code discovered by Dirk (7.10)
+  - feature: Softwarebuffer for FHT devices with queuing unsent commands and repeating commands by transmission failure (Dirk 17.10)
+  - feature: FHT low temperatur warning and setting for lowtemp-offset (Dirk 17.10)
+  - change: Change naming for state into warnings (Dirk 17.10)

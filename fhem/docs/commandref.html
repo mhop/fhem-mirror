@@ -56,7 +56,7 @@ You can use all of the following commands in in two ways:
       <a href="#define">define</a> lamp FS20 8765 01</pre>
     For other configuration files see the examples subdirectory.<br>
     <br>
-    </li>
+  </li>
 
 <li>Through the TCP/IP connection, which you can either use in a "session"
     (via telnet) or single client command (via fhem.pl). Example:
@@ -70,7 +70,7 @@ You can use all of the following commands in in two ways:
     <ul>
     <code>fhem.pl 7072 "set lamp off"</code>
     </ul>
-    </li>
+  </li>
 </ul>
 
 There are three types of commands: "fhem" commands (described in this document),
@@ -149,7 +149,7 @@ split in multiple lines<br><br>
         lost. E.g. it makes sense to set the <a href="FHZset">FHTcode</a> in
         this file or the coordinates of your house via
         <a href="#at">sunrise_coord</at>
-        </li><br>
+    </li><br>
 
     <a name="logfile"></a>
     <li>logfile<br>
@@ -157,7 +157,7 @@ split in multiple lines<br><br>
         stdout, in this case the server won't background itself.<br>
         The logfile name can also take wildcards for easier logfile rotation,
         see the <a href="#FileLog">FileLog</a> section.
-        </li><br>
+    </li><br>
 
     <a name="modpath"></a>
     <li>modpath<br>
@@ -165,7 +165,7 @@ split in multiple lines<br><br>
         should <b>not</b> contain the directory FHEM. Every file there with the
         name pattern &lt;number&gt;_&lt;name&gt;.pm will be loaded in the order
         of the number.
-        </li><br>
+    </li><br>
 
     <a name="pidfilename"></a>
     <li>pidfilename<br>
@@ -173,12 +173,12 @@ split in multiple lines<br><br>
         server runs as a daemon, and some distributions would like to check by
         the pid if we are still running. The file will be deleted upon
         shutdown.
-        </li><br>
+    </li><br>
 
     <a name="pidfilename"></a>
     <li>pidfilename<br>
         Works for the global "device"<br>
-        </li><br>
+    </li><br>
 
     <a name="port"></a>
     <li>port<br>
@@ -187,14 +187,14 @@ split in multiple lines<br><br>
         will only listen for connections from the localhost per default. If
         there is a second value  "global" then the server will listen for
         non-localhost connections too.
-        </li><br>
+    </li><br>
 
     <a name="statefile"></a>
     <li>statefile<br>
         Set the filename where the state and certain <a href="#at">at</a>
         information will be saved before shutdown. If it is not specified, then
         no information will be saved.
-        </li><br>
+    </li><br>
 
     <a name="title"></a>
     <li>title<br>
@@ -223,7 +223,7 @@ split in multiple lines<br><br>
           <li>5 - is for debugging.</li>
         </ul>
         Recommended level is 3 for normal use.
-        </li>
+    </li>
   </ul>
 
   <br>
@@ -328,29 +328,29 @@ split in multiple lines<br><br>
                Plots on as 1 and off as 0. The corresponding filelog definition
                for the device fs20dev is:<br>
                define FileLog fslog fs20dev /var/log/fs20dev-%Y-%U.log
-               </li>
+          </li>
            <li>fht<br>
                Plots the measured-temp/desired-temp/actuator lines. The
                corresponding filelog definitions (for the FHT device named
                fht1) looks like:<br>
                define FileLog fhtlog1 fht1:.*(temp|actuator).*
                /var/log/fht1-%Y-%U.log
-               </li>
+          </li>
            <li>ks300_1<br>
                Plots the temperature and rain (per hour and per day) of a
                ks300. The corresponding filelog definitions (for the KS300
                device named ks300) looks like:<br>
                define FileLog ks300log ks300:.*H:.*
                /var/log/ks300-%Y-%U.log
-               </li>
+          </li>
            <li>ks300_2<br>
                Plots the humidity and wind values of a
                ks300. The corresponding filelog definition is the same as
                above, both programs evaluate the same log.
-               </li>
+          </li>
            <li>text<br>
                Shows the logfile as it is (plain text).
-               </li>
+          </li>
         </ul>
         The corresponding gnuplot files (up to the "text" one) must be
         installed, see the fhemweb.pl configuration for the destination
@@ -433,9 +433,27 @@ split in multiple lines<br><br>
     <a name="skip_next"></a>
     <li>skip_next<br>
         Can be applied to at devices.<br>
-	Used for at commands: skip the execution of the command the next time.
-	</li><br>
+	Used for at commands: skip the execution of the command the next time.</li><br />
 
+    <a name="softbuffer" id="softbuffer"></a>
+    <li>softbuffer<br />
+  Can be applied to FHZ devices.<br />
+  Used to disable the FHZ softbuffer for FHT deviced (enabled by default).<br />
+  <strong>Note:</strong> By disabling the softbuffer FHEM works like in version 4.1. It is posible to lost commands to FHT devices by overflow the FHZ hardwarebuffer or on transmission failures.<br /> 
+  <br />
+    <a name="softbuffer" id="softbuffer"></a> </li>
+    <li>softrepeat<br />
+  Can be applied to FHZ devices.<br />
+  Used to set the repeating time while FHEM tries to resend a FHT command which failed (default 240).<br />
+  <strong>Note:</strong> Don't set this time to small. In this case it is posible that the FHZ Hardwarebuffer runs full in a short time. Than it is posible it takes long time to process the following commands. Normaly it should not necesary to change this value.<br />
+<br />
+  <a name="softbuffer" id="softbuffer"></a>    </li>
+    <li>softmaxretry<br />
+  Can be applied to FHZ devices.<br />
+  Used to set the maximal retries in which FHEM try to resend a failed command to FHT devices (default 3).<br />
+  <strong>Note:</strong> Don't set this value to height. In this case it is posible that the FHZ Hardwarebuffer runs full in a short time. Than it is posible it takes long time to process the following commands. Normaly it should not necesary to change this value.  <br />
+    <br>
+  </li>
   </ul>
 
   Examples:
@@ -443,8 +461,11 @@ split in multiple lines<br><br>
     <code>attr global verbose 3</code><br>
     <code>attr lamp room kitchen</code><br>
     <code>attr lamp dummy</code><br>
-    <code>attr lamp loglevel 6</code><br>
-  </ul>
+    <code>attr lamp loglevel 6</code><br />
+    <br>
+    <code>attr FHZ softbuffer 0 # disable the softbuffer for FHT devices</code><br />
+    <code>attr FHZ softrepeat 300 # resend failed commands to FHT devices after 300 seconds </code><br />
+  <code>attr FHZ softmaxretry 4 # stop resending failed commands to FHT devices after 4 retries.</code>  </ul>
   <br>
 
   Notes:<br>
@@ -829,7 +850,7 @@ split in multiple lines<br><br>
           this case the command will be saved to the statefile (as it
           considered volatile, i.e. entered by cronjob) and not to the
           configfile (see the <a href="#save">save</a> command.)
-          </li>
+      </li>
 
       <li>if the current time is greater then the time specified, then the
           command will be executed tomorrow. This is why the relative forms
@@ -842,12 +863,12 @@ split in multiple lines<br><br>
           file, as in the above example. If you are not using sunrise_coord, then
           the coordinates for Frankfurt am Main, Germany will be used.
           You also have to install the Datetime::Event::Sunrise perl module.
-          </li>
+      </li>
 
       <li>For even more complex date handling you either have to call fhem from
           cron or filter the date in a perl expression, see the last example and
           the section <a href="#perl">Perl special</a>.
-          </li>
+      </li>
     </ul>
     <br>
   </ul>
@@ -992,7 +1013,7 @@ split in multiple lines<br><br>
     <ul>
       <li>The mentioned codes are needed for initializing the FHZ1X00</li>
       <li>The answer for a command is also displayed by <code>list FHZ</code>
-          </li>
+      </li>
       <li>
 	  The FHZ1000PC has a message buffer for the FHT, as it
 	  only can send messages to it every 2 (or so) minutes. If the buffer
@@ -1105,6 +1126,7 @@ split in multiple lines<br><br>
     2006-11-02 04:13:31   fri-from1       06:00
     2006-11-02 04:13:31   fri-to1         23:50
     2006-11-02 04:11:30   init            255
+    2006-11-02 04:13:36   lowtemp-offset  2.0 (Celsius)
     2006-11-02 10:40:06   measured-high   0
     2006-11-02 10:40:06   measured-low    211
     2006-11-02 10:40:06   measured-temp   21.1 (Celsius)
@@ -1114,18 +1136,18 @@ split in multiple lines<br><br>
     2006-11-02 04:13:35   night-temp      18.0 (Celsius)
     2006-11-02 04:13:32   sat-from1       08:00
     2006-11-02 04:13:33   sat-to1         23:50
-    2006-11-02 10:40:07   state           Bat: ok, Window: closed
     2006-11-02 04:13:34   sun-from1       08:00
     2006-11-02 04:13:34   sun-to1         23:00
     2006-11-02 04:13:29   thu-from1       06:00
     2006-11-02 04:13:29   thu-to1         23:00
     2006-11-02 04:13:26   tue-from1       06:00
     2006-11-02 04:13:26   tue-to1         23:00
-    2006-11-02 04:13:36   unknown_85      4
+    2006-11-02 10:40:07   warnings        Battery low
     2006-11-02 04:13:27   wed-from1       06:00
     2006-11-02 04:13:28   wed-to1         23:00
     2006-11-02 04:13:36   windowopen-temp 12.0 (Celsius)
-
+Send buffer:<br />    2007-10-19 00:31:24   desired-temp    22.5
+    2007-10-19 00:33:20   mode            auto<br />
   </code></pre>
 </ul>
 
@@ -1307,7 +1329,7 @@ split in multiple lines<br><br>
     Notes:
     <ul>
       <li>Use reset with care: the device forgets even the housecode.
-          </li>
+      </li>
       <li>As the FS20 protocol needs about 0.22 seconds to transmit a
 	  sequence, a pause of 0.22 seconds is inserted after each command.
 	  </li>
@@ -1377,7 +1399,6 @@ split in multiple lines<br><br>
     mode
     holiday1
     holiday2
-    mode
     desired-temp
     day-temp
     night-temp
@@ -1386,11 +1407,15 @@ split in multiple lines<br><br>
     day
     hour
     minute
-    refreshvalues</pre>
+    refreshvalues
+    lowtemp-offset
+</pre>
     Notes:
     <ul>
       <li>All <code>*-temp</code> values need a temperature
-          as argument, which will be rounded to 0.5 Celsius</li>
+          as argument, which will be rounded to 0.5 Celsius.<br />
+          Temperature values
+must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.5 set the actuator to ON </li>
       <li><code>mode</code> is one of <code>auto, manual, holiday or
           holiday_short.<br>If the mode is holiday, then
             <ul>
@@ -1402,7 +1427,7 @@ split in multiple lines<br><br>
               <li>holiday1 sets the time, in 10-minute steps</li>
               <li>holiday2 sets number of days from now on.</li>
             </ul>
-          </li>
+      </li>
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
 	  spec as argument in the HH:MM format. They define the periods, where
 	  the day-temp is valid. The minute (MM) will be rounded to 10, and
@@ -1410,13 +1435,22 @@ split in multiple lines<br><br>
       <li><code>refreshvalues</code> does not need an argument, but sends a
           plea to the FHT device, so it may send its parameters. If you want
 	  to get these values regularly, then schedule:<br>
-	  <code>at +*01:00:00 set &lt;name&gt; refreshvalues</code><br>
-	  </li>
+	  <code>at +*01:00:00 set &lt;name&gt; refreshvalues</code></li>
+      <li><code>lowtemp-offset</code> need a temperature
+          as argument, which will be rounded to 1.0 Celsius.<br />
+          Temperature values must between 1.0 and 5.0 Celsius.<br />
+          The 
+          <code>lowtemp-offset</code> is used for temperature warning (to low temperature in a room within more than 1,5 hours after the last desired-temp changing). The low temperatur warning it relates to the actual desired temperature.<br>
+      </li>
       <li>The FHT is very economical (or lazy), it receives messages from the
-          FHZ1000 every 2 minutes (or so). Don't be surprized if your command
+          FHZ1x00 every 2 minutes (or so). Don't be surprized if your command
 	  is accepted 10 minutes later by the device. See the related
 	  <code>fhtbuf</code> entry in the <code><a href="#get">get</a></code>
-	  section.
+	  section.<br />
+      <li>For FHT devices, FHEM have an internal software buffer for sending commands step by step. This buffer should prevent lost commands. In case of transmission failures FHEM tries to resend commands. You can see the queued unsent  and the failed commands with the <a href="#list">list</a> command. If a command don't picked up from a FHT device within a <a href="#softrepeat">given time</a>, the command sends again until <a href="#softmaxretry">softmaxretry</a> reached. <br />
+      <li>To prevent long time waiting for sending important command, there is a priority list. Commands send in this importance:<br />
+<code>desired-temp, mode, refreshvalues,holiday1,holiday2,day-temp,night-temp, [all other commands]</code> <br /> 
+        <br />      
     </ul>
   </ul>
 
