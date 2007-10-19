@@ -134,7 +134,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.26 2007-09-24 07:09:17 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.27 2007-10-19 09:29:00 dirkh Exp $';
 
 $init_done = 0;
 
@@ -1044,10 +1044,58 @@ CommandList($$)
     if($r) {
       $str .= "Readings:\n";
       foreach my $c (sort keys %{$r}) {
-        $str .= sprintf("  %-19s   %-15s %s\n",$r->{$c}{TIME},$c,$r->{$c}{VAL});
+        my $val = "";
+        if (defined($r->{$c}{VAL})) {
+          $val = $r->{$c}{VAL};
+        }
+        $str .= sprintf("  %-19s   %-15s %s\n",$r->{$c}{TIME},$c,$val);
       }
     }
 
+    $attr{FHZ}{softbuffer} = 1 if (!defined($attr{FHZ}{softbuffer}));
+
+    if ($attr{FHZ}{softbuffer} == 1) {
+      my %lists = (
+        "SENDBUFFER"	=> "Send buffer",	
+        "NOTSEND"		=> "Send fail list",	
+      );
+
+      foreach my $list (keys %lists) {
+        my $l = $d->{$list};
+        if(keys (%{$l}) > 0) {
+          $str .= $lists{$list} .":\n";
+          foreach my $c (sort keys %{$l}) {
+            my (undef, undef, $vC) = split (/:/, $c);
+#            $str .= sprintf("  %-19s   %-15s %-10s %s\n",$l->{$c}{TIME},$c,$l->{$c}{VAL},$l->{$c}{SENDTIME});
+            $str .= sprintf("  %-19s   %-15s %s\n",$l->{$c}{TIME},$vC,$l->{$c}{VAL});
+          }
+        }
+
+        if ($defs{$param}->{NAME} eq "FHZ") {
+          $str .= $lists{$list} .":\n";
+
+          foreach my $d (sort keys %defs) {
+            my $p = $defs{$d};
+            my $t = $p->{TYPE};
+      
+            if ($t eq "FHT") {
+
+              $l = $p->{$list};
+              if(keys (%{$l}) > 0) {
+                foreach my $c (sort keys %{$l}) {
+                  my (undef, undef, $vC) = split (/:/, $c);
+                  my $val = "";
+                  if (defined($l->{$c}{VAL})) {
+                    $val = $l->{$c}{VAL};
+                  }
+                  $str .= sprintf("  %-19s   %-15s %-15s %s\n",$l->{$c}{TIME},$p->{NAME},$vC,$val);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   return $str;

@@ -147,3 +147,13 @@
   - weblinks added. Used by webpgm2 to display more than one plot at once
   - webpgm2 output reformatted. Using CSS to divide the screen area in 3
     parts: command line, room-list and rest
+
+- Dirk Wed Oct  7 12:45:09 MEST 2007
+  - FHT lime-protection code discovered
+
+- Dirk Wed Oct 18 23:28:00 MEST 2007
+  - Softwarebuffer for FHT devices with queuing unsent commands and
+    repeating commands by transmission failure
+  - FHT low temperatur warning and setting for lowtemp-offset
+  - Change naming for state into warnings
+    Tagged as dirkh_20071019_0
