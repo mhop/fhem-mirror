@@ -61,6 +61,7 @@ sub XmlEscape($);
 sub fhem($);
 sub fhz($);
 sub doGlobalDef($);
+sub PrintHash($$);
 
 sub CommandAttr($$);
 sub CommandDefAttr($$);
@@ -134,7 +135,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.27 2007-10-19 09:29:00 dirkh Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.28 2007-10-21 11:35:58 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1000,6 +1001,34 @@ CommandDelAttr($$)
   return undef;
 }
 
+sub
+PrintHash($$)
+{
+  my ($h, $lev) = @_;
+
+  my ($str,$sstr) = ("","");
+  my $str = "";
+  foreach my $c (sort keys %{$h}) {
+
+    if(ref($h->{$c})) {
+      if(ref($h->{$c}) eq "HASH") {
+        if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
+          $str .= sprintf("%*s %-19s   %-15s %s\n",
+                          $lev," ", $h->{$c}{TIME},$c,$h->{$c}{VAL});
+        } elsif($c eq "IODev") {
+          $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
+        } else {
+          $sstr .= sprintf("%*s %s:\n",
+                          $lev, " ", uc(substr($c,0,1)).lc(substr($c,1)));
+          $sstr .= PrintHash($h->{$c}, $lev+2);
+        }
+      }
+    } else {
+      $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c});
+    }
+  }
+  return $str . $sstr;
+}
 
 #####################################
 sub
@@ -1029,73 +1058,7 @@ CommandList($$)
     my $d = $defs{$param};
 
     $str .= "Internals:\n";
-    foreach my $c (sort keys %{$d}) {
-      next if(ref($d->{$c}));
-      $str .= sprintf("  %-10s %s\n", $c, $d->{$c});
-    }
-    $str .= sprintf("  %-10s %s\n", "IODev", $d->{IODev}{NAME}) if($d->{IODev});
-
-    $str .= "Attributes:\n";
-    foreach my $c (sort keys %{$attr{$param}}) {
-      $str .= sprintf("  %-10s %s\n", $c, $attr{$param}{$c});
-    }
-
-    my $r = $d->{READINGS};
-    if($r) {
-      $str .= "Readings:\n";
-      foreach my $c (sort keys %{$r}) {
-        my $val = "";
-        if (defined($r->{$c}{VAL})) {
-          $val = $r->{$c}{VAL};
-        }
-        $str .= sprintf("  %-19s   %-15s %s\n",$r->{$c}{TIME},$c,$val);
-      }
-    }
-
-    $attr{FHZ}{softbuffer} = 1 if (!defined($attr{FHZ}{softbuffer}));
-
-    if ($attr{FHZ}{softbuffer} == 1) {
-      my %lists = (
-        "SENDBUFFER"	=> "Send buffer",	
-        "NOTSEND"		=> "Send fail list",	
-      );
-
-      foreach my $list (keys %lists) {
-        my $l = $d->{$list};
-        if(keys (%{$l}) > 0) {
-          $str .= $lists{$list} .":\n";
-          foreach my $c (sort keys %{$l}) {
-            my (undef, undef, $vC) = split (/:/, $c);
-#            $str .= sprintf("  %-19s   %-15s %-10s %s\n",$l->{$c}{TIME},$c,$l->{$c}{VAL},$l->{$c}{SENDTIME});
-            $str .= sprintf("  %-19s   %-15s %s\n",$l->{$c}{TIME},$vC,$l->{$c}{VAL});
-          }
-        }
-
-        if ($defs{$param}->{NAME} eq "FHZ") {
-          $str .= $lists{$list} .":\n";
-
-          foreach my $d (sort keys %defs) {
-            my $p = $defs{$d};
-            my $t = $p->{TYPE};
-      
-            if ($t eq "FHT") {
-
-              $l = $p->{$list};
-              if(keys (%{$l}) > 0) {
-                foreach my $c (sort keys %{$l}) {
-                  my (undef, undef, $vC) = split (/:/, $c);
-                  my $val = "";
-                  if (defined($l->{$c}{VAL})) {
-                    $val = $l->{$c}{VAL};
-                  }
-                  $str .= sprintf("  %-19s   %-15s %-15s %s\n",$l->{$c}{TIME},$p->{NAME},$vC,$val);
-                }
-              }
-            }
-          }
-        }
-      }
-    }
+    $str .= PrintHash($d, 2);
   }
 
   return $str;
