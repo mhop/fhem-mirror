@@ -22,6 +22,34 @@ $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HM
 	$file="$logpath/$drawhms.log"; 
 	if (! in_array($type,$supported_HMS)) show_error_type($imgmaxxhms,$imgmaxyhms,$type);
         if (! file_exists($file)) show_error($file,$drawhms,$imgmaxxhms,$imgmaxyhms,$type);
+
+	## do we really need a new graphic??
+	$execorder=$tailpath.' -1 '.$file;
+	exec($execorder,$tail1);
+ 	$parts = explode(" ", $tail1[0]);
+	$date=$parts[0];
+	
+
+	$savefile=$AbsolutPath."/tmp/HMS.".$drawhms.".log.".$parts[0].".png";
+	if (file_exists($savefile)) {
+
+		#echo "exists: $savefile"; exit;
+		$im2 = @ImageCreateFromPNG($savefile);
+		header("Content-type: image/png");
+		imagePng($im2);
+		exit; # ;-)))
+	}
+	else #delete old pngs
+	{
+		#echo "not exist: $savefile"; exit;
+		$delfile=$AbsolutPath."/tmp/HMS.".$drawhms.".log.*.png";
+		foreach (glob($delfile) as $filename) {
+   		unlink($filename);
+		}
+	}
+
+
+
 	
 	$_SESSION["arraydata"] = array();
 	
@@ -282,6 +310,7 @@ if ( $type == "HMS100WD" or $type == "HMS100MG" or $type == "HMS100W"
 
 #ok. let's draw
 	
+	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
 
@@ -337,6 +366,7 @@ function show_error($file,$drawhms,$imgmaxx,$imgmaxy,$type)
 	}
         ImageTTFText ($im, $fontsize, 0, 5, 45, $txtcolor, $fontttf, $text);
 
+	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
 	exit;
@@ -365,6 +395,7 @@ function show_error_type($imgmaxx,$imgmaxy,$type)
 	ImageFill($im, 0, 0, $bg2p);
 	ImageRectangle($im, 0, 0, $imgmaxx-1, $imgmaxy-1, $white);
 	
+	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
 	exit;

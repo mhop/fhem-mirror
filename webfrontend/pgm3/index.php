@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='0.8.5cvs';
+$pgm3version='071023cvs';
 
 	
 	$Action		=	$_POST['Action'];
@@ -199,7 +199,7 @@ endswitch;
 
 
 if (! isset($showroom)) $showroom="ALL";
-if ($taillog==1) exec($taillogorder,$tailoutput);
+if (($taillog==1) and (isset ($showhist)) ) exec($taillogorder,$tailoutput);
 
 
 #executes over the network to the fhem.pl (or localhost)

@@ -10,7 +10,10 @@
 					# run global: "port <nr> global"
 	$fhz1000port="7072";		# port of fhem.pl
 	$logpath="/var/tmp";		# where are your logs?
-	$fhz1000_pl="/home/FHZ/fhem/fhem.pl"; #only required if you are using PHP4
+	$AbsolutPath="/srv/www/htdocs/pgm3"; # where ist your pgm3?
+
+
+	$fhz1000_pl="/home/FHZ/fhem/fhem.pl"; #only required if you are using HP4
 
 ##################################################################################
 ###### nice to have
@@ -63,7 +66,7 @@
 	$showroombuttons=1; 		#default 1  Values 0/1
 	$imgmaxxroom=$imgmaxxfs20;  	#Size of the pictures, default=$imgmaxxfs20
         $imgmaxyroom=30; 		# default=30 
-	$roomfontsizetitel=10;  	# default=10
+	$roomfontsizetitel=10;  	# default=9
 	$roommaxiconperline=$fs20maxiconperline; # default=$fs20maxiconperline
 
 ##############################################################################################
@@ -146,35 +149,38 @@ $UserDefs=0;
 #####################
 ## Userdef: 0
 
+# the sortnumbers must be complete. eg. 0 1 2 3 or 2 0 3 1 and so on
+$sortnumber=0;	
+
 # No blanks or other special signs!!
-$userdef[0]['name']='SolarV';	
+$userdef[$sortnumber]['name']='SolarV';	
 
 #In which field are the values?? See the example above
-$userdef[0]['valuefield']=4;	
+$userdef[$sortnumber]['valuefield']=4;	
 
-#Type of Device [temperature | piri | fs20] pgm3 will try to generate a gnuplot picture
-$userdef[0]['gnuplottype']='temperature';	
+#Type of Device [temperature | piri] pgm3 will try to generate a gnuplot picture
+$userdef[$sortnumber]['gnuplottype']='temperature';	
 
 # example, path to the logfile with the entrys like above
-$userdef[0]['logpath']=$logpath.'/lse_solarV.log';   
+$userdef[$sortnumber]['logpath']=$logpath.'/lse_solarV.log';   
 
-$userdef[0]['room']='user';
+$userdef[$sortnumber]['room']='hidden';
 
 # Semantic eg. Voltage
-$userdef[0]['semlong']='Voltage'; 	
+$userdef[$sortnumber]['semlong']='Voltage'; 	
 
 # Semantic short e.g. V
-$userdef[0]['semshort']='V';
+$userdef[$sortnumber]['semshort']='V';
 
 #Size of the pictures. Default:  725
-$userdef[0]['imagemax']=725;
-$userdef[0]['imagemay']=52;
+$userdef[$sortnumber]['imagemax']=725;
+$userdef[$sortnumber]['imagemay']=52;
 
 # Maximum count of pixel (from right to left) (Default:575)
-$userdef[0]['maxcount']=575;
+$userdef[$sortnumber]['maxcount']=575;
 
  # Text of main text from the right side (Default:)
-$userdef[0]['XcorrectMainText']=25;               
+$userdef[$sortnumber]['XcorrectMainText']=25;               
 
 # automatic Logrotate; $logrotate must be 'yes'.
 # Default:2200
@@ -182,91 +188,78 @@ $userdef[0]['XcorrectMainText']=25;
 # otherwise the system will slow down
 # pgm3 (user www-data) needs the rights to write the logs
 # from fhz1000.pl (user = ???)
-$userdef[0]['logrotatelines']=2200;  
+$userdef[$sortnumber]['logrotatelines']=2200;  
 
-
-#################
-## Userdef: 1
-# 
-#$userdef[1]['name']='';	
-#$userdef[1]['valuefield']=;	
-#$userdef[1]['gnuplottype']='temperature';	
-#$userdef[1]['logpath']='/var/tmp/log.log';   
-#$userdef[1]['room']='';
-#$userdef[1]['semlong']=''; 	
-#$userdef[1]['semshort']='';
-#$userdef[1]['imagemax']=725;
-#$userdef[1]['imagemay']=52;
-#$userdef[1]['maxcount']=575;
-#$userdef[1]['XcorrectMainText']=25;               
-#$userdef[1]['logrotatelines']=2200;  
-
-########################
-# example: 
-# define piriulog FileLog /var/tmp/piriu.log piriu:.*
-#$userdef[1]['name']='PiriU';	
-#$userdef[1]['valuefield']=3;	
-#$userdef[1]['gnuplottype']='piri';	
-#$userdef[1]['logpath']='/mnt/fhz/piriu.log';   
-#$userdef[1]['room']='wgu';
-#$userdef[1]['semlong']='Bewegungsmelder'; 	
-#$userdef[1]['semshort']='';
-#$userdef[1]['imagemax']=725;
-#$userdef[1]['imagemay']=52;
-#$userdef[1]['maxcount']=575;
-#$userdef[1]['XcorrectMainText']=25;               
-#$userdef[1]['logrotatelines']=2200;  
-
-########################
-# example: 
-# define piriolog FileLog /var/tmp/pirio.log pirio:.*
-#$userdef[2]['name']='PiriO';	
-#$userdef[2]['valuefield']=3;	
-#$userdef[2]['gnuplottype']='piri';	
-#$userdef[2]['logpath']='/mnt/fhz/pirio.log';   
-#$userdef[2]['room']='wgo';
-#$userdef[2]['semlong']='Bewegungsmelder'; 	
-#$userdef[2]['semshort']='';
-#$userdef[2]['imagemax']=725;
-#$userdef[2]['imagemay']=52;
-#$userdef[2]['maxcount']=575;
-#$userdef[2]['XcorrectMainText']=25;               
-#$userdef[2]['logrotatelines']=2200;  
-#
 
 ########################
 # example: 
 #define solarpumpe.log FileLog /var/tmp/solarpumpe.log solarpumpe:.*(on|off).*
-#$userdef[3]['name']='SolarPumpe';	
-#$userdef[3]['valuefield']=3;	
-#$userdef[3]['gnuplottype']='fs20';	
-#$userdef[3]['logpath']='/mnt/fhz/solarpumpe.log';   
-#$userdef[3]['room']='cellar';
-#$userdef[3]['semlong']='Solarpumpe'; 	
-#$userdef[3]['semshort']='';
-#$userdef[3]['imagemax']=725;
-#$userdef[3]['imagemay']=52;
-#$userdef[3]['maxcount']=575;
-#$userdef[3]['XcorrectMainText']=25;               
-#$userdef[3]['logrotatelines']=50;  
-#
+#$sortnumber=1;
+#$userdef[$sortnumber]['name']='PiriO';	
+#$userdef[$sortnumber]['name']='SolarPumpe';	
+##$userdef[$sortnumber]['valuefield']=3;	
+#$userdef[$sortnumber]['gnuplottype']='fs20';	
+#$userdef[$sortnumber]['logpath']='/var/tmp/solarpumpe.log';   
+#$userdef[$sortnumber]['room']='cellar';
+#$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
+#$userdef[$sortnumber]['semshort']='';
+#$userdef[$sortnumber]['imagemax']=725;
+#$userdef[$sortnumber]['imagemay']=52;
+#$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['XcorrectMainText']=25;               
+#$userdef[$sortnumber]['logrotatelines']=50;  
+
 
 ##########################
 # example: 
 #define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
-#$userdef[4]['name']='Rolu1';	
-#$userdef[4]['valuefield']=3;	
-#$userdef[4]['gnuplottype']='fs20';	
-#$userdef[4]['logpath']='/mnt/fhz/rolu1.log';   
-#$userdef[4]['room']='wgu';
-#$userdef[4]['semlong']='Rolladen'; 	
-#$userdef[4]['semshort']='';
-#$userdef[4]['imagemax']=725;
-#$userdef[4]['imagemay']=52;
-#$userdef[4]['maxcount']=575;
-#$userdef[4]['XcorrectMainText']=25;               
-#$userdef[4]['logrotatelines']=30;  
-#
+#$sortnumber=3;
+#$userdef[$sortnumber]['name']='Rolu1';	
+#$userdef[$sortnumber]['valuefield']=3;	
+#$userdef[$sortnumber]['gnuplottype']='fs20';	
+#$userdef[$sortnumber]['logpath']='/var/tmp/rolu1.log';   
+#$userdef[$sortnumber]['room']='wgu';
+##$userdef[$sortnumber]['semlong']='Rolladen'; 	
+#$userdef[$sortnumber]['semshort']='';
+#$userdef[$sortnumber]['imagemax']=725;
+#$userdef[$sortnumber]['imagemay']=52;
+#$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['XcorrectMainText']=25;               
+#$userdef[$sortnumber]['logrotatelines']=30;  
+
+##########################
+# example: 
+#define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
+#$sortnumber=4;
+#$userdef[$sortnumber]['name']='allight';	
+#$userdef[$sortnumber]['valuefield']=3;	
+#$userdef[$sortnumber]['gnuplottype']='fs20';	
+#$userdef[$sortnumber]['logpath']='/var/tmp/allight.log';   
+#$userdef[$sortnumber]['room']='alarm';
+#$userdef[$sortnumber]['semlong']='Alarm light'; 	
+#$userdef[$sortnumber]['semshort']='';
+#$userdef[$sortnumber]['imagemax']=725;
+#$userdef[$sortnumber]['imagemay']=52;
+#$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['XcorrectMainText']=25;               
+#$userdef[$sortnumber]['logrotatelines']=30;  
+##########################
+# example: 
+#define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
+#$sortnumber=5;
+#$userdef[$sortnumber]['name']='FS10';	
+#$userdef[$sortnumber]['valuefield']=2;	
+#$userdef[$sortnumber]['gnuplottype']='temperature';	
+#$userdef[$sortnumber]['logpath']='/var/tmp/wspd_7.gnu';   
+#$userdef[$sortnumber]['timeformat']='%Y/%m/%d %H:%M:%S';   
+#$userdef[$sortnumber]['room']='hidden';
+#$userdef[$sortnumber]['semlong']='FS10'; 	
+#$userdef[$sortnumber]['semshort']='°C';
+#$userdef[$sortnumber]['imagemax']=725;
+#$userdef[$sortnumber]['imagemay']=52;
+#$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['XcorrectMainText']=25;               
+#$userdef[$sortnumber]['logrotatelines']=3300;  
 #################
 ## Userdef: x
 #
@@ -278,17 +271,12 @@ $userdef[0]['logrotatelines']=2200;
 ########################
 
 
-
-
-
-
-
-
 ##############################################################################################
 ## misc
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
 	$tailcount=20; 			#make shure to have the correct rights. Values: 0/1
-	$taillogorder="/usr/bin/tail -$tailcount $logpath/fhem.log ";
+	$tailpath="/usr/bin/tail";
+	$taillogorder=$tailpath." -$tailcount $logpath/fhem.log ";
 
 
 

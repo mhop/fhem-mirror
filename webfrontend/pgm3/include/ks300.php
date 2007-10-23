@@ -13,11 +13,36 @@ $drawks=$_GET['drawks'];
 $room=$_GET['room'];
 $avgday=$_GET['avgday'];
 $avgmonth=$_GET['avgmonth'];
-#$drawks="ks300";
 
         $file="$logpath/$drawks.log";
         if (! file_exists($file)) show_error($file,$drawks,$imgmaxxks,$imgmaxyks);
 	
+	## do we really need a new graphic??
+	$execorder=$tailpath.' -1 '.$file;
+	exec($execorder,$tail1);
+ 	$parts = explode(" ", $tail1[0]);
+	
+
+	$savefile=$AbsolutPath."/tmp/KS.".$drawks.".log.".$parts[0].".png";
+	if (file_exists($savefile)) {
+
+		$im2 = @ImageCreateFromPNG($savefile);
+		header("Content-type: image/png");
+		imagePng($im2);
+		exit; # ;-)))
+	}
+	else #delete old pngs
+	{
+		#echo "not exist: $savefile"; exit;
+		$delfile=$AbsolutPath."/tmp/KS.".$drawks.".log.*.png";
+		foreach (glob($delfile) as $filename) {
+   		unlink($filename);
+		}
+	}
+
+	
+
+
 	$arraydata = array();
 	
 	$im = ImageCreateTrueColor($imgmaxxks,$imgmaxyks);
@@ -405,6 +430,7 @@ ImageCopy ($imall,$imw,0,$imgmaxyks*2,0,0,$imgmaxxks,$imgmaxyks);
 ImageCopy ($imall,$imr,0,$imgmaxyks*3,0,0,$imgmaxxks,$imgmaxyks);
 
 
+imagePng($imall,$savefile);
 header("Content-type: image/png");
 imagePng($imall);
 

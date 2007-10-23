@@ -71,7 +71,7 @@ break;
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
 		set y2label 'Humidity (%)'
-		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 3,\
+		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 2,\
      		'$logfile' using 1:6 axes x1y2 title 'Rel. Humidity (%)' with lines
 		";
 		break;
@@ -89,7 +89,7 @@ EOD;
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
 		set y2label 'Humidity (%)'
-		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 3,\
+		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 2,\
      		'$logfile' using 1:6 axes x1y2 title 'Rel. Humidity (%)' with lines
 		";
 		break;
@@ -118,7 +118,7 @@ EOD;
 		$gplotmaintmp = <<<EOD
 
 plot "< awk '/measured/{print $1, $4}' $logfile"\
-using 1:2 axes x1y1 title 'Measured temperature' with lines lw 3,\
+using 1:2 axes x1y1 title 'Measured temperature' with lines lw 2,\
 "< awk '/actuator/{print $1, $4+0}'  $logfile"\
 using 1:2 axes x1y2 title 'Actuator (%)' with steps lw 1,\
 "< awk '/desired/{print $1, $4}'  $logfile"\
@@ -128,7 +128,7 @@ EOD;
 $gplotmainonlymeasured = <<<EOD
 
 plot "< awk '/measured/{print $1, $4}' $logfile"\
-using 1:2 axes x1y1 title 'Measured temperature' with lines lw 3
+using 1:2 axes x1y1 title 'Measured temperature' with lines lw 2
 EOD;
 		$gplotmain=$gplotmain.$gplotmaintmp;
 		$gplotmain2=$gplotmain2.$gplotmainonlymeasured;
@@ -137,7 +137,7 @@ EOD;
         Case HMS100T:  ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'  
-		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 3
+		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 2
 		";
 		break;
 
@@ -147,7 +147,7 @@ $gplotmain=<<<EOD
 set size 1,0.5
 set noytics 
 set noy2tics 
-plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 3
+plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 2
 EOD;
 		break;
         Case piri:  ############################################
@@ -160,7 +160,7 @@ set yrange [-1.2:2.2]
 plot "< awk '{print $1, 1; }' $logfile "\
         using 1:2 title '$drawuserdef' with impulses
 
-plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 3
+plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 2
 EOD;
 		break;
 
@@ -176,7 +176,7 @@ EOD;
 endswitch;	
 
 $message=$OUT1.$gplothdr.$gplotmain;
-$f1=fopen("tmp/gnu1","w");
+$f1=fopen("tmp/gnu1","w+");
 fputs($f1,$message);
 fclose($f1);
 exec("$gnuplot tmp/gnu1",$output);

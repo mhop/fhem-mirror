@@ -1,4 +1,8 @@
-All the Documentation of pgm3 is now only online
+Be sure that the directory <pgm3>/tmp is writeable for the user of the webserver (e.g. wwwrun.www)
+Make something like "chown -R wwwrun.www tmp"
+
+All the other  Documentation of pgm3 is now only online
 http://www.martin-haas.de/fhz
+
 
 Enjoy it :-)
