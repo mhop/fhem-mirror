@@ -30,7 +30,12 @@
   - Now pgm3 shows other logfiles (like from wired devices) too. Changes in index.php, config.php, gnuplot.php, new userdefs.php)
 - Martin 2007-10-14
  -  User defined logs with several values in one file now supported. Changes in index.php, gnuplot.php, userdefs.php and config.php.
+
 - Martin 2007-10-16
  - User defined graphics now for Piri an FS20 too
+
 - Martin 2007-10-18
  - User defined graphics for FS20 improved ("full" picture)
+
+- Martin 2007-10-23
+ - every module now checks if a redraw of the picture is really necessary. If not the old picture will be sent. The time to reload the screen now is down to less than 50 percent.

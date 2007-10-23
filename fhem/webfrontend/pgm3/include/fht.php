@@ -22,25 +22,6 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	
 	$_SESSION["arraydata"] = array();
 	
-	$im = ImageCreateTrueColor($imgmaxxfht,$imgmaxyfht);
-	$black = ImageColorAllocate($im, 0, 0, 0);
-	$bg1p = ImageColorAllocate($im, 110,148,183);
-	$bg2p = ImageColorAllocate($im, 175,198,219);
-	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
-	$white = ImageColorAllocate($im, 255, 255, 255);
-	$gray= ImageColorAllocate($im, 133, 133, 133);
-	#$lightgray= ImageColorAllocate($im, 200, 198, 222);
-	$red = ImageColorAllocate($im, 255, 0, 0);
-	$green = ImageColorAllocate($im, 0, 255, 0);
-	$yellow= ImageColorAllocate($im, 255, 255, 0);
-	$lightyellow= ImageColorAllocate($im, 255, 247,222 );
-	$orange= ImageColorAllocate($im, 255, 230, 25);
-	$actuatorcolor =  ImageColorAllocate($im, $actR, $actG, $actB);
-	$desiredcolor =  ImageColorAllocate($im, $desR, $desG, $desB);
-
-
-	ImageFill($im, 0, 0, $bg2p);
-	ImageRectangle($im, 0, 0, $imgmaxxfht-1, $imgmaxyfht-1, $white);
 
   	$array = file($file); 
 	$oldmin=0; //only the data from every 10min
@@ -48,10 +29,11 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$actuator="00%";
 	$actuator_date="unknown";
 	$counter=count($array);
+
+
 	$arraydesired=array();
 	$arrayactuator=array();
 
-	#echo $counter; exit;
 	
 	#Logrotate
 	if ((($logrotateFHTlines+200) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateFHTlines);
@@ -77,7 +59,50 @@ setlocale (LC_ALL, 'de_DE.utf8');
 		}
      	}
 
+
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
+
+
+	#if the expected graphic alreay exist then do not redraw the picture
+
+	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$resultreverse[0][0].".png";
+	if (file_exists($savefile)) {
+
+		$im2 = @ImageCreateFromPNG($savefile);
+		header("Content-type: image/png");
+		imagePng($im2);
+		exit; # ;-)))
+	}
+	else #delete old pngs
+	{
+		$delfile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.*.png";
+		foreach (glob($delfile) as $filename) {
+   		unlink($filename);
+		}
+	}
+
+
+	$im = ImageCreateTrueColor($imgmaxxfht,$imgmaxyfht);
+	$black = ImageColorAllocate($im, 0, 0, 0);
+	$bg1p = ImageColorAllocate($im, 110,148,183);
+	$bg2p = ImageColorAllocate($im, 175,198,219);
+	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
+	$white = ImageColorAllocate($im, 255, 255, 255);
+	$gray= ImageColorAllocate($im, 133, 133, 133);
+	#$lightgray= ImageColorAllocate($im, 200, 198, 222);
+	$red = ImageColorAllocate($im, 255, 0, 0);
+	$green = ImageColorAllocate($im, 0, 255, 0);
+	$yellow= ImageColorAllocate($im, 255, 255, 0);
+	$lightyellow= ImageColorAllocate($im, 255, 247,222 );
+	$orange= ImageColorAllocate($im, 255, 230, 25);
+	$actuatorcolor =  ImageColorAllocate($im, $actR, $actG, $actB);
+	$desiredcolor =  ImageColorAllocate($im, $desR, $desG, $desB);
+
+
+	ImageFill($im, 0, 0, $bg2p);
+	ImageRectangle($im, 0, 0, $imgmaxxfht-1, $imgmaxyfht-1, $white);
+
+	
 	$reversedesired = array_reverse($arraydesired);
 	$reverseactuator = array_reverse($arrayactuator);
 	$xold=$imgmaxxfht;
@@ -158,19 +183,13 @@ setlocale (LC_ALL, 'de_DE.utf8');
 
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
         
-	#$text=$desired_date;
-        #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
-        
 	$text="Actuator: $actuator";
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         	
-	#$text=$actuator_date;
-        #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
-        
 	$text=$resultreverse[0][0];
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127, 13, $txtcolor, $fontttf, $text);
-        #ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127-$XcorrectDate, 13, $txtcolor, $fontttf, $text);
 
+	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
 
@@ -194,5 +213,7 @@ function show_error($file,$drawfht,$imgmaxxfht,$imgmaxyfht)
 	imagePng($im);
 	exit;
 }
+
+
 
 ?>

@@ -136,3 +136,6 @@ It is not necessary to tell fhem that there are other logs.
 
 2007-10-18 (CVS)
 -- feature: User defined graphics for FS20 now with a full picture.
+
+2007-10-23 (071023cvs)
+-- feature: optimized speed for small devices (more than 50 percent on e.g a NSLU2)

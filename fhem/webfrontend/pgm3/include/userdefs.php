@@ -32,23 +32,36 @@ include "functions.php";
 
         if (! file_exists($file)) show_error($file,$drawuserdef,$imgmaxxuserdef,$imgmaxyuserdef,$type,$userdefnr);
 	
+
+
+	## do we really need a new graphic??
+	$execorder=$tailpath.' -1 '.$file;
+	exec($execorder,$tail1);
+ 	$parts = explode(" ", $tail1[0]);
+	
+
+        $savefile=$AbsolutPath."/tmp/USERDEF.".$drawuserdef.".log.".$parts[0].".png";
+	if (file_exists($savefile)) {
+
+		$im2 = @ImageCreateFromPNG($savefile);
+		header("Content-type: image/png");
+		imagePng($im2);
+		exit; # ;-)))
+	}
+	else #delete old pngs
+	{
+                $delfile=$AbsolutPath."/tmp/USERDEF.".$drawuserdef.".log.*.png";
+		foreach (glob($delfile) as $filename) {
+   		unlink($filename);
+		}
+	}
+
+	
+	
+
+
 	$_SESSION["arraydata"] = array();
 	
-	$im = ImageCreateTrueColor($imgmaxxuserdef,$imgmaxyuserdef);
-	$black = ImageColorAllocate($im, 0, 0, 0);
-	$bg1p = ImageColorAllocate($im, 110,148,183);
-	$bg2p = ImageColorAllocate($im, 175,198,219);
-	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
-	$white = ImageColorAllocate($im, 255, 255, 255);
-	$gray= ImageColorAllocate($im, 133, 133, 133);
-	$red = ImageColorAllocate($im, 255, 0, 0);
-	$green = ImageColorAllocate($im, 0, 255, 0);
-	$yellow= ImageColorAllocate($im, 255, 255, 0);
-	$orange= ImageColorAllocate($im, 255, 230, 25);
-
-
-	ImageFill($im, 0, 0, $bg2p);
-	ImageRectangle($im, 0, 0, $imgmaxxuserdef-1, $imgmaxyuserdef-1, $white);
 
   	$array = file($file); 
 	$oldmin=0; //only the data from every 10min
@@ -92,8 +105,30 @@ include "functions.php";
      	}
 	
 
-	$resultreverse = array_reverse($_SESSION["arraydata"]);
+
+
+	# Start Graphic
+	$im = ImageCreateTrueColor($imgmaxxuserdef,$imgmaxyuserdef);
+	$black = ImageColorAllocate($im, 0, 0, 0);
+	$bg1p = ImageColorAllocate($im, 110,148,183);
+	$bg2p = ImageColorAllocate($im, 175,198,219);
+	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
+	$white = ImageColorAllocate($im, 255, 255, 255);
+	$gray= ImageColorAllocate($im, 133, 133, 133);
+	$red = ImageColorAllocate($im, 255, 0, 0);
+	$green = ImageColorAllocate($im, 0, 255, 0);
+	$yellow= ImageColorAllocate($im, 255, 255, 0);
+	$orange= ImageColorAllocate($im, 255, 230, 25);
+
+
+	ImageFill($im, 0, 0, $bg2p);
+	ImageRectangle($im, 0, 0, $imgmaxxuserdef-1, $imgmaxyuserdef-1, $white);
+
+
+
+
 	$xold=$imgmaxxuserdef;
+	$resultreverse = array_reverse($_SESSION["arraydata"]);
 	
 	if ( $imgmaxxuserdef > count ($resultreverse) )
 	{ $_SESSION["maxdata"] = count ($resultreverse); }
@@ -126,12 +161,11 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$datumyesterday= mktime (0,0,0,date("m")  ,date("d")-5,date("Y"));
 			$xrange2= date ("Y-m-d",$datumyesterday);
 			$xrange="set xrange ['$xrange2':'$xrange1']";
-			$gnuplotfile="../tmp/".$drawuserdef;
-			#$gnuplotpng="../tmp/".$drawuserdef.".png";
-			$gnuplotpng=$drawuserdef.".png";
+			$gnuplotfile=$AbsolutPath."/tmp/".$drawuserdef;
+			$gnuplotpng=$drawuserdef.".sm.png";
 			
 			$messageA=<<<EOD
-			set output '$gnuplotpng'
+			set output '$AbsolutPath/tmp/$gnuplotpng' 
 			set terminal png 
 			set xdata time 
 			set timefmt '%Y-%m-%d_%H:%M:%S' 
@@ -159,7 +193,7 @@ EOD;
 			$newlastline=$actdate." ".$f2." ".$f3." ".$f4." ".$f5." ".$f6;
 			array_push( $array ,$newlastline);
 			$filename=substr($file,strrpos($file, '/')+1);
-			$filename='../tmp/'.$filename.'.tmp';
+			$filename=$AbsolutPath.'/tmp/'.$filename.'.tmp';
  			$f1=fopen("$filename","w");
 			 for ($x = 0; $x <= count($array); $x++)
         		{
@@ -199,15 +233,16 @@ endswitch;
 if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 {
 			$message=$messageA.$messageB;
-			$f1=fopen("$gnuplotfile","w");
+			$f1=fopen("$AbsolutPath/tmp/$drawuserdef","w+");
 			fputs($f1,$message);
 			fclose($f1);
-			exec("$gnuplot $gnuplotfile",$output);
+#			exit;
+			exec("$gnuplot $AbsolutPath/tmp/$drawuserdef",$output);
 
 			$w = imagesx($im);
 			$h = imagesy($im);
 
-			$im2 = imagecreatefrompng("$gnuplotpng");
+			$im2 = imagecreatefrompng("$AbsolutPath/tmp/$gnuplotpng");
 			$w2 = imagesx($im2);
 			$h2 = imagesy($im2);
 			ImageCopy($im,$im2,150,0,0,10,$w2-10,$h2);
@@ -253,6 +288,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 #############################################################################
 #ok. let's draw
 	
+	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
 
