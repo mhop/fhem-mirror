@@ -11,6 +11,35 @@ include "../config.php";
 	$datefs20=$_GET['datefs20'];
 	$room=$_GET['room'];
 
+
+	## do we really need a new graphic??
+	#$execorder=$tailpath.' -1 '.$file;
+	#exec($execorder,$tail1);
+ 	#$parts = explode(" ", $tail1[0]);
+	#$date=$parts[0];
+	
+
+	$savefile=$AbsolutPath."/tmp/FS20.".$drawfs20.".log.".$datefs20.".png";
+	if (file_exists($savefile)) {
+
+		$im2 = @ImageCreateFromPNG($savefile);
+		header("Content-type: image/png");
+		imagePng($im2);
+		exit; # ;-)))
+	}
+	else #delete old pngs
+	{
+		$delfile=$AbsolutPath."/tmp/FS20.".$drawfs20.".log.*.png";
+		foreach (glob($delfile) as $filename) {
+   		unlink($filename);
+		}
+	}
+
+
+
+
+
+
 	$im = ImageCreateTrueColor($imgmaxxfs20,$imgmaxyfs20);
 	$black = ImageColorAllocate($im, 0, 0, 0);
 	$bg1p = ImageColorAllocate($im, 110,148,183);
@@ -86,6 +115,7 @@ include "../config.php";
 	if ($room != '') {ImageTTFText ($im, 7, 0, 5, 26, $txtcolor, $fontttf, $txtroom.$room);};
 
 	
+	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
 ?>
