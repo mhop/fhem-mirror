@@ -38,10 +38,12 @@ include "functions.php";
 	$execorder=$tailpath.' -1 '.$file;
 	exec($execorder,$tail1);
  	$parts = explode(" ", $tail1[0]);
-	
 
+
+	$today= date("d");
         $savefile=$AbsolutPath."/tmp/USERDEF.".$drawuserdef.".log.".$parts[0].".png";
-	if (file_exists($savefile)) {
+	$fmtime=date ("d", filemtime($savefile)); #at least one new graphic per day (gnuplot)
+	if ((file_exists($savefile)) and ($fmtime == $today)) {
 
 		$im2 = @ImageCreateFromPNG($savefile);
 		header("Content-type: image/png");
@@ -69,7 +71,6 @@ include "functions.php";
 	$mintemp=100;
 	$maxtemp=-100;
 	$counter=count($array);
-	#if ($maxcountUSERDEF <  $counter)  {$counter=$maxcountUSERDEF;};
 	
 	#Logrotate
 	if ((($logrotateUSERDEFlines+100) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateUSERDEFlines);
@@ -314,11 +315,6 @@ function show_error($file,$drawuserdef,$imgmaxx,$imgmaxy,$type,$section)
         $txtcolor=$bg3p;
         ImageTTFText ($im, $fontsize, 0, 5, 17, $txtcolor, $fontttf, $text);
  	$text="Please check the userdef[$section] of <pgm3>/config.php and refresh your browser";
-        #$fontsize=7;
-        #ImageTTFText ($im, $fontsize, 0, 5, 30, $txtcolor, $fontttf, $text);
-	#$logname=$drawuserdef."log";
-        #$fontsize=9;
-	#$text="define $logname FileLog $file $drawuserdef:.*s:.*";
         ImageTTFText ($im, $fontsize, 0, 5, 45, $txtcolor, $fontttf, $text);
 
 	header("Content-type: image/png");
