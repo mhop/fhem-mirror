@@ -141,4 +141,4 @@ It is not necessary to tell fhem that there are other logs.
 -- feature: optimized speed for small devices (more than 50 percent on e.g a NSLU2)
 
 2007-10-24 (071024cvs)
--- bugfix: at least one new picture per day for userdefs (gnuplot picture)
+-- bugfix: at least one new picture per hour for userdefs (gnuplot picture)
