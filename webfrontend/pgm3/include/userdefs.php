@@ -40,9 +40,9 @@ include "functions.php";
  	$parts = explode(" ", $tail1[0]);
 
 
-	$today= date("d");
+	$today= date("H");
         $savefile=$AbsolutPath."/tmp/USERDEF.".$drawuserdef.".log.".$parts[0].".png";
-	$fmtime=date ("d", filemtime($savefile)); #at least one new graphic per day (gnuplot)
+	$fmtime=date ("H", filemtime($savefile)); #at least one new graphic per hour (gnuplot)
 	if ((file_exists($savefile)) and ($fmtime == $today)) {
 
 		$im2 = @ImageCreateFromPNG($savefile);
