@@ -41,4 +41,4 @@
  - every module now checks if a redraw of the picture is really necessary. If not the old picture will be sent. The time to reload the screen now is down to less than 50 percent.
 
 - Martin 2007-10-24
- - Change in userdefs.php. At least one new picture per day for userdefs (gnuplot picture)
+ - Change in userdefs.php. At least one new picture per hour for userdefs (gnuplot picture)
