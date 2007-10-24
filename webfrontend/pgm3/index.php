@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='071023cvs';
+$pgm3version='071024';
 
 	
 	$Action		=	$_POST['Action'];
