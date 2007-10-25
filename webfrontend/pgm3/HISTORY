@@ -42,3 +42,6 @@
 
 - Martin 2007-10-24
  - Change in userdefs.php. At least one new picture per hour for userdefs (gnuplot picture)
+
+- Martin 2007-10-25
+ - design: userdef-gnuplot with transparent background (userdef.php)

@@ -142,3 +142,7 @@ It is not necessary to tell fhem that there are other logs.
 
 2007-10-24 (071024cvs)
 -- bugfix: at least one new picture per hour for userdefs (gnuplot picture)
+
+2007-10-25 (071025cvs)
+-- design: userdef-gnuoplot with transparent background
+

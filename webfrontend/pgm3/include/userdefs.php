@@ -167,7 +167,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			
 			$messageA=<<<EOD
 			set output '$AbsolutPath/tmp/$gnuplotpng' 
-			set terminal png 
+			set terminal png transparent
 			set xdata time 
 			set timefmt '%Y-%m-%d_%H:%M:%S' 
 			set noytics 
@@ -237,7 +237,6 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$f1=fopen("$AbsolutPath/tmp/$drawuserdef","w+");
 			fputs($f1,$message);
 			fclose($f1);
-#			exit;
 			exec("$gnuplot $AbsolutPath/tmp/$drawuserdef",$output);
 
 			$w = imagesx($im);
@@ -246,7 +245,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$im2 = imagecreatefrompng("$AbsolutPath/tmp/$gnuplotpng");
 			$w2 = imagesx($im2);
 			$h2 = imagesy($im2);
-			ImageCopy($im,$im2,150,0,0,10,$w2-10,$h2);
+			ImageCopy($im,$im2,163,0,0,10,$w2-20,$h2);
 }
 
 
@@ -272,7 +271,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 	$text="min= $mintemp max= $maxtemp";
         ImageTTFText ($im,  $fontsize, 0, 67-$XcorrectMainTextUSERDEF, 49, $txtcolor, $fontttf, $text);
 	$text=$resultreverse[0][0];
-        ImageTTFText ($im,  $fontsize, 0, $imgmaxxuserdef-127,  13, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, $imgmaxxuserdef-127,  15, $txtcolor, $fontttf, $text);
 #############################################################################
 ## general
         $txtcolor=$bg3p; 
