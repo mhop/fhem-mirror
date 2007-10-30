@@ -146,3 +146,6 @@ It is not necessary to tell fhem that there are other logs.
 2007-10-25 (071025cvs)
 -- design: userdef-gnuoplot with transparent background
 
+2007-10-20 (071030cvs)
+-- fix: gnuplot for FS20 now only off or on
+

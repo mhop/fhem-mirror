@@ -63,8 +63,9 @@ set noytics
 set noy2tics 
 set yrange [-0.2:1.2]
 set ylabel "On/Off"  
-plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title '' with steps
+plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 1 : $3==\"dimdown\"? 0 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title '' with steps
 EOD;
+#plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title '' with steps
 break;
 
         Case WS300_t1:  ############################################
