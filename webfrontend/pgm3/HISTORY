@@ -45,3 +45,6 @@
 
 - Martin 2007-10-25
  - design: userdef-gnuplot with transparent background (userdef.php)
+
+- Martin 2007-10-30
+ -  fix: gnuplot for FS20 now only off or on
