@@ -69,7 +69,7 @@ FHZ_Initialize($)
   $hash->{StateFn} = "FHZ_SetState";
   $hash->{ParseFn} = "FHZ_Parse";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
-                   "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6" .
+                   "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0"; 
 }
 
@@ -208,7 +208,7 @@ FHZ_Define($$)
   my $dev = $a[2];
 
   $attr{$name}{savefirst} = 1;
-  $attr{$name}{fhtsoftbuffer} = 1;
+  $attr{$name}{fhtsoftbuffer} = 0;
 
   if($dev eq "none") {
     Log 1, "FHZ device is none, commands will be echoed only";

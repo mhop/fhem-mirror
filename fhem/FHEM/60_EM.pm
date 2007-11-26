@@ -28,7 +28,7 @@ EM_Initialize($)
   $hash->{UndefFn} = "EM_Undef";
   $hash->{GetFn}   = "EM_Get";
   $hash->{SetFn}   = "EM_Set";
-  $hash->{AttrList}= "model:em1010pc loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "model:em1010pc dummy:1,0 loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################

@@ -14,6 +14,10 @@
   skeleton for self-written perl funtions.
 - 99_ALARM.pm
   Example for a Low Budget ALARM System by Martin
+- 99_dummy.pm
+  Used for programming
+- 99_weblink.pm
+  Used by fhemweb2.pl
 - checkmsg.pl
   Check header/function/crc of an FS20 hex message
 - crc.pl
