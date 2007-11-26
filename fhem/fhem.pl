@@ -135,7 +135,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.29 2007-11-26 08:27:04 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.30 2007-11-26 14:56:45 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -745,9 +745,13 @@ CommandSave($$)
     print SFH "\ndefattr" . ($r ne "~" ? " room $r" : "") . "\n";
     foreach my $d (sort keys %{$rooms{$r}} ) {
       next if($defs{$d}{VOLATILE});
-      my $def = $defs{$d}{DEF};
-      $def =~ s/;/;;/g;
-      print SFH "define $d $defs{$d}{TYPE} $def\n";
+      if($defs{$d}{DEF}) {
+        my $def = $defs{$d}{DEF};
+        $def =~ s/;/;;/g;
+        print SFH "define $d $defs{$d}{TYPE} $def\n";
+      } else {
+        print SFH "define $d $defs{$d}{TYPE}\n";
+      }
       foreach my $a (sort keys %{$attr{$d}}) {
         next if($a eq "room");
         print SFH "attr $d $a $attr{$d}{$a}\n";
@@ -915,7 +919,7 @@ CommandDefine($$)
   $hash{NAME}  = $a[0];
   $hash{TYPE}  = $a[1];
   $hash{STATE} = "???";
-  $hash{DEF}   = $a[2];
+  $hash{DEF}   = $a[2] if(int(@a) > 2);
   $hash{NR}    = $devcount++;
 
   # If the device wants to issue initialization gets/sets, then it needs to be 
@@ -1233,7 +1237,7 @@ CommandAttr($$)
 
   my $list = getAllAttr($a[0]);
   return "Unknown argument $a[1], choose one of $list" if($a[1] eq "?");
-  return "Unknown attribute $a[1], use attr global userattr"
+  return "Unknown attribute $a[1], use attr global userattr ($list)"
                 if(" $list " !~ m/ ${a[1]}[ :;]/);
 
 

@@ -31,7 +31,7 @@ M232Counter_GetStatus($)
   my ($hash) = @_;
 
   if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+60, "M232Counter_GetStatus", $hash);
+    InternalTimer(gettimeofday()+60, "M232Counter_GetStatus", $hash, 1);
   }
 
   my $name = $hash->{NAME};
@@ -161,15 +161,9 @@ M232Counter_Define($$)
 
   AssignIoPort($hash);
 
-  # InternalTimer blocks if init_done is not true
-  my $oid = $init_done;
-  $init_done = 1;
-
   if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+60, "M232Counter_GetStatus", $hash);
+    InternalTimer(gettimeofday()+60, "M232Counter_GetStatus", $hash, 0);
   }
-
-  $init_done = $oid;
   return undef;
 }
 

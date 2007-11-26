@@ -247,15 +247,24 @@ FS20_Define($$)
                         "addr [fg addr] [lm addr] [gm FF]";
 
   return $u if(int(@a) < 4);
-  return "Define $a[0]: wrong housecode format: specify a 4 digit hex value"
-  		if($a[2] !~ m/^[a-f0-9]{4}$/i);
-  return "Define $a[0]: wrong btn format: specify a 2 digit hex value"
-  		if($a[3] !~ m/^[a-f0-9]{2}$/i);
+  return "Define $a[0]: wrong housecode format: specify a 4 digit hex value ".
+         "or an 8 digit quad value"
+  		if( ($a[2] !~ m/^[a-f0-9]{4}$/i) && ($a[2] !~ m/^[1-4]{8}$/i) );
 
-  $hash->{XMIT} = lc($a[2]);
-  $hash->{BTN}  = lc($a[3]);
+  return "Define $a[0]: wrong btn format: specify a 2 digit hex value " .
+         "or a 4 digit quad value"
+  		if( ($a[3] !~ m/^[a-f0-9]{2}$/i) && ($a[3] !~ m/^[1-4]{4}$/i) );
 
-  my $code = lc("$a[2] $a[3]");
+  my $housecode = $a[2];
+  $housecode = four2hex($housecode,4) if (length($housecode) == 8);
+
+  my $btncode = $a[3];
+  $btncode = four2hex($btncode,2) if (length($btncode) == 4);
+
+  $hash->{XMIT} = lc($housecode);
+  $hash->{BTN}  = lc($btncode);
+
+  my $code = "$housecode $btncode";
   my $ncode = 1;
   my $name = $a[0];
 
@@ -268,16 +277,21 @@ FS20_Define($$)
 
     $a[$i] = lc($a[$i]);
     if($a[$i] eq "fg") {
-      return "Bad fg address, see the doc" if($a[$i+1] !~ m/^f[a-f0-9]$/);
+      return "Bad fg address for $name, see the doc" if( ($a[$i+1] !~ m/^f[a-f0-9]$/) && ($a[$i+1] !~ m/^44[1-4][1-4]$/));
     } elsif($a[$i] eq "lm") {
-      return "Bad lm address, see the doc" if($a[$i+1] !~ m/^[a-f0-9]f$/);
+      return "Bad lm address for $name, see the doc" if( ($a[$i+1] !~ m/^[a-f0-9]f$/) && ($a[$i+1] !~ m/^[1-4][1-4]44$/));
     } elsif($a[$i] eq "gm") {
-      return "Bad gm address, mus be ff" if($a[$i+1] ne "ff");
+      return "Bad gm address for $name, must be ff" if( ($a[$i+1] ne "ff") && ($a[$i+1] ne "4444"));
     } else {
       return $u;
     }
 
-    $code = lc("$a[2] $a[$i+1]");
+    my $grpcode = $a[$i+1];
+    if (length($grpcode) == 4) {
+       $grpcode = four2hex($grpcode,2);
+    }
+
+    $code = "$housecode $grpcode";
     $hash->{CODE}{$ncode++} = $code;
     $defptr{$code}{$name}   = $hash;
   }
@@ -342,11 +356,37 @@ FS20_Parse($$)
     # it by the second FHZ
     return "" if($dev eq "0001" && $btn eq "00" && $cde eq "00");
 
-    Log 3, "FS20 Unknown device $dev, Button $btn Code $cde ($v), " .
+    my $dev_four = hex2four($dev);
+    my $btn_four = hex2four($btn);
+    Log 3, "FS20 Unknown device $dev ($dev_four), Button $btn ($btn_four) Code $cde ($v), " .
     	   "please define it";
     return "UNDEFINED FS20 $dev/$btn/$cde";
   }
 
+}
+
+#############################
+sub
+hex2four($)
+{
+  my $v = shift;
+  my $r = "";
+  foreach my $x (split("", $v)) {
+    $r .= sprintf("%d%d", (hex($x)/4)+1, (hex($x)%4)+1);
+  }
+  return $r;
+}
+
+#############################
+sub
+four2hex($$)
+{
+  my ($v,$len) = @_;
+  my $r = 0;
+  foreach my $x (split("", $v)) {
+    $r = $r*4+($x-1);
+  }
+  return sprintf("%0*x", $len,$r);
 }
 
 

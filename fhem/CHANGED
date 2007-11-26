@@ -342,22 +342,23 @@
 - ==DATE== (4.2)
   - feature: added archivedir/archivecmd to the the main logfile
   - feature: 99_Sunrise_EL.pm (does not need any Date modules)
-  - bugfix:  Seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
+  - bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
   - bugfix:  FHT mode holiday_short added (9.9, Dirk)
   - bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)
   - feature: webpgm2 output reformatted
   - feature: webpgm2 displaying multiple plots
   - feature: FHT lime-protection code discovered by Dirk (7.10)
-  - feature: Softwarebuffer for FHT devices (Dirk 17.10)
+  - feature: softwarebuffer for FHT devices (Dirk 17.10)
   - feature: FHT low temperatur warning and offset (Dirk 17.10)
-  - change:  Change FHT state into warnings (Dirk 17.10)
+  - change:  change FHT state into warnings (Dirk 17.10)
   - feature: Softwarebuffer code simplified (Rudi 22.11)
   - bugfix:  bug #12327 doppeltes my
   - bugfix:  set STATE from trigger
   - bugfix:  readings state vs STATE problem (xmllist/trigger)
   - change:  SUNRISE doc changed (99_SUNRISE.pm -> 99_SUNRISE_EL.pm)
-  - feature: Support for the M232 ELV device (Boris, 25.11)
+  - feature: support for the M232 ELV device (Boris, 25.11)
+  - feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)
+  - feature: dummy type added (contrib/99_dummy.pm)
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
-  dummy type / dummy attribute 
