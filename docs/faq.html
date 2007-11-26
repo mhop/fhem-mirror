@@ -227,40 +227,21 @@ by fhem.pl?</b>
 <a name="faq11"></a>
 <b>11. I'd like to use this sunrise/sunset stuff, can you help me?</b>
 <ul>
-   First you (most probably) have to install the DateTime::Event::Sunrise perl
-   module, as it is not part of the standard distributions. If it is not
-   installed and you copy the contrib/99_SUNRISE.pm into your module (FHEM)
-   directory, then the program will not start up, telling you that this module
-   is missing.
-   The (IMHO) easiest way to install it is via the following command (probably
-   as root):<br>
-   <pre>
-   perl -MCPAN -e shell
-   cpan> install DateTime::Event::Sunrise</pre>
-   This will fetch the module from a CPAN archive, compile it and install it,
-   and will do the same with each perl module which is needed by this one.<br>
-   
+   Copy contrib/99_SUNRISE_EL.pm into your FHEM directory.
    Next look for the geographic coordinates of your home, e.g with a GPS
    receiver or with googleearth. Compute the latitude/longitude as needed, and
-   enter them in your init file (fhem.cfg) with the command:
-   <pre>{sunrise_coord("<latitude>", "<longitude>", "Europe/Berlin") }</pre>
-   If you are living in a different timezone, then change the string above
-   according to the <code>perldoc DateTime</code> manpage.<br>
-
-   Now copy the contrib/99_SUNRISE.pm file into your module directory, and
-   restart the program. If everything is ok, typing
+   enter them in your lastinclude file with the command:
+   <pre>{sunrise_coord("<latitude>", "<longitude>", "") }</pre>
+   If everything is ok, typing
    <pre>{ sunrise_abs() }</pre>
    in the telnet prompt, will return the time of the sunrise today, in a
    HH:MM:SS format.<br><br>
 
-   <b>Note:</b> As fhem.cfg will be overwritten if you use the save command,
-   it is better to put the sunrise_coord command in the "lastinclude" file,
-   e.g. /home/fhem/fhem.cfg.static. This file will be read, if you set the
-   lastinclude attribute:<br><code><br>
-
-   attr global lastinclude /home/fhem/fhem.cfg.static</code><br><br>
-
-   and will not be overwritten by save.
+   99_SUNRISE_EL.pm is the ExtraLight version of the original 99_SUNRISE.pm,
+   which needs the DateTime::Event::Sunrise perl module, which in turn is
+   usually difficult to install. If you still want to use the original module,
+   then the initialization string will be slightly different:
+   <pre>{sunrise_coord("<latitude>", "<longitude>", "Europe/Berlin") }</pre>
 
 </ul>
 

@@ -6,7 +6,6 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 
 sub EMEM_Get($@);
-sub EMEM_Set($@);
 sub EMEM_Define($$);
 sub EMEM_GetStatus($);
 
@@ -29,15 +28,17 @@ EMEM_GetStatus($)
   my ($hash) = @_;
 
   if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+300, "EMEM_GetStatus", $hash);
+    InternalTimer(gettimeofday()+300, "EMEM_GetStatus", $hash, 0);
   }
 
   my $dnr = $hash->{DEVNR};
   my $name = $hash->{NAME};
 
+  return "Empty status: dummy IO device" if(IsIoDummy($name));
+
   my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
   if(!defined($d)) {
-    my $msg = "EMEM $name read error";
+    my $msg = "EMEM $name read error (GetStatus 1)";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
@@ -122,11 +123,7 @@ EMEM_Define($$)
   AssignIoPort($hash);
 
 
-  # InternalTimer blocks if init_done is not true
-  my $oid = $init_done;
-  $init_done = 1;
   EMEM_GetStatus($hash);
-  $init_done = $oid;
   return undef;
 }
 
