@@ -49,7 +49,7 @@ sub GetLogLevel(@);
 sub HandleTimeout();
 sub HandleArchiving($);
 sub IOWrite($@);
-sub InternalTimer($$$);
+sub InternalTimer($$$$);
 sub Log($$);
 sub OpenLogfile($);
 sub ResolveDateWildcards($@);
@@ -135,7 +135,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.28 2007-10-21 11:35:58 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.29 2007-11-26 08:27:04 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -226,6 +226,9 @@ if(int(@ARGV) == 2) {
 # End of client code
 ###################################################
 
+
+###################################################
+# Server initialization
 my $ret = CommandInclude(undef, $attr{global}{configfile});
 die($ret) if($ret);
 
@@ -244,20 +247,17 @@ if($attr{global}{statefile} && -r $attr{global}{statefile}) {
 }
 SignalHandling();
 
-################################################
-# Main loop
-
 my $pfn = $attr{global}{pidfilename};
 if($pfn) {
   die "$pfn: $!\n" if(!open(PID, ">$pfn"));
   print PID $$ . "\n";
   close(PID);
 }
-
 $init_done = 1;
+
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
-
+################################################
 # Main Loop
 while (1) {
   my ($rout, $rin) = ('', '');
@@ -327,11 +327,23 @@ while (1) {
 sub
 IsDummy($)
 {
-  my $dev = shift;
+  my $devname = shift;
 
-  return 1 if(defined($attr{$dev}) && defined($attr{$dev}{dummy}));
+  return 1 if(defined($attr{$devname}) && defined($attr{$devname}{dummy}));
   return 0;
 }
+
+################################################
+sub
+IsIoDummy($)
+{
+  my $name = shift;
+
+  return IsDummy($defs{$name}{IODev}{NAME})
+                if($defs{$name} && $defs{$name}{IODev});
+  return 1;
+}
+
 
 ################################################
 sub
@@ -1007,7 +1019,6 @@ PrintHash($$)
   my ($h, $lev) = @_;
 
   my ($str,$sstr) = ("","");
-  my $str = "";
   foreach my $c (sort keys %{$h}) {
 
     if(ref($h->{$c})) {
@@ -1015,7 +1026,7 @@ PrintHash($$)
         if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
           $str .= sprintf("%*s %-19s   %-15s %s\n",
                           $lev," ", $h->{$c}{TIME},$c,$h->{$c}{VAL});
-        } elsif($c eq "IODev") {
+        } elsif($c eq "IODev" || $c eq "HASH") {
           $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
         } else {
           $sstr .= sprintf("%*s %s:\n",
@@ -1464,11 +1475,11 @@ HandleTimeout()
 
 #####################################
 sub
-InternalTimer($$$)
+InternalTimer($$$$)
 {
-  my ($tim, $fn, $arg) = @_;
+  my ($tim, $fn, $arg, $waitIfInitNotDone) = @_;
 
-  if(!$init_done) {
+  if(!$init_done && $waitIfInitNotDone) {
     select(undef, undef, undef, $tim-gettimeofday());
     no strict "refs";
     &{$fn}($arg);
@@ -1583,9 +1594,14 @@ DoTrigger($$)
   } elsif(!defined($defs{$dev}{CHANGED})) {
     return "";
   }
+  $defs{$dev}{STATE} = $defs{$dev}{CHANGED}[0];
+
+  # STATE && {READINGS}{state} should be the same
+  my $r = $defs{$dev}{READINGS};
+  $r->{state}{VAL} = $defs{$dev}{STATE} if($r && $r->{state});
 
   my $max = int(@{$defs{$dev}{CHANGED}});
-  Log 5, "Triggering $dev ($max canges)";
+  Log 5, "Triggering $dev ($max changes)";
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
   ################

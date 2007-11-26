@@ -1,12 +1,28 @@
+- 70_SCIVT.pm
+  Support for an SCD series solar controler device. Details see 
+  http://english.ivt-hirschau.de/content.php?parent_id=CAT_64&doc_id=DOC_118
+- 80_M232.pm/81_M232Counter.pm
+  Support for the M232 device from ELV by Boris.
 - 91_DbLog.pm
   Example to log data in a (DBI supported) database (MySQL, Oracle, etc)
+- 99_SUNRISE.pm
+  The original Sunrise/Sunset support. Uses DateTime::Event::Sunrise. Uses the
+  99_SUNRISE_EL.pm module instead.
+- 99_SUNRISE_EL.pm
+  Support foor computins sunrise/sunset times.
+- 99_Utils.pm
+  skeleton for self-written perl funtions.
 - 99_ALARM.pm
   Example for a Low Budget ALARM System by Martin
 - checkmsg.pl
-  Check cwthe CRC of an FS20 hex message
-- fhem
-  RC script by Stefan to be put into /etc/init.d and then symlinked
-  to /etc/rc3.d or similar.
+  Check header/function/crc of an FS20 hex message
+- crc.pl
+  Computing CRC16 in perl
+- em1010.pl
+  Standalone EM1010PC reader program
+- init-scripts
+  RC scripts to be put into /etc/init.d and then symlinked to /etc/rc3.d or
+  similar.
 - four2hex
   Convert housecode from  ELV notation (4) to fhem.pl notation (hex)
 - fs20_holidays.sh
@@ -19,3 +35,5 @@
   Martin's "don't lock me out" program: look at the comment
 - rrd
   Peter's RRD support. See the HOWTO
+- serial.pm
+  Serial line analyzer

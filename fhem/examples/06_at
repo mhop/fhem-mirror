@@ -16,9 +16,9 @@ define a7 at +*{3}00:00:02 set lamp on-for-timer 1   # Blink 3 times
 
 ##################################
 # Switch the lamp on from sunset to 11 PM each day
-# You have to install 99_SUNRISE.pm in the FHEM directory to have sunset()
+# You have to install 99_SUNRISE_EL.pm in the FHEM directory to have sunset()
 # We have to use the relative versions, as the next event is computed now
-{ sunrise_coord("8.686", "50.112", "Europe/Berlin") }
+{ sunrise_coord("8.686", "50.112", "") }
 define a8 at +*{sunset_rel()} set lamp on
 define a9 at *23:00:00 set lamp off
 
