@@ -433,26 +433,26 @@ split in multiple lines<br><br>
     <a name="skip_next"></a>
     <li>skip_next<br>
         Can be applied to at devices.<br>
-	Used for at commands: skip the execution of the command the next time.</li><br />
+	Used for at commands: skip the execution of the command the next
+        time.</li><br>
 
-    <a name="softbuffer" id="softbuffer"></a>
+    <a name="softbuffer"></a>
     <li>softbuffer<br />
-  Can be applied to FHZ devices.<br />
-  Used to disable the FHZ softbuffer for FHT deviced (enabled by default).<br />
-  <strong>Note:</strong> By disabling the softbuffer FHEM works like in version 4.1. It is posible to lost commands to FHT devices by overflow the FHZ hardwarebuffer or on transmission failures.<br /> 
-  <br />
-    <a name="softbuffer" id="softbuffer"></a> </li>
-    <li>softrepeat<br />
-  Can be applied to FHZ devices.<br />
-  Used to set the repeating time while FHEM tries to resend a FHT command which failed (default 240).<br />
-  <strong>Note:</strong> Don't set this time to small. In this case it is posible that the FHZ Hardwarebuffer runs full in a short time. Than it is posible it takes long time to process the following commands. Normaly it should not necesary to change this value.<br />
-<br />
-  <a name="softbuffer" id="softbuffer"></a>    </li>
-    <li>softmaxretry<br />
-  Can be applied to FHZ devices.<br />
-  Used to set the maximal retries in which FHEM try to resend a failed command to FHT devices (default 3).<br />
-  <strong>Note:</strong> Don't set this value to height. In this case it is posible that the FHZ Hardwarebuffer runs full in a short time. Than it is posible it takes long time to process the following commands. Normaly it should not necesary to change this value.  <br />
-    <br>
+        Can be applied to FHZ devices.<br />
+        As the FHZ command buffer for FHT devices is limited, and commands
+        are only sent to the FHT devices every 150 seconds, the hardware
+        buffer may overflow and FHT commands get lost. Setting this attribute
+        to 1 implements an "unlimited" software buffer<br>
+        Default is disabled (i.e. not set or set to 0).</li><br>
+
+    <a name="retrycount"></a>
+    <li>retrycount<br />
+        Can be applied to FHT devices.<br />
+        If the <a href="#softbuffer">softbuffer</a> attribute is set, then
+        resend commands <code>retrycount</code> times if after 240 seconds
+        no confirmation message is rececived from the corresponding FHT
+        device.<br>
+        Default is 3.</li><br>
   </li>
   </ul>
 
@@ -825,8 +825,8 @@ split in multiple lines<br><br>
     define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
 
     # Switch the lamp on from sunset to 11 PM 
-    # Copy 99_SUNRISE.pm in the FHEM directory to have sunset_rel()
-    { sunrise_coord("8.686", "50.112", "Europe/Berlin") }
+    # Copy 99_SUNRISE_EL.pm in the FHEM directory to have sunset_rel()
+    { sunrise_coord("8.686", "50.112", "") }
     define a9 at +*{sunset_rel()} set lamp on
     define a10 at *23:00:00 set lamp off
 
@@ -858,11 +858,11 @@ split in multiple lines<br><br>
           (+) flag</li>
 
       <li>In order to use the sunrise_rel()/sunset_rel() functions, copy the
-          99_SUNRISE.pm file from the contrib into the modules (FHEM)
-          directory, and put { sunrise_coord(long, lat, tz) } into your config
-          file, as in the above example. If you are not using sunrise_coord, then
-          the coordinates for Frankfurt am Main, Germany will be used.
-          You also have to install the Datetime::Event::Sunrise perl module.
+          99_SUNRISE_EL.pm file from the contrib into the modules (FHEM)
+          directory, and put { sunrise_coord(long, lat, "") } into your
+          <a href="#lastinclude">lastinclude</a> file, as in the above example.
+          If you are not using sunrise_coord, then the coordinates for
+          Frankfurt am Main, Germany will be used.
       </li>
 
       <li>For even more complex date handling you either have to call fhem from
@@ -1626,10 +1626,8 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
    </li>
 
    <li>
-     If you add the 99_SUNRISE.pm from the contrib directory to your module
-     directory (NOTE: you have to install the Perl module
-     DateTime::Event::Sunrise first), then you have access to the follwing
-     functions: <br>
+     If you add the 99_SUNRISE_EL.pm from the contrib directory to your module
+     directory, then you have access to the following functions: <br>
      <ul>
      sunset_rel()<br>
      sunset_abs()<br>

@@ -79,7 +79,7 @@ attr global userattr freigabe
 
 define FHZ FHZ /dev/ttyUSB0        
 
-{ sunrise_coord("10.000", "53.550", "Europe/Berlin") }
+{ sunrise_coord("10.000", "53.550", "") }
 
 # devices
 

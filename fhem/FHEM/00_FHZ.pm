@@ -68,7 +68,9 @@ FHZ_Initialize($)
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{StateFn} = "FHZ_SetState";
   $hash->{ParseFn} = "FHZ_Parse";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 softbuffer softrepeat softmaxretry";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
+                   "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6" .
+                   "fhtsoftbuffer:1,0"; 
 }
 
 #####################################
@@ -161,24 +163,6 @@ FHZ_Get($@)
 }
 
 #####################################
-# get the FHZ hardwarebuffer without logentry
-# and as decimal value
-sub getFhzBuffer()
-{
-  my $msg = "Timeout";
-
-  while (index($msg,"Timeout") >= 0) {					# try getting FHZ buffer until no Timeout occurs
-    FHZ_Write($defs{FHZ}, "04", "c90185")  if(!IsDummy("FHZ"));
-    $msg = FHZ_ReadAnswer($defs{FHZ}, "fhtbuf");
-  }
-
-  my $v = substr($msg, 16, 2);
-  $v = hex $v;
-
-  return "$v";
-}
-
-#####################################
 sub
 FHZ_SetState($$$$)
 {
@@ -220,11 +204,15 @@ FHZ_Define($$)
   delete $hash->{PortObj};
   delete $hash->{FD};
 
+  my $name = $a[0];
   my $dev = $a[2];
-  $attr{$a[0]}{savefirst} = 1;
+
+  $attr{$name}{savefirst} = 1;
+  $attr{$name}{fhtsoftbuffer} = 1;
 
   if($dev eq "none") {
     Log 1, "FHZ device is none, commands will be echoed only";
+    $attr{$name}{dummy} = 1;
     return undef;
   }
 
@@ -255,7 +243,7 @@ FHZ_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
 
-  DoInit($a[0]);
+  DoInit($name);
   return undef;
 }
 
@@ -423,7 +411,7 @@ FHZ_Write($$$)
     ##############
     # Write the next buffer not earlier than 0.22 seconds (= 65.6ms + 10ms +
     # 65.6ms + 10ms + 65.6ms), else it will be discarded by the FHZ1X00 PC
-    InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash);
+    InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
   } elsif($hash->{QUEUECNT} == 1) {
     $hash->{QUEUE} = [ $bstring ];
   } else {
@@ -443,7 +431,7 @@ FHZ_HandleWriteQueue($)
   if($cnt > 0) {
     my $bstring = shift(@{$hash->{QUEUE}});
     $hash->{PortObj}->write($bstring);
-    InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash);
+    InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
   }
 }
 

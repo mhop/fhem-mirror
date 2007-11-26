@@ -31,15 +31,17 @@ EMWZ_GetStatus($)
   my ($hash) = @_;
 
   if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+300, "EMWZ_GetStatus", $hash);
+    InternalTimer(gettimeofday()+300, "EMWZ_GetStatus", $hash, 0);
   }
 
   my $dnr = $hash->{DEVNR};
   my $name = $hash->{NAME};
 
+  return "Empty status: dummy IO device" if(IsIoDummy($name));
+
   my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
   if(!defined($d)) {
-    my $msg = "EMWZ $name read error";
+    my $msg = "EMWZ $name read error (GetStatus 1)";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
@@ -54,7 +56,7 @@ EMWZ_GetStatus($)
   my $pulses=w($d,13);
   my $ec=w($d,49) / 10;
   if($ec <= 0) {
-    my $msg = "EMWZ read error";
+    my $msg = "EMWZ read error (GetStatus 2)";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
@@ -124,10 +126,12 @@ EMWZ_Set($@)
 
   return $u if(int(@a) != 3);
 
+  my $name = $hash->{NAME};
+  return "" if(IsIoDummy($name));
+
   my $v = $a[2];
   my $d = $hash->{DEVNR};
   my $msg;
-  my $name = $hash->{NAME};
 
   if($a[1] eq "price") {
     $v *= 10000; # Make display and input the same
@@ -141,9 +145,10 @@ EMWZ_Set($@)
     return $u;
   }
 
+
   my $ret = IOWrite($hash, $msg);
   if(!defined($ret)) {
-    my $msg = "EMWZ $name read error";
+    my $msg = "EMWZ $name read error (Set)";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
@@ -170,11 +175,7 @@ EMWZ_Define($$)
   AssignIoPort($hash);
 
 
-  # InternalTimer blocks if init_done is not true
-  my $oid = $init_done;
-  $init_done = 1;
   EMWZ_GetStatus($hash);
-  $init_done = $oid;
   return undef;
 }
 
