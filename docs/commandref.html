@@ -946,13 +946,35 @@ split in multiple lines<br><br>
 
     Notes:
     <ul>
-      Normally you won't have to define fileplot weblinks manually, as fhemweb.pl
-      (webpgm2) makes it easy for you, just plot a logfile (see <a
-      href="#logtype">logtype</a>) and convert it to weblink.  Now you can
-      group these weblinks by putting them into rooms.
-      If you convert the current logfile to a weblink, it will always refer to the
-      current file (and not the one you originally specified).
+      <li>Normally you won't have to define fileplot weblinks manually, as
+          fhemweb.pl (webpgm2) makes it easy for you, just plot a logfile (see
+          <a href="#logtype">logtype</a>) and convert it to weblink.  Now you
+          can group these weblinks by putting them into rooms.  If you convert
+          the current logfile to a weblink, it will always refer to the current
+          file (and not the one you originally specified).</li>
+      <li>The <b>99_weblink.pm</b> module is in the contrib directory, you have
+          to "install" it manually by copying it into the FHEM directory. </li>
     </ul>
+  </ul>
+
+  <a name="dummy"></a>
+  <h4>Type dummy</h4>
+  <ul>
+    <code>define &lt;name&gt; dummy</code>
+    <br><br>
+
+    Define a dummy. A dummy can take via <a href="#set">set</a> any values.
+    Used for programming. 
+    Example:
+    <ul>
+      <code>define myvar dummy</code><br>
+      <code>set myvar 7</code><br>
+    </ul>
+    Notes:
+    <ul>
+      <li>The <b>99_dummy.pm</b> module is in the contrib directory, you have
+          to "install" it manually by copying it into the FHEM directory.</li>
+    </ul>>
   </ul>
 
 </ul>
