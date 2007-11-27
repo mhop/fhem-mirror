@@ -321,7 +321,7 @@ FHT_Parse($$)
   if(!$val) {
     # This is a confirmation message. We reformat it so that
     # it looks like a real message, and let the rest parse it
-    Log 4, "FHT $name confirmation: $cde)";
+    Log 4, "FHT $name confirmation: $cde";
     $val = substr($cde, 2, 2);
     $cde = substr($cde, 0, 2) . "0069";
     $confirm = 1;
@@ -399,9 +399,6 @@ FHT_Parse($$)
   } elsif($type eq "lowtemp-offset") {
     $val = sprintf("%d.0 (Celsius)", $val)
 
-  } elsif($type =~ m/echo_/) {		# Ignore these messages
-    return "";
-    
   }
 
   $def->{READINGS}{$type}{TIME} = $tn;
@@ -409,17 +406,19 @@ FHT_Parse($$)
   $def->{CHANGED}[0] = "$type: $val";
   $def->{STATE} = "$type: $val" if($type eq "measured-temp");
 
-  Log 4, "FHT $name ($type: $val)";
+  Log 4, "FHT $name $type: $val";
 
   ################################
   # Softbuffer: deleted confirmed commands
-  my $io = $hash->{IODev};
-  if($confirm && keys(%{$io->{SOFTBUFFER}})) {
+  if($confirm) {
     my $found; 
+    my $io = $def->{IODev};
     foreach my $key (sort keys %{$io->{SOFTBUFFER}}) {
       my $h = $io->{SOFTBUFFER}{$key};
-      if($h->{HASH}->{NAME} eq $name &&
-         $h->{CMD} eq $type) {
+      my $hcmd = $h->{CMD};
+      $hcmd = "init" if($hcmd eq "refreshvalues");
+      Log 5, "FHT check $h->{HASH}->{NAME} eq $name && $hcmd eq $type";
+      if($h->{HASH}->{NAME} eq $name && $hcmd eq $type) {
         $found = $key;
         last;
       }
@@ -440,6 +439,7 @@ doSoftBuffer($)
   my $now = gettimeofday();
   
   my $count = 0;
+  my $fhzbuflen = -999;
   foreach my $key (keys %{ $io->{SOFTBUFFER} }) {
 
     $count++;
@@ -457,8 +457,10 @@ doSoftBuffer($)
       }
     }
 
-    next if(getFhzBuffer($io) < $minFhzHardwareBuffer);
+    $fhzbuflen = getFhzBuffer($io) if($fhzbuflen == -999);
+    next if($fhzbuflen < $minFhzHardwareBuffer);
     sendCommand($h->{HASH}, $h->{CMD}, $h->{VAL}, $h->{ARG});
+    $fhzbuflen -= ($h->{CMD} eq "refreshvalues" ? 7 : 5);
     $h->{SENDTIME} = $now;
     $h->{NSENT}++;
 
@@ -491,13 +493,12 @@ getFhzBuffer($)
 
   return $minFhzHardwareBuffer if(IsDummy($io->{NAME}));
 
-  Log 4, "getFhzBuffer";
   for(;;) {
     FHZ_Write($io, "04", "c90185");
-
     my $msg = FHZ_ReadAnswer($io, "fhtbuf");
-
-    return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9]+$/);
+    Log 5, "getFhzBuffer: $count $msg";
+  
+    return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9A-F]+$/i);
     return 0 if($count++ > 5);
   }
 }
@@ -516,8 +517,6 @@ sendCommand($$$$)
     if(!IsDummy($name)) {
       my $havefhz = ($hash->{IODev} && defined($hash->{IODev}->{FD}));
       IOWrite($hash, "04", $arg);
-      sleep(1) if($havefhz);
-      IOWrite($hash, "04", "c90185");  # Check the fht buffer
       sleep(1) if($havefhz);
     }
 
