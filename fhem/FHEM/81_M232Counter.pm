@@ -1,3 +1,9 @@
+#
+#
+# 81_M232Counter.pm
+# written by Dr. Boris Neubert 2007-11-26 
+# e-mail: omega at online dot de
+#
 ##############################################
 package main;
 
