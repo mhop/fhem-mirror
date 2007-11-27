@@ -15,26 +15,25 @@ Formerly known as fhz1000.pl
 
 <h2>News (as of =DATE=, Version =VERS=)</h2>
 <ul>
-  <li> doc:     linux.html (private udev-rules, not 50-..., ATTRS)
-  <li> bugfix:  setting devices with "-" in their name did not work
-  <li> doc:     fhem.pl and commandref.html (notifyon -> notify, correction
-                of examples)
-  <li> feature: modify command added
-  <li> feature: The "-" in the name is not allowed any more
-  <li> bugfix:  disabled notify causes "uninitialized value" (STefan, 1.5)
-  <li> bugfix:  deleted FS20 items are still logging (zombie) (Gerhard, 16.5)
-  <li> bugfix:  added FS20S8, removed stty_parmrk (Martin, 24.5)
-  <li> feature: added archivedir/archivecmd to the FileLog
-  <li> feature: added EM1010PC/EM1000WZ/EM1000EM support
-  <li> bugfix:  undefined messages for unknown HMS devs (Peter, 8.6)
-  <li> bugfix:  em1010 and %oldvalue bugs (Peter, 9.6)
-  <li> bugfix:  SCIVT solar controller (peterp, 1.7)
-  <li> bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
-  <li> feature: First steps for a Fritz!Box port. See the fritzbox.html
+  <li>feature: added archivedir/archivecmd to the the main logfile
+  <li>feature: 99_Sunrise_EL.pm (does not need any Date modules)
+  <li>bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
+  <li>bugfix:  FHT mode holiday_short added (9.9, Dirk)
+  <li>bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)
+  <li>feature: webpgm2 output reformatted
+  <li>feature: webpgm2 displaying multiple plots
   <li>feature: FHT lime-protection code discovered by Dirk (7.10)
-  <li>feature: Softwarebuffer for FHT devices with queuing unsent commands and repeating commands by transmission failure (Dirk 17.10)
-  <li> feature: FHT low temperatur warning and setting for lowtemp-offset (Dirk 17.10)
-  <li>change: Change naming for state into warnings (Dirk 17.10)
+  <li>feature: softwarebuffer for FHT devices (Dirk 17.10)
+  <li>feature: FHT low temperatur warning and offset (Dirk 17.10)
+  <li>change:  change FHT state into warnings (Dirk 17.10)
+  <li>feature: Softwarebuffer code simplified (Rudi 22.11)
+  <li>bugfix:  bug #12327 doppeltes my
+  <li>bugfix:  set STATE from trigger
+  <li>bugfix:  readings state vs STATE problem (xmllist/trigger)
+  <li>change:  SUNRISE doc changed (99_SUNRISE.pm -> 99_SUNRISE_EL.pm)
+  <li>feature: support for the M232 ELV device (Boris, 25.11)
+  <li>feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)
+  <li>feature: dummy type added (contrib/99_dummy.pm)
 </ul>
 
 </ul>
@@ -55,8 +54,8 @@ Currently implemented features:<br>
     <li>reading and sending FS20 events (on/off/dimming, timer commands)<br>
     <li>support of FS20 address features function group, local and global master
     <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
-        The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.<br />
-        For FHT8b devices, FHEM have an internal software buffer for sending commands step by step. This buffer should prevent lost commands. In case of transmission failures FHEM tries to resend commands. <br />
+        The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.<br>
+        Internal software buffer to prevent lost commands.<br>
     </li>
     <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK and RM100-2)</li>
     <li>reading KS300 data</li>
@@ -64,7 +63,8 @@ Currently implemented features:<br>
   </li>
   <li>reading WS300 data, and up to 9 attached devices</li>
   <li>reading EM1000WZ/EM1000EM data via an attached EM1010PC</li>
-  <li>reading an attached SCIVT device</li>
+  <li>reading attached SCIVT devices</li>
+  <li>reading attached M232 devices</li>
   <li>logging events to files (or database), with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
       events</li>

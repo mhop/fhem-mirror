@@ -1,3 +1,9 @@
+#
+#
+# 80_M232.pm
+# written by Dr. Boris Neubert 2007-11-26
+# e-mail: omega at online dot de
+#
 ##############################################
 package main;
 
@@ -77,18 +83,23 @@ M232_Undef($$)
 
 
 #####################################
+
 sub
 M232_Set($@)
 {
   my ($hash, @a) = @_;
   my $u1 = "Usage: set <name> auto <value>\n" .
                   "set <name> stop\n" .
-		  "set <name> start";
+		  "set <name> start\n" .
+		  "set <name> octet <value>\n" .
+		  "set <name> [io0..io7] 0|1\n";
 
   return $u1 if(int(@a) < 2);
   my $msg;
+  my $reading= $a[1];
 
-  if($a[1] eq "auto") {
+
+  if($reading eq "auto") {
         return $u1 if(int(@a) !=3);
 	my $value= $a[2];
         my @legal= (0..5,"none");
@@ -99,14 +110,31 @@ M232_Set($@)
 	$msg= "M" . $value;
   }
   
-  elsif($a[1] eq "start") {
+  elsif($reading eq "start") {
         return $u1 if(int(@a) !=2);
 	$msg= "Z1";
   }
 
-  elsif($a[1] eq "stop") {
+  elsif($reading eq "stop") {
         return $u1 if(int(@a) !=2);
 	$msg= "Z0";
+  }
+
+  elsif($reading eq "octet") {
+        return $u1 if(int(@a) !=3);
+	my $value= $a[2];
+        my @legal= (0..255);
+        if(!grep($value eq $_, @legal)) {
+                return "Illegal value $value, possible values: 0..255";
+        }
+	$msg= sprintf("W%02X", $value);
+  }
+
+  elsif($reading =~ /^io[0-7]$/) {
+        return $u1 if(int(@a) !=3);
+	my $value= $a[2];
+	return $u1 unless($value eq "0" || $value eq "1");
+        $msg= "D" . substr($reading,2,1) . $value;
   }
 
   else { return $u1; }
@@ -147,7 +175,7 @@ M232_Get($@)
 	$msg= "a" . substr($reading,2,1);
   	my $d = M232GetData($hash->{DeviceName}, $msg);
  	return "Read error" if(!defined($d));
-	my $voltage= hex substr($d,0,3);
+	my $voltage= (hex substr($d,0,3))*5.00/1024.0;
 	my $iscurrent= substr($d,3,1);
 	$retval= $voltage; # . " " . $iscurrent;
   } 

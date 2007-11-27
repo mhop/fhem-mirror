@@ -350,7 +350,6 @@ getDevData()
       if($smooth && (w($d,$off+2) == 0xffff)) { # "smoothing"
         next;
       } else {
-printf ("%d %d\n", $div, $backlog);
 	my $v = w($d,$off)*12/$div/$backlog;
 	my $f1 = b($d,$off+2);
 	my $f2 = b($d,$off+3);
