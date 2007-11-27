@@ -333,4 +333,40 @@ DONE:
   return undef;
 }
 
+
+#########################
+# Interpretation is left for the "user";
+sub
+EmGetDevData($)
+{
+  my ($hash) = @_;
+
+  my $dnr = $hash->{DEVNR};
+  my $d = IOWrite($hash, sprintf("7a%02x", $dnr-1));
+
+  return("ERROR: No device no. $dnr present")
+        if($d eq ((pack('H*',"00") x 45) . pack('H*',"FF") x 6));
+
+  my $nrreadings = w($d,2);
+  return("ERROR: No data to read (yet?)")
+        if($nrreadings == 0);
+
+  my $step  = b($d,6);
+  my $start = b($d,18)+13;
+  my $end   = $start + int(($nrreadings-1)/64)*$step;
+
+  my @ret;
+  for(my $p = $start; $p <= $end; $p += $step) {        # blockwise
+    $d = IOWrite($hash, sprintf("52%02x%02x00000801", $p%256, int($p/256)));
+    my $max = (($p == $end) ? ($nrreadings%64)*4+4 : 260);
+    my $step = b($d, 6);
+
+    for(my $off = 8; $off <= $max; $off += 4) {         # Samples in each block
+      push(@ret, sprintf("%04x%04x\n", w($d,$off), w($d,$off+2)));
+    }
+  }
+  return @ret;
+}
+
+
 1;

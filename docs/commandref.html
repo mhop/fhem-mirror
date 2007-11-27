@@ -652,9 +652,9 @@ split in multiple lines<br><br>
   <a name="WS300"></a>
   <h4>Type WS300</h4>
   <ul>
-    <code>define WS300Device WS300 &lt;serial device&gt;<br>
+    <code>define WS300Device WS300 &lt;serial device&gt;</code><br>
     or<br>
-    <code>define &lt;devname&gt WS300 [0-9]<br>
+    <code>define &lt;devname&gt WS300 [0-9]</code><br>
     <br>
     The first line is mandatory if you have a WS300 device: it defines the
     input device with its USB port. The name of this device is fixed and must
@@ -732,6 +732,52 @@ split in multiple lines<br><br>
     </ul>
     <br>
   </ul>
+
+
+  <a name="M232"></a>
+  <h4>Type M232</h4>
+  <ul>
+    <code>define &lt;name&gt; M232 &lt;m232-device&gt;</code>
+    <br><br>
+
+    Define a M232 device. You can attach as many M232 devices as you like. A
+    M232 device provides 6 analog inputs (voltage 0..5V with 10 bit resolution)
+    and 8 bidirectional digital ports. The eighth digital port can be used as a
+    16 bit counter (maximum frequency 3kHz). The M232 device needs to be
+    connected to a 25pin sub-d RS232 serial port. A USB-to-serial converter
+    works fine if no serial port is available.<br><br>
+
+    Examples:
+    <ul>
+      <code>define m232 M232 /dev/ttyUSB2</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="M232Counter"></a>
+  <h4>Type M232Counter</h4>
+  <ul>
+    <code>define &lt;name&gt; M232Counter [unit [factor]]</code>
+    <br><br>
+
+    Define at most one M232Counter for a M232 device. Defining a M232Counter
+    will schedule an internal task, which reads the status of the counter every
+    minute, and triggers notify/filelog commands. <code>unit</code> is the unit
+    name, <code>factor</code> is used to calculate the reading of the counter
+    from number of ticks.  <br><br> <br>Note: the unit defaults to the string
+    "ticks", but it must be specified if you wish to set the factor, which
+    defaults to 1.0. In the second example below one tick equals 1/1250th kWh.
+    Do not forget to start the counter (with <code>set .. start</code> for
+    M232) or to start the counter and set the reading to a specified value
+    (with <code>set ... value</code> for M232Counter).  <br><br>
+    Example:
+    <ul>
+      <code>define counter M232Counter turns</code><br>
+      <code>define counter M232Counter kWh 0.0008</code><br>
+    </ul>
+    <br>
+  </ul>
+
 
   <a name="SCIVT"></a>
   <h4>Type SCIVT</h4>
@@ -1058,6 +1104,39 @@ split in multiple lines<br><br>
     <br><br>
     This is the same command which is scheduled every 5 minutes internally.
   </ul>
+
+  <h4>Type M232:</h4>
+  <ul>
+    <code>get &lt;name&gt; [an0..an5]</code>
+    <br><br>
+    Gets the reading of analog input 0..5 in volts.
+    <br><br>
+    <code>get &lt;name&gt; [io0..io7]</code>
+    <br><br>
+    Gets the state of digital ports 0..7, result is 0 or 1.
+    <br><br>
+    <code>get &lt;name&gt; octet</code>
+    <br><br>
+    Gets the state of all digital ports at once, result is 0..255.
+    <br><br>
+    <code>get &lt;name&gt; counter</code>
+    <br><br>
+    Gets the number of ticks of the counter since the last reset. The counter
+    wraps around from 65535 to 0.
+    <br><br>
+  </ul>
+
+  <h4>Type M232Counter:</h4>
+  <ul>
+    <code>get &lt;name&gt; status</code>
+    <br><br>
+    Gets the reading of the counter multiplied by the factor from the
+    <code>define</code> statement. Wraparounds of the counter are accounted for
+    by an offset (see  reading <code>basis</code> in the output of the
+    <code>list</code> statement for the device).
+    <br><br>
+  </ul>
+
 </ul>
 
 
@@ -1289,7 +1368,7 @@ Send buffer:<br />    2007-10-19 00:31:24   desired-temp    22.5
       <li>In order to set the time of your FHT's, schedule this command every
       minute:<br>
 	  <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
-	  See the <a href="#loglevel">loglevel<a> to prevent logging of
+	  See the <a href="#loglevel">loglevel</a> to prevent logging of
           this command.
 	  </li>
       <li>FHTcode is a two digit hex number (from 00 to 63?) and sets the
@@ -1479,7 +1558,7 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
   <a name="WS300set"></a>
   <h4>Type WS300:</h4>
   <ul>
-    <code>set WS300Device  &lt;interval(min.)&gt; &lt;height(m)&gt; &lt;rainvalume(ml)&gt;
+    <code>set WS300Device  &lt;interval(min.)&gt; &lt;height(m)&gt; &lt;rainvalume(ml)&gt;</code>
     <br><br>
     Set some WS300 configuration parameters.
   </ul>
@@ -1487,7 +1566,7 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
   <a name="EMWZset"></a>
   <h4>Type EMWZ:</h4>
   <ul>
-    <code>set EMWZdevice  &lt;param&gt; &lt;value&gt;<br><br>
+    <code>set EMWZdevice  &lt;param&gt; &lt;value&gt;</code><br><br>
     where param is one of:
     <ul>
       <li>rperkw<br>
@@ -1503,6 +1582,35 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
           The price of one KW in EURO (use e.g. 0.20 for 20 Cents). It is used
           only on the EM1010PC display, it is of no interest for FHEM.
     </ul>
+  </ul>
+
+  <h4>Type M232:</h4>
+  <ul>
+    <code>set &lt;name&gt; stop</code>
+    <br><br>
+    Stops the counter.
+    <br><br>
+    <code>set &lt;name&gt; start</code>
+    <br><br>
+    Resets the counter to zero and starts it.
+    <br><br>
+    <code>set &lt;name&gt; octet <value></code>
+    <br><br>
+    Sets the state of all digital ports at once, value is 0..255.
+    <br><br>
+    <code>set &lt;name&gt; [io0..io7] 0|1</code>
+    <br><br>
+    Turns digital port 0..7 off or on.
+    <br><br>
+  </ul>
+
+  <h4>Type M232Counter:</h4>
+  <ul>
+    <code>set &lt;name&gt; value &lt;value&gt;</code>
+    <br><br>
+    Sets the reading of the counter to the given value. The counter is reset
+    and started and the offset is adjusted to value/unit.
+    <br><br>
   </ul>
 
 
@@ -1644,7 +1752,7 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
 
    <li>
      To access the numerical value of an FS20 command (e.g. toggle), use the
-     hash <code>fs20_c2b<code>. E.g. { Log 2, $fs20_c2b{"toggle"} }
+     hash <code>fs20_c2b</code>. E.g. { Log 2, $fs20_c2b{"toggle"} }
    </li>
 
    <li>
