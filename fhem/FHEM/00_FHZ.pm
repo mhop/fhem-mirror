@@ -296,7 +296,7 @@ FHZ_Parse($$)
     $msg = substr($msg, 4, 2);
   }
 
-  Log 4, "FHZ $name $type: $msg)";
+  Log 4, "FHZ $name $type: $msg";
   $def->{CHANGED}[0] = "$type: $msg";
   return $hash->{NAME};
 }
@@ -343,7 +343,7 @@ FHZ_ReadAnswer($$)
   for(;;) {
 
     vec($rin, $hash->{FD}, 1) = 1;
-    my $nfound = select($rin, undef, undef, 3);
+    my $nfound = select($rin, undef, undef, 3); # 3 seconds timeout
     if($nfound < 0) {
       next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
       die("Select error $nfound / $!\n");
@@ -352,8 +352,7 @@ FHZ_ReadAnswer($$)
 
     my $buf = $hash->{PortObj}->input();
 
-#    Log 5, "FHZ/RAW: " . unpack('H*',$buf);
-Log 4, "FHZ/RAW: " . unpack('H*',$buf);
+    Log 5, "FHZ/RAW: " . unpack('H*',$buf);
     $mfhzdata .= $buf;
     next if(length($mfhzdata) < 2);
 

@@ -135,7 +135,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.30 2007-11-26 14:56:45 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.31 2007-11-27 15:17:47 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1628,8 +1628,10 @@ DoTrigger($$)
     $defs{$dev}{INTRIGGER}=1;
     my $ret = "";
     foreach my $n (sort keys %defs) {
-      Log 5, "$dev trigger: Checking $n for notify";
-      $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+      if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
+        Log 5, "$dev trigger: Checking $n for notify";
+        $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+      }
     }
     delete($defs{$dev}{INTRIGGER});
   }
