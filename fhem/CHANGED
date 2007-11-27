@@ -351,6 +351,8 @@
   - feature: softwarebuffer for FHT devices (Dirk 17.10)
   - feature: FHT low temperatur warning and offset (Dirk 17.10)
   - change:  change FHT state into warnings (Dirk 17.10)
+             NOTE: you'll get an undefined type state &
+             undefined type unknown_85 after upgrade.
   - feature: Softwarebuffer code simplified (Rudi 22.11)
   - bugfix:  bug #12327 doppeltes my
   - bugfix:  set STATE from trigger
