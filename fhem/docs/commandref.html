@@ -548,20 +548,36 @@ split in multiple lines<br><br>
     [fg &lt;fgaddr&gt;] [lm &lt;lmaddr&gt;] [gm FF] </code>
     <br><br>
 
-    <code>&lt;housecode&gt;</code> is a four digit hex number,
-    corresponding to the housecode address, <code>&lt;button&gt;</code> is
-    a two digit hex nunmber, corresponding to a button of the transmitter.<br>
-    <li>The optional fg specifies the function group, the first digit of the 2
-    digit adress must be F.</li>
-    <li>The optional lm specifies the local master, the last digit of the 2
-    digit adress must be F.</li>
-    <li>The optional gm specifies the global master, the adress must be FF.</li>
-    <br>
+   The values of housecode, button, fg, lm, and gm can be either defined as
+   hexadecimal value or as ELV-like "quad-decimal" value with digits 1-4. We
+   will reference this ELV-like notation as ELV4 later in this document. You
+   may even mix both hexadecimal and ELV4 notations, because FHEM can detect
+   the used notation automatically by counting the digits.<br>
+
+   <ul>
+   <li><code>&lt;housecode&gt;</code> is a 4 digit hex or 8 digit ELV4 number,
+     corresponding to the housecode address.</li>
+   <li><code>&lt;button&gt;</code> is a 2 digit hex or 4 digit ELV4 number,
+     corresponding to a button of the transmitter.</li>
+   <li>The optional <code>&lt;fgaddr&gt;</code> specifies the function group.
+     It is a 2 digit hex or 4 digit ELV address. The first digit of the hex
+     adress must be F or the first 2 digits of the ELV4 address must be
+     44.</li>
+   <li>The optional <code>&lt;lmaddr&gt;</code> specifies the local
+     master. It is a 2 digit hex or 4 digit ELV address.  The last digit of the
+     hex address must be F or the last 2 digits of the ELV4 address must be
+     44.</li>
+   <li>The optional gm specifies the global master, the adress must be FF if
+     defined as hex value or 4444 if defined as ELV4 value.</li>
+   </ul>
+   <br>
 
     Examples:
     <ul>
-      <code>define lamp FS20 7777 00 fg F1</code><br>
-      <code>define roll1 FS20 7777 01</code>
+      <code>define lamp FS20 7777 00 fg F1 gm F</code><br>
+      <code>define roll1 FS20 7777 01</code><br>
+      <code>define otherlamp FS20 24242424 1111 fg 4412 gm 4444</code><br>
+      <code>define otherroll1 FS20 24242424 1114</code>
     </ul>
   </ul>
   <br>
