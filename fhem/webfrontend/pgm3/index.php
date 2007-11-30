@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='071030';
+$pgm3version='071130';
 
 	
 	$Action		=	$_POST['Action'];
@@ -64,6 +64,14 @@ $pgm3version='071030';
 	$fs20dev	=	$_POST['fs20dev'];
 	$errormessage	=	$_POST['errormessage'];
 
+	if (! isset($showrss)) $showrss=$_GET['showrss'];
+	if (! isset($rssorder)) $rssorder=$_GET['rssorder'];
+	if ($rssorder=="") 
+		{unset($rssorder);}
+	else
+		{$Action='exec'; $order=$rssorder;}
+
+	
 	if (! isset($showhmsgnu)) $showhmsgnu=$_GET['showhmsgnu'];
 	if ($showhmsgnu=="") unset($showhmsgnu);
 
@@ -230,17 +238,6 @@ $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
 return $errormessage;
 }
 
-###### write the header on screen
- echo "
-         <html>
-	 <head>
-	 <meta http-equiv='refresh' content='$urlreload; URL=$forwardurl'>
-	 <meta http-equiv='pragma' content='no-cache'>
-	 <meta http-equiv='Cache-Control' content='no-cache'>
- 	 <link rel='shortcut icon' href='include/fs20.ico' >
-	 <title>$titel</title>";
- 	  include ("include/style.css");	 
- echo "	 </head>";
 
 
 ###### make an array from the xmllist
@@ -431,9 +428,32 @@ xml_parser_free($xml_parser);
 #print_r($fs20devs);  exit;
 #echo count($stack[0][children]);exit;
 
+
+
+
+
 # Print Array on Screen
 
  $now=date($timeformat);
+
+
+# only RSS-Feeds?? 
+ if (isset($showrss)) { include "include/rssfeeds.php"; exit; }
+
+
+
+###### write the header on screen
+ echo "
+         <html>
+	 <head>
+	 <meta http-equiv='refresh' content='$urlreload; URL=$forwardurl'>
+	 <meta http-equiv='pragma' content='no-cache'>
+	 <meta http-equiv='Cache-Control' content='no-cache'>
+	 <link rel='alternate' type='application/rss+xml' title='$RSStitel' href='index.php?showrss'>
+ 	 <link rel='shortcut icon' href='include/fs20.ico' >
+	 <title>$titel</title>";
+ 	  include ("include/style.css");	 
+ echo "	 </head>";
 
 
  echo"      <body $bodybg>
@@ -514,7 +534,7 @@ xml_parser_free($xml_parser);
 
 	##### Check Version of FHEM
 	      if (! ($stack[0][children][0][name]=='_internal__LIST')) ##older FHZ100 have no Internal_LIST
-		{echo "Error!! You need at least FHEM-4.0 to run this pgm3!!";}
+		{echo "Error!! There is no FHEM. You need at least FHEM-4.0 to run this pgm3!!";}
 
 
 
