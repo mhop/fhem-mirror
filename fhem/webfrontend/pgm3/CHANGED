@@ -149,3 +149,6 @@ It is not necessary to tell fhem that there are other logs.
 2007-10-20 (071030cvs)
 -- fix: gnuplot for FS20 now only off or on
 
+2007-11-30 (071130)
+-- feature: RSS-Feeds added
+

@@ -48,3 +48,7 @@
 
 - Martin 2007-10-30
  -  fix: gnuplot for FS20 now only off or on
+
+- Martin 2007-11-30
+ -  feature: RSS-Feeds added. New include/rssfeeds.php. Changes in index.php and config.php
+
