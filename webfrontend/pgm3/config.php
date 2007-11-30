@@ -286,6 +286,8 @@ $userdef[$sortnumber]['logrotatelines']=2200;
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
 	$showHIST='yes';		 	#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
 
+        $RSStitel='FHEM :-)';
+
 
 
 	$urlreload=90;			# Automatic reloading page [sec]. Default fast: 60 slow:90
