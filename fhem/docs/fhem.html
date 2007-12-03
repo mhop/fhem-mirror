@@ -25,7 +25,10 @@ Formerly known as fhz1000.pl
   <li>feature: FHT lime-protection code discovered by Dirk (7.10)
   <li>feature: softwarebuffer for FHT devices (Dirk 17.10)
   <li>feature: FHT low temperatur warning and offset (Dirk 17.10)
-  <li>change:  change FHT state into warnings (Dirk 17.10)
+  <li>change:  change FHT state into warnings (Dirk 17.10)<br>
+               NOTE: you'll get an undefined type state &amp; undefined type
+               unknown_85 message after upgrade, this will disappear at the
+               second start.</li>
   <li>feature: Softwarebuffer code simplified (Rudi 22.11)
   <li>bugfix:  bug #12327 doppeltes my
   <li>bugfix:  set STATE from trigger
@@ -40,12 +43,12 @@ Formerly known as fhz1000.pl
 
 <h2>Description</h2>
 <ul>
-This program makes the FHZ1000/FHZ1300/WS300 USB devices sold by ELV, Conrad and
-others useable with Linux. In fact, there is nothing Linux special in it, you
-should be able to use it on other platforms as long as you can access the
-hardware as a serial device.<br>
-The program runs as a server, you can control it via telnet, command line
-program or TCP/IP directly, like the supplied web frontends do.<br> <br>
+This program makes the FHZ1000/FHZ1300/WS300 and other USB devices sold by ELV,
+Conrad and others useable with Linux. In fact, there is nothing Linux special
+in it, you should be able to use it on other platforms as long as you can
+access the hardware as a serial device.<br> The program runs as a server, you
+can control it via telnet, command line program or TCP/IP directly, like the
+supplied web frontends do.<br> <br>
 
 Currently implemented features:<br>
 <ul>
@@ -60,6 +63,8 @@ Currently implemented features:<br>
     <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK and RM100-2)</li>
     <li>reading KS300 data</li>
   </ul>
+     <b>Note:</b>The FHZ1350 WLAN is probably not working due to a prorietary
+     encryption. 
   </li>
   <li>reading WS300 data, and up to 9 attached devices</li>
   <li>reading EM1000WZ/EM1000EM data via an attached EM1010PC</li>
@@ -145,13 +150,14 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
   <li>Copy the file <code>fhem.pl</code> into your path (e.g.
       <code>/usr/local/bin</code>), and the FHEM directory e.g. to
       <code>/usr/local/lib</code>. </li>
+  <li>Copy additional modules from the contrib directory
+      (like 99_SUNRISE_EL.pm)</li>
   <li>Make sure that you can access the serial USB
       device (e.g. <code>/dev/tts/USB0</code>).</li>
   <li>Create a configuration file (see the examples directory and 
-      docs/commandref.html), and change at least the modpath
+      docs/commandref.html), change at least the modpath
       (<code>/usr/local/lib</code>) and define FHZ FHZ (<code>/dev/tts/USB0</code>)
       parameters.</li>
-  <li>Delete the savefile if you are upgrading from an older version.</li>
   <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
 </ul>
 
@@ -179,10 +185,10 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 	 &lt;device-name&gt;.&lt;state&gt;, &lt;device-name&gt;,
 	 &lt;device-type&gt;.&lt;state&gt;, &lt;device-type&gt;<br>
 	 </li>
-     <li>Edit <code>fhemweb.pl</code>, and check the "Config" section.</li>
      <li>If you want to have access to plotted logs, then make sure that
          gnuplot is installed and set the logtype for the FileLog device
-         (see commandref.html and example/04_log).
+         (see commandref.html and example/04_log). Copy the file
+         contrib/99_weblink.pm to the installed FHEM directory.
 	 </li>
      <li>Call &lt;your-site&gt;/cgi-bin/fhemweb.pl
   </ul>
