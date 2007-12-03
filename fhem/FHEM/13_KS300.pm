@@ -149,18 +149,17 @@ KS300_Parse($$)
 
     my $max = int(@v);
 
-
-    for(my $i = 0; $i < $max; $i++) {
-      $r->{$txt[$i]}{TIME} = $tm;
-      my $val = "$v[$i] $sfx[$i]";
-      $r->{$txt[$i]}{VAL} = $val;
-      $def->{CHANGED}[$i] = "$txt[$i]: $val";
-    }
-
     # For logging/summary
     my $val = "T: $v[4]  H: $v[3]  W: $v[2]  R: $v[1]  IR: $v[5]";
     $def->{STATE} = $val;
-    $def->{CHANGED}[$max++] = $val;
+    $def->{CHANGED}[0] = $val;
+
+    for(my $i = 0; $i < $max; $i++) {
+      $r->{$txt[$i]}{TIME} = $tm;
+      $val = "$v[$i] $sfx[$i]";
+      $r->{$txt[$i]}{VAL} = $val;
+      $def->{CHANGED}[$i+1] = "$txt[$i]: $val";
+    }
 
     ###################################
     # AVG computing
