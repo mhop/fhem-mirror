@@ -222,7 +222,7 @@ FHT_Set($@)
   $val = "" if (!defined($val));
 
   my $ioname = "";
-  $hash->{IODev}->{NAME} if($hash->{IODEV});
+  $ioname = $hash->{IODev}->{NAME} if($hash->{IODev});
   if($attr{$ioname} && $attr{$ioname}{fhtsoftbuffer}) {
 
     my $io = $hash->{IODev};
