@@ -339,7 +339,7 @@
   - bugfix:  WS300 loglevel change (from 2 to 5 or device specific loglevel)
   - feature: First steps for a Fritz!Box port. See the fritzbox.html
 
-- ==DATE== (4.2)
+- 2007-12-02 (4.2)
   - feature: added archivedir/archivecmd to the the main logfile
   - feature: 99_Sunrise_EL.pm (does not need any Date modules)
   - bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
