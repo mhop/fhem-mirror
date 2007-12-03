@@ -152,3 +152,6 @@ It is not necessary to tell fhem that there are other logs.
 2007-11-30 (071130)
 -- feature: RSS-Feeds added
 
+2007-12-03 (071203)
+-- minor: rebuild picture of fht on every entry in the log (not only on change of measured-temp.
+

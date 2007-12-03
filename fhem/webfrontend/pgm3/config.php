@@ -30,7 +30,7 @@
 	# this is only possible, if the webserver (e.g.wwwrun) has the rights ro write the
 	# files from fh1000.pl. If you want that then run fhz1000.pl as wwwrun too.
 	# if 'yes' then only the needed lines are in the logfiles, the rest will be deleted.
-	$logrotate='yes';	# yes/no default='no'
+	$logrotate='yes';	# yes/no default='yes'
 
 
 ## Kioskmode. Only show but don't switch anything. Values: on/off
