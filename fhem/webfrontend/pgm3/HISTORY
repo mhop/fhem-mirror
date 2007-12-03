@@ -52,3 +52,7 @@
 - Martin 2007-11-30
  -  feature: RSS-Feeds added. New include/rssfeeds.php. Changes in index.php and config.php
 
+- Martin 2007-12-03
+ -- minor bugfix: rebuild picture of fht on every entry in the log (not only on change of measured-temp. Changes in fht.php
+ -- logrotate: better warning if there are wrong rights for the pgm3-logrotate
+
