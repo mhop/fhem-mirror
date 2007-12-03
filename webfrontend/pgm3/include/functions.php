@@ -9,7 +9,7 @@ function LogRotate($array,$file,$logrotatelines)
 	$filename=$file;
 	
 	if (!$handle = fopen($filename, "w")) {
-         print "Logrotate: cannot open $filename -- correct rights??";
+         print "Logrotate: cannot open $filename -- correct rights?? Read the chapter in the config.php!";
          exit;
    	}
         for ($x = $counter-$logrotatelines; $x < $counter; $x++)

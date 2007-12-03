@@ -19,6 +19,34 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$file="$logpath/$drawfht.log";
 
         if (! file_exists($file)) show_error($file,$drawfht,$imgmaxxfht,$imgmaxyfht);
+
+
+
+ ## do we really need a new graphic??
+        $execorder=$tailpath.' -1 '.$file;
+        exec($execorder,$tail1);
+        $parts = explode(" ", $tail1[0]);
+        $date=$parts[0];
+
+	#if the expected graphic already exist then do not redraw the picture
+
+	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$parts[0].".png";
+	if (file_exists($savefile)) {
+
+		$im2 = @ImageCreateFromPNG($savefile);
+		header("Content-type: image/png");
+		imagePng($im2);
+		exit; # ;-)))
+	}
+	else #delete old pngs
+	{
+		$delfile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.*.png";
+		foreach (glob($delfile) as $filename) {
+   		unlink($filename);
+		}
+	}
+
+
 	
 	$_SESSION["arraydata"] = array();
 	
@@ -63,23 +91,23 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
 
 
-	#if the expected graphic alreay exist then do not redraw the picture
+	#if the expected graphic already exist then do not redraw the picture
 
-	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$resultreverse[0][0].".png";
-	if (file_exists($savefile)) {
-
-		$im2 = @ImageCreateFromPNG($savefile);
-		header("Content-type: image/png");
-		imagePng($im2);
-		exit; # ;-)))
-	}
-	else #delete old pngs
-	{
-		$delfile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.*.png";
-		foreach (glob($delfile) as $filename) {
-   		unlink($filename);
-		}
-	}
+#	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$resultreverse[0][0].".png";
+#	if (file_exists($savefile)) {
+#
+#		$im2 = @ImageCreateFromPNG($savefile);
+#		header("Content-type: image/png");
+#		imagePng($im2);
+#		exit; # ;-)))
+#	}
+#	else #delete old pngs
+#	{
+#		$delfile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.*.png";
+#		foreach (glob($delfile) as $filename) {
+ #  		unlink($filename);
+#		}
+#	}
 
 
 	$im = ImageCreateTrueColor($imgmaxxfht,$imgmaxyfht);
