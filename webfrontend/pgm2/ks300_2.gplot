@@ -3,7 +3,7 @@
 # FileLog definition:
 #  define FileLog ks300log ks300:.*H:.* /var/log/ks300-%Y-%U.log 
 #
-set terminal png size 1024,240 crop
+set terminal png size 800,200 crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
