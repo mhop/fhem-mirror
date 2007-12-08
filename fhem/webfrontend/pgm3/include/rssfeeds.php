@@ -38,6 +38,10 @@
 
 header("Content-Type: text/xml");
 
+
+$fs20list=array();
+
+
 echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 
 
@@ -56,7 +60,6 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
         ############################
               if (substr($stack[0][children][$i][name],0,5)=='FS20_')
               {
-    			echo "<item>\n<title>*************  FS20 state *************</title>\n<link>$forwardurl</link>\n</item>";
                         $type=$stack[0][children][$i][name];
                         $counter=0;
                         for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -87,7 +90,8 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 				echo $url;
                          if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
                          {
-			echo "<item>\n<title>$fs20   $state</title>\n<link>$url</link>\n</item>\n";
+#			echo "<item>\n<title>$fs20   $state</title>\n<link>$url</link>\n</item>\n";
+			 array_push( $fs20list,array($fs20,$state,$room,$measured,$url));
                          };
                          }
                }
@@ -107,6 +111,9 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
                                         {$room=$stack[0][children][$i][children][$j][children][$k][attrs][value]; }
                                    if ( $check=="measured-temp")
                                         {$measuredtemp=$stack[0][children][$i][children][$j][children][$k][attrs][value]; 
+					$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
+					$pos=strpos($measured,' ');
+					$measured=substr($measured,$pos,strlen($measured));
 					$pos=strpos($measuredtemp,' ');
 					$measuredtemp=substr($measuredtemp,0,$pos);
 					}
@@ -114,7 +121,7 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
                  if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
                  {
                          $FHTdev=$stack[0][children][$i][children][$j][attrs][name];
-			echo "<item>\n<title>$FHTdev  $measuredtemp</title>\n<link>$forwardurl</link>\n</item>\n";
+			echo "<item>\n<title>$FHTdev  $measuredtemp $measured</title>\n<link>$forwardurl</link>\n</item>\n";
 
                         }
                 }
@@ -127,6 +134,8 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
                         for($j=0; $j < count($stack[0][children][$i][children]); $j++)
                          {
                                 $room="";
+				unset($state);
+				unset($humidity);
                                 for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
                                 {
                                    if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="room")
@@ -134,13 +143,24 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
                                         }
                                    if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="type")
                                         {$type=$stack[0][children][$i][children][$j][children][$k][attrs][value];};
-                                   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="STATE")
-                                        {$state=$stack[0][children][$i][children][$j][children][$k][attrs][value];};
+                                   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="humidity")
+                                        {$humidity=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+					};
+                                   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="temperature")
+                                        {
+					$state=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+					$pos=strpos($state,'(');
+					$state=substr($state,0,$pos);
+					$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
+					$pos=strpos($measured,' ');
+					$measured=substr($measured,$pos,strlen($measured));
+					$state=$humidity.$state;
+					};
                                 }
                  if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
                  {
                         $HMSdev=$stack[0][children][$i][children][$j][attrs][name];
-			echo "<item>\n<title>$HMSdev  $state</title>\n<link>$forwardurl</link>\n</item>\n";
+			echo "<item>\n<title>$HMSdev  $state $measured</title>\n<link>$forwardurl</link>\n</item>\n";
 
 
                 }
@@ -160,14 +180,38 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>
                         {
                                  if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="STATE")
                                  {$state=$stack[0][children][$i][children][$j][children][$k][attrs][value];};
+                                 if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="temperature")
+				$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
                         }
-			echo "<item>\n<title>$KSdev  $state</title>\n<link>$forwardurl</link>\n</item>\n";
+			$pos=strpos($measured,' ');
+			$measured=substr($measured,$pos,strlen($measured));
+			echo "<item>\n<title>$KSdev $state $measured</title>\n<link>$forwardurl</link>\n</item>\n";
 
                         }
                 }
 
         ############################
 }
+
+
+# now the FS20-Devices
+	if (count($fs20list) > 0 )
+	 echo "<item>\n<title>*************  FS20 state *************</title>\n<link>$forwardurl</link>\n</item>";
+
+ for ($x = 0; $x < count($fs20list); $x++)
+        {
+		$parts = explode(" ", $fs20list[$x]);
+		$fs20= $fs20list[$x][0];
+		$state= $fs20list[$x][1];
+		$measured= $fs20list[$x][3];
+		$pos=strpos($measured,' ');
+		$measured=substr($measured,$pos,strlen($measured));
+		$url= $fs20list[$x][4];
+		echo "<item>\n<title> $fs20    $state $measured</title>\n<link>$url</link>\n</item>\n";
+
+
+	}
+
 
 
 echo "
