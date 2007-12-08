@@ -37,6 +37,25 @@ function bft($windspeed)        # wind speed in Beaufort
         return($bft);
 }
 
+# saturation vapour pressure, approximation for
+# temperature range 0°C .. +100,9°C
+# see http://www.umnicom.de/Elektronik/Projekte/Wetterstation/Sensoren/SattDruck/SattDruck.htm
+function svp($temperature)	# saturation vapour pressure in hPa
+{
+	$c1= 6.10780; 	# hPa
+	$c2= 17.09085; 
+	$c3= 234.175; 	# °C
+	
+	return($c1*exp(($c2*$temperature)/($c3+$temperature)));
+}
+
+# see http://www.umnicom.de/Elektronik/Projekte/Wetterstation/Sensoren/Taupunkte/Taupunkte.htm
+function dewpoint($temp,$hum)	# dew point and temperature in °C, humidity in % 
+{
+	$svp= svp($temp);
+	$log= log10($svp*$hum/100.0);
+	return( (234.67*$log-184.2)/(8.233-$log));
+}
 
 function randdefine()
 {
@@ -44,7 +63,7 @@ function randdefine()
         $rand2 = rand(500,20000);
         $rq = md5($rand1.$rand2);
         $randdefine=substr($rq,0,5);
-return ($randdefine);
+	return ($randdefine);
 }
 
 

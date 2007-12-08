@@ -99,6 +99,7 @@
         $imgmaxyhms=52;
         $maxcountHMS='575';                     # Maximum count of pixel (from right to left) (Default:575)
         $XcorrectMainTextHMS=25;                # Text of main text from the right side (Default:)
+	$showdewpoint='yes';                    # Dewpoint (german: taupunkt)
         $logrotateHMSlines=1200;                # automatic Logrotate; $logrotate must be 'yes'.
                                                 # Default:1200
                                                 # read docs/logrotate if you want adjust it manually!
