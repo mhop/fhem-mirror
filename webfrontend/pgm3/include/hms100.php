@@ -194,15 +194,6 @@ if ( $type == "HMS100TF")  ## hms100tf-Device.
         ImageTTFText ($im,  $fontsize, 0, 182, 47, $txtcolor, $fontttf, $text);
 
 
-# Taupunkt
-#	$tp  = Taupunkt($tvalue,$hvalue);
-#	$fontsize=9;
-#	$text=$tp." °C";
-#       ImageTTFText ($im, $fontsize, 0, 350, 35, $bg1p, $fontttfb, $text);
-#       $txtcolor=$orange; 
-#	$fontsize=7;
-#	$text="Taupunkt";
-#        ImageTTFText ($im,  $fontsize, 0, 350, 47, $bg1p, $fontttf, $text);
 };
 
 
@@ -228,6 +219,20 @@ if ( $type == "HMS100T" or $type == "HMS100TF" )
 	$text=$resultreverse[0][0];
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxhms-127,  13, $txtcolor, $fontttf, $text);
 };
+#############################################################################
+## dew point
+if ( $type == "HMS100TF" and $showdewpoint=='yes' )
+{
+	$dp  = sprintf("%3.1f", dewpoint($tvalue,$hvalue));
+	$fontsize=9;
+	$text=$dp." &#176;C";
+        ImageTTFText ($im, $fontsize, 0, 350, 35, $bg1p, $fontttfb, $text);
+        $txtcolor=$orange; 
+	$fontsize=7;
+	$text="Dewpoint";
+        ImageTTFText ($im,  $fontsize, 0, 350, 47, $bg1p, $fontttf, $text);
+}
+
 #############################################################################
 ## general
         $txtcolor=$bg3p; 

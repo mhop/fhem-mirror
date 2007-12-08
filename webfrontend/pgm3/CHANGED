@@ -153,5 +153,9 @@ It is not necessary to tell fhem that there are other logs.
 -- feature: RSS-Feeds added
 
 2007-12-03 (071203)
--- minor: rebuild picture of fht on every entry in the log (not only on change of measured-temp.
+-- change: rebuild picture of fht on every entry in the log (not only on change of measured-temp.
 
+2007-12-08 (071208)
+-- bugfix: Wrong display in MS IE. (Reported and solved by Boris)
+-- Feature: Drewpoint im HMS100TF (Boris)
+-- Feature: RSS-Feeds now new arranged 

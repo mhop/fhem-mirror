@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='071203';
+$pgm3version='071208';
 
 	
 	$Action		=	$_POST['Action'];
@@ -690,11 +690,11 @@ xml_parser_free($xml_parser);
                                        <input type=hidden name=Action value=showhmsgnu>
                                         <input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showhmsgnu value=$gnuvalue>
-                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=2>";
+                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=3>";
 				
 			}
 			else
-		 	{echo "<tr><td $bg2><td $bg2 colspan=2> ";}
+		 	{echo "<tr><td $bg2><td $bg2 colspan=3> ";}
 		       	
 			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		
