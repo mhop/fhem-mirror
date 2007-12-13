@@ -6,7 +6,9 @@ Currently temperature, windspeed, rain and brightness sensors are supported.
 For use with FHEM you have to compile pcwsd like usual, it can be found here
   http://geggus.net/sven/pcwsd/
 
-Start pcwsd deamon with pcwsd -d /dev/ttyUSB4 -ld /var/log/fs10-
+Start pcwsd deamon with
+  pcwsd -d /dev/ttyUSB4 -ld /var/log/fs10- -tlf %Y-%m-%d_%T
+
 A few minutes later you should see files with temperature values.
 
 For use with FHEM define
