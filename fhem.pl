@@ -56,6 +56,8 @@ sub ResolveDateWildcards($@);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
+sub FmtDateTime($);
+sub FmtTime($);
 sub WriteStatefile();
 sub XmlEscape($);
 sub fhem($);
@@ -135,7 +137,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.31 2007-11-27 15:17:47 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.32 2007-12-13 15:26:27 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1519,6 +1521,15 @@ sub
 TimeNow()
 {
   my @t = localtime;
+  return sprintf("%04d-%02d-%02d %02d:%02d:%02d",
+      $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+}
+
+#####################################
+sub
+FmtDateTime($)
+{
+  my @t = localtime(shift);
   return sprintf("%04d-%02d-%02d %02d:%02d:%02d",
       $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
 }
