@@ -157,3 +157,6 @@
   - FHT low temperatur warning and setting for lowtemp-offset
   - Change naming for state into warnings
     Tagged as dirkh_20071019_0
+
+- Martin Fri Dec 21 13:39:17 CET 2007
+  - voip2fhem added (contrib/)
