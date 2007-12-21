@@ -1,0 +1,72 @@
+#!/bin/bash
+# Interface from Asterisk to fhem
+# this file is called from /etc/asterisk/extensions.conf
+# Martin Haas 071214
+
+
+
+# if you want to use the english spoken espeak then change "espeak -v de" to "espeak"
+
+
+FHEM=localhost   # if not localhost then set the port inside of FHEM to global
+FHEMport=7072
+location=/var/tmp/voip2fhem  # later the owner must be asterisk.asterisk!
+
+[[ ! -d $location ]] && mkdir $location
+
+
+
+####################################################
+##
+providesound()
+{
+    lvoice="$location/$(echo $voice | sed -e 's/-//g' -e 's/[ .:]/_/g').gsm"
+
+    echo $lvoice
+
+    if [ ! -f $lvoice ]
+    then
+	    espeak -v de -s 120 -w /tmp/asterisk.wav "$voice"
+            sox /tmp/asterisk.wav -r 8000 -c 1 $lvoice resample -ql
+    fi
+    cp $lvoice /tmp/asterisk$type.gsm
+
+}
+
+
+###################################
+##
+case "$3" in
+
+	######################################
+     KS300) 
+     	temperature=$(echo "list $1" | netcat -w1 $FHEM $FHEMport | grep temperature | awk '{print $4}')
+	[[ ${temperature:0:1} == - ]] && temperature="minus $temperature" ## negativ temperature
+	voice=$2; type=1; providesound "$voice" $type
+	voice=$temperature; type=2; providesound "$voice" $type
+	;;
+	######################################
+     FHT) 
+     	temperature=$(echo "list $1" | netcat -w1 $FHEM $FHEMport | grep measured-temp | awk '{print $4}')
+	voice=$2; type=1; providesound "$voice" $type
+	voice=$temperature; type=2; providesound "$voice" $type
+	;;
+	######################################
+     FS20STATE) 
+     	state=$(echo "list $1" | netcat -w1 $FHEM $FHEMport | grep STATE | awk '{print $2}')
+	voice=$2; type=1; providesound "$voice" $type
+	voice=$state; type=2; providesound "$voice" $type
+	;;
+	#####################################
+     HMS100) 
+     	temperature=$(echo "list $1" | netcat -w1 $FHEM $FHEMport | grep STATE | awk '{print $3}')
+	voice=$2; type=1; providesound "$voice" $type
+	voice=$temperature; type=2; providesound "$voice" $type
+	;;
+	######################################
+     FS20)
+     	echo "set $1 toggle" | netcat -w1 $FHEM $FHEMport
+	voice=$2; type=1; providesound "$voice" $type
+	;;
+esac
+
