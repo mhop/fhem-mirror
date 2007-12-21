@@ -1,0 +1,56 @@
+****** VoIP2FHEM or HOWTO control the FHEM with Asterisk ******
+
+Description
+    * This is a HOWTO about the use of a VoIP-DECT-Telephone as a remote
+      controller for the FHEM-Devices.
+      The provided scripts are under the GPL.
+
+      The Goal is
+      -- Switching the FS20-Devices
+      -- text2speach, the Telephone reads e.g. the measured-temp
+      -- Possibility to start scripts with the Remote Telephone
+      -- AND EVERYTHING MUST RUN ON THE NSLU2 :-)
+
+Technical Overview
+    * On the NLSU2 (or every other Linux Box) runs an Asterisk. This machine
+      must not be the machine with the FHEM. I bought the Voip-DECT-Telephone
+      Siemens Gigaset C470 IP (80.-EUR). It has a nice Webinterface and it is
+      possible to read in a self made telephone book.
+      The Asterisk calls depending on the dialed number a bash skript. After
+      that Asterisk plays two soundfiles < text >< value > in a loop.
+
+      The NSLU2 is a weak machine. It always only creates a soundfile 1x and
+      then stores it on the harddisk. A set of prebuild voices (e.g. digits
+      from -20 to 90) are included. Some scripts for creating soundfiles and
+      automatically the telephone book are provided too.
+Installation
+    * Go to http://fhem.dnsalias.net/voip2fhem and download the files.
+      -- Install with your package manager asterisk, sox, espeak. On the NLSU2:
+      "apt-get install asterisk sox espeak".
+      -- Debian: activate asterisk in the /etc/default/asterisk
+      -- copy the scripts voip2fhem voip2fhem_create_telefonlist
+      voip2fhem_create_txt2gsm to /usr/local/bin/ and be shure that they are
+      executable (chmod +x /usr/local/bin/voip2fhem*)
+      -- You can find on http://fhem.dnsalias.net/voip2fhem prepared voices:
+      "tar -xvzf voip2fhem_voices.tar.gz -C /" and give the correct rights
+      "chown -R asterisk.asterisk /var/tmp/voip2fhem"
+      -- cp extensions.conf and sip.conf to /etc/asterisk/ and edit these files
+      and the bash script /usr/local/bin/voip2fhem
+      -- restart/reload asterisk (/etc/init.d/asterisk restart or asterisk -
+      r and then "extensions reload" and "sip reload")
+Hints
+    * -- if there isn't the required soundfile then the NSLU2 creates it. This
+      needs minutes (example: the word "asterisk" needs 3 min). voip2fhem
+      stores this file and the next time it will be used.
+      -- Use the script voip2fhem_create_txt2gsm on a faster machine to create
+      the sounds. Usage: voip2fhem_create_txt2gsm "I love FHEM". The soundfile
+      is then automatically copied to /var/tmp/voip2fhem/
+      -- it is also possible to connect the ASTERISK with the rest of the world
+      (e.g. Sipgate, 1und1) :-)
+      -- for debug asterisk: "asterisk -r", "sip debug"
+
+
+Have fun and success :-)
+Martin Haas
+fhem@martin-haas.de
+
