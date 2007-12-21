@@ -159,3 +159,9 @@ It is not necessary to tell fhem that there are other logs.
 -- bugfix: Wrong display in MS IE. (Reported and solved by Boris)
 -- Feature: Drewpoint im HMS100TF (Boris)
 -- Feature: RSS-Feeds now new arranged 
+
+
+2007-12-21 (071221)
+ -- Feature: HMS-CO supported (Peter A.) ==> hms100.php
+ -- Feature: Webcams or local pictures added ==>index.php. config.php
+ -- Feature: ks300 mit Drewpoint (Boris) ==>functions.php, ks300.php, config.php
