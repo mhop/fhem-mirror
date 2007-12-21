@@ -38,7 +38,7 @@
 
 
 ## Webcams
-        $showwebcam=0;                  #shows webcam-Urls or other pictures
+        $showwebcam=0;                  #shows webcam-Urls or other pictures (0/1)
         $webcamwidth='150';             # the width of the shown picture
 	$wgetpath="/usr/bin/wget";      # you need the package wget for http, ftp...
         $webcam[0]='http://webcam/IMAGE.JPG';
@@ -200,7 +200,7 @@ $userdef[$sortnumber]['XcorrectMainText']=25;
 # read docs/logrotate if you want adjust it manually!
 # otherwise the system will slow down
 # pgm3 (user www-data) needs the rights to write the logs
-# from fhz1000.pl (user = ???)
+# of fhem.pl (user = ???)
 $userdef[$sortnumber]['logrotatelines']=2200;  
 
 
@@ -232,7 +232,7 @@ $userdef[$sortnumber]['logrotatelines']=2200;
 #$userdef[$sortnumber]['gnuplottype']='fs20';	
 #$userdef[$sortnumber]['logpath']='/var/tmp/rolu1.log';   
 #$userdef[$sortnumber]['room']='wgu';
-##$userdef[$sortnumber]['semlong']='Rolladen'; 	
+#$userdef[$sortnumber]['semlong']='Rolladen'; 	
 #$userdef[$sortnumber]['semshort']='';
 #$userdef[$sortnumber]['imagemax']=725;
 #$userdef[$sortnumber]['imagemay']=52;
