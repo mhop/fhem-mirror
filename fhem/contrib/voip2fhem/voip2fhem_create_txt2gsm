@@ -1,0 +1,79 @@
+#!/bin/bash
+# weak machines need a long time to create a gsm-Voicefile.
+# this script searches for an existing voice and if not it will create it
+# Martin Haas 071217
+
+# The NSLU2 needs e.g. 5min to convert the word "Aussentemperatur"
+
+# Call this file (on a faster machine :-) ) with the words to convert
+# e-g voip2fhem_create_txt2gsm "This is a test"
+# otherwise this script creates number from -20 to +90
+
+# hint: cat examplefile | while read line; do ./voip2fhem_create_txt2gsm "$line"; done
+
+
+
+
+location=/var/tmp/voip2fhem  # later the owner must be asterisk.asterisk
+
+[[ ! -d $location ]] && { mkdir $location; chown asterisk.asterisk $location; }
+
+
+
+
+###################################################
+###
+CreateVoices()
+{
+ lvoice="$location/$(echo $voice | sed 's/[ ,.:]/_/g').gsm"
+
+ echo $lvoice
+
+ if [ ! -f $lvoice ] 
+ then
+   espeak -v de -s 120 -w /tmp/asterisk.wav "$voice" 
+   sox /tmp/asterisk.wav -r 8000 -c 1 $lvoice resample -ql
+ fi
+}
+
+
+
+
+
+###################################################
+## main
+
+if [[ $1 ]]
+then
+	voice=$1
+	CreateVoices "$voice"
+
+else
+
+for i in `seq -20 90 ` -0
+do
+	if [ ${i:0:1} == - ] 
+	then
+		m="minus $i" ## negativ temperature
+		voice=$(echo $m | sed -e 's/-//g' -e 's/\./,/g') # English people: change , against .
+	else
+		voice=$(echo $i | sed 's/\./,/g') # English people: change , against .
+	fi
+	
+	CreateVoices "$voice"
+
+	origvoice=$voice
+
+
+	for k in `seq 0 9`
+	do
+		
+		voice="$origvoice,$k" # English people: change , against .
+		CreateVoices "$voice"
+		voice=$origvoice
+
+	done
+
+done
+
+fi
