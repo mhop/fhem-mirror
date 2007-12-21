@@ -222,7 +222,7 @@ $avgmonth=$_GET['avgmonth'];
 	{
         $dp  = sprintf("%3.1f", dewpoint($tvalue,$hvalue));
         $fontsize=9;
-        $text=$dp." °C";
+	$text=$dp." &#176;C"
         ImageTTFText ($im, $fontsize, 0, 350, 35, $bg1p, $fontttfb, $text);
         $txtcolor=$orange;
         $fontsize=7;
