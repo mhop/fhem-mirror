@@ -37,6 +37,17 @@
 	$kioskmode='off';
 
 
+## Webcams
+        $showwebcam=0;                  #shows webcam-Urls or other pictures
+        $webcamwidth='150';             # the width of the shown picture
+	$wgetpath="/usr/bin/wget";      # you need the package wget for http, ftp...
+        $webcam[0]='http://webcam/IMAGE.JPG';
+       #$webcam[1]='IMAGE.PNG';        # Supported are Webcams with http:// ftp:// ....
+                                       # and Images wich must be copied to <pgm3>/tmp/
+
+#       $webcam[2]='http://...';
+#       ...
+
 
 
 ##############################################################################################
@@ -114,6 +125,7 @@
         $imgmaxyks=52;
         $showbft=1;                     # Display values additionaly in Beafort. Values: 0 /1 Default:1
         $maxcountKS='575';              # Maximum count of pixel (from right to left) (Default:575)
+        $showdewpointks300='yes';       # Dewpoint (german: taupunkt)
         $XcorrectMainTextKS=45;         # Text of main text from the right side (Default: 35)
 
         $logrotateKS300lines=2100;      # automatic Logrotate; $logrotate must be 'yes'.

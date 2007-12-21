@@ -37,25 +37,18 @@ function bft($windspeed)        # wind speed in Beaufort
         return($bft);
 }
 
-# saturation vapour pressure, approximation for
-# temperature range 0°C .. +100,9°C
-# see http://www.umnicom.de/Elektronik/Projekte/Wetterstation/Sensoren/SattDruck/SattDruck.htm
-function svp($temperature)	# saturation vapour pressure in hPa
-{
-	$c1= 6.10780; 	# hPa
-	$c2= 17.09085; 
-	$c3= 234.175; 	# °C
-	
-	return($c1*exp(($c2*$temperature)/($c3+$temperature)));
-}
 
-# see http://www.umnicom.de/Elektronik/Projekte/Wetterstation/Sensoren/Taupunkte/Taupunkte.htm
+# see http://de.wikipedia.org/wiki/Taupunkt, http://en.wikipedia.org/wiki/Dewpoint
+# The dew point (or dewpoint) is the temperature to which a given parcel of air must be cooled, at constant 
+# barometric pressure, for water vapor to condense into water. The condensed water is called dew. The dew point 
+# is a saturation point.
+# approximation valid for -30°C < $temp < 70°C
 function dewpoint($temp,$hum)	# dew point and temperature in °C, humidity in % 
 {
-	$svp= svp($temp);
-	$log= log10($svp*$hum/100.0);
-	return( (234.67*$log-184.2)/(8.233-$log));
+	$log= log($hum/100.0);
+	return( (241.2*$log+(4222.03716*$temp)/(241.2+$temp))/(17.5043-$log-(17.5043*$temp)/(241.22+$temp)) );
 }
+
 
 function randdefine()
 {
