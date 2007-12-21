@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='071208';
+$pgm3version='071221';
 
 	
 	$Action		=	$_POST['Action'];
@@ -472,6 +472,47 @@ xml_parser_free($xml_parser);
 		 <font size=-2 $fontcolor1><div align='right'>v$pgm3version</div></font>
 		</td></tr>";
 	
+	###################### Webcam
+	
+ 	if ($showwebcam==1)
+	{	
+	    echo "  <tr>
+                <td $bg1 colspan=4><font $fontcolor1>
+                <table  cellspacing='0' cellpadding='0' width='100%'>
+                        <tr>
+                        <td>
+                        <font $fontcolor1>WEBCAM</font>
+                        </td>
+                        <td align=right>
+	    ";
+	    for($i=0; $i < count($webcam); $i++)
+            {  
+		$webcam1=$webcam[$i];
+		$pos = strpos($webcam1,'://'); # e.g. http://..
+		if ($pos === false) # picture instead of an URL
+		{
+			$webcamname=$webcam[$i];
+		}
+		else
+		{
+			$webcamname=str_replace("/","",$webcam1);
+			$webcamname=str_replace(":","",$webcamname);
+			$order="$wgetpath -O tmp/$webcamname $webcam1";
+			exec($order,$res);
+        		$errormessage = $res[0];
+			echo $errormessage;
+		}
+	 	echo"<a href='tmp/$webcamname'><img src='tmp/$webcamname' width='$webcamwidth' border=2></a>";
+	     }   
+	     echo"
+			</td>
+			</tr>
+		</table>
+		</td>
+		</tr>
+		";
+	
+	};
 	############################ FHZ
 	if ($show_fs20pulldown==1 or $show_general==1 or $show_fhtpulldown==1)
 	{

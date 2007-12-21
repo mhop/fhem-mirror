@@ -147,6 +147,7 @@ $avgmonth=$_GET['avgmonth'];
         	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
 	$text=$temp." &#176;C";
+	$tvalue= $temp;
         ImageTTFText ($im, $fontsize, 0, 90-$XcorrectMainTextKS, 37, $txtcolor, $fontttfb, $text);
 	$text= $drawks;
         ImageTTFText ($im, 8, 0,  90-$XcorrectMainTextKS, 22, $txtcolor, $fontttfb, $text);
@@ -207,12 +208,27 @@ $avgmonth=$_GET['avgmonth'];
         	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
 	$text=$temp." %";
+	$hvalue= $temp;
         ImageTTFText ($im, $fontsize, 0,  90-$XcorrectMainText, 37, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	$text="min= $min max= $max";
         ImageTTFText ($im, $fontsize, 0,  67-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
 
 	$imh=$im;
+
+
+	# dewpoint
+	if ($showdewpointks300='yes')
+	{
+        $dp  = sprintf("%3.1f", dewpoint($tvalue,$hvalue));
+        $fontsize=9;
+        $text=$dp." °C";
+        ImageTTFText ($im, $fontsize, 0, 350, 35, $bg1p, $fontttfb, $text);
+        $txtcolor=$orange;
+        $fontsize=7;
+        $text="Dewpoint";
+        ImageTTFText ($im,  $fontsize, 0, 350, 47, $bg1p, $fontttf, $text);
+	}
 
 #wind/Air Pressure
 	$im = ImageCreateTrueColor($imgmaxxks,$imgmaxyks);
