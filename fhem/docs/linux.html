@@ -10,6 +10,12 @@
 
 <h2>fhem.pl - Hints for GNU/Linux</h2>
 
+<table border=1><tr><td>
+Note: Depending on the GNU/Linux distribution (Debian, openSuSE, etc.) and version of the Linux kernel you may or <i>may not</i> have to do the following steps.<br>
+It is worth giving it a try without any modifications <b>first</b>.<br>
+We are trying to convince the kernel developers to enable all ELV devices by default. If that is done, the following steps are unnecessary. We will update this page then accordingly.
+</td></tr></table>
+<hr>
 <p><b><a name="onedevice">One device</a></b><br>
 If you connect one USB device (FHZ1000PC, FHZ1300PC, EM1010PC, WS300, ...)
 to your GNU/Linux server you can use the regular <i>ftdi_sio</i> kernel module.
@@ -33,7 +39,7 @@ The you load the module using:<br>
 <code><br>
 # modprobe ftdi_sio<br>
 </code><br>
-
+<hr>
 <p><b><a name="multipledevices">Multiple devices</a></b><br>
 If you're using multiple USB devices (FHZ1000PC, FHZ1300PC, EM1010PC, WS300, ...)
 you cannot use the methode above. You need to modify the ftdi_sio kernel module
@@ -113,7 +119,7 @@ You should now see multiple ttyUSB devices:
 crw-rw---- 1 root uucp 188, 0 2007-02-11 23:00 /dev/ttyUSB0<br>
 crw-rw---- 1 root uucp 188, 1 2007-02-11 23:00 /dev/ttyUSB1<br>
 </code><br>
-
+<hr>
 <p><b><a name="devicelinks">Device links</a></b><br>
 If you're using multiple USB devices (FHZ, EM, WS...) it might occur that the
 enumeration of the /dev/ttyUSB<i>n</i> numbers get mixed up if one of the

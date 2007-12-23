@@ -367,6 +367,7 @@
   - feature: HMS100CO (by Peter)
   - feature: EMGZ (by Peter)
   - feature: Generate warning if too many commands were sent in the last hour
+  - doc: linux.html: Introduction (Peter S.)
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
