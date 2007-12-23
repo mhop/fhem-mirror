@@ -364,6 +364,9 @@
 
 - ==DATE== (4.3)
   - bugfix:  KS300 state was wrong after the STATE bugfix
+  - feature: HMS100CO (by Peter)
+  - feature: EMGZ (by Peter)
+  - feature: Generate warning if too many commands were sent in the last hour
 
 - TODO
   emem -2.5kW / getDevData for emwz -1

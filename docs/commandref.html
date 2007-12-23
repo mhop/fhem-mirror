@@ -537,7 +537,16 @@ split in multiple lines<br><br>
     messages, we just ignore messages which were sent out by our device for the
     next 3 seconds (or configured otherwise by filtertimeout).
     <br>
-    For GNU/Linux you may want to read our <a href="linux.html">hints for GNU/Linux</a> about <a href="linux.html#multipledevices">multiple USB devices</a>.
+    For GNU/Linux you may want to read our <a href="linux.html">hints for
+    GNU/Linux</a> about <a href="linux.html#multipledevices">multiple USB
+    devices</a>.<br>
+
+    <b>Note:</b>The firmware of the FHZ1x00 will drop commands if the airtime
+    for the last hour would exceed 1% (which corresponds roughly to 163
+    commands). For this purpose there is a command counter for the last hour
+    (see list FHZDEVICE), which triggers with "TRANSMIT LIMIT EXCEEDED" if
+    there were more than 163 commands in the last hour.<br>
+
   </ul>
   <br>
 
@@ -745,6 +754,25 @@ split in multiple lines<br><br>
     Example:
     <ul>
       <code>define emem EMEM 5</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="EMGZ"></a>
+  <h4>Type EMGZ</h4>
+  <ul>
+    <code>define &lt;name&gt; EMGZ &lt;device-number&gt;</code>
+    <br><br>
+
+    Define up to 4 EM1000GZ attached to the EM1010PC. The device number must
+    be 9.
+    Defining an EMGZ will schedule an internal task, which reads the
+    status of the device every 5 minutes, and triggers notify/filelog commands.
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define emgz EMGZ 9</code><br>
     </ul>
     <br>
   </ul>
