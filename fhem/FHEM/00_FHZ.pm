@@ -11,6 +11,7 @@ sub FHZ_Read($);
 sub FHZ_ReadAnswer($$);
 sub FhzCrc(@);
 sub CheckFhzCrc($);
+sub XmitLimitCheck($$);
 
 my $msgstart = pack('H*', "81");# Every msg starts wit this
 
@@ -46,6 +47,7 @@ my %codes = (
 my $def;
 my %msghist;		# Used when more than one FHZ is attached
 my $msgcount = 0;
+my $xmit_limit = 163;   # Maximum nr of transmissions per hour (unconfirmed).
 
 #####################################
 # Note: we are a data provider _and_ a consumer at the same time
@@ -190,6 +192,11 @@ DoInit($)
   push(@init, "set $name raw 04 01010100010000");
 
   CommandChain(3, \@init);
+
+  # Reset the counter
+  my $hash = $defs{$name};
+  delete($hash->{XMIT_TIME});
+  delete($hash->{NR_CMD_LAST_H});
 }
 
 #####################################
@@ -244,6 +251,7 @@ FHZ_Define($$)
   $hash->{PARTIAL} = "";
 
   DoInit($name);
+
   return undef;
 }
 
@@ -379,6 +387,42 @@ FHZ_CompleteMsg($$)
   return pack('C*', 0x81, $len/2+2, ord(pack('H*',$fn)), FhzCrc(@data), @data);
 }
 
+    
+#####################################
+# Check if the 1% limit is reached and trigger notifies
+sub
+XmitLimitCheck($$)
+{
+  my ($hash,$bstring) = @_;
+  my $now = time();
+
+  $bstring = unpack('H*', $bstring);
+  return if($bstring =~ m/c90185$/); # fhtbuf
+
+  if(!$hash->{XMIT_TIME}) {
+    $hash->{XMIT_TIME}[0] = $now;
+    $hash->{NR_CMD_LAST_H} = 1;
+    return;
+  }
+
+  my $nowM1h = $now-3600;
+  my @b = grep { $_ > $nowM1h } @{$hash->{XMIT_TIME}};
+
+  if(@b > $xmit_limit) {
+
+    my $me = $hash->{NAME};
+    Log GetLogLevel($me,2), "FHZ TRANSMIT LIMIT EXCEEDED";
+    DoTriger($me, "TRANSMIT LIMIT EXCEEDED");
+
+  } else {
+
+    push(@b, $now);
+
+  }
+  $hash->{XMIT_TIME} = \@b;
+  $hash->{NR_CMD_LAST_H} = int(@b);
+}
+
 #####################################
 sub
 FHZ_Write($$$)
@@ -406,11 +450,15 @@ FHZ_Write($$$)
   Log 5, "Sending " . unpack('H*', $bstring);
 
   if(!$hash->{QUEUECNT}) {
+
+    XmitLimitCheck($hash,$bstring);
     $hash->{PortObj}->write($bstring);
+
     ##############
     # Write the next buffer not earlier than 0.22 seconds (= 65.6ms + 10ms +
     # 65.6ms + 10ms + 65.6ms), else it will be discarded by the FHZ1X00 PC
     InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
+
   } elsif($hash->{QUEUECNT} == 1) {
     $hash->{QUEUE} = [ $bstring ];
   } else {
@@ -429,6 +477,7 @@ FHZ_HandleWriteQueue($)
   my $cnt = --$hash->{QUEUECNT};
   if($cnt > 0) {
     my $bstring = shift(@{$hash->{QUEUE}});
+    XmitLimitCheck($hash,$bstring);
     $hash->{PortObj}->write($bstring);
     InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
   }

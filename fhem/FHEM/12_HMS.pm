@@ -12,6 +12,7 @@ my %codes = (
   "4" => "HMS100TFK", # Depending on the onboard jumper it is 4 or 5
   "5" => "HMS100TFK",
   "6" => "HMS100MG",
+  "8" => "HMS100CO",
 );
 
 my %defptr;
@@ -30,12 +31,13 @@ HMS_Initialize($)
 #                        810e047f0214a001a81f000001000000 HMS100TFK
 #                        810e048f0295a0010155000001000000 HMS100TFK (jumper)
 #			 810e04330216a001b4c5000001000000 HMS100MG
+#                        810e04210218a00186e0000000000000 HMS100CO
 
-  $hash->{Match}     = "^810e04....(1|5|9)[0-6]a001";
+  $hash->{Match}     = "^810e04....(1|5|9)[0-8]a001";
   $hash->{DefFn}     = "HMS_Define";
   $hash->{UndefFn}   = "HMS_Undef";
   $hash->{ParseFn}   = "HMS_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model;hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model;hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -177,6 +179,19 @@ HMS_Parse($$)
     $v[1] = "off";
     if ($status & 1) { $v[0] = "on"; }
     $val = "Gas Detect: $v[0]";
+
+  } elsif ($type eq "HMS100CO") {    # By PAN
+
+    @txt = ( "gas_detect", "battery");
+    @sfx = ( "",             "");
+
+    # Battery-low condition detect is not yet properly
+    # implemented.
+    my $status = hex(substr($val, 1, 1));
+    $v[0] = ($status != "0") ? "on" : "off";
+    $v[1] = "off";
+    if ($status & 1) { $v[0] = "on"; }
+    $val = "CO Detect: $v[0]";
 
   } else {
 
