@@ -65,3 +65,7 @@
  -- Feature: HMS-CO supported (Peter A.)
  -- Feature: Webcams or local pictures added
  -- Feature: ks300 mit Drewpoint (Boris)
+
+- Martin 2007-12-24
+ -- Bugfix: Userdef-Gnuplot with type temperature now with y1tics
+ -- Feature: Webcam/Pics hideable
