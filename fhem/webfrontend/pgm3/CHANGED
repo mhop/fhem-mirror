@@ -165,3 +165,7 @@ It is not necessary to tell fhem that there are other logs.
  -- Feature: HMS-CO supported (Peter A.) ==> hms100.php
  -- Feature: Webcams or local pictures added ==>index.php. config.php
  -- Feature: ks300 mit Drewpoint (Boris) ==>functions.php, ks300.php, config.php
+
+2007-12-24 (071224)
+ -- Bugfix: UserDef with type "temperature" now with y1tics ==> gnuplot.php
+ -- Feature: Webcam/Pics now hideable ==> index.php, config.php

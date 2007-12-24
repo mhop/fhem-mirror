@@ -6,7 +6,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2006 Copyright: Martin Haas (fhz@martin-haas.de)
+#  (c) 2006 2007 2008 Copyright: Martin Haas (fhz@martin-haas.de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='071221';
+$pgm3version='071224';
 
 	
 	$Action		=	$_POST['Action'];
@@ -130,6 +130,9 @@ $pgm3version='071221';
 
 	if (! isset($errormessage)) $errormessage=$_GET['errormessage'];
 	if ($errormessage=="") unset($errormessage);
+	
+	if (! isset($showpics)) $showpics=$_GET['showpics'];
+	if ($showpics=="none") unset($showpics);
 
 
 
@@ -143,6 +146,7 @@ $pgm3version='071221';
 		if ($showLOGS=='yes') $showlogs='yes';
 		if ($showNOTI=='yes') $shownoti='yes';
 		if ($showHIST=='yes') $showhist='yes';
+		if ($showPICS=='yes') $showpics='yes';
 	}
 
 
@@ -156,6 +160,7 @@ $pgm3version='071221';
 	if (isset ($shownoti)) { $forwardurl=$forwardurl.'&shownoti';};
 	if (isset ($showlogs)) { $forwardurl=$forwardurl.'&showlogs';};
 	if (isset ($showat)) { $forwardurl=$forwardurl.'&showat';};
+	if (isset ($showpics)) { $forwardurl=$forwardurl.'&showpics';};
 	if (isset ($showhist)) { $forwardurl=$forwardurl.'&showhist';};
 	if (isset ($showfs20)) { $forwardurl=$forwardurl.'&showfs20='.$showfs20;};
 	if (isset ($showmenu)) 
@@ -170,6 +175,7 @@ $pgm3version='071221';
 	if (isset ($showhmsgnu)) $link=$link.'&showhmsgnu='.$showhmsgnu; 
 	if (isset ($showuserdefgnu)) $link=$link.'&showuserdefgnu='.$showuserdefgnu; 
 	if (isset ($showks)) $link=$link.'&showks='.$showks; 
+	if (isset ($showpics)) $link=$link.'&showpics'; 
 
 
 switch ($Action):
@@ -198,7 +204,7 @@ switch ($Action):
 		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
 		header("Location:  $forwardurl");
 		break;
-	Case showfht|showroom|showks|showhmsgnu|hide|showuserdefgnu:
+	Case showfht|showroom|showks|showhmsgnu|hide|showuserdefgnu|showpics:
 		header("Location: $forwardurl");
 		break;
 	default:
@@ -480,11 +486,18 @@ xml_parser_free($xml_parser);
                 <td $bg1 colspan=4><font $fontcolor1>
                 <table  cellspacing='0' cellpadding='0' width='100%'>
                         <tr>
-                        <td>
-                        <font $fontcolor1>WEBCAM</font>
-                        </td>
+                        <td><font $fontcolor1> WEBCAM </font>";
+		 if (! isset($showpics))
+                 { echo "<a href=$formwardurl?showpics$link>show pics</a>";}
+                else
+                { echo "<a href=$formwardurl?$link&showpics=none>hide pics</a>";}
+
+                        
+   	    echo"	</td>
                         <td align=right>
 	    ";
+	    if (isset($showpics))
+	    {
 	    for($i=0; $i < count($webcam); $i++)
             {  
 		$webcam1=$webcam[$i];
@@ -504,6 +517,7 @@ xml_parser_free($xml_parser);
 		}
 	 	echo"<a href='tmp/$webcamname'><img src='tmp/$webcamname' width='$webcamwidth' border=2></a>";
 	     }   
+	     }
 	     echo"
 			</td>
 			</tr>
