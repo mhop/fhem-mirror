@@ -297,7 +297,8 @@ $userdef[$sortnumber]['logrotatelines']=2200;
 	$showLOGS='no';			#show the LOGS at startup. Default: no Values: yes/no
 	$showAT='no';			#show the AT_JOBS at startup. Default: yes Values: yes/no
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
-	$showHIST='yes';		 	#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
+	$showHIST='yes';		#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
+        $showPICS='yes';                #if shwowebcam=1 then initial the Pics will be shown. Default: yes 
 
         $RSStitel='FHEM :-)';
 

@@ -146,7 +146,6 @@ EOD;
 $gplotmain=<<<EOD
 \n set ylabel '$SemanticLong ( $SemanticShort )'  
 set size 1,0.5
-set noytics 
 set noy2tics 
 plot "$logfile" using 1:$valuefield axes x1y1 title '$SemanticLong' with lines lw 2
 EOD;
