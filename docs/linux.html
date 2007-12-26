@@ -42,7 +42,7 @@ The you load the module using:<br>
 <hr>
 <p><b><a name="multipledevices">Multiple devices</a></b><br>
 If you're using multiple USB devices (FHZ1000PC, FHZ1300PC, EM1010PC, WS300, ...)
-you cannot use the methode above. You need to modify the ftdi_sio kernel module
+you cannot use the method above. You need to modify the ftdi_sio kernel module
 to make it work. The following example was done with openSuSE 10.1:<br>
 You need to have the kernel-source-<i>version</i> RPM of your
 current kernel (see output of <code>uname -r</code>) installed.<br>
@@ -86,7 +86,7 @@ Now you have 3 choices:<br>
 # make M=drivers/usb/serial</code>
 <td>
 ... to build the modules for all of <i>usb serial</i>.<br>
-If you have a less powerfull machine like the ARM-Based NSLU2 then it is sufficient to only build the required module.
+If you have a less powerful machine like the ARM-Based NSLU2 then it is sufficient to only build the required module.
 </td></tr>
 <td><code>
 # make modules</code>
@@ -107,7 +107,7 @@ Once you have the module:<br>
 # cp ftdi_sio.ko ftdi_sio.ko_backup<br>
 # cp /usr/src/linux/drivers/usb/serial/ftdi_sio.ko .<br>
 </code><br>
-To make it become active you may need to stop applications (like fhem) who
+To activete it you may need to stop applications (like fhem) who
 are using the /dev/ttyUSB device and unload the module and load it again.<br>
 <code><br>
 # rmmod ftdi_so<br>
