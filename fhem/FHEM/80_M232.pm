@@ -22,7 +22,7 @@ M232_Initialize($)
 
 # Provider
   $hash->{WriteFn} = "M232_Write";
-  $hash->{Clients} = ":M232Counter:";
+  $hash->{Clients} = ":M232Counter:M232Voltage:";
 
 # Consumer
   $hash->{DefFn}   = "M232_Define";
