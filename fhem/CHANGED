@@ -371,6 +371,7 @@
   - feature: contrib/82_M232Voltage.pm (by Boris, 24.12)
   - feature: delattr renamed to deleteattr (Rudi, 29.12)
   - feature: device spec (list/range/regexp) for most commands implemented
+  - feature: %NAME, %EVENT, %TYPE parameters in notify definition
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
