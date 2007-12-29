@@ -2,7 +2,7 @@
   Created the file HISTORY and the file README.DEV
 
 - Pest, Thu Feb  1 20:45 MET 2007
-  Added description for attribute "model" in commandref.html
+  Added description for attribute ,
 
 - Rudi, Sun Feb 11 18:56:05 MET 2007
   - showtime added for pgm2 (useful for FS20 piri display)
@@ -23,7 +23,7 @@
 
 - Rudi, Sun Mar  4 11:18:10 MET 2007
   Reorganization. Goal: making attribute adding/deleting more uniform
-  ("at/notify" and other device differences), and making web-configuration
+  (,
   possible (i.e. saving the configfile, list of possible devices etc).
 
   Internal changes:
@@ -34,24 +34,24 @@
     -> User written scripts can more easily analyze device states
 
   User visible changes:
-  - at/notify "renamed" to "define <name> at/notify", both moved to external
+  - at/notify ,
     modules. Now it is possible
-    - to have a further "at" or "notify" modules
+    - to have a further ,
       (notify & filelog use the same interface)
     - to have more than one notify for the same event
     - to delete at commands without strange escapes.
       The delete syntax changed (no more def/at/ntfy needed)
     - at/notify can have attributes
     Drawback: each at and notify must have a name, which is strange first.
-  - logfile/modpath/pidfile/port/verbose "renamed" to "attr global xxx"
+  - logfile/modpath/pidfile/port/verbose ,
     Dumping and extending these attributes is easier, no special handling
     required in the web-frontend.
-  - savefile renamed to "attr global statefile"
+  - savefile renamed to ,
   - configfile global attribute added.
   - save command added, it writes the statefile and then the configfile.
   - delattr added to delete single attributes
   - list/xmllist format changed, they contain more information.
-  - "define/set/get/attr name ?" returns a list of possible arguments
+  - ,
     in the same format. This data is contained in the xmllist.
   - disable attribute for at/notify/filelog
   - rename added
@@ -92,7 +92,7 @@
   - feature: modify command added. It helps change e.g. only the time component
     for an at command, without deleting and creating it again and then
     reapplying all the attributes.
-  - feature: the "-" character is disallowed in defined names. Use dot (.) or _
+  - feature: the ,
     instead.  The - is used to separate ranges in the set command.
 
 - Rudi, Sun May 27 12:51:52 MEST 2007
@@ -164,3 +164,9 @@
 - Peter Sun Dec 23 19:59:00 MEST 2007
   - linux.html: Introduction refinement.
 
+- Rudi Sat Dec 29 16:27:14 MET 2007
+  - delattr renamed to deleteattr
+  - devicespec introduced:
+    it may contain a list of devices, a range of devices, or multiple devices
+    identified by regexp. Following commands take a devicespec as argument:
+    attr, deleteattr, delete, get, list, set, setstate, trigger

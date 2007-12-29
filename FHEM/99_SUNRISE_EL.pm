@@ -71,7 +71,7 @@ sr($$$$)
   $sst += ($seconds/3600);
 
   my $diff = 0;
-  if($nh > $sst) {
+  if($nh >= $sst) {
     $nt += 86400; # Tommorow
     $diff = 24;
     @lt = localtime($nt);

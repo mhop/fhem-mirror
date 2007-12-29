@@ -15,7 +15,7 @@
 <a href="#attr">attr</a><br>
 <a href="#defattr">defattr</a><br>
 <a href="#define">define</a><br>
-<a href="#delattr">delattr</a><br>
+<a href="#deleteattr">deleteattr</a><br>
 <a href="#delete">delete</a><br>
 <a href="#get">get</a><br>
 <a href="#include">include</a><br>
@@ -32,6 +32,7 @@
 <a href="#trigger">trigger</a><br>
 <a href="#sleep">sleep</a><br>
 <a href="#xmllist">xmllist</a><br>
+<a href="#devspec">Device specification</a><br>
 <a href="#perl">Perl specials</a><br>
 
 <a name="intro"></a>
@@ -115,7 +116,7 @@ split in multiple lines<br><br>
 <a name="attr"></a>
 <h3>attr</h3>
 <ul>
-  <code>attr &lt;name&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
   or <br>
   <code>attr at &lt;at-spec-regexp&gt; &lt;attribute&gt; </code><br>
 
@@ -126,6 +127,8 @@ split in multiple lines<br><br>
   below.<br>
 
   Use "attr &lt;name&gt; ?" to get a list of possible attributes.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
   <br><br>
 
   Following are attributes of the global device:<br>
@@ -470,7 +473,7 @@ split in multiple lines<br><br>
 
   Notes:<br>
   <ul>
-    <li>See <a href="#delattr">delattr</a> to delete attributes.</li>
+    <li>See <a href="#deleteattr">deleteattr</a> to delete attributes.</li>
   </ul>
 </ul>
 
@@ -1093,18 +1096,20 @@ split in multiple lines<br><br>
 </ul>
 
 
-<a name="delattr"></a>
-<h3>delattr</h3>
+<a name="deleteattr"></a>
+<h3>deleteattr</h3>
 <ul>
-  <code>delattr &lt;name&gt; [&lt;attrname&gt;]</code> <br>
+  <code>deleteattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
   <br>
   Delete either a single attribute (see the <a href="#attr">attr</a> command)
-  or all attributes for a device (if no &lt;attrname&gt; is defined).<br>
+  or all attributes for a device (if no &lt;attrname&gt; is defined).
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
 
   Examples:
   <ul>
-    <code>delattr lamp follow-on-for-timer</code><br>
-    <code>delattr lamp</code><br>
+    <code>deleteattr lamp follow-on-for-timer</code><br>
+    <code>deleteattr lamp</code><br>
   </ul>
   <br>
 </ul>
@@ -1112,10 +1117,11 @@ split in multiple lines<br><br>
 <a name="delete"></a>
 <h3>delete</h3>
 <ul>
-  <code>delete &lt;name&gt;</code> <br>
+  <code>delete &lt;devspec&gt;</code> <br>
   <br>
   Delete something created with the <a href="#define">define</a> command.
-  <br>
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
   Examples:
   <ul>
     <code>delete lamp</code><br>
@@ -1126,12 +1132,13 @@ split in multiple lines<br><br>
 <a name="get"></a>
 <h3>get</h3>
 <ul>
-  <code>get &lt;name&gt; &lt;type-specific&gt;</code>
+  <code>get &lt;devspec&gt; &lt;type-specific&gt;</code>
   <br><br>
   Ask a value directly from the device, and wait for an answer. In general, you
   can get a list of possible commands by<br><code>get &lt;device&gt; ?</code>
   <br>
-  Right now only the FHZ module supports this function.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
 
   <h4>Type FHZ:</h4>
   <ul>
@@ -1231,11 +1238,13 @@ split in multiple lines<br><br>
 <a name="list"></a>
 <h3>list</h3>
 <ul>
-  <code>list [name]</code>
+  <code>list [devspec]</code>
   <br><br>
   Output a list of all definitions, all notify settings and all at
   entries. This is one of the few commands which return a string in a
   normal case.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
   <br><br>
   Example:
   <pre><code>  FHZ> list
@@ -1404,13 +1413,13 @@ Send buffer:<br />    2007-10-19 00:31:24   desired-temp    22.5
 <a name="set"></a>
 <h3>set</h3>
 <ul>
-  <code>set &lt;name&gt; &lt;type-specific&gt;</code>
+  <code>set &lt;devspec&gt; &lt;type-specific&gt;</code>
   <br><br>
   Set parameters of a device / send signals to a device. You can
   get a list of possible commands by<br><code>set &lt;name&gt; ?</code>
   <br>
-  Instead of &lt;name&gt; you can also use an enumeration (separated by comma)
-  or ranges (separated by -), see the FS20 examples.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
 
   <a name="FHZset"></a>
   <h4>Type FHZ:</h4>
@@ -1687,12 +1696,14 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
 <a name="setstate"></a>
 <h3>setstate</h3>
 <ul>
-  <code>setstate &lt;name&gt; &lt;value&gt;</code>
+  <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
   <br><br>
   Set the "STATE" for <code>&lt;name&gt;</code> as shown in paranthesis in the
   <a href="#list">list</a> command
   to <code>&lt;value&gt;</code> without sending any signals to the device
   itself. This command is also used in the <a href="#statefile">statefile</a>.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
   <br><br>
   Examples:
   <ul>
@@ -1726,9 +1737,12 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
 <a name="trigger"></a>
 <h3>trigger</h3>
 <ul>
-  <code>trigger &lt;dev&gt; &lt;state&gt;</code>
+  <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
   <br><br>
   Trigger a <a href="#notify">notify</a> definition.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
+
   <br><br>
   Example:
   <ul>
@@ -1776,6 +1790,45 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
   </pre>
 </ul>
 
+
+<a name="devspec"></a>
+<h3>Device specification</h3>
+<ul>
+  The commands
+    <a href="#attr">attr</a>, 
+    <a href="#deleteattr">deleteattr</a>,
+    <a href="#delete">delete</a>,
+    <a href="#get">get</a>,
+    <a href="#list">list</a>, 
+    <a href="#set">set</a>, 
+    <a href="#setstate">setstate</a>,
+    <a href="#trigger">trigger</a>
+  can take a more complex device specification as argument,
+  which will be expanded to a list of devices. A devspec can be:
+  <ul>
+  <li>a list of devices, separated by comma (,)</li>
+  <li>a range of devices, separated by dash (-)</li>
+  <li>a regular expression, if the the spec contains on e of the following
+      characters: ^*[]$</li>
+  </ul>
+  Example:
+  <ul>
+    <code>set lamp1,lamp2,lamp3 on</code><br>
+    <code>set lamp[1-3] on</code><br>
+    <code>set lamp.* on</code><br>
+    <code>set lamp1-lamp3 on</code><br>
+    <code>set lamp1-lamp3,lamp3 on</code><br>
+  </ul>
+  Notes:
+  <ul>
+  <li>first the spec is separated by komma, then the range or the regular
+      expression operations are executed.</li>
+  <li>if there is a device which xactly corresponds to the spec, then
+      no special processing is done.</li>
+  <li>the returned list can contain the same device more than once, so
+      int tha last example the list will contain lamp3 twice.</li>
+  </ul>
+</ul>
 
 <a name="perl"></a>
 <h3>Perl specials</h3>
