@@ -369,6 +369,8 @@
   - feature: Generate warning if too many commands were sent in the last hour
   - doc:     linux.html: Introduction (Peter S.)
   - feature: contrib/82_M232Voltage.pm (by Boris, 24.12)
+  - feature: delattr renamed to deleteattr (Rudi, 29.12)
+  - feature: device spec (list/range/regexp) for most commands implemented
 
 - TODO
   emem -2.5kW / getDevData for emwz -1

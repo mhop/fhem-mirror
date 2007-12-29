@@ -93,7 +93,7 @@ define roll_eg_wz1  FS20 fb02 0c fg f2 lm 8f
 define roll_wz1_off1 at *20:00:00               { if( $value{roll_eg_wz1} ne "off" ) {          \
                                                     if( $attr{roll_eg_wz1}{freigabe} ) {        \
                                                         fhem("set roll_eg_wz1 off");;           \
-                                                        fhem("delattr roll_eg_wz1 freigabe")    \
+                                                        fhem("deleteattr roll_eg_wz1 freigabe")    \
                                                     } else {                                    \
                                                         fhem("attr roll_eg_wz1 freigabe")       \
                                                     }                                           \
@@ -102,11 +102,11 @@ define roll_wz1_off1 at *20:00:00               { if( $value{roll_eg_wz1} ne "of
 define roll_wz1_off2 at +*{sunset_rel(+3600)}   { if( $value{roll_eg_wz1} ne "off" ) {          \
                                                     if( $attr{roll_eg_wz1}{freigabe} ) {        \
                                                         fhem("set roll_eg_wz1 off");;           \
-                                                        fhem("delattr roll_eg_wz1 freigabe")    \
+                                                        fhem("deleteattr roll_eg_wz1 freigabe")    \
                                                     } else {                                    \
                                                         fhem("attr roll_eg_wz1 freigabe")       \
                                                     }                                           \
                                                 } }
 
 define roll_wz1_off3 at *22:00:00       { fhem("set roll_eg_wz1 off") if($value{roll_eg_wz1} ne "off");; \
-                                          fhem("delattr roll_eg_wz1 freigabe") }
+                                          fhem("deleteattr roll_eg_wz1 freigabe") }
