@@ -165,7 +165,9 @@
   - linux.html: Introduction refinement.
 
 - Rudi Sat Dec 29 16:27:14 MET 2007
-  - delattr renamed to deleteattr
+  - delattr renamed to deleteattr, as del should complete to delete and not to
+    delattr
+  - defattr renamed to setdefaultattr (same as before for def)
   - devicespec introduced:
     it may contain a list of devices, a range of devices, or multiple devices
     identified by regexp. Following commands take a devicespec as argument:
