@@ -64,11 +64,12 @@ sub fhem($);
 sub fhz($);
 sub doGlobalDef($);
 sub PrintHash($$);
+sub devspec2array($);
 
 sub CommandAttr($$);
 sub CommandDefAttr($$);
 sub CommandDefine($$);
-sub CommandDelAttr($$);
+sub CommandDeleteAttr($$);
 sub CommandDelete($$);
 sub CommandGet($$);
 sub CommandHelp($$);
@@ -137,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.32 2007-12-13 15:26:27 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.33 2007-12-29 15:57:42 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -152,17 +153,17 @@ my %cmds = (
   "?"       => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
   "attr" => { Fn=>"CommandAttr", 
-	    Hlp=>"<name> <attrname> [<attrvalue>],set attributes for <name>" },
+            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>" },
   "defattr" => { Fn=>"CommandDefAttr", 
 	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
-  "delattr" => { Fn=>"CommandDelAttr", 
-	    Hlp=>"<name> [<attrname>],delete attribute <attrname> for <name>" },
+  "deleteattr" => { Fn=>"CommandDeleteAttr", 
+	    Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
   "delete"  => { Fn=>"CommandDelete",
-	    Hlp=>"name,delete the corresponding definition"},
+	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
   "get"     => { Fn=>"CommandGet", 
-	    Hlp=>"<name> <type dependent>,request data from <name>" },
+	    Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
   "help"    => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
   "include" => { Fn=>"CommandInclude",
@@ -170,7 +171,7 @@ my %cmds = (
   "inform" => { Fn=>"CommandInform",
 	    Hlp=>"{on|off},echo all commands and events to this client" },
   "list"    => { Fn=>"CommandList",
-	    Hlp=>"[device],list definitions and status info" },
+	    Hlp=>"[devspec],list definitions and status info" },
   "modify"  => { Fn=>"CommandModify",
 	    Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
@@ -184,15 +185,15 @@ my %cmds = (
   "save"    => { Fn=>"CommandSave", 
 	    Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet", 
-	    Hlp=>"<name> <type dependent>,transmit code for <name>" },
+	    Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate", 
-	    Hlp=>"<name> <state>,set the state shown in the command list" },
+	    Hlp=>"<devspec> <state>,set the state shown in the command list" },
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>",terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
             Hlp=>"<sec>,sleep for sec, 3 decimal places are interpreted" },
   "trigger" => { Fn=>"CommandTrigger",
-            Hlp=>"<dev> <state>,trigger notify command" },
+            Hlp=>"<devspec> <state>,trigger notify command" },
   "xmllist" => { Fn=>"CommandXmlList",
             Hlp=>",list definitions and status info as xml" },
 );
@@ -534,6 +535,38 @@ AnalyzeCommand($$)
 }
 
 #####################################
+my $namedef =
+  "where <name> is either:\n" .
+  "- a single device name\n" .
+  "- a list seperated by komma (,)\n" .
+  "- a regexp, if contains one of the following characters: *[]^\$\n" .
+  "- a range seperated by dash (-)\n";
+
+sub
+devspec2array($)
+{
+  my ($name) = @_;
+  return $name if(defined($defs{$name}));
+  my @ret;
+
+  foreach my $l (split(",", $name)) {   # List
+    if($l =~ m/[*\[\]^\$]/) {           # Regexp
+      push @ret, grep($_ =~ m/$l/, sort keys %defs);
+      next;
+    }
+    if($l =~ m/-/) {                    # Range
+      my ($lower, $upper) = split("-", $l, 2);
+      push @ret, grep($_ ge $lower && $_ le $upper, sort keys %defs);
+      next;
+    }
+    push @ret, $l;
+  }
+
+  return $name if(!@ret);               # No match, return the input
+  return @ret;
+}
+
+#####################################
 sub
 CommandHelp($$)
 {
@@ -782,7 +815,6 @@ CommandShutdown($$)
   exit(0);
 }
 
-
 #####################################
 sub
 DoSet(@)
@@ -798,6 +830,7 @@ DoSet(@)
   return DoTrigger($dev, join(" ", @a));
 }
 
+
 #####################################
 sub
 CommandSet($$)
@@ -805,32 +838,10 @@ CommandSet($$)
   my ($cl, $param) = @_;
   my @a = split("[ \t][ \t]*", $param);
   return "Usage: set <name> <type-dependent-options>\n" .
-         "       <name> can be an enumeration (separated by comma)\n" .
-         "       or a range (separated by -)" if(int(@a)<1);
+         "$namedef" if(int(@a)<1);
 
-  my $dev = $a[0];
   my @rets;
-
-  foreach my $sdev (split(",", $dev)) {
-
-    if($sdev =~ m/-/) {		 # Range (separated by -)
-
-      if(defined($defs{$sdev})) {
-        $a[0] = $sdev;
-        my $ret = DoSet(@a);
-        push @rets, $ret if($ret);
-        next;
-      }
-
-      my @lim = split("-", $sdev);
-      foreach my $sd (sort keys %defs) {
-        next if($sd lt $lim[0] || $sd gt $lim[1]);
-        $a[0] = $sd;
-        my $ret = DoSet(@a);
-        push @rets, $ret if($ret);
-      }
-      next;
-    }
+  foreach my $sdev (devspec2array($a[0])) {
 
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
@@ -853,12 +864,26 @@ CommandGet($$)
   my ($cl, $param) = @_;
 
   my @a = split("[ \t][ \t]*", $param);
-  return "Usage: get <name> <type-dependent-options>" if(int(@a) < 1);
-  my $dev = $a[0];
-  return "Please define $dev first ($param)" if(!defined($defs{$dev}));
-  return "No get implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{GetFn});
+  return "Usage: get <name> <type-dependent-options>\n" .
+         "$namedef" if(int(@a) < 1);
 
-  return CallFn($a[0], "GetFn", $defs{$dev}, @a);
+
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+    if(!$modules{$defs{$sdev}{TYPE}}{GetFn}) {
+      push @rets, "No get implemented for $sdev";
+      next;
+    }
+
+    $a[0] = $sdev;
+    my $ret = CallFn($sdev, "GetFn", $defs{$sdev}, @a);
+    push @rets, $ret if($ret);
+  }
+  return join("\n", @rets);
 }
 
 #####################################
@@ -985,38 +1010,65 @@ CommandDelete($$)
 {
   my ($cl, $def) = @_;
 
-  return "Please define $def first" if(!defined($defs{$def}));
-  my $ret = CallFn($def, "UndefFn", $defs{$def}, $def);
-  return $ret if($ret);
+  return "Usage: delete <name>\n" .
+         "$namedef" if(!$def);
 
-  delete($attr{$def});
-  delete($defs{$def});
+  my @rets;
+  foreach my $sdev (devspec2array($def)) {
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
 
-  return undef;
+    my $ret = CallFn($sdev, "UndefFn", $defs{$sdev}, $sdev);
+    if($ret) {
+      push @rets, $ret;
+      next;
+    }
+    delete($attr{$sdev});
+    delete($defs{$sdev});
+  }
+  return join("\n", @rets);
 }
 
 #############
 sub
-CommandDelAttr($$)
+CommandDeleteAttr($$)
 {
   my ($cl, $def) = @_;
 
   my @a = split(" ", $def, 2);
-  return "Usage: delattr <name> [<attrname>]" if(@a < 1);
-  return "Cannot delete global parameters" if($a[0] eq "global");
-  return "No definition found for $a[0]\n" if(!$defs{$a[0]});
+  return "Usage: deleteattr <name> [<attrname>]\n" .
+         "$namedef" if(@a < 1);
 
-  $ret = CallFn($a[0], "AttrFn", "del", @a);
-  return $ret if($ret);
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
 
-  if(@a == 1) {
-    delete($attr{$a[0]});
-    return undef;
+    if($sdev eq "global") {
+      push @rets, "Cannot delete global parameters";
+      next;
+    }
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+
+    $a[0] = $sdev;
+    $ret = CallFn($sdev, "AttrFn", "del", @a);
+    if($ret) {
+      push @rets, $ret;
+      next;
+    }
+
+    if(@a == 1) {
+      delete($attr{$sdev});
+    } else {
+      delete($attr{$sdev}{$a[1]}) if(defined($attr{$sdev}));
+    }
+
   }
-  return "Attribute not defined"
-                if(!defined($attr{$a[0]}) || !defined($attr{$a[0]}{$a[1]}));
-  delete($attr{$a[0]}{$a[1]});
-  return undef;
+
+  return join("\n", @rets);
 }
 
 sub
@@ -1071,11 +1123,15 @@ CommandList($$)
 
   } else {
 
-    return "No device named $param found" if(!defined($defs{$param}));
-    my $d = $defs{$param};
+    foreach my $sdev (devspec2array($param)) {
+      if(!defined($defs{$sdev})) {
+        $str .= "No device named $param found";
+        next;
+      }
+      $str .= "Internals:\n";
+      $str .= PrintHash($defs{$sdev}, 2);
+    }
 
-    $str .= "Internals:\n";
-    $str .= PrintHash($d, 2);
   }
 
   return $str;
@@ -1224,40 +1280,15 @@ getAllAttr($)
   return $list;
 }
 
-#####################################
 sub
-CommandAttr($$)
+GlobalAttr($$)
 {
-  my ($cl, $param) = @_;
-  my $ret = undef;
-  
-  my @a = split(" ", $param, 3);
-  return "Usage: attr <name> <attrname> [<attrvalue>]" if(@a < 2);
-
-  return "Please define $a[0] first: no definition found"
-    if(!defined($defs{$a[0]}));
-
-  my $list = getAllAttr($a[0]);
-  return "Unknown argument $a[1], choose one of $list" if($a[1] eq "?");
-  return "Unknown attribute $a[1], use attr global userattr ($list)"
-                if(" $list " !~ m/ ${a[1]}[ :;]/);
-
-
-  $ret = CallFn($a[0], "AttrFn", "set", @a);
-  return $ret if($ret);
-
-  if(defined($a[2])) {
-    $attr{$a[0]}{$a[1]} = $a[2];
-  } else {
-    $attr{$a[0]}{$a[1]} = "1";
-  }
-
-  return if($a[0] ne "global"); # Global specials ahead
+  my ($name, $val) = @_;
 
   ################
-  if($a[1] eq "logfile") {
+  if($name eq "logfile") {
     my @t = localtime;
-    my $ret = OpenLogfile(ResolveDateWildcards($a[2], @t));
+    my $ret = OpenLogfile(ResolveDateWildcards($val, @t));
     if($ret) {
       return $ret if($init_done);
       die($ret);
@@ -1265,10 +1296,10 @@ CommandAttr($$)
   }
 
   ################
-  elsif($a[1] eq "port") {
+  elsif($name eq "port") {
 
     return undef if($reread_active);
-    my ($port, $global) = split(" ", $a[2]);
+    my ($port, $global) = split(" ", $val);
     if($global && $global ne "global") {
       return "Bad syntax, usage: attr global port <portnumber> [global]";
     }
@@ -1289,8 +1320,8 @@ CommandAttr($$)
   }
 
   ################
-  elsif($a[1] eq "verbose") {
-    if($a[2] =~ m/^[0-5]$/) {
+  elsif($name eq "verbose") {
+    if($val =~ m/^[0-5]$/) {
       return undef;
     } else {
       $attr{global}{verbose} = 3;
@@ -1298,10 +1329,10 @@ CommandAttr($$)
     }
   }
 
-  elsif($a[1] eq "modpath") {
+  elsif($name eq "modpath") {
     return "modpath must point to a directory where the FHEM subdir is"
-  	if(! -d "$a[2]/FHEM");
-    my $modpath = "$a[2]/FHEM";
+        if(! -d "$val/FHEM");
+    my $modpath = "$val/FHEM";
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     my $counter = 0;
@@ -1327,10 +1358,65 @@ CommandAttr($$)
                   "point modpath to a directory where the FHEM subdir is";
     }
 
-    $modpath_set = $a[2];
+    $modpath_set = $val;
   }
 
   return undef;
+}
+
+#####################################
+sub
+CommandAttr($$)
+{
+  my ($cl, $param) = @_;
+  my $ret = undef;
+  
+  my @a = split(" ", $param, 3);
+  return "Usage: attr <name> <attrname> [<attrvalue>]\n" .
+        "$namedef" if(@a < 2);
+
+
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
+
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+
+    my $list = getAllAttr($sdev);
+    if($a[1] eq "?") {
+      push @rets, "Unknown argument $a[1], choose one of $list";
+      next;
+    }
+    if(" $list " !~ m/ ${a[1]}[ :;]/) {
+      push @rets, "Unknown attribute $a[1], use attr global userattr ($list)";
+      next;
+    }
+
+    $a[0] = $sdev;
+    $ret = CallFn($sdev, "AttrFn", "set", @a);
+    if($ret) {
+      push @rets, $ret;
+      next;
+    }
+
+    if(defined($a[2])) {
+      $attr{$sdev}{$a[1]} = $a[2];
+    } else {
+      $attr{$sdev}{$a[1]} = "1";
+    }
+
+    if($sdev eq "global") {
+      $ret = GlobalAttr($a[1], $a[2]);
+      if($ret) {
+        push @rets, $ret;
+        next;
+      }
+    }
+
+  }
+  return join("\n", @rets);
 }
 
 
@@ -1357,42 +1443,52 @@ sub
 CommandSetstate($$)
 {
   my ($cl, $param) = @_;
-  my $ret = undef;
   
   my @a = split(" ", $param, 2);
-  return "Usage: setstate <name> <state>" if(@a != 2);
-  return "Please define $a[0] first" if(!defined($defs{$a[0]}));
+  return "Usage: setstate <name> <state>\n" .
+         "$namedef" if(@a != 2);
 
-  my $d = $defs{$a[0]};
 
-  # Detailed state with timestamp
-  if($a[1] =~ m/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /) {
-    my @b = split(" ", $a[1], 4);
-
-    if($defs{$a[0]}{TYPE} eq "FS20" && $b[2] ne "state") { # Compatibility mode
-      $b[3] = $b[2] . ($b[3] ? " $b[3]" : "");
-      $b[2] = "state";
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
     }
 
-    my $tim = "$b[0] $b[1]";
-    $ret = CallFn($a[0], "StateFn", $d, $tim, $b[2], $b[3]);
-    return $ret if($ret);
+    my $d = $defs{$sdev};
 
-    if(!$d->{READINGS}{$b[2]} || $d->{READINGS}{$b[2]}{TIME} lt $tim) {
-      $d->{READINGS}{$b[2]}{VAL} = $b[3];
-      $d->{READINGS}{$b[2]}{TIME} = $tim;
+    # Detailed state with timestamp
+    if($a[1] =~ m/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /) {
+      my @b = split(" ", $a[1], 4);
+
+      if($defs{$sdev}{TYPE} eq "FS20" && $b[2] ne "state") { # Compatibility
+        $b[3] = $b[2] . ($b[3] ? " $b[3]" : "");
+        $b[2] = "state";
+      }
+
+      my $tim = "$b[0] $b[1]";
+      my $ret = CallFn($sdev, "StateFn", $d, $tim, $b[2], $b[3]);
+      if($ret) {
+        push @rets, $ret;
+        next;
+      }
+
+      if(!$d->{READINGS}{$b[2]} || $d->{READINGS}{$b[2]}{TIME} lt $tim) {
+        $d->{READINGS}{$b[2]}{VAL} = $b[3];
+        $d->{READINGS}{$b[2]}{TIME} = $tim;
+      }
+
+    } else {
+      $d->{STATE} = $a[1];
+
+      $oldvalue{$sdev}{VAL} = $a[1];
+      # This time is not the correct one, but we do not store a timestamp for
+      # this reading.
+      $oldvalue{$sdev}{TIME} = TimeNow();
     }
-
-  } else {
-    $d->{STATE} = $a[1];
-
-    $oldvalue{$a[0]}{VAL} = $a[1];
-    # This time is not the correct one, but we do not store a timestamp for
-    # this reading.
-    $oldvalue{$a[0]}{TIME} = TimeNow();
   }
-  
-  return $ret;
+  return join("\n", @rets);
 }
 
 #####################################
@@ -1402,9 +1498,22 @@ CommandTrigger($$)
   my ($cl, $param) = @_;
 
   my ($dev, $state) = split(" ", $param, 2);
-  return "Usage: trigger <device> <state>" if(!$state);
-  return "Please define $dev first" if(!defined($defs{$dev}));
-  return DoTrigger($dev, $state);
+  return "Usage: trigger <name> <state>\n" .
+         "$namedef" if(!$state);
+
+  my @rets;
+  foreach my $sdev (devspec2array($dev)) {
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+    my $ret = DoTrigger($sdev, $state);
+    if($ret) {
+      push @rets, $ret;
+      next;
+    }
+  }
+  return join("\n", @rets);
 }
 
 #####################################
