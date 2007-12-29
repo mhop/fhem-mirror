@@ -63,7 +63,13 @@ notify_Exec($$)
       my $exec = $log->{CMD};
 
       $exec =~ s/%%/____/g;
-      $exec =~ s/%/$s/g;
+      my $extsyntax= 0;
+      $extsyntax+= ($exec =~ s/%TYPE/$t/g);
+      $extsyntax+= ($exec =~ s/%NAME/$n/g);
+      $extsyntax+= ($exec =~ s/%EVENT/$s/g);
+      if(!$extsyntax) {
+        $exec =~ s/%/$s/g;
+      }
       $exec =~ s/____/%/g;
 
       $exec =~ s/@@/____/g;

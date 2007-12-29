@@ -1019,11 +1019,19 @@ split in multiple lines<br><br>
       <li>The character <code>%</code> will be replaced with the received event,
       e.g. with <code>on</code> or <code>off</code> or <code>measured-temp: 21.7
       (Celsius)</code><br> It is advisable to put the <code>%</code> into double
-      quotes, else the shell may get a syntax error.<br>
-      To use % or @ in the text itself, use the double mode (%% or @@)</li>
-          
+      quotes, else the shell may get a syntax error.</li>
+
       <li>The character <code>@</code> will be replaced with the device
       name.</li>
+
+      <li>To use % or @ in the text itself, use the double mode (%% or @@).</li>
+
+      <li>Instead of <code>%</code> and <code>@</code>, the parameters
+      <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code>
+      (same as <code>@</code>) and <code>%TYPE</code> (contains the device
+      type, e.g. <code>FHT</code>) can be used. A single <code>%</code>
+      looses its special meaning if any of these parameters appears in the 
+      definition.</li>
 
       <li><code>&lt;pattern&gt;</code> may also be a compound of
       <code>definition:event</code> to filter for events.</li>
