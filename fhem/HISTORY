@@ -170,3 +170,7 @@
     it may contain a list of devices, a range of devices, or multiple devices
     identified by regexp. Following commands take a devicespec as argument:
     attr, deleteattr, delete, get, list, set, setstate, trigger
+
+- Boris Sat Dec 29 16:56:00 CET 2007
+  - %NAME, %EVENT, %TYPE parameters in notify definition, commandref.html update
+
