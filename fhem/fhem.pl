@@ -67,7 +67,7 @@ sub PrintHash($$);
 sub devspec2array($);
 
 sub CommandAttr($$);
-sub CommandDefAttr($$);
+sub CommandDefaultAttr($$);
 sub CommandDefine($$);
 sub CommandDeleteAttr($$);
 sub CommandDelete($$);
@@ -133,12 +133,12 @@ my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my $modpath_set;                # Check if modpath was used, and report if not.
 my $global_cl;			# To use from perl snippets
 my $devcount = 0;		# To sort the devices
-my %defattr;    		# Default attributes
+my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.33 2007-12-29 15:57:42 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.34 2007-12-29 16:25:02 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -154,8 +154,6 @@ my %cmds = (
 	    Hlp=>",get this help" },
   "attr" => { Fn=>"CommandAttr", 
             Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>" },
-  "defattr" => { Fn=>"CommandDefAttr", 
-	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "deleteattr" => { Fn=>"CommandDeleteAttr", 
@@ -188,6 +186,8 @@ my %cmds = (
 	    Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
   "setstate"=> { Fn=>"CommandSetstate", 
 	    Hlp=>"<devspec> <state>,set the state shown in the command list" },
+  "setdefaultattr" => { Fn=>"CommandDefaultAttr", 
+	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>",terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
@@ -498,6 +498,8 @@ AnalyzeCommand($$)
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
   return if(!$fn);
 
+  $fn = "setdefaultattr" if($fn eq "defattr"); # Compatibility mode
+
   #############
   # Search for abbreviation
   if(!defined($cmds{$fn})) {
@@ -777,7 +779,7 @@ CommandSave($$)
   }
 
   foreach my $r (sort keys %rooms) {
-    print SFH "\ndefattr" . ($r ne "~" ? " room $r" : "") . "\n";
+    print SFH "\nsetdefaultattr" . ($r ne "~" ? " room $r" : "") . "\n";
     foreach my $d (sort keys %{$rooms{$r}} ) {
       next if($defs{$d}{VOLATILE});
       if($defs{$d}{DEF}) {
@@ -794,7 +796,7 @@ CommandSave($$)
     }
   }
   
-  print SFH "defattr\n";        # Delete the last default attribute.
+  print SFH "setdefaultattr\n";        # Delete the last default attribute.
 
   print SFH "include $attr{global}{lastinclude}\n"
         if($attr{global}{lastinclude});
@@ -957,8 +959,8 @@ CommandDefine($$)
   if($ret) {
     delete $defs{$a[0]}
   } else {
-    foreach my $da (sort keys (%defattr)) {     # Default attributes
-      CommandAttr($cl, "$a[0] $da $defattr{$da}");
+    foreach my $da (sort keys (%defaultattr)) {     # Default attributes
+      CommandAttr($cl, "$a[0] $da $defaultattr{$da}");
     }
   }
   return $ret;
@@ -1423,17 +1425,17 @@ CommandAttr($$)
 #####################################
 # Default Attr
 sub
-CommandDefAttr($$)
+CommandDefaultAttr($$)
 {
   my ($cl, $param) = @_;
 
   my @a = split(" ", $param, 2);
   if(int(@a) == 0) {
-    %defattr = ();
+    %defaultattr = ();
   } elsif(int(@a) == 1) {
-    $defattr{$a[0]} = 1;
+    $defaultattr{$a[0]} = 1;
   } else {
-    $defattr{$a[0]} = $a[1];
+    $defaultattr{$a[0]} = $a[1];
   } 
   return undef;
 }
