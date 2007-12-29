@@ -13,10 +13,9 @@
 <a href="#intro">Introduction</a><br>
 <a href="#help">?,help</a><br>
 <a href="#attr">attr</a><br>
-<a href="#defattr">defattr</a><br>
 <a href="#define">define</a><br>
-<a href="#deleteattr">deleteattr</a><br>
 <a href="#delete">delete</a><br>
+<a href="#deleteattr">deleteattr</a><br>
 <a href="#get">get</a><br>
 <a href="#include">include</a><br>
 <a href="#inform">inform</a><br>
@@ -27,11 +26,13 @@
 <a href="#rereadcfg">rereadcfg</a><br>
 <a href="#save">save</a><br>
 <a href="#set">set</a><br>
+<a href="#setdefaultattr">setdefaultattr</a><br>
 <a href="#setstate">setstate</a><br>
 <a href="#shutdown">shutdown</a><br>
-<a href="#trigger">trigger</a><br>
 <a href="#sleep">sleep</a><br>
+<a href="#trigger">trigger</a><br>
 <a href="#xmllist">xmllist</a><br>
+
 <a href="#devspec">Device specification</a><br>
 <a href="#perl">Perl specials</a><br>
 
@@ -477,10 +478,10 @@ split in multiple lines<br><br>
   </ul>
 </ul>
 
-<a name="defattr"></a>
-<h3>defattr</h3>
+<a name="setdefaultattr"></a>
+<h3>setdefaultattr</h3>
 <ul>
-  <code>defattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
+  <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
 
   <br>Set the default attribute. Each device defined from now on will receive
   this attribute (see the <a href="#attr">attr</a> entry for details on
@@ -491,12 +492,12 @@ split in multiple lines<br><br>
   Example to set the attribute "room kitchen" and "loglevel 4" to
   each of the lamps:
   <ul>
-    <code>defattr room kitchen</code><br>
-    <code>defattr loglevel 4</code><br>
+    <code>setdefaultattr room kitchen</code><br>
+    <code>setdefaultattr loglevel 4</code><br>
     <code>define lamp1 FS20 1234 11</code><br>
     <code>define lamp2 FS20 1234 12</code><br>
     <code>define lamp3 FS20 1234 13</code><br>
-    <code>defattr</code><br>
+    <code>setdefaultattr</code><br>
   </ul>
   <br>
 
