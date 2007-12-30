@@ -138,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.34 2007-12-29 16:25:02 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.35 2007-12-30 14:50:30 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -292,7 +292,7 @@ while (1) {
   if(vec($rout, $server->fileno(), 1)) {
     my @clientinfo = $server->accept();
     if(!@clientinfo) {
-      Print("ERROR", 1, "016 Accept failed for admin port");
+      Log 1, "Accept failed: $!";
       next;
     }
     my @clientsock = sockaddr_in($clientinfo[1]);

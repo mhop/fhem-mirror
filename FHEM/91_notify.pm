@@ -54,6 +54,7 @@ notify_Exec($$)
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
+  my $t = $dev->{TYPE};
 
   my $ret = "";
   for (my $i = 0; $i < $max; $i++) {
