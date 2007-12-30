@@ -176,3 +176,6 @@
 - Boris Sat Dec 29 16:56:00 CET 2007
   - %NAME, %EVENT, %TYPE parameters in notify definition, commandref.html update
 
+- Boris Sun Dec 30 22:35:00 CET 2007
+  - added dblog/93_DbLog.pm and samples in contrib directory, commandref.html update
+

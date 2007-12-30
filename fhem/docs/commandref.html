@@ -906,6 +906,60 @@ split in multiple lines<br><br>
     <br>
   </ul>
 
+  <a name="DbLog"></a>
+  <h4>Type DbLog</h4>
+  <ul>
+    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
+    <br><br>
+  
+    Log events to a database. The database connection is defined in
+    <code>&lt;configfilename&gt;</code> (see sample configuration file 
+    <code>db.conf</code>). The configuration is stored in a separate file
+    to avoid storing the password in the main configuration file and to have it
+    visible in the output of the <a href="#list">list</a> command.
+    <br><br>
+
+    You must have <code>93_DbLog.pm</code> in the <code>FHEM</code> subdirectory 
+    to make this work. Additionally, the modules <code>DBI</code> and 
+    <code>DBD::&lt;dbtype&gt;</code> need to be installed (use 
+    <code>cpan -i &lt;module&gt;</code> if your distribution does not have it).
+    <br><br>
+    <code>&lt;regexp&gt;</code> is the same as in <a href="#FileLog">FileLog</a>.
+    <br><br>
+    Sample code to create a MySQL database is in <code>fhemdb_create.sql</code>.
+    The database contains two tables: <code>current</code> and 
+    <code>history</code>. The latter contains all events whereas the former only
+    contains the last event for any given reading and device.
+    The columns have the following meaning:
+    <ol>
+	<li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
+	<li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
+	<li>TYPE: device type, e.g. <code>KS300</code></li>
+	<li>EVENT: event specification as full string, 
+                                    	e.g. <code>humidity: 71 (%)</code></li>
+	<li>READING: name of reading extracted from event, 
+					e.g. <code>humidity</code></li>
+	<li>VALUE: actual reading extracted from event,
+					e.g. <code>71</code></li>
+	<li>UNIT: unit extracted from event, e.g. <code>%</code></li>
+    </ol>
+    The content of VALUE is optimized for automated post-processing, e.g.
+    <code>yes</code> is translated to <code>1</code>.
+    <br><br>
+    The current values can be retrieved by means of the perl script
+    <code>fhemdb_get.pl</code>. Its output is adapted to what a 
+    <a href="www.cacti.net">Cacti</a> data input method expects. 
+    Call <code>fhemdb_get.pl</code> without parameters to see the usage
+    information.
+    <br><br>
+    Examples:
+    <ul>
+    	<code># log everything to database</code><br>
+    	<code>define logdb DbLog /etc/fhem/db.conf .*:.*</code>
+    </ul>
+  </ul>
+
+
   <a name="at"></a>
   <h4>Type at</h4>
   <ul>
@@ -1010,7 +1064,7 @@ split in multiple lines<br><br>
       <code>define b3lampV3 notify btn3 "/usr/local/bin/setlamp "%""</code><br>
       <code>define b3lampV3 notify btn3 set lamp1 %;;set lamp2 %</code><br>
       <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
-      <code>define LogHToDB notify .*H:.* {DbLog("@","%")}</code><br>
+      <!-- <code>define LogHToDB notify .*H:.* {DbLog("@","%")}</code><br> -->
       <code>define LogUndef notify UNDEFINED "send-me-mail.sh "%""</code><br>
     </ul>
     <br>
@@ -1043,8 +1097,10 @@ split in multiple lines<br><br>
       href="#list">list</a> output in paranthesis after the device name, or the
       string you see when you do a detailed list of the device.</li>
 
-      <li>To use database logging, copy the file contrib/91_DbLog.p into your
+      <!--
+      <li>To use database logging, copy the file contrib/91_DbLog.pm into your
       modules directory, and change the $dbconn parameter in the file.</li>
+      -->
 
       <li>Each undefined device (FS20, HMS, FHT) will be reported with the
       device name "UNDEFINED". The % parameter will contain the type (FS20,

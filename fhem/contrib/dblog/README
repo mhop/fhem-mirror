@@ -1,0 +1,13 @@
+For usage instruction see commandref.html, section define
+2007-12-30bn
+
+- 93_DbLog.pm
+  copy this file into <modpath>/FHEM
+- db.conf
+  sample database configuration file
+- fhemdb_create.sql
+  sample sql command to create a mysql database for logging purposes
+- fhemdb_get.pl
+  sample perl script for retrieving the current (latest) data from
+  the logging database
+
