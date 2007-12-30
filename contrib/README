@@ -7,6 +7,7 @@
   Support for FS10. Read README.FS10, you have to install pcwsd first.
 - 91_DbLog.pm
   Example to log data in a (DBI supported) database (MySQL, Oracle, etc)
+  see dblog for a full-featured database log
 - 99_ALARM.pm
   Example for a Low Budget ALARM System by Martin
 - 99_SUNRISE.pm
@@ -43,3 +44,5 @@
   Peter's RRD support. See the HOWTO
 - serial.pm
   Serial line analyzer
+- dblog
+  Support for a full-featured database log by Boris. See the README.
