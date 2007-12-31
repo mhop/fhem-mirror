@@ -177,5 +177,11 @@
   - %NAME, %EVENT, %TYPE parameters in notify definition, commandref.html update
 
 - Boris Sun Dec 30 22:35:00 CET 2007
-  - added dblog/93_DbLog.pm and samples in contrib directory, commandref.html update
+  - added dblog/93_DbLog.pm and samples in contrib directory, commandref.html
+    update
 
+- Rudi Mon Dec 31 15:37:19 MET 2007
+  - feature: webfrontend/pgm2 converted to a FHEM module
+    No more need for a webserver for basic WEB administration. For HTTPS or
+    password you still need apache or the like.
+    One step closer for complete fhem on the FritzBox.

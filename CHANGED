@@ -374,6 +374,7 @@
   - feature: device spec (list/range/regexp) for most commands implemented
   - feature: %NAME, %EVENT, %TYPE parameters in notify definition
   - feature: added 93_DbLog.pm, database logging facility (Boris, 30.12.)
+  - feature: webfrontend/pgm2 converted to a FHEM module
 
 - TODO
   emem -2.5kW / getDevData for emwz -1

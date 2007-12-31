@@ -138,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.35 2007-12-30 14:50:30 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.36 2007-12-31 14:43:02 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -278,7 +278,7 @@ while (1) {
   CommandShutdown(undef, undef) if($sig_term);
 
   if($nfound < 0) {
-    next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
+    next if ($! == 0);
     die("Select error $nfound / $!\n");
   }
 
@@ -513,12 +513,13 @@ AnalyzeCommand($$)
   }
 
   if(!defined($cmds{$fn})) {
+    my $msg =  "Unknown command  $fn, try help";
     if($cl) {
-      syswrite($client{$cl}{fd}, "Unknown command  $fn, try help\n");
+      syswrite($client{$cl}{fd}, "$msg\n");
     } else {
-      Log 1, "Unknown command >$fn<, try help";
+      Log 3, "$msg";
     }
-    return;
+    return $msg;
   }
 
   $param = "" if(!defined($param));
@@ -530,10 +531,10 @@ AnalyzeCommand($$)
     if($cl) {
       syswrite($client{$cl}{fd}, $ret . "\n");
     } else {
-      Log 1, $ret;
-      return $ret;
+      Log 3, $ret;
     }
   }
+  return $ret;
 }
 
 #####################################
@@ -713,6 +714,7 @@ WriteStatefile()
   print SFH "#$t\n";
 
   foreach my $d (sort keys %defs) {
+    next if($defs{$d}{TEMPORARY});
     print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n"
         if($defs{$d}{VOLATILE});
     print SFH "setstate $d $defs{$d}{STATE}\n"
@@ -781,6 +783,7 @@ CommandSave($$)
   foreach my $r (sort keys %rooms) {
     print SFH "\nsetdefaultattr" . ($r ne "~" ? " room $r" : "") . "\n";
     foreach my $d (sort keys %{$rooms{$r}} ) {
+      next if($defs{$d}{TEMPORARY});
       next if($defs{$d}{VOLATILE});
       if($defs{$d}{DEF}) {
         my $def = $defs{$d}{DEF};

@@ -75,7 +75,7 @@ Currently implemented features:<br>
       events</li>
   <li>timed commands (e.g. switching a lamp on from sunset till midnight)</li>
   <li>modular architecture</li>
-  <li>a lot of web frontends, choose your favorite</li>
+  <li>Two different web frontends, choose your favorite</li>
 <br>
 </ul>
 See <a href="commandref.html">commandref.html</a> for a detailed command
@@ -172,28 +172,15 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 
 <h3>Web frontend 2 (webfrontend/pgm2)</h3>
   <ul>
-  This frontend is CGI/CSS based. It has support for rooms, and FHT/KS300 logs.<br>
+  This frontend is a FHEM module realising a primitive HTTP server -> You do
+  not even need apache if security (password/HTTPS) is not a concern.
+  It has support for grouping devices into rooms, manipulating devices, direct
+  fhem commands, diplaying logfiles as text or (if gnuplot is installed) as
+  graphs.<br>
   Screenshots: <a href="pgm2-1.png">one</a>, <a href="pgm2-2.png">two</a>.
   <br><br>
 
-  <ul>
-     <li>Copy the file fhemweb.pl and *.gplot to your cgi-bin directory
-         (/home/httpd/cgi-bin), the icons (*.gif) to your httpd icons
-         (/home/httpd/icons), and commandref.html to the html directory
-         (/home/httpd/html).<br>
-	 Note: The program looks for icons in the following order:
-	 &lt;device-name&gt;.&lt;state&gt;, &lt;device-name&gt;,
-	 &lt;device-type&gt;.&lt;state&gt;, &lt;device-type&gt;<br>
-	 </li>
-     <li>If you want to have access to plotted logs, then make sure that
-         gnuplot is installed and set the logtype for the FileLog device
-         (see commandref.html and example/04_log). Copy the file
-         contrib/99_weblink.pm to the installed FHEM directory.
-	 </li>
-     <li>Call &lt;your-site&gt;/cgi-bin/fhemweb.pl
-  </ul>
-  For special features like assigning devices to rooms see the README file.
-  </ul>
+  For installation see the webpgm/pgm2/README file.<br>
 
 <h3>Web frontend 3 (webfrontend/pgm3)</h3>
   <ul>
