@@ -375,6 +375,7 @@
   - feature: %NAME, %EVENT, %TYPE parameters in notify definition
   - feature: added 93_DbLog.pm, database logging facility (Boris, 30.12.)
   - feature: webfrontend/pgm2 converted to a FHEM module
+  - bugfix:  99_SUNRISE_EL.pm: may schedule double events
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
