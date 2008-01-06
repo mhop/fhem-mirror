@@ -15,28 +15,31 @@ Formerly known as fhz1000.pl
 
 <h2>News (as of =DATE=, Version =VERS=)</h2>
 <ul>
-  <li>feature: added archivedir/archivecmd to the the main logfile
-  <li>feature: 99_Sunrise_EL.pm (does not need any Date modules)
-  <li>bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)
-  <li>bugfix:  FHT mode holiday_short added (9.9, Dirk)
-  <li>bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)
-  <li>feature: webpgm2 output reformatted
-  <li>feature: webpgm2 displaying multiple plots
-  <li>feature: FHT lime-protection code discovered by Dirk (7.10)
-  <li>feature: softwarebuffer for FHT devices (Dirk 17.10)
-  <li>feature: FHT low temperatur warning and offset (Dirk 17.10)
+  <li>feature: added archivedir/archivecmd to the the main logfile</li>
+  <li>feature: 99_Sunrise_EL.pm (does not need any Date modules)</li>
+  <li>bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)</li>
+  <li>bugfix:  FHT mode holiday_short added (9.9, Dirk)</li>
+  <li>bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)</li>
+  <li>feature: webpgm2 output reformatted</li>
+  <li>feature: webpgm2 displaying multiple plots</li>
+  <li>feature: FHT lime-protection code discovered by Dirk (7.10)</li>
+  <li>feature: softwarebuffer for FHT devices (Dirk 17.10)</li>
+  <li>feature: FHT low temperatur warning and offset (Dirk 17.10)</li>
   <li>change:  change FHT state into warnings (Dirk 17.10)<br>
                NOTE: you'll get an undefined type state &amp; undefined type
                unknown_85 message after upgrade, this will disappear at the
                second start.</li>
-  <li>feature: Softwarebuffer code simplified (Rudi 22.11)
-  <li>bugfix:  bug #12327 doppeltes my
-  <li>bugfix:  set STATE from trigger
-  <li>bugfix:  readings state vs STATE problem (xmllist/trigger)
-  <li>change:  SUNRISE doc changed (99_SUNRISE.pm -> 99_SUNRISE_EL.pm)
-  <li>feature: support for the M232 ELV device (Boris, 25.11)
-  <li>feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)
-  <li>feature: dummy type added (contrib/99_dummy.pm)
+  <li>feature: Softwarebuffer code simplified (Rudi 22.11)</li>
+  <li>bugfix:  bug #12327 doppeltes my</li>
+  <li>bugfix:  set STATE from trigger</li>
+  <li>bugfix:  readings state vs STATE problem (xmllist/trigger)</li>
+  <li>change:  SUNRISE doc changed (99_SUNRISE.pm -> 99_SUNRISE_EL.pm)</li>
+  <li>feature: support for the M232 ELV device (Boris, 25.11)</li>
+  <li>feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)</li>
+  <li>feature: dummy type added (contrib/99_dummy.pm)</li>
+  <li>feature: added database logging facility (93_DbLog.pm) (Boris, 29.12)</li>
+  <li>feature: support for %NAME, %EVENT, %TYPE parameters in notify definition (Boris, 29.12)</li>
+  <li>bugfix:  62_EMEM.pm: energy_total_kWh renamed to energy_kWh_w, energy_kWh added (Boris, 6.1)</li>
 </ul>
 
 </ul>
@@ -70,7 +73,7 @@ Currently implemented features:<br>
   <li>reading EM1000WZ/EM1000EM data via an attached EM1010PC</li>
   <li>reading attached SCIVT devices</li>
   <li>reading attached M232 devices</li>
-  <li>logging events to files (or database), with regexp filters</li>
+  <li>logging events to files or databases, with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
       events</li>
   <li>timed commands (e.g. switching a lamp on from sunset till midnight)</li>

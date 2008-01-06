@@ -251,18 +251,22 @@ getDevStatus()
     return;
   }
   my $pulses=w($d,13);
+  my $pulses_max=w($d,15);
   my $ec=w($d,49) / 10;
   my $cur_energy=0;
   my $cur_power=0;
+  my $cur_power_max=0;
   my $sum_h_energy=0;
   my $sum_d_energy=0;
+  my $sum_w_energy=0;
   my $total_energy=0;
   my $iec=0;
 
-  printf("     Readings  (off 02): %d\n",   w($d,2));
-  printf("     Nr devs   (off 05): %d\n",   b($d,6));
-  printf("     puls/5min (off 13): %d\n",   $pulses);
-  printf("     Startblk  (off 18): %d\n",   b($d,18)+13);
+  printf("     Readings       (off  2): %d\n",   w($d,2));
+  printf("     Nr devs        (off  6): %d\n",   b($d,6));
+  printf("     puls/5min      (off 13): %d\n",   $pulses);
+  printf("     puls.max/5min  (off 15): %d\n",   $pulses_max);
+  #printf("     Startblk  (off 18): %d\n",   b($d,18)+13);
   #for (my $lauf = 19; $lauf < 45; $lauf += 2) {
   #	printf("     t wert    (off $lauf): %d\n",   w($d,$lauf));
   #}
@@ -272,6 +276,7 @@ getDevStatus()
 		# Sensor 5..
     $iec = 1000;
     $cur_power  = $pulses / 100;
+    $cur_power_max  = $pulses_max / 100;
   } else {
 	 # Sensor 1..4
     $iec = $ec;
@@ -279,16 +284,19 @@ getDevStatus()
     $cur_power = $cur_energy / 5 * 60; # 5minute interval scaled to 1h
     printf("     cur.energy(off   ): %.3f kWh\n", $cur_energy);
   }
-  $sum_h_energy= dw($d,33) / $iec; # 33= pulses this our
+  $sum_h_energy= dw($d,33) / $iec; # 33= pulses this hour
   $sum_d_energy= dw($d,37) / $iec; # 37= pulses today
-  $total_energy= dw($d,41) / $iec; # 41= pulses total
-  printf("     cur.power (off   ): %.3f kW avr.\n", $cur_power);
-  printf("         energy(off 33): %.3f kWh/h\n", $sum_h_energy);
-  printf("         energy(off 37): %.3f kWh/d\n", $sum_d_energy);
-  printf("     ttl energy(off 41): %.3f kWh (total)\n", $total_energy);
-  printf("     Alarm PA  (off 45): %d W\n", w($d,45));
-  printf("     Price CF  (off 47): %0.2f (EUR/KWH)\n",   w($d,47)/10000);
-  printf("     R/KW  EC  (off 49): %d\n",   $ec);
+  $sum_w_energy= dw($d,41) / $iec; # 41= pulses this week
+  $total_energy= dw($d, 7) / $iec; #  7= pulses total
+  printf("     cur.power      (      ): %.3f kW\n", $cur_power);
+  printf("     cur.power max  (      ): %.3f kW\n", $cur_power_max);
+  printf("     energy h       (off 33): %.3f kWh (h)\n", $sum_h_energy);
+  printf("     energy d       (off 37): %.3f kWh (d)\n", $sum_d_energy);
+  printf("     energy w       (off 41): %.3f kWh (w)\n", $sum_w_energy);
+  printf("     total energy   (off  7): %.3f kWh (total)\n", $total_energy);
+  printf("     Alarm PA       (off 45): %d W\n", w($d,45));
+  printf("     Price CF       (off 47): %0.2f EUR/kWh\n",   w($d,47)/10000);
+  printf("     R/kW  EC       (off 49): %d\n",   $ec);
   hexdump($d);
 }
 

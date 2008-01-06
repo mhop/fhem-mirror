@@ -105,6 +105,17 @@ DbLog_ParseEvent($$)
      ($type eq "M232Counter") ||
      ($type eq "EMEM")) {
   }
+  # FS20
+  elsif($type eq "FS20") {
+     @parts= split(/ /,$value);
+     my $reading= $parts[0]; if(!defined($reading)) { $reading= ""; }
+     $value= join(" ", shift @parts);
+     if($reading =~ m(^dim*%$)) { 
+	$value= substr($reading,3,length($reading)-4);
+     	$reading= "dim";
+	$unit= "%";
+     }
+  }
   # FHT 
   elsif($type eq "FHT") {
      if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
