@@ -185,3 +185,11 @@
     No more need for a webserver for basic WEB administration. For HTTPS or
     password you still need apache or the like.
     One step closer for complete fhem on the FritzBox.
+
+- Boris Sun Jan 06 13:35:00 CET 2008
+  - bugfix: 62_EMEM.pm:  changed reading energy_total_kWh to energy_kWh_w, 
+    added energy_kWh (formerly energy_total_kWh)
+  - changed em1010.pl accordingly, added em1000em doc for getDevStatus reply from 
+    device
+  - minor changes in fhem.html
+  

@@ -50,22 +50,30 @@ EMEM_GetStatus($)
   }
 
   my $pulses=w($d,13);
+  my $pulses_max= w($d,15);
   my $iec = 1000;
   my $cur_power = $pulses / 100;
+  my $cur_power_max = $pulses_max / 100;
 
   if($cur_power > 30) { # 20Amp x 3 Phase
-    my $msg = "EMEM Bogus reading: curr. power is reported to be $cur_power setting to -1";
+    my $msg = "EMEM Bogus reading: curr. power is reported to be $cur_power, setting to -1";
     Log GetLogLevel($name,2), $msg;
     #return $msg;
     $cur_power = -1.0;
   }
+  if($cur_power_max > 30) { # 20Amp x 3 Phase
+    $cur_power_max = -1.0;
+  }
 
   my %vals;
   $vals{"5min_pulses"}        = $pulses;
+  $vals{"5min_pulses_max"}    = $pulses_max;
   $vals{"energy_kWh_h"}       = sprintf("%0.3f", dw($d,33) / $iec);
-  $vals{"energy_today_kWh_d"} = sprintf("%0.3f", dw($d,37) / $iec);
-  $vals{"energy_total_kWh"}   = sprintf("%0.3f", dw($d,41) / $iec);
+  $vals{"energy_kWh_d"}	      = sprintf("%0.3f", dw($d,37) / $iec);
+  $vals{"energy_kWh_w"}       = sprintf("%0.3f", dw($d,41) / $iec);
+  $vals{"energy_kWh"}         = sprintf("%0.3f", dw($d, 7) / $iec);
   $vals{"power_kW"}           = sprintf("%.3f", $cur_power);
+  $vals{"power_kW_max"}       = sprintf("%.3f", $cur_power_max);
   $vals{"alarm_PA_W"}         = w($d,45);
   $vals{"price_CF"}           = sprintf("%.3f", w($d,47)/10000);
 
@@ -84,7 +92,7 @@ EMEM_GetStatus($)
   }
 
   $hash->{STATE} = "$cur_power kW";
-  Log GetLogLevel($name,4), "EMEM $name: $cur_power kW / $vals{energy_kWh_h} kWh/h";
+  Log GetLogLevel($name,4), "EMEM $name: $cur_power kW / $vals{energy_kWh} kWh";
 
   return $hash->{STATE};
 }

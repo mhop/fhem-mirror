@@ -376,6 +376,8 @@
   - feature: added 93_DbLog.pm, database logging facility (Boris, 30.12.)
   - feature: webfrontend/pgm2 converted to a FHEM module
   - bugfix:  99_SUNRISE_EL.pm: may schedule double events
+  - bugfix:  62_EMEM.pl, contrib/em1010.pl: correct readings for energy_kWh
+             and energy_kWh_w (Boris, 06.01.08)
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
