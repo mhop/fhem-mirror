@@ -138,15 +138,15 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.36 2007-12-31 14:43:02 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.37 2008-01-08 20:15:58 rudolfkoenig Exp $';
 
 $init_done = 0;
 
 $modules{_internal_}{ORDER} = -1;
-$modules{_internal_}{AttrList} = "configfile logfile lastinclude modpath " .
-                        "pidfilename port statefile title userattr " .
-                        "nrarchive archivedir archivecmd " .
-                        "verbose:1,2,3,4,5 version";
+$modules{_internal_}{AttrList} =
+        "archivecmd allowfrom archivedir configfile lastinclude logfile " .
+        "modpath nrarchive pidfilename port statefile title userattr " .
+        "verbose:1,2,3,4,5 version";
 
 
 my %cmds = (
@@ -295,10 +295,23 @@ while (1) {
       Log 1, "Accept failed: $!";
       next;
     }
-    my @clientsock = sockaddr_in($clientinfo[1]);
+    my ($port, $iaddr) = sockaddr_in($clientinfo[1]);
+    my $caddr = inet_ntoa($iaddr);
+    my $af = $attr{global}{allowfrom};
+    if($af) {
+      if(",$af," !~ m/,$caddr,/) {
+        my $hostname = gethostbyaddr($iaddr, AF_INET);
+        if(!$hostname || ",$af," !~ m/,$hostname,/) {
+          Log 1, "Connection refused from $caddr:$port";
+          close($clientinfo[0]);
+          next;
+        }
+      }
+    }
+
     my $fd = $clientinfo[0];
     $client{$fd}{fd}   = $fd;
-    $client{$fd}{addr} = inet_ntoa($clientsock[1]) . ":" . $clientsock[0];
+    $client{$fd}{addr} = "$caddr:$port";
     $client{$fd}{buffer} = "";
     Log 4, "Connection accepted from $client{$fd}{addr}";
   }

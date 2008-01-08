@@ -378,6 +378,7 @@
   - bugfix:  99_SUNRISE_EL.pm: may schedule double events
   - bugfix:  62_EMEM.pl, contrib/em1010.pl: correct readings for energy_kWh
              and energy_kWh_w (Boris, 06.01.08)
+  - feature: gloabl attr allowfrom, as wished by Holger (8.1.2008)
 
 - TODO
   emem -2.5kW / getDevData for emwz -1

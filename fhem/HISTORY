@@ -189,7 +189,11 @@
 - Boris Sun Jan 06 13:35:00 CET 2008
   - bugfix: 62_EMEM.pm:  changed reading energy_total_kWh to energy_kWh_w, 
     added energy_kWh (formerly energy_total_kWh)
-  - changed em1010.pl accordingly, added em1000em doc for getDevStatus reply from 
-    device
+  - changed em1010.pl accordingly, added em1000em doc for getDevStatus reply
+    from device
   - minor changes in fhem.html
-  
+
+- Rudi Tue Jan  8 21:13:08 MET 2008
+  - feature: attr global allowfrom <ip-adresses/hostnames>
+    If set, only connects from these addresses are allowed. This is to
+    "simulate" a little bit of security.
