@@ -447,8 +447,8 @@ split in multiple lines<br><br>
 	Used for at commands: skip the execution of the command the next
         time.</li><br>
 
-    <a name="softbuffer"></a>
-    <li>softbuffer<br />
+    <a name="fhtsoftbuffer"></a>
+    <li>fhtsoftbuffer<br />
         Can be applied to FHZ devices.<br />
         As the FHZ command buffer for FHT devices is limited, and commands
         are only sent to the FHT devices every 150 seconds, the hardware
@@ -459,7 +459,7 @@ split in multiple lines<br><br>
     <a name="retrycount"></a>
     <li>retrycount<br />
         Can be applied to FHT devices.<br />
-        If the <a href="#softbuffer">softbuffer</a> attribute is set, then
+        If the <a href="#fhtsoftbuffer">fhtsoftbuffer</a> attribute is set, then
         resend commands <code>retrycount</code> times if after 240 seconds
         no confirmation message is rececived from the corresponding FHT
         device.<br>
@@ -474,7 +474,7 @@ split in multiple lines<br><br>
     <code>attr lamp dummy</code><br>
     <code>attr lamp loglevel 6</code><br />
     <br>
-    <code>attr FHZ softbuffer 0 # disable the softbuffer for FHT devices</code><br />
+    <code>attr FHZ fhtsoftbuffer 0 # disable the fhtsoftbuffer for FHT devices</code><br />
     <code>attr FHZ softrepeat 300 # resend failed commands to FHT devices after 300 seconds </code><br />
   <code>attr FHZ softmaxretry 4 # stop resending failed commands to FHT devices after 4 retries.</code>  </ul>
   <br>
