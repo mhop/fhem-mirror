@@ -124,7 +124,7 @@ my %c2bset;	# Setteable values
 my %defptr;
 
 my $minFhzHardwareBuffer = 10; # min fhtbuf free bytes before sending commands
-my $retryafter = 240;          # in seconds, only when softbuffer is active
+my $retryafter = 240;          # in seconds, only when fhtsoftbuffer is active
 my $cmdcount = 0;
 
 #####################################
@@ -159,72 +159,92 @@ FHT_Initialize($)
 }
 
 
-
 sub
 FHT_Set($@)
 {
-  my ($hash, @a)	= @_;
-  my $ret		= undef;
+  my ($hash, @a) = @_;
+  my $ret;
 
-  return "\"set $a[0]\" needs two parameters" if(@a < 2);
+  return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
 
-  my $name    = $a[0];
-  my $cmd     = $a[1];
+  my $name    = shift(@a);
 
-  return "Unknown argument $cmd, choose one of " .
-		join(" ", sort {$c2bset{$a} cmp $c2bset{$b} } keys %c2bset)
-  		if(!defined($c2bset{$cmd}));
-  return "\"set $a[0]\" needs two parameters"
-            if(@a != 3 && !(@a == 2 && $nosetarg{$cmd}));
+  my $ncmd = 0;
+  my $arg = "020183" . $hash->{CODE};
+  my ($cmd, $val) = ("", "");
 
-  my $val = $a[2];
-  my $arg = "020183" . $hash->{CODE} . $c2bset{$cmd};
+  while(@a) {
+    my $lcmd = shift(@a);
 
-  if ($cmd =~ m/-temp/) {
+    $cmd .=" " if($cmd);
+    $cmd .= $lcmd;
 
-    return "Invalid temperature, use NN.N" if($val !~ m/^\d*\.?\d+$/);
-    return "Invalid temperature, must between 5.5 and 30.5"
-                        if($val < 5.5 || $val > 30.5);
-    my $a = int($val*2);
-    $arg .= sprintf("%02x", $a);
-    $ret = sprintf("Rounded temperature to %.1f", $a/2) if($a/2 != $val);
-    $val = sprintf("%.1f", $a/2);
+    return "Unknown argument $lcmd, choose one of " .
+                join(" ", sort {$c2bset{$a} cmp $c2bset{$b} } keys %c2bset)
+                if(!defined($c2bset{$lcmd}));
+    return "\"set $name\" needs a parameters"
+                if(@a < 1 && !$nosetarg{$lcmd});
+    $ncmd++;
 
-  } elsif($cmd =~ m/-from/ || $cmd =~ m/-to/) {
+    if(!$nosetarg{$lcmd}) {
+      $val = shift(@a);
+      $cmd .= " $val";
+    } else {
+      $val = undef;
+    }
 
-    return "Invalid timeformat, use HH:MM" if($val !~ m/^([0-2]\d):([0-5]\d)/);
-    my $a = ($1*6) + ($2/10);
-    $arg .= sprintf("%02x", $a);
+    $arg .= $c2bset{$lcmd};
 
-    my $nt = sprintf("%02d:%02d", $1, ($2/10)*10);
-    $ret = "Rounded time to $nt" if($nt ne $val);
-    $val = $nt;
+    if ($lcmd =~ m/-temp/) {
 
-  } elsif($cmd eq "mode") {
+      return "Invalid temperature, use NN.N" if($val !~ m/^\d*\.?\d+$/);
+      return "Invalid temperature, must between 5.5 and 30.5"
+                          if($val < 5.5 || $val > 30.5);
+      my $a = int($val*2);
+      $arg .= sprintf("%02x", $a);
+      $ret = sprintf("Rounded temperature to %.1f", $a/2) if($a/2 != $val);
+      $val = sprintf("%.1f", $a/2);
 
-    return "Invalid mode, use one of " . join(" ", sort keys %m2c)
-      if(!defined($m2c{$val}));
-    $arg .= sprintf("%02x", $m2c{$val});
+    } elsif($lcmd =~ m/-from/ || $lcmd =~ m/-to/) {
 
-  } elsif ($cmd eq "lowtemp-offset") {
+      return "Invalid timeformat, use HH:MM"
+                        if($val !~ m/^([0-2]\d):([0-5]\d)/);
+      my $a = ($1*6) + ($2/10);
+      $arg .= sprintf("%02x", $a);
 
-    return "Invalid lowtemperature-offset, must between 1 and 5"
-        if($val !~ m/^[1-5]$/);
-    $arg .= sprintf("%02x", $val);
-    $val = "$val.0";
+      my $nt = sprintf("%02d:%02d", $1, ($2/10)*10);
+      $ret = "Rounded time to $nt" if($nt ne $val);
+      $val = $nt;
 
-  } else {	# Holiday1, Holiday2
+    } elsif($lcmd eq "mode") {
 
-    $arg .= sprintf("%02x", $val) if(defined($val));
+      return "Invalid mode, use one of " . join(" ", sort keys %m2c)
+        if(!defined($m2c{$val}));
+      $arg .= sprintf("%02x", $m2c{$val});
 
+    } elsif ($lcmd eq "lowtemp-offset") {
+
+      return "Invalid lowtemperature-offset, must between 1 and 5"
+          if($val !~ m/^[1-5]$/);
+      $arg .= sprintf("%02x", $val);
+      $val = "$val.0";
+
+    } else {	# Holiday1, Holiday2
+
+      $arg .= sprintf("%02x", $val) if(defined($val));
+
+    }
   }
 
-  $val = "" if (!defined($val));
+  $val = "" if (!defined($val) || $ncmd > 1);
+
 
   my $ioname = "";
   $ioname = $hash->{IODev}->{NAME} if($hash->{IODev});
   if($attr{$ioname} && $attr{$ioname}{fhtsoftbuffer}) {
-
+    if($ncmd > 1) {
+      return "Cannot accept multiple FHT commands with fhtsoftbuffer enabled";
+    }
     my $io = $hash->{IODev};
     my %h = (HASH => $hash, CMD => $cmd, VAL => $val, ARG => $arg);
 
