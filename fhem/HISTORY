@@ -197,3 +197,15 @@
   - feature: attr global allowfrom <ip-adresses/hostnames>
     If set, only connects from these addresses are allowed. This is to
     "simulate" a little bit of security.
+
+- Rudi Sat Jan 19 18:04:12 MET 2008
+  - FHT: multiple commands
+    Up to 8 commands in one set, these are transmitted at once to the FHT
+  - softbuffer changes
+    minfhtbuffer attribute, as otherwise nearly everything will be sent to
+    the FHT buffer, so ordering won't take effect.
+  - cmd rename
+    repeat1,repeat2. refreshvalues changed to refresh and init. refreshvalues
+    won't be advertized but still replaced to "refresh 255 init 255"
+  - extensive documentation update for the FHT
+
