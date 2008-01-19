@@ -448,22 +448,34 @@ split in multiple lines<br><br>
         time.</li><br>
 
     <a name="fhtsoftbuffer"></a>
-    <li>fhtsoftbuffer<br />
-        Can be applied to FHZ devices.<br />
-        As the FHZ command buffer for FHT devices is limited, and commands
-        are only sent to the FHT devices every 150 seconds, the hardware
-        buffer may overflow and FHT commands get lost. Setting this attribute
-        to 1 implements an "unlimited" software buffer<br>
+    <li>fhtsoftbuffer<br/>
+        Can be applied to FHZ devices.<br/>
+        As the FHZ command buffer for FHT devices is limited (see fhtbuf),
+        and commands are only sent to the FHT device every 120 seconds,
+        the hardware buffer may overflow and FHT commands get lost.
+        Setting this attribute implements an "unlimited" software buffer<br>
         Default is disabled (i.e. not set or set to 0).</li><br>
 
     <a name="retrycount"></a>
-    <li>retrycount<br />
-        Can be applied to FHT devices.<br />
+    <li>retrycount<br/>
+        Can be applied to FHT devices.<br/>
         If the <a href="#fhtsoftbuffer">fhtsoftbuffer</a> attribute is set, then
         resend commands <code>retrycount</code> times if after 240 seconds
         no confirmation message is rececived from the corresponding FHT
         device.<br>
         Default is 3.</li><br>
+
+    <a name="minfhtbuffer"></a>
+    <li>minfhtbuffer<br/>
+        Can be applied to FHT devices.<br/>
+        FHEM wont send commands to the FHZ if its fhtbuffer is below
+        this value, default is 0. If this value is low, then the ordering of
+        fht commands (see the note in the FHT section of <a href="#set">set</a>)
+        has little effect, as only commands in the softbuffer can be
+        prioritized. The maximum value should be 7 below the hardware maximum
+        (see fhtbuf).
+
+        </li><br>
   </li>
   </ul>
 
@@ -472,11 +484,11 @@ split in multiple lines<br><br>
     <code>attr global verbose 3</code><br>
     <code>attr lamp room kitchen</code><br>
     <code>attr lamp dummy</code><br>
-    <code>attr lamp loglevel 6</code><br />
+    <code>attr lamp loglevel 6</code><br/>
     <br>
-    <code>attr FHZ fhtsoftbuffer 0 # disable the fhtsoftbuffer for FHT devices</code><br />
-    <code>attr FHZ softrepeat 300 # resend failed commands to FHT devices after 300 seconds </code><br />
-  <code>attr FHZ softmaxretry 4 # stop resending failed commands to FHT devices after 4 retries.</code>  </ul>
+    <code>attr FHZ fhtsoftbuffer 0 # disable the fhtsoftbuffer</code><br/>
+    <code>attr FHZ retrycount 4    # resend commands to FHT devices at most 4 times.</code>
+  </ul>
   <br>
 
   Notes:<br>
@@ -617,7 +629,7 @@ split in multiple lines<br><br>
       <code>define wz FHT 3232</code><br>
     </ul>
     <br>
-    See the section <a href="#set">set</a> for more.
+    See the FHT section in <a href="#set">set</a> for more.
   </ul>
   <br>
 
@@ -1229,11 +1241,17 @@ split in multiple lines<br><br>
       <li>The answer for a command is also displayed by <code>list FHZ</code>
       </li>
       <li>
-	  The FHZ1000PC has a message buffer for the FHT, as it
-	  only can send messages to it every 2 (or so) minutes. If the buffer
-	  is full, then newly issued ones will be dropped. <code>fhtbuf</code>
-	  returns the free memory in this buffer (in hex), my maximum is 2c (42
-	  bytes).</code></li>
+          The FHZ1x00PC has a message buffer for the FHT (see the FHT entry in
+          the <a href="#set">set</a> section). If the buffer is full, then newly
+          issued commands will be dropped, if the attribute <a
+          href="#fhtsoftbuffer">fhtsoftbuffer</a> is not set.
+          <code>fhtbuf</code> returns the free memory in this buffer (in hex),
+          an empty buffer in the FHZ1000 is 2c (42 bytes), in the FHZ1300 is 4a
+          (74 bytes). A message occupies 3 + 2x(number of FHT commands) bytes,
+          this is the second reason why sending multiple FHT commands with one
+          <a href="#set"> set</a> is a good idea. The first reason is, that
+          these FHT commands are sent at once to the FHT.
+          </li>
     </ul>
   </ul>
 
@@ -1395,8 +1413,8 @@ split in multiple lines<br><br>
     2006-11-02 04:13:27   wed-from1       06:00
     2006-11-02 04:13:28   wed-to1         23:00
     2006-11-02 04:13:36   windowopen-temp 12.0 (Celsius)
-Send buffer:<br />    2007-10-19 00:31:24   desired-temp    22.5
-    2007-10-19 00:33:20   mode            auto<br />
+Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
+    2007-10-19 00:33:20   mode            auto<br/>
   </code></pre>
 </ul>
 
@@ -1617,56 +1635,73 @@ Send buffer:<br />    2007-10-19 00:31:24   desired-temp    22.5
     <br><br>
     where <code>value</code> is one of:<br>
     <pre>
-    mon-from1
-    mon-to1
-    mon-from2
-    mon-to2
-    tue-from1
-    tue-to1
-    tue-from2
-    tue-to2
-    wed-from1
-    wed-to1
-    wed-from2
-    wed-to2
-    thu-from1
-    thu-to1
-    thu-from2
-    thu-to2
-    fri-from1
-    fri-to1
-    fri-from2
-    fri-to2
-    sat-from1
-    sat-to1
-    sat-from2
-    sat-to2
-    sun-from1
-    sun-to1
-    sun-from2
-    sun-to2
-    mode
-    holiday1
-    holiday2
-    desired-temp
-    day-temp
-    night-temp
-    year
-    month
-    day
-    hour
-    minute
-    refreshvalues
-    lowtemp-offset
+      desired-temp
+      day-temp night-temp
+      refresh
+      init
+      mode  
+      holiday1 holiday2      # Not verified
+      manu-temp              # No clue what it does.
+      year month day hour minute
+      lowtemp-offset         # Alarm-Temp.-Differenz
+      windowopen-temp
+      mon-from1 mon-to1 mon-from2 mon-to2
+      tue-from1 tue-to1 tue-from2 tue-to2
+      wed-from1 wed-to1 wed-from2 wed-to2
+      thu-from1 thu-to1 thu-from2 thu-to2
+      fri-from1 fri-to1 fri-from2 fri-to2
+      sat-from1 sat-to1 sat-from2 sat-to2
+      sun-from1 sun-to1 sun-from2 sun-to2
 </pre>
+
+    Examples:
+    <ul>
+      <code>set wz desired-temp 22.5</code><br>
+      <code>set fl desired-temp 20.5 day-temp 19.0 night-temp 16.0</code><br>
+    </ul>
+    <br>
+
     Notes:
     <ul>
+      <li>Following events are reported (more or less regularly) from each FHT
+          device: <code>measured-temp actuator lime-protection synctime
+                  actuator1...actuator8 warnings</code><br>
+          You can use these strings for <a href="#notify">notify</a> or
+          <a href="#FileLog">FileLog</a> definitions.
+          <ul>
+            <li>actuator is only sent, if it one of them is open
+                (normally not during the summer time).</li>
+            <li>actuator1..actuator8 is only sent, if the actuator offset
+                for this actuator is not 0</li>
+            <li>lime-protection is sent when the lime-protection is running.
+                </li>
+            <li>I don't know when the synctime is sent.
+                </li>
+            <li>warnings can contain following strings:
+                none, Battery low,Temperature too low, Window open,
+                Fault on window sensor
+                </li>
+          </ul>
+          <br>
+
+      <li>The FHT is very economical (or lazy), it accepts one message from the
+          FHZ1x00 every 2 minutes (or so). Don't be surprized if your command
+	  is only accepted 10 minutes later by the device. FHT commands are
+          buffered in the FHZ1x00 till they are sent to the FHT, see the related
+	  <code>fhtbuf</code> entry in the <code><a href="#get">get</a></code>
+	  section.<br>
+          You can send up to 8 commands in one message at once to the FHT if
+          you specify them all as arguments to the same set command, see the
+          example above.<br><br>
+
       <li>All <code>*-temp</code> values need a temperature
-          as argument, which will be rounded to 0.5 Celsius.<br />
-          Temperature values
-must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.5 set the actuator to ON </li>
+          as argument, which will be rounded to 0.5 Celsius.<br/>
+          Temperature values must  between 5.5 and 30.5 Celsius. Value 5.5 set
+          the actuator to OFF, value 30.5 set the actuator to ON<br><br>
+
       <li><code>mode</code> is one of <code>auto, manual, holiday or
-          holiday_short.<br>If the mode is holiday, then
+          holiday_short.</code><br>
+          If the mode is holiday, then
             <ul>
               <li>holiday1 sets the end-day of the holiday</li>
               <li>holiday2 sets the end-month of the holiday</li>
@@ -1676,30 +1711,50 @@ must  between 5.5 and 30.5 Celsius. Value 5.5 set the actuator to OFF, value 30.
               <li>holiday1 sets the time, in 10-minute steps</li>
               <li>holiday2 sets number of days from now on.</li>
             </ul>
-      </li>
+          <br>
+
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
 	  spec as argument in the HH:MM format. They define the periods, where
 	  the day-temp is valid. The minute (MM) will be rounded to 10, and
-	  24:00 means off.</li>
-      <li><code>refreshvalues</code> does not need an argument, but sends a
-          plea to the FHT device, so it may send its parameters. If you want
-	  to get these values regularly, then schedule:<br>
-	  <code>at +*01:00:00 set &lt;name&gt; refreshvalues</code></li>
+	  24:00 means off.
+          <br><br>
+
+      <li>The <code>refresh</code> parameter should be 255. It requests
+          the FHT to resend all parameter values. As the FHT stops sending
+          the values every 5-10 days, it is adviseable to schedule following
+          command regularly:<br>
+	  <code>define fht_refresh at +*06:00:00
+                set &lt;name&gt; refresh 255 init 255</code>
+          <br>
+          For the technically inclined: The argument 240 (0xf0) requests the
+          actuator, fri,sat,sun,measured-temp and warnings values, the argument
+          15 (0x0f) the actuator,mon,tue,wed and thu values and all other
+          arguments does not seem to work.
+          <br><br>
+
       <li><code>lowtemp-offset</code> need a temperature
-          as argument, which will be rounded to 1.0 Celsius.<br />
-          Temperature values must between 1.0 and 5.0 Celsius.<br />
-          The 
-          <code>lowtemp-offset</code> is used for temperature warning (to low temperature in a room within more than 1,5 hours after the last desired-temp changing). The low temperatur warning it relates to the actual desired temperature.<br>
-      </li>
-      <li>The FHT is very economical (or lazy), it receives messages from the
-          FHZ1x00 every 2 minutes (or so). Don't be surprized if your command
-	  is accepted 10 minutes later by the device. See the related
-	  <code>fhtbuf</code> entry in the <code><a href="#get">get</a></code>
-	  section.<br />
-      <li>For FHT devices, FHEM have an internal software buffer for sending commands step by step. This buffer should prevent lost commands. In case of transmission failures FHEM tries to resend commands. You can see the queued unsent  and the failed commands with the <a href="#list">list</a> command. If a command don't picked up from a FHT device within a <a href="#softrepeat">given time</a>, the command sends again until <a href="#softmaxretry">softmaxretry</a> reached. <br />
-      <li>To prevent long time waiting for sending important command, there is a priority list. Commands send in this importance:<br />
-<code>desired-temp, mode, refreshvalues,holiday1,holiday2,day-temp,night-temp, [all other commands]</code> <br /> 
-        <br />      
+          as argument, which will be rounded to 1.0 Celsius.<br/>
+          Temperature values must between 1.0 and 5.0 Celsius.<br/>
+          The <code>lowtemp-offset</code> is used for temperature warning
+          (to low temperature in a room within more than 1,5 hours after the
+          last desired-temp changing). The low temperatur warning it relates to
+          the actual desired temperature.
+          <br><br>
+
+      <li>FHEM optionally has an internal software buffer for FHT devices.
+          This buffer should prevent transmission errors. If there is no
+          confirmation for a given period, FHEM resends the command. You can
+          see the queued commands with <a href="#list">list</a>
+          &lt;fht-device&gt;.
+          See the <a href="#fhtsoftbuffer">fhtsoftbuffer</a>,
+          <a href="#retrycount">retrycount</a> and
+          <a href="#minfhtbuffer">minfhtbuffer</a> attributes for details.
+          <br><br>
+
+      <li>If a buffer is still in the softbuffer, it will be sent in the
+          following order:<br/> <code>desired-temp,mode,refresh,holiday1,holiday2,day-temp,night-temp, [all other commands]</code>
+          <br><br>
+
     </ul>
   </ul>
 
