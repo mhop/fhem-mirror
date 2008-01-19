@@ -1732,14 +1732,11 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
           arguments does not seem to work.
           <br><br>
 
-      <li><code>lowtemp-offset</code> need a temperature
-          as argument, which will be rounded to 1.0 Celsius.<br/>
-          Temperature values must between 1.0 and 5.0 Celsius.<br/>
-          The <code>lowtemp-offset</code> is used for temperature warning
-          (to low temperature in a room within more than 1,5 hours after the
-          last desired-temp changing). The low temperatur warning it relates to
-          the actual desired temperature.
-          <br><br>
+      <li><code>lowtemp-offset</code> needs a temperature as argument, valid
+          values must be between 1.0 and 5.0 Celsius.<br/> It will trigger a
+          warning if <code>desired-temp - measured-temp &gt;
+          lowtemp-offset</code> in a room after 1.5 hours after the last
+          desired-temp change.  <br><br>
 
       <li>FHEM optionally has an internal software buffer for FHT devices.
           This buffer should prevent transmission errors. If there is no
