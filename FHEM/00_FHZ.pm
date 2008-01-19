@@ -142,7 +142,7 @@ FHZ_Get($@)
 
   my $v = join(" ", @a);
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,2), "FHZ get $name $v";
+  Log GetLogLevel($name,2), "FHZ get $v";
 
   FHZ_Write($hash, $fn, $arg) if(!IsDummy("FHZ"));
 

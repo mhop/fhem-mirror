@@ -6,11 +6,15 @@ use warnings;
 
 sub doSoftBuffer($);
 sub softBufferTimer($);
-sub sendCommand($$$$);
+sub getFhtMin($);
+sub getFhtBuffer($);
 
 my %codes = (
   "0000.6" => "actuator",	
+  "00002a" => "lime-protection",
   "00002c" => "synctime",		# Not verified
+  "0000aa" => "code_0000aa",
+  "0000ba" => "code_0000ba",
   "0100.6" => "actuator1",		# Not verified (1-8)
   "0200.6" => "actuator2",
   "0300.6" => "actuator3",
@@ -19,6 +23,7 @@ my %codes = (
   "0600.6" => "actuator6",
   "0700.6" => "actuator7",
   "0800.6" => "actuator8",
+
   "140069" => "mon-from1",
   "150069" => "mon-to1",
   "160069" => "mon-from2",
@@ -47,33 +52,34 @@ my %codes = (
   "2d0069" => "sun-to1",
   "2e0069" => "sun-from2",
   "2f0069" => "sun-to2",
+
   "3e0069" => "mode",
   "3f0069" => "holiday1",		# Not verified
   "400069" => "holiday2",		# Not verified
   "410069" => "desired-temp",
-  "XX0069" => "measured-temp",		# sum of next. two, never "really" sent
+  "XX0069" => "measured-temp",		# sum of next. two, never really sent
   "420069" => "measured-low",
   "430069" => "measured-high",
+  "430079" => "code_430079",
   "440069" => "warnings",
-  "450069" => "manu-temp",		# Manuelle Temperatur keine ahnung was das bewirkt
+  "440079" => "code_440079",
+  "450069" => "manu-temp",		# No clue what it does.
+
+  "..0067" => "repeat1",                # repeat the last data (?)
+  "..0077" => "repeat2",
+
   "600069" => "year",
   "610069" => "month",
   "620069" => "day",
   "630069" => "hour",
   "640069" => "minute",
-  "650069" => "init",
+  "650069" => "refresh",
+  "660069" => "init",                   # ?
+
   "820069" => "day-temp",
   "840069" => "night-temp",
-  "850069" => "lowtemp-offset",	# Alarm-Temp.-Differenz
+  "850069" => "lowtemp-offset",         # Alarm-Temp.-Differenz
   "8a0069" => "windowopen-temp",
-  "00002a" => "lime-protection",
-  "0000aa" => "code_0000aa",
-  "0000ba" => "code_0000ba",
-  "430079" => "code_430079",
-  "440079" => "code_440079",
-  "4b0067" => "code_4b0067",
-  "4b0077" => "code_4b0077",
-  "7e0067" => "code_7e0067",
 );
 
 my %cantset = (
@@ -91,26 +97,23 @@ my %cantset = (
   "measured-high" => 1,
   "measured-low"  => 1,
   "warnings"       => 1,
-  "init"          => 1,
   "lime-protection"=>1,
+  "repeat1"       => 1,
+  "repeat2"       => 1,
 
   "code_0000aa"   => 1,
   "code_0000ba"   => 1,
   "code_430079"   => 1,
   "code_440079"   => 1,
-  "code_4b0067"   => 1,
-  "code_4b0077"   => 1,
-  "code_7e0067"   => 1,
 );
 
 my %nosetarg = (
-  "refreshvalues" => 1,
 );
 
 my %priority = (
   "desired-temp"=> 1,	
   "mode"	=> 2,	
-  "refreshvalues"=> 3,	
+  "refresh"     => 3,	
   "holiday1"	=> 4,	
   "holiday2"	=> 5,	
   "day-temp"	=> 6,	
@@ -123,7 +126,7 @@ my %c2b;	# command->button hash (reverse of codes)
 my %c2bset;	# Setteable values
 my %defptr;
 
-my $minFhzHardwareBuffer = 10; # min fhtbuf free bytes before sending commands
+my $defmin = 0;                # min fhtbuf free bytes before sending commands
 my $retryafter = 240;          # in seconds, only when fhtsoftbuffer is active
 my $cmdcount = 0;
 
@@ -141,7 +144,6 @@ FHT_Initialize($)
   foreach my $k (keys %c2m) {
     $m2c{$c2m{$k}} = $k;
   }
-  $c2bset{refreshvalues} = "65ff66ff";
 
 #                        810c0426 0909a001 1111 1600
 #                        810c04b3 0909a001 1111 44006900
@@ -155,7 +157,7 @@ FHT_Initialize($)
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "do_not_notify:0,1 model;fht80b dummy:0,1 " .
-                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount";
+                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer";
 }
 
 
@@ -167,35 +169,39 @@ FHT_Set($@)
 
   return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
 
-  my $name    = shift(@a);
+  my $name = shift(@a);
+  # Backward compatibility, replace refreshvalues with refresh and init.
+  for(my $i = 0; $i < @a; $i++) {
+    splice(@a,$i,1,("refresh","255","init","255"))
+        if($a[$i] eq "refreshvalues");
+  }
 
   my $ncmd = 0;
   my $arg = "020183" . $hash->{CODE};
-  my ($cmd, $val) = ("", "");
+  my ($cmd, $allcmd, $val) = ("", "", "");
 
   while(@a) {
-    my $lcmd = shift(@a);
+    $cmd = shift(@a);
 
-    $cmd .=" " if($cmd);
-    $cmd .= $lcmd;
+    $allcmd .=" " if($allcmd);
+    $allcmd .= $cmd;
 
-    return "Unknown argument $lcmd, choose one of " .
+    return "Unknown argument $cmd, choose one of " .
                 join(" ", sort {$c2bset{$a} cmp $c2bset{$b} } keys %c2bset)
-                if(!defined($c2bset{$lcmd}));
+                if(!defined($c2bset{$cmd}));
     return "\"set $name\" needs a parameters"
-                if(@a < 1 && !$nosetarg{$lcmd});
+                if(@a < 1 && !$nosetarg{$cmd});
     $ncmd++;
 
-    if(!$nosetarg{$lcmd}) {
-      $val = shift(@a);
-      $cmd .= " $val";
-    } else {
+    if($nosetarg{$cmd}) {
       $val = undef;
+    } else {
+      $val = shift(@a);
     }
 
-    $arg .= $c2bset{$lcmd};
+    $arg .= $c2bset{$cmd};
 
-    if ($lcmd =~ m/-temp/) {
+    if ($cmd =~ m/-temp/) {
 
       return "Invalid temperature, use NN.N" if($val !~ m/^\d*\.?\d+$/);
       return "Invalid temperature, must between 5.5 and 30.5"
@@ -205,7 +211,7 @@ FHT_Set($@)
       $ret = sprintf("Rounded temperature to %.1f", $a/2) if($a/2 != $val);
       $val = sprintf("%.1f", $a/2);
 
-    } elsif($lcmd =~ m/-from/ || $lcmd =~ m/-to/) {
+    } elsif($cmd =~ m/-from/ || $cmd =~ m/-to/) {
 
       return "Invalid timeformat, use HH:MM"
                         if($val !~ m/^([0-2]\d):([0-5]\d)/);
@@ -216,13 +222,13 @@ FHT_Set($@)
       $ret = "Rounded time to $nt" if($nt ne $val);
       $val = $nt;
 
-    } elsif($lcmd eq "mode") {
+    } elsif($cmd eq "mode") {
 
       return "Invalid mode, use one of " . join(" ", sort keys %m2c)
         if(!defined($m2c{$val}));
       $arg .= sprintf("%02x", $m2c{$val});
 
-    } elsif ($lcmd eq "lowtemp-offset") {
+    } elsif ($cmd eq "lowtemp-offset") {
 
       return "Invalid lowtemperature-offset, must between 1 and 5"
           if($val !~ m/^[1-5]$/);
@@ -234,19 +240,17 @@ FHT_Set($@)
       $arg .= sprintf("%02x", $val) if(defined($val));
 
     }
+    $allcmd .= " $val" if($val);
   }
 
-  $val = "" if (!defined($val) || $ncmd > 1);
-
+  return "Too many commands specified, an FHT only supports up to 8"
+        if($ncmd > 8);
 
   my $ioname = "";
   $ioname = $hash->{IODev}->{NAME} if($hash->{IODev});
   if($attr{$ioname} && $attr{$ioname}{fhtsoftbuffer}) {
-    if($ncmd > 1) {
-      return "Cannot accept multiple FHT commands with fhtsoftbuffer enabled";
-    }
     my $io = $hash->{IODev};
-    my %h = (HASH => $hash, CMD => $cmd, VAL => $val, ARG => $arg);
+    my %h = (HASH => $hash, CMD => $allcmd, ARG => $arg);
 
     my $prio = $priority{$cmd};
     $prio = "9" if(!$prio);
@@ -257,7 +261,8 @@ FHT_Set($@)
 
   } else {
 
-    sendCommand($hash, $cmd, $val, $arg);
+    IOWrite($hash, "04", $arg) if(!IsDummy($name));
+    Log GetLogLevel($name,2), "FHT set $name $allcmd";
 
   }
 
@@ -297,7 +302,7 @@ FHT_Define($$)
   AssignIoPort($hash);
 
   Log GetLogLevel($a[0],2),"Asking the FHT device $a[0]/$a[2] to send its data";
-  FHT_Set($hash, ($a[0], "refreshvalues"));
+  FHT_Set($hash, ($a[0], "init", "255", "refresh", "255"));
 
   return undef;
 }
@@ -430,17 +435,18 @@ FHT_Parse($$)
   Log 4, "FHT $name $type: $val";
 
   ################################
-  # Softbuffer: deleted confirmed commands
+  # Softbuffer: delete confirmed commands
   if($confirm) {
     my $found; 
     my $io = $def->{IODev};
     foreach my $key (sort keys %{$io->{SOFTBUFFER}}) {
       my $h = $io->{SOFTBUFFER}{$key};
       my $hcmd = $h->{CMD};
-      $hcmd = "init" if($hcmd eq "refreshvalues");
-      Log 5, "FHT check $h->{HASH}->{NAME} eq $name && $hcmd eq $type";
-      if($h->{HASH}->{NAME} eq $name && $hcmd eq $type) {
+      my $hname = $h->{HASH}->{NAME};
+      Log 4, "FHT softbuffer check: $hname / $hcmd";
+      if($hname eq $name && $hcmd =~ m/^$type $val/) {
         $found = $key;
+        Log 4, "FHT softbuffer found";
         last;
       }
     }
@@ -471,17 +477,21 @@ doSoftBuffer($)
       next if($now-$h->{SENDTIME} < $retryafter);
       my $retry = $attr{$name}{retrycount};
       if($h->{NSENT} > $retry) {
-        Log GetLogLevel($name,2), "$name set $h->{CMD} $h->{VAL}: ".
+        Log GetLogLevel($name,2), "$name set $h->{CMD}: ".
                           "no confirmation after $h->{NSENT} tries, giving up";
         delete($io->{SOFTBUFFER}{$key});
         next;
       }
     }
 
-    $fhzbuflen = getFhzBuffer($io) if($fhzbuflen == -999);
-    next if($fhzbuflen < $minFhzHardwareBuffer);
-    sendCommand($h->{HASH}, $h->{CMD}, $h->{VAL}, $h->{ARG});
-    $fhzbuflen -= ($h->{CMD} eq "refreshvalues" ? 7 : 5);
+    $fhzbuflen = getFhtBuffer($io) if($fhzbuflen == -999);
+    my $arglen = length($h->{ARG})/2 - 2;       # Length in bytes
+
+    next if($fhzbuflen < $arglen || $fhzbuflen < getFhtMin($io));
+    IOWrite($h->{HASH}, "04", $h->{ARG}) if(!IsDummy($name));
+    Log GetLogLevel($name,2), "FHT set $name $h->{CMD}";
+
+    $fhzbuflen -= $arglen;
     $h->{SENDTIME} = $now;
     $h->{NSENT}++;
 
@@ -503,50 +513,35 @@ softBufferTimer($)
   doSoftBuffer($io);
 }
 
+#####################################
+sub
+getFhtMin($)
+{
+  my ($io) = @_;
+  my $ioname = $io->{NAME};
+  return $attr{$ioname}{minfhtbuffer}
+        if($attr{$ioname} && $attr{$ioname}{minfhtbuffer});
+  return $defmin;
+}
 
 #####################################
 # get the FHZ hardwarebuffer without logentry as decimal value
 sub
-getFhzBuffer($)
+getFhtBuffer($)
 {
   my ($io) = @_;
   my $count = 0;
 
-  return $minFhzHardwareBuffer if(IsDummy($io->{NAME}));
+  return getFhtMin($io) if(IsDummy($io->{NAME}));
 
   for(;;) {
     FHZ_Write($io, "04", "c90185");
     my $msg = FHZ_ReadAnswer($io, "fhtbuf");
-    Log 5, "getFhzBuffer: $count $msg";
+    Log 5, "getFhtBuffer: $count $msg";
   
     return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9A-F]+$/i);
     return 0 if($count++ > 5);
   }
-}
-
-#####################################
-# Send FHZ command
-sub
-sendCommand($$$$)
-{
-  my ($hash, $cmd, $val, $arg) = @_;
-  my $name = $hash->{NAME};
-
-  if($cmd eq "refreshvalues") {
-
-    # This is special. Without the sleep the next FHT won't send its data
-    if(!IsDummy($name)) {
-      my $havefhz = ($hash->{IODev} && defined($hash->{IODev}->{FD}));
-      IOWrite($hash, "04", $arg);
-      sleep(1) if($havefhz);
-    }
-
-  } else {
-
-    IOWrite($hash, "04", $arg) if(!IsDummy($name));
-
-  }
-  Log GetLogLevel($name,2), "FHT set $name $cmd $val";
 }
 
 1;

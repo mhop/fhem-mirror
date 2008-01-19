@@ -138,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.37 2008-01-08 20:15:58 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.38 2008-01-19 19:02:30 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1388,11 +1388,11 @@ CommandAttr($$)
 {
   my ($cl, $param) = @_;
   my $ret = undef;
+  my @a;
+  @a = split(" ", $param, 3) if($param);
   
-  my @a = split(" ", $param, 3);
   return "Usage: attr <name> <attrname> [<attrvalue>]\n" .
-        "$namedef" if(@a < 2);
-
+        "$namedef" if(@a && @a < 2);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
