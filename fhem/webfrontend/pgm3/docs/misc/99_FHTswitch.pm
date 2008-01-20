@@ -74,7 +74,7 @@ MyFHTswitch($)
 	fhz "$fhtorder";
 	$fhtorder="set $fht windowopen-temp $desiredtemp[0] ";
 	fhz "$fhtorder";
-	fhz "set $fht refreshvalues";
+	fhz "set $fht report1 255 report2 255";
 }
 
 1;
