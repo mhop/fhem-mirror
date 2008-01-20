@@ -10,19 +10,15 @@ sub getFhtMin($);
 sub getFhtBuffer($);
 
 my %codes = (
-  "0000.6" => "actuator",	
-  "00002a" => "lime-protection",
-  "00002c" => "synctime",		# Not verified
-  "0000aa" => "code_0000aa",
-  "0000ba" => "code_0000ba",
-  "0100.6" => "actuator1",		# Not verified (1-8)
-  "0200.6" => "actuator2",
-  "0300.6" => "actuator3",
-  "0400.6" => "actuator4",
-  "0500.6" => "actuator5",
-  "0600.6" => "actuator6",
-  "0700.6" => "actuator7",
-  "0800.6" => "actuator8",
+  "0000.." => "actuator",
+  "0100.." => "actuator1",
+  "0200.." => "actuator2",
+  "0300.." => "actuator3",
+  "0400.." => "actuator4",
+  "0500.." => "actuator5",
+  "0600.." => "actuator6",
+  "0700.." => "actuator7",
+  "0800.." => "actuator8",
 
   "140069" => "mon-from1",
   "150069" => "mon-to1",
@@ -60,9 +56,7 @@ my %codes = (
   "XX0069" => "measured-temp",		# sum of next. two, never really sent
   "420069" => "measured-low",
   "430069" => "measured-high",
-  "430079" => "code_430079",
   "440069" => "warnings",
-  "440079" => "code_440079",
   "450069" => "manu-temp",		# No clue what it does.
 
   "..0067" => "repeat1",                # repeat the last data (?)
@@ -73,8 +67,8 @@ my %codes = (
   "620069" => "day",
   "630069" => "hour",
   "640069" => "minute",
-  "650069" => "refresh",
-  "660069" => "init",                   # ?
+  "650069" => "report1",
+  "660069" => "report2",
 
   "820069" => "day-temp",
   "840069" => "night-temp",
@@ -83,7 +77,7 @@ my %codes = (
 );
 
 my %cantset = (
-  "actuator"      => 1,
+  "actuators"     => 1,
   "actuator1"     => 1,
   "actuator2"     => 1,
   "actuator3"     => 1,
@@ -92,28 +86,20 @@ my %cantset = (
   "actuator6"     => 1,
   "actuator7"     => 1,
   "actuator8"     => 1,
-  "synctime"      => 1,
   "measured-temp" => 1,
   "measured-high" => 1,
   "measured-low"  => 1,
-  "warnings"       => 1,
-  "lime-protection"=>1,
+  "warnings"      => 1,
   "repeat1"       => 1,
   "repeat2"       => 1,
-
-  "code_0000aa"   => 1,
-  "code_0000ba"   => 1,
-  "code_430079"   => 1,
-  "code_440079"   => 1,
 );
 
-my %nosetarg = (
-);
 
 my %priority = (
   "desired-temp"=> 1,	
   "mode"	=> 2,	
-  "refresh"     => 3,	
+  "report1"    => 3,	
+  "report2"    => 3,
   "holiday1"	=> 4,	
   "holiday2"	=> 5,	
   "day-temp"	=> 6,	
@@ -165,14 +151,14 @@ sub
 FHT_Set($@)
 {
   my ($hash, @a) = @_;
-  my $ret;
+  my $ret = "";
 
   return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
 
   my $name = shift(@a);
-  # Backward compatibility, replace refreshvalues with refresh and init.
+  # Backward compatibility, replace refreshvalues with report1 and report2.
   for(my $i = 0; $i < @a; $i++) {
-    splice(@a,$i,1,("refresh","255","init","255"))
+    splice(@a,$i,1,("report1","255","report2","255"))
         if($a[$i] eq "refreshvalues");
   }
 
@@ -186,19 +172,12 @@ FHT_Set($@)
     $allcmd .=" " if($allcmd);
     $allcmd .= $cmd;
 
-    return "Unknown argument $cmd, choose one of " .
-                join(" ", sort {$c2bset{$a} cmp $c2bset{$b} } keys %c2bset)
+    return "Unknown argument $cmd, choose one of " . join(" ", sort keys %c2bset)
                 if(!defined($c2bset{$cmd}));
-    return "\"set $name\" needs a parameters"
-                if(@a < 1 && !$nosetarg{$cmd});
+    return "\"set $name\" needs a parameter"
+                if(@a < 1);
     $ncmd++;
-
-    if($nosetarg{$cmd}) {
-      $val = undef;
-    } else {
-      $val = shift(@a);
-    }
-
+    $val = shift(@a);
     $arg .= $c2bset{$cmd};
 
     if ($cmd =~ m/-temp/) {
@@ -208,7 +187,7 @@ FHT_Set($@)
                           if($val < 5.5 || $val > 30.5);
       my $a = int($val*2);
       $arg .= sprintf("%02x", $a);
-      $ret = sprintf("Rounded temperature to %.1f", $a/2) if($a/2 != $val);
+      $ret .= sprintf("Rounded temperature to %.1f", $a/2) if($a/2 != $val);
       $val = sprintf("%.1f", $a/2);
 
     } elsif($cmd =~ m/-from/ || $cmd =~ m/-to/) {
@@ -217,9 +196,8 @@ FHT_Set($@)
                         if($val !~ m/^([0-2]\d):([0-5]\d)/);
       my $a = ($1*6) + ($2/10);
       $arg .= sprintf("%02x", $a);
-
-      my $nt = sprintf("%02d:%02d", $1, ($2/10)*10);
-      $ret = "Rounded time to $nt" if($nt ne $val);
+      my $nt = sprintf("%02d:%02d", $1, int($2/10)*10);
+      $ret .= "Rounded $cmd to $nt" if($nt ne $val);
       $val = $nt;
 
     } elsif($cmd eq "mode") {
@@ -237,6 +215,8 @@ FHT_Set($@)
 
     } else {	# Holiday1, Holiday2
 
+      return "Invalid argument, must be between 1 and 255"
+          if($val !~ m/^\d+$/ || $val < 0 || $val > 255);
       $arg .= sprintf("%02x", $val) if(defined($val));
 
     }
@@ -302,7 +282,7 @@ FHT_Define($$)
   AssignIoPort($hash);
 
   Log GetLogLevel($a[0],2),"Asking the FHT device $a[0]/$a[2] to send its data";
-  FHT_Set($hash, ($a[0], "init", "255", "refresh", "255"));
+  FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
 
   return undef;
 }
@@ -344,26 +324,27 @@ FHT_Parse($$)
     return $name;
   }
 
-  if(!$val) {
+  my $scmd = substr($cde, 0, 2);
+  if(!$val || $scmd eq "65" || $scmd eq "66") {
     # This is a confirmation message. We reformat it so that
     # it looks like a real message, and let the rest parse it
     Log 4, "FHT $name confirmation: $cde";
     $val = substr($cde, 2, 2);
-    $cde = substr($cde, 0, 2) . "0069";
+    $cde = $scmd . "0069";
     $confirm = 1;
   }
 
-  my $type;
+  my $cmd;
   foreach my $c (keys %codes) {
     if($cde =~ m/$c/) {
-      $type = $codes{$c};
+      $cmd = $codes{$c};
       last;
     }
   }
 
-  $val =  hex($val);
+  $val = hex($val);
 
-  if(!$type) {
+  if(!$cmd) {
     Log 4, "FHT $name (Unknown: $cde => $val)";
     $def->{CHANGED}[0] = "unknown $cde: $val";
     return $name;
@@ -372,49 +353,59 @@ FHT_Parse($$)
   my $tn = TimeNow();
 
   ###########################
-  # Reformat the values so they are readable
+  # Reformat the values so they are readable.
+  # The first four are confirmation messages, so they must be converted to
+  # the same format as the input (for the softbuffer)
 
-  if($type eq "actuator") {
-    $val = sprintf("%02d%%", int(100*$val/255 + 0.5));
-  } elsif($type eq "lime-protection") {
-    $val = sprintf("(actuator: %02d%%)", int(100*$val/255 + 0.5));
-  } elsif($cde ge "140069" && $cde le "2f0069") {	# Time specs
-    Log 5, "FHT $name ($type: $val)";
-    return "" if($val == 144);	# Empty, forget it
-    my $hour = $val / 6;
-    my $min = ($val % 6) * 10;
-    $val = sprintf("%02d:%02d", $hour, $min);
+  if($cmd =~ m/-from/ || $cmd =~ m/-to/) {
+    $val = sprintf("%02d:%02d", $val/6, ($val%6)*10);
 
-  } elsif($type eq "mode") {
+  } elsif($cmd eq "mode") {
     $val = $c2m{$val} if(defined($c2m{$val}));
 
-  } elsif($type eq "measured-low") {
+  } elsif($cmd =~ m/.*-temp/) {
+    $val = sprintf("%.1f", $val / 2)
 
-    $def->{READINGS}{$type}{TIME} = $tn;
-    $def->{READINGS}{$type}{VAL} = $val;
+  } elsif($cmd eq "lowtemp-offset") {
+    $val = sprintf("%d.0", $val)
+
+  } elsif($cmd =~ m/^actuator/) {
+
+    my $sval = substr($cde, 4, 2);
+    my $fv = sprintf("%d%%", int(100*$val/255+0.5));
+
+       if($sval =~ m/.6/) { $val = "$fv" }
+    elsif($sval =~ m/.8/) { $val = "offset $fv" }
+    elsif($sval =~ m/.a/) { $val = "lime-protection" }
+    elsif($sval =~ m/.c/) { $val = "synctime" } 
+    elsif($sval =~ m/.e/) { $val = "test" }
+    elsif($sval =~ m/.f/) { $val = "pair" }
+    else { $val = "Unknown: $sval = $fv" }
+
+  } elsif($cmd eq "lime-protection") {
+    $val = sprintf("(actuator: %02d%%)", int(100*$val/255 + 0.5));
+
+  } elsif($cmd eq "measured-low") {
+    $def->{READINGS}{$cmd}{TIME} = $tn;
+    $def->{READINGS}{$cmd}{VAL} = $val;
     return "";
 
-  } elsif($type eq "measured-high") {
-
-    $def->{READINGS}{$type}{TIME} = $tn;
-    $def->{READINGS}{$type}{VAL} = $val;
+  } elsif($cmd eq "measured-high") {
+    $def->{READINGS}{$cmd}{TIME} = $tn;
+    $def->{READINGS}{$cmd}{VAL} = $val;
 
     if(defined($def->{READINGS}{"measured-low"}{VAL})) {
 
       $val = $val*256 + $def->{READINGS}{"measured-low"}{VAL};
       $val /= 10;
       $val = sprintf("%.1f (Celsius)", $val);
-      $type = "measured-temp"
+      $cmd = "measured-temp"
 
     } else {
       return "";
     }
 
-  } elsif($type =~ m/.*-temp/) {
-    $val = sprintf("%.1f (Celsius)", $val / 2)
-
-  } elsif($type eq "warnings") {
-
+  } elsif($cmd eq "warnings") {
     my $nVal;
     if($val & 1) {                          $nVal  = "Battery low"; }
     if($val & 2) { $nVal .= "; " if($nVal); $nVal .= "Temperature too low"; }
@@ -422,17 +413,14 @@ FHT_Parse($$)
     if($val &16) { $nVal .= "; " if($nVal); $nVal .= "Fault on window sensor"; }
     $val = $nVal? $nVal : "none";
 
-  } elsif($type eq "lowtemp-offset") {
-    $val = sprintf("%d.0 (Celsius)", $val)
-
   }
 
-  $def->{READINGS}{$type}{TIME} = $tn;
-  $def->{READINGS}{$type}{VAL} = $val;
-  $def->{CHANGED}[0] = "$type: $val";
-  $def->{STATE} = "$type: $val" if($type eq "measured-temp");
+  $def->{READINGS}{$cmd}{TIME} = $tn;
+  $def->{READINGS}{$cmd}{VAL} = $val;
+  $def->{CHANGED}[0] = "$cmd: $val";
+  $def->{STATE} = "$cmd: $val" if($cmd eq "measured-temp");
 
-  Log 4, "FHT $name $type: $val";
+  Log 4, "FHT $name $cmd: $val";
 
   ################################
   # Softbuffer: delete confirmed commands
@@ -444,7 +432,7 @@ FHT_Parse($$)
       my $hcmd = $h->{CMD};
       my $hname = $h->{HASH}->{NAME};
       Log 4, "FHT softbuffer check: $hname / $hcmd";
-      if($hname eq $name && $hcmd =~ m/^$type $val/) {
+      if($hname eq $name && $hcmd =~ m/^$cmd $val/) {
         $found = $key;
         Log 4, "FHT softbuffer found";
         last;
