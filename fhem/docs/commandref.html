@@ -223,15 +223,12 @@ split in multiple lines<br><br>
     <li>verbose<br>
         Set the verbosity level. Possible values:
         <ul>
-          <li>0 - it will only tell you when the server was started, or
-          stopped</li>
-          <li>1 - it logs all error messages or unknown packets</li>
-          <li>2 - it logs all signals received or sent in a "digested"
-          format,</li>
-          <li>3 - it logs the signals for undefined devices,</li>
-          <li>4 - it logs the TCP/IP connections and the called programs with
-          parameters,</li>
-          <li>5 - is for debugging.</li>
+          <li>0 - server start/stop
+          <li>1 - error messages or unknown packets
+          <li>2 - major events/alarms.
+          <li>3 - commands sent out will be logged.
+          <li>4 - you'll see whats received by the different devices.
+          <li>5 - debugging.</li>
         </ul>
         Recommended level is 3 for normal use.
     </li>
@@ -1392,7 +1389,6 @@ split in multiple lines<br><br>
     2006-11-02 06:03:37   desired-temp    21.0 (Celsius)
     2006-11-02 04:13:31   fri-from1       06:00
     2006-11-02 04:13:31   fri-to1         23:50
-    2006-11-02 04:11:30   init            255
     2006-11-02 04:13:36   lowtemp-offset  2.0 (Celsius)
     2006-11-02 10:40:06   measured-high   0
     2006-11-02 10:40:06   measured-low    211
@@ -1637,8 +1633,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     <pre>
       desired-temp
       day-temp night-temp
-      refresh
-      init
+      report1 report2
       mode  
       holiday1 holiday2      # Not verified
       manu-temp              # No clue what it does.
@@ -1664,23 +1659,31 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     Notes:
     <ul>
       <li>Following events are reported (more or less regularly) from each FHT
-          device: <code>measured-temp actuator lime-protection synctime
-                  actuator1...actuator8 warnings</code><br>
+          device: <code>measured-temp actuator actuator1...actuator8 warnings</code><br>
           You can use these strings for <a href="#notify">notify</a> or
           <a href="#FileLog">FileLog</a> definitions.
           <ul>
-            <li>actuator is only sent, if it one of them is open
-                (normally not during the summer time).</li>
-            <li>actuator1..actuator8 is only sent, if the actuator offset
-                for this actuator is not 0</li>
-            <li>lime-protection is sent when the lime-protection is running.
-                </li>
-            <li>I don't know when the synctime is sent.
-                </li>
             <li>warnings can contain following strings:
                 none, Battery low,Temperature too low, Window open,
                 Fault on window sensor
                 </li>
+            <li>actuator (without a suffix) stands for all actuators.
+            <li>actuator or actuator1..8 can take following values:
+                <ul>
+                  <li>&lt;value&gt;%<br>
+                     This is the normal case, the actuator is instructed to open to this value.
+                  <li>offset &lt;value&gt;%<br>
+                     The actuator is running with this offset.
+                  <li>lime-protection<br>
+                     The actuator was instructed to execute the lime-protection procedure.
+                  <li>synctime<br>
+                     If you select Sond/Sync on the FHT80B, you'll see a count down.
+                  <li>test<br>
+                     The actuator was instructed by the FHT80b to emit a beep.
+                  <li>pair<br>
+                     The the FHT80b sent a "you-belong-to-me" to this actuator.
+                </ul>
+                Note: 
           </ul>
           <br>
 
@@ -1719,17 +1722,41 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
 	  24:00 means off.
           <br><br>
 
-      <li>The <code>refresh</code> parameter should be 255. It requests
-          the FHT to resend all parameter values. As the FHT stops sending
-          the values every 5-10 days, it is adviseable to schedule following
-          command regularly:<br>
-	  <code>define fht_refresh at +*06:00:00
-                set &lt;name&gt; refresh 255 init 255</code>
-          <br>
-          For the technically inclined: The argument 240 (0xf0) requests the
-          actuator, fri,sat,sun,measured-temp and warnings values, the argument
-          15 (0x0f) the actuator,mon,tue,wed and thu values and all other
-          arguments does not seem to work.
+      <li>As the FHT stops sending the values every 5-10
+          days, it is adviseable to schedule following command regularly:<br>
+	  <code>define fht_report at +*06:00:00
+                set &lt;name&gt; report1 255 report2 255</code>
+          <br><br>
+
+      <li><code>report1</code> with parameter 255 requests all settings for
+          monday till sunday to be sent. The argument is a bitfield, to request
+          unique values add up the following:
+          <ul>
+            <li> 1: monday
+            <li> 2: tuesday
+            <li> 4: thursday
+            <li> 8: wednesday
+            <li>16: friday
+            <li>32: saturday
+            <li>64: sunday
+          </ul>
+          measured-temp and actuator is sent along if it is considered appropriate
+          by the FHT.
+          <br><br>
+
+      <li><code>report2</code> with parameter 255 requests the following
+          settings to be reported: day-temp night-temp windowopen-temp
+          lowtemp-offset desired-temp measured-temp mode warnings. 
+          The argument is (more or less) a bitfield, to request unique values
+          add up the following:
+          <ul>
+          <li> 1: warnings
+          <li> 2: mode
+          <li> 4: day-temp, night-temp, windowopen-temp
+          <li>64: lowtemp-offset
+          </ul>
+          measured-temp and actuator is sent along if it is considered appropriate
+          by the FHT.
           <br><br>
 
       <li><code>lowtemp-offset</code> needs a temperature as argument, valid
@@ -1749,7 +1776,8 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
           <br><br>
 
       <li>If a buffer is still in the softbuffer, it will be sent in the
-          following order:<br/> <code>desired-temp,mode,refresh,holiday1,holiday2,day-temp,night-temp, [all other commands]</code>
+          following order:<br/> <code>desired-temp,mode,report1,report2,
+          holiday1,holiday2,day-temp,night-temp, [all other commands]</code>
           <br><br>
 
     </ul>
