@@ -27,4 +27,4 @@ define fhz_timer at *03:30:00 set FHZ time
 # then comment out the line below. My devices send a message when a value
 # changes, and send measured-temp, actuator and state messages regularly.
 # Be patient: the reply comes in 5-10 minutes.
-define wz_refresh at *04:00:00 set wz refreshvalues
+define wz_refresh at *04:00:00 set wz report1 255 report2 255
