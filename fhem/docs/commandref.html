@@ -1548,39 +1548,24 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     <br><br>
     where <code>value</code> is one of:<br>
     <pre>
-      dim06%
-      dim12%
-      dim18%
-      dim25%
-      dim31%
-      dim37%
-      dim43%
-      dim50%
-      dim56%
-      dim62%
-      dim68%
-      dim75%
-      dim81%
-      dim87%
-      dim93%
-      dim100%
-      dimdown
-      dimup
-      dimupdown
-      off
-      off-for-timer
-      on     		# dimmer: set to value before switching it off
-      on-for-timer      # see the note
-      on-old-for-timer  # set to previous (before switching it on) 
-      ramp-on-time      # time to reach the desired dim value on dimmers
-      ramp-off-time     # time to reach the off state on dimmers
-      reset
-      sendstate
-      timer
-      toggle            # between off and previous dim val
-      on-till           # Special, see the note
-      </pre>
-
+    dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%
+    dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%
+    dimdown
+    dimup
+    dimupdown
+    off
+    off-for-timer
+    on                # dimmer: set to value before switching it off
+    on-for-timer      # see the note
+    on-old-for-timer  # set to previous (before switching it on) 
+    ramp-on-time      # time to reach the desired dim value on dimmers
+    ramp-off-time     # time to reach the off state on dimmers
+    reset
+    sendstate
+    timer
+    toggle            # between off and previous dim val
+    on-till           # Special, see the note
+</pre>
     Examples:
     <ul>
       <code>set lamp on</code><br>
@@ -1658,7 +1643,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
 
     Notes:
     <ul>
-      <li>Following events are reported (more or less regularly) from each FHT
+      <li>Following events are reported (more or less regularly) by each FHT
           device: <code>measured-temp actuator actuator1...actuator8 warnings</code><br>
           You can use these strings for <a href="#notify">notify</a> or
           <a href="#FileLog">FileLog</a> definitions.
@@ -1762,7 +1747,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
       <li><code>lowtemp-offset</code> needs a temperature as argument, valid
           values must be between 1.0 and 5.0 Celsius.<br/> It will trigger a
           warning if <code>desired-temp - measured-temp &gt;
-          lowtemp-offset</code> in a room after 1.5 hours after the last
+          lowtemp-offset</code> in a room for at least 1.5 hours after the last
           desired-temp change.  <br><br>
 
       <li>FHEM optionally has an internal software buffer for FHT devices.
