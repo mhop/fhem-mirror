@@ -19,7 +19,7 @@ my $__ME               = "/fhem";
 
 ###################
 # CSS
-my $FHEMWEB_css1 = "border: solid; border-width: thin; width: 100%";
+my $FHEMWEB_css1 = "border: solid; border-width: thin; width: 100%; -moz-border-radius:8px; ";
 my $FHEMWEB_css="
   body             { color: black;  background: #FFFFD7; }
   table.room       { $FHEMWEB_css1; background: #D7FFFF; }
