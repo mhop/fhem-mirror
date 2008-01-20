@@ -7,7 +7,7 @@
 			      "thu-to1","fri-from1","fri-to1","sat-from1","sat-to1","sun-from1","sun-to1",
 				"mon-from2","mon-to2","tue-from2","tue-to2","wed-from2","wed-to2","thu-from2",
 			      "thu-to2","fri-from2","fri-to2","sat-from2","sat-to2","sun-from2","sun-to2",
-				"day-temp","night-temp","desired-temp","refreshvalues","windowopen-temp"
+				"day-temp","night-temp","desired-temp","report1","report2","windowopen-temp"
 			);
 
 		echo "
