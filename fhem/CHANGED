@@ -380,6 +380,7 @@
              and energy_kWh_w (Boris, 06.01.08)
   - feature: global attr allowfrom, as wished by Holger (8.1.2008)
   - feature: FHT: multiple commands, softbuffer changes, cmd rename, doc
+  - feature: EM1010PC: automatic reset
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
