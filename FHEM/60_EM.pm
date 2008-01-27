@@ -11,6 +11,11 @@ sub EmCrcCheck($$);
 sub EmEsc($);
 sub EmGetData($$);
 sub EmMakeMsg($);
+sub EM_Set($@);
+
+# Following one-byte commands are trange, as they cause a timeout:
+# 124 127 150 153 155 156
+
 
 #####################################
 sub
@@ -93,7 +98,7 @@ EM_Set($@)
           "       set <name> time [YYYY-MM-DD HH:MM:SS]";
 
   return $u1 if(int(@a) < 2);
-  my $msg;
+  my $name = $hash->{DeviceName};
 
   if($a[1] eq "time") {
 
@@ -106,22 +111,29 @@ EM_Set($@)
     }
     my @d = split("-", $a[2]);
     my @t = split(":", $a[3]);
-    $msg = sprintf("73%02x%02x%02x00%02x%02x%02x",
+    my $msg = sprintf("73%02x%02x%02x00%02x%02x%02x",
           $d[2],$d[1],$d[0]-2000+0xd0, $t[0],$t[1],$t[2]);
+    my $d = EmGetData($name, $msg);
+    return "Read error" if(!defined($d));
+    return b($d,0);
 
   } elsif($a[1] eq "reset") {
 
-    $msg = "4545";
+    my $d = EmGetData($name, "4545");   # Reset
+    return "Read error" if(!defined($d));
+    sleep(5);
+    EM_Set($hash, ($a[0], "time"));     # Set the time
+    sleep(1);
+    $d = EmGetData($name, "67");        # "Push the button", we don't want usesr interaction
+    return "Read error" if(!defined($d));
 
   } else {
 
     return "Unknown argument $a[1], choose one of reset,time"
 
   }
+  return undef;
 
-  my $d = EmGetData($hash->{DeviceName}, $msg);
-  return "Read error" if(!defined($d));
-  return b($d,0);
 }
 
 #########################

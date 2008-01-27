@@ -211,3 +211,6 @@
   - lime-protection changed, as it is an actuator subcommand. Further actuator
     commands added.
 
+- Rudi Sun Jan 27 18:12:42 MET 2008
+  - em1010PC: sending a "67" after a reset skips the manual interaction:
+    automatic reset is now possible. 
