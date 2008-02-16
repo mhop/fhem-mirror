@@ -214,3 +214,6 @@
 - Rudi Sun Jan 27 18:12:42 MET 2008
   - em1010PC: sending a "67" after a reset skips the manual interaction:
     automatic reset is now possible. 
+
+- Peter S. Sat Feb 16 22:22:21 MET 2008
+  - linux.html: Note on kernel 2.6.24.2 (includes our changes)
