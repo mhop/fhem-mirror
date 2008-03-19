@@ -412,7 +412,7 @@ XmitLimitCheck($$)
 
     my $me = $hash->{NAME};
     Log GetLogLevel($me,2), "FHZ TRANSMIT LIMIT EXCEEDED";
-    DoTriger($me, "TRANSMIT LIMIT EXCEEDED");
+    DoTrigger($me, "TRANSMIT LIMIT EXCEEDED");
 
   } else {
 
