@@ -69,3 +69,6 @@
 - Martin 2007-12-24
  -- Bugfix: Userdef-Gnuplot with type temperature now with y1tics
  -- Feature: Webcam/Pics hideable
+
+- Martin 2008-03-24
+ -- Bugfix: FHT-View with the current CVS-FHEM was broken

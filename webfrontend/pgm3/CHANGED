@@ -169,3 +169,6 @@ It is not necessary to tell fhem that there are other logs.
 2007-12-24 (071224)
  -- Bugfix: UserDef with type "temperature" now with y1tics ==> gnuplot.php
  -- Feature: Webcam/Pics now hideable ==> index.php, config.php
+
+2008-03-24  
+   -- Bugfix: FHT-View with the current CVS-FHEM was broken: Small changes in include/fht.php
