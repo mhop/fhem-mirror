@@ -109,18 +109,27 @@ DbLog_ParseEvent($$)
   elsif($type eq "FS20") {
      @parts= split(/ /,$value);
      my $reading= $parts[0]; if(!defined($reading)) { $reading= ""; }
-     $value= join(" ", shift @parts);
-     if($reading =~ m(^dim*%$)) { 
-	$value= substr($reading,3,length($reading)-4);
-     	$reading= "dim";
-	$unit= "%";
+     if($#parts>=1) {
+     	$value= join(" ", shift @parts);
+	     if($reading =~ m(^dim*%$)) { 
+		$value= substr($reading,3,length($reading)-4);
+     		$reading= "dim";
+		$unit= "%";
+	}
+      else {
+      	$value= "";
+      }
      }
   }
   # FHT 
   elsif($type eq "FHT") {
      if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading eq "actuator") { $value=~ s/%//; $value= $value*1.; $unit= "%"; }
+     if($reading eq "actuator") { 
+		# TODO: 2008-03-24 currently something wrong: 
+		# "actuator: lime-protection"		
+		$value=~ s/%//; $value= $value*1.; $unit= "%"; 
+     }
   }
   # KS300
   elsif($type eq "KS300") {
