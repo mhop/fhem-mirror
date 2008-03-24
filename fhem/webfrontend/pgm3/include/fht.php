@@ -91,25 +91,6 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
 
 
-	#if the expected graphic already exist then do not redraw the picture
-
-#	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$resultreverse[0][0].".png";
-#	if (file_exists($savefile)) {
-#
-#		$im2 = @ImageCreateFromPNG($savefile);
-#		header("Content-type: image/png");
-#		imagePng($im2);
-#		exit; # ;-)))
-#	}
-#	else #delete old pngs
-#	{
-#		$delfile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.*.png";
-#		foreach (glob($delfile) as $filename) {
- #  		unlink($filename);
-#		}
-#	}
-
-
 	$im = ImageCreateTrueColor($imgmaxxfht,$imgmaxyfht);
 	$black = ImageColorAllocate($im, 0, 0, 0);
 	$bg1p = ImageColorAllocate($im, 110,148,183);
@@ -207,10 +188,18 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$text=$txtroom.$room;
         ImageTTFText ($im,  $fontsize, 0, 3,  49, $txtcolor, $fontttf, $text);
         
-	 $text="desired: $desired_temp  ".substr($desired_date,11,5);
+	 $text="desired: $desired_temp";
 
-        ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
-        
+         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
+       
+	# Time of desired-temp
+	 $text=substr($desired_date,11,5);
+      	 ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-160-$XcorrectDate, 23, $txtcolor, $fontttf, $text);
+
+
+
+
+ 
 	$text="Actuator: $actuator";
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         	

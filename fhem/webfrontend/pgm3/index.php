@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='071224';
+$pgm3version='080324';
 
 	
 	$Action		=	$_POST['Action'];
@@ -454,6 +454,7 @@ xml_parser_free($xml_parser);
 	 <head>
 	 <meta http-equiv='refresh' content='$urlreload; URL=$forwardurl'>
 	 <meta http-equiv='pragma' content='no-cache'>
+	 <meta http-equiv='expires' content='0'>
 	 <meta http-equiv='Cache-Control' content='no-cache'>
 	 <link rel='alternate' type='application/rss+xml' title='$RSStitel' href='index.php?showrss'>
  	 <link rel='shortcut icon' href='include/fs20.ico' >
@@ -510,6 +511,7 @@ xml_parser_free($xml_parser);
 		{
 			$webcamname=str_replace("/","",$webcam1);
 			$webcamname=str_replace(":","",$webcamname);
+#			$order="$wgetpath -O tmp/$webcamname $webcam1; /usr/bin/touch tmp/$webcamname";
 			$order="$wgetpath -O tmp/$webcamname $webcam1";
 			exec($order,$res);
         		$errormessage = $res[0];
