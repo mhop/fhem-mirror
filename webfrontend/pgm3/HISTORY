@@ -72,3 +72,6 @@
 
 - Martin 2008-03-24
  -- Bugfix: FHT-View with the current CVS-FHEM was broken
+
+- Martin 2008-03-25
+ -- Bugfix: KS300-Log now possible with Full Log like define kslog FileLog /var/tmp/ks300.log ks300:.*
