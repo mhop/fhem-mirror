@@ -126,9 +126,13 @@ DbLog_ParseEvent($$)
      if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading eq "actuator") { 
-		# TODO: 2008-03-24 currently something wrong: 
-		# "actuator: lime-protection"		
-		$value=~ s/%//; $value= $value*1.; $unit= "%"; 
+		if($value eq "lime-protection") {
+			$reading= "actuator-lime-protection";
+			undef $value;
+		}
+		else {
+			$value=~ s/%//; $value= $value*1.; $unit= "%"; 
+		}
      }
   }
   # KS300
