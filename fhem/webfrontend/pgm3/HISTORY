@@ -75,3 +75,6 @@
 
 - Martin 2008-03-25
  -- Bugfix: KS300-Log now possible with Full Log like define kslog FileLog /var/tmp/ks300.log ks300:.*
+
+- Martin 2008-14-13
+ -- Bugfix: FHT: lime-protection not more in the field of actuator

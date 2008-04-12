@@ -176,3 +176,6 @@ It is not necessary to tell fhem that there are other logs.
 2008-03-24  
    -- Bugfix: KS300-Log now possible with Full Log like define kslog FileLog /var/tmp/ks300.log ks300:.
    	==> Small Changes in ks300.php
+
+2008-04-13
+   -- Bugfix: FHT: lime-protection not more in the field of actuator: Small Changes in fht.php

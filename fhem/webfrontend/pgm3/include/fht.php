@@ -199,7 +199,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
 
 
 
- 
+	if ($actuator=="lime-protection") $actuator="0%";
 	$text="Actuator: $actuator";
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         	
