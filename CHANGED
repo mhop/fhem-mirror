@@ -381,6 +381,9 @@
   - feature: global attr allowfrom, as wished by Holger (8.1.2008)
   - feature: FHT: multiple commands, softbuffer changes, cmd rename, doc
   - feature: EM1010PC: automatic reset
+  - feature: contrib/00_LIRC.pm (25.3, by Bernhard)
+  - bugfix : 00_FHZ: additional stty settings for strange Linux versions
+  - bugfix : pgm2 wrong temp summary for FHT's (reported by O.D., 16.4.2008)
 
 - TODO
   emem -2.5kW / getDevData for emwz -1
