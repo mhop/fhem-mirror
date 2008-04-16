@@ -121,7 +121,7 @@ EM_Set($@)
 
     my $d = EmGetData($name, "4545");   # Reset
     return "Read error" if(!defined($d));
-    sleep(5);
+    sleep(10);
     EM_Set($hash, ($a[0], "time"));     # Set the time
     sleep(1);
     $d = EmGetData($name, "67");        # "Push the button", we don't want usesr interaction

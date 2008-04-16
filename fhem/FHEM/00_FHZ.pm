@@ -245,6 +245,14 @@ FHZ_Define($$)
   $po->stty_echok(0);
   $po->stty_echoctl(0);
 
+  # Needed for some strange distros
+  $po->stty_echo(0);
+  $po->stty_icanon(0);
+  $po->stty_isig(0);
+  $po->stty_opost(0);
+  $po->stty_icrnl(0);
+
+
   $hash->{PortObj} = $po;
   $hash->{FD} = $po->FILENO;
   $hash->{DeviceName} = $dev;
