@@ -138,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.38 2008-01-19 19:02:30 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.39 2008-04-16 16:26:25 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -191,7 +191,7 @@ my %cmds = (
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>",terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
-            Hlp=>"<sec>,sleep for sec, 3 decimal places are interpreted" },
+            Hlp=>"<sec>,sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
   "xmllist" => { Fn=>"CommandXmlList",
@@ -1178,6 +1178,7 @@ CommandXmlList($$)
   my $str = "<FHZINFO>\n";
   my $lt = "";
 
+  delete($modules{""}) if(defined($modules{""}));
   for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
     		            $modules{$defs{$b}{TYPE}}{ORDER};
     		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {

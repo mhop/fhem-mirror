@@ -20,6 +20,8 @@ dummy_Set($@)
   my ($hash, @a) = @_;
 
   return "no set value specified" if(int(@a) != 2);
+  return "Unknown argument $a[1], choose one of *" if($a[1] eq "?");
+
   my $v = $a[1];
   $hash->{CHANGED}[0] = $v;
   $hash->{STATE} = $v;

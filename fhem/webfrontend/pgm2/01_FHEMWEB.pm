@@ -235,6 +235,8 @@ FHEMWEB_AnswerCall($)
       open(FH, "$FHEMWEB_absicondir$1") || return;
       pO join("", <FH>);
       close(FH);
+    } else {
+      Log 5, "Unknown document $arg requested";
     }
     return;
   }
@@ -657,7 +659,9 @@ FHEMWEB_showRoom()
 
       } elsif($type eq "FHT") {
 
-        $v =~ s/^[^0-9]*([.0-9]+).*$/$1/g;
+        $v = $__devs{$d}{STATE}{"measured-temp"}{VAL};
+
+        $v =~ s/ .*//;
         pO "<td><a href=\"$__ME?detail=$d\">$d</a></td>";
         pO "<td align=\"center\">$v&deg;</td>";
 
