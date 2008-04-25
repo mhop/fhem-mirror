@@ -14,7 +14,7 @@
 <h2>Description</h2>
 <ul>
   This document describes how to install <a href="fhem.html">FHEM</a> on the
-  fritzbox. The document and the port itself is in a very beginning stage.<br>
+  fritzbox.<br>
   <br>
   What works:<br>
   <ul>
@@ -23,14 +23,13 @@
     <li>FS20, FHT and KS300-2 (tested)</li>
     <li>HMS (untested, but should work)</li>
     <li>SunSet/SunRise.</li>
+    <li>one of the Web frontends (webpgm2, the builtin one)</li>
   </ul>
 
   <br>
   What does not work right now:<br>
   <ul>
     <li>Automatic startup after reboot of the fritzbox</li>
-    <li>HTML Frontend. Planning a webfrontend/pgm2 "fhem" module, as do not
-        know how to start CGI programs from the builtin web browser.
     <li>Gnuplot. No idea how to replace it, perhaps we compile a fritzbox
         version</li>
     <li>EM1010PC. I tried it without batteries, and I think the USB interface
@@ -42,18 +41,18 @@
 
 <h2>Howto</h2>
 <ul>
-  Tested on the fritzbox 7170, with Firmware 29.04.33.<br>
+  Tested on the fritzbox 7170, with Firmware 29.04.49.<br>
   <b>Note:</b>The kernel modules are for kernel 2.16.13.1, and perl is compiled
   for uCLibc 0.9.28.<br><br>
 
   Prerequisites:<br>
   <ul>
-    <li>you need a fritzbox with an USB host port. Check your kernel version.
+    <li>You need a fritzbox with an USB host port. Check your kernel version.
         If it won't match the version above, see the "Compile tips" in this
         document.</li>
     <li>an USB hub (a small passive one is enough).</li>
     <li>an FHZ1000 or FHZ1300</li>
-    <li>an USB stick, at least 64MB. As the fritzbox is USB 1.1 only,
+    <li>a USB stick, at least 64MB. As the fritzbox is USB 1.1 only,
         the slowest is fast enough.</li>
     <li>telnet access for the fritzbox. See the links on how to enable it.
     <li>the complete fhem package from the links section.</li>
@@ -72,11 +71,39 @@
     <li>Log in via telnet to the fritzbox.</li>
     <li>Change into the directory /var/media/ftp/*Partition*/usr/fhem .</li>
     <li>Execute the command rc.fhem.</li>
-    <li>Now you can login from your PC to this fhem server via:<br>
+    <li>Now you can either use a Web browser:<br>
         <ul>
-        telnet fritz.box 7072<br>
+          <a href="http://192.168.178.1:8083/fhem">
+                  http://192.168.178.1:8083/fhem</a><br>
         </ul>
-        and configure it.</li>
+        with the online help, or choose the command-line via:<br>
+        <ul>
+          telnet fritz.box 7072<br>
+        </ul>
+        to define your devices.</li>
+  </ul>
+  <br>
+  Tips:<br>
+  <ul>
+    <li>The installation creates the link /var/usr to the USB disk
+        (/var/media/ftp/*Partition*/usr)</li>
+    <li>In the beginning only the most necessary (in my opinion, anyway :-)
+        modules are installed: FHZ/FS20/HMS/KS300/SUNRISE_EL. If you want to
+        use other modules, they are in the /var/usr/fhem/FHEM/unused directory,
+        just move the needed module in the parent directory, and do a
+        "reload module" (without the .pm suffix).</li>
+    <li>If you use webpgm2, and unsure about an attribute, then just define it,
+        you'll get a link to the description of the attribute in the online
+        help".</li>
+    <li>If your're unsure about the parameters for a command try "?" as an
+        argument, e.g.:
+        <ul>
+        ?<br>
+        define <name> ?<br>
+        define <name> <type> ?<br>
+        set <name> ?<br>
+        </ul>
+        </li>
   </ul>
 </ul>
 
@@ -96,8 +123,8 @@
 
 <h2>Links</h2>
 <ul>
-  <li>Complete fhem package for the fritzbox: <a href="fb_fhem_0.1.tar.gz">
-      fb_fhem_0.1.tar.gz</a></li>
+  <li>Complete fhem package for the fritzbox: <a href="fb_fhem_0.2.tar.gz">
+      fb_fhem_0.2.tar.gz</a></li>
   <li>Telnet on the fritzbox:
       <a href="http://www.ip-phone-forum.de/showthread.php?t=69245">
       ip-phone-thread</a></li>
