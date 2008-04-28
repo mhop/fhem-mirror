@@ -138,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.40 2008-04-28 16:26:10 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.41 2008-04-28 17:27:14 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1248,20 +1248,23 @@ CommandReload($$)
 
   my $ret;
   no strict "refs";
+
   eval { 
     do "$file";
+
+    # Get the correct module case from the initialize function name. We need
+    # this as sometimes we live on a FAT fs with wrong case
+    foreach my $i (keys %main::) {
+      if($i =~ m/^(${m})_initialize$/i) {
+        $m = $1;
+        last;
+      }
+    }
+
     $ret = &{ "${m}_Initialize" }(\%hash);
   };
   if($@) {
-
-    # Perhaps we have a "USB-Stick on the fritzbox" case problem: 
-    my $olderr = $@;
-    if($olderr =~ m/Undefined subroutine/) {
-      $m = ($m =~ m/^[a-z]*$/) ? uc($m) : lc($m);
-      Log 2, "Retrying with $m";
-      eval { $ret = &{ "${m}_Initialize" }(\%hash); };
-    }
-    return $olderr if($@);
+    return "$@";
   }
   use strict "refs";
 
