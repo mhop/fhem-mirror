@@ -26,8 +26,8 @@ my $long   = "8.686";
 my $lat    = "50.112";
 my $tz     = ""; # will be overwritten
 my $altit  = "-6";        # Civil twilight
-my $RADEG  = ( 180 / pi );
-my $DEGRAD = ( pi / 180 );
+my $RADEG  = ( 180 / 3.1415926 );
+my $DEGRAD = ( 3.1415926 / 180 );
 my $INV360 = ( 1.0 / 360.0 );
 
 
