@@ -138,7 +138,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.39 2008-04-16 16:26:25 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.40 2008-04-28 16:26:10 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1238,12 +1238,13 @@ CommandReload($$)
 
   $param =~ s,[\./],,g;
   $param =~ s,\.pm$,,g;
-  my $file = "$modpath_set/FHEM/$param.pm";
+  my $file = "$modpath_set/$param.pm";
   return "Can't read $file: $!" if(! -r "$file");
 
   my $m = $param;
-  $m =~ s,^[0-9][0-9]_,,;
-  Log 2, "Loading $file";
+  $m =~ s,^([0-9][0-9])_,,;
+  my $order = $1;
+  Log 5, "Loading $file";
 
   my $ret;
   no strict "refs";
@@ -1252,12 +1253,20 @@ CommandReload($$)
     $ret = &{ "${m}_Initialize" }(\%hash);
   };
   if($@) {
-    return "$@";
+
+    # Perhaps we have a "USB-Stick on the fritzbox" case problem: 
+    my $olderr = $@;
+    if($olderr =~ m/Undefined subroutine/) {
+      $m = ($m =~ m/^[a-z]*$/) ? uc($m) : lc($m);
+      Log 2, "Retrying with $m";
+      eval { $ret = &{ "${m}_Initialize" }(\%hash); };
+    }
+    return $olderr if($@);
   }
   use strict "refs";
 
   $modules{$m} = \%hash;
-  $modules{$m}{ORDER} = 99 if(!$modules{$m}{ORDER});
+  $modules{$m}{ORDER} = $order;
 
   return undef;
 }
@@ -1356,28 +1365,25 @@ GlobalAttr($$)
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     my $counter = 0;
 
+    $modpath_set = $modpath;
     foreach my $m (sort grep(/^[0-9][0-9].*\.pm$/,readdir(DH))) {
 
+      $m =~ s/\.pm$//;
+      my $err = CommandReload(undef, $m);
+      if($err) {
+        Log 1, $err;
+        exit(1);
+      }
       $counter++;
-      Log 5, "Loading $m";
-      require "$modpath/$m";
-
-      next if($m !~ m/^([0-9]+)_(.*)\.pm$/);
-      $m = $2;
-      $modules{$m}{ORDER} = $1;
-
-      no strict "refs";
-      &{ "${m}_Initialize" }($modules{$m});
-      use strict "refs";
     }
     closedir(DH);
 
     if(!$counter) {
-      return "No modules found, " .
-                  "point modpath to a directory where the FHEM subdir is";
+      return "No modules found, set modpath to a directory in which a " .
+             "subdirectory called \"FHEM\" exists wich in turn contains " .
+             "the fhem module files <*>.pm";
     }
 
-    $modpath_set = $val;
   }
 
   return undef;
