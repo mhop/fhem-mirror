@@ -42,9 +42,9 @@
 #
 # global configuration
 #
-my $dbconn      = "mysql:database=fhem;host=localhost;port=3306";
-my $dbuser      = "root";
-my $dbpassword  = "britta";
+my $dbconn      = "mysql:database=fhem;host=db;port=3306";
+my $dbuser      = "fhemuser";
+my $dbpassword  = "fhempassword";
 
 #
 # nothing to change below this line
