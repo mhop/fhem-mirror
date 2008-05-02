@@ -320,7 +320,7 @@ FHT_Parse($$)
 
   if(length($cde) < 6) {
     Log GetLogLevel($name,2), "FHT Unknown code from $name : $cde";
-    $def->{CHANGED}[0] = "unknown code $cde";
+    $def->{CHANGED}[0] = "unknown_$cde";
     return $name;
   }
 
@@ -346,7 +346,7 @@ FHT_Parse($$)
 
   if(!$cmd) {
     Log 4, "FHT $name (Unknown: $cde => $val)";
-    $def->{CHANGED}[0] = "unknown $cde: $val";
+    $def->{CHANGED}[0] = "unknown_$cde: $val";
     return $name;
   }
 
@@ -375,12 +375,12 @@ FHT_Parse($$)
     my $fv = sprintf("%d%%", int(100*$val/255+0.5));
 
        if($sval =~ m/.6/) { $val = "$fv" }
-    elsif($sval =~ m/.8/) { $val = "offset $fv" }
+    elsif($sval =~ m/.8/) { $val = "offset: $fv" }
     elsif($sval =~ m/.a/) { $val = "lime-protection" }
     elsif($sval =~ m/.c/) { $val = "synctime" } 
     elsif($sval =~ m/.e/) { $val = "test" }
     elsif($sval =~ m/.f/) { $val = "pair" }
-    else { $val = "Unknown: $sval = $fv" }
+    else { $val = "unknown_$sval: $fv" }
 
   } elsif($cmd eq "lime-protection") {
     $val = sprintf("(actuator: %02d%%)", int(100*$val/255 + 0.5));
@@ -525,6 +525,7 @@ getFhtBuffer($)
   for(;;) {
     FHZ_Write($io, "04", "c90185");
     my $msg = FHZ_ReadAnswer($io, "fhtbuf");
+    if(!defined($msg)) { $msg= ""; }
     Log 5, "getFhtBuffer: $count $msg";
   
     return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9A-F]+$/i);

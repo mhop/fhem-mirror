@@ -334,7 +334,7 @@ FS20_Parse($$)
   }
 
   my $v = $codes{$cde};
-  $v = "unknown:$cde" if(!defined($v));
+  $v = "unknown_$cde" if(!defined($v));
   $v .= " $dur" if($dur);
 
   my $def = $defptr{"$dev $btn"};
@@ -360,7 +360,7 @@ FS20_Parse($$)
     my $btn_four = hex2four($btn);
     Log 3, "FS20 Unknown device $dev ($dev_four), Button $btn ($btn_four) Code $cde ($v), " .
     	   "please define it";
-    return "UNDEFINED FS20 $dev/$btn/$cde";
+    return "UNDEFINED FS20: $dev/$btn/$cde";
   }
 
 }

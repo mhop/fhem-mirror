@@ -123,11 +123,45 @@ DbLog_ParseEvent($$)
   }
   # FHT 
   elsif($type eq "FHT") {
+     if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
+	@parts= split(/ /,$event);
+	$reading= $parts[0];
+	$value= $parts[1];
+	$unit= "";
+     }
      if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading eq "actuator") { 
+     if($reading =~ m(^actuator[0-9]*)) { 
 		if($value eq "lime-protection") {
 			$reading= "actuator-lime-protection";
+			undef $value;
+		}
+		elsif($value =~ m(^offset:)) {
+			$reading= "actuator-offset";
+     			@parts= split(/: /,$value);
+			$value= $parts[1];
+			if(defined $value) {
+				$value=~ s/%//; $value= $value*1.; $unit= "%";
+			}
+		}
+		elsif($value =~ m(^unknown_)) {
+    			@parts= split(/: /,$value);
+			$reading= "actuator-" . $parts[0];
+			$value= $parts[1];
+			if(defined $value) {
+				$value=~ s/%//; $value= $value*1.; $unit= "%";
+			}
+		}
+		elsif($value eq "synctime") {
+			$reading= "actuator-synctime";
+			undef $value;
+		}
+		elsif($value eq "test") {
+			$reading= "actuator-test";
+			undef $value;
+		}
+		elsif($value eq "pair") {
+			$reading= "actuator-pair";
 			undef $value;
 		}
 		else {
@@ -198,6 +232,10 @@ DbLog_Log($$)
       my $reading= $r[0];
       my $value= $r[1];
       my $unit= $r[2];
+      if(!defined $reading) { $reading= ""; }	
+      if(!defined $value) { $value= ""; }	
+      if(!defined $unit) { $unit= ""; }	
+	
 
       my $is= "(TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES " .
          "('$ts', '$n', '$t', '$s', '$reading', '$value', '$unit')";
