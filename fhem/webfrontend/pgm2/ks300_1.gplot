@@ -3,7 +3,7 @@
 # FileLog definition:
 #  define FileLog ks300log ks300:.*H:.* /var/log/ks300-%Y-%U.log 
 #
-set terminal png size 800,200 crop
+set terminal png transparent size 800,200 crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
@@ -13,8 +13,27 @@ set y2tics
 set title '<TL>'
 set grid
 
-set ylabel "Temperature (Celsius)"
-set y2label "Rain (l/m2)"
-plot "<IN>" using 1:4 axes x1y1 title 'Temperature' with lines,\
-     "<grep -v avg_ <IN> | perl -ane '@a = split(\"[_:]\", $F[0]); if(defined($lh) && $lh ne $a[1]) { printf(\"${ld}_$lh:30:00 %f\n\", $hv); $hv = 0; } if($lv) { $hv += ($F[9]-$lv); } $lh = $a[1]; $ld = $a[0]; $lv = $F[9]; END { printf(\"${ld}_$lh:30:00 %f\n\", $hv) }'" using 1:2 axes x1y2 title 'Rain/h' with histeps,\
-     "<grep -v avg_ <IN> | perl -ane '@a = split(\"[_]\", $F[0]); if(defined($ld) && $ld ne $a[0]) { printf(\"${ld}_12:00:00 %f\n\", $dv); $dv = 0; } if($lv) { $dv += ($F[9]-$lv); } $ld = $a[0]; $lv = $F[9]; END {printf(\"${ld}_12:00:00 %f\n\", $dv)}'" using 1:2 axes x1y2 title 'Rain/day' with histeps
+set y2label "Temperature (Celsius)"
+set format y "%0.1f"
+set ylabel "Rain (l/m2)"
+set yrange [0:]
+
+# Computing Rain/h and Rain/d values by accumulating the changes.
+
+plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines lw 2,\
+     "<grep -v avg_ <IN> | perl -ane '\
+        @a = split(\"[_:]\", $F[0]);\
+        if(defined($lh) && $lh ne $a[1])\
+          { printf(\"${ld}_$lh:30:00 %f\n\", $hv); $hv = 0; }\
+        if($lv) { $hv += ($F[9]-$lv); }\
+        $lh = $a[1]; $ld = $a[0]; $lv = $F[9];\
+        END { printf(\"${ld}_$lh:30:00 %f\n\", $hv) }'"\
+     using 1:2 axes x1y1 title 'Rain/h' with histeps,\
+     "<grep -v avg_ <IN> | perl -ane '\
+        @a = split(\"[_]\", $F[0]);\
+        if(defined($ld) && $ld ne $a[0]) {\
+          printf(\"${ld}_12:00:00 %f\n\", $dv); $dv = 0; }\
+          if($lv) { $dv += ($F[9]-$lv); }\
+          $ld = $a[0]; $lv = $F[9];\
+          END {printf(\"${ld}_12:00:00 %f\n\", $dv)}'"\
+     using 1:2 axes x1y1 title 'Rain/day' with histeps

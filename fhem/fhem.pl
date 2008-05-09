@@ -45,26 +45,27 @@ sub AssignIoPort($);
 sub CallFn(@);
 sub CommandChain($$);
 sub DoClose($);
+sub FmtDateTime($);
+sub FmtTime($);
 sub GetLogLevel(@);
-sub HandleTimeout();
+sub GlobalAttr($$);
 sub HandleArchiving($);
+sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
 sub Log($$);
 sub OpenLogfile($);
+sub PrintHash($$);
 sub ResolveDateWildcards($@);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
-sub FmtDateTime($);
-sub FmtTime($);
 sub WriteStatefile();
 sub XmlEscape($);
+sub devspec2array($);
+sub doGlobalDef($);
 sub fhem($);
 sub fhz($);
-sub doGlobalDef($);
-sub PrintHash($$);
-sub devspec2array($);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -138,7 +139,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.41 2008-04-28 17:27:14 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.42 2008-05-09 13:58:10 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -441,13 +442,22 @@ AnalyzeInput($)
     my ($cmd, $rest) = split("\n", $client{$c}{buffer}, 2);
     $client{$c}{buffer} = $rest;
     if($cmd) {
-      AnalyzeCommandChain($c, $cmd);
-      return if(!defined($client{$c}));		 # quit
+      if($cmd =~ m/\\$/) {                     # Multi-line
+        $client{$c}{prevlines} .= $cmd . "\n";
+      } else {
+        if($client{$c}{prevlines}) {
+          $cmd = $client{$c}{prevlines} . $cmd;
+          undef($client{$c}{prevlines});
+        }
+        AnalyzeCommandChain($c, $cmd);
+        return if(!defined($client{$c}));         # quit
+      }
     } else {
-      $client{$c}{prompt} = 1;
+      $client{$c}{prompt} = 1;                  # Empty return
     }
-    syswrite($client{$c}{fd}, "FHZ> ")
-	      if($client{$c}{prompt} && $rest !~ m/\n/);
+
+    syswrite($client{$c}{fd}, $client{$c}{prevlines} ? "> " : "FHZ> ")
+                if($client{$c}{prompt} && !$rest);
   }
 }
 
@@ -457,7 +467,7 @@ sub
 AnalyzeCommandChain($$)
 {
   my ($c, $cmd) = @_;
-  $cmd =~ s/#.*$//;
+  $cmd =~ s/#.*$//s;
   $cmd =~ s/;;/____/g;
   foreach my $subcmd (split(";", $cmd)) {
     $subcmd =~ s/____/;/g;
@@ -478,8 +488,9 @@ AnalyzeCommand($$)
   Log 5, "Cmd: >$cmd<";
   return if(!$cmd);
 
-  if($cmd =~ m/^{.*}$/) {		# Perl code
+  if($cmd =~ m/^{.*}$/s) {		# Perl code
 
+    $cmd =~ s/\\\n/ /g;                 # Multi-line
     # Make life easier for oneliners: 
     %value = ();
     foreach my $d (keys %defs) { $value{$d} = $defs{$d}{STATE } }
@@ -502,7 +513,7 @@ AnalyzeCommand($$)
 
   }
 
-  if($cmd =~ m/^"(.*)"$/) {		 # Shell code, always in bg
+  if($cmd =~ m/^"(.*)"$/s) {		 # Shell code, always in bg
     system("$1 &"); 
     return;
   }
@@ -526,7 +537,7 @@ AnalyzeCommand($$)
   }
 
   if(!defined($cmds{$fn})) {
-    my $msg =  "Unknown command  $fn, try help";
+    my $msg =  "Unknown command $fn, try help";
     if($cl) {
       syswrite($client{$cl}{fd}, "$msg\n");
     } else {
@@ -616,7 +627,7 @@ CommandInclude($$)
   while(my $l = <$fh>) {
     chomp($l);
     if($l =~ m/^(.*)\\$/) {		# Multiline commands
-      $bigcmd .= $1;
+      $bigcmd .= "$1\\\n";
     } else {
       AnalyzeCommandChain($cl, $bigcmd . $l);
       $bigcmd = "";
@@ -996,10 +1007,11 @@ CommandModify($$)
   return "Define $a[0] first" if(!defined($defs{$a[0]}));
   my $hash = $defs{$a[0]};
 
-  my $odef = $hash->{DEF};
+  $hash->{OLDDEF} = $hash->{DEF};
   $hash->{DEF} = $a[1];
   my $ret = CallFn($a[0], "DefFn", $hash, "$a[0] $hash->{TYPE} $a[1]");
-  $hash->{DEF} = $odef if($ret);
+  $hash->{DEF} = $hash->{OLDDEF} if($ret);
+  delete($hash->{OLDDEF});
   return $ret;
 }
 
@@ -1162,6 +1174,7 @@ XmlEscape($)
 {
   my $a = shift;
   return "" if(!$a);
+  $a =~ s/\\\n/<br>/g;  # Multi-line
   $a =~ s/&/&amp;/g;
   $a =~ s/"/&quot;/g;
   $a =~ s/</&lt;/g;
@@ -1247,22 +1260,21 @@ CommandReload($$)
   Log 5, "Loading $file";
 
   my $ret;
-  no strict "refs";
 
+  no strict "refs";
+  # Get the correct module case from the initialize function name. We need
+  # this as sometimes we live on a FAT fs with wrong case
   eval { 
     do "$file";
-
-    # Get the correct module case from the initialize function name. We need
-    # this as sometimes we live on a FAT fs with wrong case
     foreach my $i (keys %main::) {
       if($i =~ m/^(${m})_initialize$/i) {
         $m = $1;
         last;
       }
     }
-
     $ret = &{ "${m}_Initialize" }(\%hash);
   };
+
   if($@) {
     return "$@";
   }
@@ -1418,7 +1430,7 @@ CommandAttr($$)
       next;
     }
     if(" $list " !~ m/ ${a[1]}[ :;]/) {
-      push @rets, "Unknown attribute $a[1], use attr global userattr ($list)";
+      push @rets, "Unknown attribute $a[1], use attr global userattr $a[1]";
       next;
     }
 
@@ -1725,10 +1737,9 @@ sub
 SemicolonEscape($)
 {
   my $cmd = shift;
-
   $cmd =~ s/^[ \t]*//;
   $cmd =~ s/[ \t]*$//;
-  if($cmd =~ m/^{.*}$/ || $cmd =~ m/^".*"$/) {
+  if($cmd =~ m/^{.*}$/s || $cmd =~ m/^".*"$/s) {
     $cmd =~ s/;/;;/g
   }
   return $cmd;

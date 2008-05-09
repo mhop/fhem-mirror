@@ -25,17 +25,17 @@ notify_Define($$)
   my ($type, $name, $re, $command) = split("[ \t]+", $def, 4);
   
   if(!$command) {
-    if($hash->{CMD}) {
-      $command = $hash->{CMD};  # Called from modify
+    if($hash->{OLDDEF}) { # Called from modify, where command is optional
+      (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
       $hash->{DEF} = "$re $command";
     } else {
       return "Usage: define <name> notify <regexp> <command>";
     }
   }
+
   # Checking for misleading regexps
   eval { "Hallo" =~ m/^$re$/ };
   return "Bad regexp: $@" if($@);
-  $hash->{CMD} = SemicolonEscape($command);
   $hash->{REGEXP} = $re;
   $hash->{STATE} = "active";
 
@@ -46,13 +46,13 @@ notify_Define($$)
 sub
 notify_Exec($$)
 {
-  my ($log, $dev) = @_;
+  my ($ntfy, $dev) = @_;
 
-  my $ln = $log->{NAME};
+  my $ln = $ntfy->{NAME};
   return "" if($attr{$ln} && $attr{$ln}{disable});
 
   my $n = $dev->{NAME};
-  my $re = $log->{REGEXP};
+  my $re = $ntfy->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
   my $t = $dev->{TYPE};
 
@@ -61,7 +61,8 @@ notify_Exec($$)
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
-      my $exec = $log->{CMD};
+      my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
+      $exec = SemicolonEscape($exec);
 
       $exec =~ s/%%/____/g;
       my $extsyntax= 0;

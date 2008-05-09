@@ -25,8 +25,8 @@ at_Define($$)
   my ($name, undef, $tm, $command) = split("[ \t]+", $def, 4);
 
   if(!$command) {
-    if($hash->{CMD}) {
-      $command = $hash->{CMD};  # Called from modify
+    if($hash->{OLDDEF}) { # Called from modify, where command is optional
+      (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
       $hash->{DEF} = "$tm $command";
     } else {
       return "Usage: define <name> at <timespec> <command>";
@@ -65,7 +65,6 @@ at_Define($$)
   }
   $hash->{NTM} = $ntm if($rel eq "+" || $fn);
   $hash->{TRIGGERTIME} = $nt;
-  $hash->{CMD} = SemicolonEscape($command);
   $nextat = $nt if(!$nextat || $nextat > $nt);
 
   $hash->{STATE} = "Next: " . FmtTime($nt);
@@ -85,7 +84,9 @@ at_Exec($)
   }
 
   delete $attr{$name}{skip_next} if($skip);
-  AnalyzeCommandChain(undef, $defs{$name}{CMD}) if(!$skip && !$disable);
+  my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
+  $command = SemicolonEscape($command);
+  AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
 
   my $count = $defs{$name}{REP};
   my $def = $defs{$name}{DEF};

@@ -6,46 +6,16 @@ use warnings;
 
 use IO::Socket;
 
-###################
-# Config
-my $FHEMWEB_absicondir = "/home/httpd/icons";   # Copy your icons here
-my $FHEMWEB_relicondir = "/icons";
-my $FHEMWEB_gnuplot    = "/usr/bin/gnuplot";    # Set it to empty to disable
-my $FHEMWEB_gnuplotdir = "/home/httpd/cgi-bin"; # the .gplot filees live here
-my $FHEMWEB_absdoc     = "/home/httpd/html/commandref.html";
-my $FHEMWEB_reldoc     = "/commandref.html";
-my $FHEMWEB_tmpfile    = "/tmp/file.$$";
-my $__ME               = "/fhem";
 
 ###################
-# CSS
-my $FHEMWEB_css1 = "border: solid; border-width: thin; width: 100%; -moz-border-radius:8px; ";
-my $FHEMWEB_css="
-  body             { color: black;  background: #FFFFD7; }
-  table.room       { $FHEMWEB_css1; background: #D7FFFF; }
-  table.room               tr.sel { background: #A0FFFF; }
-  table.FS20       { $FHEMWEB_css1; background: #C0FFFF; }
-  table.FS20               tr.odd { background: #D7FFFF; }
-  table.FHT        { $FHEMWEB_css1; background: #FFC0C0; }
-  table.FHT                tr.odd { background: #FFD7D7; }
-  table.KS300      { $FHEMWEB_css1; background: #C0FFC0; }
-  table.KS300              tr.odd { background: #A7FFA7; }
-  table.FileLog    { $FHEMWEB_css1; background: #FFC0C0; }
-  table.FileLog            tr.odd { background: #FFD7D7; }
-  table.at         { $FHEMWEB_css1; background: #FFFFC0; }
-  table.at                 tr.odd { background: #FFFFD7; }
-  table.notify     { $FHEMWEB_css1; background: #D7D7A0; }
-  table.notify tr.odd             { background: #FFFFC0; }
-  table.FHZ        { $FHEMWEB_css1; background: #C0C0C0; }
-  table.FHZ                tr.odd { background: #D7D7D7; }
-  table.EM         { $FHEMWEB_css1; background: #E0E0E0; }
-  table.EM                 tr.odd { background: #F0F0F0; }
-  table._internal_ { $FHEMWEB_css1; background: #C0C0C0; }
-  table._internal_         tr.odd { background: #D7D7D7; }
-  #hdr   { position:absolute; top:10px; left:10px; }
-  #left  { position:absolute; top:50px; left:10px; width:130px; }
-  #right { position:absolute; top:50px; left:160px; bottom:10px; overflow:auto;}
-";
+# Config
+my $__ME;
+my $FHEMWEBdir;
+my $FHEMWEB_tmpfile    = "/tmp/file.$$";
+my $FHEMWEB_reldoc;
+
+use vars qw(%defs);
+use vars qw(%attr);
 
 # Nothing to config below
 #########################
@@ -84,7 +54,7 @@ my $__title;
 my $__cmdret;
 my $__RET;
 my $__RETTYPE;
-my $__SF = "<form method=\"get\" action=\"$__ME\">";
+my $__SF;
 my $__ti;  # Tabindex for all input fields
 
 
@@ -98,7 +68,7 @@ FHEMWEB_Initialize($)
 
   $hash->{DefFn}   = "FHEMWEB_Define";
   $hash->{UndefFn} = "FHEMWEB_Undef";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 fhemwebdir fhemwebname";
 }
 
 #####################################
@@ -114,14 +84,16 @@ FHEMWEB_Define($$)
   $hash->{STATE} = "Initialized";
   $hash->{PORT} = IO::Socket::INET->new(
           Proto        => 'tcp',
-          LocalHost    => ($global ? undef : "localhost"),
+          LocalHost    => (($global && $global eq "global") ? undef : "localhost"),
           LocalPort    => $port,
           Listen       => 10,
           ReuseAddr    => 1);
+
   return "Can't open server port at $port: $!" if(!$hash->{PORT});
+
   $hash->{FD} = $hash->{PORT}->fileno();
   $hash->{SERVERSOCKET} = "True";
-  Log 2, "FHEMWEB port $port opened";
+  Log(2, "FHEMWEB port $port opened");
 
   return undef;
 }
@@ -149,7 +121,7 @@ FHEMWEB_Read($)
 
     if(!@clientinfo) {
       Print("ERROR", 1, "016 Accept failed for admin port");
-      Log 1, "Accept failed for HTTP port ($name: $!)";
+      Log(1, "Accept failed for HTTP port ($name: $!)");
       return;
     }
 
@@ -166,13 +138,19 @@ FHEMWEB_Read($)
     $nhash{BUF}   = "";
 
     $defs{$nhash{NAME}} = \%nhash;
-    Log $ll, "Connection accepted from $nhash{NAME}";
+    Log($ll, "Connection accepted from $nhash{NAME}");
     return;
 
   }
 
   my $name = $hash->{SNAME};
   my $ll = GetLogLevel($name,4);
+  $FHEMWEBdir = ($attr{$name} && $attr{$name}{fhemwebdir}) ? 
+                        $attr{$name}{fhemwebdir} : "$attr{global}{modpath}/FHEM";
+  $__ME = "/" . (($attr{$name} && $attr{$name}{fhemwebname}) ? 
+                                $attr{$name}{fhemwebname} : "fhem");
+  $FHEMWEB_reldoc = "$__ME/commandref.html";
+  $__SF = "<form method=\"get\" action=\"$__ME\">";
 
   # Data from HTTP Client
   my $buf;
@@ -182,27 +160,29 @@ FHEMWEB_Read($)
     close($hash->{CD});
     delete($defs{$hash->{NAME}});
     # Don't delete the attr entry.
-    Log $ll, "Connection closed for $hash->{NAME}";
+    Log($ll, "Connection closed for $hash->{NAME}");
     return;
   }
 
   $hash->{BUF} .= $buf;
-  #Log 1, "Got: >$hash->{BUF}<";
+  #Log(1, "Got: >$hash->{BUF}<");
   return if($hash->{BUF} !~ m/\n\n$/ && $hash->{BUF} !~ m/\r\n\r\n$/);
 
   my @lines = split("[\r\n]", $hash->{BUF});
   my ($mode, $arg, $method) = split(" ", $lines[0]);
   $hash->{BUF} = "";
 
-  Log $ll, "HTTP $hash->{NAME} GET $arg";
+  Log($ll, "HTTP $hash->{NAME} GET $arg");
 
   FHEMWEB_AnswerCall($arg);
 
   my $c = $hash->{CD};
   my $l = length($__RET);
+  my $exp = localtime(time()+300) . " GMT";
 
   print  $c "HTTP/1.1 200 OK\r\n",
             "Content-Length: $l\r\n",
+            "Expires: $exp\r\n",
             "Content-Type: $__RETTYPE\r\n\r\n",
             $__RET;
 }
@@ -225,27 +205,35 @@ FHEMWEB_AnswerCall($)
   $__ti = 1;
 
   # Lets go:
-  if($arg !~ m/^$__ME(.*)/) {
-    if($arg =~ m/^$FHEMWEB_reldoc/) {
-      open(FH, $FHEMWEB_absdoc) || return;
-      pO join("", <FH>);
-      close(FH);
-    } elsif($arg =~ m/^$FHEMWEB_relicondir(.*)$/) {
-      $__RETTYPE = "image/gif";
-      open(FH, "$FHEMWEB_absicondir$1") || return;
-      pO join("", <FH>);
-      close(FH);
-    } else {
-      Log 5, "Unknown document $arg requested";
-    }
+  if($arg =~ m/^$FHEMWEB_reldoc/) {
+    open(FH, "$FHEMWEBdir/commandref.html") || return;
+    pO join("", <FH>);
+    close(FH);
+    return;
+  } elsif($arg =~ m,^$__ME/style.css,) {
+    open(FH, "$FHEMWEBdir/style.css") || return;
+    pO join("", <FH>);
+    close(FH);
+    $__RETTYPE = "text/css";
+    return;
+  } elsif($arg =~ m,^$__ME/icons/(.*)$,) {
+    open(FH, "$FHEMWEBdir/$1") || return;
+    pO join("", <FH>);
+    close(FH);
+    $__RETTYPE = "image/gif";
+    return;
+  } elsif($arg !~ m/^$__ME(.*)/) {
+    Log(5, "Unknown document $arg requested");
     return;
   }
+
   my $cmd = FHEMWEB_digestCgi($1);
 
   $__cmdret = fC($cmd) if($cmd && 
                           $cmd !~ /^showlog/ &&
                           $cmd !~ /^toweblink/ &&
-                          $cmd !~ /^showarchive/);
+                          $cmd !~ /^showarchive/ &&
+                          $cmd !~ /^edit/);
   FHEMWEB_parseXmlList();
   return FHEMWEB_showLog($cmd) if($cmd =~ m/^showlog /);
 
@@ -264,9 +252,9 @@ FHEMWEB_AnswerCall($)
     }
   }
 
-  pO "<html><head><title>$__title</title><style type=\"text/css\">";
-  pO "<!--/* <![CDATA[ */\n$FHEMWEB_css\n/* ]]> */-->";
-  pO "</style></head><body name=\"$__title\">\n";
+  pO "<html><head><title>$__title</title>";
+  pO "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>";
+  pO "</head><body name=\"$__title\">\n";
 
   if($__cmdret) {
     $__detail = "";
@@ -300,8 +288,9 @@ FHEMWEB_digestCgi($)
   foreach my $pv (split("&", $arg)) {
     $pv =~ s/\+/ /g;
     $pv =~ s/%(..)/chr(hex($1))/ge;
-    #Log 1, "P1: $pv";
     my ($p,$v) = split("=",$pv, 2);
+    $v =~ s/[\r]\n/\\\n/g; 
+    #Log(0, "P: $p, V: $v");
 
     if($p eq "detail")       { $__detail = $v; }
     if($p eq "room")         { $__room = $v; }
@@ -337,6 +326,7 @@ FHEMWEB_parseXmlList()
     ####### INT, ATTR & STATE
     if($l =~ m,^\t\t\t<(.*) key="(.*)" value="([^"]*)"(.*)/>,) {
       my ($t, $n, $v, $m) = ($1, $2, $3, $4);
+      $v =~ s/&lt;br&gt;/<br>/g;
       $__devs{$name}{$t}{$n}{VAL} = $v;
       if($m) {
         $m =~ m/measured="(.*)"/;
@@ -392,8 +382,9 @@ FHEMWEB_makeTable($$$$$$$$)
 {
   my($d,$t,$header,$hash,$clist,$ccmd,$makelink,$cmd) = (@_);
 
-  $t = "EM" if($t =~ m/^EM.*$/);
   return if(!$hash && !$clist);
+
+  $t = "EM" if($t =~ m/^EM.*$/);        # EMWZ,EMEM,etc.
   pO "  <table class=\"$t\">\n";
 
   # Header
@@ -420,7 +411,13 @@ FHEMWEB_makeTable($$$$$$$$)
     } else {
       pO "<td>$v</td>";
     }
-    pO "<td>$hash->{$v}{VAL}</td>";
+
+    if($v eq "DEF") {
+      FHEMWEB_makeEdit($d, $t, "modify", $hash->{$v}{VAL});
+    } else {
+      pO "<td id=\"show\">$hash->{$v}{VAL}</td>";
+    }
+
     pO "<td>$hash->{$v}{TIM}</td>" if($hash->{$v}{TIM});
     pO "<td><a href=\"$__ME?cmd.$d=$cmd $d $v&detail=$d\">$cmd</a></td>"
         if($cmd);
@@ -490,6 +487,14 @@ FHEMWEB_doDetail($)
   pO "<div id=\"right\">\n";
   pO "<table><tr><td>\n";
   pO "<a href=\"$__ME?cmd=delete $d\">Delete $d</a>\n";
+
+  my $pgm = "Javascript:" .
+               "s=document.getElementById('edit').style;".
+               "if(s.display=='none') s.display='block'; else s.display='none';".
+               "s=document.getElementById('disp').style;".
+               "if(s.display=='none') s.display='block'; else s.display='none';";
+  pO "<a href=\"#top\" onClick=\"$pgm\">Modify $d</a>";
+
   pO "</td></tr><tr><td>\n";
   FHEMWEB_makeTable($d, $t,
         "<a href=\"$FHEMWEB_reldoc#${t}set\">State</a>,Value,Measured",
@@ -547,7 +552,7 @@ FHEMWEB_checkDirs()
 {
   return if($__iconsread && (time() - $__iconsread) < 5);
   %__icons = ();
-  if(opendir(DH, $FHEMWEB_absicondir)) {
+  if(opendir(DH, $FHEMWEBdir)) {
     while(my $l = readdir(DH)) {
       next if($l =~ m/^\./);
       my $x = $l;
@@ -647,7 +652,7 @@ FHEMWEB_showRoom()
 
         pO "<td><a href=\"$__ME?detail=$d\">$d</a></td>";
         if($iname) {
-          pO "<td align=\"center\"><img src=\"$FHEMWEB_relicondir/$iname\" ".
+          pO "<td align=\"center\"><img src=\"$__ME/icons/$iname\" ".
                   "alt=\"$v\"/></td>";
         } else {
           pO "<td align=\"center\">$v</td>";
@@ -796,7 +801,7 @@ FHEMWEB_showLog($)
   my $path = "$1/$file";
   $path = $__devs{$d}{ATTR}{archivedir}{VAL} . "/$file" if(!-f $path);
 
-  my $gplot_pgm = "$FHEMWEB_gnuplotdir/$type.gplot";
+  my $gplot_pgm = "$FHEMWEBdir/$type.gplot";
 
   return FHEMWEB_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
   return FHEMWEB_fatal("Cannot read $path") if(!-r $path);
@@ -809,7 +814,7 @@ FHEMWEB_showLog($)
   $gplot_script =~ s/<IN>/$path/g;
   $gplot_script =~ s/<TL>/$file/g;
 
-  open(FH, "|$FHEMWEB_gnuplot > /dev/null");# feed it to gnuplot
+  open(FH, "|gnuplot > /dev/null");# feed it to gnuplot
   print FH $gplot_script;
   close(FH);
 
@@ -865,6 +870,30 @@ FHEMWEB_textfield($$)
   return $s;
 }
 
+sub
+FHEMWEB_makeEdit($$$$)
+{
+  my ($name, $type, $cmd, $val) = @_;
+
+  pO "<td>";
+  pO   "<div id=\"edit\" style=\"display:none\"><form>";
+  my $eval = $val;
+  $eval =~ s/<br>/\n/g;
+  if($type eq "at" || $type eq "notify") {
+    pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\" ".
+            "tabindex=\"$__ti\">$eval</textarea>";
+  } else {
+    pO     "<input type=\"text\" name=\"val.${cmd}$name\" size=\"40\" ".
+            "tabindex=\"$__ti\" value=\"$eval\"/>";
+  }
+  $__ti++;
+  pO     "<br>" . FHEMWEB_submit("cmd.${cmd}$name", "$cmd $name");
+  pO   "</form></div>";
+  $eval = "<pre>$eval</pre>" if($eval =~ m/\n/);
+  pO   "<div id=\"disp\">$eval</div>";
+  pO  "</td>";
+}
+
 ##################
 sub
 FHEMWEB_submit($$)
@@ -891,10 +920,13 @@ pO(@)
 sub
 fC($)
 {
+  my ($cmd) = @_;
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;
-  my $ret = AnalyzeCommand(undef, shift);
-  $attr{global}{verbose} = $oll;
+  my $ret = AnalyzeCommand(undef, $cmd);
+  if($cmd !~ m/attr.*global.*verbose/) {
+    $attr{global}{verbose} = $oll;
+  }
   return $ret;
 }
 
