@@ -384,6 +384,7 @@
   - feature: contrib/00_LIRC.pm (25.3, by Bernhard)
   - bugfix : 00_FHZ: additional stty settings for strange Linux versions
   - bugfix : pgm2 wrong temp summary for FHT's (reported by O.D., 16.4.2008)
-
-- TODO
-  emem -2.5kW / getDevData for emwz -1
+  - feature: FHEM modules may live on a filesystem with "ignorant" casing (FAT)
+  - feature: FileLog "set reopen" for manual tweaking of logfiles.
+  - feature: multiline commands are supported through the command line
+  - feature: pgm2 installation changes, multiple instances, external css

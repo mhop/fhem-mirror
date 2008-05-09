@@ -11,8 +11,10 @@ FileLog_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{DefFn} = "FileLog_Define";
-  $hash->{UndefFn} = "FileLog_Undef";
+  $hash->{DefFn}    = "FileLog_Define";
+  $hash->{SetFn}    = "FileLog_Set";
+  $hash->{GetFn}    = "FileLog_Get";
+  $hash->{UndefFn}  = "FileLog_Undef";
   $hash->{NotifyFn} = "FileLog_Log";
   $hash->{AttrFn}   = "FileLog_Attr";
   # logtype is used by the frontend
@@ -101,6 +103,7 @@ FileLog_Log($$)
   return "";
 }
 
+###################################
 sub
 FileLog_Attr(@)
 {
@@ -117,4 +120,79 @@ FileLog_Attr(@)
 
   return undef;
 }
+
+###################################
+sub
+FileLog_Set($@)
+{
+  my ($hash, @a) = @_;
+  
+  return "no set argument specified" if(int(@a) != 2);
+  return "Unknown argument $a[1], choose one of reopen"
+        if($a[1] ne "reopen");
+
+  my $fh = $hash->{FH};
+  my $cn = $hash->{currentlogfile};
+  $fh->close();
+  $fh = new IO::File ">>$cn";
+  return "Can't open $cn" if(!defined($fh));
+  $hash->{FH} = $fh;
+  return undef;
+}
+
+###################################
+sub
+FileLog_Get($@)
+{
+  my ($hash, @a) = @_;
+  
+  return "Usage: get $a[0] <from> <to> <column_list>" if(int(@a) != 4);
+  my $fh = new IO::File $hash->{currentlogfile};
+  seekTo($fh, $hash, $a[1]);
+#  my @arr = 
+  while(my $l = <$fh>) {
+    last if($l gt $a[2]);
+  }
+  close($fh);
+  return "EOF" if(!defined($data));
+
+  return $data;
+}
+
+###################################
+sub
+seekTo($$$)
+{
+  my ($fh, $hash, $ts) = @_;
+
+  # If its cached
+  if($hash->{pos} && $hash->{pos}{$ts}) {
+    $fh->seek($hash->{pos}{$ts}, 0);
+    return;
+  }
+
+  $fh->seek(0, 2); # Go to the end
+  my $upper = $fh->tell;
+
+  my ($lower, $next, $last) = (0, $upper/2, 0);
+  while() {                                             # Binary search
+    $fh->seek($next, 0);
+    my $data = <$fh>;
+    if($data !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /) {
+      $next = $fh->tell;
+      $data = <$fh>;
+    }
+    last if($next eq $last);
+
+    $last = $next;
+    if($data lt $ts) {
+      ($lower, $next) = ($next, ($next+$upper)/2);
+    } else {
+      ($upper, $next) = ($next, ($lower+$next)/2);
+    }
+  }
+  $hash->{pos}{$ts} = $last;
+
+}
+
 1;

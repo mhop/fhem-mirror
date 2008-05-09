@@ -98,9 +98,9 @@ configuration file at startup). The commands are either executed directly, or
 later if they are arguments to the <a href="#at">at</a> and <a
 href="#notify">notify</a> fhem commands.<br><br>
 
-If commands are read from a file, then a line ending with \ will be
-concatenated with the next one, so long lines (e.g. perl oneliners) can be
-split in multiple lines<br><br>
+A line ending with \ will be concatenated with the next one, so long lines
+(e.g. multiple perl commands) can be split in multiple lines. Some web fronteds
+make editing of multiline commands transparent.<br><br>
 
 
 <a name="help"></a>
@@ -1824,6 +1824,15 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     Sets the reading of the counter to the given value. The counter is reset
     and started and the offset is adjusted to value/unit.
     <br><br>
+  </ul>
+
+  <a name="FileLogset"></a>
+  <h4>Type FileLog:</h4>
+  <ul>
+    <code>set &lt;name&gt; reopen</code><br>
+
+    Used to reopen a FileLog after making some manual changes to the logfile.
+    <br>
   </ul>
 
 

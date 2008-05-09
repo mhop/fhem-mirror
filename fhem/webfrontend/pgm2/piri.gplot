@@ -3,7 +3,7 @@
 # FileLog definition:
 #  define FileLog fs20log fs20dev /var/log/fs20dev-%Y-%U.log 
 #
-set terminal png size 800,200 crop
+set terminal png transparent size 800,200 crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
