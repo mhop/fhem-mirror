@@ -29,7 +29,6 @@
   <br>
   What does not work right now:<br>
   <ul>
-    <li>Automatic startup after reboot of the fritzbox</li>
     <li>Gnuplot. No idea how to replace it, perhaps we compile a fritzbox
         version</li>
     <li>EM1010PC. I tried it without batteries, and I think the USB interface
@@ -81,6 +80,12 @@
           telnet fritz.box 7072<br>
         </ul>
         to define your devices.</li>
+    <li>To enable automatic startup after reboot of the fritzbox enter the
+        following at the end of the /var/flash/debug.cfg:<br>
+        <ul>
+          /bin/sleep 120<br>
+          cd /var/media/ftp/*Partition*/usr/fhem &amp;&amp; ./rc.fhem
+        </ul></li>
   </ul>
   <br>
   Tips:<br>
@@ -123,8 +128,8 @@
 
 <h2>Links</h2>
 <ul>
-  <li>Complete fhem package for the fritzbox: <a href="fb_fhem_0.2.tar.gz">
-      fb_fhem_0.2.tar.gz</a></li>
+  <li>Complete fhem package for the fritzbox: <a href="fb_fhem_0.3.tar.gz">
+      fb_fhem_0.3.tar.gz</a></li>
   <li>Telnet on the fritzbox:
       <a href="http://www.ip-phone-forum.de/showthread.php?t=69245">
       ip-phone-thread</a></li>

@@ -3,21 +3,24 @@
 # FileLog definition: 
 #   define FileLog fhtlog1 fht1:.*(temp|actuator).* /var/log/fht1-%Y-%U.log 
 #
-set terminal png size 800,200 crop
+set terminal png transparent size 800,200 crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics nomirror
 set y2tics
-set ytics 1
+#set ytics
 set title '<TL>'
-set grid
+set grid xtics y2tics
 
-set ylabel "Temperature (Celsius)"
-set y2label "Actuator (%)"
+set y2label "temperature (Celsius)"
+set ylabel "Actuator (%)"
+
 plot \
-  "< awk '/measured/{print $1, $4; s=1}' <IN>"\
-     using 1:2 axes x1y1 title 'Measured temperature' with lines,\
-  "< awk '/actuator/ {print $1, $4+0; have=1} /measured/ {s=$1} END { if(!have) print (s, 0)}' <IN>"\
-     using 1:2 axes x1y2 title 'Actuator (%)' with lines
+  "< awk '/measured/{print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
+  "< awk '/desired/ {print $1, $4+0}' <IN>"\
+     using 1:2 axes x1y2 title 'Desired temperature' with steps,\
+  "< awk '/actuator/ {print $1, $4+0}' <IN>"\
+     using 1:2 axes x1y1 title 'Actuator (%)' with lines\

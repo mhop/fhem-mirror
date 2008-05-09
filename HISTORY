@@ -220,3 +220,31 @@
 
 - Peter S. Wed Mar 19 08:24:00 MET 2008
   - 00_FHZ.pm: DoTriger -> DoTrigger
+
+- Rudi Fri May  9 20:00:00 MEST 2008
+  - feature: FHEM modules may live on a filesystem with "ignorant" casing (FAT)
+    If you install FHEM on a USB-Stick (e.g. for the FritzBox) it may happen
+    that the filename casing is different from the function names inside the file.
+    -> Fhem won't find the <module>_Initialize function. Fixed by searching all
+    function-names for a match with "ignore-case"
+  - feature: FileLog function "set reopen" impemented. In case you want to delete some
+    wrong entries from a current logfile, you must tell fhem to reopen the file again
+  - feature: multiline commands are supported through the command line
+    Up till now multiline commands were supported only by "include". Now they
+    are supprted from the (tcp/ip) connection too, so they can be used by the
+    web frontends.
+  - feature: pgm2 installation changes, multiple instances, external css
+    pgm2 (FHEMWEB) is now a "real" fhem module:
+    - the configuration takes place via attributes
+    - the css file is external, and each FHEMWEB instance can use its own set
+    - the default location for pictures, gnuplot scripts and css is the FHEM
+      module directory
+    - multiline support for notify and at scripts.
+
+
+
+
+    - feature: FileLog "set reopen" for manual tweaking of logfiles.
+      - feature: multiline commands are supported through the command line
+        - feature: pgm2 installation changes, multiple instances, external css
+
