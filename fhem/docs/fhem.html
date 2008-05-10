@@ -15,6 +15,7 @@ Formerly known as fhz1000.pl
 
 <h2>News (as of =DATE=, Version =VERS=)</h2>
 <ul>
+  <li>feature: added ws2000 support via 87_WS2000.pm(thomas 10.05.08)</li>
   <li>feature: added archivedir/archivecmd to the the main logfile</li>
   <li>feature: 99_Sunrise_EL.pm (does not need any Date modules)</li>
   <li>bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)</li>
@@ -73,6 +74,8 @@ Currently implemented features:<br>
   <li>reading EM1000WZ/EM1000EM data via an attached EM1010PC</li>
   <li>reading attached SCIVT devices</li>
   <li>reading attached M232 devices</li>
+  <li>reading attached WS2000/WS25000 devices, also via raw network converters(xport)</li>
+  <li>logging events to files or databases
   <li>logging events to files or databases, with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
       events</li>
@@ -138,9 +141,10 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 
 <h3>Perl modules</h3>
 <ul>
-  You need perl with the Device::SerialPort (<a
+  You need perl &gt;=5.8, on Unix with the Device::SerialPort (<a
   href="http://search.cpan.org/dist/Device-SerialPort/">
-  http://search.cpan.org/dist/Device-SerialPort/</a>)
+  http://search.cpan.org/dist/Device-SerialPort/</a>),
+  on Windows Win32::SerialPort (best along ActiveState ActivePerl installation on Windows)
   module. All other needed modules were present in my installation.
   If this module reports <code>Can't call method "opened" on an undefined
   value...</code> when starting the server, then you either may ignore
@@ -149,7 +153,7 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
     	                       $self->{HANDLE}->opened);</pre>
 </ul>
 
-<h3>Server installation</h3>
+<h3>Server installation on Unix</h3>
 <ul>
   <li>Copy the file <code>fhem.pl</code> into your path (e.g.
       <code>/usr/local/bin</code>), and the FHEM directory e.g. to
@@ -164,6 +168,23 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
       parameters.</li>
   <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
 </ul>
+
+<h3>Server installation on Windows</h3>
+( if you are using cygwin for your perl installation you can follow the guidelines for Unix)
+<ul>
+  <li> be sure you have perl.exe in your path (%PATH%)</li>
+  <li> unpack distribution in a directory of your choise </li>
+  <li>Copy additional modules from the contrib directory
+      (like 99_SUNRISE_EL.pm)</li>
+  <li>Make sure that you can access the serial USB
+      device via virtual COM-Port or via socket(e.g. <code>COMX or xport:10001</code>).</li>
+  <li>Create a configuration file (see the examples directory and 
+      docs/commandref.html), change at least the modpath
+      (<code>your_install_dir</code>) and define FHZ FHZ (<code>COM10</code>)
+      parameters.</li>
+  <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
+</ul>
+
 
 <h3>General Notes for Webfrontends:</h3>
 <ul>
