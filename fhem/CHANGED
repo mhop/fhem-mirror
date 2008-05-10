@@ -388,3 +388,6 @@
   - feature: FileLog "set reopen" for manual tweaking of logfiles.
   - feature: multiline commands are supported through the command line
   - feature: pgm2 installation changes, multiple instances, external css
+  - feature: 87_ws2000.pm (thomas 10.05.08)
+  - contrib: ws2000_reader.pl Standalone decoder and server (thomas 10.05.08)
+  - doc		: update fhem.html and commandline.html reflecting ws2000 and windows installation(thomas 10.05.08)
