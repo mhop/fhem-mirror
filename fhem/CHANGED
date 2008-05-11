@@ -396,3 +396,5 @@
   - bugfix : WS2000:fixed serial port access on windows by replacing FD with ReadyFn
   - bugfix : FileLog: dont use FH->sync on windows (not implemented there)
   - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and Win32::SerialPort to get it running in Windows (sorry, untestet)
+  - bugfix: FileLog undefined $data in FileLog_Get
+  - feature: fhem.pl check modules for compiletime errors and do not initialize them
