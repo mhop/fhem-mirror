@@ -149,9 +149,11 @@ FileLog_Get($@)
   return "Usage: get $a[0] <from> <to> <column_list>" if(int(@a) != 4);
   my $fh = new IO::File $hash->{currentlogfile};
   seekTo($fh, $hash, $a[1]);
-#  my @arr = 
+#  my @arr =
+ my $data='';
   while(my $l = <$fh>) {
     last if($l gt $a[2]);
+    $data.=$l;
   }
   close($fh);
   return "EOF" if(!defined($data));

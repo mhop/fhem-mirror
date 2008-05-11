@@ -114,7 +114,7 @@ WS300_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-
+    my $po;
   if($a[0] eq "WS300Device")
   {
     $defptr{10} = $hash;
@@ -124,13 +124,13 @@ WS300_Define($$)
     $hash->{SENSOR} = 10;
     $hash->{READINGS}{WS300Device}{VAL} = "Initializing";
     $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
-
+ 
   if ($^O=~/Win/) {
     eval ("use Win32::SerialPort;");
-   my $po = new Win32::SerialPort ($DeviceName);
+    $po = new Win32::SerialPort ($DeviceName);
   }else{
     eval ("use Device::SerialPort;");
-   my $po = new Device::SerialPort ($DeviceName);
+    $po = new Device::SerialPort ($DeviceName);
   }
     if(!$po)
     {
@@ -514,6 +514,7 @@ WS300_Poll($)
   my $hash = shift;
   my $bstring="   ";
   my $count;
+  my $po;
   my $inchar='';
   my $escape=0;
   my $ll = GetLogLevel("WS300Device");
@@ -541,9 +542,9 @@ NEXTPOLL:
     $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
     sleep(1);
     if ($^O=~/Win/) {
-      my $po = new Win32::SerialPort ($devname);
+       $po = new Win32::SerialPort ($devname);
     }else{  
-     my $po = new Device::SerialPort ($devname);
+      $po = new Device::SerialPort ($devname);
     }
     if($po) 
     {
