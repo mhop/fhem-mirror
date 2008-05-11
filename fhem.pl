@@ -103,7 +103,8 @@ sub CommandTrigger($$);
 # StateFn  - set local info for this device, do not activate anything
 # TimeFn   - if the TRIGGERTIME of a device is reached, call this function
 # NotifyFn - call this if some device changed its properties
-# ReadFn - Reading from a filedescriptor (see FHZ/WS300)
+# ReadyFn - check for available data, if no FD
+# ReadFn - Reading from a Device (see FHZ/WS300)
 
 #Special values in %defs:
 # TYPE    - The name of the module it belongs to
@@ -139,7 +140,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.42 2008-05-09 13:58:10 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.43 2008-05-11 17:27:01 tdressler Exp $';
 
 $init_done = 0;
 
@@ -263,6 +264,7 @@ Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
 ################################################
 # Main Loop
+MAIN:
 while (1) {
   my ($rout, $rin) = ('', '');
 
@@ -273,8 +275,8 @@ while (1) {
   foreach my $c (keys %client) {
     vec($rin, fileno($client{$c}{fd}), 1) = 1;
   }
-
-  my $nfound = select($rout=$rin, undef, undef, HandleTimeout());
+  my $timeout=HandleTimeout()||0.2;#0.2s if nothing else defined
+  my $nfound = select($rout=$rin, undef, undef, $timeout);
 
   CommandShutdown(undef, undef) if($sig_term);
 
@@ -282,12 +284,14 @@ while (1) {
     next if ($! == 0);
     die("Select error $nfound / $!\n");
   }
-
+ 
   ###############################
-  # Message from the hardware (FHZ1000/WS3000/etc)
+  # Message from the hardware (FHZ1000/WS3000/etc) via FD or from Ready Function
   foreach my $p (keys %defs) {
-    next if(!$defs{$p}{FD} || !vec($rout, $defs{$p}{FD}, 1));
-    CallFn($p, "ReadFn", $defs{$p});
+    my $ready=CallFn($p,"ReadyFn",$defs{$p}) if ($modules{$p}{ReadyFn});
+    if(($defs{$p}{FD} && vec($rout, $defs{$p}{FD}, 1)) || $ready) {
+         CallFn($p, "ReadFn", $defs{$p});
+    }
   }
   
   if(vec($rout, $server->fileno(), 1)) {
