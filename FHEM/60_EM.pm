@@ -42,7 +42,7 @@ EM_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-
+  my $po;
   $hash->{STATE} = "Initialized";
 
   delete $hash->{PortObj};
@@ -62,10 +62,10 @@ EM_Define($$)
   Log 3, "EM opening device $dev";
   if ($^O=~/Win/) {
    eval ("use Win32::SerialPort;");
-   my $po = new Win32::SerialPort ($dev);
+    $po = new Win32::SerialPort ($dev);
   }else{
    eval ("use Device::SerialPort;");
-   my $po = new Device::SerialPort ($dev);
+    $po = new Device::SerialPort ($dev);
   }
   
   return "Can't open $dev: $!" if(!$po);
@@ -282,12 +282,13 @@ EmGetData($$)
 {
   my ($dev, $d) = @_;
   $d = EmMakeMsg(pack('H*', $d));
-
+  my $serport;
   return undef if(!$dev);
+  #OS depends
   if ($^O=~/Win/) {
-      my $serport = new Win32::SerialPort ($dev);
+       $serport = new Win32::SerialPort ($dev);
     }else{  
-     my $serport = new Device::SerialPort ($dev);
+      $serport = new Device::SerialPort ($dev);
     }
     
   if(!$serport) {
@@ -313,15 +314,19 @@ EmGetData($$)
     my $started = 0;
     my $complete = 0;
     for(;;) {
-      my ($rout, $rin) = ('', '');
-      vec($rin, $serport->FILENO, 1) = 1;
-      my $nfound = select($rout=$rin, undef, undef, 1.0);
-
-      if($nfound < 0) {
-        $rm = "EM Select error $nfound / $!";
-        goto DONE;
-      }
-      last if($nfound == 0);
+      #select will not work on windows, replaced with status
+      #
+      #my ($rout, $rin) = ('', '');
+      #vec($rin, $serport->FILENO, 1) = 1;
+      #my $nfound = select($rout=$rin, undef, undef, 1.0);
+      #
+      #if($nfound < 0) {
+      #  $rm = "EM Select error $nfound / $!";
+      #  goto DONE;
+      #}
+      #last if($nfound == 0);
+      my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$serport->status;
+     last if ($InBytes<1);
 
       my $buf = $serport->input();
       if(!defined($buf) || length($buf) == 0) {
