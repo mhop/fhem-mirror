@@ -4,7 +4,7 @@ package main;
 # Modul for FHEM
 #
 # contributed by thomas dressler 2008
-# $Id: 87_WS2000.pm,v 1.2 2008-05-11 17:34:07 tdressler Exp $
+# $Id: 87_WS2000.pm,v 1.3 2008-05-11 21:17:30 tdressler Exp $
 ###########################
 use strict;
 use Switch;
@@ -303,14 +303,18 @@ sub
 WS2000_Parse($$) {
     my ($hash,$msg) = @_;
     my ($stx,$typ,$w1,$w2,$w3,$w4,$w5,$etx)=map {$_ & 0x7F} unpack("U*",$msg);
-    
-    my ($sensor,$daten1,$einheit1,$daten2,$einheit2,$daten3,$einheit3,$result,$shortname,$val, $unit);  
-    my $group = ($typ & 0x70)/16 ;#/slash for komodo syntax checker!
-    my $snr = $typ % 16;
     my $tm=TimeNow();
     my $name=$hash->{NAME};
     my $factor=$attr{$name}{rain}||366;
     my $altitude=$attr{$name}{altitude}||0;
+    if ($etx != 3) {
+      Log 4, "$name:Frame Error!";
+      return undef;
+    }
+    my ($sensor,$daten1,$einheit1,$daten2,$einheit2,$daten3,$einheit3,$result,$shortname,$val, $unit);  
+    my $group = ($typ & 0x70)/16 ;#/slash for komodo syntax checker!
+    my $snr = $typ % 16;
+    
     
     #duplicate check (repeater?)
     my $prevmsg=$hash->{READINGS}{RAW}{VAL}||'';
@@ -319,7 +323,7 @@ WS2000_Parse($$) {
       Log 4,"$name check: Duplicate detected";
       return undef;
     }
-    my $rawtext="Typ=$typ,W1=$w1,W2=$w2,W3=$w3,W4=$w4,W5=$w5";
+    my $rawtext="Typ:$typ,W1:$w1,W2:$w2,W3:$w3,W4:$w4,W5:$w5";
     Log 4, "$name parsing: $rawtext";
     
     #break into sensor specs
@@ -345,7 +349,7 @@ WS2000_Parse($$) {
                 }
 		$shortname='TX'.$snr;
                 $einheit1 = " C";
-                $result = $shortname . " => T=" . $daten1 . $einheit1;
+                $result = $shortname . " => T:" . $daten1 . $einheit1;
                 
             }
         case 1 {
@@ -366,7 +370,7 @@ WS2000_Parse($$) {
             $daten3 = 0;
             $einheit2 = " %";
             
-	    $result = $shortname . " => T=" . $daten1 . $einheit1 . ", H=" . $daten2 .$einheit2;
+	    $result = $shortname . " => T:" . $daten1 . $einheit1 . ", H:" . $daten2 .$einheit2;
             
             
         }
@@ -388,8 +392,10 @@ WS2000_Parse($$) {
 	    }
             my $diff=$daten1-$prev;
             $daten2= $diff * $factor/1000;
-            $einheit2 = " l/m≤";
-            $result = $shortname . " => M=".$daten2. $einheit2."(". $diff . $einheit1 ." x Faktor $factor), C=$daten1, P=$prev" ;
+            $einheit2 = " l/m2";
+            $result = $shortname 
+		 . " => M:".$daten2. $einheit2."(". $diff . $einheit1 ." x Faktor $factor)"
+		 . ", C:$daten1, P:$prev" ;
             
         }
         case 3 {
@@ -414,7 +420,7 @@ WS2000_Parse($$) {
 	    my @wr=("N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW");
 	    my @bf=(0,0.7,5.4,11.9,19.4,38.7,49.8,61.7,74.6,88.9,102.4,117.4);
 	    my @bfn=("Windstille","leiser Zug","leichte Brise","schwache Brise","maessige Brise","frische Brise",
-                "starker Wind","steifer Wind","st√ºrmischer Wind","Sturm","schweer Sturm","orkanartiger Sturm","Orkan");
+                "starker Wind","steifer Wind","stuermischer Wind","Sturm","schwerer Sturm","orkanartiger Sturm","Orkan");
 	    my $i=1;
 	    foreach  (1..$#bf) {
 	          if ($daten1<$bf[$i]) {
@@ -426,7 +432,11 @@ WS2000_Parse($$) {
 	    #windrichtung
 	    my $w=int($daten2/22.5+0.5);
 	    if ($w ==16) {$w=0;}
-	    $result = $shortname . " => S=" . $daten1 . $einheit1 . ", B=$i($bfn[$i]),D=" . $daten2 . $einheit2 . "($wr[$w]) $einheit3 $daten3";
+	    $result = $shortname 
+		.  " => S:" . $daten1 . $einheit1 
+		.  ", BF:$i($bfn[$i])"
+		.  " ,R:" . $daten2 . $einheit2 
+		.  "($wr[$w])".$einheit3. $daten3;
           
         }
         case 4 {
@@ -447,7 +457,10 @@ WS2000_Parse($$) {
             $einheit1 = " C";
             $einheit2 = " %";
             $einheit3 = " hPa";
-            $result = $shortname . " => T=" . $daten1 . $einheit1 . ", H=" . $daten2 . $einheit2 . ", D=" . $daten3 . $einheit3;
+            $result = $shortname 
+		. " => T:" . $daten1 . $einheit1 
+		. ", H:" . $daten2 . $einheit2 
+		. ", D:" . $daten3 . $einheit3;
             
         }
         case 5 {
@@ -462,7 +475,7 @@ WS2000_Parse($$) {
             }
             $daten1 = $daten1 * ($w1 * 128 + $w2);
             $einheit1 = "Lux";
-            $result = $shortname . " => L=" . $daten1 . $einheit1;
+            $result = $shortname . " => L:" . $daten1 . $einheit1;
             
         }
         case 6 {
@@ -477,8 +490,8 @@ WS2000_Parse($$) {
                 case 3 {$daten1 = 1000;}
             }
             $daten1 = $daten1 * ($w1 * 128 + $w2);
-            $einheit1 = " W/m≤";
-            $result = $shortname . " => P=" . $daten1 . $einheit1;
+            $einheit1 = " W/m2";
+            $result = $shortname . " => P:" . $daten1 . $einheit1;
             
         }
         else {

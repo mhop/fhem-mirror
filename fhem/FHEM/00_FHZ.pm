@@ -205,7 +205,7 @@ FHZ_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-
+  my $po;
   $hash->{STATE} = "Initialized";
 
   delete $hash->{PortObj};
@@ -225,11 +225,11 @@ FHZ_Define($$)
   
   Log 3, "FHZ opening FHZ device $dev";
   if ($^O=~/Win/) {
-   eval ("use Win32::SerialPort;");
-   my $po = new Win32::SerialPort ($dev);
+   require Win32::SerialPort;
+   $po = new Win32::SerialPort ($dev);
   }else{
-   eval ("use Device::SerialPort;");
-   my $po = new Device::SerialPort ($dev);
+   require Device::SerialPort;
+   $po = new Device::SerialPort ($dev);
   }
   return "Can't open $dev: $!\n" if(!$po);
   Log 3, "FHZ opened FHZ device $dev";
