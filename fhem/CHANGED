@@ -391,3 +391,8 @@
   - feature: 87_ws2000.pm (thomas 10.05.08)
   - contrib: ws2000_reader.pl Standalone decoder and server (thomas 10.05.08)
   - doc		: update fhem.html and commandline.html reflecting ws2000 and windows installation(thomas 10.05.08)
+  - feature: add ReadyFn to fhem.pl in main loop to have an alternative for select, which is not working on windows (thomas 11.05)
+  - feature: set timeout to 0.2s, if HandleTimeout returns undef=forever
+  - bugfix : WS2000:fixed serial port access on windows by replacing FD with ReadyFn
+  - bugfix : FileLog: dont use FH->sync on windows (not implemented there)
+  - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and Win32::SerialPort to get it running in Windows (sorry, untestet)
