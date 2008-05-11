@@ -97,7 +97,7 @@ FileLog_Log($$)
 
       print $fh "$t $n $s\n";
       $fh->flush;
-      $fh->sync;
+      $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
     }
   }
   return "";
