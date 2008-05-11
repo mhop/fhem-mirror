@@ -4,7 +4,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-use Device::SerialPort;
+
 
 sub FHZ_Write($$$);
 sub FHZ_Read($);
@@ -222,9 +222,15 @@ FHZ_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
-
+  
   Log 3, "FHZ opening FHZ device $dev";
-  my $po = new Device::SerialPort ($dev);
+  if ($^O=~/Win/) {
+   eval ("use Win32::SerialPort;");
+   my $po = new Win32::SerialPort ($dev);
+  }else{
+   eval ("use Device::SerialPort;");
+   my $po = new Device::SerialPort ($dev);
+  }
   return "Can't open $dev: $!\n" if(!$po);
   Log 3, "FHZ opened FHZ device $dev";
 
