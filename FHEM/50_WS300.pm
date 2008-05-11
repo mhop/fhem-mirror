@@ -125,7 +125,13 @@ WS300_Define($$)
     $hash->{READINGS}{WS300Device}{VAL} = "Initializing";
     $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
 
-    my $po = new Device::SerialPort ($a[2]);
+  if ($^O=~/Win/) {
+    eval ("use Win32::SerialPort;");
+   my $po = new Win32::SerialPort ($DeviceName);
+  }else{
+    eval ("use Device::SerialPort;");
+   my $po = new Device::SerialPort ($DeviceName);
+  }
     if(!$po)
     {
       $hash->{STATE} = "error opening device";
@@ -534,7 +540,11 @@ NEXTPOLL:
     $hash->{READINGS}{WS300Device}{VAL} = "disconnected";
     $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
     sleep(1);
-    my $po = new Device::SerialPort($devname);
+    if ($^O=~/Win/) {
+      my $po = new Win32::SerialPort ($devname);
+    }else{  
+     my $po = new Device::SerialPort ($devname);
+    }
     if($po) 
     {
       $po->reset_error();

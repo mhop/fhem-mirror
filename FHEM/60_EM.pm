@@ -3,7 +3,7 @@ package main;
 
 use strict;
 use warnings;
-use Device::SerialPort;
+
 
 sub EM_Write($$);
 sub EmCrc($$);
@@ -60,7 +60,14 @@ EM_Define($$)
   }
 
   Log 3, "EM opening device $dev";
-  my $po = new Device::SerialPort ($dev);
+  if ($^O=~/Win/) {
+   eval ("use Win32::SerialPort;");
+   my $po = new Win32::SerialPort ($dev);
+  }else{
+   eval ("use Device::SerialPort;");
+   my $po = new Device::SerialPort ($dev);
+  }
+  
   return "Can't open $dev: $!" if(!$po);
   Log 3, "EM opened device $dev";
   $po->close();
@@ -277,7 +284,12 @@ EmGetData($$)
   $d = EmMakeMsg(pack('H*', $d));
 
   return undef if(!$dev);
-  my $serport = new Device::SerialPort ($dev);
+  if ($^O=~/Win/) {
+      my $serport = new Win32::SerialPort ($dev);
+    }else{  
+     my $serport = new Device::SerialPort ($dev);
+    }
+    
   if(!$serport) {
     Log 1, "EM: Can't open $dev: $!";
     return undef;
