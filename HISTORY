@@ -240,10 +240,6 @@
     - the default location for pictures, gnuplot scripts and css is the FHEM
       module directory
     - multiline support for notify and at scripts.
-
-
-
-
     - feature: FileLog "set reopen" for manual tweaking of logfiles.
       - feature: multiline commands are supported through the command line
         - feature: pgm2 installation changes, multiple instances, external css
@@ -252,3 +248,9 @@
 	-feature:add WS2000 Support new modul 87_ws2000.pm and standalone reader/server ws2000_reader.pl
 	-doc: modified fhem.html/commandref.html reflectiing ws2000 device and added windows support
 		(tagged:before tdressler_20080510_1, after tdressler_20080510_2)
+-tdressler So May 11 19:30:00 MEST 2008
+	- feature: add ReadyFn to fhem.pl in main loop to have an alternative for select, which is not working on windows (thomas 11.05)
+  - feature: set timeout to 0.2s, if HandleTimeout returns undef=forever (tagged tdressler_20080511_1/2)
+  - bugfix : WS2000:fixed serial port access on windows by replacing FD with ReadyFn
+  - bugfix : FileLog: dont use FH->sync on windows (not implemented there)
+  - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and Win32::SerialPort to get it running in Windows (sorry, untestet)
