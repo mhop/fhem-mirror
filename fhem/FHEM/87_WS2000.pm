@@ -4,7 +4,7 @@ package main;
 # Modul for FHEM
 #
 # contributed by thomas dressler 2008
-# $Id: 87_WS2000.pm,v 1.1 2008-05-10 21:10:29 tdressler Exp $
+# $Id: 87_WS2000.pm,v 1.2 2008-05-11 17:34:07 tdressler Exp $
 ###########################
 use strict;
 use Switch;
@@ -13,7 +13,7 @@ use warnings;
 #prototypes to make komodo happy
 use vars qw{%attr %defs};
 sub Log($$);
-
+our $FH;
 ####################################
 # WS2000_Initialize
 # Implements Initialize function
@@ -31,7 +31,7 @@ sub WS2000_Initialize($)
   $hash->{UndefFn} = "WS2000_Undef";
   $hash->{GetFn}   = "WS2000_Get";
   $hash->{SetFn}   = "WS2000_Set";
-  #$hash->{ParseFn} = "WS2000_Parse";
+  $hash->{ReadyFn} = "WS2000_Ready";
   $hash->{ReadFn}   ="WS2000_Read";
   $hash->{ListFn}   ="WS2000_List";
   $hash->{AttrList}= "model:WS2000 rain altitude loglevel:0,1,2,3,4,5";
@@ -49,7 +49,8 @@ WS2000_Define($$)
   delete $hash->{po};
   delete $hash->{socket};
   delete $hash->{FD};
-   my $quiet=0;
+  my $ws2000_cfg='ws2000.cfg';
+   my $quiet=1;
    my $name=$hash->{NAME};
   my $PortName = $a[2];
   my $PortObj;
@@ -74,11 +75,12 @@ WS2000_Define($$)
                    return "Can't use Win32::SerialPort $@\n";
                 }
                 $PortObj = new Win32::SerialPort ($PortName, $quiet);
-                if ($PortObj) {
+                if (!$PortObj) {
                    $hash->{STATE} = "error opening device";
                    Log 1,"Error opening Serial Device $PortName";
-                   return "Can't open PortName: $^E\n";
+                   return "Can't open Device $PortName: $^E\n";
                 }
+		 #$hash->{FD}=$PortObj->{_HANDLE};
 	} else {
 		eval ("use Device::SerialPort;");
 		if ($@) {
@@ -87,11 +89,12 @@ WS2000_Define($$)
                    return "Can't Device::SerialPort $@\n";
                 }
 		$PortObj = new Device::SerialPort ($PortName, $quiet);
-                if ($PortObj) {
+                if (!$PortObj) {
                    $hash->{STATE} = "error opening device";
                    Log 1,"Error opening Serial Device $PortName";
-                   return "Can't open PortName: $^E\n";
+                   return "Can't open Device $PortName: $^E\n";
                 }
+		 #$hash->{FD}=$PortObj->FILENO;
 	}
         #Parameter 19200,8,2,Odd,None
         $PortObj->baudrate(19200);
@@ -104,7 +107,6 @@ WS2000_Define($$)
 		return "Serial write Settings failed!\n";
 	}
         $hash->{po}=$PortObj;
-        $hash->{FD}=$PortObj->FILENO;
         $hash->{socket}=0;
         
     }elsif($PortName=~/([\w.]+):(\d{1,5})/){
@@ -156,6 +158,21 @@ WS2000_Undef($$)
   }
   Log 5, "$name shutdown complete";
   return undef;
+}
+
+#####################################
+# WS2000_Set
+# implement SetFn
+# currently nothing to set
+#
+sub
+WS2000_Ready($$)
+{
+  my ($hash, $dev) = @_;
+  my $po=$hash->{po};
+  return undef if !$po;
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
+  return ($InBytes>0);
 }
 
 #####################################
@@ -298,7 +315,7 @@ WS2000_Parse($$) {
     #duplicate check (repeater?)
     my $prevmsg=$hash->{READINGS}{RAW}{VAL}||'';
     my $prevtime=$hash->{READINGS}{RAW}{TIME}||0;
-    if (($prevmsg eq $msg) && ((time() - $prevtime) <3)) {
+    if (($prevmsg eq $msg) && ((time() - $prevtime) <10)) {
       Log 4,"$name check: Duplicate detected";
       return undef;
     }
