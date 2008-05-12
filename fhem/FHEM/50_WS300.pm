@@ -150,6 +150,7 @@ WS300_Define($$)
     $po->dtr_active(1);
     sleep(1);
     $po->rts_active(0);
+    $po->write_settings;
     $hash->{PortObj} = $po;
     $hash->{DeviceName} = $a[2];    
     $hash->{STATE} = "opened";
@@ -558,6 +559,7 @@ NEXTPOLL:
       $po->dtr_active(1);
       sleep(1);
       $po->rts_active(0);
+      $po->write_settings;
       Log 1, "USB device $devname reappeared";
       $hash->{PortObj} = $po;
       $hash->{STATE} = "opened";
