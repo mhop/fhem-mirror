@@ -258,3 +258,6 @@
   - bugfix: FileLog undefined $data in FileLog_Get
   - feature: fhem.pl check modules for compiletime errors and do not initialize them if any
   -bugfix:  EM, WS300, FHZ scope of portobj variable
+ -tdressler Mo May 11 14:00:00 MEST 2008
+   bugfix: FHZ with windows, use there ReadyFn if windows; small cosmetic changes
+   doc	: add hint to virtual com port driver, modification for FHZ to use default FTDI driver
