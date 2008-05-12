@@ -9,10 +9,12 @@ package main;
 
 use strict;
 use warnings;
-use Device::SerialPort;
+
 
 sub M232Write($$);
 sub M232GetData($$);
+sub Log($$);
+use vars qw {%attr %defs};
 
 #####################################
 sub
@@ -53,8 +55,31 @@ M232_Define($$)
   }
 
   Log 3, "M232 opening device $dev";
-  my $po = new Device::SerialPort ($dev);
-  return "Can't open $dev: $!" if(!$po);
+  my $po;
+	if ($^O eq 'MSWin32') {
+		eval ("use Win32::SerialPort;");
+		if ($@) {
+                   $hash->{STATE} = "error using Modul Win32::SerialPort";
+                   Log 1,"Error using Device::SerialPort";
+                   return "Can't use Win32::SerialPort $@\n";
+                }
+                $po = new Win32::SerialPort ($dev, 1);
+                
+	} else {
+		eval ("use Device::SerialPort;");
+		if ($@) {
+                   $hash->{STATE} = "error using Modul Device::SerialPort";
+                   Log 1,"Error using Device::SerialPort";
+                   return "Can't Device::SerialPort $@\n";
+                }
+		$po = new Device::SerialPort ($dev, 1);
+	}
+	if (!$po) {
+                   $hash->{STATE} = "error opening device";
+                   Log 1,"Error opening Serial Device $dev";
+                   return "Can't open Device $dev: $^E\n";
+	}
+  
   Log 3, "M232 opened device $dev";
   $po->close();
 
@@ -80,6 +105,20 @@ M232_Undef($$)
   }
   return undef;
 }
+#####################################
+# M232_Ready
+# implement ReadyFn
+# only used for Win32
+#
+sub
+M232_Ready($$)
+{
+  my ($hash, $dev) = @_;
+  my $po=$dev||$hash->{po};
+  return 0 if !$po;
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
+  return ($InBytes>0);
+}
 
 
 #####################################
@@ -97,12 +136,13 @@ M232_Set($@)
   return $u1 if(int(@a) < 2);
   my $msg;
   my $reading= $a[1];
-
+  my $value;
+  my @legal;
 
   if($reading eq "auto") {
         return $u1 if(int(@a) !=3);
-	my $value= $a[2];
-        my @legal= (0..5,"none");
+	$value= $a[2];
+        @legal= (0..5,"none");
         if(!grep($value eq $_, @legal)) {
                 return "Illegal value $value, possible values: @legal";
         }
@@ -122,8 +162,8 @@ M232_Set($@)
 
   elsif($reading eq "octet") {
         return $u1 if(int(@a) !=3);
-	my $value= $a[2];
-        my @legal= (0..255);
+	$value= $a[2];
+        @legal= (0..255);
         if(!grep($value eq $_, @legal)) {
                 return "Illegal value $value, possible values: 0..255";
         }
@@ -132,14 +172,14 @@ M232_Set($@)
 
   elsif($reading =~ /^io[0-7]$/) {
         return $u1 if(int(@a) !=3);
-	my $value= $a[2];
+	$value= $a[2];
 	return $u1 unless($value eq "0" || $value eq "1");
         $msg= "D" . substr($reading,2,1) . $value;
   }
 
   else { return $u1; }
 		
-  my $d = M232GetData($hash->{DeviceName}, $msg);
+  my $d = M232GetData($hash, $msg);
   return "Read error" if(!defined($d));
   return $d;
 }
@@ -161,38 +201,39 @@ M232_Get($@)
   my $reading= $a[1];
   my $msg;
   my $retval;
+  my ($count,$d,$state,$iscurrent,$voltage);
 
 
   if($reading eq "counter") {
 	$msg= "z";
-  	my $d = M232GetData($hash->{DeviceName}, $msg);
+  	$d = M232GetData($hash, $msg);
  	return "Read error" if(!defined($d));
-	my $count= hex $d;
+	$count= hex $d;
 	$retval= $count;
   } 
 
   elsif($reading =~  /^an[0-5]$/) {
 	$msg= "a" . substr($reading,2,1);
-  	my $d = M232GetData($hash->{DeviceName}, $msg);
+  	$d = M232GetData($hash, $msg);
  	return "Read error" if(!defined($d));
-	my $voltage= (hex substr($d,0,3))*5.00/1024.0;
-	my $iscurrent= substr($d,3,1);
+	$voltage= (hex substr($d,0,3))*5.00/1024.0;
+	$iscurrent= substr($d,3,1);
 	$retval= $voltage; # . " " . $iscurrent;
   } 
   
   elsif($reading =~ /^io[0-7]$/) {
 	$msg= "d" . substr($reading,2,1);
-  	my $d = M232GetData($hash->{DeviceName}, $msg);
+  	$d = M232GetData($hash, $msg);
  	return "Read error" if(!defined($d));
-	my $state= hex $d;
+	$state= hex $d;
 	$retval= $state;
   } 
 
   elsif($reading eq "octet") {
 	$msg= "w"; 
-  	my $d = M232GetData($hash->{DeviceName}, $msg);
+  	$d = M232GetData($hash, $msg);
  	return "Read error" if(!defined($d));
-	my $state= hex $d;
+	$state= hex $d;
 	$retval= $state;
   } 
 
@@ -211,7 +252,7 @@ M232_Write($$)
 {
   my ($hash,$msg) = @_;
 
-  return M232GetData($hash->{DeviceName}, $msg);
+  return M232GetData($hash, $msg);
 }
 
 
@@ -219,16 +260,20 @@ M232_Write($$)
 sub
 M232GetData($$)
 {
-  my ($dev, $d) = @_;
-
+  my ($hash, $data) = @_;
+  my $dev=$hash->{DeviceName};
   my $MSGSTART= chr 1;
   my $MSGEND= chr 13;
   my $MSGACK= chr 6;
   my $MSGNACK= chr 21;
+  my $serport;
+  my $d = $MSGSTART . $data . $MSGEND;
 
-  $d = $MSGSTART . $d . $MSGEND;
-
-  my $serport = new Device::SerialPort ($dev);
+  if ($^O eq 'MSWin32') {
+    $serport=new Win32::SerialPort ($dev, 1);
+  }else{
+    $serport=new Device::SerialPort ($dev, 1);
+  }
   if(!$serport) {
     Log 3, "M232: Can't open $dev: $!";
     return undef;
@@ -239,7 +284,8 @@ M232GetData($$)
   $serport->parity('none');
   $serport->stopbits(1);
   $serport->handshake('none');
-
+  $serport->write_settings;
+  $hash->{po}=$serport;
   Log 4, "M232: Sending $d";
 
   my $rm = "M232: ?";
@@ -249,22 +295,29 @@ M232GetData($$)
 
   my $retval = "";
   my $status = "";
-
+  my $nfound=0;
+  my $ret=undef;
+  sleep(1);
   for(;;) {
+    if ($^O eq 'MSWin32') {
+      $nfound=M232_Ready($hash,undef);
+    }else{
       my ($rout, $rin) = ('', '');
       vec($rin, $serport->FILENO, 1) = 1;
-      my $nfound = select($rout=$rin, undef, undef, 1.0);
-
+       $nfound = select($rin, undef, undef, 1.0); # 3 seconds timeout
       if($nfound < 0) {
-        $rm = "M232: Select error $nfound / $!";
-        goto DONE;
+        next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
+        $rm="M232:Select error $nfound / $!";
+	last;
       }
+    }
+      
       last if($nfound == 0);
 
       my $out = $serport->read(1);
       if(!defined($out) || length($out) == 0) {
         $rm = "M232 EOF on $dev";
-        goto DONE;
+        last;
       }
 
       if($out eq $MSGACK) {
@@ -280,17 +333,18 @@ M232GetData($$)
       }
 
       if($status) {
-      	$serport->close();
-  	Log 4, $rm;
-	return $retval;
+	$ret=$retval;
+	last;
       }
 	
   }
 
 DONE:
   $serport->close();
+  undef $serport;
+  delete $hash->{po} if exists($hash->{po});
   Log 4, $rm;
-  return undef;
+  return $ret;
 }
 
 1;
