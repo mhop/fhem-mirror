@@ -140,7 +140,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.44 2008-05-11 21:03:13 tdressler Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.45 2008-05-12 12:08:35 tdressler Exp $';
 
 $init_done = 0;
 
@@ -264,7 +264,7 @@ Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
 ################################################
 # Main Loop
-MAIN:
+sub MAIN {MAIN:};#Dummy 
 while (1) {
   my ($rout, $rin) = ('', '');
 
