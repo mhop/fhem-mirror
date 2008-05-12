@@ -70,11 +70,21 @@ FHZ_Initialize($)
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{StateFn} = "FHZ_SetState";
   $hash->{ParseFn} = "FHZ_Parse";
+  $hash->{ReadyFn} = "FHZ_Ready" if ($^O eq 'MSWin32');
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0"; 
 }
-
+#####################################
+sub
+FHZ_Ready($$)
+{
+  my ($hash, $dev) = @_;
+  my $po=$hash->{PortObj};
+  return undef if !$po;
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
+  return ($InBytes>0);
+}
 #####################################
 sub
 FHZ_Set($@)
@@ -257,10 +267,13 @@ FHZ_Define($$)
   $po->stty_isig(0);
   $po->stty_opost(0);
   $po->stty_icrnl(0);
+  $po->write_settings;
 
 
   $hash->{PortObj} = $po;
-  $hash->{FD} = $po->FILENO;
+  $hash->{FD} = $po->FILENO if !( $^O =~ /Win/ );  
+  
+  
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
 
@@ -361,14 +374,17 @@ FHZ_ReadAnswer($$)
   return undef if(!$hash || !defined($hash->{FD}));
 
   my ($mfhzdata, $rin) = ("", '');
-
+  my $nfound;
   for(;;) {
-
-    vec($rin, $hash->{FD}, 1) = 1;
-    my $nfound = select($rin, undef, undef, 3); # 3 seconds timeout
-    if($nfound < 0) {
-      next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-      die("Select error $nfound / $!\n");
+    if ($^O eq 'MSWin32') {
+      $nfound=FHZ_Ready($hash,$def);
+    }else{
+      vec($rin, $hash->{FD}, 1) = 1;
+       $nfound = select($rin, undef, undef, 3); # 3 seconds timeout
+      if($nfound < 0) {
+        next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
+        die("Select error $nfound / $!\n");
+      }
     }
     return "Timeout reading answer for get $arg" if($nfound == 0);
 
@@ -520,10 +536,15 @@ FHZ_Read($)
     $hash->{PortObj}->close();
     for(;;) {
       sleep(5);
-      $hash->{PortObj} = new Device::SerialPort($devname);
+      if ($^O eq 'MSWin32') {
+        $hash->{PortObj} = new Win32::SerialPort($devname);
+      }else{
+        $hash->{PortObj} = new Device::SerialPort($devname);  
+      }
+      
       if($hash->{PortObj}) {
         Log 1, "USB device $devname reappeared";
-        $hash->{FD} = $hash->{PortObj}->FILENO;
+        $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
         DoInit($name);
 	return;
       }
@@ -600,7 +621,7 @@ FHZ_Read($)
       my @found;
       my $last_module;
       foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
-			    keys %modules) {
+		      grep {defined($modules{$_}{ORDER});}keys %modules) {
 	next if($iohash->{Clients} !~ m/:$m:/);
 	next if($dmsg !~ m/$modules{$m}{Match}/i);
 	no strict "refs";
