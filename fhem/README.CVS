@@ -18,7 +18,7 @@ If you wish to contribute to the project, then
 - describe your changes in the file HISTORY, and dont forget to mention your
   name and the date of change
 - it makes sense to do a "cvs diff" before checking in the stuff with
-    cvs commit
+  cvs commit
 - if you do complex/nontrivial changes affecting more than one file, then 
   please tag the whole software before and after the change with:
   - before: % cvs tag <berlios-uid>_<date_as_YYYYMMDD>_0
