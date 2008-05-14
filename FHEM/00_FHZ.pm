@@ -237,7 +237,7 @@ FHZ_Define($$)
   if ($^O=~/Win/) {
    require Win32::SerialPort;
    $po = new Win32::SerialPort ($dev);
-  }else{
+  } else  {
    require Device::SerialPort;
    $po = new Device::SerialPort ($dev);
   }
@@ -376,9 +376,9 @@ FHZ_ReadAnswer($$)
   my ($mfhzdata, $rin) = ("", '');
   my $nfound;
   for(;;) {
-    if ($^O eq 'MSWin32') {
+    if($^O eq 'MSWin32') {
       $nfound=FHZ_Ready($hash,$def);
-    }else{
+    } else {
       vec($rin, $hash->{FD}, 1) = 1;
        $nfound = select($rin, undef, undef, 3); # 3 seconds timeout
       if($nfound < 0) {

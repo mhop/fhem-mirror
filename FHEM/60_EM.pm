@@ -314,19 +314,22 @@ EmGetData($$)
     my $started = 0;
     my $complete = 0;
     for(;;) {
-      #select will not work on windows, replaced with status
-      #
-      #my ($rout, $rin) = ('', '');
-      #vec($rin, $serport->FILENO, 1) = 1;
-      #my $nfound = select($rout=$rin, undef, undef, 1.0);
-      #
-      #if($nfound < 0) {
-      #  $rm = "EM Select error $nfound / $!";
-      #  goto DONE;
-      #}
-      #last if($nfound == 0);
-      my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$serport->status;
-     last if ($InBytes<1);
+
+      if($^O !~ /Win/) {
+        my ($rout, $rin) = ('', '');
+        vec($rin, $serport->FILENO, 1) = 1;
+        my $nfound = select($rout=$rin, undef, undef, 1.0);
+        
+        if($nfound < 0) {
+          $rm = "EM Select error $nfound / $!";
+          goto DONE;
+        }
+        last if($nfound == 0);
+      } else {
+        #select will not work on windows, replaced with status
+        my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$serport->status;
+        last if ($InBytes<1);
+      }
 
       my $buf = $serport->input();
       if(!defined($buf) || length($buf) == 0) {

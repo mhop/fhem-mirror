@@ -224,11 +224,13 @@
 - Rudi Fri May  9 20:00:00 MEST 2008
   - feature: FHEM modules may live on a filesystem with "ignorant" casing (FAT)
     If you install FHEM on a USB-Stick (e.g. for the FritzBox) it may happen
-    that the filename casing is different from the function names inside the file.
+    that the filename casing is different from the function names inside the
+    file.
     -> Fhem won't find the <module>_Initialize function. Fixed by searching all
     function-names for a match with "ignore-case"
-  - feature: FileLog function "set reopen" impemented. In case you want to delete some
-    wrong entries from a current logfile, you must tell fhem to reopen the file again
+  - feature: FileLog function "set reopen" impemented. In case you want to
+    delete some wrong entries from a current logfile, you must tell fhem to
+    reopen the file again
   - feature: multiline commands are supported through the command line
     Up till now multiline commands were supported only by "include". Now they
     are supprted from the (tcp/ip) connection too, so they can be used by the
@@ -241,25 +243,38 @@
       module directory
     - multiline support for notify and at scripts.
     - feature: FileLog "set reopen" for manual tweaking of logfiles.
-      - feature: multiline commands are supported through the command line
-        - feature: pgm2 installation changes, multiple instances, external css
+    - feature: multiline commands are supported through the command line
+    - feature: pgm2 installation changes, multiple instances, external css
 
 -tdressler Sa May  10 23:00:00 MEST 2008
-	-feature:add WS2000 Support new modul 87_ws2000.pm and standalone reader/server ws2000_reader.pl
-	-doc: modified fhem.html/commandref.html reflectiing ws2000 device and added windows support
-		(tagged:before tdressler_20080510_1, after tdressler_20080510_2)
+  - feature:add WS2000 Support new modul 87_ws2000.pm and standalone
+           reader/server ws2000_reader.pl
+  - doc: modified fhem.html/commandref.html reflectiing ws2000 device and
+    added windows support (tagged:before tdressler_20080510_1, after
+    tdressler_20080510_2)
+
 -tdressler So May 11 19:30:00 MEST 2008
-	- feature: add ReadyFn to fhem.pl in main loop to have an alternative for select, which is not working on windows (thomas 11.05)
-  - feature: set timeout to 0.2s, if HandleTimeout returns undef=forever (tagged tdressler_20080511_1/2)
-  - bugfix : WS2000:fixed serial port access on windows by replacing FD with ReadyFn
+  - feature: add ReadyFn to fhem.pl in main loop to have an alternative for
+    select, which is not working on windows (thomas 11.05)
+  - feature: set timeout to 0.2s, if HandleTimeout returns undef=forever
+    (tagged tdressler_20080511_1/2)
+  - bugfix : WS2000:fixed serial port access on windows by replacing FD with
+    ReadyFn
   - bugfix : FileLog: dont use FH->sync on windows (not implemented there)
-  - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and Win32::SerialPort to get it running in Windows (sorry, untestet)
+  - feature: EM, WS300, FHZ:Add Switch for Device::SerialPort and
+    Win32::SerialPort to get it running in Windows (sorry, untestet)
+
  -tdressler So May 11 23:30:00 MEST 2008
-  - bugfix: FileLog undefined $data in FileLog_Get
-  - feature: fhem.pl check modules for compiletime errors and do not initialize them if any
-  -bugfix:  EM, WS300, FHZ scope of portobj variable
+  - bugfix:  FileLog undefined $data in FileLog_Get
+  - feature: fhem.pl check modules for compiletime errors and do not initialize
+    them if any
+  - bugfix:  EM, WS300, FHZ scope of portobj variable
+
  -tdressler Mo May 12 14:00:00 MEST 2008
-   bugfix: FHZ with windows, use there ReadyFn if windows; small cosmetic changes
-   doc	: add hint to virtual com port driver, modification for FHZ to use default FTDI driver
+  - bugfix: FHZ with windows, use there ReadyFn if windows; small cosmetic
+    changes
+  - doc: add hint to virtual com port driver, modification for FHZ to use
+    default FTDI driver
+
  -tdressler Mo May 12 19:00:00 MEST 2008
-  feature : add windows support to M232
+  - feature : add windows support to M232
