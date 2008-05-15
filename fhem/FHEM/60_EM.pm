@@ -60,7 +60,7 @@ EM_Define($$)
   }
 
   Log 3, "EM opening device $dev";
-  if ($^O=~/Win/) {
+  if ( $^O =~ /Win/) {
    eval ("use Win32::SerialPort;");
     $po = new Win32::SerialPort ($dev);
   }else{
@@ -283,6 +283,7 @@ EmGetData($$)
   my ($dev, $d) = @_;
   $d = EmMakeMsg(pack('H*', $d));
   my $serport;
+  my $rm;
   return undef if(!$dev);
   #OS depends
   if ($^O=~/Win/) {
@@ -301,21 +302,42 @@ EmGetData($$)
   $serport->parity('none');
   $serport->stopbits(1);
   $serport->handshake('none');
-
+  if ( $^O =~ /Win/ ) {
+    unless ($serport->write_settings) {
+          $rm= "EM:Can't change Device_Control_Block: $^E\n";
+          goto DONE;
+        }
+  }
   Log 4, "EM: Sending " . unpack('H*', $d);
 
-  my $rm = "EM timeout reading the answer";
+  $rm = "EM: timeout reading the answer";
   for(my $rep = 0; $rep < 3; $rep++) {
 
     $serport->write($d);
-
+    
+    
     my $retval = "";
     my $esc = 0;
     my $started = 0;
     my $complete = 0;
+    my $buf;
+    my $i;
+    my $b;
     for(;;) {
 
-      if($^O !~ /Win/) {
+      if($^O =~ /Win/) {
+        #select will not work on windows, replaced with status
+        my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=(0,0,0,0);
+        for ($i=0;$i<9; $i++) {
+           sleep(1); #waiiiit
+          ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$serport->status;
+          last if $InBytes>0;
+        }
+        Log 5,"EM: read returned $InBytes Bytes($i trys)";
+        last if ($InBytes<1);
+        $buf = $serport->input();
+        
+      } else {
         my ($rout, $rin) = ('', '');
         vec($rin, $serport->FILENO, 1) = 1;
         my $nfound = select($rout=$rin, undef, undef, 1.0);
@@ -325,20 +347,17 @@ EmGetData($$)
           goto DONE;
         }
         last if($nfound == 0);
-      } else {
-        #select will not work on windows, replaced with status
-        my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$serport->status;
-        last if ($InBytes<1);
+        $buf = $serport->input();
       }
 
-      my $buf = $serport->input();
+      
       if(!defined($buf) || length($buf) == 0) {
         $rm = "EM EOF on $dev";
         goto DONE;
       }
 
-      for(my $i = 0; $i < length($buf); $i++) {
-        my $b = ord(substr($buf,$i,1));
+      for($i = 0; $i < length($buf); $i++) {
+        $b = ord(substr($buf,$i,1));
 
         if(!$started && $b != 0x02) { next; }
         $started = 1;
@@ -355,12 +374,15 @@ EmGetData($$)
         if(w($retval,2) != $l-7)      { $rm = "EM Length mismatch"; goto DONE; }
         if(!EmCrcCheck($retval,$l-7)) { $rm = "EM Bad CRC";         goto DONE; }
         $serport->close();
-        return substr($retval, 4, $l-7);
+        my $data=substr($retval, 4, $l-7);
+        Log 5,"EM: returned ".unpack("H*",$data);
+        return $data;
       }
     }
   }
 
 DONE:
+  Log 5,$rm;
   $serport->close();
   return undef;
 }
@@ -388,12 +410,14 @@ EmGetDevData($)
   my $end   = $start + int(($nrreadings-1)/64)*$step;
 
   my @ret;
+  my $max;
+  my $off;
   for(my $p = $start; $p <= $end; $p += $step) {        # blockwise
     $d = IOWrite($hash, sprintf("52%02x%02x00000801", $p%256, int($p/256)));
-    my $max = (($p == $end) ? ($nrreadings%64)*4+4 : 260);
-    my $step = b($d, 6);
+    $max = (($p == $end) ? ($nrreadings%64)*4+4 : 260);
+    $step = b($d, 6);
 
-    for(my $off = 8; $off <= $max; $off += 4) {         # Samples in each block
+    for($off = 8; $off <= $max; $off += 4) {         # Samples in each block
       push(@ret, sprintf("%04x%04x\n", w($d,$off), w($d,$off+2)));
     }
   }
