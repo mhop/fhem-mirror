@@ -404,3 +404,4 @@
   - feature: fhem.pl check modules for compiletime errors and do not initialize
              them
   - feature: M232 add windows support (thomas 12.05.08)
+  - feature: add simple ELV IPWE1 support (thomas 12.05.08)
