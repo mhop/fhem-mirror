@@ -427,6 +427,7 @@ make editing of multiline commands transparent.<br><br>
         <li>WS300: ws300pc</li>
         <li>EM1010: em1010pc</li>
         <li>WS2000: ws2000</li>
+        <li>IPWE: ipwe</li>
         </ul>
 	</li><br>
 
@@ -926,6 +927,41 @@ make editing of multiline commands transparent.<br><br>
     <br>
   </ul>
   
+  <a name="IPWE"></a>
+  <h4>Type IPWE</h4>
+  <ul>
+    <code>define &lt;name&gt; IPWE &lt;hostname&gt; [&lt;delay&gt;]</code>
+    <br><br>
+
+    Define a IPWE network attached weather data receiver device sold by ELV. Details see <a
+    href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=21508">here</a>.
+    It's intended to receive the same sensors as WS300 (8 T/H-Sensors and one kombi sensor), 
+    but can be accessed via http and telnet.
+    <br>
+     For unknown reason, my try to use the telnet interface   was not working neither with raw sockets
+      nor with Net::Telnet module. Therefore i choosed here the "easy" way
+    to simple readout the http page and extract all data from the offered table. For this reason this module doesnt 
+    contain any option to configure this device.
+    <br><br><b>Note:</b> You should give your sensors a name within the web interface, once they a received the first time.
+    <br>To extract a single sensor simply match for this name or sensor id<br>
+	<br>
+	
+    Attributes:
+    <ul>
+      <li><code>delay</code>: seconds between read accesses(default 300s)</li>
+      
+    </ul>
+    <br>
+    Example:
+    <ul>
+      <code>define ipwe IPWE ipwe1 120</code><br>
+    </ul>
+      <ul>
+      <code>attr ipwe delay 600</code> : 10min between readouts<br>
+    </ul>
+    <br>
+  </ul>
+  
   <a name="FileLog"></a>
   <h4>Type FileLog</h4>
   <ul>
@@ -1334,7 +1370,33 @@ make editing of multiline commands transparent.<br><br>
     <code>list</code> statement for the device).
     <br><br>
   </ul>
-
+  
+  <h4>Type WS2000:</h4>
+  <ul>
+    <code>get &lt;name&gt; list</code>
+    <br>
+    Gets the last reading of all received sensord
+    <br><br>
+    <code>get &lt;name&gt; [TH0..TH7, T0..T7, I0..I7, R0..R7, W0..W7, L0..L7, P0..P7,LAST,RAW]</code><br>
+    get the last reading for the name sensor, <br>
+    <code>LAST</code>: Last received Sensor
+    <br><br>
+    <code>RAW</code>: original Data from interface
+    <br><br>
+  </ul>
+  
+ 
+<h4>Type IPWE</h4>
+  <ul>
+    <code>get &lt;name&gt; status</code>
+    <br><br>
+    Gets actual data from device for sensors with data
+    <br><br>
+    <code>get &lt;name&gt; &lt; sensorname&gt; </code>
+    <br><br>
+    will grep output from device for this sensorname
+    <br><br>
+  </ul>
 </ul>
 
 
