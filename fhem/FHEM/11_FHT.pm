@@ -382,9 +382,6 @@ FHT_Parse($$)
     elsif($sval =~ m/.f/) { $val = "pair" }
     else { $val = "unknown_$sval: $fv" }
 
-  } elsif($cmd eq "lime-protection") {
-    $val = sprintf("(actuator: %02d%%)", int(100*$val/255 + 0.5));
-
   } elsif($cmd eq "measured-low") {
     $def->{READINGS}{$cmd}{TIME} = $tn;
     $def->{READINGS}{$cmd}{VAL} = $val;
