@@ -16,5 +16,8 @@ set grid
 set ylabel "Temperature (Celsius)"
 set y2label "Rain (l/m2)"
 
+#FileLog 5:avg_day:
+#FileLog 11:avg_day:
+
 plot "<grep avg_day <IN>" using 1:5 axes x1y1 title 'Temperature' with lines,\
      "<grep avg_day <IN>" using 1:11 axes x1y2 title 'Rain' with histeps
