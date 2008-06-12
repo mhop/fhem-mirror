@@ -19,4 +19,6 @@ set y2tics
 set format y "%.1f"
 set format y2 "%.1f"
 
+#FileLog 0 4::
+
 plot "<IN>" using 1:4 notitle with lines

@@ -17,10 +17,15 @@ set grid xtics y2tics
 set y2label "temperature (Celsius)"
 set ylabel "Actuator (%)"
 
+#FileLog 4:measured:
+##FileLog 4:desired:
+#FileLog 4:actuator.*%:int
+
+#  "< awk '/desired/ {print $1, $4+0}' <IN>"\
+#     using 1:2 axes x1y2 title 'Desired temperature' with steps,\
+
 plot \
   "< awk '/measured/{print $1, $4}' <IN>"\
      using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
-  "< awk '/desired/ {print $1, $4+0}' <IN>"\
-     using 1:2 axes x1y2 title 'Desired temperature' with steps,\
   "< awk '/actuator/ {print $1, $4+0}' <IN>"\
      using 1:2 axes x1y1 title 'Actuator (%)' with lines\

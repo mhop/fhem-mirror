@@ -5,6 +5,8 @@ use strict;
 use warnings;
 use IO::File;
 
+sub seekTo($$$$);
+
 #####################################
 sub
 FileLog_Initialize($)
@@ -141,35 +143,167 @@ FileLog_Set($@)
 }
 
 ###################################
+# We use this function to be able to scroll/zoom in the plots created from the
+# logfile.  When outfile is specified, it is used with gnuplot post-processing,
+# when outfile is "-" it is used to create SVG graphics
+#
+# Up till now following functions are impemented:
+# - int (to cut off % from a number, as for the actuator)
+# - delta-h / delta-d to get rain/h and rain/d values from continuous data.
+
 sub
 FileLog_Get($@)
 {
   my ($hash, @a) = @_;
   
-  return "Usage: get $a[0] <from> <to> <column_list>" if(int(@a) != 4);
-  my $fh = new IO::File $hash->{currentlogfile};
-  seekTo($fh, $hash, $a[1]);
-#  my @arr =
- my $data='';
-  while(my $l = <$fh>) {
-    last if($l gt $a[2]);
-    $data.=$l;
-  }
-  close($fh);
-  return "EOF" if(!defined($data));
+  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec> ...\n" .
+         "  where column_spec is <col>:<regexp>:<fn>\n" .
+         "  see the FileLogGrep entries in he .gplot files\n" .
+         "  <infile> is without direcory, - means the current file\n" .
+         "  <outfile> is a prefix, - means stdout\n"
+        if(int(@a) < 5);
 
-  return $data;
+  shift @a;
+  my $inf  = shift @a;
+  my $outf = shift @a;
+  my $from = shift @a;
+  my $to   = shift @a;
+
+  if($inf eq "-") {
+    $inf = $hash->{currentlogfile};
+  } else {
+    my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,);
+    if(!-f $linf) {
+      $linf = $attr{$hash->{NAME}}{archivedir} . "/" . $inf;
+      return "Error: File-not-found" if(!-f $linf);
+    }
+    $inf = $linf;
+  }
+  my $ifh = new IO::File $inf;
+  seekTo($inf, $ifh, $hash, $from);
+
+  #############
+  # Digest the input.
+  # last1: first delta value after d/h change
+  # last2: last delta value recorded (for the very last entry)
+  # last3: last delta timestamp (d or h)
+  my (@d, @fname);
+  for(my $i = 0; $i < int(@a); $i++) {
+    my @fld = split(":", $a[$i], 3);
+
+    my %h;
+    if($outf ne "-") {
+      $fname[$i] = "$outf.$i";
+      $h{fh} = new IO::File "> $fname[$i]";
+    }
+    $h{re} = $fld[1];
+    $h{fn} = $fld[2];
+    $h{didx} = 2 if($fld[2] && $fld[2] eq "delta-d");
+    $h{didx} = 3 if($fld[2] && $fld[2] eq "delta-h");
+
+    if($fld[0] =~ m/"(.*)"/) {
+      $h{col} = $1;
+      $h{isfix} = 1;
+    } else {
+      $h{col} = $fld[0]-1;
+    }
+    $h{ret} = [];
+    $d[$i] = \%h;
+  }
+
+  my %lastdate;
+  while(my $l = <$ifh>) {
+    last if($l gt $to);
+    my @fld = split("[ \r\n]+", $l);
+    for(my $i = 0; $i < int(@a); $i++) {           # Process each req. field
+      my $h = $d[$i];
+      my $re = $h->{re};
+      next if($re && $l !~ m/$re/);
+
+      my $col = $h->{col};
+      my $line = "";
+
+      if($h->{isfix}) {                            # Fixed text
+        $line = "$fld[0] $col";
+
+      } elsif(!$h->{fn}) {                         # The column
+        $line = "$fld[0] $fld[$col]";
+
+      } elsif($h->{fn} eq "int") {                 # int function
+        my $val = $fld[$col];
+        $val =~ s/[^\d.]//;
+        $line = "$fld[0] $val";
+
+      } elsif($h->{didx}) {                        # delta-h  or delta-d
+
+        my $hd = $h->{didx};
+        my @ld = split("[-_:]", $fld[0]);
+        if(!defined($h->{last1}) || $h->{last3} ne $ld[$hd]) {
+          if(defined($h->{last1})) {
+            my @lda = split("[_:]", $lastdate{$hd});
+            my $ts = "12:00:00";                   # middle timestamp
+            $ts = "$lda[1]:30:00" if($hd == 3);
+            $line = sprintf("%s_%s %0.1f", $lda[0],$ts, $fld[$col]-$h->{last1});
+          }
+          $h->{last1} = $fld[$col];
+          $h->{last3} = $ld[$hd];
+        }
+        $h->{last2} = $fld[$col];
+        $lastdate{$hd} = $fld[0];
+      } else {
+        $line = "$fld[0] " . eval($h->{fn});
+      }
+
+      next if(!$line);
+
+      if($outf eq "-") {
+        push @{$h->{ret}}, $line;
+      } else {
+        my $fh = $h->{fh};
+        print $fh $line,"\n";
+      }
+    }
+  }
+  $ifh->close();
+
+  my $ret = "";
+  for(my $i = 0; $i < int(@a); $i++) {
+    my $h = $d[$i];
+    my $hd = $h->{didx};
+    if($hd && $lastdate{$hd}) {
+      my $val = defined($h->{last1}) ?  $h->{last2}-$h->{last1} : 0;
+
+      my @lda = split("[_:]", $lastdate{$hd});
+      my $ts = "12:00:00";                   # middle timestamp
+      $ts = "$lda[1]:30:00" if($hd == 3);
+      my $line = sprintf("%s_%s %0.1f", $lda[0],$ts, $h->{last2}-$h->{last1});
+
+      if($outf eq "-") {
+        push @{$h->{ret}}, $line;
+      } else {
+        my $fh = $h->{fh};
+        print $fh $line,"\n";
+      }
+    }
+    if($outf eq "-") {
+      $ret .= join("\n", @{$h->{ret}}) if($h->{ret});
+    } else {
+      $h->{fh}->close();
+    }
+  }
+
+  return ($outf eq "-") ? $ret : join(" ", @fname);
 }
 
 ###################################
 sub
-seekTo($$$)
+seekTo($$$$)
 {
-  my ($fh, $hash, $ts) = @_;
+  my ($fname, $fh, $hash, $ts) = @_;
 
   # If its cached
-  if($hash->{pos} && $hash->{pos}{$ts}) {
-    $fh->seek($hash->{pos}{$ts}, 0);
+  if($hash->{pos} && $hash->{pos}{"$fname:$ts"}) {
+    $fh->seek($hash->{pos}{"$fname:$ts"}, 0);
     return;
   }
 
@@ -183,17 +317,21 @@ seekTo($$$)
     if($data !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /) {
       $next = $fh->tell;
       $data = <$fh>;
+      $next = $last if(!$data);
     }
-    last if($next eq $last);
+    if($next eq $last) {
+      $fh->seek($next, 0);
+      last;
+    }
 
     $last = $next;
-    if($data lt $ts) {
+    if(!$data || $data lt $ts) {
       ($lower, $next) = ($next, ($next+$upper)/2);
     } else {
       ($upper, $next) = ($next, ($lower+$next)/2);
     }
   }
-  $hash->{pos}{$ts} = $last;
+  $hash->{pos}{"$fname:$ts"} = $last;
 
 }
 
