@@ -11,6 +11,7 @@ weblink_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "weblink_Define";
+  $hash->{AttrList}= "fixedrange noscroll";
 }
 
 

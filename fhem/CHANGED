@@ -405,3 +405,5 @@
              them
   - feature: M232 add windows support (thomas 12.05.08)
   - feature: add simple ELV IPWE1 support (thomas 12.05.08)
+  - feature: FileLog get to read logfiles. Used heavily by webpgm2
+  - feature: webpgm2: gnuplot-scroll mode to navigate/zoom in logfiles

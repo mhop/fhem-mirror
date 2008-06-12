@@ -284,3 +284,13 @@
 
 - Peter S. Mon Jun 02 00:39 MET 2008
   - linux.html: openSUSE 11 contains our changes.
+
+- Thu Jun 12 07:15:03 MEST 2008
+  - feature: FileLog get to read logfiles / webpgm2: gnuplot-scroll mode to
+    navigate/zoom in logfiles
+    webpgm2 uses the FileLog get to grep data for a given data range from a
+    logfile. Using this grep scrolling to a different date range / zooming
+    to another resolution (day/week/month/year) can be implemented.
+    The logfiles should be large, as scrolling across logfiles is not
+    implemented. To speed up the grep, a binary search with seek is used, and
+    seek positions are cached.

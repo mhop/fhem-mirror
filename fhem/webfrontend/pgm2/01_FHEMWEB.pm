@@ -35,11 +35,13 @@ sub FHEMWEB_showLogWrapper($);
 sub FHEMWEB_popup($$$);
 sub FHEMWEB_textfield($$);
 sub FHEMWEB_submit($$);
-sub __roomOverview();
+sub FHEMWEB_roomOverview();
 sub FHEMWEB_fatal($);
 sub pF($@);
 sub pO(@);
 sub FHEMWEB_AnswerCall($);
+sub FHEMWEB_zoomLink($$$$);
+sub FHEMWEB_calcWeblink($$);
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -52,10 +54,15 @@ my $__room;
 my $__detail;
 my $__title;
 my $__cmdret;
+my $__scrolledweblinkcount;
+my %__wlpos;
 my $__RET;
 my $__RETTYPE;
 my $__SF;
 my $__ti;  # Tabindex for all input fields
+my @__zoom;
+my %__zoom;
+my $__plotmode;
 
 
 #####################################
@@ -68,7 +75,7 @@ FHEMWEB_Initialize($)
 
   $hash->{DefFn}   = "FHEMWEB_Define";
   $hash->{UndefFn} = "FHEMWEB_Undef";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 fhemwebdir fhemwebname";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webdir webname plotmode:gnuplot,gnuplot-scroll,SVG";
 }
 
 #####################################
@@ -94,6 +101,12 @@ FHEMWEB_Define($$)
   $hash->{FD} = $hash->{PORT}->fileno();
   $hash->{SERVERSOCKET} = "True";
   Log(2, "FHEMWEB port $port opened");
+
+  ###############
+  # Initialize internal structures
+  my $n = 0;
+  @__zoom = ("day","week","month","year");
+  %__zoom = map { $_, $n++ } @__zoom;
 
   return undef;
 }
@@ -145,10 +158,10 @@ FHEMWEB_Read($)
 
   my $name = $hash->{SNAME};
   my $ll = GetLogLevel($name,4);
-  $FHEMWEBdir = ($attr{$name} && $attr{$name}{fhemwebdir}) ? 
-                        $attr{$name}{fhemwebdir} : "$attr{global}{modpath}/FHEM";
-  $__ME = "/" . (($attr{$name} && $attr{$name}{fhemwebname}) ? 
-                                $attr{$name}{fhemwebname} : "fhem");
+  $FHEMWEBdir = ($attr{$name} && $attr{$name}{webdir}) ? 
+                        $attr{$name}{webdir} : "$attr{global}{modpath}/FHEM";
+  $__ME = "/" . (($attr{$name} && $attr{$name}{webname}) ? 
+                                $attr{$name}{webname} : "fhem");
   $FHEMWEB_reldoc = "$__ME/commandref.html";
   $__SF = "<form method=\"get\" action=\"$__ME\">";
 
@@ -173,16 +186,16 @@ FHEMWEB_Read($)
   $hash->{BUF} = "";
 
   Log($ll, "HTTP $hash->{NAME} GET $arg");
+  $__plotmode = $attr{$name}{plotmode} ? $attr{$name}{plotmode} : "gnuplot";
 
   FHEMWEB_AnswerCall($arg);
 
   my $c = $hash->{CD};
   my $l = length($__RET);
-  my $exp = localtime(time()+300) . " GMT";
-
+#  my $exp = localtime(time()+300) . " GMT";
+#            "Expires: $exp\r\n",
   print  $c "HTTP/1.1 200 OK\r\n",
             "Content-Length: $l\r\n",
-            "Expires: $exp\r\n",
             "Content-Type: $__RETTYPE\r\n\r\n",
             $__RET;
 }
@@ -195,6 +208,7 @@ FHEMWEB_AnswerCall($)
 
   %__rooms = ();
   %__devs = ();
+  %__wlpos = ();
   %__types = ();
   $__room = "";
   $__detail = "";
@@ -266,8 +280,8 @@ FHEMWEB_AnswerCall($)
     pO "</div>\n";
   }
 
-  __roomOverview();
-  FHEMWEB_doDetail($__detail)    if($__detail);
+  FHEMWEB_roomOverview();
+  FHEMWEB_doDetail($__detail)  if($__detail);
   FHEMWEB_showRoom()           if($__room && !$__detail);
   FHEMWEB_showLogWrapper($cmd) if($cmd =~ /^showlogwrapper/);
   FHEMWEB_showArchive($cmd)    if($cmd =~ m/^showarchive/);
@@ -289,7 +303,7 @@ FHEMWEB_digestCgi($)
     $pv =~ s/\+/ /g;
     $pv =~ s/%(..)/chr(hex($1))/ge;
     my ($p,$v) = split("=",$pv, 2);
-    $v =~ s/[\r]\n/\\\n/g; 
+    $v =~ s/[\r]\n/\\\n/g;              # Multiline: escape the NL for fhem
     #Log(0, "P: $p, V: $v");
 
     if($p eq "detail")       { $__detail = $v; }
@@ -299,6 +313,9 @@ FHEMWEB_digestCgi($)
     if($p =~ m/^val\.(.*)$/) { $val{$1} = $v; }
     if($p =~ m/^dev\.(.*)$/) { $dev{$1} = $v; }
     if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c= $1; }
+    if($p eq "wlpos")        { %__wlpos =  split(/[=;]/, $v); }
+
+
   }
   $cmd.=" $dev{$c}" if($dev{$c});
   $cmd.=" $arg{$c}" if($arg{$c});
@@ -514,14 +531,30 @@ FHEMWEB_doDetail($)
 ##############
 # Room overview
 sub
-__roomOverview()
+FHEMWEB_roomOverview()
 {
   pO $__SF;
 
   pO "<div id=\"hdr\">\n";
+  pO "<table><tr><td>";
   pO "<a href=\"$FHEMWEB_reldoc\">Cmd</a>: ";
   pO FHEMWEB_textfield("cmd", 30);
-  pO FHEMWEB_hidden("room", "$__room") if($__room);
+  $__scrolledweblinkcount = 0;
+  if($__room) {
+    pO FHEMWEB_hidden("room", "$__room");
+    if(!$__detail) {    # Global navigation buttons for weblink >= 2
+      FHEMWEB_calcWeblink(undef,undef);
+      if($__scrolledweblinkcount) {
+        pO "</td><td>";
+        pO "&nbsp;&nbsp;";
+        FHEMWEB_zoomLink("zoom=-1", "Zoom-in.png", "zoom in", 0);
+        FHEMWEB_zoomLink("zoom=1",  "Zoom-out.png","zoom out", 0);
+        FHEMWEB_zoomLink("all=-1",  "Prev.png",    "prev", 0);
+        FHEMWEB_zoomLink("all=1",   "Next.png",    "next", 0);
+      }
+    }
+  }
+  pO "</td></tr></table>";
   pO "</div>\n";
 
   pO "<div id=\"left\">\n";
@@ -717,8 +750,20 @@ FHEMWEB_showRoom()
               $__devs{$va[0]}{INT}{currentlogfile}{VAL} =~ m,([^/]*)$,;
               $va[2] = $1;
             }
-            pO "<td><img src=\"$__ME?cmd=showlog $va[0] $va[1] $va[2]\"/>";
+            pO "<table><tr><td>";
+
+            my $wl = "";
+            $__wlpos{$va[0]} = $__wlpos{$d} if($__wlpos{$d});
+            $wl = "&wlpos=" . join(";", map { "$_=$__wlpos{$_}" }
+                                  grep { /(zoom|all|$va[0])/ } keys %__wlpos);
+            
+            pO "<img src=\"$__ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl\"/>";
+            pO "</td><td>";
+            
+            FHEMWEB_zoomLink("$d=-1", "Prev.png", "prev", 1);
+            FHEMWEB_zoomLink("$d=1",  "Next.png", "next", 1);
             pO "<a href=\"$__ME?detail=$d\">$d</a></td>";
+            pO "</td></tr></table>";
 
           }
         }
@@ -756,6 +801,8 @@ FHEMWEB_fileList($)
 }
 
 ######################
+# Show the content of the log (plain text), or an image and offer a link
+# to convert it to a weblink
 sub
 FHEMWEB_showLogWrapper($)
 {
@@ -782,7 +829,7 @@ FHEMWEB_showLogWrapper($)
     pO "<div id=\"right\">\n";
     pO "<table><tr></td>\n";
     pO "<table><tr></td>\n";
-    pO "<td><img src=\"$__ME?cmd=showlog $d $type $file\"/>";
+    pO "<td><img src=\"$__ME?cmd=showlog undef $d $type $file\"/>";
     pO "<a href=\"$__ME?cmd=toweblink $d:$type:$file\"><br>Convert to weblink</a></td>";
     pO "</td></tr></table>\n";
     pO "</td></tr></table>\n";
@@ -795,28 +842,83 @@ sub
 FHEMWEB_showLog($)
 {
   my ($cmd) = @_;
-  my (undef, $d, $type, $file) = split(" ", $cmd, 4);
-
-  $__devs{$d}{INT}{logfile}{VAL} =~ m,^(.*)/([^/]*)$,; # Dir and File
-  my $path = "$1/$file";
-  $path = $__devs{$d}{ATTR}{archivedir}{VAL} . "/$file" if(!-f $path);
+  my (undef, $wl, $d, $type, $file) = split(" ", $cmd, 5);
 
   my $gplot_pgm = "$FHEMWEBdir/$type.gplot";
-
   return FHEMWEB_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
-  return FHEMWEB_fatal("Cannot read $path") if(!-r $path);
 
-  # Read in the template gnuplot file
-  open(FH, $gplot_pgm) || FHEMWEB_fatal("$gplot_pgm: $!"); 
-  my $gplot_script = join("", <FH>);
-  close(FH);
-  $gplot_script =~ s/<OUT>/$FHEMWEB_tmpfile/g;
-  $gplot_script =~ s/<IN>/$path/g;
-  $gplot_script =~ s/<TL>/$file/g;
+  FHEMWEB_calcWeblink($d,$wl);
+  if($__plotmode eq "gnuplot" || !$__devs{$d}{from}) {
 
-  open(FH, "|gnuplot > /dev/null");# feed it to gnuplot
-  print FH $gplot_script;
-  close(FH);
+    # Looking for the logfile....
+
+    $__devs{$d}{INT}{logfile}{VAL} =~ m,^(.*)/([^/]*)$,; # Dir and File
+    my $path = "$1/$file";
+    $path = $__devs{$d}{ATTR}{archivedir}{VAL} . "/$file" if(!-f $path);
+    return FHEMWEB_fatal("Cannot read $path") if(!-r $path);
+
+    open(FH, $gplot_pgm) || FHEMWEB_fatal("$gplot_pgm: $!"); 
+    my $gplot_script = join("", <FH>);
+    close(FH);
+    $gplot_script =~ s/<OUT>/$FHEMWEB_tmpfile/g;
+    $gplot_script =~ s/<IN>/$path/g;
+    $gplot_script =~ s/<TL>/$file/g;
+
+    if($__devs{$wl} && $__devs{$wl}{ATTR}{fixedrange}) {
+      my $fr = $__devs{$wl}{ATTR}{fixedrange}{VAL};
+      $fr =~ s/ /\":\"/;
+      $fr = "set xrange [\"$fr\"]\n";
+      $gplot_script =~ s/(set timefmt ".*")/$1\n$fr/;
+    }
+
+    open(FH, "|gnuplot > /dev/null");# feed it to gnuplot
+    print FH $gplot_script;
+    close(FH);
+
+  } else { # gnuplot-scroll
+
+    ############################
+    # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
+    # the plot directive with our own, as we offer a file for each line
+    my (@filelog, @data, $plot);
+    open(FH, $gplot_pgm) || FHEMWEB_fatal("$gplot_pgm: $!"); 
+    while(my $l = <FH>) {
+      if($l =~ m/^#FileLog (.*)$/) {
+        push(@filelog, $1);
+      } elsif($l =~ "^plot" || $plot) {
+        $plot .= $l;
+      } else {
+        push(@data, $l);
+      }
+    }
+    close(FH);
+
+    my $gplot_script = join("", @data);
+    $gplot_script =~ s/<OUT>/$FHEMWEB_tmpfile/g;
+    $gplot_script =~ s/<TL>/$file/g;
+
+    my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
+
+    my @path = split(" ", fC("get $d $file $FHEMWEB_tmpfile $f $t " .
+                                join(" ", @filelog)));
+    my $i = 0;
+    $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
+    my $xrange = "set xrange [\"$f\":\"$t\"]\n";
+    foreach my $p (@path) {
+      next if(!-z $p);
+      open(FH, ">$p");
+      print FH "$f 0\n";
+      close(FH);
+    }
+
+    open(FH, "|gnuplot > /dev/null");# feed it to gnuplot
+    print FH $gplot_script, $xrange, $plot;
+    close(FH);
+    foreach my $p (@path) {
+      unlink($p);
+    }
+  }
+
 
   $__RETTYPE = "image/png";
   open(FH, "$FHEMWEB_tmpfile.png");         # read in the result and send it
@@ -904,6 +1006,131 @@ FHEMWEB_submit($$)
   return $s;
 }
 
+##################
+sub
+FHEMWEB_zoomLink($$$$)
+{
+  my ($cmd, $img, $alt, $br) = @_;
+
+  my ($d,$off) = split("=", $cmd, 2);
+
+  return if($__plotmode eq "gnuplot");
+  return if($__devs{$d} && $__devs{$d}{ATTR}{fixedrange});
+  return if($__devs{$d} && $__devs{$d}{ATTR}{noscroll});
+
+  my $val = $__wlpos{$d};
+
+  $cmd = "room=$__room&wlpos=";
+  if($d eq "zoom") {
+
+    $val = "day" if(!$val);
+    $val = $__zoom{$val};
+    return if(!defined($val) || $val+$off < 0 || $val+$off >= int(@__zoom) );
+    $val = $__zoom[$val+$off];
+    return if(!$val);
+    $cmd .= "zoom=$val";
+
+  } else {
+
+    return if((!$val && $off > 0) || ($val && $val+$off > 0)); # no future
+    $__wlpos{$d}=($val ? $val+$off : $off);
+    $cmd .= join(";", map { "$_=$__wlpos{$_}" } sort keys %__wlpos);
+
+    if(!defined($val)) {
+      delete $__wlpos{$d};
+    } else {
+      $__wlpos{$d} = $val;
+    }
+  }
+
+  pO "<a href=\"$__ME?$cmd\">";
+  pO "<img style=\"border-color:transparent\" alt=\"$alt\" ".
+                "src=\"$__ME/icons/$img\"/></a>";
+  pO "<br>" if($br);
+}
+
+##################
+# Calculate either the number of scrollable weblinks (for $d = undef) or
+# for the device the valid from and to dates for the given zoom and offset
+sub
+FHEMWEB_calcWeblink($$)
+{
+  my ($d,$wl) = @_;
+
+  return if($__plotmode eq "gnuplot");
+  my $now = time();
+
+  my $zoom = $__wlpos{zoom};
+  $zoom = "day" if(!$zoom);
+
+  if(!$d) {
+    foreach my $d (sort keys %__devs ) {
+      next if($__devs{$d}{type} ne "weblink");
+      next if(!$__room || ($__room ne "all" && !$__rooms{$__room}{$d}));
+      next if($__devs{$d}{ATTR} && $__devs{$d}{ATTR}{noscroll});
+      next if($__devs{$d}{ATTR} && $__devs{$d}{ATTR}{fixedrange});
+      $__scrolledweblinkcount++;
+    }
+    return;
+  }
+
+  return if(!$__devs{$wl});
+  return if($__devs{$wl} && $__devs{$wl}{ATTR}{noscroll});
+
+  if($__devs{$wl} && $__devs{$wl}{ATTR}{fixedrange}) {
+    my @range = split(" ", $__devs{$wl}{ATTR}{fixedrange}{VAL});
+    $__devs{$d}{from} = $range[0];
+    $__devs{$d}{to}   = $range[1];
+    return;
+  }
+
+  my $off = $__wlpos{$d};
+  $off = 0 if(!$off);
+  $off += $__wlpos{all} if($__wlpos{all});
+
+  if($zoom eq "day") {
+
+    my $t = $now + $off*86400;
+    my @l = localtime($t);
+    $__devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $__devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]+1);
+
+  } elsif($zoom eq "week") {
+
+    my @l = localtime($now);
+    my $t = $now - ($l[6]*86400) + ($off*86400)*7;
+    @l = localtime($t);
+    $__devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+
+    @l = localtime($t+7*86400);
+    $__devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+
+
+  } elsif($zoom eq "month") {
+
+    my @l = localtime($now);
+    while($off < -12) {
+      $off += 12; $l[5]--;
+    }
+    $l[4] += $off;
+    $l[4] += 12, $l[5]-- if($l[4] < 0);
+    $__devs{$d}{from} = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
+
+    $l[4]++;
+    $l[4] = 0, $l[5]++ if($l[4] == 12);
+    $__devs{$d}{to}   = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
+
+  } elsif($zoom eq "year") {
+
+    my @l = localtime($now);
+    $l[5] += $off;
+    $__devs{$d}{from} = sprintf("%04d", $l[5]+1900);
+    $__devs{$d}{to}   = sprintf("%04d", $l[5]+1901);
+
+  }
+}
+
+##################
 sub
 pF($@)
 {
@@ -911,12 +1138,14 @@ pF($@)
   $__RET .= sprintf $fmt, @_;
 }
 
+##################
 sub
 pO(@)
 {
   $__RET .= shift;
 }
 
+##################
 sub
 fC($)
 {

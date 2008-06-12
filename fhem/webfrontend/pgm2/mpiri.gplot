@@ -15,6 +15,12 @@ set ytics ("Sz" 0.8, "FlO" 0.6, "FlU" 0.4, "Wz1" 0.2, "Wz2" 0.0)
 set y2tics ("Sz" 0.8, "FlO" 0.6, "FlU" 0.4, "Wz1" 0.2, "Wz2" 0.0)
 set yrange [-0.1:0.9]
 
+#FileLog "0.8":sz:
+#FileLog "0.6":flo:
+#FileLog "0.4":flu:
+#FileLog "0.2":wz1:
+#FileLog "0.0":wz2:
+
 plot\
   "< awk '/sz/ {print $1, 0.8; }' <IN>" using 1:2 notitle with points,\
   "< awk '/flo/{print $1, 0.6; }' <IN>" using 1:2 notitle with points,\
