@@ -156,8 +156,8 @@ FileLog_Get($@)
 {
   my ($hash, @a) = @_;
   
-  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec> ...\n" .
-         "  where column_spec is <col>:<regexp>:<fn>\n" .
+  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec>...\n".
+         "  where column_spec is <col>:<regexp>:<default>:<fn>\n" .
          "  see the FileLogGrep entries in he .gplot files\n" .
          "  <infile> is without direcory, - means the current file\n" .
          "  <outfile> is a prefix, - means stdout\n"
@@ -167,7 +167,7 @@ FileLog_Get($@)
   my $inf  = shift @a;
   my $outf = shift @a;
   my $from = shift @a;
-  my $to   = shift @a;
+  my $to   = shift @a; # Now @a contains the list of column_specs
 
   if($inf eq "-") {
     $inf = $hash->{currentlogfile};
@@ -189,7 +189,7 @@ FileLog_Get($@)
   # last3: last delta timestamp (d or h)
   my (@d, @fname);
   for(my $i = 0; $i < int(@a); $i++) {
-    my @fld = split(":", $a[$i], 3);
+    my @fld = split(":", $a[$i], 4);
 
     my %h;
     if($outf ne "-") {
@@ -197,9 +197,10 @@ FileLog_Get($@)
       $h{fh} = new IO::File "> $fname[$i]";
     }
     $h{re} = $fld[1];
-    $h{fn} = $fld[2];
-    $h{didx} = 2 if($fld[2] && $fld[2] eq "delta-d");
-    $h{didx} = 3 if($fld[2] && $fld[2] eq "delta-h");
+    $h{df} = defined($fld[2]) ? $fld[2] : "";
+    $h{fn} = $fld[3];
+    $h{didx} = 10 if($fld[3] && $fld[3] eq "delta-d");
+    $h{didx} = 13 if($fld[3] && $fld[3] eq "delta-h");
 
     if($fld[0] =~ m/"(.*)"/) {
       $h{col} = $1;
@@ -207,7 +208,7 @@ FileLog_Get($@)
     } else {
       $h{col} = $fld[0]-1;
     }
-    $h{ret} = [];
+    $h{ret} = "";
     $d[$i] = \%h;
   }
 
@@ -215,7 +216,7 @@ FileLog_Get($@)
   while(my $l = <$ifh>) {
     last if($l gt $to);
     my @fld = split("[ \r\n]+", $l);
-    for(my $i = 0; $i < int(@a); $i++) {           # Process each req. field
+    for my $i (0..int(@a)-1) {           # Process each req. field
       my $h = $d[$i];
       my $re = $h->{re};
       next if($re && $l !~ m/$re/);
@@ -229,38 +230,42 @@ FileLog_Get($@)
       } elsif(!$h->{fn}) {                         # The column
         $line = "$fld[0] $fld[$col]";
 
-      } elsif($h->{fn} eq "int") {                 # int function
-        my $val = $fld[$col];
-        $val =~ s/[^\d.]//;
-        $line = "$fld[0] $val";
-
       } elsif($h->{didx}) {                        # delta-h  or delta-d
 
         my $hd = $h->{didx};
-        my @ld = split("[-_:]", $fld[0]);
-        if(!defined($h->{last1}) || $h->{last3} ne $ld[$hd]) {
+        my $ld = substr($fld[0],0,$hd);
+        if(!defined($h->{last1}) || $h->{last3} ne $ld) {
           if(defined($h->{last1})) {
             my @lda = split("[_:]", $lastdate{$hd});
             my $ts = "12:00:00";                   # middle timestamp
-            $ts = "$lda[1]:30:00" if($hd == 3);
-            $line = sprintf("%s_%s %0.1f", $lda[0],$ts, $fld[$col]-$h->{last1});
+            $ts = "$lda[1]:30:00" if($hd == 13);
+            my $v = $fld[$col]-$h->{last1};
+            $v = 0 if($v < 0);                     # Skip negative delta
+            $line = sprintf("%s_%s %0.1f", $lda[0],$ts, $v);
           }
           $h->{last1} = $fld[$col];
-          $h->{last3} = $ld[$hd];
+          $h->{last3} = $ld;
         }
         $h->{last2} = $fld[$col];
         $lastdate{$hd} = $fld[0];
+
+      } elsif($h->{fn} eq "int") {                 # int function
+        my $val = $fld[$col];
+        $line = "$fld[0] $1" if($val =~ m/^([0-9]+).*/);
+
       } else {
         $line = "$fld[0] " . eval($h->{fn});
       }
 
       next if(!$line);
 
+      $h->{count}++;
+      $line .= "\n";
       if($outf eq "-") {
-        push @{$h->{ret}}, $line;
+        $h->{ret} .= $line;
       } else {
         my $fh = $h->{fh};
-        print $fh $line,"\n";
+        print $fh $line;
       }
     }
   }
@@ -276,19 +281,28 @@ FileLog_Get($@)
       my @lda = split("[_:]", $lastdate{$hd});
       my $ts = "12:00:00";                   # middle timestamp
       $ts = "$lda[1]:30:00" if($hd == 3);
-      my $line = sprintf("%s_%s %0.1f", $lda[0],$ts, $h->{last2}-$h->{last1});
+      my $line = sprintf("%s_%s %0.1f\n", $lda[0],$ts, $h->{last2}-$h->{last1});
 
       if($outf eq "-") {
-        push @{$h->{ret}}, $line;
+        $h->{ret} .= $line;
+        $h->{count}++;
       } else {
         my $fh = $h->{fh};
-        print $fh $line,"\n";
+        print $fh $line;
+        $h->{count}++;
       }
     }
     if($outf eq "-") {
-      $ret .= join("\n", @{$h->{ret}}) if($h->{ret});
+      $h->{ret} .= "$from $h->{df}\n" if(!$h->{count} && $h->{df} ne "");
+      $ret .= $h->{ret} if($h->{ret});
+      $ret .= "#$a[$i]\n";
     } else {
-      $h->{fh}->close();
+      my $fh = $h->{fh};
+#Log 0, "FLg: $i: >$h->{count}, $h->{df}<";
+      if(!$h->{count} && $h->{df} ne "") {
+        print $fh "$from $h->{df}\n";
+      }
+      $fh->close();
     }
   }
 
@@ -317,7 +331,10 @@ seekTo($$$$)
     if($data !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /) {
       $next = $fh->tell;
       $data = <$fh>;
-      $next = $last if(!$data);
+      if(!$data) {
+        $last = $next;
+        last;
+      }
     }
     if($next eq $last) {
       $fh->seek($next, 0);
