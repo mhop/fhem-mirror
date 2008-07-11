@@ -1,0 +1,15 @@
+text { font-family:Times; font-size:12px; }
+text.title { font-size:16px; }
+
+rect.border { stroke:black; stroke-width:1px; fill:none; }
+
+polyline { stroke:black; stroke-width:1px; fill:none; }
+
+.vgrid { stroke-dasharray:2,6; stroke:gray; }
+.hgrid { stroke-dasharray:2,6; stroke:gray; }
+
+.l0 { stroke:red;     } text.l0 { stroke:none; fill:red; } 
+.l1 { stroke:green;   } text.l1 { stroke:none; fill:green; } 
+.l2 { stroke:blue;    } text.l2 { stroke:none; fill:blue; }
+.l3 { stroke:magenta; } text.l3 { stroke:none; fill:magenta; }
+.l4 { stroke:cyan;    } text.l4 { stroke:none; fill:cyan; }
