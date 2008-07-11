@@ -294,3 +294,14 @@
     The logfiles should be large, as scrolling across logfiles is not
     implemented. To speed up the grep, a binary search with seek is used, and
     seek positions are cached.
+
+- Thu Jul 11 07:15:03 MEST 2008
+  - feature: 99_SVG.pm for webpgm2: generates SVG from the logfile.
+    Generating SVG is configurable, the "old" gnuplot mode is still there.
+    Downside of the SVG: the browser must support SVG (Firefox/Opera does,
+    I.E. with the Adobe plugin), and the browsesr consumes more memory.
+    Upside: no gnuplot needed on the server, faster(?), less data to transfer
+    for daily data.
+    Tested with Firefox 3.0.
+    Todo: Test with IE+Adobe Plugin/Opera.
+  - feature: HOWTO for webpgm2 (first chapter)
