@@ -1,6 +1,6 @@
 body {
   color: black;
-   background: #FFFFD7;
+  background: #FFFFD7;
 }
 
 table.room {
@@ -140,6 +140,7 @@ table._internal_         tr.odd {
   position:absolute;
   top:50px;
   left:160px;
+  right:10px;
   bottom:10px;
   overflow:auto;
 }
