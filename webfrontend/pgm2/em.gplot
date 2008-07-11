@@ -4,7 +4,7 @@
 
 
 #=================
-set terminal png transparent size 800,200 crop
+set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
@@ -19,6 +19,6 @@ set y2tics
 set format y "%.1f"
 set format y2 "%.1f"
 
-#FileLog 0 4::
+#FileLog 4::0:
 
 plot "<IN>" using 1:4 notitle with lines

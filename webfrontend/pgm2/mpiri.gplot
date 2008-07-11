@@ -3,7 +3,7 @@
 # define pirilog FileLog /var/log/piri-%Y-%m-%d.log piri.*
 # The devices are called piri.sz, piri.flo, piri.flu, prir.wz1 and piri.wz2
 #
-set terminal png transparent size 800,200 crop
+set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
@@ -14,12 +14,13 @@ set title '<TL>'
 set ytics ("Sz" 0.8, "FlO" 0.6, "FlU" 0.4, "Wz1" 0.2, "Wz2" 0.0)
 set y2tics ("Sz" 0.8, "FlO" 0.6, "FlU" 0.4, "Wz1" 0.2, "Wz2" 0.0)
 set yrange [-0.1:0.9]
+set y2range [-0.1:0.9]
 
-#FileLog "0.8":sz:
-#FileLog "0.6":flo:
-#FileLog "0.4":flu:
-#FileLog "0.2":wz1:
-#FileLog "0.0":wz2:
+#FileLog "0.8":sz:0.8:
+#FileLog "0.6":flo:0.6:
+#FileLog "0.4":flu:0.4:
+#FileLog "0.2":wz1:0.2:
+#FileLog "0.0":wz2:0.0:
 
 plot\
   "< awk '/sz/ {print $1, 0.8; }' <IN>" using 1:2 notitle with points,\
