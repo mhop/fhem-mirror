@@ -44,7 +44,10 @@ my %readonly = (
 );
 
 use vars qw(%fs20_c2b);		# Peter would like to access it from outside
+
+# defptr{XMIT BTN}{DEVNAME} -> Ptr to global defs entry for this device
 my %defptr;
+
 my %follow;
 my $fs20_simple ="off off-for-timer on on-for-timer on-till reset timer toggle";
 my %models = (
@@ -275,11 +278,14 @@ FS20_Define($$)
 
     $a[$i] = lc($a[$i]);
     if($a[$i] eq "fg") {
-      return "Bad fg address for $name, see the doc" if( ($a[$i+1] !~ m/^f[a-f0-9]$/) && ($a[$i+1] !~ m/^44[1-4][1-4]$/));
+      return "Bad fg address for $name, see the doc"
+        if( ($a[$i+1] !~ m/^f[a-f0-9]$/) && ($a[$i+1] !~ m/^44[1-4][1-4]$/));
     } elsif($a[$i] eq "lm") {
-      return "Bad lm address for $name, see the doc" if( ($a[$i+1] !~ m/^[a-f0-9]f$/) && ($a[$i+1] !~ m/^[1-4][1-4]44$/));
+      return "Bad lm address for $name, see the doc"
+        if( ($a[$i+1] !~ m/^[a-f0-9]f$/) && ($a[$i+1] !~ m/^[1-4][1-4]44$/));
     } elsif($a[$i] eq "gm") {
-      return "Bad gm address for $name, must be ff" if( ($a[$i+1] ne "ff") && ($a[$i+1] ne "4444"));
+      return "Bad gm address for $name, must be ff"
+        if( ($a[$i+1] ne "ff") && ($a[$i+1] ne "4444"));
     } else {
       return $u;
     }
@@ -304,6 +310,7 @@ FS20_Undef($$)
   foreach my $c (keys %{ $hash->{CODE} } ) {
     $c = $hash->{CODE}{$c};
     delete($defptr{$c}{$name}) if($defptr{$c});
+    delete($defptr{$c}{$name}) if(!%{$defptr{$c}});
   }
   return undef;
 }
@@ -356,8 +363,8 @@ FS20_Parse($$)
 
     my $dev_four = hex2four($dev);
     my $btn_four = hex2four($btn);
-    Log 3, "FS20 Unknown device $dev ($dev_four), Button $btn ($btn_four) Code $cde ($v), " .
-    	   "please define it";
+    Log 3, "FS20 Unknown device $dev ($dev_four), " .
+                "Button $btn ($btn_four) Code $cde ($v), please define it";
     return "UNDEFINED FS20: $dev/$btn/$cde";
   }
 
