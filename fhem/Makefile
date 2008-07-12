@@ -1,8 +1,8 @@
 BINDIR=/usr/local/bin
 MODDIR=/usr/local/lib
 
-VERS=4.2
-DATE=2007-12-02
+VERS=4.3
+DATE=2008-07-12
 DIR=fhem-$(VERS)
 
 all:
@@ -12,6 +12,12 @@ all:
 install:
 	cp fhem.pl $(BINDIR)
 	cp -rp FHEM $(MODDIR)
+	perl -pi -e 's,modpath .,modpath $(MODDIR),' examples/*
+
+install-pgm2:
+	cp fhem.pl $(BINDIR)
+	cp -rp FHEM $(MODDIR)
+	cp -rp webfrontend/pgm2/* $(MODDIR)
 	perl -pi -e 's,modpath .,modpath $(MODDIR),' examples/*
 
 dist:

@@ -3,7 +3,7 @@
 # 
 # Define a lamp (which is plugged in via an FS20ST).
 # To program the FS20ST, start the server, plug the FS20ST in pressing its
-# button, and then execute   fhem.pl 7072 "set lamp on" 
+# button (it starts blinking), and then execute   fhem.pl 7072 "set lamp on" 
 #
 
 # Common part

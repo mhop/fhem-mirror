@@ -1,7 +1,7 @@
 #
 # fhem.pl configfile
-# Logging FS20/KS300 data
-# See the file fht.gnuplot for displaying the logged data (or webfrontend/pgm2)
+# Logging FS20/KS300 data into files. For database logging see the
+# contrib/91_DbLog.pm
 #
 
 attr global logfile /tmp/fhem-%Y-%m.log
@@ -17,9 +17,11 @@ define ks1 KS300 1234 250   # type KS300, with 250ml rain / counter
 
 #########################
 # Log temperature and actuator changes into a file, its name changes weekly
-define wzlog  FileLog /var/tmp/wz-%Y-%U.log wz:.*(temp|actuator).*
+define wzlog FileLog /var/tmp/wz-%Y-%U.log wz:.*(temp|actuator).*
 
-# Make it accessible from fhemweb.pl (webpgm2)
+# Make it accessible from 01_FHEMWEB.pm (webpgm2)
+# Note: for FHEMWEB large logfiles (one per year) are recommended to be able to
+# navigate
 attr wzlog logtype fht:Temp
 
 # ks300 log

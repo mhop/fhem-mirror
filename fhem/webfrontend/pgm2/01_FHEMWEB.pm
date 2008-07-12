@@ -56,12 +56,12 @@ my $__detail;                   # durrently selected device for detail view
 my $__title;                    # Page title
 my $__cmdret;                   # Returned data by the fhem call
 my $__scrolledweblinkcount;     # Number of scrolled weblinks
-my %__wlpos;                    # WebLink scroll position
+my %__pos;                      # scroll position
 my $__RET;                      # Returned data (html)
 my $__RETTYPE;                  # image/png or the like
 my $__SF;                       # Short for submit form
 my $__ti;                       # Tabindex for all input fields
-my @__zoom;                     # "day","week","month","year"
+my @__zoom;                     # "qday", "day","week","month","year"
 my %__zoom;                     # the same as @__zoom
 my $__plotmode;                 # Current plotmode
 my $__plotsize;                 # Size for a plot
@@ -110,7 +110,7 @@ FHEMWEB_Define($$)
   ###############
   # Initialize internal structures
   my $n = 0;
-  @__zoom = ("day","week","month","year");
+  @__zoom = ("qday", "day","week","month","year");
   %__zoom = map { $_, $n++ } @__zoom;
 
   return undef;
@@ -212,7 +212,7 @@ FHEMWEB_AnswerCall($)
 {
   my ($arg) = @_;
 
-  %__wlpos = ();
+  %__pos = ();
   $__room = "";
   $__detail = "";
   $__cmdret = "";
@@ -328,7 +328,7 @@ FHEMWEB_digestCgi($)
     if($p =~ m/^val\.(.*)$/) { $val{$1} = $v; }
     if($p =~ m/^dev\.(.*)$/) { $dev{$1} = $v; }
     if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c= $1; }
-    if($p eq "wlpos")        { %__wlpos =  split(/[=;]/, $v); }
+    if($p eq "pos")          { %__pos =  split(/[=;]/, $v); }
     if($p eq "data")         { $__data = $v; }
 
   }
@@ -579,8 +579,8 @@ FHEMWEB_roomOverview($)
         pO "&nbsp;&nbsp;";
         FHEMWEB_zoomLink("zoom=-1", "Zoom-in.png", "zoom in", 0);
         FHEMWEB_zoomLink("zoom=1",  "Zoom-out.png","zoom out", 0);
-        FHEMWEB_zoomLink("all=-1",  "Prev.png",    "prev", 0);
-        FHEMWEB_zoomLink("all=1",   "Next.png",    "next", 0);
+        FHEMWEB_zoomLink("off=-1",  "Prev.png",    "prev", 0);
+        FHEMWEB_zoomLink("off=1",   "Next.png",    "next", 0);
       }
     }
   }
@@ -606,7 +606,7 @@ FHEMWEB_roomOverview($)
   pO "      <tr><td><a href=\"$__ME/HOWTO.html\">Howto</a></td></tr>\n";
   pO "      <tr><td><a href=\"$__ME/commandref.html\">Details</a></td></tr>\n";
   my $sel = ($cmd =~ m/^style/) ? " class=\"sel\"" : "";
-  pO "      <tr$sel><td><a href=\"$__ME?cmd=style list\">Misc. files</a></td></tr>\n";
+  pO "      <tr$sel><td><a href=\"$__ME?cmd=style list\">Edit files</a></td></tr>\n";
   pO "    </table>\n";
   pO "  </td></tr>\n";
   pO "  </table>\n";
@@ -791,10 +791,7 @@ FHEMWEB_showRoom()
             }
             pO "<table><tr><td>";
 
-            $__wlpos{$va[0]} = $__wlpos{$d} if($__wlpos{$d});
-
-            my $wl = "&amp;wlpos=" . join(";", map { "$_=$__wlpos{$_}" }
-                                grep { /(zoom|all|$va[0])/ } keys %__wlpos);
+            my $wl = "&amp;pos=" . join(";", map {"$_=$__pos{$_}"} keys %__pos);
 
             my $arg="$__ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
             if($__plotmode eq "SVG") {
@@ -806,9 +803,6 @@ FHEMWEB_showRoom()
             }
 
             pO "</td><td>";
-            
-            FHEMWEB_zoomLink("$d=-1", "Prev.png", "prev", 1);
-            FHEMWEB_zoomLink("$d=1",  "Next.png", "next", 1);
             pO "<a href=\"$__ME?detail=$d\">$d</a>";
             pO "</td></tr></table>";
 
@@ -1107,13 +1101,13 @@ FHEMWEB_zoomLink($$$$)
 
   my ($d,$off) = split("=", $cmd, 2);
 
-  return if($__plotmode eq "gnuplot");
+  return if($__plotmode eq "gnuplot");                    # No scrolling
   return if($__devs{$d} && $__devs{$d}{ATTR}{fixedrange});
   return if($__devs{$d} && $__devs{$d}{ATTR}{noscroll});
 
-  my $val = $__wlpos{$d};
+  my $val = $__pos{$d};
 
-  $cmd = "room=$__room&amp;wlpos=";
+  $cmd = "room=$__room&amp;pos=";
   if($d eq "zoom") {
 
     $val = "day" if(!$val);
@@ -1121,20 +1115,33 @@ FHEMWEB_zoomLink($$$$)
     return if(!defined($val) || $val+$off < 0 || $val+$off >= int(@__zoom) );
     $val = $__zoom[$val+$off];
     return if(!$val);
-    $cmd .= "zoom=$val";
+
+    # Approximation of the next offset.
+    my $w_off = $__pos{off};
+    $w_off = 0 if(!$w_off);
+    if($val eq "qday") {
+      $w_off =              $w_off*4;
+    } elsif($val eq "day") {
+      $w_off = ($off < 0) ? $w_off*7 : int($w_off/4);
+    } elsif($val eq "week") {
+      $w_off = ($off < 0) ? $w_off*4 : int($w_off/7);
+    } elsif($val eq "month") {
+      $w_off = ($off < 0) ? $w_off*12: int($w_off/4);
+    } elsif($val eq "year") {
+      $w_off =                         int($w_off/12);
+    }
+    $cmd .= "zoom=$val;off=$w_off";
 
   } else {
 
     return if((!$val && $off > 0) || ($val && $val+$off > 0)); # no future
-    $__wlpos{$d}=($val ? $val+$off : $off);
-    $cmd .= join(";", map { "$_=$__wlpos{$_}" } sort keys %__wlpos);
+    $off=($val ? $val+$off : $off);
+    my $zoom=$__pos{zoom};
+    $zoom = 0 if(!$zoom);
+    $cmd .= "zoom=$zoom;off=$off";
 
-    if(!defined($val)) {
-      delete $__wlpos{$d};
-    } else {
-      $__wlpos{$d} = $val;
-    }
   }
+
 
   pO "<a href=\"$__ME?$cmd\">";
   pO "<img style=\"border-color:transparent\" alt=\"$alt\" ".
@@ -1153,7 +1160,7 @@ FHEMWEB_calcWeblink($$)
   return if($__plotmode eq "gnuplot");
   my $now = time();
 
-  my $zoom = $__wlpos{zoom};
+  my $zoom = $__pos{zoom};
   $zoom = "day" if(!$zoom);
 
   if(!$d) {
@@ -1167,6 +1174,7 @@ FHEMWEB_calcWeblink($$)
     return;
   }
 
+
   return if(!$__devs{$wl});
   return if($__devs{$wl} && $__devs{$wl}{ATTR}{noscroll});
 
@@ -1177,11 +1185,21 @@ FHEMWEB_calcWeblink($$)
     return;
   }
 
-  my $off = $__wlpos{$d};
+  my $off = $__pos{$d};
   $off = 0 if(!$off);
-  $off += $__wlpos{all} if($__wlpos{all});
+  $off += $__pos{off} if($__pos{off});
 
-  if($zoom eq "day") {
+  if($zoom eq "qday") {
+
+    my $t = $now + $off*21600;
+    my @l = localtime($t);
+    $l[2] = int($l[2]/6)*6;
+    $__devs{$d}{from}
+        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    $__devs{$d}{to}
+        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]+6);
+
+  } elsif($zoom eq "day") {
 
     my $t = $now + $off*86400;
     my @l = localtime($t);

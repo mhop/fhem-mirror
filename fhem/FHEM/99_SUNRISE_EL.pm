@@ -265,7 +265,7 @@ sub tand($) { tan( ( $_[0] ) * $DEGRAD ); }
 sub atand($) { ( $RADEG * atan( $_[0] ) ); }
 sub asind($) { ( $RADEG * asin( $_[0] ) ); }
 sub acosd($) { ( $RADEG * acos( $_[0] ) ); }
-sub atan2d($) { ( $RADEG * atan2( $_[0], $_[1] ) ); }
+sub atan2d($$) { ( $RADEG * atan2( $_[0], $_[1] ) ); }
 
 sub
 _revolution($)
