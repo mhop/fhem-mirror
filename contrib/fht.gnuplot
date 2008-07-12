@@ -5,6 +5,7 @@
 #   gnuplot fht.gnuplot
 # (i.e. this file)
 # Note: The webfrontend pgm2 and pgm3 does this for you.
+# More examples can be found in the webfrontend/pgm2 directory.
 
 
 ###########################

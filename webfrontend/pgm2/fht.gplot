@@ -14,7 +14,7 @@ set y2tics
 set title '<TL>'
 set grid xtics y2tics
 
-set y2label "temperature (Celsius)"
+set y2label "Temperature in C°"
 set ylabel "Actuator (%)"
 
 #FileLog 4:measured:0:
