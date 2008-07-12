@@ -25,17 +25,17 @@ setstate roll1 off          # initial state is closed
 # Note: Only one of the methods should be used
 
 # Method 1a: builtin commands. Note the double ;
-notifyon btn3 set roll1 %;; set roll2 %
+define n_1a notify btn3 set roll1 %;; set roll2 %
 
 # Method 1b: shorter:
-notifyon btn3 set roll1,roll2 %
+define n_1b notify btn3 set roll1,roll2 %
 
 # Method 2a: perl.
-notifyon btn3 { fhem "set roll1,roll2 %" }
+define n_2a notify btn3 { fhem "set roll1,roll2 %" }
 
 # Method 2b: perl. open the rollades only to a certain amount if they are
 # closed. Else do the required command.
-notifyon btn3 {\
+define n_2b notify btn3 {\
   if("%" eq "on" && $value{roll1} eq "off") {\
     fhem "set roll1 on-for-timer 10";;\
     fhem "set roll2 on-for-timer 16";;\
@@ -45,7 +45,7 @@ notifyon btn3 {\
 }
 
 # Method 3: shell. The script follows after "quit". Dont forget to chmod u+x it.
-notifyon btn3 "/usr/local/bin/roll.sh %"
+define n_3 notify btn3 "/usr/local/bin/roll.sh %"
 
 quit                        # Ignore the rest of this file
 

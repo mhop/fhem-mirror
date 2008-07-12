@@ -13,3 +13,7 @@ polyline { stroke:black; stroke-width:1px; fill:none; }
 .l2 { stroke:blue;    } text.l2 { stroke:none; fill:blue; }
 .l3 { stroke:magenta; } text.l3 { stroke:none; fill:magenta; }
 .l4 { stroke:cyan;    } text.l4 { stroke:none; fill:cyan; }
+.l5 { stroke:black;   } text.l5 { stroke:none; fill:black; }
+.l6 { stroke:olive;   } text.l6 { stroke:none; fill:olive; }
+.l7 { stroke:gray;    } text.l7 { stroke:none; fill:gray; }
+.l8 { stroke:yellow;  } text.l8 { stroke:none; fill:yellow; }

@@ -475,6 +475,37 @@ make editing of multiline commands transparent.<br><br>
         (see fhtbuf).
 
         </li><br>
+
+    <a name="webname"></a>
+    <li>webname<br/>
+        Can be applied to FHEMWEB devices. (webfrontend/pgm2)<br/>
+        Path after the http://hostname:port/ specification. Defaults to fhem,
+        i.e the default http address is http://localhost:8083/fhem
+        </li><br>
+
+    <a name="plotmode"></a>
+    <li>plotmode<br/>
+        Can be applied to FHEMWEB devices. (webfrontend/pgm2)<br/>
+        Specifies ho to generate the plots:
+        <ul>
+          <li>gnuplot<br>
+              Call the gnuplot script with each logfile. The filename
+              specification of the <a href="#FileLog">FileLog</a> device will
+              determine what is in the plot.  The data is converted into an
+              image on the backend with gnuplot.</li>
+          <li>gnuplot-scroll<br>
+              Fhemweb will offer zoom and scroll buttons in order to navigate
+              in the current logfile, i.e. you can select just a part of the
+              data to be displayed. The more data is contained in a single
+              logfile, the easier you can navigate. The recommendation is to
+              store the data for a whole year in one logfile.  The data is
+              converted into an image on the backend with gnuplot.</li>
+          <li>SVG (TODO)<br>
+              The same scrolling as with gnuplot scroll, but the data is sent
+              as an SVG path specification to the frontend, which will compute
+              the image: no need for gnuplot on the backend.</li>
+        </ul>
+        </li><br>
   </li>
   </ul>
 
@@ -1294,6 +1325,7 @@ make editing of multiline commands transparent.<br><br>
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.<br>
 
+  <a name="FHZget"></a>
   <h4>Type FHZ:</h4>
   <ul>
     <code>get FHZ &lt;value&gt;</code>
@@ -1325,6 +1357,7 @@ make editing of multiline commands transparent.<br><br>
     </ul>
   </ul>
 
+  <a name="EMget"></a>
   <h4>Type EM:</h4>
   <ul>
     <code>get EM &lt;value&gt;</code>
@@ -1332,6 +1365,7 @@ make editing of multiline commands transparent.<br><br>
     where <code>value</code> is either version or time.
   </ul>
 
+  <a name="EMWZget"></a>
   <h4>Type EMWZ:</h4>
   <ul>
     <code>get EMWZ status</code>
@@ -1339,6 +1373,7 @@ make editing of multiline commands transparent.<br><br>
     This is the same command which is scheduled every 5 minutes internally.
   </ul>
 
+  <a name="M232get"></a>
   <h4>Type M232:</h4>
   <ul>
     <code>get &lt;name&gt; [an0..an5]</code>
@@ -1360,6 +1395,7 @@ make editing of multiline commands transparent.<br><br>
     <br><br>
   </ul>
 
+  <a name="M232Counterget"></a>
   <h4>Type M232Counter:</h4>
   <ul>
     <code>get &lt;name&gt; status</code>
@@ -1371,6 +1407,7 @@ make editing of multiline commands transparent.<br><br>
     <br><br>
   </ul>
   
+  <a name="WS2000get"></a>
   <h4>Type WS2000:</h4>
   <ul>
     <code>get &lt;name&gt; list</code>
@@ -1386,7 +1423,8 @@ make editing of multiline commands transparent.<br><br>
   </ul>
   
  
-<h4>Type IPWE</h4>
+  <a name="IPWEget"></a>
+  <h4>Type IPWE</h4>
   <ul>
     <code>get &lt;name&gt; status</code>
     <br><br>
@@ -1397,6 +1435,68 @@ make editing of multiline commands transparent.<br><br>
     will grep output from device for this sensorname
     <br><br>
   </ul>
+
+  <a name="FileLogget"></a>
+  <h4>Type FileLog</h4>
+  <ul>
+    <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+          &lt;to&gt; &lt;column_spec&gt; </code>
+    <br><br>
+    Read data from the logfile.
+    <ul>
+      <li>&lt;infile&gt;<br>
+        Name of the logfile to grep. "-" is the current logfile, or you can
+        specify an older file (or a file from the archive).</li>
+      <li>&lt;outfile&gt;<br>
+        If it is "-", you get the data back on the current connection, else it
+        is the prefix for the output file. If more than one file is specified,
+        the data is separated by a comment line for "-", else it is written in
+        separate files, numerated from 0.
+        </li>
+      <li>&lt;from&gt; &lt;to&gt;<br>
+        Used to grep the data. The elements should correspond to the
+        timeformat or be an initial substring of it.</li>
+      <li>&lt;column_spec&gt;<br>
+        For each column_spec return a set of data in a separate file or
+        separated by a comment line on the current connection.<br>
+        Syntax: &lt;col&gt;:&lt;regexp&gt;:&lt;default&gt;:&lt;fn&gt;<br>
+        <ul>
+          <li>&lt;col&gt;
+            The column number to return, starting at 1 with the date.
+            If the column is enclosed in double quotes, then it is a fix text,
+            not a column nuber.</li>
+          <li>&lt;regexp&gt;
+            If present, return only lines containing the regexp. Case sensitive.
+            </li>
+          <li>&lt;default&gt;<br>
+            If no values were found and the default value is set, then return
+            one line containing the from value and this default. We need this
+            feature as gnuplot aborts if a dataset has no value at all.
+            </li>
+          <li>&lt;fn&gt;
+            One of the following:
+            <ul>
+              <li>int<br>
+                Extract the  integer at the beginning og the string. Used e.g.
+                for constructs like 10%</li>
+              <li>delta-h or delta-d<br>
+                Return the delta of the values for a given hour or a given day.
+                Used if the column contains a counter, as is the case for the
+                KS300 rain column.</li>
+              <li>everything else<br>
+                The string is evaluated as a perl expression. @fld is the
+                current line splitted by spaces. Note: The string/perl
+                expression cannot contain spaces, as the part after the space
+                will be considered as the next column_spec.</li>
+            </ul></li>
+        </ul></li>
+      </ul>
+    <br><br>
+    Example:
+      <pre>get outlog out-2008.log - 2008-01-01 2008-01-08 4:IR:int: 9:IR::</pre>
+    <br><br>
+  </ul>
+
 </ul>
 
 

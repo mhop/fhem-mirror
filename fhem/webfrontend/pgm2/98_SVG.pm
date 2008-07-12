@@ -27,7 +27,7 @@ SVG_render($$$$$$$)
 
   my ($ow,$oh) = split(",", $wh);       # Original width
   my $th = 16;                          # "Font" height
-  my ($x, $y) = (3*$th,  1.5*$th);      # Rect offset
+  my ($x, $y) = (3*$th,  1.2*$th);      # Rect offset
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
   my %conf;                             # gnuplot file settings
 
@@ -108,7 +108,6 @@ SVG_render($$$$$$$)
       push @{$dyp}, $v;
       $min = $v if($min > $v);
       $max = $v if($max < $v);
-
     }
   }
 
@@ -135,7 +134,9 @@ SVG_render($$$$$$$)
   # Compute & draw vertical tics, grid and labels
   my $ddur = ($tosec-$fromsec)/86400;
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
-  if($ddur <= 1) {
+  if($ddur <= 0.5) {
+    $first_tag=". 2 1"; $tag=": 3 4"; $step = 3600; $tstep = 900;
+  } elsif($ddur <= 1) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 4*3600; $tstep = 3600;
   } elsif ($ddur <= 7) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 24*3600; $tstep = 6*3600;
@@ -286,7 +287,6 @@ SVG_render($$$$$$$)
       pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
 
     } elsif($type[$idx] eq "histeps" ) {
-
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
