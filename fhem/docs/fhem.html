@@ -12,50 +12,18 @@
 <h1>FHEM</h1>
 GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT.
 Formerly known as fhz1000.pl
-
-<h2>News (as of =DATE=, Version =VERS=)</h2>
-<ul>
-  <li>feature: added ELV IPWE-Support via 88_IPWE.pm (thomas 18.05.08)</li>
-  <li>feature: added windows COM-Port support to FHZ, EM,WS2000,WS300 (thomas 12.05.08)</li>
-  <li>feature: added ReadyFn to have an alternate methode to check if data available(thomas 11.05.08)</li>
-  <li>feature: added ws2000 support via 87_WS2000.pm(thomas 10.05.08)</li>
-  <li>feature: added archivedir/archivecmd to the the main logfile</li>
-  <li>feature: 99_Sunrise_EL.pm (does not need any Date modules)</li>
-  <li>bugfix:  seldom xmllist error resulting in corrupt xml (Martin/Peter, 4.9)</li>
-  <li>bugfix:  FHT mode holiday_short added (9.9, Dirk)</li>
-  <li>bugfix:  Modifying a device from its own trigger crashes (Klaus, 10.9)</li>
-  <li>feature: webpgm2 output reformatted</li>
-  <li>feature: webpgm2 displaying multiple plots</li>
-  <li>feature: FHT lime-protection code discovered by Dirk (7.10)</li>
-  <li>feature: softwarebuffer for FHT devices (Dirk 17.10)</li>
-  <li>feature: FHT low temperatur warning and offset (Dirk 17.10)</li>
-  <li>change:  change FHT state into warnings (Dirk 17.10)<br>
-               NOTE: you'll get an undefined type state &amp; undefined type
-               unknown_85 message after upgrade, this will disappear at the
-               second start.</li>
-  <li>feature: Softwarebuffer code simplified (Rudi 22.11)</li>
-  <li>bugfix:  bug #12327 doppeltes my</li>
-  <li>bugfix:  set STATE from trigger</li>
-  <li>bugfix:  readings state vs STATE problem (xmllist/trigger)</li>
-  <li>change:  SUNRISE doc changed (99_SUNRISE.pm -> 99_SUNRISE_EL.pm)</li>
-  <li>feature: support for the M232 ELV device (Boris, 25.11)</li>
-  <li>feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)</li>
-  <li>feature: dummy type added (contrib/99_dummy.pm)</li>
-  <li>feature: added database logging facility (93_DbLog.pm) (Boris, 29.12)</li>
-  <li>feature: support for %NAME, %EVENT, %TYPE parameters in notify definition (Boris, 29.12)</li>
-  <li>bugfix:  62_EMEM.pm: energy_total_kWh renamed to energy_kWh_w, energy_kWh added (Boris, 6.1)</li>
-</ul>
-
-</ul>
+<br/><br/>
+Current Version: (as of =DATE=) is <a href="http://www.koeniglich.de/fhem/fhem-=VERS=.tar.gz">=VERS=</a>
+See the <a href="CHANGED">CHANGED</a> file for current changes.
 
 <h2>Description</h2>
 <ul>
 This program makes the FHZ1000/FHZ1300/WS300 and other USB devices sold by ELV,
 Conrad and others useable with Linux. In fact, there is nothing Linux special
-in it, you should be able to use it on other platforms as long as you can
-access the hardware as a serial device.<br> The program runs as a server, you
-can control it via telnet, command line program or TCP/IP directly, like the
-supplied web frontends do.<br> <br>
+in it, there are reports from OS X and Windows. You should be able to use it on
+other platforms as long as you can access the hardware as a serial device.<br>
+The program runs as a server, you can control it via telnet, command line
+program or TCP/IP directly, like the supplied web frontends do.<br> <br>
 
 Currently implemented features:<br>
 <ul>
@@ -79,13 +47,12 @@ Currently implemented features:<br>
   <li>reading attached M232 devices</li>
   <li>reading attached WS2000/WS25000 devices, also via raw network converters(xport)</li>
   <li>extract sensor data from IPWE networked weather data receiver</li>
-  <li>logging events to files or databases</li>
   <li>logging events to files or databases, with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
       events</li>
   <li>timed commands (e.g. switching a lamp on from sunset till midnight)</li>
-  <li>modular architecture</li>
-  <li>Two different web frontends, choose your favorite</li>
+  <li>modular architecture, easy to add your special device</li>
+  <li>different web frontends, choose your favorite</li>
 <br>
 </ul>
 See <a href="commandref.html">commandref.html</a> for a detailed command
@@ -119,9 +86,7 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
      <li>Windows driver installation:
           <a href="http://fhz4linux.info/tiki-index.php?page=Driver%20installation">
           http://fhz4linux.info/tiki-index.php?page=Driver%20installation</a> <br>
-          (best:use "Solution B";change only the value PID to the FDTI default. Your supplied software will not harm.)<br>
-	  At this time, we only support virtual com port on windows. Only COM1..COM9 are known to work
-	  ->COM10 will result in a "unknown Device" error.</li>
+          (use "Solution B", only COM1..COM9 is supported)</li>
     <li>Instructions for Nas/Routers (NSLU2):
           <a href="http://www.martin-haas.de/fhz/nslu2fhz">
         http://www.martin-haas.de/fhz/nslu2fhz</a></li>
@@ -142,20 +107,13 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 <h2>Installation</h2>
 <ul>
 
-<h3>Linux driver</h3>
-  See <a href="http://www.koeniglich.de/fhem/linux.html">
-  	http://www.koeniglich.de/fhem/linux.html</a><br>
-  For kernels older then 2.6.x apply the patch from the doc directory to your
-  kernel, recompile it and reboot or load/reload the ftdi_sio module.
-</ul>
-
 <h3>Perl modules</h3>
 <ul>
-  You need perl &gt;=5.8, on Unix with the Device::SerialPort (<a
+  You need perl &gt;=5.6, on Unix with the Device::SerialPort (<a
   href="http://search.cpan.org/dist/Device-SerialPort/">
   http://search.cpan.org/dist/Device-SerialPort/</a>),
-  on Windows Win32::SerialPort (best along ActiveState ActivePerl installation on Windows)
-  module. All other needed modules were present in my installation.
+  on Windows Win32::SerialPort (use ActiveState's ActivePerl)
+  module.
   If this module reports <code>Can't call method "opened" on an undefined
   value...</code> when starting the server, then you either may ignore
   this message, or replace the mentioned line with:<pre>
@@ -180,7 +138,7 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 </ul>
 
 <h3>Server installation on Windows</h3>
-( if you are using cygwin for your perl installation you can follow the guidelines for Unix)
+If you are using cygwin for your perl installation you can follow the guidelines for Unix.
 <ul>
   <li>be sure you have perl.exe in your path (%PATH%)</li>
   <li>unpack distribution in a directory of your choice </li>
@@ -203,19 +161,21 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
   <li>The web server and the fhem server must be on the same host</li>
   <li><b>Important:</b> Make sure you add some protection (.htaccess, etc)
       else everybody will be able to set your devices</li>
+  <li>The list below contains the 2 actively maintained fronteds:</li>
 </ul>
 
 <h3>Web frontend 2 (webfrontend/pgm2)</h3>
   <ul>
-  This frontend is a FHEM module realising a primitive HTTP server -> You do
-  not even need apache if security (password/HTTPS) is not a concern.
-  It has support for grouping devices into rooms, manipulating devices, direct
-  fhem commands, diplaying logfiles as text or (if gnuplot is installed) as
-  graphs.<br>
-  Screenshots: <a href="pgm2-1.png">one</a>, <a href="pgm2-2.png">two</a>.
-  <br><br>
+  This frontend is a FHEM module implementing a HTTP server.  It has support
+  for grouping devices into rooms, manipulating devices, direct fhem commands,
+  displaying logfiles as text or plot (SVG builtin or PNG by gnuplot),
+  navigating/zooming in the plots.  <br/>
 
+  Screenshots: <a href="pgm2-1.png">overview</a>, <a href="pgm2-2.png">detail</a>,
+  <a href="pgm2-3.png">SVG-plots</a>.
+  <br><br>
   For installation see the webpgm/pgm2/README file.<br>
+  </ul>
 
 <h3>Web frontend 3 (webfrontend/pgm3)</h3>
   <ul>
@@ -251,21 +211,6 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
   </ul>
   </ul>
 
-<h3>Web frontend 4 (webfrontend/pgm4, the template)</h3>
-  <ul>
-  This frontend is PHP based and was contributed by Stefan Mayer. It won't work
-  for you without modification, it is meant as a template or as an example. See
-  the <a href="pgm4.gif">screenshot</a>. To install:
-  <ul>
-    <li>Copy the directory webfrontend/pgm4 to your html directory.</li>
-    <li>Install/enable PHP (see the description for frontend3)</li>
-    <li>Call the program with http://webserver/pgm4/fs20.php</li>
-  </ul>
-  Now you can go on, and modify it to suit your needs :-)
-  </ul>
-
-</ul>
-
 <h2>License:</h2>
 <ul>
   Copyright:<br>
@@ -274,7 +219,7 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
     <li>Raoul Matthiessen (webfrontends/pgm1)</li>
     <li>Martin Haas (webfrontends/pgm3)</li>
   </ul>
-  License:   GPL (v2)
+  License: GPL (v2)
 </ul>
 
 </ul>
