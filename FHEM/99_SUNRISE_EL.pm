@@ -19,6 +19,7 @@ sub sunrise_abs(@);
 sub sunset_abs(@);
 sub isday();
 sub sunrise_coord($$$);
+
 sub SUNRISE_Initialize($);
 
 # See perldoc DateTime::Event::Sunrise for details

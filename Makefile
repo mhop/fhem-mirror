@@ -11,20 +11,22 @@ all:
 
 install:
 	cp fhem.pl $(BINDIR)
-	cp -rp FHEM $(MODDIR)
+	cp -r FHEM $(MODDIR)
 	perl -pi -e 's,modpath .,modpath $(MODDIR),' examples/*
 
 install-pgm2:
 	cp fhem.pl $(BINDIR)
-	cp -rp FHEM $(MODDIR)
-	cp -rp webfrontend/pgm2/* $(MODDIR)
+	cp -r FHEM $(MODDIR)
+	cp -r webfrontend/pgm2/* $(MODDIR)
 	perl -pi -e 's,modpath .,modpath $(MODDIR),' examples/*
 
 dist:
 	@echo Version is $(VERS), Date is $(DATE)
 	mkdir .f
-	cp -rp * .f
+	cp -r CHANGED FHEM HISTORY Makefile README.CVS em1010pc\
+                TODO contrib docs examples fhem.pl test webfrontend .f
 	find .f -name \*.orig -print | xargs rm -f
+	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
 	mv .f fhem-$(VERS)

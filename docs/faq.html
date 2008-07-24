@@ -46,6 +46,9 @@ me?</a><br><br>
 
 <a href="#faq12">12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</a><br><br>
 
+<a href="#faq12">13. I'd like to see directly in the Web frontend if a window is open. How to do that?</a><br><br>
+
+<br>
 <br>
 <br>
 <br>
@@ -271,6 +274,20 @@ by fhem.pl?</b>
   FHZ> define chilldown at +*00:30:00 { fhem("set ventilator on") if($value{myfht} gt "measured-temp: 25.0") }
   </pre>
 
+</ul>
+
+<a name="faq13"></a>
+<b>13. I'd like to see directly in the Web frontend if a window is open.
+How to do that? (by fwolff)</b>
+<ul>
+
+  Just define a new (pseudo) FS20 device called "window" and use the following
+  notify settings:
+
+  <pre>
+  define window_open notify bad.*warnings.*Window.*open.* set window on
+  define window_close notify bad.*warnings.*none.* set window off
+  </pre>
 </ul>
 
 </body>

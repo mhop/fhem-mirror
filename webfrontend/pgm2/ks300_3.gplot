@@ -13,7 +13,7 @@ set y2tics
 set title '<TL>'
 set grid
 
-set ylabel "Temperature in C°"
+set ylabel "Temperature in C"
 set y2label "Rain (l/m2)"
 
 #FileLog 5:avg_day:0:

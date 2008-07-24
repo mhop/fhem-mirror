@@ -4,6 +4,7 @@ package main;
 use strict;
 use warnings;
 use IO::File;
+#use Devel::Size qw(size total_size);
 
 sub seekTo($$$$);
 
@@ -168,6 +169,11 @@ FileLog_Get($@)
   my $outf = shift @a;
   my $from = shift @a;
   my $to   = shift @a; # Now @a contains the list of column_specs
+  my $internal;
+  if($outf eq "INT") {
+    $outf = "-";
+    $internal = 1;
+  }
 
   if($inf eq "-") {
     $inf = $hash->{currentlogfile};
@@ -215,11 +221,12 @@ FileLog_Get($@)
   my %lastdate;
   while(my $l = <$ifh>) {
     last if($l gt $to);
-    my @fld = split("[ \r\n]+", $l);
+    my @fld = split("[ \r\n]+", $l);     # 40%
+
     for my $i (0..int(@a)-1) {           # Process each req. field
       my $h = $d[$i];
       my $re = $h->{re};
-      next if($re && $l !~ m/$re/);
+      next if($re && $l !~ m/$re/);      # 20%
 
       my $col = $h->{col};
       my $line = "";
@@ -298,12 +305,15 @@ FileLog_Get($@)
       $ret .= "#$a[$i]\n";
     } else {
       my $fh = $h->{fh};
-#Log 0, "FLg: $i: >$h->{count}, $h->{df}<";
       if(!$h->{count} && $h->{df} ne "") {
         print $fh "$from $h->{df}\n";
       }
       $fh->close();
     }
+  }
+  if($internal) {
+    $internal_data = \$ret;
+    return "OK";
   }
 
   return ($outf eq "-") ? $ret : join(" ", @fname);

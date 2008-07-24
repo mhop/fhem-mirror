@@ -5,6 +5,7 @@ use strict;
 use warnings;
 
 use IO::Socket;
+#use Devel::Size qw(size total_size);
 
 
 ###################
@@ -998,8 +999,8 @@ FHEMWEB_showLog($)
     $f = 0 if(!$f);     # From the beginning of time...
     $t = 9 if(!$t);     # till the end
 
-    my $ret = fC("get $d $file - $f $t " . join(" ", @filelog));
-    SVG_render($file, $__plotsize, $f, $t, \@data, \$ret, $plot);
+    my $ret = fC("get $d $file INT $f $t " . join(" ", @filelog));
+    SVG_render($file, $__plotsize, $f, $t, \@data, $internal_data, $plot);
     $__RETTYPE = "image/svg+xml";
 
   }
