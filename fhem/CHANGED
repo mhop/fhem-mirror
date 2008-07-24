@@ -362,7 +362,7 @@
   - feature: alternativ Quad-based numbers for the FS20 (Matthias, 24.11)
   - feature: dummy type added (contrib/99_dummy.pm)
 
-- ==DATE== (4.3)
+- 2008-07-12 (4.3)
   - bugfix:  KS300 state was wrong after the STATE bugfix
   - feature: HMS100CO (by Peter)
   - feature: EMGZ (by Peter)
@@ -410,3 +410,7 @@
   - bugfix:  deleting FS20 device won't result in unknown device (Daniel, 11.7)
   - feature: webpgm2 generates SVG's from logs: no need for gnuplot
   - bugfix:  examples corrected to work with current syntax
+
+- ==DATE== (4.4)
+  - feature: RM100-2 battery empty warning (mare 23.07.08)
+  - feature: optimising the pgm2/SVG memory usage
