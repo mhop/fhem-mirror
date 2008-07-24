@@ -35,5 +35,10 @@ define a11 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
 define a12 at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
 
 ##################################
+# Switch lamp1 on at sunrise, but not before 07:00
+# Note: you  have to put 99_Utils.pm in the FHEM modules directory
+define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1 on
+
+##################################
 # Blink 3 times if the piri sends a command
 define n1 notify piri:on.* define a13 at +*{3}00:00:02 set lamp on-for-timer 1

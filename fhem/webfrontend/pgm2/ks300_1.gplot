@@ -13,7 +13,7 @@ set y2tics
 set title '<TL>'
 set grid
 
-set y2label "Temperature in C°"
+set y2label "Temperature in C"
 set format y "%0.1f"
 set ylabel "Rain (l/m2)"
 set yrange [0:]

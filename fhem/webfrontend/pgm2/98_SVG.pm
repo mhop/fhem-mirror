@@ -4,6 +4,9 @@ package main;
 use strict;
 use warnings;
 use POSIX;
+#use Devel::Size qw(size total_size);
+
+
 
 sub SVG_render($$$$$$$);
 sub time_to_sec($);
@@ -36,7 +39,7 @@ SVG_render($$$$$$$)
          if($a[0] && $a[0] eq "set") { $conf{$a[1]} = $a[2]; } } @{$confp};
 
   # Html Header
-  pO "<?xml version=\"1.0\" encoding=\"iso8859-1\"?>\n";
+  pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   pO "<?xml-stylesheet href=\"$__ME/svg_style.css\" type=\"text/css\"?>\n";
   pO "<!DOCTYPE svg>\n";
   pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\">\n";
@@ -91,8 +94,18 @@ SVG_render($$$$$$$)
   my (%hmin, %hmax, @hdx, @hdy);
   my ($dxp, $dyp) = (\(), \());
 
-  my ($d, $v);
-  foreach my $l (split("\n", $$dp)) {
+  my ($d, $v, $ld, $lv) = ("","","","");
+
+  my ($dpl,$dpoff,$l) = (length($$dp), 0, "");
+  while($dpoff < $dpl) {                # using split instead is memory hog
+    my $ndpoff = index($$dp, "\n", $dpoff);
+    if($ndpoff == -1) {
+      $l = substr($$dp, $dpoff);
+    } else {
+      $l = substr($$dp, $dpoff, $ndpoff-$dpoff);
+    }
+    $dpoff = $ndpoff+1;
+
     if($l =~ m/^#/) {
       my $a = $axes[$idx];
       $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
@@ -104,15 +117,20 @@ SVG_render($$$$$$$)
 
     } else {
       ($d, $v) = split(" ", $l);
-      push @{$dxp}, ($tmul ? int((time_to_sec($d)-$fromsec)*$tmul) : $d);
-      push @{$dyp}, $v;
-      $min = $v if($min > $v);
-      $max = $v if($max < $v);
+      $d =  ($tmul ? int((time_to_sec($d)-$fromsec)*$tmul) : $d);
+      if($ld ne $d || $lv ne $v) {              # Saves a lot on year zoomlevel
+        $ld = $d; $lv = $v;
+        push @{$dxp}, $d;
+        push @{$dyp}, $v;
+        $min = $v if($min > $v);
+        $max = $v if($max < $v);
+      }
     }
+    last if($ndpoff == -1);
   }
 
   $dxp = $hdx[0];
-  if(int(@{$dxp}) < 2 && !$tosec) { # not enough data and no range...
+  if($dxp && int(@{$dxp}) < 2 && !$tosec) { # not enough data and no range...
     pO "</svg>\n";
     return;
   }
@@ -261,11 +279,16 @@ SVG_render($$$$$$$)
     my $hmul = $h/($hmax{$a}-$min);
     my $ret = "";
     my ($dxp, $dyp) = ($hdx[$idx], $hdy[$idx]);
+    next if(!defined($dxp));
 
+    my ($lx, $ly) = (-1,-1);
     if($type[$idx] eq "points" ) {
 
         foreach my $i (0..int(@{$dxp})-1) {
-          my ($x1, $y1) = ($x+$dxp->[$i], $y+$h-($dyp->[$i]-$min)*$hmul);
+          my ($x1, $y1) = (int($x+$dxp->[$i]),
+                           int($y+$h-($dyp->[$i]-$min)*$hmul));
+          next if($x1 == $lx && $y1 == $ly);
+          $ly = $x1; $ly = $y1;
           $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
                 $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
           pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
@@ -281,6 +304,8 @@ SVG_render($$$$$$$)
         foreach my $i (1..int(@{$dxp})-1) {
           my ($x1, $y1) = ($x+$dxp->[$i-1], $y+$h-($dyp->[$i-1]-$min)*$hmul);
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
+          next if(int($x2) == $lx && int($y1) == $ly);
+          $lx = int($x2); $ly = int($y2);
           $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
         }
       }
@@ -295,6 +320,8 @@ SVG_render($$$$$$$)
         foreach my $i (1..int(@{$dxp})-1) {
           my ($x1, $y1) = ($x+$dxp->[$i-1], $y+$h-($dyp->[$i-1]-$min)*$hmul);
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
+          next if(int($x2) == $lx && int($y1) == $ly);
+          $lx = int($x2); $ly = int($y2);
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
              $x1,$y1, ($x1+$x2)/2,$y1, ($x1+$x2)/2,$y2, $x2,$y2);
         }
@@ -303,14 +330,16 @@ SVG_render($$$$$$$)
 
     } else {                            # lines and everything else
       foreach my $i (0..int(@{$dxp})-1) {
-        $ret .=  sprintf(" %d,%d", $x + $dxp->[$i],
-                                   $y + $h-($dyp->[$i]-$min)*$hmul);
+        my ($x1, $y1) = (int($x+$dxp->[$i]),
+                         int($y+$h-($dyp->[$i]-$min)*$hmul));
+        next if($x1 == $lx && $y1 == $ly);
+        $lx = $x1; $ly = $y1;
+        $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
       pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
     }
 
   }
-
   pO "</svg>\n";
 }
 

@@ -164,7 +164,10 @@ HMS_Parse($$)
     @sfx = ( "",             "");
 
     $v[0] = ( hex(substr($val, 1, 1)) != "0" ) ? "on" : "off";
-    $v[1] = "unknown";               # Battery-low detect is _NOT_ implemented.
+    $v[1] = "ok";
+    my  $status = hex(substr($msg, 10, 1));
+    if( $status & 4 ) { $v[1] = "empty"; }
+    if( $status & 8 ) { $v[1] = "replaced"; }
     $val = "smoke_detect: $v[0]";
 
   } elsif ($type eq "HMS100MG") {    # By Peter Stark

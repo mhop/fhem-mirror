@@ -125,6 +125,7 @@ use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
 use vars qw($nextat);           # used by the at module
 use vars qw($init_done);        #
+use vars qw($internal_data);    # 
 
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
@@ -140,7 +141,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.46 2008-07-11 07:26:19 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.47 2008-07-24 07:39:15 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -390,12 +391,12 @@ Log($$)
   my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
   OpenLogfile($nfile) if($currlogfile && $currlogfile ne $nfile);
 
-  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
-        $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
+#  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
+#       $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
 
-#  my ($seconds, $microseconds) = gettimeofday();
-#  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d.%03d",
-#        $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0], $microseconds/1000);
+  my ($seconds, $microseconds) = gettimeofday();
+  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d.%03d",
+        $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0], $microseconds/1000);
 
   if($logopened) {
     print LOG "$tim $loglevel: $text\n";
