@@ -8,11 +8,12 @@
 # After about 5-10 minutes, check if "list wz" returns something meaningful
 #
 
-attr global logfile /var/log/fhem/fhem-%Y-%m.log
-attr global statefile /var/log/fhem/fhem.save    # where to save the state of the devices
+attr global logfile /tmp/fhem-%Y-%m.log
+attr global statefile /tmp/fhem.save    # where to save the state of the devices
 attr global verbose 3                   # "normal" verbosity
 attr global port 7072                   # our TCP/IP port (localhost only)
-attr global modpath /usr/local/libusr/local/lib      # where our FHEM directory is
+attr global modpath .                   # where our FHEM directory is
+
 define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
 
 define wz FHT 3232          # type FHT, transmitter code 3232 (default value)
