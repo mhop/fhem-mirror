@@ -49,6 +49,7 @@ sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
 sub GlobalAttr($$);
+sub GetTimeSpec($);
 sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
@@ -78,6 +79,7 @@ sub CommandInclude($$);
 sub CommandInform($$);
 sub CommandList($$);
 sub CommandModify($$);
+sub CommandReload($$);
 sub CommandRereadCfg($$);
 sub CommandRename($$);
 sub CommandQuit($$);
@@ -141,11 +143,12 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.47 2008-07-24 07:39:15 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.48 2008-07-25 14:14:24 rudolfkoenig Exp $';
 
 $init_done = 0;
 
 $modules{_internal_}{ORDER} = -1;
+$modules{_internal_}{LOADED} = 1;
 $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
@@ -289,9 +292,9 @@ while (1) {
   ###############################
   # Message from the hardware (FHZ1000/WS3000/etc) via FD or from Ready Function
   foreach my $p (keys %defs) {
-    my $ready=CallFn($p,"ReadyFn",$defs{$p}) if ($modules{$p}{ReadyFn});
+    my $ready = CallFn($p,"ReadyFn",$defs{$p});
     if(($defs{$p}{FD} && vec($rout, $defs{$p}{FD}, 1)) || $ready) {
-         CallFn($p, "ReadFn", $defs{$p});
+      CallFn($p, "ReadFn", $defs{$p});
     }
   }
   
@@ -921,38 +924,6 @@ CommandGet($$)
 }
 
 #####################################
-# Parse a timespec: Either HH:MM:SS or HH:MM or { perfunc() }
-sub
-GetTimeSpec($)
-{
-  my ($tspec) = @_;
-  my ($hr, $min, $sec, $fn);
-
-  if($tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
-    ($hr, $min, $sec) = ($1, $2, $3);
-  } elsif($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
-    ($hr, $min, $sec) = ($1, $2, 0);
-  } elsif($tspec =~ m/^{(.*)}$/) {
-    $fn = $1;
-    $tspec = eval $fn;
-    if(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
-      ($hr, $min, $sec) = ($1, $2, $3);
-    } elsif(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
-      ($hr, $min, $sec) = ($1, $2, 0);
-    } else {
-      $tspec = "<empty string>" if(!$tspec);
-      return ("the at function \"$fn\" must return a timespec and not $tspec.",
-      		undef, undef, undef, undef);
-    }
-  } else {
-    return ("Wrong timespec $tspec: either HH:MM:SS or {perlcode}",
-    		undef, undef, undef, undef);
-  }
-  return (undef, $hr, $min, $sec, $fn);
-}
-
-
-#####################################
 sub
 CommandDefine($$)
 {
@@ -962,13 +933,18 @@ CommandDefine($$)
   return "Usage: define <name> <type> <type dependent arguments>"
   					if(int(@a) < 2);
 
-  # Return a list of modules
-  if(!$modules{$a[1]} || !$modules{$a[1]}{DefFn}) {
+  my $m = $a[1];
+  if($modules{$m} && !$modules{$m}{LOADED}) { # autoload
+    my $o = $modules{$m}{ORDER};
+    CommandReload($cl, "${o}_$m");
+  }
+
+  if(!$modules{$m} || !$modules{$m}{DefFn}) {
     my @m;
-    foreach my $i (sort keys %modules) {
-      push @m, $i if($modules{$i}{DefFn})
+    foreach my $i (sort keys %modules) {            # Return a list of modules
+      push @m, $i if($modules{$i}{DefFn} || !$modules{$i}{LOADED});
     }
-    return "Unknown argument $a[1], choose one of " . join(" ",@m);
+    return "Unknown argument $m, choose one of @m";
   }
 
   return "$a[0] already defined, delete it first" if(defined($defs{$a[0]}));
@@ -978,7 +954,7 @@ CommandDefine($$)
   my %hash;
 
   $hash{NAME}  = $a[0];
-  $hash{TYPE}  = $a[1];
+  $hash{TYPE}  = $m;
   $hash{STATE} = "???";
   $hash{DEF}   = $a[2] if(int(@a) > 2);
   $hash{NR}    = $devcount++;
@@ -1253,34 +1229,34 @@ CommandReload($$)
 {
   my ($cl, $param) = @_;
   my %hash;
-
-  $param =~ s,[\./],,g;
+  $param =~ s,/,,g;
   $param =~ s,\.pm$,,g;
   my $file = "$modpath_set/$param.pm";
   return "Can't read $file: $!" if(! -r "$file");
 
   my $m = $param;
   $m =~ s,^([0-9][0-9])_,,;
-  my $order = $1;
-  Log 5, "Loading $file";
-
+  my $order = (defined($1) ? $1 : "00");
+  Log 5, "Loading $file, order $order";
 
   no strict "refs";
-  # Get the correct module case from the initialize function name. We need
-  # this as sometimes we live on a FAT fs with wrong case
   eval { 
     my $ret=do "$file";
     if (!$ret) {
         Log 1,"Error:Modul $param deactivated:\n $@";
         return "$@";
     }
+
+    # Get the name of the initialize function. This may differ from the
+    # filename as sometimes we live on a FAT fs with wrong case.
+    my $fnname = $m;
     foreach my $i (keys %main::) {
       if($i =~ m/^(${m})_initialize$/i) {
-        $m = $1;
+        $fnname = $1;
         last;
       }
     }
-    $ret = &{ "${m}_Initialize" }(\%hash);
+    $ret = &{ "${fnname}_Initialize" }(\%hash);
   };
 
   if($@) {
@@ -1290,6 +1266,7 @@ CommandReload($$)
 
   $modules{$m} = \%hash;
   $modules{$m}{ORDER} = $order;
+  $modules{$m}{LOADED} = 1;
 
   return undef;
 }
@@ -1389,14 +1366,10 @@ GlobalAttr($$)
     my $counter = 0;
 
     $modpath_set = $modpath;
-    foreach my $m (sort grep(/^[0-9][0-9].*\.pm$/,readdir(DH))) {
-
-      $m =~ s/\.pm$//;
-      my $err = CommandReload(undef, $m);
-      if($err) {
-        Log 1, $err;
-        exit(1);
-      }
+    foreach my $m (sort readdir(DH)) {
+      next if($m !~ m/^([0-9][0-9])_(.*)\.pm$/);
+      $modules{$2}{ORDER} = $1;
+      CommandReload(undef, $m) if($1 eq "99");  # Alway load util functions
       $counter++;
     }
     closedir(DH);
@@ -1753,6 +1726,40 @@ SemicolonEscape($)
   return $cmd;
 }
 
+#####################################
+# Parse a timespec: Either HH:MM:SS or HH:MM or { perfunc() }
+sub
+GetTimeSpec($)
+{
+  my ($tspec) = @_;
+  my ($hr, $min, $sec, $fn);
+
+  if($tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
+    ($hr, $min, $sec) = ($1, $2, $3);
+  } elsif($tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
+    ($hr, $min, $sec) = ($1, $2, 0);
+  } elsif($tspec =~ m/^{(.*)}$/) {
+    $fn = $1;
+    $tspec = eval $fn;
+    if(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
+      ($hr, $min, $sec) = ($1, $2, $3);
+    } elsif(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
+      ($hr, $min, $sec) = ($1, $2, 0);
+    } else {
+      $tspec = "<empty string>" if(!$tspec);
+      return ("the at function \"$fn\" must return a timespec and not $tspec.",
+      		undef, undef, undef, undef);
+    }
+  } else {
+    return ("Wrong timespec $tspec: either HH:MM:SS or {perlcode}",
+    		undef, undef, undef, undef);
+  }
+  return (undef, $hr, $min, $sec, $fn);
+}
+
+
+#####################################
+# Do the notification
 sub
 DoTrigger($$)
 {
@@ -1815,6 +1822,8 @@ DoTrigger($$)
   return $ret;
 }
 
+#####################################
+# Wrapper for calling a module function
 sub
 CallFn(@)
 {
@@ -1845,6 +1854,8 @@ fhz($)
   return AnalyzeCommandChain($global_cl, $param);
 }
 
+#####################################
+# initialize the global device
 sub
 doGlobalDef($)
 {
@@ -1863,6 +1874,7 @@ doGlobalDef($)
   CommandAttr(undef, "global version =VERS= from =DATE= ($cvsid)");
 }
 
+#####################################
 # Make a directory and its parent directories if needed.
 sub
 HandleArchiving($)
