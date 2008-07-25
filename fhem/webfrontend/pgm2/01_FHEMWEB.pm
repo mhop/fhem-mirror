@@ -81,6 +81,7 @@ FHEMWEB_Initialize($)
 
   $hash->{DefFn}   = "FHEMWEB_Define";
   $hash->{UndefFn} = "FHEMWEB_Undef";
+  $hash->{AttrFn}  = "FHEMWEB_Attr";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname plotmode:gnuplot,gnuplot-scroll,SVG plotsize";
 }
 
@@ -124,6 +125,18 @@ FHEMWEB_Undef($$)
   my ($hash, $arg) = @_;
   close($hash->{PORT});
   return undef;
+}
+
+#####################################
+sub
+FHEMWEB_Attr(@)
+{
+  my @a = @_;
+
+  if($a[0] eq "set" && $a[2] eq "plotmode" && $a[3] eq "SVG" &&
+     !$modules{SVG}{LOADED}) {
+     CommandReload(undef, "98_SVG");
+  }
 }
 
 #####################################
