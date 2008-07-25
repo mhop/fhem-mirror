@@ -1,6 +1,5 @@
 # These are only examples for the at and notify command
 
-
 ##################################
 # absolute ones:
 define a1 at 17:00:00 set lamp on                            # fhem command
@@ -14,11 +13,14 @@ define a5 at +00:00:10 set lamp on           # switch the lamp on in 10 seconds
 define a6 at +00:00:02 set lamp on-for-timer 1       # Blink once in 2 seconds
 define a7 at +*{3}00:00:02 set lamp on-for-timer 1   # Blink 3 times
 
+# For correct sunrise/sunset values, put the following line (with your
+# coordinates in it) in your fhem.cfg
+{ sunrise_coord("8.686", "50.112", "") }
+
 ##################################
 # Switch the lamp on from sunset to 11 PM each day
-# You have to install 99_SUNRISE_EL.pm in the FHEM directory to have sunset()
 # We have to use the relative versions, as the next event is computed now
-{ sunrise_coord("8.686", "50.112", "") }
+# and absolute values would cause problems in the spring
 define a8 at +*{sunset_rel()} set lamp on
 define a9 at *23:00:00 set lamp off
 
@@ -27,7 +29,7 @@ define a9 at *23:00:00 set lamp off
 define a10 at +*{sunset_rel()} set lamp on-till 23:00
 
 ##################################
-# Only do this on weekend. For the preset perl variables see commandref.html
+# Only do this at weekend. For the preset perl variables see commandref.html
 define a11 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
 
 ##################################
@@ -36,7 +38,6 @@ define a12 at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
 
 ##################################
 # Switch lamp1 on at sunrise, but not before 07:00
-# Note: you  have to put 99_Utils.pm in the FHEM modules directory
 define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1 on
 
 ##################################
