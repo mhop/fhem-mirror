@@ -1,8 +1,9 @@
-#
-# Display a piri log with multiple units logging into the same file
-# define pirilog FileLog /var/log/piri-%Y-%m-%d.log piri.*
+############################
+# Display a piri log with multiple units logging into the same file.
+# Corresponding FileLog definition:
+# define pirilog FileLog /var/log/fhem/piri-%Y-%m-%d.log piri.*
 # The devices are called piri.sz, piri.flo, piri.flu, prir.wz1 and piri.wz2
-#
+
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

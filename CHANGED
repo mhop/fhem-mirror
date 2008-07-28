@@ -414,3 +414,6 @@
 - ==DATE== (4.4)
   - feature: RM100-2 battery empty warning (mare 23.07.08)
   - feature: optimising the pgm2/SVG memory usage
+  - feature: autoloading FHEM modules
+  - bugfix:  STATE/$value is carrying again the correct value
+  - feature: enhancing the Makefile and the documentation
