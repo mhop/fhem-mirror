@@ -1,4 +1,5 @@
 ##############################################
+# - Use 99_SUNRISE_EL.pm instead of this module
 # - Be aware: Installing the DateTime modules might be tedious, one way is:
 #   perl -MCPAN -e shell
 #   cpan> install DateTime::Event::Sunrise

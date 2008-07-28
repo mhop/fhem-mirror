@@ -48,11 +48,8 @@ me?</a><br><br>
 
 <a href="#faq12">13. I'd like to see directly in the Web frontend if a window is open. How to do that?</a><br><br>
 
-<br>
-<br>
-<br>
-<br>
-<br>
+<br/>
+<br/>
 
 <a name="faq1"></a>
 <b>1. I am using fhem.pl with an fhz1000.pl config file and fhem.pl won't
@@ -123,9 +120,11 @@ start</b>
 
 <a name="faq5"></a>
 <b>5. I have the code for my devices in the ELV notation, which contains 1,2,3
-and 4, but you require a hex code.<br> How should I convert it?</b>
+and 4, but fhem requires a hex code. How should I convert it?</b>
 
 <ul>
+   Note: current fhem versions accept FS20 codes in ELV notation.<br/><br/>
+
    The code used by ELV is in the "quaternal" (?) system plus one added to each
    digit, so you can even use the 4 button remote for programming. To convert,
    you have two choices: the program four2hex in the contrib directory, or the
@@ -154,7 +153,7 @@ and 4, but you require a hex code.<br> How should I convert it?</b>
 
 
 <a name="faq6"></a>
-<b>6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.<br>
+<b>6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.
 Help me!</b>
 <ul>
    The FHT80b's are talking to a single FHZ1XXX device, which has a unique
@@ -174,8 +173,8 @@ Help me!</b>
 
 
 <a name="faq7"></a>
-<b>7. I can specify an optional ml/raincounter for a KS300.<br>
-Why do you think that 255 should be the default?</b>
+<b>7. I can specify an optional ml/raincounter for a KS300. Why do you think
+that 255 should be the default?</b>
 <ul>
    The manual talks about 0.3l resolution, but I wanted to calibrate my device.
    So I filled a plastic bottle with 0.5 liter water from the measuring cup,
@@ -195,7 +194,7 @@ Why do you think that 255 should be the default?</b>
 
 <a name="faq8"></a>
 <b>8. The time specification of the builtin at command is not very
-flexible.<br> Please add day/month/weekday to it.</b>
+flexible. Please add day/month/weekday to it.</b>
 <ul>
   I think the command is complex and flexible enough. Use a perl expression
   for this functionality like (described in the commandref.html):
@@ -230,22 +229,18 @@ by fhem.pl?</b>
 <a name="faq11"></a>
 <b>11. I'd like to use this sunrise/sunset stuff, can you help me?</b>
 <ul>
-   Copy contrib/99_SUNRISE_EL.pm into your FHEM directory.
-   Next look for the geographic coordinates of your home, e.g with a GPS
+   Look for the geographic coordinates of your home, e.g with a GPS
    receiver or with googleearth. Compute the latitude/longitude as needed, and
    enter them in your lastinclude file with the command:
    <pre>{sunrise_coord("<latitude>", "<longitude>", "") }</pre>
-   If everything is ok, typing
-   <pre>{ sunrise_abs() }</pre>
-   in the telnet prompt, will return the time of the sunrise today, in a
-   HH:MM:SS format.<br><br>
+   After restart, { sunrise_abs() } will return the time of the sunrise today,
+   in a HH:MM:SS format.<br><br>
 
-   99_SUNRISE_EL.pm is the ExtraLight version of the original 99_SUNRISE.pm,
-   which needs the DateTime::Event::Sunrise perl module, which in turn is
-   usually difficult to install. If you still want to use the original module,
-   then the initialization string will be slightly different:
+   Note: 99_SUNRISE_EL.pm is the ExtraLight version of the original
+   99_SUNRISE.pm, which needs the DateTime::Event::Sunrise perl module, which
+   in turn is usually difficult to install. If you still want to use the
+   original module, then the initialization string will be slightly different:
    <pre>{sunrise_coord("<latitude>", "<longitude>", "Europe/Berlin") }</pre>
-
 </ul>
 
 <a name="faq12"></a>

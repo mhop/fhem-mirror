@@ -203,6 +203,7 @@ FileLog_Get($@)
       $h{fh} = new IO::File "> $fname[$i]";
     }
     $h{re} = $fld[1];
+
     $h{df} = defined($fld[2]) ? $fld[2] : "";
     $h{fn} = $fld[3];
     $h{didx} = 10 if($fld[3] && $fld[3] eq "delta-d");
@@ -210,9 +211,15 @@ FileLog_Get($@)
 
     if($fld[0] =~ m/"(.*)"/) {
       $h{col} = $1;
-      $h{isfix} = 1;
+      $h{type} = 0;
     } else {
       $h{col} = $fld[0]-1;
+      $h{type} = 1;
+    }
+    if($h{fn}) {
+      $h{type} = 4;
+      $h{type} = 2 if($h{didx});
+      $h{type} = 3 if($h{fn} eq "int");
     }
     $h{ret} = "";
     $d[$i] = \%h;
@@ -225,19 +232,20 @@ FileLog_Get($@)
 
     for my $i (0..int(@a)-1) {           # Process each req. field
       my $h = $d[$i];
-      my $re = $h->{re};
-      next if($re && $l !~ m/$re/);      # 20%
+      next if($h->{re} && $l !~ m/$h->{re}/);      # 20%
 
       my $col = $h->{col};
-      my $line = "";
+      my $t = $h->{type};
+      my $line;
 
-      if($h->{isfix}) {                            # Fixed text
-        $line = "$fld[0] $col";
 
-      } elsif(!$h->{fn}) {                         # The column
-        $line = "$fld[0] $fld[$col]";
+      if($t == 0) {                         # Fixed text
+        $line = "$fld[0] $col\n";
 
-      } elsif($h->{didx}) {                        # delta-h  or delta-d
+      } elsif($t == 1) {                    # The column
+        $line = "$fld[0] $fld[$col]\n";
+
+      } elsif($t == 2) {                    # delta-h  or delta-d
 
         my $hd = $h->{didx};
         my $ld = substr($fld[0],0,$hd);
@@ -248,31 +256,29 @@ FileLog_Get($@)
             $ts = "$lda[1]:30:00" if($hd == 13);
             my $v = $fld[$col]-$h->{last1};
             $v = 0 if($v < 0);                     # Skip negative delta
-            $line = sprintf("%s_%s %0.1f", $lda[0],$ts, $v);
+            $line = sprintf("%s_%s %0.1f\n", $lda[0],$ts, $v);
           }
           $h->{last1} = $fld[$col];
           $h->{last3} = $ld;
         }
         $h->{last2} = $fld[$col];
         $lastdate{$hd} = $fld[0];
+        next if(!$line);
 
-      } elsif($h->{fn} eq "int") {                 # int function
+      } elsif($t == 3) {                    # int function
         my $val = $fld[$col];
-        $line = "$fld[0] $1" if($val =~ m/^([0-9]+).*/);
+        $line = "$fld[0] $1\n" if($val =~ m/^([0-9]+).*/);
 
-      } else {
-        $line = "$fld[0] " . eval($h->{fn});
+      } else {                              # evaluate
+        $line = "$fld[0] " . eval($h->{fn}) . "\n";
       }
 
-      next if(!$line);
-
-      $h->{count}++;
-      $line .= "\n";
       if($outf eq "-") {
         $h->{ret} .= $line;
       } else {
         my $fh = $h->{fh};
         print $fh $line;
+        $h->{count}++;
       }
     }
   }
@@ -292,7 +298,6 @@ FileLog_Get($@)
 
       if($outf eq "-") {
         $h->{ret} .= $line;
-        $h->{count}++;
       } else {
         my $fh = $h->{fh};
         print $fh $line;
@@ -300,7 +305,7 @@ FileLog_Get($@)
       }
     }
     if($outf eq "-") {
-      $h->{ret} .= "$from $h->{df}\n" if(!$h->{count} && $h->{df} ne "");
+      $h->{ret} .= "$from $h->{df}\n" if(!$h->{ret} && $h->{df} ne "");
       $ret .= $h->{ret} if($h->{ret});
       $ret .= "#$a[$i]\n";
     } else {

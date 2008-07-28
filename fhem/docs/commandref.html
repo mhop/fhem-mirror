@@ -166,9 +166,16 @@ make editing of multiline commands transparent.<br><br>
     <a name="modpath"></a>
     <li>modpath<br>
         Specify the path to the modules directory <code>FHEM</code>. The path
-        should <b>not</b> contain the directory FHEM. Every file there with the
-        name pattern &lt;number&gt;_&lt;name&gt;.pm will be loaded in the order
-        of the number.
+        should <b>not</b> contain the directory FHEM. Upon setting the
+        attribute, the directory will be scanned for filenames of the form
+        NN_&lt;NAME&gt;.pm, and make them available for device definition under
+        &lt;NAME&gt;. If the first device of type &lt;NAME&gt; is defined, the
+        module will be loaded, and its function with the name
+        &lt;NAME&gt;_initialize will be called. Exception to this rule are
+        modules with NN=99, these are considered to be utility modules
+        containing only perl helper functions, they are loaded at startup (i.e.
+        modpath attribute definition time).
+
     </li><br>
 
     <a name="pidfilename"></a>
@@ -325,7 +332,7 @@ make editing of multiline commands transparent.<br><br>
     <a name="logtype"></a>
     <li>logtype<br>
         Can be applied to FileLog devices.<br>
-        Used by the pgm2 webfrontend to offer gnuplot images made from the
+        Used by the pgm2 webfrontend to offer gnuplot/SVG images made from the
         logs.  The string is made up of tokens separated by comma (,), each
         token specifies a different gnuplot program. The token may contain a
         colon (:), the part before the colon defines the name of the program,
@@ -357,13 +364,10 @@ make editing of multiline commands transparent.<br><br>
                above, both programs evaluate the same log.
           </li>
            <li>text<br>
-               Shows the logfile as it is (plain text).
+               Shows the logfile as it is (plain text). Not gnuplot definition
+               is needed.
           </li>
         </ul>
-        The corresponding gnuplot files (up to the "text" one) must be
-        installed, see the fhemweb.pl configuration for the destination
-        directory.<br>
-
         Example:<br>
            attr fhtlog1 logtype ks300_1:Temp/Rain,ks300_2:Hum/Wind,text:Raw-data
     </li><br>
@@ -385,42 +389,40 @@ make editing of multiline commands transparent.<br><br>
         devices:<br>
         <ul>
         <li>FHT: fht80b</li>
-        <li>FS20: 
-          fs20hgs
-          fs20pira
-          fs20piri
-          fs20s20
-          fs20s8
-          fs20s4
-          fs20s4a
-          fs20s4m
-          fs20s4u
-          fs20s4ub
-          fs20sd
-          fs20sn
-          fs20sr
-          fs20ss
-          fs20str
-          fs20tfk
-          fs20tfk
-          fs20tk
-          fs20uts
-          fs20ze
+        <li>FS20:
+<pre>fs20hgs
+fs20pira
+fs20piri
+fs20s20
+fs20s8
+fs20s4
+fs20s4a
+fs20s4m
+fs20s4u
+fs20s4ub
+fs20sd
+fs20sn
+fs20sr
+fs20ss
+fs20str
+fs20tfk
+fs20tfk
+fs20tk
+fs20uts
+fs20ze
 
-          fs20as1
-          fs20as4
-          fs20di
-          fs20du
-          fs20ms2
-          fs20rst
-          fs20sa
-          fs20sig
-          fs20st
-          fs20sv
-          fs20sv
-          fs20usr
-
-        </li>
+fs20as1
+fs20as4
+fs20di
+fs20du
+fs20ms2
+fs20rst
+fs20sa
+fs20sig
+fs20st
+fs20sv
+fs20sv
+fs20usr</pre></li>
 
         <li>HMS: hms100-t hms100-tf hms100-wd hms100-mg hms100-tfk rm100-2</li>
         <li>KS300: ks300</li>
@@ -460,7 +462,7 @@ make editing of multiline commands transparent.<br><br>
         Can be applied to FHT devices.<br/>
         If the <a href="#fhtsoftbuffer">fhtsoftbuffer</a> attribute is set, then
         resend commands <code>retrycount</code> times if after 240 seconds
-        no confirmation message is rececived from the corresponding FHT
+        no confirmation message is received from the corresponding FHT
         device.<br>
         Default is 3.</li><br>
 
@@ -483,10 +485,18 @@ make editing of multiline commands transparent.<br><br>
         i.e the default http address is http://localhost:8083/fhem
         </li><br>
 
+    <a name="refresh"></a>
+    <li>webname<br/>
+        Can be applied to FHEMWEB devices. (webfrontend/pgm2)<br/>
+        If set, a http-equiv="refresh" entry will be genererated with the given
+        argument (i.e. the browser will reload the page after the given
+        seconds).
+        </li><br>
+
     <a name="plotmode"></a>
     <li>plotmode<br/>
         Can be applied to FHEMWEB devices. (webfrontend/pgm2)<br/>
-        Specifies ho to generate the plots:
+        Specifies how to generate the plots:
         <ul>
           <li>gnuplot<br>
               Call the gnuplot script with each logfile. The filename
@@ -500,11 +510,19 @@ make editing of multiline commands transparent.<br><br>
               logfile, the easier you can navigate. The recommendation is to
               store the data for a whole year in one logfile.  The data is
               converted into an image on the backend with gnuplot.</li>
-          <li>SVG (TODO)<br>
+          <li>SVG<br>
               The same scrolling as with gnuplot scroll, but the data is sent
-              as an SVG path specification to the frontend, which will compute
+              as an SVG script to the frontend, which will compute
               the image: no need for gnuplot on the backend.</li>
         </ul>
+        </li><br>
+
+    <a name="plotsize"></a>
+    <li>plotsize<br/>
+        Can be applied to FHEMWEB devices. (webfrontend/pgm2)<br/> Specifies
+        the defult size of the plot, in pixels, separated by comma:
+        width,height. You can set individual sizes by setting the plotsize of
+        the weblink.
         </li><br>
   </li>
   </ul>
@@ -1148,9 +1166,8 @@ make editing of multiline commands transparent.<br><br>
           of the sunset/sunrise functions should be used with the relative
           (+) flag</li>
 
-      <li>In order to use the sunrise_rel()/sunset_rel() functions, copy the
-          99_SUNRISE_EL.pm file from the contrib into the modules (FHEM)
-          directory, and put { sunrise_coord(long, lat, "") } into your
+      <li>In order to use the sunrise_rel()/sunset_rel() functions,
+          put { sunrise_coord(long, lat, "") } into your
           <a href="#lastinclude">lastinclude</a> file, as in the above example.
           If you are not using sunrise_coord, then the coordinates for
           Frankfurt am Main, Germany will be used.
@@ -1217,10 +1234,8 @@ make editing of multiline commands transparent.<br><br>
       href="#list">list</a> output in paranthesis after the device name, or the
       string you see when you do a detailed list of the device.</li>
 
-      <!--
       <li>To use database logging, copy the file contrib/91_DbLog.pm into your
       modules directory, and change the $dbconn parameter in the file.</li>
-      -->
 
       <li>Each undefined device (FS20, HMS, FHT) will be reported with the
       device name "UNDEFINED". The % parameter will contain the type (FS20,
@@ -1235,8 +1250,8 @@ make editing of multiline commands transparent.<br><br>
     <code>define &lt;name&gt; weblink [link|fileplot] &lt;argument&gt;</code>
     <br><br>
     This is a placeholder used with webpgm2 to be able to integrate links
-    into it, and to be able to put more than one gnuplot picture on one page.
-    It has no set or get methods.
+    into it, and to be able to put more than one gnuplot/SVG picture on one
+    page.  It has no set or get methods.
 
     Examples:
     <ul>
@@ -1248,13 +1263,11 @@ make editing of multiline commands transparent.<br><br>
     Notes:
     <ul>
       <li>Normally you won't have to define fileplot weblinks manually, as
-          fhemweb.pl (webpgm2) makes it easy for you, just plot a logfile (see
+          FHEMWEB makes it easy for you, just plot a logfile (see
           <a href="#logtype">logtype</a>) and convert it to weblink.  Now you
           can group these weblinks by putting them into rooms.  If you convert
           the current logfile to a weblink, it will always refer to the current
           file (and not the one you originally specified).</li>
-      <li>The <b>99_weblink.pm</b> module is in the contrib directory, you have
-          to "install" it manually by copying it into the FHEM directory. </li>
     </ul>
   </ul>
 
@@ -1271,11 +1284,6 @@ make editing of multiline commands transparent.<br><br>
       <code>define myvar dummy</code><br>
       <code>set myvar 7</code><br>
     </ul>
-    Notes:
-    <ul>
-      <li>The <b>99_dummy.pm</b> module is in the contrib directory, you have
-          to "install" it manually by copying it into the FHEM directory.</li>
-    </ul>>
   </ul>
 
 </ul>
@@ -2221,8 +2229,8 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
    </li>
 
    <li>
-     If you add the 99_SUNRISE_EL.pm from the contrib directory to your module
-     directory, then you have access to the following functions: <br>
+     By using the 99_SUNRISE_EL.pm module, you have access to the following
+     functions: <br>
      <ul>
      sunset_rel()<br>
      sunset_abs()<br>

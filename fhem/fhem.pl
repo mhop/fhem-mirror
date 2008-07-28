@@ -143,7 +143,7 @@ my %intAt;			# Internal at timer hash.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.48 2008-07-25 14:14:24 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.49 2008-07-28 12:33:29 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -633,7 +633,7 @@ CommandInclude($$)
   my $bigcmd = "";
   $rcvdquit = 0;
   while(my $l = <$fh>) {
-    chomp($l);
+    $l =~ s/[\r\n]//g;
     if($l =~ m/^(.*)\\$/) {		# Multiline commands
       $bigcmd .= "$1\\\n";
     } else {
@@ -1004,7 +1004,7 @@ AssignIoPort($)
   my ($hash) = @_;
 
   # Set the I/O device
-  for my $p (sort { $defs{$b}{NR} cmp $defs{$a}{NR} } keys %defs) {
+  for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
     my $cl = $modules{$defs{$p}{TYPE}}{Clients};
     if(defined($cl) && $cl =~ m/:$hash->{TYPE}:/) {
       $hash->{IODev} = $defs{$p};
@@ -1369,7 +1369,8 @@ GlobalAttr($$)
     foreach my $m (sort readdir(DH)) {
       next if($m !~ m/^([0-9][0-9])_(.*)\.pm$/);
       $modules{$2}{ORDER} = $1;
-      CommandReload(undef, $m) if($1 eq "99");  # Alway load util functions
+      CommandReload(undef, $m)                  # Always load utility modules
+         if($1 eq "99" && $modules{$2} && !$modules{$2}{LOADED});
       $counter++;
     }
     closedir(DH);
@@ -1772,7 +1773,9 @@ DoTrigger($$)
   } elsif(!defined($defs{$dev}{CHANGED})) {
     return "";
   }
-  $defs{$dev}{STATE} = $defs{$dev}{CHANGED}[0];
+
+  # Done by the modules to be able to ignore unimportant messages
+  #$defs{$dev}{STATE} = $defs{$dev}{CHANGED}[0];
 
   # STATE && {READINGS}{state} should be the same
   my $r = $defs{$dev}{READINGS};
