@@ -13,8 +13,11 @@
 GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT.
 Formerly known as fhz1000.pl
 <br/><br/>
-Current Version: (as of =DATE=) is <a href="http://www.koeniglich.de/fhem/fhem-=VERS=.tar.gz">=VERS=</a>
-See the <a href="CHANGED">CHANGED</a> file for current changes.
+Current Version: (as of =DATE=) is <a
+href="http://www.koeniglich.de/fhem/fhem-=VERS=.tar.gz">=VERS=</a>
+
+See the <a href="CHANGED">CHANGED</a> file for current changes, or the <a
+href="#webfrontends"/>webfrontends</a> section for screenshots.
 
 <h2>Description</h2>
 <ul>
@@ -45,7 +48,8 @@ Currently implemented features:<br>
   <li>reading EM1000WZ/EM1000EM/EM1000GZ data via an attached EM1010PC</li>
   <li>reading attached SCIVT devices</li>
   <li>reading attached M232 devices</li>
-  <li>reading attached WS2000/WS25000 devices, also via raw network converters(xport)</li>
+  <li>reading attached WS2000/WS25000 devices, also via raw network
+      converters(xport)</li>
   <li>extract sensor data from IPWE networked weather data receiver</li>
   <li>logging events to files or databases, with regexp filters</li>
   <li>notifying external programs or internal modules when receiving certain
@@ -55,8 +59,8 @@ Currently implemented features:<br>
   <li>different web frontends, choose your favorite</li>
 <br>
 </ul>
-See <a href="commandref.html">commandref.html</a> for a detailed command
-description and <a href="faq.html">faq.html</a> for the F.A.Q.
+See <a href="HOWTO.html">HOWTO.html</a>, <a href="commandref.html">commandref.html</a>
+and <a href="faq.html">faq.html</a> for more documentation.
 </ul>
 
 <h2>Links:</h2>
@@ -123,37 +127,25 @@ description and <a href="faq.html">faq.html</a> for the F.A.Q.
 
 <h3>Server installation on Unix</h3>
 <ul>
-  <li>Copy the file <code>fhem.pl</code> into your path (e.g.
-      <code>/usr/local/bin</code>), and the FHEM directory e.g. to
-      <code>/usr/local/lib</code>. </li>
-  <li>Copy additional modules from the contrib directory
-      (like 99_SUNRISE_EL.pm)</li>
-  <li>Make sure that you can access the serial USB
-      device (e.g. <code>/dev/tts/USB0</code>).</li>
-  <li>Create a configuration file (see the examples directory and 
-      docs/commandref.html), change at least the modpath
-      (<code>/usr/local/lib</code>) and define FHZ FHZ (<code>/dev/tts/USB0</code>)
-      parameters.</li>
+  <li>Check the Makefile for the installation path, then type make install.</li>
+  <li>Create a configuration file (see the examples directory or 
+      docs/commandref.html).</li>
   <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
 </ul>
 
 <h3>Server installation on Windows</h3>
 If you are using cygwin for your perl installation you can follow the guidelines for Unix.
 <ul>
-  <li>be sure you have perl.exe in your path (%PATH%)</li>
-  <li>unpack distribution in a directory of your choice </li>
-  <li>Copy additional modules from the contrib directory
-      (like 99_SUNRISE_EL.pm)</li>
-  <li>Make sure that you can access the serial USB
-      device via virtual COM-Port or via socket(e.g. <code>COMX or xport:10001</code>).</li>
+  <li>Be sure you have perl.exe in your path (%PATH%)</li>
+  <li>Make sure that you can access the serial USB device via virtual COM-Port
+     or via socket(e.g. <code>COMX or xport:10001</code>).</li>
   <li>Create a configuration file (see the examples directory and 
-      docs/commandref.html), change at least the modpath
-      (<code>your_install_dir</code>) and define FHZ FHZ (<code>COM10</code>)
-      parameters.</li>
+      docs/commandref.html)</li>
   <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
 </ul>
 
 
+<a name="webfrontends"/>
 <h3>General Notes for Webfrontends:</h3>
 <ul>
   <li>You don't have to install all of them, one is probably more than
@@ -171,10 +163,15 @@ If you are using cygwin for your perl installation you can follow the guidelines
   displaying logfiles as text or plot (SVG builtin or PNG by gnuplot),
   navigating/zooming in the plots.  <br/>
 
-  Screenshots: <a href="pgm2-1.png">overview</a>, <a href="pgm2-2.png">detail</a>,
-  <a href="pgm2-3.png">SVG-plots</a>.
+  Screenshots: <a href="pgm2-1.png">overview</a>, <a
+  href="pgm2-2.png">detail</a>, <a href="pgm2-3.png">SVG-plots</a>.
   <br><br>
-  For installation see the webpgm/pgm2/README file.<br>
+  Installation: make install-pgm2 &amp;&amp; perl fhem.pl <br>
+
+  Connect to fhem via <a
+  href="http://localhost:8083/fhem">http://localhost:8083/fhem</a>. See the
+  Howto there on how to continue.
+
   </ul>
 
 <h3>Web frontend 3 (webfrontend/pgm3)</h3>

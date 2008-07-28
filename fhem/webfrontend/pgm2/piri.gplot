@@ -1,8 +1,8 @@
-#
-# Display the on and off values off an FS20 device
+############################
+# Display the on and off values for a single FS20 device
 # FileLog definition:
-#  define FileLog fs20log fs20dev /var/log/fs20dev-%Y-%U.log 
-#
+# define fs20log FileLog /var/log/fhem/fs20dev-%Y-%U.log fs20dev
+
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

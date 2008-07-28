@@ -1,8 +1,8 @@
-#
+############################
 # Display the measured temp and the actuator.
-# FileLog definition: 
-#   define FileLog fhtlog1 fht1:.*(temp|actuator).* /var/log/fht1-%Y-%U.log 
-#
+# Corresponding FileLog definition: 
+# define fhtlog1 FileLog /var/log/fhem/fht1-%Y-%U.log fht1:.*(temp|actuator).*
+
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
 set xdata time

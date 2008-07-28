@@ -27,6 +27,7 @@ sub FHEMWEB_checkDirs();
 sub FHEMWEB_digestCgi($);
 sub FHEMWEB_doDetail($);
 sub FHEMWEB_fileList($);
+sub FHEMWEB_getAttr($$);
 sub FHEMWEB_makeTable($$$$$$$$);
 sub FHEMWEB_parseXmlList($);
 sub FHEMWEB_showRoom();
@@ -64,6 +65,7 @@ my $__SF;                       # Short for submit form
 my $__ti;                       # Tabindex for all input fields
 my @__zoom;                     # "qday", "day","week","month","year"
 my %__zoom;                     # the same as @__zoom
+my $__wname;                    # Web instance name
 my $__plotmode;                 # Current plotmode
 my $__plotsize;                 # Size for a plot
 my $__data;                     # Filecontent from browser when editing a file
@@ -81,8 +83,7 @@ FHEMWEB_Initialize($)
 
   $hash->{DefFn}   = "FHEMWEB_Define";
   $hash->{UndefFn} = "FHEMWEB_Undef";
-  $hash->{AttrFn}  = "FHEMWEB_Attr";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname plotmode:gnuplot,gnuplot-scroll,SVG plotsize";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh";
 }
 
 #####################################
@@ -123,20 +124,8 @@ sub
 FHEMWEB_Undef($$)
 {
   my ($hash, $arg) = @_;
-  close($hash->{PORT});
+  close($hash->{PORT}) if(defined($hash->{PORT}));  # Clients do not have PORT
   return undef;
-}
-
-#####################################
-sub
-FHEMWEB_Attr(@)
-{
-  my @a = @_;
-
-  if($a[0] eq "set" && $a[2] eq "plotmode" && $a[3] eq "SVG" &&
-     !$modules{SVG}{LOADED}) {
-     CommandReload(undef, "98_SVG");
-  }
 }
 
 #####################################
@@ -175,11 +164,11 @@ FHEMWEB_Read($)
 
   }
 
-  my $name = $hash->{SNAME};
-  my $ll = GetLogLevel($name,4);
+  $__wname = $hash->{SNAME};
+
+  my $ll = GetLogLevel($__wname,4);
   $FHEMWEBdir = "$attr{global}{modpath}/FHEM";
-  $__ME = "/" . (($attr{$name} && $attr{$name}{webname}) ? 
-                                $attr{$name}{webname} : "fhem");
+  $__ME = "/" . FHEMWEB_getAttr("webname", "fhem");
   $FHEMWEB_reldoc = "$__ME/commandref.html";
   $__SF = "<form method=\"get\" action=\"$__ME\">";
 
@@ -196,16 +185,20 @@ FHEMWEB_Read($)
   }
 
   $hash->{BUF} .= $buf;
-  #Log(1, "Got: >$hash->{BUF}<");
   return if($hash->{BUF} !~ m/\n\n$/ && $hash->{BUF} !~ m/\r\n\r\n$/);
 
+  #Log(0, "Got: >$hash->{BUF}<");
   my @lines = split("[\r\n]", $hash->{BUF});
   my ($mode, $arg, $method) = split(" ", $lines[0]);
   $hash->{BUF} = "";
 
   Log($ll, "HTTP $hash->{NAME} GET $arg");
-  $__plotmode = $attr{$name}{plotmode} ? $attr{$name}{plotmode} : "SVG";
-  $__plotsize = $attr{$name}{plotsize} ? $attr{$name}{plotsize} : "800,200";
+  $__plotmode = FHEMWEB_getAttr("plotmode", "SVG");
+  $__plotsize = FHEMWEB_getAttr("plotsize", "800,200");
+  if($__plotmode eq "SVG" && !$modules{SVG}{LOADED}) {
+    my $ret = CommandReload(undef, "98_SVG");
+    Log 0, $ret if($ret);
+  }
 
   my $cacheable = FHEMWEB_AnswerCall($arg);
 
@@ -235,12 +228,13 @@ FHEMWEB_AnswerCall($)
   $__ti = 1;
 
   # Lets go:
-  if($arg =~ m,^${__ME}/(.*html)$, || $arg =~ m,^${__ME}/(.*svg)$,) {
+  if($arg =~ m,^${__ME}/(.*html)$, || $arg =~ m,^${__ME}/(example.*)$,) {
     my $f = $1;
+    $f =~ s,/,,g;    # little bit of security
     open(FH, "$FHEMWEBdir/$f") || return;
     pO join("", <FH>);
     close(FH);
-    $__RETTYPE = "text/html; charset=ISO-8859-1" if($f =~ m/\.*html$/);
+    $__RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
     return 1;
   } elsif($arg =~ m,^$__ME/(.*).css,) {
     open(FH, "$FHEMWEBdir/$1.css") || return;
@@ -292,6 +286,8 @@ FHEMWEB_AnswerCall($)
   }
 
   pO "<html>\n<head>\n<title>$__title</title>\n";
+  my $rf = FHEMWEB_getAttr("refresh", "");
+  pO "<meta http-equiv=\"refresh\" content=\"$rf\">\n" if($rf);
   pO "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>\n";
   pO "</head>\n<body name=\"$__title\">\n";
 
@@ -618,8 +614,11 @@ FHEMWEB_roomOverview($)
   pO "  <tr><td>\n";
   pO "    <table class=\"room\" summary=\"Help/Configuration\">\n";
   pO "      <tr><td><a href=\"$__ME/HOWTO.html\">Howto</a></td></tr>\n";
+  pO "      <tr><td><a href=\"$__ME/faq.html\">FAQ</a></td></tr>\n";
   pO "      <tr><td><a href=\"$__ME/commandref.html\">Details</a></td></tr>\n";
-  my $sel = ($cmd =~ m/^style/) ? " class=\"sel\"" : "";
+  my $sel = ($cmd =~ m/examples/) ? " class=\"sel\"" : "";
+  pO "      <tr$sel><td><a href=\"$__ME?cmd=style examples\">Examples</a></td></tr>\n";
+  $sel = ($cmd =~ m/list/) ? " class=\"sel\"" : "";
   pO "      <tr$sel><td><a href=\"$__ME?cmd=style list\">Edit files</a></td></tr>\n";
   pO "    </table>\n";
   pO "  </td></tr>\n";
@@ -870,7 +869,10 @@ FHEMWEB_showLogWrapper($)
     my $path = "$1/$file";
     $path = $__devs{$d}{ATTR}{archivedir}{VAL} . "/$file" if(!-f $path);
 
-    open(FH, $path) || return FHEMWEB_fatal("$path: $!"); 
+    if(!open(FH, $path)) {
+      pO "$path: $!"; 
+      return;
+    }
     my $cnt = join("", <FH>);
     close(FH);
     $cnt =~ s/</&lt;/g;
@@ -1265,11 +1267,15 @@ FHEMWEB_style($$)
 
   if($a[1] eq "list") {
 
-    my @fl = FHEMWEB_fileList("$FHEMWEBdir/.*.css");
+    my @fl;
+    push(@fl, "fhem.cfg");
+    push(@fl, "<br>");
+    push(@fl, FHEMWEB_fileList("$FHEMWEBdir/.*.css"));
     push(@fl, "<br>");
     push(@fl, FHEMWEB_fileList("$FHEMWEBdir/.*.gplot"));
     push(@fl, "<br>");
     push(@fl, FHEMWEB_fileList("$FHEMWEBdir/.*html"));
+
     pO "<div id=\"right\">\n";
     pO "  <table><tr><td>\n";
     pO "  $msg<br/><br/>\n" if($msg);
@@ -1284,15 +1290,38 @@ FHEMWEB_style($$)
     pO "  </td></tr></table>\n";
     pO "</div>\n";
 
+  } elsif($a[1] eq "examples") {
+
+    my @fl = FHEMWEB_fileList("$FHEMWEBdir/example.*");
+    pO "<div id=\"right\">\n";
+    pO "  <table><tr><td>\n";
+    pO "  $msg<br/><br/>\n" if($msg);
+    pO "  <table class=\"at\">\n";
+    my $row = 0;
+    foreach my $file (@fl) {
+      pO "<tr class=\"" . ($row?"odd":"even") . "\">";
+      pO "<td><a href=\"$__ME/$file\">$file</a></td></tr>";
+      $row = ($row+1)%2;
+    }
+    pO "  </table>\n";
+    pO "  </td></tr></table>\n";
+    pO "</div>\n";
+
   } elsif($a[1] eq "edit") {
 
-    open(FH, "$FHEMWEBdir/$a[2]") || return FHEMWEB_fatal("$a[2]: $!");
+    $a[2] =~ s,/,,g;    # little bit of security
+    my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
+                                   "$FHEMWEBdir/$a[2]");
+    if(!open(FH, $f)) {
+      pO "$f: $!";
+      return;
+    }
     my $data = join("", <FH>);
     close(FH);
 
     pO "<div id=\"right\">\n";
     pO "  <form>";
-    pO     FHEMWEB_submit("save", "Save $a[2]") . "<br/><br/>";
+    pO     FHEMWEB_submit("save", "Save $f") . "<br/><br/>";
     pO     FHEMWEB_hidden("cmd", "style save $a[2]");
     pO     "<textarea name=\"data\" cols=\"80\" rows=\"30\">" .
                 "$data</textarea>";
@@ -1301,11 +1330,19 @@ FHEMWEB_style($$)
 
   } elsif($a[1] eq "save") {
 
-    open(FH, ">$FHEMWEBdir/$a[2]") || return FHEMWEB_fatal("$a[2]: $!");
+    $a[2] =~ s,/,,g;    # little bit of security
+    my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
+                                   "$FHEMWEBdir/$a[2]");
+    if(!open(FH, ">$f")) {
+      pO "$f: $!";
+      return;
+    }
     print FH $__data;
     close(FH);
-    FHEMWEB_style("style list", "Saved file $a[2]");
-    
+    FHEMWEB_style("style list", "Saved file $f");
+    $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} : $a[2]);
+
+    fC("rereadcfg") if($a[2] eq "fhem.cfg");
   }
 
 }
@@ -1337,10 +1374,17 @@ fC($)
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0 if($cmd ne "save");
   my $ret = AnalyzeCommand(undef, $cmd);
-  if($cmd !~ m/attr.*global.*verbose/) {
-    $attr{global}{verbose} = $oll;
-  }
+  $attr{global}{verbose} = $oll if($cmd !~ m/attr.*global.*verbose/);
   return $ret;
+}
+
+sub
+FHEMWEB_getAttr($$)
+{
+  my ($aname, $def) = @_;
+  return $attr{$__wname}{$aname}
+        if($attr{$__wname} && defined($attr{$__wname}{$aname}));
+  return $def;
 }
 
 

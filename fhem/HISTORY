@@ -305,3 +305,11 @@
     Tested with Firefox 3.0.
     Todo: Test with IE+Adobe Plugin/Opera.
   - feature: HOWTO for webpgm2 (first chapter)
+
+Fri Jul 25 18:14:26 MEST 2008
+  - Autoloading modules. In order to make module installation easier and
+    to optimize memory usage, modules are loaded when the first device of a
+    certain category is defined. Exceptions are the modules prefixed with 99,
+    these are considered "utility" modules and are loaded at the beginning.
+    Some of the older 99_x modules were renamed (99_SVG, 99_dummy), and most
+    contrib modules were moved to the main FHEM directory.
