@@ -1,5 +1,5 @@
 ############################
-# Display the daily avarage temperature and rainfall from a KS300.
+# Display the monthly avarage temperature and rainfall from a KS300.
 # Corresponding FileLog definition:
 # define avglog FileLog /var/log/fhem/ks300-%Y.log ks300:.*avg.*
 
@@ -16,8 +16,8 @@ set grid
 set ylabel "Temperature in C"
 set y2label "Rain (l/m2)"
 
-#FileLog 5:avg_day:0:
-#FileLog 11:avg_day:0:
+#FileLog 5:avg_month:0:
+#FileLog 11:avg_month:0:
 
-plot "<grep avg_day <IN>" using 1:5 axes x1y1 title 'Temperature' with lines,\
-     "<grep avg_day <IN>" using 1:11 axes x1y2 title 'Rain' with histeps
+plot "<grep avg_month <IN>" using 1:5 axes x1y1 title 'Temperature' with lines,\
+     "<grep avg_month <IN>" using 1:11 axes x1y2 title 'Rain' with fsteps

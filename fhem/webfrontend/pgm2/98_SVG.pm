@@ -294,7 +294,7 @@ SVG_render($$$$$$$)
           pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
         }
 
-    } elsif($type[$idx] eq "steps" ) {
+    } elsif($type[$idx] eq "steps" || $type[$idx] eq "fsteps" ) {
 
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
@@ -306,7 +306,11 @@ SVG_render($$$$$$$)
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
           next if(int($x2) == $lx && int($y1) == $ly);
           $lx = int($x2); $ly = int($y2);
-          $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
+          if($type[$idx] eq "steps") {
+            $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
+          } else {
+            $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
+          }
         }
       }
       pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";

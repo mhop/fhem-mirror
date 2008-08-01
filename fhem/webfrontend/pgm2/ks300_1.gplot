@@ -2,6 +2,8 @@
 # Display the temperature and the humidity values of a KS300.
 # Corresponding FileLog definition:
 # define ks300log FileLog /var/log/fhem/ks300-%Y-%U.log ks300:.*H:.*
+#   or (SVG/gnuplot-scroll)
+# define ks300log FileLog /var/log/fhem/ks300-%Y.log ks300:.*H:.*
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
