@@ -2,8 +2,8 @@ BINDIR=/usr/local/bin
 MODDIR=/usr/local/lib
 VARDIR=/var/log/fhem
 
-VERS=4.3
-DATE=2008-07-12
+VERS=4.4
+DATE=2008-08-04
 
 all:
 	@echo Nothing to do for all.
