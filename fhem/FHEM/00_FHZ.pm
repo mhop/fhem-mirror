@@ -520,7 +520,7 @@ FHZ_Read($)
   my ($hash) = @_;
 
   my $buf = $hash->{PortObj}->input();
-  my $iohash = $modules{$hash->{TYPE}};
+  my $iohash = $modules{$hash->{TYPE}}; # Our (FHZ) module pointer
   my $name = $hash->{NAME};
 
   ###########
@@ -623,7 +623,10 @@ FHZ_Read($)
       foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
 		      grep {defined($modules{$_}{ORDER});}keys %modules) {
 	next if($iohash->{Clients} !~ m/:$m:/);
-	next if($dmsg !~ m/$modules{$m}{Match}/i);
+
+        # Module is not loaded or the message is not for this module
+	next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
+
 	no strict "refs";
 	@found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
 	use strict "refs";
