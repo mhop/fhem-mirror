@@ -76,6 +76,10 @@ EMWZ_GetStatus($)
   $vals{"alarm_PA"} = w($d,45) . " Watt";
   $vals{"price_CF"} = sprintf("%.3f", w($d,47)/10000);
   $vals{"RperKW_EC"} = $ec;
+  $hash->{READINGS}{cum_kWh}{VAL} = 0 if(!$hash->{READINGS}{cum_kWh}{VAL});
+  $vals{"cum_kWh"} = sprintf("%0.3f",
+                      $hash->{READINGS}{cum_kWh}{VAL} + $vals{"energy"}); 
+  
 
   my $tn = TimeNow();
   my $idx = 0;

@@ -54,14 +54,8 @@ EMGZ_GetStatus($)
   }
 
   my $pulses=w($d,13);
-  my $ec=w($d,49) / 10;
-  if($ec < 0) {					# war <=
-    my $msg = "EMGZ read error (GetStatus 2)";
-    Log GetLogLevel($name,2), $msg;
-    return $msg;
-  }
 
-  $ec = 100; 	# fixed value
+  my $ec = 100; 	# fixed value
  
   my $cur_energy = $pulses / $ec;       # ec = U/m^3
   my $cur_power = $cur_energy / 5 * 60; # 5minute interval scaled to 1h
@@ -75,10 +69,14 @@ EMGZ_GetStatus($)
   my %vals;
   $vals{"5min_pulses"} = $pulses;
   $vals{"act_flow_m3"} = sprintf("%0.3f", $cur_energy);
-  $vals{"m3ph"} = sprintf("%.3f", $cur_power);
+  $vals{"m3ph"}     = sprintf("%.3f", $cur_power);
   $vals{"alarm_PA"} = w($d,45) . " Watt";		# nonsens
   $vals{"price_CF"} = sprintf("%.3f", w($d,47)/10000);
   $vals{"Rperm3_EC"} = $ec;
+  $hash->{READINGS}{cum_m3}{VAL} = 0 if(!$hash->{READINGS}{cum_m3}{VAL});
+  $vals{"cum_m3"} = sprintf("%0.3f",
+                        $hash->{READINGS}{cum_m3}{VAL} + $vals{"act_flow_m3"});
+  
 
   my $tn = TimeNow();
   my $idx = 0;
@@ -125,7 +123,7 @@ EMGZ_Set($@)
 {
   my ($hash, @a) = @_;
   my $u = "Usage: set <name> <type> <value>, " .
-                "<type> is one of price,alarm,rperkw";
+                "<type> is price";
 
   return $u if(int(@a) != 3);
 
@@ -139,11 +137,6 @@ EMGZ_Set($@)
   if($a[1] eq "price") {
     $v *= 10000; # Make display and input the same
     $msg = sprintf("79%02x2f02%02x%02x", $d-1, $v%256, int($v/256));
-  } elsif($a[1] eq "alarm") {
-    $msg = sprintf("79%02x2d02%02x%02x", $d-1, $v%256, int($v/256));
-  } elsif($a[1] eq "rperkw") {
-    $v *= 10; # Make display and input the same
-    $msg = sprintf("79%02x3102%02x%02x", $d-1, $v%256, int($v/256));
   } else {
     return $u;
   }
@@ -151,7 +144,7 @@ EMGZ_Set($@)
 
   my $ret = IOWrite($hash, $msg);
   if(!defined($ret)) {
-    my $msg = "EMWZ $name read error (Set)";
+    $msg = "EMWZ $name read error (Set)";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
