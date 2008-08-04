@@ -283,7 +283,7 @@ make editing of multiline commands transparent.<br><br>
 
     <a name="disable"></a>
     <li>disable<br>
-        Can be applied to at/notify/FileLog devices.<br>
+        Can be applied to at/watchdog/notify/FileLog devices.<br>
 	Disables the corresponding at/notify or FileLog device. Note:
         If applied to an <a href="#at">at</a>, the command will not be executed,
         but the next time will be computed.</li><br>
@@ -424,7 +424,7 @@ fs20sv
 fs20sv
 fs20usr</pre></li>
 
-        <li>HMS: hms100-t hms100-tf hms100-wd hms100-mg hms100-tfk rm100-2</li>
+        <li>HMS: hms100-t hms100-tf hms100-wd hms100-mg hms100-co hms100-tfk hms100-fit rm100-2</li>
         <li>KS300: ks300</li>
         <li>WS300: ws300pc</li>
         <li>EM1010: em1010pc</li>
@@ -701,24 +701,30 @@ fs20usr</pre></li>
       circumstances, the authors are not liable for any damage occuring as a
       result of incomplete or buggy code</li>
 
-      <li>Currently supported devices are the HMS100T, HMS100TF, HMS100WD and
-      the RM100-2.</li>
+      <li>Currently supported devices are the HMS100-T HMS100-TF HMS100-WD
+          HMS100-MG HMS100-TFK HMS100-CO HMS100-FIT RM100-2 </li>
 
       <li>The housecode of the HMS devices may change if the battery is renewed.
       In order to make life easier, you can define a "wildcard" device for each
       type of HMS device. First the real device-id will be checked, then the
       wildcard device id. The wildcards are:
       <ul>
-	<li>1000 for the HMS100TF</li>
-	<li>1001 for the HMS100T</li>
-	<li>1002 for the HMS100WD</li>
+	<li>1000 for the HMS100-TF</li>
+	<li>1001 for the HMS100-T</li>
+	<li>1002 for the HMS100-WD</li>
 	<li>1003 for the RM100-2</li>
-	<li>1006 for the HMS100MG</li>
+	<li>1004 for the HMS100-TFK/li>
+	<li>1006 for the HMS100-MG</li>
+	<li>1008 for the HMS100-CO</li>
+	<li>100e for the HMS100-FIT</li>
       </ul>
       </li>
 
-      <li>Some battery low notifications are not yet implemented (RM100, HMS100WD).</li>
-      <li>Please test your installation before relying on the functionality.</li>
+      <li>Some battery low notifications are not yet implemented (RM100,
+      HMS100WD).</li>
+      <li>Please test your installation before relying on the
+      functionality.</li>
+
     </ul>
     <br>
   </ul>
@@ -1177,6 +1183,43 @@ fs20usr</pre></li>
           cron or filter the date in a perl expression, see the last example and
           the section <a href="#perl">Perl special</a>.
       </li>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="watchdog"></a>
+  <h4>Type watchdog</h4>
+  <ul>
+    <code>define &lt;name&gt; watchdog &lt;regexp1&gt; &lt;timespec&gt; &lt;regexp2&gt; &lt;command&gt;</code><br>
+    <br>
+    Start an arbitrary fhem.pl command if after &lt;timespec&gt; receiving an
+    event matching &lt;regexp1&gt; no event matching &lt;regexp2&gt; is
+    received.<br>
+    The syntax for &lt;regexp1&gt; and &lt;regexp2&gt; is the same as the
+    regexp for <a href="#notify">notify</a>.<br>
+    &lt;timespec&gt; is HH:MM[:SS]<br>
+    &lt;command&gt; is a usual fhem command like used int the <a
+    href="#at">at</a> or <a href="#notify">notify</a>
+    <br><br>
+
+    Examples:
+    <pre>
+    # "Reset" the FHT80 if we do not receive any message for 15 Minutes
+    define w watchdog FHT80 00:15:00 SAME set FHT80 refreshvalues
+    # Shout if the HMS100-FIT is not alive
+    define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"
+    </pre>
+
+    Notes:<br>
+    <ul>
+      <li>if &lt;regexp1&gt; is . (dot), then activate the watchdog at
+      definition time. Else it will be activated when the first matching event
+      is received.</li>
+
+      <li>if &lt;regexp2&gt; is SAME, then it will be the same as the first
+      regexp, and it will be reactivated, when it is received. This is probably
+      the normal operation.</li>
     </ul>
     <br>
   </ul>

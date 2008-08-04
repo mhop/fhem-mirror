@@ -44,9 +44,16 @@ hex code needed by fhem.pl?</a><br><br>
 <a href="#faq11">11. I'd like to use this sunrise/sunset stuff, can you help
 me?</a><br><br>
 
-<a href="#faq12">12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</a><br><br>
+<a href="#faq12">12. I'd like to switch on the ventilator if the FHT tells me
+its too hot. How to tell fhem to do that?</a><br><br>
 
-<a href="#faq12">13. I'd like to see directly in the Web frontend if a window is open. How to do that?</a><br><br>
+<a href="#faq13">13. I'd like to see directly in the Web frontend if a window
+is open. How to do that?</a><br><br>
+
+<a href="#faq14">14. In the summer I get a lot of "actuator:lime-protection"
+messages from  my FHT80b. How to switch back to the actuator:0% messages?</a>
+<br><br>
+
 
 <br/>
 <br/>
@@ -284,6 +291,33 @@ How to do that? (by fwolff)</b>
   define window_close notify bad.*warnings.*none.* set window off
   </pre>
 </ul>
+
+<a name="faq14"></a>
+<b>14. In the summer I get a lot of "actuator:lime-protection
+messages from  my FHT80b. How to switch back to the actuator:0% messages?
+</b>
+<ul>
+
+  (Thanks for Martin Fischer for researching)<br>
+  The problem happens if at the weekly lime-protection time (usually saturday
+  at 11:00 AM) the desired temperature is lower than the measured temperature.
+  I think this is an FHT80b firmware bug, a workaround is to set the desired
+  temperature for a short time higher than the measured temperature.
+  You can automate it with the following notify:
+<pre>
+  define lime_reset notify .*lime-protection {\
+    $d = $defs{@}{READINGS}{"desired-temp"}{VAL};;\
+    $m = $defs{@}{READINGS}{"measured-temp"}{VAL};;\
+    if($m > $d) {\
+      fhem("set @ desired-temp 29");;\
+      fhem("set @ desired-temp $d");;\
+    }\
+  }
+</pre>
+
+</ul>
+
+<a name="faq14">
 
 </body>
 </html>
