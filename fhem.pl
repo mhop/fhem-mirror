@@ -58,6 +58,7 @@ sub Log($$);
 sub OpenLogfile($);
 sub PrintHash($$);
 sub ResolveDateWildcards($@);
+sub RemoveInternalTimer($);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
@@ -103,7 +104,6 @@ sub CommandTrigger($$);
 # SetFn    - set/activate this device
 # GetFn    - get some data from this device
 # StateFn  - set local info for this device, do not activate anything
-# TimeFn   - if the TRIGGERTIME of a device is reached, call this function
 # NotifyFn - call this if some device changed its properties
 # ReadyFn - check for available data, if no FD
 # ReadFn - Reading from a Device (see FHZ/WS300)
@@ -125,7 +125,6 @@ use vars qw(%attr);		# Attributes
 
 use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
-use vars qw($nextat);           # used by the at module
 use vars qw($init_done);        #
 use vars qw($internal_data);    # 
 
@@ -140,10 +139,11 @@ my $global_cl;			# To use from perl snippets
 my $devcount = 0;		# To sort the devices
 my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
+my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.49 2008-07-28 12:33:29 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.50 2008-08-04 13:47:53 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1580,17 +1580,6 @@ HandleTimeout()
   return ($nextat-$now) if($now < $nextat);
 
   $nextat = 0;
-  foreach my $i (keys %defs) {
-    next if(!$defs{$i}{TRIGGERTIME});
-
-    if($now >= $defs{$i}{TRIGGERTIME}) {
-      CallFn($i, "TimeFn", $i);
-    } else {
-      $nextat = $defs{$i}{TRIGGERTIME}
-        if(!$nextat || $nextat > $defs{$i}{TRIGGERTIME});
-    }
-  }
-
   #############
   # Check the internal list.
   foreach my $i (keys %intAt) {
@@ -1629,6 +1618,16 @@ InternalTimer($$$$)
   $intAt{$intAtCnt}{ARG} = $arg;
   $intAtCnt++;
   $nextat = $tim if(!$nextat || $nextat > $tim);
+}
+
+#####################################
+sub
+RemoveInternalTimer($)
+{
+  my ($arg) = @_;
+  foreach my $a (keys %intAt) {
+    delete($intAt{$a}) if($intAt{$a}{ARG} eq $arg);
+  }
 }
 
 
