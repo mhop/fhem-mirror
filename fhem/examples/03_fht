@@ -32,3 +32,21 @@ define wz_refresh at *04:00:00 set wz report1 255 report2 255
 
 # alias for the above
 define wz_refresh at *04:00:00 set wz refreshvalues
+
+
+###################
+# If at the weekly lime-protection time (usually saturday at 11:00 AM) the
+# desired temperature is lower than the measured temperature, then you'll get
+# instead of "actuator:0%" the "actuator:lime-protection" messsages every 2.5
+# minutes.  I think this is an FHT80b firmware bug, a workaround is to set the
+# desired temperature for a short time higher than the measured temperature.
+# You can automate it (for all FHT's) with the following notify:
+
+define lime_reset notify .*lime-protection {\
+  my $d = $defs{@}{READINGS}{"desired-temp"}{VAL};;\
+  my $m = $defs{@}{READINGS}{"measured-temp"}{VAL};;\
+  if($m > $d) {\
+    fhem("set @ desired-temp 29");;\
+    fhem("set @ desired-temp $d");;\
+  }\
+}

@@ -417,3 +417,6 @@
   - feature: autoloading FHEM modules
   - bugfix:  STATE/$value is carrying again the correct value
   - feature: enhancing the Makefile and the documentation
+  - feature: 90_at is using now InternalTimer, subsecond precision added
+  - feature: HMS100-FIT added (01.01.08 by Peter and 22.01.08 by Juergen)
+  - feature: 91_watchdog added to handle the HMS100-FIT

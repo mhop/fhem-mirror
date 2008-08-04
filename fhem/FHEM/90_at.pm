@@ -3,6 +3,7 @@ package main;
 
 use strict;
 use warnings;
+use Time::HiRes qw(gettimeofday);
 
 #####################################
 sub
@@ -11,7 +12,6 @@ at_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "at_Define";
-  $hash->{TimeFn}   = "at_Exec";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{AttrList} = "disable:0,1 skip_next:0,1";
 }
@@ -42,7 +42,7 @@ at_Define($$)
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
 
-  my $ot = time;
+  my $ot = gettimeofday();
   my @lt = localtime($ot);
   my $nt = $ot;
 
@@ -65,7 +65,7 @@ at_Define($$)
   }
   $hash->{NTM} = $ntm if($rel eq "+" || $fn);
   $hash->{TRIGGERTIME} = $nt;
-  $nextat = $nt if(!$nextat || $nextat > $nt);
+  InternalTimer($nt, "at_Exec", $name, 0);
 
   $hash->{STATE} = "Next: " . FmtTime($nt);
   
