@@ -172,7 +172,7 @@ FHT_Set($@)
     $allcmd .=" " if($allcmd);
     $allcmd .= $cmd;
 
-    return "Unknown argument $cmd, choose one of " . join(" ", sort keys %c2bset)
+    return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2bset)
                 if(!defined($c2bset{$cmd}));
     return "\"set $name\" needs a parameter"
                 if(@a < 1);
