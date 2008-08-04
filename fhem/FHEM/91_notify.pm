@@ -22,7 +22,7 @@ sub
 notify_Define($$)
 {
   my ($hash, $def) = @_;
-  my ($type, $name, $re, $command) = split("[ \t]+", $def, 4);
+  my ($name, $type, $re, $command) = split("[ \t]+", $def, 4);
   
   if(!$command) {
     if($hash->{OLDDEF}) { # Called from modify, where command is optional
