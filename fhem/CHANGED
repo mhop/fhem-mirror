@@ -420,3 +420,4 @@
   - feature: 90_at is using now InternalTimer, subsecond precision added
   - feature: HMS100-FIT added (01.01.08 by Peter and 22.01.08 by Juergen)
   - feature: 91_watchdog added to handle the HMS100-FIT
+  - feature: cum_kWh/cum_m3 added to EMWZ/EMGZ (11.01.08 by Peter)
