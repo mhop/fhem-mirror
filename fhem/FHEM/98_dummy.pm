@@ -25,7 +25,7 @@ dummy_Set($@)
 
   my $v = $a[1];
 
-  Log GetLogLevel($a[0],2), "dummy set $v";
+  Log GetLogLevel($a[0],2), "dummy set @a";
 
   $hash->{CHANGED}[0] = $v;
   $hash->{STATE} = $v;
