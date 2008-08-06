@@ -308,7 +308,7 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
   define lime_reset notify .*lime-protection {\
     $d = $defs{@}{READINGS}{"desired-temp"}{VAL};;\
     $m = $defs{@}{READINGS}{"measured-temp"}{VAL};;\
-    if($m > $d) {\
+    if($m gt $d) {\
       fhem("set @ desired-temp 29");;\
       fhem("set @ desired-temp $d");;\
     }\
