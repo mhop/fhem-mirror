@@ -10,3 +10,6 @@ attr global modpath .                  # where our FHEM directory is
 
 define WEB FHEMWEB 8083
 attr WEB plotmode SVG
+
+# Fake logfile, to access the global log
+define Logfile FileLog /tmp/fhem-%Y-%m.log fakelog

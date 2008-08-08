@@ -1,0 +1,35 @@
+############################
+# Display irrigation times, the log must be of the form
+# 2008-04-29_19:00:06 GVent5 365 365 187
+# 2008-04-29_19:00:06 Total time is 365
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+set title '<TL>'
+set grid xtics y2tics
+
+set ylabel "Minutes"
+set y2label "Minutes"
+
+#FileLog 3:GVent1:0:$d=$fld[2];$d/60
+#FileLog 3:GVent2:0:$d+=$fld[2];$fld[2]?$d/60:0
+#FileLog 3:GVent3:0:$d+=$fld[2];$fld[2]?$d/60:0
+#FileLog 3:GVent4:0:$d+=$fld[2];$fld[2]?$d/60:0
+#FileLog 3:GVent5:0:$d+=$fld[2];$fld[2]?$d/60:0
+#FileLog 3:GVent6:0:$d+=$fld[2];$fld[2]?$d/60:0
+#FileLog 3:GVent7:0:$d+=$fld[2];$fld[2]?$d/60:0
+#FileLog 3:GVent8:0:$d+=$fld[2];$fld[2]?$d/60:0
+
+plot "<IN>" using 1:3 title 'Lb west' with points,\
+     "<IN>" using 1:3 title 'Rasen Sued' with points,\
+     "<IN>" using 1:3 title 'Lb ost' with points,\
+     "<IN>" using 1:3 title 'Rasen Haus' with points,\
+     "<IN>" using 1:3 title 'Eingang' with points,\
+     "<IN>" using 1:3 title 'Rasen West' with points,\
+     "<IN>" using 1:3 title 'Stichstr.' with points,\
+     "<IN>" using 1:3 title 'Beete' with points

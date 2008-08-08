@@ -41,7 +41,7 @@ FileLog_Define($@)
   my @t = localtime;
   my $f = ResolveDateWildcards($a[2], @t);
   $fh = new IO::File ">>$f";
-  return "Can't open $f" if(!defined($fh));
+  return "Can't open $f: $!" if(!defined($fh));
 
   $hash->{FH} = $fh;
   $hash->{REGEXP} = $a[3];
@@ -226,6 +226,7 @@ FileLog_Get($@)
   }
 
   my %lastdate;
+  my $d;                    # Used by eval functions
   while(my $l = <$ifh>) {
     last if($l gt $to);
     my @fld = split("[ \r\n]+", $l);     # 40%
@@ -263,7 +264,6 @@ FileLog_Get($@)
         }
         $h->{last2} = $fld[$col];
         $lastdate{$hd} = $fld[0];
-        next if(!$line);
 
       } elsif($t == 3) {                    # int function
         my $val = $fld[$col];
@@ -272,6 +272,7 @@ FileLog_Get($@)
       } else {                              # evaluate
         $line = "$fld[0] " . eval($h->{fn}) . "\n";
       }
+      next if(!$line);
 
       if($outf eq "-") {
         $h->{ret} .= $line;
@@ -318,7 +319,7 @@ FileLog_Get($@)
   }
   if($internal) {
     $internal_data = \$ret;
-    return "OK";
+    return undef;
   }
 
   return ($outf eq "-") ? $ret : join(" ", @fname);
