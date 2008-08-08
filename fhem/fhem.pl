@@ -143,7 +143,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.51 2008-08-04 14:34:53 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.52 2008-08-08 10:46:25 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -1187,10 +1187,7 @@ CommandXmlList($$)
       $lt = $t;
 
       my $a1 = XmlEscape($p->{STATE});
-      my $a2 = CommandSet(undef, "$d ?");
-      $a2 =~ s/.*choose one of //;
-      $a2 = "" if($a2 =~ /^No set implemented for/);
-      $a2 = XmlEscape($a2);
+      my $a2 = XmlEscape(getAllSets($d));
       my $a3 = XmlEscape(getAllAttr($d));
 
       $str .= "\t\t<$t name=\"$d\" state=\"$a1\" sets=\"$a2\" attrs=\"$a3\">\n";
@@ -1306,6 +1303,17 @@ getAllAttr($)
   $list .= " " . $attr{global}{userattr}
         if($attr{global}{userattr});
   return $list;
+}
+
+#####################################
+sub
+getAllSets($)
+{
+  my $d = shift;
+  my $a2 = CommandSet(undef, "$d ?");
+  $a2 =~ s/.*choose one of //;
+  $a2 = "" if($a2 =~ /^No set implemented for/);
+  return $a2;
 }
 
 sub
@@ -1831,6 +1839,11 @@ CallFn(@)
 {
   my $d = shift;
   my $n = shift;
+  if(!$defs{$d}{TYPE}) {
+    Log 0, "Removing $d, has no TYPE";
+    delete($defs{$d});
+    return undef;
+  }
   my $fn = $modules{$defs{$d}{TYPE}}{$n};
   return "" if(!$fn);
   no strict "refs";

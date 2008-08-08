@@ -411,7 +411,7 @@
   - feature: webpgm2 generates SVG's from logs: no need for gnuplot
   - bugfix:  examples corrected to work with current syntax
 
-- ==DATE== (4.4)
+- 2008-08-04 (4.4)
   - feature: RM100-2 battery empty warning (mare 23.07.08)
   - feature: optimising the pgm2/SVG memory usage
   - feature: autoloading FHEM modules
@@ -421,3 +421,6 @@
   - feature: HMS100-FIT added (01.01.08 by Peter and 22.01.08 by Juergen)
   - feature: 91_watchdog added to handle the HMS100-FIT
   - feature: cum_kWh/cum_m3 added to EMWZ/EMGZ (11.01.08 by Peter)
+
+- ==DATE== (4.5)
+  - feature: further 01_FHEMWEB cleanup

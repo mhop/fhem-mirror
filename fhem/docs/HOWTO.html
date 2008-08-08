@@ -225,6 +225,14 @@
       <li>Start httpd with the startssl option (SSL or the like must be set in
       one of your system files, look at /etc/init.d/httpd).</li>
       </ul>
+      <br/><br/>
+
+      To display "foreign" (non fhem) files as a plot or a just as plain text,
+      configure a fake logfile with the correct filename and an unused regexp,
+      e.g.<br><pre>
+      define messages FileLog /var/log/messages fakelog
+      </pre>
+      <br/><br/>
 
 
   <body>
