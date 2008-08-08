@@ -515,17 +515,25 @@ fs20usr</pre></li>
               as an SVG script to the frontend, which will compute
               the image: no need for gnuplot on the backend.</li>
         </ul>
+        See also the attribute fixedrange.
         </li><br>
 
     <a name="plotsize"></a>
     <li>plotsize<br/>
         Can be applied to FHEMWEB devices. (webfrontend/pgm2)<br/> Specifies
-        the defult size of the plot, in pixels, separated by comma:
+        the default size of the plot, in pixels, separated by comma:
         width,height. You can set individual sizes by setting the plotsize of
         the weblink.
         </li><br>
-  </li>
-  </ul>
+
+    <a name="fixedrange"></a>
+    <li>fixedrange<br/>
+        Can be applied to weblink devices (FHEMWEB).<br/>
+        Contains two time specs in the form YYYY-MM-DD separated by a space.
+        In plotmode gnuplot-scroll or SVG the given time-range will be used,
+        and no scrolling for this weblinks will be possible. Needed e.g. for
+        looking at last-years data without scrolling.
+        </li><br> </li> </ul>
 
   Examples:
   <ul>

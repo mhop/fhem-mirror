@@ -3,74 +3,56 @@ package main;
 
 use strict;
 use warnings;
-
 use IO::Socket;
-#use Devel::Size qw(size total_size);
-
-
-###################
-# Config
-use vars qw($__ME);
-my $FHEMWEBdir;
-my $FHEMWEB_tmpfile    = "/tmp/file.$$";
-my $FHEMWEB_reldoc;
-
-use vars qw(%defs);
-use vars qw(%attr);
-
-# Nothing to config below
-#########################
 
 #########################
 # Forward declaration
-sub FHEMWEB_checkDirs();
-sub FHEMWEB_digestCgi($);
-sub FHEMWEB_doDetail($);
-sub FHEMWEB_fileList($);
-sub FHEMWEB_getAttr($$);
-sub FHEMWEB_makeTable($$$$$$$$);
-sub FHEMWEB_parseXmlList($);
-sub FHEMWEB_showRoom();
-sub FHEMWEB_showArchive($);
-sub FHEMWEB_showLog($);
-sub FHEMWEB_showLogWrapper($);
-sub FHEMWEB_select($$$);
-sub FHEMWEB_textfield($$);
-sub FHEMWEB_submit($$);
-sub FHEMWEB_style($$);
-sub FHEMWEB_roomOverview($);
-sub FHEMWEB_fatal($);
+sub FW_digestCgi($);
+sub FW_doDetail($);
+sub FW_fileList($);
+sub FW_getAttr($$$);
+sub FW_makeTable($$$$$$$$);
+sub FW_updateHashes();
+sub FW_showRoom();
+sub FW_showArchive($);
+sub FW_showLog($);
+sub FW_logWrapper($);
+sub FW_showWeblink($$$);
+sub FW_select($$$);
+sub FW_textfield($$);
+sub FW_submit($$);
+sub FW_style($$);
+sub FW_roomOverview($);
+sub FW_fatal($);
 sub pF($@);
 sub pO(@);
-sub FHEMWEB_AnswerCall($);
-sub FHEMWEB_zoomLink($$$$);
-sub FHEMWEB_calcWeblink($$);
+sub FW_AnswerCall($);
+sub FW_zoomLink($$$);
+sub FW_calcWeblink($$);
+
+use vars qw($__ME); # webname (fhem), needed by SVG
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
-my %__icons;                    # List of icons
-my $__iconsread;                # Timestamp of last icondir check
-my %__rooms;                    # hash of all rooms
-my %__devs;                     # hash of all devices ant their attributes
-my %__types;                    # device types, for sorting
-my $__room;                     # currently selected room
-my $__detail;                   # durrently selected device for detail view
-my $__title;                    # Page title
-my $__cmdret;                   # Returned data by the fhem call
-my $__scrolledweblinkcount;     # Number of scrolled weblinks
-my %__pos;                      # scroll position
-my $__RET;                      # Returned data (html)
-my $__RETTYPE;                  # image/png or the like
-my $__SF;                       # Short for submit form
-my $__ti;                       # Tabindex for all input fields
-my @__zoom;                     # "qday", "day","week","month","year"
-my %__zoom;                     # the same as @__zoom
-my $__wname;                    # Web instance name
-my $__plotmode;                 # Current plotmode
-my $__plotsize;                 # Size for a plot
-my $__data;                     # Filecontent from browser when editing a file
-my $__svgloaded;                # Do not load the SVG twice
-my $__lastxmllist;              # last time xmllist was parsed
+my %__icons;      # List of icons
+my $__iconsread;  # Timestamp of last icondir check
+my %__rooms;      # hash of all rooms
+my %__devs;       # hash of from/to entries per device
+my %__types;      # device types, for sorting
+my $__room;       # currently selected room
+my $__detail;     # currently selected device for detail view
+my $__cmdret;     # Returned data by the fhem call
+my %__pos;        # scroll position
+my $__RET;        # Returned data (html)
+my $__RETTYPE;    # image/png or the like
+my @__zoom;       # "qday", "day","week","month","year"
+my %__zoom;       # the same as @__zoom
+my $__wname;      # Web instance name
+my $__plotmode;   # Global plot mode (WEB attribute)
+my $__plotsize;   # Global plot size (WEB attribute)
+my $__data;       # Filecontent from browser when editing a file
+my $__dir;        # FHEM directory
+my $__reldoc;     # $__ME/commandref.html;
 
 
 #####################################
@@ -79,16 +61,24 @@ FHEMWEB_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{ReadFn}  = "FHEMWEB_Read";
+  $hash->{ReadFn}  = "FW_Read";
 
-  $hash->{DefFn}   = "FHEMWEB_Define";
-  $hash->{UndefFn} = "FHEMWEB_Undef";
+  $hash->{DefFn}   = "FW_Define";
+  $hash->{UndefFn} = "FW_Undef";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh";
+
+  ###############
+  # Initialize internal structures
+  my $n = 0;
+  @__zoom = ("qday", "day","week","month","year");
+  %__zoom = map { $_, $n++ } @__zoom;
+
+  $__dir = "$attr{global}{modpath}/FHEM";
 }
 
 #####################################
 sub
-FHEMWEB_Define($$)
+FW_Define($$)
 {
   my ($hash, $def) = @_;
   my ($name, $type, $port, $global) = split("[ \t]+", $def);
@@ -98,30 +88,24 @@ FHEMWEB_Define($$)
 
   $hash->{STATE} = "Initialized";
   $hash->{PORT} = IO::Socket::INET->new(
-          Proto        => 'tcp',
-          LocalHost    => (($global && $global eq "global") ? undef : "localhost"),
-          LocalPort    => $port,
-          Listen       => 10,
-          ReuseAddr    => 1);
+          Proto     => 'tcp',
+          LocalHost => (($global && $global eq "global") ? undef : "localhost"),
+          LocalPort => $port,
+          Listen    => 10,
+          ReuseAddr => 1);
 
   return "Can't open server port at $port: $!" if(!$hash->{PORT});
 
   $hash->{FD} = $hash->{PORT}->fileno();
-  $hash->{SERVERSOCKET} = "True";
+  $hash->{SERVERSOCKET} = 1;
   Log(2, "FHEMWEB port $port opened");
-
-  ###############
-  # Initialize internal structures
-  my $n = 0;
-  @__zoom = ("qday", "day","week","month","year");
-  %__zoom = map { $_, $n++ } @__zoom;
 
   return undef;
 }
 
 #####################################
 sub
-FHEMWEB_Undef($$)
+FW_Undef($$)
 {
   my ($hash, $arg) = @_;
   close($hash->{PORT}) if(defined($hash->{PORT}));  # Clients do not have PORT
@@ -130,7 +114,7 @@ FHEMWEB_Undef($$)
 
 #####################################
 sub
-FHEMWEB_Read($)
+FW_Read($)
 {
   my ($hash) = @_;
 
@@ -167,10 +151,6 @@ FHEMWEB_Read($)
   $__wname = $hash->{SNAME};
 
   my $ll = GetLogLevel($__wname,4);
-  $FHEMWEBdir = "$attr{global}{modpath}/FHEM";
-  $__ME = "/" . FHEMWEB_getAttr("webname", "fhem");
-  $FHEMWEB_reldoc = "$__ME/commandref.html";
-  $__SF = "<form method=\"get\" action=\"$__ME\">";
 
   # Data from HTTP Client
   my $buf;
@@ -193,14 +173,7 @@ FHEMWEB_Read($)
   $hash->{BUF} = "";
 
   Log($ll, "HTTP $hash->{NAME} GET $arg");
-  $__plotmode = FHEMWEB_getAttr("plotmode", "SVG");
-  $__plotsize = FHEMWEB_getAttr("plotsize", "800,200");
-  if($__plotmode eq "SVG" && !$modules{SVG}{LOADED}) {
-    my $ret = CommandReload(undef, "98_SVG");
-    Log 0, $ret if($ret);
-  }
-
-  my $cacheable = FHEMWEB_AnswerCall($arg);
+  my $cacheable = FW_AnswerCall($arg);
 
   my $c = $hash->{CD};
   my $l = length($__RET);
@@ -213,37 +186,33 @@ FHEMWEB_Read($)
            $__RET;
 }
 
-
+###########################
 sub
-FHEMWEB_AnswerCall($)
+FW_AnswerCall($)
 {
   my ($arg) = @_;
 
-  %__pos = ();
-  $__room = "";
-  $__detail = "";
-  $__cmdret = "";
   $__RET = "";
   $__RETTYPE = "text/html; charset=ISO-8859-1";
-  $__ti = 1;
+  $__ME = "/" . FW_getAttr($__wname, "webname", "fhem");
 
   # Lets go:
   if($arg =~ m,^${__ME}/(.*html)$, || $arg =~ m,^${__ME}/(example.*)$,) {
     my $f = $1;
     $f =~ s,/,,g;    # little bit of security
-    open(FH, "$FHEMWEBdir/$f") || return;
+    open(FH, "$__dir/$f") || return;
     pO join("", <FH>);
     close(FH);
     $__RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
     return 1;
   } elsif($arg =~ m,^$__ME/(.*).css,) {
-    open(FH, "$FHEMWEBdir/$1.css") || return;
+    open(FH, "$__dir/$1.css") || return;
     pO join("", <FH>);
     close(FH);
     $__RETTYPE = "text/css";
     return 1;
   } elsif($arg =~ m,^$__ME/icons/(.*)$,) {
-    open(FH, "$FHEMWEBdir/$1") || return;
+    open(FH, "$__dir/$1") || return;
     pO join("", <FH>);
     close(FH);
     $__RETTYPE = "image/*";
@@ -253,43 +222,48 @@ FHEMWEB_AnswerCall($)
     return 0;
   }
 
-  my $cmd = FHEMWEB_digestCgi($1);
+  my $cmd = FW_digestCgi($1);
   my $docmd = 0;
   $docmd = 1 if($cmd && 
                 $cmd !~ /^showlog/ &&
+                $cmd !~ /^logwrapper/ &&
                 $cmd !~ /^toweblink/ &&
                 $cmd !~ /^showarchive/ &&
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
+  $__plotmode = FW_getAttr($__wname, "plotmode", "SVG");
+  $__plotsize = FW_getAttr($__wname, "plotsize", "800,200");
+  $__reldoc = "$__ME/commandref.html";
 
-  $__cmdret = fC($cmd) if($docmd);
-  FHEMWEB_parseXmlList($docmd);
+  $__cmdret = $docmd ? fC($cmd) : "";
+  FW_updateHashes();
   if($cmd =~ m/^showlog /) {
-    FHEMWEB_showLog($cmd);
+    FW_showLog($cmd);
     return 0;
   }
 
   if($cmd =~ m/^toweblink (.*)$/) {
     my @aa = split(":", $1);
     my $max = 0;
-    for my $d (keys %__devs) {
+    for my $d (keys %defs) {
       $max = ($1+1) if($d =~ m/^wl_(\d+)$/ && $1 >= $max);
     }
-    $__devs{$aa[0]}{INT}{currentlogfile}{VAL} =~ m,([^/]*)$,;
+    $defs{$aa[0]}{currentlogfile} =~ m,([^/]*)$,;
     $aa[2] = "CURRENT" if($1 eq $aa[2]);
     $__cmdret = fC("define wl_$max weblink fileplot $aa[0]:$aa[1]:$aa[2]");
     if(!$__cmdret) {
       $__detail = "wl_$max";
-      FHEMWEB_parseXmlList(1);
+      FW_updateHashes();
     }
   }
 
-  pO "<html>\n<head>\n<title>$__title</title>\n";
-  my $rf = FHEMWEB_getAttr("refresh", "");
+  my $t = FW_getAttr("global", "title", "Home, Sweet Home");
+  pO "<html>\n<head>\n<title>$t</title>\n";
+  my $rf = FW_getAttr($__wname, "refresh", "");
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">\n" if($rf);
   pO "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>\n";
-  pO "</head>\n<body name=\"$__title\">\n";
+  pO "</head>\n<body name=\"$t\">\n";
 
   if($__cmdret) {
     $__detail = "";
@@ -301,12 +275,12 @@ FHEMWEB_AnswerCall($)
     pO "</div>\n";
   }
 
-  FHEMWEB_roomOverview($cmd);
-  FHEMWEB_style($cmd,undef)    if($cmd =~ m/^style /);
-  FHEMWEB_doDetail($__detail)  if($__detail);
-  FHEMWEB_showRoom()           if($__room && !$__detail);
-  FHEMWEB_showLogWrapper($cmd) if($cmd =~ /^showlogwrapper/);
-  FHEMWEB_showArchive($cmd)    if($cmd =~ m/^showarchive/);
+  FW_roomOverview($cmd);
+  FW_style($cmd,undef)    if($cmd =~ m/^style /);
+  FW_doDetail($__detail)  if($__detail);
+  FW_showRoom()           if($__room && !$__detail);
+  FW_logWrapper($cmd)     if($cmd =~ /^logwrapper/);
+  FW_showArchive($cmd)    if($cmd =~ m/^showarchive/);
   pO "</body></html>";
   return 0;
 }
@@ -315,11 +289,15 @@ FHEMWEB_AnswerCall($)
 ###########################
 # Digest CGI parameters
 sub
-FHEMWEB_digestCgi($)
+FW_digestCgi($)
 {
   my ($arg) = @_;
   my (%arg, %val, %dev);
   my ($cmd, $c) = ("","","");
+
+  $__detail = "";
+  %__pos = ();
+  $__room = "";
 
   $arg =~ s/^\?//;
   foreach my $pv (split("&", $arg)) {
@@ -349,97 +327,37 @@ FHEMWEB_digestCgi($)
 }
 
 #####################
-# Get the data and parse it. We are parsing XML in a non-scientific way :-)
 sub
-FHEMWEB_parseXmlList($)
+FW_updateHashes()
 {
-  my $docmd = shift;
-  my $name;
-
-  if(!$docmd && $__lastxmllist && (time() - $__lastxmllist) < 2) {
-    $__room = $__devs{$__detail}{ATTR}{room}{VAL} if($__detail);
-    return;
-  }
-
-  $__lastxmllist = time();
-  %__rooms = ();
-  %__devs = ();
-  %__types = ();
-  $__title = "";
-
-  foreach my $l (split("\n", fC("xmllist"))) {
-
-    ####### Device
-    if($l =~ m/^\t\t<(.*) name="(.*)" state="(.*)" sets="(.*)" attrs="(.*)">/){
-      $name = $2;
-      $__devs{$name}{type}  = ($1 eq "HMS" ? "KS300" : $1);
-      $__devs{$name}{state} = $3;
-      $__devs{$name}{sets}  = $4;
-      $__devs{$name}{attrs} = $5;
-      next;
-    }
-    ####### INT, ATTR & STATE
-    if($l =~ m,^\t\t\t<(.*) key="(.*)" value="([^"]*)"(.*)/>,) {
-      my ($t, $n, $v, $m) = ($1, $2, $3, $4);
-      $v =~ s,&lt;br&gt;,<br/>,g;
-      $__devs{$name}{$t}{$n}{VAL} = $v;
-      if($m) {
-        $m =~ m/measured="(.*)"/;
-        $__devs{$name}{$t}{$n}{TIM} = $1;
-      }
-
-      if($t eq "ATTR" && $n eq "room") {
-        $__rooms{$v}{$name} = 1;
-	if($name eq "global") {
-	  $__rooms{$v}{LogFile} = 1;
-	  $__devs{LogFile}{ATTR}{room}{VAL} = $v;
-	}
-      }
-
-      if($name eq "global" && $n eq "logfile") {
-	my $ln = "LogFile";
-	$__devs{$ln}{type}  = "FileLog";
-        $__devs{$ln}{INT}{logfile}{VAL} = $v;
-        $__devs{$ln}{state} = "active";
-      }
-    }
-
-  }
-  if(defined($__devs{global}{ATTR}{archivedir})) {
-    $__devs{LogFile}{ATTR}{archivedir}{VAL} = 
-     $__devs{global}{ATTR}{archivedir}{VAL};
-  }
-
   #################
-  #Tag the gadgets without room with "Unsorted"
-  if(%__rooms) {
-    foreach my $name (keys %__devs ) {
-      if(!$__devs{$name}{ATTR}{room}) {
-        $__devs{$name}{ATTR}{room}{VAL} = "Unsorted";
-        $__rooms{Unsorted}{$name} = 1;
-      }
-    }
+  # Make a room  hash
+  %__rooms = ();
+  foreach my $d (keys %defs ) {
+    my $r = FW_getAttr($d, "room", "Unsorted");
+    $__rooms{$r}{$d} = 1;
   }
 
   ###############
   # Needed for type sorting
-  foreach my $d (sort keys %__devs ) {
-    $__types{$__devs{$d}{type}} = 1;
+  %__types = ();
+  foreach my $d (sort keys %defs ) {
+    $__types{$defs{$d}{TYPE}}{$d} = 1;
   }
-  $__title = $__devs{global}{ATTR}{title}{VAL} ? 
-               $__devs{global}{ATTR}{title}{VAL} : "First page";
-  $__room = $__devs{$__detail}{ATTR}{room}{VAL} if($__detail);
+
+  $__room = FW_getAttr($__detail, "room", "Unsorted") if($__detail);
 }
 
 ##############################
 sub
-FHEMWEB_makeTable($$$$$$$$)
+FW_makeTable($$$$$$$$)
 {
   my($d,$t,$header,$hash,$clist,$ccmd,$makelink,$cmd) = (@_);
 
   return if(!$hash && !$clist);
 
-  $t = "EM" if($t =~ m/^EM.*$/);        # EMWZ,EMEM,etc.
+  $t = "EM"    if($t =~ m/^EM.*$/);        # EMWZ,EMEM,etc.
+  $t = "KS300" if($t eq "HMS");
   pO "  <table class=\"$t\">\n";
 
   # Header
@@ -451,30 +369,36 @@ FHEMWEB_makeTable($$$$$$$$)
   if($clist) {
     pO "<tr>\n";
     my @al = map { s/[:;].*//;$_ } split(" ", $clist);
-    pO "<td>" . FHEMWEB_select("arg.$ccmd$d",\@al,undef) . "</td>";
-    pO "<td>" . FHEMWEB_textfield("val.$ccmd$d", 6)    . "</td>";
-    pO "<td>" . FHEMWEB_submit("cmd.$ccmd$d", $ccmd)    . "</td>";
-    pO FHEMWEB_hidden("dev.$ccmd$d", $d);
+    pO "<td>" . FW_select("arg.$ccmd$d",\@al,undef) . "</td>";
+    pO "<td>" . FW_textfield("val.$ccmd$d", 6)    . "</td>";
+    pO "<td>" . FW_submit("cmd.$ccmd$d", $ccmd)    . "</td>";
+    pO FW_hidden("dev.$ccmd$d", $d);
     pO "</tr>\n";
   }
 
   my $row = 1;
   foreach my $v (sort keys %{$hash}) {
+    my $r = ref($hash->{$v});
+    next if($r && ($r ne "HASH" || !$hash->{$v}{VAL}));
     pF "    <tr class=\"%s\">", $row?"odd":"even";
     $row = ($row+1)%2;
-    if($makelink && $FHEMWEB_reldoc) {
-      pO "<td><a href=\"$FHEMWEB_reldoc#$v\">$v</a></td>";
+    if($makelink && $__reldoc) {
+      pO "<td><a href=\"$__reldoc#$v\">$v</a></td>";
     } else {
       pO "<td>$v</td>";
     }
 
-    if($v eq "DEF") {
-      FHEMWEB_makeEdit($d, $t, "modify", $hash->{$v}{VAL});
+    if(ref($hash->{$v})) {
+        pO "<td id=\"show\">$hash->{$v}{VAL}</td>";
+        pO "<td>$hash->{$v}{TIME}</td>" if($hash->{$v}{TIME});
     } else {
-      pO "<td id=\"show\">$hash->{$v}{VAL}</td>";
+      if($v eq "DEF") {
+        FW_makeEdit($d, $t, "modify", $hash->{$v});
+      } else {
+        pO "<td id=\"show\">$hash->{$v}</td>";
+      }
     }
 
-    pO "<td>$hash->{$v}{TIM}</td>" if($hash->{$v}{TIM});
     pO "<td><a href=\"$__ME?cmd.$d=$cmd $d $v&amp;detail=$d\">$cmd</a></td>"
         if($cmd);
 
@@ -487,34 +411,34 @@ FHEMWEB_makeTable($$$$$$$$)
 
 ##############################
 sub
-FHEMWEB_showArchive($)
+FW_showArchive($)
 {
   my ($arg) = @_;
   my (undef, $d) = split(" ", $arg);
 
-  my $fn = $__devs{$d}{INT}{logfile}{VAL};
+  my $fn = $defs{$d}{logfile};
   if($fn =~ m,^(.+)/([^/]+)$,) {
     $fn = $2;
   }
-  $fn = $__devs{$d}{ATTR}{archivedir}{VAL} . "/" . $fn;
-  my $t = $__devs{$d}{type};
+  $fn = FW_getAttr($d, "archivedir", "") . "/" . $fn;
+  my $t = $defs{$d}{TYPE};
 
   pO "<div id=\"right\">\n";
   pO "<table><tr><td>\n";
   pO "<table class=\"$t\"><tr><td>\n";
 
   my $row =  0;
-  my $l = $__devs{$d}{ATTR}{logtype};
-  foreach my $f (FHEMWEB_fileList($fn)) {
+  my $l = FW_getAttr($d, "logtype", undef);
+  foreach my $f (FW_fileList($fn)) {
     pF "    <tr class=\"%s\"><td>$f</td>", $row?"odd":"even";
     $row = ($row+1)%2;
     if(!defined($l)) {
-      pO "<td><a href=\"$__ME?cmd=showlogwrapper $d text $f\">text</a></td>";
+      pO "<td><a href=\"$__ME?cmd=logwrapper $d text $f\">text</a></td>";
     } else {
-      foreach my $ln (split(",", $l->{VAL})) {
+      foreach my $ln (split(",", $l)) {
 	my ($lt, $name) = split(":", $ln);
 	$name = $lt if(!$name);
-	pO "<td><a href=\"$__ME?cmd=showlogwrapper $d $lt $f\">$name</a></td>";
+	pO "<td><a href=\"$__ME?cmd=logwrapper $d $lt $f\">$name</a></td>";
       }
     }
     pO "</tr>";
@@ -528,69 +452,70 @@ FHEMWEB_showArchive($)
 
 ##############################
 sub
-FHEMWEB_doDetail($)
+FW_doDetail($)
 {
   my ($d) = @_;
 
-  pO $__SF;
-  pO FHEMWEB_hidden("detail", $d);
+  pO "<form method=\"get\" action=\"$__ME\">";
+  pO FW_hidden("detail", $d);
 
-  $__room = $__devs{$d}{ATTR}{room}{VAL}
-                if($__devs{$d}{ATTR}{room});
-
-  my $t = $__devs{$d}{type};
+  $__room = FW_getAttr($d, "room", undef);
+  my $t = $defs{$d}{TYPE};
 
   pO "<div id=\"right\">\n";
   pO "<table><tr><td>\n";
   pO "<a href=\"$__ME?cmd=delete $d\">Delete $d</a>\n";
 
   my $pgm = "Javascript:" .
-               "s=document.getElementById('edit').style;".
-               "if(s.display=='none') s.display='block'; else s.display='none';".
-               "s=document.getElementById('disp').style;".
-               "if(s.display=='none') s.display='block'; else s.display='none';";
+             "s=document.getElementById('edit').style;".
+             "if(s.display=='none') s.display='block'; else s.display='none';".
+             "s=document.getElementById('disp').style;".
+             "if(s.display=='none') s.display='block'; else s.display='none';";
   pO "<a href=\"#top\" onClick=\"$pgm\">Modify $d</a>";
 
   pO "</td></tr><tr><td>\n";
-  FHEMWEB_makeTable($d, $t,
-        "<a href=\"$FHEMWEB_reldoc#${t}set\">State</a>,Value,Measured",
-        $__devs{$d}{STATE}, $__devs{$d}{sets}, "set", 0, undef);
-  FHEMWEB_makeTable($d, $t, "Internal,Value",
-        $__devs{$d}{INT}, "", undef, 0, undef);
-  FHEMWEB_makeTable($d, $t,
-        "<a href=\"$FHEMWEB_reldoc#attr\">Attribute</a>,Value,Action",
-        $__devs{$d}{ATTR}, $__devs{$d}{attrs}, "attr", 1,
+  FW_makeTable($d, $t,
+        "<a href=\"$__reldoc#${t}set\">State</a>,Value,Measured",
+        $defs{$d}{READINGS}, getAllSets($d), "set", 0, undef);
+  FW_makeTable($d, $t, "Internal,Value",
+        $defs{$d}, "", undef, 0, undef);
+  FW_makeTable($d, $t,
+        "<a href=\"$__reldoc#attr\">Attribute</a>,Value,Action",
+        $attr{$d}, getAllAttr($d), "attr", 1,
         $d eq "global" ? "" : "deleteattr");
   pO "</td></tr></table>\n";
-  pO "</div>\n";
 
+  FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}) if($t eq "weblink");
+
+  pO "</div>\n";
   pO "</form>\n";
+
 }
 
 ##############
 # Room overview
 sub
-FHEMWEB_roomOverview($)
+FW_roomOverview($)
 {
   my ($cmd) = @_;
-  pO $__SF;
+  pO "<form method=\"get\" action=\"$__ME\">";
 
   pO "<div id=\"hdr\">\n";
   pO "<table><tr><td>";
-  pO "<a href=\"$FHEMWEB_reldoc\">Fhem cmd</a>: ";
-  pO FHEMWEB_textfield("cmd", 30);
-  $__scrolledweblinkcount = 0;
+  pO "<a href=\"$__reldoc\">Fhem cmd</a>: ";
+  pO FW_textfield("cmd", 30);
   if($__room) {
-    pO FHEMWEB_hidden("room", "$__room");
-    if(!$__detail) {    # Global navigation buttons for weblink >= 2
-      FHEMWEB_calcWeblink(undef,undef);
-      if($__scrolledweblinkcount) {
+    pO FW_hidden("room", "$__room");
+
+    # plots navigation buttons
+    if(!$__detail || $defs{$__detail}{TYPE} eq "weblink") {
+      if(FW_calcWeblink(undef,undef)) {
         pO "</td><td>";
         pO "&nbsp;&nbsp;";
-        FHEMWEB_zoomLink("zoom=-1", "Zoom-in.png", "zoom in", 0);
-        FHEMWEB_zoomLink("zoom=1",  "Zoom-out.png","zoom out", 0);
-        FHEMWEB_zoomLink("off=-1",  "Prev.png",    "prev", 0);
-        FHEMWEB_zoomLink("off=1",   "Next.png",    "next", 0);
+        FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
+        FW_zoomLink("zoom=1",  "Zoom-out.png","zoom out");
+        FW_zoomLink("off=-1",  "Prev.png",    "prev");
+        FW_zoomLink("off=1",   "Next.png",    "next");
       }
     }
   }
@@ -627,53 +552,40 @@ FHEMWEB_roomOverview($)
   pO "</form>\n";
 }
 
-#################
-# Read in the icons
-sub
-FHEMWEB_checkDirs()
-{
-  return if($__iconsread && (time() - $__iconsread) < 5);
-  %__icons = ();
-  if(opendir(DH, $FHEMWEBdir)) {
-    while(my $l = readdir(DH)) {
-      next if($l =~ m/^\./);
-      my $x = $l;
-      $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
-      $__icons{$x} = $l;
-    }
-    closedir(DH);
-  }
-  $__iconsread = time();
-}
 
 ########################
 # Generate the html output: i.e present the data
 sub
-FHEMWEB_showRoom()
+FW_showRoom()
 {
-  FHEMWEB_checkDirs();
+  # (re-) list the icons
+  if(!$__iconsread || (time() - $__iconsread) > 5) {
+    %__icons = ();
+    if(opendir(DH, $__dir)) {
+      while(my $l = readdir(DH)) {
+        next if($l =~ m/^\./);
+        my $x = $l;
+        $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
+        $__icons{$x} = $l;
+      }
+      closedir(DH);
+    }
+    $__iconsread = time();
+  }
 
-  pO $__SF;
+  pO "<form method=\"get\" action=\"$__ME\">";
   pO "<div id=\"right\">\n";
   pO "  <table><tr><td>\n";  # Need for equal width of subtables
 
   foreach my $type (sort keys %__types) {
     
     #################
-    # Filter the devices in the room
+    # Check if there is a device of this type in the room
     if($__room && $__room ne "all") {
-      my $havedev;
-      foreach my $d (sort keys %__devs ) {
-        next if($__devs{$d}{type} ne $type);
-        next if(!$__rooms{$__room}{$d});
-        $havedev = 1;
-        last;
-      }
-      next if(!$havedev);
+       next if(!grep { $__rooms{$__room}{$_} } keys %{$__types{$type}} );
     }
 
     my $rf = ($__room ? "&amp;room=$__room" : "");
-
 
     ############################
     # Print the table headers
@@ -681,55 +593,47 @@ FHEMWEB_showRoom()
     $t = "EM" if($t =~ m/^EM.*$/);
     pO "  <table class=\"$t\" summary=\"List of $type devices\">\n";
 
+    my $h;
     if($type eq "FS20") {
-      pO "    <tr><th>FS20 dev.</th><th>State</th>";
-      pO "<th colspan=\"2\">Set to</th>";
-      pO "</tr>\n";
+      $h = "FS20 dev.</th><th>State</th><th colspan=\"2\">Set to";
+    } elsif($type eq "FHT") {
+      $h = "FHT dev.</th><th>Measured</th><th>Set to";
+    } elsif($type eq "at")         { $h = "Scheduled commands (at)";
+    } elsif($type eq "FileLog")    { $h = "Logs";
+    } elsif($type eq "_internal_") { $h = "Global variables";
+    } elsif($type eq "weblink")    { $h = "";
+    } else {
+      $h = $type;
     }
-    if($type eq "FHT") {
-      pO "    <tr><th>FHT dev.</th><th>Measured</th>";
-      pO "<th>Set to</th>";
-      pO "</tr>\n";
-    }
-
-    my $hstart = "    <tr><th>";
-    my $hend   = "</th></tr>\n";
-    pO $hstart . "Logs" . $hend                       if($type eq "FileLog");
-    pO $hstart . "HMS/KS300</th><th>Readings" . $hend if($type eq "KS300");
-    pO $hstart . "Scheduled commands (at)" . $hend    if($type eq "at");
-    pO $hstart . "Triggers (notify)" . $hend          if($type eq "notify");
-    pO $hstart . "Global variables" . $hend        if($type eq "_internal_");
+    pO "    <tr><th>$h</th></tr>\n" if($h);
 
     my $row=1;
-    foreach my $d (sort keys %__devs ) {
+    foreach my $d (sort keys %{$__types{$type}} ) {
 
-      next if($__devs{$d}{type} ne $type);
       next if($__room && $__room ne "all" &&
              !$__rooms{$__room}{$d});
 
       pF "    <tr class=\"%s\">", $row?"odd":"even";
       $row = ($row+1)%2;
-
-      #####################
-      # Check if the icon exists
-
-      my $v = $__devs{$d}{state};
+      my $v = $defs{$d}{STATE};
 
       if($type eq "FS20") {
 
-        my $v = $__devs{$d}{state};
         my $iv = $v;
         my $iname = "";
 
-        if(defined($__devs{$d}) &&
-           defined($__devs{$d}{ATTR}{showtime})) {
-          $v = $__devs{$d}{STATE}{state}{TIM};
+        if(defined(FW_getAttr($d, "showtime", undef))) {
+
+          $v = $defs{$d}{READINGS}{state}{TIME};
+
         } elsif($iv) {
+
           $iv =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
           $iname = $__icons{"$type"}     if($__icons{"$type"});
           $iname = $__icons{"$type.$iv"} if($__icons{"$type.$iv"});
           $iname = $__icons{"$d"}        if($__icons{"$d"});
           $iname = $__icons{"$d.$iv"}    if($__icons{"$d.$iv"});
+
         }
         $v = "" if(!defined($v));
 
@@ -740,14 +644,14 @@ FHEMWEB_showRoom()
         } else {
           pO "<td align=\"center\">$v</td>";
         }
-        if($__devs{$d}{sets}) {
+        if(getAllSets($d)) {
           pO "<td><a href=\"$__ME?cmd.$d=set $d on$rf\">on</a></td>";
           pO "<td><a href=\"$__ME?cmd.$d=set $d off$rf\">off</a></td>";
         }
 
       } elsif($type eq "FHT") {
 
-        $v = $__devs{$d}{STATE}{"measured-temp"}{VAL};
+        $v = $defs{$d}{READINGS}{"measured-temp"}{VAL};
         $v = "" if(!defined($v));
 
         $v =~ s/ .*//;
@@ -755,75 +659,40 @@ FHEMWEB_showRoom()
         pO "<td align=\"center\">$v&deg;</td>";
 
         $v = sprintf("%2.1f", int(2*$v)/2) if($v =~ m/[0-9.-]/);
-        my @tv = map { ($_.".0", $_+0.5) } (16..26);
+        my @tv = map { ($_.".0", $_+0.5) } (10..29);
         $v = int($v*20)/$v if($v =~ m/^[0-9].$/);
-        pO FHEMWEB_hidden("arg.$d", "desired-temp");
-        pO FHEMWEB_hidden("dev.$d", $d);
+        pO FW_hidden("arg.$d", "desired-temp");
+        pO FW_hidden("dev.$d", $d);
         pO "<td>" .
-            FHEMWEB_select("val.$d",\@tv,$v) .
-            FHEMWEB_submit("cmd.$d", "set") . "</td>";
+            FW_select("val.$d",\@tv,$v) .
+            FW_submit("cmd.$d", "set") . "</td>";
 
       } elsif($type eq "FileLog") {
+
         pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>\n";
-        if($__devs{$d}{ATTR}{archivedir}) {
+        if(defined(FW_getAttr($d, "archivedir", undef))) {
           pO "<td><a href=\"$__ME?cmd=showarchive $d\">archive</a></td>";
         }
 
-        my $l = $__devs{$d}{ATTR}{logtype};
-        if(!defined($l)) {
-	  my %h = ("VAL" => "text");
-	  $l = \%h;
-	}
-	my @fl = FHEMWEB_fileList($__devs{$d}{INT}{logfile}{VAL});
-
-	foreach my $f (@fl) {
+	foreach my $f (FW_fileList($defs{$d}{logfile})) {
           pF "    </tr>";
 	  pF "    <tr class=\"%s\"><td>$f</td>", $row?"odd":"even";
 	  $row = ($row+1)%2;
-	  foreach my $ln (split(",", $l->{VAL})) {
+	  foreach my $ln (split(",", FW_getAttr($d, "logtype", "text"))) {
 	    my ($lt, $name) = split(":", $ln);
 	    $name = $lt if(!$name);
-	    pO "<td><a href=\"$__ME?cmd=showlogwrapper $d $lt $f\">$name</a></td>";
+	    pO "<td><a href=\"$__ME?cmd=logwrapper $d $lt $f\">$name</a></td>";
 	  }
 	}
 
       } elsif($type eq "weblink") {
 
-        $v = $__devs{$d}{INT}{LINK}{VAL};
-        $t = $__devs{$d}{INT}{WLTYPE}{VAL};
-        if($t eq "link") {
-          pO "<td><a href=\"$v\">$d</a></td>\n";
-        } elsif($t eq "fileplot") {
-          my @va = split(":", $v, 3);
-          if(@va != 3 || !$__devs{$va[0]}{INT}{currentlogfile}) {
-	    pO "<td>Broken definition: $v</a></td>";
-          } else {
-            if($va[2] eq "CURRENT") {
-              $__devs{$va[0]}{INT}{currentlogfile}{VAL} =~ m,([^/]*)$,;
-              $va[2] = $1;
-            }
-            pO "<table><tr><td>";
-
-            my $wl = "&amp;pos=" . join(";", map {"$_=$__pos{$_}"} keys %__pos);
-
-            my $arg="$__ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
-            if($__plotmode eq "SVG") {
-              my ($w, $h) = split(",", $__plotsize);
-              pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
-                    "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
-            } else {
-              pO "<img src=\"$arg\"/>\n";
-            }
-
-            pO "</td><td>";
-            pO "<a href=\"$__ME?detail=$d\">$d</a>";
-            pO "</td></tr></table>";
-
-          }
-        }
+        FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE});
 
       } else {
+
         pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>\n";
+
       }
       pO "  </tr>\n";
     }
@@ -836,9 +705,9 @@ FHEMWEB_showRoom()
 }
 
 #################
-# return a sorted list of actual files for a given FileLog type string
+# return a sorted list of actual files for a given regexp
 sub
-FHEMWEB_fileList($)
+FW_fileList($)
 {
   my ($fname) = @_;
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
@@ -859,18 +728,18 @@ FHEMWEB_fileList($)
 # Show the content of the log (plain text), or an image and offer a link
 # to convert it to a weblink
 sub
-FHEMWEB_showLogWrapper($)
+FW_logWrapper($)
 {
   my ($cmd) = @_;
   my (undef, $d, $type, $file) = split(" ", $cmd, 4);
 
   if($type eq "text") {
-    $__devs{$d}{INT}{logfile}{VAL} =~ m,^(.*)/([^/]*)$,; # Dir and File
+    $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
-    $path = $__devs{$d}{ATTR}{archivedir}{VAL} . "/$file" if(!-f $path);
+    $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
 
     if(!open(FH, $path)) {
-      pO "$path: $!"; 
+      pO "<div id=\"right\">$path: $!</div>\n";
       return;
     }
     my $cnt = join("", <FH>);
@@ -889,8 +758,8 @@ FHEMWEB_showLogWrapper($)
     pO "<table><tr><td>\n";
     pO "<td>";
     my $arg = "$__ME?cmd=showlog undef $d $type $file";
-    if($__plotmode eq "SVG") {
-      my ($w, $h) = split(",", $__plotsize);
+    if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
+      my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
       pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
     } else {
@@ -905,38 +774,43 @@ FHEMWEB_showLogWrapper($)
 }
 
 ######################
-# Generate an image from the log via gnuplot
+# Generate an image from the log via gnuplot or SVG
 sub
-FHEMWEB_showLog($)
+FW_showLog($)
 {
   my ($cmd) = @_;
   my (undef, $wl, $d, $type, $file) = split(" ", $cmd, 5);
 
-  my $gplot_pgm = "$FHEMWEBdir/$type.gplot";
-  return FHEMWEB_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
-  FHEMWEB_calcWeblink($d,$wl);
+  my $pm = FW_getAttr($wl,"plotmode",$__plotmode);
+  my $ps = FW_getAttr($wl,"plotsize",$__plotsize);
 
-  if($__plotmode =~ m/gnuplot/) {
-    if($__plotmode eq "gnuplot" || !$__devs{$d}{from}) {
+  my $gplot_pgm = "$__dir/$type.gplot";
+  return FW_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
+  FW_calcWeblink($d,$wl);
+
+  if($pm =~ m/gnuplot/) {
+
+    my $tmpfile = "/tmp/file.$$";
+    if($pm eq "gnuplot" || !$__devs{$d}{from}) {
 
       # Looking for the logfile....
 
-      $__devs{$d}{INT}{logfile}{VAL} =~ m,^(.*)/([^/]*)$,; # Dir and File
+      $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
       my $path = "$1/$file";
-      $path = $__devs{$d}{ATTR}{archivedir}{VAL} . "/$file" if(!-f $path);
-      return FHEMWEB_fatal("Cannot read $path") if(!-r $path);
+      $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
+      return FW_fatal("Cannot read $path") if(!-r $path);
 
-      open(FH, $gplot_pgm) || return FHEMWEB_fatal("$gplot_pgm: $!"); 
+      open(FH, $gplot_pgm) || return FW_fatal("$gplot_pgm: $!"); 
       my $gplot_script = join("", <FH>);
       close(FH);
 
-      $gplot_script =~ s/<OUT>/$FHEMWEB_tmpfile/g;
-      $gplot_script =~ s/<SIZE>/$__plotsize/g;
+      $gplot_script =~ s/<OUT>/$tmpfile/g;
+      $gplot_script =~ s/<SIZE>/$ps/g;
       $gplot_script =~ s/<IN>/$path/g;
       $gplot_script =~ s/<TL>/$file/g;
 
-      if($__devs{$wl} && $__devs{$wl}{ATTR}{fixedrange}) {
-        my $fr = $__devs{$wl}{ATTR}{fixedrange}{VAL};
+      my $fr = FW_getAttr($wl, "fixedrange", undef);
+      if($fr) {
         $fr =~ s/ /\":\"/;
         $fr = "set xrange [\"$fr\"]\n";
         $gplot_script =~ s/(set timefmt ".*")/$1\n$fr/;
@@ -946,13 +820,13 @@ FHEMWEB_showLog($)
       print FH $gplot_script;
       close(FH);
 
-    } elsif($__plotmode eq "gnuplot-scroll") {
+    } elsif($pm eq "gnuplot-scroll") {
 
       ############################
       # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
       # the plot directive with our own, as we offer a file for each line
       my (@filelog, @data, $plot);
-      open(FH, $gplot_pgm) || return FHEMWEB_fatal("$gplot_pgm: $!"); 
+      open(FH, $gplot_pgm) || return FW_fatal("$gplot_pgm: $!"); 
       while(my $l = <FH>) {
         if($l =~ m/^#FileLog (.*)$/) {
           push(@filelog, $1);
@@ -965,14 +839,18 @@ FHEMWEB_showLog($)
       close(FH);
 
       my $gplot_script = join("", @data);
-      $gplot_script =~ s/<OUT>/$FHEMWEB_tmpfile/g;
-      $gplot_script =~ s/<SIZE>/$__plotsize/g;
+      $gplot_script =~ s/<OUT>/$tmpfile/g;
+      $gplot_script =~ s/<SIZE>/$ps/g;
       $gplot_script =~ s/<TL>/$file/g;
 
       my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
 
-      my @path = split(" ", fC("get $d $file $FHEMWEB_tmpfile $f $t " .
+      my $oll = $attr{global}{verbose};
+      $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
+      my @path = split(" ", fC("get $d $file $tmpfile $f $t " .
                                   join(" ", @filelog)));
+      $attr{global}{verbose} = $oll;
+
       my $i = 0;
       $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
       my $xrange = "set xrange [\"$f\":\"$t\"]\n";
@@ -991,15 +869,15 @@ FHEMWEB_showLog($)
       }
     }
     $__RETTYPE = "image/png";
-    open(FH, "$FHEMWEB_tmpfile.png");         # read in the result and send it
+    open(FH, "$tmpfile.png");         # read in the result and send it
     pO join("", <FH>);
     close(FH);
-    unlink("$FHEMWEB_tmpfile.png");
+    unlink("$tmpfile.png");
 
-  } elsif($__plotmode eq "SVG") {
+  } elsif($pm eq "SVG") {
 
     my (@filelog, @data, $plot);
-    open(FH, $gplot_pgm) || return FHEMWEB_fatal("$gplot_pgm: $!"); 
+    open(FH, $gplot_pgm) || return FW_fatal("$gplot_pgm: $!"); 
     while(my $l = <FH>) {
       if($l =~ m/^#FileLog (.*)$/) {
         push(@filelog, $1);
@@ -1014,20 +892,23 @@ FHEMWEB_showLog($)
     $f = 0 if(!$f);     # From the beginning of time...
     $t = 9 if(!$t);     # till the end
 
-    my $ret = fC("get $d $file INT $f $t " . join(" ", @filelog));
-    SVG_render($file, $__plotsize, $f, $t, \@data, $internal_data, $plot);
+    my $ret;
+    if(!$modules{SVG}{LOADED}) {
+      $ret = CommandReload(undef, "98_SVG");
+      Log 0, $ret if($ret);
+    }
+
+    $ret = fC("get $d $file INT $f $t " . join(" ", @filelog));
+    SVG_render($file, $ps, $f, $t, \@data, $internal_data, $plot);
     $__RETTYPE = "image/svg+xml";
 
   }
 
-
 }
-
-
 
 ##################
 sub
-FHEMWEB_fatal($)
+FW_fatal($)
 {
   my ($msg) = @_;
   pO "<html><body>$msg</body></html>";
@@ -1035,7 +916,7 @@ FHEMWEB_fatal($)
 
 ##################
 sub
-FHEMWEB_hidden($$)
+FW_hidden($$)
 {
   my ($n, $v) = @_;
   return "<input type=\"hidden\" name=\"$n\" value=\"$v\"/>";
@@ -1044,11 +925,10 @@ FHEMWEB_hidden($$)
 ##################
 # Generate a select field with option list
 sub
-FHEMWEB_select($$$)
+FW_select($$$)
 {
   my ($n, $va, $def) = @_;
-  my $s = "<select name=\"$n\" tabindex=\"$__ti\">";
-  $__ti++;
+  my $s = "<select name=\"$n\">";
 
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
@@ -1063,18 +943,17 @@ FHEMWEB_select($$$)
 
 ##################
 sub
-FHEMWEB_textfield($$)
+FW_textfield($$)
 {
   my ($n, $z) = @_;
-  my $s = "<input type=\"text\" name=\"$n\" tabindex=\"$__ti\" size=\"$z\"/>";
-  $__ti++;
+  my $s = "<input type=\"text\" name=\"$n\" size=\"$z\"/>";
   return $s;
 }
 
 ##################
 # Multiline (for some types of widgets) editor with submit 
 sub
-FHEMWEB_makeEdit($$$$)
+FW_makeEdit($$$$)
 {
   my ($name, $type, $cmd, $val) = @_;
 
@@ -1084,14 +963,13 @@ FHEMWEB_makeEdit($$$$)
   $eval =~ s,<br/>,\n,g;
 
   if($type eq "at" || $type eq "notify") {
-    pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\" ".
-            "tabindex=\"$__ti\">$eval</textarea>";
+    pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\">".
+            "$eval</textarea>";
   } else {
     pO     "<input type=\"text\" name=\"val.${cmd}$name\" size=\"40\" ".
-            "tabindex=\"$__ti\" value=\"$eval\"/>";
+           "value=\"$eval\"/>";
   }
-  $__ti++;
-  pO     "<br/>" . FHEMWEB_submit("cmd.${cmd}$name", "$cmd $name");
+  pO     "<br/>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
   pO   "</form></div>";
   $eval = "<pre>$eval</pre>" if($eval =~ m/\n/);
   pO   "<div id=\"disp\">$eval</div>";
@@ -1100,30 +978,25 @@ FHEMWEB_makeEdit($$$$)
 
 ##################
 sub
-FHEMWEB_submit($$)
+FW_submit($$)
 {
   my ($n, $v) = @_;
-  my $s ="<input type=\"submit\" tabindex=\"$__ti\" name=\"$n\" value=\"$v\"/>";
-  $__ti++;
+  my $s ="<input type=\"submit\" name=\"$n\" value=\"$v\"/>";
   return $s;
 }
 
 ##################
 # Generate the zoom and scroll images with links if appropriate
 sub
-FHEMWEB_zoomLink($$$$)
+FW_zoomLink($$$)
 {
-  my ($cmd, $img, $alt, $br) = @_;
+  my ($cmd, $img, $alt) = @_;
 
   my ($d,$off) = split("=", $cmd, 2);
 
-  return if($__plotmode eq "gnuplot");                    # No scrolling
-  return if($__devs{$d} && $__devs{$d}{ATTR}{fixedrange});
-  return if($__devs{$d} && $__devs{$d}{ATTR}{noscroll});
-
   my $val = $__pos{$d};
+  $cmd = ($__detail ? "detail=$__detail":"room=$__room") . "&amp;pos=";
 
-  $cmd = "room=$__room&amp;pos=";
   if($d eq "zoom") {
 
     $val = "day" if(!$val);
@@ -1162,40 +1035,38 @@ FHEMWEB_zoomLink($$$$)
   pO "<a href=\"$__ME?$cmd\">";
   pO "<img style=\"border-color:transparent\" alt=\"$alt\" ".
                 "src=\"$__ME/icons/$img\"/></a>";
-  pO "<br/>" if($br);
 }
 
 ##################
 # Calculate either the number of scrollable weblinks (for $d = undef) or
 # for the device the valid from and to dates for the given zoom and offset
 sub
-FHEMWEB_calcWeblink($$)
+FW_calcWeblink($$)
 {
   my ($d,$wl) = @_;
 
-  return if($__plotmode eq "gnuplot");
-  my $now = time();
-
-  my $zoom = $__pos{zoom};
-  $zoom = "day" if(!$zoom);
+  my $pm = FW_getAttr($d,"plotmode",$__plotmode);
+  return if($pm eq "gnuplot");
 
   if(!$d) {
-    foreach my $d (sort keys %__devs ) {
-      next if($__devs{$d}{type} ne "weblink");
+    my $cnt = 0;
+    foreach my $d (sort keys %defs ) {
+      next if($defs{$d}{TYPE} ne "weblink");
+      next if($defs{$d}{WLTYPE} ne "fileplot");
       next if(!$__room || ($__room ne "all" && !$__rooms{$__room}{$d}));
-      next if($__devs{$d}{ATTR} && $__devs{$d}{ATTR}{noscroll});
-      next if($__devs{$d}{ATTR} && $__devs{$d}{ATTR}{fixedrange});
-      $__scrolledweblinkcount++;
+
+      next if(FW_getAttr($d, "fixedrange", undef));
+      next if($pm eq "gnuplot");
+      $cnt++;
     }
-    return;
+    return $cnt;
   }
 
+  return if(!$defs{$wl});
 
-  return if(!$__devs{$wl});
-  return if($__devs{$wl} && $__devs{$wl}{ATTR}{noscroll});
-
-  if($__devs{$wl} && $__devs{$wl}{ATTR}{fixedrange}) {
-    my @range = split(" ", $__devs{$wl}{ATTR}{fixedrange}{VAL});
+  my $fr = FW_getAttr($wl, "fixedrange", undef);
+  if($fr) {
+    my @range = split(" ", $fr);
     $__devs{$d}{from} = $range[0];
     $__devs{$d}{to}   = $range[1];
     return;
@@ -1204,6 +1075,10 @@ FHEMWEB_calcWeblink($$)
   my $off = $__pos{$d};
   $off = 0 if(!$off);
   $off += $__pos{off} if($__pos{off});
+
+  my $now = time();
+  my $zoom = $__pos{zoom};
+  $zoom = "day" if(!$zoom);
 
   if($zoom eq "qday") {
 
@@ -1260,7 +1135,7 @@ FHEMWEB_calcWeblink($$)
 ##################
 # List/Edit/Save css and gnuplot files
 sub
-FHEMWEB_style($$)
+FW_style($$)
 {
   my ($cmd, $msg) = @_;
   my @a = split(" ", $cmd);
@@ -1270,11 +1145,11 @@ FHEMWEB_style($$)
     my @fl;
     push(@fl, "fhem.cfg");
     push(@fl, "<br>");
-    push(@fl, FHEMWEB_fileList("$FHEMWEBdir/.*.css"));
+    push(@fl, FW_fileList("$__dir/.*.css"));
     push(@fl, "<br>");
-    push(@fl, FHEMWEB_fileList("$FHEMWEBdir/.*.gplot"));
+    push(@fl, FW_fileList("$__dir/.*.gplot"));
     push(@fl, "<br>");
-    push(@fl, FHEMWEB_fileList("$FHEMWEBdir/.*html"));
+    push(@fl, FW_fileList("$__dir/.*html"));
 
     pO "<div id=\"right\">\n";
     pO "  <table><tr><td>\n";
@@ -1292,7 +1167,7 @@ FHEMWEB_style($$)
 
   } elsif($a[1] eq "examples") {
 
-    my @fl = FHEMWEB_fileList("$FHEMWEBdir/example.*");
+    my @fl = FW_fileList("$__dir/example.*");
     pO "<div id=\"right\">\n";
     pO "  <table><tr><td>\n";
     pO "  $msg<br/><br/>\n" if($msg);
@@ -1311,7 +1186,7 @@ FHEMWEB_style($$)
 
     $a[2] =~ s,/,,g;    # little bit of security
     my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$FHEMWEBdir/$a[2]");
+                                   "$__dir/$a[2]");
     if(!open(FH, $f)) {
       pO "$f: $!";
       return;
@@ -1321,8 +1196,8 @@ FHEMWEB_style($$)
 
     pO "<div id=\"right\">\n";
     pO "  <form>";
-    pO     FHEMWEB_submit("save", "Save $f") . "<br/><br/>";
-    pO     FHEMWEB_hidden("cmd", "style save $a[2]");
+    pO     FW_submit("save", "Save $f") . "<br/><br/>";
+    pO     FW_hidden("cmd", "style save $a[2]");
     pO     "<textarea name=\"data\" cols=\"80\" rows=\"30\">" .
                 "$data</textarea>";
     pO   "</form>";
@@ -1332,19 +1207,27 @@ FHEMWEB_style($$)
 
     $a[2] =~ s,/,,g;    # little bit of security
     my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$FHEMWEBdir/$a[2]");
+                                   "$__dir/$a[2]");
     if(!open(FH, ">$f")) {
       pO "$f: $!";
       return;
     }
     print FH $__data;
     close(FH);
-    FHEMWEB_style("style list", "Saved file $f");
+    FW_style("style list", "Saved file $f");
     $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} : $a[2]);
 
     fC("rereadcfg") if($a[2] eq "fhem.cfg");
   }
 
+}
+
+##################
+# print (append) to output
+sub
+pO(@)
+{
+  $__RET .= shift;
 }
 
 ##################
@@ -1357,35 +1240,61 @@ pF($@)
 }
 
 ##################
-# print output
-sub
-pO(@)
-{
-  $__RET .= shift;
-}
-
-##################
 # fhem command
 sub
 fC($)
 {
   my ($cmd) = @_;
   #Log 0, "Calling $cmd";
-  my $oll = $attr{global}{verbose};
-  $attr{global}{verbose} = 0 if($cmd ne "save");
   my $ret = AnalyzeCommand(undef, $cmd);
-  $attr{global}{verbose} = $oll if($cmd !~ m/attr.*global.*verbose/);
   return $ret;
 }
 
+##################
 sub
-FHEMWEB_getAttr($$)
+FW_getAttr($$$)
 {
-  my ($aname, $def) = @_;
-  return $attr{$__wname}{$aname}
-        if($attr{$__wname} && defined($attr{$__wname}{$aname}));
+  my ($d, $aname, $def) = @_;
+  return $attr{$d}{$aname} if($d && $attr{$d} && defined($attr{$d}{$aname}));
   return $def;
 }
 
+##################
+sub
+FW_showWeblink($$$)
+{
+  my ($d, $v, $t) = @_;
+
+  if($t eq "link") {
+    pO "<td><a href=\"$v\">$d</a></td>\n";
+  } elsif($t eq "fileplot") {
+    my @va = split(":", $v, 3);
+    if(@va != 3 || !$defs{$va[0]}{currentlogfile}) {
+      pO "<td>Broken definition: $v</a></td>";
+    } else {
+      if($va[2] eq "CURRENT") {
+        $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
+        $va[2] = $1;
+      }
+      pO "<table><tr><td>";
+
+      my $wl = "&amp;pos=" . join(";", map {"$_=$__pos{$_}"} keys %__pos);
+
+      my $arg="$__ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
+      if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
+        my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
+        pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
+              "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+      } else {
+        pO "<img src=\"$arg\"/>\n";
+      }
+
+      pO "</td><td>";
+      pO "<a href=\"$__ME?detail=$d\">$d</a>";
+      pO "</td></tr></table>";
+
+    }
+  }
+}
 
 1;
