@@ -1,5 +1,5 @@
 #
-# Display the measured temp and the actuator.
+# Display the measured temp and the humidity.
 # FileLog definition: 
 # define UGHygrolog FileLog /var/tmp/UGHygro.log UGHygro:.*T:.*
 # attr UGHygrolog logtype hms_tf
@@ -8,7 +8,12 @@
 # Logfile record example:
 # 2008-07-24_02:20:57 UGHygro T: 17.2  H: 77.6  Bat: ok
 
-set terminal png transparent small <SIZE> crop
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
 set output '<OUT>.png'
 set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
