@@ -143,7 +143,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.52 2008-08-08 10:46:25 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.53 2008-08-25 09:52:29 rudolfkoenig Exp $';
 
 $init_done = 0;
 
@@ -152,7 +152,7 @@ $modules{_internal_}{LOADED} = 1;
 $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
-        "verbose:1,2,3,4,5 version";
+        "verbose:1,2,3,4,5 mseclog version";
 
 
 my %cmds = (
@@ -395,11 +395,11 @@ Log($$)
   OpenLogfile($nfile) if($currlogfile && $currlogfile ne $nfile);
 
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
-       $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
-
-#  my ($seconds, $microseconds) = gettimeofday();
-#  my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d.%03d",
-#        $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0], $microseconds/1000);
+          $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
+  if($attr{global}{mseclog}) {
+    my ($seconds, $microseconds) = gettimeofday();
+    $tim .= sprintf(".%03d", $microseconds/1000);
+  }
 
   if($logopened) {
     print LOG "$tim $loglevel: $text\n";
