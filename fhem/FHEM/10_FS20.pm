@@ -177,13 +177,8 @@ FS20_Set($@)
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   my $val;
-  if($na == 2) {
 
-    IOWrite($hash, "04", "010101" . $hash->{XMIT} . $hash->{BTN} . $c)
-    	if(!IsDummy($a[0]));
-
-  } else {
-
+  if($na == 3) {                                # Timed command.
     $c =~ s/1/3/; # Set the extension bit
 
     ########################
@@ -202,11 +197,10 @@ FS20_Set($@)
       }
     }
     return "Specified timeout too large, max is 15360" if(length($c) == 2);
-
-    IOWrite($hash, "04", "010101" . $hash->{XMIT} . $hash->{BTN} . $c)
-    	if(!IsDummy($a[0]));
-
   }
+
+  IOWrite($hash, "04", "010101" . $hash->{XMIT} . $hash->{BTN} . $c)
+    	if(!IsDummy($a[0]));
 
   ###########################################
   # Set the state of a device to off if on-for-timer is called

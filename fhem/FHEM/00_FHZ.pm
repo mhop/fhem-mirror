@@ -9,9 +9,9 @@ use Time::HiRes qw(gettimeofday);
 sub FHZ_Write($$$);
 sub FHZ_Read($);
 sub FHZ_ReadAnswer($$);
-sub FhzCrc(@);
-sub CheckFhzCrc($);
-sub XmitLimitCheck($$);
+sub FHZ_Crc(@);
+sub FHZ_CheckCrc($);
+sub FHZ_XmitLimitCheck($$);
 
 my $msgstart = pack('H*', "81");# Every msg starts wit this
 
@@ -47,7 +47,6 @@ my %codes = (
 my $def;
 my %msghist;		# Used when more than one FHZ is attached
 my $msgcount = 0;
-my $xmit_limit = 163;   # Maximum nr of transmissions per hour (unconfirmed).
 
 #####################################
 # Note: we are a data provider _and_ a consumer at the same time
@@ -61,16 +60,18 @@ FHZ_Initialize($)
   $hash->{ReadFn}  = "FHZ_Read";
   $hash->{WriteFn} = "FHZ_Write";
   $hash->{Clients} = ":FHZ:FS20:FHT:HMS:KS300:";
+  $hash->{ReadyFn} = "FHZ_Ready" if ($^O eq 'MSWin32');
 
 # Consumer
   $hash->{Match}   = "^81..C9..0102";
+  $hash->{ParseFn} = "FHZ_Parse";
+
+# Normal devices
   $hash->{DefFn}   = "FHZ_Define";
   $hash->{UndefFn} = "FHZ_Undef";
   $hash->{GetFn}   = "FHZ_Get";
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{StateFn} = "FHZ_SetState";
-  $hash->{ParseFn} = "FHZ_Parse";
-  $hash->{ReadyFn} = "FHZ_Ready" if ($^O eq 'MSWin32');
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0"; 
@@ -85,6 +86,7 @@ FHZ_Ready($$)
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
   return ($InBytes>0);
 }
+
 #####################################
 sub
 FHZ_Set($@)
@@ -134,7 +136,7 @@ FHZ_Set($@)
 
   }
 
-  FHZ_Write($hash, $fn, $arg) if(!IsDummy("FHZ"));
+  FHZ_Write($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
   return undef;
 }
 
@@ -154,7 +156,7 @@ FHZ_Get($@)
   my $name = $hash->{NAME};
   Log GetLogLevel($name,2), "FHZ get $v";
 
-  FHZ_Write($hash, $fn, $arg) if(!IsDummy("FHZ"));
+  FHZ_Write($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
 
   my $msg = FHZ_ReadAnswer($hash, $a[1]);
   return $msg if(!$msg || $msg !~ /^81..c9..0102/);
@@ -338,7 +340,7 @@ FHZ_Parse($$)
 
 #####################################
 sub
-FhzCrc(@)
+FHZ_Crc(@)
 {
   my $sum = 0;
   map { $sum += $_; } @_;
@@ -347,7 +349,7 @@ FhzCrc(@)
 
 #####################################
 sub
-CheckFhzCrc($)
+FHZ_CheckCrc($)
 {
   my $msg = shift;
   return 0 if(length($msg) < 8);
@@ -360,7 +362,7 @@ CheckFhzCrc($)
 
   # FS20 Repeater generate a CRC which is one or two greater then the computed
   # one. The FHZ1000 filters such pakets, so we do not see them
-  return (($crc eq FhzCrc(@data)) ? 1 : 0);
+  return (($crc eq FHZ_Crc(@data)) ? 1 : 0);
 }
 
 
@@ -405,6 +407,7 @@ FHZ_ReadAnswer($$)
 }
 
 ##############
+# Compute CRC, add header, glue fn and messages
 sub
 FHZ_CompleteMsg($$)
 {
@@ -414,14 +417,14 @@ FHZ_CompleteMsg($$)
   for(my $i = 0; $i < $len; $i += 2) {
     push(@data, ord(pack('H*', substr($msg, $i, 2))));
   }
-  return pack('C*', 0x81, $len/2+2, ord(pack('H*',$fn)), FhzCrc(@data), @data);
+  return pack('C*', 0x81, $len/2+2, ord(pack('H*',$fn)), FHZ_Crc(@data), @data);
 }
 
     
 #####################################
 # Check if the 1% limit is reached and trigger notifies
 sub
-XmitLimitCheck($$)
+FHZ_XmitLimitCheck($$)
 {
   my ($hash,$bstring) = @_;
   my $now = time();
@@ -438,7 +441,7 @@ XmitLimitCheck($$)
   my $nowM1h = $now-3600;
   my @b = grep { $_ > $nowM1h } @{$hash->{XMIT_TIME}};
 
-  if(@b > $xmit_limit) {
+  if(@b > 163) {          # Maximum nr of transmissions per hour (unconfirmed).
 
     my $me = $hash->{NAME};
     Log GetLogLevel($me,2), "FHZ TRANSMIT LIMIT EXCEEDED";
@@ -481,7 +484,7 @@ FHZ_Write($$$)
 
   if(!$hash->{QUEUECNT}) {
 
-    XmitLimitCheck($hash,$bstring);
+    FHZ_XmitLimitCheck($hash,$bstring);
     $hash->{PortObj}->write($bstring);
 
     ##############
@@ -507,7 +510,7 @@ FHZ_HandleWriteQueue($)
   my $cnt = --$hash->{QUEUECNT};
   if($cnt > 0) {
     my $bstring = shift(@{$hash->{QUEUE}});
-    XmitLimitCheck($hash,$bstring);
+    FHZ_XmitLimitCheck($hash,$bstring);
     $hash->{PortObj}->write($bstring);
     InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
   }
@@ -583,7 +586,7 @@ FHZ_Read($)
     last if(length($fhzdata) < $len);
 
     my $dmsg = unpack('H*', substr($fhzdata, 0, $len));
-    if(CheckFhzCrc($dmsg)) {
+    if(FHZ_CheckCrc($dmsg)) {
 
       if(substr($fhzdata,2,1) eq $msgstart) { # Skip function 0x81
 	$fhzdata = substr($fhzdata, 2);
