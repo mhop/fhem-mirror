@@ -34,8 +34,17 @@ sub CUL_Ready($$);
 my %msghist;		# Used when more than one CUL is attached
 my $msgcount = 0;
 my %gets = (
-  "ccreg"   => "C",
-  "version" => "V",
+  "ccreg"       => "C",
+  "readeeprom"  => "R",
+  "version"     => "V",
+  "time"        => "t",
+);
+
+my %sets = (
+  "writeeeprom" => "W",
+  "sendrawFS20" => "F",
+  "sendrawFHT"  => "T",
+  "verbose"     => "X",
 );
 
 sub
@@ -46,7 +55,7 @@ CUL_Initialize($)
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} = ":CUL:FS20:FHT:";
+  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:";
   $hash->{ReadyFn} = "CUL_Ready" if ($^O eq 'MSWin32');
 
 # Normal devices
@@ -127,7 +136,14 @@ sub
 CUL_Set($@)
 {
   my ($hash, @a) = @_;
-  return "NYI";
+
+  return "\"set CUL\" needs at least one parameter" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(",", sort keys %sets)
+  	if(!defined($sets{$a[1]}));
+
+  my $arg = ($a[2] ? $a[2] : "");
+  CUL_Write($hash, $sets{$a[1]}, $arg) if(!IsDummy($hash->{NAME}));
+  return undef;
 }
 
 #####################################
@@ -136,7 +152,7 @@ CUL_Get($@)
 {
   my ($hash, @a) = @_;
 
-  return "\"get CUL\" needs at leass one parameter" if(@a < 2);
+  return "\"get CUL\" needs at least one parameter" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
   	if(!defined($gets{$a[1]}));
 
@@ -149,7 +165,6 @@ CUL_Get($@)
   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
 
   return "$a[0] $a[1] => $msg";
-  return "NYI"
 }
 
 #####################################
@@ -157,7 +172,7 @@ sub
 CUL_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-  return "NYI";
+  return undef;
 }
 
 #####################################
@@ -183,7 +198,7 @@ CUL_DoInit($)
     Log 1, $msg;
     return $msg;
   }
-  $hash->{PortObj}->write("XFE\n");     # Enable message reporting
+  $hash->{PortObj}->write("X01\n");     # Enable message reporting
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -275,7 +290,6 @@ CUL_Write($$$)
     Log 1, "CUL cannot translate $fn $msg";
     return;
   }
-
 
   ###############
   # insert value into the msghist. At the moment this only makes sense for FS20
@@ -407,6 +421,7 @@ CUL_Read($)
     $msgcount++;
 
 Log 1, "CUL: $dmsg";
+    ###########################################
     #Translate Message from CUL to FHZ
     my $fn = substr($dmsg,0,1);
     if($fn eq "F") {                                 # FS20
@@ -424,8 +439,22 @@ Log 1, "CUL: $dmsg";
                         substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
+    } elsif($fn eq "K" && length($dmsg) == 15) {     # KS300
+
+      # K17815254024C82 ->   810d04f94027a0011718254520C428
+      my $n = "";
+      my @a = split("", $dmsg);
+      for(my $i = 0; $i < 14; $i+=2) {   # Swap nibbles.
+        $n .= $a[$i+2] . $a[$i+1];
+      }
+      $dmsg = sprintf("81%02x04xx4027a001%s", length($dmsg)/2+6, $n);
+
+    } elsif($fn eq "K" && length($dmsg) == 9) {      # CUL_WS / Native
+      ;
+    } elsif($fn eq "E") {                            # CUL_EM / Native
+      ;
     } else {
-      Log 5, "CUL: unknown message $dmsg";
+      Log 4, "CUL: unknown message $dmsg";
       goto NEXTMSG;
     }
 

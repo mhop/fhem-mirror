@@ -68,6 +68,7 @@ at_Define($$)
   InternalTimer($nt, "at_Exec", $name, 0);
 
   $hash->{STATE} = "Next: " . FmtTime($nt);
+     if(!($attr{$name} && $attr{$name}{disable}));
   
   return undef;
 }
@@ -79,11 +80,12 @@ at_Exec($)
   my ($skip, $disable);
 
   if(defined($attr{$name})) {
-    $skip = 1 if(defined($attr{$name}{skip_next}));
-    $disable = 1 if(defined($attr{$name}{disable}));
+    $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
+    $disable = 1 if($attr{$name} && $attr{$name}{disable});
   }
 
   delete $attr{$name}{skip_next} if($skip);
+  return if(!$defs{$name}{DEF});           # Just deleted
   my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
   $command = SemicolonEscape($command);
   AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
