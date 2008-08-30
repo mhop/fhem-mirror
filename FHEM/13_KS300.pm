@@ -7,9 +7,6 @@ use warnings;
 my %defptr;
 my $negcount = 0;
 
-######################
-# Note: this is just an empty hull.
-
 #####################################
 sub
 KS300_Initialize($)
@@ -20,7 +17,7 @@ KS300_Initialize($)
   # 810d04f94027a00171212730000008
   # 81 0d 04 f9 4027a00171 212730000008
 
-  $hash->{Match}     = "^810.04..402.a001";
+  $hash->{Match}     = "^810d04..4027a001";
   $hash->{DefFn}     = "KS300_Define";
   $hash->{UndefFn}   = "KS300_Undef";
   $hash->{ParseFn}   = "KS300_Parse";
@@ -66,11 +63,6 @@ sub
 KS300_Parse($$)
 {
   my ($hash,$msg) = @_;
-
-  if($msg !~ m/^810d04..4027a001/) {
-    Log 4, "KS300 unknown message $msg";
-    return "";
-  }
 
   ###############################
   #          1          2
