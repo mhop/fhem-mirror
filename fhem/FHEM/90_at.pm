@@ -67,7 +67,7 @@ at_Define($$)
   $hash->{TRIGGERTIME} = $nt;
   InternalTimer($nt, "at_Exec", $name, 0);
 
-  $hash->{STATE} = "Next: " . FmtTime($nt);
+  $hash->{STATE} = ("Next: " . FmtTime($nt))
      if(!($attr{$name} && $attr{$name}{disable}));
   
   return undef;
