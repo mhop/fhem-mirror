@@ -11,6 +11,7 @@ dummy_Initialize($)
 
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6";
 }
 
 ###################################
