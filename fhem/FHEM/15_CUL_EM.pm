@@ -31,12 +31,18 @@ CUL_EM_Define($$)
 
   return "wrong syntax: define <name> CUL_EM <code> [corr]"
             if(int(@a) < 3 || int(@a) > 4);
-  $a[2] = lc($a[2]);
   return "Define $a[0]: wrong CODE format: valid is 1-12"
                 if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
 
   $hash->{CODE} = $a[2];
-  $hash->{corr} = ((int(@a) > 3) ? $a[3] : 1);
+  if($a[2] >= 1 && $a[2] <= 4) {                # EMWZ: nRotation in 5 minutes
+    my $c = (int(@a) > 3 ? 150 : $a[3]);
+    $hash->{corr} = (12/$c);
+  } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM: 0.01
+    $hash->{corr} = (int(@a) > 3 ? 0.01 : $a[3]);
+  } else {
+    $hash->{corr} = 1;
+  }
   $defptr{$a[2]} = $hash;
   return undef;
 }
@@ -63,10 +69,11 @@ CUL_EM_Parse($$)
   my $tpe = ($a[1].$a[2])+0;
   my $cde = ($a[3].$a[4])+0;
   my $cnt = hex($a[5].$a[6]);
-  my $cum = hex($a[ 7].$a[ 8].$a[ 9].$a[10]);
-  my $lst = hex($a[11].$a[12].$a[13].$a[14]);
-  my $top = hex($a[15].$a[16].$a[17].$a[18]);
-  my $val = sprintf("CUM: %d  5MIN: %d  TOP: %d", $cum, $lst, $top);
+  my $cum = hex($a[ 9].$a[10].$a[ 7].$a[ 8]);
+  my $lst = hex($a[13].$a[14].$a[11].$a[12]);
+  my $top = hex($a[17].$a[18].$a[15].$a[16]);
+  my $val = sprintf("CNT %d CUM: %d  5MIN: %d  TOP: %d",
+                $cnt, $cum, $lst, $top);
 
   if($defptr{$cde}) {
     $hash = $defptr{$cde};
@@ -74,7 +81,8 @@ CUL_EM_Parse($$)
     $cum *= $corr;
     $lst *= $corr;
     $top *= $corr;
-    $val = sprintf("CUM: %d  5MIN: %d  TOP: %d", $cum, $lst, $top);
+    $val = sprintf("CND %d  CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
+                        $cnt, $cum, $lst, $top);
     my $n = $hash->{NAME};
     Log GetLogLevel($n,1), "CUL_EM $n: $val";
     $hash->{STATE} = $val;
