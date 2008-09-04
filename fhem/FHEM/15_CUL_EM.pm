@@ -36,10 +36,10 @@ CUL_EM_Define($$)
 
   $hash->{CODE} = $a[2];
   if($a[2] >= 1 && $a[2] <= 4) {                # EMWZ: nRotation in 5 minutes
-    my $c = (int(@a) > 3 ? 150 : $a[3]);
+    my $c = (int(@a) > 3 ? $a[3] : 150);
     $hash->{corr} = (12/$c);
   } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM: 0.01
-    $hash->{corr} = (int(@a) > 3 ? 0.01 : $a[3]);
+    $hash->{corr} = (int(@a) > 3 ? $a[3] : 0.01);
   } else {
     $hash->{corr} = 1;
   }
