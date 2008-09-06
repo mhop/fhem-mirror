@@ -4,7 +4,7 @@ package main;
 # Modul for FHEM
 #
 # contributed by thomas dressler 2008
-# $Id: 87_WS2000.pm,v 1.3 2008-05-11 21:17:30 tdressler Exp $
+# $Id: 87_WS2000.pm,v 1.4 2008-09-06 08:33:25 rudolfkoenig Exp $
 ###########################
 use strict;
 use Switch;
@@ -81,6 +81,7 @@ WS2000_Define($$)
                    return "Can't open Device $PortName: $^E\n";
                 }
 		 #$hash->{FD}=$PortObj->{_HANDLE};
+                $readyfnlist{"$a[0].$a[2]"} = $hash;
 	} else {
 		eval ("use Device::SerialPort;");
 		if ($@) {
@@ -94,7 +95,8 @@ WS2000_Define($$)
                    Log 1,"Error opening Serial Device $PortName";
                    return "Can't open Device $PortName: $^E\n";
                 }
-		 #$hash->{FD}=$PortObj->FILENO;
+		$hash->{FD}=$PortObj->FILENO;
+                $selectlist{"$a[0].$a[2]"} = $hash;
 	}
         #Parameter 19200,8,2,Odd,None
         $PortObj->baudrate(19200);
@@ -125,13 +127,14 @@ WS2000_Define($$)
                 }
         $xport->autoflush(1);
         $hash->{FD}=$xport->fileno;
+        $selectlist{"$a[0].$a[2]"} = $hash;
         $hash->{socket}=$xport;
         
         
     }else{
-                    $hash->{STATE} = "$PortName is no device and not implemented";
-                   Log 1,"$PortName is no device and not implemented";
-                   return "$PortName is no device and not implemented\n";
+        $hash->{STATE} = "$PortName is no device and not implemented";
+        Log 1,"$PortName is no device and not implemented";
+        return "$PortName is no device and not implemented\n";
     }
   Log 4, "$name connected to device $PortName";
   $hash->{STATE} = "open";

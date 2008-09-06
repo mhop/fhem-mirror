@@ -45,9 +45,6 @@ EM_Define($$)
   my $po;
   $hash->{STATE} = "Initialized";
 
-  delete $hash->{PortObj};
-  delete $hash->{FD};
-
   my $name = $a[0];
   my $dev = $a[2];
 
