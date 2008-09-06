@@ -43,9 +43,6 @@ M232_Define($$)
 
   $hash->{STATE} = "Initialized";
 
-  delete $hash->{PortObj};
-  delete $hash->{FD};
-
   my $dev = $a[2];
   $attr{$a[0]}{savefirst} = 1;
 

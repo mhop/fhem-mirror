@@ -424,3 +424,8 @@
 
 - ==DATE== (4.5)
   - feature: further 01_FHEMWEB cleanup
+  - feature: CUL support for FS20(r/w), FHT(readonly), KS300, EM
+  - feature: list outputs the device attributes too
+  - bugfix:  rename bugs fixed
+  - bugfix:  better integration of ReadyFn (Windows), slight overall speedup
+  - bugfix:  Ignore/correct "type" casing when autoloading modules

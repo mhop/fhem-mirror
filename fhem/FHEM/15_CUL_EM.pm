@@ -81,7 +81,7 @@ CUL_EM_Parse($$)
     $cum *= $corr;
     $lst *= $corr;
     $top *= $corr;
-    $val = sprintf("CND %d  CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
+    $val = sprintf("CNT %d  CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
                         $cnt, $cum, $lst, $top);
     my $n = $hash->{NAME};
     Log GetLogLevel($n,1), "CUL_EM $n: $val";
