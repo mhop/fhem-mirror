@@ -29,8 +29,18 @@ table.KS300 tr.odd { background: #A7FFA7; }
 table.FHZ { border:thin solid; width: 100%; background: #C0C0C0; }
 table.FHZ tr.odd { background: #D7D7D7; }
 
+table.CUL { border:thin solid; width: 100%; background: #C0C0C0; }
+table.CUL tr.odd { background: #D7D7D7; }
+
 table.EM { border:thin solid; width: 100%; background: #E0E0E0; }
 table.EM tr.odd { background: #F0F0F0; }
+
+table.CUL_EM { border:thin solid; width: 100%; background: #E0E0E0; }
+table.CUL_EM tr.odd { background: #F0F0F0; }
+
+table.CUL_WS { border:thin solid; width: 100%; background: #FFC0C0; }
+table.CUL_WS  tr.odd { background: #FFD7D7; }
+
 
 table.FHEMWEB { border:thin solid; width: 100%; background: #E0E0E0; }
 table.FHEMWEB tr.odd { background: #F0F0F0; }

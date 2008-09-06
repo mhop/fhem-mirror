@@ -56,6 +56,7 @@ LIRC_Define($$)
 
   $hash->{LircObj} = $lirc;
   $hash->{FD} = $lirc->sock;
+  $selectlist{"$name.$config"} = $hash;
   $hash->{SelectObj} = $select;
   $hash->{DeviceName} = $name;    
   $hash->{STATE} = "Opened";

@@ -205,7 +205,7 @@ FS20_Set($@)
   ###########################################
   # Set the state of a device to off if on-for-timer is called
   if($follow{$a[0]}) {
-    CommandDelete(undef, "at .*setstate.*$a[0]");
+    CommandDelete(undef, $a[0] . "_timer");
     delete $follow{$a[0]};
   }
   if($a[1] eq "on-for-timer" && $na == 3 &&
@@ -303,8 +303,12 @@ FS20_Undef($$)
   my ($hash, $name) = @_;
   foreach my $c (keys %{ $hash->{CODE} } ) {
     $c = $hash->{CODE}{$c};
-    delete($defptr{$c}{$name}) if($defptr{$c});
-    delete($defptr{$c}{$name}) if(!%{$defptr{$c}});
+
+    # As after a rename the $name my be different from the $defptr{$c}{$n}
+    # we look for the hash.
+    foreach my $dname (keys %{ $defptr{$c} }) {
+      delete($defptr{$c}{$dname}) if($defptr{$c}{$dname} == $hash);
+    }
   }
   return undef;
 }

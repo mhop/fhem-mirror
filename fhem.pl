@@ -114,7 +114,7 @@ sub CommandTrigger($$);
 # NR      - its "serial" number
 # DEF     - its definition
 # READINGS- The readings. Each value has a "VAL" and a "TIME" component.
-# FD      - FileDescriptor. If set, it will be integrated into the global select
+# FD      - FileDescriptor. Used by selectlist / readyfnlist
 # IODev   - attached to io device
 # CHANGED - Currently changed attributes of this device. Used by NotifyFn
 # VOLATILE- Set if the definition should be saved to the "statefile"
@@ -122,6 +122,8 @@ sub CommandTrigger($$);
 use vars qw(%modules);		# List of loaded modules (device/log/etc)
 use vars qw(%defs);		# FHEM device/button definitions
 use vars qw(%attr);		# Attributes
+use vars qw(%selectlist);	# devices which want a "select"
+use vars qw(%readyfnlist);	# devices which want a "readyfn"
 
 use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
@@ -143,7 +145,14 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.53 2008-08-25 09:52:29 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.54 2008-09-06 08:33:55 rudolfkoenig Exp $';
+my $namedef =
+  "where <name> is either:\n" .
+  "- a single device name\n" .
+  "- a list seperated by komma (,)\n" .
+  "- a regexp, if contains one of the following characters: *[]^\$\n" .
+  "- a range seperated by dash (-)\n";
+
 
 $init_done = 0;
 
@@ -152,7 +161,7 @@ $modules{_internal_}{LOADED} = 1;
 $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
-        "verbose:1,2,3,4,5 mseclog version";
+        "verbose:1,2,3,4,5 mseclog version nofork";
 
 
 my %cmds = (
@@ -242,7 +251,7 @@ my $ret = CommandInclude(undef, $attr{global}{configfile});
 die($ret) if($ret);
 
 # Go to background if the logfile is a real file (not stdout)
-if($attr{global}{logfile} ne "-") {
+if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
   defined(my $pid = fork) || die "Can't fork: $!";
   exit(0) if $pid;
 }
@@ -273,13 +282,15 @@ while (1) {
   my ($rout, $rin) = ('', '');
 
   vec($rin, $server->fileno(), 1) = 1;
-  foreach my $p (keys %defs) {
-    vec($rin, $defs{$p}{FD}, 1) = 1 if($defs{$p}{FD});
+  foreach my $p (keys %selectlist) {
+    vec($rin, $selectlist{$p}{FD}, 1) = 1
   }
   foreach my $c (keys %client) {
     vec($rin, fileno($client{$c}{fd}), 1) = 1;
   }
-  my $timeout=HandleTimeout()||0.2;#0.2s if nothing else defined
+
+  my $timeout = HandleTimeout();
+  $timeout = 0.1 if(!defined($timeout) && keys %readyfnlist);
   my $nfound = select($rout=$rin, undef, undef, $timeout);
 
   CommandShutdown(undef, undef) if($sig_term);
@@ -290,12 +301,16 @@ while (1) {
   }
  
   ###############################
-  # Message from the hardware (FHZ1000/WS3000/etc) via FD or from Ready Function
-  foreach my $p (keys %defs) {
-    my $ready = CallFn($p,"ReadyFn",$defs{$p});
-    if(($defs{$p}{FD} && vec($rout, $defs{$p}{FD}, 1)) || $ready) {
-      CallFn($p, "ReadFn", $defs{$p});
-    }
+  # Message from the hardware (FHZ1000/WS3000/etc) via select or the Ready
+  # Function. The latter ist needed for Windows, where USB devices are not
+  # reported by select.
+  foreach my $p (keys %selectlist) {
+    CallFn($selectlist{$p}{NAME}, "ReadFn", $selectlist{$p})
+      if(vec($rout, $selectlist{$p}{FD}, 1));
+  }
+  foreach my $p (keys %readyfnlist) {
+    CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p})
+      if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p}));
   }
   
   if(vec($rout, $server->fileno(), 1)) {
@@ -569,18 +584,11 @@ AnalyzeCommand($$)
   return $ret;
 }
 
-#####################################
-my $namedef =
-  "where <name> is either:\n" .
-  "- a single device name\n" .
-  "- a list seperated by komma (,)\n" .
-  "- a regexp, if contains one of the following characters: *[]^\$\n" .
-  "- a range seperated by dash (-)\n";
-
 sub
 devspec2array($)
 {
   my ($name) = @_;
+  return "" if(!defined($name));
   return $name if(defined($defs{$name}));
   my @ret;
 
@@ -874,8 +882,7 @@ CommandSet($$)
 {
   my ($cl, $param) = @_;
   my @a = split("[ \t][ \t]*", $param);
-  return "Usage: set <name> <type-dependent-options>\n" .
-         "$namedef" if(int(@a)<1);
+  return "Usage: set <name> <type-dependent-options>\n$namedef" if(int(@a)<1);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
@@ -901,8 +908,7 @@ CommandGet($$)
   my ($cl, $param) = @_;
 
   my @a = split("[ \t][ \t]*", $param);
-  return "Usage: get <name> <type-dependent-options>\n" .
-         "$namedef" if(int(@a) < 1);
+  return "Usage: get <name> <type-dependent-options>\n$namedef" if(int(@a) < 1);
 
 
   my @rets;
@@ -932,24 +938,40 @@ CommandDefine($$)
 
   return "Usage: define <name> <type> <type dependent arguments>"
   					if(int(@a) < 2);
-
-  my $m = $a[1];
-  if($modules{$m} && !$modules{$m}{LOADED}) { # autoload
-    my $o = $modules{$m}{ORDER};
-    CommandReload($cl, "${o}_$m");
-  }
-
-  if(!$modules{$m} || !$modules{$m}{DefFn}) {
-    my @m;
-    foreach my $i (sort keys %modules) {            # Return a list of modules
-      push @m, $i if($modules{$i}{DefFn} || !$modules{$i}{LOADED});
-    }
-    return "Unknown argument $m, choose one of @m";
-  }
-
   return "$a[0] already defined, delete it first" if(defined($defs{$a[0]}));
   return "Invalid characters in name (not A-Za-z0-9.:_): $a[0]"
                         if($a[0] !~ m/^[a-z0-9.:_]*$/i);
+
+  my $m = $a[1];
+  if(!$modules{$m}) {                           # Perhaps just wrong case?
+    foreach my $i (keys %modules) {
+      if(uc($m) eq uc($i)) {
+        $m = $i;
+        last;
+      }
+    }
+  }
+
+  if($modules{$m} && !$modules{$m}{LOADED}) {   # autoload
+    my $o = $modules{$m}{ORDER};
+    CommandReload($cl, "${o}_$m");
+
+    if(!$modules{$m}{LOADED}) {                 # Case corrected by reload?
+      foreach my $i (keys %modules) {
+        if(uc($m) eq uc($i) && $modules{$i}{LOADED}) {
+          delete($modules{$m});
+          $m = $i;
+          last;
+        }
+      }
+    }
+  }
+
+  if(!$modules{$m} || !$modules{$m}{DefFn}) {
+    my @m = grep { $modules{$_}{DefFn} || !$modules{$_}{LOADED} }
+                sort keys %modules;
+    return "Unknown argument $m, choose one of @m";
+  }
 
   my %hash;
 
@@ -965,7 +987,8 @@ CommandDefine($$)
 
   my $ret = CallFn($a[0], "DefFn", \%hash, $def);
   if($ret) {
-    delete $defs{$a[0]}
+    delete $defs{$a[0]};                            # Veto
+    delete $attr{$a[0]};
   } else {
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$a[0] $da $defaultattr{$da}");
@@ -1021,8 +1044,7 @@ CommandDelete($$)
 {
   my ($cl, $def) = @_;
 
-  return "Usage: delete <name>\n" .
-         "$namedef" if(!$def);
+  return "Usage: delete <name>$namedef\n" if(!$def);
 
   my @rets;
   foreach my $sdev (devspec2array($def)) {
@@ -1036,8 +1058,18 @@ CommandDelete($$)
       push @rets, $ret;
       next;
     }
+
+    # Delete releated hashes
+    foreach my $p (keys %selectlist) {
+      delete $selectlist{$p} if($selectlist{$p}{NAME} eq $sdev);
+    }
+    foreach my $p (keys %readyfnlist) {
+      delete $readyfnlist{$p} if($readyfnlist{$p}{NAME} eq $sdev);
+    }
+
     delete($attr{$sdev});
-    delete($defs{$sdev});
+    delete($defs{$sdev});       # Remove the main entry
+
   }
   return join("\n", @rets);
 }
@@ -1049,8 +1081,7 @@ CommandDeleteAttr($$)
   my ($cl, $def) = @_;
 
   my @a = split(" ", $def, 2);
-  return "Usage: deleteattr <name> [<attrname>]\n" .
-         "$namedef" if(@a < 1);
+  return "Usage: deleteattr <name> [<attrname>]\n$namedef" if(@a < 1);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
@@ -1141,6 +1172,8 @@ CommandList($$)
       }
       $str .= "Internals:\n";
       $str .= PrintHash($defs{$sdev}, 2);
+      $str .= "Attributes:\n";
+      $str .= PrintHash($attr{$sdev}, 2);
     }
 
   }
@@ -1254,6 +1287,7 @@ CommandReload($$)
       }
     }
     $ret = &{ "${fnname}_Initialize" }(\%hash);
+    $m = $fnname;
   };
 
   if($@) {
@@ -1281,7 +1315,8 @@ CommandRename($$)
   return "Cannot rename global" if($old eq "global");
 
   $defs{$new} = $defs{$old};
-  delete($defs{$old});
+  $defs{$new}{NAME} = $new;
+  delete($defs{$old});          # The new pointer will preserve the hash
 
   $attr{$new} = $attr{$old} if(defined($attr{$old}));
   delete($attr{$old});
@@ -1378,7 +1413,7 @@ GlobalAttr($$)
       next if($m !~ m/^([0-9][0-9])_(.*)\.pm$/);
       $modules{$2}{ORDER} = $1;
       CommandReload(undef, $m)                  # Always load utility modules
-         if($1 eq "99" && $modules{$2} && !$modules{$2}{LOADED});
+         if($1 eq "99" && !$modules{$2}{LOADED});
       $counter++;
     }
     closedir(DH);
@@ -1403,8 +1438,8 @@ CommandAttr($$)
   my @a;
   @a = split(" ", $param, 3) if($param);
   
-  return "Usage: attr <name> <attrname> [<attrvalue>]\n" .
-        "$namedef" if(@a && @a < 2);
+  return "Usage: attr <name> <attrname> [<attrvalue>]\n$namedef"
+           if(@a && @a < 2);
 
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
@@ -1475,8 +1510,7 @@ CommandSetstate($$)
   my ($cl, $param) = @_;
   
   my @a = split(" ", $param, 2);
-  return "Usage: setstate <name> <state>\n" .
-         "$namedef" if(@a != 2);
+  return "Usage: setstate <name> <state>\n$namedef" if(@a != 2);
 
 
   my @rets;
@@ -1528,8 +1562,7 @@ CommandTrigger($$)
   my ($cl, $param) = @_;
 
   my ($dev, $state) = split(" ", $param, 2);
-  return "Usage: trigger <name> <state>\n" .
-         "$namedef" if(!$state);
+  return "Usage: trigger <name> <state>\n$namedef" if(!$state);
 
   my @rets;
   foreach my $sdev (devspec2array($dev)) {
@@ -1794,11 +1827,11 @@ DoTrigger($$)
 
   ################
   # Inform
-  for(my $i = 0; $i < $max; $i++) {
-    my $state = $defs{$dev}{CHANGED}[$i];
-    my $fe = "$dev:$state";
-    foreach my $c (keys %client) {
-      next if(!$client{$c}{inform});
+  foreach my $c (keys %client) {        # Do client loop first, is cheaper
+    next if(!$client{$c}{inform});
+    for(my $i = 0; $i < $max; $i++) {
+      my $state = $defs{$dev}{CHANGED}[$i];
+      my $fe = "$dev:$state";
       syswrite($client{$c}{fd}, "$defs{$dev}{TYPE} $dev $state\n");
     }
   }
@@ -1839,9 +1872,13 @@ CallFn(@)
 {
   my $d = shift;
   my $n = shift;
+
+  if(!$defs{$d}) {
+    Log 0, "Strange call for nonexistent $d: $n";
+    return undef;
+  }
   if(!$defs{$d}{TYPE}) {
-    Log 0, "Removing $d, has no TYPE";
-    delete($defs{$d});
+    Log 0, "Strange call for typeless $d: $n";
     return undef;
   }
   my $fn = $modules{$defs{$d}{TYPE}}{$n};

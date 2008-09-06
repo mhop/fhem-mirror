@@ -60,7 +60,7 @@ FHZ_Initialize($)
   $hash->{ReadFn}  = "FHZ_Read";
   $hash->{WriteFn} = "FHZ_Write";
   $hash->{Clients} = ":FHZ:FS20:FHT:HMS:KS300:";
-  $hash->{ReadyFn} = "FHZ_Ready" if ($^O eq 'MSWin32');
+  $hash->{ReadyFn} = "FHZ_Ready";
 
 # Consumer
   $hash->{Match}   = "^81..C9..0102";
@@ -273,7 +273,12 @@ FHZ_Define($$)
 
 
   $hash->{PortObj} = $po;
-  $hash->{FD} = $po->FILENO if !( $^O =~ /Win/ );  
+  if( $^O !~ /Win/ ) {
+    $hash->{FD} = $po->FILENO;
+    $selectlist{"$name.$dev"} = $hash;
+  } else {
+    $readyfnlist{"$name.$dev"} = $hash;
+  }
   
   
   $hash->{DeviceName} = $dev;
@@ -643,12 +648,13 @@ FHZ_Read($)
 
       goto NEXTMSG if($found[0] eq "");	# Special return: Do not notify
 
+      # The trigger needs a device: we create a minimal temporary one
       if($found[0] =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
 	my $d = $1;
 	$defs{$d}{NAME} = $1;
 	$defs{$d}{TYPE} = $last_module;
 	DoTrigger($d, "$2 $3");
-	delete $defs{$d};
+        CommandDelete(undef, $d);                 # Remove the device
 	goto NEXTMSG;
       }
 

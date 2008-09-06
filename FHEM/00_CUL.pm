@@ -104,7 +104,12 @@ CUL_Define($$)
   Log 3, "CUL opened CUL device $dev";
 
   $hash->{PortObj} = $po;
-  $hash->{FD} = $po->FILENO if !( $^O =~ /Win/ );  
+  if( $^O !~ /Win/ ) {
+    $hash->{FD} = $po->FILENO;
+    $selectlist{"$name.$dev"} = $hash;
+  } else {
+    $readyfnlist{"$name.$dev"} = $hash;
+  }
   
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
@@ -138,7 +143,7 @@ CUL_Set($@)
   my ($hash, @a) = @_;
 
   return "\"set CUL\" needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(",", sort keys %sets)
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
   	if(!defined($sets{$a[1]}));
 
   my $arg = ($a[2] ? $a[2] : "");
@@ -153,7 +158,7 @@ CUL_Get($@)
   my ($hash, @a) = @_;
 
   return "\"get CUL\" needs at least one parameter" if(@a < 2);
-  return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
   	if(!defined($gets{$a[1]}));
 
   my $arg = ($a[2] ? $a[2] : "");
@@ -481,12 +486,13 @@ Log 1, "CUL: $dmsg";
 
     goto NEXTMSG if($found[0] eq "");	# Special return: Do not notify
 
+    # The trigger needs a device: we create a minimal temporary one
     if($found[0] =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
       my $d = $1;
       $defs{$d}{NAME} = $1;
       $defs{$d}{TYPE} = $last_module;
       DoTrigger($d, "$2 $3");
-      delete $defs{$d};
+      CommandDelete(undef, $d);                 # Remove the device
       goto NEXTMSG;
     }
 

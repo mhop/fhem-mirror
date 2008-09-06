@@ -97,6 +97,8 @@ FW_Define($$)
   return "Can't open server port at $port: $!" if(!$hash->{PORT});
 
   $hash->{FD} = $hash->{PORT}->fileno();
+
+  $selectlist{"$name.$port"} = $hash;
   $hash->{SERVERSOCKET} = 1;
   Log(2, "FHEMWEB port $port opened");
 
@@ -108,7 +110,8 @@ sub
 FW_Undef($$)
 {
   my ($hash, $arg) = @_;
-  close($hash->{PORT}) if(defined($hash->{PORT}));  # Clients do not have PORT
+  close($hash->{CD})   if(defined($hash->{CD}));    # Clients
+  close($hash->{PORT}) if(defined($hash->{PORT}));  # Server
   return undef;
 }
 
@@ -143,6 +146,8 @@ FW_Read($)
     $nhash{BUF}   = "";
 
     $defs{$nhash{NAME}} = \%nhash;
+    $selectlist{$nhash{NAME}} = \%nhash;
+
     Log($ll, "Connection accepted from $nhash{NAME}");
     return;
 
@@ -157,9 +162,7 @@ FW_Read($)
   my $ret = sysread($hash->{CD}, $buf, 1024);
 
   if(!defined($ret) || $ret <= 0) {
-    close($hash->{CD});
-    delete($defs{$hash->{NAME}});
-    # Don't delete the attr entry.
+    my $r = CommandDelete(undef, $hash->{NAME});
     Log($ll, "Connection closed for $hash->{NAME}");
     return;
   }
@@ -1212,6 +1215,7 @@ FW_style($$)
       pO "$f: $!";
       return;
     }
+    $__data =~ s/\r//g if($^O ne 'MSWin32');
     print FH $__data;
     close(FH);
     FW_style("style list", "Saved file $f");
@@ -1269,7 +1273,7 @@ FW_showWeblink($$$)
     pO "<td><a href=\"$v\">$d</a></td>\n";
   } elsif($t eq "fileplot") {
     my @va = split(":", $v, 3);
-    if(@va != 3 || !$defs{$va[0]}{currentlogfile}) {
+    if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {
       pO "<td>Broken definition: $v</a></td>";
     } else {
       if($va[2] eq "CURRENT") {

@@ -92,7 +92,7 @@ at_Exec($)
 
   my $count = $defs{$name}{REP};
   my $def = $defs{$name}{DEF};
-  delete $defs{$name};
+  CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{/);   # Replace the count }
