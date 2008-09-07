@@ -34,17 +34,19 @@ sub CUL_Ready($$);
 my %msghist;		# Used when more than one CUL is attached
 my $msgcount = 0;
 my %gets = (
-  "ccreg"       => "C",
-  "readeeprom"  => "R",
-  "version"     => "V",
-  "time"        => "t",
+  "ccreg"    => "C",
+  "eeprom"   => "R",
+  "version"  => "V",
+  "time"     => "t",
 );
 
 my %sets = (
-  "writeeeprom" => "W",
-  "sendrawFS20" => "F",
-  "sendrawFHT"  => "T",
-  "verbose"     => "X",
+  "eeprom"    => "W",
+  "rawFS20"   => "F",
+  "rawFHT"    => "T",
+  "verbose"   => "X",
+  "freq"      => "=",
+  "bandwidth" => "=",
 );
 
 sub
@@ -147,7 +149,53 @@ CUL_Set($@)
   	if(!defined($sets{$a[1]}));
 
   my $arg = ($a[2] ? $a[2] : "");
-  CUL_Write($hash, $sets{$a[1]}, $arg) if(!IsDummy($hash->{NAME}));
+
+  if($a[1] eq "freq") {                         # MHz
+
+    my $f = $arg/26*65536;
+
+    my $f2 = sprintf("%02x", $f / 65536);
+    my $f1 = sprintf("%02x", int($f % 65536) / 256);
+    my $f0 = sprintf("%02x", $f % 256);
+    $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
+    my $msg = 
+        "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz, verbose to 01";
+    Log 1, $msg;
+    CUL_Write($hash, "W", "0D$f2");            # Will reprogram the CC1101
+    CUL_Write($hash, "W", "0E$f1");
+    CUL_Write($hash, "W", "0F$f0");
+    CUL_Write($hash, "X", "01");
+    return $msg;
+
+  } elsif($a[1] eq "bandwidth") {               # KHz
+
+    my $ob = 5;
+    if(!IsDummy($hash->{NAME})) {
+      CUL_Write($hash, "C", "10");
+      $ob = CUL_ReadAnswer($hash, $a[1]);
+      return "Can't get old MDMCFG4 value" if($ob !~ m,/ (.*)\r,);
+      $ob = $1 & 0x0f;
+    }
+
+    my ($bits, $bw) = (0,0);
+    for (my $e = 0; $e < 4; $e++) {
+      for (my $m = 0; $m < 4; $m++) {
+        $bits = ($e<<6)+($m<<4);
+        $bw  = int(26000/(8 * (4+$m) * (1 << $e))); # KHz
+        goto GOTBW if($arg >= $bw);
+      }
+    }
+GOTBW:
+    $ob = sprintf("%02x", $ob+$bits);
+    my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to 01";
+    Log 1, $msg;
+    CUL_Write($hash, "W", "10$ob");
+    CUL_Write($hash, "X", "01");
+    return $msg;
+
+  } else {
+    CUL_Write($hash, $sets{$a[1]}, $arg);
+  }
   return undef;
 }
 
@@ -164,6 +212,7 @@ CUL_Get($@)
   my $arg = ($a[2] ? $a[2] : "");
   CUL_Write($hash, $gets{$a[1]}, $arg) if(!IsDummy($hash->{NAME}));
   my $msg = CUL_ReadAnswer($hash, $a[1]);
+  $msg = "No answer" if(!defined($msg));
   $msg =~ s/[\r\n]//g;
 
   $hash->{READINGS}{$a[1]}{VAL} = $msg;
