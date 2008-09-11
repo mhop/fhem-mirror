@@ -26,6 +26,7 @@ at_Define($$)
 
   if(!$command) {
     if($hash->{OLDDEF}) { # Called from modify, where command is optional
+      RemoveInternalTimer($name);
       (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
       $hash->{DEF} = "$tm $command";
     } else {
