@@ -145,7 +145,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.54 2008-09-06 08:33:55 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.55 2008-09-14 12:53:39 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -182,7 +182,7 @@ my %cmds = (
   "include" => { Fn=>"CommandInclude",
 	    Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
-	    Hlp=>"{on|off},echo all commands and events to this client" },
+	    Hlp=>"{on|timer|off},echo all commands and events to this client" },
   "list"    => { Fn=>"CommandList",
 	    Hlp=>"[devspec],list definitions and status info" },
   "modify"  => { Fn=>"CommandModify",
@@ -505,9 +505,10 @@ AnalyzeCommand($$)
 {
   my ($cl, $cmd) = @_;
 
-  $cmd =~ s/^[ \t]*//;			# Strip space
+  $cmd =~ s/^(\\\n|[ \t])*//;		# Strip space or \\n at the begginning
   $cmd =~ s/[ \t]*$//;
 
+  
   Log 5, "Cmd: >$cmd<";
   return if(!$cmd);
 
@@ -1589,9 +1590,15 @@ CommandInform($$)
     return;
   }
 
-  return "Usage: inform {on|off}" if($param !~ m/^(on|off)$/i);
-  $client{$cl}{inform} = ($param =~ m/on/i);
-  Log 4, "Setting inform to " . ($client{$cl}{inform} ? "on" : "off");
+  $param = lc($param);
+
+  return "Usage: inform {on|off}" if($param !~ m/^(on|off|timer)$/);
+  if($param =~ m/off/) {
+    delete($client{$cl}{inform});
+  } else {
+    $client{$cl}{inform} = $param;
+    Log 4, "Setting inform to $param";
+  }
 
   return undef;
 }
@@ -1829,10 +1836,13 @@ DoTrigger($$)
   # Inform
   foreach my $c (keys %client) {        # Do client loop first, is cheaper
     next if(!$client{$c}{inform});
+    my $tn = TimeNow();
     for(my $i = 0; $i < $max; $i++) {
       my $state = $defs{$dev}{CHANGED}[$i];
       my $fe = "$dev:$state";
-      syswrite($client{$c}{fd}, "$defs{$dev}{TYPE} $dev $state\n");
+      syswrite($client{$c}{fd}, 
+        ($client{$c}{inform} eq "timer" ? "$tn " : "") .
+        "$defs{$dev}{TYPE} $dev $state\n");
     }
   }
 
