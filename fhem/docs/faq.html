@@ -11,48 +11,50 @@
 <h2>FHEM FAQ</h2>
 
 <a href="#faq1">1. I am using fhem.pl with an fhz1000.pl config file and fhem.pl
-won't start</a><br><br>
+won't start</a><br>
 
 <a href="#faq2">2. I get "undefined" messages in the log after upgrading
-fhem.pl</a><br><br>
+fhem.pl</a><br>
 
 <a href="#faq3">3. I switched on a FS20 device directly (without the remote),
-but the fhem.pl did not noticed it. Is it a bug?</a><br><br>
+but the fhem.pl did not noticed it. Is it a bug?</a><br>
 
 <a href="#faq4">4. I have some FS20/FHT/HMS devices. How do I know their
-housecode?</a><br><br>
+housecode?</a><br>
 
 <a href="#faq5">5. I have the code for my devices in the ELV notation, which
 contains 1,2,3 and 4, but you require a hex code. How should I convert
-it?</a><br><br>
+it?</a><br>
 
 <a href="#faq6">6. I replaced my FHZ1X00PC, now the FHT80b's does not work
-anymore.  Help me!</a><br><br>
+anymore.  Help me!</a><br>
 
 <a href="#faq7">7. I can specify an optional ml/raincounter for a KS300.  Why
-do you think that 255 should be the default?</a><br><br>
+do you think that 255 should be the default?</a><br>
 
 <a href="#faq8">8. The time specification of the builtin at command is not very
-flexible. Please add day/month/weekday to it.</a><br><br>
+flexible. Please add day/month/weekday to it.</a><br>
 
 <a href="#faq9">9. I defined my FS20STR as an FHT device, but I do not get
-any data from it.</a><br><br>
+any data from it.</a><br>
 
 <a href="#faq10">10. How to convert the FHT8b code seen in its display to the
-hex code needed by fhem.pl?</a><br><br>
+hex code needed by fhem.pl?</a><br>
 
 <a href="#faq11">11. I'd like to use this sunrise/sunset stuff, can you help
-me?</a><br><br>
+me?</a><br>
 
 <a href="#faq12">12. I'd like to switch on the ventilator if the FHT tells me
-its too hot. How to tell fhem to do that?</a><br><br>
+its too hot. How to tell fhem to do that?</a><br>
 
 <a href="#faq13">13. I'd like to see directly in the Web frontend if a window
-is open. How to do that?</a><br><br>
+is open. How to do that?</a><br>
 
 <a href="#faq14">14. In the summer I get a lot of "actuator:lime-protection"
 messages from  my FHT80b. How to switch back to the actuator:0% messages?</a>
-<br><br>
+<br>
+
+<a href="#faq15">15. My notify/filelog does not work, help me!</a><br>
 
 
 <br/>
@@ -317,7 +319,29 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
 
 </ul>
 
-<a name="faq14">
+<a name="faq15">
+<b>15. My notify/filelog does not work, help me!</b>
+<ul>
+   First learn what are the trigger messages: telnet to your fhem (e.g. telnet
+   localhost 7072) and issue the command "inform on". If there is an
+   FS20/HMS/etc event, then you'll see a line of the form
+   "TYPE DEVICENAME EVENT". Some devicetypes generate more than one trigger
+   message for one event, (E.g. HMS or KS300.<br>
+   Example: you have an FS20 device named piri, which sends a command
+   "on-for-timer 60". In this case you'll see: FS20 piri on-for-timer 60
+   <br><br>
+
+   Now define your notify/filelog. The regexp specified will be tested
+   against the DEVICENAME and against the DEVICENAME:EVENT strings. If they
+   match, then the action will be executed. For our example this would be:
+   define piri_ntfy piri:on.* some_command<br><br>
+
+   You can test the notify/filelog with the trigger command: issue "trigger
+   DEVICENAME EVENT" in the telnet prompt, and check if your notify/filelog
+   works as designed. Example: trigger piri on-for-timer 60<br><br>
+
+
+</ul>
 
 </body>
 </html>
