@@ -636,7 +636,10 @@ fs20usr</pre></li>
     for the last hour would exceed 1% (which corresponds roughly to 163
     commands). For this purpose there is a command counter for the last hour
     (see list FHZDEVICE), which triggers with "TRANSMIT LIMIT EXCEEDED" if
-    there were more than 163 commands in the last hour.<br>
+    there were more than 163 commands in the last hour.<br><br>
+    If you experience problems (for verbose 4 you get a lot of "Bad CRC message"
+    in the log), then try to define your device as <br>
+    <code>define &lt;name&gt; FHZ &lt;serial-device&gt; strangetty</code><br>
 
   </ul>
   <br>
