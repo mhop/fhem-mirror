@@ -255,6 +255,7 @@ FHT_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
+  $vt =~ s/^FHZ://;
   return "Undefined type $vt" if(!defined($c2b{$vt}));
   return undef;
 }
