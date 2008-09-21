@@ -10,88 +10,87 @@ sub getFhtMin($);
 sub getFhtBuffer($);
 
 my %codes = (
-  "0000.." => "actuator",
-  "0100.." => "actuator1",
-  "0200.." => "actuator2",
-  "0300.." => "actuator3",
-  "0400.." => "actuator4",
-  "0500.." => "actuator5",
-  "0600.." => "actuator6",
-  "0700.." => "actuator7",
-  "0800.." => "actuator8",
+  "00" => "actuator",
+  "01" => "actuator1",
+  "02" => "actuator2",
+  "03" => "actuator3",
+  "04" => "actuator4",
+  "05" => "actuator5",
+  "06" => "actuator6",
+  "07" => "actuator7",
+  "08" => "actuator8",
 
-  "140069" => "mon-from1",
-  "150069" => "mon-to1",
-  "160069" => "mon-from2",
-  "170069" => "mon-to2",
-  "180069" => "tue-from1",
-  "190069" => "tue-to1",
-  "1a0069" => "tue-from2",
-  "1b0069" => "tue-to2",
-  "1c0069" => "wed-from1",
-  "1d0069" => "wed-to1",
-  "1e0069" => "wed-from2",
-  "1f0069" => "wed-to2",
-  "200069" => "thu-from1",
-  "210069" => "thu-to1",
-  "220069" => "thu-from2",
-  "230069" => "thu-to2",
-  "240069" => "fri-from1",
-  "250069" => "fri-to1",
-  "260069" => "fri-from2",
-  "270069" => "fri-to2",
-  "280069" => "sat-from1",
-  "290069" => "sat-to1",
-  "2a0069" => "sat-from2",
-  "2b0069" => "sat-to2",
-  "2c0069" => "sun-from1",
-  "2d0069" => "sun-to1",
-  "2e0069" => "sun-from2",
-  "2f0069" => "sun-to2",
+  "14" => "mon-from1",
+  "15" => "mon-to1",
+  "16" => "mon-from2",
+  "17" => "mon-to2",
+  "18" => "tue-from1",
+  "19" => "tue-to1",
+  "1a" => "tue-from2",
+  "1b" => "tue-to2",
+  "1c" => "wed-from1",
+  "1d" => "wed-to1",
+  "1e" => "wed-from2",
+  "1f" => "wed-to2",
+  "20" => "thu-from1",
+  "21" => "thu-to1",
+  "22" => "thu-from2",
+  "23" => "thu-to2",
+  "24" => "fri-from1",
+  "25" => "fri-to1",
+  "26" => "fri-from2",
+  "27" => "fri-to2",
+  "28" => "sat-from1",
+  "29" => "sat-to1",
+  "2a" => "sat-from2",
+  "2b" => "sat-to2",
+  "2c" => "sun-from1",
+  "2d" => "sun-to1",
+  "2e" => "sun-from2",
+  "2f" => "sun-to2",
 
-  "3e0069" => "mode",
-  "3f0069" => "holiday1",		# Not verified
-  "400069" => "holiday2",		# Not verified
-  "410069" => "desired-temp",
-  "XX0069" => "measured-temp",		# sum of next. two, never really sent
-  "420069" => "measured-low",
-  "430069" => "measured-high",
-  "440069" => "warnings",
-  "450069" => "manu-temp",		# No clue what it does.
+  "3e" => "mode",
+  "3f" => "holiday1",		# Not verified
+  "40" => "holiday2",		# Not verified
+  "41" => "desired-temp",
+  "XX" => "measured-temp",		# sum of next. two, never really sent
+  "42" => "measured-low",
+  "43" => "measured-high",
+  "44" => "warnings",
+  "45" => "manu-temp",		# No clue what it does.
 
-  "..0067" => "repeat1",                # repeat the last data (?)
-  "..0077" => "repeat2",
+  "4b" => "ack",
+  "53" => "can-xmit",
+  "54" => "can-rcv",
 
-  "600069" => "year",
-  "610069" => "month",
-  "620069" => "day",
-  "630069" => "hour",
-  "640069" => "minute",
-  "650069" => "report1",
-  "660069" => "report2",
+  "60" => "year",
+  "61" => "month",
+  "62" => "day",
+  "63" => "hour",
+  "64" => "minute",
+  "65" => "report1",
+  "66" => "report2",
 
-  "820069" => "day-temp",
-  "840069" => "night-temp",
-  "850069" => "lowtemp-offset",         # Alarm-Temp.-Differenz
-  "8a0069" => "windowopen-temp",
+  "7d" => "start-xmit",
+  "7e" => "end-xmit",
+
+  "82" => "day-temp",
+  "84" => "night-temp",
+  "85" => "lowtemp-offset",         # Alarm-Temp.-Differenz
+  "8a" => "windowopen-temp",
 );
 
 my %cantset = (
-  "actuators"     => 1,
-  "actuator1"     => 1,
-  "actuator2"     => 1,
-  "actuator3"     => 1,
-  "actuator4"     => 1,
-  "actuator5"     => 1,
-  "actuator6"     => 1,
-  "actuator7"     => 1,
-  "actuator8"     => 1,
+  "ack"           => 1,
+  "can-xmit" => 1,
+  "can-rcv"  => 1,
+  "start-xmit"    => 1,
+  "end-xmit"      => 1,
+
   "measured-temp" => 1,
   "measured-high" => 1,
   "measured-low"  => 1,
   "warnings"      => 1,
-  "repeat1"       => 1,
-  "repeat2"       => 1,
 );
 
 
@@ -109,7 +108,6 @@ my %priority = (
 my %c2m = (0 => "auto", 1 => "manual", 2 => "holiday", 3 => "holiday_short");
 my %m2c;	# Reverse c2m
 my %c2b;	# command->button hash (reverse of codes)
-my %c2bset;	# Setteable values
 my %defptr;
 
 my $defmin = 0;                # min fhtbuf free bytes before sending commands
@@ -125,7 +123,6 @@ FHT_Initialize($)
   foreach my $k (keys %codes) {
     my $v = $codes{$k};
     $c2b{$v} = $k;
-    $c2bset{$v} = substr($k, 0, 2) if(!defined($cantset{$v}));
   }
   foreach my $k (keys %c2m) {
     $m2c{$c2m{$k}} = $k;
@@ -172,13 +169,15 @@ FHT_Set($@)
     $allcmd .=" " if($allcmd);
     $allcmd .= $cmd;
 
-    return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2bset)
-                if(!defined($c2bset{$cmd}));
-    return "\"set $name\" needs a parameter"
+    return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2b)
+                if(!defined($c2b{$cmd}));
+    return "Readonly parameter $cmd"
+                if(defined($cantset{$cmd}));
+    return "\"set $name $cmd\" needs a parameter"
                 if(@a < 1);
     $ncmd++;
     $val = shift(@a);
-    $arg .= $c2bset{$cmd};
+    $arg .= $c2b{$cmd};
 
     if ($cmd =~ m/-temp/) {
 
@@ -302,8 +301,9 @@ FHT_Parse($$)
 {
   my ($hash, $msg) = @_;
 
+  $msg = lc($msg);
   my $dev = substr($msg, 16, 4);
-  my $cde = substr($msg, 20, 6);
+  my $cde = substr($msg, 20, 2);
   my $val = substr($msg, 26, 2) if(length($msg) > 26);
   my $confirm = 0;
 
@@ -315,35 +315,17 @@ FHT_Parse($$)
   my $def = $defptr{$dev};
   my $name = $def->{NAME};
 
-  # Unknown, but don't want report it. Should come with c409c401
-  return "" if($cde eq "00");
-
-  if(length($cde) < 6) {
-    Log GetLogLevel($name,2), "FHT Unknown code from $name : $cde";
-    $def->{CHANGED}[0] = "unknown_$cde";
-    return $name;
-  }
-
-  my $scmd = substr($cde, 0, 2);
-  if(!$val || $scmd eq "65" || $scmd eq "66") {
+  if(!$val || $cde eq "65" || $cde eq "66") {
     # This is a confirmation message. We reformat it so that
     # it looks like a real message, and let the rest parse it
     Log 4, "FHT $name confirmation: $cde";
-    $val = substr($cde, 2, 2);
-    $cde = $scmd . "0069";
+    $val = substr($msg, 22, 2);
     $confirm = 1;
-  }
-
-  my $cmd;
-  foreach my $c (keys %codes) {
-    if($cde =~ m/$c/) {
-      $cmd = $codes{$c};
-      last;
-    }
   }
 
   $val = hex($val);
 
+  my $cmd = $codes{$cde};
   if(!$cmd) {
     Log 4, "FHT $name (Unknown: $cde => $val)";
     $def->{CHANGED}[0] = "unknown_$cde: $val";
@@ -371,7 +353,7 @@ FHT_Parse($$)
 
   } elsif($cmd =~ m/^actuator/) {
 
-    my $sval = substr($cde, 4, 2);
+    my $sval = substr($msg,24,2);
     my $fv = sprintf("%d%%", int(100*$val/255+0.5));
 
        if($sval =~ m/.6/) { $val = "$fv" }
@@ -411,6 +393,8 @@ FHT_Parse($$)
     $val = $nVal? $nVal : "none";
 
   }
+
+  $cmd = "FHZ:$cmd" if(substr($msg,24,1) eq "7");
 
   $def->{READINGS}{$cmd}{TIME} = $tn;
   $def->{READINGS}{$cmd}{VAL} = $val;
