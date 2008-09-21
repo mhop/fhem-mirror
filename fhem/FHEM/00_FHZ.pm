@@ -225,6 +225,7 @@ FHZ_Define($$)
 
   my $name = $a[0];
   my $dev = $a[2];
+  my $spec = $a[3];
 
   $attr{$name}{savefirst} = 1;
   $attr{$name}{fhtsoftbuffer} = 0;
@@ -253,22 +254,26 @@ FHZ_Define($$)
   $po->stopbits(1);
   $po->handshake('none');
 
-  # This part is for some Linux kernel versions whih has strange default
-  # settings.  Device::SerialPort is nice: if the flag is not defined for your
-  # OS then it will be ignored.
-  $po->stty_icanon(0);
-  #$po->stty_parmrk(0); # The debian standard install does not have it
-  $po->stty_icrnl(0);
-  $po->stty_echoe(0);
-  $po->stty_echok(0);
-  $po->stty_echoctl(0);
+  if($spec && $spec eq "strangetty") {
 
-  # Needed for some strange distros
-  $po->stty_echo(0);
-  $po->stty_icanon(0);
-  $po->stty_isig(0);
-  $po->stty_opost(0);
-  $po->stty_icrnl(0);
+    # This part is for some Linux kernel versions whih has strange default
+    # settings.  Device::SerialPort is nice: if the flag is not defined for your
+    # OS then it will be ignored.
+    $po->stty_icanon(0);
+    #$po->stty_parmrk(0); # The debian standard install does not have it
+    $po->stty_icrnl(0);
+    $po->stty_echoe(0);
+    $po->stty_echok(0);
+    $po->stty_echoctl(0);
+
+    # Needed for some strange distros
+    $po->stty_echo(0);
+    $po->stty_icanon(0);
+    $po->stty_isig(0);
+    $po->stty_opost(0);
+    $po->stty_icrnl(0);
+  }
+
   $po->write_settings;
 
 
