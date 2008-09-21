@@ -4,7 +4,8 @@ package main;
 # Modul for FHEM
 #
 # contributed by thomas dressler 2008
-# $Id: 87_WS2000.pm,v 1.4 2008-09-06 08:33:25 rudolfkoenig Exp $
+# $Id: 87_WS2000.pm,v 1.5 2008-09-21 17:55:28 rudolfkoenig Exp $
+# corr. negativ temps / peterp
 ###########################
 use strict;
 use Switch;
@@ -81,7 +82,7 @@ WS2000_Define($$)
                    return "Can't open Device $PortName: $^E\n";
                 }
 		 #$hash->{FD}=$PortObj->{_HANDLE};
-                $readyfnlist{"$a[0].$a[2]"} = $hash;
+#                $readyfnlist{"$a[0].$a[2]"} = $hash;
 	} else {
 		eval ("use Device::SerialPort;");
 		if ($@) {
@@ -96,7 +97,7 @@ WS2000_Define($$)
                    return "Can't open Device $PortName: $^E\n";
                 }
 		$hash->{FD}=$PortObj->FILENO;
-                $selectlist{"$a[0].$a[2]"} = $hash;
+#               $selectlist{"$a[0].$a[2]"} = $hash;
 	}
         #Parameter 19200,8,2,Odd,None
         $PortObj->baudrate(19200);
@@ -127,7 +128,7 @@ WS2000_Define($$)
                 }
         $xport->autoflush(1);
         $hash->{FD}=$xport->fileno;
-        $selectlist{"$a[0].$a[2]"} = $hash;
+#        $selectlist{"$a[0].$a[2]"} = $hash;
         $hash->{socket}=$xport;
         
         
@@ -345,11 +346,12 @@ WS2000_Parse($$) {
 			$snr -= 8;
                         $sensor = "Temperatursensor V1.2(" .$snr. ")";
                 }
-                if ($w1 >= 64) {
-                    $daten1 = ((255 - $w1 - $w2) / 10) * (-1);
-                }else{
-                    $daten1 = (($w1 * 128 + $w2) / 10);
+             $daten1 = (($w1 * 128 + $w2) );
+             if ($daten1 >= 16085) 
+                {
+                $daten1 = $daten1 - 16384; 
                 }
+             $daten1 = $daten1 / 10;
 		$shortname='TX'.$snr;
                 $einheit1 = " C";
                 $result = $shortname . " => T:" . $daten1 . $einheit1;
@@ -362,11 +364,12 @@ WS2000_Parse($$) {
 		$snr -= 8;
                 $sensor = "Temperatursensor mit Feuchte V1.2(" . $snr . ")";
             }
-            if ($w1 >= 64) {
-                $daten1 = ((255 - $w1 - $w2) / 10) * (-1);
-            }else{
-                $daten1 = (($w1 * 128 + $w2) / 10);
-            }
+             $daten1 = (($w1 * 128 + $w2) );
+             if ($daten1 >= 16085) 
+                {
+                $daten1 = $daten1 - 16384; 
+                }
+             $daten1 = $daten1 / 10;
 	    $shortname='TH'.$snr;
             $einheit1 = " C";
             $daten2 = $w3;
@@ -449,11 +452,12 @@ WS2000_Parse($$) {
 		$snr -= 8;
                 $sensor = "Innensensor V1.2(" . $snr . ")";
             }
-            if ($w1 >= 64) {
-                $daten1 = ((255 - $w1 - $w2) / 10) * (-1);
-            }else{
-                $daten1 = (($w1 * 128 + $w2) / 10);
-            }
+             $daten1 = (($w1 * 128 + $w2) );
+             if ($daten1 >= 16085) 
+                {
+                $daten1 = $daten1 - 16384; 
+                }
+             $daten1 = $daten1 / 10;
 	    $shortname='I'.$snr;
             $daten2 = $w3;
             $daten3 = $w4 * 128 + $w5;

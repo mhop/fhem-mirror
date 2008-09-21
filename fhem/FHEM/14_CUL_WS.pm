@@ -62,7 +62,8 @@ CUL_WS_Parse($$)
   # K41505268 -> Code 5, T: 25.0  H: 68.5
 
   my @a = split("", $msg);
-  my $cde = (($a[1]+0)&7) + 1;
+  my $firstbyte = hex($a[1]);
+  my $cde = ($firstbyte&7) + 1;
   my $sgn = (($a[1]+0)&8) ? -1 : 1;
   my $tmp = $sgn * ($a[6].$a[3].".".$a[4]);
   my $hum = $a[7].$a[8].".".$a[5];
