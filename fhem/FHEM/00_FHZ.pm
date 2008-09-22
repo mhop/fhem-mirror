@@ -189,10 +189,41 @@ FHZ_SetState($$$$)
 
 #####################################
 sub
-DoInit($)
+DoInit($$$)
 {
-  my $name = shift;
+  my ($name,$type,$po) = @_;
   my @init;
+
+  $po->reset_error();
+  $po->baudrate(9600);
+  $po->databits(8);
+  $po->parity('none');
+  $po->stopbits(1);
+  $po->handshake('none');
+
+  if($type && $type eq "strangetty") {
+
+    # This part is for some Linux kernel versions whih has strange default
+    # settings.  Device::SerialPort is nice: if the flag is not defined for your
+    # OS then it will be ignored.
+    $po->stty_icanon(0);
+    #$po->stty_parmrk(0); # The debian standard install does not have it
+    $po->stty_icrnl(0);
+    $po->stty_echoe(0);
+    $po->stty_echok(0);
+    $po->stty_echoctl(0);
+
+    # Needed for some strange distros
+    $po->stty_echo(0);
+    $po->stty_icanon(0);
+    $po->stty_isig(0);
+    $po->stty_opost(0);
+    $po->stty_icrnl(0);
+  }
+
+  $po->write_settings;
+
+
   push(@init, "get $name init2");
   push(@init, "get $name serial");
   push(@init, "set $name initHMS");
@@ -225,7 +256,7 @@ FHZ_Define($$)
 
   my $name = $a[0];
   my $dev = $a[2];
-  my $spec = $a[3];
+  $hash->{ttytype} = $a[3] if($a[3]);
 
   $attr{$name}{savefirst} = 1;
   $attr{$name}{fhtsoftbuffer} = 0;
@@ -247,36 +278,6 @@ FHZ_Define($$)
   return "Can't open $dev: $!\n" if(!$po);
   Log 3, "FHZ opened FHZ device $dev";
 
-  $po->reset_error();
-  $po->baudrate(9600);
-  $po->databits(8);
-  $po->parity('none');
-  $po->stopbits(1);
-  $po->handshake('none');
-
-  if($spec && $spec eq "strangetty") {
-
-    # This part is for some Linux kernel versions whih has strange default
-    # settings.  Device::SerialPort is nice: if the flag is not defined for your
-    # OS then it will be ignored.
-    $po->stty_icanon(0);
-    #$po->stty_parmrk(0); # The debian standard install does not have it
-    $po->stty_icrnl(0);
-    $po->stty_echoe(0);
-    $po->stty_echok(0);
-    $po->stty_echoctl(0);
-
-    # Needed for some strange distros
-    $po->stty_echo(0);
-    $po->stty_icanon(0);
-    $po->stty_isig(0);
-    $po->stty_opost(0);
-    $po->stty_icrnl(0);
-  }
-
-  $po->write_settings;
-
-
   $hash->{PortObj} = $po;
   if( $^O !~ /Win/ ) {
     $hash->{FD} = $po->FILENO;
@@ -284,12 +285,10 @@ FHZ_Define($$)
   } else {
     $readyfnlist{"$name.$dev"} = $hash;
   }
-  
-  
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
 
-  DoInit($name);
+  DoInit($name, $hash->{ttytype}, $po);
 
   return undef;
 }
@@ -558,7 +557,7 @@ FHZ_Read($)
       if($hash->{PortObj}) {
         Log 1, "USB device $devname reappeared";
         $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
-        DoInit($name);
+        DoInit($name, $hash->{ttytype}, $hash->{PortObj});
 	return;
       }
     }
