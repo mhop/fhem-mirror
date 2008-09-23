@@ -38,6 +38,7 @@ my %gets = (
   "eeprom"   => "R",
   "version"  => "V",
   "time"     => "t",
+  "ccconf"   => "=",
 );
 
 my %sets = (
@@ -161,17 +162,17 @@ CUL_Set($@)
     my $msg = 
         "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz, verbose to 01";
     Log 1, $msg;
-    CUL_Write($hash, "W", "0D$f2");            # Will reprogram the CC1101
-    CUL_Write($hash, "W", "0E$f1");
-    CUL_Write($hash, "W", "0F$f0");
-    CUL_Write($hash, "X", "01");
+    CUL_SimpleWrite($hash, "W0D$f2");            # Will reprogram the CC1101
+    CUL_SimpleWrite($hash, "W0E$f1");
+    CUL_SimpleWrite($hash, "W0F$f0");
+    CUL_SimpleWrite($hash, "X01");
     return $msg;
 
   } elsif($a[1] eq "bandwidth") {               # KHz
 
     my $ob = 5;
     if(!IsDummy($hash->{NAME})) {
-      CUL_Write($hash, "C", "10");
+      CUL_SimpleWrite($hash, "C10");
       $ob = CUL_ReadAnswer($hash, $a[1]);
       return "Can't get old MDMCFG4 value" if($ob !~ m,/ (.*)\r,);
       $ob = $1 & 0x0f;
@@ -189,12 +190,14 @@ GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
     my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to 01";
     Log 1, $msg;
-    CUL_Write($hash, "W", "10$ob");
-    CUL_Write($hash, "X", "01");
+    CUL_SimpleWrite($hash, "W10$ob");
+    CUL_SimpleWrite($hash, "X01");
     return $msg;
 
   } else {
+
     CUL_Write($hash, $sets{$a[1]}, $arg);
+
   }
   return undef;
 }
@@ -210,10 +213,33 @@ CUL_Get($@)
   	if(!defined($gets{$a[1]}));
 
   my $arg = ($a[2] ? $a[2] : "");
-  CUL_Write($hash, $gets{$a[1]}, $arg) if(!IsDummy($hash->{NAME}));
-  my $msg = CUL_ReadAnswer($hash, $a[1]);
-  $msg = "No answer" if(!defined($msg));
-  $msg =~ s/[\r\n]//g;
+  my $msg = "";
+
+  return "No $a[1] for dummies" if(IsDummy($hash->{NAME}));
+
+  if($a[1] eq "ccconf") {
+
+    my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1) ;
+    foreach my $a (sort keys %r) {
+      CUL_SimpleWrite($hash, "C$a");
+      my @answ = split(" ", CUL_ReadAnswer($hash, "C$a"));
+      $r{$a} = $answ[4];
+    }
+    $msg = sprintf("Freq:%.3fMHz  Bwidth:%dKHz  Ampl:%ddB  Sens:%ddB", 
+        26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,
+        26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),
+        $r{"1B"}&7<4 ? 24+3*($r{"1B"}&7) : 36+2*(($r{"1B"}&7)-4),
+        4+4*($r{"1D"}&3)
+        );
+    
+  } else {
+
+    CUL_Write($hash, $gets{$a[1]}, $arg) if(!IsDummy($hash->{NAME}));
+    $msg = CUL_ReadAnswer($hash, $a[1]);
+    $msg = "No answer" if(!defined($msg));
+    $msg =~ s/[\r\n]//g;
+
+  }
 
   $hash->{READINGS}{$a[1]}{VAL} = $msg;
   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
@@ -279,7 +305,7 @@ CUL_ReadAnswer($$)
       $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-        die("Select error $nfound / $!\n");
+        return "Select error $nfound / $!";
       }
     }
     return "Timeout reading answer for get $arg" if($nfound == 0);
@@ -321,6 +347,14 @@ CUL_XmitLimitCheck($$)
   }
   $hash->{XMIT_TIME} = \@b;
   $hash->{NR_CMD_LAST_H} = int(@b);
+}
+
+sub
+CUL_SimpleWrite($$)
+{
+  my ($hash, $msg) = @_;
+  return if(!$hash || !defined($hash->{PortObj}));
+  $hash->{PortObj}->write($msg . "\n");
 }
 
 #####################################
