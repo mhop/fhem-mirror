@@ -31,6 +31,7 @@ sub CUL_Read($);
 sub CUL_ReadAnswer($$);
 sub CUL_Ready($$);
 
+my $initstr = "X21";
 my %msghist;		# Used when more than one CUL is attached
 my $msgcount = 0;
 my %gets = (
@@ -165,7 +166,7 @@ CUL_Set($@)
     CUL_SimpleWrite($hash, "W0D$f2");            # Will reprogram the CC1101
     CUL_SimpleWrite($hash, "W0E$f1");
     CUL_SimpleWrite($hash, "W0F$f0");
-    CUL_SimpleWrite($hash, "X01");
+    CUL_SimpleWrite($hash, $initstr);
     return $msg;
 
   } elsif($a[1] eq "bandwidth") {               # KHz
@@ -191,11 +192,12 @@ GOTBW:
     my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to 01";
     Log 1, $msg;
     CUL_SimpleWrite($hash, "W10$ob");
-    CUL_SimpleWrite($hash, "X01");
+    CUL_SimpleWrite($hash, $initstr);
     return $msg;
 
   } else {
 
+    Log 1, "set @a";
     CUL_Write($hash, $sets{$a[1]}, $arg);
 
   }
@@ -219,17 +221,22 @@ CUL_Get($@)
 
   if($a[1] eq "ccconf") {
 
-    my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1) ;
+    my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1,
+              "23"=>1,"24"=>1,"25"=>1,"26"=>1,"34"=>1) ;
     foreach my $a (sort keys %r) {
       CUL_SimpleWrite($hash, "C$a");
       my @answ = split(" ", CUL_ReadAnswer($hash, "C$a"));
       $r{$a} = $answ[4];
     }
-    $msg = sprintf("Freq:%.3fMHz  Bwidth:%dKHz  Ampl:%ddB  Sens:%ddB", 
-        26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,
-        26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),
-        $r{"1B"}&7<4 ? 24+3*($r{"1B"}&7) : 36+2*(($r{"1B"}&7)-4),
-        4+4*($r{"1D"}&3)
+    $msg = sprintf("Freq:%.3fMHz Bwidth:%dKHz Ampl:%ddB " .
+                   "Sens:%ddB FSCAL:%02X%02X%02X%02X RSSI: %ddB", 
+        26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,                #Freq
+        26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),   #Bw
+        $r{"1B"}&7<4 ? 24+3*($r{"1B"}&7) : 36+2*(($r{"1B"}&7)-4),       #Ampl
+        4+4*($r{"1D"}&3),                                               #Sens
+        $r{"23"}, $r{"24"}, $r{"25"}, $r{"26"},                         #FSCAL
+        $r{"34"}>=128 ? (($r{34}-256)/2-74) : ($r{34}/2-74)             #RSSI
+
         );
     
   } else {
@@ -278,7 +285,7 @@ CUL_DoInit($)
     Log 1, $msg;
     return $msg;
   }
-  $hash->{PortObj}->write("X01\n");     # Enable message reporting
+  CUL_SimpleWrite($hash, $initstr);
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -508,7 +515,16 @@ CUL_Read($)
     $msghist{$msgcount}{MSG}  = $dmsg;
     $msgcount++;
 
-Log 1, "CUL: $dmsg";
+    if($initstr eq "X21") {
+      my $l = length($dmsg);
+      my $rssi = hex(substr($dmsg, $l-2, 2));
+      $dmsg = substr($dmsg, 0, $l-2);
+      $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
+      Log 1, "CUL: $dmsg $rssi";
+    } else {
+      Log 1, "CUL: $dmsg";
+    }
+
     ###########################################
     #Translate Message from CUL to FHZ
     my $fn = substr($dmsg,0,1);
