@@ -67,18 +67,18 @@ do
 
   case $variant in
     oft)
-      printf "event %02d: at +%02d:%02d:%02d set %s on-for-timer %d\n" $i $hour $minute $second ${devices[$dev]} $ontime
-      command=`printf "$command at +%02d:%02d:%02d set %s on-for-timer %d;;" $hour $minute $second ${devices[$dev]} $ontime`
+      printf "event %02d: define at.random.%02d at +%02d:%02d:%02d set %s on-for-timer %d\n" $i $i $hour $minute $second ${devices[$dev]} $ontime
+      command=`printf "$command define at.random.%02d at +%02d:%02d:%02d set %s on-for-timer %d;;" $i $hour $minute $second ${devices[$dev]} $ontime`
       ;;
     onoff)
       offtime=$(($starttime + $ontime))
       hour_off=$(($offtime / 60))
       minute_off=$(($offtime % 60))
       second_off=$(($RANDOM * 60 / $random_max))
-      printf "event %02d/on : at +%02d:%02d:%02d set %s on\n" $i $hour $minute $second ${devices[$dev]}
-      printf "event %02d/off: at +%02d:%02d:%02d set %s off\n" $i $hour_off $minute_off $second_off ${devices[$dev]}
-      command=`printf "$command at +%02d:%02d:%02d set %s on;;" $hour $minute $second ${devices[$dev]}`
-      command=`printf "$command at +%02d:%02d:%02d set %s off;;" $hour_off $minute_off $second_off ${devices[$dev]}`
+      printf "event %02d/on : define at.random.on.%02d at +%02d:%02d:%02d set %s on\n" $i $i $hour $minute $second ${devices[$dev]}
+      printf "event %02d/off: define at.random.off.%02d at +%02d:%02d:%02d set %s off\n" $i $i $hour_off $minute_off $second_off ${devices[$dev]}
+      command=`printf "$command define at.random.on.%02d at +%02d:%02d:%02d set %s on;;" $i $hour $minute $second ${devices[$dev]}`
+      command=`printf "$command define at.random.off.%02d at +%02d:%02d:%02d set %s off;;" $i $hour_off $minute_off $second_off ${devices[$dev]}`
       ;;
     *)
       echo "no variant specifieno variant specified!!"
