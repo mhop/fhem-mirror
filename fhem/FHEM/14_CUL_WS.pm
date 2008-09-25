@@ -15,7 +15,7 @@ CUL_WS_Initialize($)
   # Message is like
   # K41350270
 
-  $hash->{Match}     = "^K........\$";
+  $hash->{Match}     = "^K(........|............)\$";
   $hash->{DefFn}     = "CUL_WS_Define";
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{ParseFn}   = "CUL_WS_Parse";
@@ -57,37 +57,47 @@ sub
 CUL_WS_Parse($$)
 {
   my ($hash,$msg) = @_;
+  my %tlist = ("2"=>"rain","3"=>"wind","4"=>"temp/hum/press","5"=>"brightness");
 
-  # 012345678
-  # K41505268 -> Code 5, T: 25.0  H: 68.5
+  # 0123456789012
+  # K41505268        -> Code (4+1) 5, T: 25.0  H: 68.5
+  # K............
 
   my @a = split("", $msg);
   my $firstbyte = hex($a[1]);
   my $cde = ($firstbyte&7) + 1;
-  my $sgn = (($a[1]+0)&8) ? -1 : 1;
-  my $tmp = $sgn * ($a[6].$a[3].".".$a[4]);
-  my $hum = $a[7].$a[8].".".$a[5];
-  my $val = "T: $tmp  H: $hum";
 
-  if($defptr{$cde}) {
+  my $type = "Temp/Hum";
+  if(@a == 13) {
+    $type = $tlist{$a[2]} ? $tlist{$a[2]} : "unknown";
+  }
+
+  if(!$defptr{$cde}) {
+    Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
+    return "UNDEFINED CUL_WS: $cde";
+  }
+
+  if(@a == 9) {
+
     $hash = $defptr{$cde};
-    $tmp += $hash->{corr1};
-    $hum += $hash->{corr2};
-    $val = "T: $tmp  H: $hum";
-    my $n = $hash->{NAME};
-    Log GetLogLevel($n,1), "CUL_WS $n: $val";
-    $hash->{STATE} = $val;
+    my $name = $hash->{NAME};
 
-    $hash->{CHANGED}[0] = $val;
-    $hash->{STATE} = $val;
-    $hash->{READINGS}{state}{TIME} = TimeNow();
+    my $sgn = ($firstbyte&8) ? -1 : 1;
+    my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+    my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+    my $val = "T: $tmp  H: $hum";
+
+    Log GetLogLevel($name,4), "CUL_WS $name: $val";
+
+    $hash->{STATE} = $val;                      # List overview
+    $hash->{READINGS}{state}{TIME} = TimeNow(); # For list
     $hash->{READINGS}{state}{VAL} = $val;
 
-    return $hash->{NAME};
+    $hash->{CHANGED}[0] = $val;                 # For notify
+
+    return $name;
 
   } else {
-
-    Log 1, "CUL_WS detected, Code $cde $val";
 
   }
 
