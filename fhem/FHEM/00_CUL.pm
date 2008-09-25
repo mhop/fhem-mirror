@@ -31,7 +31,7 @@ sub CUL_Read($);
 sub CUL_ReadAnswer($$);
 sub CUL_Ready($$);
 
-my $initstr = "X21";
+my $initstr = "X01";    # Only translated messages, no RSSI
 my %msghist;		# Used when more than one CUL is attached
 my $msgcount = 0;
 my %gets = (
@@ -150,9 +150,11 @@ CUL_Set($@)
   return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
   	if(!defined($sets{$a[1]}));
 
-  my $arg = ($a[2] ? $a[2] : "");
+  my $name = shift @a;
+  my $type = shift @a;
+  my $arg = join("", @a);
 
-  if($a[1] eq "freq") {                         # MHz
+  if($type eq "freq") {                         # MHz
 
     my $f = $arg/26*65536;
 
@@ -162,19 +164,19 @@ CUL_Set($@)
     $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
     my $msg = 
         "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz, verbose to 01";
-    Log 1, $msg;
+    Log GetLogLevel($name,4), $msg;
     CUL_SimpleWrite($hash, "W0D$f2");            # Will reprogram the CC1101
     CUL_SimpleWrite($hash, "W0E$f1");
     CUL_SimpleWrite($hash, "W0F$f0");
     CUL_SimpleWrite($hash, $initstr);
     return $msg;
 
-  } elsif($a[1] eq "bandwidth") {               # KHz
+  } elsif($type eq "bandwidth") {               # KHz
 
     my $ob = 5;
     if(!IsDummy($hash->{NAME})) {
       CUL_SimpleWrite($hash, "C10");
-      $ob = CUL_ReadAnswer($hash, $a[1]);
+      $ob = CUL_ReadAnswer($hash, $type);
       return "Can't get old MDMCFG4 value" if($ob !~ m,/ (.*)\r,);
       $ob = $1 & 0x0f;
     }
@@ -190,15 +192,18 @@ CUL_Set($@)
 GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
     my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to 01";
-    Log 1, $msg;
+
+    Log GetLogLevel($name,4), $msg;
     CUL_SimpleWrite($hash, "W10$ob");
     CUL_SimpleWrite($hash, $initstr);
     return $msg;
 
   } else {
 
-    Log 1, "set @a";
-    CUL_Write($hash, $sets{$a[1]}, $arg);
+    return "Expecting a 0-padded hex number" if((length($arg)&1) == 1);
+    $initstr = "X$arg" if($type eq "verbose");
+    Log GetLogLevel($name,4), "set $name $type $arg";
+    CUL_Write($hash, $sets{$type}, $arg);
 
   }
   return undef;
@@ -343,9 +348,9 @@ CUL_XmitLimitCheck($$)
 
   if(@b > 163) {          # Maximum nr of transmissions per hour (unconfirmed).
 
-    my $me = $hash->{NAME};
-    Log GetLogLevel($me,2), "CUL TRANSMIT LIMIT EXCEEDED";
-    DoTrigger($me, "TRANSMIT LIMIT EXCEEDED");
+    my $name = $hash->{NAME};
+    Log GetLogLevel($name,2), "CUL TRANSMIT LIMIT EXCEEDED";
+    DoTrigger($name, "TRANSMIT LIMIT EXCEEDED");
 
   } else {
 
@@ -371,9 +376,10 @@ CUL_Write($$$)
   my ($hash,$fn,$msg) = @_;
 
   if(!$hash || !defined($hash->{PortObj})) {
-    Log 5, "CUL device $hash->{NAME} is not active, cannot send";
+    Log 5, "CUL device is not active, cannot send";
     return;
   }
+  my $name = $hash->{NAME};
 
   ###################
   # Rewrite message from FHZ -> CUL
@@ -382,7 +388,7 @@ CUL_Write($$$)
     $fn = "F";
     $msg = substr($msg,6);
   } else {
-    Log 1, "CUL cannot translate $fn $msg";
+    Log GetLogLevel($name,2), "CUL cannot translate $fn $msg";
     return;
   }
 
@@ -515,50 +521,52 @@ CUL_Read($)
     $msghist{$msgcount}{MSG}  = $dmsg;
     $msgcount++;
 
-    if($initstr eq "X21") {
+    if($initstr =~ m/X2/) {                          # RSSI
       my $l = length($dmsg);
       my $rssi = hex(substr($dmsg, $l-2, 2));
       $dmsg = substr($dmsg, 0, $l-2);
       $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-      Log 1, "CUL: $dmsg $rssi";
+      Log GetLogLevel($name,4), "CUL: $dmsg $rssi";
     } else {
-      Log 1, "CUL: $dmsg";
+      Log GetLogLevel($name,4), "CUL: $dmsg";
     }
 
     ###########################################
     #Translate Message from CUL to FHZ
     my $fn = substr($dmsg,0,1);
-    if($fn eq "F") {                                 # FS20
+    my $len = length($dmsg);
+
+    if($fn eq "F") {                                 # Reformat for 10_FS20.pm
+
       $dmsg = sprintf("81%02x04xx0101a001%s00%s",
-                        length($dmsg)/2+5,
-                        substr($dmsg,1,6), substr($dmsg,7));
+                        $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
-    } elsif($fn eq "T") {                            # FHT
-
-      $dmsg =~ s/([1-4]\d)79(..)$/${1}69$2/;         # should be done in the FHT
+    } elsif($fn eq "T") {                            # Reformat for 11_FHT.pm
 
       $dmsg = sprintf("81%02x04xx0909a001%s00%s",
-                        length($dmsg)/2+5,
-                        substr($dmsg,1,6), substr($dmsg,7));
+                        $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
-    } elsif($fn eq "K" && length($dmsg) == 15) {     # KS300
+    } elsif($fn eq "K") {
 
-      # K17815254024C82 ->   810d04f94027a0011718254520C428
-      my $n = "";
-      my @a = split("", $dmsg);
-      for(my $i = 0; $i < 14; $i+=2) {   # Swap nibbles.
-        $n .= $a[$i+2] . $a[$i+1];
+      if($len == 15) {                               # Reformat for 13_KS300.pm
+        my @a = split("", $dmsg);
+        $dmsg = sprintf("81%02x04xx4027a001", $len/2+6);
+        for(my $i = 0; $i < 14; $i+=2) { # Swap nibbles.
+          $dmsg .= $a[$i+2] . $a[$i+1];
+        }
+
+      } elsif($len==9 || $len==13) {                 # CUL_WS / Native
+        ;
+      } else {
+        Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
+        goto NEXTMSG;
       }
-      $dmsg = sprintf("81%02x04xx4027a001%s", length($dmsg)/2+6, $n);
-
-    } elsif($fn eq "K" && length($dmsg) == 9) {      # CUL_WS / Native
-      ;
     } elsif($fn eq "E") {                            # CUL_EM / Native
       ;
     } else {
-      Log 4, "CUL: unknown message $dmsg";
+      Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
       goto NEXTMSG;
     }
 
@@ -579,7 +587,7 @@ CUL_Read($)
       last if(int(@found));
     }
     if(!int(@found)) {
-      Log 1, "Unknown code $dmsg, help me!";
+      Log GetLogLevel($name,3), "Unknown code $dmsg, help me!";
       goto NEXTMSG;
     }
 
