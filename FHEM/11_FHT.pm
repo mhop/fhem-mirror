@@ -108,6 +108,7 @@ my %priority = (
 my %c2m = (0 => "auto", 1 => "manual", 2 => "holiday", 3 => "holiday_short");
 my %m2c;	# Reverse c2m
 my %c2b;	# command->button hash (reverse of codes)
+my %c2bset;	# command->button hash (settable values)
 my %defptr;
 
 my $defmin = 0;                # min fhtbuf free bytes before sending commands
@@ -123,6 +124,7 @@ FHT_Initialize($)
   foreach my $k (keys %codes) {
     my $v = $codes{$k};
     $c2b{$v} = $k;
+    $c2bset{$v} = $k if(!$cantset{$v});
   }
   foreach my $k (keys %c2m) {
     $m2c{$c2m{$k}} = $k;
@@ -169,7 +171,7 @@ FHT_Set($@)
     $allcmd .=" " if($allcmd);
     $allcmd .= $cmd;
 
-    return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2b)
+    return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2bset)
                 if(!defined($c2b{$cmd}));
     return "Readonly parameter $cmd"
                 if(defined($cantset{$cmd}));
@@ -292,7 +294,7 @@ sub
 FHT_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}});
+  delete($defptr{$hash->{CODE}}) if($hash && $hash->{CODE});
   return undef;
 }
 
