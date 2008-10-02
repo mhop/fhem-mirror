@@ -56,6 +56,9 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?</a>
 
 <a href="#faq15">15. My notify/filelog does not work, help me!</a><br>
 
+<a href="#faq16">16. Setting auto-mode from manual for the FHT won't change the
+         desired temperature!</a><br>
+
 
 <br/>
 <br/>
@@ -342,6 +345,36 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
 
 
 </ul>
+
+<a name="faq16">
+<b>16. Setting auto-mode from manual for the FHT won't change the desired temperature!</b>
+<ul>
+   Thanks to Waldemar Porsche the following notify will take care of that:<br>
+   <pre>define ExtendedAutoMode notify .*mode.*auto {\
+    $r = $defs{@}{READINGS};;\
+    return if (!defined($r));;\
+    my $olddesired = $r->{"desired-temp"}{VAL};;\
+    return if (!defined($olddesired));;\
+    my @day = ("sun", "mon", "tue", "wed", "thu", "fri", "sat");;\
+    my $now = sprintf("%02d:%02d", $hour, $min);;\
+    my $wd = $day[$wday];;\
+    my $desired;;\
+    if (defined($r->{"warnings"}{VAL}) && $r->{"warnings"}{VAL} eq "Window open") {\
+      $desired = $r->{"windowopen-temp"}{VAL};;\
+    } elsif (defined($r->{"$wd-from1"}{VAL}) && $r->{"$wd-from1"}{VAL} le $now && defined($r->{"$wd-to1"}{VAL}) && $r->{"$wd-to1"}{VAL} ge $now) {\
+      $desired = $r->{"day-temp"}{VAL};;\
+    } elsif (defined($r->{"$wd-from2"}{VAL}) && $r->{"$wd-from2"}{VAL} le $now && defined($r->{"$wd-to2"}{VAL}) && $r->{"$wd-to2"}{VAL} ge $now) {\
+      $desired = $r->{"day-temp"}{VAL};;\
+    } else {\
+      $desired = $r->{"night-temp"}{VAL};;\
+    }\
+    fhem ("set @ desired-temp $desired") if (defined($desired) && $desired ne $olddesired);;\
+  }
+  attr ExtendedAutoMode comment Setzt fuer den Auto mode die desired-temp in Abhaengigkeit von Temperaturprofil und Fensterkontakt
+   </pre>
+</ul>
+
+
 
 </body>
 </html>
