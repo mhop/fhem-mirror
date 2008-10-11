@@ -162,8 +162,8 @@ CUL_Set($@)
     my $f1 = sprintf("%02x", int($f % 65536) / 256);
     my $f0 = sprintf("%02x", $f % 256);
     $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
-    my $msg = 
-        "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz, verbose to 01";
+    my $msg = "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz, ".
+                "verbose to $initstr";
     Log GetLogLevel($name,4), $msg;
     CUL_SimpleWrite($hash, "W0D$f2");            # Will reprogram the CC1101
     CUL_SimpleWrite($hash, "W0E$f1");
@@ -191,7 +191,7 @@ CUL_Set($@)
     }
 GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
-    my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to 01";
+    my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to $initstr";
 
     Log GetLogLevel($name,4), $msg;
     CUL_SimpleWrite($hash, "W10$ob");
@@ -494,6 +494,14 @@ CUL_Read($)
     ($dmsg,$culdata) = split("\n", $culdata);
     $dmsg =~ s/\r//;
 
+    # Debug message, X05
+    if($dmsg =~ m/^p /) {
+      foreach my $m (split("p ", $dmsg)) {
+        Log GetLogLevel($name,4), "CUL: p $m";
+      }
+      goto NEXTMSG;
+    }
+
     ###############
     # check for duplicate msg from different CUL's
     my $now = gettimeofday();
@@ -556,13 +564,9 @@ CUL_Read($)
         for(my $i = 0; $i < 14; $i+=2) { # Swap nibbles.
           $dmsg .= $a[$i+2] . $a[$i+1];
         }
-
-      } elsif($len==9 || $len==13) {                 # CUL_WS / Native
-        ;
-      } else {
-        Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
-        goto NEXTMSG;
       }
+      # Other K... Messages ar sent to CUL_WS
+
     } elsif($fn eq "E") {                            # CUL_EM / Native
       ;
     } else {
