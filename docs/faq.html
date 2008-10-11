@@ -59,6 +59,7 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?</a>
 <a href="#faq16">16. Setting auto-mode from manual for the FHT won't change the
          desired temperature!</a><br>
 
+<a href="#faq17">17. I have problem receiving data, I get "Bad CRC" or "Oversized message."</a><br>
 
 <br/>
 <br/>
@@ -355,8 +356,8 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
     return if (!defined($r));;\
     my $olddesired = $r->{"desired-temp"}{VAL};;\
     return if (!defined($olddesired));;\
-    my @day = ("sun", "mon", "tue", "wed", "thu", "fri", "sat");;\
-    my $now = sprintf("%02d:%02d", $hour, $min);;\
+    my @@day = ("sun", "mon", "tue", "wed", "thu", "fri", "sat");;\
+    my $now = sprintf("%%02d:%%02d", $hour, $min);;\
     my $wd = $day[$wday];;\
     my $desired;;\
     if (defined($r->{"warnings"}{VAL}) && $r->{"warnings"}{VAL} eq "Window open") {\
@@ -371,6 +372,26 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
     fhem ("set @ desired-temp $desired") if (defined($desired) && $desired ne $olddesired);;\
   }
   attr ExtendedAutoMode comment Setzt fuer den Auto mode die desired-temp in Abhaengigkeit von Temperaturprofil und Fensterkontakt
+   </pre>
+</ul>
+
+<a name="faq17">
+<b>17. I have problem receiving data, I get "Bad CRC" or "Oversized
+   message."</b>
+<ul>
+   Some Linux distibutions have problems with the settings of the serial USB
+   lines. Sometimes the 8.th bit is stripped, sometimes software flowcontrol
+   is enabled. Fhem tries to clear the serial line, but it is not always
+   successfull. Following command fixes the problem in some cases:
+
+   <pre>
+     stty < /dev/elv_fhz1300pc\
+        -parenb -parodd cs8 hupcl -cstopb -cread clocal\
+        -crtscts -ignbrk -brkint -ignpar -parmrk -inpck -istrip -inlcr\
+        -igncr -icrnl -ixon -ixoff -iuclc -ixany -imaxbel -iutf8 -opost\
+        -olcuc -ocrnl -onlcr -onocr -onlret -ofill -ofdel nl0 cr0 tab0\
+        bs0 vt0 ff0 -isig -icanon -iexten -echo -echoe -echok -echonl\
+        -noflsh -xcase -tostop -echoprt -echoctl -echoke
    </pre>
 </ul>
 
