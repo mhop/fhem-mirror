@@ -23,7 +23,7 @@ CUL_WS_Initialize($)
   # Message is like
   # K41350270
 
-  $hash->{Match}     = "^K.....\$";
+  $hash->{Match}     = "^K.....";
   $hash->{DefFn}     = "CUL_WS_Define";
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{ParseFn}   = "CUL_WS_Parse";
@@ -58,7 +58,7 @@ sub
 CUL_WS_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}});
+  delete($defptr{$hash->{CODE}}) if($hash && $hash->{CODE});
   return undef;
 }
 
