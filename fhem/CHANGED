@@ -433,4 +433,4 @@
   - feature: FHT internal modifications (better protocol understanding)
   - feature: add timestamp to inform
   - feature: The strange stty settings in 00_FHEM.pm are optional
-            
+  - bugfix:  webpgm2 iPhone fix

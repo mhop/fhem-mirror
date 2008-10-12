@@ -330,7 +330,7 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
    localhost 7072) and issue the command "inform on". If there is an
    FS20/HMS/etc event, then you'll see a line of the form
    "TYPE DEVICENAME EVENT". Some devicetypes generate more than one trigger
-   message for one event, (E.g. HMS or KS300.<br>
+   message for one event, e.g. HMS or KS300.<br>
    Example: you have an FS20 device named piri, which sends a command
    "on-for-timer 60". In this case you'll see: FS20 piri on-for-timer 60
    <br><br>
@@ -338,11 +338,15 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
    Now define your notify/filelog. The regexp specified will be tested
    against the DEVICENAME and against the DEVICENAME:EVENT strings. If they
    match, then the action will be executed. For our example this would be:
-   define piri_ntfy piri:on.* some_command<br><br>
+   define piri_ntfy notify piri:on.* some_command<br><br>
 
    You can test the notify/filelog with the trigger command: issue "trigger
    DEVICENAME EVENT" in the telnet prompt, and check if your notify/filelog
-   works as designed. Example: trigger piri on-for-timer 60<br><br>
+   works as designed. Example: trigger piri on-for-timer 60<br>
+   Tip: you can test a new setup without a connected FHZ1x00. Create a new
+   config file, set the FHZ1x00 device to none, and generate events via
+   trigger.
+   <br><br>
 
 
 </ul>

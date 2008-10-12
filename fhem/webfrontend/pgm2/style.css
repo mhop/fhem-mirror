@@ -48,4 +48,4 @@ table.FHEMWEB tr.odd { background: #F0F0F0; }
 #hdr   { position:absolute; top:10px; left:10px; }
 #left  { position:absolute; top:50px; left:10px; width:130px; }
 #right { position:absolute; top:50px; left:160px;
-         right:10px; bottom:10px; overflow:auto; }
+         right:10px; overflow:auto; }

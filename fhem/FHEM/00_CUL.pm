@@ -39,13 +39,13 @@ my %gets = (
   "eeprom"   => "R",
   "version"  => "V",
   "time"     => "t",
+  "raw"      => "",
   "ccconf"   => "=",
 );
 
 my %sets = (
   "eeprom"    => "W",
-  "rawFS20"   => "F",
-  "rawFHT"    => "T",
+  "raw"       => "",
   "verbose"   => "X",
   "freq"      => "=",
   "bandwidth" => "=",
@@ -200,7 +200,8 @@ GOTBW:
 
   } else {
 
-    return "Expecting a 0-padded hex number" if((length($arg)&1) == 1);
+    return "Expecting a 0-padded hex number"
+        if((length($arg)&1) == 1 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
     Log GetLogLevel($name,4), "set $name $type $arg";
     CUL_Write($hash, $sets{$type}, $arg);
@@ -383,7 +384,7 @@ CUL_Write($$$)
 
   ###################
   # Rewrite message from FHZ -> CUL
-  if(length($fn) == 1) {                                   # CUL Native
+  if(length($fn) <= 1) {                                   # CUL Native
   } elsif($fn eq "04" && substr($msg,0,6) eq "010101") {   # FS20
     $fn = "F";
     $msg = substr($msg,6);
@@ -558,7 +559,7 @@ CUL_Read($)
 
     } elsif($fn eq "K") {
 
-      if($len == 15) {                               # Reformat for 13_KS300.pm
+      if($len == 99) {                               # Reformat for 13_KS300.pm
         my @a = split("", $dmsg);
         $dmsg = sprintf("81%02x04xx4027a001", $len/2+6);
         for(my $i = 0; $i < 14; $i+=2) { # Swap nibbles.
