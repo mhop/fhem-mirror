@@ -76,24 +76,6 @@ CUL_WS_Parse($$)
 
   my @a = split("", $msg);
 
-  if(@a == 5) {                 # 433MHz / reverse the bits
-    my (@b, $ob);
-    for(my $i = 0; $i<@a; $i++) {
-      my $r = hex($a[$i]);
-      $r = ((($r & 0x3)<<2) | (($r & 0xc)>>2));
-      $r = ((($r & 0x5)<<1) | (($r & 0xa)>>1));
-
-      if($i&1) {
-        push(@b, sprintf("%X%X", $r, $ob));
-      } elsif($i == (@a-1)) {
-        push(@b, sprintf("%X", $r));
-      } else {
-        $ob = $r;
-      }
-    }
-    @a = @b;
-  }
-
   my $firstbyte = hex($a[1]);
   my $cde = ($firstbyte&7) + 1;
 
