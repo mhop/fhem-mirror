@@ -35,11 +35,17 @@ CUL_EM_Define($$)
                 if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
 
   $hash->{CODE} = $a[2];
+
   if($a[2] >= 1 && $a[2] <= 4) {                # EMWZ: nRotation in 5 minutes
     my $c = (int(@a) > 3 ? $a[3] : 150);
     $hash->{corr} = (12/$c);
+
   } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM: 0.01
     $hash->{corr} = (int(@a) > 3 ? $a[3] : 0.01);
+
+  } elsif($a[2] >= 9 && $a[2] <= 12) {          # EMGZ: 0.01
+    $hash->{corr} = (int(@a) > 3 ? $a[3] : 0.01);
+
   } else {
     $hash->{corr} = 1;
   }
