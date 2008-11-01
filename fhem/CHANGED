@@ -225,7 +225,7 @@
     - filelogs will additionally be notified on set or trigger commands
     - the extra_notify flag is gone: it is default now, there is a
       do_not_notify flag for the opposite behaviour.
-  - feature: at timespec as a function. Example: at +*{sunset()} 
+  - feature: at timespec as a function. Example: at +*{sunset()}
     commandref.html and examples revisited.
   - feature: 99_SUNRISE.pm added to use with the new at functionality
     (replaces the old 99_SUNSET.pm)
@@ -434,3 +434,4 @@
   - feature: add timestamp to inform
   - feature: The strange stty settings in 00_FHEM.pm are optional
   - bugfix:  webpgm2 iPhone fix
+  - feature: fullinit and reopen commands for FHZ added (Boris 2008-11-01)
