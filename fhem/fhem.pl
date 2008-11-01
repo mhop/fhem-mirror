@@ -128,7 +128,7 @@ use vars qw(%readyfnlist);	# devices which want a "readyfn"
 use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
 use vars qw($init_done);        #
-use vars qw($internal_data);    # 
+use vars qw($internal_data);    #
 
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
@@ -145,7 +145,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.55 2008-09-14 12:53:39 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.56 2008-11-01 21:27:10 neubert Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -167,15 +167,15 @@ $modules{_internal_}{AttrList} =
 my %cmds = (
   "?"       => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
-  "attr" => { Fn=>"CommandAttr", 
+  "attr" => { Fn=>"CommandAttr",
             Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>" },
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
-  "deleteattr" => { Fn=>"CommandDeleteAttr", 
+  "deleteattr" => { Fn=>"CommandDeleteAttr",
 	    Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
   "delete"  => { Fn=>"CommandDelete",
 	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
-  "get"     => { Fn=>"CommandGet", 
+  "get"     => { Fn=>"CommandGet",
 	    Hlp=>"<devspec> <type dependent>,request data from <devspec>" },
   "help"    => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
@@ -195,13 +195,13 @@ my %cmds = (
 	    Hlp=>"<old> <new>,rename a definition" },
   "rereadcfg"  => { Fn=>"CommandRereadCfg",
 	    Hlp=>",reread the config file" },
-  "save"    => { Fn=>"CommandSave", 
+  "save"    => { Fn=>"CommandSave",
 	    Hlp=>"[configfile],write the configfile and the statefile" },
-  "set"     => { Fn=>"CommandSet", 
+  "set"     => { Fn=>"CommandSet",
 	    Hlp=>"<devspec> <type dependent>,transmit code for <devspec>" },
-  "setstate"=> { Fn=>"CommandSetstate", 
+  "setstate"=> { Fn=>"CommandSetstate",
 	    Hlp=>"<devspec> <state>,set the state shown in the command list" },
-  "setdefaultattr" => { Fn=>"CommandDefaultAttr", 
+  "setdefaultattr" => { Fn=>"CommandDefaultAttr",
 	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "shutdown"=> { Fn=>"CommandShutdown",
 	    Hlp=>",terminate the server" },
@@ -277,7 +277,7 @@ Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
 ################################################
 # Main Loop
-sub MAIN {MAIN:};#Dummy 
+sub MAIN {MAIN:};#Dummy
 while (1) {
   my ($rout, $rin) = ('', '');
 
@@ -299,7 +299,7 @@ while (1) {
     next if ($! == 0);
     die("Select error $nfound / $!\n");
   }
- 
+
   ###############################
   # Message from the hardware (FHZ1000/WS3000/etc) via select or the Ready
   # Function. The latter ist needed for Windows, where USB devices are not
@@ -312,7 +312,7 @@ while (1) {
     CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p})
       if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p}));
   }
-  
+
   if(vec($rout, $server->fileno(), 1)) {
     my @clientinfo = $server->accept();
     if(!@clientinfo) {
@@ -508,14 +508,14 @@ AnalyzeCommand($$)
   $cmd =~ s/^(\\\n|[ \t])*//;		# Strip space or \\n at the begginning
   $cmd =~ s/[ \t]*$//;
 
-  
+
   Log 5, "Cmd: >$cmd<";
   return if(!$cmd);
 
   if($cmd =~ m/^{.*}$/s) {		# Perl code
 
     $cmd =~ s/\\\n/ /g;                 # Multi-line
-    # Make life easier for oneliners: 
+    # Make life easier for oneliners:
     %value = ();
     foreach my $d (keys %defs) { $value{$d} = $defs{$d}{STATE} }
     my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
@@ -538,7 +538,7 @@ AnalyzeCommand($$)
   }
 
   if($cmd =~ m/^"(.*)"$/s) {		 # Shell code, always in bg
-    system("$1 &"); 
+    system("$1 &");
     return;
   }
 
@@ -617,7 +617,7 @@ CommandHelp($$)
   my ($cl, $param) = @_;
 
   my $str = "\n" .
-            "Possible commands:\n\n" . 
+            "Possible commands:\n\n" .
             "Command   Parameter                 Description\n" .
 	    "-----------------------------------------------\n";
 
@@ -670,7 +670,7 @@ OpenLogfile($)
     open LOG, '>&STDOUT'    or die "Can't dup stdout: $!";
 
   } else {
-    
+
     $defs{global}{currentlogfile} = $param;
     $defs{global}{logfile} = $attr{global}{logfile};
     HandleArchiving($defs{global});
@@ -839,7 +839,7 @@ CommandSave($$)
       }
     }
   }
-  
+
   print SFH "setdefaultattr\n";        # Delete the last default attribute.
 
   print SFH "include $attr{global}{lastinclude}\n"
@@ -982,7 +982,7 @@ CommandDefine($$)
   $hash{DEF}   = $a[2] if(int(@a) > 2);
   $hash{NR}    = $devcount++;
 
-  # If the device wants to issue initialization gets/sets, then it needs to be 
+  # If the device wants to issue initialization gets/sets, then it needs to be
   # in the global hash.
   $defs{$a[0]} = \%hash;
 
@@ -1271,7 +1271,7 @@ CommandReload($$)
   Log 5, "Loading $file, order $order";
 
   no strict "refs";
-  eval { 
+  eval {
     my $ret=do "$file";
     if (!$ret) {
         Log 1,"Error:Modul $param deactivated:\n $@";
@@ -1438,7 +1438,7 @@ CommandAttr($$)
   my $ret = undef;
   my @a;
   @a = split(" ", $param, 3) if($param);
-  
+
   return "Usage: attr <name> <attrname> [<attrvalue>]\n$namedef"
            if(@a && @a < 2);
 
@@ -1500,7 +1500,7 @@ CommandDefaultAttr($$)
     $defaultattr{$a[0]} = 1;
   } else {
     $defaultattr{$a[0]} = $a[1];
-  } 
+  }
   return undef;
 }
 
@@ -1509,7 +1509,7 @@ sub
 CommandSetstate($$)
 {
   my ($cl, $param) = @_;
-  
+
   my @a = split(" ", $param, 2);
   return "Usage: setstate <name> <state>\n$namedef" if(@a != 2);
 
@@ -1758,7 +1758,7 @@ ResolveDateWildcards($@)
   my $j = sprintf("%03d", $t[7]+1);    $f =~ s/%j/$j/g;
   my $U = sprintf("%02d", int(($t[7]-$t[6]+6)/7));   $f =~ s/%U/$U/g;
   my $V = sprintf("%02d", int(($t[7]-$t[6]+7)/7)+1); $f =~ s/%V/$V/g;
-  
+
   return $f;
 }
 
@@ -1840,7 +1840,7 @@ DoTrigger($$)
     for(my $i = 0; $i < $max; $i++) {
       my $state = $defs{$dev}{CHANGED}[$i];
       my $fe = "$dev:$state";
-      syswrite($client{$c}{fd}, 
+      syswrite($client{$c}{fd},
         ($client{$c}{inform} eq "timer" ? "$tn " : "") .
         "$defs{$dev}{TYPE} $dev $state\n");
     }
@@ -1855,9 +1855,13 @@ DoTrigger($$)
     $defs{$dev}{INTRIGGER}=1;
     my $ret = "";
     foreach my $n (sort keys %defs) {
-      if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
-        Log 5, "$dev trigger: Checking $n for notify";
-        $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+      if(defined($modules{$defs{$n}{TYPE}})) {
+        if(defined($modules{$defs{$n}{TYPE}}{NotifyFn})) {
+          if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
+            Log 5, "$dev trigger: Checking $n for notify";
+            $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+          }
+        }
       }
     }
     delete($defs{$dev}{INTRIGGER});
@@ -1949,7 +1953,7 @@ HandleArchiving($)
   my $cmd = $attr{$ln}{archivecmd};
   if($cmd) {
     $cmd =~ s/%/$log->{currentlogfile}/g;
-    Log 2, "Archive: calling $cmd"; 
+    Log 2, "Archive: calling $cmd";
     system($cmd);
     return;
   }
