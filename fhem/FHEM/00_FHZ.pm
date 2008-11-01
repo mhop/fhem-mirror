@@ -30,6 +30,8 @@ my %sets = (
 
   "activefor"=> "xx xx",
   "raw"      => "xx xx",
+  "initfull" => "xx xx",
+  "reopen"   => "xx xx",
 );
 my %setnrparam = (
   "time"     => 0,
@@ -38,6 +40,8 @@ my %setnrparam = (
   "FHTcode"  => 1,
   "activefor"=> 1,
   "raw"      => 2,
+  "initfull" => 0,
+  "reopen"   => 0,
 );
 
 my %codes = (
@@ -74,7 +78,7 @@ FHZ_Initialize($)
   $hash->{StateFn} = "FHZ_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
-                   "fhtsoftbuffer:1,0"; 
+                   "fhtsoftbuffer:1,0";
 }
 #####################################
 sub
@@ -116,6 +120,21 @@ FHZ_Set($@)
 
     $dhash->{IODev} = $hash;
     return undef;
+
+  } elsif($a[1] eq "initfull") {
+
+    my @init;
+    push(@init, "get $name init2");
+    push(@init, "get $name serial");
+    push(@init, "set $name initHMS");
+    push(@init, "set $name initFS20");
+    push(@init, "set $name time");
+    push(@init, "set $name raw 04 01010100010000");
+    CommandChain(3, \@init);
+
+  } elsif($a[1] eq "reopen") {
+
+    FHZ_Reopen($hash);
 
   } elsif($a[1] eq "raw") {
 
@@ -266,7 +285,7 @@ FHZ_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
-  
+
   Log 3, "FHZ opening FHZ device $dev";
   if ($^O=~/Win/) {
    require Win32::SerialPort;
@@ -429,7 +448,7 @@ FHZ_CompleteMsg($$)
   return pack('C*', 0x81, $len/2+2, ord(pack('H*',$fn)), FHZ_Crc(@data), @data);
 }
 
-    
+
 #####################################
 # Check if the 1% limit is reached and trigger notifies
 sub
@@ -527,6 +546,31 @@ FHZ_HandleWriteQueue($)
 
 #####################################
 sub
+FHZ_Reopen($)
+{
+  my ($hash) = @_;
+
+  my $devname = $hash->{DeviceName};
+  $hash->{PortObj}->close();
+  Log 1, "USB device $devname closed";
+  for(;;) {
+      sleep(5);
+      if ($^O eq 'MSWin32') {
+        $hash->{PortObj} = new Win32::SerialPort($devname);
+      }else{
+        $hash->{PortObj} = new Device::SerialPort($devname);
+      }
+      if($hash->{PortObj}) {
+        Log 1, "USB device $devname reopened";
+        $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
+        DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
+        return;
+      }
+  }
+}
+
+#####################################
+sub
 FHZ_Read($)
 {
   my ($hash) = @_;
@@ -551,9 +595,9 @@ FHZ_Read($)
       if ($^O eq 'MSWin32') {
         $hash->{PortObj} = new Win32::SerialPort($devname);
       }else{
-        $hash->{PortObj} = new Device::SerialPort($devname);  
+        $hash->{PortObj} = new Device::SerialPort($devname);
       }
-      
+
       if($hash->{PortObj}) {
         Log 1, "USB device $devname reappeared";
         $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
