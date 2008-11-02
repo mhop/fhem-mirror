@@ -34,7 +34,7 @@ DbLog_Define($@)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> DbLog configuration regexp" 
+  return "wrong syntax: define <name> DbLog configuration regexp"
 	if(int(@a) != 4);
 
   my $regexp    	= $a[3];
@@ -58,7 +58,7 @@ DbLog_Undef($$)
 {
   my ($hash, $name) = @_;
   my $dbh= $hash->{DBH};
-  $dbh->disconnect() if(defined($dbh)); 
+  $dbh->disconnect() if(defined($dbh));
   return undef;
 }
 
@@ -101,17 +101,18 @@ DbLog_ParseEvent($$)
 
 
   # EMEM, M232Counter, M232Voltage return plain numbers
-  if(($type eq "M232Voltage") || 
+  if(($type eq "M232Voltage") ||
      ($type eq "M232Counter") ||
      ($type eq "EMEM")) {
   }
   # FS20
-  elsif($type eq "FS20") {
+  elsif(($type eq "FS20") ||
+        ($type eq "X10")) {
      @parts= split(/ /,$value);
      my $reading= $parts[0]; if(!defined($reading)) { $reading= ""; }
      if($#parts>=1) {
      	$value= join(" ", shift @parts);
-	     if($reading =~ m(^dim*%$)) { 
+	     if($reading =~ m(^dim*%$)) {
 		$value= substr($reading,3,length($reading)-4);
      		$reading= "dim";
 		$unit= "%";
@@ -121,7 +122,7 @@ DbLog_ParseEvent($$)
       }
      }
   }
-  # FHT 
+  # FHT
   elsif($type eq "FHT") {
      if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
 	@parts= split(/ /,$event);
@@ -131,7 +132,7 @@ DbLog_ParseEvent($$)
      }
      if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading =~ m(^actuator[0-9]*)) { 
+     if($reading =~ m(^actuator[0-9]*)) {
 		if($value eq "lime-protection") {
 			$reading= "actuator-lime-protection";
 			undef $value;
@@ -165,7 +166,7 @@ DbLog_ParseEvent($$)
 			undef $value;
 		}
 		else {
-			$value=~ s/%//; $value= $value*1.; $unit= "%"; 
+			$value=~ s/%//; $value= $value*1.; $unit= "%";
 		}
      }
   }
@@ -179,8 +180,8 @@ DbLog_ParseEvent($$)
      if($reading eq "rain") { $value=~ s/ \(l\/m2\)//; $unit= "l/m2"; }
      if($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
      if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
-     if($reading eq "israining") { 
-	$value=~ s/ \(yes\/no\)//; 
+     if($reading eq "israining") {
+	$value=~ s/ \(yes\/no\)//;
         $value=~ s/no/0/;
         $value=~ s/yes/1/;
       }
@@ -190,13 +191,13 @@ DbLog_ParseEvent($$)
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
      if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
-     if($reading eq "battery") { 
+     if($reading eq "battery") {
         $value=~ s/ok/1/;
         $value=~ s/replaced/1/;
         $value=~ s/empty/0/;
      }
    }
-  
+
 
   @result= ($reading,$value,$unit);
   return @result;
@@ -209,7 +210,7 @@ DbLog_Log($$)
 {
   # Log is my entry, Dev is the entry of the changed device
   my ($log, $dev) = @_;
- 
+
   # name and type required for parsing
   my $n= $dev->{NAME};
   my $t= $dev->{TYPE};
@@ -232,10 +233,10 @@ DbLog_Log($$)
       my $reading= $r[0];
       my $value= $r[1];
       my $unit= $r[2];
-      if(!defined $reading) { $reading= ""; }	
-      if(!defined $value) { $value= ""; }	
-      if(!defined $unit) { $unit= ""; }	
-	
+      if(!defined $reading) { $reading= ""; }
+      if(!defined $value) { $value= ""; }
+      if(!defined $unit) { $unit= ""; }
+
 
       my $is= "(TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES " .
          "('$ts', '$n', '$t', '$s', '$reading', '$value', '$unit')";
@@ -287,7 +288,7 @@ sub
 DbLog_ExecSQL1($$)
 {
   my ($dbh,$sql)= @_;
- 
+
   my $sth = $dbh->do($sql);
   if(!$sth) {
     Log 2, "DBLog error: " . $DBI::errstr;
@@ -300,7 +301,7 @@ sub
 DbLog_ExecSQL($$)
 {
   my ($hash,$sql)= @_;
- 
+
   Log 5, "Executing $sql";
   my $dbh= $hash->{DBH};
   if(!DbLog_ExecSQL1($dbh,$sql)) {

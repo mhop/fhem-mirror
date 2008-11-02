@@ -334,7 +334,7 @@ xml_parser_free($xml_parser);
       if ($showroombuttons==1)
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
-	      if (substr($stack[0][children][$i][name],0,5)=='FS20_')
+	      if ( (substr($stack[0][children][$i][name],0,5)=='FS20_') || (substr($stack[0][children][$i][name],0,4)=='X10_'))
 	      {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -599,7 +599,7 @@ xml_parser_free($xml_parser);
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
 	############################
-	      if (substr($stack[0][children][$i][name],0,5)=='FS20_')
+	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_')||(substr($stack[0][children][$i][name],0,4)=='X10_'))
 	      {
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
