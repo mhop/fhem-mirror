@@ -435,3 +435,7 @@
   - feature: The strange stty settings in 00_FHEM.pm are optional
   - bugfix:  webpgm2 iPhone fix
   - feature: fullinit and reopen commands for FHZ added (Boris 2008-11-01)
+  - bugfix:  avoid access to undefined NotifyFn in hash in fhem.pl (Boris 2008-11-01)
+  - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
+             devices in fhem (Boris 2008-11-02)
+  - feature: X10 support for pgm3 (Boris 2008-11-02)

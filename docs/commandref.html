@@ -49,11 +49,11 @@ You can use all of the following commands in in two ways:
     A minimal configuration file would look like:
     <pre>
       attr global <a href="#logfile">logfile</a> /tmp/fhem.log
-      attr global <a href="#statefile">statefile</a> /tmp/fhem.save  
-      attr global <a href="#verbose">verbose</a> 3                   
-      attr global <a href="#port">port</a> 7072                   
+      attr global <a href="#statefile">statefile</a> /tmp/fhem.save
+      attr global <a href="#verbose">verbose</a> 3
+      attr global <a href="#port">port</a> 7072
       attr global <a href="#modpath">modpath</a> /usr/local/lib
-      <a href="#define">define</a> FHZ FHZ /dev/tts/USB0        
+      <a href="#define">define</a> FHZ FHZ /dev/tts/USB0
 
       <a href="#define">define</a> lamp FS20 8765 01</pre>
     For other configuration files see the examples subdirectory.<br>
@@ -1004,7 +1004,7 @@ fs20usr</pre></li>
     </ul>
     <br>
   </ul>
-  
+
   <a name="IPWE"></a>
   <h4>Type IPWE</h4>
   <ul>
@@ -1013,21 +1013,21 @@ fs20usr</pre></li>
 
     Define a IPWE network attached weather data receiver device sold by ELV. Details see <a
     href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=21508">here</a>.
-    It's intended to receive the same sensors as WS300 (8 T/H-Sensors and one kombi sensor), 
+    It's intended to receive the same sensors as WS300 (8 T/H-Sensors and one kombi sensor),
     but can be accessed via http and telnet.
     <br>
      For unknown reason, my try to use the telnet interface   was not working neither with raw sockets
       nor with Net::Telnet module. Therefore i choosed here the "easy" way
-    to simple readout the http page and extract all data from the offered table. For this reason this module doesnt 
+    to simple readout the http page and extract all data from the offered table. For this reason this module doesnt
     contain any option to configure this device.
     <br><br><b>Note:</b> You should give your sensors a name within the web interface, once they a received the first time.
     <br>To extract a single sensor simply match for this name or sensor id<br>
 	<br>
-	
+
     Attributes:
     <ul>
       <li><code>delay</code>: seconds between read accesses(default 300s)</li>
-      
+
     </ul>
     <br>
     Example:
@@ -1039,7 +1039,70 @@ fs20usr</pre></li>
     </ul>
     <br>
   </ul>
-  
+
+  <a name="CM11"></a>
+  <h4>Type CM11</h4>
+  <ul>
+    <code>define &lt;name&gt; CM11 &lt;serial-device&gt;</code>
+    <br><br>
+    CM11 is the X10 module to interface X10 devices with the PC.<br><br>
+
+    The current implementation can evaluate incoming data on the powerline of
+    any kind. It can send on, off, dimdown and dimup commands.
+    <br><br>
+    This statement specifies the serial port to communicate with the CM11.
+    The name of the serial-device depends on your distribution. If serial-device
+    is none, then no device will be opened, so youcan experiment without
+    hardware attached.<br>
+
+    If you experience problems (for verbose 4 you get a lot of "Bad CRC message"
+    in the log), then try to define your device as <br>
+    <code>define &lt;name&gt; FHZ &lt;serial-device&gt; strangetty</code><br>
+    <br>
+
+    Example:
+    <ul>
+      <code>define x10if CM11 /dev/ttyUSB3</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="X10"></a>
+  <h4>Type X10</h4>
+  <ul>
+    <code>define &lt;name&gt; X10 &lt;model&gt; &lt;housecode&gt;
+          &lt;unitcode&gt;</code>
+    <br><br>
+
+   Defines an X10 device via its model, housecode and unitcode.<br><br>
+
+   Notes:
+   <ul>
+   <li><code>&lt;model&gt;</code> is one of
+      <ul>
+        <li><code>lm12</code>: lamp module, dimmable</li>
+        <li><code>lm15</code>: lamp module, not dimmable</li>
+        <li><code>am12</code>: appliance module, not dimmable</li>
+        <li><code>tm12</code>: tranceiver module, not dimmable. Its
+            unitcode is 1.</li>
+      </ul>
+      Model determines whether a dim command is reasonable to be sent
+      or not.</li>
+   <li><code>&lt;housecode&gt;</code> ranges from A to P.</li>
+   <li><code>&lt;unitcode&gt;</code> ranges from 1 to 16.</li>
+   </ul>
+   <br>
+
+    Examples:
+    <ul>
+      <code>define lamp1 X10 lm12 N 10</code><br>
+      <code>define pump X10 am12 B 7</code><br>
+      <code>define lamp2 X10 lm15 N 11</code><br>
+    </ul>
+  </ul>
+  <br>
+
+
   <a name="FileLog"></a>
   <h4>Type FileLog</h4>
   <ul>
@@ -1078,23 +1141,23 @@ fs20usr</pre></li>
   <ul>
     <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
     <br><br>
-  
+
     Log events to a database. The database connection is defined in
-    <code>&lt;configfilename&gt;</code> (see sample configuration file 
+    <code>&lt;configfilename&gt;</code> (see sample configuration file
     <code>db.conf</code>). The configuration is stored in a separate file
     to avoid storing the password in the main configuration file and to have it
     visible in the output of the <a href="#list">list</a> command.
     <br><br>
 
-    You must have <code>93_DbLog.pm</code> in the <code>FHEM</code> subdirectory 
-    to make this work. Additionally, the modules <code>DBI</code> and 
-    <code>DBD::&lt;dbtype&gt;</code> need to be installed (use 
+    You must have <code>93_DbLog.pm</code> in the <code>FHEM</code> subdirectory
+    to make this work. Additionally, the modules <code>DBI</code> and
+    <code>DBD::&lt;dbtype&gt;</code> need to be installed (use
     <code>cpan -i &lt;module&gt;</code> if your distribution does not have it).
     <br><br>
     <code>&lt;regexp&gt;</code> is the same as in <a href="#FileLog">FileLog</a>.
     <br><br>
     Sample code to create a MySQL database is in <code>fhemdb_create.sql</code>.
-    The database contains two tables: <code>current</code> and 
+    The database contains two tables: <code>current</code> and
     <code>history</code>. The latter contains all events whereas the former only
     contains the last event for any given reading and device.
     The columns have the following meaning:
@@ -1102,9 +1165,9 @@ fs20usr</pre></li>
 	<li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
 	<li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
 	<li>TYPE: device type, e.g. <code>KS300</code></li>
-	<li>EVENT: event specification as full string, 
+	<li>EVENT: event specification as full string,
                                     	e.g. <code>humidity: 71 (%)</code></li>
-	<li>READING: name of reading extracted from event, 
+	<li>READING: name of reading extracted from event,
 					e.g. <code>humidity</code></li>
 	<li>VALUE: actual reading extracted from event,
 					e.g. <code>71</code></li>
@@ -1114,8 +1177,8 @@ fs20usr</pre></li>
     <code>yes</code> is translated to <code>1</code>.
     <br><br>
     The current values can be retrieved by means of the perl script
-    <code>fhemdb_get.pl</code>. Its output is adapted to what a 
-    <a href="www.cacti.net">Cacti</a> data input method expects. 
+    <code>fhemdb_get.pl</code>. Its output is adapted to what a
+    <a href="www.cacti.net">Cacti</a> data input method expects.
     Call <code>fhemdb_get.pl</code> without parameters to see the usage
     information.
     <br><br>
@@ -1162,7 +1225,7 @@ fs20usr</pre></li>
     # Blink 3 times if the piri sends a command
     define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
 
-    # Switch the lamp on from sunset to 11 PM 
+    # Switch the lamp on from sunset to 11 PM
     # Copy 99_SUNRISE_EL.pm in the FHEM directory to have sunset_rel()
     { sunrise_coord("8.686", "50.112", "") }
     define a9 at +*{sunset_rel()} set lamp on
@@ -1288,7 +1351,7 @@ fs20usr</pre></li>
       <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code>
       (same as <code>@</code>) and <code>%TYPE</code> (contains the device
       type, e.g. <code>FHT</code>) can be used. A single <code>%</code>
-      looses its special meaning if any of these parameters appears in the 
+      looses its special meaning if any of these parameters appears in the
       definition.</li>
 
       <li><code>&lt;pattern&gt;</code> may also be a compound of
@@ -1344,7 +1407,7 @@ fs20usr</pre></li>
     <br><br>
 
     Define a dummy. A dummy can take via <a href="#set">set</a> any values.
-    Used for programming. 
+    Used for programming.
     Example:
     <ul>
       <code>define myvar dummy</code><br>
@@ -1480,7 +1543,7 @@ fs20usr</pre></li>
     <code>list</code> statement for the device).
     <br><br>
   </ul>
-  
+
   <a name="WS2000get"></a>
   <h4>Type WS2000:</h4>
   <ul>
@@ -1495,8 +1558,8 @@ fs20usr</pre></li>
     <code>RAW</code>: original Data from interface
     <br><br>
   </ul>
-  
- 
+
+
   <a name="IPWEget"></a>
   <h4>Type IPWE</h4>
   <ul>
@@ -1693,7 +1756,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
 <ul>
   <code>modify &lt;name&gt; &lt;type-dependent-options&gt;</code>
   <br><br>
-  
+
   Used to modify some definitions. Useful for changing some <a
   href="#at">at</a> or <a href="#notify">notify</a> definitions.  If specifying
   one argument to an at type deinition, only the time part will be changed. In
@@ -1757,7 +1820,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
 <ul>
   <code>save [&lt;configfile&gt;]</code>
   <br><br>
-  Save first the <a href="#statefile">statefile</a>, then the 
+  Save first the <a href="#statefile">statefile</a>, then the
   <a href="#configfile">configfile</a> information. If a parameter is specified,
   it will be used instead the global configfile attribute.<br><br>
   Notes:
@@ -1792,7 +1855,9 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
       time
       FHTcode
       activefor
-      raw</pre>
+      raw
+      initfull
+      reopen</pre>
     Notes:
     <ul>
       <li>use activefor if you have multiple FHZ devices, and you want to
@@ -1810,6 +1875,26 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
           central FHT code, which is used by the FHT devices. After changing
           it, you <b>must</b> reprogram each FHT80b with: PROG (until Sond
           appears), then select CEnt, Prog, Select nA.</li>
+      <li>If the FHT ceases to work for FHT devices whereas other devices
+          (e.g. HMS, KS300) continue to work, a<ul>
+          <code>set FHZ initfull</code></ul> command could help. Try<ul>
+          <code>set FHZ reopen</code></ul> if the FHZ
+          ceases to work completely. If all else fails, shutdown fhem, unplug
+          and replug the FHZ device. Problems with FHZ may also be related to
+          long USB cables or insufficient power on the USB - use a powered hub
+          to avoid such issues.</li>
+      <li><code>initfull</code> issues the initialization sequence for the FHZ
+          device:<br>
+          <pre>
+            get FHZ init2
+            get FHZ serial
+            set FHZ initHMS
+            set FHZ initFS20
+            set FHZ time
+            set FHZ raw 04 01010100010000</pre></li>
+      <li><code>reopen</code> closes and reopens the serial device port. This
+          implicitely initializes the FHZ and issues the
+          <code>initfull</code> command sequence.</li>
     </ul>
   </ul>
 
@@ -1830,7 +1915,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     off-for-timer
     on                # dimmer: set to value before switching it off
     on-for-timer      # see the note
-    on-old-for-timer  # set to previous (before switching it on) 
+    on-old-for-timer  # set to previous (before switching it on)
     ramp-on-time      # time to reach the desired dim value on dimmers
     ramp-off-time     # time to reach the off state on dimmers
     reset
@@ -1873,7 +1958,8 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
           the program automatically schedules a "setstate off" for the
 	  specified time.</li>
       <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
-	  or {<perl-code>}, where the perl-code returns a time specification).
+	  or { &lt;perl code&gt; }, where the perl-code returns a time
+          specification).
 	  If the current time is greater then the specified time, then the
 	  command is ignored, else an "on" command is generated, and for the
 	  given "till-time" an off command is scheduleld via the at command.
@@ -1892,7 +1978,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
       desired-temp
       day-temp night-temp
       report1 report2
-      mode  
+      mode
       holiday1 holiday2      # Not verified
       manu-temp              # No clue what it does.
       year month day hour minute
@@ -1941,7 +2027,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
                   <li>pair<br>
                      The the FHT80b sent a "you-belong-to-me" to this actuator.
                 </ul>
-                Note: 
+                Note:
           </ul>
           <br>
 
@@ -2004,7 +2090,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
 
       <li><code>report2</code> with parameter 255 requests the following
           settings to be reported: day-temp night-temp windowopen-temp
-          lowtemp-offset desired-temp measured-temp mode warnings. 
+          lowtemp-offset desired-temp measured-temp mode warnings.
           The argument is (more or less) a bitfield, to request unique values
           add up the following:
           <ul>
@@ -2084,7 +2170,7 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     <br><br>
     Sets the state of all digital ports at once, value is 0..255.
     <br><br>
-    <code>set &lt;name&gt; [io0..io7] 0|1</code>
+    <code>set &lt;name&gt; io0..io7 0|1</code>
     <br><br>
     Turns digital port 0..7 off or on.
     <br><br>
@@ -2099,6 +2185,57 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
     <br><br>
   </ul>
 
+  <a name="X10set"></a>
+  <h4>Type X10:</h4>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;argument&gt]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    dimdown           # requires argument, see the note
+    dimup             # requires argument, see the note
+    off
+    on
+    on-till           # Special, see the note
+    </pre>
+    Examples:
+    <ul>
+      <code>set lamp1 dimup 10</code><br>
+      <code>set lamp1,lamp2 off</code><br>
+      <code>set pump off</code><br>
+      <code>set lamp2 on-till 19:59</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>Only switching and dimming are supported by now.</li>
+      <li>Dimming is valid only for a dimmable device as specified by
+          the <code>model</code> argument in its <code>define</code>
+          statement.
+      <li>An X10 device has 210 discrete brightness levels. If you use a
+          X10 sender, e.g. a remote control or a wall switch to dim, a
+          brightness step is 100%/210.</li>
+      <li><code>dimdown</code> and <code>dimup</code> take a number in the
+          range from 0 to 22 as argument. It is assumed that argument 1 is
+          a 1% brightness change (microdim) and arguments 2 to 22 are
+          10%..100% brightness changes. The meaning of argument 0 is
+          unclear.</li>
+      <li>This currently leads to some confusion in the logs as the
+          <code>dimdown</code> and <code>dimup</code> codes are logged with
+          different meaning of the arguments depending on whether the commands
+          were sent from the PC or from a remote control or a wall switch.</li>
+      <li><code>dimdown</code> and <code>dimup</code> from on and off states may
+          have unexpected results. This seems to be a feature of the X10
+          devices.</li>
+      <li><code>on-till</code> requires an absolute time in the "at" format
+          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          returns a time specification).
+          If the current time is greater then the specified time, then the
+          command is ignored, else an "on" command is generated, and for the
+          given "till-time" an off command is scheduleld via the at command.
+          </li>
+    </ul>
+  </ul>
   <a name="FileLogset"></a>
   <h4>Type FileLog:</h4>
   <ul>
@@ -2214,12 +2351,12 @@ Send buffer:<br/>    2007-10-19 00:31:24   desired-temp    22.5
 <h3>Device specification</h3>
 <ul>
   The commands
-    <a href="#attr">attr</a>, 
+    <a href="#attr">attr</a>,
     <a href="#deleteattr">deleteattr</a>,
     <a href="#delete">delete</a>,
     <a href="#get">get</a>,
-    <a href="#list">list</a>, 
-    <a href="#set">set</a>, 
+    <a href="#list">list</a>,
+    <a href="#set">set</a>,
     <a href="#setstate">setstate</a>,
     <a href="#trigger">trigger</a>
   can take a more complex device specification as argument,

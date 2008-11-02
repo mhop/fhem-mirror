@@ -10,7 +10,7 @@
 
 
 <h1>FHEM</h1>
-GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT.
+GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT,X10.
 Formerly known as fhz1000.pl
 <br/><br/>
 Current Version: (as of =DATE=) is <a
@@ -22,7 +22,8 @@ href="#webfrontends"/>webfrontends</a> section for screenshots.
 <h2>Description</h2>
 <ul>
 This program makes the FHZ1000/FHZ1300/WS300 and other USB devices sold by ELV,
-Conrad and others useable with Linux. In fact, there is nothing Linux special
+Conrad and others as well as X10 devices sold by Marmitek, Powerhouse and
+others useable with Linux. In fact, there is nothing Linux special
 in it, there are reports from OS X and Windows. You should be able to use it on
 other platforms as long as you can access the hardware as a serial device.<br>
 The program runs as a server, you can control it via telnet, command line
@@ -32,17 +33,25 @@ Currently implemented features:<br>
 <ul>
   <li>Via the FHZ module (with access to one or more FHZ1000/FHZ1300 device):
   <ul>
-    <li>reading and sending FS20 events (on/off/dimming, timer commands)<br>
-    <li>support of FS20 address features function group, local and global master
+    <li>reading and sending FS20 events (on/off/dimming, timer
+        commands)</li>
+    <li>support of FS20 address features function group, local and global
+        master</li>
     <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
-        The FHT8b seems to work too. <b>Note:</b> the FHT8 wont work.<br>
-        Internal software buffer to prevent lost commands.<br>
-    </li>
+        The FHT8b seems to work too. Note: the FHT8 wont work.<br>
+        Internal software buffer to prevent lost commands.</li>
     <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK,-CO,-FIT and RM100-2)</li>
     <li>reading KS300 data</li>
   </ul>
-     <b>Note:</b>The FHZ1350 WLAN is probably not working due to a prorietary
-     encryption. 
+     Note: The FHZ1350 WLAN is probably not working due to a prorietary
+     encryption.
+  </li>
+  <li>Via the CM11 module (with access to a X10 computer interface):
+  <ul>
+    <li>reading all X10 events</li>
+    <li>sending X10 events (on/off/dimming)</li>
+    <li>on/off switching suppport</li>
+  </ul>
   </li>
   <li>reading WS300 data, and up to 9 attached devices</li>
   <li>reading EM1000WZ/EM1000EM/EM1000GZ data via an attached EM1010PC</li>
@@ -130,7 +139,7 @@ and <a href="faq.html">faq.html</a> for more documentation.
 <h3>Server installation on Unix</h3>
 <ul>
   <li>Check the Makefile for the installation path, then type make install.</li>
-  <li>Create a configuration file (see the examples directory or 
+  <li>Create a configuration file (see the examples directory or
       docs/commandref.html).</li>
   <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
 </ul>
@@ -141,7 +150,7 @@ If you are using cygwin for your perl installation you can follow the guidelines
   <li>Be sure you have perl.exe in your path (%PATH%)</li>
   <li>Make sure that you can access the serial USB device via virtual COM-Port
      or via socket(e.g. <code>COMX or xport:10001</code>).</li>
-  <li>Create a configuration file (see the examples directory and 
+  <li>Create a configuration file (see the examples directory and
       docs/commandref.html)</li>
   <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
 </ul>
@@ -179,7 +188,7 @@ If you are using cygwin for your perl installation you can follow the guidelines
 <h3>Web frontend 3 (webfrontend/pgm3)</h3>
   <ul>
   This frontend is PHP based and was contributed by Martin Haas.
-  Look at the webfrontends/pgm3/docs for more documentation or at 
+  Look at the webfrontends/pgm3/docs for more documentation or at
   <a href="pgm3-0.5.1.png">this screenshot</a>. A lot more details can be
   found on Martins page: <a href="http://www.martin-haas.de/fhz">
   http://www.martin-haas.de/fhz</a>
