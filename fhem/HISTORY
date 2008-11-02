@@ -316,4 +316,9 @@ Fri Jul 25 18:14:26 MEST 2008
 
 - Boris Sat Nov 01 CET 2008
   - feature: new commands fullinit and reopen for FHZ, commandref.html update
+  - bugfix: avoid access to undefined NotifyFn in hash in fhem.pl
 
+- Boris Sun Nov 02 CET 2008
+  - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
+    devices in fhem
+  - feature: X10 support for pgm3
