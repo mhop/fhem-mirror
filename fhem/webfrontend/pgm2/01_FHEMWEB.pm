@@ -1070,8 +1070,9 @@ FW_calcWeblink($$)
   my $fr = FW_getAttr($wl, "fixedrange", undef);
   if($fr) {
     my @range = split(" ", $fr);
-    $__devs{$d}{from} = $range[0];
-    $__devs{$d}{to}   = $range[1];
+    my @t = localtime;
+    $__devs{$d}{from} = ResolveDateWildcards($range[0], @t);
+    $__devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
     return;
   }
 
