@@ -439,3 +439,4 @@
   - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
              devices in fhem (Boris 2008-11-02)
   - feature: X10 support for pgm3 (Boris 2008-11-02)
+  - bugfix:  FHT short message warning
