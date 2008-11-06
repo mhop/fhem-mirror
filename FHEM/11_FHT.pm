@@ -318,6 +318,12 @@ FHT_Parse($$)
   my $def = $defptr{$dev};
   my $name = $def->{NAME};
 
+  # Short message
+  if(length($msg) < 26)  {
+    Log 4,"FHT Short message. Device $name, Message: $msg";
+    return "";
+  }
+
   if(!$val || $cde eq "65" || $cde eq "66") {
     # This is a confirmation message. We reformat it so that
     # it looks like a real message, and let the rest parse it
