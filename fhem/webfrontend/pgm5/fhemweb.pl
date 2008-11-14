@@ -92,7 +92,7 @@ close(FH);
 
 $me = "" if(!$me);
 my $q = new CGI;
-
+$ti = 1;
 
 ##################
 # Lets go:
