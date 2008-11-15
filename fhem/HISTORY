@@ -322,3 +322,7 @@ Fri Jul 25 18:14:26 MEST 2008
   - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
     devices in fhem
   - feature: X10 support for pgm3
+
+- Boris Sat Nov 15 CET 2008
+  - bugfix: correct correction factors for EMEM in 15_CUL_EM.pm
+
