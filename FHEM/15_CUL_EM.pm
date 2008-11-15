@@ -29,8 +29,8 @@ CUL_EM_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> CUL_EM <code> [corr]"
-            if(int(@a) < 3 || int(@a) > 4);
+  return "wrong syntax: define <name> CUL_EM <code> [corr1 corr2]"
+            if(int(@a) != 3 && int(@a) != 5);
   return "Define $a[0]: wrong CODE format: valid is 1-12"
                 if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
 
@@ -38,16 +38,22 @@ CUL_EM_Define($$)
 
   if($a[2] >= 1 && $a[2] <= 4) {                # EMWZ: nRotation in 5 minutes
     my $c = (int(@a) > 3 ? $a[3] : 150);
-    $hash->{corr} = (12/$c);
+    $hash->{corr1} = (12/$c);
+    $hash->{corr2} = (12/$c);
 
-  } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM: 0.01
-    $hash->{corr} = (int(@a) > 3 ? $a[3] : 0.01);
+  } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM
+    # corr1 is the correction factor for power
+    $hash->{corr1} = (int(@a) > 3 ? $a[3] : 0.01);
+    # corr2 is the correction factor for energy
+    $hash->{corr2} = (int(@a) > 3 ? $a[4] : 0.001);
 
   } elsif($a[2] >= 9 && $a[2] <= 12) {          # EMGZ: 0.01
-    $hash->{corr} = (int(@a) > 3 ? $a[3] : 0.01);
+    $hash->{corr1} = (int(@a) > 3 ? $a[3] : 0.01);
+    $hash->{corr2} = (int(@a) > 3 ? $a[4] : 0.01);
 
   } else {
-    $hash->{corr} = 1;
+    $hash->{corr1} = 1;
+    $hash->{corr2} = 1;
   }
   $defptr{$a[2]} = $hash;
   return undef;
@@ -78,16 +84,17 @@ CUL_EM_Parse($$)
   my $cum = hex($a[ 9].$a[10].$a[ 7].$a[ 8]);
   my $lst = hex($a[13].$a[14].$a[11].$a[12]);
   my $top = hex($a[17].$a[18].$a[15].$a[16]);
-  my $val = sprintf("CNT %d CUM: %d  5MIN: %d  TOP: %d",
+  my $val = sprintf("CNT: %d CUM: %d  5MIN: %d  TOP: %d",
                 $cnt, $cum, $lst, $top);
 
   if($defptr{$cde}) {
     $hash = $defptr{$cde};
-    my $corr = $hash->{corr};
-    $cum *= $corr;
-    $lst *= $corr;
-    $top *= $corr;
-    $val = sprintf("CNT %d  CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
+    my $corr1 = $hash->{corr1}; # EMEM power correction factor
+    my $corr2 = $hash->{corr2}; # EMEM energy correction factor
+    $cum *= $corr2;
+    $lst *= $corr1;
+    $top *= $corr1;
+    $val = sprintf("CNT: %d  CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
                         $cnt, $cum, $lst, $top);
     my $n = $hash->{NAME};
     Log GetLogLevel($n,1), "CUL_EM $n: $val";
