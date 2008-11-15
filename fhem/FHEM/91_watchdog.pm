@@ -101,6 +101,7 @@ watchdog_Activate($)
   my ($ntfy) = @_;
   my $nt = gettimeofday() + $ntfy->{TO};
   $ntfy->{STATE} = "Next: " . FmtTime($nt);
+  RemoveInternalTimer($ntfy);
   InternalTimer($nt, "watchdog_Trigger", $ntfy, 0)
 }
 
