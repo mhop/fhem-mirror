@@ -145,7 +145,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.56 2008-11-01 21:27:10 neubert Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.57 2008-11-15 09:28:22 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1632,9 +1632,13 @@ HandleTimeout()
   # Check the internal list.
   foreach my $i (keys %intAt) {
     my $tim = $intAt{$i}{TRIGGERTIME};
-    if($tim <= $now) {
+    my $fn = $intAt{$i}{FN};
+    if(!defined($tim) || !defined($fn)) {
+      delete($intAt{$i});
+      next;
+    } elsif($tim <= $now) {
       no strict "refs";
-      &{$intAt{$i}{FN}}($intAt{$i}{ARG});
+      &{$fn}($intAt{$i}{ARG});
       use strict "refs";
       delete($intAt{$i});
     }
@@ -1856,11 +1860,9 @@ DoTrigger($$)
     my $ret = "";
     foreach my $n (sort keys %defs) {
       if(defined($modules{$defs{$n}{TYPE}})) {
-        if(defined($modules{$defs{$n}{TYPE}}{NotifyFn})) {
-          if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
-            Log 5, "$dev trigger: Checking $n for notify";
-            $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
-          }
+        if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
+          Log 5, "$dev trigger: Checking $n for notify";
+          $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
         }
       }
     }
