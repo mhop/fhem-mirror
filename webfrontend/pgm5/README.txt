@@ -1,3 +1,11 @@
+Description of the pgm5 webfrontend:
+
+(c) Olaf Droegehorn
+    o.droegehorn@dhs-computertechnik.de
+    www.dhs-computertechnik.de
+
+General description:
+
 Web frontend 5 (webfrontend/pgm5) (known upto FHEM 4.2 as pgm2):
 
 This frontend is CGI/CSS based. It has support for rooms, and  FHT/KS300 logs.
@@ -22,20 +30,12 @@ The renderer has plotmode, plotsize, tmpfile, status, refresh as attributes.
 With this you can control, how it works (and when in renders: refresh: 00:15:00 means every 15 minutes it will render an update).
 
 What will be rendered: All FileLogs for which you have set a WebLink will be rendered in the given intervals.
-
 The GET method of the renderer is also able to render specific graphics only for single use on request.
-
-Supported methods of renderer:
-DEFINE, SET, GET, ATTR
-DEFINE: defines the renderer
-SET: Set renderer ON/OFF toggels interval based rendering
-GET: renders graphics, based on given parameters
-ATTR: defines attributes, but all attributes will be set during define 
-      to default values.
 
 The PGM5 webfrontend does all this for you, but if you want to use the FHEMRENDERER for own things, you can use it directly.
 
-Installation:
+
+INSTALLATION:
 Copy the file fhemweb.pl and *.css to your cgi-bin directory (/home/httpd/cgi-bin), the icons (*.gif) to your httpd icons (/home/httpd/icons), and commandref.html to the html directory (/home/httpd/html) (or also to cgi-bin directory).
 
 The *.gplot files should be reused from the built-in FHEMWEB and should reside in the installed FHEM directory. Here we don't provide specific *.gplot files as the mechanisms are exactly the same.

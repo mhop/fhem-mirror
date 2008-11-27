@@ -1,3 +1,6 @@
+#(c) Olaf Droegehorn
+#    o.droegehorn@dhs-computertechnik.de
+#    www.dhs-computertechnik.de
 ##############################################
 package main;
 
