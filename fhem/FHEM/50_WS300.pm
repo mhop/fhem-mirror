@@ -64,18 +64,18 @@ WS300_Initialize($)
   my ($hash) = @_;
 
   # Provider
-  $hash->{Clients} = ":WS300:";
-  $hash->{ReadFn} = "WS300_Read";        
-  $hash->{WriteFn} = "WS300_Write";        
-  $hash->{Type}      = "FHZ1000";
-  $hash->{Match}     = "^WS300.*";
-  $hash->{SetFn}     = "WS300_Set";
-  $hash->{GetFn}     = "WS300_Get";
-  $hash->{DefFn}     = "WS300_Define";
-  $hash->{UndefFn}   = "WS300_Undef";
-  $hash->{ParseFn}   = "WS300_Parse";
-  $hash->{ReadFn}    = "WS300_Read";
   $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 loglevel:0,1,2,3,4,5,6";
+  $hash->{DefFn}     = "WS300_Define";
+  $hash->{GetFn}     = "WS300_Get";
+  $hash->{ParseFn}   = "WS300_Parse";
+  $hash->{SetFn}     = "WS300_Set";
+  $hash->{UndefFn}   = "WS300_Undef";
+
+  $hash->{Clients}   = ":WS300:";       # Not needed
+  $hash->{Match}     = "^WS300.*";      # Not needed
+  $hash->{ReadFn}    = "WS300_Read";    # Not needed
+  $hash->{Type}      = "FHZ1000";       # Not needed
+  $hash->{WriteFn}   = "WS300_Write";   # Not needed
 }
 
 ###################################
