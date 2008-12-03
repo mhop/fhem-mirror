@@ -306,7 +306,7 @@
     Todo: Test with IE+Adobe Plugin/Opera.
   - feature: HOWTO for webpgm2 (first chapter)
 
-Fri Jul 25 18:14:26 MEST 2008
+- Fri Jul 25 18:14:26 MEST 2008
   - Autoloading modules. In order to make module installation easier and
     to optimize memory usage, modules are loaded when the first device of a
     certain category is defined. Exceptions are the modules prefixed with 99,
@@ -323,6 +323,23 @@ Fri Jul 25 18:14:26 MEST 2008
     devices in fhem
   - feature: X10 support for pgm3
 
+- Sat Nov 15 10:23:56 MET 2008 (Rudi)
+  - Watchdog crash fixed: watchdog could insert itself more than once in the
+    internal timer queue. The first one deletes all occurances from the list,
+    but the loop over the list works on the cached keys -> the function/arg for
+    the second key is already removed.
+  - feature: X10 support for pgm3
+
 - Boris Sat Nov 15 CET 2008
   - bugfix: correct correction factors for EMEM in 15_CUL_EM.pm
 
+- Wed Dec  3 18:36:56 MET 2008 (Rudi)
+  - reorder commandref.html, so that all aspects of a device
+    (define/set/get/attributes) are in one block. This makes possible to
+    "outsource" device documentation
+  - added "mobile" flag to the CUL definition, intended for a CUR, which is
+    a remote with a battery, so it is not connected all the time to fhem.
+    Without the flag fhem will block when the CUR is disconnected.
+    Note: we have to sleep after disconnect for 5 seconds, else the Linux
+    kernel sends us a SIGSEGV, and the USB device is gone till the next reboot.
+  - the fhem CUL part documented
