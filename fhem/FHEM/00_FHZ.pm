@@ -82,9 +82,9 @@ FHZ_Initialize($)
 }
 #####################################
 sub
-FHZ_Ready($$)
+FHZ_Ready($)
 {
-  my ($hash, $dev) = @_;
+  my ($hash) = @_;
   my $po=$hash->{PortObj};
   return undef if !$po;
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
@@ -407,7 +407,7 @@ FHZ_ReadAnswer($$)
   my $nfound;
   for(;;) {
     if($^O eq 'MSWin32') {
-      $nfound=FHZ_Ready($hash,$def);
+      $nfound=FHZ_Ready($hash);
     } else {
       vec($rin, $hash->{FD}, 1) = 1;
        $nfound = select($rin, undef, undef, 3); # 3 seconds timeout
@@ -535,8 +535,8 @@ sub
 FHZ_HandleWriteQueue($)
 {
   my $hash = shift;
-  my $cnt = --$hash->{QUEUECNT};
-  if($cnt > 0) {
+  if($hash->{QUEUECNT} > 0) {
+    $hash->{QUEUECNT}--;
     my $bstring = shift(@{$hash->{QUEUE}});
     FHZ_XmitLimitCheck($hash,$bstring);
     $hash->{PortObj}->write($bstring);
