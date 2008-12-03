@@ -66,6 +66,7 @@ at_Define($$)
   }
   $hash->{NTM} = $ntm if($rel eq "+" || $fn);
   $hash->{TRIGGERTIME} = $nt;
+  RemoveInternalTimer($name);
   InternalTimer($nt, "at_Exec", $name, 0);
 
   $hash->{STATE} = ("Next: " . FmtTime($nt))

@@ -794,6 +794,8 @@ FW_showLog($)
   if($pm =~ m/gnuplot/) {
 
     my $tmpfile = "/tmp/file.$$";
+    my $errfile = "/tmp/gnuplot.err";
+
     if($pm eq "gnuplot" || !$__devs{$d}{from}) {
 
       # Looking for the logfile....
@@ -819,7 +821,7 @@ FW_showLog($)
         $gplot_script =~ s/(set timefmt ".*")/$1\n$fr/;
       }
 
-      open(FH, "|gnuplot > /dev/null");# feed it to gnuplot
+      open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
       print FH $gplot_script;
       close(FH);
 
@@ -864,7 +866,7 @@ FW_showLog($)
         close(FH);
       }
 
-      open(FH, "|gnuplot > /dev/null");# feed it to gnuplot
+      open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
       print FH $gplot_script, $xrange, $plot;
       close(FH);
       foreach my $p (@path) {

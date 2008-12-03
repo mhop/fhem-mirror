@@ -27,7 +27,7 @@ CUL_WS_Initialize($)
   $hash->{DefFn}     = "CUL_WS_Define";
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{ParseFn}   = "CUL_WS_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:S300TH loglevel";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel";
 }
 
 
@@ -41,8 +41,8 @@ CUL_WS_Define($$)
   return "wrong syntax: define <name> CUL_WS <code> [corr1...corr4]"
             if(int(@a) < 3 || int(@a) > 6);
   $a[2] = lc($a[2]);
-  return "Define $a[0]: wrong CODE format: valid is 1-7"
-                if($a[2] !~ m/^[1-7]$/);
+  return "Define $a[0]: wrong CODE format: valid is 1-8"
+                if($a[2] !~ m/^[1-8]$/);
 
   $hash->{CODE} = $a[2];
   $hash->{corr1} = ((int(@a) > 3) ? $a[3] : 0);
@@ -79,7 +79,7 @@ CUL_WS_Parse($$)
   my $firstbyte = hex($a[1]);
   my $cde = ($firstbyte&7) + 1;
 
-    my $type = $tlist{$a[2]} ? $tlist{$a[2]} : "unknown";
+  my $type = $tlist{$a[2]} ? $tlist{$a[2]} : "unknown";
   if(!$defptr{$cde}) {
     Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
     return "UNDEFINED CUL_WS: $cde";
