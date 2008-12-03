@@ -19,7 +19,7 @@ CUL_EM_Initialize($)
   $hash->{DefFn}     = "CUL_EM_Define";
   $hash->{UndefFn}   = "CUL_EM_Undef";
   $hash->{ParseFn}   = "CUL_EM_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:S300TH loglevel";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:EMEM,EMWZ,EMGZ loglevel";
 }
 
 #####################################
