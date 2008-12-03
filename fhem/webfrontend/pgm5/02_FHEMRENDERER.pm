@@ -519,7 +519,7 @@ FHEMRENDERER_calcWeblink($$)
   }
 
 
-  return if(!$__devs{$wl});
+#  return if(!$__devs{$wl});
   return if($__devs{$wl} && $__devs{$wl}{ATTR}{noscroll});
 
   if($__devs{$wl} && $__devs{$wl}{ATTR}{fixedrange}) {
