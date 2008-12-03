@@ -423,21 +423,30 @@
   - feature: cum_kWh/cum_m3 added to EMWZ/EMGZ (11.01.08 by Peter)
 
 - ==DATE== (4.5)
-  - feature: further 01_FHEMWEB cleanup
+  - bugfix:  further 01_FHEMWEB cleanup
   - feature: CUL support for FS20(r/w), FHT(readonly), KS300 and EM
-  - feature: list outputs the device attributes too
+  - feature: command list outputs the device attributes too
   - bugfix:  rename bugs fixed
   - bugfix:  better integration of ReadyFn (Windows), slight overall speedup
-  - bugfix:  Ignore/correct "type" casing when autoloading modules
+  - bugfix:  Ignore/correct casing when autoloading modules
   - bugfix:  at is executed twice after a modify (rufus99, 2008-09-10)
   - feature: FHT internal modifications (better protocol understanding)
   - feature: add timestamp to inform
   - feature: The strange stty settings in 00_FHEM.pm are optional
   - bugfix:  webpgm2 iPhone fix
   - feature: fullinit and reopen commands for FHZ added (Boris 2008-11-01)
-  - bugfix:  avoid access to undefined NotifyFn in hash in fhem.pl (Boris 2008-11-01)
+  - bugfix:  undefined NotifyFn in fhem.pl (Boris 2008-11-01)
   - feature: new modules 00_CM11.pm and 20_X10.pm for integration of X10
              devices in fhem (Boris 2008-11-02)
   - feature: X10 support for pgm3 (Boris 2008-11-02)
   - bugfix:  FHT short message warning
+  - bugfix:  rereadconfig crashes with active webpgm2 connections (2008-11-13)
+  - bugfix:  watchdog crash (2008-11-15)
+  - bugfix:  Strange call for nonexistent MyCUL: ReadFn 
+  - feature: webpgm2: gplot output goes to /tmp/gnuplot.err
+  - feature: devspec TYPE,DEF,STATE. e.g. list TYPE:FS20, set DEF:123 on
+  - bugfix:  at schedules 2 events after the DST change (fix not verified)
+  - feature: commandref.html reorg. There are now device sections.
+  - feature: CUL / CUL_EM / CUL_WS documentation
+  - feature: do not block fhem when the CUR is disconnected
   - bugfix:  correct correction factors for EMEM in 15_CUL_EM.pm
