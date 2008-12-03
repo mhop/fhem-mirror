@@ -124,11 +124,14 @@ use vars qw(%defs);		# FHEM device/button definitions
 use vars qw(%attr);		# Attributes
 use vars qw(%selectlist);	# devices which want a "select"
 use vars qw(%readyfnlist);	# devices which want a "readyfn"
+use vars qw($readytimeout);	# Polling interval. UNIX: device search only
+$readytimeout = ($^O eq "MSWin32") ? 0.1 : 5.0;
 
 use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
 use vars qw($init_done);        #
 use vars qw($internal_data);    #
+
 
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
@@ -145,7 +148,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.57 2008-11-15 09:28:22 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.58 2008-12-03 16:42:48 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -290,7 +293,7 @@ while (1) {
   }
 
   my $timeout = HandleTimeout();
-  $timeout = 0.1 if(!defined($timeout) && keys %readyfnlist);
+  $timeout = $readytimeout if(!defined($timeout) && keys %readyfnlist);
   my $nfound = select($rout=$rin, undef, undef, $timeout);
 
   CommandShutdown(undef, undef) if($sig_term);
@@ -517,7 +520,9 @@ AnalyzeCommand($$)
     $cmd =~ s/\\\n/ /g;                 # Multi-line
     # Make life easier for oneliners:
     %value = ();
-    foreach my $d (keys %defs) { $value{$d} = $defs{$d}{STATE} }
+    foreach my $d (keys %defs) {
+      $value{$d} = $defs{$d}{STATE}
+    }
     my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
     my $we = (($wday==0 || $wday==6) ? 1 : 0);
     $month++;
@@ -588,10 +593,24 @@ AnalyzeCommand($$)
 sub
 devspec2array($)
 {
+  my %knownattr = ( "DEF"=>1, "STATE"=>1, "TYPE"=>1 );
+
   my ($name) = @_;
   return "" if(!defined($name));
   return $name if(defined($defs{$name}));
   my @ret;
+
+  if($name =~ m/(.*):(.*)/ && $knownattr{$1}) {
+    my $lattr = $1;
+    my $re = $2;
+    foreach my $l (sort keys %defs) {
+      push @ret, $l
+        if(!$re || ($defs{$l}{$lattr} && $defs{$l}{$lattr} =~ m/$re/));
+    }
+    return $name if(!@ret);               # No match, return the input
+    return @ret;
+  }
+
 
   foreach my $l (split(",", $name)) {   # List
     if($l =~ m/[*\[\]^\$]/) {           # Regexp
@@ -812,6 +831,7 @@ CommandSave($$)
     my $r = $savefirst{$d};
     delete $rooms{$r}{$d};
     delete $rooms{$r} if(! %{$rooms{$r}});
+    next if(!$defs{$d});
     my $def = $defs{$d}{DEF};
     $def =~ s/;/;;/g;
     print SFH "define $d $defs{$d}{TYPE} $def\n";
@@ -824,6 +844,7 @@ CommandSave($$)
   foreach my $r (sort keys %rooms) {
     print SFH "\nsetdefaultattr" . ($r ne "~" ? " room $r" : "") . "\n";
     foreach my $d (sort keys %{$rooms{$r}} ) {
+      next if(!$defs{$d});
       next if($defs{$d}{TEMPORARY});
       next if($defs{$d}{VOLATILE});
       if($defs{$d}{DEF}) {
@@ -868,7 +889,8 @@ DoSet(@)
   my @a = @_;
 
   my $dev = $a[0];
-  return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
+  return "No set implemented for $dev"
+        if(!$defs{$dev} || !$modules{$defs{$dev}{TYPE}}{SetFn});
   my $ret = CallFn($dev, "SetFn", $defs{$dev}, @a);
   return $ret if($ret);
 
@@ -887,11 +909,6 @@ CommandSet($$)
 
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
-
-    if(!defined($defs{$sdev})) {
-      push @rets, "Please define $sdev first";
-      next;
-    }
 
     $a[0] = $sdev;
     my $ret = DoSet(@a);
@@ -1166,17 +1183,22 @@ CommandList($$)
 
   } else {
 
-    foreach my $sdev (devspec2array($param)) {
+    my @list = devspec2array($param);
+    if(@list == 1) {
+      my $sdev = $list[0];
       if(!defined($defs{$sdev})) {
         $str .= "No device named $param found";
-        next;
+      } else {
+        $str .= "Internals:\n";
+        $str .= PrintHash($defs{$sdev}, 2);
+        $str .= "Attributes:\n";
+        $str .= PrintHash($attr{$sdev}, 2);
       }
-      $str .= "Internals:\n";
-      $str .= PrintHash($defs{$sdev}, 2);
-      $str .= "Attributes:\n";
-      $str .= PrintHash($attr{$sdev}, 2);
+    } else {
+      foreach my $sdev (@list) {
+        $str .= "$sdev\n";
+      }
     }
-
   }
 
   return $str;
@@ -1333,6 +1355,8 @@ sub
 getAllAttr($)
 {
   my $d = shift;
+  return "" if(!$defs{$d});
+
   my $list = $AttrList;
   $list .= " " . $modules{$defs{$d}{TYPE}}{AttrList}
         if($modules{$defs{$d}{TYPE}}{AttrList});
