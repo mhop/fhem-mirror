@@ -538,9 +538,11 @@ FHZ_HandleWriteQueue($)
   if($hash->{QUEUECNT} > 0) {
     $hash->{QUEUECNT}--;
     my $bstring = shift(@{$hash->{QUEUE}});
-    FHZ_XmitLimitCheck($hash,$bstring);
-    $hash->{PortObj}->write($bstring);
-    InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
+    if(defined($bstring)) {
+      FHZ_XmitLimitCheck($hash,$bstring);
+      $hash->{PortObj}->write($bstring);
+      InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
+    }
   }
 }
 
