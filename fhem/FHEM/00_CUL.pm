@@ -276,8 +276,12 @@ CUL_DoInit($)
   }
   delete($hash->{RA_Timeout});
 
-  $hash->{PortObj}->write("V\n");
-  my $ver = CUL_ReadAnswer($hash, "Version");
+  my ($ver, $try) = ("", 0);
+  while($try++ < 3 && $ver !~ m/^V/) {
+    $hash->{PortObj}->write("V\n");
+    $ver = CUL_ReadAnswer($hash, "Version");
+  }
+
   if($ver !~ m/^V/) {
     $attr{$name}{dummy} = 1;
     $hash->{PortObj}->close();
@@ -285,6 +289,7 @@ CUL_DoInit($)
     Log 1, $msg;
     return $msg;
   }
+
   CUL_SimpleWrite($hash, $initstr);
   $hash->{STATE} = "Initialized";
 
@@ -405,7 +410,6 @@ CUL_Write($$$)
 
   if($fn eq "F") {
     if(!$hash->{QUEUECNT}) {
-
       CUL_XmitLimitCheck($hash, $bstring);
       $hash->{PortObj}->write($bstring);
 
@@ -437,9 +441,11 @@ CUL_HandleWriteQueue($)
   if($hash->{QUEUECNT} > 0) {
     $hash->{QUEUECNT}--;
     my $bstring = shift(@{$hash->{QUEUE}});
-    CUL_XmitLimitCheck($hash,$bstring);
-    $hash->{PortObj}->write($bstring);
-    InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
+    if(defined($bstring)) {
+      CUL_XmitLimitCheck($hash,$bstring);
+      $hash->{PortObj}->write($bstring);
+      InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
+    }
   }
 }
 
