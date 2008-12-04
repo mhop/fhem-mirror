@@ -14,7 +14,7 @@
   <a href="#intro">Introduction</a><br>
   <a href="#command">Fhem command types</a><br>
   <a href="#devspec">Device specification</a><br>
-  
+
   <br>
   <b>fhem commands</b>
   <ul>
@@ -169,7 +169,7 @@ prompt:<br>
   </ul>
 <br>
 
-Shell commands will be executed in the background, perl expressions and 
+Shell commands will be executed in the background, perl expressions and
 fhem commands will be executed in the main "thread".  In order to make perl
 expressions easier to write, some special functions and variables are
 available. See the section <a href="#perl">Perl special</a> for a description.
@@ -701,7 +701,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <h3>global</h3>
 <ul>
   The global device is used to set different global attributes. It will be
-  automatically defined, it cannot be deleted or renamed and has no set or get 
+  automatically defined, it cannot be deleted or renamed and has no set or get
   parameters<br>
   <br>
 
@@ -1124,7 +1124,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
 	  or { &lt;perl code&gt; }, where the perl-code returns a time
           specification).
-	  If the current time is greater then the specified time, then the
+	  If the current time is greater than the specified time, then the
 	  command is ignored, else an "on" command is generated, and for the
 	  given "till-time" an off command is scheduleld via the at command.
 	  </li>
@@ -2022,7 +2022,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li><code>on-till</code> requires an absolute time in the "at" format
           (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
           returns a time specification).
-          If the current time is greater then the specified time, then the
+          If the current time is greater than the specified time, then the
           command is ignored, else an "on" command is generated, and for the
           given "till-time" an off command is scheduleld via the at command.
           </li>
@@ -2146,7 +2146,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br>
   </ul>
 
-  <b>Set</b> <ul>N/A</ul><br> 
+  <b>Set</b> <ul>N/A</ul><br>
 
   <b>Get</b>
   <ul>
@@ -2380,7 +2380,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="WS2000define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; WS2000&lt;device_to_connect&gt;</code>
+    <code>define &lt;name&gt; WS2000 &lt;device_to_connect&gt;</code>
     <br><br>
 
     Define a WS2000 series raw receiver device sold by ELV. Details see <a
@@ -2397,7 +2397,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     Attributes:
     <ul>
       <li><code>rain</code>: factor for calculating amount of rain in ml/count</li>
-      <li><code>altitude</code>: height in meters to calculate pressure for NN(not used yet)</li>
+      <li><code>altitude</code>: height in meters to calculate pressure for NN (not used yet)</li>
     </ul>
     <br>
     Example:
@@ -2566,6 +2566,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global]</code>
+    <br><br>
     Enable the webfrontend on port &lt;tcp-portnr&gt;. If global is specified,
     then requests from all interfaces (not only localhost / 127.0.0.1) are
     serviced.
@@ -2667,8 +2668,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     <PRE>
     # absolute ones:
     define a1 at 17:00:00 set lamp on                            # fhem command
-    define a2 at 17:00:00 { Log 1, "Teetime" }                   # Perl command
-    define a3 at 17:00:00 "/bin/echo "Teetime" > /dev/console"   # shell command
+    define a2 at 17:00:00 { Log 1, "Teatime" }                   # Perl command
+    define a3 at 17:00:00 "/bin/echo "Teatime" > /dev/console"   # shell command
     define a4 at *17:00:00 set lamp on                           # every day
 
     # relative ones
@@ -2707,7 +2708,7 @@ A line ending with \ will be concatenated with the next one, so long lines
           configfile (see the <a href="#save">save</a> command.)
       </li>
 
-      <li>if the current time is greater then the time specified, then the
+      <li>if the current time is greater than the time specified, then the
           command will be executed tomorrow. This is why the relative forms
           of the sunset/sunrise functions should be used with the relative
           (+) flag</li>
@@ -3160,7 +3161,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
-  <b>Get</b> <ul>N/A</ul><br> 
+  <b>Get</b> <ul>N/A</ul><br>
 
   <b>Attributes</b>
   <ul>
@@ -3181,7 +3182,7 @@ isday, sunrise_coord</pre>
   href="#notify">notify</a> commands.<br>
   First you should call the sunrise_coord function with your exact longitude
   and latitude (see e.g. maps.google.com for the exact values, which should be
-  in the form of a floating point value). This command should be part of the 
+  in the form of a floating point value). This command should be part of the
   <a href="#lastinclude">lastinclude</a> file. The default value is Frankfurt
   am Main, Germany.<br><br>
 
