@@ -514,12 +514,12 @@ getFhtBuffer($)
 
   for(;;) {
     FHZ_Write($io, "04", "c90185");
-    my $msg = FHZ_ReadAnswer($io, "fhtbuf");
+    my $msg = FHZ_ReadAnswer($io, "fhtbuf", 1.0);
     if(!defined($msg)) { $msg= ""; }
     Log 5, "getFhtBuffer: $count $msg";
   
     return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9A-F]+$/i);
-    return 0 if($count++ > 5);
+    return 0 if($count++ >= 5);
   }
 }
 
