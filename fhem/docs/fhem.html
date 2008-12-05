@@ -114,7 +114,10 @@ and <a href="faq.html">faq.html</a> for more documentation.
   </ul>
   Commercial products:
   <ul>
-    <li><a href="http://www.dhs-computertechnik.de/">
+    <li>Integration of FHZ and NAS running FHEM. Using an enhanced transmitter to achieve more distant transmission. Full integrated solution for Home-Control
+	and beyond (other service like UPS management, etc. are also available).
+	<br>
+	<a href="http://www.dhs-computertechnik.de/">
     http://www.dhs-computertechnik.de/</a></li>
   </ul>
 
@@ -224,7 +227,50 @@ If you are using cygwin for your perl installation you can follow the guidelines
      <li>Call &lt;your-site&gt;/pgm3/index.php</li>
   </ul>
   </ul>
+<br>
+  
+<h3>Web frontend 5 (webfrontend/pgm5)</h3>
+  <ul>
+This frontend is CGI/CSS based. It has support for rooms, and  FHT/KS300 logs.
 
+This webfrontend is an update of the former know pgm2 (up to 4.2):
+It resides in YOUR HTTP server, and doesn't provide an own, like the FHEMWEB module does.<br>
+<br>
+Why to use this:<br>
+1) If you want to stick with your Web-Servers (due to restrictions, 
+   ports or any other reason)<br>
+2) If you have a NAS (Network attached storage) and limited CPU-Power. 
+   This frontend can render the graphics in the background (in 
+   intervals) and sends only the rendered graphics to the HTML-Page.<br>
+3) If you need the FHEMRENDERER to render the images for other/own   
+   pages.<br>
+   <br>
+   A lot more details can be
+  found on Olaf Droegehorns page: <a href="http://www.droegehorn.de/fhz">
+  http://www.droegehorn.de/fhz</a>
+  <br><br>
+  
+  Installation:
+  <ul>
+     <li>Copy the file fhemweb.pl and *.css to your cgi-bin directory (/home/httpd/cgi-bin), the icons (*.gif) to your httpd icons (/home/httpd/icons), and commandref.html to the html directory (/home/httpd/html) (or also to cgi-bin directory).<br>
+		Note: The program looks for icons in the following order: <br>
+		'device-name.state', 'device-name', 'device-type.state', 'device-type'</li>
+
+	 
+  	 <li>The *.gplot files should be reused from the built-in FHEMWEB and should reside in the installed FHEM directory. Here we don't provide specific *.gplot files as the mechanisms are exactly the same.</li>
+
+
+	 <li>If you want to have access to plotted logs, then make sure that gnuplot is installed and set the logtype for the FileLog device (see commandref.html and example/04_log). 
+		Copy the file contrib/99_weblink.pm to the installed FHEM directory.</li>
+
+	 <li>Copy the file pgm5/02_FHEMRENDERER.pm to the installed FHEM directory.
+	This gives you a graphic rendering engine (gnuplot & gnuplot-scroll at the moment), which can be configured to renderer images in intervals.</li>
+
+     <li>Call 'your-site'/cgi-bin/fhemweb.pl </li>
+
+  </ul>
+  </ul>  
+  
 <h2>License:</h2>
 <ul>
   Copyright:<br>
@@ -232,6 +278,7 @@ If you are using cygwin for your perl installation you can follow the guidelines
     <li>Rudolf Koenig (r dot koenig at koeniglich dot de)</li>
     <li>Raoul Matthiessen (webfrontends/pgm1)</li>
     <li>Martin Haas (webfrontends/pgm3)</li>
+	<li>Olaf Droegehorn (webfrontends/pgm5)</li>
   </ul>
   License: GPL (v2)
 </ul>
