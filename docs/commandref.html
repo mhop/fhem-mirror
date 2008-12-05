@@ -74,6 +74,7 @@
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#X10">X10</a> &nbsp;
       <a href="#weblink">weblink</a> &nbsp;
+      <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
 
   </ul>
 
@@ -3207,6 +3208,133 @@ isday, sunrise_coord</pre>
 
   <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
+
+<a name="FHEMRENDERER"></a>
+<h3>FHEMRENDERER</h3>
+<ul>
+  The FHEMRENDERER module is intended to render (draw) graphics based on the FHEM Log-Files.
+  This can be done either based on a timer (used in the module) or based on a direct call of GET.
+  The rendered graphics will be stored in a pre-defined directory with a predefined prefix of the files.
+  <br> <br>
+
+  <a name="FHEMRENDERERdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHEMRENDERER [global]</code>
+	    <br><br>
+        This defines a new "device", that is of type FHEMRENDERER. The option 'global' can be used if needed for sorting reasons. 
+        Otherwise this option has no real meaning for FHEMRENDERER.<br>
+        <br>
+        As a side-effect of defining this "device" the following attributes will be set for this "device":<br>
+		&nbsp;&nbsp;plotmode	gnuplot	<br>
+		&nbsp;&nbsp;plotsize	800,200 <br>
+		&nbsp;&nbsp;refresh		00:10:00 <br>
+		&nbsp;&nbsp;room		Unsorted <br>
+		&nbsp;&nbsp;status		off <br>
+		&nbsp;&nbsp;tmpfile		/tmp/ <br>
+<br>    
+        NOTE: The Logfile will report (with LogLevel 2) that the FHEMRENDERER has been defined.
+
+  </ul>
+  <br>
+
+  <a name="FHEMRENDERERset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt</code><br>
+    Set either on or off.<br>
+	<br>
+	This switches the timer-based rendering on/off. The attribute 'status' will be modified accordingly.<br>
+	NOTE: only WebLink based graphics will be rendered.
+
+  </ul>
+  <br>
+
+  <a name="FHEMRENDERERget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;[[file-name] device type logfile [pos=zoom=XX&off=YY]]&gt</code><br>
+	<br>
+	The get function supports different sets of arguments: <br>
+	Arguments:<br />
+	&nbsp;&nbsp;&nbsp;NONE: all WebLink based FilePlots will be rerendered<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be '<attr-tmpfile><weblinkname>.png'<br>
+	&nbsp;&nbsp;&nbsp;THREE: device type logfile <br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered:<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile logfile.png'<br>
+	&nbsp;&nbsp;&nbsp;FOUR:	file-name device type logfile<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered:<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
+	&nbsp;&nbsp;&nbsp;FIVE:	file-name device type logfile pos=zoom=XX&off=YYY <br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered assuming that plotmode is 'gnuplot-scroll':<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The 'zoom' will be either qday/day/week/month/year (same as used in FHEMWEB).<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The offset 'off' is either 0 (then the second part can be omitted, or -1/-2.... to jump back in time.<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
+<br>
+			NOTE: If you want to use zoom AND offset then you have to concatenate via '&' !!<br>
+<br>
+		NOTE: combinations are possible in limited ranges:<br>
+			meaning: you can add the 'pos=zoom=XX&off=YY' to any of the first three sets. <br>
+                     This may e.g. result in rendering all WebLinks with a specific zoom or offset <br>
+				 (if you just pass the 'pos=zoom=xx&off=yy' parameter);<br>
+<br>
+	Any rendered image (one or all WebLinks) will be stored in 'attr-tmpfile' followed by a 'filename.png'. The filename will be
+	either derived (from weblink-name or logfile-name) or, for single files, can be assigend.<br>
+
+  </ul>
+  <br>
+
+
+  <b>Attributes</b>
+  <ul>
+    <a name="plotmode"></a>
+    <li>plotmode<br/>
+        Specifies how to generate the plots:
+        <ul>
+          <li>gnuplot<br>
+              Call the gnuplot script with each logfile. The filename
+              specification of the <a href="#FileLog">FileLog</a> device will
+              determine what is in the plot.  The data is converted into an
+              image on the backend with gnuplot.</li>
+          <li>gnuplot-scroll<br>
+              FHEMRENDERER will offer zoom and offset possibilities in order to navigate
+              in the current logfile, i.e. you can select just a part of the
+              data to be displayed. The more data is contained in a single
+              logfile, the easier you can navigate. The recommendation is to
+              store the data for a whole year in one logfile.  The data is
+              converted into an image on the backend with gnuplot.</li>
+        </ul>
+        </li><br>
+
+    <a name="plotsize"></a>
+    <li>plotsize<br/>
+        the default size of the plot, in pixels, separated by comma:
+        width,height. You can set individual sizes by setting the plotsize of
+        the weblink.
+        </li><br>
+    <a name="status="></a>
+    <li>status<br/>
+        Reflects the status, if the renderer timer has been set to ON or OFF.
+        By reading the status, you can detect, if the timer is running, or not.
+        </li><br>
+
+    <a name="refresh"></a>
+    <li>refresh<br/>
+        This defines the time-interval in which a new rendering of the defined WebLinks will be done.
+        </li><br>
+
+    <a name="tmpfile"></a>
+    <li>tmpfile<br/>
+        This gives the path and a possible prefix for the rendered filenames.<br/>
+        You can specify a path to which the files will be rendered. If you also specify a prefix, this will be used to build the resulting filename.
+        </li><br> </li> </ul>
+  </ul>
+
+</ul>
+
 
 
 <a name="perl"></a>
