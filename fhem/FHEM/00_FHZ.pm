@@ -8,7 +8,7 @@ use Time::HiRes qw(gettimeofday);
 
 sub FHZ_Write($$$);
 sub FHZ_Read($);
-sub FHZ_ReadAnswer($$);
+sub FHZ_ReadAnswer($$$);
 sub FHZ_Crc(@);
 sub FHZ_CheckCrc($);
 sub FHZ_XmitLimitCheck($$);
@@ -175,9 +175,11 @@ FHZ_Get($@)
   my $name = $hash->{NAME};
   Log GetLogLevel($name,2), "FHZ get $v";
 
+  FHZ_ReadAnswer($hash, "Flush", 0);
   FHZ_Write($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
 
-  my $msg = FHZ_ReadAnswer($hash, $a[1]);
+  my $msg = FHZ_ReadAnswer($hash, $a[1], 1.0);
+  Log 5, "GET Got: $msg";
   return $msg if(!$msg || $msg !~ /^81..c9..0102/);
 
   if($a[1] eq "serial") {
@@ -397,9 +399,9 @@ FHZ_CheckCrc($)
 #####################################
 # This is a direct read for commands like get
 sub
-FHZ_ReadAnswer($$)
+FHZ_ReadAnswer($$$)
 {
-  my ($hash,$arg) = @_;
+  my ($hash,$arg, $to) = @_;
 
   return undef if(!$hash || !defined($hash->{FD}));
 
@@ -410,7 +412,7 @@ FHZ_ReadAnswer($$)
       $nfound=FHZ_Ready($hash);
     } else {
       vec($rin, $hash->{FD}, 1) = 1;
-       $nfound = select($rin, undef, undef, 3); # 3 seconds timeout
+      $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         die("Select error $nfound / $!\n");
@@ -510,9 +512,10 @@ FHZ_Write($$$)
   my $bstring = FHZ_CompleteMsg($fn, $msg);
   Log 5, "Sending " . unpack('H*', $bstring);
 
-  if(!$hash->{QUEUECNT}) {
+  if(!$hash->{QUEUE}) {
 
     FHZ_XmitLimitCheck($hash,$bstring);
+    $hash->{QUEUE} = [ $bstring ];
     $hash->{PortObj}->write($bstring);
 
     ##############
@@ -520,12 +523,9 @@ FHZ_Write($$$)
     # 65.6ms + 10ms + 65.6ms), else it will be discarded by the FHZ1X00 PC
     InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
 
-  } elsif($hash->{QUEUECNT} == 1) {
-    $hash->{QUEUE} = [ $bstring ];
   } else {
     push(@{$hash->{QUEUE}}, $bstring);
   }
-  $hash->{QUEUECNT}++;
 
 
 }
@@ -535,14 +535,18 @@ sub
 FHZ_HandleWriteQueue($)
 {
   my $hash = shift;
-  if($hash->{QUEUECNT} > 0) {
-    $hash->{QUEUECNT}--;
-    my $bstring = shift(@{$hash->{QUEUE}});
-    if(defined($bstring)) {
-      FHZ_XmitLimitCheck($hash,$bstring);
-      $hash->{PortObj}->write($bstring);
-      InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
+  my $arr = $hash->{QUEUE};
+
+  if(defined($arr) && @{$arr} > 0) {
+    shift(@{$arr});
+    if(@{$arr} == 0) {
+      delete($hash->{QUEUE});
+      return;
     }
+    my $bstring = $arr->[0];
+    FHZ_XmitLimitCheck($hash,$bstring);
+    $hash->{PortObj}->write($bstring);
+    InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
   }
 }
 
