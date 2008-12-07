@@ -95,14 +95,14 @@ my %cantset = (
 
 
 my %priority = (
-  "desired-temp"=> 1,	
-  "mode"	=> 2,	
-  "report1"    => 3,	
+  "desired-temp"=> 1,
+  "mode"	=> 2,
+  "report1"    => 3,
   "report2"    => 3,
-  "holiday1"	=> 4,	
-  "holiday2"	=> 5,	
-  "day-temp"	=> 6,	
-  "night-temp"	=> 7,	
+  "holiday1"	=> 4,
+  "holiday2"	=> 5,
+  "day-temp"	=> 6,
+  "night-temp"	=> 7,
 );
 
 my %c2m = (0 => "auto", 1 => "manual", 2 => "holiday", 3 => "holiday_short");
@@ -274,7 +274,7 @@ FHT_Define($$)
   $a[2] = lc($a[2]);
   return "Define $a[0]: wrong CODE format: specify a 4 digit hex value"
   		if($a[2] !~ m/^[a-f0-9][a-f0-9][a-f0-9][a-f0-9]$/i);
-  
+
 
   $hash->{CODE} = $a[2];
   $hash->{CODE} = $a[2];
@@ -283,8 +283,8 @@ FHT_Define($$)
 
   AssignIoPort($hash);
 
-  Log GetLogLevel($a[0],2),"Asking the FHT device $a[0]/$a[2] to send its data";
-  FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
+  #Log GetLogLevel($a[0],2),"Asking the FHT device $a[0]/$a[2] to send its data";
+  #FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
 
   return undef;
 }
@@ -299,7 +299,7 @@ FHT_Undef($$)
 }
 
 #####################################
-sub 
+sub
 FHT_Parse($$)
 {
   my ($hash, $msg) = @_;
@@ -368,7 +368,7 @@ FHT_Parse($$)
        if($sval =~ m/.6/) { $val = "$fv" }
     elsif($sval =~ m/.8/) { $val = "offset: $fv" }
     elsif($sval =~ m/.a/) { $val = "lime-protection" }
-    elsif($sval =~ m/.c/) { $val = "synctime" } 
+    elsif($sval =~ m/.c/) { $val = "synctime" }
     elsif($sval =~ m/.e/) { $val = "test" }
     elsif($sval =~ m/.f/) { $val = "pair" }
     else { $val = "unknown_$sval: $fv" }
@@ -415,7 +415,7 @@ FHT_Parse($$)
   ################################
   # Softbuffer: delete confirmed commands
   if($confirm) {
-    my $found; 
+    my $found;
     my $io = $def->{IODev};
     foreach my $key (sort keys %{$io->{SOFTBUFFER}}) {
       my $h = $io->{SOFTBUFFER}{$key};
@@ -442,7 +442,7 @@ doSoftBuffer($)
   my ($io) = @_;
 
   my $now = gettimeofday();
-  
+
   my $count = 0;
   my $fhzbuflen = -999;
   foreach my $key (keys %{ $io->{SOFTBUFFER} }) {
@@ -517,7 +517,7 @@ getFhtBuffer($)
     my $msg = FHZ_ReadAnswer($io, "fhtbuf", 1.0);
     if(!defined($msg)) { $msg= ""; }
     Log 5, "getFhtBuffer: $count $msg";
-  
+
     return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9A-F]+$/i);
     return 0 if($count++ >= 5);
   }
