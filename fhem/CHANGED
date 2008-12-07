@@ -442,7 +442,7 @@
   - bugfix:  FHT short message warning
   - bugfix:  rereadconfig crashes with active webpgm2 connections (2008-11-13)
   - bugfix:  watchdog crash (2008-11-15)
-  - bugfix:  Strange call for nonexistent MyCUL: ReadFn 
+  - bugfix:  Strange call for nonexistent MyCUL: ReadFn
   - feature: webpgm2: gplot output goes to /tmp/gnuplot.err
   - feature: devspec TYPE,DEF,STATE. e.g. list TYPE:FS20, set DEF:123 on
   - bugfix:  at schedules 2 events after the DST change (fix not verified)
@@ -450,3 +450,9 @@
   - feature: CUL / CUL_EM / CUL_WS documentation
   - feature: do not block fhem when the CUR is disconnected
   - bugfix:  correct correction factors for EMEM in 15_CUL_EM.pm
+  - feature: reworked 15_CUL_EM.pm to account for timer wraparounds, more
+             readings added
+  - feature: speed gain through disabled refreshvalues query to all FHTs at
+             definition; if you want it back at a "set myFHT report1 255
+             report2 255" command to the config file.
+
