@@ -343,3 +343,9 @@
     Note: we have to sleep after disconnect for 5 seconds, else the Linux
     kernel sends us a SIGSEGV, and the USB device is gone till the next reboot.
   - the fhem CUL part documented
+
+- Sun Dec  7 21:09 (Boris)
+  - reworked 15_CUL_EM.pm to account for timer wraparounds, more readings added
+  - speed gain through disabled refreshvalues query to all FHTs at definition;
+    if you want it back at a "set myFHT report1 255 report2 255" command to the
+    config file.
