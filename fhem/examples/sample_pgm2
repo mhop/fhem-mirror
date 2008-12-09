@@ -2,14 +2,14 @@
 # Minimalistic fhem.pl & pgm2 configfile. Take a look at the other examples for
 # more.
 #
-attr global logfile /tmp/fhem-%Y-%m.log
-attr global statefile /tmp/fhem.save   # where to save the state of the devices
+attr global logfile /tmp/fhem/fhem-%Y-%m.log
+attr global statefile /tmp/fhem/fhem.save   # where to save the state of the devices
 attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 attr global port 7072                  # our TCP/IP port (localhost only)
-attr global modpath .                  # where our FHEM directory is
+attr global modpath /tmp/fhem/fhem                  # where our FHEM directory is
 
 define WEB FHEMWEB 8083
 attr WEB plotmode SVG
 
 # Fake logfile, to access the global log
-define Logfile FileLog /tmp/fhem-%Y-%m.log fakelog
+define Logfile FileLog /tmp/fhem/fhem-%Y-%m.log fakelog

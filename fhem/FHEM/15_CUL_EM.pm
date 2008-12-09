@@ -30,7 +30,7 @@ CUL_EM_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   return "wrong syntax: define <name> CUL_EM <code> [corr1 corr2]"
-            if(int(@a) != 3 && int(@a) != 5);
+            if(int(@a) < 3 || int(@a) > 5);
   return "Define $a[0]: wrong CODE format: valid is 1-12"
                 if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
 
@@ -45,11 +45,11 @@ CUL_EM_Define($$)
     # corr1 is the correction factor for power
     $hash->{corr1} = (int(@a) > 3 ? $a[3] : 0.01);
     # corr2 is the correction factor for energy
-    $hash->{corr2} = (int(@a) > 3 ? $a[4] : 0.001);
+    $hash->{corr2} = (int(@a) > 4 ? $a[4] : 0.001);
 
   } elsif($a[2] >= 9 && $a[2] <= 12) {          # EMGZ: 0.01
     $hash->{corr1} = (int(@a) > 3 ? $a[3] : 0.01);
-    $hash->{corr2} = (int(@a) > 3 ? $a[4] : 0.01);
+    $hash->{corr2} = (int(@a) > 4 ? $a[4] : 0.01);
 
   } else {
     $hash->{corr1} = 1;

@@ -1,12 +1,12 @@
 - 2005-10-27 (1.3)
-  - Bugfix: multiple at commands at the same time.</pre>
+  - Bugfix: multiple at commands at the same time.
 
 - 2005-11-10 (1.4)
   - Reformatting the package and the documentation
   - New links
 
 - 2005-12-26 (1.5)
-  - "modularized" in preparation for the FHZ80B -> each device has a type
+  - "modularized" in preparation for the FHT80B -> each device has a type
   - added relative "at" commands (with +HH:MM:SS)
   - multiple commands on one line separated with ;
   - sleeping 0.22 seconds after an ST command
@@ -450,9 +450,11 @@
   - feature: CUL / CUL_EM / CUL_WS documentation
   - feature: do not block fhem when the CUR is disconnected
   - bugfix:  correct correction factors for EMEM in 15_CUL_EM.pm
+  - bugfix:  more stable CUL initialization
   - feature: reworked 15_CUL_EM.pm to account for timer wraparounds, more
              readings added
   - feature: speed gain through disabled refreshvalues query to all FHTs at
              definition; if you want it back at a "set myFHT report1 255
              report2 255" command to the config file.
-
+  - feature: fhem commands may be added in modules. XmlList is external now.
+  - bugfix:  rereadcfg from webpgm2 does not crash fhem.pl

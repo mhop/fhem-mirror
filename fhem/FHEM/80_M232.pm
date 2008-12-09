@@ -96,7 +96,8 @@ M232_Undef($$)
        defined($defs{$d}{IODev}) &&
        $defs{$d}{IODev} == $hash)
       {
-        Log GetLogLevel($name,2), "deleting port for $d";
+        my $lev = ($reread_active ? 4 : 2);
+        Log GetLogLevel($name,$lev), "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }

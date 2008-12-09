@@ -4,7 +4,8 @@
 #
 #  Copyright notice
 #
-#  (c) 2005 Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
+#  (c) 2005-2008
+#  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
 #  This script free software; you can redistribute it and/or modify
@@ -48,7 +49,6 @@ sub DoClose($);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
-sub GlobalAttr($$);
 sub GetTimeSpec($);
 sub HandleArchiving($);
 sub HandleTimeout();
@@ -89,7 +89,6 @@ sub CommandSet($$);
 sub CommandSetstate($$);
 sub CommandSleep($$);
 sub CommandShutdown($$);
-sub CommandXmlList($$);
 sub CommandTrigger($$);
 
 ##################################################
@@ -131,7 +130,9 @@ use vars qw(%value);		# Current values, see commandref.html
 use vars qw(%oldvalue);		# Old values, see commandref.html
 use vars qw($init_done);        #
 use vars qw($internal_data);    #
+use vars qw(%cmds);             # Global command name hash. To be expanded
 
+use vars qw($reread_active);
 
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
@@ -146,9 +147,8 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $reread_active = 0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.58 2008-12-03 16:42:48 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.59 2008-12-09 14:12:40 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -165,9 +165,10 @@ $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork";
+$modules{_internal_}{AttrFn} = "GlobalAttr";
 
 
-my %cmds = (
+%cmds = (
   "?"       => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
   "attr" => { Fn=>"CommandAttr",
@@ -212,8 +213,6 @@ my %cmds = (
             Hlp=>"<sec>,sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
-  "xmllist" => { Fn=>"CommandXmlList",
-            Hlp=>",list definitions and status info as xml" },
 );
 
 
@@ -721,6 +720,8 @@ CommandRereadCfg($$)
 
   WriteStatefile();
 
+  $reread_active=1;
+
   foreach my $d (keys %defs) {
     my $ret = CallFn($d, "UndefFn", $defs{$d}, $d);
     return $ret if($ret);
@@ -729,10 +730,10 @@ CommandRereadCfg($$)
   my $cfgfile = $attr{global}{configfile};
   %defs = ();
   %attr = ();
+  %selectlist = ();
+  %readyfnlist = ();
+
   doGlobalDef($cfgfile);
-
-
-  $reread_active=1;
 
   my $ret = CommandInclude($cl, $cfgfile);
   if(!$ret && $attr{global}{statefile} && -r $attr{global}{statefile}) {
@@ -1061,7 +1062,6 @@ sub
 CommandDelete($$)
 {
   my ($cl, $def) = @_;
-
   return "Usage: delete <name>$namedef\n" if(!$def);
 
   my @rets;
@@ -1207,77 +1207,6 @@ CommandList($$)
 
 #####################################
 sub
-XmlEscape($)
-{
-  my $a = shift;
-  return "" if(!$a);
-  $a =~ s/\\\n/<br>/g;  # Multi-line
-  $a =~ s/&/&amp;/g;
-  $a =~ s/"/&quot;/g;
-  $a =~ s/</&lt;/g;
-  $a =~ s/>/&gt;/g;
-  $a =~ s/([^ -~])/sprintf("#%02x;", ord($1))/ge;
-  return $a;
-}
-
-#####################################
-sub
-CommandXmlList($$)
-{
-  my ($cl, $param) = @_;
-  my $str = "<FHZINFO>\n";
-  my $lt = "";
-
-  delete($modules{""}) if(defined($modules{""}));
-  for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
-    		            $modules{$defs{$b}{TYPE}}{ORDER};
-    		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
-
-      my $p = $defs{$d};
-      my $t = $p->{TYPE};
-
-      if($t ne $lt) {
-        $str .= "\t</${lt}_LIST>\n" if($lt);
-        $str .= "\t<${t}_LIST>\n";
-      }
-      $lt = $t;
-
-      my $a1 = XmlEscape($p->{STATE});
-      my $a2 = XmlEscape(getAllSets($d));
-      my $a3 = XmlEscape(getAllAttr($d));
-
-      $str .= "\t\t<$t name=\"$d\" state=\"$a1\" sets=\"$a2\" attrs=\"$a3\">\n";
-
-      foreach my $c (sort keys %{$p}) {
-        next if(ref($p->{$c}));
-        $str .= sprintf("\t\t\t<INT key=\"%s\" value=\"%s\"/>\n",
-                        XmlEscape($c), XmlEscape($p->{$c}));
-      }
-      $str .= sprintf("\t\t\t<INT key=\"IODev\" value=\"%s\"/>\n",
-                                        $p->{IODev}{NAME}) if($p->{IODev});
-
-      foreach my $c (sort keys %{$attr{$d}}) {
-        $str .= sprintf("\t\t\t<ATTR key=\"%s\" value=\"%s\"/>\n",
-                        XmlEscape($c), XmlEscape($attr{$d}{$c}));
-      }
-
-      my $r = $p->{READINGS};
-      if($r) {
-        foreach my $c (sort keys %{$r}) {
-	  $str .=
-            sprintf("\t\t\t<STATE key=\"%s\" value=\"%s\" measured=\"%s\"/>\n",
-                XmlEscape($c), XmlEscape($r->{$c}{VAL}), $r->{$c}{TIME});
-        }
-      }
-      $str .= "\t\t</$t>\n";
-  }
-  $str .= "\t</${lt}_LIST>\n" if($lt);
-  $str .= "</FHZINFO>\n";
-  return $str;
-}
-
-#####################################
-sub
 CommandReload($$)
 {
   my ($cl, $param) = @_;
@@ -1379,7 +1308,9 @@ getAllSets($)
 sub
 GlobalAttr($$)
 {
-  my ($name, $val) = @_;
+  my ($type, $me, $name, $val) = @_;
+
+  return if($type ne "set");
 
   ################
   if($name eq "logfile") {
@@ -1495,14 +1426,6 @@ CommandAttr($$)
       $attr{$sdev}{$a[1]} = $a[2];
     } else {
       $attr{$sdev}{$a[1]} = "1";
-    }
-
-    if($sdev eq "global") {
-      $ret = GlobalAttr($a[1], $a[2]);
-      if($ret) {
-        push @rets, $ret;
-        next;
-      }
     }
 
   }

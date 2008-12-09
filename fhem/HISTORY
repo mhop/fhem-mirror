@@ -349,3 +349,9 @@
   - speed gain through disabled refreshvalues query to all FHTs at definition;
     if you want it back at a "set myFHT report1 255 report2 255" command to the
     config file.
+
+- Mon Dec  8 21:26 MET 2008 (Rudi)
+  - Modules can now modify the cmds hash, i.e. modules can add / overwrite /
+    delete internal fhem commands. See 99_XmlList.pm for an example. Since this
+    modules is called 99_xxx, it will be always loaded, but user of webpgm2 do
+    not need it.
