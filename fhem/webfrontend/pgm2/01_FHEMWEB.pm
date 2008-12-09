@@ -87,21 +87,20 @@ FW_Define($$)
            ($global && $global ne "global"));
 
   $hash->{STATE} = "Initialized";
-  $hash->{PORT} = IO::Socket::INET->new(
+  $hash->{SERVERSOCKET} = IO::Socket::INET->new(
           Proto     => 'tcp',
           LocalHost => (($global && $global eq "global") ? undef : "localhost"),
           LocalPort => $port,
           Listen    => 10,
           ReuseAddr => 1);
 
-  return "Can't open server port at $port: $!" if(!$hash->{PORT});
+  return "Can't open server port at $port: $!" if(!$hash->{SERVERSOCKET});
 
-  $hash->{FD} = $hash->{PORT}->fileno();
+  $hash->{FD} = $hash->{SERVERSOCKET}->fileno();
+  $hash->{PORT} = $port;
 
   $selectlist{"$name.$port"} = $hash;
-  $hash->{SERVERSOCKET} = 1;
   Log(2, "FHEMWEB port $port opened");
-
   return undef;
 }
 
@@ -110,8 +109,19 @@ sub
 FW_Undef($$)
 {
   my ($hash, $arg) = @_;
-  close($hash->{CD})   if(defined($hash->{CD}));    # Clients
-  close($hash->{PORT}) if(defined($hash->{PORT}));  # Server
+  my $name = $hash->{NAME};
+
+  return undef if($hash->{INUSE});
+
+  if(defined($hash->{CD})) {                   # Clients
+    close($hash->{CD});
+    delete($selectlist{$hash->{NAME}});
+  }
+  if(defined($hash->{SERVERSOCKET})) {          # Server
+    close($hash->{SERVERSOCKET});
+    $name = $name . "." . $hash->{PORT};
+    delete($selectlist{$name});
+  }
   return undef;
 }
 
@@ -120,11 +130,11 @@ sub
 FW_Read($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
 
-    my @clientinfo = $hash->{PORT}->accept();
-    my $name = $hash->{NAME};
+    my @clientinfo = $hash->{SERVERSOCKET}->accept();
     my $ll = GetLogLevel($name,4);
 
     if(!@clientinfo) {
@@ -162,8 +172,8 @@ FW_Read($)
   my $ret = sysread($hash->{CD}, $buf, 1024);
 
   if(!defined($ret) || $ret <= 0) {
-    my $r = CommandDelete(undef, $hash->{NAME});
-    Log($ll, "Connection closed for $hash->{NAME}");
+    my $r = CommandDelete(undef, $name);
+    Log($ll, "Connection closed for $name");
     return;
   }
 
@@ -175,8 +185,16 @@ FW_Read($)
   my ($mode, $arg, $method) = split(" ", $lines[0]);
   $hash->{BUF} = "";
 
-  Log($ll, "HTTP $hash->{NAME} GET $arg");
+  Log($ll, "HTTP $name GET $arg");
+  $hash->{INUSE} = 1;
+
   my $cacheable = FW_AnswerCall($arg);
+
+  delete($hash->{INUSE});
+  if(!$selectlist{$name}) {             # removed by rereadcfg, reinsert
+    $selectlist{$name} = $hash;
+    $defs{$name} = $hash;
+  }
 
   my $c = $hash->{CD};
   my $l = length($__RET);
