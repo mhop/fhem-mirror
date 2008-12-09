@@ -128,7 +128,8 @@ CUL_Undef($$)
        defined($defs{$d}{IODev}) &&
        $defs{$d}{IODev} == $hash)
       {
-        Log GetLogLevel($name,2), "deleting port for $d";
+        my $lev = ($reread_active ? 4 : 2);
+        Log GetLogLevel($name,$lev), "deleting port for $d";
         delete $defs{$d}{IODev};
       }
   }
@@ -197,7 +198,7 @@ GOTBW:
   } else {
 
     return "Expecting a 0-padded hex number"
-        if((length($arg)&1) == 1 && $type ne "raw");
+        if((length($arg)&1) == 0 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
     Log GetLogLevel($name,4), "set $name $type $arg";
     CUL_Write($hash, $sets{$type}, $arg);
@@ -409,21 +410,21 @@ CUL_Write($$$)
   my $bstring = "$fn$msg\n";
 
   if($fn eq "F") {
-    if(!$hash->{QUEUECNT}) {
-      CUL_XmitLimitCheck($hash, $bstring);
+
+    if(!$hash->{QUEUE}) {
+
+      CUL_XmitLimitCheck($hash,$bstring);
+      $hash->{QUEUE} = [ $bstring ];
       $hash->{PortObj}->write($bstring);
 
       ##############
-      # Write the next buffer not earlier than 0.227 seconds (= 65.6ms + 10ms +
-      # 65.6ms + 10ms + 65.6ms + 10ms)
+      # Write the next buffer not earlier than 0.22 seconds (= 65.6ms + 10ms +
+      # 65.6ms + 10ms + 65.6ms), else it will be discarded by the FHZ1X00 PC
       InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
 
-    } elsif($hash->{QUEUECNT} == 1) {
-      $hash->{QUEUE} = [ $bstring ];
     } else {
       push(@{$hash->{QUEUE}}, $bstring);
     }
-    $hash->{QUEUECNT}++;
 
   } else {
 
@@ -438,14 +439,18 @@ sub
 CUL_HandleWriteQueue($)
 {
   my $hash = shift;
-  if($hash->{QUEUECNT} > 0) {
-    $hash->{QUEUECNT}--;
-    my $bstring = shift(@{$hash->{QUEUE}});
-    if(defined($bstring)) {
-      CUL_XmitLimitCheck($hash,$bstring);
-      $hash->{PortObj}->write($bstring);
-      InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
+  my $arr = $hash->{QUEUE};
+
+  if(defined($arr) && @{$arr} > 0) {
+    shift(@{$arr});
+    if(@{$arr} == 0) {
+      delete($hash->{QUEUE});
+      return;
     }
+    my $bstring = $arr->[0];
+    CUL_XmitLimitCheck($hash,$bstring);
+    $hash->{PortObj}->write($bstring);
+    InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
   }
 }
 
