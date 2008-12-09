@@ -1,7 +1,8 @@
 ############################
 # Display the power reported by the EM1010
 # Corresponding FileLog definition:
-# define ememlog FileLog /var/log/fhem/emem-%Y.log emem:power.*
+# define ememlog FileLog /var/log/fhem/em-%Y.log emem:power.*
+# define emwzlog FileLog /var/log/fhem/em-%Y.log emwz:power.*
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
