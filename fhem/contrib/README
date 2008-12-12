@@ -1,8 +1,6 @@
 - 70_SCIVT.pm
   Support for an SCD series solar controler device. Details see 
   http://english.ivt-hirschau.de/content.php?parent_id=CAT_64&doc_id=DOC_118
-- 80_M232.pm/81_M232Counter.pm
-  Support for the M232 device from ELV by Boris.
 - 86_FS10.pm
   Support for FS10. Read README.FS10, you have to install pcwsd first.
 - 91_DbLog.pm
@@ -11,38 +9,40 @@
 - 99_ALARM.pm
   Example for a Low Budget ALARM System by Martin
 - 99_SUNRISE.pm
-  The original Sunrise/Sunset support. Uses DateTime::Event::Sunrise. Uses the
-  99_SUNRISE_EL.pm module instead.
-- 99_SUNRISE_EL.pm
-  Support foor computins sunrise/sunset times.
-- 99_Utils.pm
-  skeleton for self-written perl funtions.
-- 99_dummy.pm
-  Used for programming
-- 99_weblink.pm
-  Used by fhemweb2.pl
+  The "original" (i.e. old) Sunrise/Sunset support. Needs the hard-to-install
+  DateTime::Event::Sunrise perl module. Use the 99_SUNRISE_EL.pm module instead.
+
 - checkmsg.pl
   Check header/function/crc of an FS20 hex message
 - crc.pl
   Computing CRC16 in perl
+- dblog/*
+  Support for a full-featured database log by Boris. See the README.
 - em1010.pl / em1010.gnuplot
   Standalone EM1010PC reader program and a gnuplot file to plot em1010 data
-- init-scripts
-  RC scripts to be put into /etc/init.d and then symlinked to /etc/rc3.d or
-  similar.
 - four2hex
   Convert housecode from  ELV notation (4) to fhem.pl notation (hex)
+  Not needed any more, as current fhem versions understand both.
 - fs20_holidays.sh
   STefan's "presence simulator" for holidays
 - garden.pl
   Garden irrigation regulator with weather dependency (KS300 temp + rain)
+- JsonList
+  99_JsonList.pm adds a jsonlist command, which is list in JSON format.
+  See JsonList/README.JsonList for more. By Martin.
+- fhem2speech
+  Martins instructions on how to make FHEM talk using the MBROLA speech
+  synthesizer
+- init-scripts
+  RC scripts to be put into /etc/init.d and then symlinked to /etc/rc3.d or
+  similar.
 - ks300avg.pl
   Computing daily/monthly avarage values from a KS300 log
 - rolwzo_not_off.sh
   Martin's "don't lock me out" program: look at the comment
+- rotateShiftWork
+  Shellskript for changing am/pm temperatures when working on a shift
 - rrd
   Peter's RRD support. See the HOWTO
 - serial.pm
   Serial line analyzer
-- dblog
-  Support for a full-featured database log by Boris. See the README.
