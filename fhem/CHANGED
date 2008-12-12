@@ -458,3 +458,6 @@
              report2 255" command to the config file.
   - feature: fhem commands may be added in modules. XmlList is external now.
   - bugfix:  rereadcfg from webpgm2 does not crash fhem.pl
+  - feature: jsonlist command from Martin (contrib/JsonList)
+  - feature: contrib/rotateShiftWork from Martin
+  - feature: contrib/fhem2speech from Martin
