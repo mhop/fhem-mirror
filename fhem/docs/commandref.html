@@ -2365,9 +2365,9 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     Define a WS2000 series raw receiver device sold by ELV. Details see <a
     href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=6724">here</a>.
-    Unlike 86_FS10.pm it will handle the complete device communication itself and
-    doesnt require an external program.
-    For this reason you can now use this also on windows.
+    Unlike 86_FS10.pm it will handle the complete device communication itself
+    and doesnt require an external program.  For this reason you can now use
+    this also on windows.
     <br>
       This Device will be usually connect to a serial port, but you can also
       define a raw network redirector like lantronix XPORT(TM).
@@ -3302,13 +3302,16 @@ isday, sunrise_coord</pre>
 
     <a name="refresh"></a>
     <li>refresh<br/>
-        This defines the time-interval in which a new rendering of the defined WebLinks will be done.
+        This defines the time-interval in which a new rendering of the defined
+        WebLinks will be done.
         </li><br>
 
     <a name="tmpfile"></a>
     <li>tmpfile<br/>
-        This gives the path and a possible prefix for the rendered filenames.<br/>
-        You can specify a path to which the files will be rendered. If you also specify a prefix, this will be used to build the resulting filename.
+        This gives the path and a possible prefix for the rendered
+        filenames.<br/> You can specify a path to which the files will be
+        rendered. If you also specify a prefix, this will be used to build the
+        resulting filename.
         </li><br> </li> </ul>
   </ul>
 
@@ -3320,32 +3323,46 @@ isday, sunrise_coord</pre>
 <h3>Perl specials</h3>
 <ul>
    <li>To use fhem commands from the perl expression, use the function "fhem",
-   which takes a string argument, this string will be evaluated as an fhem
-   command chain.<br>
-   Example:
-   <ul>
-     define n1 notify piri:on { fhem "set light on" }
-   </ul>
-   </li>
-   <li>
-   To make date and time handling easier, before evaluating a perl expression
-   the variables $sec, $min, $hour, $mday, $month, $year, $wday, $yday, $isdst
-   are set (see perldoc -f localtime), with the exception that $month is in the
-   range of 1 to 12, and $year is also corrected by 1900 (as one would normally
-   expect). Additionally $we is 1 if it is weekend (i.e $wday == 0 ||
-   $wday == 6), and 0 otherwise.
-   Example:
-   <ul>
-   define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) { fhem "set light on" } }
-   </ul>
+     which takes a string argument, this string will be evaluated as a fhem
+     command chain.<br>
+     Example:
+     <ul>
+       define n1 notify piri:on { fhem "set light on" }
+     </ul></li>
 
-   </li>
+   <li>To make date and time handling easier, before evaluating a perl
+     expression the variables $sec, $min, $hour, $mday, $month, $year, $wday,
+     $yday, $isdst are set (see perldoc -f localtime), with the exception that
+     $month is in the range of 1 to 12, and $year is also corrected by 1900 (as
+     one would normally expect). Additionally $we is 1 if it is weekend (i.e
+     $wday == 0 || $wday == 6), and 0 otherwise.  Example:
+
+     <ul>
+       define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) { fhem "set
+       light on" } }
+     </ul></li>
+
+   <li>
+     The following small helper functions are defined in 99_Util.pm (which will
+     be loaded automatically):
+     <ul>
+       <li>min(a,b), max(a,b)</li>
+       <li>time_str2num("YYYY-MM-DD HH:MM:SS") returns a numerical value,
+           which makes computation of time differences easier</li>
+       <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one,
+           to compare it with the sunrise commands in the following example:<br>
+           # Switch lamp1 on at sunrise, but not before 07:00<br>
+           define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1
+           on
+           </li>
+     </ul>
+     </li>
 
    <li>
      <b>Note</b>: do not forget to escape the semicolon (;) with two semicolons
      (;;), else your perl code will be interpreted as an fhem command and you
      most certainly get syntax errors.
-   </li>
+     </li>
 
    <li>
      The current value (the string you see in paranthesis in the output of the
@@ -3354,12 +3371,12 @@ isday, sunrise_coord</pre>
      If you need the old value (and time) of the currently triggered device,
      then you can access it with <code>$oldvalue{$dev}{TIME}</code> and
      <code>$oldvalue{$dev}{VAL}</code>.<br>
-   </li>
+     </li>
 
    <li>
      To access the numerical value of an FS20 command (e.g. toggle), use the
      hash <code>fs20_c2b</code>. E.g. { Log 2, $fs20_c2b{"toggle"} }
-   </li>
+     </li>
 
    <li>
      By using the 99_SUNRISE_EL.pm module, you have access to the following
@@ -3374,7 +3391,7 @@ isday, sunrise_coord</pre>
      The _rel functions should be used as "at" spec, and the _abs functions as
      argument to the on-till argument of the set command.<br>
      isday returns 1 if the sun is visible, and 0 else.
-   </li>
+     </li>
 
 </ul>
 
