@@ -1,0 +1,63 @@
+Copyright (c)2008 Martin Fischer <m_fischer@gmx.de>
+
+Description:
+  The script fhem2speech.sh let FHEM talk.
+
+Requirements:
+  You need MBROLA synthesizer, a synthesis voice, txt2pho and bplay.
+  For more information visit:
+  o MBROLA Project, http://tcts.fpms.ac.be/synthesis/
+  o hadifix, http://www.ikp.uni-bonn.de/dt/forsch/phonetik/hadifix/
+
+Installation:
+  This describes the installation on ubuntu:
+
+  Make a temporarily directory for the needed files and change to
+  the new directory, e.g.:
+    'mkdir /usr/local/src/mbrola; cd !$'
+
+  Download the required files:
+    'wget http://www.ikp.uni-bonn.de/dt/forsch/phonetik/hadifix/txt2pho.zip'
+    'wget http://tcts.fpms.ac.be/synthesis/mbrola/bin/pclinux/mbrola3.0.1h_i386.deb'
+
+  Download at least one synthesis voice (e.g. german female voice):
+    'wget http://tcts.fpms.ac.be/synthesis/mbrola/dba/de7/de7.zip'
+
+  Install txt2pho:
+    'unzip txt2pho.zip -d /usr/share/'
+    'chmod 755 /usr/share/txt2pho/txt2pho'
+
+  Edit txt2phorc:
+    'vi /usr/share/txt2pho/txt2phorc'
+  and change the path for DATAPATH and INVPATH:
+    DATAPATH=/usr/share/txt2pho/data/
+    INVPATH=/usr/share/txt2pho/data/
+
+  Copy txt2phorc to /etc/txt2pho:
+    'cp /usr/share/txt2pho/txt2phorc /etc/txt2pho'
+
+  Install the synthesis voice (e.g. german female voice):
+    'unzip de7.zip -d /usr/share/mbrola/de7'
+
+  Install mbrola:
+    'dpkg -i mbrola3.0.1h_i386.deb'
+
+  Install bplay:
+    'apt-get install bplay'
+
+  Test your installation:
+    'echo "Test" | /usr/share/txt2pho/txt2pho | mbrola /usr/share/mbrola/de7/de7 - - | bplay -s22050 -
+b 16'
+
+  Copy the script fhem2speech.sh to a directory of your choice,
+  e.g.:
+    'cp fhem2speech.sh /usr/local/bin'
+  and make it executable:
+    'chmod 775 /usr/local/bin/fhem2speech.sh'
+
+Usage:
+  Edit your FHEM configuration file and add a line like this:
+  define speechBattery notify .*warnings.*Battery.*low.* "/usr/local/bin/fhem2speech.sh -s "Achtung, Batterie schwach: @""
+
+  At last restart FHEM or do a rereadcfg and listen to your speaker.
+
