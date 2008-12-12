@@ -10,8 +10,7 @@
 
 
 <h1>FHEM</h1>
-GPL'd server to access devices like FHZ1000/FHZ1300,EM1010PC,WS300,SCIVT,X10.
-Formerly known as fhz1000.pl
+GPL'd server for house automation. Formerly known as fhz1000.pl
 <br/><br/>
 Current Version: (as of =DATE=) is <a
 href="http://www.koeniglich.de/fhem/fhem-=VERS=.tar.gz">=VERS=</a>
@@ -21,37 +20,40 @@ href="#webfrontends"/>webfrontends</a> section for screenshots.
 
 <h2>Description</h2>
 <ul>
-This program makes the FHZ1000/FHZ1300/WS300 and other USB devices sold by ELV,
-Conrad and others as well as X10 devices sold by Marmitek, Powerhouse and
-others useable with Linux. In fact, there is nothing Linux special
-in it, there are reports from OS X and Windows. You should be able to use it on
-other platforms as long as you can access the hardware as a serial device.<br>
+<b>fhem</b> is used to automate some common tasks in the household like
+switching lamps/shutters/heating/etc. and to log events like
+temperature/humidity/power consumption.<br><br>
+
 The program runs as a server, you can control it via telnet, command line
 program or TCP/IP directly, like the supplied web frontends do.<br> <br>
 
 Currently implemented features:<br>
 <ul>
   <li>Via the FHZ module (with access to one or more FHZ1000/FHZ1300 device):
-  <ul>
-    <li>reading and sending FS20 events (on/off/dimming, timer
-        commands)</li>
-    <li>support of FS20 address features function group, local and global
-        master</li>
-    <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
-        The FHT8b seems to work too. Note: the FHT8 wont work.<br>
-        Internal software buffer to prevent lost commands.</li>
-    <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK,-CO,-FIT and RM100-2)</li>
-    <li>reading KS300 data</li>
-  </ul>
+    <ul>
+      <li>reading and sending FS20 events (on/off/dimming, timer
+          commands)</li>
+      <li>support of FS20 address features function group, local and global
+          master</li>
+      <li>reading and changing FHT80b parameters (temp, actuator, etc).<br>
+          The FHT8b seems to work too. Note: the FHT8 wont work.<br>
+          Internal software buffer to prevent lost commands.</li>
+      <li>reading HMS data (HMS100-T,-TF,-WD,-MG,-TFK,-CO,-FIT and RM100-2)</li>
+      <li>reading KS300 data</li>
+    </ul>
      Note: The FHZ1350 WLAN is probably not working due to a prorietary
      encryption.
-  </li>
+    </li>
   <li>Via the CM11 module (with access to a X10 computer interface):
-  <ul>
-    <li>reading all X10 events</li>
-    <li>sending X10 events (on/off/dimming)</li>
-    <li>timed on/off switching support</li>
-  </ul>
+    <ul>
+      <li>reading all X10 events</li>
+      <li>sending X10 events (on/off/dimming)</li>
+      <li>timed on/off switching support</li>
+    </ul>
+    </li>
+  <li>Via the CUL module (see <a href="http://www.busware.de">www.busware.de
+      </a>) access to the FS20/EM1000/FHT/S300 protocols. <b>Note:</b>due to
+      the incomplete firmware the access is read-only at the moment.
   </li>
   <li>reading WS300 data, and up to 9 attached devices</li>
   <li>reading EM1000WZ/EM1000EM/EM1000GZ data via an attached EM1010PC</li>
@@ -69,8 +71,8 @@ Currently implemented features:<br>
   <li>different web frontends, choose your favorite</li>
 <br>
 </ul>
-See <a href="HOWTO.html">HOWTO.html</a>, <a href="commandref.html">commandref.html</a>
-and <a href="faq.html">faq.html</a> for more documentation.
+See <a href="HOWTO.html">HOWTO.html</a>, <a href="commandref.html">
+commandref.html</a> and <a href="faq.html">faq.html</a> for more documentation, and <a href="README.contrib">contrib/README</a> for other extensions.
 </ul>
 
 <h2>Links:</h2>
@@ -85,14 +87,20 @@ and <a href="faq.html">faq.html</a> for more documentation.
   	http://groups.google.com/group/FHZ1000-users-on-unix</a><br>
   Martins Web frontend (webpgm3): <a href="http://www.martin-haas.de/fhz">
   	http://www.martin-haas.de/fhz</a><br>
-  Another Martins Web frontend (myHCE): <a href="http://www.fischer-net.de/projekte/haustechnik/myhce.html">http://www.fischer-net.de/projekte/haustechnik/myhce.html</a><br>
+  Another Martins Web frontend (myHCE):
+        <a href="http://www.fischer-net.de/projekte/haustechnik/myhce.html">
+        http://www.fischer-net.de/projekte/haustechnik/myhce.html</a><br>
   CVS@berlios: <a href="http://developer.berlios.de/projects/fhem">
   	http://developer.berlios.de/projects/fhem</a><br>
   LinViex (home automation frontend):
         <a href="http://sourceforge.net/projects/linviex">
-  <a href=http://shop.busware.de/product_info.php?products_id=29">CUL</CUL>
+        http://sourceforge.net/projects/linviex</a><br>
+  busware.de: <a href=http://shop.busware.de/product_info.php?products_id=29">
+        CUL</a>, <a href="http://groups.google.com/group/cul-fans">
+  	CUL fans google group</a><br>
 
-  	http://sourceforge.net/projects/linviex</a><br><br>
+  <br>
+
   Device/OS Specific installation guides:<br>
   <ul>
     <li>Linux driver installation:
@@ -170,24 +178,23 @@ If you are using cygwin for your perl installation you can follow the guidelines
 <ul>
   <li>You don't have to install all of them, one is probably more than
       enough :-)</li>
-  <li>The web server and the fhem server must be on the same host</li>
   <li><b>Important:</b> Make sure you add some protection (.htaccess, etc)
       else everybody will be able to set your devices</li>
-  <li>The list below contains the 2 actively maintained fronteds:</li>
 </ul>
 
 <h3>Web frontend 2 (webfrontend/pgm2)</h3>
   <ul>
-  This frontend is a FHEM module implementing a HTTP server.  It has support
-  for grouping devices into rooms, manipulating devices, direct fhem commands,
-  displaying logfiles as text or plot (SVG builtin or PNG by gnuplot),
-  navigating/zooming in the plots.  <br/>
+  This frontend is a FHEM module implementing a HTTP server, no further
+  programs are needed.  It has support for grouping devices into rooms,
+  manipulating devices, direct fhem commands, displaying logfiles as text or
+  plot (SVG builtin or PNG by gnuplot), navigating/zooming in the plots.  <br/>
+
 
   Screenshots: <a href="pgm2-1.png">overview</a>, <a
   href="pgm2-2.png">detail</a>, <a href="pgm2-3.png">SVG-plots</a>.
   <br><br>
   Installation: make install-pgm2 &amp;&amp; perl fhem.pl <br>
-
+  This will start fhem.pl with a minimalistic configuration.
   Connect to fhem via <a
   href="http://localhost:8083/fhem">http://localhost:8083/fhem</a>. See the
   Howto there on how to continue.
