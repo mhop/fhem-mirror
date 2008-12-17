@@ -461,3 +461,4 @@
   - feature: jsonlist command from Martin (contrib/JsonList)
   - feature: contrib/rotateShiftWork from Martin
   - feature: contrib/fhem2speech from Martin
+  - feature: attribute rainadjustment for KS300 (Boris 2008-12-17)
