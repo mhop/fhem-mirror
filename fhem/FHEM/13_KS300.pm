@@ -5,7 +5,6 @@ use strict;
 use warnings;
 
 my %defptr;
-my $negcount = 0;
 
 #####################################
 sub
@@ -21,7 +20,7 @@ KS300_Initialize($)
   $hash->{DefFn}     = "KS300_Define";
   $hash->{UndefFn}   = "KS300_Undef";
   $hash->{ParseFn}   = "KS300_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ks300 loglevel:0,1";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ks300 loglevel:0,1 rainadjustment:0,1";
 }
 
 #####################################
@@ -77,7 +76,7 @@ KS300_Parse($$)
   # CRC, they seem to contain partial data (e.g. temp/wind/hum but not rain)
   # They are suppressed as of now.
   if(hex($a[3]) != 13) {
-    Log 4, "Strange KS400 message received, wont decode ($msg)";
+    Log 4, "Strange KS300 message received, won't decode ($msg)";
     return "";
   }
 
@@ -87,6 +86,7 @@ KS300_Parse($$)
     my $dev = shift(@arr);
     my $def = $defptr{$dev};
     my $haverain = 0;
+    my $name= $def->{NAME};
 
     my @v;
     my @txt = ( "rain_raw", "rain", "wind", "humidity", "temperature",
@@ -94,34 +94,118 @@ KS300_Parse($$)
     my @sfx = ( "(counter)", "(l/m2)", "(km/h)", "(%)", "(Celsius)",
                 "(yes/no)", "","","");
 
+
+    # counter for the change hash
+    my $n= 1; # 0 is STATE and will b explicitely set
+
+    # time
+    my $tm = TimeNow();
+    my $tsecs= time();  # number of non-leap seconds since January 1, 1970, UTC
+
     # The next instr wont work for empty hashes, so we init it now
     $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
     my $r = $def->{READINGS};
 
+
+    # preset current $rain_raw
     $v[0] = hex("$a[28]$a[27]$a[26]");
+    my $rain_raw= $v[0];
 
-    #############################
-    # My KS300 sends a (quite huge) "negative" rain, when the rain begins,
-    # then the value is "normal" again. So we have to filter neg. rain out.
-    # But if the KS300 is sending this value more than once, then accept it,
-    # as the KS300 was probably reset
+    # get previous rain_raw
+    my $rain_raw_prev= $rain_raw;
+    if(defined($r->{rain_raw})) {
+         $rain_raw_prev= $r->{rain_raw}{VAL};
+    };
 
-    if($r->{rain_raw}{VAL}) {
-      my ($rrv, undef) = split(" ", $r->{rain_raw}{VAL});
-      $haverain = 1 if($v[0] != $rrv);
-      if($v[0] < $rrv) {
-        if($negcount++ < 3) {
-	  Log 3, "KS300 negative rain, ignoring it";
-          $v[0] = $rrv;
-	} else {
-	  Log 1, "KS300 was probably reset, accepting new rain value";
-	}
-      } else {
-        $negcount = 0;
-      }
+    # get previous rain_raw_adj
+    my $rain_raw_adj_prev= $rain_raw;
+    if(defined($r->{rain_raw_adj})) {
+         $rain_raw_adj_prev= $r->{rain_raw_adj}{VAL};
     }
 
-    $v[1] = sprintf("%0.1f", $v[0] * $def->{RAINUNIT} / 1000);
+    # unadjusted value as default
+    my $rain_raw_adj= $rain_raw;
+
+
+    if(defined($attr{$name}) &&
+       defined($attr{$name}{"rainadjustment"}) &&
+       ($attr{$name}{"rainadjustment"}>0)) {
+
+       # The rain values delivered by my KS300 randomly switch between two
+       # different values. The offset between the two values follows no
+       # identifiable principle. It is even unclear whether the problem is
+       # caused by KS300 or by FHZ1300. ELV denies any problem with the KS300.
+       # The problem is known to several people. For instance, see
+       # http://www.ipsymcon.de/forum/showthread.php?t=3303&highlight=ks300+regen&page=3
+       # The following code detects and automatically corrects these offsets.
+
+       my $rain_raw_ofs;
+       my $rain_raw_ofs_prev;
+       my $tsecs_prev;
+
+      # get previous offet
+       if(defined($r->{rain_raw_ofs})) {
+         $rain_raw_ofs_prev= $r->{rain_raw_ofs}{VAL};
+       } else{
+         $rain_raw_ofs_prev= 0;
+       }
+
+       # get previous tsecs
+       if(defined($r->{tsecs})) {
+         $tsecs_prev= $r->{tsecs}{VAL};
+       } else{
+         $tsecs_prev= 0; # 1970-01-01
+       }
+
+       # detect error condition
+       # delta is negative or delta is too large
+       # see http://de.wikipedia.org/wiki/Niederschlagsintensität#Niederschlagsintensit.C3.A4t
+       # during a thunderstorm in middle europe, 50l/m^2 rain may fall per hour
+       # 50l/(m^2*h) correspond to 200 ticks/h
+       # Since KS300 sends every 2,5 minutes, a maximum delta of 8 ticks would
+       # be reasonable. The observed deltas are in most cases 1 or 2 orders
+       # of magnitude larger.
+       # The code also handles counter resets after battery replacement
+
+
+       my $rain_raw_delta= $rain_raw- $rain_raw_prev;
+       my $thours_delta= ($tsecs- $tsecs_prev)/3600.0; # in hours
+       my $rain_raw_per_hour= $rain_raw_delta/$thours_delta;
+       if(($rain_raw_delta<0) || ($rain_raw_per_hour> 200.0)) {
+          $rain_raw_ofs= $rain_raw_ofs_prev-$rain_raw_delta;
+          # If the switch in the tick count occurs simultaneously with an
+          # increase due to rain, the tick is lost. Sorry.
+          $r->{rain_raw_ofs}{TIME} = $tm;
+          $r->{rain_raw_ofs}{VAL} = "$rain_raw_ofs";
+          $def->{CHANGED}[$n++] = "rain_raw_ofs: $rain_raw_ofs";
+
+       }
+
+       $rain_raw_adj= $rain_raw+ $rain_raw_ofs;
+
+    }
+
+    # remember tsecs
+    $r->{tsecs}{TIME} = $tm;
+    $r->{tsecs}{VAL} = "$tsecs";
+    $def->{CHANGED}[$n++] = "tsecs: $tsecs";
+
+    # remember rain_raw_adj
+    $r->{rain_raw_adj}{TIME} = $tm;
+    $r->{rain_raw_adj}{VAL} = "$rain_raw_adj";
+    $def->{CHANGED}[$n++] = "rain_raw_adj: $rain_raw_adj";
+
+
+    # KS300 has a sensor which detects any drop of rain and immediately
+    # sends out the israining message. The sensors consists of two parallel
+    # strips of metal separated by a small gap. The rain bridges the gap
+    # and closes the contact. If the KS300 pole is not perfectly vertical the
+    # drop runs along only one side and the contact is not closed. To get the
+    # israining information anyway, the respective flag is also set when the
+    # a positive amount of rain is detected.
+    $haverain = 1 if($rain_raw_adj != $rain_raw_adj_prev);
+
+    $v[1] = sprintf("%0.1f", $rain_raw_adj * $def->{RAINUNIT} / 1000);
     $v[2] = sprintf("%0.1f", ("$a[25]$a[24].$a[23]"+0) * $def->{WINDUNIT});
     $v[3] = "$a[22]$a[21]" + 0;
     $v[4] = "$a[20]$a[19].$a[18]" + 0; $v[4] = "-$v[4]" if($a[17] eq "7");
@@ -134,8 +218,6 @@ KS300_Parse($$)
 
     # Negative temp
     $v[4] = -$v[4] if($v[8] & 8);
-
-    my $tm = TimeNow();
 
     Log GetLogLevel($def->{NAME},4), "KS300 $dev: $msg";
 
@@ -150,7 +232,7 @@ KS300_Parse($$)
       $r->{$txt[$i]}{TIME} = $tm;
       $val = "$v[$i] $sfx[$i]";
       $r->{$txt[$i]}{VAL} = $val;
-      $def->{CHANGED}[$i+1] = "$txt[$i]: $val";
+      $def->{CHANGED}[$n++] = "$txt[$i]: $val";
     }
 
     ###################################
@@ -192,7 +274,7 @@ KS300_Parse($$)
 
       if($d[2] != $sd[2]) {			   # Day changed, report it
 
-        $def->{CHANGED}[$max++] = "avg_day $r->{avg_day}{VAL}";
+        $def->{CHANGED}[$n++] = "avg_day $r->{avg_day}{VAL}";
         $r->{cum_day}{VAL} = "$tm T: 0 H: 0 W: 0 R: $v[1]";
 
 	if(!$r->{cum_month}) {                     # Check the month
@@ -215,7 +297,7 @@ KS300_Parse($$)
 
 	  if($d[1] != $sd[1]) {                   # Month changed, report it
 
-	    $def->{CHANGED}[$max++] = "avg_month $r->{avg_month}{VAL}";
+	    $def->{CHANGED}[$n++] = "avg_month $r->{avg_month}{VAL}";
 	    $r->{cum_month}{VAL} = "0 T: 0 H: 0 W: 0 R: 0";
 
 	  }
@@ -230,7 +312,7 @@ KS300_Parse($$)
     # AVG computing
     ###################################
 
-    return $def->{NAME};
+    return $name;
 
   } else {
 
