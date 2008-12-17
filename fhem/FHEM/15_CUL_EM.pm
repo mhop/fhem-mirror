@@ -144,7 +144,7 @@ CUL_EM_Parse($$)
 
     # initialize basis_cnt_last
     my $basis_cnt_last;
-    if(defined($hash->{READINGS}{basis_cnt})) {
+    if(defined($hash->{READINGS}{basis})) {
         $basis_cnt_last= $hash->{READINGS}{basis}{VAL};
     } else {
         $basis_cnt_last= 0;
