@@ -355,3 +355,7 @@
     delete internal fhem commands. See 99_XmlList.pm for an example. Since this
     modules is called 99_xxx, it will be always loaded, but user of webpgm2 do
     not need it.
+
+- Wed Dec 17 19:48 (Boris)
+  - attribute rainadjustment for KS300 in 13_KS300.pm to account for random
+    switches in the rain counter (see commandref.html)

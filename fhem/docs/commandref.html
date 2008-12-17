@@ -1889,6 +1889,12 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (ks300)</li>
+    <li>rainadjustment<br>
+        If this attribute is set, fhem automatically accounts for rain counter
+        resets after a battery change and random counter switches as experienced
+        by some users. The raw rain counter values are adjusted by an offset
+        in order to flatten out the sudden large increases and decreases in
+        the received rain counter values. Default is off.</li>
   </ul>
   <br>
 
@@ -3201,7 +3207,7 @@ isday, sunrise_coord</pre>
   <ul>
     <code>define &lt;name&gt; FHEMRENDERER [global]</code>
 	    <br><br>
-        This defines a new "device", that is of type FHEMRENDERER. The option 'global' can be used if needed for sorting reasons. 
+        This defines a new "device", that is of type FHEMRENDERER. The option 'global' can be used if needed for sorting reasons.
         Otherwise this option has no real meaning for FHEMRENDERER.<br>
         <br>
         As a side-effect of defining this "device" the following attributes will be set for this "device":<br>
@@ -3211,7 +3217,7 @@ isday, sunrise_coord</pre>
 		&nbsp;&nbsp;room		Unsorted <br>
 		&nbsp;&nbsp;status		off <br>
 		&nbsp;&nbsp;tmpfile		/tmp/ <br>
-<br>    
+<br>
         NOTE: The Logfile will report (with LogLevel 2) that the FHEMRENDERER has been defined.
 
   </ul>
