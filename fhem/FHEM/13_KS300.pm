@@ -117,15 +117,14 @@ KS300_Parse($$)
          $rain_raw_prev= $r->{rain_raw}{VAL};
     };
 
+    # unadjusted value as default
+    my $rain_raw_adj= $rain_raw;
+
     # get previous rain_raw_adj
     my $rain_raw_adj_prev= $rain_raw;
     if(defined($r->{rain_raw_adj})) {
          $rain_raw_adj_prev= $r->{rain_raw_adj}{VAL};
-    }
-
-    # unadjusted value as default
-    my $rain_raw_adj= $rain_raw;
-
+    };
 
     if(defined($attr{$name}) &&
        defined($attr{$name}{"rainadjustment"}) &&
@@ -143,12 +142,16 @@ KS300_Parse($$)
        my $rain_raw_ofs_prev;
        my $tsecs_prev;
 
-      # get previous offet
+       # get previous offet
        if(defined($r->{rain_raw_ofs})) {
          $rain_raw_ofs_prev= $r->{rain_raw_ofs}{VAL};
        } else{
          $rain_raw_ofs_prev= 0;
        }
+
+       # the current offset is the same, but this may change later
+       $rain_raw_ofs= $rain_raw_ofs_prev;
+
 
        # get previous tsecs
        if(defined($r->{tsecs})) {
@@ -174,9 +177,11 @@ KS300_Parse($$)
        if(($rain_raw_delta<0) || ($rain_raw_per_hour> 200.0)) {
           $rain_raw_ofs= $rain_raw_ofs_prev-$rain_raw_delta;
           # If the switch in the tick count occurs simultaneously with an
-          # increase due to rain, the tick is lost. Sorry.
+          # increase due to rain, the tick is lost. We therefore assume that
+          # offsets between -5 and 0 are indeed rain.
+          if(($rain_raw_ofs>=-5) && ($rain_raw_ofs<0)) { $rain_raw_ofs= 0; }
           $r->{rain_raw_ofs}{TIME} = $tm;
-          $r->{rain_raw_ofs}{VAL} = "$rain_raw_ofs";
+          $r->{rain_raw_ofs}{VAL} = $rain_raw_ofs;
           $def->{CHANGED}[$n++] = "rain_raw_ofs: $rain_raw_ofs";
 
        }
@@ -192,7 +197,7 @@ KS300_Parse($$)
 
     # remember rain_raw_adj
     $r->{rain_raw_adj}{TIME} = $tm;
-    $r->{rain_raw_adj}{VAL} = "$rain_raw_adj";
+    $r->{rain_raw_adj}{VAL} = $rain_raw_adj;
     $def->{CHANGED}[$n++] = "rain_raw_adj: $rain_raw_adj";
 
 
