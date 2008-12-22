@@ -81,24 +81,28 @@ at_Exec($)
   my ($name) = @_;
   my ($skip, $disable);
 
+  return if(!$defs{$name}{DEF});           # Just deleted
+
   if(defined($attr{$name})) {
     $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
     $disable = 1 if($attr{$name} && $attr{$name}{disable});
   }
 
   delete $attr{$name}{skip_next} if($skip);
-  return if(!$defs{$name}{DEF});           # Just deleted
   my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
   $command = SemicolonEscape($command);
   AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
 
   my $count = $defs{$name}{REP};
   my $def = $defs{$name}{DEF};
+
+  my $oldattr = $attr{$name};           # delete removes the attributes too
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{/);   # Replace the count }
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
+    $attr{$name} = $oldattr;
   }
 }
 
