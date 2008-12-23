@@ -79,7 +79,6 @@ HMS_Parse($$)
   my $dev = substr($msg, 16, 4);
   my $cde = substr($msg, 11, 1);
   my $val = substr($msg, 24, 8) if(length($msg) == 32);
-  my $odev;
 
   my $type = "";
   foreach my $c (keys %codes) {
@@ -94,7 +93,6 @@ HMS_Parse($$)
   my $odev = $dev;
   if(!defined($defptr{$dev})) {
     Log 4, "HMS device $dev not defined, using the wildcard device 100$cde";
-    $odev = $dev;
     $dev = "100$cde";
   }
 
@@ -236,7 +234,7 @@ HMS_Parse($$)
   $def->{STATE} = $val;
   $def->{CHANGED}[$max] = $val;
 
-  $def->{CHANGED}[$max+1] = "ExactId: $odev" if($odev);
+  $def->{CHANGED}[$max+1] = "ExactId: $odev" if($odev ne $dev);
 
   return $def->{NAME};
 }
