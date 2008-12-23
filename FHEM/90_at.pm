@@ -12,6 +12,7 @@ at_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}    = "at_Define";
+  $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
   $hash->{AttrList} = "disable:0,1 skip_next:0,1";
 }
@@ -72,6 +73,14 @@ at_Define($$)
   $hash->{STATE} = ("Next: " . FmtTime($nt))
      if(!($attr{$name} && $attr{$name}{disable}));
   
+  return undef;
+}
+
+sub
+at_Undef($$)
+{
+  my ($hash, $name) = @_;
+  RemoveInternalTimer($name);
   return undef;
 }
 

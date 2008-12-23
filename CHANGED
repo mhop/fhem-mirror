@@ -463,3 +463,4 @@
   - feature: contrib/fhem2speech from Martin
   - bugfix:  attributes of at devices disappear
   - feature: attribute rainadjustment for KS300 (Boris 2008-12-17)
+  - bugfix:  deleting at / watchdog while active creates an empty device
