@@ -371,6 +371,9 @@ FHT_Parse($$)
     elsif($sval =~ m/.c/) { $val = "synctime" }
     elsif($sval =~ m/.e/) { $val = "test" }
     elsif($sval =~ m/.f/) { $val = "pair" }
+    elsif($sval =~ m/.1/) { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
+    elsif($sval =~ m/.2/) { $val = "0%" }  # FHT set to  5.5
+
     else { $val = "unknown_$sval: $fv" }
 
   } elsif($cmd eq "measured-low") {
