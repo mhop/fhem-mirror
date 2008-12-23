@@ -180,8 +180,8 @@ CUL_WS_Parse($$)
       my $wnd  = sprintf("%0.1f", "$a[9]$a[10].$a[7]" + $hash->{corr3});
       my $hum  = sprintf( "%02d", "$a[8]$a[5]" + $hash->{corr2});
       my $tmp  = sprintf("%0.1f", ("$a[6]$a[3].$a[4]"+$hash->{corr1}) *
-                                (($a[3] & 8) ? -1 : 1));
-      my $ir = ((hex($a[1]) & 0x2)) ? "yes" : "no";
+                                (($a[1]&8) ? -1 : 1));
+      my $ir = ((hex($a[1]) & 2)) ? "yes" : "no";
 
       $val = "T: $tmp  H: $hum  W: $wnd  R: $rain  IR: $ir";
       $devtype = "KS300/2";
