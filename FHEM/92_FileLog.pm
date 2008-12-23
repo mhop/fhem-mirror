@@ -244,7 +244,7 @@ FileLog_Get($@)
         $line = "$fld[0] $col\n";
 
       } elsif($t == 1) {                    # The column
-        $line = "$fld[0] $fld[$col]\n";
+        $line = "$fld[0] $fld[$col]\n" if(defined($fld[$col]));
 
       } elsif($t == 2) {                    # delta-h  or delta-d
 
