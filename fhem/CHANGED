@@ -464,3 +464,4 @@
   - bugfix:  attributes of at devices disappear
   - feature: attribute rainadjustment for KS300 (Boris 2008-12-17)
   - bugfix:  deleting at / watchdog while active creates an empty device
+  - feature: ExactId trigger added for wildcard HMS devices

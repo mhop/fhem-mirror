@@ -567,6 +567,7 @@ CUL_Read($)
 
     ###########################################
     #Translate Message from CUL to FHZ
+    next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
     my $fn = substr($dmsg,0,1);
     my $len = length($dmsg);
 
