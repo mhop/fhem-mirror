@@ -148,7 +148,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.59 2008-12-09 14:12:40 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.60 2008-12-23 15:53:13 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -467,7 +467,7 @@ AnalyzeInput($)
     my ($cmd, $rest) = split("\n", $client{$c}{buffer}, 2);
     $client{$c}{buffer} = $rest;
     if($cmd) {
-      if($cmd =~ m/\\$/) {                     # Multi-line
+      if($cmd =~ m/\\ *$/) {                     # Multi-line
         $client{$c}{prevlines} .= $cmd . "\n";
       } else {
         if($client{$c}{prevlines}) {
@@ -516,7 +516,7 @@ AnalyzeCommand($$)
 
   if($cmd =~ m/^{.*}$/s) {		# Perl code
 
-    $cmd =~ s/\\\n/ /g;                 # Multi-line
+    $cmd =~ s/\\ *\n/ /g;                 # Multi-line
     # Make life easier for oneliners:
     %value = ();
     foreach my $d (keys %defs) {
@@ -661,7 +661,7 @@ CommandInclude($$)
   $rcvdquit = 0;
   while(my $l = <$fh>) {
     $l =~ s/[\r\n]//g;
-    if($l =~ m/^(.*)\\$/) {		# Multiline commands
+    if($l =~ m/^(.*)\\ *$/) {		# Multiline commands
       $bigcmd .= "$1\\\n";
     } else {
       AnalyzeCommandChain($cl, $bigcmd . $l);
