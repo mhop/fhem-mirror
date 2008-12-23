@@ -12,6 +12,7 @@ watchdog_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "watchdog_Define";
+  $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
   $hash->{AttrList} = "disable:0,1";
 }
@@ -106,6 +107,14 @@ watchdog_Activate($)
   $ntfy->{STATE} = "Next: " . FmtTime($nt);
   RemoveInternalTimer($ntfy);
   InternalTimer($nt, "watchdog_Trigger", $ntfy, 0)
+}
+
+sub
+watchdog_Undef($$)
+{
+  my ($hash, $name) = @_;
+  RemoveInternalTimer($hash);
+  return undef;
 }
 
 
