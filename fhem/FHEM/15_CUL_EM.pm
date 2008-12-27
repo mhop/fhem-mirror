@@ -80,15 +80,6 @@ CUL_EM_Parse($$)
   my @a = split("", $msg);
   my $tpe = ($a[1].$a[2])+0;
   my $cde = ($a[3].$a[4])+0;
-  my $seqno = hex($a[5].$a[6]);
-  my $total_cnt = hex($a[ 9].$a[10].$a[ 7].$a[ 8]);
-  my $current_cnt = hex($a[13].$a[14].$a[11].$a[12]);
-  my $peak_cnt = hex($a[17].$a[18].$a[15].$a[16]);
-
-  # these are the raw readings from the device
-  my $val = sprintf("CNT: %d CUM: %d  5MIN: %d  TOP: %d",
-                $seqno, $total_cnt, $current_cnt, $peak_cnt);
-
 
   # seqno    =  number of received datagram in sequence, runs from 2 to 255
   # total_cnt=  total (cumulated) value in ticks as read from the device
@@ -98,37 +89,29 @@ CUL_EM_Parse($$)
   # current  =  current value (average over latest 5 minutes) in device units
   # peak     =  maximum value in device units
 
+  my $seqno = hex($a[5].$a[6]);
+  my $total_cnt = hex($a[ 9].$a[10].$a[ 7].$a[ 8]);
+  my $current_cnt = hex($a[13].$a[14].$a[11].$a[12]);
+  my $peak_cnt = hex($a[17].$a[18].$a[15].$a[16]);
+
+  # these are the raw readings from the device
+  my $val = sprintf("CNT: %d CUM: %d  5MIN: %d  TOP: %d",
+                         $seqno, $total_cnt, $current_cnt, $peak_cnt);
+
   if($defptr{$cde}) {
     $hash = $defptr{$cde};
 
+    my $tn = TimeNow();                 # current time
+    my $c= 0;                           # count changes
+    my %readings;
 
-    # count changes
-    my $c= 0;
-
-    # set state to raw readings
     my $n = $hash->{NAME};
-    Log GetLogLevel($n,1), "CUL_EM $n: $val";
-    $hash->{STATE} = $val;
-    $hash->{CHANGED}[$c++] = $val;
-
+    Log GetLogLevel($n,3), "CUL_EM $n: $val";
+    $readings{RAW} = $val;
 
     #
     # calculate readings
     #
-
-    # current time
-    my $tn = TimeNow();
-
-    # update sequence number reading
-    $hash->{READINGS}{seqno}{TIME} = $tn;
-    $hash->{READINGS}{seqno}{VAL} = $seqno;
-    $hash->{CHANGED}[$c++] = "seqno: $seqno";
-
-    # update raw readings
-    $hash->{READINGS}{state}{TIME} = $tn;
-    $hash->{READINGS}{state}{VAL} = $val;
-    $hash->{CHANGED}[$c++] = "state: $val";
-
     # initialize total_cnt_last
     my $total_cnt_last;
     if(defined($hash->{READINGS}{total_cnt})) {
@@ -137,10 +120,6 @@ CUL_EM_Parse($$)
         $total_cnt_last= 0;
     }
 
-    # update total_cnt reading
-    $hash->{READINGS}{total_cnt}{TIME} = $tn;
-    $hash->{READINGS}{total_cnt}{VAL} = $total_cnt;
-    $hash->{CHANGED}[$c++] = "total_cnt: $total_cnt";
 
     # initialize basis_cnt_last
     my $basis_cnt_last;
@@ -153,10 +132,8 @@ CUL_EM_Parse($$)
     # correct counter wraparound
     my $basis_cnt= $basis_cnt_last;
     if($total_cnt< $total_cnt_last) {
-        $basis_cnt+= 65536;
-        # update basis_cnt
-        $hash->{READINGS}{basis}{TIME}= $tn;
-        $hash->{READINGS}{basis}{VAL} = $basis_cnt;
+        $basis_cnt += 65536;
+        $readings{basis} = $basis_cnt;
         $hash->{CHANGED}[$c++] = "basis: $basis_cnt";
     }
 
@@ -170,16 +147,23 @@ CUL_EM_Parse($$)
     my $current  = $current_cnt*$corr1;
     my $peak     = $peak_cnt*$corr1;
 
-    $hash->{CHANGED}[$c++] = "total: $total";
-    $hash->{READINGS}{total}{TIME} = $tn;
-    $hash->{READINGS}{total}{VAL} = $total;
-    $hash->{CHANGED}[$c++] = "current: $current";
-    $hash->{READINGS}{current}{TIME} = $tn;
-    $hash->{READINGS}{current}{VAL} = $current;
-    $hash->{CHANGED}[$c++] = "peak: $peak";
-    $hash->{READINGS}{peak}{TIME} = $tn;
-    $hash->{READINGS}{peak}{VAL} = $peak;
+    $val = sprintf("CNT: %d CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
+                         $seqno, $total, $current, $peak);
+    $hash->{STATE} = $val;
+    $hash->{CHANGED}[$c++] = "$val";
 
+    $readings{total_cnt}   = $total_cnt;
+    $readings{current_cnt} = $current_cnt;
+    $readings{peak_cnt}    = $peak_cnt;
+    $readings{seqno}       = $seqno;
+    $readings{total}       = $total;
+    $readings{current}     = $current;
+    $readings{peak}        = $peak;
+
+    foreach my $k (keys %readings) {
+      $hash->{READINGS}{$k}{TIME}= $tn;
+      $hash->{READINGS}{$k}{VAL} = $readings{$k};
+    }
     return $hash->{NAME};
 
   } else {
