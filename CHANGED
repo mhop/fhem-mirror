@@ -468,3 +468,4 @@
 
 - =DATE= (4.6)
   - bugfix:  fht actuator message clarification by Klaus
+  - feature: getstate command from Martin (25.12)
