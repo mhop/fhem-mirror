@@ -422,7 +422,7 @@
   - feature: 91_watchdog added to handle the HMS100-FIT
   - feature: cum_kWh/cum_m3 added to EMWZ/EMGZ (11.01.08 by Peter)
 
-- ==DATE== (4.5)
+- 2008-12-23 (4.5)
   - bugfix:  further 01_FHEMWEB cleanup
   - feature: CUL support for FS20(r/w), FHT(readonly), KS300 and EM
   - feature: command list outputs the device attributes too
@@ -465,3 +465,6 @@
   - feature: attribute rainadjustment for KS300 (Boris 2008-12-17)
   - bugfix:  deleting at / watchdog while active creates an empty device
   - feature: ExactId trigger added for wildcard HMS devices
+
+- =DATE= (4.6)
+  - bugfix:  fht actuator message clarification by Klaus

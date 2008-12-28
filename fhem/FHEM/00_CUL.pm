@@ -198,7 +198,7 @@ GOTBW:
   } else {
 
     return "Expecting a 0-padded hex number"
-        if((length($arg)&1) == 0 && $type ne "raw");
+        if((length($arg)&1) == 1 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
     Log GetLogLevel($name,4), "set $name $type $arg";
     CUL_Write($hash, $sets{$type}, $arg);
@@ -224,20 +224,17 @@ CUL_Get($@)
 
   if($a[1] eq "ccconf") {
 
-    my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1,
-              "23"=>1,"24"=>1,"25"=>1,"26"=>1) ;
+    my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1 );
     foreach my $a (sort keys %r) {
       CUL_SimpleWrite($hash, "C$a");
       my @answ = split(" ", CUL_ReadAnswer($hash, "C$a"));
       $r{$a} = $answ[4];
     }
-    $msg = sprintf("Freq:%.3fMHz Bwidth:%dKHz Ampl:%ddB " .
-                   "Sens:%ddB FSCAL:%02X%02X%02X%02X", 
+    $msg = sprintf("Freq:%.3fMHz Bwidth:%dKHz Ampl:%ddB Sens:%ddB",
         26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,                #Freq
         26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),   #Bw
         $r{"1B"}&7<4 ? 24+3*($r{"1B"}&7) : 36+2*(($r{"1B"}&7)-4),       #Ampl
-        4+4*($r{"1D"}&3),                                               #Sens
-        $r{"23"}, $r{"24"}, $r{"25"}, $r{"26"}                          #FSCAL
+        4+4*($r{"1D"}&3)                                                #Sens
         );
     
   } else {
@@ -519,6 +516,7 @@ CUL_Read($)
     my $dmsg;
     ($dmsg,$culdata) = split("\n", $culdata);
     $dmsg =~ s/\r//;
+    goto NEXTMSG if($dmsg eq "");
 
     # Debug message, X05
     if($dmsg =~ m/^p /) {

@@ -1,4 +1,4 @@
-##############################################
+#############################################
 package main;
 
 use strict;
@@ -365,14 +365,15 @@ FHT_Parse($$)
     my $sval = substr($msg,24,2);
     my $fv = sprintf("%d%%", int(100*$val/255+0.5));
 
-       if($sval =~ m/.6/) { $val = "$fv" }
+       if($sval =~ m/.0/) { $val = "syncnow" }
+    elsif($sval =~ m/.1/) { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
+    elsif($sval =~ m/.2/) { $val = "0%" }  # FHT set to  5.5
+    elsef($sval =~ m/.6/) { $val = "$fv" }
     elsif($sval =~ m/.8/) { $val = "offset: $fv" }
     elsif($sval =~ m/.a/) { $val = "lime-protection" }
     elsif($sval =~ m/.c/) { $val = "synctime" }
     elsif($sval =~ m/.e/) { $val = "test" }
     elsif($sval =~ m/.f/) { $val = "pair" }
-    elsif($sval =~ m/.1/) { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
-    elsif($sval =~ m/.2/) { $val = "0%" }  # FHT set to  5.5
 
     else { $val = "unknown_$sval: $fv" }
 
