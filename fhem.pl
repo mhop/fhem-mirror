@@ -148,7 +148,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.60 2008-12-23 15:53:13 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.61 2008-12-28 14:36:58 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -516,7 +516,7 @@ AnalyzeCommand($$)
 
   if($cmd =~ m/^{.*}$/s) {		# Perl code
 
-    $cmd =~ s/\\ *\n/ /g;                 # Multi-line
+    $cmd =~ s/\\ *\n/ /g;               # Multi-line
     # Make life easier for oneliners:
     %value = ();
     foreach my $d (keys %defs) {
@@ -1539,7 +1539,7 @@ CommandInform($$)
 
   $param = lc($param);
 
-  return "Usage: inform {on|off}" if($param !~ m/^(on|off|timer)$/);
+  return "Usage: inform {on|off|timer}" if($param !~ m/^(on|off|timer)$/);
   if($param =~ m/off/) {
     delete($client{$cl}{inform});
   } else {
@@ -1788,6 +1788,10 @@ DoTrigger($$)
   foreach my $c (keys %client) {        # Do client loop first, is cheaper
     next if(!$client{$c}{inform});
     my $tn = TimeNow();
+    if($attr{global}{mseclog}) {
+      my ($seconds, $microseconds) = gettimeofday();
+      $tn .= sprintf(".%03d", $microseconds/1000);
+    }
     for(my $i = 0; $i < $max; $i++) {
       my $state = $defs{$dev}{CHANGED}[$i];
       my $fe = "$dev:$state";
