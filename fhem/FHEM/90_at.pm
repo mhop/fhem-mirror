@@ -18,6 +18,8 @@ at_Initialize($)
 }
 
 
+my $at_tdiff;
+
 #####################################
 sub
 at_Define($$)
@@ -52,6 +54,7 @@ at_Define($$)
                         if($rel ne "+");
   $nt += ($hr*3600+$min*60+$sec); # Plus relative time
   $nt += 86400 if($ot >= $nt);# Do it tomorrow...
+  $nt += $at_tdiff if(defined($at_tdiff));
 
   @lt = localtime($nt);
   my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
@@ -106,6 +109,9 @@ at_Exec($)
   my $def = $defs{$name}{DEF};
 
   my $oldattr = $attr{$name};           # delete removes the attributes too
+
+  # Correct drift when the timespec is relative
+  $at_tdiff = $defs{$name}{TRIGGERTIME}-gettimeofday() if($def =~ m/^\+/);
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
@@ -113,6 +119,7 @@ at_Exec($)
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
     $attr{$name} = $oldattr;
   }
+  $at_tdiff = undef;
 }
 
 sub
