@@ -368,7 +368,7 @@ FHT_Parse($$)
        if($sval =~ m/.0/) { $val = "syncnow" }
     elsif($sval =~ m/.1/) { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
     elsif($sval =~ m/.2/) { $val = "0%" }  # FHT set to  5.5
-    elsef($sval =~ m/.6/) { $val = "$fv" }
+    elsif($sval =~ m/.6/) { $val = "$fv" }
     elsif($sval =~ m/.8/) { $val = "offset: $fv" }
     elsif($sval =~ m/.a/) { $val = "lime-protection" }
     elsif($sval =~ m/.c/) { $val = "synctime" }
