@@ -39,6 +39,7 @@ CUL_EM_Define($$)
   if($a[2] >= 1 && $a[2] <= 4) {                # EMWZ: nRotation in 5 minutes
     my $c = (int(@a) > 3 ? $a[3] : 150);
     $hash->{corr1} = (12/$c);
+    $c = (int(@a) > 4 ? $a[4] : 150);
     $hash->{corr2} = (12/$c);
 
   } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM
