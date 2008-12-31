@@ -57,7 +57,7 @@ HMS_Define($$)
 
   $hash->{CODE} = $a[2];
   $defptr{$a[2]} = $hash;
-
+  AssignIoPort($hash);
   return undef;
 }
 
