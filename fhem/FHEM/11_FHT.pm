@@ -70,6 +70,7 @@ my %codes = (
   "64" => "minute",
   "65" => "report1",
   "66" => "report2",
+  "69" => "ack2",
 
   "7d" => "start-xmit",
   "7e" => "end-xmit",
@@ -82,8 +83,9 @@ my %codes = (
 
 my %cantset = (
   "ack"           => 1,
-  "can-xmit" => 1,
-  "can-rcv"  => 1,
+  "ack2"          => 1,
+  "can-xmit"      => 1,
+  "can-rcv"       => 1,
   "start-xmit"    => 1,
   "end-xmit"      => 1,
 
@@ -371,7 +373,7 @@ FHT_Parse($$)
     elsif($sval =~ m/.6/) { $val = "$fv" }
     elsif($sval =~ m/.8/) { $val = "offset: $fv" }
     elsif($sval =~ m/.a/) { $val = "lime-protection" }
-    elsif($sval =~ m/.c/) { $val = "synctime" }
+    elsif($sval =~ m/.c/) { $val = sprintf("synctime: %d", int($val>>1)); }
     elsif($sval =~ m/.e/) { $val = "test" }
     elsif($sval =~ m/.f/) { $val = "pair" }
 
