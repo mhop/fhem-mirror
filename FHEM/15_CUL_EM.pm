@@ -56,6 +56,7 @@ CUL_EM_Define($$)
     $hash->{corr2} = 1;
   }
   $defptr{$a[2]} = $hash;
+  AssignIoPort($hash);
   return undef;
 }
 
