@@ -470,3 +470,4 @@
   - bugfix:  fht actuator message clarification by Klaus
   - feature: getstate command from Martin (25.12)
   - bugfix:  at drifts for relative timespecs
+  - bugfix:  Add IODev to CUL/EM/CUL_WS/HMS/KS300

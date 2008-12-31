@@ -50,6 +50,7 @@ CUL_WS_Define($$)
   $hash->{corr3} = ((int(@a) > 5) ? $a[5] : 0);
   $hash->{corr4} = ((int(@a) > 6) ? $a[6] : 0);
   $defptr{$a[2]} = $hash;
+  AssignIoPort($hash);
   return undef;
 }
 

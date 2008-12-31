@@ -43,6 +43,7 @@ KS300_Define($$)
   $hash->{RAINUNIT} = $rainunit;
   $hash->{WINDUNIT} = $windunit;
   $defptr{$a[2]} = $hash;
+  AssignIoPort($hash);
 
   return undef;
 }
