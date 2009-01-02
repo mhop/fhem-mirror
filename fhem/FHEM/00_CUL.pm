@@ -1,8 +1,4 @@
 ##############################################
-# TODO:
-# - FHT xmit
-# - HMS rcv
-
 
 package main;
 
@@ -15,6 +11,7 @@ sub CUL_Write($$$);
 sub CUL_Read($);
 sub CUL_ReadAnswer($$);
 sub CUL_Ready($);
+sub CUL_HandleCurRequest($$);
 
 my $initstr = "X01";    # Only translated messages, no RSSI
 my %msghist;		# Used when more than one CUL is attached
@@ -50,7 +47,8 @@ CUL_Initialize($)
   $hash->{SetFn}   = "CUL_Set";
   $hash->{StateFn} = "CUL_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
-                   "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6";
+                     "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6 " . 
+                     "CUR_id_list";
 }
 
 #####################################
@@ -201,7 +199,7 @@ GOTBW:
         if((length($arg)&1) == 1 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
     Log GetLogLevel($name,4), "set $name $type $arg";
-    CUL_Write($hash, $sets{$type}, $arg);
+    CUL_SimpleWrite($hash, $sets{$type} . $arg);
 
   }
   return undef;
@@ -239,7 +237,7 @@ CUL_Get($@)
     
   } else {
 
-    CUL_Write($hash, $gets{$a[1]}, $arg) if(!IsDummy($hash->{NAME}));
+    CUL_SimpleWrite($hash, $gets{$a[1]} . $arg) if(!IsDummy($hash->{NAME}));
     $msg = CUL_ReadAnswer($hash, $a[1]);
     $msg = "No answer" if(!defined($msg));
     $msg =~ s/[\r\n]//g;
@@ -519,7 +517,7 @@ CUL_Read($)
     goto NEXTMSG if($dmsg eq "");
 
     # Debug message, X05
-    if($dmsg =~ m/^p /) {
+    if($dmsg =~ m/p /) {
       foreach my $m (split("p ", $dmsg)) {
         Log GetLogLevel($name,4), "CUL: p $m";
       }
@@ -553,7 +551,7 @@ CUL_Read($)
     $msghist{$msgcount}{MSG}  = $dmsg;
     $msgcount++;
 
-    if($initstr =~ m/X2/) {                          # RSSI
+    if($initstr =~ m/X2/ && $dmsg =~ m/[A-F0-9][A-F0-9]$/) { # RSSI
       my $l = length($dmsg);
       my $rssi = hex(substr($dmsg, $l-2, 2));
       $dmsg = substr($dmsg, 0, $l-2);
@@ -570,6 +568,14 @@ CUL_Read($)
     my $len = length($dmsg);
 
     if($fn eq "F") {                                 # Reformat for 10_FS20.pm
+
+      if(defined($attr{$name}) && defined($attr{$name}{CUR_id_list})) {
+        my $id= substr($dmsg,1,4);
+        if($attr{$name}{CUR_id_list} =~ m/$id/) {    # CUR Request
+          CUL_HandleCurRequest($hash,$dmsg);
+          goto NEXTMSG;
+        }
+      }
 
       $dmsg = sprintf("81%02x04xx0101a001%s00%s",
                         $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
@@ -681,6 +687,58 @@ CUL_Ready($)           # Windows - only
   # This is relevant for windows only
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
   return ($InBytes>0);
+}
+
+sub
+CUL_SendCurMsg($$$)
+{
+  my ($hash,$id,$msg) = @_;
+
+  $msg = substr($msg, 0, 12) if(length($msg) > 12);
+  my $rmsg = "F" . $id .  unpack('H*', $msg);
+  Log 1, "CUL_SendCurMsg: $id:$msg / $rmsg";
+  sleep(1);                # Poor mans CSMA/CD
+  CUL_SimpleWrite($hash, $rmsg);
+}
+
+sub
+CUL_HandleCurRequest($$)
+{
+  my ($hash,$msg) = @_;
+
+
+  Log 1, "CUR Request: $msg";
+  my $l = length($msg);
+  return if($l < 9);
+
+  my $id = substr($msg,1,4);
+  my $cm = substr($msg,5,2);
+  my $a1 = substr($msg,7,2);
+  my $a2 = pack('H*', substr($msg,9)) if($l > 9);
+
+  if($cm eq "00") {     # Get status
+    $msg = defined($defs{$a2}) ? $defs{$a2}{STATE} : "Undefined $a2";
+    $msg =~ s/: /:/g;
+    $msg =~ s/  / /g;
+    $msg =~ s/.*[a-z]-//g;      # FHT desired-temp, but keep T:-1
+    $msg =~ s/\(.*//g;          # FHT (Celsius) 
+    $msg =~ s/.*5MIN:/5MIN:/g;  # EM
+    $msg =~ s/\.$//;
+    $msg =~ s/ *//;            # One letter seldom makes sense
+    CUL_SendCurMsg($hash,$id, "d" . $msg);  # Display the message on the CUR
+  }
+
+  if($cm eq "01") {     # Send time
+    my @a = localtime;
+    $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
+    CUL_SendCurMsg($hash,$id, $msg);
+  }
+
+  if($cm eq "02") {     # FHT desired temp
+    $msg = sprintf("set %s desired-temp %.1f", $a2, $a1/2);
+    fhem( $msg );
+  }
+
 }
 
 1;
