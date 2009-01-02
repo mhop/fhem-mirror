@@ -359,3 +359,11 @@
 - Wed Dec 17 19:48 (Boris)
   - attribute rainadjustment for KS300 in 13_KS300.pm to account for random
     switches in the rain counter (see commandref.html)
+
+- Fri Jan  2 10:29 2009 (Rudi)
+  - 00_CUL responds to CUR request. These are sent as long FS20 messages, with
+    a housecode stored in CUR_id_list attribute of the CUL device. If the ID
+    matches, the message is analyzed, and an FS20 message to the same address
+    is sent back. The CUR must have reception enabled.
+    Right now status/set time/set FHT desired temp are implemented.
+

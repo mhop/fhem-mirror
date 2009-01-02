@@ -228,6 +228,7 @@ FileLog_Get($@)
   my %lastdate;
   my $d;                    # Used by eval functions
   while(my $l = <$ifh>) {
+    next if($l lt $from);
     last if($l gt $to);
     my @fld = split("[ \r\n]+", $l);     # 40%
 
@@ -341,15 +342,27 @@ seekTo($$$$)
   my $upper = $fh->tell;
 
   my ($lower, $next, $last) = (0, $upper/2, 0);
+  my $div = 2;
   while() {                                             # Binary search
     $fh->seek($next, 0);
     my $data = <$fh>;
-    if($data !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /) {
+    if(!$data) {
+      $last = $next;
+      last;
+    }
+    if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /) {
       $next = $fh->tell;
       $data = <$fh>;
       if(!$data) {
         $last = $next;
         last;
+      }
+
+      # If the second line is longer then the first,
+      # binary search will never get it: 
+      if($next eq $last && $data ge $ts && $div < 8192) {
+        $last = 0;
+        $div *= 2;
       }
     }
     if($next eq $last) {
@@ -359,9 +372,9 @@ seekTo($$$$)
 
     $last = $next;
     if(!$data || $data lt $ts) {
-      ($lower, $next) = ($next, ($next+$upper)/2);
+      ($lower, $next) = ($next, int(($next+$upper)/$div));
     } else {
-      ($upper, $next) = ($next, ($lower+$next)/2);
+      ($upper, $next) = ($next, int(($lower+$next)/$div));
     }
   }
   $hash->{pos}{"$fname:$ts"} = $last;
