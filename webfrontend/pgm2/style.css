@@ -8,6 +8,9 @@ table.room tr.sel { background: #A0FFFF; }
 table.at { border:thin solid; width: 100%; background: #FFFFC0; }
 table.at tr.odd { background: #FFFFD7; }
 
+table.watchdog { border:thin solid; width: 100%; background: #FFFFC0; }
+table.watchdog tr.odd { background: #FFFFD7; }
+
 table.notify { border:thin solid; width: 100%; background: #D7D7A0; }
 table.notify tr.odd { background: #FFFFC0; }
 
@@ -26,6 +29,9 @@ table.FHT  tr.odd { background: #FFD7D7; }
 table.KS300 { border:thin solid; width: 100%; background: #C0FFC0; }
 table.KS300 tr.odd { background: #A7FFA7; }
 
+table.HMS { border:thin solid; width: 100%; background: #C0FFC0; }
+table.HMS tr.odd { background: #A7FFA7; }
+
 table.FHZ { border:thin solid; width: 100%; background: #C0C0C0; }
 table.FHZ tr.odd { background: #D7D7D7; }
 
@@ -40,7 +46,6 @@ table.CUL_EM tr.odd { background: #F0F0F0; }
 
 table.CUL_WS { border:thin solid; width: 100%; background: #FFC0C0; }
 table.CUL_WS  tr.odd { background: #FFD7D7; }
-
 
 table.FHEMWEB { border:thin solid; width: 100%; background: #E0E0E0; }
 table.FHEMWEB tr.odd { background: #F0F0F0; }

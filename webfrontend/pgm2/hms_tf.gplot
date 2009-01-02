@@ -27,8 +27,8 @@ set grid xtics y2tics
 set y2label "Temperature in C"
 set ylabel "Humidity (%)"
 
-#FileLog 4:T:0:int
-#FileLog 6:T:0:int
+#FileLog 4:T:0:
+#FileLog 6:T:0:
 
 plot \
   "< awk '/T:/ {print $1, $4}' <IN>"\

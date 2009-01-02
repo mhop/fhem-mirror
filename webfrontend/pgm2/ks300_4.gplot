@@ -13,11 +13,11 @@ set y2tics
 set title '<TL>'
 set grid
 
-set ylabel "Temperature in C"
-set y2label "Rain (l/m2)"
+set y2label "Temperature in C"
+set ylabel "Rain (l/m2)"
 
 #FileLog 5:avg_month:0:
 #FileLog 11:avg_month:0:
 
-plot "<grep avg_month <IN>" using 1:5 axes x1y1 title 'Temperature' with lines,\
-     "<grep avg_month <IN>" using 1:11 axes x1y2 title 'Rain' with fsteps
+plot "<grep avg_month <IN>" using 1:5 axes x1y2 title 'Temperature' with lines,\
+     "<grep avg_month <IN>" using 1:11 axes x1y1 title 'Rain' with fsteps
