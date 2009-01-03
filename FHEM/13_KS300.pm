@@ -115,7 +115,7 @@ KS300_Parse($$)
     # get previous rain_raw
     my $rain_raw_prev= $rain_raw;
     if(defined($r->{rain_raw})) {
-         $rain_raw_prev= $r->{rain_raw}{VAL};
+      my($rain_raw_prev, undef)= split(" ", $r->{rain_raw}{VAL}); # cut off "(counter)"
     };
 
     # unadjusted value as default
