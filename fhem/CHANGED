@@ -475,3 +475,4 @@
   - feature: 00_CUL: Answer CUR requests (status/time/fht)
   - bugfix:  support for second correction factor for EMWZ in 15_CUL_EM added
   - feature: CUL further sets/gets added
+  - bugfix:  cut off string "(counter)" from fallback value in 13_KS300.pm
