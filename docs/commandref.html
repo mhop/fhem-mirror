@@ -1515,9 +1515,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         Issue a CUL firmware command.  See the CUL firmware README document for
         details on CUL commands.
         </li><br>
-    <li>freq / bandwidth<br>
-        Set the CUL frequency / bandwidth. Use it with care, it may destroy
-        your hardware and it even may be illegal to do so.
+    <li>freq / bWidth / rAmpl / sens<br>
+        Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity.
+        Use it with care, it may destroy your hardware and it even may be
+        illegal to do so.
+        </li><br>
+    <li>led><br>
+        Set the CUL led off (00), on (01) or blinking (02).
         </li><br>
   </ul>
 
@@ -1527,6 +1531,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>version<br>
         return the CUL firmware version
         </li><br>
+    <li>uptime<br>
+        return the CUL uptime (time since CUL reset).
     <li>raw<br>
         Issue a CUL firmware command, and wait for one line of data returned by
         the CUL. See the CUL firmware README document for details on CUL
