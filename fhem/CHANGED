@@ -474,3 +474,4 @@
   - bugfix:  FileLog get (pgm2 plots) wont find the first row in the file
   - feature: 00_CUL: Answer CUR requests (status/time/fht)
   - bugfix:  support for second correction factor for EMWZ in 15_CUL_EM added
+  - feature: CUL further sets/gets added

@@ -148,7 +148,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.61 2008-12-28 14:36:58 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.62 2009-01-03 12:30:29 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -890,8 +890,8 @@ DoSet(@)
   my @a = @_;
 
   my $dev = $a[0];
-  return "No set implemented for $dev"
-        if(!$defs{$dev} || !$modules{$defs{$dev}{TYPE}}{SetFn});
+  return "Please define $dev first" if(!$defs{$dev});
+  return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
   my $ret = CallFn($dev, "SetFn", $defs{$dev}, @a);
   return $ret if($ret);
 

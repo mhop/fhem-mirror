@@ -13,21 +13,28 @@ sub CUL_ReadAnswer($$);
 sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 
-my $initstr = "X01";    # Only translated messages, no RSSI
+my $initstr = "X21";    # Only translated messages + RSSI
 my %msghist;		# Used when more than one CUL is attached
 my $msgcount = 0;
 my %gets = (
   "version"  => "V",
   "raw"      => "",
   "ccconf"   => "=",
+  "uptime"   => "t",
 );
 
 my %sets = (
   "raw"       => "",
+  "freq"      => "",
+  "bWidth"    => "",
+  "rAmpl"     => "",
+  "sens"      => "",
   "verbose"   => "X",
-  "freq"      => "=",
-  "bandwidth" => "=",
+  "led"       => "l",
+  "patable"   => "x",
 );
+
+my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42);
 
 sub
 CUL_Initialize($)
@@ -157,16 +164,15 @@ CUL_Set($@)
     my $f1 = sprintf("%02x", int($f % 65536) / 256);
     my $f0 = sprintf("%02x", $f % 256);
     $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
-    my $msg = "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz, ".
-                "verbose to $initstr";
+    my $msg = "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
     Log GetLogLevel($name,4), $msg;
-    CUL_SimpleWrite($hash, "W0F$f2");            # Will reprogram the CC1101
+    CUL_SimpleWrite($hash, "W0F$f2");
     CUL_SimpleWrite($hash, "W10$f1");
     CUL_SimpleWrite($hash, "W11$f0");
-    CUL_SimpleWrite($hash, $initstr);
+    CUL_SimpleWrite($hash, $initstr);           # Will reprogram the CC1101
     return $msg;
 
-  } elsif($type eq "bandwidth") {               # KHz
+  } elsif($type eq "bWidth") {               # KHz
 
     my $ob = 5;
     if(!IsDummy($hash->{NAME})) {
@@ -184,19 +190,47 @@ CUL_Set($@)
         goto GOTBW if($arg >= $bw);
       }
     }
+
 GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
-    my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz, verbose to $initstr";
+    my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz";
 
     Log GetLogLevel($name,4), $msg;
     CUL_SimpleWrite($hash, "W12$ob");
     CUL_SimpleWrite($hash, $initstr);
     return $msg;
 
-  } else {
+  } elsif($type eq "rAmpl") {               # dB
+
+    return "a numerical value between 24 and 42 is expected"
+        if($arg !~ m/^\d+$/ || $arg < 24 || $arg > 42);
+    my ($v, $w);
+    for($v = 0; $v < @ampllist; $v++) {
+      last if($ampllist[$v] > $arg);
+    }
+    $v = sprintf("%02d", $v-1);
+    $w = $ampllist[$v];
+    my $msg = "Setting AGCCTRL2 (1B) to $v / $w dB";
+    CUL_SimpleWrite($hash, "W1D$v");
+    CUL_SimpleWrite($hash, $initstr);
+    return $msg;
+
+  } elsif($type eq "sens") {               # dB
+
+    return "a numerical value between 4 and 16 is expected"
+        if($arg !~ m/^\d+$/ || $arg < 4 || $arg > 16);
+    my $w = int($arg/4)*4;
+    my $v = sprintf("9%d",$arg/4-1);
+    my $msg = "Setting AGCCTRL0 (1D) to $v / $w dB";
+    CUL_SimpleWrite($hash, "W1F$v");
+    CUL_SimpleWrite($hash, $initstr);
+    return $msg;
+
+
+  } else { 
 
     return "Expecting a 0-padded hex number"
-        if((length($arg)&1) == 1 && $type ne "raw");
+        if((length($arg)&1) == 0 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
     Log GetLogLevel($name,4), "set $name $type $arg";
     CUL_SimpleWrite($hash, $sets{$type} . $arg);
@@ -228,10 +262,10 @@ CUL_Get($@)
       my @answ = split(" ", CUL_ReadAnswer($hash, "C$a"));
       $r{$a} = $answ[4];
     }
-    $msg = sprintf("Freq:%.3fMHz Bwidth:%dKHz Ampl:%ddB Sens:%ddB",
+    $msg = sprintf("freq:%.3fMHz bWidth:%dKHz rAmpl:%ddB sens:%ddB",
         26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,                #Freq
         26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),   #Bw
-        $r{"1B"}&7<4 ? 24+3*($r{"1B"}&7) : 36+2*(($r{"1B"}&7)-4),       #Ampl
+        $ampllist[$r{"1B"}],
         4+4*($r{"1D"}&3)                                                #Sens
         );
     
@@ -551,7 +585,7 @@ CUL_Read($)
     $msghist{$msgcount}{MSG}  = $dmsg;
     $msgcount++;
 
-    if($initstr =~ m/X2/ && $dmsg =~ m/[A-F0-9][A-F0-9]$/) { # RSSI
+    if($initstr =~ m/X2/ && $dmsg =~ m/[FEHT]([A-F0-9][A-F0-9])+$/) { # RSSI
       my $l = length($dmsg);
       my $rssi = hex(substr($dmsg, $l-2, 2));
       $dmsg = substr($dmsg, 0, $l-2);
@@ -601,7 +635,7 @@ CUL_Read($)
     } elsif($fn eq "E") {                            # CUL_EM / Native
       ;
     } else {
-      Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
+      #Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
       goto NEXTMSG;
     }
 
