@@ -165,6 +165,54 @@ CUL_EM_Parse($$)
     $readings{current}     = $current;
     $readings{peak}        = $peak;
 
+
+    ###################################
+    # Start CUMULATE day and month
+    Log GetLogLevel($n,4), "CUL_EM $n: $val";
+    my $tsecs_prev;
+    #----- get previous tsecs
+    if(defined($hash->{READINGS}{tsecs})) {
+      $tsecs_prev= $hash->{READINGS}{tsecs}{VAL};
+    } else {
+      $tsecs_prev= 0; # 1970-01-01
+    }
+    #----- save actual tsecs
+    my $tsecs= time();  # number of non-leap seconds since January 1, 1970, UTC
+    $readings{tsecs}       = $tsecs;
+    #----- check whether day or month was changed
+    if(!defined($hash->{READINGS}{cum_day})) {
+      #----- init cum_day if it is not set
+      $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f", 0,$total);
+      $readings{cum_day}   = $val;
+    } else {
+      if( (localtime($tsecs_prev))[3] != (localtime($tsecs))[3] ) {
+        #----- day has changed (#3)
+        my @cmv = split(" ", $hash->{READINGS}{cum_day}{VAL});
+        $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f", $total-$cmv[3], $total);
+        $readings{cum_day} = $val;
+        $hash->{CHANGED}[$c++] = "$val";
+        Log GetLogLevel($n,3), "CUL_EM $n: $val";
+        #
+        if( (localtime($tsecs_prev))[4] != (localtime($tsecs))[4] ) {
+          #----- month has changed (#4)
+          if(!defined($hash->{READINGS}{cum_month})) {
+            # init cum_month if not set
+            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f", 0,$total);
+            $readings{cum_month} = $val;
+          } else {
+            @cmv = split(" ", $hash->{READINGS}{cum_month}{VAL});
+            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f", $total-$cmv[3],$total);
+            $readings{cum_month} = $val;
+            $hash->{CHANGED}[$c++] = "$val";
+            Log GetLogLevel($n,3), "CUL_EM $n: $val";
+          }
+        }
+      }
+    }
+    # End CUMULATE day and month
+    ###################################
+
+
     foreach my $k (keys %readings) {
       $hash->{READINGS}{$k}{TIME}= $tn;
       $hash->{READINGS}{$k}{VAL} = $readings{$k};

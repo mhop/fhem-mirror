@@ -477,3 +477,5 @@
   - feature: CUL further sets/gets added
   - feature: Removed msghist for multiple FHZ handling, IODev attribute added
   - bugfix:  cut off string "(counter)" from fallback value in 13_KS300.pm
+  - feature: daily/monthly cumulated values for EMWZ/EMGZ/EMWM with 15_CUL_EM
+             by Klaus
