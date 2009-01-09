@@ -104,8 +104,7 @@ X10_Initialize($)
   $hash->{DefFn}     = "X10_Define";
   $hash->{UndefFn}   = "X10_Undef";
   $hash->{ParseFn}   = "X10_Parse";
-  $hash->{AttrList}  = "follow-on-for-timer:1,0 do_not_notify:1,0 dummy:1,0
-showtime:1,0 model:lm12,lm15,am12,tm13 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 dummy:1,0 showtime:1,0 model:lm12,lm15,am12,tm13 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -349,6 +348,7 @@ X10_Parse($$)
   foreach my $unitcode (@unitcodes) {
     my $h= $devices{$housecode}{$unitcode};
     if($h) {
+        return "" if($h->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
         my $name= $h->{NAME};
         $h->{CHANGED}[0] = $value;
         $h->{STATE} = $value;

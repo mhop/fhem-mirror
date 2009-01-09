@@ -27,7 +27,7 @@ CUL_WS_Initialize($)
   $hash->{DefFn}     = "CUL_WS_Define";
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{ParseFn}   = "CUL_WS_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel";
 }
 
 
@@ -85,6 +85,8 @@ CUL_WS_Parse($$)
     Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
     return "UNDEFINED CUL_WS: $cde";
   }
+  my $def = $defptr{$cde};
+  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
   $hash = $defptr{$cde};
   my $name = $hash->{NAME};

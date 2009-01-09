@@ -19,7 +19,7 @@ CUL_EM_Initialize($)
   $hash->{DefFn}     = "CUL_EM_Define";
   $hash->{UndefFn}   = "CUL_EM_Undef";
   $hash->{ParseFn}   = "CUL_EM_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:EMEM,EMWZ,EMGZ loglevel";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:EMEM,EMWZ,EMGZ loglevel";
 }
 
 #####################################
@@ -101,6 +101,9 @@ CUL_EM_Parse($$)
                          $seqno, $total_cnt, $current_cnt, $peak_cnt);
 
   if($defptr{$cde}) {
+    my $def = $defptr{$cde};
+    return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
+
     $hash = $defptr{$cde};
 
     my $tn = TimeNow();                 # current time

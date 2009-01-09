@@ -1134,17 +1134,27 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="FS20attributes"></a>
   <b>Attributes</b>
   <ul>
+    <a name="IODev"></a>
+    <li>IODev<br>
+        Set the IO or physical device which should be used for receiving /
+        sending signals for this "logical" device. An example for the physical
+        device is an FHZ or a CUL. Note: Upon startup fhem assigns each logical
+        device (FS20/HMS/KS300/etc) the last physical device which can receive
+        data for this type of device. The attribute IODev should be used only
+        if you attached more than one physical device capable of receiving
+        signals for this logical device.</li><br>
+
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <a name="dummy"></a>
     <li>dummy<br>
-        Can be applied to FS20/FHT devices.<br>
 	Set the device attribute dummy to define devices which should not
 	output any radio signals. Associated notifys will be executed if
 	the signal is received. Used e.g. to react to a code from a sender, but
 	it will not emit radio signal if triggered in the web frontend.
-	Implemented for FS20 and FHT devices.</li><br>
+	</li><br>
 
     <a name="follow-on-for-timer"></a>
     <li>follow-on-for-timer<br>
@@ -1377,6 +1387,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (fht80b)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
 
     <a name="retrycount"></a>
     <li>retrycount<br/>
@@ -1463,6 +1474,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#model">model</a> (hms100-t hms100-tf hms100-wd hms100-mg
         hms100-co hms100-tfk hms100-fit rm100-2)</li>
   </ul>
@@ -1588,6 +1600,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (S300,KS300,WS7000)</li><br>
+    <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
 </ul>
@@ -1628,6 +1641,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
+    <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
 </ul>
@@ -1744,6 +1758,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (EM1000WZ)</li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
 </ul>
@@ -1797,6 +1812,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (EM1000GZ)</li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
 </ul>
@@ -1843,6 +1859,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (EM1000EM)</li>
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
 </ul>
@@ -2052,6 +2069,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li><br>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
 </ul>

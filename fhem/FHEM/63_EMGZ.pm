@@ -20,7 +20,7 @@ EMGZ_Initialize($)
   $hash->{SetFn}     = "EMGZ_Set";
   $hash->{DefFn}     = "EMGZ_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model;EM1000GZ loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 model;EM1000GZ loglevel:0,1,2,3,4,5,6";
 }
 
 

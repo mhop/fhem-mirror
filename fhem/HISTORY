@@ -367,3 +367,7 @@
     is sent back. The CUR must have reception enabled.
     Right now status/set time/set FHT desired temp are implemented.
 
+- Fri Jan  9
+  - Added a unified dispatch for CUL/FHZ and CM11, since all of them used the
+    same code.
+  - Addedd IODev attribute to FS20/FHT/HMS/KS300/CUL_WS/CUL/EMWZ/EMGZ/EMEM
