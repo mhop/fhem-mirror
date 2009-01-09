@@ -14,8 +14,6 @@ sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 
 my $initstr = "X21";    # Only translated messages + RSSI
-my %msghist;		# Used when more than one CUL is attached
-my $msgcount = 0;
 my %gets = (
   "version"  => "V",
   "raw"      => "",
@@ -424,17 +422,6 @@ CUL_Write($$$)
     return;
   }
 
-  ###############
-  # insert value into the msghist. At the moment this only makes sense for FS20
-  # devices. As the transmitted value differs from the received one, we have to
-  # recompute.
-  if($fn eq "F" || $fn eq "T") {
-    $msghist{$msgcount}{TIME} = gettimeofday();
-    $msghist{$msgcount}{NAME} = $hash->{NAME};
-    $msghist{$msgcount}{MSG}  = "$fn$msg";
-    $msgcount++;
-  }
-
   Log 5, "CUL sending $fn$msg";
   my $bstring = "$fn$msg\n";
 
@@ -490,7 +477,6 @@ CUL_Read($)
   my ($hash) = @_;
 
   my $buf = $hash->{PortObj}->input();
-  my $iohash = $modules{$hash->{TYPE}}; # Our (CUL) module pointer
   my $name = $hash->{NAME};
 
   ###########
@@ -558,41 +544,15 @@ CUL_Read($)
       goto NEXTMSG;
     }
 
-    ###############
-    # check for duplicate msg from different CUL's
-    my $now = gettimeofday();
-    my $skip;
-    my $meetoo = ($attr{$name}{repeater} ? 1 : 0);
-
-    my $to = 0.3;
-    if(defined($attr{$name}) && defined($attr{$name}{filtertimeout})) {
-      $to = $attr{$name}{filtertimeout};
-    }
-    foreach my $oidx (keys %msghist) {
-      if($now-$msghist{$oidx}{TIME} > $to) {
-        delete($msghist{$oidx});
-        next;
-      }
-      if($msghist{$oidx}{MSG} eq $dmsg &&
-         ($meetoo || $msghist{$oidx}{NAME} ne $name)) {
-        Log 5, "Skipping $msghist{$oidx}{MSG}";
-        $skip = 1;
-      }
-    }
-    goto NEXTMSG if($skip);
-    $msghist{$msgcount}{TIME} = $now;
-    $msghist{$msgcount}{NAME} = $name;
-    $msghist{$msgcount}{MSG}  = $dmsg;
-    $msgcount++;
-
-    if($initstr =~ m/X2/ && $dmsg =~ m/[FEHT]([A-F0-9][A-F0-9])+$/) { # RSSI
+    my $rssi;
+    if($initstr =~ m/X2/ && $dmsg =~ m/[FEHTK]([A-F0-9][A-F0-9])+$/) { # RSSI
       my $l = length($dmsg);
-      my $rssi = hex(substr($dmsg, $l-2, 2));
+      $rssi = hex(substr($dmsg, $l-2, 2));
       $dmsg = substr($dmsg, 0, $l-2);
       $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-      Log GetLogLevel($name,4), "CUL: $dmsg $rssi";
+      Log GetLogLevel($name,4), "$name: $dmsg $rssi";
     } else {
-      Log GetLogLevel($name,4), "CUL: $dmsg";
+      Log GetLogLevel($name,4), "$name: $dmsg";
     }
 
     ###########################################
@@ -639,42 +599,14 @@ CUL_Read($)
       goto NEXTMSG;
     }
 
-
-    my @found;
-    my $last_module;
-    foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
-                    grep {defined($modules{$_}{ORDER});}keys %modules) {
-      next if($iohash->{Clients} !~ m/:$m:/);
-
-      # Module is not loaded or the message is not for this module
-      next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
-
-      no strict "refs";
-      @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
-      use strict "refs";
-      $last_module = $m;
-      last if(int(@found));
-    }
-    if(!int(@found)) {
-      Log GetLogLevel($name,3), "Unknown code $dmsg, help me!";
-      goto NEXTMSG;
+    my @found = Dispatch($hash, $dmsg);
+    if($rssi) {
+      foreach my $d (@found) {
+        next if(!$defs{$d});
+        $defs{$d}{RSSI} = $rssi;
+      }
     }
 
-    goto NEXTMSG if($found[0] eq "");	# Special return: Do not notify
-
-    # The trigger needs a device: we create a minimal temporary one
-    if($found[0] =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
-      my $d = $1;
-      $defs{$d}{NAME} = $1;
-      $defs{$d}{TYPE} = $last_module;
-      DoTrigger($d, "$2 $3");
-      CommandDelete(undef, $d);                 # Remove the device
-      goto NEXTMSG;
-    }
-
-    foreach my $found (@found) {
-      DoTrigger($found, undef);
-    }
 NEXTMSG:
   }
   $hash->{PARTIAL} = $culdata;

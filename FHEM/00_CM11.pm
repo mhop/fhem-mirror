@@ -78,10 +78,6 @@ my %sets = (
   "test"   => "xxx",
 );
 
-my $def;
-my %msghist;		# Used when more than one CUL is attached
-my $msgcount = 0;
-
 
 #####################################
 
@@ -415,61 +411,6 @@ CM11_SetInterfaceTime($)
 
 #####################################
 sub
-CM11_Dispatch($$$$)
-{
-  my ($hash,$housecode,$unitcodes,$x10func)= @_;
-
-  my $prefix= "CM11 device " . $hash->{NAME} . ":";
-  my $iohash = $modules{$hash->{TYPE}}; # Our (CM11) module pointer
-
-  $unitcodes= "" unless(defined($unitcodes));
-  my $dmsg= "X10:$housecode;$unitcodes;$x10func";
-  Log 5, "$prefix dispatch $dmsg";
-
-  my @found;
-  my $last_module;
-  my $nfound;
-  foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
-                 grep {defined($modules{$_}{ORDER});}keys %modules) {
-	next if($iohash->{Clients} !~ m/:$m:/);
-
-        # Module is not loaded or the message is not for this module
-	next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
-
-	no strict "refs";
-	@found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
-	use strict "refs";
-        $last_module = $m;
-        $nfound= int(@found);
-        last if($nfound);
-  }
-  # if the function was not evaluated, undef was returned
-  if(!$nfound) {
-	Log 1, "Unknown message $dmsg, help me!";
-	return;
-  }
-
-  foreach my $found (@found) {
-    if($found =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
-        # The trigger needs a device: we create a minimal temporary one
-	my $d = $1;
-	$defs{$d}{NAME} = $1;
-	$defs{$d}{TYPE} = $last_module;
-	DoTrigger($d, "$2 $3");
-        CommandDelete(undef, $d);                 # Remove the device
-	$nfound--;
-    } else {
-        DoTrigger($found, undef);
-    }
-  }
-
-  Log 5, "$prefix $nfound devices addressed";
-  return @found;
-
-}
-
-#####################################
-sub
 CM11_Read($)
 {
   #
@@ -622,9 +563,12 @@ CM11_Read($)
 			Log 5, "$prefix $housecode_func: " .
                                 $hash->{$housecode_func};
 			# dispatch message to clients
-			CM11_Dispatch($hash, $housecode,
-					     $hash->{$housecode_unit},
-					     $hash->{$housecode_func});
+
+                        my $hu = $hash->{$housecode_unit};
+                        $hu= "" unless(defined($hu));
+                        my $hf = $hash->{$housecode_func};
+                        my $dmsg= "X10:$housecode;$hu;$hf";
+			Dispatch($hash, $dmsg);
 		} else {
 			# data byte is unitcode
 			# if a command was executed before, clear unitcode list

@@ -48,10 +48,6 @@ my %codes = (
   "^8501..\$" => "fhtbuf",
 );
 
-my $def;
-my %msghist;		# Used when more than one FHZ is attached
-my $msgcount = 0;
-
 #####################################
 # Note: we are a data provider _and_ a consumer at the same time
 sub
@@ -355,7 +351,7 @@ FHZ_Parse($$)
 
   if(!$type) {
     Log 4, "FHZ $name unknown: $omsg";
-    $def->{CHANGED}[0] = "$msg";
+    $hash->{CHANGED}[0] = "$msg";
     return $hash->{NAME};
   }
 
@@ -365,7 +361,7 @@ FHZ_Parse($$)
   }
 
   Log 4, "FHZ $name $type: $msg";
-  $def->{CHANGED}[0] = "$type: $msg";
+  $hash->{CHANGED}[0] = "$type: $msg";
   return $hash->{NAME};
 }
 
@@ -496,18 +492,6 @@ FHZ_Write($$$)
   if(!$hash || !defined($hash->{PortObj})) {
     Log 5, "FHZ device $hash->{NAME} is not active, cannot send";
     return;
-  }
-
-  ###############
-  # insert value into the msghist. At the moment this only makes sense for FS20
-  # devices. As the transmitted value differs from the received one, we have to
-  # recompute.
-  if($fn eq "04" && substr($msg,0,6) eq "010101") {
-    my $nmsg = "0101a001" . substr($msg, 6, 6) . "00" . substr($msg, 12);
-    $msghist{$msgcount}{TIME} = gettimeofday();
-    $msghist{$msgcount}{NAME} = $hash->{NAME};
-    $msghist{$msgcount}{MSG}  = unpack('H*', FHZ_CompleteMsg($fn, $nmsg));
-    $msgcount++;
   }
 
   my $bstring = FHZ_CompleteMsg($fn, $msg);
@@ -652,70 +636,8 @@ FHZ_Read($)
 	$fhzdata = substr($fhzdata, 2);
 	next;
       }
+      my @found = Dispatch($hash, $dmsg);
 
-      ###############
-      # check for duplicate msg from different FHZ's
-      my $now = gettimeofday();
-      my $skip;
-      my $meetoo = ($attr{$name}{repeater} ? 1 : 0);
-
-      my $to = 3;
-      if(defined($attr{$name}) && defined($attr{$name}{filtertimeout})) {
-        $to = $attr{$name}{filtertimeout};
-      }
-      foreach my $oidx (keys %msghist) {
-        if($now-$msghist{$oidx}{TIME} > $to) {
-	  delete($msghist{$oidx});
-          next;
-        }
-	if($msghist{$oidx}{MSG} eq $dmsg &&
-           ($meetoo || $msghist{$oidx}{NAME} ne $name)) {
-          Log 5, "Skipping $msghist{$oidx}{MSG}";
-	  $skip = 1;
-	}
-      }
-      goto NEXTMSG if($skip);
-      $msghist{$msgcount}{TIME} = $now;
-      $msghist{$msgcount}{NAME} = $name;
-      $msghist{$msgcount}{MSG}  = $dmsg;
-      $msgcount++;
-
-
-      my @found;
-      my $last_module;
-      foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
-		      grep {defined($modules{$_}{ORDER});}keys %modules) {
-	next if($iohash->{Clients} !~ m/:$m:/);
-
-        # Module is not loaded or the message is not for this module
-	next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
-
-	no strict "refs";
-	@found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
-	use strict "refs";
-        $last_module = $m;
-	last if(int(@found));
-      }
-      if(!int(@found)) {
-	Log 1, "Unknown code $dmsg, help me!";
-	goto NEXTMSG;
-      }
-
-      goto NEXTMSG if($found[0] eq "");	# Special return: Do not notify
-
-      # The trigger needs a device: we create a minimal temporary one
-      if($found[0] =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
-	my $d = $1;
-	$defs{$d}{NAME} = $1;
-	$defs{$d}{TYPE} = $last_module;
-	DoTrigger($d, "$2 $3");
-        CommandDelete(undef, $d);                 # Remove the device
-	goto NEXTMSG;
-      }
-
-      foreach my $found (@found) {
-	DoTrigger($found, undef);
-      }
 NEXTMSG:
       $fhzdata = substr($fhzdata, $len);
 

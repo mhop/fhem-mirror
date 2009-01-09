@@ -143,7 +143,7 @@ FHT_Initialize($)
   $hash->{DefFn}     = "FHT_Define";
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 model;fht80b dummy:0,1 " .
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
                   "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer";
 }
 
@@ -319,6 +319,8 @@ FHT_Parse($$)
 
   my $def = $defptr{$dev};
   my $name = $def->{NAME};
+
+  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
   # Short message
   if(length($msg) < 26)  {

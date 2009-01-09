@@ -39,7 +39,7 @@ HMS_Initialize($)
   $hash->{DefFn}     = "HMS_Define";
   $hash->{UndefFn}   = "HMS_Undef";
   $hash->{ParseFn}   = "HMS_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model;hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model;hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -78,6 +78,8 @@ HMS_Parse($$)
 
   my $dev = substr($msg, 16, 4);
   my $cde = substr($msg, 11, 1);
+                         012345678901234567890123456789
+#                        810e047f0214a001a81f000001000000 HMS100TFK
   my $val = substr($msg, 24, 8) if(length($msg) == 32);
 
   my $type = "";
@@ -103,6 +105,7 @@ HMS_Parse($$)
   }
 
   my $def = $defptr{$dev};
+  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
   my (@v, @txt, @sfx);
 
