@@ -20,7 +20,7 @@ EMWZ_Initialize($)
   $hash->{SetFn}     = "EMWZ_Set";
   $hash->{DefFn}     = "EMWZ_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model;EM1000WZ loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 model;EM1000WZ loglevel:0,1,2,3,4,5,6";
 }
 
 

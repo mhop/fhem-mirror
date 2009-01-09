@@ -18,7 +18,7 @@ EMEM_Initialize($)
   $hash->{GetFn}     = "EMEM_Get";
   $hash->{DefFn}     = "EMEM_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model;EM1000EM loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 model;EM1000EM loglevel:0,1,2,3,4,5,6";
 }
 
 ###################################

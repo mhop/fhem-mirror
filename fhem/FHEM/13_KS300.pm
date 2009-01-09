@@ -20,7 +20,7 @@ KS300_Initialize($)
   $hash->{DefFn}     = "KS300_Define";
   $hash->{UndefFn}   = "KS300_Undef";
   $hash->{ParseFn}   = "KS300_Parse";
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ks300 loglevel:0,1 rainadjustment:0,1";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:ks300 loglevel:0,1 rainadjustment:0,1";
 }
 
 #####################################
@@ -88,6 +88,8 @@ KS300_Parse($$)
     my $def = $defptr{$dev};
     my $haverain = 0;
     my $name= $def->{NAME};
+
+    return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
     my @v;
     my @txt = ( "rain_raw", "rain", "wind", "humidity", "temperature",

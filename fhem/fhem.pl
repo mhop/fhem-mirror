@@ -46,6 +46,7 @@ sub AssignIoPort($);
 sub CallFn(@);
 sub CommandChain($$);
 sub DoClose($);
+sub Dispatch($$);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
@@ -148,7 +149,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.62 2009-01-03 12:30:29 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.63 2009-01-09 17:31:43 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1415,6 +1416,11 @@ CommandAttr($$)
       next;
     }
 
+    if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
+      push @rets,"Unknown IODev specified";
+      next;
+    }
+
     $a[0] = $sdev;
     $ret = CallFn($sdev, "AttrFn", "set", @a);
     if($ret) {
@@ -1427,6 +1433,7 @@ CommandAttr($$)
     } else {
       $attr{$sdev}{$a[1]} = "1";
     }
+    $defs{$sdev}{IODev} = $defs{$a[2]} if($a[1] eq "IODev");
 
   }
   return join("\n", @rets);
@@ -1942,3 +1949,53 @@ HandleArchiving($)
   }
 }
 
+#####################################
+# Call a logical device (FS20) ParseMessage with data from a physical device
+# (FHZ)
+sub
+Dispatch($$)
+{
+  my ($hash, $dmsg) = @_;
+  my $iohash = $modules{$hash->{TYPE}}; # The phyiscal device module pointer
+  my $name = $hash->{NAME};
+
+  Log 5, "$name dispatch $dmsg";
+
+  my @found;
+  my $last_module;
+  foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
+                  grep {defined($modules{$_}{ORDER});}keys %modules) {
+    next if($iohash->{Clients} !~ m/:$m:/);
+
+    # Module is not loaded or the message is not for this module
+    next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
+
+    no strict "refs";
+    @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
+    use strict "refs";
+    $last_module = $m;
+    last if(int(@found));
+  }
+  if(!int(@found)) {
+    Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
+    return "";
+  }
+
+  return if($found[0] eq "");	# Special return: Do not notify
+
+  foreach my $found (@found) {
+    if($found =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
+    # The trigger needs a device: we create a minimal temporary one
+      my $d = $1;
+      $defs{$d}{NAME} = $1;
+      $defs{$d}{TYPE} = $last_module;
+      DoTrigger($d, "$2 $3");
+      CommandDelete(undef, $d);                 # Remove the device
+      goto NEXTMSG;
+    } else {
+      DoTrigger($found, undef);
+    }
+  }
+
+  return @found;
+}
