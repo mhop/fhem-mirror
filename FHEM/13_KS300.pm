@@ -117,7 +117,7 @@ KS300_Parse($$)
     # get previous rain_raw
     my $rain_raw_prev= $rain_raw;
     if(defined($r->{rain_raw})) {
-      my($rain_raw_prev, undef)= split(" ", $r->{rain_raw}{VAL}); # cut off "(counter)"
+      ($rain_raw_prev, undef)= split(" ", $r->{rain_raw}{VAL}); # cut off "(counter)"
     };
 
     # unadjusted value as default
@@ -155,7 +155,6 @@ KS300_Parse($$)
        # the current offset is the same, but this may change later
        $rain_raw_ofs= $rain_raw_ofs_prev;
 
-
        # get previous tsecs
        if(defined($r->{tsecs})) {
          $tsecs_prev= $r->{tsecs}{VAL};
@@ -172,7 +171,6 @@ KS300_Parse($$)
        # be reasonable. The observed deltas are in most cases 1 or 2 orders
        # of magnitude larger.
        # The code also handles counter resets after battery replacement
-
 
        my $rain_raw_delta= $rain_raw- $rain_raw_prev;
        my $thours_delta= ($tsecs- $tsecs_prev)/3600.0; # in hours
