@@ -53,7 +53,7 @@ HMS_Define($$)
   $a[2] = lc($a[2]);
   return "Define $a[0]: wrong CODE format: specify a 4 digit hex value"
   		if($a[2] !~ m/^[a-f0-9][a-f0-9][a-f0-9][a-f0-9]$/);
-  
+
 
   $hash->{CODE} = $a[2];
   $defptr{$a[2]} = $hash;
@@ -78,7 +78,7 @@ HMS_Parse($$)
 
   my $dev = substr($msg, 16, 4);
   my $cde = substr($msg, 11, 1);
-                         012345678901234567890123456789
+#                        012345678901234567890123456789
 #                        810e047f0214a001a81f000001000000 HMS100TFK
   my $val = substr($msg, 24, 8) if(length($msg) == 32);
 
@@ -140,7 +140,7 @@ HMS_Parse($$)
     $val = "T: $v[0]  Bat: $v[1]";
 
   } elsif ($type eq "HMS100WD") {
-  
+
     @txt = ( "water_detect", "battery");
     @sfx = ( "",             "");
 
@@ -154,7 +154,7 @@ HMS_Parse($$)
     $val = "Water Detect: $v[0]";
 
  } elsif ($type eq "HMS100TFK") {    # By Peter P.
-  
+
     @txt = ( "switch_detect", "battery");
     @sfx = ( "",             "");
     # Battery-low condition detect is not yet properly implemented.
@@ -176,7 +176,7 @@ HMS_Parse($$)
     $val = "smoke_detect: $v[0]";
 
   } elsif ($type eq "HMS100MG") {    # By Peter Stark
-  
+
     @txt = ( "gas_detect", "battery");
     @sfx = ( "",             "");
 
