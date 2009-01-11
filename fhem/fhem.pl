@@ -149,7 +149,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.63 2009-01-09 17:31:43 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.64 2009-01-11 20:43:15 klaus01 Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -165,7 +165,7 @@ $modules{_internal_}{LOADED} = 1;
 $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
-        "verbose:1,2,3,4,5 mseclog version nofork";
+        "verbose:1,2,3,4,5 mseclog version nofork logdir";
 $modules{_internal_}{AttrFn} = "GlobalAttr";
 
 
@@ -1716,6 +1716,7 @@ ResolveDateWildcards($@)
   my $j = sprintf("%03d", $t[7]+1);    $f =~ s/%j/$j/g;
   my $U = sprintf("%02d", int(($t[7]-$t[6]+6)/7));   $f =~ s/%U/$U/g;
   my $V = sprintf("%02d", int(($t[7]-$t[6]+7)/7)+1); $f =~ s/%V/$V/g;
+  $f =~ s/%ld/$attr{global}{logdir}/g if($attr{global}{logdir}); #log directory
 
   return $f;
 }
