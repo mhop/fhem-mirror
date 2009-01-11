@@ -490,39 +490,18 @@ CUL_Read($)
     my $dev = $hash->{DeviceName};
     Log 1, "USB device $dev disconnected, waiting to reappear";
     $hash->{PortObj}->close();
+    DoTrigger($name, "DISCONNECTED");
 
-    if($hash->{MOBILE}) {
+    delete($hash->{PortObj});
+    delete($selectlist{"$name.$dev"});
+    $readyfnlist{"$name.$dev"} = $hash; # Start polling
+    $hash->{STATE} = "disconnected";
 
-      delete($hash->{PortObj});
-      delete($selectlist{"$name.$dev"});
-      $readyfnlist{"$name.$dev"} = $hash; # Start polling
-      $hash->{STATE} = "disconnected";
+    # Without the following sleep the open of the device causes a SIGSEGV,
+    # and following opens block infinitely. Only a reboot helps.
+    sleep(5);
 
-      # Without the following sleep the open of the device causes a SIGSEGV,
-      # and following opens block infinitely. Only a reboot helps.
-      sleep(5);
-
-      return "";
-
-    } else {
-
-      for(;;) {
-        sleep(5);
-        if ($^O eq 'MSWin32') {
-          $hash->{PortObj} = new Win32::SerialPort($dev);
-        }else{
-          $hash->{PortObj} = new Device::SerialPort($dev);
-        }
-
-        if($hash->{PortObj}) {
-          Log 1, "USB device $dev reappeared";
-          $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
-          CUL_DoInit($hash);
-          return;
-        }
-      }
-    }
-
+    return "";
   }
 
   my $culdata = $hash->{PARTIAL};
@@ -645,7 +624,9 @@ CUL_Ready($)           # Windows - only
     if($ret) {
       delete($selectlist{"$name.$dev"});
       delete($readyfnlist{"$name.$dev"});
+      Log 1, "Won't listen to this device any more";
     }
+    DoTrigger($name, "CONNECTED");
     return $ret;
 
   }
