@@ -12,6 +12,7 @@ sub FHZ_ReadAnswer($$$);
 sub FHZ_Crc(@);
 sub FHZ_CheckCrc($);
 sub FHZ_XmitLimitCheck($$);
+sub FHZ_DoInit($$$);
 
 my $msgstart = pack('H*', "81");# Every msg starts wit this
 
@@ -82,7 +83,37 @@ FHZ_Ready($)
 {
   my ($hash) = @_;
   my $po=$hash->{PortObj};
-  return undef if !$po;
+
+  if(!$po) {    # Looking for the device
+
+    my $dev = $hash->{DeviceName};
+    my $name = $hash->{NAME};
+
+    $hash->{PARTIAL} = "";
+    if ($^O=~/Win/) {
+     $po = new Win32::SerialPort ($dev);
+    } else  {
+     $po = new Device::SerialPort ($dev);
+    }
+    return undef if(!$po);
+
+    Log 1, "USB device $dev reappeared";
+    $hash->{PortObj} = $po;
+    if( $^O !~ /Win/ ) {
+      $hash->{FD} = $po->FILENO;
+      delete($readyfnlist{"$name.$dev"});
+      $selectlist{"$name.$dev"} = $hash;
+    } else {
+      $readyfnlist{"$name.$dev"} = $hash;
+    }
+
+    FHZ_DoInit($name, $hash->{ttytype}, $po);
+    DoTrigger($name, "CONNECTED");
+    return undef;
+
+  }
+
+  # This is relevant for windows only
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
   return ($InBytes>0);
 }
@@ -206,7 +237,7 @@ FHZ_SetState($$$$)
 
 #####################################
 sub
-DoInit($$$)
+FHZ_DoInit($$$)
 {
   my ($name,$type,$po) = @_;
   my @init;
@@ -257,6 +288,8 @@ DoInit($$$)
   my $hash = $defs{$name};
   delete($hash->{XMIT_TIME});
   delete($hash->{NR_CMD_LAST_H});
+  $hash->{STATE} = "Initialized";
+  return undef;
 }
 
 #####################################
@@ -266,7 +299,9 @@ FHZ_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $po;
-  $hash->{STATE} = "Initialized";
+
+  return "wrong syntax: define <name> FHZ devicename ".
+                        "[normal|strangetty] [mobile]" if(@a < 3 || @a > 5);
 
   delete $hash->{PortObj};
   delete $hash->{FD};
@@ -274,6 +309,8 @@ FHZ_Define($$)
   my $name = $a[0];
   my $dev = $a[2];
   $hash->{ttytype} = $a[3] if($a[3]);
+  $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
+  $hash->{STATE} = "defined";
 
   $attr{$name}{savefirst} = 1;
   $attr{$name}{fhtsoftbuffer} = 0;
@@ -284,6 +321,8 @@ FHZ_Define($$)
     return undef;
   }
 
+  $hash->{DeviceName} = $dev;
+  $hash->{PARTIAL} = "";
   Log 3, "FHZ opening FHZ device $dev";
   if ($^O=~/Win/) {
    require Win32::SerialPort;
@@ -292,7 +331,13 @@ FHZ_Define($$)
    require Device::SerialPort;
    $po = new Device::SerialPort ($dev);
   }
-  return "Can't open $dev: $!\n" if(!$po);
+  if(!$po) {
+    my $msg = "Can't open $dev: $!";
+    Log(3, $msg) if($hash->{MOBILE});
+    return $msg if(!$hash->{MOBILE});
+    $readyfnlist{"$name.$dev"} = $hash;
+    return "";
+  }
   Log 3, "FHZ opened FHZ device $dev";
 
   $hash->{PortObj} = $po;
@@ -302,11 +347,8 @@ FHZ_Define($$)
   } else {
     $readyfnlist{"$name.$dev"} = $hash;
   }
-  $hash->{DeviceName} = $dev;
-  $hash->{PARTIAL} = "";
 
-  DoInit($name, $hash->{ttytype}, $po);
-
+  FHZ_DoInit($name, $hash->{ttytype}, $po);
   return undef;
 }
 
@@ -541,20 +583,20 @@ FHZ_Reopen($)
 {
   my ($hash) = @_;
 
-  my $devname = $hash->{DeviceName};
+  my $dev = $hash->{DeviceName};
   $hash->{PortObj}->close();
-  Log 1, "USB device $devname closed";
+  Log 1, "USB device $dev closed";
   for(;;) {
       sleep(5);
       if ($^O eq 'MSWin32') {
-        $hash->{PortObj} = new Win32::SerialPort($devname);
+        $hash->{PortObj} = new Win32::SerialPort($dev);
       }else{
-        $hash->{PortObj} = new Device::SerialPort($devname);
+        $hash->{PortObj} = new Device::SerialPort($dev);
       }
       if($hash->{PortObj}) {
-        Log 1, "USB device $devname reopened";
+        Log 1, "USB device $dev reopened";
         $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
-        DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
+        FHZ_DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
         return;
       }
   }
@@ -578,25 +620,21 @@ FHZ_Read($)
 
   if(!defined($buf) || length($buf) == 0) {
 
-    my $devname = $hash->{DeviceName};
-    Log 1, "USB device $devname disconnected, waiting to reappear";
+    my $dev = $hash->{DeviceName};
+    Log 1, "USB device $dev disconnected, waiting to reappear";
     $hash->{PortObj}->close();
-    for(;;) {
-      sleep(5);
-      if ($^O eq 'MSWin32') {
-        $hash->{PortObj} = new Win32::SerialPort($devname);
-      }else{
-        $hash->{PortObj} = new Device::SerialPort($devname);
-      }
+    DoTrigger($name, "DISCONNECTED");
 
-      if($hash->{PortObj}) {
-        Log 1, "USB device $devname reappeared";
-        $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
-        DoInit($name, $hash->{ttytype}, $hash->{PortObj});
-	return;
-      }
-    }
+    delete($hash->{PortObj});
+    delete($selectlist{"$name.$dev"});
+    $readyfnlist{"$name.$dev"} = $hash; # Start polling
+    $hash->{STATE} = "disconnected";
+
+    # Without the following sleep the open of the device causes a SIGSEGV,
+    # and following opens block infinitely. Only a reboot helps.
+    sleep(5);
   }
+
 
   my $fhzdata = $hash->{PARTIAL};
   Log 5, "FHZ/RAW: " . unpack('H*',$buf) .
