@@ -355,8 +355,9 @@ FW_updateHashes()
   # Make a room  hash
   %__rooms = ();
   foreach my $d (keys %defs ) {
-    my $r = FW_getAttr($d, "room", "Unsorted");
-    $__rooms{$r}{$d} = 1;
+    foreach my $r (split(",", FW_getAttr($d, "room", "Unsorted"))) {
+      $__rooms{$r}{$d} = 1;
+    }
   }
 
   ###############
@@ -804,7 +805,18 @@ FW_showLog($)
 
   my $pm = FW_getAttr($wl,"plotmode",$__plotmode);
   my $ps = FW_getAttr($wl,"plotsize",$__plotsize);
-
+  # interprete title and label as a perl command and open accessiblity
+  #   to all internal values e.g. $value.
+  my $title = FW_getAttr($wl, "title", "\"$file\"");
+  $title = AnalyzeCommand(undef, "\{ return(" . $title . ");;\}");
+  my $label = FW_getAttr($wl, "label", undef);
+  my @g_label;
+  if ($label) {
+    @g_label = split(":",$label);
+    foreach (@g_label) {
+      $_ = AnalyzeCommand(undef, "\{ return(" . $_ . ");;\}");
+    }
+  }
   my $gplot_pgm = "$__dir/$type.gplot";
   return FW_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
   FW_calcWeblink($d,$wl);
@@ -817,7 +829,6 @@ FW_showLog($)
     if($pm eq "gnuplot" || !$__devs{$d}{from}) {
 
       # Looking for the logfile....
-
       $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
       my $path = "$1/$file";
       $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
@@ -830,7 +841,14 @@ FW_showLog($)
       $gplot_script =~ s/<OUT>/$tmpfile/g;
       $gplot_script =~ s/<SIZE>/$ps/g;
       $gplot_script =~ s/<IN>/$path/g;
-      $gplot_script =~ s/<TL>/$file/g;
+      $gplot_script =~ s/<TL>/$title/g;
+      my $g_count=0; 
+      if ($label) {
+        foreach (@g_label) {
+          $gplot_script =~ s/<L$g_count>/$_/g;
+          $g_count++;
+        }
+      }
 
       my $fr = FW_getAttr($wl, "fixedrange", undef);
       if($fr) {
@@ -864,8 +882,15 @@ FW_showLog($)
       my $gplot_script = join("", @data);
       $gplot_script =~ s/<OUT>/$tmpfile/g;
       $gplot_script =~ s/<SIZE>/$ps/g;
-      $gplot_script =~ s/<TL>/$file/g;
-
+      $gplot_script =~ s/<TL>/$title/g;
+      my $g_count=0; 
+      if ($label) {
+        foreach (@g_label) {
+          $gplot_script =~ s/<L$g_count>/$_/g;
+          $plot =~ s/<L$g_count>/$_/g;
+          $g_count++;
+        }
+      }
       my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
 
       my $oll = $attr{global}{verbose};
@@ -1088,12 +1113,19 @@ FW_calcWeblink($$)
   return if(!$defs{$wl});
 
   my $fr = FW_getAttr($wl, "fixedrange", undef);
+  my $frx;
   if($fr) {
-    my @range = split(" ", $fr);
-    my @t = localtime;
-    $__devs{$d}{from} = ResolveDateWildcards($range[0], @t);
-    $__devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
-    return;
+    #klaus fixed range day, week, month or year
+    if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
+      $frx=$fr;
+    }
+    else {
+      my @range = split(" ", $fr);
+      my @t = localtime;
+      $__devs{$d}{from} = ResolveDateWildcards($range[0], @t);
+      $__devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
+      return;
+    }
   }
 
   my $off = $__pos{$d};
@@ -1103,6 +1135,7 @@ FW_calcWeblink($$)
   my $now = time();
   my $zoom = $__pos{zoom};
   $zoom = "day" if(!$zoom);
+  $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
 
   if($zoom eq "qday") {
 
