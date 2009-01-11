@@ -479,3 +479,8 @@
   - bugfix:  cut off string "(counter)" from fallback value in 13_KS300.pm
   - feature: daily/monthly cumulated values for EMWZ/EMGZ/EMWM with 15_CUL_EM
              by Klaus
+  - feature: 01_FHEMWEB.pm: multiple room assignments
+                            fixedrange with optional [day|week|month|year]
+                            attr title and label for flexible .gplot files
+  - feature: fhem.pl: attr global logdir used by wildcard %ld
+
