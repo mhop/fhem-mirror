@@ -90,7 +90,7 @@ CM11_Initialize($)
   $hash->{ReadFn}  = "CM11_Read";
   $hash->{WriteFn} = "CM11_Write";
   $hash->{Clients} = ":X10:";
-  $hash->{ReadyFn} = "CM11_Ready" if ($^O eq 'MSWin32');
+  $hash->{ReadyFn} = "CM11_Ready";
 
 # Normal Devices
   $hash->{DefFn}   = "CM11_Define";
@@ -136,6 +136,7 @@ CM11_DoInit($$$)
   }
 
   $po->write_settings;
+  $defs{$name}{STATE} = "Initialized";
 
 }
 
@@ -147,7 +148,10 @@ CM11_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $po;
-  $hash->{STATE} = "Initialized";
+
+  return "wrong syntax: define <name> FHZ devicename ".
+                        "[normal|strangetty] [mobile]" if(@a < 3 || @a > 5);
+
 
   delete $hash->{PortObj};
   delete $hash->{FD};
@@ -155,6 +159,8 @@ CM11_Define($$)
   my $name = $a[0];
   my $dev = $a[2];
   $hash->{ttytype} = $a[3] if($a[3]);
+  $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
+  $hash->{STATE} = "defined";
 
   $attr{$name}{savefirst} = 1;
 
@@ -164,6 +170,8 @@ CM11_Define($$)
     return undef;
   }
 
+  $hash->{DeviceName} = $dev;
+  $hash->{PARTIAL} = "";
   Log 3, "CM11 opening CM11 device $dev";
   if ($^O=~/Win/) {
    require Win32::SerialPort;
@@ -172,7 +180,13 @@ CM11_Define($$)
    require Device::SerialPort;
    $po = new Device::SerialPort ($dev);
   }
-  return "Can't open $dev: $!\n" if(!$po);
+  if(!$po) {
+    my $msg = "Can't open $dev: $!";
+    Log(3, $msg) if($hash->{MOBILE});
+    return $msg if(!$hash->{MOBILE});
+    $readyfnlist{"$name.$dev"} = $hash;
+    return "";
+  }
   Log 3, "CM11 opened CM11 device $dev";
 
   $hash->{PortObj} = $po;
@@ -182,8 +196,6 @@ CM11_Define($$)
   } else {
     $readyfnlist{"$name.$dev"} = $hash;
   }
-  $hash->{DeviceName} = $dev;
-  $hash->{PARTIAL} = "";
 
   CM11_DoInit($name, $hash->{ttytype}, $po);
 
@@ -432,23 +444,19 @@ CM11_Read($)
 
   # USB troubleshooting
   if(!defined($buf) || length($buf) == 0) {
-    my $devname = $hash->{DeviceName};
-    Log 1, "USB device $devname disconnected, waiting to reappear";
+    my $dev = $hash->{DeviceName};
+    Log 1, "USB device $dev disconnected, waiting to reappear";
     $hash->{PortObj}->close();
-    for(;;) {
-      sleep(5);
-      if ($^O eq 'MSWin32') {
-        $hash->{PortObj} = new Win32::SerialPort($devname);
-      }else{
-        $hash->{PortObj} = new Device::SerialPort($devname);
-      }
-      if($hash->{PortObj}) {
-        Log 1, "USB device $devname reappeared";
-        $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
-        CM11_DoInit($name, $hash->{ttytype}, $hash->{PortObj});
-	return;
-      }
-    }
+    DoTrigger($name, "DISCONNECTED");
+
+    delete($hash->{PortObj});
+    delete($selectlist{"$name.$dev"});
+    $readyfnlist{"$name.$dev"} = $hash; # Start polling
+    $hash->{STATE} = "disconnected";
+
+    # Without the following sleep the open of the device causes a SIGSEGV,
+    # and following opens block infinitely. Only a reboot helps.
+    sleep(5);
   }
 
   #
@@ -599,10 +607,41 @@ CM11_Read($)
 
 #####################################
 sub
-CM11_Ready($$)           # Windows - only
+CM11_Ready($$)
 {
   my ($hash, $dev) = @_;
   my $po=$hash->{PortObj};
+
+  if(!$po) {    # Looking for the device
+
+    my $dev = $hash->{DeviceName};
+    my $name = $hash->{NAME};
+
+    $hash->{PARTIAL} = "";
+    if ($^O=~/Win/) {
+     $po = new Win32::SerialPort ($dev);
+    } else  {
+     $po = new Device::SerialPort ($dev);
+    }
+    return undef if(!$po);
+
+    Log 1, "USB device $dev reappeared";
+    $hash->{PortObj} = $po;
+    if( $^O !~ /Win/ ) {
+      $hash->{FD} = $po->FILENO;
+      delete($readyfnlist{"$name.$dev"});
+      $selectlist{"$name.$dev"} = $hash;
+    } else {
+      $readyfnlist{"$name.$dev"} = $hash;
+    }
+
+    CM11_DoInit($name, $hash->{ttytype}, $po);
+    DoTrigger($name, "CONNECTED");
+    return undef;
+
+  }
+
+  # This is relevant for windows only
   return undef if !$po;
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
   return ($InBytes>0);
