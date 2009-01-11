@@ -374,5 +374,17 @@
   - Added a unified dispatch for CUL/FHZ and CM11, since all of them used the
     same code.
   - Addedd IODev attribute to FS20/FHT/HMS/KS300/CUL_WS/CUL/EMWZ/EMGZ/EMEM
-
+- Sun Jan 11 (Klaus)
+  - Added fixedrange option day|week|month|year (for pgm2)
+    e.g.: attr wlEnergiemonat fixedrange month
+  - Added multiple room assignments for one device (for pgm2):
+    e.g.: attr Heizvorlauftemp room Energie,Heizung
+  - Added attr title and label(s) for more flexible .gplot files (for pgm2)
+    e.g.: attr wl_KF title "Fenster:".$value{KellerFenster}.", Entfeuchter: ".$value{Entfeuchter}
+          .gplot: <TL> (is almost there!)
+          attr wl_KF label "Fenster":"Entfeuchter"
+          .gplot: <L0> ... <L9> (constant text is to be replaced individually)
+  - Added attr global logdir, used by wildcard %ld in perl.pm
+    e.g.: attr global logdir /var/tmp
+          define emGaslog FileLog %ld/emGas.log emGas:.*CNT.*
 
