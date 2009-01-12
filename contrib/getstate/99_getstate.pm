@@ -1,6 +1,6 @@
 ################################################################
 #
-# $Id: 99_getstate.pm,v 1.1 2008-12-28 14:43:45 rudolfkoenig Exp $
+# $Id: 99_getstate.pm,v 1.2 2009-01-12 09:21:53 rudolfkoenig Exp $
 #
 #  Copyright notice
 #
