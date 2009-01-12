@@ -562,11 +562,11 @@ CUL_Read($)
 
     } elsif($fn eq "K") {
 
-      if($len == 99) {                               # Reformat for 13_KS300.pm
+      if($len == 15) {                               # Reformat for 13_KS300.pm
         my @a = split("", $dmsg);
         $dmsg = sprintf("81%02x04xx4027a001", $len/2+6);
-        for(my $i = 0; $i < 14; $i+=2) { # Swap nibbles.
-          $dmsg .= $a[$i+2] . $a[$i+1];
+        for(my $i = 1; $i < 14; $i+=2) { # Swap nibbles.
+          $dmsg .= $a[$i+1] . $a[$i];
         }
       }
       # Other K... Messages ar sent to CUL_WS
