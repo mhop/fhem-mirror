@@ -111,7 +111,7 @@ CUL_EM_Parse($$)
     my %readings;
 
     my $n = $hash->{NAME};
-    Log GetLogLevel($n,3), "CUL_EM $n: $val";
+    Log GetLogLevel($n,5), "CUL_EM $n: $val";
     $readings{RAW} = $val;
 
     #
