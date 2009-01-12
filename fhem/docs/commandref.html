@@ -24,6 +24,7 @@
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
       <a href="#get">get</a> &nbsp;
+      <a href="#getstate">getstate</a> &nbsp;
       <a href="#help">?,help</a> &nbsp;
       <a href="#include">include</a> &nbsp;
       <a href="#inform">inform</a> &nbsp;
@@ -404,6 +405,29 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
   Each device has different get parameters, see the corresponding device
   section for details.<br>
+  <br>
+
+</ul>
+
+
+<a name="getstate"></a>
+<h3>getstate</h3>
+<ul>
+  <code>getstate &lt;devspec&gt;</code>
+  <br><br>
+  Output a short space seperated status for &lt;devspec&gt;. It is useful for
+  monitoring the device in e.g. Cacti.<br>
+  Examples:
+  <ul>
+    <pre><code>  getstate lamp
+  state:1
+
+  getstate fl
+  ack:0 actuator:2 day-temp:21.5 desired-temp:22.5 [...] measured-temp:22.9 [...]
+    </code></pre>
+  </ul>
+  Note: to use this command copy the file contrib/getstate/99_getstate.pm into
+  you FHEM directory.
   <br>
 
 </ul>
