@@ -1,0 +1,45 @@
+2009-01-11 (1.4)  Martin Fischer  <m_fischer@gmx.de>
+
+	* test for arguments added
+	* new option --set to set device status added
+	* documentation updated
+
+2009-01-07 (1.3)  Martin Fischer  <m_fischer@gmx.de>
+
+	* Perl modul JSON::XS for communication with FHEM included. This requires
+	  jsonlist (fhem/contrib) for FHEM.
+	* several changes for parsing the JSON result
+	* buffering disabled
+	* output as asterisk AGI command added
+	* new subroutine for removing value units
+
+2009-01-01 (1.2)  Martin Fischer  <m_fischer@gmx.de>
+
+	* Perl modul Term::ANSIColor removed
+	* external command 'recode' for converting UTF8 to latin1. mbrola need
+	  this to speek german umlauts
+	* new output format gsm
+	* options for outputformat now configurable
+	* translation for special chars added
+	* new option --asterisk, -a to support asterisk parsing added
+	* new option --prefix to flag outfiles with a user prefix added
+	* new option --force to override existing files added
+	* support for reading files added
+	* several changes in subroutine text2speech (code cleanup)
+
+2008-12-31 (1.1)  Martin Fischer  <m_fischer@gmx.de>
+
+	* command-line options now works with Getopt::Long
+	* check for external files (mbrola, txt2pho, sox, etc.) included
+	* include a debug routine. use it with --debug on command-line
+	* documentation added
+	* added support for quiet mode. use it with -q, --quiet
+	* FHEM error trap added
+	* new option -t "TEXT". read the given text
+	* new option to support female or male voice. use it with -S, --Sex
+	  on command-line
+	* replace unwanted chars with text, e.g. - = Minus
+	* support for generating (cached) wave files
+	* update the documentation
+	* added cached files for all modes
+

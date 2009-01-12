@@ -1,0 +1,345 @@
+NAME
+    fhem-speech - Synthesized voice (based on MBROLA) extension for FHEM
+
+SYNOPSIS
+    fhem-speech -d device [-achopqS]
+
+    fhem-speech -d device --set state [-hp]
+
+    fhem-speech -f file [-acoqS]
+
+    fhem-speech -t "text" [-acoqS]
+
+    fhem-speech [-HmV?]
+
+    Try `fhem-speech --man` for full manual!
+
+DESCRIPTION
+  fhem-speech
+    fhem-speech read the status of a FHEM device and talk using the MBROLA
+    speech synthesizer. Furthermore it can read the content of a given file
+    or text.
+
+  FHEM
+    FHEM is used to automate some common tasks in the household like
+    switching lamps/shutters/heating/etc. and to log events like
+    temperature/humidity/power consumption. Visit the FHEM's homepage
+    <http://www.koeniglich.de/fhem/fhem.html> for more information.
+
+  The MBROLA project
+    Central to the MBROLA project is MBROLA, a speech synthesizer based on
+    the concatenation of diphones. It takes a list of phonemes as input,
+    together with prosodic information, and produces speech samples on 16
+    bits (linear), at the sampling frequency of the diphone database used.
+    This synthesizer is provided for free, for non commercial, non military
+    applications only. Visit the MBROLA's homepage
+    <http://tcts.fpms.ac.be/synthesis/> for more information.
+
+  Asterisk
+    Optionally fhem-speech supports AGI commands to communicate with
+    Asterisk. Visit the Asterisk(R) homepage <http://www.asterisk.org/> for
+    more information.
+
+OPTIONS
+    Mandatory arguments to long options are mandatory for short options too.
+    Ordering Options:
+
+    -d, --device device
+        Run in FHEM mode. Specifies the FHEM device to be queried. The given
+        device must be defined.
+
+    -f, --file file-name
+        Run in file mode. fhem-speech will read the given file.
+
+    -t, --text "TEXT"
+        Run in Speaker's mode. fhem-speech will read the given "TEXT".
+
+    Other options:
+
+    -a, --asterisk
+        Run in Asterisk mode. fhem-speech print out AGI-commands for direct
+        usage in Asterisk.
+
+    -c, --cache directory
+        Specifies the location of where the files should be saved if
+        fhem-speech started with the -o or --out argument.
+
+        Default location: current directory.
+
+    --force
+        Overwrites existing files.
+
+    -h, --host host
+        Specifies the hostaddress for FHEM.
+
+        Default address: "localhost".
+
+    -o, --out [gsm|wav]
+        fhem-speech saves the output to a file with the specified output
+        format.
+
+        Default address: "localhost".
+
+    -p, --port port
+        Communicate with FHEM on defined port.
+
+        Default port: "7072".
+
+    --prefix prefix
+        Set the given prefix in front of filename.
+
+    -q, --quiet
+        Run in quiet mode.
+
+    --set state
+        Send <state> to device.
+
+    -S, --sex [f|m]
+        Specifies the sex for the voice. It depends on which voices for
+        MBROLA have been installed.
+
+        Default: "de3" for the German female voice and "de2" for the German
+        male voice.
+
+    -m, --man
+        Show the manual page and exits.
+
+    -H, --help
+        Show a brief help message and exits.
+
+    -V, --version
+        Show fhem-speech's version number and exit.
+
+EXAMPLES
+    Get status information for device <EG.wz.HZ> in quiet mode:
+
+      `fhem-speech -d EG.wz.HZ -q`
+
+    Same as above with a male voice. FHEM runs on IP 192.168.1.100:
+
+      `fhem-speech -d EG.wz.HZ -S m -h 192.168.1.100`
+
+    Get status information for device <EG.wz.HZ> in Asterisk mode:
+
+      `fhem-speech -d EG.wz.HZ -a -q -o gsm -c /var/lib/asterisk/sounds/fhem/`
+
+    Read the file <foobar>:
+
+      `fhem-speech -f foobar`
+
+    Read the given text "Geht nicht gibt's nicht.":
+
+      `fhem-speech -t "Geht nicht gibt's nicht."`
+
+    Set the state for device <EG.wz.SD.01>:
+
+      `fhem-speech -d EG.wz.SD.01 --set on`
+
+INSTALLATION
+  Requirements
+   MBROLA
+    You need MBROLA synthesizer, a synthesis voice, txt2pho and sox. For
+    more information visit:
+
+    o MBROLA project, <http://tcts.fpms.ac.be/synthesis/>
+
+    o hadifix, <http://www.ikp.uni-bonn.de/dt/forsch/phonetik/hadifix/>
+
+   FHEM
+    For FHEM mode you need FHEM 4.5+ and the command extension "jsonlist".
+    For more information take a look at:
+
+    <fhem_src_path>/contrib/JsonList/README.JsonList
+
+    or visit the FHEM's homepage:
+
+    <http://www.koeniglich.de/fhem/fhem.html>
+
+   JSON::XS
+    The required command extension "jsonlist" send the result as a JSON
+    encoded string. fhem-speech need the Perl module JSON::XS to decode the
+    information.
+
+    There are several ways to install the module:
+
+    You can download the last version at:
+
+    <http://search.cpan.org/~mlehmann/JSON-XS-2.231/XS.pm>
+
+    Or you can use the package from the contrib-folder which was delivered
+    with fhem-speech.
+
+    You can use the cpan command on bash-prompt.
+
+  Installation
+    This describes the installation on ubuntu:
+
+    Make a temporarily directory for the needed files and change to the new
+    directory, e.g.:
+
+      `mkdir /usr/local/src/mbrola; cd !$`
+
+    Download the required files:
+
+      `wget http://www.ikp.uni-bonn.de/dt/forsch/phonetik/hadifix/txt2pho.zip`
+      `wget http://tcts.fpms.ac.be/synthesis/mbrola/bin/pclinux/mbrola3.0.1h_i386.deb`
+
+    Download at least one synthesis voice (e.g. German female voice):
+
+      `wget http://tcts.fpms.ac.be/synthesis/mbrola/dba/de3/de3.zip`
+
+  txt2pho
+    Install txt2pho:
+
+      `unzip txt2pho.zip -d /usr/share/`
+      `chmod 755 /usr/share/txt2pho/txt2pho`
+
+    Edit txt2phorc:
+
+      `vi /usr/share/txt2pho/txt2phorc`
+
+    and change the path for DATAPATH and INVPATH:
+
+      DATAPATH=/usr/share/txt2pho/data/
+      INVPATH=/usr/share/txt2pho/data/
+
+    Copy txt2phorc to /etc/txt2pho:
+
+      `cp /usr/share/txt2pho/txt2phorc /etc/txt2pho`
+
+  Synthesis Voice
+    Install the synthesis voice (e.g. German female voice):
+
+      `unzip de7.zip -d /usr/share/mbrola/de7`
+
+    fhem-speech use "de2" and "de3" as default voices. You can change this
+    if you like.
+
+  MBROLA
+    Install MBROLA:
+
+      `dpkg -i mbrola3.0.1h_i386.deb`
+
+  sox
+    Install sox:
+
+      `apt-get install sox libsox-fmt-all`
+
+  Test
+    Test your installation:
+
+      `echo "Test" | /usr/share/txt2pho/txt2pho |\
+       mbrola /usr/share/mbrola/de7/de7 - -.au | play -q -t au -`
+
+  fhem-speech
+    Copy the script fhem-speech to a directory of your choice, e.g.:
+
+      `cp fhem-speech /usr/local/bin`
+
+    and make it executable:
+
+      `chmod 775 /usr/local/bin/fhem-speech`
+
+  Perl
+    If you use the delivered module contrib/JSON-XS-2.231.tar.gz:
+
+      `tar xzf JSON-XS-2.231.tar.gz`
+      `cd JSON-XS-2.231`
+      `perl Makefile.pl`
+      `make`
+      `make test`
+
+    and as root:
+
+      `make install`
+
+CONFIGURATION
+    Open fhem-speech with your prefered editor.
+
+  FHEM host settings
+    Change the default host, if you like:
+
+      ###########################
+      # FHEM
+      $sys{fhem}{host}         = "localhost";
+      $sys{fhem}{port}         = "7072";
+
+  External commands
+    Change the paths depending on the installed distribution:
+
+      ###########################
+      # Mandatory external Files
+      $sys{file}{mbrola}       = "/usr/local/bin/mbrola";
+      $sys{file}{pipefilt}     = "/usr/local/bin/pipefilt";
+      $sys{file}{play}         = "/usr/bin/play";
+      $sys{file}{preproc}      = "/usr/local/bin/preproc";
+      [...]
+
+    Change the default settings for synthesis voice:
+
+      ###########################
+      # mbrola / txt2pho options
+      $sys{speech}{sex}    = "f";
+      $sys{speech}{male}   = "-f0.8 -t0.9 -l 15000";
+      $sys{speech}{female} = "-f1.2 -t1.0 -l 22050";
+
+  Translation
+    fhem-speech need the $lang{} settings to decide what messages from FHEM
+    to be spoken. For example take a look at the FHT part:
+
+      ###########################
+      # FHEM Translation
+
+      [...]
+
+      ###########################
+      # FHT
+      # keys:
+      $lang{'actuator'} = "Ventilstellung: %s Prozent";
+      $lang{'day-temp'} = "Temperatur Tag: %s Grad";
+      $lang{'desired-temp'} = "Angeforderte Temperatur: %s Grad";
+      $lang{'measured-temp'} = "Gemessene Temperatur: %s Grad";
+      $lang{'mode'} = "Modus: %s";
+      $lang{'night-temp'} = "Temperatur Nacht: %s Grad";
+      $lang{'windowopen-temp'} = "Temperatur Fenster offen: %s Grad";
+      [...]
+
+    On every FHEM response all of the defined $lang{} status information
+    will be spoken. If you don't like status information for e.g.
+    'windowopen-temp' then comment this out:
+
+      # $lang{'windowopen-temp'} = "Temperatur Fenster offen: %s Grad";
+
+    If you like to know the status for e.g. 'lowtemp-offset' add a line like
+    this:
+
+      $lang{'lowtemp-offset'} = "Versatz Temperatur %s Grad";
+
+    The '%s' stands as a placeholder for the value.
+
+OPTIONAL
+  Asterisk
+    fhem-speech support AGI commands for direct output in Asterisk.
+
+   Wrapper
+    If you like fhem-speech for use in Asterisk, you have to install a
+    wrapper around fhem-speech. You can use the example from
+    contrib/fhem-speech.agi.
+
+    Copy the wrapper to your asterisk-environment, e.g:
+
+      `cp contrib/fhem-speech.agi /var/lib/asterisk/agi-bin/`
+
+   extension.conf
+    Take a look at the example from contrib/extension.conf.
+
+LEGALESE
+    License GPLv3+: GNU GPL version 3 or later
+    <http://gnu.org/licenses/gpl.html>.
+
+    This is free software: you are free to change and redistribute it. There
+    is NO WARRANTY, to the extent permitted by law.
+
+AUTHOR
+    Copyright (C) 2008 Martin Fischer <m_fischer@gmx.de>
+
