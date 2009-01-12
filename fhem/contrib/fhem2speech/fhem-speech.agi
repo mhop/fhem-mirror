@@ -1,0 +1,55 @@
+#!/usr/bin/perl
+################################################################
+#
+#  $Id: fhem-speech.agi,v 1.1 2009-01-12 10:26:50 rudolfkoenig Exp $
+#
+
+use strict;
+
+$|=1;
+
+# Setup some variables
+my $sounds = "/var/lib/asterisk/sounds/fhem/";
+
+my %AGI;
+my $tests = 0;
+my $fail = 0;
+my $pass = 0;
+
+while(<STDIN>) {
+  chomp;
+  last unless length($_);
+  if (/^agi_(\w+)\:\s+(.*)$/) {
+    $AGI{$1} = $2;
+  }
+}
+
+print STDERR "AGI Environment Dump:\n";
+foreach my $i (sort keys %AGI) {
+        print STDERR " -- $i = $AGI{$i}\n";
+}
+
+sub checkresult {
+  my ($res) = @_;
+  my $retval;
+  $tests++;
+  chomp $res;
+  if ($res =~ /^200/) {
+    $res =~ /result=(-?\d+)/;
+    if (!length($1)) {
+      print STDERR "FAIL ($res)\n";
+      $fail++;
+    } else {
+      print STDERR "PASS ($1)\n";
+      $pass++;
+    }
+  } else {
+    print STDERR "FAIL (unexpected result '$res')\n";
+    $fail++;
+  }
+}
+
+system("fhem-speech -d $ARGV[1] -a -q -o gsm -c $sounds") if ($ARGV[0] eq "d");
+system("fhem-speech -t $ARGV[1] -a -q -o gsm -c $sounds") if ($ARGV[0] eq "t");
+system("fhem-speech -d $ARGV[1] --set $ARGV[2]") if ($ARGV[0] eq "s");
+
