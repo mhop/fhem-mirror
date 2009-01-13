@@ -427,7 +427,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     </code></pre>
   </ul>
   Note: to use this command copy the file contrib/getstate/99_getstate.pm into
-  you FHEM directory.
+  your FHEM directory.
   <br>
 
 </ul>
@@ -867,10 +867,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     The program can service multiple devices, FS20 and FHT device commands will
     be sent out through the last FHZ device defined before the definition of
-    the FS20/FHT device. To change the association, use the <a
-    href="#set">set</a> command activefor. <b>Important:</b> this definition
-    must occur after the modpath command but before any other (FHZ related)
-    device definition, else you'll see "no I/O device found" messages.<br>
+    the FS20/FHT device. To change the association, use the IODev attribute.<br>
 
     Set the attribute "repeater" for this device to 1 to ignore events received
     from a FS20 repeater. In fact we are not sure that they are repeater
@@ -902,7 +899,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     where <code>value</code> is one of:<br>
     <ul>
       FHTcode<br>
-      activefor<br>
       initFS20<br>
       initHMS<br>
       initfull<br>
@@ -912,9 +908,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     </ul>
     Notes:
     <ul>
-      <li>use activefor if you have multiple FHZ devices, and you want to
-      change the association of an FS20 or FHT device (i.e. which device will
-      send out the messages).</li>
       <li>raw is used to send out "raw" FS20/FHT messages.  See the doc
           directory for some examples</li>
       <li>In order to set the time of your FHT's, schedule this command every
