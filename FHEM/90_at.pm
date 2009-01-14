@@ -93,7 +93,7 @@ at_Exec($)
   my ($name) = @_;
   my ($skip, $disable);
 
-  return if(!$defs{$name}{DEF});           # Just deleted
+  return if(!$defs{$name});           # Just deleted
 
   if(defined($attr{$name})) {
     $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
@@ -104,6 +104,8 @@ at_Exec($)
   my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
   $command = SemicolonEscape($command);
   AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
+
+  return if(!$defs{$name});           # Deleted in the Command
 
   my $count = $defs{$name}{REP};
   my $def = $defs{$name}{DEF};
