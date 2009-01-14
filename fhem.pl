@@ -149,7 +149,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.64 2009-01-11 20:43:15 klaus01 Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.65 2009-01-14 19:16:59 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1818,6 +1818,7 @@ DoTrigger($$)
     $defs{$dev}{INTRIGGER}=1;
     my $ret = "";
     foreach my $n (sort keys %defs) {
+      next if(!defined($defs{$n}));     # Was deleted in a previous notify
       if(defined($modules{$defs{$n}{TYPE}})) {
         if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
           Log 5, "$dev trigger: Checking $n for notify";
