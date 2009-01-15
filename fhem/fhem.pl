@@ -149,7 +149,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.65 2009-01-14 19:16:59 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.66 2009-01-15 09:13:42 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1903,6 +1903,29 @@ doGlobalDef($)
 }
 
 #####################################
+# rename does not work over Filesystems: lets copy it
+sub
+myrename($$)
+{
+  my ($from, $to) = @_;
+
+  if(!open(F, $from)) {
+    Log(1, "Rename: Cannot open $from: $!");
+    return;
+  }
+  if(!open(T, ">$to")) {
+    Log(1, "Rename: Cannot open $to: $!");
+    return;
+  }
+  while(my $l = <F>) {
+    print T $l;
+  }
+  close(F);
+  close(T);
+  unlink($from);
+}
+
+#####################################
 # Make a directory and its parent directories if needed.
 sub
 HandleArchiving($)
@@ -1943,7 +1966,7 @@ HandleArchiving($)
   for(my $i = 0; $i < $max; $i++) {
     if($ard) {
       Log 2, "Moving $files[$i] to $ard";
-      rename("$dir/$files[$i]", "$ard/$files[$i]");
+      myrename("$dir/$files[$i]", "$ard/$files[$i]");
     } else {
       Log 2, "Deleting $files[$i]";
       unlink("$dir/$files[$i]");
