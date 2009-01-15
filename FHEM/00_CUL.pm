@@ -578,6 +578,7 @@ CUL_Read($)
       goto NEXTMSG;
     }
 
+    $hash->{RSSI} = $rssi;
     my @found = Dispatch($hash, $dmsg);
     if($rssi) {
       foreach my $d (@found) {
