@@ -45,6 +45,7 @@ sub AnalyzeInput($);
 sub AssignIoPort($);
 sub CallFn(@);
 sub CommandChain($$);
+sub CollectAttrNames();
 sub DoClose($);
 sub Dispatch($$);
 sub FmtDateTime($);
@@ -135,6 +136,7 @@ use vars qw(%cmds);             # Global command name hash. To be expanded
 
 use vars qw($reread_active);
 
+my %attrnames;                  # hash of attrnames needed by devspec2array
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
 my $logopened = 0;              # logfile opened or using stdout
@@ -149,7 +151,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.66 2009-01-15 09:13:42 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.67 2009-01-17 10:01:56 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -274,6 +276,7 @@ if($pfn) {
   print PID $$ . "\n";
   close(PID);
 }
+CollectAttrNames();
 $init_done = 1;
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
@@ -596,27 +599,36 @@ devspec2array($)
   my %knownattr = ( "DEF"=>1, "STATE"=>1, "TYPE"=>1 );
 
   my ($name) = @_;
+
   return "" if(!defined($name));
   return $name if(defined($defs{$name}));
-  my @ret;
 
-  if($name =~ m/(.*):(.*)/ && $knownattr{$1}) {
-    my $lattr = $1;
-    my $re = $2;
-    foreach my $l (sort keys %defs) {
-      push @ret, $l
-        if(!$re || ($defs{$l}{$lattr} && $defs{$l}{$lattr} =~ m/$re/));
-    }
-    return $name if(!@ret);               # No match, return the input
-    return @ret;
-  }
-
+  my ($isattr, @ret);
 
   foreach my $l (split(",", $name)) {   # List
+
+    if($l =~ m/(.*)=(.*)/) {
+      my ($lattr,$re) = ($1, $2);
+      if($knownattr{$lattr}) {
+        foreach my $l (sort keys %defs) {
+          push @ret, $l
+            if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr} =~ m/$re/));
+        }
+      } elsif($attrnames{$lattr}) {
+        foreach my $l (sort keys %attr) {
+          push @ret, $l
+            if($attr{$l}{$lattr} && (!$re || $attr{$l}{$lattr} =~ m/$re/));
+        }
+      } 
+      $isattr = 1;
+      next;
+    }
+
     if($l =~ m/[*\[\]^\$]/) {           # Regexp
       push @ret, grep($_ =~ m/$l/, sort keys %defs);
       next;
     }
+
     if($l =~ m/-/) {                    # Range
       my ($lower, $upper) = split("-", $l, 2);
       push @ret, grep($_ ge $lower && $_ le $upper, sort keys %defs);
@@ -625,7 +637,7 @@ devspec2array($)
     push @ret, $l;
   }
 
-  return $name if(!@ret);               # No match, return the input
+  return $name if(!@ret && !$isattr);             # No match, return the input
   return @ret;
 }
 
@@ -1128,6 +1140,7 @@ CommandDeleteAttr($$)
     }
 
   }
+  CollectAttrNames();
 
   return join("\n", @rets);
 }
@@ -1436,6 +1449,7 @@ CommandAttr($$)
     $defs{$sdev}{IODev} = $defs{$a[2]} if($a[1] eq "IODev");
 
   }
+  CollectAttrNames() if($init_done);
   return join("\n", @rets);
 }
 
@@ -1455,6 +1469,7 @@ CommandDefaultAttr($$)
   } else {
     $defaultattr{$a[0]} = $a[1];
   }
+  CollectAttrNames() if($init_done);
   return undef;
 }
 
@@ -2023,4 +2038,17 @@ Dispatch($$)
   }
 
   return @found;
+}
+
+###########################
+# Build the hash used by devspec2array
+sub
+CollectAttrNames()
+{
+  %attrnames = ();
+  foreach my $d (keys %attr) {
+    foreach my $a (keys %{ $attr{$d} }) {
+      $attrnames{$a} = 1;
+    }
+  }
 }
