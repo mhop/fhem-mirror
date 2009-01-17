@@ -225,8 +225,10 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>a range of devices, separated by dash (-)</li>
   <li>a regular expression, if the the spec contains on e of the following
       characters: ^*[]$</li>
-  <li>an internal attribute of the device, followed by a colon and then a
-      regexp for this attribute. Known attributes are DEF, STATE and TYPE.</li>
+  <li>an attribute of the device, followed by an equal sign (=) and then a
+      regexp for this attribute. As attribute you can specify either attributes
+      set with the attr command or one of the "internal" attributes DEF, STATE
+      and TYPE.</li>
   </ul>
   Example:
   <ul>
@@ -236,8 +238,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>set lamp.* on</code><br>
     <code>set lamp1-lamp3 on</code><br>
     <code>set lamp1-lamp3,lamp3 on</code><br>
-    <code>list DEF:1234.*</code><br>
-    <code>list TYPE:FS20</code><br>
+    <code>set room=kitchen off</code><br>
+    <code>list disabled=</code><br>
+    <code>list TYPE=FS20</code><br>
   </ul>
   Notes:
   <ul>
