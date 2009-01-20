@@ -381,3 +381,11 @@ function $(id) { return document.getElementById(id); }
 function ddd() { console.log.apply(console, arguments); }
 
 })();
+
+function fhz_set_fs20(fhemiphone, tgbutton)
+{
+    var mygetrequest=new XMLHttpRequest();
+    newstate = tgbutton.attributes.getNamedItem("toggled").value == "true" ? "on":"off";
+  	mygetrequest.open("GET", fhemiphone+newstate, true);
+    mygetrequest.send(null);
+}
