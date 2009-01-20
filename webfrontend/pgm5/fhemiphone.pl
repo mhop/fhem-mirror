@@ -90,6 +90,7 @@ my $n = 0;
 ##################
 # iPhone Anpassungen:
 
+#$me = "http://www.dhs-computer.dyndns.org/cgi-bin4/fhemiphone.pl" if(!$me);
 $me = "" if(!$me);
 my $q = new CGI;
 $ti = 1;
@@ -460,9 +461,9 @@ roomOverview($)
 	print "   <li><a href=\"$me?room=all\">All together</a></li>";
 
   print "   <li class=\"group\">Help/Configuration:</li>";
-	print "   <li><a href=\"$howto\">Howto</a></li>";
-	print "   <li><a href=\"$faq\">FAQ</a></li>";
-	print "   <li><a href=\"$doc\">Details</a></li>";
+	print "   <li><a href=\"$howto\" target=\"_self\">Howto</a></li>";
+	print "   <li><a href=\"$faq\" target=\"_self\">FAQ</a></li>";
+	print "   <li><a href=\"$doc\" target=\"_self\">Details</a></li>";
 	print "   <li><a href=\"$me?cmd=style examples\">Examples</a></li>";
 	print "   <li><a href=\"$me?cmd=style list\">Edit files</a></li>";
 
@@ -556,7 +557,7 @@ showRoom()
         $v = "" if(!defined($v));
 				print"         <div class=\"row\">";
 				print"             <label>$d</label>";
-				print"                <div class=\"toggle\" onclick=\"\" ";		
+				print"                <div class=\"toggle\" onclick=\"fhz_set_fs20('$me?cmd.$d=set $d ', this)\" ";		
 				if ($v eq "on") {
 					print "toggled='true'";
 				} else{
