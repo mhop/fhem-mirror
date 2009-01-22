@@ -17,8 +17,9 @@ How it works:
 The iPhone-WebFrontend works the same way as PGM5.
 
 This is a VERY FIRST BETA !!!
-Most of the things are for observing ONLY at the moment!
-Changeing states is in progress, but not supported for now. !!!
+You can see and modify FS20 and FHT devices.
+Beyond that, you can browse through your rooms.
+If you are using FHEM_RENDERER you can also disply rendered graphics.
 
 
 
@@ -29,6 +30,10 @@ The *.gplot files should be reused from the built-in FHEMWEB and should reside i
 
 Note: The program looks for icons in the following order: 
 <device-name>.<state>, <device-name>, <device-type>.<state>, <device-type>
+
+
+ATTENTION:
+You SHOULD have a loog into fhemiphone.pl to modify the needed directories at the beginning.
 
 
 NOTE: This is based on IUI (wich is part of the icons-subdir)
