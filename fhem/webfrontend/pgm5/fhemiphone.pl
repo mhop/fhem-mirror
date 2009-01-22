@@ -107,7 +107,10 @@ $docmd = 1 if($cmd &&
               $cmd !~ /^style / &&
               $cmd !~ /^edit/);
               
-$cmdret = fhemcmd($cmd) if($docmd); 
+if($docmd) {              
+	$cmdret = fhemcmd($cmd); 
+	exit (0);
+}
                            
 parseXmlList($docmd);
 
@@ -134,10 +137,7 @@ if($cmd =~ m/^toweblink (.*)$/) {
 
 print $q->header;
 print $q->start_html(-name=>$title, -title=>$title, -meta=> {'viewport'=>'width=320; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;'}, -style =>{ -type=>'text/css', -media=>'screen', -src=>'./icons/iui.css'}, -script=>{ -type=>"application/x-javascript", -src=>"./icons/iui.js"});
-print"<div class=\"toolbar\">";
-print"<h1 id=\"pageTitle\"></h1>";
-print"   <a id=\"backButton\" class=\"button\" href=\"#\"></a>";
-print"</div>";
+
   
 #For manually enetered commands
 #if($cmdret) {
@@ -299,7 +299,7 @@ parseXmlList($)
     $types{$devs{$d}{type}} = 1;
   }
   $title = $devs{global}{ATTR}{title}{VAL} ? 
-               $devs{global}{ATTR}{title}{VAL} : "DHS - Office Management";
+               $devs{global}{ATTR}{title}{VAL} : "FHEM - Control";
   $room = $devs{$detail}{ATTR}{room}{VAL} if($detail);
 }
 
@@ -442,7 +442,13 @@ doDetail($)
 sub
 roomOverview($)
 {
+	
   my ($cmd) = @_;
+	print"<div class=\"toolbar\">";
+	print"<h1 id=\"pageTitle\"></h1>";
+	print"   <a id=\"backButton\" class=\"button\" href=\"#\"></a>";
+	print"</div>";
+
 	print "<ul id=\"home\" title=\"FHEM Control\" selected=\"true\">";
 
   #########
@@ -498,7 +504,7 @@ showRoom()
   checkDirs();
   my $havelookedforrenderer;
 
-  print $q->start_form( -id => $room, -title => $room, -class => 'panel', -selected => 'true', action => $me.'?room='.$room);
+  print $q->start_form( -id => $room, -title => $room, -class => 'panel', selected => 'true', action => $me.'?room='.$room);
 
   foreach my $type (sort keys %types) {
     
@@ -591,7 +597,8 @@ showRoom()
   			
         print "<td align=\"right\">";
 
-				print $q->submit(-name=>"cmd.$d", -value=>"set");
+        print $q->hidden("cmd.$d", "set");
+				print "<a class=\"button blueButton\" type=\"submit\">Set</a>";
             
         print "</td> </tr> </table>";
         print "   </div>";
