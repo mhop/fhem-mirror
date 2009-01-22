@@ -11,6 +11,7 @@ all:
 	@echo or \'make install-pgm2\' to install a web frontend too.
 
 install:install-base
+	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
 	cp examples/sample_fhem $(VARDIR)/fhem.cfg
 	@echo
 	@echo
@@ -19,6 +20,7 @@ install:install-base
 install-pgm2:install-base
 	cp webfrontend/pgm2/* $(MODDIR)/FHEM
 	cp docs/commandref.html docs/faq.html docs/HOWTO.html $(MODDIR)/FHEM
+	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
 	cp examples/sample_pgm2 $(VARDIR)/fhem.cfg
 	cd examples; for i in *; do cp $$i $(MODDIR)/FHEM/example.$$i; done
 	@echo
