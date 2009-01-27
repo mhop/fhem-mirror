@@ -486,3 +486,6 @@
   - bugfix:  deleting at definition in the at command
   - bugfix:  deleting a notify/at/watchdog definition in a notify/at/watchdog
   - feature: devspec <attr>=<value>. E.g. set room=kitchen off; list disabled=
+  - feature: Common Module calling for CUL/FHZ/CM11
+  - feature: Store CUL sensitivity info
+  - feature: avoid the "unknown/help me" message for unloaded devices

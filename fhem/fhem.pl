@@ -45,7 +45,6 @@ sub AnalyzeInput($);
 sub AssignIoPort($);
 sub CallFn(@);
 sub CommandChain($$);
-sub CollectAttrNames();
 sub DoClose($);
 sub Dispatch($$);
 sub FmtDateTime($);
@@ -136,7 +135,6 @@ use vars qw(%cmds);             # Global command name hash. To be expanded
 
 use vars qw($reread_active);
 
-my %attrnames;                  # hash of attrnames needed by devspec2array
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
 my $logopened = 0;              # logfile opened or using stdout
@@ -151,7 +149,7 @@ my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.67 2009-01-17 10:01:56 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.68 2009-01-27 08:01:34 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -219,7 +217,6 @@ $modules{_internal_}{AttrFn} = "GlobalAttr";
 );
 
 
-
 ###################################################
 # Start the program
 if(int(@ARGV) != 1 && int(@ARGV) != 2) {
@@ -276,7 +273,6 @@ if($pfn) {
   print PID $$ . "\n";
   close(PID);
 }
-CollectAttrNames();
 $init_done = 1;
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
@@ -614,7 +610,7 @@ devspec2array($)
           push @ret, $l
             if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr} =~ m/$re/));
         }
-      } elsif($attrnames{$lattr}) {
+      } else {
         foreach my $l (sort keys %attr) {
           push @ret, $l
             if($attr{$l}{$lattr} && (!$re || $attr{$l}{$lattr} =~ m/$re/));
@@ -1140,7 +1136,6 @@ CommandDeleteAttr($$)
     }
 
   }
-  CollectAttrNames();
 
   return join("\n", @rets);
 }
@@ -1449,7 +1444,6 @@ CommandAttr($$)
     $defs{$sdev}{IODev} = $defs{$a[2]} if($a[1] eq "IODev");
 
   }
-  CollectAttrNames() if($init_done);
   return join("\n", @rets);
 }
 
@@ -1469,7 +1463,6 @@ CommandDefaultAttr($$)
   } else {
     $defaultattr{$a[0]} = $a[1];
   }
-  CollectAttrNames() if($init_done);
   return undef;
 }
 
@@ -2017,11 +2010,23 @@ Dispatch($$)
     last if(int(@found));
   }
   if(!int(@found)) {
+    my $h = $iohash->{MatchList};
+    if(defined($h)) {
+      foreach my $m (sort keys %{$h}) {
+        if($dmsg =~ m/$h->{$m}/) {
+          my (undef, $mname) = split(":", $m);
+          Log GetLogLevel($name,3),
+                "$name: Unknown $mname device detected, " .
+                        "define one to get detailed information.";
+          return undef;
+        }
+      }
+    }
     Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
-    return "";
+    return undef;
   }
 
-  return if($found[0] eq "");	# Special return: Do not notify
+  return undef if($found[0] eq "");	# Special return: Do not notify
 
   foreach my $found (@found) {
     if($found =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
@@ -2031,24 +2036,11 @@ Dispatch($$)
       $defs{$d}{TYPE} = $last_module;
       DoTrigger($d, "$2 $3");
       CommandDelete(undef, $d);                 # Remove the device
-      goto NEXTMSG;
+      return undef;
     } else {
       DoTrigger($found, undef);
     }
   }
 
-  return @found;
-}
-
-###########################
-# Build the hash used by devspec2array
-sub
-CollectAttrNames()
-{
-  %attrnames = ();
-  foreach my $d (keys %attr) {
-    foreach my $a (keys %{ $attr{$d} }) {
-      $attrnames{$a} = 1;
-    }
-  }
+  return \@found;
 }
