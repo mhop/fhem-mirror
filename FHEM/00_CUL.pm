@@ -43,6 +43,14 @@ CUL_Initialize($)
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
   $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:";
+  my %mc = (
+    "1:FS20"  => "^81..(04|0c)..0101a001",
+    "2:FHT"   => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+    "3:KS300" => "^810d04..4027a001",
+    "4:CUL_WS" => "^K.....",
+    "5:CUL_EM" => "^E0.................\$"
+  );
+  $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
 
 # Normal devices
@@ -574,14 +582,13 @@ CUL_Read($)
     } elsif($fn eq "E") {                            # CUL_EM / Native
       ;
     } else {
-      #Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
+      Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
       goto NEXTMSG;
     }
-
     $hash->{RSSI} = $rssi;
-    my @found = Dispatch($hash, $dmsg);
-    if($rssi) {
-      foreach my $d (@found) {
+    my $foundp = Dispatch($hash, $dmsg);
+    if($foundp && $rssi) {
+      foreach my $d (@{$foundp}) {
         next if(!$defs{$d});
         $defs{$d}{RSSI} = $rssi;
       }
