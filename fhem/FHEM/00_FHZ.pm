@@ -29,7 +29,6 @@ my %sets = (
   "initFS20" => "04 c90196",
   "FHTcode"  => "04 c901839e0101",
 
-  "activefor"=> "xx xx",
   "raw"      => "xx xx",
   "initfull" => "xx xx",
   "reopen"   => "xx xx",
@@ -39,7 +38,6 @@ my %setnrparam = (
   "initHMS"  => 0,
   "initFS20" => 0,
   "FHTcode"  => 1,
-  "activefor"=> 1,
   "raw"      => 2,
   "initfull" => 0,
   "reopen"   => 0,
@@ -56,11 +54,17 @@ FHZ_Initialize($)
 {
   my ($hash) = @_;
 
-
 # Provider
   $hash->{ReadFn}  = "FHZ_Read";
   $hash->{WriteFn} = "FHZ_Write";
   $hash->{Clients} = ":FHZ:FS20:FHT:HMS:KS300:";
+  my %mc = (
+    "1:FS20"  => "^81..(04|0c)..0101a001",
+    "2:FHT"   => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+    "3:HMS"   => "^810e04....(1|5|9).a001",
+    "4:KS300" => "^810d04..4027a001"
+  );
+  $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "FHZ_Ready";
 
 # Consumer
@@ -77,6 +81,7 @@ FHZ_Initialize($)
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0";
 }
+
 #####################################
 sub
 FHZ_Ready($)
@@ -137,18 +142,7 @@ FHZ_Set($@)
   my $name = $hash->{NAME};
   Log GetLogLevel($name,2), "FHZ set $v";
 
-  if($a[1] eq "activefor") {
-
-    my $dhash = $defs{$a[2]};
-    return "device $a[2] unknown" if(!defined($dhash));
-
-    return "Cannot handle $dhash->{TYPE} devices"
-    		if($modules{FHZ}->{Clients} !~ m/:$dhash->{TYPE}:/);
-
-    $dhash->{IODev} = $hash;
-    return undef;
-
-  } elsif($a[1] eq "initfull") {
+  if($a[1] eq "initfull") {
 
     my @init;
     push(@init, "get $name init2");
@@ -674,9 +668,7 @@ FHZ_Read($)
 	$fhzdata = substr($fhzdata, 2);
 	next;
       }
-      my @found = Dispatch($hash, $dmsg);
-
-NEXTMSG:
+      Dispatch($hash, $dmsg);
       $fhzdata = substr($fhzdata, $len);
 
     } else {
