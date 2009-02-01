@@ -36,6 +36,9 @@ my %codes = (
   "1b" => "reset",
   "1c" => "ramp-on-time",      #time to reach the desired dim value on dimmers
   "1d" => "ramp-off-time",     #time to reach the off state on dimmers
+  "1e" => "on-old-for-timer-prev", # old val for timer, then go to prev. state
+  "1f" => "on-100-for-timer-prev", # 100% for timer, then go to previous state
+
 );
 
 my %readonly = (
@@ -52,6 +55,7 @@ my %follow;
 my $fs20_simple ="off off-for-timer on on-for-timer on-till reset timer toggle";
 my %models = (
     fs20hgs	=> 'sender',
+    fs20ls	=> 'sender',
     fs20pira	=> 'sender',
     fs20piri	=> 'sender',
     fs20s20	=> 'sender',
@@ -101,7 +105,7 @@ FS20_Initialize($)
   $hash->{DefFn}     = "FS20_Define";
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
-  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 dummy:1,0 showtime:1,0 model;fs20hgs,fs20hgs,fs20pira,fs20piri,fs20s20,fs20s8,fs20s4,fs20s4a,fs20s4m,fs20s4u,fs20s4ub,fs20sd,fs20sn,fs20sr,fs20ss,fs20str,fs20tfk,fs20tfk,fs20tk,fs20uts,fs20ze,fs20as1,fs20as4,fs20di,fs20du,fs20ms2,fs20rst,fs20sa,fs20sig,fs20st,fs20sv,fs20usr loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 dummy:1,0 showtime:1,0 model;fs20hgs,fs20hgs,fs20pira,fs20piri,fs20s20,fs20s8,fs20s4,fs20s4a,fs20s4m,fs20s4u,fs20s4ub,fs20sd,fs20sn,fs20sr,fs20ss,fs20str,fs20tfk,fs20tfk,fs20tk,fs20uts,fs20ze,fs20as1,fs20as4,fs20di,fs20du,fs20ls,fs20ms2,fs20rst,fs20sa,fs20sig,fs20st,fs20sv,fs20usr loglevel:0,1,2,3,4,5,6";
 
 }
 
