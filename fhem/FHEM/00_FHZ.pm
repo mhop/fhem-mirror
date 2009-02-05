@@ -616,6 +616,7 @@ FHZ_Read($)
 
     my $dev = $hash->{DeviceName};
     Log 1, "USB device $dev disconnected, waiting to reappear";
+    delete($hash->{FD});
     $hash->{PortObj}->close();
     DoTrigger($name, "DISCONNECTED");
 
