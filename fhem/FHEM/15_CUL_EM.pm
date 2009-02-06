@@ -29,8 +29,8 @@ CUL_EM_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> CUL_EM <code> [corr1 corr2]"
-            if(int(@a) < 3 || int(@a) > 5);
+  return "wrong syntax: define <name> CUL_EM <code> [corr1 corr2 CostPerUnit BasicFeePerMonth]"
+            if(int(@a) < 3 || int(@a) > 7);
   return "Define $a[0]: wrong CODE format: valid is 1-12"
                 if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
 
@@ -56,6 +56,9 @@ CUL_EM_Define($$)
     $hash->{corr1} = 1;
     $hash->{corr2} = 1;
   }
+  $hash->{CostPerUnit} = (int(@a) > 5 ? $a[5] : 0);
+  $hash->{BasicFeePerMonth} = (int(@a) > 6 ? $a[6] : 0);
+
   $defptr{$a[2]} = $hash;
   AssignIoPort($hash);
   return undef;
@@ -179,16 +182,19 @@ CUL_EM_Parse($$)
     #----- save actual tsecs
     my $tsecs= time();  # number of non-leap seconds since January 1, 1970, UTC
     $readings{tsecs}       = $tsecs;
+    #----- get cost parameter
+    my $cost = $hash->{CostPerUnit};
+    my $basicfee = $hash->{BasicFeePerMonth};
     #----- check whether day or month was changed
     if(!defined($hash->{READINGS}{cum_day})) {
       #----- init cum_day if it is not set
-      $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f", 0,$total);
+      $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f", 0,$total,0);
       $readings{cum_day}   = $val;
     } else {
       if( (localtime($tsecs_prev))[3] != (localtime($tsecs))[3] ) {
         #----- day has changed (#3)
         my @cmv = split(" ", $hash->{READINGS}{cum_day}{VAL});
-        $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f", $total-$cmv[3], $total);
+        $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f", $total-$cmv[3], $total, ($total-$cmv[3])*$cost);
         $readings{cum_day} = $val;
         $hash->{CHANGED}[$c++] = "$val";
         Log GetLogLevel($n,3), "CUL_EM $n: $val";
@@ -197,11 +203,11 @@ CUL_EM_Parse($$)
           #----- month has changed (#4)
           if(!defined($hash->{READINGS}{cum_month})) {
             # init cum_month if not set
-            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f", 0,$total);
+            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f", 0,$total,0);
             $readings{cum_month} = $val;
           } else {
             @cmv = split(" ", $hash->{READINGS}{cum_month}{VAL});
-            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f", $total-$cmv[3],$total);
+            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f", $total-$cmv[3],$total,($total-$cmv[3])*$cost+$basicfee);
             $readings{cum_month} = $val;
             $hash->{CHANGED}[$c++] = "$val";
             Log GetLogLevel($n,3), "CUL_EM $n: $val";
@@ -229,3 +235,4 @@ CUL_EM_Parse($$)
 }
 
 1;
+
