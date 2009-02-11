@@ -489,4 +489,5 @@
   - feature: Common Module calling for CUL/FHZ/CM11
   - feature: Store CUL sensitivity info
   - feature: avoid the "unknown/help me" message for unloaded devices
+  - feature: structure module for big installations
   - feature: Cost Control in 15_CUL_EM (CostPerUnit, BasisFeePerMonth)
