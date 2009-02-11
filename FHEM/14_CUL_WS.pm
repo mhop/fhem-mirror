@@ -27,6 +27,7 @@ CUL_WS_Initialize($)
   $hash->{Match}     = "^K.....";
   $hash->{DefFn}     = "CUL_WS_Define";
   $hash->{UndefFn}   = "CUL_WS_Undef";
+  $hash->{AttrFn}    = "CUL_WS_Attr";
   $hash->{ParseFn}   = "CUL_WS_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel";
 }
@@ -70,7 +71,6 @@ sub
 CUL_WS_Parse($$)
 {
   my ($hash,$msg) = @_;
-  my $name = $hash->{NAME};
   my %tlist = ("0"=>"temp",
                "1"=>"temp/hum",
                "2"=>"rain",
@@ -87,17 +87,18 @@ CUL_WS_Parse($$)
   my $cde = ($firstbyte&7) + 1;
   my $type = $tlist{$a[2]} ? $tlist{$a[2]} : "unknown";
 
-  my $def = $defptr{$cde};
+  my $def = $defptr{$hash->{NAME} . "." . $cde};
+  $def = $defptr{$cde} if(!$def);
   return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
-  if(!$defptr{$cde}) 
+  if(!$def) 
      {
       Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
   #    return "UNDEFINED CUL_WS: $cde";
      }
 
   my $tm=TimeNow();
-  $hash = $defptr{$cde};
+  $hash = $def;
  
   my $typbyte = hex($a[2]) & 7;
   my $sfirstbyte = $firstbyte & 7;
@@ -226,7 +227,7 @@ else
          my $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
          my $wnd  = sprintf("%0.1f", "$a[9]$a[10].$a[7]" + $hash->{corr3});
          my $hum  = sprintf( "%02d", "$a[8]$a[5]" + $hash->{corr2});
-         my $tmp  = sprintf("%0.1f", ("$a[6]$a[3].$a[4]"+$hash->{corr1}) *
+         my $tmp  = sprintf("%0.1f", ("$a[6]$a[3].$a[4]"+ $hash->{corr1}),
                                 (($a[1] & 0xC) ? -1 : 1));
          my $ir = ((hex($a[1]) & 2)) ? "yes" : "no";
 
@@ -243,7 +244,8 @@ else
       }
    }
 
-Log GetLogLevel($name,3), "CUL_WS $devtype $name: $val";
+my $name = $hash->{NAME};
+Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
 
 $hash->{STATE} = $val;                      # List overview
 $hash->{READINGS}{state}{TIME} = TimeNow(); # For list
@@ -254,5 +256,22 @@ $hash->{READINGS}{$devtype}{TIME}=$tm;
 
 return $name;
 }
+
+sub
+CUL_WS_Attr(@)
+{
+  my @a = @_;
+
+  # Make possible to use the same code for different logical devices when they
+  # are received through different physical devices.
+  return if($a[0] ne "set" || $a[2] ne "IODev");
+  my $hash = $defs{$a[1]};
+  my $iohash = $defs{$a[3]};
+  my $cde = $hash->{CODE};
+  delete($defptr{$cde});
+  $defptr{$iohash->{NAME} . "." . $cde} = $hash;
+  return undef;
+}
+
 
 1;

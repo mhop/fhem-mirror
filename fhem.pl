@@ -135,6 +135,8 @@ use vars qw(%cmds);             # Global command name hash. To be expanded
 
 use vars qw($reread_active);
 
+my $AttrList = "room comment";
+
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
 my $logopened = 0;              # logfile opened or using stdout
@@ -148,8 +150,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $AttrList = "room comment";
-my $cvsid = '$Id: fhem.pl,v 1.68 2009-01-27 08:01:34 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.69 2009-02-11 12:58:22 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .

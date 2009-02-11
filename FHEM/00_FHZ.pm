@@ -364,6 +364,8 @@ FHZ_Undef($$)
       }
   }
   $hash->{PortObj}->close() if($hash->{PortObj});
+  delete($hash->{PortObj});
+  delete($hash->{FD});
   return undef;
 }
 
@@ -618,9 +620,8 @@ FHZ_Read($)
     Log 1, "USB device $dev disconnected, waiting to reappear";
     delete($hash->{FD});
     $hash->{PortObj}->close();
-    DoTrigger($name, "DISCONNECTED");
-
     delete($hash->{PortObj});
+    delete($hash->{FD});
     delete($selectlist{"$name.$dev"});
     $readyfnlist{"$name.$dev"} = $hash; # Start polling
     $hash->{STATE} = "disconnected";
@@ -628,6 +629,8 @@ FHZ_Read($)
     # Without the following sleep the open of the device causes a SIGSEGV,
     # and following opens block infinitely. Only a reboot helps.
     sleep(5);
+
+    DoTrigger($name, "DISCONNECTED");
   }
 
 

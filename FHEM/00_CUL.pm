@@ -498,9 +498,8 @@ CUL_Read($)
     my $dev = $hash->{DeviceName};
     Log 1, "USB device $dev disconnected, waiting to reappear";
     $hash->{PortObj}->close();
-    DoTrigger($name, "DISCONNECTED");
-
     delete($hash->{PortObj});
+    delete($hash->{FD});
     delete($selectlist{"$name.$dev"});
     $readyfnlist{"$name.$dev"} = $hash; # Start polling
     $hash->{STATE} = "disconnected";
@@ -509,6 +508,7 @@ CUL_Read($)
     # and following opens block infinitely. Only a reboot helps.
     sleep(5);
 
+    DoTrigger($name, "DISCONNECTED");
     return "";
   }
 
