@@ -15,7 +15,8 @@ install:install-base
 	cp examples/sample_fhem $(VARDIR)/fhem.cfg
 	@echo
 	@echo
-	@echo Edit $(VARDIR)/fhem.cfg then type perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
+	@echo Edit $(VARDIR)/fhem.cfg then type
+        @echo perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
 
 install-pgm2:install-base
 	cp webfrontend/pgm2/* $(MODDIR)/FHEM
@@ -25,9 +26,11 @@ install-pgm2:install-base
 	cd examples; for i in *; do cp $$i $(MODDIR)/FHEM/example.$$i; done
 	@echo
 	@echo
-	@echo Edit $(VARDIR)/fhem.cfg then start perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
+	@echo Edit $(VARDIR)/fhem.cfg then type
+        @echo perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
 
 install-base:
+        mkdir -p $(BINDIR) $(MODDIR) $(VARDIR)
 	cp fhem.pl $(BINDIR)
 	cp -r FHEM $(MODDIR)
 	mkdir -p $(VARDIR)

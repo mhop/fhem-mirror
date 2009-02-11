@@ -1,8 +1,8 @@
 FHEM:
+- Remote serial device via IP (for the FHZ1300 WLAN)
 - Common buffer for parallel use of two devices: CUL+FHZ, (WS300/EM1000PC?)
 - holiday database
 - fhem-to-fhem module
-- Remote serial device via IP
 - CUR built-in MENU creation support
 
 Webpgm2

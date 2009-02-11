@@ -66,6 +66,7 @@ SCIVT_Define($$)
   $init_done = $oid;
   return undef;
 }
+
 #####################################
 sub
 SCIVT_Set($@)
