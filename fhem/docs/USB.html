@@ -1,0 +1,141 @@
+<html>
+  <head>
+    <title>USB compendium</title>
+  </head>
+  <body>
+
+<H1>USB compendium</H1>
+
+Several fhem users are plagued by spontaneous disconnects/reconnects of USB
+devices. This is not an issue of fhem but a problem of hardware and/or USB
+drivers.<P>
+
+This document summarizes some findings on the issue. They are taken from
+users' experience and from a web research. This compendium is written for Linux
+users.
+
+
+
+<H2>A. Problem description</H2>
+
+
+USB devices spontaneously disconnect from the bus. They are reconnected after
+some time ranging from zero to many seconds. fhem global log shows messages like
+
+<pre>
+2009.01.12 19:22:14 1: USB device /dev/elv_fhz1300pc disconnected, waiting to reappear
+2009.01.12 19:22:19 1: USB device /dev/elv_fhz1300pc reappeared
+</pre>
+
+A look into the kernel message log with
+<pre>
+grep usb /var/log/messages | tail -n 100 | less
+</pre>
+
+shows messages like
+
+<pre>
+Jan 12 19:22:14 bunkertor kernel: usb 10-2.1: USB disconnect, address 59
+Jan 12 19:22:14 bunkertor kernel: usb 10-2.1.1: USB disconnect, address 61
+Jan 12 19:22:14 bunkertor kernel: usb 10-2.4: USB disconnect, address 60
+Jan 12 19:22:14 bunkertor kernel: usb 10-2: reset full speed USB device using uhci_hcd and address 2
+Jan 12 19:22:14 bunkertor kernel: usb 10-2.1: new full speed USB device using uhci_hcd and address 62
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.1: not running at top speed; connect to a high speed hub
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.1: configuration #1 chosen from 1 choice
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.1: New USB device found, idVendor=04b4, idProduct=6560
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.1: New USB device strings: Mfr=0, Product=0, SerialNumber=0
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: new full speed USB device using uhci_hcd and address 63
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: configuration #1 chosen from 1 choice
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: FTDI USB Serial Device converter now attached to ttyUSB0
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: New USB device found, idVendor=0403, idProduct=e0ef
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: Product: ELV EM 1010 PC
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.4: Manufacturer: ELV AG
+Jan 12 19:22:15 bunkertor kernel: usb 10-2.1.1: new full speed USB device using uhci_hcd and address 64
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: configuration #1 chosen from 1 choice
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: FTDI USB Serial Device converter now attached to ttyUSB1
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: New USB device found, idVendor=0403, idProduct=e0e8
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: Product: ELV FHZ 1300 PC
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: Manufacturer: ELV AG
+Jan 12 19:22:16 bunkertor kernel: usb 10-2.1.1: SerialNumber: xxxxxxxxxxx
+</pre>
+
+<H2>B. Possible reasons and remedies</H2>
+
+<H3>1. Not enough power on the bus</H3>
+
+FHZ1300PC directly connected to the computer's built-in USB ports does not work
+at all or seizes to work after short time. This is likely due to the USB's
+inability to provide sufficient power to the connected
+devices. Use of a powered hub seems to cure the problem in some cases
+(confirmed, see [6]).
+
+
+<H3>2. Mixture of USB 1.1 and USB 2.0 devices</H3>
+
+Use of an USB 1.1 hub to connect USB 2.0 devices and vice versa might lead to
+timing problems (see [3]). Consistent use of either USB 1.1 or USB 2.0 devices
+might be a cure (unconfirmed).
+
+
+<H3>3. Timing problems</H3>
+
+It was suggested that late answers from a device make the driver think that it
+has gone away. This would lead to a disconnect. followed by a reconnect when
+the device's reply arrives. Changing the timeouts
+might be a cure. It is not known how to achieve this (see [5]).
+
+
+<H3>4. Electromagnetic interferences</H3>
+
+Bad shielding of cables or devices might lead to interferences with electric
+devices nearby (fridges, light switches, ...). A computer can cope with this
+problem better or worse. Changing the computer's hardware helps (confirmed,
+see [7]). If this is not feasible, use a ferrite ring (see [8] for instance)
+or two around the ends of the cable (unconfirmed).
+
+
+<H3>5. USB Power management</H3>
+
+The linux kernel USB driver supports power management. If there is no activity
+on the USB for a certain time, the port is switched to powersaving which leads
+to a disconnect of the device (see [3]). Details on
+linux power management are found in [4]. In short, you can turn off power
+management in general if you do
+
+<pre>
+echo -1 >/sys/module/usbcore/parameters/autosuspend
+</pre>
+
+or, for a specific device,
+
+<pre>
+echo on >  /sys/bus/usb/devices/DEVICEID/power/level
+</pre>
+
+with DEVICEID substituted by the device's ID.
+
+<H3>6. USB extenders</H3>
+
+To increase the maximum cable length from 5 meters to 10 meters, so-called
+USB extenders are on sale. The consist of a fixed passive 1-port hub at the end of
+an USB cable. This drives the USB to its limits and may cause all sorts of
+problems on the bus. Either do not use USB extenders (confirmed, see [10]) at all
+or put an active (self-powered) hub in the middle (unconfirmed).
+
+<H2>C. Suggested reading</H2>
+
+[1] <A HREF="http://www.mikrocontroller.net/topic/116263">http://www.mikrocontroller.net/topic/116263</A><BR>
+[2] <A HREF="http://www.ti.com/sc/docs/apps/msp/intrface/usb/emitest.pdf">http://www.ti.com/sc/docs/apps/msp/intrface/usb/emitest.pdf</A><BR>
+[3] <A HREF="http://forum.soft32.com/linux/solution-usb-disconnect-problems-usb-ftopict345989.html">http://forum.soft32.com/linux/solution-usb-disconnect-problems-usb-ftopict345989.html</A><BR>
+[4] /usr/src/linux/Documentation/usb/power-management.txt<BR>
+[5] Google group FHZ1000 users on Linux, Message-ID: beb1c8d2-ec08-4ded-bc9b-2c0fc856fa09@e1g2000pra.googlegroups.com<BR>
+[6] Google group FHZ1000 users on Linux, Message-ID: 200812241129.01819.omega@online.de<BR>
+[7] Google group FHZ1000 users on Linux, Message-ID: 930a1555-3eda-49ce-82d9-3ecc617f5e9c@a26g2000prf.googlegroups.com<BR>
+[8] <A HREF="http://www.reichelt.de/?;ACTION=3;LA=4;GROUP=B522;GROUPID=3187;ARTICLE=7674;START=0;SORT=preis;OFFSET=1000;SID=26j@QMWawQARoAAFcmBVM2b30b32eb7a0d90a6833475d294db8c2">http://www.reichelt.de/?;ACTION=3;LA=4;GROUP=B522;GROUPID=3187;ARTICLE=7674;START=0;SORT=preis;OFFSET=1000;SID=26j@QMWawQARoAAFcmBVM2b30b32eb7a0d90a6833475d294db8c2</A><BR>
+[9] <A HREF="http://www.usb.org/developers/usbfaq/">http://www.usb.org/developers/usbfaq/</A><BR>
+[10] Google group FHZ1000 users on Linux, Message-ID: 2aac5192-1966-4939-a8ff-73d1e0b67506@w24g2000prd.googlegroups.com<BR>
+
+  </body>
+</html>
