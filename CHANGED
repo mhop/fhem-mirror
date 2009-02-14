@@ -492,3 +492,4 @@
   - feature: structure module for big installations
   - feature: Cost Control in 15_CUL_EM (CostPerUnit, BasisFeePerMonth)
   - feature: add counter differential per time in 81_M232Counter.pm
+  - feature: added USB compendium to documentation

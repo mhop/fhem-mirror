@@ -61,6 +61,11 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?</a>
 
 <a href="#faq17">17. I have problem receiving data, I get "Bad CRC" or "Oversized message."</a><br>
 
+<a href="#faq18">18. My FHZ1X00PC gets all time automatically disconnected and
+reconnected. My log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
+What is wrong with my USB?
+</a><br>
+
 <br/>
 <br/>
 
@@ -270,7 +275,7 @@ by fhem.pl?</b>
 
   # Get the second word, so we can compare it.
   FHZ> { my @a = split(" ", $value{myfht});; $a[1] }
-  23.8 
+  23.8
 
   # Set the ventilator on now, if its too hot.
   FHZ> { my @a = split(" ", $value{myfht});; fhem("set ventilator on") if($a[1] > 25.0) }
@@ -398,6 +403,18 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
         -noflsh -xcase -tostop -echoprt -echoctl -echoke
    </pre>
 </ul>
+
+<a name="faq18">
+<b>18. My FHZ1X00PC gets all time automatically disconnected and
+reconnected. My log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
+What is wrong with my USB?
+</b>
+<ul>
+Several fhem users are plagued by spontaneous disconnects/reconnects of USB
+devices. This is not an issue of fhem but a problem of hardware and/or USB drivers.
+See <a href="USB.html">USB compendium</a> for help.
+</ul>
+<br>
 
 
 
