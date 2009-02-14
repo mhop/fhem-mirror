@@ -2302,25 +2302,36 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="M232Counterdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; M232Counter [unit [factor]]</code>
+    <code>define &lt;name&gt; M232Counter [unit [factor [deltaunit [deltafactor]]]]</code>
     <br><br>
 
     Define at most one M232Counter for a M232 device. Defining a M232Counter
-    will schedule an internal task, which reads the status of the counter every
-    minute, and triggers notify/filelog commands. <code>unit</code> is the unit
+    will schedule an internal task, which periodically reads the status of the
+    counter, and triggers notify/filelog commands. <code>unit</code> is the unit
     name, <code>factor</code> is used to calculate the reading of the counter
-    from number of ticks.  <br><br> <br>Note: the unit defaults to the string
-    "ticks", but it must be specified if you wish to set the factor, which
-    defaults to 1.0. In the second example below one tick equals 1/1250th kWh.
+    from the number of ticks. <code>deltaunit</code> is the unit name of the counter
+    differential per second, <code>deltafactor</code> is used to calculate the
+    counter differential per second from the number of ticks per second.<br><br>
+    Default values:
+    <ul>
+      <li>unit: ticks</li>
+      <li>factor: 1.0</li>
+      <li>deltaunit: ticks per second</li>
+      <li>deltafactor: 1.0</li>
+    </ul>
+    <br>Note: the parameters in square brackets are optional. If you wish to
+    specify an optional parameter, all preceding parameters must be specified
+    as well.
+    <br><br>Examples:
+    <ul>
+      <code>define counter M232Counter turns</code><br>
+      <code>define counter M232Counter kWh 0.0008 kW 2.88</code>
+       (one tick equals 1/1250th kWh)<br>
+    </ul>
+    <br>
     Do not forget to start the counter (with <code>set .. start</code> for
     M232) or to start the counter and set the reading to a specified value
     (with <code>set ... value</code> for M232Counter).  <br><br>
-    Example:
-    <ul>
-      <code>define counter M232Counter turns</code><br>
-      <code>define counter M232Counter kWh 0.0008</code><br>
-    </ul>
-    <br>
   </ul>
 
   <a name="M232Counterset"></a>
@@ -2330,6 +2341,11 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
     Sets the reading of the counter to the given value. The counter is reset
     and started and the offset is adjusted to value/unit.
+    <br><br>
+    <code>set &lt;name&gt; interval &lt;interval&gt;</code>
+    <br><br>
+    Sets the status polling interval in seconds to the given value. The default
+    is 60 seconds.
     <br><br>
   </ul>
 

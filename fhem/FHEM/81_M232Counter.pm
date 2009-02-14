@@ -1,7 +1,7 @@
 #
 #
 # 81_M232Counter.pm
-# written by Dr. Boris Neubert 2007-11-26 
+# written by Dr. Boris Neubert 2007-11-26
 # e-mail: omega at online dot de
 #
 ##############################################
@@ -37,10 +37,11 @@ M232Counter_GetStatus($)
   my ($hash) = @_;
 
   if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+60, "M232Counter_GetStatus", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "M232Counter_GetStatus", $hash, 1);
   }
 
   my $name = $hash->{NAME};
+  my $r= $hash->{READINGS};
 
   my $d = IOWrite($hash, "z");
   if(!defined($d)) {
@@ -49,28 +50,80 @@ M232Counter_GetStatus($)
     return $msg;
   }
 
+  # time
   my $tn = TimeNow();
-  if(!defined($hash->{READINGS}{basis})) {
-	$hash->{READINGS}{basis}{VAL}= 0;
-	$hash->{READINGS}{basis}{TIME}= $tn;
-  }
-  if(!defined($hash->{READINGS}{count})) {
-	$hash->{READINGS}{count}{VAL}= 0;
-	$hash->{READINGS}{count}{TIME}= $tn;
-  }
-  my $count= hex $d;
-  if($count< $hash->{READINGS}{count}{VAL}) {
-	$hash->{READINGS}{basis}{VAL}+= 65536;
-	$hash->{READINGS}{basis}{TIME}= $tn;
-  }
-  my $value= ($hash->{READINGS}{basis}{VAL}+$count) * $hash->{FACTOR};
 
-  $hash->{READINGS}{count}{TIME} = $tn;
-  $hash->{READINGS}{count}{VAL} = $count;
-  $hash->{READINGS}{value}{TIME} = $tn;
-  $hash->{READINGS}{value}{VAL} = $value;
+  #tsecs
+  my $tsecs= time();  # number of non-leap seconds since January 1, 1970, UTC
+
+  # previous tsecs
+  my $tsecs_prev;
+  if(defined($r->{tsecs})) {
+      $tsecs_prev= $r->{tsecs}{VAL};
+  } else{
+      $tsecs_prev= $tsecs; # 1970-01-01
+  }
+
+  # basis
+  my $basis;
+  if(defined($r->{basis})) {
+	$basis= $r->{basis}{VAL};
+  } else {
+        $basis= 0;
+  }
+  my $basis_prev= $basis;
+
+  # previous count
+  my $count_prev;
+  if(defined($r->{count})) {
+	$count_prev= $r->{count}{VAL};
+  } else {
+        $count_prev= 0;
+  }
+
+  # current count
+  my $count= hex $d;
+  if($count< $count_prev) {
+        $basis+= 65536;
+	$r->{basis}{VAL} = $basis;
+	$r->{basis}{TIME}= $tn;
+  }
+
+  # previous value
+  my $value_prev;
+  if(defined($r->{value})) {
+        $value_prev= $r->{value}{VAL};
+  } else {
+        $value_prev= 0;
+  }
+
+  # current value
+  my $value= ($basis+$count) * $hash->{FACTOR};
+  # round to 3 digits
+  $value= int($value*1000.0+0.5)/1000.0;
+
+  # set new values
+  $r->{count}{TIME} = $tn;
+  $r->{count}{VAL} = $count;
+  $r->{value}{TIME} = $tn;
+  $r->{value}{VAL} = $value;
+  $r->{tsecs}{TIME} = $tn;
+  $r->{tsecs}{VAL} = $tsecs;
 
   $hash->{CHANGED}[0]= "value: $value";
+
+  # delta
+  my $tsecs_delta= $tsecs-$tsecs_prev;
+  my $count_delta= ($count+$basis)-($count_prev+$basis_prev);
+  if($tsecs_delta>0) {
+    my $delta= ($count_delta/$tsecs_delta)*$hash->{DELTAFACTOR};
+    # round to 3 digits
+    $delta= int($delta*1000.0+0.5)/1000.0;
+    $r->{delta}{TIME} = $tn;
+    $r->{delta}{VAL} = $delta;
+    $hash->{CHANGED}[1]= "delta: $delta";
+  }
+
 
   if(!$hash->{LOCAL}) {
     DoTrigger($name, undef) if($init_done);
@@ -121,7 +174,7 @@ M232Counter_Calibrate($@)
   # recalculate value
   $hash->{READINGS}{value}{VAL} = $value;
   $hash->{READINGS}{value}{TIME} = $tn;
- 
+
   # reset counter
   my $ret = IOWrite($hash, "Z1");
   if(!defined($ret)) {
@@ -137,14 +190,21 @@ sub
 M232Counter_Set($@)
 {
   my ($hash, @a) = @_;
-  my $u = "Usage: set <name> value <value>";
+  my $u = "Usage: set <name> value <value>\n" .
+                 "set <name> interval <seconds>\n" ;
 
   return $u if(int(@a) != 3);
   my $reading= $a[1];
-  my $value = $a[2];
-  return $u unless($reading eq "value");
 
-  my $rm= M232Counter_Calibrate($hash, $value);
+  if($a[1] eq "value") {
+      my $value= $a[2];
+      my $rm= M232Counter_Calibrate($hash, $value);
+  } elsif($a[1] eq "interval") {
+      my $interval= $a[2];
+      $hash->{INTERVAL}= $interval;
+  } else {
+      return $u;
+  }
 
   return undef;
 }
@@ -157,13 +217,18 @@ M232Counter_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "syntax: define <name> M232Counter [unit] [multiplicator]"
-    if(int(@a) < 2 && int(@a) > 4);
+  return "syntax: define <name> M232Counter [unit] [factor] [deltaunit] [deltafactor]"
+    if(int(@a) < 2 && int(@a) > 6);
 
   my $unit= ((int(@a) > 2) ? $a[2] : "ticks");
   my $factor= ((int(@a) > 3) ? $a[3] : 1.0);
+  my $deltaunit= ((int(@a) > 4) ? $a[4] : "ticks per second");
+  my $deltafactor= ((int(@a) > 5) ? $a[5] : 1.0);
   $hash->{UNIT}= $unit;
   $hash->{FACTOR}= $factor;
+  $hash->{DELTAUNIT}= $deltaunit;
+  $hash->{DELTAFACTOR}= $deltafactor;
+  $hash->{INTERVAL}= 60; # poll every minute per default
 
   AssignIoPort($hash);
 
