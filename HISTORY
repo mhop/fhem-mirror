@@ -388,3 +388,8 @@
     e.g.: attr global logdir /var/tmp
           define emGaslog FileLog %ld/emGas.log emGas:.*CNT.*
 
+- Sat Feb 15 2009 (Boris)
+  - added counter differential per time in 81_M232Counter.pm, commandref.html
+    updated
+
+
