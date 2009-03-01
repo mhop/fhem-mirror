@@ -27,7 +27,8 @@ my $plotmode   = "gnuplot";     						# Current plotmode
 my $plotsize	 = "800,200";                 # Size for a plot
 my $renderer   = "pgm5_renderer";						# Name of suitable renderer
 my $rendrefresh= "00:15:00";								# Refresh Interval for the Renderer
-
+my $render_before = 0;									# Render graphics before drawing
+my $render_after = 1;										# Render graphics after drawing
 
 # Nothing to config below
 #########################
@@ -77,6 +78,7 @@ my %zoom;                     # the same as @zoom
 my $wname;                    # Web instance name
 my $data;                     # Filecontent from browser when editing a file
 my $lastxmllist;              # last time xmllist was parsed
+my $renderer_status;					# Status of the Renderer
 
 my ($lt, $ltstr);
 
@@ -287,7 +289,7 @@ parseXmlList($)
     $types{$devs{$d}{type}} = 1;
   }
   $title = $devs{global}{ATTR}{title}{VAL} ? 
-               $devs{global}{ATTR}{title}{VAL} : "Home Management";
+               $devs{global}{ATTR}{title}{VAL} : "DHS - Office Management";
   $room = $devs{$detail}{ATTR}{room}{VAL} if($detail);
 }
 
@@ -681,8 +683,12 @@ showRoom()
 						 		fhemcmd ("attr $renderer plotsize $plotsize");
 						 		fhemcmd ("attr $renderer refresh $rendrefresh");
 						 		fhemcmd ("attr $renderer tmpfile $tmpfile");
-						 		fhemcmd ("set $renderer on");
 						 		fhemcmd ("get $renderer");
+							}  else {
+								$renderer_status = fhemcmd ("{\$attr{" . $renderer . "}{status} }");
+  							if (($renderer_status =~ m/off/) && ($render_before)) {
+									fhemcmd ("get $renderer");
+  							}								
 							}
 						}						
             print "<td>";
@@ -707,8 +713,10 @@ showRoom()
       } else {
         print "<td><a href=\"$me?detail=$d\">$d</a></td><td>$v</td>\n";
       }
-      print "  </tr>\n";
     }
+    if (($havelookedforrenderer) && ($renderer_status =~ m/off/) && ($render_after)) {
+			fhemcmd ("define render_after at +00:00:05 get $renderer");
+  	}
     print "  </table>\n";
     print "  <br>\n"; # Empty line
   }
@@ -777,9 +785,11 @@ showLogWrapper($)
 		 		fhemcmd ("attr $renderer plotsize $plotsize");
 		 		fhemcmd ("attr $renderer refresh $rendrefresh");
 		 		fhemcmd ("attr $renderer tmpfile $tmpfile");
-		 		fhemcmd ("set $renderer on");
 		 		fhemcmd ("get $renderer");
+			} else {
+				$renderer_status = fhemcmd ("{\$attr{" . $renderer . "}{status} }");
 			}
+			
 		}
     print "<div id=\"right\">\n";
     print "<table><tr></td>\n";
@@ -1119,4 +1129,3 @@ style($$)
 }
 
 1;
-
