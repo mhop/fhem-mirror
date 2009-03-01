@@ -715,7 +715,7 @@ showRoom()
       }
     }
     if (($havelookedforrenderer) && ($renderer_status =~ m/off/) && ($render_after)) {
-			fhemcmd ("define render_after at +00:00:05 get $renderer");
+			fhemcmd ("define render_after at +00:01:30 get $renderer");
   	}
     print "  </table>\n";
     print "  <br>\n"; # Empty line
