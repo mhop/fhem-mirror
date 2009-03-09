@@ -27,8 +27,8 @@ my $plotmode   = "gnuplot";     						# Current plotmode
 my $plotsize	 = "800,200";                 # Size for a plot
 my $renderer   = "pgm5_renderer";						# Name of suitable renderer
 my $rendrefresh= "00:15:00";								# Refresh Interval for the Renderer
-my $render_before = 0;									# Render graphics before drawing
-my $render_after = 1;										# Render graphics after drawing
+my $render_before = 1;									# Render graphics before drawing
+my $render_after = 0;										# Render graphics after drawing
 
 # Nothing to config below
 #########################
@@ -289,7 +289,7 @@ parseXmlList($)
     $types{$devs{$d}{type}} = 1;
   }
   $title = $devs{global}{ATTR}{title}{VAL} ? 
-               $devs{global}{ATTR}{title}{VAL} : "DHS - Office Management";
+               $devs{global}{ATTR}{title}{VAL} : "HOME Management";
   $room = $devs{$detail}{ATTR}{room}{VAL} if($detail);
 }
 
@@ -420,7 +420,7 @@ doDetail($)
         $devs{$d}{INT}, "", undef, 0, undef);
   makeTable($d, $t, "<a href=\"$doc#attr\">Attribute</a>,Value,Action",
         $devs{$d}{ATTR}, $devs{$d}{attrs}, "attr", 1,
-        $d eq "global" ? "" : "delattr");
+        $d eq "global" ? "" : "deleteattr");
   print "</td></tr></table>\n";
   print "</div>\n";
 
