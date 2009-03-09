@@ -90,7 +90,6 @@ my $n = 0;
 ##################
 # iPhone Anpassungen:
 
-#$me = "http://www.dhs-computer.dyndns.org/cgi-bin4/fhemiphone.pl" if(!$me);
 $me = "" if(!$me);
 my $q = new CGI;
 $ti = 1;
@@ -137,18 +136,6 @@ if($cmd =~ m/^toweblink (.*)$/) {
 
 print $q->header;
 print $q->start_html(-name=>$title, -title=>$title, -meta=> {'viewport'=>'width=320; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;'}, -style =>{ -type=>'text/css', -media=>'screen', -src=>'./icons/iui.css'}, -script=>{ -type=>"application/x-javascript", -src=>"./icons/iui.js"});
-
-  
-#For manually enetered commands
-#if($cmdret) {
-#  $detail = "";
-#  $room = "";
-#  $cmdret =~ s/</&lt;/g;
-#  $cmdret =~ s/>/&gt;/g;
-#  print "<div id=\"right\">\n";
-#  print "<pre>$cmdret</pre>\n";
-#  print "</div>\n";
-#}
 
 if ($cmd =~ m/^style /) {
 	style($cmd,undef);
