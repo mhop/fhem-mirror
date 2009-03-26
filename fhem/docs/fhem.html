@@ -207,13 +207,13 @@ If you are using cygwin for your perl installation you can follow the guidelines
   <ul>
   This frontend is PHP based and was contributed by Martin Haas.
   Look at the webfrontends/pgm3/docs for more documentation or at
-  <a href="pgm3-0.5.1.png">this screenshot</a>. A lot more details can be
+  <a href="pgm3-0.5.1.png">this screenshot</a>. A lot more details <a href="http://www.martin-haas.de/fhz/screenshots.html">and screenshots</a> can be
   found on Martins page: <a href="http://www.martin-haas.de/fhz">
   http://www.martin-haas.de/fhz</a>
   <br><br>
 
   <ul>
-     <li>Install PHP and enable it by commenting in the "LoadModule
+     <li>Install PHP5 and enable it by commenting in the "LoadModule
      phpX_module ..." directive in httpd.conf (perhaps it is already
      done by your distro). Restart/reload httpd.</li>
 
@@ -221,17 +221,14 @@ If you are using cygwin for your perl installation you can follow the guidelines
      files from the webfrontend/pgm3 to this directory.<br>Make sure that this
      directory is writeable by the webserver!</li>
 
-     <li>Edit index.php (/home/httpd/html/pgm3/index.php), and check the
+     <li>Make sure that php-gd is installed.</li>
+
+     <li>Edit config.php (/home/httpd/html/pgm3/config.php), and check the
      required settings section</li>
 
      <li>If you want to have access to the FHT temperature logs, then:
      <ul>
        <li>Make sure gnuplot is installed</li>
-       <li>check the showgnuplot section in index.php</li>
-       <li>For each FHT device copy the file docs/gnuplot/gnuplot.wz to
-	   gnuplot.fhtdevicename (to the /home/httpd/html/pgm3 directory) and
-	   replace fht.log in this file with the absolute name of the current
-	   logfile.</li>
      </ul>
      <li>Call &lt;your-site&gt;/pgm3/index.php</li>
   </ul>
