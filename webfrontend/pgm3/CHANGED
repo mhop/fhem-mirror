@@ -181,4 +181,5 @@ It is not necessary to tell fhem that there are other logs.
    -- Bugfix: FHT: lime-protection not more in the field of actuator: Small Changes in fht.php
 
 2009-03-26
-   -- Bugfix: table-format for userdefs changed
+   -- Bugfix: table-format for userdefs changed, small optical changes for userdef
+   -- Feature: HMS100CO added
