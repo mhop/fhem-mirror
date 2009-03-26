@@ -1,6 +1,9 @@
 Be sure that the directory <pgm3>/tmp is writeable for the user of the webserver (e.g. wwwrun.www)
 Make something like "chown -R wwwrun.www tmp"
 
+
+Hint: you need the package php-gd to see the graphics
+
 All the other  Documentation of pgm3 is now only online
 http://www.martin-haas.de/fhz
 
