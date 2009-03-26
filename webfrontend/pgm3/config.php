@@ -290,6 +290,8 @@ $userdef[$sortnumber]['logrotatelines']=2200;
 	$tailcount=20; 			#make shure to have the correct rights. Values: 0/1
 	$tailpath="/usr/bin/tail";
 	$taillogorder=$tailpath." -$tailcount $logpath/fhem.log ";
+	#$taillogorder=$tailpath." -$tailcount $logpath/fhem-" . date("Y") . "-" .  date("m") . ".log "; #if you have e.g. fhem-2009-02.log
+
 
 
 
