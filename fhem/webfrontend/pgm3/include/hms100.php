@@ -14,7 +14,7 @@ include "functions.php";
 $drawhms=$_GET['drawhms'];
 $room=$_GET['room'];
 $type=$_GET['type'];
-$supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HMS100W','RM100-2');
+$supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HMS100W','RM100-2','HMS100CO');
 
 
 
@@ -248,7 +248,7 @@ if ( $type == "HMS100TF" and $showdewpoint=='yes' )
 
 #############################################################################
 if ( $type == "HMS100WD" or $type == "HMS100MG" or $type == "HMS100W" 
-	or $type == "HMS100TFK" or $type=="RM100-2")
+	or $type == "HMS100TFK" or $type=="RM100-2" or $type=="HMS100CO")
 {
   for ($x = 0; $x < $counter; $x++)
         {
@@ -295,6 +295,7 @@ if ( $type == "HMS100WD" or $type == "HMS100MG" or $type == "HMS100W"
        
 	 if ($type=='HMS100WD' or $type=='HMS100W'){$text="Water detected:";}
 	elseif ($type=='HMS100MG'){$text="Gas detected:";}
+ 	elseif ($type=='HMS100CO'){$text="CO detected:";}
 	elseif ($type=='RM100-2'){$text="Smoke detected:";}
 	else {$text="Switch open:";}
  	$fontsize=7;
@@ -361,6 +362,10 @@ function show_error($file,$drawhms,$imgmaxx,$imgmaxy,$type)
 	{
 		$text="define $logname FileLog $file $drawhms:.*Gas.*";
 	}
+	elseif ($type=='HMS100CO')
+        {
+                $text="define $logname FileLog $file $drawhms:.*CO.*";
+        }
 	elseif ($type=='HMS100TFK')
 	{
 		$text="define $logname FileLog $file $drawhms:.*Switch.*";

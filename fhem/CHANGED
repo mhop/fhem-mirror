@@ -493,3 +493,4 @@
   - feature: Cost Control in 15_CUL_EM (CostPerUnit, BasisFeePerMonth)
   - feature: add counter differential per time in 81_M232Counter.pm
   - feature: added USB compendium to documentation
+  - feature: pgm3: Documentation for pgm3 updated, HMS100CO added (and small Bugfixes)
