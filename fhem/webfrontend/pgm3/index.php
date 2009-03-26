@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='080413';
+$pgm3version='090326';
 
 	
 	$Action		=	$_POST['Action'];
@@ -334,7 +334,8 @@ xml_parser_free($xml_parser);
       if ($showroombuttons==1)
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
-	      if ( (substr($stack[0][children][$i][name],0,5)=='FS20_') || (substr($stack[0][children][$i][name],0,4)=='X10_'))
+	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_') 
+		  || (substr($stack[0][children][$i][name],0,4)=='X10_'))
 	      {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -599,7 +600,7 @@ xml_parser_free($xml_parser);
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
 	############################
-	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_')||(substr($stack[0][children][$i][name],0,4)=='X10_'))
+	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_') || (substr( $stack[0][children][$i][name],0,4)=='X10_'))
 	      {
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
@@ -955,7 +956,7 @@ xml_parser_free($xml_parser);
                  {
                         if ($showuserdefgnu== $UserDef) {$formvalue="hide";$gnuvalue="";}
                         else {$formvalue="show";$gnuvalue=$UserDef;};
-                        echo "<tr valign=center><td align=center $bg2 valign=center>
+                        echo "<tr valign=center><td align=center $bg2 valign=center colspan=2>
                                        <form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=showuserdefgnu>
                                         <input type=hidden name=showroom value=$showroom>
