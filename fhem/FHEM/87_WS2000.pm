@@ -4,7 +4,7 @@ package main;
 # Modul for FHEM
 #
 # contributed by thomas dressler 2008
-# $Id: 87_WS2000.pm,v 1.5 2008-09-21 17:55:28 rudolfkoenig Exp $
+# $Id: 87_WS2000.pm,v 1.6 2009-04-10 09:54:37 rudolfkoenig Exp $
 # corr. negativ temps / peterp
 ###########################
 use strict;
@@ -82,7 +82,7 @@ WS2000_Define($$)
                    return "Can't open Device $PortName: $^E\n";
                 }
 		 #$hash->{FD}=$PortObj->{_HANDLE};
-#                $readyfnlist{"$a[0].$a[2]"} = $hash;
+                $readyfnlist{"$a[0].$a[2]"} = $hash;
 	} else {
 		eval ("use Device::SerialPort;");
 		if ($@) {
@@ -97,7 +97,7 @@ WS2000_Define($$)
                    return "Can't open Device $PortName: $^E\n";
                 }
 		$hash->{FD}=$PortObj->FILENO;
-#               $selectlist{"$a[0].$a[2]"} = $hash;
+               $selectlist{"$a[0].$a[2]"} = $hash;
 	}
         #Parameter 19200,8,2,Odd,None
         $PortObj->baudrate(19200);
@@ -128,7 +128,7 @@ WS2000_Define($$)
                 }
         $xport->autoflush(1);
         $hash->{FD}=$xport->fileno;
-#        $selectlist{"$a[0].$a[2]"} = $hash;
+        $selectlist{"$a[0].$a[2]"} = $hash;
         $hash->{socket}=$xport;
         
         
