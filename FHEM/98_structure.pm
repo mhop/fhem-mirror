@@ -138,7 +138,12 @@ structure_Set($@)
       Log 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
       next;
     }
-    next if($attr{$d} && $attr{$d}{structexclude});
+
+    if($attr{$d} && $attr{$d}{structexclude}) {
+      my $se = $attr{$d}{structexclude};
+      next if($hash->{NAME} =~ m/$se/);
+    }
+
     $list[0] = $d;
     my $sret .= CommandSet(undef, join(" ", @list));
     if($sret) {

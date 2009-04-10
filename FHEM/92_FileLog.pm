@@ -151,6 +151,10 @@ FileLog_Set($@)
 # Up till now following functions are impemented:
 # - int (to cut off % from a number, as for the actuator)
 # - delta-h / delta-d to get rain/h and rain/d values from continuous data.
+#
+# It will set the %data values
+#  min<x>, max<x>, avg<x>, cnt<x>, lastd<x>, lastv<x>
+# for each requested column, beggining with <x> = 1
 
 sub
 FileLog_Get($@)
@@ -194,6 +198,8 @@ FileLog_Get($@)
   # last2: last delta value recorded (for the very last entry)
   # last3: last delta timestamp (d or h)
   my (@d, @fname);
+  my (@min, @max, @sum, @cnt, @lastv, @lastd);
+
   for(my $i = 0; $i < int(@a); $i++) {
     my @fld = split(":", $a[$i], 4);
 
@@ -202,11 +208,10 @@ FileLog_Get($@)
       $fname[$i] = "$outf.$i";
       $h{fh} = new IO::File "> $fname[$i]";
     }
-    $h{re} = $fld[1];
-
-    $h{df} = defined($fld[2]) ? $fld[2] : "";
-    $h{fn} = $fld[3];
-    $h{didx} = 10 if($fld[3] && $fld[3] eq "delta-d");
+    $h{re} = $fld[1];                                   # Filter: regexp
+    $h{df} = defined($fld[2]) ? $fld[2] : "";           # default value
+    $h{fn} = $fld[3];                                   # function
+    $h{didx} = 10 if($fld[3] && $fld[3] eq "delta-d");  # delta idx, substr len
     $h{didx} = 13 if($fld[3] && $fld[3] eq "delta-h");
 
     if($fld[0] =~ m/"(.*)"/) {
@@ -223,6 +228,12 @@ FileLog_Get($@)
     }
     $h{ret} = "";
     $d[$i] = \%h;
+    $min[$i] =  999999;
+    $max[$i] = -999999;
+    $sum[$i] = 0;
+    $cnt[$i] = 0;
+    $lastv[$i] = 0;
+    $lastd[$i] = "undef";
   }
 
   my %lastdate;
@@ -238,14 +249,16 @@ FileLog_Get($@)
 
       my $col = $h->{col};
       my $t = $h->{type};
-      my $line;
 
+
+      my $val = undef;
+      my $dte = $fld[0];
 
       if($t == 0) {                         # Fixed text
-        $line = "$fld[0] $col\n";
+        $val = $col;
 
       } elsif($t == 1) {                    # The column
-        $line = "$fld[0] $fld[$col]\n" if(defined($fld[$col]));
+        $val = $fld[$col] if(defined($fld[$col]));
 
       } elsif($t == 2) {                    # delta-h  or delta-d
 
@@ -258,7 +271,8 @@ FileLog_Get($@)
             $ts = "$lda[1]:30:00" if($hd == 13);
             my $v = $fld[$col]-$h->{last1};
             $v = 0 if($v < 0);                     # Skip negative delta
-            $line = sprintf("%s_%s %0.1f\n", $lda[0],$ts, $v);
+            $dte = "$lda[0]_$ts";
+            $val = sprintf("%0.1f", $v);
           }
           $h->{last1} = $fld[$col];
           $h->{last3} = $ld;
@@ -267,19 +281,26 @@ FileLog_Get($@)
         $lastdate{$hd} = $fld[0];
 
       } elsif($t == 3) {                    # int function
-        my $val = $fld[$col];
-        $line = "$fld[0] $1\n" if($val =~ m/^([0-9]+).*/);
+        $val = $1 if($fld[$col] =~ m/^([0-9]+).*/);
 
       } else {                              # evaluate
-        $line = "$fld[0] " . eval($h->{fn}) . "\n";
+        $val = eval($h->{fn});
+
       }
-      next if(!$line);
+
+      next if(!defined($val));
+      $min[$i] = $val if($val < $min[$i]);
+      $max[$i] = $val if($val > $max[$i]);
+      $sum[$i] += $val;
+      $cnt[$i]++;
+      $lastv[$i] = $val;
+      $lastd[$i] = $dte;
 
       if($outf eq "-") {
-        $h->{ret} .= $line;
+        $h->{ret} .= "$dte $val\n";
       } else {
-        my $fh = $h->{fh};
-        print $fh $line;
+        my $fh = $h->{fh};      # cannot use $h->{fh} in print directly
+        print $fh "$dte $val\n";
         $h->{count}++;
       }
     }
@@ -317,6 +338,15 @@ FileLog_Get($@)
       }
       $fh->close();
     }
+
+    my $j = $i+1;
+    $data{"min$j"} = $min[$i] == 999999 ? "undef" : $min[$i];
+    $data{"max$j"} = $max[$i] == -999999 ? "undef" : $max[$i];
+    $data{"avg$j"} = $cnt[$i] ? sprintf("%0.1f", $sum[$i]/$cnt[$i]) : "undef";
+    $data{"cnt$j"} = $cnt[$i] ? $cnt[$i] : "undef";
+    $data{"currval$j"} = $lastv[$i];
+    $data{"currdate$j"} = $lastd[$i];
+
   }
   if($internal) {
     $internal_data = \$ret;

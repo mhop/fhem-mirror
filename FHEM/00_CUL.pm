@@ -236,7 +236,7 @@ GOTBW:
   } else { 
 
     return "Expecting a 0-padded hex number"
-        if((length($arg)&1) == 0 && $type ne "raw");
+        if((length($arg)&1) == 1 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
     Log GetLogLevel($name,4), "set $name $type $arg";
     CUL_SimpleWrite($hash, $sets{$type} . $arg);
