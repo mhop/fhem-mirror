@@ -20,7 +20,8 @@ my %gets = (
   "raw"      => "",
   "ccconf"   => "=",
   "uptime"   => "t",
-  "file"     => ""
+  "file"     => "",
+  "time"     => "c03"
 );
 
 my %sets = (
@@ -32,7 +33,8 @@ my %sets = (
   "verbose"   => "X",
   "led"       => "l",
   "patable"   => "x",
-  "file"      => ""
+  "file"      => "",
+  "time"      => ""
 );
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42);
@@ -271,6 +273,14 @@ WRITEEND:
     CUL_SimpleWrite($hash, $initstr);
     return "$name: $err" if($err);
 
+  } elsif($type eq "time") {
+
+    return "Only supported for CUR devices (see VERSION)"
+                                 if($hash->{VERSION} !~ m/CUR/);
+    my @a = localtime;
+    my $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
+    CUL_SimpleWrite($hash, $msg);
+
   } else { 
 
     return "Expecting a 0-padded hex number"
@@ -441,6 +451,12 @@ CUL_DoInit($)
     return $msg;
   }
   $hash->{VERSION} = $ver;
+
+  if($ver =~ m/CUR/) {
+    my @a = localtime;
+    my $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
+    CUL_SimpleWrite($hash, $msg);
+  }
 
   CUL_SimpleWrite($hash, $initstr);
   $hash->{STATE} = "Initialized";
