@@ -132,6 +132,7 @@ use vars qw(%oldvalue);		# Old values, see commandref.html
 use vars qw($init_done);        #
 use vars qw($internal_data);    #
 use vars qw(%cmds);             # Global command name hash. To be expanded
+use vars qw(%data);		# Hash for user data
 
 use vars qw($reread_active);
 
@@ -150,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.69 2009-02-11 12:58:22 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.70 2009-04-11 08:20:13 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
