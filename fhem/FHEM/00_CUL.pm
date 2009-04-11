@@ -7,9 +7,10 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 
 
+sub CUL_Clear($);
 sub CUL_Write($$$);
 sub CUL_Read($);
-sub CUL_ReadAnswer($$);
+sub CUL_ReadAnswer($$$);
 sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 
@@ -19,6 +20,7 @@ my %gets = (
   "raw"      => "",
   "ccconf"   => "=",
   "uptime"   => "t",
+  "file"     => ""
 );
 
 my %sets = (
@@ -30,6 +32,7 @@ my %sets = (
   "verbose"   => "X",
   "led"       => "l",
   "patable"   => "x",
+  "file"      => ""
 );
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42);
@@ -180,11 +183,11 @@ CUL_Set($@)
 
   } elsif($type eq "bWidth") {               # KHz
 
-    my $ob = 5;
+    my ($err, $ob);
     if(!IsDummy($hash->{NAME})) {
       CUL_SimpleWrite($hash, "C10");
-      $ob = CUL_ReadAnswer($hash, $type);
-      return "Can't get old MDMCFG4 value" if($ob !~ m,/ (.*)\r,);
+      ($err, $ob) = CUL_ReadAnswer($hash, $type, 0);
+      return "Can't get old MDMCFG4 value" if($err || $ob !~ m,/ (.*)\r,);
       $ob = $1 & 0x0f;
     }
 
@@ -232,6 +235,41 @@ GOTBW:
     CUL_SimpleWrite($hash, $initstr);
     return $msg;
 
+  } elsif($type eq "file") {
+
+    return "Only supported for CUR devices (see VERSION)"
+                                 if($hash->{VERSION} !~ m/CUR/);
+
+    return "$name: Need 2 further arguments: source destination"
+                                if(@a != 2);
+    my ($buf, $msg, $err);
+    return "$a[0]: $!" if(!open(FH, $a[0]));
+    $buf = join("", <FH>);
+    close(FH);
+
+    my $len = length($buf);
+    CUL_Clear($hash);
+    CUL_SimpleWrite($hash, "X00");
+
+    CUL_SimpleWrite($hash, sprintf("w%08X$a[1]", $len));
+    ($err, $msg) = CUL_ReadAnswer($hash, $type, 1);
+    goto WRITEEND if($err);
+    if($msg ne sprintf("%08X\r\n", $len)) {
+      $err = "Bogus length received: $msg";
+      goto WRITEEND;
+    }
+
+    my $off = 0;
+    while($off < $len) {
+      my $mlen = ($len-$off) > 32 ? 32 : ($len-$off);
+      my $ret = $hash->{PortObj}->write(substr($buf,$off,$mlen));
+      $off += $mlen;
+      select(undef, undef, undef, 0.001);
+    }
+
+WRITEEND:
+    CUL_SimpleWrite($hash, $initstr);
+    return "$name: $err" if($err);
 
   } else { 
 
@@ -256,16 +294,19 @@ CUL_Get($@)
   	if(!defined($gets{$a[1]}));
 
   my $arg = ($a[2] ? $a[2] : "");
-  my $msg = "";
+  my ($msg, $err);
+  my $name = $a[0];
 
-  return "No $a[1] for dummies" if(IsDummy($hash->{NAME}));
+  return "No $a[1] for dummies" if(IsDummy($name));
 
   if($a[1] eq "ccconf") {
 
     my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1 );
     foreach my $a (sort keys %r) {
       CUL_SimpleWrite($hash, "C$a");
-      my @answ = split(" ", CUL_ReadAnswer($hash, "C$a"));
+      ($err, $msg) = CUL_ReadAnswer($hash, "C$a", 0);
+      return $err if($err);
+      my @answ = split(" ", $msg);
       $r{$a} = $answ[4];
     }
     $msg = sprintf("freq:%.3fMHz bWidth:%dKHz rAmpl:%ddB sens:%ddB",
@@ -275,10 +316,73 @@ CUL_Get($@)
         4+4*($r{"1D"}&3)                                                #Sens
         );
     
+  } elsif($a[1] eq "file") {
+
+    return "Only supported for CUR devices (see VERSION)"
+                                 if($hash->{VERSION} !~ m/CUR/);
+
+    CUL_Clear($hash);
+    CUL_SimpleWrite($hash, "X00");
+
+    if(int(@a) == 2) {  # No argument: List directory
+
+      CUL_SimpleWrite($hash, "r.");
+      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
+      goto READEND if($err);
+
+      $msg =~ s/[\r\n]//g;
+      my @a;
+      foreach my $f (split(" ", $msg)) {
+        my ($name, $size) = split("/", $f);
+        push @a, sprintf("%-14s %5d", $name, hex($size));
+      }
+      $msg = join("\n", @a);
+
+    } else {            # Read specific file
+
+      if(@a != 4) {
+        $err = "Need 2 further arguments: source [destination|-]";
+        goto READEND;
+      }
+
+      CUL_SimpleWrite($hash, "r$a[2]");
+      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
+      goto READEND if($err);
+
+      if($msg eq "X") {
+        $err = "$a[2]: file not found on CUL";
+        goto READEND if($err);
+      }
+      $msg =~ s/[\r\n]//g;
+      my ($len,  $buf) = (hex($msg), "");
+      $msg = "";
+      while(length($msg) != $len) {
+        ($err, $buf) = CUL_ReadAnswer($hash, $a[1], 1);
+        goto READEND if($err);
+        $msg .= $buf;
+      }
+
+      if($a[3] ne "-") {
+        if(!open(FH, ">$a[3]")) {
+          $err = "$a[3]: $!";
+          goto READEND;
+        }
+        print FH $msg;
+        close(FH);
+        $msg = "";
+      }
+
+    }
+
+READEND:
+    CUL_SimpleWrite($hash, $initstr);
+    return "$name: $err" if($err);
+    return $msg;
+
   } else {
 
-    CUL_SimpleWrite($hash, $gets{$a[1]} . $arg) if(!IsDummy($hash->{NAME}));
-    $msg = CUL_ReadAnswer($hash, $a[1]);
+    CUL_SimpleWrite($hash, $gets{$a[1]} . $arg);
+    ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
     $msg = "No answer" if(!defined($msg));
     $msg =~ s/[\r\n]//g;
 
@@ -298,33 +402,45 @@ CUL_SetState($$$$)
   return undef;
 }
 
+sub
+CUL_Clear($)
+{
+  my $hash = shift;
+
+  # Clear the pipe
+  $hash->{RA_Timeout} = 0.1;
+  for(;;) {
+    my ($err, undef) = CUL_ReadAnswer($hash, "Clear", 0);
+    last if($err && $err =~ m/^Timeout/);
+  }
+  delete($hash->{RA_Timeout});
+}
+
 #####################################
 sub
 CUL_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
+  my $err;
+  my $msg = undef;
 
-  # Clear the pipe
-  $hash->{RA_Timeout} = 0.1;
-  for(;;) {
-    last if(CUL_ReadAnswer($hash, "Clear") =~ m/^Timeout/);
-  }
-  delete($hash->{RA_Timeout});
-
+  CUL_Clear($hash);
   my ($ver, $try) = ("", 0);
   while($try++ < 3 && $ver !~ m/^V/) {
     $hash->{PortObj}->write("V\n");
-    $ver = CUL_ReadAnswer($hash, "Version");
+    ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0);
+    return "$name: $err" if($err);
   }
 
   if($ver !~ m/^V/) {
     $attr{$name}{dummy} = 1;
     $hash->{PortObj}->close();
-    my $msg = "Not an CUL device, receives for V:  $ver";
+    $msg = "Not an CUL device, receives for V:  $ver";
     Log 1, $msg;
     return $msg;
   }
+  $hash->{VERSION} = $ver;
 
   CUL_SimpleWrite($hash, $initstr);
   $hash->{STATE} = "Initialized";
@@ -338,11 +454,11 @@ CUL_DoInit($)
 #####################################
 # This is a direct read for commands like get
 sub
-CUL_ReadAnswer($$)
+CUL_ReadAnswer($$$)
 {
-  my ($hash,$arg) = @_;
+  my ($hash, $arg, $anydata) = @_;
 
-  return undef if(!$hash || !defined($hash->{FD}));
+  return ("No FD" ,undef) if(!$hash || !defined($hash->{FD}));
   my ($mculdata, $rin) = ("", '');
   my $nfound;
   for(;;) {
@@ -355,15 +471,15 @@ CUL_ReadAnswer($$)
       $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-        return "Select error $nfound / $!";
+        return ("Select error $nfound / $!", undef);
       }
     }
-    return "Timeout reading answer for get $arg" if($nfound == 0);
+    return ("Timeout reading answer for get $arg", undef) if($nfound == 0);
     my $buf = $hash->{PortObj}->input();
 
     Log 5, "CUL/RAW: $buf";
     $mculdata .= $buf;
-    return $mculdata if($mculdata =~ m/\r\n/);
+    return (undef, $mculdata) if($mculdata =~ m/\r\n/ || $anydata);
   }
 }
 
