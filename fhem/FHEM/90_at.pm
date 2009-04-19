@@ -14,7 +14,7 @@ at_Initialize($)
   $hash->{DefFn}    = "at_Define";
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
-  $hash->{AttrList} = "disable:0,1 skip_next:0,1";
+  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6";
 }
 
 
@@ -90,16 +90,16 @@ sub
 at_Exec($)
 {
   my ($name) = @_;
-  my ($skip, $disable);
+  my ($skip, $disable) = ("","");
 
   return if(!$defs{$name});           # Just deleted
+  Log GetLogLevel($name,5), "exec at command $name";
 
   if(defined($attr{$name})) {
     $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
     $disable = 1 if($attr{$name} && $attr{$name}{disable});
   }
 
-  #Log 1, "EXEC $name";
   delete $attr{$name}{skip_next} if($skip);
   my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
   $command = SemicolonEscape($command);
@@ -117,7 +117,8 @@ at_Exec($)
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
-    $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{/);   # Replace the count }
+    $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
+    Log GetLogLevel($name,5), "redefine at command $name as $def";
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
     $attr{$name} = $oldattr;
   }
