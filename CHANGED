@@ -479,8 +479,8 @@
   - bugfix:  cut off string "(counter)" from fallback value in 13_KS300.pm
   - feature: daily/monthly cumulated values for EMWZ/EMGZ/EMWM with 15_CUL_EM
   - feature: 01_FHEMWEB.pm: multiple room assignments
-                            fixedrange with optional [day|week|month|year]
-                            attr title and label for flexible .gplot files
+  - feature: 01_FHEMWEB.pm: fixedrange with optional [day|week|month|year]
+  - feature: 01_FHEMWEB.pm: attr title and label for flexible .gplot files
   - feature: fhem.pl: attr global logdir used by wildcard %ld
   - feature: do not block on disconnected devices (FHZ/CM11/CUL)
   - bugfix:  deleting at definition in the at command
@@ -493,4 +493,5 @@
   - feature: Cost Control in 15_CUL_EM (CostPerUnit, BasisFeePerMonth)
   - feature: add counter differential per time in 81_M232Counter.pm
   - feature: added USB compendium to documentation
-  - feature: pgm3: Documentation for pgm3 updated, HMS100CO added (and small Bugfixes)
+  - feature: pgm3: Documentation for pgm3 updated, HMS100CO added (and bugfixes)
+  - bugfix:  Defining a repeated at job in a sunrise/sunset at job fails
