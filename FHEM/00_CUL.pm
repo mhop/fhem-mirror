@@ -454,7 +454,8 @@ CUL_DoInit($)
 
   if($ver =~ m/CUR/) {
     my @a = localtime;
-    my $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
+    my $msg = sprintf("c%02d%02d%02d%02d%02d%02d",
+                ($a[5]+1900)%100,$a[4]+1,$a[3],$a[2],$a[1],$a[0]);
     CUL_SimpleWrite($hash, $msg);
   }
 
