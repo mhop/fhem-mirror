@@ -369,7 +369,8 @@ FHT_Parse($$)
     my $sval = substr($msg,24,2);
     my $fv = sprintf("%d%%", int(100*$val/255+0.5));
 
-       if($sval =~ m/.0/) { $val = "syncnow" }
+       if($sval =~ m/[ab]0/i) { $val = $fv; }   # sync in the summer
+    elsif($sval =~ m/.0/) { $val = "syncnow"; }
     elsif($sval =~ m/.1/) { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
     elsif($sval =~ m/.2/) { $val = "0%" }  # FHT set to  5.5
     elsif($sval =~ m/.6/) { $val = "$fv" }
