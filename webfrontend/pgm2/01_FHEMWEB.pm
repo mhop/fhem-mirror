@@ -243,7 +243,21 @@ FW_AnswerCall($)
     return 0;
   }
 
-  my $cmd = FW_digestCgi($1);
+  ##############################
+  # Axels FHEMWEB Module...
+  $arg = $1;
+  if(defined(%FWEXT)) {
+    foreach my $k (sort keys %FWEXT) {
+      if($arg =~ m/^$k/) {
+        no strict "refs";
+        ($__RETTYPE, $__RET) = &{$FWEXT{$k}}($arg);
+        use strict "refs";
+        return 0;
+      }
+    }
+  }
+
+  my $cmd = FW_digestCgi($arg);
   my $docmd = 0;
   $docmd = 1 if($cmd && 
                 $cmd !~ /^showlog/ &&
@@ -795,6 +809,79 @@ FW_logWrapper($)
   }
 }
 
+sub
+FW_readgplotfile($$$)
+{
+  my ($wl, $gplot_pgm, $file) = @_;
+  
+  ############################
+  # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
+  # the plot directive with our own, as we offer a file for each line
+  my (@filelog, @data, $plot);
+  open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
+  while(my $l = <FH>) {
+    if($l =~ m/^#FileLog (.*)$/) {
+      push(@filelog, $1);
+    } elsif($l =~ "^plot" || $plot) {
+      $plot .= $l;
+    } else {
+      push(@data, $l);
+    }
+  }
+  close(FH);
+
+  return (undef, \@data, $plot, \@filelog);
+}
+
+sub
+FW_substcfg($$$$$$)
+{
+  my ($splitret, $wl, $cfg, $plot, $file, $tmpfile) = @_;
+
+  # interprete title and label as a perl command and open accessiblity
+  # to all internal values e.g. $value.
+
+  my $oll = $attr{global}{verbose};
+  $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
+  my $title = FW_getAttr($wl, "title", "\"$file\"");
+  $title = AnalyzeCommand(undef, "{ $title }");
+  my $label = FW_getAttr($wl, "label", undef);
+  my @g_label;
+  if ($label) {
+    @g_label = split(":",$label);
+    foreach (@g_label) {
+      $_ = AnalyzeCommand(undef, "{ $_ }");
+    }
+  }
+  $attr{global}{verbose} = $oll;
+
+  my $gplot_script = join("", @{$cfg});
+  $gplot_script .=  $plot if(!$splitret);
+
+  $gplot_script =~ s/<OUT>/$tmpfile/g;
+
+  my $ps = FW_getAttr($wl,"plotsize",$__plotsize);
+  $gplot_script =~ s/<SIZE>/$ps/g;
+
+  $gplot_script =~ s/<TL>/$title/g;
+  my $g_count=1; 
+  if ($label) {
+    foreach (@g_label) {
+      $gplot_script =~ s/<L$g_count>/$_/g;
+      $plot =~ s/<L$g_count>/$_/g;
+      $g_count++;
+    }
+  }
+
+  if($splitret) {
+    my @ret = split("\n", $gplot_script); 
+    return \@ret;
+  } else {
+    return $gplot_script;
+  }
+}
+
+
 ######################
 # Generate an image from the log via gnuplot or SVG
 sub
@@ -804,19 +891,7 @@ FW_showLog($)
   my (undef, $wl, $d, $type, $file) = split(" ", $cmd, 5);
 
   my $pm = FW_getAttr($wl,"plotmode",$__plotmode);
-  my $ps = FW_getAttr($wl,"plotsize",$__plotsize);
-  # interprete title and label as a perl command and open accessiblity
-  #   to all internal values e.g. $value.
-  my $title = FW_getAttr($wl, "title", "\"$file\"");
-  $title = AnalyzeCommand(undef, "\{ return(" . $title . ");;\}");
-  my $label = FW_getAttr($wl, "label", undef);
-  my @g_label;
-  if ($label) {
-    @g_label = split(":",$label);
-    foreach (@g_label) {
-      $_ = AnalyzeCommand(undef, "\{ return(" . $_ . ");;\}");
-    }
-  }
+
   my $gplot_pgm = "$__dir/$type.gplot";
   return FW_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
   FW_calcWeblink($d,$wl);
@@ -834,21 +909,9 @@ FW_showLog($)
       $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
       return FW_fatal("Cannot read $path") if(!-r $path);
 
-      open(FH, $gplot_pgm) || return FW_fatal("$gplot_pgm: $!"); 
-      my $gplot_script = join("", <FH>);
-      close(FH);
-
-      $gplot_script =~ s/<OUT>/$tmpfile/g;
-      $gplot_script =~ s/<SIZE>/$ps/g;
-      $gplot_script =~ s/<IN>/$path/g;
-      $gplot_script =~ s/<TL>/$title/g;
-      my $g_count=0; 
-      if ($label) {
-        foreach (@g_label) {
-          $gplot_script =~ s/<L$g_count>/$_/g;
-          $g_count++;
-        }
-      }
+      my ($err, $cfg, $plot, undef) = FW_readgplotfile($wl, $gplot_pgm, $file);
+      return $err if($err);
+      my $gplot_script = FW_substcfg(0, $wl, $cfg, $plot, $file,$tmpfile);
 
       my $fr = FW_getAttr($wl, "fixedrange", undef);
       if($fr) {
@@ -863,42 +926,21 @@ FW_showLog($)
 
     } elsif($pm eq "gnuplot-scroll") {
 
-      ############################
-      # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
-      # the plot directive with our own, as we offer a file for each line
-      my (@filelog, @data, $plot);
-      open(FH, $gplot_pgm) || return FW_fatal("$gplot_pgm: $!"); 
-      while(my $l = <FH>) {
-        if($l =~ m/^#FileLog (.*)$/) {
-          push(@filelog, $1);
-        } elsif($l =~ "^plot" || $plot) {
-          $plot .= $l;
-        } else {
-          push(@data, $l);
-        }
-      }
-      close(FH);
 
-      my $gplot_script = join("", @data);
-      $gplot_script =~ s/<OUT>/$tmpfile/g;
-      $gplot_script =~ s/<SIZE>/$ps/g;
-      $gplot_script =~ s/<TL>/$title/g;
-      my $g_count=0; 
-      if ($label) {
-        foreach (@g_label) {
-          $gplot_script =~ s/<L$g_count>/$_/g;
-          $plot =~ s/<L$g_count>/$_/g;
-          $g_count++;
-        }
-      }
+      my ($err, $cfg, $plot, $flog) = FW_readgplotfile($wl, $gplot_pgm, $file);
+      return $err if($err);
+
+
+      # Read the data from the filelog
       my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
-
       my $oll = $attr{global}{verbose};
       $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
       my @path = split(" ", fC("get $d $file $tmpfile $f $t " .
-                                  join(" ", @filelog)));
+                                  join(" ", @{$flog})));
       $attr{global}{verbose} = $oll;
 
+
+      # replace the path with the temporary filenames of the filelog output
       my $i = 0;
       $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
       my $xrange = "set xrange [\"$f\":\"$t\"]\n";
@@ -908,6 +950,8 @@ FW_showLog($)
         print FH "$f 0\n";
         close(FH);
       }
+
+      my $gplot_script = FW_substcfg(0, $wl, $cfg, $plot, $file, $tmpfile);
 
       open(FH, "|gnuplot >> $errfile 2>&1");# feed it to gnuplot
       print FH $gplot_script, $xrange, $plot;
@@ -924,18 +968,9 @@ FW_showLog($)
 
   } elsif($pm eq "SVG") {
 
-    my (@filelog, @data, $plot);
-    open(FH, $gplot_pgm) || return FW_fatal("$gplot_pgm: $!"); 
-    while(my $l = <FH>) {
-      if($l =~ m/^#FileLog (.*)$/) {
-        push(@filelog, $1);
-      } elsif($l =~ "^plot" || $plot) {
-        $plot .= $l;
-      } else {
-        push(@data, $l);
-      }
-    }
-    close(FH);
+    my ($err, $cfg, $plot, $flog) = FW_readgplotfile($wl, $gplot_pgm, $file);
+    return $err if($err);
+
     my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
     $f = 0 if(!$f);     # From the beginning of time...
     $t = 9 if(!$t);     # till the end
@@ -945,9 +980,9 @@ FW_showLog($)
       $ret = CommandReload(undef, "98_SVG");
       Log 0, $ret if($ret);
     }
-
-    $ret = fC("get $d $file INT $f $t " . join(" ", @filelog));
-    SVG_render($file, $ps, $f, $t, \@data, $internal_data, $plot);
+    $ret = fC("get $d $file INT $f $t " . join(" ", @{$flog}));
+    $cfg = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
+    SVG_render($f, $t, $cfg, $internal_data, $plot);
     $__RETTYPE = "image/svg+xml";
 
   }
