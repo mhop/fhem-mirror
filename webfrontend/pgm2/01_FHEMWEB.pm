@@ -32,6 +32,7 @@ sub FW_calcWeblink($$);
 
 use vars qw($__ME); # webname (fhem), needed by SVG
 
+
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 my %__icons;      # List of icons
@@ -244,13 +245,13 @@ FW_AnswerCall($)
   }
 
   ##############################
-  # Axels FHEMWEB Module...
+  # Axels FHEMWEB modules...
   $arg = $1;
-  if(defined(%FWEXT)) {
-    foreach my $k (sort keys %FWEXT) {
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
       if($arg =~ m/^$k/) {
         no strict "refs";
-        ($__RETTYPE, $__RET) = &{$FWEXT{$k}}($arg);
+        ($__RETTYPE, $__RET) = &{$data{FWEXT}{$k}}($arg);
         use strict "refs";
         return 0;
       }
