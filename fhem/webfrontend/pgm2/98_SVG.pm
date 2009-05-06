@@ -8,7 +8,7 @@ use POSIX;
 
 
 
-sub SVG_render($$$$$$$);
+sub SVG_render($$$$$);
 sub time_to_sec($);
 sub fmtTime($$);
 
@@ -24,19 +24,24 @@ SVG_Initialize($)
 
 #####################################
 sub
-SVG_render($$$$$$$)
+SVG_render($$$$$)
 {
-  my ($file, $wh, $from, $to, $confp, $dp, $plot) = @_;
+  my ($from, $to, $confp, $dp, $plot) = @_;
 
-  my ($ow,$oh) = split(",", $wh);       # Original width
   my $th = 16;                          # "Font" height
   my ($x, $y) = (3*$th,  1.2*$th);      # Rect offset
-  my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
   my %conf;                             # gnuplot file settings
 
   # Convert the configuration to a "readable" form -> array to hash
   map { chomp; my @a=split(" ",$_, 3);
          if($a[0] && $a[0] eq "set") { $conf{$a[1]} = $a[2]; } } @{$confp};
+
+  my $ps = "800,400";
+  $ps = $1 if($conf{terminal} =~ m/.*size[ ]*([^ ]*)/);
+  $conf{title} =~ s/'//g;
+
+  my ($ow,$oh) = split(",", $ps);       # Original width
+  my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
   # Html Header
   pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -50,7 +55,7 @@ SVG_render($$$$$$$)
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
   pO "<text x=\"$off1\" y=\"$off2\" 
-        class=\"title\" text-anchor=\"middle\">$file</text>\n";
+        class=\"title\" text-anchor=\"middle\">$conf{title}</text>\n";
 
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
@@ -105,7 +110,6 @@ SVG_render($$$$$$$)
       $l = substr($$dp, $dpoff, $ndpoff-$dpoff);
     }
     $dpoff = $ndpoff+1;
-
     if($l =~ m/^#/) {
       my $a = $axes[$idx];
       $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
@@ -352,6 +356,9 @@ sub
 time_to_sec($)
 {
   my ($str) = @_;
+  if(!$str) {
+    return 0;
+  }
   my ($y,$m,$d,$h,$mi,$s) = split("[-_:]", $str);
   $s = 0 if(!$s);
   $mi= 0 if(!$mi);
