@@ -70,10 +70,10 @@
       <a href="#M232Counter">M232Counter</a> &nbsp;
       <a href="#M232Voltage">M232Voltage</a> &nbsp;
       <a href="#SCIVT">SCIVT</a> &nbsp;
+      <a href="#structure">structure</a> &nbsp;
       <a href="#WS2000">WS2000</a> &nbsp;
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#X10">X10</a> &nbsp;
-      <a href="#weblink">weblink</a> &nbsp;
       <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
 
   </ul>
@@ -81,12 +81,14 @@
   <br>
   <b>Helper modules</b>
   <ul>
+    <a href="#FileLog">FileLog</a> &nbsp;
+    <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
     <a href="#at">at</a> &nbsp;
+    <a href="#dummy">dummy</a> &nbsp;
+    <a href="#holiday">holiday</a> &nbsp;
     <a href="#notify">notify</a> &nbsp;
     <a href="#watchdog">watchdog</a> &nbsp;
-    <a href="#FileLog">FileLog</a> &nbsp;
-    <a href="#dummy">dummy</a> &nbsp;
-    <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
+    <a href="#weblink">weblink</a> &nbsp;
   </ul>
 
   <br>
@@ -249,7 +251,9 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>if there is a device which exactly corresponds to the spec, then
       no special processing is done.</li>
   <li>the returned list can contain the same device more than once, so
-      int tha last example the list will contain lamp3 twice.</li>
+      "set lamp1-lamp3,lamp3 on" switches lamp3 twice.</li>
+  <li>for more complex structuring demands see the <a href="#structure">
+      structure</a> device.
   </ul>
 </ul>
 
@@ -740,11 +744,28 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <a name="allowfrom"></a>
+    <li>allowfrom<br>
+        Comma (,) separated list of ip-addresses or hostnames. If set,
+        only connections from these addresses are allowed.
+    </li><br>
+
     <a name="configfile"></a>
     <li>configfile<br>
         Contains the name of the fhem configuration file. If <a
         href="#save">save</a> is called without argument, then the output will
         be written to this file.
+	</li><br>
+
+    <a name="holiday2we"></a>
+    <li>holday2we<br>
+        If this attribute is set, then the <a href="#perl">$we</a> variable
+        will be true, if the value of the <a href="#holiday">holiday</a>
+        variable referenced by this attribute is not none.<br>
+        Example:<br>
+        <ul>
+          attr global holiday2we hessen
+        </ul>
 	</li><br>
 
     <a name="lastinclude"></a>
@@ -767,17 +788,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         see the <a href="#FileLog">FileLog</a> section.
     </li><br>
 
-    <a name="nofork"></a>
-    <li>nofork<br>
-        If set and the logfile is not "-", do not try to background. Needed
-        on some Fritzbox installations.
-    </li><br>
-
-    <a name="mseclog"></a>
-    <li>mseclog<br>
-        If set, the timestamp in the logfile will contain a millisecond part.
-    </li><br>
-
     <a name="modpath"></a>
     <li>modpath<br>
         Specify the path to the modules directory <code>FHEM</code>. The path
@@ -790,6 +800,17 @@ A line ending with \ will be concatenated with the next one, so long lines
         modules with NN=99, these are considered to be utility modules
         containing only perl helper functions, they are loaded at startup (i.e.
         modpath attribute definition time).
+    </li><br>
+
+    <a name="mseclog"></a>
+    <li>mseclog<br>
+        If set, the timestamp in the logfile will contain a millisecond part.
+    </li><br>
+
+    <a name="nofork"></a>
+    <li>nofork<br>
+        If set and the logfile is not "-", do not try to background. Needed
+        on some Fritzbox installations.
     </li><br>
 
     <a name="pidfilename="></a>
@@ -807,12 +828,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         will only listen for connections from the localhost per default. If
         there is a second value  "global" then the server will listen for
         non-localhost connections too.
-    </li><br>
-
-    <a name="allowfrom"></a>
-    <li>allowfrom<br>
-        Comma (,) separated list of ip-addresses or hostnames. If set,
-        only connections from these addresses are allowed.
     </li><br>
 
     <a name="statefile"></a>
@@ -847,7 +862,8 @@ A line ending with \ will be concatenated with the next one, so long lines
           <li>5 - debugging.</li>
         </ul>
         Recommended level is 3 for normal use.
-    </li>
+    </li><br>
+
   </ul>
 </ul>
 
@@ -2419,6 +2435,64 @@ A line ending with \ will be concatenated with the next one, so long lines
 
 </ul>
 
+<a name="structure"></a>
+<h3>structure</h3>
+<ul>
+  <br>
+
+  <a name="structuredefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; structure &lt;struct_type&gt; &lt;dev1&gt; &lt;dev2&gt; ...</code>
+    <br><br>
+
+    The structure device is used to organize/structure a devices in order to
+    set groups of them at once (e.g. switching everything off in a house).<br>
+    
+    The list of attached devices can be modified through the addstruct /
+    delstruct commands. Each attached device will get the attribute
+    &lt;struct_type&gt;=&lt;name&gt;<br> when it is added to the list, and the
+    attribute will be deleted if the device is deleted from the structure.
+    The structure devices can also be added to a structure, e.g. you can have
+    a building consisting of levels which consists of rooms of devices.
+    <br>
+    Example:<br>
+    <ul>
+      <li>define kitchen structure room lamp1 lamp2</li>
+      <li>addstruct kitchen TYPE=FS20</li>
+      <li>delstruct kitchen lamp1</li>
+      <li>define house structure building kitchen living</li>
+      <li>set house off</li>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="structureset"></a>
+  <b>Set</b>
+  <ul>
+    Every set command is propagated to the attached devices. Exception: if an
+    attached devices has an attribute structexcluse, and the attribute value
+    matches (as a regexp) the name of the current structure.
+  </ul>
+  <br>
+
+  <a name="structureget"></a>
+  <b>Get</b>
+  <ul>
+    get is not supported through a structure device.
+  </ul>
+  <br>
+
+
+  <b>Attributes</b>
+  <ul>
+    <li>structexclude<br>
+        exclude the device from set operations, see the set command above.</li>
+  </ul>
+  <br>
+
+</ul>
+
 <a name="WS2000"></a>
 <h3>WS2000</h3>
 <ul>
@@ -2595,7 +2669,41 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#fixedrange">fixedrange</a></li>
     <li><a href="#plotsize">plotsize</a></li>
     <li><a href="#plotmode">plotmode</a></li>
-    <li><a href="#label">label</a></li>
+    <a name="label">
+    <li>label<br>
+      Colon separated list of values. The values will be used to replace
+      &lt;L#&gt; type of strings in the .gplot file, with # beginning at 1
+      (&lt;L1&gt;, &lt;L2&gt;, etc.). Each value will be evaluated as a perl
+      expression, so you have access e.g. to the $value hash.<br><br>
+
+      If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
+      avg, cnt, lastv (last value) and lastd (last date) values of the
+      individual curves, by accessing the corresponding values from the data
+      hash, see the example below:<br>
+
+      <ul>
+        <li>Fixed text for the right and left axis:<br>
+          <ul>
+            <li>Fhem config:<br>
+                attr wl_1 label "Temperature":"Humidity"</li>
+            <li>.gplot file entry:<br>
+                set ylabel &lt;L1&gt;<br>
+                set y2label &lt;L2&gt;</li>
+          </ul></li>
+        <li>Title with maximum and current values of the 1st curve (FileLog)
+          <ul>
+            <li>Fhem config:<br>
+                attr wl_1 label "Max $data{max1}, Current $data{lastv1}"</li>
+            <li>.gplot file entry:<br>
+                set title &lt;L1&gt;<br>
+          </ul></li>
+      </ul>
+      </li>
+    <a name="title">
+    <li>title<br>
+      A special form of label (see above), which replaces the string &lt;TL&gt;
+      in the .gplot file. It defaults to the filename of the logfile.
+      </li>
   </ul>
   <br>
 
@@ -2795,6 +2903,85 @@ A line ending with \ will be concatenated with the next one, so long lines
         time.</li><br>
   </ul>
   <br>
+
+</ul>
+
+<a name="holiday"></a>
+<h3>holiday</h3>
+<ul>
+  <br>
+
+  <a name="holidaydefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; holiday</code>
+    <br><br>
+    Define a set of holidays. The module will try to open the file
+    &lt;name&gt;.holiday in the <a href="#modpath">modpath</a>/FHEM directory.
+    If an entry in the holiday file matches the current day, then the STATE of
+    this holiday instance displayed in the <a href="#list">list</a> command
+    will be set to the holiday, else the state is set to the text none. Most
+    probably you'll want to query this value in some perl script: see $value in
+    the <a href="#perl">perl</a> section or the global attribute <a
+    href="#holiday2we"> holiday2we</a>.<br>
+    The file will be reread once every night, to compute the value for the
+    current day, and by each get command (see below).<br>
+    <br>
+
+    Holiday file definition:<br>
+    The file may contain comments (beginning with #) or empty lines.
+    Significant lines begin with a number (type) and contain some space
+    separated words, depending on the type. The different types are:<br>
+    <ul>
+      <li>1<br>
+          Exact date. Arguments: &lt;MM-DD&gt; &lt;holiday-name&gt;<br>
+          Exampe: 1 12-24 Christmas
+          </li>
+      <li>2<br>
+          Easter-dependent date. Arguments: &lt;day-offset&gt;
+          &lt;holiday-name&gt;.
+          The offset is counted from Easter-Sunday. Note: the perl module
+          DateTime::Event::Easter must be installed to use this type of
+          holiday.<br>
+          Exampe: 2 1 Easter-Monday
+          </li>
+      <li>3<br>
+          Month dependent date. Arguments: &lt;nth&gt; &lt;weekday&gt;
+          &lt;month &lt;holiday-name&gt;.<br>
+          Examples:<br> 
+          <ul>
+            3  1 Mon 05 First Monday In May<br>
+            3  2 Mon 05 Second Monday In May<br>
+            3 -1 Mon 05 Last Monday In May<br>
+            3  0 Mon 05 Each Monday In May<br>
+          </ul>
+          </li>
+      <li>4<br>
+          Interval. Arguments: &lt;MM-DD&gt; &lt;MM-DD&gt; &lt;holiday-name&gt;
+          .<br>
+          Example:<br> 
+          <ul>
+            4 01-06 31-06 Summer holiday<br>
+          </ul>
+          </li>
+    </ul>
+    See also he.holiday in the contrib directory for official holidays in the
+    german country of Hessen.
+  </ul>
+  <br>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <b>Get</b>
+    <ul>
+      <code>get &lt;name&gt; &lt;MM-DD&gt;</code>
+      <br><br>
+      Return the holiday name of the specified date or the text none.
+      <br><br>
+    </ul>
+    <br>
+
+  <b>Attributes</b><ul>N/A</ul><br>
 
 </ul>
 
@@ -3402,7 +3589,10 @@ isday, sunrise_coord</pre>
      $yday, $isdst are set (see perldoc -f localtime), with the exception that
      $month is in the range of 1 to 12, and $year is also corrected by 1900 (as
      one would normally expect). Additionally $we is 1 if it is weekend (i.e
-     $wday == 0 || $wday == 6), and 0 otherwise.  Example:
+     $wday == 0 || $wday == 6), and 0 otherwise. If the <a
+     href="#holiday2we>holida2we</a> global attribute is set, $we is 1 for
+     holidays too.
+     Example:
 
      <ul>
        define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) { fhem "set
