@@ -106,7 +106,7 @@ holiday_refresh($$)
       } elsif($a[1] < 0) {          # N'th day from the end
         my $d = $fd[3] - ($a[1]+1)*7;
         my $md = $md[$fd[4]];
-        $md++ if($fd[5]%4 == 0);
+        $md++ if(schaltjahr($fd[5]+1900) && $fd[4] == 1);
         next if($d > $md || $d < $md-6);
       }
 
@@ -145,6 +145,16 @@ holiday_Get($@)
   return "argument is missing" if(int(@a) != 2);
   return "wrong argument: need MM-DD" if($a[1] !~ m/[01]\d-[0-3]\d/);
   return holiday_refresh($hash->{NAME}, $a[1]);
+}
+
+sub
+schaltjahr($)
+{
+  my($jahr) = @_;
+  return 0 if $jahr % 4;       # 2009
+  return 1 unless $jahr % 400; # 2000
+  return 0 unless $jahr % 100; # 2100
+  return 1;                    # 2012
 }
 
 1;
