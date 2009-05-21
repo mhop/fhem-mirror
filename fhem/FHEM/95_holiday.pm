@@ -1,4 +1,4 @@
-##############################################
+
 package main;
 
 use strict;
@@ -25,7 +25,9 @@ holiday_Define($$)
 {
   my ($hash, $def) = @_;
 
-  return holiday_refresh($hash->{NAME}, undef);
+  return holiday_refresh($hash->{NAME}, undef) if($init_done);
+  InternalTimer(gettimeofday()+1, "holiday_refresh", $hash->{NAME}, 0);
+  return undef;
 }
 
 sub
@@ -75,7 +77,6 @@ holiday_refresh($$)
     } elsif($l =~ m/^2/) {          # Easter date: 2 +1 Ostermontag
 
       eval { require DateTime::Event::Easter } ;
-
       if( $@) {
         Log 1, "$@";
 
@@ -93,6 +94,7 @@ holiday_refresh($$)
       my %wd = ("Sun"=>0, "Mon"=>1, "Tue"=>2, "Wed"=>3,
                 "Thu"=>4, "Fri"=>5, "Sat"=>6);
       my @md = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31);
+      $md[1]=29 if(schaltjahr($fd[5]+1900) && $fd[4] == 1);
       my $wd = $wd{$a[2]};
       if(!defined($wd)) {
         Log 1, "Wrong timespec: $l";
@@ -120,7 +122,9 @@ holiday_refresh($$)
         last;
       }
     }
+
   }
+  close(FH);
 
   RemoveInternalTimer($name);
   $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0]);         # Midnight
@@ -143,7 +147,7 @@ holiday_Get($@)
   my ($hash, @a) = @_;
 
   return "argument is missing" if(int(@a) != 2);
-  return "wrong argument: need MM-DD" if($a[1] !~ m/[01]\d-[0-3]\d/);
+  return "wrong argument: need MM-DD" if($a[1] !~ m/^[01]\d-[0-3]\d$/);
   return holiday_refresh($hash->{NAME}, $a[1]);
 }
 
