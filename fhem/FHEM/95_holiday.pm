@@ -108,7 +108,6 @@ holiday_refresh($$)
       } elsif($a[1] < 0) {          # N'th day from the end
         my $d = $fd[3] - ($a[1]+1)*7;
         my $md = $md[$fd[4]];
-        $md++ if(schaltjahr($fd[5]+1900) && $fd[4] == 1);
         next if($d > $md || $d < $md-6);
       }
 
