@@ -396,5 +396,3 @@
   - pgm3: bugfix, format table for userdef
   - pgm3: feature X10_support, taillogorder optional with date
   - pgm3: HMS100CO added, fhem.html relating pgm3 updated
-  
-

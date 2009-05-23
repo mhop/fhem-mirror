@@ -33,7 +33,6 @@ install-base:
 	mkdir -p $(BINDIR) $(MODDIR) $(VARDIR)
 	cp fhem.pl $(BINDIR)
 	cp -r FHEM $(MODDIR)
-	mkdir -p $(VARDIR)
 	perl -pi -e 's,modpath \.,modpath $(MODDIR),' examples/[a-z]*
 	perl -pi -e 's,/tmp,$(VARDIR),' examples/[a-z]*
 

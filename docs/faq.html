@@ -214,9 +214,8 @@ that 255 should be the default?</b>
 <b>8. The time specification of the builtin at command is not very
 flexible. Please add day/month/weekday to it.</b>
 <ul>
-  I think the command is complex and flexible enough. Use a perl expression
-  for this functionality like (described in the commandref.html):
-  <pre>at *07:00:00 { fhz "set lamp on" if($we) }</pre>
+  Please take a look at the holiday device, and the perl helper variables (both
+  described in the commandref.html).
 </ul>
 
 
@@ -234,7 +233,8 @@ it.</b>
 by fhem.pl?</b>
 
 <ul>
-   Convert the first 2 digits first from decimal to hex, then the next two. Example:<br>
+   Convert the first 2 digits first from decimal to hex, then the next two.
+   Example:<br>
 	 <pre>
          % bc
 	 obase=16
