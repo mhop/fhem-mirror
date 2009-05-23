@@ -120,6 +120,46 @@ holiday_refresh($$)
         $found = $args[3];
         last;
       }
+
+    } elsif($l =~ m/^5/) { # nth weekday since MM-DD / before MM-DD
+      my @a = split(" +", $l, 6);
+      # arguments: 5 <distance> <weekday> <day> <month> <name>
+      my %wd = ("Sun"=>0, "Mon"=>1, "Tue"=>2, "Wed"=>3,
+                "Thu"=>4, "Fri"=>5, "Sat"=>6);
+      my $wd = $wd{$a[2]};
+      if(!defined($wd)) {
+        Log 1, "Wrong weekday spec: $l";
+        next;
+      }
+      next if $wd != $fd[6]; # check wether weekday matches today
+      my $yday=$fd[7];
+      # create time object of target date - mktime counts months and their
+      # days from 0 instead of 1, so subtract 1 from each
+      my $tgt=mktime(0,0,1,$a[3]-1,$a[4]-1,$fd[5],0,0,-1);
+      my $tgtmin=$tgt;
+      my $tgtmax=$tgt;
+      my $weeksecs=7*24*60*60; # 7 days, 24 hours, 60 minutes, 60seconds each
+      my $cd=mktime(0,0,1,$fd[3],$fd[4],$fd[5],0,0,-1);
+      if ( $a[1] =~ /^-([0-9])*$/ ) {
+        $tgtmin -= $1*$weeksecs; # Minimum: target date minus $1 weeks
+        $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
+	# needs to be lower than max and greater than or equal to min
+        if ( ($cd ge $tgtmin) && ( $cd lt $tgtmax) ) {
+		$found=$a[5];
+		last;
+	}
+      } elsif ( $a[1] =~ /^\+?([0-9])*$/ ) {
+        $tgtmin += ($1-1)*$weeksecs; # Minimum: target date plus $1-1 weeks
+        $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
+	# needs to be lower than or equal to max and greater min
+        if ( ($cd gt $tgtmin) && ( $cd le $tgtmax) ) {
+		$found=$a[5];
+		last;
+	}
+      } else {
+        Log 1, "Wrong distance spec: $l";
+        next;
+      }
     }
 
   }

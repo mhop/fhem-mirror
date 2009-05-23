@@ -1,3 +1,4 @@
+#!/usr/bin/perl
 die("Usage: checkmsg HEX-FHZ-MESSAGE\n") if(int(@ARGV) != 1);
 my $msg = $ARGV[0];
 
