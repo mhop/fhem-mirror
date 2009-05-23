@@ -4,6 +4,7 @@ FHEM:
 - holiday database
 - fhem-to-fhem module
 - CUR built-in MENU creation support
+- Remove or reimplement repeater attribute (cul/fhz/doc)
 
 Webpgm2
 - plot data from multiple files in a single picture

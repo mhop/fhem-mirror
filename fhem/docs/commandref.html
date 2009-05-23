@@ -2964,9 +2964,20 @@ A line ending with \ will be concatenated with the next one, so long lines
             4 01-06 31-06 Summer holiday<br>
           </ul>
           </li>
+      <li>5<br>
+          Date relative, weekday fixed holiday. Arguments: &lt;nth&gt;
+          &lt;weekday&gt; &lt;month&gt; &lt;day&gt; &lt; holiday-name&gt;<br>
+          Note that while +0 or -0 as offsets are not forbidden, their behaviour
+          is undefined in the sense that it might change without notice.<br>
+          Examples:<br>
+          <ul>
+            5 -1 Wed 11 23 Buss und Bettag (first Wednesday before Nov, 23rd)<br>
+            5 1 Mon 01 31 First Monday after Jan, 31st (1st Monday in February)<br>
+          </ul>
+          </li>
     </ul>
     See also he.holiday in the contrib directory for official holidays in the
-    german country of Hessen.
+    german country of Hessen, and by.holiday for the Bavarian definition.
   </ul>
   <br>
 

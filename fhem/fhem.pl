@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.70 2009-04-11 08:20:13 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.71 2009-05-23 07:32:08 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -167,7 +167,7 @@ $modules{_internal_}{LOADED} = 1;
 $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
-        "verbose:1,2,3,4,5 mseclog version nofork logdir";
+        "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we";
 $modules{_internal_}{AttrFn} = "GlobalAttr";
 
 
@@ -294,7 +294,8 @@ while (1) {
   }
 
   my $timeout = HandleTimeout();
-  $timeout = $readytimeout if(!defined($timeout) && keys %readyfnlist);
+  $timeout = $readytimeout if(keys(%readyfnlist) &&
+                              (!defined($timeout) || $timeout > $readytimeout));
   my $nfound = select($rout=$rin, undef, undef, $timeout);
 
   CommandShutdown(undef, undef) if($sig_term);
@@ -526,6 +527,10 @@ AnalyzeCommand($$)
     }
     my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
     my $we = (($wday==0 || $wday==6) ? 1 : 0);
+    if(!$we) {
+      my $h2we = $attr{global}{holiday2we};
+      $we = 1 if($h2we && $value{$h2we} ne "none");
+    }
     $month++;
     $year+=1900;
 
@@ -839,7 +844,7 @@ CommandSave($$)
   print SFH "\n";
 
   # then the "important" ones (FHZ, WS300Device)
-  foreach my $d (sort keys %savefirst) {
+  foreach my $d (sort { $defs{$a}{NR} <=> $defs{$b}{NR} } keys %savefirst) {
     my $r = $savefirst{$d};
     delete $rooms{$r}{$d};
     delete $rooms{$r} if(! %{$rooms{$r}});
