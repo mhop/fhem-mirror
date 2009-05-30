@@ -498,3 +498,4 @@
   - bugfix:  FHT "summer" fix (avoiding a lot of syncnow)
   - feature: FHEMWEB modules added
   - feature: holiday module + doc + example + holiday2we attribute
+  - bugfix:  sunrise stuff fixed, doc missing

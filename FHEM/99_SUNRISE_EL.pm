@@ -12,7 +12,7 @@ use strict;
 use warnings;
 use Math::Trig;
 
-sub sr($$$$);
+sub sr($$$$$$);
 sub sunrise_rel(@);
 sub sunset_rel(@);
 sub sunrise_abs(@);
@@ -38,55 +38,55 @@ SUNRISE_EL_Initialize($)
   my ($hash) = @_;
 }
 
+
 ##########################
-# Compute:
+# Compute the _next_ event
 # rise:  1: event is sunrise (else sunset)
-# isrel: 1: _relative_ times until the next event (else absolute for today)
+# isrel: 1: relative times
 # seconds: second offset to event
 # daycheck: if set, then return 1 if the sun is visible, 0 else
 sub
-sr($$$$)
+sr($$$$$$)
 {
-  my ($rise, $seconds, $isrel, $daycheck) = @_;
+  my ($rise, $seconds, $isrel, $daycheck, $min, $max) = @_;
   my $needrise = ($rise || $daycheck) ? 1 : 0;
   my $needset = (!$rise || $daycheck) ? 1 : 0;
+  $seconds = 0 if(!$seconds);
 
   my $nt = time;
   my @lt = localtime($nt);
   my $gmtoff = _calctz($nt,@lt); # in hour
-  my ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
 
-  my $nh = $lt[2] + $lt[1]/60 + $lt[0]/3600;
+  my ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
+  my $sst = ($rise ? $rt : $st) + ($seconds/3600);
+
+  my $nh = $lt[2] + $lt[1]/60 + $lt[0]/3600;    # Current hour since midnight
   if($daycheck) {
     return 0 if($nh < $rt || $nh > $st);
     return 1;
   }
 
-  $seconds = 0 if(!$seconds);
-  my $sst = ($rise ? $rt : $st);
-  if(!$isrel) {
-    $sst += ($seconds/3600);
-    return h2hms_fmt($sst);
-  }
-
-  $sst += ($seconds/3600);
-
   my $diff = 0;
-  if(int(($nh-$sst)*3600) >= 0) {
-    $nt += 86400; # Tommorow
+  if($data{AT_RECOMPUTE} ||                     # compute it for tommorow
+     int(($nh-$sst)*3600) >= 0) {               # if called a subsec earlier
+    $nt += 86400;
     $diff = 24;
     @lt = localtime($nt);
     $gmtoff = _calctz($nt,@lt); # in hour
 
     ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
-
-    $sst = ($rise ? $rt : $st);
-    $sst += ($seconds/3600);
+    $sst = ($rise ? $rt : $st) + ($seconds/3600);
   }
 
-  $diff = $diff + $sst - $nh;
-  return h2hms_fmt($diff);
+  $sst = hms2h($min) if(defined($min) && (hms2h($min) > $sst));
+  $sst = hms2h($max) if(defined($max) && (hms2h($max) < $sst));
+
+  $sst += $diff if($isrel);
+  $sst -= $nh if($isrel == 1);
+
+  return h2hms_fmt($sst);
 }
+
 
 sub
 _sr($$$$$$)
@@ -305,6 +305,15 @@ _calctz($@)
   
 
 sub
+hms2h($)
+{
+  my $in = shift;
+  my @a = split(":", $in);
+  return 0 if(int(@a) < 2 || $in !~ m/^[\d:]*$/);
+  return $a[0]+$a[1]/60 + ($a[2] ? $a[2]/3600 : 0);
+}
+
+sub
 h2hms($)
 {
   my ($in) = @_;
@@ -324,11 +333,13 @@ h2hms_fmt($)
 }
 
 
-sub sunrise_rel(@) { return sr(1, shift, 1, 0) }
-sub sunset_rel(@)  { return sr(0, shift, 1, 0) }
-sub sunrise_abs(@) { return sr(1, shift, 0, 0) }
-sub sunset_abs(@)  { return sr(0, shift, 0, 0) }
-sub isday()        { return sr(1,     0, 0, 1) }
+sub sunrise_rel(@) { return sr(1, shift, 1, 0, shift, shift) }
+sub sunset_rel(@)  { return sr(0, shift, 1, 0, shift, shift) }
+sub sunrise_abs(@) { return sr(1, shift, 0, 0, shift, shift) }
+sub sunset_abs(@)  { return sr(0, shift, 0, 0, shift, shift) }
+sub sunrise(@)     { return sr(1, shift, 2, 0, shift, shift) }
+sub sunset(@)      { return sr(0, shift, 2, 0, shift, shift) }
+sub isday()        { return sr(1,     0, 0, 1, undef, undef) }
 sub sunrise_coord($$$) { ($long, $lat, $tz) = @_; return undef; }
 
 1;
