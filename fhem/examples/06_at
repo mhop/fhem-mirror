@@ -34,11 +34,11 @@ define a11 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
 
 ##################################
 # Switch lamp1 and lamp2 on from 7:00 till 10 minutes after sunrise
-define a12 at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
+define a12 at *07:00 set lamp1,lamp2 on-till {sunrise(+600)}
 
 ##################################
-# Switch lamp1 on at sunrise, but not before 07:00
-define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1 on
+# Switch lamp1 on at sunrise, but not before 07:00 and not after 09:00
+define a13 at +*{sunrise(0,"07:00","09:00"))} set lamp1 on
 
 ##################################
 # Blink 3 times if the piri sends a command
