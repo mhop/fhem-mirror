@@ -577,11 +577,9 @@ CUL_Write($$$)
   } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
 
     my $moff = 10;
-    Log 1, "Parse: $msg";
     while(length($msg) > $moff) {
       my $snd = substr($msg,6,4) .
                 substr($msg,$moff,2) . "79" . substr($msg,$moff+2,2);
-      Log 1, "Dumping: T$snd";
       $hash->{PortObj}->write("T$snd\n");
       $moff += 4;
     }
