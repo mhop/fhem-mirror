@@ -41,7 +41,7 @@ CUL_WS_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   return "wrong syntax: define <name> CUL_WS <code> [corr1...corr4]"
-            if(int(@a) < 3 || int(@a) > 6);
+            if(int(@a) < 3 || int(@a) > 7);
   $a[2] = lc($a[2]);
   return "Define $a[0]: wrong CODE format: valid is 1-8"
                 if($a[2] !~ m/^[1-8]$/);

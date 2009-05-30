@@ -96,7 +96,8 @@ KS300_Parse($$)
                 "israining", "unknown1", "unknown2", "unknown3");
     my @sfx = ( "(counter)", "(l/m2)", "(km/h)", "(%)", "(Celsius)",
                 "(yes/no)", "","","");
-
+    my %repchanged = ("rain"=>1, "wind"=>1, "humidity"=>1, "temperature"=>1,
+                "israining"=>1);
 
     # counter for the change hash
     my $n= 1; # 0 is STATE and will b explicitely set
@@ -194,12 +195,10 @@ KS300_Parse($$)
     # remember tsecs
     $r->{tsecs}{TIME} = $tm;
     $r->{tsecs}{VAL} = "$tsecs";
-    $def->{CHANGED}[$n++] = "tsecs: $tsecs";
 
     # remember rain_raw_adj
     $r->{rain_raw_adj}{TIME} = $tm;
     $r->{rain_raw_adj}{VAL} = $rain_raw_adj;
-    $def->{CHANGED}[$n++] = "rain_raw_adj: $rain_raw_adj";
 
 
     # KS300 has a sensor which detects any drop of rain and immediately
@@ -238,7 +237,8 @@ KS300_Parse($$)
       $r->{$txt[$i]}{TIME} = $tm;
       $val = "$v[$i] $sfx[$i]";
       $r->{$txt[$i]}{VAL} = $val;
-      $def->{CHANGED}[$n++] = "$txt[$i]: $val";
+      $def->{CHANGED}[$n++] = "$txt[$i]: $val"
+                if(defined($repchanged{$txt[$i]}));
     }
 
     ###################################

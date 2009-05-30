@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.71 2009-05-23 07:32:08 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.72 2009-05-30 15:11:56 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -613,9 +613,15 @@ devspec2array($)
     if($l =~ m/(.*)=(.*)/) {
       my ($lattr,$re) = ($1, $2);
       if($knownattr{$lattr}) {
-        foreach my $l (sort keys %defs) {
-          push @ret, $l
-            if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr} =~ m/$re/));
+        eval {                          # a bad regexp may shut down fhem.pl
+          foreach my $l (sort keys %defs) {
+              push @ret, $l
+                if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr} =~ m/$re/));
+          }
+        };
+        if($@) {
+          Log 1, "devspec2array $name: $@";
+          return $name;
         }
       } else {
         foreach my $l (sort keys %attr) {
@@ -627,9 +633,15 @@ devspec2array($)
       next;
     }
 
-    if($l =~ m/[*\[\]^\$]/) {           # Regexp
-      push @ret, grep($_ =~ m/$l/, sort keys %defs);
-      next;
+    eval {                              # a bad regexp may shut down fhem.pl
+      if($l =~ m/[*\[\]^\$]/) {         # Regexp
+        push @ret, grep($_ =~ m/$l/, sort keys %defs);
+        next;
+      }
+    };
+    if($@) {
+      Log 1, "devspec2array $name: $@";
+      return $name;
     }
 
     if($l =~ m/-/) {                    # Range

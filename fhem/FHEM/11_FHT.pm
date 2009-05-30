@@ -412,12 +412,14 @@ FHT_Parse($$)
 
   }
 
-  $cmd = "FHZ:$cmd" if(substr($msg,24,1) eq "7");
-
-  $def->{READINGS}{$cmd}{TIME} = $tn;
-  $def->{READINGS}{$cmd}{VAL} = $val;
+  if(substr($msg,24,1) eq "7") {
+    $cmd = "FHZ:$cmd";
+  } else {
+    $def->{READINGS}{$cmd}{TIME} = $tn;
+    $def->{READINGS}{$cmd}{VAL} = $val;
+    $def->{STATE} = "$cmd: $val" if($cmd eq "measured-temp");
+  }
   $def->{CHANGED}[0] = "$cmd: $val";
-  $def->{STATE} = "$cmd: $val" if($cmd eq "measured-temp");
 
   Log 4, "FHT $name $cmd: $val";
 
