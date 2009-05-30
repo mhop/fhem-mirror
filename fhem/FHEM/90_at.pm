@@ -119,7 +119,10 @@ at_Exec($)
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
     Log GetLogLevel($name,5), "redefine at command $name as $def";
+
+    $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
+    delete($data{AT_RECOMPUTE});
     $attr{$name} = $oldattr;
   }
   $at_tdiff = undef;

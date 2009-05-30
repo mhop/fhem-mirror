@@ -2848,10 +2848,14 @@ A line ending with \ will be concatenated with the next one, so long lines
     define a12 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
 
     # Switch lamp1 and lamp2 on from 7:00 till 10 minutes after sunrise
-    define a13 at *07:00 set lamp1,lamp2 on-till {sunrise_abs(+600)}
+    define a13 at *07:00 set lamp1,lamp2 on-till {sunrise(+600)}
 
     # Switch the lamp off 2 minutes after sunrise each day
-    define a14 at +*{sunrise_rel(+120)} set lamp on
+    define a14 at +{sunrise(+120)} set lamp on
+
+    # Switch lamp1 on at sunset, not before 18:00 and not after 21:00
+    define a15 at *{sunset(0,"18:00","21:00")} set lamp1 on
+
     </PRE>
 
     Notes:<br>
@@ -2864,11 +2868,9 @@ A line ending with \ will be concatenated with the next one, so long lines
       </li>
 
       <li>if the current time is greater than the time specified, then the
-          command will be executed tomorrow. This is why the relative forms
-          of the sunset/sunrise functions should be used with the relative
-          (+) flag</li>
+          command will be executed tomorrow.</li>
 
-      <li>In order to use the sunrise_rel()/sunset_rel() functions,
+      <li>In order to use the sunrise()/sunset() functions,
           put { sunrise_coord(long, lat, "") } into your
           <a href="#lastinclude">lastinclude</a> file, as in the above example.
           If you are not using sunrise_coord, then the coordinates for
@@ -3420,25 +3422,32 @@ A line ending with \ will be concatenated with the next one, so long lines
 <h3>SUNRISE_EL</h3>
 <ul>
   This module is used to define the functions<pre>
+sunrise, sunset,
 sunrise_rel, sunset_rel
 sunrise_abs, sunset_abs
 isday, sunrise_coord</pre>
-  perl functions, to be used in <a href="#at">at</a> or <a
-  href="#notify">notify</a> commands.<br>
+  perl functions, to be used in <a href="#at">at</a> or FS20 on-till commands.<br>
   First you should call the sunrise_coord function with your exact longitude
   and latitude (see e.g. maps.google.com for the exact values, which should be
   in the form of a floating point value). This command should be part of the
   <a href="#lastinclude">lastinclude</a> file. The default value is Frankfurt
   am Main, Germany.<br><br>
 
-  sunrise_rel()/sunset_rel() return the relative time to the next
-  sunrise/sunset.  The argument (in seconds) will be added to this time. The
-  relative values should be used as arguments to the <a href="#at">at</a>, see
-  the examples there for details.<br><br>
+  sunrise()/sunset() returns the absolute time of the next sunrise/sunset,
+  adding 24 hours if the next event is tomorrow, to use it in the timespec of
+  an at device or for the on-till command for FS20 devices.<br>
 
-  sunrise_abs()/sunset_abs() return the absolute time to the next
-  sunrise/sunset, with the argument added to the time. These are used e.g. in
-  arguments to the "on-till" FS20 command.<br><br>
+  sunrise_rel()/sunset_rel() returns the relative time to the next
+  sunrise/sunset. <br>
+  sunrise_abs()/sunset_abs() return the absolute time of the corresponding
+  event today (no 24 hours added).<br>
+  All functions take up to three arguments:<br>
+  <ul>
+    <li>The first specifies an offset (in seconds), which will be added to the
+    event.
+    <li>The second and third specify min and max values (format: "HH:MM").
+  </ul>
+  <br>
 
   isday() can be used in some notify or at commands to check if the sun is up or
   down.
