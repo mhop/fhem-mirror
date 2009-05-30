@@ -499,3 +499,4 @@
   - feature: FHEMWEB modules added
   - feature: holiday module + doc + example + holiday2we attribute
   - bugfix:  sunrise stuff fixed, doc missing
+  - feature: CUL FHT sending added
