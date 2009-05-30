@@ -77,15 +77,18 @@ CUL_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $po;
 
-  return "wrong syntax: define <name> CUL devicename [mobile]"
-    if(@a < 3 || @a > 4);
+  return "wrong syntax: define <name> CUL devicename <FHTID> [mobile]"
+    if(@a < 4 || @a > 5);
 
   delete $hash->{PortObj};
   delete $hash->{FD};
 
   my $name = $a[0];
   my $dev = $a[2];
-  $hash->{MOBILE} = 1 if($a[3] && $a[3] eq "mobile");
+  return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
+                if($a[3] !~ m/^[0-6]\d[0-6]\d$/);
+  $hash->{FHTID} = uc($a[3]);
+  $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
   $hash->{STATE} = "defined";
 
   $attr{$name}{savefirst} = 1;
@@ -460,6 +463,19 @@ CUL_DoInit($)
   }
 
   CUL_SimpleWrite($hash, $initstr);
+
+  # FHTID
+  my $fhtid;
+  CUL_SimpleWrite($hash, "T01");
+  ($err, $fhtid) = CUL_ReadAnswer($hash, "FHTID", 0);
+  return "$name: $err" if($err);
+  $fhtid =~ s/[\r\n]//g;
+  Log 5, "GOT CUL fhtid: $fhtid";
+  if(!defined($fhtid) || $fhtid ne $hash->{FHTID}) {
+    Log 2, "Setting CUL fhtid to " . $hash->{FHTID};
+    CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
+  }
+
   $hash->{STATE} = "Initialized";
 
   # Reset the counter
@@ -558,6 +574,19 @@ CUL_Write($$$)
   } elsif($fn eq "04" && substr($msg,0,6) eq "010101") {   # FS20
     $fn = "F";
     $msg = substr($msg,6);
+  } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
+
+    my $moff = 10;
+    Log 1, "Parse: $msg";
+    while(length($msg) > $moff) {
+      my $snd = substr($msg,6,4) .
+                substr($msg,$moff,2) . "79" . substr($msg,$moff+2,2);
+      Log 1, "Dumping: T$snd";
+      $hash->{PortObj}->write("T$snd\n");
+      $moff += 4;
+    }
+    return;
+
   } else {
     Log GetLogLevel($name,2), "CUL cannot translate $fn $msg";
     return;
