@@ -500,3 +500,4 @@
   - feature: holiday module + doc + example + holiday2we attribute
   - bugfix:  sunrise stuff fixed, doc missing
   - feature: CUL FHT sending added
+  - bugfix:  workaround to make M232 counter wraparound
