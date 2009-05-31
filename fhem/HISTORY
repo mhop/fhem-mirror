@@ -400,3 +400,6 @@
 - Sat May 30 2009 (Rudi)
   - 99_SUNRISE_EL: sunrise/sunset called in "at" computes correctly the next
     event. New "sunrise()/sunset()" calls added, min max optional parameter.
+
+- Sun May 31 2009 (Boris)
+  - 81_M232Counter.pm: counter stops at 65536; workaround makes counter wraparound
