@@ -45,7 +45,7 @@ M232Counter_GetStatus($)
 
   my $d = IOWrite($hash, "z");
   if(!defined($d)) {
-    my $msg = "M232Counter $name read error";
+    my $msg = "M232Counter $name tick count read error";
     Log GetLogLevel($name,2), $msg;
     return $msg;
   }
@@ -73,7 +73,8 @@ M232Counter_GetStatus($)
   }
   my $basis_prev= $basis;
 
-  # previous count
+
+  # previous count (this variable is currently unused)
   my $count_prev;
   if(defined($r->{count})) {
 	$count_prev= $r->{count}{VAL};
@@ -83,10 +84,20 @@ M232Counter_GetStatus($)
 
   # current count
   my $count= hex $d;
-  if($count< $count_prev) {
-        $basis+= 65536;
-	$r->{basis}{VAL} = $basis;
-	$r->{basis}{TIME}= $tn;
+  # If the counter reaches 65536, the counter does not wrap around but
+  # stops at 0. We therefore purposefully reset the counter to 0 before
+  # it reaches its final tick count.
+  if($count > 64000) {
+    $basis+= count;
+    $count= 0;
+    $r->{basis}{VAL} = $basis;
+    $r->{basis}{TIME}= $tn;
+    my $ret = IOWrite($hash, "Z1");
+    if(!defined($ret)) {
+      my $msg = "M232Counter $name reset error";
+      Log GetLogLevel($name,2), $msg;
+      return $msg;
+    }
   }
 
   # previous value
@@ -110,7 +121,8 @@ M232Counter_GetStatus($)
   $r->{tsecs}{TIME} = $tn;
   $r->{tsecs}{VAL} = $tsecs;
 
-  $hash->{CHANGED}[0]= "value: $value";
+  $hash->{CHANGED}[0]= "count: $count";
+  $hash->{CHANGED}[1]= "value: $value";
 
   # delta
   my $tsecs_delta= $tsecs-$tsecs_prev;
@@ -121,7 +133,7 @@ M232Counter_GetStatus($)
     $delta= int($delta*1000.0+0.5)/1000.0;
     $r->{delta}{TIME} = $tn;
     $r->{delta}{VAL} = $delta;
-    $hash->{CHANGED}[1]= "delta: $delta";
+    $hash->{CHANGED}[2]= "delta: $delta";
   }
 
 
