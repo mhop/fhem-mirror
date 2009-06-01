@@ -403,3 +403,7 @@
 
 - Sun May 31 2009 (Boris)
   - 81_M232Counter.pm: counter stops at 65536; workaround makes counter wraparound
+
+- Mon Jun 01 2009 (Boris)
+  - 59_Weather.pm: new virtual device for weather forecasts, documentation
+    updated.
