@@ -21,7 +21,8 @@ my %gets = (
   "ccconf"   => "=",
   "uptime"   => "t",
   "file"     => "",
-  "time"     => "c03"
+  "time"     => "c03",
+  "fhtbuf"   => "T03"
 );
 
 my %sets = (
