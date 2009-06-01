@@ -88,7 +88,7 @@ M232Counter_GetStatus($)
   # stops at 0. We therefore purposefully reset the counter to 0 before
   # it reaches its final tick count.
   if($count > 64000) {
-    $basis+= count;
+    $basis+= $count;
     $count= 0;
     $r->{basis}{VAL} = $basis;
     $r->{basis}{TIME}= $tn;
