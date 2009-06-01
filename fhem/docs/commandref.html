@@ -1538,7 +1538,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CULdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; CUL &lt;serial-device&gt; [mobile]</code> <br>
+    <code>define &lt;name&gt; CUL &lt;serial-device&gt; &lt;housecode&gt; [mobile]</code> <br>
     <br>
     Specifies the serial port to communicate with the CUL or CUR.
     The name(s) of the serial-device(s) depends on your distribution,
@@ -1548,10 +1548,11 @@ A line ending with \ will be concatenated with the next one, so long lines
     If the serial-device is called none, then no device will be opened, so you
     can experiment without hardware attached.<br>
     If you specify the "mobile" parameter, then fhem.pl won't block if the
-    device is removed. This is mainly intended for the CUR.
+    device is removed. This is mainly intended for the CUR.<br>
+    The housecode is a 4 digit hex number, and it is used when the CUL/CUR
+    talks to FHT devices or when CUR requests data.
   </ul>
   <br>
-
   <a name="CULset"></a>
   <b>Set </b>
   <ul>

@@ -99,8 +99,8 @@ my %cantset = (
 my %priority = (
   "desired-temp"=> 1,
   "mode"	=> 2,
-  "report1"    => 3,
-  "report2"    => 3,
+  "report1"     => 3,
+  "report2"     => 3,
   "holiday1"	=> 4,
   "holiday2"	=> 5,
   "day-temp"	=> 6,
@@ -157,10 +157,18 @@ FHT_Set($@)
   return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
 
   my $name = shift(@a);
-  # Backward compatibility, replace refreshvalues with report1 and report2.
+
+  # Replace refreshvalues with report1 and report2, and time with hour/minute
   for(my $i = 0; $i < @a; $i++) {
     splice(@a,$i,1,("report1","255","report2","255"))
         if($a[$i] eq "refreshvalues");
+
+    if($a[$i] eq "time") {                              # CUL hack
+      my @t = localtime;
+      splice(@a,$i,1,("hour",$t[2],"minute",$t[1]));
+      IOWrite($hash, "", sprintf("T04%x", $t[0]) )
+                  if($hash->{IODev} && $hash->{IODev}->{TYPE} eq "CUL");
+    }
   }
 
   my $ncmd = 0;
