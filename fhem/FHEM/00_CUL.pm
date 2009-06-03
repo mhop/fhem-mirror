@@ -87,7 +87,7 @@ CUL_Define($$)
   my $name = $a[0];
   my $dev = $a[2];
   return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
-                if($a[3] !~ m/^[0-6]\d[0-6]\d$/);
+                if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
   $hash->{FHTID} = uc($a[3]);
   $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
   $hash->{STATE} = "defined";
@@ -555,6 +555,8 @@ CUL_SimpleWrite($$)
   my ($hash, $msg) = @_;
   return if(!$hash || !defined($hash->{PortObj}));
   $hash->{PortObj}->write($msg . "\n");
+  #Log 1, "CUL_SimpleWrite $msg";
+  select(undef, undef, undef, 0.01);
 }
 
 #####################################
@@ -581,7 +583,7 @@ CUL_Write($$$)
     while(length($msg) > $moff) {
       my $snd = substr($msg,6,4) .
                 substr($msg,$moff,2) . "79" . substr($msg,$moff+2,2);
-      $hash->{PortObj}->write("T$snd\n");
+      CUL_SimpleWrite($hash, "T$snd");
       $moff += 4;
     }
     return;
