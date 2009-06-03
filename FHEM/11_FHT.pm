@@ -267,6 +267,7 @@ FHT_SetState($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
 
+  return "Ignoring FHZ state" if($vt =~ m/^FHZ:/);
   $vt =~ s/^FHZ://;
   return "Undefined type $vt" if(!defined($c2b{$vt}));
   return undef;
