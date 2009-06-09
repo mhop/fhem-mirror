@@ -144,7 +144,7 @@ FHT_Initialize($)
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
-                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer";
+                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer lazy";
 }
 
 
@@ -175,11 +175,14 @@ FHT_Set($@)
   my $arg = "020183" . $hash->{CODE};
   my ($cmd, $allcmd, $val) = ("", "", "");
 
+  my $lazy= defined($attr{$name}) &&
+       		defined($attr{$name}{"lazy"}) &&
+       		($attr{$name}{"lazy"}>0);
+  my $readings= $hash->{READINGS};
+
+
   while(@a) {
     $cmd = shift(@a);
-
-    $allcmd .=" " if($allcmd);
-    $allcmd .= $cmd;
 
     return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2bset)
                 if(!defined($c2b{$cmd}));
@@ -187,7 +190,7 @@ FHT_Set($@)
                 if(defined($cantset{$cmd}));
     return "\"set $name $cmd\" needs a parameter"
                 if(@a < 1);
-    $ncmd++;
+
     $val = shift(@a);
     $arg .= $c2b{$cmd};
 
@@ -231,11 +234,24 @@ FHT_Set($@)
       $arg .= sprintf("%02x", $val) if(defined($val));
 
     }
-    $allcmd .= " $val" if($val);
+
+
+    if($lazy && defined($readings->{$cmd}) && $readings->{$cmd}{VAL} eq $val) {
+    	$ret .= "Lazy mode ignores $cmd";
+    	Log GetLogLevel($name,2), "Lazy mode ignores $cmd $val";
+
+    } else {
+	$ncmd++;
+    	$allcmd .=" " if($allcmd);
+    	$allcmd .= $cmd;
+    	$allcmd .= " $val" if($val);
+    }
   }
 
   return "Too many commands specified, an FHT only supports up to 8"
         if($ncmd > 8);
+
+  return $ret if(!$ncmd);
 
   my $ioname = "";
   $ioname = $hash->{IODev}->{NAME} if($hash->{IODev});

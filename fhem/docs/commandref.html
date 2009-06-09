@@ -1439,12 +1439,21 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="minfhtbuffer"></a>
     <li>minfhtbuffer<br/>
         Can be applied to FHT devices.<br/>
-        FHEM wont send commands to the FHZ if its fhtbuffer is below
+        FHEM won't send commands to the FHZ if its fhtbuffer is below
         this value, default is 0. If this value is low, then the ordering of
         fht commands (see the note in the FHT section of <a href="#set">set</a>)
         has little effect, as only commands in the softbuffer can be
         prioritized. The maximum value should be 7 below the hardware maximum
         (see fhtbuf).
+        </li><br>
+
+    <a name="lazy"></a>
+    <li>lazy<br/>
+        Can be applied to FHT devices.<br/>
+        If the lazy attribute is set, FHEM won't send commands to the FHT if
+        the current reading and the value to be set are already identical. This
+        may help avoiding violations of the max-1%-time-on-air rule in large
+        installations. Not set per default.
         </li>
   </ul>
   <br>
