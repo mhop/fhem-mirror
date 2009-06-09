@@ -407,3 +407,6 @@
 - Mon Jun 01 2009 (Boris)
   - 59_Weather.pm: new virtual device for weather forecasts, documentation
     updated.
+
+- Tue Jun 09 2009 (Boris)
+  - 11_FHT.pm: lazy attribute for FHT devices
