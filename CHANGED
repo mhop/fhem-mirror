@@ -502,3 +502,4 @@
   - feature: CUL FHT sending added
   - bugfix:  workaround to make M232 counter wraparound
   - feature: Google Weather API support form FHEM (Boris 2009-06-01)
+  - feature: lazy attribute for FHT devices (Boris 2009-06-09)
