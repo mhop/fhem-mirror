@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.72 2009-05-30 15:11:56 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.73 2009-06-12 09:42:37 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -633,16 +633,18 @@ devspec2array($)
       next;
     }
 
+    my $regok;
     eval {                              # a bad regexp may shut down fhem.pl
       if($l =~ m/[*\[\]^\$]/) {         # Regexp
         push @ret, grep($_ =~ m/$l/, sort keys %defs);
-        next;
+        $regok = 1;
       }
     };
     if($@) {
       Log 1, "devspec2array $name: $@";
       return $name;
     }
+    next if($regok);
 
     if($l =~ m/-/) {                    # Range
       my ($lower, $upper) = split("-", $l, 2);
@@ -1849,7 +1851,8 @@ DoTrigger($$)
       if(defined($modules{$defs{$n}{TYPE}})) {
         if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
           Log 5, "$dev trigger: Checking $n for notify";
-          $ret .= CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+          my $r = CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+          $ret .= $r if($r);
         }
       }
     }
