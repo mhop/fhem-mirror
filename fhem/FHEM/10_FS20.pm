@@ -360,6 +360,20 @@ FS20_Parse($$)
       $lh->{READINGS}{state}{TIME} = TimeNow();
       $lh->{READINGS}{state}{VAL} = $v;
       Log GetLogLevel($n,2), "FS20 $n $v";
+
+      if($follow{$n}) {
+        CommandDelete(undef, $n . "_timer");
+        delete $follow{$n};
+      }
+      if($v =~ m/for-timer/ &&
+        defined($attr{$n}) &&
+        defined($attr{$n}{"follow-on-for-timer"})) {
+        my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
+        Log 4, "Follow: +$to setstate $n off";
+        CommandDefine(undef, $n . "_timer at +$to setstate $n off");
+        $follow{$n} = $to;
+      }
+
       push(@list, $n);
     }
     return @list;
