@@ -217,7 +217,7 @@ FS20_Set($@)
     CommandDelete(undef, $a[0] . "_timer");
     delete $follow{$a[0]};
   }
-  if($a[1] eq "on-for-timer" && $na == 3 &&
+  if($a[1] =~ m/for-timer/ && $na == 3 &&
      defined($attr{$a[0]}) && defined($attr{$a[0]}{"follow-on-for-timer"})) {
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
     $follow{$a[0]} = $to;
