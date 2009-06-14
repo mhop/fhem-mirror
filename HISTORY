@@ -373,6 +373,7 @@
 - Fri Jan  9
   - Added a unified dispatch for CUL/FHZ and CM11, since all of them used the
     same code.
+
   - Addedd IODev attribute to FS20/FHT/HMS/KS300/CUL_WS/CUL/EMWZ/EMGZ/EMEM
 - Sun Jan 11 (Klaus)
   - Added fixedrange option day|week|month|year (for pgm2)
@@ -410,3 +411,6 @@
 
 - Tue Jun 09 2009 (Boris)
   - 11_FHT.pm: lazy attribute for FHT devices
+
+- Sun Jun 14 2009 (Rudi
+  - 11_FHT.pm: tmpcorr attribute for FHT devices
