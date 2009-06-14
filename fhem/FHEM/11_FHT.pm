@@ -144,7 +144,8 @@ FHT_Initialize($)
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
-                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer lazy";
+                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer".
+                  "lazy tmpcorr";
 }
 
 
@@ -418,9 +419,11 @@ FHT_Parse($$)
 
     if(defined($def->{READINGS}{"measured-low"}{VAL})) {
 
+      my $off = ($attr{$name} && $attr{$name}{tmpcorr}) ?
+                        $attr{$name}{tmpcorr} : 0;
       $val = $val*256 + $def->{READINGS}{"measured-low"}{VAL};
       $val /= 10;
-      $val = sprintf("%.1f (Celsius)", $val);
+      $val = sprintf("%.1f (Celsius)", $val+$off);
       $cmd = "measured-temp"
 
     } else {
