@@ -74,6 +74,7 @@
       <a href="#WS2000">WS2000</a> &nbsp;
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#Weather">Weather</a> &nbsp;
+      <a href="#USF1000">USF1000</a> &nbsp;
       <a href="#X10">X10</a> &nbsp;
       <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
 
@@ -2149,7 +2150,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   <br>
 
-  <a name="WS300"></a>
+  <a name="WS300define"></a>
   <b>Define</b>
   <ul>
     <code>define WS300Device WS300 &lt;serial device&gt;</code><br>
@@ -2205,7 +2206,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   <br>
 
-  <a name="Weather"></a>
+  <a name="Weatherdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt;]</code><br>
@@ -2274,6 +2275,71 @@ A line ending with \ will be concatenated with the next one, so long lines
     N/A
   </ul>
   <br>
+</ul>
+
+
+<a name="USF1000"></a>
+<h3>USF1000</h3>
+<ul>
+  Fhem can receive your tank's fill level from the USF1000S device
+  through a <a href="#FHZ">FHZ</a> device, so one must be defined first.
+  The state contains the fill level in % (lower case v in the device state)
+  and the current volume in liters (upper case V in the device state).
+  Measured distance to the liquid's surface, fill level, volume and warnings
+  (Test mode, Battery low) are available.<br>
+  <br>
+
+  <a name="USF1000Define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; USF1000 &lt;geometry&gt;</code>
+    <br><br>
+
+    <code>&lt;geometry&gt;</code> determines the form of the tank and the
+    position of the sensor. The following geometries are currently
+    supported:<br><br>
+    <ul>
+    	<li><code>cub &lt;length&gt; &lt;width&gt; &lt;height&gt; &lt;offset&gt;</code></li>
+    	<li><code>cylv &lt;diameter&gt; &lt;height&gt; &lt;offset&gt;</code></li>
+    </ul>
+    <br>
+    <code>cub</code> stands for a cuboid whose base is &lt;length&gt; &times; &lt;width&gt;.
+    <code>cylv</code> stands for a vertical cylinder whose diameter is &lt;diameter&gt;.
+    &lt;height&gt; is the distance of the surface of the liquid from the ground
+    if the tank is full. &lt;offset&gt; is the distance of the sensor relative to
+    the surface of the liquid. All quantities are expressed in meters.<br>
+    <br>
+
+    Example:<br>
+    <ul>
+      <code>define MyTank USF1000 cylv 2 1 0.3</code>: a cylindrical water tank with
+      2 meters diameter. The water stands 1 meter high if the tank is full. The
+      sensor is fixed 1,3 meters above ground.<br>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (usf1000s)</li>
+  </ul>
+  <br>
+
 </ul>
 
 

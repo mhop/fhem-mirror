@@ -412,5 +412,8 @@
 - Tue Jun 09 2009 (Boris)
   - 11_FHT.pm: lazy attribute for FHT devices
 
-- Sun Jun 14 2009 (Rudi
+- Sun Jun 14 2009 (Rudi)
   - 11_FHT.pm: tmpcorr attribute for FHT devices
+
+- Sat Jun 20 2009 (Boris)
+  - 09_USF1000.pm: new module to support USF1000S devices.
