@@ -73,7 +73,6 @@ CUL_EM_Undef($$)
   return undef;
 }
 
-
 #####################################
 sub
 CUL_EM_Parse($$)
@@ -142,7 +141,6 @@ CUL_EM_Parse($$)
     if($total_cnt< $total_cnt_last) {
         $basis_cnt += 65536;
         $readings{basis} = $basis_cnt;
-        $hash->{CHANGED}[$c++] = "basis: $basis_cnt";
     }
 
     #
@@ -196,7 +194,6 @@ CUL_EM_Parse($$)
         my @cmv = split(" ", $hash->{READINGS}{cum_day}{VAL});
         $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f", $total-$cmv[3], $total, ($total-$cmv[3])*$cost);
         $readings{cum_day} = $val;
-        $hash->{CHANGED}[$c++] = "$val";
         Log GetLogLevel($n,3), "CUL_EM $n: $val";
         #
         if( (localtime($tsecs_prev))[4] != (localtime($tsecs))[4] ) {
@@ -209,7 +206,6 @@ CUL_EM_Parse($$)
             @cmv = split(" ", $hash->{READINGS}{cum_month}{VAL});
             $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f", $total-$cmv[3],$total,($total-$cmv[3])*$cost+$basicfee);
             $readings{cum_month} = $val;
-            $hash->{CHANGED}[$c++] = "$val";
             Log GetLogLevel($n,3), "CUL_EM $n: $val";
           }
         }
@@ -222,6 +218,7 @@ CUL_EM_Parse($$)
     foreach my $k (keys %readings) {
       $hash->{READINGS}{$k}{TIME}= $tn;
       $hash->{READINGS}{$k}{VAL} = $readings{$k};
+      $hash->{CHANGED}[$c++] = "$k: $readings{$k}";
     }
     return $hash->{NAME};
 
