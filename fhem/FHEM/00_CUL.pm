@@ -711,7 +711,7 @@ CUL_Read($)
     my $fn = substr($dmsg,0,1);
     my $len = length($dmsg);
 
-    if($fn eq "F") {                                 # Reformat for 10_FS20.pm
+    if($fn eq "F" && length($dmsg) >= 9) {            # Reformat for 10_FS20.pm
 
       if(defined($attr{$name}) && defined($attr{$name}{CUR_id_list})) {
         my $id= substr($dmsg,1,4);
@@ -745,7 +745,7 @@ CUL_Read($)
     } elsif($fn eq "E") {                            # CUL_EM / Native
       ;
     } else {
-      Log GetLogLevel($name,4), "CUL: unknown message $dmsg";
+      Log GetLogLevel($name,2), "CUL: unknown message $dmsg";
       goto NEXTMSG;
     }
     $hash->{RSSI} = $rssi;
