@@ -59,11 +59,11 @@ FHZ_Initialize($)
   $hash->{WriteFn} = "FHZ_Write";
   $hash->{Clients} = ":FHZ:FS20:FHT:HMS:KS300:USF1000:";
   my %mc = (
+    "0:USF1000" => "^810c04..0101a001a5ceaa00...."
     "1:FS20"  => "^81..(04|0c)..0101a001",
     "2:FHT"   => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
     "3:HMS"   => "^810e04....(1|5|9).a001",
     "4:KS300" => "^810d04..4027a001",
-    "5:USF1000" => "^810c04..0101a001a5ceaa00...."
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "FHZ_Ready";
