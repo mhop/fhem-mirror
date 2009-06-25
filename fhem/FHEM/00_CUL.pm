@@ -48,13 +48,14 @@ CUL_Initialize($)
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:";
+  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:";
   my %mc = (
-    "1:FS20"  => "^81..(04|0c)..0101a001",
-    "2:FHT"   => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
-    "3:KS300" => "^810d04..4027a001",
-    "4:CUL_WS" => "^K.....",
-    "5:CUL_EM" => "^E0.................\$"
+    "1:USF1000" => "^81..(04|0c)..0101a001a5ceaa00....",
+    "2:FS20"    => "^81..(04|0c)..0101a001",
+    "3:FHT"     => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+    "4:KS300"   => "^810d04..4027a001",
+    "5:CUL_WS"  => "^K.....",
+    "6:CUL_EM"  => "^E0.................\$"
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
@@ -473,7 +474,7 @@ CUL_DoInit($)
   $fhtid =~ s/[\r\n]//g;
   Log 5, "GOT CUL fhtid: $fhtid";
   if(!defined($fhtid) || $fhtid ne $hash->{FHTID}) {
-    Log 2, "Setting CUL fhtid to " . $hash->{FHTID};
+    Log 2, "Setting CUL fhtid from $fhtid to " . $hash->{FHTID};
     CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
   }
 
