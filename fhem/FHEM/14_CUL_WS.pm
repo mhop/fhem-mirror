@@ -12,9 +12,6 @@ my %defptr;
 # WS2000/WS7000
 #
 
-my $Station8 = "WS300";
-my $Station4 = "WS7000";
-
 #####################################
 sub
 CUL_WS_Initialize($)
@@ -91,11 +88,10 @@ CUL_WS_Parse($$)
   $def = $defptr{$cde} if(!$def);
   return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
-  if(!$def) 
-     {
-      Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
-  #    return "UNDEFINED CUL_WS: $cde";
-     }
+  if(!$def) {
+    Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
+    return "UNDEFINED CUL_WS: $cde";
+  }
 
   my $tm=TimeNow();
   $hash = $def;
@@ -104,61 +100,60 @@ CUL_WS_Parse($$)
   my $sfirstbyte = $firstbyte & 7;
   my $val = "";
   my $devtype = "unknown";
+  my $family  = "unknown";
+  my ($sgn, $tmp, $rain, $hum, $prs, $wnd);
 
-if($sfirstbyte == 7) 
-   {
-   if($typbyte == 0) 
-      {
-      my $sgn = ($firstbyte&8) ? -1 : 1;
-      my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+  if($sfirstbyte == 7) {
+  
+    if($typbyte == 0) {                         # temp
+      $sgn = ($firstbyte&8) ? -1 : 1;
+      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $val = "T: $tmp";
-      $devtype = "??? Temp";
-      }
+      $devtype = "Temp";
+    }
 
-   if($typbyte == 1) 
-      {
-      my $sgn = ($firstbyte&8) ? -1 : 1;
-      my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-      my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+    if($typbyte == 1) {                         # temp/hum
+      $sgn = ($firstbyte&8) ? -1 : 1;
+      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
-      $devtype = "$Station8 PS50";
-      }
+      $devtype = "PS50";
+      $family = "WS300";
+    }
 
-   if($typbyte == 2) 
-      {
+    if($typbyte == 2) {                         # rain
       #my $more = ($firstbyte&8) ? 0 : 1000;
       my $c = $hash->{corr1} ? $hash->{corr1} : 1;
-      my $hexcount = hex($a[5].$a[3].$a[4]) + $c;
-      $val = "R: $hexcount";
-      $devtype =  "$Station4 Rain";
-      }
+      $rain = hex($a[5].$a[3].$a[4]) + $c;
+      $val = "R: $rain";
+      $devtype =  "Rain";
+      $family = "WS300";
+    }
 
-   if($typbyte == 3) 
-      {
+    if($typbyte == 3) {                         # wind
       my $hun = ($firstbyte&8) ? 100 : 0;
-      my $speed = ($a[6].$a[3].".".$a[4])+$hun;
+      $wnd = ($a[6].$a[3].".".$a[4])+$hun;
       my $dir  = (($a[7]&3).$a[8].$a[5])+0;
       my $swing = ($a[7]&6) >> 2;
-      $val = "W: $speed D: $dir A: $swing";
-      $devtype = "$Station4 Wind";
-      }
+      $val = "W: $wnd D: $dir A: $swing";
+      $devtype = "Wind";
+      $family = "WS300";
+    }
 
-   if($typbyte == 4) 
-      {
-      my $sgn = ($firstbyte&8) ? -1 : 1;
-      my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-      my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
-      my $prs = ($a[9].$a[10])+ 900 + $hash->{corr3};
-      if ($prs < 930) 
-         {
-         $prs = $prs + 100;
-         }
+    if($typbyte == 4) {                         # temp/hum/press
+      $sgn = ($firstbyte&8) ? -1 : 1;
+      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+      $prs = ($a[9].$a[10])+ 900 + $hash->{corr3};
+      if($prs < 930) {
+        $prs = $prs + 100;
+      }
       $val = "T: $tmp  H: $hum  P: $prs";
-      $devtype = "$Station4 Indoor";
-      }
+      $devtype = "Indoor";
+      $family = "WS300";
+    }
 
-   if($typbyte == 5) 
-      {
+    if($typbyte == 5) {                         # brightness
       my $fakt = 1;
       my $rawfakt = ($a[5])+0;
       if($rawfakt == 1) { $fakt =   10; }
@@ -167,94 +162,80 @@ if($sfirstbyte == 7)
      
       my $br = (hex($a[5].$a[4].$a[3])*$fakt)  + $hash->{corr1};
       $val = "B: $br";
-      $devtype = "$Station4 Brightness";
-      }
+      $devtype = "Brightness";
+      $family = "WS300";
+    }
 
-   if($typbyte == 6) 
-      {                   #wurde nie gebaut
-      $devtype = "$Station4 Pyro";
-      }
+    if($typbyte == 6) {                         # Pyro: wurde nie gebaut
+      $devtype = "Pyro";
+      $family = "WS300";
+    }
 
-   if($typbyte == 7) 
-      {
-#      if(@a == 9) 
-#         {            #  S300TH
-#         my $sgn = ($firstbyte&8) ? -1 : 1;
-#         my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-#         my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
-#         $val = "T: $tmp  H: $hum";
-#         $devtype = "S300TH";
-#         } 
-#      elsif(@a == 15) 
-#         {           #  KS300/2#
-#
-#         my $c = $hash->{corr4} ? $hash->{corr4} : 255;
-#         my $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
-#         my $wnd  = sprintf("%0.1f", "$a[9]$a[10].$a[7]" + $hash->{corr3});
-#         my $hum  = sprintf( "%02d", "$a[8]$a[5]" + $hash->{corr2});
-#         my $tmp  = sprintf("%0.1f", ("$a[6]$a[3].$a[4]"+$hash->{corr1}) *
-#                                (($a[1] & 0xC) ? -1 : 1));
-#         my $ir = ((hex($a[1]) & 2)) ? "yes" : "no";
-
-#         $val = "T: $tmp  H: $hum  W: $wnd  R: $rain  IR: $ir";
-#         $devtype = "KS300/2";
-#         }
-#      else
-#        {    
-         my $sgn = ($firstbyte&8) ? -1 : 1;
-         my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-         my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
-         $val = "T: $tmp  H: $hum";
-         $devtype = "??? Temp/Hum";
-#         }
-      }
-   }
-else 
-   {
-#$firstbyte not 7
-   if(@a == 9) 
-      {            #  S300TH
-         my $sgn = ($firstbyte&8) ? -1 : 1;
-         my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-         my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
-         $val = "T: $tmp  H: $hum";
-         $devtype = "$Station8 S300TH";
-      } 
-   elsif(@a == 15) 
-      {           #  KS300/2
-
-         my $c = $hash->{corr4} ? $hash->{corr4} : 255;
-         my $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
-         my $wnd  = sprintf("%0.1f", "$a[9]$a[10].$a[7]" + $hash->{corr3});
-         my $hum  = sprintf( "%02d", "$a[8]$a[5]" + $hash->{corr2});
-         my $tmp  = sprintf("%0.1f", ("$a[6]$a[3].$a[4]"+ $hash->{corr1}),
-                                (($a[1] & 0xC) ? -1 : 1));
-         my $ir = ((hex($a[1]) & 2)) ? "yes" : "no";
-
-         $val = "T: $tmp  H: $hum  W: $wnd  R: $rain  IR: $ir";
-         $devtype = "$Station8 KS300/2";
-      } 
-   else #WS7000 Temp/Hum sensors
-      {
-      my $sgn = ($firstbyte&8) ? -1 : 1;
-      my $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
-      my $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+    if($typbyte == 7) {                         # Temp/hum
+      $sgn = ($firstbyte&8) ? -1 : 1;
+      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
-      $devtype = "WS7000 TH".$sfirstbyte;
-      }
-   }
+      $devtype = "Temp/Hum";
 
-my $name = $hash->{NAME};
-Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
+    }
+    
+  } else {                                      # $firstbyte not 7
 
-$hash->{STATE} = $val;                      # List overview
-$hash->{READINGS}{state}{TIME} = TimeNow(); # For list
-$hash->{READINGS}{state}{VAL} = $val;
-$hash->{CHANGED}[0] = $val;                 # For notify
-$hash->{READINGS}{$devtype}{VAL}=$val;
-$hash->{READINGS}{$devtype}{TIME}=$tm;
+    if(@a == 9) {                               #  S300TH
+      $sgn = ($firstbyte&8) ? -1 : 1;
+      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+      $val = "T: $tmp  H: $hum";
+      $devtype = "S300TH";
+      $family = "WS300";
 
-return $name;
+    } elsif(@a == 15) {                         # KS300/2
+
+      my $c = $hash->{corr4} ? $hash->{corr4} : 255;
+      $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
+      $wnd  = sprintf("%0.1f", "$a[9]$a[10].$a[7]" + $hash->{corr3});
+      $hum  = sprintf( "%02d", "$a[8]$a[5]" + $hash->{corr2});
+      $tmp  = sprintf("%0.1f", ("$a[6]$a[3].$a[4]"+ $hash->{corr1}),
+                             (($a[1] & 0xC) ? -1 : 1));
+      my $ir = ((hex($a[1]) & 2)) ? "yes" : "no";
+
+      $val = "T: $tmp  H: $hum  W: $wnd  R: $rain  IR: $ir";
+      $devtype = "KS300/2";
+      $family = "WS300";
+
+    } else {                                    # WS7000 Temp/Hum sensors
+
+      $sgn = ($firstbyte&8) ? -1 : 1;
+      $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
+      $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
+      $val = "T: $tmp  H: $hum";
+      $devtype = "TH".$sfirstbyte;
+      $family = "WS7000";
+
+    }
+
+  }
+
+  my $name = $hash->{NAME};
+  Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
+
+  if($hum < 0) {
+    Log 1, "BOGUS: $name reading: $val, skipping it";
+    return $name;
+  }
+
+  $hash->{STATE} = $val;                      # List overview
+  $hash->{READINGS}{state}{TIME} = TimeNow(); # For list
+  $hash->{READINGS}{state}{VAL} = $val;
+  $hash->{CHANGED}[0] = $val;                 # For notify
+
+  $hash->{READINGS}{DEVTYPE}{VAL}=$devtype;
+  $hash->{READINGS}{DEVTYPE}{TIME}=$tm;
+  $hash->{READINGS}{DEVFAMILY}{VAL}=$family;
+  $hash->{READINGS}{DEVFAMILY}{TIME}=$tm;
+
+  return $name;
 }
 
 sub
