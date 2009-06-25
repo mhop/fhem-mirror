@@ -21,7 +21,7 @@ USF1000_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^810c04..0101a001a5ceaa00....";
+  $hash->{Match}     = "^81..(04|0c)..0101a001a5ceaa00....";
   $hash->{DefFn}     = "USF1000_Define";
   $hash->{UndefFn}   = "USF1000_Undef";
   $hash->{ParseFn}   = "USF1000_Parse";
