@@ -712,7 +712,7 @@ CUL_Read($)
     my $fn = substr($dmsg,0,1);
     my $len = length($dmsg);
 
-    if($fn eq "F" && length($dmsg) >= 9) {            # Reformat for 10_FS20.pm
+    if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
 
       if(defined($attr{$name}) && defined($attr{$name}{CUR_id_list})) {
         my $id= substr($dmsg,1,4);
@@ -726,13 +726,13 @@ CUL_Read($)
                         $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
-    } elsif($fn eq "T") {                            # Reformat for 11_FHT.pm
+    } elsif($fn eq "T" && $len >= 11) {              # Reformat for 11_FHT.pm
 
       $dmsg = sprintf("81%02x04xx0909a001%s00%s",
                         $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
-    } elsif($fn eq "K") {
+    } elsif($fn eq "K" && $len >= 5) {
 
       if($len == 15) {                               # Reformat for 13_KS300.pm
         my @a = split("", $dmsg);
@@ -743,7 +743,7 @@ CUL_Read($)
       }
       # Other K... Messages ar sent to CUL_WS
 
-    } elsif($fn eq "E") {                            # CUL_EM / Native
+    } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
       ;
     } else {
       Log GetLogLevel($name,2), "CUL: unknown message $dmsg";
