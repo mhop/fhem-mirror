@@ -220,7 +220,7 @@ CUL_WS_Parse($$)
   my $name = $hash->{NAME};
   Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
 
-  if($hum < 0) {
+  if(defined($hum) &&  $hum < 0) {
     Log 1, "BOGUS: $name reading: $val, skipping it";
     return $name;
   }
