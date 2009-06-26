@@ -505,4 +505,6 @@
   - feature: Google Weather API support for FHEM (Boris 2009-06-01)
   - feature: lazy attribute for FHT devices (Boris 2009-06-09)
   - feature: tmpcorr attribute for FHT devices
+  - feature: CUL_EM generates an event for each of the READINGS
   - feature: USF1000S support for FHEM added (Boris 2009-06-20)
+  - feature: CUL supports HMS (culfw >= 1.22 needed)
