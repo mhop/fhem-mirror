@@ -48,14 +48,15 @@ CUL_Initialize($)
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:";
+  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:";
   my %mc = (
     "1:USF1000" => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:FS20"    => "^81..(04|0c)..0101a001",
     "3:FHT"     => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
     "4:KS300"   => "^810d04..4027a001",
     "5:CUL_WS"  => "^K.....",
-    "6:CUL_EM"  => "^E0.................\$"
+    "6:CUL_EM"  => "^E0.................\$",
+    "7:HMS"     => "^810e04....(1|5|9).a001",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
@@ -696,7 +697,8 @@ CUL_Read($)
     }
 
     my $rssi;
-    if($initstr =~ m/X2/ && $dmsg =~ m/[FEHTK]([A-F0-9][A-F0-9])+$/) { # RSSI
+    my $rmsg = $dmsg;
+    if($initstr =~ m/X2/ && $dmsg =~ m/[FTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
       my $l = length($dmsg);
       $rssi = hex(substr($dmsg, $l-2, 2));
       $dmsg = substr($dmsg, 0, $l-2);
@@ -723,13 +725,19 @@ CUL_Read($)
       }
 
       $dmsg = sprintf("81%02x04xx0101a001%s00%s",
-                        $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
+                        $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
     } elsif($fn eq "T" && $len >= 11) {              # Reformat for 11_FHT.pm
 
       $dmsg = sprintf("81%02x04xx0909a001%s00%s",
-                        $len/2+5, substr($dmsg,1,6), substr($dmsg,7));
+                        $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
+      $dmsg = lc($dmsg);
+
+    } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
+
+      $dmsg = sprintf("81%02x04xxxx5%sa001%s0000%s",
+              $len/2+8, substr($dmsg,6,1), substr($dmsg,1,4), substr($dmsg,5));
       $dmsg = lc($dmsg);
 
     } elsif($fn eq "K" && $len >= 5) {
@@ -749,12 +757,15 @@ CUL_Read($)
       Log GetLogLevel($name,2), "CUL: unknown message $dmsg";
       goto NEXTMSG;
     }
+
     $hash->{RSSI} = $rssi;
+    $hash->{RAWMSG} = $rmsg;
     my $foundp = Dispatch($hash, $dmsg);
-    if($foundp && $rssi) {
+    if($foundp) {
       foreach my $d (@{$foundp}) {
         next if(!$defs{$d});
-        $defs{$d}{RSSI} = $rssi;
+        $defs{$d}{RSSI} = $rssi if($rssi);
+        $defs{$d}{RAWMSG} = $rmsg;
       }
     }
 

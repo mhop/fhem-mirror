@@ -66,7 +66,8 @@ sub
 HMS_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}});
+  delete($defptr{$hash->{CODE}})
+        if(defined($hash->{CODE}) && defined($defptr{$hash->{CODE}}));
   return undef;
 }
 
@@ -216,7 +217,7 @@ HMS_Parse($$)
 
   } else {
 
-    Log 4, "HMS Device $dev (Unknown type: $type)";
+    Log 3, "HMS Device $dev (Unknown type: $type)";
     return "";
 
   }
