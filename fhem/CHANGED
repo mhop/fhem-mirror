@@ -509,3 +509,4 @@
   - feature: USF1000S support for FHEM added (Boris 2009-06-20)
   - feature: CUL supports HMS (culfw >= 1.22 needed)
   - feature: CUL shutdown procedure added
+  - feature: 14_CUL_WS: better error checking
