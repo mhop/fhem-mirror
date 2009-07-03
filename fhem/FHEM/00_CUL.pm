@@ -70,6 +70,7 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
                      "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "CUR_id_list";
+  $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
 #####################################
@@ -155,9 +156,21 @@ CUL_Undef($$)
         delete $defs{$d}{IODev};
       }
   }
+
+  CUL_SimpleWrite($hash, "X00"); # Switch reception off, it may hang up the CUL
   $hash->{PortObj}->close() if($hash->{PortObj});
   return undef;
 }
+
+#####################################
+sub
+CUL_Shutdown($)
+{
+  my ($hash) = @_;
+  CUL_SimpleWrite($hash, "X00") if($hash->{VERSION} !~ m/CUR/);
+  return undef;
+}
+
 
 #####################################
 sub

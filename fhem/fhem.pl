@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.73 2009-06-12 09:42:37 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.74 2009-07-03 06:53:50 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -908,6 +908,11 @@ CommandShutdown($$)
 {
   my ($cl, $param) = @_;
   Log 0, "Server shutdown";
+
+  foreach my $d (sort keys %defs) {
+    CallFn($d, "ShutdownFn", $defs{$d});
+  }
+
   WriteStatefile();
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
   exit(0);
