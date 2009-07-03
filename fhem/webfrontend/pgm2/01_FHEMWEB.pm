@@ -251,7 +251,7 @@ FW_AnswerCall($)
     foreach my $k (sort keys %{$data{FWEXT}}) {
       if($arg =~ m/^$k/) {
         no strict "refs";
-        ($__RETTYPE, $__RET) = &{$data{FWEXT}{$k}}($arg);
+        ($__RETTYPE, $__RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
         use strict "refs";
         return 0;
       }
@@ -541,6 +541,15 @@ FW_roomOverview($)
   pO "<table><tr><td>";
   pO "<a href=\"$__reldoc\">Fhem cmd</a>: ";
   pO FW_textfield("cmd", 30);
+  
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
+      my $h = $data{FWEXT}{$k};
+      next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
+      pO "   <a href=\"$__ME\/" . $h->{LINK} . "\">" . $h->{NAME}. "</a>";
+    }
+  }
+
   if($__room) {
     pO FW_hidden("room", "$__room");
 
@@ -1040,11 +1049,10 @@ sub
 FW_makeEdit($$$$)
 {
   my ($name, $type, $cmd, $val) = @_;
-
   pO "<td>";
   pO   "<div id=\"edit\" style=\"display:none\"><form>";
   my $eval = $val;
-  $eval =~ s,<br/>,\n,g;
+  $eval =~ s,\\\n,\n,g;
 
   if($type eq "at" || $type eq "notify") {
     pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\">".

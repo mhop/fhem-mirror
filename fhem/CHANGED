@@ -510,3 +510,4 @@
   - feature: CUL supports HMS (culfw >= 1.22 needed)
   - feature: CUL shutdown procedure added
   - feature: 14_CUL_WS: better error checking
+  - bugfix:  webpgm2 multi line editing is working again
