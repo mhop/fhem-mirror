@@ -105,14 +105,14 @@ CUL_WS_Parse($$)
 
   if($sfirstbyte == 7) {
   
-    if($typbyte == 0) {                         # temp
+    if($typbyte == 0 && int(@a) > 6) {           # temp
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $val = "T: $tmp";
       $devtype = "Temp";
     }
 
-    if($typbyte == 1) {                         # temp/hum
+    if($typbyte == 1 && int(@a) > 8) {           # temp/hum
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
@@ -121,7 +121,7 @@ CUL_WS_Parse($$)
       $family = "WS300";
     }
 
-    if($typbyte == 2) {                         # rain
+    if($typbyte == 2 && int(@a) > 5) {           # rain
       #my $more = ($firstbyte&8) ? 0 : 1000;
       my $c = $hash->{corr1} ? $hash->{corr1} : 1;
       $rain = hex($a[5].$a[3].$a[4]) + $c;
@@ -130,7 +130,7 @@ CUL_WS_Parse($$)
       $family = "WS300";
     }
 
-    if($typbyte == 3) {                         # wind
+    if($typbyte == 3 && int(@a) > 8) {           # wind
       my $hun = ($firstbyte&8) ? 100 : 0;
       $wnd = ($a[6].$a[3].".".$a[4])+$hun;
       my $dir  = (($a[7]&3).$a[8].$a[5])+0;
@@ -140,7 +140,7 @@ CUL_WS_Parse($$)
       $family = "WS300";
     }
 
-    if($typbyte == 4) {                         # temp/hum/press
+    if($typbyte == 4 && int(@a) > 10) {          # temp/hum/press
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
@@ -153,7 +153,7 @@ CUL_WS_Parse($$)
       $family = "WS300";
     }
 
-    if($typbyte == 5) {                         # brightness
+    if($typbyte == 5 && int(@a) > 5) {           # brightness
       my $fakt = 1;
       my $rawfakt = ($a[5])+0;
       if($rawfakt == 1) { $fakt =   10; }
@@ -166,12 +166,12 @@ CUL_WS_Parse($$)
       $family = "WS300";
     }
 
-    if($typbyte == 6) {                         # Pyro: wurde nie gebaut
+    if($typbyte == 6 && int(@a) > 0) {           # Pyro: wurde nie gebaut
       $devtype = "Pyro";
       $family = "WS300";
     }
 
-    if($typbyte == 7) {                         # Temp/hum
+    if($typbyte == 7 && int(@a) > 8) {           # Temp/hum
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
@@ -182,7 +182,7 @@ CUL_WS_Parse($$)
     
   } else {                                      # $firstbyte not 7
 
-    if(@a == 9) {                               #  S300TH
+    if(@a == 9 && int(@a) > 8) {                 #  S300TH
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
@@ -190,7 +190,7 @@ CUL_WS_Parse($$)
       $devtype = "S300TH";
       $family = "WS300";
 
-    } elsif(@a == 15) {                         # KS300/2
+    } elsif(@a == 15 && int(@a) > 14) {          # KS300/2
 
       my $c = $hash->{corr4} ? $hash->{corr4} : 255;
       $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
@@ -204,7 +204,7 @@ CUL_WS_Parse($$)
       $devtype = "KS300/2";
       $family = "WS300";
 
-    } else {                                    # WS7000 Temp/Hum sensors
+    } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
 
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
@@ -219,6 +219,10 @@ CUL_WS_Parse($$)
 
   my $name = $hash->{NAME};
   Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
+  if(!$val) {
+    Log GetLogLevel($name,1), "CUL_WS Cannot decode $msg";
+    return "";
+  }
 
   if(defined($hum) &&  $hum < 0) {
     Log 1, "BOGUS: $name reading: $val, skipping it";
