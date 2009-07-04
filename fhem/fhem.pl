@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.74 2009-07-03 06:53:50 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.75 2009-07-04 10:09:27 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -308,14 +308,20 @@ while (1) {
   ###############################
   # Message from the hardware (FHZ1000/WS3000/etc) via select or the Ready
   # Function. The latter ist needed for Windows, where USB devices are not
-  # reported by select.
+  # reported by select, but is used by unix too, to check if the device is
+  # attached again.
   foreach my $p (keys %selectlist) {
     CallFn($selectlist{$p}{NAME}, "ReadFn", $selectlist{$p})
       if(vec($rout, $selectlist{$p}{FD}, 1));
   }
   foreach my $p (keys %readyfnlist) {
-    CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p})
-      if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p}));
+    if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p})) {
+
+      if($readyfnlist{$p}) {    # ReadyFn may decide to delete the device
+        CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p});
+      }
+
+    }
   }
 
   if(vec($rout, $server->fileno(), 1)) {
