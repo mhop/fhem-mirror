@@ -466,7 +466,7 @@
   - bugfix:  deleting at / watchdog while active creates an empty device
   - feature: ExactId trigger added for wildcard HMS devices
 
-- =DATE= (4.6)
+- 2009-07-03 (4.6)
   - bugfix:  fht actuator message clarification by Klaus
   - feature: getstate command from Martin (25.12)
   - bugfix:  at drifts for relative timespecs
@@ -511,3 +511,6 @@
   - feature: CUL shutdown procedure added
   - feature: 14_CUL_WS: better error checking
   - bugfix:  webpgm2 multi line editing is working again
+
+- =DATE= (4.7)
+  - bugfix:  Reattached corrupted CUL device caused uninitialized message
