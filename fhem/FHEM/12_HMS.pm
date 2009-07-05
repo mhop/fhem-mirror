@@ -148,8 +148,8 @@ HMS_Parse($$)
     # Battery-low condition detect is not yet properly
     # implemented. As soon as my WD's batteries get low
     # I am willing to supply a patch ;-) SEP7-RIPE, 2006/05/13
-    my $status = hex(substr($val, 1, 1));
-    $v[1] = "ok";
+    my $status = hex(substr($msg, 10, 1)); #Battery low condition
+    $v[1] = (($status & 4) ? "empty" : "ok"); # bit is set if Voltage < 2.5 V.
     $v[0] = "off";
     if ( $status & 1 ) { $v[0] = "on"; }
     $val = "Water Detect: $v[0]";
