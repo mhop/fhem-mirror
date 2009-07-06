@@ -144,27 +144,24 @@ HMS_Parse($$)
 
     @txt = ( "water_detect", "battery");
     @sfx = ( "",             "");
-
-    # Battery-low condition detect is not yet properly
-    # implemented. As soon as my WD's batteries get low
-    # I am willing to supply a patch ;-) SEP7-RIPE, 2006/05/13
-    my $status = hex(substr($msg, 10, 1)); #Battery low condition
-    $v[1] = (($status & 4) ? "empty" : "ok"); # bit is set if Voltage < 2.5 V.
+    my $status = hex(substr($val, 1, 1));
     $v[0] = "off";
     if ( $status & 1 ) { $v[0] = "on"; }
     $val = "Water Detect: $v[0]";
+    $status = hex(substr($msg, 10, 1)); #Battery low condition
+    $v[1] = (($status & 4) ? "empty" : "ok"); # bit is set if Voltage < 2.5 V.
 
  } elsif ($type eq "HMS100TFK") {    # By Peter P.
 
     @txt = ( "switch_detect", "battery");
     @sfx = ( "",             "");
-    # Battery-low condition detect is not yet properly implemented.
     my $status = hex(substr($val, 1, 1));
     $v[0] = ($status ? "on" : "off");
-    $v[1] = "off";
     $val = "Switch Detect: $v[0]";
+    $status = hex(substr($msg, 10, 1)); #Battery low condition
+    $v[1] = (($status & 4) ? "empty" : "ok"); # bit is set if Voltage < 2.5 V.
 
-  } elsif($type eq "RM100-2") {
+ } elsif($type eq "RM100-2") {
 
     @txt = ( "smoke_detect", "battery");
     @sfx = ( "",             "");
