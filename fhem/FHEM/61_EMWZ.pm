@@ -146,7 +146,7 @@ EMWZ_Set($@)
     $v *= 10; # Make display and input the same
     $msg = sprintf("79%02x3102%02x%02x", $d-1, $v%256, int($v/256));
   } else {
-    return $u;
+    return "Unknown argument $a[1], choose one of price alarm rperkw";
   }
 
 
