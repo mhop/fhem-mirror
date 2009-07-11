@@ -134,7 +134,7 @@ EM_Set($@)
 
   } else {
 
-    return "Unknown argument $a[1], choose one of reset,time"
+    return "Unknown argument $a[1], choose one of reset time"
 
   }
   return undef;

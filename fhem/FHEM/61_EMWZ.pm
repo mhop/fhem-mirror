@@ -125,31 +125,26 @@ sub
 EMWZ_Set($@)
 {
   my ($hash, @a) = @_;
-  my $u = "Usage: set <name> <type> <value>, " .
-                "<type> is one of price,alarm,rperkw";
-
-  return $u if(int(@a) != 3);
 
   my $name = $hash->{NAME};
-  return "" if(IsIoDummy($name));
 
   my $v = $a[2];
   my $d = $hash->{DEVNR};
   my $msg;
 
-  if($a[1] eq "price") {
+  if($a[1] eq "price" && int(@a) == 3) {
     $v *= 10000; # Make display and input the same
     $msg = sprintf("79%02x2f02%02x%02x", $d-1, $v%256, int($v/256));
-  } elsif($a[1] eq "alarm") {
+  } elsif($a[1] eq "alarm" && int(@a) == 3) {
     $msg = sprintf("79%02x2d02%02x%02x", $d-1, $v%256, int($v/256));
-  } elsif($a[1] eq "rperkw") {
+  } elsif($a[1] eq "rperkw" && int(@a) == 3) {
     $v *= 10; # Make display and input the same
     $msg = sprintf("79%02x3102%02x%02x", $d-1, $v%256, int($v/256));
   } else {
     return "Unknown argument $a[1], choose one of price alarm rperkw";
   }
 
-
+  return "" if(IsIoDummy($name));
   my $ret = IOWrite($hash, $msg);
   if(!defined($ret)) {
     my $msg = "EMWZ $name read error (Set)";
