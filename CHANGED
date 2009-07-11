@@ -514,3 +514,4 @@
 
 - =DATE= (4.7)
   - bugfix:  Reattached corrupted CUL device caused uninitialized message
+  - bugfix:  CUL/HMS changes, HMS cleanup

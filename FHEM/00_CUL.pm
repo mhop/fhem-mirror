@@ -167,8 +167,15 @@ sub
 CUL_Shutdown($)
 {
   my ($hash) = @_;
-  CUL_SimpleWrite($hash, "X00") if($hash->{VERSION} !~ m/CUR/);
+  CUL_SimpleWrite($hash, "X00") if(!CUL_isCUR($hash));
   return undef;
+}
+
+sub
+CUL_isCUR($)
+{
+  my ($hash) = @_;
+  return ($hash->{VERSION} && $hash->{VERSION} =~ m/CUR/);
 }
 
 
@@ -258,8 +265,7 @@ GOTBW:
 
   } elsif($type eq "file") {
 
-    return "Only supported for CUR devices (see VERSION)"
-                                 if($hash->{VERSION} !~ m/CUR/);
+    return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
 
     return "$name: Need 2 further arguments: source destination"
                                 if(@a != 2);
@@ -294,8 +300,7 @@ WRITEEND:
 
   } elsif($type eq "time") {
 
-    return "Only supported for CUR devices (see VERSION)"
-                                 if($hash->{VERSION} !~ m/CUR/);
+    return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
     my @a = localtime;
     my $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
     CUL_SimpleWrite($hash, $msg);
@@ -347,8 +352,7 @@ CUL_Get($@)
     
   } elsif($a[1] eq "file") {
 
-    return "Only supported for CUR devices (see VERSION)"
-                                 if($hash->{VERSION} !~ m/CUR/);
+    return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
 
     CUL_Clear($hash);
     CUL_SimpleWrite($hash, "X00");
@@ -749,8 +753,14 @@ CUL_Read($)
 
     } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
 
-      $dmsg = sprintf("81%02x04xxxx5%sa001%s0000%s",
-              $len/2+8, substr($dmsg,6,1), substr($dmsg,1,4), substr($dmsg,5));
+      my $type = hex(substr($dmsg,6,1));
+      my $prf  = $type > 1 ? "02" : "05";
+      my $bat  = $type > 1 ? hex(substr($dmsg,5,1))+1 : 1;
+      $dmsg = sprintf("81%02x04xx%s%x%xa001%s0000%s",
+                        $len/2+8,                    # Packet-Length
+                        $prf, $bat, $type,
+                        substr($dmsg,1,4),           # House-Code
+                        substr($dmsg,5));            # Values
       $dmsg = lc($dmsg);
 
     } elsif($fn eq "K" && $len >= 5) {

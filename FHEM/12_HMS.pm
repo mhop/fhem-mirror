@@ -108,108 +108,98 @@ HMS_Parse($$)
   my $def = $defptr{$dev};
   return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
-  my (@v, @txt, @sfx);
+  my (@v, @txt);
+
+  # Used for HMS100TF & HMS100T
+  my $batstr1 = "ok";
+  my $status1 = hex(substr($val, 0, 1));
+  $batstr1 = "empty"    if( $status1 & 2 );
+  $batstr1 = "replaced" if( $status1 & 4 );
+
+  # Used for the other devices
+  my $batstr2 = "ok";
+  my $status = hex(substr($val, 1, 1));
+  my $status2 = hex(substr($msg, 10, 1));
+  $batstr2 = "empty"    if( $status2 & 4 );
+  $batstr2 = "replaced" if( $status2 & 8 );
 
   if($type eq "HMS100TF") {
 
     @txt = ( "temperature", "humidity", "battery");
-    @sfx = ( "(Celsius)",   "(%)",      "");
 
     # Codierung <s1><s0><t1><t0><f0><t2><f2><f1>
-    my $status = hex(substr($val, 0, 1));
     $v[0] = int(substr($val, 5, 1) . substr($val, 2, 2))/10;
+    $v[0] =  -$v[0] if($status1 & 8);
     $v[1] = int(substr($val, 6, 2) . substr($val, 4, 1))/10;
-    $v[2] = "ok";
-    if ( $status & 2 ) { $v[2] = "empty"; }
-    if ( $status & 4 ) { $v[2] = "replaced"; }
-    if ( $status & 8 ) { $v[0] =  -$v[0]; }
+    $v[2] = $batstr1;
 
     $val = "T: $v[0]  H: $v[1]  Bat: $v[2]";
+    $v[0] = "$v[0] (Celsius)";
+    $v[1] = "$v[1] (%)";
 
   } elsif ($type eq "HMS100T") {
 
     @txt = ( "temperature", "battery");
-    @sfx = ( "(Celsius)",   "");
 
-    my $status = hex(substr($val, 0, 1));
     $v[0] = int(substr($val, 5, 1) . substr($val, 2, 2))/10;
-    $v[1] = "ok";
-    if ( $status & 2 ) { $v[1] = "empty"; }
-    if ( $status & 4 ) { $v[1] = "replaced"; }
-    if ( $status & 8 ) { $v[0] = -$v[0]; }
+    $v[0] =  -$v[0] if($status1 & 8);
+    $v[1] = $batstr1;
 
     $val = "T: $v[0]  Bat: $v[1]";
+    $v[0] = "$v[0] (Celsius)";
 
   } elsif ($type eq "HMS100WD") {
 
     @txt = ( "water_detect", "battery");
-    @sfx = ( "",             "");
-    my $status = hex(substr($val, 1, 1));
-    $v[0] = "off";
-    if ( $status & 1 ) { $v[0] = "on"; }
+
+    $v[0] = ($status ? "on" : "off");
+    $v[1] = $batstr2;
+
     $val = "Water Detect: $v[0]";
-    $status = hex(substr($msg, 10, 1)); #Battery low condition
-    $v[1] = (($status & 4) ? "empty" : "ok"); # bit is set if Voltage < 2.5 V.
 
  } elsif ($type eq "HMS100TFK") {    # By Peter P.
 
     @txt = ( "switch_detect", "battery");
-    @sfx = ( "",             "");
-    my $status = hex(substr($val, 1, 1));
+
     $v[0] = ($status ? "on" : "off");
+    $v[1] = $batstr2;
+
     $val = "Switch Detect: $v[0]";
-    $status = hex(substr($msg, 10, 1)); #Battery low condition
-    $v[1] = (($status & 4) ? "empty" : "ok"); # bit is set if Voltage < 2.5 V.
 
  } elsif($type eq "RM100-2") {
 
     @txt = ( "smoke_detect", "battery");
-    @sfx = ( "",             "");
 
-    $v[0] = ( hex(substr($val, 1, 1)) != "0" ) ? "on" : "off";
-    $v[1] = "ok";
-    my  $status = hex(substr($msg, 10, 1));
-    if( $status & 4 ) { $v[1] = "empty"; }
-    if( $status & 8 ) { $v[1] = "replaced"; }
+    $v[0] = ($status ? "on" : "off");
+    $v[1] = $batstr2;
+
     $val = "smoke_detect: $v[0]";
 
   } elsif ($type eq "HMS100MG") {    # By Peter Stark
 
     @txt = ( "gas_detect", "battery");
-    @sfx = ( "",             "");
 
-    # Battery-low condition detect is not yet properly
-    # implemented.
-    my $status = hex(substr($val, 1, 1));
-    $v[0] = ($status != "0") ? "on" : "off";
-    $v[1] = "off";
-    if ($status & 1) { $v[0] = "on"; }
+    $v[0] = ($status ? "on" : "off");
+    $v[1] = $batstr2;                 # Battery conditions not yet verified
+
     $val = "Gas Detect: $v[0]";
 
   } elsif ($type eq "HMS100CO") {    # By PAN
 
     @txt = ( "gas_detect", "battery");
-    @sfx = ( "",             "");
 
-    # Battery-low condition detect is not yet properly
-    # implemented.
-    my $status = hex(substr($val, 1, 1));
-    $v[0] = ($status != "0") ? "on" : "off";
-    $v[1] = "off";
-    if ($status & 1) { $v[0] = "on"; }
+    $v[0] = ($status ? "on" : "off");
+    $v[1] = $batstr2;                 # Battery conditions not yet verified
+
     $val = "CO Detect: $v[0]";
 
  } elsif ($type eq "HMS100FIT") {    # By PAN
 
     @txt = ( "fi_triggered", "battery");
-    @sfx = ( "",             "");
 
-    # Battery-low condition detect is not yet properly
-    # implemented.
-    my $status = hex(substr($val, 1, 1));
-    $v[0] = ($status != "0") ? "on" : "off";
-    $v[1] = "off";
-    if ($status & 1) { $v[0] = "on"; }
+    $v[0] = ($status ? "on" : "off");
+    $v[1] = $batstr2;                 # Battery conditions not yet verified
+
     $val = "FI triggered: $v[0]";
 
   } else {
@@ -225,17 +215,15 @@ HMS_Parse($$)
   my $max = int(@txt);
   for( my $i = 0; $i < $max; $i++) {
     $def->{READINGS}{$txt[$i]}{TIME} = $now;
-    my $v = "$v[$i] $sfx[$i]";
-    $def->{READINGS}{$txt[$i]}{VAL} = $v;
-    $def->{CHANGED}[$i] = "$txt[$i]: $v";
+    $def->{READINGS}{$txt[$i]}{VAL} = $v[$i];
+    $def->{CHANGED}[$i] = "$txt[$i]: $v[$i]";
   }
   $def->{READINGS}{type}{TIME} = $now;
   $def->{READINGS}{type}{VAL} = $type;
 
   $def->{STATE} = $val;
-  $def->{CHANGED}[$max] = $val;
-
-  $def->{CHANGED}[$max+1] = "ExactId: $odev" if($odev ne $dev);
+  $def->{CHANGED}[$max++] = $val;
+  $def->{CHANGED}[$max++] = "ExactId: $odev" if($odev ne $dev);
 
   return $def->{NAME};
 }
