@@ -96,7 +96,7 @@ FHZ_Ready($)
     my $name = $hash->{NAME};
 
     $hash->{PARTIAL} = "";
-    if ($^O=~/Win/) {
+    if($^O =~ m/Win/) {
      $po = new Win32::SerialPort ($dev);
     } else  {
      $po = new Device::SerialPort ($dev);
@@ -105,7 +105,7 @@ FHZ_Ready($)
 
     Log 1, "USB device $dev reappeared";
     $hash->{PortObj} = $po;
-    if( $^O !~ /Win/ ) {
+    if($^O !~ m/Win/) {
       $hash->{FD} = $po->FILENO;
       delete($readyfnlist{"$name.$dev"});
       $selectlist{"$name.$dev"} = $hash;
@@ -319,7 +319,7 @@ FHZ_Define($$)
   $hash->{DeviceName} = $dev;
   $hash->{PARTIAL} = "";
   Log 3, "FHZ opening FHZ device $dev";
-  if ($^O=~/Win/) {
+  if($^O =~ m/Win/) {
    require Win32::SerialPort;
    $po = new Win32::SerialPort ($dev);
   } else  {
@@ -336,7 +336,7 @@ FHZ_Define($$)
   Log 3, "FHZ opened FHZ device $dev";
 
   $hash->{PortObj} = $po;
-  if( $^O !~ /Win/ ) {
+  if($^O !~ m/Win/) {
     $hash->{FD} = $po->FILENO;
     $selectlist{"$name.$dev"} = $hash;
   } else {
@@ -444,7 +444,7 @@ FHZ_ReadAnswer($$$)
   my ($mfhzdata, $rin) = ("", '');
   my $nfound;
   for(;;) {
-    if($^O eq 'MSWin32') {
+    if($^O =~ m/Win/) {
       $nfound=FHZ_Ready($hash);
     } else {
       vec($rin, $hash->{FD}, 1) = 1;
@@ -585,14 +585,14 @@ FHZ_Reopen($)
   Log 1, "USB device $dev closed";
   for(;;) {
       sleep(5);
-      if ($^O eq 'MSWin32') {
+      if($^O =~ m/Win/) {
         $hash->{PortObj} = new Win32::SerialPort($dev);
       }else{
         $hash->{PortObj} = new Device::SerialPort($dev);
       }
       if($hash->{PortObj}) {
         Log 1, "USB device $dev reopened";
-        $hash->{FD} = $hash->{PortObj}->FILENO if !($^O eq 'MSWin32');
+        $hash->{FD} = $hash->{PortObj}->FILENO if($^O !~ m/Win/);
         FHZ_DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
         return;
       }

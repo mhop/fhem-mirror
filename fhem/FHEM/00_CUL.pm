@@ -511,11 +511,13 @@ CUL_ReadAnswer($$$)
 {
   my ($hash, $arg, $anydata) = @_;
 
-  return ("No FD" ,undef) if(!$hash || !defined($hash->{FD}));
+  return ("No FD" ,undef)
+        if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
+
   my ($mculdata, $rin) = ("", '');
   my $nfound;
   for(;;) {
-    if($^O eq 'MSWin32') {
+    if($^O =~ m/Win/) {
       $nfound=CUL_Ready($hash);
     } else {
       vec($rin, $hash->{FD}, 1) = 1;
@@ -700,22 +702,13 @@ CUL_Read($)
 
   while($culdata =~ m/\n/) {
 
-    my $dmsg;
-    ($dmsg,$culdata) = split("\n", $culdata);
-    $dmsg =~ s/\r//;
-    goto NEXTMSG if($dmsg eq "");
+    my ($rmsg, $rssi);
+    ($rmsg,$culdata) = split("\n", $culdata, 2);
+    $rmsg =~ s/\r//;
+    goto NEXTMSG if($rmsg eq "");
 
-    # Debug message, X05
-    if($dmsg =~ m/p /) {
-      foreach my $m (split("p ", $dmsg)) {
-        Log GetLogLevel($name,4), "CUL: p $m";
-      }
-      goto NEXTMSG;
-    }
-
-    my $rssi;
-    my $rmsg = $dmsg;
-    if($initstr =~ m/X2/ && $dmsg =~ m/[FTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
+    my $dmsg = $rmsg;
+    if($initstr =~ m/X2/ && $dmsg =~ m/^[FTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
       my $l = length($dmsg);
       $rssi = hex(substr($dmsg, $l-2, 2));
       $dmsg = substr($dmsg, 0, $l-2);
@@ -781,7 +774,7 @@ CUL_Read($)
       goto NEXTMSG;
     }
 
-    $hash->{RSSI} = $rssi;
+    $hash->{RSSI} = $rssi if(defined($rssi));
     $hash->{RAWMSG} = $rmsg;
     my $foundp = Dispatch($hash, $dmsg);
     if($foundp) {
