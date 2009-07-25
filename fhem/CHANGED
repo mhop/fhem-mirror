@@ -516,3 +516,4 @@
   - bugfix:  Reattached corrupted CUL device caused uninitialized message
   - bugfix:  CUL/HMS changes, HMS cleanup
   - bugfix:  EM/EMWZ/EMGZ set changed to work in FHEMWEB
+  - bugfix:  Avoid unitialized in xmllist for corrupt readings (reporter: Boris)
