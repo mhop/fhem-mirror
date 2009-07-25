@@ -147,6 +147,7 @@ FW_Read($)
     my @clientsock = sockaddr_in($clientinfo[1]);
 
     my %nhash;
+    $nhash{NR}    = $devcount++;
     $nhash{NAME}  = "FHEMWEB:". inet_ntoa($clientsock[1]) .":".$clientsock[0];
     $nhash{FD}    = $clientinfo[0]->fileno();
     $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
@@ -235,6 +236,7 @@ FW_AnswerCall($)
     return 1;
   } elsif($arg =~ m,^$__ME/icons/(.*)$,) {
     open(FH, "$__dir/$1") || return;
+    binmode (FH); # necessary for Windows
     pO join("", <FH>);
     close(FH);
     $__RETTYPE = "image/*";
@@ -788,6 +790,7 @@ FW_logWrapper($)
       pO "<div id=\"right\">$path: $!</div>\n";
       return;
     }
+    binmode (FH); # necessary for Windows
     my $cnt = join("", <FH>);
     close(FH);
     $cnt =~ s/</&lt;/g;
@@ -972,6 +975,7 @@ FW_showLog($)
     }
     $__RETTYPE = "image/png";
     open(FH, "$tmpfile.png");         # read in the result and send it
+    binmode (FH); # necessary for Windows
     pO join("", <FH>);
     close(FH);
     unlink("$tmpfile.png");

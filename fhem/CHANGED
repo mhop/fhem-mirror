@@ -517,3 +517,4 @@
   - bugfix:  CUL/HMS changes, HMS cleanup
   - bugfix:  EM/EMWZ/EMGZ set changed to work in FHEMWEB
   - bugfix:  Avoid unitialized in xmllist for corrupt readings (reporter: Boris)
+  - bugfix:  Add binmode to 01_fhemweb.pm for windows
