@@ -6,6 +6,9 @@ use warnings;
 
 my %defptr;
 
+# Adjust TOTAL to you meter:
+# {$defs{emwz}{READINGS}{basis}{VAL}=<meter>/<corr2>-<total_cnt> }
+
 #####################################
 sub
 CUL_EM_Initialize($)
@@ -38,9 +41,9 @@ CUL_EM_Define($$)
 
   if($a[2] >= 1 && $a[2] <= 4) {                # EMWZ: nRotation in 5 minutes
     my $c = (int(@a) > 3 ? $a[3] : 150);
-    $hash->{corr1} = (12/$c);
-    $c = (int(@a) > 4 ? $a[4] : 150);
-    $hash->{corr2} = (12/$c);
+    $hash->{corr1} = (12/$c);                   # peak/current
+    $c = (int(@a) > 4 ? $a[4] : 1800);
+    $hash->{corr2} = (12/$c);                   # total
 
   } elsif($a[2] >= 5 && $a[2] <= 8) {           # EMEM
     # corr1 is the correction factor for power
@@ -120,27 +123,22 @@ CUL_EM_Parse($$)
     # calculate readings
     #
     # initialize total_cnt_last
-    my $total_cnt_last;
+    my $total_cnt_last = 0;
     if(defined($hash->{READINGS}{total_cnt})) {
-        $total_cnt_last= $hash->{READINGS}{total_cnt}{VAL};
-    } else {
-        $total_cnt_last= 0;
+      $total_cnt_last= $hash->{READINGS}{total_cnt}{VAL};
     }
 
 
     # initialize basis_cnt_last
-    my $basis_cnt_last;
+    my $basis_cnt = 0;
     if(defined($hash->{READINGS}{basis})) {
-        $basis_cnt_last= $hash->{READINGS}{basis}{VAL};
-    } else {
-        $basis_cnt_last= 0;
+      $basis_cnt = $hash->{READINGS}{basis}{VAL};
     }
 
     # correct counter wraparound
-    my $basis_cnt= $basis_cnt_last;
     if($total_cnt< $total_cnt_last) {
-        $basis_cnt += 65536;
-        $readings{basis} = $basis_cnt;
+      $basis_cnt += 65536;
+      $readings{basis} = $basis_cnt;
     }
 
     #
@@ -171,42 +169,55 @@ CUL_EM_Parse($$)
     # Start CUMULATE day and month
     Log GetLogLevel($n,4), "CUL_EM $n: $val";
     my $tsecs_prev;
+
     #----- get previous tsecs
     if(defined($hash->{READINGS}{tsecs})) {
       $tsecs_prev= $hash->{READINGS}{tsecs}{VAL};
     } else {
       $tsecs_prev= 0; # 1970-01-01
     }
+
     #----- save actual tsecs
     my $tsecs= time();  # number of non-leap seconds since January 1, 1970, UTC
     $readings{tsecs}       = $tsecs;
+
     #----- get cost parameter
     my $cost = $hash->{CostPerUnit};
     my $basicfee = $hash->{BasicFeePerMonth};
+
     #----- check whether day or month was changed
     if(!defined($hash->{READINGS}{cum_day})) {
       #----- init cum_day if it is not set
       $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f", 0,$total,0);
       $readings{cum_day}   = $val;
+
     } else {
+
       if( (localtime($tsecs_prev))[3] != (localtime($tsecs))[3] ) {
         #----- day has changed (#3)
         my @cmv = split(" ", $hash->{READINGS}{cum_day}{VAL});
-        $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f", $total-$cmv[3], $total, ($total-$cmv[3])*$cost);
+        $val = sprintf("CUM_DAY: %0.3f CUM: %0.3f COST: %0.2f",
+                        $total-$cmv[3], $total, ($total-$cmv[3])*$cost);
         $readings{cum_day} = $val;
         Log GetLogLevel($n,3), "CUL_EM $n: $val";
-        #
+
+
         if( (localtime($tsecs_prev))[4] != (localtime($tsecs))[4] ) {
+
           #----- month has changed (#4)
           if(!defined($hash->{READINGS}{cum_month})) {
             # init cum_month if not set
-            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f", 0,$total,0);
+            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f",
+                       0, $total, 0);
             $readings{cum_month} = $val;
+
           } else {
             @cmv = split(" ", $hash->{READINGS}{cum_month}{VAL});
-            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f", $total-$cmv[3],$total,($total-$cmv[3])*$cost+$basicfee);
+            $val = sprintf("CUM_MONTH: %0.3f CUM: %0.3f COST: %0.2f",
+                       $total-$cmv[3], $total,($total-$cmv[3])*$cost+$basicfee);
             $readings{cum_month} = $val;
             Log GetLogLevel($n,3), "CUL_EM $n: $val";
+
           }
         }
       }
