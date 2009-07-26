@@ -747,13 +747,17 @@ CUL_Read($)
     } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
 
       my $type = hex(substr($dmsg,6,1));
+      my $stat = $type > 1 ? hex(substr($dmsg,7,2)) : hex(substr($dmsg,5,2));
       my $prf  = $type > 1 ? "02" : "05";
       my $bat  = $type > 1 ? hex(substr($dmsg,5,1))+1 : 1;
-      $dmsg = sprintf("81%02x04xx%s%x%xa001%s0000%s",
-                        $len/2+8,                    # Packet-Length
+      my $HA = substr($dmsg,1,4);
+      my $values = $type > 1 ?  "000000" : substr($dmsg,7);
+      $dmsg = sprintf("81%02x04xx%s%x%xa001%s0000%02x%s",
+                        $len/2+8,            # Packet-Length
                         $prf, $bat, $type,
-                        substr($dmsg,1,4),           # House-Code
-                        substr($dmsg,5));            # Values
+                        $HA,                 # House-Code
+                        $stat,
+                        $values);            # Values
       $dmsg = lc($dmsg);
 
     } elsif($fn eq "K" && $len >= 5) {
