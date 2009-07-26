@@ -84,14 +84,20 @@ CUL_WS_Parse($$)
   my $cde = ($firstbyte&7) + 1;
   my $type = $tlist{$a[2]} ? $tlist{$a[2]} : "unknown";
 
+  # There are only 8 S300 devices. In order to enable more, we try to look up
+  # the name in connection with the receiver's name ("CUL868.1", "CUL433.1")
+  # See attr <name> IODev XX
+
   my $def = $defptr{$hash->{NAME} . "." . $cde};
   $def = $defptr{$cde} if(!$def);
-  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
-
   if(!$def) {
     Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
     return "UNDEFINED CUL_WS: $cde";
   }
+
+  # It's not our device
+  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
+
 
   my $tm=TimeNow();
   $hash = $def;
@@ -127,7 +133,7 @@ CUL_WS_Parse($$)
       $rain = hex($a[5].$a[3].$a[4]) + $c;
       $val = "R: $rain";
       $devtype =  "Rain";
-      $family = "WS300";
+      $family = "WS7000";
     }
 
     if($typbyte == 3 && int(@a) > 8) {           # wind
@@ -137,7 +143,7 @@ CUL_WS_Parse($$)
       my $swing = ($a[7]&6) >> 2;
       $val = "W: $wnd D: $dir A: $swing";
       $devtype = "Wind";
-      $family = "WS300";
+      $family = "WS7000";
     }
 
     if($typbyte == 4 && int(@a) > 10) {          # temp/hum/press
@@ -150,7 +156,7 @@ CUL_WS_Parse($$)
       }
       $val = "T: $tmp  H: $hum  P: $prs";
       $devtype = "Indoor";
-      $family = "WS300";
+      $family = "WS7000";
     }
 
     if($typbyte == 5 && int(@a) > 5) {           # brightness
@@ -163,12 +169,12 @@ CUL_WS_Parse($$)
       my $br = (hex($a[5].$a[4].$a[3])*$fakt)  + $hash->{corr1};
       $val = "B: $br";
       $devtype = "Brightness";
-      $family = "WS300";
+      $family = "WS7000";
     }
 
     if($typbyte == 6 && int(@a) > 0) {           # Pyro: wurde nie gebaut
       $devtype = "Pyro";
-      $family = "WS300";
+      $family = "WS7000";
     }
 
     if($typbyte == 7 && int(@a) > 8) {           # Temp/hum
@@ -177,6 +183,7 @@ CUL_WS_Parse($$)
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
       $val = "T: $tmp  H: $hum";
       $devtype = "Temp/Hum";
+      $family = "WS7000";
 
     }
     
@@ -218,13 +225,14 @@ CUL_WS_Parse($$)
   }
 
   my $name = $hash->{NAME};
-  Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
   if(!$val) {
     Log GetLogLevel($name,1), "CUL_WS Cannot decode $msg";
     return "";
   }
+  Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
 
-  if(defined($hum) &&  $hum < 0) {
+
+  if(defined($hum) && $hum < 0) {
     Log 1, "BOGUS: $name reading: $val, skipping it";
     return $name;
   }

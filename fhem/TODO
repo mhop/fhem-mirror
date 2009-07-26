@@ -1,4 +1,6 @@
 FHEM:
+- RAWTIME
+
 - Remote serial device via IP (for the FHZ1300 WLAN)
 - Common buffer for parallel use of two devices: CUL+FHZ, (WS300/EM1000PC?)
 - fhem-to-fhem module
