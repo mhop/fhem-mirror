@@ -133,6 +133,7 @@ use vars qw($init_done);        #
 use vars qw($internal_data);    #
 use vars qw(%cmds);             # Global command name hash. To be expanded
 use vars qw(%data);		# Hash for user data
+use vars qw($devcount);	        # To sort the devices
 
 use vars qw($reread_active);
 
@@ -146,12 +147,11 @@ my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my $modpath_set;                # Check if modpath was used, and report if not.
 my $global_cl;			# To use from perl snippets
-my $devcount = 0;		# To sort the devices
 my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.75 2009-07-04 10:09:27 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.76 2009-07-26 09:20:07 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -401,10 +401,12 @@ sub
 GetLogLevel(@)
 {
   my ($dev,$deflev) = @_;
+  my $df = defined($deflev) ? $deflev : 2;
 
+  return $df if(!defined($dev));
   return $attr{$dev}{loglevel}
   	if(defined($attr{$dev}) && defined($attr{$dev}{loglevel}));
-  return defined($deflev) ? $deflev : 2;
+  return $df;
 }
 
 
@@ -1930,7 +1932,7 @@ doGlobalDef($)
 {
   my ($arg) = @_;
 
-  $devcount = 0;
+  $devcount = 1;
   $defs{global}{NR}    = $devcount++;
   $defs{global}{TYPE}  = "_internal_";
   $defs{global}{STATE} = "<no definition>";
