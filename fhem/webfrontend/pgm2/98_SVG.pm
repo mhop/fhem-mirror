@@ -112,8 +112,10 @@ SVG_render($$$$$)
     $dpoff = $ndpoff+1;
     if($l =~ m/^#/) {
       my $a = $axes[$idx];
-      $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
-      $hmax{$a} = $max if(!defined($hmax{$a}) || $hmax{$a} < $max);
+      if(defined($a)) {
+        $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
+        $hmax{$a} = $max if(!defined($hmax{$a}) || $hmax{$a} < $max);
+      }
       ($min, $max) = (99999999, -99999999);
       $hdx[$idx] = $dxp; $hdy[$idx] = $dyp;
       ($dxp, $dyp) = (\(), \());
@@ -208,6 +210,7 @@ SVG_render($$$$$)
   for my $axis ("x1y1", "x1y2") {
 
     # Round values, compute a nice step
+    next if(!defined($hmax{$axis}));
     my $dh = $hmax{$axis} - $hmin{$axis};
     my ($step, $mi, $ma);
     my @limit = (1,2,5,10,20,50,100,200,500,1000,2000,5000,10000);
@@ -279,6 +282,7 @@ SVG_render($$$$$)
   # Second loop over the data: draw the measured points
   for my $idx (0..int(@hdx)-1) {
     my $a = $axes[$idx];
+    next if(!defined($a));
     $min = $hmin{$a};
     $hmax{$a} += 1 if($min == $hmax{$a});  # Else division by 0 in the next line
     my $hmul = $h/($hmax{$a}-$min);
