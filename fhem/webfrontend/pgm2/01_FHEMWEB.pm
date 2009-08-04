@@ -21,6 +21,7 @@ sub FW_showWeblink($$$);
 sub FW_select($$$);
 sub FW_textfield($$);
 sub FW_submit($$);
+sub FW_substcfg($$$$$$);
 sub FW_style($$);
 sub FW_roomOverview($);
 sub FW_fatal($);
@@ -851,7 +852,7 @@ FW_substcfg($$$$$$)
 {
   my ($splitret, $wl, $cfg, $plot, $file, $tmpfile) = @_;
 
-  # interprete title and label as a perl command and open accessiblity
+  # interpret title and label as a perl command and make
   # to all internal values e.g. $value.
 
   my $oll = $attr{global}{verbose};
@@ -886,9 +887,9 @@ FW_substcfg($$$$$$)
     }
   }
 
-  if($splitret) {
+  if($splitret == 1) {
     my @ret = split("\n", $gplot_script); 
-    return \@ret;
+    return (\@ret, $plot);
   } else {
     return $gplot_script;
   }
@@ -995,7 +996,7 @@ FW_showLog($)
       Log 0, $ret if($ret);
     }
     $ret = fC("get $d $file INT $f $t " . join(" ", @{$flog}));
-    $cfg = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
+    ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
     SVG_render($f, $t, $cfg, $internal_data, $plot);
     $__RETTYPE = "image/svg+xml";
 
