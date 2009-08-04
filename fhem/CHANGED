@@ -520,3 +520,4 @@
   - bugfix:  Add binmode to 01_fhemweb.pm for windows
   - bugfix:  Uniform check for windows, enable CUL for windows.
   - bugfix:  CUL/HMS parsing patches from Peter
+  - bugfix:  Fixes for Windows by Klaus

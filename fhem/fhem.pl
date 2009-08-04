@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.76 2009-07-26 09:20:07 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.77 2009-08-04 08:03:57 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -253,6 +253,12 @@ if(int(@ARGV) == 2) {
 # Server initialization
 my $ret = CommandInclude(undef, $attr{global}{configfile});
 die($ret) if($ret);
+
+if($^O =~ m/Win/ && !$attr{global}{nofork}) {
+  Log 1, "Forcing 'attr global nofork' on WINDOWS";
+  Log 1, "set it in the config file to avoud this message";
+  $attr{global}{nofork}=1;
+}
 
 # Go to background if the logfile is a real file (not stdout)
 if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
