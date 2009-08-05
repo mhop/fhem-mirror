@@ -240,7 +240,8 @@ FW_AnswerCall($)
     binmode (FH); # necessary for Windows
     pO join("", <FH>);
     close(FH);
-    $__RETTYPE = "image/*";
+    my @f_ext = split(/\./,$1); #kpb
+    $__RETTYPE = "image/$f_ext[-1]";
     return 1;
   } elsif($arg !~ m/^$__ME(.*)/) {
     Log(5, "Unknown document $arg requested");
