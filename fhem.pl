@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.78 2009-08-12 08:01:49 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.79 2009-08-12 08:08:14 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -322,9 +322,10 @@ while (1) {
       if(vec($rout, $selectlist{$p}{FD}, 1));
   }
   foreach my $p (keys %readyfnlist) {
-    if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p})) {
+    next if(!$readyfnlist{$p});                 # due to rereadcfg / delete
 
-      if($readyfnlist{$p}) {    # ReadyFn may decide to delete the device
+    if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p})) {
+      if($readyfnlist{$p}) {                    # delete itself inside ReadyFn 
         CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p});
       }
 
@@ -1129,10 +1130,12 @@ CommandDelete($$)
 
     # Delete releated hashes
     foreach my $p (keys %selectlist) {
-      delete $selectlist{$p} if($selectlist{$p}{NAME} eq $sdev);
+      delete $selectlist{$p}
+        if($selectlist{$p} && $selectlist{$p}{NAME} eq $sdev);
     }
     foreach my $p (keys %readyfnlist) {
-      delete $readyfnlist{$p} if($readyfnlist{$p}{NAME} eq $sdev);
+      delete $readyfnlist{$p}
+        if($readyfnlist{$p} && $readyfnlist{$p}{NAME} eq $sdev);
     }
 
     delete($attr{$sdev});
