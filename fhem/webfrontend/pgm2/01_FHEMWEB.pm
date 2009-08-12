@@ -835,6 +835,7 @@ FW_readgplotfile($$$)
   my (@filelog, @data, $plot);
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
   while(my $l = <FH>) {
+    $l =~ s/\r//g;
     if($l =~ m/^#FileLog (.*)$/) {
       push(@filelog, $1);
     } elsif($l =~ "^plot" || $plot) {
@@ -887,6 +888,9 @@ FW_substcfg($$$$$$)
       $g_count++;
     }
   }
+
+  $plot =~ s/\r//g;             # For our windows friends...
+  $gplot_script =~ s/\r//g;
 
   if($splitret == 1) {
     my @ret = split("\n", $gplot_script); 
