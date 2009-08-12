@@ -521,3 +521,5 @@
   - bugfix:  Uniform check for windows, enable CUL for windows.
   - bugfix:  CUL/HMS parsing patches from Peter
   - bugfix:  Fixes for Windows by Klaus
+  - bugfix:  Another "rereadcfg" bugfix
+  - feature: Update to the current (1.27) CUL FHT interface
