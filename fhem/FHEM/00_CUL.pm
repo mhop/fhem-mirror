@@ -595,18 +595,16 @@ CUL_Write($$$)
   ###################
   # Rewrite message from FHZ -> CUL
   if(length($fn) <= 1) {                                   # CUL Native
+    ;
+
   } elsif($fn eq "04" && substr($msg,0,6) eq "010101") {   # FS20
     $fn = "F";
     $msg = substr($msg,6);
-  } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
 
-    my $moff = 10;
-    while(length($msg) > $moff) {
-      my $snd = substr($msg,6,4) .
-                substr($msg,$moff,2) . "79" . substr($msg,$moff+2,2);
-      CUL_SimpleWrite($hash, "T$snd");
-      $moff += 4;
-    }
+  } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
+    $fn = "T";
+    $msg = substr($msg,6,4) . substr($msg,10);
+    CUL_SimpleWrite($hash, $fn . $msg);
     return;
 
   } else {
