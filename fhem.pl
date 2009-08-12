@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.77 2009-08-04 08:03:57 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.78 2009-08-12 08:01:49 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -317,6 +317,7 @@ while (1) {
   # reported by select, but is used by unix too, to check if the device is
   # attached again.
   foreach my $p (keys %selectlist) {
+    next if(!$selectlist{$p});                  # due to rereadcfg / delete
     CallFn($selectlist{$p}{NAME}, "ReadFn", $selectlist{$p})
       if(vec($rout, $selectlist{$p}{FD}, 1));
   }
