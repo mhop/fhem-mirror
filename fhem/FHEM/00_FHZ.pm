@@ -439,7 +439,7 @@ FHZ_ReadAnswer($$$)
 {
   my ($hash,$arg, $to) = @_;
 
-  return undef if(!$hash || !defined($hash->{FD}));
+  return undef if(!$hash || ($^O!~/Win/ && !defined($hash->{FD}));
 
   my ($mfhzdata, $rin) = ("", '');
   my $nfound;
