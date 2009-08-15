@@ -766,6 +766,7 @@ CUL_Read($)
         for(my $i = 1; $i < 14; $i+=2) { # Swap nibbles.
           $dmsg .= $a[$i+1] . $a[$i];
         }
+        $dmsg = lc($dmsg);
       }
       # Other K... Messages ar sent to CUL_WS
 
