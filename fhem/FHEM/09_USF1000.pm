@@ -101,6 +101,8 @@ USF1000_Parse($$)
   return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
 
+  my $t= TimeNow();
+
   # Msg format:
   # 01 23 45 67 8901 2345 6789 01 23 45 67
   # 81 0c 04 .. 0101 a001 a5ce aa 00 cc xx
@@ -112,44 +114,46 @@ USF1000_Parse($$)
   my $lowbattery= (hex($cc) & 0x40 ? 1 : 0);
   my $testmode=   (hex($cc) & 0x80 ? 1 : 0);
   my $distance=   hex($xx)/100.0; # in meters
-
-  my $wlevel  =   $def->{HEIGHT}-($distance-$def->{OFFSET}); # water level
-
-  my $geometry= $def->{GEOMETRY};
-  my $capacity= $def->{CAPACITY}; # capacity of tank (for distance= offset) in liters
-  my $volume;   # current volume in tank in liters
-  my $flevel;	# fill level in percent
+  my $valid= (($distance>0.00) && ($distance<2.55));
 
 
-  if($geometry eq "cub") {
-  	# cuboid
-  	$volume  = $def->{LENGTH}*$def->{WIDTH}*$wlevel*1000.0;
-  } elsif($geometry eq "cylv") {
-  	# vertical cylinder
-  	$volume  = $PI*$def->{DIAMETER}*$def->{DIAMETER}/4.0*$wlevel*1000.0;
-  } else {
-  	return 0;
+  if($valid) {
+  	my $wlevel  =   $def->{HEIGHT}-($distance-$def->{OFFSET}); # water level
+
+	my $geometry= $def->{GEOMETRY};
+  	my $capacity= $def->{CAPACITY}; # capacity of tank (for distance= offset) in liters
+  	my $volume;   # current volume in tank in liters
+  	my $flevel;	# fill level in percent
+
+  	if($geometry eq "cub") {
+  		# cuboid
+  		$volume  = $def->{LENGTH}*$def->{WIDTH}*$wlevel*1000.0;
+  	} elsif($geometry eq "cylv") {
+  		# vertical cylinder
+  		$volume  = $PI*$def->{DIAMETER}*$def->{DIAMETER}/4.0*$wlevel*1000.0;
+  	} else {
+  		return 0;
+  	}
+
+  	$flevel  = int($volume/$capacity*100.0+0.5);
+  	$volume= int($volume/10.0+0.5)*10.0;
+
+
+  	my $state= sprintf("v: %d  V: %d", $flevel, $volume);
+
+  	$def->{CHANGED}[0] = $state;
+  	$def->{STATE} = $state;
+  	$def->{READINGS}{state}{TIME} = $t;
+  	$def->{READINGS}{state}{VAL} = $state;
+  	Log GetLogLevel($name, 4), "USF1000 $name: $state";
+
+  	$def->{READINGS}{distance}{TIME} = $t;
+  	$def->{READINGS}{distance}{VAL} = $distance;
+  	$def->{READINGS}{level}{TIME} = $t;
+  	$def->{READINGS}{level}{VAL} = $flevel;
+  	$def->{READINGS}{volume}{TIME} = $t;
+  	$def->{READINGS}{volume}{VAL} = $volume;
   }
-
-  $flevel  = int($volume/$capacity*100.0+0.5);
-  $volume= int($volume/10.0+0.5)*10.0;
-
-  my $t= TimeNow();
-
-  my $state= sprintf("v: %d  V: %d", $flevel, $volume);
-
-  $def->{CHANGED}[0] = $state;
-  $def->{STATE} = $state;
-  $def->{READINGS}{state}{TIME} = $t;
-  $def->{READINGS}{state}{VAL} = $state;
-  Log GetLogLevel($name, 4), "USF1000 $name: $state";
-
-  $def->{READINGS}{distance}{TIME} = $t;
-  $def->{READINGS}{distance}{VAL} = $distance;
-  $def->{READINGS}{level}{TIME} = $t;
-  $def->{READINGS}{level}{VAL} = $flevel;
-  $def->{READINGS}{volume}{TIME} = $t;
-  $def->{READINGS}{volume}{VAL} = $volume;
 
   my $warnings= ($lowbattery ? "Battery low" : "");
   if($testmode) {
