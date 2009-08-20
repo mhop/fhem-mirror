@@ -417,3 +417,6 @@
 
 - Sat Jun 20 2009 (Boris)
   - 09_USF1000.pm: new module to support USF1000S devices.
+
+- Fri Aug 08 2009 (Boris)
+  - 09_USF1000.pm: suppress inplausible readings from USF1000

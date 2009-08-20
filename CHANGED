@@ -523,3 +523,4 @@
   - bugfix:  Fixes for Windows by Klaus
   - bugfix:  Another "rereadcfg" bugfix
   - feature: Update to the current (1.27) CUL FHT interface
+  - feature: suppress inplausible readings from USF1000
