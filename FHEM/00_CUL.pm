@@ -515,22 +515,30 @@ CUL_ReadAnswer($$$)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
 
   my ($mculdata, $rin) = ("", '');
-  my $nfound;
+  my $buf;
+  my $to = 3;                                         # 3 seconds timeout
+  $to = $hash->{RA_Timeout} if($hash->{RA_Timeout});  # ...or less
   for(;;) {
+
     if($^O =~ m/Win/) {
-      $nfound=CUL_Ready($hash);
+      $hash->{PortObj}->read_const_time($to*1000); # set timeout (ms)
+      # Read anstatt input sonst funzt read_const_time nicht.
+      $buf = $hash->{PortObj}->read(999);          
+      return ("Timeout reading answer for get $arg", undef)
+        if(length($buf) == 0);
+
     } else {
       vec($rin, $hash->{FD}, 1) = 1;
-      my $to = 3;                                         # 3 seconds timeout
-      $to = $hash->{RA_Timeout} if($hash->{RA_Timeout});  # ...or less
-      $nfound = select($rin, undef, undef, $to);
+      my $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-        return ("Select error $nfound / $!", undef);
+        die("Select error $nfound / $!", undef);
       }
+      return ("Timeout reading answer for get $arg", undef)
+        if($nfound == 0);
+      $buf = $hash->{PortObj}->input();
+
     }
-    return ("Timeout reading answer for get $arg", undef) if($nfound == 0);
-    my $buf = $hash->{PortObj}->input();
 
     Log 5, "CUL/RAW: $buf";
     $mculdata .= $buf;
