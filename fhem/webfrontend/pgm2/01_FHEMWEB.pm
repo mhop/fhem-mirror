@@ -117,7 +117,7 @@ FW_Undef($$)
 
   if(defined($hash->{CD})) {                   # Clients
     close($hash->{CD});
-    delete($selectlist{$hash->{NAME}});
+    delete($selectlist{$name});
   }
   if(defined($hash->{SERVERSOCKET})) {          # Server
     close($hash->{SERVERSOCKET});

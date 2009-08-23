@@ -1,48 +1,40 @@
-# Beispiel für FHEM PRIV-CGI Schnittstelle
-#
+################################################################################
+# FHEM PRIV-CGI
+# Stand: 08/2009
+# Update:
+# 08/2009 ROOMS -> Übersicht aller Räume mit Devices und STATE
+# 08/2009 READINGS -> Übersicht aller READIMGS nach Datum -> READING -> Device
+# 08/2009 Excute FHEMCommands /privcgi?Task=EXEC&cmd=FHEMCOMMAND&dev=DEVICENAME&attr=ATTRIBUTE&val=Value
+################################################################################
 # Danke an Rudi für die Schnittstelle....
-#
-# "Eigentlich wollte ich nur sehen, wie meine FHT's eingestellt sind,
-# "und eine Übersicht aller vergbener FS20-Code's. ;-)"
-#
+# Dies Modul als Beispiel für die Nutzung der Schnittstelle...
 # Das Modul verändert nichts an FHEM
-# das Orginal-Mudol ist im CVS unter Contrib 99_priv_cgi.pm zu finden
-#
+################################################################################
 # Beschreibung
 # Es werden lediglich vorhanden Information aus FHEM in eigenen Ansichten/Listen dargestellt.
 #
 # Ansicht/List
-# ALL
-# Überblick über alle Devices
-#
-# FHT
-# Übersicht aller FHT's
-# Die eingestellten Schaltzeitpunkte an denen der FHT zwischen Tag- und Nacht-Temperatur wechslet; bzw. umgekehrt.
-#
-# FS20
-# Übersicht alle FS20-Devices
-#
-# TH
-# Temperatur & Humidity
-# Alle Devices (die ich habe) die eine Temperatur oder Luftfeuchte messen (FHT,KS300,HMS,S300TH...)
-#
-# DUMMY (als Beispiel für eigene Functionen)
-#   Überischt aller DUMMY-Devices
-#
-#
+# ALL -> Überblick über alle Devices
+# FHT -> Übersicht aller FHT's incl. Programme
+# FS20 -> Übersicht alle FS20-Devices
+# TH -> Alle Devices (die ich habe) die eine Temperatur oder Luftfeuchte messen (FHT,KS300,HMS,S300TH...)
+# ROOMS -> Übersicht aller Räume mit Devices und STATE
+# READINGS -> Übersicht aller READINGS; Gruppiert nach Datum -> READING -> Device
+# DUMMY -> Überischt aller DUMMY-Devices (als Beispiel für eigene Functionen)
+################################################################################
 # Installation
 #
 # Modul ins FHEM-Modul Verzeichnis kopieren
 # entweder FHEM neu starten
 # oder "reload 99_priv_cgi.pm"
 #
-
+################################################################################
 # Aufruf:
 # Bsp.: FHEMWEB => http://localhost:8083/fhem
-# PROC-CGI => http://localhost:8083/fhem/privcgi
-#
+# PRIV-CGI => http://localhost:8083/fhem/privcgi
 #
 # Eigene Erweiterungen implementieren:
+# Aufruf: http://localhost:8083/fhem/privcgi?Type=FHT&Task=List
 # A. Ergänzung LIST-Funktion
 #  - Eigene Funktion schreiben z.B. sub priv_cgi_my_function($)
 #  - Eigenen Key festlegen z.B. myKey
@@ -55,18 +47,15 @@
 # - $data{$cgi_key}{TASK}{MyFunc} = "Function_Aufruf"
 ##############################################
 package main;
-
-# call it whith http://localhost:8083/fhem/privcgi
-
 use strict;
 use warnings;
+use Data::Dumper;
 use vars qw(%data);
 
 sub priv_cgi_Initialize($)
 {
 	my $cgi_key = "privcgi";
 	my $fhem_url = "/" . $cgi_key ; 
-#	$data{FWEXT}{$fhem_url} = "priv_cgi_callback";
 	$data{FWEXT}{$fhem_url}{FUNC} = "priv_cgi_callback";
 	$data{FWEXT}{$fhem_url}{LINK} = "privcgi";
 	$data{FWEXT}{$fhem_url}{NAME} = "MyFHEM";
@@ -83,9 +72,14 @@ sub priv_cgi_Initialize($)
     $data{$cgi_key}{TASK_LIST}{TYPE}{FHT} = "priv_cgi_print_fht";
     $data{$cgi_key}{TASK_LIST}{TYPE}{FS20} = "priv_cgi_print_fs20";
 	$data{$cgi_key}{TASK_LIST}{TYPE}{TH} = "priv_cgi_print_th";
+	$data{$cgi_key}{TASK_LIST}{TYPE}{ROOMS} = "priv_cgi_print_rooms";
+	$data{$cgi_key}{TASK_LIST}{TYPE}{READINGS} = "priv_cgi_print_readings";
 #	$data{$cgi_key}{TASK_LIST}{TYPE}{DUMMY} = "priv_cgi_print_dummy";
 
-
+	# ExcuteFhemCommands
+	# /privcgi?EXEC=FHEMCOMMAD&DEVICE&VALUE-1&VALUE-2
+	# /privcgi?Task=EXEC&cmd=FHEMCOMMAND&dev=DEVICENAME&attr=VALUE-1
+	$data{$cgi_key}{TASK}{EXEC} = "priv_cgi_exec";
 }
 
 sub
@@ -111,12 +105,13 @@ sub
 priv_cgi_get_start($)
 {
  my $in = shift;
+ print "CGI_START: " . Dumper(@_) . "\n";
  my (@tmp,$n,$v,$cgikey,$param);
  # Aufruf mit oder ohne Argumente
- # /privcgi oder /privcgi?ToDo=List&What=FHT
+ # /privcgi oder /privcgi??Type=FHT&Task=List
  if($in =~ /\?/)
   {
-  # Aufruf mit Argumenten: /privcgi?ToDo=List&What=FHT
+  # Aufruf mit Argumenten: /privcgi?Type=FHT&Task=List
   @tmp = split(/\?/, $in);
   $cgikey = shift(@tmp);
   $cgikey =~ s/\///;
@@ -343,7 +338,6 @@ sub priv_cgi_print_th()
   foreach my $d (sort keys %defs) {
     $type = $defs{$d}{TYPE};
 	next if(!($type =~ m/^(FHT|HMS|KS300|CUL_WS)/));
-	#next if($type ne "FHT" || $type ne "HMS" || $type ne "KS300" || $type ne "CUL_WS");
     $t = "";
     $h = "";
     $i = "";
@@ -381,5 +375,114 @@ sub priv_cgi_print_all()
 	}
   $str .= "<\/table>\n";
   return ($str);
+}
+sub priv_cgi_print_rooms()
+{
+my ($str,$r,$d,$ri);
+my %rooms = ();
+# Quelle 01_FHEMWEB.pm ...
+foreach $d (sort keys %defs ) {
+    foreach my $r (split(",", FW_getAttr($d, "room", "Unsorted"))) {
+      $rooms{$r}{$d} = $defs{$d}{STATE};}
+    }
+# print Dumper(%rooms);
+# Tabelle
+# Raum | DEVICE | TYPE | MODELL | STATE
+$str = "<table>";
+$str .= "<tr ALIGN=LEFT><th>Raum</th><th>Device</th><th>Type</th><th>Model</th><th>State</th></tr>";
+foreach $r (sort keys %rooms)
+	{
+	$ri = 0;
+#	$str .= "<tr><td>" . $r . "</td><td></td><td></td><td></td><td></td></tr>\n";
+	foreach $d (sort keys %{$rooms{$r}}){
+		if($ri eq 0) {$str .= "<tr bgcolor=\"#CCCCCC\"><td>" . $r . "</td>";}
+		else {$str .= "<tr><td></td>"}
+#		$str .= "<tr><td></td><td>" . $d . "</td>";
+		$str .= "<td>" . $d . "</td>";
+		$str .= "<td>" . $defs{$d}{TYPE} . "</td>";
+		$str .= "<td>" . $attr{$d}{model} . "</td>";
+		$str .= "<td>" . $defs{$d}{STATE} . "</td></tr>\n";
+		$ri++;
+		}
+	}
+$str .= "</table>";
+return ($str);
+}
+sub priv_cgi_print_readings()
+{
+my ($d,$r,$d1,$str,@tmp);
+# Übersicht aller READINGS
+# Tabelle:
+# READING
+#	DATUM
+#		DEVICE VALUE TIME
+# %reads{DATUM}{READINGS}{DEVICE}{READINGS}{VALUE} = VAL
+# %reads{DATUM}{READINGS}{DEVICE}{READINGS}{TIME} = ZEIT
+my (%reads,$readings,$datum,$device,$value,$zeit);
+foreach $device (sort keys %defs )
+{
+	foreach $r (sort keys %{$defs{$device}{READINGS}})
+	{
+		@tmp = split(' ', $defs{$device}{READINGS}{$r}{TIME});
+		$readings = $r;
+		$datum = $tmp[0];
+		$value = $defs{$device}{READINGS}{$r}{VAL};
+		$zeit = $tmp[1];
+		$reads{$datum}{$readings}{$device}{$readings}{VALUE} = $defs{$device}{READINGS}{$r}{VAL};
+		$reads{$datum}{$readings}{$device}{$readings}{TIME} = $zeit;
+	}
+}
+$str = "<table>\n";
+# Counter
+my ($ri,$di);
+# Datum
+foreach $r (sort keys %reads)
+	{
+	# READINGS
+	$ri = 0;
+	foreach $d (sort keys %{$reads{$r}})
+		{
+		$di = 0;
+			foreach $d1 (sort keys %{$reads{$r}{$d}})
+				{
+				if($ri eq 0){$str .= "<tr bgcolor=\"#CCCCCC\"><td>" . $r . "</td>";}
+				else{$str .= "<tr><td></td>";}
+				if($di eq 0) {$str .= "<td>" . $d . "</td>";}
+				else {$str .= "<td></td>"}
+				$str .= "<td>" . $d1 . "</td><td>" . $reads{$r}{$d}{$d1}{$d}{VALUE} . "</td><td>" .$reads{$r}{$d}{$d1}{$d}{TIME} . "</td></tr>\n";
+				$di++;
+				}
+		$ri++;
+		}
+	
+	}
+$str .= "</table>\n";
+return ($str);
+}
+sub 
+priv_cgi_exec($$) 
+{
+# /privcgi?Task=EXEC&cmd=FHEMCOMMAND&dev=DEVICENAME&attr=ATTRIBUTE&val=Value
+# Task=EXEC&cmd=set&dev=WaWaZiDATA&attr=active&val=100
+# Task=EXEC&cmd=attr&dev=WaWaZiDATA&attr=room&val=PRIVCGIEXEC
+Log 0, "PRIVCGIEXEC: @_\n";
+my $cgikey = shift;
+my $ret_param = "text/plain; charset=ISO-8859-1";
+my $ret_txt = undef;
+my $cmd = lc($data{$cgikey}{QUERY}{cmd});
+my $dev = $data{$cgikey}{QUERY}{dev};
+my $attr = $data{$cgikey}{QUERY}{attr};
+my $val = $data{$cgikey}{QUERY}{val};
+Log 0, "PRIVCGIEXEC: FHEM-Command: $cmd $dev $attr $val\n";
+if(!defined($cmds{$cmd}))
+		{
+		return ($ret_param, "PRIVCGIEXEC: unkown COMMAND $cmd");
+		}
+	if(!defined($defs{$dev}))
+		{
+		return ($ret_param, "PRIVCGIEXEC: unknown DEVICE $dev");
+		}
+$ret_txt = AnalyzeCommand(undef, "$cmd $dev $attr $val");
+return ($ret_param, $ret_txt);
 }
 1;
