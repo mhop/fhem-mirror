@@ -442,21 +442,29 @@ FHZ_ReadAnswer($$$)
   return undef if(!$hash || ($^O!~/Win/ && !defined($hash->{FD})));
 
   my ($mfhzdata, $rin) = ("", '');
-  my $nfound;
+  my $buf;
+
   for(;;) {
+
     if($^O =~ m/Win/) {
-      $nfound=FHZ_Ready($hash);
+      $hash->{PortObj}->read_const_time($to*1000); # set timeout (ms)
+      # Read anstatt input sonst funzt read_const_time nicht.
+      $buf = $hash->{PortObj}->read(999);          
+      return "Timeout reading answer for get $arg"
+        if(length($buf) == 0);
+
     } else {
       vec($rin, $hash->{FD}, 1) = 1;
-      $nfound = select($rin, undef, undef, $to);
+      my $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         die("Select error $nfound / $!\n");
       }
-    }
-    return "Timeout reading answer for get $arg" if($nfound == 0);
+      return "Timeout reading answer for get $arg"
+        if($nfound == 0);
+      $buf = $hash->{PortObj}->input();
 
-    my $buf = $hash->{PortObj}->input();
+    }
 
     Log 5, "FHZ/RAW: " . unpack('H*',$buf);
     $mfhzdata .= $buf;

@@ -164,10 +164,10 @@ FHT_Set($@)
     splice(@a,$i,1,("report1","255","report2","255"))
         if($a[$i] eq "refreshvalues");
 
-    if($a[$i] eq "time") {                              # CUL hack
+    if($a[$i] eq "time") {
       my @t = localtime;
       splice(@a,$i,1,("hour",$t[2],"minute",$t[1]));
-      IOWrite($hash, "", sprintf("T04%x", $t[0]) )
+      IOWrite($hash, "", sprintf("T04%x", $t[0]))                # CUL hack
                   if($hash->{IODev} && $hash->{IODev}->{TYPE} eq "CUL");
     }
   }
