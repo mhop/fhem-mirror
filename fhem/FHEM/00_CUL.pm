@@ -14,6 +14,11 @@ sub CUL_ReadAnswer($$$);
 sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 
+sub CUL_OpenDev($$);
+sub CUL_CloseDev($);
+sub CUL_SimpleWrite(@);
+sub CUL_SimpleRead($);
+
 my $initstr = "X21";    # Only translated messages + RSSI
 my %gets = (
   "version"  => "V",
@@ -79,20 +84,17 @@ CUL_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-  my $po;
 
-  return "wrong syntax: define <name> CUL devicename <FHTID> [mobile]"
+  return "wrong syntax: define <name> CUL devicename <FHTID>"
     if(@a < 4 || @a > 5);
 
-  delete $hash->{PortObj};
-  delete $hash->{FD};
+  CUL_CloseDev($hash);
 
   my $name = $a[0];
   my $dev = $a[2];
   return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
                 if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
   $hash->{FHTID} = uc($a[3]);
-  $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
   $hash->{STATE} = "defined";
 
   $attr{$name}{savefirst} = 1;
@@ -105,39 +107,9 @@ CUL_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
-  $hash->{PARTIAL} = "";
-  Log 3, "CUL opening CUL device $dev";
-  if ($^O=~/Win/) {
-   require Win32::SerialPort;
-   $po = new Win32::SerialPort ($dev);
-  } else  {
-   require Device::SerialPort;
-   $po = new Device::SerialPort ($dev);
-  }
-  if(!$po) {
-    my $msg = "Can't open $dev: $!";
-    Log(3, $msg) if($hash->{MOBILE});
-    return $msg if(!$hash->{MOBILE});
-    $readyfnlist{"$name.$dev"} = $hash;
-    return "";
-  }
-  Log 3, "CUL opened CUL device $dev";
-
-  $hash->{PortObj} = $po;
-  if( $^O !~ /Win/ ) {
-    $hash->{FD} = $po->FILENO;
-    $selectlist{"$name.$dev"} = $hash;
-  } else {
-    $readyfnlist{"$name.$dev"} = $hash;
-  }
-  
-  my $ret  = CUL_DoInit($hash);
-  if($ret) {
-    delete($selectlist{"$name.$dev"});
-    delete($readyfnlist{"$name.$dev"});
-  }
-  return $ret;
+  return CUL_OpenDev($hash, 0);
 }
+
 
 #####################################
 sub
@@ -158,7 +130,7 @@ CUL_Undef($$)
   }
 
   CUL_SimpleWrite($hash, "X00"); # Switch reception off, it may hang up the CUL
-  $hash->{PortObj}->close() if($hash->{PortObj});
+  CUL_CloseDev($hash); 
   return undef;
 }
 
@@ -289,9 +261,8 @@ GOTBW:
     my $off = 0;
     while($off < $len) {
       my $mlen = ($len-$off) > 32 ? 32 : ($len-$off);
-      my $ret = $hash->{PortObj}->write(substr($buf,$off,$mlen));
+      CUL_SimpleWrite($hash, substr($buf,$off,$mlen), 1);
       $off += $mlen;
-      select(undef, undef, undef, 0.001);
     }
 
 WRITEEND:
@@ -461,15 +432,14 @@ CUL_DoInit($)
   CUL_Clear($hash);
   my ($ver, $try) = ("", 0);
   while($try++ < 3 && $ver !~ m/^V/) {
-    $hash->{PortObj}->write("V\n");
+    CUL_SimpleWrite($hash, "V");
     ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0);
     return "$name: $err" if($err);
   }
 
   if($ver !~ m/^V/) {
     $attr{$name}{dummy} = 1;
-    $hash->{PortObj}->close();
-    $msg = "Not an CUL device, receives for V:  $ver";
+    $msg = "Not an CUL device, got for V:  $ver";
     Log 1, $msg;
     return $msg;
   }
@@ -511,7 +481,7 @@ CUL_ReadAnswer($$$)
 {
   my ($hash, $arg, $anydata) = @_;
 
-  return ("No FD" ,undef)
+  return ("No FD", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
 
   my ($mculdata, $rin) = ("", '');
@@ -520,14 +490,17 @@ CUL_ReadAnswer($$$)
   $to = $hash->{RA_Timeout} if($hash->{RA_Timeout});  # ...or less
   for(;;) {
 
-    if($^O =~ m/Win/) {
-      $hash->{PortObj}->read_const_time($to*1000); # set timeout (ms)
+    if($^O =~ m/Win/ && $hash->{USBDev}) {
+      $hash->{USBDev}->read_const_time($to*1000); # set timeout (ms)
       # Read anstatt input sonst funzt read_const_time nicht.
-      $buf = $hash->{PortObj}->read(999);          
+      $buf = $hash->{USBDev}->read(999);          
       return ("Timeout reading answer for get $arg", undef)
         if(length($buf) == 0);
 
     } else {
+      return ("Device lost when reading answer for get $arg", undef)
+        if(!$hash->{FD});
+
       vec($rin, $hash->{FD}, 1) = 1;
       my $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
@@ -536,12 +509,13 @@ CUL_ReadAnswer($$$)
       }
       return ("Timeout reading answer for get $arg", undef)
         if($nfound == 0);
-      $buf = $hash->{PortObj}->input();
-
+      $buf = CUL_SimpleRead($hash);
     }
 
-    Log 5, "CUL/RAW: $buf";
-    $mculdata .= $buf;
+    if($buf) {
+      Log 5, "CUL/RAW: $buf";
+      $mculdata .= $buf;
+    }
     return (undef, $mculdata) if($mculdata =~ m/\r\n/ || $anydata);
   }
 }
@@ -578,26 +552,12 @@ CUL_XmitLimitCheck($$)
   $hash->{NR_CMD_LAST_H} = int(@b);
 }
 
-sub
-CUL_SimpleWrite($$)
-{
-  my ($hash, $msg) = @_;
-  return if(!$hash || !defined($hash->{PortObj}));
-  $hash->{PortObj}->write($msg . "\n");
-  #Log 1, "CUL_SimpleWrite $msg";
-  select(undef, undef, undef, 0.01);
-}
-
 #####################################
 sub
 CUL_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
 
-  if(!$hash || !defined($hash->{PortObj})) {
-    Log 5, "CUL device is not active, cannot send";
-    return;
-  }
   my $name = $hash->{NAME};
 
   ###################
@@ -621,32 +581,42 @@ CUL_Write($$$)
   }
 
   Log 5, "CUL sending $fn$msg";
-  my $bstring = "$fn$msg\n";
+  my $bstring = "$fn$msg";
 
   if($fn eq "F") {
 
-    if(!$hash->{QUEUE}) {
-
+    if(!CUL_AddFS20Queue($hash, $bstring)) {
       CUL_XmitLimitCheck($hash,$bstring);
-      $hash->{QUEUE} = [ $bstring ];
-      $hash->{PortObj}->write($bstring);
-
-      ##############
-      # Write the next buffer not earlier than 0.22 seconds (= 65.6ms + 10ms +
-      # 65.6ms + 10ms + 65.6ms), else it will be discarded by the FHZ1X00 PC
-      InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
-
-    } else {
-      push(@{$hash->{QUEUE}}, $bstring);
+      CUL_SimpleWrite($hash, $bstring);
     }
 
   } else {
 
-    $hash->{PortObj}->write($bstring);
+    CUL_SimpleWrite($hash, $bstring);
 
   }
 
 }
+
+sub
+CUL_AddFS20Queue($$)
+{
+  my ($hash, $bstring) = @_;
+
+  if(!$hash->{QUEUE}) {
+    ##############
+    # Write the next buffer not earlier than 0.23 seconds
+    # = 3* (12*0.8+1.2+1.0*5*9+0.8+10) = 226.8ms
+    # else it will be sent too early by the CUL, resulting in a collision
+    # Experimental value: 0.25 does not always work: 0.3 is better...
+    $hash->{QUEUE} = [ $bstring ];
+    InternalTimer(gettimeofday()+0.5, "CUL_HandleWriteQueue", $hash, 1);
+    return 0;
+  }
+  push(@{$hash->{QUEUE}}, $bstring);
+  return 1;
+}
+
 
 #####################################
 sub
@@ -655,16 +625,17 @@ CUL_HandleWriteQueue($)
   my $hash = shift;
   my $arr = $hash->{QUEUE};
 
-  if(defined($arr) && @{$arr} > 0) {
+  while(defined($arr) && @{$arr} > 0) {
     shift(@{$arr});
     if(@{$arr} == 0) {
       delete($hash->{QUEUE});
       return;
     }
     my $bstring = $arr->[0];
+    next if($bstring eq "-");
     CUL_XmitLimitCheck($hash,$bstring);
-    $hash->{PortObj}->write($bstring);
-    InternalTimer(gettimeofday()+0.25, "CUL_HandleWriteQueue", $hash, 1);
+    CUL_SimpleWrite($hash, $bstring);
+    InternalTimer(gettimeofday()+0.5, "CUL_HandleWriteQueue", $hash, 1);
   }
 }
 
@@ -674,23 +645,20 @@ CUL_Read($)
 {
   my ($hash) = @_;
 
-  my $buf = $hash->{PortObj}->input();
+  my $buf = CUL_SimpleRead($hash);
   my $name = $hash->{NAME};
 
   ###########
   # Lets' try again: Some drivers return len(0) on the first read...
   if(defined($buf) && length($buf) == 0) {
-    $buf = $hash->{PortObj}->input();
+    $buf = CUL_SimpleRead($hash);
   }
 
   if(!defined($buf) || length($buf) == 0) {
 
     my $dev = $hash->{DeviceName};
-    Log 1, "USB device $dev disconnected, waiting to reappear";
-    $hash->{PortObj}->close();
-    delete($hash->{PortObj});
-    delete($hash->{FD});
-    delete($selectlist{"$name.$dev"});
+    Log 1, "$dev disconnected, waiting to reappear";
+    CUL_CloseDev($hash);
     $readyfnlist{"$name.$dev"} = $hash; # Start polling
     $hash->{STATE} = "disconnected";
 
@@ -731,6 +699,8 @@ CUL_Read($)
     my $len = length($dmsg);
 
     if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
+
+      CUL_AddFS20Queue($hash, "-");          # Avoid sending response too early
 
       if(defined($attr{$name}) && defined($attr{$name}{CUR_id_list})) {
         my $id= substr($dmsg,1,4);
@@ -803,46 +773,16 @@ NEXTMSG:
 
 #####################################
 sub
-CUL_Ready($)           # Windows - only
+CUL_Ready($)
 {
   my ($hash) = @_;
-  my $po=$hash->{PortObj};
 
-  if(!$po) {    # Looking for the device
+  return CUL_OpenDev($hash, 1)
+                if($hash->{STATE} eq "disconnected");
 
-    my $dev = $hash->{DeviceName};
-    my $name = $hash->{NAME};
-
-    $hash->{PARTIAL} = "";
-    if ($^O=~/Win/) {
-     $po = new Win32::SerialPort ($dev);
-    } else  {
-     $po = new Device::SerialPort ($dev);
-    }
-    return undef if(!$po);
-
-    Log 1, "USB device $dev reappeared";
-    $hash->{PortObj} = $po;
-    if( $^O !~ /Win/ ) {
-      $hash->{FD} = $po->FILENO;
-      delete($readyfnlist{"$name.$dev"});
-      $selectlist{"$name.$dev"} = $hash;
-    } else {
-      $readyfnlist{"$name.$dev"} = $hash;
-    }
-    my $ret  = CUL_DoInit($hash);
-    if($ret) {
-      delete($selectlist{"$name.$dev"});
-      delete($readyfnlist{"$name.$dev"});
-      Log 1, "Won't listen to this device any more";
-    }
-    DoTrigger($name, "CONNECTED");
-    return $ret;
-
-  }
-
-  # This is relevant for windows only
-  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags)=$po->status;
+  # This is relevant for windows/USB only
+  my $po=$hash->{USBDev};
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
 }
 
@@ -896,6 +836,141 @@ CUL_HandleCurRequest($$)
     fhem( $msg );
   }
 
+}
+
+########################
+sub
+CUL_SimpleWrite(@)
+{
+  my ($hash, $msg, $noapp) = @_;
+  return if(!$hash);
+
+  $msg .= "\n" unless($noapp);
+
+  $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
+  syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
+
+  #Log 1, "CUL_SimpleWrite >$msg<";
+  select(undef, undef, undef, 0.001);
+}
+
+########################
+sub
+CUL_SimpleRead($)
+{
+  my ($hash) = @_;
+
+  if($hash->{USBDev}) {
+    return $hash->{USBDev}->input();
+  }
+
+  if($hash->{TCPDev}) {
+    my $buf;
+    if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
+      CUL_CloseDev($hash);
+      my $name = $hash->{NAME};
+      my $dev = $hash->{DeviceName};
+      $readyfnlist{"$name.$dev"} = $hash; # Start polling
+      $hash->{STATE} = "disconnected";
+      return undef;
+    }
+
+    return $buf;
+  }
+  return undef;
+}
+
+########################
+sub
+CUL_CloseDev($)
+{
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $dev = $hash->{DeviceName};
+
+  return if(!$dev);
+  
+  if($hash->{TCPDev}) {
+    $hash->{TCPDev}->close();
+    delete($hash->{TCPDev});
+
+  } elsif($hash->{USBDev}) {
+    $hash->{USBDev}->close() ;
+    delete($hash->{USBDev});
+
+  }
+  delete($selectlist{"$name.$dev"});
+  delete($readyfnlist{"$name.$dev"});
+  delete($hash->{FD});
+}
+
+########################
+sub
+CUL_OpenDev($$)
+{
+  my ($hash, $reopen) = @_;
+  my $dev = $hash->{DeviceName};
+  my $name = $hash->{NAME};
+  my $po;
+
+  $hash->{PARTIAL} = "";
+  Log 3, "CUL opening CUL device $dev"
+        if(!$reopen);
+
+  if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
+    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
+    if(!$conn) {
+      Log(3, "Can't connect to $dev: $!") if(!$reopen);
+      $readyfnlist{"$name.$dev"} = $hash;
+      $hash->{STATE} = "disconnected";
+      return "";
+    }
+
+    $hash->{TCPDev} = $conn;
+    $hash->{FD} = $conn->fileno();
+    delete($readyfnlist{"$name.$dev"});
+    $selectlist{"$name.$dev"} = $hash;
+
+  } else {                              # USB Device
+    if ($^O=~/Win/) {
+     require Win32::SerialPort;
+     $po = new Win32::SerialPort ($dev);
+    } else  {
+     require Device::SerialPort;
+     $po = new Device::SerialPort ($dev);
+    }
+
+    if(!$po) {
+      return undef if($reopen);
+      Log(3, "Can't open $dev: $!");
+      $readyfnlist{"$name.$dev"} = $hash;
+      $hash->{STATE} = "disconnected";
+      return "";
+    }
+    $hash->{USBDev} = $po;
+    if( $^O =~ /Win/ ) {
+      $readyfnlist{"$name.$dev"} = $hash;
+    } else {
+      $hash->{FD} = $po->FILENO;
+      delete($readyfnlist{"$name.$dev"});
+      $selectlist{"$name.$dev"} = $hash;
+    }
+  }
+
+  if($reopen) {
+    Log 1, "CUL $dev reappeared ($name)";
+  } else {
+    Log 3, "CUL opened $dev for $name";
+  }
+    
+  my $ret  = CUL_DoInit($hash);
+  if($ret) {
+    CUL_CloseDev($hash);
+    Log 1, "Cannot init $dev, ignoring it";
+  }
+
+  DoTrigger($name, "CONNECTED") if($reopen);
+  return $ret;
 }
 
 1;
