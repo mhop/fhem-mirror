@@ -1323,7 +1323,8 @@ FW_style($$)
       pO "$f: $!";
       return;
     }
-    $__data =~ s/\r//g if($^O ne 'MSWin32');
+    $__data =~ s/\r//g if($^O !~ m/Win/);
+    binmode (FH);
     print FH $__data;
     close(FH);
     FW_style("style list", "Saved file $f");
