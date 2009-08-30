@@ -525,3 +525,4 @@
   - feature: Update to the current (1.27) CUL FHT interface
   - feature: suppress inplausible readings from USF1000
   - bugfix:  FHZ_ReadAnswer bugfix for Windows (Klaus, 20.8.2009)
+  - feature: CUL: device acces code reorganized, TCP/IP support added
