@@ -10,7 +10,6 @@
 # Aufruf: dumpdef <XXX>
 # <MOD> = %modules
 # <SEL> = %selectlist
-# <VAL> = %value
 # <CMD> = %cmds
 # <DAT> = %data
 ##############################################
@@ -35,11 +34,10 @@ dumpdef_Initialize($)
 sub Commanddumpdef($)
 {
   my ($cl, $d) = @_;
-#  $d = $a[1];
   return "Usage: dumpdef <DeviceName>" if(!$d);
   my($package, $filename, $line, $subroutine) = caller(3);
   my $r = "CALLER => $package: $filename LINE: $line SUB: $subroutine \n";
-  $r .= "<h1>SUB-NAME: " .(caller(0))[3] . "</h1>\n";
+  $r .= "SUB-NAME: " .(caller(0))[3] . "\n";
   if($d eq "CMD") {$r .= Dumper(%cmds) . "\n"; return $r; }
   if($d eq "DAT") {$r .= Dumper(%data) . "\n"; return $r; }
   if($d eq "MOD") {$r .= Dumper(%modules) . "\n"; return $r; }
