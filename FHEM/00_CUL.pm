@@ -107,7 +107,8 @@ CUL_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
-  return CUL_OpenDev($hash, 0);
+  my $ret = CUL_OpenDev($hash, 0);
+  return $ret;
 }
 
 
@@ -466,7 +467,7 @@ CUL_DoInit($)
     CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
   }
 
-  $hash->{STATE} = "Initialized";
+  $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -913,16 +914,30 @@ CUL_OpenDev($$)
   my $name = $hash->{NAME};
   my $po;
 
+
   $hash->{PARTIAL} = "";
   Log 3, "CUL opening CUL device $dev"
         if(!$reopen);
 
   if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
+
+    # This part is called every time the timeout (5sec) is expired _OR_
+    # somebody is communicating over another TCP connection. As the connect
+    # for non-existent devices has a delay of 3 sec, we are sitting all the
+    # time in this connect. NEXT_OPEN tries to avoid this problem.
+    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
+      return;
+    }
+
     my $conn = IO::Socket::INET->new(PeerAddr => $dev);
-    if(!$conn) {
+    if($conn) {
+      delete($hash->{NEXT_OPEN})
+
+    } else {
       Log(3, "Can't connect to $dev: $!") if(!$reopen);
       $readyfnlist{"$name.$dev"} = $hash;
       $hash->{STATE} = "disconnected";
+      $hash->{NEXT_OPEN} = time()+60;
       return "";
     }
 

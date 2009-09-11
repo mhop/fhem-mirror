@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.79 2009-08-12 08:08:14 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.80 2009-09-11 07:34:12 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -287,7 +287,7 @@ Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
 ################################################
 # Main Loop
-sub MAIN {MAIN:};#Dummy
+sub MAIN {MAIN:};               #Dummy
 while (1) {
   my ($rout, $rin) = ('', '');
 
@@ -825,7 +825,9 @@ WriteStatefile()
     print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n"
         if($defs{$d}{VOLATILE});
     print SFH "setstate $d $defs{$d}{STATE}\n"
-        if($defs{$d}{STATE} && $defs{$d}{STATE} ne "unknown");
+        if($defs{$d}{STATE} &&
+           $defs{$d}{STATE} ne "unknown" &&
+           $defs{$d}{STATE} ne "Initialized");
 
     #############
     # Now the detailed list

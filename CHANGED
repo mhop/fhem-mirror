@@ -526,4 +526,5 @@
   - feature: suppress inplausible readings from USF1000
   - bugfix:  FHZ_ReadAnswer bugfix for Windows (Klaus, 20.8.2009)
   - feature: CUL: device acces code reorganized, TCP/IP support added
-  - feature: Pachube module from Axel in contrib
+  - feature: Pachube module from Axel
+  - feature: dumpdef module from Axel in contrib

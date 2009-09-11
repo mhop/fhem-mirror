@@ -84,9 +84,11 @@
   <b>Helper modules</b>
   <ul>
     <a href="#FileLog">FileLog</a> &nbsp;
+    <a href="#PachLog">PachLog</a> &nbsp;
     <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
     <a href="#at">at</a> &nbsp;
     <a href="#dummy">dummy</a> &nbsp;
+    <a href="#dumpdef">dumpdef</a> &nbsp;
     <a href="#holiday">holiday</a> &nbsp;
     <a href="#notify">notify</a> &nbsp;
     <a href="#watchdog">watchdog</a> &nbsp;
@@ -1537,11 +1539,13 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CUL"></a>
 <h3>CUL</h3>
 <ul>
-  The CUL is an USB device sold by <a href="http://www.busware.de">busware.de
-  </a>. With the opensource firmware (see this <a
-  href="http://www.koeniglich.de/culfw/culfw.html">link</a>) it is
-  capable to receive and send different 868MHz protocols
-  (FS20/FHT/S300/EM/HMS).<br>
+  The CUL/CUR/CUN is a family of RF devices sold by <a
+  href="http://www.busware.de">busware.de</a>.
+
+  With the opensource firmware (see this <a
+  href="http://www.koeniglich.de/culfw/culfw.html">link</a>) they are capable
+  to receive and send different 868MHz protocols (FS20/FHT/S300/EM/HMS).<br>
+
   <br>
   Some protocols (FS20/FHT) are converted by this module so that the same
   logical device can be used, irrespective if the radio telegram is received by
@@ -1554,17 +1558,24 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CULdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; CUL &lt;serial-device&gt; &lt;housecode&gt; [mobile]</code> <br>
+    <code>define &lt;name&gt; CUL &lt;device&gt; &lt;housecode&gt;</code> <br>
     <br>
-    Specifies the serial port to communicate with the CUL or CUR.
-    The name(s) of the serial-device(s) depends on your distribution,
+    USB-connected devices (CUL/CUR/CUN):<br><ul>
+    &lt;device&gt; specifies the serial port to communicate with the CUL or CUR.
+    The name of the serial-device depends on your distribution,
     under linux the cdc_acm kernel module is responsible, and usually a
-    /dev/ttyACM0 device will be created.
+    /dev/ttyACM0 device will be created. If your distribution does not have a
+    cdc_acm module, you can force usbserial to handle the CUL by the following
+    command:<ul>modprobe usbserial vendor=0x03eb product=0x204b</ul>In this
+    case the device is most probably /dev/ttyUSB0.<br>
+    </ul>
+    Network-connected devices (CUN):<br><ul>
+    &lt;device&gt; specifies the host:port of the device. E.g. 192.168.0.244:2323
+    </ul>
     <br>
-    If the serial-device is called none, then no device will be opened, so you
+    If the device is called none, then no device will be opened, so you
     can experiment without hardware attached.<br>
-    If you specify the "mobile" parameter, then fhem.pl won't block if the
-    device is removed. This is mainly intended for the CUR.<br>
+
     The housecode is a 4 digit hex number, and it is used when the CUL/CUR
     talks to FHT devices or when CUR requests data.
   </ul>
@@ -3786,6 +3797,92 @@ isday, sunrise_coord</pre>
 </ul>
 
 
+<a name="PachLog"></a>
+<h3>PachLog</h3>
+<ul>
+  The PachLog module logs sensor data like temperature and humidity to <a
+  href=http://www.pachube.com>www.pachube.com</a>.<br>
+  <br>
+  <a name="PachLogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <br><code>define &lt;name&gt; PachLog &lt;Pachube-API-Key&gt;</code> <br>
+    <br>
+    &lt;Pachube-API-Key&gt;:<br>
+        You need the Pachube-API-Key to authenticate your application to the
+        Pachube service.<br>
+	Don't share this with anyone: it's just like a password.<br>
+  </ul>
+  <br>
+
+  <a name="PachLog_Set"></a>
+  <b>Set</b>
+	<ul>
+		<br>
+		Add a new device for logging to www.pachube.com<br><br>
+		<code>set &lt;NAME&gt; ADD &lt;FHEM-DEVICENAME&gt; FEED-NR:ID:READING:ID:READING</code><br><br>
+		Example: KS300 weather data<br><br>
+		READING: temperature humidity wind rain<br><br>
+		1. Generate input feed on www.pachube.com => You get your
+                   FEED-NR: 1234<br>
+		2. Add datastreams to the feed:<br>
+		<ul>
+		<table>
+		<tr><td>ID</td><td>0</td><td>temperature</td></tr>
+		<tr><td>ID</td><td>1</td><td>humidity</td></tr>
+		<tr><td>ID</td><td>2</td><td>wind</td></tr>
+		<tr><td>ID</td><td>3</td><td>rain</td></tr></table><br>
+		</ul>
+		3. Add the KS300 to your PachLog device<br><br>
+		<code>set &lt;NAME&gt; ADD &lt;My-KS300&gt; 1234:0temperature:1:humidity:2:wind:3:rain</code><br><br>
+		Delete a device form logging to www.pachube.com<br><br>
+		<code>set &lt;NAME&gt; DEL &lt;FHEM-DEVICENAME&gt;</code><br><br>
+	</ul>
+	<br>
+	
+  <b>Get</b> <ul>N/A</ul><br>
+  <b>Attributes</b> <ul>N/A</ul><br>
+</ul>
+
+
+<a name="dumpdef"></a>
+<h3>dumpdef</h3>
+<ul>
+  <code>dumpdef &lt;options&gt;</code>
+  <br><br>
+	Data::Dumper for FHEM-Devices/Hashes<br><br>
+	Dumps the content of &lt;options&gt; to FHEMWEB<br><br>
+	Options:<br><br>
+	<ul>
+	<table>
+	<tr><td><code>FHEM-DEVICENAME</code></td><td>=></td><td><code>%defs{FHEM-DEVICENAME}+%attr{FHEM-DEVICENAME}</code></td></tr>
+	<tr><td><code>MOD</code></td><td>=></td><td><code>%modules</code></td></tr>
+	<tr><td><code>SEL</code></td><td>=></td><td><code>%selectlist</code></td></tr>
+	<tr><td><code>DAT</code></td><td>=></td><td><code>%data</code></td></tr>
+	<tr><td><code>CMD</code></td><td>=></td><td><code>%cmd</code></td></tr>
+	</table>
+	</ul>
+  <br><br>
+  Example:
+  <ul><br>
+    <code>dumpdef TEST</code><br><br>
+    <ul><code>CALLER => main: /opt/fhz/FHEM/01_FHEMWEB.pm LINE: 194 SUB: main::FW_AnswerCall<br>
+	SUB-NAME: main::Commanddumpdef<br>
+	DUMP-DEVICE: TEST <br>
+	$VAR1 = {<ul><code>
+			  'IODev' => {},<br>
+			  'NAME' => 'TEST',<br>
+			  'NR' => 64,<br>
+			  'STATE' => '???',<br>
+			  'TYPE' => 'dummy'<br>
+			};</code></ul>
+	<code>DUMP-DEVICE-ATTR<br>
+	$VAR1 = {</code><ul><code>
+			  'room' => 'DEF_DUMMY,GRP.TEST'<br>
+			};</ul></code>
+	</code></ul><br>
+  </ul>
+</ul>
 
 <a name="perl"></a>
 <h3>Perl specials</h3>
