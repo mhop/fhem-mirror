@@ -524,6 +524,7 @@
   - bugfix:  Another "rereadcfg" bugfix
   - feature: Update to the current (1.27) CUL FHT interface
   - feature: suppress inplausible readings from USF1000
+  - feature: get time, fwrev, set reopen for CM11 (Boris 2009-09-12)
   - bugfix:  FHZ_ReadAnswer bugfix for Windows (Klaus, 20.8.2009)
   - feature: CUL: device acces code reorganized, TCP/IP support added
   - feature: Pachube module from Axel
