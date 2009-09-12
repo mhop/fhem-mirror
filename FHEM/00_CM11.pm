@@ -71,11 +71,12 @@ my %functions_rcv  = qw(0000 ALL_UNITS_OFF
 
 
 my %gets = (
-  "test"   => "xxx",
+  "fwrev"   => "xxx",
+  "time"   => "xxx",
 );
 
 my %sets = (
-  "test"   => "xxx",
+  "reopen"   => "xxx",
 );
 
 
@@ -92,11 +93,11 @@ CM11_Initialize($)
   $hash->{Clients} = ":X10:";
   $hash->{ReadyFn} = "CM11_Ready";
 
-# Normal Devices
+# Normal Device
   $hash->{DefFn}   = "CM11_Define";
   $hash->{UndefFn} = "CM11_Undef";
-#  $hash->{GetFn}   = "CM11_Get";
-#  $hash->{SetFn}   = "CM11_Set";
+  $hash->{GetFn}   = "CM11_Get";
+  $hash->{SetFn}   = "CM11_Set";
   $hash->{StateFn} = "CM11_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "model:CM11 loglevel:0,1,2,3,4,5,6";
@@ -143,13 +144,38 @@ CM11_DoInit($$$)
 
 #####################################
 sub
+CM11_Reopen($)
+{
+  my ($hash) = @_;
+
+  my $dev = $hash->{DeviceName};
+  $hash->{PortObj}->close();
+  Log 1, "Device $dev closed";
+  for(;;) {
+      sleep(5);
+      if($^O =~ m/Win/) {
+        $hash->{PortObj} = new Win32::SerialPort($dev);
+      }else{
+        $hash->{PortObj} = new Device::SerialPort($dev);
+      }
+      if($hash->{PortObj}) {
+        Log 1, "Device $dev reopened";
+        $hash->{FD} = $hash->{PortObj}->FILENO if($^O !~ m/Win/);
+        CM11_DoInit($hash->{NAME}, $hash->{ttytype}, $hash->{PortObj});
+        return;
+      }
+  }
+}
+
+#####################################
+sub
 CM11_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $po;
 
-  return "wrong syntax: define <name> FHZ devicename ".
+  return "wrong syntax: define <name> CM11 devicename ".
                         "[normal|strangetty] [mobile]" if(@a < 3 || @a > 5);
 
 
@@ -385,6 +411,75 @@ CM11_GetInterfaceStatus($)
       return if(!defined($buf)); # read error
       $statusmsg.= $buf;
     }
+    return $statusmsg;
+}
+
+#####################################
+sub CM11_Get($@)
+{
+  my ($hash, @a) = @_;
+
+  return "CM11: get needs only one parameter" if(@a != 2);
+  return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
+        if(!defined($gets{$a[1]}));
+
+  my ($fn, $arg) = split(" ", $gets{$a[1]});
+
+  my $v = join(" ", @a);
+  my $name = $hash->{NAME};
+  Log GetLogLevel($name,2), "CM11 get $v";
+
+  my $statusmsg= CM11_GetInterfaceStatus($hash);
+  if(!defined($statusmsg)) {
+	$v= "error";
+	Log 2, "CM11 error, device is irresponsive."
+  } else {
+	my $msg= unpack("H*", $statusmsg);
+  	Log 5, "CM11 got ". $msg;
+
+	if($a[1] eq "fwrev") {
+    		$v = hex(substr($msg, 14, 1));
+  	} elsif($a[1] eq "time") {
+		my $sec= hex(substr($msg, 4, 2));
+		my $hour= hex(substr($msg, 8, 2))*2;
+		my $min= hex(substr($msg, 6, 2)); 
+		if($min>59) {
+			$min-= 60;
+			$hour++;	
+		}
+		my $day= hex(substr($msg, 10, 2));
+		$day+= 256 if(hex(substr($msg, 12, 1)) & 0xf);
+		$v= sprintf("%d.%02d:%02d:%02d", $day,$hour,$min,$sec);
+	}
+  }
+  $hash->{READINGS}{$a[1]}{VAL} = $v;
+  $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
+
+  return "$a[0] $a[1] => $v";
+}
+
+
+#####################################
+sub
+CM11_Set($@)
+{
+  my ($hash, @a) = @_;
+
+  return "CM11: set needs one parameter" if(@a != 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
+        if(!defined($sets{$a[1]}));
+
+  my ($fn, $arg) = split(" ", $sets{$a[1]});
+
+  my $v = join(" ", @a);
+  my $name = $hash->{NAME};
+  Log GetLogLevel($name,2), "CM11 set $v";
+
+  if($a[1] eq "reopen") {
+    CM11_Reopen($hash);
+  }
+
+  return undef;
 }
 
 #####################################
