@@ -420,3 +420,6 @@
 
 - Fri Aug 08 2009 (Boris)
   - 09_USF1000.pm: suppress inplausible readings from USF1000
+
+- Sat Sep 12 2009 (Boris)
+  - 00_CM11.pm: feature: get time, fwrev, set reopen for CM11 (Boris 2009-09-12)
