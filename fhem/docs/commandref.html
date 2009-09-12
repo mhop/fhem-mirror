@@ -1690,7 +1690,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     for the total number.
     <ul>
       <li>for EMWZ devices you should specify the rotation speed (R/kW)
-          of your watt-meter (e.g. 150) for corr1 and 12 times this value for 
+          of your watt-meter (e.g. 150) for corr1 and 12 times this value for
           corr2</li>
       <li>for EMEM devices the corr1 value is 0.01, and the corr2 value is
           0.001 </li>
@@ -2046,9 +2046,32 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br>
   </ul>
 
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; reopen</code>
+    <br><br>
+    Reopens the serial port.
+  </ul>
+  <br>
 
-  <b>Get</b> <ul>N/A</ul><br>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; fwrev</code>
+    <br><br>
+    Reads the firmware revision of the CM11 device. Returns <code>error</code>
+    if the serial connection to the device times out. Can be used for error
+    detection.
+    <br><br>
+
+    <code>get &lt;name&gt; time</code>
+    <br><br>
+    Reads the internal time of the device which is the total uptime (modulo one
+    year), since fhem sets the time to 0.00:00:00 if the device requests the time
+    to be set after being powered on. Returns <code>error</code>
+    if the serial connection to the device times out. Can be used for error
+    detection.
+  </ul>
+  <br>
 
   <b>Attributes</b>
   <ul>
@@ -3839,7 +3862,7 @@ isday, sunrise_coord</pre>
 		<code>set &lt;NAME&gt; DEL &lt;FHEM-DEVICENAME&gt;</code><br><br>
 	</ul>
 	<br>
-	
+
   <b>Get</b> <ul>N/A</ul><br>
   <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
