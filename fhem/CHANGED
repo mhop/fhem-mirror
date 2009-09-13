@@ -529,3 +529,4 @@
   - feature: CUL: device acces code reorganized, TCP/IP support added
   - feature: Pachube module from Axel
   - feature: dumpdef module from Axel in contrib
+  - feature: javascripting support in FHEMWEB (Klaus/Axel)

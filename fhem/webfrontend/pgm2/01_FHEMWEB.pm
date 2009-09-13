@@ -229,12 +229,14 @@ FW_AnswerCall($)
     close(FH);
     $__RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
     return 1;
+
   } elsif($arg =~ m,^$__ME/(.*).css,) {
     open(FH, "$__dir/$1.css") || return;
     pO join("", <FH>);
     close(FH);
     $__RETTYPE = "text/css";
     return 1;
+
   } elsif($arg =~ m,^$__ME/icons/(.*)$,) {
     open(FH, "$__dir/$1") || return;
     binmode (FH); # necessary for Windows
@@ -243,9 +245,18 @@ FW_AnswerCall($)
     my @f_ext = split(/\./,$1); #kpb
     $__RETTYPE = "image/$f_ext[-1]";
     return 1;
+
+ } elsif($arg =~ m,^$__ME/(.*).js,) { #kpb java include
+    open(FH, "$__dir/$1.js") || return;
+    pO join("", <FH>);
+    close(FH);
+    $__RETTYPE = "application/javascript";
+    return 1;
+
   } elsif($arg !~ m/^$__ME(.*)/) {
     Log(5, "Unknown document $arg requested");
     return 0;
+
   }
 
   ##############################
