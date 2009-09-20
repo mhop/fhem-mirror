@@ -423,3 +423,6 @@
 
 - Sat Sep 12 2009 (Boris)
   - 00_CM11.pm: feature: get time, fwrev, set reopen for CM11 (Boris 2009-09-12)
+
+- Sun Sep 20 2009 (Boris)
+  - Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
