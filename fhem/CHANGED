@@ -530,3 +530,4 @@
   - feature: Pachube module from Axel
   - feature: dumpdef module from Axel in contrib
   - feature: javascripting support in FHEMWEB (Klaus/Axel)
+  - feature: Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
