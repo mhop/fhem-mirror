@@ -57,13 +57,14 @@ FHZ_Initialize($)
 # Provider
   $hash->{ReadFn}  = "FHZ_Read";
   $hash->{WriteFn} = "FHZ_Write";
-  $hash->{Clients} = ":FHZ:FS20:FHT:HMS:KS300:USF1000:";
+  $hash->{Clients} = ":FHZ:FS20:FHT:HMS:KS300:USF1000:BS:";
   my %mc = (
-    "1:USF1000" => "^810c04..0101a001a5ceaa00....",
-    "2:FS20"  => "^81..(04|0c)..0101a001",
-    "3:FHT"   => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
-    "4:HMS"   => "^810e04....(1|5|9).a001",
-    "5:KS300" => "^810d04..4027a001",
+    "1:USF1000" => "^81..(04|0c)..0101a001a5ceaa00....",
+    "2:BS"      => "^81..(04|0c)..0101a001a5cf......",
+    "3:FS20"    => "^81..(04|0c)..0101a001",
+    "4:FHT"     => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+    "5:HMS"     => "^810e04....(1|5|9).a001",
+    "6:KS300"   => "^810d04..4027a001",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "FHZ_Ready";
@@ -449,7 +450,7 @@ FHZ_ReadAnswer($$$)
     if($^O =~ m/Win/) {
       $hash->{PortObj}->read_const_time($to*1000); # set timeout (ms)
       # Read anstatt input sonst funzt read_const_time nicht.
-      $buf = $hash->{PortObj}->read(999);          
+      $buf = $hash->{PortObj}->read(999);
       return "Timeout reading answer for get $arg"
         if(length($buf) == 0);
 
@@ -466,7 +467,7 @@ FHZ_ReadAnswer($$$)
 
     }
 
-    Log 5, "FHZ/RAW: " . unpack('H*',$buf);
+    Log 4, "FHZ/RAW: " . unpack('H*',$buf);
     $mfhzdata .= $buf;
     next if(length($mfhzdata) < 2);
 
@@ -644,7 +645,7 @@ FHZ_Read($)
 
 
   my $fhzdata = $hash->{PARTIAL};
-  Log 5, "FHZ/RAW: " . unpack('H*',$buf) .
+  Log 4, "FHZ/RAW: " . unpack('H*',$buf) .
       " (Unparsed: " . unpack('H*', $fhzdata) . ")";
   $fhzdata .= $buf;
 
