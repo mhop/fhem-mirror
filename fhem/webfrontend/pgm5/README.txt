@@ -4,6 +4,31 @@ Description of the pgm5 webfrontend:
     o.droegehorn@dhs-computertechnik.de
     www.dhs-computertechnik.de
 
+#################################################################################
+#  Copyright notice
+#
+#  (c) 2008-2009
+#  Copyright: Dr. Olaf Droegehorn
+#  All rights reserved
+#
+#  This script free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+#################################################################################
+
 General description:
 
 Web frontend 5 (webfrontend/pgm5) (known upto FHEM 4.2 as pgm2):
