@@ -66,6 +66,8 @@ reconnected. My log shows "USB device /dev/elv_fhz1300pc disconnected, waiting t
 What is wrong with my USB?
 </a><br>
 
+<a href="#faq19">19. How do I set the dim100% from the at command?</a><br>
+
 <br/>
 <br/>
 
@@ -417,6 +419,29 @@ See <a href="USB.html">USB compendium</a> for help.
 <br>
 
 
+<a name="faq19">
+<b>19. How do I set the dim100% from the at command?</b>
+<ul>
+  As the % and @ characters are special, they have to be escaped. See the
+  following list (copied here from the commandref.html, notify command
+  description).<br><br>
+
+  <li>The character <code>%</code> will be replaced with the received event,
+  e.g. with <code>on</code> or <code>off</code> or <code>measured-temp: 21.7
+  (Celsius)</code><br> It is advisable to put the <code>%</code> into double
+  quotes, else the shell may get a syntax error.</li>
+
+  <li>The character <code>@</code> will be replaced with the device
+  name.</li>
+
+  <li>To use % or @ in the text itself, use the double mode (%% or @@).</li>
+
+  <li>Instead of <code>%</code> and <code>@</code>, the parameters
+  <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code>
+  (same as <code>@</code>) and <code>%TYPE</code> (contains the device
+  type, e.g. <code>FHT</code>) can be used. A single <code>%</code>
+  looses its special meaning if any of these parameters appears in the
+  definition.</li>
 
 </body>
 </html>
