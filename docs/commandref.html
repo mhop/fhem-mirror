@@ -186,7 +186,8 @@ use the client form of fhem.pl (described above).<br>
 
 Multiple fhem commands are separated by semicolon (;). In order to use semicolon
 in perl code or shell programs, they have to be escaped by the double semicolon
-(;;).<br>
+(;;). See the <b>Notes</b> section of the <a href="#notify">notify</a>
+chapter on command parameters and escape rules.<br>
 
 E.g. the following first command switches Lamp1 off at 07:00 and Lamp2
 immediately (at the point of definition), the second one switches both lamps
@@ -1491,7 +1492,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       result of incomplete or buggy code</li>
 
       <li>Currently supported devices are the HMS100-T HMS100-TF HMS100-WD
-          HMS100-MG HMS100-TFK HMS100-CO HMS100-FIT RM100-2 </li>
+          HMS100-MG HMS100-TFK HMS100-CO HMS100-FIT RM100-2 RM100-3</li>
 
       <li>The housecode of the HMS devices may change if the battery is renewed.
       In order to make life easier, you can define a "wildcard" device for each
@@ -1965,6 +1966,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   This module services messages received by the FHZ device, if you use one of
   the other alternetives, see the <a href="#WS300">WS300</a> or <a
   href="#CUL_WS">CUL_WS</a> entries.<br>
+  Note: The KS555 is also reported to work.<br>
   <br>
 
   <a name="KS300"></a>
