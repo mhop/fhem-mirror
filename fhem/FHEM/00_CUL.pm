@@ -72,7 +72,7 @@ CUL_Initialize($)
   $hash->{GetFn}   = "CUL_Get";
   $hash->{SetFn}   = "CUL_Set";
   $hash->{StateFn} = "CUL_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout " .
                      "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "CUR_id_list";
   $hash->{ShutdownFn} = "CUL_Shutdown";
@@ -95,10 +95,8 @@ CUL_Define($$)
   return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
                 if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
   $hash->{FHTID} = uc($a[3]);
-  $hash->{STATE} = "defined";
 
   $attr{$name}{savefirst} = 1;
-  $attr{$name}{repeater} = 1;
 
   if($dev eq "none") {
     Log 1, "CUL device is none, commands will be echoed only";
@@ -977,8 +975,10 @@ CUL_OpenDev($$)
   } else {
     Log 3, "CUL opened $dev for $name";
   }
-    
+
+  $hash->{STATE}="";       # Allow InitDev to set the state
   my $ret  = CUL_DoInit($hash);
+
   if($ret) {
     CUL_CloseDev($hash);
     Log 1, "Cannot init $dev, ignoring it";
