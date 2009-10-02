@@ -79,6 +79,9 @@ EMWZ_GetStatus($)
   $hash->{READINGS}{cum_kWh}{VAL} = 0 if(!$hash->{READINGS}{cum_kWh}{VAL});
   $vals{"cum_kWh"} = sprintf("%0.3f",
                       $hash->{READINGS}{cum_kWh}{VAL} + $vals{"energy"}); 
+  $vals{summary} = sprintf("Pulses: %s Energy: %s Power: %s Cum: %s",
+                      $vals{"5min_pulses"}, $vals{energy},
+                      $vals{power}, $vals{cum_kWh});
   
 
   my $tn = TimeNow();
