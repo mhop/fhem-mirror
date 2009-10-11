@@ -426,3 +426,10 @@
 
 - Sun Sep 20 2009 (Boris)
   - Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
+
+- Sat Oct 03 2009 (Boris)
+  - bugfix: missing blank in attribute list for FHT; exclude report from lazy
+  - typos and anchors in documentation corrected
+
+ - Sun Oct11 2009 (Boris)
+  - finalized 09_BS.pm and documentation

@@ -144,7 +144,7 @@ FHT_Initialize($)
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
-                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer".
+                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer ".
                   "lazy tmpcorr";
 }
 
@@ -237,7 +237,9 @@ FHT_Set($@)
     }
 
 
-    if($lazy && defined($readings->{$cmd}) && $readings->{$cmd}{VAL} eq $val) {
+    if($lazy &&
+    	$cmd ne "report1" && $cmd ne "report2" && $cmd ne "refreshvalues" &&
+    	defined($readings->{$cmd}) && $readings->{$cmd}{VAL} eq $val) {
     	$ret .= "Lazy mode ignores $cmd";
     	Log GetLogLevel($name,2), "Lazy mode ignores $cmd $val";
 

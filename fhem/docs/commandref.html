@@ -49,6 +49,7 @@
   <ul>
       <a href="#global">global</a><br>
 
+      <a href="#BS">BS</a> &nbsp;
       <a href="#CM11">CM11</a> &nbsp;
       <a href="#CUL">CUL</a> &nbsp;
       <a href="#CUL_EM">CUL_EM</a> &nbsp;
@@ -1009,7 +1010,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 	Disable FileLog/notify/inform notification for a device. This affects
 	the received signal, the set and trigger commands.</li><br>
 
-    <li><a href="#dummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
 
     <a name="filtertimeout"></a>
     <li>filtertimeout<br>
@@ -1425,7 +1426,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#dummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (fht80b)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
@@ -1625,7 +1626,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#dummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#filtertimeout">filtertimeout</a></li><br>
     <li><a href="#repeater">repeater</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
@@ -1787,7 +1788,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (em1010pc)</li>
-    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
   </ul>
   <br>
@@ -1849,7 +1850,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (EM1000WZ)</li>
-    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
@@ -1903,7 +1904,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (EM1000GZ)</li>
-    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
@@ -1950,7 +1951,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (EM1000EM)</li>
-    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
@@ -2078,7 +2079,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (CM11)</li>
   </ul>
@@ -2182,7 +2183,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <li><a href="#follow-on-for-timer">follow-on-for-timer</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#dummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li><br>
     <li><a href="#loglevel">loglevel</a></li>
@@ -2409,6 +2410,69 @@ A line ending with \ will be concatenated with the next one, so long lines
 </ul>
 
 
+<a name="BS"></a>
+<h3>BS</h3>
+<ul>
+  The module BS allows to collect data from a brightness sensor through a
+  <a href="#FHZ">FHZ</a> device. For details on the brightness sensor see
+  <a href="http://www.busware.de/tiki-index.php?page=CPM-BS">busware wiki</a>.
+  You can have at most nine different brightness sensors in range of your
+  FHZ.<br>
+  <br>
+
+  The state contains the brightness in % (reading <code>brightness</code>) and
+  the brightness in lux (reading <code>lux</code>). The <code>flags</code>
+  reading is always zero. The meaning of these readings is explained in more
+  detail on the above mentioned wiki page.<br>
+  <br>
+
+  <a name="BSDefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; BS &lt;sensor#&gt; [&lt;RExt&gt;]</code>
+    <br><br>
+
+    <code>&lt;sensor#&gt;</code> is the number of sensor in the brightness
+    sensor address system that runs from 1 to 9.<br>
+    <br>
+    <code>&lt;RExt&gt;</code> is the value of the resistor on your brightness
+    sensor in &Omega; (Ohm). The brightness reading in % is proportional to the resistance, the
+    lux reading is proportional to the resistance squared. The value is
+    optional. The default resistance is RExt= 50.000&Omega;.<br>
+    <br>
+
+    Example:<br>
+    <ul>
+      <code>define bs1 BS 1 40000</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (bs)</li>
+  </ul>
+  <br>
+
+</ul>
+
+
+
 
 <a name="SCIVT"></a>
 <h3>SCIVT</h3>
@@ -2610,7 +2674,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
-    <li><a href="#dummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (M232Counter)</li>
   </ul>
@@ -2657,7 +2721,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
-    <li><a href="#dummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (M232Voltage)</li>
   </ul>
