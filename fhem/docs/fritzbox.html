@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
-<title>Home of FHEM</title>
+<title>FHEM on the Fritz!Box</title>
 </head>
 
 <body style="background-color: white">
@@ -11,131 +11,99 @@
 
 <h1><a href="fhem.html">FHEM</a> on the Fritz!Box</h1>
 
-<h2>Description</h2>
-<ul>
-  This document describes how to install <a href="fhem.html">FHEM</a> on the
-  fritzbox.<br>
-  <br>
-  What works:<br>
-  <ul>
-    <li>The basic fhem.pl server with at commands, notify, logging (tested)</li>
-    <li>FHZ1000 and FHZ1300 (both tested)</li>
-    <li>FS20, FHT and KS300-2 (tested)</li>
-    <li>HMS (untested, but should work)</li>
-    <li>SunSet/SunRise.</li>
-    <li>one of the Web frontends (webpgm2, the builtin one)</li>
-  </ul>
+(as of 2009-10-19)
 
-  <br>
-  What does not work right now:<br>
-  <ul>
-    <li>Gnuplot. No idea how to replace it, perhaps we compile a fritzbox
-        version</li>
-    <li>EM1010PC. I tried it without batteries, and I think the USB interface
-    cannot power an USB hub, an FHZ1300 and an EM1010PC together. The fritzbox
-    resets when trying to initialize the devices. More experiments needed.</li>
-    <li>WS300PC. Untested, don't have one.</li>
-  </ul>
+<h3>Description for the Fritzbox 7170 from Achim</h3>
+<ul>
+    <li>Flash Fritzbox with the Freetz firmware
+      <a href="fb7170/7170_04.70freetz-1.1.de_20091005-165006.image">
+      7170_04.70freetz-1.1.de_20091005-165006.image</a> (8MB) using the
+      Fritzbox web-frontend.<br><br>
+
+    <li>Copy tgz packages <a href="fb7170/apache-1.3.41.tgz">apache</a> (1MB),
+      <a href="fb7170/fhem-4.6.tgz">fhem</a> (1MB) and 
+      <a href="fb7170/perl-5.6.2.tgz">perl</a> (10MB) to the USB stick
+      and attach it to the box.<br><br>
+
+    <li>Restart the box and connect to the box using telnet, e.g. with<pre>
+        telnet 192.168.178.1</pre>
+
+    <li>Untar the packages into a new directory on the USB stick, e.g.<pre>
+      cd /var/media/ftp/uStor01/
+      mkdir fritzext
+      cd fritzext
+      tar -xvzf ../fhem-4.6.tgz
+      tar -xvzf ../perl-5.6.2.tgz
+      tar -xvzf ../apache-1.3.41.tgz</pre>
+      For the following ascii file modifications the editor nano can be used
+      which is contained in the Freetz firmware.<br><br>
+
+    <li>Adapt /var/flash/debug.cfg, and change the path to fhem:<pre>
+      /var/flash # more debug.cfg
+      export dTSB=1212687845
+      /bin/sleep 120
+      cd /var/media/ftp/uStor01/fritzext/fhem-4.5 && ./rc.fhem</pre>
+
+    <li>Adapt fhem/rc.fhem, and change the path to perl, fhem, apache:<pre>
+      #!/bin/sh
+      # "RC" script for a fhem running on the Fritz!Box from
+      # an attached usb-stick.
+
+      cd /var
+      ln -s /var/media/ftp/uStor01/fritzext/perl .
+      ln -s /var/media/ftp/uStor01/fritzext/apache-1.3.41 .
+      ln -s /var/media/ftp/uStor01/fritzext/fhem  .
+
+      export LD_LIBRARY_PATH=/var/perl/lib
+      export PATH=/var/perl/bin:$PATH
+      export PERL5LIB=/var/perl/lib/:/var/perl/perl5/:/var/perl/lib/perl5/5.6.2/
+
+      mount -o remount,rw /var/media/ftp/uStor01
+
+      swapon /var/perl/swapfile
+
+      # For CUL:
+      insmod /lib/modules/2.6.13.1-ohio/kernel/drivers/usb/serial/usbserial.ko
+      vendor=0x03eb product=0x204b
+
+      # For FHZ:
+      insmod /lib/modules/2.6.13.1-ohio/kernel/drivers/usb/serial/ftdi_sio.ko
+
+      cd /var/media/ftp/uStor01/fritzext/fhem
+      perl fhem.pl fhem.cfg
+      cd /var/
+      apache-1.3.41/apache apache-1.3.41/conf/apache.conf</pre>
+
+    <li>Adapt your fhem.cfg.  CUL can be used on /dev/ttyUSB0.<br><br>
+    <li>Restart the box
 </ul>
 
-<h2>Howto</h2>
+<h3>Description for the Fritzbox 7270 from Volker</h3>
 <ul>
-  Tested on the fritzbox 7170, with Firmware 29.04.49.<br>
-  <b>Note:</b>The kernel modules are for kernel 2.16.13.1, and perl is compiled
-  for uCLibc 0.9.28.<br><br>
-
-  Prerequisites:<br>
-  <ul>
-    <li>You need a fritzbox with an USB host port. Check your kernel version.
-        If it won't match the version above, see the "Compile tips" in this
-        document.</li>
-    <li>an USB hub (a small passive one is enough).</li>
-    <li>an FHZ1000 or FHZ1300</li>
-    <li>a USB stick, at least 64MB. As the fritzbox is USB 1.1 only,
-        the slowest is fast enough.</li>
-    <li>telnet access for the fritzbox. See the links on how to enable it.
-    <li>the complete fhem package from the links section.</li>
-  </ul>
-  <br>
-  Installation:<br>
-  <ul>
-    <li>Connect the USB stick to a PC, and unpack the content of the 
-        fb_fhem_x.y.tar.gz in the root directory of the USB stick. You'll
-        get a perl 5.6.2 installation with just those modules wich are needed
-        by fhem, an empty 32MB swapfile with a swapon/swapoff command,
-        the fhem server with an empty configuration file, and an rc.fhem
-        script which should start everything.</li>
-    <li>Connect the USB stick and the FHZ1x00 via the USB hub to the
-        fritzbox.</li>
-    <li>Log in via telnet to the fritzbox.</li>
-    <li>Change into the directory /var/media/ftp/*Partition*/usr/fhem .</li>
-    <li>Execute the command rc.fhem.</li>
-    <li>Now you can either use a Web browser:<br>
-        <ul>
-          <a href="http://192.168.178.1:8083/fhem">
-                  http://192.168.178.1:8083/fhem</a><br>
-        </ul>
-        with the online help, or choose the command-line via:<br>
-        <ul>
-          telnet fritz.box 7072<br>
-        </ul>
-        to define your devices.</li>
-    <li>To enable automatic startup after reboot of the fritzbox enter the
-        following at the end of the /var/flash/debug.cfg:<br>
-        <ul>
-          /bin/sleep 120<br>
-          cd /var/media/ftp/*Partition*/usr/fhem &amp;&amp; ./rc.fhem
-        </ul></li>
-  </ul>
-  <br>
-  Tips:<br>
-  <ul>
-    <li>The installation creates the link /var/usr to the USB disk
-        (/var/media/ftp/*Partition*/usr)</li>
-    <li>In the beginning only the most necessary (in my opinion, anyway :-)
-        modules are installed: FHZ/FS20/HMS/KS300/SUNRISE_EL. If you want to
-        use other modules, they are in the /var/usr/fhem/FHEM/unused directory,
-        just move the needed module in the parent directory, and do a
-        "reload module" (without the .pm suffix).</li>
-    <li>If you use webpgm2, and unsure about an attribute, then just define it,
-        you'll get a link to the description of the attribute in the online
-        help".</li>
-    <li>If your're unsure about the parameters for a command try "?" as an
-        argument, e.g.:
-        <ul>
-        ?<br>
-        define <name> ?<br>
-        define <name> <type> ?<br>
-        set <name> ?<br>
-        </ul>
-        </li>
-  </ul>
+  <li>Unpack <a href="fb7270/fhem45-on-fritzbox.tgz">fhem45-on-fritzbox.tgz</a>
+    on the USB-Stick.<br><br>
+  <li>Attach the USB storage (stick) to the Fritz!Box. The Fritz!Box should
+    recognize it. Now we have to modify usr/fhem/rc.fhem.<br><br>
+  <li>Login (via telnet) to the Fritz!Box<pre>
+    telnet fritz.box</pre>
+  <li>Edit usr/fhem/rc.fhem and adapt the mount point. This is in often 
+    MassStorageDevice-Partition-0-1<br><br>
+  <li>Start ./rc-cp.fhem in the Directory usr/fhem<br><br>
+  <li>Either start it manually with<pre>
+    export LD_LIBRARY_PATH=/var/usr/lib
+    export PATH=/var/usr/bin:$PATH
+    perl fhem.pl fhem.conf</pre>
+    or enable perl fhem.pl fhem.conf in rc.fhem and start it with ./rc.fhem
+    <br><br>
 </ul>
 
-<h2>Compile tips</h2>
+<h3>Links</h3>
 <ul>
-  <b>Note:</b> You don't need to compile anything if you have the correct
-  kernel and uclibc version.<br><br>
-
-  I compiled the ftdi_sio module with the help of the ds26-15.1 packages, see
-  the links.<br>
-  The ftdi_sio module had to be modified, as 2.16.13 does not contain the USB
-  ID's of the ELV devices.<br>
-  Compiling a working perl for the fritzbox was a nightmare. After compiling
-  5.8.8 I dicovered it has a strange bug: Appending numbers to strings won't
-  work on the fritzbox. This is why I compiled an "old" (5.6.2) one, which
-  seems to work perfectly.  </ul>
-
-<h2>Links</h2>
-<ul>
-  <li>Complete fhem package for the fritzbox: <a href="fb_fhem_0.4.tar.gz">
-      fb_fhem_0.4.tar.gz</a></li>
-  <li>Telnet on the fritzbox:
-      <a href="http://www.ip-phone-forum.de/showthread.php?t=69245">
-      ip-phone-thread</a></li>
-  <li>Compiler for the fritzbox:
-      <a href="http://www.ip-phone-forum.de/showthread.php?t=142389">
-      ds26-15.1</a></li>
+  <li>
+    My own, outdated description: <a href="fritzbox_old.html">fritzbox_old.html
+    </a>
+</ul>
+My 
 </body>
 
 </html>
