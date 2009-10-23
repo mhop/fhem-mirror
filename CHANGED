@@ -493,7 +493,7 @@
   - feature: Cost Control in 15_CUL_EM (CostPerUnit, BasisFeePerMonth)
   - feature: add counter differential per time in 81_M232Counter.pm
   - feature: added USB compendium to documentation
-  - feature: pgm3: Documentation for pgm3 updated, HMS100CO added (and bugfixes)
+  - feature: pgm3: Documentation for pgm3 updated, HMS100CO added (and bugfix)
   - bugfix:  Defining a repeated at job in a sunrise/sunset at job fails
   - bugfix:  FHT "summer" fix (avoiding a lot of syncnow)
   - feature: FHEMWEB modules added
@@ -516,7 +516,7 @@
   - bugfix:  Reattached corrupted CUL device caused uninitialized message
   - bugfix:  CUL/HMS changes, HMS cleanup
   - bugfix:  EM/EMWZ/EMGZ set changed to work in FHEMWEB
-  - bugfix:  Avoid unitialized in xmllist for corrupt readings (reporter: Boris)
+  - bugfix:  Avoid unitialized in xmllist for corrupt readings, reporter Boris
   - bugfix:  Add binmode to 01_fhemweb.pm for windows
   - bugfix:  Uniform check for windows, enable CUL for windows.
   - bugfix:  CUL/HMS parsing patches from Peter
@@ -526,7 +526,7 @@
   - feature: suppress inplausible readings from USF1000
   - feature: get time, fwrev, set reopen for CM11 (Boris 2009-09-12)
   - bugfix:  FHZ_ReadAnswer bugfix for Windows (Klaus, 20.8.2009)
-  - feature: CUL: device acces code reorganized, TCP/IP support added
+  - feature: CUL: device access code reorganized, TCP/IP support added (CUN)
   - feature: Pachube module from Axel
   - feature: dumpdef module from Axel in contrib
   - feature: javascripting support in FHEMWEB (Klaus/Axel)
