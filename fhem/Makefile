@@ -2,8 +2,8 @@ BINDIR=/usr/local/bin
 MODDIR=/usr/local/lib
 VARDIR=/var/log/fhem
 
-VERS=4.6
-DATE=2009-07-03
+VERS=4.7
+DATE=2009-09-26
 
 all:
 	@echo Nothing to do for all.
@@ -39,8 +39,8 @@ install-base:
 dist:
 	@echo Version is $(VERS), Date is $(DATE)
 	mkdir .f
-	cp -r CHANGED FHEM HISTORY Makefile README.CVS em1010pc\
-                TODO contrib docs examples fhem.pl test webfrontend .f
+	cp -r CHANGED FHEM HISTORY Makefile README.CVS\
+                TODO contrib docs examples fhem.pl webfrontend .f
 	find .f -name CVS -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
