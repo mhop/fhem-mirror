@@ -81,20 +81,23 @@
 <h3>Description for the Fritzbox 7270 from Volker</h3>
 <ul>
   <li>Unpack <a href="fb7270/fhem45-on-fritzbox.tgz">fhem45-on-fritzbox.tgz</a>
-    on the USB-Stick.<br><br>
+    to the USB-Stick.<br><br>
   <li>Attach the USB storage (stick) to the Fritz!Box. The Fritz!Box should
     recognize it. Now we have to modify usr/fhem/rc.fhem.<br><br>
-  <li>Login (via telnet) to the Fritz!Box<pre>
+  <li>Login (via telnet) to the Fritz!Box with the WEB-Password<pre>
     telnet fritz.box</pre>
-  <li>Edit usr/fhem/rc.fhem and adapt the mount point. This is in often 
-    MassStorageDevice-Partition-0-1<br><br>
-  <li>Start ./rc-cp.fhem in the Directory usr/fhem<br><br>
-  <li>Either start it manually with<pre>
-    export LD_LIBRARY_PATH=/var/usr/lib
-    export PATH=/var/usr/bin:$PATH
-    perl fhem.pl fhem.conf</pre>
-    or enable perl fhem.pl fhem.conf in rc.fhem and start it with ./rc.fhem
-    <br><br>
+  <li>Change to the folder /var/media/ftp/*partition*/usr/fhem <br><br>
+  <li>Edit rc-cp.fhem with nvi<br>
+    (i starts editing, ESC leaves edit mode, X deletes a character, :q! quits
+    nvi without change, ; :wq saves and quits nvi)<br>
+    and adapt the mount point. This is often MassStorageDevice-Partition-0-1.
+    This script will generate some links, makes a copy of .../usr/fhem to
+    /var/usr/ and starts "perl fhem-celica.pl fhem.volker.conf" in the
+    background.<br><br>
+  <li>Run ./rc-cp.fhem in the directory usr/fhem<br>
+    <b>Note:</b>After rebooting the Fritz!Box you will have run this script
+    again.<br><br>
+
 </ul>
 
 <h3>Links</h3>
