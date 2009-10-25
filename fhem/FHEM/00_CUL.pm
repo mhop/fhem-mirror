@@ -13,6 +13,7 @@ sub CUL_Read($);
 sub CUL_ReadAnswer($$$);
 sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
+sub CUL_HandleWriteQueue($);
 
 sub CUL_OpenDev($$);
 sub CUL_CloseDev($);
@@ -630,10 +631,13 @@ CUL_HandleWriteQueue($)
       return;
     }
     my $bstring = $arr->[0];
-    next if($bstring eq "-");
-    CUL_XmitLimitCheck($hash,$bstring);
-    CUL_SimpleWrite($hash, $bstring);
-    InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+    if($bstring eq "-") {
+      CUL_HandleWriteQueue($hash);
+    } else {
+      CUL_XmitLimitCheck($hash,$bstring);
+      CUL_SimpleWrite($hash, $bstring);
+      InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+    }
   }
 }
 
