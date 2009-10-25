@@ -512,7 +512,7 @@
   - feature: 14_CUL_WS: better error checking
   - bugfix:  webpgm2 multi line editing is working again
 
-- =DATE= (4.7)
+- 2009-10-23 (4.7)
   - bugfix:  Reattached corrupted CUL device caused uninitialized message
   - bugfix:  CUL/HMS changes, HMS cleanup
   - bugfix:  EM/EMWZ/EMGZ set changed to work in FHEMWEB
@@ -531,3 +531,6 @@
   - feature: dumpdef module from Axel in contrib
   - feature: javascripting support in FHEMWEB (Klaus/Axel)
   - feature: Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
+
+- ==DATE== (4.8)
+  - bugfix:  loosing data when sending FS20 messages in a group
