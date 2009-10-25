@@ -607,9 +607,8 @@ CUL_AddFS20Queue($$)
     # Write the next buffer not earlier than 0.23 seconds
     # = 3* (12*0.8+1.2+1.0*5*9+0.8+10) = 226.8ms
     # else it will be sent too early by the CUL, resulting in a collision
-    # Experimental value: 0.25 does not always work: 0.3 is better...
     $hash->{QUEUE} = [ $bstring ];
-    InternalTimer(gettimeofday()+0.5, "CUL_HandleWriteQueue", $hash, 1);
+    InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
     return 0;
   }
   push(@{$hash->{QUEUE}}, $bstring);
@@ -624,7 +623,7 @@ CUL_HandleWriteQueue($)
   my $hash = shift;
   my $arr = $hash->{QUEUE};
 
-  while(defined($arr) && @{$arr} > 0) {
+  if(defined($arr) && @{$arr} > 0) {
     shift(@{$arr});
     if(@{$arr} == 0) {
       delete($hash->{QUEUE});
@@ -634,7 +633,7 @@ CUL_HandleWriteQueue($)
     next if($bstring eq "-");
     CUL_XmitLimitCheck($hash,$bstring);
     CUL_SimpleWrite($hash, $bstring);
-    InternalTimer(gettimeofday()+0.5, "CUL_HandleWriteQueue", $hash, 1);
+    InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
   }
 }
 
