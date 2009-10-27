@@ -15,13 +15,20 @@
 
 <h3>Description for the Fritzbox 7170 from Achim</h3>
 <ul>
-    <li>Flash Fritzbox with the Freetz firmware
-      <a href="fb7170/7170_04.70freetz-1.1.de_20091005-165006.image">
-      7170_04.70freetz-1.1.de_20091005-165006.image</a> (8MB) using the
-      Fritzbox web-frontend.<br><br>
-
-    <li>Copy tgz packages <a href="fb7170/apache-1.3.41.tgz">apache</a> (1MB),
-      <a href="fb7170/fhem-4.6.tgz">fhem</a> (1MB) and 
+    <li>Flash the FritzBox with the Freetz firmware using the Fritzbox
+    web-frontend.  As we are not allowed to offer a FritzBox binary image for
+    download, here is a mini HOWTO:<br>
+    <ul>
+    <li>Download <a
+        href="http://trac.freetz.org/downloads/freetz-1.0.3.tar.bz2">
+        http://trac.freetz.org/downloads/freetz-1.0.3.tar.bz2</a></li>
+    <li>Bunzip2 and untar the package</li>
+    <li>Copy <a href="fb7170/Config.in">Config.in</a> into the untarred
+        directory
+    <li>Call make
+    </ul><br>
+    <li>Copy the tgz packages <a href="fb7170/apache-1.3.41.tgz">apache</a>
+      (1MB), <a href="fb7170/fhem-4.6.tgz">fhem</a> (1MB) and 
       <a href="fb7170/perl-5.6.2.tgz">perl</a> (10MB) to the USB stick
       and attach it to the box.<br><br>
 
