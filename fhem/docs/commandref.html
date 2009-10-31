@@ -1190,7 +1190,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         signals for this logical device.</li><br>
 
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <a name="dummy"></a>
+    <a name="attrdummy"></a>
     <li>dummy<br>
 	Set the device attribute dummy to define devices which should not
 	output any radio signals. Associated notifys will be executed if
@@ -1296,7 +1296,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     Notes:
     <ul>
       <li>Following events are reported (more or less regularly) by each FHT
-          device: <code>measured-temp actuator actuator1...actuator8 warnings</code><br>
+          device: <code>measured-temp actuator actuator1...actuator8
+          warnings</code><br>
           You can use these strings for <a href="#notify">notify</a> or
           <a href="#FileLog">FileLog</a> definitions.
           <ul>
@@ -1308,13 +1309,16 @@ A line ending with \ will be concatenated with the next one, so long lines
             <li>actuator or actuator1..8 can take following values:
                 <ul>
                   <li>&lt;value&gt;%<br>
-                     This is the normal case, the actuator is instructed to open to this value.
+                     This is the normal case, the actuator is instructed to
+                     open to this value.
                   <li>offset &lt;value&gt;%<br>
                      The actuator is running with this offset.
                   <li>lime-protection<br>
-                     The actuator was instructed to execute the lime-protection procedure.
+                     The actuator was instructed to execute the lime-protection
+                     procedure.
                   <li>synctime<br>
-                     If you select Sond/Sync on the FHT80B, you'll see a count down.
+                     If you select Sond/Sync on the FHT80B, you'll see a count
+                     down.
                   <li>test<br>
                      The actuator was instructed by the FHT80b to emit a beep.
                   <li>pair<br>
@@ -1325,18 +1329,17 @@ A line ending with \ will be concatenated with the next one, so long lines
           <br>
 
       <li>The FHT is very economical (or lazy), it accepts one message from the
-          FHZ1x00 every 2 minutes (or so). Don't be surprized if your command
-	  is only accepted 10 minutes later by the device. FHT commands are
-          buffered in the FHZ1x00 till they are sent to the FHT, see the related
-	  <code>fhtbuf</code> entry in the <code><a href="#get">get</a></code>
-	  section.<br>
-          You can send up to 8 commands in one message at once to the FHT if
-          you specify them all as arguments to the same set command, see the
-          example above.<br><br>
+          FHZ1x00 every 115+x seconds, where x depends on the housecode. Don't
+          be surprized if your command is only accepted 10 minutes later by the
+          device. FHT commands are buffered in the FHZ1x00/CUL till they are
+          sent to the FHT, see the related <code>fhtbuf</code> entry in the
+          <code><a href="#get">get</a></code> section.<br> You can send up to 8
+          commands in one message at once to the FHT if you specify them all as
+          arguments to the same set command, see the example above.<br><br>
 
       <li>All <code>*-temp</code> values need a temperature
           as argument, which will be rounded to 0.5 Celsius.<br/>
-          Temperature values must  between 5.5 and 30.5 Celsius. Value 5.5 set
+          Temperature values must  between 5.5 and 30.5 Celsius. Value 5.5 sets
           the actuator to OFF, value 30.5 set the actuator to ON<br><br>
 
       <li><code>mode</code> is one of <code>auto, manual, holiday or
@@ -1377,7 +1380,8 @@ A line ending with \ will be concatenated with the next one, so long lines
             <li>32: saturday
             <li>64: sunday
           </ul>
-          measured-temp and actuator is sent along if it is considered appropriate
+          measured-temp and actuator is sent along if it is considered
+          appropriate
           by the FHT.
           <br><br>
 
@@ -1392,7 +1396,9 @@ A line ending with \ will be concatenated with the next one, so long lines
           <li> 4: day-temp, night-temp, windowopen-temp
           <li>64: lowtemp-offset
           </ul>
-          measured-temp and actuator is sent along if it is considered appropriate
+          measured-temp and actuator is sent along if it is considered
+          appropriate
+
           by the FHT.
           <br><br>
 
@@ -1426,7 +1432,15 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#attrdummy">dummy</a><br>
+      <b>Note:</b>It makes sense to define an FHT device even for an FHT8b,
+      else you will receive "unknown FHT device, please define one" message
+      for each FHT8b as the CUL is reporting the 8b valve messages.  But you
+      should set the dummy attribute for these devices, else the internal FHT
+      buffer of the CUL will be filled with data for the 8b's which is never
+      consumed. If the buffer is full, you'll get "EOB" messages from the CUL,
+      and you cannot transmit any data to the 80b's<li><br>
+
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (fht80b)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
