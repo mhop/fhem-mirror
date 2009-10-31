@@ -15,6 +15,8 @@
 - 99_SUNRISE.pm
   The "original" (i.e. old) Sunrise/Sunset support. Needs the hard-to-install
   DateTime::Event::Sunrise perl module. Use the 99_SUNRISE_EL.pm module instead.
+- 99_PID
+  Direct 8v controlling with the help of Temp sensors by Alexander
 
 - checkmsg.pl
   Check header/function/crc of an FS20 hex message
