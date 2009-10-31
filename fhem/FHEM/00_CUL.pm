@@ -434,7 +434,7 @@ CUL_DoInit($)
   while($try++ < 3 && $ver !~ m/^V/) {
     CUL_SimpleWrite($hash, "V");
     ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0);
-    return "$name: $err" if($err);
+    return "$name: $err" if($err && ($err !~ m/Timeout/ || $try == 3));
   }
 
   if($ver !~ m/^V/) {
