@@ -75,7 +75,7 @@ CUL_Initialize($)
   $hash->{StateFn} = "CUL_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout " .
                      "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "CUR_id_list";
+                     "CUR_id_list fhtsoftbuffer:1,0";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -387,7 +387,10 @@ READEND:
 
     CUL_SimpleWrite($hash, $gets{$a[1]} . $arg);
     ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
-    $msg = "No answer" if(!defined($msg));
+    if(!defined($msg)) {
+      CUL_Disconnected($hash);
+      $msg = "No answer";
+    };
     $msg =~ s/[\r\n]//g;
 
   }
@@ -505,11 +508,15 @@ CUL_ReadAnswer($$$)
       my $nfound = select($rin, undef, undef, $to);
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
-        die("Select error $nfound / $!", undef);
+        my $err = $!;
+        close($hash->{FD});
+        undef($hash->{FD});
+        return("CUL_ReadAnswer $arg: $err", undef);
       }
       return ("Timeout reading answer for get $arg", undef)
         if($nfound == 0);
       $buf = CUL_SimpleRead($hash);
+      return ("No data", undef) if(!defined($buf));
     }
 
     if($buf) {
@@ -642,6 +649,7 @@ CUL_HandleWriteQueue($)
 }
 
 #####################################
+# called from the global loop, when the select for hash->{FD} reports data
 sub
 CUL_Read($)
 {
@@ -657,18 +665,7 @@ CUL_Read($)
   }
 
   if(!defined($buf) || length($buf) == 0) {
-
-    my $dev = $hash->{DeviceName};
-    Log 1, "$dev disconnected, waiting to reappear";
-    CUL_CloseDev($hash);
-    $readyfnlist{"$name.$dev"} = $hash; # Start polling
-    $hash->{STATE} = "disconnected";
-
-    # Without the following sleep the open of the device causes a SIGSEGV,
-    # and following opens block infinitely. Only a reboot helps.
-    sleep(5);
-
-    DoTrigger($name, "DISCONNECTED");
+    CUL_Disconnected($hash);
     return "";
   }
 
@@ -702,7 +699,7 @@ CUL_Read($)
 
     if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
 
-      CUL_AddFS20Queue($hash, "-");          # Avoid sending response too early
+      CUL_AddFS20Queue($hash, "-");                  # Block immediate replies
 
       if(defined($attr{$name}) && defined($attr{$name}{CUR_id_list})) {
         my $id= substr($dmsg,1,4);
@@ -869,11 +866,7 @@ CUL_SimpleRead($)
   if($hash->{TCPDev}) {
     my $buf;
     if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
-      CUL_CloseDev($hash);
-      my $name = $hash->{NAME};
-      my $dev = $hash->{DeviceName};
-      $readyfnlist{"$name.$dev"} = $hash; # Start polling
-      $hash->{STATE} = "disconnected";
+      CUL_Disconnected();
       return undef;
     }
 
@@ -989,6 +982,27 @@ CUL_OpenDev($$)
 
   DoTrigger($name, "CONNECTED") if($reopen);
   return $ret;
+}
+
+sub
+CUL_Disconnected($)
+{
+  my $hash = shift;
+  my $dev = $hash->{DeviceName};
+  my $name = $hash->{NAME};
+
+  return if(!defined($hash->{FD}));                 # Already deleted.
+
+  Log 1, "$dev disconnected, waiting to reappear";
+  CUL_CloseDev($hash);
+  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
+  $hash->{STATE} = "disconnected";
+
+  # Without the following sleep the open of the device causes a SIGSEGV,
+  # and following opens block infinitely. Only a reboot helps.
+  sleep(5);
+
+  DoTrigger($name, "DISCONNECTED");
 }
 
 1;
