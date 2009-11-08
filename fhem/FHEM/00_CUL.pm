@@ -509,8 +509,7 @@ CUL_ReadAnswer($$$)
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         my $err = $!;
-        close($hash->{FD});
-        undef($hash->{FD});
+        CUL_Disconnected($hash);
         return("CUL_ReadAnswer $arg: $err", undef);
       }
       return ("Timeout reading answer for get $arg", undef)
