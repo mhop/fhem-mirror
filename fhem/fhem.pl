@@ -151,7 +151,7 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.80 2009-09-11 07:34:12 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.81 2009-11-08 14:18:06 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1274,7 +1274,7 @@ CommandReload($$)
   my $m = $param;
   $m =~ s,^([0-9][0-9])_,,;
   my $order = (defined($1) ? $1 : "00");
-  Log 5, "Loading $file, order $order";
+  Log 5, "Loading $file";
 
   no strict "refs";
   eval {

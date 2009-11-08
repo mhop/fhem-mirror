@@ -144,8 +144,8 @@ FHT_Initialize($)
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
-                  "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount minfhtbuffer ".
-                  "lazy tmpcorr";
+                       "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount " .
+                       "minfhtbuffer lazy tmpcorr";
 }
 
 
@@ -404,7 +404,7 @@ FHT_Parse($$)
     elsif($sval =~ m/.6/) { $val = "$fv" }
     elsif($sval =~ m/.8/) { $val = "offset: $fv" }
     elsif($sval =~ m/.a/) { $val = "lime-protection" }
-    elsif($sval =~ m/.c/) { $val = sprintf("synctime: %d", int($val>>1)); }
+    elsif($sval =~ m/.c/) { $val = sprintf("synctime: %d", int($val/2)-1); }
     elsif($sval =~ m/.e/) { $val = "test" }
     elsif($sval =~ m/.f/) { $val = "pair" }
 
@@ -554,12 +554,9 @@ getFhtBuffer($)
   return getFhtMin($io) if(IsDummy($io->{NAME}));
 
   for(;;) {
-    FHZ_Write($io, "04", "c90185");
-    my $msg = FHZ_ReadAnswer($io, "fhtbuf", 1.0);
-    if(!defined($msg)) { $msg= ""; }
+    my $msg = CallFn($io->{NAME}, "GetFn", $io, (" ", "fhtbuf"));
     Log 5, "getFhtBuffer: $count $msg";
-
-    return hex(substr($msg, 16, 2)) if($msg && $msg =~ m/^[0-9A-F]+$/i);
+    return hex($1) if($msg && $msg =~ m/=> ([0-9A-F]+)$/i);
     return 0 if($count++ >= 5);
   }
 }
