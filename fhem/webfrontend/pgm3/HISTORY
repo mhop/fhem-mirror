@@ -83,3 +83,6 @@
   -- Bugfix: table-format for userdefs changed
   -- Feature: taillogorder optional with date (config.php)
   -- Feature: HMS100CO added
+
+- Martin 2009-11-10
+  -- Bugfix: Pulldown-Menu without selected FTDEV not possible any more
