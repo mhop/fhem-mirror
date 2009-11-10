@@ -433,3 +433,6 @@
 
  - Sun Oct11 2009 (Boris)
   - finalized 09_BS.pm and documentation
+
+- Tue Nov10 2009 (Martin Haas)
+ - Bugfix: pgm3: Pulldown-Menu without selected FHTDEV not possible any more

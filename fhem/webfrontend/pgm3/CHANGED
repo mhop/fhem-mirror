@@ -183,3 +183,7 @@ It is not necessary to tell fhem that there are other logs.
 2009-03-26
    -- Bugfix: table-format for userdefs changed, small optical changes for userdef
    -- Feature: HMS100CO added
+
+2009-11-10
+-- Bugfix: Pulldown-Menu without selected FTDEV not possible any more
+	   Changed: index.php. Check for selcted dhtdev
