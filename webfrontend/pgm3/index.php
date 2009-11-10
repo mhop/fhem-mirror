@@ -6,7 +6,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2006 2007 2008 Copyright: Martin Haas (fhz@martin-haas.de)
+#  (c) 2006-2009 Copyright: Martin Haas (fhz@martin-haas.de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -41,8 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='090326';
-
+$pgm3version='091110';
 	
 	$Action		=	$_POST['Action'];
 	$order		= 	$_POST['order'];
@@ -197,6 +196,7 @@ switch ($Action):
 	Case exec3:
 		if ($atorder=='at') 
 		{ $atorder='define '.randdefine().' '.$atorder; }
+		if (! isset($fhtdev)) {echo "FHT-Device not set - exit"; break;}
 		$order="$atorder $attime set $fhtdev $orderpulldown $valuetime";
 		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
 	Case execfht:
@@ -209,7 +209,6 @@ switch ($Action):
 		break;
 	default:
 endswitch;
-
 
 
 if (! isset($showroom)) $showroom="ALL";
@@ -253,6 +252,7 @@ $output=array();
 
 
 $version = explode('.', phpversion());
+
 
 if ( $version[0] == 4 )
 {
