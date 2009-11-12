@@ -893,11 +893,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     The program can service multiple devices, FS20 and FHT device commands will
     be sent out through the last FHZ device defined before the definition of
     the FS20/FHT device. To change the association, use the IODev attribute.<br>
-
-    Set the attribute "repeater" for this device to 1 to ignore events received
-    from a FS20 repeater. In fact we are not sure that they are repeater
-    messages, we just ignore messages which were sent out by our device for the
-    next 3 seconds (or configured otherwise by filtertimeout).
     <br>
 
     For GNU/Linux you may want to read our <a href="linux.html">hints for
@@ -1011,22 +1006,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 	the received signal, the set and trigger commands.</li><br>
 
     <li><a href="#attrdummy">dummy</a></li><br>
-
-    <a name="filtertimeout"></a>
-    <li>filtertimeout<br>
-        Ignore duplicate messages for this amount of time. The time is in
-        seconds, fractions are allowed. It affects installations with more then
-        one FHZ device or repeater, see the <a href="#repeater">repeater</a>
-        entry.
-	</li><br>
-
-    <a name="repeater"></a>
-    <li>repeater<br>
-        Set the attribute "repeater" for an FHZ device to 1 to ignore events
-        received from a FS20 repeater. In fact we are not sure that they are
-        repeater messages, we just ignore messages which were sent out by our
-        device for the next 3 seconds (see the next attribute)
-	</li><br>
 
     <li><a href="#showtime">showtime</a></li><br>
 
@@ -1181,13 +1160,13 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <a name="IODev"></a>
     <li>IODev<br>
-        Set the IO or physical device which should be used for receiving /
-        sending signals for this "logical" device. An example for the physical
-        device is an FHZ or a CUL. Note: Upon startup fhem assigns each logical
-        device (FS20/HMS/KS300/etc) the last physical device which can receive
-        data for this type of device. The attribute IODev should be used only
-        if you attached more than one physical device capable of receiving
-        signals for this logical device.</li><br>
+        Set the IO or physical device which should be used for sending signals
+        for this "logical" device. An example for the physical device is an FHZ
+        or a CUL. Note: Upon startup fhem assigns each logical device
+        (FS20/HMS/KS300/etc) the last physical device which can receive data
+        for this type of device. The attribute IODev needs to be used only if
+        you attached more than one physical device capable of receiving signals
+        for this logical device.</li><br>
 
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <a name="attrdummy"></a>
@@ -1641,8 +1620,6 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#attrdummy">dummy</a></li><br>
-    <li><a href="#filtertimeout">filtertimeout</a></li><br>
-    <li><a href="#repeater">repeater</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (CUL,CUR)</li><br>
