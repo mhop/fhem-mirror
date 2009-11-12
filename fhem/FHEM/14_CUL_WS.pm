@@ -95,10 +95,6 @@ CUL_WS_Parse($$)
     return "UNDEFINED CUL_WS: $cde";
   }
 
-  # It's not our device
-  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
-
-
   my $tm=TimeNow();
   $hash = $def;
  

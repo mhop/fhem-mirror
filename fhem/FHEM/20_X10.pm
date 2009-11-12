@@ -348,7 +348,6 @@ X10_Parse($$)
   foreach my $unitcode (@unitcodes) {
     my $h= $devices{$housecode}{$unitcode};
     if($h) {
-        return "" if($h->{IODev} && $h->{IODev}{NAME} ne $hash->{NAME});
         my $name= $h->{NAME};
         $h->{CHANGED}[0] = $value;
         $h->{STATE} = $value;

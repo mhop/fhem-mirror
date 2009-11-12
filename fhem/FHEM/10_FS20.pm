@@ -354,7 +354,6 @@ FS20_Parse($$)
     my @list;
     foreach my $n (keys %{ $def }) {
       my $lh = $def->{$n};
-      return "" if($lh->{IODev} && $lh->{IODev}{NAME} ne $hash->{NAME});
       $lh->{CHANGED}[0] = $v;
       $lh->{STATE} = $v;
       $lh->{READINGS}{state}{TIME} = TimeNow();
