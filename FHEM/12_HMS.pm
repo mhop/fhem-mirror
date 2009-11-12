@@ -106,7 +106,6 @@ HMS_Parse($$)
   }
 
   my $def = $defptr{$dev};
-  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
   my (@v, @txt);
 

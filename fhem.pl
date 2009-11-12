@@ -39,12 +39,14 @@ use Time::HiRes qw(gettimeofday);
 ##################################################
 # Forward declarations
 #
+sub AddDuplicate($$);
 sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
 sub AnalyzeInput($);
 sub AssignIoPort($);
 sub CallFn(@);
 sub CommandChain($$);
+sub CheckDuplicate($$);
 sub DoClose($);
 sub Dispatch($$);
 sub FmtDateTime($);
@@ -151,7 +153,9 @@ my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
-my $cvsid = '$Id: fhem.pl,v 1.81 2009-11-08 14:18:06 rudolfkoenig Exp $';
+my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
+my $duplidx=0;                  # helper for the above pool
+my $cvsid = '$Id: fhem.pl,v 1.82 2009-11-12 19:08:00 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -175,7 +179,7 @@ $modules{_internal_}{AttrFn} = "GlobalAttr";
   "?"       => { Fn=>"CommandHelp",
 	    Hlp=>",get this help" },
   "attr" => { Fn=>"CommandAttr",
-            Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>" },
+           Hlp=>"<devspec> <attrname> [<attrval>],set attribute for <devspec>"},
   "define"  => { Fn=>"CommandDefine",
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
@@ -2041,6 +2045,9 @@ Dispatch($$)
 
   Log 5, "$name dispatch $dmsg";
 
+  my ($isdup, $idx) = CheckDuplicate($name, $dmsg);
+  return $duplicate{$idx}{FND} if($isdup);
+
   my @found;
   my $last_module;
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
@@ -2056,6 +2063,7 @@ Dispatch($$)
     $last_module = $m;
     last if(int(@found));
   }
+
   if(!int(@found)) {
     my $h = $iohash->{MatchList};
     if(defined($h)) {
@@ -2088,6 +2096,44 @@ Dispatch($$)
       DoTrigger($found, undef);
     }
   }
+  $duplicate{$idx}{FND} = \@found;
 
   return \@found;
+}
+
+sub
+CheckDuplicate($$)
+{
+  my ($ioname, $msg) = @_;
+
+  # Store only the "relevant" part, as the CUL won't compute the checksum
+  $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
+
+  my $now = gettimeofday();
+  my $lim = $now-0.5;
+
+  foreach my $oidx (keys %duplicate) {
+    if($duplicate{$oidx}{TIM} < $lim) {
+      delete($duplicate{$oidx});
+
+    } elsif($duplicate{$oidx}{MSG} eq $msg &&
+            $duplicate{$oidx}{ION} ne $ioname) {
+      return (1, $oidx);
+
+    }
+  }
+  $duplicate{$duplidx}{ION} = $ioname;
+  $duplicate{$duplidx}{MSG} = $msg;
+  $duplicate{$duplidx}{TIM} = $now;
+  $duplidx++;
+  return (0, $duplidx-1);
+}
+
+sub
+AddDuplicate($$)
+{
+  $duplicate{$duplidx}{ION} = shift;
+  $duplicate{$duplidx}{MSG} = shift;
+  $duplicate{$duplidx}{TIM} = gettimeofday();
+  $duplidx++;
 }

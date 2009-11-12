@@ -89,8 +89,6 @@ KS300_Parse($$)
     my $haverain = 0;
     my $name= $def->{NAME};
 
-    return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
-
     my @v;
     my @txt = ( "rain_raw", "rain", "wind", "humidity", "temperature",
                 "israining", "unknown1", "unknown2", "unknown3");

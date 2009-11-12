@@ -536,4 +536,5 @@
   - bugfix:  loosing data when sending FS20 messages in a group
   - bugfix:  better handling of disconnected CUN
   - feature: softfhtbuffer added to CUL
-  - bugfix: pgm3: Pulldown-Menu without selected FHTDEV not possible any more
+  - bugfix:  pgm3: Pulldown-Menu without selected FHTDEV not possible any more
+  - feature: duplicate buffer added for multi-cul/-fhz setups

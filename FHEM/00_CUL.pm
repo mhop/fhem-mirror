@@ -73,7 +73,7 @@ CUL_Initialize($)
   $hash->{GetFn}   = "CUL_Get";
   $hash->{SetFn}   = "CUL_Set";
   $hash->{StateFn} = "CUL_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout " .
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "CUR_id_list fhtsoftbuffer:1,0";
   $hash->{ShutdownFn} = "CUL_Shutdown";
@@ -573,6 +573,8 @@ CUL_Write($$$)
 
   } elsif($fn eq "04" && substr($msg,0,6) eq "010101") {   # FS20
     $fn = "F";
+    AddDuplicate($hash->{NAME},
+                "0101a001" . substr($msg, 6, 6) . "00" . substr($msg, 12));
     $msg = substr($msg,6);
 
   } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
@@ -759,8 +761,9 @@ CUL_Read($)
     if($foundp) {
       foreach my $d (@{$foundp}) {
         next if(!$defs{$d});
-        $defs{$d}{RSSI} = $rssi if($rssi);
+        $defs{$d}{"RSSI_$name"} = $rssi if($rssi);
         $defs{$d}{RAWMSG} = $rmsg;
+        $defs{$d}{"MSGCNT_$name"}++;
       }
     }
 

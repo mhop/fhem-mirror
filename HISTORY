@@ -431,8 +431,16 @@
   - bugfix: missing blank in attribute list for FHT; exclude report from lazy
   - typos and anchors in documentation corrected
 
- - Sun Oct11 2009 (Boris)
+- Sun Oct 11 2009 (Boris)
   - finalized 09_BS.pm and documentation
 
-- Tue Nov10 2009 (Martin Haas)
- - Bugfix: pgm3: Pulldown-Menu without selected FHTDEV not possible any more
+- Tue Nov 10 2009 (Martin Haas)
+  - Bugfix: pgm3: Pulldown-Menu without selected FHTDEV not possible any more
+
+- Thu Nov 12 2009 (Rudi)
+  - The duplicate pool added. The check routine is called from the Dispatch
+    routine (so it will affecc CUL/FHZ and CM11), and for FS20 calls from
+    the CUL and FHZ Write function.
+    Duplicates within 0.5 seconds are filtered if they are not reported by the
+    same IO Unit. Existing check for IODev removed from BS USF1000 FS20 FHT HMS
+    KS300 CUL_WS CUL_EM X10.

@@ -107,7 +107,6 @@ CUL_EM_Parse($$)
 
   if($defptr{$cde}) {
     my $def = $defptr{$cde};
-    return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
     $hash = $defptr{$cde};
 

@@ -98,9 +98,6 @@ USF1000_Parse($$)
   my $def= $defptr{$dev};
   my $name= $def->{NAME};
 
-  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
-
-
   my $t= TimeNow();
 
   # Msg format:

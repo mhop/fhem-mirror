@@ -79,7 +79,7 @@ FHZ_Initialize($)
   $hash->{GetFn}   = "FHZ_Get";
   $hash->{SetFn}   = "FHZ_Set";
   $hash->{StateFn} = "FHZ_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 filtertimeout repeater:1,0 " .
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0";
 }
@@ -542,6 +542,16 @@ FHZ_Write($$$)
     return;
   }
 
+  ###############
+  # insert value into the msghist. At the moment this only makes sense for FS20
+  # devices. As the transmitted value differs from the received one, we have to
+  # recompute.
+  if($fn eq "04" && substr($msg,0,6) eq "010101") {
+    AddDuplicate($hash->{NAME},
+                "0101a001" . substr($msg, 6, 6) . "00" . substr($msg, 12));
+  }
+
+
   my $bstring = FHZ_CompleteMsg($fn, $msg);
   Log 5, "Sending " . unpack('H*', $bstring);
 
@@ -689,6 +699,7 @@ FHZ_Read($)
         foreach my $d (@{$foundp}) {
           next if(!$defs{$d});
           $defs{$d}{RAWMSG} = $dmsg;
+          $defs{$d}{"MSGCNT_$name"}++;
         }
       }
 

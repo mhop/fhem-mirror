@@ -167,8 +167,6 @@ FHT_Set($@)
     if($a[$i] eq "time") {
       my @t = localtime;
       splice(@a,$i,1,("hour",$t[2],"minute",$t[1]));
-      IOWrite($hash, "", sprintf("T04%x", $t[0]))                # CUL hack
-                  if($hash->{IODev} && $hash->{IODev}->{TYPE} eq "CUL");
     }
   }
 
@@ -347,8 +345,6 @@ FHT_Parse($$)
 
   my $def = $defptr{$dev};
   my $name = $def->{NAME};
-
-  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
 
   # Short message
   if(length($msg) < 26)  {

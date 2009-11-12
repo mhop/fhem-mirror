@@ -89,8 +89,6 @@ BS_Parse($$)
 
   my $name= $def->{NAME};
 
-  return "" if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME});
-
   my $t= TimeNow();
 
   my $flags= hex(substr($msg, 24, 1)) & 0xdc;
