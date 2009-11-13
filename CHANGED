@@ -538,3 +538,5 @@
   - feature: softfhtbuffer added to CUL
   - bugfix:  pgm3: Pulldown-Menu without selected FHTDEV not possible any more
   - feature: duplicate buffer added for multi-cul/-fhz setups
+  - feature: 20_OWFS.pm for communication to 1-Wire via OWFS added (Martin Fischer)
+  - feature: 21_OWTEMP.pm for 1-Wire Digital Thermometer added (Martin Fischer)
