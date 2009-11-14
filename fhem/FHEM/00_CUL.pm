@@ -761,17 +761,13 @@ CUL_Read($)
       goto NEXTMSG;
     }
 
-    $hash->{RSSI} = $rssi if(defined($rssi));
     $hash->{RAWMSG} = $rmsg;
-    my $foundp = Dispatch($hash, $dmsg);
-    if($foundp) {
-      foreach my $d (@{$foundp}) {
-        next if(!$defs{$d});
-        $defs{$d}{"RSSI_$name"} = $rssi if($rssi);
-        $defs{$d}{RAWMSG} = $rmsg;
-        $defs{$d}{"MSGCNT_$name"}++;
-      }
+    my %addvals = (RAWMSG => $rmsg);
+    if(defined($rssi)) {
+      $hash->{RSSI} = $rssi;
+      $addvals{RSSI} = $rssi;
     }
+    Dispatch($hash, $dmsg, \%addvals);
 
 NEXTMSG:
   }
