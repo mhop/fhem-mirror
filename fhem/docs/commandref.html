@@ -53,6 +53,7 @@
       <a href="#CM11">CM11</a> &nbsp;
       <a href="#CUL">CUL</a> &nbsp;
       <a href="#CUL_EM">CUL_EM</a> &nbsp;
+      <a href="#CUL_FHTTK">CUL_FHTTK</a> &nbsp;
       <a href="#CUL_WS">CUL_WS</a> &nbsp;
       <a href="#DbLog">DbLog</a> &nbsp;
       <a href="#EM">EM</a> &nbsp;
@@ -1203,7 +1204,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         devices:<br><br>
           <b>Sender/Sensor</b>: fs20hgs fs20ls fs20pira fs20piri fs20s20 fs20s8
           fs20s4 fs20s4a fs20s4m fs20s4u fs20s4ub fs20sd fs20sn fs20sr fs20ss
-          fs20str fs20tfk fs20tfk fs20tk fs20uts fs20ze<br><br>
+          fs20str fs20tfk fs20tk fs20uts fs20ze<br><br>
 
           <b>Receiver/Actor</b>: fs20as1 fs20as4 fs20di fs20du fs20ms2
                 fs20rst fs20sa fs20sig fs20st fs20sv fs20sv fs20usr
@@ -1461,6 +1462,60 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
 
 </ul>
+
+
+<a name="CUL_FHTTK"></a>
+<h3>CUL_FHTTK</h3>
+<ul>
+  This module handles messages from the FHT80 TF "Fenster-Tür-Kontakt" (Window-Door-Contact)
+  which are normally only acted upon by the <a href="#FHT">FHT80B</a>. With this module,
+  FHT80 TFs are in a limited way (see <a href="http://fhz4linux.info/tiki-index.php?page=FHT+protocol">Wiki</a>
+  for detailed explanation of TF's mode of operation) usable similar to HMS100 TFK. The name
+  of the module was chosen as a) only CUL will spill out the datagrams and b) "TF" designates
+  usually temperature+humidity sensors (no clue, why ELV didn't label this one "TFK" like with
+  FS20 and HMS).<br><br>
+  As said before, FHEM can receive FHT80 TF radio (868.35 MHz) messages only through an
+  <a href="#CUL">CUL</a> device, so this must be defined first.<br><br>
+
+  <a name="CUL_FHTTKdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_FHTTK &lt;devicecode&gt;</code>
+    <br><br>
+
+    <code>&lt;devicecode&gt;</code> is a six digit hex number, given to the FHT80 TF during
+    production, i. e. it is not changeable. (Yes, it keeps this code after changing batteries
+    as well.)<br>
+
+    Examples:
+    <ul>
+      <code>define TK_TEST CUL_FHTTK 965AB0</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="CUL_FHTTKset"></a>
+  <b>Set </b>
+    <ul> Nothing to set here yet ... </ul>
+  <br>
+
+  <b>Get</b>
+   <ul> No get implemented yet ...
+   </ul><br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF)</li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+  </ul>
+  <br>
+
+</ul>
+
 
 <a name="HMS"></a>
 <h3>HMS</h3>
