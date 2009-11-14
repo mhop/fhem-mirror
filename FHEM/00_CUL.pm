@@ -54,15 +54,16 @@ CUL_Initialize($)
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:";
+  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:";
   my %mc = (
-    "1:USF1000" => "^81..(04|0c)..0101a001a5ceaa00....",
-    "2:FS20"    => "^81..(04|0c)..0101a001",
-    "3:FHT"     => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
-    "4:KS300"   => "^810d04..4027a001",
-    "5:CUL_WS"  => "^K.....",
-    "6:CUL_EM"  => "^E0.................\$",
-    "7:HMS"     => "^810e04....(1|5|9).a001",
+    "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
+    "2:FS20"      => "^81..(04|0c)..0101a001",
+    "3:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+    "4:KS300"     => "^810d04..4027a001",
+    "5:CUL_WS"    => "^K.....",
+    "6:CUL_EM"    => "^E0.................\$",
+    "7:HMS"       => "^810e04....(1|5|9).a001",
+    "8:CUL_FHTTK" => "^T........",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
@@ -714,11 +715,16 @@ CUL_Read($)
                         $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
       $dmsg = lc($dmsg);
 
-    } elsif($fn eq "T" && $len >= 11) {              # Reformat for 11_FHT.pm
+    } elsif($fn eq "T") {
+      if ($len >= 11) {                              # Reformat for 11_FHT.pm
+        $dmsg = sprintf("81%02x04xx0909a001%s00%s",
+                         $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
+        $dmsg = lc($dmsg);
 
-      $dmsg = sprintf("81%02x04xx0909a001%s00%s",
-                        $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
-      $dmsg = lc($dmsg);
+      } else {
+        ;                                            # => 09_CUL_FHTTK.pm
+
+      }
 
     } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
 
