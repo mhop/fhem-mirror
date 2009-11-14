@@ -3,7 +3,7 @@ MODDIR=/usr/local/lib
 VARDIR=/var/log/fhem
 
 VERS=4.7
-DATE=2009-09-26
+DATE=2009-10-23
 
 all:
 	@echo Nothing to do for all.
