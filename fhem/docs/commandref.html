@@ -783,8 +783,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         This file is needed, as the save command will write only defines and
         attributes to the config file, any other commands / includes will be
         lost. E.g. it makes sense to set the <a href="FHZset">FHTcode</a> in
-        this file or the coordinates of your house via
-        <a href="#SUNRISE_EL">sunrise_coord</a>
+        this file.
     </li><br>
 
     <a name="logfile"></a>
@@ -3176,8 +3175,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
 
     # Switch the lamp on from sunset to 11 PM
-    # Copy 99_SUNRISE_EL.pm in the FHEM directory to have sunset_rel()
-    { sunrise_coord("8.686", "50.112", "") }
     define a9 at +*{sunset_rel()} set lamp on
     define a10 at *23:00:00 set lamp off
 
@@ -3209,13 +3206,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 
       <li>if the current time is greater than the time specified, then the
           command will be executed tomorrow.</li>
-
-      <li>In order to use the sunrise()/sunset() functions,
-          put { sunrise_coord(long, lat, "") } into your
-          <a href="#lastinclude">lastinclude</a> file, as in the above example.
-          If you are not using sunrise_coord, then the coordinates for
-          Frankfurt am Main, Germany will be used.
-      </li>
 
       <li>For even more complex date handling you either have to call fhem from
           cron or filter the date in a perl expression, see the last example and
@@ -3765,13 +3755,18 @@ A line ending with \ will be concatenated with the next one, so long lines
 sunrise, sunset,
 sunrise_rel, sunset_rel
 sunrise_abs, sunset_abs
-isday, sunrise_coord</pre>
+isday</pre>
   perl functions, to be used in <a href="#at">at</a> or FS20 on-till commands.<br>
-  First you should call the sunrise_coord function with your exact longitude
-  and latitude (see e.g. maps.google.com for the exact values, which should be
-  in the form of a floating point value). This command should be part of the
-  <a href="#lastinclude">lastinclude</a> file. The default value is Frankfurt
-  am Main, Germany.<br><br>
+  First you should edit SUNRISE_EL.pm, and set long and lat to the exact longitude
+  and latitude values (see e.g. maps.google.com for the exact values, which
+  should be in the form of a floating point value).  The default value is
+  Frankfurt am Main, Germany.
+  <br><br>
+  The default altitude ($altit in SUNRISE_EL.pm) defines the sunrise/sunset
+  for Civil twilight (i.e. one can no longer read outside without artificial
+  illumination), which differs from sunrise/sunset times found on different
+  websites.  See perldoc "DateTime::Event::Sunrise" for alternatives.
+  <br><br>
 
   sunrise()/sunset() returns the absolute time of the next sunrise/sunset,
   adding 24 hours if the next event is tomorrow, to use it in the timespec of
