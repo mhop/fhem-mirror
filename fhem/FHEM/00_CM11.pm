@@ -671,7 +671,7 @@ CM11_Read($)
                         $hu= "" unless(defined($hu));
                         my $hf = $hash->{$housecode_func};
                         my $dmsg= "X10:$housecode;$hu;$hf";
-			Dispatch($hash, $dmsg);
+			Dispatch($hash, $dmsg, undef);
 		} else {
 			# data byte is unitcode
 			# if a command was executed before, clear unitcode list

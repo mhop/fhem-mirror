@@ -48,7 +48,7 @@ sub CallFn(@);
 sub CommandChain($$);
 sub CheckDuplicate($$);
 sub DoClose($);
-sub Dispatch($$);
+sub Dispatch($$$);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.82 2009-11-12 19:08:00 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.83 2009-11-14 09:20:37 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2037,9 +2037,9 @@ HandleArchiving($)
 # Call a logical device (FS20) ParseMessage with data from a physical device
 # (FHZ)
 sub
-Dispatch($$)
+Dispatch($$$)
 {
-  my ($hash, $dmsg) = @_;
+  my ($hash, $dmsg, $addvals) = @_;
   my $iohash = $modules{$hash->{TYPE}}; # The phyiscal device module pointer
   my $name = $hash->{NAME};
 
@@ -2093,9 +2093,19 @@ Dispatch($$)
       CommandDelete(undef, $d);                 # Remove the device
       return undef;
     } else {
+      if($defs{$found}) {
+        if($addvals) {
+          foreach my $av (keys %{$addvals}) {
+            $defs{$found}{"${name}_$av"} = $addvals->{$av};
+          }
+        }
+        $defs{$found}{"${name}_MSGCNT"}++;
+        $defs{$found}{LASTIODev} = $name;
+      }
       DoTrigger($found, undef);
     }
   }
+
   $duplicate{$idx}{FND} = \@found;
 
   return \@found;

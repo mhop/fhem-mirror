@@ -694,14 +694,8 @@ FHZ_Read($)
       }
 
       $hash->{RAWMSG} = $dmsg;
-      my $foundp = Dispatch($hash, $dmsg);
-      if($foundp) {
-        foreach my $d (@{$foundp}) {
-          next if(!$defs{$d});
-          $defs{$d}{RAWMSG} = $dmsg;
-          $defs{$d}{"MSGCNT_$name"}++;
-        }
-      }
+      my %addvals = (RAWMSG => $rmsg);
+      my $foundp = Dispatch($hash, $dmsg, \%addvals);
 
       $fhzdata = substr($fhzdata, $len);
 
