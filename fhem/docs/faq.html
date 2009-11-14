@@ -68,6 +68,9 @@ What is wrong with my USB?
 
 <a href="#faq19">19. How do I set the dim100% from the at command?</a><br>
 
+<a href="#faq20">20. Why do my Sunrise/Sunnset times differ from the ones on
+webseite XXX?</a><br>
+
 <br/>
 <br/>
 
@@ -251,16 +254,13 @@ by fhem.pl?</b>
 <ul>
    Look for the geographic coordinates of your home, e.g with a GPS
    receiver or with googleearth. Compute the latitude/longitude as needed, and
-   enter them in your lastinclude file with the command:
-   <pre>{sunrise_coord("<latitude>", "<longitude>", "") }</pre>
+   enter them in your 99_SUNRISE_EL.pm file.
    After restart, { sunrise() } will return the time of the next sunrise,
-   in a HH:MM:SS format.<br><br>
+   in a HH:MM:SS format. Also note <a href="#faq20">faq20</a><br><br>
 
    Note: 99_SUNRISE_EL.pm is the ExtraLight version of the original
    99_SUNRISE.pm, which needs the DateTime::Event::Sunrise perl module, which
-   in turn is usually difficult to install. If you still want to use the
-   original module, then the initialization string will be slightly different:
-   <pre>{sunrise_coord("<latitude>", "<longitude>", "Europe/Berlin") }</pre>
+   in turn is usually difficult to install.
 </ul>
 
 <a name="faq12"></a>
@@ -442,6 +442,41 @@ See <a href="USB.html">USB compendium</a> for help.
   type, e.g. <code>FHT</code>) can be used. A single <code>%</code>
   looses its special meaning if any of these parameters appears in the
   definition.</li>
+</ul>
+
+<a name="faq20">
+<b>20. Why do my Sunrise/Sunnset times differ from the ones on webseite XXX?</b>
+<ul>
+  There are different ways of defining sunrise/sunset. To quote "perldoc
+  DateTime::Event::Sunrise" :<br>
+  <ul>
+    <li>0 degrees<br>
+        Center of Sun's disk touches a mathematical horizon
+    <li>-0.25 degrees<br>
+        Sun's upper limb touches a mathematical horizon
+    <li>-0.583 degrees<br>
+        Center of Sun's disk touches the horizon; atmospheric refraction
+        accounted for
+    <li>-0.833 degrees<br>
+        Sun's supper limb touches the horizon; atmospheric refraction
+        accounted for
+    <li>-6 degrees<br>
+        Civil twilight (one can no longer read outside without artificial
+        illumination)
+    <li>-12 degrees<br>
+        Nautical twilight (navigation using a sea horizon no longer possible)
+    <li>-15 degrees<br>
+        Amateur astronomical twilight (the sky is dark enough for most
+        astronomical observations)
+    <li>-18 degrees<br>
+        Astronomical twilight (the sky is completely dark)
+  </ul>
+  <br>
+  The default in fhem is -6, as we most often deal with lamps & reading. Most
+  websites use -0.833, the difference is normally about 30 minutes. You can
+  change it in 99_SUNRISE.pm by setting the $altit variable.
+
+</ul>
 
 </body>
 </html>
