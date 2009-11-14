@@ -13,10 +13,6 @@ define a5 at +00:00:10 set lamp on           # switch the lamp on in 10 seconds
 define a6 at +00:00:02 set lamp on-for-timer 1       # Blink once in 2 seconds
 define a7 at +*{3}00:00:02 set lamp on-for-timer 1   # Blink 3 times
 
-# For correct sunrise/sunset values, put the following line (with your
-# coordinates in it) in your fhem.cfg
-{ sunrise_coord("8.686", "50.112", "") }
-
 ##################################
 # Switch the lamp on from sunset to 11 PM each day
 # We have to use the relative versions, as the next event is computed now
