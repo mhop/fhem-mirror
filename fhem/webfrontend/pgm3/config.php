@@ -1,22 +1,26 @@
 <?php
 
 ##################################################################################
-#### pgm3 -- a PHP-webfrontend for fhz1000.pl 
+#### pgm3 -- a PHP-webfrontend for fhem.pl 
 
 
 ###### required settings
-	$fhz1000="localhost"; #only php5 ! On which machine is fhem runnning??
+	$fhem="localhost"; #only php5 is supported! On which machine is fhem runnning??
+					# it must not be the same machine as fhem
 					# if it is not localhost then the fhem.cfg must
 					# run global: "port <nr> global"
-	$fhz1000port="7072";		# port of fhem.pl
-	$logpath="/var/tmp";		# where are your logs?
-	$AbsolutPath="/srv/www/htdocs/pgm3"; # where ist your pgm3?
+	$fhemport="7072";		# port of fhem.pl
+	$logpath="/var/tmp/";		# where are your logs? Use a writabel nfs-share if pgm3 and fhem are not on the same machine
+	$AbsolutPath="/srv/www/htdocs/"; # where ist your pgm3?
 
-
-	$fhz1000_pl="/home/FHZ/fhem/fhem.pl"; #only required if you are using HP4
 
 ##################################################################################
 ###### nice to have
+
+
+##### use netcat if your have problems with the stream_socket-tcp-connection
+## package netcat must be installed
+	$usenetcat=0;
 
 
 ###### showgnuplot 
@@ -28,7 +32,7 @@
 
 #####	logrotate of hms, ks300, fht
 	# this is only possible, if the webserver (e.g.wwwrun) has the rights ro write the
-	# files from fh1000.pl. If you want that then run fhz1000.pl as wwwrun too.
+	# files from fh1000.pl. If you want that then run fhem.pl as wwwrun too.
 	# if 'yes' then only the needed lines are in the logfiles, the rest will be deleted.
 	$logrotate='yes';	# yes/no default='yes'
 
@@ -42,6 +46,8 @@
         $webcamwidth='150';             # the width of the shown picture
 	$wgetpath="/usr/bin/wget";      # you need the package wget for http, ftp...
         $webcam[0]='http://webcam/IMAGE.JPG';
+        $webcam[1]='http://webcam2/IMAGE.JPG';
+        #$webcam[1]='http://www.bostream.nu/hoganas/OutsideTempHistory.gif';
        #$webcam[1]='IMAGE.PNG';        # Supported are Webcams with http:// ftp:// ....
                                        # and Images wich must be copied to <pgm3>/tmp/
 
@@ -49,14 +55,21 @@
 #       ...
 
 
+# Weather				# Google-Api. It requires an Internet Connection
+	$enableweather=1;		# show the google-weather?
+	$weathercity='Giessen';
+	$weathercountry='Germany';
+	$weatherlang='de';
+	#$weatherlang='en';
+
 
 ##############################################################################################
 ## FHZ-DEVICES
 	$show_general=1; 		#field to type FHZ1000-orders 0/1 Default:1
 	$show_fs20pulldown=1; 		#Pull-Down for the FS20 Devices 0/1 Default:1
 	$show_fhtpulldown=1; 		#Pull-Down for the FHT-Devices 0/1 Default:1
-
-
+	$show_logpulldown=1; 		#Pull-Down for Log-files and FS20 (grep fhem.log)
+	$logsort='| sort -r';		#sort the Log-Output how you want;
 
 
 ##############################################################################################
@@ -67,7 +80,7 @@
 	$fs20maxiconperline=9; 	# default=9
 
 					#room. Write e.g. "attr rolowz room wzo" 
-					#into your fhz1000.cfg and restart fhz1000.pl
+					#into your fhem.cfg and restart fhem.pl
 					# this will be marked on the FS20-Button. 
 	$txtroom=""; 			# default=""; example: $txtroom="room: ";
 					# room hidden will not be shown
@@ -94,12 +107,12 @@
         $maxcount='510';                        # Maximum count of pixel (from right to left) (Default:460)
         $XcorrectDate=380;                      # Text of e.g. Date from the right side (Default:380)
         $XcorrectMainText=32;                   # Text of main text from the right side (Default: 32)
-        $logrotateFHTlines=4800;                # automatic Logrotate; $logrotate must be 'yes'.
+        $logrotateFHTlines=5400;                # automatic Logrotate; $logrotate must be 'yes'.
                                                 # Default:4800
                                                 # read docs/logrotate if you want adjust it manually!
                                                 # otherwise the system will slow down
                                                 # pgm3 (user www-data) needs the rights to write the logs
-                                                # from fhz1000.pl (user = ???)
+                                                # from fhem.pl (user = ???)
 
 
 
@@ -116,7 +129,7 @@
                                                 # read docs/logrotate if you want adjust it manually!
                                                 # otherwise the system will slow down
                                                 # pgm3 (user www-data) needs the rights to write the logs
-                                                # from fhz1000.pl (user = ???)
+                                                # from fhem.pl (user = ???)
 
 ##############################################################################################
 ## KS300-Device
@@ -133,7 +146,7 @@
                                         # read docs/logrotate if you want adjust it manually
                                         # otherwise the system will slow down
                                         # pgm3 (user www-data) needs the rights to write the logs
-                                        # from fhz1000.pl (user = ???)
+                                        # from fhem.pl (user = ???)
 
 ##############################################################################################
 ## USERDEF
@@ -153,7 +166,7 @@
 # Field4: 0.0
 #...
 # Field1 must be the date/time-field. Then tell pgm3 with $userdef[x]['valuefield'] (see below)
-# the field with the needed value. It is possible to create several graphics with on logfile.
+# the field with the needed value. It is possible to create several graphics with one logfile.
 
 
 # Do you want user defined graphics? 1/0 Default: 0	
@@ -163,37 +176,37 @@ $UserDefs=0;
 ## Userdef: 0
 
 # the sortnumbers must be complete. eg. 0 1 2 3 or 2 0 3 1 and so on
-$sortnumber=0;	
+#$sortnumber=0;	
 
 # No blanks or other special signs!!
-$userdef[$sortnumber]['name']='SolarV';	
+#$userdef[$sortnumber]['name']='SolarV';	
 
 #In which field are the values?? See the example above
-$userdef[$sortnumber]['valuefield']=4;	
+#$userdef[$sortnumber]['valuefield']=4;	
 
-#Type of Device [temperature | piri] pgm3 will try to generate a gnuplot picture
-$userdef[$sortnumber]['gnuplottype']='temperature';	
+#Type of Device [temperature | piri | fs20] pgm3 will try to generate a gnuplot picture
+#$userdef[$sortnumber]['gnuplottype']='temperature';	
 
 # example, path to the logfile with the entrys like above
-$userdef[$sortnumber]['logpath']=$logpath.'/lse_solarV.log';   
+#$userdef[$sortnumber]['logpath']=$logpath.'/lse_solarV.log';   
 
-$userdef[$sortnumber]['room']='hidden';
+#$userdef[$sortnumber]['room']='garden';
 
 # Semantic eg. Voltage
-$userdef[$sortnumber]['semlong']='Voltage'; 	
+#$userdef[$sortnumber]['semlong']='Voltage'; 	
 
 # Semantic short e.g. V
-$userdef[$sortnumber]['semshort']='V';
+#$userdef[$sortnumber]['semshort']='V';
 
 #Size of the pictures. Default:  725
-$userdef[$sortnumber]['imagemax']=725;
-$userdef[$sortnumber]['imagemay']=52;
+#$userdef[$sortnumber]['imagemax']=725;
+#$userdef[$sortnumber]['imagemay']=52;
 
 # Maximum count of pixel (from right to left) (Default:575)
-$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['maxcount']=575;
 
  # Text of main text from the right side (Default:)
-$userdef[$sortnumber]['XcorrectMainText']=25;               
+#$userdef[$sortnumber]['XcorrectMainText']=25;               
 
 # automatic Logrotate; $logrotate must be 'yes'.
 # Default:2200
@@ -201,32 +214,32 @@ $userdef[$sortnumber]['XcorrectMainText']=25;
 # otherwise the system will slow down
 # pgm3 (user www-data) needs the rights to write the logs
 # of fhem.pl (user = ???)
-$userdef[$sortnumber]['logrotatelines']=2200;  
+#$userdef[$sortnumber]['logrotatelines']=2200;  
 
 
 ########################
 # example: 
 #define solarpumpe.log FileLog /var/tmp/solarpumpe.log solarpumpe:.*(on|off).*
-#$sortnumber=1;
-#$userdef[$sortnumber]['name']='PiriO';	
-#$userdef[$sortnumber]['name']='SolarPumpe';	
-##$userdef[$sortnumber]['valuefield']=3;	
-#$userdef[$sortnumber]['gnuplottype']='fs20';	
-#$userdef[$sortnumber]['logpath']='/var/tmp/solarpumpe.log';   
-#$userdef[$sortnumber]['room']='cellar';
-#$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
-#$userdef[$sortnumber]['semshort']='';
-#$userdef[$sortnumber]['imagemax']=725;
-#$userdef[$sortnumber]['imagemay']=52;
-#$userdef[$sortnumber]['maxcount']=575;
-#$userdef[$sortnumber]['XcorrectMainText']=25;               
-#$userdef[$sortnumber]['logrotatelines']=50;  
+$sortnumber=0;
+$userdef[$sortnumber]['name']='PiriO';	
+$userdef[$sortnumber]['name']='SolarPumpe';	
+$userdef[$sortnumber]['valuefield']=3;	
+$userdef[$sortnumber]['gnuplottype']='fs20';	
+$userdef[$sortnumber]['logpath']='/mnt/fhz/solarpumpe.log';   
+$userdef[$sortnumber]['room']='cellar';
+$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
+$userdef[$sortnumber]['semshort']='';
+$userdef[$sortnumber]['imagemax']=725;
+$userdef[$sortnumber]['imagemay']=52;
+$userdef[$sortnumber]['maxcount']=575;
+$userdef[$sortnumber]['XcorrectMainText']=25;               
+$userdef[$sortnumber]['logrotatelines']=50;  
 
 
 ##########################
 # example: 
 #define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
-#$sortnumber=3;
+#$sortnumber=2;
 #$userdef[$sortnumber]['name']='Rolu1';	
 #$userdef[$sortnumber]['valuefield']=3;	
 #$userdef[$sortnumber]['gnuplottype']='fs20';	
@@ -243,20 +256,40 @@ $userdef[$sortnumber]['logrotatelines']=2200;
 ##########################
 # example: 
 #define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
-#$sortnumber=4;
-#$userdef[$sortnumber]['name']='allight';	
-#$userdef[$sortnumber]['valuefield']=3;	
-#$userdef[$sortnumber]['gnuplottype']='fs20';	
-#$userdef[$sortnumber]['logpath']='/var/tmp/allight.log';   
-#$userdef[$sortnumber]['room']='alarm';
-#$userdef[$sortnumber]['semlong']='Alarm light'; 	
-#$userdef[$sortnumber]['semshort']='';
+$sortnumber=1;
+$userdef[$sortnumber]['name']='allight';	
+$userdef[$sortnumber]['valuefield']=3;	
+$userdef[$sortnumber]['gnuplottype']='fs20';	
+$userdef[$sortnumber]['logpath']='/mnt/fhz/allight.log';   
+$userdef[$sortnumber]['room']='alarm';
+$userdef[$sortnumber]['semlong']='Alarm light'; 	
+$userdef[$sortnumber]['semshort']='';
+$userdef[$sortnumber]['imagemax']=725;
+$userdef[$sortnumber]['imagemay']=52;
+$userdef[$sortnumber]['maxcount']=575;
+$userdef[$sortnumber]['XcorrectMainText']=25;               
+$userdef[$sortnumber]['logrotatelines']=30;  
+##########################
+
+
+#$sortnumber=2;
+#$userdef[$sortnumber]['name']='tARV';
+#$userdef[$sortnumber]['valuefield']=3;
+#$userdef[$sortnumber]['gnuplottype']='temperature';
+#$userdef[$sortnumber]['logpath']='/mnt/fhz/t_arv.log';
+##$userdef[$sortnumber]['logpath']='/mnt/fhz/allight.log';
+#$userdef[$sortnumber]['room']='Hautpg';
+#$userdef[$sortnumber]['semlong']='tARV';
+#$userdef[$sortnumber]['semshort']='°C';
 #$userdef[$sortnumber]['imagemax']=725;
 #$userdef[$sortnumber]['imagemay']=52;
-#$userdef[$sortnumber]['maxcount']=575;
-#$userdef[$sortnumber]['XcorrectMainText']=25;               
-#$userdef[$sortnumber]['logrotatelines']=30;  
-##########################
+##$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['XcorrectMainText']=25;
+#$userdef[$sortnumber]['logrotatelines']=2200;
+
+
+
+
 # example: 
 #define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
 #$sortnumber=5;
@@ -287,20 +320,21 @@ $userdef[$sortnumber]['logrotatelines']=2200;
 ##############################################################################################
 ## misc
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
-	$tailcount=20; 			#make shure to have the correct rights. Values: 0/1
+	$tailcount=30; 			#make shure to have the correct rights. Values: 0/1
 	$tailpath="/usr/bin/tail";
 	$taillogorder=$tailpath." -$tailcount $logpath/fhem.log ";
-	#$taillogorder=$tailpath." -$tailcount $logpath/fhem-" . date("Y") . "-" .  date("m") . ".log "; #if you have e.g. fhem-2009-02.log
+	#$taillogorder=$tailpath." -$tailcount $logpath/fhem-" . date("Y") . "-" .  date("m") . ".log "; #if you have e.g. fhem-2009-02.log  
 
 
 
-
-## show Information at startup. 
-	$showLOGS='no';			#show the LOGS at startup. Default: no Values: yes/no
+## show Information at STARTUP. 
+	$showLOGS='no';			#show the entrys of the LOGS in the 
+					#fhem.cfg at startup. Default: no Values: yes/no
 	$showAT='no';			#show the AT_JOBS at startup. Default: yes Values: yes/no
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
 	$showHIST='yes';		#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
         $showPICS='yes';                #if shwowebcam=1 then initial the Pics will be shown. Default: yes 
+	$showWeath='yes';		# Show weather on startup? $enableweather must 1 
 
         $RSStitel='FHEM :-)';
 

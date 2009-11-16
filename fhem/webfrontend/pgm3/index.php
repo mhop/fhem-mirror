@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='091110';
+$pgm3version='091116';
 	
 	$Action		=	$_POST['Action'];
 	$order		= 	$_POST['order'];
@@ -50,6 +50,7 @@ $pgm3version='091110';
 	$kstyp		=	$_POST['kstyp'];
 	$showroom	=	$_POST['showroom'];
 	$showmenu	=	$_POST['showmenu'];
+	$showweath	=	$_POST['showweath'];
 	$showhmsgnu	=	$_POST['showhmsgnu'];
 	$showuserdefgnu	=	$_POST['showuserdefgnu'];
 	$temp		=	$_POST['temp'];
@@ -83,6 +84,10 @@ $pgm3version='091110';
 	if (! isset($showfht)) $showfht=$_GET['showfht'];
 	if ($showfht=="") unset($showfht);
 	if ($showfht=="none") unset($showfht);
+
+	if (! isset($showweath)) $showweath=$_GET['showweath'];
+	if ($showweath=="") unset($showweath);
+	if ($showweath=="none") unset($showweath);
 
 	if (! isset($showmenu)) $showmenu=$_GET['showmenu'];
 	if ($showmenu=="") unset($showmenu);
@@ -146,12 +151,13 @@ $pgm3version='091110';
 		if ($showNOTI=='yes') $shownoti='yes';
 		if ($showHIST=='yes') $showhist='yes';
 		if ($showPICS=='yes') $showpics='yes';
+		if ($showWeath=='yes') $showweath='1';
 	}
 
 
 	if (isset ($showfht)) { $forwardurl=$forwardurl.'&showfht='.$showfht;};
 	if (isset ($fs20dev)) 
-	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&showmenu='.$showmenu.'&showroom='.$showroom;};
+	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&showmenu='.$showmenu.'&showroom='.$showroom.'&showweath'.$showweath;};
 	if (isset ($showks)) { $forwardurl=$forwardurl.'&showks='.$showks.'&kstyp='.$kstyp;};
 	if (isset ($showhmsgnu)) { $forwardurl=$forwardurl.'&showhmsgnu='.$showhmsgnu;};
 	if (isset ($showuserdefgnu)) { $forwardurl=$forwardurl.'&showuserdefgnu='.$showuserdefgnu;};
@@ -162,6 +168,7 @@ $pgm3version='091110';
 	if (isset ($showpics)) { $forwardurl=$forwardurl.'&showpics';};
 	if (isset ($showhist)) { $forwardurl=$forwardurl.'&showhist';};
 	if (isset ($showfs20)) { $forwardurl=$forwardurl.'&showfs20='.$showfs20;};
+	if (isset ($showweath)) { $forwardurl=$forwardurl.'&showweath='.$showweath;};
 	if (isset ($showmenu)) 
 	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&valuetime='.$valuetime.'&showmenu='.$showmenu.'&showroom='.$showroom;}
 	unset($link);
@@ -170,6 +177,7 @@ $pgm3version='091110';
 	if (isset ($showhist)) $link=$link.'&showhist'; 
 	if (isset ($showat)) $link=$link.'&showat'; 
 	if (isset ($showmenu)) $link=$link.'&showmenu='.$showmenu; 
+	if (isset ($showweath)) $link=$link.'&showweath='.$showweath; 
 	if (isset ($showfht)) $link=$link.'&showfht='.$showfht; 
 	if (isset ($showhmsgnu)) $link=$link.'&showhmsgnu='.$showhmsgnu; 
 	if (isset ($showuserdefgnu)) $link=$link.'&showuserdefgnu='.$showuserdefgnu; 
@@ -183,7 +191,7 @@ switch ($Action):
 		{
 			$order=str_replace("\\","",$order);
 			$order=str_replace("@","+",$order);
-			execFHZ($order,$fhz1000,$fhz1000port);
+			execFHZ($order,$fhem,$fhemport);
 		}
 		header("Location:  $forwardurl&errormessage=$errormessage");
 		break;
@@ -191,17 +199,17 @@ switch ($Action):
 		if ($atorder=='at') 
 		{ $atorder='define '.randdefine().' '.$atorder; }
 		$order="$atorder $attime set $fs20dev $orderpulldown $valuetime";
-		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
+		if ($kioskmode=='off') execFHZ($order,$fhem,$fhemport);
 		header("Location:  $forwardurl");
 	Case exec3:
 		if ($atorder=='at') 
 		{ $atorder='define '.randdefine().' '.$atorder; }
 		if (! isset($fhtdev)) {echo "FHT-Device not set - exit"; break;}
 		$order="$atorder $attime set $fhtdev $orderpulldown $valuetime";
-		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
+		if ($kioskmode=='off') execFHZ($order,$fhem,$fhemport);
 	Case execfht:
 		$order="set $dofht desired-temp $temp";
-		if ($kioskmode=='off') execFHZ($order,$fhz1000,$fhz1000port);
+		if ($kioskmode=='off') execFHZ($order,$fhem,$fhemport);
 		header("Location:  $forwardurl");
 		break;
 	Case showfht|showroom|showks|showhmsgnu|hide|showuserdefgnu|showpics:
@@ -220,26 +228,39 @@ function execFHZ($order,$machine,$port)
 {
 global $errormessage;
 
-$version = explode('.', phpversion());
 
-if ( $version[0] == 4 )
-{
-	include "config.php";
-	$order="$fhz1000_pl $port '$order'";  #PHP4, only localhost
+#PHP4 is not supported any more 20091115
+#$version = explode('.', phpversion());
+
+#if ( $version[0] == 4 )
+#{
+#	include "config.php";
+#	$order="$fhem_pl $port '$order'";  #PHP4, only localhost
+#	exec($order,$res);
+#        $errormessage = $res[0]; 
+#}#
+#else
+#{
+if ($usenetcat=='1')
+ {
+	$order="$echo xmllist | netcat -w3 $machine $port";  
 	exec($order,$res);
         $errormessage = $res[0]; 
-}
-else
-{
-$fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
-        if (!$fp) {
+ }
+ else
+ {
+ $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
+         if (!$fp) {
            echo "$errstr ($errno)<br />\n";
         } else {
            fwrite($fp, "$order\n;quit\n");
-               	$errormessage= fgets($fp, 1024);
+               	#$errormessage= fgets($fp, 1024);
+               	#$errormessage= fgets($fp, 65535);
+               	$errormessage= fgets($fp);
            fclose($fp);
         }
-}
+ }
+#}
 return $errormessage;
 }
 
@@ -249,19 +270,19 @@ return $errormessage;
 unset($output);
 $stack = array();
 $output=array();
-
+unset($longxml);
 
 $version = explode('.', phpversion());
 
 
 if ( $version[0] == 4 )
 {
-        $xmllist="$fhz1000_pl $fhz1000port xmllist";
+        $xmllist="$fhem_pl $fhemport xmllist";
         exec($xmllist,$output);
 }
 else
 {
-	$fp = stream_socket_client("tcp://$fhz1000:$fhz1000port", $errno, $errstr, 30);
+	$fp = stream_socket_client("tcp://$fhem:$fhemport", $errno, $errstr, 30);
 	if (!$fp) {
 	   echo "$errstr ($errno)<br />\n";
 	} else {
@@ -273,8 +294,7 @@ else
 	   fclose($fp);
 	}
 }
-#print_r($output);
-#exit;
+
 
 
 
@@ -327,11 +347,19 @@ foreach($output as $data) {
 xml_parser_free($xml_parser);
 
 
-#searching for rooms/fs20
+
+
+
+
+#print_r($stack);
+#exit;
+
+
+#searching for rooms/fs20/Logpaths
 	$rooms=array();
 	$fs20devs=array();
 	$fhtdevs=array();
-      if ($showroombuttons==1)
+	$logpaths=array();
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
 	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_') 
@@ -355,6 +383,11 @@ xml_parser_free($xml_parser);
 		  	 if ((! in_array($fs20devxml,$fs20devs)) AND ( $room != 'hidden')) array_push($fs20devs,$fs20devxml);
 			}
 	      }#FS20
+
+
+####################################################  FHTs
+
+
 	       elseif (substr($stack[0][children][$i][name],0,4)=='FHT_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -372,6 +405,13 @@ xml_parser_free($xml_parser);
 			  	 if ((! in_array($fhtdevxml,$fhtdevs)) AND ( $room != 'hidden')) array_push($fhtdevs,$fhtdevxml);
 			 }
 		} #FHT
+
+
+
+####################################################  HMS
+
+
+
 	       elseif (substr($stack[0][children][$i][name],0,4)=='HMS_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -385,6 +425,48 @@ xml_parser_free($xml_parser);
 				}
 		       }
 	       } # HMS
+
+#################################################### LogpathFileLOG
+
+
+	       elseif (substr($stack[0][children][$i][name],0,8)=='FileLog_')
+	       {
+		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
+			 {
+			 	for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+				{
+				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="currentlogfile") 
+					{$logpathstack=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+				  	 if (! in_array($logpathistack,$logpaths)) array_push($logpaths,$logpathstack);
+					}
+				}
+		       }
+	       } # FileLog
+
+
+
+#################################################### INTERNAL Logpath
+
+
+	       elseif (substr($stack[0][children][$i][name],0,9)=='_internal')
+	       {
+		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
+			 {
+			 	for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+				{
+				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="currentlogfile") 
+					{$fhemlog=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+				  	 if (! in_array($fhemlog,$logpaths)) array_push($logpaths,$fhemlog);
+					}
+				}
+		       }
+	       } # _internal_
+
+
+
+#################################################### SCIVT
+
+
 	       elseif (substr($stack[0][children][$i][name],0,6)=='SCIVT_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -398,6 +480,11 @@ xml_parser_free($xml_parser);
 				}
 		       }
 	       } # SCIVT
+
+
+
+#################################################### SCIVT
+
 	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_')
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -416,7 +503,7 @@ xml_parser_free($xml_parser);
 			  }
 			}
 		}
-	} # end searching rooms in the array from fhem
+	} # end searching rooms /logpaths in the array from fhem
 	# user defined rooms?
 	if ($UserDefs==1)
 	{
@@ -431,10 +518,14 @@ xml_parser_free($xml_parser);
 	array_push($rooms,'ALL');
 	sort($rooms);
 
+
+
+
 #print_r($rooms); echo "Count: $countrooms"; exit;
 #print_r($fs20devs);  exit;
 #echo count($stack[0][children]);exit;
-
+#print_r($logpaths);  exit;
+#exit;
 
 
 
@@ -457,6 +548,8 @@ xml_parser_free($xml_parser);
 	 <meta http-equiv='pragma' content='no-cache'>
 	 <meta http-equiv='expires' content='0'>
 	 <meta http-equiv='Cache-Control' content='no-cache'>
+	 <meta http-equiv='content-type' content='text/html; charset=UTF-8'>
+
 	 <link rel='alternate' type='application/rss+xml' title='$RSStitel' href='index.php?showrss'>
  	 <link rel='shortcut icon' href='include/fs20.ico' >
 	 <title>$titel</title>";
@@ -530,15 +623,36 @@ xml_parser_free($xml_parser);
 		";
 	
 	};
-	############################ FHZ
+
+
+
+
+       ############################ WEATHER
+     if ($enableweather==1)
+	{
+	echo "<tr><td $bg1 colspan=4><font $fontcolor1><table  cellspacing='0' cellpadding='0' width='100%'>
+		<tr><td><font $fontcolor1>WEATHER</td><td align=right><font $fontcolor1><b>";
+	if ($showweath != '1')	
+		{ echo "<a href=$formwardurl?showweath=1&showroom=$showroom$link>show</a>";}
+		else
+		{ echo "<a href=$formwardurl?showroom=$showroom$link&showweath=none>hide</a>";}
+
+	echo "</b></font></td></tr></table>";
+	echo "</font></td></tr>";
+	if ($showweath==1) include 'include/weather.php';
+     }
+
+
+
+       ############################ FHZ
 	if ($show_fs20pulldown==1 or $show_general==1 or $show_fhtpulldown==1)
 	{
 	echo "<tr><td $bg1 colspan=4><font $fontcolor1><table  cellspacing='0' cellpadding='0' width='100%'>
 		<tr><td><font $fontcolor1>FHZ_DEVICE</td><td align=right><font $fontcolor1><b>";
 	if ($showmenu != '1')	
-		{ echo "<a href=$formwardurl?showmenu=1&showroom=$showroom$link>show menu</a>";}
+		{ echo "<a href=$formwardurl?showmenu=1&showroom=$showroom$link>show</a>";}
 		else
-		{ echo "<a href=$formwardurl?showroom=$showroom$link&showmenu=none>hide menu</a>";}
+		{ echo "<a href=$formwardurl?showroom=$showroom$link&showmenu=none>hide</a>";}
 
 	echo "</b></font></td></tr></table>";
 	echo "</font></td></tr>";
@@ -550,8 +664,8 @@ xml_parser_free($xml_parser);
 		if ($show_general=='1') 
 		{echo "
 		<tr>
-		<td colspan=2 align=right $bg2><font  $fontcolor3> General: </font></td>
-		<td align=left $bg2 colspan=2><font $fontcolor3>
+		<td colspan=1 align=right $bg2><font  $fontcolor3> General: </font></td>
+		<td align=left $bg2 colspan=1><font $fontcolor3>
 		<form action=$forwardurl method='POST'>
 		<input type=text name=order size=30>
 		<input type=hidden name=showfht value=$showfht>
@@ -564,7 +678,12 @@ xml_parser_free($xml_parser);
 	
 	if ($show_fs20pulldown=='1') include 'include/fs20pulldown.php';
 	if ($show_fhtpulldown=='1') include 'include/fhtpulldown.php';
+	if ($show_logpulldown=='1') include 'include/logpulldown.php';
 	};
+
+
+
+
 
 	############################ ROOMS
 	if (($showroombuttons==1) and (count($rooms)>1))
@@ -664,6 +783,9 @@ xml_parser_free($xml_parser);
 				   if ( $check=="room") 
 					{$room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 					}
+				   if ( $check=="warnings") 
+					{$battery=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+					}
 				}
 		 if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
 		 {
@@ -674,6 +796,7 @@ xml_parser_free($xml_parser);
 				       <form action=$forwardurl method='POST'>
 				       <input type=hidden name=Action value=hide>
 				       <input type=hidden name=showfht value=none>
+				       <input type=hidden name= value=none>
 			 		<input type=hidden name=showroom value=$showroom>
 				       <input type=submit value='hide'></form>
 					<a href=$forwardurl&showmenu=1&fhtdev=$FHTdev&orderpulldown=desired-temp&valuetime=20.0>adjust</a></td>";
@@ -690,7 +813,7 @@ xml_parser_free($xml_parser);
 			 	};
 				   
 				echo "<td $bg2 colspan='3'> 
-				<img src='include/fht.php?drawfht=$FHTdev&room=$room' width='$imgmaxxfht' height='$imgmaxyfht'>
+				<img src='include/fht.php?drawfht=$FHTdev&room=$room&battery=$battery' width='$imgmaxxfht' height='$imgmaxyfht'>
 				</td>";
 				echo "</tr>";
 			 	
@@ -730,6 +853,9 @@ xml_parser_free($xml_parser);
 				$room="";
 			 	for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
 				{
+				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="battery") 
+					{$battery=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+					}
 				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="room") 
 					{$room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 					}
@@ -747,6 +873,7 @@ xml_parser_free($xml_parser);
                                        <form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=showhmsgnu>
                                         <input type=hidden name=showroom value=$showroom>
+                                        <input type=hidden name=battery value=$battery>
                                         <input type=hidden name=showhmsgnu value=$gnuvalue>
                                        <input type=submit value='$formvalue'></form></td><td $bg2 colspan=3>";
 				
@@ -754,7 +881,7 @@ xml_parser_free($xml_parser);
 			else
 		 	{echo "<tr><td $bg2><td $bg2 colspan=3> ";}
 		       	
-			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
+			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type&battery=$battery' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		
 		if ($showhmsgnu == $HMSdev and $showgnuplot == 1)
                                 { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0);
@@ -868,7 +995,7 @@ xml_parser_free($xml_parser);
 			  	}	
 			}
 			 	$name=$stack[0][children][$i][children][$j][attrs][name];
-			 	echo "<tr><td colspan=2 border=0>Log:</td>
+			 	echo "<tr><td colspan=1 border=0>Log:</td>
 					<td colspan=2 border=0>$value / $name </td></tr>";
 				
 			 }
@@ -897,7 +1024,7 @@ xml_parser_free($xml_parser);
 			  	}	
 			}
 			 	$name=$stack[0][children][$i][children][$j][attrs][name];
-			 	echo "<tr><td colspan=2>Notification:</td><td colspan=2>$value / $name</td></tr>";
+			 	echo "<tr><td colspan=1>Notification:</td><td colspan=2>$value / $name</td></tr>";
 			 }
 		} 
 	############################
@@ -929,7 +1056,7 @@ xml_parser_free($xml_parser);
 			}
 
 				$order='delete '.$order;
-			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del</a></td><td colspan=2>$value / $next / $command</td></tr>";
+			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del </a> $value / $next / $command</td></tr>";
 			 }
 		} 
 	};
@@ -956,12 +1083,12 @@ xml_parser_free($xml_parser);
                  {
                         if ($showuserdefgnu== $UserDef) {$formvalue="hide";$gnuvalue="";}
                         else {$formvalue="show";$gnuvalue=$UserDef;};
-                        echo "<tr valign=center><td align=center $bg2 valign=center colspan=2>
+                        echo "<tr valign=center><td align=center $bg2 valign=center colspan=1>
                                        <form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=showuserdefgnu>
                                         <input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showuserdefgnu value=$gnuvalue>
-                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=2>";
+                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=1>";
 
                         echo "<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
 
@@ -991,7 +1118,7 @@ xml_parser_free($xml_parser);
 		else
 		{ echo "<a href=$formwardurl?showroom=$showroom$link&showhist=none>hide</a>";}
 	      	echo "</font></td></tr></table></td></tr>";
-	if (isset ($showhist)) {foreach($tailoutput as $data) echo "<tr><td colspan=2>History</td><td colspan=2>$data</td></tr>";};
+	if (isset ($showhist)) {foreach($tailoutput as $data) echo "<tr><td colspan=1>History</td><td colspan=2>$data</td></tr>";};
 	
 
 	};

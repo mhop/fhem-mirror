@@ -14,6 +14,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
 
 	
 	$drawfht=$_GET['drawfht'];
+	$battery=$_GET['battery'];
 	$room=$_GET['room'];
 
 	$file="$logpath/$drawfht.log";
@@ -206,6 +207,14 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$text=$resultreverse[0][0];
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-127, 13, $txtcolor, $fontttf, $text);
 
+
+	$fontsize=7;  
+        $text=$battery;   
+        if ($battery == 'none') {$text='Bat: ok';}
+	else {$text='Bat: low'; $txtcolor=$red;}
+        ImageTTFText ($im,  $fontsize, 0, 165, 10, $txtcolor, $fontttf, $text);
+        $fontsize=7;  
+
 	imagePng($im,$savefile);
 	header("Content-type: image/png");
 	imagePng($im);
@@ -223,7 +232,7 @@ function show_error($file,$drawfht,$imgmaxxfht,$imgmaxyfht)
 	ImageFill($im, 0, 0, $bg2p);
 	ImageRectangle($im, 0, 0, $imgmaxxfht-1, $imgmaxyfht-1, $white);
 	imagestring($im, 3, 5, 5, "Error, there is no $file", $black);
-	imagestring($im, 1, 3, 25, "Please add the following to your fhz1000.cfg", $black);
+	imagestring($im, 1, 3, 25, "Please add the following to your fhem.cfg", $black);
 	$logname=$drawfht."log";
 	imagestring($im, 1, 3, 35, "define $logname FileLog $file $drawfht:.*(temp|actuator|desired).*", $black);
 	header("Content-type: image/png");

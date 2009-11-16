@@ -216,25 +216,27 @@ If you are using cygwin for your perl installation you can follow the guidelines
 <h3>Web frontend 3 (webfrontend/pgm3)</h3>
   <ul>
   This frontend is PHP based and was contributed by Martin Haas.
-  Look at the webfrontends/pgm3/docs for more documentation or at
-  <a href="pgm3-0.5.1.png">this screenshot</a>. A lot more details <a href="http://www.martin-haas.de/fhz/screenshots.html">and screenshots</a> can be
+  Look at the webfrontends/pgm3/docs for more documentation.
+  A lot more details <a href="http://www.martin-haas.de/fhz/screenshots.html">and screenshots</a> can be
   found on Martins page: <a href="http://www.martin-haas.de/fhz">
   http://www.martin-haas.de/fhz</a>
+  <br>pgm3 must not run on the same maschine like fhem.<br>
+  The Devices of 95% of the users are detected and configured automatically. 
+  Further 4% are adaptable by the function UserDef. See config.php for explanation.
+   
   <br><br>
 
-  <ul>
-     <li>Install PHP5 and enable it by commenting in the "LoadModule
-     phpX_module ..." directive in httpd.conf (perhaps it is already
-     done by your distro). Restart/reload httpd.</li>
+  Installation:
+    <ul>
+     <li>Install PHP5, the php5-Apache-Modules and php-gd. Every current 
+     distribution should do all the needed configuration without your input.</li>
 
-     <li>Create a directory (e.g.: /home/httpd/html/pgm3) and copy all the
-     files from the webfrontend/pgm3 to this directory.<br>Make sure that this
-     directory is writeable by the webserver!</li>
+     <li>Create a directory in the Apache2 DocumentRoot 
+     (e.g.: /home/httpd/html/pgm3) and copy all the files from the 
+     webfrontend/pgm3 to this directory.<br>Make sure that this
+     directory is writeable by the webserver (e.g. User www-data.www-data)!
+     </li>
 
-     <li>Make sure that php-gd is installed.</li>
-
-     <li>Edit config.php (/home/httpd/html/pgm3/config.php), and check the
-     required settings section</li>
 
      <li>If you want to have access to the FHT temperature logs, then:
      <ul>
