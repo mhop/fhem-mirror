@@ -1,6 +1,6 @@
 <?php
 
-##Pulldown for FS20-Devices
+##Pulldown for FHT--Devices
 
 
 		$orders=array("mon-from1","mon-to1","tue-from1","tue-to1","wed-from1","wed-to1","thu-from1",
@@ -12,11 +12,8 @@
 
 		echo "
 		<tr>
-		<td colspan=2 align=right $bg2><font $fontcolor3>FHT: </font></td><td align=left $bg2><font $fontcolor3>
+		<td colspan=1 align=right $bg2><font $fontcolor3>FHT: </font></td><td align=left $bg2><font $fontcolor3>
 		<form action=$forwardurl method='POST'>";
-		#<input type=hidden name=showfht value=$showfht>
-		#<input type=hidden name=showhms value=$showhms>
-		#<input type=hidden name=showmenu value=$showmenu>
 		echo"<input type=hidden name=Action value=exec3>
 		
 		<select name=atorder size=1>
@@ -89,7 +86,6 @@
 		if (isset($valuetime))	echo"<option selected>$valuetime</option>";
 		echo"</select>";
 
-		#$order="$atorder $attime set $fhtdev $orderpulldown $valuetime";
 		echo "<input type=submit value='go!'></form></td></tr>";
 
 ?>

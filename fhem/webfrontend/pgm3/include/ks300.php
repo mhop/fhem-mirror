@@ -470,7 +470,7 @@ function show_error($file,$draw,$imgmaxx,$imgmaxy)
 	ImageFill($im, 0, 0, $bg2p);
 	ImageRectangle($im, 0, 0, $imgmaxx-1, $imgmaxy-1, $white);
 	imagestring($im, 3, 5, 5, "Error, there is no $file", $black);
-	imagestring($im, 1, 3, 25, "Please add the following to your fhz1000.cfg", $black);
+	imagestring($im, 1, 3, 25, "Please add the following to your fhem.cfg", $black);
 	$logname=$draw."log";
 	imagestring($im, 1, 3, 35, "define $logname FileLog $file $draw:.*H:.*", $black);
 	header("Content-type: image/png");

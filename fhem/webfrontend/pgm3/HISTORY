@@ -86,3 +86,10 @@
 
 - Martin 2009-11-10
   -- Bugfix: Pulldown-Menu without selected FTDEV not possible any more
+
+- Martin 2009-11-16
+  -- Feature: Google-Weather-Api added. 
+  -- Feature: Dislay of all Logs including the FS20-devices (grep on fhem.log)
+  -- Feature: The status of the batteries of FHT and HMS are shown in the graphics
+  -- php4 disabled. Only php5 is supported.
+  -- A lot of examples of the UserDefs are added.

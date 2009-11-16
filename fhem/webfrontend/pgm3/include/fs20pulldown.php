@@ -10,7 +10,7 @@
 
 		echo "
 		<tr>
-		<td colspan=2 align=right $bg2><font $fontcolor3>FS20: </font></td><td align=left $bg2><font $fontcolor3>
+		<td colspan=1 align=right $bg2><font $fontcolor3>FS20: </font></td><td align=left $bg2><font $fontcolor3>
 		<form action=$forwardurl method='POST'>
 		<input type=hidden name=showfht value=$showfht>
 		<input type=hidden name=showhms value=$showhms>

@@ -444,3 +444,10 @@
     Duplicates within 0.5 seconds are filtered if they are not reported by the
     same IO Unit. Existing check for IODev removed from BS USF1000 FS20 FHT HMS
     KS300 CUL_WS CUL_EM X10.
+
+- Mon Nov 16 2009 (MartinH)
+  - pgm3: Google-Weather-Api added. Display of all Logs including the 
+  FS20-devices (grep on fhem.log) The status of the batteries of FHT and HMS 
+  are shown in the graphics. php4 disabled. Now only php5 is supported. A 
+  lot of examples of the UserDefs are added. The pgm3-section of fhem.html was
+  changed.
