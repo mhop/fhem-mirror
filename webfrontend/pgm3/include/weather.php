@@ -24,7 +24,7 @@ function website_WEATHER($station, $land,  $sprache)
 	
 	$WEATHER[0]['condition'] = $api->weather->current_conditions->condition->attributes()->data;
 	$WEATHER[0]['temperatur'] = $api->weather->current_conditions->temp_c->attributes()->data;
-	$WEATHER[0]['luftfeuchtigkeit'] = $api->weather->current_conditions->humidity->attributes()->data;
+	$WEATHER[0]['humidity'] = $api->weather->current_conditions->humidity->attributes()->data;
 	$WEATHER[0]['wind'] = $api->weather->current_conditions->wind_condition->attributes()->data;
 	$WEATHER[0]['icon'] = str_replace($icons_google, $icons_src, $api->weather->current_conditions->icon->attributes()->data);
 	
@@ -61,8 +61,8 @@ $WEATHER = website_WEATHER($weathercity, $weathercountry, $weatherlang);
 	echo "<td><font $fontcolor3><b>$now: </b>";
 	echo $WEATHER[0]['condition']."<br/>\n";
 
-  	$pos=strrpos($WEATHER[0]['luftfeuchtigkeit'],':');
-  	$hum=substr($WEATHER[0]['luftfeuchtigkeit'],$pos+2,strlen($WEATHER[0]['luftfeuchtigkeit']));
+  	$pos=strrpos($WEATHER[0]['humidity'],':');
+  	$hum=substr($WEATHER[0]['humidity'],$pos+2,strlen($WEATHER[0]['humidity']));
 
 	echo "T/Hum: ".$WEATHER[0]['temperatur']."&deg; / $hum<br/>\n";
 	echo $WEATHER[0]['wind']."<br/>\n";
