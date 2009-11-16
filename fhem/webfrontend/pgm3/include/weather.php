@@ -55,10 +55,10 @@ $WEATHER = website_WEATHER($weathercity, $weathercountry, $weatherlang);
 
 	$city=str_replace(" ","<br>",$WEATHER['city']);
 	echo "<td colspan=4 $bg2><table cellspacing='1' cellpadding='0' align='center' border=0 width='100%' $bg2><tr $bg2>";
-	echo "<td $bg2><b>".$city."</b></td>";
+	echo "<td $bg2><font $fontcolor3><b>".$city."</b></font></td><font $fontcolor3>";
 	if ($weatherlang=='de') {$now='Jetzt';} else $now='Now';
 
-	echo "<td><b>$now: </b>";
+	echo "<td><font $fontcolor3><b>$now: </b>";
 	echo $WEATHER[0]['condition']."<br/>\n";
 
   	$pos=strrpos($WEATHER[0]['luftfeuchtigkeit'],':');
@@ -67,18 +67,18 @@ $WEATHER = website_WEATHER($weathercity, $weathercountry, $weatherlang);
 	echo "T/Hum: ".$WEATHER[0]['temperatur']."&deg; / $hum<br/>\n";
 	echo $WEATHER[0]['wind']."<br/>\n";
 	echo "<img src=\"http://www.google.com/ig/images/weather".$WEATHER[0]['icon']."\" alt=\"".$WEATHER[0]['condition']."\" />\n";
-	echo "</td><td>";
+	echo "</font></td><td>";
 
 	for($i=1; $i<5; $i++)
 	{
-		echo "<b>".$WEATHER[$i]['weekday']."</b><br/>\n";
+		echo "<b><font $fontcolor3>".$WEATHER[$i]['weekday']."</b><br/>\n";
 		echo $WEATHER[$i]['condition']."<br/>\n";
 		echo "min. ".$WEATHER[$i]['low']."&deg; max. ".$WEATHER[$i]['high']."&deg;<br/>\n";
 		echo "<img src=\"http://www.google.com/ig/images/weather".$WEATHER[$i]['icon']."\" alt=\"".$WEATHER[$i]['condition']."\" />\n";
-		echo "</td><td>";
+		echo "</font></td><td>";
 	}
 
-	echo "</td></tr></table></td></tr>";
+	echo "</font></td></tr></table></td></tr>";
 
     }
 ?>
