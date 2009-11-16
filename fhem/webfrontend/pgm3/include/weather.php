@@ -1,7 +1,6 @@
 <?php
 
 
-include '../config.php';
 setlocale (LC_ALL, 'de_DE.utf8');
 
 
