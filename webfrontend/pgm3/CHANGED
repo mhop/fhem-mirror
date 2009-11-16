@@ -186,4 +186,8 @@ It is not necessary to tell fhem that there are other logs.
 
 2009-11-10
 -- Bugfix: Pulldown-Menu without selected FTDEV not possible any more
-	   Changed: index.php. Check for selcted dhtdev
+	   Changed: index.php. Check for selected dhtdev
+
+2009-11-16
+	-- New version with Battery-check, Log-Pull-Down, Google-Weather-Api	
+	-- Changed Files: index.php, config.php, fhtpulldown.php, weather.php

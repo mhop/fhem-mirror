@@ -14,6 +14,7 @@ include "functions.php";
 $drawhms=$_GET['drawhms'];
 $room=$_GET['room'];
 $type=$_GET['type'];
+$battery=$_GET['battery'];
 $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HMS100W','RM100-2','HMS100CO');
 
 
@@ -240,6 +241,12 @@ if ( $type == "HMS100TF" and $showdewpoint=='yes' )
 	$text= $drawhms;
         ImageTTFText ($im, 8, 0,90-$XcorrectMainTextHMS, 22, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
+	$text='Bat: '.$battery;
+	if ($battery != 'ok') {$txtcolor=$red; $text='Bat: low';};
+        ImageTTFText ($im,  $fontsize, 0, 105, 10, $txtcolor, $fontttf, $text);
+	$fontsize=7;
+        $txtcolor=$bg3p; 
+
 	$text=$txtroom.$room;
         ImageTTFText ($im,  $fontsize, 0, 3,  $imgmaxyhms-7, $txtcolor, $fontttf, $text);
 	$text=$type;
@@ -341,7 +348,7 @@ function show_error($file,$drawhms,$imgmaxx,$imgmaxy,$type)
         $fontsize=9;
         $txtcolor=$bg3p;
         ImageTTFText ($im, $fontsize, 0, 5, 17, $txtcolor, $fontttf, $text);
- 	$text="Please add the following to your fhz1000.cfg and restart fhz1000.pl:";
+ 	$text="Please add the following to your fhem.cfg and restart fhem.pl:";
         $fontsize=7;
         ImageTTFText ($im, $fontsize, 0, 5, 30, $txtcolor, $fontttf, $text);
 	$logname=$drawhms."log";
