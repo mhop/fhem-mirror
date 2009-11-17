@@ -694,7 +694,7 @@ FHZ_Read($)
       }
 
       $hash->{RAWMSG} = $dmsg;
-      my %addvals = (RAWMSG => $rmsg);
+      my %addvals = (RAWMSG => $dmsg);
       my $foundp = Dispatch($hash, $dmsg, \%addvals);
 
       $fhzdata = substr($fhzdata, $len);
