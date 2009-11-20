@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.83 2009-11-14 09:20:37 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.84 2009-11-20 11:10:07 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2046,7 +2046,18 @@ Dispatch($$$)
   Log 5, "$name dispatch $dmsg";
 
   my ($isdup, $idx) = CheckDuplicate($name, $dmsg);
-  return $duplicate{$idx}{FND} if($isdup);
+  if($isdup) {
+    my $found = $duplicate{$idx}{FND};
+    foreach my $found (@{$found}) {
+      if($addvals) {
+        foreach my $av (keys %{$addvals}) {
+          $defs{$found}{"${name}_$av"} = $addvals->{$av};
+        }
+      }
+      $defs{$found}{"${name}_MSGCNT"}++;
+    }
+    return $duplicate{$idx}{FND};
+  }
 
   my @found;
   my $last_module;
@@ -2094,6 +2105,7 @@ Dispatch($$$)
       return undef;
     } else {
       if($defs{$found}) {
+        $defs{$found}{MSGCNT}++;
         if($addvals) {
           foreach my $av (keys %{$addvals}) {
             $defs{$found}{"${name}_$av"} = $addvals->{$av};

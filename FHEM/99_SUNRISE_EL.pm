@@ -1,7 +1,4 @@
 ##############################################
-# - Please call sunrise_coord before using this module, else you'll get times
-#   for frankfurt am main (germany). See the "at" entry in commandref.html
-#
 # This code is derived from DateTime::Event::Sunrise, version 0.0501.
 # Simplified and removed further package # dependency (DateTime,
 # Params::Validate, etc). For comments see the original code.
