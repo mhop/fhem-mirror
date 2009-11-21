@@ -14,6 +14,7 @@ sub CUL_ReadAnswer($$$);
 sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 sub CUL_HandleWriteQueue($);
+sub CUL_Parse($$$$$);
 
 sub CUL_OpenDev($$);
 sub CUL_CloseDev($);
@@ -54,7 +55,8 @@ CUL_Initialize($)
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} = ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:";
+  $hash->{Clients} =
+        ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:CUL_RFR:";
   my %mc = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:FS20"      => "^81..(04|0c)..0101a001",
@@ -64,6 +66,7 @@ CUL_Initialize($)
     "6:CUL_EM"    => "^E0.................\$",
     "7:HMS"       => "^810e04....(1|5|9).a001",
     "8:CUL_FHTTK" => "^T........",
+    "9:CUL_RFR"   => "^[0-9][0-9]U...",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
@@ -75,8 +78,8 @@ CUL_Initialize($)
   $hash->{SetFn}   = "CUL_Set";
   $hash->{StateFn} = "CUL_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:CUL,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "CUR_id_list fhtsoftbuffer:1,0";
+                     "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
+                     "fhtsoftbuffer:1,0";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -559,9 +562,8 @@ CUL_XmitLimitCheck($$)
   $hash->{NR_CMD_LAST_H} = int(@b);
 }
 
-#####################################
 sub
-CUL_Write($$$)
+CUL_WriteTranslate($$$)
 {
   my ($hash,$fn,$msg) = @_;
 
@@ -581,8 +583,38 @@ CUL_Write($$$)
   } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
     $fn = "T";
     $msg = substr($msg,6,4) . substr($msg,10);
-    CUL_SimpleWrite($hash, $fn . $msg);
-    return;
+
+  } else {
+    Log GetLogLevel($name,2), "CUL cannot translate $fn $msg";
+    return (undef, undef);
+  }
+  return ($fn, $msg);
+}
+
+#####################################
+sub
+CUL_Write($$$)
+{
+  my ($hash,$fn,$msg) = @_;
+
+  ($fn, $msg) = CUL_WriteTranslate($hash, $fn, $msg);
+ZZZZZZZZZ
+  my $name = $hash->{NAME};
+
+  ###################
+  # Rewrite message from FHZ -> CUL
+  if(length($fn) <= 1) {                                   # CUL Native
+    ;
+
+  } elsif($fn eq "04" && substr($msg,0,6) eq "010101") {   # FS20
+    $fn = "F";
+    AddDuplicate($hash->{NAME},
+                "0101a001" . substr($msg, 6, 6) . "00" . substr($msg, 12));
+    $msg = substr($msg,6);
+
+  } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
+    $fn = "T";
+    $msg = substr($msg,6,4) . substr($msg,10);
 
   } else {
     Log GetLogLevel($name,2), "CUL cannot translate $fn $msg";
@@ -676,103 +708,106 @@ CUL_Read($)
   $culdata .= $buf;
 
   while($culdata =~ m/\n/) {
-
-    my ($rmsg, $rssi);
+    my $rmsg;
     ($rmsg,$culdata) = split("\n", $culdata, 2);
     $rmsg =~ s/\r//;
-    goto NEXTMSG if($rmsg eq "");
-
-    my $dmsg = $rmsg;
-    if($initstr =~ m/X2/ && $dmsg =~ m/^[FTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
-      my $l = length($dmsg);
-      $rssi = hex(substr($dmsg, $l-2, 2));
-      $dmsg = substr($dmsg, 0, $l-2);
-      $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-      Log GetLogLevel($name,4), "$name: $dmsg $rssi";
-    } else {
-      Log GetLogLevel($name,4), "$name: $dmsg";
-    }
-
-    ###########################################
-    #Translate Message from CUL to FHZ
-    next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
-    my $fn = substr($dmsg,0,1);
-    my $len = length($dmsg);
-
-    if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
-
-      CUL_AddFS20Queue($hash, "-");                  # Block immediate replies
-
-      if(defined($attr{$name}) && defined($attr{$name}{CUR_id_list})) {
-        my $id= substr($dmsg,1,4);
-        if($attr{$name}{CUR_id_list} =~ m/$id/) {    # CUR Request
-          CUL_HandleCurRequest($hash,$dmsg);
-          goto NEXTMSG;
-        }
-      }
-
-      $dmsg = sprintf("81%02x04xx0101a001%s00%s",
-                        $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
-      $dmsg = lc($dmsg);
-
-    } elsif($fn eq "T") {
-      if ($len >= 11) {                              # Reformat for 11_FHT.pm
-        $dmsg = sprintf("81%02x04xx0909a001%s00%s",
-                         $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
-        $dmsg = lc($dmsg);
-
-      } else {
-        ;                                            # => 09_CUL_FHTTK.pm
-
-      }
-
-    } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
-
-      my $type = hex(substr($dmsg,6,1));
-      my $stat = $type > 1 ? hex(substr($dmsg,7,2)) : hex(substr($dmsg,5,2));
-      my $prf  = $type > 1 ? "02" : "05";
-      my $bat  = $type > 1 ? hex(substr($dmsg,5,1))+1 : 1;
-      my $HA = substr($dmsg,1,4);
-      my $values = $type > 1 ?  "000000" : substr($dmsg,7);
-      $dmsg = sprintf("81%02x04xx%s%x%xa001%s0000%02x%s",
-                        $len/2+8,            # Packet-Length
-                        $prf, $bat, $type,
-                        $HA,                 # House-Code
-                        $stat,
-                        $values);            # Values
-      $dmsg = lc($dmsg);
-
-    } elsif($fn eq "K" && $len >= 5) {
-
-      if($len == 15) {                               # Reformat for 13_KS300.pm
-        my @a = split("", $dmsg);
-        $dmsg = sprintf("81%02x04xx4027a001", $len/2+6);
-        for(my $i = 1; $i < 14; $i+=2) { # Swap nibbles.
-          $dmsg .= $a[$i+1] . $a[$i];
-        }
-        $dmsg = lc($dmsg);
-      }
-      # Other K... Messages ar sent to CUL_WS
-
-    } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
-      ;
-    } else {
-      Log GetLogLevel($name,2), "CUL: unknown message $dmsg";
-      goto NEXTMSG;
-    }
-
-    $hash->{RAWMSG} = $rmsg;
-    my %addvals = (RAWMSG => $rmsg);
-    if(defined($rssi)) {
-      $hash->{RSSI} = $rssi;
-      $addvals{RSSI} = $rssi;
-    }
-    Dispatch($hash, $dmsg, \%addvals);
-
-NEXTMSG:
+    CUL_Parse($hash, $hash, $name, $rmsg, $initstr) if($rmsg);
   }
   $hash->{PARTIAL} = $culdata;
 }
+
+sub
+CUL_Parse($$$$$)
+{
+  my ($hash, $iohash, $name, $rmsg, $initstr) = @_;
+
+  my $rssi;
+
+  my $dmsg = $rmsg;
+  if($initstr =~ m/X2/ && $dmsg =~ m/^[FTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
+    my $l = length($dmsg);
+    $rssi = hex(substr($dmsg, $l-2, 2));
+    $dmsg = substr($dmsg, 0, $l-2);
+    $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
+    Log GetLogLevel($name,4), "$name: $dmsg $rssi";
+  } else {
+    Log GetLogLevel($name,4), "$name: $dmsg";
+  }
+
+  ###########################################
+  #Translate Message from CUL to FHZ
+  next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
+
+  if($dmsg =~ m/^[0-9][0-9]U.../) {                # RF_ROUTER
+    Dispatch($hash, $dmsg, undef);
+    return;
+  }
+
+  my $fn = substr($dmsg,0,1);
+  my $len = length($dmsg);
+
+  if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
+
+    CUL_AddFS20Queue($iohash, "-");                # Block immediate replies
+    $dmsg = sprintf("81%02x04xx0101a001%s00%s",
+                      $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
+    $dmsg = lc($dmsg);
+
+  } elsif($fn eq "T") {
+    if ($len >= 11) {                              # Reformat for 11_FHT.pm
+      $dmsg = sprintf("81%02x04xx0909a001%s00%s",
+                       $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
+      $dmsg = lc($dmsg);
+
+    } else {
+      ;                                            # => 09_CUL_FHTTK.pm
+
+    }
+
+  } elsif($fn eq "H" && $len >= 13) {              # Reformat for 12_HMS.pm
+
+    my $type = hex(substr($dmsg,6,1));
+    my $stat = $type > 1 ? hex(substr($dmsg,7,2)) : hex(substr($dmsg,5,2));
+    my $prf  = $type > 1 ? "02" : "05";
+    my $bat  = $type > 1 ? hex(substr($dmsg,5,1))+1 : 1;
+    my $HA = substr($dmsg,1,4);
+    my $values = $type > 1 ?  "000000" : substr($dmsg,7);
+    $dmsg = sprintf("81%02x04xx%s%x%xa001%s0000%02x%s",
+                      $len/2+8,            # Packet-Length
+                      $prf, $bat, $type,
+                      $HA,                 # House-Code
+                      $stat,
+                      $values);            # Values
+    $dmsg = lc($dmsg);
+
+  } elsif($fn eq "K" && $len >= 5) {
+
+    if($len == 15) {                               # Reformat for 13_KS300.pm
+      my @a = split("", $dmsg);
+      $dmsg = sprintf("81%02x04xx4027a001", $len/2+6);
+      for(my $i = 1; $i < 14; $i+=2) { # Swap nibbles.
+        $dmsg .= $a[$i+1] . $a[$i];
+      }
+      $dmsg = lc($dmsg);
+    }
+    # Other K... Messages ar sent to CUL_WS
+
+  } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
+    ;
+  } else {
+    Log GetLogLevel($name,2), "CUL: unknown message $dmsg";
+    return;
+  }
+
+  $hash->{RAWMSG} = $rmsg;
+  my %addvals = (RAWMSG => $rmsg);
+  if(defined($rssi)) {
+    $hash->{RSSI} = $rssi;
+    $addvals{RSSI} = $rssi;
+  }
+  Dispatch($hash, $dmsg, \%addvals);
+}
+
 
 #####################################
 sub
@@ -799,46 +834,6 @@ CUL_SendCurMsg($$$)
   Log 1, "CUL_SendCurMsg: $id:$msg / $rmsg";
   sleep(1);                # Poor mans CSMA/CD
   CUL_SimpleWrite($hash, $rmsg);
-}
-
-sub
-CUL_HandleCurRequest($$)
-{
-  my ($hash,$msg) = @_;
-
-
-  Log 1, "CUR Request: $msg";
-  my $l = length($msg);
-  return if($l < 9);
-
-  my $id = substr($msg,1,4);
-  my $cm = substr($msg,5,2);
-  my $a1 = substr($msg,7,2);
-  my $a2 = pack('H*', substr($msg,9)) if($l > 9);
-
-  if($cm eq "00") {     # Get status
-    $msg = defined($defs{$a2}) ? $defs{$a2}{STATE} : "Undefined $a2";
-    $msg =~ s/: /:/g;
-    $msg =~ s/  / /g;
-    $msg =~ s/.*[a-z]-//g;      # FHT desired-temp, but keep T:-1
-    $msg =~ s/\(.*//g;          # FHT (Celsius) 
-    $msg =~ s/.*5MIN:/5MIN:/g;  # EM
-    $msg =~ s/\.$//;
-    $msg =~ s/ *//;            # One letter seldom makes sense
-    CUL_SendCurMsg($hash,$id, "d" . $msg);  # Display the message on the CUR
-  }
-
-  if($cm eq "01") {     # Send time
-    my @a = localtime;
-    $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
-    CUL_SendCurMsg($hash,$id, $msg);
-  }
-
-  if($cm eq "02") {     # FHT desired temp
-    $msg = sprintf("set %s desired-temp %.1f", $a2, $a1/2);
-    fhem( $msg );
-  }
-
 }
 
 ########################
