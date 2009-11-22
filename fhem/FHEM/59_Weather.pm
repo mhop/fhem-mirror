@@ -84,9 +84,15 @@ sub Weather_GetUpdate($)
   # see http://search.cpan.org/~possum/Weather-Google-0.03/lib/Weather/Google.pm
 
   my $location= $hash->{LOCATION};
-  my $WeatherObj= new Weather::Google($location);
-
+  my $WeatherObj;
   Log 4, "$name: Updating weather information for $location.";
+  eval {
+  	$WeatherObj= new Weather::Google($location);
+  };
+  if($@) {
+	Log 1, "$name: Could not retrieve weather information.";
+	return 0;
+  }
 
   my $current = $WeatherObj->current_conditions;
   foreach my $condition ( keys ( %$current ) ) {
