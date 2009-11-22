@@ -4,7 +4,7 @@ package main;
 # Modul for FHEM
 #
 # contributed by thomas dressler 2008
-# $Id: 87_WS2000.pm,v 1.6 2009-04-10 09:54:37 rudolfkoenig Exp $
+# $Id: 87_WS2000.pm,v 1.7 2009-11-22 19:16:16 rudolfkoenig Exp $
 # corr. negativ temps / peterp
 ###########################
 use strict;
@@ -55,7 +55,6 @@ WS2000_Define($$)
    my $name=$hash->{NAME};
   my $PortName = $a[2];
   my $PortObj;
-  $attr{$a[0]}{savefirst} = 1;
 
   if($PortName eq "none") {
     Log 1, "WS2000 device is none, commands will be echoed only";

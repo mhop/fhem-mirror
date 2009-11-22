@@ -308,7 +308,6 @@ FHZ_Define($$)
   $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
   $hash->{STATE} = "defined";
 
-  $attr{$name}{savefirst} = 1;
   $attr{$name}{fhtsoftbuffer} = 0;
 
   if($dev eq "none") {

@@ -44,8 +44,6 @@ M232_Define($$)
   $hash->{STATE} = "Initialized";
 
   my $dev = $a[2];
-  $attr{$a[0]}{savefirst} = 1;
-
   if($dev eq "none") {
     Log 1, "M232 device is none, commands will be echoed only";
     return undef;
