@@ -542,3 +542,5 @@
   - feature: 21_OWTEMP.pm for 1-Wire Digital Thermometer added (Martin Fischer)
   - feature: CUL_FHTTK from Kai
   - feature: pgm3: Google-Weather, Battery-Check, Log-View added (MartinH)
+  - feature: CUL_RFR (RF_ROUTING) added
+  - feature: Command save retains now the order of the old config file

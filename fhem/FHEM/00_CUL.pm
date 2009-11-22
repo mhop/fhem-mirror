@@ -28,7 +28,6 @@ my %gets = (
   "ccconf"   => "=",
   "uptime"   => "t",
   "file"     => "",
-  "time"     => "c03",
   "fhtbuf"   => "T03"
 );
 
@@ -66,7 +65,7 @@ CUL_Initialize($)
     "6:CUL_EM"    => "^E0.................\$",
     "7:HMS"       => "^810e04....(1|5|9).a001",
     "8:CUL_FHTTK" => "^T........",
-    "9:CUL_RFR"   => "^[0-9][0-9]U...",
+    "9:CUL_RFR"   => "^[0-9A-F]{4}U.",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
@@ -100,8 +99,6 @@ CUL_Define($$)
   return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
                 if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
   $hash->{FHTID} = uc($a[3]);
-
-  $attr{$name}{savefirst} = 1;
 
   if($dev eq "none") {
     Log 1, "CUL device is none, commands will be echoed only";
@@ -297,8 +294,9 @@ sub
 CUL_Get($@)
 {
   my ($hash, @a) = @_;
+  my $type = $hash->{TYPE};
 
-  return "\"get CUL\" needs at least one parameter" if(@a < 2);
+  return "\"get $type\" needs at least one parameter" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . join(" ", sort keys %gets)
   	if(!defined($gets{$a[1]}));
 
@@ -321,7 +319,7 @@ CUL_Get($@)
     $msg = sprintf("freq:%.3fMHz bWidth:%dKHz rAmpl:%ddB sens:%ddB",
         26*(($r{"0D"}*256+$r{"0E"})*256+$r{"0F"})/65536,                #Freq
         26000/(8 * (4+(($r{"10"}>>4)&3)) * (1 << (($r{"10"}>>6)&3))),   #Bw
-        $ampllist[$r{"1B"}],
+        $ampllist[$r{"1B"}&7],
         4+4*($r{"1D"}&3)                                                #Sens
         );
     
@@ -483,10 +481,14 @@ CUL_DoInit($)
 
 #####################################
 # This is a direct read for commands like get
+# Anydata is used by read file to get the filesize
 sub
 CUL_ReadAnswer($$$)
 {
   my ($hash, $arg, $anydata) = @_;
+  my $type = $hash->{TYPE};
+
+  $hash = $hash->{IODev} if($type eq "CUL_RFR");
 
   return ("No FD", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
@@ -520,14 +522,17 @@ CUL_ReadAnswer($$$)
         if($nfound == 0);
       $buf = CUL_SimpleRead($hash);
       return ("No data", undef) if(!defined($buf));
+
     }
 
     if($buf) {
       Log 5, "CUL/RAW: $buf";
       $mculdata .= $buf;
     }
+    $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
     return (undef, $mculdata) if($mculdata =~ m/\r\n/ || $anydata);
   }
+
 }
 
 #####################################
@@ -598,28 +603,7 @@ CUL_Write($$$)
   my ($hash,$fn,$msg) = @_;
 
   ($fn, $msg) = CUL_WriteTranslate($hash, $fn, $msg);
-ZZZZZZZZZ
-  my $name = $hash->{NAME};
-
-  ###################
-  # Rewrite message from FHZ -> CUL
-  if(length($fn) <= 1) {                                   # CUL Native
-    ;
-
-  } elsif($fn eq "04" && substr($msg,0,6) eq "010101") {   # FS20
-    $fn = "F";
-    AddDuplicate($hash->{NAME},
-                "0101a001" . substr($msg, 6, 6) . "00" . substr($msg, 12));
-    $msg = substr($msg,6);
-
-  } elsif($fn eq "04" && substr($msg,0,6) eq "020183") {   # FHT
-    $fn = "T";
-    $msg = substr($msg,6,4) . substr($msg,10);
-
-  } else {
-    Log GetLogLevel($name,2), "CUL cannot translate $fn $msg";
-    return;
-  }
+  return if(!defined($fn));
 
   Log 5, "CUL sending $fn$msg";
   my $bstring = "$fn$msg";
@@ -738,7 +722,7 @@ CUL_Parse($$$$$)
   #Translate Message from CUL to FHZ
   next if(!$dmsg || length($dmsg) < 1);            # Bogus messages
 
-  if($dmsg =~ m/^[0-9][0-9]U.../) {                # RF_ROUTER
+  if($dmsg =~ m/^[0-9A-F]{4}U./) {                 # RF_ROUTER
     Dispatch($hash, $dmsg, undef);
     return;
   }
@@ -824,26 +808,18 @@ CUL_Ready($)
   return ($InBytes>0);
 }
 
-sub
-CUL_SendCurMsg($$$)
-{
-  my ($hash,$id,$msg) = @_;
-
-  $msg = substr($msg, 0, 12) if(length($msg) > 12);
-  my $rmsg = "F" . $id .  unpack('H*', $msg);
-  Log 1, "CUL_SendCurMsg: $id:$msg / $rmsg";
-  sleep(1);                # Poor mans CSMA/CD
-  CUL_SimpleWrite($hash, $rmsg);
-}
-
 ########################
 sub
 CUL_SimpleWrite(@)
 {
-  my ($hash, $msg, $noapp) = @_;
+  my ($hash, $msg, $nonl) = @_;
   return if(!$hash);
 
-  $msg .= "\n" unless($noapp);
+  if($hash->{TYPE} eq "CUL_RFR") {
+    $msg = CUL_RFR_AddPrefix($hash, $msg);
+    $hash = $hash->{IODev};
+  }
+  $msg .= "\n" unless($nonl);
 
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
@@ -990,7 +966,7 @@ CUL_Disconnected($)
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
 
-  return if(!defined($hash->{FD}));                 # Already deleted.
+  return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
   Log 1, "$dev disconnected, waiting to reappear";
   CUL_CloseDev($hash);

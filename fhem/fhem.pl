@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.84 2009-11-20 11:10:07 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.85 2009-11-22 19:16:16 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -859,47 +859,19 @@ CommandSave($$)
     return "Cannot open $param: $!";
   }
 
-  # Sort the devices by room
-  my (%rooms, %savefirst);
-  foreach my $d (sort keys %defs) {
-    next if($d eq "global");
-    my $r = ($attr{$d} && $attr{$d}{room}) ? $attr{$d}{room} : "~";
-    $rooms{$r}{$d} = 1;
-    $savefirst{$d} = $r if($attr{$d} && $attr{$d}{savefirst});
-  }
+  my $oldroom = "";
+  foreach my $d (sort { $defs{$a}{NR} <=> $defs{$b}{NR} } keys %defs) {
+    next if($defs{$d}{TEMPORARY} || # e.g. WEBPGM connections
+            $defs{$d}{VOLATILE});   # e.g at, will be saved to the statefile
 
-  # First the global definitions
-  my $t = localtime;
-  print SFH "#$t\n\n";
-  print SFH "attr global userattr $attr{global}{userattr}\n"
-                                if($attr{global}{userattr});
-  foreach my $a (sort keys %{$attr{global}}) {
-    next if($a eq "configfile" || $a eq "version" || $a eq "userattr");
-    print SFH "attr global $a $attr{global}{$a}\n";
-  }
-  print SFH "\n";
-
-  # then the "important" ones (FHZ, WS300Device)
-  foreach my $d (sort { $defs{$a}{NR} <=> $defs{$b}{NR} } keys %savefirst) {
-    my $r = $savefirst{$d};
-    delete $rooms{$r}{$d};
-    delete $rooms{$r} if(! %{$rooms{$r}});
-    next if(!$defs{$d});
-    my $def = $defs{$d}{DEF};
-    $def =~ s/;/;;/g;
-    print SFH "define $d $defs{$d}{TYPE} $def\n";
-    foreach my $a (sort keys %{$attr{$d}}) {
-      next if($a eq "savefirst");
-      print SFH "attr $d $a $attr{$d}{$a}\n";
+    my $room = ($attr{$d} ? $attr{$d}{room} : "");
+    $room = "" if(!$room);
+    if($room ne $oldroom) {
+      print SFH "\nsetdefaultattr" . ($room ? " room $room" : "") . "\n";
+      $oldroom = $room;
     }
-  }
 
-  foreach my $r (sort keys %rooms) {
-    print SFH "\nsetdefaultattr" . ($r ne "~" ? " room $r" : "") . "\n";
-    foreach my $d (sort keys %{$rooms{$r}} ) {
-      next if(!$defs{$d});
-      next if($defs{$d}{TEMPORARY});
-      next if($defs{$d}{VOLATILE});
+    if($d ne "global") {
       if($defs{$d}{DEF}) {
         my $def = $defs{$d}{DEF};
         $def =~ s/;/;;/g;
@@ -907,15 +879,14 @@ CommandSave($$)
       } else {
         print SFH "define $d $defs{$d}{TYPE}\n";
       }
-      foreach my $a (sort keys %{$attr{$d}}) {
-        next if($a eq "room");
-        print SFH "attr $d $a $attr{$d}{$a}\n";
-      }
+    }
+    foreach my $a (sort keys %{$attr{$d}}) {
+      next if($a eq "room");
+      next if($d eq "global" && 
+              ($a eq "configfile" || $a eq "version" || $a eq "userattr"));
+      print SFH "attr $d $a $attr{$d}{$a}\n";
     }
   }
-
-  print SFH "setdefaultattr\n";        # Delete the last default attribute.
-
   print SFH "include $attr{global}{lastinclude}\n"
         if($attr{global}{lastinclude});
 
