@@ -188,8 +188,6 @@ CM11_Define($$)
   $hash->{MOBILE} = 1 if($a[4] && $a[4] eq "mobile");
   $hash->{STATE} = "defined";
 
-  $attr{$name}{savefirst} = 1;
-
   if($dev eq "none") {
     Log 1, "CM11 device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;

@@ -158,7 +158,6 @@ WS300_Define($$)
     $hash->{READINGS}{WS300Device}{TIME} = TimeNow;    
     CommandDefine(undef,"WS300Device_timer at +*00:00:05 get WS300Device data");
     Log 1,"WS300 Device $a[2] opened";
-    $attr{$a[0]}{savefirst} = 1;
     return undef;
   }
   return "wrong syntax: define <name> WS300 <sensor (0-9)>\n0-7=ASH2200\n8=KS300\n9=WS300" if(int(@a) < 3);
