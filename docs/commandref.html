@@ -478,13 +478,16 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="list"></a>
 <h3>list</h3>
 <ul>
-  <code>list [devspec]</code>
+  <code>list [devspec] [value]</code>
   <br><br>
   Output a list of all definitions, all notify settings and all at
   entries. This is one of the few commands which return a string in a
   normal case.
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.
+  <br>
+  If value is specified, then output this property (like DEF, TYPE, etc) or
+  reading (actuator, measured-temp) for all devices from the devspec. 
   <br><br>
   Example:
   <pre><code>  FHZ> list
