@@ -91,11 +91,11 @@ KS300_Parse($$)
 
     my @v;
     my @txt = ( "rain_raw", "rain", "wind", "humidity", "temperature",
-                "israining", "unknown1", "unknown2", "unknown3","rain_now");
-    my @sfx = ( "(counter)", "(l/m2)", "(km/h)", "", "",
-                "(yes/no)", "","","","");
+                "israining", "unknown1", "unknown2", "unknown3");
+    my @sfx = ( "(counter)", "(l/m2)", "(km/h)", "(%)", "(Celsius)",
+                "(yes/no)", "","","");
     my %repchanged = ("rain"=>1, "wind"=>1, "humidity"=>1, "temperature"=>1,
-                "israining"=>1, "rain_diff" =>1);
+                "israining"=>1);
 
     # counter for the change hash
     my $n= 1; # 0 is STATE and will b explicitely set
@@ -218,13 +218,6 @@ KS300_Parse($$)
     $v[6] = $a[29];
     $v[7] = $a[16];
     $v[8] = $a[17];
-    if($v[1]){                  # rain diff
-      my $rain_old = $def->{READINGS}{'rain'}{VAL};
-      $rain_old =~ s/[^0123456789.]//g;
-      $v[9] = $v[1] - $rain_old;
-    } else {
-      $v[9] = 0;
-    }
 
     # Negative temp
     $v[4] = -$v[4] if($v[8] & 8);
@@ -279,6 +272,7 @@ KS300_Parse($$)
       $difft = $sec - $ssec;
       $difft += 86400 if($d[2] != $sd[2]);         # Sec since last reading
 
+      $difft = 1 if(!$difft);                      # Don't want illegal division.
       $t /= $difft; $h /= $difft; $w /= $difft; $e = $v[1] - $cv[9];
       $r->{avg_day}{VAL} =
       		sprintf("T: %.1f  H: %d  W: %.1f  R: %.1f", $t, $h, $w, $e);
