@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.85 2009-11-22 19:16:16 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.86 2009-11-25 10:48:01 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -883,7 +883,7 @@ CommandSave($$)
     foreach my $a (sort keys %{$attr{$d}}) {
       next if($a eq "room");
       next if($d eq "global" && 
-              ($a eq "configfile" || $a eq "version" || $a eq "userattr"));
+              ($a eq "configfile" || $a eq "version"));
       print SFH "attr $d $a $attr{$d}{$a}\n";
     }
   }
@@ -1076,7 +1076,8 @@ AssignIoPort($)
   # Set the I/O device
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
     my $cl = $modules{$defs{$p}{TYPE}}{Clients};
-    if(defined($cl) && $cl =~ m/:$hash->{TYPE}:/) {
+    if(defined($cl) && $cl =~ m/:$hash->{TYPE}:/ &&
+       $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
       $hash->{IODev} = $defs{$p};
       last;
     }
@@ -1462,7 +1463,12 @@ CommandAttr($$)
     } else {
       $attr{$sdev}{$a[1]} = "1";
     }
-    $defs{$sdev}{IODev} = $defs{$a[2]} if($a[1] eq "IODev");
+    if($a[1] eq "IODev") {
+      my $ioname = $a[2];
+      $defs{$sdev}{IODev} = $defs{$ioname};
+      $defs{$sdev}{NR} = $devcount++
+        if($defs{$ioname}{NR} > $defs{$sdev}{NR});
+    }
 
   }
   return join("\n", @rets);
@@ -2026,6 +2032,7 @@ Dispatch($$$)
         }
       }
       $defs{$found}{"${name}_MSGCNT"}++;
+      $defs{$found}{"${name}_TIME"} = TimeNow();
     }
     return $duplicate{$idx}{FND};
   }
@@ -2083,6 +2090,7 @@ Dispatch($$$)
           }
         }
         $defs{$found}{"${name}_MSGCNT"}++;
+        $defs{$found}{"${name}_TIME"} = TimeNow();
         $defs{$found}{LASTIODev} = $name;
       }
       DoTrigger($found, undef);
