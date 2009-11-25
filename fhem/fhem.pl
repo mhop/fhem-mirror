@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.86 2009-11-25 10:48:01 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.87 2009-11-25 11:13:44 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1214,8 +1214,26 @@ CommandList($$)
 
   } else {
 
-    my @list = devspec2array($param);
-    if(@list == 1) {
+    my @arg = split(" ", $param);
+    my @list = devspec2array($arg[0]);
+    if($arg[1]) {
+      foreach my $sdev (@list) {
+
+        if($defs{$sdev} &&
+           $defs{$sdev}{$arg[1]}) {
+          $str .= $sdev . " " . 
+                  $defs{$sdev}{$arg[1]} . "\n";
+
+        } elsif($defs{$sdev} &&
+           $defs{$sdev}{READINGS} &&
+           $defs{$sdev}{READINGS}{$arg[1]}) {
+          $str .= $sdev . " ". 
+                  $defs{$sdev}{READINGS}{$arg[1]}{TIME} . " " .
+                  $defs{$sdev}{READINGS}{$arg[1]}{VAL} . "\n";
+        }
+      }
+
+    } elsif(@list == 1) {
       my $sdev = $list[0];
       if(!defined($defs{$sdev})) {
         $str .= "No device named $param found";
@@ -1225,10 +1243,12 @@ CommandList($$)
         $str .= "Attributes:\n";
         $str .= PrintHash($attr{$sdev}, 2);
       }
+
     } else {
       foreach my $sdev (@list) {
         $str .= "$sdev\n";
       }
+
     }
   }
 
