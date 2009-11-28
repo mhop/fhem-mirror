@@ -1827,8 +1827,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     the fhem command "set MyCUL raw u0201". Now remove this CUL and attach the
     original, base CUL again. The RFR CUL got the id 02, and will relay every
     message to the base CUL with id 01.
-    <li>Take the RFR CUL, and attach it to an USB power supply, as displayed on
-    the image above. As the configured base id is not 00, it will activate RF
+    <li>Take the RFR CUL, and attach it to an USB power supply, as seen on
+    the image. As the configured base id is not 00, it will activate RF
     reception on boot, and will start sending messages to the base CUL.
     <li>Now you have to define this RFR cul as a fhem device:
   </ul>
@@ -1849,9 +1849,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     have two characters, each representing a one byte hex number.<br>
     Example:
     <ul>
-      <code>define MyCUL raw u0100</code><br>
+      <code>set MyCUL raw u0100</code><br>
       # Now replace the base CUL with the RFR CUL<br>
-      <code>define MyCUL raw u0201</code><br>
+      <code>set MyCUL raw u0201</code><br>
       # Reattach the base CUL to the PC and attach the RFR CUL to a
       USB power supply<br>
       <code>define MyRFR CUL_RFR 02 01</code><br>
