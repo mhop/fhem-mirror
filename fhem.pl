@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.87 2009-11-25 11:13:44 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.88 2009-11-28 11:14:12 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1696,14 +1696,13 @@ RemoveInternalTimer($)
 sub
 SignalHandling()
 {
-  if ($^O ne "MSWin32") {
-
+  if($^O ne "MSWin32") {
     $SIG{'INT'}  = sub { $sig_term = 1; };
-    $SIG{'QUIT'} = sub { $sig_term = 1; };
     $SIG{'TERM'} = sub { $sig_term = 1; };
     $SIG{'PIPE'} = 'IGNORE';
     $SIG{'CHLD'} = 'IGNORE';
     $SIG{'HUP'}  = sub { CommandRereadCfg(undef, "") };
+
   }
 }
 
