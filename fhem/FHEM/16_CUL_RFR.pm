@@ -18,10 +18,7 @@ CUL_RFR_Initialize($)
   # Message is like
   # K41350270
 
-  my $cl = $modules{CUL}->{Clients};
-  $cl =~ s/CUL_RFR//;                       # Dont want to be my own client.
-
-  $hash->{Clients}   = $cl;
+  $hash->{Clients}   = $modules{CUL}->{Clients};
   $hash->{Match}     = "^[0-9A-F]{4}U.";
   $hash->{DefFn}     = "CUL_RFR_Define";
   $hash->{UndefFn}   = "CUL_RFR_Undef";
@@ -69,7 +66,7 @@ sub
 CUL_RFR_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}});
+  delete($defptr{$hash->{ID} . $hash->{ROUTERID}});
   return undef;
 }
 
@@ -91,6 +88,13 @@ CUL_RFR_Parse($$)
   }
   my $hash = $defptr{$cde};
   my $name = $hash->{NAME};
+
+     if($smsg =~ m/^T/) { $hash->{NR_TMSG}++ }
+  elsif($smsg =~ m/^F/) { $hash->{NR_FMSG}++ }
+  elsif($smsg =~ m/^E/) { $hash->{NR_EMSG}++ }
+  elsif($smsg =~ m/^K/) { $hash->{NR_KMSG}++ }
+  else                  { $hash->{NR_RMSG}++ }
+
   CUL_Parse($hash, $iohash, $hash->{NAME}, $smsg, "X21");
   return "";
 }
@@ -98,7 +102,7 @@ CUL_RFR_Parse($$)
 sub
 CUL_RFR_DelPrefix($)
 {
-  my ($prefix, $msg) = split("U", shift);
+  my ($prefix, $msg) = split("U", shift, 2);
   return $msg;
 }
 

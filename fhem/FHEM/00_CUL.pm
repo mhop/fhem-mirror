@@ -526,7 +526,7 @@ CUL_ReadAnswer($$$)
     }
 
     if($buf) {
-      Log 5, "CUL/RAW: $buf";
+      Log 5, "CUL/RAW (ReadAnswer): $buf";
       $mculdata .= $buf;
     }
     $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
