@@ -544,3 +544,4 @@
   - feature: pgm3: Google-Weather, Battery-Check, Log-View added (MartinH)
   - feature: CUL_RFR (RF_ROUTING) added
   - feature: Command save retains now the order of the old config file
+  - feature: List parameter added (list .* RFR_MSGCNT)
