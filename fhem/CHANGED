@@ -532,7 +532,7 @@
   - feature: javascripting support in FHEMWEB (Klaus/Axel)
   - feature: Module 09_BS.pm for brightness sensor added (Boris 2009-09-20)
 
-- ==DATE== (4.8)
+- 2009-11-28 (4.8)
   - bugfix:  loosing data when sending FS20 messages in a group
   - bugfix:  better handling of disconnected CUN
   - feature: softfhtbuffer added to CUL
@@ -545,3 +545,6 @@
   - feature: CUL_RFR (RF_ROUTING) added
   - feature: Command save retains now the order of the old config file
   - feature: List parameter added (list .* RFR_MSGCNT)
+
+- ==DATE== (4.9)
+  - bugfix:  changed the fhem prompt from FHZ> to fhem>
