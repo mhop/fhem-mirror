@@ -155,7 +155,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.88 2009-11-28 11:14:12 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.89 2009-12-01 22:41:17 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -504,7 +504,7 @@ AnalyzeInput($)
       $client{$c}{prompt} = 1;                  # Empty return
     }
 
-    syswrite($client{$c}{fd}, $client{$c}{prevlines} ? "> " : "FHZ> ")
+    syswrite($client{$c}{fd}, $client{$c}{prevlines} ? "> " : "fhem> ")
                 if($client{$c}{prompt} && !$rest);
   }
 }
