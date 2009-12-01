@@ -1820,11 +1820,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   ROUTING in both CUL's:
   <ul>
     <li>First give your base CUL (which remains connected to the PC) an RFR ID
-    by issuing the fhem command "set MyCUL raw u0100". With this command
+    by issuing the fhem command "set MyCUL raw ui0100". With this command
     the base CUL will get the ID 01, and it will not relay messages to other
     CUL's (as the second number is 00).
     <li>Now replace the base CUL with the RFR CUL, and set its id by issuing
-    the fhem command "set MyCUL raw u0201". Now remove this CUL and attach the
+    the fhem command "set MyCUL raw ui0201". Now remove this CUL and attach the
     original, base CUL again. The RFR CUL got the id 02, and will relay every
     message to the base CUL with id 01.
     <li>Take the RFR CUL, and attach it to an USB power supply, as seen on
@@ -1849,9 +1849,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     have two characters, each representing a one byte hex number.<br>
     Example:
     <ul>
-      <code>set MyCUL raw u0100</code><br>
+      <code>set MyCUL raw ui0100</code><br>
       # Now replace the base CUL with the RFR CUL<br>
-      <code>set MyCUL raw u0201</code><br>
+      <code>set MyCUL raw ui0201</code><br>
       # Reattach the base CUL to the PC and attach the RFR CUL to a
       USB power supply<br>
       <code>define MyRFR CUL_RFR 02 01</code><br>
