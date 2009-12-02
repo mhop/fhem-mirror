@@ -65,8 +65,8 @@
 # Globale Einstellungen
 # global settings
 
-attr global logfile /var/log/fhem/fhem.log
-attr global statefile /var/cache/fhem/fhem.save
+attr global logfile /tmp/fhem.log
+attr global statefile /tmp/fhem.save
 attr global pidfilename /var/run/fhem.pid
 attr global verbose 3
 attr global port 7072

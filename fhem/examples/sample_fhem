@@ -1,8 +1,8 @@
 #
 # Minimalistic fhem.pl configfile. Take a look at the other examples for more.
 #
-attr global logfile .-%Y-%m.log
-attr global statefile ..save   # where to save the state of the devices
+attr global logfile /tmp/fhem-%Y-%m.log
+attr global statefile /tmp/fhem.save   # where to save the state of the devices
 attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 attr global port 7072                  # our TCP/IP port (localhost only)
 attr global modpath .                  # where our FHEM directory is
