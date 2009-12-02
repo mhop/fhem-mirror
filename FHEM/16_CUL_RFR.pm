@@ -102,7 +102,10 @@ CUL_RFR_Parse($$)
 sub
 CUL_RFR_DelPrefix($)
 {
-  my ($prefix, $msg) = split("U", shift, 2);
+  my ($msg) = @_;
+  while($msg =~ m/^\d{4}U/) {
+    (undef, $msg) = split("U", $msg, 2);
+  }
   return $msg;
 }
 
@@ -110,7 +113,12 @@ sub
 CUL_RFR_AddPrefix($$)
 {
   my ($hash, $msg) = @_;
-  return "u" . $hash->{ID} . $hash->{ROUTERID} . $msg;
+  while($hash->{TYPE} eq "CUL_RFR") {
+    # Prefix $msg with RRBBU and return the corresponding CUL hash
+    $msg = "u" . $hash->{ID} . $hash->{ROUTERID} . $msg;
+    $hash = $hash->{IODev};
+  }
+  return ($hash, $msg);
 }
 
 1;

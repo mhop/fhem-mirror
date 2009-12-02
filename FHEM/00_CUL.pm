@@ -488,7 +488,10 @@ CUL_ReadAnswer($$$)
   my ($hash, $arg, $anydata) = @_;
   my $type = $hash->{TYPE};
 
-  $hash = $hash->{IODev} if($type eq "CUL_RFR");
+  while($hash->{TYPE} eq "CUL_RFR") {   # Look for the first "real" CUL
+    $hash = $hash->{IODev};
+  }
+
 
   return ("No FD", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
@@ -816,8 +819,8 @@ CUL_SimpleWrite(@)
   return if(!$hash);
 
   if($hash->{TYPE} eq "CUL_RFR") {
-    $msg = CUL_RFR_AddPrefix($hash, $msg);
-    $hash = $hash->{IODev};
+    # Prefix $msg with RRBBU and return the corresponding CUL hash.
+    ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
   }
   $msg .= "\n" unless($nonl);
 

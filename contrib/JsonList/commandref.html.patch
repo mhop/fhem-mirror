@@ -21,7 +21,7 @@
 +  entries if no parameter is given.
 +  <br><br>
 +  Example:
-+  <pre><code>  FHZ> jsonlist
++  <pre><code>  fhem> jsonlist
 +  {
 +    "ResultSet": {
 +      "Results": [
@@ -40,7 +40,7 @@
 +  </code></pre>
 +  If specifying <code>&lt;devspec&gt;</code>, then a detailed status for
 +  <code>&lt;devspec&gt;</code>  will be displayed, e.g.:
-+  <pre><code>  FHZ> jsonlist lamp1
++  <pre><code>  fhem> jsonlist lamp1
 +  {
 +    "ResultSet": {
 +      "Results": {
@@ -67,7 +67,7 @@
 +  </code></pre>
 +  If specifying <code>&lt;typespec&gt;</code>, then a list with the status for
 +  the defined <code>&lt;typespec&gt;</code> devices will be displayed, e.g.:
-+  <pre><code>  FHZ> jsonlist HMS
++  <pre><code>  fhem> jsonlist HMS
 +  {
 +    "ResultSet": {
 +      "Results": [
@@ -82,7 +82,7 @@
 +  </code></pre>
 +  If specifying <code>ROOMS</code>, then a list with the defined rooms
 +  will be displayed, e.g.:
-+  <pre><code>  FHZ> jsonlist ROOMS
++  <pre><code>  fhem> jsonlist ROOMS
 +  {
 +    "ResultSet": {
 +      "Results": [
