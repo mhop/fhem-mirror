@@ -31,7 +31,7 @@ Usage:
   displayed, e.g.:
 
   Example:
-  FHZ> jsonlist
+  fhem> jsonlist
   {
     "ResultSet": {
       "Results": [
@@ -49,7 +49,7 @@ Usage:
   }
 
   Example for <devspec>:
-  FHZ> jsonlist lamp1
+  fhem> jsonlist lamp1
   {
     "ResultSet": {
       "Results": {
@@ -75,7 +75,7 @@ Usage:
   }
 
   Example for <typespec>:
-  FHZ> jsonlist HMS
+  fhem> jsonlist HMS
   {
     "ResultSet": {
       "Results": [
@@ -89,7 +89,7 @@ Usage:
   }
 
   Example for ROOMS:
-  FHZ> jsonlist ROOMS
+  fhem> jsonlist ROOMS
   {
     "ResultSet": {
       "Results": [
