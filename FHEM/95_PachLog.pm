@@ -32,8 +32,8 @@
 # FEED 3456 -> ID 1 -> DEVICE B
 # => geht nicht
 #
-# Es werden nur READINGS mit einfach Werten und Zahlen unterstützt.
-# Beispiele: NICHT unterstütze READINGS 
+# Es werden nur READINGS mit einfach Werten und Zahlen unterst?tzt.
+# Beispiele: NICHT unterst?tze READINGS 
 # cum_month => CUM_MONTH: 37.173 CUM: 108.090 COST: 0.00
 # cum_day => 2009-09-09 00:03:19 T: 1511725.6 H: 4409616 W: 609.4 R: 150.4
 # israining	no => (yes/no)
@@ -60,6 +60,7 @@ PachLog_Initialize($)
   $hash->{SetFn}    = "PachLog_Set";
   $hash->{GetFn}    = "PachLog_Get";
   $hash->{NotifyFn} = "PachLog_Notify";
+  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,5 disable:0,1";
 }
 #######################################################################
 sub PachLog_Define($@)
@@ -86,7 +87,7 @@ sub PachLog_Set($@)
   # Pruefen Uebergabeparameter
   # @a => a[0]:<NAME>; a[1]=ADD oder DEL; a[2]= DeviceName;
   # a[3]=FEED:STREAM:VALUE:STREAM:VALUE&FEED-2:STREAM,VALUE
-  # READINGS setzten oder löschen
+  # READINGS setzten oder l?schen
   if($a[1] eq "DEL")
     {
     GetLogLevel($a[0],2),"PACHLOG -> DELETE: A0= ". $a[0] . " A1= " . $a[1] . " A2=" . $a[2];
@@ -142,11 +143,16 @@ sub PachLog_Notify ($$)
 {
   my ($me, $trigger) = @_;
   my $d = $me->{NAME};
+  return "" if($attr{$d} && $attr{$d}{disable});
   my $t = $trigger->{NAME};
+  #LogLevel
+  my $ll;
+  if(defined($attr{$d}{'loglevel'})){$ll = $attr{$d}{'loglevel'};}
+  else {$ll = 5;}
   # Eintrag fuer Trigger-Device vorhanden
   if(!defined($defs{$d}{READINGS}{$t}))
   {
-    Log 5, ("PACHLOG[INFO] => " . $t .  " => Nicht definiert");
+    Log $ll, ("PACHLOG[INFO] => " . $t .  " => Nicht definiert");
     return undef;}
   
   # Umwandeln 1234:0:temperature:1:humidity => %feed
@@ -173,19 +179,18 @@ sub PachLog_Notify ($$)
     # FS20: VAL = on => 1 && VAL = off => 0
     # @a = split(' ', $i);
     # $feed{$feednr}{$r}{VAL} = &ReadingToNumber($a[0]) ;
-    $feed{$feednr}{$r}{VAL} = &ReadingToNumber($i) ;
+    $feed{$feednr}{$r}{VAL} = &ReadingToNumber($i,$ll) ;
 	
   }
-  Log 5, "PACHLOG => dumper(FEED) => " .Dumper(%feed);
+#  Log $ll, "PACHLOG => dumper(FEED) => " .Dumper(%feed);
   
   # CVS-Data
-  # my @cvs = ();
-  # foreach my $r (keys %{$feed{$feednr}})
-  # {
-  #  $cvs[$feed{$feednr}{$r}{STREAM}] = $feed{$feednr}{$r}{VAL};
-  # }
-  # my $cvs_data = join(',',@cvs);
-  # Log 5, "PACHLOG[CVSDATA] => $cvs_data";
+  my @cvs = ();
+  foreach my $r (keys %{$feed{$feednr}}) {
+    $cvs[$feed{$feednr}{$r}{STREAM}] = $feed{$feednr}{$r}{VAL};
+   }
+  my $cvs_data = join(',',@cvs);
+  Log $ll, "PACHLOG[CVSDATA] => $cvs_data";
   
   # Aufbereiten %feed als EEML-Data
   my $eeml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -196,7 +201,7 @@ sub PachLog_Notify ($$)
       $eeml .= "<data id=\"" . $feed{$feednr}{$r}{STREAM} . "\">\n";
       $eeml .= "<value>" . $feed{$feednr}{$r}{VAL} . "</value>\n";
 	  # Unit fuer EEML: <unit symbol="C" type="derivedSI">Celsius</unit>
-		my ($u_name,$u_symbol,$u_type,$u_tag) = split(',',&PachLog_ReadingToUnit($r));
+		my ($u_name,$u_symbol,$u_type,$u_tag) = split(',',&PachLog_ReadingToUnit($r,$ll));
 		if(defined($u_name)) {
 		$eeml .= "<tag>". $u_tag . "</tag>\n";
 		$eeml .= "<unit symbol=\"" . $u_symbol. "\" type=\"" . $u_type. "\">" . $u_name . "<\/unit>\n";
@@ -205,61 +210,76 @@ sub PachLog_Notify ($$)
       }
   $eeml .= "</environment>\n";
   $eeml .= "</eeml>\n";
-  Log 5, "PACHLOG -> " . $t . " EEML => " . $eeml;
-# Pachube-Update per EEML -> XML
+  Log $ll, "PACHLOG -> " . $t . " EEML => " . $eeml;
+  # Pachube-Update per EEML -> XML
   my ($res,$ret,$ua,$apiKey,$url);
   $apiKey = $defs{$d}{DEF};
   $url   = "http://www.pachube.com/api/feeds/" . $feednr . ".xml";
   $ua  = new LWP::UserAgent;
   $ua->default_header('X-PachubeApiKey' => $apiKey);
+  #Timeout 3 sec ... default 180sec
+  $ua->timeout(3);
   $res = $ua->request(PUT $url,'Content' => $eeml);
     # Ueberpruefen wir, ob alles okay war:
     if ($res->is_success())
     {
-        Log 0,("PACHLOG => Update[" . $t ."] => SUCCESS\n");
+        Log 0,("PACHLOG => Update[" . $t ."]: " . $cvs_data . " >> SUCCESS\n");
         # Time setzten
         $defs{$d}{READINGS}{$t}{TIME} = TimeNow(); 
     }
     else {Log 0,("PACHLOG => Update[" . $t ."] ERROR: " . ($res->as_string) . "\n");}
 }
-sub PachLog_ReadingToUnit($)
+################################################################################
+sub PachLog_ReadingToUnit($$)
 {
 # Unit fuer EEML: <unit symbol="C" type="derivedSI">Celsius</unit>
 # Input: READING z.B. temperature
 # Output: Name,symbol,Type,Tag z.B. Celsius,C,derivedSI
 # weiters => www.eeml.org
 # No Match = undef
-	my $in = shift;
+	my ($in,$ll) = @_;
 	my %unit = ();
 	%unit = (
 		'temperature' => "Celsius,C,derivedSI,Temperature",
 		'current' => "Power,kW,derivedSI,EnergyConsumption",
 		'humidity' => "Humidity,rel%,contextDependentUnits,Humidity",
 		'rain' => "Rain,l/m2,contextDependentUnits,Rain",
+                'rain_now' => "Rain,l/m2,contextDependentUnits,Rain",
 		'wind' => "Wind,m/s,contextDependentUnits,Wind",
 		);
-	if(defined($unit{$in})) {return $unit{$in};}
+	if(defined($unit{$in})) {
+		Log $ll ,("PACHLOG[ReadingToUnit] " . $in . " >> " . $unit{$in} );
+		return $unit{$in};}
 	else {return undef;}
 }
-sub ReadingToNumber($)
+################################################################################
+sub ReadingToNumber($$)
 {
 # Input: reading z.B. 21.1 (Celsius) oder dim10%, on-for-oldtimer etc.
 # Output: 21.1 oder 10
 # ERROR = undef
-# Alles außer Nummern loeschen $t =~ s/[^0123456789.]//g; 
-	my $in = shift;
-	Log 5, "PACHLOG[ReadingToNumber] => in => $in";
+# Alles au?er Nummern loeschen $t =~ s/[^0123456789.-]//g; 
+	my ($in,$ll) = @_;
+	Log $ll, "PACHLOG[ReadingToNumber] => in => $in";
 	# Bekannte READINGS FS20 Devices oder FHT
 	if($in =~ /^on|Switch.*on/i) {$in = 1;}
 	if($in =~ /^off|Switch.*off|lime-protection/i) {$in = 0;}
 	# Keine Zahl vorhanden
-	if($in !~ /\d{1}/) {return undef;}
+	if($in !~ /\d{1}/) {
+        Log $ll, "PACHLOG[ReadingToNumber] No Number: $in";
+        return undef;}
 	# Mehrfachwerte in READING z.B. CUM_DAY: 5.040 CUM: 334.420 COST: 0.00
 	my @b = split(' ', $in);
-	if(int(@b) gt 2) {return undef;}
-	# Nurnoch Zahlen z.B. dim10% = 10 oder 21.1 (Celsius) = 21.1
-	$in =~ s/[^0123456789.]//g;
-	Log 5, "PACHLOG[ReadingToNumber] => out => $in";
+	if(int(@b) gt 2) {
+        Log $ll, "PACHLOG[ReadingToNumber] Not Supportet Reading: $in";
+        return undef;}
+	# Nur noch Zahlen z.B. dim10% = 10 oder 21.1 (Celsius) = 21.1
+	if (int(@b) eq 2){
+		Log $ll, "PACHLOG[ReadingToNumber] Split:WhiteSpace-0- $b[0]";
+		$in = $b[0];
+		}
+	$in =~ s/[^0123456789.-]//g;
+	Log $ll, "PACHLOG[ReadingToNumber] => out => $in";
 	return $in
 }
 1;
