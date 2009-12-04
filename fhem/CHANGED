@@ -550,3 +550,4 @@
   - bugfix:  changed the fhem prompt from FHZ> to fhem>
   - bugfix:  CUL_RFR fixes (chaining RFR's should work)
   - bugfix:  Path in the examples fixed (got corrupted)
+  - bugfix:  PachLog fixes from Axel
