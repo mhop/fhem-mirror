@@ -21,8 +21,6 @@ define ks1 KS300 1234 250   # type KS300, with 250ml rain / counter
 define wzlog FileLog /var/log/fhem/wz-%Y-%U.log wz:.*(temp|actuator).*
 
 # Make it accessible from 01_FHEMWEB.pm (webpgm2)
-# Note: for FHEMWEB large logfiles (one per year) are recommended to be able to
-# navigate
 attr wzlog logtype fht:Temp
 
 # ks300 log
@@ -36,8 +34,10 @@ attr kslog logtype ks300_1:Temp/Hum,ks300_2:Rain/Wind
 # paranthesis, and your shell will probably bark.
 define tmplog notifyon wz:temp.* "/usr/local/bin/log.sh @ "@ %""
 
+quit
+
 #########################
-And here is /usr/local/bin/log.sh, don't forget chmod +x
+#And here is /usr/local/bin/log.sh, don't forget chmod +x
 
 #!/bin/sh
 fname=$1
