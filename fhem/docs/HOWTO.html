@@ -5,10 +5,6 @@
   <body style="background-color: white;">
     <h2>FHEMWEB Howto</h2>
 
-    <b>Note:</b> Don't forget to type "save" in the FHEMWEB/pgm2 "Fhem cmd"
-    input field after defining a device or setting its attribute. Otherwise the
-    changes will disappear after the next start.</br><br>
-
     <a href="#starting">Starting</a><br/>
     <a href="#FHZ">Attaching an FHZ device</a><br/>
     <a href="#FS20rx">Configuring FS20 receivers</a><br/>
@@ -25,11 +21,17 @@
     <a name="starting"/>
     <h3>Starting</h3>
       <ul>
-      Install & start fhem with the command:<pre>
+      First install the Device::SerialPort (or Win32::SerialPort)  perl module
+      with the command <code>"cpan -i Device::Serial"</code></br>
+      The default configuration will install fhem into /usr/local/bin,
+      /usr/local/lib/FHEM and /var/log/fhem. Edit the Makefile to change
+      this. 
+
+      To install & start fhem type:<pre>
       make install-pgm2
       perl /usr/local/bin/fhem.pl /var/log/fhem/fhem.cfg</pre>
 
-      The logfile should look like:<pre>
+      After starting, the logfile should look like:<pre>
       2008.06.15 16:17:03 2: FHEMWEB port 8083 opened
       2008.06.15 16:17:03 0: Server started (version ...)
       </pre>
@@ -44,57 +46,77 @@
       Attach the FHZ1000 or FHZ1300 to your computer, and look for a file named
       /dev/ttyUSB0 or /dev/tts/USB0 (or /var/elv on the Fritz!Box).
       Define it for fhem (by typing it in the
-      "Fhem cmd" input widget):<pre>
+      "Fhem cmd" input field in the browser):<pre>
       define FHZ1 FHZ /dev/ttyUSB0</pre>
-      Look <a href="commandref.html#define">here</a> for more.
+      You can find details <a href="commandref.html#define">here</a> and
+      <a href="commandref.html#FHZ">here</a>. Instead of an FHZ you can also
+      use a <a href="commandref.html#CUL">CUL</a> with slightly different
+      parameters.
 
-      </ul>
+      <br><br>
+      <b>Note:</b> Don't forget to type "save" in the "Fhem cmd" input field of
+      the browser after defining a device or setting its attribute.  Otherwise
+      the changes will disappear after the next start.</br><br> </ul>
 
 
     <a name="FS20rx"/>
     <h3>Configuring FS20 receivers</h3>
       <ul>
-      Configure the device in fhem first e.g. with:<pre>
+      Configure the <a href="commandref.html#FS20">FS20</a> device in
+      fhem first with:<pre>
       define lamp1 FS20 1234 56</pre>
+
       Now press the button on the device for a while until its LED starts to
       blink. Click on the "on" link in the fhem window to send a command. The
-      LED should terminate blinking, the device is programmed.<br/>
-      Set the model attribute of the device:<pre>
+      LED should terminate blinking, the device is programmed to housecode
+      1234, device code 56. You can also use the 4-base ELV notation.
+      Now set the model attribute of the device:<pre>
       attr lamp1 model fs20st</pre>
+
       to get only the commands available for this device.
       <a href="commandref.html#model">Here</a> is a complete list of models.<br>
       </ul>
 
     <a name="FS20tx"/>
-    <h3>Configuring FS20 transmitters</h3>
+    <h3>Misc. RF transmitters (FS20/EM/S300 etc.)</h3>
       <ul>
-      Make sure the global loglevel is at least 3 (attr global verbose 3, check
-      the fhem.cfg file in the Edit files section).<br>
-      Now make sure that the transmitter is sending a signal. In the logfile
-      (FHEMWEB: "All together" ->  Logs -> Logfile -> text) a line should
-      appear:<pre> FS20 Unknown device HOUSECODE, Button BTN Code CDE, please
-      define it</pre>
+      Wait a while, until the transmitter sent some data. In the logfile
+      (Browser window: "All together" ->  Logs:Logfile:text) a line
+      will  appear:<pre>
+      FS20 Unknown device &lt;HOUSECODE, Button &lt;BTN&gt; Code &lt;CDE&gt;, please define it</pre>
 
       Now define a device:<pre>
-      define piri1 FS20 HOUSECODE BTN</pre>
+      define piri1 FS20 &lt;HOUSECODE&gt; &lt;BTN&gt;</pre>
+
       Set the model attribute of the device:<pre>
       attr lamp1 model fs20piri</pre>
+
       to get only the commands available for this device.
-      <a href="commandref.html#model">Here</a> is a complete list of models.<br>
+      <a href="commandref.html#model">Here</a> is a complete list of FS20
+      models.<br> For other device-types similar messages should appear.
+      </ul>
       </ul>
 
     <a name="FHT"/>
     <h3>Configuring FHT devices</h3>
       <ul>
-      Make sure the global loglevel is at least 3 (attr global verbose 3, check
-      the fhem.cfg file in the Edit files section).<br>
-      Now wait for a while, till the FHT is sending some signals. In the
-      logfile (FHEMWEB: "All together" ->  Logs -> LogFile -> text) a line
-      should appear:<pre> FHT Unknown device HOUSECODE, please define it</pre>
+      Wait for a while (2-5 mins) till the FHT is sending some signals. In the
+      logfile ("All together" -> Logs:LogFile:text) a line should
+      appear:<br><pre>
+      FHZ1: Unknown FHT device detected, define one to get detailed information</pre>
 
-      Now define a device:<pre>
-      define livingroom FHT HOUSECODE</pre>
-      If there is no signal for a while, the check <a href="faq.html#faq6">
+      Define your FHT device with an arbitrary code in order to load the FHT
+      module, see <a href="commandref.html#FHT">this</a> link for details:<pre>
+      define MyFHT FHT  1111</pre>
+
+      The next message in the log will contain more details:<pre>
+      FHT Unknown device &lt;HOUSECODE&gt;, please define it</pre>
+
+      Delete and create your device again:<pre>
+      delete MyFHT
+      define MyFHT FHT &lt;HOUSECODE&gt;</pre>
+
+      If there is no signal for a while, then check <a href="faq.html#faq6">
       this</a> FAQ entry.
       </ul>
 
@@ -103,11 +125,22 @@
       <ul>
       To execute commands at a given time / periodically, you have to define
       devices of the type at. See the definition <a href="commandref.html#at">
-      here</a> or examples <a href="example.06_at">here</a>.<br/><br/>
+      here</a> and the examples  <a href="example.06_at">here</a> The last link
+      only works if you are reading this HOWTO from your fhem Web.<br/><br/>
 
-      To execute commands if a device sent a message, then you have to define
-      devices of the type notify. See the definition
-      <a href="commandref.html#notify">here</a>.
+      To execute commands if a device sent a message you have to define
+      devices of the type <a href="commandref.html#notify">notify</a> or
+      <a href="commandref.html#watchdog">watchdog</a>. In order to understand
+      the fhem events better you can open a telnet session to your fhem<pre>
+      telnet localhost 7072</pre>
+
+      and type <pre>
+      inform timer</pre>
+
+      Now you will receive in this telnet session all events, just like the
+      notifies/watchdogs do. You can even simulate events by using the 
+      <a href="commandref.html#trigger">trigger</a> command:<pre>
+      trigger lamp1 on</pre>
       </ul>
 
     <a name="rooms"/>
@@ -141,11 +174,12 @@
       FHEMWEB has builtin support for displaying FileLog type logs as plots,
       see the <a href="#plot">plot</a> section below.<br/><br/>
 
-      See the attributes
-      <a href="commandref.html#archivedir">archivedir</a>,
-      <a href="commandref.html#archivecmd">archivecmd</a>,
-      <a href="commandref.html#nrarchive">nrarchive</a>
-      attributes for archiving the logs.
+      The size of each logfile will be determined by its wildcard characters
+      (year/month/week/day), look at the <a href="commandref.html#FileLog">
+      FileLog</a> definition.
+      Don't forget to enable archiving with the <a
+      href="commandref.html#nrarchive">nrarchive</a> or <a
+      href="commandref.html#archivedir">archivecmd</a> attributes.
       </ul>
 
     <a name="plot"/>
@@ -160,33 +194,22 @@
       When displaying the plot, you can convert it into a "weblink", which can
       in turn have a room attribute, to group more than one Plot together. If
       the weblink refers to the current logfile, then it will be stored as a
-      CURRENT weblink, and it will always display the most recent log.
+      CURRENT weblink, and it will always display the most recent log (you do
+      not have to redefine it if the logfile changes due to year/month/date
+      parameters in its name).
+
       <br/><br/>
 
       The logs can be converted to a plot either with gnuplot (which must be
       installed and in your PATH), or via the builtin SVG module, in this case
-      your internet browser must support SVG. Firefox and opera support SVG
-      out of the box, Internet Explorer does it via the Adobe "SVG viewer"
-      plugin. To use SVG graphics, set the <a
+      your internet browser must support SVG. Firefox, opera and the
+      iPhone/Android borwser support SVG out of the box, Internet Explorer does
+      it via the Adobe "SVG viewer" plugin. To use SVG graphics, set the <a
       href="commandref.html#plotmode">plotmode</a> attribute to SVG.<br><br>
 
-      In order to look at historic data, you can either convert at the archive
-      entries to weblink in "plotmode=gnuplot" mode, or use the
-      "plotmode=gnuplot-scroll" or "plotmode=SVG" modes. In the latter case
-      you'll get the possibility to zoom or scroll in the plot. Note: the
+      To zoom in the log you have to set plotmode to gnuplot-scroll or SVG. The
       gnuplot files must have #FileLog entries in order to be useable with
-      scrolling, as the filtering happens with the FileLog
-      <a href="commandref.html#FileLogget">get</a> function, see the supplied
-      gnuplot files for an example.<br><br>
-
-      It make sense to build large logfiles for scrolling in them (year
-      resolution), or smaller ones if you do not want to use the zoom/scroll
-      feature. The size of the logfiles will be determined by its wildcard
-      characters (year/month/week/day), look at the
-      <a href="commandref.html#FileLog">FileLog</a> definition. Don't forget to
-      enable archiving with the
-      <a href="commandref.html#archivedir">archivedir</a> or
-      <a href="commandref.html#archivedir">archivecmd</a> attributes.
+      scrolling, see the supplied gnuplot files for an example.<br><br>
 
       </ul>
 
@@ -231,10 +254,9 @@
       To display "foreign" (non fhem) files as a plot or a just as plain text,
       configure a fake logfile with the correct filename and an unused regexp,
       e.g.<br><pre>
-      define messages FileLog /var/log/messages fakelog
-      </pre>
-      <br/><br/>
+      define messages FileLog /var/log/messages fakelog</pre>
       </ul>
+      <br>
 
     <a name="structure"/>
     <h3>Complex structures</h3>

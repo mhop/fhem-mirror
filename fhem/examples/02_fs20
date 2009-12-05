@@ -1,7 +1,7 @@
 #
 # fhem.pl configfile
 # 
-# The challange: We have 2 rollades (which are connected via the FS20MS).
+# The challenge: We have 2 rollades (which are connected via the FS20MS).
 # Button 3 on the FS20S20 should activate both rollades. There are three
 # solutions:
 # 1. Builtin commands
