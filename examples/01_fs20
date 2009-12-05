@@ -2,7 +2,7 @@
 # fhem.pl configfile
 # 
 # Define a lamp (which is plugged in via an FS20ST).
-# To program the FS20ST, start the server, plug the FS20ST in pressing its
+# To program the FS20ST, start the server, plug the FS20ST while pressing its
 # button (it starts blinking), and then execute   fhem.pl 7072 "set lamp on" 
 #
 

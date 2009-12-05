@@ -12,29 +12,31 @@ all:
 
 install:install-base
 	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
-	cp examples/sample_fhem $(VARDIR)/fhem.cfg
+	cp examples_changed/sample_fhem $(VARDIR)/fhem.cfg
 	@echo
 	@echo
-	@echo Edit $(VARDIR)/fhem.cfg then type
+	@echo Start fhem with
 	@echo perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
 
 install-pgm2:install-base
 	cp -r webfrontend/pgm2/* $(MODDIR)/FHEM
 	cp docs/commandref.html docs/faq.html docs/HOWTO.html $(MODDIR)/FHEM
 	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
-	cp examples/sample_pgm2 $(VARDIR)/fhem.cfg
-	cd examples; for i in *; do cp -r $$i $(MODDIR)/FHEM/example.$$i; done
+	cp examples_changed/sample_pgm2 $(VARDIR)/fhem.cfg
+	cd examples_changed; for i in *; do cp -r $$i $(MODDIR)/FHEM/example.$$i; done
 	@echo
 	@echo
-	@echo Edit $(VARDIR)/fhem.cfg then type
+	@echo Start fhem with
 	@echo perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
 
 install-base:
 	mkdir -p $(BINDIR) $(MODDIR) $(VARDIR)
 	cp fhem.pl $(BINDIR)
 	cp -r FHEM $(MODDIR)
-	perl -pi -e 's,modpath \.,modpath $(MODDIR),' examples/[a-z]*
-	perl -pi -e 's,/tmp,$(VARDIR),' examples/[a-z]*
+	rm -rf examples_changed
+	cp -r examples examples_changed
+	perl -pi -e 's,modpath \.,modpath $(MODDIR),' examples_changed/[a-z]*
+	perl -pi -e 's,([^h]) /tmp,$$1 $(VARDIR),' examples_changed/[a-z]*
 
 dist:
 	@echo Version is $(VERS), Date is $(DATE)
