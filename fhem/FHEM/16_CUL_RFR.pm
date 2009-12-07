@@ -19,6 +19,7 @@ CUL_RFR_Initialize($)
   # K41350270
 
   $hash->{Clients}   = $modules{CUL}->{Clients};
+  $hash->{MatchList} = $modules{CUL}->{MatchList};
   $hash->{Match}     = "^[0-9A-F]{4}U.";
   $hash->{DefFn}     = "CUL_RFR_Define";
   $hash->{UndefFn}   = "CUL_RFR_Undef";
