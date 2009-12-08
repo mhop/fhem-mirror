@@ -6,10 +6,7 @@
 # 08/2009 READINGS -> Übersicht aller READIMGS nach Datum -> READING -> Device
 # 08/2009 Excute FHEMCommands /privcgi?Task=EXEC&cmd=FHEMCOMMAND&dev=DEVICENAME&attr=ATTRIBUTE&val=Value
 ################################################################################
-# Danke an Rudi für die Schnittstelle....
-# Dies Modul als Beispiel für die Nutzung der Schnittstelle...
-# Das Modul verändert nichts an FHEM
-################################################################################
+# TEST CVS *****
 # Beschreibung
 # Es werden lediglich vorhanden Information aus FHEM in eigenen Ansichten/Listen dargestellt.
 #
