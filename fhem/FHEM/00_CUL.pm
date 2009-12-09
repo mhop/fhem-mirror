@@ -786,6 +786,7 @@ CUL_Parse($$$$$)
     return;
   }
 
+  $hash->{RAWMSGTIME} = TimeNow();
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $rmsg);
   if(defined($rssi)) {
