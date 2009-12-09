@@ -552,3 +552,4 @@
   - bugfix:  Path in the examples fixed (got corrupted)
   - bugfix:  PachLog fixes from Axel
   - bugfix:  HOWTO/Examples revisited for correctness
+  - bugfix:  DEFINED & INITIALIZED triggers.
