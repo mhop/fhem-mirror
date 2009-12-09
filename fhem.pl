@@ -156,7 +156,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.90 2009-12-09 13:15:16 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.91 2009-12-09 13:29:47 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
