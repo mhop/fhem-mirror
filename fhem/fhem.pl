@@ -48,6 +48,7 @@ sub CallFn(@);
 sub CommandChain($$);
 sub CheckDuplicate($$);
 sub DoClose($);
+sub DoTrigger($$);
 sub Dispatch($$$);
 sub FmtDateTime($);
 sub FmtTime($);
@@ -155,7 +156,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.89 2009-12-01 22:41:17 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.90 2009-12-09 13:15:16 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -286,6 +287,7 @@ if($pfn) {
   close(PID);
 }
 $init_done = 1;
+DoTrigger("global", "INITIALIZED");
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
@@ -1041,6 +1043,7 @@ CommandDefine($$)
       CommandAttr($cl, "$a[0] $da $defaultattr{$da}");
     }
   }
+  DoTrigger($a[0], "DEFINED");
   return $ret;
 }
 
@@ -1572,7 +1575,8 @@ CommandTrigger($$)
   my ($cl, $param) = @_;
 
   my ($dev, $state) = split(" ", $param, 2);
-  return "Usage: trigger <name> <state>\n$namedef" if(!$state);
+  return "Usage: trigger <name> <state>\n$namedef" if(!$dev);
+  $state = "" if(!$state);
 
   my @rets;
   foreach my $sdev (devspec2array($dev)) {
@@ -1873,6 +1877,7 @@ DoTrigger($$)
     my $ret = "";
     foreach my $n (sort keys %defs) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
+      next if($n eq $dev && defined($ns) && $ns eq "DEFINED");
       if(defined($modules{$defs{$n}{TYPE}})) {
         if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
           Log 5, "$dev trigger: Checking $n for notify";
