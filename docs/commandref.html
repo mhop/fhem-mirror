@@ -3722,6 +3722,20 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>Each undefined device (FS20, HMS, FHT) will be reported with the
       device name "UNDEFINED". The % parameter will contain the type (FS20,
       HMS100T, etc) and device number, separated by a space.</li>
+
+      <li>After defining a device, the event "DEFINED" will be triggered. This
+          can be used in the fhem.cfg to set some values of the device.</li>
+
+      <li>After initialization finished, the event "INITIALIZED" for the device
+          "global" will be triggered.</li>
+
+      <li>Notify can be used to store macros for manual execution. Use the <a
+          href="#trigger">trigger</a> command to execute the macro. E.g.<br>
+          <pre>
+          fhem> define MyMacro notify MyMacro { Log 1, "Hello"}
+          fhem> trigger MyMacro</pre>
+
+
     </ul>
   </ul>
   <br>
@@ -4356,6 +4370,15 @@ isday</pre>
 <a name="perl"></a>
 <h3>Perl specials</h3>
 <ul>
+   <li>To test perl oneliners, type them on the prompt by enclosing it in {}, e.g.<br>
+       <ul>
+         { Log 1, "Hallo" }
+       </ul>
+       </li>
+
+   <li>To store some macros, see the Notes in the <a href="#notify">notify</a>
+       description.</li>
+
    <li>To use fhem commands from the perl expression, use the function "fhem",
      which takes a string argument, this string will be evaluated as a fhem
      command chain.<br>
