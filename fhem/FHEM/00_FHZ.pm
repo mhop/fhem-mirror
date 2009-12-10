@@ -692,7 +692,8 @@ FHZ_Read($)
 	next;
       }
 
-      $hash->{RAWMSGTIME} = TimeNow();
+      $hash->{"${name}_MSGCNT"}++;
+      $hash->{"${name}_TIME"} = TimeNow();
       $hash->{RAWMSG} = $dmsg;
       my %addvals = (RAWMSG => $dmsg);
       my $foundp = Dispatch($hash, $dmsg, \%addvals);
