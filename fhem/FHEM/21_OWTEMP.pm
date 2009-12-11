@@ -273,6 +273,8 @@ OWTEMP_Define($$)
   $defptr{$a[2]} = $hash;
   AssignIoPort($hash);
 
+  return "No I/O device found. Please define a OWFS device first."
+    if(!defined($hash->{IODev}->{NAME}));
   $hash->{LOCAL} = 2;
   OWTEMP_GetUpdate($hash,"");
   delete $hash->{LOCAL};

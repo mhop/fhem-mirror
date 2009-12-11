@@ -553,3 +553,5 @@
   - bugfix:  PachLog fixes from Axel
   - bugfix:  HOWTO/Examples revisited for correctness
   - bugfix:  DEFINED & INITIALIZED triggers.
+  - feature: 20_OWFS.pm support for passive Devices e.g. DS9097 (see commandref.html)
+  - bugfix:  21_OWTEMP.pm Defining a device now fail when no OWFS device was defined
