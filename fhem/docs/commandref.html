@@ -2876,7 +2876,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="OWFSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; OWFS &lt;owserver-ip:port&gt; &lt;model&gt; &lt;id&gt;</code>
+    <code>define &lt;name&gt; OWFS &lt;owserver-ip:port&gt; &lt;model&gt; [&lt;id&gt;]</code>
     <br><br>
 
     Define a 1-wire device to communicate with an OWFS-Server.<br><br>
@@ -2888,11 +2888,11 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>&lt;model&gt;</code>
     <ul>
       Define the <a href="#owfs_type">type</a> of the input device.
-      Currently supportet: <code>DS1420</code>
+      Currently supportet: <code>DS1420, DS9097 (for passive Adapter)</code>
     </ul>
     <code>&lt;id&gt;</code>
     <ul>
-      Corresponding to the <a href="#owfs_id">id</a> of the input device.
+      Corresponding to the <a href="#owfs_id">id</a> of the input device. Only for active Adapter.
       <br><br>
     </ul>
 
@@ -2902,7 +2902,13 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     Example:
     <ul>
-      <code>define DS9490R OWFS 127.0.0.1:4304 DS1420 93302D000000</code><br>
+      <code>#define an active Adapter:<br>
+      define DS9490R OWFS 127.0.0.1:4304 DS1420 93302D000000</code><br>
+    </ul>
+    <br>
+    <ul>
+      <code>#define a passive Adapter:<br>
+      define DS9097 OWFS 127.0.0.1:4304 DS9097</code><br>
     </ul>
     <br>
   </ul>
@@ -2914,7 +2920,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
-    where <code>value</code> is one of:<br>
+    where <code>value</code> is one of (not supported by passive Devices e.g. DS9097):<br>
     <ul>
       <li><a name="owfs_address"></a>
         <code>address</code> (read-only)<br>
@@ -3030,7 +3036,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     Example:
     <ul>
-      <code>define KG.hz.TF.01 OWTEMP 93302D000000 300 60</code><br>
+      <code>define KG.hz.TF.01 OWTEMP 14B598010800 300 60</code><br>
     </ul>
     <br>
   </ul>
