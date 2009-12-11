@@ -30,6 +30,7 @@ use OW;
 
 my %models = (
   "DS1420"     => "",
+  "DS9097"     => "",
 );
 my %fc = (
   "1:DS9420"   => "01",
@@ -77,6 +78,8 @@ OWFS_Get($$)
   my ($hash,@a) = @_;
 
   return "argument is missing @a" if (@a != 2);
+  return "Passive Adapter defined. No Get function implemented."
+    if(!defined($hash->{OW_ID}));
   return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
     if(!defined($gets{$a[1]}));
 
@@ -116,10 +119,12 @@ OWFS_DoInit($)
   my $path;
   my $ret;
 
-  $path = $hash->{OW_FAMILY}.".".$hash->{OWFS_ID};
+  if (defined($hash->{OWFS_ID})) {
+    $path = $hash->{OW_FAMILY}.".".$hash->{OWFS_ID};
  
-  foreach my $q (sort keys %gets) {
-    $ret = OWFS_GetData($hash,$q);
+    foreach my $q (sort keys %gets) {
+      $ret = OWFS_GetData($hash,$q);
+    }
   }
 
   $hash->{STATE} = "Initialized" if (!$hash->{STATE});  
@@ -137,7 +142,7 @@ OWFS_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> OWFS <owserver:port> <model> <id>"
+  return "wrong syntax: define <name> OWFS <owserver:port> <model> [<id>]"
     if (@a < 2 && int(@a) > 5);
 
   my $name  = $a[0];
@@ -149,22 +154,24 @@ OWFS_Define($$)
   return "Define $name: wrong model: specify one of " . join ",", sort keys %models
     if (!grep { $_ eq $model } keys %models);
 
-  my $id     = $a[4];
-  return "Define $name: wrong ID format: specify a 12 digit value"
-    if (uc($id) !~ m/^[0-9|A-F]{12}$/); 
+  if (@a > 4) {
+    my $id     = $a[4];
+    return "Define $name: wrong ID format: specify a 12 digit value"
+      if (uc($id) !~ m/^[0-9|A-F]{12}$/); 
 
-  $hash->{FamilyCode} = \%fc;
-  my $fc = $hash->{FamilyCode};
-  if (defined ($fc)) {
-    foreach my $c (sort keys %{$fc}) {
-      if ($c =~ m/$model/) {
-        $hash->{OW_FAMILY} = $fc->{$c};
+    $hash->{FamilyCode} = \%fc;
+    my $fc = $hash->{FamilyCode};
+    if (defined ($fc)) {
+      foreach my $c (sort keys %{$fc}) {
+        if ($c =~ m/$model/) {
+          $hash->{OW_FAMILY} = $fc->{$c};
+        }
       }
     }
+    delete ($hash->{FamilyCode});
+    $hash->{OW_ID} = $id;
+    $hash->{OW_PATH} = $hash->{OW_FAMILY}.".".$hash->{OW_ID};
   }
-  delete ($hash->{FamilyCode});
-  $hash->{OW_ID} = $id;
-  $hash->{OW_PATH} = $hash->{OW_FAMILY}.".".$hash->{OW_ID};
 
   $hash->{STATE} = "Defined";
 
