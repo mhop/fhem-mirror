@@ -4,8 +4,8 @@
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 09.09.2009
-# Version: 0.0.9
+# Stand: 14.12.2009
+# Version: 0.0.91
 # Übersetzung in "Richtiges English" sind willkommen ;-))
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 #######################################################################
@@ -31,6 +31,15 @@
 # For each READINNG you can create seperate RRD-Definitions:
 # %data{RRD_LOG}{DEV_TYPE}{READINGS} = RRD_LOG_TYPE
 # 
+# NEW:
+# attr -> IODEVSTATS
+# If set RRD_Log will log RRS and MSGCNT
+# <IDOEV-Name>/<DEVICE_Name>_rssi RRD: RRD_Log_5minGAUGE
+# <IDOEV-Name>/<DEVICE_Name>_msgcnt RRD: RRD_Log_5minCOUNTER
+# also
+# <IDOEV-Name>_MSGCNT -> Counter for received Messeages by this IODEV
+# <IDOEV-Name>/RAWMSGCOUNT.rrd
+# 
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 #######################################################################
 package main;
@@ -49,7 +58,7 @@ RRD_Log_Initialize($)
   $hash->{DefFn} = "RRD_Log_Define";
   $hash->{SetFn}    = "RRD_Log_Set";
   $hash->{NotifyFn} = "RRD_Log_Notify";
-  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,5 disable:0,1";
+  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,5 disable:0,1 IODEVSTATS";
   
   # Global RRDLog conf
   # Mapping READING to RRD-File-Config
@@ -59,31 +68,41 @@ RRD_Log_Initialize($)
   $data{RRD_LOG}{READING}{FHT}{'measured-temp'} = "RRD_Log_15minGAUGE";
   $data{RRD_LOG}{READING}{FHT}{'desired-temp'} = "RRD_Log_15minGAUGE";
   $data{RRD_LOG}{READING}{FHT}{'actuator'} = "RRD_Log_5minGAUGE";
-  $data{RRD_LOG}{READING}{FHT}{'rssi'} = "RRD_Log_5minGAUGE";
   #HMS
   $data{RRD_LOG}{READING}{HMS}{'temperature'} = "RRD_Log_5minGAUGE";
   $data{RRD_LOG}{READING}{HMS}{'humidity'} = "RRD_Log_5minGAUGE";
-  $data{RRD_LOG}{READING}{HMS}{'rssi'} = "RRD_Log_5minGAUGE";
   # KS300
-  $data{RRD_LOG}{READING}{KS300}{'rain'} = "RRD_Log_5minGAUGE";
-  $data{RRD_LOG}{READING}{KS300}{'rain_now'} = "RRD_Log_5minCOUNTER";
+  $data{RRD_LOG}{READING}{KS300}{'rain_15min'} = "RRD_Log_15minGAUGE";
+  $data{RRD_LOG}{READING}{KS300}{'rain_now'} = "RRD_Log_5minGAUGE";
+  $data{RRD_LOG}{READING}{KS300}{'rain'} = "RRD_Log_5minCOUNTER";
   $data{RRD_LOG}{READING}{KS300}{'temperature'} = "RRD_Log_5minGAUGE";
   $data{RRD_LOG}{READING}{KS300}{'humidity'} = "RRD_Log_5minGAUGE";
   $data{RRD_LOG}{READING}{KS300}{'wind'} = "RRD_Log_5minGAUGE";
   # CUL_WS => S55TH&S300TH
   $data{RRD_LOG}{READING}{CUL_WS}{'temperature'} = "RRD_Log_5minGAUGE";
   $data{RRD_LOG}{READING}{CUL_WS}{'humidity'} = "RRD_Log_5minGAUGE";
-  $data{RRD_LOG}{READING}{CUL_WS}{'rssi'} = "RRD_Log_5minGAUGE";
   #CUL_EM
   $data{RRD_LOG}{READING}{CUL_EM}{'current'} = "RRD_Log_5minGAUGE";
-  $data{RRD_LOG}{READING}{CUL_EM}{'rssi'} = "RRD_Log_5minGAUGE";
   #FS20
   $data{RRD_LOG}{READING}{FS20}{'state'} = "RRD_Log_10secGAUGE";
-  
+  # IODEVSTATS=CUL
+  $data{RRD_LOG}{READING}{CUL}{'msg'} = "RRD_Log_5minCOUNTER";
+  $data{RRD_LOG}{READING}{CUL}{'rssi'} = "RRD_Log_5minGAUGE";
+  $data{RRD_LOG}{READING}{CUL}{'RAWMSGCOUNT'} = "RRD_Log_5minGAUGE";
+  # IODEVSTATS=FHZ
+  $data{RRD_LOG}{READING}{FHZ}{'msg'} = "RRD_Log_5minCOUNTER";
+  $data{RRD_LOG}{READING}{FHZ}{'rssi'} = "RRD_Log_5minGAUGE";
+  $data{RRD_LOG}{READING}{FHZ}{'RAWMSGCOUNT'} = "RRD_Log_5minGAUGE";
+  # IODEVSTATS=CUL_RFR
+  $data{RRD_LOG}{READING}{CUL_RFR}{'msg'} = "RRD_Log_5minCOUNTER";
+  $data{RRD_LOG}{READING}{CUL_RFR}{'rssi'} = "RRD_Log_5minGAUGE";
+  $data{RRD_LOG}{READING}{CUL_RFR}{'RAWMSGCOUNT'} = "RRD_Log_5minGAUGE";
   # temp. save Path to RRDs
   # $data{RRD_LOG}{RRDS}{<DEVICE-NAME>}{<READING>} = $rrd_path
   # reset RRS
   delete $data{RRD_LOG}{RRDS};
+  #RESET RAWMSGCNT
+  delete $data{RRD_LOG}{RAWMSGCOUNT}
 }
 #######################################################################
 sub RRD_Log_Define()
@@ -128,23 +147,39 @@ sub RRD_Log_Set() {
       delete($hash->{READINGS}{$a[2]})
       }
     }
-    if($a[1] eq "ADD")
-    {
-    # Device check
-    if(!defined($defs{$a[2]})) {return "RRDLOG[SET::ERROR] $a[2] => Unkown Device";}
-    # Mindestens 3 Parameter
-    my @readings = split(/:/, $a[3]);
-    return "RRDLOG[SET::ERROR] No READING found "  if(int(@readings) < 1);
-    # Reading check
-    my $def_type = $defs{$a[2]}{TYPE};
-    foreach my $reading (@readings){
-        if(!defined($defs{$a[2]}{READINGS}{$reading})) {return "RRDLOG[SET::ERROR] $a[2] => $reading => Unkown";}
-        if(!defined($data{RRD_LOG}{READING}{$def_type}{$reading})) {return "RRDLOG[SET::ERROR] $a[2]  => $reading => not supported";}
+    if($a[1] eq "ADDTYPE") {
+        my $add_type = $a[2];
+        if(!defined($data{RRD_LOG}{READING}{$add_type})) {return "RRDLOG[SET::ERROR] $a[2] => Unkown Type";}
+        my ($reading,$reading_list);
+        foreach $reading (keys %{$data{RRD_LOG}{READING}{$add_type}}) {
+            $reading_list .= ":" . $reading;
         }
-    $hash->{READINGS}{$a[2]}{TIME} = TimeNow();
-    $hash->{READINGS}{$a[2]}{VAL} = $a[3];
-    $hash->{CHANGED}[0] = $a[1];
-    $hash->{STATE} = $a[1];
+        $reading_list = reverse($reading_list);
+        chop($reading_list);
+        $reading_list = reverse($reading_list);
+        my ($device);
+        foreach $device (sort keys %defs) {
+            next if($defs{$device}{TYPE} ne $add_type);
+            $hash->{READINGS}{$device}{TIME} = TimeNow();
+            $hash->{READINGS}{$device}{VAL} = $reading_list;
+        }
+    }
+    if($a[1] eq "ADD") {
+        # Device check
+        if(!defined($defs{$a[2]})) {return "RRDLOG[SET::ERROR] $a[2] => Unkown Device";}
+        # Mindestens 3 Parameter
+        my @readings = split(/:/, $a[3]);
+        return "RRDLOG[SET::ERROR] No READING found "  if(int(@readings) < 1);
+        # Reading check
+        my $def_type = $defs{$a[2]}{TYPE};
+        foreach my $reading (@readings){
+            if(!defined($defs{$a[2]}{READINGS}{$reading})) {return "RRDLOG[SET::ERROR] $a[2] => $reading => Unkown";}
+            if(!defined($data{RRD_LOG}{READING}{$def_type}{$reading})) {return "RRDLOG[SET::ERROR] $a[2]  => $reading => not supported";}
+            }
+        $hash->{READINGS}{$a[2]}{TIME} = TimeNow();
+        $hash->{READINGS}{$a[2]}{VAL} = $a[3];
+        $hash->{CHANGED}[0] = $a[1];
+        $hash->{STATE} = $a[1];
     }
   return undef; 
 }
@@ -167,6 +202,7 @@ sub RRD_Log_Notify() {
         Log $ll,"RRDLOG[Notify::ERROR] $dev_name => Not configured";
         return undef;}
     # Readings configured
+    ### if $d_reading =~ m//
     my %dev_name_readings;
     foreach my $d_reading (split(/:/,$defs{$my_name}{READINGS}{$dev_name}{VAL})) {
         $dev_name_readings{$d_reading} = 1 ;
@@ -174,7 +210,60 @@ sub RRD_Log_Notify() {
     my $max = int(@{$defs{$dev_name}{CHANGED}});
     my ($changed_reading, $changed_value);
     #FS20 => CHANGED => [on],
-
+    my $timestamp = time();
+    # IODEVSTATS
+    if(defined($attr{$my_name}{IODEVSTATS}) && defined($defs{$dev_name}{LASTIODev})){
+        Log $ll,"RRDLOG|IODEVSTATS|$dev_name: " . $defs{$dev_name}{LASTIODev};
+        # 'LASTIODev' => 'MyCUL',MyCUN_MSGCNT' => 1,MyCUN_RSSI' => '-79.5',
+        # Aufruf RRD_Log_disptach_reading(RRD_LOG,LASTIODev,READING,VALUE,$timestamp);
+        # Maximal 19 Zeichen DS-Name
+        my $LASTIODev = $defs{$dev_name}{LASTIODev};
+        my $iostat_reading = $dev_name . "_rssi";
+        my $iostat_index = $LASTIODev . "_RSSI";
+        $iostat_reading =~ s/\./_/g ;
+        my $cul_rssi_return;
+        if(defined($defs{$dev_name}{$iostat_index})){
+            my $iodev_rssi = $defs{$dev_name}{$iostat_index};
+			# RSSI ist negativ...wollen aber nur positive Werte
+			if($iodev_rssi =~ m/-/){$iodev_rssi =~ s/-//;}
+            Log $ll,"RRDLOG|IODEVSTATS|RSSI|RRD_Log_disptach_reading: $self,$LASTIODev,$iostat_reading ,$iodev_rssi,$timestamp";
+            $cul_rssi_return = &RRD_Log_disptach_reading($self,$LASTIODev,$iostat_reading ,$iodev_rssi,$timestamp);
+        }
+        $iostat_index = $LASTIODev . "_MSGCNT";
+        $iostat_reading = $dev_name . "_msg";
+        $iostat_reading =~ s/\./_/g ;
+        my $iodev_msgcnt = $defs{$dev_name}{$iostat_index };
+        Log $ll,"RRDLOG|IODEVSTATS|MSGCNT|RRD_Log_disptach_reading: $self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp";
+        $cul_rssi_return = &RRD_Log_disptach_reading($self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp);
+        #RAWMSGCOUNT
+        # 5min Werte = 300sec
+        if(defined($defs{$LASTIODev}{"${LASTIODev}_MSGCNT"})){
+        #INIT
+        my $tsecs = time();
+        my $secs = 300;
+        if(!defined($data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev})){
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS} = $tsecs;
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
+          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|INIT:" . $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
+          }
+        #Calculate
+        my $calc_next =  $tsecs - $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS};
+        Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|calc_next: $calc_next";
+        if($calc_next > $secs) {
+          $iodev_msgcnt = $defs{$LASTIODev}{RAWMSGCOUNT} - $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT};
+          $iostat_reading = "RAWMSGCOUNT";
+          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|RRD_Log_disptach_reading: $self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp";
+          $cul_rssi_return = &RRD_Log_disptach_reading($self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp);
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS} = $tsecs;
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $defs{$LASTIODev}{RAWMSGCOUNT};
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{LAST} = $iodev_msgcnt;
+          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|Update: $tsecs|" . $defs{$LASTIODev}{RAWMSGCOUNT} . "|$iodev_msgcnt";
+          }
+        }
+        #RAWMSGCOUNT
+        }
+    # IODEVSTATS
+    # Loop $def{<NAME>}{CHANGED}[i]
     for(my $i = 0; $i < $max; $i++) {
         Log $ll,"RRDLOG[Notify] $dev_name => " . $defs{$dev_name}{CHANGED}[$i];
         # Handle Changed READINGS
@@ -188,12 +277,11 @@ sub RRD_Log_Notify() {
         }   
         Log $ll, "RRDLOG[Notify] $dev_name => $changed_reading => $changed_value";
         #Trim
-        $changed_reading =~ s/^\s+//;
-        $changed_reading =~ s/\s+$//;
-        $changed_value =~ s/^\s+//;
-        $changed_value =~ s/\s+$//;
+        if($changed_reading =~ m/^\s+/) {$changed_reading =~ s/^\s+//;}
+        if($changed_reading =~ m/\s+$/) {$changed_reading =~ s/\s+$//;}
+        if($changed_reading =~ m/^\s+/) {$changed_value =~ s/^\s+//;}
+        if($changed_reading =~ m/\s+$/) {$changed_value =~ s/\s+$//;}
         next if (!defined($dev_name_readings{$changed_reading}));
-        my $timestamp = time();
         my $rrd_dispatch_return = &RRD_Log_disptach_reading($self,$dev_name,$changed_reading,$changed_value,$timestamp);
     }
 }
@@ -204,7 +292,7 @@ sub RRD_Log_disptach_reading($$$) {
     my $ll = $attr{$self->{NAME}}{'loglevel'};
     Log $ll, "RRDLOG[Disptach] $changed_device => $changed_reading => $changed_value";
     # Reading To Number
-    $changed_value = &RRD_Log_ReadingToNumber($changed_value);
+    $changed_value = &RRD_Log_ReadingToNumber($changed_value,$ll);
     Log $ll, "RRDLOG[Disptach] $changed_device => $changed_reading => $changed_value";
     if(!defined($changed_value)) {
         Log 0, "RRDLOG[Disptach::ERROR] Invalid Value = $changed_value";
@@ -233,18 +321,15 @@ sub RRD_Log_disptach_reading($$$) {
     }
     # Create New RRD or Add to hash
     my $changed_device_type = $defs{$changed_device}{TYPE};
-    if(!defined($data{RRD_LOG}{READING}{$changed_device_type}{$changed_reading})) {return undef;}
-    Log $ll, "RRDLOG[Disptach] $changed_device => Type => $changed_device_type";
-    # Falls fuer DEVICE-TYPE eine spezielle Funktion definiert wurde
-    if(defined($data{RRD_LOG}{READING}{$changed_device_type}{FUNCTION})){
-        # Function handles the RRDs
-        my $device_function = $data{RRD_LOG}{READING}{$changed_device_type}{FUNCTION};
-        no strict "refs";
-        my $device_function_return = &$device_function($self,$changed_device,$changed_reading);
-        use strict "refs";
-        return undef;
+    #CUL-Weiche
+    if($changed_device_type eq "CUL" && $changed_device_type eq "FHZ" && $changed_device_type eq "CUL_RFR"){
+    if(!defined($data{RRD_LOG}{READING}{$changed_device_type}{$changed_reading})) {
+        Log $ll, "RRDLOG|Disptach|CUL_WEICHE: $changed_device Type $changed_device_type not configured";
+        return undef;}
     }
-    # Pruefen on File bereits existiert un nur im HASH nachgetragen werden muss
+    Log $ll, "RRDLOG[Disptach] $changed_device => Type => $changed_device_type";
+    
+    # Pruefen on File bereits existiert und nur im HASH nachgetragen werden muss
     # Falls nein => NEU ANLAGE
     # File exists
     # Timestamp 
@@ -266,7 +351,7 @@ sub RRD_Log_disptach_reading($$$) {
         Log $ll, "RRDLOG[Disptach] $changed_device => $changed_reading => RRD-Update: $rrd_update";
         RRDs::update ($rrd_file , $rrd_update);
         $rrd_new = RRDs::last ($rrd_file);
-        Log 0, "RRDLOG[Disptach] $changed_device => $changed_reading => RRDS $rrd_last => $rrd_new";
+        Log $ll, "RRDLOG[Disptach] $changed_device => $changed_reading => RRDS $rrd_last => $rrd_new";
         return undef;
         }
     # NEU ANLAGE
@@ -276,7 +361,21 @@ sub RRD_Log_disptach_reading($$$) {
         $rrd_path_ok=mkdir($rrd_path,0777);
         }
     no strict "refs";
-    my $rrd_create_func =  $data{RRD_LOG}{READING}{$changed_device_type}{$changed_reading};
+    
+    my $rrd_create_func;
+    if($changed_device_type eq "CUL" && $changed_device_type eq "FHZ" && $changed_device_type eq "CUL_RFR"){
+        my $cul_reading;
+        if(lc($changed_reading) =~ m/_rssi$/){$cul_reading = "rssi";}
+        if(lc($changed_reading) =~ m/_msg$/){$cul_reading = "msg";}
+        if(lc($changed_reading) eq "RAWMSGCOUNT"){$cul_reading = "RAWMSGCOUNT";}
+        $rrd_create_func = $data{RRD_LOG}{READING}{"CUL"}{$cul_reading};
+        Log $ll, "RRDLOG[Disptach] CUL -> rrd_create_func = $rrd_create_func";
+        }
+    else {$rrd_create_func =  $data{RRD_LOG}{READING}{$changed_device_type}{$changed_reading};}
+    if(!defined($rrd_create_func)){
+      Log $ll, "RRDLOG|Disptach|rrd_create_func|ERROR: Function not defined";
+      return undef;
+    }
     $rrd_file = &$rrd_create_func($self,$changed_device,$changed_reading,$rrd_file,$timestamp);
     use strict "refs";
     if($rrd_file) {
@@ -295,30 +394,40 @@ sub RRD_Log_disptach_reading($$$) {
     
 }
 ########################################################################
-sub RRD_Log_ReadingToNumber($)
+sub RRD_Log_ReadingToNumber($$)
 {
 # Input: reading z.B. 21.1 (Celsius) oder dim10%, on-for-oldtimer etc.
 # Output: 21.1 oder 10
 # ERROR = undef
 # Alles außer Nummern loeschen $t =~ s/[^0123456789.]//g; 
-	my $in = shift;
-	Log 5, "RRDLOG[ReadingToNumber] In => $in";
+	my ($in,$ll) = @_;
+	Log $ll, "RRDLOG[ReadingToNumber] In => $in";
 	# Bekannte READINGS FS20 Devices oder FHT
 	if($in =~ /^on|Switch.*on|israining:.*yes|^yes/i) {$in = 10;}
-	if($in =~ /^off|Switch.*off|lime-protection|syncnow|israining:.*no|^no/i) {$in = 5;}
+	if($in =~ /^off|Switch.*off|toggle|israining:.*no|^no/i) {$in = 5;}
+    if($in =~ /lime-protection|syncnow/i) {$in = 0;}
 	# Keine Zahl vorhanden
-	if($in !~ /\d{1}/) {return undef;}
+	if($in !~ /\d{1}/) {
+        Log $ll, "RRDLOG[ReadingToNumber] No Number: $in";
+        return undef;}
 	# Mehrfachwerte in READING z.B. CUM_DAY: 5.040 CUM: 334.420 COST: 0.00
 	my @b = split(' ', $in);
-	if(int(@b) gt 2) {return undef;}
-	# Nurnoch Zahlen z.B. dim10% = 10 oder 21.1 (Celsius) = 21.1
-	$in =~ s/[^0123456789.]//g;
-	Log 5, "RRDLOG[ReadingToNumber] Out => $in";
+	if(int(@b) gt 2) {
+        Log $ll, "RRDLOG[ReadingToNumber] CUM_DAY: $in";
+        return undef;}
+	# Nur noch Zahlen z.B. dim10% = 10 oder 21.1 (Celsius) = 21.1
+    if (int(@b) eq 2){
+        Log $ll, "RRDLOG[ReadingToNumber] Split:WhiteSpace-0- $b[0]";
+        $in = $b[0];
+        }
+    $in =~ s/[^0123456789\.-]//g;
+	Log $ll, "RRDLOG[ReadingToNumber] Out => $in";
 	return scalar($in);
 }
 ################################################################################
 sub RRD_Log_5minGAUGE($$$){
     my ($self,$changed_device,$changed_reading,$rrd_file,$timestamp) = @_;
+    # Log 0, "RRDLOG-5min- $self,$changed_device,$changed_reading,$rrd_file,$timestamp";
     # Create RRD
     # Tagesverlauf: Alle 5 min ein neuer Wert 
     # --step 300
@@ -340,7 +449,7 @@ sub RRD_Log_5minGAUGE($$$){
     # RRA:MAX:0.5:48:7300
     # Last 100 Werte
     # RRD:LAST:1:1:100
-    
+    Log 0, "RRDLOG[5minCOUNTER] => NEW RRD-FILE => $rrd_file => Start: $timestamp";
     RRDs::create($rrd_file,
     "--step=120",
     "--start=$timestamp",
@@ -349,9 +458,12 @@ sub RRD_Log_5minGAUGE($$$){
     "RRA:MAX:0.5:48:7300",
     "RRA:AVERAGE:0.5:3:17280",
     "RRA:AVERAGE:0.5:6:262800",
-    "RRA:AVERAGE:0.5:1:1440") or die "RRDLOG[ERROR]: Create RRD error: ($RRDs::error)";
-    
-    return $rrd_file;
+    "RRA:AVERAGE:0.5:1:1440");
+    my $ERR=RRDs::error;
+    if (defined($ERR)) {
+        Log 0, "RRDLOG[5minGAUGE]::ERROR Create RRD: $ERR";
+        return undef;}  
+    else {return $rrd_file;}
 }
 ################################################################################
 sub RRD_Log_5minCOUNTER($$$){
@@ -373,23 +485,20 @@ sub RRD_Log_5minCOUNTER($$$){
     # RRA:AVERAGE:0.5:6:262800
     # Min/Max Werte = 4 pro Tag für 5 Jahre
     # (4*60)/5min =  48; 4 Werte/Tag * 365 * 5 = 7300
-    # RRA:MIN:0.5:48:7300
-    # RRA:MAX:0.5:48:7300
-    # Last 100 Werte
-    # RRD:LAST:1:1:100
     
     Log 0, "RRDLOG[5minCOUNTER] => NEW RRD-FILE => $rrd_file => Start: $timestamp";
     RRDs::create($rrd_file,
     "--step=120",
     "--start=$timestamp",
-    "DS:$changed_reading:COUNTER:900:-20:100",
-    "RRA:MIN:0.5:48:7300",
-    "RRA:MAX:0.5:48:7300",
+    "DS:$changed_reading:COUNTER:900:0:1000",
     "RRA:AVERAGE:0.5:3:17280",
     "RRA:AVERAGE:0.5:6:262800",
-    "RRA:AVERAGE:0.5:1:1440") or die "RRDLOG[ERROR]: Create RRD error: ($RRDs::error)";
-    
-    return $rrd_file;
+    "RRA:AVERAGE:0.5:1:1440");
+    my $ERR=RRDs::error;
+    if (defined($ERR)) {
+        Log 0, "RRDLOG[5minCOUNTER]::ERROR Create RRD: $ERR";
+        return undef;}  
+    else {return $rrd_file;}
 }
 ################################################################################
 sub RRD_Log_15minGAUGE($$$){
@@ -422,9 +531,12 @@ sub RRD_Log_15minGAUGE($$$){
     "RRA:MAX:0.5:12:7300",
     "RRA:AVERAGE:0.5:1:2880",
     "RRA:AVERAGE:0.5:2:43400",
-    "RRA:AVERAGE:0.5:1:1880") or die "RRDLOG[ERROR]: Create RRD error: ($RRDs::error)";
-    
-    return $rrd_file;
+    "RRA:AVERAGE:0.5:1:1880");
+    my $ERR=RRDs::error;
+    if (defined($ERR)) {
+        Log 0, "RRDLOG[15minGAUGE]::ERROR Create RRD: $ERR";
+        return undef;}  
+    else {return $rrd_file;}
 }
 ################################################################################
 sub RRD_Log_10secGAUGE($$$){
@@ -442,8 +554,12 @@ sub RRD_Log_10secGAUGE($$$){
     "--start=$timestamp",
     "DS:$changed_reading:GAUGE:10:-100:100",
     "RRA:AVERAGE:0.5:1:43200",
-    "RRA:AVERAGE:0.5:90:17280") or die "RRDLOG[ERROR]: Create RRD error: ($RRDs::error)";
-    return $rrd_file;
+    "RRA:AVERAGE:0.5:90:17280");
+    my $ERR=RRDs::error;
+    if (defined($ERR)) {
+        Log 0, "RRDLOG[10secGAUGE]::ERROR Create RRD: $ERR";
+        return undef;}  
+    else {return $rrd_file;}
 }
 ################################################################################
 sub RRD_Log_10minDERIVE($$$){
@@ -460,7 +576,11 @@ sub RRD_Log_10minDERIVE($$$){
         "DS:$changed_reading:DERIVE:120:0:1000",
         "RRA:MAX:0.5:1:7300",
         "RRA:AVERAGE:0.5:12:7300",
-        "RRA:AVERAGE:0.5:1:4320") or die "RRDLOG[ERROR]: Create RRD error: ($RRDs::error)";
-    return $rrd_file;
+        "RRA:AVERAGE:0.5:1:4320");
+    my $ERR=RRDs::error;
+    if (defined($ERR)) {
+        Log 0, "RRDLOG[10minDERIVE]::ERROR Create RRD: $ERR";
+        return undef;}  
+    else {return $rrd_file;}
 }
 1;
