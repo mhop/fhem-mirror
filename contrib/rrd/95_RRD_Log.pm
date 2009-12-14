@@ -242,23 +242,24 @@ sub RRD_Log_Notify() {
         #INIT
         my $tsecs = time();
         my $secs = 300;
+	my $msgcnt = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
         if(!defined($data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev})){
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS} = $tsecs;
-          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
-          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|INIT:" . $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $msgcnt;
+          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|INIT:" . $msgcnt;
           }
         #Calculate
         my $calc_next =  $tsecs - $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS};
         Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|calc_next: $calc_next";
         if($calc_next > $secs) {
-          $iodev_msgcnt = $defs{$LASTIODev}{RAWMSGCOUNT} - $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT};
+          $iodev_msgcnt = $msgcnt - $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT};
           $iostat_reading = "RAWMSGCOUNT";
           Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|RRD_Log_disptach_reading: $self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp";
           $cul_rssi_return = &RRD_Log_disptach_reading($self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp);
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS} = $tsecs;
-          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $msgcnt;
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{LAST} = $iodev_msgcnt;
-          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|Update: $tsecs|" . $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"} . "|$iodev_msgcnt";
+          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|Update: $tsecs|" . $msgcnt . "|$iodev_msgcnt";
           }
         }
         #RAWMSGCOUNT
