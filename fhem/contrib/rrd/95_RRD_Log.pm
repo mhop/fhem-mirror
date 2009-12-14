@@ -256,9 +256,9 @@ sub RRD_Log_Notify() {
           Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|RRD_Log_disptach_reading: $self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp";
           $cul_rssi_return = &RRD_Log_disptach_reading($self,$LASTIODev,$iostat_reading ,$iodev_msgcnt,$timestamp);
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS} = $tsecs;
-          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $defs{$LASTIODev}{RAWMSGCOUNT};
+          $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{LAST} = $iodev_msgcnt;
-          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|Update: $tsecs|" . $defs{$LASTIODev}{RAWMSGCOUNT} . "|$iodev_msgcnt";
+          Log $ll,"RRDLOG|IODEVSTATS|RAWMSGCOUNT|$LASTIODev|Update: $tsecs|" . $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"} . "|$iodev_msgcnt";
           }
         }
         #RAWMSGCOUNT
