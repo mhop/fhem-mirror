@@ -154,20 +154,23 @@ OWTEMP_GetUpdate($$)
       $warn = "templow";
       $hash->{ALARM} = "1";
       $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "  A: ".$hash->{ALARM};
+      $alarm = "A: ".$hash->{ALARM};
     } elsif ($temp >= $hash->{READINGS}{temphigh}{VAL}) {
       $warn = "temphigh";
       $hash->{ALARM} = "1";
       $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "  A: ".$hash->{ALARM};
+      $alarm = "A: ".$hash->{ALARM};
     } else {
       $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "  A: ".$hash->{ALARM};
+      $alarm = "A: ".$hash->{ALARM};
     }
     $hash->{CHANGED}[$count] = "warnings: $warn";
     $hash->{CHANGED}[$count+1] = "T: " . $temp . $alarm;
   
-    $hash->{STATE} = "T: " . $hash->{READINGS}{temperature}{VAL} . $alarm;
+    $hash->{STATE} = "T: " . $temp . "  " .
+                     "L: " . $hash->{READINGS}{templow}{VAL} . "  " .
+                     "H: " . $hash->{READINGS}{temphigh}{VAL} . "  " .
+                     $alarm;
   } else {
     $value = OW::get("/uncached/$path/".$a);
     foreach my $r (sort keys %gets) {
