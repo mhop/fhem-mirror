@@ -66,7 +66,7 @@ OWFS_Initialize($)
   $hash->{DefFn}      = "OWFS_Define";
   $hash->{UndefFn}    = "OWFS_Undef";
   $hash->{GetFn}      = "OWFS_Get";
-  $hash->{SetFn}      = "OWFS_Set";
+  #$hash->{SetFn}      = "OWFS_Set";
   $hash->{AttrList}   = "do_not_notify:1,0 dummy:1,0 temp-scale:C,F,K,R " .
                         "showtime:1,0 loglevel:0,1,2,3,4,5,6";
 }
