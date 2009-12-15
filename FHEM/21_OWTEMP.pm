@@ -90,7 +90,7 @@ OWTEMP_UpdateReading($$$$$)
   $hash->{READINGS}{$reading}{VAL}  = $value;
   Log 4, "OWTEMP $hash->{NAME} $reading: $value";
 
-  return 1;
+  return $value;
 }
 
 #####################################
@@ -114,6 +114,8 @@ OWTEMP_GetUpdate($$)
   my $now   = TimeNow();
   my $scale = $attr{$hash->{IODev}->{NAME}}{"temp-scale"};
   my $value = "";
+  my $ret   = "";
+  my $count = 0;
 
   $scale = "Celsius"    if ($scale eq "C");
   $scale = "Fahrenheit" if ($scale eq "F");
@@ -127,13 +129,17 @@ OWTEMP_GetUpdate($$)
       foreach my $r (sort keys %gets) {
         $value = OW::get("/uncached/$path/".$r);
         $temp = $value if ($r eq "temperature");
-        OWTEMP_UpdateReading($hash,$r,$now,$scale,$value);
+        $ret = OWTEMP_UpdateReading($hash,$r,$now,$scale,$value);
+	$hash->{CHANGED}[$count] = "$r: $ret";
+	$count++;
       }
     } else {
       foreach my $r (sort keys %updates) {
         $value = OW::get("/uncached/$path/".$r);
         $temp = $value if ($r eq "temperature");
-        OWTEMP_UpdateReading($hash,$r,$now,$scale,$value);
+        $ret = OWTEMP_UpdateReading($hash,$r,$now,$scale,$value);
+	$hash->{CHANGED}[$count] = "$r: $ret";
+	$count++;
       }
     }
 
@@ -147,22 +153,25 @@ OWTEMP_GetUpdate($$)
     if ($temp <= $hash->{READINGS}{templow}{VAL}) {
       $warn = "templow";
       $hash->{ALARM} = "1";
-      OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "  Alarm: $warn";
+      $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
+      $alarm = "  A: ".$hash->{ALARM};
     } elsif ($temp >= $hash->{READINGS}{temphigh}{VAL}) {
       $warn = "temphigh";
       $hash->{ALARM} = "1";
-      OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "  Alarm: $warn";
+      $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
+      $alarm = "  A: ".$hash->{ALARM};
     } else {
-      OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
+      $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
+      $alarm = "  A: ".$hash->{ALARM};
     }
+    $hash->{CHANGED}[$count] = "warnings: $warn";
+    $hash->{CHANGED}[$count+1] = "T: " . $temp . $alarm;
   
     $hash->{STATE} = "T: " . $hash->{READINGS}{temperature}{VAL} . $alarm;
   } else {
     $value = OW::get("/uncached/$path/".$a);
     foreach my $r (sort keys %gets) {
-      OWTEMP_UpdateReading($hash,$r,$now,$scale,$value) if($r eq $a);
+      $ret = OWTEMP_UpdateReading($hash,$r,$now,$scale,$value) if($r eq $a);
     }
     return $value;
   }
@@ -189,7 +198,7 @@ OWTEMP_Get($@)
   $value = OWTEMP_GetUpdate($hash,$a[1]);
   delete $hash->{LOCAL};
 
-  my $reading= $a[1];
+  my $reading = $a[1];
 
   if(defined($hash->{READINGS}{$reading})) {
     $value = $hash->{READINGS}{$reading}{VAL};
