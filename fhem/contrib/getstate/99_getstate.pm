@@ -1,6 +1,6 @@
 ################################################################
 #
-# $Id: 99_getstate.pm,v 1.2 2009-01-12 09:21:53 rudolfkoenig Exp $
+# $Id: 99_getstate.pm,v 1.3 2009-12-16 16:46:00 m_fischer Exp $
 #
 #  Copyright notice
 #
@@ -66,7 +66,7 @@ CommandGetState($)
     my $val;
     my $v;
 
-    if($r) {
+    if($r && $defs{$sdev}{TYPE} ne "CUL_WS") {
       foreach my $c (sort keys %{$r}) {
         undef($v);
         $val = $r->{$c}{VAL};
@@ -76,9 +76,16 @@ CommandGetState($)
         $v = $val if (isNumber($val) && !$v);
         $v = $val if (isInteger($val) && !$v);
         $v = $val if (isFloat($val) && !$v);
+        $c =~ s/:/-/g;
         $str .= sprintf("%s:%s ",$c,$v) if(defined($v));
       }
 
+    }
+    if ($r && $defs{$sdev}{TYPE} eq "CUL_WS") {
+      $v = $defs{$sdev}{READINGS}{state}{VAL};
+      $v =~ s/:\s+/:/g;
+      $v =~ s/\s+/ /g;
+      $str = $v;
     }
 
   }
