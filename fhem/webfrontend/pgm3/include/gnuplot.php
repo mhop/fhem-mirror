@@ -165,6 +165,7 @@ EOD;
 		break;
 
         Case HMS100TF:  ############################################
+        Case CUL_WS:  ############################################
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
 		set y2label 'Humidity (%)'

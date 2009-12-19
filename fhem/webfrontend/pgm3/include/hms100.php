@@ -15,7 +15,7 @@ $drawhms=$_GET['drawhms'];
 $room=$_GET['room'];
 $type=$_GET['type'];
 $battery=$_GET['battery'];
-$supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HMS100W','RM100-2','HMS100CO');
+$supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HMS100W','RM100-2','HMS100CO','CUL_WS');
 
 
 
@@ -85,7 +85,7 @@ $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HM
 #print_r($array[1][12]);  exit;
 ###########################################################################
 
-if ( $type == "HMS100T" or $type == "HMS100TF" )  ## hms100t-Device.  
+if ( $type == "HMS100T" or $type == "HMS100TF" or $type == "CUL_WS")  ## hms100t-Device.  
 {
 	
    	for ($x = 0; $x < $counter; $x++)
@@ -145,7 +145,7 @@ if ( $type == "HMS100T" or $type == "HMS100TF" )  ## hms100t-Device.
 }; #HMS100T
 
 
-if ( $type == "HMS100TF")  ## hms100tf-Device.  
+if (( $type == "HMS100TF") or ( $type == "CUL_WS"))  ## hms100tf-Device.  
 {
 #Humidity...
 
@@ -200,7 +200,7 @@ if ( $type == "HMS100TF")  ## hms100tf-Device.
 
 
 #############################################################################
-if ( $type == "HMS100T" or $type == "HMS100TF" )
+if ( $type == "HMS100T" or $type == "HMS100TF"  or $type == "CUL_WS")
 {
 
 	$text="Temperature";
@@ -242,6 +242,7 @@ if ( $type == "HMS100TF" and $showdewpoint=='yes' )
         ImageTTFText ($im, 8, 0,90-$XcorrectMainTextHMS, 22, $txtcolor, $fontttfb, $text);
 	$fontsize=7;
 	$text='Bat: '.$battery;
+	if ($type=="CUL_WS") $text="";
 	if ($battery != 'ok') {$txtcolor=$red; $text='Bat: low';};
         ImageTTFText ($im,  $fontsize, 0, 105, 10, $txtcolor, $fontttf, $text);
 	$fontsize=7;
