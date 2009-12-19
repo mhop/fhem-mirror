@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='091116a';
+$pgm3version='091219';
 	
 	$Action		=	$_POST['Action'];
 	$order		= 	$_POST['order'];
@@ -843,7 +843,7 @@ xml_parser_free($xml_parser);
 		}
 	       }
 	############################
-	       elseif (substr($stack[0][children][$i][name],0,4)=='HMS_')
+	       elseif ((substr($stack[0][children][$i][name],0,4)=='HMS_') or (substr($stack[0][children][$i][name],0,6)=='CUL_WS'))
 	       {
 			$type=$stack[0][children][$i][name];
 			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
@@ -859,13 +859,14 @@ xml_parser_free($xml_parser);
 				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="room") 
 					{$room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 					}
-				   if ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="type") 
+				   if (( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="type")  or
+				      ( $stack[0][children][$i][children][$j][children][$k][attrs][key]=="TYPE") )
 					{$type=$stack[0][children][$i][children][$j][children][$k][attrs][value];};
 				}
 		 if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
 		 {
 			$HMSdev=$stack[0][children][$i][children][$j][attrs][name];
-			if ($type=="HMS100T" or $type=="HMS100TF")
+			if ($type=="HMS100T" or $type=="HMS100TF" or $type=="CUL_WS")
 			{
 			if ($showhmsgnu== $HMSdev) {$formvalue="hide";$gnuvalue="";}
 			else {$formvalue="show";$gnuvalue=$HMSdev;};

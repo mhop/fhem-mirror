@@ -93,3 +93,6 @@
   -- Feature: The status of the batteries of FHT and HMS are shown in the graphics
   -- php4 disabled. Only php5 is supported.
   -- A lot of examples of the UserDefs are added.
+
+- Martin 2009-12-19
+  -- Feature: CUL_WS added. Automatic support for S300TH (eg. S555TH)
