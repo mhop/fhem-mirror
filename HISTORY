@@ -451,3 +451,6 @@
   are shown in the graphics. php4 disabled. Now only php5 is supported. A 
   lot of examples of the UserDefs are added. The pgm3-section of fhem.html was
   changed.
+
+- Sat Dec 19 2009 (MartinH)
+  - pgm3: Automatic support for CUL_WS (S300TH) added

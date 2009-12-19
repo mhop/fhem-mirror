@@ -191,3 +191,7 @@ It is not necessary to tell fhem that there are other logs.
 2009-11-16
 	-- New version with Battery-check, Log-Pull-Down, Google-Weather-Api	
 	-- Changed Files: index.php, config.php, fhtpulldown.php, weather.php
+
+2009-12-19
+	-- Feature: CUL_WS added. Automatic support for S300TH (eg. S555TH). 
+	   Changed: index.php, hms100.php, gnuplot.php

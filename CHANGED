@@ -558,4 +558,5 @@
   - bugfix:  21_OWTEMP.pm Defining a device now fail when no OWFS device was defined (M.Fischer)
   - bugfix:  21_OWTEMP.pm missing trigger fo notify/filelog (M.Fischer)
   - feature: 99_getstate.pm get state from S555TH now (M.Fischer)
+  - feature: pgm3: automatic support for CUL_WS (S300TH) added (MartinH)
 
