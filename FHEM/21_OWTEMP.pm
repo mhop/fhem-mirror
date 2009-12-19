@@ -154,23 +154,23 @@ OWTEMP_GetUpdate($$)
       $warn = "templow";
       $hash->{ALARM} = "1";
       $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "A: ".$hash->{ALARM};
+      $alarm = $hash->{ALARM};
     } elsif ($temp >= $hash->{READINGS}{temphigh}{VAL}) {
       $warn = "temphigh";
       $hash->{ALARM} = "1";
       $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "A: ".$hash->{ALARM};
+      $alarm = $hash->{ALARM};
     } else {
       $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = "A: ".$hash->{ALARM};
+      $alarm = $hash->{ALARM};
     }
     $hash->{CHANGED}[$count] = "warnings: $warn";
-    $hash->{CHANGED}[$count+1] = "T: " . $temp . $alarm;
+    $hash->{CHANGED}[$count+1] = "T: " . $temp . "  " . "A: " . $alarm;
   
     $hash->{STATE} = "T: " . $temp . "  " .
                      "L: " . $hash->{READINGS}{templow}{VAL} . "  " .
                      "H: " . $hash->{READINGS}{temphigh}{VAL} . "  " .
-                     $alarm;
+                     "A: " . $alarm;
   } else {
     $value = OW::get("/uncached/$path/".$a);
     foreach my $r (sort keys %gets) {
@@ -226,17 +226,13 @@ OWTEMP_Set($@)
 
   if ($key eq "INTERVAL" || $key eq "ALARMINT") {
     $hash->{$key} = $value;
-    #RemoveInternalTimer($hash);
-    if ($hash->{ALARM} == 0) {
-      InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 0);
-    } else {
-      InternalTimer(gettimeofday()+$hash->{ALARMINT}, "OWTEMP_GetUpdate", $hash, 0);
-    }
-    Log 4, "OWTEMP $hash->{NAME} $key $value";
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{$key}, "OWTEMP_GetUpdate", $hash, 0);
+    Log 4, "set OWTEMP $hash->{NAME} $key $value";
   } elsif ($key eq "templow" || $key eq "temphigh") {
     return "wrong value: range -55°C - 125°C" if (int($value) < -55 || int($value) > 125);
     $ret = OW::put("$path/".$key,$value);
-    Log 4, "OWTEMP $hash->{NAME} $key $value";
+    Log 4, "set OWTEMP $hash->{NAME} $key $value";
     $hash->{LOCAL} = 1;
     OWTEMP_GetUpdate($hash,$key);
     delete $hash->{LOCAL};
@@ -245,7 +241,7 @@ OWTEMP_Set($@)
     $hash->{LOCAL} = 1;
     $value = OWTEMP_GetUpdate($hash,$key);
     delete $hash->{LOCAL};
-    Log 4, "OWTEMP $hash->{NAME} $key $value";
+    Log 4, "set OWTEMP $hash->{NAME} $key $value";
   }
   return undef;
 }
