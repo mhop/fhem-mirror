@@ -49,16 +49,30 @@ my %gets = (
 );
 
 my %sets = (
-  "alias"       => "",
-  "temphigh"    => "",
-  "templow"     => "",
-  "INTERVAL"    => "",
-  "ALARMINT"    => "",
+  "alias"         => "",
+  "temphigh"      => "",
+  "templow"       => "",
+  "interval"      => "",
+  "alarminterval" => "",
 );
 
 my %updates = (
   "present"     => "",
   "temperature" => "",
+  "templow"     => "",
+  "temphigh"    => "",
+);
+
+my %dummy = (
+  "crc8"         => "4D",
+  "alias"        => "dummy",
+  "locator"      => "FFFFFFFFFFFFFFFF",
+  "power"        => "0",
+  "present"      => "1",
+  "temphigh"     => "75",
+  "templow"      => "10",
+  "type"         => "DS18S20",
+  "warnings"     => "none",
 );
 
 #####################################
@@ -76,16 +90,27 @@ OWTEMP_Initialize($)
 
 #####################################
 sub
-OWTEMP_UpdateReading($$$$$)
+OWTEMP_UpdateReading($$$$)
 {
-  my ($hash,$reading,$now,$scale,$value) = @_;
-  return 0 if (!defined($value) || $value eq "");
+  my ($hash,$reading,$now,$value) = @_;
 
-  # trim spaces
-  $value =~ s/\s//g;
+  # define vars
+  my $temp;
 
-  $value = sprintf("%.4f",$value) if($reading eq "temperature");
-  $value = $value . " ($scale)" if($reading eq "temperature" && $scale ne "");
+  # exit if empty value
+  return 0
+    if(!defined($value) || $value eq "");
+
+  # trim value
+  $value =~ s/\s//g
+    if($reading ne "warnings");
+  if($reading eq "temperature") {
+    $value  = sprintf("%.4f",$value);
+    $temp   = $value;
+    $value  = $value . " (".$hash->{OW_SCALE}.")";
+  }
+
+  # update readings
   $hash->{READINGS}{$reading}{TIME} = $now;
   $hash->{READINGS}{$reading}{VAL}  = $value;
   Log 4, "OWTEMP $hash->{NAME} $reading: $value";
@@ -97,106 +122,188 @@ OWTEMP_UpdateReading($$$$$)
 sub
 OWTEMP_GetUpdate($$)
 {
-  my ($hash,$a) = @_;
+  my ($hash, $a) = @_;
 
-  if (!$hash->{LOCAL}) {
-    if ($hash->{ALARM} == 0) {
-      InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 1);
+  # define vars
+  my $name    = $hash->{NAME};
+  my $now     = TimeNow();
+  my $value   = "";
+  my $temp    = "";
+  my $ret     = "";
+  my $count   = 0;
+
+  # define warnings
+  my $warn        = "none";
+  $hash->{ALARM}  = "0";
+
+  # check for real sensor
+  if($hash->{OW_ID} ne "none") {
+    # real sensor
+
+    if(!$hash->{LOCAL} || $a eq "") {
+      foreach my $r (sort keys %updates) {
+        $ret = "";
+        $ret = OW::get("/uncached/".$hash->{OW_PATH}."/".$r);
+        if(!defined($ret)) {
+          # 
+          $hash->{PRESENT} = "0";
+          $r = "present";
+          $value = "0";
+          $ret = OWTEMP_UpdateReading($hash,$r,$now,$value);
+          $hash->{CHANGED}[$count] = "present: ".$value
+        } else {
+          $hash->{PRESENT} = "1";
+          $value = $ret;
+          if($r eq "temperature") {
+            $temp = sprintf("%.4f",$value);
+            $temp =~ s/\s//g;
+          }
+          $ret = OWTEMP_UpdateReading($hash,$r,$now,$value);
+        }
+        last if($hash->{PRESENT} eq "0");
+      }
     } else {
-      InternalTimer(gettimeofday()+$hash->{ALARMINT}, "OWTEMP_GetUpdate", $hash, 1);
+      $ret = "";
+      $ret = OW::get("/uncached/".$hash->{OW_PATH}."/".$a);
+      if(!defined($ret)) {
+        $hash->{PRESENT} = "0";
+        $a = "present";
+        $value = "0";
+        $ret = OWTEMP_UpdateReading($hash,$a,$now,$value);
+      } else {
+        $hash->{PRESENT} = "1";
+        $value = $ret;
+        if($a eq "temperature") {
+          $temp = sprintf("%.4f",$value);
+          $temp =~ s/\s//g;
+          $value = $temp;
+        }
+        $ret = OWTEMP_UpdateReading($hash,$a,$now,$value);
+      }
+    }
+  } else {
+    # dummy sensor
+    $temp = sprintf("%.4f",rand(85));
+    $dummy{temperature} = $temp;
+    $dummy{present}     = "1";
+    $hash->{PRESENT}    = $dummy{present};
+    
+    if(!$hash->{LOCAL} || $a eq "") {
+      foreach my $r (sort keys %updates) {
+        $ret = OWTEMP_UpdateReading($hash,$r,$now,$dummy{$r});
+      }
+    } else {
+      $ret = "";
+      $ret = $dummy{$a};
+      if($ret ne "") {
+        $value = $ret;
+        if($a eq "temperature") {
+          $temp = sprintf("%.4f",$value);
+          $temp =~ s/\s//g;
+        }
+        $ret = OWTEMP_UpdateReading($hash,$a,$now,$value);
+      }
     }
   }
 
-  my $name = $hash->{NAME};
+  return 1
+    if($hash->{LOCAL} && $a eq "" && $hash->{PRESENT} eq "0"); 
 
-  # get OWTEMP information
-  my $path  = $hash->{OW_PATH};
-  my $now   = TimeNow();
-  my $scale = $attr{$hash->{IODev}->{NAME}}{"temp-scale"};
-  my $value = "";
-  my $ret   = "";
-  my $count = 0;
+  # check for warnings
+  my $templow   = $hash->{READINGS}{templow}{VAL};
+  my $temphigh  = $hash->{READINGS}{temphigh}{VAL};
 
-  $scale = "Celsius"    if ($scale eq "C");
-  $scale = "Fahrenheit" if ($scale eq "F");
-  $scale = "Kelvin"     if ($scale eq "K");
-  $scale = "Rankine"    if ($scale eq "R");
-
-  my $temp = "";
-
-  if (!$hash->{LOCAL} || $hash->{LOCAL} == 2) {
-    if (defined($hash->{LOCAL}) && $hash->{LOCAL} == 2) {
-      foreach my $r (sort keys %gets) {
-        $value = OW::get("/uncached/$path/".$r);
-        $temp = $value if ($r eq "temperature");
-        $ret = OWTEMP_UpdateReading($hash,$r,$now,$scale,$value);
-	$hash->{CHANGED}[$count] = "$r: $ret";
-	$count++;
-      }
-    } else {
-      foreach my $r (sort keys %updates) {
-        $value = OW::get("/uncached/$path/".$r);
-        $temp = $value if ($r eq "temperature");
-        $ret = OWTEMP_UpdateReading($hash,$r,$now,$scale,$value);
-	$hash->{CHANGED}[$count] = "$r: $ret";
-	$count++;
-      }
-    }
-
-    # trim spaces
-    $temp =~ s/\s//g;
-    # set default warning to none
-    my $warn  = "none";
-    my $alarm = "";
-    $hash->{ALARM} = "0";
-
-    if ($temp <= $hash->{READINGS}{templow}{VAL}) {
+  if($hash->{PRESENT} eq "1") {
+    if($temp <= $templow) {
+      # low temperature
+      $hash->{ALARM} = "1";
       $warn = "templow";
+    } elsif($temp >= $temphigh) {
+      # high temperature
       $hash->{ALARM} = "1";
-      $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = $hash->{ALARM};
-    } elsif ($temp >= $hash->{READINGS}{temphigh}{VAL}) {
       $warn = "temphigh";
-      $hash->{ALARM} = "1";
-      $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = $hash->{ALARM};
-    } else {
-      $ret = OWTEMP_UpdateReading($hash,"warnings",$now,"",$warn);
-      $alarm = $hash->{ALARM};
     }
-    $hash->{CHANGED}[$count] = "warnings: $warn";
-    $hash->{CHANGED}[$count+1] = "T: " . $temp . "  " . "A: " . $alarm;
-  
-    $hash->{STATE} = "T: " . $temp . "  " .
-                     "L: " . $hash->{READINGS}{templow}{VAL} . "  " .
-                     "H: " . $hash->{READINGS}{temphigh}{VAL} . "  " .
-                     "A: " . $alarm;
   } else {
-    $value = OW::get("/uncached/$path/".$a);
-    foreach my $r (sort keys %gets) {
-      $ret = OWTEMP_UpdateReading($hash,$r,$now,$scale,$value) if($r eq $a);
+    # set old state
+    $temp = $hash->{READINGS}{temperature}{VAL};
+    ($temp,undef) = split(" ",$temp);
+    # sensor is missing
+    $hash->{ALARM} = "1";
+    $warn = "not present";
+  }
+
+  if(!$hash->{LOCAL} || $a eq "") {
+    $ret = OWTEMP_UpdateReading($hash,"warnings",$now,$warn);
+  }
+
+  $hash->{STATE} =  "T: ".$temp."  ".
+                    "L: ".$templow."  ".
+                    "H: ".$temphigh."  ".
+                    "P: ".$hash->{PRESENT}."  ".
+                    "A: ".$hash->{ALARM}."  ".
+                    "W: ".$warn;
+
+  # inform changes
+  # state
+  $hash->{CHANGED}[$count++] = $hash->{STATE};
+  # present
+  $hash->{CHANGED}[$count++] = "present: ".$hash->{PRESENT}
+    if(defined($hash->{PRESENT}) && $hash->{PRESENT} ne "");
+  # temperature
+  $hash->{CHANGED}[$count++] = "temperature: ".$temp." (".$hash->{OW_SCALE}.")"
+    if(defined($temp) && $temp ne "");
+  # temperature raw
+  $hash->{CHANGED}[$count++] = "tempraw: ".$temp
+    if(defined($temp) && $temp ne "");
+  # low temperature
+  $hash->{CHANGED}[$count++] = "templow: ".$templow
+    if(defined($templow) && $templow ne "");
+  # high temperature
+  $hash->{CHANGED}[$count++] = "temphigh: ".$temphigh
+    if(defined($temphigh) && $temphigh ne "");
+  # warnings
+  $hash->{CHANGED}[$count++] = "warnings: ".$warn
+    if(defined($warn) && $warn ne "");
+
+
+  if(!$hash->{LOCAL}) {
+    # update timer
+    RemoveInternalTimer($hash);
+    # check alarm
+    if($hash->{ALARM} eq "0") {
+      $hash->{INTERVAL} = $hash->{INTV_CHECK};
+    } else {
+      $hash->{INTERVAL} = $hash->{INTV_ALARM};
     }
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 1);
+  } else {
     return $value;
   }
 
-  if(!$hash->{LOCAL} || $hash->{LOCAL} == 2) {
+  if(!$hash->{LOCAL}) {
     DoTrigger($name, undef) if($init_done);
   }
 
-  return 1;
+  return $hash->{STATE};
 }
 
-###################################
+#####################################
 sub
 OWTEMP_Get($@)
 {
   my ($hash, @a) = @_;
+  
+  # check syntax
+  return "argument is missing @a"
+    if(int(@a) != 2);
+  # check argument
+  return "Unknown argument $a[1], choose one of ".join(",", sort keys %gets)
+    if(!defined($gets{$a[1]}));
 
-  return "argument is missing @a" if(int(@a) != 2);
-  return "Unknown argument $a[1], choose one of " . join(",", sort keys %gets)
-        if(!defined($gets{$a[1]}));
-
+  # define vars
   my $value;
+
+  # get value
   $hash->{LOCAL} = 1;
   $value = OWTEMP_GetUpdate($hash,$a[1]);
   delete $hash->{LOCAL};
@@ -210,87 +317,161 @@ OWTEMP_Get($@)
   return "$a[0] $reading => $value";
 }
 
-###################################
+#####################################
 sub
 OWTEMP_Set($@)
 {
   my ($hash, @a) = @_;
-  return "set needs one parameter" if(int(@a) != 3);
-  return "Unknown argument $a[1], choose one of " . join(",", sort keys %sets)
-        if(!defined($sets{$a[1]}));
 
+  # check syntax
+  return "set needs one parameter"
+    if(int(@a) != 3);
+  # check arguments
+  return "Unknown argument $a[1], choose one of ".join(",", sort keys %sets)
+    if(!defined($sets{$a[1]}));
+
+  # define vars
   my $key   = $a[1];
   my $value = $a[2];
-  my $path  = $hash->{OW_PATH};
   my $ret;
 
-  if ($key eq "INTERVAL" || $key eq "ALARMINT") {
+  # set new timer
+  if($key eq "interval" || $key eq "alarminterval") {
+    $key = "INTV_CHECK"
+      if($key eq "interval");
+    $key = "INTV_ALARM"
+      if($key eq "alarminterval");
+    # update timer
     $hash->{$key} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{$key}, "OWTEMP_GetUpdate", $hash, 0);
-    Log 4, "set OWTEMP $hash->{NAME} $key $value";
-  } elsif ($key eq "templow" || $key eq "temphigh") {
-    return "wrong value: range -55°C - 125°C" if (int($value) < -55 || int($value) > 125);
-    $ret = OW::put("$path/".$key,$value);
-    Log 4, "set OWTEMP $hash->{NAME} $key $value";
-    $hash->{LOCAL} = 1;
-    OWTEMP_GetUpdate($hash,$key);
-    delete $hash->{LOCAL};
-  } else {
-    $ret = OW::put("$path/".$key,$value);
-    $hash->{LOCAL} = 1;
-    $value = OWTEMP_GetUpdate($hash,$key);
-    delete $hash->{LOCAL};
-    Log 4, "set OWTEMP $hash->{NAME} $key $value";
+    # check alarm
+    if($hash->{ALARM} eq "0") {
+      $hash->{INTERVAL} = $hash->{INTV_CHECK};
+    } else {
+      $hash->{INTERVAL} = $hash->{INTV_ALARM};
+    }
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 1);
   }
+
+  # set warnings
+  if($key eq "templow" || $key eq "temphigh") {
+    # check range
+    return "wrong value: range -55°C - 125°C"
+      if(int($value) < -55 || int($value) > 125);
+  }
+
+  # set value
+  Log 4, "OWTEMP set $hash->{NAME} $key $value";
+
+  # check for real sensor
+  if($hash->{OW_ID} ne "none") {
+    # real senson
+    $ret = OW::put($hash->{OW_PATH}."/$key",$value);
+  } else {
+    # dummy sensor
+    $dummy{$key} = $value;
+  }
+
+  # update readings
+  if($key ne "interval" || $key ne "alarminterval") {
+    $hash->{LOCAL} = 1;
+    $ret = OWTEMP_GetUpdate($hash,$key);
+    delete $hash->{LOCAL};
+  }
+  
   return undef;
 }
 
-###################################
+#####################################
 sub
 OWTEMP_Define($$)
 {
   my ($hash, $def) = @_;
 
   # define <name> OWTEMP <id> [interval] [alarminterval]
-  # define flow OWTEMP 332670010800 300
+  # e.g.: define flow OWTEMP 332670010800 300
 
   my @a = split("[ \t][ \t]*", $def);
 
+  # check syntax
   return "wrong syntax: define <name> OWTEMP <id> [interval] [alarminterval]"
     if(int(@a) < 2 && int(@a) > 5);
-  return "Define $a[0]: wrong ID format: specify a 12 digit value"
-    if(lc($a[2]) !~ m/^[0-9|a-f]{12}$/);
+  # check ID format
+  return "Define $a[0]: missing ID or wrong ID format: specify a 12 digit value or set it to none for demo mode"
+    if(lc($a[2]) ne "none" && lc($a[2]) !~ m/^[0-9|a-f]{12}$/);
+
+  # define vars
+  my $name          = $a[0];
+  my $id            = $a[2];
+  my $interval      = 300;
+  my $alarminterval = 300;
+  my $scale         = "";
+  my $ret           = "";
+
+  # overwrite default intervals if set by define
+  if(int(@a)==4) { $interval = $a[3]; }
+  if(int(@a)==5) { $interval = $a[3]; $alarminterval = $a[4] }
+
+  # define device internals
+  $hash->{ALARM}      = 0;
+  $hash->{INTERVAL}   = $interval;
+  $hash->{INTV_CHECK} = $interval;
+  $hash->{INTV_ALARM} = $alarminterval;
+  $hash->{OW_ID}      = $id;
+  $hash->{OW_FAMILY}  = $gets{family};
+  $hash->{OW_PATH}    = $hash->{OW_FAMILY}.".".$hash->{OW_ID};
+  $hash->{PRESENT}    = 0;
+
+  $defptr{$a[2]} = $hash;
+
+  # assign IO port
+  AssignIoPort($hash);
+  return "No I/O device found. Please define a OWFS device first."
+    if(!defined($hash->{IODev}->{NAME}));
+
+  # get scale from I/O device
+  $scale = $attr{$hash->{IODev}->{NAME}}{"temp-scale"};
+  # define scale for temperature values
+  $scale = "Celsius"    if ($scale eq "C");
+  $scale = "Fahrenheit" if ($scale eq "F");
+  $scale = "Kelvin"     if ($scale eq "K");
+  $scale = "Rankine"    if ($scale eq "R");
+  $hash->{OW_SCALE} = $scale;
+
+  $hash->{STATE} = "Defined";
+
+  # define dummy values for testing
+  if($hash->{OW_ID} eq "none") {
+    my $now   = TimeNow();
+    $dummy{address}     = $hash->{OW_FAMILY}.$hash->{OW_ID}.$dummy{crc8};
+    $dummy{family}      = $hash->{OW_FAMILY};
+    $dummy{id}          = $hash->{OW_ID};
+    $dummy{temperature} = "80.0000 (".$hash->{OW_SCALE}.")";
+    foreach my $r (sort keys %gets) {
+      $hash->{READINGS}{$r}{TIME} = $now;
+      $hash->{READINGS}{$r}{VAL}  = $dummy{$r};
+      Log 4, "OWTEMP $hash->{NAME} $r: ".$dummy{$r};
+    }
+  }
 
   $hash->{STATE} = "Initialized";
 
-  my $name     = $a[0];
-  my $id       = $a[2];
-  my $interval = 300;
-  my $alarmint = 300;
-  if(int(@a)==4) { $interval = $a[3]; }
-  if(int(@a)==5) { $interval = $a[3]; $alarmint = $a[4] }
-
-  $hash->{OW_ID}     = $id;
-  $hash->{OW_FAMILY} = $gets{family};
-  $hash->{OW_PATH}   = $gets{family}.".".$hash->{OW_ID};
-  $hash->{INTERVAL}  = $interval;
-  $hash->{ALARMINT}  = $alarmint;
-  $hash->{ALARM}     = 0;
-
-  $defptr{$a[2]} = $hash;
-  AssignIoPort($hash);
-
-  return "No I/O device found. Please define a OWFS device first."
-    if(!defined($hash->{IODev}->{NAME}));
-  $hash->{LOCAL} = 2;
-  OWTEMP_GetUpdate($hash,"");
+  # initalize
+  $hash->{LOCAL} = 1;
+  $ret = OWTEMP_GetUpdate($hash,"");
   delete $hash->{LOCAL};
 
-  if ($hash->{ALARM} == "0") {
+  # exit if sensor is not present
+  return "Define $hash->{NAME}: Sensor is not reachable. Check first your 1-wire connection."
+    if(defined($ret) && $ret eq 1);
+
+  if(!$hash->{LOCAL}) {
+    if($hash->{ALARM} eq "0") {
+      $hash->{INTERVAL} = $hash->{INTV_CHECK};
+    } else {
+      $hash->{INTERVAL} = $hash->{INTV_ALARM};
+    }
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 0);
-  } else {
-    InternalTimer(gettimeofday()+$hash->{ALARMINT}, "OWTEMP_GetUpdate", $hash, 0);
   }
 
   return undef;
