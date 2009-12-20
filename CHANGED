@@ -561,3 +561,5 @@
   - feature: pgm3: automatic support for CUL_WS (S300TH) added (MartinH)
   - bugfix:  21_OWTEMP.pm missing space within state logging (M.Fischer)
   - bugfix:  21_OWTEMP.pm interval fixed (M.Fischer)
+  - bugfix:  21_OWTEMP.pm complete rewrite with errorcontrol and demo mode (M.Fischer)
+
