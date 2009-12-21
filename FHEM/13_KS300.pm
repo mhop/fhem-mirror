@@ -322,10 +322,10 @@ KS300_Parse($$)
   } else {
 
     Log 4, "KS300 detected: $msg";
+    return "UNDEFINED KS300 KS300 1234";
 
   }
 
-  return "";
 }
 
 1;

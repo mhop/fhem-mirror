@@ -32,7 +32,8 @@ CUL_EM_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> CUL_EM <code> [corr1 corr2 CostPerUnit BasicFeePerMonth]"
+  return "wrong syntax: define <name> CUL_EM <code> ".
+                                "[corr1 corr2 CostPerUnit BasicFeePerMonth]"
             if(int(@a) < 3 || int(@a) > 7);
   return "Define $a[0]: wrong CODE format: valid is 1-12"
                 if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
@@ -235,10 +236,10 @@ CUL_EM_Parse($$)
   } else {
 
     Log 1, "CUL_EM detected, Code $cde $val";
+    return "UNDEFINED CUL_EM_$cde CUL_EM $cde";
 
   }
 
-  return "";
 }
 
 1;

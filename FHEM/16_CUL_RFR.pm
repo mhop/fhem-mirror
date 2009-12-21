@@ -85,7 +85,7 @@ CUL_RFR_Parse($$)
 
   if(!$defptr{$cde}) {
     Log 1, "CUL_RFR detected, Id $id, Router $rid, MSG $smsg";
-    return;
+    return "UNDEFINED CUL_RFR_$id CUL_RFR $id $rid";
   }
   my $hash = $defptr{$cde};
   my $name = $hash->{NAME};

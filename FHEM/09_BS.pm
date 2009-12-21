@@ -83,8 +83,9 @@ BS_Parse($$)
 
   my $def= $defptr{$dev};
   if(!defined($def)) {
-    Log 3, sprintf("BS Unknown device %s, please define it", $sensor);
-    return "UNDEFINED BS";
+    $sensor =~ s/^0//; 
+    Log 3, "BS Unknown device $sensor, please define it";
+    return "UNDEFINED BS_$sensor BS $sensor";
   }
 
   my $name= $def->{NAME};
