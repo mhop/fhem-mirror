@@ -454,3 +454,8 @@
 
 - Sat Dec 19 2009 (MartinH)
   - pgm3: Automatic support for CUL_WS (S300TH) added
+
+- Mon Dec 21 2009 (Rudi)
+  - In order to support automatic device creation (coming 98_autocreate.pm),
+    the return value in case of an undefined device should contain parameters
+    for a correct define statement.
