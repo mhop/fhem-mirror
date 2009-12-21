@@ -156,7 +156,6 @@ FHT_Set($@)
   my $ret = "";
 
   return "\"set $a[0]\" needs at least two parameters" if(@a < 2);
-
   my $name = shift(@a);
 
   # Replace refreshvalues with report1 and report2, and time with hour/minute
@@ -340,7 +339,7 @@ FHT_Parse($$)
 
   if(!defined($defptr{$dev})) {
     Log 3, "FHT Unknown device $dev, please define it";
-    return "UNDEFINED FHT $dev";
+    return "UNDEFINED FHT_$dev FHT $dev";
   }
 
   my $def = $defptr{$dev};
@@ -415,14 +414,15 @@ FHT_Parse($$)
     $def->{READINGS}{$cmd}{TIME} = $tn;
     $def->{READINGS}{$cmd}{VAL} = $val;
 
-    if(defined($def->{READINGS}{"measured-low"}{VAL})) {
+    if(defined($def->{READINGS}{"measured-low"}) &&
+       defined($def->{READINGS}{"measured-low"}{VAL})) {
 
       my $off = ($attr{$name} && $attr{$name}{tmpcorr}) ?
                         $attr{$name}{tmpcorr} : 0;
       $val = $val*256 + $def->{READINGS}{"measured-low"}{VAL};
       $val /= 10;
       $val = sprintf("%.1f (Celsius)", $val+$off);
-      $cmd = "measured-temp"
+      $cmd = "measured-temp";
 
     } else {
       return "";

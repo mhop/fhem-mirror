@@ -315,7 +315,7 @@ X10_Parse($$)
       Log 3, "X10 No units with housecode $housecode, command $command, " .
              "please define one";
       push(@list,
-      "UNDEFINED X10 device $housecode ?, command $command");
+             "UNDEFINED X10_$housecode X10 lm15 $housecode ?");
       return @list;
     }
   }
@@ -328,7 +328,7 @@ X10_Parse($$)
     # but no unit was previously selected
     Log 3, "X10 No unit selected for housecode $housecode, command $command";
     push(@list,
-    "UNDEFINED X10 device $housecode ?, command $command");
+             "UNDEFINED X10_$housecode X10 lm15 $housecode ?");
     return @list;
   }
 
@@ -359,7 +359,7 @@ X10_Parse($$)
         Log 3, "X10 Unknown device $housecode $unitcode, command $command, " .
                "please define it";
         push(@list,
-        "UNDEFINED X10 device $housecode $unitcode, command $command");
+             "UNDEFINED X10_$housecode X10 lm15 $housecode $unitcode");
     }
   }
   return @list;

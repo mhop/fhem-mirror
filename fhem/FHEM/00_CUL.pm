@@ -808,7 +808,7 @@ CUL_Ready($)
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
-  my $po=$hash->{USBDev};
+  my $po = $hash->{USBDev};
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
 }

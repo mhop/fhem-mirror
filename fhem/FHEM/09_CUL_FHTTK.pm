@@ -129,8 +129,8 @@ CUL_FHTTK_Define($$)
 
   my $name     = $a[0];
   my $sensor   = lc($a[2]);
-  if($sensor !~ /[0123456789abcdef]/) {
-       return "erroneous sensor specification $sensor, use one of 0..9..f";
+  if($sensor !~ /^[0-9a-f]{6}$/) {
+       return "wrong sensor specification $sensor, need a 6 digit hex number";
   }
 
 #  $hash->{SENSOR}= "$sensor";
@@ -164,8 +164,8 @@ CUL_FHTTK_Parse($$)
   my $def   = $defptr{$sensor};
   my $self  = $def->{NAME};
   if(!defined($def)) {
-    Log 3, sprintf("FHTTK Unknown device %s, please define it", $sensor);
-    return "UNDEFINED FHTTK";
+    Log 3, "FHTTK Unknown device $sensor, please define it";
+    return "UNDEFINED CUL_FHTTK_$sensor CUL_FHTTK $sensor";
   }
 
   # if it's not our device

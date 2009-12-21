@@ -58,6 +58,7 @@ sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
+sub LoadModule($);
 sub Log($$);
 sub OpenLogfile($);
 sub PrintHash($$);
@@ -156,7 +157,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.91 2009-12-09 13:29:47 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.92 2009-12-21 18:03:56 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -172,7 +173,8 @@ $modules{_internal_}{LOADED} = 1;
 $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
-        "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we";
+        "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
+        "autoload_undefined_devices";
 $modules{_internal_}{AttrFn} = "GlobalAttr";
 
 
@@ -638,7 +640,7 @@ devspec2array($)
         eval {                          # a bad regexp may shut down fhem.pl
           foreach my $l (sort keys %defs) {
               push @ret, $l
-                if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr} =~ m/$re/));
+                if($defs{$l}{$lattr} && (!$re || $defs{$l}{$lattr}=~m/^$re$/));
           }
         };
         if($@) {
@@ -658,7 +660,7 @@ devspec2array($)
     my $regok;
     eval {                              # a bad regexp may shut down fhem.pl
       if($l =~ m/[*\[\]^\$]/) {         # Regexp
-        push @ret, grep($_ =~ m/$l/, sort keys %defs);
+        push @ret, grep($_ =~ m/^$l$/, sort keys %defs);
         $regok = 1;
       }
     };
@@ -980,6 +982,29 @@ CommandGet($$)
 
 #####################################
 sub
+LoadModule($)
+{
+  my ($m) = @_;
+
+  if($modules{$m} && !$modules{$m}{LOADED}) {   # autoload
+    my $o = $modules{$m}{ORDER};
+    CommandReload(undef, "${o}_$m");
+
+    if(!$modules{$m}{LOADED}) {                 # Case corrected by reload?
+      foreach my $i (keys %modules) {
+        if(uc($m) eq uc($i) && $modules{$i}{LOADED}) {
+          delete($modules{$m});
+          $m = $i;
+          last;
+        }
+      }
+    }
+  }
+  return $m;
+}
+
+#####################################
+sub
 CommandDefine($$)
 {
   my ($cl, $def) = @_;
@@ -1001,20 +1026,7 @@ CommandDefine($$)
     }
   }
 
-  if($modules{$m} && !$modules{$m}{LOADED}) {   # autoload
-    my $o = $modules{$m}{ORDER};
-    CommandReload($cl, "${o}_$m");
-
-    if(!$modules{$m}{LOADED}) {                 # Case corrected by reload?
-      foreach my $i (keys %modules) {
-        if(uc($m) eq uc($i) && $modules{$i}{LOADED}) {
-          delete($modules{$m});
-          $m = $i;
-          last;
-        }
-      }
-    }
-  }
+  $m = LoadModule($m);
 
   if(!$modules{$m} || !$modules{$m}{DefFn}) {
     my @m = grep { $modules{$_}{DefFn} || !$modules{$_}{LOADED} }
@@ -1043,7 +1055,7 @@ CommandDefine($$)
       CommandAttr($cl, "$a[0] $da $defaultattr{$da}");
     }
   }
-  DoTrigger($a[0], "DEFINED");
+  DoTrigger("global", "DEFINED $a[0]");
   return $ret;
 }
 
@@ -1121,6 +1133,7 @@ CommandDelete($$)
 
     delete($attr{$sdev});
     delete($defs{$sdev});       # Remove the main entry
+    DoTrigger("global", "DELETED $sdev");
 
   }
   return join("\n", @rets);
@@ -1330,6 +1343,7 @@ CommandRename($$)
   $oldvalue{$new} = $oldvalue{$old} if(defined($oldvalue{$old}));
   delete($oldvalue{$old});
 
+  DoTrigger("global", "RENAMED $old $new");
   return undef;
 }
 
@@ -1877,7 +1891,6 @@ DoTrigger($$)
     my $ret = "";
     foreach my $n (sort keys %defs) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
-      next if($n eq $dev && defined($ns) && $ns eq "DEFINED");
       if(defined($modules{$defs{$n}{TYPE}})) {
         if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
           Log 5, "$dev trigger: Checking $n for notify";
@@ -2081,30 +2094,41 @@ Dispatch($$$)
     my $h = $iohash->{MatchList};
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
+
         if($dmsg =~ m/$h->{$m}/) {
-          my (undef, $mname) = split(":", $m);
-          Log GetLogLevel($name,3),
+          my ($order, $mname) = split(":", $m);
+
+          if($attr{global}{autoload_undefined_devices}) {
+            $mname = LoadModule($mname);
+            no strict "refs";
+            @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
+            use strict "refs";
+            $last_module = $mname;
+
+          } else {
+            Log GetLogLevel($name,3),
                 "$name: Unknown $mname device detected, " .
                         "define one to get detailed information.";
-          return undef;
+            return undef;
+
+          }
         }
       }
     }
-    Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
-    return undef;
+    if(!int(@found)) {
+      Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
+      return undef;
+    }
   }
 
   return undef if($found[0] eq "");	# Special return: Do not notify
 
   foreach my $found (@found) {
-    if($found =~ m/^(UNDEFINED) ([^ ]*) (.*)$/) {
-    # The trigger needs a device: we create a minimal temporary one
-      my $d = $1;
-      $defs{$d}{NAME} = $1;
-      $defs{$d}{TYPE} = $last_module;
-      DoTrigger($d, "$2 $3");
-      CommandDelete(undef, $d);                 # Remove the device
+
+    if($found =~ m/^(UNDEFINED.*)/) {
+      DoTrigger("global", $1);
       return undef;
+
     } else {
       if($defs{$found}) {
         $defs{$found}{MSGCNT}++;

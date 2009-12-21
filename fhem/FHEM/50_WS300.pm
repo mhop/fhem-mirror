@@ -255,7 +255,8 @@ WS300_Parse($$)
       Log $ll,"Sensor $s vorhanden";
       if(!defined($defptr{$s})) 
       {
-  	Log(3,"WS300 $s: undefined");
+        Log 3, "WS300 Unknown device $s, please define it";
+        return "UNDEFINED WS300_$s WS300 $s";
       }
       else
       {
@@ -446,7 +447,8 @@ WS300_Parse($$)
   }
   if(!defined($defptr{9})) 
   {
-    Log(3,"WS300 9: undefined");
+    Log 3, "WS300 Unknown device 9, please define it";
+    return "UNDEFINED WS300_9 WS300 9";
   }
   else
   {

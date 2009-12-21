@@ -92,7 +92,7 @@ USF1000_Parse($$)
 
   if(!defined($defptr{$dev})) {
     Log 3, "USF1000 Unknown device, please define it";
-    return "UNDEFINED USF1000";
+    return "UNDEFINED USF1000 USF1000 cylv 1 1 0.5";
   }
 
   my $def= $defptr{$dev};
