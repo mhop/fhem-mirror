@@ -354,6 +354,8 @@ FS20_Parse($$)
     my @list;
     foreach my $n (keys %{ $def }) {
       my $lh = $def->{$n};
+      $n = $lh->{NAME};        # It may be renamed
+
       $lh->{CHANGED}[0] = $v;
       $lh->{STATE} = $v;
       $lh->{READINGS}{state}{TIME} = TimeNow();
@@ -386,7 +388,7 @@ FS20_Parse($$)
     my $btn_four = hex2four($btn);
     Log 3, "FS20 Unknown device $dev ($dev_four), " .
                 "Button $btn ($btn_four) Code $cde ($v), please define it";
-    return "UNDEFINED FS20: $dev/$btn/$cde";
+    return "UNDEFINED FS20_$dev$btn FS20 $dev $btn";
   }
 
 }

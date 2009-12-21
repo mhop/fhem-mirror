@@ -552,7 +552,8 @@
   - bugfix:  Path in the examples fixed (got corrupted)
   - bugfix:  PachLog fixes from Axel
   - bugfix:  HOWTO/Examples revisited for correctness
-  - bugfix:  DEFINED & INITIALIZED triggers.
+  - bugfix:  INITIALIZED, DEFINED, RENAMED, DELETED triggers
+  - feature: image weblinks from Stefan
   - feature: 20_OWFS.pm support for passive Devices e.g. DS9097 (see commandref.html)
   - bugfix:  20_OWFS.pm crash fhem with PGM2/3, xmllist (M.Fischer)
   - bugfix:  21_OWTEMP.pm Defining a device now fail when no OWFS device was defined (M.Fischer)
@@ -562,4 +563,3 @@
   - bugfix:  21_OWTEMP.pm missing space within state logging (M.Fischer)
   - bugfix:  21_OWTEMP.pm interval fixed (M.Fischer)
   - bugfix:  21_OWTEMP.pm complete rewrite with errorcontrol and demo mode (M.Fischer)
-

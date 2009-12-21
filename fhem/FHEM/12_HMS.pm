@@ -102,7 +102,8 @@ HMS_Parse($$)
   if(!defined($defptr{$dev})) {
     Log 3, "Unknown HMS device $dev/$odev, please define it";
     $type = "HMS" if(!$type);
-    return "UNDEFINED $type $odev";
+    $type =~ s/-//; # RM100-2, - is special in fhem names
+    return "UNDEFINED ${type}_$odev HMS $odev";
   }
 
   my $def = $defptr{$dev};

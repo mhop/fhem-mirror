@@ -288,7 +288,7 @@ FileLog_Get($@)
 
       }
 
-      next if(!defined($val));
+      next if(!defined($val) || $val !~ m/^[-\.\d]+$/o);
       $min[$i] = $val if($val < $min[$i]);
       $max[$i] = $val if($val > $max[$i]);
       $sum[$i] += $val;

@@ -148,8 +148,9 @@ FW_Read($)
     my @clientsock = sockaddr_in($clientinfo[1]);
 
     my %nhash;
+    my $cname = "FHEMWEB:". inet_ntoa($clientsock[1]) .":".$clientsock[0];
     $nhash{NR}    = $devcount++;
-    $nhash{NAME}  = "FHEMWEB:". inet_ntoa($clientsock[1]) .":".$clientsock[0];
+    $nhash{NAME}  = $cname;
     $nhash{FD}    = $clientinfo[0]->fileno();
     $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
     $nhash{TYPE}  = "FHEMWEB";
@@ -157,6 +158,7 @@ FW_Read($)
     $nhash{SNAME} = $name;
     $nhash{TEMPORARY} = 1;              # Don't want to save it
     $nhash{BUF}   = "";
+    $attr{$cname}{room} = "hidden";
 
     $defs{$nhash{NAME}} = \%nhash;
     $selectlist{$nhash{NAME}} = \%nhash;
@@ -1391,6 +1393,10 @@ FW_showWeblink($$$)
 
   if($t eq "link") {
     pO "<td><a href=\"$v\">$d</a></td>\n";
+
+  } elsif($t eq "image") {
+    pO "<td><img src=\"$v\"><br><a href=\"$__ME?detail=$d\">$d</a></td>\n";
+
   } elsif($t eq "fileplot") {
     my @va = split(":", $v, 3);
     if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {

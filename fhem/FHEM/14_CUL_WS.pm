@@ -39,7 +39,6 @@ CUL_WS_Define($$)
 
   return "wrong syntax: define <name> CUL_WS <code> [corr1...corr4]"
             if(int(@a) < 3 || int(@a) > 7);
-  $a[2] = lc($a[2]);
   return "Define $a[0]: wrong CODE format: valid is 1-8"
                 if($a[2] !~ m/^[1-8]$/);
 
@@ -92,7 +91,7 @@ CUL_WS_Parse($$)
   $def = $defptr{$cde} if(!$def);
   if(!$def) {
     Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
-    return "UNDEFINED CUL_WS: $cde";
+    return "UNDEFINED CUL_WS_$cde CUL_WS $cde";
   }
 
   my $tm=TimeNow();
