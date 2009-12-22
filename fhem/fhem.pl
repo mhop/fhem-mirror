@@ -157,7 +157,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.92 2009-12-21 18:03:56 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.93 2009-12-22 11:00:54 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -863,29 +863,20 @@ CommandSave($$)
     return "Cannot open $param: $!";
   }
 
-  my $oldroom = "";
   foreach my $d (sort { $defs{$a}{NR} <=> $defs{$b}{NR} } keys %defs) {
     next if($defs{$d}{TEMPORARY} || # e.g. WEBPGM connections
             $defs{$d}{VOLATILE});   # e.g at, will be saved to the statefile
-
-    my $room = ($attr{$d} ? $attr{$d}{room} : "");
-    $room = "" if(!$room);
-    if($room ne $oldroom) {
-      print SFH "\nsetdefaultattr" . ($room ? " room $room" : "") . "\n";
-      $oldroom = $room;
-    }
 
     if($d ne "global") {
       if($defs{$d}{DEF}) {
         my $def = $defs{$d}{DEF};
         $def =~ s/;/;;/g;
-        print SFH "define $d $defs{$d}{TYPE} $def\n";
+        print SFH "\ndefine $d $defs{$d}{TYPE} $def\n";
       } else {
-        print SFH "define $d $defs{$d}{TYPE}\n";
+        print SFH "\ndefine $d $defs{$d}{TYPE}\n";
       }
     }
     foreach my $a (sort keys %{$attr{$d}}) {
-      next if($a eq "room");
       next if($d eq "global" && 
               ($a eq "configfile" || $a eq "version"));
       print SFH "attr $d $a $attr{$d}{$a}\n";

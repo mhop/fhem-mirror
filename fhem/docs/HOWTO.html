@@ -6,7 +6,7 @@
     <h2>FHEMWEB Howto</h2>
 
     <a href="#starting">Starting</a><br/>
-    <a href="#FHZ">Attaching an FHZ device</a><br/>
+    <a href="#FHZ">Attaching an FHZ/CUL</a><br/>
     <a href="#FS20rx">Configuring FS20 receivers</a><br/>
     <a href="#FS20tx">Configuring FS20 transmitters</a><br/>
     <a href="#FHT">Configuring FHT devices</a><br/>
@@ -41,7 +41,7 @@
 
 
     <a name="FHZ"/>
-    <h3>Attaching an FHZ device</h3>
+    <h3>Attaching an FHZ/CUL</h3>
       <ul>
       Attach the FHZ1000 or FHZ1300 to your computer, and look for a file named
       /dev/ttyUSB0 or /dev/tts/USB0 (or /var/elv on the Fritz!Box).
@@ -51,12 +51,26 @@
       You can find details <a href="commandref.html#define">here</a> and
       <a href="commandref.html#FHZ">here</a>. Instead of an FHZ you can also
       use a <a href="commandref.html#CUL">CUL</a> with slightly different
-      parameters.
+      parameters (define CUL CUL /dev/ttyACM0 1234).
 
       <br><br>
       <b>Note:</b> Don't forget to type "save" in the "Fhem cmd" input field of
       the browser after defining a device or setting its attribute.  Otherwise
       the changes will disappear after the next start.</br><br> </ul>
+
+    <a name="autocreate"/>
+    <h3>Automatically creating transmitters</h3>
+      <ul>
+      The sample configuration file installed via "make install-pgm2" has
+      configured an <a href="commandref.html#autocreate">autocreate</a>
+      instance. This will automatically create fhem devices upon reception
+      of a message form this device (typically a sensor like S300 or FHT).
+      Just wait for a while, and re-check your browser for newly appeared
+      devices. You can use <a href="commandref.html#rename"> rename</a> to
+      rename the automatically created device, e.g. type in the input field of
+      the web frontend:<pre>
+      rename FHT_1234 fht.kitchen</pre> 
+      </ul>
 
 
     <a name="FS20rx"/>

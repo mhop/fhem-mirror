@@ -1,7 +1,7 @@
 ############################
 # Display the measured temp and the actuator.
 # Corresponding FileLog definition: 
-# define fhtlog1 FileLog /var/log/fhem/fht1-%Y-%U.log fht1:.*(temp|actuator).*
+# define <filelogname> FileLog /var/log/fhem/fht-%Y.log <fhtname>
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
@@ -11,18 +11,14 @@ set xlabel " "
 set ytics nomirror
 set y2tics
 #set ytics
-set title '<TL>'
+set title '<L1>'
 set grid xtics y2tics
 
 set y2label "Temperature in C"
 set ylabel "Actuator (%)"
 
 #FileLog 4:measured:0:
-##FileLog 4:desired:0:
 #FileLog 4:actuator.*[0-9]+%:0:int
-
-#  "< awk '/desired/ {print $1, $4+0}' <IN>"\
-#     using 1:2 axes x1y2 title 'Desired temperature' with steps,\
 
 plot \
   "< awk '/measured/{print $1, $4}' <IN>"\
