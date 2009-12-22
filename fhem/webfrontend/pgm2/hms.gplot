@@ -1,9 +1,7 @@
 #
 # Display the measured temp and the humidity.
 # FileLog definition: 
-# define UGHygrolog FileLog /var/tmp/UGHygro.log UGHygro:.*T:.*
-# attr UGHygrolog logtype hms_tf
-# define wl_11 weblink fileplot UGHygrolog:hms_tf:CURRENT
+# define <filelogname> FileLog /var/log/fhem/hmsname-%Y.log <hmsname>:T:.*
 #
 # Logfile record example:
 # 2008-07-24_02:20:57 UGHygro T: 17.2  H: 77.6  Bat: ok
@@ -21,7 +19,7 @@ set xlabel " "
 set ytics nomirror
 set y2tics
 #set ytics
-set title '<TL>'
+set title '<L1>'
 set grid xtics y2tics
 
 set y2label "Temperature in C"
@@ -35,7 +33,3 @@ plot \
      using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
   "< awk '/H:/ {print $1, $6}' <IN>"\
      using 1:2 axes x1y1 title 'Humidity (%)' with lines lw 1\
-
-
-
-

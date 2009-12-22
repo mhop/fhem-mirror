@@ -1,4 +1,4 @@
-die("Usage: crc HEX-MESSAGE\n") if(int(@ARGV) != 2);
+die("Usage: crc <HEX-MESSAGE> <CRC>\n") if(int(@ARGV) != 2);
 my $msg = $ARGV[0];
 $msg =~ s/ //g;
 

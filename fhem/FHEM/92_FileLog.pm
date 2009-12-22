@@ -80,7 +80,7 @@ FileLog_Log($$)
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
       my $t = TimeNow();
       $t = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
-      $t =~ s/ /_/; # Makes it easier to parse with gnuplot
+      $t =~ s/ /_/o; # Makes it easier to parse with gnuplot
 
       my $fh = $log->{FH};
       my @t = localtime;
@@ -182,7 +182,7 @@ FileLog_Get($@)
   if($inf eq "-") {
     $inf = $hash->{currentlogfile};
   } else {
-    my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,);
+    my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,o);
     if(!-f $linf) {
       $linf = $attr{$hash->{NAME}}{archivedir} . "/" . $inf;
       return "Error: File-not-found" if(!-f $linf);
@@ -214,7 +214,7 @@ FileLog_Get($@)
     $h{didx} = 10 if($fld[3] && $fld[3] eq "delta-d");  # delta idx, substr len
     $h{didx} = 13 if($fld[3] && $fld[3] eq "delta-h");
 
-    if($fld[0] =~ m/"(.*)"/) {
+    if($fld[0] =~ m/"(.*)"/o) {
       $h{col} = $1;
       $h{type} = 0;
     } else {
@@ -281,7 +281,7 @@ FileLog_Get($@)
         $lastdate{$hd} = $fld[0];
 
       } elsif($t == 3) {                    # int function
-        $val = $1 if($fld[$col] =~ m/^([0-9]+).*/);
+        $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
 
       } else {                              # evaluate
         $val = eval($h->{fn});
@@ -380,7 +380,7 @@ seekTo($$$$)
       $last = $next;
       last;
     }
-    if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /) {
+    if($data !~ m/^\d\d\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /o) {
       $next = $fh->tell;
       $data = <$fh>;
       if(!$data) {

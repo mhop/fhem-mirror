@@ -8,7 +8,7 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel "Energiemonitor EM1000EM"
 
-set title '<TL>'
+set title '<L1>'
 set ylabel "Power (kW)"
 set y2label "Power (kWh)"
 set grid

@@ -1,9 +1,7 @@
 ############################
 # Display the temperature and the humidity values of a KS300.
 # Corresponding FileLog definition:
-# define ks300log FileLog /var/log/fhem/ks300-%Y-%U.log ks300:.*H:.*
-#   or (SVG/gnuplot-scroll)
-# define ks300log FileLog /var/log/fhem/ks300-%Y.log ks300:.*H:.*
+# define <filelogname> FileLog /var/log/fhem/hms-%Y.log <ks300name>:T:.*
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
@@ -12,7 +10,7 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics nomirror
 set y2tics
-set title '<TL>'
+set title '<L1>'
 set grid
 
 set y2label "Temperature in C"
