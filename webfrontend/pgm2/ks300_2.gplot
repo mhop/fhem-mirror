@@ -1,9 +1,7 @@
 ############################
 # Display the Wind and the Rain values of a KS300.
 # Corresponding FileLog definition:
-# define ks300log FileLog /var/log/fhem/ks300-%Y-%U.log ks300:.*H:.*
-#   or (SVG/gnuplot-scroll)
-# define ks300log FileLog /var/log/fhem/ks300-%Y.log ks300:.*H:.*
+# define <filelogname> FileLog /var/log/fhem/hms-%Y.log <ks300name>:T:.*
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'

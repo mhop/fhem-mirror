@@ -1,7 +1,7 @@
 ############################
 # Display the s300th data reported by the CUL
 # Corresponding FileLog definition:
-# define ememlog FileLog /var/log/fhem/s300th-%Y.log s300th.*
+# define <filelogname> FileLog /var/log/fhem/s300th-%Y.log <s300name>
 
 set terminal png transparent size <SIZE> crop
 set output '<OUT>.png'
@@ -9,7 +9,7 @@ set xdata time
 set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 
-set title '<TL>'
+set title '<L1>'
 set ylabel "Temp (C)"
 set y2label "Temp (C)"
 set grid
@@ -18,10 +18,6 @@ set y2tics
 set format y "%.1f"
 set format y2 "%.1f"
 
-#FileLog 4:s300th1:0:
-#FileLog 4:s300th3:0:
-#FileLog 4:s300th5:0:
+#FileLog 4::0:
 
-plot "<grep s300th1 <IN>" using 1:8 title '1' with lines,\
-     "<grep s300th3 <IN>" using 1:8 title '3' with lines,\
-     "<grep s300th5 <IN>" using 1:8 title '5' with lines
+plot "<IN>" using 1:4 title 'Temperature' with lines
