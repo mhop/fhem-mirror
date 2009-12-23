@@ -154,10 +154,12 @@ FHZ_Set($@)
     push(@init, "set $name time");
     push(@init, "set $name raw 04 01010100010000");
     CommandChain(3, \@init);
+    return undef;
 
   } elsif($a[1] eq "reopen") {
 
     FHZ_Reopen($hash);
+    return undef;
 
   } elsif($a[1] eq "raw") {
 
