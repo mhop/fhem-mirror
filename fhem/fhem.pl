@@ -157,7 +157,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.93 2009-12-22 11:00:54 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.94 2009-12-27 18:07:14 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1810,7 +1810,7 @@ GetTimeSpec($)
     ($hr, $min, $sec) = ($1, $2, 0);
   } elsif($tspec =~ m/^{(.*)}$/) {
     $fn = $1;
-    $tspec = eval $fn;
+    $tspec = AnalyzeCommand(undef, "{$fn}");
     if(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9]):([0-5][0-9])$/) {
       ($hr, $min, $sec) = ($1, $2, $3);
     } elsif(!$@ && $tspec =~ m/^([0-9]+):([0-5][0-9])$/) {
