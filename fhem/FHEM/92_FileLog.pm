@@ -390,7 +390,7 @@ seekTo($$$$)
 
       # If the second line is longer then the first,
       # binary search will never get it: 
-      if($next eq $last && $data ge $ts && $div < 8192) {
+      if($next eq $last && $data ge $ts && $div < 8192 && $next < 1024) {
         $last = 0;
         $div *= 2;
       }
