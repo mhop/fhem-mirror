@@ -145,7 +145,9 @@ Do_On_Till($@)
 
   my @b = ($a[0], "on");
   FS20_Set($hash, @b);
-  CommandDefine(undef, $hash->{NAME} . "_till at $hms_till set $a[0] off");
+  my $tname = $hash->{NAME} . "_till";
+  CommandDelete(undef, $tname) if($defs{$tname});
+  CommandDefine(undef, "$tname at $hms_till set $a[0] off");
 
 }
 
