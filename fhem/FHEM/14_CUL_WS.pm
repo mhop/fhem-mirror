@@ -134,8 +134,8 @@ CUL_WS_Parse($$)
     if($typbyte == 3 && int(@a) > 8) {           # wind
       my $hun = ($firstbyte&8) ? 100 : 0;
       $wnd = ($a[6].$a[3].".".$a[4])+$hun;
-      my $dir  = (($a[7]&3).$a[8].$a[5])+0;
-      my $swing = ($a[7]&6) >> 2;
+      my $dir  = ((hex($a[7])&3).$a[8].$a[5])+0;
+      my $swing = (hex($a[7])&6) >> 2;
       $val = "W: $wnd D: $dir A: $swing";
       $devtype = "Wind";
       $family = "WS7000";
