@@ -12,7 +12,7 @@
 # Example
 # define WBS001 WBS Temperature 1032D8ED01080011
 # $defs$defs{WBS001}{TYPE} = WBS
-# $defs$defs{WBS001}{CODE} = 12345
+# $defs$defs{WBS001}{CODE} = 1032D8ED01080011
 # $defs{WBS001}{READINGS}{Temperature}{VAL} = 0
 # $defs{WBS001}{READINGS}{Temperature}{TIME} = TimeNow()
 # Only One READING for each WBS
@@ -38,6 +38,7 @@ use Data::Dumper;
 use vars qw(%defs);
 use vars qw(%attr);
 use vars qw(%data);
+use vars qw(%modules);
 # Reverse-Lokup-Pointer
 my %defptr;
 ################################################################################
@@ -49,6 +50,13 @@ sub WBS_Initialize($)
   $hash->{UndefFn}   = "WBS_Undef";
   $hash->{ParseFn}   = "WBS_Parse";
   $hash->{AttrList}  = "IODEV do_not_notify:0,1 loglevel:0,5 disable:0,1";
+  $hash->{defptr} = {};
+  #Rebuild DefPtr
+  my $mod = "WBS";
+  foreach my $d (sort keys %defs) {
+    next if($defs{$d}{TYPE} ne $mod);
+	$hash->{defptr}{$defs{$d}{CODE}} = $defs{$d}{NAME};
+  }
 }
 ################################################################################
 sub WBS_Define($)
@@ -59,9 +67,10 @@ sub WBS_Define($)
   Log 0, "WBS|DEFPTR: " . Dumper(%defptr);
   my @a = split(/ /, $defs);
   return "WBS|Define|ERROR: Unknown argument count " . int(@a) . " , usage define <NAME> WBS TYPE CODE"  if(int(@a) != 4);
+  my $mod = $a[1];
   my $Type = $a[2];
   my $Code = $a[3];
-  if(defined($defptr{$Code})) {
+  if(defined($modules{$mod}{defptr}{$Code})) {
 	return "WBS|Define|ERROR: Code is used";
   }
   if(length($Code) > 16) {
@@ -80,8 +89,12 @@ sub WBS_Define($)
 sub WBS_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}})
-        if(defined($hash->{CODE}) && defined($defptr{$hash->{CODE}}));
+  Log 0, "WBS|Undef: " . Dumper(@_);
+  my $mod = $defs{$name}{TYPE};
+  my $Code = $defs{$name}{CODE};
+  if(defined($modules{$mod}{defptr}{$Code})) {
+	delete $modules{$mod}{defptr}{$Code}
+  }
   return undef;
 }
 ################################################################################
@@ -97,12 +110,12 @@ sub WBS_Parse($$)
 	return "WBS|Parse|ERROR: Max. Length VALUE > 8";
   }
   # Find Device-Name
-  if(!defined($defptr{$code})) {
+  my $mod = "WBS";
+  if(!defined($modules{$mod}{defptr}{$code})){
   return "WBS|Parse|ERROR: Unkown Device for $code";
   }
-  Log 0, "WBS|Parse: " . Dumper(%defptr);
-  my $wbs = $defptr{$code};
-  my $wbs_name = $wbs->{NAME};
+  my $wbs_name = $modules{$mod}{defptr}{$code};
+  my $wbs = $defs{$wbs_name};
   #LogLevel
   my $ll = 0;
   if(defined($attr{$wbs_name}{loglevel})) {$ll = $attr{$wbs_name}{loglevel};}
@@ -117,6 +130,7 @@ sub WBS_Parse($$)
   $wbs->{STATE} = "$fc: $value";
   # Changed
   $wbs->{CHANGED}[0] = "$reading:$value";
+  return $wbs_name;
 }
 ################################################################################
 1;
