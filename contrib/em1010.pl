@@ -351,7 +351,7 @@ getDevData()
     #hexdump($d);
 
     my $max = (($p == $end) ? ($nrreadings%64)*4+4 : 260);
-    my $step = b($d, 6);
+    my $step = b($d, 7); # Switched from 6 to 7 (Thomas, 2009-12-31)
 
     for(my $off = 8; $off <= $max; $off += 4) {
       $backlog++;
