@@ -163,16 +163,11 @@ CUL_FHTTK_Parse($$)
   my $state = lc(substr($msg, 7, 2));
   my $def   = $defptr{$sensor};
   my $self  = $def->{NAME};
-  if(!defined($def)) {
+
+  if(!defined($defptr{$sensor})) {
     Log 3, "FHTTK Unknown device $sensor, please define it";
     return "UNDEFINED CUL_FHTTK_$sensor CUL_FHTTK $sensor";
   }
-
-  # if it's not our device
-#  if($def->{IODev} && $def->{IODev}{NAME} ne $hash->{NAME}) {
-#    Log 3, sprintf("skipping device %s on this receiver", $sensor);
-#    return "";
-#  }
 
   if(!defined($fhttfk_translatedcodes{$state})) {
       Log 3, sprintf("FHTTK $def Unknown state $state");
@@ -181,60 +176,52 @@ CUL_FHTTK_Parse($$)
       return "";
   }
 
-#  Log 3, sprintf("FHTTK Translating $state into %s", $fhttfk_translatedcodes{$state});
   $state=$fhttfk_translatedcodes{$state};
   # PREVIOUS
-  # FIXME: Message regarded as similar if last char is identical; sure that's always
-  #        the differentiator? -wusel, 2009-11-09
-  if(defined($defs{$self}{READINGS}{PREV}{TIMESTAMP})) {
-      if($defs{$self}{READINGS}{PREV}{TIMESTAMP} > time()-5) {
-         if(defined($defs{$self}{READINGS}{PREV}{STATE})) {
-             if($defs{$self}{READINGS}{PREV}{STATE} eq $state) {
-                 Log 3, sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 secs ago", $defs{$self}{READINGS}{PREV}{STATE});
+  # FIXME: Message regarded as similar if last char is identical;
+  # sure that's always the differentiator? -wusel, 2009-11-09
+  if(defined($defs{$self}{PREV}{TIMESTAMP})) {
+      if($defs{$self}{PREV}{TIMESTAMP} > time()-5) {
+         if(defined($defs{$self}{PREV}{STATE})) {
+             if($defs{$self}{PREV}{STATE} eq $state) {
+                 Log GetLogLevel($def->{NAME},4), sprintf("FHTTK skipping state $state as last similar telegram was received less than 5 (%d) secs ago", $defs{$self}{PREV}{STATE}, time()-$defs{$self}{PREV}{TIMESTAMP});
                  return "";
              }
          }
       }
   }
-  $def->{PREVTIMESTAMP} = defined($defs{$self}{READINGS}{PREV}{TIMESTAMP})?$defs{$self}{READINGS}{PREV}{TIMESTAMP}:time();
+  $def->{PREVTIMESTAMP} = defined($defs{$self}{PREV}{TIMESTAMP})?$defs{$self}{PREV}{TIMESTAMP}:time();
   $def->{PREVSTATE} = defined($def->{STATE})?$def->{STATE}:"Unknown";
-  $defs{$self}{READINGS}{PREV}{STATE}=$state;
+  $defs{$self}{PREV}{STATE}=$state;
   #READINGS
   my ($reading,$val) = split(/:/, $fhttfk_codes{$state});
   $defs{$self}{READINGS}{$reading}{VAL} = $val;
   $defs{$self}{READINGS}{$reading}{TIME} = TimeNow();
-  $defs{$self}{READINGS}{PREV}{TIMESTAMP} = time();
+  $defs{$self}{PREV}{TIMESTAMP} = time();
   # -wusel, 2009-11-09: According to http://fhz4linux.info/tiki-index.php?page=FHT+protocol,
   #                     FHT80TF usually transmitts between 60 and 240 seconds. (255-256 sec in
   #                     my experience ...) If we got no fresh data for over 5 minutes (300 sec),
   #                     flag this.
-  if($defs{$self}{READINGS}{PREV}{TIMESTAMP}+720 < time()) {
+  if($defs{$self}{PREV}{TIMESTAMP}+720 < time()) {
       $defs{$self}{READINGS}{"Reliability"}{VAL} = "dead";
       $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
-  } elsif($defs{$self}{READINGS}{PREV}{TIMESTAMP}+600 < time()) {
+  } elsif($defs{$self}{PREV}{TIMESTAMP}+600 < time()) {
       $defs{$self}{READINGS}{"Reliability"}{VAL} = "low";
       $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
-  } elsif($defs{$self}{READINGS}{PREV}{TIMESTAMP}+300 < time()) {
+  } elsif($defs{$self}{PREV}{TIMESTAMP}+300 < time()) {
       $defs{$self}{READINGS}{"Reliability"}{VAL} = "medium";
       $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
   } else {
-      undef($defs{$self}{READINGS}{"Reliability"}{VAL});
-      undef($defs{$self}{READINGS}{"Reliability"}{TIME});
-      undef($defs{$self}{READINGS}{"Reliability"});
+      $defs{$self}{READINGS}{"Reliability"}{VAL} = "ok";
+      $defs{$self}{READINGS}{"Reliability"}{TIME} = TimeNow();
   }
   # Flag the battery warning separately
   if($state eq "11" || $state eq "12") {
       $defs{$self}{READINGS}{"Battery"}{VAL} = "Low";
       $defs{$self}{READINGS}{"Battery"}{TIME} = TimeNow();
-      $defs{$self}{READINGS}{"Warning"}{VAL} = "Battery Low";
-      $defs{$self}{READINGS}{"Warning"}{TIME} = TimeNow();
   } else {
-      undef($defs{$self}{READINGS}{"Battery"}{VAL});
-      undef($defs{$self}{READINGS}{"Battery"}{TIME});
-      undef($defs{$self}{READINGS}{"Battery"});
-      undef($defs{$self}{READINGS}{"Warning"}{VAL});
-      undef($defs{$self}{READINGS}{"Warning"}{TIME});
-      undef($defs{$self}{READINGS}{"Warning"});
+      $defs{$self}{READINGS}{"Battery"}{VAL} = "ok";
+      $defs{$self}{READINGS}{"Battery"}{TIME} = TimeNow();
   }
   #CHANGED
   $defs{$self}{CHANGED}[0] = $reading . ": " . $val;
