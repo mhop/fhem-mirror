@@ -203,16 +203,19 @@
       <a href="commandref.html#logtype">logtype</a> attribute of the
       corresponding FileLog. Take a look at the available gnuplot files in the
       "Edit files" section, they contain the corresponding FileLog definition
-      example.<br/><br/>
+      example.<br>
+      Note that the .gplot files are also used if you use SVG output and
+      not the gnuplot backend!<br><br>
+
 
       When displaying the plot, you can convert it into a "weblink", which can
-      in turn have a room attribute, to group more than one Plot together. If
+      in turn have a room attribute to group more than one Plot together. If
       the weblink refers to the current logfile, then it will be stored as a
       CURRENT weblink, and it will always display the most recent log (you do
       not have to redefine it if the logfile changes due to year/month/date
       parameters in its name).
-
       <br/><br/>
+
 
       The logs can be converted to a plot either with gnuplot (which must be
       installed and in your PATH), or via the builtin SVG module, in this case
@@ -220,6 +223,32 @@
       iPhone/Android borwser support SVG out of the box, Internet Explorer does
       it via the Adobe "SVG viewer" plugin. To use SVG graphics, set the <a
       href="commandref.html#plotmode">plotmode</a> attribute to SVG.<br><br>
+
+      In order to look at historic data, you can either convert at the
+      archive entries to weblink in "plotmode=gnuplot" mode, or use the
+      "plotmode=gnuplot-scroll" or "plotmode=SVG" modes. In the latter case
+      you'll get the possibility to zoom or scroll in the plot.<br><br>
+
+      Use the zoom and scroll icons at the top of the page.<br><br>
+
+      The current time scope (day, week, month..) set at the overview
+      page (containing weblinks) will also be used for graphics you open via
+      links (current log or archive) - there are no zoom and scroll icons
+      there.<br><br>
+
+      Note: the gnuplot files must have #FileLog entries in order to be
+      useable with scrolling, as the filtering happens with the FileLog get
+      function, see the supplied gnuplot files for an example.<br><br>
+
+       The order of the #FileLog lines need to match the corresponding
+      'awk'-(double-)lines!<br><br>
+
+      It make sense to build large logfiles for scrolling in them (year
+      resolution), or smaller ones if you do not want to use the zoom/scroll
+      feature. The size of the logfiles will be determined by its wildcard
+      characters (year/month/week/day), look at the FileLog definition.
+      Don't forget to enable archiving with the archivedir or archivecmd
+      attributes.<br><br>
 
       To zoom in the log you have to set plotmode to gnuplot-scroll or SVG. The
       gnuplot files must have #FileLog entries in order to be useable with
@@ -269,8 +298,11 @@
       configure a fake logfile with the correct filename and an unused regexp,
       e.g.<br><pre>
       define messages FileLog /var/log/messages fakelog</pre>
+
+
       </ul>
       <br>
+
 
     <a name="structure"/>
     <h3>Complex structures</h3>
