@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.96 2010-01-01 14:53:03 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.97 2010-01-01 15:18:09 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -406,9 +406,12 @@ sub
 IsIgnored($)
 {
   my $devname = shift;
-  return 1 if($devname &&
-              defined($attr{$devname}) &&
-              defined($attr{$devname}{ignore}));
+  if($devname &&
+     defined($attr{$devname}) &&
+     defined($attr{$devname}{ignore})) {
+    Log 4, "Ignoring $devname";
+    return 1;
+  }
   return 0;
 }
 
