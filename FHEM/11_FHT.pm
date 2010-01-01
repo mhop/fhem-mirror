@@ -111,7 +111,6 @@ my %c2m = (0 => "auto", 1 => "manual", 2 => "holiday", 3 => "holiday_short");
 my %m2c;	# Reverse c2m
 my %c2b;	# command->button hash (reverse of codes)
 my %c2bset;	# command->button hash (settable values)
-my %defptr;
 
 my $defmin = 0;                # min fhtbuf free bytes before sending commands
 my $retryafter = 240;          # in seconds, only when fhtsoftbuffer is active
@@ -305,7 +304,7 @@ FHT_Define($$)
 
   $hash->{CODE} = $a[2];
   $hash->{CODE} = $a[2];
-  $defptr{$a[2]} = $hash;
+  $modules{FHT}{defptr}{$a[2]} = $hash;
   $attr{$a[0]}{retrycount} = 3;
 
   AssignIoPort($hash);
@@ -321,7 +320,7 @@ sub
 FHT_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}}) if($hash && $hash->{CODE});
+  delete($modules{FHT}{defptr}{$hash->{CODE}}) if($hash && $hash->{CODE});
   return undef;
 }
 
@@ -337,12 +336,12 @@ FHT_Parse($$)
   my $val = substr($msg, 26, 2) if(length($msg) > 26);
   my $confirm = 0;
 
-  if(!defined($defptr{$dev})) {
+  if(!defined($modules{FHT}{defptr}{$dev})) {
     Log 3, "FHT Unknown device $dev, please define it";
     return "UNDEFINED FHT_$dev FHT $dev";
   }
 
-  my $def = $defptr{$dev};
+  my $def = $modules{FHT}{defptr}{$dev};
   my $name = $def->{NAME};
 
   # Short message

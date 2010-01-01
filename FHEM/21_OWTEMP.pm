@@ -28,8 +28,6 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use OW;
 
-my %defptr;
-
 my %gets = (
   "address"     => "",
   "alias"       => "",
@@ -422,7 +420,7 @@ OWTEMP_Define($$)
   $hash->{OW_PATH}    = $hash->{OW_FAMILY}.".".$hash->{OW_ID};
   $hash->{PRESENT}    = 0;
 
-  $defptr{$a[2]} = $hash;
+  $modules{OWTEMP}{defptr}{$a[2]} = $hash;
 
   # assign IO port
   AssignIoPort($hash);
@@ -483,7 +481,7 @@ OWTEMP_Undef($$)
 {
   my ($hash, $name) = @_;
 
-  delete($defptr{$hash->{NAME}});
+  delete($modules{OWTEMP}{defptr}{$hash->{NAME}});
   RemoveInternalTimer($hash);
 
   return undef;

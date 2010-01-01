@@ -4,8 +4,6 @@ package main;
 use strict;
 use warnings;
 
-my %defptr;
-
 # Adjust TOTAL to you meter:
 # {$defs{emwz}{READINGS}{basis}{VAL}=<meter>/<corr2>-<total_cnt> }
 
@@ -45,7 +43,7 @@ CUL_RFR_Define($$)
                $a[3] !~ m/[0-9A-F]{2}/i);
   $hash->{ID} = $a[2];
   $hash->{ROUTERID} = $a[3];
-  $defptr{"$a[2]$a[3]"} = $hash;
+  $modules{CUL_RFR}{defptr}{"$a[2]$a[3]"} = $hash;
   AssignIoPort($hash);
   return undef;
 }
@@ -67,7 +65,7 @@ sub
 CUL_RFR_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{ID} . $hash->{ROUTERID}});
+  delete($modules{CUL_RFR}{defptr}{$hash->{ID} . $hash->{ROUTERID}});
   return undef;
 }
 
@@ -83,11 +81,11 @@ CUL_RFR_Parse($$)
   my ($rid, $id, $smsg) = ($1,$2,$3);
   my $cde = "${id}${rid}";
 
-  if(!$defptr{$cde}) {
+  if(!$modules{CUL_RFR}{defptr}{$cde}) {
     Log 1, "CUL_RFR detected, Id $id, Router $rid, MSG $smsg";
     return "UNDEFINED CUL_RFR_$id CUL_RFR $id $rid";
   }
-  my $hash = $defptr{$cde};
+  my $hash = $modules{CUL_RFR}{defptr}{$cde};
   my $name = $hash->{NAME};
 
      if($smsg =~ m/^T/) { $hash->{NR_TMSG}++ }
