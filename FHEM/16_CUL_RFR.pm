@@ -22,7 +22,8 @@ CUL_RFR_Initialize($)
   $hash->{DefFn}     = "CUL_RFR_Define";
   $hash->{UndefFn}   = "CUL_RFR_Undef";
   $hash->{ParseFn}   = "CUL_RFR_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 model:CUL,CUN,CUR loglevel";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 model:CUL,CUN,CUR " .
+                       "loglevel:0,1,2,3,4,5,6 ignore:0,1";
 
   $hash->{WriteFn}   = "CUL_RFR_Write";
   $hash->{GetFn}     = "CUL_Get";
@@ -87,6 +88,7 @@ CUL_RFR_Parse($$)
   }
   my $hash = $modules{CUL_RFR}{defptr}{$cde};
   my $name = $hash->{NAME};
+  return "" if(IsIgnored($name));
 
      if($smsg =~ m/^T/) { $hash->{NR_TMSG}++ }
   elsif($smsg =~ m/^F/) { $hash->{NR_FMSG}++ }

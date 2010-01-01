@@ -22,7 +22,8 @@ BS_Initialize($)
   $hash->{DefFn}     = "BS_Define";
   $hash->{UndefFn}   = "BS_Undef";
   $hash->{ParseFn}   = "BS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 showtime:0,1 dummy:1,0 model:BS loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "do_not_notify:1,0 showtime:0,1 ".
+                       "ignore:1,0 model:BS loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -88,6 +89,7 @@ BS_Parse($$)
   }
 
   my $name= $def->{NAME};
+  return "" if(IsIgnored($name));
 
   my $t= TimeNow();
 

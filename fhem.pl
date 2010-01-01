@@ -73,6 +73,8 @@ sub devspec2array($);
 sub doGlobalDef($);
 sub fhem($);
 sub fhz($);
+sub IsDummy($);
+sub IsIgnored($);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -157,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.95 2010-01-01 13:48:33 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.96 2010-01-01 14:53:03 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -400,6 +402,17 @@ IsDummy($)
   return 0;
 }
 
+sub
+IsIgnored($)
+{
+  my $devname = shift;
+  return 1 if($devname &&
+              defined($attr{$devname}) &&
+              defined($attr{$devname}{ignore}));
+  return 0;
+}
+
+
 ################################################
 sub
 IsIoDummy($)
@@ -472,9 +485,11 @@ IOWrite($@)
 {
   my ($hash, @a) = @_;
 
+  my $dev = $hash->{NAME};
+  return if(IsDummy($dev) || IsIgnored($dev));
   my $iohash = $hash->{IODev};
   if(!$iohash) {
-    Log 5, "No IO device found for $hash->{NAME}";
+    Log 5, "No IO device found for $dev";
     return;
   }
 
@@ -679,6 +694,8 @@ devspec2array($)
   }
 
   return $name if(!@ret && !$isattr);             # No match, return the input
+  @ret = grep { !$attr{$_} || !$attr{$_}{ignore} } @ret
+        if($name !~ m/^ignore=/);
   return @ret;
 }
 
@@ -1213,6 +1230,7 @@ CommandList($$)
     for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
 		  	      $modules{$defs{$b}{TYPE}}{ORDER};
 		         $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
+      next if(IsIgnored($d));
       my $t = $defs{$d}{TYPE};
       $str .= "\n$t:\n" if($t ne $lt);
       $str .= sprintf("  %-20s (%s)\n", $d, $defs{$d}{STATE});

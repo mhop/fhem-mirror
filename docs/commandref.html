@@ -1249,6 +1249,16 @@ A line ending with \ will be concatenated with the next one, so long lines
 	</li><br>
 
 
+    <a name="ignore"></a>
+    <li>ignore<br>
+        Ignore this device, e.g. if it belongs to your neighbour. The device
+        won't trigger any FileLogs/notifys, issued commands will silently
+        ignored (no RF signal will be sent out, just like for the <a
+        href="#attrdummy">dummy</a> attribute). The device won't appear in the
+        list command (only if it is explicitely asked for it), nor will it
+        appear in commands which use some wildcard/attribute as name specifiers
+        (see <a href="#devspec">devspec</a>). You still get them with the
+        "ignored=1" special devspec.  </li>
 
   </ul>
 </ul>
@@ -1449,6 +1459,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#attrdummy">dummy</a><br>
       <b>Note:</b>It makes sense to define an FHT device even for an FHT8b,
@@ -1544,11 +1555,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (FHT80TF)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#ignore">ignore</a></li><br>
   </ul>
   <br>
 
@@ -1613,6 +1624,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
@@ -1761,6 +1773,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
@@ -1825,6 +1838,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#ignore">ignore</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
@@ -1898,7 +1912,9 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
-    Same as for the <a href="#CUL">CUL</a>.</ul><br>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    The rest of the attributes is the same as for the <a href="#CUL">CUL</a>.</ul><br>
   </ul>
   <br>
 </ul>
@@ -2166,6 +2182,8 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#IODev">IODev</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
@@ -2563,10 +2581,12 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (usf1000s)</li>
+    <li><a href="#ignore">ignore</a></li>
   </ul>
   <br>
 
@@ -2629,6 +2649,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (bs)</li>
+    <li><a href="#ignore">ignore</a></li>
   </ul>
   <br>
 
@@ -3138,6 +3159,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#showtime">showtime</a></li>
+    <li><a href="#IODev">IODev</a></li>
   </ul>
   <br>
 
@@ -3402,7 +3424,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         <li>Title with maximum and current values of the 1st curve (FileLog)
           <ul>
             <li>Fhem config:<br>
-                attr wl_1 label "Max $data{max1}, Current $data{lastv1}"</li>
+                attr wl_1 label "Max $data{max1}, Current $data{currval1}"</li>
             <li>.gplot file entry:<br>
                 set title &lt;L1&gt;<br>
           </ul></li>
@@ -4138,8 +4160,8 @@ A line ending with \ will be concatenated with the next one, so long lines
                Plots the measured-temp/desired-temp/actuator lines. The
                corresponding filelog definitions (for the FHT device named
                fht1) looks like:<br>
-               define FileLog fhtlog1 fht1:.*(temp|actuator).*
-               /var/log/fht1-%Y-%U.log
+               <code>define fhtlog1 FileLog fht1:.*(temp|actuator).* /var/log/fht1-%Y-%U.log</code>
+
           </li>
            <li>ks300<br>
                Plots the temperature and rain (per hour and per day) of a
