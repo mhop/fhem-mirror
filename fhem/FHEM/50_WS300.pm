@@ -39,7 +39,6 @@ package main;
 use strict;
 use warnings;
 
-my %defptr;
 my $DeviceName="";
 my $inbuf="";
 
@@ -117,7 +116,7 @@ WS300_Define($$)
     my $po;
   if($a[0] eq "WS300Device")
   {
-    $defptr{10} = $hash;
+    $modules{WS300}{defptr}{10} = $hash;
     return "wrong syntax: define WS300Device WS300 <DeviceName>" if(int(@a) < 3);
     $DeviceName = $a[2];
     $hash->{STATE} = "Initializing";
@@ -164,7 +163,7 @@ WS300_Define($$)
   return "no device: define WS300Device WS300 <DeviceName> first" if($DeviceName eq "");
   return "Define $a[0]: wrong sensor number." if($a[2] !~ m/^[0-9]$/);
   $hash->{SENSOR} = $a[2];
-  $defptr{$a[2]} = $hash;
+  $modules{WS300}{defptr}{$a[2]} = $hash;
 
   return undef;
 }
@@ -175,7 +174,7 @@ WS300_Undef($$)
 {
   my ($hash, $name) = @_;
   return undef if(!defined($hash->{SENSOR}));
-  delete($defptr{$hash->{SENSOR}});
+  delete($modules{WS300}{defptr}{$hash->{SENSOR}});
   return undef;
 }
 
@@ -253,14 +252,14 @@ WS300_Parse($$)
     {
       my $p=($s*6)+$offs;
       Log $ll,"Sensor $s vorhanden";
-      if(!defined($defptr{$s})) 
+      if(!defined($modules{WS300}{defptr}{$s})) 
       {
         Log 3, "WS300 Unknown device $s, please define it";
         return "UNDEFINED WS300_$s WS300 $s";
       }
       else
       {
-        $def = $defptr{$s};
+        $def = $modules{WS300}{defptr}{$s};
         $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
         $ref = $def->{READINGS};
 
@@ -445,14 +444,14 @@ WS300_Parse($$)
       }
     }
   }
-  if(!defined($defptr{9})) 
+  if(!defined($modules{WS300}{defptr}{9})) 
   {
     Log 3, "WS300 Unknown device 9, please define it";
     return "UNDEFINED WS300_9 WS300 9";
   }
   else
   {
-    $def = $defptr{9};
+    $def = $modules{WS300}{defptr}{9};
     $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
     $ref = $def->{READINGS};
 

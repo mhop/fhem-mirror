@@ -4,8 +4,6 @@ package main;
 use strict;
 use warnings;
 
-my %defptr;
-
 # Adjust TOTAL to you meter:
 # {$defs{emwz}{READINGS}{basis}{VAL}=<meter>/<corr2>-<total_cnt> }
 
@@ -63,7 +61,7 @@ CUL_EM_Define($$)
   $hash->{CostPerUnit} = (int(@a) > 5 ? $a[5] : 0);
   $hash->{BasicFeePerMonth} = (int(@a) > 6 ? $a[6] : 0);
 
-  $defptr{$a[2]} = $hash;
+  $modules{CUL_EM}{defptr}{$a[2]} = $hash;
   AssignIoPort($hash);
   return undef;
 }
@@ -73,7 +71,7 @@ sub
 CUL_EM_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}});
+  delete($modules{CUL_EM}{defptr}{$hash->{CODE}});
   return undef;
 }
 
@@ -106,10 +104,10 @@ CUL_EM_Parse($$)
   my $val = sprintf("CNT: %d CUM: %d  5MIN: %d  TOP: %d",
                          $seqno, $total_cnt, $current_cnt, $peak_cnt);
 
-  if($defptr{$cde}) {
-    my $def = $defptr{$cde};
+  if($modules{CUL_EM}{defptr}{$cde}) {
+    my $def = $modules{CUL_EM}{defptr}{$cde};
 
-    $hash = $defptr{$cde};
+    $hash = $def;
 
     my $tn = TimeNow();                 # current time
     my $c= 0;                           # count changes

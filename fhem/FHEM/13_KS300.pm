@@ -4,7 +4,6 @@ package main;
 use strict;
 use warnings;
 
-my %defptr;
 
 #####################################
 sub
@@ -42,7 +41,7 @@ KS300_Define($$)
   $hash->{CODE} = $a[2];
   $hash->{RAINUNIT} = $rainunit;
   $hash->{WINDUNIT} = $windunit;
-  $defptr{$a[2]} = $hash;
+  $modules{KS300}{defptr}{$a[2]} = $hash;
   AssignIoPort($hash);
 
   return undef;
@@ -53,7 +52,7 @@ sub
 KS300_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}});
+  delete($modules{KS300}{defptr}{$hash->{CODE}});
   return undef;
 }
 
@@ -81,11 +80,11 @@ KS300_Parse($$)
     return "";
   }
 
-  if(int(keys %defptr)) {
+  if(int(keys %{ $modules{KS300}{defptr} })) {
 
-    my @arr = keys(%defptr); # No code is known yet
+    my @arr = keys(%{ $modules{KS300}{defptr} }); # No code is known yet
     my $dev = shift(@arr);
-    my $def = $defptr{$dev};
+    my $def = $modules{KS300}{defptr}{$dev};
     my $haverain = 0;
     my $name= $def->{NAME};
 

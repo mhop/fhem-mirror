@@ -74,7 +74,6 @@ my %fhttfk_codes = (
     "92" => "Window:Closed, Low Batt",
     "12" => "Window:Closed, Low Batt",
     "0f" => "Test:Success");
-my %defptr;
 
 # -wusel, 2009-11-09: Map retransmission codes to major (8x) ones (0x)
 #                     As I'm somewhat lazy, I just list all codes from
@@ -135,7 +134,7 @@ CUL_FHTTK_Define($$)
 
 #  $hash->{SENSOR}= "$sensor";
   $hash->{CODE} = $sensor;
-  $defptr{$sensor} = $hash;
+  $modules{CUL_FHTTK}{defptr}{$sensor} = $hash;
 #  $defs{$hash}{READINGS}{PREV}{STATE}="00";
 #  $defs{$hash}{READINGS}{PREV}{TIMESTAMP} = localtime();
   AssignIoPort($hash);
@@ -148,7 +147,7 @@ sub
 CUL_FHTTK_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}}) if($hash && $hash->{CODE});
+  delete($modules{CUL_FHTTK}{defptr}{$hash->{CODE}}) if($hash && $hash->{CODE});
   return undef;
 }
 
@@ -160,14 +159,14 @@ CUL_FHTTK_Parse($$)
   my ($hash, $msg) = @_;
 
   my $sensor= lc(substr($msg, 1, 6));
-  my $state = lc(substr($msg, 7, 2));
-  my $def   = $defptr{$sensor};
-  my $self  = $def->{NAME};
-
-  if(!defined($defptr{$sensor})) {
+  my $def   = $modules{CUL_FHTTK}{defptr}{$sensor};
+  if(!$def) {
     Log 3, "FHTTK Unknown device $sensor, please define it";
     return "UNDEFINED CUL_FHTTK_$sensor CUL_FHTTK $sensor";
   }
+
+  my $self  = $def->{NAME};
+  my $state = lc(substr($msg, 7, 2));
 
   if(!defined($fhttfk_translatedcodes{$state})) {
       Log 3, sprintf("FHTTK $def Unknown state $state");

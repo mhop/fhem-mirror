@@ -16,8 +16,6 @@ my %codes = (
   "e" => "HMS100FIT",
 );
 
-my %defptr;
-
 
 #####################################
 sub
@@ -56,7 +54,7 @@ HMS_Define($$)
 
 
   $hash->{CODE} = $a[2];
-  $defptr{$a[2]} = $hash;
+  $modules{HMS}{defptr}{$a[2]} = $hash;
   AssignIoPort($hash);
   return undef;
 }
@@ -66,8 +64,9 @@ sub
 HMS_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}})
-        if(defined($hash->{CODE}) && defined($defptr{$hash->{CODE}}));
+  delete($modules{HMS}{defptr}{$hash->{CODE}})
+        if(defined($hash->{CODE}) &&
+           defined($modules{HMS}{defptr}{$hash->{CODE}}));
   return undef;
 }
 
@@ -94,19 +93,19 @@ HMS_Parse($$)
   # As the HMS devices change their id on each battery change, we offer
   # a wildcard too for each type:  100<device-code>,
   my $odev = $dev;
-  if(!defined($defptr{$dev})) {
+  if(!defined($modules{HMS}{defptr}{$dev})) {
     Log 4, "HMS device $dev not defined, using the wildcard device 100$cde";
     $dev = "100$cde";
   }
 
-  if(!defined($defptr{$dev})) {
+  if(!defined($modules{HMS}{defptr}{$dev})) {
     Log 3, "Unknown HMS device $dev/$odev, please define it";
     $type = "HMS" if(!$type);
     $type =~ s/-//; # RM100-2, - is special in fhem names
     return "UNDEFINED ${type}_$odev HMS $odev";
   }
 
-  my $def = $defptr{$dev};
+  my $def = $modules{HMS}{defptr}{$dev};
 
   my (@v, @txt);
 

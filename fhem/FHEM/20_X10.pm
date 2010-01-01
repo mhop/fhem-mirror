@@ -76,8 +76,6 @@ my %functions_set = ( "on"      => 0,
                       "on-till" => 1,
                     );
 
-# devices{HOUSE}{UNIT} -> Pointer to hash for the device for lookups
-my %devices;
 
 my %models = (
     lm12	=> 'dimmer',
@@ -254,13 +252,13 @@ X10_Define($$)
   $hash->{HOUSE}  = $housecode;
   $hash->{UNIT}   = $unitcode;
 
-  if(defined($devices{$housecode}{$unitcode})) {
+  if(defined($modules{X10}{defptr}{$housecode}{$unitcode})) {
     return "Error: duplicate X10 device $housecode $unitcode definition " .
            $hash->{NAME} . " (previous: " .
-           $devices{$housecode}{$unitcode}->{NAME} .")";
+           $modules{X10}{defptr}{$housecode}{$unitcode}->{NAME} .")";
   }
 
-  $devices{$housecode}{$unitcode}= $hash;
+  $modules{X10}{defptr}{$housecode}{$unitcode}= $hash;
 
   AssignIoPort($hash);
 }
@@ -271,7 +269,7 @@ X10_Undef($$)
 {
   my ($hash, $name) = @_;
   if( defined($hash->{HOUSE}) && defined($hash->{UNIT}) ) {
-    delete($devices{$hash->{HOUSE}}{$hash->{UNIT}});
+    delete($modules{X10}{defptr}{$hash->{HOUSE}}{$hash->{UNIT}});
   }
   return undef;
 }
@@ -302,8 +300,8 @@ X10_Parse($$)
   if($all_lights || $all_units) {
     $function= $functions_rewrite{$function}; # translate, all_lights_on -> on
     $unitcodes= "";
-    foreach my $unitcode (keys %{ $devices{$housecode} } ) {
-      my $h= $devices{$housecode}{$unitcode};
+    foreach my $unitcode (keys %{ $modules{X10}{defptr}{$housecode} } ) {
+      my $h= $modules{X10}{defptr}{$housecode}{$unitcode};
       my $islampmodule= grep { $_ eq $h->{MODEL} } @lampmodules;
       if($all_units || $islampmodule ) {
         $unitcodes.= " " if($unitcodes ne "");
@@ -346,7 +344,7 @@ X10_Parse($$)
 
   my $unknown_unitcodes= '';
   foreach my $unitcode (@unitcodes) {
-    my $h= $devices{$housecode}{$unitcode};
+    my $h= $modules{X10}{defptr}{$housecode}{$unitcode};
     if($h) {
         my $name= $h->{NAME};
         $h->{CHANGED}[0] = $value;

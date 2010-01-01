@@ -4,8 +4,6 @@ package main;
 use strict;
 use warnings;
 
-my %defptr;
-
 # Supports following devices:
 # KS300TH     (this is redirected to the more sophisticated 14_KS300 by 00_CUL)
 # S300TH  
@@ -47,7 +45,7 @@ CUL_WS_Define($$)
   $hash->{corr2} = ((int(@a) > 4) ? $a[4] : 0);
   $hash->{corr3} = ((int(@a) > 5) ? $a[5] : 0);
   $hash->{corr4} = ((int(@a) > 6) ? $a[6] : 0);
-  $defptr{$a[2]} = $hash;
+  $modules{CUL_WS}{defptr}{$a[2]} = $hash;
   AssignIoPort($hash);
   return undef;
 }
@@ -57,7 +55,7 @@ sub
 CUL_WS_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{CODE}}) if($hash && $hash->{CODE});
+  delete($modules{CUL_WS}{defptr}{$hash->{CODE}}) if($hash && $hash->{CODE});
   return undef;
 }
 
@@ -87,8 +85,8 @@ CUL_WS_Parse($$)
   # the name in connection with the receiver's name ("CUL868.1", "CUL433.1")
   # See attr <name> IODev XX
 
-  my $def = $defptr{$hash->{NAME} . "." . $cde};
-  $def = $defptr{$cde} if(!$def);
+  my $def = $modules{CUL_WS}{defptr}{$hash->{NAME} . "." . $cde};
+  $def = $modules{CUL_WS}{defptr}{$cde} if(!$def);
   if(!$def) {
     Log 1, "CUL_WS UNDEFINED $type sensor detected, code $cde";
     return "UNDEFINED CUL_WS_$cde CUL_WS $cde";
@@ -256,8 +254,8 @@ CUL_WS_Attr(@)
   my $hash = $defs{$a[1]};
   my $iohash = $defs{$a[3]};
   my $cde = $hash->{CODE};
-  delete($defptr{$cde});
-  $defptr{$iohash->{NAME} . "." . $cde} = $hash;
+  delete($modules{CUL_WS}{defptr}{$cde});
+  $modules{CUL_WS}{defptr}{$iohash->{NAME} . "." . $cde} = $hash;
   return undef;
 }
 
