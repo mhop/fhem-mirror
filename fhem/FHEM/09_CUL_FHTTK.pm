@@ -112,7 +112,8 @@ CUL_FHTTK_Initialize($)
   $hash->{DefFn}     = "CUL_FHTTK_Define";
   $hash->{UndefFn}   = "CUL_FHTTK_Undef";
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 showtime:0,1 dummy:1,0 model:FHT80TF loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
+                        "model:FHT80TF loglevel:0,1,2,3,4,5,6";
 }
 
 
@@ -167,6 +168,8 @@ CUL_FHTTK_Parse($$)
 
   my $self  = $def->{NAME};
   my $state = lc(substr($msg, 7, 2));
+
+  return "" if(IsIgnored($self));
 
   if(!defined($fhttfk_translatedcodes{$state})) {
       Log 3, sprintf("FHTTK $def Unknown state $state");

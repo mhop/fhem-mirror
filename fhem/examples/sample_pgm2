@@ -7,7 +7,7 @@ attr global port 7072                  # our TCP/IP port (localhost only)
 attr global statefile /tmp/fhem.save   # where to save the state of the devices
 attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 
-#define CUL CUL /dev/ttyACM0
+#define CUL CUL /dev/ttyACM0 1234
 #define FHEM FHEM /dev/USB0
 
 define WEB FHEMWEB 8083 global

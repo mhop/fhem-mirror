@@ -24,7 +24,8 @@ USF1000_Initialize($)
   $hash->{DefFn}     = "USF1000_Define";
   $hash->{UndefFn}   = "USF1000_Undef";
   $hash->{ParseFn}   = "USF1000_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 showtime:0,1 dummy:1,0 model:usf1000s loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
+                        "model:usf1000s loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -96,6 +97,8 @@ USF1000_Parse($$)
 
   my $def= $modules{USF1000}{defptr}{$dev};
   my $name= $def->{NAME};
+
+  return "" if(IsIgnored($name));
 
   my $t= TimeNow();
 

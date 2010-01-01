@@ -45,6 +45,7 @@ CommandXmlList($$)
     		            $modules{$defs{$b}{TYPE}}{ORDER};
     		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
 
+      next if(IsIgnored($d));
       my $p = $defs{$d};
       my $t = $p->{TYPE};
 

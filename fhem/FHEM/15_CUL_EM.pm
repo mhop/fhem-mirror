@@ -20,7 +20,8 @@ CUL_EM_Initialize($)
   $hash->{DefFn}     = "CUL_EM_Define";
   $hash->{UndefFn}   = "CUL_EM_Undef";
   $hash->{ParseFn}   = "CUL_EM_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:EMEM,EMWZ,EMGZ loglevel";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
+                        "model:EMEM,EMWZ,EMGZ loglevel ignore:0,1";
 }
 
 #####################################
@@ -106,14 +107,14 @@ CUL_EM_Parse($$)
 
   if($modules{CUL_EM}{defptr}{$cde}) {
     my $def = $modules{CUL_EM}{defptr}{$cde};
-
     $hash = $def;
+    my $n = $hash->{NAME};
+    return "" if(IsIgnored($n));
 
     my $tn = TimeNow();                 # current time
     my $c= 0;                           # count changes
     my %readings;
 
-    my $n = $hash->{NAME};
     Log GetLogLevel($n,5), "CUL_EM $n: $val";
     $readings{RAW} = $val;
 
