@@ -48,10 +48,6 @@ my %readonly = (
 
 use vars qw(%fs20_c2b);		# Peter would like to access it from outside
 
-# defptr{XMIT BTN}{DEVNAME} -> Ptr to global defs entry for this device
-my %defptr;
-
-my %follow;
 my $fs20_simple ="off off-for-timer on on-for-timer on-till reset timer toggle";
 my %models = (
     fs20hgs     => 'sender',
@@ -215,14 +211,14 @@ FS20_Set($@)
 
   ###########################################
   # Set the state of a device to off if on-for-timer is called
-  if($follow{$a[0]}) {
+  if($modules{FS20}{ldata}{$a[0]}) {
     CommandDelete(undef, $a[0] . "_timer");
-    delete $follow{$a[0]};
+    delete $modules{FS20}{ldata}{$a[0]};
   }
   if($a[1] =~ m/for-timer/ && $na == 3 &&
      defined($attr{$a[0]}) && defined($attr{$a[0]}{"follow-on-for-timer"})) {
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
-    $follow{$a[0]} = $to;
+    $modules{FS20}{ldata}{$a[0]} = $to;
     Log 4, "Follow: +$to setstate $a[0] off";
     CommandDefine(undef, $a[0] . "_timer at +$to setstate $a[0] off");
   }
@@ -231,9 +227,9 @@ FS20_Set($@)
   # Look for all devices with the same code, and set state, timestamp
   my $code = "$hash->{XMIT} $hash->{BTN}";
   my $tn = TimeNow();
-  foreach my $n (keys %{ $defptr{$code} }) {
+  foreach my $n (keys %{ $modules{FS20}{defptr}{$code} }) {
 
-    my $lh = $defptr{$code}{$n};
+    my $lh = $modules{FS20}{defptr}{$code}{$n};
     $lh->{CHANGED}[0] = $v;
     $lh->{STATE} = $v;
     $lh->{READINGS}{state}{TIME} = $tn;
@@ -275,7 +271,7 @@ FS20_Define($$)
   my $name = $a[0];
 
   $hash->{CODE}{$ncode++} = $code;
-  $defptr{$code}{$name}   = $hash;
+  $modules{FS20}{defptr}{$code}{$name}   = $hash;
 
   for(my $i = 4; $i < int(@a); $i += 2) {
 
@@ -302,7 +298,7 @@ FS20_Define($$)
 
     $code = "$housecode $grpcode";
     $hash->{CODE}{$ncode++} = $code;
-    $defptr{$code}{$name}   = $hash;
+    $modules{FS20}{defptr}{$code}{$name}   = $hash;
   }
   AssignIoPort($hash);
 }
@@ -312,13 +308,15 @@ sub
 FS20_Undef($$)
 {
   my ($hash, $name) = @_;
+
   foreach my $c (keys %{ $hash->{CODE} } ) {
     $c = $hash->{CODE}{$c};
 
     # As after a rename the $name my be different from the $defptr{$c}{$n}
     # we look for the hash.
-    foreach my $dname (keys %{ $defptr{$c} }) {
-      delete($defptr{$c}{$dname}) if($defptr{$c}{$dname} == $hash);
+    foreach my $dname (keys %{ $modules{FS20}{defptr}{$c} }) {
+      delete($modules{FS20}{defptr}{$c}{$dname})
+        if($modules{FS20}{defptr}{$c}{$dname} == $hash);
     }
   }
   return undef;
@@ -351,7 +349,7 @@ FS20_Parse($$)
   $v = "unknown_$cde" if(!defined($v));
   $v .= " $dur" if($dur);
 
-  my $def = $defptr{"$dev $btn"};
+  my $def = $modules{FS20}{defptr}{"$dev $btn"};
   if($def) {
     my @list;
     foreach my $n (keys %{ $def }) {
@@ -364,9 +362,9 @@ FS20_Parse($$)
       $lh->{READINGS}{state}{VAL} = $v;
       Log GetLogLevel($n,2), "FS20 $n $v";
 
-      if($follow{$n}) {
+      if($modules{FS20}{ldata}{$n}) {
         CommandDelete(undef, $n . "_timer");
-        delete $follow{$n};
+        delete $modules{FS20}{ldata}{$n};
       }
       if($v =~ m/for-timer/ &&
         defined($attr{$n}) &&
@@ -374,7 +372,7 @@ FS20_Parse($$)
         my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
         Log 4, "Follow: +$to setstate $n off";
         CommandDefine(undef, $n . "_timer at +$to setstate $n off");
-        $follow{$n} = $to;
+        $modules{FS20}{ldata}{$n} = $to;
       }
 
       push(@list, $n);

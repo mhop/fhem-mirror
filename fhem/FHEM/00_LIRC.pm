@@ -7,8 +7,6 @@ use Time::HiRes qw(gettimeofday);
 use Lirc::Client;
 use IO::Select;
 
-my $def;
-
 #####################################
 # Note: we are a data provider _and_ a consumer at the same time
 sub

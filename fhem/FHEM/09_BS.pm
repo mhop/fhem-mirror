@@ -12,8 +12,6 @@ use warnings;
 
 my $PI= 3.141592653589793238;
 
-my %defptr;
-
 #############################
 sub
 BS_Initialize($)
@@ -54,7 +52,7 @@ BS_Define($$)
   my $dev= "a5cf $sensor";
   $hash->{DEF}= $dev;
 
-  $defptr{$dev} = $hash;
+  $modules{BS}{defptr}{$dev} = $hash;
   AssignIoPort($hash);
 }
 
@@ -63,7 +61,8 @@ sub
 BS_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$hash->{DEF}});
+  
+  delete($modules{BS}{defptr}{$hash->{DEF}});
   return undef;
 }
 
@@ -81,7 +80,7 @@ BS_Parse($$)
   my $sensor= substr($msg, 20, 2);
   my $dev= "a5cf $sensor";
 
-  my $def= $defptr{$dev};
+  my $def= $modules{BS}{defptr}{$dev};
   if(!defined($def)) {
     $sensor =~ s/^0//; 
     Log 3, "BS Unknown device $sensor, please define it";

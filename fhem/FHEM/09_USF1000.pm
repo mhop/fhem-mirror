@@ -12,7 +12,6 @@ use warnings;
 
 my $PI= 3.141592653589793238;
 
-my %defptr;
 my $dev= "a5ce aa";
 
 #############################
@@ -71,7 +70,7 @@ USF1000_Define($$)
   	 return $g;
   }
 
-  $defptr{$dev} = $hash;
+  $modules{USF1000}{defptr}{$dev} = $hash;
   AssignIoPort($hash);
 }
 
@@ -80,7 +79,7 @@ sub
 USF1000_Undef($$)
 {
   my ($hash, $name) = @_;
-  delete($defptr{$dev});
+  delete($modules{USF1000}{defptr}{$dev});
   return undef;
 }
 
@@ -90,12 +89,12 @@ USF1000_Parse($$)
 {
   my ($hash, $msg) = @_;	# hash points to the FHZ, not to the USF1000
 
-  if(!defined($defptr{$dev})) {
+  if(!defined($modules{USF1000}{defptr}{$dev})) {
     Log 3, "USF1000 Unknown device, please define it";
     return "UNDEFINED USF1000 USF1000 cylv 1 1 0.5";
   }
 
-  my $def= $defptr{$dev};
+  my $def= $modules{USF1000}{defptr}{$dev};
   my $name= $def->{NAME};
 
   my $t= TimeNow();

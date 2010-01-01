@@ -157,7 +157,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.94 2009-12-27 18:07:14 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.95 2010-01-01 13:48:33 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1305,9 +1305,16 @@ CommandReload($$)
   }
   use strict "refs";
 
+  my ($defptr, $ldata);
+  if($modules{$m}) {
+    $defptr = $modules{$m}{defptr};
+    $ldata = $modules{$m}{ldata};
+  }
   $modules{$m} = \%hash;
   $modules{$m}{ORDER} = $order;
   $modules{$m}{LOADED} = 1;
+  $modules{$m}{defptr} = $defptr if($defptr);
+  $modules{$m}{ldata} = $defptr if($ldata);
 
   return undef;
 }
