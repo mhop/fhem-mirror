@@ -24,7 +24,7 @@ CUL_WS_Initialize($)
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{AttrFn}    = "CUL_WS_Attr";
   $hash->{ParseFn}   = "CUL_WS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel ignore:0,1";
 }
 
 
@@ -94,6 +94,8 @@ CUL_WS_Parse($$)
 
   my $tm=TimeNow();
   $hash = $def;
+  my $name = $hash->{NAME};
+  return "" if(IsIgnored($name));
  
   my $typbyte = hex($a[2]) & 7;
   my $sfirstbyte = $firstbyte & 7;
@@ -217,7 +219,6 @@ CUL_WS_Parse($$)
 
   }
 
-  my $name = $hash->{NAME};
   if(!$val) {
     Log GetLogLevel($name,1), "CUL_WS Cannot decode $msg";
     return "";

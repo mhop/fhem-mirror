@@ -37,7 +37,7 @@ HMS_Initialize($)
   $hash->{DefFn}     = "HMS_Define";
   $hash->{UndefFn}   = "HMS_Undef";
   $hash->{ParseFn}   = "HMS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model;hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model;hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6 ignore:0,1";
 }
 
 #####################################
@@ -106,6 +106,8 @@ HMS_Parse($$)
   }
 
   my $def = $modules{HMS}{defptr}{$dev};
+  my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
 
   my (@v, @txt);
 
@@ -209,7 +211,7 @@ HMS_Parse($$)
   }
 
   my $now = TimeNow();
-  Log GetLogLevel($def->{NAME},4), "HMS Device $dev ($type: $val)";
+  Log GetLogLevel($name,4), "HMS Device $dev ($type: $val)";
 
   my $max = int(@txt);
   for( my $i = 0; $i < $max; $i++) {
@@ -224,7 +226,7 @@ HMS_Parse($$)
   $def->{CHANGED}[$max++] = $val;
   $def->{CHANGED}[$max++] = "ExactId: $odev" if($odev ne $dev);
 
-  return $def->{NAME};
+  return $name;
 }
 
 1;

@@ -144,7 +144,7 @@ FHT_Initialize($)
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
                        "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount " .
-                       "minfhtbuffer lazy tmpcorr";
+                       "minfhtbuffer lazy tmpcorr ignore:0,1";
 }
 
 
@@ -267,7 +267,7 @@ FHT_Set($@)
 
   } else {
 
-    IOWrite($hash, "04", $arg) if(!IsDummy($name));
+    IOWrite($hash, "04", $arg);
     Log GetLogLevel($name,2), "FHT set $name $allcmd";
 
   }
@@ -343,6 +343,7 @@ FHT_Parse($$)
 
   my $def = $modules{FHT}{defptr}{$dev};
   my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
 
   # Short message
   if(length($msg) < 26)  {
@@ -502,7 +503,7 @@ doSoftBuffer($)
     my $arglen = length($h->{ARG})/2 - 2;       # Length in bytes
 
     next if($fhzbuflen < $arglen || $fhzbuflen < getFhtMin($io));
-    IOWrite($h->{HASH}, "04", $h->{ARG}) if(!IsDummy($name));
+    IOWrite($h->{HASH}, "04", $h->{ARG});
     Log GetLogLevel($name,2), "FHT set $name $h->{CMD}";
 
     $fhzbuflen -= $arglen;

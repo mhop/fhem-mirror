@@ -191,8 +191,10 @@ FW_Read($)
   $hash->{BUF} = "";
 
   Log($ll, "HTTP $name GET $arg");
-  $hash->{INUSE} = 1;
+  my $pid;
+  return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
 
+  $hash->{INUSE} = 1;
   my $cacheable = FW_AnswerCall($arg);
 
   delete($hash->{INUSE});
@@ -210,6 +212,7 @@ FW_Read($)
            $e,
            "Content-Type: $__RETTYPE\r\n\r\n",
            $__RET;
+  exit if(defined($pid));
 }
 
 ###########################
@@ -387,6 +390,7 @@ FW_updateHashes()
   # Make a room  hash
   %__rooms = ();
   foreach my $d (keys %defs ) {
+    next if(IsIgnored($d));
     foreach my $r (split(",", FW_getAttr($d, "room", "Unsorted"))) {
       $__rooms{$r}{$d} = 1;
     }
@@ -396,6 +400,7 @@ FW_updateHashes()
   # Needed for type sorting
   %__types = ();
   foreach my $d (sort keys %defs ) {
+    next if(IsIgnored($d));
     $__types{$defs{$d}{TYPE}}{$d} = 1;
   }
 
