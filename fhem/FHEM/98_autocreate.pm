@@ -11,11 +11,13 @@ use warnings;
 # - check "UNDEFINED" parameters for BS/USF1000/X10
 
 my %flogpar = (
-  "CUL_EM:.*"     => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT:.*" },
-  "CUL_WS:.*"     => { GPLOT => "cul_ws:Temp,",  FILTER => "%NAME" },
-  "FHT:.*"        => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
-  "HMS:HMS100T.*" => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
-  "KS300:.*"      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,", 
+  "CUL_EM:.*"      => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT:.*" },
+  "CUL_WS:.*"      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
+  "CUL_FHTTK:.*"   => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
+  "FHT:.*"         => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
+  "HMS:HMS100TFK_.*" => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
+  "HMS:HMS100T._.*" => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
+  "KS300:.*"       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,", 
                                                  FILTER => "%NAME:T:.*" },
 );
 
@@ -91,7 +93,7 @@ autocreate_Notify($$)
       my $flname = "FileLog_$name";
       my ($gplot, $filter) = ("", $name);
       foreach my $k (keys %flogpar) {
-        next if("$type:$name" !~ m/^$k$/);
+       next if("$type:$name" !~ m/^$k$/);
         $gplot = $flogpar{$k}{GPLOT};
         $filter = replace_wildcards($hash, $flogpar{$k}{FILTER});
       }
@@ -110,7 +112,10 @@ autocreate_Notify($$)
       next if(!$attr{$me}{weblink} || !$gplot);
       $room = replace_wildcards($hash, $attr{$me}{weblink_room});
       my $wlname = "weblink_$name";
-      $cmd = "$wlname weblink fileplot $flname:$lctype:CURRENT";
+      my $gplotfile;
+      my $stuff;
+      ($gplotfile, $stuff) = split(/:/, $gplot);
+      $cmd = "$wlname weblink fileplot $flname:$gplotfile:CURRENT";
       Log GetLogLevel($me,2), "autocreate: define $cmd";
       $ret = CommandDefine(undef, $cmd);
       if($ret) {
