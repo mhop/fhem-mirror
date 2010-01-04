@@ -79,6 +79,7 @@
       <a href="#SCIVT">SCIVT</a> &nbsp;
       <a href="#structure">structure</a> &nbsp;
       <a href="#WS2000">WS2000</a> &nbsp;
+      <a href="#WS3600">WS3600</a> &nbsp;
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#Weather">Weather</a> &nbsp;
       <a href="#USF1000">USF1000</a> &nbsp;
@@ -3291,6 +3292,166 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+</ul>
+
+<a name="WS3600"></a>
+<h3>WS3600</h3>
+<ul>
+  <br>
+
+  <a name="WS3600define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WS3600 &lt;/path/to/fetch3600&gt;</code>
+    <br><br>
+
+    Define a WS3600 series weather station (Europe Supplies, technotrade, etc; refer to
+    <a href="http://www.wetterstationsforum.de/ws3600_master-touch.php">Wetterstationen.info</a>
+    (german) for details on this model); the station is queried by means of an external program,
+    fetch3600. It talks to the attached weather station (several WS do supply an RS323 interface
+    but seem to use some kind of "morse code" on the RTS, CTS wires instead of using propper
+    serial communication (RX, TX); it's no use to recode that crap into FHEM when there is a
+    stable package of tools to talk to the station available: <a href=http://open3600.fast-mail.nl/tiki-index.php>open3600</a>)
+    and delivers the current readings line by line as reading-value-pairs. These are read in
+    and translated into more readable names for FHEM by the module WS3600.pm.<br><br>
+    As the WS3600 is rather similar to the <a href=http://www.wetterstationsforum.de/ws2300_matrix.php>WS2300</a>
+    and open3600 basically is a modified offspring of <a href=http://www.lavrsen.dk/twiki/bin/view/Open2300/WebHome>open2300</a>, by exchanging the /path/to/fetch3600 with /path/to/fetch2300 this module
+    should be able to handle the WS2300 was well.<br><br>
+    Currently, it is expected that the WS is attached to the local computer and fetch3600 is run
+    locally. Basically the executable called needs to supply on stdout an output similar to what
+    fetch3600 returns; how to implement a "networked setup" is left as an excercise to the reader.
+    <br>
+    For the records, this is an output of fetch3600:<pre>
+Date 14-Nov-2009
+Time 10:50:22
+Ti 22.8
+Timin 20.8
+Timax 27.9
+TTimin 10:27
+DTimin 15-10-2009
+TTimax 23:31
+DTimax 20-08-2009
+To 14.2
+Tomin -0.4
+Tomax 35.6
+TTomin 07:03
+DTomin 15-10-2009
+TTomax 16:52
+DTomax 20-08-2009
+DP 9.2
+DPmin -2.2
+DPmax 20.3
+TDPmin 07:03
+DDPmin 15-10-2009
+TDPmax 11:58
+DDPmax 20-08-2009
+RHi 48
+RHimin 32
+RHimax 57
+TRHimin 17:03
+DRHimin 21-10-2009
+TRHimax 22:24
+DRHimax 07-10-2009
+RHo 72
+RHomin 27
+RHomax 96
+TRHomin 16:41
+DRHomin 20-08-2009
+TRHomax 06:28
+DRHomax 02-11-2009
+WS 0.0
+DIRtext WSW
+DIR0 247.5
+DIR1 247.5
+DIR2 247.5
+DIR3 247.5
+DIR4 247.5
+DIR5 247.5
+WC 14.2
+WCmin -0.4
+WCmax 35.6
+TWCmin 07:03
+DWCmin 15-10-2009
+TWCmax 16:52
+DWCmax 20-08-2009
+WSmin 0.0
+WSmax 25.6
+TWSmin 10:44
+DWSmin 14-11-2009
+TWSmax 19:08
+DWSmax 24-09-2009
+R1h 0.00
+R1hmax 24.34
+TR1hmax 22:34
+DR1hmax 07-10-2009
+R24h 0.00
+R24hmax 55.42
+TR24hmax 07:11
+DR24hmax 08-10-2009
+R1w 29.00
+R1wmax 95.83
+TR1wmax 00:00
+DR1wmax 12-10-2009
+R1m 117.58
+R1mmax 117.58
+TR1mmax 00:00
+DR1mmax 01-11-2009
+Rtot 3028.70
+TRtot 03:29
+DRtot 18-09-2005
+RP 992.200
+AP 995.900
+RPmin 970.300
+RPmax 1020.000
+TRPmin 05:25
+DRPmin 04-11-2009
+TRPmax 09:19
+DRPmax 11-09-2009
+Tendency Falling
+Forecast Cloudy</pre>
+
+    There is no expectation on the readings received from the fetch3600 binary; so, in
+    essence, if you have a similar setup (unsupported, attached weather station and a
+    means to get it's reading into an output similar to above's), you <em>should be able</em>
+    to use WS3600.pm with a custom written script to interface FHEM with your station
+    as well. WS3600.pm <em>only recognizes the above readings</em> (and translates these
+    into, e. g., <code>Temp-inside</code> for <code>Ti</code> for use within FHEM), other
+    lines are silently dropped on the floor.<br><br>
+
+    fetch3600 is available as binary for the Windows OS as well, <em>but I haven't tested operation
+    under that OS, use it at your own risk and you mileage may vary ...</em>
+    <br>Note: Currently this device does not support a "set" function nor anything to "get". The
+    later would be possible to implement if neccessary, though.
+    <br><br>
+
+    Implementation of WS3600.pm tries to be nice, that is it reads from the pipe only 
+    non-blocking (== if there is data), so it should be safe even to use it via ssh or
+    a netcat-pipe over the Internet, but this, as well, has not been tested yet.
+    <br><br>
+
+    Attributes:
+    <ul>
+      <li><code>model</code>: <code>WS3600</code> or <code>WS2300</code> (not used for anything, yet)</li>
+    </ul>
+    <br>
+    Example:
+    <ul>
+      <code>define my3600 W36000 /usr/local/bin/fetch360</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="WS3600set"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="WS3600get"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (WS3600, WS2300)</li>
+  </ul>
+  <br>
 </ul>
 
 <a name="IPWE"></a>
