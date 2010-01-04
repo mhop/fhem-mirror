@@ -29,7 +29,7 @@ package main;
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2009/2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_WS3600.pm,v 1.1 2010-01-04 15:05:36 painseeker Exp $
+# $Id: 70_WS3600.pm,v 1.2 2010-01-04 23:07:35 painseeker Exp $
 ###########################
 
 use strict;
@@ -155,7 +155,7 @@ WS3600_Define($$)
 
   my $FH;
   my $dev = sprintf("%s |", $a[2]);
-  Log 3, "WS3600 using \"$dev\" as parameter to open()";
+  Log 3, "WS3600 using \"$dev\" as parameter to open(); trying ...";
   open($FH, $dev);
   if(!$FH) {
       return "WS3600 Can't start $dev: $!";
@@ -187,7 +187,7 @@ WS3600_Define($$)
 # WS3600_GetStatus($hash);
 #  $init_done = $oid;
 
-  Log 3, "WS3600 setting timer";
+  Log 3, "WS3600 setting callback timer";
 
   my $oid = $init_done;
   $init_done = 1;
@@ -215,7 +215,7 @@ WS3600_Undef($$)
   delete $selectlist{"$name.pipe"};
 
   $hash->{STATE}='undefined';
-  Log 5, "$name shutdown complete";
+  Log 3, "$name shutdown complete";
   return undef;
 }
 
@@ -233,7 +233,7 @@ WS3600_GetStatus($)
     # Call us in n seconds again.
 #    InternalTimer(gettimeofday()+ $hash->{Timer}, "WS3600_GetStatus", $hash, 1);
 
-    Log 3, "WS3600 contacting station";
+    Log 4, "WS3600 contacting station";
  
     open($FH, $dev);
     if(!$FH) {
@@ -242,7 +242,7 @@ WS3600_GetStatus($)
 
     $hash->{FD}=$FH;
     $selectlist{"$name.pipe"} = $hash;
-    Log 3, "WS3600 pipe opened";
+    Log 4, "WS3600 pipe opened";
     $hash->{STATE} = "running";
     $hash->{pipeopentime} = time();
 #    InternalTimer(gettimeofday() + 6, "WS3600_Read", $hash, 1);
@@ -260,19 +260,19 @@ WS3600_Read($)
     my $FH;
     my $inputline;
 
-    Log 3, "WS3600 Read entered";
+    Log 4, "WS3600 Read entered";
 
     if(!defined($hash->{FD})) {
-	Log 3, "WS3600 FD undef'd";
+	Log 3, "Oops, WS3600 FD undef'd";
 	return undef;
     }
     if(!$hash->{FD}) {
-	Log 3, "WS3600 FD empty";
+	Log 3, "Oops, WS3600 FD empty";
 	return undef;
     }
     $FH = $hash->{FD};
 
-    Log 3, "WS3600 start reading";
+    Log 4, "WS3600 reading started";
 
     my @lines;
     my $eof;
@@ -286,13 +286,20 @@ WS3600_Read($)
 
     ($eof, @lines) = nonblockGetLines($FH);
 
-    Log 3, "WS3600 ended reading (eof=$eof)";
+    if(!defined($eof)) {
+	Log 4, "WS3600 FIXME: eof undefined?!";
+	$eof=0;
+    }
+    Log 4, "WS3600 reading ended with eof==$eof";
 
+    # FIXME! Current observed behaviour is "would block", then read of only EOF.
+    #        Not sure if it's always that way; more correct would be checking
+    #        for empty $inputline or undef'd $rawreading,$val. -wusel, 2010-01-04 
     if($eof != 1) {
     foreach my $inputline ( @lines ) {
 	$inputline =~ s/\s+$//;
 	my ($rawreading, $val)=split(/ /, $inputline);
-	Log 3, "WS3600 read $inputline:$rawreading:$val";
+	Log 5, "WS3600 read $inputline:$rawreading:$val";
 	if(defined($TranslatedCodes{$rawreading})) {
 
 #	    delete $defs{$name}{READINGS}{"  $rawreading"};
@@ -330,9 +337,9 @@ WS3600_Read($)
 	delete $hash->{FD};
 	delete $selectlist{"$name.pipe"};
 	InternalTimer(gettimeofday()+ $hash->{Timer}, "WS3600_GetStatus", $hash, 1);
-	Log 3, "WS3600 done reading pipe";
+	Log 4, "WS3600 done reading pipe";
     } else {
-	Log 3, "WS3600 reading would block";
+	Log 4, "WS3600 (further) reading would block";
     }
 
 #    $OtherString =~ s/^\s+//;

@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.97 2010-01-01 15:18:09 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.98 2010-01-04 23:07:35 painseeker Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -862,7 +862,21 @@ WriteStatefile()
     my $r = $defs{$d}{READINGS};
     if($r) {
       foreach my $c (sort keys %{$r}) {
-        print SFH "setstate $d $r->{$c}{TIME} $c $r->{$c}{VAL}\n";
+	  my $errors=0;
+
+	  if(!defined($r->{$c}{TIME})) {
+	      Log 4, "ERROR WITH DEF $d: Missing TIME in READINGS of key $c!";
+	      $errors++;
+	  }
+	  if(!defined($r->{$c}{VAL})) {
+	      Log 4, "ERROR WITH DEF $d: Missing VAL in READINGS of key $c!";
+	      $errors++;
+	  }
+	  if($errors==0) {
+	      print SFH "setstate $d $r->{$c}{TIME} $c $r->{$c}{VAL}\n";
+	  } else {
+	      Log 3, "Sanitizer: not saving READING $c of $d due to missing VAL and/or TIME.";
+	  }
       }
     }
   }
