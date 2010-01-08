@@ -195,3 +195,6 @@ It is not necessary to tell fhem that there are other logs.
 2009-12-19
 	-- Feature: CUL_WS added. Automatic support for S300TH (eg. S555TH). 
 	   Changed: index.php, hms100.php, gnuplot.php
+2010-01-08
+	-- Feature, Bugs look at HISTORY
+	   Changed: every php-File!

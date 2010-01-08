@@ -3,14 +3,17 @@
 ##################################################################################
 #### pgm3 -- a PHP-webfrontend for fhem.pl 
 
+### Look at http://www.fhemwiki.de for more information
+
 
 ###### required settings
-	$fhem="localhost"; #only php5 is supported! On which machine is fhem runnning??
-					# it must not be the same machine as fhem
+	$fhem="fhem"; #only php5 is supported! On which machine is fhem runnning??
+	#$fhem="localhost"; #only php5 is supported! On which machine is fhem runnning??
+					# it needs not to be on the same machine as fhem
 					# if it is not localhost then the fhem.cfg must
-					# run global: "port <nr> global"
+					# run global: "attr global port <nr> global"
 	$fhemport="7072";		# port of fhem.pl
-	$logpath="/var/tmp/";		# where are your logs? Use a writabel nfs-share if pgm3 and fhem are not on the same machine
+	$logpath="/mnt/fhz/";		# where are your logs? Use a writabel nfs-share if pgm3 and fhem are not on the same machine
 	$AbsolutPath="/srv/www/htdocs/"; # where ist your pgm3?
 
 
@@ -18,21 +21,12 @@
 ###### nice to have
 
 
-##### use netcat if your have problems with the stream_socket-tcp-connection
-## package netcat must be installed
-	$usenetcat=0;
 
 
-###### showgnuplot 
-	# Gnuplot will automatically show the pictures.
-	# There is no reason any more to deactivate Gnuplot. Values: 0/1
-	$showgnuplot=1;
-	$gnuplot='/usr/bin/gnuplot';		# location of gnuplot
-	$pictype='png';  	
 
 #####	logrotate of hms, ks300, fht
 	# this is only possible, if the webserver (e.g.wwwrun) has the rights ro write the
-	# files from fh1000.pl. If you want that then run fhem.pl as wwwrun too.
+	# files from fhem.pl. If you want that then run fhem.pl as wwwrun too.
 	# if 'yes' then only the needed lines are in the logfiles, the rest will be deleted.
 	$logrotate='yes';	# yes/no default='yes'
 
@@ -42,9 +36,11 @@
 
 
 ## Webcams
-        $showwebcam=0;                  #shows webcam-Urls or other pictures (0/1)
+        $showwebcam=1;                  #shows webcam-Urls or other pictures (0/1)
         $webcamwidth='150';             # the width of the shown picture
 	$wgetpath="/usr/bin/wget";      # you need the package wget for http, ftp...
+	$webcamroom='donthide';		# existing room. Otherwise it will either
+					# be in ALL or wiht 'donthide' not hided
         $webcam[0]='http://webcam/IMAGE.JPG';
         $webcam[1]='http://webcam2/IMAGE.JPG';
         #$webcam[1]='http://www.bostream.nu/hoganas/OutsideTempHistory.gif';
@@ -57,10 +53,12 @@
 
 # Weather				# Google-Api. It requires an Internet Connection
 	$enableweather=1;		# show the google-weather?
-	$weathercity='Giessen';
+	$weathercity='Linden';
 	$weathercountry='Germany';
 	$weatherlang='de';
 	#$weatherlang='en';
+	$weatherroom='donthide';	# existing room. Otherwise it will either
+					# be in ALL or with 'donthide' not hided
 
 
 ##############################################################################################
@@ -71,7 +69,9 @@
 	$show_logpulldown=1; 		#Pull-Down for Log-files and FS20 (grep fhem.log)
 	$logsort='| sort -r';		#sort the Log-Output how you want;
 
-
+##############################################################################################
+# ATTENTION: the changes of sizes only affects after the next build of pictures!           
+# or delete the old pictures: rm <pgm>/tmp/*                                    
 ##############################################################################################
 ## FS20-Device, adjust it if you have e.g. long titles
 	$imgmaxxfs20=85;  		#Size of the pictures, default=85
@@ -170,7 +170,7 @@
 
 
 # Do you want user defined graphics? 1/0 Default: 0	
-$UserDefs=0;
+$UserDefs=1;
 
 #####################
 ## Userdef: 0
@@ -316,14 +316,22 @@ $userdef[$sortnumber]['logrotatelines']=30;
 
 ########################
 
+###### showgnuplot 
+	# Gnuplot will automatically show the pictures.
+	# There is no reason any more to deactivate Gnuplot. Values: 0/1
+	$showgnuplot=1;
+	$gnuplot='/usr/bin/gnuplot';		# location of gnuplot
+	$pictype='png';  	
+
+
 
 ##############################################################################################
 ## misc
 	$taillog=1; 			#make shure to have the correct rights. Values: 0/1
 	$tailcount=30; 			#make shure to have the correct rights. Values: 0/1
 	$tailpath="/usr/bin/tail";
-	$taillogorder=$tailpath." -$tailcount $logpath/fhem.log ";
-	#$taillogorder=$tailpath." -$tailcount $logpath/fhem-" . date("Y") . "-" .  date("m") . ".log "; #if you have e.g. fhem-2009-02.log  
+	#$taillogorder=$tailpath." -$tailcount $logpath/fhem.log ";
+	$taillogorder=$tailpath." -$tailcount $logpath/fhem-" . date("Y") . "-" .  date("m") . ".log "; #if you have e.g. fhem-2009-02.log  
 
 
 
@@ -338,23 +346,57 @@ $userdef[$sortnumber]['logrotatelines']=30;
 
         $RSStitel='FHEM :-)';
 
-
-
 	$urlreload=90;			# Automatic reloading page [sec]. Default fast: 60 slow:90
 	$titel="PHP-Webmachine for fhem :-)"; #feel free to create an own title
 	$timeformat="Y-m-d H:i:s";
 	$winsize=800;			# width of the pgm3
-	$bodybg="bgcolor='#F5F5F5'"; 
-	$bg1="bgcolor='#6E94B7'";
-	$bg2="bgcolor='#AFC6DB'";
-	$bg3="bgcolor='#F8F8F8'";
-	$bg4="bgcolor='#6394BD'";
-	$fontcolor1="color='#FFFFFF'";
-	
-	$fontcolor3="color='143554'";
-	$fontcol_grap_R=20;
-	$fontcol_grap_G=53;
-	$fontcol_grap_B=84;
+
+
+##### use netcat if your have problems with the stream_socket-tcp-connection
+## package netcat must be installed
+	$usenetcat=0;
+                                                                                
+                                                                                
+##########################                                                      
+##### SKINS - change your colors                                                
+# Look at http://www.farb-tabelle.de/de/farbtabelle.htm for colors
+## DEFAULT                                                                      
+      #  $bodybg="bgcolor='#F5F5F5'";
+      #  $bg1="bgcolor='#6E7B8B'"; # e.g. Header  
+      #  $bg2="bgcolor='#AFC6DB'";  # e.g. behind the buttons
+      #  $bg4="bgcolor='#6394BD'";  # border around all
+      #  $bg5="bgcolor='#FFFFFF'"; # between the tables
+      #  #$fontcolor1="color='#FFFFFF'";
+      #  $fontcolor1="color='#FFFFFF'";
+      #  $fontcolor3="color='#143554'";
+#	# The Button needs decimal Code Instead Hex.
+#	# Use the column left from the HEX.
+#	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
+#	$buttonBg_R='175';$buttonBg_G='198';$buttonBg_B='219';
+##########################                                                      
+##ORANGE
+        $bodybg="bgcolor='#FFDAB9'";
+        $bg1="bgcolor='#FF8C00'";  
+        $bg2="bgcolor='#FFA500'";
+        $bg4="bgcolor='#6394BD'";
+        $bg5="bgcolor='#FFFFFF'";
+        $fontcolor1="color='#000000'";
+        $fontcolor3="color='#000000'";
+	# The Button needs decimal Code Instead Hex.
+	# Use the column left from the HEX on 
+	# http://www.pagentest.de/web_farben/web_farben.html.
+	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
+	$buttonBg_R='255';$buttonBg_G='165';$buttonBg_B='0';
+	#Dec-Code from $bg1:
+	$bg1_R='255';$bg1_G='140';$bg1_B='0';
+
+
+
+
+##########################                                                      
+        $fontcol_grap_R=20;                                                     
+        $fontcol_grap_G=53;                                                     
+        $fontcol_grap_B=84;    
 	$fontttf="Vera";
 	$fontttfb="VeraBd"; 		##copyright of the fonts: docs/copyright_font
 	   ## if there is now graphic try the following:
@@ -363,6 +405,9 @@ $userdef[$sortnumber]['logrotatelines']=30;
 	    # or absolut:
 	    #	$fontttf="/srv/www/htdocs/fhz/include/Vera.ttf";
 	    #	$fontttfb="/srv/www/htdocs/fhz/include/VeraBd.ttf";
+
+
+
 
 ###############################   end of settings
 	putenv('GDFONTPATH=' . realpath('.')); 

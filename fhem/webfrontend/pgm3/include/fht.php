@@ -76,7 +76,10 @@ setlocale (LC_ALL, 'de_DE.utf8');
 		if ($type=="desired-temp:") 
 			{$desired_temp=$temp;$desired_date=$date;}
 		if ($type=="actuator:") 
+		{
+			if (trim($temp) != 'lime-protection')
 			{$actuator=rtrim($temp);$actuator_date=$date;}
+		}
 		if  ((($array[$x][14] != $oldmin) or ($array[$x][12] != $oldhour)) and ($type=="measured-temp:"))
 		{
 			$oldmin=$array[$x][14]; 
@@ -94,8 +97,8 @@ setlocale (LC_ALL, 'de_DE.utf8');
 
 	$im = ImageCreateTrueColor($imgmaxxfht,$imgmaxyfht);
 	$black = ImageColorAllocate($im, 0, 0, 0);
-	$bg1p = ImageColorAllocate($im, 110,148,183);
-	$bg2p = ImageColorAllocate($im, 175,198,219);
+	$bg1p = ImageColorAllocate($im, $bg1_R,$bg1_G,$bg1_B);
+	$bg2p = ImageColorAllocate($im, $buttonBg_R,$buttonBg_G,$buttonBg_B);
 	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
 	$white = ImageColorAllocate($im, 255, 255, 255);
 	$gray= ImageColorAllocate($im, 133, 133, 133);
@@ -200,7 +203,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
 
 
 
-	if ($actuator=="lime-protection") $actuator="0%";
+	if ($actuator=="lime-protection") $actuator="?";
 	$text="Actuator: $actuator";
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxfht-230-$XcorrectDate, 33, $txtcolor, $fontttf, $text);
         	

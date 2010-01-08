@@ -96,3 +96,12 @@
 
 - Martin 2009-12-19
   -- Feature: CUL_WS added. Automatic support for S300TH (eg. S555TH)
+
+- Martin 2010-01-08
+  -- Feature: Interface to fhem changes to stream_socket_client
+  -- Bugfix: table-format on Android-Browser
+  -- Feature:  Optimized for smartphones
+  -- Feature: Rooms possible for Webcam and Google-Weather 
+  -- Misc: Output of html better formated
+  -- Feature. Skinable -- change the colors
+

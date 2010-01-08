@@ -6,7 +6,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2006-2009 Copyright: Martin Haas (fhz@martin-haas.de)
+#  (c) 2006-2010 Copyright: Martin Haas (fhz@martin-haas.de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='091219';
+$pgm3version='100108';
 	
 	$Action		=	$_POST['Action'];
 	$order		= 	$_POST['order'];
@@ -143,6 +143,7 @@ $pgm3version='091219';
 # try to get the URL:
 	$homeurl='http://'.$_SERVER['HTTP_HOST'].$_SERVER['SCRIPT_NAME'];
 	 $forwardurl=$homeurl.'?';
+         $phpfileurl=$_SERVER['SCRIPT_NAME'];
 	$testFirstStart=$_SERVER['QUERY_STRING'];
 	if ($testFirstStart=='')  ##new session (??) then start-values
 	{
@@ -229,18 +230,6 @@ function execFHZ($order,$machine,$port)
 global $errormessage;
 
 
-#PHP4 is not supported any more 20091115
-#$version = explode('.', phpversion());
-
-#if ( $version[0] == 4 )
-#{
-#	include "config.php";
-#	$order="$fhem_pl $port '$order'";  #PHP4, only localhost
-#	exec($order,$res);
-#        $errormessage = $res[0]; 
-#}#
-#else
-#{
 if ($usenetcat=='1')
  {
 	$order="$echo xmllist | netcat -w3 $machine $port";  
@@ -254,8 +243,6 @@ if ($usenetcat=='1')
            echo "$errstr ($errno)<br />\n";
         } else {
            fwrite($fp, "$order\n;quit\n");
-               	#$errormessage= fgets($fp, 1024);
-               	#$errormessage= fgets($fp, 65535);
                	$errormessage= fgets($fp);
            fclose($fp);
         }
@@ -275,25 +262,18 @@ unset($longxml);
 $version = explode('.', phpversion());
 
 
-if ( $version[0] == 4 )
-{
-        $xmllist="$fhem_pl $fhemport xmllist";
-        exec($xmllist,$output);
-}
-else
-{
+
+# get the xmllist from fhem
 	$fp = stream_socket_client("tcp://$fhem:$fhemport", $errno, $errstr, 30);
 	if (!$fp) {
 	   echo "$errstr ($errno)<br />\n";
 	} else {
 	   fwrite($fp, "xmllist\r\n;quit\r\n");
-	   while (!feof($fp)) {
-	       $outputvar = fgets($fp, 1024);
-		array_push($output,$outputvar);
-	   }
+	   $outputvar=stream_get_contents($fp);
+	   array_push($output,$outputvar);
 	   fclose($fp);
 	}
-}
+
 
 
 
@@ -550,7 +530,7 @@ xml_parser_free($xml_parser);
 	 <meta http-equiv='Cache-Control' content='no-cache'>
 	 <meta http-equiv='content-type' content='text/html; charset=UTF-8'>
 
-	 <link rel='alternate' type='application/rss+xml' title='$RSStitel' href='index.php?showrss'>
+	 <link rel='alternate' type='application/rss+xml' title='$RSStitel' href='$phpfileurl?showrss'>
  	 <link rel='shortcut icon' href='include/fs20.ico' >
 	 <title>$titel</title>";
  	  include ("include/style.css");	 
@@ -559,13 +539,13 @@ xml_parser_free($xml_parser);
 
  echo"      <body $bodybg>
 	$errormessage
-	<table width='$winsize' cellspacing='1' cellpadding='10' border='0' $bgcolor1><tr><td></td></tr></table>
-	<table width='$winsize' cellspacing='1' cellpadding='0' border='0' align='CENTER' $bg4>
+	\r<table width='$winsize' cellspacing='1' cellpadding='10' border='0' $bgcolor1><tr><td></td></tr>\r</table>
+	\r<table width='$winsize' cellspacing='1' cellpadding='0' border='0' align='CENTER' $bg4>
 	  <tr> 
-	      <td bgcolor='#6394BD' width='100%'> 
-	      <table bgcolor='#FFFFFF' width='100%' cellspacing='0' cellpadding='0' border='0'>
+	      <td $bg4 width='100%'> 
+	      \r<table $bg5 width='100%' cellspacing='0' cellpadding='0' border='0'>
 	              <tr> <td>
-	<table width='100%' cellspacing='2' cellpadding='2' align=center border='0'>
+	\r<table width='100%' cellspacing='2' cellpadding='2' align=center border='0'>
 	<tr><td $bg1 colspan=4><br>
 		<font size=+1 $fontcolor1><center><b>$titel</b></font>
 	 	<font size=3 $fontcolor1><br><b>$now</b>
@@ -579,7 +559,7 @@ xml_parser_free($xml_parser);
 	{	
 	    echo "  <tr>
                 <td $bg1 colspan=4><font $fontcolor1>
-                <table  cellspacing='0' cellpadding='0' width='100%'>
+                \r<table  cellspacing='0' cellpadding='0' width='100%'>
                         <tr>
                         <td><font $fontcolor1> WEBCAM </font>";
 		 if (! isset($showpics))
@@ -591,6 +571,8 @@ xml_parser_free($xml_parser);
    	    echo"	</td>
                         <td align=right>
 	    ";
+     if (($webcamroom != 'hidden') 
+         and ($showroom=='ALL' or $showroom==$webcamroom or $webcamroom=='donthide'))
 	    if (isset($showpics))
 	    {
 	    for($i=0; $i < count($webcam); $i++)
@@ -617,7 +599,7 @@ xml_parser_free($xml_parser);
 	     echo"
 			</td>
 			</tr>
-		</table>
+		\r</table>
 		</td>
 		</tr>
 		";
@@ -630,16 +612,18 @@ xml_parser_free($xml_parser);
        ############################ WEATHER
      if ($enableweather==1)
 	{
-	echo "<tr><td $bg1 colspan=4><font $fontcolor1><table  cellspacing='0' cellpadding='0' width='100%'>
+	echo "<tr><td $bg1 colspan=4><font $fontcolor1>\r<table  cellspacing='0' cellpadding='0' width='100%'>
 		<tr><td><font $fontcolor1>WEATHER</td><td align=right><font $fontcolor1><b>";
 	if ($showweath != '1')	
 		{ echo "<a href=$formwardurl?showweath=1&showroom=$showroom$link>show</a>";}
 		else
 		{ echo "<a href=$formwardurl?showroom=$showroom$link&showweath=none>hide</a>";}
 
-	echo "</b></font></td></tr></table>";
+	echo "</b></font></td></tr>\r</table>";
 	echo "</font></td></tr>";
-	if ($showweath==1) include 'include/weather.php';
+     if (($weatherroom != 'hidden') 
+         and ($showroom=='ALL' or $showroom==$weatherroom or $weatherroom=='donthide') 
+         and ($showweath==1)) include 'include/weather.php';
      }
 
 
@@ -647,14 +631,14 @@ xml_parser_free($xml_parser);
        ############################ FHZ
 	if ($show_fs20pulldown==1 or $show_general==1 or $show_fhtpulldown==1)
 	{
-	echo "<tr><td $bg1 colspan=4><font $fontcolor1><table  cellspacing='0' cellpadding='0' width='100%'>
+	echo "<tr><td $bg1 colspan=4><font $fontcolor1>\r<table  cellspacing='0' cellpadding='0' width='100%'>
 		<tr><td><font $fontcolor1>FHZ_DEVICE</td><td align=right><font $fontcolor1><b>";
 	if ($showmenu != '1')	
 		{ echo "<a href=$formwardurl?showmenu=1&showroom=$showroom$link>show</a>";}
 		else
 		{ echo "<a href=$formwardurl?showroom=$showroom$link&showmenu=none>hide</a>";}
 
-	echo "</b></font></td></tr></table>";
+	echo "</b></font></td></tr>\r</table>";
 	echo "</font></td></tr>";
 	}
 
@@ -688,9 +672,14 @@ xml_parser_free($xml_parser);
 	############################ ROOMS
 	if (($showroombuttons==1) and (count($rooms)>1))
 	{
-		echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
-		echo "ROOMS ";
-		echo "</font></td></tr>";
+
+echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>                    
+                        \r\r<table  cellspacing='0' cellpadding='0' width='100%'
+>                                                                               
+                        <tr><td><font $fontcolor1>ROOMS</td><td align=rig
+ht><font $fontcolor1><b>                                                        
+                        </font></td></tr>\r</table></td></tr>\r";
+
 		echo "<tr><td $bg2 colspan=4>";
 		$counter=0;
 	 	for($i=0; $i < count($rooms); $i++)
@@ -698,7 +687,7 @@ xml_parser_free($xml_parser);
 				 $room=$rooms[$i];
 				 if ($room != 'hidden')
 		 		{
-				echo"<a href='index.php?Action=showroom&showroom=$room$link'><img src='include/room.php?room=$room&showroom=$showroom'></a>";
+				echo"<a href='$phpfileurl?Action=showroom&showroom=$room$link'><img src='include/room.php?room=$room&showroom=$showroom'></a>";
 				$counter++;
 
 				if  (fmod($counter,$roommaxiconperline)== 0.0) echo "<br>";
@@ -714,7 +703,7 @@ xml_parser_free($xml_parser);
 		{echo "Error!! There is no FHEM. You need at least FHEM-4.0 to run this pgm3!!";}
 
 
-
+	## now the xmllist will be writen on screen as html
 	##### Let's go.... :-)))))
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
@@ -722,8 +711,12 @@ xml_parser_free($xml_parser);
 	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_') || (substr( $stack[0][children][$i][name],0,4)=='X10_'))
 	      {
 			$type=$stack[0][children][$i][name];
-			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
-	      		echo "$type</font></td></tr>";
+			#echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>";
+	      		#echo "$type</font></td></tr>";
+			echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
+                        \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
+                        <tr><td><font $fontcolor1>$type</td><td align=right><font $fontcolor1><b>
+                        </font></td></tr>\r</table></td></tr>\r";
 			$counter=0;
 			echo "<tr><td $bg2 colspan=4>";
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -753,16 +746,16 @@ xml_parser_free($xml_parser);
 			 if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
 			 {
 			 	$counter++;
-				echo"<a href='index.php?Action=exec&order=$order&showroom=$showroom$link'><img src='include/fs20.php?drawfs20=$fs20&statefs20=$state&datefs20=$measured&room=$room'></a>";
+				echo"<a href='$phpfileurl?Action=exec&order=$order&showroom=$showroom$link'><img src='include/fs20.php?drawfs20=$fs20&statefs20=$state&datefs20=$measured&room=$room'></a>";
 				if  (fmod($counter,$fs20maxiconperline)== 0.0) echo "<br>";
 			 };
 			 }
-			 	echo "</td></tr>";
+			 	echo "</td></tr>\r";
 				if (isset($showfs20) and $showgnuplot == 1)
 			 	{   
                                  	drawgnuplot($showfs20,"FS20",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range);
 					$FS20dev1=$showfs20.'1';
-                                	echo "<tr><td colspan=5 align=center><img src='tmp/$showfs20.$pictype'><br>
+                                	echo "\r<tr><td colspan=5 align=center><img src='tmp/$showfs20.$pictype'><br>
 					<img src='tmp/$FS20dev1.$pictype'>
                                         </td></tr>
 			 		      <tr><td colspan=4><hr color='#AFC6DB'></td></tr>";
@@ -772,8 +765,15 @@ xml_parser_free($xml_parser);
 	       elseif (substr($stack[0][children][$i][name],0,4)=='FHT_')
 	       {
 			$type=$stack[0][children][$i][name];
-			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
-	      		echo "$type</font></td></tr>";
+			#echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
+	      		#echo "$type</font></td></tr>\r";
+			echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
+                        \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
+                        <tr><td><font $fontcolor1>$type</td><td align=right><font $fontcolor1><b>
+                        </font></td></tr>\r</table></td></tr>\r";
+
+
+
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
 				$room="";
@@ -792,7 +792,7 @@ xml_parser_free($xml_parser);
 		    
 			 $FHTdev=$stack[0][children][$i][children][$j][attrs][name];
 			 if ($showfht == $FHTdev)
-			 	{echo "<tr valign=center><td align=center $bg2 valign=center> 
+			 	{echo "\r<tr valign=center><td align=center $bg2 valign=center> 
 				       <form action=$forwardurl method='POST'>
 				       <input type=hidden name=Action value=hide>
 				       <input type=hidden name=showfht value=none>
@@ -802,7 +802,7 @@ xml_parser_free($xml_parser);
 					<a href=$forwardurl&showmenu=1&fhtdev=$FHTdev&orderpulldown=desired-temp&valuetime=20.0>adjust</a></td>";
 			 	}
 			 else
-			 	{echo "<tr valign=center><td align=center $bg2 valign=center> 
+			 	{echo "\r<tr valign=center><td align=center $bg2 valign=center> 
 				       <form action=$forwardurl method='POST'>
 				       <input type=hidden name=Action value=showfht>
 				       <input type=hidden name=showfht value=$FHTdev>
@@ -812,7 +812,7 @@ xml_parser_free($xml_parser);
 					<a href=$forwardurl&showmenu=1&fhtdev=$FHTdev&orderpulldown=desired-temp&valuetime=20.0>adjust</a></td>";
 			 	};
 				   
-				echo "<td $bg2 colspan='3'> 
+				echo "\r<td $bg2 colspan='3'> 
 				<img src='include/fht.php?drawfht=$FHTdev&room=$room&battery=$battery' width='$imgmaxxfht' height='$imgmaxyfht'>
 				</td>";
 				echo "</tr>";
@@ -821,23 +821,23 @@ xml_parser_free($xml_parser);
 			 	{   
                                  	drawgnuplot($FHTdev,"FHT",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range);
 					$FHTdev1=$FHTdev.'1';
-                                	echo "<tr><td colspan=5 align=center><img src='tmp/$FHTdev.$pictype'><br>
+                                	echo "\r<tr><td colspan=5 align=center><img src='tmp/$FHTdev.$pictype'><br>
 					<img src='tmp/$FHTdev1.$pictype'>
                                         </td></tr>
 			 		      <tr><td colspan=4><hr color='#AFC6DB'></td></tr>";
 				}
 				if ( $showfht==$FHTdev)
 				{
-				echo "<tr><td colspan=4><table border=0><tr>";
+				echo "\r<tr><td colspan=4>\r<table border=0><tr>";
 			 	for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
 				{
 				   	$name=$stack[0][children][$i][children][$j][children][$k][attrs][key];
 					$value=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 					$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
-			        	echo "<td><tr><td colspan=1> $FHTdev (FHT): </td><td>$name</td><td>$value
+			        	echo "\r<td><tr><td colspan=1> $FHTdev (FHT): </td><td>$name</td><td>$value
 					      </td><td>$measured</td></tr></td>";
 				   }
-				echo "</tr></table></td></tr>";
+				echo "</tr>\r</table></td></tr>\r\r";
 				}
 			}
 		}
@@ -846,8 +846,16 @@ xml_parser_free($xml_parser);
 	       elseif ((substr($stack[0][children][$i][name],0,4)=='HMS_') or (substr($stack[0][children][$i][name],0,6)=='CUL_WS'))
 	       {
 			$type=$stack[0][children][$i][name];
-			echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
-	      		echo "$type</font></td></tr>";
+			#echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>";
+#	      		echo "$type</font></td></tr>";
+			echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
+                        \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
+                        <tr><td><font $fontcolor1>$type</td><td align=right><font $fontcolor1><b>
+                        </font></td></tr>\r</table></td></tr>\r";
+
+
+
+
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
 				$room="";
@@ -870,7 +878,7 @@ xml_parser_free($xml_parser);
 			{
 			if ($showhmsgnu== $HMSdev) {$formvalue="hide";$gnuvalue="";}
 			else {$formvalue="show";$gnuvalue=$HMSdev;};
-			echo "<tr valign=center><td align=center $bg2 valign=center>
+			echo "\r<tr valign=center><td align=center $bg2 valign=center>
                                        <form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=showhmsgnu>
                                         <input type=hidden name=showroom value=$showroom>
@@ -880,14 +888,14 @@ xml_parser_free($xml_parser);
 				
 			}
 			else
-		 	{echo "<tr><td $bg2><td $bg2 colspan=3> ";}
+		 	{echo "\<tr><td $bg2><td $bg2 colspan=3> ";}
 		       	
 			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type&battery=$battery' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		
 		if ($showhmsgnu == $HMSdev and $showgnuplot == 1)
                                 { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0);
 				$HMSdev1=$HMSdev.'1';
-                                echo "<tr><td colspan=5 align=center><img src='tmp/$HMSdev.$pictype'><br>
+                                echo "\r<tr><td colspan=5 align=center><img src='tmp/$HMSdev.$pictype'><br>
 					<img src='tmp/$HMSdev1.$pictype'>
                                         </td></tr>";
                 }
@@ -899,8 +907,12 @@ xml_parser_free($xml_parser);
 	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_' or substr($stack[0][children][$i][name],0,6)=='WS300_')
 	       {
 			$type=$stack[0][children][$i][name];
-                        echo "<tr><td $bg1 colspan=4><font $fontcolor1>";
-                        echo "$type</font></td></tr>";
+                        #echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>";
+                        #echo "$type</font></td></tr>";
+			echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
+                        \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
+                        <tr><td><font $fontcolor1>$type</td><td align=right><font $fontcolor1><b>
+                        </font></td></tr>\r</table></td></tr>\r";
                         for($j=0; $j < count($stack[0][children][$i][children]); $j++)
                          {
                          $KSdev=$stack[0][children][$i][children][$j][attrs][name];
@@ -927,14 +939,14 @@ xml_parser_free($xml_parser);
 			 $Yks=$imgmaxyks*4;
 			##gnuplot
 			if ($showks == $KSdev)
-                                {echo "<tr valign=center><td align=center $bg2 valign=center>
+                                {echo "\r<tr valign=center><td align=center $bg2 valign=center>
                                        <form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=hide>
                                         <input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showks value=''>
                                        <input type=submit value='hide'></form></td>";}
                          else
-					{echo "<tr valign=center><td align=center $bg2 valign=center>
+					{echo "\r<tr valign=center><td align=center $bg2 valign=center>
                                        <form action=$forwardurl method='POST'>";
 
                                         echo "<input type=hidden name=Action value=showks><br>Temp./Hum.<br>
@@ -947,7 +959,7 @@ xml_parser_free($xml_parser);
                                        <input type=submit value='show'></form></td>";
                          };
 
-			 echo "<td $bg2 center=align colspan=3>";
+			 echo "\r<td $bg2 center=align colspan=3>";
                          echo "<img src='include/ks300.php?drawks=$KSdev&room=$room&avgmonth=$KSavgmonth&avgday=$KSavgday' width='$Xks' height='$Yks'>";
                          echo "</td></tr>";
                          if (! isset ($willi)) $drawtype="KS300"; else $drawtype="WS300";
@@ -962,7 +974,7 @@ xml_parser_free($xml_parser);
                                         drawgnuplot($KSdev,$drawtype."_t2",$gnuplot,$pictype,$logpath,0,0);
                                 }
                                 $KSdev1=$KSdev.'1';
-                                echo "<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
+                                echo "\r<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
                                         <img src='tmp/$KSdev1.$pictype'>
                                         </td></tr>";
                         }
@@ -974,8 +986,8 @@ xml_parser_free($xml_parser);
 	############################
 	       elseif ($stack[0][children][$i][name]=='LOGS'or $stack[0][children][$i][name]=='FileLog_LIST')
 	       {
-		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
-			<table  cellspacing='0' cellpadding='0' width='100%'>
+		echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>
+			\r<table  cellspacing='0' cellpadding='0' width='100%'>
 			<tr><td><font $fontcolor1>LOGS</td><td align=right><font $fontcolor1><b>";
 		if (! isset ($showlogs))	
 		{ echo "<a href=$formwardurl?showlogs&showroom=$showroom$link>show</a>";}
@@ -983,7 +995,7 @@ xml_parser_free($xml_parser);
 		{ 
 		echo "<a href=$formwardurl?showroom=$showroom$link&showlogs=none>hide</a>";}
 	
-	      		echo "</font></td></tr></table></td></tr>";
+	      		echo "</font></td></tr>\r</table></td></tr>\r";
 		if (isset ($showlogs))
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -996,7 +1008,7 @@ xml_parser_free($xml_parser);
 			  	}	
 			}
 			 	$name=$stack[0][children][$i][children][$j][attrs][name];
-			 	echo "<tr><td colspan=1 border=0>Log:</td>
+			 	echo "\r<tr><td colspan=1 border=0>Log:</td>
 					<td colspan=2 border=0>$value / $name </td></tr>";
 				
 			 }
@@ -1004,14 +1016,14 @@ xml_parser_free($xml_parser);
 	############################
 	       elseif ($stack[0][children][$i][name]=='NOTIFICATIONS' or $stack[0][children][$i][name]=='notify_LIST')
 	       {
-		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
-			<table  cellspacing='0' cellpadding='0' width='100%'>
+		echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>
+			\r<table  cellspacing='0' cellpadding='0' width='100%'>
 			<tr><td><font $fontcolor1>NOTIFICATIONS</td><td align=right><font $fontcolor1><b>";
 		if (! isset ($shownoti))	
 		{ echo "<a href=$formwardurl?shownoti&showroom=$showroom$link>show</a>";}
 		else
 		{ echo "<a href=$formwardurl?showroom=$showroom$link&shownoti=none>hide</a>";}
-	      	echo "</font></td></tr></table></td></tr>";
+	      	echo "</font></td></tr>\r</table></td></tr>\r\r";
 
 		if (isset ($shownoti))
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
@@ -1025,20 +1037,20 @@ xml_parser_free($xml_parser);
 			  	}	
 			}
 			 	$name=$stack[0][children][$i][children][$j][attrs][name];
-			 	echo "<tr><td colspan=1>Notification:</td><td colspan=2>$value / $name</td></tr>";
+			 	echo "\r<tr><td colspan=1>Notification:</td><td colspan=2>$value / $name</td></tr>";
 			 }
 		} 
 	############################
 	       elseif ($stack[0][children][$i][name]=='AT_JOBS' or $stack[0][children][$i][name]=='at_LIST')
 	       {
-		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
-			<table  cellspacing='0' cellpadding='0' width='100%'>
+		echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>
+			\r<table  cellspacing='0' cellpadding='0' width='100%'>
 			<tr><td><font $fontcolor1>AT_JOBS</td><td align=right><font $fontcolor1><b>";
 		if (! isset ($showat))	
 		{ echo "<a href=$formwardurl?showat&showroom=$showroom$link>show</a>";}
 		else
 		{ echo "<a href=$formwardurl?showroom=$showroom$link&showat=none>hide</a>";}
-	      	echo "</font></td></tr></table></td></tr>";
+	      	echo "</font></td></tr>\r</table></td></tr>\r\r";
 
 
 		if (isset ($showat))
@@ -1057,7 +1069,7 @@ xml_parser_free($xml_parser);
 			}
 
 				$order='delete '.$order;
-			 	echo "<tr><td> AT-Job: </td><td><a href='index.php?Action=exec&order=$order$link'>del </a> $value / $next / $command</td></tr>";
+			 	echo "\r<tr><td> AT-Job: </td><td><a href='$phpfileurl?Action=exec&order=$order$link'>del </a> $value / $next / $command</td></tr>";
 			 }
 		} 
 	};
@@ -1065,10 +1077,10 @@ xml_parser_free($xml_parser);
 ##################### User defined graphics??
 	if ($UserDefs==1)
         {
-	 echo "<tr><td $bg1 colspan=4><font $fontcolor1>
-                        <table  cellspacing='0' cellpadding='0' width='100%'>
+	 echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
+                        \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
                         <tr><td><font $fontcolor1>USER DEFINED</td><td align=right><font $fontcolor1><b>
-			</font></td></tr></table></td></tr>";
+			</font></td></tr>\r</table></td></tr>\r";
 
 		 $type='userdef';
 
@@ -1084,19 +1096,19 @@ xml_parser_free($xml_parser);
                  {
                         if ($showuserdefgnu== $UserDef) {$formvalue="hide";$gnuvalue="";}
                         else {$formvalue="show";$gnuvalue=$UserDef;};
-                        echo "<tr valign=center><td align=center $bg2 valign=center colspan=1>
-                                       <form action=$forwardurl method='POST'>
+                        echo "\r<tr valign=center><td align=center $bg2 valign=center colspan=1>
+                                       \r<form action=$forwardurl method='POST'>
                                        <input type=hidden name=Action value=showuserdefgnu>
                                         <input type=hidden name=showroom value=$showroom>
                                         <input type=hidden name=showuserdefgnu value=$gnuvalue>
-                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=1>";
+                                       <input type=submit value='$formvalue'></form></td><td $bg2 colspan=1>\r";
 
-                        echo "<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
+                        echo "\r<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
 
                 if ($showuserdefgnu == $UserDef and $showgnuplot == 1)
                                 { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],$i);
                                 $UserDef1=$UserDef.'1';
-                                echo "<tr><td colspan=5 align=center><img src='tmp/$UserDef.$pictype'><br>
+                                echo "\r<tr><td colspan=5 align=center><img src='tmp/$UserDef.$pictype'><br>
                                         <img src='tmp/$UserDef1.$pictype'>
                                         </td></tr>";
                 }
@@ -1111,18 +1123,18 @@ xml_parser_free($xml_parser);
 
 	if ($taillog==1) 
 	{
-		echo "<tr><td $bg1 colspan=4><font $fontcolor1>
-			<table  cellspacing='0' cellpadding='0' width='100%'>
+		echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
+			\r\r<table  cellspacing='0' cellpadding='0' width='100%'>
 			<tr><td><font $fontcolor1>$taillogorder</td><td align=right><font $fontcolor1><b>";
 		if (! isset ($showhist))	
 		{ echo "<a href=$formwardurl?showhist&showroom=$showroom$link>show</a>";}
 		else
 		{ echo "<a href=$formwardurl?showroom=$showroom$link&showhist=none>hide</a>";}
-	      	echo "</font></td></tr></table></td></tr>";
-	if (isset ($showhist)) {foreach($tailoutput as $data) echo "<tr><td colspan=1>History</td><td colspan=2>$data</td></tr>";};
+	      	echo "</font></td></tr>\r</table></td></tr>";
+	if (isset ($showhist)) {foreach($tailoutput as $data) echo "\r<tr><td  colspan=1>History</td><td colspan=2>$data</td></tr>";};
 	
 
 	};
-	echo "</td></tr></table></td></tr></table></font></table></body></html>";
+	echo "\r</td></tr>\r</table></td></tr>\r</table></font>\r</table></body></html>";
 
 ?>
