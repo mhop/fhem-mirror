@@ -3,6 +3,8 @@
 
 setlocale (LC_ALL, 'de_DE.utf8');
 
+#include '../config.php'; #only debug
+
 
 
 function website_WEATHER($station, $land,  $sprache)

@@ -465,3 +465,9 @@
     work. There is also a second parameter $modules{modname}{ldata} which will
     be saved over a Reload, used by the FS20 for the follow feature.
   - ignore attribute added to ignore devices of the neighbour
+
+- Fri Jan 8 2010 (MartinH)
+    Interface to fhem changes to stream_socket_client. Table-format on Android-Browser
+    optimized. Optimized for smartphones. Rooms possible for Webcam and Google-Weather.
+    Output of html better formated and skinable -- change the colors.
+
