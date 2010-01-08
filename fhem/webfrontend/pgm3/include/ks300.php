@@ -47,8 +47,8 @@ $avgmonth=$_GET['avgmonth'];
 	
 	$im = ImageCreateTrueColor($imgmaxxks,$imgmaxyks);
 	$black = ImageColorAllocate($im, 0, 0, 0);
-	$bg1p = ImageColorAllocate($im, 110,148,183);
-	$bg2p = ImageColorAllocate($im, 175,198,219);
+	$bg1p = ImageColorAllocate($im, $bg1_R,$bg1_G,$bg1_B);
+	$bg2p = ImageColorAllocate($im, $buttonBg_R,$buttonBg_G,$buttonBg_B);
 	$bg3p = ImageColorAllocate($im, $fontcol_grap_R,$fontcol_grap_G,$fontcol_grap_B);
 	$white = ImageColorAllocate($im, 255, 255, 255);
 	$gray= ImageColorAllocate($im, 133, 133, 133);
@@ -141,7 +141,8 @@ $avgmonth=$_GET['avgmonth'];
 		if ($mintemp < 0) 
 		{
 			$y = round($imgmaxyks-((0-$mintemp)*$fac));
-			ImageLine($im, $imgmaxxks, $y,0 , $y, $bg1p);
+			#ImageLine($im, $imgmaxxks-$maxcountKS, $y,0 , $y, $bg1p);
+			ImageLine($im, $imgmaxxks, $y,$imgmaxxks-$maxcountKS , $y, $bg1p);
 		}
 		$text="Temperature";
 		$fontsize=7;

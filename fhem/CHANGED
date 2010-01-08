@@ -564,3 +564,6 @@
   - bugfix:  21_OWTEMP.pm interval fixed (M.Fischer)
   - bugfix:  21_OWTEMP.pm rewrite with errorcontrol and demo mode (M.Fischer)
   - feature: ignore attribute
+  - bugfix:  [pgm3] table-format on Android-Browser optimized
+  - feature: [pgm3] Skinable - change the colors. Rooms possible for Webcam and Google-Weather
+
