@@ -36,7 +36,7 @@
 
 
 ## Webcams
-        $showwebcam=1;                  #shows webcam-Urls or other pictures (0/1)
+        $showwebcam=0;                  #shows webcam-Urls or other pictures (0/1)
         $webcamwidth='150';             # the width of the shown picture
 	$wgetpath="/usr/bin/wget";      # you need the package wget for http, ftp...
 	$webcamroom='donthide';		# existing room. Otherwise it will either
