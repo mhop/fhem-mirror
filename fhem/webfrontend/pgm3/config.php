@@ -356,39 +356,38 @@ $userdef[$sortnumber]['logrotatelines']=30;
 ## package netcat must be installed
 	$usenetcat=0;
                                                                                 
-                                                                                
 ##########################                                                      
 ##### SKINS - change your colors                                                
 # Look at http://www.farb-tabelle.de/de/farbtabelle.htm for colors
 ## DEFAULT                                                                      
-      #  $bodybg="bgcolor='#F5F5F5'";
-      #  $bg1="bgcolor='#6E7B8B'"; # e.g. Header  
-      #  $bg2="bgcolor='#AFC6DB'";  # e.g. behind the buttons
-      #  $bg4="bgcolor='#6394BD'";  # border around all
-      #  $bg5="bgcolor='#FFFFFF'"; # between the tables
-      #  #$fontcolor1="color='#FFFFFF'";
-      #  $fontcolor1="color='#FFFFFF'";
-      #  $fontcolor3="color='#143554'";
-#	# The Button needs decimal Code Instead Hex.
-#	# Use the column left from the HEX.
-#	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
-#	$buttonBg_R='175';$buttonBg_G='198';$buttonBg_B='219';
+        $bodybg="bgcolor='#F5F5F5'";
+        $bg1="bgcolor='#6E94B7'"; # e.g. Header  
+        $bg2="bgcolor='#AFC6DB'";  # e.g. behind the buttons
+        $bg4="bgcolor='#6394BD'";  # border around all
+        $bg5="bgcolor='#FFFFFF'"; # between the tables
+        $fontcolor1="color='#FFFFFF'";
+        $fontcolor3="color='#143554'";
+	# The Button needs decimal Code Instead Hex.
+	# Use the column left from the HEX.
+	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
+	$buttonBg_R='175';$buttonBg_G='198';$buttonBg_B='219';
+	$bg1_R='110';$bg1_G='148';$bg1_B='181';
 ##########################                                                      
 ##ORANGE
-        $bodybg="bgcolor='#FFDAB9'";
-        $bg1="bgcolor='#FF8C00'";  
-        $bg2="bgcolor='#FFA500'";
-        $bg4="bgcolor='#6394BD'";
-        $bg5="bgcolor='#FFFFFF'";
-        $fontcolor1="color='#000000'";
-        $fontcolor3="color='#000000'";
+#        $bodybg="bgcolor='#FFDAB9'";
+#        $bg1="bgcolor='#FF8C00'";  
+#        $bg2="bgcolor='#FFA500'";
+#        $bg4="bgcolor='#6394BD'";
+#        $bg5="bgcolor='#FFFFFF'";
+#        $fontcolor1="color='#000000'";
+#        $fontcolor3="color='#000000'";
 	# The Button needs decimal Code Instead Hex.
 	# Use the column left from the HEX on 
 	# http://www.farb-tabelle.de/de/farbtabelle.htm
 	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
-	$buttonBg_R='255';$buttonBg_G='165';$buttonBg_B='0';
+#	$buttonBg_R='255';$buttonBg_G='165';$buttonBg_B='0';
 	#Dec-Code from $bg1:
-	$bg1_R='255';$bg1_G='140';$bg1_B='0';
+#	$bg1_R='255';$bg1_G='140';$bg1_B='0';
 
 
 
