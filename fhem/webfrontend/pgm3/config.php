@@ -220,20 +220,20 @@ $UserDefs=1;
 ########################
 # example: 
 #define solarpumpe.log FileLog /var/tmp/solarpumpe.log solarpumpe:.*(on|off).*
-$sortnumber=0;
-$userdef[$sortnumber]['name']='PiriO';	
-$userdef[$sortnumber]['name']='SolarPumpe';	
-$userdef[$sortnumber]['valuefield']=3;	
-$userdef[$sortnumber]['gnuplottype']='fs20';	
-$userdef[$sortnumber]['logpath']='/mnt/fhz/solarpumpe.log';   
-$userdef[$sortnumber]['room']='cellar';
-$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
-$userdef[$sortnumber]['semshort']='';
-$userdef[$sortnumber]['imagemax']=725;
-$userdef[$sortnumber]['imagemay']=52;
-$userdef[$sortnumber]['maxcount']=575;
-$userdef[$sortnumber]['XcorrectMainText']=25;               
-$userdef[$sortnumber]['logrotatelines']=50;  
+#$sortnumber=0;
+#$userdef[$sortnumber]['name']='PiriO';	
+#$userdef[$sortnumber]['name']='SolarPumpe';	
+#$userdef[$sortnumber]['valuefield']=3;	
+#$userdef[$sortnumber]['gnuplottype']='fs20';	
+#$userdef[$sortnumber]['logpath']='/mnt/fhz/solarpumpe.log';   
+#$userdef[$sortnumber]['room']='cellar';
+#$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
+#$userdef[$sortnumber]['semshort']='';
+#$userdef[$sortnumber]['imagemax']=725;
+#$userdef[$sortnumber]['imagemay']=52;
+#$userdef[$sortnumber]['maxcount']=575;
+#$userdef[$sortnumber]['XcorrectMainText']=25;               
+#$userdef[$sortnumber]['logrotatelines']=50;  
 
 
 ##########################
@@ -253,26 +253,6 @@ $userdef[$sortnumber]['logrotatelines']=50;
 #$userdef[$sortnumber]['XcorrectMainText']=25;               
 #$userdef[$sortnumber]['logrotatelines']=30;  
 
-##########################
-# example: 
-#define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
-$sortnumber=1;
-$userdef[$sortnumber]['name']='allight';	
-$userdef[$sortnumber]['valuefield']=3;	
-$userdef[$sortnumber]['gnuplottype']='fs20';	
-$userdef[$sortnumber]['logpath']='/mnt/fhz/allight.log';   
-$userdef[$sortnumber]['room']='alarm';
-$userdef[$sortnumber]['semlong']='Alarm light'; 	
-$userdef[$sortnumber]['semshort']='';
-$userdef[$sortnumber]['imagemax']=725;
-$userdef[$sortnumber]['imagemay']=52;
-$userdef[$sortnumber]['maxcount']=575;
-$userdef[$sortnumber]['XcorrectMainText']=25;               
-$userdef[$sortnumber]['logrotatelines']=30;  
-##########################
-
-
-#$sortnumber=2;
 #$userdef[$sortnumber]['name']='tARV';
 #$userdef[$sortnumber]['valuefield']=3;
 #$userdef[$sortnumber]['gnuplottype']='temperature';
