@@ -384,7 +384,7 @@ $userdef[$sortnumber]['logrotatelines']=30;
         $fontcolor3="color='#000000'";
 	# The Button needs decimal Code Instead Hex.
 	# Use the column left from the HEX on 
-	# http://www.pagentest.de/web_farben/web_farben.html.
+	# http://www.farb-tabelle.de/de/farbtabelle.htm
 	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
 	$buttonBg_R='255';$buttonBg_G='165';$buttonBg_B='0';
 	#Dec-Code from $bg1:
