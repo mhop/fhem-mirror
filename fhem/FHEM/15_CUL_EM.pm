@@ -35,7 +35,7 @@ CUL_EM_Define($$)
                                 "[corr1 corr2 CostPerUnit BasicFeePerMonth]"
             if(int(@a) < 3 || int(@a) > 7);
   return "Define $a[0]: wrong CODE format: valid is 1-12"
-                if($a[2] !~ m/^\d$/ || $a[2] < 1 || $a[2] > 12);
+                if($a[2] !~ m/^\d+$/ || $a[2] < 1 || $a[2] > 12);
 
   $hash->{CODE} = $a[2];
 
@@ -86,7 +86,7 @@ CUL_EM_Parse($$)
   # E01012471B80100B80B -> Type 01, Code 01, Cnt 10
   my @a = split("", $msg);
   my $tpe = ($a[1].$a[2])+0;
-  my $cde = ($a[3].$a[4])+0;
+  my $cde = hex($a[3].$a[4]);
 
   # seqno    =  number of received datagram in sequence, runs from 2 to 255
   # total_cnt=  total (cumulated) value in ticks as read from the device
