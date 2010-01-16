@@ -80,6 +80,8 @@
       <a href="#structure">structure</a> &nbsp;
       <a href="#WS2000">WS2000</a> &nbsp;
       <a href="#WS3600">WS3600</a> &nbsp;
+      <a href="#SISPM">SISPM</a> &nbsp;
+      <a href="#SIS_PMS">SIS_PMS</a> &nbsp;
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#Weather">Weather</a> &nbsp;
       <a href="#USF1000">USF1000</a> &nbsp;
@@ -3452,6 +3454,168 @@ Forecast Cloudy</pre>
     <li><a href="#model">model</a> (WS3600, WS2300)</li>
   </ul>
   <br>
+</ul>
+
+<a name="SISPM"></a>
+<h3>SISPM</h3>
+<ul>
+  <br>
+
+  <a name="SISPMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SISPM &lt;/path/to/sispmctl&gt;</code>
+    <br><br>
+
+    <i><b>PLEASE NOTE:</b> This module is to be considered alpha quality; it has not been
+    tested extensively, especially the interaction between "set" commands and the sheduled
+    status reading needs more obervation. (Testing with FIFOs seems as if it's working
+    without blocking nor interference, but that's on a mostly unloaded, fast system.)<br><br>
+    BE CAREFUL when using multiple PMs on one host; the parser in SISPM_Define() is MOST
+    PROBABLY broken here, I haven't had the opportunity to test this yet. YOU HAVE BEEN
+    WARNED.</i> And now to what's this disclaimer tries to prevent you from using ;)<br><br>
+
+    Defines a path to the program "sispmctl", which is used to control (locally attached)
+    "Silver Shield Power Manager" devices. Usually these are connected to the local computer
+    via USB, more than one "sispm" device per computer is supported. (Please note that, due
+    to neglections in their USB driver, AVM's Fritz!Box 7170 (and derivates, like Deutsche
+    Telekom's Speedport W901V) <b>is not</b> able to talk to these devices ...)
+
+    The communication between FHEM and the Power Manager device is done by using the open
+    source <a href="http://sispmctl.sourceforge.net/">sispmctl</a> program. Thus, for the
+    time being, THIS functionality is only available running FHEM on Linux (or any other platform
+    where you can get the sispmctl program compiled and running). On the bright side: by
+    interfacing via commandline, it is possible to define multiple SISPM devices, e. g. with
+    a wrapper that does execute sispmctl on a remote (Linux) system. And: sispmctl runs happily
+    on Marvells SheevaPlug ;)
+
+    After defining a SISPM device, a first test is done, identifying attached PMs. If this
+    succeeds, an internal task is scheduled to read the status every 30 seconds. (Reason
+    being that someone else could have switched sockets externally to FHEM.)
+
+    To actually control any power sockets, you need to define a <a href="#SIS_PMS">SIS_PMS</a>
+    device ;) If autocreate is enabled, those should be autocreated for your convenience as
+    soon as the first scan took place (30 seconds after the define).
+
+    Implementation of SISPM.pm tries to be nice, that is it reads from the pipe only 
+    non-blocking (== if there is data), so it should be safe even to use it via ssh or
+    a netcat-pipe over the Internet, but this, as well, has not been tested extensively yet.
+    <br><br>
+
+    Attributes:
+    <ul>
+      <li><code>model</code>: <code>SISPM</code> (ignored for now)</li>
+    </ul>
+    <br>
+    Example:
+    <ul>
+      <code>define PMS_Terrarium SISPM /usr/bin/sispmctl</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="SISPMset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="SISPMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (SISPM)</li>
+  </ul>
+  <br>
+</ul>
+
+<a name="SIS_PMS"></a>
+
+<h3>SIS_PMS</h3>
+<ul>
+  This module is responsible for handling the actual sockets (power on,
+  power off, toggle) on a "Silver Shield Power Manager", see <a href="#SISPM">SISPM</a>
+  for how to define access to one (SIS_PMS stands for "Silver Shield Power Manager Socket").
+  <br><br>
+
+  <a name="SIS_PMSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SIS_PMS &lt;serial&gt; &lt;socket&gt;</code>
+    <br><br>
+
+   To securely distinguish multiple attached Power Manager devices, the
+   serial number of those is used. You get these with "sispmctl -s"&nbsp;- or
+   just let autocreate define the sockets attached for you.<br>
+
+   <ul>
+   <li><code>&lt;serial&gt;</code> is the serial number of the Power Manager device, see above.</li>
+   <li><code>&lt;socket&gt;</code> is a number between 1 and 4 (for a 4 socket model)</li>
+   </ul>
+   <br>
+
+    Examples:
+    <ul>
+      <code>define lamp SIS_PMS 01:02:03:04:05 1</code><br>
+      <code>define otherlamp SIS_PMS 01:02:03:04:05 3</code><br>
+      <code>define tv SIS_PMS 01:01:38:44:55 1</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="SIS_PMSset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt;]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    off
+<!--    off-for-timer
+-->    on
+<!--    on-for-timer      # see the note
+-->    toggle
+<!--    on-till           # Special, see the note
+-->    </pre>
+    Examples:
+    <ul>
+      <code>set lamp on</code><br>
+      <code>set lamp1,lamp2,lamp3 on</code><br>
+      <code>set lamp1-lamp3 on</code><br><!--
+      <code>set lamp on-for-timer 12</code><br>-->
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>As an external program is used, a noticeable delay may occur.</li><!--
+      <li>The <code>time</code> used in <code>*-for-timer</code> is, unlike
+          with FS20, in seconds and internally uses "at" statements to schedule
+          the switching.
+      <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
+	  or { &lt;perl code&gt; }, where the perl-code returns a time
+          specification).
+	  If the current time is greater than the specified time, then the
+	  command is ignored, else an "on" command is generated, and for the
+	  given "till-time" an off command is scheduleld via the at command.
+	  </li>
+-->    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="SIS_PMSattributes"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <a name="attrdummy"></a>
+    <li>dummy<br>
+	Set the device attribute dummy to define devices which should not
+	output any signals. Associated notifys will be executed if the signal
+	is received. Used e.g. to react to a code from a sender, but it will
+	not actually switch if triggered in the web frontend.
+	</li><br>
+
+    <li><a href="#loglevel">loglevel</a></li><br>
+  </ul>
 </ul>
 
 <a name="IPWE"></a>
