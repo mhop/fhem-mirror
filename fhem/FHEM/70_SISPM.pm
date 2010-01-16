@@ -1,0 +1,358 @@
+################################################################
+#
+#  Copyright notice
+#
+#  (c) 2009 Copyright: Kai 'wusel' Siering (wusel+fhem at uu dot org)
+#  All rights reserved
+#
+#  This code is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  This copyright notice MUST APPEAR in all copies of the script!
+###############################################
+
+###########################
+# 70_SISPM.pm
+# Module for FHEM
+#
+# Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
+# Based in part on work for FHEM by other authors ...
+# $Id: 70_SISPM.pm,v 1.1 2010-01-16 22:08:32 painseeker Exp $
+###########################
+
+package main;
+
+use strict;
+use warnings;
+
+my %sets = (
+  "cmd"       => "",
+  "freq"      => "",
+);
+
+my %TranslatedCodes = (
+    "Date" => "Date",
+);
+
+my %WantedCodesForStatus = (
+    "Ti" => "Ti:",
+);
+
+#####################################
+sub
+SISPM_Initialize($)
+{
+  my ($hash) = @_;
+
+# Consumer
+  $hash->{DefFn}   = "SISPM_Define";
+  $hash->{Clients} =
+        ":SIS_PMS:";
+  my %mc = (
+    "1:SIS_PMS"   => "^socket ..:..:..:..:.. . state o.*",
+  );
+  $hash->{MatchList} = \%mc;
+  $hash->{AttrList}= "model:SISPM loglevel:0,1,2,3,4,5,6";
+  $hash->{ReadFn}  = "SISPM_Read";
+  $hash->{WriteFn} = "SISPM_Write";
+  $hash->{UndefFn} = "SISPM_Undef";
+}
+
+#####################################
+sub
+SISPM_Define($$)
+{
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
+  my $numdetected=0;
+  my $currentdevice=0;
+
+  return "Define the /path/to/sispmctl as a parameter" if(@a != 3);
+
+  my $FH;
+  my $dev = sprintf("%s", $a[2]);
+  Log 3, "SISPM using \"$dev\" as parameter to open(); trying ...";
+  my $tmpdev=sprintf("%s -s 2>&1 |", $dev);
+  open($FH, $tmpdev);
+  if(!$FH) {
+      return "SISPM Can't start $dev: $!";
+  }
+  local $_;
+  while (<$FH>) {
+      if(/^(No GEMBIRD SiS-PM found.)/) {
+	  Log 3, "SISPM woops? $1";
+      }
+   
+      if(/^Gembird #(\d+) is USB device (\d+)./) {
+	  Log 3, "SISPM found SISPM device number $1 as USB $2";
+	  $hash->{UNITS}{$1}{USB}=$2;
+	  $currentdevice=$numdetected;
+	  $numdetected++;
+      }
+      if(/^This device has a serial number of (.*)/) {
+	  Log 3, "SISPM device number " . $currentdevice . " has serial $1";
+	  $hash->{UNITS}{$currentdevice}{SERIAL}=$1;
+ 	  $hash->{SERIALS}{$1}{UNIT}=$currentdevice;
+  	  $hash->{SERIALS}{$1}{USB}=$hash->{UNITS}{$currentdevice}{USB};
+    }
+  }
+  close($FH);
+  Log 3, "SISPM initial read done";
+
+  if ($numdetected==0) {
+      return "SISPM no SIMPM devices found.";
+  }
+
+  $hash->{NumPMs} = $numdetected;
+  $hash->{DeviceName} = $dev;
+  $hash->{Timer} = 30;  # just a keepalive for now
+
+  Log 3, "SISPM setting callback timer";
+
+  my $oid = $init_done;
+  $init_done = 1;
+  InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
+  $init_done = $oid;
+
+  Log 3, "SISPM initialized";
+
+  $hash->{STATE} = "initialized";
+  return undef;
+}
+
+#####################################
+sub
+SISPM_Undef($$)
+{
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
+  my $name = $hash->{NAME};
+
+  if(defined($hash->{FD})) {
+      close($hash->{FD});
+      delete $hash->{FD};
+  }
+  delete $selectlist{"$name.pipe"};
+
+  $hash->{STATE}='undefined';
+  Log 3, "$name shutdown complete";
+  return undef;
+}
+
+
+#####################################
+sub
+SISPM_GetStatus($)
+{
+    my ($hash) = @_;
+    my $dnr = $hash->{DEVNR};
+    my $name = $hash->{NAME};
+    my $dev = $hash->{DeviceName};
+    my $FH;
+
+    # Call us in n seconds again.
+#    InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
+
+    Log 4, "SISPM contacting device";
+
+    my $tmpdev=sprintf("%s -s -g all 2>&1 |", $dev);
+    open($FH, $tmpdev);
+    if(!$FH) {
+	return "SISPM Can't open pipe: $dev: $!";
+    }
+
+    $hash->{FD}=$FH;
+    $selectlist{"$name.pipe"} = $hash;
+    Log 4, "SISPM pipe opened";
+    $hash->{STATE} = "querying";
+    $hash->{pipeopentime} = time();
+#    InternalTimer(gettimeofday() + 6, "SISPM_Read", $hash, 1);
+#    return $hash->{STATE};
+}
+
+#####################################
+sub
+SISPM_Read($)
+{
+    my ($hash) = @_;
+    my $dnr = $hash->{DEVNR};
+    my $name = $hash->{NAME};
+    my $dev = $hash->{DeviceName};
+    my $FH;
+    my $inputline;
+
+    Log 4, "SISPM Read entered";
+
+    if(!defined($hash->{FD})) {
+	Log 3, "Oops, SISPM FD undef'd";
+	return undef;
+    }
+    if(!$hash->{FD}) {
+	Log 3, "Oops, SISPM FD empty";
+	return undef;
+    }
+    $FH = $hash->{FD};
+
+    Log 4, "SISPM reading started";
+
+    my @lines;
+    my $eof;
+    my $i=0;
+    my $tn = TimeNow();
+    my $reading;
+    my $readingforstatus;
+    my $currentserial="none";
+
+    ($eof, @lines) = nonblockGetLinesSISPM($FH);
+
+    if(!defined($eof)) {
+	Log 4, "SISPM FIXME: eof undefined?!";
+	$eof=0;
+    }
+    Log 4, "SISPM reading ended with eof==$eof";
+
+    # FIXME! Current observed behaviour is "would block", then read of only EOF.
+    #        Not sure if it's always that way; more correct would be checking
+    #        for empty $inputline or undef'd $rawreading,$val. -wusel, 2010-01-04 
+    if($eof != 1) {
+    foreach my $inputline ( @lines ) {
+	$inputline =~ s/\s+$//;
+
+	# wusel, 2010-01-16: Seems as if reading not always works as expected;
+	#                    throw away the whole readings if there's a NULL
+	#                    serial number.
+	if($currentserial eq "00:00:00:00:00") {
+	    next;
+	}
+
+	if($inputline =~ /^(No GEMBIRD SiS-PM found.)/) {
+	    Log 3, "SISPM woops? $1";
+	}
+
+	if($inputline =~ /^Gembird #(\d+) is USB device (\d+)\./ || 
+	   $inputline =~ /^Accessing Gembird #(\d+) USB device (\d+)/) {
+	    Log 5, "SISPM found SISPM device number $1 as USB $2";
+	    if($hash->{UNITS}{$1}{USB}!=$2) {
+# -wusel, 2010-01-15: FIXME! Verify that this IS the device we're
+#                     looking for. As USB renumbering can happen,
+#                     if the $hash->{UNITS}{$1}{USB}=$2 not matches
+#                     we'd need to redo a "sispmctl -s", maybe by
+#                     going to SISPM_Define() again?
+#
+#                     Hoping the best for now -- DON'T TOUCH RUNNING
+#                     BOX WITH MORE THAN ONE SISPM CONNECTED OR HELL
+#                     MAY BREAK LOOSE ;)
+		Log 3, "SISPM: Odd, got unit $1 as USB $2, have $1 on file as " .  $hash->{UNITS}{$1}{USB} . "?";
+	    }
+	}
+
+# -wusel, 2010-01-15: FIXME! This will break on >1 PMS!
+	if($inputline =~ /^This device has a serial number of (.*)/) {
+	    $currentserial=$1;
+	    if($currentserial eq "00:00:00:00:00") {
+		Log 3, "SISPM Whooopsie! Something funny has happend, your serial nullified ($currentserial). That's an error and we bail out here.";
+		next;
+	    }
+	}
+
+	if($inputline =~ /^Status of outlet (\d):\s+(.*)/) {
+	    if($currentserial ne "none") {
+		Log 5, "SISPM found socket $1 on $currentserial, state $2";
+		my $dmsg="socket " . $currentserial . " $1 state " . $2;
+		my %addvals;
+		Dispatch($hash, $dmsg, \%addvals);
+	    } else {
+		Log 3, "SISPM Whooopsie! Found socket $1, state $2, but no serial (serial is $currentserial)?";
+	    }
+	}
+    }
+    }
+
+    if($eof) {
+	close($FH);
+	delete $hash->{FD};
+	delete $selectlist{"$name.pipe"};
+	InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
+	Log 4, "SISPM done reading pipe";
+    } else {
+	Log 4, "SISPM (further) reading would block";
+    }
+}
+
+
+#####################################
+sub SISPM_Write($$$) {
+    my ($hash,$fn,$msg) = @_;
+    my $dev = $hash->{DeviceName};
+
+#    Log 3, "SISPM_Write entered for $hash->{NAME} with $fn and $msg";
+
+    my ($serial, $socket, $what) = split(' ', $msg);
+
+    my $deviceno;
+    my $cmdline;
+    my $cmdletter="t";
+
+    if($what eq "on") {
+	$cmdletter="o";
+    } elsif($what eq "off") {
+	$cmdletter="f";
+    }
+
+    if(defined($hash->{SERIALS}{$serial}{UNIT})) {
+	$deviceno=($hash->{SERIALS}{$serial}{UNIT})+1;
+	$cmdline=sprintf("%s -d %d -%s %d 2>&1 >/dev/null", $dev, $deviceno, $cmdletter, $socket);
+	system($cmdline);
+    } else {
+	Log 2, "SISPM_Write can not find SISPM device with serial $serial";
+    }
+    return;
+}
+
+
+# From http://www.perlmonks.org/?node_id=713384 / http://davesource.com/Solutions/20080924.Perl-Non-blocking-Read-On-Pipes-Or-Files.html
+#
+# Used, hopefully, with permission ;)
+#
+# An non-blocking filehandle read that returns an array of lines read
+# Returns:  ($eof,@lines)
+my %nonblockGetLines_lastSISPM;
+sub nonblockGetLinesSISPM {
+  my ($fh,$timeout) = @_;
+
+  $timeout = 0 unless defined $timeout;
+  my $rfd = '';
+  $nonblockGetLines_lastSISPM{$fh} = ''
+        unless defined $nonblockGetLines_lastSISPM{$fh};
+
+  vec($rfd,fileno($fh),1) = 1;
+  return unless select($rfd, undef, undef, $timeout)>=0;
+    # I'm not sure the following is necessary?
+  return unless vec($rfd,fileno($fh),1);
+  my $buf = '';
+  my $n = sysread($fh,$buf,1024*1024);
+  # If we're done, make sure to send the last unfinished line
+  return (1,$nonblockGetLines_lastSISPM{$fh}) unless $n;
+    # Prepend the last unfinished line
+  $buf = $nonblockGetLines_lastSISPM{$fh}.$buf;
+    # And save any newly unfinished lines
+  $nonblockGetLines_lastSISPM{$fh} =
+        (substr($buf,-1) !~ /[\r\n]/ && $buf =~ s/([^\r\n]*)$//)
+            ? $1 : '';
+  $buf ? (0,split(/\n/,$buf)) : (0);
+}
+
+
+1;
