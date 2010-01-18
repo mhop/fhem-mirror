@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 17_SIS_PMS.pm,v 1.1 2010-01-16 22:08:32 painseeker Exp $
+# $Id: 17_SIS_PMS.pm,v 1.2 2010-01-18 01:12:34 painseeker Exp $
 ###########################
 
 package main;
@@ -37,6 +37,7 @@ package main;
 use strict;
 use warnings;
 
+my $SIS_PMS_cmds ="off on on-till off-till toggle";
 
 sub
 SIS_PMS_Initialize($)
@@ -145,6 +146,59 @@ SIS_PMS_Parse($$)
 }
 
 
+#############################
+sub
+SIS_PMS_Do_On_Till($@)
+{
+  my ($hash, @a) = @_;
+  return "Timespec (HH:MM[:SS]) needed for the on-till command" if(@a != 3);
+
+  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+  return $err if($err);
+
+  my @lt = localtime;
+  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
+  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+  if($hms_now ge $hms_till) {
+    Log 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
+    return "";
+  }
+
+  my @b = ($a[0], "on");
+  SIS_PMS_Set($hash, @b);
+  my $tname = $hash->{NAME} . "_till";
+  CommandDelete(undef, $tname) if($defs{$tname});
+  CommandDefine(undef, "$tname at $hms_till set $a[0] off");
+
+}
+
+#############################
+sub
+SIS_PMS_Do_Off_Till($@)
+{
+  my ($hash, @a) = @_;
+  return "Timespec (HH:MM[:SS]) needed for the off-till command" if(@a != 3);
+
+  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+  return $err if($err);
+
+  my @lt = localtime;
+  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
+  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+  if($hms_now ge $hms_till) {
+    Log 4, "off-till: won't switch as now ($hms_now) is later than $hms_till";
+    return "";
+  }
+
+  my @b = ($a[0], "off");
+  SIS_PMS_Set($hash, @b);
+  my $tname = $hash->{NAME} . "_till";
+  CommandDelete(undef, $tname) if($defs{$tname});
+  CommandDefine(undef, "$tname at $hms_till set $a[0] on");
+
+}
+
+
 ###################################
 sub
 SIS_PMS_Set($@)
@@ -157,11 +211,22 @@ SIS_PMS_Set($@)
 
     return "no set value specified" if($na < 2 || $na > 3);
 
-#    Log 3, "SIS_PM_Set entered for " . $hash->{NAME};
+    my @cmds=split(" ", $SIS_PMS_cmds);
+    my $ncmds=int(@cmds);
+    my $i;
+    my $known_cmd=0;
 
-    if ($what ne "on" && $what ne "off" && $what ne "toggle") {
-	return "Unknown argument $what, choose one of on off toggle";
+    for($i=0; $i<$ncmds; $i++ && $known_cmd==0) {
+	if($cmds[$i] eq $what) {
+	    $known_cmd++;
+	}
     }
+    if($known_cmd==0) {
+	return "Unknown argument $what, choose one of $SIS_PMS_cmds";
+    }
+
+    return SIS_PMS_Do_On_Till($hash, @a) if($a[1] eq "on-till");
+    return SIS_PMS_Do_Off_Till($hash, @a) if($a[1] eq "off-till");
 
     my $prevstate=$hash->{STATE};
     my $currstate=$what;
