@@ -3487,7 +3487,9 @@ Forecast Cloudy</pre>
     where you can get the sispmctl program compiled and running). On the bright side: by
     interfacing via commandline, it is possible to define multiple SISPM devices, e. g. with
     a wrapper that does execute sispmctl on a remote (Linux) system. And: sispmctl runs happily
-    on Marvells SheevaPlug ;)
+    on Marvells SheevaPlug ;) <i>Please note:</i> if you're not running FHEM as root, you most likely
+    have to make sispmctl setuid root (<code>chmod 4755 /path/to/sispmctl</code>) or fiddle with
+    udev so that the devices of the Power Manager are owned by the user running FHEM.
 
     After defining a SISPM device, a first test is done, identifying attached PMs. If this
     succeeds, an internal task is scheduled to read the status every 30 seconds. (Reason
@@ -3569,34 +3571,30 @@ Forecast Cloudy</pre>
     where <code>value</code> is one of:<br>
     <pre>
     off
-<!--    off-for-timer
--->    on
-<!--    on-for-timer      # see the note
--->    toggle
-<!--    on-till           # Special, see the note
--->    </pre>
+    on
+    toggle
+    on-till           # Special, see the note
+    off-till          # Special, see the note
+    </pre>
     Examples:
     <ul>
       <code>set lamp on</code><br>
       <code>set lamp1,lamp2,lamp3 on</code><br>
-      <code>set lamp1-lamp3 on</code><br><!--
-      <code>set lamp on-for-timer 12</code><br>-->
+      <code>set lamp1-lamp3 on</code><br>
+      <code>set hql_lamp on-till 18:45</code><br>
     </ul>
     <br>
     Notes:
     <ul>
-      <li>As an external program is used, a noticeable delay may occur.</li><!--
-      <li>The <code>time</code> used in <code>*-for-timer</code> is, unlike
-          with FS20, in seconds and internally uses "at" statements to schedule
-          the switching.
-      <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
+      <li>As an external program is used, a noticeable delay may occur.</li>
+      <li>*-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
 	  or { &lt;perl code&gt; }, where the perl-code returns a time
           specification).
 	  If the current time is greater than the specified time, then the
-	  command is ignored, else an "on" command is generated, and for the
-	  given "till-time" an off command is scheduleld via the at command.
-	  </li>
--->    </ul>
+	  command is ignored, else an "on" or "off" command, respectively, is
+          generated, and for the given time an "off"/"on" command is
+	  scheduleld via the at command.</li>
+    </ul>
   </ul>
   <br>
 

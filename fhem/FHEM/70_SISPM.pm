@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_SISPM.pm,v 1.1 2010-01-16 22:08:32 painseeker Exp $
+# $Id: 70_SISPM.pm,v 1.2 2010-01-18 01:12:34 painseeker Exp $
 ###########################
 
 package main;
@@ -71,6 +71,19 @@ SISPM_Initialize($)
 }
 
 #####################################
+sub FixSISPMSerial($) {
+    my $serial=$_[0];
+
+    if(length($serial)!=length("..:..:..:..:..")){
+	my ($sn1, $sn2, $sn3, $sn4, $sn5) = split(":", $serial);
+	$serial=sprintf("%2s:%2s:%2s:%2s:%2s", substr($sn1, -2, 2), substr($sn2, -2, 2), substr($sn3, -2, 2), substr($sn4, -2, 2), substr($sn5, -2, 2));
+	$serial =~ s/ /0/g;
+    }
+
+    return $serial;
+}
+
+#####################################
 sub
 SISPM_Define($$)
 {
@@ -102,10 +115,15 @@ SISPM_Define($$)
 	  $numdetected++;
       }
       if(/^This device has a serial number of (.*)/) {
-	  Log 3, "SISPM device number " . $currentdevice . " has serial $1";
-	  $hash->{UNITS}{$currentdevice}{SERIAL}=$1;
- 	  $hash->{SERIALS}{$1}{UNIT}=$currentdevice;
-  	  $hash->{SERIALS}{$1}{USB}=$hash->{UNITS}{$currentdevice}{USB};
+	  my $serial=$1;
+	  Log 3, "SISPM device number " . $currentdevice . " has serial $serial";
+	  if(length($serial)!=length("..:..:..:..:..")){
+	      $serial = FixSISPMSerial($serial);
+	      Log 3, "SISPM: Whoopsi, weird serial format; fixing to $serial.";
+	  }
+	  $hash->{UNITS}{$currentdevice}{SERIAL}=$serial;
+ 	  $hash->{SERIALS}{$serial}{UNIT}=$currentdevice;
+  	  $hash->{SERIALS}{$serial}{USB}=$hash->{UNITS}{$currentdevice}{USB};
     }
   }
   close($FH);
@@ -176,7 +194,7 @@ SISPM_GetStatus($)
     $hash->{FD}=$FH;
     $selectlist{"$name.pipe"} = $hash;
     Log 4, "SISPM pipe opened";
-    $hash->{STATE} = "querying";
+    $hash->{STATE} = "running";
     $hash->{pipeopentime} = time();
 #    InternalTimer(gettimeofday() + 6, "SISPM_Read", $hash, 1);
 #    return $hash->{STATE};
@@ -260,9 +278,9 @@ SISPM_Read($)
 
 # -wusel, 2010-01-15: FIXME! This will break on >1 PMS!
 	if($inputline =~ /^This device has a serial number of (.*)/) {
-	    $currentserial=$1;
+	    $currentserial=FixSISPMSerial($1);
 	    if($currentserial eq "00:00:00:00:00") {
-		Log 3, "SISPM Whooopsie! Something funny has happend, your serial nullified ($currentserial). That's an error and we bail out here.";
+		Log 3, "SISPM Whooopsie! Your serial nullified ($currentserial). Skipping ...";
 		next;
 	    }
 	}
@@ -285,8 +303,10 @@ SISPM_Read($)
 	delete $hash->{FD};
 	delete $selectlist{"$name.pipe"};
 	InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
+	$hash->{STATE} = "read";
 	Log 4, "SISPM done reading pipe";
     } else {
+	$hash->{STATE} = "reading";
 	Log 4, "SISPM (further) reading would block";
     }
 }
