@@ -3467,13 +3467,52 @@ Forecast Cloudy</pre>
     <code>define &lt;name&gt; SISPM &lt;/path/to/sispmctl&gt;</code>
     <br><br>
 
-    <i><b>PLEASE NOTE:</b> This module is to be considered alpha quality; it has not been
-    tested extensively, especially the interaction between "set" commands and the sheduled
-    status reading needs more obervation. (Testing with FIFOs seems as if it's working
-    without blocking nor interference, but that's on a mostly unloaded, fast system.)<br><br>
-    BE CAREFUL when using multiple PMs on one host; the parser in SISPM_Define() is MOST
-    PROBABLY broken here, I haven't had the opportunity to test this yet. YOU HAVE BEEN
-    WARNED.</i> And now to what's this disclaimer tries to prevent you from using ;)<br><br>
+    <div style="background-color: #ffaaaa;">
+    <i><b>PLEASE NOTE:</b> This module is still work in progess; please treat it as such.
+    (That is, don't but your central heating on SISPM in a cold winter just yet ;))</i><br><br>
+    Further tests should be done regarding the interaction between "set" commands and the sheduled
+    status reading. (Testing with FIFOs seems as if it's working without blocking nor interference,
+    but that's on a mostly unloaded, fast system.)<br><br>
+    When <i>using multiple SIS PMs on one host</i>, sispmctl up to and including V 2.7 has a bug:
+<pre>plug-2:# sispmctl -v -s -d 1 -g all -d 2 -g all
+
+SiS PM Control for Linux 2.7
+
+(C) 2004, 2005, 2006, 2007, 2008 by Mondrian Nuessle, (C) 2005, 2006 by Andreas Neuper.
+This program is free software.
+[...]
+
+Gembird #0 is USB device 013.This device is a 4-socket SiS-PM.
+[...]
+
+Gembird #1 is USB device 015.This device is a 4-socket SiS-PM.
+[...]
+
+Accessing Gembird #1 USB device 015
+Status of outlet 1:     on
+Status of outlet 2:     on
+Status of outlet 3:     on
+Status of outlet 4:     on
+Error performing requested action
+Libusb error string: error sending control message: Invalid argument
+Terminating
+*** glibc detected *** sispmctl: double free or corruption (fasttop): 0x000251e0 ***
+[...]</pre>
+    Well, the fix is simple and will be sent upstream, but in case it's not incorporated
+    at the time you need it, here it is; it's easy to apply even by hand ;-)
+<pre>
+--- src/main.c-old      2010-01-19 16:56:15.000000000 +0100
++++ src/main.c  2010-01-19 16:54:56.000000000 +0100
+@@ -441,7 +441,7 @@
+            }
+            break;
+        case 'd': // replace previous (first is default) device by selected one
+-           if(udev!=NULL) usb_close (udev);
++           if(udev!=NULL) { usb_close (udev); udev=NULL; }
+            devnum = atoi(optarg);
+            if(devnum>=count) devnum=count-1;
+            break;
+</pre></div><br>
 
     Defines a path to the program "sispmctl", which is used to control (locally attached)
     "Silver Shield Power Manager" devices. Usually these are connected to the local computer
