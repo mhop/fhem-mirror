@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_SISPM.pm,v 1.2 2010-01-18 01:12:34 painseeker Exp $
+# $Id: 70_SISPM.pm,v 1.3 2010-01-19 19:33:01 painseeker Exp $
 ###########################
 
 package main;
@@ -102,6 +102,7 @@ SISPM_Define($$)
   if(!$FH) {
       return "SISPM Can't start $dev: $!";
   }
+  $hash->{NUMUNITS}=0;
   local $_;
   while (<$FH>) {
       if(/^(No GEMBIRD SiS-PM found.)/) {
@@ -111,9 +112,11 @@ SISPM_Define($$)
       if(/^Gembird #(\d+) is USB device (\d+)./) {
 	  Log 3, "SISPM found SISPM device number $1 as USB $2";
 	  $hash->{UNITS}{$1}{USB}=$2;
-	  $currentdevice=$numdetected;
+	  $currentdevice=$1;
 	  $numdetected++;
+ 	  $hash->{NUMUNITS}=$numdetected;
       }
+
       if(/^This device has a serial number of (.*)/) {
 	  my $serial=$1;
 	  Log 3, "SISPM device number " . $currentdevice . " has serial $serial";
@@ -179,13 +182,19 @@ SISPM_GetStatus($)
     my $name = $hash->{NAME};
     my $dev = $hash->{DeviceName};
     my $FH;
+    my $i;
 
     # Call us in n seconds again.
 #    InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
 
     Log 4, "SISPM contacting device";
 
-    my $tmpdev=sprintf("%s -s -g all 2>&1 |", $dev);
+    my $tmpdev=sprintf("%s -s ", $dev);
+
+    for($i=0; $i<$hash->{NUMUNITS}; $i++) {
+	$tmpdev=sprintf("%s -d %d -g all ", $tmpdev, $i);
+    }
+    $tmpdev=sprintf("%s 2>&1 |", $tmpdev);
     open($FH, $tmpdev);
     if(!$FH) {
 	return "SISPM Can't open pipe: $dev: $!";
@@ -232,6 +241,10 @@ SISPM_Read($)
     my $reading;
     my $readingforstatus;
     my $currentserial="none";
+    my $currentdevice=0;
+    my $currentusbid=0;
+    my $renumbered=0;
+    my $newPMfound=0;
 
     ($eof, @lines) = nonblockGetLinesSISPM($FH);
 
@@ -255,39 +268,65 @@ SISPM_Read($)
 	    next;
 	}
 
+# wusel, 2010-01-19: Multiple (2) SIS PM do work now. But USB renumbering will still
+#                    break things rather badly. Thinking about dropping it altogether,
+#                    that is wipe old state data ($hash->{UNITS} et. al.) and rebuild
+#                    data each time from scratch. That should work as SIS_PMS uses the
+#                    serial as key; unfortunately, sispmctl doesn't offer this (and it
+#                    wont work due to those FFFFFFxx readings), so we need to keep
+#                    track of unit number <-> serial ... But if between reading this
+#                    data and a "set" statement something changes, we still could switch
+#                    the wrong socket.
+#
+#                    As sispmctl 2.7 is broken already for multiple invocations with -d,
+#                    I consider fixing both the serial number issue as well as add the
+#                    serial as selector ... Drat. Instead of getting the ToDo list shorter,
+#                    it just got longer ;-)
+
 	if($inputline =~ /^(No GEMBIRD SiS-PM found.)/) {
-	    Log 3, "SISPM woops? $1";
+	    Log 3, "SISPM Whoopsie? $1";
+	    next;
 	}
 
 	if($inputline =~ /^Gembird #(\d+) is USB device (\d+)\./ || 
 	   $inputline =~ /^Accessing Gembird #(\d+) USB device (\d+)/) {
 	    Log 5, "SISPM found SISPM device number $1 as USB $2";
-	    if($hash->{UNITS}{$1}{USB}!=$2) {
-# -wusel, 2010-01-15: FIXME! Verify that this IS the device we're
-#                     looking for. As USB renumbering can happen,
-#                     if the $hash->{UNITS}{$1}{USB}=$2 not matches
-#                     we'd need to redo a "sispmctl -s", maybe by
-#                     going to SISPM_Define() again?
-#
-#                     Hoping the best for now -- DON'T TOUCH RUNNING
-#                     BOX WITH MORE THAN ONE SISPM CONNECTED OR HELL
-#                     MAY BREAK LOOSE ;)
-		Log 3, "SISPM: Odd, got unit $1 as USB $2, have $1 on file as " .  $hash->{UNITS}{$1}{USB} . "?";
+	    if($1 < $hash->{NUMUNITS}) {
+		if($hash->{UNITS}{$1}{USB}!=$2) {
+		    Log 3, "SISPM: USB ids changed (unit $1 is now USB $2 but was " .  $hash->{UNITS}{$1}{USB} . "); will fix.";
+		    $renumbered=1;
+		}   
+	    } else { # Something wonderful has happened, we have a new SIS PM!
+		Log 3, "SISPM: Wuuuhn! Found a new unit $1 as USB $2. Will assimilate it.";
+		$newPMfound=1;
+	    }
+	    $currentdevice=$1;
+	    $currentusbid=$2;
+	    $currentserial="none";
+	    if(defined($hash->{UNITS}{$currentdevice}{SERIAL})) {
+		$currentserial=$hash->{UNITS}{$currentdevice}{SERIAL};
 	    }
 	}
 
-# -wusel, 2010-01-15: FIXME! This will break on >1 PMS!
 	if($inputline =~ /^This device has a serial number of (.*)/) {
 	    $currentserial=FixSISPMSerial($1);
 	    if($currentserial eq "00:00:00:00:00") {
 		Log 3, "SISPM Whooopsie! Your serial nullified ($currentserial). Skipping ...";
 		next;
 	    }
+
+	    if($newPMfound==1) {
+		$hash->{UNITS}{$currentdevice}{USB}=$currentusbid;
+		$hash->{UNITS}{$currentdevice}{SERIAL}=$currentserial;
+		$hash->{SERIALS}{$currentserial}{UNIT}=$currentdevice;
+		$hash->{SERIALS}{$currentserial}{USB}=$currentusbid;
+		$hash->{NUMUNITS}+=1;
+	    }
 	}
 
 	if($inputline =~ /^Status of outlet (\d):\s+(.*)/) {
 	    if($currentserial ne "none") {
-		Log 5, "SISPM found socket $1 on $currentserial, state $2";
+		Log 3, "SISPM found socket $1 on $currentserial, state $2";
 		my $dmsg="socket " . $currentserial . " $1 state " . $2;
 		my %addvals;
 		Dispatch($hash, $dmsg, \%addvals);
@@ -332,7 +371,7 @@ sub SISPM_Write($$$) {
     }
 
     if(defined($hash->{SERIALS}{$serial}{UNIT})) {
-	$deviceno=($hash->{SERIALS}{$serial}{UNIT})+1;
+	$deviceno=($hash->{SERIALS}{$serial}{UNIT});
 	$cmdline=sprintf("%s -d %d -%s %d 2>&1 >/dev/null", $dev, $deviceno, $cmdletter, $socket);
 	system($cmdline);
     } else {
