@@ -41,8 +41,8 @@ CommandXmlList($$)
   my $lt = "";
 
   delete($modules{""}) if(defined($modules{""}));
-  for my $d (sort { my $x = $defs{$a}{TYPE}.$modules{$defs{$a}{TYPE}}{ORDER} cmp
-    		            $defs{$b}{TYPE}.$modules{$defs{$b}{TYPE}}{ORDER};
+  for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
+    		            $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
     		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
 
       next if(IsIgnored($d));
