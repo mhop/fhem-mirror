@@ -143,7 +143,7 @@ use vars qw($devcount);	        # To sort the devices
 
 use vars qw($reread_active);
 
-my $AttrList = "room comment";
+my $AttrList = "room comment alias";
 
 my $server;			# Server socket
 my $currlogfile;		# logfile, without wildcards
@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.98 2010-01-04 23:07:35 painseeker Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.99 2010-01-20 08:56:17 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
