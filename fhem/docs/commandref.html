@@ -86,6 +86,8 @@
       <a href="#Weather">Weather</a> &nbsp;
       <a href="#USF1000">USF1000</a> &nbsp;
       <a href="#X10">X10</a> &nbsp;
+      <a href="#xxLG7000">xxLG7000</a> &nbsp;
+      <a href="#LGTV">LGTV</a> &nbsp;
       <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
 
   </ul>
@@ -2914,6 +2916,121 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+</ul>
+
+<a name="xxLG7000"></a>
+<h3>xxLG7000</h3>
+<ul>
+  <br>
+
+  <a name="xxLG7000define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; xxLG7000 &lt;serial-device&gt;</code>
+    <br><br>
+
+    Defines a serial link to a TV set of LG's xxLG70yy series; these LCD TVs
+    (as well as their Plasma cousins, xxPG70yy) feature a serial connector which
+    can officially be used to control the TV set (see your Onwer's Manual, there's
+    an Appendix labelled "External Control Device setup"). And, well, xxLG7000 is
+    the FHEM module to actually do this. (BTW, they run Linux internally ;))<br><br>
+
+    Examples:
+    <ul>
+      <code>define myLG7k xxLG7000 /dev/ttyUSB1</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="xxLG7000set"></a>
+  <b>Set </b>
+  <ul> Not used, nothing to set directly. </ul>
+
+  <a name="xxLG7000get"></a>
+  <b>Get</b>
+  <ul> Not used, nothing to get directly. </ul>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li>SetID (1, 2, ...; see Owner's Manual. Currently, only SetID 1 is addressed, regardless of this setting. Anyone who onws more than one of these?)</li>
+  </ul>
+  <br>
+</ul>
+
+
+<a name="LGTV"></a>
+<h3>LGTV</h3>
+<ul>
+
+  <a name="LGTVdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; LGTV</code>
+    <br><br>
+
+    This module is expected to work with <a href="#xxLG7000">xxLG7000</a> as it's
+    IODev. With LGTV and a compatible hardware module (currently, there's only
+    xxLG7000), you are able to power your TV set on and off, query it's power state,
+    select the input (AV, RGB, Composites, analogue TV, DVB-T, HDMI) or mute/unmute
+    the volume.<br>
+    Defining a LGTV device will schedule an internal task, which periodically reads
+    the status of the TV set (power state; if power is on, query the selected input)
+    and triggers notify/filelog commands.<br><br>
+  </ul>
+
+  <a name="LGTVset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;what&gt; &lt;value&gt;</code>
+    <br><br>
+    Currently, the following commands are defined; not all may be available on a
+    given TV set. An error messages should be recorded if e. g. the input in question
+    is not usable.
+
+<pre>power state
+power on
+power off
+input AV1
+input AV2
+input AV3
+input AV3
+input Component
+input RGB
+input HDMI1
+input HDMI2
+input HDMI3
+input HDMI4
+input DVBT
+input PAL
+audio mute
+audio normal
+selected input</pre>
+  </ul>
+  <a name="LGTVget"></a>
+  <b>Get</b>
+  <ul>
+    <!-- <code>get &lt;name&gt; status</code>
+    <br><br> -->
+    Not yet implemented; use "set name power state" or "set name selected input" for now.
+    <br><br>
+  </ul>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li>
+<!--    <li><a href="#model">model</a> (M232Counter)</li> -->
+  </ul>
+<br>
+  <b>Implementator's note</b>
+  <ul>
+    The commands listed above are send 1:1 to the underlying IODev (e. g. xxLG7000); that IODev
+    is responsible for translation into <i>whatever means</i> to invoke the function on the TV.
+    It is my hope that other's will adopt this idea and write compatible low level drivers for other
+    TV sets, to make this module (even ;)) more useful.
+  </ul>
+  <br>
 </ul>
 
 <a name="OWFS"></a>
