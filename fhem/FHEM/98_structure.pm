@@ -48,7 +48,9 @@ structure_Define($$)
 
   my %list;
   foreach my $a (@a) {
-    $list{$a} = 1;
+    foreach my $d (devspec2array($a)) {
+      $list{$d} = 1;
+    }
   }
   $hash->{CONTENT} = \%list;
   $hash->{STATE} = join(" ", sort(keys %{$hash->{CONTENT}}));
