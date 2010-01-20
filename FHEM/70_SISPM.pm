@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_SISPM.pm,v 1.3 2010-01-19 19:33:01 painseeker Exp $
+# $Id: 70_SISPM.pm,v 1.4 2010-01-20 01:04:01 painseeker Exp $
 ###########################
 
 package main;
@@ -37,18 +37,6 @@ package main;
 use strict;
 use warnings;
 
-my %sets = (
-  "cmd"       => "",
-  "freq"      => "",
-);
-
-my %TranslatedCodes = (
-    "Date" => "Date",
-);
-
-my %WantedCodesForStatus = (
-    "Ti" => "Ti:",
-);
 
 #####################################
 sub
@@ -326,7 +314,7 @@ SISPM_Read($)
 
 	if($inputline =~ /^Status of outlet (\d):\s+(.*)/) {
 	    if($currentserial ne "none") {
-		Log 3, "SISPM found socket $1 on $currentserial, state $2";
+		Log 5, "SISPM found socket $1 on $currentserial, state $2";
 		my $dmsg="socket " . $currentserial . " $1 state " . $2;
 		my %addvals;
 		Dispatch($hash, $dmsg, \%addvals);
