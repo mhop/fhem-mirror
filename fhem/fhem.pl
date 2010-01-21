@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.99 2010-01-20 08:56:17 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.100 2010-01-21 19:29:47 m_fischer Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1244,9 +1244,9 @@ CommandList($$)
     my $lt = "";
 
     # Sort first by type then by name
-    for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
-		  	      $modules{$defs{$b}{TYPE}}{ORDER};
-		         $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
+    for my $d (sort { my $x=$modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
+		  	    $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
+		         $x=($a cmp $b) if($x == 0); $x; } keys %defs) {
       next if(IsIgnored($d));
       my $t = $defs{$d}{TYPE};
       $str .= "\n$t:\n" if($t ne $lt);
@@ -1604,7 +1604,9 @@ CommandSetstate($$)
       }
 
     } else {
-      $d->{STATE} = $a[1];
+
+      # Do not overwrite state like "opened" or "initialized"
+      $d->{STATE} = $a[1] if($init_done || $d->{STATE} eq "???");
 
       $oldvalue{$sdev}{VAL} = $a[1];
       # This time is not the correct one, but we do not store a timestamp for
