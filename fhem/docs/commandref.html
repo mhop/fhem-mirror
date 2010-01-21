@@ -1341,8 +1341,15 @@ A line ending with \ will be concatenated with the next one, so long lines
           <ul>
             <li>warnings can contain following strings:
                 none, Battery low,Temperature too low, Window open,
-                Fault on window sensor
-                </li>
+                Fault on window sensor.<br>
+                In addition, the current warnings are reported separately:
+                <ul>
+                   <li>battery: ok / low</li>
+                   <li>lowtemp: ok / low</li>
+                   <li>window: open / closed</li>
+                   <li>windowsensor: ok / fault</li>
+                </ul>
+            </li>
             <li>actuator (without a suffix) stands for all actuators.
             <li>actuator or actuator1..8 can take following values:
                 <ul>
@@ -1362,9 +1369,9 @@ A line ending with \ will be concatenated with the next one, so long lines
                   <li>pair<br>
                      The the FHT80b sent a "you-belong-to-me" to this actuator.
                 </ul>
-                Note:
           </ul>
-          <br>
+       </li>
+      <br>
 
       <li>The FHT is very economical (or lazy), it accepts one message from the
           FHZ1x00 every 115+x seconds, where x depends on the housecode. Don't
