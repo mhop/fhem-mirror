@@ -567,4 +567,5 @@
   - bugfix:  [pgm3] table-format on Android-Browser optimized
   - feature: [pgm3] Skinable - change the colors.
   - feature: [pgm3] Rooms possible for Webcam and Google-Weather
+  - bugfix:  dummy/structure was listed twice in list and xmllist
 
