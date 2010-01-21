@@ -84,15 +84,19 @@ my %codes = (
 my %cantset = (
   "ack"           => 1,
   "ack2"          => 1,
+  "battery"       => 1,
   "can-xmit"      => 1,
   "can-rcv"       => 1,
   "start-xmit"    => 1,
   "end-xmit"      => 1,
 
+  "lowtemp"       => 1,
   "measured-temp" => 1,
   "measured-high" => 1,
   "measured-low"  => 1,
   "warnings"      => 1,
+  "window"        => 1,
+  "windowsensor"  => 1,
 );
 
 
@@ -371,6 +375,25 @@ FHT_Parse($$)
   my $tn = TimeNow();
 
   ###########################
+  # Set default values for battery, lowtemp, window and windowsensor warnings.
+  my $warnBattery = "ok";
+  my $warnTempLow = "ok";
+  my $warnWindowSensor = "ok";
+  my $warnWindow  = "closed";
+
+  $def->{READINGS}{'battery'}{TIME} = $tn;
+  $def->{READINGS}{'battery'}{VAL} = $warnBattery;
+
+  $def->{READINGS}{'lowtemp'}{TIME} = $tn;
+  $def->{READINGS}{'lowtemp'}{VAL} = $warnTempLow;
+
+  $def->{READINGS}{'window'}{TIME} = $tn;
+  $def->{READINGS}{'window'}{VAL} = $warnWindow;
+
+  $def->{READINGS}{'windowsensor'}{TIME} = $tn;
+  $def->{READINGS}{'windowsensor'}{VAL} = $warnWindowSensor;
+
+  ###########################
   # Reformat the values so they are readable.
   # The first four are confirmation messages, so they must be converted to
   # the same format as the input (for the softbuffer)
@@ -430,10 +453,30 @@ FHT_Parse($$)
 
   } elsif($cmd eq "warnings") {
     my $nVal;
-    if($val & 1) {                          $nVal  = "Battery low"; }
-    if($val & 2) { $nVal .= "; " if($nVal); $nVal .= "Temperature too low"; }
-    if($val &32) { $nVal .= "; " if($nVal); $nVal .= "Window open"; }
-    if($val &16) { $nVal .= "; " if($nVal); $nVal .= "Fault on window sensor"; }
+    if($val & 1) {
+      $nVal  = "Battery low";
+      $warnBattery = "low";
+      $def->{READINGS}{'battery'}{TIME} = $tn;
+      $def->{READINGS}{'battery'}{VAL} = $warnBattery;
+    }
+    if($val & 2) {
+      $nVal .= "; " if($nVal); $nVal .= "Temperature too low";
+      $warnTempLow = "warn";
+      $def->{READINGS}{'lowtemp'}{TIME} = $tn;
+      $def->{READINGS}{'lowtemp'}{VAL} = $warnTempLow;
+      }
+    if($val &32) {
+      $nVal .= "; " if($nVal); $nVal .= "Window open";
+      $warnWindow = "open";
+      $def->{READINGS}{'window'}{TIME} = $tn;
+      $def->{READINGS}{'window'}{VAL} = $warnWindow;
+      }
+    if($val &16) {
+      $nVal .= "; " if($nVal); $nVal .= "Fault on window sensor";
+      $warnWindowSensor = "fault";
+      $def->{READINGS}{'windowsensor'}{TIME} = $tn;
+      $def->{READINGS}{'windowsensor'}{VAL} = $warnWindowSensor;
+    }
     $val = $nVal? $nVal : "none";
 
   }
@@ -448,6 +491,18 @@ FHT_Parse($$)
   $def->{CHANGED}[0] = "$cmd: $val";
 
   Log 4, "FHT $name $cmd: $val";
+
+  if ($cmd eq "warnings") {
+    $def->{CHANGED}[1] = "battery: $warnBattery";
+    Log 4, "FHT $name battery: $warnBattery";
+    $def->{CHANGED}[2] = "lowtemp: $warnTempLow";
+    Log 4, "FHT $name lowtemp: $warnTempLow";
+    $def->{CHANGED}[3] = "window: $warnWindow";
+    Log 4, "FHT $name window: $warnWindow";
+    $def->{CHANGED}[4] = "windowsensor: $warnWindowSensor";
+    Log 4, "FHT $name windowsensor: $warnWindowSensor";
+  }
+
 
   ################################
   # Softbuffer: delete confirmed commands
