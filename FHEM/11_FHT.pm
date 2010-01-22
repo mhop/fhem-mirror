@@ -99,6 +99,13 @@ my %cantset = (
   "windowsensor"  => 1,
 );
 
+# additional warnings
+my %warnings = (
+  "battery"       => 1,
+  "lowtemp"       => 1,
+  "window"        => 1,
+  "windowsensor"  => 1,
+);
 
 my %priority = (
   "desired-temp"=> 1,
@@ -288,7 +295,7 @@ FHT_SetState($$$$)
 
   return "Ignoring FHZ state" if($vt =~ m/^FHZ:/);
   $vt =~ s/^FHZ://;
-  return "Undefined type $vt" if(!defined($c2b{$vt}));
+  return "Undefined type $vt" if(!defined($c2b{$vt}) && !defined($warnings{$vt}));
   return undef;
 }
 
@@ -374,24 +381,8 @@ FHT_Parse($$)
 
   my $tn = TimeNow();
 
-  ###########################
-  # Set default values for battery, lowtemp, window and windowsensor warnings.
-  my $warnBattery = "ok";
-  my $warnTempLow = "ok";
-  my $warnWindowSensor = "ok";
-  my $warnWindow  = "closed";
-
-  $def->{READINGS}{'battery'}{TIME} = $tn;
-  $def->{READINGS}{'battery'}{VAL} = $warnBattery;
-
-  $def->{READINGS}{'lowtemp'}{TIME} = $tn;
-  $def->{READINGS}{'lowtemp'}{VAL} = $warnTempLow;
-
-  $def->{READINGS}{'window'}{TIME} = $tn;
-  $def->{READINGS}{'window'}{VAL} = $warnWindow;
-
-  $def->{READINGS}{'windowsensor'}{TIME} = $tn;
-  $def->{READINGS}{'windowsensor'}{VAL} = $warnWindowSensor;
+  # counter for notifies
+  my $nc = 0;
 
   ###########################
   # Reformat the values so they are readable.
@@ -453,32 +444,66 @@ FHT_Parse($$)
 
   } elsif($cmd eq "warnings") {
     my $nVal;
+
+    # initialize values for additional warnings
+    my $valBattery;
+    my $valLowTemp;
+    my $valWindow;
+    my $valSensor;
+    my $nBattery;
+    my $nLowTemp;
+    my $nWindow;
+    my $nSensor;
+
+    # parse warnings
     if($val & 1) {
       $nVal  = "Battery low";
-      $warnBattery = "low";
-      $def->{READINGS}{'battery'}{TIME} = $tn;
-      $def->{READINGS}{'battery'}{VAL} = $warnBattery;
+      $nBattery = "low";
     }
     if($val & 2) {
       $nVal .= "; " if($nVal); $nVal .= "Temperature too low";
-      $warnTempLow = "warn";
-      $def->{READINGS}{'lowtemp'}{TIME} = $tn;
-      $def->{READINGS}{'lowtemp'}{VAL} = $warnTempLow;
-      }
+      $nLowTemp = "warn";
+    }
     if($val &32) {
       $nVal .= "; " if($nVal); $nVal .= "Window open";
-      $warnWindow = "open";
-      $def->{READINGS}{'window'}{TIME} = $tn;
-      $def->{READINGS}{'window'}{VAL} = $warnWindow;
-      }
+      $nWindow = "open";
+    }
     if($val &16) {
       $nVal .= "; " if($nVal); $nVal .= "Fault on window sensor";
-      $warnWindowSensor = "fault";
-      $def->{READINGS}{'windowsensor'}{TIME} = $tn;
-      $def->{READINGS}{'windowsensor'}{VAL} = $warnWindowSensor;
+      $nSensor = "fault";
     }
+
+    # set default values or new values if they were changed
+    $valBattery = $nBattery? $nBattery : "ok";
+    $valLowTemp = $nLowTemp? $nLowTemp : "ok";
+    $valWindow  = $nWindow? $nWindow : "closed";
+    $valSensor  = $nSensor? $nSensor : "ok";
     $val = $nVal? $nVal : "none";
 
+    # set additional warnings and trigger notify
+    $def->{READINGS}{'battery'}{TIME} = $tn;
+    $def->{READINGS}{'battery'}{VAL} = $valBattery;
+    $def->{CHANGED}[$nc] = "battery: $valBattery";
+    Log 4, "FHT $name battery: $valBattery";
+    $nc++;
+
+    $def->{READINGS}{'lowtemp'}{TIME} = $tn;
+    $def->{READINGS}{'lowtemp'}{VAL} = $valLowTemp;
+    $def->{CHANGED}[$nc] = "lowtemp: $valLowTemp";
+    Log 4, "FHT $name lowtemp: $valLowTemp";
+    $nc++;
+
+    $def->{READINGS}{'window'}{TIME} = $tn;
+    $def->{READINGS}{'window'}{VAL} = $valWindow;
+    $def->{CHANGED}[$nc] = "window: $valWindow";
+    Log 4, "FHT $name window: $valWindow";
+    $nc++;
+
+    $def->{READINGS}{'windowsensor'}{TIME} = $tn;
+    $def->{READINGS}{'windowsensor'}{VAL} = $valSensor;
+    $def->{CHANGED}[$nc] = "windowsensor: $valSensor";
+    Log 4, "FHT $name windowsensor: $valSensor";
+    $nc++;
   }
 
   if(substr($msg,24,1) eq "7") {
@@ -488,21 +513,9 @@ FHT_Parse($$)
     $def->{READINGS}{$cmd}{VAL} = $val;
     $def->{STATE} = "$cmd: $val" if($cmd eq "measured-temp");
   }
-  $def->{CHANGED}[0] = "$cmd: $val";
+  $def->{CHANGED}[$nc] = "$cmd: $val";
 
   Log 4, "FHT $name $cmd: $val";
-
-  if ($cmd eq "warnings") {
-    $def->{CHANGED}[1] = "battery: $warnBattery";
-    Log 4, "FHT $name battery: $warnBattery";
-    $def->{CHANGED}[2] = "lowtemp: $warnTempLow";
-    Log 4, "FHT $name lowtemp: $warnTempLow";
-    $def->{CHANGED}[3] = "window: $warnWindow";
-    Log 4, "FHT $name window: $warnWindow";
-    $def->{CHANGED}[4] = "windowsensor: $warnWindowSensor";
-    Log 4, "FHT $name windowsensor: $warnWindowSensor";
-  }
-
 
   ################################
   # Softbuffer: delete confirmed commands
