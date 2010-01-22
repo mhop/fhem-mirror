@@ -57,6 +57,7 @@
 # able for any alerting uses (unless a delay of said
 # amount of time doesn't matter, of course ;)).
 #
+# $Id: 09_CUL_FHTTK.pm,v 1.6 2010-01-22 09:51:55 painseeker Exp $
 ##############################################
 package main;
 
