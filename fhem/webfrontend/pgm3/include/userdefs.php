@@ -269,8 +269,10 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 
         $txtcolor=$bg3p; 
 	$fontsize=7;
-	$text="min= $mintemp max= $maxtemp";
-        ImageTTFText ($im,  $fontsize, 0, 67-$XcorrectMainTextUSERDEF, 49, $txtcolor, $fontttf, $text);
+	if (is_numeric($mintemp) || is_numeric($maxtemp)) {
+		$text="min= $mintemp max= $maxtemp";
+			ImageTTFText ($im,  $fontsize, 0, 67-$XcorrectMainTextUSERDEF, 49, $txtcolor, $fontttf, $text);
+	}
 	$text=$resultreverse[0][0];
         ImageTTFText ($im,  $fontsize, 0, $imgmaxxuserdef-127,  15, $txtcolor, $fontttf, $text);
 #############################################################################
