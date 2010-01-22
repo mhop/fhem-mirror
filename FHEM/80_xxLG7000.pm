@@ -3,6 +3,7 @@
 # with LG's Scarlet Series of LCDs (e. g. LG 47LG7000)
 #
 # Written by Kai 'wusel' Siering <wusel+fhem@uu.org> around 2010-01-20
+# $Id: 80_xxLG7000.pm,v 1.2 2010-01-22 09:51:56 painseeker Exp $
 #
 # re-using code of 80_M232.pm by Dr. Boris Neubert
 ##############################################
@@ -18,24 +19,25 @@ sub Log($$);
 use vars qw {%attr %defs};
 
 my %commands = (
-  "power state"      => "ka %d FF\r",
-  "power on"         => "ka %d 01\r",
-  "power off"        => "ka %d 00\r",
-  "input AV1"        => "xb %d 20\r",
-  "input AV2"        => "xb %d 21\r",
-  "input AV3"        => "xb %d 22\r",
-  "input AV4"        => "xb %d 23\r",
-  "input Component"  => "xb %d 40\r",
-  "input RGB-PC"     => "xb %d 50\r",
-  "input HDMI1"      => "xb %d 90\r",
-  "input HDMI2"      => "xb %d 91\r",
-  "input HDMI3"      => "xb %d 92\r",
-  "input HDMI4"      => "xb %d 93\r",
-  "input DVBT"       => "xb %d 00\r",
-  "input PAL"        => "xb %d 10\r",
-  "selected input"   => "xb %d FF\r",
-  "audio mute"       => "ke %d 00\r",
-  "audio normal"     => "ke %d 01\r",
+  "power state"      => "ka %x FF\r",
+  "power on"         => "ka %x 01\r",
+  "power off"        => "ka %x 00\r",
+  "input AV1"        => "xb %x 20\r",
+  "input AV2"        => "xb %x 21\r",
+  "input AV3"        => "xb %x 22\r",
+  "input AV4"        => "xb %x 23\r",
+  "input Component"  => "xb %x 40\r",
+  "input RGB-PC"     => "xb %x 50\r",
+  "input HDMI1"      => "xb %x 90\r",
+  "input HDMI2"      => "xb %x 91\r",
+  "input HDMI3"      => "xb %x 92\r",
+  "input HDMI4"      => "xb %x 93\r",
+  "input DVB-T"      => "xb %x 00\r",
+  "input PAL"        => "xb %x 10\r",
+  "selected input"   => "xb %x FF\r",
+  "audio mute"       => "ke %x 00\r",
+  "audio normal"     => "ke %x 01\r",
+  "audio state"      => "ke %x FF\r",
 );
 
 my %responses = (
@@ -49,11 +51,15 @@ my %responses = (
   "b OK91"    => "input HDMI2",
   "b OK92"    => "input HDMI3",
   "b OK93"    => "input HDMI4",
+  "b OKa0"    => "input HDMI1-no_link", # At least 47LG7000 returns 10100001 instead of 10010001 when
+  "b OKa1"    => "input HDMI2-no_link", # there is no link/signal connected to the corresponding
+  "b OKa2"    => "input HDMI3-no_link", # HDMI input. -wusel, 2010-01-20
+  "b OKa3"    => "input HDMI4-no_link",
   "b OK40"    => "input Components",
   "b OK50"    => "input RGB-PC",
-  "b OK10"    => "input PAL",
-  "b OK00"    => "input DVB-T",
-  "e OK00"    => "audio muted",
+  "b OK10"    => "input PAL",           # Selecting analogue (dubbed PAL here) input does not work for
+  "b OK00"    => "input DVB-T",         # me; well, there's nothing to see anymore anyway, at least
+  "e OK00"    => "audio muted",         # in Germany ;) (Ack, I don't have CATV.) -wusel, 2010-01-20
   "e OK01"    => "audio normal",
 );
 
@@ -74,9 +80,7 @@ xxLG7000_Initialize($)
 # Consumer
   $hash->{DefFn}   = "xxLG7000_Define";
   $hash->{UndefFn} = "xxLG7000_Undef";
-#  $hash->{GetFn}   = "xxLG7000_Get";
-#  $hash->{SetFn}   = "xxLG7000_Set";
-  $hash->{AttrList}= "SetID:01,02, loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "SetID:1,2,... loglevel:0,1,2,3,4,5";
 }
 
 
@@ -125,6 +129,7 @@ xxLG7000_Define($$)
   $po->close();
 
   $hash->{DeviceName} = $dev;
+  $attr{$a[0]}{SetID}=1;
   return undef;
 }
 
@@ -165,159 +170,48 @@ xxLG7000_Ready($$)
 
 #####################################
 sub
-xxLG7000_Set($@)
-{
-  my ($hash, @a) = @_;
-  my $u1 = "Usage: see commandref.html for details\n";
-
-  return $u1 if(int(@a) < 2);
-  my $msg;
-  my $reading= $a[1];
-  my $value;
-  my @legal;
-
-  if($reading eq "auto") {
-        return $u1 if(int(@a) !=3);
-	$value= $a[2];
-        @legal= (0..5,"none");
-        if(!grep($value eq $_, @legal)) {
-                return "Illegal value $value, possible values: @legal";
-        }
-        if($value eq "none") { $value= 0; } else { $value+=1; }
-	$msg= "M" . $value;
-  }
-  
-  elsif($reading eq "start") {
-        return $u1 if(int(@a) !=2);
-	$msg= "Z1";
-  }
-
-  elsif($reading eq "stop") {
-        return $u1 if(int(@a) !=2);
-	$msg= "Z0";
-  }
-
-  elsif($reading eq "octet") {
-        return $u1 if(int(@a) !=3);
-	$value= $a[2];
-        @legal= (0..255);
-        if(!grep($value eq $_, @legal)) {
-                return "Illegal value $value, possible values: 0..255";
-        }
-	$msg= sprintf("W%02X", $value);
-  }
-
-  elsif($reading =~ /^io[0-7]$/) {
-        return $u1 if(int(@a) !=3);
-	$value= $a[2];
-	return $u1 unless($value eq "0" || $value eq "1");
-        $msg= "D" . substr($reading,2,1) . $value;
-  }
-
-  else { return $u1; }
-		
-  my $d = xxLG7000GetData($hash, $msg);
-  return "Read error" if(!defined($d));
-  return $d;
-}
-
-
-#####################################
-sub
-xxLG7000_Get($@)
-{
-
-  my ($hash, @a) = @_;
-  my $u1 = "Usage: get <name> [an0..an5]\n" .
-                  "get <name> [io0..io7]\n" .
-                  "get <name> octet\n" .
-                  "get <name> counter";
-
-  return $u1 if(int(@a) != 2);
-
-  my $name= $a[0];
-  my $reading= $a[1];
-  my $msg;
-  my $retval;
-  my ($count,$d,$state,$iscurrent,$voltage);
-
-
-  if($reading eq "counter") {
-	$msg= "z";
-  	$d = xxLG7000GetData($hash, $msg);
- 	return "Read error" if(!defined($d));
-	$count= hex $d;
-	$retval= $count;
-  } 
-
-  elsif($reading =~  /^an[0-5]$/) {
-	$msg= "a" . substr($reading,2,1);
-  	$d = xxLG7000GetData($hash, $msg);
- 	return "Read error" if(!defined($d));
-	$voltage= (hex substr($d,0,3))*5.00/1024.0;
-	$iscurrent= substr($d,3,1);
-	$retval= $voltage; # . " " . $iscurrent;
-  } 
-  
-  elsif($reading =~ /^io[0-7]$/) {
-	$msg= "d" . substr($reading,2,1);
-  	$d = xxLG7000GetData($hash, $msg);
- 	return "Read error" if(!defined($d));
-	$state= hex $d;
-	$retval= $state;
-  } 
-
-  elsif($reading eq "octet") {
-	$msg= "w"; 
-  	$d = xxLG7000GetData($hash, $msg);
- 	return "Read error" if(!defined($d));
-	$state= hex $d;
-	$retval= $state;
-  } 
-
-  else { return $u1; }
-
-  $hash->{READINGS}{$reading}{VAL}= $retval;
-  $hash->{READINGS}{$reading}{TIME}= TimeNow();
-
-  return "$name $reading => $retval";
-		
-}
-
-
-#####################################
-sub
 xxLG7000_Write($$)
 {
   my ($hash,$msg) = @_;
   my $dev = $hash->{DeviceName};
   my $UnitNo=1;
   my $ret;
-  my $retmsg;
+  my $retmsg="error occured";
+  my $myname=$hash->{NAME};
+
+
+  if(defined($attr{$myname}{SetID})) {
+      $UnitNo=$attr{$myname}{SetID};
+      Log $UnitNo==1?5:4, "xxLG7000_Write: Using SetID $UnitNo for $myname.";
+  }
 
   my $sendstring=$commands{$msg};
 
   if(!defined($sendstring)) {
-      return "Unknown command $msg, choose one of " . join(" ", sort keys %commands);
+      return "error unknown command $msg, choose one of " . join(" ", sort keys %commands);
   }
 
-  $sendstring=sprintf($sendstring, $UnitNo); # FIXME! This needs to become a settable attribut!
+  $sendstring=sprintf($sendstring, $UnitNo);
+  Log 5, "xxLG7000_Write: sending $sendstring";
   $ret=xxLG7000GetData($hash, $sendstring);
-
-  Log 3, "xxLG7000_Write: wrote $msg, received $ret";
-
-  $retmsg=sprintf("%s %s", substr($ret, 0, 1), substr($ret, 5));
-  $retmsg=$responses{$retmsg};
-  if(!defined($retmsg)) {
-      if(substr($ret, 5, 2) eq "NG") {
-	  $retmsg="error message";
-	  Log 3, "xxLG7000_Write: error message: $ret";
-    } else {
-	  $retmsg=sprintf("Unknown response %s, help me!");
-	  Log 3, "xxLG7000_Write: $retmsg";
-      }
+  if(!defined($ret) || length($ret)<=6) {
+      Log 2, "xxLG7000_Write: error, got too short answer ($ret).";
   } else {
-      Log 3, "xxLG7000_Write: returns $retmsg";
+      Log 5, "xxLG7000_Write: wrote $msg, received $ret";
+
+      $retmsg=sprintf("%s %s", substr($ret, 0, 1), substr($ret, 5));
+      $retmsg=$responses{$retmsg};
+      if(!defined($retmsg)) {
+	  if(substr($ret, 5, 2) eq "NG") {
+	      $retmsg="error message";
+	      Log 5, "xxLG7000_Write: error message: $ret";
+	  } else {
+	      Log 2, "xxLG7000_Write: Unknown response $ret, help me!";
+	      $retmsg=sprintf("error message_unknown:%s", $ret =~ s/ /_/);
+	  }
+      } else {
+	  Log 5, "xxLG7000_Write: returns $retmsg";
+      }
   }
 
   return $retmsg;
