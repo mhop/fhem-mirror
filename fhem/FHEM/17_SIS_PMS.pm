@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 17_SIS_PMS.pm,v 1.2 2010-01-18 01:12:34 painseeker Exp $
+# $Id: 17_SIS_PMS.pm,v 1.3 2010-01-22 09:59:14 painseeker Exp $
 ###########################
 
 package main;
@@ -216,7 +216,7 @@ SIS_PMS_Set($@)
     my $i;
     my $known_cmd=0;
 
-    for($i=0; $i<$ncmds; $i++ && $known_cmd==0) {
+    for($i=0; $i<$ncmds; $i++) {
 	if($cmds[$i] eq $what) {
 	    $known_cmd++;
 	}

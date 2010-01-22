@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_SISPM.pm,v 1.4 2010-01-20 01:04:01 painseeker Exp $
+# $Id: 70_SISPM.pm,v 1.5 2010-01-22 09:59:14 painseeker Exp $
 ###########################
 
 package main;
@@ -71,34 +71,54 @@ sub FixSISPMSerial($) {
     return $serial;
 }
 
+
 #####################################
 sub
-SISPM_Define($$)
+SISPM_GetCurrentConfig($)
 {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
+  my ($hash) = @_;
   my $numdetected=0;
   my $currentdevice=0;
-
-  return "Define the /path/to/sispmctl as a parameter" if(@a != 3);
-
   my $FH;
-  my $dev = sprintf("%s", $a[2]);
-  Log 3, "SISPM using \"$dev\" as parameter to open(); trying ...";
+  my $i;
+  my $dev = sprintf("%s", $hash->{DeviceName});
+
+  Log 3, "SISPM_GetCurrentConfig: Using \"$dev\" as parameter to open(); trying ...";
+
+  # First, clear the old data! As we're addressing by hashes, keeping old data would be unwise.
+  if(defined($hash->{NUMUNITS}) && $hash->{NUMUNITS}>0) {
+      for($i=0; $i<$hash->{NUMUNITS}; $i++) {
+	  my $serial;
+	  
+	  if(defined($hash->{UNITS}{$i}{SERIAL})) {
+	      $serial=$hash->{UNITS}{$i}{SERIAL};
+	      delete $hash->{SERIALS}{$serial}{UNIT};
+	      delete $hash->{SERIALS}{$serial}{USB};
+	  }
+	  
+	  if(defined($hash->{UNITS}{$i}{USB})) {
+	      delete $hash->{UNITS}{$i}{USB};
+	      delete $hash->{UNITS}{$i}{SERIAL};
+	  }
+      }
+  }
+  $hash->{NUMUNITS}=0;
+
   my $tmpdev=sprintf("%s -s 2>&1 |", $dev);
   open($FH, $tmpdev);
   if(!$FH) {
-      return "SISPM Can't start $dev: $!";
+      Log 3, "SISPM_GetCurrentConfig: Can't start $tmpdev: $!";
+      return "Can't start $tmpdev: $!";
   }
-  $hash->{NUMUNITS}=0;
+
   local $_;
   while (<$FH>) {
       if(/^(No GEMBIRD SiS-PM found.)/) {
-	  Log 3, "SISPM woops? $1";
+	  Log 3, "SISPM_GetCurrentConfig: Whoops? $1";
       }
    
       if(/^Gembird #(\d+) is USB device (\d+)./) {
-	  Log 3, "SISPM found SISPM device number $1 as USB $2";
+	  Log 3, "SISPM_GetCurrentConfig: Found SISPM device number $1 as USB $2";
 	  $hash->{UNITS}{$1}{USB}=$2;
 	  $currentdevice=$1;
 	  $numdetected++;
@@ -107,10 +127,10 @@ SISPM_Define($$)
 
       if(/^This device has a serial number of (.*)/) {
 	  my $serial=$1;
-	  Log 3, "SISPM device number " . $currentdevice . " has serial $serial";
+	  Log 3, "SISPM_GetCurrentConfig: Device number " . $currentdevice . " has serial $serial";
 	  if(length($serial)!=length("..:..:..:..:..")){
 	      $serial = FixSISPMSerial($serial);
-	      Log 3, "SISPM: Whoopsi, weird serial format; fixing to $serial.";
+	      Log 3, "SISPM_GetCurrentConfig: Whoopsi, weird serial format; fixing to $serial.";
 	  }
 	  $hash->{UNITS}{$currentdevice}{SERIAL}=$serial;
  	  $hash->{SERIALS}{$serial}{UNIT}=$currentdevice;
@@ -118,15 +138,50 @@ SISPM_Define($$)
     }
   }
   close($FH);
-  Log 3, "SISPM initial read done";
+  Log 3, "SISPM_GetCurrentConfig: Initial read done";
 
   if ($numdetected==0) {
+      Log 3, "SISPM_GetCurrentConfig: No SIMPM devices found.";
+     return "no SIMPM devices found.";
+  }
+
+  $hash->{NUMUNITS} = $numdetected;
+  $hash->{STATE} = "initialized";
+  return undef;
+}
+
+
+#####################################
+sub
+SISPM_Define($$)
+{
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
+  my $numdetected=0;
+  my $currentdevice=0;
+  my $retval;
+
+  return "Define the /path/to/sispmctl as a parameter" if(@a != 3);
+
+  my $FH;
+  my $dev = sprintf("%s", $a[2]);
+  $hash->{DeviceName} = $dev;
+  Log 3, "SISPM using \"$dev\" as parameter to open(); trying ...";
+ 
+  $retval=SISPM_GetCurrentConfig($hash);
+
+  Log 3, "SISPM GetCurrentConfing done";
+
+  if(defined($retval)) {
+      Log 3, "SISPM: An error occured: $retval";
+      return $retval;
+  }
+
+  if($hash->{NUMUNITS} < 1) {
       return "SISPM no SIMPM devices found.";
   }
 
-  $hash->{NumPMs} = $numdetected;
-  $hash->{DeviceName} = $dev;
-  $hash->{Timer} = 30;  # just a keepalive for now
+  $hash->{Timer} = 30;
 
   Log 3, "SISPM setting callback timer";
 
@@ -136,8 +191,6 @@ SISPM_Define($$)
   $init_done = $oid;
 
   Log 3, "SISPM initialized";
-
-  $hash->{STATE} = "initialized";
   return undef;
 }
 
@@ -283,10 +336,12 @@ SISPM_Read($)
 		if($hash->{UNITS}{$1}{USB}!=$2) {
 		    Log 3, "SISPM: USB ids changed (unit $1 is now USB $2 but was " .  $hash->{UNITS}{$1}{USB} . "); will fix.";
 		    $renumbered=1;
+		    $hash->{FIXRENUMBER}="yes";
 		}   
 	    } else { # Something wonderful has happened, we have a new SIS PM!
 		Log 3, "SISPM: Wuuuhn! Found a new unit $1 as USB $2. Will assimilate it.";
 		$newPMfound=1;
+		$hash->{FIXNEW}="yes";
 	    }
 	    $currentdevice=$1;
 	    $currentusbid=$2;
@@ -332,6 +387,21 @@ SISPM_Read($)
 	InternalTimer(gettimeofday()+ $hash->{Timer}, "SISPM_GetStatus", $hash, 1);
 	$hash->{STATE} = "read";
 	Log 4, "SISPM done reading pipe";
+	if(defined($hash->{FIXRENUMBER}) || defined($hash->{FIXNEW})) {
+	    my $retval;
+
+	    Log 3, "SISPM now adapts to new environment ...";
+	    $retval=SISPM_GetCurrentConfig($hash);
+	    if(defined($retval)) {
+		Log 3, "SISPM an error occured during reconfiguration: $retval";
+	    }
+	    if(defined($hash->{FIXRENUMBER})) {
+		delete $hash->{FIXRENUMBER};
+	    }
+	    if(defined($hash->{FIXNEW})) {
+		delete $hash->{FIXNEW};
+	    }
+	}
     } else {
 	$hash->{STATE} = "reading";
 	Log 4, "SISPM (further) reading would block";
