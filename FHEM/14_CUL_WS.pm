@@ -1,3 +1,5 @@
+# $Id: 14_CUL_WS.pm,v 1.25 2010-01-25 19:55:40 painseeker Exp $
+#
 ##############################################
 package main;
 
@@ -74,6 +76,30 @@ CUL_WS_Parse($$)
                "6"=>"pyro",
                "7"=>"temp/hum");
 
+  # -wusel, 2010-01-24: *sigh* No READINGS set, bad for other modules. Trying to add
+  #                     setting READINGS as well as STATE ...
+  my $NotifyType;
+  my $NotifyHumidity;
+  my $NotifyTemperature;
+  my $NotifyRain;
+  my $NotifyIsRaining;
+  my $NotifyWind;
+  my $NotifyWindDir;
+  my $NotifyWindSwing;
+  my $NotifyBrightness;
+  my $NotifyPressure;
+  my %NotifyMappings = (
+      "T"      => "temperature",
+      "H"      => "humidity",
+      "R"      => "rain",
+      "IR"     => "is_raining",
+      "W"      => "wind",
+      "WD"     => "wind_direction",
+      "WS"     => "wind_swing",
+      "B"      => "brightness",
+      "P"      => "pressure",
+  );
+ 
 
   my @a = split("", $msg);
 
@@ -111,6 +137,8 @@ CUL_WS_Parse($$)
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $val = "T: $tmp";
       $devtype = "Temp";
+      $NotifyType="T";
+      $NotifyTemperature=$tmp;
     }
 
     if($typbyte == 1 && int(@a) > 8) {           # temp/hum
@@ -120,6 +148,9 @@ CUL_WS_Parse($$)
       $val = "T: $tmp  H: $hum";
       $devtype = "PS50";
       $family = "WS300";
+      $NotifyType="T H";
+      $NotifyTemperature=$tmp;
+      $NotifyHumidity=$hum;
     }
 
     if($typbyte == 2 && int(@a) > 5) {           # rain
@@ -129,7 +160,9 @@ CUL_WS_Parse($$)
       $val = "R: $rain";
       $devtype =  "Rain";
       $family = "WS7000";
-    }
+      $NotifyType="R";
+      $NotifyRain=$rain;
+   }
 
     if($typbyte == 3 && int(@a) > 8) {           # wind
       my $hun = ($firstbyte&8) ? 100 : 0;
@@ -139,6 +172,10 @@ CUL_WS_Parse($$)
       $val = "W: $wnd D: $dir A: $swing";
       $devtype = "Wind";
       $family = "WS7000";
+      $NotifyType="W WD WS";
+      $NotifyWind=$wnd;
+      $NotifyWindDir=$dir;
+      $NotifyWindSwing=$swing;
     }
 
     if($typbyte == 4 && int(@a) > 10) {          # temp/hum/press
@@ -152,6 +189,10 @@ CUL_WS_Parse($$)
       $val = "T: $tmp  H: $hum  P: $prs";
       $devtype = "Indoor";
       $family = "WS7000";
+      $NotifyType="T H P";
+      $NotifyTemperature=$tmp;
+      $NotifyHumidity=$hum;
+      $NotifyPressure=$prs;
     }
 
     if($typbyte == 5 && int(@a) > 5) {           # brightness
@@ -165,6 +206,8 @@ CUL_WS_Parse($$)
       $val = "B: $br";
       $devtype = "Brightness";
       $family = "WS7000";
+      $NotifyType="B";
+      $NotifyBrightness=$br;
     }
 
     if($typbyte == 6 && int(@a) > 0) {           # Pyro: wurde nie gebaut
@@ -179,7 +222,9 @@ CUL_WS_Parse($$)
       $val = "T: $tmp  H: $hum";
       $devtype = "Temp/Hum";
       $family = "WS7000";
-
+      $NotifyType="T H";
+      $NotifyTemperature=$tmp;
+      $NotifyHumidity=$hum;
     }
     
   } else {                                      # $firstbyte not 7
@@ -191,7 +236,9 @@ CUL_WS_Parse($$)
       $val = "T: $tmp  H: $hum";
       $devtype = "S300TH";
       $family = "WS300";
-
+      $NotifyType="T H";
+      $NotifyTemperature=$tmp;
+      $NotifyHumidity=$hum;
     } elsif(@a == 15 && int(@a) > 14) {          # KS300/2
 
       my $c = $hash->{corr4} ? $hash->{corr4} : 255;
@@ -205,8 +252,13 @@ CUL_WS_Parse($$)
       $val = "T: $tmp  H: $hum  W: $wnd  R: $rain  IR: $ir";
       $devtype = "KS300/2";
       $family = "WS300";
-
-    } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
+      $NotifyType="T H W R IR";
+      $NotifyTemperature=$tmp;
+      $NotifyHumidity=$hum;
+      $NotifyWind=$wnd;
+      $NotifyRain=$rain;
+      $NotifyIsRaining=$ir;
+   } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
 
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
@@ -214,7 +266,9 @@ CUL_WS_Parse($$)
       $val = "T: $tmp  H: $hum";
       $devtype = "TH".$sfirstbyte;
       $family = "WS7000";
-
+      $NotifyType="T H";
+      $NotifyTemperature=$tmp;
+      $NotifyHumidity=$hum;
     }
 
   }
@@ -235,6 +289,50 @@ CUL_WS_Parse($$)
   $hash->{READINGS}{state}{TIME} = TimeNow(); # For list
   $hash->{READINGS}{state}{VAL} = $val;
   $hash->{CHANGED}[0] = $val;                 # For notify
+
+  my $i=1;
+  my $j;
+  my @Notifies=split(" ", $NotifyType);
+  for($j=0; $j<int(@Notifies); $j++) {
+      if($Notifies[$j] eq "T") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyTemperature;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyTemperature;
+     } elsif($Notifies[$j] eq "H") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyHumidity;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyHumidity;
+      } elsif($Notifies[$j] eq "R") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyRain;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyRain;
+      } elsif($Notifies[$j] eq "W") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWind;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyWind;
+      } elsif($Notifies[$j] eq "WD") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWindDir;
+ 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyWindDir;
+     } elsif($Notifies[$j] eq "WS") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWindSwing;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyWindSwing;
+      } elsif($Notifies[$j] eq "IR") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyIsRaining;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyIsRaining;
+      } elsif($Notifies[$j] eq "B") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyBrightness;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyBrightness;
+      } elsif($Notifies[$j] eq "P") {
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
+	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyPressure;
+ 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyPressure;
+     }
+  }
+
 
   $hash->{READINGS}{DEVTYPE}{VAL}=$devtype;
   $hash->{READINGS}{DEVTYPE}{TIME}=$tm;
