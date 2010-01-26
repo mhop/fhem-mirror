@@ -4,9 +4,8 @@
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 14.12.2009
-# Version: 0.0.91
-# Übersetzung in "Richtiges English" sind willkommen ;-))
+# Stand: 26.01.2010
+# Version: 0.5.0
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 #######################################################################
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
@@ -31,14 +30,22 @@
 # For each READINNG you can create seperate RRD-Definitions:
 # %data{RRD_LOG}{DEV_TYPE}{READINGS} = RRD_LOG_TYPE
 # 
-# NEW:
+# Update :
+#
+# - keine Ueberpruefung ob READING vorhanden ist im SET
+#
 # attr -> IODEVSTATS
-# If set RRD_Log will log RRS and MSGCNT
+# If set RRD_Log will log RSSI and MSGCNT
 # <IDOEV-Name>/<DEVICE_Name>_rssi RRD: RRD_Log_5minGAUGE
 # <IDOEV-Name>/<DEVICE_Name>_msgcnt RRD: RRD_Log_5minCOUNTER
 # also
 # <IDOEV-Name>_MSGCNT -> Counter for received Messeages by this IODEV
 # <IDOEV-Name>/RAWMSGCOUNT.rrd
+#
+# ADDTYPE
+# set RRDLog ADDTYPE HMS
+# es werden alle Devices des Types HMS dem RRDLog zugeordnet
+# enpstrechend den konfigurierten READINGs in $data{RRD_LOG}{READING}
 #
 #
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
@@ -64,7 +71,6 @@ RRD_Log_Initialize($)
   # Global RRDLog conf
   # Mapping READING to RRD-File-Config
   # %data{RRD_LOG}{DEV_TYPE}{READINGS} = RRD_LOG_TYPE
-  # %data{RRD_LOG}{DEV_TYPE}{FUNCTION} = Device-Handling via Function
   #FHT
   $data{RRD_LOG}{READING}{FHT}{'measured-temp'} = "RRD_Log_15minGAUGE";
   $data{RRD_LOG}{READING}{FHT}{'desired-temp'} = "RRD_Log_15minGAUGE";
@@ -98,6 +104,8 @@ RRD_Log_Initialize($)
   $data{RRD_LOG}{READING}{CUL_RFR}{'msg'} = "RRD_Log_5minCOUNTER";
   $data{RRD_LOG}{READING}{CUL_RFR}{'rssi'} = "RRD_Log_5minGAUGE";
   $data{RRD_LOG}{READING}{CUL_RFR}{'RAWMSGCOUNT'} = "RRD_Log_5minGAUGE";
+  #WBS
+  $data{RRD_LOG}{READING}{WBS}{'Temperature'} = "RRD_Log_5minGAUGE";
   # temp. save Path to RRDs
   # $data{RRD_LOG}{RRDS}{<DEVICE-NAME>}{<READING>} = $rrd_path
   # reset RRS
@@ -120,8 +128,8 @@ sub RRD_Log_Define()
         return "RRDLOG[Define::ERROR] Invalid Path: $rrdpath";}
     $self->{RRDPATH} = $a[2];
     #RRD Startdate
-    $self->{RRD_Start_Date_tsecs} =  "1199944800";
-    $self->{RRD_Start_Date} =  "01.10.2008";
+    $self->{RRD_Start_Date_tsecs} =  time();
+    $self->{RRD_Start_Date} =  TimeNow();
     #LogLevel auf 5
     my $my_name = $self->{NAME};
     $attr{$my_name}{'loglevel'} = '5';
@@ -174,7 +182,7 @@ sub RRD_Log_Set() {
         # Reading check
         my $def_type = $defs{$a[2]}{TYPE};
         foreach my $reading (@readings){
-            if(!defined($defs{$a[2]}{READINGS}{$reading})) {return "RRDLOG[SET::ERROR] $a[2] => $reading => Unkown";}
+            # if(!defined($defs{$a[2]}{READINGS}{$reading})) {return "RRDLOG[SET::ERROR] $a[2] => $reading => Unkown";}
             if(!defined($data{RRD_LOG}{READING}{$def_type}{$reading})) {return "RRDLOG[SET::ERROR] $a[2]  => $reading => not supported";}
             }
         $hash->{READINGS}{$a[2]}{TIME} = TimeNow();
@@ -225,8 +233,8 @@ sub RRD_Log_Notify() {
         my $cul_rssi_return;
         if(defined($defs{$dev_name}{$iostat_index})){
             my $iodev_rssi = $defs{$dev_name}{$iostat_index};
-			# RSSI ist negativ...wollen aber nur positive Werte
-			if($iodev_rssi =~ m/-/){$iodev_rssi =~ s/-//;}
+        # RSSI ist negativ...wollen aber nur positive Werte
+        if($iodev_rssi =~ m/-/){$iodev_rssi =~ s/-//;}
             Log $ll,"RRDLOG|IODEVSTATS|RSSI|RRD_Log_disptach_reading: $self,$LASTIODev,$iostat_reading ,$iodev_rssi,$timestamp";
             $cul_rssi_return = &RRD_Log_disptach_reading($self,$LASTIODev,$iostat_reading ,$iodev_rssi,$timestamp);
         }
@@ -242,7 +250,7 @@ sub RRD_Log_Notify() {
         #INIT
         my $tsecs = time();
         my $secs = 300;
-	my $msgcnt = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
+        my $msgcnt = $defs{$LASTIODev}{"${LASTIODev}_MSGCNT"};
         if(!defined($data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev})){
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{TSECS} = $tsecs;
           $data{RRD_LOG}{RAWMSGCOUNT}{$LASTIODev}{CNT} = $msgcnt;
@@ -276,15 +284,18 @@ sub RRD_Log_Notify() {
             }
         else {
             ($changed_reading, $changed_value) = split(/:/,$defs{$dev_name}{CHANGED}[$i]);
-        }   
-        Log $ll, "RRDLOG[Notify] $dev_name => $changed_reading => $changed_value";
-        #Trim
-        if($changed_reading =~ m/^\s+/) {$changed_reading =~ s/^\s+//;}
-        if($changed_reading =~ m/\s+$/) {$changed_reading =~ s/\s+$//;}
-        if($changed_reading =~ m/^\s+/) {$changed_value =~ s/^\s+//;}
-        if($changed_reading =~ m/\s+$/) {$changed_value =~ s/\s+$//;}
-        next if (!defined($dev_name_readings{$changed_reading}));
-        my $rrd_dispatch_return = &RRD_Log_disptach_reading($self,$dev_name,$changed_reading,$changed_value,$timestamp);
+        }
+        if(!defined($defs{$dev_name}{READINGS}{$changed_reading})) {
+          Log 0, "RRDLOG[NOTIFY::ERROR] $dev_name => $changed_reading => Unkown";
+          next;}
+          Log $ll, "RRDLOG[Notify] $dev_name => $changed_reading => $changed_value";
+          #Trim
+          if($changed_reading =~ m/^\s+/) {$changed_reading =~ s/^\s+//;}
+          if($changed_reading =~ m/\s+$/) {$changed_reading =~ s/\s+$//;}
+          if($changed_reading =~ m/^\s+/) {$changed_value =~ s/^\s+//;}
+          if($changed_reading =~ m/\s+$/) {$changed_value =~ s/\s+$//;}
+          next if (!defined($dev_name_readings{$changed_reading}));
+          my $rrd_dispatch_return = &RRD_Log_disptach_reading($self,$dev_name,$changed_reading,$changed_value,$timestamp);
     }
 }
 ########################################################################
