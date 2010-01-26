@@ -196,7 +196,14 @@ DbLog_ParseEvent($$)
         $value=~ s/replaced/1/;
         $value=~ s/empty/0/;
      }
-   }
+  }
+
+  # CUL_WS
+  elsif($type eq "CUL_WS") {
+     if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
+     if($reading eq "temperature") { $unit= "°C"; }
+     if($reading eq "humidity") { $unit= "%"; }
+  }
 
 
   @result= ($reading,$value,$unit);
