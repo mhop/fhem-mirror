@@ -1,4 +1,4 @@
-# $Id: 14_CUL_WS.pm,v 1.25 2010-01-25 19:55:40 painseeker Exp $
+# $Id: 14_CUL_WS.pm,v 1.26 2010-01-26 23:31:17 mr_p Exp $
 #
 ##############################################
 package main;
@@ -297,39 +297,39 @@ CUL_WS_Parse($$)
       if($Notifies[$j] eq "T") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyTemperature;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyTemperature;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyTemperature;
      } elsif($Notifies[$j] eq "H") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyHumidity;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyHumidity;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyHumidity;
       } elsif($Notifies[$j] eq "R") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyRain;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyRain;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyRain;
       } elsif($Notifies[$j] eq "W") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWind;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyWind;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyWind;
       } elsif($Notifies[$j] eq "WD") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWindDir;
- 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyWindDir;
+ 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyWindDir;
      } elsif($Notifies[$j] eq "WS") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWindSwing;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyWindSwing;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyWindSwing;
       } elsif($Notifies[$j] eq "IR") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyIsRaining;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyIsRaining;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyIsRaining;
       } elsif($Notifies[$j] eq "B") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyBrightness;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyBrightness;
+	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyBrightness;
       } elsif($Notifies[$j] eq "P") {
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
 	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyPressure;
- 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ":" . $NotifyPressure;
+ 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyPressure;
      }
   }
 
