@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.100 2010-01-21 19:29:47 m_fischer Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.101 2010-01-29 07:37:47 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1317,9 +1317,10 @@ CommandReload($$)
   no strict "refs";
   eval {
     my $ret=do "$file";
-    if (!$ret) {
-        Log 1,"Error:Modul $param deactivated:\n $@";
-        return "$@";
+    if(!$ret) {
+      Log 1,"Error:Modul $param deactivated:\n $@";
+      use strict "refs";
+      return "$@";
     }
 
     # Get the name of the initialize function. This may differ from the
@@ -1334,11 +1335,9 @@ CommandReload($$)
     $ret = &{ "${fnname}_Initialize" }(\%hash);
     $m = $fnname;
   };
-
-  if($@) {
-    return "$@";
-  }
   use strict "refs";
+
+  return "$@" if($@);
 
   my ($defptr, $ldata);
   if($modules{$m}) {
