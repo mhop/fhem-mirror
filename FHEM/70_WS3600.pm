@@ -29,7 +29,7 @@ package main;
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2009/2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_WS3600.pm,v 1.2 2010-01-04 23:07:35 painseeker Exp $
+# $Id: 70_WS3600.pm,v 1.3 2010-01-30 16:25:37 painseeker Exp $
 ###########################
 
 use strict;
@@ -131,6 +131,21 @@ my %TranslatedCodes = (
     "Forecast" => "Forecast",
 );
 
+my %WantedCodesForStatus = (
+    "Ti" => "Ti:",
+    "To" => "T:",
+    "DP" => "DP:",
+    "RHi" => "Hi:",
+    "RHo" => "H:",
+    "WS" => "W:",
+    "DIRtext" => "Dir:",
+    "WC" => "WC:",
+    "R1h" => "R:",
+    "RP" => "P:",
+    "Tendency" => "Tendency:",
+    "Forecast" => "Forecast:",
+);
+
 #####################################
 sub
 WS3600_Initialize($)
@@ -197,6 +212,7 @@ WS3600_Define($$)
   Log 3, "WS3600 initialized";
 
   $hash->{STATE} = "initialized";
+  $hash->{TMPSTATE} = "";
   return undef;
 }
 
@@ -215,7 +231,7 @@ WS3600_Undef($$)
   delete $selectlist{"$name.pipe"};
 
   $hash->{STATE}='undefined';
-  Log 3, "$name shutdown complete";
+  Log GetLogLevel($name,3), "$name shutdown complete";
   return undef;
 }
 
@@ -233,7 +249,7 @@ WS3600_GetStatus($)
     # Call us in n seconds again.
 #    InternalTimer(gettimeofday()+ $hash->{Timer}, "WS3600_GetStatus", $hash, 1);
 
-    Log 4, "WS3600 contacting station";
+    Log GetLogLevel($name,4), "WS3600 contacting station";
  
     open($FH, $dev);
     if(!$FH) {
@@ -242,8 +258,8 @@ WS3600_GetStatus($)
 
     $hash->{FD}=$FH;
     $selectlist{"$name.pipe"} = $hash;
-    Log 4, "WS3600 pipe opened";
-    $hash->{STATE} = "running";
+    Log GetLogLevel($name,4), "WS3600 pipe opened";
+#    $hash->{STATE} = "running";
     $hash->{pipeopentime} = time();
 #    InternalTimer(gettimeofday() + 6, "WS3600_Read", $hash, 1);
     return $hash->{STATE};
@@ -260,37 +276,38 @@ WS3600_Read($)
     my $FH;
     my $inputline;
 
-    Log 4, "WS3600 Read entered";
+    Log GetLogLevel($name,4), "WS3600 Read entered";
 
     if(!defined($hash->{FD})) {
-	Log 3, "Oops, WS3600 FD undef'd";
+	Log GetLogLevel($name,3), "Oops, WS3600 FD undef'd";
 	return undef;
     }
     if(!$hash->{FD}) {
-	Log 3, "Oops, WS3600 FD empty";
+	Log GetLogLevel($name,3), "Oops, WS3600 FD empty";
 	return undef;
     }
     $FH = $hash->{FD};
 
-    Log 4, "WS3600 reading started";
+    Log GetLogLevel($name,4), "WS3600 reading started";
 
     my @lines;
     my $eof;
     my $i=0;
     my $tn = TimeNow();
-    my $StateString="";
+    my $StateString=$hash->{TMPSTATE};
     my $HumidString="";
     my $TempsString="";
     my $OtherString="";
     my $reading;
+    my $readingforstatus;
 
     ($eof, @lines) = nonblockGetLines($FH);
 
     if(!defined($eof)) {
-	Log 4, "WS3600 FIXME: eof undefined?!";
+	Log GetLogLevel($name,4), "WS3600 FIXME: eof undefined?!";
 	$eof=0;
     }
-    Log 4, "WS3600 reading ended with eof==$eof";
+    Log GetLogLevel($name,4), "WS3600 reading ended with eof==$eof";
 
     # FIXME! Current observed behaviour is "would block", then read of only EOF.
     #        Not sure if it's always that way; more correct would be checking
@@ -299,7 +316,7 @@ WS3600_Read($)
     foreach my $inputline ( @lines ) {
 	$inputline =~ s/\s+$//;
 	my ($rawreading, $val)=split(/ /, $inputline);
-	Log 5, "WS3600 read $inputline:$rawreading:$val";
+	Log GetLogLevel($name,5), "WS3600 read $inputline:$rawreading:$val";
 	if(defined($TranslatedCodes{$rawreading})) {
 
 #	    delete $defs{$name}{READINGS}{"  $rawreading"};
@@ -308,6 +325,22 @@ WS3600_Read($)
 
 	    $defs{$name}{READINGS}{$reading}{VAL} = $val;
 	    $defs{$name}{READINGS}{$reading}{TIME} = $tn;
+#
+# -wusel, 2010-01-30: BIG CHANGE: only put into CHANGED[] what will be in
+#                     STATE as well; this is done to reduce the burden on
+#                     the notification framework (each one currently leads
+#                     to a separate notify which will in turn lead a call
+#                     of EVERY NotifyFn()) and to improve FHEMs overall
+#                     performance.
+#                     Every value is still be stored in READINGS though.
+#
+#	    $hash->{CHANGED}[$i++] = "$reading: $val";
+
+	    if(defined($WantedCodesForStatus{$rawreading})) {
+		$readingforstatus=$WantedCodesForStatus{$rawreading};
+		$StateString=sprintf("%s %s %s", $StateString, $readingforstatus, $val);
+		$hash->{CHANGED}[$i++] = "$reading: $val";
+	    }
 #	    if($rawreading =~ m/^(Tendency|Forecast)/) {
 #		$hash->{CHANGED}[$i++] = "$reading: $val";
 #		$StateString=sprintf("%s %s: %s", $StateString, $reading, $val);
@@ -330,6 +363,7 @@ WS3600_Read($)
 #	    }
 	}
     }
+    $hash->{TMPSTATE} = $StateString;
     }
 
     if($eof) {
@@ -337,9 +371,9 @@ WS3600_Read($)
 	delete $hash->{FD};
 	delete $selectlist{"$name.pipe"};
 	InternalTimer(gettimeofday()+ $hash->{Timer}, "WS3600_GetStatus", $hash, 1);
-	Log 4, "WS3600 done reading pipe";
+	Log GetLogLevel($name,4), "WS3600 done reading pipe";
     } else {
-	Log 4, "WS3600 (further) reading would block";
+	Log GetLogLevel($name,4), "WS3600 (further) reading would block";
     }
 
 #    $OtherString =~ s/^\s+//;
@@ -360,12 +394,16 @@ WS3600_Read($)
 #    $defs{$name}{READINGS}{"Forecast"}{TIME} = $tn;
 #    $hash->{CHANGED}[$i++] = $StateString;
 
+# -wusel, 2010-01-06: FIXME: does this logic with STATE work?
+# -wusel, 2010-01-30: Removed setting STATE to "reading".
+
     if($eof) {
-	$hash->{CHANGED}[$i++] = "Status: updated";
+#	$hash->{CHANGED}[$i++] = "Status: $StateString";
+	$hash->{STATE} = $hash->{TMPSTATE};
+	$hash->{TMPSTATE} = "";
 	DoTrigger($name, undef);
-	$hash->{STATE} = "updated";
-    } else {
-	$hash->{STATE} = "reading";
+#    } else {
+#	$hash->{STATE} = "reading";
     }
 
     return $hash->{STATE};
@@ -402,84 +440,6 @@ sub nonblockGetLines {
         (substr($buf,-1) !~ /[\r\n]/ && $buf =~ s/([^\r\n]*)$//)
             ? $1 : '';
   $buf ? (0,split(/\n/,$buf)) : (0);
-}
-
-#####################################
-sub
-WS3600_OldGetStatus($)
-{
-    my ($hash) = @_;
-    my $dnr = $hash->{DEVNR};
-    my $name = $hash->{NAME};
-    my $dev = $hash->{DeviceName};
-
-    # Call us in n seconds again.
-    InternalTimer(gettimeofday()+ $hash->{Timer}, "WS3600_GetStatus", $hash, 1);
-
-    my %vals;
-    #my $result = WS3600_GetLine($hash->{DeviceName}, $hash->{Cmd});
-
-    my $FH;
-    Log 3, "WS3600 contacting station";
- 
-    open($FH, $dev);
-    if(!$FH) {
-	return "WS3600 Can't start $dev: $!";
-    }
-    local $_;
-    my $i=0;
-    my $tn = TimeNow();
-    my $StateString="";
-    my $HumidString="";
-    my $TempsString="";
-    my $OtherString="";
-    while (<$FH>) {
-	$_ =~ s/\s+$//;
-	my ($reading, $val)=split(/ /, $_);
-	$defs{$name}{READINGS}{$reading}{VAL} = $val;
-	$defs{$name}{READINGS}{$reading}{TIME} = $tn;
-	if($reading =~ m/^(Tendency|Forecast)/) {
-	    $hash->{CHANGED}[$i++] = "$reading: $val";
-	    $StateString=sprintf("%s %s: %s", $StateString, $reading, $val);
-	}
-	if($reading =~ m/^(Ti$|To$|WC$)/) {
-	    $hash->{CHANGED}[$i++] = "$reading: $val";
-	    $TempsString=sprintf("%s %s: %s °C", $TempsString, $reading, $val);
-	}
- 	if($reading =~ m/^(RHi$|RHo$)/) {
-	    $hash->{CHANGED}[$i++] = "$reading: $val";
-	    $HumidString=sprintf("%s %s: %s %%", $HumidString, $reading, $val);
-	}
-	if($reading =~ m/^(R1h$|R24h$)/) {
-	    $hash->{CHANGED}[$i++] = "$reading: $val";
-	    $OtherString=sprintf("%s %s: %s mm", $OtherString, $reading, $val);
-	}
-	if($reading =~ m/^(RP$|AP$)/) {
-	    $hash->{CHANGED}[$i++] = "$reading: $val";
-	    $OtherString=sprintf("%s %s: %s hPa", $OtherString, $reading, $val);
-	}
-    }
-    close($FH);
-    Log 3, "WS3600 fetched station's data";
-    
-    $OtherString =~ s/^\s+//;
-    $HumidString =~ s/^\s+//;
-    $TempsString =~ s/^\s+//;
-    $StateString =~ s/^\s+//;
-
-    $defs{$name}{READINGS}{"Humidity"}{VAL} = $HumidString;
-    $defs{$name}{READINGS}{"Humidity"}{TIME} = $tn;
-    $defs{$name}{READINGS}{"Temperatures"}{VAL} = $TempsString;
-    $defs{$name}{READINGS}{"Temperatures"}{TIME} = $tn;
-    $defs{$name}{READINGS}{"Rain/Pressure"}{VAL} = $OtherString;
-    $defs{$name}{READINGS}{"Rain/Pressure"}{TIME} = $tn;
-    $defs{$name}{READINGS}{"Forecast"}{VAL} = $StateString;
-    $defs{$name}{READINGS}{"Forecast"}{TIME} = $tn;
-
-    DoTrigger($name, undef) if($init_done);
-
-    $hash->{STATE} = $StateString;
-    return $hash->{STATE};
 }
 
 1;
