@@ -74,6 +74,7 @@ my %functions_set = ( "on"      => 0,
                       "dimup"   => 1,
                       "dimdown" => 1,
                       "on-till" => 1,
+		      "on-for-timer" => 1,
                     );
 
 
@@ -102,7 +103,7 @@ X10_Initialize($)
   $hash->{DefFn}     = "X10_Define";
   $hash->{UndefFn}   = "X10_Undef";
   $hash->{ParseFn}   = "X10_Parse";
-  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 " .
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 " .
                        "dummy:1,0 showtime:1,0 model:lm12,lm15,am12,tm13 " .
                        "loglevel:0,1,2,3,4,5,6";
 
@@ -134,9 +135,38 @@ X10_Do_On_Till($@)
     return "";
   }
 
+  if($modules{X10}{ldata}{$a[0]}) {
+    CommandDelete(undef, $a[0] . "_timer");
+    delete $modules{FS20}{ldata}{$a[0]};
+  }
+  $modules{X10}{ldata}{$a[0]} = "$hms_till";
+
   my @b = ($a[0], "on");
   X10_Set($hash, @b);
-  CommandDefine(undef, $hash->{NAME} . "_till at $hms_till set $a[0] off");
+  CommandDefine(undef, $hash->{NAME} . "_timer at $hms_till set $a[0] off");
+
+}
+#############################
+sub
+X10_Do_On_For_Timer($@)
+{
+  my ($hash, @a) = @_;
+  return "Timespec (HH:MM[:SS]) needed for the on-for-timer command" if(@a != 3);
+
+  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+  return $err if($err);
+
+  my $hms_for_timer = sprintf("+%02d:%02d:%02d", $hr, $min, $sec);
+
+  if($modules{X10}{ldata}{$a[0]}) {
+    CommandDelete(undef, $a[0] . "_timer");
+    delete $modules{FS20}{ldata}{$a[0]};
+  }
+  $modules{X10}{ldata}{$a[0]} = "$hms_for_timer";
+
+  my @b = ($a[0], "on");
+  X10_Set($hash, @b);
+  CommandDefine(undef, $hash->{NAME} . "_timer at $hms_for_timer set $a[0] off");
 
 }
 
@@ -194,6 +224,11 @@ X10_Set($@)
 
   # special for on-till
   return X10_Do_On_Till($hash, @a) if($function eq "on-till");
+
+  # special for on-for-timer
+  return X10_Do_On_For_Timer($hash, @a) if($function eq "on-for-timer");
+
+
 
   # argument evaluation
   my $model= $hash->{MODEL};

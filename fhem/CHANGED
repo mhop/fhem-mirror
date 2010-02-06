@@ -570,3 +570,4 @@
   - bugfix:  dummy/structure was listed twice in list and xmllist
   - feature: 11_FHT.pm added new readings for warnings on battery, lowtemp,
              window and windowsensor (M.Fischer)
+  - feature: on-for-timer added for X10 modules (Boris)
