@@ -446,9 +446,9 @@
     KS300 CUL_WS CUL_EM X10.
 
 - Mon Nov 16 2009 (MartinH)
-  - pgm3: Google-Weather-Api added. Display of all Logs including the 
-  FS20-devices (grep on fhem.log) The status of the batteries of FHT and HMS 
-  are shown in the graphics. php4 disabled. Now only php5 is supported. A 
+  - pgm3: Google-Weather-Api added. Display of all Logs including the
+  FS20-devices (grep on fhem.log) The status of the batteries of FHT and HMS
+  are shown in the graphics. php4 disabled. Now only php5 is supported. A
   lot of examples of the UserDefs are added. The pgm3-section of fhem.html was
   changed.
 
@@ -472,3 +472,6 @@
     Webcam and Google-Weather.  Output of html better formated and skinable --
     change the colors.
 
+- Sat  Feb 6 2010 (Boris)
+  - feature: on-for-timer added for X10 modules and bug fixed for overlapping
+    on-till and on-for-timer commands (Boris)
