@@ -500,7 +500,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   &lt;devspec&gt;.
   <br>
   If value is specified, then output this property (like DEF, TYPE, etc) or
-  reading (actuator, measured-temp) for all devices from the devspec. 
+  reading (actuator, measured-temp) for all devices from the devspec.
   <br><br>
   Example:
   <pre><code>  fhem> list
@@ -788,7 +788,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <a name="autoload_undefined_devices"></a>
     <li>autoload_undefined_devices<br>
-        If set, automatically load the corresponding module when a message 
+        If set, automatically load the corresponding module when a message
         of this type is received. This is used by the <a href="#autocreate">
         autocreate</a> device, to automatically create a fhem device upon
         receiving a corresponding message.
@@ -1521,7 +1521,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CUL_FHTTK"></a>
 <h3>CUL_FHTTK</h3>
 <ul>
-  This module handles messages from the FHT80 TF "Fenster-Tür-Kontakt" (Window-Door-Contact)
+  This module handles messages from the FHT80 TF "Fenster-Tï¿½r-Kontakt" (Window-Door-Contact)
   which are normally only acted upon by the <a href="#FHT">FHT80B</a>. With this module,
   FHT80 TFs are in a limited way (see <a href="http://fhz4linux.info/tiki-index.php?page=FHT+protocol">Wiki</a>
   for detailed explanation of TF's mode of operation) usable similar to HMS100 TFK. The name
@@ -2322,6 +2322,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     off
     on
     on-till           # Special, see the note
+    on-for-timer      # Special, see the note
     </pre>
     Examples:
     <ul>
@@ -2329,6 +2330,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       <code>set lamp1,lamp2 off</code><br>
       <code>set pump off</code><br>
       <code>set lamp2 on-till 19:59</code><br>
+      <code>set lamp2 on-for-timer 00:02:30</code><br>
     </ul>
     <br>
     Notes:
@@ -2359,6 +2361,10 @@ A line ending with \ will be concatenated with the next one, so long lines
           command is ignored, else an "on" command is generated, and for the
           given "till-time" an off command is scheduleld via the at command.
           </li>
+      <li><code>on-for-timer</code> requires a relative time in the "at" format
+          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          returns a time specification).
+          </li>
     </ul>
   </ul>
   <br>
@@ -2367,11 +2373,10 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
-    <li><a href="#follow-on-for-timer">follow-on-for-timer</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#attrdummy">dummy</a></li><br>
-    <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li><br>
+  <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
@@ -3094,7 +3099,7 @@ audio</pre>
 
     Note:<br>
     If the <code>owserver-ip:port</code> is called <code>none</code>, then
-    no device will be opened, so you can experiment without hardware attached.<br><br> 
+    no device will be opened, so you can experiment without hardware attached.<br><br>
 
     Example:
     <ul>
@@ -3148,7 +3153,7 @@ audio</pre>
         8-byte number (16 character hexidecimal) starting with family code FE.<br>
         If no Link Locator is between the device and the master, the locator
         field will be all FF.
-      </li>      
+      </li>
       <li><a name="owfs_present"></a>
         <code>present</code> (read-only)<br>
         Is the device currently present on the 1-wire bus?
@@ -3229,7 +3234,7 @@ audio</pre>
     </ul>
 
     Note:<br>
-    Currently supported <a href="#owfs_type">type</a>: <code>DS18S20</code>.<br><br> 
+    Currently supported <a href="#owfs_type">type</a>: <code>DS18S20</code>.<br><br>
 
     Example:
     <ul>
@@ -3247,7 +3252,7 @@ audio</pre>
     <ul>
       <li><a name="owtemp_templow"></a>
         <code>templow</code> (read-write)<br>
-        The upper limit for the low temperature alarm state. 
+        The upper limit for the low temperature alarm state.
       </li>
       <li><a name="owtemp_temphigh"></a>
         <code>temphigh</code> (read-write)<br>
@@ -3275,7 +3280,7 @@ audio</pre>
       <li><a href="#owfs_crc8">crc8</a> (read-only)</li>
       <li><a href="#owfs_family">family</a> (read-only)</li>
       <li><a href="#owfs_id">id</a> (read-only)</li>
-      <li><a href="#owfs_locator">locator</a> (read-only)</li>      
+      <li><a href="#owfs_locator">locator</a> (read-only)</li>
       <li><a href="#owfs_present">present</a> (read-only)</li>
       <li><a name="owtemp_temperature"></a>
         <code>temperature</code> (read-only)<br>
@@ -3566,7 +3571,7 @@ Forecast Cloudy</pre>
     later would be possible to implement if neccessary, though.
     <br><br>
 
-    Implementation of WS3600.pm tries to be nice, that is it reads from the pipe only 
+    Implementation of WS3600.pm tries to be nice, that is it reads from the pipe only
     non-blocking (== if there is data), so it should be safe even to use it via ssh or
     a netcat-pipe over the Internet, but this, as well, has not been tested yet.
     <br><br>
@@ -3678,7 +3683,7 @@ Terminating
     device ;) If autocreate is enabled, those should be autocreated for your convenience as
     soon as the first scan took place (30 seconds after the define).
 
-    Implementation of SISPM.pm tries to be nice, that is it reads from the pipe only 
+    Implementation of SISPM.pm tries to be nice, that is it reads from the pipe only
     non-blocking (== if there is data), so it should be safe even to use it via ssh or
     a netcat-pipe over the Internet, but this, as well, has not been tested extensively yet.
     <br><br>
@@ -4926,7 +4931,7 @@ isday</pre>
 	The Pachube-API-Key however is what you need in your code to authenticate your application's access the Pachube service.<br>
 	Don't share this with anyone: it's just like any other password.<br>
 	<a href=http://www.pachube.com>www.pachube.com</a><br>
-    
+
   </ul>
   <br>
 
@@ -4953,7 +4958,7 @@ isday</pre>
 		<code>set &lt;NAME&gt; DEL &lt;FHEM-DEVICENAME&gt;</code><br><br>
 	</ul>
 	<br>
-	
+
   <b>Get</b> <ul>N/A</ul><br>
   <b>Attributes</b>
   <ul>
