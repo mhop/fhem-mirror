@@ -1,5 +1,4 @@
 ##############################################
-
 package main;
 
 use strict;
@@ -20,6 +19,7 @@ sub CUL_OpenDev($$);
 sub CUL_CloseDev($);
 sub CUL_SimpleWrite(@);
 sub CUL_SimpleRead($);
+sub CUL_Disconnected($);
 
 my $initstr = "X21";    # Only translated messages + RSSI
 my %gets = (
@@ -618,6 +618,14 @@ CUL_Write($$$)
       CUL_SimpleWrite($hash, $bstring);
     }
 
+  } elsif($bstring =~ m/u....F/) { 
+    # put FS20 messages sent over an RFR in the common queue
+
+    if(!CUL_AddFS20Queue($hash, $bstring)) {
+      CUL_SimpleWrite($hash, $bstring);
+    }
+
+
   } else {
 
     CUL_SimpleWrite($hash, $bstring);
@@ -846,7 +854,7 @@ CUL_SimpleRead($)
   if($hash->{TCPDev}) {
     my $buf;
     if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
-      CUL_Disconnected();
+      CUL_Disconnected($hash);
       return undef;
     }
 
@@ -949,7 +957,7 @@ CUL_OpenDev($$)
   if($reopen) {
     Log 1, "CUL $dev reappeared ($name)";
   } else {
-    Log 3, "CUL opened $dev for $name";
+    Log 3, "CUL device opened";
   }
 
   $hash->{STATE}="";       # Allow InitDev to set the state
