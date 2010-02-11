@@ -1,4 +1,6 @@
 FHEM:
+- autodetect physical hardware
+- commonfunctions.pm
 - fhem-to-fhem module
 - CUR built-in MENU creation support
 
