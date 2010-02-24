@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.101 2010-01-29 07:37:47 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.102 2010-02-24 08:20:37 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2109,7 +2109,6 @@ Dispatch($$$)
   }
 
   my @found;
-  my $last_module;
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep {defined($modules{$_}{ORDER});}keys %modules) {
     next if($iohash->{Clients} !~ m/:$m:/);
@@ -2120,7 +2119,6 @@ Dispatch($$$)
     no strict "refs";
     @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
     use strict "refs";
-    $last_module = $m;
     last if(int(@found));
   }
 
@@ -2134,10 +2132,13 @@ Dispatch($$$)
 
           if($attr{global}{autoload_undefined_devices}) {
             $mname = LoadModule($mname);
-            no strict "refs";
-            @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
-            use strict "refs";
-            $last_module = $mname;
+            if($modules{$mname} && $modules{$mname}{ParseFn}) {
+              no strict "refs";
+              @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
+              use strict "refs";
+            } else {
+              Log 0, "ERROR: Cannot autoload $mname";
+            }
 
           } else {
             Log GetLogLevel($name,3),
