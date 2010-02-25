@@ -13,14 +13,16 @@ function website_WEATHER($station, $land,  $sprache)
 	$icons_google = "/ig/images/weather/";
 	
 	$api = simplexml_load_string(utf8_encode(file_get_contents("http://www.google.com/ig/api?weather=".$station."&hl=".$sprache)));
-	if (!$api) {$WEATHER="FALSE"; return $WEATHER;};
+	if (! $api->weather->forecast_information) { $WEATHER="FALSE"; return $WEATHER;};
 	#print_r($api);
 	#exit;
 	
 	$WEATHER = array();
-	
+
 	$WEATHER['city'] = $api->weather->forecast_information->city->attributes()->data;
+
 	$WEATHER['datum'] = $api->weather->forecast_information->forecast_date->attributes()->data;
+	
 	$WEATHER['zeit'] = $api->weather->forecast_information->current_date_time->attributes()->data;
 	
 	$WEATHER[0]['condition'] = $api->weather->current_conditions->condition->attributes()->data;
@@ -48,7 +50,7 @@ function website_WEATHER($station, $land,  $sprache)
 $WEATHER = website_WEATHER($weathercity, $weathercountry, $weatherlang);
     if ($WEATHER=="FALSE")
     {
-	echo "<td colspan=4 $bg2>Google-Weather-Api is not reachable.</td>";
+	echo "<td colspan=4 $bg2>Google-Weather-Api failed.</td>";
     } 
     else
     {
