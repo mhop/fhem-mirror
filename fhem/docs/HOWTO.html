@@ -1,10 +1,31 @@
 <html>
-  <head>
-    <title>FHEMWEB Howto</title>
-  </head>
-  <body style="background-color: white;">
-    <h2>FHEMWEB Howto</h2>
+<head>
+  <title>FHEM Howto</title>
+  <style type="text/css">
+    body   { background-color: #FFFFE7;}
+    #left  { position:absolute; top:20px; left:20px; width:140px; }
+    #right { position:absolute; top:20px; left:180px; bottom:20px; right:10px; }
+    body>div#left { position:fixed; }
+    h3 {     color:#52865D; line-height:1.3;
+             margin-top:1.5em; font-family:Arial,Sans-serif; }
+    div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
+    div#dist { padding-top:0.3em; }
+    a {  color: #278727; }
+  </style>
 
+</head>
+
+
+<body>
+
+  <div id="left">
+    <img src="fhem.png">
+    <h3>FHEM Howto</h3>
+  </div>
+
+
+  <div id="right">
+    <!--
     <a href="#starting">Starting</a><br/>
     <a href="#FHZ">Attaching an FHZ/CUL</a><br/>
     <a href="#FS20rx">Configuring FS20 receivers</a><br/>
@@ -16,9 +37,10 @@
     <a href="#plot">Plotting logs</a><br/>
     <a href="#tips">FHEMWEB tips</a><br/>
     <a href="#structure">Complex structures</a><br/>
+    -->
 
 
-    <a name="starting"/>
+    <a name="starting"></a>
     <h3>Starting</h3>
       <ul>
       First install the Device::SerialPort (or Win32::SerialPort)  perl module
@@ -40,7 +62,7 @@
       </ul>
 
 
-    <a name="FHZ"/>
+    <a name="FHZ"></a>
     <h3>Attaching an FHZ/CUL</h3>
       <ul>
       Attach the FHZ1000 or FHZ1300 to your computer, and look for a file named
@@ -58,7 +80,7 @@
       the browser after defining a device or setting its attribute.  Otherwise
       the changes will disappear after the next start.</br><br> </ul>
 
-    <a name="autocreate"/>
+    <a name="autocreate"></a>
     <h3>Automatically creating transmitters</h3>
       <ul>
       The sample configuration file installed via "make install-pgm2" has
@@ -73,7 +95,7 @@
       </ul>
 
 
-    <a name="FS20rx"/>
+    <a name="FS20rx"></a>
     <h3>Configuring FS20 receivers</h3>
       <ul>
       Configure the <a href="commandref.html#FS20">FS20</a> device in
@@ -91,7 +113,7 @@
       <a href="commandref.html#model">Here</a> is a complete list of models.<br>
       </ul>
 
-    <a name="FS20tx"/>
+    <a name="FS20tx"></a>
     <h3>Misc. RF transmitters (FS20/EM/S300 etc.)</h3>
       <ul>
       Wait a while, until the transmitter sent some data. In the logfile
@@ -111,7 +133,7 @@
       </ul>
       </ul>
 
-    <a name="FHT"/>
+    <a name="FHT"></a>
     <h3>Configuring FHT devices</h3>
       <ul>
       Wait for a while (2-5 mins) till the FHT is sending some signals. In the
@@ -134,7 +156,7 @@
       this</a> FAQ entry.
       </ul>
 
-    <a name="at"/>
+    <a name="at"></a>
     <h3>Timed commands / Notification</h3>
       <ul>
       To execute commands at a given time / periodically, you have to define
@@ -157,8 +179,8 @@
       trigger lamp1 on</pre>
       </ul>
 
-    <a name="rooms"/>
-    <h3>FHEMWEB look and feel.</h3>
+    <a name="rooms"></a>
+    <h3>FHEMWEB look and feel</h3>
       <ul>
       It makes sense to group your devices into rooms by setting the room
       attribute. FHEMWEB puts devices without a room attribute into the
@@ -177,7 +199,7 @@
       <a href="commandref.html#plotsize">plotsize</a>.
       </ul>
 
-    <a name="log"/>
+    <a name="log"></a>
     <h3>Logging data</h3>
       <ul>
       To log messages into files, define devices of the type <a
@@ -196,7 +218,7 @@
       href="commandref.html#archivedir">archivecmd</a> attributes.
       </ul>
 
-    <a name="plot"/>
+    <a name="plot"></a>
     <h3>Plotting logs</h3>
       <ul>
       To convert a log into a plot in FHEMWEB, set the
@@ -251,7 +273,7 @@
 
       </ul>
 
-    <a name="tips"/>
+    <a name="tips"></a>
     <h3>FHEMWEB tips</h3>
       <ul>
       You can first set an attribute to an arbitrary (wrong) value, then click
@@ -299,7 +321,7 @@
       <br>
 
 
-    <a name="structure"/>
+    <a name="structure"></a>
     <h3>Complex structures</h3>
       <ul>
       Put your devices in different rooms. You can now use the
@@ -310,5 +332,6 @@
       floors, buildings, etc. and set all elements of a gives structure at once.
       </ul>
 
-  <body>
+  </div>
+<body>
 </html>
