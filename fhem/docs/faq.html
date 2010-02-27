@@ -4,111 +4,169 @@
 
 <head>
   <title>FHEM FAQ</title>
+  <style type="text/css">
+    body   { background-color: #FFFFE7;}
+    #left  { position:absolute; top:20px; left:20px; width:140px; }
+    #right { position:absolute; top:20px; left:180px; bottom:20px; right:10px; }
+    body>div#left { position:fixed; }
+    h3,h4 {  color:#52865D; line-height:1.3;
+             margin-top:1.5em; font-family:Arial,Sans-serif; }
+    div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
+    div#dist { padding-top:0.3em; }
+    a {  text-decoration:none; color: #276727; }
+  </style>
 </head>
 
-<body style="background-color: white;">
 
-<h2>FHEM FAQ</h2>
+<body>
 
-<a href="#faq1">1. I am using fhem.pl with an fhz1000.pl config file and fhem.pl
-won't start</a><br>
+  <div id="left">
+    <img src="fhem.png">
+    <h3>FHEM FAQ</h3>
+  </div>
 
-<a href="#faq2">2. I get "undefined" messages in the log after upgrading
-fhem.pl</a><br>
+  <div id="right">
 
-<a href="#faq3">3. I switched on a FS20 device directly (without the remote),
-but the fhem.pl did not noticed it. Is it a bug?</a><br>
+<!--
+<div id="dist">
+<a href="#faq1">
+  1. I get a <code>Can't call method "opened"</code> message when starting
+  fhem. Why?</a>
+  </div>
 
-<a href="#faq4">4. I have some FS20/FHT/HMS devices. How do I know their
-housecode?</a><br>
+<div id="dist">
+<a href="#faq2">
+  2. I get "undefined" messages in the log after upgrading fhem.pl</a>
+  </div>
 
-<a href="#faq5">5. I have the code for my devices in the ELV notation, which
-contains 1,2,3 and 4, but you require a hex code. How should I convert
-it?</a><br>
+<div id="dist">
+<a href="#faq3">
+  3. I switched on a FS20 device directly (without the remote), but the
+  fhem.pl did not noticed it. Is it a bug?</a>
+  </div>
 
-<a href="#faq6">6. I replaced my FHZ1X00PC, now the FHT80b's does not work
-anymore.  Help me!</a><br>
+<div id="dist">
+<a href="#faq4">
+  4. I have some FS20/FHT/HMS devices. How do I know their housecode?</a>
+  </div>
 
-<a href="#faq7">7. I can specify an optional ml/raincounter for a KS300.  Why
-do you think that 255 should be the default?</a><br>
+<div id="dist">
+<a href="#faq5">
+  5. I have the code for my devices in the ELV notation, which contains 1,2,3
+  and 4, but you require a hex code. How should I convert it?</a>
+  </div>
 
-<a href="#faq8">8. The time specification of the builtin at command is not very
-flexible. Please add day/month/weekday to it.</a><br>
+<div id="dist">
+<a href="#faq6">
+  6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.  Help
+  me!</a>
+  </div>
 
-<a href="#faq9">9. I defined my FS20STR as an FHT device, but I do not get
-any data from it.</a><br>
+<div id="dist">
+<a href="#faq7">
+  7. I can specify an optional ml/raincounter for a KS300.  Why do you think
+  that 255 should be the default?</a>
+  </div>
 
-<a href="#faq10">10. How to convert the FHT8b code seen in its display to the
-hex code needed by fhem.pl?</a><br>
+<div id="dist">
+<a href="#faq8">
+  8. The time specification of the builtin at command is not very flexible.
+  Please add day/month/weekday to it.</a>
+  </div>
 
-<a href="#faq11">11. I'd like to use this sunrise/sunset stuff, can you help
-me?</a><br>
+<div id="dist">
+<a href="#faq9">
+  9. I defined my FS20STR as an FHT device, but I do not get any data from
+  it.</a>
+  </div>
 
-<a href="#faq12">12. I'd like to switch on the ventilator if the FHT tells me
-its too hot. How to tell fhem to do that?</a><br>
+<div id="dist">
+<a href="#faq10">
+  10. How to convert the FHT80b code seen in its display to the hex code needed
+  by fhem.pl?</a>
+  </div>
 
-<a href="#faq13">13. I'd like to see directly in the Web frontend if a window
-is open. How to do that?</a><br>
+<div id="dist">
+<a href="#faq11">
+  11. I'd like to use this sunrise/sunset stuff, can you help me?</a>
+  </div>
 
-<a href="#faq14">14. In the summer I get a lot of "actuator:lime-protection"
-messages from  my FHT80b. How to switch back to the actuator:0% messages?</a>
-<br>
+<div id="dist">
+<a href="#faq12">
+  12. I'd like to switch on the ventilator if the FHT tells me its too hot. How
+  to tell fhem to do that?</a>
+  </div>
 
-<a href="#faq15">15. My notify/filelog does not work, help me!</a><br>
+<div id="dist">
+<a href="#faq13">
+  13. I'd like to see directly in the Web frontend if a window is open. How to
+  do that?</a>
+  </div>
 
-<a href="#faq16">16. Setting auto-mode from manual for the FHT won't change the
-         desired temperature!</a><br>
+<div id="dist">
+<a href="#faq14">
+  14. In the summer I get a lot of "actuator:lime-protection" messages from  my
+  FHT80b. How to switch back to the actuator:0% messages?</a> 
+  </div>
 
-<a href="#faq17">17. I have problem receiving data, I get "Bad CRC" or "Oversized message."</a><br>
+<div id="dist">
+<a href="#faq15">
+  15. My notify/filelog does not work, help me!</a>
+  </div>
 
-<a href="#faq18">18. My FHZ1X00PC gets all time automatically disconnected and
-reconnected. My log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
-What is wrong with my USB?
-</a><br>
+<div id="dist">
+<a href="#faq16">
+  16. Setting auto-mode from manual for the FHT won't change the desired
+  temperature!</a>
+  </div>
 
-<a href="#faq19">19. How do I set the dim100% from the at command?</a><br>
+<div id="dist">
+<a href="#faq17">
+  17. I have problem receiving data, I get "Bad CRC" or "Oversized
+  message."</a>
+  </div>
 
-<a href="#faq20">20. Why do my Sunrise/Sunnset times differ from the ones on
-webseite XXX?</a><br>
+<div id="dist">
+<a href="#faq18">
+  18. My FHZ1X00PC gets all time automatically disconnected and reconnected. My
+  log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
+  What is wrong with my USB?</a>
+  </div>
+
+<div id="dist">
+<a href="#faq19">
+  19. How do I set the dim100% from the at command?</a>
+  </div>
+
+<div id="dist">
+<a href="#faq20">
+  20. Why do my Sunrise/Sunset times differ from the ones on webseite
+  XXX?</a>
+  </div>
 
 <br/>
 <br/>
+-->
 
 <a name="faq1"></a>
-<b>1. I am using fhem.pl with an fhz1000.pl config file and fhem.pl won't
-start</b>
-
-<ul>
-   The syntax changed, you have to modify you config file:
-   <ul>
-     <li>logfile/modpath/pidfile/port/verbose "renamed" to "attr global xx</li>
-     <ul>
-       <li>change logfile <xxx> to attr global logfile <xxx></li>
-       <li>change modpath <xxx> to attr global modpath <xxx></li>
-       <li>change pidfile <xxx> to attr global pidfilename <xxx></li>
-       <li>change port <xxx> to attr global port <xxx></li>
-       <li>change verbose <xxx> to attr global verbose <xxx></li>
-     </ul>
-     <li>savefile renamed to "attr global statefile" (<b>not</b> savefile)</li>
-     <li>at/notify "renamed" to "define  at/notify"<br>
-         This means you have to give a name to each of your at's or
-         notify commands. E.g.:
-     <ul>
-         <li><code>at *07:00 set lamp on</code><br>
-         &nbsp;&nbsp;becomes<br>
-         <code>define wake_me at *07:00 set lamp on</code></li>
-         <li><code>notify fire:on "send_sms"</code><br>
-         &nbsp;&nbsp;becomes<br>
-         <code>define fire_alarm notify fire:on "send_sms"</code><br>
-     </ul>
-     This seems to be tedious at the beginning but you get easy
-     deletion and attribute specification for these commands.
-   </ul>
-</ul>
+<h4>1. I get a <code>Can't call method "opened"</code> message when starting
+  fhem. Why?</h4>
+  <ul>
+    You need perl &gt;=5.6, on Unix with the Device::SerialPort (<a
+    href="http://search.cpan.org/dist/Device-SerialPort/">
+    http://search.cpan.org/dist/Device-SerialPort/</a>),
+    on Windows Win32::SerialPort (use ActiveState's ActivePerl)
+    module.
+    If this module reports <code>Can't call method "opened" on an undefined
+    value...</code> when starting the server, then you either may ignore
+    this message, or replace the mentioned line with:<pre>
+      $self->{HANDLE}->close if (defined($self->{HANDLE}) &&
+                                 $self->{HANDLE}->opened);</pre>
+  </ul>
 
 
 <a name="faq2"></a>
-<b>2. I get "undefined" messages in the log after upgrading fhem.pl</b>
+<h4>2. I get "undefined" messages in the log after upgrading fhem.pl</h4>
 <ul>
    Stop fhem.pl, delete the previous .save file and restart fhem.pl.
    If the problem still exists, send a bugreport.
@@ -116,8 +174,8 @@ start</b>
 
 
 <a name="faq3"></a>
-<b>3. I switched on a FS20 device directly (without the remote), but
-   the fhem.pl did not noticed it.<br>Is it a bug?</b>
+<h4>3. I switched on a FS20 device directly (without the remote), but
+   the fhem.pl did not noticed it.<br>Is it a bug?</h4>
 <ul>
    The protocol used by the FS20 family is quite simple: it is </b>not</b>
    encrypted in any way, and there is no feedback to the sender.  So if you
@@ -130,8 +188,7 @@ start</b>
 
 
 <a name="faq4"></a>
-<b>4. I have some FS20/FHT/HMS devices.<br>
-   How do I know their housecode?</b><br>
+<h4>4. I have some FS20/FHT/HMS devices. How do I know their housecode?</h4>
 <ul>
    If you already programmed some devices, then just start fhem.pl with one
    of the example configuration files, and watch the log.  When activating a
@@ -142,8 +199,8 @@ start</b>
 
 
 <a name="faq5"></a>
-<b>5. I have the code for my devices in the ELV notation, which contains 1,2,3
-and 4, but fhem requires a hex code. How should I convert it?</b>
+<h4>5. I have the code for my devices in the ELV notation, which contains 1,2,3
+and 4, but fhem requires a hex code. How should I convert it?</h4>
 
 <ul>
    Note: current fhem versions accept FS20 codes in ELV notation.<br/><br/>
@@ -176,8 +233,8 @@ and 4, but fhem requires a hex code. How should I convert it?</b>
 
 
 <a name="faq6"></a>
-<b>6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.
-Help me!</b>
+<h4>6. I replaced my FHZ1X00PC, now the FHT80b's does not work anymore.
+Help me!</h4>
 <ul>
    The FHT80b's are talking to a single FHZ1XXX device, which has a unique
    "FHTcode". You have two choices: if you know the old FHTcode, then you can
@@ -196,8 +253,8 @@ Help me!</b>
 
 
 <a name="faq7"></a>
-<b>7. I can specify an optional ml/raincounter for a KS300. Why do you think
-that 255 should be the default?</b>
+<h4>7. I can specify an optional ml/raincounter for a KS300. Why do you think
+that 255 should be the default?</h4>
 <ul>
    The manual talks about 0.3l resolution, but I wanted to calibrate my device.
    So I filled a plastic bottle with 0.5 liter water from the measuring cup,
@@ -216,8 +273,8 @@ that 255 should be the default?</b>
 
 
 <a name="faq8"></a>
-<b>8. The time specification of the builtin at command is not very
-flexible. Please add day/month/weekday to it.</b>
+<h4>8. The time specification of the builtin at command is not very
+flexible. Please add day/month/weekday to it.</h4>
 <ul>
   Please take a look at the holiday device, and the perl helper variables (both
   described in the commandref.html).
@@ -225,8 +282,8 @@ flexible. Please add day/month/weekday to it.</b>
 
 
 <a name="faq9"></a>
-<b>9. I defined my FS20STR as an FHT device, but I do not get any data from
-it.</b>
+<h4>9. I defined my FS20STR as an FHT device, but I do not get any data from
+it.</h4>
 <ul>
    The FS20STR is an FS20 device, even if it looks like an FHT80b.
    You'll get "only" on-for-timer and off-for-timer events sent.
@@ -234,8 +291,8 @@ it.</b>
 
 
 <a name="faq10"></a>
-<b>10. How to convert the FHT8b code seen in its display to the hex code needed
-by fhem.pl?</b>
+<h4>10. How to convert the FHT80b code seen in its display to the hex code needed
+by fhem.pl?</h4>
 
 <ul>
    Convert the first 2 digits first from decimal to hex, then the next two.
@@ -245,12 +302,12 @@ by fhem.pl?</b>
 	 obase=16
 	 &lt;first two digits&gt;
 	 &lt;last two digits&gt;</pre>
-   E.g The FHT8b code 1121 is 0b15 for the fhem.pl
+   E.g The FHT80b code 1121 is 0b15 for the fhem.pl
 </ul>
 
 
 <a name="faq11"></a>
-<b>11. I'd like to use this sunrise/sunset stuff, can you help me?</b>
+<h4>11. I'd like to use this sunrise/sunset stuff, can you help me?</h4>
 <ul>
    Look for the geographic coordinates of your home, e.g with a GPS
    receiver or with googleearth. Compute the latitude/longitude as needed, and
@@ -264,7 +321,7 @@ by fhem.pl?</b>
 </ul>
 
 <a name="faq12"></a>
-<b>12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</b>
+<h4>12. I'd like to switch on the ventilator if the FHT tells me its too hot. How to tell fhem to do that?</h4>
 <ul>
 
   To get used to the methods, we do it step by step. Telnet to fhem, and type
@@ -292,8 +349,8 @@ by fhem.pl?</b>
 </ul>
 
 <a name="faq13"></a>
-<b>13. I'd like to see directly in the Web frontend if a window is open.
-How to do that? (by fwolff)</b>
+<h4>13. I'd like to see directly in the Web frontend if a window is open.
+How to do that? (by fwolff)</h4>
 <ul>
 
   Just define a new (pseudo) FS20 device called "window" and use the following
@@ -306,9 +363,9 @@ How to do that? (by fwolff)</b>
 </ul>
 
 <a name="faq14"></a>
-<b>14. In the summer I get a lot of "actuator:lime-protection
+<h4>14. In the summer I get a lot of "actuator:lime-protection
 messages from  my FHT80b. How to switch back to the actuator:0% messages?
-</b>
+</h4>
 <ul>
 
   (Thanks for Martin Fischer for researching)<br>
@@ -330,8 +387,8 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
 
 </ul>
 
-<a name="faq15">
-<b>15. My notify/filelog does not work, help me!</b>
+<a name="faq15"></a>
+<h4>15. My notify/filelog does not work, help me!</h4>
 <ul>
    First learn what are the trigger messages: telnet to your fhem (e.g. telnet
    localhost 7072) and issue the command "inform on". If there is an
@@ -358,8 +415,8 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
 
 </ul>
 
-<a name="faq16">
-<b>16. Setting auto-mode from manual for the FHT won't change the desired temperature!</b>
+<a name="faq16"></a>
+<h4>16. Setting auto-mode from manual for the FHT won't change the desired temperature!</h4>
 <ul>
    Thanks to Waldemar Porsche the following notify will take care of that:<br>
    <pre>define ExtendedAutoMode notify .*mode.*auto {\
@@ -386,9 +443,9 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
    </pre>
 </ul>
 
-<a name="faq17">
-<b>17. I have problem receiving data, I get "Bad CRC" or "Oversized
-   message."</b>
+<a name="faq17"></a>
+<h4>17. I have problem receiving data, I get "Bad CRC" or "Oversized
+   message."</h4>
 <ul>
    Some Linux distibutions have problems with the settings of the serial USB
    lines. Sometimes the 8.th bit is stripped, sometimes software flowcontrol
@@ -406,21 +463,20 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
    </pre>
 </ul>
 
-<a name="faq18">
-<b>18. My FHZ1X00PC gets all time automatically disconnected and
+<a name="faq18"></a>
+<h4>18. My FHZ1X00PC gets all time automatically disconnected and
 reconnected. My log shows "USB device /dev/elv_fhz1300pc disconnected, waiting to reappear".
 What is wrong with my USB?
-</b>
+</h4>
 <ul>
 Several fhem users are plagued by spontaneous disconnects/reconnects of USB
 devices. This is not an issue of fhem but a problem of hardware and/or USB drivers.
 See <a href="USB.html">USB compendium</a> for help.
 </ul>
-<br>
 
 
-<a name="faq19">
-<b>19. How do I set the dim100% from the at command?</b>
+<a name="faq19"></a>
+<h4>19. How do I set the dim100% from the at command?</h4>
 <ul>
   As the % and @ characters are special, they have to be escaped. See the
   following list (copied here from the commandref.html, notify command
@@ -444,8 +500,8 @@ See <a href="USB.html">USB compendium</a> for help.
   definition.</li>
 </ul>
 
-<a name="faq20">
-<b>20. Why do my Sunrise/Sunnset times differ from the ones on webseite XXX?</b>
+<a name="faq20"></a>
+<h4>20. Why do my Sunrise/Sunset times differ from the ones on webseite XXX?</h4>
 <ul>
   There are different ways of defining sunrise/sunset. To quote "perldoc
   DateTime::Event::Sunrise" :<br>
