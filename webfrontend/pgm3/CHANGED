@@ -198,3 +198,9 @@ It is not necessary to tell fhem that there are other logs.
 2010-01-08
 	-- Feature, Bugs look at HISTORY
 	   Changed: every php-File!
+2010-03-12
+	-- Bugfix: Better check of availability of Google-Weather
+	   Changed: weather.php
+	-- Feature: DBLog for everything except UserDefs 
+	   Changed: index.php, config.php, fht.php, hsm100.php, 
+	   	    fhtpulldown.php, ks300.php

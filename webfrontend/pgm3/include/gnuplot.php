@@ -6,7 +6,7 @@
 ################
 
 
-function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHTy2range)
+function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHTy2range,$DBUse)
 {
 
 	if ($gnutyp=="userdef")
@@ -33,6 +33,19 @@ function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHT
 	$IN="$gnudraw ($gnutyp)";
 
 	}
+
+
+### DBUse for
+	if ($DBUse == '1' and ( $gnutyp=='FHT' or $gnutyp=='HMS100T' or $gnutyp=='HMS100TF' or $gnutyp=='CUL_WS' or $gnutyp=='KS300_t1' or $gnutyp=='KS300_t2' or $gnutyp=='WS300_t1' or $gnutyp=='WS300_t2'))
+	{
+	include "config.php";
+	$logfile="tmp/".$gnudraw.".log";
+	$f1=fopen($logfile,"w+");
+	};
+
+
+
+
 	$gnudraw1=$gnudraw.'1';
 	$OUT1="set output 'tmp/$gnudraw.$pictype'";
 	$OUT2="set output 'tmp/$gnudraw1.$pictype'";
@@ -47,17 +60,26 @@ $gplothdr="
 	set title '$IN'
 	set grid
 	";
+
+
 $datumtomorrow= mktime (0,0,0,date("m")  ,date("d")+1,date("Y"));
 $xrange1= date ("Y-m-d",$datumtomorrow);
 $datumyesterday= mktime (0,0,0,date("m")  ,date("d")-1,date("Y"));
+$datumweek= mktime (0,0,0,date("m")  ,date("d")-6,date("Y"));
 $xrange2= date ("Y-m-d",$datumyesterday);
-$xrange="set xrange ['$xrange2':'$xrange1']
-	";
+$xrange3= date ("Y-m-d",$datumweek);
+$xrange="set xrange ['$xrange2':'$xrange1'] ";
+$xrangeweek="set xrange ['$xrange3':'$xrange1'] ";
+
+
+
+
 
 
 switch ($gnutyp):
         Case FS20:  ############################################
 $gplotmain=<<<EOD
+
 set size 1,0.5
 set noytics 
 set noy2tics 
@@ -65,10 +87,24 @@ set yrange [-0.2:1.2]
 set ylabel "On/Off"  
 plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 1 : $3==\"dimdown\"? 0 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title '' with steps
 EOD;
-#plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' $logfile" using 1:2 title '' with steps
+
 break;
 
+
+
+
+
+
         Case WS300_t1:  ############################################
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' and reading='data' order by timestamp  desc limit ".$logrotateKS300lines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->value\n");
+      		}
+		fclose($f1);
+		}
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
 		set y2label 'Humidity (%)'
@@ -77,7 +113,21 @@ break;
 		";
 		break;
 
+
+
+
+
+
         Case WS300_t2:  ############################################
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' and reading='data' order by timestamp  desc limit ".$logrotateKS300lines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->value\n");
+      		}
+		fclose($f1);
+		}
 $gplotmain=<<<EOD
 set ylabel "Air Pressure (hPa)"
 set y2label "Willi"
@@ -86,7 +136,21 @@ plot "< grep -v avg $logfile" using 1:8 axes x1y1 title 'Air Pressure' with line
 EOD;
 		break;
 
+
+
+
+
+
         Case KS300_t1:  ############################################
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' and reading='data' order by timestamp  desc limit ".$logrotateKS300lines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->value\n");
+      		}
+		fclose($f1);
+		}
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
 		set y2label 'Humidity (%)'
@@ -95,16 +159,44 @@ EOD;
 		";
 		break;
 
+
+
+
+
         Case KS300_t2:  ############################################
-$gplotmain=<<<EOD
-set ylabel "Wind (Km/h)"
-set y2label "Rain (l/m2)"
-plot "< grep -v avg $logfile" using 1:8 axes x1y1 title 'Wind' with lines, \
-"< grep -v avg $logfile" using 1:10 axes x1y2 title 'Rain' with lines
-EOD;
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' and reading='data' order by timestamp  desc limit ".$logrotateKS300lines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->value\n");
+     		}
+		fclose($f1);
+		}
+	$gplotmain="
+	set ylabel 'Wind (Km/h)'
+	set y2label 'Rain (l/m2)'
+	plot '$logfile' using 1:8 axes x1y1 title 'Wind' with lines, \
+	'$logfile' using 1:10 axes x1y2 title 'Rain' with lines
+	";
 		break;
 
+
+
+
+
         Case FHT:   ############################################
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' order by timestamp  desc limit ".$logrotateFHTlines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->reading $row->value\n");
+      		}
+		fclose($f1);
+		}
+
+
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'  
 		set yrange [$FHTyrange]
@@ -136,6 +228,15 @@ EOD;
 		break;
 
         Case HMS100T:  ############################################
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' and reading='data' and type='HMS' order by timestamp  desc limit ".$logrotateHMSlines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->value\n");
+      		}
+		fclose($f1);
+		}
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'  
 		plot '$logfile' using 1:4 axes x1y1 title 'Temperature' with lines lw 2
@@ -166,6 +267,16 @@ EOD;
 
         Case HMS100TF:  ############################################
         Case CUL_WS:  ############################################
+		if ($DBUse==1)
+		{
+		$sqlarray=mysql_query("select timestamp,reading,value from history where device='".$gnudraw."' and reading='data' and (type='HMS' or type='CUL_WS') order by timestamp  desc limit ".$logrotateHMSlines."") 		or die (mysql_error());
+	while ($row = mysql_fetch_object($sqlarray)) {
+		$date=str_replace(" ","_",$row->timestamp);
+		fputs($f1,"$date $gnudraw $row->value\n");
+      		}
+		fclose($f1);
+		}
+
 		$gplotmain="
 		set ylabel 'Temperature (Celsius)'
 		set y2label 'Humidity (%)'
@@ -176,10 +287,13 @@ EOD;
 	default:
 endswitch;	
 
-$message=$OUT1.$gplothdr.$gplotmain;
-$f1=fopen("tmp/gnu1","w+");
-fputs($f1,$message);
-fclose($f1);
+
+
+
+$message=$OUT1.$gplothdr.$xrangeweek.$gplotmain;
+$f3=fopen("tmp/gnu1","w+");
+fputs($f3,$message);
+fclose($f3);
 exec("$gnuplot tmp/gnu1",$output);
 
 $message=$OUT2.$gplothdr.$xrange.$gplotmain;

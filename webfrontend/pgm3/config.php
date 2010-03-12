@@ -7,14 +7,21 @@
 
 
 ###### required settings
-	$fhem="fhem"; #only php5 is supported! On which machine is fhem runnning??
-	#$fhem="localhost"; #only php5 is supported! On which machine is fhem runnning??
+	$fhem="localhost"; #only php5 is supported! On which machine is fhem runnning??
 					# it needs not to be on the same machine as fhem
 					# if it is not localhost then the fhem.cfg must
 					# run global: "attr global port <nr> global"
 	$fhemport="7072";		# port of fhem.pl
-	$logpath="/mnt/fhz/";		# where are your logs? Use a writabel nfs-share if pgm3 and fhem are not on the same machine
-	$AbsolutPath="/srv/www/htdocs/"; # where ist your pgm3?
+	$logpath="/var/tmp/";		# where are your logs? Use a writabel nfs-share if pgm3 and fhem are not on the same machine
+	$AbsolutPath="/var/www/"; # where ist your pgm3?
+
+###### DBlog instead of Filelogs -- only for experienced Users!
+## Look at contrib/dblog and http://fhemwiki.de for further information
+       $DBUse="0"; # Wanna use DB-Logging instead of File-Logging? Use 1 for ye s and 0 for no.                                                                 
+        $DBNode="localhost";    # On which machine is your db running?          
+        $DBName="fhem"; # Whats the name of your DB for fhem?                   
+        $DBUser="USER";     # Enter the username to connect to the DB.              
+        $DBPass="PASSWD";     # Enter the password which is needed to connect to the DB
 
 
 ##################################################################################
@@ -102,13 +109,13 @@
         $desR='255'; $desG='255'; $desB='255';  # Color of desired-temp-line Red/Green/Blue (Default: 255/255/255) 
         $show_actuator=1;                       # show the actuator-value as a graphic (0/1)
         $actR='255'; $actG='247'; $actB='200';  # Color of Actuator-line Red/Green/Blue (Default: 255/247/200)
-        $FHTyrange='15:31';                     # Temperature in gnuplot. Default 15 to 31 (Celsius)
+        $FHTyrange='14:31';                     # Temperature in gnuplot. Default 14 to 31 (Celsius)
         $FHTy2range='0:70';                     # Actuator in gnuplot. Default 0 to 70 (Percent)
         $maxcount='510';                        # Maximum count of pixel (from right to left) (Default:460)
         $XcorrectDate=380;                      # Text of e.g. Date from the right side (Default:380)
         $XcorrectMainText=32;                   # Text of main text from the right side (Default: 32)
-        $logrotateFHTlines=5400;                # automatic Logrotate; $logrotate must be 'yes'.
-                                                # Default:4800
+        $logrotateFHTlines=8200;                # automatic Logrotate; $logrotate must be 'yes'.
+                                                # Default:8200
                                                 # read docs/logrotate if you want adjust it manually!
                                                 # otherwise the system will slow down
                                                 # pgm3 (user www-data) needs the rights to write the logs
@@ -124,8 +131,8 @@
         $maxcountHMS='575';                     # Maximum count of pixel (from right to left) (Default:575)
         $XcorrectMainTextHMS=25;                # Text of main text from the right side (Default:)
 	$showdewpoint='yes';                    # Dewpoint (german: taupunkt)
-        $logrotateHMSlines=1200;                # automatic Logrotate; $logrotate must be 'yes'.
-                                                # Default:1200
+        $logrotateHMSlines=1500;                # automatic Logrotate; $logrotate must be 'yes'.
+                                                # Default:1500
                                                 # read docs/logrotate if you want adjust it manually!
                                                 # otherwise the system will slow down
                                                 # pgm3 (user www-data) needs the rights to write the logs
@@ -170,7 +177,7 @@
 
 
 # Do you want user defined graphics? 1/0 Default: 0	
-$UserDefs=1;
+$UserDefs=0;
 
 #####################
 ## Userdef: 0
@@ -220,20 +227,20 @@ $UserDefs=1;
 ########################
 # example: 
 #define solarpumpe.log FileLog /var/tmp/solarpumpe.log solarpumpe:.*(on|off).*
-#$sortnumber=0;
-#$userdef[$sortnumber]['name']='PiriO';	
-#$userdef[$sortnumber]['name']='SolarPumpe';	
-#$userdef[$sortnumber]['valuefield']=3;	
-#$userdef[$sortnumber]['gnuplottype']='fs20';	
-#$userdef[$sortnumber]['logpath']='/mnt/fhz/solarpumpe.log';   
-#$userdef[$sortnumber]['room']='cellar';
-#$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
-#$userdef[$sortnumber]['semshort']='';
-#$userdef[$sortnumber]['imagemax']=725;
-#$userdef[$sortnumber]['imagemay']=52;
-#$userdef[$sortnumber]['maxcount']=575;
-#$userdef[$sortnumber]['XcorrectMainText']=25;               
-#$userdef[$sortnumber]['logrotatelines']=50;  
+$sortnumber=0;
+$userdef[$sortnumber]['name']='PiriO';	
+$userdef[$sortnumber]['name']='SolarPumpe';	
+$userdef[$sortnumber]['valuefield']=3;	
+$userdef[$sortnumber]['gnuplottype']='fs20';	
+$userdef[$sortnumber]['logpath']='/mnt/fhz/solarpumpe.log';   
+$userdef[$sortnumber]['room']='cellar';
+$userdef[$sortnumber]['semlong']='Solarpumpe'; 	
+$userdef[$sortnumber]['semshort']='';
+$userdef[$sortnumber]['imagemax']=725;
+$userdef[$sortnumber]['imagemay']=52;
+$userdef[$sortnumber]['maxcount']=575;
+$userdef[$sortnumber]['XcorrectMainText']=25;               
+$userdef[$sortnumber]['logrotatelines']=50;  
 
 
 ##########################
@@ -253,6 +260,26 @@ $UserDefs=1;
 #$userdef[$sortnumber]['XcorrectMainText']=25;               
 #$userdef[$sortnumber]['logrotatelines']=30;  
 
+##########################
+# example: 
+#define rolu1.log FileLog /var/tmp/rolu1.log rolu1:.*(on|off|dimup|dimdown).*
+$sortnumber=1;
+$userdef[$sortnumber]['name']='allight';	
+$userdef[$sortnumber]['valuefield']=3;	
+$userdef[$sortnumber]['gnuplottype']='fs20';	
+$userdef[$sortnumber]['logpath']='/mnt/fhz/allight.log';   
+$userdef[$sortnumber]['room']='alarm';
+$userdef[$sortnumber]['semlong']='Alarm light'; 	
+$userdef[$sortnumber]['semshort']='';
+$userdef[$sortnumber]['imagemax']=725;
+$userdef[$sortnumber]['imagemay']=52;
+$userdef[$sortnumber]['maxcount']=575;
+$userdef[$sortnumber]['XcorrectMainText']=25;               
+$userdef[$sortnumber]['logrotatelines']=30;  
+##########################
+
+
+#$sortnumber=2;
 #$userdef[$sortnumber]['name']='tARV';
 #$userdef[$sortnumber]['valuefield']=3;
 #$userdef[$sortnumber]['gnuplottype']='temperature';
@@ -321,14 +348,15 @@ $UserDefs=1;
 	$showAT='no';			#show the AT_JOBS at startup. Default: yes Values: yes/no
 	$showNOTI='no';		 	#show the NOTIFICATIONS at startup. Default: no Values: yes/no
 	$showHIST='yes';		#show the HISTORY (if taillog=1) at startup. Default: yes Values: yes/no
-        $showPICS='yes';                #if shwowebcam=1 then initial the Pics will be shown. Default: yes 
+        $showPICS='no';                #if shwowebcam=1 then initial the Pics will be shown. Default: yes 
 	$showWeath='yes';		# Show weather on startup? $enableweather must 1 
 
         $RSStitel='FHEM :-)';
 
 	$urlreload=90;			# Automatic reloading page [sec]. Default fast: 60 slow:90
 	$titel="PHP-Webmachine for fhem :-)"; #feel free to create an own title
-	$timeformat="Y-m-d H:i:s";
+	#$timeformat="Y-m-d H:i:s"; #English
+	$timeformat="d.m.Y H:i:s"; # German
 	$winsize=800;			# width of the pgm3
 
 
@@ -354,20 +382,20 @@ $UserDefs=1;
 	$bg1_R='110';$bg1_G='148';$bg1_B='181';
 ##########################                                                      
 ##ORANGE
-#        $bodybg="bgcolor='#FFDAB9'";
-#        $bg1="bgcolor='#FF8C00'";  
-#        $bg2="bgcolor='#FFA500'";
-#        $bg4="bgcolor='#6394BD'";
-#        $bg5="bgcolor='#FFFFFF'";
-#        $fontcolor1="color='#000000'";
-#        $fontcolor3="color='#000000'";
+        #$bodybg="bgcolor='#FFDAB9'";
+        #$bg1="bgcolor='#FF8C00'";  
+        #$bg2="bgcolor='#FFA500'";
+        #$bg4="bgcolor='#6394BD'";
+        #$bg5="bgcolor='#FFFFFF'";
+        #$fontcolor1="color='#000000'";
+        #$fontcolor3="color='#000000'";
 	# The Button needs decimal Code Instead Hex.
 	# Use the column left from the HEX on 
 	# http://www.farb-tabelle.de/de/farbtabelle.htm
 	# You must delete the old graphics after the change. "rm <pgm3>/tmp/*"
-#	$buttonBg_R='255';$buttonBg_G='165';$buttonBg_B='0';
+	#$buttonBg_R='255';$buttonBg_G='165';$buttonBg_B='0';
 	#Dec-Code from $bg1:
-#	$bg1_R='255';$bg1_G='140';$bg1_B='0';
+	#$bg1_R='255';$bg1_G='140';$bg1_B='0';
 
 
 
@@ -390,5 +418,14 @@ $UserDefs=1;
 
 ###############################   end of settings
 	putenv('GDFONTPATH=' . realpath('.')); 
+
+
+
+### If DB-query is used, this is the only point of connect. ###                 
+if ($DBUse=="1") {      
+  @mysql_connect($DBNode, $DBUser, $DBPass) or die("Can't connect"); 
+  @mysql_select_db($DBName) or die("No database found");  
+}                                                                               
+ 
 
 ?>

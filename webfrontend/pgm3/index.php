@@ -41,8 +41,10 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='100108';
+$pgm3version='100312';
 	
+
+
 	$Action		=	$_POST['Action'];
 	$order		= 	$_POST['order'];
 	$showfht	=	$_POST['showfht'];
@@ -388,11 +390,12 @@ xml_parser_free($xml_parser);
 
 
 
-####################################################  HMS
+####################################################  HMS and CUL_WS
 
 
 
-	       elseif (substr($stack[0][children][$i][name],0,4)=='HMS_')
+	       elseif ((substr($stack[0][children][$i][name],0,4)=='HMS_') || (substr($stack[0][children][$i][name],0,7)=='CUL_WS_'))
+
 	       {
 		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
 			 {
@@ -404,7 +407,7 @@ xml_parser_free($xml_parser);
 					}
 				}
 		       }
-	       } # HMS
+	       } # HMS and CUL_WS
 
 #################################################### LogpathFileLOG
 
@@ -753,7 +756,7 @@ ht><font $fontcolor1><b>
 			 	echo "</td></tr>\r";
 				if (isset($showfs20) and $showgnuplot == 1)
 			 	{   
-                                 	drawgnuplot($showfs20,"FS20",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range);
+                                 	drawgnuplot($showfs20,"FS20",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range,$DBUse);
 					$FS20dev1=$showfs20.'1';
                                 	echo "\r<tr><td colspan=5 align=center><img src='tmp/$showfs20.$pictype'><br>
 					<img src='tmp/$FS20dev1.$pictype'>
@@ -819,7 +822,7 @@ ht><font $fontcolor1><b>
 			 	
 				if ($showfht==$FHTdev and $showgnuplot == 1)
 			 	{   
-                                 	drawgnuplot($FHTdev,"FHT",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range);
+                                 	drawgnuplot($FHTdev,"FHT",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range,$DBUse);
 					$FHTdev1=$FHTdev.'1';
                                 	echo "\r<tr><td colspan=5 align=center><img src='tmp/$FHTdev.$pictype'><br>
 					<img src='tmp/$FHTdev1.$pictype'>
@@ -893,7 +896,7 @@ ht><font $fontcolor1><b>
 			echo "<img src='include/hms100.php?drawhms=$HMSdev&room=$room&type=$type&battery=$battery' width='$imgmaxxhms' height='$imgmaxyhms'></td> </tr>";
 		
 		if ($showhmsgnu == $HMSdev and $showgnuplot == 1)
-                                { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0);
+                                { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0,$DBUse);
 				$HMSdev1=$HMSdev.'1';
                                 echo "\r<tr><td colspan=5 align=center><img src='tmp/$HMSdev.$pictype'><br>
 					<img src='tmp/$HMSdev1.$pictype'>
@@ -967,11 +970,11 @@ ht><font $fontcolor1><b>
                                  {
                                 if ($kstyp=="1")
                                 {
-                                        drawgnuplot($KSdev,$drawtype."_t1",$gnuplot,$pictype,$logpath,0,0);
+                                        drawgnuplot($KSdev,$drawtype."_t1",$gnuplot,$pictype,$logpath,0,0,$DBUse);
                                 }
                                 else
                                 {
-                                        drawgnuplot($KSdev,$drawtype."_t2",$gnuplot,$pictype,$logpath,0,0);
+                                        drawgnuplot($KSdev,$drawtype."_t2",$gnuplot,$pictype,$logpath,0,0,$DBUse);
                                 }
                                 $KSdev1=$KSdev.'1';
                                 echo "\r<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
@@ -1106,7 +1109,7 @@ ht><font $fontcolor1><b>
                         echo "\r<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
 
                 if ($showuserdefgnu == $UserDef and $showgnuplot == 1)
-                                { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],$i);
+                                { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],$i,$DBUse);
                                 $UserDef1=$UserDef.'1';
                                 echo "\r<tr><td colspan=5 align=center><img src='tmp/$UserDef.$pictype'><br>
                                         <img src='tmp/$UserDef1.$pictype'>

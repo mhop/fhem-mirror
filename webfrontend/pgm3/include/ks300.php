@@ -14,6 +14,15 @@ $room=$_GET['room'];
 $avgday=$_GET['avgday'];
 $avgmonth=$_GET['avgmonth'];
 
+
+if ($DBUse=="1") {                                                      
+                $sqlquery=mysql_query("select timestamp from history where device='".$drawks."'  order by timestamp desc limit 1");              
+		$query=mysql_fetch_object($sqlquery);                           
+                $date=str_replace(" ","_",$query->timestamp);                   
+        }                                                                       
+        else {    
+
+
         $file="$logpath/$drawks.log";
         if (! file_exists($file)) show_error($file,$drawks,$imgmaxxks,$imgmaxyks);
 	
@@ -21,9 +30,12 @@ $avgmonth=$_GET['avgmonth'];
 	$execorder=$tailpath.' -1 '.$file;
 	exec($execorder,$tail1);
  	$parts = explode(" ", $tail1[0]);
+	$date=$parts[0];
+} #dbuse
 	
 
-	$savefile=$AbsolutPath."/tmp/KS.".$drawks.".log.".$parts[0].".png";
+	#if the expected graphic already exist then do not redraw the picture 
+	$savefile=$AbsolutPath."/tmp/KS.".$drawks.".log.".$date.".png";
 	if (file_exists($savefile)) {
 
 		$im2 = @ImageCreateFromPNG($savefile);
@@ -66,7 +78,24 @@ $avgmonth=$_GET['avgmonth'];
 		ImageFill($im, 0, 0, $bg2p);
 		ImageRectangle($im, 0, 0, $imgmaxxks-1, $imgmaxyks-1, $white);
 
-		$array = file($file); 
+	if ($DBUse=="1") 
+	{
+	$array=array();
+	$sqlarray=mysql_query("select timestamp,event from history where device='".$drawks."' and reading='data' order by timestamp desc limit ".$logrotateKS300lines."") or die (mysql_error()); 
+	while ( $row=mysql_fetch_object($sqlarray))
+		{
+		$date=str_replace(" ","_",$row->timestamp);
+		array_push($array,$date.' '.$drawks.' '.$row->event);
+		}
+	$array=array_reverse($array);
+	#print_r($array); #debug
+	#exit;
+	}
+
+        else $array = file($file);  
+
+
+
 		$oldmin=0; //only the data from every 10min
 		$oldhour=0; //only the data from every 10min
 		$mintemp=100;
@@ -74,7 +103,7 @@ $avgmonth=$_GET['avgmonth'];
 		$counter=count($array);
 	
 #Logrotate
-	if ((($logrotateKS300lines+200) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateKS300lines);
+	if ((($logrotateKS300lines+200) < $counter) and ($logrotate == 'yes') and ($DBUse!="1")) LogRotate($array,$file,$logrotateKS300lines);
 
 # go	
 	for ($x = 0; $x < $counter; $x++)
