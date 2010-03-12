@@ -17,11 +17,21 @@ $type=$_GET['type'];
 $battery=$_GET['battery'];
 $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HMS100W','RM100-2','HMS100CO','CUL_WS');
 
+	
+#Supported Device. Use UserDefs if you have other devices
+if (! in_array($type,$supported_HMS)) show_error_type($imgmaxxhms,$imgmaxyhms,$type);
 
+
+
+if ($DBUse=="1") {                                                              
+                $sqlquery=mysql_query("select timestamp from history where device='".$drawhms."' and reading='data' order by timestamp desc limit 1");     
+	$query=mysql_fetch_object($sqlquery);
+                $date=str_replace(" ","_",$query->timestamp);                   
+        }                                                                       
+        else {
 
 
 	$file="$logpath/$drawhms.log"; 
-	if (! in_array($type,$supported_HMS)) show_error_type($imgmaxxhms,$imgmaxyhms,$type);
         if (! file_exists($file)) show_error($file,$drawhms,$imgmaxxhms,$imgmaxyhms,$type);
 
 	## do we really need a new graphic??
@@ -29,20 +39,21 @@ $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HM
 	exec($execorder,$tail1);
  	$parts = explode(" ", $tail1[0]);
 	$date=$parts[0];
+
+} #DBUse
 	
 
-	$savefile=$AbsolutPath."/tmp/HMS.".$drawhms.".log.".$parts[0].".png";
+	$savefile=$AbsolutPath."/tmp/HMS.".$drawhms.".log.".$date.".png";
+
 	if (file_exists($savefile)) {
 
-		#echo "exists: $savefile"; exit;
 		$im2 = @ImageCreateFromPNG($savefile);
 		header("Content-type: image/png");
 		imagePng($im2);
-		exit; # ;-)))
+		exit; # ;-))) we do not need a new graphic
 	}
 	else #delete old pngs
 	{
-		#echo "not exist: $savefile"; exit;
 		$delfile=$AbsolutPath."/tmp/HMS.".$drawhms.".log.*.png";
 		foreach (glob($delfile) as $filename) {
    		unlink($filename);
@@ -70,7 +81,21 @@ $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HM
 	ImageFill($im, 0, 0, $bg2p);
 	ImageRectangle($im, 0, 0, $imgmaxxhms-1, $imgmaxyhms-1, $white);
 
-  	$array = file($file); 
+
+if ($DBUse=="1")
+        { 
+        $array=array();
+        $sqlarray=mysql_query("select timestamp,event from history where device='".$drawhms."' and reading='data' order by timestamp desc limit ".$logrotateHMSlines."") or die (mysql_error());
+        while ( $row=mysql_fetch_object($sqlarray))
+                { 
+                $date=str_replace(" ","_",$row->timestamp);
+                array_push($array,$date.' '.$drawhms.' '.$row->event);
+                } 
+        $array=array_reverse($array); 
+        }
+        else $array = file($file);
+
+
 	$oldmin=0; //only the data from every 10min
 	$oldhour=0; //only the data from every 10min
 	$mintemp=100;
@@ -79,7 +104,7 @@ $supported_HMS= array('HMS100T','HMS100TF','HMS100WD','HMS100MG','HMS100TFK','HM
 	#if ($maxcountHMS <  $counter)  {$counter=$maxcountHMS;};
 	
 	#Logrotate
-	if ((($logrotateHMSlines+100) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateHMSlines);
+	if ((($logrotateHMSlines+100) < $counter) and ($logrotate == 'yes') and ($DBUse!="1")) LogRotate($array,$file,$logrotateHMSlines);
 
 #print_r($array[1]);  
 #print_r($array[1][12]);  exit;
@@ -243,7 +268,7 @@ if ( $type == "HMS100TF" and $showdewpoint=='yes' )
 	$fontsize=7;
 	$text='Bat: '.$battery;
 	if ($type=="CUL_WS") $text="";
-	if ($battery != 'ok') {$txtcolor=$red; $text='Bat: low';};
+	if ($battery == 'empty') {$txtcolor=$red; $text='Bat: low';};
         ImageTTFText ($im,  $fontsize, 0, 105, 10, $txtcolor, $fontttf, $text);
 	$fontsize=7;
         $txtcolor=$bg3p; 

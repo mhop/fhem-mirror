@@ -571,3 +571,6 @@
   - feature: 11_FHT.pm added new readings for warnings on battery, lowtemp,
              window and windowsensor (M.Fischer)
   - feature: on-for-timer added for X10 modules (Boris)
+  - bugfix: pgm3: Better check of availability of google-weather (MartinH) 
+  - feature: pgm3: DBLog added for everything except UserDefs 
+  	     (Gerhard Pfeffer / MartinH)

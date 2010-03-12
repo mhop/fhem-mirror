@@ -105,3 +105,6 @@
   -- Misc: Output of html better formated
   -- Feature. Skinable -- change the colors
 
+- Martin 2010-03-12
+  -- Bugfix: better check of availability of google-weather
+  -- Feature: DBLog added for everything except UserDefs

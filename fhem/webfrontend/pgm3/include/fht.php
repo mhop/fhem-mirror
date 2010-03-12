@@ -1,7 +1,5 @@
 <?php
-	
-	
-	
+
 ################# Creates graphics vor pgm3
 
 
@@ -9,6 +7,7 @@
 
 include "../config.php";
 include "functions.php";
+#include "dblog.php";
 
 setlocale (LC_ALL, 'de_DE.utf8');
 
@@ -17,21 +16,25 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$battery=$_GET['battery'];
 	$room=$_GET['room'];
 
-	$file="$logpath/$drawfht.log";
-
-        if (! file_exists($file)) show_error($file,$drawfht,$imgmaxxfht,$imgmaxyfht);
-
-
+	if ($DBUse=="1") {
+		$sqlquery=mysql_query("select timestamp from history where device='".$drawfht."' and type='FHT' order by timestamp desc limit 1");
+		$query=mysql_fetch_object($sqlquery);
+		$date=str_replace(" ","_",$query->timestamp);
+	}
+	else {
+		$file="$logpath/$drawfht.log";
+		if (! file_exists($file)) show_error($file,$drawfht,$imgmaxxfht,$imgmaxyfht);
 
  ## do we really need a new graphic??
-        $execorder=$tailpath.' -1 '.$file;
-        exec($execorder,$tail1);
-        $parts = explode(" ", $tail1[0]);
-        $date=$parts[0];
+		$execorder=$tailpath.' -1 '.$file;
+		exec($execorder,$tail1);
+		$parts = explode(" ", $tail1[0]);
+		$date=$parts[0];
+	}
 
 	#if the expected graphic already exist then do not redraw the picture
 
-	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$parts[0].".png";
+	$savefile=$AbsolutPath."/tmp/FHT.".$drawfht.".log.".$date.".png";
 	if (file_exists($savefile)) {
 
 		$im2 = @ImageCreateFromPNG($savefile);
@@ -52,44 +55,60 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$_SESSION["arraydata"] = array();
 	
 
-  	$array = file($file); 
+	if ($DBUse=="1") $sqlarray=mysql_query("select timestamp,reading,value from (select timestamp,reading,value from history where device='".$drawfht."' order by timestamp desc limit ".$logrotateFHTlines.") as subtable order by timestamp asc") or die (mysql_error());
+	else $array = file($file);
 	$oldmin=0; //only the data from every 10min
 	$oldhour=0; //only the data from every 10min
 	$actuator="00%";
 	$actuator_date="unknown";
-	$counter=count($array);
-
+	if ($DBUse=="1") $counter=mysql_num_rows($sqlarray);
+	else $counter=count($array);
 
 	$arraydesired=array();
 	$arrayactuator=array();
 
 	
 	#Logrotate
-	if ((($logrotateFHTlines+200) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateFHTlines);
+	if ((($logrotateFHTlines+200) < $counter) and ($logrotate == 'yes') and ($DBUse!="1")) LogRotate($array,$file,$logrotateFHTlines);
 
-   	for ($x = 0; $x < $counter; $x++)
-	{
-		$parts = explode(" ", $array[$x]);
-		$date=$parts[0];
-		$type=$parts[2];
-		$temp=$parts[3];
-		if ($type=="desired-temp:") 
+	for ($x = 0; $x < $counter; $x++)
+ 	{
+		if ($DBUse=="1") {
+			mysql_data_seek($sqlarray,$x);
+			$parts=mysql_fetch_assoc($sqlarray);
+#			$date=$parts['timestamp'];
+			$date=str_replace(" ","_",$parts['timestamp']);
+			$type=$parts['reading'];
+			$temp=$parts['value'];
+			$array[$x]=$date." ".$type." ".$temp;
+			if ($type=="actuator") $temp=$temp."%";
+#			print "Output: ".$date." ".$type." ".$temp."<br />";
+		}
+		else {
+			$parts = explode(" ", $array[$x]);
+			$date=$parts[0];
+			$type=$parts[2];
+			$temp=$parts[3];
+		}
+
+		if (substr($type,0,12)=="desired-temp") 
 			{$desired_temp=$temp;$desired_date=$date;}
-		if ($type=="actuator:") 
+		if (substr($type,0,8)=="actuator") 
 		{
 			if (trim($temp) != 'lime-protection')
 			{$actuator=rtrim($temp);$actuator_date=$date;}
 		}
-		if  ((($array[$x][14] != $oldmin) or ($array[$x][12] != $oldhour)) and ($type=="measured-temp:"))
+#		print ":::".$array[$x][14]."---".$oldmin."<br />";
+#		print "...".$array[$x][12]."---".$oldhour."<br />";
+		if  ((($array[$x][14] != $oldmin) or ($array[$x][12] != $oldhour)) and (substr($type,0,13)=="measured-temp"))
 		{
 			$oldmin=$array[$x][14]; 
 			$oldhour=$array[$x][12]; 
 			array_push( $_SESSION["arraydata"],array($date,$type,$temp));
 			array_push( $arraydesired,$desired_temp);
 			array_push( $arrayactuator,$actuator);
-
 		}
-     	}
+	}
 
 
 	$resultreverse = array_reverse($_SESSION["arraydata"]);
@@ -187,7 +206,7 @@ setlocale (LC_ALL, 'de_DE.utf8');
         $txtcolor=$bg3p; 
 	$fontsize=7;
 	$text="min= $mintemp max= $maxtemp";
-        ImageTTFText ($im,  $fontsize, 0, 67-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
+        ImageTTFText ($im,  $fontsize, 0, 90-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
         
 	$text=$txtroom.$room;
         ImageTTFText ($im,  $fontsize, 0, 3,  49, $txtcolor, $fontttf, $text);
@@ -214,7 +233,8 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$fontsize=7;  
         $text=$battery;   
         if ($battery == 'none') {$text='Bat: ok';}
-	else {$text='Bat: low'; $txtcolor=$red;}
+	elseif ($battery =='empty') {$text='Bat: low'; $txtcolor=$red;}
+	else {$text='';};
         ImageTTFText ($im,  $fontsize, 0, 165, 10, $txtcolor, $fontttf, $text);
         $fontsize=7;  
 
