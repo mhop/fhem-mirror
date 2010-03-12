@@ -59,7 +59,7 @@
 
 
 # Weather				# Google-Api. It requires an Internet Connection
-	$enableweather=1;		# show the google-weather?
+	$enableweather=0;		# show the google-weather?
 	$weathercity='Linden';
 	$weathercountry='Germany';
 	$weatherlang='de';
