@@ -1,4 +1,7 @@
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
 <head>
   <title>FHEM Howto</title>
   <style type="text/css">
@@ -12,7 +15,6 @@
     div#dist { padding-top:0.3em; }
     a {  color: #278727; }
   </style>
-
 </head>
 
 
@@ -86,36 +88,22 @@
       The sample configuration file installed via "make install-pgm2" has
       configured an <a href="commandref.html#autocreate">autocreate</a>
       instance. This will automatically create fhem devices upon reception
-      of a message form this device (typically a sensor like S300 or FHT).
-      Just wait for a while, and re-check your browser for newly appeared
-      devices. You can use <a href="commandref.html#rename"> rename</a> to
-      rename the automatically created device, e.g. type in the input field of
-      the web frontend:<pre>
+      of a message from this device (typically a sensor like S300 or FHT).
+      Just wait for a while, watch the log and re-check your browser for newly
+      appeared devices. You can use <a href="commandref.html#rename">
+      rename</a> to rename the automatically created device, e.g. type in the
+      input field of the web frontend:<pre>
       rename FHT_1234 fht.kitchen</pre> 
       </ul>
 
 
-    <a name="FS20rx"></a>
-    <h3>Configuring FS20 receivers</h3>
-      <ul>
-      Configure the <a href="commandref.html#FS20">FS20</a> device in
-      fhem first with:<pre>
-      define lamp1 FS20 1234 56</pre>
-
-      Now press the button on the device for a while until its LED starts to
-      blink. Click on the "on" link in the fhem window to send a command. The
-      LED should terminate blinking, the device is programmed to housecode
-      1234, device code 56. You can also use the 4-base ELV notation.
-      Now set the model attribute of the device:<pre>
-      attr lamp1 model fs20st</pre>
-
-      to get only the commands available for this device.
-      <a href="commandref.html#model">Here</a> is a complete list of models.<br>
-      </ul>
-
     <a name="FS20tx"></a>
     <h3>Misc. RF transmitters (FS20/EM/S300 etc.)</h3>
       <ul>
+      <a href="commandref.html#autocreate">autocreate</a> will create
+      automatically fhem FS20/EM/S300/HMS devices, the following description is
+      for doing it manually.<br><br>
+
       Wait a while, until the transmitter sent some data. In the logfile
       (Browser window: "All together" ->  Logs:Logfile:text) a line
       will  appear:<pre>
@@ -133,9 +121,37 @@
       </ul>
       </ul>
 
+    <a name="FS20rx"></a>
+    <h3>Configuring FS20 receivers</h3>
+      <ul>
+      Configure the <a href="commandref.html#FS20">FS20</a> device in
+      fhem first with:<pre>
+      define lamp1 FS20 1234 56</pre>
+
+      Now press the button on the device for a while until its LED starts to
+      blink. Click on the "on" link in the fhem window to send a command. The
+      LED should terminate blinking, the device is programmed to housecode
+      1234, device code 56. You can also use the 4-base ELV notation.
+      Now set the model attribute of the device:<pre>
+      attr lamp1 model fs20st</pre>
+
+      to get only the commands available for this device.
+      <a href="commandref.html#model">Here</a> is a complete list of models.
+      </ul>
+
+
     <a name="FHT"></a>
     <h3>Configuring FHT devices</h3>
       <ul>
+      <b>Note:</b> Creating a fhem FHT device automatically or manually does
+      not imply that the CUL or the FHZ is paired with it. For this purpose you
+      have to set the FHT to accept new "Cent" devices, and send a command to
+      it (e.g.  set fht.kitchen desired-temp 20)<br><br>
+
+      <a href="commandref.html#autocreate">autocreate</a> will create
+      automatically FHT devices, the following description is for
+      doing it manually.<br><br>
+
       Wait for a while (2-5 mins) till the FHT is sending some signals. In the
       logfile ("All together" -> Logs:LogFile:text) a line should
       appear:<br><pre>
@@ -180,7 +196,7 @@
       </ul>
 
     <a name="rooms"></a>
-    <h3>FHEMWEB look and feel</h3>
+    <h3>FHEMWEB (pgm2) look and feel</h3>
       <ul>
       It makes sense to group your devices into rooms by setting the room
       attribute. FHEMWEB puts devices without a room attribute into the
@@ -203,7 +219,8 @@
     <h3>Logging data</h3>
       <ul>
       To log messages into files, define devices of the type <a
-      href="commandref.html#FileLog">FileLog</a>. To log messages into a
+      href="commandref.html#FileLog">FileLog</a>. Autocreate will create
+      logfiles for newly detected devices. To log messages into a
       database, see the contrib/dblog directory in the fhem
       distribution.<br/><br/>
 
@@ -221,6 +238,9 @@
     <a name="plot"></a>
     <h3>Plotting logs</h3>
       <ul>
+      Autocreate will create weblinks (i.e. plots) for newly detected devices.
+      The following section describes how to do it manually.<br>
+
       To convert a log into a plot in FHEMWEB, set the
       <a href="commandref.html#logtype">logtype</a> attribute of the
       corresponding FileLog. Take a look at the available gnuplot files in the
@@ -242,8 +262,9 @@
       installed and in your PATH), or via the builtin SVG module, in this case
       your internet browser must support SVG. Firefox, opera and the
       iPhone/Android borwser support SVG out of the box, Internet Explorer does
-      it via the Adobe "SVG viewer" plugin. To use SVG graphics, set the <a
-      href="commandref.html#plotmode">plotmode</a> attribute to SVG.<br><br>
+      it via the Adobe "SVG viewer" plugin. SVG mode is the default, to change
+      it set the <a href="commandref.html#plotmode">plotmode</a> attribute to
+      gnuplot or gnuplot-scroll.<br><br>
 
       In order to look at historic data, you can either convert at the
       archive entries to weblink in "plotmode=gnuplot" mode, or use the
