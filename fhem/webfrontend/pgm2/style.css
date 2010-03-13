@@ -1,56 +1,20 @@
-body { color: black; background: #FFFFE7; }
+body   { background-color: #FFFFE7;}
+#left  { position:absolute; top:20px; left:20px; width:140px; }
+#hdr   { position:absolute; top:10px; left:180px; }
+#right { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
+a {  color: #278727; }
 
+table.block { border:1px solid gray; width: 100%; background: #F8F8E0; }
+table.block tr.odd { background: #F0F0D8; }
+table.block tr.sel { background: #F0F0D8; }
 table { -moz-border-radius:8px; }
 
-table.room { border:thin solid; width: 100%; background: #D7FFFF; }
-table.room tr.sel { background: #A0FFFF; }
 
-table.at { border:thin solid; width: 100%; background: #FFFFC0; }
-table.at tr.odd { background: #FFFFD7; }
+table#room { background: #D7FFFF; }
+table#room tr.sel { background: #A0FFFF; }
 
-table.watchdog { border:thin solid; width: 100%; background: #FFFFC0; }
-table.watchdog tr.odd { background: #FFFFD7; }
-
-table.notify { border:thin solid; width: 100%; background: #D7D7A0; }
-table.notify tr.odd { background: #FFFFC0; }
-
-table.FileLog { border:thin solid; width: 100%; background: #FFC0C0; }
-table.FileLog tr.odd { background: #FFD7D7; }
-
-table._internal_ { border:thin solid; width: 100%; background: #C0C0C0; }
-table._internal_ tr.odd { background: #D7D7D7; }
-
-table.FS20 { border:thin solid; width: 100%; background: #C0FFFF; }
-table.FS20 tr.odd { background: #D7FFFF; }
-
-table.FHT { border:thin solid; width: 100%; background: #FFC0C0; }
-table.FHT  tr.odd { background: #FFD7D7; }
-
-table.KS300 { border:thin solid; width: 100%; background: #C0FFC0; }
-table.KS300 tr.odd { background: #A7FFA7; }
-
-table.HMS { border:thin solid; width: 100%; background: #C0FFC0; }
-table.HMS tr.odd { background: #A7FFA7; }
-
-table.FHZ { border:thin solid; width: 100%; background: #C0C0C0; }
-table.FHZ tr.odd { background: #D7D7D7; }
-
-table.CUL { border:thin solid; width: 100%; background: #C0C0C0; }
-table.CUL tr.odd { background: #D7D7D7; }
-
-table.EM { border:thin solid; width: 100%; background: #E0E0E0; }
-table.EM tr.odd { background: #F0F0F0; }
-
-table.CUL_EM { border:thin solid; width: 100%; background: #E0E0E0; }
-table.CUL_EM tr.odd { background: #F0F0F0; }
-
-table.CUL_WS { border:thin solid; width: 100%; background: #FFC0C0; }
-table.CUL_WS  tr.odd { background: #FFD7D7; }
-
-table.FHEMWEB { border:thin solid; width: 100%; background: #E0E0E0; }
-table.FHEMWEB tr.odd { background: #F0F0F0; }
-
-#hdr   { position:absolute; top:10px; left:10px; }
-#left  { position:absolute; top:50px; left:10px; width:130px; }
-#right { position:absolute; top:50px; left:160px;
-         right:10px; overflow:auto; }
+/* Customize specific devices */
+/*
+table#FS20 { background: #FF8080; }
+table#FS20 tr.odd { background: #E08080; }
+*/
