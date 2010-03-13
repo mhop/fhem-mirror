@@ -1,10 +1,4 @@
 If the files are too big the system will be slower than usual.
 
-In the config.php it is now possible to automatic logrotate the HMS, FHT and KS300-Logs. But it is only possible if the user of the pgm3 (e.g. wwwrun) has the rights to write the logfiles from fhz1000.pl (user=???????)
-
-If you want do that manually then read the enclosed examples for your crontab.
-
-Every Linux-System normally has a logrotate-Daemon. Put the fhz1000.logrotate in your /etc/logrotate.d/ to lograte the fhz1000.cfg and edit it or use the builtin method: "logfile /tmp/fhz1000-%Y-%m.log"
-
-
+In the config.php it is now possible to automatic logrotate the HMS, FHT, KS300-Logs and others. But it is only possible if the user of the pgm3 (e.g. wwwrun) has the rights to write the logfiles from fhz1000.pl (user=???????)
 
