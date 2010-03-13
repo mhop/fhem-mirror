@@ -1,0 +1,17 @@
+Be sure that the directory <pgm3>/tmp is writeable for the user of the webserver (e.g. wwwrun.www or www-data.www-data)
+Make something like "chown -R wwwrun.www tmp"
+
+Hint: you need the packages php-gd and gnuplot to see the graphics
+
+Look at the wiki on http://www.fhemwiki.de. In the future there will be the most of the Documentation.
+
+All the other Documentation of pgm3 is there:
+http://www.martin-haas.de/fhz
+
+Enjoy it :-)
+
+Martin Haas
+fhz@martin-haas.de
+
+
+
