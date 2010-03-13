@@ -790,7 +790,7 @@ CUL_Parse($$$$$)
   } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
     ;
   } else {
-    Log GetLogLevel($name,2), "CUL: unknown message $dmsg";
+    Log GetLogLevel($name,2), "$name: unknown message $dmsg";
     return;
   }
 
@@ -898,7 +898,7 @@ CUL_OpenDev($$)
 
 
   $hash->{PARTIAL} = "";
-  Log 3, "CUL opening CUL device $dev"
+  Log 3, "CUL opening $name device $dev"
         if(!$reopen);
 
   if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
