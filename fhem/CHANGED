@@ -546,7 +546,7 @@
   - feature: Command save retains now the order of the old config file
   - feature: List parameter added (list .* RFR_MSGCNT)
 
-- =DATE= (4.9)
+- 2010-03-13 (4.9)
   - bugfix:  changed the fhem prompt from FHZ> to fhem>
   - bugfix:  CUL_RFR fixes (chaining RFR's should work)
   - bugfix:  Path in the examples fixed (got corrupted)
@@ -576,3 +576,6 @@
   - feature: pgm3: DBLog added for everything except UserDefs 
   	     (Gerhard Pfeffer / MartinH)
   - feature: pgm2 style changes, SVG in background, optional compression
+
+- =DATE= (5.0)
+  - feature: KM271: Read only
