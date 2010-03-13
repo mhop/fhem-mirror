@@ -3,7 +3,7 @@ MODDIR=/usr/local/lib
 VARDIR=/var/log/fhem
 
 VERS=4.9
-DATE=2009-12-23
+DATE=2010-03-14
 
 all:
 	@echo Nothing to do for all.
@@ -21,6 +21,7 @@ install:install-base
 install-pgm2:install-base
 	cp -r webfrontend/pgm2/* $(MODDIR)/FHEM
 	cp docs/commandref.html docs/faq.html docs/HOWTO.html $(MODDIR)/FHEM
+	cp docs/*.png docs/*.jpg $(MODDIR)/FHEM
 	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
 	cp examples_changed/sample_pgm2 $(VARDIR)/fhem.cfg
 	cd examples_changed; for i in *; do cp -r $$i $(MODDIR)/FHEM/example.$$i; done
