@@ -546,7 +546,7 @@
   - feature: Command save retains now the order of the old config file
   - feature: List parameter added (list .* RFR_MSGCNT)
 
-- ==DATE== (4.9)
+- =DATE= (4.9)
   - bugfix:  changed the fhem prompt from FHZ> to fhem>
   - bugfix:  CUL_RFR fixes (chaining RFR's should work)
   - bugfix:  Path in the examples fixed (got corrupted)
@@ -570,7 +570,9 @@
   - bugfix:  dummy/structure was listed twice in list and xmllist
   - feature: 11_FHT.pm added new readings for warnings on battery, lowtemp,
              window and windowsensor (M.Fischer)
+  - feature: autocreate.pm (create undefined RF devices, logs and plots)
   - feature: on-for-timer added for X10 modules (Boris)
-  - bugfix: pgm3: Better check of availability of google-weather (MartinH) 
+  - bugfix:  pgm3: Better check of availability of google-weather (MartinH) 
   - feature: pgm3: DBLog added for everything except UserDefs 
   	     (Gerhard Pfeffer / MartinH)
+  - feature: pgm2 style changes, SVG in background, optional compression
