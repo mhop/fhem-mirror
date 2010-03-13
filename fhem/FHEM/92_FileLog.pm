@@ -185,7 +185,7 @@ FileLog_Get($@)
     my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,o);
     if(!-f $linf) {
       $linf = $attr{$hash->{NAME}}{archivedir} . "/" . $inf;
-      return "Error: File-not-found" if(!-f $linf);
+      return "Error: cannot access $linf" if(!-f $linf);
     }
     $inf = $linf;
   }
