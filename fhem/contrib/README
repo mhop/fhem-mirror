@@ -56,4 +56,6 @@
   Peter's RRD support. See the HOWTO
 - serial.pm
   Serial line analyzer
-
+- km271.pl
+  Plain Buderus Logamatic 2107 communication module (KM271) logger
+  See the 00_KM271.pm fhem module for its successor.

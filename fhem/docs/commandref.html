@@ -73,40 +73,42 @@
       <a href="#CUL">CUL</a> &nbsp;
       <a href="#CUL_EM">CUL_EM</a> &nbsp;
       <a href="#CUL_FHTTK">CUL_FHTTK</a> &nbsp;
-      <a href="#CUL_WS">CUL_WS</a> &nbsp;
       <a href="#CUL_RFR">CUL_RFR</a> &nbsp;
+      <a href="#CUL_WS">CUL_WS</a> &nbsp;
+      <a href="#DS18S20">DS18S20</a> &nbsp;
       <a href="#DbLog">DbLog</a> &nbsp;
       <a href="#EM">EM</a> &nbsp;
       <a href="#EMEM">EMEM</a> &nbsp;
       <a href="#EMGZ">EMGZ</a> &nbsp;
       <a href="#EMWZ">EMWZ</a> &nbsp;
+      <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
+      <a href="#FHEMWEB">FHEMWEB</a> &nbsp;
       <a href="#FHT">FHT</a> &nbsp;
       <a href="#FHZ">FHZ</a> &nbsp;
       <a href="#FS20">FS20</a> &nbsp;
       <a href="#HMS">HMS</a> &nbsp;
-      <a href="#FHEMWEB">FHEMWEB</a> &nbsp;
       <a href="#IPWE">IPWE</a> &nbsp;
+      <a href="#KM271">KM271</a> &nbsp;
       <a href="#KS300">KS300</a> &nbsp;
+      <a href="#LGTV">LGTV</a> &nbsp;
       <a href="#LIRC">LIRC</a> &nbsp;
       <a href="#M232">M232</a> &nbsp;
       <a href="#M232Counter">M232Counter</a> &nbsp;
       <a href="#M232Voltage">M232Voltage</a> &nbsp;
       <a href="#OWFS">OWFS</a> &nbsp;
       <a href="#OWTEMP">OWTEMP</a> &nbsp;
-      <a href="#DS18S20">DS18S20</a> &nbsp;
       <a href="#SCIVT">SCIVT</a> &nbsp;
-      <a href="#structure">structure</a> &nbsp;
-      <a href="#WS2000">WS2000</a> &nbsp;
-      <a href="#WS3600">WS3600</a> &nbsp;
       <a href="#SISPM">SISPM</a> &nbsp;
       <a href="#SIS_PMS">SIS_PMS</a> &nbsp;
-      <a href="#WS300">WS300</a> &nbsp;
-      <a href="#Weather">Weather</a> &nbsp;
       <a href="#USF1000">USF1000</a> &nbsp;
+      <a href="#WS2000">WS2000</a> &nbsp;
+      <a href="#WS300">WS300</a> &nbsp;
+      <a href="#WS3600">WS3600</a> &nbsp;
+      <a href="#Weather">Weather</a> &nbsp;
       <a href="#X10">X10</a> &nbsp;
+      <a href="#structure">structure</a> &nbsp;
       <a href="#xxLG7000">xxLG7000</a> &nbsp;
-      <a href="#LGTV">LGTV</a> &nbsp;
-      <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
+
 
   </ul>
 
@@ -2158,6 +2160,138 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#IODev">IODev</a></li><br>
   </ul>
   <br>
+</ul>
+
+<a name="KM271"></a>
+<h3>KM271</h3>
+<ul>
+  KM271 is the name of the communication device for the Buderus Logamatic 2105
+  or 2107 heating controller. It is connected via a serial line to the fhem
+  computer. The fhem module sets the communication device into log-mode, which
+  then will generate an event on change of the inner parameters. There are
+  about 20.000 events a day, the FHEM module ignores about 90% of them, if the
+  <a href="#all_km271_events">all_km271_events</a> attribute is not set.<br>
+  <br>
+  Following events are known:
+  <div id="block">
+<pre>  Betriebswerte_1_HK1
+  Betriebswerte_2_HK1
+  Vorlaufsolltemperatur_HK1
+  Vorlaufisttemperatur_HK1
+  Raumsolltemperatur_HK1
+  Raumisttemperatur_HK1
+  Einschaltoptimierungszeit_HK1
+  Ausschaltoptimierungszeit_HK1
+  Pumpenleistung_HK1
+  Mischerstellung_HK1
+  Heizkennlinie_HK1_bei_+_10_Grad
+  Heizkennlinie_HK1_bei_0_Grad
+  Heizkennlinie_HK1_bei_-_10_Grad
+
+  Betriebswerte_1_HK2
+  Betriebswerte_1_HK2
+  Vorlaufsolltemperatur_HK2
+  Vorlaufisttemperatur_HK2
+  Raumsolltemperatur_HK2
+  Raumisttemperatur_HK2
+  Einschaltoptimierungszeit_HK2
+  Ausschaltoptimierungszeit_HK2
+  Pumpenleistung_HK2
+  Mischerstellung_HK2
+  Heizkennlinie_HK2_bei_+_10_Grad
+  Heizkennlinie_HK2_bei_0_Grad
+  Heizkennlinie_HK2_bei_-_10_Grad
+
+  Betriebswerte_1_WW
+  Betriebswerte_2_WW
+  Warmwassersolltemperatur
+  Warmwasseristtemperatur
+  Warmwasseroptimierungszeit
+  Ladepumpe
+
+  Kesselvorlaufsolltemperatur
+  Kesselvorlaufisttemperatur
+  Brennereinschalttemperatur
+  Brennerausschalttemperatur
+  Kesselintegral_1
+  Kesselintegral_2
+  Kesselfehler
+  Kesselbetrieb
+  Brenneransteuerung
+  Abgastemperatur
+  modulare_Brenner_Stellwert
+  Brennerlaufzeit_1_Minuten_Byte2
+  Brennerlaufzeit_1_Minuten_Byte1
+  Brennerlaufzeit_1_Minuten_Byte0
+  Brennerlaufzeit_2_Minuten_Byte2
+  Brennerlaufzeit_2_Minuten_Byte1
+  Brennerlaufzeit_2_Minuten_Byte0
+
+  Aussentemperatur
+  gedaempfte_Aussentemperatur
+  Versionsnummer_VK
+  Versionsnummer_NK
+  Modulkennung
+</pre>
+  </div>
+  <br>
+  As I cannot explain all the values, I logged data for a period and plotted
+  each received value in the following logs:
+    <ul>
+      <li><a href="km271/km271_Aussentemperatur.png">Aussentemperatur</a></li>
+      <li><a href="km271/km271_Betriebswerte.png">Betriebswerte</a></li>
+      <li><a href="km271/km271_Brenneransteuerung.png">Brenneransteuerung</a></li>
+      <li><a href="km271/km271_Brennerlaufzeit.png">Brennerlaufzeit</a></li>
+      <li><a href="km271/km271_Brennerschalttemperatur.png">Brennerschalttemperatur</a></li>
+      <li><a href="km271/km271_Heizkennlinie.png">Heizkennlinie</a></li>
+      <li><a href="km271/km271_Kesselbetrieb.png">Kesselbetrieb</a></li>
+      <li><a href="km271/km271_Kesselintegral.png">Kesselintegral</a></li>
+      <li><a href="km271/km271_Ladepumpe.png">Ladepumpe</a></li>
+      <li><a href="km271/km271_Raumsolltemperatur_HK1.png">Raumsolltemperatur_HK1</a></li>
+      <li><a href="km271/km271_Vorlauftemperatur.png">Vorlauftemperatur</a></li>
+      <li><a href="km271/km271_Warmwasser.png">Warmwasser</a></li>
+    </ul>
+
+  </ul>
+
+
+
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; KM271 &lt;serial-device-name&gt;</code>
+    <br><br>
+    Example:
+    <ul>
+      <code>define KM271 KM271 /dev/ttyS0</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Set </b>
+  <ul>
+    Not yet implemented
+  </ul>
+  <br>
+
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <a name="all_km271_events"></a>
+    <li>all_km271_events<br>
+        If this attribute is set to 1, do not ignore following events:<br>
+        Vorlaufisttemperatur_HK1, Kesselvorlaufisttemperatur,
+        Kesselintegral_1, "Kesselintegral_2<br>
+        These events account for ca. 92% of all events.</li>
+  </ul>
+  <br>
+
 </ul>
 
 <a name="KS300"></a>
