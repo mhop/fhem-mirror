@@ -8,7 +8,7 @@ use POSIX;
 
 
 
-sub SVG_render($$$$$);
+sub SVG_render($$$$$$);
 sub time_to_sec($);
 sub fmtTime($$);
 
@@ -24,9 +24,16 @@ SVG_Initialize($)
 
 #####################################
 sub
-SVG_render($$$$$)
+SVG_render($$$$$$)
 {
-  my ($from, $to, $confp, $dp, $plot) = @_;
+  my $name = shift;  # e.g. wl_8
+  my $from = shift;  # e.g. 2008-01-01
+  my $to = shift;    # e.g. 2009-01-01
+  my $confp = shift; # lines from the .gplot file, w/o FileLog and plot
+  my $dp = shift;    # pointer to data (one string)
+  my $plot = shift;  # Plot lines from the .gplot file
+
+  return "" if(!defined($dp));
 
   my $th = 16;                          # "Font" height
   my ($x, $y) = (3*$th,  1.2*$th);      # Rect offset
@@ -47,15 +54,22 @@ SVG_render($$$$$)
   pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   pO "<?xml-stylesheet href=\"$__ME/svg_style.css\" type=\"text/css\"?>\n";
   pO "<!DOCTYPE svg>\n";
-  pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\">\n";
+  pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" " .
+        "onload='Init(evt)'>\n";
+#  pO "<script type=\"text/ecmascript\" ".
+#        "xmlns:xlink=\"http://www.w3.org/1999/xlink\" ".
+#        "xlink:href=\"$__ME/svg.js\"/>\n";
 
   # Rectangle
   pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\"
         stroke-width=\"1px\" class=\"border\"/>\n";
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
+  my $title = $conf{title};
+  $title =~ s/</&lt;/g;
+  $title =~ s/>/&gt;/g;
   pO "<text x=\"$off1\" y=\"$off2\" 
-        class=\"title\" text-anchor=\"middle\">$conf{title}</text>\n";
+        class=\"title\" text-anchor=\"middle\">$title</text>\n";
 
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
@@ -82,10 +96,24 @@ SVG_render($$$$$)
 
   ($off1,$off2) = ($ow-$x-$th, $y+$th);
   for my $i (0..int(@ltitle)-1) {
+    my $j = $i+1;
+    my $t = $ltitle[$i];
+    my $desc = sprintf("Min:%s Max:%s Last:%s",
+        $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
     pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"end\" ".
-      "class=\"l$i\">$ltitle[$i]</text>\n";
+      "class=\"l$i\">$t<title>$t</title><desc>$desc</desc></text>\n";
     $off2 += $th;
   }
+
+  # Invisible ToolTip
+  pO "<g id='ToolTip' opacity='0.8' visibility='hidden' pointer-events='none'>
+        <rect id='tipbox' x='0' y='5' width='88' height='20' rx='2' ry='2'
+              fill='white' stroke='black'/>
+        <text id='tipText' x='5' y='20' font-family='Arial' font-size='12'>
+           <tspan id='tipTitle' x='5' font-weight='bold'><![CDATA[]]></tspan>
+           <tspan id='tipDesc' x='5' dy='15' fill='blue'><![CDATA[]]></tspan>
+        </text>
+     </g>\n";
 
 
   # Loop over the input, digest dates, calculate min/max values

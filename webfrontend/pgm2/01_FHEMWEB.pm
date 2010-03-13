@@ -32,10 +32,12 @@ sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
 
 use vars qw($__ME); # webname (fhem), needed by SVG
+my $zlib_loaded;
 
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
+# Note: for delivering SVG plots we fork
 my %__icons;      # List of icons
 my $__iconsread;  # Timestamp of last icondir check
 my %__rooms;      # hash of all rooms
@@ -67,7 +69,8 @@ FHEMWEB_Initialize($)
 
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
+                     "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh";
 
   ###############
   # Initialize internal structures
@@ -75,7 +78,6 @@ FHEMWEB_Initialize($)
   @__zoom = ("qday", "day","week","month","year");
   %__zoom = map { $_, $n++ } @__zoom;
 
-  $__dir = "$attr{global}{modpath}/FHEM";
 }
 
 #####################################
@@ -187,6 +189,8 @@ FW_Read($)
 
   #Log(0, "Got: >$hash->{BUF}<");
   my @lines = split("[\r\n]", $hash->{BUF});
+  my @enc = grep /Accept-Encoding/, @lines;
+  
   my ($mode, $arg, $method) = split(" ", $lines[0]);
   $hash->{BUF} = "";
 
@@ -203,13 +207,33 @@ FW_Read($)
     $defs{$name} = $hash;
   }
 
+  if(!$zlib_loaded && FW_getAttr($__wname, "fwcompress", 1)) {
+    $zlib_loaded = 1;
+    eval { require Compress::Zlib; };
+    if($@) {
+      Log 1, $@;
+      Log 1, "$__wname: Can't load Compress::Zlib, deactivating compression";
+      $attr{$__wname}{fwcompress} = 0;
+    }
+  }
+
+  my $compressed = "";
+  if(($__RETTYPE=~m/text/i || $__RETTYPE=~m/svg/i || $__RETTYPE=~m/script/i) &&
+     (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
+     FW_getAttr($__wname, "fwcompress", 1)) {
+
+    $__RET = Compress::Zlib::memGzip($__RET);
+    $compressed = "Content-Encoding: gzip\r\n";
+  }
+
   my $c = $hash->{CD};
-  my $l = length($__RET);
-  my $e = ($cacheable? ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
-  #Log 0, "$arg / RL: $l";
+  my $length = length($__RET);
+  my $expires = ($cacheable?
+                        ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
+#Log 0, "$arg / RL: $length / $__RETTYPE / $compressed";
   print $c "HTTP/1.1 200 OK\r\n",
-           "Content-Length: $l\r\n",
-           $e,
+           "Content-Length: $length\r\n",
+           $expires, $compressed,
            "Content-Type: $__RETTYPE\r\n\r\n",
            $__RET;
   exit if(defined($pid));
@@ -224,6 +248,7 @@ FW_AnswerCall($)
   $__RET = "";
   $__RETTYPE = "text/html; charset=ISO-8859-1";
   $__ME = "/" . FW_getAttr($__wname, "webname", "fhem");
+  $__dir = FW_getAttr($__wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
 
   # Lets go:
   if($arg =~ m,^${__ME}/(.*html)$, || $arg =~ m,^${__ME}/(example.*)$,) {
@@ -242,7 +267,8 @@ FW_AnswerCall($)
     $__RETTYPE = "text/css";
     return 1;
 
-  } elsif($arg =~ m,^$__ME/icons/(.*)$,) {
+  } elsif($arg =~ m,^$__ME/icons/(.*)$, ||
+          $arg =~ m,^$__ME/(.*.png)$,) {
     open(FH, "$__dir/$1") || return;
     binmode (FH); # necessary for Windows
     pO join("", <FH>);
@@ -315,20 +341,24 @@ FW_AnswerCall($)
   }
 
   my $t = FW_getAttr("global", "title", "Home, Sweet Home");
-  pO "<html>\n<head>\n<title>$t</title>\n";
+
+  pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
+
+  pO '<html xmlns="http://www.w3.org/1999/xhtml">';
+  pO "<head>\n<title>$t</title>";
   my $rf = FW_getAttr($__wname, "refresh", "");
-  pO "<meta http-equiv=\"refresh\" content=\"$rf\">\n" if($rf);
-  pO "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>\n";
-  pO "</head>\n<body name=\"$t\">\n";
+  pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
+  pO "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>";
+  pO "</head>\n<body name=\"$t\">";
 
   if($__cmdret) {
     $__detail = "";
     $__room = "";
     $__cmdret =~ s/</&lt;/g;
     $__cmdret =~ s/>/&gt;/g;
-    pO "<div id=\"right\">\n";
-    pO "<pre>$__cmdret</pre>\n";
-    pO "</div>\n";
+    pO "<div id=\"right\">";
+    pO "<pre>$__cmdret</pre>";
+    pO "</div>";
   }
 
   FW_roomOverview($cmd);
@@ -417,22 +447,22 @@ FW_makeTable($$$$$$$$)
 
   $t = "EM"    if($t =~ m/^EM.*$/);        # EMWZ,EMEM,etc.
   $t = "KS300" if($t eq "HMS");
-  pO "  <table class=\"$t\">\n";
+  pO "  <table class=\"block\" id=\"$t\">";
 
   # Header
   pO "  <tr>";
   foreach my $h (split(",", $header)) {
     pO "<th>$h</th>";
   }
-  pO "</tr>\n";
+  pO "</tr>";
   if($clist) {
-    pO "<tr>\n";
+    pO "<tr>";
     my @al = map { s/[:;].*//;$_ } split(" ", $clist);
     pO "<td>" . FW_select("arg.$ccmd$d",\@al,undef) . "</td>";
-    pO "<td>" . FW_textfield("val.$ccmd$d", 6)    . "</td>";
+    pO "<td>" . FW_textfield("val.$ccmd$d", 20)    . "</td>";
     pO "<td>" . FW_submit("cmd.$ccmd$d", $ccmd)    . "</td>";
     pO FW_hidden("dev.$ccmd$d", $d);
-    pO "</tr>\n";
+    pO "</tr>";
   }
 
   my $row = 1;
@@ -461,10 +491,10 @@ FW_makeTable($$$$$$$$)
     pO "<td><a href=\"$__ME?cmd.$d=$cmd $d $v&amp;detail=$d\">$cmd</a></td>"
         if($cmd);
 
-    pO "</tr>\n";
+    pO "</tr>";
   }
-  pO "  </table>\n";
-  pO "<br/>\n";
+  pO "  </table>";
+  pO "<br/>";
   
 }
 
@@ -482,9 +512,9 @@ FW_showArchive($)
   $fn = FW_getAttr($d, "archivedir", "") . "/" . $fn;
   my $t = $defs{$d}{TYPE};
 
-  pO "<div id=\"right\">\n";
-  pO "<table><tr><td>\n";
-  pO "<table class=\"$t\"><tr><td>\n";
+  pO "<div id=\"right\">";
+  pO "<table><tr><td>";
+  pO "<table class=\"block\" id=\"$t\"><tr><td>";
 
   my $row =  0;
   my $l = FW_getAttr($d, "logtype", undef);
@@ -503,9 +533,9 @@ FW_showArchive($)
     pO "</tr>";
   }
 
-  pO "</td></tr></table>\n";
-  pO "</td></tr></table>\n";
-  pO "</div>\n";
+  pO "</td></tr></table>";
+  pO "</td></tr></table>";
+  pO "</div>";
 }
 
 
@@ -521,9 +551,9 @@ FW_doDetail($)
   $__room = FW_getAttr($d, "room", undef);
   my $t = $defs{$d}{TYPE};
 
-  pO "<div id=\"right\">\n";
-  pO "<table><tr><td>\n";
-  pO "<a href=\"$__ME?cmd=delete $d\">Delete $d</a>\n";
+  pO "<div id=\"right\">";
+  pO "<table><tr><td>";
+  pO "<a href=\"$__ME?cmd=delete $d\">Delete $d</a>";
 
   my $pgm = "Javascript:" .
              "s=document.getElementById('edit').style;".
@@ -532,7 +562,7 @@ FW_doDetail($)
              "if(s.display=='none') s.display='block'; else s.display='none';";
   pO "<a href=\"#top\" onClick=\"$pgm\">Modify $d</a>";
 
-  pO "</td></tr><tr><td>\n";
+  pO "</td></tr><tr><td>";
   FW_makeTable($d, $t,
         "<a href=\"$__reldoc#${t}set\">State</a>,Value,Measured",
         $defs{$d}{READINGS}, getAllSets($d), "set", 0, undef);
@@ -542,12 +572,12 @@ FW_doDetail($)
         "<a href=\"$__reldoc#attr\">Attribute</a>,Value,Action",
         $attr{$d}, getAllAttr($d), "attr", 1,
         $d eq "global" ? "" : "deleteattr");
-  pO "</td></tr></table>\n";
+  pO "</td></tr></table>";
 
   FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}) if($t eq "weblink");
 
-  pO "</div>\n";
-  pO "</form>\n";
+  pO "</div>";
+  pO "</form>";
 
 }
 
@@ -559,19 +589,10 @@ FW_roomOverview($)
   my ($cmd) = @_;
   pO "<form method=\"get\" action=\"$__ME\">";
 
-  pO "<div id=\"hdr\">\n";
+  pO "<div id=\"hdr\">";
   pO "<table><tr><td>";
-  pO "<a href=\"$__reldoc\">Fhem cmd</a>: ";
   pO FW_textfield("cmd", 30);
   
-  if(defined($data{FWEXT})) {
-    foreach my $k (sort keys %{$data{FWEXT}}) {
-      my $h = $data{FWEXT}{$k};
-      next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
-      pO "   <a href=\"$__ME\/" . $h->{LINK} . "\">" . $h->{NAME}. "</a>";
-    }
-  }
-
   if($__room) {
     pO FW_hidden("room", "$__room");
 
@@ -588,36 +609,48 @@ FW_roomOverview($)
     }
   }
   pO "</td></tr></table>";
-  pO "</div>\n";
+  pO "</div>";
 
-  pO "<div id=\"left\">\n";
-  pO "  <table><tr><td>\n";
-  pO "    <table class=\"room\" summary=\"Room list\">\n";
+  pO "<div id=\"left\">";
+  pO "  <img src=\"$__ME/fhem.png\"><br><br>";
+  pO "  <table><tr><td>";
+  pO "    <table class=\"block\" id=\"room\" summary=\"Room list\">";
+
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
+      my $h = $data{FWEXT}{$k};
+      next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
+      pO "<tr><td><a href=\"$__ME\/" . $h->{LINK} . "\">"
+                . $h->{NAME}. "</a></td></tr>";
+    }
+    pO "<tr><td></td></tr>";
+  }
+
   $__room = "" if(!$__room);
   foreach my $r (sort keys %__rooms) {
     next if($r eq "hidden");
     pF "    <tr%s>", $r eq $__room ? " class=\"sel\"" : "";
-    pO "<td><a href=\"$__ME?room=$r\">$r</a>";
-    pO "</td></tr>\n";
+    pO "<td><a href=\"$__ME?room=$r\">$r</a></td></tr>";
   }
   pF "    <tr%s>",  "all" eq $__room ? " class=\"sel\"" : "";
-  pO "<td><a href=\"$__ME?room=all\">All together</a></td></tr>";
-  pO "  </table>\n";
-  pO "  </td></tr>\n";
-  pO "  <tr><td>\n";
-  pO "    <table class=\"room\" summary=\"Help/Configuration\">\n";
-  pO "      <tr><td><a href=\"$__ME/HOWTO.html\">Howto</a></td></tr>\n";
-  pO "      <tr><td><a href=\"$__ME/faq.html\">FAQ</a></td></tr>\n";
-  pO "      <tr><td><a href=\"$__ME/commandref.html\">Details</a></td></tr>\n";
+  pO "    <td><a href=\"$__ME?room=all\">All together</a></td></tr>";
+  pO "  </table>";
+
+  pO "  </td></tr>";
+  pO "  <tr><td>";
+  pO "    <table class=\"block\" id=\"room\" summary=\"Help/Configuration\">";
+  pO "      <tr><td><a href=\"$__ME/HOWTO.html\">Howto</a></td></tr>";
+  pO "      <tr><td><a href=\"$__ME/faq.html\">FAQ</a></td></tr>";
+  pO "      <tr><td><a href=\"$__ME/commandref.html\">Details</a></td></tr>";
   my $sel = ($cmd =~ m/examples/) ? " class=\"sel\"" : "";
-  pO "      <tr$sel><td><a href=\"$__ME?cmd=style examples\">Examples</a></td></tr>\n";
+  pO "      <tr$sel><td><a href=\"$__ME?cmd=style examples\">Examples</a></td></tr>";
   $sel = ($cmd =~ m/list/) ? " class=\"sel\"" : "";
-  pO "      <tr$sel><td><a href=\"$__ME?cmd=style list\">Edit files</a></td></tr>\n";
-  pO "    </table>\n";
-  pO "  </td></tr>\n";
-  pO "  </table>\n";
-  pO "</div>\n";
-  pO "</form>\n";
+  pO "      <tr$sel><td><a href=\"$__ME?cmd=style list\">Edit files</a></td></tr>";
+  pO "    </table>";
+  pO "  </td></tr>";
+  pO "  </table>";
+  pO "</div>";
+  pO "</form>";
 }
 
 
@@ -642,8 +675,8 @@ FW_showRoom()
   }
 
   pO "<form method=\"get\" action=\"$__ME\">";
-  pO "<div id=\"right\">\n";
-  pO "  <table><tr><td>\n";  # Need for equal width of subtables
+  pO "<div id=\"right\">";
+  pO "  <table><tr><td>";  # Need for equal width of subtables
 
   foreach my $type (sort keys %__types) {
     
@@ -659,25 +692,25 @@ FW_showRoom()
     # Print the table headers
     my $t = $type;
     $t = "EM" if($t =~ m/^EM.*$/);
-    pO "  <table class=\"$t\" summary=\"List of $type devices\">\n";
 
-    my $h;
+    my $th;
+    my $id = "class=\"block\"";
     if($type eq "FS20") {
-      $h = "FS20 dev.</th><th>State</th><th colspan=\"2\">Set to";
+      $th = "FS20 dev.</th><th>State</th><th colspan=\"2\">Set to";
     } elsif($type eq "FHT") {
-      $h = "FHT dev.</th><th>Measured</th><th>Set to";
-    } elsif($type eq "at")         { $h = "Scheduled commands (at)";
-    } elsif($type eq "FileLog")    { $h = "Logs";
-    } elsif($type eq "_internal_") { $h = "Global variables";
-    } elsif($type eq "weblink")    { $h = "";
+      $th = "FHT dev.</th><th>Measured</th><th>Set to";
+    } elsif($type eq "at")         { $th = "Scheduled commands (at)";
+    } elsif($type eq "FileLog")    { $th = "Logs";
+    } elsif($type eq "_internal_") { $th = "Global variables";
+    } elsif($type eq "weblink")    { $th = ""; $id = "";
     } else {
-      $h = $type;
+      $th = $type;
     }
-    pO "    <tr><th>$h</th></tr>\n" if($h);
+    pO "  <table $id id=\"$t\" summary=\"List of $type devices\">";
+    pO "  <tr><th>$th</th></tr>" if($th);
 
     my $row=1;
     foreach my $d (sort keys %{$__types{$type}} ) {
-
       next if($__room && $__room ne "all" &&
              !$__rooms{$__room}{$d});
 
@@ -737,7 +770,7 @@ FW_showRoom()
 
       } elsif($type eq "FileLog") {
 
-        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>\n";
+        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>";
         if(defined(FW_getAttr($d, "archivedir", undef))) {
           pO "<td><a href=\"$__ME?cmd=showarchive $d\">archive</a></td>";
         }
@@ -759,17 +792,17 @@ FW_showRoom()
 
       } else {
 
-        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>\n";
+        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>";
 
       }
-      pO "  </tr>\n";
+      pO "  </tr>";
     }
-    pO "  </table>\n";
-    pO "  <br/>\n"; # Empty line
+    pO "  </table>";
+    pO "  <br/>"; # Empty line
   }
-  pO "  </td></tr>\n</table>\n";
-  pO "</div>\n";
-  pO "</form>\n";
+  pO "  </td></tr>\n</table>";
+  pO "</div>";
+  pO "</form>";
 }
 
 #################
@@ -807,7 +840,7 @@ FW_logWrapper($)
     $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
 
     if(!open(FH, $path)) {
-      pO "<div id=\"right\">$path: $!</div>\n";
+      pO "<div id=\"right\">$path: $!</div>";
       return;
     }
     binmode (FH); # necessary for Windows
@@ -816,15 +849,15 @@ FW_logWrapper($)
     $cnt =~ s/</&lt;/g;
     $cnt =~ s/>/&gt;/g;
 
-    pO "<div id=\"right\">\n";
-    pO "<pre>$cnt</pre>\n";
-    pO "</div>\n";
+    pO "<div id=\"right\">";
+    pO "<pre>$cnt</pre>";
+    pO "</div>";
 
   } else {
 
-    pO "<div id=\"right\">\n";
-    pO "<table><tr><td>\n";
-    pO "<table><tr><td>\n";
+    pO "<div id=\"right\">";
+    pO "<table><tr><td>";
+    pO "<table><tr><td>";
     pO "<td>";
     my $arg = "$__ME?cmd=showlog undef $d $type $file";
     if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
@@ -832,13 +865,13 @@ FW_logWrapper($)
       pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
     } else {
-      pO "<img src=\"$arg\"/>\n";
+      pO "<img src=\"$arg\"/>";
     }
 
     pO "<a href=\"$__ME?cmd=toweblink $d:$type:$file\"><br/>Convert to weblink</a></td>";
-    pO "</td></tr></table>\n";
-    pO "</td></tr></table>\n";
-    pO "</div>\n";
+    pO "</td></tr></table>";
+    pO "</td></tr></table>";
+    pO "</div>";
   }
 }
 
@@ -1020,7 +1053,7 @@ FW_showLog($)
     }
     $ret = fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    SVG_render($f, $t, $cfg, $internal_data, $plot);
+    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot);
     $__RETTYPE = "image/svg+xml";
 
   }
@@ -1082,13 +1115,8 @@ FW_makeEdit($$$$)
   my $eval = $val;
   $eval =~ s,\\\n,\n,g;
 
-  if($type eq "at" || $type eq "notify") {
-    pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\">".
+  pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\">".
             "$eval</textarea>";
-  } else {
-    pO     "<input type=\"text\" name=\"val.${cmd}$name\" size=\"40\" ".
-           "value=\"$eval\"/>";
-  }
   pO     "<br/>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
   pO   "</form></div>";
   $eval = "<pre>$eval</pre>" if($eval =~ m/\n/);
@@ -1280,36 +1308,36 @@ FW_style($$)
     push(@fl, "<br>");
     push(@fl, FW_fileList("$__dir/.*html"));
 
-    pO "<div id=\"right\">\n";
-    pO "  <table><tr><td>\n";
-    pO "  $msg<br/><br/>\n" if($msg);
-    pO "  <table class=\"at\">\n";
+    pO "<div id=\"right\">";
+    pO "  <table><tr><td>";
+    pO "  $msg<br/><br/>" if($msg);
+    pO "  <table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
       pO "<td><a href=\"$__ME?cmd=style edit $file\">$file</a></td></tr>";
       $row = ($row+1)%2;
     }
-    pO "  </table>\n";
-    pO "  </td></tr></table>\n";
-    pO "</div>\n";
+    pO "  </table>";
+    pO "  </td></tr></table>";
+    pO "</div>";
 
   } elsif($a[1] eq "examples") {
 
     my @fl = FW_fileList("$__dir/example.*");
-    pO "<div id=\"right\">\n";
-    pO "  <table><tr><td>\n";
-    pO "  $msg<br/><br/>\n" if($msg);
-    pO "  <table class=\"at\">\n";
+    pO "<div id=\"right\">";
+    pO "  <table><tr><td>";
+    pO "  $msg<br/><br/>" if($msg);
+    pO "  <table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
       pO "<td><a href=\"$__ME/$file\">$file</a></td></tr>";
       $row = ($row+1)%2;
     }
-    pO "  </table>\n";
-    pO "  </td></tr></table>\n";
-    pO "</div>\n";
+    pO "  </table>";
+    pO "  </td></tr></table>";
+    pO "</div>";
 
   } elsif($a[1] eq "edit") {
 
@@ -1323,14 +1351,14 @@ FW_style($$)
     my $data = join("", <FH>);
     close(FH);
 
-    pO "<div id=\"right\">\n";
+    pO "<div id=\"right\">";
     pO "  <form>";
     pO     FW_submit("save", "Save $f") . "<br/><br/>";
     pO     FW_hidden("cmd", "style save $a[2]");
     pO     "<textarea name=\"data\" cols=\"80\" rows=\"30\">" .
                 "$data</textarea>";
     pO   "</form>";
-    pO "</div>\n";
+    pO "</div>";
 
   } elsif($a[1] eq "save") {
 
@@ -1359,6 +1387,7 @@ sub
 pO(@)
 {
   $__RET .= shift;
+  $__RET .= "\n";
 }
 
 ##################
@@ -1397,10 +1426,10 @@ FW_showWeblink($$$)
   my ($d, $v, $t) = @_;
 
   if($t eq "link") {
-    pO "<td><a href=\"$v\">$d</a></td>\n";
+    pO "<td><a href=\"$v\">$d</a></td>";
 
   } elsif($t eq "image") {
-    pO "<td><img src=\"$v\"><br><a href=\"$__ME?detail=$d\">$d</a></td>\n";
+    pO "<td><img src=\"$v\"><br><a href=\"$__ME?detail=$d\">$d</a></td>";
 
   } elsif($t eq "fileplot") {
     my @va = split(":", $v, 3);
@@ -1421,7 +1450,7 @@ FW_showWeblink($$$)
         pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
               "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
       } else {
-        pO "<img src=\"$arg\"/>\n";
+        pO "<img src=\"$arg\"/>";
       }
 
       pO "</td><td>";
