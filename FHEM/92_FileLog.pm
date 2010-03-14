@@ -262,15 +262,15 @@ FileLog_Get($@)
 
       } elsif($t == 2) {                    # delta-h  or delta-d
 
-        my $hd = $h->{didx};
-        my $ld = substr($fld[0],0,$hd);
+        my $hd = $h->{didx};                # TimeStamp-Length
+        my $ld = substr($fld[0],0,$hd);     # TimeStamp-Part (hour or date)
         if(!defined($h->{last1}) || $h->{last3} ne $ld) {
           if(defined($h->{last1})) {
             my @lda = split("[_:]", $lastdate{$hd});
-            my $ts = "12:00:00";                   # middle timestamp
+            my $ts = "12:00:00";            # middle timestamp
             $ts = "$lda[1]:30:00" if($hd == 13);
             my $v = $fld[$col]-$h->{last1};
-            $v = 0 if($v < 0);                     # Skip negative delta
+            $v = 0 if($v < 0);              # Skip negative delta
             $dte = "$lda[0]_$ts";
             $val = sprintf("%0.1f", $v);
           }
@@ -279,7 +279,6 @@ FileLog_Get($@)
         }
         $h->{last2} = $fld[$col];
         $lastdate{$hd} = $fld[0];
-
       } elsif($t == 3) {                    # int function
         $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
 
@@ -312,7 +311,12 @@ FileLog_Get($@)
     my $h = $d[$i];
     my $hd = $h->{didx};
     if($hd && $lastdate{$hd}) {
-      my $val = defined($h->{last1}) ?  $h->{last2}-$h->{last1} : 0;
+      my $val = defined($h->{last1}) ? $h->{last2}-$h->{last1} : 0;
+      $min[$i] = $val if($min[$i] ==  999999);
+      $max[$i] = $val if($max[$i] == -999999);
+      $lastv[$i] = $val if(!$lastv[$i]);
+      $sum[$i] = $val if(!$sum[$i]);
+      $cnt[$i] = 1 if(!$cnt[$i]);
 
       my @lda = split("[_:]", $lastdate{$hd});
       my $ts = "12:00:00";                   # middle timestamp
