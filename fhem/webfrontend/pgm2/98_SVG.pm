@@ -240,8 +240,9 @@ SVG_render($$$$$$)
     # Round values, compute a nice step
     next if(!defined($hmax{$axis}));
     my $dh = $hmax{$axis} - $hmin{$axis};
-    my ($step, $mi, $ma);
-    my @limit = (1,2,5,10,20,50,100,200,500,1000,2000,5000,10000);
+    my ($step, $mi, $ma) = (1, 1, 1);
+    my @limit = (1,2,5,10,20,50,100,200,500,1000,2000,5000,10000,
+                 20000,50000,100000,200000,500000,1000000,2000000);
     for my $li (0..int(@limit)-1) {
       my $l = $limit[$li];
       next if($dh > $l);
