@@ -4481,7 +4481,7 @@ Terminating
       <code>define b3lampV3 notify btn3 set lamp1 %;;set lamp2 %</code><br>
       <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
       <!-- <code>define LogHToDB notify .*H:.* {DbLog("@","%")}</code><br> -->
-      <code>define LogUndef notify UNDEFINED "send-me-mail.sh "%""</code><br>
+      <code>define LogUndef notify global:UNDEFINED.* "send-me-mail.sh "%""</code><br>
     </ul>
     <br>
 
