@@ -24,7 +24,7 @@ if (! in_array($type,$supported_HMS)) show_error_type($imgmaxxhms,$imgmaxyhms,$t
 
 
 if ($DBUse=="1") {                                                              
-                $sqlquery=mysql_query("select timestamp from history where device='".$drawhms."' and reading='data' order by timestamp desc limit 1");     
+                $sqlquery=mysql_query("select timestamp from history where device='".$drawhms."' and (reading='data' or reading like '%_detect') order by timestamp desc limit 1");     
 	$query=mysql_fetch_object($sqlquery);
                 $date=str_replace(" ","_",$query->timestamp);                   
         }                                                                       
@@ -85,7 +85,7 @@ if ($DBUse=="1") {
 if ($DBUse=="1")
         { 
         $array=array();
-        $sqlarray=mysql_query("select timestamp,event from history where device='".$drawhms."' and reading='data' order by timestamp desc limit ".$logrotateHMSlines."") or die (mysql_error());
+        $sqlarray=mysql_query("select timestamp,event from history where device='".$drawhms."' and (reading='data' or reading like '%_detect') order by timestamp desc limit ".$logrotateHMSlines."") or die (mysql_error());
         while ( $row=mysql_fetch_object($sqlarray))
                 { 
                 $date=str_replace(" ","_",$row->timestamp);
