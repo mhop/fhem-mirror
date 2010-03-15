@@ -1,11 +1,11 @@
 ################################################################################
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
-# 97 GROUP for the 01_FHEMWEB module
+# 97 GROUP
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 26.01.2010
-# Version: 0.5.0
+# Stand: 15.03.2010
+# Version: 0.5.1
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 ################################################################################
 # Usage:
@@ -13,18 +13,7 @@
 # set <New-Group-Name> ADD/DEL <NAME>:<DEVICENAME>:<READING>
 #
 # Spezial Categories:
-# SHOWLEFT -> This cat shows  Name und Value of READING on the Left-Side
-# (DIV-Left) Example:
-#
-# define 01.OG.SCHLAFZIMMMER GROUP 01.OG
-# set GRP001 ADD FHT8v:FHT_1234:actuator
-# set GRP001 ADD Temperatur:CUL_WS_3:temperature
-# set GRP001 ADD Fenster:CUL_FHTTFK_1234:Window
-#
-# define 01.OG.BAD GROUP 01.OG
-# set GRP001 ADD Temperatur:CUL_WS_4:temperature
-# set GRP001 ADD Luftfeuchte:CUL_WS_4:humidity
-#
+# SHOWLEFT -> This cat shows  Name und Value of READING on the Left-Side (DIV-Left)
 ################################################################################
 package main;
 use strict;
