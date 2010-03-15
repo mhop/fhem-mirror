@@ -29,6 +29,11 @@ Description of the 02_FHEMRENDERER Module:
 #  This copyright notice MUST APPEAR in all copies of the script!
 #################################################################################
 
+Versions:
+
+V1.0: Initial Version
+V1.1: Bugfix: Enabled multiple RENERER Instances
+
 General Description:
 
 The FHEMRENDERER module is intended to render (draw) graphics based on the FHEM Log-Files.
