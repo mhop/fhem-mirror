@@ -91,7 +91,7 @@ FHEMRENDERER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{ReadFn}  = "FHEMRENDERER_Read";
+#  $hash->{ReadFn}  = "FHEMRENDERER_Read";
   $hash->{DefFn}   = "FHEMRENDERER_Define";
   $hash->{UndefFn} = "FHEMRENDERER_Undef";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 plotmode:gnuplot,gnuplot-scroll plotsize refresh tmpfile status";
@@ -143,9 +143,10 @@ FHEMRENDERER_Set($@)
   my ($hash, @a) = @_;
   my $ret = undef;
   my $na = int(@a);
-
+  $__wname = $hash->{NAME};
+  
   return "no set value specified" if($na < 2 || $na > 3);
-
+  
 #  if($__plotmode eq "SVG" && !$modules{SVG}{LOADED}) {
 #    my $ret = CommandReload(undef, "98_SVG");
 #    Log 0, $ret if($ret);
@@ -173,9 +174,12 @@ FHEMRENDERER_Get($@)
   my $ret = undef;
   my $v;
   my $t;
-
+  
 	FHEMRENDERER_parseXmlList(0);
 
+  $__wname = "";
+  $__wname = $hash->{NAME};
+  
   $__plotmode = FHEMRENDERER_getAttr("plotmode", "gnuplot");
   $__plotsize = FHEMRENDERER_getAttr("plotsize", "800,200");
   $FHEMRENDERER_tmpfile = FHEMRENDERER_getAttr("tmpfile", "/tmp/");
