@@ -12,6 +12,8 @@
   see dblog for a full-featured database log
 - 95_PachLog.pm
   Pachube module from Axel
+- 97_GROUP.pm
+  Helper for FHEMWEB to display different groups of device READINGS at once
 - 99_dumpdef.pm
   Debugging helpers from Axel
 - 99_ALARM.pm
