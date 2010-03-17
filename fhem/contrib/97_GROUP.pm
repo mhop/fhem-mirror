@@ -4,8 +4,8 @@
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 15.03.2010
-# Version: 0.5.1
+# Stand: 17.03.2010
+# Version: 0.5.5
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 ################################################################################
 # Usage:
@@ -39,7 +39,7 @@ sub GROUP_Initialize($)
   delete $hash->{defptr};
   delete $hash->{conf};
   foreach my $d (sort keys %defs) {
-    Log 0, "GROUP INIT $d:" . $defs{$d}{TYPE};
+    # # Log 0, "GROUP INIT $d:" . $defs{$d}{TYPE};
     next if(!defined($defs{$d}{TYPE}));
     next if($defs{$d}{TYPE} ne "GROUP");
     my $cat = $defs{$d}{STATE};
@@ -55,7 +55,7 @@ sub GRP_Define(){
   # define <GROUP-NMAE> GROUP <CONF> SHOWLEFT
   # Show this Values in DIV-Container LEFT 
   my ($self, $defs) = @_;
-  Log 0, "GROUP DEFINE " . Dumper(@_);
+  # # Log 0, "GROUP DEFINE " . Dumper(@_);
   my $name = $self->{NAME};
   # defs = $a[0] <GROUP-NAME> $a[1] GROUP $a[2]<CATEGORY-NAME> $a[3] SHOWLEFT
   # $VAR2 = 'L01 GROUP SHOWLEFT';
@@ -63,7 +63,7 @@ sub GRP_Define(){
   # CATEGORY
   my $cat = $name;
   if(int(@a) gt 2){$cat = $a[2];}
-  Log 0, "GROUP DEFINE CAT:" . $cat;
+  # Log 0, "GROUP DEFINE CAT:" . $cat;
   my $ret = &GRP_HANDLE_CAT($name,$cat);
   # Save cat to State
   $self->{STATE} = $cat;
@@ -74,9 +74,13 @@ sub GRP_Define(){
 #-------------------------------------------------------------------------------
 sub GRP_Undef(){
   my ($self, $name) = @_;
-  ??? empty CAT is left ??? 
-  if(defined($modules{GROUP}{defptr}{$name})) {
-    delete $modules{GROUP}{defptr}{$name};
+  # ??? empty CAT is left ??? 
+  if(defined($modules{GROUP}{defptr})) {
+    foreach my $d (sort keys %{$modules{GROUP}{defptr}}){
+      if(defined($modules{GROUP}{defptr}{$d}{$name})){
+      delete $modules{GROUP}{defptr}{$d}{$name};
+      }
+    }
   }
   if(defined($modules{GROUP}{conf})) {
     foreach my $c (sort keys %{$modules{GROUP}{conf}}){
@@ -94,13 +98,13 @@ sub GRP_Set()
   # @a => a[0]:<NAME>; a[1]=ADD; a[2]= <DEVICE-NAME>:<READING>
   my ($self, @a) = @_;
   # FHEMWEB Frage....Auswahliste
-  Log 0, "GROUP SET " . Dumper(@_);
+  # Log 0, "GROUP SET " . Dumper(@_);
   return "GROUP Unknown argument $a[1], choose one of ". join(" ",sort keys %{$self->{READINGS}}) if($a[1] eq "?");
   # ADD
   if($a[1] eq "ADD") {
   my ($name,$dev,$reading) = split(/:/,$a[2]);
   if(!defined($defs{$dev})){return "Device unkwon";}
-  Log 0 , "GRP SET ". $a[0] . ":" . $a[1] . ":" . $dev . ":" . $reading;
+  # Log 0 , "GRP SET ". $a[0] . ":" . $a[1] . ":" . $dev . ":" . $reading;
   $self->{READINGS}{$name}{VAL} = $dev . ":" . $reading;
   $self->{READINGS}{$name}{TIME} = TimeNow();
   }
@@ -193,6 +197,8 @@ sub GRP_CGI_LEFT(){
         # Name | Value
         my ($device,$reading) = split(/:/,$defs{$g}{READINGS}{$r}{VAL});
         my $value = $defs{$device}{READINGS}{$reading}{VAL};
+        $value =~ s/[^0123456789\.-]//g;
+        $value = sprintf("%.2f", $value);
         $rh .= "<tr><td>$r</td><td>$value</td></tr>\n"
       }
     }
@@ -204,8 +210,8 @@ sub GRP_CGI_LEFT(){
 #-------------------------------------------------------------------------------
 sub GRP_CGI_RIGHT(){
   my ($CAT) = @_;
-  Log 0,"GROUP CGI-RIGHT CAT: $CAT";
-  my ($name,$device,$reading,$vtype,$value,$vtime,$rh,$tr_class);
+  # Log 0,"GROUP CGI-RIGHT CAT: $CAT";
+  my ($name,$device,$reading,$value,$vtime,$rh,$tr_class,$comment);
   # rh = return-Html
   my $row = 1;
   # Table
@@ -217,20 +223,29 @@ sub GRP_CGI_RIGHT(){
     # Log 0,"GROUP CGI-RIGHT DEV: $c";
     $rh .= "<table class=\"GROUP\">\n";
     $rh .= "<tr>";
-    $rh .= "<th align=\"left\" WIDTH=\"10%\">$c</th>";
+    $rh .= "<th align=\"left\" WIDTH=\"10%\"><a href=\"$__ME?detail=$c\">$c</a></th>";
     $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
-    $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
+    if(defined($attr{$c}{comment})){
+          $comment = $attr{$c}{comment};
+          $rh .= "<th align=\"left\" WIDTH=\"10%\">$comment</th>";}
+    else {$rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";}
     $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
     $rh .= "</tr>\n";
     # GROUP -> READING
       foreach my $r (sort keys %{$defs{$c}{READINGS}}){
         # Name | Value
         ($device,$reading) = split(/:/,$defs{$c}{READINGS}{$r}{VAL});
-        $value = $defs{$device}{READINGS}{$reading}{VAL};
-        $vtime = $defs{$device}{READINGS}{$reading}{TIME};
-        $vtype = $defs{$device}{TYPE};
+        if(defined($defs{$device}{READINGS}{$reading})) {
+          $value = $defs{$device}{READINGS}{$reading}{VAL};
+          $vtime = $defs{$device}{READINGS}{$reading}{TIME};
+        }
+        else {
+          $value = "???";
+          $vtime = "****-**-** **:**:**";
+        }
         $tr_class = $row?"odd":"even";
-        $rh .= "<tr class=\"" . $tr_class . "\"><td>$r</td><td>$value</td><td>$vtime</td><td>$vtype</td></tr>\n";
+        $rh .= "<tr class=\"" . $tr_class . "\"><td>$r</td><td>$value</td><td>$vtime</td>";
+        $rh .= "<td><a href=\"$__ME?detail=$device\">$device</a></td></tr>\n";
         $row = ($row+1)%2;
       }
     $rh .= "</table><br>\n";
@@ -242,22 +257,23 @@ sub GRP_CGI_RIGHT(){
 sub GRP_CGI_DISPTACH_URL($){
   my ($htmlarg) = @_;
   # htmlarg = /GROUPS/<GRP-NAME>
-  Log 0,"GRP URL-DISP: " . $htmlarg;
+  # Log 0,"GRP URL-DISP: " . $htmlarg;
   my @params = split(/\//,$htmlarg);
   my $CAT = undef;
   if($params[2]) {
     $CAT = $params[2];
-    Log 0,"GRP URL-DISP-CAT: " . $CAT;}
+    # Log 0,"GRP URL-DISP-CAT: " . $CAT;
+    }
   return $CAT;
 }
 #-------------------------------------------------------------------------------
 sub GRP_HANDLE_CAT($$){
   my($device,$cat) = @_;
-  Log 0,"GRP CAT-DISP: $device:$cat";
+  # Log 0,"GRP CAT-DISP: $device:$cat";
   # Normal Categories -> %modules{GROUP}{defptr}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
   # Spezial Categories -> %modules{GROUP}{conf}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
   if($cat eq "SHOWLEFT") {
-    Log 0,"GRP CAT-DISP-> SHOWLEFT -> $cat -> $device";
+    # Log 0,"GRP CAT-DISP-> SHOWLEFT -> $cat -> $device";
     $modules{GROUP}{conf}{$cat}{$device} = 1;
     return undef;
   }
