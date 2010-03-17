@@ -171,8 +171,17 @@ FW_Read($)
   }
 
   $__wname = $hash->{SNAME};
-
   my $ll = GetLogLevel($__wname,4);
+
+  if(!$zlib_loaded && FW_getAttr($__wname, "fwcompress", 1)) {
+    $zlib_loaded = 1;
+    eval { require Compress::Zlib; };
+    if($@) {
+      Log 1, $@;
+      Log 1, "$__wname: Can't load Compress::Zlib, deactivating compression";
+      $attr{$__wname}{fwcompress} = 0;
+    }
+  }
 
   # Data from HTTP Client
   my $buf;
@@ -207,16 +216,6 @@ FW_Read($)
     $defs{$name} = $hash;
   }
 
-  if(!$zlib_loaded && FW_getAttr($__wname, "fwcompress", 1)) {
-    $zlib_loaded = 1;
-    eval { require Compress::Zlib; };
-    if($@) {
-      Log 1, $@;
-      Log 1, "$__wname: Can't load Compress::Zlib, deactivating compression";
-      $attr{$__wname}{fwcompress} = 0;
-    }
-  }
-
   my $compressed = "";
   if(($__RETTYPE=~m/text/i || $__RETTYPE=~m/svg/i || $__RETTYPE=~m/script/i) &&
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
@@ -230,7 +229,7 @@ FW_Read($)
   my $length = length($__RET);
   my $expires = ($cacheable?
                         ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
-#Log 0, "$arg / RL: $length / $__RETTYPE / $compressed";
+  #Log 0, "$arg / RL: $length / $__RETTYPE / $compressed";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
            $expires, $compressed,
