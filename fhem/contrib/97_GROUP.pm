@@ -4,8 +4,8 @@
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 17.03.2010
-# Version: 0.5.5
+# Stand: 19.03.2010
+# Version: 0.9.5
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 ################################################################################
 # Usage:
@@ -153,6 +153,7 @@ sub GRP_CGI_CSS() {
   $css .= "table.GROUP { border:thin solid; background: #E0E0E0;}\n";
   $css .= "table.GROUP tr.odd { background: #F0F0F0;}\n";
   $css .= "\/\/--><\/style>";
+  # TEST
   #$css = "<link href=\"$__ME/group.css\" rel=\"stylesheet\"/>\n";
   return $css;
 }
@@ -197,7 +198,10 @@ sub GRP_CGI_LEFT(){
         # Name | Value
         my ($device,$reading) = split(/:/,$defs{$g}{READINGS}{$r}{VAL});
         my $value = $defs{$device}{READINGS}{$reading}{VAL};
-        $value =~ s/[^0123456789\.-]//g;
+        if($value =~ m/ /){
+          my @a = split(/ /, $value);
+          $value = $a[0];
+          }
         $value = sprintf("%.2f", $value);
         $rh .= "<tr><td>$r</td><td>$value</td></tr>\n"
       }
@@ -210,12 +214,10 @@ sub GRP_CGI_LEFT(){
 #-------------------------------------------------------------------------------
 sub GRP_CGI_RIGHT(){
   my ($CAT) = @_;
-  # Log 0,"GROUP CGI-RIGHT CAT: $CAT";
   my ($name,$device,$reading,$value,$vtime,$rh,$tr_class,$comment);
   # rh = return-Html
   my $row = 1;
-  # Table
-  # GROUP
+  # Table GROUP
   # Name | Value | Time | Device-Type
   $rh = "<div id=\"right\">\n";
   # Category -> DEVICE
@@ -235,7 +237,7 @@ sub GRP_CGI_RIGHT(){
       foreach my $r (sort keys %{$defs{$c}{READINGS}}){
         # Name | Value
         ($device,$reading) = split(/:/,$defs{$c}{READINGS}{$r}{VAL});
-        if(defined($defs{$device}{READINGS}{$reading})) {
+        if(defined($defs{$device}{READINGS}{$reading}{VAL})) {
           $value = $defs{$device}{READINGS}{$reading}{VAL};
           $vtime = $defs{$device}{READINGS}{$reading}{TIME};
         }
@@ -256,8 +258,6 @@ sub GRP_CGI_RIGHT(){
 #-------------------------------------------------------------------------------
 sub GRP_CGI_DISPTACH_URL($){
   my ($htmlarg) = @_;
-  # htmlarg = /GROUPS/<GRP-NAME>
-  # Log 0,"GRP URL-DISP: " . $htmlarg;
   my @params = split(/\//,$htmlarg);
   my $CAT = undef;
   if($params[2]) {
@@ -269,7 +269,6 @@ sub GRP_CGI_DISPTACH_URL($){
 #-------------------------------------------------------------------------------
 sub GRP_HANDLE_CAT($$){
   my($device,$cat) = @_;
-  # Log 0,"GRP CAT-DISP: $device:$cat";
   # Normal Categories -> %modules{GROUP}{defptr}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
   # Spezial Categories -> %modules{GROUP}{conf}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
   if($cat eq "SHOWLEFT") {
