@@ -102,14 +102,11 @@ _sr($$$$$$)
 
         my $d_sunrise_1 = $d + $tmp_rise_1 / 24.0;
         ( $tmp_rise_2, undef ) =
-          _sunrise_sunset( $d_sunrise_1, $long,
-          $lat, $altit, 15.04107 );
+          _sunrise_sunset( $d_sunrise_1, $long, $lat, $altit, 15.04107 );
         $tmp_rise_1 = $tmp_rise_3;
         my $d_sunrise_2 = $d + $tmp_rise_2 / 24.0;
         ( $tmp_rise_3, undef ) =
-          _sunrise_sunset( $d_sunrise_2, $long,
-          $lat, $altit, 15.04107 );
-
+          _sunrise_sunset( $d_sunrise_2, $long, $lat, $altit, 15.04107 );
     }
   }
 
@@ -120,13 +117,11 @@ _sr($$$$$$)
 
         my $d_sunset_1 = $d + $tmp_set_1 / 24.0;
         ( undef, $tmp_set_2 ) =
-          _sunrise_sunset( $d_sunset_1, $long,
-          $lat, $altit, 15.04107 );
+          _sunrise_sunset( $d_sunset_1, $long, $lat, $altit, 15.04107 );
         $tmp_set_1 = $tmp_set_3;
         my $d_sunset_2 = $d + $tmp_set_2 / 24.0;
         ( undef, $tmp_set_3 ) =
-          _sunrise_sunset( $d_sunset_2, $long,
-          $lat, $altit, 15.04107 );
+          _sunrise_sunset( $d_sunset_2, $long, $lat, $altit, 15.04107 );
 
     }
   }
@@ -143,15 +138,20 @@ _sunrise_sunset($$$$$)
 
   my $sidtime = _revolution( _GMST0($d) + 180.0 + $lon );
 
-  my ( $sRA, $sdec ) = _sun_RA_dec($d);
-  my $tsouth  = 12.0 - _rev180( $sidtime - $sRA ) / $h;
-  my $sradius = 0.2666 / $sRA;
+  # Compute Sun's RA + Decl + distance at this moment
+  my ( $sRA, $sdec, $sr ) = _sun_RA_dec($d);
 
+  # Compute time when Sun is at south - in hours UT
+  my $tsouth  = 12.0 - _rev180( $sidtime - $sRA ) / $h;
+
+  # Compute the Sun's apparent radius, degrees
+  my $sradius = 0.2666 / $sr;
+
+  # Do correction to upper limb, if necessary
   $altit -= $sradius;
 
   # Compute the diurnal arc that the Sun traverses to reach 
   # the specified altitude altit: 
-
   my $cost =
     ( sind($altit) - sind($lat) * sind($sdec) ) /
     ( cosd($lat) * cosd($sdec) );
@@ -221,6 +221,8 @@ _sunpos($)
   return ( $Solar_distance, $True_solar_longitude );
 }
 
+
+# Sun's Right Ascension (RA), Declination (dec) and distance (r)
 sub
 _sun_RA_dec($)
 {
@@ -239,7 +241,7 @@ _sun_RA_dec($)
   my $RA  = atan2d( $y, $x );
   my $dec = atan2d( $z, sqrt( $x * $x + $y * $y ) );
 
-  return ( $RA, $dec );
+  return ( $RA, $dec, $r );
 }
 
 sub
