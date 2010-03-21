@@ -1,19 +1,22 @@
 ################################################################################
-#*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 # 97 GROUP
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 19.03.2010
-# Version: 0.9.5
-#*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
+# Stand: 21.03.2010
+# Version: 0.9.0
+# ToDos: 
+# - Delete empty Categories in sub GRP_Undef
+# - rebuild $hash->{defptr} and $hash->{conf} in sub GROUP_Initialize
 ################################################################################
 # Usage:
 # define <New-Group-Name> GROUP <CATEGORY>
 # set <New-Group-Name> ADD/DEL <NAME>:<DEVICENAME>:<READING>
 #
 # Spezial Categories:
-# SHOWLEFT -> This cat shows  Name und Value of READING on the Left-Side (DIV-Left)
+# SHOWLEFT -> DisplayName & Value are shown on the Left-Side (DIV-Left)
+#
+# Unkown RAEDINGS: ???
 ################################################################################
 package main;
 use strict;
@@ -36,15 +39,15 @@ sub GROUP_Initialize($)
   $data{FWEXT}{$fhem_url}{NAME} = $name;
   
   # Rebuild
-  delete $hash->{defptr};
-  delete $hash->{conf};
-  foreach my $d (sort keys %defs) {
-    # # Log 0, "GROUP INIT $d:" . $defs{$d}{TYPE};
-    next if(!defined($defs{$d}{TYPE}));
-    next if($defs{$d}{TYPE} ne "GROUP");
-    my $cat = $defs{$d}{STATE};
-    my $ret = &GRP_HANDLE_CAT($d,$cat);
-  }
+  #  delete $hash->{defptr};
+  #  delete $hash->{conf};
+  #  foreach my $d (sort keys %defs) {
+  #    # Log 0, "GROUP INIT $d:" . $defs{$d}{TYPE};
+  #    next if(!defined($defs{$d}{TYPE}));
+  #    next if($defs{$d}{TYPE} ne "GROUP");
+  #    my $cat = $defs{$d}{STATE};
+  #    my $ret = &GRP_HANDLE_CAT($d,$cat);
+  #  }
 
   return undef;
 }
@@ -52,18 +55,14 @@ sub GROUP_Initialize($)
 sub GRP_Define(){
   # define <GROUP-NMAE> GROUP <CATEGORY-NAME>
   # If no Cat is defined:<GROUP-NMAE> = <CATEGORY-NAME>
-  # define <GROUP-NMAE> GROUP <CONF> SHOWLEFT
-  # Show this Values in DIV-Container LEFT 
   my ($self, $defs) = @_;
   # # Log 0, "GROUP DEFINE " . Dumper(@_);
   my $name = $self->{NAME};
-  # defs = $a[0] <GROUP-NAME> $a[1] GROUP $a[2]<CATEGORY-NAME> $a[3] SHOWLEFT
-  # $VAR2 = 'L01 GROUP SHOWLEFT';
+  # defs = $a[0] <GROUP-DEVICE-NAME> $a[1] GROUP $a[2]<CATEGORY-NAME>;
   my @a = split(/ /, $defs);
   # CATEGORY
   my $cat = $name;
   if(int(@a) gt 2){$cat = $a[2];}
-  # Log 0, "GROUP DEFINE CAT:" . $cat;
   my $ret = &GRP_HANDLE_CAT($name,$cat);
   # Save cat to State
   $self->{STATE} = $cat;
@@ -97,21 +96,18 @@ sub GRP_Set()
   # set <NAME> ADD/DEL <NAME>:<DEVICE-NAME>:<READING>
   # @a => a[0]:<NAME>; a[1]=ADD; a[2]= <DEVICE-NAME>:<READING>
   my ($self, @a) = @_;
-  # FHEMWEB Frage....Auswahliste
-  # Log 0, "GROUP SET " . Dumper(@_);
+  # FHEMWEB Question....select
   return "GROUP Unknown argument $a[1], choose one of ". join(" ",sort keys %{$self->{READINGS}}) if($a[1] eq "?");
   # ADD
   if($a[1] eq "ADD") {
   my ($name,$dev,$reading) = split(/:/,$a[2]);
   if(!defined($defs{$dev})){return "Device unkwon";}
-  # Log 0 , "GRP SET ". $a[0] . ":" . $a[1] . ":" . $dev . ":" . $reading;
   $self->{READINGS}{$name}{VAL} = $dev . ":" . $reading;
   $self->{READINGS}{$name}{TIME} = TimeNow();
   }
   if($a[1] eq "DEL") {
-  # @a => a[0]:<NAME>; a[1]=DEL; a[2]= <READING>
-  delete $self->{READINGS}{$a[2]};
-  }
+    delete $self->{READINGS}{$a[2]};
+    }
   # Set GROUP-CAT
   # set <NAME> CAT <CATEGORY-NAME>
   if($a[1] eq "CAT") {
@@ -150,8 +146,9 @@ sub GRP_CGI_CSS() {
   my $css;
   $css   =  "<style type=\"text/css\"><!--\n";
   $css .= "\#left {float: left; width: 15%; height:100%;}\n";
-  $css .= "table.GROUP { border:thin solid; background: #E0E0E0;}\n";
+  $css .= "table.GROUP { border:thin solid; background: #E0E0E0; text-align:left;}\n";
   $css .= "table.GROUP tr.odd { background: #F0F0F0;}\n";
+  $css .= "table.GROUP td {nowrap;}";
   $css .= "\/\/--><\/style>";
   # TEST
   #$css = "<link href=\"$__ME/group.css\" rel=\"stylesheet\"/>\n";
@@ -197,13 +194,16 @@ sub GRP_CGI_LEFT(){
       foreach my $r (sort keys %{$defs{$g}{READINGS}}){
         # Name | Value
         my ($device,$reading) = split(/:/,$defs{$g}{READINGS}{$r}{VAL});
-        my $value = $defs{$device}{READINGS}{$reading}{VAL};
-        if($value =~ m/ /){
-          my @a = split(/ /, $value);
-          $value = $a[0];
+        if(defined($defs{$device}{READINGS}{$reading}{VAL})){
+          my $value = $defs{$device}{READINGS}{$reading}{VAL};
+          if($value =~ m/ /){
+            my @a = split(/ /, $value);
+            $value = $a[0];
+            }
+          $value = sprintf("%.2f", $value);
+          $rh .= "<tr><td>$r</td><td>$value</td></tr>\n"
           }
-        $value = sprintf("%.2f", $value);
-        $rh .= "<tr><td>$r</td><td>$value</td></tr>\n"
+       else{$rh .= "<tr><td>$r</td><td>???</td></tr>\n"}
       }
     }
     $rh .= "</table>\n";
@@ -223,15 +223,17 @@ sub GRP_CGI_RIGHT(){
   # Category -> DEVICE
   foreach my $c (sort keys %{$modules{GROUP}{defptr}{$CAT}}){
     # Log 0,"GROUP CGI-RIGHT DEV: $c";
-    $rh .= "<table class=\"GROUP\">\n";
+    $rh .= "<table class=\"GROUP\" WIDTH=\"85%\">\n";
     $rh .= "<tr>";
     $rh .= "<th align=\"left\" WIDTH=\"10%\"><a href=\"$__ME?detail=$c\">$c</a></th>";
-    $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
+    $rh .= "<th align=\"left\" WIDTH=\"8%\"></th>";
     if(defined($attr{$c}{comment})){
           $comment = $attr{$c}{comment};
-          $rh .= "<th align=\"left\" WIDTH=\"10%\">$comment</th>";}
-    else {$rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";}
-    $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
+          $rh .= "<th align=\"left\" WIDTH=\"20%\" colspan=\"2\">$comment</th>";}
+    else {
+        $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
+        $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";}
+    
     $rh .= "</tr>\n";
     # GROUP -> READING
       foreach my $r (sort keys %{$defs{$c}{READINGS}}){
