@@ -78,7 +78,7 @@ CUL_Initialize($)
   $hash->{StateFn} = "CUL_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "fhtsoftbuffer:1,0";
+                     "fhtsoftbuffer:1,0 sendpool";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -101,7 +101,7 @@ CUL_Define($$)
   $hash->{FHTID} = uc($a[3]);
 
   if($dev eq "none") {
-    Log 1, "CUL device is none, commands will be echoed only";
+    Log 1, "$name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
@@ -613,17 +613,12 @@ CUL_Write($$$)
 
   if($fn eq "F") {
 
-    if(!CUL_AddFS20Queue($hash, $bstring)) {
-      CUL_XmitLimitCheck($hash,$bstring);
-      CUL_SimpleWrite($hash, $bstring);
-    }
+    CUL_AddFS20Queue($hash, $bstring);
 
   } elsif($bstring =~ m/u....F/) { 
     # put FS20 messages sent over an RFR in the common queue
 
-    if(!CUL_AddFS20Queue($hash, $bstring)) {
-      CUL_SimpleWrite($hash, $bstring);
-    }
+    CUL_AddFS20Queue($hash, $bstring);
 
 
   } else {
@@ -635,21 +630,50 @@ CUL_Write($$$)
 }
 
 sub
+CUL_SendFromQueue($$)
+{
+  my ($hash, $bstring) = @_;
+  my $name = $hash->{NAME};
+
+  if($bstring ne "") {
+    # Is one of the CUL-fellows sending data?
+    if($attr{$name} && $attr{$name}{sendpool}) {
+      my @fellows = split(",", $attr{$name}{sendpool});
+      foreach my $f (@fellows) {
+        if($f ne $name &&
+           $defs{$f} &&
+           $defs{$f}{QUEUE} &&
+           $defs{$f}{QUEUE}->[0] ne "")
+          {
+            unshift(@{$hash->{QUEUE}}, "");
+            InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+            return;
+          }
+      }
+    }
+    CUL_XmitLimitCheck($hash,$bstring);
+    CUL_SimpleWrite($hash, $bstring);
+  }
+
+  ##############
+  # Write the next buffer not earlier than 0.23 seconds
+  # = 3* (12*0.8+1.2+1.0*5*9+0.8+10) = 226.8ms
+  # else it will be sent too early by the CUL, resulting in a collision
+  InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+}
+
+sub
 CUL_AddFS20Queue($$)
 {
   my ($hash, $bstring) = @_;
 
   if(!$hash->{QUEUE}) {
-    ##############
-    # Write the next buffer not earlier than 0.23 seconds
-    # = 3* (12*0.8+1.2+1.0*5*9+0.8+10) = 226.8ms
-    # else it will be sent too early by the CUL, resulting in a collision
     $hash->{QUEUE} = [ $bstring ];
-    InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
-    return 0;
+    CUL_SendFromQueue($hash, $bstring);
+
+  } else {
+    push(@{$hash->{QUEUE}}, $bstring);
   }
-  push(@{$hash->{QUEUE}}, $bstring);
-  return 1;
 }
 
 
@@ -667,12 +691,10 @@ CUL_HandleWriteQueue($)
       return;
     }
     my $bstring = $arr->[0];
-    if($bstring eq "-") {
+    if($bstring eq "") {
       CUL_HandleWriteQueue($hash);
     } else {
-      CUL_XmitLimitCheck($hash,$bstring);
-      CUL_SimpleWrite($hash, $bstring);
-      InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+      CUL_SendFromQueue($hash, $bstring);
     }
   }
 }
@@ -743,7 +765,7 @@ CUL_Parse($$$$$)
 
   if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
 
-    CUL_AddFS20Queue($iohash, "-");                # Block immediate replies
+    CUL_AddFS20Queue($iohash, "");                 # Block immediate replies
     $dmsg = sprintf("81%02x04xx0101a001%s00%s",
                       $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
     $dmsg = lc($dmsg);
