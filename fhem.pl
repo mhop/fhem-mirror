@@ -159,7 +159,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.102 2010-02-24 08:20:37 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.103 2010-03-22 14:31:37 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -862,21 +862,15 @@ WriteStatefile()
     my $r = $defs{$d}{READINGS};
     if($r) {
       foreach my $c (sort keys %{$r}) {
-	  my $errors=0;
 
-	  if(!defined($r->{$c}{TIME})) {
-	      Log 4, "ERROR WITH DEF $d: Missing TIME in READINGS of key $c!";
-	      $errors++;
-	  }
-	  if(!defined($r->{$c}{VAL})) {
-	      Log 4, "ERROR WITH DEF $d: Missing VAL in READINGS of key $c!";
-	      $errors++;
-	  }
-	  if($errors==0) {
-	      print SFH "setstate $d $r->{$c}{TIME} $c $r->{$c}{VAL}\n";
-	  } else {
-	      Log 3, "Sanitizer: not saving READING $c of $d due to missing VAL and/or TIME.";
-	  }
+	if(!defined($r->{$c}{TIME})) {
+	  Log 3, "WriteStatefile $d $c: Missing TIME";
+	} elsif(!defined($r->{$c}{VAL})) {
+	  Log 3, "WriteStatefile $d $c: Missing VAL";
+	} else {
+	  print SFH "setstate $d $r->{$c}{TIME} $c $r->{$c}{VAL}\n";
+        }
+
       }
     }
   }
@@ -1691,7 +1685,8 @@ HandleTimeout()
   $nextat = 0;
   #############
   # Check the internal list.
-  foreach my $i (keys %intAt) {
+  foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=> 
+                        $intAt{$b}{TRIGGERTIME} } keys %intAt) {
     my $tim = $intAt{$i}{TRIGGERTIME};
     my $fn = $intAt{$i}{FN};
     if(!defined($tim) || !defined($fn)) {
@@ -1725,7 +1720,6 @@ InternalTimer($$$$)
     use strict "refs";
     return;
   }
-
   $intAt{$intAtCnt}{TRIGGERTIME} = $tim;
   $intAt{$intAtCnt}{FN} = $fn;
   $intAt{$intAtCnt}{ARG} = $arg;
