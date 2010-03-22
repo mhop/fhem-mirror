@@ -1700,13 +1700,16 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>define &lt;name&gt; CUL &lt;device&gt; &lt;housecode&gt;</code> <br>
     <br>
     USB-connected devices (CUL/CUR/CUN):<br><ul>
-    &lt;device&gt; specifies the serial port to communicate with the CUL or CUR.
-    The name of the serial-device depends on your distribution,
-    under linux the cdc_acm kernel module is responsible, and usually a
-    /dev/ttyACM0 device will be created. If your distribution does not have a
-    cdc_acm module, you can force usbserial to handle the CUL by the following
-    command:<ul>modprobe usbserial vendor=0x03eb product=0x204b</ul>In this
-    case the device is most probably /dev/ttyUSB0.<br>
+      &lt;device&gt; specifies the serial port to communicate with the CUL or
+      CUR.  The name of the serial-device depends on your distribution, under
+      linux the cdc_acm kernel module is responsible, and usually a
+      /dev/ttyACM0 device will be created. If your distribution does not have a
+      cdc_acm module, you can force usbserial to handle the CUL by the
+      following command:<ul>modprobe usbserial vendor=0x03eb
+      product=0x204b</ul>In this case the device is most probably
+      /dev/ttyUSB0.<br><br>
+      You can also specify a baudrate if the device name contains the @
+      character, e.g.: /dev/ttyACM0@38400<br><br>
     </ul>
     Network-connected devices (CUN):<br><ul>
     &lt;device&gt; specifies the host:port of the device. E.g. 192.168.0.244:2323
@@ -4059,7 +4062,7 @@ Terminating
     <li><a href="#fixedrange">fixedrange</a></li>
     <li><a href="#plotsize">plotsize</a></li>
     <li><a href="#plotmode">plotmode</a></li>
-    <a name="label">
+    <a name="label"></a>
     <li>label<br>
       Colon separated list of values. The values will be used to replace
       &lt;L#&gt; type of strings in the .gplot file, with # beginning at 1
@@ -4067,7 +4070,7 @@ Terminating
       expression, so you have access e.g. to the $value hash.<br><br>
 
       If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      avg, cnt, lastv (last value) and lastd (last date) values of the
+      avg, cnt, sum, lastv (last value) and lastd (last date) values of the
       individual curves, by accessing the corresponding values from the data
       hash, see the example below:<br>
 
@@ -4089,7 +4092,7 @@ Terminating
           </ul></li>
       </ul>
       </li>
-    <a name="title">
+    <a name="title"></a>
     <li>title<br>
       A special form of label (see above), which replaces the string &lt;TL&gt;
       in the .gplot file. It defaults to the filename of the logfile.
