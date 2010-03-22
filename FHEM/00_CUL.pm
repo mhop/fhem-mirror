@@ -929,6 +929,10 @@ CUL_OpenDev($$)
     $selectlist{"$name.$dev"} = $hash;
 
   } else {                              # USB Device
+
+    my $baudrate;
+    ($dev, $baudrate) = split("@", $dev);
+
     if ($^O=~/Win/) {
      require Win32::SerialPort;
      $po = new Win32::SerialPort ($dev);
@@ -952,6 +956,17 @@ CUL_OpenDev($$)
       delete($readyfnlist{"$name.$dev"});
       $selectlist{"$name.$dev"} = $hash;
     }
+
+    if($baudrate) {
+      $po->reset_error();
+      Log 3, "$name: Setting baudrate to $baudrate";
+      $po->baudrate($baudrate);
+      $po->databits(8);
+      $po->parity('none');
+      $po->stopbits(1);
+      $po->handshake('none');
+    }
+
   }
 
   if($reopen) {

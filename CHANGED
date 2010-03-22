@@ -580,3 +580,5 @@
 - =DATE= (5.0)
   - feature: KM271: Read only
   - bugfix:  99_SUNRISE_EL endless loop bug
+  - feature: CUL: optional baudrate spec in definition
+
