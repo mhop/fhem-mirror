@@ -1712,7 +1712,8 @@ A line ending with \ will be concatenated with the next one, so long lines
       character, e.g.: /dev/ttyACM0@38400<br><br>
     </ul>
     Network-connected devices (CUN):<br><ul>
-    &lt;device&gt; specifies the host:port of the device. E.g. 192.168.0.244:2323
+    &lt;device&gt; specifies the host:port of the device. E.g.
+    192.168.0.244:2323
     </ul>
     <br>
     If the device is called none, then no device will be opened, so you
@@ -1770,6 +1771,17 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (CUL,CUR)</li><br>
+    <li><a href="#sendpool">sendpool</a><br>
+        If using more than one CUL/CUN for covering a large area, sending
+        different events by the different CUL's might disturb each other. This
+        phenomenon is also known as the Palm-Beach-Resort effect.
+        Putting them in a common sendpool will serialize sending the events.
+        E.g. if you have three CUN's, you have to specify following
+        attributes:<br>
+        attr CUL1 sendpool CUL1,CUL2,CUL3<br>
+        attr CUL2 sendpool CUL1,CUL2,CUL3<br>
+        attr CUL3 sendpool CUL1,CUL2,CUL3<br>
+        </li><br>
   </ul>
   <br>
 </ul>
