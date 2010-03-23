@@ -347,6 +347,7 @@ FileLog_Get($@)
     $data{"min$j"} = $min[$i] == 999999 ? "undef" : $min[$i];
     $data{"max$j"} = $max[$i] == -999999 ? "undef" : $max[$i];
     $data{"avg$j"} = $cnt[$i] ? sprintf("%0.1f", $sum[$i]/$cnt[$i]) : "undef";
+    $data{"sum$j"} = $sum[$i];
     $data{"cnt$j"} = $cnt[$i] ? $cnt[$i] : "undef";
     $data{"currval$j"} = $lastv[$i];
     $data{"currdate$j"} = $lastd[$i];
