@@ -506,7 +506,7 @@ FHT_Parse($$)
     $nc++;
   }
 
-  if(substr($msg,24,1) eq "7") {
+  if(substr($msg,24,1) eq "7") {        # Do not store FHZ acks.
     $cmd = "FHZ:$cmd";
   } else {
     $def->{READINGS}{$cmd}{TIME} = $tn;

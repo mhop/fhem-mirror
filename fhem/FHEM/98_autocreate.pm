@@ -93,7 +93,7 @@ autocreate_Notify($$)
       my $flname = "FileLog_$name";
       my ($gplot, $filter) = ("", $name);
       foreach my $k (keys %flogpar) {
-       next if("$type:$name" !~ m/^$k$/);
+        next if("$type:$name" !~ m/^$k$/);
         $gplot = $flogpar{$k}{GPLOT};
         $filter = replace_wildcards($hash, $flogpar{$k}{FILTER});
       }
