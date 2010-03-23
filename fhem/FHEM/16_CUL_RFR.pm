@@ -4,9 +4,6 @@ package main;
 use strict;
 use warnings;
 
-# Adjust TOTAL to you meter:
-# {$defs{emwz}{READINGS}{basis}{VAL}=<meter>/<corr2>-<total_cnt> }
-
 #####################################
 sub
 CUL_RFR_Initialize($)
@@ -95,6 +92,9 @@ CUL_RFR_Parse($$)
   elsif($smsg =~ m/^E/) { $hash->{NR_EMSG}++ }
   elsif($smsg =~ m/^K/) { $hash->{NR_KMSG}++ }
   else                  { $hash->{NR_RMSG}++ }
+
+  $smsg = $1 if($smsg =~ m/^(E[0-9A-F]{20})[REFHKT]/);   # Fixing a CUL/RFR bug
+  $smsg = $1 if($smsg =~ m/^(R[0-9A-F]{12})[REFHKT]/);
 
   CUL_Parse($hash, $iohash, $hash->{NAME}, $smsg, "X21");
   return "";
