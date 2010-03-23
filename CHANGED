@@ -582,3 +582,4 @@
   - bugfix:  99_SUNRISE_EL endless loop bug
   - feature: CUL: optional baudrate spec in definition
   - feature: CUL: sendpool attribute
+  - feature: CUL_HOERMANN module added

@@ -467,7 +467,7 @@ FW_makeTable($$$$$$$$)
   my $row = 1;
   foreach my $v (sort keys %{$hash}) {
     my $r = ref($hash->{$v});
-    next if($r && ($r ne "HASH" || !$hash->{$v}{VAL}));
+    next if($r && ($r ne "HASH" || !defined($hash->{$v}{VAL})));
     pF "    <tr class=\"%s\">", $row?"odd":"even";
     $row = ($row+1)%2;
     if($makelink && $__reldoc) {
