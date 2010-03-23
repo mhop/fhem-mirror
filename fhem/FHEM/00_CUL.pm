@@ -44,7 +44,7 @@ my %sets = (
   "time"      => ""
 );
 
-my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42);
+my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB) 
 
 sub
 CUL_Initialize($)
@@ -55,7 +55,8 @@ CUL_Initialize($)
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
   $hash->{Clients} =
-        ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:CUL_RFR:FHT8V:";
+        ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:CUL_RFR:FHT8V".
+        ":CUL_HOERMANN";
   my %mc = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:FS20"      => "^81..(04|0c)..0101a001",
@@ -66,6 +67,7 @@ CUL_Initialize($)
     "7:HMS"       => "^810e04....(1|5|9).a001",
     "8:CUL_FHTTK" => "^T........",
     "9:CUL_RFR"   => "^[0-9A-F]{4}U.",
+    "A:CUL_HOERMANN"=> "^R..........",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
@@ -810,6 +812,8 @@ CUL_Parse($$$$$)
     # Other K... Messages ar sent to CUL_WS
 
   } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
+    ;
+  } elsif($fn eq "R" && $len >= 11) {              # CUL_EM / Native
     ;
   } else {
     Log GetLogLevel($name,2), "$name: unknown message $dmsg";
