@@ -239,6 +239,14 @@ SVG_render($$$$$$)
 
     # Round values, compute a nice step
     next if(!defined($hmax{$axis}));
+
+    # yrange handling
+    my $yr = ($axis eq "x1y1" ? "yrange" : "y2range");
+    if($conf{$yr} && $conf{$yr} =~ /\[(.*):(.*)\]/) {
+      $hmin{$axis} = $1 if($1 ne "");
+      $hmax{$axis} = $2 if($2 ne "");
+    }
+
     my $dh = $hmax{$axis} - $hmin{$axis};
     my ($step, $mi, $ma) = (1, 1, 1);
     my @limit = (1,2,5,10,20,50,100,200,500,1000,2000,5000,10000,
@@ -256,13 +264,6 @@ SVG_render($$$$$$)
       }
       $step = $l/10;
       last;
-    }
-
-    # yrange handling
-    my $yr = ($axis eq "x1y1" ? "yrange" : "y2range");
-    if($conf{$yr} && $conf{$yr} =~ /\[(.*):(.*)\]/) {
-      $mi = $1 if($1 ne "");
-      $ma = $2 if($2 ne "");
     }
     $hmax{$axis} = $ma;
     $hmin{$axis} = $mi;
@@ -301,7 +302,8 @@ SVG_render($$$$$$)
         }
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
-        pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$i</text>";
+        my $txt = sprintf("%g", $i);
+        pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
       }
     }
 
