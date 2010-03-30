@@ -560,7 +560,7 @@ FHZ_Write($$$)
 
     FHZ_XmitLimitCheck($hash,$bstring);
     $hash->{QUEUE} = [ $bstring ];
-    $hash->{PortObj}->write($bstring);
+    $hash->{PortObj}->write($bstring) if($hash->{PortObj});
 
     ##############
     # Write the next buffer not earlier than 0.22 seconds (= 65.6ms + 10ms +
@@ -589,7 +589,7 @@ FHZ_HandleWriteQueue($)
     }
     my $bstring = $arr->[0];
     FHZ_XmitLimitCheck($hash,$bstring);
-    $hash->{PortObj}->write($bstring);
+    $hash->{PortObj}->write($bstring) if($hash->{PortObj});
     InternalTimer(gettimeofday()+0.25, "FHZ_HandleWriteQueue", $hash, 1);
   }
 }

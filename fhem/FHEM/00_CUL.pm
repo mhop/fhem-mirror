@@ -56,7 +56,7 @@ CUL_Initialize($)
   $hash->{WriteFn} = "CUL_Write";
   $hash->{Clients} =
         ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:CUL_RFR:FHT8V".
-        ":CUL_HOERMANN";
+        ":CUL_HOERMANN:";
   my %mc = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:FS20"      => "^81..(04|0c)..0101a001",
