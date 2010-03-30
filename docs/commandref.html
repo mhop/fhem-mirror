@@ -2223,65 +2223,64 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
   Following events are known:
   <div id="block">
-<pre>  Betriebswerte_1_HK1
-  Betriebswerte_2_HK1
-  Vorlaufsolltemperatur_HK1
-  Vorlaufisttemperatur_HK1
-  Raumsolltemperatur_HK1
-  Raumisttemperatur_HK1
-  Einschaltoptimierungszeit_HK1
-  Ausschaltoptimierungszeit_HK1
-  Pumpenleistung_HK1
-  Mischerstellung_HK1
-  Heizkennlinie_HK1_bei_+_10_Grad
-  Heizkennlinie_HK1_bei_0_Grad
-  Heizkennlinie_HK1_bei_-_10_Grad
+<pre>  HK1_Betriebswerte1
+  HK1_Betriebswerte2
+  HK1_Vorlaufsolltemperatur
+  HK1_Vorlaufisttemperatur
+  HK1_Raumsolltemperatur
+  HK1_Raumisttemperatur
+  HK1_Einschaltoptimierungszeit
+  HK1_Ausschaltoptimierungszeit
+  HK1_Pumpenleistung
+  HK1_Mischerstellung
+  HK1_Heizkennlinie_bei_+_10_Grad
+  HK1_Heizkennlinie_bei_0_Grad
+  HK1_Heizkennlinie_bei_-_10_Grad
 
-  Betriebswerte_1_HK2
-  Betriebswerte_1_HK2
-  Vorlaufsolltemperatur_HK2
-  Vorlaufisttemperatur_HK2
-  Raumsolltemperatur_HK2
-  Raumisttemperatur_HK2
-  Einschaltoptimierungszeit_HK2
-  Ausschaltoptimierungszeit_HK2
-  Pumpenleistung_HK2
-  Mischerstellung_HK2
-  Heizkennlinie_HK2_bei_+_10_Grad
-  Heizkennlinie_HK2_bei_0_Grad
-  Heizkennlinie_HK2_bei_-_10_Grad
+  HK2_Betriebswerte1
+  HK2_Betriebswerte2
+  HK2_Vorlaufsolltemperatur
+  HK2_Vorlaufisttemperatur
+  HK2_Raumsolltemperatur
+  HK2_Raumisttemperatur
+  HK2_Einschaltoptimierungszeit
+  HK2_Ausschaltoptimierungszeit
+  HK2_Pumpenleistung
+  HK2_Mischerstellung
+  HK2_Heizkennlinie_bei_+_10_Grad
+  HK2_Heizkennlinie_bei_0_Grad
+  HK2_Heizkennlinie_bei_-_10_Grad
 
-  Betriebswerte_1_WW
-  Betriebswerte_2_WW
-  Warmwassersolltemperatur
-  Warmwasseristtemperatur
-  Warmwasseroptimierungszeit
-  Ladepumpe
+  WW_Betriebswerte1
+  WW_Betriebswerte2
+  WW_Solltemperatur
+  WW_Isttemperatur
+  WW_Einschaltoptimierungszeit
+  WW_Ladepumpe
 
-  Kesselvorlaufsolltemperatur
-  Kesselvorlaufisttemperatur
-  Brennereinschalttemperatur
-  Brennerausschalttemperatur
-  Kesselintegral_1
-  Kesselintegral_2
-  Kesselfehler
-  Kesselbetrieb
-  Brenneransteuerung
+  Kessel_Vorlaufsolltemperatur
+  Kessel_Vorlaufisttemperatur
+  Brenner_Einschalttemperatur
+  Brenner_Ausschalttemperatur
+  Kessel_Integral1
+  Kessel_Integral
+  Kessel_Fehler
+  Kessel_Betrieb
+  Brenner_Ansteuerung
   Abgastemperatur
-  modulare_Brenner_Stellwert
-  Brennerlaufzeit_1_Minuten_Byte2
-  Brennerlaufzeit_1_Minuten_Byte1
-  Brennerlaufzeit_1_Minuten_Byte0
-  Brennerlaufzeit_2_Minuten_Byte2
-  Brennerlaufzeit_2_Minuten_Byte1
-  Brennerlaufzeit_2_Minuten_Byte0
+  Brenner_Stellwert
+  Brenner_Laufzeit1_Minuten2
+  Brenner_Laufzeit1_Minuten1
+  Brenner_Laufzeit1_Minuten
+  Brenner_Laufzeit2_Minuten2
+  Brenner_Laufzeit2_Minuten1
+  Brenner_Laufzeit2_Minuten
 
   Aussentemperatur
-  gedaempfte_Aussentemperatur
+  Aussentemperatur_gedaempft
   Versionsnummer_VK
   Versionsnummer_NK
-  Modulkennung
-</pre>
+  Modulkennung</pre>
   </div>
   <br>
   As I cannot explain all the values, I logged data for a period and plotted
@@ -2300,7 +2299,10 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li><a href="km271/km271_Vorlauftemperatur.png">Vorlauftemperatur</a></li>
       <li><a href="km271/km271_Warmwasser.png">Warmwasser</a></li>
     </ul>
-
+  All of these events are reported directly after initialization (or after
+  requesting logmode), along with some 60 configuration records (6byte long
+  each). About 20 parameters from these records are reverse engeneered, they
+  all start with CFG_.
   </ul>
 
 
@@ -2318,7 +2320,16 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Set </b>
   <ul>
-    Not yet implemented
+    <code>set KM271  &lt;param&gt; [&lt;value&gt;]</code><br><br>
+    where param is one of:
+    <ul>
+      <li>hk1_nachtsoll &lt;temp&gt;<br>(0.5 celsius resolution)</li>
+      <li>hk1_tagsoll &lt;temp&gt;<br>(0.5 celsius resolution)</li>
+      <li>hk1_betriebsart [automatik|nacht|tag]</li>
+      <li>ww_soll &lt;temp&gt;<br>(1.0 celsius resolution)</li>
+      <li>ww_betriebsart [automatik|nacht|tag]</li>
+      <li>logmode<br>set to logmode / request all parameters again</li>
+    </ul>
   </ul>
   <br>
 
@@ -2337,7 +2348,11 @@ A line ending with \ will be concatenated with the next one, so long lines
         If this attribute is set to 1, do not ignore following events:<br>
         Vorlaufisttemperatur_HK1, Kesselvorlaufisttemperatur,
         Kesselintegral_1, "Kesselintegral_2<br>
-        These events account for ca. 92% of all events.</li>
+        These events account for ca. 92% of all events.<br>
+        All UNKNOWN events are ignored too, most of them were only seen
+        directly after setting the device into logmode.
+        </li>
+
   </ul>
   <br>
 
