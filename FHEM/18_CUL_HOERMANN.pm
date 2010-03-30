@@ -40,8 +40,8 @@ CUL_HOERMANN_Parse($$)
 {
   my ($hash, $msg) = @_;
 
-  # Msg format: RHHHHHHHH
-  my $cde = substr($msg, 1, 8);
+  # Msg format: R0123456789
+  my $cde = substr($msg, 1, 10);
   my $def = $modules{CUL_HOERMANN}{defptr}{$cde};
 
   if($def) {
@@ -56,7 +56,6 @@ CUL_HOERMANN_Parse($$)
     Log 3, "CUL_HOERMANN Unknown device $cde, please define it";
     return "UNDEFINED CUL_HOERMANN_$cde CUL_HOERMANN $cde";
   }
-
 }
 
 1;
