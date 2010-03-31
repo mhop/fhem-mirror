@@ -3,20 +3,20 @@
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 21.03.2010
-# Version: 0.9.0
-# ToDos: 
-# - Delete empty Categories in sub GRP_Undef
-# - rebuild $hash->{defptr} and $hash->{conf} in sub GROUP_Initialize
+# Stand: 31.03.2010
+# Version: 1.0.0
 ################################################################################
 # Usage:
 # define <New-Group-Name> GROUP <CATEGORY>
 # set <New-Group-Name> ADD/DEL <NAME>:<DEVICENAME>:<READING>
+# READING-VALUES are first searched there $hash{<DEVICENAME>}{READINGS}{<READING>}
+# and for the second there $hash{<DEVICENAME>}{<READING>}
 #
 # Spezial Categories:
-# SHOWLEFT -> DisplayName & Value are shown on the Left-Side (DIV-Left)
+# SHOWLEFT -> DisplayName & Value appear on the Left-Side (DIV-Left)
 #
-# Unkown RAEDINGS: ???
+# Unkown READINGS appear as "???"
+# Unkown TimeStamps appear as "****-**-** **:**:**"
 ################################################################################
 package main;
 use strict;
@@ -38,17 +38,6 @@ sub GROUP_Initialize($)
   $data{FWEXT}{$fhem_url}{LINK} = $name;
   $data{FWEXT}{$fhem_url}{NAME} = $name;
   
-  # Rebuild
-  #  delete $hash->{defptr};
-  #  delete $hash->{conf};
-  #  foreach my $d (sort keys %defs) {
-  #    # Log 0, "GROUP INIT $d:" . $defs{$d}{TYPE};
-  #    next if(!defined($defs{$d}{TYPE}));
-  #    next if($defs{$d}{TYPE} ne "GROUP");
-  #    my $cat = $defs{$d}{STATE};
-  #    my $ret = &GRP_HANDLE_CAT($d,$cat);
-  #  }
-
   return undef;
 }
 #-------------------------------------------------------------------------------
@@ -56,7 +45,6 @@ sub GRP_Define(){
   # define <GROUP-NMAE> GROUP <CATEGORY-NAME>
   # If no Cat is defined:<GROUP-NMAE> = <CATEGORY-NAME>
   my ($self, $defs) = @_;
-  # # Log 0, "GROUP DEFINE " . Dumper(@_);
   my $name = $self->{NAME};
   # defs = $a[0] <GROUP-DEVICE-NAME> $a[1] GROUP $a[2]<CATEGORY-NAME>;
   my @a = split(/ /, $defs);
@@ -73,21 +61,38 @@ sub GRP_Define(){
 #-------------------------------------------------------------------------------
 sub GRP_Undef(){
   my ($self, $name) = @_;
-  # ??? empty CAT is left ??? 
+  # $dc = Device-Count in categorie
+	my $dc = 1;
   if(defined($modules{GROUP}{defptr})) {
     foreach my $d (sort keys %{$modules{GROUP}{defptr}}){
       if(defined($modules{GROUP}{defptr}{$d}{$name})){
       delete $modules{GROUP}{defptr}{$d}{$name};
+			$dc = keys(%{$modules{GROUP}{defptr}{$d}});
       }
+			# Delete empty Categories
+			if($dc eq 0) {
+				Log 0, "GROUP UNDEF DELETE CAT: $d";
+				delete $modules{GROUP}{defptr}{$d};
+				};
     }
   }
+	$dc = 1;
   if(defined($modules{GROUP}{conf})) {
     foreach my $c (sort keys %{$modules{GROUP}{conf}}){
       if(defined($modules{GROUP}{conf}{$c}{$name})){
       delete $modules{GROUP}{conf}{$c}{$name};
+			$dc = keys(%{$modules{GROUP}{conf}{$c}});
       }
+			# Delete empty Categories
+			if($dc eq 0) {
+				Log 0, "GROUP UNDEF DELETE CAT: $c";
+				delete $modules{GROUP}{defptr}{$c};
+				};
     }
   }
+	# ??? empty CAT is left ??? 
+	# Check for empty categories
+	
   return undef;
 }
 #-------------------------------------------------------------------------------
@@ -121,6 +126,7 @@ sub GRP_CGI()
   my ($htmlarg) = @_;
   # htmlarg = /GROUPS/<CAT-NAME>
   my $Cat = GRP_CGI_DISPTACH_URL($htmlarg);
+	if(!defined($Cat)){$Cat = ""};
   my ($ret_html);
   $ret_html = "<!DOCTYPE html PUBLIC \"-\/\/W3C\/\/DTD HTML 4.01\/\/EN\" \"http:\/\/www.w3.org\/TR\/html4\/strict.dtd\">\n";
   $ret_html .= "<html>\n";
@@ -192,18 +198,11 @@ sub GRP_CGI_LEFT(){
       #Tabelle
       $rh .= "<tr><th>$g</th><th></th></tr>\n";
       foreach my $r (sort keys %{$defs{$g}{READINGS}}){
-        # Name | Value
-        my ($device,$reading) = split(/:/,$defs{$g}{READINGS}{$r}{VAL});
-        if(defined($defs{$device}{READINGS}{$reading}{VAL})){
-          my $value = $defs{$device}{READINGS}{$reading}{VAL};
-          if($value =~ m/ /){
-            my @a = split(/ /, $value);
-            $value = $a[0];
-            }
-          $value = sprintf("%.2f", $value);
-          $rh .= "<tr><td>$r</td><td>$value</td></tr>\n"
-          }
-       else{$rh .= "<tr><td>$r</td><td>???</td></tr>\n"}
+        # $dn = DeviceName + $rn = Readingname to get ReadingValue
+        my ($dn,$rn) = split(/:/,$defs{$g}{READINGS}{$r}{VAL});
+				# $rv = ReadingValue; $rt = ReadingTime; $ru = ReadingUnit
+        my ($rv,undef,undef) = &GRP_GET_READING_VAL($dn,$rn);
+        $rh .= "<tr><td>$r</td><td>$rv</td></tr>\n";
       }
     }
     $rh .= "</table>\n";
@@ -237,19 +236,13 @@ sub GRP_CGI_RIGHT(){
     $rh .= "</tr>\n";
     # GROUP -> READING
       foreach my $r (sort keys %{$defs{$c}{READINGS}}){
-        # Name | Value
-        ($device,$reading) = split(/:/,$defs{$c}{READINGS}{$r}{VAL});
-        if(defined($defs{$device}{READINGS}{$reading}{VAL})) {
-          $value = $defs{$device}{READINGS}{$reading}{VAL};
-          $vtime = $defs{$device}{READINGS}{$reading}{TIME};
-        }
-        else {
-          $value = "???";
-          $vtime = "****-**-** **:**:**";
-        }
+				# $dn = DeviceName + $rn = Readingname to get ReadingValue
+        my ($dn,$rn) = split(/:/,$defs{$c}{READINGS}{$r}{VAL});
+				# $rv = ReadingValue; $rt = ReadingTime; $ru = ReadingUnit
+        my ($rv,$rt,$ru) = &GRP_GET_READING_VAL($dn,$rn);
         $tr_class = $row?"odd":"even";
-        $rh .= "<tr class=\"" . $tr_class . "\"><td>$r</td><td>$value</td><td>$vtime</td>";
-        $rh .= "<td><a href=\"$__ME?detail=$device\">$device</a></td></tr>\n";
+        $rh .= "<tr class=\"" . $tr_class . "\"><td>$r</td><td>$rv&nbsp;$ru</td><td>$rt</td>";
+        $rh .= "<td><a href=\"$__ME?detail=$dn\">$dn</a></td></tr>\n";
         $row = ($row+1)%2;
       }
     $rh .= "</table><br>\n";
@@ -267,6 +260,38 @@ sub GRP_CGI_DISPTACH_URL($){
     # Log 0,"GRP URL-DISP-CAT: " . $CAT;
     }
   return $CAT;
+}
+#-------------------------------------------------------------------------------
+sub GRP_GET_READING_VAL($$){
+  # IN $dn = DeviceName; $rn = ReadingName
+  my($dn,$rn) = @_;
+  # OUT $rv = ReadingValue; $rt = ReadingTime; $ru = ReadingUnit
+	# Default Values
+  my $rv = "???";
+  my $rt = "****-**-** **:**:**";
+  my $ru = "";
+  # First $hash->{READINGS}
+  if(defined($defs{$dn}{READINGS}{$rn}{VAL})) {
+    $rv = $defs{$dn}{READINGS}{$rn}{VAL};
+    $rt = $defs{$dn}{READINGS}{$rn}{TIME};
+     }
+  if($rv =~ m/ /){
+    my @a = split(/ /, $rv);
+    $rv = $a[0];
+    $ru = $a[1];
+    }
+	if($rv ne "???"){
+		$rv = sprintf("%.2f", $rv);
+		}
+  Log 0,"GROUP GET-READING: $rv,$rt,$ru";
+  # Second $hash
+	# First Wins
+  if(defined($defs{$dn}{$rn}) && $rv eq "???"){
+    $rv = $defs{$dn}{$rn};
+    $rt = " ";
+  }
+  Log 0,"GROUP GET-READING: $rv,$rt,$ru";
+  return ($rv,$rt,$ru);  
 }
 #-------------------------------------------------------------------------------
 sub GRP_HANDLE_CAT($$){
