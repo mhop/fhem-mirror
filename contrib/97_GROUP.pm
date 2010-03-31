@@ -280,7 +280,7 @@ sub GRP_GET_READING_VAL($$){
     $rv = $a[0];
     $ru = $a[1];
     }
-	if($rv ne "???"){
+	if($rv =~ /\d{1}/) {
 		$rv = sprintf("%.2f", $rv);
 		}
   Log 0,"GROUP GET-READING: $rv,$rt,$ru";
