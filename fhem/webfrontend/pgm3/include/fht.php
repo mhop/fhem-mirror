@@ -234,7 +234,9 @@ setlocale (LC_ALL, 'de_DE.utf8');
         $text=$battery;   
         if ($battery == 'none') {$text='Bat: ok';}
 	elseif ($battery =='empty') {$text='Bat: low'; $txtcolor=$red;}
-	else {$text='';};
+	elseif ($battery =='Battery low') {$text='Bat: low'; $txtcolor=$red;}
+	else {$text=$battery;};
+	#else {$text='';};
         ImageTTFText ($im,  $fontsize, 0, 165, 10, $txtcolor, $fontttf, $text);
         $fontsize=7;  
 
