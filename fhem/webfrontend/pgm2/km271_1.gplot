@@ -18,11 +18,11 @@ set format y "%0.1f"
 set ylabel "Minutes"
 set yrange [0:]
 
-#FileLog 4:Warmwasseristtemperatur:0:
-#FileLog 4:Brennerlaufzeit:0:delta-h
+#FileLog 4:WW_Isttemperatur:0:
+#FileLog 4:Brenner_Laufzeit1_Minuten\x3a:0:delta-h
 
-plot "<IN>" using 1:4 axes x1y2 title 'WW-Temp' with lines lw 2,\
-     "<grep Brennerlaufzeit <IN> | perl -ane '\
+plot "<grep WW_Isttemperatur <IN>" using 1:4 axes x1y2 title 'WW-Temp' with lines lw 2,\
+     "<grep Brenner_Laufzeit1_Minuten: <IN> | perl -ane '\
         @a = split(\"[_:]\", $F[0]);\
         if(defined($lh) && $lh ne $a[1])\
           { printf(\"${ld}_$lh:30:00 %f\n\", $hv); $hv = 0; }\
