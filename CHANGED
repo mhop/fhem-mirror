@@ -583,3 +583,4 @@
   - feature: CUL: optional baudrate spec in definition
   - feature: CUL: sendpool attribute
   - feature: CUL_HOERMANN module added
+  - bugfix:  DST change: absolute at and relative sunrise fix
