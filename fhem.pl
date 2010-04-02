@@ -62,6 +62,7 @@ sub LoadModule($);
 sub Log($$);
 sub OpenLogfile($);
 sub PrintHash($$);
+sub ReadingsVal($$$);
 sub ResolveDateWildcards($@);
 sub RemoveInternalTimer($);
 sub SecondsTillTomorrow($);
@@ -160,7 +161,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.104 2010-04-02 14:20:53 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.105 2010-04-02 16:26:58 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2237,4 +2238,18 @@ SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
 
   return $stt_sec;
 }
+
+sub
+ReadingsVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{READINGS}) &&
+     defined($defs{$d}{READINGS}{$n}) &&
+     defined($defs{$d}{READINGS}{$n}{VAL})) {
+     return $defs{$d}{READINGS}{$n}{VAL};
+  }
+  return $default;
+}
+
 
