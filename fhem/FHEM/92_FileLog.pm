@@ -153,7 +153,7 @@ FileLog_Set($@)
 # - delta-h / delta-d to get rain/h and rain/d values from continuous data.
 #
 # It will set the %data values
-#  min<x>, max<x>, avg<x>, cnt<x>, lastd<x>, lastv<x>
+#  min<x>, max<x>, avg<x>, cnt<x>, lastd<x>, lastv<x>, sum<x>
 # for each requested column, beggining with <x> = 1
 
 sub
@@ -315,8 +315,8 @@ FileLog_Get($@)
       $min[$i] = $val if($min[$i] ==  999999);
       $max[$i] = $val if($max[$i] == -999999);
       $lastv[$i] = $val if(!$lastv[$i]);
-      $sum[$i] = $val if(!$sum[$i]);
-      $cnt[$i] = 1 if(!$cnt[$i]);
+      $sum[$i] = ($sum[$i] ? $sum[$i] + $val : $val);
+      $cnt[$i]++;
 
       my @lda = split("[_:]", $lastdate{$hd});
       my $ts = "12:00:00";                   # middle timestamp
