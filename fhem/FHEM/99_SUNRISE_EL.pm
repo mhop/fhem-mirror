@@ -67,11 +67,11 @@ sr($$$$$$)
   if($data{AT_RECOMPUTE} ||                     # compute it for tommorow
      int(($nh-$sst)*3600) >= 0) {               # if called a subsec earlier
     $nt += 86400;
-    $diff = 24;
     @lt = localtime($nt);
-    $gmtoff = _calctz($nt,@lt); # in hour
+    my $ngmtoff = _calctz($nt,@lt); # in hour
+    $diff = 24+$gmtoff-$ngmtoff;
 
-    ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
+    ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
     $sst = ($rise ? $rt : $st) + ($seconds/3600);
   }
 

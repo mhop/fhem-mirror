@@ -53,7 +53,7 @@ at_Define($$)
   $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0])         # Midnight for absolute time
                         if($rel ne "+");
   $nt += ($hr*3600+$min*60+$sec); # Plus relative time
-  $nt += 86400 if($ot >= $nt);                  # Do it tomorrow...
+  $nt += SecondsTillTomorrow($ot) if($ot >= $nt);  # Do it tomorrow...
   $nt += $at_tdiff if(defined($at_tdiff));
 
   @lt = localtime($nt);

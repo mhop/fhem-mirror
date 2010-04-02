@@ -64,6 +64,7 @@ sub OpenLogfile($);
 sub PrintHash($$);
 sub ResolveDateWildcards($@);
 sub RemoveInternalTimer($);
+sub SecondsTillTomorrow($);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
@@ -159,13 +160,15 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.103 2010-03-22 14:31:37 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.104 2010-04-02 14:20:53 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
   "- a list seperated by komma (,)\n" .
   "- a regexp, if contains one of the following characters: *[]^\$\n" .
   "- a range seperated by dash (-)\n";
+my $stt_sec;                    # Used by SecondsTillTomorrow()
+my $stt_day;                    # Used by SecondsTillTomorrow()
 
 
 $init_done = 0;
@@ -2215,3 +2218,23 @@ AddDuplicate($$)
   $duplicate{$duplidx}{TIM} = gettimeofday();
   $duplidx++;
 }
+
+sub
+SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
+{
+  my $t = shift;
+  my $day = int($t/86400);
+
+  if(!$stt_day || $day != $stt_day) {
+    my $t = $day*86400+12*3600;
+    my @l1 = localtime($t);
+    my @l2 = localtime($t+86400);
+    $stt_sec = 86400+
+                ($l1[2]-$l2[2])*3600+
+                ($l1[1]-$l2[1])*60;
+    $stt_day = $day;
+  }
+
+  return $stt_sec;
+}
+
