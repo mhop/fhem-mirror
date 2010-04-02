@@ -751,20 +751,21 @@ FW_showRoom()
 
       } elsif($type eq "FHT") {
 
-        $v = $defs{$d}{READINGS}{"measured-temp"}{VAL};
-        $v = "" if(!defined($v));
+        $v = ReadingsVal($d, "measured-temp", "");
 
         $v =~ s/ .*//;
         pO "<td><a href=\"$__ME?detail=$d\">$d</a></td>";
         pO "<td align=\"center\">$v&deg;</td>";
 
         $v = sprintf("%2.1f", int(2*$v)/2) if($v =~ m/[0-9.-]/);
-        my @tv = map { ($_.".0", $_+0.5) } (10..29);
+        my @tv = map { ($_.".0", $_+0.5) } (5..30);
+        shift(@tv);     # 5.0 is not valid
         $v = int($v*20)/$v if($v =~ m/^[0-9].$/);
         pO FW_hidden("arg.$d", "desired-temp");
         pO FW_hidden("dev.$d", $d);
+
         pO "<td>" .
-            FW_select("val.$d",\@tv,$v) .
+            FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $v)) .
             FW_submit("cmd.$d", "set") . "</td>";
 
       } elsif($type eq "FileLog") {
