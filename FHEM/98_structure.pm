@@ -133,7 +133,10 @@ structure_Set($@)
 {
   my ($hash, @list) = @_;
   my $ret = "";
+  my %pars;
+
   $hash->{INSET} = 1;
+
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
     if($defs{$d}{INSET}) {
@@ -151,11 +154,17 @@ structure_Set($@)
     if($sret) {
       $ret .= "\n" if($ret);
       $ret .= $sret;
+      if($list[1] eq "?") {
+        $sret =~ s/.*one of //;
+        map { $pars{$_} = 1 } split(" ", $sret);
+      }
     }
   }
   delete($hash->{INSET});
-  Log 5, "ATTR: $ret" if($ret);
-  return undef;
+  Log 5, "SET: $ret" if($ret);
+  return $list[1] eq "?"
+           ? "Unknown argument ?, choose one of " . join(" ", sort keys(%pars))
+           : undef;
 }
 
 ###################################
