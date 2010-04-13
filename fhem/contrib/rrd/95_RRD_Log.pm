@@ -4,8 +4,8 @@
 # Feedback: http://groups.google.com/group/fhem-users 
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 26.01.2010
-# Version: 0.5.0
+# Stand: 13.04.2010
+# Version: 0.9.0
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
 #######################################################################
 #*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA*BETA
@@ -336,7 +336,7 @@ sub RRD_Log_disptach_reading($$$) {
     my $changed_device_type = $defs{$changed_device}{TYPE};
     #CUL-Weiche
     if($changed_device_type eq "CUL" && $changed_device_type eq "FHZ" && $changed_device_type eq "CUL_RFR"){
-    if(!defined($data{RRD_LOG}{READING}{$changed_device_type}{$changed_reading})) {
+    if(!defined($data{RRD_LOG}{READING}{$changed_device_type})) {
         Log $ll, "RRDLOG|Disptach|CUL_WEICHE: $changed_device Type $changed_device_type not configured";
         return undef;}
     }
@@ -376,7 +376,7 @@ sub RRD_Log_disptach_reading($$$) {
     no strict "refs";
     
     my $rrd_create_func;
-    if($changed_device_type eq "CUL" && $changed_device_type eq "FHZ" && $changed_device_type eq "CUL_RFR"){
+    if($changed_device_type eq "CUL" || $changed_device_type eq "FHZ" || $changed_device_type eq "CUL_RFR"){
         my $cul_reading;
         if(lc($changed_reading) =~ m/_rssi$/){$cul_reading = "rssi";}
         if(lc($changed_reading) =~ m/_msg$/){$cul_reading = "msg";}
@@ -386,7 +386,7 @@ sub RRD_Log_disptach_reading($$$) {
         }
     else {$rrd_create_func =  $data{RRD_LOG}{READING}{$changed_device_type}{$changed_reading};}
     if(!defined($rrd_create_func)){
-      Log $ll, "RRDLOG|Disptach|rrd_create_func|ERROR: Function not defined";
+      Log $ll, "RRDLOG[ERRROR] dispatch rrd_create_func $changed_device_type:$changed_reading Function not defined";
       return undef;
     }
     $rrd_file = &$rrd_create_func($self,$changed_device,$changed_reading,$rrd_file,$timestamp);
