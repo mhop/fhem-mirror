@@ -93,10 +93,9 @@ CUL_RFR_Parse($$)
   elsif($smsg =~ m/^K/) { $hash->{NR_KMSG}++ }
   else                  { $hash->{NR_RMSG}++ }
 
-  $smsg = $1 if($smsg =~ m/^(E[0-9A-F]{20})[REFHKT]/);   # Fixing a CUL/RFR bug
-  $smsg = $1 if($smsg =~ m/^(R[0-9A-F]{12})[REFHKT]/);
-
-  CUL_Parse($hash, $iohash, $hash->{NAME}, $smsg, "X21");
+  foreach my $m (split(";", $smsg)) {
+    CUL_Parse($hash, $iohash, $hash->{NAME}, $m, "X21");
+  }
   return "";
 }
 
@@ -107,6 +106,7 @@ CUL_RFR_DelPrefix($)
   while($msg =~ m/^\d{4}U/) {
     (undef, $msg) = split("U", $msg, 2);
   }
+  $msg =~ s/;([\r\n]*)$/$1/;
   return $msg;
 }
 
