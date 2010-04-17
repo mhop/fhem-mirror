@@ -1739,9 +1739,25 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>freq / bWidth / rAmpl / sens<br>
         Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity.
         Use it with care, it may destroy your hardware and it even may be
-        illegal to do so.
+        illegal to do so. Note: the parameters used for RFR transmission are
+        not affected.<br>
+        <ul>
+        <li>freq sets both the reception and transmission frequency. Note:
+            although the CC1101 can be set to frequencies between 315 and 915
+            MHz, the antenna interface and the antenna of the CUL is tuned for
+            exactly one frequency. Default is 868.3MHz (or 433MHz)
+        <li>bWidth can be set to values between 58kHz and 812kHz. Large values
+            are susceptible to interference, but make possible to receive
+            inaccurate or multiple transmitters. It affects tranmission too.
+            Default is 325kHz.
+        <li>rAmpl is receiver amplification, with values between 24 and 42 dB.
+            Bigger values allow reception of weak signals. Default is 42.
+        <li>sens is the decision boundery between the on and off values, and it
+            is 4, 8, 12 or 16 dB.  Smaller values allow reception of less clear
+            signals. Default is 4dB.
+        </ul>
         </li><br>
-    <li>led><br>
+    <li>led<br>
         Set the CUL led off (00), on (01) or blinking (02).
         </li><br>
   </ul>
