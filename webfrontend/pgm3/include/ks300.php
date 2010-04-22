@@ -121,7 +121,6 @@ if ($DBUse=="1") {
 			$oldmin=$array[$x][14]; 
 			$oldhour=$array[$x][12]; 
 			array_push( $arraydata,array($date,$temp,$hum,$wind,$rain,$israin));
-
 			}
 		}
 		#WS300 has Willi instead other things
@@ -178,6 +177,7 @@ if ($DBUse=="1") {
         	$txtcolor=$bg3p; 
         	ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
 	$fontsize=9;
+	$temp=$resultreverse[0][1]; #Martin
 	$text=$temp." &#176;C";
 	$tvalue= $temp;
         ImageTTFText ($im, $fontsize, 0, 90-$XcorrectMainTextKS, 37, $txtcolor, $fontttfb, $text);
@@ -502,7 +502,7 @@ function show_error($file,$draw,$imgmaxx,$imgmaxy)
 	imagestring($im, 3, 5, 5, "Error, there is no $file", $black);
 	imagestring($im, 1, 3, 25, "Please add the following to your fhem.cfg", $black);
 	$logname=$draw."log";
-	imagestring($im, 1, 3, 35, "define $logname FileLog $file $draw:.*H:.*", $black);
+	imagestring($im, 1, 3, 35, "define $logname FileLog $file $draw:*", $black);
 	header("Content-type: image/png");
 	imagePng($im);
 	exit;
