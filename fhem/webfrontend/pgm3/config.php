@@ -148,8 +148,8 @@
         $showdewpointks300='yes';       # Dewpoint (german: taupunkt)
         $XcorrectMainTextKS=45;         # Text of main text from the right side (Default: 35)
 
-        $logrotateKS300lines=2100;      # automatic Logrotate; $logrotate must be 'yes'.
-                                        # Default:2100
+        $logrotateKS300lines=13000;      # automatic Logrotate; $logrotate must be 'yes'.
+                                        # Default: 13000
                                         # read docs/logrotate if you want adjust it manually
                                         # otherwise the system will slow down
                                         # pgm3 (user www-data) needs the rights to write the logs
