@@ -42,13 +42,14 @@ include "functions.php";
 
 	$today= date("H");
         $savefile=$AbsolutPath."/tmp/USERDEF.".$drawuserdef.".log.".$parts[0].".png";
-	$fmtime=date ("H", filemtime($savefile)); #at least one new graphic per hour (gnuplot)
-	if ((file_exists($savefile)) and ($fmtime == $today)) {
-
+	if (file_exists($savefile)) {
+		$fmtime=date ("H", filemtime($savefile)); #at least one new graphic per hour (gnuplot)
+	     if ($fmtime == $today) {
 		$im2 = @ImageCreateFromPNG($savefile);
 		header("Content-type: image/png");
 		imagePng($im2);
 		exit; # ;-)))
+	     }
 	}
 	else #delete old pngs
 	{
@@ -239,6 +240,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			fputs($f1,$message);
 			fclose($f1);
 			exec("$gnuplot $AbsolutPath/tmp/$drawuserdef",$output);
+		sleep(3);
 
 			$w = imagesx($im);
 			$h = imagesy($im);

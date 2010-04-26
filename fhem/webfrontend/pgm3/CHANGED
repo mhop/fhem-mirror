@@ -204,3 +204,6 @@ It is not necessary to tell fhem that there are other logs.
 	-- Feature: DBLog for everything except UserDefs 
 	   Changed: index.php, config.php, fht.php, hsm100.php, 
 	   	    fhtpulldown.php, ks300.php
+2010-04-26
+	-- Bugfix: userdefs.php: FS20-Type the first time with broken graphic
+
