@@ -108,3 +108,5 @@
 - Martin 2010-03-12
   -- Bugfix: better check of availability of google-weather
   -- Feature: DBLog added for everything except UserDefs
+-Martin 201004-26
+  -- Bugfxi: the FS20-Type from Userdef the first time with a broken graphic
