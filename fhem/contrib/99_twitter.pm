@@ -9,10 +9,20 @@
 # per AT-Job alle 15min
 # define TW001 at +00:15:00 {my $msg = TimeNow() . " " . $defs{<DEVICE-NAME>}{'STATE'} ;; fhem "twitter $msg"}
 #
+# twitter STATUS
+# Shows status of twitter-command: Twitter:Enabeld MSG-COUNT: 2 ERR-COUNT: 0
+#
+# twitter enable
+# Enables twitter-command
+#
 # Twitter Limits
 # http://help.twitter.com/forums/10711/entries/15364
 # Updates: 1,000 per day. The daily update limit is further broken down into
 # smaller limits for semi-hourly intervals. Retweets are counted as updates.
+#
+# My Limits ;-)
+# LPW-Timeout 5sec
+# Max-Errors = 10
 ##############################################
 package main;
 use strict;
@@ -23,7 +33,6 @@ use LWP::UserAgent;
 use vars qw(%data);
 use vars qw(%cmds);
 sub Commandtwitter($);
-
 #####################################
 sub
 twitter_Initialize($)
@@ -40,6 +49,10 @@ twitter_Initialize($)
   # Max 1000 MSGs per Day
   $data{twitter}{conf}{msg_count} = 0;
   $data{twitter}{conf}{day} = (localtime(time()))[3];
+  # Error-Counter
+  $data{twitter}{error} = 0;
+  $data{twitter}{error_max} = 10;
+  $data{twitter}{last_msg} = "";
   #FHEM-Command
   $cmds{twitter}{Fn} = "Commandtwitter";
   $cmds{twitter}{Hlp} = "Sends Twitter Messages (max. 140 Chars): twitter MSG";
@@ -52,9 +65,38 @@ sub Commandtwitter($)
   Log 0, "TWITTER[ERROR] Keine Nachricht";
   return undef;
   }
+  #Show Status
+  my $status;
+  if($msg eq "STATUS"){
+    if(defined($data{twitter}{conf}{disabeld})){$status = "Twitter:Disbaled";}
+    else{$status = "Twitter:Enabeld";}
+    $status .= " MSG-COUNT: " . $data{twitter}{conf}{msg_count};
+    $status .= " ERR-COUNT: " . $data{twitter}{error};
+    $status .= " MSG-LAST: " . $data{twitter}{last_msg};
+    return $status;
+  }
+  #Enable
+  if($msg eq "ENABLE"){
+    if(defined($data{twitter}{conf}{disabeld})){
+        $status = "Twitter enabled";
+        retunr $status;
+        }
+    return "Twitter already Enabeld";
+  }
+  #ERROR-Counter
+  my ($err_cnt,$err_max);
+  if(defined($data{twitter}{error})){
+  	$err_cnt = $data{twitter}{error};
+  	$err_max = $data{twitter}{error_max};
+  	if($err_cnt > $err_max){
+  		# ERROR disable twitter
+  		Log 0, "TWITTER[INFO] ErrCounter exceeded $err_max  DISABLED";
+    	$data{twitter}{conf}{disabeld} = 1;
+  		}
+  	}
   # Disbaled ??
   if(defined($data{twitter}{conf}{disabeld})){
-    Log 0, "TWITTER[INFO] DISABLED";
+    Log 0, "TWITTER[STATUS] DISABLED";
     return undef;
   }
   #Changed Day
@@ -64,6 +106,8 @@ sub Commandtwitter($)
     $data{twitter}{conf}{day} = $d;
     Log 0,"TWITTER[INFO] DAY-CHANGE: DAY: $d_old MSG-COUNT: " . $data{twitter}{conf}{msg_count};
     $data{twitter}{conf}{msg_count} = 0;
+    #Reset ERROR-Counter
+    $data{twitter}{error} = 0;
   }
   #Count MSG
   my $msg_cnt = $data{twitter}{conf}{msg_count};
@@ -90,22 +134,29 @@ sub Commandtwitter($)
   
   $browser->credentials('twitter.com:80', 'Twitter API', $t_user , $t_pdw);
   my $response = $browser->get("http://twitter.com/account/verify_credentials.json");
-  if($response->code eq 200){$t_log = "LOGIN=SUCCESS";}
+  if($response->code eq 200){
+  	$t_log = "LOGIN=SUCCESS";
+  	}
   else {
-    $t_log = "[ERROR] LOGIN: " . $response->code .":".$response->message . " DISABLED";
-    # ERROR disable twitter
-    $data{twitter}{conf}{disabeld} = 1;
+    $t_log = "TWITTER[ERROR] LOGIN: " . $response->code .":".$response->message . " DISABLED";
+    $data{twitter}{error}++;
+    $data{twitter}{last_msg} = TimeNow() . " " . $t_log;
+    return undef;
     }
   
   $response = $browser->post($url, {status => $msg});
-  if($response->code eq 200){$t_log .= " UPDATE=SUCCESS";}
+  if($response->code eq 200){
+  	$t_log .= " UPDATE=SUCCESS";
+  	}
   else {
-    $t_log = "[ERROR] UPDATE: " . $response->code .":".$response->message . " DISABLED";
-    # ERROR disable twitter
-    $data{twitter}{conf}{disabeld} = 1;
+    $t_log = "TWITTER[ERROR] UPDATE: " . $response->code .":".$response->message . " DISABLED";
+    $data{twitter}{error}++;
+    $data{twitter}{last_msg} = TimeNow() . " " . $t_log;
+    return undef;
     }
   $msg_cnt++;
   Log 0, "TWITTER[INFO] " . $t_log . " MSG-$msg_cnt-: $msg";
+  $data{twitter}{last_msg} = TimeNow() . " TWITTER[INFO] " . $t_log . " MSG-$msg_cnt-: $msg";
   $data{twitter}{conf}{msg_count}++;
   return undef;
 }
