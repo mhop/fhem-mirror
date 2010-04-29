@@ -12,8 +12,8 @@
 # twitter STATUS
 # Shows status of twitter-command: Twitter:Enabeld MSG-COUNT: 2 ERR-COUNT: 0
 #
-# twitter enable
-# Enables twitter-command
+# twitter ENABLE/DISABLE
+# Enables/disbales twitter-command
 #
 # Twitter Limits
 # http://help.twitter.com/forums/10711/entries/15364
@@ -79,9 +79,14 @@ sub Commandtwitter($)
   if($msg eq "ENABLE"){
     if(defined($data{twitter}{conf}{disabeld})){
         $status = "Twitter enabled";
-        retunr $status;
+        return $status;
         }
     return "Twitter already Enabeld";
+  }
+  # Disable
+  if($msg eq "DISABLE"){
+    $data{twitter}{conf}{disabeld} = 1;
+    return "Twitter disabeld";
   }
   #ERROR-Counter
   my ($err_cnt,$err_max);
