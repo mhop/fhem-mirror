@@ -1,5 +1,31 @@
 ##############################################
+#
 # Twitter for FHEM
+#
+##############################################
+#
+#  Copyright notice
+#
+#  (c) 2010
+#  Copyright: Axel Rieger (fhem BEI anax PUNKT info)
+#  All rights reserved
+#
+#  This script free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+##############################################
 # Sends Twitter-MSG
 #
 # Usage:
@@ -10,7 +36,18 @@
 # define TW001 at +00:15:00 {my $msg = TimeNow() . " " . $defs{<DEVICE-NAME>}{'STATE'} ;; fhem "twitter $msg"}
 #
 # twitter STATUS
-# Shows status of twitter-command: Twitter:Enabeld MSG-COUNT: 2 ERR-COUNT: 0
+# Shows status of twitter-command:
+#--------------------------------------------------------------------------------
+#TWITTER 
+#--------------------------------------------------------------------------------
+#	 Status: Enabeld
+#	 Message-Count: 17
+#	 Message-Count-Max: 1000
+#	 Error-Count: 0
+#	 Error-Count-Max: 5
+#	 Last Message: <TIMESTAMP>
+#	 Last Message: <MESSAGE>
+#--------------------------------------------------------------------------------
 #
 # twitter ENABLE/DISABLE
 # Enables/disbales twitter-command
@@ -51,8 +88,9 @@ twitter_Initialize($)
   $data{twitter}{conf}{day} = (localtime(time()))[3];
   # Error-Counter
   $data{twitter}{error} = 0;
-  $data{twitter}{error_max} = 10;
+  $data{twitter}{error_max} = 5;
   $data{twitter}{last_msg} = "";
+  $data{twitter}{last_msg_time} = "";
   #FHEM-Command
   $cmds{twitter}{Fn} = "Commandtwitter";
   $cmds{twitter}{Hlp} = "Sends Twitter Messages (max. 140 Chars): twitter MSG";
@@ -62,17 +100,24 @@ sub Commandtwitter($)
 {
   my ($cl, $msg) = @_;
   if(!$msg) {
-  Log 0, "TWITTER[ERROR] Keine Nachricht";
-  return undef;
+    Log 0, "TWITTER[ERROR] Keine Nachricht";
+    return undef;
   }
   #Show Status
   my $status;
+  $status .= "--------------------------------------------------------------------------------\n";
+  $status .= "TWITTER \n";
+  $status .= "--------------------------------------------------------------------------------\n";
   if($msg eq "STATUS"){
-    if(defined($data{twitter}{conf}{disabeld})){$status = "Twitter:Disbaled";}
-    else{$status = "Twitter:Enabeld";}
-    $status .= " MSG-COUNT: " . $data{twitter}{conf}{msg_count};
-    $status .= " ERR-COUNT: " . $data{twitter}{error};
-    $status .= " MSG-LAST: " . $data{twitter}{last_msg};
+    if(defined($data{twitter}{conf}{disabeld})){$status .= "\t Status: Disbaled\n";}
+    else{$status .= "\t Status: Enabeld\n";}
+    $status .= "\t Message-Count: " . $data{twitter}{conf}{msg_count} . "\n";
+    $status .= "\t Message-Count-Max: 1000\n";
+    $status .= "\t Error-Count: " . $data{twitter}{error} . "\n"; 
+    $status .= "\t Error-Count-Max: " . $data{twitter}{error_max} . "\n";
+    $status .= "\t Last Message: " . $data{twitter}{last_msg_time} . "\n";
+    $status .= "\t Last Message: " . $data{twitter}{last_msg} . "\n";
+    $status .= "--------------------------------------------------------------------------------\n";
     return $status;
   }
   #Enable
@@ -96,6 +141,8 @@ sub Commandtwitter($)
   	if($err_cnt > $err_max){
   		# ERROR disable twitter
   		Log 0, "TWITTER[INFO] ErrCounter exceeded $err_max  DISABLED";
+        $data{twitter}{last_msg_time} = TimeNow();
+        $data{twitter}{last_msg} = "TWITTER[INFO] ErrCounter exceeded $err_max  DISABLED";
     	$data{twitter}{conf}{disabeld} = 1;
   		}
   	}
@@ -118,6 +165,8 @@ sub Commandtwitter($)
   my $msg_cnt = $data{twitter}{conf}{msg_count};
   if($msg_cnt > 1000) {
     Log 0, "TWITTER[INFO] MessageCount exceede 1000 Messages per Day";
+    $data{twitter}{last_msg_time} = TimeNow() ;
+    $data{twitter}{last_msg} = "TWITTER[INFO] Message-Count exceeded 1000 Messages per Day";
     return undef;
   }
   my $t_user = $data{twitter}{login}{user};
@@ -145,7 +194,8 @@ sub Commandtwitter($)
   else {
     $t_log = "TWITTER[ERROR] LOGIN: " . $response->code .":".$response->message . " DISABLED";
     $data{twitter}{error}++;
-    $data{twitter}{last_msg} = TimeNow() . " " . $t_log;
+    $data{twitter}{last_msg_time} = TimeNow() ;
+    $data{twitter}{last_msg} = $t_log;
     return undef;
     }
   
@@ -156,13 +206,17 @@ sub Commandtwitter($)
   else {
     $t_log = "TWITTER[ERROR] UPDATE: " . $response->code .":".$response->message . " DISABLED";
     $data{twitter}{error}++;
-    $data{twitter}{last_msg} = TimeNow() . " " . $t_log;
+    $data{twitter}{last_msg_time} = TimeNow() ;
+    $data{twitter}{last_msg} = $t_log;
     return undef;
     }
-  $msg_cnt++;
   Log 0, "TWITTER[INFO] " . $t_log . " MSG-$msg_cnt-: $msg";
-  $data{twitter}{last_msg} = TimeNow() . " TWITTER[INFO] " . $t_log . " MSG-$msg_cnt-: $msg";
+  $data{twitter}{last_msg_time} = TimeNow() ;
+  $data{twitter}{last_msg} = $msg;
   $data{twitter}{conf}{msg_count}++;
+  # Reset ERROR-COUNTER
+  $data{twitter}{error} = 0;
+  $msg_cnt++;
   return undef;
 }
 1;
