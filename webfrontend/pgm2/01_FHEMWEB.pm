@@ -183,6 +183,12 @@ FW_Read($)
     }
   }
 
+  # This is a hack... Dont want to do it each time after a fork.
+  if(!$modules{SVG}{LOADED}) {
+    my $ret = CommandReload(undef, "98_SVG");
+    Log 0, $ret if($ret);
+  }
+
   # Data from HTTP Client
   my $buf;
   my $ret = sysread($hash->{CD}, $buf, 1024);
