@@ -161,7 +161,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.105 2010-04-02 16:26:58 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.106 2010-05-14 12:19:31 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -495,8 +495,11 @@ IOWrite($@)
   my $dev = $hash->{NAME};
   return if(IsDummy($dev) || IsIgnored($dev));
   my $iohash = $hash->{IODev};
-  if(!$iohash) {
-    Log 5, "No IO device found for $dev";
+  if(!$iohash ||
+     !$iohash->{TYPE} ||
+     !$modules{$iohash->{TYPE}} ||
+     !$modules{$iohash->{TYPE}}{WriteFn}) {
+    Log 5, "No IO device or WriteFn found for $dev";
     return;
   }
 
@@ -767,9 +770,9 @@ OpenLogfile($)
 
   } else {
 
+    HandleArchiving($defs{global});
     $defs{global}{currentlogfile} = $param;
     $defs{global}{logfile} = $attr{global}{logfile};
-    HandleArchiving($defs{global});
 
     open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
     # Redirect stdin/stderr
