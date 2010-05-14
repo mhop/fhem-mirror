@@ -12,6 +12,7 @@ sub SVG_render($$$$$$);
 sub time_to_sec($);
 sub fmtTime($$);
 
+
 my ($__lt, $__ltstr);
 
 #####################################
@@ -51,37 +52,37 @@ SVG_render($$$$$$)
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
   # Html Header
-  pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
-  pO "<?xml-stylesheet href=\"$__ME/svg_style.css\" type=\"text/css\"?>\n";
-  pO "<!DOCTYPE svg>\n";
-  pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" " .
-        "onload='Init(evt)'>\n";
-#  pO "<script type=\"text/ecmascript\" ".
-#        "xmlns:xlink=\"http://www.w3.org/1999/xlink\" ".
-#        "xlink:href=\"$__ME/svg.js\"/>\n";
+  pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
+  pO "<?xml-stylesheet href=\"$__ME/svg_style.css\" type=\"text/css\"?>";
+  pO "<!DOCTYPE svg>";
+  pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" ".
+        "xmlns:xlink=\"http://www.w3.org/1999/xlink\" " .
+        ">";
+  pO "<script type=\"text/ecmascript\" ".
+        "xlink:href=\"$__ME/svg.js\"/>";
 
   # Rectangle
-  pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\"
-        stroke-width=\"1px\" class=\"border\"/>\n";
+  pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" ".
+        "stroke-width=\"1px\" class=\"border\"/>";
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
-  my $title = $conf{title};
+  my $title = ($conf{title} ? $conf{title} : " ");
   $title =~ s/</&lt;/g;
   $title =~ s/>/&gt;/g;
-  pO "<text x=\"$off1\" y=\"$off2\" 
-        class=\"title\" text-anchor=\"middle\">$title</text>\n";
+  pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
+        "class=\"title\" text-anchor=\"middle\">$title</text>";
 
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
   ($off1,$off2) = (3*$th/4, $oh/2);
-  pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" 
-      class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>\n";
+  pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+      "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
 
   $t = ($conf{y2label} ? $conf{y2label} : "");
   $t =~ s/"//g;
   ($off1,$off2) = ($ow-$th/4, $oh/2);
-  pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" 
-      class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>\n";
+  pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+      "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
 
   # Digest axes/title/type from $plot (gnuplot) and draw the line-titles
   my (@axes,@ltitle,@type);
@@ -95,26 +96,18 @@ SVG_render($$$$$$)
   }
 
   ($off1,$off2) = ($ow-$x-$th, $y+$th);
+
+
   for my $i (0..int(@ltitle)-1) {
     my $j = $i+1;
     my $t = $ltitle[$i];
-    my $desc = sprintf("Min:%s Max:%s Last:%s",
+    my $desc = sprintf("$t: Min:%g Max:%g Last:%g",
         $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
-    pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"end\" ".
-      "class=\"l$i\">$t<title>$t</title><desc>$desc</desc></text>\n";
+    pO "<text title=\"$desc\" ".
+          "onclick=\"svg_labelselect(evt)\" line_id=\"line_$i\" " .
+          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l$i\">$t</text>";
     $off2 += $th;
   }
-
-  # Invisible ToolTip
-  pO "<g id='ToolTip' opacity='0.8' visibility='hidden' pointer-events='none'>
-        <rect id='tipbox' x='0' y='5' width='88' height='20' rx='2' ry='2'
-              fill='white' stroke='black'/>
-        <text id='tipText' x='5' y='20' font-family='Arial' font-size='12'>
-           <tspan id='tipTitle' x='5' font-weight='bold'><![CDATA[]]></tspan>
-           <tspan id='tipDesc' x='5' dy='15' fill='blue'><![CDATA[]]></tspan>
-        </text>
-     </g>\n";
-
 
   # Loop over the input, digest dates, calculate min/max values
   my ($fromsec, $tosec);
@@ -166,7 +159,7 @@ SVG_render($$$$$$)
 
   $dxp = $hdx[0];
   if($dxp && int(@{$dxp}) < 2 && !$tosec) { # not enough data and no range...
-    pO "</svg>\n";
+    pO "</svg>";
     return;
   }
 
@@ -209,8 +202,8 @@ SVG_render($$$$$$)
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $tstep) {
     $i = time_align($i,$aligntics);
     $off1 = int($x+($i-$fromsec)*$tmul);
-    pO "<polyline points=\"$off1,$y $off1,$off2\"/>\n";
-    pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>\n";
+    pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
+    pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
   }
 
   # then the text and the grid
@@ -223,10 +216,10 @@ SVG_render($$$$$$)
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $step) {
     $i = time_align($i,$aligntext);
     $off1 = int($x+($i-$fromsec)*$tmul);
-    pO "<polyline points=\"$off1,$y $off1,$off4\" class=\"hgrid\"/>\n";
     $t = fmtTime($tag, $i);
-    pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" 
-        text-anchor=\"middle\">$t</text>";
+    pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
+              "text-anchor=\"middle\">$t</text>";
+    pO "  <polyline points=\"$off1,$y $off1,$off4\" class=\"hgrid\"/>";
   }
 
 
@@ -284,7 +277,7 @@ SVG_render($$$$$$)
         $tlabel =~ s/^"(.*)"$/$1/;
 
         $off2 = int($y+($ma-$tvalue)*$hmul);
-        pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>\n";
+        pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>";
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
         pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>
@@ -295,10 +288,11 @@ SVG_render($$$$$$)
 
       for(my $i = $mi; $i <= $ma; $i += $step) {
         $off2 = int($y+($ma-$i)*$hmul);
-        pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>\n";
+        pO "  <polyline points=\"$off3,$off2 $off4,$off2\"/>";
         if($axis eq "x1y2")  {
           my $o6 = $x+$w;
-          pO "<polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>\n";
+          pO "  <polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>"
+            if($i > $mi && $i < $ma);
         }
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
@@ -313,6 +307,7 @@ SVG_render($$$$$$)
   # Second loop over the data: draw the measured points
   for my $idx (0..int(@hdx)-1) {
     my $a = $axes[$idx];
+
     next if(!defined($a));
     $min = $hmin{$a};
     $hmax{$a} += 1 if($min == $hmax{$a});  # Else division by 0 in the next line
@@ -320,6 +315,15 @@ SVG_render($$$$$$)
     my $ret = "";
     my ($dxp, $dyp) = ($hdx[$idx], $hdy[$idx]);
     next if(!defined($dxp));
+
+    my $yh = $y+$h;
+    my $tl = $ltitle[$idx] ? $ltitle[$idx]  : "";
+    my $dec = int(log($hmul*3)/log(10));
+    $dec = 0 if($dec < 0);
+    my $js_helpers = "id=\"line_$idx\" decimals=\"$dec\" ".
+          "x_off=\"$fromsec\" x_min=\"$x\" x_mul=\"$tmul\" ".
+          "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
+          "onclick=\"svg_click(evt)\"";
 
     my ($lx, $ly) = (-1,-1);
     if($type[$idx] eq "points" ) {
@@ -331,7 +335,7 @@ SVG_render($$$$$$)
           $ly = $x1; $ly = $y1;
           $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
                 $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
-          pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
+          pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
         }
 
     } elsif($type[$idx] eq "steps" || $type[$idx] eq "fsteps" ) {
@@ -353,7 +357,7 @@ SVG_render($$$$$$)
           }
         }
       }
-      pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
+      pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
 
     } elsif($type[$idx] eq "histeps" ) {
       if(@{$dxp} == 1) {
@@ -370,7 +374,7 @@ SVG_render($$$$$$)
              $x1,$y1, ($x1+$x2)/2,$y1, ($x1+$x2)/2,$y2, $x2,$y2);
         }
       }
-      pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
+      pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
 
     } else {                            # lines and everything else
       foreach my $i (0..int(@{$dxp})-1) {
@@ -380,11 +384,13 @@ SVG_render($$$$$$)
         $lx = $x1; $ly = $y1;
         $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
-      pO "<polyline points=\"$ret\" class=\"l$idx\"/>\n";
+
+      pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+    
     }
 
   }
-  pO "</svg>\n";
+  pO "</svg>";
 }
 
 sub
