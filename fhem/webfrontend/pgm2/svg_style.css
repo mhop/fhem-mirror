@@ -3,7 +3,7 @@ text.title { font-size:16px; }
 
 rect.border { stroke:black; stroke-width:1px; fill:none; }
 
-polyline { stroke:black; stroke-width:1px; fill:none; }
+polyline { stroke:black; fill:none; }
 
 .vgrid { stroke-dasharray:2,6; stroke:gray; }
 .hgrid { stroke-dasharray:2,6; stroke:gray; }

@@ -584,3 +584,4 @@
   - feature: CUL: sendpool attribute
   - feature: CUL_HOERMANN module added
   - bugfix:  DST change: absolute at and relative sunrise fix
+  - feature: FHEMWEB javascript additions for SVG plots (click on lines/labels)
