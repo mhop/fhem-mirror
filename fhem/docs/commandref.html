@@ -4247,7 +4247,8 @@ Terminating
     <li>plotsize<br/>
         the default size of the plot, in pixels, separated by comma:
         width,height. You can set individual sizes by setting the plotsize of
-        the weblink.
+        the weblink. Default is 800,160 for desktop, and 480,160 for
+        smallscreen.
         </li><br>
 
     <a name="fixedrange"></a>
@@ -4257,7 +4258,18 @@ Terminating
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
         and no scrolling for this weblinks will be possible. Needed e.g. for
         looking at last-years data without scrolling.
-        </li><br> </li> </ul>
+        </li><br>
+
+    <a name="smallscreen"></a>
+    <li>smallscreen<br/>
+        Optimize for small screen size, e.g. smartphones.
+        Note: The default configuration installed with make install-pgm2
+        installs 2 FHEMWEB instances: port 8083 for desktop browsers and
+        port 8084 for smallscreen browsers.
+        </li><br>
+
+    </li></ul>
+        
   </ul>
 
 </ul>

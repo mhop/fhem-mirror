@@ -101,8 +101,11 @@ SVG_render($$$$$$)
   for my $i (0..int(@ltitle)-1) {
     my $j = $i+1;
     my $t = $ltitle[$i];
-    my $desc = sprintf("$t: Min:%g Max:%g Last:%g",
+    my $desc = "";
+    if(defined($data{"min$j"}) && $data{"min$j"} ne "undef") {
+      $desc = sprintf("$t: Min:%g Max:%g Last:%g",
         $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
+    }
     pO "<text title=\"$desc\" ".
           "onclick=\"svg_labelselect(evt)\" line_id=\"line_$i\" " .
           "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l$i\">$t</text>";
