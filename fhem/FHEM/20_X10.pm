@@ -23,6 +23,25 @@
 #
 ################################################################
 
+
+#
+# Internals introduced in this module:
+#	MODEL	distinguish between different X10 device types
+#	BRIGHT	brightness level of dimmer devices in units of microdims (0..210)
+#
+# Readings introduced in this module:
+#	state	function and argument of last command
+#	onoff	inherited from switch interface (0= on, 1= off)
+#	dimmer	inherited from dimmer interface (0= dark, 100= bright)
+#
+# Setters introduced in this module:
+#	on	inherited from switch interface
+#	off	inherited from switch interface
+#	dimmer  inherited from dimmer interface (0= dark, 100= bright)
+#	dimdown	inherited from dimmer interface
+#	dimup	inherited from dimmer interface
+#
+
 package main;
 
 use strict;
@@ -73,6 +92,7 @@ my %functions_set = ( "on"      => 0,
                       "off"     => 0,
                       "dimup"   => 1,
                       "dimdown" => 1,
+		      "dimto"   => 1,
                       "on-till" => 1,
 		      "on-for-timer" => 1,
                     );
@@ -80,9 +100,9 @@ my %functions_set = ( "on"      => 0,
 
 my %models = (
     lm12	=> 'dimmer',
-    lm15        => 'simple',
-    am12        => 'simple',
-    tm13        => 'simple',
+    lm15        => 'switch',
+    am12        => 'switch',
+    tm13        => 'switch',
 );
 
 my @lampmodules = ('lm12','lm15'); # lamp modules
@@ -116,6 +136,84 @@ X10_SetState($$$$)
   my ($hash, $tim, $vt, $val) = @_;
   return undef;
 }
+
+#############################
+sub
+X10_StateMachine($$$$)
+{
+  my($hash, $time, $function, $argument)= @_;
+
+  # the following changes between (onoff,bright) states were
+  # experimentally observed for a Busch Timac Ferndimmer 2265
+  # bright and argument are measured in brightness steps
+  # from 0 (0%) to 210 (100%).
+  # for convenience, we connect the off state with a 210 bright state
+  #
+  #	initial		on		off		dimup d 	dimdown d
+  #	-------------------------------------------------------------------------
+  #	(on,x)	  ->	(on,x)		(off,210)	(on,x+d)	(on,x-d)
+  #	(off,210) ->	(on,210)	(off,210)	(on,210)	(on,210-d)
+
+  my $onoff;
+  my $bright;
+
+
+  if(defined($hash->{ONOFF})) {
+    $onoff= $hash->{ONOFF};
+  } else {
+    $onoff= 0; }
+  if(defined($hash->{BRIGHT})) {
+    $bright= $hash->{BRIGHT};
+  } else {
+    $bright= 0; }
+  #Log 1, $hash->{NAME} . " initial state ($onoff,$bright)";
+
+  if($onoff) {
+    # initial state (on,bright)
+    if($function eq "on") {
+    } elsif($function eq "off") {
+      $onoff= 0; $bright= 210;
+    } elsif($function eq "dimup") {
+      $bright+= $argument;
+      if($bright> 210) { $bright= 210 };
+    } elsif($function eq "dimdown") {
+      $bright-= $argument;
+      if($bright< 0) { $bright= 0 };
+    }
+  } else {
+    # initial state (off,bright)
+    if($function eq "on") {
+      $onoff= 1; $bright= 210;
+    } elsif($function eq "off") {
+      $onoff= 0; $bright= 210;
+    } elsif($function eq "dimup") {
+      $onoff= 1; $bright= 210;
+    } elsif($function eq "dimdown") {
+      $onoff= 1;
+      $bright= 210-$argument;
+      if($bright< 0) { $bright= 0 };
+    }
+  }
+  #Log 1, $hash->{NAME} . " final state ($onoff,$bright)";
+
+  $hash->{ONOFF}= $onoff;
+  $hash->{BRIGHT}= $bright;
+  $hash->{READINGS}{onoff}{TIME}= $time;
+  $hash->{READINGS}{onoff}{VAL}= $onoff;
+  $hash->{READINGS}{dimmer}{TIME}= $time;
+  $hash->{READINGS}{dimmer}{VAL}= int(1000.0*$bright/210.0+0.5)/10.0;
+}
+
+#############################
+sub
+X10_LevelToDims($)
+{
+  # 22= 100%
+  my ($level)= @_;
+  my $dim= int(22*$level/100.0+0.5);
+  return $dim;
+}
+
 
 #############################
 sub
@@ -237,10 +335,29 @@ X10_Set($@)
   if($function =~ m/^dim/) {
     return "Cannot dim $name (model $model)" if($models{$model} ne "dimmer");
     my $arg= $a[2];
-    return "Wrong argument $arg, use 0..22" if($arg !~ m/^[0-9]{1,2}$/);
-    return "Wrong argument $arg, use 0..22" if($arg>22);
-    $dim= $arg;
-  }
+    return "Wrong argument $arg, use 0..100" if($arg !~ m/^[0-9]{1,3}$/);
+    return "Wrong argument $arg, use 0..100" if($arg>100);
+    if($function eq "dimto") {
+      # translate dimmer command to dimup/dimdown command
+      my $bright= 210;
+      if(defined($hash->{BRIGHT})) { $bright= $hash->{BRIGHT} };
+      $arg= $arg-100.0*$bright/210.0;
+      if($arg> 0) {
+	$function= "dimup";
+	$dim= X10_LevelToDims($arg);
+      } else {
+	$function= "dimdown";
+	$dim= X10_LevelToDims(-$arg);
+      }
+    } else {
+      $dim= X10_LevelToDims($arg);
+    }
+
+    # the meaning of $dim= 0, 1 is unclear
+    # if we encounter the need for dimming by such a small amount, we
+    # ignore it
+    if($dim< 2) { return "Dim amount too small" };
+  };
 
   # send command to CM11
   X11_Write($hash, $function, $dim) if(!IsDummy($a[0]));
@@ -255,6 +372,7 @@ X10_Set($@)
   $hash->{STATE} = $v;
   $hash->{READINGS}{state}{TIME} = $tn;
   $hash->{READINGS}{state}{VAL} = $v;
+  X10_StateMachine($hash, $tn, $function, int(210.0*$dim/22.0+0.5));
 
   return undef;
 }
@@ -288,6 +406,13 @@ X10_Define($$)
   $hash->{MODEL}  = $model;
   $hash->{HOUSE}  = $housecode;
   $hash->{UNIT}   = $unitcode;
+
+  if($models{$model} eq "switch") {
+    $hash->{INTERFACES}= "switch"
+  }
+  elsif($models{$model} eq "dimmer") {
+    $hash->{INTERFACES}= "dimmer"
+  };
 
   if(defined($modules{X10}{defptr}{$housecode}{$unitcode})) {
     return "Error: duplicate X10 device $housecode $unitcode definition " .
@@ -378,16 +503,17 @@ X10_Parse($$)
     $value = "$value $dim" ;
   }
 
-
   my $unknown_unitcodes= '';
+  my $tn= TimeNow();
   foreach my $unitcode (@unitcodes) {
     my $h= $modules{X10}{defptr}{$housecode}{$unitcode};
     if($h) {
         my $name= $h->{NAME};
         $h->{CHANGED}[0] = $value;
         $h->{STATE} = $value;
-        $h->{READINGS}{state}{TIME} = TimeNow();
+        $h->{READINGS}{state}{TIME} = $tn;
         $h->{READINGS}{state}{VAL} = $value;
+	X10_StateMachine($h, $tn, $function, $arg);
         Log GetLogLevel($name,2), "X10 $name $value";
         push(@list, $name);
     } else {

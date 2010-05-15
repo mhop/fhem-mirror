@@ -572,8 +572,8 @@
              window and windowsensor (M.Fischer)
   - feature: autocreate.pm (create undefined RF devices, logs and plots)
   - feature: on-for-timer added for X10 modules (Boris)
-  - bugfix:  pgm3: Better check of availability of google-weather (MartinH) 
-  - feature: pgm3: DBLog added for everything except UserDefs 
+  - bugfix:  pgm3: Better check of availability of google-weather (MartinH)
+  - feature: pgm3: DBLog added for everything except UserDefs
   	     (Gerhard Pfeffer / MartinH)
   - feature: pgm2 style changes, SVG in background, optional compression
 
@@ -586,3 +586,4 @@
   - bugfix:  DST change: absolute at and relative sunrise fix
   - feature: FHEMWEB javascript additions for SVG plots (click on lines/labels)
   - feature: FHEMWEB smallscreen attribute
+  - feature: Dimmer function of X10 module changed to match FS20 dimmer functions.
