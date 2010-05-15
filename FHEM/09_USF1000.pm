@@ -137,21 +137,25 @@ USF1000_Parse($$)
   	$flevel  = int($volume/$capacity*100.0+0.5);
   	$volume= int($volume/10.0+0.5)*10.0;
 
+  	if($flevel>-5) {
+		# reflections may lead to false reading (distance too large)
+		# the meaningless results are suppressed
 
-  	my $state= sprintf("v: %d  V: %d", $flevel, $volume);
+		my $state= sprintf("v: %d  V: %d", $flevel, $volume);
 
-  	$def->{CHANGED}[0] = $state;
-  	$def->{STATE} = $state;
-  	$def->{READINGS}{state}{TIME} = $t;
-  	$def->{READINGS}{state}{VAL} = $state;
-  	Log GetLogLevel($name, 4), "USF1000 $name: $state";
+		$def->{CHANGED}[0] = $state;
+		$def->{STATE} = $state;
+		$def->{READINGS}{state}{TIME} = $t;
+		$def->{READINGS}{state}{VAL} = $state;
+		Log GetLogLevel($name, 4), "USF1000 $name: $state";
 
-  	$def->{READINGS}{distance}{TIME} = $t;
-  	$def->{READINGS}{distance}{VAL} = $distance;
-  	$def->{READINGS}{level}{TIME} = $t;
-  	$def->{READINGS}{level}{VAL} = $flevel;
-  	$def->{READINGS}{volume}{TIME} = $t;
-  	$def->{READINGS}{volume}{VAL} = $volume;
+		$def->{READINGS}{distance}{TIME} = $t;
+		$def->{READINGS}{distance}{VAL} = $distance;
+		$def->{READINGS}{level}{TIME} = $t;
+		$def->{READINGS}{level}{VAL} = $flevel;
+		$def->{READINGS}{volume}{TIME} = $t;
+		$def->{READINGS}{volume}{VAL} = $volume;
+	}
   }
 
   my $warnings= ($lowbattery ? "Battery low" : "");
