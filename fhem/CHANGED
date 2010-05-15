@@ -577,7 +577,7 @@
   	     (Gerhard Pfeffer / MartinH)
   - feature: pgm2 style changes, SVG in background, optional compression
 
-- =DATE= (5.0)
+- =DATE= (4.10)
   - feature: KM271: Read only
   - bugfix:  99_SUNRISE_EL endless loop bug
   - feature: CUL: optional baudrate spec in definition
@@ -587,3 +587,4 @@
   - feature: FHEMWEB javascript additions for SVG plots (click on lines/labels)
   - feature: FHEMWEB smallscreen attribute
   - feature: Dimmer function of X10 module changed to match FS20 dimmer functions.
+  - feature: allow only meaningful readings (fill level > -5%) in USF1000
