@@ -11,8 +11,9 @@ attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 #define FHEM FHEM /dev/USB0
 
 define WEB FHEMWEB 8083 global
-attr WEB plotmode SVG
-attr WEB plotsize 800,160
+
+define WEBS FHEMWEB 8084 global
+attr WEBS smallscreen
 
 # Fake logfile, to access the global log
 define Logfile FileLog /tmp/fhem-%Y-%m.log fakelog
