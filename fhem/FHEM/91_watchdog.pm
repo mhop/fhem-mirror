@@ -95,7 +95,8 @@ watchdog_Trigger($)
   my $exec = SemicolonEscape($ntfy->{CMD});;
   $ntfy->{STATE} = "triggered";
   $ntfy->{INWATCHDOG} = 1;
-  AnalyzeCommandChain(undef, $exec);
+  my $ret = AnalyzeCommandChain(undef, $exec);
+  Log 3, $ret if($ret);
   $ntfy->{INWATCHDOG} = 0;
 }
 
