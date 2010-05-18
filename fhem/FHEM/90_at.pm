@@ -103,7 +103,8 @@ at_Exec($)
   delete $attr{$name}{skip_next} if($skip);
   my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
   $command = SemicolonEscape($command);
-  AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
+  my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
+  Log 3, $ret if($ret);
 
   return if(!$defs{$name});           # Deleted in the Command
 

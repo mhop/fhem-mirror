@@ -79,6 +79,7 @@ notify_Exec($$)
       $exec =~ s/____/@/g;
 
       my $r = AnalyzeCommandChain(undef, $exec);
+      Log 3, $r if($r);
       $ret .= " $r" if($r);
     }
   }
