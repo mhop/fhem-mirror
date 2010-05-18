@@ -154,14 +154,13 @@ my %client;			# Client array
 my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my $modpath_set;                # Check if modpath was used, and report if not.
-my $global_cl;			# To use from perl snippets
 my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.106 2010-05-14 12:19:31 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.107 2010-05-18 08:08:53 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -544,13 +543,17 @@ sub
 AnalyzeCommandChain($$)
 {
   my ($c, $cmd) = @_;
+  my $ret = "";
+
   $cmd =~ s/#.*$//s;
   $cmd =~ s/;;/____/g;
   foreach my $subcmd (split(";", $cmd)) {
     $subcmd =~ s/____/;/g;
-    AnalyzeCommand($c, $subcmd);
+    my $lret = AnalyzeCommand($c, $subcmd);
+    $ret .= $lret if(defined($lret));
     last if($c && !defined($client{$c}));	 # quit
   }
+  return $ret;
 }
 
 #####################################
@@ -583,16 +586,9 @@ AnalyzeCommand($$)
     $month++;
     $year+=1900;
 
-    $global_cl = $cl;
     my $ret = eval $cmd;
     $ret = $@ if($@);
-    if($ret) {
-      if($cl) {
-	syswrite($client{$cl}{fd}, "$ret\n")
-      } else {
-	Log 3, $ret;
-      }
-    }
+    syswrite($client{$cl}{fd}, "$ret\n") if($ret && $cl);
     return $ret;
 
   }
@@ -635,13 +631,7 @@ AnalyzeCommand($$)
   my $ret = &{$cmds{$fn}{Fn} }($cl, $param);
   use strict "refs";
 
-  if($ret) {
-    if($cl) {
-      syswrite($client{$cl}{fd}, $ret . "\n");
-    } else {
-      Log 3, $ret;
-    }
-  }
+  syswrite($client{$cl}{fd}, $ret . "\n") if($ret && $cl);
   return $ret;
 }
 
@@ -1979,15 +1969,7 @@ sub
 fhem($)
 {
   my $param = shift;
-  return AnalyzeCommandChain($global_cl, $param);
-}
-
-# the "old" name, kept to make upgrade process easier
-sub
-fhz($)
-{
-  my $param = shift;
-  return AnalyzeCommandChain($global_cl, $param);
+  return AnalyzeCommandChain(undef, $param);
 }
 
 #####################################
