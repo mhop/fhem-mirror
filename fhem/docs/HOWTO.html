@@ -28,17 +28,17 @@
 
   <div id="right">
     <!--
-    <a href="#starting">Starting</a><br/>
-    <a href="#FHZ">Attaching an FHZ/CUL</a><br/>
-    <a href="#FS20rx">Configuring FS20 receivers</a><br/>
-    <a href="#FS20tx">Configuring FS20 transmitters</a><br/>
-    <a href="#FHT">Configuring FHT devices</a><br/>
-    <a href="#at">Timed commands / Notify</a><br/>
-    <a href="#rooms">FHEMWEB look and feel</a><br/>
-    <a href="#log">Logging data</a><br/>
-    <a href="#plot">Plotting logs</a><br/>
-    <a href="#tips">FHEMWEB tips</a><br/>
-    <a href="#structure">Complex structures</a><br/>
+    <a href="#starting">Starting</a><br>
+    <a href="#FHZ">Attaching an FHZ/CUL</a><br>
+    <a href="#FS20rx">Configuring FS20 receivers</a><br>
+    <a href="#FS20tx">Configuring FS20 transmitters</a><br>
+    <a href="#FHT">Configuring FHT devices</a><br>
+    <a href="#at">Timed commands / Notify</a><br>
+    <a href="#rooms">FHEMWEB look and feel</a><br>
+    <a href="#log">Logging data</a><br>
+    <a href="#plot">Plotting logs</a><br>
+    <a href="#tips">FHEMWEB tips</a><br>
+    <a href="#structure">Complex structures</a><br>
     -->
 
 
@@ -182,7 +182,7 @@
       To execute commands at a given time / periodically, you have to define
       devices of the type at. See the definition <a href="commandref.html#at">
       here</a> and the examples  <a href="example.06_at">here</a> The last link
-      only works if you are reading this HOWTO from your fhem Web.<br/><br/>
+      only works if you are reading this HOWTO from your fhem Web.<br><br>
 
       To execute commands if a device sent a message you have to define
       devices of the type <a href="commandref.html#notify">notify</a> or
@@ -205,13 +205,13 @@
       It makes sense to group your devices into rooms by setting the room
       attribute. FHEMWEB puts devices without a room attribute into the
       "Unsorted" room. Devices in the room "hidden" will not be shown.
-      <br/><br/>
+      <br><br>
 
       Set the title of the webpage by setting the title attribute of the global
-      device ("All together" -> global)<br/><br/>
+      device ("All together" -> global)<br><br>
 
       Edit the colors / fonts by changing the style.css ("Edit files" ->
-      style.css)<br/><br/>
+      style.css)<br><br>
 
       Further FHEMWEB attributes:
       <a href="commandref.html#webname">webname</a>,
@@ -226,10 +226,10 @@
       href="commandref.html#FileLog">FileLog</a>. Autocreate will create
       logfiles for newly detected devices. To log messages into a
       database, see the contrib/dblog directory in the fhem
-      distribution.<br/><br/>
+      distribution.<br><br>
 
       FHEMWEB has builtin support for displaying FileLog type logs as plots,
-      see the <a href="#plot">plot</a> section below.<br/><br/>
+      see the <a href="#plot">plot</a> section below.<br><br>
 
       The size of each logfile will be determined by its wildcard characters
       (year/month/week/day), look at the <a href="commandref.html#FileLog">
@@ -259,7 +259,7 @@
       CURRENT weblink, and it will always display the most recent log (you do
       not have to redefine it if the logfile changes due to year/month/date
       parameters in its name).
-      <br/><br/>
+      <br><br>
 
 
       The logs can be converted to a plot either with gnuplot (which must be
@@ -301,10 +301,10 @@
     <a name="tips"></a>
     <h3>FHEMWEB tips</h3>
       <ul>
-      You can first set an attribute to an arbitrary (wrong) value, then click
-      on the attribute: you will be guided to the correct place in the
-      documentation; now you can change the attribute value to the correct
-      one.<br/><br/>
+      Click on the State link on the device page to get a documentation of
+      all its settable values, similarly clicking on Attributes will guide you
+      to the documentation of its attributes.
+      <br><br>
 
       Password/HTTPS<br>
       These features are implemented by apache, and apache must be configured
@@ -321,9 +321,9 @@
       ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
 
       and then restart httpd with apachectl graceful. To create the password
-      file, execute<br/>
+      file, execute<br>
       htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
-      <br/><br/>
+      <br><br>
 
       To enable HTTPS, please check the web. In essence:<br>
       <ul>
@@ -334,7 +334,7 @@
       <li>Start httpd with the startssl option (SSL or the like must be set in
       one of your system files, look at /etc/init.d/httpd).</li>
       </ul>
-      <br/><br/>
+      <br><br>
 
       To display "foreign" (non fhem) files as a plot or a just as plain text,
       configure a fake logfile with the correct filename and an unused regexp,
