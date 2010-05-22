@@ -579,7 +579,7 @@ FW_doDetail($)
   FW_makeTable($d, $t, "Internal,Value",
         $defs{$d}, "", undef, 0, undef);
   FW_makeTable($d, $t,
-        "<a href=\"$__reldoc#attr\">Attribute</a>,Value,Action",
+        "<a href=\"$__reldoc#${t}attr\">Attribute</a>,Value,Action",
         $attr{$d}, getAllAttr($d), "attr", 1,
         $d eq "global" ? "" : "deleteattr");
   pO "</td></tr></table>";
@@ -999,7 +999,23 @@ FW_showLog($)
   my $pm = FW_getAttr($wl,"plotmode",$__plotmode);
 
   my $gplot_pgm = "$__dir/$type.gplot";
-  return FW_fatal("Cannot read $gplot_pgm") if(!-r $gplot_pgm);
+
+  if(!-r $gplot_pgm) {
+    my $msg = "Cannot read $gplot_pgm";
+    Log 1, $msg;
+
+    if($pm =~ m/SVG/) { # FW_fatal for SVG:
+      $__RETTYPE = "image/svg+xml";
+      pO '<svg xmlns="http://www.w3.org/2000/svg">';
+      pO '<text x="20" y="20">'.$msg.'</text>';
+      pO '</svg>';
+      return;
+
+    } else {
+      return FW_fatal($msg);
+
+    }
+  }
   FW_calcWeblink($d,$wl);
 
   if($pm =~ m/gnuplot/) {

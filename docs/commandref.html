@@ -1063,6 +1063,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="FHZattr"></a>
   <b>Attributes</b>
   <ul>
     <a name="do_not_notify"></a>
@@ -1220,7 +1221,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Get</b> <ul>N/A</ul><br>
 
-  <a name="FS20attributes"></a>
+  <a name="FS20attr"></a>
   <b>Attributes</b>
   <ul>
     <a name="IODev"></a>
@@ -1483,6 +1484,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="FHTattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li><br>
@@ -1494,7 +1496,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       should set the dummy attribute for these devices, else the internal FHT
       buffer of the CUL will be filled with data for the 8b's which is never
       consumed. If the buffer is full, you'll get "EOB" messages from the CUL,
-      and you cannot transmit any data to the 80b's<li><br>
+      and you cannot transmit any data to the 80b's</li><br>
 
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (fht80b)</li><br>
@@ -1578,6 +1580,7 @@ A line ending with \ will be concatenated with the next one, so long lines
    <ul> No get implemented yet ...
    </ul><br>
 
+  <a name="CUL_FHTTKattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
@@ -1644,10 +1647,13 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="HMSset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="HMSget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="HMSattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li><br>
@@ -1781,6 +1787,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
   </ul>
 
+  <a name="CULattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
@@ -1828,6 +1835,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_WSget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="CUL_WSattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li><br>
@@ -1893,6 +1901,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_EMget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="CUL_EMattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li><br>
@@ -1925,9 +1934,10 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_HOERMANNset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
-  <a name="CUL_HOERMANNEMget"></a>
+  <a name="CUL_HOERMANNget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="CUL_HOERMANNattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2000,6 +2010,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_RFRget"></a>
   <b>Get</b> <ul>Same as for the <a href="#CULget">CUL</a>.</ul><br>
 
+  <a name="CUL_RFRattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li><br>
@@ -2054,6 +2065,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     where <code>value</code> is either version or time.
   </ul>
 
+  <a name="EMattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (em1010pc)</li>
@@ -2116,6 +2128,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="EMWZattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (EM1000WZ)</li>
@@ -2170,6 +2183,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="EMGZattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (EM1000GZ)</li>
@@ -2217,6 +2231,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="EMEMattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (EM1000EM)</li>
@@ -2323,6 +2338,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
 
 
+  <a name="KM271define"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; KM271 &lt;serial-device-name&gt;</code>
@@ -2334,6 +2350,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="KM271set"></a>
   <b>Set </b>
   <ul>
     <code>set KM271  &lt;param&gt; [&lt;value&gt;]</code><br><br>
@@ -2349,12 +2366,14 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="KM271get"></a>
   <b>Get</b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="KM271attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2386,6 +2405,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   Note: The KS555 is also reported to work.<br>
   <br>
 
+  <a name="KS300define"></a>
   <a name="KS300"></a>
   <b>Define</b>
   <ul>
@@ -2405,18 +2425,21 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="KS300set"></a>
   <b>Set </b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="KS300get"></a>
   <b>Get</b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="KS300attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#ignore">ignore</a></li>
@@ -2467,6 +2490,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br>
   </ul>
 
+  <a name="CM11set"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; reopen</code>
@@ -2475,6 +2499,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="CM11get"></a>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; fwrev</code>
@@ -2494,6 +2519,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="CM11attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2601,8 +2627,10 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="X10get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="X10attr"></a>
   <b>Attributes</b>
   <ul>
   <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2620,16 +2648,20 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   <br>
 
+  <a name="LIRCdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; LIRC &lt;device&gt;</code>
   </ul>
   <br>
 
+  <a name="LIRCset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="LIRCget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="LIRCattr"></a>
   <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
 
@@ -2673,12 +2705,14 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
 
 
+  <a name="WS300get"></a>
   <b>Get</b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="WS300attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2758,6 +2792,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="Weatherattr"></a>
   <b>Attributes</b>
   <ul>
     N/A
@@ -2809,18 +2844,21 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="USF1000set"></a>
   <b>Set </b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="USF1000get"></a>
   <b>Get</b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="USF1000attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#IODev">IODev</a></li><br>
@@ -2873,18 +2911,21 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="BSset"></a>
   <b>Set </b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="BSget"></a>
   <b>Get</b>
   <ul>
     N/A
   </ul>
   <br>
 
+  <a name="BSattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -2928,8 +2969,10 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br>
   </ul>
 
+  <a name="SVICTset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="SVICTget"></a>
   <b>Get</b>
   <ul>
     <code>get SCVIT data</code>
@@ -2937,6 +2980,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+  <a name="SVICTattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
@@ -3017,6 +3061,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
 
 
+  <a name="M232attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
@@ -3098,6 +3143,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
   </ul>
 
+  <a name="M232Counterattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#attrdummy">dummy</a></li><br>
@@ -3145,6 +3191,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
   </ul>
 
+  <a name="M232Voltageattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#attrdummy">dummy</a></li><br>
@@ -3200,6 +3247,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Get</b>
   <ul> Not used, nothing to get directly. </ul>
 
+  <a name="xxLG7000attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
@@ -3276,6 +3324,7 @@ input
 audio</pre>
   </ul>
 
+  <a name="LGTVattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#attrdummy">dummy</a></li><br>
@@ -3407,6 +3456,7 @@ audio</pre>
     <br>
   </ul>
 
+  <a name="OWFSattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#attrdummy">dummy</a></li>
@@ -3534,6 +3584,7 @@ audio</pre>
     <br>
   </ul>
 
+  <a name="OWTEMPattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li>
@@ -3594,6 +3645,7 @@ audio</pre>
   <br>
 
 
+  <a name="structureattr"></a>
   <b>Attributes</b>
   <ul>
     <li>structexclude<br>
@@ -3662,6 +3714,7 @@ audio</pre>
   </ul>
 
 
+  <a name="WS2000attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (ws2000)</li>
@@ -3826,6 +3879,7 @@ Forecast Cloudy</pre>
   <a name="WS3600get"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="WS3600attr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (WS3600, WS2300)</li>
@@ -3938,6 +3992,7 @@ Terminating
   <a name="SISPMget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="SISPMattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (SISPM)</li>
@@ -4088,6 +4143,7 @@ Terminating
   </ul>
 
 
+  <a name="IPWEattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#model">model</a> (ipwe)</li>
@@ -4130,10 +4186,13 @@ Terminating
           file, even if its name changes regularly (and not the one you
           originally specified).</li> </ul> </ul>
 
+  <a name="weblinkset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="weblinkget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="weblinkattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#fixedrange">fixedrange</a></li>
@@ -4198,10 +4257,13 @@ Terminating
   </ul>
   <br>
 
+  <a name="FHEMWEBset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="FHEMWEBget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="FHEMWEBattr"></a>
   <b>Attributes</b>
   <ul>
     <a name="webname"></a>
@@ -4363,10 +4425,13 @@ Terminating
   </ul>
 
 
+  <a name="atset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="atget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="atattr"></a>
   <b>Attributes</b>
   <ul>
     <a name="disable"></a>
@@ -4427,9 +4492,13 @@ Terminating
   </ul>
 
 
+  <a name="autocreateset"></a>
   <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="autocreateget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="autocreateattr"></a>
   <b>Attributes</b>
   <ul>
     <a name="autosave"></a>
@@ -4536,8 +4605,10 @@ Terminating
   </ul>
   <br>
 
+  <a name="holidayset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="holidayget"></a>
   <b>Get</b>
     <ul>
       <code>get &lt;name&gt; &lt;MM-DD&gt;</code>
@@ -4547,6 +4618,7 @@ Terminating
     </ul>
     <br>
 
+  <a name="holidayattr"></a>
   <b>Attributes</b><ul>N/A</ul><br>
 
 </ul>
@@ -4634,10 +4706,13 @@ Terminating
   <br>
 
 
+  <a name="notifyset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="notifyget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="notifyattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
@@ -4687,10 +4762,13 @@ Terminating
     <br>
   </ul>
 
+  <a name="watchdogset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="watchdogget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="watchdogattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
@@ -4758,10 +4836,13 @@ Terminating
   </ul>
 
 
+  <a name="DbLogset"></a>
   <b>Set</b> <ul>N/A</ul><br>
 
+  <a name="DbLogget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="DbLogattr"></a>
   <b>Attributes</b> <ul>N/A</ul><br>
 
 </ul>
@@ -4875,6 +4956,7 @@ Terminating
     <br><br>
   </ul>
 
+  <a name="FileLogattr"></a>
   <b>Attributes</b>
   <ul>
     <a name="archivedir"></a>
@@ -4975,8 +5057,10 @@ Terminating
   </ul>
   <br>
 
+  <a name="dummyget"></a>
   <b>Get</b> <ul>N/A</ul><br>
 
+  <a name="dummyattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
@@ -5113,6 +5197,7 @@ isday</pre>
   <br>
 
 
+  <a name="FHEMRENDERERattr"></a>
   <b>Attributes</b>
   <ul>
     <a name="plotmode"></a>
@@ -5183,7 +5268,7 @@ isday</pre>
   </ul>
   <br>
 
-  <a name="PachLog_Set"></a>
+  <a name="PachLogset"></a>
   <b>Set</b>
 	<ul>
 		<br>
@@ -5207,7 +5292,10 @@ isday</pre>
 	</ul>
 	<br>
 
+  <a name="PachLogget"></a>
   <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="PachLogattr"></a>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
