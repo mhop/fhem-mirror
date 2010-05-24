@@ -395,7 +395,7 @@ FW_digestCgi($)
   %__pos = ();
   $__room = "";
 
-  $arg =~ s/^\?//;
+  $arg =~ s,^[?/],,;
   foreach my $pv (split("&", $arg)) {
     $pv =~ s/\+/ /g;
     $pv =~ s/%(..)/chr(hex($1))/ge;
@@ -403,7 +403,6 @@ FW_digestCgi($)
 
     # Multiline: escape the NL for fhem
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
-    #Log(0, "P: $p, V: $v");
 
     if($p eq "detail")       { $__detail = $v; }
     if($p eq "room")         { $__room = $v; }
