@@ -1,8 +1,12 @@
 ################################################################################
+# Route RAW-Sensor-Data via FHEMWEB/CGI to fhem.pl: Function -> disptach($$$)
 # 99_CGI_RAWMSG
 #
-# Route RAW-Sensor-Data via FHEMWEB/CGI to fhem.pl: Function -> disptach($$$)
+# Version: 1.0.1
+# Date: 24.05.2010
+# Author: Axel Rieger
 #
+################################################################################
 # Examples for RAW-Sensor-Data
 # WBS = WeB-Sensors
 # WBS:SENSOR-CODE:SENSOR-TYPE:VALUE:TIMESTAMP
@@ -51,10 +55,10 @@ sub CGI_RAWMSG_Dispatch($$)
 {
   my ($htmlarg) = @_;
   my ($ret_param,$ret_txt,@tmp,$rawmsg,$cgikey);
-  Log 0, "CGI_RAWMSG|Dispatch|START: $htmlarg";
+  Log 5, "CGI_RAWMSG|Dispatch|START: $htmlarg";
   $ret_param = "text/plain; charset=ISO-8859-1";
   $ret_txt = "ERROR;NODATA";
-  print "CGI_RAWMSG|Dispatch: " . Dumper(@_) . "\n";
+#  print "CGI_RAWMSG|Dispatch: " . Dumper(@_) . "\n";
   # Aufurf: http://[FHEMWEB]/fhem/rawmsg?TEST12345
   # htmlarg = /rawmsg?TEST12345
   if($htmlarg =~ /\?/) {
@@ -71,12 +75,12 @@ sub CGI_RAWMSG_Dispatch($$)
 	  }
 	# Check rawmsg
 	foreach my $m (sort keys %{$data{$cgikey}{MatchList}}) {
-	  Log 0, "CGI_RAWMSG|MatchList-RAWMSG: $rawmsg";
-	  Log 0, "CGI_RAWMSG|MatchList-Key: $m";
-	  Log 0, "CGI_RAWMSG|MatchList-Val: " . $data{$cgikey}{MatchList}{$m};
+	  Log 5, "CGI_RAWMSG|MatchList-RAWMSG: $rawmsg";
+	  Log 5, "CGI_RAWMSG|MatchList-Key: $m";
+	  Log 5, "CGI_RAWMSG|MatchList-Val: " . $data{$cgikey}{MatchList}{$m};
 	  my $match = $data{$cgikey}{MatchList}{$m};
 	  if($rawmsg =~ m/$match/) {
-		Log 0, "CGI_RAWMSG|MatchList-Key FOUND: $m";
+		Log 5, "CGI_RAWMSG|MatchList-Key FOUND: $m";
 		# $ret_txt = "HTMLARG = $htmlarg\n";
 		# $ret_txt .= "CGI-KEY = $cgikey\n";
 		# $ret_txt .= "RAWMSG = $rawmsg\n";
