@@ -2,6 +2,11 @@
 # Web based Sensors = 18_WBS.pm
 # Sensors updated only via Web
 #
+# Version: 1.0.1
+# Date: 24.05.2010
+# Author: Axel Rieger
+#
+################################################################################
 #
 # Define:
 # define <NAME> WBS TYPE CODE
