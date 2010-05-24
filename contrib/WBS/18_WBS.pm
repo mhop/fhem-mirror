@@ -39,8 +39,6 @@ use vars qw(%defs);
 use vars qw(%attr);
 use vars qw(%data);
 use vars qw(%modules);
-# Reverse-Lokup-Pointer
-my %defptr;
 ################################################################################
 sub WBS_Initialize($)
 {
@@ -55,7 +53,8 @@ sub WBS_Initialize($)
   my $mod = "WBS";
   foreach my $d (sort keys %defs) {
     next if($defs{$d}{TYPE} ne $mod);
-	$hash->{defptr}{$defs{$d}{CODE}} = $defs{$d}{NAME};
+  Log 0, "WBS-DEFPTR-FOUND: " . $defs{$d}{NAME} . " : " . $defs{$d}{CODE};
+	$modules{WBS}{defptr}{$defs{$d}{CODE}} = $defs{$d}{NAME};
   }
 }
 ################################################################################
@@ -64,13 +63,12 @@ sub WBS_Define($)
   # define <NAME> WBS TYPE CODE
   my ($self, $defs) = @_;
   Log 0, "WBS|DEFINE: " . Dumper(@_);
-  Log 0, "WBS|DEFPTR: " . Dumper(%defptr);
   my @a = split(/ /, $defs);
   return "WBS|Define|ERROR: Unknown argument count " . int(@a) . " , usage define <NAME> WBS TYPE CODE"  if(int(@a) != 4);
   my $mod = $a[1];
   my $Type = $a[2];
   my $Code = $a[3];
-  if(defined($modules{$mod}{defptr}{$Code})) {
+  if(defined($modules{WBS}{defptr}{$Code})) {
 	return "WBS|Define|ERROR: Code is used";
   }
   if(length($Code) > 16) {
@@ -81,8 +79,7 @@ sub WBS_Define($)
   $self->{WBS_TYPE} = $Type;
   $self->{READINGS}{$Type}{VAL} = 0;
   $self->{READINGS}{$Type}{TIME} = TimeNow();
-  $defptr{$Code} = $self;
-  Log 0, "WBS|DEFPTR: " . Dumper(%defptr);
+  $modules{WBS}{defptr}{$Code} = $self->{NAME};
   return undef;
 }
 ################################################################################
@@ -127,7 +124,7 @@ sub WBS_Parse($$)
   $wbs->{READINGS}{$reading}{TIME} = TimeNow();
   # State: [FirstChar READING]:VALUE
   my $fc = uc(substr($reading,0,1));
-  $wbs->{STATE} = "$fc: $value";
+  $wbs->{STATE} = "$fc: $value | " . TimeNow();
   # Changed
   $wbs->{CHANGED}[0] = "$reading:$value";
   return $wbs_name;
