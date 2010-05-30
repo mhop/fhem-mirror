@@ -55,19 +55,20 @@ CUL_Initialize($)
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
   $hash->{Clients} =
-        ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:HMS:CUL_FHTTK:CUL_RFR:FHT8V".
+        ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:BS:HMS:CUL_FHTTK:CUL_RFR:FHT8V".
         ":CUL_HOERMANN:";
   my %mc = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
-    "2:FS20"      => "^81..(04|0c)..0101a001",
-    "3:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
-    "4:KS300"     => "^810d04..4027a001",
-    "5:CUL_WS"    => "^K.....",
-    "6:CUL_EM"    => "^E0.................\$",
-    "7:HMS"       => "^810e04....(1|5|9).a001",
-    "8:CUL_FHTTK" => "^T........",
-    "9:CUL_RFR"   => "^[0-9A-F]{4}U.",
-    "A:CUL_HOERMANN"=> "^R..........",
+    "2:BS"        => "^81..(04|0c)..0101a001a5cf",
+    "3:FS20"      => "^81..(04|0c)..0101a001",
+    "4:FHT"       => "^81..(04|09|0d)..(0909a001|83098301|c409c401)..",
+    "5:KS300"     => "^810d04..4027a001",
+    "6:CUL_WS"    => "^K.....",
+    "7:CUL_EM"    => "^E0.................\$",
+    "8:HMS"       => "^810e04....(1|5|9).a001",
+    "9:CUL_FHTTK" => "^T........",
+    "A:CUL_RFR"   => "^[0-9A-F]{4}U.",
+    "B:CUL_HOERMANN"=> "^R..........",
   );
   $hash->{MatchList} = \%mc;
   $hash->{ReadyFn} = "CUL_Ready";
