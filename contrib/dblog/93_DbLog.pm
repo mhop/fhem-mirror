@@ -205,6 +205,15 @@ DbLog_ParseEvent($$)
      if($reading eq "humidity") { $unit= "%"; }
   }
 
+  # BS
+  elsif($type eq "BS") {
+	 if($event =~ m(brightness:.*)) { 
+		@parts= split(/ /,$event);
+		$reading= "lux";
+		$value= $parts[4]*1.;
+		$unit= "lux";
+     }
+  }
 
   @result= ($reading,$value,$unit);
   return @result;
