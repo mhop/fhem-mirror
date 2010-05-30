@@ -10,15 +10,13 @@ package main;
 use strict;
 use warnings;
 
-my $PI= 3.141592653589793238;
-
 #############################
 sub
 BS_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^81..(04|0c)..0101a001a5cf......";
+  $hash->{Match}     = "^81..(04|0c)..0101a001a5cf";
   $hash->{DefFn}     = "BS_Define";
   $hash->{UndefFn}   = "BS_Undef";
   $hash->{ParseFn}   = "BS_Parse";
@@ -27,7 +25,6 @@ BS_Initialize($)
 
 }
 
-
 #############################
 sub
 BS_Define($$)
@@ -35,8 +32,8 @@ BS_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  my $u= "wrong syntax: define <name> BS <sensor> [RExt]";
-  return $u if((int(@a)< 3) || (int(@a)>4));
+  my $u= "wrong syntax: define <name> BS <sensor> [[RExt] luxOffset]";
+  return $u if((int(@a)< 3) || (int(@a)>5));
 
   my $name	= $a[0];
   my $sensor	= $a[2];
@@ -46,9 +43,12 @@ BS_Define($$)
   $sensor= "0$sensor";
 
   my $RExt	= 50000; # default is 50kOhm
-  $RExt= $a[3] if(int(@a)==4);
+  $RExt= $a[3] if(int(@a)>=4);
+  my $luxOffset= 0;  # default is no offset
+  $luxOffset= $a[4] if(int(@a)>=5);
   $hash->{SENSOR}= "$sensor";
   $hash->{RExt}= $RExt;
+  $hash->{luxOffset}= $luxOffset;
 
   my $dev= "a5cf $sensor";
   $hash->{DEF}= $dev;
@@ -97,12 +97,14 @@ BS_Parse($$)
   my $value= hex(substr($msg, 25, 3)) & 0x3ff;
 
   my $RExt= $def->{RExt};
+  my $luxOffset= $def->{luxOffset};
   my $brightness= $value/10.24; # Vout in percent of reference voltage 1.1V
 
   # brightness in lux= 100lux*(VOut/RExt/1.8muA)^2;
   my $VOut= $value*1.1/1024.0;
   my $temp= $VOut/$RExt/1.8E-6;
   my $lux= 100.0*$temp*$temp;
+  $lux+= $luxOffset; # add lux offset
 
   my $state= sprintf("brightness: %.2f  lux: %.0f  flags: %d",
   	$brightness, $lux, $flags);

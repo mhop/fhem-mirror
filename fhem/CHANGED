@@ -11,6 +11,8 @@
   - feature: Dimmer function of X10 module changed to match FS20
   - feature: allow only meaningful readings (fill level > -5%) in USF1000
   - feature: device attr links in commandref.html
+  - bugfix:  make BS known to CUL to avoid lost messages if both FHZ1300 and CUL
+             are connected, adjust matching rule
 
 - 2010-03-13 (4.9)
   - bugfix:  changed the fhem prompt from FHZ> to fhem>
