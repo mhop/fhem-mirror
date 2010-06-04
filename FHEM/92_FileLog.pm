@@ -245,6 +245,7 @@ FileLog_Get($@)
 
     for my $i (0..int(@a)-1) {           # Process each req. field
       my $h = $d[$i];
+      my @missingvals;
       next if($h->{re} && $l !~ m/$h->{re}/);      # 20%
 
       my $col = $h->{col};
@@ -273,12 +274,19 @@ FileLog_Get($@)
             $v = 0 if($v < 0);              # Skip negative delta
             $dte = "$lda[0]_$ts";
             $val = sprintf("%0.1f", $v);
+            if($hd == 13) {                 # Generate missing 0 values / hour
+              my @cda = split("[_:]", $ld);
+              for(my $mi = $lda[1]+1; $mi < $cda[1]; $mi++) {
+                push @missingvals, sprintf("%s_%02d:30:00 0\n", $lda[0], $mi);
+              }
+            }
           }
           $h->{last1} = $fld[$col];
           $h->{last3} = $ld;
         }
         $h->{last2} = $fld[$col];
         $lastdate{$hd} = $fld[0];
+
       } elsif($t == 3) {                    # int function
         $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
 
@@ -294,14 +302,21 @@ FileLog_Get($@)
       $cnt[$i]++;
       $lastv[$i] = $val;
       $lastd[$i] = $dte;
+      foreach my $mval (@missingvals) { 
+        $cnt[$i]++;
+        $min[$i] = 0 if(0 < $min[$i]);
+      }
 
       if($outf eq "-") {
         $h->{ret} .= "$dte $val\n";
+        foreach my $mval (@missingvals) { $h->{ret} .= $mval }
       } else {
         my $fh = $h->{fh};      # cannot use $h->{fh} in print directly
         print $fh "$dte $val\n";
+        foreach my $mval (@missingvals) { print $fh $mval }
         $h->{count}++;
       }
+
     }
   }
   $ifh->close();
