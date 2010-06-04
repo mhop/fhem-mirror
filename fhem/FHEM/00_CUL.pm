@@ -168,6 +168,7 @@ CUL_Set($@)
   my $name = shift @a;
   my $type = shift @a;
   my $arg = join("", @a);
+  my $ll = GetLogLevel($name,3);
 
   if($type eq "freq") {                         # MHz
 
@@ -177,13 +178,11 @@ CUL_Set($@)
     my $f1 = sprintf("%02x", int($f % 65536) / 256);
     my $f0 = sprintf("%02x", $f % 256);
     $arg = sprintf("%.3f", (hex($f2)*65536+hex($f1)*256+hex($f0))/65536*26);
-    my $msg = "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
-    Log GetLogLevel($name,4), $msg;
+    Log $ll, "Setting FREQ2..0 (0D,0E,0F) to $f2 $f1 $f0 = $arg MHz";
     CUL_SimpleWrite($hash, "W0F$f2");
     CUL_SimpleWrite($hash, "W10$f1");
     CUL_SimpleWrite($hash, "W11$f0");
     CUL_SimpleWrite($hash, $initstr);           # Will reprogram the CC1101
-    return $msg;
 
   } elsif($type eq "bWidth") {               # KHz
 
@@ -206,12 +205,9 @@ CUL_Set($@)
 
 GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
-    my $msg = "Setting MDMCFG4 (10) to $ob = $bw KHz";
-
-    Log GetLogLevel($name,4), $msg;
+    Log $ll, "Setting MDMCFG4 (10) to $ob = $bw KHz";
     CUL_SimpleWrite($hash, "W12$ob");
     CUL_SimpleWrite($hash, $initstr);
-    return $msg;
 
   } elsif($type eq "rAmpl") {               # dB
 
@@ -223,10 +219,9 @@ GOTBW:
     }
     $v = sprintf("%02d", $v-1);
     $w = $ampllist[$v];
-    my $msg = "Setting AGCCTRL2 (1B) to $v / $w dB";
+    Log $ll, "Setting AGCCTRL2 (1B) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1D$v");
     CUL_SimpleWrite($hash, $initstr);
-    return $msg;
 
   } elsif($type eq "sens") {               # dB
 
@@ -234,10 +229,9 @@ GOTBW:
         if($arg !~ m/^\d+$/ || $arg < 4 || $arg > 16);
     my $w = int($arg/4)*4;
     my $v = sprintf("9%d",$arg/4-1);
-    my $msg = "Setting AGCCTRL0 (1D) to $v / $w dB";
+    Log $ll, "Setting AGCCTRL0 (1D) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1F$v");
     CUL_SimpleWrite($hash, $initstr);
-    return $msg;
 
   } elsif($type eq "file") {
 
@@ -285,7 +279,7 @@ WRITEEND:
     return "Expecting a 0-padded hex number"
         if((length($arg)&1) == 1 && $type ne "raw");
     $initstr = "X$arg" if($type eq "verbose");
-    Log GetLogLevel($name,4), "set $name $type $arg";
+    Log $ll, "set $name $type $arg";
     CUL_SimpleWrite($hash, $sets{$type} . $arg);
 
   }
