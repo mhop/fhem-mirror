@@ -134,7 +134,6 @@ svg_labelselect(evt)
 function
 svg_click(evt)
 {
-  var d = evt.target.ownerDocument;
   var t=evt.target;
   var y_mul = parseFloat(t.getAttribute("y_mul"));
   var y_h   = parseFloat(t.getAttribute("y_h"));
@@ -149,6 +148,7 @@ svg_click(evt)
   var ts = (d.getHours() < 10 ? '0' : '') + d.getHours() + ":"+
            (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
 
-  var tl = d.getElementById('svg_title');
+  
+  var tl = evt.target.ownerDocument.getElementById('svg_title');
   tl.firstChild.nodeValue = t.getAttribute("title")+": "+y_org+" ("+ts+")";
 }
