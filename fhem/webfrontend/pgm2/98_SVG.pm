@@ -53,18 +53,25 @@ SVG_render($$$$$$)
 
  # Html Header
   pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
-  pO "<?xml-stylesheet href=\"$__ME/svg_style.css\" type=\"text/css\"?>";
   pO "<!DOCTYPE svg>";
   pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" ".
         "xmlns:xlink=\"http://www.w3.org/1999/xlink\" " .
         ">";
-  #pO "<script type=\"text/ecmascript\" xlink:href=\"$__ME/svg.js\"/>";
 
-  
+  pO "<style type=\"text/css\"><![CDATA[";
+  if(open(FH, "$__dir/svg_style.css")) {
+    pO join("", <FH>);
+    close(FH);
+  } else {
+    Log 0, "Can't open $__dir/svg_style.css"
+  }
+  pO "]]></style>";
 
+  # Background
+  pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
   # Rectangle
   pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" ".
-        "stroke-width=\"1px\" class=\"border\"/>";
+        "fill=\"none\" class=\"border\"/>";
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
