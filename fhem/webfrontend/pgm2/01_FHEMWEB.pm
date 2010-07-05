@@ -31,33 +31,33 @@ sub FW_AnswerCall($);
 sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
 
-use vars qw($__ME); # webname (fhem), needed by SVG
+use vars qw($__dir); # moddir (./FHEM), needed by SVG
 my $zlib_loaded;
 
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
+my $__cmdret;     # Returned data by the fhem call
+my $__data;       # Filecontent from browser when editing a file
+my $__detail;     # currently selected device for detail view
+my %__devs;       # hash of from/to entries per device
 my %__icons;      # List of icons
 my $__iconsread;  # Timestamp of last icondir check
-my %__rooms;      # hash of all rooms
-my %__devs;       # hash of from/to entries per device
-my %__types;      # device types, for sorting
-my $__room;       # currently selected room
-my $__detail;     # currently selected device for detail view
-my $__cmdret;     # Returned data by the fhem call
-my %__pos;        # scroll position
-my $__RET;        # Returned data (html)
-my $__RETTYPE;    # image/png or the like
-my @__zoom;       # "qday", "day","week","month","year"
-my %__zoom;       # the same as @__zoom
-my $__wname;      # Web instance name
+my $__ME;         # webname (fhem)
 my $__plotmode;   # Global plot mode (WEB attribute)
 my $__plotsize;   # Global plot size (WEB attribute)
-my $__data;       # Filecontent from browser when editing a file
-my $__dir;        # FHEM directory
+my %__pos;        # scroll position
 my $__reldoc;     # $__ME/commandref.html;
+my $__RET;        # Returned data (html)
+my $__RETTYPE;    # image/png or the like
+my $__room;       # currently selected room
+my %__rooms;      # hash of all rooms
 my $__ss;         # smallscreen
+my %__types;      # device types, for sorting
+my $__wname;      # Web instance name
+my @__zoom;       # "qday", "day","week","month","year"
+my %__zoom;       # the same as @__zoom
 
 
 #####################################
@@ -359,7 +359,8 @@ FW_AnswerCall($)
   my $stylecss = ($__ss ? "style_smallscreen.css" : "style.css");
   pO "<link href=\"$__ME/$stylecss\" rel=\"stylesheet\"/>";
   pO "<meta name=\"viewport\" content=\"width=device-width\"/>" if($__ss);
-  pO "<script type=\"text/javascript\" src=\"$__ME/svg.js\"></script>";
+  pO "<script type=\"text/javascript\" src=\"$__ME/svg.js\"></script>"
+                        if($__plotmode eq "SVG");
   pO "</head>\n<body name=\"$t\">";
 
   if($__cmdret) {
@@ -898,7 +899,7 @@ FW_logWrapper($)
     my $arg = "$__ME?cmd=showlog undef $d $type $file";
     if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
       my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
-      pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
+      pO "<embed data=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
     } else {
