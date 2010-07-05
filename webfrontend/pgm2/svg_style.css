@@ -3,8 +3,8 @@ text.title { font-size:16px; }
 text.copy  { font-size:16px; stroke:none; fill:blue; }
 text.paste { font-size:16px; stroke:none; fill:blue; }
 
-rect.border { stroke:black; stroke-width:1px; fill:none; }
-
+.background { fill:#FFFFE7; }
+.border { stroke:black; stroke-width:1px; }
 polyline { stroke:black; fill:none; }
 
 .vgrid { stroke-dasharray:2,6; stroke:gray; }
