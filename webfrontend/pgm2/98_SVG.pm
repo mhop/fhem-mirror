@@ -51,15 +51,16 @@ SVG_render($$$$$$)
   my ($ow,$oh) = split(",", $ps);       # Original width
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
-  # Html Header
+ # Html Header
   pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
   pO "<?xml-stylesheet href=\"$__ME/svg_style.css\" type=\"text/css\"?>";
   pO "<!DOCTYPE svg>";
   pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" ".
         "xmlns:xlink=\"http://www.w3.org/1999/xlink\" " .
         ">";
-  pO "<script type=\"text/ecmascript\" ".
-        "xlink:href=\"$__ME/svg.js\"/>";
+  #pO "<script type=\"text/ecmascript\" xlink:href=\"$__ME/svg.js\"/>";
+
+  
 
   # Rectangle
   pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" ".
@@ -71,6 +72,14 @@ SVG_render($$$$$$)
   $title =~ s/>/&gt;/g;
   pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
         "class=\"title\" text-anchor=\"middle\">$title</text>";
+
+  pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
+        "onclick=\"parent.svg_paste(evt)\" " .
+        "class=\"paste\" text-anchor=\"end\"> </text>";
+  pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
+        "onclick=\"parent.svg_copy(evt)\" " .
+        "class=\"copy\" text-anchor=\"end\"> </text>";
+
 
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
@@ -98,6 +107,7 @@ SVG_render($$$$$$)
   ($off1,$off2) = ($ow-$x-$th, $y+$th);
 
 
+
   for my $i (0..int(@ltitle)-1) {
     my $j = $i+1;
     my $t = $ltitle[$i];
@@ -107,7 +117,7 @@ SVG_render($$$$$$)
         $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
     }
     pO "<text title=\"$desc\" ".
-          "onclick=\"svg_labelselect(evt)\" line_id=\"line_$i\" " .
+          "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
           "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l$i\">$t</text>";
     $off2 += $th;
   }
@@ -326,7 +336,7 @@ SVG_render($$$$$$)
     my $js_helpers = "id=\"line_$idx\" decimals=\"$dec\" ".
           "x_off=\"$fromsec\" x_min=\"$x\" x_mul=\"$tmul\" ".
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
-          "onclick=\"svg_click(evt)\"";
+          "onclick=\"parent.svg_click(evt)\"";
 
     my ($lx, $ly) = (-1,-1);
     if($type[$idx] eq "points" ) {
