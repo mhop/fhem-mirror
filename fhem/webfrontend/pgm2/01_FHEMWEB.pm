@@ -359,6 +359,7 @@ FW_AnswerCall($)
   my $stylecss = ($__ss ? "style_smallscreen.css" : "style.css");
   pO "<link href=\"$__ME/$stylecss\" rel=\"stylesheet\"/>";
   pO "<meta name=\"viewport\" content=\"width=device-width\"/>" if($__ss);
+  pO "<script type=\"text/javascript\" src=\"$__ME/svg.js\"></script>";
   pO "</head>\n<body name=\"$t\">";
 
   if($__cmdret) {
@@ -899,6 +900,7 @@ FW_logWrapper($)
       my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
       pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
     } else {
       pO "<img src=\"$arg\"/>";
     }
@@ -1507,6 +1509,7 @@ FW_showWeblink($$$)
         my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
         pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
               "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
+
       } else {
         pO "<img src=\"$arg\"/>";
       }

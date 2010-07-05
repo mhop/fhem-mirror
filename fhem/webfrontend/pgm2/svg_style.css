@@ -1,5 +1,7 @@
 text { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
+text.copy  { font-size:16px; stroke:none; fill:blue; }
+text.paste { font-size:16px; stroke:none; fill:blue; }
 
 rect.border { stroke:black; stroke-width:1px; fill:none; }
 
@@ -17,3 +19,4 @@ polyline { stroke:black; fill:none; }
 .l6 { stroke:olive;   } text.l6 { stroke:none; fill:olive; }
 .l7 { stroke:gray;    } text.l7 { stroke:none; fill:gray; }
 .l8 { stroke:yellow;  } text.l8 { stroke:none; fill:yellow; }
+.pasted { stroke-dasharray:1,1; stroke:black; }
