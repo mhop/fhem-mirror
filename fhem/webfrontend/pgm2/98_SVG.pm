@@ -67,10 +67,17 @@ SVG_render($$$$$$)
   }
   pO "]]></style>";
 
+  if(open(FH, "$__dir/svg_defs.svg")) { # gradient definitions
+    pO join("", <FH>);
+    close(FH);
+  } else {
+    Log 0, "Can't open $__dir/svg_defs.svg"
+  }
+
   # Background
   pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
   # Rectangle
-  pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" ".
+  pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
         "fill=\"none\" class=\"border\"/>";
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
