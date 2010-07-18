@@ -1,5 +1,5 @@
 - =DATE= (4.10)
-  - feature: KM271: Read only
+  - feature: KM271
   - bugfix:  99_SUNRISE_EL endless loop bug
   - feature: CUL: optional baudrate spec in definition
   - feature: CUL: sendpool attribute

@@ -42,20 +42,19 @@ uncompressPoints(cmpData)
 
 
 function
-get_cookie(name)
+get_cookie()
 {
   var c = parent.document.cookie;
   if(c == null)
     return "";
-  var results = c.match("fw_"+escape(name)+'=(.*?)(;|$)' );
+  var results = c.match('fhemweb=(.*?)(;|$)' );
   return (results ? unescape(results[1]) : "");
 }
 
 function
-set_cookie(name, value)
+set_cookie(value)
 {
-  name = "fw_"+escape(name);
-  parent.document.cookie=name+"="+escape(value);
+  parent.document.cookie="fhemweb="+escape(value);
 }
 
  
@@ -65,8 +64,7 @@ svg_copy(evt)
   var d = evt.target.ownerDocument;
   var cp = d.getElementById("svg_copy");
   cp.firstChild.nodeValue = " ";
-  set_cookie(old_sel.getAttribute("title"),
-             old_sel.getAttribute("y_min")+":"+
+  set_cookie(old_sel.getAttribute("y_min")+":"+
              old_sel.getAttribute("y_mul")+":"+
              compressPoints(old_sel.getAttribute("points")));
 }
@@ -80,7 +78,7 @@ svg_paste(evt)
 
   var o=d.createElementNS(xmlns, "polyline");
   o.setAttribute("class", "pasted");
-  var data = get_cookie(old_sel.getAttribute("title")).split(":", 3);
+  var data = get_cookie().split(":", 3);
   o.setAttribute("points", uncompressPoints(data[2]));
 
   var h  = parseFloat(old_sel.getAttribute("y_h"));
@@ -124,8 +122,7 @@ svg_labelselect(evt)
     if(sel.getAttribute("points") != null) {
       tl.firstChild.nodeValue = evt.target.getAttribute("title");
       cp.firstChild.nodeValue = "Copy";
-      ps.firstChild.nodeValue = (
-                    get_cookie(sel.getAttribute("title"))==""?" ":"Paste");
+      ps.firstChild.nodeValue = (get_cookie()==""?" ":"Paste");
     }
 
   }
