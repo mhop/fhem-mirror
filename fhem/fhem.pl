@@ -160,7 +160,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.107 2010-05-18 08:08:53 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.108 2010-07-18 08:17:48 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2093,7 +2093,7 @@ Dispatch($$$)
 
   my @found;
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
-                  grep {defined($modules{$_}{ORDER});}keys %modules) {
+                  grep {defined($modules{$_}{ORDER})} keys %modules) {
     next if($iohash->{Clients} !~ m/:$m:/);
 
     # Module is not loaded or the message is not for this module
