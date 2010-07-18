@@ -7,4 +7,4 @@ FHEM:
 Webpgm2
 - plot data from multiple files in a single picture
 - setting the dummy state via dropdown is not possible
-- SVG gimmicks for the plot
+- click on the graph only correct for the day zoom

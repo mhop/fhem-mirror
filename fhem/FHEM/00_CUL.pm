@@ -567,6 +567,9 @@ CUL_XmitLimitCheck($$)
   $hash->{NR_CMD_LAST_H} = int(@b);
 }
 
+#####################################
+# Translate data prepared for an FHZ to CUL syntax, so we can reuse
+# the FS20 and FHZ modules.
 sub
 CUL_WriteTranslate($$$)
 {
@@ -605,7 +608,7 @@ CUL_Write($$$)
   ($fn, $msg) = CUL_WriteTranslate($hash, $fn, $msg);
   return if(!defined($fn));
 
-  Log 5, "CUL sending $fn$msg";
+  Log 5, "$hash->{NAME} sending $fn$msg";
   my $bstring = "$fn$msg";
 
   if($fn eq "F") {
