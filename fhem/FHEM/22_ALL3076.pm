@@ -49,7 +49,7 @@ ALL3076_Set($@)
   my ($hash, @a) = @_;
 
   return "no set value specified" if(int(@a) != 2);
-  return "Unknown argument $a[1], choose one of dim[1-100]% dimdown dimup on off toggle" if($a[1] eq "?");
+  return "Unknown argument $a[1], choose one of on off toggle dimdown dimup dim10% dim20% dim30% dim40% dim50% dim60% dim70% dim80% dim90% dim100%" if($a[1] eq "?");
 
   my $v = $a[1];
   my $v2 = "";
