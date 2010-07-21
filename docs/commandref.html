@@ -69,6 +69,7 @@
       <a href="#global">global</a><br>
 
       <a href="#ALL3076">ALL3076</a> &nbsp;
+      <a href="#ALL4000T">ALL4000T</a> &nbsp;
       <a href="#BS">BS</a> &nbsp;
       <a href="#CM11">CM11</a> &nbsp;
       <a href="#CUL">CUL</a> &nbsp;
@@ -2925,6 +2926,23 @@ A line ending with \ will be concatenated with the next one, so long lines
     <ul>
       <li>Toggle is special implemented. List name returns "on" or "off" even after a toggle command</li>
   </ul>
+</ul>
+<a name="ALL4000T"></a>
+<h3>ALL4000T</h3>
+<ul>
+  <a name="ALL4000Tdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ALL4000T &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines a temperature sensor connected on an Allnet 4000 device via its ip address and port. Use the delay argument to define the delay between polls.<br><br>
+
+    Examples:
+    <ul>
+      <code>define AUSSEN.POOL.TEMP.vorlauf ALL4000T 192.168.68.20 t2 120</code><br>
+    </ul>
+  </ul>
+  <br>
 </ul>
 
 <a name="BS"></a>
