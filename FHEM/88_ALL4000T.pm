@@ -95,7 +95,7 @@ ALL4000T_GetStatus($)
   my $xml = new XML::Simple;
 
   my $URL="http://".$host."/xml";
-  my $agent = LWP::UserAgent->new(env_proxy => 1,keep_alive => 1, timeout => 30);
+  my $agent = LWP::UserAgent->new(env_proxy => 1,keep_alive => 1, timeout => 3);
   my $header = HTTP::Request->new(GET => $URL);
   my $request = HTTP::Request->new('GET', $URL, $header);
   my $response = $agent->request($request);
@@ -113,7 +113,7 @@ ALL4000T_GetStatus($)
   my $data = $xml->XMLin($body);
   my $current=$data->{BODY}->{FORM}->{TEXTAREA}->{xml}->{data}->{$host_port};
 
-  $text="T: ".$current;
+  $text="Temperature:".$current;
   my $sensor="temperature";
   Log 4,"$name: $text";
   if (!$hash->{local}){
@@ -122,7 +122,7 @@ ALL4000T_GetStatus($)
        $hash->{READINGS}{$sensor}{VAL} = $current." (Celsius)";;
        DoTrigger($name, undef) if($init_done);    
   }
-  $hash->{STATE} = $text;
+  $hash->{STATE} = "T:".$current;
   return($text);
 }
 
