@@ -106,6 +106,8 @@ RRD_Log_Initialize($)
   $data{RRD_LOG}{READING}{CUL_RFR}{'RAWMSGCOUNT'} = "RRD_Log_5minGAUGE";
   #WBS
   $data{RRD_LOG}{READING}{WBS}{'Temperature'} = "RRD_Log_5minGAUGE";
+  # ALL4000T
+  $data{RRD_LOG}{READING}{ALL4000T}{'Temperature'} = "RRD_Log_5minGAUGE";
   # temp. save Path to RRDs
   # $data{RRD_LOG}{RRDS}{<DEVICE-NAME>}{<READING>} = $rrd_path
   # reset RRS
