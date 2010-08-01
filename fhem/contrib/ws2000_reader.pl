@@ -1,10 +1,10 @@
-#!perl
+#!/usr/bin/perl
 #
 # read_ws2000 from device (elv art-Nr. 390-61) and provides socket service (like XPORT),
 #  or act as client for this service
 # licence GPL2
 # Thomas Dressler 2008
-# $Id: ws2000_reader.pl,v 1.1 2008-05-10 21:10:38 tdressler Exp $
+# $Id: ws2000_reader.pl,v 1.2 2010-08-01 13:33:13 rudolfkoenig Exp $
 
 use Switch;
 use strict;

@@ -1,3 +1,5 @@
+#!/usr/bin/perl
+
 die("Usage: crc <HEX-MESSAGE> <CRC>\n") if(int(@ARGV) != 2);
 my $msg = $ARGV[0];
 $msg =~ s/ //g;
