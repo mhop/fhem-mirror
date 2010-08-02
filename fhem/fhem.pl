@@ -160,7 +160,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.108 2010-07-18 08:17:48 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.109 2010-08-02 12:47:55 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -270,6 +270,16 @@ if($^O =~ m/Win/ && !$attr{global}{nofork}) {
   Log 1, "Forcing 'attr global nofork' on WINDOWS";
   Log 1, "set it in the config file to avoud this message";
   $attr{global}{nofork}=1;
+}
+
+
+# If started as root, and there is a fhem user in the /etc/passwd, su to it
+if($^O !~ m/Win/ && $< == 0) {
+  my @pw = getpwnam("fhem");
+  if(@pw) {
+    use POSIX qw(setuid);
+    setuid($pw[2]);
+  }
 }
 
 # Go to background if the logfile is a real file (not stdout)

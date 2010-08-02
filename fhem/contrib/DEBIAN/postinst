@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Don't know how to check presence of fhem in passwd with -e
+#set -e
+
+grep -q fhem /etc/passwd
+e=$?
+
+if test ! $e = 0; then
+  useradd --system --home /var/log/fhem --shell /bin/false fhem
+fi
+chown -R fhem /var/log/fhem /etc/fhem.cfg
+initctl start fhem

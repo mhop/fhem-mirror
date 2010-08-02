@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # script to generate a random number of on/off events to simulate presence eg.
 # while on holidays.  normally this script would be executed by an event like a

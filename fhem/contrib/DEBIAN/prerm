@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -e
+if pgrep fhem.pl >/dev/null; then
+  initctl stop fhem
+fi
