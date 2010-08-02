@@ -1,0 +1,6 @@
+fhem (4.10)
+
+  * Trying to make Debian package lintian clean.
+  * First release
+
+ -- Rudolf Koenig <r.koenig@koeniglich.de>  2010-08-01
