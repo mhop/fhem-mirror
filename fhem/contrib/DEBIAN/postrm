@@ -1,0 +1,10 @@
+#!/bin/sh
+
+set -e
+
+if grep -q fhem /etc/passwd; then
+  userdel fhem
+fi
+if test -f /etc/init/fhem.conf; then
+  rm /etc/init/fhem.conf
+fi

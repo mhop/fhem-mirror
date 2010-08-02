@@ -1,43 +1,55 @@
-BINDIR=/usr/local/bin
-MODDIR=/usr/local/lib
+BINDIR=/usr/bin
+MODDIR=/usr/share/fhem
 VARDIR=/var/log/fhem
+DOCDIR=/usr/share/doc/fhem
+MANDIR=/usr/share/man/man1
+ETCDIR=/etc
 
-VERS=4.9
-DATE=2010-03-14
+# Used for .deb package creation
+RBINDIR=$(ROOT)$(BINDIR)
+RMODDIR=$(ROOT)$(MODDIR)
+RVARDIR=$(ROOT)$(VARDIR)
+RDOCDIR=$(ROOT)$(DOCDIR)
+RMANDIR=$(ROOT)$(MANDIR)
+RETCDIR=$(ROOT)$(ETCDIR)
+
+VERS=4.10
+DATE=2010-08-01
+DESTDIR=fhem-$(VERS)
 
 all:
 	@echo Nothing to do for all.
 	@echo To install, check the Makefile, and then \'make install\'
 	@echo or \'make install-pgm2\' to install a web frontend too.
 
-install:install-base
-	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
-	cp examples_changed/sample_fhem $(VARDIR)/fhem.cfg
-	@echo
-	@echo
-	@echo Start fhem with
-	@echo perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
+install:install-pgm2
 
 install-pgm2:install-base
-	cp -r webfrontend/pgm2/* $(MODDIR)/FHEM
-	cp docs/commandref.html docs/faq.html docs/HOWTO.html $(MODDIR)/FHEM
-	cp docs/*.png docs/*.jpg $(MODDIR)/FHEM
-	-mv $(VARDIR)/fhem.cfg $(VARDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
-	cp examples_changed/sample_pgm2 $(VARDIR)/fhem.cfg
-	cd examples_changed; for i in *; do cp -r $$i $(MODDIR)/FHEM/example.$$i; done
-	@echo
-	@echo
-	@echo Start fhem with
-	@echo perl $(BINDIR)/fhem.pl $(VARDIR)/fhem.cfg
+	cp -r webfrontend/pgm2/* $(RMODDIR)/FHEM
+	cp docs/commandref.html docs/faq.html docs/HOWTO.html $(RMODDIR)/FHEM
+	cp docs/*.png docs/*.jpg $(RMODDIR)/FHEM
+	cd examples_changed; for i in *; do cp -r $$i $(RMODDIR)/FHEM/example.$$i; done
+	cp examples_changed/sample_pgm2 $(RETCDIR)/fhem.cfg
 
 install-base:
-	mkdir -p $(BINDIR) $(MODDIR) $(VARDIR)
-	cp fhem.pl $(BINDIR)
-	cp -r FHEM $(MODDIR)
+	@echo After installation start fhem with
+	@echo perl $(BINDIR)/fhem.pl $(ETCDIR)/fhem.cfg
+	@echo
+	@echo
+	mkdir -p $(RBINDIR) $(RMODDIR) $(RVARDIR)
+	mkdir -p $(RDOCDIR) $(RETCDIR) $(RMANDIR)
+	cp fhem.pl $(RBINDIR)
+	cp -r FHEM $(RMODDIR)
 	rm -rf examples_changed
 	cp -r examples examples_changed
 	perl -pi -e 's,modpath \.,modpath $(MODDIR),' examples_changed/[a-z]*
 	perl -pi -e 's,([^h]) /tmp,$$1 $(VARDIR),' examples_changed/[a-z]*
+	-mv $(RETCDIR)/fhem.cfg $(RETCDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`
+	cp examples_changed/sample_fhem $(RETCDIR)/fhem.cfg
+	cp -rp contrib $(RMODDIR)
+	cp -rp docs/* $(RDOCDIR)
+	cp docs/fhem.man $(RMANDIR)/fhem.pl.1
+	gzip -9 $(RMANDIR)/fhem.pl.1
 
 dist:
 	@echo Version is $(VERS), Date is $(DATE)
@@ -45,11 +57,34 @@ dist:
 	cp -r CHANGED FHEM HISTORY Makefile README.CVS\
                 TODO contrib docs examples fhem.pl webfrontend .f
 	find .f -name CVS -print | xargs rm -rf
+	find .f -name example.CVS -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
-	mv .f fhem-$(VERS)
-	tar cf - fhem-$(VERS) | gzip > fhem-$(VERS).tar.gz
-	mv fhem-$(VERS)/docs/*.html .
-	rm -rf fhem-$(VERS)
+	mv .f $(DESTDIR)
+	tar cf - $(DESTDIR) | gzip > $(DESTDIR).tar.gz
+	mv $(DESTDIR)/docs/*.html .
+	rm -rf $(DESTDIR)
+
+deb:
+	echo $(PWD)
+	rm -rf .f
+	make ROOT=`pwd`/.f install
+	cp -r contrib/DEBIAN .f
+	mkdir .f/etc/init
+	cp contrib/init-scripts/fhem.upstart .f/etc/init/fhem.conf
+	find .f -name CVS -print | xargs rm -rf
+	find .f -name example.CVS -print | xargs rm -rf
+	find .f -name \*.orig -print | xargs rm -f
+	find .f -name .#\* -print | xargs rm -f
+	find .f -type f -print |\
+		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
+	find .f -type f | xargs chmod 644
+	find .f -type d | xargs chmod 755
+	chmod 755 `cat contrib/executables`
+	gzip -9 .f/$(DOCDIR)/changelog
+	chown -R root:root .f
+	mv .f $(DESTDIR)
+	dpkg-deb --build $(DESTDIR)
+	rm -rf $(DESTDIR)
