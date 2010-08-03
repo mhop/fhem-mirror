@@ -127,8 +127,8 @@ SVG_render($$$$$$)
     my $t = $ltitle[$i];
     my $desc = "";
     if(defined($data{"min$j"}) && $data{"min$j"} ne "undef") {
-      $desc = sprintf("$t: Min:%g Max:%g Last:%g",
-        $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
+      $desc = sprintf("%s: Min:%g Max:%g Last:%g",
+        $t, $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
     }
     pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
