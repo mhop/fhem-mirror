@@ -14,7 +14,7 @@
   - bugfix:  make BS known to CUL to avoid lost messages if both FHZ1300 and CUL
              are connected, adjust matching rule
   - feature: Copy&Paste in SVG
-  - feature: Debian/Ubuntu Package creation in the Makefile
+  - feature: Debian/Ubuntu Package. Install-path changes to satisfy lintian
 
 - 2010-03-13 (4.9)
   - bugfix:  changed the fhem prompt from FHZ> to fhem>
