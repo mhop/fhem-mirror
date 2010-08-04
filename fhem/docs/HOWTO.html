@@ -60,23 +60,22 @@
       After starting, the logfile should look like:<pre>
       2008.06.15 16:17:03 2: FHEMWEB port 8083 opened
       2008.06.15 16:17:03 2: FHEMWEB port 8084 opened
-      2008.06.15 16:17:03 0: Server started (version ...)
-      </pre>
-      Connect to fhem with an internet browser:
-      <a href="http://localhost:8083/fhem">http://localhost:8083/fhem</a><br>
-      or 
-      <a href="http://localhost:8084/fhem">http://localhost:8084/fhem</a> if
-      you are using a small-screen browser (e.g a smartphone).
+      2008.06.15 16:17:03 0: Server started (version ...)</pre>
       </ul>
 
-
     <a name="FHZ"></a>
-    <h3>Attaching the USB device for the PC (CUL / FHZ / EM1010PC)</h3>
+    <h3>Attaching the USB device for the PC (CUL / FHZ1x00PC / EM1010PC)</h3>
       <ul>
-      Attach the USB device (CUL, FHZ1000/FHZ1300, EM1010PC) to your computer,
-      and look for the corresponding device in the /dev directory.<br>
-      For CUL a file named /dev/ttyACM* will be created under Linux and
-      /dev/cu.usbmodem* under OSX. Note the exact name of the device.
+      Connect to fhem with an internet browser:
+      <a href="http://localhost:8083/fhem">http://localhost:8083/fhem</a>
+      or 
+      <a href="http://localhost:8084/fhem">http://localhost:8084/fhem</a> if
+      you are using a small-screen browser (e.g a smartphone).<br><br>
+
+      Attach the USB device (CUL, FHZ1000PC/FHZ1300, EM1010PC) to your
+      computer, and look for the corresponding device in the /dev
+      directory.<br> For CUL a file named /dev/ttyACM* will be created under
+      Linux and /dev/cu.usbmodem* under OS X. Note the exact name of the device.
       Define it for fhem (by typing it in the "Fhem cmd" input field in the
       browser):<pre>
       define CUL1 CUL /dev/ttyACM0 1234</pre>
@@ -84,10 +83,13 @@
       You can find details about CUL define parameters <a
       href="commandref.html#CUL">here</a>.<br><br>
 
-
-      Instead of the CUL you can also use an <a
-      href="commandref.html#FHZ">FHZ</a> with slightly different parameters
-      (define FHZ1 FHZ /dev/ttyUSB0).
+      The same is to be done for the <a href="commandref.html#FHZ">FHZ</a> with
+      slightly different parameters:<pre>
+      define FHZ1 FHZ /dev/ttyUSB0</pre>
+      For the FHZ on OSX you need to install the ftdi driver first from <a
+      href="http://www.ftdichip.com/Drivers/VCP.htm">
+      http://www.ftdichip.com/Drivers/VCP.htm</a>, the device name will be
+      /dev/cu.usbserial-xxxxxxxx.
 
       <br><br>
       <b>Note:</b> Don't forget to type "save" in the "Fhem cmd" input field of
@@ -303,7 +305,6 @@
       characters (year/month/week/day), look at the FileLog definition.
       Don't forget to enable archiving with the archivedir or archivecmd
       attributes.<br><br>
-
       </ul>
 
     <a name="tips"></a>
@@ -348,10 +349,7 @@
       configure a fake logfile with the correct filename and an unused regexp,
       e.g.<br><pre>
       define messages FileLog /var/log/messages fakelog</pre>
-
-
       </ul>
-      <br>
 
 
     <a name="structure"></a>
