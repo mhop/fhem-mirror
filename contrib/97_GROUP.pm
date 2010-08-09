@@ -191,7 +191,8 @@ sub GRP_CGI_LEFT(){
   # rh = return-Html
   my $rh;
   # $rh = "<div id=\"left\">\n";
-  $rh = "<div id=\"menu\">\n";
+  $rh = "<div id=\"logo\"><img src=\"" . $__ME . "/fhem.png\"></div>";
+  $rh .= "<div id=\"menu\">\n";
   # Print Groups
   $rh .= "<table class=\"room\">\n";
   foreach my $g (sort keys %{$modules{GROUP}{defptr}}){
