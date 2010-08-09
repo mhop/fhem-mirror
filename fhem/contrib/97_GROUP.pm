@@ -4,7 +4,10 @@
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
 # Stand: 31.03.2010
-# Version: 1.0.0
+# Version: 1.1.0
+# Update 08/2010
+# Support for New-Style-Sheets div=menu div=content
+# Added SpecialReading DNW 
 ################################################################################
 # Usage:
 # define <New-Group-Name> GROUP <CATEGORY>
@@ -12,7 +15,11 @@
 # READING-VALUES are first searched there $hash{<DEVICENAME>}{READINGS}{<READING>}
 # and for the second there $hash{<DEVICENAME>}{<READING>}
 #
-# Spezial Categories:
+# Special READINGs
+# FHT-Device and READING = DNW
+# Displays: Day-Temp Night-Temp WindowOpen-Temp: D:22.00 N:18.00 W:5.50
+#
+# Special Categories:
 # SHOWLEFT -> DisplayName & Value appear on the Left-Side (DIV-Left)
 #
 # Unkown READINGS appear as "???"
@@ -37,7 +44,8 @@ sub GROUP_Initialize($)
   $data{FWEXT}{$fhem_url}{FUNC} = "GRP_CGI";
   $data{FWEXT}{$fhem_url}{LINK} = $name;
   $data{FWEXT}{$fhem_url}{NAME} = $name;
-  
+  # Special READINGs
+	$data{GROUP}{READINGS}{DNW} = "GRP_GET_READING_DNW";
   return undef;
 }
 #-------------------------------------------------------------------------------
@@ -182,7 +190,8 @@ sub GRP_CGI_TOP($) {
 sub GRP_CGI_LEFT(){
   # rh = return-Html
   my $rh;
-  $rh = "<div id=\"left\">\n";
+  # $rh = "<div id=\"left\">\n";
+  $rh = "<div id=\"menu\">\n";
   # Print Groups
   $rh .= "<table class=\"room\">\n";
   foreach my $g (sort keys %{$modules{GROUP}{defptr}}){
@@ -218,7 +227,8 @@ sub GRP_CGI_RIGHT(){
   my $row = 1;
   # Table GROUP
   # Name | Value | Time | Device-Type
-  $rh = "<div id=\"right\">\n";
+  # $rh = "<div id=\"right\">\n";
+  $rh = "<div id=\"content\">\n";
   # Category -> DEVICE
   foreach my $c (sort keys %{$modules{GROUP}{defptr}{$CAT}}){
     # Log 0,"GROUP CGI-RIGHT DEV: $c";
@@ -262,6 +272,19 @@ sub GRP_CGI_DISPTACH_URL($){
   return $CAT;
 }
 #-------------------------------------------------------------------------------
+sub GRP_HANDLE_CAT($$){
+  my($device,$cat) = @_;
+  # Normal Categories -> %modules{GROUP}{defptr}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
+  # Spezial Categories -> %modules{GROUP}{conf}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
+  if($cat eq "SHOWLEFT") {
+    # Log 0,"GRP CAT-DISP-> SHOWLEFT -> $cat -> $device";
+    $modules{GROUP}{conf}{$cat}{$device} = 1;
+    return undef;
+  }
+  $modules{GROUP}{defptr}{$cat}{$device} = 1;
+  return undef;
+}
+#-------------------------------------------------------------------------------
 sub GRP_GET_READING_VAL($$){
   # IN $dn = DeviceName; $rn = ReadingName
   my($dn,$rn) = @_;
@@ -283,27 +306,58 @@ sub GRP_GET_READING_VAL($$){
 	if($rv =~ /\d{1}/) {
 		$rv = sprintf("%.2f", $rv);
 		}
-  Log 0,"GROUP GET-READING: $rv,$rt,$ru";
+  # Log 0,"GROUP GET-READING: $rv,$rt,$ru";
   # Second $hash
 	# First Wins
   if(defined($defs{$dn}{$rn}) && $rv eq "???"){
     $rv = $defs{$dn}{$rn};
     $rt = " ";
   }
-  Log 0,"GROUP GET-READING: $rv,$rt,$ru";
+	# third Special READINGs
+	if(defined($data{GROUP}{READINGS}{$rn}) && $rv eq "???" ){
+		my $rv_function = $data{GROUP}{READINGS}{$rn};
+		Log 0, "GROUP SP-READINGS Func: " . $rv_function;
+		no strict "refs";
+		if(defined(&$rv_function)){
+			my ($rv_return,$rt_return) = &$rv_function($dn,$rn);
+				# On ERROR return undef
+				if($rv_return) {
+					$rv = $rv_return;
+					$rt = $rt_return;
+					}
+		}
+		use strict "refs";
+	}
+  # Log 0,"GROUP GET-READING: $rv,$rt,$ru";
   return ($rv,$rt,$ru);  
 }
 #-------------------------------------------------------------------------------
-sub GRP_HANDLE_CAT($$){
-  my($device,$cat) = @_;
-  # Normal Categories -> %modules{GROUP}{defptr}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
-  # Spezial Categories -> %modules{GROUP}{conf}{<CAT-NAME>}{<GROUP-DEVICE-NAME>}
-  if($cat eq "SHOWLEFT") {
-    # Log 0,"GRP CAT-DISP-> SHOWLEFT -> $cat -> $device";
-    $modules{GROUP}{conf}{$cat}{$device} = 1;
-    return undef;
-  }
-  $modules{GROUP}{defptr}{$cat}{$device} = 1;
-  return undef;
+sub GRP_GET_READING_DNW($$){
+	# FHT-Device and READING = DNW
+	# Displays: Day-Temp Night-Temp WindowOpen-Temp: D:22.00 N:18.00 W:5.50
+	# IN $dn = DeviceName; $rn = ReadingName
+  my($dn,$rn) = @_;
+	# Type = FHT ???
+	if($defs{$dn}{TYPE} ne "FHT"){return undef;}
+	my($day,$night,$window,$rv_time);
+	$day = "??";
+	$night = "??";
+	$window = "??";
+	$rv_time = "--";
+	if(defined($defs{$dn}{READINGS}{'day-temp'}{VAL})) {
+		$day = $defs{$dn}{READINGS}{'day-temp'}{VAL};
+		}
+	if(defined($defs{$dn}{READINGS}{'day-temp'}{TIME})) {
+		$rv_time = $defs{$dn}{READINGS}{'day-temp'}{TIME};
+		}
+	if(defined($defs{$dn}{READINGS}{'night-temp'}{VAL})) {
+		$night = $defs{$dn}{READINGS}{'night-temp'}{VAL};
+		}
+	if(defined($defs{$dn}{READINGS}{'windowopen-temp'}{VAL})) {
+		$window = $defs{$dn}{READINGS}{'windowopen-temp'}{VAL};
+		}
+	# Retunr Value
+	my $rv = "D:$day N:$night W:$window";
+	return ($rv,$rv_time);
 }
 1;
