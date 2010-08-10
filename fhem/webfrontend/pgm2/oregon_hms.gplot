@@ -1,0 +1,40 @@
+#
+# Display the measured temperature and the humidity of Oregon sensors.
+#
+# FileLog definition: 
+# define <filelogname> FileLog /var/log/fhem/<devname>-%Y.log <devname>
+# Filelog example:
+# define FileLog_THR128_08 FileLog /var/log/fhem/THR128_08-%Y.log THR128_08
+#
+# Logfile record example:
+#2010-08-10_17:59:46 THGR810_b1 temperature: 21.6
+#2010-08-10_17:59:46 THGR810_b1 humidity: 66
+
+
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+#set ytics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+set ylabel "Humidity (%)"
+
+#FileLog 4:temperature:0:
+#FileLog 4:humidity:0:
+
+plot \
+  "< awk $3=="temperature:" {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
+  "< awk $3=="humidity:" {print $1, $4}' <IN>"\
+     using 1:2 axes x1y1 title 'Humidity (%)' with lines lw 1\
