@@ -101,6 +101,7 @@
       <a href="#M232Voltage">M232Voltage</a> &nbsp;
       <a href="#OWFS">OWFS</a> &nbsp;
       <a href="#OWTEMP">OWTEMP</a> &nbsp;
+      <a href="#RFXCOM">RFXCOM</a> &nbsp;
       <a href="#SCIVT">SCIVT</a> &nbsp;
       <a href="#SISPM">SISPM</a> &nbsp;
       <a href="#SIS_PMS">SIS_PMS</a> &nbsp;
@@ -3752,6 +3753,52 @@ audio</pre>
   </ul>
   <br>
 
+</ul>
+
+<a name="RFXCOM"></a>
+<h3>RFXCOM</h3>
+<ul>
+  <table>
+  <tr><td>
+  <a href="http://www.rfxcom.com">RFXCOM</a> sells RF receivers and transmitters
+  for a variety of protocols. The 433.92MHz receivers support many Oregon Scientific weather sensors. <br>
+  <br>
+  This module supports receiving messages for the USB attached receivers (Order code: 80002, see <a href="http://www.rfxcom.com/receivers.htm">http://www.rfxcom.com/receivers.htm</a>).
+  For testing purposes you may also use the LAN based receivers. However
+  the code for LAN access is still in beta stage and not fault tolerant. Therefore you should use the USB attached receiver.<br>
+  <br>
+  Currently one parser module (41_Oregon.pm) is implemented to parse and process messages for 
+  Oregon Scientific weather sensors. If you need to process other devices that are supported
+  by RFXCOM, you have to implement a new parsing module.<br>
+  See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> of 
+  Oregon Scientific weather sensors that could be received by the RFXCOM receivers.
+  Please note that not all sensors are currently implemented in the parser module right now.
+  The parsing module ist based on the <a href="http://www.xpl-perl.org.uk/">Perl xPL</a> 
+  project parsing modules. Thanks to Mark Hindess from the xPL project for writing this code. <br>
+  <br>
+  Until now the following Oregon Scientific weather sensors have been tested: BTHR918N, THGR810, THR128, THWR288A, WTGR800.  <br>
+  <br>
+ <a name="RFXCOMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; RFXCOM &lt;device&gt; </code><br>
+  </ul>
+    <br>
+    USB-connected (80002):<br><ul>
+      &lt;device&gt; specifies the USB port to communicate with the RFXCOM receiver.
+      Normally on Linux the device will be named /dev/ttyUSBx, where x is a number. 
+      For example /dev/ttyUSB0.<br><br>
+      Example: <br>
+	<code>define RFXCOMUSB RFXCOM /dev/ttyUSB0</code>
+      <br>
+     </ul>
+   <br>
+    Network-connected devices:<br><ul>
+    &lt;device&gt; specifies the host:port of the device. E.g.
+    192.168.1.5:10001
+    </ul>
+    <br>
+  </table> 
 </ul>
 
 <a name="structure"></a>
