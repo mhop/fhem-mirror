@@ -47,12 +47,15 @@ The FHEMRENDERER uses attributes to control the behaviour:
 		room		Unsorted
 		status		off
 		tmpfile		/tmp/
+		multiprocess	off
 
 These attributes have the following meaning:
 plotmode, plotsize: 	Control gnuplot and the desired output
 refresh: 		type HH:MM:SS, is the time-interval in which the re-rendering is done
 status:  		Tells if the timer-based re-rendering is on/off
 tmpfile:		Is the path (and prefix, if given) of the graphic-files, that will be rendered
+multiprocess:		You can set "on" or "off". If multiprocess is "on" the time-scheduled renderings will be done in a 
+                        mutli-process manner, and FHEM will not be blocked by the rendering process. 
 
 NOTE: The timer-based rendering renders ONLY those fileplots, for which you have defined a WebLink !
       See WebLink for more details on how to define.
@@ -88,6 +91,7 @@ DEFINE
 		room		Unsorted
 		status		off
 		tmpfile		/tmp/
+		multiprocess	off
 
         
         NOTE: The Logfile will report (with LogLevel 2) that the FHEMRENDERER has been defined.
@@ -169,6 +173,7 @@ ATTR
 		refresh		Timer-Interval for rerendering (HH:MM:SS)
 		status		Status of the Timer (off/on)
 		tmpfile		Path and prefix of for the rendered graphics (e.g. /tmp/)
+		multiprocess	on / off
 
 
 
