@@ -32,6 +32,7 @@ sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
 
 use vars qw($__dir); # moddir (./FHEM), needed by SVG
+use vars qw($__ME);  # webname (fhem), needed by 97_GROUP
 my $zlib_loaded;
 
 
@@ -44,7 +45,6 @@ my $__detail;     # currently selected device for detail view
 my %__devs;       # hash of from/to entries per device
 my %__icons;      # List of icons
 my $__iconsread;  # Timestamp of last icondir check
-my $__ME;         # webname (fhem)
 my $__plotmode;   # Global plot mode (WEB attribute)
 my $__plotsize;   # Global plot size (WEB attribute)
 my %__pos;        # scroll position
