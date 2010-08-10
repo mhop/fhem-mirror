@@ -84,6 +84,7 @@ my $__data;                     # Filecontent from browser when editing a file
 my $__svgloaded;                # Do not load the SVG twice
 my $__lastxmllist;              # last time xmllist was parsed
 my $FHEMRENDERER_tmpfile;       # TempDir & File for the rendered graphics
+my $__mp;
 
 #####################################
 sub
@@ -94,7 +95,7 @@ FHEMRENDERER_Initialize($)
 #  $hash->{ReadFn}  = "FHEMRENDERER_Read";
   $hash->{DefFn}   = "FHEMRENDERER_Define";
   $hash->{UndefFn} = "FHEMRENDERER_Undef";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 plotmode:gnuplot,gnuplot-scroll plotsize refresh tmpfile status";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 plotmode:gnuplot,gnuplot-scroll plotsize refresh tmpfile status multiprocess";
   $hash->{SetFn}   = "FHEMRENDERER_Set";
   $hash->{GetFn}   = "FHEMRENDERER_Get";
 }
@@ -121,6 +122,7 @@ FHEMRENDERER_Define($$)
   $__timeinterval = FHEMRENDERER_getAttr("refresh", "00:10:00");
   $__plotmode = FHEMRENDERER_getAttr("plotmode", "gnuplot");
   $__plotsize = FHEMRENDERER_getAttr("plotsize", "800,200");
+  $__mp = FHEMRENDERER_getAttr("multiprocess", "off");
   $FHEMRENDERER_tmpfile = FHEMRENDERER_getAttr("tmpfile", "/tmp/");
   FHEMRENDERER_setAttr("status", "off");
   
@@ -174,6 +176,7 @@ FHEMRENDERER_Get($@)
   my $ret = undef;
   my $v;
   my $t;
+  my $pid;
   
 	FHEMRENDERER_parseXmlList(0);
 
@@ -183,8 +186,9 @@ FHEMRENDERER_Get($@)
   $__plotmode = FHEMRENDERER_getAttr("plotmode", "gnuplot");
   $__plotsize = FHEMRENDERER_getAttr("plotsize", "800,200");
   $FHEMRENDERER_tmpfile = FHEMRENDERER_getAttr("tmpfile", "/tmp/");
-
-  if (@a <= 2) {
+  $__mp = FHEMRENDERER_getAttr("multiprocess", "off");
+  
+   if (@a <= 2) {
   	if (@a == 2) {
   		my ($p,$v) = split("=",$a[1], 2);
 
@@ -196,6 +200,16 @@ FHEMRENDERER_Get($@)
        	%__pos =  split(/[=&]/, $v);
       }
     }
+
+	  if ($__mp ne "off") {
+	  	$pid = fork();
+	  	if (not defined $pid) {
+	  		return ("ERROR: No MultiProcessing possible");
+	  	}
+	  	if ($pid > 0) {
+	  		return $ret;
+	  	}
+  	}
 
     foreach my $type (sort keys %__types) {
 	  	if($type eq "weblink") {
@@ -255,7 +269,11 @@ FHEMRENDERER_Get($@)
   } else {
   	return "\"get FHEMRENDERER\" needs either none, 1(pos) or 3-5 arguments ([file-name] device type logfile [pos=zoom=XX&off=YYY])";
   }
-	return $ret;
+ 	if (not defined $pid) {
+		return $ret;
+	} else {
+		exit(0);
+	}
 }
 
 #####################
