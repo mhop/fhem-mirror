@@ -5328,7 +5328,8 @@ isday</pre>
 <ul>
   The FHEMRENDERER module is intended to render (draw) graphics based on the FHEM Log-Files.
   This can be done either based on a timer (used in the module) or based on a direct call of GET.
-  The rendered graphics will be stored in a pre-defined directory with a predefined prefix of the files.
+  The rendered graphics will be stored in a pre-defined directory with a predefined prefix of the files. The renderer can also work in a multi-process mode,
+  which doesn't block the main FHEM-Loop.
   <br> <br>
 
   <a name="FHEMRENDERERdefine"></a>
@@ -5340,12 +5341,13 @@ isday</pre>
         Otherwise this option has no real meaning for FHEMRENDERER.<br>
         <br>
         As a side-effect of defining this "device" the following attributes will be set for this "device":<br>
-		&nbsp;&nbsp;plotmode	gnuplot	<br>
-		&nbsp;&nbsp;plotsize	800,200 <br>
-		&nbsp;&nbsp;refresh		00:10:00 <br>
-		&nbsp;&nbsp;room		Unsorted <br>
-		&nbsp;&nbsp;status		off <br>
-		&nbsp;&nbsp;tmpfile		/tmp/ <br>
+		&nbsp;&nbsp;plotmode		gnuplot	<br>
+		&nbsp;&nbsp;plotsize		800,200 <br>
+		&nbsp;&nbsp;refresh			00:10:00 <br>
+		&nbsp;&nbsp;room			Unsorted <br>
+		&nbsp;&nbsp;status			off <br>
+		&nbsp;&nbsp;tmpfile			/tmp/ <br>
+		&nbsp;&nbsp;multiprocess	off <br>
 <br>
         NOTE: The Logfile will report (with LogLevel 2) that the FHEMRENDERER has been defined.
 
@@ -5448,7 +5450,16 @@ isday</pre>
         filenames.<br/> You can specify a path to which the files will be
         rendered. If you also specify a prefix, this will be used to build the
         resulting filename.
-        </li><br> </li> </ul>
+        </li><br> 
+    <li>multiprocess<br/>
+        This defines if the Renderer works in a multiprocessing mode.<br/> 
+		You can set multiprocessing either to ON / OFF and the renderer will draw the
+		time-scheduled tasks either in multiprocessing mode, or not.
+		NOTE: Direct GET calls, except for a general GET (for all weblinks) will be renderer
+		in an interactive mode, meaning that the FHEM-Loop will be block as long as the graphics are rendered.
+		If you want to use multiprocessing, set the RENDERER and multiprocessing to ON and the
+		weblink-graphics will be rendered in the background.
+        </li><br></li> </ul>
   </ul>
 
 </ul>
