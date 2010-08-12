@@ -906,6 +906,7 @@ CUL_CloseDev($)
     delete($hash->{USBDev});
 
   }
+  ($dev, undef) = split("@", $dev); # Remove the baudrate
   delete($selectlist{"$name.$dev"});
   delete($readyfnlist{"$name.$dev"});
   delete($hash->{FD});
