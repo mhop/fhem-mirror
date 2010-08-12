@@ -952,7 +952,7 @@ CUL_OpenDev($$)
     delete($readyfnlist{"$name.$dev"});
     $selectlist{"$name.$dev"} = $hash;
 
-  } else {                              # USB Device
+  } else {                              # USB/Serial device
 
     my $baudrate;
     ($dev, $baudrate) = split("@", $dev);
@@ -989,7 +989,27 @@ CUL_OpenDev($$)
       $po->parity('none');
       $po->stopbits(1);
       $po->handshake('none');
+
+      # This part is for some Linux kernel versions whih has strange default
+      # settings.  Device::SerialPort is nice: if the flag is not defined for your
+      # OS then it will be ignored.
+      $po->stty_icanon(0);
+      #$po->stty_parmrk(0); # The debian standard install does not have it
+      $po->stty_icrnl(0);
+      $po->stty_echoe(0);
+      $po->stty_echok(0);
+      $po->stty_echoctl(0);
+
+      # Needed for some strange distros
+      $po->stty_echo(0);
+      $po->stty_icanon(0);
+      $po->stty_isig(0);
+      $po->stty_opost(0);
+      $po->stty_icrnl(0);
     }
+
+    $po->write_settings;
+
 
   }
 
