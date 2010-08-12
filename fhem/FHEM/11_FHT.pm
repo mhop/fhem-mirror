@@ -82,6 +82,16 @@ my %codes = (
 );
 
 my %cantset = (
+  "actuator"      => 1,
+  "actuator1"     => 1,
+  "actuator2"     => 1,
+  "actuator3"     => 1,
+  "actuator4"     => 1,
+  "actuator5"     => 1,
+  "actuator6"     => 1,
+  "actuator7"     => 1,
+  "actuator8"     => 1,
+
   "ack"           => 1,
   "ack2"          => 1,
   "battery"       => 1,
