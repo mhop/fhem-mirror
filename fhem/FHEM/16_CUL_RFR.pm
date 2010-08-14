@@ -20,7 +20,7 @@ CUL_RFR_Initialize($)
   $hash->{UndefFn}   = "CUL_RFR_Undef";
   $hash->{ParseFn}   = "CUL_RFR_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 model:CUL,CUN,CUR " .
-                       "loglevel:0,1,2,3,4,5,6 ignore:0,1";
+                       "loglevel:0,1,2,3,4,5,6 ignore:0,1 addvaltrigger";
 
   $hash->{WriteFn}   = "CUL_RFR_Write";
   $hash->{GetFn}     = "CUL_Get";
