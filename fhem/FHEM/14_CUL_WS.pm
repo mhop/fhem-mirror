@@ -1,4 +1,4 @@
-# $Id: 14_CUL_WS.pm,v 1.26 2010-01-26 23:31:17 mr_p Exp $
+# $Id: 14_CUL_WS.pm,v 1.27 2010-08-14 11:42:46 rudolfkoenig Exp $
 #
 ##############################################
 package main;
@@ -279,60 +279,53 @@ CUL_WS_Parse($$)
   }
   Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
 
+  # Sanity checks
+  if($NotifyTemperature && $hash->{READINGS}{temperature}{VAL}) {
+    my $tval = $hash->{READINGS}{strangetemp} ? 
+               $hash->{READINGS}{strangetemp}{VAL} : 
+               $hash->{READINGS}{temperature}{VAL};
+    my $diff = ($NotifyTemperature - $tval)+0;
+    if($diff < -15.0 || $diff > 15.0) {
+      Log 2, "$name: Temp difference ($diff) too large: $val, skipping it";
+      $hash->{READINGS}{strangetemp}{VAL} = $NotifyTemperature;
+      $hash->{READINGS}{strangetemp}{TIME} = $tm;
+      return "";
+    }
+  }
+  delete $hash->{READINGS}{strangetemp} if($hash->{READINGS});
 
-  if(defined($hum) && $hum < 0) {
+  if(defined($hum) && ($hum < 0 || $hum > 100)) {
     Log 1, "BOGUS: $name reading: $val, skipping it";
-    return $name;
+    return "";
   }
 
+
   $hash->{STATE} = $val;                      # List overview
-  $hash->{READINGS}{state}{TIME} = TimeNow(); # For list
+  $hash->{READINGS}{state}{TIME} = $tm;       # For list
   $hash->{READINGS}{state}{VAL} = $val;
   $hash->{CHANGED}[0] = $val;                 # For notify
 
   my $i=1;
   my $j;
   my @Notifies=split(" ", $NotifyType);
-  for($j=0; $j<int(@Notifies); $j++) {
-      if($Notifies[$j] eq "T") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyTemperature;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyTemperature;
-     } elsif($Notifies[$j] eq "H") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyHumidity;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyHumidity;
-      } elsif($Notifies[$j] eq "R") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyRain;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyRain;
-      } elsif($Notifies[$j] eq "W") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWind;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyWind;
-      } elsif($Notifies[$j] eq "WD") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWindDir;
- 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyWindDir;
-     } elsif($Notifies[$j] eq "WS") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyWindSwing;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyWindSwing;
-      } elsif($Notifies[$j] eq "IR") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyIsRaining;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyIsRaining;
-      } elsif($Notifies[$j] eq "B") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyBrightness;
-	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyBrightness;
-      } elsif($Notifies[$j] eq "P") {
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{TIME} = TimeNow();
-	  $hash->{READINGS}{$NotifyMappings{$Notifies[$j]}}{VAL} = $NotifyPressure;
- 	  $hash->{CHANGED}[$i++] = $NotifyMappings{$Notifies[$j]} . ": " . $NotifyPressure;
-     }
-  }
 
+  for($j=0; $j<int(@Notifies); $j++) {
+    my $val = "";
+         if($Notifies[$j] eq "T")  { $val = $NotifyTemperature;
+    } elsif($Notifies[$j] eq "H")  { $val = $NotifyHumidity;
+    } elsif($Notifies[$j] eq "R")  { $val = $NotifyRain;
+    } elsif($Notifies[$j] eq "W")  { $val = $NotifyWind;
+    } elsif($Notifies[$j] eq "WD") { $val = $NotifyWindDir;
+    } elsif($Notifies[$j] eq "WS") { $val = $NotifyWindSwing;
+    } elsif($Notifies[$j] eq "IR") { $val = $NotifyIsRaining;
+    } elsif($Notifies[$j] eq "B")  { $val = $NotifyBrightness;
+    } elsif($Notifies[$j] eq "P")  { $val = $NotifyPressure;
+    }
+    my $nm = $NotifyMappings{$Notifies[$j]};
+    $hash->{READINGS}{$nm}{TIME} = $tm;
+    $hash->{READINGS}{$nm}{VAL} = $val;
+    $hash->{CHANGED}[$i++] = "$nm: $val";
+  }
 
   $hash->{READINGS}{DEVTYPE}{VAL}=$devtype;
   $hash->{READINGS}{DEVTYPE}{TIME}=$tm;
