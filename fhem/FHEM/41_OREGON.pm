@@ -33,7 +33,11 @@
 #This library is free software; you can redistribute it and/or modify
 #it under the same terms as Perl itself, either Perl version 5.8.7 or,
 #at your option, any later version of Perl 5 you may have available.
-
+#
+# values for "set global verbose"
+# 4: log unknown protocols
+# 5: log decoding hexlines for debugging
+#
 package main;
 
 use strict;
@@ -51,8 +55,7 @@ OREGON_Initialize($)
   $hash->{DefFn}     = "OREGON_Define";
   $hash->{UndefFn}   = "OREGON_Undef";
   $hash->{ParseFn}   = "OREGON_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                        "showtime:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -587,14 +590,13 @@ OREGON_Parse($$)
 
   my $time = time();
   my $hexline = unpack('H*', $msg);
-  #if ($time_old ==0) {
-  #	Log 1, "OREGON: delay=0 hex=$hexline";
-  #} else {
-  #	my $time_diff = $time - $time_old ;
-  #	Log 1, "OREGON: delay=$time_diff hex=$hexline";
-  #}
-  #$time_old = $time;
-  #Log GetLogLevel($name,1), "OREGON: decoding '$hexline'";
+  if ($time_old ==0) {
+  	Log 5, "OREGON: decoding delay=0 hex=$hexline";
+  } else {
+  	my $time_diff = $time - $time_old ;
+  	Log 5, "OREGON: decoding delay=$time_diff hex=$hexline";
+  }
+  $time_old = $time;
 
   # convert string to array of bytes. Skip length byte
   my @rfxcom_data_array = ();
@@ -617,29 +619,29 @@ OREGON_Parse($$)
 
   my $rec = $types{$key} || $types{$key&0xfffff};
   unless ($rec) {
-    Log 1, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$hexline'.";
+    Log 4, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$hexline'.";
     return "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits.\n";
   }
   
   # test checksum as defines in %types:
   my $checksum = $rec->{checksum};
   if ($checksum && !$checksum->(\@rfxcom_data_array) ) {
-    Log 1, "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
+    Log 3, "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
     next;
   }
 
   my $method = $rec->{method};
   unless ($method) {
-    Log 1, "OREGON: Possible message from Oregon part '$rec->{part}'";
-    Log 1, "OREGON: sensor_id=$sensor_id (bits=$bits)";
+    Log 4, "OREGON: Possible message from Oregon part '$rec->{part}'";
+    Log 4, "OREGON: sensor_id=$sensor_id (bits=$bits)";
     next;
   }
 
   my @res;
 
   if (! defined(&$method)) {
-    Log 1, "OREGON: Error: Unknown function=$method. Please define it in file $0";
-    Log 1, "OREGON: sensor_id=$sensor_id (bits=$bits)\n";
+    Log 4, "OREGON: Error: Unknown function=$method. Please define it in file $0";
+    Log 4, "OREGON: sensor_id=$sensor_id (bits=$bits)\n";
     return "OREGON: Error: Unknown function=$method. Please define it in file $0";
   } else {
     @res = $method->($rec->{part}, \@rfxcom_data_array);
