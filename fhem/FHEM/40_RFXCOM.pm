@@ -76,9 +76,7 @@ RFXCOM_Initialize($)
   $hash->{GetFn}   = "RFXCOM_Get";
   $hash->{SetFn}   = "RFXCOM_Set";
   $hash->{StateFn} = "RFXCOM_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 " . 
-                     "fhtsoftbuffer:1,0 sendpool";
+  $hash->{AttrList}= "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "RFXCOM_Shutdown";
 }
 
@@ -258,7 +256,7 @@ RFXCOM_Read($)
   }
 
   my $rfxcom_data = $hash->{PARTIAL};
-  Log 5, "RFXCOM/RAW: $rfxcom_data/$mybuf";
+  #Log 5, "RFXCOM/RAW: $rfxcom_data/$mybuf";
   $rfxcom_data .= $mybuf;
 
   #my $hexline = unpack('H*', $rfxcom_data);
@@ -293,7 +291,7 @@ RFXCOM_Parse($$$$)
   my ($hash, $iohash, $name, $rmsg) = @_;
 
   my $hexline = unpack('H*', $rmsg);
-  #Log 1, "RFXCOM_Parse1 '$hexline'";
+  Log 5, "RFXCOM_Parse1 '$hexline'";
 
   my %addvals;
   # Parse only if message is different within 2 seconds (some Oregon sensors always sends the message twice
