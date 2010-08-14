@@ -160,7 +160,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.109 2010-08-02 12:47:55 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.110 2010-08-14 10:35:12 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1014,7 +1014,11 @@ LoadModule($)
 
   if($modules{$m} && !$modules{$m}{LOADED}) {   # autoload
     my $o = $modules{$m}{ORDER};
-    CommandReload(undef, "${o}_$m");
+    my $ret = CommandReload(undef, "${o}_$m");
+    if($ret) {
+      Log 0, $ret;
+      return "UNDEFINED";
+    }
 
     if(!$modules{$m}{LOADED}) {                 # Case corrected by reload?
       foreach my $i (keys %modules) {
@@ -2160,9 +2164,12 @@ Dispatch($$$)
     } else {
       if($defs{$found}) {
         $defs{$found}{MSGCNT}++;
+        my $avtrigger = ($attr{$name} && $attr{$name}{addvaltrigger});
         if($addvals) {
           foreach my $av (keys %{$addvals}) {
             $defs{$found}{"${name}_$av"} = $addvals->{$av};
+            push(@{$defs{$found}{CHANGED}}, "$av: $addvals->{$av}")
+              if($avtrigger);
           }
         }
         $defs{$found}{"${name}_MSGCNT"}++;

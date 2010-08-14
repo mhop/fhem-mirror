@@ -1800,7 +1800,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (CUL,CUR)</li><br>
+    <li><a href="#model">model</a> (CUL,CUN,CUR)</li><br>
     <li><a href="#sendpool">sendpool</a><br>
         If using more than one CUL/CUN for covering a large area, sending
         different events by the different CUL's might disturb each other. This
@@ -1811,6 +1811,10 @@ A line ending with \ will be concatenated with the next one, so long lines
         attr CUN1 sendpool CUN1,CUN2,CUN3<br>
         attr CUN2 sendpool CUN1,CUN2,CUN3<br>
         attr CUN3 sendpool CUN1,CUN2,CUN3<br>
+        </li><br>
+    <li><a href="#addvaltrigger">addvaltrigger</a><br>
+        Create triggers for additional device values. Right now these are RSSI
+        and RAWMSG for the CUL family and RAWMSG for the FHZ.
         </li><br>
   </ul>
   <br>

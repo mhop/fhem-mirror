@@ -1,6 +1,9 @@
 FHEM:
+- CUL_WS safety check
+- document autocreate rename anomaly (rename filelog only)
+- implement PID
+- implement wiki decisions
 - autodetect physical hardware
-- commonfunctions.pm
 - fhem-to-fhem module
 - CUR built-in MENU creation support
 
@@ -8,3 +11,5 @@ Webpgm2
 - plot data from multiple files in a single picture
 - setting the dummy state via dropdown is not possible
 - click on the graph only correct for the day zoom
+- integrate weblink details in the SVG
+- autocreate: multiple plots

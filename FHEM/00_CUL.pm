@@ -81,7 +81,7 @@ CUL_Initialize($)
   $hash->{StateFn} = "CUL_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "fhtsoftbuffer:1,0 sendpool";
+                     "fhtsoftbuffer:1,0 sendpool addvaltrigger";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -92,8 +92,11 @@ CUL_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> CUL devicename <FHTID>"
-    if(@a < 4 || @a > 5);
+  if(@a < 4 || @a > 5) {
+    my $msg = "wrong syntax: define <name> CUL devicename <FHTID>";
+    Log 2, $msg;
+    return $msg;
+  }
 
   CUL_CloseDev($hash);
 
