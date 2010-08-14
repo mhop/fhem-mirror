@@ -1,4 +1,4 @@
-- =DATE= (4.10)
+- =DATE= (5.0)
   - feature: KM271
   - bugfix:  99_SUNRISE_EL endless loop bug
   - feature: CUL: optional baudrate spec in definition
@@ -15,6 +15,12 @@
              are connected, adjust matching rule
   - feature: Copy&Paste in SVG
   - feature: Debian/Ubuntu Package. Install-path changes to satisfy lintian
+  - feature: Allnet 3076/4027/4000T
+  - feature: RFXCOMM Module for Oregon Weatherstations
+  - feature: Davis VantagePro2
+  - feature: ELV USB-WDE1
+  - feature: addvaltriggers CUL attribute for adding RSSI as a trigger
+  - feature: CUL_WS sanity check for large temp differences.
 
 - 2010-03-13 (4.9)
   - bugfix:  changed the fhem prompt from FHZ> to fhem>

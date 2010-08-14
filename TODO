@@ -1,6 +1,5 @@
 FHEM:
-- CUL_WS safety check
-- document autocreate rename anomaly (rename filelog only)
+- fix autocreate rename anomaly (rename filelog only)
 - implement PID
 - implement wiki decisions
 - autodetect physical hardware
