@@ -1,4 +1,5 @@
-- =DATE= (5.0)
+- 2010-08-15 (5.0)
+  - **NOTE*: The default installation path is changed to satisfy lintian
   - feature: KM271
   - bugfix:  99_SUNRISE_EL endless loop bug
   - feature: CUL: optional baudrate spec in definition

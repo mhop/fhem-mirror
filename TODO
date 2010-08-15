@@ -1,4 +1,5 @@
 FHEM:
+- RFR: Error message for uncomplete last message
 - fix autocreate rename anomaly (rename filelog only)
 - implement PID
 - implement wiki decisions
