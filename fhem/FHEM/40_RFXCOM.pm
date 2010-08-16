@@ -264,7 +264,7 @@ RFXCOM_Read($)
 
   # first char as byte represents number of bits of the message
   my $bits = ord($rfxcom_data);
-  my $num_bytes = $bits >> 3;
+  my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
 
   while(length($rfxcom_data) > $num_bytes) {
     # the buffer contains at least the number of bytes we need
