@@ -610,7 +610,7 @@ OREGON_Parse($$)
   }
 
   my $bits = ord($msg);
-  my $num_bytes = $bits >> 3;
+  my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
 
   my $type1 = $rfxcom_data_array[0];
   my $type2 = $rfxcom_data_array[1];
@@ -719,7 +719,7 @@ OREGON_Parse($$)
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{forecast};;
 		}
        		case "speed" { 
-			#$val .= "W: ".$i->{current}." ";
+			$val .= "W: ".$i->{current}." ";
 
 			$sensor = "wind_speed";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
@@ -727,7 +727,7 @@ OREGON_Parse($$)
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 		}
        		case "direction" { 
-			#$val .= "WD: ".$i->{current}."  ";
+			$val .= "WD: ".$i->{current}."  ";
 
 			$sensor = "wind_dir";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
@@ -735,7 +735,7 @@ OREGON_Parse($$)
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 		}
        		case "rain" { 
-			#$val .= "RR: ".$i->{current}." ";
+			$val .= "RR: ".$i->{current}." ";
 
 			$sensor = "rain_rate";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
@@ -743,7 +743,7 @@ OREGON_Parse($$)
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 		}
        		case "train" { 
-			#$val .= "TR: ".$i->{current}."  ";
+			$val .= "TR: ".$i->{current}."  ";
 
 			$sensor = "rain_total";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
