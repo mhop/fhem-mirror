@@ -231,11 +231,10 @@ my %types =
     part => 'RTGR328N', checksum => \&checksum2, method => \&common_temphydro,
    },
    # PCR800. Commented out until fully tested.
-   #type_length_key(0x2a19, 92) =>
-   #{
-   # part => 'PCR800', checksum => \&checksum8, method => \&rain_PCR800,
-   #},
-
+   type_length_key(0x2a19, 92) =>
+   {
+    part => 'PCR800', checksum => \&checksum8, method => \&rain_PCR800,
+   },
   );
 
 # --------------------------------------------
@@ -502,22 +501,21 @@ sub rain_PCR800 {
   my $type = shift;
   my $bytes = shift;
 
+  #
+  #my $hexline = "";
+  #for (my $i=0;$i<=10;$i++) {
+  # 	$hexline .= sprintf("%02x",$bytes->[$i]);
+  #} 
+  #
   my $device = sprintf "%02x", $bytes->[3];
   my $dev_str = $type.$DOT.$device;
   my @res = ();
 
-  my $rain = sprintf("%02x%02x",$bytes->[5], $bytes->[4])/100;
-  $rain *= 25.4; # convert from inch/hr to mm/hr
+  my $rain = sprintf("%02x",$bytes->[5])/10 + hi_nibble($bytes->[4])/100 + lo_nibble($bytes->[6])/1000;
+  $rain *= 25.4; # convert from inch to mm
 
-  #my $rain = sprintf("%2.2f",(($bytes->[5])/10 + hi_nibble($bytes->[4])/100 + lo_nibble($bytes->[6])/1000));# * 25.4;
-
-  my $train = lo_nibble($bytes->[9])*100 +
-    sprintf("%02x", $bytes->[8]) + sprintf("%02x", $bytes->[7])/100 +
-      hi_nibble($bytes->[6])/1000;
-  $train *= 25.4; # convert from inch to mm
-
-  #  my $train = sprintf("%2.2f", ( ($bytes->[7])/100 + hi_nibble($bytes->[6])/1000 + 
-  #				lo_nibble($bytes->[9])*100 + ($bytes->[8]) ) * 25.4);
+  my $train = sprintf("%2.2f", ( sprintf("%02x",$bytes->[7])/100 + hi_nibble($bytes->[6])/1000 + 
+  			lo_nibble($bytes->[9])*100 + sprintf("%02x",$bytes->[8]) ) * 25.4);
 
   push @res, {
                                device => $dev_str,
@@ -531,6 +529,13 @@ sub rain_PCR800 {
                                current => $train,
                                units => 'mm',
                               };
+  # hexline debugging
+  #push @res, {
+  #                             device => $dev_str,
+  #                             type => 'hexline',
+  #                             current => $hexline,
+  #                             units => 'hex',
+  #                            };
   simple_battery($bytes, $dev_str, \@res);
   return @res;
 }
@@ -741,6 +746,12 @@ OREGON_Parse($$)
 			#$val .= "TR: ".$i->{current}."  ";
 
 			$sensor = "rain_total";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+		}
+       		case "hexline" { 
+			$sensor = "hexline";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
