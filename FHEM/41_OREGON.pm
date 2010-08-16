@@ -632,14 +632,14 @@ OREGON_Parse($$)
   my $checksum = $rec->{checksum};
   if ($checksum && !$checksum->(\@rfxcom_data_array) ) {
     Log 3, "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
-    next;
+    return;
   }
 
   my $method = $rec->{method};
   unless ($method) {
     Log 4, "OREGON: Possible message from Oregon part '$rec->{part}'";
     Log 4, "OREGON: sensor_id=$sensor_id (bits=$bits)";
-    next;
+    return;
   }
 
   my @res;
