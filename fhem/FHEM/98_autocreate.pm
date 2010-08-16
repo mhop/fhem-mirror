@@ -23,13 +23,13 @@ my %flogpar = (
   # * temperature
   "OREGON:(THR128|THWR288A|THN132N).*"  => { GPLOT => "oregon_hms_t:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
-  "OREGON:(THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"  => { GPLOT => "oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
+  "OREGON:(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"  => { GPLOT => "oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
   # * temperature, humidity, pressure
-  "OREGON:(BTHR918N|THGR228N|BTHR918|BTHR918N).*"  => { GPLOT => "oregon_temp_press:Temp/Press,oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
+  "OREGON:(BTHR918N|BTHR918|BTHR918N).*"  => { GPLOT => "oregon_temp_press:Temp/Press,oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
   # * anenometer
   "OREGON:(WGR800|WGR918|WTGR800_A).*"  => { GPLOT => "oregon_wind:WindDir/WindSpeed,",  FILTER => "%NAME" },
   # * Oregon sensors: Rain gauge
-  #"OREGON:(PCR800).*"  => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
+  "OREGON:(PCR800).*"  => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
 );
 
 #####################################
