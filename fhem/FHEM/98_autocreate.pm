@@ -29,7 +29,7 @@ my %flogpar = (
   # * anenometer
   "OREGON:(WGR800|WGR918|WTGR800_A).*"  => { GPLOT => "oregon_wind:WindDir/WindSpeed,",  FILTER => "%NAME" },
   # * Oregon sensors: Rain gauge
-  "OREGON:(PCR800).*"  => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
+  "OREGON:(PCR800|RGR918).*"  => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
 );
 
 #####################################
