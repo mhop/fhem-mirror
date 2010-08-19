@@ -1,4 +1,4 @@
-# $Id: 14_CUL_WS.pm,v 1.27 2010-08-14 11:42:46 rudolfkoenig Exp $
+# $Id: 14_CUL_WS.pm,v 1.28 2010-08-19 18:42:06 wherzig Exp $
 #
 ##############################################
 package main;
@@ -230,6 +230,12 @@ CUL_WS_Parse($$)
   } else {                                      # $firstbyte not 7
 
     if(@a == 9 && int(@a) > 8) {                 #  S300TH
+      # Sanity check
+      if (!($msg =~ /^K\d\d\d\d\d\d\d\d$/ )) {
+        Log GetLogLevel($name,1), "Error: S300TH CUL_WS Cannot decode $msg (sanitycheck). Malformed";
+        return "";
+      }
+
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
@@ -240,6 +246,10 @@ CUL_WS_Parse($$)
       $NotifyTemperature=$tmp;
       $NotifyHumidity=$hum;
     } elsif(@a == 15 && int(@a) > 14) {          # KS300/2
+      if (!($msg =~ /^K\d\d\d\d\d\d\d\d\d\d\d\d\d\d$/ )) {
+        Log GetLogLevel($name,1), "Error: KS300/2 Cannot decode $msg (sanitycheck). Malformed";
+        return "";
+      }
 
       my $c = $hash->{corr4} ? $hash->{corr4} : 255;
       $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
