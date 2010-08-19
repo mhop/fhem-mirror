@@ -19,7 +19,6 @@
 #
 ##################################
 #
-# Most of the subs are copied and modified from xpl-perl 
 # from the following two files:
 #	xpl-perl/lib/xPL/Utils.pm:
 #	xpl-perl/lib/xPL/RF/Oregon.pm:
@@ -145,17 +144,6 @@ my %types =
    {
     part => 'WGR800', checksum => \&checksum4, method => \&wtgr800_anemometer,
    },
-   # 
-   type_length_key(0xda78, 72) =>
-   {
-    part => 'UVN800', checksun => \&checksum7, method => \&uvn800,
-   },
-   # 
-   type_length_key(0xea7c, 120) =>
-   {
-    part => 'UV138', checksum => \&checksum1, method => \&uv138,
-   },
-   # 
    type_length_key(0xea4c, 80) =>
    {
     part => 'THWR288A', checksum => \&checksum1, method => \&common_temp,
@@ -319,6 +307,41 @@ sub percentage_battery {
 	}
 }
 
+# --------------------------------------------------------
+
+sub wgr918_anemometer {
+    	my $type = shift;
+    	my $bytes = shift;
+
+  	my $device = sprintf "%02x", $bytes->[3];
+  	my $dev_str = $type.$DOT.$device;
+
+	my @res = ();
+
+
+  	my $dir = sprintf("%02x",$bytes->[5])*10 + hi_nibble($bytes->[4]);
+  	my $speed = lo_nibble($bytes->[7]) * 10 + sprintf("%02x",$bytes->[6])/10;
+  	my $avspeed = sprintf("%02x",$bytes->[8]) + hi_nibble($bytes->[7]) / 10;
+
+	push @res, {
+                               device => $dev_str,
+                               type => 'speed',
+                               current => $speed,
+                               average => $avspeed,
+                               units => 'mps',
+                              } , {
+                               device => $dev_str,
+                               type => 'direction',
+                               current => $dir,
+                               units => 'degrees',
+                              } 
+	;
+  	percentage_battery($bytes, $dev_str, \@res);
+
+  	return @res;
+}
+
+
 # -----------------------------
 sub wtgr800_anemometer {
     	my $type = shift;
@@ -331,11 +354,13 @@ sub wtgr800_anemometer {
 
   	my $dir = hi_nibble($bytes->[4]) * 22.5;
 	my $speed = lo_nibble($bytes->[7]) * 10 + sprintf("%02x",$bytes->[6])/10;
+  	my $avspeed = sprintf("%02x",$bytes->[8]) + hi_nibble($bytes->[7]) / 10;
 
  	push @res, {
                                device => $dev_str,
                                type => 'speed',
                                current => $speed,
+                               average => $avspeed,
                                units => 'mps',
                               } , {
                                device => $dev_str,
@@ -720,11 +745,17 @@ OREGON_Parse($$)
 		}
        		case "speed" { 
 			$val .= "W: ".$i->{current}." ";
+			$val .= "WA: ".$i->{average}." ";
 
 			$sensor = "wind_speed";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+
+			$sensor = "wind_avspeed";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{average};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{average};;
 		}
        		case "direction" { 
 			$val .= "WD: ".$i->{current}."  ";
