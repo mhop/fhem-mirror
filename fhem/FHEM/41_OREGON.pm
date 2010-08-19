@@ -19,6 +19,7 @@
 #
 ##################################
 #
+# Most of the subs are copied and modified from xpl-perl 
 # from the following two files:
 #	xpl-perl/lib/xPL/Utils.pm:
 #	xpl-perl/lib/xPL/RF/Oregon.pm:
