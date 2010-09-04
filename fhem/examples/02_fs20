@@ -63,7 +63,7 @@ quit                        # Ignore the rest of this file
 # instead.
 #
 
-fhem=/usr/local/bin/fhem.pl
+fhem=/usr/bin/fhem.pl
 
 if test $1 = "on"; then
   $fhem 7072 "set roll1 on-for-timer 10"

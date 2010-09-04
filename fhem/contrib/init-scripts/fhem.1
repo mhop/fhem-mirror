@@ -5,12 +5,12 @@
 # Written by Stefan Manteuffel
 
 PATH=/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin
-DAEMON=/usr/local/bin/fhem.pl
+DAEMON=/usr/bin/fhem.pl
 PIDFILE=/var/run/fhem.pid
 
 # Arguments to atd
 #
-ARGS="/etc/FHZ/fhem.cfg"
+ARGS="/etc/fhem.cfg"
 
 test -x $DAEMON || exit 0
 
