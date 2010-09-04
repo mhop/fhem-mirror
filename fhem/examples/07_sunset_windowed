@@ -70,7 +70,7 @@ attr global statefile /tmp/fhem.save
 attr global pidfilename /var/run/fhem.pid
 attr global verbose 3
 attr global port 7072
-attr global modpath /usr/local/libusr/local/lib
+attr global modpath /usr/share/fhem
 
 # Die Definition des Attributs "freigabe"
 # definition of attribute "freigabe"

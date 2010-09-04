@@ -43,7 +43,7 @@ even=(08:30 11:30 16:30 22:30)
 # (from1 to1 from2 to2)
 free=(08:30 23:50 24:00 24:00)
 # define fhem.pl host:port
-FHEM_BIN="/usr/local/bin/fhem.pl localhost:7072"
+FHEM_BIN="/usr/bin/fhem.pl localhost:7072"
 # define file for rotation
 WEEKFILE="/var/fhem/week.save"
 
