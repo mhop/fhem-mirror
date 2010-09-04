@@ -50,12 +50,12 @@
       First install the Device::SerialPort (or Win32::SerialPort)  perl module
       with the command <code>"sudo cpan Device::SerialPort"</code></br>
       The default configuration will install fhem into /usr/bin,
-      /usr/share/fhem and /var/log/fhem. Edit the Makefile to change
-      this. 
+      /usr/share/fhem and /var/log/fhem and /etc/fhem.cfg. Edit the Makefile to
+      change this. 
 
       To install & start fhem type:<pre>
       make install-pgm2
-      perl /usr/local/bin/fhem.pl /var/log/fhem/fhem.cfg</pre>
+      perl /usr/bin/fhem.pl /etc/fhem.cfg</pre>
 
       After starting, the logfile should look like:<pre>
       2008.06.15 16:17:03 2: FHEMWEB port 8083 opened

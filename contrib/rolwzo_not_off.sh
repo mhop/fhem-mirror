@@ -8,7 +8,7 @@
 # define rolzwo_not_off notify rolwzo /usr/local/bin/rolwzo_not_off.sh
 
 
-FHZ="/usr/local/bin/fhem.pl 7072"
+FHZ="/usr/bin/fhem.pl 7072"
 order="delete rolwzo_off"
 
 DATESTRING=`date +"%H"`
