@@ -11,7 +11,7 @@ DESCRIPTION
 INSTALLATION
     Copy the script 99_getstate.pm to FHEM modules directory, e.g.
 
-        'cp 99_getstate.pm /usr/local/lib/FHEM'
+        'cp 99_getstate.pm /usr/share/fhem/FHEM'
 
     and restart FHEM.
 

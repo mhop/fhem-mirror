@@ -6,7 +6,7 @@ Description:
 
 Installation:
   Copy the script 99_JsonList.pm to FHEM modules directory, e.g.
-    'cp 99_JsonList.pm /usr/local/lib/FHEM'
+    'cp 99_JsonList.pm /usr/share/fhem/FHEM'
   and restart FHEM.
 
   Keep your commandref.html up-to-date:
