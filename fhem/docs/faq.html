@@ -106,7 +106,7 @@
 <div id="dist">
 <a href="#faq14">
   14. In the summer I get a lot of "actuator:lime-protection" messages from  my
-  FHT80b. How to switch back to the actuator:0% messages?</a> 
+  FHT80b. How to switch back to the actuator:0% messages?</a>
   </div>
 
 <div id="dist">
@@ -140,9 +140,16 @@
 
 <div id="dist">
 <a href="#faq20">
-  20. Why do my Sunrise/Sunset times differ from the ones on webseite
+  20. Why do my Sunrise/Sunset times differ from the ones on website
   XXX?</a>
   </div>
+
+<div id="dist">
+<a href="#faq21">
+  21. What is "unknown message: EOB" from a CUL device?</a>
+  </div>
+
+
 
 <br/>
 <br/>
@@ -534,5 +541,18 @@ See <a href="USB.html">USB compendium</a> for help.
 
 </ul>
 
+<a name="faq21"></a>
+<h4>21. What is "unknown message: EOB" from a CUL device?</h4>
+<ul>
+  If too many messages for FHT devices are queued in CUL, the fht buffer
+  subsystem of CUL overflows. You get EOB (end of buffer) messages and
+  likely LOVF (limit overflow) messages, too. define <code>attr CUL fhtsoftbuffer 1</code>
+  to activate a quasi unlimited software buffer in fhem itself to avoid this
+  behavior.<br><br>
+
+  By the way, <code>set CUL raw T01abcd</code> (abcd= FHT house code) resets
+  the CUL FHT subsystem, no need to unplug/replug the CUL device in case of
+  the aforementioned issue.
+</ul>
 </body>
 </html>

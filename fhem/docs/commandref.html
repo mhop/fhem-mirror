@@ -1097,7 +1097,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         As the FHZ command buffer for FHT devices is limited (see fhtbuf),
         and commands are only sent to the FHT device every 120 seconds,
         the hardware buffer may overflow and FHT commands get lost.
-        Setting this attribute implements an "unlimited" software buffer<br>
+        Setting this attribute implements an "unlimited" software buffer.<br>
         Default is disabled (i.e. not set or set to 0).</li><br>
   </ul>
   <br>
@@ -1787,6 +1787,18 @@ A line ending with \ will be concatenated with the next one, so long lines
         the CUL. See the CUL firmware README document for details on CUL
         commands.
         </li><br>
+    <li>fhtbuf<br>
+          CUL has a message buffer for the FHT. If the buffer is full, then newly
+          issued commands will be dropped, if the attribute <a
+          href="#culfhtsoftbuffer">fhtsoftbuffer</a> is not set. Instead, a "EOB" message is issued.
+          <code>fhtbuf</code> returns the free memory in this buffer (in hex),
+          an empty buffer in the CUL is 40 (64 bytes).
+          A message occupies 3 + 2x(number of FHT commands) bytes,
+          this is the second reason why sending multiple FHT commands with one
+          <a href="#set">set</a> is a good idea. The first reason is, that
+          these FHT commands are sent at once to the FHT.
+          </li>
+</li><br>
     <li>ccconf<br>
         Read some CUL radio-chip (cc1101) registers (frequency, bandwidth, etc),
         and display them in human readable form.
@@ -1812,6 +1824,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         attr CUN2 sendpool CUN1,CUN2,CUN3<br>
         attr CUN3 sendpool CUN1,CUN2,CUN3<br>
         </li><br>
+    <li><a name="culfhtsoftbuffer">fhtsoftbuffer</a><br/>
+        As the CUL command buffer for FHT devices is limited (see fhtbuf),
+        and commands are only sent to the FHT device every 120 seconds,
+        the hardware buffer may overflow and FHT commands get lost or errors
+        may occur.
+        Setting this attribute implements an "unlimited" software buffer.<br>
+        Default is disabled (i.e. not set or set to 0).</li><br>
     <li><a href="#addvaltrigger">addvaltrigger</a><br>
         Create triggers for additional device values. Right now these are RSSI
         and RAWMSG for the CUL family and RAWMSG for the FHZ.
@@ -2966,7 +2985,7 @@ Attributes:<br>
     dimup
     off
     on
-    toggle 
+    toggle
     </pre>
     Examples:
     <ul>
@@ -3008,7 +3027,7 @@ Attributes:<br>
     <code>define &lt;name&gt; ALL4027 &lt;ip-address&gt; &lt;port&gt; &lt;relay_nr&gt; &lt;delay&gt;</code>
     <br><br>
     Defines an Allnet 4027 device (Box with 8 relays) connected to an ALL4000 via its ip address. The status of the device is also pooled (delay interval), because someone else is able  to change the state via the webinterface of the device.<br><br>
-    
+
 
     Examples:
     <ul>
@@ -3026,7 +3045,7 @@ Attributes:<br>
     <pre>
     off
     on
-    toggle 
+    toggle
     </pre>
     Examples:
     <ul>
@@ -3775,13 +3794,13 @@ audio</pre>
   For testing purposes you may also use the LAN based receivers. However
   the code for LAN access is still in beta stage and not fault tolerant. Therefore you should use the USB attached receiver.<br>
   <br>
-  Currently one parser module (41_Oregon.pm) is implemented to parse and process messages for 
+  Currently one parser module (41_Oregon.pm) is implemented to parse and process messages for
   Oregon Scientific weather sensors. If you need to process other devices that are supported
   by RFXCOM, you have to implement a new parsing module.<br>
-  See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> of 
+  See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> of
   Oregon Scientific weather sensors that could be received by the RFXCOM receivers.
   Please note that not all sensors are currently implemented in the parser module right now.
-  The parsing module ist based on the <a href="http://www.xpl-perl.org.uk/">Perl xPL</a> 
+  The parsing module ist based on the <a href="http://www.xpl-perl.org.uk/">Perl xPL</a>
   project parsing modules. Thanks to Mark Hindess from the xPL project for writing this code. <br>
   <br>
   Until now the following Oregon Scientific weather sensors have been tested: BTHR918N, THGR810, THR128, THWR288A, WTGR800.  <br>
@@ -3794,7 +3813,7 @@ audio</pre>
     <br>
     USB-connected (80002):<br><ul>
       &lt;device&gt; specifies the USB port to communicate with the RFXCOM receiver.
-      Normally on Linux the device will be named /dev/ttyUSBx, where x is a number. 
+      Normally on Linux the device will be named /dev/ttyUSBx, where x is a number.
       For example /dev/ttyUSB0.<br><br>
       Example: <br>
 	<code>define RFXCOMUSB RFXCOM /dev/ttyUSB0</code>
@@ -3806,7 +3825,7 @@ audio</pre>
     192.168.1.5:10001
     </ul>
     <br>
-  </table> 
+  </table>
 </ul>
 
 <a name="structure"></a>
@@ -4590,7 +4609,7 @@ Terminating
         </li><br>
 
     </li></ul>
-        
+
   </ul>
 
 </ul>
@@ -5500,9 +5519,9 @@ isday</pre>
         filenames.<br/> You can specify a path to which the files will be
         rendered. If you also specify a prefix, this will be used to build the
         resulting filename.
-        </li><br> 
+        </li><br>
     <li>multiprocess<br/>
-        This defines if the Renderer works in a multiprocessing mode.<br/> 
+        This defines if the Renderer works in a multiprocessing mode.<br/>
 		You can set multiprocessing either to on / off and the renderer will draw the
 		time-scheduled tasks either in multiprocessing mode, or not.
 		NOTE: Direct GET calls, except for a general GET (for all weblinks) will be renderer
