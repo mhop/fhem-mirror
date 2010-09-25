@@ -27,6 +27,7 @@ sub FW_roomOverview($);
 sub FW_fatal($);
 sub pF($@);
 sub pO(@);
+sub pH(@);
 sub FW_AnswerCall($);
 sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
@@ -351,14 +352,19 @@ FW_AnswerCall($)
   my $t = FW_getAttr("global", "title", "Home, Sweet Home");
 
   pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
-
   pO '<html xmlns="http://www.w3.org/1999/xhtml">';
   pO "<head>\n<title>$t</title>";
+
+  if($__ss) {
+    pO '<link rel="apple-touch-icon-precomposed" href="'.$__ME.'/fhemicon.png"/>';
+    pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
+    pO '<meta name="viewport" content="width=device-width"/>';
+  }
+
   my $rf = FW_getAttr($__wname, "refresh", "");
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   my $stylecss = ($__ss ? "style_smallscreen.css" : "style.css");
   pO "<link href=\"$__ME/$stylecss\" rel=\"stylesheet\"/>";
-  pO "<meta name=\"viewport\" content=\"width=device-width\"/>" if($__ss);
   pO "<script type=\"text/javascript\" src=\"$__ME/svg.js\"></script>"
                         if($__plotmode eq "SVG");
   pO "</head>\n<body name=\"$t\">";
@@ -483,7 +489,7 @@ FW_makeTable($$$$$$$$)
     pF "    <tr class=\"%s\">", $row?"odd":"even";
     $row = ($row+1)%2;
     if($makelink && $__reldoc) {
-      pO "<td><a href=\"$__reldoc#$v\">$v</a></td>";
+      pO "<td><a href=\"$__reldoc#$v\">$v</a></td>";    # no pH, want to open extra browser
     } else {
       pO "<td>$v</td>";
     }
@@ -499,7 +505,7 @@ FW_makeTable($$$$$$$$)
       }
     }
 
-    pO "<td><a href=\"$__ME?cmd.$d=$cmd $d $v&amp;detail=$d\">$cmd</a></td>"
+    pH "cmd.$d=$cmd $d $v&amp;detail=$d", $cmd, 1
         if($cmd);
 
     pO "</tr>";
@@ -533,12 +539,12 @@ FW_showArchive($)
     pF "    <tr class=\"%s\"><td>$f</td>", $row?"odd":"even";
     $row = ($row+1)%2;
     if(!defined($l)) {
-      pO "<td><a href=\"$__ME?cmd=logwrapper $d text $f\">text</a></td>";
+      pH "cmd=logwrapper $d text $f", "text", 1;
     } else {
       foreach my $ln (split(",", $l)) {
 	my ($lt, $name) = split(":", $ln);
 	$name = $lt if(!$name);
-	pO "<td><a href=\"$__ME?cmd=logwrapper $d $lt $f\">$name</a></td>";
+	pH "cmd=logwrapper $d $lt $f", $name, 1;
       }
     }
     pO "</tr>";
@@ -564,14 +570,16 @@ FW_doDetail($)
 
   pO "<div id=\"content\">";
   pO "<table><tr><td>";
-  pO "<a href=\"$__ME?cmd=delete $d\">Delete $d</a>";
+  pH "cmd=delete $d", "Delete $d";
 
   my $pgm = "Javascript:" .
              "s=document.getElementById('edit').style;".
              "if(s.display=='none') s.display='block'; else s.display='none';".
              "s=document.getElementById('disp').style;".
              "if(s.display=='none') s.display='block'; else s.display='none';";
-  pO "<a href=\"#top\" onClick=\"$pgm\">Modify $d</a>";
+  pO "<a onClick=\"$pgm\">Modify $d</a>";
+
+  pH "room=$__room", "Back:$__room" if($__ss);
 
   pO "</td></tr><tr><td>";
   FW_makeTable($d, $t,
@@ -603,13 +611,15 @@ FW_roomOverview($)
   # HEADER
   pO "<form method=\"get\" action=\"$__ME\">";
   pO "<div id=\"hdr\">";
-  pO "<table><tr><td>";
-  pO FW_textfield("cmd", $__ss ? 20 : 40);
+  pO '<table border="0"><tr><td style="padding:0">';
+  my $tf_done;
   if($__room) {
     pO FW_hidden("room", "$__room");
     # plots navigation buttons
     if(!$__detail || $defs{$__detail}{TYPE} eq "weblink") {
       if(FW_calcWeblink(undef,undef)) {
+        pO FW_textfield("cmd", $__ss ? 20 : 40);
+        $tf_done = 1;
         pO "</td><td>";
         pO "&nbsp;&nbsp;";
         FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
@@ -619,14 +629,15 @@ FW_roomOverview($)
       }
     }
   }
+  pO FW_textfield("cmd", $__ss ? 28 : 40) if(!$tf_done);
   pO "</td></tr></table>";
   pO "</div>";
   pO "</form>";
 
   ##############
   # LOGO
-  my $logofile = ($__ss ? "fhem_smallscreen.png" : "fhem.png");
-  pO "<div id=\"logo\"><img src=\"$__ME/$logofile\"></div>";
+  my $logo = $__ss ? "fhem_smallscreen.png" : "fhem.png";
+  pO "<div id=\"logo\"><img src=\"$__ME/$logo\"></div>";
 
   ##############
   # MENU
@@ -774,7 +785,7 @@ FW_showRoom()
         }
         $v = "" if(!defined($v));
 
-        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td>";
+        pH "detail=$d", $d, 1;
         if($iname) {
           pO "<td align=\"center\"><img src=\"$__ME/icons/$iname\" ".
                   "alt=\"$v\"/></td>";
@@ -782,8 +793,8 @@ FW_showRoom()
           pO "<td align=\"center\">$v</td>";
         }
         if(getAllSets($d)) {
-          pO "<td><a href=\"$__ME?cmd.$d=set $d on$rf\">on</a></td>";
-          pO "<td><a href=\"$__ME?cmd.$d=set $d off$rf\">off</a></td>";
+          pH "cmd.$d=set $d on$rf", "on", 1;
+          pH "cmd.$d=set $d off$rf", "off", 1;
         }
 
       } elsif($type eq "FHT") {
@@ -791,7 +802,7 @@ FW_showRoom()
         $v = ReadingsVal($d, "measured-temp", "");
 
         $v =~ s/ .*//;
-        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td>";
+        pH "detail=$d", $d, 1;
         pO "<td align=\"center\">$v&deg;</td>";
 
         $v = sprintf("%2.1f", int(2*$v)/2) if($v =~ m/[0-9.-]/);
@@ -807,9 +818,10 @@ FW_showRoom()
 
       } elsif($type eq "FileLog") {
 
-        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>";
+        pH "detail=$d", $d, 1;
+        pO "<td>$v</td>";
         if(defined(FW_getAttr($d, "archivedir", undef))) {
-          pO "<td><a href=\"$__ME?cmd=showarchive $d\">archive</a></td>";
+          pH "cmd=showarchive $d", "archive", 1;
         }
 
 	foreach my $f (FW_fileList($defs{$d}{logfile})) {
@@ -819,7 +831,7 @@ FW_showRoom()
 	  foreach my $ln (split(",", FW_getAttr($d, "logtype", "text"))) {
 	    my ($lt, $name) = split(":", $ln);
 	    $name = $lt if(!$name);
-	    pO "<td><a href=\"$__ME?cmd=logwrapper $d $lt $f\">$name</a></td>";
+	    pH "cmd=logwrapper $d $lt $f", $name, 1;
 	  }
 	}
 
@@ -829,7 +841,8 @@ FW_showRoom()
 
       } else {
 
-        pO "<td><a href=\"$__ME?detail=$d\">$d</a></td><td>$v</td>";
+        pH "detail=$d", $d, 1;
+        pO "<td>$v</td>";
 
       }
       pO "  </tr>";
@@ -906,7 +919,8 @@ FW_logWrapper($)
       pO "<img src=\"$arg\"/>";
     }
 
-    pO "<a href=\"$__ME?cmd=toweblink $d:$type:$file\"><br>Convert to weblink</a></td>";
+    pH "cmd=toweblink $d:$type:$file", "<br>Convert to weblink";
+    pO "</td>";
     pO "</td></tr></table>";
     pO "</td></tr></table>";
     pO "</div>";
@@ -1107,7 +1121,7 @@ FW_showLog($)
     }
     $ret = fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot);
+    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $__ss);
     $__RETTYPE = "image/svg+xml";
 
   }
@@ -1168,8 +1182,9 @@ FW_makeEdit($$$$)
   pO   "<div id=\"edit\" style=\"display:none\"><form>";
   my $eval = $val;
   $eval =~ s,\\\n,\n,g;
+  my $ncols = $__ss ? 40 : 60;
 
-  pO     "<textarea name=\"val.${cmd}$name\" cols=\"60\" rows=\"10\">".
+  pO     "<textarea name=\"val.${cmd}$name\" cols=\"$ncols\" rows=\"10\">".
             "$eval</textarea>";
   pO     "<br>" . FW_submit("cmd.${cmd}$name", "$cmd $name");
   pO   "</form></div>";
@@ -1234,9 +1249,8 @@ FW_zoomLink($$$)
   }
 
 
-  pO "<a href=\"$__ME?$cmd\">";
-  pO "<img style=\"border-color:transparent\" alt=\"$alt\" ".
-                "src=\"$__ME/icons/$img\"/></a>";
+  pH "$cmd", "<img style=\"border-color:transparent\" alt=\"$alt\" ".
+                "src=\"$__ME/icons/$img\"/>";
 }
 
 ##################
@@ -1371,7 +1385,8 @@ FW_style($$)
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      pO "<td><a href=\"$__ME?cmd=style edit $file\">$file</a></td></tr>";
+      pH "cmd=style edit $file", $file, 1;
+      pO "</tr>";
       $row = ($row+1)%2;
     }
     pO "  </table>";
@@ -1388,7 +1403,8 @@ FW_style($$)
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      pO "<td><a href=\"$__ME/$file\">$file</a></td></tr>";
+      pH $file, $file, 1;
+      pO "</tr>";
       $row = ($row+1)%2;
     }
     pO "  </table>";
@@ -1446,6 +1462,22 @@ pO(@)
   $__RET .= "\n";
 }
 
+#################
+# add href
+sub
+pH(@)
+{
+   my ($link, $txt, $td) = @_;
+
+   pO "<td>" if($td);
+   if($__ss) {
+     pO "<a onClick=\"location.href='$__ME?$link'\">$txt</a>";
+   } else {
+     pO "<a href=\"$__ME?$link\">$txt</a>";
+   }
+   pO "</td>" if($td);
+}
+
 ##################
 # print formatted
 sub
@@ -1482,10 +1514,12 @@ FW_showWeblink($$$)
   my ($d, $v, $t) = @_;
 
   if($t eq "link") {
-    pO "<td><a href=\"$v\">$d</a></td>";
+    pH $v, $d, 1;
 
   } elsif($t eq "image") {
-    pO "<td><img src=\"$v\"><br><a href=\"$__ME?detail=$d\">$d</a></td>";
+    pO "<td><img src=\"$v\"><br>";
+    pH "detail=$d", $d;
+    pO "</td>";
 
   } elsif($t eq "fileplot") {
     my @va = split(":", $v, 3);
@@ -1498,7 +1532,8 @@ FW_showWeblink($$$)
       }
 
       if($__ss) {
-        pO "<a href=\"$__ME?detail=$d\">$d</a><br>"
+        pH "detail=$d", $d;
+        pO "<br>";
       } else {
         pO "<table><tr><td>";
       }
@@ -1518,7 +1553,9 @@ FW_showWeblink($$$)
       if($__ss) {
         pO "<br>";
       } else {
-        pO "</td><td><a href=\"$__ME?detail=$d\">$d</a></td></tr></table>";
+        pO "</td>";
+        pH "detail=$d", $d, 1;
+        pO "</tr></table>";
       }
 
     }
