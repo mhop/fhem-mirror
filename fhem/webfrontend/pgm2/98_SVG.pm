@@ -8,7 +8,7 @@ use POSIX;
 
 
 
-sub SVG_render($$$$$$);
+sub SVG_render($$$$$$$);
 sub time_to_sec($);
 sub fmtTime($$);
 
@@ -25,7 +25,7 @@ SVG_Initialize($)
 
 #####################################
 sub
-SVG_render($$$$$$)
+SVG_render($$$$$$$)
 {
   my $name = shift;  # e.g. wl_8
   my $from = shift;  # e.g. 2008-01-01
@@ -33,11 +33,12 @@ SVG_render($$$$$$)
   my $confp = shift; # lines from the .gplot file, w/o FileLog and plot
   my $dp = shift;    # pointer to data (one string)
   my $plot = shift;  # Plot lines from the .gplot file
+  my $__ss = shift;  # small screen
 
   return "" if(!defined($dp));
 
   my $th = 16;                          # "Font" height
-  my ($x, $y) = (3*$th,  1.2*$th);      # Rect offset
+  my ($x, $y) = (($__ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
   my %conf;                             # gnuplot file settings
 
   # Convert the configuration to a "readable" form -> array to hash
@@ -97,15 +98,17 @@ SVG_render($$$$$$)
 
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
-  ($off1,$off2) = (3*$th/4, $oh/2);
-  pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
-      "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+  if(!$__ss) {
+    ($off1,$off2) = (3*$th/4, $oh/2);
+    pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+        "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
 
-  $t = ($conf{y2label} ? $conf{y2label} : "");
-  $t =~ s/"//g;
-  ($off1,$off2) = ($ow-$th/4, $oh/2);
-  pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
-      "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+    $t = ($conf{y2label} ? $conf{y2label} : "");
+    $t =~ s/"//g;
+    ($off1,$off2) = ($ow-$th/4, $oh/2);
+    pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+        "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
+  }
 
   # Digest axes/title/type from $plot (gnuplot) and draw the line-titles
   my (@axes,@ltitle,@type);
