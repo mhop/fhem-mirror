@@ -1,3 +1,6 @@
+- =DATE= (=VER=)
+  - feature: smallscreen optimizations for iPhone
+
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
   - feature: KM271
