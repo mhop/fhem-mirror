@@ -1,8 +1,8 @@
 ################################################################################
 # 98_FHTCONF.pm
 #
-# Version: 1.0
-# Stand: 08/2010
+# Version: 1.5
+# Stand: 09/2010
 # Autor: Axel Rieger
 # a[PUNKT]r[BEI]oo2p[PUNKT]net
 #
@@ -17,7 +17,8 @@
 # Get a list of FHT-Devices in FHTRoom:
 # FHEM: set FHTC01 A0_FHT_DEVICES
 #
-# Configuration
+# Update:
+# 09/2010 Added PRIV-CGI OverView
 # 
 ################################################################################
 package main;
@@ -41,7 +42,12 @@ sub FHTCONF_Initialize($)
   # FHEM Command to Update FHTs
   $cmds{fhtconf}{Fn} = "Commandfhtconf";
   $cmds{fhtconf}{Hlp} = "FHTCONF[HELP]: fhtconf <FHTCONF-NAME>";
-	
+  # FHTCONF CGI
+  my $name = "FHTCONF";
+  my $fhem_url = "/" . $name ; 
+  $data{FWEXT}{$fhem_url}{FUNC} = "FHTCONF_CGI";
+  $data{FWEXT}{$fhem_url}{LINK} = $name;
+  $data{FWEXT}{$fhem_url}{NAME} = $name;
   Log 0, "FHEM-MODUL[98_FHTCONF.pm] LOADED";
 }
 ################################################################################
@@ -159,6 +165,7 @@ sub Commandfhtconf($)
 	# Device disabled
 	if(defined($attr{$dn}{disable})) {
 		Log 0, "FHTCONF CMD $dn disabled";
+		$defs{$dn}{STATE} = "[DISBALED] ". TimeNow();
 		return undef;
 		}
 	#LogLevel
@@ -172,11 +179,18 @@ sub Commandfhtconf($)
 	if(defined($attr{$dn}{FHTRoom})){
 	  $room = $attr{$dn}{FHTRoom};
 	  $device_list_reading = GetDevType_Room($room);
+		# GetDevType_ROOM[ERROR]: No Room"
+		if($device_list_reading =~ m/\[ERROR\]/) {
+			$defs{$dn}{STATE} = "[ERROR] ". TimeNow();
+			Log $ll ,"FHTCONF-CMD[ERROR] $dn: $device_list_reading";
+      return undef;
+		}
 	  $defs{$dn}{READINGS}{A0_FHT_DEVICES}{VAL} = $device_list_reading;
 	  $defs{$dn}{READINGS}{A0_FHT_DEVICES}{TIME} = TimeNow();
 	}
 	else {
 	    Log 0,"FHTCONF[ERROR] no FHTRoom defined";
+			$defs{$dn}{STATE} = "[ERROR] No FHTRoom defined ". TimeNow();
 	    return undef;
 	  }
 	#-----------------------------------------------------------------------------
@@ -211,13 +225,13 @@ sub Commandfhtconf($)
 	# FHT-Devices ----------------------------------------------------------------
 	my (@fht_devices,$fht);
 	Log $ll ,"FHTCONF $dn update FHT-DEVICES: $device_list_reading";
-	if($device_list_reading eq ""){
-      Log $ll ,"FHTCONF-CMD $dn: NO FHT-DEVICES";
-      return undef;}
+
 	@fht_devices = split(/\|/,$device_list_reading);
-	# Send Commands via at-Jobs --------------------------------------------------
-	# SendIntervall = $sn Default 5 sec
+
 	my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime(time());
+	$month = $month + 1;
+	$year = $year + 1900;
+	
 	my ($p,$old,$new,$at_time,$at_name,$tsecs);
 	# SendList
 	my $fhemcmd = "";
@@ -241,12 +255,13 @@ sub Commandfhtconf($)
 	  $fhemcmd = "";
 	  $cmd = "";
 	}
-	else {Log 0, "FHTCONF-CMD-SEND: No Changes";}
+	else {
+			Log 0, "FHTCONF-CMD-SEND: $fht No Changes";}
 
-	# Report 2
-	fhem "set $fht report2 255";
-	# FHT Time
-	fhem "set $fht hour $hour day $mday month $month";
+	# Report 1&2
+	fhem "set $fht report1 255 report2 255";
+	# FHT Time&Date
+	fhem "set $fht hour $hour minute $min year $year month $month day $mday";
 	}
 	# Set STATE
 	$defs{$dn}{STATE} = "LastUpdate ". TimeNow();
@@ -319,5 +334,186 @@ sub FHTCONF_init_READINGS($) {
   $defs{$name}{READINGS}{Z0_INIT}{TIME} = TimeNow();
   return undef;
 }
-
+################################################################################
+# FHTCONF CGI
+################################################################################
+sub FHTCONF_CGI() {
+  my ($htmlarg) = @_;
+  # htmlarg = /GROUPS/<CAT-NAME>
+  my $Cat = FHTCONF_CGI_DISPTACH_URL($htmlarg);
+  if(!defined($Cat)){$Cat = ""};
+  my ($ret_html);
+  $ret_html = "<!DOCTYPE html PUBLIC \"-\/\/W3C\/\/DTD HTML 4.01\/\/EN\" \"http:\/\/www.w3.org\/TR\/html4\/strict.dtd\">\n";
+  $ret_html .= "<html>\n";
+  $ret_html .= "<head>\n";
+  $ret_html .= &FHTCONF_CGI_CSS();
+  $ret_html .= "<title>FHEM GROUPS<\/title>\n";
+  $ret_html .= "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>\n";
+  $ret_html .= "<\/head>\n";
+  $ret_html .= "<body>\n";
+  # DIV HDR
+  $ret_html .= &FHTCONF_CGI_TOP($Cat);
+  # DIV LEFT
+  $ret_html .= &FHTCONF_CGI_LEFT($Cat);
+  # DIV RIGHT
+  if($Cat ne "") {
+    $ret_html .= &FHTCONF_CGI_RIGHT($Cat);
+  }
+  # HTML
+  $ret_html .= "</body>\n";
+  $ret_html .= "</html>\n";
+  return ("text/html; charset=ISO-8859-1", $ret_html);
+}
+#-------------------------------------------------------------------------------
+sub FHTCONF_CGI_DISPTACH_URL($){
+  my ($htmlarg) = @_;
+  my @params = split(/\//,$htmlarg);
+  my $CAT = undef;
+  if($params[2]) {
+    $CAT = $params[2];
+    # Log 0,"GRP URL-DISP-CAT: " . $CAT;
+    }
+  return $CAT;
+}
+#-------------------------------------------------------------------------------
+sub FHTCONF_CGI_CSS() {
+  my $css;
+  $css   =  "<style type=\"text/css\"><!--\n";
+  $css .= "\#left {float: left; width: 15%; height:100%;}\n";
+  $css .= "table.GROUP { border:thin solid; background: #E0E0E0; text-align:left;}\n";
+  $css .= "table.GROUP tr.odd { background: #F0F0F0;}\n";
+  $css .= "table.GROUP td {nowrap;}";
+  $css .= "\/\/--><\/style>";
+  # TEST
+  #$css = "<link href=\"$__ME/group.css\" rel=\"stylesheet\"/>\n";
+  return $css;
+}
+#-------------------------------------------------------------------------------
+sub FHTCONF_CGI_TOP($) {
+  my $CAT = shift(@_);
+  # rh = return-Html
+  my $rh;
+  $rh = "<div id=\"hdr\">\n";
+  $rh .= "<form method=\"get\" action=\"" . $__ME . "\">\n";
+  $rh .= "<table WIDTH=\"100%\">\n";
+  $rh .= "<tr>";
+  $rh .= "<td><a href=\"" . $__ME . "\">FHEM:</a>$CAT</td>";
+  $rh .= "<td><input type=\"text\" name=\"cmd\" size=\"30\"/></td>";
+  $rh .= "</tr>\n";
+  $rh .= "</table>\n";
+  $rh .= "</form>\n";
+  $rh .= "<br>\n";
+  $rh .= "</div>\n";
+  return $rh;
+}
+#-------------------------------------------------------------------------------
+sub FHTCONF_CGI_LEFT(){
+  # rh = return-Html
+  my $rh;
+  $rh = "<div id=\"logo\"><img src=\"" . $__ME . "/fhem.png\"></div>";
+  $rh .= "<div id=\"menu\">\n";
+  # Print FHTCONF-Devices
+  $rh .= "<table class=\"room\">\n";
+    foreach my $d (sort keys %defs) {
+    next if($defs{$d}{TYPE} ne "FHTCONF");
+    $rh .= "<tr><td>";
+    $rh .= "<a href=\"" . $__ME . "/FHTCONF/$d\">$d</a></h3>";
+    $rh .= "</td></tr>\n";
+    }
+  $rh .= "</table>\n";
+  $rh .= "</div>\n";
+  return $rh;
+}
+#-------------------------------------------------------------------------------
+sub FHTCONF_CGI_RIGHT(){
+  my ($CAT) = @_;
+  my ($rh,$fhtroom,$fht,@fhts,@ft,@fp,$fht_list);
+  $fhtroom = $attr{$CAT}{FHTRoom};
+  $fht_list = GetDevType_Room($fhtroom);
+  $rh = "<div id=\"content\">\n";
+  if($CAT eq "") {$CAT = "***";}
+  # $rh .="CAT: " . $CAT . " FHTROOM:" . $fhtroom . "<br>\n";
+  # $rh .= "FHT-Devices: " . $fht_list . "<br>\n";
+  $rh .= "<table>\n";
+  # Tabelle
+  # Zeile - Row Namen FHTCONFDevice FHT-Devices
+  $fp[0] .= "<th></th>";
+  $fp[1] .= "<td></td>";
+  $fp[2] .= "<td>IODEV</td>"; 
+  $fp[3] .= "<td>Warnings</td>";
+  $fp[4] .= "<td></td>";
+  $fp[5] .= "<td>Mode</td>";
+  $fp[6] .= "<td>Day-Temp</td>";
+  $fp[7] .= "<td>LowTemp-OffSet</td>";
+  $fp[8] .= "<td>Night-Temp</td>";
+  $fp[9] .= "<td>WindowOpen-Temp</td>";
+  $fp[10] .= "<td></td>";
+  $fp[11] .= "<td>Montag</td>";
+  $fp[12] .= "<td>Dienstag</td>";
+  $fp[13] .= "<td>Mittwoch</td>";
+  $fp[14] .= "<td>Donnerstag</td>";
+  $fp[15] .= "<td>Freitag</td>";
+  $fp[16] .= "<td>Samstag</td>";
+  $fp[17] .= "<td>Sonntag</td>";
+  $fp[18] .= "<td></td>";
+  #Values FHTCONF-Device
+  $fp[0] .= "<th><a href=\"$__ME?detail=$CAT\">$CAT</a></th>";
+  # $fp[0] .= "<th>" . $CAT . "</th>";
+  $fp[1] .= "<td></td>";
+  $fp[2] .= "<td></td>";
+  $fp[3] .= "<td></td>";
+  $fp[4] .= "<td></td>";
+  $fp[5] .= "<td>" . $defs{$CAT}{READINGS}{A1_mode}{VAL} . "</td>";
+  $fp[6] .= "<td>" . $defs{$CAT}{READINGS}{A2_day_temp}{VAL} . "</td>";
+  $fp[7] .= "<td>" . $defs{$CAT}{READINGS}{A2_lowtemp_offset}{VAL} . "</td>";
+  $fp[8] .= "<td>" . $defs{$CAT}{READINGS}{A2_night_temp}{VAL} . "</td>";
+  $fp[9] .= "<td>" . $defs{$CAT}{READINGS}{A2_windowopen_temp}{VAL} . "</td>";
+  $fp[10] .= "<td></td>";
+  $fp[11] .= "<td>" . $defs{$CAT}{READINGS}{B0_MONTAG}{VAL} . "</td>";
+  $fp[12] .= "<td>" . $defs{$CAT}{READINGS}{B1_DIENSTAG}{VAL} . "</td>";
+  $fp[13] .= "<td>" . $defs{$CAT}{READINGS}{B2_MITTWOCH}{VAL} . "</td>";
+  $fp[14] .= "<td>" . $defs{$CAT}{READINGS}{B3_DONNERSTAG}{VAL} . "</td>";
+  $fp[15] .= "<td>" . $defs{$CAT}{READINGS}{B4_FREITAG}{VAL} . "</td>";
+  $fp[16] .= "<td>" . $defs{$CAT}{READINGS}{B5_SAMSTAG}{VAL} . "</td>";
+  $fp[17] .= "<td>" . $defs{$CAT}{READINGS}{B6_SONNTAG}{VAL} . "</td>";
+  $fp[18] .= "<td></td>";
+  # FHT Devices
+  @fhts = split(/\|/,$fht_list);
+  foreach $fht (@fhts){
+	$fp[0] .= "<th><a href=\"$__ME?detail=$fht\">$fht</a></th>";
+    # $fp[0] .= "<th>" . $fht . "</td>";
+    $fp[1] .= "<td></td>";
+    $fp[2] .= "<td>" . $attr{$fht}{IODev} . "</td>";
+    $fp[3] .= "<td>" . $defs{$fht}{READINGS}{warnings}{VAL} . "</td>";
+    $fp[4] .= "<td></td>";
+    $fp[5] .= "<td>" . $defs{$fht}{READINGS}{mode}{VAL} . "</td>";
+    $fp[6] .= "<td>" . $defs{$fht}{READINGS}{'day-temp'}{VAL} . "</td>";
+    $fp[7] .= "<td>" . $defs{$fht}{READINGS}{'lowtemp-offset'}{VAL} . "</td>";
+    $fp[8] .= "<td>" . $defs{$fht}{READINGS}{'night-temp'}{VAL} . "</td>";
+    $fp[9] .= "<td>" . $defs{$fht}{READINGS}{'windowopen-temp'}{VAL} . "</td>";
+    $fp[10] .= "<td></td>";
+    $fp[11] .= "<td>" . $defs{$fht}{READINGS}{'mon-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'mon-to1'}{VAL} . "|";
+    $fp[11] .= $defs{$fht}{READINGS}{'mon-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'mon-to2'}{VAL} . "</td>";
+    $fp[12] .= "<td>" . $defs{$fht}{READINGS}{'tue-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'tue-to1'}{VAL} . "|";
+    $fp[12] .= $defs{$fht}{READINGS}{'tue-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'tue-to2'}{VAL} . "</td>";
+    $fp[13] .= "<td>" . $defs{$fht}{READINGS}{'wed-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'wed-to1'}{VAL} . "|";
+    $fp[13] .= $defs{$fht}{READINGS}{'wed-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'wed-to2'}{VAL} . "</td>";
+    $fp[14] .= "<td>" . $defs{$fht}{READINGS}{'thu-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'thu-to1'}{VAL} . "|";
+    $fp[14] .= $defs{$fht}{READINGS}{'thu-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'thu-to2'}{VAL} . "</td>";
+    $fp[15] .= "<td>" . $defs{$fht}{READINGS}{'fri-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'fri-to1'}{VAL} . "|";
+    $fp[15] .= $defs{$fht}{READINGS}{'fri-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'fri-to2'}{VAL} . "</td>";
+    $fp[16] .= "<td>" . $defs{$fht}{READINGS}{'sat-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'sat-to1'}{VAL} . "|";
+    $fp[16] .= $defs{$fht}{READINGS}{'sat-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'sat-to2'}{VAL} . "</td>";
+    $fp[17] .= "<td>" . $defs{$fht}{READINGS}{'sun-from1'}{VAL} . "|" . $defs{$fht}{READINGS}{'sun-to1'}{VAL} . "|";
+    $fp[17] .= $defs{$fht}{READINGS}{'sun-from2'}{VAL} . "|" . $defs{$fht}{READINGS}{'sun-to2'}{VAL} . "</td>";
+	$fp[18] .= "<td>" . $attr{$fht}{comment} . "</td>";
+  }
+  foreach (@fp) {
+  $rh .= "<tr ALIGN=LEFT>" . $_ . "</tr>\n";
+  }
+  $rh .= "</table>\n";
+  $rh .= "</div>\n";
+  return $rh;
+}
+################################################################################
 1;
