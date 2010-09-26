@@ -663,8 +663,8 @@ FW_roomOverview($)
   push(@list1, "Howto");      push(@list2, "$__ME/HOWTO.html");
   push(@list1, "FAQ");        push(@list2, "$__ME/faq.html");
   push(@list1, "Details");    push(@list2, "$__ME/commandref.html");
-  push(@list1, "Examples");   push(@list2, "$__ME/cmd=style examples");
-  push(@list1, "Edit files"); push(@list2, "$__ME/cmd=style list");
+  push(@list1, "Examples");   push(@list2, "$__ME/cmd=style%20examples");
+  push(@list1, "Edit files"); push(@list2, "$__ME/cmd=style%20list");
   push(@list1, ""); push(@list2, "");
 
   pO "<div id=\"menu\">";
@@ -784,6 +784,7 @@ FW_showRoom()
 
         }
         $v = "" if(!defined($v));
+        my $actor = getAllSets($d);
 
         pH "detail=$d", $d, 1;
         if($iname) {
@@ -792,7 +793,7 @@ FW_showRoom()
         } else {
           pO "<td align=\"center\">$v</td>";
         }
-        if(getAllSets($d)) {
+        if($actor) {
           pH "cmd.$d=set $d on$rf", "on", 1;
           pH "cmd.$d=set $d off$rf", "off", 1;
         }
@@ -1423,11 +1424,12 @@ FW_style($$)
     my $data = join("", <FH>);
     close(FH);
 
+    my $ncols = $__ss ? 40 : 80;
     pO "<div id=\"content\">";
     pO "  <form>";
     pO     FW_submit("save", "Save $f") . "<br><br>";
     pO     FW_hidden("cmd", "style save $a[2]");
-    pO     "<textarea name=\"data\" cols=\"80\" rows=\"30\">" .
+    pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     pO   "</form>";
     pO "</div>";
@@ -1514,7 +1516,7 @@ FW_showWeblink($$$)
   my ($d, $v, $t) = @_;
 
   if($t eq "link") {
-    pH $v, $d, 1;
+    pO "<td><a href=\"$v\">$d</a></td>";    # no pH, want to open extra browser
 
   } elsif($t eq "image") {
     pO "<td><img src=\"$v\"><br>";
