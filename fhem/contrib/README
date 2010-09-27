@@ -61,3 +61,7 @@
 - km271.pl
   Plain Buderus Logamatic 2107 communication module (KM271) logger
   See the 00_KM271.pm fhem module for its successor.
+- RSSImonitor.pl
+  Produces an overview on the RSSI readings from a log. Good for checking
+  the signal quality at various locations for CUL and CUN. See begin of
+  script for usage instructions.
