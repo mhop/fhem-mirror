@@ -913,7 +913,7 @@ FW_logWrapper($)
     my $arg = "$__ME?cmd=showlog undef $d $type $file";
     if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
       my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
-      pO "<embed data=\"$arg\" type=\"image/svg+xml\"" .
+      pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
     } else {
