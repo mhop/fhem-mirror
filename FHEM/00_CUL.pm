@@ -93,7 +93,7 @@ CUL_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a < 4 || @a > 5) {
-    my $msg = "wrong syntax: define <name> CUL devicename <FHTID>";
+    my $msg = "wrong syntax: define <name> CUL devicename[\@baudrate] <FHTID>";
     Log 2, $msg;
     return $msg;
   }
