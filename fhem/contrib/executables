@@ -10,6 +10,7 @@
 .f/usr/share/fhem/contrib/getstate/fhem-getstate
 .f/usr/share/fhem/contrib/init-scripts/fhem.1
 .f/usr/share/fhem/contrib/init-scripts/fhem.2
+.f/usr/share/fhem/contrib/init-scripts/fhem.3
 .f/usr/share/fhem/contrib/km271.pl
 .f/usr/share/fhem/contrib/ks300avg.pl
 .f/usr/share/fhem/contrib/rolwzo_not_off.sh

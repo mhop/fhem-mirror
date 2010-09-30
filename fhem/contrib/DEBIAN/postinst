@@ -1,13 +1,24 @@
 #!/bin/sh
 
-# Don't know how to check presence of fhem in passwd with -e
-#set -e
+set -e
 
-grep -q fhem /etc/passwd
-e=$?
-
-if test ! $e = 0; then
-  useradd --system --home /var/log/fhem --shell /bin/false fhem
+if ! getent passwd fhem >/dev/null; then
+    useradd --system --home /var/log/fhem --shell /bin/false fhem
 fi
+
 chown -R fhem /var/log/fhem /etc/fhem.cfg
-initctl start fhem
+
+#set up of autostart
+if test -x /sbin/initctl; then
+    # upstart
+    mkdir -p /etc/init
+    cp /usr/share/fhem/contrib/init-scripts/fhem.upstart /etc/init/fhem.conf
+    initctl start fhem
+else
+    # Sysvinit
+    mkdir -p /etc/init.d
+    cp /usr/share/fhem/contrib/init-scripts/fhem.3 /etc/init.d/fhem
+    chmod ugo+x /etc/init.d/fhem
+    update-rc.d fhem defaults
+    invoke-rc.d fhem start
+fi

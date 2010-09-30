@@ -3,8 +3,13 @@
 set -e
 
 if grep -q fhem /etc/passwd; then
-  userdel fhem
+    userdel fhem
 fi
+
 if test -f /etc/init/fhem.conf; then
-  rm /etc/init/fhem.conf
+    rm /etc/init/fhem.conf
+fi
+if test -f /etc/init.d/fhem; then
+    update-rc.d fhem remove
+    rm /etc/init.d/fhem
 fi

@@ -72,8 +72,6 @@ deb:
 	rm -rf .f
 	make ROOT=`pwd`/.f install
 	cp -r contrib/DEBIAN .f
-	mkdir .f/etc/init
-	cp contrib/init-scripts/fhem.upstart .f/etc/init/fhem.conf
 	find .f -name CVS -print | xargs rm -rf
 	find .f -name example.CVS -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
