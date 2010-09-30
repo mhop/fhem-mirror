@@ -89,6 +89,8 @@ my %models = (
     fs20usr     => 'simple',
 );
 
+sub hex2four($);
+sub four2hex($$);
 
 sub
 FS20_Initialize($)
