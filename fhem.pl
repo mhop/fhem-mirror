@@ -160,7 +160,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.111 2010-09-30 13:12:27 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.112 2010-10-08 07:07:40 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -331,6 +331,21 @@ while (1) {
 
   if($nfound < 0) {
     next if ($! == 0);
+
+    # Handling "Bad file descriptor". This is a programming error.
+    if($! eq "Bad file descriptor") {
+      my $nbad = 0;
+      foreach my $p (keys %selectlist) {
+        my ($tin, $tout) = ('', '');
+        vec($tin, $selectlist{$p}{FD}, 1) = 1;
+        if(select($tout=$tin, undef, undef, 0) < 0) {
+          Log 0, "ERROR: Found & deleted bad fileno for $p";
+          delete($selectlist{$p});
+          $nbad++;
+        }
+      }
+      next if($nbad > 0);
+    }
     die("Select error $nfound / $!\n");
   }
 
