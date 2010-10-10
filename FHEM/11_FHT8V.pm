@@ -48,8 +48,8 @@ FHT8V_Define($$)
     return sprintf("Wrong housecode: must be one of$vals");
   }
 
-  $hash->{ADDR} = uc($a[2]);
-  $hash->{IDX}  = sprintf("%02X", $my1-$io1);
+  $hash->{addr} = uc($a[2]);
+  $hash->{idx}  = sprintf("%02X", $my1-$io1);
   $hash->{STATE} = "defined";
   return "";
 }
@@ -69,11 +69,11 @@ FHT8V_Set($@)
         if(@a != 3 || $a[2] !~ m/^\d+$/ || $a[2] < 0 || $a[2] > 100);
     Log GetLogLevel($n,3), "FHT8V set $n $arg $a[2]";
     $hash->{STATE} = sprintf("%d %%", $a[2]);
-    IOWrite($hash, "", sprintf("T%s0026%02X", $hash->{ADDR}, $a[2]*2.55));
+    IOWrite($hash, "", sprintf("T%s0026%02X", $hash->{addr}, $a[2]*2.55));
 
   } elsif ($arg eq "pair" ) {
     Log GetLogLevel($n,3), "FHT8V set $n $arg";
-    IOWrite($hash, "", sprintf("T%s002f00", $hash->{ADDR}));
+    IOWrite($hash, "", sprintf("T%s002f00", $hash->{addr}));
 
   } else {
     return "Unknown argument $a[1], choose one of valve pair"
@@ -95,7 +95,7 @@ FHT8V_Get($@)
   if($arg eq "valve" ) {
     my $io = $hash->{IODev};
     my $msg = CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "T10"));
-    my $idx = $hash->{IDX};
+    my $idx = $hash->{idx};
     return int(hex($1)/2.55) if($msg =~ m/$idx:26(..)/);
     return "N/A";
 
