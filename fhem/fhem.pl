@@ -160,7 +160,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.112 2010-10-08 07:07:40 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.113 2010-10-10 08:23:29 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1095,12 +1095,14 @@ CommandDefine($$)
   if($ret) {
     delete $defs{$a[0]};                            # Veto
     delete $attr{$a[0]};
+
   } else {
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$a[0] $da $defaultattr{$da}");
     }
+    DoTrigger("global", "DEFINED $a[0]");
+
   }
-  DoTrigger("global", "DEFINED $a[0]");
   return $ret;
 }
 
