@@ -88,6 +88,7 @@
       <a href="#FHEMRENDERER">FHEMRENDERER</a> &nbsp;
       <a href="#FHEMWEB">FHEMWEB</a> &nbsp;
       <a href="#FHT">FHT</a> &nbsp;
+      <a href="#FHT8V">FHT8V</a> &nbsp;
       <a href="#FHZ">FHZ</a> &nbsp;
       <a href="#FS20">FS20</a> &nbsp;
       <a href="#HMS">HMS</a> &nbsp;
@@ -1135,13 +1136,13 @@ A line ending with \ will be concatenated with the next one, so long lines
      corresponding to a button of the transmitter.</li>
    <li>The optional <code>&lt;fgaddr&gt;</code> specifies the function group.
      It is a 2 digit hex or 4 digit ELV address. The first digit of the hex
-     adress must be F or the first 2 digits of the ELV4 address must be
+     address must be F or the first 2 digits of the ELV4 address must be
      44.</li>
    <li>The optional <code>&lt;lmaddr&gt;</code> specifies the local
      master. It is a 2 digit hex or 4 digit ELV address.  The last digit of the
      hex address must be F or the last 2 digits of the ELV4 address must be
      44.</li>
-   <li>The optional gm specifies the global master, the adress must be FF if
+   <li>The optional gm specifies the global master, the address must be FF if
      defined as hex value or 4444 if defined as ELV4 value.</li>
    </ul>
    <br>
@@ -1310,7 +1311,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
 
     <code>&lt;housecode&gt;</code> is a four digit hex number,
-    corresponding to the adress of the FHT80b device.
+    corresponding to the address of the FHT80b device.
     <br>
 
     Examples:
@@ -1546,6 +1547,77 @@ A line ending with \ will be concatenated with the next one, so long lines
 
 </ul>
 
+<a name="FHT8V"></a>
+<h3>FHT8V</h3>
+<ul>
+  Fhem can directly control FHT8V type valves via a <a href="#CUL">CUL</a>
+  device without an intermediate FHT. This paragraph documents one of the
+  building blocks, the other is the <a href="#PID">PID</a> device.
+  <br>
+  <br>
+
+  <a name="FHT8Vdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev]</code>
+    <br><br>
+
+    <code>&lt;housecode&gt;</code> is a four digit hex number,
+    and must have the following relation to the housecode of the corresponding CUL
+    device:
+    <ul>given the CUL housecode as AABB, then this housecode must be
+    of the form CCBB, where CC is greater or equal to AA, but less then AA+8.
+    </ul>
+    This form is chosen so that the CUL can update all FHT8V valve states
+    within 2 minutes.
+    <br>
+    <br>
+    <code>&lt;IODev&gt;</code> must be specified if the last defined CUL device
+    is not the one to use. Usually this is done voa the <a
+    href="#IODev">IODev</a> attribute, but as the address checked is performed
+    at the definition, we must use an exception here.
+    <br>
+
+    Examples:
+    <ul>
+      <code>define wz FHT8V 3232</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FHT8Vset"></a>
+  <b>Set </b>
+  <ul>
+      <li>set &lt;name&gt; valve &lt;value;&gt;<br>
+      Set the valve to the given value (in percent, from 0 to 100).  
+      </li>
+      <li>set &lt;name&gt; pair<br>
+      Pair the valve with the CUL.
+      </li>
+  </ul>
+  <br>
+
+  <a name="FHT8Vget"></a>
+  <b>Get </b>
+  <ul>
+      <li>get &lt;name&gt; valve<br>
+      Read back the valve position from the CUL FHT buffer, and convert it to percent (from 0 to 100).  
+      </li>
+  </ul>
+  <br>
+
+  <a name="FHT8Vattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#dummy">loglevel</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+
 
 <a name="CUL_FHTTK"></a>
 <h3>CUL_FHTTK</h3>
@@ -1611,7 +1683,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
 
     <code>&lt;housecode&gt;</code> is a four digit hex number,
-    corresponding to the adress of the HMS device.
+    corresponding to the address of the HMS device.
     <br>
 
     Examples:
@@ -2442,7 +2514,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
 
     <code>&lt;housecode&gt;</code> is a four digit hex number,
-    corresponding to the adress of the KS300 device, right now it is ignored.
+    corresponding to the address of the KS300 device, right now it is ignored.
     The ml/raincounter defaults to 255 ml, but it must be specified if you wish
     to set the wind factor, which defaults to 1.0.
     <br>
