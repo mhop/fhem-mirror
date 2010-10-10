@@ -1,5 +1,7 @@
 - =DATE= (=VER=)
   - feature: smallscreen optimizations for iPhone
+  - feature: FHT8V rewrite (and moved from contrib into the FHEM directory).
+  - feature: PID rewrite (and moved from contrib into the FHEM directory).
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
