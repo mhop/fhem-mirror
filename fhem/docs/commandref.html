@@ -106,6 +106,7 @@
       <a href="#USF1000">USF1000</a> &nbsp;
       <a href="#USBWX">USBWX</a> &nbsp;
       <a href="#VantagePro2">VantagePro2</a> &nbsp;
+      <a href="#WEBIO">WEBIO</a> &nbsp;
       <a href="#WS2000">WS2000</a> &nbsp;
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#WS3600">WS3600</a> &nbsp;
@@ -3047,6 +3048,40 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
 
 </ul>
+<a name="WEBIO"></a>
+<h3>WEBIO</h3>
+<ul>
+  <a name="WEBIOdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WEBIO &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines an Web-IO device (Box with 2 Analog-In/Out 0..10V, www.wut.de) via ip address. The status of the device is also pooled (delay interval).<br><br>
+    
+
+    Examples:
+    <ul>
+      <code>define pumpspeed WEBIO 192.168.8.200 1 60</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="WEBIOset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    0.00 - 10.00
+    </pre>
+    Examples:
+    <ul>
+      <code>set pumpspeed 6.75</code><br>
+    </ul>
+    <br>
+</ul>
+
 <a name="VantagePro2"></a>
 <h3>VantagePro2</h3>
 <ul>
