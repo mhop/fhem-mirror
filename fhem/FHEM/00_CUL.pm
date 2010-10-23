@@ -9,7 +9,7 @@ use Time::HiRes qw(gettimeofday);
 sub CUL_Clear($);
 sub CUL_Write($$$);
 sub CUL_Read($);
-sub CUL_ReadAnswer($$$);
+sub CUL_ReadAnswer($$$$);
 sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 sub CUL_HandleWriteQueue($);
@@ -22,13 +22,14 @@ sub CUL_SimpleRead($);
 sub CUL_Disconnected($);
 
 my $initstr = "X21";    # Only translated messages + RSSI
-my %gets = (
-  "version"  => "V",
-  "raw"      => "",
-  "ccconf"   => "=",
-  "uptime"   => "t",
-  "file"     => "",
-  "fhtbuf"   => "T03"
+
+my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
+  "ccconf"   => 1,
+  "file"     => 1,
+  "version"  => ["V", '^V .*'],
+  "raw"      => ["", '.*'],
+  "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
+  "fhtbuf"   => ["T03", '^..[\r\n]*$' ],
 );
 
 my %sets = (
@@ -192,7 +193,7 @@ CUL_Set($@)
     my ($err, $ob);
     if(!IsDummy($hash->{NAME})) {
       CUL_SimpleWrite($hash, "C10");
-      ($err, $ob) = CUL_ReadAnswer($hash, $type, 0);
+      ($err, $ob) = CUL_ReadAnswer($hash, $type, 0, "^C10 = .*");
       return "Can't get old MDMCFG4 value" if($err || $ob !~ m,/ (.*)\r,);
       $ob = $1 & 0x0f;
     }
@@ -252,7 +253,7 @@ GOTBW:
     CUL_SimpleWrite($hash, "X00");
 
     CUL_SimpleWrite($hash, sprintf("w%08X$a[1]", $len));
-    ($err, $msg) = CUL_ReadAnswer($hash, $type, 1);
+    ($err, $msg) = CUL_ReadAnswer($hash, $type, 1, undef);
     goto WRITEEND if($err);
     if($msg ne sprintf("%08X\r\n", $len)) {
       $err = "Bogus length received: $msg";
@@ -311,7 +312,7 @@ CUL_Get($@)
     my %r = ( "0D"=>1,"0E"=>1,"0F"=>1,"10"=>1,"1B"=>1,"1D"=>1 );
     foreach my $a (sort keys %r) {
       CUL_SimpleWrite($hash, "C$a");
-      ($err, $msg) = CUL_ReadAnswer($hash, "C$a", 0);
+      ($err, $msg) = CUL_ReadAnswer($hash, "C$a", 0, "^C.* = .*");
       return $err if($err);
       my @answ = split(" ", $msg);
       $r{$a} = $answ[4];
@@ -333,7 +334,7 @@ CUL_Get($@)
     if(int(@a) == 2) {  # No argument: List directory
 
       CUL_SimpleWrite($hash, "r.");
-      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
+      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, undef);
       goto READEND if($err);
 
       $msg =~ s/[\r\n]//g;
@@ -352,7 +353,7 @@ CUL_Get($@)
       }
 
       CUL_SimpleWrite($hash, "r$a[2]");
-      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
+      ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, undef);
       goto READEND if($err);
 
       if($msg eq "X") {
@@ -363,7 +364,7 @@ CUL_Get($@)
       my ($len,  $buf) = (hex($msg), "");
       $msg = "";
       while(length($msg) != $len) {
-        ($err, $buf) = CUL_ReadAnswer($hash, $a[1], 1);
+        ($err, $buf) = CUL_ReadAnswer($hash, $a[1], 1, undef);
         goto READEND if($err);
         $msg .= $buf;
       }
@@ -387,8 +388,8 @@ READEND:
 
   } else {
 
-    CUL_SimpleWrite($hash, $gets{$a[1]} . $arg);
-    ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0);
+    CUL_SimpleWrite($hash, $gets{$a[1]}[0] . $arg);
+    ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, $gets{$a[1]}[1]);
     if(!defined($msg)) {
       CUL_Disconnected($hash);
       $msg = "No answer";
@@ -419,7 +420,7 @@ CUL_Clear($)
   # Clear the pipe
   $hash->{RA_Timeout} = 0.1;
   for(;;) {
-    my ($err, undef) = CUL_ReadAnswer($hash, "Clear", 0);
+    my ($err, undef) = CUL_ReadAnswer($hash, "Clear", 0, undef);
     last if($err && $err =~ m/^Timeout/);
   }
   delete($hash->{RA_Timeout});
@@ -438,7 +439,7 @@ CUL_DoInit($)
   my ($ver, $try) = ("", 0);
   while($try++ < 3 && $ver !~ m/^V/) {
     CUL_SimpleWrite($hash, "V");
-    ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0);
+    ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0, undef);
     return "$name: $err" if($err && ($err !~ m/Timeout/ || $try == 3));
   }
 
@@ -462,7 +463,7 @@ CUL_DoInit($)
   # FHTID
   my $fhtid;
   CUL_SimpleWrite($hash, "T01");
-  ($err, $fhtid) = CUL_ReadAnswer($hash, "FHTID", 0);
+  ($err, $fhtid) = CUL_ReadAnswer($hash, "FHTID", 0, undef);
   return "$name: $err" if($err);
   $fhtid =~ s/[\r\n]//g;
   Log 5, "GOT CUL fhtid: $fhtid";
@@ -483,15 +484,14 @@ CUL_DoInit($)
 # This is a direct read for commands like get
 # Anydata is used by read file to get the filesize
 sub
-CUL_ReadAnswer($$$)
+CUL_ReadAnswer($$$$)
 {
-  my ($hash, $arg, $anydata) = @_;
+  my ($hash, $arg, $anydata, $regexp) = @_;
   my $type = $hash->{TYPE};
 
   while($hash->{TYPE} eq "CUL_RFR") {   # Look for the first "real" CUL
     $hash = $hash->{IODev};
   }
-
 
   return ("No FD", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
@@ -533,7 +533,13 @@ CUL_ReadAnswer($$$)
       $mculdata .= $buf;
     }
     $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
-    return (undef, $mculdata) if($mculdata =~ m/\r\n/ || $anydata);
+    if($mculdata =~ m/\r\n/ || $anydata) {
+      if($regexp && $mculdata !~ m/$regexp/) {
+        CUL_Parse($hash, $hash, $hash->{NAME}, $mculdata, $initstr);
+      } else {
+        return (undef, $mculdata)
+      }
+    }
   }
 
 }
