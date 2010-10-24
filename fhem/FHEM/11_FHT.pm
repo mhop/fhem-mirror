@@ -628,7 +628,7 @@ getFhtBuffer($)
   return getFhtMin($io) if(IsDummy($io->{NAME}));
 
   for(;;) {
-    return 0 if(!define($io->{FD}));    # Avoid crash if the CUL/FHZ is absent
+    return 0 if(!defined($io->{FD}));    # Avoid crash if the CUL/FHZ is absent
     my $msg = CallFn($io->{NAME}, "GetFn", $io, (" ", "fhtbuf"));
     Log 5, "getFhtBuffer: $count $msg";
     return hex($1) if($msg && $msg =~ m/=> ([0-9A-F]+)$/i);
