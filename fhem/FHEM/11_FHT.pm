@@ -585,8 +585,9 @@ doSoftBuffer($)
       $arg =~ s/,(....),/$1:/;
       $arg = uc($arg);
       if($cul =~ m/$arg/) {
-        Log GetLogLevel($name,3),
-              "$name set $h->{CMD}: still in the culfw buffer, wont send";
+        Log GetLogLevel($name,3), "fhtsoftbuffer: $name set $h->{CMD} ".
+                "is still in the culfw buffer, wont send it again";
+        $h->{SENDTIME} = $now;
         next;
       }
     }
