@@ -4,8 +4,6 @@ package main;
 use strict;
 use warnings;
 
-sub addToAttrList($);
-
 #####################################
 sub
 structure_Initialize($)
@@ -197,22 +195,6 @@ structure_Attr($@)
   delete($hash->{INATTR});
   Log 5, "ATTR: $ret" if($ret);
   return undef;
-}
-
-sub
-addToAttrList($)
-{
-  my $arg = shift;
-
-  my $ua = "";
-  $ua = $attr{global}{userattr} if($attr{global}{userattr});
-  my @al = split(" ", $ua);
-  my %hash;
-  foreach my $a (@al) {
-    $hash{$a} = 1;
-  }
-  $hash{$arg} = 1;
-  $attr{global}{userattr} = join(" ", sort keys %hash);
 }
 
 1;
