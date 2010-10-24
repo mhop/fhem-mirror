@@ -565,7 +565,6 @@ doSoftBuffer($)
     $count++;
     my $h = $io->{SOFTBUFFER}{$key};
     my $name = $h->{HASH}->{NAME};
-
     if($h->{NSENT}) {
       next if($now-$h->{SENDTIME} < $retryafter);
       my $retry = $attr{$name}{retrycount};
@@ -573,6 +572,21 @@ doSoftBuffer($)
         Log GetLogLevel($name,2), "$name set $h->{CMD}: ".
                           "no confirmation after $h->{NSENT} tries, giving up";
         delete($io->{SOFTBUFFER}{$key});
+        next;
+      }
+
+    }
+    # Check if it is still in th CUL buffer.
+    if($io->{TYPE} eq "CUL") {
+      my $cul = CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "T02"));
+      my $arg = uc($h->{ARG});
+      $arg =~ s/^020183//;
+      $arg =~ s/(....)/,$1/g;
+      $arg =~ s/,(....),/$1:/;
+      $arg = uc($arg);
+      if($cul =~ m/$arg/) {
+        Log GetLogLevel($name,3),
+              "$name set $h->{CMD}: still in the culfw buffer, wont send";
         next;
       }
     }
@@ -587,7 +601,6 @@ doSoftBuffer($)
     $fhzbuflen -= $arglen;
     $h->{SENDTIME} = $now;
     $h->{NSENT}++;
-
   }
 
   if($count && !$io->{SOFTBUFFERTIMER}) {
