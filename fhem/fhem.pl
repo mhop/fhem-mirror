@@ -44,6 +44,7 @@ sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
 sub AnalyzeInput($);
 sub AssignIoPort($);
+sub addToAttrList($);
 sub CallFn(@);
 sub CommandChain($$);
 sub CheckDuplicate($$);
@@ -87,6 +88,7 @@ sub CommandGet($$);
 sub CommandHelp($$);
 sub CommandInclude($$);
 sub CommandInform($$);
+sub CommandIOWrite($$);
 sub CommandList($$);
 sub CommandModify($$);
 sub CommandReload($$);
@@ -142,6 +144,7 @@ use vars qw($internal_data);    #
 use vars qw(%cmds);             # Global command name hash. To be expanded
 use vars qw(%data);		# Hash for user data
 use vars qw($devcount);	        # To sort the devices
+use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
 
 use vars qw($reread_active);
 
@@ -154,13 +157,12 @@ my %client;			# Client array
 my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
 my $modpath_set;                # Check if modpath was used, and report if not.
-my %defaultattr;    		# Default attributes
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.113 2010-10-10 08:23:29 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.114 2010-10-24 16:08:48 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -201,7 +203,9 @@ $modules{_internal_}{AttrFn} = "GlobalAttr";
   "include" => { Fn=>"CommandInclude",
 	    Hlp=>"<filename>,read the commands from <filenname>" },
   "inform" => { Fn=>"CommandInform",
-	    Hlp=>"{on|timer|off},echo all commands and events to this client" },
+	    Hlp=>"{on|timer|raw|off},echo all events to this client" },
+  "iowrite" => { Fn=>"CommandIOWrite",
+            Hlp=>"<iodev> <data>,write raw data with iodev" },
   "list"    => { Fn=>"CommandList",
 	    Hlp=>"[devspec],list definitions and status info" },
   "modify"  => { Fn=>"CommandModify",
@@ -532,6 +536,33 @@ IOWrite($@)
   use strict "refs";
   return $ret;
 }
+
+#####################################
+sub
+CommandIOWrite($$)
+{
+  my ($cl, $param) = @_;
+  my @a = split(" ", $param);
+
+  return "Usage: iowrite <iodev> <param> ..." if(int(@a) <= 2);
+
+  my $name = shift(@a);
+  my $hash = $defs{$name};
+  return "$name not found" if(!$hash);
+  return undef if(IsDummy($name) || IsIgnored($name));
+  if(!$hash->{TYPE} ||
+     !$modules{$hash->{TYPE}} ||
+     !$modules{$hash->{TYPE}}{WriteFn}) {
+    Log 1, "No IO device or WriteFn found for $name";
+    return;
+  }
+  unshift(@a, "") if(int(@a) == 1);
+  no strict "refs";
+  my $ret = &{$modules{$hash->{TYPE}}{WriteFn}}($hash, @a);
+  use strict "refs";
+  return $ret;
+}
+
 
 #####################################
 sub
@@ -1135,10 +1166,12 @@ AssignIoPort($)
 {
   my ($hash) = @_;
 
-  # Set the I/O device
+  # Set the I/O device, search for the last compatible one.
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
     my $cl = $modules{$defs{$p}{TYPE}}{Clients};
-    if(defined($cl) && $cl =~ m/:$hash->{TYPE}:/ &&
+    my $re = $modules{$defs{$p}{TYPE}}{regexpClients};
+    if(((defined($cl) && $cl =~ m/:$hash->{TYPE}:/) ||
+        (defined($re) && $hash->{TYPE} =~ m/$re/)) &&
        $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
       $hash->{IODev} = $defs{$p};
       last;
@@ -1675,7 +1708,8 @@ CommandInform($$)
 
   $param = lc($param);
 
-  return "Usage: inform {on|off|timer}" if($param !~ m/^(on|off|timer)$/);
+  return "Usage: inform {on|timer|raw|off}"
+        if($param !~ m/^(on|off|raw|timer)$/);
   if($param =~ m/off/) {
     delete($client{$cl}{inform});
   } else {
@@ -1922,7 +1956,7 @@ DoTrigger($$)
   ################
   # Inform
   foreach my $c (keys %client) {        # Do client loop first, is cheaper
-    next if(!$client{$c}{inform});
+    next if(!$client{$c}{inform} || $client{$c}{inform} eq "raw");
     my $tn = TimeNow();
     if($attr{global}{mseclog}) {
       my ($seconds, $microseconds) = gettimeofday();
@@ -1930,7 +1964,6 @@ DoTrigger($$)
     }
     for(my $i = 0; $i < $max; $i++) {
       my $state = $defs{$dev}{CHANGED}[$i];
-      my $fe = "$dev:$state";
       syswrite($client{$c}{fd},
         ($client{$c}{inform} eq "timer" ? "$tn " : "") .
         "$defs{$dev}{TYPE} $dev $state\n");
@@ -2125,7 +2158,11 @@ Dispatch($$$)
   my @found;
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep {defined($modules{$_}{ORDER})} keys %modules) {
-    next if($iohash->{Clients} !~ m/:$m:/);
+
+    my $cl = $iohash->{Clients};
+    my $re = $iohash->{regexpClients};
+    next if(!(defined($cl) && $cl =~ m/:$m:/) ||
+             (defined($re) && $m =~ m/$re/));
 
     # Module is not loaded or the message is not for this module
     next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
@@ -2167,6 +2204,15 @@ Dispatch($$$)
     if(!int(@found)) {
       Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
       return undef;
+    }
+  }
+
+  ################
+  # Inform raw
+  if(!$iohash->{noRawInform}) {
+    foreach my $c (keys %client) {
+      next if(!$client{$c}{inform} || $client{$c}{inform} ne "raw");
+      syswrite($client{$c}{fd}, "$hash->{TYPE} $name $dmsg\n");
     }
   }
 
@@ -2270,3 +2316,20 @@ ReadingsVal($$$)
   }
   return $default;
 }
+
+sub
+addToAttrList($)
+{
+  my $arg = shift;
+
+  my $ua = "";
+  $ua = $attr{global}{userattr} if($attr{global}{userattr});
+  my @al = split(" ", $ua);
+  my %hash;
+  foreach my $a (@al) {
+    $hash{$a} = 1;
+  }
+  $hash{$arg} = 1;
+  $attr{global}{userattr} = join(" ", sort keys %hash);
+}
+
