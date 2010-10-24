@@ -1,4 +1,4 @@
-# $Id: 14_CUL_WS.pm,v 1.28 2010-08-19 18:42:06 wherzig Exp $
+# $Id: 14_CUL_WS.pm,v 1.29 2010-10-24 17:17:24 rudolfkoenig Exp $
 #
 ##############################################
 package main;
@@ -231,7 +231,7 @@ CUL_WS_Parse($$)
 
     if(@a == 9 && int(@a) > 8) {                 #  S300TH
       # Sanity check
-      if (!($msg =~ /^K\d\d\d\d\d\d\d\d$/ )) {
+      if (!($msg =~ /^K[0-9A-F]\d\d\d\d\d\d\d$/ )) {
         Log GetLogLevel($name,1), "Error: S300TH CUL_WS Cannot decode $msg (sanitycheck). Malformed";
         return "";
       }
