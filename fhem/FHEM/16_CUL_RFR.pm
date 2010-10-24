@@ -25,6 +25,7 @@ CUL_RFR_Initialize($)
   $hash->{WriteFn}   = "CUL_RFR_Write";
   $hash->{GetFn}     = "CUL_Get";
   $hash->{SetFn}     = "CUL_Set";
+  $hash->{noRawInform} = 1;     # Our message was already sent as raw.
 }
 
 
