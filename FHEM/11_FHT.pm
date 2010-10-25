@@ -588,6 +588,7 @@ doSoftBuffer($)
         Log GetLogLevel($name,3), "fhtsoftbuffer: $name set $h->{CMD} ".
                 "is still in the culfw buffer, wont send it again";
         $h->{SENDTIME} = $now;
+        $h->{NSENT}++;
         next;
       }
     }
