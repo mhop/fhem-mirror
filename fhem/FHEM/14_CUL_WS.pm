@@ -1,4 +1,4 @@
-# $Id: 14_CUL_WS.pm,v 1.29 2010-10-24 17:17:24 rudolfkoenig Exp $
+# $Id: 14_CUL_WS.pm,v 1.30 2010-10-25 15:17:29 rudolfkoenig Exp $
 #
 ##############################################
 package main;
@@ -245,12 +245,8 @@ CUL_WS_Parse($$)
       $NotifyType="T H";
       $NotifyTemperature=$tmp;
       $NotifyHumidity=$hum;
-    } elsif(@a == 15 && int(@a) > 14) {          # KS300/2
-      if (!($msg =~ /^K\d\d\d\d\d\d\d\d\d\d\d\d\d\d$/ )) {
-        Log GetLogLevel($name,1), "Error: KS300/2 Cannot decode $msg (sanitycheck). Malformed";
-        return "";
-      }
 
+    } elsif(@a == 15 && int(@a) > 14) {          # KS300/2
       my $c = $hash->{corr4} ? $hash->{corr4} : 255;
       $rain = sprintf("%0.1f", hex("$a[14]$a[11]$a[12]") * $c / 1000);
       $wnd  = sprintf("%0.1f", "$a[9]$a[10].$a[7]" + $hash->{corr3});
@@ -268,8 +264,8 @@ CUL_WS_Parse($$)
       $NotifyWind=$wnd;
       $NotifyRain=$rain;
       $NotifyIsRaining=$ir;
-   } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
 
+   } elsif(int(@a) > 8) {                       # WS7000 Temp/Hum sensors
       $sgn = ($firstbyte&8) ? -1 : 1;
       $tmp = $sgn * ($a[6].$a[3].".".$a[4]) + $hash->{corr1};
       $hum = ($a[7].$a[8].".".$a[5]) + $hash->{corr2};
