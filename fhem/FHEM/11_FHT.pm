@@ -324,11 +324,24 @@ FHT_Define($$)
 
 
   $hash->{CODE} = $a[2];
-  $hash->{CODE} = $a[2];
+  AssignIoPort($hash);
+
+  # Check if the CULs id collides with our id.
+  if($hash->{IODev} && $hash->{IODev}{TYPE} eq "CUL") {
+     $hash->{IODev}{FHTID} =~ m/^(..)(..)$/;
+     my ($i1, $i2) = (hex($1), hex($2));
+     $a[2] =~ m/^(..)(..)$/;
+     my ($l1, $l2) = (hex($1), hex($2));
+
+     if($l2 == $i2 && $l1 >= $i1 && $l1 <= $i1+7) {
+       my $err = "$a[0]: CODE collides with the FHTID of the corresponding CUL";
+       Log 1, $err;
+       return $err;
+     }
+  }
+
   $modules{FHT}{defptr}{$a[2]} = $hash;
   $attr{$a[0]}{retrycount} = 3;
-
-  AssignIoPort($hash);
 
   #Log GetLogLevel($a[0],2),"Asking the FHT device $a[0]/$a[2] to send its data";
   #FHT_Set($hash, ($a[0], "report1", "255", "report2", "255"));
