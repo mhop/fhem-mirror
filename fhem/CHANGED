@@ -5,6 +5,7 @@
   - feature: FHEM2FHEM module
   - bugfix:  CUL get should not digest foreign events (fhtsoftbuffer)
   - bugfix:  S300TH sanity check won't allow negative temperatures.
+  - feature: decode CUL uptime
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
