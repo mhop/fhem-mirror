@@ -379,16 +379,22 @@ FHT_Parse($$)
   my $name = $def->{NAME};
   return "" if(IsIgnored($name));
 
+  my $io = $def->{IODev};
+  my $ll4 = GetLogLevel($name,4);
+
   # Short message
   if(length($msg) < 26)  {
-    Log 4,"FHT Short message. Device $name, Message: $msg";
+    Log $ll4,"FHT Short message. Device $name, Message: $msg";
     return "";
   }
 
-  if(!$val || $cde eq "65" || $cde eq "66") {
+  if($io->{TYPE} eq "CUL") {
+    $confirm = 1;
+
+  } elsif(!$val || $cde eq "65" || $cde eq "66") {
     # This is a confirmation message. We reformat it so that
     # it looks like a real message, and let the rest parse it
-    Log 4, "FHT $name confirmation: $cde";
+    Log $ll4, "FHT $name confirmation: $cde";
     $val = substr($msg, 22, 2);
     $confirm = 1;
   }
@@ -397,7 +403,7 @@ FHT_Parse($$)
 
   my $cmd = $codes{$cde};
   if(!$cmd) {
-    Log 4, "FHT $name (Unknown: $cde => $val)";
+    Log $ll4, "FHT $name (Unknown: $cde => $val)";
     $def->{CHANGED}[0] = "unknown_$cde: $val";
     return $name;
   }
@@ -507,30 +513,31 @@ FHT_Parse($$)
     $def->{READINGS}{'battery'}{TIME} = $tn;
     $def->{READINGS}{'battery'}{VAL} = $valBattery;
     $def->{CHANGED}[$nc] = "battery: $valBattery";
-    Log 4, "FHT $name battery: $valBattery";
+    Log $ll4, "FHT $name battery: $valBattery";
     $nc++;
 
     $def->{READINGS}{'lowtemp'}{TIME} = $tn;
     $def->{READINGS}{'lowtemp'}{VAL} = $valLowTemp;
     $def->{CHANGED}[$nc] = "lowtemp: $valLowTemp";
-    Log 4, "FHT $name lowtemp: $valLowTemp";
+    Log $ll4, "FHT $name lowtemp: $valLowTemp";
     $nc++;
 
     $def->{READINGS}{'window'}{TIME} = $tn;
     $def->{READINGS}{'window'}{VAL} = $valWindow;
     $def->{CHANGED}[$nc] = "window: $valWindow";
-    Log 4, "FHT $name window: $valWindow";
+    Log $ll4, "FHT $name window: $valWindow";
     $nc++;
 
     $def->{READINGS}{'windowsensor'}{TIME} = $tn;
     $def->{READINGS}{'windowsensor'}{VAL} = $valSensor;
     $def->{CHANGED}[$nc] = "windowsensor: $valSensor";
-    Log 4, "FHT $name windowsensor: $valSensor";
+    Log $ll4, "FHT $name windowsensor: $valSensor";
     $nc++;
   }
 
   if(substr($msg,24,1) eq "7") {        # Do not store FHZ acks.
     $cmd = "FHZ:$cmd";
+ 
   } else {
     $def->{READINGS}{$cmd}{TIME} = $tn;
     $def->{READINGS}{$cmd}{VAL} = $val;
@@ -538,21 +545,20 @@ FHT_Parse($$)
   }
   $def->{CHANGED}[$nc] = "$cmd: $val";
 
-  Log 4, "FHT $name $cmd: $val";
+  Log $ll4, "FHT $name $cmd: $val";
 
   ################################
   # Softbuffer: delete confirmed commands
   if($confirm) {
     my $found;
-    my $io = $def->{IODev};
     foreach my $key (sort keys %{$io->{SOFTBUFFER}}) {
       my $h = $io->{SOFTBUFFER}{$key};
       my $hcmd = $h->{CMD};
       my $hname = $h->{HASH}->{NAME};
-      Log 4, "FHT softbuffer check: $hname / $hcmd";
+      Log $ll4, "FHT softbuffer check: $hname / $hcmd";
       if($hname eq $name && $hcmd =~ m/^$cmd $val/) {
         $found = $key;
-        Log 4, "FHT softbuffer found";
+        Log $ll4, "FHT softbuffer found";
         last;
       }
     }
