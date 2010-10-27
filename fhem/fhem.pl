@@ -162,7 +162,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.114 2010-10-24 16:08:48 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.115 2010-10-27 16:51:32 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -320,7 +320,7 @@ while (1) {
 
   vec($rin, $server->fileno(), 1) = 1;
   foreach my $p (keys %selectlist) {
-    vec($rin, $selectlist{$p}{FD}, 1) = 1
+    vec($rin, $selectlist{$p}{FD}, 1) = 1;
   }
   foreach my $c (keys %client) {
     vec($rin, fileno($client{$c}{fd}), 1) = 1;
@@ -334,10 +334,11 @@ while (1) {
   CommandShutdown(undef, undef) if($sig_term);
 
   if($nfound < 0) {
-    next if ($! == 0);
+    my $err = int($!);
+    next if ($err == 0);
 
     # Handling "Bad file descriptor". This is a programming error.
-    if($! eq "Bad file descriptor") {
+    if($! == $err) {  # BADF, don't want to "use errno.ph"
       my $nbad = 0;
       foreach my $p (keys %selectlist) {
         my ($tin, $tout) = ('', '');
