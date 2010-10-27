@@ -393,7 +393,14 @@ READEND:
     if(!defined($msg)) {
       CUL_Disconnected($hash);
       $msg = "No answer";
-    };
+
+    } elsif($a[1] eq "uptime") {     # decode it
+      $msg =~ s/[\r\n]//g;
+      $msg = hex($msg)/125;
+      $msg = sprintf("%d %02d:%02d:%02d",
+        $msg/86400, ($msg%86400)/3600, ($msg%3600)/60, $msg%60);
+    }
+
     $msg =~ s/[\r\n]//g;
 
   }
