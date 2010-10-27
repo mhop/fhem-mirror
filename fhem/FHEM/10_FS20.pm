@@ -79,6 +79,7 @@ my %models = (
     fs20di10    => 'dimmer',
     fs20du      => 'dimmer',
     fs20rst     => 'simple',
+    fs20rsu     => 'simple',
     fs20sa      => 'simple',
     fs20sig     => 'simple',
     fs20sm4     => 'simple',
