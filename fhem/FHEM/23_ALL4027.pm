@@ -48,10 +48,12 @@ ALL4027_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return "no set value specified" if(int(@a) != 2);
-  return "Unknown argument $a[1], choose one of on off toggle" if($a[1] eq "?");
+  return "no set value specified" if(int(@a) < 2);
+  return "Unknown argument $a[1], choose one of on off toggle on-for-timer" if($a[1] eq "?");
 
   my $v = $a[1];
+  my $v2= "";
+  if(defined($a[2])) { $v2=$a[2]; }
 
   if($v eq "toggle")
   {
@@ -71,6 +73,12 @@ ALL4027_Set($@)
 		$v="off";
 	}
   }
+  elsif($v eq "on-for-timer")
+  {
+	InternalTimer(gettimeofday()+$v2, "ALL4027_on_timeout",$hash, 0);
+# on-for-timer is now a on.
+	$v="on";
+  }
   ALL4027_execute($hash->{DEF},$v);
 
   Log GetLogLevel($a[0],2), "ALL4027 set @a";
@@ -79,6 +87,22 @@ ALL4027_Set($@)
   $hash->{STATE} = $v;
   $hash->{READINGS}{state}{TIME} = TimeNow();
   $hash->{READINGS}{state}{VAL} = $v;
+
+  DoTrigger($hash->{NAME}, undef);
+
+  return undef;
+}
+sub 
+ALL4027_on_timeout($)
+{
+  my ($hash) = @_;
+  my @a;
+
+  $a[0]=$hash->{NAME};
+  $a[1]="off"; 
+
+  ALL4027_Set($hash,@a);
+
   return undef;
 }
 ###################################
