@@ -14,20 +14,36 @@ sub FHZ_CheckCrc($);
 sub FHZ_XmitLimitCheck($$);
 sub FHZ_DoInit($$$);
 
-my $msgstart = pack('H*', "81");# Every msg starts wit this
+my $msgstart = pack('H*', "81");# Every msg starts with this
+
+# See also "FHZ1000 Protocol" http://fhz4linux.info/tiki-index.php?page=FHZ1000%20Protocol
+
+# NOTE: for protocol analysis, especially the "serial" vs. "FHTcode" case
+# is interestingly different yet similar:
+# - code 0x84 (FHZ area) vs. 0x83 (FHT area),
+# - register 0x57, _read_ vs. 0x9e, _write_ (hmm, or is this "house code" 0x9e01?)
+# - _read_ 8 nibbles (4 bytes serial), _write_ 1 (1 byte FHTcode - align-corrected to two nibbles, right?)
+# I did some few tests already (also scripted tests), no interesting findings so far,
+# but despite that torture my 1300PC still works fine ;)
 
 my %gets = (
   "init1"  => "c9 02011f64",
   "init2"  => "c9 02011f60",
   "init3"  => "c9 02011f0a",
   "serial" => "04 c90184570208",
-  "fhtbuf" => "04 c90185",
+  "fhtbuf" => "04 c90185", # get free FHZ memory (e.g. 23 bytes free)
+  # NOTE: there probably is another command to return the number of pending
+  # FHT msg submissions in FHZ (including last one), IOW: 1 == "empty";
+  # see thread "Kommunikation FHZ1000PC zum FHT80b" for clues;
+  # TODO: please analyze in case you use homeputer!!
 );
 my %sets = (
   "time"     => "c9 020161",
   "initHMS"  => "04 c90186",
+  "stopHMS"  => "04 c90197",
   "initFS20" => "04 c90196",
-  "FHTcode"  => "04 c901839e0101",
+  "initFS20_02" => "04 c9019602", # some alternate variant
+  "FHTcode"  => "04 c901839e0101", # (parameter range 1-99, "Zentralencode" in contronics speak; randomly chosen - and forgotten!! - by FHZ, thus better manually hardcode it in fhem.cfg)
 
   "raw"      => "xx xx",
   "initfull" => "xx xx",
@@ -36,7 +52,9 @@ my %sets = (
 my %setnrparam = (
   "time"     => 0,
   "initHMS"  => 0,
+  "stopHMS"  => 0,
   "initFS20" => 0,
+  "initFS20_02" => 0,
   "FHTcode"  => 1,
   "raw"      => 2,
   "initfull" => 0,

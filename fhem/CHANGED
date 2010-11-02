@@ -6,6 +6,7 @@
   - bugfix:  CUL get should not digest foreign events (fhtsoftbuffer)
   - bugfix:  S300TH sanity check won't allow negative temperatures.
   - feature: decode CUL uptime
+  - feature: USB doc changes, FHZ initFS20_02/stopHMS parameters by Andreas.
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian

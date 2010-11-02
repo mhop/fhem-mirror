@@ -595,7 +595,7 @@ doSoftBuffer($)
       }
 
     }
-    # Check if it is still in th CUL buffer.
+    # Check if it is still in the CUL buffer.
     if($io->{TYPE} eq "CUL") {
       my $cul = CallFn($io->{NAME}, "GetFn", $io, (" ", "raw", "T02"));
       my $arg = uc($h->{ARG});

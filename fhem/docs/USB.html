@@ -1,6 +1,6 @@
 <html>
   <head>
-    <title>USB compendium</title>
+    <title>USB / interference compendium</title>
   </head>
   <body>
 
@@ -11,7 +11,7 @@ devices. This is not an issue of fhem but a problem of hardware and/or USB
 drivers.<P>
 
 This document summarizes some findings on the issue. They are taken from
-users' experience and from a web research. This compendium is written for Linux
+users' experience and from a web research. This USB compendium is written for Linux
 users.
 
 
@@ -89,12 +89,10 @@ might be a cure. It is not known how to achieve this (see [5]).
 
 <H3>4. Electromagnetic interferences</H3>
 
-Bad shielding of cables or devices might lead to interferences with electric
-devices nearby (fridges, light switches, ...). A computer can cope with this
-problem better or worse. Changing the computer's hardware helps (confirmed,
-see [7]). If this is not feasible, use a ferrite ring (see [8] for instance)
-or two around the ends of the cable (unconfirmed).
+EMI appears to be a large issue with FHZ1x00 (for one thing, there are MANY reports
+of people mysteriously unable to pair some FHT80b, despite trying very hard).
 
+For many details, see <a href="#emi">Electro-magnetic interference</a> below.
 
 <H3>5. USB Power management</H3>
 
@@ -123,6 +121,51 @@ USB extenders are on sale. They consist of a fixed passive 1-port hub at the end
 an USB cable. This drives the USB to its limits and may cause all sorts of
 problems on the bus. Either do not use USB extenders (confirmed, see [10]) at all
 or put an active (self-powered) hub in the middle (unconfirmed).
+
+<H1>Electro-magnetic interference (EMI) compendium</H1>
+
+Bad shielding of cables or devices might lead to interferences with electric
+devices nearby (fridges, light switches, fluorescent lamps, ...).
+A computer can cope with this problem better or worse.
+Changing the computer's hardware helps (confirmed, see [7]).
+If this is not feasible, use a ferrite ring (see [8] for instance)
+or two around the ends of the FHZ cable (semi-confirmed).
+(or on other interference-inducing cables!)
+
+Confirmed, AndiM: MANY issues with interference on FHZ1300PC,
+which can be observed via drastically increased receiver LED activity
+e.g. when a nearby (1m) PC is running - despite some countermeasures.<br>
+
+Symptoms of trouble with interference:<br>
+<ul>
+ <li>Almost no successful bi-di communication (almost never <code>ack:</code>s received when sending values),
+     (re-)pairing FHT80b units was pretty much impossible, too,
+     but many <code>can-rcv: 50</code> from several FHTs received while pairing was not successful
+     (hmm, perhaps this is a special ID for indication of pairing protocol issues,
+     since it's exactly half of FHTID 100??)</li>
+ <li>FS20 button reception does work directly after an <code>initFS20</code> or <code>rereadcfg</code> or other
+     reset command is executed, but as soon as the first other LED activity
+     (interference? FHT traffic?) happens, any FS20 reception whatsoever drops dead again.
+     And this specifically affects FS20 handling in FHZ1300PC,
+     since specifically <code>initFS20</code> does correct it (IIRC <code>initHMS</code> doesn't)
+     and (some parts of) FHT protocol reception still does work in the meantime.</li>
+</ul>
+
+Swapping the 1m USB cable with a 1.5m cable (but not overly long - this is said to be problematic as well!)
+and adding a ferrite ring (currently at the FHZ1300PC-side cable end) did do wonders,
+it completely eliminated all problems (although not sure yet which of these measures contributed by how much,
+the increase of the distance from interference-causing parts or the ferrite ring).
+
+Please also note that it is recommended to keep an FHT at least 1.5m from a FHZ, otherwise <a href="http://www.razyboard.com/system/morethread-anmeldung-fht80b-funktioniert-nicht-haforum-53111-2713680-0.html">people experienced pairing problems</a>.
+
+<H1> Misc. issues / hints </H1>
+
+<ul>
+<li>Make sure to have correct (and also unique, BTW) FHT codes, otherwise FHZ buffers may fill up due to trying to communicate with an unavailable FHT code
+(<a href="http://www.razyboard.com/system/morethread-kommunikation-fhz1000pc-zum-fht80b-haforum-53111-1988993-0.html">Kommunikation FHZ1000PC zum FHT80b</a>).</li>
+<li>Diagnosing large-scale 868 MHz band distortion: <a href="http://groups.google.com/group/fhem-users/browse_thread/thread/7e183113f6c95f2">empf&auml;nger empfangen nicht mer</a>.
+<li>Still reception / interference issues? Try updating components to use a Superhet receiver (<a href="http://www.ip-symcon.de/forum/f19/fs20-st-superhet-empfangsmodul-3580/index3.html#post29481">FS20-ST &amp; Superhet Empfangsmodul</a>)</li>
+</ul>
 
 <H2>C. Suggested reading</H2>
 

@@ -16,6 +16,14 @@ attr global modpath .                   # where our FHEM directory is
 
 define FHZ FHZ /dev/tts/USB0 # the serial port of an FHZ 1000 PC
 
+# Since it is said that FHZ1x00 sometimes forgets its own random-initialized
+# FHTcode (Contronics speak: "Zentralencode"; sometimes called "fhtid"),
+# it's probably a good idea to manually hard-code it.
+# Changing the value (range is 1 to 99) needs re-registration of FHT80b
+# via their "cent" menu item (instructions see FAQ).
+# set FHZ FHTcode XX
+
+
 define wz FHT 3232          # type FHT, transmitter code 3232 (default value)
 
 #########################
