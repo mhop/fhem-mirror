@@ -212,11 +212,11 @@ SVG_render($$$$$$$)
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
   if($ddur <= 0.5) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 3600; $tstep = 900;
-  } elsif($ddur <= 1) {
+  } elsif($ddur <= 1.1) {       # +0.1 -> DST
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 4*3600; $tstep = 3600;
-  } elsif ($ddur <= 7) {
+  } elsif ($ddur <= 7.1) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 24*3600; $tstep = 6*3600;
-  } elsif ($ddur <= 31) {
+  } elsif ($ddur <= 31.1) {
     $first_tag=". 6";   $tag=". 2 1"; $step = 7*24*3600; $tstep = 24*3600;
     $aligntext = 1;
   } else {
@@ -430,6 +430,7 @@ time_to_sec($)
   if(!$str) {
     return 0;
   }
+Log 1, $str;
   my ($y,$m,$d,$h,$mi,$s) = split("[-_:]", $str);
   $s = 0 if(!$s);
   $mi= 0 if(!$mi);
@@ -437,11 +438,11 @@ time_to_sec($)
   $d = 1 if(!$d);
   $m = 1 if(!$m);
 
-  if(!$__ltstr || $__ltstr ne "$y-$m-$d") { # 2.5x faster
-    $__lt = mktime(0,0,0,$d,$m-1,$y-1900,0,0,-1);
-    $__ltstr = "$y-$m-$d";
+  if(!$__ltstr || $__ltstr ne "$y-$m-$d-$h") { # 2.5x faster
+    $__lt = mktime(0,0,$h,$d,$m-1,$y-1900,0,0,-1);
+    $__ltstr = "$y-$m-$d-$h";
   }
-  return $s+$mi*60+$h*3600+$__lt;
+  return $s+$mi*60+$__lt;
 }
 
 sub
