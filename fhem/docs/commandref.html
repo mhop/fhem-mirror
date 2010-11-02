@@ -989,13 +989,14 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="FHZset"></a>
   <b>Set </b>
   <ul>
-    <code>set FHZ &lt;variable&gt; [&lt;value&gt]</code>
+    <code>set FHZ &lt;variable&gt; [&lt;value&gt;]</code>
     <br><br>
     where <code>value</code> is one of:<br>
     <ul>
       FHTcode<br>
       initFS20<br>
       initHMS<br>
+      stopHMS<br>
       initfull<br>
       raw<br>
       reopen<br>
@@ -1003,8 +1004,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     </ul>
     Notes:
     <ul>
-      <li>raw is used to send out "raw" FS20/FHT messages.  See the doc
-          directory for some examples</li>
+      <li>raw is used to send out "raw" FS20/FHT messages (&quot;setters&quot; only - no query messages!).
+          See message byte streams in FHEM/00_FHZ.pm and the doc directory for some examples.</li>
       <li>In order to set the time of your FHT's, schedule this command every
       minute:<br>
 	  <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
@@ -1022,7 +1023,9 @@ A line ending with \ will be concatenated with the next one, so long lines
           ceases to work completely. If all else fails, shutdown fhem, unplug
           and replug the FHZ device. Problems with FHZ may also be related to
           long USB cables or insufficient power on the USB - use a powered hub
-          to avoid such issues.</li>
+          to improve this particular part of such issues.
+          See <a href="http://www.koeniglich.de/fhem/USB.html">our USB page</a>
+          for detailed USB / electromag. interference troubleshooting.</li>
       <li><code>initfull</code> issues the initialization sequence for the FHZ
           device:<br>
           <pre>
@@ -1035,6 +1038,8 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li><code>reopen</code> closes and reopens the serial device port. This
           implicitly initializes the FHZ and issues the
           <code>initfull</code> command sequence.</li>
+      <li><code>stopHMS</code> probably is the inverse of <code>initHMS</code>
+          (I don't have authoritative info on what exactly it does).</li>
     </ul>
   </ul>
   <br>
