@@ -76,6 +76,7 @@
       <a href="#CUL">CUL</a> &nbsp;
       <a href="#CUL_EM">CUL_EM</a> &nbsp;
       <a href="#CUL_FHTTK">CUL_FHTTK</a> &nbsp;
+      <a href="#CUL_HM">CUL_HM</a> &nbsp;
       <a href="#CUL_HOERMANN">CUL_HOERMANN</a> &nbsp;
       <a href="#CUL_RFR">CUL_RFR</a> &nbsp;
       <a href="#CUL_WS">CUL_WS</a> &nbsp;
@@ -790,7 +791,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <pre>  fhem> xmllist
   &lt;FHZINFO&gt;
           &lt;internal_LIST&gt;
-                  &lt;internal name="global" state="internal" sets="" attrs="room configfile logfile modpath pidfilename port statefile userattr verbose version"&gt;
+                  &lt;internal name="global" state="internal" sets=""
+                            attrs="room configfile logfile ..."&gt;
                           &lt;INT key="DEF" value="&lt;no definition&gt;"/&gt;
                           &lt;INT key="NR" value="0"/&gt;
                           &lt;INT key="STATE" value="internal"/&gt;
@@ -1102,7 +1104,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="fhtsoftbuffer"></a>
     <li>fhtsoftbuffer<br/>
-        Can be applied to FHZ devices.<br/>
         As the FHZ command buffer for FHT devices is limited (see fhtbuf),
         and commands are only sent to the FHT device every 120 seconds,
         the hardware buffer may overflow and FHT commands get lost.
@@ -1899,11 +1900,6 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CULset"></a>
   <b>Set </b>
   <ul>
-    <li>verbose<br>
-        Set a CUL "verbose" level. See the CUL firmware README document for
-        details. Note: only X00/X01/X21/X25 is supported by the fhem CUL
-        module, the other flags may crash fhem.
-        </li><br>
     <li>raw<br>
         Issue a CUL firmware command.  See the CUL firmware README document for
         details on CUL commands.
@@ -1973,7 +1969,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (CUL,CUN,CUR)</li><br>
-    <li><a href="#sendpool">sendpool</a><br>
+    <li><a name="sendpool">sendpool</a><br>
         If using more than one CUL/CUN for covering a large area, sending
         different events by the different CUL's might disturb each other. This
         phenomenon is also known as the Palm-Beach-Resort effect.
@@ -1984,16 +1980,27 @@ A line ending with \ will be concatenated with the next one, so long lines
         attr CUN2 sendpool CUN1,CUN2,CUN3<br>
         attr CUN3 sendpool CUN1,CUN2,CUN3<br>
         </li><br>
-    <li><a name="culfhtsoftbuffer">fhtsoftbuffer</a><br/>
-        As the CUL command buffer for FHT devices is limited (see fhtbuf),
-        and commands are only sent to the FHT device every 120 seconds,
-        the hardware buffer may overflow and FHT commands get lost or errors
-        may occur.
-        Setting this attribute implements an "unlimited" software buffer.<br>
-        Default is disabled (i.e. not set or set to 0).</li><br>
-    <li><a href="#addvaltrigger">addvaltrigger</a><br>
+    <li><a name="addvaltrigger">addvaltrigger</a><br>
         Create triggers for additional device values. Right now these are RSSI
         and RAWMSG for the CUL family and RAWMSG for the FHZ.
+        </li><br>
+    <li><a name="rfmode">rfmode</a><br>
+        Configure the RF Transceiver of the CUL (the CC1101). Available
+        arguments are:
+        <ul>
+        <li>SlowRF<br>
+            To communicate with FS20/FHT/HMS/EM1010/S300/Hoermann devices @1kHz
+            datarate. This is the default.
+
+        <li>HomeMatic<br>
+            To communicate with HomeMatic type of devices @20kHz datarate
+
+        </ul>
+        </li><br>
+
+    <li><a name="rfmode">hm_autopair</a><br>
+        Only useful in HomeMatic mode, see rfmode above. The CUL_HM Module will
+        try to pair any device requesting a pairing.
         </li><br>
   </ul>
   <br>
@@ -2102,6 +2109,62 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 </ul>
+
+<a name="CUL_HM"></a>
+<h3>CUL_HM</h3>
+<ul>
+  Support for eQ-3 HomeMatic devices via the CUL. Note: The <a
+  href="#rfmode">rfmode </a> attribute of at least one attache CUL/CUN device
+  must be set to HomeMatic. Note: The protocoll used by HomeMatic devices
+  (BidCos, known as AskSin in the culfw) must be enabled in the culfw firmware.
+  This is the default for all CUN and for newer CUL (i.e. V3.0 and greater)
+  devices.  <b>Note: This module is experimental!</b>
+  <br><br>
+
+  <a name="CUL_HMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_HM &lt;6-digit-hex-code&gt;</code>
+    <br><br>
+    Best to avoid this command with the <a href="#autocreate">autocreate</a>
+    module enabled, and the <a href="#hm_autopair">hm_autopair</a> attribute
+    set for the corresponding CUL device. Now set the physical device in
+    pairing mode (Anlernmodus), the rest should happen automatically.
+  </ul><br>
+
+  <a name="CUL_HMset"></a>
+  <b>Set</b>
+  <ul>
+     Depends on the subType of the device.
+     <li>switch
+     <ul>
+        <li>on - set the switch on</li>
+        <li>off - set the switch off</li>
+     </ul>
+     </li>
+  </ul><br>
+
+  <a name="CUL_HMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_HMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a name="#model">name</a><br>
+        This attribute is set automatically after a successful pairing.
+        It is not supposed to be set by hand.</li>
+    <li><a name="#subType">subType</a><br>
+        This attribute is set automatically after a successful pairing.
+        It is not supposed to be set by hand. It is necessary to be set
+        in order to use the set command.</li>
+  </ul>
+  <br>
+</ul>
+
 
 <a name="CUL_HOERMANN"></a>
 <h3>CUL_HOERMANN</h3>
