@@ -162,7 +162,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.115 2010-10-27 16:51:32 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.116 2010-11-06 19:31:38 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1169,8 +1169,9 @@ AssignIoPort($)
 
   # Set the I/O device, search for the last compatible one.
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
-    my $cl = $modules{$defs{$p}{TYPE}}{Clients};
-    my $re = $modules{$defs{$p}{TYPE}}{regexpClients};
+    my $mode = ($defs{$p}{mode} ? $defs{$p}{mode} : "");
+    my $cl = $modules{$defs{$p}{TYPE}}{"${mode}Clients"};
+    my $re = $modules{$defs{$p}{TYPE}}{"${mode}regexpClients"};
     if(((defined($cl) && $cl =~ m/:$hash->{TYPE}:/) ||
         (defined($re) && $hash->{TYPE} =~ m/$re/)) &&
        $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
@@ -2157,11 +2158,12 @@ Dispatch($$$)
   }
 
   my @found;
+  my $mode = ($hash->{mode} ? $hash->{mode} : "");
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep {defined($modules{$_}{ORDER})} keys %modules) {
 
-    my $cl = $iohash->{Clients};
-    my $re = $iohash->{regexpClients};
+    my $cl = $iohash->{"${mode}Clients"};
+    my $re = $iohash->{"${mode}regexpClients"};
     next if(!(defined($cl) && $cl =~ m/:$m:/) ||
              (defined($re) && $m =~ m/$re/));
 
@@ -2175,10 +2177,9 @@ Dispatch($$$)
   }
 
   if(!int(@found)) {
-    my $h = $iohash->{MatchList};
+    my $h = $iohash->{"${mode}MatchList"};
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
-
         if($dmsg =~ m/$h->{$m}/) {
           my ($order, $mname) = split(":", $m);
 
@@ -2319,6 +2320,14 @@ ReadingsVal($$$)
 }
 
 sub
+AttrVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  return $attr{$d}{$n} if(defined($attr{$d}) && defined($attr{$d}{$n}));
+  return $default;
+}
+
+sub
 addToAttrList($)
 {
   my $arg = shift;
@@ -2333,4 +2342,3 @@ addToAttrList($)
   $hash{$arg} = 1;
   $attr{global}{userattr} = join(" ", sort keys %hash);
 }
-

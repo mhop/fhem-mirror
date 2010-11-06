@@ -172,7 +172,6 @@ autocreate_Notify($$)
     }
 
   }
-
   CommandSave(undef, undef) if(!$ret && $nrcreated && $attr{$me}{autosave});
   return $ret;
 }

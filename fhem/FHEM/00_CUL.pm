@@ -5,15 +5,15 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 
-
+sub CUL_Attr(@);
 sub CUL_Clear($);
-sub CUL_Write($$$);
-sub CUL_Read($);
-sub CUL_ReadAnswer($$$$);
-sub CUL_Ready($);
 sub CUL_HandleCurRequest($$);
 sub CUL_HandleWriteQueue($);
 sub CUL_Parse($$$$$);
+sub CUL_Read($);
+sub CUL_ReadAnswer($$$$);
+sub CUL_Ready($);
+sub CUL_Write($$$);
 
 sub CUL_OpenDev($$);
 sub CUL_CloseDev($);
@@ -38,7 +38,6 @@ my %sets = (
   "bWidth"    => "",
   "rAmpl"     => "",
   "sens"      => "",
-  "verbose"   => "X",
   "led"       => "l",
   "patable"   => "x",
   "file"      => "",
@@ -47,18 +46,11 @@ my %sets = (
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB) 
 
-sub
-CUL_Initialize($)
-{
-  my ($hash) = @_;
+my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS" .
+                    ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN:";
+my $clientsHomeMatic = ":CUL_HM:";
 
-# Provider
-  $hash->{ReadFn}  = "CUL_Read";
-  $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} =
-        ":FS20:FHT:KS300:CUL_EM:CUL_WS:USF1000:BS:HMS:CUL_FHTTK:CUL_RFR:FHT8V".
-        ":CUL_HOERMANN:";
-  my %mc = (
+my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:BS"        => "^81..(04|0c)..0101a001a5cf",
     "3:FS20"      => "^81..(04|0c)..0101a001",
@@ -70,8 +62,23 @@ CUL_Initialize($)
     "9:CUL_FHTTK" => "^T........",
     "A:CUL_RFR"   => "^[0-9A-F]{4}U.",
     "B:CUL_HOERMANN"=> "^R..........",
-  );
-  $hash->{MatchList} = \%mc;
+);
+my %matchListHomeMatic = (
+    "1:CUL_HM" => "^A......................",
+);
+
+sub
+CUL_Initialize($)
+{
+  my ($hash) = @_;
+
+# Provider
+  $hash->{ReadFn}  = "CUL_Read";
+  $hash->{WriteFn} = "CUL_Write";
+  $hash->{Clients} = $clientsSlowRF;
+  $hash->{MatchList} = \%matchListSlowRF;
+  $hash->{HomeMaticClients} = $clientsHomeMatic;
+  $hash->{HomeMaticMatchList} = \%matchListHomeMatic;
   $hash->{ReadyFn} = "CUL_Ready";
 
 # Normal devices
@@ -80,9 +87,11 @@ CUL_Initialize($)
   $hash->{GetFn}   = "CUL_Get";
   $hash->{SetFn}   = "CUL_Set";
   $hash->{StateFn} = "CUL_SetState";
+  $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
-                     "fhtsoftbuffer:1,0 sendpool addvaltrigger";
+                     "fhtsoftbuffer:1,0 sendpool addvaltrigger " .
+                     "rfmode:SlowRF,HomeMatic hm_autopair";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -282,7 +291,6 @@ WRITEEND:
 
     return "Expecting a 0-padded hex number"
         if((length($arg)&1) == 1 && $type ne "raw");
-    $initstr = "X$arg" if($type eq "verbose");
     Log $ll, "set $name $type $arg";
     CUL_SimpleWrite($hash, $sets{$type} . $arg);
 
@@ -456,6 +464,7 @@ CUL_DoInit($)
     Log 1, $msg;
     return $msg;
   }
+  $ver =~ s/[\r\n]//g;
   $hash->{VERSION} = $ver;
 
   if($ver =~ m/CUR/) {
@@ -757,7 +766,7 @@ CUL_Parse($$$$$)
   my $rssi;
 
   my $dmsg = $rmsg;
-  if($initstr =~ m/X2/ && $dmsg =~ m/^[FTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
+  if($dmsg =~ m/^[AFTKEHR]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
@@ -828,6 +837,8 @@ CUL_Parse($$$$$)
   } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
     ;
   } elsif($fn eq "R" && $len >= 11) {              # CUL_EM / Native
+    ;
+  } elsif($fn eq "A" && $len >= 21) {              # AskSin/BidCos/HomeMatic
     ;
   } else {
     Log GetLogLevel($name,2), "$name: unknown message $dmsg";
@@ -1067,6 +1078,38 @@ CUL_Disconnected($)
   sleep(5);
 
   DoTrigger($name, "DISCONNECTED");
+}
+
+sub
+CUL_Attr(@)
+{
+  my @a = @_;
+
+  if($a[2] eq "rfmode") {
+
+    my $name = $a[1];
+    my $hash = $defs{$name};
+
+    if($a[3] eq "HomeMatic") {
+      return if($initstr eq "Ar");
+      $hash->{mode} = "HomeMatic";
+      $initstr = "Ar";
+      CUL_SimpleWrite($hash, $initstr);
+
+    } else {
+      return if($initstr eq "X21");
+      delete($hash->{mode});
+      $initstr = "X21";
+      CUL_SimpleWrite($hash, "Ax");
+      CUL_SimpleWrite($hash, $initstr);
+
+    }
+
+    Log 2, "Switched $name rfmode to $a[3]";
+
+  }
+ 
+  return undef;
 }
 
 1;
