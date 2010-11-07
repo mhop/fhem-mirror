@@ -1952,17 +1952,18 @@ A line ending with \ will be concatenated with the next one, so long lines
         commands.
         </li><br>
     <li>fhtbuf<br>
-          CUL has a message buffer for the FHT. If the buffer is full, then newly
-          issued commands will be dropped, if the attribute <a
-          href="#culfhtsoftbuffer">fhtsoftbuffer</a> is not set. Instead, a "EOB" message is issued.
-          <code>fhtbuf</code> returns the free memory in this buffer (in hex),
-          an empty buffer in the CUL is 40 (64 bytes).
-          A message occupies 3 + 2x(number of FHT commands) bytes,
-          this is the second reason why sending multiple FHT commands with one
-          <a href="#set">set</a> is a good idea. The first reason is, that
-          these FHT commands are sent at once to the FHT.
-          </li>
-</li><br>
+        CUL has a message buffer for the FHT. If the buffer is full, then newly
+        issued commands will be dropped, if the attribute <a
+        href="#culfhtsoftbuffer">fhtsoftbuffer</a> is not set.
+        Instead, a "EOB" message is issued.
+        <code>fhtbuf</code> returns the free memory in this buffer (in hex),
+        an empty buffer in the CUL-V2 is 74 bytes, in CUL-V3/CUN 200 Bytes.
+        A message occupies 3 + 2x(number of FHT commands) bytes,
+        this is the second reason why sending multiple FHT commands with one
+        <a href="#set">set</a> is a good idea. The first reason is, that
+        these FHT commands are sent at once to the FHT.
+        </li> <br>
+
     <li>ccconf<br>
         Read some CUL radio-chip (cc1101) registers (frequency, bandwidth, etc),
         and display them in human readable form.
@@ -2278,7 +2279,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     The rest of the attributes is the same as for the <a href="#CUL">CUL</a>.</ul><br>
   </ul>
   <br>
-</ul>
 
 
 <a name="EM"></a>
@@ -2651,7 +2651,6 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
-</ul>
 
 <a name="KS300"></a>
 <h3>KS300</h3>
@@ -4935,7 +4934,7 @@ Terminating
         site on the iPhone in Safari, try to add it to the home-screen.
         </li><br>
 
-    </li></ul>
+    </ul>
 
   </ul>
 
@@ -5299,7 +5298,7 @@ Terminating
           href="#trigger">trigger</a> command to execute the macro.
           E.g.<br>
           <code>fhem> define MyMacro notify MyMacro { Log 1, "Hello"}</code><br>
-          <code>fhem> trigger MyMacro</pre></code><br>
+          <code>fhem> trigger MyMacro</code><br>
 
 
     </ul>
@@ -5855,10 +5854,10 @@ isday</pre>
 		in an interactive mode, meaning that the FHEM-Loop will be block as long as the graphics are rendered.
 		If you want to use multiprocessing, set the RENDERER and multiprocessing to on and the
 		weblink-graphics will be rendered in the background.
-        </li><br></li> </ul>
-  </ul>
+        </li><br>
 
-</ul>
+     </ul>
+  </ul>
 
 
 <a name="PachLog"></a>
@@ -5941,22 +5940,23 @@ isday</pre>
   <br><br>
   Example:
   <ul><br>
-    <code>dumpdef TEST</code><br><br>
-    <ul><code>CALLER => main: /opt/fhz/FHEM/01_FHEMWEB.pm LINE: 194 SUB: main::FW_AnswerCall<br>
-	SUB-NAME: main::Commanddumpdef<br>
-	DUMP-DEVICE: TEST <br>
-	$VAR1 = {<ul><code>
-			  'IODev' => {},<br>
-			  'NAME' => 'TEST',<br>
-			  'NR' => 64,<br>
-			  'STATE' => '???',<br>
-			  'TYPE' => 'dummy'<br>
-			};</code></ul>
-	<code>DUMP-DEVICE-ATTR<br>
-	$VAR1 = {</code><ul><code>
-			  'room' => 'DEF_DUMMY,GRP.TEST'<br>
-			};</ul></code>
-	</code></ul><br>
+    <pre>dumpdef TEST
+
+    CALLER => main: /opt/fhz/FHEM/01_FHEMWEB.pm LINE: 194 SUB: main::FW_AnswerCall
+    SUB-NAME: main::Commanddumpdef
+    DUMP-DEVICE: TEST
+    $VAR1 = {
+        'IODev' => {},
+        'NAME' => 'TEST',
+        'NR' => 64,
+        'STATE' => '???',
+        'TYPE' => 'dummy'
+        };
+    DUMP-DEVICE-ATTR
+    $VAR1 = {
+        'room' => 'DEF_DUMMY,GRP.TEST'
+        };
+	</pre>
   </ul>
 </ul>
 

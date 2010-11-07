@@ -477,8 +477,10 @@ FW_makeTable($$$$$$$$)
     my @al = map { s/[:;].*//;$_ } split(" ", $clist);
     pO "<td>" . FW_select("arg.$ccmd$d",\@al,undef) . "</td>";
     pO "<td>" . FW_textfield("val.$ccmd$d", 20)    . "</td>";
-    pO "<td>" . FW_submit("cmd.$ccmd$d", $ccmd)    . "</td>";
-    pO FW_hidden("dev.$ccmd$d", $d);
+    pO "<td>" .
+         FW_submit("cmd.$ccmd$d", $ccmd) .
+         FW_hidden("dev.$ccmd$d", $d) .
+       "</td>";
     pO "</tr>";
   }
 
@@ -489,7 +491,8 @@ FW_makeTable($$$$$$$$)
     pF "    <tr class=\"%s\">", $row?"odd":"even";
     $row = ($row+1)%2;
     if($makelink && $__reldoc) {
-      pO "<td><a href=\"$__reldoc#$v\">$v</a></td>";    # no pH, want to open extra browser
+      # no pH, want to open extra browser
+      pO "<td><a href=\"$__reldoc#$v\">$v</a></td>"; 
     } else {
       pO "<td>$v</td>";
     }
@@ -810,12 +813,14 @@ FW_showRoom()
         my @tv = map { ($_.".0", $_+0.5) } (5..30);
         shift(@tv);     # 5.0 is not valid
         $v = int($v*20)/$v if($v =~ m/^[0-9].$/);
-        pO FW_hidden("arg.$d", "desired-temp");
-        pO FW_hidden("dev.$d", $d);
+
 
         pO "<td>" .
+            FW_hidden("arg.$d", "desired-temp") .
+            FW_hidden("dev.$d", $d) .
             FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $v)) .
-            FW_submit("cmd.$d", "set") . "</td>";
+            FW_submit("cmd.$d", "set") .
+            "</td>";
 
       } elsif($type eq "FileLog") {
 
@@ -838,7 +843,9 @@ FW_showRoom()
 
       } elsif($type eq "weblink") {
 
+        pO "<td>";
         FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE});
+        pO "</td>";
 
       } else {
 
@@ -1526,7 +1533,7 @@ FW_showWeblink($$$)
   } elsif($t eq "fileplot") {
     my @va = split(":", $v, 3);
     if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {
-      pO "<td>Broken definition: $v</a></td>";
+      pO "<td>Broken definition: $v</td>";
     } else {
       if($va[2] eq "CURRENT") {
         $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
