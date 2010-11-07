@@ -53,11 +53,10 @@ SVG_render($$$$$$$)
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
  # Html Header
-  pO "<?xml version=\"1.0\" encoding=\"UTF-8\"?>";
-  pO "<!DOCTYPE svg>";
-  pO "<svg version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" ".
-        "xmlns:xlink=\"http://www.w3.org/1999/xlink\" " .
-        ">";
+  pO '<?xml version="1.0" encoding="UTF-8"?>';
+  pO '<!DOCTYPE svg>';
+  pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
+         'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
   pO "<style type=\"text/css\"><![CDATA[";
   if(open(FH, "$__dir/svg_style.css")) {
@@ -430,7 +429,6 @@ time_to_sec($)
   if(!$str) {
     return 0;
   }
-Log 1, $str;
   my ($y,$m,$d,$h,$mi,$s) = split("[-_:]", $str);
   $s = 0 if(!$s);
   $mi= 0 if(!$mi);

@@ -9,11 +9,10 @@ function
 compressPoints(pointList)
 {
   var i, x, y, lx = -1, ly, ret = "";
-  var pl_arr = pointList.split(" ");
-  for(i = 0; i < pl_arr.length; i++) {
-    var xy = pl_arr[i].split(",");
-    x = parseInt(xy[0]);
-    y = parseInt(xy[1]);
+  var pl_arr = pointList.split(/[, ]/);
+  for(i = 0; i < pl_arr.length; i +=2) {
+    x = parseInt(pl_arr[i]);
+    y = parseInt(pl_arr[i+1]);
     if(pl_arr.length > 500 && lx != -1 && x-lx < 2)    // Filter the data.
       continue;
     ret = ret+
@@ -90,7 +89,6 @@ svg_paste(evt)
       "translate(0,"+ (h/y_mul+y_min-h/ny_mul-ny_min)*y_mul +") "+
       "scale(1, "+ (y_mul/ny_mul) +") ";
   o.setAttribute("transform", tr);
-
   d.documentElement.appendChild(o);
 }
 
