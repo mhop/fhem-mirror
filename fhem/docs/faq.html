@@ -556,5 +556,22 @@ See <a href="USB.html">USB compendium</a> for help.
   the CUL FHT subsystem, no need to unplug/replug the CUL device in case of
   the aforementioned issue.
 </ul>
+
+<a name="faq22"></a>
+<h4>22. My FHT80b device does not send temperature messages to my FHZ/CUL/CUN (any more).
+What can I do?</h4>
+<ul>
+  Please pair your FHT80b device withe FHZ/CUL/CUN as described in the
+  device manual.<br><br>
+  It is advisable to remind the FHT80b devices from time to time that there is
+  a FHZ/CUL/CUN device to report to. Adding the following line to your fhem config
+  file helps in most cases:<br>
+  <code>
+    define myReminder at *00:40:00 set TYPE=FHT time
+  </code>
+
+</ul>
+
+
 </body>
 </html>

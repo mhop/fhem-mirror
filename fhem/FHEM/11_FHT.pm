@@ -187,6 +187,11 @@ FHT_Set($@)
       my @t = localtime;
       splice(@a,$i,1,("hour",$t[2],"minute",$t[1]));
     }
+
+    if($a[$i] eq "date") {
+      my @t = localtime;
+      splice(@a,$i,1,("year",$t[5]-100,"month",$t[4]+1,"day",$t[3]));
+    }
   }
 
   my $ncmd = 0;
@@ -537,7 +542,7 @@ FHT_Parse($$)
 
   if(substr($msg,24,1) eq "7") {        # Do not store FHZ acks.
     $cmd = "FHZ:$cmd";
- 
+
   } else {
     $def->{READINGS}{$cmd}{TIME} = $tn;
     $def->{READINGS}{$cmd}{VAL} = $val;
