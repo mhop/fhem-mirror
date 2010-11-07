@@ -1348,10 +1348,12 @@ A line ending with \ will be concatenated with the next one, so long lines
       desired-temp
       day-temp night-temp
       report1 report2
+      refreshvalues
       mode
       holiday1 holiday2      # Not verified
       manu-temp              # No clue what it does.
       year month day hour minute
+      time date
       lowtemp-offset         # Alarm-Temp.-Differenz
       windowopen-temp
       mon-from1 mon-to1 mon-from2 mon-to2
@@ -1407,17 +1409,23 @@ A line ending with \ will be concatenated with the next one, so long lines
 
       <li>The FHT is very economical (or lazy), it accepts one message from the
           FHZ1x00 every 115+x seconds, where x depends on the housecode. Don't
-          be surprized if your command is only accepted 10 minutes later by the
+          be surprised if your command is only accepted 10 minutes later by the
           device. FHT commands are buffered in the FHZ1x00/CUL till they are
           sent to the FHT, see the related <code>fhtbuf</code> entry in the
           <code><a href="#get">get</a></code> section.<br> You can send up to 8
           commands in one message at once to the FHT if you specify them all as
           arguments to the same set command, see the example above.<br><br>
 
+      <li>time sets hour and minute to local time</li><br/>
+
+      <li>date sets year, month and date to local time</li><br/>
+
+      <li>refreshvalues is an alias for report1 255 report2 255</li><br/>
+
       <li>All <code>*-temp</code> values need a temperature
           as argument, which will be rounded to 0.5 Celsius.<br/>
           Temperature values must  between 5.5 and 30.5 Celsius. Value 5.5 sets
-          the actuator to OFF, value 30.5 set the actuator to ON<br><br>
+          the actuator to OFF, value 30.5 set the actuator to ON</li><br>
 
       <li><code>mode</code> is one of <code>auto, manual, holiday or
           holiday_short.</code><br>
@@ -1604,7 +1612,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Set </b>
   <ul>
       <li>set &lt;name&gt; valve &lt;value;&gt;<br>
-      Set the valve to the given value (in percent, from 0 to 100).  
+      Set the valve to the given value (in percent, from 0 to 100).
       </li>
       <li>set &lt;name&gt; pair<br>
       Pair the valve with the CUL.
@@ -1616,7 +1624,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Get </b>
   <ul>
       <li>get &lt;name&gt; valve<br>
-      Read back the valve position from the CUL FHT buffer, and convert it to percent (from 0 to 100).  
+      Read back the valve position from the CUL FHT buffer, and convert it to percent (from 0 to 100).
       </li>
   </ul>
   <br>
@@ -1669,7 +1677,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     The default values are around 25.5, 3 and 5.88, you probably need to tune
     these values. They can be also changed later.
     <br><br>
-    
+
     Examples:
     <ul>
       <code>define wz_pid PID wz_th wz_fht8v</code><br>
@@ -3132,7 +3140,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>define &lt;name&gt; WEBIO &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
     <br><br>
     Defines an Web-IO device (Box with 2 Analog-In/Out 0..10V, www.wut.de) via ip address. The status of the device is also pooled (delay interval).<br><br>
-    
+
 
     Examples:
     <ul>
