@@ -8,6 +8,7 @@
   - feature: decode CUL uptime
   - feature: USB doc changes, FHZ initFS20_02/stopHMS parameters by Andreas.
   - feature: CUL_HM (experimental) for HomeMatic devices.
+  - bugfix:  HTML-Syntax check of the pgm2 output and documents (*.html)
   - feature: added date alias for FHT80b (Boris)
 
 - 2010-08-15 (5.0)
