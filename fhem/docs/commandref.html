@@ -1946,6 +1946,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
     <li>uptime<br>
         return the CUL uptime (time since CUL reset).
+        </li><br>
     <li>raw<br>
         Issue a CUL firmware command, and wait for one line of data returned by
         the CUL. See the CUL firmware README document for details on CUL
@@ -3162,6 +3163,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       <code>set pumpspeed 6.75</code><br>
     </ul>
     <br>
+  </ul>
 </ul>
 
 <a name="VantagePro2"></a>
@@ -4781,15 +4783,15 @@ Terminating
 <h3>FHEM2FHEM</h3>
 <ul>
   FHEM2FHEM is a helper module to connect separate fhem installations.
-
+  <br><br>
   <a name="FHEM2FHEMdefine"></a>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FHEM2FHEM &lt;host:portnr&gt; [LOG:regexp|RAW:devicename]
     </code>
-  </ul>
   <br>
-  Conect to the <i>remote</i> fhem on host. portnr is the global port
+  <br>
+  Connect to the <i>remote</i> fhem on host. portnr is the global port
   attribute of the remote fhem. The next parameter specifies the connection
   type:
   <ul>
@@ -4818,6 +4820,7 @@ Terminating
   <ul>
     <code>define ds1 FHEM2FHEM 192.168.0.1:7072 LOG:.*</code><br>
     <code>define ds2 FHEM2FHEM 192.168.0.1:7072 RAW:CUL</code><br>
+  </ul>
   </ul>
   <br>
 
@@ -4938,7 +4941,6 @@ Terminating
 
   </ul>
 
-</ul>
 
 
 
@@ -5493,6 +5495,7 @@ Terminating
     Used to reopen a FileLog after making some manual changes to the logfile.
     <br>
   </ul>
+  <br>
 
 
   <a name="FileLogget"></a>
@@ -5501,7 +5504,9 @@ Terminating
     <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
           &lt;to&gt; &lt;column_spec&gt; </code>
     <br><br>
-    Read data from the logfile.
+    Read data from the logfile, used by frontends to plot data without direct
+    access to the file.<br>
+
     <ul>
       <li>&lt;infile&gt;<br>
         Name of the logfile to grep. "-" is the current logfile, or you can
