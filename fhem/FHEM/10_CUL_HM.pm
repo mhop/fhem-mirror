@@ -10,22 +10,22 @@ sub CUL_HM_Id($);
 sub CUL_HM_Initialize($);
 sub CUL_HM_Pair(@);
 sub CUL_HM_Parse($$);
-sub CUL_HM_SendCmd($$$);
+sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
 
-my %culHmSubType=(
-  "10" => "switch",
-  "20" => "dimmer",
-  "30" => "blindActuator",
-  "40" => "remote",
-  "41" => "sensor",
-  "42" => "swi",
-  "43" => "pushButton",
-  "80" => "threeStateSensor",
-  "81" => "motionDetector",
-  "C0" => "keyMatic",
-  "C1" => "winMatic", 
-  "CD" => "smokeDetector",
+my %culHmDevProps=(
+  "10" => { st => "switch",          cl => "receiver" },
+  "20" => { st => "dimmer",          cl => "receiver" },
+  "30" => { st => "blindActuator",   cl => "receiver" },
+  "40" => { st => "remote",          cl => "sender" },
+  "41" => { st => "sensor",          cl => "sender" },
+  "42" => { st => "swi",             cl => "sender" },
+  "43" => { st => "pushButton",      cl => "sender" },
+  "80" => { st => "threeStateSensor",cl => "sender" },
+  "81" => { st => "motionDetector",  cl => "sender" },
+  "C0" => { st => "keyMatic",        cl => "sender" },
+  "C1" => { st => "winMatic",        cl => "receiver" },
+  "CD" => { st => "smokeDetector",   cl => "sender" },
 );
 
 my %culHmModel=(
@@ -121,7 +121,8 @@ CUL_HM_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
                        "subType:switch,dimmer,blindActuator,remote,sensor,".
                              "swi,pushButton,threeStateSensor,motionDetector,".
-                             "keyMatic,winMatic,smokeDetector";
+                             "keyMatic,winMatic,smokeDetector " .
+                       "hmClass:receiver,sender";
 }
 
 
@@ -136,48 +137,78 @@ CUL_HM_Define($$)
         if(!(int(@a)==3 || int(@a)==4) || $a[2] !~ m/^[A-F0-9]{6}$/i);
 
   $modules{CUL_HM}{defptr}{uc($a[2])} = $hash;
-  $hash->{STATE} = "Defined";
-  if(int(@a) == 4) {
-    CUL_HM_Parse($hash, $a[3]);
-    $hash->{DEF} = $a[2];
-  }
+  $hash->{STATE} = "???";
   AssignIoPort($hash);
+  if(int(@a) == 4) {
+    $hash->{DEF} = $a[2];
+    CUL_HM_Parse($hash, $a[3]);
+  }
   return undef;
 }
 
 
+
+#############################
 sub
 CUL_HM_Parse($$)
 {
   my ($hash, $msg) = @_;
+  my $id = CUL_HM_Id($hash);
 
   # Msg format: Allnnccttssssssddddddpp...
   $msg =~ m/A(..)(..)(..)(..)(......)(......)(.*)/;
   my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
   my ($len,$msgcnt,$channel,$msgtype,$src,$dst,$p) = @msgarr;
   Log 1, "CUL_HM L:$len N:$msgcnt C:$channel T:$msgtype SRC:$src DST:$dst $p";
-  my $def = $modules{CUL_HM}{defptr}{$src};
+  my $shash = $modules{CUL_HM}{defptr}{$src};
 
-  if(!$def) {
-    Log 3, "CUL_HM Unknown device $src, please define it";
-    return "UNDEFINED CUL_HM_$src CUL_HM $src $msg";
+  my $dhash = $modules{CUL_HM}{defptr}{$dst};
+  my $dname = $dhash ? $dhash->{NAME} : "unknown";
+  $dname = "broadcast" if($dst eq "000000");
+  $dname = $hash->{NAME} if($dst eq $id);
+
+  if(!$shash) {
+    my $sname = "CUL_HM_$src";
+    if("$channel$msgtype" eq "8400" && $len eq "1A") {
+      my $model = substr($p, 2, 4);
+      if($culHmModel{$model}) {
+        $sname = $culHmModel{$model} . "_" . $src;
+        $sname =~ s/-/_/g;
+      }
+    }
+    Log 3, "CUL_HM Unknown device $sname, please define it";
+    return "UNDEFINED $sname CUL_HM $src $msg";
   }
 
-  my $name = $def->{NAME};
+  my $name = $shash->{NAME};
   my @event;
+  my $isack;
+  if($shash->{ackWaiting}) {
+    delete($shash->{ackWaiting});
+    delete($shash->{ackCmdSent});
+    RemoveInternalTimer($shash);
+    $isack = 1;
+  }
 
   my $st = AttrVal($name, "subType", undef);
-  if("$channel$msgtype" =~ m/(8400|A000|A001|8002)/) { # Pairing-Request
-    push @event, CUL_HM_Pair($name, $def, @msgarr);
+
+  if("$channel$msgtype" =~ m/(8400|A000|A001)/) { # Pairing-Request
+    push @event, CUL_HM_Pair($name, $shash, @msgarr);
 
   } elsif(!$st) {     # Will trigger unknown
     ;
 
-  } elsif($st eq "switch") {
+  } elsif("$channel$msgtype" eq "8002" &&
+           $shash->{pairingStep} &&
+           $len eq "0A") { # Ack Pair
+    push @event, CUL_HM_Pair($name, $shash, @msgarr);
 
-    if($p =~ m/^0601(..)00$/) {
-      push @event, "state:" .
-        ($1 eq "C8" ? "on" : ($1 eq "00" ? "off" : "unknown $1"));
+  } elsif($st eq "switch") { ############################################
+
+    if($p =~ m/^0.01(..)00/) {
+      my $val = ($1 eq "C8" ? "on" : ($1 eq "00" ? "off" : "unknown $1"));
+      push @event, "ackedCmd:$val";
+      push @event, "state:$val" if(!$isack);
 
     } elsif($p =~ m/^0600(..)00$/) {
       my $s = ($1 eq "C8" ? "on" : ($1 eq "00" ? "off" : "unknown $1"));
@@ -186,7 +217,20 @@ CUL_HM_Parse($$)
 
     }
 
-  } elsif($st eq "smokeDetector") {
+  } elsif($st eq "remote") { ############################################
+
+    if("$channel$msgtype" =~ m/A.4./ && $p =~ m/^(..)(..)$/) {
+      my $btn = int(($1+1)/2);
+      my $state = $1&1 ? "off" : "on";
+      my $add = ($dst eq $id) ? "" : " (to $dname)";
+      push @event, "state:Btn$btn:$state$add";
+      if($id eq $dst) {
+        CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
+                ($state eq "on"?"C8":"00")."0028", 1, 0);
+      }
+    }
+
+  } elsif($st eq "smokeDetector") { #####################################
 
     if($p eq "0106C8") {
       push @event, "state:on";
@@ -208,17 +252,18 @@ CUL_HM_Parse($$)
     Log GetLogLevel($name,2), "CUL_HM $name $vn:$vv" if($vn eq "unknown");
 
     if($vn eq "state") {
-      $def->{STATE} = $vv;
-      $def->{CHANGED}[$i] = $vv;
+      $shash->{STATE} = $vv;
+      $shash->{CHANGED}[$i] = $vv;
 
     } else {
-      $def->{CHANGED}[$i] = "$vn: $vv";
+      $shash->{CHANGED}[$i] = "$vn: $vv";
 
     }
 
-    $def->{READINGS}{$vn}{TIME} = $tn;
-    $def->{READINGS}{$vn}{VAL} = $vv;
+    $shash->{READINGS}{$vn}{TIME} = $tn;
+    $shash->{READINGS}{$vn}{VAL} = $vv;
   }
+
 
   return $name;
 }
@@ -238,91 +283,151 @@ CUL_HM_Set($@)
   my $cmd = $a[1];
   my $id = CUL_HM_Id($hash->{IODev});
 
+  my $sndcmd;
+  my $state;
+
   if($st eq "switch") {
     if($cmd eq "on" || $cmd eq "off") {
-      CUL_HM_SendCmd($hash, 
-        sprintf("++9441%s%s0101%s", $id, $hash->{DEF}, $cmd eq "on"?"C8":"00"),
-        0);
-
-    } elsif($cmd eq "raw") {
-      CUL_HM_SendCmd($hash, 
-        sprintf("++9441%s%s%s", $id, $hash->{DEF}, $a[2]), 0);
+      $state = $cmd;
+      $sndcmd = sprintf("++A440%s%s%02d%02d", $id, $hash->{DEF},
+                 $cmd eq "on" ? 2: 1, $hash->{"${cmd}MsgNr"}++);
     }
 
-  } else {
-    return "$name: Unknown subtype, cannot set";
   }
+
+  return "$name: Unknown device subtype or command" if(!$sndcmd);
+  CUL_HM_SendCmd($hash, $sndcmd, 0, 1);
+  if($state) {
+    $hash->{STATE} = $state;
+    $hash->{READINGS}{state}{TIME} = TimeNow();
+    $hash->{READINGS}{state}{VAL} = $state;
+  }
+
   return "";
 }
 
+
 ###################################
+# A pairing between rrrrrr (remote) and ssssss (switch) looks like the
+# following (nn and ff is the index of the on and off button):
+# 1A 66 84 00 ssssss 000000 19 0011 46 4551303 03831363537 10 01 0100
+# 1A CF 84 00 rrrrrr ssssss 12 0035 47 4551303 03333333633 40 04 nnff
+# 0A D0 80 02 ssssss rrrrrr 00
+# 10 D0 A0 01 ssssss rrrrrr nn05 ssssss 0104
+# 0A D0 80 02 rrrrrr ssssss 00
+# 0E D0 A0 01 ssssss rrrrrr nn07 020201
+# 0A D0 80 02 rrrrrr ssssss 00
+# 0B D0 A0 01 ssssss rrrrrr nn06
+# 0A D0 80 02 rrrrrr ssssss 00
+# 10 D0 A0 01 ssssss rrrrrr ff05 ssssss 0104
+# 0A D0 80 02 rrrrrr ssssss 00
+# 0E D0 A0 01 ssssss rrrrrr ff07 020201
+# 0A D0 80 02 rrrrrr ssssss 02
+# 0B D0 A0 01 ssssss rrrrrr ff06
+# 0A D0 80 02 rrrrrr ssssss 00
 sub
 CUL_HM_Pair(@)
 {
   my ($name, $def, $len,$msgcnt,$channel,$msgtype,$src,$dst,$p) = @_;
   my $id = CUL_HM_Id($def->{IODev});
   my $l4 = GetLogLevel($name,4);
+  my $ps = $def->{pairingStep} ? $def->{pairingStep} : "";
 
+
+  # Starting pair message with everything we need
   if($len eq "1A") {
-    my $st = substr($p, 26, 2);
+    my $stc = substr($p, 26, 2);        # subTypeCode
     my $model = substr($p, 2, 4);
-    $attr{$name}{subType} = $culHmSubType{$st} ? $culHmSubType{$st} : "unknown";
-    $attr{$name}{model} = $culHmModel{$model} ? $culHmModel{$model} : "unknown";
+    my $dp = $culHmDevProps{$stc};
 
-    $st = $attr{$name}{subType};
-    $st = $st eq "unknown" ? "subType unknown" : "is a $st";
-    Log GetLogLevel($name,2), "CUL_HM $name $st, model $attr{$name}{model}";
+    $attr{$name}{model}   = $culHmModel{$model}? $culHmModel{$model} :"unknown";
+    $attr{$name}{subType} = $dp ? $dp->{st} : "unknown";
+    $attr{$name}{hmClass} = $dp ? $dp->{cl} : "unknown";
 
-    # Lets answer if we are authorized
-    my $ion = $def->{IODev}->{NAME};
-    if(($dst eq "000000" && $attr{$ion} && $attr{$ion}{hm_autopair}) ||
-       $dst eq $id) {
-      CUL_HM_SendCmd($def,
-          "${msgcnt}A000$id${src}EEEEEE48455130313236373039EE000100", 1);
-      $def->{pairingStep} = 1;
-      Log $l4, "Pairing Step 1 (Send reply)";
+    my $stn = $attr{$name}{subType};    # subTypeName
+    my $stt = $stn eq "unknown" ? "subType unknown" : "is a $stn";
+
+    # First message
+    if(!$ps) {
+      Log GetLogLevel($name,2), "CUL_HM $name $stt, model $attr{$name}{model}";
+
+      if($stn eq "unknown") {
+        Log GetLogLevel($name,1), "CUL_HM unknown subType $stc, cannot pair";
+        return "";
+      }
+
+      # Abort if we are not authorized
+      my $ion = $def->{IODev}->{NAME};
+      return "" 
+        if(!($dst eq "000000" && AttrVal($ion, "hm_autopair", 1) ||
+             $dst eq $id));
+
+      # Sender pair mode, before btn is pressed
+      $def->{pairButtons} = substr($p, 30, 4);
+      return "" if($def->{pairButtons} eq "0000");
+
+      my ($mystc, $mymodel, $mybtn, $myunknown);
+      if(AttrVal($name,"hmClass","") eq "sender") {
+        $mymodel   = "0011";  # Emulate a HM-LC-SW1-PL
+        $mystc     = "10";    # switch
+        $mybtn     = "010100";# No buttons (?)
+        $myunknown = "46455130303831363537"
+
+      } else {
+        $mymodel   = "0060";  # Emulate a HM-PB-4DIS-WM
+        $mystc     = "40";    # remote
+        $mybtn     = "940201";# Buttons 02 (on) & 01 (off)
+        $myunknown = "48455130303634393136";
+      }
+
+      if($dst eq "000000") {
+        Log $l4, "CUL_HM Pairing Step 1";
+        CUL_HM_SendCmd($def,
+          $msgcnt."A000".$id.$src."19".$mymodel.$myunknown.$mystc.$mybtn, 1, 0);
+      }
+
+      $ps = $def->{pairingStep} = 1;
+      return "" if(AttrVal($name,"hmClass","") eq "receiver");
     }
-
-  } elsif($dst ne $id) {
-    return "";
-
-  } elsif($len eq "0A") {
-    my $ps = $def->{pairingStep};
-    if($ps) {
-      $def->{pairingStep} = ++$ps;
-      Log 1, "Pairing Step $ps (GOT ACK)";
-      return "" if($ps == 2);
-      CUL_HM_SendCmd($def, "++A001$id${src}0105${src}0103", 1)
-                                if($ps == 6);
-      CUL_HM_SendCmd($def, "++A001$id${src}0108011202120312043205B40A01", 1)
-                                if($ps == 7);
-      CUL_HM_SendCmd($def, "++A001$id${src}01080B140C240D248A00", 1)
-                                if($ps == 8);
-      CUL_HM_SendCmd($def, "++A001$id${src}0106", 1)
-                                if($ps == 9);
-      CUL_HM_SendCmd($def, "++A001$id${src}0105${id}0104", 1)
-                                if($ps == 10);
-      Log $l4, "Pairing finished" if($ps == 11);
-    }
-
-  } elsif($len eq "10") {
-    CUL_HM_SendCmd($def, "${msgcnt}8002$id${src}80", 1);
-    my $ps = $def->{pairingStep};
-    $ps = 2 if(!$ps);
-    $def->{pairingStep} = ++$ps;
-    Log $l4, "Pairing Step $ps (SEND ACK)";
-    CUL_HM_SendCmd($def, "++A001$id${src}0101${src}0100", 10)
-                                if($ps == 4);
   }
+
+  if(!$ps || $dst ne $id) {
+    Log 4, "CUL_HM $name pairing step with other device";
+    return "";
+  }
+
+  # If the partner is a receiver, then we only have to ack every message
+  # after the first.
+  if($ps && AttrVal($name,"hmClass","") eq "receiver") {
+    CUL_HM_SendCmd($def, $msgcnt."8002".$id.$src."00", 1, 0);
+    return "";
+  }
+
+  # switch emulation (sender is ack only and handled above);
+  $def->{pairButtons} =~ m/(..)(..)/;
+  my ($b1, $b2, $cmd) = ($1, $2, "");
+  $cmd = "++A001$id$src${b1}05$src${b1}04" if($ps == 1);
+  $cmd = "++A001$id$src${b1}07020201"      if($ps == 2);
+  $cmd = "++A001$id$src${b1}06"            if($ps == 3);
+  $cmd = "++A001$id$src${b2}05$src${b1}04" if($ps == 4);
+  $cmd = "++A001$id$src${b2}07020201"      if($ps == 5);
+  $cmd = "++A001$id$src${b2}06"            if($ps == 6);
+  if($ps == 7) {
+    delete($def->{pairingStep});
+    return "";
+  }
+  CUL_HM_SendCmd($def, $cmd, 1, 1);
+  $def->{pairingStep} = ++$ps;
+  Log $l4, "CUL_HM Pairing Step $ps ($cmd)";
 
   return "";
 }
     
 ###################################
 sub
-CUL_HM_SendCmd($$$)
+CUL_HM_SendCmd($$$$)
 {
-  my ($hash, $cmd, $sleep) = @_;
+  my ($hash, $cmd, $sleep, $waitforack) = @_;
   my $io = $hash->{IODev};
   my $l4 = GetLogLevel($hash->{NAME},4);
 
@@ -341,17 +446,41 @@ CUL_HM_SendCmd($$$)
   }
 
   $io->{HM_CMDNR} = $mn;
-
   $cmd = sprintf("As%02X%02x%s", length($cmd2)/2+1, $mn, $cmd2);
-  Log $l4, $cmd;
+  Log $l4, "CUL_HM $cmd";
   IOWrite($hash, "", $cmd);
+  if($waitforack) {
+    $hash->{ackWaiting} = $cmd;
+    $hash->{ackCmdSent} = 1;
+    InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0);
+  }
 }
 
+###################################
+sub
+CUL_HM_Resend($)
+{
+  my $hash = shift;
+  my $name = $hash->{NAME};
+  if($hash->{ackCmdSent} == 3) {
+    delete($hash->{ackCmdSent});
+    delete($hash->{ackWaiting});
+    $hash->{STATE} = "MISSING ACK";
+    DoTrigger($name, "MISSING ACK");
+    return;
+  }
+  IOWrite($hash, "", $hash->{ackWaiting});
+  $hash->{ackCmdSent}++;
+  DoTrigger($name, "resend nr ".$hash->{ackCmdSent});
+  InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0);
+}
+
+###################################
 sub
 CUL_HM_Id($)
 {
   my ($io) = @_;
-  return "000000" if(!$io || !$io->{FHTID});
+  return "123456" if(!$io || !$io->{FHTID});
   return "F1" . $io->{FHTID};
 }
 
