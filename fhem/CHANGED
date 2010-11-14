@@ -7,7 +7,7 @@
   - bugfix:  S300TH sanity check won't allow negative temperatures.
   - feature: decode CUL uptime
   - feature: USB doc changes, FHZ initFS20_02/stopHMS parameters by Andreas.
-  - feature: CUL_HM (experimental) for HomeMatic devices.
+  - feature: CUL_HM for some HomeMatic devices.
   - bugfix:  HTML-Syntax check of the pgm2 output and documents (*.html)
   - feature: added date alias for FHT80b (Boris)
 
