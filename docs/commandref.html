@@ -2123,12 +2123,22 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CUL_HM"></a>
 <h3>CUL_HM</h3>
 <ul>
-  Support for eQ-3 HomeMatic devices via the CUL. Note: The <a
-  href="#rfmode">rfmode </a> attribute of at least one attache CUL/CUN device
-  must be set to HomeMatic. Note: The protocoll used by HomeMatic devices
-  (BidCos, known as AskSin in the culfw) must be enabled in the culfw firmware.
-  This is the default for all CUN and for newer CUL (i.e. V3.0 and greater)
-  devices.  <b>Note: This module is experimental!</b>
+  Support for eQ-3 HomeMatic devices via the CUL.<br>
+  Prerequisites:
+  <ul>
+  <li>The <a href="#rfmode">rfmode </a> attribute of at least one attached
+      CUL/CUN device must be set to HomeMatic.
+      </li>
+  <li>The protocol used by HomeMatic devices (BidCos, known as AskSin
+      in the culfw) must be enabled in the culfw firmware. This is the
+      default for all CUN and for newer CUL (i.e. V3.0 and greater) devices
+      with culfw firmware version 1.38 and newer.
+      </li>
+  <li><b>Note</b>: Currently only remote and switch class devices are
+       supported.
+       </li>
+
+  </ul>
   <br><br>
 
   <a name="CUL_HMdefine"></a>
@@ -2136,10 +2146,13 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>define &lt;name&gt; CUL_HM &lt;6-digit-hex-code&gt;</code>
     <br><br>
-    Best to avoid this command with the <a href="#autocreate">autocreate</a>
+    Try to avoid this command with the <a href="#autocreate">autocreate</a>
     module enabled, and the <a href="#hm_autopair">hm_autopair</a> attribute
     set for the corresponding CUL device. Now set the physical device in
-    pairing mode (Anlernmodus), the rest should happen automatically.
+    pairing mode (Anlernmodus), the rest should happen automatically.<br>
+    <br>
+    If a device was not paired with the CUL, then it won't know its subType,
+    and therefore won't be able to interpret device messages correctly.
   </ul><br>
 
   <a name="CUL_HMset"></a>
@@ -2164,13 +2177,13 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
-    <li><a name="#model">name</a><br>
-        This attribute is set automatically after a successful pairing.
-        It is not supposed to be set by hand.</li>
-    <li><a name="#subType">subType</a><br>
-        This attribute is set automatically after a successful pairing.
-        It is not supposed to be set by hand. It is necessary to be set
-        in order to use the set command.</li>
+    <li><a name="#model">hmClass</a>, 
+        <a name="#model">model</a>, 
+        <a name="#subType">subType</a><br>
+        These attributes are set automatically after a successful pairing.
+        They are not supposed to be set by hand, and are necessary in order to
+        correctly interpret device messages or to be able to send them.</li>
+
   </ul>
   <br>
 </ul>

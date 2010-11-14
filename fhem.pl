@@ -162,7 +162,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.116 2010-11-06 19:31:38 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.117 2010-11-14 14:49:23 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2323,7 +2323,7 @@ sub
 AttrVal($$$)
 {
   my ($d,$n,$default) = @_;
-  return $attr{$d}{$n} if(defined($attr{$d}) && defined($attr{$d}{$n}));
+  return $attr{$d}{$n} if($d && defined($attr{$d}) && defined($attr{$d}{$n}));
   return $default;
 }
 
