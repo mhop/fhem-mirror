@@ -298,6 +298,11 @@ CUL_HM_Set($@)
 
   if($cmd eq "raw") {  ##################################################
     return "Usage: set $a[0] $cmd rowdata" if(@a != 3);
+    CUL_HM_SendCmd($hash, $a[2], 0, 1);
+    return "";
+
+  } elsif($cmd eq "rawStack") {  ########################################
+    return "Usage: set $a[0] $cmd rowdata" if(@a != 3);
     CUL_HM_PushCmdStack($hash, $a[2]);
     return "";
 
@@ -487,6 +492,7 @@ CUL_HM_SendCmd($$$$)
 
   $io->{HM_CMDNR} = $mn;
   $cmd = sprintf("As%02X%02x%s", length($cmd2)/2+1, $mn, $cmd2);
+  Log 1, "CUL_HM SEND $cmd";
   Log $l4, "CUL_HM SEND $cmd";
   IOWrite($hash, "", $cmd);
   if($waitforack) {
@@ -503,7 +509,7 @@ CUL_HM_PushCmdStack($$)
   my ($hash, $cmd) = @_;
   my @arr = ();
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-  #Log 1, $cmd;
+  Log 1, $cmd;
   push(@{$hash->{cmdStack}}, $cmd);
 }
 
