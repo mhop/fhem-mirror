@@ -35,6 +35,15 @@ use HTTP::Request;
 sub Log($$);
 #####################################
 
+sub 
+trim($)
+{
+        my $string = shift;
+        $string =~ s/^\s+//;
+        $string =~ s/\s+$//;
+        return $string;
+}
+
 sub
 ALL4000T_Initialize($)
 {
@@ -111,9 +120,9 @@ ALL4000T_GetStatus($)
 
   my $body =  $response->content;
   my $data = $xml->XMLin($body);
-  my $current=$data->{BODY}->{FORM}->{TEXTAREA}->{xml}->{data}->{$host_port};
+  my $current=trim($data->{BODY}->{FORM}->{TEXTAREA}->{xml}->{data}->{$host_port});
 
-  $text="Temperature:".$current;
+  $text="Temperature: ".$current;
   my $sensor="temperature";
   Log 4,"$name: $text";
   if (!$hash->{local}){
@@ -122,7 +131,7 @@ ALL4000T_GetStatus($)
        $hash->{READINGS}{$sensor}{VAL} = $current." (Celsius)";;
        DoTrigger($name, undef) if($init_done);    
   }
-  $hash->{STATE} = "T:".$current;
+  $hash->{STATE} = "T: ".$current;
   return($text);
 }
 
