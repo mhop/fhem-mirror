@@ -1431,8 +1431,8 @@ A line ending with \ will be concatenated with the next one, so long lines
           holiday_short.</code><br>
           If the mode is holiday, then
             <ul>
-              <li>holiday1 sets the end-day of the holiday</li>
-              <li>holiday2 sets the end-month of the holiday</li>
+              <li>holiday1 sets the end-time of the holiday, in 10-minute steps</li>
+              <li>holiday2 sets the end-day of the holiday</li>
             </ul>
           For holiday_short
             <ul>
@@ -1719,7 +1719,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CUL_FHTTK"></a>
 <h3>CUL_FHTTK</h3>
 <ul>
-  This module handles messages from the FHT80 TF "Fenster-T�r-Kontakt" (Window-Door-Contact)
+  This module handles messages from the FHT80 TF "Fenster-T&uuml;r-Kontakt" (Window-Door-Contact)
   which are normally only acted upon by the <a href="#FHT">FHT80B</a>. With this module,
   FHT80 TFs are in a limited way (see <a href="http://fhz4linux.info/tiki-index.php?page=FHT+protocol">Wiki</a>
   for detailed explanation of TF's mode of operation) usable similar to HMS100 TFK. The name
@@ -1905,6 +1905,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     talks to FHT devices or when CUR requests data.
   </ul>
   <br>
+
   <a name="CULset"></a>
   <b>Set </b>
   <ul>
@@ -1913,7 +1914,9 @@ A line ending with \ will be concatenated with the next one, so long lines
         details on CUL commands.
         </li><br>
     <li>freq / bWidth / rAmpl / sens<br>
-        Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity.
+        <a href="#rfmode">SlowRF</a> mode only.<br>
+        Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity<br>
+
         Use it with care, it may destroy your hardware and it even may be
         illegal to do so. Note: the parameters used for RFR transmission are
         not affected.<br>
@@ -1933,6 +1936,18 @@ A line ending with \ will be concatenated with the next one, so long lines
             signals. Default is 4dB.
         </ul>
         </li><br>
+    <li>hmPairForSec<br>
+       <a href="#rfmode">HomeMatic</a> mode only.<br>
+       Set the CUL in Pairing-Mode for the given seconds. Any device set into
+       pairing mode in this time will be paired with fhem.
+       </li><br>
+    <li>hmPairSerial<br>
+       <a href="#rfmode">HomeMatic</a> mode only.<br>
+       Try to pair with the given device. The argument is a 10 character
+       string, usually starting with letters and ending with digits, printed on
+       the backside of the device. It is not necessary to put the given device
+       in learning mode.
+       </li><br>
     <li>led<br>
         Set the CUL led off (00), on (01) or blinking (02).
         </li><br>
@@ -2006,11 +2021,6 @@ A line ending with \ will be concatenated with the next one, so long lines
             To communicate with HomeMatic type of devices @20kHz datarate
 
         </ul>
-        </li><br>
-
-    <li><a name="rfmode">hm_autopair</a><br>
-        Only useful in HomeMatic mode, see rfmode above. The CUL_HM Module will
-        try to pair any device requesting a pairing.
         </li><br>
   </ul>
   <br>
@@ -2147,9 +2157,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>define &lt;name&gt; CUL_HM &lt;6-digit-hex-code&gt;</code>
     <br><br>
     Try to avoid this command with the <a href="#autocreate">autocreate</a>
-    module enabled, and the <a href="#hm_autopair">hm_autopair</a> attribute
-    set for the corresponding CUL device. Now set the physical device in
-    pairing mode (Anlernmodus), the rest should happen automatically.<br>
+    module enabled. Now you have two possibilities, both as a set command to
+    the corresponding CUL device: <a href="#CULset">hmPairForSec</a> and
+    <a href="#CULset">hmPairSerial</a>.
     <br>
     If a device was not paired with the CUL, then it won't know its subType,
     and therefore won't be able to interpret device messages correctly.
