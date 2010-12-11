@@ -21,8 +21,6 @@ sub CUL_SimpleWrite(@);
 sub CUL_SimpleRead($);
 sub CUL_Disconnected($);
 
-my $initstr = "X21";    # Only translated messages + RSSI
-
 my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "ccconf"   => 1,
   "file"     => 1,
@@ -33,13 +31,15 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
 );
 
 my %sets = (
+  "hmPairForSec" => "HomeMatic",
+  "hmPairSerial" => "HomeMatic",
   "raw"       => "",
-  "freq"      => "",
-  "bWidth"    => "",
-  "rAmpl"     => "",
-  "sens"      => "",
-  "led"       => "l",
-  "patable"   => "x",
+  "freq"      => "SlowRf",
+  "bWidth"    => "SlowRf",
+  "rAmpl"     => "SlowRf",
+  "sens"      => "SlowRf",
+  "led"       => "",
+  "patable"   => "",
   "file"      => "",
   "time"      => ""
 );
@@ -48,7 +48,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
 my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS" .
                     ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN:";
-my $clientsHomeMatic = ":CUL_HM:";
+my $clientsHomeMatic = ":CUL_HM:HMS:";
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -65,6 +65,7 @@ my %matchListSlowRF = (
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A......................",
+    "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
 );
 
 sub
@@ -91,7 +92,7 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "fhtsoftbuffer:1,0 sendpool addvaltrigger " .
-                     "rfmode:SlowRF,HomeMatic hm_autopair";
+                     "rfmode:SlowRF,HomeMatic";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -115,6 +116,7 @@ CUL_Define($$)
   return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
                 if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
   $hash->{FHTID} = uc($a[3]);
+  $hash->{initString} = "X21";
 
   if($dev eq "none") {
     Log 1, "$name device is none, commands will be echoed only";
@@ -167,6 +169,14 @@ CUL_isCUR($)
   return ($hash->{VERSION} && $hash->{VERSION} =~ m/CUR/);
 }
 
+sub
+CUL_RemoveHMPair($)
+{
+  my $hash = shift;
+Log 1, "CUL_RemoveHMPair";
+  delete($hash->{hmPair});
+}
+
 
 #####################################
 sub
@@ -183,7 +193,25 @@ CUL_Set($@)
   my $arg = join("", @a);
   my $ll = GetLogLevel($name,3);
 
-  if($type eq "freq") {                         # MHz
+  return "This command is not valid in the current rfmode"
+      if($sets{$type} && $sets{$type} ne AttrVal($name, "rfmode", "SlowRF"));
+
+  if($type eq "hmPairForSec") { ####################################
+    return "Usage: set $name hmPairForSec <seconds_active>"
+        if(!$arg || $arg !~ m/^\d+$/);
+    $hash->{hmPair} = 1;
+    InternalTimer(gettimeofday()+$arg, "CUL_RemoveHMPair", $hash, 1);
+
+  } elsif($type eq "hmPairSerial") { ################################
+    return "Usage: set $name hmPairForSec <10-character-serialnumber>"
+        if(!$arg || $arg !~ m/^.{10}$/);
+
+    $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
+    CUL_SimpleWrite($hash, sprintf("As15%02x8401F1%s000000010A%s",
+                    $hash->{HM_CMDNR}, $hash->{FHTID}, unpack('H*', $arg)));
+
+
+  } elsif($type eq "freq") { ######################################## MHz
 
     my $f = $arg/26*65536;
 
@@ -195,9 +223,9 @@ CUL_Set($@)
     CUL_SimpleWrite($hash, "W0F$f2");
     CUL_SimpleWrite($hash, "W10$f1");
     CUL_SimpleWrite($hash, "W11$f0");
-    CUL_SimpleWrite($hash, $initstr);           # Will reprogram the CC1101
+    CUL_SimpleWrite($hash, $hash->{initString});        # Will reprogram the CC1101
 
-  } elsif($type eq "bWidth") {               # KHz
+  } elsif($type eq "bWidth") { ###################################### KHz
 
     my ($err, $ob);
     if(!IsDummy($hash->{NAME})) {
@@ -220,9 +248,9 @@ GOTBW:
     $ob = sprintf("%02x", $ob+$bits);
     Log $ll, "Setting MDMCFG4 (10) to $ob = $bw KHz";
     CUL_SimpleWrite($hash, "W12$ob");
-    CUL_SimpleWrite($hash, $initstr);
+    CUL_SimpleWrite($hash, $hash->{initString});
 
-  } elsif($type eq "rAmpl") {               # dB
+  } elsif($type eq "rAmpl") { ####################################### dB
 
     return "a numerical value between 24 and 42 is expected"
         if($arg !~ m/^\d+$/ || $arg < 24 || $arg > 42);
@@ -234,9 +262,9 @@ GOTBW:
     $w = $ampllist[$v];
     Log $ll, "Setting AGCCTRL2 (1B) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1D$v");
-    CUL_SimpleWrite($hash, $initstr);
+    CUL_SimpleWrite($hash, $hash->{initString});
 
-  } elsif($type eq "sens") {               # dB
+  } elsif($type eq "sens") { ######################################## dB
 
     return "a numerical value between 4 and 16 is expected"
         if($arg !~ m/^\d+$/ || $arg < 4 || $arg > 16);
@@ -244,9 +272,9 @@ GOTBW:
     my $v = sprintf("9%d",$arg/4-1);
     Log $ll, "Setting AGCCTRL0 (1D) to $v / $w dB";
     CUL_SimpleWrite($hash, "W1F$v");
-    CUL_SimpleWrite($hash, $initstr);
+    CUL_SimpleWrite($hash, $hash->{initString});
 
-  } elsif($type eq "file") {
+  } elsif($type eq "file") { ########################################
 
     return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
 
@@ -277,22 +305,24 @@ GOTBW:
     }
 
 WRITEEND:
-    CUL_SimpleWrite($hash, $initstr);
+    CUL_SimpleWrite($hash, $hash->{initString});
     return "$name: $err" if($err);
 
-  } elsif($type eq "time") {
+  } elsif($type eq "time") { ########################################
 
     return "Only supported for CUR devices (see VERSION)" if(!CUL_isCUR($hash));
     my @a = localtime;
     my $msg = sprintf("c%02d%02d%02d", $a[2],$a[1],$a[0]);
     CUL_SimpleWrite($hash, $msg);
 
-  } else { 
+  } else { ###############################################  raw,led,patable
 
     return "Expecting a 0-padded hex number"
         if((length($arg)&1) == 1 && $type ne "raw");
     Log $ll, "set $name $type $arg";
-    CUL_SimpleWrite($hash, $sets{$type} . $arg);
+    $arg = "l$arg" if($type eq "led");
+    $arg = "x$arg" if($type eq "patable");
+    CUL_SimpleWrite($hash, $arg);
 
   }
   return undef;
@@ -390,7 +420,7 @@ CUL_Get($@)
     }
 
 READEND:
-    CUL_SimpleWrite($hash, $initstr);
+    CUL_SimpleWrite($hash, $hash->{initString});
     return "$name: $err" if($err);
     return $msg;
 
@@ -474,7 +504,7 @@ CUL_DoInit($)
     CUL_SimpleWrite($hash, $msg);
   }
 
-  CUL_SimpleWrite($hash, $initstr);
+  CUL_SimpleWrite($hash, $hash->{initString});
 
   # FHTID
   my $fhtid;
@@ -551,7 +581,7 @@ CUL_ReadAnswer($$$$)
     $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
     if($mculdata =~ m/\r\n/ || $anydata) {
       if($regexp && $mculdata !~ m/$regexp/) {
-        CUL_Parse($hash, $hash, $hash->{NAME}, $mculdata, $initstr);
+        CUL_Parse($hash, $hash, $hash->{NAME}, $mculdata, $hash->{initString});
       } else {
         return (undef, $mculdata)
       }
@@ -753,7 +783,7 @@ CUL_Read($)
     my $rmsg;
     ($rmsg,$culdata) = split("\n", $culdata, 2);
     $rmsg =~ s/\r//;
-    CUL_Parse($hash, $hash, $name, $rmsg, $initstr) if($rmsg);
+    CUL_Parse($hash, $hash, $name, $rmsg, $hash->{initString}) if($rmsg);
   }
   $hash->{PARTIAL} = $culdata;
 }
@@ -888,7 +918,7 @@ CUL_SimpleWrite(@)
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 
-  #Log 1, "CUL_SimpleWrite >$msg<";
+Log 1, "CUL_SimpleWrite >$msg<";
   select(undef, undef, undef, 0.001);
 }
 
@@ -1091,17 +1121,17 @@ CUL_Attr(@)
     my $hash = $defs{$name};
 
     if($a[3] eq "HomeMatic") {
-      return if($initstr eq "Ar");
+      return if($hash->{initString} eq "Ar");
       $hash->{mode} = "HomeMatic";
-      $initstr = "Ar";
-      CUL_SimpleWrite($hash, $initstr);
+      $hash->{initString} = "Ar";
+      CUL_SimpleWrite($hash, $hash->{initString});
 
     } else {
-      return if($initstr eq "X21");
+      return if($hash->{initString} eq "X21");
       delete($hash->{mode});
-      $initstr = "X21";
+      $hash->{initString} = "X21";
       CUL_SimpleWrite($hash, "Ax");
-      CUL_SimpleWrite($hash, $initstr);
+      CUL_SimpleWrite($hash, $hash->{initString});
 
     }
 
