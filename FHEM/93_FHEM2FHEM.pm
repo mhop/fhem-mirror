@@ -24,7 +24,6 @@ FHEM2FHEM_Initialize($)
   $hash->{WriteFn} = "FHEM2FHEM_Write";
   $hash->{ReadyFn} = "FHEM2FHEM_Ready";
   $hash->{noRawInform} = 1;
-  $hash->{regexpClients} = ".*";
 
 # Normal devices
   $hash->{DefFn}   = "FHEM2FHEM_Define";
@@ -54,6 +53,7 @@ FHEM2FHEM_Define($$)
   } else {
     $hash->{remoteDevice} = $2;
     $hash->{remoteDevice} =~ s/^://;
+    $hash->{regexpClients} = ".*";
   }
 
   my $dev = $a[2];
