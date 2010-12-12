@@ -22,6 +22,7 @@ my %culHmDevProps=(
   "41" => { st => "sensor",          cl => "sender" },
   "42" => { st => "swi",             cl => "sender" },
   "43" => { st => "pushButton",      cl => "sender" },
+  "60" => { st => "KFM100",          cl => "sender" },
   "80" => { st => "threeStateSensor",cl => "sender" },
   "81" => { st => "motionDetector",  cl => "sender" },
   "C0" => { st => "keyMatic",        cl => "sender" },
@@ -86,7 +87,9 @@ my %culHmModel=(
   "0044" => "HM-SEN-EP",
   "0045" => "HM-SEC-WDS",
   "0046" => "HM-SWI-3-FM",
+  "0047" => "KFM-Display",
   "0048" => "IS-WDS-TH-OD-S-R3",
+  "0049" => "KFM-Sensor",
   "004A" => "HM-SEC-MDIR",
   "004C" => "HM-RC-12-SW",
   "004D" => "HM-RC-19-SW",
@@ -324,7 +327,7 @@ CUL_HM_Set($@)
       return "Usage: set $a[0] $cmd <btn> [on|off] <txt1> <txt2>" if(@a != 6);
       return "$a[2] is not a button number" if($a[2] !~ m/^\d$/);
       return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
-      my $bn = $a[2]*2-($a[3] eq "on" ? 1 : 0);
+      my $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
 
       CUL_HM_PushCmdStack($hash,
         sprintf("++A001%s%s%02d050000000001", $id, $hash->{DEF}, $bn));
@@ -344,8 +347,8 @@ CUL_HM_Set($@)
       $tl = length($l1);
       for(my $l = 0; $l < $tl; $l+=28) {
         my $ml = $tl-$l < 28 ? $tl-$l : 28;
-        CUL_HM_PushCmdStack($hash,
-          sprintf("++A001%s%s%02d08%s", $id, $hash->{DEF}, $bn, substr($l1,$l,$ml)));
+        CUL_HM_PushCmdStack($hash, sprintf("++A001%s%s%02d08%s",
+                $id, $hash->{DEF}, $bn, substr($l1,$l,$ml)));
       }
 
       CUL_HM_PushCmdStack($hash,
@@ -411,12 +414,13 @@ CUL_HM_Pair(@)
   my $stn = $attr{$name}{subType};    # subTypeName
   my $stt = $stn eq "unknown" ? "subType unknown" : "is a $stn";
 
-  Log GetLogLevel($name,2), "CUL_HM pair: $name $stt, model $attr{$name}{model} ".
-                                      "serialNr $attr{$name}{serialNr}";
+  Log GetLogLevel($name,2),
+        "CUL_HM pair: $name $stt, model $attr{$name}{model} ".
+        "serialNr $attr{$name}{serialNr}";
 
   # Abort if we are not authorized
   if($dst eq "000000") {
-    return if(!$iohash->{HM_PAIR} && !AttrVal($iohash->{NAME}, "hm_autopair", 0));
+    return if(!$iohash->{hmPair});
 
   } elsif($dst ne $id) {
     return "" ;

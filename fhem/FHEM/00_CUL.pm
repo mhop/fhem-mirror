@@ -76,10 +76,6 @@ CUL_Initialize($)
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
-  $hash->{Clients} = $clientsSlowRF;
-  $hash->{MatchList} = \%matchListSlowRF;
-  $hash->{HomeMaticClients} = $clientsHomeMatic;
-  $hash->{HomeMaticMatchList} = \%matchListHomeMatic;
   $hash->{ReadyFn} = "CUL_Ready";
 
 # Normal devices
@@ -117,6 +113,8 @@ CUL_Define($$)
                 if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
   $hash->{FHTID} = uc($a[3]);
   $hash->{initString} = "X21";
+  $hash->{Clients} = $clientsSlowRF;
+  $hash->{MatchList} = \%matchListSlowRF;
 
   if($dev eq "none") {
     Log 1, "$name device is none, commands will be echoed only";
@@ -1122,13 +1120,15 @@ CUL_Attr(@)
 
     if($a[3] eq "HomeMatic") {
       return if($hash->{initString} eq "Ar");
-      $hash->{mode} = "HomeMatic";
+      $hash->{Clients} = $clientsHomeMatic;
+      $hash->{MatchList} = \%matchListHomeMatic;
       $hash->{initString} = "Ar";
       CUL_SimpleWrite($hash, $hash->{initString});
 
     } else {
       return if($hash->{initString} eq "X21");
-      delete($hash->{mode});
+      $hash->{Clients} = $clientsSlowRF;
+      $hash->{MatchList} = \%matchListSlowRF;
       $hash->{initString} = "X21";
       CUL_SimpleWrite($hash, "Ax");
       CUL_SimpleWrite($hash, $hash->{initString});
