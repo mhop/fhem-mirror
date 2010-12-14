@@ -44,11 +44,9 @@ abstime2rel($)
   my @now = localtime;
   my $t2 = 3600*$now[2]+60*$now[1]+$now[0];
   my $diff = $t1-$t2;
-  $diff += 86400 if($diff < 0);
+  $diff += 86400 if($diff <= 0);
 
   return sprintf("%02d:%02d:%02d", $diff/3600, ($diff/60)%60, $diff%60);
 }
-
-
 
 1;
