@@ -238,6 +238,7 @@ CUL_HM_Parse($$)
       my $btn = int((($button&0x3f)+1)/2);
       my $state = ($button&1 ? "off" : "on") . ($button & 0x40 ? "Long" : "");
       my $add = ($dst eq $id) ? "" : " (to $dname)";
+
       push @event, "state:Btn$btn:$state$add";
       if($id eq $dst) {
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
@@ -263,6 +264,12 @@ CUL_HM_Parse($$)
   my $tn = TimeNow();
   for(my $i = 0; $i < int(@event); $i++) {
     next if($event[$i] eq "");
+
+    if($shash->{lastMsgNr} && $shash->{lastMsgNr} eq $msgcnt) {
+      Log GetLogLevel($name,4), "CUL_HM $name dup mesg";
+      next;
+    }
+
     my ($vn, $vv) = split(":", $event[$i], 2);
     Log GetLogLevel($name,2), "CUL_HM $name $vn:$vv" if($vn eq "unknown");
 
@@ -279,7 +286,8 @@ CUL_HM_Parse($$)
     $shash->{READINGS}{$vn}{VAL} = $vv;
   }
 
-
+  
+  $shash->{lastMsgNr} = $msgcnt;
   return $name;
 }
 
@@ -461,6 +469,7 @@ CUL_HM_Pair(@)
   if($isSender) {
     $hash->{pairButtons} =~ m/(..)(..)/;
     my ($b1, $b2, $cmd) = ($1, $2, "");
+    delete($hash->{cmdStack});
     CUL_HM_SendCmd($hash,      "++A001$id$src${b1}05$src${b1}04", 1, 1);
     CUL_HM_PushCmdStack($hash, "++A001$id$src${b1}07020201");
     CUL_HM_PushCmdStack($hash, "++A001$id$src${b1}06");

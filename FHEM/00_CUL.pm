@@ -171,7 +171,6 @@ sub
 CUL_RemoveHMPair($)
 {
   my $hash = shift;
-Log 1, "CUL_RemoveHMPair";
   delete($hash->{hmPair});
 }
 
@@ -916,7 +915,6 @@ CUL_SimpleWrite(@)
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 
-Log 1, "CUL_SimpleWrite >$msg<";
   select(undef, undef, undef, 0.001);
 }
 
