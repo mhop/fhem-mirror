@@ -162,7 +162,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.117 2010-11-14 14:49:23 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.118 2010-12-16 08:07:18 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -638,7 +638,7 @@ AnalyzeCommand($$)
     my $we = (($wday==0 || $wday==6) ? 1 : 0);
     if(!$we) {
       my $h2we = $attr{global}{holiday2we};
-      $we = 1 if($h2we && $value{$h2we} ne "none");
+      $we = 1 if($h2we && $value{$h2we} && $value{$h2we} ne "none");
     }
     $month++;
     $year+=1900;
@@ -1169,9 +1169,13 @@ AssignIoPort($)
 
   # Set the I/O device, search for the last compatible one.
   for my $p (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
-    my $mode = ($defs{$p}{mode} ? $defs{$p}{mode} : "");
-    my $cl = $modules{$defs{$p}{TYPE}}{"${mode}Clients"};
-    my $re = $modules{$defs{$p}{TYPE}}{"${mode}regexpClients"};
+
+    my $cl = $defs{$p}{Clients};
+    $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
+
+    my $re = $defs{$p}{regexpClients};
+    $re = $modules{$defs{$p}{TYPE}}{regexpClients} if(!$re);
+
     if(((defined($cl) && $cl =~ m/:$hash->{TYPE}:/) ||
         (defined($re) && $hash->{TYPE} =~ m/$re/)) &&
        $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
@@ -2035,7 +2039,9 @@ sub
 fhem($)
 {
   my $param = shift;
-  return AnalyzeCommandChain(undef, $param);
+  my $ret = AnalyzeCommandChain(undef, $param);
+  Log 3, "$param : $ret" if($ret);
+  return $ret;
 }
 
 #####################################
@@ -2158,12 +2164,13 @@ Dispatch($$$)
   }
 
   my @found;
-  my $mode = ($hash->{mode} ? $hash->{mode} : "");
+
+  my $cl = $hash->{Clients}; $cl = $iohash->{Clients} if(!$cl);
+  my $re = $iohash->{regexpClients}; $re = $iohash->{regexpClients} if(!$re);
+
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep {defined($modules{$_}{ORDER})} keys %modules) {
 
-    my $cl = $iohash->{"${mode}Clients"};
-    my $re = $iohash->{"${mode}regexpClients"};
     next if(!(defined($cl) && $cl =~ m/:$m:/) ||
              (defined($re) && $m =~ m/$re/));
 
@@ -2177,7 +2184,7 @@ Dispatch($$$)
   }
 
   if(!int(@found)) {
-    my $h = $iohash->{"${mode}MatchList"};
+    my $h = $hash->{MatchList}; $h = $iohash->{MatchList} if(!$h);
     if(defined($h)) {
       foreach my $m (sort keys %{$h}) {
         if($dmsg =~ m/$h->{$m}/) {
