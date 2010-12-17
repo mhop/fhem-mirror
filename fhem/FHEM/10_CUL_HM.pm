@@ -15,19 +15,20 @@ sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
 
 my %culHmDevProps=(
-  "10" => { st => "switch",          cl => "receiver" },
-  "20" => { st => "dimmer",          cl => "receiver" },
-  "30" => { st => "blindActuator",   cl => "receiver" },
-  "40" => { st => "remote",          cl => "sender" },
+  "10" => { st => "switch",          cl => "receiver" }, # Parse, Set
+  "20" => { st => "dimmer",          cl => "receiver" }, # Parse, Set
+  "30" => { st => "blindActuator",   cl => "receiver" }, # Parse, Set
+  "40" => { st => "remote",          cl => "sender" },   # Parse
   "41" => { st => "sensor",          cl => "sender" },
   "42" => { st => "swi",             cl => "sender" },
   "43" => { st => "pushButton",      cl => "sender" },
   "60" => { st => "KFM100",          cl => "sender" },
+  "70" => { st => "THSensor",        cl => "sender" },
   "80" => { st => "threeStateSensor",cl => "sender" },
   "81" => { st => "motionDetector",  cl => "sender" },
   "C0" => { st => "keyMatic",        cl => "sender" },
   "C1" => { st => "winMatic",        cl => "receiver" },
-  "CD" => { st => "smokeDetector",   cl => "sender" },
+  "CD" => { st => "smokeDetector",   cl => "sender" },   # Parse
 );
 
 my %culHmModel=(
@@ -195,14 +196,22 @@ CUL_HM_Parse($$)
   }
 
   my $st = AttrVal($name, "subType", undef);
+  my $cm = "$channel$msgtype";
+  my $lcm = "$len$channel$msgtype";
 
-  if("$len$channel$msgtype" eq "1A8400") {     #### Pairing-Request
+  if($lcm eq "1A8400") {     #### Pairing-Request
     push @event, CUL_HM_Pair($name, $shash, @msgarr);
     
-  } elsif("$channel$msgtype" =~ m/A00[012]/ && #### Pairing-Request-Conversation
-           $dst eq $id) {
+  } elsif($cm =~ m/A00[01]/ &&  #### Pairing-Request-Conversation
+          $dst eq $id) {
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
     push @event, "";
+
+  } elsif($lcm eq "11A002") {
+    push @event, "signRequest:$p";
+
+  } elsif($lcm eq "19A003") {
+    push @event, "signAnswer:$p";
 
   } elsif(!$st) {     # Will trigger unknown
     ;
@@ -216,18 +225,19 @@ CUL_HM_Parse($$)
 
     push @event, "";
 
-  } elsif($st eq "switch") { ############################################
+  } elsif($st eq "switch" || ############################################
+          $st eq "dimmer" ||
+          $st eq "blindActuator") {
 
-    if($p =~ m/^0.01(..)00/) {
-      my $val = ($1 eq "C8" ? "on" : ($1 eq "00" ? "off" : "unknown $1"));
-      push @event, "ackedCmd:$val";
+    if($p =~ m/^(0.0.)(..)00/) {
+      my $lt = $1;
+      my $val = hex($2)/2;
+      $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
+      my $msg = "unknown";
+      $msg = "ackedCmd" if($lt =~ m/0.01/);
+      $msg = "powerOn"  if($lt =~ m/0600/);
+      push @event, "$msg:$val";
       push @event, "state:$val" if(!$isack);
-
-    } elsif($p =~ m/^0600(..)00$/) {
-      my $s = ($1 eq "C8" ? "on" : ($1 eq "00" ? "off" : "unknown $1"));
-      push @event, "poweron:$s";
-      push @event, "state:$s";
-
     }
 
   } elsif($st eq "remote") { ############################################
@@ -239,11 +249,17 @@ CUL_HM_Parse($$)
       my $state = ($button&1 ? "off" : "on") . ($button & 0x40 ? "Long" : "");
       my $add = ($dst eq $id) ? "" : " (to $dname)";
 
-      push @event, "state:Btn$btn:$state$add";
+      push @event, "state:Btn$btn $state$add";
       if($id eq $dst) {
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 ($state =~ m/on/?"C8":"00")."0028", 1, 0);
+# Sign-Test
+#        CUL_HM_SendCmd($shash, "01A002".$id.$src."0400000000000000",1,0);
       }
+
+    } elsif($p =~ m/0600/) {
+      push @event, "powerOn:$p";
+
     }
 
   } elsif($st eq "smokeDetector") { #####################################
@@ -259,7 +275,7 @@ CUL_HM_Parse($$)
 
   }
 
-  push @event, "unknown:$p" if(!@event);
+  push @event, "unknownMsg:$p" if(!@event);
 
   my $tn = TimeNow();
   for(my $i = 0; $i < int(@event); $i++) {
@@ -317,7 +333,8 @@ CUL_HM_Set($@)
     CUL_HM_PushCmdStack($hash, $a[2]);
     return "";
 
-  } elsif($st eq "switch") {#############################################
+  } elsif($st eq "switch") { ############################################
+
     my %scmd = (on => "02", off => "01", onLong => "42", offLong => "41") ;
     if($scmd{$cmd}) {
       $state = $cmd;
@@ -325,9 +342,23 @@ CUL_HM_Set($@)
                  $scmd{$cmd}, $hash->{"${cmd}MsgNr"}++);
 
     } else {
-      return "Unknown argument $cmd, choose one " . join(" ", sort keys %scmd);
+      return "Unknown argument $cmd, choose one of " .join(" ",sort keys %scmd);
 
     }
+
+  } elsif($st eq "dimmer" || ############################################
+          $st eq "blindActuator") {
+
+    if($cmd =~ m/^\d+/ && $cmd >= 0 && $cmd <= 100) {
+      $state = "$cmd %";
+      $sndcmd = sprintf("++A011%s%s0201%02X", $id, $hash->{DEF}, $cmd*2);
+
+    } else {
+      my @scmd = (0..100);
+      return "Unknown argument $cmd, choose one of " .join(" ",@scmd);
+
+    }
+
 
   } elsif($st eq "remote") {#############################################
     my %scmd = (text => "01");
@@ -428,7 +459,10 @@ CUL_HM_Pair(@)
 
   # Abort if we are not authorized
   if($dst eq "000000") {
-    return if(!$iohash->{hmPair});
+    if(!$iohash->{hmPair}) {
+      Log 4, $iohash->{NAME}. " pairing (hmPairForSec) not enabled";
+      return "";
+    }
 
   } elsif($dst ne $id) {
     return "" ;
@@ -505,7 +539,6 @@ CUL_HM_SendCmd($$$$)
 
   $io->{HM_CMDNR} = $mn;
   $cmd = sprintf("As%02X%02x%s", length($cmd2)/2+1, $mn, $cmd2);
-  Log 1, "CUL_HM SEND $cmd";
   Log $l4, "CUL_HM SEND $cmd";
   IOWrite($hash, "", $cmd);
   if($waitforack) {
@@ -520,9 +553,10 @@ sub
 CUL_HM_PushCmdStack($$)
 {
   my ($hash, $cmd) = @_;
+  my $l4 = GetLogLevel($hash->{NAME},4);
   my @arr = ();
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-  Log 1, $cmd;
+  Log $l4, $cmd;
   push(@{$hash->{cmdStack}}, $cmd);
 }
 
