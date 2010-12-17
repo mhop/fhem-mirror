@@ -1946,7 +1946,7 @@ A line ending with \ will be concatenated with the next one, so long lines
        Try to pair with the given device. The argument is a 10 character
        string, usually starting with letters and ending with digits, printed on
        the backside of the device. It is not necessary to put the given device
-       in learning mode.
+       in learning mode if it is a receiver.
        </li><br>
     <li>led<br>
         Set the CUL led off (00), on (01) or blinking (02).
@@ -2133,19 +2133,20 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CUL_HM"></a>
 <h3>CUL_HM</h3>
 <ul>
-  Support for eQ-3 HomeMatic devices via the CUL.<br>
+  Support for eQ-3 HomeMatic devices via the CUL family of devices<br>
   Prerequisites:
   <ul>
   <li>The <a href="#rfmode">rfmode </a> attribute of at least one attached
       CUL/CUN device must be set to HomeMatic.
       </li>
   <li>The protocol used by HomeMatic devices (BidCos, known as AskSin
-      in the culfw) must be enabled in the culfw firmware. This is the
-      default for all CUN and for newer CUL (i.e. V3.0 and greater) devices
-      with culfw firmware version 1.38 and newer.
+      in the culfw) must be enabled in the culfw firmware. This is done
+      for all CUN and for newer CUL (i.e. V3.0 and greater) devices with culfw
+      firmware version 1.38 and newer. For CUL hardware version before 3.0 there
+      is a separate firmware with HomeMatic support which lacks FHT support.
       </li>
-  <li><b>Note</b>: Currently only remote and switch class devices are
-       supported.
+  <li><b>Note</b>: Currently supported device families: remote, switch, dimmer,
+       blindActuator, blindActuator.
        </li>
 
   </ul>
@@ -2168,13 +2169,29 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_HMset"></a>
   <b>Set</b>
   <ul>
-     Depends on the subType of the device.
+     Depends on the subType (i.e family) of the device.
      <li>switch
-     <ul>
-        <li>on - set the switch on</li>
-        <li>off - set the switch off</li>
-     </ul>
-     </li>
+       <ul>
+          <li>on - set the switch on</li>
+          <li>off - set the switch off</li>
+       </ul></li>
+     <li>dimmer, blindActuator
+       <ul>
+         <li>0 - 100 with a resolution of 0.5:<br>
+             set the dimmer / blindActuator to the given value.
+       </ul></li>
+     <li>4Dis (HM-PB-4DIS-WM)
+       <ul>
+         <li>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;<br>
+             Set the text on the display of the device. To this purpose issue
+             this set command first (or a number of them), and then choose from
+             the teach-in menu of the 4Dis the "Central" to transmit the data.
+             Example:<br>
+             <ul>
+             set 4Dis text 1 on On Lamp<br>
+             set 4Dis text 1 off Kitchen Off<br>
+             </ul>
+       </ul></li>
   </ul><br>
 
   <a name="CUL_HMget"></a>
