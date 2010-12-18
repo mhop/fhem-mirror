@@ -281,7 +281,7 @@ CUL_HM_Parse($$)
       my ($t, $h) = ($1, $2);
       $t = hex($t)/10;
       $t -= 3276.8 if($t > 1638.4);
-      $h = sprintf("%.1f", hex($h)/2.55);
+      $h = hex($h);
 
 
       push @event, "state:T:$t H:$h";
