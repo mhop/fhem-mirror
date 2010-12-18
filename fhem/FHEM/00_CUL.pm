@@ -1117,10 +1117,10 @@ CUL_Attr(@)
     my $hash = $defs{$name};
 
     if($a[3] eq "HomeMatic") {
-      return if($hash->{initString} eq "Ar");
+      return if($hash->{initString} =~ m/Ar/);
       $hash->{Clients} = $clientsHomeMatic;
       $hash->{MatchList} = \%matchListHomeMatic;
-      $hash->{initString} = "Ar";
+      $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
       CUL_SimpleWrite($hash, $hash->{initString});
 
     } else {
@@ -1128,7 +1128,7 @@ CUL_Attr(@)
       $hash->{Clients} = $clientsSlowRF;
       $hash->{MatchList} = \%matchListSlowRF;
       $hash->{initString} = "X21";
-      CUL_SimpleWrite($hash, "Ax");
+      CUL_SimpleWrite($hash, "Ax");     # reset AskSin
       CUL_SimpleWrite($hash, $hash->{initString});
 
     }

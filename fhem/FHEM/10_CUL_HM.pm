@@ -15,15 +15,15 @@ sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
 
 my %culHmDevProps=(
-  "10" => { st => "switch",          cl => "receiver" }, # Parse, Set
-  "20" => { st => "dimmer",          cl => "receiver" }, # Parse, Set
-  "30" => { st => "blindActuator",   cl => "receiver" }, # Parse, Set
+  "10" => { st => "switch",          cl => "receiver" }, # Parse,Set
+  "20" => { st => "dimmer",          cl => "receiver" }, # Parse,Set
+  "30" => { st => "blindActuator",   cl => "receiver" }, # Parse,Set
   "40" => { st => "remote",          cl => "sender" },   # Parse
   "41" => { st => "sensor",          cl => "sender" },
   "42" => { st => "swi",             cl => "sender" },
   "43" => { st => "pushButton",      cl => "sender" },
-  "60" => { st => "KFM100",          cl => "sender" },
-  "70" => { st => "THSensor",        cl => "sender" },
+  "60" => { st => "KFM100",          cl => "sender" },   # Parse,unfinished
+  "70" => { st => "THSensor",        cl => "sender" },   # Parse,unfinished
   "80" => { st => "threeStateSensor",cl => "sender" },
   "81" => { st => "motionDetector",  cl => "sender" },
   "C0" => { st => "keyMatic",        cl => "sender" },
@@ -195,7 +195,8 @@ CUL_HM_Parse($$)
     $isack = 1;
   }
 
-  my $st = AttrVal($name, "subType", undef);
+  my $st = AttrVal($name, "subType", "");
+  my $model = AttrVal($name, "model", "");
   my $cm = "$channel$msgtype";
   my $lcm = "$len$channel$msgtype";
 
@@ -270,6 +271,33 @@ CUL_HM_Parse($$)
 
     } elsif($p =~ m/^00..$/) {
       push @event, "test:$p";
+
+    }
+
+  } elsif($st eq "THSensor") { ##########################################
+
+    if($p =~ m/(....)(..)/) {
+
+      my ($t, $h) = ($1, $2);
+      $t = hex($t)/10;
+      $t -= 3276.8 if($t > 1638.4);
+      $h = sprintf("%.1f", hex($h)/2.55);
+
+
+      push @event, "state:T:$t H:$h";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+
+    }
+
+  } elsif($st eq "KFM" && $model eq "KFM-Sensor") {
+
+    if($p =~ m/814(.)0200(..)(..)(..)/) {
+      my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
+      my $v = 128-hex($k_v2);                  # FIXME: calibrate
+      $v = 256+$v if($v < 0);
+
+      push @event, "rawValue:$v";
 
     }
 
