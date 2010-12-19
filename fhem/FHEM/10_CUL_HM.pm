@@ -200,29 +200,30 @@ CUL_HM_Parse($$)
   my $cm = "$channel$msgtype";
   my $lcm = "$len$channel$msgtype";
 
-  if($lcm eq "1A8400") {     #### Pairing-Request
+  if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
     push @event, CUL_HM_Pair($name, $shash, @msgarr);
     
-  } elsif($cm =~ m/A00[01]/ &&  #### Pairing-Request-Conversation
-          $dst eq $id) {
+  } elsif($cm =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
     push @event, "";
 
-  } elsif($lcm eq "11A002") {
+  } elsif($lcm eq "11A002") {                    # signing experiments
     push @event, "signRequest:$p";
 
-  } elsif($lcm eq "19A003") {
+  } elsif($lcm eq "19A003") {                    # signing experiments
     push @event, "signAnswer:$p";
 
-  } elsif(!$st) {     # Will trigger unknown
+  } elsif(!$st) {                                # Will trigger unknown
     ;
 
-  } elsif($cm eq "8002") {      #### Ack
+  } elsif($cm eq "8002" && $shash->{cmdStack}) { # Send next msg from the stack
+    CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
+    delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
+    $shash->{lastStackAck} = 1;
+    push @event, "";
 
-    if($shash->{cmdStack}) {
-      CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
-      delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
-    }
+  } elsif($cm eq "8002" && $shash->{lastStackAck}) { # Ack of our last stack msg
+    delete($shash->{lastStackAck});
     push @event, "";
 
   } elsif($st eq "switch" || ############################################
@@ -268,8 +269,11 @@ CUL_HM_Parse($$)
       push @event, "state:on";
       push @event, "smoke_detect:on";
 
-    } elsif($p =~ m/^00..$/) {
-      push @event, "test:$p";
+    } elsif($p =~ m/^06010000$/) {
+      push @event, "state:alive";
+
+    } elsif($p =~ m/^00(..)$/) {
+      push @event, "test:$1";
 
     }
 
@@ -362,11 +366,10 @@ CUL_HM_Set($@)
 
   } elsif($st eq "switch") { ############################################
 
-    my %scmd = (on => "02", off => "01", onLong => "42", offLong => "41") ;
+    my %scmd = (on => "C8", off => "00");
     if($scmd{$cmd}) {
       $state = $cmd;
-      $sndcmd = sprintf("++A440%s%s%s%02d", $id, $hash->{DEF},
-                 $scmd{$cmd}, $hash->{"${cmd}MsgNr"}++);
+      $sndcmd = sprintf("++A011%s%s0201%s0000", $id,$hash->{DEF}, $scmd{$cmd});
 
     } else {
       return "Unknown argument $cmd, choose one of " .join(" ",sort keys %scmd);
@@ -376,12 +379,17 @@ CUL_HM_Set($@)
   } elsif($st eq "dimmer" || ############################################
           $st eq "blindActuator") {
 
-    if($cmd =~ m/^\d+/ && $cmd >= 0 && $cmd <= 100) {
+    my %scmd = (on => "C8", off => "00");
+    if($scmd{$cmd}) {
+      $state = $cmd;
+      $sndcmd = sprintf("++A011%s%s0201%s0000", $id,$hash->{DEF}, $scmd{$cmd});
+
+    } elsif($cmd =~ m/^\d+/ && $cmd >= 0 && $cmd <= 100) {
       $state = "$cmd %";
-      $sndcmd = sprintf("++A011%s%s0201%02X", $id, $hash->{DEF}, $cmd*2);
+      $sndcmd = sprintf("++A011%s%s0201%02X0000", $id, $hash->{DEF}, $cmd*2);
 
     } else {
-      my @scmd = (0..100);
+      my @scmd = ("on", "off", 0..100);
       return "Unknown argument $cmd, choose one of " .join(" ",@scmd);
 
     }
@@ -466,6 +474,9 @@ CUL_HM_Pair(@)
   my $iohash = $hash->{IODev};
   my $id = CUL_HM_Id($iohash);
   my $l4 = GetLogLevel($name,4);
+  my $isPairWithSerial;
+  my ($idstr, $s) = ($id, 0xA);
+  $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
 
   my $stc = substr($p, 26, 2);        # subTypeCode
   my $model = substr($p, 2, 4);
@@ -494,7 +505,12 @@ CUL_HM_Pair(@)
   } elsif($dst ne $id) {
     return "" ;
 
+  } elsif($iohash->{hmPairSerial}) {
+    delete($iohash->{hmPairSerial});
+    $isPairWithSerial = 1;
+
   }
+      
 
   if($stn eq "unknown") {
     Log GetLogLevel($name,1), "CUL_HM unknown subType $stc, cannot pair";
@@ -510,34 +526,34 @@ CUL_HM_Pair(@)
     return "";
   }
 
-  my ($mystc, $mymodel, $mybtn, $myserNr);
-  if($isSender) {
+  delete($hash->{cmdStack});
+
+  #if($isSender) {        # emulate a switch for a remote/etc
+  if($stn eq "remote") {
+
+    my ($mystc, $mymodel, $mybtn, $myserNr);
     $mymodel   = "0011";  # Emulate a HM-LC-SW1-PL
     $mystc     = "10";    # switch
     $mybtn     = "010100";# No buttons (?)
-
-  } else {
-    $mymodel   = "0060";  # Emulate a HM-PB-4DIS-WM
-    $mystc     = "40";    # remote
-    $mybtn     = "940201";# Buttons 02 (on) & 01 (off)
-  }
-  $myserNr = unpack('H*', "FHEM$id");
-
-  CUL_HM_SendCmd($hash,
-        $msgcnt."A000".$id.$src."19".$mymodel.$myserNr.$mystc.$mybtn, 1, 0);
-
-  # switch emulation (actor/receiver is ack only);
-  if($isSender) {
+    $myserNr = unpack('H*', "FHEM$id");
     $hash->{pairButtons} =~ m/(..)(..)/;
-    my ($b1, $b2, $cmd) = ($1, $2, "");
-    delete($hash->{cmdStack});
+    my ($b1, $b2) = ($1, $2);
+
+    CUL_HM_SendCmd($hash,
+        $msgcnt."A000".$id.$src."19".$mymodel.$myserNr.$mystc.$mybtn, 1, 1);
     CUL_HM_SendCmd($hash,      "++A001$id$src${b1}05$src${b1}04", 1, 1);
     CUL_HM_PushCmdStack($hash, "++A001$id$src${b1}07020201");
     CUL_HM_PushCmdStack($hash, "++A001$id$src${b1}06");
-    CUL_HM_PushCmdStack($hash, "++A001$id$src${b2}05$src${b1}04");
+    CUL_HM_PushCmdStack($hash, "++A001$id$src${b2}05$src${b2}04");
     CUL_HM_PushCmdStack($hash, "++A001$id$src${b2}07020201");
     CUL_HM_PushCmdStack($hash, "++A001$id$src${b2}06");
+
+  } else {
+    CUL_HM_SendCmd     ($hash, "++A001$id${src}00050000000000", 1, 1);
+    CUL_HM_PushCmdStack($hash, "++A001$id${src}00080201$idstr");
+    CUL_HM_PushCmdStack($hash, "++A001$id${src}0006");
   }
+
   return "";
 
 }
@@ -596,6 +612,7 @@ CUL_HM_Resend($)
   if($hash->{ackCmdSent} == 3) {
     delete($hash->{ackCmdSent});
     delete($hash->{ackWaiting});
+    delete($hash->{cmdStack});
     $hash->{STATE} = "MISSING ACK";
     DoTrigger($name, "MISSING ACK");
     return;
