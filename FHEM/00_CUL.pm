@@ -206,6 +206,7 @@ CUL_Set($@)
     $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
     CUL_SimpleWrite($hash, sprintf("As15%02x8401F1%s000000010A%s",
                     $hash->{HM_CMDNR}, $hash->{FHTID}, unpack('H*', $arg)));
+    $hash->{hmPairSerial} = $arg;
 
 
   } elsif($type eq "freq") { ######################################## MHz
