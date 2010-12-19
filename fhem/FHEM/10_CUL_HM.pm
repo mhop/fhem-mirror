@@ -166,6 +166,8 @@ CUL_HM_Parse($$)
   my ($len,$msgcnt,$channel,$msgtype,$src,$dst,$p) = @msgarr;
   Log 1, "CUL_HM L:$len N:$msgcnt C:$channel T:$msgtype SRC:$src DST:$dst $p";
   my $shash = $modules{CUL_HM}{defptr}{$src};
+  my $cm = "$channel$msgtype";
+  my $lcm = "$len$channel$msgtype";
 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   my $dname = $dhash ? $dhash->{NAME} : "unknown";
@@ -174,7 +176,7 @@ CUL_HM_Parse($$)
 
   if(!$shash) {
     my $sname = "CUL_HM_$src";
-    if("$channel$msgtype" eq "8400" && $len eq "1A") {
+    if($lcm eq "1A8400") {
       my $model = substr($p, 2, 4);
       if($culHmModel{$model}) {
         $sname = $culHmModel{$model} . "_" . $src;
@@ -197,8 +199,6 @@ CUL_HM_Parse($$)
 
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
-  my $cm = "$channel$msgtype";
-  my $lcm = "$len$channel$msgtype";
 
   if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
     push @event, CUL_HM_Pair($name, $shash, @msgarr);
@@ -243,7 +243,7 @@ CUL_HM_Parse($$)
 
   } elsif($st eq "remote") { ############################################
 
-    if("$channel$msgtype" =~ m/A.4./ && $p =~ m/^(..)(..)$/) {
+    if($cm =~ m/^..4./ && $p =~ m/^(..)(..)$/) {
       my ($button, $bno) = (hex($1), hex($2));
 
       my $btn = int((($button&0x3f)+1)/2);
@@ -279,19 +279,23 @@ CUL_HM_Parse($$)
 
   } elsif($st eq "THSensor") { ##########################################
 
-    if($p =~ m/(....)(..)/) {
-
+    if($p =~ m/^(....)(..)$/) {
       my ($t, $h) = ($1, $2);
       $t = hex($t)/10;
       $t -= 3276.8 if($t > 1638.4);
       $h = hex($h);
-
-
       push @event, "state:T:$t H:$h";
       push @event, "temperature:$t";
       push @event, "humidity:$h";
 
+    } elsif($p =~ m/^(....)$/) {
+      my $t = $1;
+      $t = hex($t)/10;
+      $t -= 3276.8 if($t > 1638.4);
+      push @event, "temperature:$t";
+
     }
+
 
   } elsif($st eq "KFM" && $model eq "KFM-Sensor") {
 
@@ -343,6 +347,7 @@ sub
 CUL_HM_Set($@)
 {
   my ($hash, @a) = @_;
+  my $ret = "";
 
   return "no set value specified" if(@a < 2);
 
@@ -366,10 +371,10 @@ CUL_HM_Set($@)
 
   } elsif($st eq "switch") { ############################################
 
-    my %scmd = (on => "C8", off => "00");
+    my %scmd = (on=>"C8", off=>"00");
     if($scmd{$cmd}) {
       $state = $cmd;
-      $sndcmd = sprintf("++A011%s%s0201%s0000", $id,$hash->{DEF}, $scmd{$cmd});
+      $sndcmd = sprintf("++A011%s%s0201%s0000", $id,$hash->{DEF},$scmd{$cmd});
 
     } else {
       return "Unknown argument $cmd, choose one of " .join(" ",sort keys %scmd);
@@ -445,7 +450,7 @@ CUL_HM_Set($@)
     $hash->{READINGS}{state}{VAL} = $state;
   }
 
-  return "";
+  return $ret;
 }
 
 
