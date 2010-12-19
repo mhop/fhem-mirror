@@ -220,7 +220,7 @@ CUL_Set($@)
     CUL_SimpleWrite($hash, "W0F$f2");
     CUL_SimpleWrite($hash, "W10$f1");
     CUL_SimpleWrite($hash, "W11$f0");
-    CUL_SimpleWrite($hash, $hash->{initString});        # Will reprogram the CC1101
+    CUL_SimpleWrite($hash, $hash->{initString});   # Will reprogram the CC1101
 
   } elsif($type eq "bWidth") { ###################################### KHz
 
