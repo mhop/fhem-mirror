@@ -217,13 +217,12 @@ CUL_HM_Parse($$)
   } elsif(!$st) {     # Will trigger unknown
     ;
 
-  } elsif("$channel$msgtype" eq "8002") {      #### Ack
+  } elsif($cm eq "8002") {      #### Ack
 
     if($shash->{cmdStack}) {
       CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
       delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
     }
-
     push @event, "";
 
   } elsif($st eq "switch" || ############################################
@@ -235,7 +234,7 @@ CUL_HM_Parse($$)
       my $val = hex($2)/2;
       $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
       my $msg = "unknown";
-      $msg = "ackedCmd" if($lt =~ m/0.01/);
+      $msg = "deviceMsg" if($lt =~ m/0.01/);
       $msg = "powerOn"  if($lt =~ m/0600/);
       push @event, "$msg:$val";
       push @event, "state:$val" if(!$isack);
