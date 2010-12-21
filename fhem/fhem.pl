@@ -162,7 +162,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.118 2010-12-16 08:07:18 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.119 2010-12-21 07:45:28 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1553,6 +1553,7 @@ CommandAttr($$)
   my ($cl, $param) = @_;
   my $ret = undef;
   my @a;
+  
   @a = split(" ", $param, 3) if($param);
 
   return "Usage: attr <name> <attrname> [<attrvalue>]\n$namedef"
@@ -1571,8 +1572,17 @@ CommandAttr($$)
       push @rets, "Unknown argument $a[1], choose one of $list";
       next;
     }
+
     if(" $list " !~ m/ ${a[1]}[ :;]/) {
-      push @rets, "Unknown attribute $a[1], use attr global userattr $a[1]";
+       my $found = 0;
+       foreach my $atr (split("[ \t]", $list)) { # is it a regexp?
+         if(${a[1]} =~ m/^$atr$/) {
+           $found++;
+           last;
+         }
+      }
+      push @rets, "Unknown attribute $a[1], use attr global userattr $a[1]"
+        if(!$found);
       next;
     }
 
@@ -1599,8 +1609,8 @@ CommandAttr($$)
       $defs{$sdev}{NR} = $devcount++
         if($defs{$ioname}{NR} > $defs{$sdev}{NR});
     }
-
   }
+  Log 3, join(" ", @rets) if(!$cl && @rets);
   return join("\n", @rets);
 }
 
