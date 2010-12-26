@@ -182,9 +182,13 @@ CUL_HM_Parse($$)
         $sname = $culHmModel{$model} . "_" . $src;
         $sname =~ s/-/_/g;
       }
+      Log 3, "CUL_HM Unknown device $sname, please define it";
+      return "UNDEFINED $sname CUL_HM $src $msg";
+    } {
+      Log 3, "CUL_HM Unknown device $sname. Start pairing on the device" .
+                "to generate the fhem-device with autocreate";
+      return "";
     }
-    Log 3, "CUL_HM Unknown device $sname, please define it";
-    return "UNDEFINED $sname CUL_HM $src $msg";
   }
 
   my $name = $shash->{NAME};
@@ -230,7 +234,7 @@ CUL_HM_Parse($$)
           $st eq "dimmer" ||
           $st eq "blindActuator") {
 
-    if($p =~ m/^(0.0.)(..)00/) {
+    if($p =~ m/^(0.0.)(..).0/) {
       my $lt = $1;
       my $val = hex($2)/2;
       $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
