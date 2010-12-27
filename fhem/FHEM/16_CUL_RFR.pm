@@ -13,8 +13,6 @@ CUL_RFR_Initialize($)
   # Message is like
   # K41350270
 
-  $hash->{Clients}   = $modules{CUL}->{Clients};
-  $hash->{MatchList} = $modules{CUL}->{MatchList};
   $hash->{Match}     = "^[0-9A-F]{4}U.";
   $hash->{DefFn}     = "CUL_RFR_Define";
   $hash->{UndefFn}   = "CUL_RFR_Undef";
@@ -94,6 +92,8 @@ CUL_RFR_Parse($$)
   elsif($smsg =~ m/^K/) { $hash->{NR_KMSG}++ }
   else                  { $hash->{NR_RMSG}++ }
 
+  $hash->{Clients}   = $iohash->{Clients};
+  $hash->{MatchList} = $iohash->{MatchList};
   foreach my $m (split(";", $smsg)) {
     CUL_Parse($hash, $iohash, $hash->{NAME}, $m, "X21");
   }
