@@ -64,6 +64,7 @@ sub Log($$);
 sub OpenLogfile($);
 sub PrintHash($$);
 sub ReadingsVal($$$);
+sub ReplaceEventMap($$);
 sub ResolveDateWildcards($@);
 sub RemoveInternalTimer($);
 sub SecondsTillTomorrow($);
@@ -162,7 +163,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.119 2010-12-21 07:45:28 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.120 2010-12-27 09:42:16 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -183,6 +184,7 @@ $modules{_internal_}{AttrList} =
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
         "autoload_undefined_devices";
 $modules{_internal_}{AttrFn} = "GlobalAttr";
+my $commonAttr = "eventMap";
 
 
 %cmds = (
@@ -997,6 +999,16 @@ DoSet(@)
   my $dev = $a[0];
   return "Please define $dev first" if(!$defs{$dev});
   return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
+  if($attr{$dev}{eventMap}) {
+    foreach my $rv (split(" ", $attr{$dev}{eventMap})) {
+      my ($re, $val) = split(":", $rv, 2);
+      if($a[1] =~ m/$val/) {
+        $a[1] =~ s/$val/$re/;
+        last;
+      }
+    }
+  }
+
   my $ret = CallFn($dev, "SetFn", $defs{$dev}, @a);
   return $ret if($ret);
 
@@ -1452,6 +1464,7 @@ getAllAttr($)
         if($modules{$defs{$d}{TYPE}}{AttrList});
   $list .= " " . $attr{global}{userattr}
         if($attr{global}{userattr});
+  $list .= " " . $commonAttr;
   return $list;
 }
 
@@ -1958,8 +1971,13 @@ DoTrigger($$)
     return "";
   }
 
-  # Done by the modules to be able to ignore unimportant messages
-  #$defs{$dev}{STATE} = $defs{$dev}{CHANGED}[0];
+  if($attr{$dev}{eventMap}) {
+    my $c = $defs{$dev}{CHANGED};
+    for(my $i = 0; $i < @{$c}; $i++) {
+      $c->[$i] = ReplaceEventMap($dev, $c->[$i]);
+    }
+    $defs{$dev}{STATE} = ReplaceEventMap($dev, $defs{$dev}{STATE});
+  }
 
   # STATE && {READINGS}{state} should be the same
   my $r = $defs{$dev}{READINGS};
@@ -2344,6 +2362,7 @@ AttrVal($$$)
   return $default;
 }
 
+# Add an attribute to the userattr list, if not yet present
 sub
 addToAttrList($)
 {
@@ -2358,4 +2377,20 @@ addToAttrList($)
   }
   $hash{$arg} = 1;
   $attr{global}{userattr} = join(" ", sort keys %hash);
+}
+
+sub
+ReplaceEventMap($$)
+{
+  my ($dev, $str) = @_;
+  return $str if(!$attr{$dev}{eventMap});
+
+  foreach my $rv (split(" ", $attr{$dev}{eventMap})) {
+    my ($re, $val) = split(":", $rv, 2);
+    if($str =~ m/$re/) {
+      $str =~ s/$re/$val/;
+      last;
+    }
+  }
+  return $str;
 }
