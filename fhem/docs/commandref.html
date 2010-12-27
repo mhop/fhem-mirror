@@ -1250,6 +1250,18 @@ A line ending with \ will be concatenated with the next one, so long lines
         you attached more than one physical device capable of receiving signals
         for this logical device.</li><br>
 
+    <a name="eventMap"></a>
+    <li>eventMap<br>
+        Exchange event or command names to a device specific version.  This
+        will also be used to exchange set arguments (if possible). 
+        Example:<ul><code>
+        attr store eventMap on:open off:closed<br>
+        set store open
+        </code></ul>
+        The code applies to all set commands, events and to the device state,
+        but not to the other device READINGS.
+        </li><br>
+
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <a name="attrdummy"></a>
     <li>dummy<br>
@@ -1303,11 +1315,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         (see <a href="#devspec">devspec</a>). You still get them with the
         "ignored=1" special devspec.
         </li><br>
-
-    <a name="exchange_on_off"></a>
-    <li>exchange_on_off<br>
-        Exchange on and off (and on-for-timer, etc). Both reception and sending
-        is exchanged.</li>
 
   </ul>
 </ul>
@@ -1532,6 +1539,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (fht80b)</li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
 
     <a name="retrycount"></a>
     <li>retrycount<br/>
@@ -1636,6 +1644,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#dummy">loglevel</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#eventMap">eventMap</a></li><br>
   </ul>
   <br>
 </ul>
@@ -1764,6 +1773,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
   </ul>
   <br>
 
@@ -1836,6 +1846,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
     <li><a href="#model">model</a> (hms100-t hms100-tf hms100-wd hms100-mg
         hms100-co hms100-tfk hms100-fit rm100-2)</li>
   </ul>
@@ -2060,6 +2071,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (S300,KS300,WS7000)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
   </ul>
   <br>
 </ul>
@@ -2126,6 +2138,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#loglevel">loglevel</a></li><br>
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
   </ul>
   <br>
 </ul>
@@ -2746,6 +2759,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#IODev">IODev</a></li>
+    <li><a href="#eventMap">eventMap</a></li><br>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
@@ -2941,6 +2955,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
   </ul>
   <br>
 </ul>
