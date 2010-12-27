@@ -1,11 +1,11 @@
 FHEM:
+- Avoid same firstbyte CUL id for multi-CUL
+- HomeMatic signing
+- autocreate for HomeMatic
+- autodetect physical hardware
 - RFR: Error message for uncomplete last message
 - fix autocreate rename anomaly (rename filelog only)
-- implement PID
 - implement wiki decisions
-- autodetect physical hardware
-- fhem-to-fhem module
-- CUR built-in MENU creation support
 
 Webpgm2
 - plot data from multiple files in a single picture
@@ -13,3 +13,4 @@ Webpgm2
 - click on the graph only correct for the day zoom
 - integrate weblink details in the SVG
 - autocreate: multiple plots
+- fancy webkit tranformations

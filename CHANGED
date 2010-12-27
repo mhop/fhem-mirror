@@ -11,6 +11,8 @@
   - bugfix:  HTML-Syntax check of the pgm2 output and documents (*.html)
   - feature: added date alias for FHT80b (Boris)
   - feature: attr may be a regexp (for CUL_IR)
+  - feature: Homepage moved from koeniglich.de/fhem to fhem.de
+  - feature: eventMap attribute
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
