@@ -189,21 +189,21 @@ FS20_Set($@)
   my $val;
 
   if($na == 3) {                                # Timed command.
-    $c = sprintf("%02X", $c & 0x20); # Set the extension bit
+    $c = sprintf("%02X", (hex($c) | 0x20)); # Set the extension bit
 
     ########################
     # Calculating the time.
     LOOP: for(my $i = 0; $i <= 12; $i++) {
       for(my $j = 0; $j <= 15; $j++) {
-	$val = (2**$i)*$j*0.25;
-	if($val >= $a[2]) {
+        $val = (2**$i)*$j*0.25;
+        if($val >= $a[2]) {
           if($val != $a[2]) {
             $ret = "FS20 Setting timeout to $val from $a[2]";
             Log GetLogLevel($a[0],2), $ret;
-	  }
-	  $c .= sprintf("%x%x", $i, $j);
-	  last LOOP;
-	}
+          }
+          $c .= sprintf("%x%x", $i, $j);
+          last LOOP;
+        }
       }
     }
     return "Specified timeout too large, max is 15360" if(length($c) == 2);
