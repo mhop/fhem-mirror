@@ -913,6 +913,7 @@ CUL_SimpleWrite(@)
   }
   $msg .= "\n" unless($nonl);
 
+  Log 1, "SW: $msg";
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 
