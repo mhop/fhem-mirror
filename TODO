@@ -1,5 +1,4 @@
 FHEM:
-- Avoid same firstbyte CUL id for multi-CUL
 - HomeMatic signing
 - autocreate for HomeMatic
 - autodetect physical hardware
