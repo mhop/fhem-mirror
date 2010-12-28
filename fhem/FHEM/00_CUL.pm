@@ -111,6 +111,21 @@ CUL_Define($$)
   my $dev = $a[2];
   return "FHTID must be H1H2, with H1 and H2 hex and both smaller than 64"
                 if(uc($a[3]) !~ m/^[0-6][0-9A-F][0-6][0-9A-F]$/);
+
+  if(uc($a[3]) =~ m/^([0-6][0-9A-F])/ && $1 ne "00") {
+    my $x = $1;
+    foreach my $d (keys %defs) {
+      next if($d eq $name);
+      if($defs{$d}{TYPE} eq "CUL") {
+        if(uc($defs{$d}{FHTID}) =~ m/^$x/) {
+          my $m = "$name: Cannot define multiple CULs with identical ".
+                        "first two digits ($x)";
+          Log 1, $m;
+          return $m;
+        }
+      }
+    }
+  }
   $hash->{FHTID} = uc($a[3]);
   $hash->{initString} = "X21";
   $hash->{Clients} = $clientsSlowRF;
@@ -911,9 +926,9 @@ CUL_SimpleWrite(@)
     # Prefix $msg with RRBBU and return the corresponding CUL hash.
     ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
   }
+  Log 1, "SW: $msg";
   $msg .= "\n" unless($nonl);
 
-  #Log 1, "SW: $msg";
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 
