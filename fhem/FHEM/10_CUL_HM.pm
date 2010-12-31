@@ -13,6 +13,7 @@ sub CUL_HM_Parse($$);
 sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
+sub CUL_HM_DumpBits(@);
 
 my %culHmDevProps=(
   "10" => { st => "switch",          cl => "receiver" }, # Parse,Set
@@ -127,7 +128,7 @@ CUL_HM_Initialize($)
                        "subType:switch,dimmer,blindActuator,remote,sensor,".
                              "swi,pushButton,threeStateSensor,motionDetector,".
                              "keyMatic,winMatic,smokeDetector " .
-                       "hmClass:receiver,sender serialNr";
+                       "hmClass:receiver,sender serialNr firmware";
 }
 
 
@@ -164,7 +165,8 @@ CUL_HM_Parse($$)
   $msg =~ m/A(..)(..)(..)(..)(......)(......)(.*)/;
   my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
   my ($len,$msgcnt,$channel,$msgtype,$src,$dst,$p) = @msgarr;
-  Log 1, "CUL_HM L:$len N:$msgcnt C:$channel T:$msgtype SRC:$src DST:$dst $p";
+  CUL_HM_DumpBits(@msgarr);
+
   my $shash = $modules{CUL_HM}{defptr}{$src};
   my $cm = "$channel$msgtype";
   my $lcm = "$len$channel$msgtype";
@@ -182,13 +184,9 @@ CUL_HM_Parse($$)
         $sname = $culHmModel{$model} . "_" . $src;
         $sname =~ s/-/_/g;
       }
-      Log 3, "CUL_HM Unknown device $sname, please define it";
-      return "UNDEFINED $sname CUL_HM $src $msg";
-    } {
-      Log 3, "CUL_HM Unknown device $sname. Start pairing on the device" .
-                "to generate the fhem-device with autocreate";
-      return "";
     }
+    Log 3, "CUL_HM Unknown device $sname, please define it";
+    return "UNDEFINED $sname CUL_HM $src $msg";
   }
 
   my $name = $shash->{NAME};
@@ -258,8 +256,6 @@ CUL_HM_Parse($$)
       if($id eq $dst) {
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 ($state =~ m/on/?"C8":"00")."0028", 1, 0);
-# Sign-Test
-#        CUL_HM_SendCmd($shash, "01A002".$id.$src."0400000000000000",1,0);
       }
 
     } elsif($p =~ m/0600/) {
@@ -320,7 +316,7 @@ CUL_HM_Parse($$)
   for(my $i = 0; $i < int(@event); $i++) {
     next if($event[$i] eq "");
 
-    if($shash->{lastMsgNr} && $shash->{lastMsgNr} eq $msgcnt) {
+    if($shash->{lastMsg} && $shash->{lastMsg} eq $msg) {
       Log GetLogLevel($name,4), "CUL_HM $name dup mesg";
       next;
     }
@@ -342,7 +338,7 @@ CUL_HM_Parse($$)
   }
 
   
-  $shash->{lastMsgNr} = $msgcnt;
+  $shash->{lastMsg} = $msg;
   return $name;
 }
 
@@ -495,6 +491,7 @@ CUL_HM_Pair(@)
   $attr{$name}{subType} = $dp ? $dp->{st} : "unknown";
   $attr{$name}{hmClass} = $dp ? $dp->{cl} : "unknown";
   $attr{$name}{serialNr} = pack('H*', substr($p, 6, 20));
+  $attr{$name}{firmware} = substr($p, 0, 2)/10;
   my $isSender  = (AttrVal($name,"hmClass","") eq "sender");
 
   my $stn = $attr{$name}{subType};    # subTypeName
@@ -639,6 +636,128 @@ CUL_HM_Id($)
   my ($io) = @_;
   return "123456" if(!$io || !$io->{FHTID});
   return "F1" . $io->{FHTID};
+}
+
+my %culHmBits = (
+  "8002:01:01"   => { txt => "ACK_STATUS",  params => {
+                      CHANNEL        => "02,2",
+                      STATUS         => "04,2",
+                      RSSI           => "08,2", } },
+  "8002"         => { txt => "ACK" },
+  "A001:11:01"   => { txt => "CONFIG_PEER_ADD", params => {
+                      CHANNEL        => "00,2",
+                      PEER_ADDRESS   => "04,6",
+                      PEER_CHANNEL_A => "10,2",
+                      PEER_CHANNEL_B => "12,2", } },
+  "A001:11:03"   => { txt => "CONFIG_PEER_LIST_REQ", params => {
+                      CHANNEL => "0,2", } },
+  "A001:11:04"   => { txt => "CONFIG_PARAM_REQ", params => {
+                      CHANNEL        => "00,2",
+                      PEER_ADDRESS   => "04,6",
+                      PEER_CHANNEL   => "10,2",
+                      PARAM_LIST     => "12,2", } },
+  "A001:11:05"   => { txt => "CONFIG_START", params => {
+                      CHANNEL        => "00,2",
+                      PEER_ADDRESS   => "04,6",
+                      PEER_CHANNEL   => "10,2",
+                      PARAM_LIST     => "12,2", } },
+  "A001:11:06"   => { txt => "CONFIG_END", params => {
+                      CHANNEL => "0,2", } },
+  "A001:11:08"   => { txt => "CONFIG_WRITE_INDEX", params => {
+                      CHANNEL => "0,2",
+                      DATA => "4,", } },
+  "A001:11:0E"   => { txt => "CONFIG_STATUS_REQUEST", params => {
+                      CHANNEL => "0,2", } },
+  "A010:01:01"   => { txt => "INFO_PEER_LIST", params => {
+                      PEER_ADDR1 => "02,6", PEER_CH1 => "08,2",
+                      PEER_ADDR2 => "10,6", PEER_CH2 => "16,2",
+                      PEER_ADDR3 => "18,6", PEER_CH3 => "24,2",
+                      PEER_ADDR4 => "26,6", PEER_CH4 => "32,2", } },
+  "A002"         => { txt => "Request AES", params => { 
+                      DATA =>  "0," } },
+  "A003"         => { txt => "AES reply",   params => {
+                      DATA =>  "0," } },
+  "A010:01:02"   => { txt => "INFO_PARAM_RESPONSE_PAIRS", params => {
+                      DATA => "2,", } },
+  "A010:01:03"   => { txt => "INFO_PARAM_RESPONSE_SEQ", params => {
+                      OFFSET => "2,2", 
+                      DATA => "4,", } },
+  "A011:02:0400" => { txt => "RESET" },
+  "A03E"         => { txt => "SWITCH", params => {
+                      DST      => "00,6", 
+                      UNKNOWN  => "06,2", 
+                      CHANNEL  => "08,2", 
+                      COUNTER  => "10,2", } },
+  "A410:01:06"   => { txt => "INFO_ACTUATOR_STATUS", params => {
+                      CHANNEL => "2,2", 
+                      STATUS  => "4,2", 
+                      UNKNOWN => "6,2",
+                      RSSI    => "8,2" } },
+);
+
+sub
+CUL_HM_DumpBits(@)
+{
+  my ($len,$cnt,$ch,$type,$src,$dst,$p) = @_;
+  my $p01 = substr($p,0,2);
+  my $p02 = substr($p,0,4);
+  my $p11 = substr($p,2,2);
+
+  $ch = "0A" if($ch eq "0B");
+  $ch = "A4" if("$ch$type" eq "8410");
+
+  my $ps;
+  $ps = $culHmBits{"$ch$type:11:$p11"} if(!$ps);
+  $ps = $culHmBits{"$ch$type:01:$p01"} if(!$ps);
+  $ps = $culHmBits{"$ch$type:02:$p02"} if(!$ps);
+  $ps = $culHmBits{"$ch$type"}         if(!$ps);
+  my $txt = "";
+  if($ps) {
+    $txt = $ps->{txt};
+    if($ps->{params}) {
+      $ps = $ps->{params};
+      foreach my $k (sort {$ps->{$a} cmp $ps->{$b} } keys %{$ps}) {
+        my ($o,$l) = split(",", $ps->{$k});
+        last if(length($p) <= $o);
+        if($l) {
+          $txt .= " $k:".substr($p,$o,$l);
+        } else {
+          $txt .= " $k:".substr($p,$o);
+        }
+      }
+    }
+    $txt = " ($txt)" if($txt);
+  }
+  Log 1, "CUL_HM L:$len N:$cnt C:$ch T:$type SRC:$src DST:$dst $p$txt";
+}
+
+my @culHmTimes = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
+
+sub
+CUL_HM_encodeTime($)
+{
+  my $v = shift;
+  return "00" if($v < 0.1);
+  for(my $i = 0; $i < @culHmTimes; $i++) {
+    if($culHmTimes[$i] * 32 > $v) {
+      for(my $j = 0; $j < 32; $j++) {
+        if($j*$culHmTimes[$i] >= $v) {
+          return sprintf("%X", $i*32+$j);
+        }
+      }
+    }
+  }
+  return "FF";
+}
+
+sub
+CUL_HM_decodeTime($)
+{
+  my $v = hex(shift);
+  return "undef" if($v > 255);
+  my $v1 = int($v/32);
+  my $v2 = $v%32;
+  return $v2 * $culHmTimes[$v1];
 }
 
 1;
