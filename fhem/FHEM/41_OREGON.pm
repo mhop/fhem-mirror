@@ -379,6 +379,12 @@ sub alt_temphydro {
     	my $type = shift;
     	my $bytes = shift;
 
+  #
+  my $hex_line = "";
+  for (my $i=0;$i<=9;$i++) {
+   	$hex_line .= sprintf("%02x",$bytes->[$i]);
+  } 
+  
   	my $device = sprintf "%02x", $bytes->[3];
   	my $dev_str = $type.$DOT.$device;
 	my @res = ();
@@ -386,6 +392,14 @@ sub alt_temphydro {
   	temperature($bytes, $dev_str, \@res);
   	humidity($bytes, $dev_str, \@res);
   	percentage_battery($bytes, $dev_str, \@res);
+  
+# hexline debugging
+  #push @res, {
+  #                             device => $dev_str,
+  #                             type => 'hexline',
+  #                             current => $hex_line,
+  #                             units => 'hex',
+  #                            };
 
 	return @res;
 }
@@ -528,20 +542,21 @@ sub rain_PCR800 {
   my $bytes = shift;
 
   #
-  #my $hexline = "";
-  #for (my $i=0;$i<=10;$i++) {
-  # 	$hexline .= sprintf("%02x",$bytes->[$i]);
-  #} 
-  #
+  my $hexline = "";
+  for (my $i=0;$i<=10;$i++) {
+   	$hexline .= sprintf("%02x",$bytes->[$i]);
+  } 
+  
   my $device = sprintf "%02x", $bytes->[3];
   my $dev_str = $type.$DOT.$device;
   my @res = ();
 
-  my $rain = sprintf("%02x",$bytes->[5])/10 + hi_nibble($bytes->[4])/100 + lo_nibble($bytes->[6])/1000;
+  my $rain = lo_nibble($bytes->[6])*10 + sprintf("%02x",$bytes->[5])/10 + hi_nibble($bytes->[4])/100;
   $rain *= 25.4; # convert from inch to mm
 
-  my $train = sprintf("%2.2f", ( sprintf("%02x",$bytes->[7])/100 + hi_nibble($bytes->[6])/1000 + 
-  			lo_nibble($bytes->[9])*100 + sprintf("%02x",$bytes->[8]) ) * 25.4);
+  my $train = lo_nibble($bytes->[9])*100 + sprintf("%02x",$bytes->[8]) + 
+	sprintf("%02x",$bytes->[7])/100 + hi_nibble($bytes->[6])/1000;
+  $train *= 25.4; # convert from inch to mm
 
   push @res, {
                                device => $dev_str,
@@ -650,6 +665,7 @@ OREGON_Parse($$)
 
   my $rec = $types{$key} || $types{$key&0xfffff};
   unless ($rec) {
+#Log 3, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$hexline'.";
     Log 4, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$hexline'.";
     return "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits.\n";
   }
@@ -658,7 +674,7 @@ OREGON_Parse($$)
   my $checksum = $rec->{checksum};
   if ($checksum && !$checksum->(\@rfxcom_data_array) ) {
     Log 3, "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
-    return;
+    return "OREGON: ERROR: checksum error sensor_id=$sensor_id (bits=$bits)";
   }
 
   my $method = $rec->{method};
