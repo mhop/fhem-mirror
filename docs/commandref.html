@@ -1258,8 +1258,8 @@ A line ending with \ will be concatenated with the next one, so long lines
         attr store eventMap on:open off:closed<br>
         set store open
         </code></ul>
-        The code applies to all set commands, events and to the device state,
-        but not to the other device READINGS.
+        The attribute applies to all set commands, events and to the device
+        state, but not to the other device READINGS.
         </li><br>
 
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
@@ -2033,6 +2033,17 @@ A line ending with \ will be concatenated with the next one, so long lines
 
         </ul>
         </li><br>
+    <li><a name="hmId">hmId</a><br>
+        Set the HomeMatic ID of this device. If this attribute is absent, the
+        ID will be F1&lt;housecode&gt;. Note 1: after setting or changing this
+        attribute you have to relearn all your HomeMatic devices. Note 2: the
+        value _must_ be a 6 digit hex number, and 000000 is not valid. fhem
+        wont complain if it is not correct, but the communication won't work.
+        </li><br>
+
+    <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
+        Generate events for HomeMatic protocol messages.
+        </li><br>
   </ul>
   <br>
 </ul>
@@ -2182,7 +2193,23 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_HMset"></a>
   <b>Set</b>
   <ul>
-     Depends on the subType (i.e family) of the device.
+     General commands (available to all hm devices):
+     <ul>
+     <li>raw &lt;data&gt; ...<br>
+         Only needed for experimentation.
+         send a list of "raw" commands. The first command will be immediately
+         sent, the next one after the previous one is acked by the target.  The
+         length will be computed automatically, and the message counter will be
+         incremented if the first tw charcters are ++. 
+         Example (enable AES):<pre>
+         set hm1 raw ++A001F100001234560105000000001\
+                     ++A001F10000123456010802010AF10B000C00\
+                     ++A001F1000012345601080801\
+                     ++A001F100001234560106<pre>
+         </li>
+     </ul>
+     subType (i.e family) dependent commands:
+     <ul>
      <li>switch
        <ul>
           <li>on - set the switch on</li>
@@ -2207,6 +2234,7 @@ A line ending with \ will be concatenated with the next one, so long lines
              set 4Dis text 1 off Kitchen Off<br>
              </ul>
        </ul></li>
+     </ul>
   </ul><br>
 
   <a name="CUL_HMget"></a>
