@@ -350,6 +350,7 @@ CUL_HM_Set($@)
 {
   my ($hash, @a) = @_;
   my $ret = "";
+  my $tval;
 
   return "no set value specified" if(@a < 2);
 
@@ -374,15 +375,15 @@ CUL_HM_Set($@)
 
   }
 
-  if($h) {
-    my @l = split(" ", $h);
-    my $narg = int(@l);
-    return "Usage: set $name $cmd $h" if(@a < $narg+2);
-
-  } else {
-    return "Usage: set $name $cmd (no argument required)" if(@a > 2);
-
-  }
+#  if($h) {
+#    my @l = split(" ", $h);
+#    my $narg = int(@l);
+#    return "Usage: set $name $cmd $h" if(@a < $narg+2);
+#
+#  } else {
+#    return "Usage: set $name $cmd (no argument required)" if(@a > 2);
+#
+#  }
 
 
   my $id = CUL_HM_Id($hash->{IODev});
@@ -409,9 +410,15 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "on") { ###############################################
     $sndcmd = sprintf("++A011%s%s0201C80000", $id,$hash->{DEF});
+    if(@a > 2) {
+      ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
+      $sndcmd .= $tval;
+    }
+
 
   } elsif($cmd eq "off") { ##############################################
     $sndcmd = sprintf("++A011%s%s0201000000", $id,$hash->{DEF});
+    # timer not supported :/
 
   } elsif($cmd eq "toggle") { ###########################################
     $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
@@ -422,6 +429,11 @@ CUL_HM_Set($@)
   } elsif($st eq "pct") { ##############################################
     $a[1] = 100 if ($a[1] > 100);
     $sndcmd = sprintf("++A011%s%s0201%02X0000", $id, $hash->{DEF}, $a[1]*2);
+    if(@a > 2) {
+      ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
+      $sndcmd .= $tval;
+    }
+
 
   } elsif($st eq "text") { #############################################
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/);
@@ -701,7 +713,9 @@ my %culHmBits = (
   "A011;p01=02"   => { txt => "SET" , params => {
                        CHANNEL  => "02,2", 
                        VALUE    => "04,2", 
-                       UNKNOWN  => "06,4", } }, 
+                       RAMPTIME => "06,2", 
+                       ONTIME   => "08,2",
+                       DURATION => '10,4,$val=CUL_HM_decodeTime16($val)', } }, 
   "A03E"          => { txt => "SWITCH", params => {
                        DST      => "00,6", 
                        UNKNOWN  => "06,2", 
@@ -712,6 +726,11 @@ my %culHmBits = (
                        STATUS  => '4,2', 
                        UNKNOWN => "6,2",
                        RSSI    => "8,2" } },
+  "A440"          => { txt => "REMOTE", params => {
+                       BUTTON        => '00,02,$val=(hex($val)&0x3F)',
+                       LONG          => '00,02,$val=(hex($val)&0x40)?1:0',
+                       LOWBAT        => '00,02,$val=(hex($val)&0x80)?1:0',
+                       COUNTER       => "02,02", } },
 );
 
 sub
@@ -728,7 +747,7 @@ CUL_HM_DumpProtocol($$@)
   my $p11 = substr($p,2,2);
 
   $cmd = "0A$1" if($cmd =~ m/0B(..)/);
-  $cmd = "A4" if("$cmd" eq "8410");
+  $cmd = "A4$1" if($cmd =~ m/84(..)/);
 
   my $ps;
   $ps = $culHmBits{"$cmd;p11=$p11"} if(!$ps);
@@ -755,17 +774,16 @@ CUL_HM_DumpProtocol($$@)
   DoTrigger($iname, $msg) if($ev);
 }
 
-my @culHmTimes = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
-
+my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
 sub
-CUL_HM_encodeTime($)
+CUL_HM_encodeTime8($)
 {
   my $v = shift;
   return "00" if($v < 0.1);
-  for(my $i = 0; $i < @culHmTimes; $i++) {
-    if($culHmTimes[$i] * 32 > $v) {
+  for(my $i = 0; $i < @culHmTimes8; $i++) {
+    if($culHmTimes8[$i] * 32 > $v) {
       for(my $j = 0; $j < 32; $j++) {
-        if($j*$culHmTimes[$i] >= $v) {
+        if($j*$culHmTimes8[$i] >= $v) {
           return sprintf("%X", $i*32+$j);
         }
       }
@@ -775,13 +793,46 @@ CUL_HM_encodeTime($)
 }
 
 sub
-CUL_HM_decodeTime($)
+CUL_HM_decodeTime8($)
 {
   my $v = hex(shift);
   return "undef" if($v > 255);
   my $v1 = int($v/32);
   my $v2 = $v%32;
-  return $v2 * $culHmTimes[$v1];
+  return $v2 * $culHmTimes8[$v1];
+}
+
+sub
+CUL_HM_encodeTime16($)
+{
+  my $v = shift;
+  my $ret = "FFFF";
+  my $mul = 20;
+
+  return "0000" if($v < 0.05);
+  for(my $i = 0; $i < 16; $i++) {
+    if($v*$mul < 0xfff) {
+     $ret=sprintf("%03X%X", $v*$mul, $i);
+     last;
+    }
+    $mul /= 2;
+  }
+  my $v2 = CUL_HM_decodeTime16($ret);
+  return ($ret, "Timeout $v rounded to $v2") if($v != $v2);
+  return ($ret, "");
+}
+
+sub
+CUL_HM_decodeTime16($)
+{
+  my $v = hex(shift);
+  my $m = int($v/16);
+  my $e = $v % 16;
+  my $mul = 0.05;
+  while($e--) {
+    $mul *= 2;
+  }
+  return $mul*$m;
 }
 
 1;
