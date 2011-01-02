@@ -88,7 +88,7 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "fhtsoftbuffer:1,0 sendpool addvaltrigger " .
-                     "rfmode:SlowRF,HomeMatic";
+                     "rfmode:SlowRF,HomeMatic hmId hmProtocolEvents";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 }
 
@@ -215,12 +215,13 @@ CUL_Set($@)
     InternalTimer(gettimeofday()+$arg, "CUL_RemoveHMPair", $hash, 1);
 
   } elsif($type eq "hmPairSerial") { ################################
-    return "Usage: set $name hmPairForSec <10-character-serialnumber>"
+    return "Usage: set $name hmPairSerial <10-character-serialnumber>"
         if(!$arg || $arg !~ m/^.{10}$/);
 
+    my $id = AttrVal($hash->{NAME}, "hmId", "F1".$hash->{FHTID});
     $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
-    CUL_SimpleWrite($hash, sprintf("As15%02x8401F1%s000000010A%s",
-                    $hash->{HM_CMDNR}, $hash->{FHTID}, unpack('H*', $arg)));
+    CUL_SimpleWrite($hash, sprintf("As15%02x8401%s000000010A%s",
+                    $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
     $hash->{hmPairSerial} = $arg;
 
 
@@ -926,7 +927,7 @@ CUL_SimpleWrite(@)
     # Prefix $msg with RRBBU and return the corresponding CUL hash.
     ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
   }
-  Log 1, "SW: $msg";
+  #Log 1, "SW: $msg";
   $msg .= "\n" unless($nonl);
 
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});

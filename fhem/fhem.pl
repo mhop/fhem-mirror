@@ -44,6 +44,7 @@ sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
 sub AnalyzeInput($);
 sub AssignIoPort($);
+sub AttrVal($$$);
 sub addToAttrList($);
 sub CallFn(@);
 sub CommandChain($$);
@@ -163,7 +164,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.120 2010-12-27 09:42:16 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.121 2011-01-02 14:45:53 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
