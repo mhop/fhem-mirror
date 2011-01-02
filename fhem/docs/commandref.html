@@ -2207,13 +2207,24 @@ A line ending with \ will be concatenated with the next one, so long lines
                      ++A001F1000012345601080801\
                      ++A001F100001234560106<pre>
          </li>
+     <li>reset<br>
+         Factory reset the device. You need to pair it again to use it.
+         </li>
+     <li>pair<br>
+         Pair the device again with its known serialNumber
+         </li>
+     <li>statusRequest<br>
+         Send a statusRequest to the device.
+         </li>
+
      </ul>
      subType (i.e family) dependent commands:
      <ul>
      <li>switch
        <ul>
-          <li>on - set the switch on</li>
+          <li>on [forSec] - set the switch on</li>
           <li>off - set the switch off</li>
+          <li>toggle - toggle the switch.</li>
        </ul></li>
      <li>dimmer, blindActuator
        <ul>
