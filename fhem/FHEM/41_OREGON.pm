@@ -1,6 +1,6 @@
 #################################################################################
 # 41_OREGON.pm
-# Modul for FHEM
+# Module for FHEM to decode Oregon sensor messages
 #
 # derived from 18_CUL-HOERMANN.pm
 #
@@ -51,7 +51,8 @@ OREGON_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = ".*";
+  #$hash->{Match}     = "^[\x38-\x78].*";
+  $hash->{Match}     = "^[^\x30]";
   $hash->{DefFn}     = "OREGON_Define";
   $hash->{UndefFn}   = "OREGON_Undef";
   $hash->{ParseFn}   = "OREGON_Parse";
@@ -145,6 +146,14 @@ my %types =
    {
     part => 'WGR800', checksum => \&checksum4, method => \&wtgr800_anemometer,
    },
+   type_length_key(0xda78, 72) =>
+   {
+    part => 'UVN800', checksun => \&checksum7, method => \&uvn800,
+   },
+   type_length_key(0xea7c, 120) =>
+   {
+    part => 'UV138', checksum => \&checksum1, method => \&uv138,
+   },
    type_length_key(0xea4c, 80) =>
    {
     part => 'THWR288A', checksum => \&checksum1, method => \&common_temp,
@@ -197,7 +206,7 @@ my %types =
    # RGR126, RGR682, RGR918:
    type_length_key(0x2a1d, 84) =>
    {
-    part => 'RGR918', checksum => \&checksum6, method => \&common_rain,
+    part => 'RGR918', checksum => \&checksum6plus, method => \&common_rain,
    },
    # 
    type_length_key(0x0a4d, 80) =>
@@ -234,7 +243,7 @@ my $DOT = q{_};
 
 # --------------------------------------------
 # The following functions are changed:
-#	- seome parameter like "parent" and others are removed
+#	- some parameter like "parent" and others are removed
 #	- @res array return the values directly (no usage of xPL::Message)
 
 sub temperature {
@@ -308,23 +317,91 @@ sub percentage_battery {
 	}
 }
 
+my @uv_str =
+  (
+   qw/low low low/, # 0 - 2
+   qw/medium medium medium/, # 3 - 5
+   qw/high high/, # 6 - 7
+   'very high', 'very high', 'very high', # 8 - 10
+  );
+
+sub uv_string {
+  $uv_str[$_[0]] || 'dangerous';
+}
+
+sub uv {
+  my ($bytes, $dev, $res) = @_;
+  my $uv =  lo_nibble($bytes->[5])*10 + hi_nibble($bytes->[4]);
+  my $risk = uv_string($uv);
+
+  push @$res, {
+		device => $dev,
+		type => 'uv',
+		current => $uv,
+		risk => $risk,
+	}
+}
+
+sub uv2 {
+  my ($bytes, $dev, $res) = @_;
+  my $uv =  hi_nibble($bytes->[4]);
+  my $risk = uv_string($uv);
+
+  push @$res, {
+		device => $dev,
+		type => 'uv',
+		current => $uv,
+		risk => $risk,
+	}
+}
+
 # --------------------------------------------------------
 
+sub uv138 {
+  my $type = shift;
+  my $bytes = shift;
+
+  my $device = sprintf "%02x", $bytes->[3];
+  my $dev_str = $type.$DOT.$device;
+
+  my @res = ();
+
+  uv($bytes, $dev_str, \@res);
+  simple_battery($bytes, $dev_str, \@res);
+
+  return @res;
+}
+
+sub uvn800 {
+  my $type = shift;
+  my $bytes = shift;
+
+  my $device = sprintf "%02x", $bytes->[3];
+  my $dev_str = $type.$DOT.$device;
+
+  my @res = ();
+
+  uv2($bytes, $dev_str, \@res);
+  percentage_battery($bytes, $dev_str, \@res);
+
+  return @res;
+}
+
+
 sub wgr918_anemometer {
-    	my $type = shift;
-    	my $bytes = shift;
+  my $type = shift;
+  my $bytes = shift;
 
-  	my $device = sprintf "%02x", $bytes->[3];
-  	my $dev_str = $type.$DOT.$device;
+  my $device = sprintf "%02x", $bytes->[3];
+  my $dev_str = $type.$DOT.$device;
 
-	my @res = ();
+  my @res = ();
 
+  my $dir = sprintf("%02x",$bytes->[5])*10 + hi_nibble($bytes->[4]);
+  my $speed = lo_nibble($bytes->[7]) * 10 + sprintf("%02x",$bytes->[6])/10;
+  my $avspeed = sprintf("%02x",$bytes->[8]) + hi_nibble($bytes->[7]) / 10;
 
-  	my $dir = sprintf("%02x",$bytes->[5])*10 + hi_nibble($bytes->[4]);
-  	my $speed = lo_nibble($bytes->[7]) * 10 + sprintf("%02x",$bytes->[6])/10;
-  	my $avspeed = sprintf("%02x",$bytes->[8]) + hi_nibble($bytes->[7]) / 10;
-
-	push @res, {
+  push @res, {
                                device => $dev_str,
                                type => 'speed',
                                current => $speed,
@@ -336,10 +413,10 @@ sub wgr918_anemometer {
                                current => $dir,
                                units => 'degrees',
                               } 
-	;
-  	percentage_battery($bytes, $dev_str, \@res);
+  ;
+  percentage_battery($bytes, $dev_str, \@res);
 
-  	return @res;
+  return @res;
 }
 
 
@@ -581,8 +658,6 @@ sub rain_PCR800 {
   return @res;
 }
 
-
-
 # -----------------------------
 # CHECKSUM METHODS
 
@@ -611,6 +686,12 @@ sub checksum5 {
 sub checksum6 {
   hi_nibble($_[0]->[8]) + (lo_nibble($_[0]->[9]) << 4) ==
     ((nibble_sum(8,$_[0]) - 0xa) & 0xff);
+}
+
+sub checksum6plus {
+  my $c = hi_nibble($_[0]->[8]) + (lo_nibble($_[0]->[9]) << 4);
+  my $s = (((nibble_sum(8,$_[0]) + (($_[0]->[8] & 0x0f) - 0x00)) - 0xa) & 0xff);
+  $s == $c;
 }
 
 sub checksum7 {
@@ -797,6 +878,20 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+		}
+       		case "uv" { 
+			$val .= "UV: ".$i->{current}."  ";
+			$val .= "UVR: ".$i->{risk}."  ";
+
+			$sensor = "uv_val";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+
+			$sensor = "uv_risk";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{risk};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{risk};;
 		}
        		case "hexline" { 
 			$sensor = "hexline";			
