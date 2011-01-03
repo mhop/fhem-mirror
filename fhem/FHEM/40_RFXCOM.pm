@@ -14,6 +14,8 @@
 #
 # To use it define the IP-Adresss and the Port:
 #	define RFXCOM RFXCOM 192.168.169.111:10001
+# optionally you may issue not to initialize the device (useful if you share an RFXCOM device with other programs) 
+#	define RFXCOM RFXCOM 192.168.169.111:10001 noinit
 #
 # The RFXCOM receivers supports lots of protocols that may be implemented for FHEM 
 # writing the appropriate FHEM modules.
@@ -62,9 +64,13 @@ RFXCOM_Initialize($)
 # Provider
   $hash->{ReadFn}  = "RFXCOM_Read";
   $hash->{Clients} =
-        ":OREGON:";
+        #":RFXMETER:OREGON:RFXELSE:";
+        ":RFXMETER:OREGON:";
   my %mc = (
-    "1:OREGON"   => "^.*",
+    "1:RFXMETER"   => "^0.*",
+    "2:OREGON"   => "^[^0]",
+    #"2:OREGON"   => "^[\x38-\x78].*",
+    #"3:RFXELSE"   => "^.*",
   );
   $hash->{MatchList} = \%mc;
 
@@ -76,7 +82,7 @@ RFXCOM_Initialize($)
   $hash->{GetFn}   = "RFXCOM_Get";
   $hash->{SetFn}   = "RFXCOM_Set";
   $hash->{StateFn} = "RFXCOM_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 do_not_init:1:0 loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "RFXCOM_Shutdown";
 }
 
@@ -87,19 +93,30 @@ RFXCOM_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> RFXCOM devicename"
-    if(@a != 3);
+  return "wrong syntax: define <name> RFXCOM devicename [noinit]"
+    if(@a != 3 && @a != 4);
 
   RFXCOM_CloseDev($hash);
 
   my $name = $a[0];
   my $dev = $a[2];
+  my $opt = $a[3] if(@a == 4);;
 
   if($dev eq "none") {
     Log 1, "RFXCOM: $name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
   }
+
+  if(defined($opt)) {
+    if($opt eq "noinit") {
+      Log 1, "RFXCOM: $name no init is done";
+      $attr{$name}{do_not_init} = 1;
+    } else {
+      return "wrong syntax: define <name> RFXCOM devicename [noinit]"
+    }
+  }
+  
   
   $hash->{DeviceName} = $dev;
   my $ret = RFXCOM_OpenDev($hash, 0);
@@ -208,14 +225,24 @@ RFXCOM_DoInit($)
 
   RFXCOM_Clear($hash);
 
+  if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
+    	Log 1, "RFXCOM: defined with noinit. Do not send init string to device.";
+  	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
+
+        # Reset the counter
+        delete($hash->{XMIT_TIME});
+        delete($hash->{NR_CMD_LAST_H});
+
+	return undef;
+  }
+
   #
   # Init
   my $init = pack('H*', 'F02C');
   RFXCOM_SimpleWrite($hash, $init);
   sleep(1);
 
-  
-$buf = RFXCOM_SimpleRead($hash);
+  $buf = RFXCOM_SimpleRead($hash);
   my $char = ord($buf);
   if (! $buf) {
 	return "RFXCOM: Initialization Error $name: no char read";
@@ -276,9 +303,7 @@ RFXCOM_Read($)
     #$hexline = unpack('H*', $rfxcom_data);
     #Log 1, "RFXCOM_Read rfxcom_data '$hexline'";
     #
-    # parse only messages >= 68 Bits. Others are non Oregon sensors or receiption errors. 
-    # change this if you add a module that supports other sensors.
-    RFXCOM_Parse($hash, $hash, $name, $rmsg) if($rmsg && $bits >= 68);
+    RFXCOM_Parse($hash, $hash, $name, $rmsg);
   }
   #Log 1, "RFXCOM_Read END";
 
