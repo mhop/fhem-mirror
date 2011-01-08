@@ -1003,7 +1003,9 @@ A line ending with \ will be concatenated with the next one, so long lines
       stopHMS<br>
       initfull<br>
       raw<br>
+      open<br>
       reopen<br>
+      close<br>
       time<br>
     </ul>
     Notes:
@@ -1044,6 +1046,10 @@ A line ending with \ will be concatenated with the next one, so long lines
           <code>initfull</code> command sequence.</li>
       <li><code>stopHMS</code> probably is the inverse of <code>initHMS</code>
           (I don't have authoritative info on what exactly it does).</li>
+      <li><code>close</code> closes and frees the serial device port until you open
+          it again with <code>open</code>, e.g. useful if you need to temporarily
+          unload the ftdi_sio kernel module to use the <a href="http://www.ftdichip.com/Support/Documents/AppNotes/AN232B-01_BitBang.pdf" target="_blank">bit-bang mode</a>.</li>
+
     </ul>
   </ul>
   <br>
