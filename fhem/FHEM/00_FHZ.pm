@@ -48,6 +48,9 @@ my %sets = (
   "raw"      => "xx xx",
   "initfull" => "xx xx",
   "reopen"   => "xx xx",
+  "close"   => "xx xx",
+  "open"   => "xx xx",
+
 );
 my %setnrparam = (
   "time"     => 0,
@@ -59,6 +62,9 @@ my %setnrparam = (
   "raw"      => 2,
   "initfull" => 0,
   "reopen"   => 0,
+  "close"    => 0,
+  "open"    => 0,
+
 );
 
 my %codes = (
@@ -177,6 +183,16 @@ FHZ_Set($@)
   } elsif($a[1] eq "reopen") {
 
     FHZ_Reopen($hash);
+    return undef;
+
+  } elsif($a[1] eq "close") {
+
+    FHZ_Close($hash);
+    return undef;
+
+  } elsif($a[1] eq "open") {
+
+    FHZ_Open($hash);
     return undef;
 
   } elsif($a[1] eq "raw") {
@@ -635,6 +651,55 @@ FHZ_Reopen($)
         return;
       }
   }
+}
+
+#####################################
+sub
+FHZ_Close($)
+{
+  my ($hash) = @_;
+
+  my $dev = $hash->{DeviceName};
+  return if(!$dev);
+  my $name = $hash->{NAME};
+
+  $hash->{PortObj}->close();
+  Log 1, "USB device $dev closed";
+  delete($hash->{PortObj});
+  delete($hash->{FD});
+  delete($selectlist{"$name.$dev"});
+  #$readyfnlist{"$name.$dev"} = $hash; # Start polling
+  $hash->{STATE} = "disconnected";
+
+
+  # Without the following sleep the open of the device causes a SIGSEGV,
+  # and following opens block infinitely. Only a reboot helps.
+  sleep(5);
+
+  DoTrigger($name, "DISCONNECTED");
+
+}
+
+#####################################
+sub
+FHZ_Open($)
+{
+  my ($hash) = @_;
+
+  my $dev = $hash->{DeviceName};
+  return if(!$dev);
+  my $name = $hash->{NAME};
+
+  $readyfnlist{"$name.$dev"} = $hash; # Start polling
+  $hash->{STATE} = "disconnected";
+
+
+  # Without the following sleep the open of the device causes a SIGSEGV,
+  # and following opens block infinitely. Only a reboot helps.
+  sleep(5);
+
+  DoTrigger($name, "DISCONNECTED");
+
 }
 
 #####################################
