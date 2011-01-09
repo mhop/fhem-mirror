@@ -13,7 +13,7 @@ set title '<TL>'
 set grid
 set yrange [-0.2:1.2]
 
-#FileLog "1"::0:
+#FileLog 4:Window:0:$fld[3]=~"Open"?1:0
 
 plot "< awk '{print $1, $4==\"Open\"? 1 : 0; }' <IN>"\
         using 1:2 title 'Open/Closed' with impulses
