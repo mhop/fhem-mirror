@@ -241,6 +241,8 @@ my %types =
 # Important: change it to _, because FHEM uses regexp
 my $DOT = q{_};
 
+my @OREGON_winddir_name=("N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW");
+
 # --------------------------------------------
 # The following functions are changed:
 #	- some parameter like "parent" and others are removed
@@ -398,6 +400,7 @@ sub wgr918_anemometer {
   my @res = ();
 
   my $dir = sprintf("%02x",$bytes->[5])*10 + hi_nibble($bytes->[4]);
+  my $dirname = $OREGON_winddir_name[$dir/22.5];
   my $speed = lo_nibble($bytes->[7]) * 10 + sprintf("%02x",$bytes->[6])/10;
   my $avspeed = sprintf("%02x",$bytes->[8]) + hi_nibble($bytes->[7]) / 10;
 
@@ -411,6 +414,7 @@ sub wgr918_anemometer {
                                device => $dev_str,
                                type => 'direction',
                                current => $dir,
+                               string => $dirname,
                                units => 'degrees',
                               } 
   ;
@@ -430,7 +434,9 @@ sub wtgr800_anemometer {
 
 	my @res = ();
 
-  	my $dir = hi_nibble($bytes->[4]) * 22.5;
+  	my $dir = hi_nibble($bytes->[4]) % 16;
+        my $dirname = $OREGON_winddir_name[$dir];
+        $dir = $dir * 22.5;
 	my $speed = lo_nibble($bytes->[7]) * 10 + sprintf("%02x",$bytes->[6])/10;
   	my $avspeed = sprintf("%02x",$bytes->[8]) + hi_nibble($bytes->[7]) / 10;
 
@@ -444,6 +450,8 @@ sub wtgr800_anemometer {
                                device => $dev_str,
                                type => 'direction',
                                current => $dir,
+                               string => $dirname,
+                               units => 'degrees',
                               } 
 	;
   	percentage_battery($bytes, $dev_str, \@res);
@@ -514,8 +522,8 @@ sub rtgr328n_datetime {
      lo_nibble($bytes->[5]).hi_nibble($bytes->[4])
     );
   my $day =
-    [ 'Mon', 'Tues', 'Wednes',
-      'Thur', 'Fri', 'Satur', 'Sun' ]->[($bytes->[9]&0x7)-1];
+    [ 'Mon', 'Tue', 'Wed',
+      'Thu', 'Fri', 'Sat', 'Sun' ]->[($bytes->[9]&0x7)-1];
   my $date =
     2000+(lo_nibble($bytes->[10]).hi_nibble($bytes->[9])).
       sprintf("%02d",hi_nibble($bytes->[8])).
@@ -857,11 +865,12 @@ OREGON_Parse($$)
 		}
        		case "direction" { 
 			$val .= "WD: ".$i->{current}."  ";
+			$val .= "WDN: ".$i->{string}."  ";
 
 			$sensor = "wind_dir";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			$def->{READINGS}{$sensor}{VAL} = $i->{current} . " " . $i->{string};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current} . " " . $i->{string};;
 		}
        		case "rain" { 
 			$val .= "RR: ".$i->{current}." ";
@@ -875,6 +884,14 @@ OREGON_Parse($$)
 			$val .= "TR: ".$i->{current}."  ";
 
 			$sensor = "rain_total";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+		}
+       		case "flip" { 
+			#$val .= "F: ".$i->{current}." ";
+
+			$sensor = "rain_flip";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
