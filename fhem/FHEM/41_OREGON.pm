@@ -241,7 +241,7 @@ my %types =
 # Important: change it to _, because FHEM uses regexp
 my $DOT = q{_};
 
-my @OREGON_winddir_name=("N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW");
+my @OREGON_winddir_name=("N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW");
 
 # --------------------------------------------
 # The following functions are changed:
