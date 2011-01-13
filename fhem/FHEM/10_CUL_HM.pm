@@ -126,8 +126,8 @@ CUL_HM_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
                        "subType:switch,dimmer,blindActuator,remote,sensor,".
-                             "swi,pushButton,threeStateSensor,motionDetector,".
-                             "keyMatic,winMatic,smokeDetector " .
+                         "swi,pushButton,threeStateSensor,motionDetector,".
+                         "keyMatic,winMatic,smokeDetector " .
                        "hmClass:receiver,sender serialNr firmware";
 }
 
@@ -265,6 +265,24 @@ CUL_HM_Parse($$)
       push @event, "test:$1";
 
     }
+
+  } elsif($st eq "threeStateSensor") { #####################################
+
+    if($p =~ m/^....C8/) {
+      push @event, "state:open";
+      if($id eq $dst) {
+        CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
+                "C8"."0028", 1, 0);
+      }
+
+    } elsif($p =~ m/^....00/) {
+      push @event, "state:closed";
+      if($id eq $dst) {
+        CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
+                "00"."0028", 1, 0);
+      }
+
+    push @event, "unknownMsg:$p" if(!@event);
 
   } elsif($st eq "THSensor") { ##########################################
 
@@ -510,7 +528,7 @@ CUL_HM_Pair(@)
   $attr{$name}{subType} = $dp ? $dp->{st} : "unknown";
   $attr{$name}{hmClass} = $dp ? $dp->{cl} : "unknown";
   $attr{$name}{serialNr} = pack('H*', substr($p, 6, 20));
-  $attr{$name}{firmware} = substr($p, 0, 2)/10;
+  $attr{$name}{firmware} = sprintf("%0.1f", substr($p, 0, 2)/10);
   my $isSender  = (AttrVal($name,"hmClass","") eq "sender");
 
   my $stn = $attr{$name}{subType};    # subTypeName
