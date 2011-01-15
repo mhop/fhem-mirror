@@ -268,20 +268,25 @@ CUL_HM_Parse($$)
 
   } elsif($st eq "threeStateSensor") { #####################################
 
+    push @event, "cover:closed" if($p =~ m/^0601..00$/);
+    push @event, "cover:open"   if($p =~ m/^0601..0E$/);
+    push @event, "state:alive"  if($p =~ m/^0601000E$/);
+
     if($p =~ m/^....C8/) {
-      push @event, "state:open";
+      push @event, "contact:open";
       if($id eq $dst) {
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 "C8"."0028", 1, 0);
       }
 
     } elsif($p =~ m/^....00/) {
-      push @event, "state:closed";
+      push @event, "contact:closed";
       if($id eq $dst) {
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 "00"."0028", 1, 0);
       }
 
+    }
     push @event, "unknownMsg:$p" if(!@event);
 
   } elsif($st eq "THSensor") { ##########################################
