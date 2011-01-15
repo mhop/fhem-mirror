@@ -437,19 +437,20 @@ FHT_Parse($$)
 
   } elsif($cmd =~ m/^actuator/) {
 
-    my $sval = substr($msg,24,2);
+    my $sval = lc(substr($msg,24,2));
     my $fv = sprintf("%d%%", int(100*$val/255+0.5));
 
-       if($sval =~ m/[ab]0/i) { $val = $fv; }   # sync in the summer
-    elsif($sval =~ m/.0/) { $val = "syncnow"; }
-    elsif($sval =~ m/.1/) { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
-    elsif($sval =~ m/.2/) { $val = "0%" }  # FHT set to  5.5
-    elsif($sval =~ m/.6/) { $val = "$fv" }
-    elsif($sval =~ m/.8/) { $val = "offset: $fv" }
-    elsif($sval =~ m/.a/) { $val = "lime-protection" }
-    elsif($sval =~ m/.c/) { $val = sprintf("synctime: %d", int($val/2)-1); }
-    elsif($sval =~ m/.e/) { $val = "test" }
-    elsif($sval =~ m/.f/) { $val = "pair" }
+       if($sval =~ m/[ab]0/) { $val = $fv; }   # sync in the summer
+    elsif($sval =~ m/.0/)    { $val = "syncnow"; }
+    elsif($sval =~ m/.1/)    { $val = "99%" } # FHT set to 30.5, FHT80B=="ON"
+    elsif($sval =~ m/.2/)    { $val = "0%" }  # FHT set to  5.5
+    elsif($sval =~ m/.6/)    { $val = "$fv" }
+    elsif($sval =~ m/.8/)    { $val = "offset: $fv" }
+    elsif($sval =~ m/[23]a/) { $val = "lime-protection" }
+    elsif($sval =~ m/[ab]a/) { $val = $fv } # lime protection bug
+    elsif($sval =~ m/.c/)    { $val = sprintf("synctime: %d", int($val/2)-1); }
+    elsif($sval =~ m/.e/)    { $val = "test" }
+    elsif($sval =~ m/.f/)    { $val = "pair" }
 
     else { $val = "unknown_$sval: $fv" }
 
