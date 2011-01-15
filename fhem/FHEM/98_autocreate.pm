@@ -11,25 +11,37 @@ use warnings;
 # - check "UNDEFINED" parameters for BS/USF1000/X10
 
 my %flogpar = (
-  "CUL_EM:.*"      => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT:.*" },
-  "CUL_WS:.*"      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
-  "CUL_FHTTK:.*"   => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
-  "FHT:.*"         => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
-  "HMS:HMS100TFK_.*" => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
-  "HMS:HMS100T._.*" => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
-  "KS300:.*"       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,", 
-                                                 FILTER => "%NAME:T:.*" },
+  "CUL_EM:.*"
+      => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT:.*" },
+  "CUL_WS:.*"
+      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
+  "CUL_FHTTK:.*"
+      => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
+  "FHT:.*"
+      => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
+  "HMS:HMS100TFK_.*"
+      => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
+  "HMS:HMS100T._.*"
+      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
+  "KS300:.*"
+      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,", FILTER => "%NAME:T:.*" },
   # Oregon sensors: 
   # * temperature
-  "OREGON:(THR128|THWR288A|THN132N).*"  => { GPLOT => "oregon_hms_t:Temp,",  FILTER => "%NAME" },
+  "OREGON:(THR128|THWR288A|THN132N).*"
+      => { GPLOT => "oregon_hms_t:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
-  "OREGON:(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"  => { GPLOT => "oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
+  "OREGON:(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"
+      => { GPLOT => "oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
   # * temperature, humidity, pressure
-  "OREGON:(BTHR918N|BTHR918|BTHR918N).*"  => { GPLOT => "oregon_temp_press:Temp/Press,oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
+  "OREGON:(BTHR918N|BTHR918|BTHR918N).*"
+      => { GPLOT => "oregon_temp_press:Temp/Press,oregon_hms:Temp/Hum,",
+           FILTER => "%NAME" },
   # * anenometer
-  "OREGON:(WGR800|WGR918|WTGR800_A).*"  => { GPLOT => "oregon_wind:WindDir/WindSpeed,",  FILTER => "%NAME" },
+  "OREGON:(WGR800|WGR918|WTGR800_A).*"
+      => { GPLOT => "oregon_wind:WindDir/WindSpeed,",  FILTER => "%NAME" },
   # * Oregon sensors: Rain gauge
-  "OREGON:(PCR800|RGR918).*"  => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
+  "OREGON:(PCR800|RGR918).*"
+      => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
 );
 
 #####################################
