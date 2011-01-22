@@ -80,6 +80,8 @@
       <a href="#CUL_HOERMANN">CUL_HOERMANN</a> &nbsp;
       <a href="#CUL_RFR">CUL_RFR</a> &nbsp;
       <a href="#CUL_WS">CUL_WS</a> &nbsp;
+      <a href="#ECMD">ECMD</a> &nbsp;
+      <a href="#ECMDDevice">ECMDDevice</a> &nbsp;
       <a href="#DS18S20">DS18S20</a> &nbsp;
       <a href="#EM">EM</a> &nbsp;
       <a href="#EMEM">EMEM</a> &nbsp;
@@ -1262,7 +1264,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="eventMap"></a>
     <li>eventMap<br>
         Exchange event or command names to a device specific version.  This
-        will also be used to exchange set arguments (if possible). 
+        will also be used to exchange set arguments (if possible).
         Example:<ul><code>
         attr store eventMap on:open off:closed<br>
         set store open
@@ -2250,7 +2252,7 @@ A line ending with \ will be concatenated with the next one, so long lines
          send a list of "raw" commands. The first command will be immediately
          sent, the next one after the previous one is acked by the target.  The
          length will be computed automatically, and the message counter will be
-         incremented if the first tw charcters are ++. 
+         incremented if the first tw charcters are ++.
          Example (enable AES):<pre>
          set hm1 raw ++A001F100001234560105000000001\
                      ++A001F10000123456010802010AF10B000C00\
@@ -2308,8 +2310,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
-    <li><a name="#model">hmClass</a>, 
-        <a name="#model">model</a>, 
+    <li><a name="#model">hmClass</a>,
+        <a name="#model">model</a>,
         <a name="#subType">subType</a><br>
         These attributes are set automatically after a successful pairing.
         They are not supposed to be set by hand, and are necessary in order to
@@ -3589,6 +3591,262 @@ Attributes:<br>
 
 </ul>
 
+
+<a name="ECMD"></a>
+<h3>ECMD</h3>
+<ul>
+  <br>
+  Any physical device with request/response-like communication capabilities
+  over a TCP connection can be defined as ECMD device. A practical example
+  of such a device is the AVR microcontroller board AVR-NET-IO from
+  <a href="http://www.pollin.de">Pollin</a> with
+  <a href="http://www.ethersex.de/index.php/ECMD">ECMD</a>-enabled
+  <a href="http://www.ethersex.de">Ethersex</a> firmware.<p>
+
+  A physical ECMD device can host any number of logical ECMD devices. Logical
+  devices are defined as <a href="#ECMDDevice">ECMDDevice</a>s in fhem.
+  ADC 0 to 3 and I/O port 0 to 3 of the above mentioned board
+  are examples of such logical devices. ADC 0 to 3 all belong to the same
+  device class ADC (analog/digital converter). I/O port 0 to 3 belong to the device
+  class I/O port. By means of extension boards you can make your physical
+  device drive as many logical devices as you can imagine, e.g. IR receivers,
+  LC displays, RF receivers/transmitters, 1-wire devices, etc.<p>
+
+  Defining one fhem module for any device class would create an unmanageable
+  number of modules. Thus, an abstraction layer is used. You create a device class
+  on the fly and assign it to a logical ECMD device. The
+  <a href="#ECMDClassdef">class definition</a>
+  names the parameters of the logical device, e.g. a placeholder for the number
+  of the ADC or port, as well as the get and set capabilities. Worked examples
+  are to be found in the documentation of the <a href="#ECMDDevice">ECMDDevice</a> device.
+  <br><br>
+
+  <a name="ECMDdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ECMD telnet &lt;IPAddress:Port&gt;</code>
+    <br><br>
+
+    Defines a physical ECMD device. The keyword <code>telnet</code> is fixed.<br><br>
+
+    Example:
+    <ul>
+      <code>define AVRNETIO ECMD telnet 192.168.0.91:2701</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="ECMDset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; classdef &lt;classname&gt; &lt;filename&gt;</code>
+    <br><br>
+    Creates a new device class <code>&lt;classname&gt;</code> for logical devices.
+    The class definition is in the file <code>&lt;filename&gt;</code>. You must
+    create the device class before you create a logical device that adheres to
+    that definition.
+    <br><br>
+    Example:
+    <ul>
+      <code>define AVRNETIO classdef /etc/fhem/ADC.classdef</code><br>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="ECMDget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; raw &lt;command&gt;</code>
+    <br><br>
+    Sends the command <code>&lt;command&gt;</code> to the physical ECMD device
+    <code>&lt;name&gt;</code> and reads the response.
+  </ul>
+  <br><br>
+
+  <a name="ECMDClassdef"></a>
+  <b>Class definition</b>
+  <br><br>
+  <ul>
+
+        The class definition for a logical ECMD device class is contained in a text file.
+        The text file is made up of single lines. Empty lines and text beginning with #
+        (hash) are ignored. Therefore make sure not to use hashes in commands.<br>
+
+        The following commands are recognized in the device class definition:<br><br>
+        <ul>
+                <li><code>params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br><br>
+                Declares the names of the named parameters that must be present in the
+                <a href="#ECMDDevicedefine">definition of the logical ECMD device</a>.
+                <br><br>
+                </li>
+
+                <li><code>set &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
+                <br><br>
+                Declares a new set command <code>&lt;commandname&gt;</code>.
+                <br><br>
+                </li>
+
+                <li><code>get &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
+                <br><br>
+                Declares a new get command <code>&lt;commandname&gt;</code>.
+                <br><br>
+                </li>
+
+                <li>
+                <code>set &lt;name&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
+                <code>get &lt;name&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
+                <br><br>
+                Declares the names of the named parameters that must be present in the
+                set or get command <code>&lt;name&gt;</code></a>. Be careful not to use a parameter name that
+                is already used in the device definition (see <code>params</code> above).
+                <br><br>
+                </li>
+
+        </ul>
+
+        The perl specials in the definitions of the set and get commands can contain macros. Apart from the rules
+        outlined in the <a href="#perl">documentation of perl specials</a> in fhem, the following rules apply:<br><br>
+        <ul>
+                <li>The character @ will be replaced with the device
+                name. To use @ in the text itself, use the double mode (@@).</li>
+
+                <li>The macro <code>%NAME</code> will expand to the device name (same as <code>@</code>).</li>
+
+                <li>The macro <code>%&lt;parameter&gt;</code> will expand to the current value of the
+                named parameter. This can be either a parameter from the device definition or a parameter
+                from the set or get command.</li>
+
+                <li>The macro substitution occurs before perl evaluates the expression. It is a plain text substitution.</li>
+
+                <li>If in doubt what happens, run the commands with loglevel 5 and observe the log file.</li>
+
+   </ul>
+</ul>
+
+<a name="ECMDDevice"></a>
+<h3>ECMDDevice</h3>
+<ul>
+  <br>
+  <a name="ECMDDevicedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ECMDDevice &lt;classname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <br><br>
+
+    Defines a logical ECMD device. The number of given parameters must match those given in
+    the <a href="#ECMDClassdef">class definition</a> of the device class <code>&lt;classname&gt;</code>.
+    <br><br>
+
+    Examples:
+    <ul>
+      <code>define myADC ECMDDevice ADC</code><br>
+      <code>define myRelais1 ECMDDevice relais 8</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="ECMDDeviceset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;commandname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <br><br>
+    The number of given parameters must match those given for the set command <code>&lt;commandname&gt;</code> definition in
+    the <a href="#ECMDClassdef">class definition</a>.<br><br>
+    If <code>set &lt;commandname&gt;</code> is invoked the perl special in curly brackets from the command definition
+    is evaluated and the result is sent to the physical ECMD device.
+    <br><br>
+    Example:
+    <ul>
+      <code>get myADC value 3</code><br>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="ECMDDeviceget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;commandname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <br><br>
+    The number of given parameters must match those given for the get command <code>&lt;commandname&gt;</code> definition in
+    the <a href="#ECMDClassdef">class definition</a>.<br><br>
+    If <code>get &lt;commandname&gt;</code> is invoked the perl special in curly brackets from the command definition
+    is evaluated and the result is sent to the physical ECMD device. The response from the physical ECMD device is returned
+    and the state of the logical ECMD device is updated accordingly.
+    <br><br>
+    Example:
+    <ul>
+      <code>set myRelais1 on</code><br>
+    </ul>
+    <br>
+  </ul>
+
+
+  <b>Example 1</b>
+  <br><br>
+  <ul>
+        The following example shows how to access the ADC of the AVR-NET-IO board from
+        <a href="http://www.pollin.de">Pollin</a> with
+        <a href="http://www.ethersex.de/index.php/ECMD">ECMD</a>-enabled
+        <a href="http://www.ethersex.de">Ethersex</a> firmware.<br><br>
+
+        The class definition file <code>/etc/fhem/ADC.classdef</code> looks as follows:<br><br>
+        <code>
+                get value cmd {"adc get %channel"}  <br>
+                get value params channel<br>
+        </code>
+        <br>
+        In the fhem configuration file or on the fhem command line we do the following:<br><br>
+        <code>
+                define AVRNETIO telnet 192.168.0.91:2701        # define the physical device<br>
+                set AVRNETIO classdef ADC /etc/fhem/ADC.classdef       # define the device class ADC<br>
+                define myADC ADC # define the logical device myADC with device cass ADC<br>
+                get myADC value 1 # retrieve the value of analog/digital converter number 1<br>
+        </code>
+        <br>
+        The get command is evaluated as follows: <code>get value</code> has one named parameter
+        <code>channel</code>. In the example the literal <code>1</code> is given and thus <code>%channel</code>
+        is replaced by <code>1</code> to yield <code>"adc get 1"</code> after macro substitution. Perl
+        evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO. The
+        board returns something like <code>024</code> for the current value of  analog/digital converter number 1.
+        <br><br>
+
+   </ul>
+</ul>
+
+  <b>Example 2</b>
+  <br><br>
+  <ul>
+        The following example shows how to switch a relais driven by pin 3 (bit mask 0x08) of I/O port 2 on for
+        one second and then off again.<br><br>
+
+        The class definition file <code>/etc/fhem/relais.classdef</code> looks as follows:<br><br>
+        <code>
+                params pinmask<br>
+                set on cmd {"io set ddr 2 ff\nioset port 2 0%pinmask\nwait 1000\nio set port 2 00"}<br>
+        </code>
+        <br>
+        In the fhem configuration file or on the fhem command line we do the following:<br><br>
+        <code>
+                define AVRNETIO telnet 192.168.0.91:2701        # define the physical device<br>
+                set AVRNETIO classdef relais /etc/fhem/relais.classdef       # define the device class relais<br>
+                define myRelais 8 # define the logical device myRelais with pin mask 8<br>
+                set myRelais on # execute the "on" command<br>
+        </code>
+        <br>
+        The set command is evaluated as follows: <code>%pinmask</code>
+        is replaced by <code>8</code> to yield
+        <code>"io set ddr 2 ff\nioset port 2 08\nwait 1000\nio set port 2 00"</code> after macro substitution. Perl
+        evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO line by line.
+        <br><br>
+
+   </ul>
+</ul>
+
+
+
+
 <a name="M232"></a>
 <h3>M232</h3>
 <ul>
@@ -3954,8 +4212,8 @@ audio</pre>
   <ul>
     <code>define &lt;name&gt; OREGON &lt;deviceid&gt;</code> <br>
     <br>
-    &lt;deviceid&gt; is the device identifier of the Oregon sensor. It consists of the sensors name and a one byte hex string (00-ff) that identifies the sensor. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used: 
-BTHR918, BTHR918N, PCR800 RGR918, RTGR328N, THN132N, THGR228N, THGR328N, THGR918, THR128, THWR288A, THGR810, UV138, UVN800, WGR918, WGR800, WTGR800_A, WTGR800_T. 
+    &lt;deviceid&gt; is the device identifier of the Oregon sensor. It consists of the sensors name and a one byte hex string (00-ff) that identifies the sensor. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used:
+BTHR918, BTHR918N, PCR800 RGR918, RTGR328N, THN132N, THGR228N, THGR328N, THGR918, THR128, THWR288A, THGR810, UV138, UVN800, WGR918, WGR800, WTGR800_A, WTGR800_T.
     <br>
 The one byte hex string is generated by the Oregon sensor when is it powered on. The value seems to be randomly generated. This has the advantage that you may use more than one Oregon sensor of the same type even if it has no switch to set a sensor id. For exampple the author uses three BTHR918 sensors at the same time. All have different deviceids. The drawback is that the deviceid changes after changing batteries.
     <br><br>
@@ -4243,7 +4501,7 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
   Oregon Scientific weather sensors and RFXCOM RFXMeter devices. If you need to process other devices that are supported
   by RFXCOM, you have to implement a new parsing module.<br>
   See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> of
-  Oregon Scientific weather sensors that could be received by the RFXCOM receivers. See <a href="http://www.rfxcom.com/sensors.htm">http://www.rfxcom.com/sensors.htm</a> for RFXMeter device. 
+  Oregon Scientific weather sensors that could be received by the RFXCOM receivers. See <a href="http://www.rfxcom.com/sensors.htm">http://www.rfxcom.com/sensors.htm</a> for RFXMeter device.
   Please note that not all Oregon sensors are currently implemented in the parser module right now.
   The parsing modules are based on the <a href="http://www.xpl-perl.org.uk/">Perl xPL</a>
   project parsing modules. Thanks to Mark Hindess from the xPL project for writing this code. <br>
