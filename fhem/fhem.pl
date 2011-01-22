@@ -164,7 +164,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.121 2011-01-02 14:45:53 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.122 2011-01-22 21:53:18 neubert Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -318,6 +318,8 @@ Log 0, "Server started (version $attr{global}{version}, pid $$)";
 ################################################
 # Main Loop
 sub MAIN {MAIN:};               #Dummy
+
+my $errcount= 0;
 while (1) {
   my ($rout, $rin) = ('', '');
 
@@ -329,6 +331,9 @@ while (1) {
     vec($rin, fileno($client{$c}{fd}), 1) = 1;
   }
 
+  # for documentation see
+  # man 2 select
+  # http://perldoc.perl.org/functions/select.html
   my $timeout = HandleTimeout();
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
@@ -340,21 +345,27 @@ while (1) {
     my $err = int($!);
     next if ($err == 0);
 
+    Log 1, "ERROR: Select error $nfound ($err), error count= $errcount";
+    $errcount++;
+
     # Handling "Bad file descriptor". This is a programming error.
-    if($! == $err) {  # BADF, don't want to "use errno.ph"
+    if($err == 9) {  # BADF, don't want to "use errno.ph"
       my $nbad = 0;
       foreach my $p (keys %selectlist) {
         my ($tin, $tout) = ('', '');
         vec($tin, $selectlist{$p}{FD}, 1) = 1;
         if(select($tout=$tin, undef, undef, 0) < 0) {
-          Log 0, "ERROR: Found & deleted bad fileno for $p";
+          Log 1, "Found and deleted bad fileno for $p";
           delete($selectlist{$p});
           $nbad++;
         }
       }
       next if($nbad > 0);
+      next if($errcount <= 3);
     }
-    die("Select error $nfound / $!\n");
+    die("Select error $nfound ($err)\n");
+  } else {
+    $errcount= 0;
   }
 
   ###############################
@@ -371,7 +382,7 @@ while (1) {
     next if(!$readyfnlist{$p});                 # due to rereadcfg / delete
 
     if(CallFn($readyfnlist{$p}{NAME}, "ReadyFn", $readyfnlist{$p})) {
-      if($readyfnlist{$p}) {                    # delete itself inside ReadyFn 
+      if($readyfnlist{$p}) {                    # delete itself inside ReadyFn
         CallFn($readyfnlist{$p}{NAME}, "ReadFn", $readyfnlist{$p});
       }
 
@@ -618,18 +629,9 @@ AnalyzeCommandChain($$)
 
 #####################################
 sub
-AnalyzeCommand($$)
+AnalyzePerlCommand($$)
 {
-  my ($cl, $cmd) = @_;
-
-  $cmd =~ s/^(\\\n|[ \t])*//;		# Strip space or \\n at the begginning
-  $cmd =~ s/[ \t]*$//;
-
-
-  Log 5, "Cmd: >$cmd<";
-  return if(!$cmd);
-
-  if($cmd =~ m/^{.*}$/s) {		# Perl code
+    my ($cl, $cmd) = @_;
 
     $cmd =~ s/\\ *\n/ /g;               # Multi-line
     # Make life easier for oneliners:
@@ -650,7 +652,22 @@ AnalyzeCommand($$)
     $ret = $@ if($@);
     syswrite($client{$cl}{fd}, "$ret\n") if($ret && $cl);
     return $ret;
+}
 
+sub
+AnalyzeCommand($$)
+{
+  my ($cl, $cmd) = @_;
+
+  $cmd =~ s/^(\\\n|[ \t])*//;		# Strip space or \\n at the begginning
+  $cmd =~ s/[ \t]*$//;
+
+
+  Log 5, "Cmd: >$cmd<";
+  return if(!$cmd);
+
+  if($cmd =~ m/^{.*}$/s) {		# Perl code
+    return AnalyzePerlCommand($cl, $cmd);
   }
 
   if($cmd =~ m/^"(.*)"$/s) {		 # Shell code, always in bg
@@ -727,7 +744,7 @@ devspec2array($)
           push @ret, $l
             if($attr{$l}{$lattr} && (!$re || $attr{$l}{$lattr} =~ m/$re/));
         }
-      } 
+      }
       $isattr = 1;
       next;
     }
@@ -962,7 +979,7 @@ CommandSave($$)
       }
     }
     foreach my $a (sort keys %{$attr{$d}}) {
-      next if($d eq "global" && 
+      next if($d eq "global" &&
               ($a eq "configfile" || $a eq "version"));
       print SFH "attr $d $a $attr{$d}{$a}\n";
     }
@@ -1337,13 +1354,13 @@ CommandList($$)
 
         if($defs{$sdev} &&
            $defs{$sdev}{$arg[1]}) {
-          $str .= $sdev . " " . 
+          $str .= $sdev . " " .
                   $defs{$sdev}{$arg[1]} . "\n";
 
         } elsif($defs{$sdev} &&
            $defs{$sdev}{READINGS} &&
            $defs{$sdev}{READINGS}{$arg[1]}) {
-          $str .= $sdev . " ". 
+          $str .= $sdev . " ".
                   $defs{$sdev}{READINGS}{$arg[1]}{TIME} . " " .
                   $defs{$sdev}{READINGS}{$arg[1]}{VAL} . "\n";
         }
@@ -1567,7 +1584,7 @@ CommandAttr($$)
   my ($cl, $param) = @_;
   my $ret = undef;
   my @a;
-  
+
   @a = split(" ", $param, 3) if($param);
 
   return "Usage: attr <name> <attrname> [<attrvalue>]\n$namedef"
@@ -1777,7 +1794,7 @@ HandleTimeout()
   $nextat = 0;
   #############
   # Check the internal list.
-  foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=> 
+  foreach my $i (sort { $intAt{$a}{TRIGGERTIME} <=>
                         $intAt{$b}{TRIGGERTIME} } keys %intAt) {
     my $tim = $intAt{$i}{TRIGGERTIME};
     my $fn = $intAt{$i}{FN};
@@ -1923,6 +1940,39 @@ SemicolonEscape($)
     $cmd =~ s/;/;;/g
   }
   return $cmd;
+}
+
+sub
+EvalSpecials($%)
+{
+     # The character % will be replaced with the received event,
+     #     e.g. with on or off or measured-temp: 21.7 (Celsius)
+     # The character @ will be replaced with the device name.
+     # To use % or @ in the text itself, use the double mode (%% or @@).
+     # Instead of % and @, the parameters %EVENT (same as %),
+     #     %NAME (same as @) and %TYPE (contains the device type, e.g. FHT)
+     #     can be used. A single % looses its special meaning if any of these
+     #     parameters appears in the definition.
+
+      my ($exec, %specials)= @_;
+      $exec = SemicolonEscape($exec);
+
+      $exec =~ s/%%/____/g;
+      # perform macro substitution
+      my $extsyntax= 0;
+      foreach my $special (keys %specials) {
+        $extsyntax+= ($exec =~ s/$special/$specials{$special}/g);
+      }
+      if(!$extsyntax) {
+        $exec =~ s/%/$specials{"%EVENT"}/g;
+      }
+      $exec =~ s/____/%/g;
+
+      $exec =~ s/@@/____/g;
+      $exec =~ s/@/$specials{"%NAME"}/g;
+      $exec =~ s/____/@/g;
+
+      return $exec;
 }
 
 #####################################

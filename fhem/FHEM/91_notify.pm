@@ -23,7 +23,7 @@ notify_Define($$)
 {
   my ($hash, $def) = @_;
   my ($name, $type, $re, $command) = split("[ \t]+", $def, 4);
-  
+
   if(!$command) {
     if($hash->{OLDDEF}) { # Called from modify, where command is optional
       (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
@@ -62,21 +62,13 @@ notify_Exec($$)
     $s = "" if(!defined($s));
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
-      $exec = SemicolonEscape($exec);
 
-      $exec =~ s/%%/____/g;
-      my $extsyntax= 0;
-      $extsyntax+= ($exec =~ s/%TYPE/$t/g);
-      $extsyntax+= ($exec =~ s/%NAME/$n/g);
-      $extsyntax+= ($exec =~ s/%EVENT/$s/g);
-      if(!$extsyntax) {
-        $exec =~ s/%/$s/g;
-      }
-      $exec =~ s/____/%/g;
-
-      $exec =~ s/@@/____/g;
-      $exec =~ s/@/$n/g;
-      $exec =~ s/____/@/g;
+      my %specials= (
+                "%NAME" => $n,
+                "%TYPE" => $t,
+                "%EVENT" => $s
+      );
+      $exec= EvalSpecials($exec, %specials);
 
       my $r = AnalyzeCommandChain(undef, $exec);
       Log 3, $r if($r);
