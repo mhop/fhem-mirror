@@ -930,7 +930,7 @@ CUL_SimpleWrite(@)
     # Prefix $msg with RRBBU and return the corresponding CUL hash.
     ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
   }
-  #Log 1, "SW: $msg";
+  Log 1, "SW: $msg";
   $msg .= "\n" unless($nonl);
 
   $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
@@ -1058,7 +1058,7 @@ CUL_OpenDev($$)
 
     if($baudrate) {
       $po->reset_error();
-      Log 3, "$name: Setting baudrate to $baudrate";
+      Log 3, "CUL setting $name baudrate to $baudrate";
       $po->baudrate($baudrate);
       $po->databits(8);
       $po->parity('none');
