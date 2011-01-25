@@ -56,24 +56,18 @@ ECMD_Define($$)
 
   my $name = $a[0];
   my $protocol = $a[2];
-  my $ipaddress= $a[3];
 
-  if(@a < 4 || @a > 4 || $protocol ne "telnet") {
-    my $msg = "wrong syntax: define <name> ECMD telnet <ipaddress[:port]> ";
+  if(@a < 4 || @a > 4 || (($protocol ne "telnet") && ($protocol ne "serial"))) {
+    my $msg = "wrong syntax: define <name> ECMD telnet <ipaddress[:port]> or define <name> ECMD serial <devicename[\@baudrate]>";
     Log 2, $msg;
     return $msg;
   }
 
   ECMD_CloseDev($hash);
 
-  if($ipaddress eq "none") {
-    Log 1, "$name ip address is none, commands will be echoed only";
-    $attr{$name}{dummy} = 1;
-    return undef;
-  }
-
   $hash->{Protocol}= $protocol;
-  $hash->{IPAddress}= $ipaddress;
+  my $devicename= $a[3];
+  $hash->{DeviceName} = $devicename;
 
   my $ret = ECMD_OpenDev($hash, 0);
   return $ret;
@@ -108,18 +102,25 @@ ECMD_CloseDev($)
 {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $ipaddress = $hash->{IPAddress};
+  my $dev = $hash->{DeviceName};
 
-  return if(!$ipaddress);
+  return if(!$dev);
 
   if($hash->{TCPDev}) {
     $hash->{TCPDev}->close();
     delete($hash->{TCPDev});
-  }
 
-  delete($selectlist{"$name.$ipaddress"});
-  delete($readyfnlist{"$name.$ipaddress"});
+  } elsif($hash->{USBDev}) {
+    $hash->{USBDev}->close() ;
+    delete($hash->{USBDev});
+
+  }
+  ($dev, undef) = split("@", $dev); # Remove the baudrate
+  delete($selectlist{"$name.$dev"});
+  delete($readyfnlist{"$name.$dev"});
   delete($hash->{FD});
+
+
 }
 
 ########################
@@ -128,13 +129,16 @@ ECMD_OpenDev($$)
 {
   my ($hash, $reopen) = @_;
   my $protocol = $hash->{Protocol};
-  my $ipaddress = $hash->{IPAddress};
   my $name = $hash->{NAME};
+  my $devicename = $hash->{DeviceName};
 
 
   $hash->{PARTIAL} = "";
-  Log 3, "ECMD opening $name (protocol $protocol, ipaddress $ipaddress)"
+  Log 3, "ECMD opening $name (protocol $protocol, device $devicename)"
         if(!$reopen);
+
+  if($hash->{Protocol} eq "telnet") {
+
 
     # This part is called every time the timeout (5sec) is expired _OR_
     # somebody is communicating over another TCP connection. As the connect
@@ -144,12 +148,13 @@ ECMD_OpenDev($$)
       return;
     }
 
-    my $conn = IO::Socket::INET->new(PeerAddr => $ipaddress);
+    my $conn = IO::Socket::INET->new(PeerAddr => $devicename);
     if($conn) {
       delete($hash->{NEXT_OPEN})
+
     } else {
-      Log(3, "Can't connect to $ipaddress: $!") if(!$reopen);
-      $readyfnlist{"$name.$ipaddress"} = $hash;
+      Log(3, "Can't connect to $devicename: $!") if(!$reopen);
+      $readyfnlist{"$name.$devicename"} = $hash;
       $hash->{STATE} = "disconnected";
       $hash->{NEXT_OPEN} = time()+60;
       return "";
@@ -157,12 +162,74 @@ ECMD_OpenDev($$)
 
     $hash->{TCPDev} = $conn;
     $hash->{FD} = $conn->fileno();
-    delete($readyfnlist{"$name.$ipaddress"});
-    $selectlist{"$name.$ipaddress"} = $hash;
+    delete($readyfnlist{"$name.$devicename"});
+    $selectlist{"$name.$devicename"} = $hash;
 
+  } else {
+
+    my $baudrate;
+    ($devicename, $baudrate) = split("@", $devicename);
+
+    my $po;
+    if ($^O=~/Win/) {
+     require Win32::SerialPort;
+     $po = new Win32::SerialPort ($devicename);
+    } else  {
+     require Device::SerialPort;
+     $po = new Device::SerialPort ($devicename);
+    }
+
+    if(!$po) {
+      return undef if($reopen);
+      Log(3, "Can't open $devicename: $!");
+      $readyfnlist{"$name.$devicename"} = $hash;
+      $hash->{STATE} = "disconnected";
+      return "";
+    }
+
+    $hash->{USBDev} = $po;
+    if( $^O =~ /Win/ ) {
+      $readyfnlist{"$name.$devicename"} = $hash;
+    } else {
+      $hash->{FD} = $po->FILENO;
+      delete($readyfnlist{"$name.$devicename"});
+      $selectlist{"$name.$devicename"} = $hash;
+    }
+
+    if($baudrate) {
+      $po->reset_error();
+      Log 3, "CUL setting $name baudrate to $baudrate";
+      $po->baudrate($baudrate);
+      $po->databits(8);
+      $po->parity('none');
+      $po->stopbits(1);
+      $po->handshake('none');
+
+      # This part is for some Linux kernel versions whih has strange default
+      # settings.  Device::SerialPort is nice: if the flag is not defined for your
+      # OS then it will be ignored.
+      $po->stty_icanon(0);
+      #$po->stty_parmrk(0); # The debian standard install does not have it
+      $po->stty_icrnl(0);
+      $po->stty_echoe(0);
+      $po->stty_echok(0);
+      $po->stty_echoctl(0);
+
+      # Needed for some strange distros
+      $po->stty_echo(0);
+      $po->stty_icanon(0);
+      $po->stty_isig(0);
+      $po->stty_opost(0);
+      $po->stty_icrnl(0);
+    }
+
+    $po->write_settings;
+
+
+  }
 
   if($reopen) {
-    Log 1, "ECMD $ipaddress reappeared ($name)";
+    Log 1, "ECMD $name ($devicename) reappeared";
   } else {
     Log 3, "ECMD device opened";
   }
@@ -173,7 +240,7 @@ ECMD_OpenDev($$)
   if($ret) {
     Log 1,  "$ret";
     ECMD_CloseDev($hash);
-    Log 1, "Cannot init $ipaddress, ignoring it";
+    Log 1, "Cannot init $name ($devicename), ignoring it";
   }
 
   DoTrigger($name, "CONNECTED") if($reopen);
@@ -211,6 +278,7 @@ ECMD_SimpleWrite(@)
   return if(!$hash);
 
   $msg .= "\n" unless($nonl);
+  $hash->{USBDev}->write($msg) if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 
   select(undef, undef, undef, 0.001);
@@ -222,9 +290,13 @@ ECMD_SimpleRead($)
 {
   my ($hash) = @_;
 
+  if($hash->{USBDev}) {
+    return $hash->{USBDev}->input();
+  }
+
   if($hash->{TCPDev}) {
     my $buf;
-    if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
+    if(!defined(sysread($hash->{TCPDev}, $buf, 1024))) {
       ECMD_Disconnected($hash);
       return undef;
     }
@@ -307,14 +379,14 @@ sub
 ECMD_Disconnected($)
 {
   my $hash = shift;
-  my $ipaddress = $hash->{IPAddress};
+  my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
 
   return if(!defined($hash->{FD}));                 # Already deleted o
 
-  Log 1, "$ipaddress disconnected, waiting to reappear";
+  Log 1, "$dev disconnected, waiting to reappear";
   ECMD_CloseDev($hash);
-  $readyfnlist{"$name.$ipaddress"} = $hash;               # Start polling
+  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
 
   # Without the following sleep the open of the device causes a SIGSEGV,

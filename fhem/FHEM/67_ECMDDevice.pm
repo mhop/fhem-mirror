@@ -71,6 +71,29 @@ ECMDDevice_DeviceParams2Specials($)
         return %specials;
 }
 
+###################################
+sub
+ECMDDevice_Changed($$$)
+{
+        my ($hash, $cmd, $value)= @_;
+
+        my $name= $hash->{NAME};
+        my $r= $hash->{READINGS};
+        my $tn = TimeNow();
+
+        $r->{$cmd}{TIME} = $tn;
+        $r->{$cmd}{VAL} = $value;
+
+        $hash->{CHANGED}[0]= "$cmd: $value";
+
+        DoTrigger($name, undef) if($init_done);
+
+        $hash->{STATE} = "$cmd: $value";
+        Log GetLogLevel($name, 4), "ECMDDevice $name $cmd: $value";
+
+        return $hash->{STATE};
+
+}
 
 ###################################
 sub
@@ -111,7 +134,7 @@ ECMDDevice_Get($@)
 
         my $v= IOWrite($hash, $r);
 
-        return "$name $cmdname => $v" ;
+        return ECMDDevice_Changed($hash, $cmdname, $v);
 }
 
 
@@ -151,7 +174,11 @@ ECMDDevice_Set($@)
 
         my $r = ECMDDevice_AnalyzeCommand($ecmd);
 
-        return IOWrite($hash, $r);
+        my $v= IOWrite($hash, $r);
+        $v= $params if($params);
+
+        return ECMDDevice_Changed($hash, $cmdname, $v);
+
 }
 
 
