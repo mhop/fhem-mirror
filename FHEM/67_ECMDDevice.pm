@@ -78,11 +78,9 @@ ECMDDevice_Changed($$$)
         my ($hash, $cmd, $value)= @_;
 
         my $name= $hash->{NAME};
-        my $r= $hash->{READINGS};
-        my $tn = TimeNow();
 
-        $r->{$cmd}{TIME} = $tn;
-        $r->{$cmd}{VAL} = $value;
+        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+        $hash->{READINGS}{$cmd}{VAL} = $value;
 
         $hash->{CHANGED}[0]= "$cmd: $value";
 
