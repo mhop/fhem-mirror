@@ -526,6 +526,8 @@ ECMD_Set($@)
                 }
         }
 
+        $hash->{READINGS}{$a[1]}{VAL} = "$classname $filename";
+        $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
         return undef;
 }
 
