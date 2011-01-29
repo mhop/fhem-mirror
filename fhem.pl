@@ -42,6 +42,7 @@ use Time::HiRes qw(gettimeofday);
 sub AddDuplicate($$);
 sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
+sub AnalyzePerlCommand($$);
 sub AnalyzeInput($);
 sub AssignIoPort($);
 sub AttrVal($$$);
@@ -164,7 +165,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.122 2011-01-22 21:53:18 neubert Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.123 2011-01-29 07:24:29 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -927,7 +928,7 @@ WriteStatefile()
     print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n"
         if($defs{$d}{VOLATILE});
     print SFH "setstate $d $defs{$d}{STATE}\n"
-        if($defs{$d}{STATE} &&
+        if(defined($defs{$d}{STATE}) &&
            $defs{$d}{STATE} ne "unknown" &&
            $defs{$d}{STATE} ne "Initialized");
 
@@ -1155,6 +1156,7 @@ CommandDefine($$)
 
   my $ret = CallFn($a[0], "DefFn", \%hash, $def);
   if($ret) {
+    Log 1, $ret;
     delete $defs{$a[0]};                            # Veto
     delete $attr{$a[0]};
 
