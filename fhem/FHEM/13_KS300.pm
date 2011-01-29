@@ -163,7 +163,7 @@ KS300_Parse($$)
 
        # detect error condition
        # delta is negative or delta is too large
-       # see http://de.wikipedia.org/wiki/Niederschlagsintensität#Niederschlagsintensit.C3.A4t
+       # see http://de.wikipedia.org/wiki/Niederschlagsintensit??t#Niederschlagsintensit.C3.A4t
        # during a thunderstorm in middle europe, 50l/m^2 rain may fall per hour
        # 50l/(m^2*h) correspond to 200 ticks/h
        # Since KS300 sends every 2,5 minutes, a maximum delta of 8 ticks would
@@ -228,6 +228,7 @@ KS300_Parse($$)
 
     # For logging/summary
     my $val = "T: $v[4]  H: $v[3]  W: $v[2]  R: $v[1]  IR: $v[5]";
+    Log GetLogLevel($def->{NAME},4), "KS300 $dev: $val";
     $def->{STATE} = $val;
     $def->{CHANGED}[0] = $val;
 
