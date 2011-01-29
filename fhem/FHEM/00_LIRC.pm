@@ -17,6 +17,7 @@ LIRC_Initialize($)
 
 # Provider
   $hash->{ReadFn}  = "LIRC_Read";
+  $hash->{ReadyFn} = "LIRC_Ready";
   $hash->{Clients} = ":LIRC:";
 
 # Consumer
@@ -33,13 +34,14 @@ LIRC_Define($$)
 
   $hash->{STATE} = "Initialized";
 
+  $hash->{LircObj}->clean_up() if($hash->{LircObj});
   delete $hash->{LircObj};
   delete $hash->{FD};
 
   my $name = $a[0];
   my $config = $a[2];
 
-  Log 3, "LIRC opening LIRC device $config";
+  Log 3, "LIRC opening $name device $config";
   my $lirc = Lirc::Client->new({
         prog    => 'fhem',
         rcfile  => "$config", 
@@ -53,9 +55,11 @@ LIRC_Define($$)
   $select->add( $lirc->sock );
 
   $hash->{LircObj} = $lirc;
-  $hash->{FD} = $lirc->sock;
-  $selectlist{"$name.$config"} = $hash;
-  $hash->{SelectObj} = $select;
+  
+  $hash->{FD} = $lirc->{sock};       # is not working and sets timeout to undefined 
+  $selectlist{"$name"} = $hash;      # 
+  $readyfnlist{"$name"} = $hash;     # thats why we start polling
+  $hash->{SelectObj} = $select;      
   $hash->{DeviceName} = $name;    
   $hash->{STATE} = "Opened";
 
@@ -68,7 +72,10 @@ LIRC_Undef($$)
 {
   my ($hash, $arg) = @_;
 
-  $hash->{LircObj}->close() if($hash->{LircObj});
+  $hash->{LircObj}->clean_up() if($hash->{LircObj});
+  delete $hash->{LircObj};
+  delete $hash->{FD};
+
   return undef;
 }
 
@@ -85,11 +92,22 @@ LIRC_Read($)
     # an ir event has been received (if you are tracking other filehandles, you need to make sure it is lirc)
     my @codes = $lirc->next_codes;    # should not block
     for my $code (@codes){
-      Log 3, "LIRC code: $code\n";
+      Log 3, "LIRC $code toggle";
       DoTrigger($code, "toggle");
     }
   }
 
+}
+
+#####################################
+sub
+LIRC_Ready($)
+{
+  my ($hash) = @_;
+
+  my $select= $hash->{SelectObj};
+
+  return $select->can_read(0);
 }
 
 1;
