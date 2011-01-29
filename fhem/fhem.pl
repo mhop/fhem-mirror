@@ -81,6 +81,8 @@ sub fhem($);
 sub fhz($);
 sub IsDummy($);
 sub IsIgnored($);
+sub setGlobalAttrBeforeFork();
+sub redirectStdinStdErr();
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -159,13 +161,12 @@ my $logopened = 0;              # logfile opened or using stdout
 my %client;			# Client array
 my $rcvdquit;			# Used for quit handling in init files
 my $sig_term = 0;		# if set to 1, terminate (saving the state)
-my $modpath_set;                # Check if modpath was used, and report if not.
 my %intAt;			# Internal at timer hash.
 my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.125 2011-01-29 07:38:13 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.126 2011-01-29 12:07:14 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -238,16 +239,6 @@ my $commonAttr = "eventMap";
             Hlp=>"<devspec> <state>,trigger notify command" },
 );
 
-# If started as root, and there is a fhem user in the /etc/passwd, su to it
-if($^O !~ m/Win/ && $< == 0) {
-  my @pw = getpwnam("fhem");
-  if(@pw) {
-    use POSIX qw(setuid);
-    setuid($pw[2]);
-  }
-}
-
-
 ###################################################
 # Start the program
 if(int(@ARGV) != 1 && int(@ARGV) != 2) {
@@ -258,7 +249,14 @@ if(int(@ARGV) != 1 && int(@ARGV) != 2) {
   exit(1);
 }
 
-doGlobalDef($ARGV[0]);
+# If started as root, and there is a fhem user in the /etc/passwd, su to it
+if($^O !~ m/Win/ && $< == 0) {
+  my @pw = getpwnam("fhem");
+  if(@pw) {
+    use POSIX qw(setuid);
+    setuid($pw[2]);
+  }
+}
 
 ###################################################
 # Client code
@@ -277,11 +275,14 @@ if(int(@ARGV) == 2) {
 # End of client code
 ###################################################
 
-
 ###################################################
 # Server initialization
-my $ret = CommandInclude(undef, $attr{global}{configfile});
-die($ret) if($ret);
+doGlobalDef($ARGV[0]);
+
+# As newer Linux versions reset serial parameters after fork, we parse the
+# config file after the fork. Since need some global attr parameters before, we
+# read them here.
+setGlobalAttrBeforeFork();   
 
 if($^O =~ m/Win/ && !$attr{global}{nofork}) {
   Log 1, "Forcing 'attr global nofork' on WINDOWS";
@@ -296,13 +297,15 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
   exit(0) if $pid;
 }
 
-die("No modpath specified in the configfile.\n") if(!$modpath_set);
+my $ret = CommandInclude(undef, $attr{global}{configfile});
+die("$ret\n") if($ret);
 die("No port specified in the configfile.\n") if(!$server);
 
 if($attr{global}{statefile} && -r $attr{global}{statefile}) {
   $ret = CommandInclude(undef, $attr{global}{statefile});
   die($ret) if($ret);
 }
+
 SignalHandling();
 
 my $pfn = $attr{global}{pidfilename};
@@ -311,7 +314,9 @@ if($pfn) {
   print PID $$ . "\n";
   close(PID);
 }
+
 $init_done = 1;
+redirectStdinStdErr();
 DoTrigger("global", "INITIALIZED");
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
@@ -802,6 +807,8 @@ CommandInclude($$)
 {
   my ($cl, $arg) = @_;
   my $fh;
+  my $ret = undef;
+
   if(!open($fh, $arg)) {
     return "Can't open $arg: $!";
   }
@@ -813,13 +820,14 @@ CommandInclude($$)
     if($l =~ m/^(.*)\\ *$/) {		# Multiline commands
       $bigcmd .= "$1\\\n";
     } else {
-      AnalyzeCommandChain($cl, $bigcmd . $l);
+      my $tret = AnalyzeCommandChain($cl, $bigcmd . $l);
+      $ret = $tret if(!$ret && $tret);
       $bigcmd = "";
     }
     last if($rcvdquit);
   }
   close($fh);
-  return undef;
+  return $ret;
 }
 
 
@@ -843,21 +851,30 @@ OpenLogfile($)
     $defs{global}{logfile} = $attr{global}{logfile};
 
     open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
-    # Redirect stdin/stderr
-
-    open STDIN,  '</dev/null'  or return "Can't read /dev/null: $!";
-
-    close(STDERR);
-    open(STDERR, ">>$currlogfile") or return "Can't append STDERR to log: $!";
-    STDERR->autoflush(1);
-
-    close(STDOUT);
-    open STDOUT, '>&STDERR'    or return "Can't dup stdout: $!";
-    STDOUT->autoflush(1);
+    redirectStdinStdErr() if($init_done);
+    
   }
   LOG->autoflush(1);
   $logopened = 1;
   return undef;
+}
+
+sub
+redirectStdinStdErr()
+{
+  # Redirect stdin/stderr
+  my $currlogfile = $attr{global}{logfile};
+  return if($currlogfile eq "-");
+
+  open STDIN,  '</dev/null'  or return "Can't read /dev/null: $!";
+
+  close(STDERR);
+  open(STDERR, ">>$currlogfile") or return "Can't append STDERR to log: $!";
+  STDERR->autoflush(1);
+
+  close(STDOUT);
+  open STDOUT, '>&STDERR'    or return "Can't dup stdout: $!";
+  STDOUT->autoflush(1);
 }
 
 
@@ -1139,7 +1156,7 @@ CommandDefine($$)
   if(!$modules{$m} || !$modules{$m}{DefFn}) {
     my @m = grep { $modules{$_}{DefFn} || !$modules{$_}{LOADED} }
                 sort keys %modules;
-    return "Unknown argument $m, choose one of @m";
+    return "Unknown module $m, choose one of @m";
   }
 
   my %hash;
@@ -1399,7 +1416,7 @@ CommandReload($$)
   my %hash;
   $param =~ s,/,,g;
   $param =~ s,\.pm$,,g;
-  my $file = "$modpath_set/$param.pm";
+  my $file = "$attr{global}{modpath}/FHEM/$param.pm";
   return "Can't read $file: $!" if(! -r "$file");
 
   my $m = $param;
@@ -1532,7 +1549,7 @@ GlobalAttr($$)
           Listen       => 10,
           ReuseAddr    => 1);
     if(!$server2) {
-      Log 1, "Can't open server port at $port: $!\n";
+      Log 1, "Can't open server port at $port: $!";
       return "$!" if($init_done);
       die "Can't open server port at $port: $!\n";
     }
@@ -1558,7 +1575,6 @@ GlobalAttr($$)
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     my $counter = 0;
 
-    $modpath_set = $modpath;
     foreach my $m (sort readdir(DH)) {
       next if($m !~ m/^([0-9][0-9])_(.*)\.pm$/);
       $modules{$2}{ORDER} = $1;
@@ -1602,7 +1618,7 @@ CommandAttr($$)
 
     my $list = getAllAttr($sdev);
     if($a[1] eq "?") {
-      push @rets, "Unknown argument $a[1], choose one of $list";
+      push @rets, "Unknown attribute $a[1], choose one of $list";
       next;
     }
 
@@ -1902,6 +1918,7 @@ CommandChain($$)
     for(my $n = 0; $n < $retry; $n++) {
       Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
       my $ret = AnalyzeCommand(undef, $cmd);
+Log 1, "> $ret";
       last if(!$ret || $ret !~ m/Timeout/);
     }
   }
@@ -2446,4 +2463,17 @@ ReplaceEventMap($$)
     }
   }
   return $str;
+}
+
+sub
+setGlobalAttrBeforeFork()
+{
+  my $f = $attr{global}{configfile};
+  open(FH, $f) || die("Cant open $f: $!\n");
+  while(my $l = <FH>) {
+    chomp($l);
+    next if($l !~ m/^attr +global +([^ ]+) +(.*)$/);
+    $attr{global}{$1} = $2;
+  }
+  close(FH);
 }
