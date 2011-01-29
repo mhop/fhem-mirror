@@ -946,7 +946,9 @@ CUL_SimpleRead($)
   my ($hash) = @_;
 
   if($hash->{USBDev}) {
-    return $hash->{USBDev}->input();
+    my $buf = $hash->{USBDev}->input();
+    #Log 1, "Got $buf";
+    return $buf;
   }
 
   if($hash->{TCPDev}) {
@@ -955,7 +957,6 @@ CUL_SimpleRead($)
       CUL_Disconnected($hash);
       return undef;
     }
-
     return $buf;
   }
   return undef;
