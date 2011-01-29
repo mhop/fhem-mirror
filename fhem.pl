@@ -165,7 +165,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.124 2011-01-29 07:32:48 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.125 2011-01-29 07:38:13 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -238,6 +238,15 @@ my $commonAttr = "eventMap";
             Hlp=>"<devspec> <state>,trigger notify command" },
 );
 
+# If started as root, and there is a fhem user in the /etc/passwd, su to it
+if($^O !~ m/Win/ && $< == 0) {
+  my @pw = getpwnam("fhem");
+  if(@pw) {
+    use POSIX qw(setuid);
+    setuid($pw[2]);
+  }
+}
+
 
 ###################################################
 # Start the program
@@ -280,15 +289,6 @@ if($^O =~ m/Win/ && !$attr{global}{nofork}) {
   $attr{global}{nofork}=1;
 }
 
-
-# If started as root, and there is a fhem user in the /etc/passwd, su to it
-if($^O !~ m/Win/ && $< == 0) {
-  my @pw = getpwnam("fhem");
-  if(@pw) {
-    use POSIX qw(setuid);
-    setuid($pw[2]);
-  }
-}
 
 # Go to background if the logfile is a real file (not stdout)
 if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
