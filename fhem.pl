@@ -165,7 +165,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.123 2011-01-29 07:24:29 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.124 2011-01-29 07:32:48 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1454,8 +1454,8 @@ CommandRename($$)
   my ($old, $new) = split(" ", $param);
 
   return "Please define $old first" if(!defined($defs{$old}));
-  return "Invalid characters in name (not A-Za-z0-9.:-): $new"
-                        if($new !~ m/^[a-z0-9.:_-]*$/i);
+  return "Invalid characters in name (not A-Za-z0-9.:_): $new"
+                        if($new !~ m/^[a-z0-9.:_]*$/i);
   return "Cannot rename global" if($old eq "global");
 
   $defs{$new} = $defs{$old};
