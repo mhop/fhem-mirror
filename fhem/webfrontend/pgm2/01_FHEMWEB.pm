@@ -32,33 +32,33 @@ sub FW_AnswerCall($);
 sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
 
-use vars qw($__dir); # moddir (./FHEM), needed by SVG
-use vars qw($__ME);  # webname (fhem), needed by 97_GROUP
+use vars qw($FW_dir); # moddir (./FHEM), needed by SVG
+use vars qw($FW_ME);  # webname (fhem), needed by 97_GROUP
 my $zlib_loaded;
 
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
-my $__cmdret;     # Returned data by the fhem call
-my $__data;       # Filecontent from browser when editing a file
-my $__detail;     # currently selected device for detail view
-my %__devs;       # hash of from/to entries per device
-my %__icons;      # List of icons
-my $__iconsread;  # Timestamp of last icondir check
-my $__plotmode;   # Global plot mode (WEB attribute)
-my $__plotsize;   # Global plot size (WEB attribute)
-my %__pos;        # scroll position
-my $__reldoc;     # $__ME/commandref.html;
-my $__RET;        # Returned data (html)
-my $__RETTYPE;    # image/png or the like
-my $__room;       # currently selected room
-my %__rooms;      # hash of all rooms
-my $__ss;         # smallscreen
-my %__types;      # device types, for sorting
-my $__wname;      # Web instance name
-my @__zoom;       # "qday", "day","week","month","year"
-my %__zoom;       # the same as @__zoom
+my $FW_cmdret;     # Returned data by the fhem call
+my $FW_data;       # Filecontent from browser when editing a file
+my $FW_detail;     # currently selected device for detail view
+my %FW_devs;       # hash of from/to entries per device
+my %FW_icons;      # List of icons
+my $FW_iconsread;  # Timestamp of last icondir check
+my $FW_plotmode;   # Global plot mode (WEB attribute)
+my $FW_plotsize;   # Global plot size (WEB attribute)
+my %FW_pos;        # scroll position
+my $FW_reldoc;     # $FW_ME/commandref.html;
+my $FW_RET;        # Returned data (html)
+my $FW_RETTYPE;    # image/png or the like
+my $FW_room;       # currently selected room
+my %FW_rooms;      # hash of all rooms
+my $FW_ss;         # smallscreen
+my %FW_types;      # device types, for sorting
+my $FW_wname;      # Web instance name
+my @FW_zoom;       # "qday", "day","week","month","year"
+my %FW_zoom;       # the same as @FW_zoom
 
 
 #####################################
@@ -78,8 +78,8 @@ FHEMWEB_Initialize($)
   ###############
   # Initialize internal structures
   my $n = 0;
-  @__zoom = ("qday", "day","week","month","year");
-  %__zoom = map { $_, $n++ } @__zoom;
+  @FW_zoom = ("qday", "day","week","month","year");
+  %FW_zoom = map { $_, $n++ } @FW_zoom;
 
 }
 
@@ -101,7 +101,11 @@ FW_Define($$)
           Listen    => 10,
           ReuseAddr => 1);
 
-  return "Can't open server port at $port: $!" if(!$hash->{SERVERSOCKET});
+  if(!$hash->{SERVERSOCKET}) {
+    my $msg = "Can't open server port at $port: $!";
+    Log 1, $msg;
+    return $msg;
+  }
 
   $hash->{FD} = $hash->{SERVERSOCKET}->fileno();
   $hash->{PORT} = $port;
@@ -173,16 +177,16 @@ FW_Read($)
 
   }
 
-  $__wname = $hash->{SNAME};
-  my $ll = GetLogLevel($__wname,4);
+  $FW_wname = $hash->{SNAME};
+  my $ll = GetLogLevel($FW_wname,4);
 
-  if(!$zlib_loaded && FW_getAttr($__wname, "fwcompress", 1)) {
+  if(!$zlib_loaded && FW_getAttr($FW_wname, "fwcompress", 1)) {
     $zlib_loaded = 1;
     eval { require Compress::Zlib; };
     if($@) {
       Log 1, $@;
-      Log 1, "$__wname: Can't load Compress::Zlib, deactivating compression";
-      $attr{$__wname}{fwcompress} = 0;
+      Log 1, "$FW_wname: Can't load Compress::Zlib, deactivating compression";
+      $attr{$FW_wname}{fwcompress} = 0;
     }
   }
 
@@ -226,24 +230,24 @@ FW_Read($)
   }
 
   my $compressed = "";
-  if(($__RETTYPE=~m/text/i || $__RETTYPE=~m/svg/i || $__RETTYPE=~m/script/i) &&
+  if(($FW_RETTYPE=~m/text/i || $FW_RETTYPE=~m/svg/i || $FW_RETTYPE=~m/script/i) &&
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
-     FW_getAttr($__wname, "fwcompress", 1)) {
+     FW_getAttr($FW_wname, "fwcompress", 1)) {
 
-    $__RET = Compress::Zlib::memGzip($__RET);
+    $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
   }
 
   my $c = $hash->{CD};
-  my $length = length($__RET);
+  my $length = length($FW_RET);
   my $expires = ($cacheable?
                         ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
-  #Log 0, "$arg / RL: $length / $__RETTYPE / $compressed";
+  #Log 0, "$arg / RL: $length / $FW_RETTYPE / $compressed";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
            $expires, $compressed,
-           "Content-Type: $__RETTYPE\r\n\r\n",
-           $__RET;
+           "Content-Type: $FW_RETTYPE\r\n\r\n",
+           $FW_RET;
   exit if(defined($pid));
 }
 
@@ -253,47 +257,47 @@ FW_AnswerCall($)
 {
   my ($arg) = @_;
 
-  $__RET = "";
-  $__RETTYPE = "text/html; charset=ISO-8859-1";
-  $__ME = "/" . FW_getAttr($__wname, "webname", "fhem");
-  $__dir = FW_getAttr($__wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
-  $__ss = FW_getAttr($__wname, "smallscreen", 0);
+  $FW_RET = "";
+  $FW_RETTYPE = "text/html; charset=ISO-8859-1";
+  $FW_ME = "/" . FW_getAttr($FW_wname, "webname", "fhem");
+  $FW_dir = FW_getAttr($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
+  $FW_ss = FW_getAttr($FW_wname, "smallscreen", 0);
 
   # Lets go:
-  if($arg =~ m,^${__ME}/(.*html)$, || $arg =~ m,^${__ME}/(example.*)$,) {
+  if($arg =~ m,^${FW_ME}/(.*html)$, || $arg =~ m,^${FW_ME}/(example.*)$,) {
     my $f = $1;
     $f =~ s,/,,g;    # little bit of security
-    open(FH, "$__dir/$f") || return;
+    open(FH, "$FW_dir/$f") || return;
     pO join("", <FH>);
     close(FH);
-    $__RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
+    $FW_RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
     return 1;
 
-  } elsif($arg =~ m,^$__ME/(.*).css,) {
-    open(FH, "$__dir/$1.css") || return;
+  } elsif($arg =~ m,^$FW_ME/(.*).css,) {
+    open(FH, "$FW_dir/$1.css") || return;
     pO join("", <FH>);
     close(FH);
-    $__RETTYPE = "text/css";
+    $FW_RETTYPE = "text/css";
     return 1;
 
-  } elsif($arg =~ m,^$__ME/icons/(.*)$, ||
-          $arg =~ m,^$__ME/(.*.png)$,) {
-    open(FH, "$__dir/$1") || return;
+  } elsif($arg =~ m,^$FW_ME/icons/(.*)$, ||
+          $arg =~ m,^$FW_ME/(.*.png)$,) {
+    open(FH, "$FW_dir/$1") || return;
     binmode (FH); # necessary for Windows
     pO join("", <FH>);
     close(FH);
     my @f_ext = split(/\./,$1); #kpb
-    $__RETTYPE = "image/$f_ext[-1]";
+    $FW_RETTYPE = "image/$f_ext[-1]";
     return 1;
 
- } elsif($arg =~ m,^$__ME/(.*).js,) { #kpb java include
-    open(FH, "$__dir/$1.js") || return;
+ } elsif($arg =~ m,^$FW_ME/(.*).js,) { #kpb java include
+    open(FH, "$FW_dir/$1.js") || return;
     pO join("", <FH>);
     close(FH);
-    $__RETTYPE = "application/javascript";
+    $FW_RETTYPE = "application/javascript";
     return 1;
 
-  } elsif($arg !~ m/^$__ME(.*)/) {
+  } elsif($arg !~ m/^$FW_ME(.*)/) {
     Log(5, "Unknown document $arg requested");
     return 0;
 
@@ -306,7 +310,7 @@ FW_AnswerCall($)
     foreach my $k (sort keys %{$data{FWEXT}}) {
       if($arg =~ m/^$k/) {
         no strict "refs";
-        ($__RETTYPE, $__RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
+        ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
         use strict "refs";
         return 0;
       }
@@ -323,11 +327,11 @@ FW_AnswerCall($)
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
-  $__plotmode = FW_getAttr($__wname, "plotmode", "SVG");
-  $__plotsize = FW_getAttr($__wname, "plotsize", $__ss ? "480,160" : "800,160");
-  $__reldoc = "$__ME/commandref.html";
+  $FW_plotmode = FW_getAttr($FW_wname, "plotmode", "SVG");
+  $FW_plotsize = FW_getAttr($FW_wname, "plotsize", $FW_ss ? "480,160" : "800,160");
+  $FW_reldoc = "$FW_ME/commandref.html";
 
-  $__cmdret = $docmd ? fC($cmd) : "";
+  $FW_cmdret = $docmd ? fC($cmd) : "";
   FW_updateHashes();
   if($cmd =~ m/^showlog /) {
     FW_showLog($cmd);
@@ -342,9 +346,9 @@ FW_AnswerCall($)
     }
     $defs{$aa[0]}{currentlogfile} =~ m,([^/]*)$,;
     $aa[2] = "CURRENT" if($1 eq $aa[2]);
-    $__cmdret = fC("define wl_$max weblink fileplot $aa[0]:$aa[1]:$aa[2]");
-    if(!$__cmdret) {
-      $__detail = "wl_$max";
+    $FW_cmdret = fC("define wl_$max weblink fileplot $aa[0]:$aa[1]:$aa[2]");
+    if(!$FW_cmdret) {
+      $FW_detail = "wl_$max";
       FW_updateHashes();
     }
   }
@@ -355,34 +359,34 @@ FW_AnswerCall($)
   pO '<html xmlns="http://www.w3.org/1999/xhtml">';
   pO "<head>\n<title>$t</title>";
 
-  if($__ss) {
-    pO '<link rel="apple-touch-icon-precomposed" href="'.$__ME.'/fhemicon.png"/>';
+  if($FW_ss) {
+    pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/fhemicon.png"/>';
     pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     pO '<meta name="viewport" content="width=device-width"/>';
   }
 
-  my $rf = FW_getAttr($__wname, "refresh", "");
+  my $rf = FW_getAttr($FW_wname, "refresh", "");
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
-  my $stylecss = ($__ss ? "style_smallscreen.css" : "style.css");
-  pO "<link href=\"$__ME/$stylecss\" rel=\"stylesheet\"/>";
-  pO "<script type=\"text/javascript\" src=\"$__ME/svg.js\"></script>"
-                        if($__plotmode eq "SVG");
+  my $stylecss = ($FW_ss ? "style_smallscreen.css" : "style.css");
+  pO "<link href=\"$FW_ME/$stylecss\" rel=\"stylesheet\"/>";
+  pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
+                        if($FW_plotmode eq "SVG");
   pO "</head>\n<body name=\"$t\">";
 
-  if($__cmdret) {
-    $__detail = "";
-    $__room = "";
-    $__cmdret =~ s/</&lt;/g;
-    $__cmdret =~ s/>/&gt;/g;
+  if($FW_cmdret) {
+    $FW_detail = "";
+    $FW_room = "";
+    $FW_cmdret =~ s/</&lt;/g;
+    $FW_cmdret =~ s/>/&gt;/g;
     pO "<div id=\"content\">";
-    pO "<pre>$__cmdret</pre>";
+    pO "<pre>$FW_cmdret</pre>";
     pO "</div>";
   }
 
   FW_roomOverview($cmd);
   FW_style($cmd,undef)    if($cmd =~ m/^style /);
-  FW_doDetail($__detail)  if($__detail);
-  FW_showRoom()           if($__room && !$__detail);
+  FW_doDetail($FW_detail)  if($FW_detail);
+  FW_showRoom()           if($FW_room && !$FW_detail);
   FW_logWrapper($cmd)     if($cmd =~ /^logwrapper/);
   FW_showArchive($cmd)    if($cmd =~ m/^showarchive/);
   pO "</body></html>";
@@ -399,9 +403,9 @@ FW_digestCgi($)
   my (%arg, %val, %dev);
   my ($cmd, $c) = ("","","");
 
-  $__detail = "";
-  %__pos = ();
-  $__room = "";
+  $FW_detail = "";
+  %FW_pos = ();
+  $FW_room = "";
 
   $arg =~ s,^[?/],,;
   foreach my $pv (split("&", $arg)) {
@@ -412,15 +416,15 @@ FW_digestCgi($)
     # Multiline: escape the NL for fhem
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
 
-    if($p eq "detail")       { $__detail = $v; }
-    if($p eq "room")         { $__room = $v; }
+    if($p eq "detail")       { $FW_detail = $v; }
+    if($p eq "room")         { $FW_room = $v; }
     if($p eq "cmd")          { $cmd = $v; }
     if($p =~ m/^arg\.(.*)$/) { $arg{$1} = $v; }
     if($p =~ m/^val\.(.*)$/) { $val{$1} = $v; }
     if($p =~ m/^dev\.(.*)$/) { $dev{$1} = $v; }
     if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c= $1; }
-    if($p eq "pos")          { %__pos =  split(/[=;]/, $v); }
-    if($p eq "data")         { $__data = $v; }
+    if($p eq "pos")          { %FW_pos =  split(/[=;]/, $v); }
+    if($p eq "data")         { $FW_data = $v; }
 
   }
   $cmd.=" $dev{$c}" if($dev{$c});
@@ -435,23 +439,26 @@ FW_updateHashes()
 {
   #################
   # Make a room  hash
-  %__rooms = ();
+  %FW_rooms = ();
   foreach my $d (keys %defs ) {
     next if(IsIgnored($d));
     foreach my $r (split(",", FW_getAttr($d, "room", "Unsorted"))) {
-      $__rooms{$r}{$d} = 1;
+      $FW_rooms{$r}{$d} = 1;
     }
   }
 
   ###############
   # Needed for type sorting
-  %__types = ();
+  %FW_types = ();
   foreach my $d (sort keys %defs ) {
     next if(IsIgnored($d));
-    $__types{$defs{$d}{TYPE}}{$d} = 1;
+    my $t = $defs{$d}{TYPE};
+    my $st = AttrVal($d, "subType", undef);
+    $t .= ":$st" if($st);
+    $FW_types{$t}{$d} = 1;
   }
 
-  $__room = FW_getAttr($__detail, "room", "Unsorted") if($__detail);
+  $FW_room = FW_getAttr($FW_detail, "room", "Unsorted") if($FW_detail);
 }
 
 ##############################
@@ -490,9 +497,9 @@ FW_makeTable($$$$$$$$)
     next if($r && ($r ne "HASH" || !defined($hash->{$v}{VAL})));
     pF "    <tr class=\"%s\">", $row?"odd":"even";
     $row = ($row+1)%2;
-    if($makelink && $__reldoc) {
+    if($makelink && $FW_reldoc) {
       # no pH, want to open extra browser
-      pO "<td><a href=\"$__reldoc#$v\">$v</a></td>"; 
+      pO "<td><a href=\"$FW_reldoc#$v\">$v</a></td>"; 
     } else {
       pO "<td>$v</td>";
     }
@@ -565,10 +572,10 @@ FW_doDetail($)
 {
   my ($d) = @_;
 
-  pO "<form method=\"get\" action=\"$__ME\">";
+  pO "<form method=\"get\" action=\"$FW_ME\">";
   pO FW_hidden("detail", $d);
 
-  $__room = FW_getAttr($d, "room", undef);
+  $FW_room = FW_getAttr($d, "room", undef);
   my $t = $defs{$d}{TYPE};
 
   pO "<div id=\"content\">";
@@ -582,16 +589,16 @@ FW_doDetail($)
              "if(s.display=='none') s.display='block'; else s.display='none';";
   pO "<a onClick=\"$pgm\">Modify $d</a>";
 
-  pH "room=$__room", "Back:$__room" if($__ss);
+  pH "room=$FW_room", "Back:$FW_room" if($FW_ss);
 
   pO "</td></tr><tr><td>";
   FW_makeTable($d, $t,
-        "<a href=\"$__reldoc#${t}set\">State</a>,Value,Measured",
+        "<a href=\"$FW_reldoc#${t}set\">State</a>,Value,Measured",
         $defs{$d}{READINGS}, getAllSets($d), "set", 0, undef);
   FW_makeTable($d, $t, "Internal,Value",
         $defs{$d}, "", undef, 0, undef);
   FW_makeTable($d, $t,
-        "<a href=\"$__reldoc#${t}attr\">Attribute</a>,Value,Action",
+        "<a href=\"$FW_reldoc#${t}attr\">Attribute</a>,Value,Action",
         $attr{$d}, getAllAttr($d), "attr", 1,
         $d eq "global" ? "" : "deleteattr");
   pO "</td></tr></table>";
@@ -612,16 +619,16 @@ FW_roomOverview($)
 
   ##############
   # HEADER
-  pO "<form method=\"get\" action=\"$__ME\">";
+  pO "<form method=\"get\" action=\"$FW_ME\">";
   pO "<div id=\"hdr\">";
   pO '<table border="0"><tr><td style="padding:0">';
   my $tf_done;
-  if($__room) {
-    pO FW_hidden("room", "$__room");
+  if($FW_room) {
+    pO FW_hidden("room", "$FW_room");
     # plots navigation buttons
-    if(!$__detail || $defs{$__detail}{TYPE} eq "weblink") {
+    if(!$FW_detail || $defs{$FW_detail}{TYPE} eq "weblink") {
       if(FW_calcWeblink(undef,undef)) {
-        pO FW_textfield("cmd", $__ss ? 20 : 40);
+        pO FW_textfield("cmd", $FW_ss ? 20 : 40);
         $tf_done = 1;
         pO "</td><td>";
         pO "&nbsp;&nbsp;";
@@ -632,15 +639,15 @@ FW_roomOverview($)
       }
     }
   }
-  pO FW_textfield("cmd", $__ss ? 28 : 40) if(!$tf_done);
+  pO FW_textfield("cmd", $FW_ss ? 28 : 40) if(!$tf_done);
   pO "</td></tr></table>";
   pO "</div>";
   pO "</form>";
 
   ##############
   # LOGO
-  my $logo = $__ss ? "fhem_smallscreen.png" : "fhem.png";
-  pO "<div id=\"logo\"><img src=\"$__ME/$logo\"></div>";
+  my $logo = $FW_ss ? "fhem_smallscreen.png" : "fhem.png";
+  pO "<div id=\"logo\"><img src=\"$FW_ME/$logo\"></div>";
 
   ##############
   # MENU
@@ -651,27 +658,27 @@ FW_roomOverview($)
       my $h = $data{FWEXT}{$k};
       next if($h !~ m/HASH/ || !$h->{LINK} || !$h->{NAME});
       push(@list1, $h->{NAME});
-      push(@list2, $__ME ."/".$h->{LINK});
+      push(@list2, $FW_ME ."/".$h->{LINK});
     }
     push(@list1, ""); push(@list2, "");
   }
-  $__room = "" if(!$__room);
-  foreach my $r (sort keys %__rooms) {
+  $FW_room = "" if(!$FW_room);
+  foreach my $r (sort keys %FW_rooms) {
     next if($r eq "hidden");
     push @list1, $r;
-    push @list2, "$__ME?room=$r";
+    push @list2, "$FW_ME?room=$r";
   }
-  push(@list1, "All together"); push(@list2, "$__ME?room=all");
+  push(@list1, "All together"); push(@list2, "$FW_ME?room=all");
   push(@list1, ""); push(@list2, "");
-  push(@list1, "Howto");      push(@list2, "$__ME/HOWTO.html");
-  push(@list1, "FAQ");        push(@list2, "$__ME/faq.html");
-  push(@list1, "Details");    push(@list2, "$__ME/commandref.html");
-  push(@list1, "Examples");   push(@list2, "$__ME/cmd=style%20examples");
-  push(@list1, "Edit files"); push(@list2, "$__ME/cmd=style%20list");
+  push(@list1, "Howto");      push(@list2, "$FW_ME/HOWTO.html");
+  push(@list1, "FAQ");        push(@list2, "$FW_ME/faq.html");
+  push(@list1, "Details");    push(@list2, "$FW_ME/commandref.html");
+  push(@list1, "Examples");   push(@list2, "$FW_ME/cmd=style%20examples");
+  push(@list1, "Edit files"); push(@list2, "$FW_ME/cmd=style%20list");
   push(@list1, ""); push(@list2, "");
 
   pO "<div id=\"menu\">";
-  if($__ss) {
+  if($FW_ss) {
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       if(!$list1[$idx]) {
         pO "</select>" if($idx);
@@ -679,7 +686,7 @@ FW_roomOverview($)
                               "this.options[this.selectedIndex].value\">"
           if($idx<int(@list1)-1);
       } else {
-        my $sel = ($list1[$idx] eq $__room ? " selected=\"selected\""  : "");
+        my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
         pO "  <option value=$list2[$idx]$sel>$list1[$idx]</option>";
       }
     }
@@ -693,7 +700,7 @@ FW_roomOverview($)
         pO "  <tr><td><table class=\"block\" id=\"room\">"
           if($idx<int(@list1)-1);
       } else {
-        pF "    <tr%s>", $list1[$idx] eq $__room ? " class=\"sel\"" : "";
+        pF "    <tr%s>", $list1[$idx] eq $FW_room ? " class=\"sel\"" : "";
         pO "<td><a href=\"$list2[$idx]\">$list1[$idx]</a></td></tr>";
       }
     }
@@ -710,43 +717,45 @@ sub
 FW_showRoom()
 {
   # (re-) list the icons
-  if(!$__iconsread || (time() - $__iconsread) > 5) {
-    %__icons = ();
-    if(opendir(DH, $__dir)) {
+  if(!$FW_iconsread || (time() - $FW_iconsread) > 5) {
+    %FW_icons = ();
+    if(opendir(DH, $FW_dir)) {
       while(my $l = readdir(DH)) {
         next if($l =~ m/^\./);
         my $x = $l;
         $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
-        $__icons{$x} = $l;
+        $FW_icons{$x} = $l;
       }
       closedir(DH);
     }
-    $__iconsread = time();
+    $FW_iconsread = time();
   }
 
-  pO "<form method=\"get\" action=\"$__ME\">";
+  pO "<form method=\"get\" action=\"$FW_ME\">";
   pO "<div id=\"content\">";
   pO "  <table><tr><td>";  # Need for equal width of subtables
 
-  foreach my $type (sort keys %__types) {
+  foreach my $type (sort keys %FW_types) {
     
     #################
     # Check if there is a device of this type in the room
-    if($__room && $__room ne "all") {
-       next if(!grep { $__rooms{$__room}{$_} } keys %{$__types{$type}} );
+    if($FW_room && $FW_room ne "all") {
+       next if(!grep { $FW_rooms{$FW_room}{$_} } keys %{$FW_types{$type}} );
     }
 
-    my $rf = ($__room ? "&amp;room=$__room" : "");
+    my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
     ############################
     # Print the table headers
-    my $t = $type;
-    $t = "EM" if($t =~ m/^EM.*$/);
+    my @sortedDevs = sort keys %{$FW_types{$type}};
+    my $allSets = " " . getAllSets($sortedDevs[0]) . " ";
+
+    my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
 
     my $th;
     my $id = "class=\"block\"";
-    if($type eq "FS20") {
-      $th = "FS20 dev.</th><th>State</th><th colspan=\"2\">Set to";
+    if($hasOnOff) {
+      $th = "$type</th><th>State</th><th colspan=\"2\">Set to";
     } elsif($type eq "FHT") {
       $th = "FHT dev.</th><th>Measured</th><th>Set to";
     } elsif($type eq "at")         { $th = "Scheduled commands (at)";
@@ -756,21 +765,21 @@ FW_showRoom()
     } else {
       $th = $type;
     }
-    pO "  <table $id id=\"$t\" summary=\"List of $type devices\">";
+    pO "  <table $id id=\"$type\" summary=\"List of $type devices\">";
     pO "  <tr><th>$th</th></tr>" if($th);
 
     my $row=1;
-    foreach my $d (sort keys %{$__types{$type}} ) {
-      next if($__room && $__room ne "all" &&
-             !$__rooms{$__room}{$d});
+    foreach my $d (@sortedDevs) {
+      next if($FW_room && $FW_room ne "all" &&
+             !$FW_rooms{$FW_room}{$d});
 
       pF "    <tr class=\"%s\">", $row?"odd":"even";
       $row = ($row+1)%2;
       my $v = $defs{$d}{STATE};
 
-      if($type eq "FS20") {
+      if($hasOnOff) {
 
-        my $iv = $v;
+        my $iv = $v;    # icon value
         my $iname = "";
 
         if(defined(FW_getAttr($d, "showtime", undef))) {
@@ -780,23 +789,23 @@ FW_showRoom()
         } elsif($iv) {
 
           $iv =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-          $iname = $__icons{"$type"}     if($__icons{"$type"});
-          $iname = $__icons{"$type.$iv"} if($__icons{"$type.$iv"});
-          $iname = $__icons{"$d"}        if($__icons{"$d"});
-          $iname = $__icons{"$d.$iv"}    if($__icons{"$d.$iv"});
+          $iname = $FW_icons{"FS20.$iv"}  if($FW_icons{"FS20.$iv"});
+          $iname = $FW_icons{"$type"}     if($FW_icons{"$type"});
+          $iname = $FW_icons{"$type.$iv"} if($FW_icons{"$type.$iv"});
+          $iname = $FW_icons{"$d"}        if($FW_icons{"$d"});
+          $iname = $FW_icons{"$d.$iv"}    if($FW_icons{"$d.$iv"});
 
         }
         $v = "" if(!defined($v));
-        my $actor = getAllSets($d);
 
         pH "detail=$d", $d, 1;
         if($iname) {
-          pO "<td align=\"center\"><img src=\"$__ME/icons/$iname\" ".
+          pO "<td align=\"center\"><img src=\"$FW_ME/icons/$iname\" ".
                   "alt=\"$v\"/></td>";
         } else {
           pO "<td align=\"center\">$v</td>";
         }
-        if($actor) {
+        if($allSets) {
           pH "cmd.$d=set $d on$rf", "on", 1;
           pH "cmd.$d=set $d off$rf", "off", 1;
         }
@@ -917,9 +926,9 @@ FW_logWrapper($)
     pO "<table><tr><td>";
     pO "<table><tr><td>";
     pO "<td>";
-    my $arg = "$__ME?cmd=showlog undef $d $type $file";
-    if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
-      my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
+    my $arg = "$FW_ME?cmd=showlog undef $d $type $file";
+    if(FW_getAttr($d,"plotmode",$FW_plotmode) eq "SVG") {
+      my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$FW_plotsize));
       pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
@@ -987,7 +996,7 @@ FW_substcfg($$$$$$)
 
   $gplot_script =~ s/<OUT>/$tmpfile/g;
 
-  my $ps = FW_getAttr($wl,"plotsize",$__plotsize);
+  my $ps = FW_getAttr($wl,"plotsize",$FW_plotsize);
   $gplot_script =~ s/<SIZE>/$ps/g;
 
   $gplot_script =~ s/<TL>/$title/g;
@@ -1020,16 +1029,16 @@ FW_showLog($)
   my ($cmd) = @_;
   my (undef, $wl, $d, $type, $file) = split(" ", $cmd, 5);
 
-  my $pm = FW_getAttr($wl,"plotmode",$__plotmode);
+  my $pm = FW_getAttr($wl,"plotmode",$FW_plotmode);
 
-  my $gplot_pgm = "$__dir/$type.gplot";
+  my $gplot_pgm = "$FW_dir/$type.gplot";
 
   if(!-r $gplot_pgm) {
     my $msg = "Cannot read $gplot_pgm";
     Log 1, $msg;
 
     if($pm =~ m/SVG/) { # FW_fatal for SVG:
-      $__RETTYPE = "image/svg+xml";
+      $FW_RETTYPE = "image/svg+xml";
       pO '<svg xmlns="http://www.w3.org/2000/svg">';
       pO '<text x="20" y="20">'.$msg.'</text>';
       pO '</svg>';
@@ -1047,7 +1056,7 @@ FW_showLog($)
     my $tmpfile = "/tmp/file.$$";
     my $errfile = "/tmp/gnuplot.err";
 
-    if($pm eq "gnuplot" || !$__devs{$d}{from}) {
+    if($pm eq "gnuplot" || !$FW_devs{$d}{from}) {
 
       # Looking for the logfile....
       $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
@@ -1078,7 +1087,7 @@ FW_showLog($)
 
 
       # Read the data from the filelog
-      my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
+      my ($f,$t)=($FW_devs{$d}{from}, $FW_devs{$d}{to});
       my $oll = $attr{global}{verbose};
       $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
       my @path = split(" ", fC("get $d $file $tmpfile $f $t " .
@@ -1106,7 +1115,7 @@ FW_showLog($)
         unlink($p);
       }
     }
-    $__RETTYPE = "image/png";
+    $FW_RETTYPE = "image/png";
     open(FH, "$tmpfile.png");         # read in the result and send it
     binmode (FH); # necessary for Windows
     pO join("", <FH>);
@@ -1118,7 +1127,7 @@ FW_showLog($)
     my ($err, $cfg, $plot, $flog) = FW_readgplotfile($wl, $gplot_pgm, $file);
     return $err if($err);
 
-    my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
+    my ($f,$t)=($FW_devs{$d}{from}, $FW_devs{$d}{to});
     $f = 0 if(!$f);     # From the beginning of time...
     $t = 9 if(!$t);     # till the end
 
@@ -1129,8 +1138,8 @@ FW_showLog($)
     }
     $ret = fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $__ss);
-    $__RETTYPE = "image/svg+xml";
+    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_ss);
+    $FW_RETTYPE = "image/svg+xml";
 
   }
 
@@ -1190,7 +1199,7 @@ FW_makeEdit($$$$)
   pO   "<div id=\"edit\" style=\"display:none\"><form>";
   my $eval = $val;
   $eval =~ s,\\\n,\n,g;
-  my $ncols = $__ss ? 40 : 60;
+  my $ncols = $FW_ss ? 40 : 60;
 
   pO     "<textarea name=\"val.${cmd}$name\" cols=\"$ncols\" rows=\"10\">".
             "$eval</textarea>";
@@ -1219,19 +1228,19 @@ FW_zoomLink($$$)
 
   my ($d,$off) = split("=", $cmd, 2);
 
-  my $val = $__pos{$d};
-  $cmd = ($__detail ? "detail=$__detail":"room=$__room") . "&amp;pos=";
+  my $val = $FW_pos{$d};
+  $cmd = ($FW_detail ? "detail=$FW_detail":"room=$FW_room") . "&amp;pos=";
 
   if($d eq "zoom") {
 
     $val = "day" if(!$val);
-    $val = $__zoom{$val};
-    return if(!defined($val) || $val+$off < 0 || $val+$off >= int(@__zoom) );
-    $val = $__zoom[$val+$off];
+    $val = $FW_zoom{$val};
+    return if(!defined($val) || $val+$off < 0 || $val+$off >= int(@FW_zoom) );
+    $val = $FW_zoom[$val+$off];
     return if(!$val);
 
     # Approximation of the next offset.
-    my $w_off = $__pos{off};
+    my $w_off = $FW_pos{off};
     $w_off = 0 if(!$w_off);
     if($val eq "qday") {
       $w_off =              $w_off*4;
@@ -1250,7 +1259,7 @@ FW_zoomLink($$$)
 
     return if((!$val && $off > 0) || ($val && $val+$off > 0)); # no future
     $off=($val ? $val+$off : $off);
-    my $zoom=$__pos{zoom};
+    my $zoom=$FW_pos{zoom};
     $zoom = 0 if(!$zoom);
     $cmd .= "zoom=$zoom;off=$off";
 
@@ -1258,7 +1267,7 @@ FW_zoomLink($$$)
 
 
   pH "$cmd", "<img style=\"border-color:transparent\" alt=\"$alt\" ".
-                "src=\"$__ME/icons/$img\"/>";
+                "src=\"$FW_ME/icons/$img\"/>";
 }
 
 ##################
@@ -1269,7 +1278,7 @@ FW_calcWeblink($$)
 {
   my ($d,$wl) = @_;
 
-  my $pm = FW_getAttr($d,"plotmode",$__plotmode);
+  my $pm = FW_getAttr($d,"plotmode",$FW_plotmode);
   return if($pm eq "gnuplot");
 
   if(!$d) {
@@ -1277,7 +1286,7 @@ FW_calcWeblink($$)
     foreach my $d (sort keys %defs ) {
       next if($defs{$d}{TYPE} ne "weblink");
       next if($defs{$d}{WLTYPE} ne "fileplot");
-      next if(!$__room || ($__room ne "all" && !$__rooms{$__room}{$d}));
+      next if(!$FW_room || ($FW_room ne "all" && !$FW_rooms{$FW_room}{$d}));
 
       next if(FW_getAttr($d, "fixedrange", undef));
       next if($pm eq "gnuplot");
@@ -1298,18 +1307,18 @@ FW_calcWeblink($$)
     else {
       my @range = split(" ", $fr);
       my @t = localtime;
-      $__devs{$d}{from} = ResolveDateWildcards($range[0], @t);
-      $__devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
+      $FW_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
+      $FW_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
       return;
     }
   }
 
-  my $off = $__pos{$d};
+  my $off = $FW_pos{$d};
   $off = 0 if(!$off);
-  $off += $__pos{off} if($__pos{off});
+  $off += $FW_pos{off} if($FW_pos{off});
 
   my $now = time();
-  my $zoom = $__pos{zoom};
+  my $zoom = $FW_pos{zoom};
   $zoom = "day" if(!$zoom);
   $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
 
@@ -1318,27 +1327,27 @@ FW_calcWeblink($$)
     my $t = $now + $off*21600;
     my @l = localtime($t);
     $l[2] = int($l[2]/6)*6;
-    $__devs{$d}{from}
+    $FW_devs{$d}{from}
         = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
-    $__devs{$d}{to}
+    $FW_devs{$d}{to}
         = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]+6);
 
   } elsif($zoom eq "day") {
 
     my $t = $now + $off*86400;
     my @l = localtime($t);
-    $__devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
-    $__devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]+1);
+    $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]+1);
 
   } elsif($zoom eq "week") {
 
     my @l = localtime($now);
     my $t = $now - ($l[6]*86400) + ($off*86400)*7;
     @l = localtime($t);
-    $__devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
 
     @l = localtime($t+7*86400);
-    $__devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
+    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
 
 
   } elsif($zoom eq "month") {
@@ -1349,18 +1358,18 @@ FW_calcWeblink($$)
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $__devs{$d}{from} = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
+    $FW_devs{$d}{from} = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
 
     $l[4]++;
     $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $__devs{$d}{to}   = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
+    $FW_devs{$d}{to}   = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
 
   } elsif($zoom eq "year") {
 
     my @l = localtime($now);
     $l[5] += $off;
-    $__devs{$d}{from} = sprintf("%04d", $l[5]+1900);
-    $__devs{$d}{to}   = sprintf("%04d", $l[5]+1901);
+    $FW_devs{$d}{from} = sprintf("%04d", $l[5]+1900);
+    $FW_devs{$d}{to}   = sprintf("%04d", $l[5]+1901);
 
   }
 }
@@ -1378,13 +1387,13 @@ FW_style($$)
     my @fl;
     push(@fl, "fhem.cfg");
     push(@fl, "<br>");
-    push(@fl, FW_fileList("$__dir/.*.css"));
+    push(@fl, FW_fileList("$FW_dir/.*.css"));
     push(@fl, "<br>");
-    push(@fl, FW_fileList("$__dir/.*.js"));
+    push(@fl, FW_fileList("$FW_dir/.*.js"));
     push(@fl, "<br>");
-    push(@fl, FW_fileList("$__dir/.*.gplot"));
+    push(@fl, FW_fileList("$FW_dir/.*.gplot"));
     push(@fl, "<br>");
-    push(@fl, FW_fileList("$__dir/.*html"));
+    push(@fl, FW_fileList("$FW_dir/.*html"));
 
     pO "<div id=\"content\">";
     pO "  <table><tr><td>";
@@ -1403,7 +1412,7 @@ FW_style($$)
 
   } elsif($a[1] eq "examples") {
 
-    my @fl = FW_fileList("$__dir/example.*");
+    my @fl = FW_fileList("$FW_dir/example.*");
     pO "<div id=\"content\">";
     pO "  <table><tr><td>";
     pO "  $msg<br><br>" if($msg);
@@ -1423,7 +1432,7 @@ FW_style($$)
 
     $a[2] =~ s,/,,g;    # little bit of security
     my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$__dir/$a[2]");
+                                   "$FW_dir/$a[2]");
     if(!open(FH, $f)) {
       pO "$f: $!";
       return;
@@ -1431,7 +1440,7 @@ FW_style($$)
     my $data = join("", <FH>);
     close(FH);
 
-    my $ncols = $__ss ? 40 : 80;
+    my $ncols = $FW_ss ? 40 : 80;
     pO "<div id=\"content\">";
     pO "  <form>";
     pO     FW_submit("save", "Save $f") . "<br><br>";
@@ -1445,14 +1454,14 @@ FW_style($$)
 
     $a[2] =~ s,/,,g;    # little bit of security
     my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$__dir/$a[2]");
+                                   "$FW_dir/$a[2]");
     if(!open(FH, ">$f")) {
       pO "$f: $!";
       return;
     }
-    $__data =~ s/\r//g if($^O !~ m/Win/);
+    $FW_data =~ s/\r//g if($^O !~ m/Win/);
     binmode (FH);
-    print FH $__data;
+    print FH $FW_data;
     close(FH);
     FW_style("style list", "Saved file $f");
     $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} : $a[2]);
@@ -1467,8 +1476,8 @@ FW_style($$)
 sub
 pO(@)
 {
-  $__RET .= shift;
-  $__RET .= "\n";
+  $FW_RET .= shift;
+  $FW_RET .= "\n";
 }
 
 #################
@@ -1479,10 +1488,10 @@ pH(@)
    my ($link, $txt, $td) = @_;
 
    pO "<td>" if($td);
-   if($__ss) {
-     pO "<a onClick=\"location.href='$__ME?$link'\">$txt</a>";
+   if($FW_ss) {
+     pO "<a onClick=\"location.href='$FW_ME?$link'\">$txt</a>";
    } else {
-     pO "<a href=\"$__ME?$link\">$txt</a>";
+     pO "<a href=\"$FW_ME?$link\">$txt</a>";
    }
    pO "</td>" if($td);
 }
@@ -1493,7 +1502,7 @@ sub
 pF($@)
 {
   my $fmt = shift;
-  $__RET .= sprintf $fmt, @_;
+  $FW_RET .= sprintf $fmt, @_;
 }
 
 ##################
@@ -1540,18 +1549,18 @@ FW_showWeblink($$$)
         $va[2] = $1;
       }
 
-      if($__ss) {
+      if($FW_ss) {
         pH "detail=$d", $d;
         pO "<br>";
       } else {
         pO "<table><tr><td>";
       }
 
-      my $wl = "&amp;pos=" . join(";", map {"$_=$__pos{$_}"} keys %__pos);
+      my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
 
-      my $arg="$__ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
-      if(FW_getAttr($d,"plotmode",$__plotmode) eq "SVG") {
-        my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$__plotsize));
+      my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
+      if(FW_getAttr($d,"plotmode",$FW_plotmode) eq "SVG") {
+        my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$FW_plotsize));
         pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
               "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
@@ -1559,7 +1568,7 @@ FW_showWeblink($$$)
         pO "<img src=\"$arg\"/>";
       }
 
-      if($__ss) {
+      if($FW_ss) {
         pO "<br>";
       } else {
         pO "</td>";
