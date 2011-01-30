@@ -166,7 +166,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.126 2011-01-29 12:07:14 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.127 2011-01-30 10:25:01 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1918,7 +1918,6 @@ CommandChain($$)
     for(my $n = 0; $n < $retry; $n++) {
       Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
       my $ret = AnalyzeCommand(undef, $cmd);
-Log 1, "> $ret";
       last if(!$ret || $ret !~ m/Timeout/);
     }
   }
