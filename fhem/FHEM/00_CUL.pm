@@ -995,6 +995,8 @@ CUL_OpenDev($$)
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
   my $po;
+  my $baudrate;
+  ($dev, $baudrate) = split("@", $dev);
 
 
   $hash->{PARTIAL} = "";
@@ -1030,8 +1032,6 @@ CUL_OpenDev($$)
 
   } else {                              # USB/Serial device
 
-    my $baudrate;
-    ($dev, $baudrate) = split("@", $dev);
 
     if ($^O=~/Win/) {
      require Win32::SerialPort;
@@ -1113,6 +1113,8 @@ CUL_Disconnected($)
   my $hash = shift;
   my $dev = $hash->{DeviceName};
   my $name = $hash->{NAME};
+  my $baudrate;
+  ($dev, $baudrate) = split("@", $dev);
 
   return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
