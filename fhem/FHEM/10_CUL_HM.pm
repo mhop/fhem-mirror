@@ -144,7 +144,6 @@ CUL_HM_Define($$)
         if(!(int(@a)==3 || int(@a)==4) || $a[2] !~ m/^[A-F0-9]{6,8}$/i);
 
   $modules{CUL_HM}{defptr}{uc($a[2])} = $hash;
-  $hash->{STATE} = "defined";
   AssignIoPort($hash);
 
   # shadow switch device, look for the real one, and copy its attributes
@@ -184,7 +183,7 @@ CUL_HM_Parse($$)
   my ($len,$msgcnt,$cmd,$src,$dst,$p) = @msgarr;
   CUL_HM_DumpProtocol("CUL_HM RCV", $iohash, @msgarr);
 
-  my $shash = $modules{CUL_HM}{defptr}{$src};
+  my $shash = $modules{CUL_HM}{defptr}{$src};   # Will be replaced fo multichannel commands
   my $lcm = "$len$cmd";
 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
@@ -219,15 +218,7 @@ CUL_HM_Parse($$)
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
 
-  if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
-    push @event, CUL_HM_Pair($name, $shash, @msgarr);
-    
-  } elsif($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
-    CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
-    push @event, "";
-
-  } elsif($cmd eq "8002") {                       # Ack
-
+  if($cmd eq "8002") {                       # Ack
     if($shash->{cmdStack}) {                     # Send next msg from the stack
       CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
       delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
@@ -238,12 +229,21 @@ CUL_HM_Parse($$)
 
     }
     push @event, "";
+  }
+
+
+  if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
+    push @event, CUL_HM_Pair($name, $shash, @msgarr);
+    
+  } elsif($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
+    CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
+    push @event, "";
 
   } elsif($st eq "switch" || ############################################
           $st eq "dimmer" ||
           $st eq "blindActuator") {
 
-    if($p =~ m/^(0.)(..)(..).0/) {
+    if($p =~ m/^(0.)(..)(..).0/ && $cmd ne "A010") {
       my $msgType = $1;
       my $chn = $2;
       if($chn ne "01" && $chn ne "00") {   # Switch to the shadow device
@@ -260,7 +260,7 @@ CUL_HM_Parse($$)
       $msg = "deviceMsg" if($msgType =~ m/0./);
       $msg = "powerOn"   if($msgType =~ m/06/ && $chn eq "00");
       push @event, "$msg:$val";
-      push @event, "state:$val" if(!$isack);
+      push @event, "state:$val";
     }
 
   } elsif($st eq "remote") { ############################################
@@ -351,6 +351,7 @@ CUL_HM_Parse($$)
   #push @event, "unknownMsg:$p" if(!@event);
 
   my $tn = TimeNow();
+  my @changed;
   for(my $i = 0; $i < int(@event); $i++) {
     next if($event[$i] eq "");
 
@@ -363,34 +364,44 @@ CUL_HM_Parse($$)
     Log GetLogLevel($name,2), "CUL_HM $name $vn:$vv" if($vn eq "unknown");
 
     if($vn eq "state") {
-      $shash->{STATE} = $vv;
-      $shash->{CHANGED}[$i] = $vv;
+
+      if($shash->{cmdSent} && $shash->{cmdSent} eq $vv) {
+        delete($shash->{cmdSent}); # Skip second "on/off" after our own command
+
+      } else {
+        $shash->{STATE} = $vv;
+        push @changed, $vv;
+      }
 
     } else {
-      $shash->{CHANGED}[$i] = "$vn: $vv";
+      push @changed, "$vn: $vv";
 
     }
 
     $shash->{READINGS}{$vn}{TIME} = $tn;
     $shash->{READINGS}{$vn}{VAL} = $vv;
   }
-
+  $shash->{CHANGED} = \@changed;
   
   $shash->{lastMsg} = $msg;
   return $name;
 }
 
 my %culHmGlobalSets = (
-  raw   => "data",
-  reset => 0,
-  pair  => 0,
-  statusRequest  => 0,
+  raw   => "data ...",
+  reset => "",
+  pair  => "",
+  statusRequest  => "",
 );
 my %culHmSubTypeSets = (
-  switch        => { on => 0, off => 0, toggle => 0 },
-  dimmer        => { on => 0, off => 0, toggle => 0, pct=>0 },
-  blindActuator => { on => 0, off => 0, toggle => 0, pct=>0 },
-  remote        => { text => "<btn> [on|off] <txt1> <txt2>" },
+  switch =>
+        { "on-for-timer"=>"sec", on=>"", off=>"", toggle=>"" },
+  dimmer =>
+        { "on-for-timer"=>"sec", on=>"", off=>"", toggle=>"", pct=>"" },
+  blindActuator=>
+        { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"" },
+  remote =>
+        { text => "<btn> [on|off] <txt1> <txt2>" },
 );
 
 ###################################
@@ -418,6 +429,8 @@ CUL_HM_Set($@)
 
   my $h = $culHmGlobalSets{$cmd};
   $h = $culHmSubTypeSets{$st}{$cmd} if(!defined($h) && $culHmSubTypeSets{$st});
+  my @h;
+  @h = split(" ", $h) if($h);
 
   if(!defined($h) && $culHmSubTypeSets{$st}{pct} && $cmd =~ m/^\d+/) {
     $cmd = "pct";
@@ -431,10 +444,17 @@ CUL_HM_Set($@)
     $usg =~ s/ pct/ $pct/;
     return $usg;
 
+  } elsif($h eq "" && @a != 2) {
+    return "$cmd requires no parameters";
+    
+  } elsif($h !~ m/\.\.\./ && @h != @a-2) {
+    return "$cmd requires parameters: $h";
+
   }
 
   my $id = CUL_HM_Id($shash->{IODev});
   my $sndcmd;
+  my $state = $cmd;
 
   if($cmd eq "raw") {  ##################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
@@ -442,6 +462,7 @@ CUL_HM_Set($@)
     for (my $i = 3; $i < @a; $i++) {
       CUL_HM_PushCmdStack($shash, $a[$i]);
     }
+    $state = "";
 
   } elsif($cmd eq "reset") { ############################################
     $sndcmd = sprintf("++A011%s%s0400", $id,$dst);
@@ -457,15 +478,13 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "on") { ###############################################
     $sndcmd = sprintf("++A011%s%s02%sC80000", $id,$dst, $chn);
-    if(@a > 2) {
-      ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
-      $sndcmd .= $tval;
-    }
-
 
   } elsif($cmd eq "off") { ##############################################
     $sndcmd = sprintf("++A011%s%s02%s000000", $id,$dst,$chn);
-    # timer not supported :/
+
+  } elsif($cmd eq "on-for-timer") { #####################################
+    ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
+    $sndcmd = sprintf("++A011%s%s02%sC80000%s", $id,$dst, $chn, $tval);
 
   } elsif($cmd eq "toggle") { ###########################################
     $shash->{toggleIndex} = 1 if(!$shash->{toggleIndex});
@@ -483,6 +502,7 @@ CUL_HM_Set($@)
 
 
   } elsif($st eq "text") { #############################################
+    $state = "";
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/);
     return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
     my $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
@@ -515,6 +535,10 @@ CUL_HM_Set($@)
 
   }
 
+  if($state) {
+    $hash->{STATE} = $state;
+    $hash->{cmdSent} = $state;
+  }
   CUL_HM_SendCmd($shash, $sndcmd, 0, 1);
   return $ret;
 }
