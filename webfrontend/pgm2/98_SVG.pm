@@ -13,7 +13,7 @@ sub time_to_sec($);
 sub fmtTime($$);
 
 
-my ($__lt, $__ltstr);
+my ($SVG_lt, $SVG_ltstr);
 
 #####################################
 sub
@@ -33,12 +33,12 @@ SVG_render($$$$$$$)
   my $confp = shift; # lines from the .gplot file, w/o FileLog and plot
   my $dp = shift;    # pointer to data (one string)
   my $plot = shift;  # Plot lines from the .gplot file
-  my $__ss = shift;  # small screen
+  my $SVG_ss = shift;  # small screen
 
   return "" if(!defined($dp));
 
   my $th = 16;                          # "Font" height
-  my ($x, $y) = (($__ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
+  my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
   my %conf;                             # gnuplot file settings
 
   # Convert the configuration to a "readable" form -> array to hash
@@ -59,19 +59,19 @@ SVG_render($$$$$$$)
          'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
   pO "<style type=\"text/css\"><![CDATA[";
-  if(open(FH, "$__dir/svg_style.css")) {
+  if(open(FH, "$FW_dir/svg_style.css")) {
     pO join("", <FH>);
     close(FH);
   } else {
-    Log 0, "Can't open $__dir/svg_style.css"
+    Log 0, "Can't open $FW_dir/svg_style.css"
   }
   pO "]]></style>";
 
-  if(open(FH, "$__dir/svg_defs.svg")) { # gradient definitions
+  if(open(FH, "$FW_dir/svg_defs.svg")) { # gradient definitions
     pO join("", <FH>);
     close(FH);
   } else {
-    Log 0, "Can't open $__dir/svg_defs.svg"
+    Log 0, "Can't open $FW_dir/svg_defs.svg"
   }
 
   # Background
@@ -97,7 +97,7 @@ SVG_render($$$$$$$)
 
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
-  if(!$__ss) {
+  if(!$SVG_ss) {
     ($off1,$off2) = (3*$th/4, $oh/2);
     pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
         "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
@@ -436,11 +436,11 @@ time_to_sec($)
   $d = 1 if(!$d);
   $m = 1 if(!$m);
 
-  if(!$__ltstr || $__ltstr ne "$y-$m-$d-$h") { # 2.5x faster
-    $__lt = mktime(0,0,$h,$d,$m-1,$y-1900,0,0,-1);
-    $__ltstr = "$y-$m-$d-$h";
+  if(!$SVG_ltstr || $SVG_ltstr ne "$y-$m-$d-$h") { # 2.5x faster
+    $SVG_lt = mktime(0,0,$h,$d,$m-1,$y-1900,0,0,-1);
+    $SVG_ltstr = "$y-$m-$d-$h";
   }
-  return $s+$mi*60+$__lt;
+  return $s+$mi*60+$SVG_lt;
 }
 
 sub
