@@ -1452,11 +1452,20 @@ A line ending with \ will be concatenated with the next one, so long lines
               <li>holiday1 sets the end-time of the holiday, in 10-minute steps</li>
               <li>holiday2 sets the end-day of the holiday</li>
             </ul>
-          For holiday_short
-            <ul>
-              <li>holiday1 sets the time, in 10-minute steps</li>
-              <li>holiday2 sets number of days from now on.</li>
-            </ul>
+          For holiday_short (party mode)
+          <ul>
+              <li> holiday1 sets the absolute hour to switch back from this
+              mode (in 10-minute steps, max 144)
+              <li> holiday2 sets the day of month to switch back from this mode
+              (if holiday1 exceeds 144, subtract 144 and increase holiday2 with
+              1).
+              Example:
+              <ul>
+                  <li> current date is 29 Jan, time is 18:05
+                  <li> you want to switch to party mode until tomorrow 1:00
+                  <li> set holiday1 to 6 (6 x 10min = 1hour) and holiday2 to 30
+              </ul>
+          </ul>
           <br>
 
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
@@ -2286,8 +2295,9 @@ A line ending with \ will be concatenated with the next one, so long lines
      <br>
      <li>switch
        <ul>
-          <li>on [forSec] - set the switch on</li>
+          <li>on - set the switch on</li>
           <li>off - set the switch off</li>
+          <li>on-for-timer sec - set the switch on for the given seconds. Note: the protocol does not support an off-for-timer like FS20.</li>
           <li>toggle - toggle the switch.</li>
        </ul></li>
      <br>
