@@ -47,7 +47,9 @@ my %sets = (
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB) 
 
 my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS" .
-                    ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN:ESA2000:";
+                    ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN" .
+                    ":ESA2000:CUL_IR:";
+
 my $clientsHomeMatic = ":CUL_HM:HMS:";
 
 my %matchListSlowRF = (
@@ -63,10 +65,12 @@ my %matchListSlowRF = (
     "A:CUL_RFR"   => "^[0-9A-F]{4}U.",
     "B:CUL_HOERMANN"=> "^R..........",
     "C:ESA2000"   => "^S................................\$",
+    "D:CUL_IR"    => "^I............",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A......................",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
+    "D:CUL_IR"    => "^I............",
 );
 
 sub
@@ -879,11 +883,13 @@ CUL_Parse($$$$$)
     }
     # Other K... Messages ar sent to CUL_WS
 
+  } elsif($fn eq "S" && $len >= 33) {              # CUL_ESA / ESA2000 / Native
+    ;
   } elsif($fn eq "E" && $len >= 11) {              # CUL_EM / Native
     ;
   } elsif($fn eq "R" && $len >= 11) {              # CUL_HOERMANN / Native
     ;
-  } elsif($fn eq "S" && $len >= 33) {              # CUL_ESA / ESA2000 / Native
+  } elsif($fn eq "I" && $len >= 12) {              # IR-CUL/CUN/CUNO
     ;
   } elsif($fn eq "A" && $len >= 21) {              # AskSin/BidCos/HomeMatic
     ;
