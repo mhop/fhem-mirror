@@ -2331,7 +2331,7 @@ A line ending with \ will be concatenated with the next one, so long lines
              send a list of "raw" commands. The first command will be immediately
              sent, the next one after the previous one is acked by the target.  The
              length will be computed automatically, and the message counter will be
-             incremented if the first tw charcters are ++. 
+             incremented if the first tw charcters are ++.
              Example (enable AES):<pre>
    set hm1 raw ++A001F100001234560105000000001\
                ++A001F10000123456010802010AF10B000C00\
@@ -3115,7 +3115,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       button = pwr
       config = IrPower
     end</pre>
-    and you press the pwr button the IrPower toggle event occures at fhem. 
+    and you press the pwr button the IrPower toggle event occures at fhem.
     <pre>
     define IrPower01 notify IrPower set lamp toggle</pre>
     turns the lamp on and off.
@@ -3724,6 +3724,17 @@ Attributes:<br>
     <code>&lt;name&gt;</code> and reads the response.
   </ul>
   <br><br>
+
+  <a name="M232attr"></a>
+  <b>Attributes</b>
+  <br><br>
+  <ul>
+    <li>classdefs<br>A colon-separated list of &lt;classname&gt;=&lt;filename&gt;.
+    The list is automatically updated if a class definition is added. You can
+    directly set the attribute.</li>
+  </ul>
+  <br><br>
+
 
   <a name="ECMDClassdef"></a>
   <b>Class definition</b>
