@@ -44,7 +44,8 @@ ECMD_Initialize($)
   $hash->{UndefFn} = "ECMD_Undef";
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5";
+  $hash->{AttrFn}  = "ECMD_Attr";
+  $hash->{AttrList}= "classdefs loglevel:0,1,2,3,4,5";
 }
 
 #####################################
@@ -431,19 +432,10 @@ ECMD_Get($@)
 
 #####################################
 sub
-ECMD_Set($@)
+ECMD_EvalClassDef($$$)
 {
-        my ($hash, @a) = @_;
-        my $name = $a[0];
-
-        # usage check
-        my $usage= "Usage: set $name classdef <classname> <filename> ";
-        return $usage if(@a != 4);
-        return $usage if($a[1] ne "classdef");
-
-        # from the definition
-        my $classname= $a[2];
-        my $filename= $a[3];
+        my ($hash, $classname, $filename)=@_;
+        my $name= $hash->{NAME};
 
         # refuse overwriting existing definitions
         if(defined($hash->{fhem}{classDefs}{$classname})) {
@@ -526,9 +518,56 @@ ECMD_Set($@)
                 }
         }
 
-        $hash->{READINGS}{$a[1]}{VAL} = "$classname $filename";
-        $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
+        # store class definitions in attribute
+        $attr{$name}{classdefs}= "";
+        my @a;
+        foreach my $c (keys %{$hash->{fhem}{classDefs}}) {
+                push @a, "$c=$hash->{fhem}{classDefs}{$c}{filename}";
+        }
+        $attr{$name}{"classdefs"}= join(":", @a);
+
         return undef;
+}
+
+#####################################
+sub
+ECMD_Attr($@)
+{
+
+  my @a = @_;
+  my $hash= $defs{$a[1]};
+
+  if($a[0] eq "set" && $a[2] eq "classdefs") {
+        my @classdefs= split(/:/,$a[3]);
+        delete $hash->{fhem}{classDefs};
+
+        foreach my $classdef (@classdefs) {
+                my ($classname,$filename)= split(/=/,$classdef,2);
+                ECMD_EvalClassDef($hash, $classname, $filename);
+        }
+  }
+
+  return undef;
+}
+
+
+#####################################
+sub
+ECMD_Set($@)
+{
+        my ($hash, @a) = @_;
+        my $name = $a[0];
+
+        # usage check
+        my $usage= "Usage: set $name classdef <classname> <filename> ";
+        return $usage if(@a != 4);
+        return $usage if($a[1] ne "classdef");
+
+        # from the definition
+        my $classname= $a[2];
+        my $filename= $a[3];
+
+        return ECMD_EvalClassDef($hash, $classname, $filename);
 }
 
 #####################################
