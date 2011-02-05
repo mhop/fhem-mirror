@@ -217,6 +217,10 @@ RFXMETER_Parse($$)
   if ($bits == 48) {
 	@res = parse_RFXmeter(\@rfxcom_data_array);
 	#parse_RFXmeter(\@rfxcom_data_array);
+  } else {
+	# this should never happen as this module parses only RFXmeter messages
+  	my $hexline = unpack('H*', $msg);
+  	Log 1, "RFXMETER: error unknown hex=$hexline";
   }
  
   return @res;
