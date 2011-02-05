@@ -156,6 +156,7 @@ use vars qw($reread_active);
 my $AttrList = "room comment alias";
 
 my $server;			# Server socket
+my $ipv6;			# Using IPV6
 my $currlogfile;		# logfile, without wildcards
 my $logopened = 0;              # logfile opened or using stdout
 my %client;			# Client array
@@ -166,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.128 2011-02-05 09:26:55 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.129 2011-02-05 19:04:19 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -401,8 +402,12 @@ while (1) {
       Log 1, "Accept failed: $!";
       next;
     }
-    my ($port, $iaddr) = sockaddr_in($clientinfo[1]);
-    my $caddr = inet_ntoa($iaddr);
+    my ($port, $iaddr) = $ipv6 ?
+        sockaddr_in6($clientinfo[1]) :
+        sockaddr_in($clientinfo[1]);
+    my $caddr = $ipv6 ?
+        inet_ntop(AF_INET6, $iaddr):
+        inet_ntoa($iaddr);
     my $af = $attr{global}{allowfrom};
     if($af) {
       if(",$af," !~ m/,$caddr,/) {
@@ -1535,13 +1540,27 @@ GlobalAttr($$)
     if($global && $global ne "global") {
       return "Bad syntax, usage: attr global port <portnumber> [global]";
     }
+    if($port =~ m/^IPV6:(\d+)$/i) {
+      $port = $1;
+      $ipv6 = 1;
+      eval "require IO::Socket::INET6; use Socket6;";
+      if($@) {
+        Log 1, $@;
+        Log 1, "Can't load INET6, falling back to IPV4";
+        $ipv6 = 0;
+      }
+    }
 
-    my $server2 = IO::Socket::INET->new(
-          Proto        => 'tcp',
-          LocalHost    => ($global ? undef : "localhost"),
-          LocalPort    => $port,
-          Listen       => 10,
-          ReuseAddr    => 1);
+    my $server2;
+    my @opts = (
+        Domain    => ($ipv6 ? AF_INET6 : AF_UNSPEC), # Linux bug
+        LocalHost => ($global ? undef : "localhost"),
+        LocalPort => $port,
+        Listen    => 10,
+        ReuseAddr => 1
+    );
+    $server2 = $ipv6 ? IO::Socket::INET6->new(@opts) : 
+                       IO::Socket::INET->new(@opts);
     if(!$server2) {
       Log 1, "Can't open server port at $port: $!";
       return "$!" if($init_done);
