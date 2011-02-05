@@ -1,7 +1,6 @@
 #################################################################################
-# 44_RFXX10REC.pm
-# Modul for FHEM for unkown RFXCOM X11security
-#
+# 43_RFXX10REC.pm
+# Modul for FHEM for 
 # - X10 security messages for 
 #               - ds10a: X10 Door / Window Sensor or compatible devices
 #               - ss10a: X10 motion sensor
