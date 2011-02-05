@@ -166,7 +166,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.127 2011-01-30 10:25:01 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.128 2011-02-05 09:26:55 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -303,7 +303,7 @@ die("No port specified in the configfile.\n") if(!$server);
 
 if($attr{global}{statefile} && -r $attr{global}{statefile}) {
   $ret = CommandInclude(undef, $attr{global}{statefile});
-  die($ret) if($ret);
+  Log 1, "statefile: $ret" if($ret);
 }
 
 SignalHandling();
@@ -590,6 +590,7 @@ sub
 AnalyzeInput($)
 {
   my $c = shift;
+  my @ret;
 
   while($client{$c}{buffer} =~ m/\n/) {
     my ($cmd, $rest) = split("\n", $client{$c}{buffer}, 2);
@@ -602,16 +603,20 @@ AnalyzeInput($)
           $cmd = $client{$c}{prevlines} . $cmd;
           undef($client{$c}{prevlines});
         }
-        AnalyzeCommandChain($c, $cmd);
-        return if(!defined($client{$c}));         # quit
+        my $ret = AnalyzeCommandChain($c, $cmd);
+        push @ret, $ret if(defined($ret));
       }
     } else {
       $client{$c}{prompt} = 1;                  # Empty return
     }
-
-    syswrite($client{$c}{fd}, $client{$c}{prevlines} ? "> " : "fhem> ")
-                if($client{$c}{prompt} && !$rest);
+    next if($rest);
   }
+  my $ret = "";
+  $ret .= (join("\n", @ret) . "\n") if(@ret);
+  $ret .= ($client{$c}{prevlines} ? "> " : "fhem> ")
+          if($client{$c}{prompt} && !$client{$c}{rcvdQuit});
+  syswrite($client{$c}{fd}, $ret) if($ret);
+  DoClose($c) if($client{$c}{rcvdQuit});
 }
 
 #####################################
@@ -620,44 +625,43 @@ sub
 AnalyzeCommandChain($$)
 {
   my ($c, $cmd) = @_;
-  my $ret = "";
+  my @ret;
 
   $cmd =~ s/#.*$//s;
   $cmd =~ s/;;/____/g;
   foreach my $subcmd (split(";", $cmd)) {
     $subcmd =~ s/____/;/g;
     my $lret = AnalyzeCommand($c, $subcmd);
-    $ret .= $lret if(defined($lret));
-    last if($c && !defined($client{$c}));	 # quit
+    push(@ret, $lret) if(defined($lret));
   }
-  return $ret;
+  return join("\n", @ret) if(@ret);
+  return undef;
 }
 
 #####################################
 sub
 AnalyzePerlCommand($$)
 {
-    my ($cl, $cmd) = @_;
+  my ($cl, $cmd) = @_;
 
-    $cmd =~ s/\\ *\n/ /g;               # Multi-line
-    # Make life easier for oneliners:
-    %value = ();
-    foreach my $d (keys %defs) {
-      $value{$d} = $defs{$d}{STATE}
-    }
-    my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
-    my $we = (($wday==0 || $wday==6) ? 1 : 0);
-    if(!$we) {
-      my $h2we = $attr{global}{holiday2we};
-      $we = 1 if($h2we && $value{$h2we} && $value{$h2we} ne "none");
-    }
-    $month++;
-    $year+=1900;
+  $cmd =~ s/\\ *\n/ /g;               # Multi-line
+  # Make life easier for oneliners:
+  %value = ();
+  foreach my $d (keys %defs) {
+    $value{$d} = $defs{$d}{STATE}
+  }
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
+  my $we = (($wday==0 || $wday==6) ? 1 : 0);
+  if(!$we) {
+    my $h2we = $attr{global}{holiday2we};
+    $we = 1 if($h2we && $value{$h2we} && $value{$h2we} ne "none");
+  }
+  $month++;
+  $year+=1900;
 
-    my $ret = eval $cmd;
-    $ret = $@ if($@);
-    syswrite($client{$cl}{fd}, "$ret\n") if($ret && $cl);
-    return $ret;
+  my $ret = eval $cmd;
+  $ret = $@ if($@);
+  return $ret;
 }
 
 sub
@@ -665,25 +669,25 @@ AnalyzeCommand($$)
 {
   my ($cl, $cmd) = @_;
 
-  $cmd =~ s/^(\\\n|[ \t])*//;		# Strip space or \\n at the begginning
+  $cmd =~ s/^(\\\n|[ \t])*//;# Strip space or \\n at the begginning
   $cmd =~ s/[ \t]*$//;
 
 
   Log 5, "Cmd: >$cmd<";
-  return if(!$cmd);
+  return undef if(!$cmd);
 
   if($cmd =~ m/^{.*}$/s) {		# Perl code
     return AnalyzePerlCommand($cl, $cmd);
   }
 
-  if($cmd =~ m/^"(.*)"$/s) {		 # Shell code, always in bg
+  if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
     system("$1 &");
-    return;
+    return undef;
   }
 
   $cmd =~ s/^[ \t]*//;
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
-  return if(!$fn);
+  return undef if(!$fn);
 
   $fn = "setdefaultattr" if($fn eq "defattr"); # Compatibility mode
 
@@ -699,22 +703,12 @@ AnalyzeCommand($$)
     }
   }
 
-  if(!defined($cmds{$fn})) {
-    my $msg =  "Unknown command $fn, try help";
-    if($cl) {
-      syswrite($client{$cl}{fd}, "$msg\n");
-    } else {
-      Log 3, "$msg";
-    }
-    return $msg;
-  }
-
+  return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
   $param = "" if(!defined($param));
   no strict "refs";
   my $ret = &{$cmds{$fn}{Fn} }($cl, $param);
   use strict "refs";
-
-  syswrite($client{$cl}{fd}, $ret . "\n") if($ret && $cl);
+  return undef if(defined($ret) && $ret eq "");
   return $ret;
 }
 
@@ -807,7 +801,7 @@ CommandInclude($$)
 {
   my ($cl, $arg) = @_;
   my $fh;
-  my $ret = undef;
+  my @ret;
 
   if(!open($fh, $arg)) {
     return "Can't open $arg: $!";
@@ -821,13 +815,14 @@ CommandInclude($$)
       $bigcmd .= "$1\\\n";
     } else {
       my $tret = AnalyzeCommandChain($cl, $bigcmd . $l);
-      $ret = $tret if(!$ret && $tret);
+      push @ret, $tret if(defined($tret));
       $bigcmd = "";
     }
     last if($rcvdquit);
   }
   close($fh);
-  return $ret;
+  return join("\n", @ret) if(@ret);
+  return undef;
 }
 
 
@@ -918,11 +913,10 @@ CommandQuit($$)
 
   if(!$cl) {
     $rcvdquit = 1;
-    return;
+  } else {
+    $client{$cl}{rcvdQuit} = 1;
+    return "Bye..." if($client{$cl}{prompt});
   }
-
-  syswrite($client{$cl}{fd}, "Bye...\n") if($client{$cl}{prompt});
-  DoClose($cl);
   return undef;
 }
 
@@ -1918,7 +1912,7 @@ CommandChain($$)
     for(my $n = 0; $n < $retry; $n++) {
       Log 1, sprintf("Trying again $cmd (%d out of %d)", $n+1,$retry) if($n>0);
       my $ret = AnalyzeCommand(undef, $cmd);
-      last if(!$ret || $ret !~ m/Timeout/);
+      last if(!defined($ret) || $ret !~ m/Timeout/);
     }
   }
   $attr{global}{verbose} = $ov;
@@ -2031,6 +2025,7 @@ sub
 DoTrigger($$)
 {
   my ($dev, $ns) = @_;
+  my $ret = "";
 
   return "" if(!defined($defs{$dev}));
 
@@ -2080,7 +2075,6 @@ DoTrigger($$)
   # the inner loop.
   if(!defined($defs{$dev}{INTRIGGER})) {
     $defs{$dev}{INTRIGGER}=1;
-    my $ret = "";
     foreach my $n (sort keys %defs) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
       if(defined($modules{$defs{$n}{TYPE}})) {
