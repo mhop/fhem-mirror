@@ -64,13 +64,12 @@ RFXCOM_Initialize($)
 # Provider
   $hash->{ReadFn}  = "RFXCOM_Read";
   $hash->{Clients} =
-        #":RFXMETER:OREGON:RFXELSE:";
-        ":RFXMETER:OREGON:";
+        ":RFXMETER:OREGON:RFXX10REC:RFXELSE:";
   my %mc = (
     "1:RFXMETER"   => "^0.*",
-    "2:OREGON"   => "^[^0]",
-    #"2:OREGON"   => "^[\x38-\x78].*",
-    #"3:RFXELSE"   => "^.*",
+    "2:OREGON"   => "^[\x38-\x78].*",
+    "3:RFXX10REC"   => "^(\\ |\\)).*", # 0x20 or 0x29
+    "4:RFXELSE"   => "^.*",
   );
   $hash->{MatchList} = \%mc;
 
@@ -222,6 +221,7 @@ RFXCOM_DoInit($)
   my $err;
   my $msg = undef;
   my $buf;
+  my $char = undef ;
 
   RFXCOM_Clear($hash);
 
@@ -243,7 +243,7 @@ RFXCOM_DoInit($)
   sleep(1);
 
   $buf = RFXCOM_SimpleRead($hash);
-  my $char = ord($buf);
+  if (defined($buf)) { $char = ord($buf); }
   if (! $buf) {
 	return "RFXCOM: Initialization Error $name: no char read";
   } elsif ($char ne 0x2c) {
@@ -319,15 +319,22 @@ RFXCOM_Parse($$$$)
   Log 5, "RFXCOM_Parse1 '$hexline'";
 
   my %addvals;
-  # Parse only if message is different within 2 seconds (some Oregon sensors always sends the message twice
-  if (("$last_rmsg" ne "$rmsg") || (time()-1) > $last_time) { Dispatch($hash, $rmsg, \%addvals); }
-  #if ("$last_rmsg" ne "$rmsg") { Dispatch($hash, $rmsg, \%addvals); }
+  # Parse only if message is different within 2 seconds 
+  # (some Oregon sensors always sends the message twice, X10 security sensors even sends the message five times)
+  if (("$last_rmsg" ne "$rmsg") || (time() - $last_time) > 1) { 
+    Log 5, "RFXCOM_Dispatch '$hexline'";
+    #Log 1, "RFXCOM_Dispatch '$hexline'";
+    Dispatch($hash, $rmsg, \%addvals); 
+    $hash->{"${name}_MSGCNT"}++;
+    $hash->{"${name}_TIME"} = TimeNow();
+    $hash->{RAWMSG} = $rmsg;
+  } else { 
+    #Log 1, "RFXCOM_Dispatch '$hexline' dup";
+    #Log 1, "<-duplicate->";
+  }
+
   $last_rmsg = $rmsg;
   $last_time = time();
-
-  $hash->{"${name}_MSGCNT"}++;
-  $hash->{"${name}_TIME"} = TimeNow();
-  $hash->{RAWMSG} = $rmsg;
 
   #$hexline = unpack('H*', $rmsg);
   #Log 1, "RFXCOM_Parse2 '$hexline'";
@@ -376,14 +383,10 @@ RFXCOM_SimpleRead($)
     $buf = $hash->{USBDev}->read(1) ; 
     #my $hexline = unpack('H*', $buf);
     #Log 1, "RFXCOM: RFXCOM_SimpleRead1 '$hexline'";
-    #if (length($buf) == 0) { $buf = $hash->{USBDev}->read(1) ; }
-    if (length($buf) == 0) {
+    if (!defined($buf) || length($buf) == 0) {
 	#sleep(1); 
 	$buf = $hash->{USBDev}->read(1) ; 
-
-        #my $hexline = unpack('H*', $buf);
-  	#Log 1, "RFXCOM: RFXCOM_SimpleRead2 '$hexline'";
-    	}
+    }
     return $buf;
   }
 
@@ -409,6 +412,7 @@ RFXCOM_CloseDev($)
 
   return if(!$dev);
   
+  Log 1, "RFXCOM: closing $dev";
   if($hash->{TCPDev}) {
     $hash->{TCPDev}->close();
     delete($hash->{TCPDev});
@@ -470,9 +474,9 @@ RFXCOM_OpenDev($$)
      require Win32::SerialPort;
      $po = new Win32::SerialPort ($dev);
     } else  {
+     #Log(1, "RFXCOM: new Device");
      require Device::SerialPort;
-     #$po = new Device::SerialPort ($dev);
-     $po = Device::SerialPort->new($dev);
+     $po = new Device::SerialPort ($dev);
     }
 
     if(!$po) {
@@ -491,16 +495,22 @@ RFXCOM_OpenDev($$)
       $selectlist{"$name.$dev"} = $hash;
     }
 
-    $po->databits(8);
-    $po->baudrate(4800);
-    $po->parity('none');
-    $po->stopbits(1);
-    $po->handshake('none');
-    $po->reset_error();
-    $po->lookclear; # clear buffers
+    #$po->reset_error || Log 1, "RFXCOM reset_error";
+    $po->databits(8) || Log 1, "RFXCOM could not set databits";
+    $po->baudrate(4800) || Log 1, "RFXCOM could not set baudrate";
+    $po->parity('none') || Log 1, "RFXCOM could not set parity";
+    $po->stopbits(1) || Log 1, "RFXCOM could not set stopbits";
+    $po->handshake('none') || Log 1, "RFXCOM could not set handshake";
+    $po->datatype('raw') || Log 1, "RFXCOM could not set datatype";
+    #$po->lookclear || Log 1, "RFXCOM could not set lookclear";
+
+
+    $po->write_settings || Log 1, "RFXCOM could not write_settings $dev";
+
+    $hash->{po} = $po;
+    $hash->{socket} = 0;
 
   Log 1, "RFXCOM: RFXCOM_OpenDev $dev done";
-
   }
 
   if($reopen) {
