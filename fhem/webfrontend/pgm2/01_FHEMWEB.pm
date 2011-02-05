@@ -10,7 +10,6 @@ use IO::Socket;
 sub FW_digestCgi($);
 sub FW_doDetail($);
 sub FW_fileList($);
-sub FW_getAttr($$$);
 sub FW_makeTable($$$$$$$$);
 sub FW_updateHashes();
 sub FW_showRoom();
@@ -68,12 +67,12 @@ FHEMWEB_Initialize($)
   my ($hash) = @_;
 
   $hash->{ReadFn}  = "FW_Read";
-
+  $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
-                     "smallscreen";
+                     "smallscreen nofork basicAuth basicAuthMsg HTTPS";
 
   ###############
   # Initialize internal structures
@@ -90,16 +89,30 @@ FW_Define($$)
   my ($hash, $def) = @_;
   my ($name, $type, $port, $global) = split("[ \t]+", $def);
   return "Usage: define <name> FHEMWEB <tcp-portnr> [global]"
-        if($port !~ m/^[0-9]+$/ || $port < 1 || $port > 65535 ||
-           ($global && $global ne "global"));
+        if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
+  if($port =~ m/^IPV6:(\d+)$/i) {
+    $port = $1;
+    eval "require IO::Socket::INET6; use Socket6;";
+    if($@) {
+      Log 1, $@;
+      Log 1, "Can't load INET6, falling back to IPV4";
+    } else {
+      $hash->{IPV6} = 1;
+    }
+  }
+
+  my @opts = (
+    Domain    => ($hash->{IPV6} ? AF_INET6 : AF_UNSPEC), # Linux bug
+    LocalHost => ($global ? undef : "localhost"),
+    LocalPort => $port,
+    Listen    => 10,
+    ReuseAddr => 1
+  );
   $hash->{STATE} = "Initialized";
-  $hash->{SERVERSOCKET} = IO::Socket::INET->new(
-          Proto     => 'tcp',
-          LocalHost => (($global && $global eq "global") ? undef : "localhost"),
-          LocalPort => $port,
-          Listen    => 10,
-          ReuseAddr => 1);
+  $hash->{SERVERSOCKET} = $hash->{IPV6} ?
+        IO::Socket::INET6->new(@opts) : 
+        IO::Socket::INET->new(@opts);
 
   if(!$hash->{SERVERSOCKET}) {
     my $msg = "Can't open server port at $port: $!";
@@ -145,19 +158,22 @@ FW_Read($)
 
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
 
-    my @clientinfo = $hash->{SERVERSOCKET}->accept();
     my $ll = GetLogLevel($name,4);
-
+    my @clientinfo = $hash->{SERVERSOCKET}->accept();
     if(!@clientinfo) {
-      Print("ERROR", 1, "016 Accept failed for admin port");
       Log(1, "Accept failed for HTTP port ($name: $!)");
       return;
     }
 
-    my @clientsock = sockaddr_in($clientinfo[1]);
+    my @clientsock = $hash->{IPV6} ? 
+        sockaddr_in6($clientinfo[1]) :
+        sockaddr_in($clientinfo[1]);
 
     my %nhash;
-    my $cname = "FHEMWEB:". inet_ntoa($clientsock[1]) .":".$clientsock[0];
+    my $cname = "FHEMWEB:".
+        ($hash->{IPV6} ?
+                inet_ntop(AF_INET6, $clientsock[1]) :
+                inet_ntoa($clientsock[1])) .":".$clientsock[0];
     $nhash{NR}    = $devcount++;
     $nhash{NAME}  = $cname;
     $nhash{FD}    = $clientinfo[0]->fileno();
@@ -172,15 +188,20 @@ FW_Read($)
     $defs{$nhash{NAME}} = \%nhash;
     $selectlist{$nhash{NAME}} = \%nhash;
 
+    if($hash->{SSL}) {
+      my $ret = IO::Socket::SSL->start_SSL($nhash{CD}, { SSL_server=>1, });
+      Log 1, "SSL: $!" if(!$ret && $! ne "Socket is not connected");
+    }
+
     Log($ll, "Connection accepted from $nhash{NAME}");
     return;
-
   }
 
   $FW_wname = $hash->{SNAME};
   my $ll = GetLogLevel($FW_wname,4);
+  my $c = $hash->{CD};
 
-  if(!$zlib_loaded && FW_getAttr($FW_wname, "fwcompress", 1)) {
+  if(!$zlib_loaded && AttrVal($FW_wname, "fwcompress", 1)) {
     $zlib_loaded = 1;
     eval { require Compress::Zlib; };
     if($@) {
@@ -211,14 +232,32 @@ FW_Read($)
 
   #Log 0, "Got: >$hash->{BUF}<";
   my @lines = split("[\r\n]", $hash->{BUF});
-  my @enc = grep /Accept-Encoding/, @lines;
+
+  #############################
+  # BASIC HTTP AUTH
+  my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
+  if($basicAuth) {
+    my @auth = grep /^Authorization: Basic $basicAuth/, @lines;
+    if(!@auth) {
+      my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
+      print $c "HTTP/1.1 401 Authorization Required\r\n",
+             "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
+             "Content-Length: 0\r\n\r\n";
+      return;
+    };
+  }
+  #############################
   
+  my @enc = grep /Accept-Encoding/, @lines;
   my ($mode, $arg, $method) = split(" ", $lines[0]);
   $hash->{BUF} = "";
 
   Log($ll, "HTTP $name GET $arg");
   my $pid;
-  return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
+  if(!AttrVal($FW_wname, "nofork", undef)) {
+    # Process SVG rendering as a parallel process
+    return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
+  }
 
   $hash->{INUSE} = 1;
   my $cacheable = FW_AnswerCall($arg);
@@ -230,15 +269,16 @@ FW_Read($)
   }
 
   my $compressed = "";
-  if(($FW_RETTYPE=~m/text/i || $FW_RETTYPE=~m/svg/i || $FW_RETTYPE=~m/script/i) &&
+  if(($FW_RETTYPE=~m/text/i ||
+      $FW_RETTYPE=~m/svg/i ||
+      $FW_RETTYPE=~m/script/i) &&
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
-     FW_getAttr($FW_wname, "fwcompress", 1)) {
+     AttrVal($FW_wname, "fwcompress", 1)) {
 
     $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
   }
 
-  my $c = $hash->{CD};
   my $length = length($FW_RET);
   my $expires = ($cacheable?
                         ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
@@ -259,9 +299,9 @@ FW_AnswerCall($)
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=ISO-8859-1";
-  $FW_ME = "/" . FW_getAttr($FW_wname, "webname", "fhem");
-  $FW_dir = FW_getAttr($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
-  $FW_ss = FW_getAttr($FW_wname, "smallscreen", 0);
+  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
+  $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
+  $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
 
   # Lets go:
   if($arg =~ m,^${FW_ME}/(.*html)$, || $arg =~ m,^${FW_ME}/(example.*)$,) {
@@ -327,8 +367,8 @@ FW_AnswerCall($)
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
-  $FW_plotmode = FW_getAttr($FW_wname, "plotmode", "SVG");
-  $FW_plotsize = FW_getAttr($FW_wname, "plotsize", $FW_ss ? "480,160" : "800,160");
+  $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
+  $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" : "800,160");
   $FW_reldoc = "$FW_ME/commandref.html";
 
   $FW_cmdret = $docmd ? fC($cmd) : "";
@@ -353,7 +393,7 @@ FW_AnswerCall($)
     }
   }
 
-  my $t = FW_getAttr("global", "title", "Home, Sweet Home");
+  my $t = AttrVal("global", "title", "Home, Sweet Home");
 
   pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   pO '<html xmlns="http://www.w3.org/1999/xhtml">';
@@ -365,7 +405,7 @@ FW_AnswerCall($)
     pO '<meta name="viewport" content="width=device-width"/>';
   }
 
-  my $rf = FW_getAttr($FW_wname, "refresh", "");
+  my $rf = AttrVal($FW_wname, "refresh", "");
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   my $stylecss = ($FW_ss ? "style_smallscreen.css" : "style.css");
   pO "<link href=\"$FW_ME/$stylecss\" rel=\"stylesheet\"/>";
@@ -442,7 +482,7 @@ FW_updateHashes()
   %FW_rooms = ();
   foreach my $d (keys %defs ) {
     next if(IsIgnored($d));
-    foreach my $r (split(",", FW_getAttr($d, "room", "Unsorted"))) {
+    foreach my $r (split(",", AttrVal($d, "room", "Unsorted"))) {
       $FW_rooms{$r}{$d} = 1;
     }
   }
@@ -458,7 +498,7 @@ FW_updateHashes()
     $FW_types{$t}{$d} = 1;
   }
 
-  $FW_room = FW_getAttr($FW_detail, "room", "Unsorted") if($FW_detail);
+  $FW_room = AttrVal($FW_detail, "room", "Unsorted") if($FW_detail);
 }
 
 ##############################
@@ -536,7 +576,7 @@ FW_showArchive($)
   if($fn =~ m,^(.+)/([^/]+)$,) {
     $fn = $2;
   }
-  $fn = FW_getAttr($d, "archivedir", "") . "/" . $fn;
+  $fn = AttrVal($d, "archivedir", "") . "/" . $fn;
   my $t = $defs{$d}{TYPE};
 
   pO "<div id=\"content\">";
@@ -544,7 +584,7 @@ FW_showArchive($)
   pO "<table class=\"block\" id=\"$t\"><tr><td>";
 
   my $row =  0;
-  my $l = FW_getAttr($d, "logtype", undef);
+  my $l = AttrVal($d, "logtype", undef);
   foreach my $f (FW_fileList($fn)) {
     pF "    <tr class=\"%s\"><td>$f</td>", $row?"odd":"even";
     $row = ($row+1)%2;
@@ -575,7 +615,7 @@ FW_doDetail($)
   pO "<form method=\"get\" action=\"$FW_ME\">";
   pO FW_hidden("detail", $d);
 
-  $FW_room = FW_getAttr($d, "room", undef);
+  $FW_room = AttrVal($d, "room", undef);
   my $t = $defs{$d}{TYPE};
 
   pO "<div id=\"content\">";
@@ -782,7 +822,7 @@ FW_showRoom()
         my $iv = $v;    # icon value
         my $iname = "";
 
-        if(defined(FW_getAttr($d, "showtime", undef))) {
+        if(defined(AttrVal($d, "showtime", undef))) {
 
           $v = $defs{$d}{READINGS}{state}{TIME};
 
@@ -835,7 +875,7 @@ FW_showRoom()
 
         pH "detail=$d", $d, 1;
         pO "<td>$v</td>";
-        if(defined(FW_getAttr($d, "archivedir", undef))) {
+        if(defined(AttrVal($d, "archivedir", undef))) {
           pH "cmd=showarchive $d", "archive", 1;
         }
 
@@ -843,7 +883,7 @@ FW_showRoom()
           pF "    </tr>";
 	  pF "    <tr class=\"%s\"><td>$f</td>", $row?"odd":"even";
 	  $row = ($row+1)%2;
-	  foreach my $ln (split(",", FW_getAttr($d, "logtype", "text"))) {
+	  foreach my $ln (split(",", AttrVal($d, "logtype", "text"))) {
 	    my ($lt, $name) = split(":", $ln);
 	    $name = $lt if(!$name);
 	    pH "cmd=logwrapper $d $lt $f", $name, 1;
@@ -904,7 +944,7 @@ FW_logWrapper($)
   if($type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
-    $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
+    $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
 
     if(!open(FH, $path)) {
       pO "<div id=\"content\">$path: $!</div>";
@@ -927,8 +967,8 @@ FW_logWrapper($)
     pO "<table><tr><td>";
     pO "<td>";
     my $arg = "$FW_ME?cmd=showlog undef $d $type $file";
-    if(FW_getAttr($d,"plotmode",$FW_plotmode) eq "SVG") {
-      my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$FW_plotsize));
+    if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
+      my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
       pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
@@ -979,9 +1019,9 @@ FW_substcfg($$$$$$)
 
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-  my $title = FW_getAttr($wl, "title", "\"$file\"");
+  my $title = AttrVal($wl, "title", "\"$file\"");
   $title = AnalyzeCommand(undef, "{ $title }");
-  my $label = FW_getAttr($wl, "label", undef);
+  my $label = AttrVal($wl, "label", undef);
   my @g_label;
   if ($label) {
     @g_label = split(":",$label);
@@ -996,7 +1036,7 @@ FW_substcfg($$$$$$)
 
   $gplot_script =~ s/<OUT>/$tmpfile/g;
 
-  my $ps = FW_getAttr($wl,"plotsize",$FW_plotsize);
+  my $ps = AttrVal($wl,"plotsize",$FW_plotsize);
   $gplot_script =~ s/<SIZE>/$ps/g;
 
   $gplot_script =~ s/<TL>/$title/g;
@@ -1029,7 +1069,7 @@ FW_showLog($)
   my ($cmd) = @_;
   my (undef, $wl, $d, $type, $file) = split(" ", $cmd, 5);
 
-  my $pm = FW_getAttr($wl,"plotmode",$FW_plotmode);
+  my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
 
   my $gplot_pgm = "$FW_dir/$type.gplot";
 
@@ -1061,14 +1101,14 @@ FW_showLog($)
       # Looking for the logfile....
       $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
       my $path = "$1/$file";
-      $path = FW_getAttr($d,"archivedir","") . "/$file" if(!-f $path);
+      $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
       return FW_fatal("Cannot read $path") if(!-r $path);
 
       my ($err, $cfg, $plot, undef) = FW_readgplotfile($wl, $gplot_pgm, $file);
       return $err if($err);
       my $gplot_script = FW_substcfg(0, $wl, $cfg, $plot, $file,$tmpfile);
 
-      my $fr = FW_getAttr($wl, "fixedrange", undef);
+      my $fr = AttrVal($wl, "fixedrange", undef);
       if($fr) {
         $fr =~ s/ /\":\"/;
         $fr = "set xrange [\"$fr\"]\n";
@@ -1278,7 +1318,7 @@ FW_calcWeblink($$)
 {
   my ($d,$wl) = @_;
 
-  my $pm = FW_getAttr($d,"plotmode",$FW_plotmode);
+  my $pm = AttrVal($d,"plotmode",$FW_plotmode);
   return if($pm eq "gnuplot");
 
   if(!$d) {
@@ -1288,7 +1328,7 @@ FW_calcWeblink($$)
       next if($defs{$d}{WLTYPE} ne "fileplot");
       next if(!$FW_room || ($FW_room ne "all" && !$FW_rooms{$FW_room}{$d}));
 
-      next if(FW_getAttr($d, "fixedrange", undef));
+      next if(AttrVal($d, "fixedrange", undef));
       next if($pm eq "gnuplot");
       $cnt++;
     }
@@ -1297,7 +1337,7 @@ FW_calcWeblink($$)
 
   return if(!$defs{$wl});
 
-  my $fr = FW_getAttr($wl, "fixedrange", undef);
+  my $fr = AttrVal($wl, "fixedrange", undef);
   my $frx;
   if($fr) {
     #klaus fixed range day, week, month or year
@@ -1518,15 +1558,6 @@ fC($)
 
 ##################
 sub
-FW_getAttr($$$)
-{
-  my ($d, $aname, $def) = @_;
-  return $attr{$d}{$aname} if($d && $attr{$d} && defined($attr{$d}{$aname}));
-  return $def;
-}
-
-##################
-sub
 FW_showWeblink($$$)
 {
   my ($d, $v, $t) = @_;
@@ -1559,8 +1590,8 @@ FW_showWeblink($$$)
       my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
 
       my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
-      if(FW_getAttr($d,"plotmode",$FW_plotmode) eq "SVG") {
-        my ($w, $h) = split(",", FW_getAttr($d,"plotsize",$FW_plotsize));
+      if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
+        my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
         pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
               "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
@@ -1580,4 +1611,21 @@ FW_showWeblink($$$)
   }
 }
 
+sub
+FW_Attr(@)
+{
+  my @a = @_;
+  my $hash = $defs{$a[1]};
+
+  if($a[0] eq "set" && $a[2] eq "HTTPS") {
+    eval "require IO::Socket::SSL";
+    if($@) {
+      Log 1, $@;
+      Log 1, "Can't load IO::Socket::SSL, falling back to HTTP";
+    } else {
+      $hash->{SSL} = 1;
+    }
+  }
+  return undef;
+}
 1;

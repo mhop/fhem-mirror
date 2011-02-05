@@ -915,7 +915,11 @@ A line ending with \ will be concatenated with the next one, so long lines
         connections. To offer at least a little bit of security, the server
         will only listen for connections from the localhost per default. If
         there is a second value  "global" then the server will listen for
-        non-localhost connections too.
+        non-localhost connections too.<br><br>
+        To use IPV6, specify the port as IPV6:&lt;number&gt;, in this
+        case the perl module IO::Socket:INET6 will be requested.
+        On Linux you may have to install it with cpan -i IO::Socket::INET6 or
+        apt-get libio-socket-inet6-perl; the OSX perl already has this module.
     </li><br>
 
     <a name="statefile"></a>
@@ -5411,7 +5415,8 @@ Terminating
     <br><br>
     Enable the webfrontend on port &lt;tcp-portnr&gt;. If global is specified,
     then requests from all interfaces (not only localhost / 127.0.0.1) are
-    serviced.
+    serviced.<br>
+    To enable listening on IPV6 see the comments <a href="#port">here</a>.
   </ul>
   <br>
 
@@ -5492,6 +5497,44 @@ Terminating
         port 8084 for smallscreen browsers. <b>Note:</b>After viewing the
         site on the iPhone in Safari, try to add it to the home-screen.
         </li><br>
+
+    <a name="nofork"></a>
+    <li>nofork<br>
+        If set, do not generate the logs in a parallel process. Needed
+        on some Fritzbox installations.
+    </li><br>
+
+    <a name="basicAuth"></a>
+    <li>basicAuth, basicAuthMsg<br>
+        request a username/password authentication for access. You have to set
+        the basicAuth attribute to the Base64 encoded value of
+        &lt;user&gt;:&lt;password&gt;, e.g.:<ul>
+        $ echo -n fhemuser:secret | base64<br>
+        ZmhlbXVzZXI6c2VjcmV0<br>
+        fhem.cfg:<br>
+        attr WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
+        </ul>
+        You can of course use other means of base64 encoding, e.g. online
+        Base64 encoders. If basicAuthMsg is set, it will be displayed in the
+        browser when requesting the username/password.
+    </li><br>
+
+    <a name="HTTPS"></a>
+    <li>HTTPS<br>
+        use HTTPS instead of HTTP. This feature requires the perl module
+        IO::Socket::SSL, to be installed with cpan -i IO::Socket::SSL or
+        apt-get install libio-socket-ssl-perl; the OSX perl already has this
+        module.<br>
+        A local certificate has to be generated into a directory called certs,
+        this directory <b>must</b> be in the working directory (pwd) of fhem,
+        which is not necessarily the modpath directory. To generate it:
+        <ul>
+        mkdir certs<br>
+        cd certs<br>
+        openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+        </ul>
+    </li><br>
+
 
     </ul>
 
