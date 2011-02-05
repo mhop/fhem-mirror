@@ -42,7 +42,6 @@ package main;
 
 use strict;
 use warnings;
-use Switch;
 
 my $time_old = 0;
 
@@ -51,8 +50,8 @@ OREGON_Initialize($)
 {
   my ($hash) = @_;
 
-  #$hash->{Match}     = "^[\x38-\x78].*";
-  $hash->{Match}     = "^[^\x30]";
+  $hash->{Match}     = "^[\x38-\x78].*";
+  #$hash->{Match}     = "^[^\x30]";
   $hash->{DefFn}     = "OREGON_Define";
   $hash->{UndefFn}   = "OREGON_Undef";
   $hash->{ParseFn}   = "OREGON_Parse";
@@ -805,8 +804,7 @@ OREGON_Parse($$)
   foreach $i (@res){
  	#print "!> i=".$i."\n";
 	#printf "%s\t",$i->{device};
-	switch ($i->{type}) {
-       		case "temp" { 
+	if ($i->{type} eq "temp") { 
 			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
 			$val .= "T: ".$i->{current}."  ";
 
@@ -814,8 +812,8 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
-		}
-       		case "humidity" { 
+  	} 
+	elsif ($i->{type} eq "humidity") { 
 			#printf "Luftfeuchtigkeit %d%s, %s ;",$i->{current},$i->{units},$i->{string};
 			$val .= "H: ".$i->{current}."  ";
 
@@ -823,8 +821,8 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-		}
-       		case "battery" { 
+	}
+	elsif ($i->{type} eq "battery") { 
 			#printf "Batterie %d%s; ",$i->{current},$i->{units};
 			# do not add it due to problems with hms.gplot
 			#$val .= "Bat: ".$i->{current}." ";
@@ -833,8 +831,8 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-		}
-       		case "pressure" { 
+	}
+	elsif ($i->{type} eq "pressure") { 
 			#printf "Luftdruck %d %s, Vorhersage=%s ; ",$i->{current},$i->{units},$i->{forecast};
 			# do not add it due to problems with hms.gplot
 			#$val .= "P: ".$i->{current}."  ";
@@ -848,8 +846,8 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{forecast};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{forecast};;
-		}
-       		case "speed" { 
+	}
+	elsif ($i->{type} eq "speed") { 
 			$val .= "W: ".$i->{current}." ";
 			$val .= "WA: ".$i->{average}." ";
 
@@ -862,8 +860,8 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{average};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{average};;
-		}
-       		case "direction" { 
+	}
+	elsif ($i->{type} eq "direction") { 
 			$val .= "WD: ".$i->{current}."  ";
 			$val .= "WDN: ".$i->{string}."  ";
 
@@ -871,32 +869,32 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current} . " " . $i->{string};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current} . " " . $i->{string};;
-		}
-       		case "rain" { 
+	}
+	elsif ($i->{type} eq "rain") { 
 			$val .= "RR: ".$i->{current}." ";
 
 			$sensor = "rain_rate";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-		}
-       		case "train" { 
+	}
+	elsif ($i->{type} eq "train") { 
 			$val .= "TR: ".$i->{current}."  ";
 
 			$sensor = "rain_total";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-		}
-       		case "flip" { 
+	}
+	elsif ($i->{type} eq "flip") { 
 			#$val .= "F: ".$i->{current}." ";
 
 			$sensor = "rain_flip";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-		}
-       		case "uv" { 
+	}
+	elsif ($i->{type} eq "uv") { 
 			$val .= "UV: ".$i->{current}."  ";
 			$val .= "UVR: ".$i->{risk}."  ";
 
@@ -909,18 +907,17 @@ OREGON_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{risk};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{risk};;
-		}
-       		case "hexline" { 
+	}
+	elsif ($i->{type} eq "hexline") { 
 			$sensor = "hexline";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
-		}
-		else { 
+	}
+	else { 
 			print "\nOREGON: Unknown: "; 
 			print "Type: ".$i->{type}.", ";
 			print "Value: ".$i->{current}."\n";
-		}
 	}
   }
 
