@@ -103,7 +103,7 @@ FW_Define($$)
   }
 
   my @opts = (
-    Domain    => ($hash->{IPV6} ? AF_INET6 : AF_UNSPEC), # Linux bug
+    Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
     LocalHost => ($global ? undef : "localhost"),
     LocalPort => $port,
     Listen    => 10,
@@ -172,7 +172,7 @@ FW_Read($)
     my %nhash;
     my $cname = "FHEMWEB:".
         ($hash->{IPV6} ?
-                inet_ntop(AF_INET6, $clientsock[1]) :
+                inet_ntop(AF_INET6(), $clientsock[1]) :
                 inet_ntoa($clientsock[1])) .":".$clientsock[0];
     $nhash{NR}    = $devcount++;
     $nhash{NAME}  = $cname;
