@@ -1,13 +1,18 @@
 FHEM:
+- fork problem (?)
+- autocreate disable / onForSec
+- HomeMatic in fhemweb
+- HomeMatic autocreate
 - HomeMatic signing
-- autocreate for HomeMatic
+- HomeMatic set log 2
+- mergelog
+
 - autodetect physical hardware
 - RFR: Error message for uncomplete last message
 - fix autocreate rename anomaly (rename filelog only)
 - implement wiki decisions
 
 Webpgm2
-- plot data from multiple files in a single picture
 - setting the dummy state via dropdown is not possible
 - click on the graph only correct for the day zoom
 - integrate weblink details in the SVG

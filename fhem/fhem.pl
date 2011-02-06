@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.129 2011-02-05 19:04:19 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.130 2011-02-06 08:30:05 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1724,6 +1724,7 @@ CommandSetstate($$)
       }
 
       my $tim = "$b[0] $b[1]";
+      ReplaceEventMap($sdev, $b[2]);
       my $ret = CallFn($sdev, "StateFn", $d, $tim, $b[2], $b[3]);
       if($ret) {
         push @rets, $ret;
