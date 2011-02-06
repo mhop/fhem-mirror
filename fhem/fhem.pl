@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.130 2011-02-06 08:30:05 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.131 2011-02-06 08:50:25 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -406,7 +406,7 @@ while (1) {
         sockaddr_in6($clientinfo[1]) :
         sockaddr_in($clientinfo[1]);
     my $caddr = $ipv6 ?
-        inet_ntop(AF_INET6, $iaddr):
+        inet_ntop(AF_INET6(), $iaddr):
         inet_ntoa($iaddr);
     my $af = $attr{global}{allowfrom};
     if($af) {
@@ -1553,7 +1553,7 @@ GlobalAttr($$)
 
     my $server2;
     my @opts = (
-        Domain    => ($ipv6 ? AF_INET6 : AF_UNSPEC), # Linux bug
+        Domain    => ($ipv6 ? AF_INET6() : AF_UNSPEC), # Linux bug
         LocalHost => ($global ? undef : "localhost"),
         LocalPort => $port,
         Listen    => 10,
