@@ -107,7 +107,7 @@ ESA2000_Parse($$)
 
   if($type eq "ESA2000_LED") {
 
-    @txt = ( "repeat", "sequence", "total_ticks", "actual_ticks", "ticks_kwh", "raw", "total_kwh", "actual_kwh", "diff_kwh", "diff_sec", "diff_ticks", "last_sec", "raw_total_kwh", "max_kwh", "day_kwh", "month_kwh", "year_kwh", "high_rate", "hr_kwh", "lr_kwh", "day_hr_kwh", "day_lr_kwh", "month_hr_kwh", "month_lr_kwh", "year_hr_kwh", "year_lr_kwh" );
+    @txt = ( "repeat", "sequence", "total_ticks", "actual_ticks", "ticks_kwh", "raw", "total_kwh", "actual_kwh", "diff_kwh", "diff_sec", "diff_ticks", "last_sec", "raw_total_kwh", "max_kwh", "day_kwh", "month_kwh", "year_kwh", "rate", "hr_kwh", "lr_kwh", "day_hr_kwh", "day_lr_kwh", "month_hr_kwh", "month_lr_kwh", "year_hr_kwh", "year_lr_kwh" );
 
 
     # Codierung Hex
@@ -121,13 +121,13 @@ ESA2000_Parse($$)
     # check if low-rate or high-rate. note that this is different per electricity company! (Here weekday from 6-20 is high rate)
     my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday,$isdst) = localtime;
     if ( (0 < $wday ) && ($wday < 6) && (5 < $hour) && ($hour < 20) ) {
-      $v[17] = 1;
+      $v[17] = "HR";
     } else {
-      $v[17] = 0;
+      $v[17] = "LR";
     } 
 
     $v[5] = sprintf("CNT: %d%s CUM: %d CUR: %d  TICKS: %d %s",
-                         $v[1], $v[0], $v[2], $v[3], $v[4], $v[17] ? "HR" : "LR");
+                         $v[1], $v[0], $v[2], $v[3], $v[4], $v[17] );
 
     if (defined($def->{READINGS}{$txt[11]}{VAL})) {
       $v[9] =  $v[11] - $def->{READINGS}{$txt[11]}{VAL}; # seconds since last update
@@ -148,14 +148,14 @@ ESA2000_Parse($$)
       if(defined($def->{READINGS}{$txt[14]}{TIME})) {
         if(substr($now,0,10) eq substr($def->{READINGS}{$txt[14]}{TIME},0,10)) { # a bit clumsy, I agree, but it works and its logical and this is pearl, right?
           $v[14] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[14]}{VAL}) ? $def->{READINGS}{$txt[14]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[18] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[18]}{VAL}) ? $def->{READINGS}{$txt[18]}{VAL} : 0); # high-rate
           } else {
             $v[19] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[19]}{VAL}) ? $def->{READINGS}{$txt[19]}{VAL} : 0); # low-rate
           }
         } else {
           $v[14] = $v[10]/$v[4];
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[18] = $v[10]/$v[4];
           } else {
             $v[19] = $v[10]/$v[4];
@@ -163,7 +163,7 @@ ESA2000_Parse($$)
        }
       } else {
           $v[14] = $v[10]/$v[4];
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[18] = $v[10]/$v[4];
           } else {
             $v[19] = $v[10]/$v[4];
@@ -172,14 +172,14 @@ ESA2000_Parse($$)
       if(defined($def->{READINGS}{$txt[15]}{TIME})) {
         if(substr($now,0,7) eq substr($def->{READINGS}{$txt[15]}{TIME},0,7)) { # a bit clumsy, I agree, but it works and its logical and this is pearl, right?
           $v[15] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[15]}{VAL}) ? $def->{READINGS}{$txt[15]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[20] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[20]}{VAL}) ? $def->{READINGS}{$txt[20]}{VAL} : 0); # high-rate
           } else {
             $v[21] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[21]}{VAL}) ? $def->{READINGS}{$txt[21]}{VAL} : 0); # low-rate
           }
         } else {
           $v[15] = $v[10]/$v[4];
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[20] = $v[10]/$v[4];
           } else {
             $v[21] = $v[10]/$v[4];
@@ -187,7 +187,7 @@ ESA2000_Parse($$)
         }
       } else {
           $v[15] = $v[10]/$v[4];
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[20] = $v[10]/$v[4];
           } else {
             $v[21] = $v[10]/$v[4];
@@ -196,14 +196,14 @@ ESA2000_Parse($$)
       if(defined($def->{READINGS}{$txt[16]}{TIME})) {
         if(substr($now,0,4) eq substr($def->{READINGS}{$txt[16]}{TIME},0,4)) { # a bit clumsy, I agree, but it works and its logical and this is pearl, right?
           $v[16] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[16]}{VAL}) ? $def->{READINGS}{$txt[16]}{VAL} : 0); # cumulate kWh to ensure tick-changes are calculated correctly (does this ever happen?)
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[22] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[22]}{VAL}) ? $def->{READINGS}{$txt[22]}{VAL} : 0); # high-rate
           } else {
             $v[23] = $v[10]/$v[4] + (defined($def->{READINGS}{$txt[23]}{VAL}) ? $def->{READINGS}{$txt[23]}{VAL} : 0); # low-rate
           }
         } else {
           $v[16] = $v[10]/$v[4];
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[22] = $v[10]/$v[4];
           } else {
             $v[23] = $v[10]/$v[4];
@@ -211,7 +211,7 @@ ESA2000_Parse($$)
         }
       } else {
           $v[16] = $v[10]/$v[4];
-          if ($v[17]) {
+          if ($v[17] eq "HR" ) {
             $v[22] = $v[10]/$v[4];
           } else {
             $v[23] = $v[10]/$v[4];
@@ -245,7 +245,7 @@ ESA2000_Parse($$)
       }
 
     $val = sprintf("CNT: %d%s CUM: %0.3f CUR: %0.3f TICKS: %d %s",
-                         $v[1], $v[0], $v[6], $v[7], $v[4], $v[17] ? "HR" : "LR");
+                         $v[1], $v[0], $v[6], $v[7], $v[4], $v[17]);
 
   } else {
 
