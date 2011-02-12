@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.131 2011-02-06 08:50:25 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.132 2011-02-12 11:27:16 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2486,7 +2486,10 @@ setGlobalAttrBeforeFork()
   while(my $l = <FH>) {
     chomp($l);
     next if($l !~ m/^attr +global +([^ ]+) +(.*)$/);
-    $attr{global}{$1} = $2;
+    my ($n,$v) = ($1,$2);
+    $v =~ s/#.*//;
+    $v =~ s/ .*$//;
+    $attr{global}{$n} = $v;
   }
   close(FH);
 }
