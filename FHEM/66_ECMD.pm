@@ -257,14 +257,11 @@ ECMD_DoInit($)
   my $msg = undef;
 
   ECMD_Clear($hash);
-  ECMD_SimpleWrite($hash, "version");
-  my ($err,$version)= ECMD_ReadAnswer($hash, "version");
-  return "$name: $err" if($err);
-  Log 2, "ECMD version: $version";
-
-  $hash->{VERSION} = $version;
-
-  #ECMD_SimpleWrite($hash, $hash->{initString});
+  #ECMD_SimpleWrite($hash, "version");
+  #my ($err,$version)= ECMD_ReadAnswer($hash, "version");
+  #return "$name: $err" if($err);
+  #Log 2, "ECMD version: $version";
+  #$hash->{VERSION} = $version;
 
   $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
