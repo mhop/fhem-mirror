@@ -550,13 +550,28 @@ ECMD_Attr($@)
 
 #####################################
 sub
+ECMD_Reopen($)
+{
+  my ($hash) = @_;
+  ECMD_CloseDev($hash);
+  ECMD_OpenDev($hash, 1);
+
+  return undef;
+}
+
+#####################################
+sub
 ECMD_Set($@)
 {
         my ($hash, @a) = @_;
         my $name = $a[0];
 
         # usage check
-        my $usage= "Usage: set $name classdef <classname> <filename> ";
+        my $usage= "Usage: set $name classdef <classname> <filename> OR set $name reopen";
+        if((@a == 2) && ($a[1] eq "reopen")) {
+                return ECMD_Reopen($hash);
+        }
+
         return $usage if(@a != 4);
         return $usage if($a[1] ne "classdef");
 
