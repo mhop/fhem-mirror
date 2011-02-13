@@ -1,15 +1,11 @@
 FHEM:
 - fork problem (?)
-- autocreate disable / onForSec
-- HomeMatic in fhemweb
-- HomeMatic autocreate
 - HomeMatic signing
 - HomeMatic set log 2
 - mergelog
 
 - autodetect physical hardware
 - RFR: Error message for uncomplete last message
-- fix autocreate rename anomaly (rename filelog only)
 - implement wiki decisions
 
 Webpgm2

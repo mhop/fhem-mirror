@@ -39,7 +39,7 @@ my %culHmModel=(
   "0004" => "HM-LC-SW1-FM",
   "0005" => "HM-LC-BL1-FM",
   "0006" => "HM-LC-BL1-SM",
-  "0007" => "KS550",
+  "0007" => "KS550",         # Tested
   "0008" => "HM-RC-4",       # cant pair(AES)-> broadcast only
   "0009" => "HM-LC-SW2-FM",
   "000A" => "HM-LC-SW2-SM",
@@ -82,7 +82,7 @@ my %culHmModel=(
   "003D" => "HM-WDS10-TH-O",
   "003E" => "HM-WDS30-T-O",
   "003F" => "HM-WDS40-TH-I",
-  "0040" => "HM-WDS100-C6-O",
+  "0040" => "HM-WDS100-C6-O", # Identical to KS550?
   "0041" => "HM-WDC7000",
   "0042" => "HM-SEC-SD",      # Tested
   "0043" => "HM-SEC-TIS",
@@ -322,7 +322,7 @@ CUL_HM_Parse($$)
       $t = hex($t)/10;
       $t -= 3276.8 if($t > 1638.4);
       $h = hex($h);
-      push @event, "state:T:$t H:$h";
+      push @event, "state:T: $t H: $h";
       push @event, "temperature:$t";
       push @event, "humidity:$h";
 
@@ -334,6 +334,34 @@ CUL_HM_Parse($$)
 
     }
 
+
+  } elsif($model eq "KS550") {
+    
+    if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
+      my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
+         (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
+      my $tsgn = ($t & 0x4000);    # not tested
+      $t = ($t & 0x3fff)/10;
+      $t = -$t if($tsgn);
+      my $ir = $r & 0x8000;
+      $r = ($r & 0x7fff) * 0.295;
+      my $wdr = ($w>>14)*22.5;
+      $w = $w & 0x3fff;
+      $wd = $wd * 5;
+
+      push @event,
+        "state:T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+      push @event, "windSpeed:$w";
+      push @event, "windDirection:$wd";
+      push @event, "windDirRange:$wdr";
+      push @event, "rain:$r";
+      push @event, "isRaining:$ir";
+      push @event, "sunshine:$s";
+      push @event, "brightness:$b";
+
+    }
 
   } elsif($st eq "KFM" && $model eq "KFM-Sensor") {
 
