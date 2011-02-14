@@ -27,6 +27,8 @@ sub FW_fatal($);
 sub pF($@);
 sub pO(@);
 sub pH(@);
+sub pHPlain(@);
+sub pHJava(@);
 sub FW_AnswerCall($);
 sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
@@ -624,11 +626,10 @@ FW_doDetail($)
 
   my $pgm = "Javascript:" .
              "s=document.getElementById('edit').style;".
-             "if(s.display=='none') s.display='block'; else s.display='none';".
+             "s.display = s.display=='none' ? 'block' : 'none';".
              "s=document.getElementById('disp').style;".
-             "if(s.display=='none') s.display='block'; else s.display='none';";
-  pO "<a onClick=\"$pgm\">Modify $d</a>";
-
+             "s.display = s.display=='none' ? 'block' : 'none';";
+  pHJava $pgm, "Modify $d";
   pH "room=$FW_room", "Back:$FW_room" if($FW_ss);
 
   pO "</td></tr><tr><td>";
@@ -976,7 +977,7 @@ FW_logWrapper($)
       pO "<img src=\"$arg\"/>";
     }
 
-    pH "cmd=toweblink $d:$type:$file", "<br>Convert to weblink";
+    pH "cmd=toweblink $d:$type:$file", "Convert to weblink";
     pO "</td>";
     pO "</td></tr></table>";
     pO "</td></tr></table>";
@@ -1306,7 +1307,7 @@ FW_zoomLink($$$)
   }
 
 
-  pH "$cmd", "<img style=\"border-color:transparent\" alt=\"$alt\" ".
+  pHPlain "$cmd", "<img style=\"border-color:transparent\" alt=\"$alt\" ".
                 "src=\"$FW_ME/icons/$img\"/>";
 }
 
@@ -1529,12 +1530,39 @@ pH(@)
 
    pO "<td>" if($td);
    if($FW_ss) {
+     pO "<a onClick=\"location.href='$FW_ME?$link'\"><div class=\"href\">$txt</div></a>";
+   } else {
+     pO "<a href=\"$FW_ME?$link\">$txt</a>";
+   }
+   pO "</td>" if($td);
+}
+
+sub
+pHJava(@)
+{
+   my ($link, $txt) = @_;
+
+   if($FW_ss) {
+     pO "<a onClick=\"$link\"><div class=\"href\">$txt</div></a>";
+   } else {
+     pO "<a onClick=\"$link\">$txt</a>";
+   }
+}
+
+sub
+pHPlain(@)
+{
+   my ($link, $txt, $td) = @_;
+
+   pO "<td>" if($td);
+   if($FW_ss) {
      pO "<a onClick=\"location.href='$FW_ME?$link'\">$txt</a>";
    } else {
      pO "<a href=\"$FW_ME?$link\">$txt</a>";
    }
    pO "</td>" if($td);
 }
+
 
 ##################
 # print formatted
@@ -1581,7 +1609,7 @@ FW_showWeblink($$$)
       }
 
       if($FW_ss) {
-        pH "detail=$d", $d;
+        pHPlain "detail=$d", $d;
         pO "<br>";
       } else {
         pO "<table><tr><td>";
