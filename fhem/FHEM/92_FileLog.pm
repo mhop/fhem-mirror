@@ -167,7 +167,7 @@ FileLog_Get($@)
          "  <infile> is without direcory, - means the current file\n" .
          "  <outfile> is a prefix, - means stdout\n"
         if(int(@a) < 5);
-
+Log 1, join("/", @a);
   shift @a;
   my $inf  = shift @a;
   my $outf = shift @a;

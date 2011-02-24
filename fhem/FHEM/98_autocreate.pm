@@ -24,7 +24,9 @@ my %flogpar = (
   "HMS:HMS100T._.*"
       => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
   "KS300:.*"
-      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,", FILTER => "%NAME:T:.*" },
+      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
+           FILTER => "%NAME:T:.*" },
+
   # Oregon sensors: 
   # * temperature
   "OREGON:(THR128|THWR288A|THN132N).*"
@@ -42,6 +44,14 @@ my %flogpar = (
   # * Oregon sensors: Rain gauge
   "OREGON:(PCR800|RGR918).*"
       => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
+
+  # HomeMatic
+  "CUL_HM:THSensor"
+      => { GPLOT => "hms:Temp/Hum,",
+           FILTER => "%NAME:T:.*" },
+  "CUL_HM:KS550"
+      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
+           FILTER => "%NAME:T:.*" },
 );
 
 #####################################
@@ -52,7 +62,11 @@ autocreate_Initialize($)
   $hash->{DefFn} = "autocreate_Define";
   $hash->{NotifyFn} = "autocreate_Notify";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 " . 
-                     "autosave filelog device_room weblink weblink_room";
+                     "autosave filelog device_room weblink weblink_room " .
+                     "disable";
+  my %ahash = ( Fn=>"CommandCreateLog",
+                Hlp=>"<device>,create log/weblink for <device>" );
+  $cmds{createlog} = \%ahash;
 }
 
 #####################################
@@ -83,6 +97,7 @@ autocreate_Notify($$)
   my ($ntfy, $dev) = @_;
 
   my $me = $ntfy->{NAME};
+  my ($ll1, $ll2) = (GetLogLevel($me,1), GetLogLevel($me,2));
   my $max = int(@{$dev->{CHANGED}});
   my $ret = "";
   my $nrcreated;
@@ -95,17 +110,23 @@ autocreate_Notify($$)
     ################
     if($s =~ m/^UNDEFINED ([^ ]*) ([^ ]*) (.*)$/) {
       my ($name, $type, $arg) = ($1, $2, $3);
+      next if(AttrVal($me, "disable", undef));
+
       my $lctype = lc($type);
+      my ($cmd, $ret);
+      my $hash = $defs{$name};  # Called from createlog
 
       ####################
-      my $cmd = "$name $type $arg";
-      Log GetLogLevel($me,2), "autocreate: define $cmd";
-      my $ret = CommandDefine(undef, $cmd);
-      if($ret) {
-        Log GetLogLevel($me,1), "ERROR: $ret";
-        last;
+      if(!$hash) {
+        $cmd = "$name $type $arg";
+        Log $ll2, "autocreate: define $cmd";
+        $ret = CommandDefine(undef, $cmd);
+        if($ret) {
+          Log $ll1, "ERROR: $ret";
+          last;
+        }
       }
-      my $hash = $defs{$name};
+      $hash = $defs{$name};
       $nrcreated++;
       my $room = replace_wildcards($hash, $attr{$me}{device_room});
       $attr{$name}{room} = $room if($room);
@@ -114,17 +135,20 @@ autocreate_Notify($$)
       my $fl = replace_wildcards($hash, $attr{$me}{filelog});
       next if(!$fl);
       my $flname = "FileLog_$name";
+      delete($defs{$flname});   # If we are re-creating it with createlog.
       my ($gplot, $filter) = ("", $name);
       foreach my $k (keys %flogpar) {
-        next if("$type:$name" !~ m/^$k$/);
+        my $model = AttrVal($name, "model", "");
+        next if("$type:$name"  !~ m/^$k$/ && 
+                "$type:$model" !~ m/^$k$/);
         $gplot = $flogpar{$k}{GPLOT};
         $filter = replace_wildcards($hash, $flogpar{$k}{FILTER});
       }
       $cmd = "$flname FileLog $fl $filter";
-      Log GetLogLevel($me,2), "autocreate: define $cmd";
+      Log $ll2, "autocreate: define $cmd";
       $ret = CommandDefine(undef, $cmd);
       if($ret) {
-        Log GetLogLevel($me,1), "ERROR: $ret";
+        Log $ll1, "ERROR: $ret";
         last;
       }
       $attr{$flname}{room} = $room if($room);
@@ -134,20 +158,26 @@ autocreate_Notify($$)
       ####################
       next if(!$attr{$me}{weblink} || !$gplot);
       $room = replace_wildcards($hash, $attr{$me}{weblink_room});
-      my $wlname = "weblink_$name";
-      my $gplotfile;
-      my $stuff;
-      ($gplotfile, $stuff) = split(/:/, $gplot);
-      $cmd = "$wlname weblink fileplot $flname:$gplotfile:CURRENT";
-      Log GetLogLevel($me,2), "autocreate: define $cmd";
-      $ret = CommandDefine(undef, $cmd);
-      if($ret) {
-        Log GetLogLevel($me,1), "ERROR: $ret";
-        last;
-      }
-      $attr{$wlname}{room} = $room if($room);
-      $attr{$wlname}{label} = '"' . $name .
+      my $wnr = 1;
+      foreach my $wdef (split(/,/, $gplot)) {
+        next if(!$wdef);
+        my ($gplotfile, $stuff) = split(/:/, $wdef);
+        next if(!$gplotfile);
+        my $wlname = "weblink_$name";
+        $wlname .= "_$wnr" if($wnr > 1);
+        $wnr++;
+        delete($defs{$wlname});   # If we are re-creating it with createlog.
+        $cmd = "$wlname weblink fileplot $flname:$gplotfile:CURRENT";
+        Log $ll2, "autocreate: define $cmd";
+        $ret = CommandDefine(undef, $cmd);
+        if($ret) {
+          Log $ll1, "ERROR: $ret";
+          last;
+        }
+        $attr{$wlname}{room} = $room if($room);
+        $attr{$wlname}{label} = '"' . $name .
                 ' Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
+      }
     }
 
 
@@ -166,8 +196,7 @@ autocreate_Notify($$)
         $hash->{DEF} =~ s/$old/$new/g;
 
         rename($oldlogfile, $hash->{currentlogfile});
-        Log GetLogLevel($me,2),
-                "autocreate: renamed FileLog_$old to FileLog_$new";
+        Log $ll2, "autocreate: renamed FileLog_$old to FileLog_$new";
         $nrcreated++;
       }
 
@@ -177,8 +206,7 @@ autocreate_Notify($$)
         $hash->{LINK} =~ s/$old/$new/g;
         $hash->{DEF} =~ s/$old/$new/g;
         $attr{"weblink_$new"}{label} =~ s/$old/$new/g;
-        Log GetLogLevel($me,2),
-                "autocreate: renamed weblink_$old to weblink_$new";
+        Log $ll2, "autocreate: renamed weblink_$old to weblink_$new";
         $nrcreated++;
       }
     }
@@ -188,13 +216,31 @@ autocreate_Notify($$)
   return $ret;
 }
 
-#####################################
-# Test code. Use {dp "xxx"} to fake a device specific message
-# FS20: 81xx04yy0101a00180c1020013
 sub
-dp($)
+CommandCreateLog($$)
 {
-  Dispatch($defs{CUL}, shift, undef);
+  my ($cl, $n) = @_;
+  my $ac;
+
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "autocreate");
+    $ac = $d;
+    last;
+  }
+  return "Please define an autocreate device with attributes first " .
+        "(it may be disabled)" if(!$ac);
+
+  return "No device named $n found" if(!$defs{$n});
+
+  my $acd = $defs{$ac};
+  my $disabled = AttrVal($ac, "disable", undef);
+  delete $attr{$ac}{disable} if($disabled);
+
+  $acd->{CHANGED}[0] = "UNDEFINED $n $defs{$n}{TYPE} none";
+  autocreate_Notify($acd, $acd);
+  delete $acd->{CHANGED};
+
+  $attr{$ac}{disable} = 1 if($disabled);
 }
 
 1;
