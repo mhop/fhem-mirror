@@ -337,12 +337,13 @@ CUL_HM_Parse($$)
 
   } elsif($model eq "KS550") {
     
+
     if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
       my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
          (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
       my $tsgn = ($t & 0x4000);    # not tested
       $t = ($t & 0x3fff)/10;
-      $t = -$t if($tsgn);
+      $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
       my $ir = $r & 0x8000;
       $r = ($r & 0x7fff) * 0.295;
       my $wdr = ($w>>14)*22.5;
@@ -360,6 +361,9 @@ CUL_HM_Parse($$)
       push @event, "isRaining:$ir";
       push @event, "sunshine:$s";
       push @event, "brightness:$b";
+
+    } else {
+      push @event, "KS550 unknown: $p";
 
     }
 
@@ -610,7 +614,6 @@ CUL_HM_Pair(@)
   $attr{$name}{serialNr} = pack('H*', substr($p, 6, 20));
   $attr{$name}{firmware} = sprintf("%d.%d", hex(substr($p,0,1)),hex(substr($p,1,1)));
   $attr{$name}{devInfo}  = substr($p,28);
-
   my $stn = $attr{$name}{subType};    # subTypeName
   my $stt = $stn eq "unknown" ? "subType unknown" : "is a $stn";
 
@@ -695,9 +698,11 @@ CUL_HM_SendCmd($$$$)
   $cmd = sprintf("As%02X%02x%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   if($waitforack) {
-    $hash->{ackWaiting} = $cmd;
-    $hash->{ackCmdSent} = 1;
-    InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0);
+    if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {
+      $hash->{ackWaiting} = $cmd;
+      $hash->{ackCmdSent} = 1;
+      InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0)
+    }
   }
   $cmd =~ m/As(..)(..)(....)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("CUL_HM SND", $io, ($1,$2,$3,$4,$5,$6));
@@ -738,8 +743,8 @@ sub
 CUL_HM_Id($)
 {
   my ($io) = @_;
-  return "123456" if(!$io || !defined($io->{FHTID}));
-  return AttrVal($io->{NAME}, "hmId", "F1".$io->{FHTID});
+  my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
+  return AttrVal($io->{NAME}, "hmId", "F1$fhtid");
 }
 
 my %culHmBits = (
