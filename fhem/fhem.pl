@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-2008
+#  (c) 2005-20011
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -27,7 +27,7 @@
 #  Thanks for Tosti's site (<http://www.tosti.com/FHZ1000PC.html>)
 #  for inspiration.
 #
-#  Homepage:  http://www.koeniglich.de/fhem/fhem.html
+#  Homepage:  http://fhem.de
 
 
 use strict;
@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.132 2011-02-12 11:27:16 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.133 2011-02-27 18:47:13 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -299,7 +299,7 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
 }
 
 my $ret = CommandInclude(undef, $attr{global}{configfile});
-die("$ret\n") if($ret);
+Log 1, $ret if($ret);
 die("No port specified in the configfile.\n") if(!$server);
 
 if($attr{global}{statefile} && -r $attr{global}{statefile}) {
@@ -1643,9 +1643,10 @@ CommandAttr($$)
            last;
          }
       }
-      push @rets, "Unknown attribute $a[1], use attr global userattr $a[1]"
-        if(!$found);
-      next;
+      if(!$found) {
+        push @rets, "Unknown attribute $a[1], use attr global userattr $a[1]";
+        next;
+      }
     }
 
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
