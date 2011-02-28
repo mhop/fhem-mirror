@@ -335,7 +335,7 @@ CUL_HM_Parse($$)
     }
 
 
-  } elsif($model eq "KS550") {
+  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") {, # Identical to KS550?
     
 
     if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
@@ -347,7 +347,7 @@ CUL_HM_Parse($$)
       my $ir = $r & 0x8000;
       $r = ($r & 0x7fff) * 0.295;
       my $wdr = ($w>>14)*22.5;
-      $w = $w & 0x3fff;
+      $w = ($w & 0x3fff)/10;
       $wd = $wd * 5;
 
       push @event,
