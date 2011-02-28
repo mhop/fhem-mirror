@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.133 2011-02-27 18:47:13 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.134 2011-02-28 07:27:10 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -317,7 +317,6 @@ if($pfn) {
 }
 
 $init_done = 1;
-redirectStdinStdErr();
 DoTrigger("global", "INITIALIZED");
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
@@ -510,7 +509,7 @@ Log($$)
 
   my @t = localtime;
   my $nfile = ResolveDateWildcards($attr{global}{logfile}, @t);
-  OpenLogfile($nfile) if($currlogfile && $currlogfile ne $nfile);
+  OpenLogfile($nfile) if(!$currlogfile || $currlogfile ne $nfile);
 
   my $tim = sprintf("%04d.%02d.%02d %02d:%02d:%02d",
           $t[5]+1900,$t[4]+1,$t[3], $t[2],$t[1],$t[0]);
@@ -863,17 +862,16 @@ sub
 redirectStdinStdErr()
 {
   # Redirect stdin/stderr
-  my $currlogfile = $attr{global}{logfile};
-  return if($currlogfile eq "-");
+  return if(!$currlogfile || $currlogfile eq "-");
 
-  open STDIN,  '</dev/null'  or return "Can't read /dev/null: $!";
+  open STDIN,  '</dev/null'      or print "Can't read /dev/null: $!\n";
 
   close(STDERR);
-  open(STDERR, ">>$currlogfile") or return "Can't append STDERR to log: $!";
+  open(STDERR, ">>$currlogfile") or print "Can't append STDERR to log: $!\n";
   STDERR->autoflush(1);
 
   close(STDOUT);
-  open STDOUT, '>&STDERR'    or return "Can't dup stdout: $!";
+  open STDOUT, '>&STDERR'        or print "Can't dup stdout: $!\n";
   STDOUT->autoflush(1);
 }
 
