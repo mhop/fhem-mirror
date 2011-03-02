@@ -335,10 +335,11 @@ CUL_HM_Parse($$)
     }
 
 
-  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") {, # Identical to KS550?
+  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { # Identical to KS550?
     
 
     if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
+
       my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
          (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
       my $tsgn = ($t & 0x4000);    # not tested
