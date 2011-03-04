@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.134 2011-02-28 07:27:10 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.135 2011-03-04 06:48:28 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -186,7 +186,7 @@ $modules{_internal_}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
-        "autoload_undefined_devices";
+        "autoload_undefined_devices dupTimeout";
 $modules{_internal_}{AttrFn} = "GlobalAttr";
 my $commonAttr = "eventMap";
 
@@ -2376,7 +2376,7 @@ CheckDuplicate($$)
   $msg = substr($msg, 8) if($msg =~ m/^81/ && length($msg) > 8);
 
   my $now = gettimeofday();
-  my $lim = $now-0.5;
+  my $lim = $now-AttrVal("global","dupTimeout", 0.5);
 
   foreach my $oidx (keys %duplicate) {
     if($duplicate{$oidx}{TIM} < $lim) {
