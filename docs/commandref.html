@@ -957,6 +957,12 @@ A line ending with \ will be concatenated with the next one, so long lines
         Recommended level is 3 for normal use.
     </li><br>
 
+    <a name="dupInterval"></a>
+    <li>dupTimeout<br>
+        Define the timeout for which 2 identical events from two different
+        receiver are considered a duplicate. Default is 0.5 seconds.
+    </li><br>
+
   </ul>
 </ul>
 
@@ -5482,9 +5488,9 @@ Terminating
 <h3>FHEMWEB</h3>
 <ul>
   FHEMWEB is the builtin web-frontend (webpgm2). It implements a simple web
-  server, so no additional program is needed. However, if HTTPS is desired,
-  FHEMWEB must be configured to run behind a webserver (e.g. apache) which
-  translates the HTTPS from the outside to HTTP for FHEMWEB.<br> <br>
+  server (optionally with Basic-Auth and HTTPS), so no additional program is
+  needed. 
+  <br> <br>
 
   <a name="FHEMWEBdefine"></a>
   <b>Define</b>
@@ -5569,11 +5575,14 @@ Terminating
 
     <a name="smallscreen"></a>
     <li>smallscreen<br/>
-        Optimize for small screen size, e.g. smartphones.
+        Optimize for small screen size, e.g. smartphones.<br>
         Note: The default configuration installed with make install-pgm2
         installs 2 FHEMWEB instances: port 8083 for desktop browsers and
-        port 8084 for smallscreen browsers. <b>Note:</b>After viewing the
-        site on the iPhone in Safari, try to add it to the home-screen.
+        port 8084 for smallscreen browsers, both using SVG rendering. As
+        Android does not support SVG at the moment, change plotmode to
+        gnuplot-scroll.<br>
+        WebApp suppport: After viewing the site on the iPhone or iPad in
+        Safari, add it to the home-screen to get full-screen support.
         </li><br>
 
     <a name="nofork"></a>
@@ -5587,6 +5596,7 @@ Terminating
         request a username/password authentication for access. You have to set
         the basicAuth attribute to the Base64 encoded value of
         &lt;user&gt;:&lt;password&gt;, e.g.:<ul>
+        # Calculate first the encoded string with the commandline program<br>
         $ echo -n fhemuser:secret | base64<br>
         ZmhlbXVzZXI6c2VjcmV0<br>
         fhem.cfg:<br>
@@ -5594,7 +5604,7 @@ Terminating
         </ul>
         You can of course use other means of base64 encoding, e.g. online
         Base64 encoders. If basicAuthMsg is set, it will be displayed in the
-        browser when requesting the username/password.
+        popup window when requesting the username/password.
     </li><br>
 
     <a name="HTTPS"></a>
