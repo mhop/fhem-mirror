@@ -154,7 +154,7 @@ ECMDDevice_Set($@)
         }
 
         my $ecmd= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{cmd};
-        my $params= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{params};
+        my $params= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{params};
 
         my %specials= ECMDDevice_DeviceParams2Specials($hash);
         # add specials for command
@@ -173,7 +173,7 @@ ECMDDevice_Set($@)
         my $r = ECMDDevice_AnalyzeCommand($ecmd);
 
         my $v= IOWrite($hash, $r);
-        $v= $params if($params);
+        $v= join(" ", @a) if($params);
 
         return ECMDDevice_Changed($hash, $cmdname, $v);
 
