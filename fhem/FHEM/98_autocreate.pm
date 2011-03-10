@@ -11,48 +11,54 @@ use warnings;
 # - check "UNDEFINED" parameters for BS/USF1000/X10
 
 my %flogpar = (
-  "CUL_EM:.*"
+  "CUL_EM.*"
       => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT:.*" },
-  "CUL_WS:.*"
+  "CUL_WS.*"
       => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
-  "CUL_FHTTK:.*"
+  "CUL_FHTTK.*"
       => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
-  "FHT:.*"
+  "FHT.*"
       => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
-  "HMS:HMS100TFK_.*"
+  "HMS100TFK_.*"
       => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
-  "HMS:HMS100T._.*"
+  "HMS100T._.*"
       => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
-  "KS300:.*"
+  "KS300.*"
       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
 
   # Oregon sensors: 
   # * temperature
-  "OREGON:(THR128|THWR288A|THN132N).*"
+  "(THR128|THWR288A|THN132N).*"
       => { GPLOT => "oregon_hms_t:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
-  "OREGON:(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"
+  "(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"
       => { GPLOT => "oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
   # * temperature, humidity, pressure
-  "OREGON:(BTHR918N|BTHR918|BTHR918N).*"
+  "(BTHR918N|BTHR918|BTHR918N).*"
       => { GPLOT => "oregon_temp_press:Temp/Press,oregon_hms:Temp/Hum,",
            FILTER => "%NAME" },
   # * anenometer
-  "OREGON:(WGR800|WGR918|WTGR800_A).*"
+  "(WGR800|WGR918|WTGR800_A).*"
       => { GPLOT => "oregon_wind:WindDir/WindSpeed,",  FILTER => "%NAME" },
   # * Oregon sensors: Rain gauge
-  "OREGON:(PCR800|RGR918).*"
+  "(PCR800|RGR918).*"
       => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
 
   # HomeMatic
-  "CUL_HM:THSensor"
+  "CUL_HM_THSensor.*"
       => { GPLOT => "hms:Temp/Hum,",
            FILTER => "%NAME:T:.*" },
-  "CUL_HM:KS550"
+  "CUL_HM_KS550.*"
       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
 );
+
+# Do not create FileLog for the following devices.
+my @flog_blacklist = (
+  "CUL_RFR"
+);
+
 
 #####################################
 sub
@@ -63,7 +69,7 @@ autocreate_Initialize($)
   $hash->{NotifyFn} = "autocreate_Notify";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 " . 
                      "autosave filelog device_room weblink weblink_room " .
-                     "disable";
+                     "disable ignoreTypes";
   my %ahash = ( Fn=>"CommandCreateLog",
                 Hlp=>"<device>,create log/weblink for <device>" );
   $cmds{createlog} = \%ahash;
@@ -112,7 +118,9 @@ autocreate_Notify($$)
       my ($name, $type, $arg) = ($1, $2, $3);
       next if(AttrVal($me, "disable", undef));
 
-      my $lctype = lc($type);
+      my $it = AttrVal($me, "ignoreTypes", undef);
+      next if($it && $name =~ m/$it/i);
+
       my ($cmd, $ret);
       my $hash = $defs{$name};  # Called from createlog
 
@@ -131,6 +139,13 @@ autocreate_Notify($$)
       my $room = replace_wildcards($hash, $attr{$me}{device_room});
       $attr{$name}{room} = $room if($room);
 
+      # BlackList processing
+      my $blfound;
+      foreach my $bl (@flog_blacklist) {
+        $blfound = 1 if($name  !~ m/^$bl$/);
+      }
+      last if($blfound);
+
       ####################
       my $fl = replace_wildcards($hash, $attr{$me}{filelog});
       next if(!$fl);
@@ -138,9 +153,7 @@ autocreate_Notify($$)
       delete($defs{$flname});   # If we are re-creating it with createlog.
       my ($gplot, $filter) = ("", $name);
       foreach my $k (keys %flogpar) {
-        my $model = AttrVal($name, "model", "");
-        next if("$type:$name"  !~ m/^$k$/ && 
-                "$type:$model" !~ m/^$k$/);
+        next if($name  !~ m/^$k$/);
         $gplot = $flogpar{$k}{GPLOT};
         $filter = replace_wildcards($hash, $flogpar{$k}{FILTER});
       }
@@ -212,6 +225,7 @@ autocreate_Notify($$)
     }
 
   }
+
   CommandSave(undef, undef) if(!$ret && $nrcreated && $attr{$me}{autosave});
   return $ret;
 }
