@@ -74,7 +74,7 @@ FHEMWEB_Initialize($)
   $hash->{UndefFn} = "FW_Undef";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
-                     "smallscreen nofork basicAuth basicAuthMsg HTTPS";
+                     "smallscreen plotfork basicAuth basicAuthMsg HTTPS";
 
   ###############
   # Initialize internal structures
@@ -192,7 +192,7 @@ FW_Read($)
 
     if($hash->{SSL}) {
       my $ret = IO::Socket::SSL->start_SSL($nhash{CD}, { SSL_server=>1, });
-      Log 1, "SSL: $!" if(!$ret && $! ne "Socket is not connected");
+      Log 1, "FHEMWEB HTTPS: $!" if(!$ret && $! ne "Socket is not connected");
     }
 
     Log($ll, "Connection accepted from $nhash{NAME}");
@@ -256,7 +256,7 @@ FW_Read($)
 
   Log($ll, "HTTP $name GET $arg");
   my $pid;
-  if(!AttrVal($FW_wname, "nofork", undef)) {
+  if(AttrVal($FW_wname, "plotfork", undef)) {
     # Process SVG rendering as a parallel process
     return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
   }
