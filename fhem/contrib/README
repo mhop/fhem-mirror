@@ -65,3 +65,6 @@
   Produces an overview on the RSSI readings from a log. Good for checking
   the signal quality at various locations for CUL and CUN. See begin of
   script for usage instructions.
+- tcptee.pl
+  Used to connect e.g. a fhem and a CCU to a single HM-Lan config (the
+  correstponding fhem device should have the attribute dummy).
