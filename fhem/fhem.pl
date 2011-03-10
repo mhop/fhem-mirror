@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.135 2011-03-04 06:48:28 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.136 2011-03-10 17:42:01 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -299,7 +299,7 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
 }
 
 my $ret = CommandInclude(undef, $attr{global}{configfile});
-Log 1, $ret if($ret);
+Log 1, "configfile: $ret" if($ret);
 die("No port specified in the configfile.\n") if(!$server);
 
 if($attr{global}{statefile} && -r $attr{global}{statefile}) {
@@ -929,7 +929,7 @@ WriteStatefile()
 {
   return if(!$attr{global}{statefile});
   if(!open(SFH, ">$attr{global}{statefile}")) {
-    my $msg = "Cannot open $attr{global}{statefile}: $!";
+    my $msg = "WriteStateFile: Cannot open $attr{global}{statefile}: $!";
     Log 1, $msg;
     return $msg;
   }
@@ -1170,7 +1170,7 @@ CommandDefine($$)
 
   my $ret = CallFn($a[0], "DefFn", \%hash, $def);
   if($ret) {
-    Log 1, $ret;
+    Log 1, "define: $ret";
     delete $defs{$a[0]};                            # Veto
     delete $attr{$a[0]};
 
@@ -1425,7 +1425,7 @@ CommandReload($$)
   eval {
     my $ret=do "$file";
     if(!$ret) {
-      Log 1,"Error:Modul $param deactivated:\n $@";
+      Log 1, "reload: Error:Modul $param deactivated:\n $@";
       use strict "refs";
       return "$@";
     }
@@ -1543,7 +1543,7 @@ GlobalAttr($$)
       $ipv6 = 1;
       eval "require IO::Socket::INET6; use Socket6;";
       if($@) {
-        Log 1, $@;
+        Log 1, "attr global port: $@";
         Log 1, "Can't load INET6, falling back to IPV4";
         $ipv6 = 0;
       }
@@ -1560,7 +1560,7 @@ GlobalAttr($$)
     $server2 = $ipv6 ? IO::Socket::INET6->new(@opts) : 
                        IO::Socket::INET->new(@opts);
     if(!$server2) {
-      Log 1, "Can't open server port at $port: $!";
+      Log 1, "attr global port: Can't open server port at $port: $!";
       return "$!" if($init_done);
       die "Can't open server port at $port: $!\n";
     }
