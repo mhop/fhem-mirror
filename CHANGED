@@ -19,6 +19,7 @@
   - bugfix:  serial port setting on Linux broken if running in the background
   - feature: IPV6 support, FHEMWEB basicAuth and HTTPS support
   - feature: createlog added to the autocreate module
+  - feature: contrib/tcptee.pl added
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
