@@ -258,6 +258,12 @@ HMLAN_Parse($$)
     $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
     $hash->{uptime} = HMLAN_uptime($msec);
 
+  } elsif($rmsg =~ m/R(........),(....),(........),(..),(....),(.*)/) {
+    my ($src, $d1, $msec, $d2, $rssi, $msg) =
+       ($1,   $2,  $3,    $4,  $5,    $6);
+    $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
+    $hash->{uptime} = HMLAN_uptime($msec);
+
   } elsif($rmsg =~ m/HHM-LAN-IF,(....),(..........),(......),(......),(........),(....)/) {
     my ($vers,    $serno, $d1, $owner, $msec, $d2) =
        (hex($1), $2,     $3,  $4,     $5,    $6);
@@ -304,7 +310,7 @@ sub
 HMLAN_SimpleWrite(@)
 {
   my ($hash, $msg, $nonl) = @_;
-  return if(!$hash);
+  return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
 
   Log 1, "SW: $msg";
   $msg .= "\n" unless($nonl);
@@ -425,6 +431,7 @@ HMLAN_Disconnected($)
   return if(!defined($hash->{FD}));                 # Already deleted or RFR
 
   Log 1, "$dev disconnected, waiting to reappear";
+  RemoveInternalTimer($hash);
   HMLAN_CloseDev($hash);
   $readyfnlist{"$name.$dev"} = $hash;               # Start polling
   $hash->{STATE} = "disconnected";
