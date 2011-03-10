@@ -195,11 +195,19 @@ CUL_HM_Parse($$)
   if(!$shash) {
     my $sname = "CUL_HM_$src";
     if($lcm =~ m/1A8.00/) {
+
+      # Prefer subType over model to make autocreate easier.
+      # besides the model names are quite cryptic
       my $model = substr($p, 2, 4);
-      if($culHmModel{$model}) {
-        $sname = $culHmModel{$model} . "_" . $src;
+      my $stc = substr($p, 26, 2);        # subTypeCode
+      if($culHmDevProps{$stc}) {
+        $sname = "CUL_HM_".$culHmDevProps{$stc}{st} . "_" . $src;
+
+      } elsif($culHmModel{$model}) {
+        $sname = "CUL_HM_".$culHmModel{$model} . "_" . $src;
         $sname =~ s/-/_/g;
       }
+
     }
     Log 3, "CUL_HM Unknown device $sname, please define it";
     return "UNDEFINED $sname CUL_HM $src $msg";
