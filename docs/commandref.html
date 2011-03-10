@@ -957,7 +957,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Recommended level is 3 for normal use.
     </li><br>
 
-    <a name="dupInterval"></a>
+    <a name="dupTimeout"></a>
     <li>dupTimeout<br>
         Define the timeout for which 2 identical events from two different
         receiver are considered a duplicate. Default is 0.5 seconds.
@@ -5585,10 +5585,10 @@ Terminating
         Safari, add it to the home-screen to get full-screen support.
         </li><br>
 
-    <a name="nofork"></a>
-    <li>nofork<br>
-        If set, do not generate the logs in a parallel process. Needed
-        on some Fritzbox installations.
+    <a name="plotfork"></a>
+    <li>plotfork<br>
+        If set, generate the logs in a parallel process. Note: do not use it
+        on Windows and on systems with small memory foorprint.
     </li><br>
 
     <a name="basicAuth"></a>
