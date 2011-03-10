@@ -49,7 +49,7 @@ CUL_HOERMANN_Parse($$)
     $def->{CHANGED}[0] = "toggle";
     $def->{READINGS}{state}{TIME} = TimeNow();
     $def->{READINGS}{state}{VAL} = "toggle";
-    Log GetLogLevel($name,2), "CUL_HOERMANN $name toggle";
+    Log GetLogLevel($name,4), "CUL_HOERMANN $name toggle";
     return $name;
 
   } else {
