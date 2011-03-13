@@ -52,6 +52,9 @@ my %flogpar = (
   "CUL_HM_KS550.*"
       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
+  "CUL_HM_HM-CC-TC.*"
+      => { GPLOT => "hms:Temp/Hum,",
+           FILTER => "%NAME:T:.*" },
 );
 
 # Do not create FileLog for the following devices.
@@ -230,6 +233,7 @@ autocreate_Notify($$)
   return $ret;
 }
 
+# TODO: fix it if the device is renamed.
 sub
 CommandCreateLog($$)
 {

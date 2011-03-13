@@ -75,8 +75,8 @@ my %culHmModel=(
   "0036" => "HM-PB-2-WM",
   "0037" => "HM-RC-19",
   "0038" => "HM-RC-19-B",
-  "0039" => "HM-CC-TC",
-  "003A" => "HM-CC-VD",
+  "0039" => "HM-CC-TC",       # Parse only
+  "003A" => "HM-CC-VD",       # Actuator, battery/etc missing
   "003B" => "HM-RC-4-B",
   "003C" => "HM-WDS20-TH-O",
   "003D" => "HM-WDS10-TH-O",
@@ -238,6 +238,7 @@ CUL_HM_Parse($$)
 
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
+  my $tn = TimeNow();
 
   if($cmd eq "8002") {                       # Ack
     if($shash->{cmdStack}) {                     # Send next msg from the stack
@@ -363,7 +364,7 @@ CUL_HM_Parse($$)
 
       my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
          (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
-      my $tsgn = ($t & 0x4000);    # not tested
+      my $tsgn = ($t & 0x4000);
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
       my $ir = $r & 0x8000;
@@ -389,6 +390,34 @@ CUL_HM_Parse($$)
 
     }
 
+  } elsif($model eq "HM-CC-TC") {
+
+    if($cmd eq "8670" && $p =~ m/^(....)(..)/) {
+      my (    $t,      $h) = 
+         (hex($1), hex($2));
+      my $tsgn = ($t & 0x4000);
+      $t = ($t & 0x3fff)/10;
+      $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
+      push @event, "state:T: $t H: $h";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+    }
+
+    
+    if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
+      my (   $d1,     $vp) = 
+         (hex($1), hex($2));
+      $vp = int($vp/2.56+0.5);   # Ventil position in %
+      push @event, "actuator:$vp %";
+
+      if($dhash) {      # Wont trigger
+        $dhash->{STATE} = "state:$vp %";
+        $dhash->{READINGS}{STATE}{TIME} = $tn;
+        $dhash->{READINGS}{STATE}{VAL} = "$vp %";
+      }
+    }
+
+
   } elsif($st eq "KFM" && $model eq "KFM-Sensor") {
 
     if($p =~ m/814(.)0200(..)(..)(..)/) {
@@ -404,7 +433,6 @@ CUL_HM_Parse($$)
 
   #push @event, "unknownMsg:$p" if(!@event);
 
-  my $tn = TimeNow();
   my @changed;
   for(my $i = 0; $i < int(@event); $i++) {
     next if($event[$i] eq "");
