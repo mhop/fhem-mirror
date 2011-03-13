@@ -87,7 +87,7 @@
 
       Builtin pgm2 / external pgm5 web frontend:
       <a href="pgm2-1.png">overview</a>,
-      the same rendered for <a href="pgm2-4.png">small screens</a>,
+      the same rendered for <a href="pgm2-4.png">smartphones</a>,
       <a href="pgm2-2.png">detail</a>, <a
       href="pgm2-3.png">SVG-plots</a>.
       <br><br>
@@ -140,47 +140,67 @@
       <li>Via an attached CUL or CUN (see <a
         href="http://www.busware.de">www.busware.de</a>) access to the
         following protocols: FS20 (all devices), EM (EM1000EM, EM1000GZ and
-        EM1000WZ), FHT80b, HMS, S300 (KS300, S300TH, KS555, S555TH, etc)</li>
-
+        EM1000WZ), FHT80b, HMS, S300 (KS300, S300TH, KS555, S555TH, etc),
+        HomeMatic (<a href="commandref.html#CUL_HM">selected</a> devices)</li>
+        <div id="dist"></div>
       <li>Via an attached FHZ1000 or FHZ1300 access to the following protocols:
         FS20 (all devices), FHT80b, HMS, KS300. <b>Note:</b> The FHZ1350 WLAN
         works with fhem if you replace the standard (avisario) WLAN module with
         one that won't encrypt the data.</li>
+        <div id="dist"></div>
 
       <li>reading and sending X10 events via the CM11 module (with access
         to a X10 computer interface)</li>
+        <div id="dist"></div>
 
       <li>S300 devices via an attached WS300</li>
+        <div id="dist"></div>
 
       <li>EM1010PC and attached EM1000WZ, EM1000EM or EM1000GZ</li>
+        <div id="dist"></div>
 
       <li>reading attached SCIVT devices</li>
+        <div id="dist"></div>
 
       <li>reading attached M232 devices</li>
+        <div id="dist"></div>
 
       <li>reading attached WS2000/WS25000 devices, also via raw network
         converters (xport)</li>
+        <div id="dist"></div>
 
       <li>extract sensor data from IPWE networked weather data receiver</li>
+        <div id="dist"></div>
 
       <li>Via an attached <a
         href="http://owfs.org/index.php?page=usb-ds9490r">DS9490R</a> or <a
         href="http://owfs.org/index.php?page=com-ds9097-passive">DS9097</a>
         access to the following Dallas 1-wire sensors: DS18S20, DS1820,
         DS18B20</li>
+        <div id="dist"></div>
 
       <li>Via an attached KM271 access to the Buderus Logamatic 2107</li>
+        <div id="dist"></div>
 
       <li>Allnet devices: Allnet 3076, Temperatures sensors and Allnet 4027
         relay box connected to an Allnet 4000</li>
+        <div id="dist"></div>
 
       <li>Davis VantagePro2 weatherstation</li>
+        <div id="dist"></div>
 
       <li>RFXCOM RF receivers/transmitters e.g for different Oregon Scientific
         weather sensors. Tested: BTHR918N, THGR810, THR128, THWR288A,
         WTGR800.</li>
+        <div id="dist"></div>
 
       <li>Via the ELV USB-WDE1 access to the S300/S555 family of sensors.</li>
+        <div id="dist"></div>
+
+      <li>Via an eQ-3 HomeMatic Lan Configurator access to selected HomeMatic
+          devices.
+        <div id="dist"></div>
+
 
     </ul>
 
@@ -297,12 +317,9 @@
     <h3>Debian/Ubuntu</h3>
     <ul>
       <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">
-          this</a> package, and connect to
-          http://localhost:8083/fhem (or to http://localhost:8084/fhem for
-          smartphones). Follow the <a href="HOWTO.html">HOWTO</a> for adding
-          devices.
-    </ul>
-
+          this</a> package, and connect to http://localhost:8083/fhem. Follow
+          the <a href="HOWTO.html">HOWTO</a> for adding devices.
+     </ul>
 
     <h3>Unix / OSX</h3>
     <ul>
@@ -345,7 +362,7 @@
       programs are needed. It has support for grouping devices into rooms,
       manipulating devices, direct fhem commands, displaying logfiles as text
       or plot (SVG builtin or PNG by gnuplot), navigating/zooming in the
-      plots.<br/>
+      plots, HTTP basicAuth, HTTPS and IPV6<br/>
 
       Screenshots: <a href="pgm2-1.png">overview</a>, <a
       href="pgm2-2.png">detail</a>, <a href="pgm2-3.png">SVG-plots</a>.
