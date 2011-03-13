@@ -494,9 +494,7 @@ FW_updateHashes()
   %FW_types = ();
   foreach my $d (sort keys %defs ) {
     next if(IsIgnored($d));
-    my $t = $defs{$d}{TYPE};
-    my $st = AttrVal($d, "subType", undef);
-    $t .= ":$st" if($st);
+    my $t = AttrVal($d, "subType", $defs{$d}{TYPE});
     $FW_types{$t}{$d} = 1;
   }
 
