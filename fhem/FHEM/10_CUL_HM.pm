@@ -191,8 +191,11 @@ CUL_HM_Parse($$)
   $dname = "broadcast" if($dst eq "000000");
   $dname = $iohash->{NAME} if($dst eq $id);
 
-  if($p =~ m/NACK$/) {
+  if($p =~ m/NACK$/) {  # HMLAN special
     if($dhash) {
+      delete($dhash->{ackCmdSent});
+      delete($dhash->{ackWaiting});
+      delete($dhash->{cmdStack});
       $dhash->{STATE} = "MISSING ACK";
       DoTrigger($dname, "MISSING ACK");
     }
@@ -520,6 +523,12 @@ CUL_HM_Set($@)
   } elsif($cmd eq "reset") { ############################################
     $sndcmd = sprintf("++A011%s%s0400", $id,$dst);
 
+  } elsif($cmd eq "pair") { #############################################
+    my $serialNr = AttrVal($name, "serialNr", undef);
+    return "serialNr is not set" if(!$serialNr);
+    $sndcmd = sprintf("++A401%s000000010A%s", $id, unpack("H*",$serialNr));
+    $shash->{hmPairSerial} = $serialNr;
+
   } elsif($cmd eq "unpair") { ###########################################
     $sndcmd =
         sprintf("++A001%s%s00050000000000", $id,$dst);
@@ -530,18 +539,12 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "sign") { ############################################
     $sndcmd =
-        sprintf("++A001%s%s%s050000000000", $id,$dst, $chn);
+        sprintf("++A001%s%s%s0500000000%s", $id,$dst,$chn,$chn);
     CUL_HM_PushCmdStack($shash,
-        sprintf("++A001%s%s%s0808%s",$id,$dst, $chn,
-                ($a[2] eq "on" ? "01" : "02"));
+        sprintf("++A001%s%s%s0808%s",$id,$dst,$chn,
+                ($a[2] eq "on" ? "01" : "02")));
     CUL_HM_PushCmdStack($shash,
-        sprintf("++A001%s%s%s06",$id,$dst, $chn));
-
-  } elsif($cmd eq "pair") { #############################################
-    my $serialNr = AttrVal($name, "serialNr", undef);
-    return "serialNr is not set" if(!$serialNr);
-    $sndcmd = sprintf("++A401%s000000010A%s", $id, unpack("H*",$serialNr));
-    $shash->{hmPairSerial} = $serialNr;
+        sprintf("++A001%s%s%s06",$id,$dst,$chn));
 
   } elsif($cmd eq "statusRequest") { ####################################
     $sndcmd = sprintf("++A001%s%s%s0E", $id,$dst, $chn);
