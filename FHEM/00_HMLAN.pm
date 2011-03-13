@@ -325,6 +325,7 @@ HMLAN_SimpleWrite(@)
   my $name = $hash->{NAME};
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
 
+  select(undef, undef, undef, 0.01);
   Log GetLogLevel($name,5), "SW: $msg";
   
   $msg .= "\r\n" unless($nonl);
