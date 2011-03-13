@@ -411,7 +411,7 @@ CUL_HM_Parse($$)
       push @event, "actuator:$vp %";
 
       if($dhash) {      # Wont trigger
-        $dhash->{STATE} = "state:$vp %";
+        $dhash->{STATE} = "$vp %";
         $dhash->{READINGS}{STATE}{TIME} = $tn;
         $dhash->{READINGS}{STATE}{VAL} = "$vp %";
       }
