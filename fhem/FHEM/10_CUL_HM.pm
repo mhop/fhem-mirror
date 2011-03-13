@@ -181,15 +181,25 @@ CUL_HM_Parse($$)
   $msg =~ m/A(..)(..)(....)(......)(......)(.*)/;
   my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
   my ($len,$msgcnt,$cmd,$src,$dst,$p) = @msgarr;
-  CUL_HM_DumpProtocol("CUL_HM RCV", $iohash, @msgarr);
 
-  my $shash = $modules{CUL_HM}{defptr}{$src};   # Will be replaced fo multichannel commands
+  # $shash will be replaced for multichannel commands
+  my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $lcm = "$len$cmd";
 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   my $dname = $dhash ? $dhash->{NAME} : "unknown";
   $dname = "broadcast" if($dst eq "000000");
   $dname = $iohash->{NAME} if($dst eq $id);
+
+  if($p =~ m/NACK$/) {
+    if($dhash) {
+      $dhash->{STATE} = "MISSING ACK";
+      DoTrigger($dname, "MISSING ACK");
+    }
+    return "";
+  }
+
+  CUL_HM_DumpProtocol("CUL_HM RCV", $iohash, @msgarr);
 
   # Generate an UNKNOWN event with a better name
   if(!$shash) {
@@ -239,7 +249,6 @@ CUL_HM_Parse($$)
     push @event, "";
   }
 
-
   if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
     push @event, CUL_HM_Pair($name, $shash, @msgarr);
     
@@ -251,7 +260,9 @@ CUL_HM_Parse($$)
           $st eq "dimmer" ||
           $st eq "blindActuator") {
 
-    if($p =~ m/^(0.)(..)(..).0/ && $cmd ne "A010") {
+    if($p =~ m/^(0.)(..)(..).0/
+       && $cmd ne "A010"
+       && $cmd ne "A002") {
       my $msgType = $1;
       my $chn = $2;
       if($chn ne "01" && $chn ne "00") {   # Switch to the shadow device
@@ -343,8 +354,7 @@ CUL_HM_Parse($$)
     }
 
 
-  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { # Identical to KS550?
-    
+  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") {
 
     if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
 
@@ -429,9 +439,11 @@ CUL_HM_Parse($$)
 }
 
 my %culHmGlobalSets = (
-  raw   => "data ...",
-  reset => "",
-  pair  => "",
+  raw      => "data ...",
+  reset    => "",
+  pair     => "",
+  unpair   => "",
+  sign     => "[on|off]",
   statusRequest  => "",
 );
 my %culHmSubTypeSets = (
@@ -508,6 +520,23 @@ CUL_HM_Set($@)
   } elsif($cmd eq "reset") { ############################################
     $sndcmd = sprintf("++A011%s%s0400", $id,$dst);
 
+  } elsif($cmd eq "unpair") { ###########################################
+    $sndcmd =
+        sprintf("++A001%s%s00050000000000", $id,$dst);
+    CUL_HM_PushCmdStack($shash,
+        sprintf("++A001%s%s000802000A000B000C00",$id,$dst));
+    CUL_HM_PushCmdStack($shash,
+        sprintf("++A001%s%s0006",$id,$dst));
+
+  } elsif($cmd eq "sign") { ############################################
+    $sndcmd =
+        sprintf("++A001%s%s%s050000000000", $id,$dst, $chn);
+    CUL_HM_PushCmdStack($shash,
+        sprintf("++A001%s%s%s0808%s",$id,$dst, $chn,
+                ($a[2] eq "on" ? "01" : "02"));
+    CUL_HM_PushCmdStack($shash,
+        sprintf("++A001%s%s%s06",$id,$dst, $chn));
+
   } elsif($cmd eq "pair") { #############################################
     my $serialNr = AttrVal($name, "serialNr", undef);
     return "serialNr is not set" if(!$serialNr);
@@ -530,7 +559,7 @@ CUL_HM_Set($@)
   } elsif($cmd eq "toggle") { ###########################################
     $shash->{toggleIndex} = 1 if(!$shash->{toggleIndex});
     $shash->{toggleIndex} = (($shash->{toggleIndex}+1) % 128);
-    $sndcmd = sprintf("++A03E%s%s%s40%s%02x", $id, $dst,
+    $sndcmd = sprintf("++A03E%s%s%s40%s%02X", $id, $dst,
                                       $dst, $chn, $shash->{toggleIndex});
 
   } elsif($st eq "pct") { ##############################################
@@ -671,7 +700,7 @@ CUL_HM_Pair(@)
      $attr{$name}{devInfo} =~ m,(..)(..)(..), ) {
     my ($b1, $b2, $b3) = (hex($1), hex($2), $3);
     for(my $i = $b2+1; $i<=$b1; $i++) {
-      my $nSrc = sprintf("%s%02x", $src, $i);
+      my $nSrc = sprintf("%s%02X", $src, $i);
       if(!defined($modules{CUL_HM}{defptr}{$nSrc})) {
         delete($defs{"global"}{INTRIGGER});    # Hack
         DoTrigger("global",  "UNDEFINED ${name}_CHN_$i CUL_HM $nSrc");
@@ -704,7 +733,7 @@ CUL_HM_SendCmd($$$$)
   }
 
   $io->{HM_CMDNR} = $mn;
-  $cmd = sprintf("As%02X%02x%s", length($cmd2)/2+1, $mn, $cmd2);
+  $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   if($waitforack) {
     if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {

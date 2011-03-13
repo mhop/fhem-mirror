@@ -131,10 +131,10 @@ HMLAN_Set($@)
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
         if(!$arg || $arg !~ m/^.{10}$/);
 
-    my $id = AttrVal($hash->{NAME}, "hmId", undef);
+    my $id = AttrVal($hash->{NAME}, "hmId", "123456");
     $hash->{HM_CMDNR} = $hash->{HM_CMDNR} ? ($hash->{HM_CMDNR}+1)%256 : 1;
-FixMe();
-    HMLAN_SimpleWrite($hash, sprintf("As15%02x8401%s000000010A%s",
+
+    HMLAN_Write($hash, undef, sprintf("As15%02X8401%s000000010A%s",
                     $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
     $hash->{hmPairSerial} = $arg;
 
@@ -189,17 +189,24 @@ HMLAN_ReadAnswer($$$)
   }
 }
 
+my %lhash;
+
 #####################################
 sub
 HMLAN_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
-  Log 1, "IN: $msg";
 
+  my $dst = substr($msg, 16, 6);
+  if(!$lhash{$dst} && $dst ne "000000") {
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+112A29");
+    HMLAN_SimpleWrite($hash, "-$dst");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+112A29");
+    $lhash{$dst} = 1;
+  }
   my $tm = int(gettimeofday()*1000) & 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",
                 $tm, $tm, substr($msg, 4));
-  Log 1, "$hash->{NAME} sending $msg";
   HMLAN_SimpleWrite($hash, $msg);
 }
 
@@ -249,22 +256,27 @@ HMLAN_Parse($$)
   my ($hash, $rmsg) = @_;
   my $name = $hash->{NAME};
   my $rssi;
+  my $ll5 = GetLogLevel($name,5);
 
   my $dmsg = $rmsg;
 
-  if($rmsg =~ m/E(......),(....),(........),(..),(....),(.*)/) {
+  Log $ll5, "HMLAN $rmsg";
+  if($rmsg =~ m/^E(......),(....),(........),(..),(....),(.*)/) {
     my ($src, $d1, $msec, $d2, $rssi, $msg) =
        ($1,   $2,  $3,    $4,  $5,    $6);
     $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
     $hash->{uptime} = HMLAN_uptime($msec);
 
-  } elsif($rmsg =~ m/R(........),(....),(........),(..),(....),(.*)/) {
-    my ($src, $d1, $msec, $d2, $rssi, $msg) =
-       ($1,   $2,  $3,    $4,  $5,    $6);
+  } elsif($rmsg =~ m/^R(........),(....),(........),(..),(....),(.*)/) {
+    my ($src, $status, $msec, $d2, $rssi, $msg) =
+       ($1,   $2,      $3,    $4,  $5,    $6);
+
     $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
+    $dmsg .= "NACK" if($status !~ m/...1/);
     $hash->{uptime} = HMLAN_uptime($msec);
 
-  } elsif($rmsg =~ m/HHM-LAN-IF,(....),(..........),(......),(......),(........),(....)/) {
+  } elsif($rmsg =~
+       m/^HHM-LAN-IF,(....),(..........),(......),(......),(........),(....)/) {
     my ($vers,    $serno, $d1, $owner, $msec, $d2) =
        (hex($1), $2,     $3,  $4,     $5,    $6);
     $hash->{serialNr} = $serno;
@@ -279,7 +291,7 @@ HMLAN_Parse($$)
     return;
 
   } else {
-    Log 1, "$name Unknown msg $rmsg";
+    Log $ll5, "$name Unknown msg $rmsg";
     return;
 
   }
@@ -310,12 +322,13 @@ sub
 HMLAN_SimpleWrite(@)
 {
   my ($hash, $msg, $nonl) = @_;
+  my $name = $hash->{NAME};
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
 
-  Log 1, "SW: $msg";
-  $msg .= "\n" unless($nonl);
+  Log GetLogLevel($name,5), "SW: $msg";
+  
+  $msg .= "\r\n" unless($nonl);
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
-  select(undef, undef, undef, 0.001);
 }
 
 ########################
