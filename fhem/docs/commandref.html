@@ -93,6 +93,7 @@
       <a href="#FHZ">FHZ</a> &nbsp;
       <a href="#FS20">FS20</a> &nbsp;
       <a href="#HMS">HMS</a> &nbsp;
+      <a href="#HMLAN</a> &nbsp;
       <a href="#IPWE">IPWE</a> &nbsp;
       <a href="#KM271">KM271</a> &nbsp;
       <a href="#KS300">KS300</a> &nbsp;
@@ -1885,6 +1886,67 @@ A line ending with \ will be concatenated with the next one, so long lines
 
 </ul>
 
+<a name="HMLAN"></a>
+<h3>HMLAN</h3>
+<ul>
+  <tr><td>
+  The HMLAN is the fhem module for the eQ-3 HomeMatic LAN Configurator.
+  <br><br>
+  The fhem module will emulate a CUL device, so the <a href="#CUL_HM">CUL_HM</a>
+  module can be used to define HomeMatic devices.<br><br>
+
+
+  In order to use it with fhem you <b>must</b> disable the encryption first
+  with the "HomeMatic Lan Interface Configurator" (which is part of the
+  supplied Windows software), by selecting the device, "Change IP Settings",
+  and deselect "AES Encrypt Lan Communication".<br>
+  This device can be used in parallel with a CCU and fhem, by starting the
+  fhem/contrib/tcptee.pl program, and redirecting the CCU to the local host.
+  Don't forget to disable the LAN-Encryption on the CCU for the Lan
+  configurator first, and to set the dummy attribute for the HMLAN device.
+  <br><br>
+
+
+  <a name="HMLANdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HMLAN &lt;ip-address&gt;[:port]</code><br>
+    <br>
+    port is 1000 by default.
+    If the ip-address is called none, then no device will be opened, so you
+    can experiment without hardware attached.<br>
+  </ul>
+  <br>
+
+  <a name="HMLANset"></a>
+  <b>Set</b>
+  <ul>
+    <li><a href="#hmPairForSec">hmPairForSec</a>
+    <li><a href="#hmPairSerial">hmPairSerial</a>
+  </ul>
+  <br>
+
+  <a name="HMLANget"></a>
+  <b>Get</b>
+  <ul>
+  N/A
+  </ul>
+  <br>
+  <br>
+
+  <a name="HMLANattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+    <li><a href="#hmId">hmId</a></li><br>
+    <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
+  </ul>
+</ul>
+
+
 <a name="CUL"></a>
 <h3>CUL</h3>
 <ul>
@@ -1978,11 +2040,13 @@ A line ending with \ will be concatenated with the next one, so long lines
             signals. Default is 4dB.
         </ul>
         </li><br>
+    <a name="hmPairForSec"></a>
     <li>hmPairForSec<br>
        <a href="#rfmode">HomeMatic</a> mode only.<br>
        Set the CUL in Pairing-Mode for the given seconds. Any device set into
        pairing mode in this time will be paired with fhem.
        </li><br>
+    <a name="hmPairSerial"></a>
     <li>hmPairSerial<br>
        <a href="#rfmode">HomeMatic</a> mode only.<br>
        Try to pair with the given device. The argument is a 10 character
@@ -2228,23 +2292,61 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CUL_HM"></a>
 <h3>CUL_HM</h3>
 <ul>
-  Support for eQ-3 HomeMatic devices via the CUL family of devices<br>
+  Support for eQ-3 HomeMatic devices via the <a href="#CUL">CUL</a> or the <a
+  href="#HMLAN">HMLAN</a>.
+
+  <br>
   Prerequisites:
   <ul>
-  <li>The <a href="#rfmode">rfmode </a> attribute of at least one attached
-      CUL/CUN device must be set to HomeMatic. Note: in this mode you will
-      receive <b/>only</b> HomeMatic messages.
+  <li>If the interface is a CUL device, the <a href="#rfmode">rfmode </a>
+      attribute of the corresponding CUL/CUN device must be set to HomeMatic.
+      Note: this mode is BidCos/Homematic only, you will <b>not</b> receive
+      FS20/HMS/EM/S300 messages via this device. Previously defined FS20/HMS
+      etc devices must be assigned to a different input device (CUL/FHZ/etc).
       </li>
   <li>The protocol used by HomeMatic devices (BidCos, known as AskSin
-      in the culfw) must be enabled in the culfw firmware. This is done
-      for all CUN and for newer CUL (i.e. V3.0 and greater) devices with culfw
-      firmware version 1.38 and newer. For CUL hardware version before 3.0 there
-      is a separate firmware with HomeMatic support which lacks FHT support.
+      in the culfw) must be enabled in the culfw firmware. This is done for all
+      CUN and for newer CUL (i.e. V3.0 and greater) devices with culfw firmware
+      version 1.38 and newer. For CUL hardware version before 3.0 there is a
+      separate firmware with HomeMatic support which lacks FHT support.
       </li>
-  <li><b>Note</b>: Currently supported device families: remote, switch, dimmer,
-       blindActuator, smokeDetector, threeStateSensor, THSensor and the
-       KS550</li>
-
+  </ul>
+  <b>Notes</b>
+  <ul>
+  <li>Currently supported device families: remote, switch, dimmer,
+      blindActuator, smokeDetector, threeStateSensor, THSensor and the
+      KS550</li>
+  <li>Device messages can only be interpreted correctly if the device type is
+      known. fhem will extract the device type from a "pairing request"
+      message, even if it won't respond to it (see <a
+      href="#hmPairSerial">hmPairSerial</a> and <a
+      href="#hmPairForSec">hmPairForSec</a> to enable pairing).
+      As an alternative, set the correct subType and model attributes, for a
+      list of possible subType values see "attr hmdevice ?".</li>
+  <a name="HMAES"></a>
+  <li>The so called "AES-Encryption" is in reality a signing request: if it is
+      enabled, an actor device will only execute a received command, if a
+      correct answer to a request generated by the actor is received.  This
+      means:
+      <ul>
+      <li>Reaction to commands is noticably slower, as 3 messages are sent
+          instead of one before the action is processed by the actor.
+      <li>Every command and its final ack from the device is sent in clear,
+          so an outside observer will know the status of each device.
+      <li>The firmware implementation is buggy: the "toggle" event is executed
+          <b>before</b> the answer for the signing request is received, at
+          least by some switches (HM-LC-Sw1-Pl and HM-LC-SW2-PB-FM).
+      <li>The <a href="#HMLAN">HMLAN</a> configurator will answer signing
+          requests by itself, and if it is configured with the 3-byte address
+          of a foreign CCU (the address is part of the signing request), it is
+          able to answer signing requests correctly. In the reality this will
+          only work reliably if the foreign CCU is switched off, else it
+          will also answer to the signing request in parallel, and the actor
+          will not receive a clear confirmation.
+      <li>AES-Encryption is not useable with a CUL device as the interface, but
+          it is supported with a HMLAN. Due to the issues above I do not
+          recommend using Homematic encryption at all.
+      </ul>
   </ul>
   <br><br>
 
@@ -2260,6 +2362,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     on the device to be paired, or issue a <a href="#CULset">hmPairSerial</a>
     set command if the device is a receiver and you know its serial number.
     Autocreate will then create a fhem device and set all necessary attributes.
+    Without pairing the device will not accept messages from fhem.
     <br><br>
     If you cannot use autocreate, then you have to specify:<br>
     <ul>
@@ -2298,7 +2401,16 @@ A line ending with \ will be concatenated with the next one, so long lines
          </li>
      <li>pair<br>
          Pair the device again with its known serialNumber (e.g. after a device
-         reset).  </li>
+         reset). </li>
+     <li>unpair<br>
+         "Unpair" the device, i.e. make it available to pair with other
+         master devices. </li>
+     <li>sign [on|off]<br>
+         Activate or deactivate signing (also called AES encryption, see the <a
+         href="#HMAES">note</a> above). Warning: if the device is attached via
+         a CUL, you won't be able to switch it (or deactivate signing) from
+         fhem before you reset the device directly.
+         </li>
      </ul>
      <br>
      subType (i.e family) dependent commands:
@@ -2308,7 +2420,8 @@ A line ending with \ will be concatenated with the next one, so long lines
        <ul>
           <li>on - set the switch on</li>
           <li>off - set the switch off</li>
-          <li>on-for-timer sec - set the switch on for the given seconds. Note: the protocol does not support an off-for-timer like FS20.</li>
+          <li>on-for-timer sec - set the switch on for the given seconds. Note:
+          the protocol does not support an off-for-timer like FS20.</li>
           <li>toggle - toggle the switch.</li>
        </ul></li>
      <br>
@@ -2342,7 +2455,7 @@ A line ending with \ will be concatenated with the next one, so long lines
              send a list of "raw" commands. The first command will be immediately
              sent, the next one after the previous one is acked by the target.  The
              length will be computed automatically, and the message counter will be
-             incremented if the first tw charcters are ++.
+             incremented if the first two charcters are ++.
              Example (enable AES):<pre>
    set hm1 raw ++A001F100001234560105000000001\
                ++A001F10000123456010802010AF10B000C00\
