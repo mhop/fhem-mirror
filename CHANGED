@@ -20,6 +20,7 @@
   - feature: IPV6 support, FHEMWEB basicAuth and HTTPS support
   - feature: createlog added to the autocreate module
   - feature: contrib/tcptee.pl added
+  - feature: HMLAN support
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
