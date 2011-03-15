@@ -207,7 +207,7 @@ CUL_HM_Parse($$)
   # Generate an UNKNOWN event with a better name
   if(!$shash) {
     my $sname = "CUL_HM_$src";
-    if($lcm =~ m/1A8.00/) {
+    if($lcm =~ m/1A8.00/) {     #  Pairing request
 
       # Prefer subType over model to make autocreate easier.
       # besides the model names are quite cryptic
@@ -221,9 +221,10 @@ CUL_HM_Parse($$)
         $sname =~ s/-/_/g;
       }
 
+      Log 3, "CUL_HM Unknown device $sname, please define it";
+      return "UNDEFINED $sname CUL_HM $src $msg";
     }
-    Log 3, "CUL_HM Unknown device $sname, please define it";
-    return "UNDEFINED $sname CUL_HM $src $msg";
+    return "";
   }
 
   my $name = $shash->{NAME};
