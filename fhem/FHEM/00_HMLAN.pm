@@ -33,7 +33,7 @@ HMLAN_Initialize($)
   $hash->{ReadyFn} = "HMLAN_Ready";
   $hash->{Clients} = ":CUL_HM:";
   my %mc = (
-    "1:HMLAN_HM" => "^A......................",
+    "1:CUL_HM" => "^A......................",
   );
   $hash->{MatchList} = \%mc;
 
