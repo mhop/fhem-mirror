@@ -255,21 +255,21 @@ HMLAN_Parse($$)
 {
   my ($hash, $rmsg) = @_;
   my $name = $hash->{NAME};
-  my $rssi;
   my $ll5 = GetLogLevel($name,5);
+  my ($src, $status, $msec, $d2, $rssi, $msg);
 
   my $dmsg = $rmsg;
 
   Log $ll5, "HMLAN $rmsg";
   if($rmsg =~ m/^E(......),(....),(........),(..),(....),(.*)/) {
-    my ($src, $d1, $msec, $d2, $rssi, $msg) =
-       ($1,   $2,  $3,    $4,  $5,    $6);
+    ($src, $status, $msec, $d2, $rssi, $msg) =
+    ($1,   $2,      $3,    $4,  $5,    $6);
     $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
     $hash->{uptime} = HMLAN_uptime($msec);
 
   } elsif($rmsg =~ m/^R(........),(....),(........),(..),(....),(.*)/) {
-    my ($src, $status, $msec, $d2, $rssi, $msg) =
-       ($1,   $2,      $3,    $4,  $5,    $6);
+    ($src, $status, $msec, $d2, $rssi, $msg) =
+    ($1,   $2,      $3,    $4,  $5,    $6);
 
     $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
     $dmsg .= "NACK" if($status !~ m/...1/);
@@ -301,6 +301,7 @@ HMLAN_Parse($$)
   $hash->{RAWMSG} = $rmsg;
   my %addvals = (RAWMSG => $rmsg);
   if(defined($rssi)) {
+    $rssi = hex($rssi)-65536;
     $hash->{RSSI} = $rssi;
     $addvals{RSSI} = $rssi;
   }
