@@ -31,6 +31,7 @@ HMLAN_Initialize($)
   $hash->{ReadFn}  = "HMLAN_Read";
   $hash->{WriteFn} = "HMLAN_Write";
   $hash->{ReadyFn} = "HMLAN_Ready";
+  $hash->{SetFn}   = "HMLAN_Set";
   $hash->{Clients} = ":CUL_HM:";
   my %mc = (
     "1:CUL_HM" => "^A......................",
