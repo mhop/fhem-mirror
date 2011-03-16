@@ -14,6 +14,7 @@ sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
 sub CUL_HM_DumpProtocol($$@);
+sub CUL_HM_convTemp($);
 
 my %culHmDevProps=(
   "10" => { st => "switch",          cl => "receiver" }, # Parse,Set
@@ -75,7 +76,7 @@ my %culHmModel=(
   "0036" => "HM-PB-2-WM",
   "0037" => "HM-RC-19",
   "0038" => "HM-RC-19-B",
-  "0039" => "HM-CC-TC",       # Parse only
+  "0039" => "HM-CC-TC",       # Selected commands
   "003A" => "HM-CC-VD",       # Actuator, battery/etc missing
   "003B" => "HM-RC-4-B",
   "003C" => "HM-WDS20-TH-O",
@@ -402,21 +403,31 @@ CUL_HM_Parse($$)
       push @event, "state:T: $t H: $h";
       push @event, "temperature:$t";
       push @event, "humidity:$h";
+
+      # If we have something to tell:
+      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
     }
 
-    
     if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
       my (   $d1,     $vp) = 
          (hex($1), hex($2));
-      $vp = int($vp/2.56+0.5);   # Ventil position in %
+      $vp = int($vp/2.56+0.5);   # valve position in %
       push @event, "actuator:$vp %";
 
-      if($dhash) {      # Wont trigger
+      # Set the valve state too, without an extra trigger
+      if($dhash) {
         $dhash->{STATE} = "$vp %";
         $dhash->{READINGS}{STATE}{TIME} = $tn;
         $dhash->{READINGS}{STATE}{VAL} = "$vp %";
       }
     }
+
+    if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
+      push @event, "desired-temp: " .hex($1)/2;
+    }
+
+    CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
+      if($id eq $dst && $cmd ne "8002");
 
 
   } elsif($st eq "KFM" && $model eq "KFM-Sensor") {
@@ -488,6 +499,19 @@ my %culHmSubTypeSets = (
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>" },
 );
+my %culHmModelSets = (
+  "HM-CC-TC"=>
+        { "day-temp"   => "temp",
+          "night-temp" => "temp",
+          "tempListSat"=> "HH:MM temp ...",
+          "tempListSun"=> "HH:MM temp ...",
+          "tempListMon"=> "HH:MM temp ...",
+          "tempListTue"=> "HH:MM temp ...",
+          "tempListThu"=> "HH:MM temp ...",
+          "tempListWed"=> "HH:MM temp ...",
+          "tempListFri"=> "HH:MM temp ...",
+        },
+);
 
 ###################################
 sub
@@ -501,6 +525,7 @@ CUL_HM_Set($@)
 
   my $name = $hash->{NAME};
   my $st = AttrVal($name, "subType", "");
+  my $md = AttrVal($name, "model", "");
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
   my $chn = "01";
@@ -514,6 +539,7 @@ CUL_HM_Set($@)
 
   my $h = $culHmGlobalSets{$cmd};
   $h = $culHmSubTypeSets{$st}{$cmd} if(!defined($h) && $culHmSubTypeSets{$st});
+  $h = $culHmModelSets{$md}{$cmd}   if(!defined($h) && $culHmModelSets{$md});
   my @h;
   @h = split(" ", $h) if($h);
 
@@ -525,6 +551,8 @@ CUL_HM_Set($@)
                  join(" ",sort keys %culHmGlobalSets);
     $usg .= " ". join(" ",sort keys %{$culHmSubTypeSets{$st}})
                   if($culHmSubTypeSets{$st});
+    $usg .= " ". join(" ",sort keys %{$culHmModelSets{$md}})
+                  if($culHmModelSets{$md});
     my $pct = join(" ", (0..100));
     $usg =~ s/ pct/ $pct/;
     return $usg;
@@ -533,7 +561,7 @@ CUL_HM_Set($@)
     return "$cmd requires no parameters";
     
   } elsif($h !~ m/\.\.\./ && @h != @a-2) {
-    return "$cmd requires parameters: $h";
+    return "$cmd requires parameter: $h";
 
   }
 
@@ -559,21 +587,13 @@ CUL_HM_Set($@)
     $shash->{hmPairSerial} = $serialNr;
 
   } elsif($cmd eq "unpair") { ###########################################
-    $sndcmd =
-        sprintf("++A001%s%s00050000000000", $id,$dst);
-    CUL_HM_PushCmdStack($shash,
-        sprintf("++A001%s%s000802000A000B000C00",$id,$dst));
-    CUL_HM_PushCmdStack($shash,
-        sprintf("++A001%s%s0006",$id,$dst));
+    CUL_HM_pushConfig($shash, $id, $dst, 0, 0, "02010A000B000C00");
+    $sndcmd = shift @{$shash->{cmdStack}};
 
   } elsif($cmd eq "sign") { ############################################
-    $sndcmd =
-        sprintf("++A001%s%s%s0500000000%s", $id,$dst,$chn,$chn);
-    CUL_HM_PushCmdStack($shash,
-        sprintf("++A001%s%s%s0808%s",$id,$dst,$chn,
-                ($a[2] eq "on" ? "01" : "02")));
-    CUL_HM_PushCmdStack($shash,
-        sprintf("++A001%s%s%s06",$id,$dst,$chn));
+    CUL_HM_pushConfig($shash, $id, $dst, $chn, $chn,
+                    "08" . ($a[2] eq "on" ? "01":"02"));
+    $sndcmd = shift @{$shash->{cmdStack}};
 
   } elsif($cmd eq "statusRequest") { ####################################
     $sndcmd = sprintf("++A001%s%s%s0E", $id,$dst, $chn);
@@ -594,7 +614,7 @@ CUL_HM_Set($@)
     $sndcmd = sprintf("++A03E%s%s%s40%s%02X", $id, $dst,
                                       $dst, $chn, $shash->{toggleIndex});
 
-  } elsif($st eq "pct") { ##############################################
+  } elsif($cmd eq "pct") { ##############################################
     $a[1] = 100 if ($a[1] > 100);
     $sndcmd = sprintf("++A011%s%s02%s%02X0000", $id, $dst, $chn, $a[1]*2);
     if(@a > 2) {
@@ -602,17 +622,14 @@ CUL_HM_Set($@)
       $sndcmd .= $tval;
     }
 
-
-  } elsif($st eq "text") { #############################################
+  } elsif($cmd eq "text") { #############################################
     $state = "";
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/);
     return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
     my $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
 
-    CUL_HM_PushCmdStack($shash,
-      sprintf("++A001%s%s%02d050000000001", $id, $dst, $bn));
 
-    my ($l1, $l2, $s, $tl);     # Create CONFIG_WRITE_INDEX string
+    my ($l1, $l2, $s);     # Create CONFIG_WRITE_INDEX string
     $l1 = $a[4] . "\x00";
     $l1 = substr($l1, 0, 13);
     $s = 54;
@@ -624,16 +641,39 @@ CUL_HM_Set($@)
     $l2 =~ s/(.)/sprintf("%02X%02X",$s++,ord($1))/ge;
     $l1 .= $l2;
 
-    $tl = length($l1);
-    for(my $l = 0; $l < $tl; $l+=28) {
-      my $ml = $tl-$l < 28 ? $tl-$l : 28;
-      CUL_HM_PushCmdStack($shash, sprintf("++A001%s%s%02d08%s",
-              $id, $dst, $bn, substr($l1,$l,$ml)));
-    }
-
-    CUL_HM_PushCmdStack($shash,
-      sprintf("++A001%s%s%02d06", $id, $dst, $bn));
+    CUL_HM_pushConfig($hash, $id, $dst, $bn, 1, $l1);
     return "Set your remote in learning mode to transmit the data";
+
+  } elsif($cmd =~ m/^(day|night)-temp$/) { ###############################
+    my $temp = CUL_HM_convTemp($a[2]);
+    return $temp if(length($temp) > 2);
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5,
+                             $st eq "day-temp" ? "03$temp" : "04$temp");
+    return;
+
+  } elsif($cmd =~ m/^tempList(...)/) { ##################################
+    my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
+                    "Tue"=>"5 9B", "Thu"=>"5 CB", "Wed"=>"6 01",
+                    "Fri"=>"6 31");
+    my ($list,$addr) = split(" ", $day2off{$1});
+
+    return "To few arguments"                   if(@a < 4);
+    return "To many arguments, max is 24 pairs" if(@a > 50);
+    return "Bad format, use HH:MM TEMP ..."     if(@a % 2);
+    return "Last time spec must be 24:00"       if($a[@a-2] ne "24:00");
+
+    my $data = "";
+    for(my $idx = 2; $idx < @a; $idx += 2) {
+      return "$a[$idx] is not in HH:MM format"
+                                if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
+      my ($h, $m) = ($1, $2);
+      my $temp = CUL_HM_convTemp($a[$idx+1]);
+      return $temp if(length($temp) > 2);
+      $data .= sprintf("%02X%02X%02X%s", $addr, $h*6+($m/10), $addr+1, $temp);
+      $addr += 2;
+    }
+    CUL_HM_pushConfig($hash, $id, $dst, 2, $list, $data);
+    return;
 
   }
 
@@ -641,7 +681,7 @@ CUL_HM_Set($@)
     $hash->{STATE} = $state;
     $hash->{cmdSent} = $state;
   }
-  CUL_HM_SendCmd($shash, $sndcmd, 0, 1);
+  CUL_HM_SendCmd($shash, $sndcmd, 0, 1) if($sndcmd);
   return $ret;
 }
 
@@ -710,9 +750,8 @@ CUL_HM_Pair(@)
   delete($hash->{cmdStack});
 
   if($stn ne "remote") {
-    CUL_HM_SendCmd     ($hash, "++A001$id${src}00050000000000", 1, 1);
-    CUL_HM_PushCmdStack($hash, "++A001$id${src}00080201$idstr");
-    CUL_HM_PushCmdStack($hash, "++A001$id${src}0006");
+    CUL_HM_pushConfig($hash, $id, $src, 0, 0, "0201$idstr");
+    CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
 
   } else {
     # remotes are AES per default, so the method above does not work. the
@@ -727,6 +766,7 @@ CUL_HM_Pair(@)
     CUL_HM_PushCmdStack($hash, "++A001$id${src}0106");
 
   }
+
   # Create shadow device for multi-channel
   if($stn eq "switch" &&
      $attr{$name}{devInfo} =~ m,(..)(..)(..), ) {
@@ -817,6 +857,7 @@ CUL_HM_Id($)
   return AttrVal($io->{NAME}, "hmId", "F1$fhtid");
 }
 
+#############################
 my %culHmBits = (
   "8000"          => { txt => "DEVICE_INFO",  params => {
                        FIRMWARE       => '00,2',
@@ -908,7 +949,7 @@ CUL_HM_DumpProtocol($$@)
 
   my $p01 = substr($p,0,2);
   my $p02 = substr($p,0,4);
-  my $p11 = substr($p,2,2);
+  my $p11 = (length($p) > 2 ? substr($p,2,2) : "");
 
   $cmd = "0A$1" if($cmd =~ m/0B(..)/);
   $cmd = "A4$1" if($cmd =~ m/84(..)/);
@@ -939,6 +980,7 @@ CUL_HM_DumpProtocol($$@)
   DoTrigger($iname, $msg) if($ev);
 }
 
+#############################
 my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
 sub
 CUL_HM_encodeTime8($)
@@ -957,6 +999,7 @@ CUL_HM_encodeTime8($)
   return "FF";
 }
 
+#############################
 sub
 CUL_HM_decodeTime8($)
 {
@@ -967,6 +1010,7 @@ CUL_HM_decodeTime8($)
   return $v2 * $culHmTimes8[$v1];
 }
 
+#############################
 sub
 CUL_HM_encodeTime16($)
 {
@@ -988,6 +1032,16 @@ CUL_HM_encodeTime16($)
 }
 
 sub
+CUL_HM_convTemp($)
+{
+  my ($in) = @_;
+  return "$in is not a number" if($in !~ m/^\d+$/ && $in !~ m/\d+\.\d+$/);
+  return "$in is out of bounds (6 .. 30)" if($in < 6 || $in > 30);
+  return sprintf("%02X", $in*2);
+}
+
+#############################
+sub
 CUL_HM_decodeTime16($)
 {
   my $v = hex(shift);
@@ -998,6 +1052,24 @@ CUL_HM_decodeTime16($)
     $mul *= 2;
   }
   return $mul*$m;
+}
+
+#############################
+sub
+CUL_HM_pushConfig($$$$$$)
+{
+  my ($hash,$src,$dst,$chn,$list,$content) = @_;
+
+  CUL_HM_PushCmdStack($hash,
+        sprintf("++A001%s%s%02X0500000000%02X",$src,$dst,$chn,$list));
+  my $tl = length($content);
+  for(my $l = 0; $l < $tl; $l+=28) {
+    my $ml = $tl-$l < 28 ? $tl-$l : 28;
+    CUL_HM_PushCmdStack($hash,
+      sprintf("++A001%s%s%02X08%s", $src,$dst,$chn, substr($content,$l,$ml)));
+  }
+  CUL_HM_PushCmdStack($hash,
+        sprintf("++A001%s%s%02X06",$src,$dst,$chn));
 }
 
 1;
