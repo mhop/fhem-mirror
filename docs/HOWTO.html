@@ -70,11 +70,12 @@
       <a href="http://localhost:8083/fhem">http://localhost:8083/fhem</a>
       or 
       <a href="http://localhost:8084/fhem">http://localhost:8084/fhem</a> if
-      you are using a small-screen browser (e.g a smartphone).<br><br>
+      you are using a a smartphone.<br><br>
 
       Attach the USB device (CUL, FHZ1000PC/FHZ1300, EM1010PC) to your
       computer, and look for the corresponding device in the /dev
-      directory.<br> For CUL a file named /dev/ttyACM* will be created under
+      directory. For <a href="commandref.html#CUL">CUL</a> a file named
+      /dev/ttyACM* will be created under
       Linux and /dev/cu.usbmodem* under OS X. Note the exact name of the device.
       Define it for fhem (by typing it in the "Fhem cmd" input field in the
       browser):<pre>
@@ -94,10 +95,10 @@
       <br><br>
       <b>Note:</b> Don't forget to type "save" in the "Fhem cmd" input field of
       the browser after defining a device or setting its attribute.  Otherwise
-      the changes will disappear after the next start.<br><br> </ul>
+      the changes will disappear after the next start.</ul>
 
     <a name="autocreate"></a>
-    <h3>Automatically creating transmitters</h3>
+    <h3>Configuring transmitter devices</h3>
       <ul>
       The sample configuration file installed via "make install-pgm2" has
       configured an <a href="commandref.html#autocreate">autocreate</a>
@@ -108,33 +109,34 @@
       rename</a> to rename the automatically created device, e.g. type in the
       input field of the web frontend:<pre>
       rename FHT_1234 fht.kitchen</pre> 
-      <b>NOTE</b>: you have to rename the device itself, the attached FileLog
+
+      <b>Note</b>: if you rename the device itself, the attached FileLog
       and weblink will be renamed automatically. The other way round (renaming
-      the FileLog or weblink) does not work correctly right now.
-      </ul>
+      the FileLog or weblink) will not rename the associated devices
+      automatically.<br><br>
 
-
-    <a name="FS20tx"></a>
-    <h3>Misc. RF transmitters (FS20/EM/S300 etc.)</h3>
-      <ul>
-      <a href="commandref.html#autocreate">autocreate</a> will create
-      automatically fhem FS20/EM/S300/HMS devices, the following description is
-      for doing it manually.<br><br>
-
+      If you want to do the same manually:<br>
       Wait a while, until the transmitter sent some data. In the logfile
       (Browser window: "All together" ->  Logs:Logfile:text) a line
       will  appear:<pre>
-      FS20 Unknown device &lt;HOUSECODE, Button &lt;BTN&gt; Code &lt;CDE&gt;, please define it</pre>
+      FS20 Unknown device &lt;HOUSECODE&gt;, Button &lt;BTN&gt; Code &lt;CDE&gt;, please define it</pre>
 
-      Now define a device:<pre>
+      Now define the fhem device:<pre>
       define piri1 FS20 &lt;HOUSECODE&gt; &lt;BTN&gt;</pre>
 
       Set the model attribute of the device:<pre>
-      attr lamp1 model fs20piri</pre>
+      attr piri1 model fs20piri</pre>
 
       to get only the commands available for this device.
       <a href="commandref.html#model">Here</a> is a complete list of FS20
-      models.<br> For other device-types similar messages should appear.
+      models.<br> For other device types similar messages should appear.<br><br>
+
+      <b>Note:</b> Creating a fhem FHT device automatically or manually does
+      not imply that the CUL or the FHZ is paired with it. For this purpose you
+      have to set the FHT to accept new devices (Prog:Cent:N/A), and send a command to
+      it (e.g.  set fht.kitchen desired-temp 20). 
+      If there is no signal for a while, then check <a href="faq.html#faq6">
+      this</a> FAQ entry.
       </ul>
 
     <a name="FS20rx"></a>
@@ -144,7 +146,7 @@
       fhem first with:<pre>
       define lamp1 FS20 1234 56</pre>
 
-      Now press the button on the device for a while until its LED starts to
+      Now press the button on the real device for a while until its LED starts to
       blink. Click on the "on" link in the fhem window to send a command. The
       LED should terminate blinking, the device is programmed to housecode
       1234, device code 56. You can also use the 4-base ELV notation.
@@ -152,48 +154,16 @@
       attr lamp1 model fs20st</pre>
 
       to get only the commands available for this device.
-      <a href="commandref.html#model">Here</a> is a complete list of models.
       </ul>
 
 
-    <a name="FHT"></a>
-    <h3>Configuring FHT devices</h3>
-      <ul>
-      <b>Note:</b> Creating a fhem FHT device automatically or manually does
-      not imply that the CUL or the FHZ is paired with it. For this purpose you
-      have to set the FHT to accept new "Cent" devices, and send a command to
-      it (e.g.  set fht.kitchen desired-temp 20)<br><br>
-
-      <a href="commandref.html#autocreate">autocreate</a> will create
-      automatically FHT devices, the following description is for
-      doing it manually.<br><br>
-
-      Wait for a while (2-5 mins) till the FHT is sending some signals. In the
-      logfile ("All together" -> Logs:LogFile:text) a line should
-      appear:<br><pre>
-      FHZ1: Unknown FHT device detected, define one to get detailed information</pre>
-
-      Define your FHT device with an arbitrary code in order to load the FHT
-      module, see <a href="commandref.html#FHT">this</a> link for details:<pre>
-      define MyFHT FHT  1111</pre>
-
-      The next message in the log will contain more details:<pre>
-      FHT Unknown device &lt;HOUSECODE&gt;, please define it</pre>
-
-      Delete and create your device again:<pre>
-      delete MyFHT
-      define MyFHT FHT &lt;HOUSECODE&gt;</pre>
-
-      If there is no signal for a while, then check <a href="faq.html#faq6">
-      this</a> FAQ entry.
-      </ul>
 
     <a name="at"></a>
     <h3>Timed commands / Notification</h3>
       <ul>
       To execute commands at a given time / periodically, you have to define
       devices of the type at. See the definition <a href="commandref.html#at">
-      here</a> and the examples  <a href="example.06_at">here</a> The last link
+      here</a> and the examples  <a href="example.06_at">here</a>. The last link
       only works if you are reading this HOWTO from your fhem Web.<br><br>
 
       To execute commands if a device sent a message you have to define
@@ -219,7 +189,7 @@
       "Unsorted" room. Devices in the room "hidden" will not be shown.
       <br><br>
 
-      Set the title of the webpage by setting the title attribute of the global
+      Set the title of the webpage by setting the <code>title</code> attribute of the global
       device ("All together" -> global)<br><br>
 
       Edit the colors / fonts by changing the style.css ("Edit files" ->
@@ -231,12 +201,17 @@
       <a href="commandref.html#plotsize">plotsize</a>.
       </ul>
 
+
     <a name="log"></a>
     <h3>Logging data</h3>
       <ul>
       To log messages into files, define devices of the type <a
       href="commandref.html#FileLog">FileLog</a>. Autocreate will create
-      logfiles for newly detected devices. To log messages into a
+      logfiles for newly detected devices, or you can use <a
+      href="commandref.html#createlog">createlog</a> in order to add a FileLog
+      later.<br>
+
+      To log messages into a
       database, see the contrib/dblog directory in the fhem
       distribution.<br><br>
 
@@ -255,100 +230,108 @@
     <h3>Plotting logs</h3>
       <ul>
       Autocreate will create weblinks (i.e. plots) for newly detected devices.
-      The following section describes how to do it manually.<br>
+      The following section describes how to do it manually.<br><br>
 
-      To convert a log into a plot in FHEMWEB, set the
+      To convert a FileLog into a plot (chart) in FHEMWEB, set the
       <a href="commandref.html#logtype">logtype</a> attribute of the
       corresponding FileLog. Take a look at the available gnuplot files in the
       "Edit files" section, they contain the corresponding FileLog definition
       example.<br>
       Note that the .gplot files are also used if you use SVG output and
-      not the gnuplot backend!<br><br>
+      not the gnuplot backend!<br>
+      Examples:<pre>
+        attr em1000log logtype cul_em:Power,text
+        attr fs20_log logtype fs20:Plot,text
+        attr hms100th_log logtype hms:Plot,text
+      </pre>
 
-      When displaying the plot, you can convert it into a "weblink", which can
-      in turn have a room attribute to group more than one Plot together. If
-      the weblink refers to the current logfile, then it will be stored as a
-      CURRENT weblink, and it will always display the most recent log (you do
-      not have to redefine it if the logfile changes due to year/month/date
-      parameters in its name).
+      When displaying the plot, you can convert it into a "weblink" device,
+      so that we can in turn have a room attribute to group more than one Plot
+      together. If the weblink refers to the current logfile, then it will be
+      stored as a CURRENT weblink, and it will always display the most recent
+      log (you do not have to redefine it if the logfile changes due to
+      year/month/date parameters in its name).
+
       <br><br>
 
 
       The logs can be converted to a plot either with gnuplot (which must be
       installed and in your PATH), or via the builtin SVG module, in this case
-      your internet browser must support SVG. Firefox, opera and the
-      iPhone/Android borwser support SVG out of the box, Internet Explorer does
-      it via the Adobe "SVG viewer" plugin. SVG mode is the default, to change
-      it set the <a href="commandref.html#plotmode">plotmode</a> attribute to
-      gnuplot or gnuplot-scroll.<br><br>
+      your browser must support SVG. Firefox, Opera, Chrome, Safari
+      (on the iPhone/iPad too) support SVG out of the box, Internet Explorer does
+      it via the Adobe "SVG viewer" plugin, Android does not support it (as of
+      2011/02).
+      SVG mode is the default, to change it set the <a
+      href="commandref.html#plotmode">plotmode</a> attribute to gnuplot or
+      gnuplot-scroll.<br><br>
 
       In order to look at historic data, you can either convert at the
       archive entries to weblink in "plotmode=gnuplot" mode, or use the
-      "plotmode=gnuplot-scroll" or "plotmode=SVG" modes. In the latter case
-      you'll get the possibility to zoom or scroll in the plot.<br><br>
-
-      Use the zoom and scroll icons at the top of the page.<br><br>
-
-      The current time scope (day, week, month..) set at the overview
-      page (containing weblinks) will also be used for graphics you open via
-      links (current log or archive) - there are no zoom and scroll icons
-      there.<br><br>
+      "plotmode=gnuplot-scroll" or "plotmode=SVG" modes. fnuplot-scroll and SVG
+      offer the possibility to zoom or scroll in the plot, see the arrow and
+      magnifier icons at the top of the page.<br><br>
 
       Note: the gnuplot files must have #FileLog entries in order to be
       useable with scrolling, as the filtering happens with the FileLog get
-      function, see the supplied gnuplot files for an example.<br><br>
+      function, see the supplied gnuplot files for an example or the
+      column_spec paragraph <a href="commandref.html#FileLogget">here</a> for
+      the syntax.<br><br>
 
-       The order of the #FileLog lines need to match the corresponding
-      'awk'-(double-)lines!<br><br>
+       The order of the #FileLog lines must match the corresponding 'awk'
+      entries.<br><br>
 
       It make sense to build large logfiles for scrolling in them (year
       resolution), or smaller ones if you do not want to use the zoom/scroll
       feature. The size of the logfiles will be determined by its wildcard
       characters (year/month/week/day), look at the FileLog definition.
-      Don't forget to enable archiving with the archivedir or archivecmd
-      attributes.<br><br>
       </ul>
 
     <a name="tips"></a>
     <h3>FHEMWEB tips</h3>
       <ul>
-      Click on the State link on the device page to get a documentation of
-      all its settable values, similarly clicking on Attributes will guide you
+      Click on the State link on the detail page to get a documentation of
+      all its settable values, similarly clicking on "Attribute" will guide you
       to the documentation of its attributes.
       <br><br>
 
-      Password/HTTPS<br>
-      These features are implemented by apache, and apache must be configured
-      to redirect the page to 01_FHEMWEB.pm. For this purpose add the following
-      lines to your httpd.conf:<pre>
-      &lt;Proxy *&gt;
-        AuthType Basic
-        AuthName "Password Required"
-        AuthUserFile /home/httpd/etc/passwd
-        Require valid-user
-        Allow from 127.0.0.1
-      &lt;/Proxy&gt;
-      ProxyPass        /fhem  http://localhost:8083/fhem
-      ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
-
-      and then restart httpd with apachectl graceful. To create the password
-      file, execute<br>
-      htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
-      <br>
-      See also <a href="http://fhemwiki.de/index.php/Apache_Authentication_Proxy">
-      this</a> fhemwiki entry for a more detailed description.
-      <br><br>
-
-      To enable HTTPS, please check the web. In essence:<br>
+      There are two different ways to enable <b>Password and HTTPS</b><br><br>
       <ul>
-      <li>Edit httpd.conf, add:<pre>
-      LoadModule ssl_module lib/apache/mod_ssl.so
-      Include /etc/httpd/conf/ssl.conf</pre></li>
-      <li>Create a server certificate</li>
-      <li>Start httpd with the startssl option (SSL or the like must be set in
-      one of your system files, look at /etc/init.d/httpd).</li>
+        <li>Using the builtin features of FHEMWEB for <a
+        href="commandref.html#basicAuth">basic</a> html authentication and <a
+        href="commandref.html#HTTPS">HTTPS</a>. <br><br>
+
+        <li>Using apache to implement this features, and redirect a certain prefix to
+        each FHEMWEB instance.<br>
+        Add the following lines to your httpd.conf:<pre>
+        &lt;Proxy *&gt;
+          AuthType Basic
+          AuthName "Password Required"
+          AuthUserFile /home/httpd/etc/passwd
+          Require valid-user
+          Allow from 127.0.0.1
+        &lt;/Proxy&gt;
+        ProxyPass        /fhem  http://localhost:8083/fhem
+        ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
+
+        and then restart httpd with apachectl graceful. To create the password
+        file, execute<br>
+        htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
+        <br>
+        See also <a href="http://fhemwiki.de/index.php/Apache_Authentication_Proxy">
+        this</a> fhemwiki entry for a more detailed description.
+        <br><br>
+
+        To enable HTTPS, please check the web. In essence:<br>
+        <ul>
+        <li>Edit httpd.conf, add:<pre>
+    LoadModule ssl_module lib/apache/mod_ssl.so
+    Include /etc/httpd/conf/ssl.conf</pre></li>
+        <li>Create a server certificate</li>
+        <li>Start httpd with the startssl option (SSL or the like must be set in
+        one of your system files, look at /etc/init.d/httpd).</li>
+        </ul>
+        <br><br>
       </ul>
-      <br><br>
 
       To display "foreign" (non fhem) files as a plot or a just as plain text,
       configure a fake logfile with the correct filename and an unused regexp,

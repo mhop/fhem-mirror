@@ -2445,6 +2445,24 @@ A line ending with \ will be concatenated with the next one, so long lines
              set 4Dis text 1 off Kitchen Off<br>
              </ul>
        </ul></li>
+     <li>Thermostat (HM-CC-TC)
+       <ul>
+         <li>day-temp &lt;tmp&gt;<br>
+             night-temp &lt;tmp&gt;<br>
+             Set the day or night temperature. Temp must be between 6 and 30
+             Centigrade, and precision is half a degree.
+         <li>tempListSat HH:MM temp 24:00 temp ...<br>
+             tempListSun HH:MM temp 24:00 temp ...<br>
+             tempListMon HH:MM temp 24:00 temp ...<br>
+             tempListTue HH:MM temp 24:00 temp ...<br>
+             tempListThu HH:MM temp 24:00 temp ...<br>
+             tempListWed HH:MM temp 24:00 temp ...<br>
+             tempListFri HH:MM temp 24:00 temp ...<br>
+             Specify a list of temperature intervals. Up to 24 intervals can be
+             spacified for each week day, the resolution is 10 Minutes. The
+             last time spec must always be 24:00.<br>
+             Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
+       </ul></li>
      </ul>
      <br>
 
