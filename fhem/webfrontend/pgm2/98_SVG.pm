@@ -87,6 +87,7 @@ SVG_render($$$$$$$)
   pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
         "class=\"title\" text-anchor=\"middle\">$title</text>";
 
+  # Copy and Paste labels, hidden by default
   pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
         "class=\"paste\" text-anchor=\"end\"> </text>";
@@ -121,7 +122,6 @@ SVG_render($$$$$$$)
   }
 
   ($off1,$off2) = ($ow-$x-$th, $y+$th);
-
 
 
   for my $i (0..int(@ltitle)-1) {
