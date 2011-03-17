@@ -4,18 +4,17 @@ text       { font-family:Times; font-size:12px; }
 text.title { font-size:16px; }
 text.copy  { text-decoration:underline; stroke:none; fill:blue;    }
 text.paste { text-decoration:underline; stroke:none; fill:blue;    }
-text.l0    { test-decoration:underline; stroke:none; fill:red;     } 
-text.l1    { test-decoration:underline; stroke:none; fill:green;   } 
-text.l2    { test-decoration:underline; stroke:none; fill:blue;    }
-text.l3    { test-decoration:underline; stroke:none; fill:magenta; }
-text.l4    { test-decoration:underline; stroke:none; fill:brown;   }
-text.l5    { test-decoration:underline; stroke:none; fill:black;   }
-text.l6    { test-decoration:underline; stroke:none; fill:olive;   }
-text.l7    { test-decoration:underline; stroke:none; fill:gray;    }
-text.l8    { test-decoration:underline; stroke:none; fill:yellow;  }
+text.l0    { text-decoration:underline; stroke:none; fill:red;     } 
+text.l1    { text-decoration:underline; stroke:none; fill:green;   } 
+text.l2    { text-decoration:underline; stroke:none; fill:blue;    }
+text.l3    { text-decoration:underline; stroke:none; fill:magenta; }
+text.l4    { text-decoration:underline; stroke:none; fill:brown;   }
+text.l5    { text-decoration:underline; stroke:none; fill:black;   }
+text.l6    { text-decoration:underline; stroke:none; fill:olive;   }
+text.l7    { text-decoration:underline; stroke:none; fill:gray;    }
+text.l8    { text-decoration:underline; stroke:none; fill:yellow;  }
 
 polyline { stroke:black; fill:none; }
-;.border  { stroke:black; fill:none; }
 .border  { stroke:black; fill:url(#grad1); }
 .vgrid   { stroke:gray;  stroke-dasharray:2,6; }
 .hgrid   { stroke:gray;  stroke-dasharray:2,6; }

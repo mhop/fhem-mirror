@@ -5516,7 +5516,7 @@ Terminating
     <li><a href="#plotmode">plotmode</a></li>
     <a name="label"></a>
     <li>label<br>
-      Colon separated list of values. The values will be used to replace
+      Double-Colon separated list of values. The values will be used to replace
       &lt;L#&gt; type of strings in the .gplot file, with # beginning at 1
       (&lt;L1&gt;, &lt;L2&gt;, etc.). Each value will be evaluated as a perl
       expression, so you have access e.g. to the $value hash.<br><br>
@@ -5530,7 +5530,7 @@ Terminating
         <li>Fixed text for the right and left axis:<br>
           <ul>
             <li>Fhem config:<br>
-                attr wl_1 label "Temperature":"Humidity"</li>
+                attr wl_1 label "Temperature"::"Humidity"</li>
             <li>.gplot file entry:<br>
                 set ylabel &lt;L1&gt;<br>
                 set y2label &lt;L2&gt;</li>
