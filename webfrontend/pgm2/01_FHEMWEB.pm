@@ -495,6 +495,7 @@ FW_updateHashes()
   foreach my $d (sort keys %defs ) {
     next if(IsIgnored($d));
     my $t = AttrVal($d, "subType", $defs{$d}{TYPE});
+    $t = AttrVal($d, "model", $t) if($t eq "unknown");
     $FW_types{$t}{$d} = 1;
   }
 
@@ -1023,7 +1024,7 @@ FW_substcfg($$$$$$)
   my $label = AttrVal($wl, "label", undef);
   my @g_label;
   if ($label) {
-    @g_label = split(":",$label);
+    @g_label = split("::",$label);
     foreach (@g_label) {
       $_ = AnalyzeCommand(undef, "{ $_ }");
     }

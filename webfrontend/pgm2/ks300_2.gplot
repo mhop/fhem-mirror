@@ -10,10 +10,10 @@ set timefmt "%Y-%m-%d_%H:%M:%S"
 set xlabel " "
 set ytics nomirror
 set y2tics
-set title '<TL>'
+set title '<L1>'
 set grid
 
-set ylabel "Wind (Km/h)"
+set ylabel "Wind (km/h)"
 set y2label "Humidity (%)"
 
 #FileLog 8:IR:0:
