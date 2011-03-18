@@ -63,7 +63,7 @@ HMLAN_Define($$)
   my $name = $a[0];
   my $dev = $a[2];
   $dev .= ":1000" if($dev !~ m/:/);
-  $attr{$name}{hmId} = sprintf("%06X", time()&0xffffff);
+  $attr{$name}{hmId} = sprintf("%06X", time() % 0xffffff);
 
   if($dev eq "none") {
     Log 1, "$name device is none, commands will be echoed only";
@@ -200,12 +200,12 @@ HMLAN_Write($$$)
 
   my $dst = substr($msg, 16, 6);
   if(!$lhash{$dst} && $dst ne "000000") {
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+112A29");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+$dst");
     HMLAN_SimpleWrite($hash, "-$dst");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+112A29");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+$dst");
     $lhash{$dst} = 1;
   }
-  my $tm = int(gettimeofday()*1000) & 0xffffffff;
+  my $tm = int(gettimeofday()*1000) % 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",
                 $tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
