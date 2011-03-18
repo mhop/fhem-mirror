@@ -360,7 +360,7 @@ CUL_HM_Parse($$)
     }
 
 
-  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") {
+  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
 
     if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
 
@@ -392,7 +392,7 @@ CUL_HM_Parse($$)
 
     }
 
-  } elsif($model eq "HM-CC-TC") {
+  } elsif($model eq "HM-CC-TC") {  ####################################
 
     if($cmd eq "8670" && $p =~ m/^(....)(..)/) {
       my (    $t,      $h) = 
@@ -430,7 +430,7 @@ CUL_HM_Parse($$)
       if($id eq $dst && $cmd ne "8002");
 
 
-  } elsif($st eq "KFM" && $model eq "KFM-Sensor") {
+  } elsif($st eq "KFM" && $model eq "KFM-Sensor") { ###################
 
     if($p =~ m/814(.)0200(..)(..)(..)/) {
       my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
@@ -731,6 +731,19 @@ CUL_HM_Pair(@)
         "CUL_HM pair: $name $stt, model $attr{$name}{model} ".
         "serialNr $attr{$name}{serialNr}";
 
+  # Create shadow device for multi-channel
+  if($stn eq "switch" &&
+     $attr{$name}{devInfo} =~ m,(..)(..)(..), ) {
+    my ($b1, $b2, $b3) = (hex($1), hex($2), $3);
+    for(my $i = $b2+1; $i<=$b1; $i++) {
+      my $nSrc = sprintf("%s%02X", $src, $i);
+      if(!defined($modules{CUL_HM}{defptr}{$nSrc})) {
+        delete($defs{"global"}{INTRIGGER});    # Hack
+        DoTrigger("global",  "UNDEFINED ${name}_CHN_$i CUL_HM $nSrc");
+      }
+    }
+  }
+
   # Abort if we are not authorized
   if($dst eq "000000") {
     if(!$iohash->{hmPair}) {
@@ -765,19 +778,6 @@ CUL_HM_Pair(@)
     CUL_HM_PushCmdStack($hash, "++A001$id${src}01080201$idstr");
     CUL_HM_PushCmdStack($hash, "++A001$id${src}0106");
 
-  }
-
-  # Create shadow device for multi-channel
-  if($stn eq "switch" &&
-     $attr{$name}{devInfo} =~ m,(..)(..)(..), ) {
-    my ($b1, $b2, $b3) = (hex($1), hex($2), $3);
-    for(my $i = $b2+1; $i<=$b1; $i++) {
-      my $nSrc = sprintf("%s%02X", $src, $i);
-      if(!defined($modules{CUL_HM}{defptr}{$nSrc})) {
-        delete($defs{"global"}{INTRIGGER});    # Hack
-        DoTrigger("global",  "UNDEFINED ${name}_CHN_$i CUL_HM $nSrc");
-      }
-    }
   }
 
   return "";
@@ -834,6 +834,7 @@ CUL_HM_Resend($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
+  return if(!$hash->{ackCmdSent});      # Double timer?
   if($hash->{ackCmdSent} == 3) {
     delete($hash->{ackCmdSent});
     delete($hash->{ackWaiting});
