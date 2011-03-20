@@ -45,6 +45,17 @@ my %flogpar = (
   "(PCR800|RGR918).*"
       => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
 
+  # X10 sensors received by RFXCOM
+  "RFXX10SEC.*"
+      => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
+
+  # USB-WDE1
+  "USBWX_[0-8]"
+      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
+  "USBWX_ks300"
+      => { GPLOT => "hms:Temp/Hum,ks300:Temp/Rain,ks300_2:Wind/Hum,",
+           FILTER => "%NAME:T:.*" },
+
   # HomeMatic
   "CUL_HM_THSensor.*"
       => { GPLOT => "hms:Temp/Hum,",
