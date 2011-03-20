@@ -1,25 +1,43 @@
+#################################################################################
+# 70_USBWX.pm
+# Module for FHEM to receive sensors via ELV USB-WDE1
+#
+# derived from previous 70_USBWX.pm version written by "Peter from Vienna"
+#
+# Willi Herzig, 2011
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
 ##############################################
 package main;
 
 use strict;
 use warnings;
+use Math::Complex;
 use Device::SerialPort;
 
 #####################################
 sub
 USBWX_Initialize($)
 {
-my ($hash) = @_;
+  my ($hash) = @_;
 
-$hash->{ReadFn}  = "USBWX_Read";
-$hash->{ReadyFn} = "USBWX_Ready"; 
-# Normal devices 
-$hash->{DefFn}   = "USBWX_Define";
-$hash->{UndefFn} = "USBWX_Undef"; 
+  $hash->{ReadFn}  = "USBWX_Read";
+#  $hash->{ReadyFn} = "USBWX_Ready"; 
+  # Normal devices 
+  $hash->{DefFn}   = "USBWX_Define";
+  $hash->{UndefFn} = "USBWX_Undef"; 
 
-$hash->{GetFn} = "USBWX_Get";
-$hash->{SetFn} = "USBWX_Set"; 
-$hash->{AttrList}= "model:USB-WDE1 loglevel:0,1,2,3,4,5,6";
+  $hash->{GetFn} = "USBWX_Get";
+  $hash->{SetFn} = "USBWX_Set"; 
+  $hash->{ParseFn}   = "USBWX_Parse";
+
+  $hash->{Match}     = ".*";
+
+  #$hash->{AttrList}= "model:USB-WDE1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -29,23 +47,51 @@ USBWX_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
           
-  return "wrong syntax: define <name> USBWX devicename"
-    if(@a != 3);
+  return "wrong syntax: 'define <name> USBWX <devicename>' or define <name> USBWX <code> [<corr1>...<corr4>]"
+    if(@a < 3);
           
-  USBWX_CloseDev($hash);
+  if ($a[2] =~/^[0-9].*/) {
+	# define <name> USBWX <code> [<corr1>...<corr4>]
+ 	return "wrong syntax: define <name> USBWX <code> [corr1...corr4]"
+            if(int(@a) < 3 || int(@a) > 7);
+  	return "Define $a[0]: wrong CODE format: valid is 1-8"
+                if($a[2] !~ m/^[1-9]$/);
+
+	#Log 1,"USBWX_Define def=$def";
+
+  	my $name = $a[0];
+  	my $code = $a[2];
+
+  	$hash->{CODE} = $code;
+  	$hash->{corr1} = ((int(@a) > 3) ? $a[3] : 0);
+  	$hash->{corr2} = ((int(@a) > 4) ? $a[4] : 0);
+  	$hash->{corr3} = ((int(@a) > 5) ? $a[5] : 0);
+  	$hash->{corr4} = ((int(@a) > 6) ? $a[6] : 0);
+  	$modules{USBWX}{defptr}{$code} = $hash;
+  	#AssignIoPort($hash);
+
+  } else {
+  	# define <name> USBWX <devicename>
+
+  	return "wrong syntax: define <name> USBWX <devicename>"
+    	  if(@a != 3);
+
+  	USBWX_CloseDev($hash);
+
+  	my $name = $a[0];
+  	my $dev = $a[2];
+          
+	  if($dev eq "none") {
+	    Log 1, "USBWX $name device is none, commands will be echoed only";
+    	$attr{$name}{dummy} = 1;
+    	return undef;
+  	}
 	
-  my $name = $a[0];
-  my $dev = $a[2];
-          
-  if($dev eq "none") {
-    Log 1, "USBWX $name device is none, commands will be echoed only";
-    $attr{$name}{dummy} = 1;
-    return undef;
+  	$hash->{DeviceName} = $dev;
+  	my $ret = USBWX_OpenDev($hash, 0);
+	return $ret;
   }
-	
-  $hash->{DeviceName} = $dev;
-  my $ret = USBWX_OpenDev($hash, 0);
-  return $ret;
+  return undef;
 } 
 
 #####################################
@@ -213,36 +259,35 @@ return undef;
 sub
 USBWX_Read($)
 {
-my ($hash) = @_;
-my $name = $hash->{NAME};
-my $char;
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $char;
 
-#Log 4, "USBWX Read State:$hash->{STATE}";
+  #Log 4, "USBWX Read State:$hash->{STATE}";
 
-my $mybuf = USBWX_SimpleRead($hash);
-my $usbwx_data = $hash->{PARTIAL};
-if ( ( length($usbwx_data) > 1) && ($mybuf eq "\n") )
-   {
-   Log 4, "USBWX/RAW Satz: $usbwx_data !!";
-   }
+  my $mybuf = USBWX_SimpleRead($hash);
+  my $usbwx_data = $hash->{PARTIAL};
+  #Log 1, "USBWX usbwxdata='$usbwx_data' $mybuf='$mybuf'";
+
+  if ( ( length($usbwx_data) > 1) && ($mybuf eq "\n") ) {
+   	Log 4, "USBWX/RAW Satz: $usbwx_data !!";
+   	#Log 1, "USBWX/RAW line='$usbwx_data'";
+  }
 	
-if(!defined($mybuf) || length($mybuf) == 0) 
-   {
-   USBWX_Disconnected($hash);
-   return "";
-   }
+  if(!defined($mybuf) || length($mybuf) == 0) {
+  	USBWX_Disconnected($hash);
+   	return "";
+  }
 
-$usbwx_data .= $mybuf;
 
-if ( ( length($usbwx_data) > 27) && ($mybuf eq "\n") )
-   {
-   USBWX_Parse($hash, $usbwx_data);
-   $hash->{PARTIAL} = "";
-   }
-else
-   {
-   $hash->{PARTIAL} = $usbwx_data; 
-   }
+  if ($mybuf eq "\n") {
+   	USBWX_Parse($hash, $usbwx_data);
+   	$hash->{PARTIAL} = "";
+  } else {
+  	$usbwx_data .= $mybuf;
+   	$hash->{PARTIAL} = $usbwx_data; 
+  }
+
 } 
 
 
@@ -306,85 +351,242 @@ Log 4, "USBWX SimpleWrite $msg";
 select(undef, undef, undef, 0.001);
 } 
 
+
+# -----------------------------
+# Dewpoint calculation.
+# see http://www.faqs.org/faqs/meteorology/temp-dewpoint/ "5. EXAMPLE"
+sub
+USBWX_Dewpoint($$)
+{
+	my ($temperature, $humidity) = @_;
+
+	my $dp;
+	
+	my $A = 17.2694;
+	my $B = ($temperature > 0) ? 237.3 : 265.5;
+	my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
+	my $e = $humidity/ 100 * $es;
+	if ($e == 0) {
+		Log 1, "Error: Dewpointcalculation e=0";
+		return 0;
+	}
+	my $f = ln( $e / 610.78 ) / $A;
+
+	$dp = $B * $f / ( 1 - $f  );
+
+	return($dp);
+}
+
 #####################################
 sub
 USBWX_Parse($$)
 {
-my ($hash,$rmsg) = @_;
-my $name = $hash->{NAME};
+  my ($hash,$rmsg) = @_;
 
-Log 4, "USBWX Parse Msg:$rmsg, State:$hash->{STATE}";
+  $rmsg =~ s/[\r\n]//g;
 
-my $wxmsg = substr($rmsg, 0, 3); 
-my $stmsg = substr($rmsg, 2, 3); 
+  #Log 4, "USBWX Parse Msg:$rmsg, State:$hash->{STATE}";
 
-Log 4, "USBWX Parse >$wxmsg<";
-#$1;1;;23,9;;23,6;24,3;;;26,0;;56;;59;58;;;54;;;;;;;0
+  # Testmessages
+  #$rmsg = "\$1;1;;;;;;;23,5;21,0;24,2;;;;;;36;42;;16,8;39;6,1;5;0;0";
 
-#$1;1;;;;;;;;;;;;;;;;;;;;;;;0
-#1234567890123456789012345678901234567890
+  if ($rmsg =~ /^\$1;.*/) {
+  	#$1;1;;23,9;;23,6;24,3;;;26,0;;56;;59;58;;;54;;;;;;;0
+  	#$1;1;;;;;;;;;;;;;;;;;;;;;;;0
 
-if ($wxmsg eq "\$1;")
-   {
-   my @c = split(";", $rmsg);
+	Log 4, "USBWX Parse Msg:'$rmsg', State:$hash->{STATE}";
 
-   Log 3, "USBWX T1:$c[3] T2:$c[4] T3:$c[5] T4:$c[6] T5:$c[7] T6:$c[8] T7:$c[9] T8:$c[10]";
+	# Reset to clear data already read. Otherwise data will be read multiple times.
+	USBWX_SimpleWrite($hash, "RESET"); 
 
-   $rmsg =~ s/[\r\n]//g; # Delete the NewLine 
-   $hash->{READINGS}{$name}{VAL} = $rmsg;
-   $hash->{READINGS}{$name}{TIME} = TimeNow();
-   $hash->{STATE}=$rmsg;
-   $rmsg =~ s/,/./g; # format for FHEM 
-   my @data = split(";", $rmsg);
-#add WS300 handler here
-   my @names = ("T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8");
-   my $tn = TimeNow();
-   for(my $i = 0; $i < int(@names); $i++)
-      {
-      if ($data[$i+2] ne "") # only for existing sensors
-         {      
- 	  $hash->{CHANGED}[$i] = "$names[$i]: $data[$i+2] H: $data[$i+10]";
- 	  $hash->{READINGS}{$names[$i]}{TIME} = $tn;
-	  $hash->{READINGS}{$names[$i]}{VAL} = $data[$i+2];
-         }
-	} 
-   DoTrigger($name, undef); 
-   }
-#ELV USB-WDE1 v1.1
-#Baud:9600bit/s
-#Mode:LogView
-elsif ($stmsg eq "ELV")
-   {
-   Log 4, "USBWX Parse ID";
-   my @c = split(" ", $rmsg);
-   if ($c[1] eq "USB-WDE1")
-      {
-      Log 3, "USBWX $c[1] $c[2] found";
-      $rmsg =~ s/[\r\n]/ /g;
-      $hash->{READINGS}{"status"}{VAL} = $rmsg;
-      $hash->{READINGS}{"status"}{TIME} = TimeNow();
-      } 
-   }
-elsif ($wxmsg eq "Mod")
-   {
-   Log 4, "USBWX Parse mode $rmsg";
-   my @c = split(":", $rmsg);
-   my @d = split("\n", $c[1]);
-   $d[0] =~ s/[\r\n]//g; # Delete the NewLine 
-   Log 4, "USBWX Parse mode >$d[0]<";
-   if ($d[0] eq "LogView")
-      {
-      Log 2, "USBWX in $c[0] $d[0] found";
-      $hash->{STATE} = "Initialized";
+  	my @c = split(";", $rmsg);
+   	#Log 4, "USBWX T1:$c[3] T2:$c[4] T3:$c[5] T4:$c[6] T5:$c[7] T6:$c[8] T7:$c[9] T8:$c[10]";
 
-      $hash->{READINGS}{"mode"}{VAL} = $d[0];
-      $hash->{READINGS}{"mode"}{TIME} = TimeNow();
-      } 
-   }
-else
-   {
-   Log 2, "USBWX unknown:$rmsg";
-   }
+   	$rmsg =~ s/,/./g; # format for FHEM 
+   	my @data = split(";", $rmsg);
+   	my @names = ("1", "2", "3", "4", "5", "6", "7", "8");
+   	my $tm = TimeNow();
+	# perform sensors with ID 1 up to 8
+   	for(my $i = 0; $i < int(@names); $i++) {
+		my $sensor = "";
+		my $val = "";
+		my $current;
+
+      		if ($data[$i+3] ne "") { # only for existing sensors
+
+   			my $n = 0;
+
+  			my $device_name = $names[$i];
+			my $code = $i+1;
+  			#Log 1, "i=$i, device_name=$device_name code=$code";
+
+  			my $def = $modules{USBWX}{defptr}{"$device_name"};
+
+  			if(!$def) {
+				Log 3, "USBWX: Unknown device USBWX_$device_name, please define it";
+				#Log 1, "USBWX: Unknown device USBWX_$device_name, please define it";
+    				my $ret = "UNDEFINED USBWX_$device_name USBWX $device_name";
+				DoTrigger("global", $ret);
+				return undef;
+  			}
+
+  			my $name = $def->{NAME};
+
+  			my $temperature = $data[$i+3] + $def->{corr1};;
+			$current = $temperature;
+			$val .= "T: ".$current."  ";
+			$sensor = "temperature";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $current;
+			$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+			if ($data[$i+11] ne "") {
+  				my $humidity = $data[$i+11] + $def->{corr2};;
+				$current = $humidity;
+				$val .= "H: ".$current."  ";
+				$sensor = "humidity";			
+				$def->{READINGS}{$sensor}{TIME} = $tm;
+				$def->{READINGS}{$sensor}{VAL} = $current;
+				$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+				my $dewpoint = sprintf("%.1f", USBWX_Dewpoint($temperature,$humidity));
+				$current = $dewpoint;
+				$sensor = "dewpoint";			
+				$def->{READINGS}{$sensor}{TIME} = $tm;
+				$def->{READINGS}{$sensor}{VAL} = $current;
+				$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+			}
+
+  			#Log 1, "i=$i, device_name=$device_name temp=$temperature, hum=$humidity";
+  			if ("$val" ne "") {
+    				$def->{STATE} = $val;
+    				$def->{TIME} = $tm;
+    				$def->{CHANGED}[$n++] = $val;
+			}
+
+ 	  		DoTrigger($name, undef); 
+  		}
+  	} 
+	# Look for KS300 data:
+	if ($data[19] ne "") {
+		my $n = 0;
+		my $sensor = "";
+		my $val = "";
+		my $current;
+
+		my $ks300_temperature = $data[19]; # KS300 temperature
+		my $ks300_humidity = $data[20]; # KS300 humidity
+		my $ks300_windspeed = $data[21]; # KS300 windspeed km/h
+		my $ks300_rain = $data[22]; # KS300 rain (units)
+		my $ks300_israining = $data[23]; # KS300 rain indicator 1=yes, 0=no
+
+		Log 4, "USBWX Parse KS300 data found $ks300_temperature, $ks300_humidity, $ks300_windspeed, $ks300_rain, $ks300_israining ";
+
+ 		my $device_name = "9";
+
+		my $def = $modules{USBWX}{defptr}{"$device_name"};
+
+		if(!$def) {
+			Log 3, "USBWX: Unknown device USBWX_ks300, please define it";
+			#Log 1, "USBWX: Unknown device USBWX_ks300, please define it";
+			my $ret = "UNDEFINED USBWX_ks300 USBWX $device_name";
+			DoTrigger("global", $ret);
+			return undef;
+		}
+
+		my $name = $def->{NAME};
+
+		$current = $ks300_temperature;
+		$val .= "T: ".$current."  ";
+		$sensor = "temperature";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		$current = $ks300_humidity;
+		$val .= "H: ".$current."  ";
+		$sensor = "humidity";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		my $dewpoint = sprintf("%.1f", USBWX_Dewpoint($ks300_temperature,$ks300_humidity));
+		$current = $dewpoint;
+		$sensor = "dewpoint";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		$current = $ks300_windspeed;
+		$val .= "W: ".$current."  ";
+		$sensor = "wind";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		$current = $ks300_rain;
+		$sensor = "rain_raw";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		$current = $ks300_rain * 255 / 1000;
+		$val .= "R: ".$current."  ";
+		$sensor = "rain";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		$current = $ks300_israining ? "yes" : "no";
+		$val .= "IR: ".$current."  ";
+		$sensor = "israining";			
+		$def->{READINGS}{$sensor}{TIME} = $tm;
+		$def->{READINGS}{$sensor}{VAL} = $current;
+		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+
+		$def->{STATE} = $val;
+		$def->{TIME} = $tm;
+		$def->{CHANGED}[$n++] = $val;
+
+  		DoTrigger($name, undef); 
+	}
+
+  } elsif ($rmsg =~ /^ELV.*/) {
+  	#ELV USB-WDE1 v1.1
+  	#Baud:9600bit/s
+  	#Mode:LogView
+   	Log 4, "USBWX Parse ID";
+   	my @c = split(" ", $rmsg);
+   	if ($c[1] eq "USB-WDE1") {
+      		Log 4, "USBWX $c[1] $c[2] found";
+      		$rmsg =~ s/[\r\n]/ /g;
+      		$hash->{READINGS}{"status"}{VAL} = $rmsg;
+      		$hash->{READINGS}{"status"}{TIME} = TimeNow();
+   	} 
+  } elsif ($rmsg =~ /^Mod.*/) {
+   	Log 4, "USBWX Parse mode $rmsg";
+   	my @c = split(":", $rmsg);
+   	my @d = split("\n", $c[1]);
+   	$d[0] =~ s/[\r\n]//g; # Delete the NewLine 
+   	Log 4, "USBWX Parse mode >$d[0]<";
+   	if ($d[0] eq "LogView") {
+      		Log 2, "USBWX in $c[0] $d[0] found. rmsg=$rmsg";
+      		#Log 2, "USBWX in $c[0] $d[0] found";
+      		$hash->{STATE} = "Initialized";
+
+      		$hash->{READINGS}{"mode"}{VAL} = $d[0];
+      		$hash->{READINGS}{"mode"}{TIME} = TimeNow();
+      	} 
+  } elsif ($rmsg =~ /^Baud.*/) {
+   	Log 4, "USBWX BAUD rmsg='$rmsg'";
+  } elsif ($rmsg =~ /^OK.*/) {
+   	Log 4, "USBWX EMPTY rmsg='$rmsg'";
+  } elsif ($rmsg eq "") {
+   	Log 4, "USBWX OK rmsg='$rmsg'";
+  } else {
+   	Log 2, "USBWX unknown: '$rmsg'";
+  }
+  return undef;
 }
 
 #####################################
