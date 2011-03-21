@@ -156,7 +156,7 @@ autocreate_Notify($$)
       # BlackList processing
       my $blfound;
       foreach my $bl (@flog_blacklist) {
-        $blfound = 1 if($name  !~ m/^$bl$/);
+        $blfound = 1 if($name  =~ m/^$bl$/);
       }
       last if($blfound);
 
