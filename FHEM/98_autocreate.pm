@@ -70,7 +70,7 @@ my %flogpar = (
 
 # Do not create FileLog for the following devices.
 my @flog_blacklist = (
-  "CUL_RFR"
+  "CUL_RFR.*"
 );
 
 
