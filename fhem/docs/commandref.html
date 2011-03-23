@@ -1899,11 +1899,14 @@ A line ending with \ will be concatenated with the next one, so long lines
   In order to use it with fhem you <b>must</b> disable the encryption first
   with the "HomeMatic Lan Interface Configurator" (which is part of the
   supplied Windows software), by selecting the device, "Change IP Settings",
-  and deselect "AES Encrypt Lan Communication".<br>
-  This device can be used in parallel with a CCU and fhem, by starting the
-  fhem/contrib/tcptee.pl program, and redirecting the CCU to the local host.
-  Don't forget to disable the LAN-Encryption on the CCU for the Lan
-  configurator first, and to set the dummy attribute for the HMLAN device.
+  and deselect "AES Encrypt Lan Communication".<br><br>
+  This device can be used in parallel with a CCU and (readonly) with fhem. To do this:
+  <ul>
+    <li>start the fhem/contrib/tcptee.pl program
+    <li>redirect the CCU to the local host
+    <li>disable the LAN-Encryption on the CCU for the Lan configurator
+    <li>set the dummy attribute for the HMLAN device in fhem
+  </ul>
   <br><br>
 
 
