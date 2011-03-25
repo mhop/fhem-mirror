@@ -3830,14 +3830,19 @@ Attributes:<br>
   <a name="ECMDdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; ECMD telnet &lt;IPAddress:Port&gt;</code>
+    <code>define &lt;name&gt; ECMD telnet &lt;IPAddress:Port&gt;</code><br><br>
+    or<br><br>
+    <code>define &lt;name&gt; ECMD serial &lt;SerialDevice&gt;[&lt;@BaudRate&gt;]</code>
     <br><br>
 
-    Defines a physical ECMD device. The keyword <code>telnet</code> is fixed.<br><br>
+    Defines a physical ECMD device. The keywords <code>telnet</code> or
+    <code>serial</code> are fixed.<br><br>
 
-    Example:
+    Examples:
     <ul>
       <code>define AVRNETIO ECMD telnet 192.168.0.91:2701</code><br>
+      <code>define AVRNETIO ECMD serial /dev/ttyS0</code><br>
+      <code>define AVRNETIO ECMD serial /sev/ttyUSB0@38400</code><br>
     </ul>
     <br>
   </ul>
@@ -4023,7 +4028,7 @@ Attributes:<br>
         <code>
                 define AVRNETIO telnet 192.168.0.91:2701        # define the physical device<br>
                 set AVRNETIO classdef ADC /etc/fhem/ADC.classdef       # define the device class ADC<br>
-                define myADC ADC # define the logical device myADC with device cass ADC<br>
+                define myADC ADC # define the logical device myADC with device class ADC<br>
                 get myADC value 1 # retrieve the value of analog/digital converter number 1<br>
         </code>
         <br>
@@ -5448,7 +5453,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
     <code>define &lt;name&gt; USBWX &lt;code&gt; [corr1...corr4]</code> <br>
     <br>
     &lt;code&gt; is the code which must be set on the sensor. Valid values
-    are 1 through 8. <br> 9 is used as the sensor id of the ks300 sensor.<br> 
+    are 1 through 8. <br> 9 is used as the sensor id of the ks300 sensor.<br>
     corr1..corr4 are up to 4 numerical correction factors, which will be added
     to the respective value to calibrate the device. Note: rain-values will be
     multiplied and not added to the correction factor.
@@ -5626,7 +5631,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
 <ul>
   FHEMWEB is the builtin web-frontend (webpgm2). It implements a simple web
   server (optionally with Basic-Auth and HTTPS), so no additional program is
-  needed. 
+  needed.
   <br> <br>
 
   <a name="FHEMWEBdefine"></a>
@@ -5903,7 +5908,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
       the type and a unique id for this type. When <a href="#rename">renaming
       </a> the device, the automatically created filelog and weblink devices
       will also be renamed.<br>
-      <b>Note 2:</b> you can disable the automatic creation by setting the 
+      <b>Note 2:</b> you can disable the automatic creation by setting the
       <a href="#disable">disable</a> attribute, in this case only the rename
       hook is active, and you can use the  <a href="#createlog">createlog</a>
       command to add FileLog and weblink to an already defined device.
