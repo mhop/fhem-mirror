@@ -15,7 +15,6 @@ package main;
 
 use strict;
 use warnings;
-use Math::Complex;
 use Device::SerialPort;
 
 #####################################
@@ -25,7 +24,7 @@ USBWX_Initialize($)
   my ($hash) = @_;
 
   $hash->{ReadFn}  = "USBWX_Read";
-#  $hash->{ReadyFn} = "USBWX_Ready"; 
+  $hash->{ReadyFn} = "USBWX_Ready"; 
   # Normal devices 
   $hash->{DefFn}   = "USBWX_Define";
   $hash->{UndefFn} = "USBWX_Undef"; 
@@ -34,10 +33,15 @@ USBWX_Initialize($)
   $hash->{SetFn} = "USBWX_Set"; 
   $hash->{ParseFn}   = "USBWX_Parse";
 
+  $hash->{StateFn} = "USBWX_SetState";
+
   $hash->{Match}     = ".*";
 
   #$hash->{AttrList}= "model:USB-WDE1 loglevel:0,1,2,3,4,5,6";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6";
+
+  $hash->{ShutdownFn} = "USBWX_Shutdown";
+
 }
 
 #####################################
@@ -98,115 +102,124 @@ USBWX_Define($$)
 sub
 USBWX_OpenDev($$)
 {
-my ($hash, $reopen) = @_;
-my $dev = $hash->{DeviceName};
-my $name = $hash->{NAME};
-my $po;
+  my ($hash, $reopen) = @_;
+  my $dev = $hash->{DeviceName};
+  my $name = $hash->{NAME};
+  my $po;
 
-$hash->{PARTIAL} = "";
-Log 3, "USBWX opening $name device $dev"
-   if(!$reopen); 
+#Log 1, "USBWX opening $name device $dev reopen = $reopen";
 
-if ($^O=~/Win/) 
-   {
+  $hash->{PARTIAL} = "";
+  Log 3, "USBWX opening $name device $dev"
+   	if(!$reopen); 
+
+  if ($^O=~/Win/) {
    require Win32::SerialPort;
    $po = new Win32::SerialPort ($dev);
-   } 
-else 
-   {
-   require Device::SerialPort;
-   $po = Device::SerialPort->new($dev);
-   } 
+  } else {
+     require Device::SerialPort;
+     $po = new Device::SerialPort ($dev);
+  } 
 
-if(!$po) 
-   {
+  if(!$po) {
    return undef if($reopen);
    Log(2, "USBWX Can't open $dev: $!");
    $readyfnlist{"$name.$dev"} = $hash;
    $hash->{STATE} = "disconnected";
    return "";
-   }
+  }
 
-$hash->{USBWX} = $po;
-if( $^O =~ /Win/ ) 
-   {
+  $hash->{USBWX} = $po;
+
+  if( $^O =~ /Win/ ) {
    $readyfnlist{"$name.$dev"} = $hash;
-   } 
-else 
-   {
+  } else {
    $hash->{FD} = $po->FILENO;
    delete($readyfnlist{"$name.$dev"});
    $selectlist{"$name.$dev"} = $hash;
-   } 
+  } 
 
-$po->baudrate(9600);
-$po->databits(8);
-$po->parity('none');
-$po->stopbits(1);
-$po->handshake('none');
-$po->reset_error();
-$po->lookclear; # clear buffers 
+  $po->baudrate(9600) || Log 1, "USBWX could not set baudrate";
+  $po->databits(8) || Log 1, "USBWX could not set databits";
+  $po->parity('none') || Log 1, "USBWX could not set parity";
+  $po->stopbits(1) || Log 1, "USBWX could not set stopbits";
+  $po->handshake('none') || Log 1, "USBWX could not set handshake";
+  #$po->reset_error() || Log 1, "USBWX reset_error";
+  $po->lookclear || Log 1, "USBWX could not set lookclear";
+
+  $po->write_settings || Log 1, "USBWX could not write_settings $dev";
  
-if($reopen) 
-      {
+  if($reopen) {
       Log 1, "USBWX $dev reappeared ($name)";
-      } 
-else 
-      {
+  } else {
       Log 2, "USBWX opened device $dev";
-      } 
+  } 
 
-$hash->{STATE}=""; # Allow InitDev to set the state
-my $ret = USBWX_DoInit($hash);
+    $hash->{po} = $po;
+    $hash->{socket} = 0;
 
-if($ret) 
-   {
-# try again
-      Log 1, "USBWX Cannot init $dev, at first try. Trying again.";
-      my $ret = USBWX_DoInit($hash);
-      if($ret) 
-         {
-         USBWX_CloseDev($hash);
-         Log 1, "USBWX Cannot init $dev, ignoring it";
-#         return "USBWX Error Init string.";
-         }
-   } 
-DoTrigger($name, "CONNECTED") if($reopen);
+  $hash->{STATE}=""; # Allow InitDev to set the state
+  my $ret = USBWX_DoInit($hash);
 
-return undef;
+  if($ret) {
+    # try again
+    Log 1, "USBWX Cannot init $dev, at first try. Trying again.";
+    my $ret = USBWX_DoInit($hash);
+    if($ret) {
+      USBWX_CloseDev($hash);
+      Log 1, "USBWX Cannot init $dev, ignoring it";
+      return "USBWX Error Init string.";
+    }
+  } 
+
+  DoTrigger($name, "CONNECTED") if($reopen);
+
+  #return undef;
+  return $ret;
 }
 
 ########################
 sub
 USBWX_CloseDev($)
 {
-my ($hash) = @_;
-my $name = $hash->{NAME};
-my $dev = $hash->{DeviceName};
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  my $dev = $hash->{DeviceName};
 	
-return if(!$dev);
+  return if(!$dev);
 
-$hash->{USBWX}->close() ;
-delete($hash->{USBWX});
-delete($selectlist{"$name.$dev"});
-delete($readyfnlist{"$name.$dev"});
-delete($hash->{FD});
+  Log 1, "USBWX: closing $dev";
+
+  $hash->{USBWX}->close() ;
+  delete($hash->{USBWX});
+
+  delete($selectlist{"$name.$dev"});
+  delete($readyfnlist{"$name.$dev"});
+  delete($hash->{FD});
 } 
 
 #####################################
 sub
 USBWX_Ready($)
 {
-my ($hash) = @_;
+  my ($hash) = @_;
 	
-return USBWX_OpenDev($hash, 1)
-if($hash->{STATE} eq "disconnected");
+  return USBWX_OpenDev($hash, 1)
+	if($hash->{STATE} eq "disconnected");
 
-# This is relevant for windows/USB only
-my $po = $hash->{USBWX};
-my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-return ($InBytes>0);
+  # This is relevant for windows/USB only
+  my $po = $hash->{USBWX};
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  return ($InBytes>0);
 } 
+
+#####################################
+sub
+USBWX_SetState($$$$)
+{
+  my ($hash, $tim, $vt, $val) = @_;
+  return undef;
+}
 
 #####################################
 sub
@@ -266,19 +279,19 @@ USBWX_Read($)
   #Log 4, "USBWX Read State:$hash->{STATE}";
 
   my $mybuf = USBWX_SimpleRead($hash);
+
   my $usbwx_data = $hash->{PARTIAL};
   #Log 1, "USBWX usbwxdata='$usbwx_data' $mybuf='$mybuf'";
 
-  if ( ( length($usbwx_data) > 1) && ($mybuf eq "\n") ) {
-   	Log 4, "USBWX/RAW Satz: $usbwx_data !!";
-   	#Log 1, "USBWX/RAW line='$usbwx_data'";
-  }
-	
   if(!defined($mybuf) || length($mybuf) == 0) {
   	USBWX_Disconnected($hash);
    	return "";
   }
 
+  if ( ( length($usbwx_data) > 1) && ($mybuf eq "\n") ) {
+   	Log 4, "USBWX/RAW line: '$usbwx_data'";
+   	#Log 1, "USBWX/RAW line='$usbwx_data'";
+  }
 
   if ($mybuf eq "\n") {
    	USBWX_Parse($hash, $usbwx_data);
@@ -290,6 +303,13 @@ USBWX_Read($)
 
 } 
 
+#####################################
+sub
+USBWX_Shutdown($)
+{
+  my ($hash) = @_;
+  return undef;
+}
 
 #####################################
 sub
@@ -329,7 +349,7 @@ my $buf;
 if($hash->{USBWX}) 
    {
    $buf = $hash->{USBWX}->read(1) ;
-   if (length($buf) == 0) 
+   if (!defined($buf) || length($buf) == 0) 
       {
       $buf = $hash->{USBWX}->read(1) ;
       }
@@ -351,31 +371,6 @@ Log 4, "USBWX SimpleWrite $msg";
 select(undef, undef, undef, 0.001);
 } 
 
-
-# -----------------------------
-# Dewpoint calculation.
-# see http://www.faqs.org/faqs/meteorology/temp-dewpoint/ "5. EXAMPLE"
-sub
-USBWX_Dewpoint($$)
-{
-	my ($temperature, $humidity) = @_;
-
-	my $dp;
-	
-	my $A = 17.2694;
-	my $B = ($temperature > 0) ? 237.3 : 265.5;
-	my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
-	my $e = $humidity/ 100 * $es;
-	if ($e == 0) {
-		Log 1, "Error: Dewpointcalculation e=0";
-		return 0;
-	}
-	my $f = ln( $e / 610.78 ) / $A;
-
-	$dp = $B * $f / ( 1 - $f  );
-
-	return($dp);
-}
 
 #####################################
 sub
@@ -449,7 +444,7 @@ USBWX_Parse($$)
 				$def->{READINGS}{$sensor}{VAL} = $current;
 				$def->{CHANGED}[$n++] = $sensor . ": " . $current;
 
-				my $dewpoint = sprintf("%.1f", USBWX_Dewpoint($temperature,$humidity));
+				my $dewpoint = sprintf("%.1f", dewpoint($temperature,$humidity));
 				$current = $dewpoint;
 				$sensor = "dewpoint";			
 				$def->{READINGS}{$sensor}{TIME} = $tm;
@@ -581,6 +576,12 @@ USBWX_Parse($$)
    	Log 4, "USBWX BAUD rmsg='$rmsg'";
   } elsif ($rmsg =~ /^OK.*/) {
    	Log 4, "USBWX EMPTY rmsg='$rmsg'";
+  } elsif ($rmsg =~ /^FullBuff/) {
+   	Log 1, "USBWX Fullbuf-Error rmsg='$rmsg'";
+   	Log 1, "USBWX closing device";
+	USBWX_Disconnected($hash);
+   	Log 1, "USBWX opening device";
+	my $ret = USBWX_OpenDev($hash, 0);
   } elsif ($rmsg eq "") {
    	Log 4, "USBWX OK rmsg='$rmsg'";
   } else {
@@ -593,22 +594,22 @@ USBWX_Parse($$)
 sub
 USBWX_Disconnected($)
 {
-my $hash = shift;
-my $dev = $hash->{DeviceName};
-my $name = $hash->{NAME};
+  my $hash = shift;
+  my $dev = $hash->{DeviceName};
+  my $name = $hash->{NAME};
  	
-return if(!defined($hash->{FD})); # Already deleted
+  return if(!defined($hash->{FD})); # Already deleted
 	
-Log 1, "USBWX $dev disconnected, waiting to reappear";
-USBWX_CloseDev($hash);
-$readyfnlist{"$name.$dev"} = $hash; # Start polling
-$hash->{STATE} = "disconnected";
+  Log 1, "USBWX dev='$dev' name='$name' disconnected, waiting to reappear";
+  USBWX_CloseDev($hash);
+  $readyfnlist{"$name.$dev"} = $hash; # Start polling
+  $hash->{STATE} = "disconnected";
 	
-# Without the following sleep the open of the device causes a SIGSEGV,
-# and following opens block infinitely. Only a reboot helps.
-sleep(5);
+  # Without the following sleep the open of the device causes a SIGSEGV,
+  # and following opens block infinitely. Only a reboot helps.
+  sleep(5);
 
-DoTrigger($name, "DISCONNECTED");
+  DoTrigger($name, "DISCONNECTED");
 } 
 
 
