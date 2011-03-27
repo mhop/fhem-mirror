@@ -371,6 +371,34 @@ Log 4, "USBWX SimpleWrite $msg";
 select(undef, undef, undef, 0.001);
 } 
 
+# -----------------------------
+# Dewpoint calculation.
+# see http://www.faqs.org/faqs/meteorology/temp-dewpoint/ "5. EXAMPLE"
+sub
+dewpoint($$)
+{
+        my ($temperature, $humidity) = @_;
+
+        my $dp;
+
+        my $A = 17.2694;
+        my $B = ($temperature > 0) ? 237.3 : 265.5;
+        my $es = 610.78 * exp( $A * $temperature / ($temperature + $B) );
+        my $e = $humidity/ 100 * $es;
+        if ($e == 0) {
+                Log 1, "Error: dewpoint() e==0: temp=$temperature, hum=$humidity";
+                return 0;
+        }
+        my $e1 = $e / 610.78;
+        my $f = log( $e1 ) / $A;
+        my $f1 = 1 - $f;
+        if ($f1 == 0) {
+                Log 1, "Error: dewpoint() (1-f)==0: temp=$temperature, hum=$humidity";
+                return 0;
+        }
+        $dp = $B * $f / $f1  ;
+        return($dp);
+}
 
 #####################################
 sub
