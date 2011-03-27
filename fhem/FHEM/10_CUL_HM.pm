@@ -64,7 +64,7 @@ my %culHmModel=(
   "0022" => "WS888",
   "0026" => "HM-SEC-KEY-S",
   "0027" => "HM-SEC-KEY-O",
-  "0028" => "HM-SEC-WIN",
+  "0028" => "HM-SEC-WIN",    # some experiments
   "0029" => "HM-RC-12",
   "002A" => "HM-RC-12-B",
   "002D" => "HM-LC-SW4-PCB",
@@ -330,7 +330,7 @@ CUL_HM_Parse($$)
     $p =~ m/^....(..)$/;
     $lst = $1 if(defined($1));
          if($lst eq "C8") { push @event, "contact:open";
-    } elsif($lst eq "64") { push @event, "contact:half_open";
+    } elsif($lst eq "64") { push @event, "contact:tilted";
     } elsif($lst eq "00") { push @event, "contact:closed";
     } else {                $lst = "00"; # for the ack
     }
@@ -428,9 +428,22 @@ CUL_HM_Parse($$)
 
     CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
       if($id eq $dst && $cmd ne "8002");
+      
+  } elsif($st eq "winMatic") {  ####################################
+    
+    if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
+      my ($lst, $flg) = ($1, $2);
+           if($lst eq "C8") { push @event, "contact:open";
+      } elsif($lst eq "FF") { push @event, "contact:tilted";
+      } elsif($lst eq "00") { push @event, "contact:closed";
+      }
+      CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
+        if($id eq $dst);
+    }
+    
 
 
-  } elsif($st eq "KFM" && $model eq "KFM-Sensor") { ###################
+  } elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
 
     if($p =~ m/814(.)0200(..)(..)(..)/) {
       my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
