@@ -533,7 +533,7 @@ USBWX_Parse($$)
 		$def->{READINGS}{$sensor}{VAL} = $current;
 		$def->{CHANGED}[$n++] = $sensor . ": " . $current;
 
-		my $dewpoint = sprintf("%.1f", USBWX_Dewpoint($ks300_temperature,$ks300_humidity));
+		my $dewpoint = sprintf("%.1f", dewpoint($ks300_temperature,$ks300_humidity));
 		$current = $dewpoint;
 		$sensor = "dewpoint";			
 		$def->{READINGS}{$sensor}{TIME} = $tm;
