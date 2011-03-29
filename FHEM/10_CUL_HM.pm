@@ -311,6 +311,9 @@ CUL_HM_Parse($$)
       push @event, "state:on";
       push @event, "smoke_detect:on";
 
+    } elsif($p =~ m/^01..01$/) {
+      push @event, "state:all-clear";   # Entwarnung
+
     } elsif($p =~ m/^06010000$/) {
       push @event, "state:alive";
 
@@ -433,10 +436,15 @@ CUL_HM_Parse($$)
     
     if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
       my ($lst, $flg) = ($1, $2);
-           if($lst eq "C8") { push @event, "contact:open";
-      } elsif($lst eq "FF") { push @event, "contact:tilted";
-      } elsif($lst eq "00") { push @event, "contact:closed";
+           if($lst eq "C8" && $flg eq "00") { push @event, "contact:tilted";
+      } elsif($lst eq "FF" && $flg eq "00") { push @event, "contact:closed";
+      } elsif($lst eq "00" && $flg eq "10") { push @event, "contact:movement_tilted";
+      } elsif($lst eq "00" && $flg eq "20") { push @event, "contact:movement_closed";
+      } elsif($lst eq "FF" && $flg eq "10") { push @event, "contact:lock_on";
+      } elsif($lst eq "00" && $flg eq "30") { push @event, "contact:open";
       }
+
+
       CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
         if($id eq $dst);
     }
