@@ -307,7 +307,7 @@ CUL_HM_Parse($$)
 
   } elsif($st eq "smokeDetector") { #####################################
 
-    if($p eq "01..C8") {
+    if($p =~ m/01..C8/) {
       push @event, "state:on";
       push @event, "smoke_detect:on";
 
