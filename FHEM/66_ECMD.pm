@@ -199,7 +199,7 @@ ECMD_OpenDev($$)
 
     if($baudrate) {
       $po->reset_error();
-      Log 3, "CUL setting $name baudrate to $baudrate";
+      Log 3, "ECMD setting $name baudrate to $baudrate";
       $po->baudrate($baudrate);
       $po->databits(8);
       $po->parity('none');
@@ -323,7 +323,7 @@ ECMD_ReadAnswer($$)
   #Log 5, "Timeout is $to seconds";
   for(;;) {
 
-        return ("Device lost when reading answer for get $arg", undef)
+        return ("Error: device lost when reading answer for get $arg", undef)
                 if(!$hash->{FD});
 
         vec($rin, $hash->{FD}, 1) = 1;
@@ -334,7 +334,7 @@ ECMD_ReadAnswer($$)
                 ECMD_Disconnected($hash);
                 return("Error reading answer for get $arg: $err", undef);
         }
-        return ("Timeout reading answer for get $arg", undef)
+        return ("Error: timeout reading answer for get $arg", undef)
               if($nfound == 0);
 
       $buf = ECMD_SimpleRead($hash);
@@ -367,7 +367,7 @@ ECMD_Clear($)
   $hash->{RA_Timeout} = 0.1;
   for(;;) {
     my ($err, undef) = ECMD_ReadAnswer($hash, "clear");
-    last if($err && $err =~ m/^Timeout/);
+    last if($err && $err =~ m/^Error/);
   }
   delete($hash->{RA_Timeout});
 }
