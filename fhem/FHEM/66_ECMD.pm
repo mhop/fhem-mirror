@@ -593,7 +593,7 @@ ECMD_Write($$)
   foreach my $ecmd (@ecmds) {
         Log 5, "$hash->{NAME} sending $ecmd";
         ECMD_SimpleWrite($hash, $ecmd);
-        $answer= ECMD_ReadAnswer($hash, "'ecmd");
+        $answer= ECMD_ReadAnswer($hash, "$ecmd");
         push @r, $answer;
         Log 5, $answer;
   }
