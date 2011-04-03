@@ -201,7 +201,14 @@
    of the example configuration files, and watch the log.  When activating a
    device (e.g. with the remote) then it will be logged as an unknown device
    with the housecode. Note: the verbose level must be 3 or higher.  KS300
-   devices do not have a proper code, so you can use anything.
+   devices do not have a proper code, so you can use anything.<p>
+   <p>
+   By the way, FS20 switches and dimmers are unidirectional. If you change their
+   states by pressing the connected hand switch, no information will be sent out.
+   You need to imprint it on a remote control or on fhem to set the housecode and 
+   buttoncode. Please read the manual that came with the device how to do it. In
+   fhem simply define the device with a housecode and buttoncode at your liking
+   and switch the device via fhem while the device is in learning mode. 
 </ul>
 
 
