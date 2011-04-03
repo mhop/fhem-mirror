@@ -598,7 +598,9 @@ CUL_ReadAnswer($$$$)
       $mculdata .= $buf;
     }
     $mculdata = CUL_RFR_DelPrefix($mculdata) if($type eq "CUL_RFR");
-    if($mculdata =~ m/\r\n/ || $anydata) {
+
+    # \n\n is socat special
+    if($mculdata =~ m/\r\n/ || $anydata || $mculdata =~ m/\n\n/ ) {
       if($regexp && $mculdata !~ m/$regexp/) {
         CUL_Parse($hash, $hash, $hash->{NAME}, $mculdata, $hash->{initString});
       } else {
