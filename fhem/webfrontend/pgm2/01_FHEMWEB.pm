@@ -33,8 +33,10 @@ sub FW_AnswerCall($);
 sub FW_zoomLink($$$);
 sub FW_calcWeblink($$);
 
-use vars qw($FW_dir); # moddir (./FHEM), needed by SVG
-use vars qw($FW_ME);  # webname (fhem), needed by 97_GROUP
+use vars qw($FW_dir);  # moddir (./FHEM), needed by SVG
+use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
+use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
+use vars qw(%FW_types);# device types, for sorting, for 97_GROUP/95_VIEW
 my $zlib_loaded;
 
 
@@ -55,7 +57,6 @@ my $FW_RET;        # Returned data (html)
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
-my $FW_ss;         # smallscreen
 my %FW_types;      # device types, for sorting
 my $FW_wname;      # Web instance name
 my @FW_zoom;       # "qday", "day","week","month","year"
