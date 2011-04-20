@@ -5712,7 +5712,11 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
         Contains two time specs in the form YYYY-MM-DD separated by a space.
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
         and no scrolling for this weblinks will be possible. Needed e.g. for
-        looking at last-years data without scrolling.
+        looking at last-years data without scrolling.<br><br>
+        If the value is one of day, week, month, year than set the zoom level
+        for this weblink independently of the user specified zoom-level.
+        This is useful for pages with multiple plots: one of the plots is best
+        viewed in with the default (day) zoom, the other one with a week zoom.
         </li><br>
 
     <a name="smallscreen"></a>
