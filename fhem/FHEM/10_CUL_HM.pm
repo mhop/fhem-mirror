@@ -244,7 +244,6 @@ CUL_HM_Parse($$)
 
   if($cmd eq "8002") {                       # Ack
     if($shash->{cmdStack}) {                     # Send next msg from the stack
-Log 1, "PopCmd:" . $shash->{cmdStack}->[0];
       CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
       delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
       $shash->{lastStackAck} = 1;
@@ -846,7 +845,7 @@ CUL_HM_PushCmdStack($$)
   my ($hash, $cmd) = @_;
   my @arr = ();
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-  Log 1, "PushStack: $cmd";
+  #Log 1, "PushStack: $cmd";
   push(@{$hash->{cmdStack}}, $cmd);
 }
 
