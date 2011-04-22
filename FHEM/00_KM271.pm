@@ -302,7 +302,7 @@ KM271_Read($)
       return;
     }
 
-    if($buf eq "10") { 
+    if($buf eq "10") {
       if($hash->{DATASENT}) {
         delete($hash->{DATASENT});
         KM271_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});

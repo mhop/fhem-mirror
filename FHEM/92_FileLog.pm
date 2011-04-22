@@ -250,7 +250,6 @@ FileLog_Get($@)
       my $col = $h->{col};
       my $t = $h->{type};
 
-
       my $val = undef;
       my $dte = $fld[0];
 
@@ -290,6 +289,7 @@ FileLog_Get($@)
         $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
 
       } else {                              # evaluate
+
         $val = eval($h->{fn});
 
       }
