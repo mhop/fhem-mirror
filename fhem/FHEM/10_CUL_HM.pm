@@ -564,7 +564,7 @@ CUL_HM_Set($@)
   my @h;
   @h = split(" ", $h) if($h);
 
-  if(!defined($h) && $culHmSubTypeSets{$st}{pct} && $cmd =~ m/^\d+/) {
+  if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
     $cmd = "pct";
 
   } elsif(!defined($h)) {
