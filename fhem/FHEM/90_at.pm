@@ -104,7 +104,7 @@ at_Exec($)
   my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
   $command = SemicolonEscape($command);
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
-  Log 3, $ret if($ret);
+  Log GetLogLevel($name,3), $ret if($ret);
 
   return if(!$defs{$name});           # Deleted in the Command
 
