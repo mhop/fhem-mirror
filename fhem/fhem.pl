@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.136 2011-03-10 17:42:01 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.137 2011-04-25 08:11:52 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -632,9 +632,9 @@ AnalyzeCommandChain($$)
   my @ret;
 
   $cmd =~ s/#.*$//s;
-  $cmd =~ s/;;/____/g;
+  $cmd =~ s/;;/SeMiCoLoN/g;
   foreach my $subcmd (split(";", $cmd)) {
-    $subcmd =~ s/____/;/g;
+    $subcmd =~ s/SeMiCoLoN/;/g;
     my $lret = AnalyzeCommand($c, $subcmd);
     push(@ret, $lret) if(defined($lret));
   }
@@ -662,7 +662,6 @@ AnalyzePerlCommand($$)
   }
   $month++;
   $year+=1900;
-
   my $ret = eval $cmd;
   $ret = $@ if($@);
   return $ret;
