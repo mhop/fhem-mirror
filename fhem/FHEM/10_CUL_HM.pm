@@ -519,6 +519,8 @@ my %culHmSubTypeSets = (
         { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"" },
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>" },
+  winMatic =>
+        { matic => "<btn>" },
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>
@@ -695,6 +697,15 @@ CUL_HM_Set($@)
     }
     CUL_HM_pushConfig($hash, $id, $dst, 2, $list, $data);
     return;
+
+  } elsif($cmd =~ m/^matic(...)/) { ####################### By Frank
+    my $btna = sprintf "%X", $a[2];
+    my $lg = length($btna);
+    my $btnb =" ";
+    if ($lg eq "1"){
+      $btnb = sprintf("0%s", $btna);
+    }
+    $sndcmd = sprintf("++B03E%s%s%s40%s%s",$id, $dst, $id, $btnb, $chn);
 
   }
 
