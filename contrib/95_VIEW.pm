@@ -3,24 +3,49 @@
 # Feedback: http://groups.google.com/group/fhem-users
 # Define Custom View
 # Stand: 04.2011
-# Version: 0.9
+# Version: 1.0
+################################################################
+#
+#  Copyright notice
+#
+#  (c) 2011 Copyright: Axel Rieger (fhem bei anax punkt info)
+#  All rights reserved
+#
+#  This script free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
 ################################################################################
 # Usage
 # define <NAME> VIEW
 # attr <NAME> ViewRegExType -> Chose Device-Type (Perl-RegExp)
 # attr <NAME> ViewRegExName -> Chose Device-Name (Perl-RegExp)
 # attr <NAME> ViewRegExReading -> Chose Readings (Perl-RegExp)
+# attr <Name> ViewRegExReadingStringCompare -> Chose ReadingValue (Perl-RegEx)
 #
 # Examples:
 # Show all Device with Type FHT
 # attr MyFHT ViewRegExType FHT
 # attr MyFHT ViewRegExName * or NotSet
 # attr MyFHT ViewRegExReading  * or NotSet
+# attr MyFHT ViewRegExReadingStringCompare * or Notset
 #
-# Show all Warnings of ALL Devices
+# Show all Warnings of ALL Devices without "none"-Values
 # attr MyFHT ViewRegExType * or NotSet
 # attr MyFHT ViewRegExName * or NotSet
 # attr MyFHT ViewRegExReading warnings
+# attr MyFHT ViewRegExReadingStringCompare [^none]
 ################################################################################
 package main;
 use strict;
