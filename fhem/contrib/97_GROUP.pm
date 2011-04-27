@@ -1,13 +1,13 @@
 ################################################################################
 # 97 GROUP
-# Feedback: http://groups.google.com/group/fhem-users 
+# Feedback: http://groups.google.com/group/fhem-users
 # Logging to RRDs
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
 # Stand: 31.03.2010
 # Version: 1.1.0
 # Update 08/2010
 # Support for New-Style-Sheets div=menu div=content
-# Added SpecialReading DNW 
+# Added SpecialReading DNW
 ################################################################################
 # Usage:
 # define <New-Group-Name> GROUP <CATEGORY>
@@ -40,7 +40,7 @@ sub GROUP_Initialize($)
   $hash->{AttrList}  = "loglevel:0,5";
   # CGI
   my $name = "GROUPS";
-  my $fhem_url = "/" . $name ; 
+  my $fhem_url = "/" . $name ;
   $data{FWEXT}{$fhem_url}{FUNC} = "GRP_CGI";
   $data{FWEXT}{$fhem_url}{LINK} = $name;
   $data{FWEXT}{$fhem_url}{NAME} = $name;
@@ -98,9 +98,9 @@ sub GRP_Undef(){
 				};
     }
   }
-	# ??? empty CAT is left ??? 
+	# ??? empty CAT is left ???
 	# Check for empty categories
-	
+
   return undef;
 }
 #-------------------------------------------------------------------------------
@@ -134,6 +134,7 @@ sub GRP_CGI()
   my ($htmlarg) = @_;
   # htmlarg = /GROUPS/<CAT-NAME>
   my $Cat = GRP_CGI_DISPTACH_URL($htmlarg);
+	Log 0,"GROUPS-FW-FEHM: $FW_ME";
 	if(!defined($Cat)){$Cat = ""};
   my ($ret_html);
   $ret_html = "<!DOCTYPE html PUBLIC \"-\/\/W3C\/\/DTD HTML 4.01\/\/EN\" \"http:\/\/www.w3.org\/TR\/html4\/strict.dtd\">\n";
@@ -141,7 +142,7 @@ sub GRP_CGI()
   $ret_html .= "<head>\n";
   $ret_html .= &GRP_CGI_CSS();
   $ret_html .= "<title>FHEM GROUPS<\/title>\n";
-  $ret_html .= "<link href=\"$__ME/style.css\" rel=\"stylesheet\"/>\n";
+  $ret_html .= "<link href=\"$FW_ME/style.css\" rel=\"stylesheet\"/>\n";
   $ret_html .= "<\/head>\n";
   $ret_html .= "<body>\n";
   # DIV HDR
@@ -165,7 +166,7 @@ sub GRP_CGI_CSS() {
   $css .= "table.GROUP td {nowrap;}";
   $css .= "\/\/--><\/style>";
   # TEST
-  #$css = "<link href=\"$__ME/group.css\" rel=\"stylesheet\"/>\n";
+  #$css = "<link href=\"$FW_ME/group.css\" rel=\"stylesheet\"/>\n";
   return $css;
 }
 #-------------------------------------------------------------------------------
@@ -174,10 +175,10 @@ sub GRP_CGI_TOP($) {
   # rh = return-Html
   my $rh;
   $rh = "<div id=\"hdr\">\n";
-  $rh .= "<form method=\"get\" action=\"" . $__ME . "\">\n";
+  $rh .= "<form method=\"get\" action=\"" . $FW_ME . "\">\n";
   $rh .= "<table WIDTH=\"100%\">\n";
   $rh .= "<tr>";
-  $rh .= "<td><a href=\"" . $__ME . "\">FHEM:</a>$CAT</td>";
+  $rh .= "<td><a href=\"" . $FW_ME . "\">FHEM:</a>$CAT</td>";
   $rh .= "<td><input type=\"text\" name=\"cmd\" size=\"30\"/></td>";
   $rh .= "</tr>\n";
   $rh .= "</table>\n";
@@ -191,13 +192,13 @@ sub GRP_CGI_LEFT(){
   # rh = return-Html
   my $rh;
   # $rh = "<div id=\"left\">\n";
-  $rh = "<div id=\"logo\"><img src=\"" . $__ME . "/fhem.png\"></div>";
+  $rh = "<div id=\"logo\"><img src=\"" . $FW_ME . "/fhem.png\"></div>";
   $rh .= "<div id=\"menu\">\n";
   # Print Groups
   $rh .= "<table class=\"room\">\n";
   foreach my $g (sort keys %{$modules{GROUP}{defptr}}){
     $rh .= "<tr><td>";
-    $rh .= "<a href=\"" . $__ME . "/GROUPS/$g\">$g</a></h3>";
+    $rh .= "<a href=\"" . $FW_ME . "/GROUPS/$g\">$g</a></h3>";
     $rh .= "</td></tr>\n";
   }
   $rh .= "</table><br>\n";
@@ -235,7 +236,7 @@ sub GRP_CGI_RIGHT(){
     # Log 0,"GROUP CGI-RIGHT DEV: $c";
     $rh .= "<table class=\"GROUP\" WIDTH=\"85%\">\n";
     $rh .= "<tr>";
-    $rh .= "<th align=\"left\" WIDTH=\"10%\"><a href=\"$__ME?detail=$c\">$c</a></th>";
+    $rh .= "<th align=\"left\" WIDTH=\"10%\"><a href=\"$FW_ME?detail=$c\">$c</a></th>";
     $rh .= "<th align=\"left\" WIDTH=\"8%\"></th>";
     if(defined($attr{$c}{comment})){
           $comment = $attr{$c}{comment};
@@ -243,17 +244,17 @@ sub GRP_CGI_RIGHT(){
     else {
         $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";
         $rh .= "<th align=\"left\" WIDTH=\"10%\"></th>";}
-    
+
     $rh .= "</tr>\n";
     # GROUP -> READING
       foreach my $r (sort keys %{$defs{$c}{READINGS}}){
-				# $dn = DeviceName + $rn = Readingname to get ReadingValue
+		  # $dn = DeviceName + $rn = Readingname to get ReadingValue
         my ($dn,$rn) = split(/:/,$defs{$c}{READINGS}{$r}{VAL});
-				# $rv = ReadingValue; $rt = ReadingTime; $ru = ReadingUnit
+		  # $rv = ReadingValue; $rt = ReadingTime; $ru = ReadingUnit
         my ($rv,$rt,$ru) = &GRP_GET_READING_VAL($dn,$rn);
         $tr_class = $row?"odd":"even";
         $rh .= "<tr class=\"" . $tr_class . "\"><td>$r</td><td>$rv&nbsp;$ru</td><td>$rt</td>";
-        $rh .= "<td><a href=\"$__ME?detail=$dn\">$dn</a></td></tr>\n";
+        $rh .= "<td><a href=\"$FW_ME?detail=$dn\">$dn</a></td></tr>\n";
         $row = ($row+1)%2;
       }
     $rh .= "</table><br>\n";
@@ -330,7 +331,7 @@ sub GRP_GET_READING_VAL($$){
 		use strict "refs";
 	}
   # Log 0,"GROUP GET-READING: $rv,$rt,$ru";
-  return ($rv,$rt,$ru);  
+  return ($rv,$rt,$ru);
 }
 #-------------------------------------------------------------------------------
 sub GRP_GET_READING_DNW($$){
