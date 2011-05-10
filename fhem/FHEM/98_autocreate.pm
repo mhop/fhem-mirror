@@ -12,7 +12,7 @@ use warnings;
 
 my %flogpar = (
   "CUL_EM.*"
-      => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT:.*" },
+      => { GPLOT => "cul_em:Power,", FILTER => "%NAME" },
   "CUL_WS.*"
       => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
   "CUL_FHTTK.*"
