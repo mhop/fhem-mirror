@@ -93,7 +93,7 @@ my %culHmModel=(
   "0047" => "KFM-Display",
   "0048" => "IS-WDS-TH-OD-S-R3",
   "0049" => "KFM-Sensor",
-  "004A" => "HM-SEC-MDIR",
+  "004A" => "HM-SEC-MDIR",   # Tested
   "004C" => "HM-RC-12-SW",
   "004D" => "HM-RC-19-SW",
   "004E" => "HM-LC-DDC1-PCB",
@@ -304,6 +304,24 @@ CUL_HM_Parse($$)
       }
 
     }
+
+  } elsif($st eq "motionDetector") { #####################################
+
+    # Code with help of Bassem
+    my $state;
+    if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
+      ($state, undef) = ($1, $2);
+      push @event, "brightness:$state";
+      push @event, "state:alive";
+    }
+    if($cmd eq "A441" && $p =~ m/^01(......)/) {
+      $state = $1;
+      push @event, "state:motion";
+    }
+
+    CUL_HM_SendCmd($shash, "++8002".$id.$src."0101${state}00",1,0)
+       if($id eq $dst && $state);  # Send Ack
+
 
   } elsif($st eq "smokeDetector") { #####################################
 
