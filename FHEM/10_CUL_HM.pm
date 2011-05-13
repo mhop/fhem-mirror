@@ -298,7 +298,7 @@ CUL_HM_Parse($$)
       my $add = ($dst eq $id) ? "" : " (to $dname)";
 
       push @event, "state:Btn$btn $state$add";
-      if($id eq $dst) {
+      if($id eq $dst && $cmd ne "8002") {  # Send Ack
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 ($state =~ m/on/?"C8":"00")."00", 1, 0);
       }
@@ -309,18 +309,19 @@ CUL_HM_Parse($$)
 
     # Code with help of Bassem
     my $state;
-    if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
+    if($cmd =~ m/^.410/ && $p =~ m/^0601(..)(..)/) {
       ($state, undef) = ($1, $2);
       push @event, "brightness:$state";
       push @event, "state:alive";
     }
-    if($cmd eq "A441" && $p =~ m/^01(......)/) {
+    if($cmd =~ m/^.441/ && $p =~ m/^01(......)/) {
       $state = $1;
       push @event, "state:motion";
+      # A0D258410143DFABC82AD0601240E
     }
 
     CUL_HM_SendCmd($shash, "++8002".$id.$src."0101${state}00",1,0)
-       if($id eq $dst && $state);  # Send Ack
+      if($id eq $dst && $cmd ne "8002");  # Send Ack
 
 
   } elsif($st eq "smokeDetector") { #####################################
