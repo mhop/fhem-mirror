@@ -311,7 +311,7 @@ CUL_HM_Parse($$)
     my $state;
     if($cmd =~ m/^.410/ && $p =~ m/^0601(..)(..)/) {
       ($state, undef) = ($1, $2);
-      push @event, "brightness:$state";
+      push @event, "brightness:".hex($state);
       push @event, "state:alive";
     }
     if($cmd =~ m/^.441/ && $p =~ m/^01(......)/) {
