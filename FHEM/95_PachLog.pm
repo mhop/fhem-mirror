@@ -1,7 +1,7 @@
 #######################################################################
-# 
+#
 # 95_PachLog.pm
-# 
+#
 # Logging to www.pachube.com
 # Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
 # Stand: 09.09.2009
@@ -18,7 +18,7 @@
 #          FEED-NR: 1234
 #          ID 0 => Temperatur (temperature)
 #          ID 1 => rel. Luftfeuchte (humidity)
-# 
+#
 # FHEM: PachLog-Devices: PACH01
 #       HMS_DEVICE: HMS_TF01
 #       FEED-NR: 1234
@@ -33,7 +33,7 @@
 # => geht nicht
 #
 # Es werden nur READINGS mit einfach Werten und Zahlen unterst?tzt.
-# Beispiele: NICHT unterst?tze READINGS 
+# Beispiele: NICHT unterst?tze READINGS
 # cum_month => CUM_MONTH: 37.173 CUM: 108.090 COST: 0.00
 # cum_day => 2009-09-09 00:03:19 T: 1511725.6 H: 4409616 W: 609.4 R: 150.4
 # israining	no => (yes/no)
@@ -47,7 +47,7 @@ use warnings;
 use POSIX;
 use Data::Dumper;
 use LWP;
-use LWP::UserAgent; 
+use LWP::UserAgent;
 use HTTP::Request::Common;
 
 #######################################################################
@@ -74,8 +74,8 @@ sub PachLog_Define($@)
   Log 5, Dumper(@_) . "\n";
   return "Unknown argument count " . int(@a) . " , usage set <name> dataset value or set <name> delete dataset"  if(int(@a) != 1);
   return undef;
-  
-  
+
+
 }
 #######################################################################
 sub PachLog_Set($@)
@@ -154,7 +154,7 @@ sub PachLog_Notify ($$)
   {
     Log $ll, ("PACHLOG[INFO] => " . $t .  " => Nicht definiert");
     return undef;}
-  
+
   # Umwandeln 1234:0:temperature:1:humidity => %feed
   # Struktur:
   # %feed{FEED-NR}{READING}{VAL}
@@ -180,10 +180,10 @@ sub PachLog_Notify ($$)
     # @a = split(' ', $i);
     # $feed{$feednr}{$r}{VAL} = &ReadingToNumber($a[0]) ;
     $feed{$feednr}{$r}{VAL} = &ReadingToNumber($i,$ll) ;
-	
+
   }
 #  Log $ll, "PACHLOG => dumper(FEED) => " .Dumper(%feed);
-  
+
   # CVS-Data
   my @cvs = ();
   foreach my $r (keys %{$feed{$feednr}}) {
@@ -191,7 +191,7 @@ sub PachLog_Notify ($$)
    }
   my $cvs_data = join(',',@cvs);
   Log $ll, "PACHLOG[CVSDATA] => $cvs_data";
-  
+
   # Aufbereiten %feed als EEML-Data
   my $eeml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
   $eeml .= "<eeml xmlns=\"http://www.eeml.org/xsd/005\">\n";
@@ -225,7 +225,7 @@ sub PachLog_Notify ($$)
     {
         Log 0,("PACHLOG => Update[" . $t ."]: " . $cvs_data . " >> SUCCESS\n");
         # Time setzten
-        $defs{$d}{READINGS}{$t}{TIME} = TimeNow(); 
+        $defs{$d}{READINGS}{$t}{TIME} = TimeNow();
     }
     else {Log 0,("PACHLOG => Update[" . $t ."] ERROR: " . ($res->as_string) . "\n");}
 }
@@ -241,11 +241,12 @@ sub PachLog_ReadingToUnit($$)
 	my %unit = ();
 	%unit = (
 		'temperature' => "Celsius,C,derivedSI,Temperature",
-		'current' => "Power,kW,derivedSI,EnergyConsumption",
-		'humidity' => "Humidity,rel%,contextDependentUnits,Humidity",
-		'rain' => "Rain,l/m2,contextDependentUnits,Rain",
-                'rain_now' => "Rain,l/m2,contextDependentUnits,Rain",
-		'wind' => "Wind,m/s,contextDependentUnits,Wind",
+      'dewpoint'    => "Celsius,C,derivedSI,Temperature",
+		'current'     => "Power,kW,derivedSI,EnergyConsumption",
+		'humidity'    => "Humidity,rel%,contextDependentUnits,Humidity",
+		'rain'        => "Rain,l/m2,contextDependentUnits,Rain",
+      'rain_now'    => "Rain,l/m2,contextDependentUnits,Rain",
+		'wind'        => "Wind,m/s,contextDependentUnits,Wind",
 		);
 	if(defined($unit{$in})) {
 		Log $ll ,("PACHLOG[ReadingToUnit] " . $in . " >> " . $unit{$in} );
@@ -258,7 +259,7 @@ sub ReadingToNumber($$)
 # Input: reading z.B. 21.1 (Celsius) oder dim10%, on-for-oldtimer etc.
 # Output: 21.1 oder 10
 # ERROR = undef
-# Alles au?er Nummern loeschen $t =~ s/[^0123456789.-]//g; 
+# Alles au?er Nummern loeschen $t =~ s/[^0123456789.-]//g;
 	my ($in,$ll) = @_;
 	Log $ll, "PACHLOG[ReadingToNumber] => in => $in";
 	# Bekannte READINGS FS20 Devices oder FHT
