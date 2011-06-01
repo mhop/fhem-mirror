@@ -69,7 +69,7 @@ $WEATHER = website_WEATHER($weathercity, $weathercountry, $weatherlang);
 
 	echo "T/Hum: ".$WEATHER[0]['temperatur']."&deg; / $hum<br/>\n";
 	echo $WEATHER[0]['wind']."<br/>\n";
-	echo "<img src=\"http://www.google.com/ig/images/weather".$WEATHER[0]['icon']."\" alt=\"".$WEATHER[0]['condition']."\" />\n";
+	echo "<img src=\"".$WEATHER[0]['icon']."\" alt=\"".$WEATHER[0]['condition']."\"/>\n";
 	echo "</font></td><td>";
 
 	for($i=1; $i<5; $i++)
@@ -77,7 +77,7 @@ $WEATHER = website_WEATHER($weathercity, $weathercountry, $weatherlang);
 		echo "<b><font $fontcolor3>".$WEATHER[$i]['weekday']."</b><br/>\n";
 		echo $WEATHER[$i]['condition']."<br/>\n";
 		echo "min. ".$WEATHER[$i]['low']."&deg; max. ".$WEATHER[$i]['high']."&deg;<br/>\n";
-		echo "<img src=\"http://www.google.com/ig/images/weather".$WEATHER[$i]['icon']."\" alt=\"".$WEATHER[$i]['condition']."\" />\n";
+		echo "<img src=\"".$WEATHER[$i]['icon']."\" alt=\"".$WEATHER[$i]['condition']."\" />\n";
 		echo "</font></td><td>";
 	}
 
