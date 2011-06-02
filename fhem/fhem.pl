@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.138 2011-04-25 15:52:32 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.139 2011-06-02 07:10:01 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -176,7 +176,7 @@ my $namedef =
   "- a range seperated by dash (-)\n";
 my $stt_sec;                    # Used by SecondsTillTomorrow()
 my $stt_day;                    # Used by SecondsTillTomorrow()
-
+my $lastTime;                   # Call rereadcfg if the time is set vie NTP.
 
 $init_done = 0;
 
@@ -324,6 +324,7 @@ Log 0, "Server started (version $attr{global}{version}, pid $$)";
 ################################################
 # Main Loop
 sub MAIN {MAIN:};               #Dummy
+
 
 my $errcount= 0;
 while (1) {
@@ -1818,6 +1819,16 @@ HandleTimeout()
   return undef if(!$nextat);
 
   my $now = gettimeofday();
+
+  # The following is FritzBox special: it does not have an RTC,
+  # and the time is set via NTP well after the fhem startup,
+  # so that all at commands should be recalculated
+  if($lastTime && abs($now - $lastTime) > 86400) {
+    Log 1, "Time shift, calling rereadcfg";
+    CommandRereadCfg(undef, undef);
+  }
+  $lastTime = $now;
+
   return ($nextat-$now) if($now < $nextat);
 
   $nextat = 0;
