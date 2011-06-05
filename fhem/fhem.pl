@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.140 2011-06-04 08:41:22 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.141 2011-06-05 11:10:34 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1736,14 +1736,14 @@ CommandSetstate($$)
 
     } else {
 
-      $oldvalue{$sdev}{VAL} = $d->{STATE};
-
       # Do not overwrite state like "opened" or "initialized"
       $d->{STATE} = $a[1] if($init_done || $d->{STATE} eq "???");
 
       # This time is not the correct one, but we do not store a timestamp for
       # this reading.
       $oldvalue{$sdev}{TIME} = TimeNow();
+      $oldvalue{$sdev}{VAL} = $d->{STATE};
+
     }
   }
   return join("\n", @rets);
@@ -2121,7 +2121,7 @@ DoTrigger($$)
   # Used by triggered perl programs to check the old value
   # Not suited for multi-valued devices (KS300, etc)
   $oldvalue{$dev}{TIME} = TimeNow();
-  $oldvalue{$dev}{VAL} = $defs{$dev}{CHANGED}[0];
+  $oldvalue{$dev}{VAL} = $defs{$dev}{STATE};
 
   delete($defs{$dev}{CHANGED}) if(!defined($defs{$dev}{INTRIGGER}));
 
