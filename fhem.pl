@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.141 2011-06-05 11:10:34 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.142 2011-06-05 11:23:03 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2445,6 +2445,36 @@ ReadingsVal($$$)
   }
   return $default;
 }
+
+sub
+Value($)
+{
+  my ($d) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{STATE})) {
+     return $defs{$d}{STATE};
+  }
+  return "";
+}
+
+sub
+OldValue($)
+{
+  my ($d) = @_;
+  return $oldvalue{$d}{VAL} if(defined($oldvalue{$d})) ;
+  return "";
+}
+
+sub
+OldTimestamp($)
+{
+  my ($d) = @_;
+  return $oldvalue{$d}{TIME} if(defined($oldvalue{$d})) ;
+  return "";
+}
+
+
+
 
 sub
 AttrVal($$$)
