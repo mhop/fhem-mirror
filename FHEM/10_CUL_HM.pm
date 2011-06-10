@@ -453,8 +453,10 @@ CUL_HM_Parse($$)
       
   } elsif($st eq "winMatic") {  ####################################
     
+Log 1, "WM";
     if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
       my ($lst, $flg) = ($1, $2);
+Log 1, "WM1";
            if($lst eq "C8" && $flg eq "00") { push @event, "contact:tilted";
       } elsif($lst eq "FF" && $flg eq "00") { push @event, "contact:closed";
       } elsif($lst eq "00" && $flg eq "10") { push @event, "contact:movement_tilted";
@@ -462,17 +464,38 @@ CUL_HM_Parse($$)
       } elsif($lst eq "FF" && $flg eq "10") { push @event, "contact:lock_on";
       } elsif($lst eq "00" && $flg eq "30") { push @event, "contact:open";
       }
-
-
       CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
         if($id eq $dst);
     }
+
+    if($cmd eq "A010" && $p =~ m/^0287(..)89(..)8B(..)/) {
+      my ($air, undef, $course) = ($1, $2, $3);
+Log 1, "WM2";
+      push @event, "airing:".
+      ($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air));
+      push @event, "course:".($course eq "FF" ? "tilt" : "close");
+
+      CUL_HM_SendCmd($shash, "++8002".$id.$src."00",1,0)  # Send Ack
+        if($id eq $dst);
+    }
+
+    if($cmd eq "A010" &&
+       $p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
+
+      my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
+         ($1, $2, $3, $4, $5, $6, $7, $8);
+      push @event, "airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5));
+      push @event, "contact:tesed";
+      CUL_HM_SendCmd($shash, "++8002".$id.$src."00",1,0)  # Send Ack
+        if($id eq $dst);
+   } 
+
     
 
 
   } elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
 
-    if($p =~ m/814(.)0200(..)(..)(..)/) {
+    if($p =~ m/.14(.)0200(..)(..)(..)/) {
       my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
       my $v = 128-hex($k_v2);                  # FIXME: calibrate
       $v = 256+$v if($v < 0);
