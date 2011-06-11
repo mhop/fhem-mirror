@@ -129,7 +129,8 @@ CUL_HM_Initialize($)
                        "subType:switch,dimmer,blindActuator,remote,sensor,".
                          "swi,pushButton,threeStateSensor,motionDetector,".
                          "keyMatic,winMatic,smokeDetector " .
-                       "hmClass:receiver,sender serialNr firmware devInfo";
+                       "hmClass:receiver,sender serialNr firmware devInfo ".
+                       "rawToReadable unit";
 }
 
 
@@ -499,8 +500,25 @@ Log 1, "WM2";
       my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
       my $v = 128-hex($k_v2);                  # FIXME: calibrate
       $v = 256+$v if($v < 0);
-
+      $v += 256 if(!($k_v3 & 1));
       push @event, "rawValue:$v";
+
+      my $r2r = AttrVal($name, "rawToReadable", undef);
+      if($r2r) {
+        my @r2r = split("[ :]", $r2r);
+        foreach(my $idx = 0; $idx < @r2r-2; $idx+=2) {
+          if($v >= $r2r[$idx] && $v <= $r2r[$idx+2]) {
+            my $f = (($v-$r2r[$idx])/($r2r[$idx+2]-$r2r[$idx]));
+            my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
+            my $unit = AttrVal($name, "unit", "");
+            $unit = " $unit" if($unit);
+            push @event, "state:$cv$unit";
+            last;
+          }
+        }
+      } else {
+        push @event, "state:$v";
+      }
 
     }
 
