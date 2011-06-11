@@ -2502,6 +2502,25 @@ A line ending with \ will be concatenated with the next one, so long lines
         These attributes are set automatically after a successful pairing.
         They are not supposed to be set by hand, and are necessary in order to
         correctly interpret device messages or to be able to send them.</li>
+    <li><a name="#rawToReadable">rawToReadable</a><br>
+        Used to convert raw KFM100 values to readable data, based on measured
+        values. E.g.  fill slowly your container, while monitoring the
+        values reported with <a href="#inform">inform</a>. You'll see:
+        <ul>
+          10 (at 0%)<br>
+          50 (at 20%)<br>
+          79 (at 40%)<br>
+         270 (at 100%)<br>
+        </ul>
+        Apply these values with: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
+        fhem will do a linear interpolation for values between the bounderies.
+        </li>
+    <li><a name="#unit">unit</a><br>
+        set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
+        attr KFM100 unit Liter
+        </li>
+
+
 
   </ul>
   <br>
