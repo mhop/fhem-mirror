@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.142 2011-06-05 11:23:03 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.143 2011-06-12 10:51:57 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -176,7 +176,6 @@ my $namedef =
   "- a range seperated by dash (-)\n";
 my $stt_sec;                    # Used by SecondsTillTomorrow()
 my $stt_day;                    # Used by SecondsTillTomorrow()
-my $lastTime;                   # Call rereadcfg if the time is set vie NTP.
 
 $init_done = 0;
 
@@ -296,6 +295,12 @@ if($^O =~ m/Win/ && !$attr{global}{nofork}) {
 if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
   defined(my $pid = fork) || die "Can't fork: $!";
   exit(0) if $pid;
+}
+
+# FritzBox special: Wait until the time is set via NTP,
+# but no more then 2 hours
+while(time() < 2*3600) {
+  sleep(5);
 }
 
 my $ret = CommandInclude(undef, $attr{global}{configfile});
@@ -685,7 +690,9 @@ AnalyzeCommand($$)
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
-    system("$1 &");
+    my $out = "";
+    $out = "> $currlogfile 2>&1" if($currlogfile ne "-");
+    system("$1 $out &");
     return undef;
   }
 
@@ -815,6 +822,7 @@ CommandInclude($$)
   $rcvdquit = 0;
   while(my $l = <$fh>) {
     $l =~ s/[\r\n]//g;
+
     if($l =~ m/^(.*)\\ *$/) {		# Multiline commands
       $bigcmd .= "$1\\\n";
     } else {
@@ -823,6 +831,7 @@ CommandInclude($$)
       $bigcmd = "";
     }
     last if($rcvdquit);
+
   }
   close($fh);
   return join("\n", @ret) if(@ret);
@@ -1820,16 +1829,6 @@ HandleTimeout()
   return undef if(!$nextat);
 
   my $now = gettimeofday();
-
-  # The following is FritzBox special: it does not have an RTC,
-  # and the time is set via NTP well after the fhem startup,
-  # so that all at commands should be recalculated
-  if($lastTime && abs($now - $lastTime) > 86400) {
-    Log 1, "Time shift, calling rereadcfg";
-    CommandRereadCfg(undef, undef);
-  }
-  $lastTime = $now;
-
   return ($nextat-$now) if($now < $nextat);
 
   $nextat = 0;
