@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.143 2011-06-12 10:51:57 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.144 2011-06-19 06:17:27 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -691,7 +691,7 @@ AnalyzeCommand($$)
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
     my $out = "";
-    $out = "> $currlogfile 2>&1" if($currlogfile ne "-");
+    $out = ">> $currlogfile 2>&1" if($currlogfile ne "-");
     system("$1 $out &");
     return undef;
   }
