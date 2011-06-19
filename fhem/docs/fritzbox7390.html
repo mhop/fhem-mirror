@@ -1,0 +1,76 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+  <title>fhem on the Fritz!Box 7390</title>
+  <style type="text/css">
+    body   { background-color: #FFFFE7;}
+    #left  { position:absolute; top:20px; left:20px; width:140px; }
+    #right { position:absolute; top:20px; left:180px; bottom:20px; right:10px; }
+    body>div#left { position:fixed; }
+    h2,h3,h4 {     color:#52865D; line-height:1.3;
+             margin-top:1.5em; font-family:Arial,Sans-serif; }
+    div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
+    div#dist { padding-top:0.3em; }
+    a {  color: #278727; }
+  </style>
+</head>
+
+
+<body>
+
+  <div id="left">
+    <img src="fhem.png">
+    <h3>Fhem on the Fritzbox 7390</h3>
+  </div>
+
+  <div id="right">
+
+<h1><a href="fhem.html">FHEM</a> on the Fritz!Box 7390</h1>
+
+(as of 2011-06-18)
+
+<h3>Description for the Fritzbox 7390</h3>
+<ul>
+    AVM released after the CeBIT 2011 a "firmware" image containing fhem, see <a
+    href="http://www.avm.de/de/Service/Service-Portale/Labor/7390_hausautomation/labor_start_hausautomation.php">this</a>
+    link. This is to be installed in addition to the normal firmware.  In order
+    to use this version, you have to install a Lab version of the "normal"
+    firmware first, because we need the USB-Serial kernel modules in order to
+    talk to the CUL and the "Lab" firmware also contains a hook in order to
+    start fhem. 
+    <br>
+    Version 19798 of this firmware configures 2 CUL devices, the first one
+    talking FS20, the second preconfigured for HomeMatic. Autoconfigure is not
+    enabled by default, so you'll either have to enable it or to enter the
+    devices by hand.
+    <br><br>
+    The bad news with this version is, that it will start fhem in a chroot
+    environment, i.e. you will not be able to use arbitrary FritzBox functions
+    out of fhem.
+    <br><br>
+
+    <a href="fhem-5.1.rc1.fb7390.image">This</a> firmware image is a modified
+    version of the AVM original firmware, as it will not start fhem in a chroot
+    jail. I also cleaned up the perl distribution, so it is some 30
+    uncompressed MB smaller than the original.
+    <br>
+    When installing it, you have to confirm with an extra click that it does
+    not have a valid AVM signature. It will reuse your old logfiles and
+    configuration, unlike the "original" AVM firmware. Autoconfigure is on, and
+    there are NO CUL devices defined in the initial configuration, you'll have
+    to do this manually, e.g. by following the HOWTO or the command reference.
+    <br><br>
+
+    Further bad news for both versions: Currently the only working serial
+    kernel driver is the cdc_acm, which means only the CUL can be attached
+    directly to the FritzBox. The FHZ1x00 needs the ftdi_sio driver, which
+    currently panics the FritzBox.<br> Alternatively you can use devices
+    attached via network, like the CUN.
+
+</ul>
+</div>
+</body>
+
+</html>
