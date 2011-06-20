@@ -33,32 +33,32 @@
 
 <h3>Description for the Fritzbox 7390</h3>
 <ul>
-    AVM released after the CeBIT 2011 a "firmware" image containing fhem, see <a
+    AVM released after the CeBIT 2011 an image for the Fritz!Box7390 containing
+    fhem, see <a
     href="http://www.avm.de/de/Service/Service-Portale/Labor/7390_hausautomation/labor_start_hausautomation.php">this</a>
-    link. This is to be installed in addition to the normal firmware.  In order
-    to use this version, you have to install a Lab version of the "normal"
-    firmware first, because we need the USB-Serial kernel modules in order to
-    talk to the CUL and the "Lab" firmware also contains a hook in order to
-    start fhem. 
-    <br>
-    Version 19798 of this firmware configures 2 CUL devices, the first one
+    link. This image is to be installed in addition to the normal firmware.  In
+    order to use the image, you have to install a Lab version of the
+    normal firmware first, because fhem needs the USB-Serial kernel modules in
+    order to talk to the CUL and the "Lab" firmware also contains a hook in
+    order to start fhem.<br>
+
+    Version 19798 of this fhem-image configures 2 CUL devices, the first one
     talking FS20, the second preconfigured for HomeMatic. Autoconfigure is not
     enabled by default, so you'll either have to enable it or to enter the
-    devices by hand.
-    <br><br>
-    The bad news with this version is, that it will start fhem in a chroot
-    environment, i.e. you will not be able to use arbitrary FritzBox functions
-    out of fhem.
-    <br><br>
+    devices by hand.  <br><br>
 
-    <a href="fhem-5.1.rc1.fb7390.image">This</a> firmware image is a modified
-    version of the AVM original firmware, as it will not start fhem in a chroot
-    jail. I also cleaned up the perl distribution, so it is some 30
-    uncompressed MB smaller than the original.
-    <br>
+    The bad news with this fhem-image is, that it will start fhem in a chroot
+    environment, i.e. you will not be able to trigger arbitrary FritzBox
+    functions out of fhem, e.g. sending mail, enabling WLAN, etc.<br><br>
+
+    <a href="fhem-5.1.rc1.fb7390.image">This</a> fhem-image contains a stripped
+    down version of the perl package from the AVM fhem-image, a CVS version of
+    fhem, and a modified installation script. The main difference is starting
+    fhem in a normal (non-chroot) environment, and enabling autocreate.<br><br>
+
     When installing it, you have to confirm with an extra click that it does
     not have a valid AVM signature. It will reuse your old logfiles and
-    configuration, unlike the "original" AVM firmware. Autoconfigure is on, and
+    configuration, unlike the "original" AVM firmware. Autocreate is on, and
     there are NO CUL devices defined in the initial configuration, you'll have
     to do this manually, e.g. by following the HOWTO or the command reference.
     <br><br>
@@ -68,7 +68,6 @@
     directly to the FritzBox. The FHZ1x00 needs the ftdi_sio driver, which
     currently panics the FritzBox.<br> Alternatively you can use devices
     attached via network, like the CUN.
-
 </ul>
 </div>
 </body>
