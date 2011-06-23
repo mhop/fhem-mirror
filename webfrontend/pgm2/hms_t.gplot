@@ -26,7 +26,7 @@ set grid xtics y2tics
 
 set y2label "Temperature in C"
 
-#FileLog 4:T:0:
+#FileLog 4:T\x3a:0:
 
 plot \
   "< awk '/T:/ {print $1, $4}' <IN>"\
