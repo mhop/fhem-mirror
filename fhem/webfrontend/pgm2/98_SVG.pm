@@ -347,7 +347,8 @@ SVG_render($$$$$$$)
 
     my $yh = $y+$h;
     my $tl = $ltitle[$idx] ? $ltitle[$idx]  : "";
-    my $dec = int(log($hmul*3)/log(10));
+    my $dec = int(log($hmul*3)/log(10)); # Some perl implementations do not have log()
+    # my $dec = 1;
     $dec = 0 if($dec < 0);
     my $js_helpers = "id=\"line_$idx\" decimals=\"$dec\" ".
           "x_off=\"$fromsec\" x_min=\"$x\" x_mul=\"$tmul\" ".

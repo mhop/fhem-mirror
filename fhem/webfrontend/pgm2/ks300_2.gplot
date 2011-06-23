@@ -16,8 +16,8 @@ set grid
 set ylabel "Wind (km/h)"
 set y2label "Humidity (%)"
 
-#FileLog 8:IR:0:
-#FileLog 6:IR:0:
+#FileLog 8:IR\x3a:0:
+#FileLog 6:IR\x3a:0:
 
 plot "<IN>" using 1:8 axes x1y1 title 'Wind' with lines,\
      "<IN>" using 1:6 axes x1y2 title 'Rel. Humidity (%)' with lines
