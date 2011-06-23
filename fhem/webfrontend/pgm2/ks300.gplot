@@ -20,9 +20,9 @@ set yrange [0:]
 
 # Computing Rain/h and Rain/d values by accumulating the changes.
 
-#FileLog 4:IR:0:
-#FileLog 10:IR:0:delta-h
-#FileLog 10:IR:0:delta-d
+#FileLog 4:IR\x3a:0:
+#FileLog 10:IR\x3a:0:delta-h
+#FileLog 10:IR\x3a:0:delta-d
 
 plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines lw 2,\
      "<grep -v avg_ <IN> | perl -ane '\
