@@ -580,7 +580,7 @@ my %culHmSubTypeSets = (
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>" },
   winMatic =>
-        { matic => "<btn>" },
+        { matic => "<btn>", read => "<btn>", config => "<btn> <txt1> <txt2>", create => "<txt>" },
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>
@@ -762,8 +762,77 @@ CUL_HM_Set($@)
     # Trigger pre-programmed action in the winmatic. These actions must be
     # programmed via the original software.
 
-    $sndcmd = sprintf("++B03E%s%s%s40%02X%s",$id, $dst, $id, $a[2], $chn);
+    $sndcmd = sprintf("++B03E%s%s%s40%02X%s", $id, $dst, $id, $a[2], $chn);
 
+  } elsif($cmd eq "create") { ###################################
+    $sndcmd = sprintf("++B001%s%s0101%s%02X%s", $id, $dst, $id, $a[2], $chn);
+    CUL_HM_SendCmd($hash, $sndcmd, 1, 1);
+    sleep(2);
+    $sndcmd = sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn);
+
+  } elsif($cmd eq "read") { ###################################
+    $sndcmd = sprintf("++B001%s%s0104%s%02X03", $id, $dst, $id, $a[2]);
+
+  } elsif($cmd eq "config") { #####################################
+    if ($a[3] eq "tilt") {
+      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);        
+      CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);    
+      $sndcmd =  sprintf("++A001%s%s01080B220D838B228D83", $id, $dst);
+      sleep (2);
+      CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);
+      sleep(2);
+      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+
+    } elsif ($a[3] eq "close") {
+      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
+      CUL_HM_SendCmd($hash, $sndcmd, 2, 2);
+      $sndcmd =  sprintf("++A001%s%s01080B550D838B558D83", $id, $dst);
+      sleep(2);
+      CUL_HM_SendCmd($hash, $sndcmd, 2, 2);
+      sleep(2);
+      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+
+    } elsif ($a[3] eq "closed") {
+      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      $sndcmd =  sprintf("++A001%s%s01080F008F00", $id, $dst);
+      sleep(2);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      sleep(2);
+      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+
+    } elsif ($a[3] eq "bolt") {
+      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      $sndcmd =  sprintf("++A001%s%s01080FFF8FFF", $id, $dst);
+      sleep(2);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      sleep(2);
+      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+
+    } elsif ($a[3] eq "delete") {
+      $sndcmd = sprintf("++B001%s%s0102%s%02X%s", $id, $dst, $id, $a[2], $chn);
+
+    } elsif ($a[3] eq "speedclose") {
+      $sndcmd = sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      $sndcmd = $a[4]*2;
+      $sndcmd = sprintf("++A001%s%s010823%02XA3%02X", $id, $dst, $sndcmd, $sndcmd);
+      sleep(2);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      sleep(2);
+      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+
+    } elsif ($a[3] eq "speedtilt") {
+      $sndcmd = sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      $sndcmd = $a[4]*2;
+      $sndcmd = sprintf("++A001%s%s010822%02XA2%02X", $id, $dst, $sndcmd, $sndcmd);
+      sleep(2);
+      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
+      sleep(2);
+      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+    }
   }
 
   if($state) {
