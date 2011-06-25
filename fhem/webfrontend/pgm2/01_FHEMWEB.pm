@@ -36,6 +36,7 @@ sub FW_calcWeblink($$);
 use vars qw($FW_dir);  # moddir (./FHEM), needed by SVG
 use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
 use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
+use vars qw($FW_tp);   # is touchpad (iPad / etc)
 use vars qw(%FW_types);# device types, for sorting, for 97_GROUP/95_VIEW
 my $zlib_loaded;
 
@@ -75,7 +76,8 @@ FHEMWEB_Initialize($)
   $hash->{UndefFn} = "FW_Undef";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
-                     "smallscreen plotfork basicAuth basicAuthMsg HTTPS";
+                     "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
+                     "HTTPS";
 
   ###############
   # Initialize internal structures
@@ -255,7 +257,7 @@ FW_Read($)
   my ($mode, $arg, $method) = split(" ", $lines[0]);
   $hash->{BUF} = "";
 
-  Log($ll, "HTTP $name GET $arg");
+  Log $ll, "HTTP $name GET $arg";
   my $pid;
   if(AttrVal($FW_wname, "plotfork", undef)) {
     # Process SVG rendering as a parallel process
@@ -285,7 +287,7 @@ FW_Read($)
   my $length = length($FW_RET);
   my $expires = ($cacheable?
                         ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
-  #Log 0, "$arg / RL: $length / $FW_RETTYPE / $compressed";
+  Log $ll, "$arg / RL: $length / $FW_RETTYPE / $compressed / $expires";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
            $expires, $compressed,
@@ -305,6 +307,7 @@ FW_AnswerCall($)
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
+  $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
 
   # Lets go:
   if($arg =~ m,^${FW_ME}/(.*html)$, || $arg =~ m,^${FW_ME}/(example.*)$,) {
@@ -371,7 +374,8 @@ FW_AnswerCall($)
                 $cmd !~ /^edit/);
 
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
-  $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" : "800,160");
+  $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
+                                                $FW_tp ? "600,160" : "800,160");
   $FW_reldoc = "$FW_ME/commandref.html";
 
   $FW_cmdret = $docmd ? fC($cmd) : "";
@@ -402,7 +406,8 @@ FW_AnswerCall($)
   pO '<html xmlns="http://www.w3.org/1999/xhtml">';
   pO "<head>\n<title>$t</title>";
 
-  if($FW_ss) {
+  # Enable WebApp
+  if($FW_tp || $FW_ss) {
     pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/fhemicon.png"/>';
     pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     pO '<meta name="viewport" content="width=device-width"/>';
@@ -410,7 +415,8 @@ FW_AnswerCall($)
 
   my $rf = AttrVal($FW_wname, "refresh", "");
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
-  my $stylecss = ($FW_ss ? "style_smallscreen.css" : "style.css");
+  my $stylecss = ($FW_ss ? "style_smallscreen.css" :
+                  $FW_tp ? "style_touchpad.css" : "style.css");
   pO "<link href=\"$FW_ME/$stylecss\" rel=\"stylesheet\"/>";
   pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
@@ -719,7 +725,7 @@ FW_roomOverview($)
   push(@list1, ""); push(@list2, "");
 
   pO "<div id=\"menu\">";
-  if($FW_ss) {
+  if($FW_ss) {  # Make a selection sensitive dropdown list
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       if(!$list1[$idx]) {
         pO "</select>" if($idx);
@@ -736,13 +742,20 @@ FW_roomOverview($)
 
     pO "<table>";
     foreach(my $idx = 0; $idx < @list1; $idx++) {
-      if(!$list1[$idx]) {
+      my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
+      if(!$l1) {
         pO "  </table></td></tr>" if($idx);
         pO "  <tr><td><table class=\"block\" id=\"room\">"
           if($idx<int(@list1)-1);
       } else {
-        pF "    <tr%s>", $list1[$idx] eq $FW_room ? " class=\"sel\"" : "";
-        pO "<td><a href=\"$list2[$idx]\">$list1[$idx]</a></td></tr>";
+        pF "    <tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
+        #pO "<td><a href=\"$l2\">$l1</a></td></tr>";
+        if($l2 =~ m/.html$/) {
+           pO "<td><a href=\"$l2\">$l1</a></td>";
+        } else {
+          pH $l2, $l1, 1;
+        }
+        pO "</tr>";
       }
     }
     pO "</table>";
@@ -847,8 +860,9 @@ FW_showRoom()
           pO "<td align=\"center\">$v</td>";
         }
         if($allSets) {
-          pH "cmd.$d=set $d on$rf", "on", 1;
-          pH "cmd.$d=set $d off$rf", "off", 1;
+          my $sp = "&nbsp;&nbsp;";
+          pH "cmd.$d=set $d on$rf",  "${sp}on${sp}", 1;
+          pH "cmd.$d=set $d off$rf", "${sp}off${sp}", 1;
         }
 
       } elsif($type eq "FHT") {
@@ -1427,13 +1441,13 @@ FW_style($$)
 
     my @fl;
     push(@fl, "fhem.cfg");
-    push(@fl, "<br>");
+    push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.css"));
-    push(@fl, "<br>");
+    push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.js"));
-    push(@fl, "<br>");
+    push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.gplot"));
-    push(@fl, "<br>");
+    push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*html"));
 
     pO "<div id=\"content\">";
@@ -1443,7 +1457,11 @@ FW_style($$)
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      pH "cmd=style edit $file", $file, 1;
+      if($file eq "") {
+        pO "<td><br></td>";
+      } else {
+        pH "cmd=style edit $file", $file, 1;
+      }
       pO "</tr>";
       $row = ($row+1)%2;
     }
@@ -1484,6 +1502,7 @@ FW_style($$)
     my $ncols = $FW_ss ? 40 : 80;
     pO "<div id=\"content\">";
     pO "  <form>";
+    $f =~ s,^.*/,,;
     pO     FW_submit("save", "Save $f") . "<br><br>";
     pO     FW_hidden("cmd", "style save $a[2]");
     pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
@@ -1504,9 +1523,8 @@ FW_style($$)
     binmode (FH);
     print FH $FW_data;
     close(FH);
-    FW_style("style list", "Saved file $f");
-    $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} : $a[2]);
-
+    $f =~ s,^.*/,,;
+    FW_style("style list", "Saved the file $f");
     fC("rereadcfg") if($a[2] eq "fhem.cfg");
   }
 
@@ -1529,10 +1547,11 @@ pH(@)
    my ($link, $txt, $td) = @_;
 
    pO "<td>" if($td);
-   if($FW_ss) {
-     pO "<a onClick=\"location.href='$FW_ME?$link'\"><div class=\"href\">$txt</div></a>";
+   $link = ($link =~ m,^/,) ? $link : "$FW_ME?$link";
+   if($FW_ss || $FW_tp) {
+     pO "<a onClick=\"location.href='$link'\"><div class=\"href\">$txt</div></a>";
    } else {
-     pO "<a href=\"$FW_ME?$link\">$txt</a>";
+     pO "<a href=\"$link\">$txt</a>";
    }
    pO "</td>" if($td);
 }
@@ -1542,7 +1561,7 @@ pHJava(@)
 {
    my ($link, $txt) = @_;
 
-   if($FW_ss) {
+   if($FW_ss || $FW_tp) {
      pO "<a onClick=\"$link\"><div class=\"href\">$txt</div></a>";
    } else {
      pO "<a onClick=\"$link\">$txt</a>";
@@ -1555,7 +1574,7 @@ pHPlain(@)
    my ($link, $txt, $td) = @_;
 
    pO "<td>" if($td);
-   if($FW_ss) {
+   if($FW_ss || $FW_tp) {
      pO "<a onClick=\"location.href='$FW_ME?$link'\">$txt</a>";
    } else {
      pO "<a href=\"$FW_ME?$link\">$txt</a>";
@@ -1608,13 +1627,6 @@ FW_showWeblink($$$)
         $va[2] = $1;
       }
 
-      if($FW_ss) {
-        pHPlain "detail=$d", $d;
-        pO "<br>";
-      } else {
-        pO "<table><tr><td>";
-      }
-
       my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
 
       my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
@@ -1627,13 +1639,9 @@ FW_showWeblink($$$)
         pO "<img src=\"$arg\"/>";
       }
 
-      if($FW_ss) {
-        pO "<br>";
-      } else {
-        pO "</td>";
-        pH "detail=$d", $d, 1;
-        pO "</tr></table>";
-      }
+      pO "<br>";
+      pHPlain "detail=$d", $d;
+      pO "<br>";
 
     }
   }
