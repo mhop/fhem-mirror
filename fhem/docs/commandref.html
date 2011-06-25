@@ -2017,8 +2017,10 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Set </b>
   <ul>
     <li>raw<br>
-        Issue a CUL firmware command.  See the CUL firmware README document for
-        details on CUL commands.
+        Issue a CUL firmware command.  See the <a
+        href="http://www.koeniglich.de/culfw/commandref.html">this</a> document
+        for details on CUL commands.
+
         </li><br>
     <li>freq / bWidth / rAmpl / sens<br>
         <a href="#rfmode">SlowRF</a> mode only.<br>
@@ -5739,15 +5741,18 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
         </li><br>
 
     <a name="smallscreen"></a>
-    <li>smallscreen<br/>
-        Optimize for small screen size, e.g. smartphones.<br>
+    <a name="touchpad"></a>
+    <li>smallscreen, touchpad<br/>
+        Optimize for small screen size (i.e. smartphones) or for touchpad
+        devices (i.e. tablets)<br>
         Note: The default configuration installed with make install-pgm2
         installs 2 FHEMWEB instances: port 8083 for desktop browsers and
         port 8084 for smallscreen browsers, both using SVG rendering. As
         Android does not support SVG at the moment, change plotmode to
         gnuplot-scroll.<br>
-        WebApp suppport: After viewing the site on the iPhone or iPad in
-        Safari, add it to the home-screen to get full-screen support.
+        WebApp suppport if specifying one of the above options: After viewing
+        the site on the iPhone or iPad in Safari, add it to the home-screen to
+        get full-screen support.
         </li><br>
 
     <a name="plotfork"></a>
