@@ -46,8 +46,8 @@ my %sets = (
 
 my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB) 
 
-my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS" .
-                    ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN" .
+my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS: " .
+                    ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
                     ":ESA2000:CUL_IR:";
 
 my $clientsHomeMatic = ":CUL_HM:HMS:";
