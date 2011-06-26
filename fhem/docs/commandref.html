@@ -46,6 +46,7 @@
       <a href="#help">?,help</a> &nbsp;
       <a href="#include">include</a> &nbsp;
       <a href="#inform">inform</a> &nbsp;
+      <a href="#fhemupdate">fhemupdate</a> &nbsp;
       <a href="#list">list</a> &nbsp;
       <a href="#modify">modify</a> &nbsp;
       <a href="#quit">quit</a> &nbsp;
@@ -526,6 +527,22 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <br>
 </ul>
+
+<a name="fhemupdate"></a>
+<h3>fhemupdate</h3>
+<ul>
+  <code>fhemupdate [filename]</code> <br>
+  <br>
+    Update the fhem modules and documentation from a nightly CVS chekout.  For
+    this purpose fhem contants http://fhem.de, compares the stored timestamps
+    of the local files with the filelist on the server, and downloads the files
+    changed on the server. For all downloaded modules a reload will be
+    scheduled if the corresponding module is loaded.<br>
+    If an explicit filename is given, then this file will be downloaded
+    unconditionally.<br>
+    Note: if the main program (fhem.pl) is changed, a manual restart of fhem
+    will be necessary to apply the changes.
+    <br> </ul>
 
 <a name="list"></a>
 <h3>list</h3>
