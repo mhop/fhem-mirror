@@ -49,7 +49,7 @@ install-base:
 	cp -rp contrib $(RMODDIR)
 	cp -rp docs/* $(RDOCDIR)
 	cp docs/fhem.man $(RMANDIR)/fhem.pl.1
-	gzip -9 $(RMANDIR)/fhem.pl.1
+	gzip -f -9 $(RMANDIR)/fhem.pl.1
 
 dist:
 	@echo Version is $(VERS), Date is $(DATE)
