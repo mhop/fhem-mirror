@@ -11,6 +11,7 @@ my %eib_c2b1 = (
 	"up" => "01",
 	"down" => "00",
 	"up-for-timer" => "01",
+	"down-for-timer" => "00",
 );
 
 my %eib_c2b2 = (
@@ -161,8 +162,8 @@ EIBUPDOWN_Set($@)
     my $dur = $a[2];
     my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
     $modules{EIB}{ldata}{$a[0]} = $to;
-    Log 4, "Follow: +$to set $a[0] off";
-    CommandDefine(undef, $a[0] . "_timer at +$to set $a[0] off");
+    Log 4, "Follow: +$to set $a[0] alloff";
+    CommandDefine(undef, $a[0] . "_timer at +$to set $a[0] alloff");
   }
 
   ##########################
