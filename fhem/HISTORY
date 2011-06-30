@@ -475,3 +475,6 @@
 - Sat  Feb 6 2010 (Boris)
   - feature: on-for-timer added for X10 modules and bug fixed for overlapping
     on-till and on-for-timer commands (Boris)
+    
+- Thu Jun 30 2011 (Maz Rashid)
+  - Introducing 00_TUL.pm and 10_EIB.pm modules for connecting FHEM on EIB.
