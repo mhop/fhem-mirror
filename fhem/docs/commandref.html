@@ -702,9 +702,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   it will be used instead the global configfile attribute.<br><br>
   Notes:
   <ul>
-    <li>save only writes out definitions and attributes, but no commands
-        which were previously part of the config file. Put such commands in the
-        <a href="#lastinclude">lastinclude</a> file.
+    <li>save only writes out definitions and attributes, but no (set/get)
+    commands which were previously part of the config file. If you need such
+    commands after the initialization (e.g.  <a href="FHZset">FHTcode</a>), you
+    should trigger them via <a href="#notify">notify</a>, when receiving the
+    INITIALIZED event.
   </ul>
 </ul>
 
@@ -881,10 +883,8 @@ A line ending with \ will be concatenated with the next one, so long lines
         If this attribute is set, then the last command of the generated
         configfile (see the <a href="#save">save</a> command) will be<br>
         include &lt;lastinclude-value&gt;<br>
-        This file is needed, as the save command will write only defines and
-        attributes to the config file, any other commands / includes will be
-        lost. E.g. it makes sense to set the <a href="FHZset">FHTcode</a> in
-        this file.
+        This attribute is DEPRECATED, use <a href="#notify">notify</a>, with
+        the INITIALIZED event to execute commands after initialization.
     </li><br>
 
     <a name="logfile"></a>
