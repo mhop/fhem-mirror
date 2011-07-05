@@ -38,6 +38,7 @@
   <ul>
 
       <a href="#attr">attr</a> &nbsp;
+      <a href="#CULflash">CULflash</a> &nbsp;
       <a href="#define">define</a> &nbsp;
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
@@ -534,15 +535,36 @@ A line ending with \ will be concatenated with the next one, so long lines
   <code>updatefhem [filename]</code> <br>
   <br>
     Update the fhem modules and documentation from a nightly CVS chekout.  For
-    this purpose fhem contants http://fhem.de, compares the stored timestamps
-    of the local files with the filelist on the server, and downloads the files
-    changed on the server. For all downloaded modules a reload will be
-    scheduled if the corresponding module is loaded.<br>
+    this purpose fhem contacts http://fhem.de/fhemupdate, compares the stored
+    timestamps of the local files with the filelist on the server, and
+    downloads the files changed on the server. For all downloaded modules a
+    reload will be scheduled if the corresponding module is loaded.<br>
     If an explicit filename is given, then this file will be downloaded
     unconditionally.<br>
     Note: if the main program (fhem.pl) is changed, a manual restart of fhem
     will be necessary to apply the changes.
-    <br> </ul>
+    <br>
+</ul>
+
+<a name="CULflash"></a>
+<h3>CULflash</h3>
+<ul>
+  <code>CULflash &lt;CUL-Name&gt; &lt;CUL-Version&gt;</code> <br>
+  <br>
+    Download the CUL firmware from a nightly CVS chekout and flash the
+    hardware. Currently only the CUL is supported with its versions:
+    CUL_V2, CUL_V2_HM, CUL_V3, CUL_V4.<br>
+    <b>Note:</b> dfu-programmer has to be installed in the path.<br>
+    If the CUL is not yet flashed, then first define a <a href="#CUL">CUL</a>
+    device (even if fhem won't be able to open the device), insert it with the
+    button pressed (this will set the device into flash-mode), then issue the
+    CULflash command.<br>
+    Example:
+    <ul>
+    <code>fhem> CULflash CUL CUL_V3</code>
+    </ul>
+</ul>
+
 
 <a name="list"></a>
 <h3>list</h3>
