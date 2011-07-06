@@ -454,10 +454,8 @@ CUL_HM_Parse($$)
       
   } elsif($st eq "winMatic") {  ####################################
     
-Log 1, "WM";
     if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
       my ($lst, $flg) = ($1, $2);
-Log 1, "WM1";
            if($lst eq "C8" && $flg eq "00") { push @event, "contact:tilted";
       } elsif($lst eq "FF" && $flg eq "00") { push @event, "contact:closed";
       } elsif($lst eq "00" && $flg eq "10") { push @event, "contact:movement_tilted";
@@ -471,7 +469,6 @@ Log 1, "WM1";
 
     if($cmd eq "A010" && $p =~ m/^0287(..)89(..)8B(..)/) {
       my ($air, undef, $course) = ($1, $2, $3);
-Log 1, "WM2";
       push @event, "airing:".
       ($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air));
       push @event, "course:".($course eq "FF" ? "tilt" : "close");
@@ -499,9 +496,12 @@ Log 1, "WM2";
     if($p =~ m/.14(.)0200(..)(..)(..)/) {
       my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
       my $v = 128-hex($k_v2);                  # FIXME: calibrate
-      $v = 256+$v if($v < 0);
+      # $v = 256+$v if($v < 0);
       $v += 256 if(!($k_v3 & 1));
       push @event, "rawValue:$v";
+
+      my $seq = hex($k_cnt);
+      push @event, "Sequence:$seq";
 
       my $r2r = AttrVal($name, "rawToReadable", undef);
       if($r2r) {
