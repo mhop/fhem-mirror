@@ -310,16 +310,13 @@ FW_AnswerCall($)
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
 
   # Lets go:
-Log 1, "ARG: $arg";
   if($arg =~ m,^${FW_ME}/(example.*|.*html)$,) {
     my $f = $1;
-Log 1, "GOT: $f";
     $f =~ s,/,,g;    # little bit of security
     open(FH, "$FW_dir/$f") || return;
     pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
-Log 1, "RT: $FW_RETTYPE";
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/(.*).css,) {
