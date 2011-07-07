@@ -13,8 +13,8 @@ RDOCDIR=$(ROOT)$(DOCDIR)
 RMANDIR=$(ROOT)$(MANDIR)
 RETCDIR=$(ROOT)$(ETCDIR)
 
-VERS=5.0
-DATE=2010-08-15
+VERS=5.1
+DATE=2011-07-09
 DESTDIR=fhem-$(VERS)
 
 all:
@@ -86,3 +86,6 @@ deb:
 	mv .f $(DESTDIR)
 	dpkg-deb --build $(DESTDIR)
 	rm -rf $(DESTDIR)
+
+fb7390:
+	cd contrib/FB7390 && ./makeimage $(DESTDIR)

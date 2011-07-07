@@ -310,13 +310,16 @@ FW_AnswerCall($)
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
 
   # Lets go:
-  if($arg =~ m,^${FW_ME}/(.*html)$, || $arg =~ m,^${FW_ME}/(example.*)$,) {
+Log 1, "ARG: $arg";
+  if($arg =~ m,^${FW_ME}/(example.*|.*html)$,) {
     my $f = $1;
+Log 1, "GOT: $f";
     $f =~ s,/,,g;    # little bit of security
     open(FH, "$FW_dir/$f") || return;
     pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
+Log 1, "RT: $FW_RETTYPE";
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/(.*).css,) {
@@ -434,7 +437,7 @@ FW_AnswerCall($)
 
   FW_roomOverview($cmd);
   FW_style($cmd,undef)    if($cmd =~ m/^style /);
-  FW_doDetail($FW_detail)  if($FW_detail);
+  FW_doDetail($FW_detail) if($FW_detail);
   FW_showRoom()           if($FW_room && !$FW_detail);
   FW_logWrapper($cmd)     if($cmd =~ /^logwrapper/);
   FW_showArchive($cmd)    if($cmd =~ m/^showarchive/);
@@ -1442,8 +1445,9 @@ FW_style($$)
     my @fl;
     push(@fl, "fhem.cfg");
     push(@fl, "");
+    push(@fl, FW_fileList("$FW_dir/.*.sh"));
+    push(@fl, FW_fileList("$FW_dir/.*Util.*"));
     push(@fl, FW_fileList("$FW_dir/.*.css"));
-    push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.js"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.gplot"));
@@ -1479,7 +1483,7 @@ FW_style($$)
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      pH $file, $file, 1;
+      pO "<td><a href=\"$FW_ME/$file\">$file</a></td>"; 
       pO "</tr>";
       $row = ($row+1)%2;
     }
