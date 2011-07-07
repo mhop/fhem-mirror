@@ -706,7 +706,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   Re-read the configuration file.
   Note: The statefile will be saved first, then the config file will be read
   (all devices will be initialized again), and at last the statefile will be
-  reloaded.
+  reloaded. It triggers upon completion the global:REREADCFG event.
   <br><br>
   Example:
   <ul>
@@ -783,7 +783,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <code>shutdown</code>
   <br><br>
   Shut down the server (after saving the <a href="#statefile">state information
-  </a>)
+  </a>). It triggers the global:SHUTDOWN event.
   <br><br>
   Example:
   <ul>

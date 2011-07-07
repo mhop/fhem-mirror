@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.144 2011-06-19 06:17:27 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.145 2011-07-07 08:46:28 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -912,6 +912,7 @@ CommandRereadCfg($$)
   if(!$ret && $attr{global}{statefile} && -r $attr{global}{statefile}) {
     $ret = CommandInclude($cl, $attr{global}{statefile});
   }
+  DoTrigger("global", "REREADCFG");
 
   $reread_active=0;
   return $ret;
@@ -1021,6 +1022,7 @@ sub
 CommandShutdown($$)
 {
   my ($cl, $param) = @_;
+  DoTrigger("global", "SHUTDOWN");
   Log 0, "Server shutdown";
 
   foreach my $d (sort keys %defs) {
