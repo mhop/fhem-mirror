@@ -45,13 +45,19 @@
     <a name="starting"></a>
     <h3>Starting fhem</h3>
       <ul>
-      Skip this section if you installed fhem via the Debian package.<br><br>
+      Skip this section if you installed fhem via the Debian
+      <a href="http://fhem.de/fhem-=VERS=.deb">package</a> or via the Fritzbox7390 
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">image</a><br><br>
 
       First install the Device::SerialPort (or Win32::SerialPort)  perl module
-      with the command <code>"sudo cpan Device::SerialPort"</code><br>
+      with the command <code>"sudo cpan Device::SerialPort"</code>. There are
+      also precompiled debian packages (libdevice-serialport-perl), and this
+      module is already installed on OSX. You will need it to access the USB
+      devices<br><br>
+
       The default configuration will install fhem into /usr/bin,
-      /usr/share/fhem and /var/log/fhem and /etc/fhem.cfg. Edit the Makefile to
-      change this. 
+      /usr/share/fhem and /var/log/fhem and /etc/fhem.cfg, according to the
+      debian/ubuntu requirments. Edit the Makefile to change this. 
 
       To install & start fhem type:<pre>
       make install-pgm2
@@ -60,6 +66,7 @@
       After starting, the logfile should look like:<pre>
       2008.06.15 16:17:03 2: FHEMWEB port 8083 opened
       2008.06.15 16:17:03 2: FHEMWEB port 8084 opened
+      2008.06.15 16:17:03 2: FHEMWEB port 8085 opened
       2008.06.15 16:17:03 0: Server started (version ...)</pre>
       </ul>
 
@@ -67,10 +74,12 @@
     <h3>Attaching the USB device for the PC (CUL / FHZ1x00PC / EM1010PC)</h3>
       <ul>
       Connect to fhem with an internet browser:
-      <a href="http://localhost:8083/fhem">http://localhost:8083/fhem</a>
-      or 
-      <a href="http://localhost:8084/fhem">http://localhost:8084/fhem</a> if
-      you are using a a smartphone.<br><br>
+      <a href="http://localhost:8083/fhem">http://fhem-host:8083/fhem</a>
+      if you are using a normal desktop,
+      <a href="http://localhost:8084/fhem">http://fhem-host:8084/fhem</a> if
+      you are using a smartphone, or
+      <a href="http://localhost:8084/fhem">http://fhem-host:8085/fhem</a> if
+      you are using a tablet like the iPad.<br><br>
 
       Attach the USB device (CUL, FHZ1000PC/FHZ1300, EM1010PC) to your
       computer, and look for the corresponding device in the /dev
@@ -79,7 +88,7 @@
       Linux and /dev/cu.usbmodem* under OS X. Note the exact name of the device.
       Define it for fhem (by typing it in the "Fhem cmd" input field in the
       browser):<pre>
-      define CUL1 CUL /dev/ttyACM0 1234</pre>
+      define CUL1 CUL /dev/ttyACM0@9600 1234</pre>
 
       You can find details about CUL define parameters <a
       href="commandref.html#CUL">here</a>.<br><br>
@@ -93,9 +102,16 @@
       /dev/cu.usbserial-xxxxxxxx.
 
       <br><br>
-      <b>Note:</b> Don't forget to type "save" in the "Fhem cmd" input field of
-      the browser after defining a device or setting its attribute.  Otherwise
-      the changes will disappear after the next start.</ul>
+      <b>Notes:</b>
+      <ul>
+        <li>Don't forget to type "save" in the "Fhem cmd" input field of the
+        browser after defining a device or setting its attribute.  Otherwise
+        the changes will disappear after the next start.
+        <li>The CUL is arriving without a firmware. You can flash it via the
+        <a href="commandref.html#CULflash">CULflash</a> command, if the
+        dfu-programmer is installed. dfu-programmer is part of the FB390 image.
+      </ul>
+      </ul>
 
     <a name="autocreate"></a>
     <h3>Configuring transmitter devices</h3>
@@ -117,7 +133,7 @@
 
       If you want to do the same manually:<br>
       Wait a while, until the transmitter sent some data. In the logfile
-      (Browser window: "All together" ->  Logs:Logfile:text) a line
+      (Browser window: "Unsorted -> Logs / Fhemlog / text) a line
       will  appear:<pre>
       FS20 Unknown device &lt;HOUSECODE&gt;, Button &lt;BTN&gt; Code &lt;CDE&gt;, please define it</pre>
 
@@ -131,12 +147,12 @@
       <a href="commandref.html#model">Here</a> is a complete list of FS20
       models.<br> For other device types similar messages should appear.<br><br>
 
-      <b>Note:</b> Creating a fhem FHT device automatically or manually does
-      not imply that the CUL or the FHZ is paired with it. For this purpose you
-      have to set the FHT to accept new devices (Prog:Cent:N/A), and send a command to
-      it (e.g.  set fht.kitchen desired-temp 20). 
-      If there is no signal for a while, then check <a href="faq.html#faq6">
-      this</a> FAQ entry.
+      <b>Note:</b> Creating a fhem FHT or HomeMatic device automatically or
+      manually does not imply that the CUL or the FHZ is paired with it. For
+      this purpose you have to set the FHT to accept new devices
+      (Prog:Cent:N/A), and send a command to it (e.g.  set fht.kitchen
+      desired-temp 20).  If there is no signal for a while, then check <a
+      href="faq.html#faq6"> this</a> FAQ entry.
       </ul>
 
     <a name="FS20rx"></a>
@@ -162,7 +178,7 @@
     <h3>Timed commands / Notification</h3>
       <ul>
       To execute commands at a given time / periodically, you have to define
-      devices of the type at. See the definition <a href="commandref.html#at">
+      devices of the type <b>at</b>. See the definition <a href="commandref.html#at">
       here</a> and the examples  <a href="example.06_at">here</a>. The last link
       only works if you are reading this HOWTO from your fhem Web.<br><br>
 
@@ -258,26 +274,26 @@
       The logs can be converted to a plot either with gnuplot (which must be
       installed and in your PATH), or via the builtin SVG module, in this case
       your browser must support SVG. Firefox, Opera, Chrome, Safari
-      (on the iPhone/iPad too) support SVG out of the box, Internet Explorer does
-      it via the Adobe "SVG viewer" plugin, Android does not support it (as of
-      2011/02).
+      (both on OSX and iOS) support SVG out of the box, Internet Explorer
+      from version 9. IE prior to version 9 does it via the Adobe "SVG viewer"
+      plugin, and some Android versions prior to 3.0 do not support it.
+
       SVG mode is the default, to change it set the <a
       href="commandref.html#plotmode">plotmode</a> attribute to gnuplot or
       gnuplot-scroll.<br><br>
 
-      In order to look at historic data, you can either convert at the
-      archive entries to weblink in "plotmode=gnuplot" mode, or use the
-      "plotmode=gnuplot-scroll" or "plotmode=SVG" modes. fnuplot-scroll and SVG
+      In order to look at historic data, you can either convert the
+      archive entries to a weblink in "plotmode=gnuplot" mode, or use the
+      "plotmode=gnuplot-scroll" or "plotmode=SVG" modes. gnuplot-scroll and SVG
       offer the possibility to zoom or scroll in the plot, see the arrow and
       magnifier icons at the top of the page.<br><br>
 
-      Note: the gnuplot files must have #FileLog entries in order to be
-      useable with scrolling, as the filtering happens with the FileLog get
-      function, see the supplied gnuplot files for an example or the
-      column_spec paragraph <a href="commandref.html#FileLogget">here</a> for
-      the syntax.<br><br>
+      Note: the gnuplot files must have #FileLog entries in order to be useable
+      with gnuplot-scroll or SVG, as the filtering happens with the FileLog get
+      function, see the supplied gnuplot files or the column_spec paragraph <a
+      href="commandref.html#FileLogget">here</a> for the syntax.<br><br>
 
-       The order of the #FileLog lines must match the corresponding 'awk'
+      The order of the #FileLog lines must match the corresponding 'awk'
       entries.<br><br>
 
       It make sense to build large logfiles for scrolling in them (year

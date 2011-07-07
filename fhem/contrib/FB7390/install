@@ -1,0 +1,65 @@
+#! /bin/sh
+
+root=/var/InternerSpeicher
+home=$root/fhem
+
+echo "########################### FHEM INSTALL BEGIN #######################"
+killall perl > /dev/null 2>&1
+sleep 1
+
+echo "########################### Extracting fhem.tar.gz ###################"
+cd $root
+if test -d fhem; then
+  mv fhem fhem.OLD
+fi
+
+gzip -cd /var/fhem.tar.gz | tar xf -
+
+cd $root
+
+# Save files from the AVM Style installation
+if test -f fhem.OLD/opt/etc/fhem.cfg; then
+  echo "########################### Converting chroot style config ###########"
+  export LD_LIBRARY_PATH=$home/lib
+  export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
+  cp fhem.OLD/opt/etc/fhem.cfg fhem
+  fhem/perl -pi -e 's,/opt,$root,g;
+                    s,fhem/share,fhem,;
+                    s,^#define autocreate,define autocreate,;
+                    s,^#attr autocreate,attr autocreate,;
+                    s,ttyACM(.)(@\d+)?,ttyACM$1\@38400,;' fhem/fhem.cfg
+  mv fhem.OLD/opt/fhem/log/* fhem/log
+fi
+
+# Save files from our old version
+if test -f fhem.OLD/fhem.cfg; then
+  echo "########################### Copying non-chroot style config ##########"
+  mv fhem.OLD/FHEM/*.sh fhem/FHEM
+  mv fhem.OLD/FHEM/99.*Util.pm fhem/FHEM
+  mv fhem.OLD/FHEM/*.sh fhem/FHEM
+  mv fhem.OLD/log/* fhem/log
+  mv fhem.OLD/fhem.cfg fhem
+fi
+chown -R boxusr80:root $home
+
+if test -d fhem.OLD; then
+  echo "########################### Deleting the old directory ###############"
+  rm -rf fhem.OLD
+fi
+
+cat /var/flash/debug.cfg > /var/nvi.tmp
+grep -q fhem /var/nvi.tmp
+r=$?
+if test $r != 0; then
+  echo "########################### Modifying the startup script #############"
+  echo $home/startfhem >> /var/nvi.tmp
+  cat /var/nvi.tmp > /var/flash/debug.cfg
+fi
+rm -f /var/nvi.tmp
+
+echo "########################### Starting fhem ############################"
+sync
+$home/startfhem
+
+echo "########################### FHEM INSTALL END #########################"
+exit 1 # INSTALL_SUCCESS_REBOOT

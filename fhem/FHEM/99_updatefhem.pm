@@ -33,8 +33,8 @@ CommandUpdatefhem($$)
   my ($cl, $param) = @_;
   my $lt = "";
   my $ret = "";
-  #my $moddir = "$attr{global}{modpath}/FHEM";
-  my $moddir = "XXX";
+  my $moddir = "$attr{global}{modpath}/FHEM";
+  #my $moddir = "XXX";
 
   # Read in the OLD filetimes.txt
   my %oldtime;
@@ -111,8 +111,8 @@ sub
 CommandCULflash($$)
 {
   my ($cl, $param) = @_;
-  #my $moddir = "$attr{global}{modpath}/FHEM";
-  my $moddir = "XXX";
+  my $moddir = "$attr{global}{modpath}/FHEM";
+  #my $moddir = "XXX";
 
   my %ctypes = (
     CUL_V2     => "at90usb162",
