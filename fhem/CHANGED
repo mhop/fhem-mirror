@@ -1,4 +1,6 @@
 - =DATE= (=VER=)
+
+- 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
   - feature: FHT8V rewrite (and moved from contrib into the FHEM directory).
   - feature: PID rewrite (and moved from contrib into the FHEM directory).
@@ -21,6 +23,10 @@
   - feature: createlog added to the autocreate module
   - feature: contrib/tcptee.pl added
   - feature: HMLAN support
+  - feature: Fritzbox7390 image
+  - feature: pgm2 tablet support, included into the default configuration
+  - feature: TUL/EIB Support (by Maz)
+  - feature: updatefhem/CULflash
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
