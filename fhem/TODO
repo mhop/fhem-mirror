@@ -1,6 +1,5 @@
 FHEM:
 - uniform .gplot "set title" and naming (ks300_1.gplot -> tempRain.gplot)
-- HomeMatic signing
 - HomeMatic set log 2
 - mergelog
 
@@ -14,8 +13,3 @@ Webpgm2
 - integrate weblink details in the SVG
 - autocreate: multiple plots
 - fancy webkit tranformations
-
-=============
-5.1
-- .deb
-- examples

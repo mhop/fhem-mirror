@@ -12,6 +12,8 @@
     body>div#left { position:fixed; }
     h3 {     color:#52865D; line-height:1.3;
              margin-top:1.5em; font-family:Arial,Sans-serif; }
+    h4 {     color:#52865D; line-height:1.3;
+             margin-top:1.5em; font-family:Arial,Sans-serif; }
     div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
     div#dist { padding-top:0.3em; }
     a {  color: #278727; }
@@ -69,10 +71,10 @@
       <br>
       See the <a href="CHANGED">CHANGED</a> file for current changes.
       <br>
-      Nightly CVS version:
+      Nightly CVS version: a 
       <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
-      http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz</a>
-      <br><br>
+      tarball</a>, or from the fhem commandline via <a
+      href="commandref.html#updatefhem">updatefhem</a>.  <br><br>
 
 
       Please fill out our <a href="http://fhem.de/tinc?key=Erq0O0LU&formname=FHEM_used_modules">survey</a>,
@@ -119,12 +121,14 @@
     <h3>Features</h3>
     <ul>
       <li>support for a lot of protocols used in house automation like FS20,
-          FHT, HMS, OneWire, X10, S300, EM. See the <a
+          FHT, HMS, OneWire, X10, S300, EM, HomeMatic, KNX. See the <a
           href="#Hardware">Hardware</a> section for more.
           </li>
-      <li>autocreating devices/logs when receiving data from a new device</li>
+      <li>autocreating devices/logs when receiving data from a new device:
+      start fhem and watch how the plots of your sensors are appearing
+      automatically.</li>
       <li>logging events to files or databases, with regexp filters</li>
-      <li>notifying external programs or internal modules when receiving certain
+      <li>notifying external programs or scripts when receiving certain
           events</li>
       <li>timed commands (e.g. switching a lamp on from sunset till midnight)
           </li>
@@ -201,6 +205,16 @@
           devices.
         <div id="dist"></div>
 
+      <li>Via the eibd or a TUL (see <a
+          href="http://www.busware.de">www.busware.de</a>) access to the EIB/KNX
+          protocol.
+        <div id="dist"></div>
+        <div id="dist"></div>
+        <div id="dist"></div>
+
+      A detailed description is to be found in the <a
+      href="commandref.html">fhem reference</a>.
+
 
     </ul>
 
@@ -214,16 +228,16 @@
       <div id="dist"><a href="commandref.html">commandref.html</a>
       contains a detailed description of all features/modules.</div>
 
-      <div id="dist">Google-Group: <a 
-      href="http://groups.google.com/group/fhem-users">
-      http://groups.google.com/group/fhem-users</a><br>Although most entries
-      are in german here, don't be afraid to ask something in english.</div>
-
       <div id="dist">Our wiki at <a
       href="http://fhemwiki.de/index.php/FHEM">fhemwiki.de</a></div>
 
       <div id="dist">Frequently Asked Questions: <a
       href="faq.html">faq.html</a></div>
+
+      <div id="dist">Google-Group: <a 
+      href="http://groups.google.com/group/fhem-users">
+      http://groups.google.com/group/fhem-users</a><br>Although most entries
+      are in german here, don't be afraid to ask something in english.</div>
 
       <div id="dist"><a href="README.contrib">contrib/README</a> describes
       some loosely coupled useful modules / scripts which can be used with
@@ -265,6 +279,16 @@
 
       Device/OS Specific installation guides:<br>
       <ul>
+        <li>Instructions for the Fritz!Box:
+          <a href="fritzbox7390.html">7390</a>, <a
+          href="http://fhemwiki.de/index.php/AVM_Fritz!Box">7170@fhemwiki</a>
+          and <a href="fritzbox.html">7170/7270</a></li>
+        <li>Instructions for Nas/Routers (NSLU2):
+          <a href="http://www.martin-haas.de/fhz/nslu2fhz">
+          http://www.martin-haas.de/fhz/nslu2fhz</a></li>
+        <li>Instructions for the Allnet all6250:
+          <a href="http://wiki.dungeon.de/all6250_opennas_mit_fhem">
+          http://wiki.dungeon.de/all6250_opennas_mit_fhem</a></li>
         <li>Linux driver installation:
           <a href="http://fhem.de/linux.html">
           http://fhem.de/linux.html</a></li>
@@ -278,14 +302,6 @@
           <a href="http://fhz4linux.info/tiki-index.php?page=Driver%20installation">
           http://fhz4linux.info/tiki-index.php?page=Driver%20installation</a> <br>
            (use "Solution B", only COM1..COM9 is supported)</li>
-        <li>Instructions for Nas/Routers (NSLU2):
-          <a href="http://www.martin-haas.de/fhz/nslu2fhz">
-          http://www.martin-haas.de/fhz/nslu2fhz</a></li>
-        <li>Instructions for the Fritz!Box:
-          <a href="fritzbox7390.html">7390</a> and <a href="fritzbox.html">7170/7270</a></li>
-        <li>Instructions for the Allnet all6250:
-          <a href="http://wiki.dungeon.de/all6250_opennas_mit_fhem">
-          http://wiki.dungeon.de/all6250_opennas_mit_fhem</a></li>
       </ul>
       <br>
 
@@ -312,25 +328,32 @@
     <a name="Installation"></a>
     <h3>Installation</h3>
     <ul>
+    <h4>Fritz!Box 7390</h4>
+    <ul>
+      <li>Install a current Lab version first, then <a
+          href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> image, and
+          connect to http://localhost:8083/fhem. Follow the <a
+          href="HOWTO.html">HOWTO</a> for adding devices.
+     </ul>
 
-    <h3>Debian/Ubuntu</h3>
+    <h4>Debian/Ubuntu</h4>
     <ul>
       <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">
           this</a> package, and connect to http://localhost:8083/fhem. Follow
           the <a href="HOWTO.html">HOWTO</a> for adding devices.
      </ul>
 
-    <h3>Unix / OSX</h3>
+    <h4>Unix / OSX</h4>
     <ul>
       <li>Make sure you have perl. Install the module Device::SerialPort with
-        "sudo cpan Device::SerialPort"</li>
+        "sudo cpan Device::SerialPort" (OSX user can skip this part).</li>
       <li>Check the Makefile for the installation path, then type make
         install-pgm2.</li>
       <li>Check the installed configuration file and start fhem as advised.
       <li>Follow the <a href="HOWTO.html">HOWTO</a> for adding devices.
     </ul>
 
-    <h3>Windows</h3>
+    <h4>Windows</h4>
     <ul>
       <b>Note:</b>If you are using cygwin for your perl installation you can
       follow the guidelines for Unix.<br><br>
@@ -361,17 +384,14 @@
       programs are needed. It has support for grouping devices into rooms,
       manipulating devices, direct fhem commands, displaying logfiles as text
       or plot (SVG builtin or PNG by gnuplot), navigating/zooming in the
-      plots, HTTP basicAuth, HTTPS and IPV6<br/>
+      plots, HTTP basicAuth, HTTPS and IPV6 (with the IO::Socket::SSL and
+      IO::Socket:INET6 perl modules)
+      <br>
 
       Screenshots: <a href="pgm2-1.png">overview</a>, <a
       href="pgm2-2.png">detail</a>, <a href="pgm2-3.png">SVG-plots</a>.
       <br><br>
-      Installation: make install-pgm2<br>
-      Start fhem as advised in the make output.<br>
-      This will start fhem.pl with a minimalistic configuration.
-      Connect to fhem via <a
-      href="http://localhost:8083/fhem">http://localhost:8083/fhem</a>. See the
-      Howto there on how to continue.
+      It installed by default, but it can be deconfigured.<br>
     </ul>
 
     <h3>Web frontend 3 (webfrontend/pgm3)</h3>
