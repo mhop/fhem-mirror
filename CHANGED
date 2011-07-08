@@ -1,5 +1,3 @@
-- =DATE= (=VER=)
-
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
   - feature: FHT8V rewrite (and moved from contrib into the FHEM directory).
