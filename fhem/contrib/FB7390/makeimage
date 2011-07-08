@@ -3,7 +3,7 @@
 fw=$1
 if test ! -f ../../$fw.tar.gz; then
   echo "usage: makeimage <fhem-VERSION.tar.gz>"
-  echo "../../<fhem-VERSION>.tar.gz mus exist"
+  echo "../../<fhem-VERSION>.tar.gz must exist"
   exit 1
 fi
 
@@ -25,8 +25,8 @@ echo Extracting $fw
 rm -rf $fw
 tar zxf ../../$fw.tar.gz
 cd $fw
-cp fhem.pl\
-        FHEM/*\
+cp fhem.pl ../var/fhem
+cp FHEM/*\
         webfrontend/pgm2/*\
         docs/*.html\
         docs/fhem.png\
