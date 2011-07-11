@@ -5590,7 +5590,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
       Double-Colon separated list of values. The values will be used to replace
       &lt;L#&gt; type of strings in the .gplot file, with # beginning at 1
       (&lt;L1&gt;, &lt;L2&gt;, etc.). Each value will be evaluated as a perl
-      expression, so you have access e.g. to the $value hash.<br><br>
+      expression, so you have access e.g. to the Value functions.<br><br>
 
       If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
       avg, cnt, sum, lastv (last value) and lastd (last date) values of the
@@ -6065,7 +6065,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
     If an entry in the holiday file matches the current day, then the STATE of
     this holiday instance displayed in the <a href="#list">list</a> command
     will be set to the holiday, else the state is set to the text none. Most
-    probably you'll want to query this value in some perl script: see $value in
+    probably you'll want to query this value in some perl script: see Value() in
     the <a href="#perl">perl</a> section or the global attribute <a
     href="#holiday2we"> holiday2we</a>.<br>
     The file will be reread once every night, to compute the value for the
@@ -6943,10 +6943,9 @@ isday</pre>
    <li>
      The current value (the string you see in paranthesis in the output of the
      list command) is available in the <code>value</code> hash; to access it
-     use $value{&lt;devicename&gt;}<br>
-     If you need the old value (and time) of the currently triggered device,
-     then you can access it with <code>$oldvalue{$dev}{TIME}</code> and
-     <code>$oldvalue{$dev}{VAL}</code>.<br>
+     use <code>Value("name")</code>. If you need the old value (and time) of
+     the currently triggered device, then you can access it with
+     <code>OldValue("name")</code> and <code>OldTimestamp("name")</code>.<br>
      </li>
 
    <li>
