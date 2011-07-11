@@ -774,13 +774,14 @@ FW_showRoom()
   if(!$FW_iconsread || (time() - $FW_iconsread) > 5) {
     %FW_icons = ();
     if(opendir(DH, $FW_dir)) {
-      while(my $l = readdir(DH)) {
-        next if($l =~ m/^\./);
+      my @files = readdir(DH);
+      closedir(DH);
+      foreach my $l (sort @files) {     # Order: .gif,.jpg,.png
+        next if($l !~ m/\.(png|gif|jpg)$/i);
         my $x = $l;
         $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
         $FW_icons{$x} = $l;
       }
-      closedir(DH);
     }
     $FW_iconsread = time();
   }
@@ -843,11 +844,11 @@ FW_showRoom()
         } elsif($iv) {
 
           $iv =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-          $iname = $FW_icons{"FS20.$iv"}  if($FW_icons{"FS20.$iv"});
-          $iname = $FW_icons{"$type"}     if($FW_icons{"$type"});
-          $iname = $FW_icons{"$type.$iv"} if($FW_icons{"$type.$iv"});
-          $iname = $FW_icons{"$d"}        if($FW_icons{"$d"});
-          $iname = $FW_icons{"$d.$iv"}    if($FW_icons{"$d.$iv"});
+          $iname = $FW_icons{"$iv"}       if($FW_icons{$iv});         # on.png
+          $iname = $FW_icons{"$type"}     if($FW_icons{$type});       # FS20.png
+          $iname = $FW_icons{"$type.$iv"} if($FW_icons{"$type.$iv"}); # FS20.on.png
+          $iname = $FW_icons{"$d"}        if($FW_icons{$d});          # lamp.png
+          $iname = $FW_icons{"$d.$iv"}    if($FW_icons{"$d.$iv"});    # lamp.on.png
 
         }
         $v = "" if(!defined($v));
