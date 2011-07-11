@@ -25,6 +25,8 @@
   - feature: pgm2 tablet support, included into the default configuration
   - feature: TUL/EIB Support (by Maz)
   - feature: updatefhem/CULflash
+  - feature: $value{} => Value(), $oldvalue => OldValue()/OldTimestamp()
+
 
 - 2010-08-15 (5.0)
   - **NOTE*: The default installation path is changed to satisfy lintian
