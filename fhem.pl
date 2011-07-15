@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.146 2011-07-08 12:14:12 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.147 2011-07-15 08:59:31 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -298,7 +298,7 @@ if($attr{global}{logfile} ne "-" && !$attr{global}{nofork}) {
 }
 
 # FritzBox special: Wait until the time is set via NTP,
-# but no more then 2 hours
+# but not more than 2 hours
 while(time() < 2*3600) {
   sleep(5);
 }

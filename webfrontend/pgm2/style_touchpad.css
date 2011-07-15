@@ -3,20 +3,31 @@ body     { background-color: #FFFFE7;}
 #menu    { position:absolute; top:120px;left:10px; width:100px; }
 #hdr     { position:absolute; top:10px; left:120px; }
 #content { position:absolute; top:50px; left:120px; bottom:20px; right:10px; }
+
 a {  color: #278727; }
 
 div.href { /* Push buttons */
   padding:0; border:1px solid gray; height:1.5em;
-  -moz-border-radius:0.5em; -webkit-border-radius:0.5em;
-  display: -webkit-box; -webkit-box-orient: horizontal; -webkit-box-pack: center; -webkit-box-align: center;
-  background-image:-webkit-gradient(linear, right top, right bottom, color-stop(0%,#fffff7), color-stop(49%,#ffffc7));
+
+  -moz-border-radius:0.5em; border-radius:0.5em;
+
+  display: -webkit-box; -webkit-box-align: center;
+  display: -moz-box; -moz-box-align: center;
+
+  background-image:-webkit-gradient(linear, right top, right bottom,
+                   color-stop(0%,#fffff7), color-stop(49%,#ffffc7));
+  background-image:-moz-linear-gradient(top, #fffff7, #ffffc7);
+  background-image:-o-linear-gradient(top, #fffff7, #ffffc7);
+
   -webkit-box-shadow: 0 0.15em 0.15em rgba(0,0,0, .5);
+  -moz-box-shadow: 0 0.15em 0.15em rgba(0,0,0, .5);
+  box-shadow: 0 0.15em 0.15em rgba(0,0,0, .5);
 }
 
 table.block { border:1px solid gray; width: 100%; background: #F8F8E0; }
 table.block tr.odd { background: #F0F0D8; }
 table.block tr.sel { background: #F0F0D8; }
-table { -moz-border-radius:8px; -webkit-border-radius:8px; }
+table { -moz-border-radius:8px; border-radius:8px; }
 
 table#room { background: #D7FFFF; }
 table#room tr.sel { background: #A0FFFF; }

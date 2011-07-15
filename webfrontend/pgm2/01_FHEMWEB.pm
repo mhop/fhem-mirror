@@ -410,7 +410,8 @@ FW_AnswerCall($)
   if($FW_tp || $FW_ss) {
     pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/fhemicon.png"/>';
     pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
-    pO '<meta name="viewport" content="width=device-width"/>';
+    #pO '<meta name="viewport" content="width=device-width"/>'
+    pO '<meta name="viewport" content="width=320"/>' if($FW_ss);
   }
 
   my $rf = AttrVal($FW_wname, "refresh", "");
@@ -861,9 +862,8 @@ FW_showRoom()
           pO "<td align=\"center\">$v</td>";
         }
         if($allSets) {
-          my $sp = "&nbsp;&nbsp;";
-          pH "cmd.$d=set $d on$rf",  "${sp}on${sp}", 1;
-          pH "cmd.$d=set $d off$rf", "${sp}off${sp}", 1;
+          pH "cmd.$d=set $d on$rf",  "on", 1;
+          pH "cmd.$d=set $d off$rf", "off", 1;
         }
 
       } elsif($type eq "FHT") {
@@ -1551,7 +1551,9 @@ pH(@)
    pO "<td>" if($td);
    $link = ($link =~ m,^/,) ? $link : "$FW_ME?$link";
    if($FW_ss || $FW_tp) {
-     pO "<a onClick=\"location.href='$link'\"><div class=\"href\">$txt</div></a>";
+     #pO "<a onClick=\"location.href='$link'\"><div class=\"href\">$txt</div></a>";
+     my $sp = "&nbsp;&nbsp;";
+     pO "<div class=\"href\"><a onClick=\"location.href='$link'\">$sp$txt$sp</a></div>";
    } else {
      pO "<a href=\"$link\">$txt</a>";
    }
@@ -1564,7 +1566,9 @@ pHJava(@)
    my ($link, $txt) = @_;
 
    if($FW_ss || $FW_tp) {
-     pO "<a onClick=\"$link\"><div class=\"href\">$txt</div></a>";
+     #pO "<a onClick=\"$link\"><div class=\"href\">$txt</div></a>";
+     my $sp = "&nbsp;&nbsp;";
+     pO "<div class=\"href\"><a onClick=\"$link\">$sp$txt$sp</a></div>";
    } else {
      pO "<a onClick=\"$link\">$txt</a>";
    }
