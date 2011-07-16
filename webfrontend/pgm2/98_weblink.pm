@@ -11,7 +11,7 @@ weblink_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "weblink_Define";
-  $hash->{AttrList}= "fixedrange plotmode plotsize label title";
+  $hash->{AttrList}= "fixedrange plotmode plotsize label title htmlattr";
 }
 
 
@@ -21,7 +21,7 @@ weblink_Define($$)
 {
   my ($hash, $def) = @_;
   my ($type, $name, $wltype, $link) = split("[ \t]+", $def, 4);
-  my %thash = ( link=>1, fileplot=>1, image=>1 );
+  my %thash = ( link=>1, fileplot=>1, image=>1, iframe=>1 );
   
   if(!$link || !$thash{$wltype}) {
     return "Usage: define <name> weblink [" .
