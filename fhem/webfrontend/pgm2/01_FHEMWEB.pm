@@ -7,31 +7,33 @@ use IO::Socket;
 
 #########################
 # Forward declaration
+sub FW_AnswerCall($);
+sub FW_calcWeblink($$);
+sub FW_dev2image($);
 sub FW_digestCgi($);
 sub FW_doDetail($);
+sub FW_fatal($);
 sub FW_fileList($);
+sub FW_logWrapper($);
 sub FW_makeTable($$$$$$$$);
-sub FW_updateHashes();
-sub FW_showRoom();
+sub FW_ReadIcons();
+sub FW_roomOverview($);
+sub FW_select($$$);
 sub FW_showArchive($);
 sub FW_showLog($);
-sub FW_logWrapper($);
+sub FW_showRoom();
 sub FW_showWeblink($$$);
-sub FW_select($$$);
-sub FW_textfield($$);
+sub FW_style($$);
 sub FW_submit($$);
 sub FW_substcfg($$$$$$);
-sub FW_style($$);
-sub FW_roomOverview($);
-sub FW_fatal($);
-sub pF($@);
-sub pO(@);
-sub pH(@);
-sub pHPlain(@);
-sub pHJava(@);
-sub FW_AnswerCall($);
+sub FW_textfield($$);
+sub FW_updateHashes();
 sub FW_zoomLink($$$);
-sub FW_calcWeblink($$);
+sub pF($@);
+sub pH(@);
+sub pHJava(@);
+sub pHPlain(@);
+sub pO(@);
 
 use vars qw($FW_dir);  # moddir (./FHEM), needed by SVG
 use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
@@ -328,13 +330,20 @@ FW_AnswerCall($)
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$, ||
           $arg =~ m,^$FW_ME/(.*.png)$,) {
-    open(FH, "$FW_dir/$1") || return;
+    my $img = $1;
+    my $cachable = 1;
+    if(!open(FH, "$FW_dir/$img")) {
+      FW_ReadIcons();
+      $img = FW_dev2image($img);
+      $cachable = 0;
+      return if(!$img || !open(FH, "$FW_dir/$img"));
+    }
     binmode (FH); # necessary for Windows
     pO join("", <FH>);
     close(FH);
-    my @f_ext = split(/\./,$1); #kpb
+    my @f_ext = split(/\./,$img); #kpb
     $FW_RETTYPE = "image/$f_ext[-1]";
-    return 1;
+    return $cachable;
 
  } elsif($arg =~ m,^$FW_ME/(.*).js,) { #kpb java include
     open(FH, "$FW_dir/$1.js") || return;
@@ -772,20 +781,7 @@ sub
 FW_showRoom()
 {
   # (re-) list the icons
-  if(!$FW_iconsread || (time() - $FW_iconsread) > 5) {
-    %FW_icons = ();
-    if(opendir(DH, $FW_dir)) {
-      my @files = readdir(DH);
-      closedir(DH);
-      foreach my $l (sort @files) {     # Order: .gif,.jpg,.png
-        next if($l !~ m/\.(png|gif|jpg)$/i);
-        my $x = $l;
-        $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
-        $FW_icons{$x} = $l;
-      }
-    }
-    $FW_iconsread = time();
-  }
+  FW_ReadIcons();
 
   pO "<form method=\"get\" action=\"$FW_ME\">";
   pO "<div id=\"content\">";
@@ -844,12 +840,7 @@ FW_showRoom()
 
         } elsif($iv) {
 
-          $iv =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-          $iname = $FW_icons{"$iv"}       if($FW_icons{$iv});         # on.png
-          $iname = $FW_icons{"$type"}     if($FW_icons{$type});       # FS20.png
-          $iname = $FW_icons{"$type.$iv"} if($FW_icons{"$type.$iv"}); # FS20.on.png
-          $iname = $FW_icons{"$d"}        if($FW_icons{$d});          # lamp.png
-          $iname = $FW_icons{"$d.$iv"}    if($FW_icons{"$d.$iv"});    # lamp.on.png
+          $iname = FW_dev2image($d);
 
         }
         $v = "" if(!defined($v));
@@ -1615,13 +1606,21 @@ FW_showWeblink($$$)
 {
   my ($d, $v, $t) = @_;
 
+  my $attr = AttrVal($d, "htmlattr", "");
+
   if($t eq "link") {
-    pO "<td><a href=\"$v\">$d</a></td>";    # no pH, want to open extra browser
+    pO "<td><a href=\"$v\" $attr>$d</a></td>";    # no pH, want to open extra browser
 
   } elsif($t eq "image") {
-    pO "<td><img src=\"$v\"><br>";
+    pO "<td><img src=\"$v\" $attr><br>";
     pH "detail=$d", $d;
     pO "</td>";
+
+  } elsif($t eq "iframe") {
+    pO "<td><iframe src=\"$v\" $attr/><br>";
+    pH "detail=$d", $d;
+    pO "</td>";
+
 
   } elsif($t eq "fileplot") {
     my @va = split(":", $v, 3);
@@ -1670,4 +1669,43 @@ FW_Attr(@)
   }
   return undef;
 }
+
+sub
+FW_ReadIcons()
+{
+  my $now = time();
+  return if($FW_iconsread && ($now - $FW_iconsread) <= 5);
+  %FW_icons = ();
+  if(opendir(DH, $FW_dir)) {
+    my @files = readdir(DH);
+    closedir(DH);
+    foreach my $l (sort @files) {     # Order: .gif,.jpg,.png
+      next if($l !~ m/\.(png|gif|jpg)$/i);
+      my $x = $l;
+      $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
+      $FW_icons{$x} = $l;
+    }
+  }
+  $FW_iconsread = $now;
+}
+
+sub
+FW_dev2image($)
+{
+  my ($d) = @_;
+  my $iname = "";
+  return $iname if(!$d || !$defs{$d});
+
+  my ($type, $iv) = ($defs{$d}{TYPE}, $defs{$d}{STATE});
+  return $iname if(!$type || !$iv);
+
+  $iv =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
+  $iname = $FW_icons{$iv}         if($FW_icons{$iv});         # on.png
+  $iname = $FW_icons{$type}       if($FW_icons{$type});       # FS20.png
+  $iname = $FW_icons{"$type.$iv"} if($FW_icons{"$type.$iv"}); # FS20.on.png
+  $iname = $FW_icons{$d}          if($FW_icons{$d});          # lamp.png
+  $iname = $FW_icons{"$d.$iv"}    if($FW_icons{"$d.$iv"});    # lamp.on.png
+  return $iname;
+}
+
 1;
