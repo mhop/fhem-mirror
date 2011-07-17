@@ -36,7 +36,6 @@ SVG_render($$$$$$$)
   my $SVG_ss = shift;  # small screen
 
   return "" if(!defined($dp));
-
   my $th = 16;                          # "Font" height
   my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
   my %conf;                             # gnuplot file settings

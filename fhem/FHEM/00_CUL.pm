@@ -48,7 +48,7 @@ my @ampllist = (24, 27, 30, 33, 36, 38, 40, 42); # rAmpl(dB)
 
 my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS: " .
                     ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
-                    ":ESA2000:CUL_IR:";
+                    ":ESA2000:CUL_IR:CUL_TX";
 
 my $clientsHomeMatic = ":CUL_HM:HMS:";
 
@@ -66,6 +66,7 @@ my %matchListSlowRF = (
     "B:CUL_HOERMANN"=> "^R..........",
     "C:ESA2000"   => "^S................................\$",
     "D:CUL_IR"    => "^I............",
+    "E:CUL_TX"    => "^t..........",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A......................",
@@ -817,7 +818,7 @@ CUL_Parse($$$$$)
   my $rssi;
 
   my $dmsg = $rmsg;
-  if($dmsg =~ m/^[AFTKEHRS]([A-F0-9][A-F0-9])+$/) { # RSSI
+  if($dmsg =~ m/^[AFTKEHRSt]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
@@ -894,6 +895,8 @@ CUL_Parse($$$$$)
   } elsif($fn eq "I" && $len >= 12) {              # IR-CUL/CUN/CUNO
     ;
   } elsif($fn eq "A" && $len >= 21) {              # AskSin/BidCos/HomeMatic
+    ;
+  } elsif($fn eq "t" && $len >= 5)  {              # TX3
     ;
   } else {
     Log GetLogLevel($name,2), "$name: unknown message $dmsg";
