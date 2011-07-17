@@ -1,0 +1,27 @@
+# Attribute 'small' is useful for gnuplot/-scroll only,
+# if plotsize is less than 800,400
+#set terminal png transparent small size <SIZE> crop
+
+set terminal png transparent size <SIZE> crop
+
+set output '<OUT>.png'
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics nomirror
+set y2tics
+#set ytics
+set title '<L1>'
+set grid xtics y2tics
+
+set y2label "Temperature in C"
+set ylabel "Humidity (%)"
+
+#FileLog 4:T\x3a:10:
+#FileLog 4:H\x3a:50:
+
+plot \
+  "< awk '/T:/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
+  "< awk '/H:/ {print $1, $4}' <IN>"\
+     using 1:2 axes x1y1 title 'Humidity (%)' with lines lw 1\
