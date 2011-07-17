@@ -12,16 +12,16 @@ use warnings;
 
 my %flogpar = (
   "CUL_EM.*"
-      => { GPLOT => "cul_em:Power,", FILTER => "%NAME" },
+      => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT.*" },
   "CUL_WS.*"
-      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
+      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME:T:.*" },
   "CUL_FHTTK.*"
       => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
   "FHT.*"
       => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
   "HMS100TFK_.*"
       => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
-  "HMS100T._.*"
+  "HMS100T_.*"
       => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
   "KS300.*"
       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
@@ -58,14 +58,16 @@ my %flogpar = (
 
   # HomeMatic
   "CUL_HM_THSensor.*"
-      => { GPLOT => "hms:Temp/Hum,",
-           FILTER => "%NAME:T:.*" },
+      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
   "CUL_HM_KS550.*"
       => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
   "CUL_HM_HM-CC-TC.*"
-      => { GPLOT => "hms:Temp/Hum,",
-           FILTER => "%NAME:T:.*" },
+      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
+
+  # Lacrosse TX
+  "CUL_TX.*"
+      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:(T|H):.*" },
 );
 
 # Do not create FileLog for the following devices.
