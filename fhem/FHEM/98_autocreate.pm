@@ -67,7 +67,7 @@ my %flogpar = (
 
   # Lacrosse TX
   "CUL_TX.*"
-      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:(T|H):.*" },
+      => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME:(T|H):.*" },
 );
 
 # Do not create FileLog for the following devices.
