@@ -82,7 +82,7 @@ CUL_TX_Parse($$)
   my $type = $a[2];
   if($type eq "0") {
      $devtype = "temperature";
-     $val = sprintf("%2.1f", ($valraw - 50 + $hash->{corr}) );
+     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
      Log $ll4, "CUL_TX $devtype $name $id3 T: $val F: $id2";
      $no = "T: $val";
 
