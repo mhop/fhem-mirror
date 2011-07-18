@@ -118,6 +118,7 @@
       <a href="#USBWX">USBWX</a> &nbsp;
       <a href="#VantagePro2">VantagePro2</a> &nbsp;
       <a href="#WEBIO">WEBIO</a> &nbsp;
+      <a href="#WEBIO_12DIGITAL">WEBIO_12DIGITAL</a> &nbsp;
       <a href="#WS2000">WS2000</a> &nbsp;
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#WS3600">WS3600</a> &nbsp;
@@ -3619,6 +3620,40 @@ A line ending with \ will be concatenated with the next one, so long lines
     Examples:
     <ul>
       <code>set pumpspeed 6.75</code><br>
+    </ul>
+    <br>
+  </ul>
+</ul>
+
+<a name="WEBIO_12DIGITAL"></a>
+<h3>WEBIO_12DIGITAL</h3>
+<ul>
+  <a name="WEBIO_12DIGITALdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WEBIO_12DIGITAL &lt;ip-address&gt; &lt;outputport&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines an Web-IO-Digital device (Box with up to 12 digital in/outputs, www.wut.de) via ip address. The status of the device is also pooled (delay interval).<br><br>
+
+    Examples:
+    <ul>
+      <code>define motor1 WEBIO_12DIGITAL 192.168.8.200 1 60</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="WEBIO_12DIGITALset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+       on off
+    </pre>
+    Examples:
+    <ul>
+      <code>set motor1 on</code><br>
     </ul>
     <br>
   </ul>
