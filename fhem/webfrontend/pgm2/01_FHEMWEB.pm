@@ -687,8 +687,7 @@ FW_roomOverview($)
       if(FW_calcWeblink(undef,undef)) {
         pO FW_textfield("cmd", $FW_ss ? 20 : 40);
         $tf_done = 1;
-        pO "</td><td>";
-        pO "&nbsp;&nbsp;";
+        pO "</td><td>&nbsp;&nbsp;</td>";
         FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
         FW_zoomLink("zoom=1",  "Zoom-out.png","zoom out");
         FW_zoomLink("off=-1",  "Prev.png",    "prev");
@@ -696,7 +695,7 @@ FW_roomOverview($)
       }
     }
   }
-  pO FW_textfield("cmd", $FW_ss ? 28 : 40) if(!$tf_done);
+  pO FW_textfield("cmd", $FW_ss ? 25 : 40) if(!$tf_done);
   pO "</td></tr></table>";
   pO "</div>";
   pO "</form>";
@@ -735,10 +734,12 @@ FW_roomOverview($)
   push(@list1, ""); push(@list2, "");
 
   pO "<div id=\"menu\">";
+  pO "<table>";
   if($FW_ss) {  # Make a selection sensitive dropdown list
+    pO "  <tr><td>";
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       if(!$list1[$idx]) {
-        pO "</select>" if($idx);
+        pO "</select></td><td>" if($idx);
         pO "<select OnChange=\"location.href=" .
                               "this.options[this.selectedIndex].value\">"
           if($idx<int(@list1)-1);
@@ -747,10 +748,10 @@ FW_roomOverview($)
         pO "  <option value=$list2[$idx]$sel>$list1[$idx]</option>";
       }
     }
+    pO "  </td></tr>";
 
   } else {
 
-    pO "<table>";
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
@@ -768,9 +769,9 @@ FW_roomOverview($)
         pO "</tr>";
       }
     }
-    pO "</table>";
 
   }
+  pO "</table>";
   pO "</div>";
 }
 
@@ -1313,8 +1314,10 @@ FW_zoomLink($$$)
   }
 
 
+  pO "<td>";
   pHPlain "$cmd", "<img style=\"border-color:transparent\" alt=\"$alt\" ".
                 "src=\"$FW_ME/icons/$img\"/>";
+  pO "</td>";
 }
 
 ##################

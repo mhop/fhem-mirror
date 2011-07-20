@@ -1,8 +1,8 @@
 body     { background-color: #FFFFE7; }
-#logo    { position:absolute; top:10px; left:10px; }
-#menu    { position:absolute; top:10px; left:85px; }
-#hdr     { position:absolute; top:40px; left:85px; }
-#content { position:absolute; top:85px; left:10px; }
+#logo    { position:absolute; top: 2px; left: 2px; }
+#menu    { position:absolute; top: 2px; left:65px; }
+#hdr     { position:absolute; top:40px; left:65px; }
+#content { position:absolute; top:85px; left: 5px; }
 
 a {  color: #278727; }
 
