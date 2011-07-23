@@ -241,9 +241,9 @@ FS20_Set($@)
   # Look for all devices with the same code, and set state, timestamp
   my $code = "$hash->{XMIT} $hash->{BTN}";
   my $tn = TimeNow();
-  foreach my $n (keys %{ $modules{FS20}{defptr}{$code} }) {
-
-    my $lh = $modules{FS20}{defptr}{$code}{$n};
+  my $defptr = $modules{FS20}{defptr};
+  foreach my $n (keys %{ $defptr->{$code} }) {
+    my $lh = $defptr->{$code}{$n};
     $lh->{CHANGED}[0] = $v;
     $lh->{STATE} = $v;
     $lh->{READINGS}{state}{TIME} = $tn;
@@ -280,10 +280,9 @@ FS20_Define($$)
   $hash->{XMIT} = lc($housecode);
   $hash->{BTN}  = lc($btncode);
 
-  my $code = "$housecode $btncode";
+  my $code = lc("$housecode $btncode");
   my $ncode = 1;
   my $name = $a[0];
-
   $hash->{CODE}{$ncode++} = $code;
   $modules{FS20}{defptr}{$code}{$name}   = $hash;
 
