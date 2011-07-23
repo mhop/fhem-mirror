@@ -944,8 +944,8 @@ CUL_SimpleWrite(@)
   #Log 1, "SW: $msg";
   $msg .= "\n" unless($nonl);
 
-  $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
+  $hash->{USBDev}->write($msg)    if($hash->{USBDev});
+  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
 
   select(undef, undef, undef, 0.001);
 }
