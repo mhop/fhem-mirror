@@ -318,6 +318,7 @@ CUL_HM_Parse($$)
     if($cmd =~ m/^.441/ && $p =~ m/^01(......)/) {
       $state = $1;
       push @event, "state:motion";
+      push @event, "motion:"; #added peterp
       # A0D258410143DFABC82AD0601240E
     }
 
