@@ -52,8 +52,8 @@ EIB_Define($$)
   my $u = "wrong syntax: define <name> EIB <group name>";
 
   return $u if(int(@a) < 3);
-  return "Define $a[0]: wrong group name format: specify as 0-15/0-15/0-255"
-  		if( ($a[2] !~ m/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/i));
+  return "Define $a[0]: wrong group name format: specify as 0-15/0-15/0-255 or as hex"
+  		if( ($a[2] !~ m/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/i)  && ($a[2] !~ m/^[0-9]{4}$/i));
 
   my $groupname = eib_name2hex($a[2]);
 
