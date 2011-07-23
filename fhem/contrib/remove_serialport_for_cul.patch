@@ -1,0 +1,105 @@
+? remove_serialport_for_cul.patch
+Index: 00_CUL.pm
+===================================================================
+RCS file: /cvsroot/fhem/fhem/FHEM/00_CUL.pm,v
+retrieving revision 1.96
+diff -u -r1.96 00_CUL.pm
+--- 00_CUL.pm	17 Jul 2011 19:13:40 -0000	1.96
++++ 00_CUL.pm	22 Jul 2011 18:20:38 -0000
+@@ -944,7 +941,7 @@
+   #Log 1, "SW: $msg";
+   $msg .= "\n" unless($nonl);
+ 
+-  $hash->{USBDev}->write($msg . "\n") if($hash->{USBDev});
++  syswrite($hash->{USBDev}, $msg)     if($hash->{USBDev});
+   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
+ 
+   select(undef, undef, undef, 0.001);
+@@ -957,7 +954,11 @@
+   my ($hash) = @_;
+ 
+   if($hash->{USBDev}) {
+-    my $buf = $hash->{USBDev}->input();
++    my $buf;
++    if(!defined(sysread($hash->{USBDev}, $buf, 256))) {
++      CUL_Disconnected($hash);
++      return undef;
++    }
+     #Log 1, "Got $buf";
+     return $buf;
+   }
+@@ -988,8 +989,7 @@
+     delete($hash->{TCPDev});
+ 
+   } elsif($hash->{USBDev}) {
+-    $hash->{USBDev}->close() ;
+-    delete($hash->{USBDev});
++    close($hash->{USBDev});
+ 
+   }
+   ($dev, undef) = split("@", $dev); # Remove the baudrate
+@@ -1006,6 +1006,7 @@
+   my $dev = $hash->{DeviceName};
+   my $name = $hash->{NAME};
+   my $po;
++  my $res;
+   my $baudrate;
+   ($dev, $baudrate) = split("@", $dev);
+ 
+@@ -1048,11 +1049,10 @@
+      require Win32::SerialPort;
+      $po = new Win32::SerialPort ($dev);
+     } else  {
+-     require Device::SerialPort;
+-     $po = new Device::SerialPort ($dev);
++     $res=open($po, "+<${dev}");
+     }
+ 
+-    if(!$po) {
++    if(!$res) {
+       return undef if($reopen);
+       Log(3, "Can't open $dev: $!");
+       $readyfnlist{"$name.$dev"} = $hash;
+@@ -1063,41 +1063,11 @@
+     if( $^O =~ /Win/ ) {
+       $readyfnlist{"$name.$dev"} = $hash;
+     } else {
+-      $hash->{FD} = $po->FILENO;
++      $hash->{FD} = fileno($po);
+       delete($readyfnlist{"$name.$dev"});
+       $selectlist{"$name.$dev"} = $hash;
+     }
+ 
+-    if($baudrate) {
+-      $po->reset_error();
+-      Log 3, "CUL setting $name baudrate to $baudrate";
+-      $po->baudrate($baudrate);
+-      $po->databits(8);
+-      $po->parity('none');
+-      $po->stopbits(1);
+-      $po->handshake('none');
+-
+-      # This part is for some Linux kernel versions whih has strange default
+-      # settings.  Device::SerialPort is nice: if the flag is not defined for your
+-      # OS then it will be ignored.
+-      $po->stty_icanon(0);
+-      #$po->stty_parmrk(0); # The debian standard install does not have it
+-      $po->stty_icrnl(0);
+-      $po->stty_echoe(0);
+-      $po->stty_echok(0);
+-      $po->stty_echoctl(0);
+-
+-      # Needed for some strange distros
+-      $po->stty_echo(0);
+-      $po->stty_icanon(0);
+-      $po->stty_isig(0);
+-      $po->stty_opost(0);
+-      $po->stty_icrnl(0);
+-    }
+-
+-    $po->write_settings;
+-
+-
+   }
+ 
+   if($reopen) {
