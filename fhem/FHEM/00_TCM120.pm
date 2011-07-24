@@ -29,6 +29,11 @@ TCM120_Initialize($)
   $hash->{ReadFn}  = "TCM120_Read";
   $hash->{WriteFn} = "TCM120_Write";
   $hash->{ReadyFn} = "TCM120_Ready";
+  $hash->{Clients} = ":EnOcean:";
+  my %matchList= (
+    "1:EnOcean"   => "^EnOcean:0B",
+  );
+  $hash->{MatchList} = \%matchList;
 
 # Normal devices
   $hash->{DefFn}   = "TCM120_Define";
@@ -134,8 +139,8 @@ TCM120_Read($)
       Log $ll5, "$name: wrong checksum: got $crc, computed $mycrc" ;
       return;
     }
-    if($net =~ m/^0b/) {        # Receive Radio Telegram (RRT)
-      Dispatch($hash, $net, undef);
+    if($net =~ m/^0B/) {        # Receive Radio Telegram (RRT)
+      Dispatch($hash, "EnOcean:$net", undef);
     } else {                    # Receive Message Telegram (RMT)
       TCM120_Parse($hash, $net, 0);
     }
@@ -187,7 +192,7 @@ TCM120_Parse($$$)
   my $cmd = $parsetbl{substr($rawmsg, 0, 4)};
 
   if(!$cmd) {
-    $msg ="$name, Unknown command: $rawmsg";
+    $msg ="Unknown command: $rawmsg";
 
   } else {
     if($cmd->{expr}) {
@@ -198,6 +203,7 @@ TCM120_Parse($$$)
       $msg .= eval $cmd->{expr};
 
     } else {
+      return "" if($cmd ->{msg} eq "OK" && !$ret); # SKIP Ok
       $msg = $cmd->{msg};
 
     }
