@@ -86,6 +86,7 @@
       <a href="#ECMD">ECMD</a> &nbsp;
       <a href="#ECMDDevice">ECMDDevice</a> &nbsp;
       <a href="#DS18S20">DS18S20</a> &nbsp;
+      <a href="#EnOcean">EnOcean</a> &nbsp;
       <a href="#EM">EM</a> &nbsp;
       <a href="#EMEM">EMEM</a> &nbsp;
       <a href="#EMGZ">EMGZ</a> &nbsp;
@@ -2719,6 +2720,84 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+
+<a name="EnOcean"></a>
+<h3>EnOcean</h3>
+<ul>
+  Devices sold by numerous hardware verndors (e.g. Eltako, Peha, etc), using
+  the RF Protocol provided by the EnOcean Alliance.
+  This module is currently only tested to work with remotes, but other types of
+  devices should also work. Feedback is welcome.
+  <br><br>
+  <a name="EnOceandefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EnOcean &lt;ID&gt;</code>
+    <br><br>
+
+    Define an EnOcean device, connected via a <a href="#TCM120">TCM120</a>. The
+    &lt;ID&gt; parameter is an 8 digit hex number. For remotes and sensors the
+    <a href="#autocreate">autocreate</a> module may help you.<br>
+    In order to control devices, you cannot reuse the ID's of other devices
+    (like remotes), instead you have to create your own, which must be in the
+    allowed ID-Range of the underlying IO device. For this first query the
+    TCM120 with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
+    up to 128 ID's starting with the base shown there. If you are using an
+    ID outside of the allowed range, you'll see an ERR_ID_RANGE message in the
+    fhem log.<br>
+
+    For each ID there is the possibility to use 8 different commands, so
+    in fact you can control 8*128/2=512 switches.<br><br>
+
+
+    Example:
+    <ul>
+      <code>define switch1 EnOcean ffc54500</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EnOceanset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set switch1 &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of Btn0, Btn1, Btn2, Btn3, then certain
+    combinations of these buttons: Btn0,Btn2 Btn0,Btn3 Btn1,Btn2 Btn1,Btn3 and
+    released.<br>
+    In fact we are trying to emulate a PTM100 type remote, which is capable to
+    report either single buttons, some combinations of 2 buttons and the
+    released state.<br>
+    If you define an <a href="#eventMap">eventMap</a> attribute with on/off,
+    then you'll be able to easily set the device from the <a
+    href="#FHEMWEB">WEB</a> frontend.<br><br>
+    Example:
+    <ul><code>
+      set switch1 Btn1<br>
+      set switch1 Btn0,Btn2<br>
+      attr eventMap Btn1:on Btn0,Btn2:off<br>
+      set switch1 on<br>
+    </code></ul>
+  </ul>
+  <br>
+
+  <a name="EnOceanget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="EnOceanattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a></li>
+    <li><a href="#subType">subType</a></li>
+  </ul>
+  <br>
+</ul>
 
 <a name="EM"></a>
 <h3>EM</h3>
@@ -5656,6 +5735,8 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
   <b>Set </b>
   <ul>
     <li>idbase<br>
+        Set the ID base. Note: The firmware executes this command only up to then
+        times to prevent misuse.
     <li>modem_off<br>
     <li>modem_on<br>
     <li>reset<br>
@@ -5671,6 +5752,9 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
   <b>Get</b>
   <ul>
     <li>idbase<br>
+        Get the ID base. You need this command in order to control EnOcean
+        devices, see the <a href="#EnOceandefine">EnOcean</a>
+        paragraph.<br><br>
     <li>modem_status<br>
     <li>sensitivity<br>
     <li>sw_ver<br>

@@ -79,7 +79,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "HTTPS";
+                     "stylesheet HTTPS";
 
   ###############
   # Initialize internal structures
@@ -329,7 +329,7 @@ FW_AnswerCall($)
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$, ||
-          $arg =~ m,^$FW_ME/(.*.png)$,) {
+          $arg =~ m,^$FW_ME/(.*.png)$,i) {
     my $img = $1;
     my $cachable = 1;
     if(!open(FH, "$FW_dir/$img")) {
@@ -427,6 +427,7 @@ FW_AnswerCall($)
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   my $stylecss = ($FW_ss ? "style_smallscreen.css" :
                   $FW_tp ? "style_touchpad.css" : "style.css");
+  $stylecss = AttrVal($FW_wname, "stylecss", $stylecss);
   pO "<link href=\"$FW_ME/$stylecss\" rel=\"stylesheet\"/>";
   pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
@@ -800,20 +801,24 @@ FW_showRoom()
 
     ############################
     # Print the table headers
-    my @sortedDevs = sort keys %{$FW_types{$type}};
-    my $allSets = " " . getAllSets($sortedDevs[0]) . " ";
-
+    my @roomDevs = grep { $FW_room && ($FW_room eq "all" ||
+                                       $FW_rooms{$FW_room}{$_}) }
+                   sort keys %{$FW_types{$type}};
+    my $allSets = " " . getAllSets($roomDevs[0]) . " ";
     my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
+    if(!$hasOnOff) {    # Check the eventMap
+      my $em = AttrVal($roomDevs[0], "eventMap", "") . " ";
+      $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
+    }
+
 
     my $th;
     my $id = "class=\"block\"";
     if($hasOnOff) {
       $th = "$type</th><th>State</th><th colspan=\"2\">Set to";
-    } elsif($type eq "FHT") {
-      $th = "FHT dev.</th><th>Measured</th><th>Set to";
+    } elsif($allSets =~ m/ desired-temp /) {
+      $th = "Device</th><th>Measured</th><th>Set to";
     } elsif($type eq "at")         { $th = "Scheduled commands (at)";
-    } elsif($type eq "FileLog")    { $th = "Logs";
-    } elsif($type eq "_internal_") { $th = "Global variables";
     } elsif($type eq "weblink")    { $th = ""; $id = "";
     } else {
       $th = $type;
@@ -822,7 +827,7 @@ FW_showRoom()
     pO "  <tr><th>$th</th></tr>" if($th);
 
     my $row=1;
-    foreach my $d (@sortedDevs) {
+    foreach my $d (@roomDevs) {
       next if($FW_room && $FW_room ne "all" &&
              !$FW_rooms{$FW_room}{$d});
 
@@ -831,18 +836,13 @@ FW_showRoom()
       my $v = $defs{$d}{STATE};
 
       if($hasOnOff) {
-
         my $iv = $v;    # icon value
         my $iname = "";
 
         if(defined(AttrVal($d, "showtime", undef))) {
-
           $v = $defs{$d}{READINGS}{state}{TIME};
-
         } elsif($iv) {
-
           $iname = FW_dev2image($d);
-
         }
         $v = "" if(!defined($v));
 
@@ -858,8 +858,7 @@ FW_showRoom()
           pH "cmd.$d=set $d off$rf", "off", 1;
         }
 
-      } elsif($type eq "FHT") {
-
+      } elsif($allSets =~ m/ desired-temp /) {
         $v = ReadingsVal($d, "measured-temp", "");
 
         $v =~ s/ .*//;
