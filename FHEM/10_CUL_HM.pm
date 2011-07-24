@@ -321,6 +321,8 @@ CUL_HM_Parse($$)
       push @event, "motion:"; #added peterp
       # A0D258410143DFABC82AD0601240E
     }
+    push @event, "cover:closed" if($p =~ m/^0601..00$/);         # By peterp
+    push @event, "cover:open"   if($p =~ m/^0601..0E$/);
 
     CUL_HM_SendCmd($shash, "++8002".$id.$src."0101${state}00",1,0)
       if($id eq $dst && $cmd ne "8002");  # Send Ack
