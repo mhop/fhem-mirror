@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.147 2011-07-15 08:59:31 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.148 2011-07-24 11:53:11 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -179,14 +179,14 @@ my $stt_day;                    # Used by SecondsTillTomorrow()
 
 $init_done = 0;
 
-$modules{_internal_}{ORDER} = -1;
-$modules{_internal_}{LOADED} = 1;
-$modules{_internal_}{AttrList} =
+$modules{Global}{ORDER} = -1;
+$modules{Global}{LOADED} = 1;
+$modules{Global}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
         "autoload_undefined_devices dupTimeout";
-$modules{_internal_}{AttrFn} = "GlobalAttr";
+$modules{Global}{AttrFn} = "GlobalAttr";
 my $commonAttr = "eventMap";
 
 
@@ -2174,7 +2174,7 @@ doGlobalDef($)
 
   $devcount = 1;
   $defs{global}{NR}    = $devcount++;
-  $defs{global}{TYPE}  = "_internal_";
+  $defs{global}{TYPE}  = "Global";
   $defs{global}{STATE} = "<no definition>";
   $defs{global}{DEF}   = "<no definition>";
   $defs{global}{NAME}  = "global";
