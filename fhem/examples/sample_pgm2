@@ -3,7 +3,7 @@
 #
 attr global logfile /tmp/fhem-%Y-%m.log
 attr global modpath .                  # where our FHEM directory is
-attr global port 7072                  # our TCP/IP port (localhost only)
+attr global port 7072 global           # our TCP/IP port (localhost only)
 attr global statefile /tmp/fhem.save   # where to save the state of the devices
 attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 
