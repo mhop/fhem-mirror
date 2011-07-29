@@ -72,7 +72,7 @@ TUL_Define($$)
 
   my $name = $a[0];
   my $dev = $a[2];
-  my $devaddr = tul_str2hex($a[3],0);
+  my $devaddr = tul_str2hex($a[3]);
   my $linedef = substr(tul_str2hex($a[4]),0,2) if(@a > 4);
 
   if($dev eq "none") {
@@ -585,7 +585,7 @@ TUL_Attr(@)
 sub tul_hex2addr {
 	my $str = lc($_[0]);
     if ($str =~ /([0-9a-f])([0-9a-f])([0-9a-f]{2})/) {
-        return (hex($1) << 11) | (hex($2) << 8) | hex($3);
+        return (hex($1) << 12) | (hex($2) << 8) | hex($3);
     }
     else
     {
