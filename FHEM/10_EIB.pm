@@ -53,9 +53,9 @@ EIB_Define($$)
 
   return $u if(int(@a) < 3);
   return "Define $a[0]: wrong group name format: specify as 0-15/0-15/0-255 or as hex"
-  		if( ($a[2] !~ m/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/i)  && ($a[2] !~ m/^[0-9]{4}$/i));
+  		if( ($a[2] !~ m/^[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{1,3}$/i)  && (lc($a[2]) !~ m/^[0-9a-f]{4}$/i));
 
-  my $groupname = eib_name2hex($a[2]);
+  my $groupname = eib_name2hex(lc($a[2]));
 
   $hash->{GROUP} = lc($groupname);
 
