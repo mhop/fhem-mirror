@@ -2405,8 +2405,9 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Notes</b>
   <ul>
   <li>Currently supported device families: remote, switch, dimmer,
-      blindActuator, smokeDetector, threeStateSensor, THSensor and the
-      KS550</li>
+      blindActuator, smokeDetector, threeStateSensor, THSensor,
+      motionSensor. Special devices: KS550, HM-CC-TC and the KFM100.
+      </li>
   <li>Device messages can only be interpreted correctly if the device type is
       known. fhem will extract the device type from a "pairing request"
       message, even if it won't respond to it (see <a
