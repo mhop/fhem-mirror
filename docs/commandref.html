@@ -1318,14 +1318,16 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="eventMap"></a>
     <li>eventMap<br>
-        Exchange event or command names to a device specific version.  This
-        will also be used to exchange set arguments (if possible).
-        Example:<ul><code>
+        Replace event names and set arguments. The value of this attribute
+        consists of a list of space separated values, each value is a colon
+        separated pair. The first part specifies the "old" value, the second
+        the new/desired value. If the first character is slash(/) or komma(,)
+        then split not by space but by this character, enabling to embed spaces.
+        Examples:<ul><code>
         attr store eventMap on:open off:closed<br>
+        attr store eventMap /on-for-timer 10:open/off:closed/<br>
         set store open
         </code></ul>
-        The attribute applies to all set commands, events and to the device
-        state, but not to the other device READINGS.
         </li><br>
 
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
