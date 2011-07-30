@@ -80,7 +80,7 @@ my %culHmModel=(
   "003A" => "HM-CC-VD",       # Actuator, battery/etc missing
   "003B" => "HM-RC-4-B",
   "003C" => "HM-WDS20-TH-O",
-  "003D" => "HM-WDS10-TH-O",
+  "003D" => "HM-WDS10-TH-O",  # Reported to work (2011-07-26)
   "003E" => "HM-WDS30-T-O",
   "003F" => "HM-WDS40-TH-I",
   "0040" => "HM-WDS100-C6-O", # Identical to KS550?
@@ -321,8 +321,10 @@ CUL_HM_Parse($$)
       push @event, "motion:"; #added peterp
       # A0D258410143DFABC82AD0601240E
     }
-    push @event, "cover:closed" if($p =~ m/^0601..00$/);         # By peterp
-    push @event, "cover:open"   if($p =~ m/^0601..0E$/);
+    if($cmd =~ m/^.610/) {
+      push @event, "cover:closed" if($p =~ m/^0601..00$/);         # By peterp
+      push @event, "cover:open"   if($p =~ m/^0601..0E$/);
+    }
 
     CUL_HM_SendCmd($shash, "++8002".$id.$src."0101${state}00",1,0)
       if($id eq $dst && $cmd ne "8002");  # Send Ack
@@ -583,7 +585,7 @@ my %culHmSubTypeSets = (
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>" },
   winMatic =>
-        { matic => "<btn>", read => "<btn>", config => "<btn> <txt1> <txt2>", create => "<txt>" },
+        { matic => "<btn>", read => "<btn>", keydef => "<btn> <txt1> <txt2>", create => "<txt>" },
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>
@@ -776,65 +778,29 @@ CUL_HM_Set($@)
   } elsif($cmd eq "read") { ###################################
     $sndcmd = sprintf("++B001%s%s0104%s%02X03", $id, $dst, $id, $a[2]);
 
-  } elsif($cmd eq "config") { #####################################
+  } elsif($cmd eq "keydef") { #####################################
     if ($a[3] eq "tilt") {
-      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);        
-      CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);    
-      $sndcmd =  sprintf("++A001%s%s01080B220D838B228D83", $id, $dst);
-      sleep (2);
-      CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);
-      sleep(2);
-      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0B220D838B228D83");
 
     } elsif ($a[3] eq "close") {
-      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
-      CUL_HM_SendCmd($hash, $sndcmd, 2, 2);
-      $sndcmd =  sprintf("++A001%s%s01080B550D838B558D83", $id, $dst);
-      sleep(2);
-      CUL_HM_SendCmd($hash, $sndcmd, 2, 2);
-      sleep(2);
-      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0B550D838B558D83");
 
     } elsif ($a[3] eq "closed") {
-      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      $sndcmd =  sprintf("++A001%s%s01080F008F00", $id, $dst);
-      sleep(2);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      sleep(2);
-      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0F008F00");
 
     } elsif ($a[3] eq "bolt") {
-      $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      $sndcmd =  sprintf("++A001%s%s01080FFF8FFF", $id, $dst);
-      sleep(2);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      sleep(2);
-      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0FFF8FFF");
 
     } elsif ($a[3] eq "delete") {
       $sndcmd = sprintf("++B001%s%s0102%s%02X%s", $id, $dst, $id, $a[2], $chn);
 
     } elsif ($a[3] eq "speedclose") {
-      $sndcmd = sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      $sndcmd = $a[4]*2;
-      $sndcmd = sprintf("++A001%s%s010823%02XA3%02X", $id, $dst, $sndcmd, $sndcmd);
-      sleep(2);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      sleep(2);
-      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
+                                sprintf("23%02XA3%02X", $sndcmd, $sndcmd));
 
     } elsif ($a[3] eq "speedtilt") {
-      $sndcmd = sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a[2]);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      $sndcmd = $a[4]*2;
-      $sndcmd = sprintf("++A001%s%s010822%02XA2%02X", $id, $dst, $sndcmd, $sndcmd);
-      sleep(2);
-      CUL_HM_SendCmd($hash, $sndcmd , 2, 2);
-      sleep(2);
-      $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
+                                sprintf("22%02XA2%02X", $sndcmd, $sndcmd));
     }
   }
 
@@ -1232,6 +1198,20 @@ CUL_HM_pushConfig($$$$$$)
   }
   CUL_HM_PushCmdStack($hash,
         sprintf("++A001%s%s%02X06",$src,$dst,$chn));
+}
+
+sub
+CUL_HM_maticFn($$$$$)
+{
+  my ($hash, $id, $dst, $a2, $cfg) = @_;
+  my $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a2);
+  CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);    
+  $sndcmd =  sprintf("++A001%s%s01080%s", $id, $dst, $cfg);
+  sleep (2);
+  CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);
+  sleep(2);
+  $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
+  return $sndcmd;
 }
 
 1;
