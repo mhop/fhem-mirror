@@ -2239,7 +2239,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   The CUL_TX module interprets TX2/TX3 type of messages received by the CUL,
   see also http://www.f6fbb.org/domo/sensors/tx3_th.php.
-  This protocol is used by the Lacrosse TX3-TH thermo/hygro sensor and other
+  This protocol is used by the La Crosse TX3-TH thermo/hygro sensor and other
   wireless themperature sensors. Please report the manufacturer/model of other
   working devices.  <br><br>
 
@@ -2405,8 +2405,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Notes</b>
   <ul>
   <li>Currently supported device families: remote, switch, dimmer,
-      blindActuator, smokeDetector, threeStateSensor, THSensor,
-      motionSensor. Special devices: KS550, HM-CC-TC and the KFM100.
+      blindActuator, motionDetector, smokeDetector, threeStateSensor, THSensor,
+      winmatic. Special devices: KS550, HM-CC-TC and the KFM100.
       </li>
   <li>Device messages can only be interpreted correctly if the device type is
       known. fhem will extract the device type from a "pairing request"
@@ -2537,7 +2537,8 @@ A line ending with \ will be concatenated with the next one, so long lines
              set 4Dis text 1 off Kitchen Off<br>
              </ul>
        </ul></li>
-     <li>Thermostat (HM-CC-TC)
+     <br>
+     <li>Climate-Control (HM-CC-TC)
        <ul>
          <li>day-temp &lt;tmp&gt;<br>
              night-temp &lt;tmp&gt;<br>
