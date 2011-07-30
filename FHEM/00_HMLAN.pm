@@ -43,7 +43,7 @@ HMLAN_Initialize($)
   $hash->{UndefFn} = "HMLAN_Undef";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
-                     "hmId hmProtocolEvents";
+                     "hmId hmProtocolEvents hmKey";
 }
 
 #####################################
@@ -63,7 +63,7 @@ HMLAN_Define($$)
   my $name = $a[0];
   my $dev = $a[2];
   $dev .= ":1000" if($dev !~ m/:/);
-  $attr{$name}{hmId} = sprintf("%06X", time() % 0xffffff);
+  $attr{$name}{hmId} = sprintf("%06X", time() % 0xffffff); # Will be overwritten
 
   if($dev eq "none") {
     Log 1, "$name device is none, commands will be echoed only";
@@ -199,10 +199,15 @@ HMLAN_Write($$$)
   my ($hash,$fn,$msg) = @_;
 
   my $dst = substr($msg, 16, 6);
-  if(!$lhash{$dst} && $dst ne "000000") {
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+$dst");
+  if(!$lhash{$dst} && $dst ne "000000") {       # Don't think I grok the logic
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
     HMLAN_SimpleWrite($hash, "-$dst");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,\r\n+$dst,00,00,\r\n+$dst");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
+    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
     $lhash{$dst} = 1;
   }
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
@@ -273,7 +278,7 @@ HMLAN_Parse($$)
     ($1,   $2,      $3,    $4,  $5,    $6);
 
     $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
-    $dmsg .= "NACK" if($status !~ m/...1/);
+    $dmsg .= "NACK" if($status !~ m/00(01|02|21)/);
     $hash->{uptime} = HMLAN_uptime($msec);
 
   } elsif($rmsg =~
@@ -284,15 +289,14 @@ HMLAN_Parse($$)
     $hash->{firmware} = sprintf("%d.%d", ($vers>>12)&0xf, $vers & 0xffff);
     $hash->{owner} = $owner;
     $hash->{uptime} = HMLAN_uptime($msec);
-    my $myId = AttrVal($name, "hmId", $owner);
-    if($owner ne $myId && !AttrVal($name, "dummy", 0)) {
-      Log 1, "HMLAN setting owner to $myId from $owner";
-      HMLAN_SimpleWrite($hash, "A$myId");
-    }
+    return;
+
+  } elsif($rmsg =~ m/^I00.*/) {
+    # Ack from the HMLAN
     return;
 
   } else {
-    Log $ll5, "$name Unknown msg $rmsg";
+    Log $ll5, "$name Unknown msg >$rmsg<";
     return;
 
   }
@@ -418,6 +422,18 @@ HMLAN_OpenDev($$)
   } else {
     Log 3, "HMLAN device opened";
   }
+
+  my $id  = AttrVal($name, "hmId", undef);
+  my $key = AttrVal($name, "hmKey", "");        # 36(!) hex digits
+
+  my $s2000 = sprintf("%02X", time()-946681200); # sec since 2000
+  HMLAN_SimpleWrite($hash, "A$id") if($id);
+  HMLAN_SimpleWrite($hash, "C");
+  HMLAN_SimpleWrite($hash, "Y01,01,$key");
+  HMLAN_SimpleWrite($hash, "Y02,00,");
+  HMLAN_SimpleWrite($hash, "Y03,00,");
+  HMLAN_SimpleWrite($hash, "Y03,00,");
+  HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
 
   $hash->{STATE}="Initialized";
 
