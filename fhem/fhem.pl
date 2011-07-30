@@ -66,7 +66,7 @@ sub Log($$);
 sub OpenLogfile($);
 sub PrintHash($$);
 sub ReadingsVal($$$);
-sub ReplaceEventMap($$);
+sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
 sub RemoveInternalTimer($);
 sub SecondsTillTomorrow($);
@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.148 2011-07-24 11:53:11 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.149 2011-07-30 13:22:25 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1043,16 +1043,8 @@ DoSet(@)
   my $dev = $a[0];
   return "Please define $dev first" if(!$defs{$dev});
   return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
-  if($attr{$dev}{eventMap}) {
-    foreach my $rv (split(" ", $attr{$dev}{eventMap})) {
-      my ($re, $val) = split(":", $rv, 2);
-      if($a[1] =~ m/$val/) {
-        $a[1] =~ s/$val/$re/;
-        last;
-      }
-    }
-  }
 
+  @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
   my $ret = CallFn($dev, "SetFn", $defs{$dev}, @a);
   return $ret if($ret);
 
@@ -1724,25 +1716,18 @@ CommandSetstate($$)
     my $d = $defs{$sdev};
 
     # Detailed state with timestamp
-    if($a[1] =~ m/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} /) {
-      my @b = split(" ", $a[1], 4);
-
-      if($defs{$sdev}{TYPE} eq "FS20" && $b[2] ne "state") { # Compatibility
-        $b[3] = $b[2] . ($b[3] ? " $b[3]" : "");
-        $b[2] = "state";
-      }
-
-      my $tim = "$b[0] $b[1]";
-      ReplaceEventMap($sdev, $b[2]);
-      my $ret = CallFn($sdev, "StateFn", $d, $tim, $b[2], $b[3]);
+    if($a[1] =~ m/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +([^ ].*)$/) {
+      my ($tim, $nameval) =  ($1, $2);
+      my ($sname, $sval) = split(" ", $nameval, 2);
+      my $ret = CallFn($sdev, "StateFn", $d, $tim, $sname, $sval);
       if($ret) {
         push @rets, $ret;
         next;
       }
 
-      if(!$d->{READINGS}{$b[2]} || $d->{READINGS}{$b[2]}{TIME} lt $tim) {
-        $d->{READINGS}{$b[2]}{VAL} = $b[3];
-        $d->{READINGS}{$b[2]}{TIME} = $tim;
+      if(!$d->{READINGS}{$sname} || $d->{READINGS}{$sname}{TIME} lt $tim) {
+        $d->{READINGS}{$sname}{VAL} = $sval;
+        $d->{READINGS}{$sname}{TIME} = $tim;
       }
 
     } else {
@@ -2068,9 +2053,9 @@ DoTrigger($$)
   if($attr{$dev}{eventMap}) {
     my $c = $defs{$dev}{CHANGED};
     for(my $i = 0; $i < @{$c}; $i++) {
-      $c->[$i] = ReplaceEventMap($dev, $c->[$i]);
+      $c->[$i] = ReplaceEventMap($dev, $c->[$i], 1);
     }
-    $defs{$dev}{STATE} = ReplaceEventMap($dev, $defs{$dev}{STATE});
+    $defs{$dev}{STATE} = ReplaceEventMap($dev, $defs{$dev}{STATE}, 1);
   }
 
   # STATE && {READINGS}{state} should be the same
@@ -2503,19 +2488,43 @@ addToAttrList($)
 }
 
 sub
-ReplaceEventMap($$)
+ReplaceEventMap($$$)
 {
-  my ($dev, $str) = @_;
-  return $str if(!$attr{$dev}{eventMap});
+  my ($dev, $str, $dir) = @_;
+  my $em = $attr{$dev}{eventMap};
+  return $str if(!$em);
 
-  foreach my $rv (split(" ", $attr{$dev}{eventMap})) {
+  my $sc = " ";               # Split character
+  my $fc = substr($em, 0, 1); # First character of the eventmap
+  if($fc eq "," || $fc eq "/") {
+    $sc = $fc;
+    $em = substr($em, 1);
+  }
+
+  my $nstr = join(" ", @{$str}) if(!$dir);
+  my $changed;
+  foreach my $rv (split($sc, $em)) {
     my ($re, $val) = split(":", $rv, 2);
-    if($str =~ m/$re/) {
-      $str =~ s/$re/$val/;
-      last;
+    next if(!defined($val));
+    if($dir) {  # event -> Presentation
+      if($str =~ m/$re/) {
+        $str =~ s/$re/$val/;
+        $changed = 1;
+        last;
+      }
+
+    } else {    # Setting event
+      if($nstr =~ m/$val/) {
+        $nstr =~ s/$val/$re/;
+        $changed = 1;
+        last;
+      }
+
     }
   }
-  return $str;
+  return $str if($dir);
+  return split(" ",$nstr) if($changed);
+  return @{$str};
 }
 
 sub
