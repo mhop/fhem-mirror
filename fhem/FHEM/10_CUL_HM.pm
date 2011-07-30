@@ -244,7 +244,7 @@ CUL_HM_Parse($$)
   my $tn = TimeNow();
 
   if($cmd eq "8002") {                       # Ack
-    if($shash->{cmdStack}) {                     # Send next msg from the stack
+    if($shash->{cmdStack}) {                 # Send next msg from the stack
       CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
       delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
       $shash->{lastStackAck} = 1;
@@ -310,12 +310,12 @@ CUL_HM_Parse($$)
 
     # Code with help of Bassem
     my $state;
-    if($cmd =~ m/^.410/ && $p =~ m/^0601(..)(..)/) {
+    if($cmd =~ m/^..10/ && $p =~ m/^0601(..)(..)/) {
       ($state, undef) = ($1, $2);
       push @event, "brightness:".hex($state);
       push @event, "state:alive";
     }
-    if($cmd =~ m/^.441/ && $p =~ m/^01(......)/) {
+    if($cmd =~ m/^..41/ && $p =~ m/^01(......)/) {
       $state = $1;
       push @event, "state:motion";
       push @event, "motion:"; #added peterp
@@ -934,7 +934,8 @@ CUL_HM_SendCmd($$$$)
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   if($waitforack) {
-    if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {
+    #if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {
+    if($hash->{IODev}) {
       $hash->{ackWaiting} = $cmd;
       $hash->{ackCmdSent} = 1;
       InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0)
