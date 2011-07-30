@@ -2,6 +2,7 @@
   - bugfix:  applying smallscreen attributes to firefox/opera
   - feature: CUL_TX added (thanks to Peterp)
   - feature: TCM120 / EnOcean parser added
+  - feature: eventMap enhanced
 
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone

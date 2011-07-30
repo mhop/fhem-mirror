@@ -2,7 +2,7 @@
 
 fw=$1
 if test ! -f ../../$fw.tar.gz; then
-  echo "usage: makeimage <fhem-VERSION.tar.gz>"
+  echo "usage: makeimage <fhem-VERSION>"
   echo "../../<fhem-VERSION>.tar.gz must exist"
   exit 1
 fi
