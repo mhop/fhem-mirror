@@ -37,9 +37,9 @@ sub f_to_c($) {
 }
 
 ###################################
-sub Weather_UpdateReading($$$$$) {
+sub Weather_UpdateReading($$$$$$) {
 
-  my ($hash,$prefix,$key,$tn,$value)= @_;
+  my ($hash,$prefix,$key,$tn,$value,$n)= @_;
 
   return 0 if(!defined($value) || $value eq "");
   return 0 if($key eq "unit_system");
@@ -59,7 +59,14 @@ sub Weather_UpdateReading($$$$$) {
   my $r= $hash->{READINGS};
   $r->{$reading}{TIME}= $tn;
   $r->{$reading}{VAL} = $value;
-  Log 5, "Weather $hash->{NAME}: $reading= $value";
+
+  my $name= $hash->{NAME};
+  Log 1, "Weather $name: $reading= $value";
+
+  #if(!$hash->{LOCAL}) {
+    DoTrigger($name, ReadingsVal($name, $reading, "")); # if($init_done);
+  #}
+  
 
   return 1;
 }
@@ -74,6 +81,8 @@ sub Weather_GetUpdate($)
   }
 
   my $name = $hash->{NAME};
+
+  my $n= 0;
 
 
   # time
@@ -97,14 +106,14 @@ sub Weather_GetUpdate($)
   my $current = $WeatherObj->current_conditions;
   foreach my $condition ( keys ( %$current ) ) {
   	my $value= $current->{$condition};
-  	Weather_UpdateReading($hash,"",$condition,$tn,$value);
+  	Weather_UpdateReading($hash,"",$condition,$tn,$value,$n);
   }
 
   my $fci= $WeatherObj->forecast_information;
   foreach my $i ( keys ( %$fci ) ) {
   	my $reading= $i;
   	my $value= $fci->{$i};
-  	Weather_UpdateReading($hash,"",$i,$tn,$value);
+  	Weather_UpdateReading($hash,"",$i,$tn,$value,$n);
   }
 
   for(my $t= 0; $t<= 3; $t++) {
@@ -112,12 +121,8 @@ sub Weather_GetUpdate($)
   	my $prefix= sprintf("fc%d_", $t);
 	foreach my $condition ( keys ( %$fcc ) ) {
   		my $value= $fcc->{$condition};
-	  	Weather_UpdateReading($hash,$prefix,$condition,$tn,$value);
+	  	Weather_UpdateReading($hash,$prefix,$condition,$tn,$value,$n);
   	}
-  }
-
-  if(!$hash->{LOCAL}) {
-    DoTrigger($name, undef) if($init_done);
   }
 
   return 1;

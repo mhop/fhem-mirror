@@ -3,6 +3,7 @@
   - feature: CUL_TX added (thanks to Peterp)
   - feature: TCM120 / EnOcean parser added
   - feature: eventMap enhanced
+  - bugfix:  enabled logging for 59_Weather.pm (Boris)
 
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
