@@ -478,3 +478,6 @@
     
 - Thu Jun 30 2011 (Maz Rashid)
   - Introducing 00_TUL.pm and 10_EIB.pm modules for connecting FHEM on EIB.
+  
+- Thu Aug 04 2011 (Boris)
+  - enabled logging for 59_Weather.pm
