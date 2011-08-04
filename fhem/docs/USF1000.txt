@@ -20,7 +20,7 @@ xx:		measured distance in cm
 code:
 
 	hex	bin
-	37	00110111	30s message interval, normal operation
+	37	00110111	30min message interval, normal operation
 	B7	10110111	3s message interval, normal operation
 	F7	11110111	3s message interval, battery low
 		|||+++++-- 0x17 always 0x17
