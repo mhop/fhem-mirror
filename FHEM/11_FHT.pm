@@ -500,11 +500,11 @@ FHT_Parse($$)
       $nLowTemp = "warn";
     }
     if($val &32) {
-      $nVal .= "; " if($nVal); $nVal .= "Window open";
+      $nVal .= ", " if($nVal); $nVal .= "Window open";
       $nWindow = "open";
     }
     if($val &16) {
-      $nVal .= "; " if($nVal); $nVal .= "Fault on window sensor";
+      $nVal .= ", " if($nVal); $nVal .= "Fault on window sensor";
       $nSensor = "fault";
     }
 
