@@ -11,6 +11,7 @@ sub CUL_HM_Initialize($);
 sub CUL_HM_Pair(@);
 sub CUL_HM_Parse($$);
 sub CUL_HM_PushCmdStack($$);
+sub CUL_HM_ProcessCmdStack($);
 sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
 sub CUL_HM_DumpProtocol($$@);
@@ -184,6 +185,12 @@ CUL_HM_Parse($$)
   my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
   my ($len,$msgcnt,$cmd,$src,$dst,$p) = @msgarr;
 
+  my $cmdX = $cmd;
+  $cmdX =~ s/^A4/A0/;
+  $cmdX =~ s/^0B/0A/;
+  $cmdX =~ s/^84/A0/;
+  my $msgX = "$len$msgcnt$cmdX$src$dst$p";
+
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $lcm = "$len$cmd";
@@ -197,6 +204,7 @@ CUL_HM_Parse($$)
     if($dhash) {
       delete($dhash->{ackCmdSent});
       delete($dhash->{ackWaiting});
+Log 0, "DELETE 1:".$dhash->{NAME};
       delete($dhash->{cmdStack});
       $dhash->{STATE} = "MISSING ACK";
       DoTrigger($dname, "MISSING ACK");
@@ -244,25 +252,124 @@ CUL_HM_Parse($$)
   my $tn = TimeNow();
 
   if($cmd eq "8002") {                       # Ack
-    if($shash->{cmdStack}) {                 # Send next msg from the stack
-      CUL_HM_SendCmd($shash, shift @{$shash->{cmdStack}}, 1, 1);
-      delete($shash->{cmdStack}) if(!@{$shash->{cmdStack}});
-      $shash->{lastStackAck} = 1;
-
-    } elsif($shash->{lastStackAck}) {            # Ack of our last stack msg
-      delete($shash->{lastStackAck});
-
-    }
+    CUL_HM_ProcessCmdStack($shash);
     push @event, "";
   }
 
   if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
-    push @event, CUL_HM_Pair($name, $shash, @msgarr);
-    
+    if($shash->{cmdStack}) {
+      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1);
+    } else {
+      push @event, CUL_HM_Pair($name, $shash, @msgarr);
+    }
+
   } elsif($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
     push @event, "";
 
+
+  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
+
+    if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
+
+      my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
+         (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
+      my $tsgn = ($t & 0x4000);
+      $t = ($t & 0x3fff)/10;
+      $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
+      my $ir = $r & 0x8000;
+      $r = ($r & 0x7fff) * 0.295;
+      my $wdr = ($w>>14)*22.5;
+      $w = ($w & 0x3fff)/10;
+      $wd = $wd * 5;
+
+      push @event,
+        "state:T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+      push @event, "windSpeed:$w";
+      push @event, "windDirection:$wd";
+      push @event, "windDirRange:$wdr";
+      push @event, "rain:$r";
+      push @event, "isRaining:$ir";
+      push @event, "sunshine:$s";
+      push @event, "brightness:$b";
+
+    } else {
+      push @event, "KS550 unknown: $p";
+
+    }
+
+  } elsif($model eq "HM-CC-TC") {  ####################################
+
+    if($cmd eq "8670" && $p =~ m/^(....)(..)/) {
+      my (    $t,      $h) = 
+         (hex($1), hex($2));
+      my $tsgn = ($t & 0x4000);
+      $t = ($t & 0x3fff)/10;
+      $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
+      push @event, "state:T: $t H: $h";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+
+      # If we have something to tell:
+      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
+    }
+
+    if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
+      my (   $d1,     $vp) = 
+         (hex($1), hex($2));
+      $vp = int($vp/2.56+0.5);   # valve position in %
+      push @event, "actuator:$vp %";
+
+      # Set the valve state too, without an extra trigger
+      if($dhash) {
+        $dhash->{STATE} = "$vp %";
+        $dhash->{READINGS}{STATE}{TIME} = $tn;
+        $dhash->{READINGS}{STATE}{VAL} = "$vp %";
+      }
+    }
+
+    if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
+      push @event, "desired-temp: " .hex($1)/2;
+    }
+
+    CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
+      if($id eq $dst && $cmd ne "8002");
+      
+
+  } elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
+
+    if($p =~ m/.14(.)0200(..)(..)(..)/) {
+      my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
+      my $v = 128-hex($k_v2);                  # FIXME: calibrate
+      # $v = 256+$v if($v < 0);
+      $v += 256 if(!($k_v3 & 1));
+      push @event, "rawValue:$v";
+
+      my $seq = hex($k_cnt);
+      push @event, "Sequence:$seq";
+
+      my $r2r = AttrVal($name, "rawToReadable", undef);
+      if($r2r) {
+        my @r2r = split("[ :]", $r2r);
+        foreach(my $idx = 0; $idx < @r2r-2; $idx+=2) {
+          if($v >= $r2r[$idx] && $v <= $r2r[$idx+2]) {
+            my $f = (($v-$r2r[$idx])/($r2r[$idx+2]-$r2r[$idx]));
+            my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
+            my $unit = AttrVal($name, "unit", "");
+            $unit = " $unit" if($unit);
+            push @event, "state:$cv$unit";
+            last;
+          }
+        }
+      } else {
+        push @event, "state:$v";
+      }
+
+    }
+
+    
   } elsif($st eq "switch" || ############################################
           $st eq "dimmer" ||
           $st eq "blindActuator") {
@@ -387,76 +494,6 @@ CUL_HM_Parse($$)
 
     }
 
-
-  } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
-
-    if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
-
-      my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
-         (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
-      my $tsgn = ($t & 0x4000);
-      $t = ($t & 0x3fff)/10;
-      $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
-      my $ir = $r & 0x8000;
-      $r = ($r & 0x7fff) * 0.295;
-      my $wdr = ($w>>14)*22.5;
-      $w = ($w & 0x3fff)/10;
-      $wd = $wd * 5;
-
-      push @event,
-        "state:T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b";
-      push @event, "temperature:$t";
-      push @event, "humidity:$h";
-      push @event, "windSpeed:$w";
-      push @event, "windDirection:$wd";
-      push @event, "windDirRange:$wdr";
-      push @event, "rain:$r";
-      push @event, "isRaining:$ir";
-      push @event, "sunshine:$s";
-      push @event, "brightness:$b";
-
-    } else {
-      push @event, "KS550 unknown: $p";
-
-    }
-
-  } elsif($model eq "HM-CC-TC") {  ####################################
-
-    if($cmd eq "8670" && $p =~ m/^(....)(..)/) {
-      my (    $t,      $h) = 
-         (hex($1), hex($2));
-      my $tsgn = ($t & 0x4000);
-      $t = ($t & 0x3fff)/10;
-      $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
-      push @event, "state:T: $t H: $h";
-      push @event, "temperature:$t";
-      push @event, "humidity:$h";
-
-      # If we have something to tell:
-      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
-    }
-
-    if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
-      my (   $d1,     $vp) = 
-         (hex($1), hex($2));
-      $vp = int($vp/2.56+0.5);   # valve position in %
-      push @event, "actuator:$vp %";
-
-      # Set the valve state too, without an extra trigger
-      if($dhash) {
-        $dhash->{STATE} = "$vp %";
-        $dhash->{READINGS}{STATE}{TIME} = $tn;
-        $dhash->{READINGS}{STATE}{VAL} = "$vp %";
-      }
-    }
-
-    if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
-      push @event, "desired-temp: " .hex($1)/2;
-    }
-
-    CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
-      if($id eq $dst && $cmd ne "8002");
-      
   } elsif($st eq "winMatic") {  ####################################
     
     if($cmd eq "A410" && $p =~ m/^0601(..)(..)/) {
@@ -493,40 +530,6 @@ CUL_HM_Parse($$)
         if($id eq $dst);
    } 
 
-    
-
-
-  } elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
-
-    if($p =~ m/.14(.)0200(..)(..)(..)/) {
-      my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
-      my $v = 128-hex($k_v2);                  # FIXME: calibrate
-      # $v = 256+$v if($v < 0);
-      $v += 256 if(!($k_v3 & 1));
-      push @event, "rawValue:$v";
-
-      my $seq = hex($k_cnt);
-      push @event, "Sequence:$seq";
-
-      my $r2r = AttrVal($name, "rawToReadable", undef);
-      if($r2r) {
-        my @r2r = split("[ :]", $r2r);
-        foreach(my $idx = 0; $idx < @r2r-2; $idx+=2) {
-          if($v >= $r2r[$idx] && $v <= $r2r[$idx+2]) {
-            my $f = (($v-$r2r[$idx])/($r2r[$idx+2]-$r2r[$idx]));
-            my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
-            my $unit = AttrVal($name, "unit", "");
-            $unit = " $unit" if($unit);
-            push @event, "state:$cv$unit";
-            last;
-          }
-        }
-      } else {
-        push @event, "state:$v";
-      }
-
-    }
-
   }
 
   #push @event, "unknownMsg:$p" if(!@event);
@@ -534,8 +537,7 @@ CUL_HM_Parse($$)
   my @changed;
   for(my $i = 0; $i < int(@event); $i++) {
     next if($event[$i] eq "");
-
-    if($shash->{lastMsg} && $shash->{lastMsg} eq $msg) {
+    if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) {
       Log GetLogLevel($name,4), "CUL_HM $name dup mesg";
       next;
     }
@@ -563,7 +565,7 @@ CUL_HM_Parse($$)
   }
   $shash->{CHANGED} = \@changed;
   
-  $shash->{lastMsg} = $msg;
+  $shash->{lastMsg} = $msgX;
   return $name;
 }
 
@@ -583,7 +585,8 @@ my %culHmSubTypeSets = (
   blindActuator=>
         { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"" },
   remote =>
-        { text => "<btn> [on|off] <txt1> <txt2>" },
+        { text => "<btn> [on|off] <txt1> <txt2>",
+          devicepair => "<btn> device", },
   winMatic =>
         { matic => "<btn>", read => "<btn>", keydef => "<btn> <txt1> <txt2>", create => "<txt>" },
 );
@@ -712,7 +715,7 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "text") { #############################################
     $state = "";
-    return "$a[2] is not a button number" if($a[2] !~ m/^\d$/);
+    return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
     return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
     my $bn = $a[2]*2-($a[3] eq "on" ? 0 : 1);
 
@@ -801,7 +804,42 @@ CUL_HM_Set($@)
     } elsif ($a[3] eq "speedtilt") {
       $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
                                 sprintf("22%02XA2%02X", $sndcmd, $sndcmd));
+
     }
+
+  } elsif($cmd eq "devicepair") { #####################################
+    return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
+    my $b1 = sprintf("%02X", $a[2]*2-1);
+    my $b2 = sprintf("%02X", $a[2]*2);
+    
+    my $dhash = $defs{$a[3]};
+    return "$a[3] is not a known fhem device" if(!$dhash);
+    return "$a[3] is not a CUL_HM device" if($dhash->{TYPE} ne "CUL_HM");
+
+    my $dst2 = $dhash->{DEF};
+    my $chn2 = "01";
+    if(length($dst) == 8) {       # shadow switch device for multi-channel switch
+      $chn2 = substr($dst2, 6, 2);
+      $dst2 = substr($dst2, 0, 6);
+    }
+
+    # First the remote
+    for(my $i = 1; $i <= 2; $i++) {
+      my $b = ($i==1 ? $b1 : $b2);
+      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}03");
+      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}01${dst2}${chn2}00");
+      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}05${dst2}${chn2}04");
+      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}080100");
+      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}06");
+      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}04${dst2}${chn2}04");
+    }
+
+    # Now the switch.
+                      $sndcmd = "++A001${id}${dst2}${chn2}01${dst}${b2}${b1}";
+    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b1}03");
+    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b2}03");
+    $shash = $dhash; # Exchange the shash, as the switch is always alive.
+
   }
 
   if($state) {
@@ -921,6 +959,7 @@ CUL_HM_SendCmd($$$$)
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
 
+Log 0, "SEND: ".$hash->{NAME};
   if($mn eq "++") {
     $mn = $io->{HM_CMDNR} ? ($io->{HM_CMDNR} +1) : 1;
     $mn = 0 if($mn > 255);
@@ -934,8 +973,7 @@ CUL_HM_SendCmd($$$$)
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   if($waitforack) {
-    #if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {
-    if($hash->{IODev}) {
+    if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {
       $hash->{ackWaiting} = $cmd;
       $hash->{ackCmdSent} = 1;
       InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0)
@@ -952,8 +990,30 @@ CUL_HM_PushCmdStack($$)
   my ($hash, $cmd) = @_;
   my @arr = ();
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
-  #Log 1, "PushStack: $cmd";
   push(@{$hash->{cmdStack}}, $cmd);
+Log 1, "PushStack: $hash->{NAME} ". @{$hash->{cmdStack}};
+}
+
+###################################
+sub
+CUL_HM_ProcessCmdStack($)
+{
+  my ($hash) = @_;
+  my $sent;
+
+Log 1, "CUL_HM_ProcessCmdStack $hash->{NAME}";
+  if($hash->{cmdStack}) {
+Log 1, "Sending from stack:". @{$hash->{cmdStack}};
+    if(@{$hash->{cmdStack}}) {
+      CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
+      $sent = 1;
+    }
+    if(!@{$hash->{cmdStack}}) {
+Log 0, "DELETE 2:".$hash->{NAME};
+      delete($hash->{cmdStack});
+    }
+  }
+  return $sent;
 }
 
 ###################################
@@ -966,6 +1026,7 @@ CUL_HM_Resend($)
   if($hash->{ackCmdSent} == 3) {
     delete($hash->{ackCmdSent});
     delete($hash->{ackWaiting});
+Log 0, "DELETE 3:".$hash->{NAME};
     delete($hash->{cmdStack});
     $hash->{STATE} = "MISSING ACK";
     DoTrigger($name, "MISSING ACK");
@@ -1053,14 +1114,14 @@ my %culHmBits = (
                        UNKNOWN  => "06,2", 
                        CHANNEL  => "08,2", 
                        COUNTER  => "10,2", } },
-  "A401;p02=010A" => { txt => "PAIR_SERIAL", params => {
+  "A001;p02=010A" => { txt => "PAIR_SERIAL", params => {
                        SERIALNO       => '04,,$val=pack("H*",$val)', } },
-  "A410;p01=06"   => { txt => "INFO_ACTUATOR_STATUS", params => {
+  "A010;p01=06"   => { txt => "INFO_ACTUATOR_STATUS", params => {
                        CHANNEL => "2,2", 
                        STATUS  => '4,2', 
                        UNKNOWN => "6,2",
                        RSSI    => "8,2" } },
-  "A440"          => { txt => "REMOTE", params => {
+  "A040"          => { txt => "REMOTE", params => {
                        BUTTON        => '00,02,$val=(hex($val)&0x3F)',
                        LONG          => '00,02,$val=(hex($val)&0x40)?1:0',
                        LOWBAT        => '00,02,$val=(hex($val)&0x80)?1:0',
@@ -1083,6 +1144,7 @@ CUL_HM_DumpProtocol($$@)
   $cmd = "0A$1" if($cmd =~ m/0B(..)/);
   $cmd = "A4$1" if($cmd =~ m/84(..)/);
   $cmd = "8000" if($cmd =~ m/A40./ && $len eq "1A");
+  $cmd = "A0$1" if($cmd =~ m/A4(..)/);
 
   my $ps;
   $ps = $culHmBits{"$cmd;p11=$p11"} if(!$ps);
