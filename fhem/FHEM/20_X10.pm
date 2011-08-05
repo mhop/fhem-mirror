@@ -317,7 +317,7 @@ X10_Set($@)
   my $function= $a[1];
   my $nrparams= $functions_set{$function};
   return "Unknown argument $function, choose one of " .
-          join(",", sort keys %functions_set) if(!defined($nrparams));
+          join(" ", sort keys %functions_set) if(!defined($nrparams));
   return "Wrong number of parameters"  if($na != 2+$nrparams);
 
   # special for on-till
