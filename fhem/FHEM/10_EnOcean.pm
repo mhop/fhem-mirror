@@ -25,7 +25,7 @@ EnOcean_Initialize($)
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-                       "subType:remote,sensor,modem ";
+             "subType:remote,sensor,modem,windowHandle,contact,SR04PT ";
 }
 
 
@@ -42,7 +42,7 @@ EnOcean_Define($$)
 
   $modules{EnOcean}{defptr}{uc($a[2])} = $hash;
   AssignIoPort($hash);
-  # Help FHEMWEB split up davices
+  # Help FHEMWEB split up devices
   $attr{$name}{subType} = $1 if($name =~ m/EnO_(.*)_$a[2]/);
   return undef;
 }
@@ -109,6 +109,7 @@ EnOcean_Parse($$)
   }
 
   my $name = $hash->{NAME};
+  my $st = AttrVal($name, "subType", "");
   my $ll4 = GetLogLevel($name, 4);
   Log $ll4, "EnOcean: ORG:$org, DATA:$data, ID:$id, STATUS:$status";
   my @event;
@@ -116,7 +117,6 @@ EnOcean_Parse($$)
   push @event, "0:rp_counter:".(hex($status)&0xf);
 
   my $d1 =  hex substr($data,0,2);
-
   #################################
   if($org eq "05") {    # PTM remote. Queer reporting methods.
     my $nu =  ((hex($status)&0x10)>>4);
@@ -127,35 +127,53 @@ EnOcean_Parse($$)
     if($nu) {
       $msg  = sprintf    "Btn%d", ($d1&0xe0)>>5;
       $msg .= sprintf ",Btn%d", ($d1&0x0e)>>1 if($d1 & 1);
+      $msg .= ($d1&0x10) ? " pressed" : " released";
 
     } else {
       #confusing for normal use
       #my $nbu = (($d1&0xe0)>>5);
       #$msg  = sprintf "Buttons %d", $nbu ? ($nbu+1) : 0;
-      $msg = "buttons";
+      $msg = "buttons " . ($d1&0x10 ? "pressed" : "released");
+
+      if($st eq "windowHandle") {
+        $msg = "closed"           if($d1 == 0xF0);
+        $msg = "open"             if($d1 == 0xE0);
+        $msg = "tilted"           if($d1 == 0xD0);
+        $msg = "open from tilted" if($d1 == 0xC0);
+      }
       
     }
-    $msg .= ($d1&0x10) ? " pressed" : " released";
     push @event, "1:state:$msg";
 
   #################################
   } elsif($org eq "06") {
-    push @event, "1:state:$d1";
-    push @event, "1:sensor1:$d1";
+    if($st eq "contact") {
+      push @event, "1:state:" . ($d1 == 9 ? "closed" : "open");
+
+    } else {
+      push @event, "1:state:sensor:$d1";
+      push @event, "1:sensor:$d1";
+    }
 
   #################################
   } elsif($org eq "07") {
     my $d2 = hex substr($data,2,2);
     my $d3 = hex substr($data,4,2);
     my $d4 = hex substr($data,6,2);
-    push @event, "1:state:$d1";
-    push @event, "1:sensor1:$d1";
-    push @event, "1:sensor2:$d2";
-    push @event, "1:sensor3:$d3";
-    push @event, "1:D3:".($d4&0x8)?1:0;
-    push @event, "1:D2:".($d4&0x4)?1:0;
-    push @event, "1:D1:".($d4&0x2)?1:0;
-    push @event, "1:D0:".($d4&0x1)?1:0;
+    if($st eq "SR04PT") {
+      push @event, "1:state:alive";
+      push @event, "1:present:".(($d4&0x1)?"No":"Yes");
+      push @event, "1:desired:$d1";
+    } else {
+      push @event, "1:state:$d1";
+      push @event, "1:sensor1:$d1";
+      push @event, "1:sensor2:$d2";
+      push @event, "1:sensor3:$d3";
+      push @event, "1:D3:".(($d4&0x8)?1:0);
+      push @event, "1:D2:".(($d4&0x4)?1:0);
+      push @event, "1:D1:".(($d4&0x2)?1:0);
+      push @event, "1:D0:".(($d4&0x1)?1:0);
+    }
 
   #################################
   } elsif($org eq "08") { # CTM remote.
@@ -172,13 +190,13 @@ EnOcean_Parse($$)
   } elsif($org eq "0B") {
     push @event, "1:state:Modem:ACK";
 
+  } elsif($org eq "00") {
   }
 
   my $tn = TimeNow();
   my @changed;
   for(my $i = 0; $i < int(@event); $i++) {
     my ($dochanged, $vn, $vv) = split(":", $event[$i], 3);
-
     if($dochanged) {
       if($vn eq "state") {
         $hash->{STATE} = $vv;
