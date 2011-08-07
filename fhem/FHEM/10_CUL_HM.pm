@@ -782,8 +782,9 @@ CUL_HM_Set($@)
     $sndcmd = sprintf("++B001%s%s0104%s%02X03", $id, $dst, $id, $a[2]);
 
   } elsif($cmd eq "keydef") { #####################################
-    if ($a[3] eq "tilt") {
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0B220D838B228D83");
+
+   if ($a[3] eq "tilt") {
+      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],"0B220D838B228D83");
 
     } elsif ($a[3] eq "close") {
       $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0B550D838B558D83");
@@ -798,14 +799,16 @@ CUL_HM_Set($@)
       $sndcmd = sprintf("++B001%s%s0102%s%02X%s", $id, $dst, $id, $a[2], $chn);
 
     } elsif ($a[3] eq "speedclose") {
+      $sndcmd = $a[4]*2;
       $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
                                 sprintf("23%02XA3%02X", $sndcmd, $sndcmd));
 
     } elsif ($a[3] eq "speedtilt") {
+      $sndcmd = $a[4]*2;
       $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
                                 sprintf("22%02XA2%02X", $sndcmd, $sndcmd));
-
     }
+
 
   } elsif($cmd eq "devicepair") { #####################################
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
@@ -818,7 +821,7 @@ CUL_HM_Set($@)
 
     my $dst2 = $dhash->{DEF};
     my $chn2 = "01";
-    if(length($dst) == 8) {       # shadow switch device for multi-channel switch
+    if(length($dst) == 8) {      # shadow switch device for multi-channel switch
       $chn2 = substr($dst2, 6, 2);
       $dst2 = substr($dst2, 0, 6);
     }
@@ -1268,13 +1271,12 @@ CUL_HM_maticFn($$$$$)
 {
   my ($hash, $id, $dst, $a2, $cfg) = @_;
   my $sndcmd =  sprintf("++B001%s%s0105%s%02X03", $id, $dst, $id, $a2);
-  CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);    
-  $sndcmd =  sprintf("++A001%s%s01080%s", $id, $dst, $cfg);
-  sleep (2);
-  CUL_HM_SendCmd ($hash, $sndcmd, 2, 2);
-  sleep(2);
+  CUL_HM_SendCmd ($hash, $sndcmd, 10, 2);
+  $sndcmd =  sprintf("++A001%s%s0108%s", $id, $dst, $cfg);
+  CUL_HM_SendCmd ($hash, $sndcmd, 10, 2);
   $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
   return $sndcmd;
 }
+
 
 1;
