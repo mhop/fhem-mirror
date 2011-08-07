@@ -150,6 +150,12 @@ CUL_EM_Parse($$)
     my $current  = $current_cnt*$corr1;
     my $peak     = $peak_cnt*$corr1;
 
+    if($tpe ne 2) {
+      $peak      = 3000/($peak_cnt > 1 ? $peak_cnt : 1)*$corr1;
+      $peak      = ($current > 0 ? $peak : 0);
+    }
+
+
     $val = sprintf("CNT: %d CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
                          $seqno, $total, $current, $peak);
     $hash->{STATE} = $val;
