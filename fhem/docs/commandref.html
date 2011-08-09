@@ -2742,17 +2742,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     Define an EnOcean device, connected via a <a href="#TCM">TCM</a>. The
     &lt;ID&gt; parameter is an 8 digit hex number. For remotes and sensors the
     <a href="#autocreate">autocreate</a> module may help you.<br>
-    In order to control devices, you cannot reuse the ID's of other devices
-    (like remotes), instead you have to create your own, which must be in the
-    allowed ID-Range of the underlying IO device. For this first query the
-    TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
-    up to 128 ID's starting with the base shown there. If you are using an
-    ID outside of the allowed range, you'll see an ERR_ID_RANGE message in the
-    fhem log.<br>
-
-    For each ID there is the possibility to use 8 different commands, so
-    in fact you can control 8*128/2=512 switches.<br><br>
-
 
     Example:
     <ul>
@@ -2766,20 +2755,26 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>set switch1 &lt;value&gt;</code>
     <br><br>
-    where <code>value</code> is one of the values for the Remote-Events, see below.
-    combinations of these buttons: Btn0,Btn2 Btn0,Btn3 Btn1,Btn2 Btn1,Btn3 and
-    released.<br>
-    In fact we are trying to emulate a PTM100 type remote, which is capable to
-    report either single buttons, some combinations of 2 buttons and the
-    released state.<br>
+    where <code>value</code> is one of A0,AI,B0,BI,C0,CI,D0,DI and 
+    released, in fact we are trying to emulate a PTM100 type remote.
+    <br>
+
     If you define an <a href="#eventMap">eventMap</a> attribute with on/off,
     then you'll be able to easily set the device from the <a
     href="#FHEMWEB">WEB</a> frontend.<br><br>
+    In order to control devices, you cannot reuse the ID's of other devices
+    (like remotes), instead you have to create your own, which must be in the
+    allowed ID-Range of the underlying IO device. For this first query the
+    TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
+    up to 128 ID's starting with the base shown there. If you are using an
+    ID outside of the allowed range, you'll see an ERR_ID_RANGE message in the
+    fhem log.<br>
+
     Example:
     <ul><code>
-      set switch1 Btn1<br>
-      set switch1 Btn0,Btn2<br>
-      attr eventMap Btn1:on Btn0,Btn2:off<br>
+      set switch1 BI<br>
+      set switch1 B0<br>
+      attr eventMap BI:on B0:off<br>
       set switch1 on<br>
     </code></ul>
   </ul>
@@ -2805,16 +2800,20 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="EnOceanevents"></a>
   <b>Generated events:</b>
   <ul>
-     <li>Remote / Wall Switch. Switches with more than one (pair) of buttons
+     <li>switch. Switches (remotes) with more than one (pair) of buttons
          are separate devices with separate address.
      <ul>
-         <li>Btn0 pressed
-         <li>Btn1 pressed
-         <li>Btn2 pressed
-         <li>Btn3 pressed
-         <li>Btn0,Btn1 pressed
-         <li>&lt;all other combinations of BtnX/BtnY&gt; pressed
-         <li>released
+         <li>A0
+         <li>AI
+         <li>B0
+         <li>BI
+         <li>C0
+         <li>CI
+         <li>D0
+         <li>DI
+         <li>A0,BI
+         <li>&lt;all other combinations of BtnX/BtnY&gt;
+         <li>buttons released
      </ul>
      <li>windowHandle (HOPPE SecuSignal). Set the subType attr to windowHandle.
      <ul>
@@ -2823,17 +2822,26 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li>tilted
          <li>open from tilted
      </ul>
-     <li>STM-250 Door and window contact. Set the subType attr to contact.
+     <li>keycard. Set the subType attr to keycard. (untested)
+     <ul>
+         <li>keycard inserted
+         <li>keycard removed
+     </ul>
+     <li>STM-250 Door and window contact.
      <ul>
          <li>closed
          <li>open
+         <li>learnBtn: on
      </ul>
-     <li>SR04PT (Temp sensor + Presence button and desired temp dial). Set the
-          subType attr to SR04PT:
+     <li>SR04* (Temp sensor + Presence button and desired temp dial). Set the
+          subType attr to SR04:
      <ul>
-         <li>alive
-         <li>present: [Yes|No]
-         <li>desired: [0-255]
+         <li>temperature: XY.Z
+         <li>set_point: [0..255]
+         <li>fan: [0,1,2,3,Auto]
+         <li>present: yes
+         <li>learnBtn: on
+         <li>T: XY.Z SP: [0..255] F: [0,1,2,3,Auto] P: [yes|no]
      </ul>
   </ul>
 </ul>
