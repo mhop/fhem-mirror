@@ -46,7 +46,7 @@ TCM_Initialize($)
   $hash->{ReadyFn} = "TCM_Ready";
   $hash->{Clients} = ":EnOcean:";
   my %matchList= (
-    "1:EnOcean"   => "^EnOcean:0B",
+    "1:EnOcean"   => "^EnOcean:",
   );
   $hash->{MatchList} = \%matchList;
 
@@ -210,10 +210,23 @@ TCM_Read($)
         Log $ll2, "$name: wrong checksum: got $crc, computed $mycrc" ;
         return;
       }
-      if($net =~ m/^0B/) {        # Receive Radio Telegram (RRT)
-        Dispatch($hash, "EnOcean:$net", undef);
+
+      # Receive Radio Telegram (RRT)
+      if($net =~ m/^0B(..)(........)(........)(..)/) {
+        my ($org, $d1,$id,$status) = ($1, $2);
+
+        # Re-translate the ORG to RadioORG / TCM310 equivalent
+        my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
+        if($orgmap{$org}) {
+          $org = $orgmap{$org};
+        } else {
+          Log 1, "TCM120: unknown ORG mapping for $org";
+        }
+        Dispatch($hash, "EnOcean:$org:$d1:$id:$status", undef);
+
       } else {                    # Receive Message Telegram (RMT)
         TCM_Parse120($hash, $net, 0);
+
       }
 
 
@@ -254,18 +267,14 @@ TCM_Read($)
       }
 
       if($t eq "01") { # Radio
-        my %orgmap = ("F6"=>"05", "D5"=>"06", "A5"=>"07", );
         $mdata =~ m/^(..)(.*)(........)(..)$/;
-        my $org = $orgmap{$1};
-        Log 1, "TCM310: unknown ORG mapping for $1" if(!$org);
-        my $net = sprintf("0B%s%s%s%s%s",
-                      $org ? $org:"00", $2, "0"x(8-length($2)), $3, $4);
-        $odata =~ m/^(..)(........)(..)(..)$/;
-        my %addvals = (SubTelNum => $1, DestinationID => $2,
-                       RSSI => $3, SecurityLevel => $4,);
+        my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
+
+        my %addvals = (SubTelNum => hex($1), DestinationID => $2,
+                       RSSI => hex($3), SecurityLevel => hex($4),);
         $hash->{RSSI} = $3;
 
-        Dispatch($hash, "EnOcean:$net", \%addvals);
+        Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
 
       } else {
         Log $ll2, "$name: unknown packet type $t: $data" ;
