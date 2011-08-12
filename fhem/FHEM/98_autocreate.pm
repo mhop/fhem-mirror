@@ -12,9 +12,9 @@ use warnings;
 
 my %flogpar = (
   "CUL_EM.*"
-      => { GPLOT => "cul_em:Power,", FILTER => "%NAME:CNT.*" },
+      => { GPLOT => "power8:Power,", FILTER => "%NAME:CNT.*" },
   "CUL_WS.*"
-      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME:T:.*" },
+      => { GPLOT => "temp4hum6:Temp/Hum,",  FILTER => "%NAME:T:.*" },
   "CUL_FHTTK.*"
       => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
   "FHT.*"
@@ -22,28 +22,28 @@ my %flogpar = (
   "HMS100TFK_.*"
       => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
   "HMS100T_.*"
-      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
+      => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
   "KS300.*"
-      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
+      => { GPLOT => "temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
 
   # Oregon sensors: 
   # * temperature
   "(THR128|THWR288A|THN132N).*"
-      => { GPLOT => "oregon_hms_t:Temp,",  FILTER => "%NAME" },
+      => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
   "(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"
-      => { GPLOT => "oregon_hms:Temp/Hum,",  FILTER => "%NAME" },
+      => { GPLOT => "temp4hum4:Temp/Hum,",  FILTER => "%NAME" },
   # * temperature, humidity, pressure
   "(BTHR918N|BTHR918|BTHR918N).*"
-      => { GPLOT => "oregon_temp_press:Temp/Press,oregon_hms:Temp/Hum,",
+      => { GPLOT => "rain4press4:Temp/Press,temp4hum4:Temp/Hum,",
            FILTER => "%NAME" },
   # * anenometer
   "(WGR800|WGR918|WTGR800_A).*"
-      => { GPLOT => "oregon_wind:WindDir/WindSpeed,",  FILTER => "%NAME" },
+      => { GPLOT => "wind4windDir4:WindDir/WindSpeed,",  FILTER => "%NAME" },
   # * Oregon sensors: Rain gauge
   "(PCR800|RGR918).*"
-      => { GPLOT => "oregon_rain:RainRate",  FILTER => "%NAME" },
+      => { GPLOT => "rain4:RainRate",  FILTER => "%NAME" },
 
   # X10 sensors received by RFXCOM
   "RFXX10SEC.*"
@@ -51,19 +51,19 @@ my %flogpar = (
 
   # USB-WDE1
   "USBWX_[0-8]"
-      => { GPLOT => "hms:Temp/Hum,",  FILTER => "%NAME" },
+      => { GPLOT => "temp4hum6:Temp/Hum,",  FILTER => "%NAME" },
   "USBWX_ks300"
-      => { GPLOT => "hms:Temp/Hum,ks300:Temp/Rain,ks300_2:Wind/Hum,",
+      => { GPLOT => "temp4hum6:Temp/Hum,temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
 
   # HomeMatic
   "CUL_HM_THSensor.*"
-      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
+      => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
   "CUL_HM_KS550.*"
-      => { GPLOT => "ks300:Temp/Rain,ks300_2:Wind/Hum,",
+      => { GPLOT => "temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
            FILTER => "%NAME:T:.*" },
   "CUL_HM_HM-CC-TC.*"
-      => { GPLOT => "hms:Temp/Hum,", FILTER => "%NAME:T:.*" },
+      => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
 
   # Lacrosse TX
   "CUL_TX.*"
