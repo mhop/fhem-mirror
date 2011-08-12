@@ -175,11 +175,12 @@ FS20_Set($@)
   return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
 
   my $c = $fs20_c2b{$a[1]};
+  my $name = $a[0];
   if(!defined($c)) {
 
     # Model specific set arguments
-    if(defined($attr{$a[0]}) && defined($attr{$a[0]}{"model"})) {
-      my $mt = $models{$attr{$a[0]}{"model"}};
+    if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
+      my $mt = $models{$attr{$name}{"model"}};
       return "Unknown argument $a[1], choose one of "
                                                if($mt && $mt eq "sender");
       return "Unknown argument $a[1], choose one of $fs20_simple"
@@ -195,7 +196,7 @@ FS20_Set($@)
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
   my $v = join(" ", @a);
-  Log GetLogLevel($a[0],2), "FS20 set $v";
+  Log GetLogLevel($name,2), "FS20 set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   my $val;
@@ -210,8 +211,8 @@ FS20_Set($@)
         $val = (2**$i)*$j*0.25;
         if($val >= $a[2]) {
           if($val != $a[2]) {
-            $ret = "FS20 Setting timeout to $val from $a[2]";
-            Log GetLogLevel($a[0],2), $ret;
+            Log GetLogLevel($name,2), 
+               "$name: changing timeout to $val from $a[2]";
           }
           $c .= sprintf("%x%x", $i, $j);
           last LOOP;
@@ -225,16 +226,16 @@ FS20_Set($@)
 
   ###########################################
   # Set the state of a device to off if on-for-timer is called
-  if($modules{FS20}{ldata}{$a[0]}) {
-    CommandDelete(undef, $a[0] . "_timer");
-    delete $modules{FS20}{ldata}{$a[0]};
+  if($modules{FS20}{ldata}{$name}) {
+    CommandDelete(undef, $name . "_timer");
+    delete $modules{FS20}{ldata}{$name};
   }
   if($a[1] =~ m/for-timer/ && $na == 3 &&
-     defined($attr{$a[0]}) && defined($attr{$a[0]}{"follow-on-for-timer"})) {
+     defined($attr{$name}) && defined($attr{$name}{"follow-on-for-timer"})) {
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
-    $modules{FS20}{ldata}{$a[0]} = $to;
-    Log 4, "Follow: +$to setstate $a[0] off";
-    CommandDefine(undef, $a[0] . "_timer at +$to setstate $a[0] off");
+    $modules{FS20}{ldata}{$name} = $to;
+    Log 4, "Follow: +$to setstate $name off";
+    CommandDefine(undef, $name . "_timer at +$to setstate $name off");
   }
 
   ##########################
