@@ -26,7 +26,7 @@ attr wzlog logtype fht:Temp
 # ks300 log
 define kslog  FileLog /var/log/wz-%Y-%U.log ks1:.*H:.*
 define avglog FileLog /var/log/avg.log ks1:.*avg.*
-attr kslog logtype ks300:Temp/Hum,ks300_2:Rain/Wind
+attr kslog logtype temp4rain10:Temp/Rain,hum6wind8:Hum/Wind
 
 ##############################
 # Alternative log method. It does the same, but it is somewhat slower as it
