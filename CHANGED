@@ -5,6 +5,7 @@
   - feature: eventMap enhanced
   - bugfix:  enabled logging for 59_Weather.pm (Boris)
   - feature: .gplot files renamed from type to content
+  - bugifix: FS20 on-for-timer error reporting only in the logfile
 
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
