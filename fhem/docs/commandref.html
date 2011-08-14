@@ -4198,21 +4198,27 @@ Attributes:<br>
 
         </ul>
 
-        The perl specials in the definitions of the set and get commands can contain macros. Apart from the rules
-        outlined in the <a href="#perl">documentation of perl specials</a> in fhem, the following rules apply:<br><br>
+        The perl specials in the definitions of the set and get commands can
+        contain macros. Apart from the rules outlined in the <a
+        href="#perl">documentation of perl specials</a> in fhem, the following
+        rules apply:<br><br>
         <ul>
-                <li>The character @ will be replaced with the device
-                name. To use @ in the text itself, use the double mode (@@).</li>
+          <li>The character @ will be replaced with the device
+          name. To use @ in the text itself, use the double mode (@@).</li>
 
-                <li>The macro <code>%NAME</code> will expand to the device name (same as <code>@</code>).</li>
+          <li>The macro <code>%NAME</code> will expand to the device name (same
+          as <code>@</code>).</li>
 
-                <li>The macro <code>%&lt;parameter&gt;</code> will expand to the current value of the
-                named parameter. This can be either a parameter from the device definition or a parameter
-                from the set or get command.</li>
+          <li>The macro <code>%&lt;parameter&gt;</code> will expand to the
+          current value of the named parameter. This can be either a parameter
+          from the device definition or a parameter from the set or get
+          command.</li>
 
-                <li>The macro substitution occurs before perl evaluates the expression. It is a plain text substitution.</li>
+          <li>The macro substitution occurs before perl evaluates the
+          expression. It is a plain text substitution.</li>
 
-                <li>If in doubt what happens, run the commands with loglevel 5 and observe the log file.</li>
+          <li>If in doubt what happens, run the commands with loglevel 5 and
+          observe the log file.</li>
 
    </ul>
 </ul>
@@ -7041,7 +7047,7 @@ isday</pre>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered assuming that plotmode is 'gnuplot-scroll':<br>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The 'zoom' will be either qday/day/week/month/year (same as used in FHEMWEB).<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The offset 'off' is either 0 (then the second part can be omitted, or -1/-2.... to jump back in time.<br>
+	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The offset 'off' is either 0 (then the second part can be omitted), or -1/-2.... to jump back in time.<br>
 	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
 <br>
 			NOTE: If you want to use zoom AND offset then you have to concatenate via '&' !!<br>
@@ -7221,90 +7227,132 @@ isday</pre>
 
 <a name="perl"></a>
 <h3>Perl specials</h3>
-<ul>
-   <li>To test perl oneliners, type them on the prompt by enclosing it in {}, e.g.<br>
-       <ul>
-         { Log 1, "Hallo" }
-       </ul>
-       </li>
+  If you want to automate some tasks via fhem, then you'll probably use <a
+  href="#at">at</a> or <a href="#notify">notify</a>. For more complex tasks
+  you'll use either a shell-Skript or a perl "oneliner" as the at/notify
+  argument. This chapter gives some tips in using the perl oneliners.<br><br>
 
-   <li>To store some macros, see the Notes in the <a href="#notify">notify</a>
-       description.</li>
+  <li>To test perl oneliners, type them on the telnet prompt (or FHEMWEB text
+    input) by enclosing it in {}, one line at once.  The last line will only
+    write something in the logfile, the output of the other lines is directly
+    visible.
+    <ul>
+      { "Hello" }<br>
+      { 1+3*4 }<br>
+      { `ls /etc` }<br>
+      { Log 1, "Hello" }<br>
+    </ul>
+    <br>
 
-   <li>To use fhem commands from the perl expression, use the function "fhem",
-     which takes a string argument, this string will be evaluated as a fhem
-     command chain.<br>
-     Example:
-     <ul>
-       define n1 notify piri:on { fhem "set light on" }
-     </ul></li>
+  <li>
+    Perl expressions are separated by ;, in fhem oneliners they have to
+    escaped with ;;<br>
+    <ul>
+      { my $a = 1+1;; Log 1, "Hello $a" }
+    </ul>
+    <br>
 
-   <li>To make date and time handling easier, before evaluating a perl
-     expression the variables $sec, $min, $hour, $mday, $month, $year, $wday,
-     $yday, $isdst are set (see perldoc -f localtime), with the exception that
-     $month is in the range of 1 to 12, and $year is also corrected by 1900 (as
-     one would normally expect). Additionally $we is 1 if it is weekend (i.e
-     $wday == 0 || $wday == 6), and 0 otherwise. If the <a
-     href="#holiday2we">holida2we</a> global attribute is set, $we is 1 for
-     holidays too.
-     Example:
+  <li>To use fhem commands from the perl expression, use the function fhem(),
+    which takes a string argument, this string will be evaluated as a fhem
+    command:<br>
+    <ul>
+      { fhem "set light on" }<br>
+      define n1 notify piri:on { fhem "set light on" }
+    </ul>
+    <br>
 
-     <ul>
-       define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) { fhem "set
-       light on" } }
-     </ul></li>
+  <li>Notify can be used to store macros for manual execution. Use the <a
+    href="#trigger">trigger</a> command to execute the macro:<br>
+    <ul>
+      define MyMacro notify MyMacro { Log 1, "Hello"}<br>
+      trigger MyMacro<br>
+      define MacroWithArg notify MyMacro { Log 1, "Hello %"}<br>
+      trigger MyMacro MyArg<br>
+    </ul>
+    <br>
 
-   <li>
-     The following small helper functions are defined in 99_Util.pm (which will
-     be loaded automatically):
-     <ul>
-       <li>min(a,b), max(a,b)</li>
-       <li>time_str2num("YYYY-MM-DD HH:MM:SS") returns a numerical value,
-           which makes computation of time differences easier</li>
-       <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one,
-           to compare it with the sunrise commands in the following example:<br>
-           # Switch lamp1 on at sunrise, but not before 07:00<br>
-           define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1
-           on
-           </li>
-     </ul>
-     </li>
 
-   <li>
-     <b>Note</b>: do not forget to escape the semicolon (;) with two semicolons
-     (;;), else your perl code will be interpreted as an fhem command and you
-     most certainly get syntax errors.
-     </li>
+  <li>To make date and time handling easier, the variables $sec, $min, $hour,
+    $mday, $month, $year, $wday, $yday, $isdst are available in the perl
+    oneliners (see also perldoc -f localtime). Exceptions: $month is in the
+    range of 1 to 12, and $year is corrected by 1900 (as I would expect).<br>
+    Additionally the variabe $we is 1 if it is weekend (i.e $wday == 0 or
+    $wday == 6), and 0 otherwise. If the <a href="#holiday2we">holida2we</a>
+    global attribute is set, $we is 1 for holidays too.<br>
+    <ul>
+      define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) {
+        fhem "set light on" } }<br>
+      define roll_en *07:45:00 { fhem "trigger SwitchAllRoll on" if(!$we) }<br>
+      define roll_en *08:30:00 { fhem "trigger SwitchAllRoll on" if($we) }<br>
 
-   <li>
-     The current value (the string you see in paranthesis in the output of the
-     list command) is available in the <code>value</code> hash; to access it
-     use <code>Value("name")</code>. If you need the old value (and time) of
-     the currently triggered device, then you can access it with
-     <code>OldValue("name")</code> and <code>OldTimestamp("name")</code>.<br>
-     </li>
+    </ul>
+    <br>
 
-   <li>
-     To access the numerical value of an FS20 command (e.g. toggle), use the
-     hash <code>fs20_c2b</code>. E.g. { Log 2, $fs20_c2b{"toggle"} }
-     </li>
+  <li>
+    The following helper functions are defined in 99_Util.pm (which will
+    be loaded automatically, as every module with prefix 99):
+    <ul>
+      <li>min(a,b), max(a,b)</li>
+      <li>time_str2num("YYYY-MM-DD HH:MM:SS") returns a numerical value,
+          which makes computation of time differences easier</li>
+      <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one,
+          to compare it with the sunrise commands in the following example:<br>
+          # Switch lamp1 on at sunrise, but not before 07:00<br>
+          define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1
+          on<br>
+          # Note that this functionality is easier to achieve with:<br>
+          define a13 at +*{sunrise_rel(0,"07:00",undef)} set lamp1 on<br>
+          </li>
+    </ul>
+    </li>
 
-   <li>
-     By using the 99_SUNRISE_EL.pm module, you have access to the following
-     functions: <br>
-     <ul>
-     sunset_rel()<br>
-     sunset_abs()<br>
-     sunrise_rel()<br>
-     sunrise_abs()<br>
-     isday()<br>
-     </ul>
-     The _rel functions should be used as "at" spec, and the _abs functions as
-     argument to the on-till argument of the set command.<br>
-     isday returns 1 if the sun is visible, and 0 else.
-     </li>
+  <li>
+    To access the device states/attributes, use the following functions:
+    <br>
+    <ul>
+      <li>Value(&lt;devicename&gt;)<br>
+        returns the state of the device (the string you see in paranthesis in
+        the output of the list command).
+        <br><br>
+      <li>OldValue(&lt;devicename&gt;)
+      <li>OldTimestamp(&lt;devicename&gt;)<br>
+        returns the old value/timestamp of the device. 
+        <br><br>
+      <li>
+        ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
+        Return the reading (the value in the Readings section of "list device")
+        <br><br>
+      <li>
+        AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
+        Return the attribute of the device
+        <br><br>
+        { Value("wz") }<br>
+        { OldValue("wz") }<br>
+        { time_str2num(OldTimestamp("wz")) }<br>
+        { ReadingsVal("wz", "measured-temp", "20")+0 }<br>
+        { AttrVal("wz", "room", "none") }<br>
+      </ul>
 
-</ul>
+
+  <li>
+    By using the 99_SUNRISE_EL.pm module, you have access to the following
+    functions: <br>
+    <ul>
+    sunset_rel($offset, $min, $max)<br>
+    sunset_abs($offset, $min, $max)<br>
+    sunrise_rel($offset, $min, $max)<br>
+    sunrise_abs($offset, $min, $max)<br>
+    isday()<br>
+    </ul>
+    offset is in seconds, and the format of min/max is "HH:MM" or "HH:MM:SS".
+    isday returns 1 if the sun is visible, and 0 else.
+    </li>
+
+  <br>
+  <br>
+  <br>
+  <br>
+
 
 </body>
 </html>
