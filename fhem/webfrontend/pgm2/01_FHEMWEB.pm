@@ -41,6 +41,7 @@ use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
 use vars qw($FW_tp);   # is touchpad (iPad / etc)
 use vars qw(%FW_types);# device types, for sorting, for 97_GROUP/95_VIEW
 my $zlib_loaded;
+my $try_zlib = 1;
 
 
 #########################
@@ -208,10 +209,11 @@ FW_Read($)
   my $ll = GetLogLevel($FW_wname,4);
   my $c = $hash->{CD};
 
-  if(!$zlib_loaded && AttrVal($FW_wname, "fwcompress", 1)) {
+  if(!$zlib_loaded && $try_zlib && AttrVal($FW_wname, "fwcompress", 1)) {
     $zlib_loaded = 1;
     eval { require Compress::Zlib; };
     if($@) {
+      $try_zlib = 0;
       Log 1, $@;
       Log 1, "$FW_wname: Can't load Compress::Zlib, deactivating compression";
       $attr{$FW_wname}{fwcompress} = 0;
@@ -280,8 +282,8 @@ FW_Read($)
       $FW_RETTYPE=~m/svg/i ||
       $FW_RETTYPE=~m/script/i) &&
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
+     $try_zlib &&
      AttrVal($FW_wname, "fwcompress", 1)) {
-
     $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
   }
