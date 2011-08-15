@@ -386,7 +386,7 @@ FW_AnswerCall($)
 
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
-                                                $FW_tp ? "600,160" : "800,160");
+                                                $FW_tp ? "640,160" : "800,160");
   $FW_reldoc = "$FW_ME/commandref.html";
 
   $FW_cmdret = $docmd ? fC($cmd) : "";
@@ -423,6 +423,7 @@ FW_AnswerCall($)
     pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     #pO '<meta name="viewport" content="width=device-width"/>'
     pO '<meta name="viewport" content="width=320"/>' if($FW_ss);
+    pO '<meta name="viewport" content="width=768"/>' if($FW_tp);
   }
 
   my $rf = AttrVal($FW_wname, "refresh", "");
@@ -727,7 +728,7 @@ FW_roomOverview($)
     push @list1, $r;
     push @list2, "$FW_ME?room=$r";
   }
-  push(@list1, "All together"); push(@list2, "$FW_ME?room=all");
+  push(@list1, "Everything"); push(@list2, "$FW_ME?room=all");
   push(@list1, ""); push(@list2, "");
   push(@list1, "Howto");      push(@list2, "$FW_ME/HOWTO.html");
   push(@list1, "FAQ");        push(@list2, "$FW_ME/faq.html");
@@ -856,8 +857,8 @@ FW_showRoom()
           pO "<td align=\"center\">$v</td>";
         }
         if($allSets) {
-          pH "cmd.$d=set $d on$rf",  "on", 1;
-          pH "cmd.$d=set $d off$rf", "off", 1;
+          pH "cmd.$d=set $d on$rf",  ReplaceEventMap($d, "on", 1), 1;
+          pH "cmd.$d=set $d off$rf", ReplaceEventMap($d, "off", 1), 1;
         }
 
       } elsif($allSets =~ m/ desired-temp /) {
@@ -1546,9 +1547,9 @@ pH(@)
    pO "<td>" if($td);
    $link = ($link =~ m,^/,) ? $link : "$FW_ME?$link";
    if($FW_ss || $FW_tp) {
-     #pO "<a onClick=\"location.href='$link'\"><div class=\"href\">$txt</div></a>";
      my $sp = "&nbsp;&nbsp;";
-     pO "<div class=\"href\"><a onClick=\"location.href='$link'\">$sp$txt$sp</a></div>";
+     pO "<a onClick=\"location.href='$link'\"><div class=\"href\">$sp$txt$sp</div></a>";
+     #pO "<div class=\"href\"><a onClick=\"location.href='$link'\">$sp$txt$sp</a></div>";
    } else {
      pO "<a href=\"$link\">$txt</a>";
    }
@@ -1561,9 +1562,9 @@ pHJava(@)
    my ($link, $txt) = @_;
 
    if($FW_ss || $FW_tp) {
-     #pO "<a onClick=\"$link\"><div class=\"href\">$txt</div></a>";
      my $sp = "&nbsp;&nbsp;";
-     pO "<div class=\"href\"><a onClick=\"$link\">$sp$txt$sp</a></div>";
+     pO "<a onClick=\"$link\"><div class=\"href\">$sp$txt$sp</div></a>";
+     #pO "<div class=\"href\"><a onClick=\"$link\">$sp$txt$sp</a></div>";
    } else {
      pO "<a onClick=\"$link\">$txt</a>";
    }
