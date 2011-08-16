@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.149 2011-07-30 13:22:25 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.150 2011-08-16 18:06:38 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1222,12 +1222,8 @@ AssignIoPort($)
     my $cl = $defs{$p}{Clients};
     $cl = $modules{$defs{$p}{TYPE}}{Clients} if(!$cl);
 
-    my $re = $defs{$p}{regexpClients};
-    $re = $modules{$defs{$p}{TYPE}}{regexpClients} if(!$re);
-
-    if(((defined($cl) && $cl =~ m/:$hash->{TYPE}:/) ||
-        (defined($re) && $hash->{TYPE} =~ m/$re/)) &&
-       $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
+    if((defined($cl) && $cl =~ m/:$hash->{TYPE}:/) &&
+        $defs{$p}{NAME} ne $hash->{NAME}) {      # e.g. RFR
       $hash->{IODev} = $defs{$p};
       last;
     }
@@ -2271,14 +2267,13 @@ Dispatch($$$)
 
   my @found;
 
-  my $cl = $hash->{Clients}; $cl = $iohash->{Clients} if(!$cl);
-  my $re = $iohash->{regexpClients}; $re = $iohash->{regexpClients} if(!$re);
+  my $cl = $hash->{Clients};
+  $cl = $iohash->{Clients} if(!$cl);
 
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep {defined($modules{$_}{ORDER})} keys %modules) {
 
-    next if(!(defined($cl) && $cl =~ m/:$m:/) ||
-             (defined($re) && $m =~ m/$re/));
+    next if(!(defined($cl) && $cl =~ m/:$m:/));
 
     # Module is not loaded or the message is not for this module
     next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
