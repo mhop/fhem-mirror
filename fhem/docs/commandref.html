@@ -1,6 +1,7 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+   "http://www.w3.org/TR/html4/loose.dtd">
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
 
 <head>
   <title>fhem reference</title>
@@ -15,13 +16,14 @@
     div#dist { padding-top:0.3em; }
     a {  color: #278727; }
   </style>
+  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
 </head>
 
 
 <body>
 
   <div id="left">
-    <img src="fhem.png">
+    <img src="fhem.png" alt="fhem-logo"/>
     <h3>fhem.pl reference</h3>
   </div>
 
@@ -97,7 +99,7 @@
       <a href="#FHZ">FHZ</a> &nbsp;
       <a href="#FS20">FS20</a> &nbsp;
       <a href="#HMS">HMS</a> &nbsp;
-      <a href="#HMLAN>HMLAN</a> &nbsp;
+      <a href="#HMLAN">HMLAN</a> &nbsp;
       <a href="#IPWE">IPWE</a> &nbsp;
       <a href="#KM271">KM271</a> &nbsp;
       <a href="#KS300">KS300</a> &nbsp;
@@ -370,7 +372,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>attr global verbose 3</code><br>
     <code>attr lamp room kitchen</code><br>
-    <code>attr lamp loglevel 6</code><br/>
+    <code>attr lamp loglevel 6</code><br>
   </ul>
   <br>
 
@@ -1169,7 +1171,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (fhz1000,fhz1300)</li><br>
 
     <a name="fhtsoftbuffer"></a>
-    <li>fhtsoftbuffer<br/>
+    <li>fhtsoftbuffer<br>
         As the FHZ command buffer for FHT devices is limited (see fhtbuf),
         and commands are only sent to the FHT device every 120 seconds,
         the hardware buffer may overflow and FHT commands get lost.
@@ -1495,14 +1497,14 @@ A line ending with \ will be concatenated with the next one, so long lines
           commands in one message at once to the FHT if you specify them all as
           arguments to the same set command, see the example above.<br><br>
 
-      <li>time sets hour and minute to local time</li><br/>
+      <li>time sets hour and minute to local time</li><br>
 
-      <li>date sets year, month and date to local time</li><br/>
+      <li>date sets year, month and date to local time</li><br>
 
-      <li>refreshvalues is an alias for report1 255 report2 255</li><br/>
+      <li>refreshvalues is an alias for report1 255 report2 255</li><br>
 
       <li>All <code>*-temp</code> values need a temperature
-          as argument, which will be rounded to 0.5 Celsius.<br/>
+          as argument, which will be rounded to 0.5 Celsius.<br>
           Temperature values must  between 5.5 and 30.5 Celsius. Value 5.5 sets
           the actuator to OFF, value 30.5 set the actuator to ON</li><br>
 
@@ -1576,7 +1578,7 @@ A line ending with \ will be concatenated with the next one, so long lines
           <br><br>
 
       <li><code>lowtemp-offset</code> needs a temperature as argument, valid
-          values must be between 1.0 and 5.0 Celsius.<br/> It will trigger a
+          values must be between 1.0 and 5.0 Celsius.<br> It will trigger a
           warning if <code>desired-temp - measured-temp &gt;
           lowtemp-offset</code> in a room for at least 1.5 hours after the last
           desired-temp change.  <br><br>
@@ -1592,7 +1594,7 @@ A line ending with \ will be concatenated with the next one, so long lines
           <br><br>
 
       <li>If a buffer is still in the softbuffer, it will be sent in the
-          following order:<br/> <code>desired-temp,mode,report1,report2,
+          following order:<br> <code>desired-temp,mode,report1,report2,
           holiday1,holiday2,day-temp,night-temp, [all other commands]</code>
           <br><br>
 
@@ -1623,7 +1625,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#eventMap">eventMap</a></li><br>
 
     <a name="retrycount"></a>
-    <li>retrycount<br/>
+    <li>retrycount<br>
         If the <a href="#fhtsoftbuffer">fhtsoftbuffer</a> attribute is set, then
         resend commands <code>retrycount</code> times if after 240 seconds
         no confirmation message is received from the corresponding FHT
@@ -1631,7 +1633,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Default is 3.</li><br>
 
     <a name="minfhtbuffer"></a>
-    <li>minfhtbuffer<br/>
+    <li>minfhtbuffer<br>
         FHEM won't send commands to the FHZ if its fhtbuffer is below
         this value, default is 0. If this value is low, then the ordering of
         fht commands (see the note in the FHT section of <a href="#set">set</a>)
@@ -1641,7 +1643,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
 
     <a name="lazy"></a>
-    <li>lazy<br/>
+    <li>lazy<br>
         If the lazy attribute is set, FHEM won't send commands to the FHT if
         the current reading and the value to be set are already identical. This
         may help avoiding conflicts with the max-1%-time-on-air rule in large
@@ -1649,7 +1651,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
 
     <a name="tmpcorr"></a>
-    <li>tmpcorr<br/>
+    <li>tmpcorr<br>
         Correct the temperature reported by the FHT by the value specified.
         Note: only the measured-temp value reported by fhem (used for logging)
         will be modified.
@@ -5998,8 +6000,16 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
     fhem device <i>devicename</i>, just like if it would be attached to the
     local fhem.
     Drawback: only devices using the Dispatch function (CUL, FHZ, CM11,
-    SISPM, RFXCOM) generate raw messages.
+    SISPM, RFXCOM, TCM, TUL) generate raw messages.<br>
+    <i>devicename</i> must exist on the local
+    fhem server too with the same name and same type as the remote device, but
+    usually with the device-node "none", so it is only a dummy device.  All
+    necessary attributes (e.g. <a href="#rfmode">rfmode</a> if the remote CUL
+    is in HomeMatic mode) must also be set for the local device.
+
+    </li>
   </ul>
+  <br>
   Examples:
   <ul>
     <code>define ds1 FHEM2FHEM 192.168.0.1:7072 LOG:.*</code><br>
@@ -6058,20 +6068,20 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
   <b>Attributes</b>
   <ul>
     <a name="webname"></a>
-    <li>webname<br/>
+    <li>webname<br>
         Path after the http://hostname:port/ specification. Defaults to fhem,
         i.e the default http address is http://localhost:8083/fhem
         </li><br>
 
     <a name="refresh"></a>
-    <li>refresh<br/>
+    <li>refresh<br>
         If set, a http-equiv="refresh" entry will be genererated with the given
         argument (i.e. the browser will reload the page after the given
         seconds).
         </li><br>
 
     <a name="plotmode"></a>
-    <li>plotmode<br/>
+    <li>plotmode<br>
         Specifies how to generate the plots:
         <ul>
           <li>gnuplot<br>
@@ -6101,7 +6111,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
         </li><br>
 
     <a name="plotsize"></a>
-    <li>plotsize<br/>
+    <li>plotsize<br>
         the default size of the plot, in pixels, separated by comma:
         width,height. You can set individual sizes by setting the plotsize of
         the weblink. Default is 800,160 for desktop, and 480,160 for
@@ -6109,8 +6119,8 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
         </li><br>
 
     <a name="fixedrange"></a>
-    <li>fixedrange<br/>
-        Can be applied to weblink devices (FHEMWEB).<br/>
+    <li>fixedrange<br>
+        Can be applied to weblink devices (FHEMWEB).<br>
         Contains two time specs in the form YYYY-MM-DD separated by a space.
         In plotmode gnuplot-scroll or SVG the given time-range will be used,
         and no scrolling for this weblinks will be possible. Needed e.g. for
@@ -6123,7 +6133,7 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
 
     <a name="smallscreen"></a>
     <a name="touchpad"></a>
-    <li>smallscreen, touchpad<br/>
+    <li>smallscreen, touchpad<br>
         Optimize for small screen size (i.e. smartphones) or for touchpad
         devices (i.e. tablets)<br>
         Note: The default configuration installed with make install-pgm2
@@ -7068,7 +7078,7 @@ isday</pre>
   <b>Attributes</b>
   <ul>
     <a name="plotmode"></a>
-    <li>plotmode<br/>
+    <li>plotmode<br>
         Specifies how to generate the plots:
         <ul>
           <li>gnuplot<br>
@@ -7087,32 +7097,32 @@ isday</pre>
         </li><br>
 
     <a name="plotsize"></a>
-    <li>plotsize<br/>
+    <li>plotsize<br>
         the default size of the plot, in pixels, separated by comma:
         width,height. You can set individual sizes by setting the plotsize of
         the weblink.
         </li><br>
     <a name="status="></a>
-    <li>status<br/>
+    <li>status<br>
         Reflects the status, if the renderer timer has been set to ON or OFF.
         By reading the status, you can detect, if the timer is running, or not.
         </li><br>
 
     <a name="refresh"></a>
-    <li>refresh<br/>
+    <li>refresh<br>
         This defines the time-interval in which a new rendering of the defined
         WebLinks will be done.
         </li><br>
 
     <a name="tmpfile"></a>
-    <li>tmpfile<br/>
+    <li>tmpfile<br>
         This gives the path and a possible prefix for the rendered
-        filenames.<br/> You can specify a path to which the files will be
+        filenames.<br> You can specify a path to which the files will be
         rendered. If you also specify a prefix, this will be used to build the
         resulting filename.
         </li><br>
-    <li>multiprocess<br/>
-        This defines if the Renderer works in a multiprocessing mode.<br/>
+    <li>multiprocess<br>
+        This defines if the Renderer works in a multiprocessing mode.<br>
 		You can set multiprocessing either to on / off and the renderer will draw the
 		time-scheduled tasks either in multiprocessing mode, or not.
 		NOTE: Direct GET calls, except for a general GET (for all weblinks) will be renderer

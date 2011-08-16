@@ -39,9 +39,9 @@ FHEM2FHEM_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  if(@a != 4 || !($a[3] =~ m/^(LOG|RAW)(:.*)$/)) {
-    my $msg = 
-        "wrong syntax: define <name> FHEM2FHEM host[:port] [LOG:regexp|RAW:device]";
+  if(@a != 4 || !($a[3] =~ m/^(LOG|RAW):(.*)$/)) {
+    my $msg = "wrong syntax: define <name> FHEM2FHEM host[:port] ".
+                        "[LOG:regexp|RAW:device]";
     Log 2, $msg;
     return $msg;
   }
@@ -49,11 +49,16 @@ FHEM2FHEM_Define($$)
   $hash->{informType} = $1;
   if($1 eq "LOG") {
     $hash->{regexp} = $2;
-    $hash->{regexp} =~ s/^://;
+
   } else {
-    $hash->{remoteDevice} = $2;
-    $hash->{remoteDevice} =~ s/^://;
-    $hash->{regexpClients} = ".*";
+    my $rdev = $2;
+    my $iodev = $defs{$rdev};
+    return "Undefined local device $rdev" if(!$iodev);
+    $hash->{rawDevice} = $rdev;
+    $hash->{Clients} = $iodev->{Clients};
+    $hash->{Clients} = $modules{$iodev->{TYPE}}{Clients}
+        if(!$hash->{Clients});
+
   }
 
   my $dev = $a[2];
@@ -88,7 +93,7 @@ FHEM2FHEM_Write($$)
     return if(!$conn);  # Hopefuly it is reported elsewhere
     $hash->{TCPDev2} = $conn;
   }
-  my $rdev = $hash->{remoteDevice};
+  my $rdev = $hash->{rawDevice};
   syswrite($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
 }
 
@@ -143,12 +148,10 @@ FHEM2FHEM_Read($)
 
     } else {    # RAW
       my ($type, $rname, $msg) = split(" ", $rmsg, 3);
-      next if($rname ne $hash->{remoteDevice});
-      LoadModule($type);
-      my %fake;
-      $fake{NAME} = $name;
-      $fake{TYPE} = $type;
-      Dispatch(\%fake, $msg, undef);
+      my $rdev = $hash->{rawDevice};
+      next if($rname ne $rdev);
+      Dispatch($defs{$rdev}, $msg, undef);
+
     }
   }
   $hash->{PARTIAL} = $data;
