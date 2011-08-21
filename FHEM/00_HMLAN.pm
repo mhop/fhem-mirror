@@ -266,7 +266,7 @@ HMLAN_Parse($$)
 
   my $dmsg = $rmsg;
 
-  Log $ll5, "HMLAN $rmsg";
+  Log $ll5, "HMLAN_Parse: $name $rmsg";
   if($rmsg =~ m/^E(......),(....),(........),(..),(....),(.*)/) {
     ($src, $status, $msec, $d2, $rssi, $msg) =
     ($1,   $2,      $3,    $4,  $5,    $6);
@@ -289,6 +289,11 @@ HMLAN_Parse($$)
     $hash->{firmware} = sprintf("%d.%d", ($vers>>12)&0xf, $vers & 0xffff);
     $hash->{owner} = $owner;
     $hash->{uptime} = HMLAN_uptime($msec);
+    my $myId = AttrVal($name, "hmId", $owner);
+    if($owner ne $myId && !AttrVal($name, "dummy", 0)) {
+      Log 1, "HMLAN setting owner to $myId from $owner";
+      HMLAN_SimpleWrite($hash, "A$myId");
+    }
     return;
 
   } elsif($rmsg =~ m/^I00.*/) {
