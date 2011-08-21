@@ -131,7 +131,7 @@ CUL_HM_Initialize($)
                          "swi,pushButton,threeStateSensor,motionDetector,".
                          "keyMatic,winMatic,smokeDetector " .
                        "hmClass:receiver,sender serialNr firmware devInfo ".
-                       "rawToReadable unit follow-on-for-timer";
+                       "rawToReadable unit";
 }
 
 
@@ -238,14 +238,6 @@ CUL_HM_Parse($$)
 
   my $name = $shash->{NAME};
   my @event;
-  my $isack;
-  if($shash->{ackWaiting}) {
-    delete($shash->{ackWaiting});
-    delete($shash->{ackCmdSent});
-    RemoveInternalTimer($shash);
-    $isack = 1;
-  }
-
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
   my $tn = TimeNow();
@@ -565,6 +557,13 @@ CUL_HM_Parse($$)
   $shash->{CHANGED} = \@changed;
   
   $shash->{lastMsg} = $msgX;
+
+  if($shash->{ackWaiting}) {
+    delete($shash->{ackWaiting});
+    delete($shash->{ackCmdSent});
+    RemoveInternalTimer($shash);
+  }
+
   return $name;
 }
 
@@ -619,12 +618,10 @@ CUL_HM_Set($@)
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
   my $chn = "01";
-  my $shash = $hash;
 
   if(length($dst) == 8) {       # shadow switch device for multi-channel switch
     $chn = substr($dst, 6, 2);
     $dst = substr($dst, 0, 6);
-    $shash = $modules{CUL_HM}{defptr}{$dst};
   }
 
   my $h = $culHmGlobalSets{$cmd};
@@ -655,17 +652,15 @@ CUL_HM_Set($@)
 
   }
 
-  my $id = CUL_HM_Id($shash->{IODev});
+  my $id = CUL_HM_Id($hash->{IODev});
   my $sndcmd;
   my $state = join(" ", @a[1..(int(@a)-1)]);
-
-  CommandDelete(undef, $name."_fortimer") if($defs{"${name}_fortimer"});
 
   if($cmd eq "raw") {  ##################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
     $sndcmd = $a[2];
     for (my $i = 3; $i < @a; $i++) {
-      CUL_HM_PushCmdStack($shash, $a[$i]);
+      CUL_HM_PushCmdStack($hash, $a[$i]);
     }
     $state = "";
 
@@ -676,16 +671,16 @@ CUL_HM_Set($@)
     my $serialNr = AttrVal($name, "serialNr", undef);
     return "serialNr is not set" if(!$serialNr);
     $sndcmd = sprintf("++A401%s000000010A%s", $id, unpack("H*",$serialNr));
-    $shash->{hmPairSerial} = $serialNr;
+    $hash->{hmPairSerial} = $serialNr;
 
   } elsif($cmd eq "unpair") { ###########################################
-    CUL_HM_pushConfig($shash, $id, $dst, 0, 0, "02010A000B000C00");
-    $sndcmd = shift @{$shash->{cmdStack}};
+    CUL_HM_pushConfig($hash, $id, $dst, 0, 0, "02010A000B000C00");
+    $sndcmd = shift @{$hash->{cmdStack}};
 
   } elsif($cmd eq "sign") { ############################################
-    CUL_HM_pushConfig($shash, $id, $dst, $chn, $chn,
+    CUL_HM_pushConfig($hash, $id, $dst, $chn, $chn,
                     "08" . ($a[2] eq "on" ? "01":"02"));
-    $sndcmd = shift @{$shash->{cmdStack}};
+    $sndcmd = shift @{$hash->{cmdStack}};
 
   } elsif($cmd eq "statusRequest") { ####################################
     $sndcmd = sprintf("++A001%s%s%s0E", $id,$dst, $chn);
@@ -700,19 +695,11 @@ CUL_HM_Set($@)
     ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
     $sndcmd = sprintf("++A011%s%s02%sC80000%s", $id,$dst, $chn, $tval);
 
-    if(AttrVal($name, "follow-on-for-timer", undef)) {
-      my $val = $a[2];
-      my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
-      Log 4, "Follow: +$to setstate $name off";
-Log 1, "FOFT: $to";
-      CommandDefine(undef, $name . "_fortimer at +$to setstate $name off");
-    }
-
   } elsif($cmd eq "toggle") { ###########################################
-    $shash->{toggleIndex} = 1 if(!$shash->{toggleIndex});
-    $shash->{toggleIndex} = (($shash->{toggleIndex}+1) % 128);
+    $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
+    $hash->{toggleIndex} = (($hash->{toggleIndex}+1) % 128);
     $sndcmd = sprintf("++A03E%s%s%s40%s%02X", $id, $dst,
-                                      $dst, $chn, $shash->{toggleIndex});
+                                      $dst, $chn, $hash->{toggleIndex});
 
   } elsif($cmd eq "pct") { ##############################################
     $a[1] = 100 if ($a[1] > 100);
@@ -838,19 +825,19 @@ Log 1, "FOFT: $to";
     # First the remote
     for(my $i = 1; $i <= 2; $i++) {
       my $b = ($i==1 ? $b1 : $b2);
-      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}03");
-      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}01${dst2}${chn2}00");
-      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}05${dst2}${chn2}04");
-      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}080100");
-      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}06");
-      CUL_HM_PushCmdStack($shash, "++A001${id}${dst}${b}04${dst2}${chn2}04");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}03");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}01${dst2}${chn2}00");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}05${dst2}${chn2}04");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}080100");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}06");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}04${dst2}${chn2}04");
     }
 
     # Now the switch.
                       $sndcmd = "++A001${id}${dst2}${chn2}01${dst}${b2}${b1}";
     CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b1}03");
     CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b2}03");
-    $shash = $dhash; # Exchange the shash, as the switch is always alive.
+    $hash = $dhash; # Exchange the hash, as the switch is always alive.
 
   }
 
@@ -858,7 +845,7 @@ Log 1, "FOFT: $to";
     $hash->{STATE} = $state;
     $hash->{cmdSent} = $state;
   }
-  CUL_HM_SendCmd($shash, $sndcmd, 0, 1) if($sndcmd);
+  CUL_HM_SendCmd($hash, $sndcmd, 0, 1) if($sndcmd);
   return $ret;
 }
 
@@ -984,10 +971,13 @@ CUL_HM_SendCmd($$$$)
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
   if($waitforack) {
-    if($hash->{IODev} && $hash->{IODev}{TYPE} ne "HMLAN") {
+    my $iohash = $hash->{IODev};
+    if($iohash && $iohash->{TYPE} ne "HMLAN") {
       $hash->{ackWaiting} = $cmd;
       $hash->{ackCmdSent} = 1;
-      InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0)
+      my $off = 0.5;
+      $off += 0.15*int(@{$iohash->{QUEUE}}) if($iohash->{QUEUE});
+      InternalTimer(gettimeofday()+$off, "CUL_HM_Resend", $hash, 0);
     }
   }
   $cmd =~ m/As(..)(..)(....)(......)(......)(.*)/;
@@ -1002,7 +992,6 @@ CUL_HM_PushCmdStack($$)
   my @arr = ();
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
   push(@{$hash->{cmdStack}}, $cmd);
-Log 1, "PushStack: $hash->{NAME} ". @{$hash->{cmdStack}};
 }
 
 ###################################
@@ -1042,7 +1031,7 @@ CUL_HM_Resend($)
   IOWrite($hash, "", $hash->{ackWaiting});
   $hash->{ackCmdSent}++;
   DoTrigger($name, "resend nr ".$hash->{ackCmdSent});
-  InternalTimer(gettimeofday()+0.4, "CUL_HM_Resend", $hash, 0);
+  InternalTimer(gettimeofday()+0.5, "CUL_HM_Resend", $hash, 0);
 }
 
 ###################################
