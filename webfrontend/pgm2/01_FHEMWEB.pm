@@ -422,8 +422,11 @@ FW_AnswerCall($)
     pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/fhemicon.png"/>';
     pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     #pO '<meta name="viewport" content="width=device-width"/>'
-    pO '<meta name="viewport" content="width=320"/>' if($FW_ss);
-    pO '<meta name="viewport" content="width=768"/>' if($FW_tp);
+    if($FW_ss) {
+      pO '<meta name="viewport" content="width=320"/>';
+    } elsif($FW_tp) {
+      pO '<meta name="viewport" content="width=768"/>';
+    }
   }
 
   my $rf = AttrVal($FW_wname, "refresh", "");
