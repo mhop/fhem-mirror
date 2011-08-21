@@ -131,7 +131,7 @@ CUL_HM_Initialize($)
                          "swi,pushButton,threeStateSensor,motionDetector,".
                          "keyMatic,winMatic,smokeDetector " .
                        "hmClass:receiver,sender serialNr firmware devInfo ".
-                       "rawToReadable unit";
+                       "rawToReadable unit follow-on-for-timer";
 }
 
 
@@ -204,7 +204,6 @@ CUL_HM_Parse($$)
     if($dhash) {
       delete($dhash->{ackCmdSent});
       delete($dhash->{ackWaiting});
-Log 0, "DELETE 1:".$dhash->{NAME};
       delete($dhash->{cmdStack});
       $dhash->{STATE} = "MISSING ACK";
       DoTrigger($dname, "MISSING ACK");
@@ -658,7 +657,9 @@ CUL_HM_Set($@)
 
   my $id = CUL_HM_Id($shash->{IODev});
   my $sndcmd;
-  my $state = $cmd;
+  my $state = join(" ", @a[1..(int(@a)-1)]);
+
+  CommandDelete(undef, $name."_fortimer") if($defs{"${name}_fortimer"});
 
   if($cmd eq "raw") {  ##################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
@@ -698,6 +699,14 @@ CUL_HM_Set($@)
   } elsif($cmd eq "on-for-timer") { #####################################
     ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
     $sndcmd = sprintf("++A011%s%s02%sC80000%s", $id,$dst, $chn, $tval);
+
+    if(AttrVal($name, "follow-on-for-timer", undef)) {
+      my $val = $a[2];
+      my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
+      Log 4, "Follow: +$to setstate $name off";
+Log 1, "FOFT: $to";
+      CommandDefine(undef, $name . "_fortimer at +$to setstate $name off");
+    }
 
   } elsif($cmd eq "toggle") { ###########################################
     $shash->{toggleIndex} = 1 if(!$shash->{toggleIndex});
@@ -962,7 +971,6 @@ CUL_HM_SendCmd($$$$)
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
 
-Log 0, "SEND: ".$hash->{NAME};
   if($mn eq "++") {
     $mn = $io->{HM_CMDNR} ? ($io->{HM_CMDNR} +1) : 1;
     $mn = 0 if($mn > 255);
@@ -1004,15 +1012,12 @@ CUL_HM_ProcessCmdStack($)
   my ($hash) = @_;
   my $sent;
 
-Log 1, "CUL_HM_ProcessCmdStack $hash->{NAME}";
   if($hash->{cmdStack}) {
-Log 1, "Sending from stack:". @{$hash->{cmdStack}};
     if(@{$hash->{cmdStack}}) {
       CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
       $sent = 1;
     }
     if(!@{$hash->{cmdStack}}) {
-Log 0, "DELETE 2:".$hash->{NAME};
       delete($hash->{cmdStack});
     }
   }
@@ -1029,7 +1034,6 @@ CUL_HM_Resend($)
   if($hash->{ackCmdSent} == 3) {
     delete($hash->{ackCmdSent});
     delete($hash->{ackWaiting});
-Log 0, "DELETE 3:".$hash->{NAME};
     delete($hash->{cmdStack});
     $hash->{STATE} = "MISSING ACK";
     DoTrigger($name, "MISSING ACK");
@@ -1221,7 +1225,7 @@ CUL_HM_encodeTime16($)
     $mul /= 2;
   }
   my $v2 = CUL_HM_decodeTime16($ret);
-  return ($ret, "Timeout $v rounded to $v2") if($v != $v2);
+  Log 1, "Timeout $v rounded to $v2" if($v != $v2);
   return ($ret, "");
 }
 
