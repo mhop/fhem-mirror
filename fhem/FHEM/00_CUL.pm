@@ -688,15 +688,11 @@ CUL_Write($$$)
   Log 5, "$hash->{NAME} sending $fn$msg";
   my $bstring = "$fn$msg";
 
-  if($fn eq "F") {
+  if($fn eq "F" ||                      # FS20 message
+     $bstring =~ m/^u....F/ ||          # FS20 messages sent over an RFR
+     ($fn eq "" && $bstring =~ m/^A/)) { # AskSin/BidCos/HomeMatic
 
     CUL_AddFS20Queue($hash, $bstring);
-
-  } elsif($bstring =~ m/u....F/) { 
-    # put FS20 messages sent over an RFR in the common queue
-
-    CUL_AddFS20Queue($hash, $bstring);
-
 
   } else {
 
@@ -712,10 +708,13 @@ CUL_SendFromQueue($$)
   my ($hash, $bstring) = @_;
   my $name = $hash->{NAME};
 
+  my $hm = ($bstring =~ m/^A/);
+  my $to = ($hm ? 0.15 : 0.3);
+
   if($bstring ne "") {
-    # Is one of the CUL-fellows sending data?
-    if($attr{$name} && $attr{$name}{sendpool}) {
-      my @fellows = split(",", $attr{$name}{sendpool});
+    my $sp = AttrVal($name, "sendpool", undef);
+    if($sp) {                           # Is one of the CUL-fellows sending data?
+      my @fellows = split(",", $sp);
       foreach my $f (@fellows) {
         if($f ne $name &&
            $defs{$f} &&
@@ -723,12 +722,12 @@ CUL_SendFromQueue($$)
            $defs{$f}{QUEUE}->[0] ne "")
           {
             unshift(@{$hash->{QUEUE}}, "");
-            InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+            InternalTimer(gettimeofday()+$to, "CUL_HandleWriteQueue", $hash, 1);
             return;
           }
       }
     }
-    CUL_XmitLimitCheck($hash,$bstring);
+    CUL_XmitLimitCheck($hash,$bstring) if(!$hm);
     CUL_SimpleWrite($hash, $bstring);
   }
 
@@ -736,7 +735,7 @@ CUL_SendFromQueue($$)
   # Write the next buffer not earlier than 0.23 seconds
   # = 3* (12*0.8+1.2+1.0*5*9+0.8+10) = 226.8ms
   # else it will be sent too early by the CUL, resulting in a collision
-  InternalTimer(gettimeofday()+0.3, "CUL_HandleWriteQueue", $hash, 1);
+  InternalTimer(gettimeofday()+$to, "CUL_HandleWriteQueue", $hash, 1);
 }
 
 sub
@@ -941,7 +940,11 @@ CUL_SimpleWrite(@)
     # Prefix $msg with RRBBU and return the corresponding CUL hash.
     ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
   }
-  #Log 1, "SW: $msg";
+
+  my $name = $hash->{NAME};
+  my $ll5 = GetLogLevel($name,5);
+  Log $ll5, "SW: $msg";
+
   $msg .= "\n" unless($nonl);
 
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
