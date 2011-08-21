@@ -38,7 +38,7 @@ my %culHmModel=(
   "0001" => "HM-LC-SW1-PL-OM54",
   "0002" => "HM-LC-SW1-SM",
   "0003" => "HM-LC-SW4-SM",
-  "0004" => "HM-LC-SW1-FM",
+  "0004" => "HM-LC-SW1-FM",  # Tested
   "0005" => "HM-LC-BL1-FM",
   "0006" => "HM-LC-BL1-SM",
   "0007" => "KS550",         # Tested
@@ -387,7 +387,7 @@ CUL_HM_Parse($$)
       push @event, "state:$val";
     }
 
-  } elsif($st eq "remote") { ############################################
+  } elsif($st eq "remote" || $st eq "pushButton") { #######################
 
     if($cmd =~ m/^..4./ && $p =~ m/^(..)(..)$/) {
       my ($button, $bno) = (hex($1), hex($2));
