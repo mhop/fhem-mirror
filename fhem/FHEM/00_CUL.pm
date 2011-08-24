@@ -106,7 +106,8 @@ CUL_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a < 4 || @a > 5) {
-    my $msg = "wrong syntax: define <name> CUL devicename[\@baudrate] <FHTID>";
+    my $msg = "wrong syntax: define <name> CUL {none | devicename[\@baudrate] ".
+                        "| devicename\@directio | hostname:port} <FHTID>";
     Log 2, $msg;
     return $msg;
   }
@@ -949,6 +950,7 @@ CUL_SimpleWrite(@)
 
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
+  syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
 
   select(undef, undef, undef, 0.001);
 }
@@ -958,22 +960,21 @@ sub
 CUL_SimpleRead($)
 {
   my ($hash) = @_;
+  my ($buf, $res);
 
   if($hash->{USBDev}) {
-    my $buf = $hash->{USBDev}->input();
-    #Log 1, "Got $buf";
-    return $buf;
-  }
+    $buf = $hash->{USBDev}->input();
 
-  if($hash->{TCPDev}) {
-    my $buf;
-    if(!defined(sysread($hash->{TCPDev}, $buf, 256))) {
-      CUL_Disconnected($hash);
-      return undef;
-    }
-    return $buf;
+  } elsif($hash->{DIODev}) {
+    $res = sysread($hash->{DIODev}, $buf, 256);
+    $buf = undef if(!defined($res));
+
+  } elsif($hash->{TCPDev}) {
+    $res = sysread($hash->{TCPDev}, $buf, 256);
+    $buf = undef if(!defined($res));
+
   }
-  return undef;
+  return $buf;
 }
 
 ########################
@@ -993,6 +994,10 @@ CUL_CloseDev($)
   } elsif($hash->{USBDev}) {
     $hash->{USBDev}->close() ;
     delete($hash->{USBDev});
+
+  } elsif($hash->{DIODev}) {
+    close($hash->{DIODev});
+    delete($hash->{DIODev});
 
   }
   ($dev, undef) = split("@", $dev); # Remove the baudrate
@@ -1043,6 +1048,27 @@ CUL_OpenDev($$)
     $hash->{FD} = $conn->fileno();
     delete($readyfnlist{"$name.$dev"});
     $selectlist{"$name.$dev"} = $hash;
+
+  } elsif(lc($baudrate) eq "directio") {   # Without Device::SerialPort
+
+    if(!open($po, "+<$dev")) {
+      return undef if($reopen);
+      Log(3, "Can't open $dev: $!");
+      $readyfnlist{"$name.$dev"} = $hash;
+      $hash->{STATE} = "disconnected";
+      return "";
+    }
+
+    $hash->{DIODev} = $po;
+
+    if( $^O =~ /Win/ ) {
+      $readyfnlist{"$name.$dev"} = $hash;
+    } else {
+      $hash->{FD} = fileno($po);
+      delete($readyfnlist{"$name.$dev"});
+      $selectlist{"$name.$dev"} = $hash;
+    }
+
 
   } else {                              # USB/Serial device
 

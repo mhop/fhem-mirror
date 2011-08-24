@@ -2048,8 +2048,16 @@ A line ending with \ will be concatenated with the next one, so long lines
       following command:<ul>modprobe usbserial vendor=0x03eb
       product=0x204b</ul>In this case the device is most probably
       /dev/ttyUSB0.<br><br>
+
       You can also specify a baudrate if the device name contains the @
       character, e.g.: /dev/ttyACM0@38400<br><br>
+
+      If the baudrate is "directio" (e.g.: /dev/ttyACM0@directio), then the
+      perl module Device::SerialPort is not needed, and fhem opens the device
+      with simple file io. This might work if the operating system uses sane
+      defaults for the serial parameters, e.g. some Linux distributions and
+      OSX.  <br><br>
+
     </ul>
     Network-connected devices (CUN):<br><ul>
     &lt;device&gt; specifies the host:port of the device. E.g.
@@ -2547,16 +2555,16 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li>day-temp &lt;tmp&gt;<br>
              night-temp &lt;tmp&gt;<br>
              Set the day or night temperature. Temp must be between 6 and 30
-             Centigrade, and precision is half a degree.
-         <li>tempListSat HH:MM temp 24:00 temp ...<br>
-             tempListSun HH:MM temp 24:00 temp ...<br>
-             tempListMon HH:MM temp 24:00 temp ...<br>
-             tempListTue HH:MM temp 24:00 temp ...<br>
-             tempListThu HH:MM temp 24:00 temp ...<br>
-             tempListWed HH:MM temp 24:00 temp ...<br>
-             tempListFri HH:MM temp 24:00 temp ...<br>
+             Celsius, and precision is half a degree.
+         <li>tempListSat HH:MM temp ... 24:00 temp<br>
+             tempListSun HH:MM temp ... 24:00 temp<br>
+             tempListMon HH:MM temp ... 24:00 temp<br>
+             tempListTue HH:MM temp ... 24:00 temp<br>
+             tempListThu HH:MM temp ... 24:00 temp<br>
+             tempListWed HH:MM temp ... 24:00 temp<br>
+             tempListFri HH:MM temp ... 24:00 temp<br>
              Specify a list of temperature intervals. Up to 24 intervals can be
-             spacified for each week day, the resolution is 10 Minutes. The
+             specified for each week day, the resolution is 10 Minutes. The
              last time spec must always be 24:00.<br>
              Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
        </ul></li>
@@ -2567,11 +2575,11 @@ A line ending with \ will be concatenated with the next one, so long lines
        <ul>
          <li>raw &lt;data&gt; ...<br>
              Only needed for experimentation.
-             send a list of "raw" commands. The first command will be immediately
-             sent, the next one after the previous one is acked by the target.  The
-             length will be computed automatically, and the message counter will be
-             incremented if the first two charcters are ++.
-             Example (enable AES):<pre>
+             send a list of "raw" commands. The first command will be
+             immediately sent, the next one after the previous one is acked by
+             the target.  The length will be computed automatically, and the
+             message counter will be incremented if the first two charcters are
+             ++. Example (enable AES):<pre>
    set hm1 raw ++A001F100001234560105000000001\
                ++A001F10000123456010802010AF10B000C00\
                ++A001F1000012345601080801\
