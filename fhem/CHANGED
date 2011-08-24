@@ -7,6 +7,7 @@
   - feature: .gplot files renamed from type to content
   - bugfix:  FS20 on-for-timer error reporting only in the logfile
   - bugfix:  FHEM2FHEM should work with CUL again, after syntax change
+  - feature: CUL directio mode (No Device::SerialPort needed)
 
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
