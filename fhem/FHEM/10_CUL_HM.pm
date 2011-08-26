@@ -437,7 +437,7 @@ CUL_HM_Parse($$)
     } elsif($p =~ m/^01..01$/) {
       push @event, "state:all-clear";   # Entwarnung
 
-    } elsif($p =~ m/^06010000$/) {
+    } elsif($p =~ m/^06010.00$/) {
       push @event, "state:alive";
 
     } elsif($p =~ m/^00(..)$/) {
