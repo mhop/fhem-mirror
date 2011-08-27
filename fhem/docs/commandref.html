@@ -1017,6 +1017,9 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="FHZ"></a>
 <h3>FHZ</h3>
 <ul>
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the devices is connected via USB or a serial port.
+  <br><br>
 
   <a name="FHZdefine"></a>
   <b>Define</b>
@@ -1391,6 +1394,22 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
 
   </ul>
+  <br>
+
+  <a name="FS20events"></a>
+  <b>Generated events:</b>
+  <ul>
+     From an FS20 device you can receive one of the following events.
+     <li>on
+     <li>off
+     <li>toggle
+     <li>dimdown
+     <li>dimup
+     <li>dimupdown
+     <li>on-for-timer
+     Which event is sent is device dependent and can sometimes configured on
+     the device.
+  </ul>
 </ul>
 
 <a name="FHT"></a>
@@ -1657,6 +1676,32 @@ A line ending with \ will be concatenated with the next one, so long lines
         will be modified.
         </li>
   </ul>
+  <br>
+
+  <a name="FHTevents"></a>
+  <b>Generated events:</b>
+  <ul>
+     <li>actuator
+     <li>actuator1 actuator2 actuator3 actuator4<br>
+         actuator5 actuator6 actuator7 actuator8<br>
+         (sent if you configured an offset for the associated valve)
+     <li>mon-from1 mon-to1 mon-from2 mon-to2
+     <li>tue-from1 tue-to1 tue-from2 tue-to2
+     <li>wed-from1 wed-to1 wed-from2 wed-to2
+     <li>thu-from1 thu-to1 thu-from2 thu-to2
+     <li>fri-from1 fri-to1 fri-from2 fri-to2
+     <li>sat-from1 sat-to1 sat-from2 sat-to2
+     <li>sun-from1 sun-to1 sun-from2 sun-to2
+     <li>mode
+     <li>holiday1 holiday2
+     <li>desired-temp
+     <li>measured-temp measured-low measured-high
+     <li>warnings
+     <li>manu-temp
+     <li>year month day hour minute
+     <li>day-temp night-temp lowtemp-offset windowopen-temp
+     <li>ack can-xmit can-rcv ack2 start-xmit end-xmit
+         (only if the CUL is configured to transmit FHT protocol data)
   <br>
 
 </ul>
@@ -2015,19 +2060,22 @@ A line ending with \ will be concatenated with the next one, so long lines
   to receive and send different 868MHz protocols (FS20/FHT/S300/EM/HMS).
   It is even possible to use these devices as range extenders/routers, see the
   <a href="#CUL_RFR">CUL_RFR</a> module for details.
-  <br>
+  <br> <br>
 
-  <br>
   Some protocols (FS20, FHT and KS300) are converted by this module so that
   the same logical device can be used, irrespective if the radio telegram is
   received by a CUL or an FHZ device.<br> Other protocols (S300/EM) need their
   own modules. E.g. S300 devices are processed by the CUL_WS module if the
   signals are received by the CUL, similarly EMWZ/EMGZ/EMEM is handled by the
-  CUL_EM module.<br>
+  CUL_EM module.<br><br>
 
-  <br>
   It is possible to attach more than one device in order to get better
   reception, fhem will filter out duplicate messages.<br><br>
+
+  Note: this module may require the Device::SerialPort or Win32::SerialPort
+  module if you attach the device via USB and the OS sets strange default
+  parameters for serial devices.
+  
 
   </td><td>
   <img src="ccc.jpg"/>
@@ -2594,6 +2642,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CUL_HMattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#showtime">showtime</a></li>
@@ -2621,9 +2670,72 @@ A line ending with \ will be concatenated with the next one, so long lines
         set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
         attr KFM100 unit Liter
         </li>
-
-
-
+  </ul>
+  <br>
+  <a name="CUL_HMevents"></a>
+  <b>Generated events:</b>
+  <ul>
+  <li>KS550/HM-WDS100-C6-O:<br>
+      T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b
+  <li>HM-CC-TC:<br>
+      T: $t H: $h<br>
+      temperature $t<br>
+      humidity $h<br>
+      actuator $vp %<br>
+      desired-temp: $t<br>
+  <li>KFM100:<br>
+      rawValue $v<br>
+      Sequence $s<br>
+      $cv $unit<br>
+  <li>switch/dimmer/blindActuator:<br>
+      deviceMsg on<br>
+      deviceMsg off<br>
+      deviceMsg $val %<br>
+      poweron on<br>
+      poweron off<br>
+      poweron $val %<br>
+  <li>remote/pushButton<br>
+      Btn$x on<br>
+      Btn$x off<br>
+      Btn$x onLong<br>
+      Btn$x offLong<br>
+      Btn$x on (to $dest)<br>
+      Btn$x off (to $dest)<br>
+      Btn$x onLong (to $dest)<br>
+      Btn$x offLong (to $dest)<br>
+  <li>motionDetector<br>
+      brightness:$b<br>
+      alive<br>
+      motion<br>
+      cover closed<br>
+      cover open<br>
+  <li>smokeDetector<br>
+      on<br>
+      smoke_detect on<br>
+      all-clear<br>
+      alive<br>
+      test $t<br>
+  <li>threeStateSensor<br>
+      cover closed<br>
+      cover open<br>
+      alive<br>
+      contact closed<br>
+      contact open<br>
+      contact tilted<br>
+  <li>THSensor<br>
+      T: $t H: $h<br>
+      temperature $t<br>
+      humidity $h<br>
+  <li>winMatic<br>
+      contact closed<br>
+      contact open<br>
+      contact tilted<br>
+      contact movement_tilted<br>
+      contact movement_closed<br>
+      contact lock_on<br>
+      airing: $air<br>
+      course: tilt<br>
+      course: close<br>
   </ul>
   <br>
 </ul>
@@ -2740,8 +2852,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   Devices sold by numerous hardware verndors (e.g. Eltako, Peha, etc), using
   the RF Protocol provided by the EnOcean Alliance.
-  This module is currently only tested to work with remotes, but other types of
-  devices should also work. Feedback is welcome.
   <br><br>
   <a name="EnOceandefine"></a>
   <b>Define</b>
@@ -3086,92 +3196,10 @@ A line ending with \ will be concatenated with the next one, so long lines
   then will generate an event on change of the inner parameters. There are
   about 20.000 events a day, the FHEM module ignores about 90% of them, if the
   <a href="#all_km271_events">all_km271_events</a> attribute is not set.<br>
-  <br>
-  Following events are known:
-  <div id="block">
-<pre>  HK1_Betriebswerte1
-  HK1_Betriebswerte2
-  HK1_Vorlaufsolltemperatur
-  HK1_Vorlaufisttemperatur
-  HK1_Raumsolltemperatur
-  HK1_Raumisttemperatur
-  HK1_Einschaltoptimierungszeit
-  HK1_Ausschaltoptimierungszeit
-  HK1_Pumpenleistung
-  HK1_Mischerstellung
-  HK1_Heizkennlinie_bei_+_10_Grad
-  HK1_Heizkennlinie_bei_0_Grad
-  HK1_Heizkennlinie_bei_-_10_Grad
+  <br><br>
 
-  HK2_Betriebswerte1
-  HK2_Betriebswerte2
-  HK2_Vorlaufsolltemperatur
-  HK2_Vorlaufisttemperatur
-  HK2_Raumsolltemperatur
-  HK2_Raumisttemperatur
-  HK2_Einschaltoptimierungszeit
-  HK2_Ausschaltoptimierungszeit
-  HK2_Pumpenleistung
-  HK2_Mischerstellung
-  HK2_Heizkennlinie_bei_+_10_Grad
-  HK2_Heizkennlinie_bei_0_Grad
-  HK2_Heizkennlinie_bei_-_10_Grad
-
-  WW_Betriebswerte1
-  WW_Betriebswerte2
-  WW_Solltemperatur
-  WW_Isttemperatur
-  WW_Einschaltoptimierungszeit
-  WW_Ladepumpe
-
-  Kessel_Vorlaufsolltemperatur
-  Kessel_Vorlaufisttemperatur
-  Brenner_Einschalttemperatur
-  Brenner_Ausschalttemperatur
-  Kessel_Integral1
-  Kessel_Integral
-  Kessel_Fehler
-  Kessel_Betrieb
-  Brenner_Ansteuerung
-  Abgastemperatur
-  Brenner_Stellwert
-  Brenner_Laufzeit1_Minuten2
-  Brenner_Laufzeit1_Minuten1
-  Brenner_Laufzeit1_Minuten
-  Brenner_Laufzeit2_Minuten2
-  Brenner_Laufzeit2_Minuten1
-  Brenner_Laufzeit2_Minuten
-
-  Aussentemperatur
-  Aussentemperatur_gedaempft
-  Versionsnummer_VK
-  Versionsnummer_NK
-  Modulkennung</pre>
-  </div>
-  <br>
-  As I cannot explain all the values, I logged data for a period and plotted
-  each received value in the following logs:
-    <ul>
-      <li><a href="km271/km271_Aussentemperatur.png">Aussentemperatur</a></li>
-      <li><a href="km271/km271_Betriebswerte.png">Betriebswerte</a></li>
-      <li><a href="km271/km271_Brenneransteuerung.png">Brenneransteuerung</a></li>
-      <li><a href="km271/km271_Brennerlaufzeit.png">Brennerlaufzeit</a></li>
-      <li><a href="km271/km271_Brennerschalttemperatur.png">Brennerschalttemperatur</a></li>
-      <li><a href="km271/km271_Heizkennlinie.png">Heizkennlinie</a></li>
-      <li><a href="km271/km271_Kesselbetrieb.png">Kesselbetrieb</a></li>
-      <li><a href="km271/km271_Kesselintegral.png">Kesselintegral</a></li>
-      <li><a href="km271/km271_Ladepumpe.png">Ladepumpe</a></li>
-      <li><a href="km271/km271_Raumsolltemperatur_HK1.png">Raumsolltemperatur_HK1</a></li>
-      <li><a href="km271/km271_Vorlauftemperatur.png">Vorlauftemperatur</a></li>
-      <li><a href="km271/km271_Warmwasser.png">Warmwasser</a></li>
-    </ul>
-  All of these events are reported directly after initialization (or after
-  requesting logmode), along with some 60 configuration records (6byte long
-  each). About 20 parameters from these records are reverse engeneered, they
-  all start with CFG_.
-  </ul>
-
-
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module.
+  <br><br>
 
   <a name="KM271define"></a>
   <b>Define</b>
@@ -3225,6 +3253,89 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   </ul>
   <br>
+
+  
+  <a name="KM271events"></a>
+  <b>Generated events:</b>
+  <ul>
+    <li>HK1_Betriebswerte1
+    <li>HK1_Betriebswerte2
+    <li>HK1_Vorlaufsolltemperatur
+    <li>HK1_Vorlaufisttemperatur
+    <li>HK1_Raumsolltemperatur
+    <li>HK1_Raumisttemperatur
+    <li>HK1_Einschaltoptimierungszeit
+    <li>HK1_Ausschaltoptimierungszeit
+    <li>HK1_Pumpenleistung
+    <li>HK1_Mischerstellung
+    <li>HK1_Heizkennlinie_bei_+_10_Grad
+    <li>HK1_Heizkennlinie_bei_0_Grad
+    <li>HK1_Heizkennlinie_bei_-_10_Grad
+    <li>HK2_Betriebswerte1
+    <li>HK2_Betriebswerte2
+    <li>HK2_Vorlaufsolltemperatur
+    <li>HK2_Vorlaufisttemperatur
+    <li>HK2_Raumsolltemperatur
+    <li>HK2_Raumisttemperatur
+    <li>HK2_Einschaltoptimierungszeit
+    <li>HK2_Ausschaltoptimierungszeit
+    <li>HK2_Pumpenleistung
+    <li>HK2_Mischerstellung
+    <li>HK2_Heizkennlinie_bei_+_10_Grad
+    <li>HK2_Heizkennlinie_bei_0_Grad
+    <li>HK2_Heizkennlinie_bei_-_10_Grad
+    <li>WW_Betriebswerte1
+    <li>WW_Betriebswerte2
+    <li>WW_Solltemperatur
+    <li>WW_Isttemperatur
+    <li>WW_Einschaltoptimierungszeit
+    <li>WW_Ladepumpe
+    <li>Kessel_Vorlaufsolltemperatur
+    <li>Kessel_Vorlaufisttemperatur
+    <li>Brenner_Einschalttemperatur
+    <li>Brenner_Ausschalttemperatur
+    <li>Kessel_Integral1
+    <li>Kessel_Integral
+    <li>Kessel_Fehler
+    <li>Kessel_Betrieb
+    <li>Brenner_Ansteuerung
+    <li>Abgastemperatur
+    <li>Brenner_Stellwert
+    <li>Brenner_Laufzeit1_Minuten2
+    <li>Brenner_Laufzeit1_Minuten1
+    <li>Brenner_Laufzeit1_Minuten
+    <li>Brenner_Laufzeit2_Minuten2
+    <li>Brenner_Laufzeit2_Minuten1
+    <li>Brenner_Laufzeit2_Minuten
+    <li>Aussentemperatur
+    <li>Aussentemperatur_gedaempft
+    <li>Versionsnummer_VK
+    <li>Versionsnummer_NK
+    <li>Modulkennung
+  </ul>
+  <br>
+  As I cannot explain all the values, I logged data for a period and plotted
+  each received value in the following logs:
+    <ul>
+      <li><a href="km271/km271_Aussentemperatur.png">Aussentemperatur</a></li>
+      <li><a href="km271/km271_Betriebswerte.png">Betriebswerte</a></li>
+      <li><a href="km271/km271_Brenneransteuerung.png">Brenneransteuerung</a></li>
+      <li><a href="km271/km271_Brennerlaufzeit.png">Brennerlaufzeit</a></li>
+      <li><a href="km271/km271_Brennerschalttemperatur.png">Brennerschalttemperatur</a></li>
+      <li><a href="km271/km271_Heizkennlinie.png">Heizkennlinie</a></li>
+      <li><a href="km271/km271_Kesselbetrieb.png">Kesselbetrieb</a></li>
+      <li><a href="km271/km271_Kesselintegral.png">Kesselintegral</a></li>
+      <li><a href="km271/km271_Ladepumpe.png">Ladepumpe</a></li>
+      <li><a href="km271/km271_Raumsolltemperatur_HK1.png">Raumsolltemperatur_HK1</a></li>
+      <li><a href="km271/km271_Vorlauftemperatur.png">Vorlauftemperatur</a></li>
+      <li><a href="km271/km271_Warmwasser.png">Warmwasser</a></li>
+    </ul>
+  All of these events are reported directly after initialization (or after
+  requesting logmode), along with some 60 configuration records (6byte long
+  each). About 20 parameters from these records are reverse engeneered, they
+  all start with CFG_.
+  </ul>
+
 
 
 <a name="KS300"></a>
@@ -3297,8 +3408,8 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="CM11"></a>
 <h3>CM11</h3>
 <ul>
-  <br>
-
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module.
+  <br><br>
   <a name="CM11define"></a>
   <b>Define</b>
   <ul>
@@ -3482,9 +3593,10 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="LIRC"></a>
 <h3>LIRC</h3>
 <ul>
-  Can use infrared signals received by an lirc device as toggle events.
-  <br>
-  <br>
+  Use infrared signals received by an lirc device as toggle events.
+  <br><br>
+  Note: this module needs the Lirc::Client perl module.
+  <br><br>
 
   <a name="LIRCdefine"></a>
   <b>Define</b>
@@ -3730,6 +3842,8 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="WEBIO"></a>
 <h3>WEBIO</h3>
 <ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
   <a name="WEBIOdefine"></a>
   <b>Define</b>
   <ul>
@@ -3765,6 +3879,8 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="WEBIO_12DIGITAL"></a>
 <h3>WEBIO_12DIGITAL</h3>
 <ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
   <a name="WEBIO_12DIGITALdefine"></a>
   <b>Define</b>
   <ul>
@@ -3795,10 +3911,12 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br>
   </ul>
 </ul>
-
+Net::Telnet 
 <a name="VantagePro2"></a>
 <h3>VantagePro2</h3>
 <ul>
+  Note: this module needs the Net::Telnet perl module.
+  <br><br>
   <a name="VantagePro2define"></a>
   <b>Define</b>
   <ul>
@@ -3845,6 +3963,8 @@ Attributes:<br>
 <a name="ALL3076"></a>
 <h3>ALL3076</h3>
 <ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
   <a name="ALL3076define"></a>
   <b>Define</b>
   <ul>
@@ -3900,6 +4020,9 @@ Attributes:<br>
 <a name="ALL4000T"></a>
 <h3>ALL4000T</h3>
 <ul>
+  Note: this module requires the following perl modules: XML::Simple LWP::UserAgent
+  HTTP::Request.
+  <br><br>
   <a name="ALL4000Tdefine"></a>
   <b>Define</b>
   <ul>
@@ -3917,6 +4040,8 @@ Attributes:<br>
 <a name="ALL4027"></a>
 <h3>ALL4027</h3>
 <ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
   <a name="ALL4027define"></a>
   <b>Define</b>
   <ul>
@@ -4077,7 +4202,6 @@ Attributes:<br>
 <a name="ECMD"></a>
 <h3>ECMD</h3>
 <ul>
-  <br>
   Any physical device with request/response-like communication capabilities
   over a TCP connection can be defined as ECMD device. A practical example
   of such a device is the AVR microcontroller board AVR-NET-IO from
@@ -4101,6 +4225,10 @@ Attributes:<br>
   names the parameters of the logical device, e.g. a placeholder for the number
   of the ADC or port, as well as the get and set capabilities. Worked examples
   are to be found in the documentation of the <a href="#ECMDDevice">ECMDDevice</a> device.
+  <br><br>
+
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the module is connected via serial Port or USB.
   <br><br>
 
   <a name="ECMDdefine"></a>
@@ -4749,8 +4877,8 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
   properties of the device are represented as simple files that can be read
   and written.<br><br>
 
-  Note:<br>
-  You need the owperl module from <a href="http://owfs.org/index.php?page=owperl">http://owfs.org/</a>.
+  Note: You need the owperl module from
+  <a href="http://owfs.org/index.php?page=owperl">http://owfs.org/</a>.
   <br><br>
 
   <a name="OWFSdefine"></a>
@@ -5018,7 +5146,9 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
     <li> 44_RFXELSE.pm: Process and display all other messages. This module shows you messages that could not be handled by the other modules. It is useful to see RF receiption problems.</li>
     </ul>
   <br>
-  <br>
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the devices is connected via USB or a serial port.
+  <br><br>
  <a name="RFXCOMdefine"></a>
   <b>Define</b>
   <ul>
@@ -5721,10 +5851,21 @@ Terminating
 <a name="USBWX"></a>
 <h3>USBWX</h3>
 <ul>
-  The USBWX module interprets the messages received by the ELV <a href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">USB-WDE1</a> weather receiver. This receiver is compaptible with the following ELV sensors: KS200/KS300, S300IA, S300TH, ASH2200, PS50. It also known to work with Conrad weather sensors KS555, S555TH and ASH555.<br> This module was tested with ELV S300TH, ELV ASH2200, ELV KS300, Conrad S555TH and Conrad KS555. <br>
-Readings and STATE of temperature/humidity sensors are compatible with the CUL_WS module. For KS300/KS555 sensors STATE is compatible with the KS300 module. The module is integrated into autocreate to generate the appropriate filelogs and weblinks automatically.
-  <br>
-  <br>
+  The USBWX module interprets the messages received by the ELV <a
+href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">USB-WDE1</a>
+  weather receiver. This receiver is compaptible with the following ELV sensors:
+  KS200/KS300, S300IA, S300TH, ASH2200, PS50. It also known to work with Conrad
+  weather sensors KS555, S555TH and ASH555.<br> This module was tested with ELV
+  S300TH, ELV ASH2200, ELV KS300, Conrad S555TH and Conrad KS555. <br> Readings
+  and STATE of temperature/humidity sensors are compatible with the CUL_WS
+  module. For KS300/KS555 sensors STATE is compatible with the KS300 module. The
+  module is integrated into autocreate to generate the appropriate filelogs and
+  weblinks automatically.
+  <br><br>
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the devices is connected via USB or a serial port.
+  <br><br>
+
   <a name="USBWXdefine"></a>
   <b>Define</b>
   <ul>
@@ -5774,6 +5915,9 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
   As the TCM120 and the TCM310 speak completely different protocols, this
   module implements 2 drivers in one. It is the "physical" part for the <a
   href="#EnOcean">EnOcean</a> module.<br><br>
+
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module.
+  <br><br>
 
   <a name="TCMdefine"></a>
   <b>Define</b>
@@ -6413,7 +6557,9 @@ Readings and STATE of temperature/humidity sensors are compatible with the CUL_W
 <a name="holiday"></a>
 <h3>holiday</h3>
 <ul>
-  <br>
+  Note: this module requires the "DateTime::Event::Easter" perl module for all
+  easter related holidays.
+  <br><br>
 
   <a name="holidaydefine"></a>
   <b>Define</b>
@@ -7147,8 +7293,9 @@ isday</pre>
 <h3>PachLog</h3>
 <ul>
   The PachLog-Module Logs SensorData like (temperature and humidity) to <a href=http://www.pachube.com>www.pachube.com</a>.
-  <br>
-  <br>
+  <br><br>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
   <a name="PachLogdefine"></a>
   <b>Define</b>
   <ul>
