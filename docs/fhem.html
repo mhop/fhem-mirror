@@ -71,8 +71,9 @@
     <ul>
       Current Version: (as of =DATE=): 
       <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
-      <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a> or
-      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>
+      <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>,
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7270.zip</a>
       <br>
       See the <a href="CHANGED">CHANGED</a> file for current changes.
       <br>
@@ -159,9 +160,11 @@
         La Crosse TX2/TX3.</li>
         <div id="dist"></div>
       <li>Via an attached FHZ1000 or FHZ1300 access to the following protocols:
-        FS20 (all devices), FHT80b, HMS, KS300. <b>Note:</b> The FHZ1350 WLAN
-        works with fhem if you replace the standard (avisario) WLAN module with
-        one that won't encrypt the data.</li>
+        FS20 (all devices), FHT80b, HMS, KS300. <b>Note:</b> For the WLAN
+        version of the FHZ1300 see this <a
+        href="http://www.thinkwiki.org/wiki/User:Akw/FHZ">
+        link</a>.
+        </li>
         <div id="dist"></div>
 
       <li>reading and sending X10 events via the CM11 module (with access
@@ -221,7 +224,8 @@
           protocol.
         <div id="dist"></div>
 
-      <li>Via a TCM120 (e.g. the BSC BOR) access to the EnOcean protocol.
+      <li>Via a TCM120 (e.g. the BSC BOR) or a TCM310 (e.g. busware EUL) access
+      to the EnOcean protocol.
         <div id="dist"></div>
         <div id="dist"></div>
         <div id="dist"></div>
@@ -296,10 +300,7 @@
 
       Device/OS Specific installation guides:<br>
       <ul>
-        <li>Instructions for the Fritz!Box:
-          <a href="fritzbox7390.html">7390</a>, <a
-          href="http://fhemwiki.de/index.php/AVM_Fritz!Box">7170@fhemwiki</a>
-          and <a href="fritzbox.html">7170/7270</a></li>
+        <li>Instructions for the <a href="fritzbox.html">Fritz!Box</a></li>
         <li>Instructions for Nas/Routers (NSLU2):
           <a href="http://www.martin-haas.de/fhz/nslu2fhz">
           http://www.martin-haas.de/fhz/nslu2fhz</a></li>
@@ -345,11 +346,10 @@
     <a name="Installation"></a>
     <h3>Installation</h3>
     <ul>
-    <h4>Fritz!Box 7390</h4>
+    <h4>Fritz!Box</h4>
     <ul>
-      <li>Install a current Lab version first, then <a
-          href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> image, and
-          connect to http://localhost:8083/fhem. Follow the <a
+      <li>See the detailed documentation <a href="fritzbox.html">here</a>, and
+          after installation connect to http://localhost:8083/fhem. Follow the <a
           href="HOWTO.html">HOWTO</a> for adding devices.
      </ul>
 
