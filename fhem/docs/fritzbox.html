@@ -27,11 +27,64 @@
 
   <div id="right">
 
-<h1><a href="fhem.html">FHEM</a> on the Fritz!Box</h1>
+<h2><a href="fhem.html">FHEM</a> on the Fritz!Box</h2>
 
-(as of 2009-10-19)
 
-<h3>Description for the Fritzbox 7170 from Achim</h3>
+<h3>Fritz!Box 7390 (as of 2011-09-03)</h3>
+    <ul>
+    After the CeBIT 2011 AVM released an image for the Fritz!Box7390 containing
+    fhem, see <a href="http://www.avm.de/de/Service/Service-Portale/Labor/index.php"
+    >this</a> link. This image is to be installed in <i>addition</i> to the
+    normal firmware.
+    Version 19798 of this fhem-image (not the Lab firmware) configures 2 CUL
+    devices, the first one talking FS20 ("SlowRF"), the second preconfigured for
+    HomeMatic. Autoconfigure is not enabled by default, so you'll either have
+    to enable it or to enter the devices by hand.
+    <br><br>
+
+    The bad news with this fhem-image is, that it will start fhem in a chroot
+    environment, i.e. you will not be able to trigger arbitrary FritzBox
+    functions out of fhem, e.g. sending mail, enabling WLAN, etc.
+    <br><br>
+
+    <a href="fhem-=VERS=-fb7390.image">This</a> fhem-image contains a stripped
+    down version of the perl package from the AVM fhem-image, a newer version
+    of fhem, and a modified installation script. The main difference is
+    starting fhem in a normal (non-chroot) environment, and enabling
+    autocreate.  When installing it, you have to confirm with an extra click
+    that it does not have a valid AVM signature. It will reuse your old
+    logfiles and configuration, unlike the "original" AVM firmware. Autocreate
+    is on, and there are NO CUL devices defined in the initial configuration,
+    you'll have to do this manually, e.g. by following the HOWTO or the command
+    reference. 
+    </ul>
+
+<h3>Fritz!Box 7270 (as of 2011-09-03)</h3>
+    <ul>
+    Thank to Eyk's work there is also a <a
+    href="fhem-=VERS=-fb7270.zip">ZIP</a> file for the Fritz!Box7270. To install it:
+    <ul>
+      <li>First unzip the .ZIP file in the root directory of the USB-disk/USB-stick.
+      <li>Attach the stick to the FB
+      <li>open a telnet window, connect to the FB.
+      <li>With the command df check the name of the stick on the FB.
+      <li>Execute the following command in the FB telnet window to start fhem
+          when the FB reboots:<br>
+          echo "&lt;name-of-the-stick&gt;/fhem/startfhem" >> /var/flash/debug.cfg
+      <li>Start fhem manually with "&lt;name-of-the-stick&gt;/fhem/startfhem"
+    </ul>
+    Note: As the perl in this package does <b>not</b> contain the
+    Device::SerialPort module, currently only the CUL and devices connected via
+    TCP/IP are supported. To define the CUL, the following command should be used:<br>
+      <ul>
+        define MyCUL CUL /dev/ttyACM0@directio 1234
+      </ul>
+    for details see the <a href="commandref.html#CUL">CUL</a> documentation.
+    </ul>
+
+<h3>Fritzbox 7170 in <a href="http://fhemwiki.de/index.php/AVM_Fritz!Box">fhemwiki</a></h3>
+
+<h3>Fritzbox 7170 (from Achim, as of 2009-10-19)</h3>
 <ul>
     <li>Flash the FritzBox with the Freetz firmware using the Fritzbox
     web-frontend.  As we are not allowed to offer a FritzBox binary image for
@@ -103,10 +156,10 @@
     <li>Restart the box
 </ul>
 
-<h3>Description for the Fritzbox 7270 from Volker</h3>
+<h3>Fritzbox 7270 (from Volker, as of 2009-10-19)</h3>
 <ul>
   <li>Unpack <a href="fb7270/fhem45-on-fritzbox.tgz">fhem45-on-fritzbox.tgz</a>
-    to the USB-Stick.<br><br>
+    to the USB-stick.<br><br>
   <li>Attach the USB storage (stick) to the Fritz!Box. The Fritz!Box should
     recognize it. Now we have to modify usr/fhem/rc.fhem.<br><br>
   <li>Login (via telnet) to the Fritz!Box with the WEB-Password<pre>
