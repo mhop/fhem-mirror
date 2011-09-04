@@ -270,9 +270,10 @@ TCM_Read($)
         $mdata =~ m/^(..)(.*)(........)(..)$/;
         my ($org, $d1, $id, $status) = ($1,$2,$3,$4);
 
+        $odata =~ m/^(..)(........)(..)(..)$/;
         my %addvals = (SubTelNum => hex($1), DestinationID => $2,
                        RSSI => hex($3), SecurityLevel => hex($4),);
-        $hash->{RSSI} = $3;
+        $hash->{RSSI} = hex($3);
 
         Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
 
