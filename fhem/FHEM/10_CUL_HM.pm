@@ -65,7 +65,7 @@ my %culHmModel=(
   "0022" => "WS888",
   "0026" => "HM-SEC-KEY-S",
   "0027" => "HM-SEC-KEY-O",
-  "0028" => "HM-SEC-WIN",    # some experiments
+  "0028" => "HM-SEC-WIN",     # some experiments
   "0029" => "HM-RC-12",
   "002A" => "HM-RC-12-B",
   "002D" => "HM-LC-SW4-PCB",
@@ -73,7 +73,7 @@ my %culHmModel=(
   "002F" => "HM-SEC-SC",
   "0030" => "HM-SEC-RHS",     # Tested
   "0034" => "HM-PBI-4-FM",
-  "0035" => "HM-PB-4-WM",
+  "0035" => "HM-PB-4-WM",     # Tested
   "0036" => "HM-PB-2-WM",
   "0037" => "HM-RC-19",
   "0038" => "HM-RC-19-B",
@@ -94,7 +94,7 @@ my %culHmModel=(
   "0047" => "KFM-Display",
   "0048" => "IS-WDS-TH-OD-S-R3",
   "0049" => "KFM-Sensor",
-  "004A" => "HM-SEC-MDIR",   # Tested
+  "004A" => "HM-SEC-MDIR",     # Tested
   "004C" => "HM-RC-12-SW",
   "004D" => "HM-RC-19-SW",
   "004E" => "HM-LC-DDC1-PCB",
@@ -329,6 +329,22 @@ CUL_HM_Parse($$)
       if($id eq $dst && $cmd ne "8002");
       
 
+  } elsif($model eq "HM-CC-VD") { ###################
+    # CMD:8202 SRC:13F251 DST:15B50D 010100002A
+    if($cmd eq "8202" && $p =~ m/^(..)(..)(..)(..)/) { # status ACK to controlling HM-CC-TC
+      my (   $vp,     $d1) =
+         (hex($3), $4);
+      $vp = int($vp/2.56+0.5);   # valve position in %, encoding wrong ###!!!!###
+      push @event, "actuator:$vp %";
+           if($d1 eq "10") { push @event, "actuator:movement_open";
+      } elsif($d1 eq "20") { push @event, "actuator:movement_close";
+      }
+    }
+
+    CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
+      if($id eq $dst && $cmd ne "8002");
+  
+
   } elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
 
     if($p =~ m/.14(.)0200(..)(..)(..)/) {
@@ -350,7 +366,8 @@ CUL_HM_Parse($$)
             my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
             my $unit = AttrVal($name, "unit", "");
             $unit = " $unit" if($unit);
-            push @event, "state:$cv$unit";
+            push @event, "state:$cv $unit";
+            push @event, "content:$cv $unit";
             last;
           }
         }
@@ -416,8 +433,7 @@ CUL_HM_Parse($$)
     if($cmd =~ m/^..41/ && $p =~ m/^01(......)/) {
       $state = $1;
       push @event, "state:motion";
-      push @event, "motion:"; #added peterp
-      # A0D258410143DFABC82AD0601240E
+      push @event, "motion:"; #added peterp # A0D258410143DFABC82AD0601240E
     }
     if($cmd =~ m/^.610/) {
       push @event, "cover:closed" if($p =~ m/^0601..00$/);         # By peterp
@@ -743,6 +759,8 @@ CUL_HM_Set($@)
                     "Tue"=>"5 9B", "Thu"=>"5 CB", "Wed"=>"6 01",
                     "Fri"=>"6 31");
     my ($list,$addr) = split(" ", $day2off{$1});
+    $addr = hex($addr);
+
 
     return "To few arguments"                   if(@a < 4);
     return "To many arguments, max is 24 pairs" if(@a > 50);
