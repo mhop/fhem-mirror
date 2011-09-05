@@ -60,7 +60,12 @@ notify_Exec($$)
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
-    if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
+    my $found = ($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/);
+    if(!$found && AttrVal($n, "eventMap", undef)) {
+      (undef, $s) = ReplaceEventMap($n, [$n,$s], 0);
+      $found = ("$n:$s" =~ m/^$re$/);
+    }
+    if($found) {
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
 
       my %specials= (
