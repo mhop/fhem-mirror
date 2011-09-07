@@ -135,7 +135,8 @@ SVG_render($$$$$$$)
     }
     pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
-          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l" . ($linestyle[$i]//$i) . "\">$t</text>";
+          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l" .
+                (defined($linestyle[$i]) ? $linestyle[$i] : $i) . "\">$t</text>";
     $off2 += $th;
   }
 
@@ -416,7 +417,10 @@ SVG_render($$$$$$$)
         $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
 
-      pO "<polyline $js_helpers points=\"$ret\" style=\"stroke-width:" . ($linewidth[$idx]//1) . "\" class=\"l" . ($linestyle[$idx]//$idx) . "\"/>";
+      pO "<polyline $js_helpers points=\"$ret\" style=\"stroke-width:" .
+        (defined($linewidth[$idx]) ? $linewidth[$idx] : 1) .
+        "\" class=\"l" .
+        (defined($linestyle[$idx]) ? $linestyle[$idx] : $idx) . "\"/>";
     
     }
 
