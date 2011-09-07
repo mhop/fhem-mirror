@@ -110,11 +110,13 @@ SVG_render($$$$$$$)
   }
 
   # Digest axes/title/type from $plot (gnuplot) and draw the line-titles
-  my (@axes,@ltitle,@type);
+  my (@axes,@ltitle,@type,@linestyle,@linewidth);
   my $i;
   $i = 0; $plot =~ s/ axes (\w+)/$axes[$i++]=$1/gse;
   $i = 0; $plot =~ s/ title '([^']*)'/$ltitle[$i++]=$1/gse;
   $i = 0; $plot =~ s/ with (\w+)/$type[$i++]=$1/gse;
+  $i = 0; $plot =~ s/ ls (\d+)/$linestyle[$i++]=$1/gse;
+  $i = 0; $plot =~ s/ lw (\d+)/$linewidth[$i++]=$1/gse;
 
   for my $i (0..int(@type)-1) {         # axes is optional
     $axes[$i] = "x1y2" if(!$axes[$i]);
@@ -133,7 +135,7 @@ SVG_render($$$$$$$)
     }
     pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
-          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l$i\">$t</text>";
+          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l" . ($linestyle[$i]//$i) . "\">$t</text>";
     $off2 += $th;
   }
 
@@ -414,7 +416,7 @@ SVG_render($$$$$$$)
         $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
 
-      pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+      pO "<polyline $js_helpers points=\"$ret\" style=\"stroke-width:" . ($linewidth[$idx]//1) . "\" class=\"l" . ($linestyle[$idx]//$idx) . "\"/>";
     
     }
 
