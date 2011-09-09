@@ -2602,6 +2602,7 @@ A line ending with \ will be concatenated with the next one, so long lines
        <ul>
          <li>day-temp &lt;tmp&gt;<br>
              night-temp &lt;tmp&gt;<br>
+             party-temp &lt;tmp&gt;<br>
              Set the day or night temperature. Temp must be between 6 and 30
              Celsius, and precision is half a degree.
          <li>tempListSat HH:MM temp ... 24:00 temp<br>
@@ -2683,6 +2684,14 @@ A line ending with \ will be concatenated with the next one, so long lines
       humidity $h<br>
       actuator $vp %<br>
       desired-temp: $t<br>
+      ValveErrorPosition $dname: $vep %<br>
+      ValveOffset $dname: $of %<br>
+  <li>HM-CC-VD:<br>
+      actuator $vp %<br>
+      actuator:movement_open<br>
+      actuator:movement_close<br>
+      ValveErrorPosition:$vep %<br>
+      ValveOffset $dname: $of %<br>
   <li>KFM100:<br>
       rawValue $v<br>
       Sequence $s<br>
