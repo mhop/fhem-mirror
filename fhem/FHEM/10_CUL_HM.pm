@@ -321,6 +321,13 @@ CUL_HM_Parse($$)
       }
     }
 
+    if($cmd eq "A001" && $p =~ m/^01080900(..)(..)/) {
+      my (   $of,     $vep) = 
+         (hex($1), hex($2));
+      push @event, "ValveErrorPosition $dname: $vep %";
+      push @event, "ValveOffset $dname: $of %";
+    }
+
     if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
       push @event, "desired-temp: " .hex($1)/2;
     }
@@ -334,11 +341,19 @@ CUL_HM_Parse($$)
     if($cmd eq "8202" && $p =~ m/^(..)(..)(..)(..)/) { # status ACK to controlling HM-CC-TC
       my (   $vp,     $d1) =
          (hex($3), $4);
-      $vp = int($vp/2.56+0.5);   # valve position in %, encoding wrong ###!!!!###
+      $vp = int($vp)/2;   # valve position in %
       push @event, "actuator:$vp %";
            if($d1 eq "10") { push @event, "actuator:movement_open";
       } elsif($d1 eq "20") { push @event, "actuator:movement_close";
       }
+    }
+
+    # CMD:A010 SRC:13F251 DST:5D24C9 0401000000000509000A070000
+    if($cmd eq "A010" && $p =~ m/^04010000000005(..)(..)(..)(..)/) { # status change report to paired central unit
+      my (    $of,     $vep) = 
+        (hex($3), hex($4));
+      push @event, "valve error position:$vep %";
+      push @event, "ValveOffset $dname: $of %";
     }
 
     CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
@@ -608,6 +623,7 @@ my %culHmModelSets = (
   "HM-CC-TC"=>
         { "day-temp"   => "temp",
           "night-temp" => "temp",
+          "party-temp" => "temp",
           "tempListSat"=> "HH:MM temp ...",
           "tempListSun"=> "HH:MM temp ...",
           "tempListMon"=> "HH:MM temp ...",
@@ -747,16 +763,17 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash, $id, $dst, $bn, 1, $l1);
     return "Set your remote in learning mode to transmit the data";
 
-  } elsif($cmd =~ m/^(day|night)-temp$/) { ###############################
+  } elsif($cmd =~ m/^(day|night|party)-temp$/) { ###############################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_pushConfig($hash, $id, $dst, 2, 5,
-                             $st eq "day-temp" ? "03$temp" : "04$temp");
+                             $st eq "day-temp" ? "03$temp" : 
+                            $st eq "night-temp" ? "04$temp" : "06$temp");
     return;
 
   } elsif($cmd =~ m/^tempList(...)/) { ##################################
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
-                    "Tue"=>"5 9B", "Thu"=>"5 CB", "Wed"=>"6 01",
+                    "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
                     "Fri"=>"6 31");
     my ($list,$addr) = split(" ", $day2off{$1});
     $addr = hex($addr);
@@ -1130,6 +1147,11 @@ my %culHmBits = (
                        COUNTER  => "10,2", } },
   "A001;p02=010A" => { txt => "PAIR_SERIAL", params => {
                        SERIALNO       => '04,,$val=pack("H*",$val)', } },
+  "A010;p01=04"   => { txt => "INFO_PARAMETER_CHANGE", params => {
+                       CHANNEL => "2,2", 
+                       UNKNOWN => "4,8", 
+                       PARAM_LIST => "12,2",
+                       DATA => '14,,$val =~ s/(..)(..)/ $1:$2/g', } },
   "A010;p01=06"   => { txt => "INFO_ACTUATOR_STATUS", params => {
                        CHANNEL => "2,2", 
                        STATUS  => '4,2', 
