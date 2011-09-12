@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.150 2011-08-16 18:06:38 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.151 2011-09-12 15:22:06 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -1981,6 +1981,14 @@ EvalSpecials($%)
       $exec = SemicolonEscape($exec);
 
       $exec =~ s/%%/____/g;
+
+      # %EVTPART due to HM remote logic
+      my $idx = 0;
+      foreach my $part (split(" ", $specials{"%EVENT"})) {
+        $specials{"%EVTPART$idx"} = $part;
+        $idx++;
+      }
+
       # perform macro substitution
       my $extsyntax= 0;
       foreach my $special (keys %specials) {
@@ -2482,6 +2490,7 @@ addToAttrList($)
   $attr{global}{userattr} = join(" ", sort keys %hash);
 }
 
+# $dir: 0 = User to Fhem (i.e. set), 1 = Fhem to User (i.e trigger)
 sub
 ReplaceEventMap($$$)
 {
