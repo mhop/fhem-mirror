@@ -6701,10 +6701,11 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       <li>To use % or @ in the text itself, use the double mode (%% or @@).</li>
 
       <li>Instead of <code>%</code> and <code>@</code>, the parameters
-      <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code>
-      (same as <code>@</code>) and <code>%TYPE</code> (contains the device
-      type, e.g. <code>FHT</code>) can be used. A single <code>%</code>
-      looses its special meaning if any of these parameters appears in the
+      <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same as
+      <code>@</code>) and <code>%TYPE</code> (contains the device type, e.g.
+      <code>FHT</code>) can be used. The space separated event "parts" are
+      available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code> looses
+      its special meaning if any of these parameters appears in the
       definition.</li>
 
       <li><code>&lt;pattern&gt;</code> may also be a compound of
