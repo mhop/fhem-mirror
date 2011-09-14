@@ -80,7 +80,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheet HTTPS";
+                     "stylesheet hiddenroom HTTPS";
 
   ###############
   # Initialize internal structures
@@ -641,6 +641,7 @@ FW_doDetail($)
   pO FW_hidden("detail", $d);
 
   $FW_room = AttrVal($d, "room", undef);
+  $FW_room = $1 if($FW_room && $FW_room =~ m/^([^,]*),/);       # Get first of a Multi-Room
   my $t = $defs{$d}{TYPE};
 
   pO "<div id=\"content\">";
@@ -726,8 +727,13 @@ FW_roomOverview($)
     push(@list1, ""); push(@list2, "");
   }
   $FW_room = "" if(!$FW_room);
+
+  my %hiddenroom;
+  foreach my $r (split(",",AttrVal($FW_wname, "hiddenroom", ""))) {
+    $hiddenroom{$r} = 1;
+  }
   foreach my $r (sort keys %FW_rooms) {
-    next if($r eq "hidden");
+    next if($r eq "hidden" || $hiddenroom{$r});
     push @list1, $r;
     push @list2, "$FW_ME?room=$r";
   }
