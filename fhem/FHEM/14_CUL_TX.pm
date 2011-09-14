@@ -63,7 +63,7 @@ CUL_TX_Parse($$)
 
   if($a[5] ne $a[8] || $a[6] ne $a[9]) {
     Log 4, "CUL_TX $id3 ($msg) data error";
-    return;
+    return "";
   }
 
   my $def = $modules{CUL_TX}{defptr}{$id3};
@@ -110,7 +110,6 @@ CUL_TX_Parse($$)
 
   DoTrigger($name, undef) if($init_done);
   return $name;
-
 }
 
 1;

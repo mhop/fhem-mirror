@@ -83,7 +83,7 @@ my %culHmModel=(
   "003C" => "HM-WDS20-TH-O",
   "003D" => "HM-WDS10-TH-O",  # Reported to work (2011-07-26)
   "003E" => "HM-WDS30-T-O",
-  "003F" => "HM-WDS40-TH-I",
+  "003F" => "HM-WDS40-TH-I",  # Tested by peterp
   "0040" => "HM-WDS100-C6-O", # Identical to KS550?
   "0041" => "HM-WDC7000",
   "0042" => "HM-SEC-SD",      # Tested
@@ -113,6 +113,7 @@ my %culHmModel=(
   "0060" => "HM-PB-4DIS-WM",   # Tested
   "0061" => "HM-LC-SW4-DR",
   "0062" => "HM-LC-SW2-DR",
+  "0066" => "HM_LC_Sw4-WM",    # Tested by peterp
 );
 
 
