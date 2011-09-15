@@ -1050,7 +1050,7 @@ CUL_OpenDev($$)
     delete($readyfnlist{"$name.$dev"});
     $selectlist{"$name.$dev"} = $hash;
 
-  } elsif(lc($baudrate) eq "directio") {   # Without Device::SerialPort
+  } elsif($baudrate && lc($baudrate) eq "directio") {   # Without Device::SerialPort
 
     if(!open($po, "+<$dev")) {
       return undef if($reopen);
