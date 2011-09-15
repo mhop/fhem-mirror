@@ -507,6 +507,7 @@ CUL_DoInit($)
     CUL_SimpleWrite($hash, "V");
     ($err, $ver) = CUL_ReadAnswer($hash, "Version", 0, undef);
     return "$name: $err" if($err && ($err !~ m/Timeout/ || $try == 3));
+    $ver = "" if(!$ver);
   }
 
   if($ver !~ m/^V/) {
