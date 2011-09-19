@@ -48,9 +48,28 @@ ITACH_RELAY_Set($@)
   my ($hash, @a) = @_;
 
   return "no set value specified" if(int(@a) != 2);
-  return "Unknown argument $a[1], choose one of on off" if($a[1] eq "?");
+  return "Unknown argument $a[1], choose one of on off toggle" if($a[1] eq "?");
 
   my $v = $a[1];
+
+  if($v eq "toggle")
+  {
+	if(defined $hash->{READINGS}{state}{VAL})
+	{
+		if($hash->{READINGS}{state}{VAL} eq "off")
+		{
+			$v="on";
+		}
+		else
+		{
+			$v="off";
+		}
+	}
+	else
+	{
+		$v="off";
+	}
+  }
 
   ITACH_RELAY_execute($hash->{DEF},$v);
 
