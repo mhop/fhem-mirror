@@ -101,6 +101,7 @@
       <a href="#HMS">HMS</a> &nbsp;
       <a href="#HMLAN">HMLAN</a> &nbsp;
       <a href="#IPWE">IPWE</a> &nbsp;
+      <a href="#ITACH_RELAY">ITACH_RELAY</a> &nbsp;
       <a href="#KM271">KM271</a> &nbsp;
       <a href="#KS300">KS300</a> &nbsp;
       <a href="#LGTV">LGTV</a> &nbsp;
@@ -5823,6 +5824,48 @@ Terminating
   </ul>
   <br>
 
+</ul>
+<a name="ITACH_RELAY"></a>
+<h3>ITACH_RELAY</h3>
+<ul>
+  Note: this module needs the Net::Telnet module.
+  <br><br>
+  <a name="ITACH_RELAYdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ITACH_RELAY &lt;ip-address&gt; &lt;port&gt;</code>
+    <br><br>
+    Defines an Global Cache iTach Relay device (Box with 3 relays) via its ip address. <br><br>
+
+
+    Examples:
+    <ul>
+      <code>define motor1 ITACH_RELAY 192.168.8.200 1</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="ITACH_RELAYset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    off
+    on
+    toggle
+    </pre>
+    Examples:
+    <ul>
+      <code>set motor1 on</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>Toggle is special implemented. List name returns "on" or "off" even after a toggle command</li>
+    </ul>
+  </ul>
 </ul>
 
 <a name="USBWX"></a>
