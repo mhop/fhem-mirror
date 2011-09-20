@@ -75,7 +75,7 @@ watchdog_Notify($$)
       if($n =~ m/^$re2$/ || "$n:$s" =~ m/^$re2$/) {
         RemoveInternalTimer($ntfy);
 
-        if($re1 eq $re2) {
+        if($re1 eq $re2 || $re1 eq ".") {
           watchdog_Activate($ntfy);
 
         } else {
