@@ -74,14 +74,20 @@ watchdog_Notify($$)
     if($ntfy->{STATE} =~ m/Next:/) {
       if($n =~ m/^$re2$/ || "$n:$s" =~ m/^$re2$/) {
         RemoveInternalTimer($ntfy);
+
         if($re1 eq $re2) {
           watchdog_Activate($ntfy);
+
         } else {
           $ntfy->{STATE} = "defined";
+
         }
+
       }
-    } elsif($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/) {
+
+    } elsif($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/ || ($ln eq $n && $s eq ".")) {
       watchdog_Activate($ntfy);
+
     }
   }
   return "";
