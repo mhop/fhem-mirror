@@ -322,6 +322,80 @@ CUL_HM_Parse($$)
       }
     }
 
+    # 0403 167DE9 01 05 05 16 0000 windowopen-temp channel 03, device 167DE9 on
+    # slot 01.
+    if($cmd eq "A410" && $p =~ m/^0403(......)(..)(..)(..)(..)(....)/) {
+      my ( $tdev,   $tchan,  $plist, $o1,     $v1,  $rest) = 
+         (($1), hex($2), hex($3),   ($4), hex($5), ($6));
+      my $msg;
+      if($plist == 5) {
+      	if($o1 eq "05") {
+	  $msg = sprintf("windowopen-temp-%d: %.1f (sensor:%s)",
+                        $tchan, $v1/2, $tdev);
+	}
+      }
+      push @event, $msg if $msg;
+    }
+    # idea: remember  all possible 24 value-pairs per day and reconstruct list
+    # everytime new values are set or received.
+    if($cmd eq "A410" &&
+       $p =~ m/^0402000000000(.)(..)(..)(..)(..)(..)(..)(..)(..)/) {
+      # param list 5 or 6, 4 value pairs.
+      my ($plist, $o1,    $v1,    $o2,    $v2,    $o3,    $v3,    $o4,    $v4) =
+         (hex($1),hex($2),hex($3),hex($4),hex($5),hex($6),hex($7),hex($8),hex($9));
+
+      my ($dayoff, $maxdays, $basevalue);
+      my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+
+      if($plist == 5 || $plist == 6) {
+        if($plist == 5) {
+          $dayoff = 0; $maxdays = 5; $basevalue = hex("0B");
+
+        } else {
+          $dayoff = 5; $maxdays = 2; $basevalue = hex("01");
+
+        }
+        my $idx = ($o1-$basevalue);
+        my $dayidx = int($idx/48);
+        if($idx % 4 == 0 && $dayidx < $maxdays) {
+          $idx -= 48*$dayidx;
+	  $idx /= 2;
+          my $day = $days[$dayidx+$dayoff];
+          $shash->{TEMPLIST}{$day}{$idx}{HOUR} = int($v1/6);
+          $shash->{TEMPLIST}{$day}{$idx}{MINUTE} = ($v1 - int($v1/6)*6)*10;
+          $shash->{TEMPLIST}{$day}{$idx}{TEMP} = $v2/2;
+          $shash->{TEMPLIST}{$day}{$idx+1}{HOUR} = int($v3/6);
+          $shash->{TEMPLIST}{$day}{$idx+1}{MINUTE} = ($v3 - int($v3/6)*6)*10;
+          $shash->{TEMPLIST}{$day}{$idx+1}{TEMP} = $v4/2;
+        }
+      }
+
+      foreach my $wd (@days) {
+	my $twentyfour = 0;
+        my $msg = sprintf("tempList%s:", $wd);
+        foreach(my $idx=0; $idx<24; $idx+=1) {
+          if(defined ($shash->{TEMPLIST}{$wd}{$idx}{TEMP}) &&
+                      $shash->{TEMPLIST}{$wd}{$idx}{TEMP} ne "") {
+	    if($twentyfour == 0) {
+              $msg .= sprintf(" %02d:%02d %.1f",
+                                $shash->{TEMPLIST}{$wd}{$idx}{HOUR},
+                                $shash->{TEMPLIST}{$wd}{$idx}{MINUTE},
+                                $shash->{TEMPLIST}{$wd}{$idx}{TEMP});
+	    } else {
+	      $shash->{TEMPLIST}{$wd}{$idx}{HOUR} = "";
+	      $shash->{TEMPLIST}{$wd}{$idx}{MINUTE} = "";
+	      $shash->{TEMPLIST}{$wd}{$idx}{TEMP} = "";
+	    }
+          }
+          if(defined ($shash->{TEMPLIST}{$wd}{$idx}{HOUR}) &&
+	            0+$shash->{TEMPLIST}{$wd}{$idx}{HOUR} == 24) {
+	    $twentyfour = 1;  # next value uninteresting, only first counts.
+	  }
+      	}
+        push @event, $msg if($msg);
+      }
+    }
+
     if($cmd eq "A001" && $p =~ m/^01080900(..)(..)/) {
       my (   $of,     $vep) = 
          (hex($1), hex($2));
@@ -416,7 +490,8 @@ CUL_HM_Parse($$)
       my $msg = "unknown";
       $msg = "deviceMsg" if($msgType =~ m/0./);
       $msg = "powerOn"   if($msgType =~ m/06/ && $chn eq "00");
-      push @event, "$msg:$val";
+      my $add = ($dst eq $id) ? "" : " (to $dname)";
+      push @event, "$msg:$val$add";
       push @event, "state:$val";
     }
 
@@ -776,7 +851,8 @@ CUL_HM_Set($@)
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
                     "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
                     "Fri"=>"6 31");
-    my ($list,$addr) = split(" ", $day2off{$1});
+    my $wd = $1;
+    my ($list,$addr) = split(" ", $day2off{$wd});
     $addr = hex($addr);
 
 
@@ -786,6 +862,7 @@ CUL_HM_Set($@)
     return "Last time spec must be 24:00"       if($a[@a-2] ne "24:00");
 
     my $data = "";
+    my $msg = "";
     for(my $idx = 2; $idx < @a; $idx += 2) {
       return "$a[$idx] is not in HH:MM format"
                                 if($a[$idx] !~ m/^([0-2]\d):([0-5]\d)/);
@@ -794,8 +871,17 @@ CUL_HM_Set($@)
       return $temp if(length($temp) > 2);
       $data .= sprintf("%02X%02X%02X%s", $addr, $h*6+($m/10), $addr+1, $temp);
       $addr += 2;
+      $hash->{TEMPLIST}{$wd}{($idx-2)/2}{HOUR} = $h;
+      $hash->{TEMPLIST}{$wd}{($idx-2)/2}{MINUTE} = $m;
+      $hash->{TEMPLIST}{$wd}{($idx-2)/2}{TEMP} = $a[$idx+1];
+      $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
     CUL_HM_pushConfig($hash, $id, $dst, 2, $list, $data);
+
+    my $vn = "tempList$wd";
+    $hash->{READINGS}{$vn}{TIME} = TimeNow();
+    $hash->{READINGS}{$vn}{VAL} = $msg;
+
     return;
 
   } elsif($cmd eq "matic") { ##################################### 
@@ -1311,6 +1397,5 @@ CUL_HM_maticFn($$$$$)
   $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
   return $sndcmd;
 }
-
 
 1;
