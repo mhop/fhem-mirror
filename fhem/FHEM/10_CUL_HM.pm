@@ -27,6 +27,7 @@ my %culHmDevProps=(
   "43" => { st => "pushButton",      cl => "sender" },
   "60" => { st => "KFM100",          cl => "sender" },   # Parse,unfinished
   "70" => { st => "THSensor",        cl => "sender" },   # Parse,unfinished
+  "71" => { st => "WDC",             cl => "sender" },   # Parse
   "80" => { st => "threeStateSensor",cl => "sender" },
   "81" => { st => "motionDetector",  cl => "sender" },
   "C0" => { st => "keyMatic",        cl => "sender" },
@@ -39,13 +40,13 @@ my %culHmModel=(
   "0002" => "HM-LC-SW1-SM",
   "0003" => "HM-LC-SW4-SM",
   "0004" => "HM-LC-SW1-FM",  # Tested
-  "0005" => "HM-LC-BL1-FM",
+  "0005" => "HM-LC-BL1-FM",  # Tested by ruebezahl (2011-09-22)
   "0006" => "HM-LC-BL1-SM",
   "0007" => "KS550",         # Tested
   "0008" => "HM-RC-4",       # cant pair(AES)-> broadcast only
   "0009" => "HM-LC-SW2-FM",
   "000A" => "HM-LC-SW2-SM",
-  "000B" => "HM-WDC7000",
+  "000B" => "HM-WDC7000",    # Tested by elanter (2011-09-22)
   "000D" => "ASH550",
   "000E" => "ASH550I",
   "000F" => "S550IA",
@@ -85,7 +86,7 @@ my %culHmModel=(
   "003E" => "HM-WDS30-T-O",
   "003F" => "HM-WDS40-TH-I",  # Tested by peterp
   "0040" => "HM-WDS100-C6-O", # Identical to KS550?
-  "0041" => "HM-WDC7000",
+  "0041" => "HM-WDC7000",     # Tested by elanter (2011-09-22)
   "0042" => "HM-SEC-SD",      # Tested
   "0043" => "HM-SEC-TIS",
   "0044" => "HM-SEN-EP",
@@ -102,7 +103,7 @@ my %culHmModel=(
   "0050" => "HM-SEC-SFA-SM",
   "0051" => "HM-LC-SW1-PB-FM",
   "0052" => "HM-LC-SW2-PB-FM", # Tested
-  "0053" => "HM-LC-BL1-PB-FM",
+  "0053" => "HM-LC-BL1-PB-FM", # Tested by ruebezahl (2011-09-22)
   "0056" => "HM-CC-SCD",
   "0057" => "HM-LC-DIM1T-PL",
   "0058" => "HM-LC-DIM1T-CV",
@@ -424,7 +425,8 @@ CUL_HM_Parse($$)
     }
 
     # CMD:A010 SRC:13F251 DST:5D24C9 0401000000000509000A070000
-    if($cmd eq "A010" && $p =~ m/^04010000000005(..)(..)(..)(..)/) { # status change report to paired central unit
+    # status change report to paired central unit
+    if($cmd eq "A010" && $p =~ m/^04010000000005(..)(..)(..)(..)/) {
       my (    $of,     $vep) = 
         (hex($3), hex($4));
       push @event, "valve error position:$vep %";
@@ -591,6 +593,28 @@ CUL_HM_Parse($$)
       push @event, "temperature:$t";
 
     }
+
+  } elsif($st eq "WDC") { ##########################################
+
+    if($p =~ m/^(....)(..)(....)$/) {
+      my ($t, $h, $ap) = ($1, $2, $3);
+      $t = hex($t)/10;
+      $t -= 3276.8 if($t > 1638.4);
+      $h = hex($h);
+      $ap = hex($ap);
+      push @event, "state:T: $t H: $h AP: $ap";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+      push @event, "airpress:$ap";
+
+    } elsif($p =~ m/^(....)$/) {
+      my $t = $1;
+      $t = hex($t)/10;
+      $t -= 3276.8 if($t > 1638.4);
+      push @event, "temperature:$t";
+
+    }
+
 
   } elsif($st eq "winMatic") {  ####################################
     
