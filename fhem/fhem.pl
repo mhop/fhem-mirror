@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.151 2011-09-12 15:22:06 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.152 2011-09-23 11:52:00 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -251,6 +251,13 @@ if(int(@ARGV) != 1 && int(@ARGV) != 2) {
 
 # If started as root, and there is a fhem user in the /etc/passwd, su to it
 if($^O !~ m/Win/ && $< == 0) {
+
+  my @gr = getgrnam("dialout");
+  if(@gr) {
+    use POSIX qw(setgid);
+    setgid($gr[2]);
+  }
+
   my @pw = getpwnam("fhem");
   if(@pw) {
     use POSIX qw(setuid);
