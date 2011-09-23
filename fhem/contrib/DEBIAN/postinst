@@ -6,7 +6,7 @@ if ! getent passwd fhem >/dev/null; then
     useradd --system --home /var/log/fhem --gid dialout --shell /bin/false fhem
 fi
 
-chown -R fhem /var/log/fhem /etc/fhem.cfg /usr/share/fhem
+chown -R fhem /var/log/fhem /etc/fhem.cfg /usr/share/fhem /usr/bin/fhem.pl
 
 #set up of autostart
 if test -x /sbin/initctl; then
