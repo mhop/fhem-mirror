@@ -693,7 +693,7 @@ FW_roomOverview($)
     # plots navigation buttons
     if(!$FW_detail || $defs{$FW_detail}{TYPE} eq "weblink") {
       if(FW_calcWeblink(undef,undef)) {
-        pO FW_textfield("cmd", $FW_ss ? 20 : 40);
+        pO FW_textfield("cmd", $FW_ss ? 15 : 40);
         $tf_done = 1;
         pO "</td><td>&nbsp;&nbsp;</td>";
         FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
@@ -703,7 +703,7 @@ FW_roomOverview($)
       }
     }
   }
-  pO FW_textfield("cmd", $FW_ss ? 25 : 40) if(!$tf_done);
+  pO FW_textfield("cmd", $FW_ss ? 15 : 40) if(!$tf_done);
   pO "</td></tr></table>";
   pO "</div>";
   pO "</form>";
@@ -740,6 +740,7 @@ FW_roomOverview($)
   push(@list1, "Everything"); push(@list2, "$FW_ME?room=all");
   push(@list1, ""); push(@list2, "");
   push(@list1, "Howto");      push(@list2, "$FW_ME/HOWTO.html");
+  push(@list1, "Wiki");       push(@list2, "http://fhemwiki.de");
   push(@list1, "FAQ");        push(@list2, "$FW_ME/faq.html");
   push(@list1, "Details");    push(@list2, "$FW_ME/commandref.html");
   push(@list1, "Examples");   push(@list2, "$FW_ME/cmd=style%20examples");
@@ -773,8 +774,7 @@ FW_roomOverview($)
           if($idx<int(@list1)-1);
       } else {
         pF "    <tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
-        #pO "<td><a href=\"$l2\">$l1</a></td></tr>";
-        if($l2 =~ m/.html$/) {
+        if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            pO "<td><a href=\"$l2\">$l1</a></td>";
         } else {
           pH $l2, $l1, 1;
@@ -836,7 +836,7 @@ FW_showRoom()
       $th = $type;
     }
     pO "  <table $id id=\"$type\" summary=\"List of $type devices\">";
-    pO "  <tr><th>$th</th></tr>" if($th);
+    pO "  <tr><th>$th</th></tr>" if($th && !$FW_ss);
 
     my $row=1;
     foreach my $d (@roomDevs) {
@@ -1558,7 +1558,6 @@ pH(@)
    if($FW_ss || $FW_tp) {
      my $sp = "&nbsp;&nbsp;";
      pO "<a onClick=\"location.href='$link'\"><div class=\"href\">$sp$txt$sp</div></a>";
-     #pO "<div class=\"href\"><a onClick=\"location.href='$link'\">$sp$txt$sp</a></div>";
    } else {
      pO "<a href=\"$link\">$txt</a>";
    }
@@ -1573,7 +1572,6 @@ pHJava(@)
    if($FW_ss || $FW_tp) {
      my $sp = "&nbsp;&nbsp;";
      pO "<a onClick=\"$link\"><div class=\"href\">$sp$txt$sp</div></a>";
-     #pO "<div class=\"href\"><a onClick=\"$link\">$sp$txt$sp</a></div>";
    } else {
      pO "<a onClick=\"$link\">$txt</a>";
    }
@@ -1623,17 +1621,19 @@ FW_showWeblink($$$)
   my $attr = AttrVal($d, "htmlattr", "");
 
   if($t eq "link") {
-    pO "<td><a href=\"$v\" $attr>$d</a></td>";    # no pH, want to open extra browser
+    pO "<a href=\"$v\" $attr>$d</a>";    # no pH, want to open extra browser
 
   } elsif($t eq "image") {
-    pO "<td><img src=\"$v\" $attr><br>";
-    pH "detail=$d", $d;
-    pO "</td>";
+    pO "<img src=\"$v\" $attr><br>";
+    pO "<br>";
+    pHPlain "detail=$d", $d;
+    pO "<br>";
 
   } elsif($t eq "iframe") {
-    pO "<td><iframe src=\"$v\" $attr/><br>";
-    pH "detail=$d", $d;
-    pO "</td>";
+    pO "<iframe src=\"$v\" $attr>Iframes disabled</iframe>";
+    pO "<br>";
+    pHPlain "detail=$d", $d;
+    pO "<br>";
 
 
   } elsif($t eq "fileplot") {
