@@ -13,10 +13,6 @@ use Time::HiRes qw(gettimeofday);
 
 sub KM271_Read($);
 sub KM271_Ready($);
-sub KM271_OpenDev($);
-sub KM271_CloseDev($);
-sub KM271_SimpleWrite(@);
-sub KM271_SimpleRead($);
 sub KM271_crc($);
 sub KM271_setbits($$);
 sub KM271_GetReading($$);
@@ -180,6 +176,8 @@ KM271_Initialize($)
 {
   my ($hash) = @_;
 
+  require "$attr{global}{modpath}/FHEM/DevIo.pm";
+
   $hash->{ReadFn}  = "KM271_Read";
   $hash->{ReadyFn} = "KM271_Ready";
 
@@ -208,7 +206,7 @@ KM271_Define($$)
   return "wrong syntax: define <name> KM271 [devicename|none]"
     if(@a != 3);
 
-  KM271_CloseDev($hash);
+  DevIo_CloseDev($hash);
   my $name = $a[0];
   my $dev = $a[2];
 
@@ -218,7 +216,7 @@ KM271_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
-  my $ret = KM271_OpenDev($hash);
+  my $ret = DevIo_OpenDev($hash, 0, "KM271_DoInit");
   return $ret;
 }
 
@@ -228,7 +226,7 @@ sub
 KM271_Undef($$)
 {
   my ($hash, $arg) = @_;
-  KM271_CloseDev($hash); 
+  DevIo_CloseDev($hash); 
   return undef;
 }
 
@@ -269,7 +267,7 @@ KM271_Set($@)
   my $data = ($val ? sprintf($fmt, $val) : $fmt);
 
   push @{$hash->{SENDBUFFER}}, $data;
-  KM271_SimpleWrite($hash, "02") if(!$hash->{WAITING});
+  DevIo_SimpleWrite($hash, "02") if(!$hash->{WAITING});
 
   return undef;
 }
@@ -284,45 +282,40 @@ KM271_Read($)
   my $name = $hash->{NAME};
   my ($data, $crc);
 
-  my $buf = KM271_SimpleRead($hash);
-  Log 5, "KM271RAW: " . unpack('H*', $buf);
-
-  if(!defined($buf)) {
-    Log 1, "$name: EOF";
-    KM271_CloseDev($hash);
-    return;
-  }
+  my $buf = DevIo_SimpleRead($hash);
+  return "" if(!defined($buf));
 
   $buf = unpack('H*', $buf);
+  Log 5, "KM271RAW: $buf";
 
   if(@{$hash->{SENDBUFFER}} || $hash->{DATASENT}) {               # Send data
 
     if($buf eq "02") {                    # KM271 Wants to send, override
-      KM271_SimpleWrite($hash, "02");
+      DevIo_SimpleWrite($hash, "02");
       return;
     }
 
     if($buf eq "10") {
       if($hash->{DATASENT}) {
         delete($hash->{DATASENT});
-        KM271_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});
+        DevIo_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});
         return;
       }
       $data = pop @{ $hash->{SENDBUFFER} };
       $data =~ s/10/1010/g;
       $crc = KM271_crc($data);
-      KM271_SimpleWrite($hash, $data."1003$crc");  # Send the data
+      DevIo_SimpleWrite($hash, $data."1003$crc");  # Send the data
     }
 
     if($buf eq "15") {                        # NACK from the KM271
       Log 1, "$name: NACK!";
       delete($hash->{DATASENT});
-      KM271_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});
+      DevIo_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});
       return;
     }
 
   } elsif($buf eq "02") {                    # KM271 Wants to send
-    KM271_SimpleWrite($hash, "10");     # We are ready
+    DevIo_SimpleWrite($hash, "10");     # We are ready
     $hash->{PARTIAL} = "";
     $hash->{WAITING} = 1;
     return;
@@ -339,12 +332,12 @@ KM271_Read($)
 
   if(KM271_crc($data) ne $crc) {
     Log 1, "Wrong CRC in $hash->{PARTIAL}: $crc vs. ". KM271_crc($data);
-    KM271_SimpleWrite($hash, "15"); # NAK
-    KM271_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}}); # want to send
+    DevIo_SimpleWrite($hash, "15"); # NAK
+    DevIo_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}}); # want to send
     return;
   }
 
-  KM271_SimpleWrite($hash, "10");       # ACK, Data received ok
+  DevIo_SimpleWrite($hash, "10");       # ACK, Data received ok
 
 
   $data =~ s/1010/10/g;
@@ -406,97 +399,21 @@ KM271_Ready($)
 {
   my ($hash) = @_;
 
+  return DevIo_OpenDev($hash, 1, undef)
+                if($hash->{STATE} eq "disconnected");
+
   # This is relevant for windows/USB only
-  my $po = $hash->{Dev};
+  my $po = $hash->{USBDev};
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
 }
 
-########################
 sub
-KM271_SimpleWrite(@)
-{
-  my ($hash, $msg) = @_;
-  Log 3, "KM271 SimpleWrite $msg" if(length($msg) != 2);
-  $hash->{Dev}->write(pack('H*',$msg)) if($hash->{DeviceName});
-}
-
-########################
-sub
-KM271_SimpleRead($)
+KM271_DoInit($)
 {
   my ($hash) = @_;
-  return $hash->{Dev}->input() if($hash->{Dev});
-  return undef;
-}
-
-########################
-sub
-KM271_CloseDev($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dev = $hash->{DeviceName};
-
-  return if(!$dev);     # "none"
-  
-  if($hash->{Dev}) {
-    $hash->{Dev}->close() ;
-    delete($hash->{Dev});
-
-  }
-  delete($selectlist{"$name.$dev"});
-  delete($readyfnlist{"$name.$dev"});
-  delete($hash->{FD});
-  delete($hash->{DeviceName});
-}
-
-########################
-sub
-KM271_OpenDev($)
-{
-  my ($hash) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $po;
-
-  $hash->{PARTIAL} = "";
-  Log 3, "KM271 opening $name device $dev";
-
-  if ($^O=~/Win/) {
-   require Win32::SerialPort;
-   $po = new Win32::SerialPort ($dev);
-  } else  {
-   require Device::SerialPort;
-   $po = new Device::SerialPort ($dev);
-  }
-
-  if(!$po) {
-    Log(3, "Can't open $dev: $!");
-    return "";
-  }
-  $hash->{Dev} = $po;
-  if( $^O =~ /Win/ ) {
-    $readyfnlist{"$name.$dev"} = $hash;
-  } else {
-    $hash->{FD} = $po->FILENO;
-    delete($readyfnlist{"$name.$dev"});
-    $selectlist{"$name.$dev"} = $hash;
-  }
-
-  $po->reset_error();
-  $po->baudrate(2400);
-  $po->databits(8);
-  $po->parity('none');
-  $po->stopbits(1);
-  $po->handshake('none');
-
-  $hash->{STATE} = "Initialized";
-
   push @{$hash->{SENDBUFFER}}, "EE0000";
-  KM271_SimpleWrite($hash, "02");      # STX
-
-  Log 3, "$dev opened";
+  DevIo_SimpleWrite($hash, "02");      # STX
   return undef;
 }
 

@@ -15,11 +15,7 @@ sub CUL_ReadAnswer($$$$);
 sub CUL_Ready($);
 sub CUL_Write($$$);
 
-sub CUL_OpenDev($$);
-sub CUL_CloseDev($);
 sub CUL_SimpleWrite(@);
-sub CUL_SimpleRead($);
-sub CUL_Disconnected($);
 
 my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "ccconf"   => 1,
@@ -79,6 +75,8 @@ CUL_Initialize($)
 {
   my ($hash) = @_;
 
+  require "$attr{global}{modpath}/FHEM/DevIo.pm";
+
 # Provider
   $hash->{ReadFn}  = "CUL_Read";
   $hash->{WriteFn} = "CUL_Write";
@@ -96,6 +94,7 @@ CUL_Initialize($)
                      "fhtsoftbuffer:1,0 sendpool addvaltrigger " .
                      "rfmode:SlowRF,HomeMatic hmId hmProtocolEvents";
   $hash->{ShutdownFn} = "CUL_Shutdown";
+
 }
 
 #####################################
@@ -112,7 +111,7 @@ CUL_Define($$)
     return $msg;
   }
 
-  CUL_CloseDev($hash);
+  DevIo_CloseDev($hash);
 
   my $name = $a[0];
   my $dev = $a[2];
@@ -145,7 +144,7 @@ CUL_Define($$)
   }
   
   $hash->{DeviceName} = $dev;
-  my $ret = CUL_OpenDev($hash, 0);
+  my $ret = DevIo_OpenDev($hash, 0, "CUL_DoInit");
   return $ret;
 }
 
@@ -169,7 +168,7 @@ CUL_Undef($$)
   }
 
   CUL_SimpleWrite($hash, "X00"); # Switch reception off, it may hang up the CUL
-  CUL_CloseDev($hash); 
+  DevIo_CloseDev($hash); 
   return undef;
 }
 
@@ -450,7 +449,7 @@ READEND:
     CUL_SimpleWrite($hash, $gets{$a[1]}[0] . $arg);
     ($err, $msg) = CUL_ReadAnswer($hash, $a[1], 0, $gets{$a[1]}[1]);
     if(!defined($msg)) {
-      CUL_Disconnected($hash);
+      DevIo_Disconnected($hash);
       $msg = "No answer";
 
     } elsif($a[1] eq "uptime") {     # decode it
@@ -540,7 +539,7 @@ CUL_DoInit($)
     CUL_SimpleWrite($hash, "T01" . $hash->{FHTID});
   }
 
-  $hash->{STATE} = "Initialized" if(!$hash->{STATE});
+  $hash->{STATE} = "Initialized";
 
   # Reset the counter
   delete($hash->{XMIT_TIME});
@@ -586,12 +585,12 @@ CUL_ReadAnswer($$$$)
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         my $err = $!;
-        CUL_Disconnected($hash);
+        DevIo_Disconnected($hash);
         return("CUL_ReadAnswer $arg: $err", undef);
       }
       return ("Timeout reading answer for get $arg", undef)
         if($nfound == 0);
-      $buf = CUL_SimpleRead($hash);
+      $buf = DevIo_SimpleRead($hash);
       return ("No data", undef) if(!defined($buf));
 
     }
@@ -784,19 +783,9 @@ CUL_Read($)
 {
   my ($hash) = @_;
 
-  my $buf = CUL_SimpleRead($hash);
+  my $buf = DevIo_SimpleRead($hash);
+  return "" if(!defined($buf));
   my $name = $hash->{NAME};
-
-  ###########
-  # Lets' try again: Some drivers return len(0) on the first read...
-  if(defined($buf) && length($buf) == 0) {
-    $buf = CUL_SimpleRead($hash);
-  }
-
-  if(!defined($buf) || length($buf) == 0) {
-    CUL_Disconnected($hash);
-    return "";
-  }
 
   my $culdata = $hash->{PARTIAL};
   Log 5, "CUL/RAW: $culdata/$buf";
@@ -842,8 +831,7 @@ CUL_Parse($$$$$)
   my $len = length($dmsg);
 
   if($fn eq "F" && $len >= 9) {                    # Reformat for 10_FS20.pm
-
-    CUL_AddFS20Queue($iohash, "");                 # Block immediate replies
+    CUL_AddFS20Queue($iohash, "");                 # Delay immediate replies
     $dmsg = sprintf("81%02x04xx0101a001%s00%s",
                       $len/2+7, substr($dmsg,1,6), substr($dmsg,7));
     $dmsg = lc($dmsg);
@@ -922,7 +910,7 @@ CUL_Ready($)
 {
   my ($hash) = @_;
 
-  return CUL_OpenDev($hash, 1)
+  return DevIo_OpenDev($hash, 1, "CUL_DoInit")
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
@@ -954,221 +942,6 @@ CUL_SimpleWrite(@)
   syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
 
   select(undef, undef, undef, 0.001);
-}
-
-########################
-sub
-CUL_SimpleRead($)
-{
-  my ($hash) = @_;
-  my ($buf, $res);
-
-  if($hash->{USBDev}) {
-    $buf = $hash->{USBDev}->input();
-
-  } elsif($hash->{DIODev}) {
-    $res = sysread($hash->{DIODev}, $buf, 256);
-    $buf = undef if(!defined($res));
-
-  } elsif($hash->{TCPDev}) {
-    $res = sysread($hash->{TCPDev}, $buf, 256);
-    $buf = undef if(!defined($res));
-
-  }
-  return $buf;
-}
-
-########################
-sub
-CUL_CloseDev($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dev = $hash->{DeviceName};
-
-  return if(!$dev);
-  
-  if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close();
-    delete($hash->{TCPDev});
-
-  } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
-    delete($hash->{USBDev});
-
-  } elsif($hash->{DIODev}) {
-    close($hash->{DIODev});
-    delete($hash->{DIODev});
-
-  }
-  ($dev, undef) = split("@", $dev); # Remove the baudrate
-  delete($selectlist{"$name.$dev"});
-  delete($readyfnlist{"$name.$dev"});
-  delete($hash->{FD});
-}
-
-########################
-sub
-CUL_OpenDev($$)
-{
-  my ($hash, $reopen) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $po;
-  my $baudrate;
-  ($dev, $baudrate) = split("@", $dev);
-
-
-  $hash->{PARTIAL} = "";
-  Log 3, "CUL opening $name device $dev"
-        if(!$reopen);
-
-  if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
-
-    # This part is called every time the timeout (5sec) is expired _OR_
-    # somebody is communicating over another TCP connection. As the connect
-    # for non-existent devices has a delay of 3 sec, we are sitting all the
-    # time in this connect. NEXT_OPEN tries to avoid this problem.
-    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return;
-    }
-
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
-    if($conn) {
-      delete($hash->{NEXT_OPEN})
-
-    } else {
-      Log(3, "Can't connect to $dev: $!") if(!$reopen);
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      $hash->{NEXT_OPEN} = time()+60;
-      return "";
-    }
-
-    $hash->{TCPDev} = $conn;
-    $hash->{FD} = $conn->fileno();
-    delete($readyfnlist{"$name.$dev"});
-    $selectlist{"$name.$dev"} = $hash;
-
-  } elsif($baudrate && lc($baudrate) eq "directio") {   # Without Device::SerialPort
-
-    if(!open($po, "+<$dev")) {
-      return undef if($reopen);
-      Log(3, "Can't open $dev: $!");
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      return "";
-    }
-
-    $hash->{DIODev} = $po;
-
-    if( $^O =~ /Win/ ) {
-      $readyfnlist{"$name.$dev"} = $hash;
-    } else {
-      $hash->{FD} = fileno($po);
-      delete($readyfnlist{"$name.$dev"});
-      $selectlist{"$name.$dev"} = $hash;
-    }
-
-
-  } else {                              # USB/Serial device
-
-
-    if ($^O=~/Win/) {
-     require Win32::SerialPort;
-     $po = new Win32::SerialPort ($dev);
-    } else  {
-     require Device::SerialPort;
-     $po = new Device::SerialPort ($dev);
-    }
-
-    if(!$po) {
-      return undef if($reopen);
-      Log(3, "Can't open $dev: $!");
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      return "";
-    }
-    $hash->{USBDev} = $po;
-    if( $^O =~ /Win/ ) {
-      $readyfnlist{"$name.$dev"} = $hash;
-    } else {
-      $hash->{FD} = $po->FILENO;
-      delete($readyfnlist{"$name.$dev"});
-      $selectlist{"$name.$dev"} = $hash;
-    }
-
-    if($baudrate) {
-      $po->reset_error();
-      Log 3, "CUL setting $name baudrate to $baudrate";
-      $po->baudrate($baudrate);
-      $po->databits(8);
-      $po->parity('none');
-      $po->stopbits(1);
-      $po->handshake('none');
-
-      # This part is for some Linux kernel versions whih has strange default
-      # settings.  Device::SerialPort is nice: if the flag is not defined for your
-      # OS then it will be ignored.
-      $po->stty_icanon(0);
-      #$po->stty_parmrk(0); # The debian standard install does not have it
-      $po->stty_icrnl(0);
-      $po->stty_echoe(0);
-      $po->stty_echok(0);
-      $po->stty_echoctl(0);
-
-      # Needed for some strange distros
-      $po->stty_echo(0);
-      $po->stty_icanon(0);
-      $po->stty_isig(0);
-      $po->stty_opost(0);
-      $po->stty_icrnl(0);
-    }
-
-    $po->write_settings;
-
-
-  }
-
-  if($reopen) {
-    Log 1, "CUL $dev reappeared ($name)";
-  } else {
-    Log 3, "CUL device opened";
-  }
-
-  $hash->{STATE}="";       # Allow InitDev to set the state
-  my $ret  = CUL_DoInit($hash);
-
-  if($ret) {
-    CUL_CloseDev($hash);
-    Log 1, "Cannot init $dev, ignoring it";
-  }
-
-  DoTrigger($name, "CONNECTED") if($reopen);
-  return $ret;
-}
-
-sub
-CUL_Disconnected($)
-{
-  my $hash = shift;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $baudrate;
-  ($dev, $baudrate) = split("@", $dev);
-
-  return if(!defined($hash->{FD}));                 # Already deleted or RFR
-
-  Log 1, "$dev disconnected, waiting to reappear";
-  CUL_CloseDev($hash);
-  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
-  $hash->{STATE} = "disconnected";
-
-  # Without the following sleep the open of the device causes a SIGSEGV,
-  # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
-
-  DoTrigger($name, "DISCONNECTED");
 }
 
 sub

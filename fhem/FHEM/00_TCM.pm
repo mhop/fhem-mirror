@@ -26,11 +26,6 @@ sub TCM_ReadAnswer($$);
 sub TCM_Ready($);
 sub TCM_Write($$$);
 
-sub TCM_OpenDev($$);
-sub TCM_CloseDev($);
-sub TCM_SimpleWrite($$);
-sub TCM_SimpleRead($);
-sub TCM_Disconnected($);
 sub TCM_Parse120($$$);
 sub TCM_CRC8($);
 sub TCM_CSUM($);
@@ -39,6 +34,8 @@ sub
 TCM_Initialize($)
 {
   my ($hash) = @_;
+
+  require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
   $hash->{ReadFn}  = "TCM_Read";
@@ -70,7 +67,7 @@ TCM_Define($$)
                         "{devicename[\@baudrate]|ip:port}"
     if(@a != 4 || $model !~ m/^(120|310)$/);
 
-  TCM_CloseDev($hash);
+  DevIo_CloseDev($hash);
   my $dev  = $a[3];
 
   if($dev eq "none") {
@@ -81,7 +78,7 @@ TCM_Define($$)
   
   $hash->{DeviceName} = $dev;
   $hash->{MODEL} = $model;
-  my $ret = TCM_OpenDev($hash, 0);
+  my $ret = DevIo_OpenDev($hash, 0, undef);
   return $ret;
 }
 
@@ -114,7 +111,7 @@ TCM_Write($$$)
   }
     Log $ll5, "$hash->{NAME} sending $bstring";
 
-  TCM_SimpleWrite($hash, $bstring);
+  DevIo_SimpleWrite($hash, $bstring);
 }
 
 #####################################
@@ -180,21 +177,12 @@ TCM_Read($)
 {
   my ($hash) = @_;
 
-  my $buf = TCM_SimpleRead($hash);
+  my $buf = DevIo_SimpleRead($hash);
+  return "" if(!defined($buf));
+
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   my $ll2 = GetLogLevel($name,2);
-
-  ###########
-  # Lets' try again: Some drivers return len(0) on the first read...
-  if(defined($buf) && length($buf) == 0) {
-    $buf = TCM_SimpleRead($hash);
-  }
-
-  if(!defined($buf) || length($buf) == 0) {
-    TCM_Disconnected($hash);
-    return "";
-  }
 
   my $data = $hash->{PARTIAL} . uc(unpack('H*', $buf));
   Log $ll5, "$name/RAW: $data";
@@ -401,200 +389,13 @@ TCM_Ready($)
 {
   my ($hash) = @_;
 
-  return TCM_OpenDev($hash, 1)
+  return DevIo_OpenDev($hash, 1, undef)
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
-}
-
-########################
-# Input is HEX, with header and CRC
-sub
-TCM_SimpleWrite($$)
-{
-  my ($hash, $msg) = @_;
-  return if(!$hash);
-  #Log 1, "SW: $msg";
-  $msg = pack('H*', $msg);
-  $hash->{USBDev}->write($msg)    if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
-  select(undef, undef, undef, 0.001);
-}
-
-########################
-sub
-TCM_SimpleRead($)
-{
-  my ($hash) = @_;
-  my $buf;
-
-  $buf = $hash->{USBDev}->input() if($hash->{USBDev});
-  $buf = sysread($hash->{TCPDev}, $buf, 256) if($hash->{TCPDev});
-  return $buf;
-}
-
-########################
-sub
-TCM_CloseDev($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dev = $hash->{DeviceName};
-
-  return if(!$dev);
-
-  if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close();
-    delete($hash->{TCPDev});
-
-  } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
-    delete($hash->{USBDev});
-
-  }
-  
-  ($dev, undef) = split("@", $dev); # Remove the baudrate
-  delete($selectlist{"$name.$dev"});
-  delete($readyfnlist{"$name.$dev"});
-  delete($hash->{FD});
-}
-
-########################
-sub
-TCM_OpenDev($$)
-{
-  my ($hash, $reopen) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $po;
-  my $baudrate;
-  ($dev, $baudrate) = split("@", $dev);
-  if(!$baudrate) {
-    $baudrate =  9600 if($hash->{MODEL} == 120);
-    $baudrate = 57600 if($hash->{MODEL} == 310);
-  }
-
-
-  $hash->{PARTIAL} = "";
-  Log 3, "TCM opening $name device $dev"
-        if(!$reopen);
-
-  if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
-
-    # This part is called every time the timeout (5sec) is expired _OR_
-    # somebody is communicating over another TCP connection. As the connect
-    # for non-existent devices has a delay of 3 sec, we are sitting all the
-    # time in this connect. NEXT_OPEN tries to avoid this problem.
-    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return;
-    }
-
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
-    if($conn) {
-      delete($hash->{NEXT_OPEN})
-
-    } else {
-      Log(3, "Can't connect to $dev: $!") if(!$reopen);
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      $hash->{NEXT_OPEN} = time()+60;
-      return "";
-    }
-
-    $hash->{TCPDev} = $conn;
-    $hash->{FD} = $conn->fileno();
-    delete($readyfnlist{"$name.$dev"});
-    $selectlist{"$name.$dev"} = $hash;
-
-  } else {                              # USB/Serial device
-
-    if ($^O=~/Win/) {
-     require Win32::SerialPort;
-     $po = new Win32::SerialPort ($dev);
-    } else  {
-     require Device::SerialPort;
-     $po = new Device::SerialPort ($dev);
-    }
-
-    if(!$po) {
-      return undef if($reopen);
-      Log(3, "Can't open $dev: $!");
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      return "";
-    }
-    $hash->{USBDev} = $po;
-    if( $^O =~ /Win/ ) {
-      $readyfnlist{"$name.$dev"} = $hash;
-    } else {
-      $hash->{FD} = $po->FILENO;
-      delete($readyfnlist{"$name.$dev"});
-      $selectlist{"$name.$dev"} = $hash;
-    }
-
-    $po->reset_error();
-    $po->baudrate($baudrate);
-    $po->databits(8);
-    $po->parity('none');
-    $po->stopbits(1);
-    $po->handshake('none');
-
-    # This part is for some Linux kernel versions whih has strange default
-    # settings.  Device::SerialPort is nice: if the flag is not defined for your
-    # OS then it will be ignored.
-    $po->stty_icanon(0);
-    #$po->stty_parmrk(0); # The debian standard install does not have it
-    $po->stty_icrnl(0);
-    $po->stty_echoe(0);
-    $po->stty_echok(0);
-    $po->stty_echoctl(0);
-
-    # Needed for some strange distros
-    $po->stty_echo(0);
-    $po->stty_icanon(0);
-    $po->stty_isig(0);
-    $po->stty_opost(0);
-    $po->stty_icrnl(0);
-
-    $po->write_settings;
-  }
-
-  if($reopen) {
-    Log 1, "TCM $dev reappeared ($name)";
-  } else {
-    Log 3, "TCM device opened";
-  }
-
-  $hash->{STATE}="connected";
-
-  DoTrigger($name, "CONNECTED") if($reopen);
-  return "";
-}
-
-sub
-TCM_Disconnected($)
-{
-  my $hash = shift;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $baudrate;
-  ($dev, $baudrate) = split("@", $dev);
-
-  return if(!defined($hash->{FD}));                 # Already deleted or RFR
-
-  Log 1, "$dev disconnected, waiting to reappear";
-  TCM_CloseDev($hash);
-  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
-  $hash->{STATE} = "disconnected";
-
-  # Without the following sleep the open of the device causes a SIGSEGV,
-  # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
-
-  DoTrigger($name, "DISCONNECTED");
 }
 
 my %gets120 = (
@@ -711,7 +512,7 @@ TCM_Set($@)
   ##############################
   if($hash->{MODEL} eq "120") {
     if($cmdHex eq "") {            # wake is very special
-      TCM_SimpleWrite($hash, "AA");
+      DevIo_SimpleWrite($hash, "AA");
       return "";
     }
 
@@ -767,12 +568,12 @@ TCM_ReadAnswer($$)
       if($nfound < 0) {
         next if ($! == EAGAIN() || $! == EINTR() || $! == 0);
         my $err = $!;
-        TCM_Disconnected($hash);
+        DevIo_Disconnected($hash);
         return("TCM_ReadAnswer $err", undef);
       }
       return ("Timeout reading answer for $arg", undef)
         if($nfound == 0);
-      $buf = TCM_SimpleRead($hash);
+      $buf = DevIo_SimpleRead($hash);
       return ("No data", undef) if(!defined($buf));
 
     }
