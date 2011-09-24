@@ -1,39 +1,51 @@
-body     { background-color: #FFFFE7; }
+body     { background-color: #FFFFE7; 
+           font-family:Arial, sans-serif; font-size:24px;
+           }
+textarea { font-family:Arial, sans-serif; font-size:16px}
+input    { font-family:Arial, sans-serif; font-size:16px}
+select   { font-family:Arial, sans-serif; font-size:16px}
+#back    { position:absolute; top: 2px; left:18px; }
 #logo    { position:absolute; top: 2px; left: 2px; }
 #menu    { position:absolute; top: 2px; left:65px; }
 #hdr     { position:absolute; top:40px; left:65px; }
-#content { position:absolute; top:85px; left: 5px; }
+#content { position:absolute; top:85px; left: 0px; right: 0px;}
 
 a {  color: #278727; }
+img {  border-style: none; }
 
-div.href { /* Push buttons */
-  padding:0; border:1px solid gray; height:1.5em;
+div.col1 { width: 188px; height: 30px; white-space: nowrap; }
+div.col2 { width: 108px; height: 30px; 
+  -webkit-box-pack: center; -moz-box-pack: center; box-pack: center;
+  white-space: wrap;
+  font-size:16px;
+}
+div.col1, div.col2 {
+  overflow: hidden; text-overflow: ellipsis;
 
-  -moz-border-radius:0.5em; border-radius:0.5em;
-
+  padding-top: 10px; padding-bottom: 10px;
+  padding-left: 5px; padding-right: 5px;
   display: -webkit-box; -webkit-box-align: center;
   display: -moz-box; -moz-box-align: center;
 
   background-image:-webkit-gradient(linear, right top, right bottom,
-                   color-stop(0%,#fffff7), color-stop(49%,#ffffc7));
-  background-image:-moz-linear-gradient(top, #fffff7, #ffffc7);
-  background-image:-o-linear-gradient(top, #fffff7, #ffffc7);
-
-  -webkit-box-shadow: 0 0.15em 0.15em rgba(0,0,0, .5);
-  -moz-box-shadow: 0 0.15em 0.15em rgba(0,0,0, .5);
-  box-shadow: 0 0.15em 0.15em rgba(0,0,0, .5);
+                   color-stop(0%,#fffff7), color-stop(100%,#ffffb7));
+  background-image:-moz-linear-gradient(top, #fffff7, #ffffb7);
+  background-image:-o-linear-gradient(top, #fffff7, #ffffb7);
 }
 
-table.block { border:1px solid gray; width: 100%; background: #F8F8E0; }
+div.dname, div.dval  {
+  width: 152px; 
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size:16px;
+}
+div.tiny { font-size:10px; }
+
+table.block { width: 320px; background: #F8F8E0; border-spacing:0px; } 
+table.block tr { border:1px solid gray; border-spacing:0px; }
 table.block tr.odd { background: #F0F0D8; }
 table.block tr.sel { background: #F0F0D8; }
+table.block td { width: 150px; };
 table { -moz-border-radius:8px; border-radius:8px; }
 
 table#room { background: #D7FFFF; }
 table#room tr.sel { background: #A0FFFF; }
-
-/* Customize specific devices */
-/*
-table#FS20 { background: #FF8080; }
-table#FS20 tr.odd { background: #E08080; }
-*/
