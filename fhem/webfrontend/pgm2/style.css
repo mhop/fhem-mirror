@@ -1,21 +1,20 @@
-body     { background-color: #FFFFE7;}
+body     { background-color: #FFFFE7; font-family:Arial, sans-serif; font-size:16px;}
+input    { font-family:Arial, sans-serif; font-size:16px; }
+select   { font-family:Arial, sans-serif; font-size:16px; }
 #logo    { position:absolute; top:10px; left:20px; width:140px; }
 #menu    { position:absolute; top:120px;left:20px; width:140px; }
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
 
 a {  color: #278727; }
+img {  border-style: none; }
 
-table.block { border:1px solid gray; width: 100%; background: #F8F8E0; }
+.wide { width:100%; }
+
+table.block { border:1px solid gray; background: #F8F8E0; }
 table.block tr.odd { background: #F0F0D8; }
 table.block tr.sel { background: #F0F0D8; }
 table { -moz-border-radius:8px; border-radius:8px; }
 
-table#room { background: #D7FFFF; }
+table#room { border:1px solid gray; width: 100%; background: #D7FFFF; }
 table#room tr.sel { background: #A0FFFF; }
-
-/* Customize specific devices */
-/*
-table#FS20 { background: #FF8080; }
-table#FS20 tr.odd { background: #E08080; }
-*/
