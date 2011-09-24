@@ -2000,7 +2000,6 @@ A line ending with \ will be concatenated with the next one, so long lines
   The fhem module will emulate a CUL device, so the <a href="#CUL_HM">CUL_HM</a>
   module can be used to define HomeMatic devices.<br><br>
 
-
   In order to use it with fhem you <b>must</b> disable the encryption first
   with the "HomeMatic Lan Interface Configurator" (which is part of the
   supplied Windows software), by selecting the device, "Change IP Settings",
@@ -2693,8 +2692,10 @@ A line ending with \ will be concatenated with the next one, so long lines
       humidity $h<br>
       actuator $vp %<br>
       desired-temp: $t<br>
+      tempList$wd: hh:mm $t hh:mm $t ...<br>
       ValveErrorPosition $dname: $vep %<br>
       ValveOffset $dname: $of %<br>
+      windowopentemp-$tchan: $t (sensor:$tdev)<br>
   <li>HM-CC-VD:<br>
       actuator $vp %<br>
       actuator:movement_open<br>
@@ -2744,6 +2745,11 @@ A line ending with \ will be concatenated with the next one, so long lines
       T: $t H: $h<br>
       temperature $t<br>
       humidity $h<br>
+  <li>WDC7000<br>
+      T: $t H: $h AP: $ap<br>
+      temperature $t<br>
+      humidity $h<br>
+      airpress $ap<br>
   <li>winMatic<br>
       contact closed<br>
       contact open<br>
@@ -5936,9 +5942,6 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
   module implements 2 drivers in one. It is the "physical" part for the <a
   href="#EnOcean">EnOcean</a> module.<br><br>
 
-  Note: this module requires the Device::SerialPort or Win32::SerialPort module.
-  <br><br>
-
   <a name="TCMdefine"></a>
   <b>Define</b>
   <ul>
@@ -5946,22 +5949,16 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <br>
     First you have to specify the type of the EnOcean Transceiver Chip , i.e
     either 120 for the TCM120 or 310 for the TCM310.<br><br>
-    USB-connected device:<br><ul>
-      &lt;device&gt; specifies the serial port to communicate with the TCM.
-      The name of the serial-device depends on your distribution, under linux
-      it is commonly /dev/ttyACM0.
-      You can also specify a baudrate if the device name contains the @
-      character, e.g.: /dev/ttyACM0@9600. The default for the TCM120 is 9600
-      Baud, and for the TCM310 it is 57600 baud.
-      <br><br>
-    </ul>
-    Network-connected device (untested):<br><ul>
-    &lt;device&gt; specifies the host:port of the device. E.g.
-    192.168.0.244:2323
-    </ul>
-    <br>
-    If the device is called none, then no device will be opened, so you
-    can experiment without hardware attached.<br>
+    <code>device</code> can take the same parameters (@baudrate, @directio,
+    TCP/IP, none) like the <a href="#CULdefine">CUL</a>, but you probably have
+    to specify the baudrate: the TCM120 should be opened with 9600 Baud, the
+    TCM310 with 57600 baud.
+    Example:
+    <ul><code>
+      define BscBor TCM 120 /dev/ttyACM0@9600<br>
+      define TCM310 TCM 310 /dev/ttyACM0@57600<br>
+    </code></ul>
+
   </ul>
   <br>
 
@@ -6364,7 +6361,11 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 
     <a name="hiddenroom"></a>
     <li>hiddenroom<br>
-        Komma separated list of rooms to "hide", i.e. not to show.
+        Komma separated list of rooms to "hide", i.e. not to show. Special
+        values are input and detail, in which case no input areas or link to
+        the detailed views are shown (although they still can be addressed
+        through url manipulation). The list can also contain values from the
+        additional "Howto/Wiki/FAQ" block.
         <br><br>
         </li>
 
