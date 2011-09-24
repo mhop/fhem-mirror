@@ -77,6 +77,7 @@ watchdog_Notify($$)
 
         if($re1 eq $re2 || $re1 eq ".") {
           watchdog_Activate($ntfy);
+          return "";
 
         } else {
           $ntfy->{STATE} = "defined";
@@ -85,7 +86,11 @@ watchdog_Notify($$)
 
       }
 
-    } elsif($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/ || ($ln eq $n && $s eq ".")) {
+    }
+
+    if($n =~ m/^$re1$/ ||
+       "$n:$s" =~ m/^$re1$/ ||
+       ($ln eq $n && $s eq ".")) {
       watchdog_Activate($ntfy);
 
     }
