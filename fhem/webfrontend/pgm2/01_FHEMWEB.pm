@@ -547,7 +547,7 @@ FW_makeTable($$)
 
     my $val = $hash->{$n};
 
-    if($n eq "DEF" && !$FW_hiddenroom{"input"}) {
+    if($n eq "DEF" && !$FW_hiddenroom{input}) {
       FW_makeEdit($name, $n, $val);
 
     } else {
@@ -653,6 +653,7 @@ FW_roomOverview($)
 {
   my ($cmd) = @_;
 
+  %FW_hiddenroom = ();
   foreach my $r (split(",",AttrVal($FW_wname, "hiddenroom", ""))) {
     $FW_hiddenroom{$r} = 1;
   }
