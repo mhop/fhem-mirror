@@ -1532,7 +1532,6 @@ sub
 fC($)
 {
   my ($cmd) = @_;
-Log 0, "Calling $cmd";
   my $ret = AnalyzeCommand(undef, $cmd);
   return $ret;
 }
