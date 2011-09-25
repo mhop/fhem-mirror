@@ -27,7 +27,6 @@ my %culHmDevProps=(
   "43" => { st => "pushButton",      cl => "sender" },
   "60" => { st => "KFM100",          cl => "sender" },   # Parse,unfinished
   "70" => { st => "THSensor",        cl => "sender" },   # Parse,unfinished
-  "71" => { st => "WDC",             cl => "sender" },   # Parse
   "80" => { st => "threeStateSensor",cl => "sender" },
   "81" => { st => "motionDetector",  cl => "sender" },
   "C0" => { st => "keyMatic",        cl => "sender" },
@@ -90,7 +89,7 @@ my %culHmModel=(
   "0042" => "HM-SEC-SD",      # Tested
   "0043" => "HM-SEC-TIS",
   "0044" => "HM-SEN-EP",
-  "0045" => "HM-SEC-WDS",
+  "0045" => "HM-SEC-WDS",     # Tested by peterp
   "0046" => "HM-SWI-3-FM",
   "0047" => "KFM-Display",
   "0048" => "IS-WDS-TH-OD-S-R3",
@@ -199,6 +198,7 @@ CUL_HM_Parse($$)
 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   my $dname = $dhash ? $dhash->{NAME} : "unknown";
+  my $target = ($dst eq $id) ? "" : " (to $dname)";
   $dname = "broadcast" if($dst eq "000000");
   $dname = $iohash->{NAME} if($dst eq $id);
 
@@ -492,8 +492,7 @@ CUL_HM_Parse($$)
       my $msg = "unknown";
       $msg = "deviceMsg" if($msgType =~ m/0./);
       $msg = "powerOn"   if($msgType =~ m/06/ && $chn eq "00");
-      my $add = ($dst eq $id) ? "" : " (to $dname)";
-      push @event, "$msg:$val$add";
+      push @event, "$msg:$val$target";
       push @event, "state:$val";
     }
 
@@ -504,9 +503,8 @@ CUL_HM_Parse($$)
 
       my $btn = int((($button&0x3f)+1)/2);
       my $state = ($button&1 ? "off" : "on") . ($button & 0x40 ? "Long" : "");
-      my $add = ($dst eq $id) ? "" : " (to $dname)";
 
-      push @event, "state:Btn$btn $state$add";
+      push @event, "state:Btn$btn $state$target";
       if($id eq $dst && $cmd ne "8002") {  # Send Ack
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 ($state =~ m/on/?"C8":"00")."00", 1, 0);
@@ -526,7 +524,7 @@ CUL_HM_Parse($$)
     if($cmd =~ m/^..41/ && $p =~ m/^01(......)/) {
       $state = $1;
       push @event, "state:motion";
-      push @event, "motion:"; #added peterp # A0D258410143DFABC82AD0601240E
+      push @event, "motion:on$target"; #added peterp
     }
     if($cmd =~ m/^.610/) {
       push @event, "cover:closed" if($p =~ m/^0601..00$/);         # By peterp
@@ -541,7 +539,7 @@ CUL_HM_Parse($$)
 
     if($p =~ m/01..C8/) {
       push @event, "state:on";
-      push @event, "smoke_detect:on";
+      push @event, "smoke_detect:on$target";
 
     } elsif($p =~ m/^01..01$/) {
       push @event, "state:all-clear";   # Entwarnung
@@ -561,13 +559,20 @@ CUL_HM_Parse($$)
     push @event, "cover:open"   if($p =~ m/^0601..0E$/);
     push @event, "state:alive"  if($p =~ m/^0601000E$/);
 
-    my $lst = "undef";
     $p =~ m/^....(..)$/;
-    $lst = $1 if(defined($1));
-         if($lst eq "C8") { push @event, "contact:open";
-    } elsif($lst eq "64") { push @event, "contact:tilted";
-    } elsif($lst eq "00") { push @event, "contact:closed";
-    } else {                $lst = "00"; # for the ack
+    my $lst = defined($1) ? $1 : "00";
+
+    my %txt;
+    %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
+    %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
+                 if($model eq "HM-SEC-WDS");
+
+    if($txt{$lst}) {
+      push @event, "contact:$txt{$lst}$target";
+
+    } else {
+      $lst = "00"; # for the ack
+
     }
 
     CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
@@ -575,27 +580,8 @@ CUL_HM_Parse($$)
     push @event, "unknownMsg:$p" if(!@event);
 
 
-  } elsif($st eq "THSensor") { ##########################################
-
-    if($p =~ m/^(....)(..)$/) {
-      my ($t, $h) = ($1, $2);
-      $t = hex($t)/10;
-      $t -= 3276.8 if($t > 1638.4);
-      $h = hex($h);
-      push @event, "state:T: $t H: $h";
-      push @event, "temperature:$t";
-      push @event, "humidity:$h";
-
-    } elsif($p =~ m/^(....)$/) {
-      my $t = $1;
-      $t = hex($t)/10;
-      $t -= 3276.8 if($t > 1638.4);
-      push @event, "temperature:$t";
-
-    }
-
-  } elsif($st eq "WDC") { ##########################################
-
+  } elsif($model eq "HM-WDC7000") { #### $st=THSensor with additional pressure
+  
     if($p =~ m/^(....)(..)(....)$/) {
       my ($t, $h, $ap) = ($1, $2, $3);
       $t = hex($t)/10;
@@ -615,6 +601,24 @@ CUL_HM_Parse($$)
 
     }
 
+  } elsif($st eq "THSensor") { ##########################################
+
+    if($p =~ m/^(....)(..)$/) {
+      my ($t, $h) = ($1, $2);
+      $t = hex($t)/10;
+      $t -= 3276.8 if($t > 1638.4);
+      $h = hex($h);
+      push @event, "state:T: $t H: $h";
+      push @event, "temperature:$t";
+      push @event, "humidity:$h";
+
+    } elsif($p =~ m/^(....)$/) {
+      my $t = $1;
+      $t = hex($t)/10;
+      $t -= 3276.8 if($t > 1638.4);
+      push @event, "temperature:$t";
+
+    }
 
   } elsif($st eq "winMatic") {  ####################################
     
