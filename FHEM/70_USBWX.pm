@@ -321,7 +321,6 @@ my $msg;
 my $name=$a[0];
 my $reading= $a[1];
 $msg="$name => No Set function ($reading) implemented";
-Log 1,$msg;
 return $msg;
 }
 
