@@ -174,16 +174,16 @@ GetHttpFile($$)
 {
   my ($host, $filename) = @_;
 
-  my $server = IO::Socket::INET->new(PeerAddr => $server);
-  if(!$server) {
-    Log 1, "Can't connect to $server\n";
+  my $conn = IO::Socket::INET->new(PeerAddr => $host);
+  if(!$conn) {
+    Log 1, "Can't connect to $host\n";
     return undef;
   }
   $host =~ s/:.*//;
   my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
-  syswrite $server, $req;
+  syswrite $conn, $req;
   my ($buf, $ret);
-  while(sysread($server, $buf, 65536) > 0) {
+  while(sysread($conn, $buf, 65536) > 0) {
     $ret .= $buf;
   }
   $ret=~ s/.*?\r\n\r\n//s;
