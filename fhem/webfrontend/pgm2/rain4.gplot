@@ -34,7 +34,7 @@ set yrange [0:]
 #FileLog 4:rain_total:0:delta-d
 
 plot "< awk $3=="rain_rate:" {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Rain Rate' with lines lw 2,\
+     using 1:2 axes x1y2 title 'Rain Rate' with lines,\
      "<grep rain_total <IN> | perl -ane '\
         @a = split(\" \", $F[0]);\
         if(defined($lh) && $lh ne $a[1])\

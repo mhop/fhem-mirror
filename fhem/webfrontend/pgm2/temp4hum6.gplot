@@ -26,16 +26,8 @@ set y2label "Temperature in C"
 set ylabel "Humidity (%)"
 
 #FileLog 4:T\x3a:0:
-#FileLog 4:T\x3a:0:
-#FileLog 6:H\x3a:0:
 #FileLog 6:H\x3a:0:
 
 plot \
-  "< awk '/T:/ {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title '' with lines ls 7 lw 4,\
-  "< awk '/T:/ {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Measured temperature' with lines ls 0 lw 1,\
-  "< awk '/H:/ {print $1, $6}' <IN>"\
-     using 1:2 axes x1y1 title '' with lines ls 7 lw 4;\
-  "< awk '/H:/ {print $1, $6}' <IN>"\
-     using 1:2 axes x1y1 title 'Humidity (%)' with lines ls 2 lw 1;\
+  "< awk '/T:/ {print $1, $4}' <IN>" using 1:2 axes x1y2 title '' with lines,\
+  "< awk '/H:/ {print $1, $6}' <IN>" using 1:2 axes x1y1 title '' with lines

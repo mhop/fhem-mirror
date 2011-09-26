@@ -35,6 +35,6 @@ set ylabel "Pressure in hPa"
 
 plot \
   "< awk $3=="temperature:" {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
+     using 1:2 axes x1y2 title 'Measured temperature' with lines,\
   "< awk $3=="pressure:" {print $1, $4}' <IN>"\
-     using 1:2 axes x1y1 title 'Pressure hPa' with lines lw 1\
+     using 1:2 axes x1y1 title 'Pressure hPa' with lines

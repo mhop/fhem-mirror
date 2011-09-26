@@ -35,6 +35,6 @@ set ylabel "Wind Dir"
 
 plot \
   "< awk $3=="wind_speed:" {print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Wind Speed' with lines lw 2,\
+     using 1:2 axes x1y2 title 'Wind Speed' with lines,\
   "< awk $3=="wind_dir:" {print $1, $4}' <IN>"\
-     using 1:2 axes x1y1 title 'Wind Direction' with points lw 1\
+     using 1:2 axes x1y1 title 'Wind Direction' with points\
