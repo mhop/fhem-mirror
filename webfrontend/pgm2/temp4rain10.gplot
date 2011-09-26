@@ -24,7 +24,7 @@ set yrange [0:]
 #FileLog 10:IR\x3a:0:delta-h
 #FileLog 10:IR\x3a:0:delta-d
 
-plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines lw 2,\
+plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines,\
      "<grep -v avg_ <IN> | perl -ane '\
         @a = split(\"[_:]\", $F[0]);\
         if(defined($lh) && $lh ne $a[1])\

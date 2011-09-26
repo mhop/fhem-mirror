@@ -22,6 +22,6 @@ set ylabel "Humidity (%)"
 
 plot \
   "< egrep 'T:|temperature' <IN>"\
-         using 1:4 axes x1y2 title 'Measured temperature' with lines lw 2,\
+         using 1:4 axes x1y2 title 'Measured temperature' with lines,\
   "< egrep 'H:|temperature' <IN>"\
-        using 1:4 axes x1y1 title 'Humidity (%)' with lines lw 1\
+        using 1:4 axes x1y1 title 'Humidity (%)' with lines\
