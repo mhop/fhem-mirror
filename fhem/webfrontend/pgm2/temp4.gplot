@@ -30,4 +30,4 @@ set y2label "Temperature in C"
 
 plot \
   "< egrep 'T:|temperature:' <IN>"\
-     using 1:4 axes x1y2 title 'Measured temperature' with lines lw 2,\
+     using 1:4 axes x1y2 title 'Measured temperature' with lines

@@ -22,6 +22,6 @@ set ylabel "Actuator (%)"
 
 plot \
   "< awk '/measured/{print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Measured temperature' with lines lw 2,\
+     using 1:2 axes x1y2 title 'Measured temperature' with lines,\
   "< awk '/actuator/ {print $1, $4+0}' <IN>"\
      using 1:2 axes x1y1 title 'Actuator (%)' with lines\

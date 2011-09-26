@@ -25,8 +25,6 @@ set format y2 "%.1f"
 
 plot \
   "< awk '/5MIN:/ {print $1, $8}' <IN>"\
-     using 1:2 axes x1y2 title 'kWh' with lines lw 1,\
+     using 1:2 axes x1y2 title 'kWh' with lines,\
   "< awk '/TOP:/ {print $1, $10}' <IN>"\
-     using 1:2 axes x1y1 title 'Spitze kW' with lines lw 2\
-
-
+     using 1:2 axes x1y1 title 'Spitze kW' with lines
