@@ -57,12 +57,12 @@ my %matchListSlowRF = (
     "6:CUL_WS"    => "^K.....",
     "7:CUL_EM"    => "^E0.................\$",
     "8:HMS"       => "^810e04....(1|5|9).a001",
-    "9:CUL_FHTTK" => "^T........",
+    "9:CUL_FHTTK" => "^T[A-F0-9]{8}",
     "A:CUL_RFR"   => "^[0-9A-F]{4}U.",
     "B:CUL_HOERMANN"=> "^R..........",
     "C:ESA2000"   => "^S................................\$",
     "D:CUL_IR"    => "^I............",
-    "E:CUL_TX"    => "^t..........",
+    "E:CUL_TX"    => "^TX[A-F0-9]{10}",
 );
 my %matchListHomeMatic = (
     "1:CUL_HM" => "^A......................",
@@ -886,7 +886,7 @@ CUL_Parse($$$$$)
   } elsif($fn eq "A" && $len >= 21) {              # AskSin/BidCos/HomeMatic
     ;
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
-    ;
+    $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } else {
     Log GetLogLevel($name,2), "$name: unknown message $dmsg";
     return;
