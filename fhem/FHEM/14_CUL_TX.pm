@@ -12,7 +12,7 @@ CUL_TX_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^t..........";
+  $hash->{Match}     = "^TX..........";        # Need TX to avoid FHTTK
   $hash->{DefFn}     = "CUL_TX_Define";
   $hash->{UndefFn}   = "CUL_TX_Undef";
   $hash->{ParseFn}   = "CUL_TX_Parse";
@@ -56,6 +56,7 @@ sub
 CUL_TX_Parse($$)
 {
   my ($hash, $msg) = @_;
+  $msg = substr($msg, 1);
   # Msg format: taTHHXYZXY, see http://www.f6fbb.org/domo/sensors/tx3_th.php
   my @a = split("", $msg);
   my $id2 = hex($a[4]) & 1; #meaning unknown
