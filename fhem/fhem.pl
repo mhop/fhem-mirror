@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.152 2011-09-23 11:52:00 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.153 2011-09-30 15:46:19 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2506,7 +2506,7 @@ ReplaceEventMap($$$)
   return $str if(!$em);
 
   my $sc = " ";               # Split character
-  my $fc = substr($em, 0, 1); # First character of the eventmap
+  my $fc = substr($em, 0, 1); # First character of the eventMap
   if($fc eq "," || $fc eq "/") {
     $sc = $fc;
     $em = substr($em, 1);
@@ -2544,7 +2544,7 @@ setGlobalAttrBeforeFork()
   my $f = $attr{global}{configfile};
   open(FH, $f) || die("Cant open $f: $!\n");
   while(my $l = <FH>) {
-    chomp($l);
+    $l =~ s/[\r\n]//g;
     next if($l !~ m/^attr\s+global\s+([^\s]+)\s+(.*)$/);
     my ($n,$v) = ($1,$2);
     $v =~ s/#.*//;
