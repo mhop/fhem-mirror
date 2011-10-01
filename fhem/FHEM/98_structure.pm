@@ -51,7 +51,7 @@ structure_Define($$)
     }
   }
   $hash->{CONTENT} = \%list;
-  $hash->{STATE} = join(" ", sort(keys %{$hash->{CONTENT}}));
+  $hash->{STATE} = "defined";
 
   @a = ( "set", $devname, $stype, $devname );
   structure_Attr(@a);
@@ -90,7 +90,6 @@ CommandAddStruct($)
   foreach my $d (devspec2array($a[0])) {
     $hash->{CONTENT}{$d} = 1;
   }
-  $hash->{STATE} = join(" ", sort(keys %{$hash->{CONTENT}}));
 
   @a = ( "set", $hash->{NAME}, $hash->{ATTR}, $hash->{NAME} );
   structure_Attr(@a);
@@ -117,7 +116,6 @@ CommandDelStruct($)
   foreach my $d (devspec2array($a[0])) {
     delete($hash->{CONTENT}{$d});
   }
-  $hash->{STATE} = join(" ", sort(keys %{$hash->{CONTENT}}));
 
   @a = ( "del", $hash->{NAME}, $hash->{ATTR} );
   structure_Attr(@a);
@@ -134,6 +132,9 @@ structure_Set($@)
   my %pars;
 
   $hash->{INSET} = 1;
+
+  $hash->{STATE} = join(" ", @list[1..@list-1])
+    if($list[1] ne "?");
 
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
