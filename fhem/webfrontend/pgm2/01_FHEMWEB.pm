@@ -12,7 +12,7 @@ sub FW_calcWeblink($$);
 sub FW_dev2image($);
 sub FW_digestCgi($);
 sub FW_doDetail($);
-sub FW_dumpFileLog($$);
+sub FW_dumpFileLog($$$);
 sub FW_fatal($);
 sub FW_fileList($);
 sub FW_logWrapper($);
@@ -623,7 +623,7 @@ FW_doDetail($)
 
   if($t eq "FileLog" ) {
     pO "  <table class=\"block wide\">";
-    FW_dumpFileLog($d, 0);
+    FW_dumpFileLog($d, 0, 1);
     pO "  </table>";
   }
 
@@ -866,7 +866,7 @@ FW_showRoom()
              FW_submit("cmd.$d", "set").
              "</td>";
         } elsif($type eq "FileLog") {
-          FW_dumpFileLog($d, 1);
+          $row = FW_dumpFileLog($d, 1, $row);
 
         }
       }
@@ -1688,11 +1688,10 @@ FW_makeEdit($$$)
 }
 
 sub
-FW_dumpFileLog($$)
+FW_dumpFileLog($$$)
 {
-  my ($d, $oneRow) = @_;
+  my ($d, $oneRow,$row) = @_;
 
-  my $row = 1;
   foreach my $f (FW_fileList($defs{$d}{logfile})) {
     my $nr;
 
@@ -1720,5 +1719,6 @@ FW_dumpFileLog($$)
       $row++;
     }
   }
+  return $row;
 }
 1;
