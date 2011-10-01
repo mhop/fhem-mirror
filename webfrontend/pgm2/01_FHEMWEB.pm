@@ -12,11 +12,12 @@ sub FW_calcWeblink($$);
 sub FW_dev2image($);
 sub FW_digestCgi($);
 sub FW_doDetail($);
+sub FW_dumpFileLog($$);
 sub FW_fatal($);
 sub FW_fileList($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
-sub FW_makeTable($$);
+sub FW_makeTable($$@);
 sub FW_ReadIcons();
 sub FW_roomOverview($);
 sub FW_select($$$);
@@ -531,9 +532,9 @@ FW_updateHashes()
 
 ##############################
 sub
-FW_makeTable($$)
+FW_makeTable($$@)
 {
-  my($name, $hash) = (@_);
+  my($name, $hash, $cmd) = (@_);
 
   return if(!$hash || !int(keys %{$hash}));
   pO "  <table class=\"block wide\">";
@@ -571,6 +572,9 @@ FW_makeTable($$)
       }
 
     }
+    pH "cmd.$name=$cmd $name $n&amp;detail=$name", $cmd, 1
+        if($cmd && !$FW_ss);
+
 
     pO "</tr>";
   }
@@ -586,11 +590,14 @@ FW_makeSelect($$$)
   my ($d, $cmd, $list) = @_;
   return if(!$list || $FW_hiddenroom{input});
   my @al = map { s/[:;].*//;$_ } split(" ", $list);
-  pO FW_submit("cmd.$cmd$d", $cmd) .
-     "&nbsp;$d" .
-     FW_hidden("dev.$cmd$d", $d);
+
+  pO "<form method=\"get\" action=\"$FW_ME\">";
+  pO FW_hidden("detail", $d);
+  pO FW_hidden("dev.$cmd$d", $d);
+  pO FW_submit("cmd.$cmd$d", $cmd) . "&nbsp;$d";
   pO FW_select("arg.$cmd$d",\@al,undef);
   pO FW_textfield("val.$cmd$d", 30);
+  pO "</form>";
 }
 
 
@@ -612,24 +619,11 @@ FW_doDetail($)
   pO "Readings" if($defs{$d}{READINGS});
   FW_makeTable($d, $defs{$d}{READINGS});
   FW_makeSelect($d, "attr", getAllAttr($d));
-  FW_makeTable($d, $attr{$d});
+  FW_makeTable($d, $attr{$d}, "deleteattr");
 
   if($t eq "FileLog" ) {
     pO "  <table class=\"block wide\">";
-    my $row = 1;
-    foreach my $f (FW_fileList($defs{$d}{logfile})) {
-      my $nr;
-      foreach my $ln (split(",", AttrVal($d, "logtype", "text"))) {
-        my ($lt, $name) = split(":", $ln);
-        $name = $lt if(!$name);
-        pF "    <tr class=\"%s\">", ($row&1)?"odd":"even";
-        pF "<td><div class=\"dname\">%s</div></td>", ($nr ? "" : $f);
-        pH "cmd=logwrapper $d $lt $f",
-                "<div class=\"dval\">$name</div>", 1, "dval";
-        pO "</tr>";
-        $nr++; $row++;
-      }
-    }
+    FW_dumpFileLog($d, 0);
     pO "  </table>";
   }
 
@@ -780,90 +774,106 @@ FW_showRoom()
 
   pO "<form method=\"get\" action=\"$FW_ME\">";
   pO "<div id=\"content\">";
-  pO "  <table class=\"block\">";
+  pO "  <table>";  # Need for equal width of subtables
 
   my @list = ($FW_room eq "all" ? keys %defs : keys %{$FW_rooms{$FW_room}});
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
   my $row=1;
-  foreach my $d (sort @list) {
-    next if(IsIgnored($d));
-    my $type = $defs{$d}{TYPE};
+  foreach my $type (sort keys %FW_types) {
+
     next if(!$type || $type eq "weblink");
 
-    my $allSets = " " . getAllSets($d) . " ";
-    my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
-    if(!$hasOnOff) {    # Check the eventMap
-      my $em = AttrVal($d, "eventMap", "") . " ";
-      $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
-    }
+    #################
+    # Check if there is a device of this type in the room
+    my @devs = grep { $FW_rooms{$FW_room}{$_} && !IsIgnored($_) }
+                        keys %{$FW_types{$type}};
+    next if($FW_room && $FW_room ne "all" && !@devs);
 
-    pF "    <tr class=\"%s\">", ($row&1)?"odd":"even";
+    pO "  <tr><td><div class=\"devType\">$type</div></td></tr>";
+    pO "  <tr><td>";
+    pO "  <table class=\"block wide\" id=\"$type\">";
 
-    if($FW_hiddenroom{detail}) {
-      pO "<td><div class=\"col1\">$d</div></td>";
+    foreach my $d (sort @devs) {
+      my $type = $defs{$d}{TYPE};
 
-    } else {
-      pH "detail=$d", $d, 1, "col1";
+      my $allSets = " " . getAllSets($d) . " ";
+      my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
+      if(!$hasOnOff) {    # Check the eventMap
+        my $em = AttrVal($d, "eventMap", "") . " ";
+        $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
+      }
 
-    }
+      pF "    <tr class=\"%s\">", ($row&1)?"odd":"even";
 
-    $row++;
+      if($FW_hiddenroom{detail}) {
+        pO "<td><div class=\"col1\">$d</div></td>";
 
-    my $state = $defs{$d}{STATE};
-    $state = "" if(!defined($state));
-    my $txt = $state;
+      } else {
+        pH "detail=$d", $d, 1, "col1";
 
-    if(defined(AttrVal($d, "showtime", undef))) {
-      $txt = $defs{$d}{READINGS}{state}{TIME};
+      }
 
-    } elsif($allSets =~ m/ desired-temp /) {
-      $txt = ReadingsVal($d, "measured-temp", "");
-      $txt =~ s/ .*//;
-      $txt .= "&deg;"
+      $row++;
 
-    } else {
-      my $icon;
-      $icon = FW_dev2image($d);
-      $txt = "<img src=\"$FW_ME/icons/$icon\" alt=\"$txt\"/>" if($icon);
+      my $state = $defs{$d}{STATE};
+      $state = "" if(!defined($state));
+      my $txt = $state;
 
-    }
-
-    pO "<td>";
-    pO "<table border=\"0\"><tr><td>" if(!$FW_ss);
-    # align needed for FireFox
-    $txt = "<div align=\"center\" class=\"col2\">$txt</div>" if($FW_ss);
-    if($hasOnOff) {
-      pHPlain "cmd.$d=set $d ".($state eq "on" ? "off":"on").$rf,  $txt, 0;
-    } else {
-      pO $txt;
-    }
-
-    if(!$FW_ss) {
-      pO "</td>";
-      if($hasOnOff) {
-        pH "cmd.$d=set $d on$rf",  ReplaceEventMap($d, "on", 1), 1, "col2";
-        pH "cmd.$d=set $d off$rf", ReplaceEventMap($d, "off", 1), 1, "col2";
+      if(defined(AttrVal($d, "showtime", undef))) {
+        $txt = $defs{$d}{READINGS}{state}{TIME};
 
       } elsif($allSets =~ m/ desired-temp /) {
         $txt = ReadingsVal($d, "measured-temp", "");
         $txt =~ s/ .*//;
-        $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-        my @tv = map { ($_.".0", $_+0.5) } (5..30);
-        shift(@tv);     # 5.0 is not valid
-        $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
+        $txt .= "&deg;"
 
-        pO "<td>".
-           FW_hidden("arg.$d", "desired-temp") .
-           FW_hidden("dev.$d", $d) .
-           FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt)) .
-           "</td><td>".
-           FW_submit("cmd.$d", "set").
-           "</td>";
+      } else {
+        my $icon;
+        $icon = FW_dev2image($d);
+        $txt = "<img src=\"$FW_ME/icons/$icon\" alt=\"$txt\"/>" if($icon);
+
       }
-      pO "</tr></table>";
+
+      pO "<td>";
+      # align needed for FireFox
+      $txt = "<div align=\"center\" class=\"col2\">$txt</div>" if($FW_ss);
+      if($hasOnOff) {
+        pHPlain "cmd.$d=set $d ".($state eq "on" ? "off":"on").$rf,  $txt, 0;
+      } else {
+        pO $txt;
+      }
+
+      if(!$FW_ss) {
+        pO "</td>";
+        if($hasOnOff) {
+          pH "cmd.$d=set $d on$rf",  ReplaceEventMap($d, "on", 1), 1, "col2";
+          pH "cmd.$d=set $d off$rf", ReplaceEventMap($d, "off", 1), 1, "col2";
+
+        } elsif($allSets =~ m/ desired-temp /) {
+          $txt = ReadingsVal($d, "measured-temp", "");
+          $txt =~ s/ .*//;
+          $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
+          my @tv = map { ($_.".0", $_+0.5) } (5..30);
+          shift(@tv);     # 5.0 is not valid
+          $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
+
+          pO "<td>".
+             FW_hidden("arg.$d", "desired-temp") .
+             FW_hidden("dev.$d", $d) .
+             FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt)) .
+             "</td><td>".
+             FW_submit("cmd.$d", "set").
+             "</td>";
+        } elsif($type eq "FileLog") {
+          FW_dumpFileLog($d, 1);
+
+        }
+      }
+      pO "</td>";
     }
-    pO "</td>";
+    pO "  </table>";
+    pO "  </td></tr>";
   }
   pO "  </table><br>";
 
@@ -879,7 +889,7 @@ FW_showRoom()
        $defs{$d}{WLTYPE} eq "fileplot" &&
        !AttrVal($d, "fixedrange", undef)) {
 
-      pO "<br>";
+      pO "<br>" if($row > 1);
       $buttonsDisplayed = 1;
       FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
       FW_zoomLink("zoom=1",  "Zoom-out.png","zoom out");
@@ -1487,17 +1497,14 @@ pH(@)
 
    pO "<td>" if($td);
    $link = ($link =~ m,^/,) ? $link : "$FW_ME?$link";
-   $class  = " class=\"$class\"" if($class);
    $class = "" if(!defined($class));
+   $class  = " class=\"$class\"" if($class);
 
-   if($FW_ss) {       # No pointer change if using onClick
-     pO "<a onClick=\"location.href='$link'\"><div $class>$txt</div></a>";
-
-   } elsif($FW_tp) {
-     pO "<a onClick=\"location.href='$link'\"><div $class>$txt</div></a>";
+   if($FW_ss || $FW_tp) {       # No pointer change if using onClick
+     pO "<a onClick=\"location.href='$link'\"><div$class>$txt</div></a>";
 
    } else {
-     pO "<a href=\"$link\">$txt</a>";
+     pO "<a href=\"$link\"><div$class>$txt</div></a>";
    }
    pO "</td>" if($td);
 }
@@ -1679,4 +1686,38 @@ FW_makeEdit($$$)
   pO  "</td>";
 }
 
+sub
+FW_dumpFileLog($$)
+{
+  my ($d, $oneRow) = @_;
+
+  my $row = 1;
+  foreach my $f (FW_fileList($defs{$d}{logfile})) {
+    my $nr;
+
+    if($oneRow) {
+      pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
+      pF "<td><div class=\"dname\">$f</div></td>";
+    }
+    foreach my $ln (split(",", AttrVal($d, "logtype", "text"))) {
+      my ($lt, $name) = split(":", $ln);
+      $name = $lt if(!$name);
+      if(!$oneRow) {
+        pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
+        pF "<td><div class=\"dname\">%s</div></td>", ($nr ? "" : $f);
+      }
+      pH "cmd=logwrapper $d $lt $f",
+              "<div class=\"dval\">$name</div>", 1, "dval";
+      if(!$oneRow) {
+        pO "</tr>";
+        $row++;
+      }
+      $nr++;
+    }
+    if($oneRow) {
+      pO "</tr>";
+      $row++;
+    }
+  }
+}
 1;

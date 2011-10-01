@@ -10,6 +10,7 @@ select   { font-family:Arial, sans-serif; font-size:16px}
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
 
+.devType { padding-top:10px; }
 a {  color: #278727; }
 img {  border-style: none; }
 
