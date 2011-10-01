@@ -776,7 +776,6 @@ FW_showRoom()
   pO "<div id=\"content\">";
   pO "  <table>";  # Need for equal width of subtables
 
-  my @list = ($FW_room eq "all" ? keys %defs : keys %{$FW_rooms{$FW_room}});
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
   my $row=1;
@@ -786,9 +785,10 @@ FW_showRoom()
 
     #################
     # Check if there is a device of this type in the room
-    my @devs = grep { $FW_rooms{$FW_room}{$_} && !IsIgnored($_) }
-                        keys %{$FW_types{$type}};
-    next if($FW_room && $FW_room ne "all" && !@devs);
+    $FW_room = "" if(!defined($FW_room));
+    my @devs = grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
+                      !IsIgnored($_) } keys %{$FW_types{$type}};
+    next if(!@devs);
 
     pO "  <tr><td><div class=\"devType\">$type</div></td></tr>";
     pO "  <tr><td>";
@@ -879,6 +879,7 @@ FW_showRoom()
 
   # Now the weblinks
   my $buttonsDisplayed;
+  my @list = ($FW_room eq "all" ? keys %defs : keys %{$FW_rooms{$FW_room}});
   foreach my $d (sort @list) {
     next if(IsIgnored($d));
     my $type = $defs{$d}{TYPE};
