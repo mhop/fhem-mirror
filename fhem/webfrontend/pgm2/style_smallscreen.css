@@ -1,16 +1,16 @@
 body     { background-color: #FFFFE7; 
            font-family:Arial, sans-serif; font-size:24px;
            }
-textarea { font-family:Arial, sans-serif; font-size:16px}
-input    { font-family:Arial, sans-serif; font-size:16px}
-select   { font-family:Arial, sans-serif; font-size:16px}
+textarea { font-family:Arial, sans-serif; font-size:16px;}
+input    { font-family:Arial, sans-serif; font-size:16px;}
+select   { font-family:Arial, sans-serif; font-size:16px;}
 #back    { position:absolute; top: 2px; left:18px; }
 #logo    { position:absolute; top: 2px; left: 2px; }
 #menu    { position:absolute; top: 2px; left:65px; }
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
 
-.devType { padding-top:10px; }
+.devType { padding-top:10px; font-size:12px;}
 a {  color: #278727; }
 img {  border-style: none; }
 
