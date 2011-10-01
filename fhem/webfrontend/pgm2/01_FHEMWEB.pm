@@ -631,7 +631,7 @@ FW_doDetail($)
 
   FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, 1) if($t eq "weblink");
 
-  pO "<br>";
+  pO "<br><br>";
   pH "$FW_reldoc#${t}", "Device specific help";
   pO "<br><br>";
   pO "</div>";
@@ -886,7 +886,6 @@ FW_showRoom()
     next if(!$type || $type ne "weblink");
 
     $buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
-    pO "  <br>"; # Empty line
   }
   pO "</div>";
   pO "</form>";
@@ -1571,7 +1570,8 @@ FW_showWeblink($$$$)
 
     my @va = split(":", $v, 3);
     if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {
-      pO "<td>Broken definition: $v</td>";
+      pO "Broken definition: $v<br>";
+
     } else {
       if($va[2] eq "CURRENT") {
         $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
@@ -1592,7 +1592,7 @@ FW_showWeblink($$$$)
 
       pO "<br>";
       pHPlain "detail=$d", $d;
-      pO "<br><br>";
+      pO "<br>";
 
     }
   }
