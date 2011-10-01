@@ -23,7 +23,7 @@ sub FW_roomOverview($);
 sub FW_select($$$);
 sub FW_showLog($);
 sub FW_showRoom();
-sub FW_showWeblink($$$);
+sub FW_showWeblink($$$$);
 sub FW_style($$);
 sub FW_submit($$);
 sub FW_substcfg($$$$$$);
@@ -629,7 +629,7 @@ FW_doDetail($)
 
   pO "</td></tr></table>";
 
-  FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}) if($t eq "weblink");
+  FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, 1) if($t eq "weblink");
 
   pO "<br>";
   pH "$FW_reldoc#${t}", "Device specific help";
@@ -878,28 +878,14 @@ FW_showRoom()
   pO "  </table><br>";
 
   # Now the weblinks
-  my $buttonsDisplayed;
+  my $buttons = 1;
   my @list = ($FW_room eq "all" ? keys %defs : keys %{$FW_rooms{$FW_room}});
   foreach my $d (sort @list) {
     next if(IsIgnored($d));
     my $type = $defs{$d}{TYPE};
     next if(!$type || $type ne "weblink");
 
-    # plots navigation buttons
-    if(!$buttonsDisplayed && 
-       $defs{$d}{WLTYPE} eq "fileplot" &&
-       !AttrVal($d, "fixedrange", undef)) {
-
-      pO "<br>" if($row > 1);
-      $buttonsDisplayed = 1;
-      FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
-      FW_zoomLink("zoom=1",  "Zoom-out.png","zoom out");
-      FW_zoomLink("off=-1",  "Prev.png",    "prev");
-      FW_zoomLink("off=1",   "Next.png",    "next");
-      pO "<br>";
-    }
-
-    FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE});
+    $buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
     pO "  <br>"; # Empty line
   }
   pO "</div>";
@@ -1546,9 +1532,9 @@ fC($)
 
 ##################
 sub
-FW_showWeblink($$$)
+FW_showWeblink($$$$)
 {
-  my ($d, $v, $t) = @_;
+  my ($d, $v, $t, $buttons) = @_;
 
   my $attr = AttrVal($d, "htmlattr", "");
 
@@ -1569,6 +1555,20 @@ FW_showWeblink($$$)
 
 
   } elsif($t eq "fileplot") {
+
+    # plots navigation buttons
+    if($buttons&& 
+       $defs{$d}{WLTYPE} eq "fileplot" &&
+       !AttrVal($d, "fixedrange", undef)) {
+
+      FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
+      FW_zoomLink("zoom=1",  "Zoom-out.png","zoom out");
+      FW_zoomLink("off=-1",  "Prev.png",    "prev");
+      FW_zoomLink("off=1",   "Next.png",    "next");
+      $buttons = 0;
+      pO "<br>";
+    }
+
     my @va = split(":", $v, 3);
     if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {
       pO "<td>Broken definition: $v</td>";
@@ -1592,10 +1592,11 @@ FW_showWeblink($$$)
 
       pO "<br>";
       pHPlain "detail=$d", $d;
-      pO "<br>";
+      pO "<br><br>";
 
     }
   }
+  return $buttons;
 }
 
 sub
