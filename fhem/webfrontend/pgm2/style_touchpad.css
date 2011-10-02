@@ -17,7 +17,7 @@ table.block tr.odd { background: #F0F0D8; }
 table.block tr.sel { background: #F0F0D8; }
 table { -moz-border-radius:8px; border-radius:8px; }
 
-.col1, .col2  { padding: 8px; }
+.col1, .col2, .col3  { padding: 8px; }
 .dname, .dval { padding: 0px; font-size: 14px; }
 
 table#room { border:1px solid gray; width: 100%; background: #D7FFFF; }
