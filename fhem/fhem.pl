@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.153 2011-09-30 15:46:19 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.154 2011-10-02 12:27:51 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -342,6 +342,8 @@ my $errcount= 0;
 while (1) {
   my ($rout, $rin) = ('', '');
 
+  my $timeout = HandleTimeout();
+
   vec($rin, $server->fileno(), 1) = 1;
   foreach my $p (keys %selectlist) {
     vec($rin, $selectlist{$p}{FD}, 1) = 1;
@@ -353,7 +355,6 @@ while (1) {
   # for documentation see
   # man 2 select
   # http://perldoc.perl.org/functions/select.html
-  my $timeout = HandleTimeout();
   $timeout = $readytimeout if(keys(%readyfnlist) &&
                               (!defined($timeout) || $timeout > $readytimeout));
   my $nfound = select($rout=$rin, undef, undef, $timeout);
@@ -1261,8 +1262,9 @@ CommandDelete($$)
 
     # Delete releated hashes
     foreach my $p (keys %selectlist) {
-      delete $selectlist{$p}
-        if($selectlist{$p} && $selectlist{$p}{NAME} eq $sdev);
+      if($selectlist{$p} && $selectlist{$p}{NAME} eq $sdev) {
+        delete $selectlist{$p};
+      }
     }
     foreach my $p (keys %readyfnlist) {
       delete $readyfnlist{$p}
@@ -1270,8 +1272,9 @@ CommandDelete($$)
     }
 
     delete($attr{$sdev});
+    my $temporary = $defs{$sdev}{TEMPORARY};
     delete($defs{$sdev});       # Remove the main entry
-    DoTrigger("global", "DELETED $sdev");
+    DoTrigger("global", "DELETED $sdev") if(!$temporary);
 
   }
   return join("\n", @rets);
