@@ -1736,17 +1736,18 @@ FW_Notify($$)
   return undef if(AttrVal($dn, "room", "") ne $filter);
 
   FW_ReadIcons();
+
+  my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp);
   $FW_wname = $ntfy->{SNAME};
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   $FW_longpoll = 1;
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
-
   my ($allSet, $hasOnOff, $txt) = FW_devState($dn, "");
+  ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp) = @old;
 
   $ntfy->{INFORMBUF} = "" if(!defined($ntfy->{INFORMBUF}));
   $ntfy->{INFORMBUF} .= "$dn;$dev->{STATE};$txt\n";
-Log 0, "Sending $txt";
   RemoveInternalTimer($ln);
   InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
 
