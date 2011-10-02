@@ -324,14 +324,14 @@ FW_AnswerCall($)
   if($arg =~ m,^${FW_ME}/(example.*|.*html)$,) {
     my $f = $1;
     $f =~ s,/,,g;    # little bit of security
-    open(FH, "$FW_dir/$f") || return;
+    open(FH, "$FW_dir/$f") || return 0;
     pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/(.*).css,) {
-    open(FH, "$FW_dir/$1.css") || return;
+    open(FH, "$FW_dir/$1.css") || return 0;
     pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "text/css";
@@ -345,7 +345,7 @@ FW_AnswerCall($)
       FW_ReadIcons();
       $img = FW_dev2image($img);
       $cachable = 0;
-      return if(!$img || !open(FH, "$FW_dir/$img"));
+      return 0 if(!$img || !open(FH, "$FW_dir/$img"));
     }
     binmode (FH); # necessary for Windows
     pO join("", <FH>);
@@ -355,7 +355,7 @@ FW_AnswerCall($)
     return $cachable;
 
  } elsif($arg =~ m,^$FW_ME/(.*).js,) { #kpb java include
-    open(FH, "$FW_dir/$1.js") || return;
+    open(FH, "$FW_dir/$1.js") || return 0;
     pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "application/javascript";
