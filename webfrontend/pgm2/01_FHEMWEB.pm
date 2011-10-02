@@ -62,10 +62,14 @@ my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
 my %FW_types;      # device types, for sorting
-my $FW_wname;      # Web instance name
+my $FW_wname;      # Web instance 
+my $FW_cname;      # Current connection
 my @FW_zoom;       # "qday", "day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
 my %FW_hiddenroom; # hash of hidden rooms
+my $FW_longpoll;
+my $FW_inform;
+my $FW_XHR;
 
 
 #####################################
@@ -78,10 +82,11 @@ FHEMWEB_Initialize($)
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
+  $hash->{NotifyFn}= "FW_Notify";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheet hiddenroom HTTPS";
+                     "stylesheet hiddenroom HTTPS longpoll";
 
   ###############
   # Initialize internal structures
@@ -207,9 +212,9 @@ FW_Read($)
   }
 
   $FW_wname = $hash->{SNAME};
+  $FW_cname = $name;
   my $ll = GetLogLevel($FW_wname,4);
   my $c = $hash->{CD};
-
   if(!$zlib_loaded && $try_zlib && AttrVal($FW_wname, "fwcompress", 1)) {
     $zlib_loaded = 1;
     eval { require Compress::Zlib; };
@@ -229,10 +234,10 @@ FW_Read($)
 
   # Data from HTTP Client
   my $buf;
-  my $ret = sysread($hash->{CD}, $buf, 1024);
+  my $ret = sysread($c, $buf, 1024);
 
   if(!defined($ret) || $ret <= 0) {
-    my $r = CommandDelete(undef, $name);
+    CommandDelete(undef, $name);
     Log($ll, "Connection closed for $name");
     return;
   }
@@ -271,8 +276,9 @@ FW_Read($)
 
   $hash->{INUSE} = 1;
   my $cacheable = FW_AnswerCall($arg);
-
   delete($hash->{INUSE});
+  return if($cacheable == -1); # Longpoll / inform request;
+
   if(!$selectlist{$name}) {             # removed by rereadcfg, reinsert
     $selectlist{$name} = $hash;
     $defs{$name} = $hash;
@@ -390,11 +396,30 @@ FW_AnswerCall($)
   $FW_reldoc = "$FW_ME/commandref.html";
 
   $FW_cmdret = $docmd ? fC($cmd) : "";
+
+  if($FW_inform) {      # Longpoll header
+    $defs{$FW_cname}{inform} = $FW_room;
+    my $c = $defs{$FW_cname}{CD};
+    print $c "HTTP/1.1 200 OK\r\n",
+             "Content-Type: text/plain; charset=ISO-8859-1\r\n\r\n";
+    return -1;
+  }
+
+  if($FW_XHR) {
+    $FW_RETTYPE = "text/plain; charset=ISO-8859-1";
+    pO $FW_cmdret;
+    return 0;
+  }
+
   FW_updateHashes();
   if($cmd =~ m/^showlog /) {
     FW_showLog($cmd);
     return 0;
   }
+
+  $FW_longpoll = (AttrVal($FW_wname, "longpoll", undef) &&
+                  $FW_room &&
+                  !$FW_detail);
 
   if($cmd =~ m/^toweblink (.*)$/) {
     my @aa = split(":", $1);
@@ -433,10 +458,12 @@ FW_AnswerCall($)
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   my $stylecss = ($FW_ss ? "style_smallscreen.css" :
                   $FW_tp ? "style_touchpad.css" : "style.css");
-  $stylecss = AttrVal($FW_wname, "stylecss", $stylecss);
+  $stylecss = AttrVal($FW_wname, "stylesheet", $stylecss);
   pO "<link href=\"$FW_ME/$stylecss\" rel=\"stylesheet\"/>";
   pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
+  pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
+                        if($FW_longpoll);
   pO "</head>\n<body name=\"$t\">";
 
   if($FW_cmdret) {
@@ -473,9 +500,11 @@ FW_digestCgi($)
   my (%arg, %val, %dev);
   my ($cmd, $c) = ("","","");
 
-  $FW_detail = "";
   %FW_pos = ();
   $FW_room = "";
+  $FW_detail = "";
+  $FW_XHR = undef;
+  $FW_inform = undef;
 
   $arg =~ s,^[?/],,;
   foreach my $pv (split("&", $arg)) {
@@ -495,6 +524,8 @@ FW_digestCgi($)
     if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c= $1; }
     if($p eq "pos")          { %FW_pos =  split(/[=;]/, $v); }
     if($p eq "data")         { $FW_data = $v; }
+    if($p eq "XHR")          { $FW_XHR = 1; }
+    if($p eq "inform")       { $FW_inform = $v; }
 
   }
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
@@ -537,13 +568,13 @@ FW_makeTable($$@)
   my($name, $hash, $cmd) = (@_);
 
   return if(!$hash || !int(keys %{$hash}));
-  pO "  <table class=\"block wide\">";
+  pO "<table class=\"block wide\">";
 
   my $row = 1;
   foreach my $n (sort keys %{$hash}) {
     my $r = ref($hash->{$n});
     next if($r && ($r ne "HASH" || !defined($hash->{$n}{VAL})));
-    pF "    <tr class=\"%s\">", ($row&1)?"odd":"even";
+    pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
     $row++;
 
     my $val = $hash->{$n};
@@ -578,7 +609,7 @@ FW_makeTable($$@)
 
     pO "</tr>";
   }
-  pO "  </table>";
+  pO "</table>";
   pO "<br>";
   
 }
@@ -622,9 +653,9 @@ FW_doDetail($)
   FW_makeTable($d, $attr{$d}, "deleteattr");
 
   if($t eq "FileLog" ) {
-    pO "  <table class=\"block wide\">";
+    pO "<table class=\"block wide\">";
     FW_dumpFileLog($d, 0, 1);
-    pO "  </table>";
+    pO "</table>";
   }
 
   pO "</td></tr></table>";
@@ -728,25 +759,25 @@ FW_roomOverview($)
   pO "<div id=\"menu\">";
   pO "<table>";
   if($FW_ss) {  # Make a selection sensitive dropdown list
-    pO "  <tr><td><select OnChange=\"location.href=" .
+    pO "<tr><td><select OnChange=\"location.href=" .
                               "this.options[this.selectedIndex].value\">";
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       next if(!$list1[$idx]);
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
-      pO "  <option value=$list2[$idx]$sel>$list1[$idx]</option>";
+      pO "<option value=$list2[$idx]$sel>$list1[$idx]</option>";
     }
-    pO "  </select></td></tr>";
+    pO "</select></td></tr>";
 
   } else {
 
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
-        pO "  </table></td></tr>" if($idx);
-        pO "  <tr><td><table id=\"room\">"
+        pO "</table></td></tr>" if($idx);
+        pO "<tr><td><table id=\"room\">"
           if($idx<int(@list1)-1);
       } else {
-        pF "    <tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
+        pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            pO "<td><a href=\"$l2\">$l1</a></td>";
         } else {
@@ -774,7 +805,7 @@ FW_showRoom()
 
   pO "<form method=\"get\" action=\"$FW_ME\">";
   pO "<div id=\"content\">";
-  pO "  <table>";  # Need for equal width of subtables
+  pO "<table>";  # Need for equal width of subtables
 
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
 
@@ -790,22 +821,14 @@ FW_showRoom()
                       !IsIgnored($_) } keys %{$FW_types{$type}};
     next if(!@devs);
 
-    pO "  <tr><td><div class=\"devType\">$type</div></td></tr>";
-    pO "  <tr><td>";
-    pO "  <table class=\"block wide\" id=\"$type\">";
+    pO "\n<tr><td><div class=\"devType\">$type</div></td></tr>";
+    pO "<tr><td>";
+    pO "<table class=\"block wide\" id=\"$type\">";
 
     foreach my $d (sort @devs) {
       my $type = $defs{$d}{TYPE};
 
-      my $allSets = " " . getAllSets($d) . " ";
-      my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
-      if(!$hasOnOff) {    # Check the eventMap
-        my $em = AttrVal($d, "eventMap", "") . " ";
-        $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
-      }
-
-      pF "    <tr class=\"%s\">", ($row&1)?"odd":"even";
-
+      pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
       if($FW_hiddenroom{detail}) {
         pO "<td><div class=\"col1\">$d</div></td>";
 
@@ -816,39 +839,14 @@ FW_showRoom()
 
       $row++;
 
-      my $state = $defs{$d}{STATE};
-      $state = "" if(!defined($state));
-      my $txt = $state;
-
-      if(defined(AttrVal($d, "showtime", undef))) {
-        $txt = $defs{$d}{READINGS}{state}{TIME};
-
-      } elsif($allSets =~ m/ desired-temp /) {
-        $txt = ReadingsVal($d, "measured-temp", "");
-        $txt =~ s/ .*//;
-        $txt .= "&deg;"
-
-      } else {
-        my $icon;
-        $icon = FW_dev2image($d);
-        $txt = "<img src=\"$FW_ME/icons/$icon\" alt=\"$txt\"/>" if($icon);
-
-      }
-
-      pO "<td>";
-      # align needed for FireFox
-      $txt = "<div align=\"center\" class=\"col2\">$txt</div>" if($FW_ss);
-      if($hasOnOff) {
-        pHPlain "cmd.$d=set $d ".($state eq "on" ? "off":"on").$rf,  $txt, 0;
-      } else {
-        pO $txt;
-      }
+      my ($allSets, $hasOnOff, $txt) = FW_devState($d, $rf);
+      pO "<td id=\"$d\">$txt";
 
       if(!$FW_ss) {
         pO "</td>";
         if($hasOnOff) {
-          pH "cmd.$d=set $d on$rf",  ReplaceEventMap($d, "on", 1), 1, "col2";
-          pH "cmd.$d=set $d off$rf", ReplaceEventMap($d, "off", 1), 1, "col2";
+          pH "cmd.$d=set $d on$rf",  ReplaceEventMap($d, "on", 1), 1, "col3";
+          pH "cmd.$d=set $d off$rf", ReplaceEventMap($d, "off", 1), 1, "col3";
 
         } elsif($allSets =~ m/ desired-temp /) {
           $txt = ReadingsVal($d, "measured-temp", "");
@@ -872,10 +870,10 @@ FW_showRoom()
       }
       pO "</td>";
     }
-    pO "  </table>";
-    pO "  </td></tr>";
+    pO "</table>";
+    pO "</td></tr>";
   }
-  pO "  </table><br>";
+  pO "</table><br>";
 
   # Now the weblinks
   my $buttons = 1;
@@ -1384,9 +1382,9 @@ FW_style($$)
     push(@fl, FW_fileList("$FW_dir/.*html"));
 
     pO "<div id=\"content\">";
-    pO "  <table><tr><td>";
-    pO "  $msg<br><br>" if($msg);
-    pO "  <table class=\"block\" id=\"at\">";
+    pO "<table><tr><td>";
+    pO "$msg<br><br>" if($msg);
+    pO "<table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
@@ -1398,17 +1396,17 @@ FW_style($$)
       pO "</tr>";
       $row = ($row+1)%2;
     }
-    pO "  </table>";
-    pO "  </td></tr></table>";
+    pO "</table>";
+    pO "</td></tr></table>";
     pO "</div>";
 
   } elsif($a[1] eq "examples") {
 
     my @fl = FW_fileList("$FW_dir/example.*");
     pO "<div id=\"content\">";
-    pO "  <table><tr><td>";
-    pO "  $msg<br><br>" if($msg);
-    pO "  <table class=\"block\" id=\"at\">";
+    pO "<table><tr><td>";
+    pO "$msg<br><br>" if($msg);
+    pO "<table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
@@ -1416,8 +1414,8 @@ FW_style($$)
       pO "</tr>";
       $row = ($row+1)%2;
     }
-    pO "  </table>";
-    pO "  </td></tr></table>";
+    pO "</table>";
+    pO "</td></tr></table>";
     pO "</div>";
 
   } elsif($a[1] eq "edit") {
@@ -1434,7 +1432,7 @@ FW_style($$)
 
     my $ncols = $FW_ss ? 40 : 80;
     pO "<div id=\"content\">";
-    pO "  <form>";
+    pO "<form>";
     $f =~ s,^.*/,,;
     pO     FW_submit("save", "Save $f") . "<br><br>";
     pO     FW_hidden("cmd", "style save $a[2]");
@@ -1508,6 +1506,7 @@ pHPlain(@)
    }
    pO "</td>" if($td);
 }
+
 
 
 ##################
@@ -1722,4 +1721,94 @@ FW_dumpFileLog($$$)
   }
   return $row;
 }
+
+sub
+FW_Notify($$)
+{
+  my ($ntfy, $dev) = @_;
+
+  my $filter = $ntfy->{inform};
+  return undef if(!$filter);
+
+  my $ln = $ntfy->{NAME};
+
+  my $dn = $dev->{NAME};
+  return undef if(AttrVal($dn, "room", "") ne $filter);
+
+  FW_ReadIcons();
+  $FW_wname = $ntfy->{SNAME};
+  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
+  $FW_longpoll = 1;
+  $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
+  $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
+
+  my ($allSet, $hasOnOff, $txt) = FW_devState($dn, "");
+
+  $ntfy->{INFORMBUF} = "" if(!defined($ntfy->{INFORMBUF}));
+  $ntfy->{INFORMBUF} .= "$dn;$dev->{STATE};$txt\n";
+Log 0, "Sending $txt";
+  RemoveInternalTimer($ln);
+  InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+
+  return undef;
+}
+
+sub
+FW_FlushInform($)
+{
+  my ($name) = @_;
+  my $hash = $defs{$name};
+  my $c = $hash->{CD};
+  print $c $hash->{INFORMBUF};
+
+  CommandDelete(undef, $name);
+}
+
+sub
+FW_devState($$)
+{
+  my ($d, $rf) = @_;
+  my $allSets = " " . getAllSets($d) . " ";
+  my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
+  if(!$hasOnOff) {    # Check the eventMap
+    my $em = AttrVal($d, "eventMap", "") . " ";
+    $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
+  }
+
+  my $state = $defs{$d}{STATE};
+  $state = "" if(!defined($state));
+  my $txt = $state;
+
+  if(defined(AttrVal($d, "showtime", undef))) {
+    $txt = $defs{$d}{READINGS}{state}{TIME};
+
+  } elsif($allSets =~ m/ desired-temp /) {
+    $txt = ReadingsVal($d, "measured-temp", "");
+    $txt =~ s/ .*//;
+    $txt .= "&deg;"
+
+  } else {
+    my $icon;
+    $icon = FW_dev2image($d);
+    $txt = "<img src=\"$FW_ME/icons/$icon\" alt=\"$txt\"/>"
+                    if($icon);
+  }
+
+  $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
+  if($hasOnOff) {
+    my $link = "cmd.$d=set $d ".($state eq "on" ? "off":"on");
+    if($FW_longpoll) {
+      $txt = "<a onClick=\"cmd('$FW_ME?XHR=1&$link')\">$txt</a>";
+
+    } elsif($FW_ss || $FW_tp) {
+      $txt = "<a onClick=\"location.href='$FW_ME?$link$rf'\">$txt</a>";
+
+    } else {
+      $txt = "<a href=\"$FW_ME?$link\">$txt</a>";
+
+    }
+  }
+  return ($allSets, $hasOnOff, $txt);
+}
+
 1;
