@@ -1565,10 +1565,9 @@ A line ending with \ will be concatenated with the next one, so long lines
 	  24:00 means off.
           <br><br>
 
-      <li>As the FHT stops sending the values every 5-10
-          days, it is adviseable to schedule following command regularly:<br>
-	  <code>define fht_report at +*06:00:00
-                set &lt;name&gt; report1 255 report2 255</code>
+      <li>To synchronize the FHT time and to "wake" muted FHTs it is adviseable
+          to schedule following command:<br>
+	  <code>define fht_sync at  +*3:30 set TYPE=FHT time
           <br><br>
 
       <li><code>report1</code> with parameter 255 requests all settings for
@@ -1586,6 +1585,9 @@ A line ending with \ will be concatenated with the next one, so long lines
           measured-temp and actuator is sent along if it is considered
           appropriate
           by the FHT.
+          <br><br>
+          <b>Note:</b> This command generates a lot of RF traffic, which can
+          lead to further problems, especially if the reception is not clear.
           <br><br>
 
       <li><code>report2</code> with parameter 255 requests the following
@@ -6916,8 +6918,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 
     Examples:
     <pre>
-    # "Reset" the FHT80 if we do not receive any message for 15 Minutes
-    define w watchdog FHT80 00:15:00 SAME set FHT80 refreshvalues
+    # Talk to the FHT80 if we do not receive any message for 15 Minutes
+    define w watchdog FHT80 00:15:00 SAME set FHT80 time
     # Shout if the HMS100-FIT is not alive
     define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"
     </pre>
