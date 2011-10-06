@@ -198,10 +198,10 @@ CUL_HM_Parse($$)
   my $lcm = "$len$cmd";
 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
-  my $dname = $dhash ? $dhash->{NAME} : "unknown";
+  my $dname = $dhash ? $dhash->{NAME} :
+                       ($dst eq "000000" ? "broadcast" : 
+                       ($dst eq $id ? $iohash->{NAME} : $dst));
   my $target = ($dst eq $id) ? "" : " (to $dname)";
-  $dname = "broadcast" if($dst eq "000000");
-  $dname = $iohash->{NAME} if($dst eq $id);
 
   if($p =~ m/NACK$/) {  # HMLAN special
     if($dhash) {
