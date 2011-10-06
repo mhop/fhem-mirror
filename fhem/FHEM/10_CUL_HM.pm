@@ -95,6 +95,7 @@ my %culHmModel=(
   "0048" => "IS-WDS-TH-OD-S-R3",
   "0049" => "KFM-Sensor",
   "004A" => "HM-SEC-MDIR",     # Tested
+  "004B" => "HM-Sec-Cen",      # by peterp
   "004C" => "HM-RC-12-SW",
   "004D" => "HM-RC-19-SW",
   "004E" => "HM-LC-DDC1-PCB",
