@@ -3729,7 +3729,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="Weatherdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [en|de|fr|es]]</code><br>
     <br>
     Defines a virtual device for weather forecasts. You need to have the perl
     module Weather::Google installed to use this device. If you do not have it,
@@ -3743,14 +3743,18 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>http://www.google.de/ig/api?weather=location&hl=en</code>
     to see the raw output for your location.<br><br>
 
-    The parameter <code>interval</code> is the time between subsequent updates
+    The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
+
+    The optional language parameter may be one of <code>en</code>, <code>de</code>, <code>fr</code>, 
+    <code>es</code>. It determines the natural language in which the forecast information appears.
+    It defaults to en. If you want to set the language you also have to set the interval.<br><br>
 
     Examples:
     <pre>
       define MyWeather Weather "Frankfurt,HE"
       define Forecast Weather "Amsterdam,NL" 1800
-      define weather Weather "30000,France"
+      define weather Weather "30000,France" 3600 fr
     </pre>
   </ul>
   <br>

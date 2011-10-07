@@ -4,12 +4,13 @@
   - feature: TCM120/TCM310 + EnOcean parser added
   - feature: eventMap enhanced
   - bugfix:  enabled logging for 59_Weather.pm (Boris)
+  - feature: language selection for 59_Weather.pm (Erwin)
   - feature: .gplot files renamed from type to content
   - bugfix:  FS20 on-for-timer error reporting only in the logfile
   - bugfix:  FHEM2FHEM should work with CUL again, after syntax change
   - feature: CUL directio mode (No Device::SerialPort needed)
   - feature: FritzBox 7270 ZIP file
-
+  
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
   - feature: FHT8V rewrite (and moved from contrib into the FHEM directory).
