@@ -32,7 +32,6 @@ sub Weather_Initialize($) {
 sub f_to_c($) {
 
   my ($f)= @_;
-
   return int(($f-32)*5/9+0.5);
 }
 
@@ -42,17 +41,16 @@ sub Weather_UpdateReading($$$$$$) {
   my ($hash,$prefix,$key,$tn,$value,$n)= @_;
 
   return 0 if(!defined($value) || $value eq "");
-  return 0 if($key eq "unit_system");
-
+  
   if($key eq "temp") {
   	$key= "temp_c";
-  	$value= f_to_c($value);
+   	$value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  # assume F to C conversion required
   } elsif($key eq "low") {
   	$key= "low_c";
-  	$value= f_to_c($value);
+      	$value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
   } elsif($key eq "high") {
-  	$key= "high_c";
-  	$value= f_to_c($value);
+  	$key= "high_c"; 
+    	$value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
   }
 
   my $reading= $prefix . $key;
@@ -93,10 +91,11 @@ sub Weather_GetUpdate($)
   # see http://search.cpan.org/~possum/Weather-Google-0.03/lib/Weather/Google.pm
 
   my $location= $hash->{LOCATION};
+  my $lang= $hash->{LANG}; 
   my $WeatherObj;
-  Log 4, "$name: Updating weather information for $location.";
+  Log 4, "$name: Updating weather information for $location, language $lang."; 
   eval {
-  	$WeatherObj= new Weather::Google($location);
+ 	$WeatherObj= new Weather::Google($location, {language => $lang}); 
   };
   if($@) {
 	Log 1, "$name: Could not retrieve weather information.";
@@ -165,18 +164,21 @@ sub Weather_Define($$) {
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "syntax: define <name> Weather <location> [interval]"
-    if(int(@a) < 3 && int(@a) > 4);
+  return "syntax: define <name> Weather <location> [interval [en|de|fr|es]]" 
+    if(int(@a) < 3 && int(@a) > 5); 
 
   $hash->{STATE} = "Initialized";
 
   my $name	= $a[0];
   my $location	= $a[2];
   my $interval	= 3600;
-  if(int(@a)==4) { $interval= $a[3]; }
+  my $lang	= "en"; 
+  if(int(@a)>=4) { $interval= $a[3]; }
+  if(int(@a)==5) { $lang= $a[4]; } 
 
   $hash->{LOCATION}	= $location;
   $hash->{INTERVAL}	= $interval;
+  $hash->{LANG}		= $lang; 
   $hash->{READINGS}{current_date_time}{TIME}= TimeNow();
   $hash->{READINGS}{current_date_time}{VAL}= "none";
 
