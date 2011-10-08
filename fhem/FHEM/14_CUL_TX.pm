@@ -85,13 +85,13 @@ CUL_TX_Parse($$)
      $devtype = "temperature";
      $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
      Log $ll4, "CUL_TX $devtype $name $id3 T: $val F: $id2";
-     $no = "T: $val";
+     $no = "temperature: $val";
 
   } elsif ($type eq "E") {
      $devtype = "humidity";
      $val = $valraw;
      Log $ll4, "CUL_TX $devtype $name $id3 H: $val F: $id2";
-     $no = "H: $val";
+     $no = "humidity: $val";
 
   } else {
      my $ll2 = GetLogLevel($name,4);
