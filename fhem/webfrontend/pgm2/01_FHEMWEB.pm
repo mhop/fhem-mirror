@@ -943,15 +943,19 @@ FW_logWrapper($)
     pO "</div>";
 
   } else {
-
     pO "<div id=\"content\">";
-    pO "<table><tr><td>";
+    pO "<br>";
+    FW_zoomLink("cmd=$cmd;zoom=-1", "Zoom-in.png", "zoom in");
+    FW_zoomLink("cmd=$cmd;zoom=1",  "Zoom-out.png","zoom out");
+    FW_zoomLink("cmd=$cmd;off=-1",  "Prev.png",    "prev");
+    FW_zoomLink("cmd=$cmd;off=1",   "Next.png",    "next");
     pO "<table><tr><td>";
     pO "<td>";
-    my $arg = "$FW_ME?cmd=showlog undef $d $type $file";
+    my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
+    my $arg = "$FW_ME?cmd=showlog undef $d $type $file$wl";
     if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
       my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
-      pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
+      pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
                     "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
     } else {
@@ -962,8 +966,8 @@ FW_logWrapper($)
     pH "cmd=toweblink $d:$type:$file", "Convert to weblink";
     pO "</td>";
     pO "</td></tr></table>";
-    pO "</td></tr></table>";
     pO "</div>";
+
   }
 }
 
@@ -1229,10 +1233,14 @@ FW_zoomLink($$$)
 {
   my ($cmd, $img, $alt) = @_;
 
+  my $prf;
+  $cmd =~ m/^(.*);([^;]*)$/;
+  ($prf, $cmd) = ($1, $2) if($2);
   my ($d,$off) = split("=", $cmd, 2);
 
   my $val = $FW_pos{$d};
-  $cmd = ($FW_detail ? "detail=$FW_detail":"room=$FW_room") . "&amp;pos=";
+  $cmd = ($FW_detail ? "detail=$FW_detail":
+                        ($prf ? $prf : "room=$FW_room")) . "&amp;pos=";
 
   if($d eq "zoom") {
 
@@ -1283,21 +1291,22 @@ FW_calcWeblink($$)
 
   my $pm = AttrVal($d,"plotmode",$FW_plotmode);
   return if($pm eq "gnuplot");
-  return if(!$defs{$wl});
 
-  my $fr = AttrVal($wl, "fixedrange", undef);
   my $frx;
-  if($fr) {
-    #klaus fixed range day, week, month or year
-    if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
-      $frx=$fr;
-    }
-    else {
-      my @range = split(" ", $fr);
-      my @t = localtime;
-      $FW_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
-      $FW_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
-      return;
+  if($defs{$wl}) {
+    my $fr = AttrVal($wl, "fixedrange", undef);
+    if($fr) {
+      #klaus fixed range day, week, month or year
+      if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
+        $frx=$fr;
+      }
+      else {
+        my @range = split(" ", $fr);
+        my @t = localtime;
+        $FW_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
+        $FW_devs{$d}{to} = ResolveDateWildcards($range[1], @t); 
+        return;
+      }
     }
   }
 
@@ -1558,7 +1567,7 @@ FW_showWeblink($$$$)
   } elsif($t eq "fileplot") {
 
     # plots navigation buttons
-    if($buttons&& 
+    if($buttons && 
        $defs{$d}{WLTYPE} eq "fileplot" &&
        !AttrVal($d, "fixedrange", undef)) {
 
@@ -1585,7 +1594,7 @@ FW_showWeblink($$$$)
       my $arg="$FW_ME?cmd=showlog $d $va[0] $va[1] $va[2]$wl";
       if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
         my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
-        pO "<embed src=\"$arg\" type=\"image/svg+xml\"" .
+        pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
               "width=\"$w\" height=\"$h\" name=\"$d\"/>\n";
 
       } else {
