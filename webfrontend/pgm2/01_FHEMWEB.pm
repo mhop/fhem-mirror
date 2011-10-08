@@ -94,6 +94,7 @@ FHEMWEB_Initialize($)
   @FW_zoom = ("qday", "day","week","month","year");
   %FW_zoom = map { $_, $n++ } @FW_zoom;
 
+  addToAttrList("webCmd");
 }
 
 #####################################
@@ -178,6 +179,7 @@ FW_Read($)
       Log(1, "Accept failed for HTTP port ($name: $!)");
       return;
     }
+    $hash->{CONNECTS}++;
 
     my @clientsock = $hash->{IPV6} ? 
         sockaddr_in6($clientinfo[1]) :
@@ -839,14 +841,15 @@ FW_showRoom()
 
       $row++;
 
-      my ($allSets, $hasOnOff, $txt) = FW_devState($d, $rf);
+      my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
       pO "<td id=\"$d\">$txt";
 
       if(!$FW_ss) {
         pO "</td>";
-        if($hasOnOff) {
-          pH "cmd.$d=set $d on$rf",  ReplaceEventMap($d, "on", 1), 1, "col3";
-          pH "cmd.$d=set $d off$rf", ReplaceEventMap($d, "off", 1), 1, "col3";
+        if($cmdlist) {
+          foreach my $cmd (split(" ", $cmdlist)) {
+            pH "cmd.$d=set $d $cmd$rf",  ReplaceEventMap($d,$cmd,1), 1, "col3";
+          }
 
         } elsif($allSets =~ m/ desired-temp /) {
           $txt = ReadingsVal($d, "measured-temp", "");
@@ -1733,7 +1736,7 @@ FW_Notify($$)
   my $ln = $ntfy->{NAME};
 
   my $dn = $dev->{NAME};
-  return undef if(AttrVal($dn, "room", "") ne $filter);
+  return undef if($filter ne "all" && AttrVal($dn, "room", "") ne $filter);
 
   FW_ReadIcons();
 
@@ -1743,7 +1746,7 @@ FW_Notify($$)
   $FW_longpoll = 1;
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
-  my ($allSet, $hasOnOff, $txt) = FW_devState($dn, "");
+  my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
   ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp) = @old;
 
   $ntfy->{INFORMBUF} = "" if(!defined($ntfy->{INFORMBUF}));
@@ -1769,11 +1772,17 @@ sub
 FW_devState($$)
 {
   my ($d, $rf) = @_;
-  my $allSets = " " . getAllSets($d) . " ";
-  my $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
-  if(!$hasOnOff) {    # Check the eventMap
-    my $em = AttrVal($d, "eventMap", "") . " ";
-    $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
+
+  my ($allSets, $hasOnOff, $cmdlist, $link);
+  my $webCmd = AttrVal($d, "webCmd", undef);
+
+  if(!$webCmd) {
+    $allSets = " " . getAllSets($d) . " ";
+    $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
+    if(!$hasOnOff) {    # Check the eventMap
+      my $em = AttrVal($d, "eventMap", "") . " ";
+      $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
+    }
   }
 
   my $state = $defs{$d}{STATE};
@@ -1783,7 +1792,7 @@ FW_devState($$)
   if(defined(AttrVal($d, "showtime", undef))) {
     $txt = $defs{$d}{READINGS}{state}{TIME};
 
-  } elsif($allSets =~ m/ desired-temp /) {
+  } elsif($allSets && $allSets =~ m/ desired-temp /) {
     $txt = ReadingsVal($d, "measured-temp", "");
     $txt =~ s/ .*//;
     $txt .= "&deg;"
@@ -1796,8 +1805,19 @@ FW_devState($$)
   }
 
   $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
-  if($hasOnOff) {
-    my $link = "cmd.$d=set $d ".($state eq "on" ? "off":"on");
+
+  if($webCmd) {
+    my @a = split(" ", $webCmd);
+    $link = "cmd.$d=set $d $a[0]";
+    $cmdlist = $webCmd;
+
+  } elsif($hasOnOff) {
+    $link = "cmd.$d=set $d ".($state eq "on" ? "off":"on");
+    $cmdlist = "on off";
+
+  }
+
+  if($link) {
     if($FW_longpoll) {
       $txt = "<a onClick=\"cmd('$FW_ME?XHR=1&$link')\">$txt</a>";
 
@@ -1809,7 +1829,7 @@ FW_devState($$)
 
     }
   }
-  return ($allSets, $hasOnOff, $txt);
+  return ($allSets, $cmdlist, $txt);
 }
 
 1;
