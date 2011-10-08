@@ -578,14 +578,14 @@ TUL_Attr(@)
 # The following section has been inspired by the EIB module from MrHouse project
 # written by Peter Sj?din peter@sjodin.net and Mike Pieper eibdmh@pieper-family.de
 # Code has been mainly changed to fit to the FHEM framework by Maz Rashid
-# (to be honest the code had to be reworked very intensively de to the lack of code quality)
+# (to be honest the code had to be reworked very intensively due  the lack of code quality)
 #
 
 # Utility functions
 sub tul_hex2addr {
 	my $str = lc($_[0]);
     if ($str =~ /([0-9a-f])([0-9a-f])([0-9a-f]{2})/) {
-        return (hex($1) << 12) | (hex($2) << 8) | hex($3);
+        return (hex($1) << 11) | (hex($2) << 8) | hex($3);
     }
     else
     {
