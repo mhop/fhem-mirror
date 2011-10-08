@@ -11,7 +11,7 @@ cmd(arg)
 function
 doUpdate()
 {
-  if(pollConn.readyState != 4)
+  if(pollConn.readyState != 4 || pollConn.status != 200)
     return;
   var lines = pollConn.responseText.split("\n");
   for(var i=0; i < lines.length; i++) {
