@@ -30,8 +30,13 @@ function
 longpoll()
 {
   pollConn = new XMLHttpRequest();
-  pollConn.open("GET", document.location.pathname+document.location.search+
-                "&XHR=1&inform=1", true);
+  var room="room=all";
+  var sa = document.location.search.substring(1).split("&");
+  for(var i = 0; i < sa.length; i++) {
+    if(sa[i].substring(0,5) == "room=")
+      room=sa[i];
+  }
+  pollConn.open("GET", document.location.pathname+room+"&XHR=1&inform=1", true);
   pollConn.onreadystatechange = doUpdate;
   pollConn.send(null);
 }
