@@ -17,11 +17,11 @@ set grid xtics y2tics
 set y2label "Temperature in C"
 set ylabel "Humidity (%)"
 
-#FileLog 4:T\x3a|temperature:10:
-#FileLog 4:H\x3a|humidity:50:
+#FileLog 4:temperature:10:
+#FileLog 4:humidity:50:
 
 plot \
-  "< egrep 'T:|temperature' <IN>"\
+  "< egrep 'temperature' <IN>"\
          using 1:4 axes x1y2 title 'Measured temperature' with lines,\
-  "< egrep 'H:|temperature' <IN>"\
+  "< egrep 'humidity' <IN>"\
         using 1:4 axes x1y1 title 'Humidity (%)' with lines\
