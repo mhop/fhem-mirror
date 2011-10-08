@@ -6386,7 +6386,21 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         In this mode status update is refreshed more or less instantaneously,
         and state change (on/off only) is done without requesting a complete
         refresh from the server.
+        <br><br>
+        </li>
+
+    <a name="webCmd"></a>
+    <li>webCmd<br>
+        Colon separated list of commands to be shown in the room overview for a
+        certain device. Example:
+        <ul>
+          attr lamp webCmd on:off:on-for-timer 10
+        </ul>
+        On smallscreen devices only the first value is accessible.
+        </li>
+
     </ul>
+
 
   </ul>
 
