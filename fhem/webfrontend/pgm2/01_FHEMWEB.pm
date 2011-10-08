@@ -847,7 +847,7 @@ FW_showRoom()
       if(!$FW_ss) {
         pO "</td>";
         if($cmdlist) {
-          foreach my $cmd (split(" ", $cmdlist)) {
+          foreach my $cmd (split(":", $cmdlist)) {
             pH "cmd.$d=set $d $cmd$rf",  ReplaceEventMap($d,$cmd,1), 1, "col3";
           }
 
@@ -1807,13 +1807,13 @@ FW_devState($$)
   $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
 
   if($webCmd) {
-    my @a = split(" ", $webCmd);
+    my @a = split(":", $webCmd);
     $link = "cmd.$d=set $d $a[0]";
     $cmdlist = $webCmd;
 
   } elsif($hasOnOff) {
     $link = "cmd.$d=set $d ".($state eq "on" ? "off":"on");
-    $cmdlist = "on off";
+    $cmdlist = "on:off";
 
   }
 
