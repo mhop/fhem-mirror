@@ -2198,7 +2198,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>fhtbuf<br>
         CUL has a message buffer for the FHT. If the buffer is full, then newly
         issued commands will be dropped, if the attribute <a
-        href="#culfhtsoftbuffer">fhtsoftbuffer</a> is not set.
+        href="#fhtsoftbuffer">fhtsoftbuffer</a> is not set.
         Instead, a "EOB" message is issued.
         <code>fhtbuf</code> returns the free memory in this buffer (in hex),
         an empty buffer in the CUL-V2 is 74 bytes, in CUL-V3/CUN 200 Bytes.
@@ -2915,8 +2915,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>set switch1 &lt;value&gt;</code>
     <br><br>
-    where <code>value</code> is one of A0,AI,B0,BI,C0,CI,D0,DI and 
-    released, in fact we are trying to emulate a PTM100 type remote.
+    where <code>value</code> is one of A0,AI,B0,BI,C0,CI,D0,DI, combinations of
+    these and released, in fact we are trying to emulate a PTM100 type remote.
     <br>
 
     If you define an <a href="#eventMap">eventMap</a> attribute with on/off,
@@ -2933,7 +2933,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     Example:
     <ul><code>
       set switch1 BI<br>
-      set switch1 B0<br>
+      set switch1 B0,CI<br>
       attr eventMap BI:on B0:off<br>
       set switch1 on<br>
     </code></ul>
@@ -5956,8 +5956,9 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 <ul>
   The TCM module serves an USB or TCP/IP connected TCM120 or TCM310 EnOcean
   Transceiver module. These are mostly packaged together with a serial to USB
-  chip and an antenna, e.g. the BSC BOR contains the TCM120.  See also the
-  datasheet available from <a href="http://www.enocean.com">www.enocean.com</a>.
+  chip and an antenna, e.g. the BSC BOR contains the TCM120, the EUL from
+  busware contains a TCM310.  See also the datasheet available from <a
+  href="http://www.enocean.com">www.enocean.com</a>.
   <br>
   As the TCM120 and the TCM310 speak completely different protocols, this
   module implements 2 drivers in one. It is the "physical" part for the <a
