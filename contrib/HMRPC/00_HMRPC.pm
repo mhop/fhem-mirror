@@ -3,7 +3,7 @@
 # HomeMatic XMLRPC API Device Provider
 # Written by Oliver Wagner <owagner@vapor.com>
 #
-# V0.1
+# V0.3
 #
 ##############################################
 #
@@ -36,6 +36,7 @@ sub HMRPC_Initialize($)
 	$hash->{ShutdownFn} = "HMRPC_Shutdown";
 	$hash->{ReadFn} = "HMRPC_Read";
 	$hash->{SetFn} = "HMRPC_Set";
+	$hash->{GetFn} = "HMRPC_Get";
 	$hash->{Clients} = ":HMDEV:";
 }
 
@@ -230,5 +231,22 @@ HMRPC_Set($@)
 		return undef;
 	}
 }
+
+################################
+#
+#
+sub
+HMRPC_Get($@)
+{
+	my ($hash,@a) = @_;
+	return "argument missing, usage is <id> <attribute> @a" if(@a!=3);	
+	my $ret=$hash->{client}->simple_request("getValue",$a[1],$a[2]);
+	if(ref($ret))
+	{
+		return $ret->{faultCode}.": ".$ret->{faultString};		
+	}
+	return $ret;
+}
+
 
 1;
