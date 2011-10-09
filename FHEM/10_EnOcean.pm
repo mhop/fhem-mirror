@@ -67,23 +67,35 @@ EnOcean_Set($@)
 {
   my ($hash, @a) = @_;
   return "no set value specified" if(@a < 2);
-  return "there a no set commands with argument" if(@a > 2);
-
-  my $cmd = $a[1];
-  my $arg = $a[2];
-  my $cmdhash = $ptm200btn{$cmd};
-  return "Unknown argument $cmd, choose one of " .
-        join(" ", sort keys %ptm200btn) if(!defined($cmdhash));
 
   my $name = $hash->{NAME};
   my $ll2 = GetLogLevel($name, 2);
-  Log $ll2, "EnOcean: set $name $cmd";
 
-  my ($db_3, $status) = split(":", $cmdhash, 2);
-  IOWrite($hash, "",
-        sprintf("6B05%s000000%s%s", ($db_3<<5), $hash->{DEF}, $status));
+  shift @a;
+  for(my $i = 0; $i < @a; $i++) {
+    my $cmd = $a[$i];
+    my ($c1,$c2) = split(",", $cmd, 2);
+    return "Unknown argument $cmd, choose one of " .
+                                join(" ", sort keys %ptm200btn)
+          if(!defined($ptm200btn{$c1}) || ($c2 && !defined($ptm200btn{$c2})));
+    Log $ll2, "EnOcean: set $name $cmd";
+
+    my ($db_3, $status) = split(":", $ptm200btn{$c1}, 2);
+    $db_3 <<= 5;
+    $db_3 |= 0x10 if($c1 ne "released"); # set the pressed flag
+    if($c2) {
+      my ($d2, undef) = split(":", $ptm200btn{$c2}, 2);
+      $db_3 |= ($d2<<1) | 0x01;
+    }
+
+    IOWrite($hash, "",
+                sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
+
+    select(undef, undef, undef, 0.1) if($i < int(@a)-1);
+  }
 
   my $tn = TimeNow();
+  my $cmd = join(" ", @a);
   $hash->{CHANGED}[0] = $cmd;
   $hash->{STATE} = $cmd;
   $hash->{READINGS}{state}{TIME} = $tn;
@@ -134,8 +146,11 @@ EnOcean_Parse($$)
 
     if($nu) {
 
+      # Theoretically there can be a released event with some of the A0,BI
+      # pins set, but with the plastic cover on this wont happen.
       $msg  = $ptm200btn[($db_3&0xe0)>>5];
       $msg .= ",".$ptm200btn[($db_3&0x0e)>>1] if($db_3 & 1);
+      $msg .= " released" if(!($db_3 & 0x10));
 
     } else {
 
