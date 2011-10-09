@@ -26,7 +26,7 @@ EnOcean_Initialize($)
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-             "subType:switch,contact,sensor,windowHandle,SR04";
+             "subType:switch,contact,sensor,windowHandle,SR04,MD15";
 }
 
 my %rorgname = ("F6"=>"switch",     # RPS
@@ -35,6 +35,40 @@ my %rorgname = ("F6"=>"switch",     # RPS
                );
 my @ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %ptm200btn;
+my %manuf = (
+  "001" => "Peha",
+  "002" => "Thermokon",
+  "003" => "Servodan",
+  "004" => "EchoFlex Solutions",
+  "005" => "Omnio AG",
+  "006" => "Hardmeier electronics",
+  "007" => "Regulvar Inc",
+  "008" => "Ad Hoc Electronics",
+  "009" => "Distech Controls",
+  "00A" => "Kieback + Peter",
+  "00B" => "EnOcean GmbH",
+  "00C" => "Probare",
+  "00D" => "Eltako",
+  "00E" => "Leviton",
+  "00F" => "Honeywell",
+  "010" => "Spartan Peripheral Devices",
+  "011" => "Siemens",
+  "012" => "T-Mac",
+  "013" => "Reliable Controls Corporation",
+  "014" => "Elsner Elektronik GmbH",
+  "015" => "Diehl Controls",
+  "016" => "BSC Computer",
+  "017" => "S+S Regeltechnik GmbH",
+  "018" => "Masco Corporation",
+  "019" => "Intesis Software SL",
+  "01A" => "Res.",
+  "01B" => "Lutuo Technology",
+  "01C" => "CAN2GO",
+);
+
+my %subTypes = (
+  "A5.20.01" => "MD15",
+);
 
 #############################
 sub
@@ -61,7 +95,6 @@ EnOcean_Define($$)
 
 
 #############################
-# Simulate a PTM
 sub
 EnOcean_Set($@)
 {
@@ -69,27 +102,34 @@ EnOcean_Set($@)
   return "no set value specified" if(@a < 2);
 
   my $name = $hash->{NAME};
+  my $st = AttrVal($name, "subType", "");
   my $ll2 = GetLogLevel($name, 2);
 
   shift @a;
   for(my $i = 0; $i < @a; $i++) {
     my $cmd = $a[$i];
-    my ($c1,$c2) = split(",", $cmd, 2);
-    return "Unknown argument $cmd, choose one of " .
-                                join(" ", sort keys %ptm200btn)
-          if(!defined($ptm200btn{$c1}) || ($c2 && !defined($ptm200btn{$c2})));
-    Log $ll2, "EnOcean: set $name $cmd";
 
-    my ($db_3, $status) = split(":", $ptm200btn{$c1}, 2);
-    $db_3 <<= 5;
-    $db_3 |= 0x10 if($c1 ne "released"); # set the pressed flag
-    if($c2) {
-      my ($d2, undef) = split(":", $ptm200btn{$c2}, 2);
-      $db_3 |= ($d2<<1) | 0x01;
+    if($st eq "MD15") {
+
+    } else {                                          # Simulate a PTM
+      my ($c1,$c2) = split(",", $cmd, 2);
+      return "Unknown argument $cmd, choose one of " .
+                                  join(" ", sort keys %ptm200btn)
+            if(!defined($ptm200btn{$c1}) || ($c2 && !defined($ptm200btn{$c2})));
+      Log $ll2, "EnOcean: set $name $cmd";
+
+      my ($db_3, $status) = split(":", $ptm200btn{$c1}, 2);
+      $db_3 <<= 5;
+      $db_3 |= 0x10 if($c1 ne "released"); # set the pressed flag
+      if($c2) {
+        my ($d2, undef) = split(":", $ptm200btn{$c2}, 2);
+        $db_3 |= ($d2<<1) | 0x01;
+      }
+      IOWrite($hash, "",
+                sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
+
     }
 
-    IOWrite($hash, "",
-                sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
 
     select(undef, undef, undef, 0.1) if($i < int(@a)-1);
   }
@@ -181,13 +221,32 @@ EnOcean_Parse($$)
 
   #################################
   # 1BS. Only contact is defined in the EEP2.1 for 1BS
-  } elsif($rorg eq "D5") { 
+  } elsif($rorg eq "D5") {
     push @event, "3:state:" . ($db_3&1 ? "closed" : "open");
     push @event, "3:learnBtn:on" if(!($db_3&0x8));
 
   #################################
   } elsif($rorg eq "A5") {
-    if($st eq "SR04") {
+
+    if(($db_0 & 0x08) == 0) {
+      if($db_0 & 0x80) {
+        my $fn = sprintf "%02x", ($db_3>>2);
+        my $tp = sprintf "%02X", ((($db_3&3) << 5) | ($db_2 >> 3));
+        my $mf = sprintf "%03X", ((($db_2&7) << 8) | $db_1);
+        $mf = $manuf{$mf} if($manuf{$mf});
+        my $m = "teach-in:class A5.$fn.$tp (manufacturer: $mf)";
+        Log 1, $m;
+        push @event, "3:$m";
+        my $st = "A5.$fn.$tp";
+        $st = $subTypes{$st} if($subTypes{$st});
+        $attr{$name}{subType} = $st;
+
+      } else {
+        push @event, "3:teach-in:no type/manuf. data transmitted";
+
+      }
+
+    } elsif($st eq "SR04") {
       my ($fspeed, $temp, $present);
       $fspeed = 3;
       $fspeed = 2      if($db_3 >= 145);
@@ -204,6 +263,19 @@ EnOcean_Parse($$)
       push @event, "3:learnBtn:on" if(!($db_0&0x8));
       push @event, "3:T:$temp SP: $db_3 F: $fspeed P: $present";
 
+    } elsif($st eq "MD15") {
+      push @event, "3:state:$db_3 %";
+      push @event, "3:currentValue:$db_3";
+      push @event, "3:serviceOn:"    . (($db_2 & 0x80) ? "yes" : "no");
+      push @event, "3:energyInput:"  . (($db_2 & 0x40) ? "enabled":"disabled");
+      push @event, "3:energyStorage:". (($db_2 & 0x20) ? "charged":"empty");
+      push @event, "3:battery:"      . (($db_2 & 0x10) ? "ok" : "empty");
+      push @event, "3:cover:"        . (($db_2 & 0x08) ? "open" : "closed");
+      push @event, "3:tempSensor:"   . (($db_2 & 0x04) ? "failed" : "ok");
+      push @event, "3:window:"       . (($db_2 & 0x02) ? "open" : "closed");
+      push @event, "3:actuator:"     . (($db_2 & 0x01) ? "ok" : "obstructed");
+      push @event, "3:temperature:"  . sprintf "%.1f", ($db_1*40/255);
+      
     } else {
       push @event, "3:state:$db_3";
       push @event, "3:sensor1:$db_3";
