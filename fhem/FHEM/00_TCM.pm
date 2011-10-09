@@ -100,16 +100,17 @@ TCM_Write($$$)
     $bstring = "A55A".$bstring.TCM_CSUM($bstring);
 
   } else {      # 310 / ESP3
+
     if(!$fn) { # Radio Paket from the EnOcean Module
       $msg =~ m/^6B05(..)000000(........)(..)$/;
-      # FIXME
+      $fn = "00070701";
+      $msg = "F6$1$2${3}03FFFFFFFFFF00";
     }
-
     $bstring = sprintf("55%s%s%s%s",    # $fn == Header, $msg == DATA
         $fn, TCM_CRC8($fn), $msg, TCM_CRC8($msg));
 
   }
-    Log $ll5, "$hash->{NAME} sending $bstring";
+  Log $ll5, "$hash->{NAME} sending $bstring";
 
   DevIo_SimpleWrite($hash, $bstring);
 }
@@ -201,7 +202,7 @@ TCM_Read($)
 
       # Receive Radio Telegram (RRT)
       if($net =~ m/^0B(..)(........)(........)(..)/) {
-        my ($org, $d1,$id,$status) = ($1, $2);
+        my ($org, $d1,$id,$status) = ($1, $2, $3, $4);
 
         # Re-translate the ORG to RadioORG / TCM310 equivalent
         my %orgmap = ("05"=>"F6", "06"=>"D5", "07"=>"A5", );
@@ -265,11 +266,22 @@ TCM_Read($)
 
         Dispatch($hash, "EnOcean:$org:$d1:$id:$status:$odata", \%addvals);
 
+      } elsif($t eq "02") {
+        my $rc = substr($mdata, 0, 2);
+        my %codes = (
+          "00"=>"RET_OK",
+          "01"=>"RET_ERROR",
+          "02"=>"RET_NOT_SUPPORTED",
+          "03"=>"RET_WRONG_PARAM",
+          "04"=>"RET_OPERATION_DENIED",
+        );
+        $rc = $codes{$rc} if($codes{$rc});
+        Log $ll2, "$name: RESPONSE: $rc" ;
+
       } else {
         Log $ll2, "$name: unknown packet type $t: $data" ;
 
       }
-
 
     } else {
       if(length($data) >= 4) {
