@@ -2,7 +2,7 @@
 # HMRPC Device Handler
 # Written by Oliver Wagner <owagner@vapor.com>
 #
-# V0.2
+# V0.3
 #
 ##############################################
 #
@@ -23,6 +23,7 @@ HMDEV_Initialize($)
   $hash->{DefFn}     = "HMDEV_Define";
   $hash->{ParseFn}   = "HMDEV_Parse";
   $hash->{SetFn}     = "HMDEV_Set";
+  $hash->{GetFn}     = "HMDEV_Get";
   $hash->{AttrList}  = "IODev do_not_notify:0,1";
 }
 
@@ -73,10 +74,10 @@ HMDEV_Parse($$)
   $hash->{READINGS}{$mp[2]}{TIME}=TimeNow();
   # Note that we always trigger a change on PRESS_LONG/PRESS_SHORT events
   # (they are sent whenever a button is presed, and there is no change back)
-  if(!$currentval || ($currentval ne $mp[3]) || ($currentval =~ m/^PRESS_/))
+  if(!defined $currentval || ($currentval ne $mp[3]) || ($currentval =~ m/^PRESS_/))
   {
-  	push @changed, "$mp[2]: $mp[3]";
-  	$hash->{READINGS}{$mp[2]}{VAL}=$mp[3];
+	push @changed, "$mp[2]: $mp[3]";
+	$hash->{READINGS}{$mp[2]}{VAL}=$mp[3];
   }
   $hash->{CHANGED}=\@changed;
   
@@ -90,7 +91,7 @@ HMDEV_Set($@)
 	my ($hash, @a) = @_;
 
 	return "invalid set call @a" if(@a != 3 && @a != 4);
-	# We delegate this call to the IODev, after having added the device address
+	# We delegate this call to the HMRPC IODev, after having added the device address
 	if(@a==4)
 	{
 		return HMRPC_Set($hash->{IODev},$hash->{IODev}->{NAME},$hash->{hmaddr},$a[1],$a[2],$a[3]);
@@ -101,5 +102,14 @@ HMDEV_Set($@)
 	}
 }
 
+################################
+sub
+HMDEV_Get($@)
+{
+	my ($hash, @a) = @_;
+	return "argument missing, usage is <attribute> @a" if(@a!=2);
+	# Like set, we simply delegate to the HMPRC IODev here
+	return HMRPC_Get($hash->{IODev},$hash->{IODev}->{NAME},$hash->{hmaddr},$a[1]);
+}
 
 1;
