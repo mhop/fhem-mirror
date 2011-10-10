@@ -2,7 +2,7 @@ HMRPC - xmlrpc-basierte Homematic-Integration fuer fhem
 =======================================================
 Von Oliver Wagner <owagner@vapor.com>
 
-V0.3
+V0.4
 
 Uebersicht
 ----------
@@ -115,8 +115,8 @@ Problem auf der Service-Seite darzustellen.
 Aenderungen
 -----------
 V0.3 - get-Methoden implementiert, als Aufruf von XML-RPC getValue()
-     - bei Boolean-Werten wurde bei false bei jedem Empfang faelschlicherweise
-       eine Notification ausgeloest
+     - bei Boolean-Werten wurde bei false bei jedem event-Empfang 
+       faelschlicherweise eine Notification ausgeloest
 
 
 Anhang
