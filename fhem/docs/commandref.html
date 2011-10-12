@@ -82,6 +82,7 @@
       <a href="#CUL_FHTTK">CUL_FHTTK</a> &nbsp;
       <a href="#CUL_HM">CUL_HM</a> &nbsp;
       <a href="#CUL_HOERMANN">CUL_HOERMANN</a> &nbsp;
+      <a href="#CUL_IR">CUL_IR</a> &nbsp;
       <a href="#CUL_RFR">CUL_RFR</a> &nbsp;
       <a href="#CUL_TX">CUL_TX</a> &nbsp;
       <a href="#CUL_WS">CUL_WS</a> &nbsp;
@@ -360,7 +361,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
         can appear in more than one room, in this case the rooms have to be
         specified komma separated.<br>
-	Devices in the room hidden will not appear in the web output, or set
+        Devices in the room hidden will not appear in the web output, or set
         the <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
         rooms for certain FHEMWEB instances.
         </li>
@@ -370,7 +371,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Used in the webfrontend pgm2 to show the time of last activity
         instead of the state in the summary view. Useful e.g. for FS20 PIRI
         devices.
-	</li>
+    </li>
   </ul>
   <br>
 
@@ -787,7 +788,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   Note:
   <ul>
     <li>The statefile uses another version of this command, don't be surprised.
-	</li>
+    </li>
   </ul>
 </ul>
 
@@ -902,7 +903,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Contains the name of the fhem configuration file. If <a
         href="#save">save</a> is called without argument, then the output will
         be written to this file.
-	</li><br>
+    </li><br>
 
     <a name="holiday2we"></a>
     <li>holday2we<br>
@@ -913,7 +914,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         <ul>
           attr global holiday2we hessen
         </ul>
-	</li><br>
+    </li><br>
 
     <a name="lastinclude"></a>
     <li>lastinclude<br>
@@ -989,14 +990,14 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="title"></a>
     <li>title<br>
         Used by the web frontend fhemweb.pl (webpgm2) as a Page title.
-	</li><br>
+    </li><br>
 
     <a name="userattr"></a>
     <li>userattr<br>
         A space separated list which contains the names of additional
         attributes. Without specifying them you will not be able to set them
         (in order to prevent typos).
-	</li><br>
+    </li><br>
 
     <a name="verbose"></a>
     <li>verbose<br>
@@ -1086,10 +1087,10 @@ A line ending with \ will be concatenated with the next one, so long lines
           See message byte streams in FHEM/00_FHZ.pm and the doc directory for some examples.</li>
       <li>In order to set the time of your FHT's, schedule this command every
       minute:<br>
-	  <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
-	  See the <a href="#loglevel">loglevel</a> to prevent logging of
+      <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
+      See the <a href="#loglevel">loglevel</a> to prevent logging of
           this command.
-	  </li>
+      </li>
       <li>FHTcode is a two digit hex number (from 00 to 63?) and sets the
           central FHT code, which is used by the FHT devices. After changing
           it, you <b>must</b> reprogram each FHT80b with: PROG (until Sond
@@ -1165,8 +1166,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <a name="do_not_notify"></a>
     <li>do_not_notify<br>
-	Disable FileLog/notify/inform notification for a device. This affects
-	the received signal, the set and trigger commands.</li><br>
+    Disable FileLog/notify/inform notification for a device. This affects
+    the received signal, the set and trigger commands.</li><br>
 
     <li><a href="#attrdummy">dummy</a></li><br>
 
@@ -1174,11 +1175,11 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="loglevel"></a>
     <li>loglevel<br>
-	Set the device loglevel to e.g. 6 if you do not wish messages from a
-	given device to appear in the global logfile (FHZ/FS20/FHT).  E.g. to
-	set the FHT time, you should schedule "set FHZ time" every minute, but
-	this in turn makes your logfile unreadable.  These messages will not be
-	generated if the FHZ attribute loglevel is set to 6.</li><br>
+    Set the device loglevel to e.g. 6 if you do not wish messages from a
+    given device to appear in the global logfile (FHZ/FS20/FHT).  E.g. to
+    set the FHT time, you should schedule "set FHZ time" every minute, but
+    this in turn makes your logfile unreadable.  These messages will not be
+    generated if the FHZ attribute loglevel is set to 6.</li><br>
 
     <li><a href="#model">model</a> (fhz1000,fhz1300)</li><br>
 
@@ -1284,33 +1285,33 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>Use reset with care: the device forgets even the housecode.
       </li>
       <li>As the FS20 protocol needs about 0.22 seconds to transmit a
-	  sequence, a pause of 0.22 seconds is inserted after each command.
-	  </li>
+      sequence, a pause of 0.22 seconds is inserted after each command.
+      </li>
       <li>The FS20ST switches on for dim*%, dimup. It does not respond to
           sendstate.</li>
       <li>If the timer is set (i.e. it is not 0) then on, dim*,
           and *-for-timer will take it into account (at least by the FS20ST).
-	  </li>
+      </li>
       <li>The <code>time</code> argument ranges from 0.25sec to 4 hours and
           16 minutes.
-	  As the time is encoded in one byte there are only 112 distinct
-	  values, the resolution gets coarse with larger values. The program
-	  will report the used timeout if the specified one cannot be set
-	  exactly.  The resolution is 0.25 sec from 0 to 4 sec, 0.5 sec from 4
-	  to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
+      As the time is encoded in one byte there are only 112 distinct
+      values, the resolution gets coarse with larger values. The program
+      will report the used timeout if the specified one cannot be set
+      exactly.  The resolution is 0.25 sec from 0 to 4 sec, 0.5 sec from 4
+      to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
           precision for large values, use <a href="#at">at</a> which has a 1
           sec resolution.</li>
       <li>If the attribute follow-on-for-timer is set for the device and the
           on-for-timer command is sent to the device with a time parameter,
           the program automatically schedules a "setstate off" for the
-	  specified time.</li>
+      specified time.</li>
       <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
-	  or { &lt;perl code&gt; }, where the perl-code returns a time
+      or { &lt;perl code&gt; }, where the perl-code returns a time
           specification).
-	  If the current time is greater than the specified time, then the
-	  command is ignored, else an "on" command is generated, and for the
-	  given "till-time" an off command is scheduleld via the at command.
-	  </li>
+      If the current time is greater than the specified time, then the
+      command is ignored, else an "on" command is generated, and for the
+      given "till-time" an off command is scheduleld via the at command.
+      </li>
     </ul>
   </ul>
   <br>
@@ -1347,18 +1348,18 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <a name="attrdummy"></a>
     <li>dummy<br>
-	Set the device attribute dummy to define devices which should not
-	output any radio signals. Associated notifys will be executed if
-	the signal is received. Used e.g. to react to a code from a sender, but
-	it will not emit radio signal if triggered in the web frontend.
-	</li><br>
+    Set the device attribute dummy to define devices which should not
+    output any radio signals. Associated notifys will be executed if
+    the signal is received. Used e.g. to react to a code from a sender, but
+    it will not emit radio signal if triggered in the web frontend.
+    </li><br>
 
     <a name="follow-on-for-timer"></a>
     <li>follow-on-for-timer<br>
-	the program automatically schedules a "setstate off" for the time
-	specified as argument to the on-for-timer command (for the specified
-	device only).
-	</li><br>
+    the program automatically schedules a "setstate off" for the time
+    specified as argument to the on-for-timer command (for the specified
+    device only).
+    </li><br>
 
     <li><a href="#loglevel">loglevel</a></li><br>
 
@@ -1387,7 +1388,7 @@ A line ending with \ will be concatenated with the next one, so long lines
           <b>Receiver/Actor</b>: fs20as1 fs20as4 fs20ms2 fs20rgbsa fs20rst
           fs20rsu fs20sa fs20sig fs20sm4 fs20sm8 fs20st fs20su fs20sv fs20ue1
           fs20usr fs20ws1
-	</li><br>
+    </li><br>
 
 
     <a name="ignore"></a>
@@ -1559,14 +1560,14 @@ A line ending with \ will be concatenated with the next one, so long lines
           <br>
 
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
-	  spec as argument in the HH:MM format. They define the periods, where
-	  the day-temp is valid. The minute (MM) will be rounded to 10, and
-	  24:00 means off.
+      spec as argument in the HH:MM format. They define the periods, where
+      the day-temp is valid. The minute (MM) will be rounded to 10, and
+      24:00 means off.
           <br><br>
 
       <li>To synchronize the FHT time and to "wake" muted FHTs it is adviseable
           to schedule following command:<br>
-	  <code>define fht_sync at  +*3:30 set TYPE=FHT time</code>
+      <code>define fht_sync at  +*3:30 set TYPE=FHT time</code>
           <br><br>
 
       <li><code>report1</code> with parameter 255 requests all settings for
@@ -1950,14 +1951,14 @@ A line ending with \ will be concatenated with the next one, so long lines
       type of HMS device. First the real device-id will be checked, then the
       wildcard device id. The wildcards are:
       <ul>
-	<li>1000 for the HMS100-TF</li>
-	<li>1001 for the HMS100-T</li>
-	<li>1002 for the HMS100-WD</li>
-	<li>1003 for the RM100-2</li>
-	<li>1004 for the HMS100-TFK/li>
-	<li>1006 for the HMS100-MG</li>
-	<li>1008 for the HMS100-CO</li>
-	<li>100e for the HMS100-FIT</li>
+    <li>1000 for the HMS100-TF</li>
+    <li>1001 for the HMS100-T</li>
+    <li>1002 for the HMS100-WD</li>
+    <li>1003 for the RM100-2</li>
+    <li>1004 for the HMS100-TFK/li>
+    <li>1006 for the HMS100-MG</li>
+    <li>1008 for the HMS100-CO</li>
+    <li>100e for the HMS100-FIT</li>
       </ul>
       </li>
 
@@ -2415,6 +2416,123 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+
+<a name="CUL_IR"></a>
+<h3>CUL_IR</h3>
+<ul>
+
+  <table>
+  <tr><td>
+  The CUL_IR module interprets Infrared messages received by the CUN/CUNO/CUNOv2/TuxRadio.
+  Those devices can receive Infrared Signals from basically any Remote controller and will transform
+  that information in a so called Button-Code  <br><br>
+
+
+  <a name="CUL_IRdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_IR &lt;<a href="#IODev">IODev</a>&gt;</code> <br>
+    <br>
+    &lt;<a href="#IODev">IODev</a>&gt; is the devicename of the IR-receivung device, e.g. CUL1.<br><br>
+
+    Your definition should look like E.g.:
+    <pre>
+    define IR-Rec CUL_IR CUNO1</pre>
+  </ul>
+
+  <a name="CUL_IRset"></a>
+  <b>Set</b>
+  <ul>
+    <a name="irLearnForSec"></a>
+    <li>irLearnForSec<br>
+       Sets the CUL_IR device in an IR-Code Learning mode for the given seconds. Any received IR-Code will 
+       be stored as a Button attribute for this devices. The name of these attributes is dependent on the two 
+       attributes <a href="#CUL_IRattr">learncount</a> and <a href="#CUL_IRattr">learnprefix</a>.<br>
+       Attention: Before learning IR-Codes the CUL_IR device needs to be set in IR-Receiving mode
+       by modifying the <a href="#irReceive">irReceive</a> attribute.
+       </li>
+  </ul>
+
+  <a name="CUL_IRget"></a>
+  <b>Get</b>
+  <ul>N/A</ul>
+
+  <a name="CUL_IRattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#irReceive">irReceive</a><br>
+        Configure the IR Transceiver of the &lt;<a href="#IODev">IODev</a>&gt; (the CUNO1). Available
+        arguments are:
+        <ul>
+        <li>OFF<br>
+            Switching off the reception of IR signals. This is the default.
+
+        <li>ON<br>
+            Switching on the reception of IR signals. This is WITHOUT filtering repetitions. This is 
+            not recommended as many remote controls do repeat their signals.
+
+        <li>ON_NR<br>
+            Switching on the reception of IR signals with filtering of repetitions. This is 
+            the recommended modus operandi.
+        </ul>
+    </li><br>
+
+    <li><a href="#Button.*">Button.*</a><br>
+        Button.* is the wildcard for all learnt IR-Codes. IR-Codes are learnt as Button-Attributes.
+        The name for a learnt Button - IR-Code is compiled out of three elements:<br>
+        <pre>
+        Button&lt;learnprefix&gt;&lt;learncount&gt;
+        </pre>
+        When the CUL_IR device is set into <a href="#irLearnForSec">learning mode</a> it will generate a 
+        new button-attribute for each new IR-Code received.This is done according to the following syntax:<br>
+        <pre>
+        &lt;Button-Attribute-Name&gt; &lt;IR-Code&gt;</pre>
+        Examples of learnt button-attributes with EMPTY &lt;learnprefix&gt; and &lt;learncount&gt; starting from 1:<br>
+        <pre>
+        Button001   I02029A000000
+        Button002   I02029A000001</pre>
+        To make sure that something happens when this IR-code is received later on one has to modify the attribute 
+        and to add commands as attribute values.
+        Examples:
+        <pre>
+        Button001   I02029A000000   set WZ_Lamp on
+        Button002   I02029A000001   set Switch on</pre>
+        The syntax for this is:
+        <pre>
+        attr &lt;device-name&gt; &lt;attribute-name&gt; &lt;IR-Code&gt; &lt;command&gt;
+        </pre>
+    </li>
+    <li><a href="#Group.*">Group.*</a><br>
+        Group.* is the wildcard for IR-Code groups. With these attributes one can define
+        IR-Code parts, which may match to several Button-IR-Codes.<br>
+        This is done by defining group-attributes that contain only parts of the IR-Code.
+        The syntax is:
+        <pre>
+        &lt;Group-Attribute-Name&gt; &lt;IR-Code&gt;</pre>
+        Examples of a group-attribute is:<br>
+        <pre>
+        Group001   I02029A</pre>
+        With this all IR-Codes starting with I02029A will match the Group001.
+    </li><br>
+    <li><a href="#learncount">learncount</a><br>
+        learncount is used to store the next button-code-number that needs to be learned.
+        By manually modifying this attribute new button sequences can be arranged.
+    </li><br>
+    <li><a href="#learnprefix">learnprefix</a><br>
+        learnprefix is a string which will be added to the button-attribute-name. <br>
+        A button-attribute-name is constructed by:
+        <pre>
+        Button&lt;learnprefix&gt;&lt;learncount&gt;    </pre>
+        If learnprefix is empty the button-attribute-name only contains the term
+        "Button" and the actual number of <a href="#learncount">learncount</a>.
+    </li><br> 
   </ul>
   <br>
 </ul>
@@ -3785,20 +3903,20 @@ A line ending with \ will be concatenated with the next one, so long lines
     Valid readings and their meaning (? can be one of 0, 1, 2, 3 and stands
     for today, tomorrow, ...):<br>
     <table>
-	<tr><td>city</td><td>name of town returned for location</td></tr>
-	<tr><td>condition</td><td>current condition, one of Sunny, Clear, Partly Cloudy, Mostly Cloudy, Overcast, Chance of Rain</td></tr>
-	<tr><td>current_date_time</td><td>last update of forecast on server</td></tr>
-	<tr><td>fc?_condition</td><td>forecast condition</td></tr>
-	<tr><td>fc?_day_of_week</td><td>day of week for day +?</td></tr>
-	<tr><td>fc?_high_c</td><td>forecasted daily high in degrees centigrade</td></tr>
-	<tr><td>fc?_icon</td><td>relative path for forecast icon, prefix with <code>http://www.google.com</code> to form a valid URL for display in web interfaces</td></tr>
-	<tr><td>fc?_low_c</td><td>forecasted daily low in degrees centigrade</td></tr>
-	<tr><td>humidity</td><td>current humidity</td></tr>
-	<tr><td>icon</td><td>relative path for current icon</td></tr>
-	<tr><td>postal_code</td><td>location sent to server</td></tr>
-	<tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
-	<tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
-	<tr><td>wind_condition</td><td>wind direction and speed</td></tr>
+    <tr><td>city</td><td>name of town returned for location</td></tr>
+    <tr><td>condition</td><td>current condition, one of Sunny, Clear, Partly Cloudy, Mostly Cloudy, Overcast, Chance of Rain</td></tr>
+    <tr><td>current_date_time</td><td>last update of forecast on server</td></tr>
+    <tr><td>fc?_condition</td><td>forecast condition</td></tr>
+    <tr><td>fc?_day_of_week</td><td>day of week for day +?</td></tr>
+    <tr><td>fc?_high_c</td><td>forecasted daily high in degrees centigrade</td></tr>
+    <tr><td>fc?_icon</td><td>relative path for forecast icon, prefix with <code>http://www.google.com</code> to form a valid URL for display in web interfaces</td></tr>
+    <tr><td>fc?_low_c</td><td>forecasted daily low in degrees centigrade</td></tr>
+    <tr><td>humidity</td><td>current humidity</td></tr>
+    <tr><td>icon</td><td>relative path for current icon</td></tr>
+    <tr><td>postal_code</td><td>location sent to server</td></tr>
+    <tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
+    <tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
+    <tr><td>wind_condition</td><td>wind direction and speed</td></tr>
     </table>
 
   </ul>
@@ -3836,8 +3954,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     position of the sensor. The following geometries are currently
     supported:<br><br>
     <ul>
-    	<li><code>cub &lt;length&gt; &lt;width&gt; &lt;height&gt; &lt;offset&gt;</code></li>
-    	<li><code>cylv &lt;diameter&gt; &lt;height&gt; &lt;offset&gt;</code></li>
+        <li><code>cub &lt;length&gt; &lt;width&gt; &lt;height&gt; &lt;offset&gt;</code></li>
+        <li><code>cylv &lt;diameter&gt; &lt;height&gt; &lt;offset&gt;</code></li>
     </ul>
     <br>
     <code>cub</code> stands for a cuboid whose base is &lt;length&gt; &times; &lt;width&gt;.
@@ -3991,8 +4109,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     <ul>
       <code>define AUSSEN.wetterstation VantagePro2 192.168.8.127 4999 60</code><br>
       <code>
-	fhem> list AUSSEN.wetterstation<br>
-	Internals:<br>
+    fhem> list AUSSEN.wetterstation<br>
+    Internals:<br>
    DEF        192.168.8.127 4999 60<br>
    Host       192.168.8.127<br>
    NAME       AUSSEN.wetterstation<br>
@@ -4918,7 +5036,7 @@ BTHR918, BTHR918N, PCR800 RGR918, RTGR328N, THN132N, THGR228N, THGR328N, THGR918
 The one byte hex string is generated by the Oregon sensor when is it powered on. The value seems to be randomly generated. This has the advantage that you may use more than one Oregon sensor of the same type even if it has no switch to set a sensor id. For exampple the author uses three BTHR918 sensors at the same time. All have different deviceids. The drawback is that the deviceid changes after changing batteries.
     <br><br>
       Example: <br>
-	<code>define Kaminzimmer OREGON BTHR918N_ab</code>
+    <code>define Kaminzimmer OREGON BTHR918N_ab</code>
       <br>
   </ul>
   <br>
@@ -5224,7 +5342,7 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
       For example /dev/ttyUSB0.<br>
       <br>
       Example: <br>
-	<code>define RFXCOMUSB RFXCOM /dev/ttyUSB0</code>
+    <code>define RFXCOMUSB RFXCOM /dev/ttyUSB0</code>
       <br>
      </ul>
     <br>
@@ -5238,9 +5356,9 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
       <br>
       <br>
       Example: <br>
-	<code>define RFXCOMTCP RFXCOM 192.168.1.5:10001
-	<br>
-	<code>define RFXCOMTCP2 RFXCOM 192.168.1.121:10001 noinit
+    <code>define RFXCOMTCP RFXCOM 192.168.1.5:10001
+    <br>
+    <code>define RFXCOMTCP2 RFXCOM 192.168.1.121:10001 noinit
       <br>
     </ul>
     <br>
@@ -5267,11 +5385,11 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
     &lt;unitname&gt; is an optional string that describes the value units. It is added to the Reading generated to describe the values.
     <br><br>
       Example: <br>
-	<code>define RFXWater RFXMETER 00 0.5 ltr</code>
+    <code>define RFXWater RFXMETER 00 0.5 ltr</code>
       <br>
-	<code>define RFXPower RFXMETER 01 0.001 kwh</code>
+    <code>define RFXPower RFXMETER 01 0.001 kwh</code>
       <br>
-	<code>define RFXGas RFXMETER 02 0.01 cu_m</code>
+    <code>define RFXGas RFXMETER 02 0.01 cu_m</code>
       <br>
   </ul>
   <br>
@@ -5299,49 +5417,49 @@ The one byte hex string is generated by the Oregon sensor when is it powered on.
     <code>&lt;type&gt;</code>
     <ul>
       specifies the type of the X10 device: <br>
-	X10 security devices:
+    X10 security devices:
         <ul>
-    	  <li> <code>ds10a</code> (X10 security ds10a Door/Window Sensor or compatible devices. This device type reports the status of the switch [Open/Closed], status of the delay switch [min|max]], and battery status [ok|low].)</li>
-    	  <li> <code>ms10a</code> (X10 security ms10a motion sensor. This device type reports the status of motion sensor  [normal|alert] and battery status [ok|low].))</li>
-    	  <li> <code>sd90</code> (Marmitek sd90 smoke detector. This device type reports the status of the smoke detector [normal|alert] and battery status [ok|low].)</li>
-    	  <li> <code>kr18</code> (X10 security remote control. Report the Reading "Security" with values [Arm|Disarm], "ButtonA" and "ButtonB" with values [on|off] )</li>
+          <li> <code>ds10a</code> (X10 security ds10a Door/Window Sensor or compatible devices. This device type reports the status of the switch [Open/Closed], status of the delay switch [min|max]], and battery status [ok|low].)</li>
+          <li> <code>ms10a</code> (X10 security ms10a motion sensor. This device type reports the status of motion sensor  [normal|alert] and battery status [ok|low].))</li>
+          <li> <code>sd90</code> (Marmitek sd90 smoke detector. This device type reports the status of the smoke detector [normal|alert] and battery status [ok|low].)</li>
+          <li> <code>kr18</code> (X10 security remote control. Report the Reading "Security" with values [Arm|Disarm], "ButtonA" and "ButtonB" with values [on|off] )</li>
         </ul>
-	X10 lightning devices:
+    X10 lightning devices:
         <ul>
-    	  <li> <code>ms14a</code> (X10 motion sensor. Reports [normal|alert] on the first deviceid (motion sensor) and [on|off] for the second deviceid (light sensor)) </li>
-    	  <li> <code>x10</code> (All other x10 devices. Report [on|off] on both deviceids.)</li>
+          <li> <code>ms14a</code> (X10 motion sensor. Reports [normal|alert] on the first deviceid (motion sensor) and [on|off] for the second deviceid (light sensor)) </li>
+          <li> <code>x10</code> (All other x10 devices. Report [on|off] on both deviceids.)</li>
         </ul>
     </ul>
     <br>
     <code>&lt;deviceid&gt;</code>
     <ul>
-	specifies the first device id of the device. X10 security have a a 16-Bit device id which has to be written as a hex-string (example "5a54").
-	A X10 lightning device has a house code A..P followed by a unitcode 1..16 (example "B1").
+    specifies the first device id of the device. X10 security have a a 16-Bit device id which has to be written as a hex-string (example "5a54").
+    A X10 lightning device has a house code A..P followed by a unitcode 1..16 (example "B1").
     </ul>
     <br>
     <code>&lt;devicelog&gt;</code>
     <ul>
-	is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "Smoke" for sd90.
+    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "Smoke" for sd90.
     </ul>
     <br>
     <code>&lt;deviceid2&gt;</code>
     <ul>
-	is optional and specifies the second device id of the device if it exists. For example sd90 smoke sensors can be configured to report two device ids. ms14a motion sensors report motion status on the first deviceid and the status of the light sensor on the second deviceid.
+    is optional and specifies the second device id of the device if it exists. For example sd90 smoke sensors can be configured to report two device ids. ms14a motion sensors report motion status on the first deviceid and the status of the light sensor on the second deviceid.
     </ul>
     <br>
     <code>&lt;devicelog2&gt;</code>
     <ul>
-	is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
     </ul>
     <br>
       Example: <br>
-	<code>define livingroom_window RFXX10REC ds10a 72cd Window</code>
+    <code>define livingroom_window RFXX10REC ds10a 72cd Window</code>
       <br>
-	<code>define motion_sensor1 RFXX10REC ms10a 55c6 motion</code>
+    <code>define motion_sensor1 RFXX10REC ms10a 55c6 motion</code>
       <br>
-	<code>define smoke_sensor1 RFXX10REC sd90 54d3 Smoke 54d3 Smoketest</code>
+    <code>define smoke_sensor1 RFXX10REC sd90 54d3 Smoke 54d3 Smoketest</code>
       <br>
-	<code>define motion_sensor2 RFXX10REC ms14a A1 motion A2 light</code>
+    <code>define motion_sensor2 RFXX10REC ms14a A1 motion A2 light</code>
       <br>
   </ul>
   <br>
@@ -5757,12 +5875,12 @@ Terminating
     <ul>
       <li>As an external program is used, a noticeable delay may occur.</li>
       <li>*-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
-	  or { &lt;perl code&gt; }, where the perl-code returns a time
+      or { &lt;perl code&gt; }, where the perl-code returns a time
           specification).
-	  If the current time is greater than the specified time, then the
-	  command is ignored, else an "on" or "off" command, respectively, is
+      If the current time is greater than the specified time, then the
+      command is ignored, else an "on" or "off" command, respectively, is
           generated, and for the given time an "off"/"on" command is
-	  scheduleld via the at command.</li>
+      scheduleld via the at command.</li>
     </ul>
   </ul>
   <br>
@@ -5775,11 +5893,11 @@ Terminating
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <a name="attrdummy"></a>
     <li>dummy<br>
-	Set the device attribute dummy to define devices which should not
-	output any signals. Associated notifys will be executed if the signal
-	is received. Used e.g. to react to a code from a sender, but it will
-	not actually switch if triggered in the web frontend.
-	</li><br>
+    Set the device attribute dummy to define devices which should not
+    output any signals. Associated notifys will be executed if the signal
+    is received. Used e.g. to react to a code from a sender, but it will
+    not actually switch if triggered in the web frontend.
+    </li><br>
 
     <li><a href="#loglevel">loglevel</a></li><br>
   </ul>
@@ -5807,7 +5925,7 @@ Terminating
     contain any option to configure this device.
     <br><br><b>Note:</b> You should give your sensors a name within the web interface, once they a received the first time.
     <br>To extract a single sensor simply match for this name or sensor id<br>
-	<br>
+    <br>
 
     Attributes:
     <ul>
@@ -6513,13 +6631,13 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <a name="disable"></a>
     <li>disable<br>
         Can be applied to at/watchdog/notify/FileLog devices.<br>
-	Disables the corresponding at/notify or FileLog device. Note:
+    Disables the corresponding at/notify or FileLog device. Note:
         If applied to an <a href="#at">at</a>, the command will not be executed,
         but the next time will be computed.</li><br>
 
     <a name="skip_next"></a>
     <li>skip_next<br>
-	Used for at commands: skip the execution of the command the next
+    Used for at commands: skip the execution of the command the next
         time.</li><br>
   </ul>
   <br>
@@ -7007,16 +7125,16 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     contains the last event for any given reading and device.
     The columns have the following meaning:
     <ol>
-	<li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
-	<li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
-	<li>TYPE: device type, e.g. <code>KS300</code></li>
-	<li>EVENT: event specification as full string,
-                                    	e.g. <code>humidity: 71 (%)</code></li>
-	<li>READING: name of reading extracted from event,
-					e.g. <code>humidity</code></li>
-	<li>VALUE: actual reading extracted from event,
-					e.g. <code>71</code></li>
-	<li>UNIT: unit extracted from event, e.g. <code>%</code></li>
+    <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
+    <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
+    <li>TYPE: device type, e.g. <code>KS300</code></li>
+    <li>EVENT: event specification as full string,
+                                        e.g. <code>humidity: 71 (%)</code></li>
+    <li>READING: name of reading extracted from event,
+                    e.g. <code>humidity</code></li>
+    <li>VALUE: actual reading extracted from event,
+                    e.g. <code>71</code></li>
+    <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
     </ol>
     The content of VALUE is optimized for automated post-processing, e.g.
     <code>yes</code> is translated to <code>1</code>.
@@ -7029,8 +7147,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <br><br>
     Examples:
     <ul>
-    	<code># log everything to database</code><br>
-    	<code>define logdb DbLog /etc/fhem/db.conf .*:.*</code>
+        <code># log everything to database</code><br>
+        <code>define logdb DbLog /etc/fhem/db.conf .*:.*</code>
     </ul>
   </ul>
 
@@ -7079,7 +7197,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <ul>
       <code>define lamplog FileLog /var/tmp/lamp.log lamp</code><br>
       <code>define wzlog FileLog /var/tmp/wz-%Y-%U.log
-      		wz:(measured-temp|actuator).*</code><br>
+              wz:(measured-temp|actuator).*</code><br>
     </ul>
     <br>
   </ul>
@@ -7165,7 +7283,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <a name="archivecmd"></a>
     <a name="nrarchive"></a>
     <li>archivecmd / archivedir / nrarchive<br>
-	When a new FileLog file is opened, the FileLog archiver wil be called.
+    When a new FileLog file is opened, the FileLog archiver wil be called.
         This happens only, if the name of the logfile has changed (due to
         time-specific wildcards, see the <a href="#FileLog">FileLog</a>
         section), and there is a new entry to be written into the file.
@@ -7333,18 +7451,18 @@ isday</pre>
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; FHEMRENDERER [global]</code>
-	    <br><br>
+        <br><br>
         This defines a new "device", that is of type FHEMRENDERER. The option 'global' can be used if needed for sorting reasons.
         Otherwise this option has no real meaning for FHEMRENDERER.<br>
         <br>
         As a side-effect of defining this "device" the following attributes will be set for this "device":<br>
-		&nbsp;&nbsp;plotmode		gnuplot	<br>
-		&nbsp;&nbsp;plotsize		800,200 <br>
-		&nbsp;&nbsp;refresh			00:10:00 <br>
-		&nbsp;&nbsp;room			Unsorted <br>
-		&nbsp;&nbsp;status			off <br>
-		&nbsp;&nbsp;tmpfile			/tmp/ <br>
-		&nbsp;&nbsp;multiprocess	off <br>
+        &nbsp;&nbsp;plotmode        gnuplot    <br>
+        &nbsp;&nbsp;plotsize        800,200 <br>
+        &nbsp;&nbsp;refresh            00:10:00 <br>
+        &nbsp;&nbsp;room            Unsorted <br>
+        &nbsp;&nbsp;status            off <br>
+        &nbsp;&nbsp;tmpfile            /tmp/ <br>
+        &nbsp;&nbsp;multiprocess    off <br>
 <br>
         NOTE: The Logfile will report (with LogLevel 2) that the FHEMRENDERER has been defined.
 
@@ -7356,9 +7474,9 @@ isday</pre>
   <ul>
     <code>set &lt;name&gt; &lt;value&gt</code><br>
     Set either on or off.<br>
-	<br>
-	This switches the timer-based rendering on/off. The attribute 'status' will be modified accordingly.<br>
-	NOTE: only WebLink based graphics will be rendered.
+    <br>
+    This switches the timer-based rendering on/off. The attribute 'status' will be modified accordingly.<br>
+    NOTE: only WebLink based graphics will be rendered.
 
   </ul>
   <br>
@@ -7367,35 +7485,35 @@ isday</pre>
   <b>Get</b>
   <ul>
     <code>get &lt;name&gt; &lt;[[file-name] device type logfile [pos=zoom=XX&off=YY]]&gt</code><br>
-	<br>
-	The get function supports different sets of arguments: <br>
-	Arguments:<br />
-	&nbsp;&nbsp;&nbsp;NONE: all WebLink based FilePlots will be rerendered<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be '<attr-tmpfile><weblinkname>.png'<br>
-	&nbsp;&nbsp;&nbsp;THREE: device type logfile <br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered:<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile logfile.png'<br>
-	&nbsp;&nbsp;&nbsp;FOUR:	file-name device type logfile<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered:<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
-	&nbsp;&nbsp;&nbsp;FIVE:	file-name device type logfile pos=zoom=XX&off=YYY <br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered assuming that plotmode is 'gnuplot-scroll':<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The 'zoom' will be either qday/day/week/month/year (same as used in FHEMWEB).<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The offset 'off' is either 0 (then the second part can be omitted), or -1/-2.... to jump back in time.<br>
-	&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
+    <br>
+    The get function supports different sets of arguments: <br>
+    Arguments:<br />
+    &nbsp;&nbsp;&nbsp;NONE: all WebLink based FilePlots will be rerendered<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be '<attr-tmpfile><weblinkname>.png'<br>
+    &nbsp;&nbsp;&nbsp;THREE: device type logfile <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile logfile.png'<br>
+    &nbsp;&nbsp;&nbsp;FOUR:    file-name device type logfile<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
+    &nbsp;&nbsp;&nbsp;FIVE:    file-name device type logfile pos=zoom=XX&off=YYY <br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In this case only one specific graphic will be rendered assuming that plotmode is 'gnuplot-scroll':<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A graphic will be rendered for 'device', where device is a FileLog, based on the type 'type' based on the given 'logfile'<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The 'zoom' will be either qday/day/week/month/year (same as used in FHEMWEB).<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The offset 'off' is either 0 (then the second part can be omitted), or -1/-2.... to jump back in time.<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The resulting filename will be 'attr-tmpfile file-name.png'<br>
 <br>
-			NOTE: If you want to use zoom AND offset then you have to concatenate via '&' !!<br>
+            NOTE: If you want to use zoom AND offset then you have to concatenate via '&' !!<br>
 <br>
-		NOTE: combinations are possible in limited ranges:<br>
-			meaning: you can add the 'pos=zoom=XX&off=YY' to any of the first three sets. <br>
+        NOTE: combinations are possible in limited ranges:<br>
+            meaning: you can add the 'pos=zoom=XX&off=YY' to any of the first three sets. <br>
                      This may e.g. result in rendering all WebLinks with a specific zoom or offset <br>
-				 (if you just pass the 'pos=zoom=xx&off=yy' parameter);<br>
+                 (if you just pass the 'pos=zoom=xx&off=yy' parameter);<br>
 <br>
-	Any rendered image (one or all WebLinks) will be stored in 'attr-tmpfile' followed by a 'filename.png'. The filename will be
-	either derived (from weblink-name or logfile-name) or, for single files, can be assigend.<br>
+    Any rendered image (one or all WebLinks) will be stored in 'attr-tmpfile' followed by a 'filename.png'. The filename will be
+    either derived (from weblink-name or logfile-name) or, for single files, can be assigend.<br>
 
   </ul>
   <br>
@@ -7450,12 +7568,12 @@ isday</pre>
         </li><br>
     <li>multiprocess<br>
         This defines if the Renderer works in a multiprocessing mode.<br>
-		You can set multiprocessing either to on / off and the renderer will draw the
-		time-scheduled tasks either in multiprocessing mode, or not.
-		NOTE: Direct GET calls, except for a general GET (for all weblinks) will be renderer
-		in an interactive mode, meaning that the FHEM-Loop will be block as long as the graphics are rendered.
-		If you want to use multiprocessing, set the RENDERER and multiprocessing to on and the
-		weblink-graphics will be rendered in the background.
+        You can set multiprocessing either to on / off and the renderer will draw the
+        time-scheduled tasks either in multiprocessing mode, or not.
+        NOTE: Direct GET calls, except for a general GET (for all weblinks) will be renderer
+        in an interactive mode, meaning that the FHEM-Loop will be block as long as the graphics are rendered.
+        If you want to use multiprocessing, set the RENDERER and multiprocessing to on and the
+        weblink-graphics will be rendered in the background.
         </li><br>
 
      </ul>
@@ -7475,36 +7593,36 @@ isday</pre>
     <br><code>define &lt;name&gt; PachLog &lt;Pachube-API-Key&gt;</code> <br>
     <br>
     &lt;Pachube-API-Key&gt;:<br>
-	The Pachube-API-Key however is what you need in your code to authenticate your application's access the Pachube service.<br>
-	Don't share this with anyone: it's just like any other password.<br>
-	<a href=http://www.pachube.com>www.pachube.com</a><br>
+    The Pachube-API-Key however is what you need in your code to authenticate your application's access the Pachube service.<br>
+    Don't share this with anyone: it's just like any other password.<br>
+    <a href=http://www.pachube.com>www.pachube.com</a><br>
 
   </ul>
   <br>
 
   <a name="PachLogset"></a>
   <b>Set</b>
-	<ul>
-		<br>
-		Add a new Device for Logging to www.pachube.com<br><br>
-		<code>set &lt;NAME&gt; ADD &lt;FHEM-DEVICENAME&gt; FEED-NR:ID:READING:ID:READING</code><br><br>
-		Example: KS300-Weather-Data<br><br>
-		READINGS: temperature humidity wind rain<br><br>
-		1. Generate Input-Feed on www.pachube.com => Yout get your FEED-NR: 1234<br>
-		2. Add Datastreams to the Feed:<br>
-		<ul>
-		<table>
-		<tr><td>ID</td><td>0</td><td>temperature</td></tr>
-		<tr><td>ID</td><td>1</td><td>humidity</td></tr>
-		<tr><td>ID</td><td>2</td><td>wind</td></tr>
-		<tr><td>ID</td><td>3</td><td>rain</td></tr></table><br>
-		</ul>
-		3. Add the KS300 to your PachLog-Device<br><br>
-		<code>set &lt;NAME&gt; ADD &lt;My-KS300&gt; 1234:0temperature:1:humidity:2:wind:3:rain</code><br><br>
-		Delete a Device form Logging to www.pachube.com<br><br>
-		<code>set &lt;NAME&gt; DEL &lt;FHEM-DEVICENAME&gt;</code><br><br>
-	</ul>
-	<br>
+    <ul>
+        <br>
+        Add a new Device for Logging to www.pachube.com<br><br>
+        <code>set &lt;NAME&gt; ADD &lt;FHEM-DEVICENAME&gt; FEED-NR:ID:READING:ID:READING</code><br><br>
+        Example: KS300-Weather-Data<br><br>
+        READINGS: temperature humidity wind rain<br><br>
+        1. Generate Input-Feed on www.pachube.com => Yout get your FEED-NR: 1234<br>
+        2. Add Datastreams to the Feed:<br>
+        <ul>
+        <table>
+        <tr><td>ID</td><td>0</td><td>temperature</td></tr>
+        <tr><td>ID</td><td>1</td><td>humidity</td></tr>
+        <tr><td>ID</td><td>2</td><td>wind</td></tr>
+        <tr><td>ID</td><td>3</td><td>rain</td></tr></table><br>
+        </ul>
+        3. Add the KS300 to your PachLog-Device<br><br>
+        <code>set &lt;NAME&gt; ADD &lt;My-KS300&gt; 1234:0temperature:1:humidity:2:wind:3:rain</code><br><br>
+        Delete a Device form Logging to www.pachube.com<br><br>
+        <code>set &lt;NAME&gt; DEL &lt;FHEM-DEVICENAME&gt;</code><br><br>
+    </ul>
+    <br>
 
   <a name="PachLogget"></a>
   <b>Get</b> <ul>N/A</ul><br>
@@ -7513,11 +7631,11 @@ isday</pre>
   <b>Attributes</b>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
-	<li><a href="#loglevel">loglevel</a></li><br>
-	<a name="disable"></a>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <a name="disable"></a>
     <li>disable<br>
-		Disables PachLog.
-		Nor more Logging to www.pachube.com
+        Disables PachLog.
+        Nor more Logging to www.pachube.com
    </ul><br>
 
 
@@ -7528,18 +7646,18 @@ isday</pre>
 <ul>
   <code>dumpdef &lt;options&gt;</code>
   <br><br>
-	Data::Dumper for FHEM-Devices/Hashes<br><br>
-	Dumps the content of &lt;options&gt; to FHEMWEB<br><br>
-	Options:<br><br>
-	<ul>
-	<table>
-	<tr><td><code>FHEM-DEVICENAME</code></td><td>=></td><td><code>%defs{FHEM-DEVICENAME}+%attr{FHEM-DEVICENAME}</code></td></tr>
-	<tr><td><code>MOD</code></td><td>=></td><td><code>%modules</code></td></tr>
-	<tr><td><code>SEL</code></td><td>=></td><td><code>%selectlist</code></td></tr>
-	<tr><td><code>DAT</code></td><td>=></td><td><code>%data</code></td></tr>
-	<tr><td><code>CMD</code></td><td>=></td><td><code>%cmd</code></td></tr>
-	</table>
-	</ul>
+    Data::Dumper for FHEM-Devices/Hashes<br><br>
+    Dumps the content of &lt;options&gt; to FHEMWEB<br><br>
+    Options:<br><br>
+    <ul>
+    <table>
+    <tr><td><code>FHEM-DEVICENAME</code></td><td>=></td><td><code>%defs{FHEM-DEVICENAME}+%attr{FHEM-DEVICENAME}</code></td></tr>
+    <tr><td><code>MOD</code></td><td>=></td><td><code>%modules</code></td></tr>
+    <tr><td><code>SEL</code></td><td>=></td><td><code>%selectlist</code></td></tr>
+    <tr><td><code>DAT</code></td><td>=></td><td><code>%data</code></td></tr>
+    <tr><td><code>CMD</code></td><td>=></td><td><code>%cmd</code></td></tr>
+    </table>
+    </ul>
   <br><br>
   Example:
   <ul><br>
@@ -7559,7 +7677,7 @@ isday</pre>
     $VAR1 = {
         'room' => 'DEF_DUMMY,GRP.TEST'
         };
-	</pre>
+    </pre>
   </ul>
 </ul>
 
