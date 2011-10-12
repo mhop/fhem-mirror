@@ -1,4 +1,6 @@
-
+### mh changed 95_holiday.pm to 95_holiday_MH.pm 
+### mh no requirement for DateTime::Event::Easter
+### mh
 package main;
 
 use strict;
@@ -76,18 +78,28 @@ holiday_refresh($$)
 
     } elsif($l =~ m/^2/) {          # Easter date: 2 +1 Ostermontag
 
-      eval { require DateTime::Event::Easter } ;
-      if( $@) {
-        Log 1, "$@";
+      ###mh new code for easter sunday calc w.o. requirement for
+      # DateTime::Event::Easter
+      #                   replace $a1 with $1 !!!
+      # split line from file into args '2 <offset from E-sunday> <tagname>'
+      my @a = split(" ", $l, 3);
 
-      } else {
-        my @a = split(" +", $l, 3);
-        my $dt = DateTime::Event::Easter->new(day=>$a[1])
-                          ->following(DateTime->new(year=>(1900+$lt[5])));
-        next if($dt->day != $fd[3] || $dt->month != $fd[4]+1);
-        $found = $a[2];
-        last;
-      }
+      # get month & day for E-sunday
+      my ($Om,$Od) = western_easter(($lt[5]+1900));
+      my $timex = mktime(0,0,12,$Od,$Om-1, $lt[5],0,0,-1); # gen timevalue
+      $timex = $timex + $a[1]*86400; # add offset days
+
+      my ($msecond, $mminute, $mhour,
+          $mday, $mmonth, $myear, $mrest) = localtime($timex);
+      $myear = $myear+1900;
+      $mmonth = $mmonth+1;
+      #Log 4, "$name: Ostern ".($lt[5]+1900)." ist am " .sprintf("%02d-%02d",
+      #                $Od, $Om) ." Target day: $mday-$mmonth-$myear"; 
+
+      next if($mday != $fd[3] || $mmonth != $fd[4]+1);
+      $found = $a[2];
+      Log 4, "$name: Match day: $a[2]\n";
+      last;
 
     } elsif($l =~ m/^3/) {          # Relative date: 3 -1 Mon 03 Holiday
       my @a = split(" +", $l, 5);
@@ -200,4 +212,32 @@ schaltjahr($)
   return 1;                    # 2012
 }
 
+### mh sub western_easter copied from cpan Date::Time::Easter
+### mh changes marked with # mh
+### mh
+### mh calling parameter is 4 digit year
+### mh
+sub
+western_easter($)
+{
+  my $year = shift;
+  my $golden_number = $year % 19;
+
+  #quasicentury is so named because its a century, only its 
+  # the number of full centuries rather than the current century
+  my $quasicentury = int($year / 100);
+  my $epact = ($quasicentury - int($quasicentury/4) -
+        int(($quasicentury * 8 + 13)/25) + ($golden_number*19) + 15) % 30;
+
+  my $interval = $epact - int($epact/28)*
+                (1 - int(29/($epact+1)) * int((21 - $golden_number)/11) );
+  my $weekday = ($year + int($year/4) + $interval +
+                 2 - $quasicentury + int($quasicentury/4)) % 7;
+  
+  my $offset = $interval - $weekday;
+  my $month = 3 + int(($offset+40)/44);
+  my $day = $offset + 28 - 31* int($month/4);
+  
+  return $month, $day;
+}
 1;
