@@ -1,6 +1,3 @@
-### mh changed 95_holiday.pm to 95_holiday_MH.pm 
-### mh no requirement for DateTime::Event::Easter
-### mh
 package main;
 
 use strict;
