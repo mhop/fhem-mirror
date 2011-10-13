@@ -10,6 +10,7 @@
   - bugfix:  FHEM2FHEM should work with CUL again, after syntax change
   - feature: CUL directio mode (No Device::SerialPort needed)
   - feature: FritzBox 7270 ZIP file
+  - buxgfix: prevent fhem from stalling if telnet times out in 66_ECMD.pm
   
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
