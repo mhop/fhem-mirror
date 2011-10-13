@@ -149,7 +149,16 @@ ECMD_OpenDev($$)
       return;
     }
 
-    my $conn = IO::Socket::INET->new(PeerAddr => $devicename);
+    my $conn;
+    eval {
+	local $SIG{ALRM} = sub { die 'Timed Out'; }; 
+	alarm 10;
+	$conn = IO::Socket::INET->new(PeerAddr => $devicename, timeout => 5);
+    };
+    alarm 0;
+    $conn= undef if $@;
+#    return "Error: timeout." if ( $@ && $@ =~ /Timed Out/ );
+#    return "Error: Eval corrupted: $@" if $@;
     if($conn) {
       delete($hash->{NEXT_OPEN})
 
