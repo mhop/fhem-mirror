@@ -1790,7 +1790,7 @@ FW_devState($$)
     $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
     if(!$hasOnOff) {    # Check the eventMap
       my $em = AttrVal($d, "eventMap", "") . " ";
-      $hasOnOff = ($em =~ m/:on / && $em =~ m/:off /);
+      $hasOnOff = ($em =~ m/:on\b/ && $em =~ m/:off\b/);
     }
   }
 

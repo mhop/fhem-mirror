@@ -3090,8 +3090,10 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li>D0
          <li>DI
          <li>A0,BI
-         <li>&lt;all other combinations of BtnX/BtnY&gt;
-         <li>buttons released
+         <li>&lt;BtnX,BtnY&gt; where BtnX and BtnY is one of the above, e.g.
+             A0,BI or D0,CI
+         <li>buttons:released
+         <li>buttons:<BtnX> released<br>
      </ul>
      <li>windowHandle (HOPPE SecuSignal). Set the subType attr to windowHandle.
      <ul>
@@ -6778,10 +6780,11 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       <li>2<br>
           Easter-dependent date. Arguments: &lt;day-offset&gt;
           &lt;holiday-name&gt;.
-          The offset is counted from Easter-Sunday. Note: the perl module
-          DateTime::Event::Easter must be installed to use this type of
-          holiday.<br>
-          Exampe: 2 1 Easter-Monday
+          The offset is counted from Easter-Sunday.
+          <br>
+          Exampe: 2 1 Easter-Monday<br>
+          Sidenote: You can check the easter date with:
+          fhem> { join("-", western_easter(2011)) }
           </li>
       <li>3<br>
           Month dependent date. Arguments: &lt;nth&gt; &lt;weekday&gt;
