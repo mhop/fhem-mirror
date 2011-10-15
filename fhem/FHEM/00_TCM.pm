@@ -232,12 +232,13 @@ TCM_Read($)
   } else {                              # TCM310 / ESP3
     if($data =~ m/^55(....)(..)(..)(..)/) {
       my ($l1, $l2, $t, $crc) = (hex($1), hex($2), $3, $4);
-      my $tlen = (7+$l1+$l2);
-      if(length($data) < 2*$tlen) {
+      my $tlen = 2*(7+$l1+$l2);
+      if(length($data) < $tlen) {
         $hash->{PARTIAL} = $data;
         return;
       }
-      $hash->{PARTIAL} = substr($data, ($tlen*2));
+      $hash->{PARTIAL} = substr($data, $tlen);
+      $data = substr($data, 0, $tlen);
 
       my $hdr = substr($data, 2, 8);
       my $mdata = substr($data, 12, $l1*2);
@@ -276,7 +277,7 @@ TCM_Read($)
           "04"=>"RET_OPERATION_DENIED",
         );
         $rc = $codes{$rc} if($codes{$rc});
-        Log $ll2, "$name: RESPONSE: $rc" ;
+        Log (($rc eq "RET_OK") ? $ll5 : $ll2, "$name: RESPONSE: $rc") ;
 
       } else {
         Log $ll2, "$name: unknown packet type $t: $data" ;
