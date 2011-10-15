@@ -10,31 +10,15 @@ sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Set($@);
 
-# TODO
-# Send120
-# Send310
-# Test windowHandle
-
-sub
-EnOcean_Initialize($)
-{
-  my ($hash) = @_;
-
-  $hash->{Match}     = "^EnOcean:";
-  $hash->{DefFn}     = "EnOcean_Define";
-  $hash->{ParseFn}   = "EnOcean_Parse";
-  $hash->{SetFn}     = "EnOcean_Set";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-             "subType:switch,contact,sensor,windowHandle,SR04,MD15";
-}
-
 my %rorgname = ("F6"=>"switch",     # RPS
                 "D5"=>"contact",    # 1BS
                 "A5"=>"sensor",     # 4BS
                );
 my @ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %ptm200btn;
+
+# Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an
+# intry in the table below. This table is only needed for A5 category devices
 my %manuf = (
   "001" => "Peha",
   "002" => "Thermokon",
@@ -70,6 +54,26 @@ my %subTypes = (
   "A5.20.01" => "MD15",
 );
 
+sub
+EnOcean_Initialize($)
+{
+  my ($hash) = @_;
+
+  $hash->{Match}     = "^EnOcean:";
+  $hash->{DefFn}     = "EnOcean_Define";
+  $hash->{ParseFn}   = "EnOcean_Parse";
+  $hash->{SetFn}     = "EnOcean_Set";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
+                       "subType:switch,contact,sensor,windowHandle,SR04,MD15";
+
+  for(my $i=0; $i<@ptm200btn;$i++) {
+    $ptm200btn{$ptm200btn[$i]} = "$i:30";
+  }
+  $ptm200btn{released} = "0:20";
+  return undef;
+}
+
 #############################
 sub
 EnOcean_Define($$)
@@ -86,11 +90,6 @@ EnOcean_Define($$)
   # Help FHEMWEB split up devices
   $attr{$name}{subType} = $1 if($name =~ m/EnO_(.*)_$a[2]/);
 
-  for(my $i=0; $i<@ptm200btn;$i++) {
-    $ptm200btn{$ptm200btn[$i]} = "$i:30";
-  }
-  $ptm200btn{released} = "0:20";
-  return undef;
 }
 
 
@@ -181,6 +180,7 @@ EnOcean_Parse($$)
   if($rorg eq "F6") {
     my $nu =  ((hex($status)&0x10)>>4);
 
+    # unused flags (AFAIK)
     #push @event, "1:T21:".((hex($status)&0x20)>>5);
     #push @event, "1:NU:$nu";
 
@@ -210,14 +210,20 @@ EnOcean_Parse($$)
           $msg = "keycard removed";
           
         } else {
-          $msg = "buttons ". (($db_3&0x10) ? "pressed" : "released");
+          $msg = (($db_3&0x10) ? "pressed" : "released");
 
         }
 
       }
       
     }
-    push @event, "3:state:$msg";
+
+    # released events are disturbing when using a remote, since it overwrites
+    # the "real" state immediately
+    my $event = "state";
+    $event = "buttons" if($msg =~ m/released$/);
+
+    push @event, "3:$event:$msg";
 
   #################################
   # 1BS. Only contact is defined in the EEP2.1 for 1BS
@@ -289,6 +295,9 @@ EnOcean_Parse($$)
     }
 
   }
+
+  # Flag & 1: reading
+  # Flag & 2: changed
 
   my $tn = TimeNow();
   my @changed;
