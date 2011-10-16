@@ -557,23 +557,34 @@ CUL_HM_Parse($$)
 
   } elsif($st eq "threeStateSensor") { #####################################
 
-    push @event, "cover:closed" if($p =~ m/^0601..00$/);
-    push @event, "cover:open"   if($p =~ m/^0601..0E$/);
-    push @event, "state:alive"  if($p =~ m/^0601000E$/);
-
     $p =~ m/^....(..)$/;
     my $lst = defined($1) ? $1 : "00";
 
-    my %txt;
-    %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
-    %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
-                 if($model eq "HM-SEC-WDS");
+    if($p =~ m/^0601000E$/) {
+      push @event, "state:alive";
 
-    if($txt{$lst}) {
-      push @event, "contact:$txt{$lst}$target";
+    } elsif($p =~ m/^0601..00$/) {
+      push @event, "cover:closed";
+      push @event, "state:alive";
+
+    } elsif($p =~ m/^0601..0E$/) {
+      push @event, "cover:open";
+      push @event, "state:sabotage";
 
     } else {
-      $lst = "00"; # for the ack
+
+      my %txt;
+      %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
+      %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
+                   if($model eq "HM-SEC-WDS");
+
+      if($txt{$lst}) {
+        push @event, "contact:$txt{$lst}$target";
+
+      } else {
+        $lst = "00"; # for the ack
+
+      }
 
     }
 
