@@ -924,6 +924,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         This attribute is DEPRECATED, use <a href="#notify">notify</a>, with
         the INITIALIZED event to execute commands after initialization.
     </li><br>
+    
+    <a name="latitude"></a>
+    <li>latitude<br>
+      If set, this latitude is used to calculate sunset/sunrise<br>
+      Notation need to be in decimal format (for example Berlin = 52.666)
+      As default Frankfurt/Main, Germany (50.112) is used.
+    </li><br>
 
     <a name="logfile"></a>
     <li>logfile<br>
@@ -931,6 +938,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         stdout, in this case the server won't background itself.<br>
         The logfile name can also take wildcards for easier logfile rotation,
         see the <a href="#FileLog">FileLog</a> section.
+    </li><br>
+
+    <a name="longitude></a>
+    <li>longitude<br>
+        If set, this longitude is used to calculate sunset/sunrise<br>
+        Notation need to be in decimal format (for example Berlin = 13.400)
+        As default Frankfurt/Main, Germany (8.686) is used.
     </li><br>
 
     <a name="modpath"></a>
@@ -3031,6 +3045,25 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="EnOceanset"></a>
   <b>Set</b>
   <ul>
+    <li>MD15 commands. Note: The command is not sent until the MD15
+    wakes up and sends a mesage, usually every 10 minutes.
+    <ul>
+      <li>actuator &lt;value&gt;<br>
+         Set the actuator to the specifed percent value (0-100)</li>
+      <li>desired-temp &lt;value&gt;<br>
+         Use the builtin PI regulator, and set the desired temperature to the
+         specified degree. The actual value will be taken from the temperature
+         reported by the MD15.</li>
+      <li>desired+actual &lt;value1&gt; &lt;value2&gt;<br>
+         Use the builtin PI regulator, and set the desired temperature to
+         &lt;value1&gt;. The actual value is supplied in &lt;value2&gt;</li>
+      <li>unattended<br>
+         Do not regulate the MD15.</li>
+    </ul></li>
+
+
+    <li>all other:
+    <ul>
     <code>set switch1 &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is one of A0,AI,B0,BI,C0,CI,D0,DI, combinations of
@@ -3055,6 +3088,9 @@ A line ending with \ will be concatenated with the next one, so long lines
       attr eventMap BI:on B0:off<br>
       set switch1 on<br>
     </code></ul>
+    </li>
+
+    </ul>
   </ul>
   <br>
 
@@ -3118,11 +3154,28 @@ A line ending with \ will be concatenated with the next one, so long lines
      <ul>
          <li>temperature: XY.Z
          <li>set_point: [0..255]
-         <li>fan: [0,1,2,3,Auto]
+         <li>fan: [0|1|2|3|Auto]
          <li>present: yes
          <li>learnBtn: on
-         <li>T: XY.Z SP: [0..255] F: [0,1,2,3,Auto] P: [yes|no]
+         <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]
      </ul>
+     <li>MD15-FtL-HE (Heating/Valve-regulator)<br>
+         subType must be MD15. This is done if the device was created by
+         autocreate.<br>
+     <ul>
+       <li>$actuator %      
+       <li>currentValue: $actuator
+       <li>serviceOn: [yes|no]
+       <li>energyInput: [enabled|disabled]
+       <li>energyStorage: [charged|empty]
+       <li>battery: [ok|empty]
+       <li>cover: [open|closed]
+       <li>tempSensor: [failed|ok]
+       <li>window: [open|closed]
+       <li>actuator: [ok|obstructed]
+       <li>temperature: $tmp
+     </ul>
+
   </ul>
 </ul>
 
