@@ -18,6 +18,7 @@ sub CUL_HM_DumpProtocol($$@);
 sub CUL_HM_convTemp($);
 
 my %culHmDevProps=(
+  "01" => { st => "AlarmControl",    cl => "controller" }, # by peterp
   "10" => { st => "switch",          cl => "receiver" }, # Parse,Set
   "20" => { st => "dimmer",          cl => "receiver" }, # Parse,Set
   "30" => { st => "blindActuator",   cl => "receiver" }, # Parse,Set
