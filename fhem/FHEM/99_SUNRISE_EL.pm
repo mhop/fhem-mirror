@@ -20,8 +20,8 @@ sub sunrise_coord($$$);
 sub SUNRISE_Initialize($);
 
 # See perldoc DateTime::Event::Sunrise for details
-my $long   = "8.686";
-my $lat    = "50.112";
+my $long;
+my $lat;
 my $tz     = ""; # will be overwritten
 my $altit  = "-6";        # Civil twilight
 my $RADEG  = ( 180 / 3.1415926 );
@@ -49,6 +49,15 @@ sr($$$$$$)
   my $needrise = ($rise || $daycheck) ? 1 : 0;
   my $needset = (!$rise || $daycheck) ? 1 : 0;
   $seconds = 0 if(!$seconds);
+
+   ############################
+   # If set in global, use longitude/latitude
+   # from global, otherwise set Frankfurt/Germany as
+   # default
+   $long = AttrVal("global", "longitude", "8.686");
+   $lat  = AttrVal("global", "latitude", "50.112");
+   Log 5, "Compute sunrise/sunset for latitude $lat , longitude $long";
+ 
 
   my $nt = time;
   my @lt = localtime($nt);
