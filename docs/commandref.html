@@ -2451,11 +2451,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>define &lt;name&gt; CUL_IR &lt;<a href="#IODev">IODev</a>&gt;</code> <br>
     <br>
-    &lt;<a href="#IODev">IODev</a>&gt; is the devicename of the IR-receivung device, e.g. CUL1.<br><br>
+    &lt;<a href="#IODev">IODev</a>&gt; is the devicename of the IR-receivung device, e.g. CUNO1.<br><br>
 
     Your definition should look like E.g.:
     <pre>
-    define IR-Rec CUL_IR CUNO1</pre>
+    define IR-Dev CUL_IR CUNO1</pre>
   </ul>
 
   <a name="CUL_IRset"></a>
@@ -2468,7 +2468,25 @@ A line ending with \ will be concatenated with the next one, so long lines
        attributes <a href="#CUL_IRattr">learncount</a> and <a href="#CUL_IRattr">learnprefix</a>.<br>
        Attention: Before learning IR-Codes the CUL_IR device needs to be set in IR-Receiving mode
        by modifying the <a href="#irReceive">irReceive</a> attribute.
-       </li>
+     </li>
+    <a name="irSend"></a>
+    <li>irSend<br>
+       Sends out IR-commands via the connected IODev. The IR-command can be specified as buttonname according
+	   to <a href="#Button.*">Button.*</a> or as IR-Code directly. If a buttonname is specified, the
+	   corresponding IR-Code will be sent out.<br>
+	   Example: <br>
+   	   <pre>set IR-Dev irSend ButtonA001 </pre>
+	   If defining an IR-Code directly the following Code-Syntax needs to be followed:<br>
+	   <pre>IRCode: &lt;PP&gt;&lt;AAAA&gt;&lt;CCCC&gt;&lt;FF&gt; </pre>
+	   with P = Protocol; A = Address; C = Command; F = Flags<br>
+	   With the Flags you can modify IR-Repetition. Flags between 00-0E will produce
+	   0-15 IR-Repetitions.
+	   You can type the IR-Code as plain as above, or with a heading "I" as learnt for the buttons.<br>
+	   Example: <br>
+   	   <code>set IR-Dev irSend 0A07070F0F02<br>
+	   set IR-Dev irSend I0A07070F0F00 </code>
+	   
+     </li> 
   </ul>
 
   <a name="CUL_IRget"></a>
@@ -2498,7 +2516,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         </ul>
     </li><br>
 
-    <li><a href="#Button.*">Button.*</a><br>
+	<li><a name="Button.*"></a>Button.*<br>
         Button.* is the wildcard for all learnt IR-Codes. IR-Codes are learnt as Button-Attributes.
         The name for a learnt Button - IR-Code is compiled out of three elements:<br>
         <pre>
@@ -2523,7 +2541,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         attr &lt;device-name&gt; &lt;attribute-name&gt; &lt;IR-Code&gt; &lt;command&gt;
         </pre>
     </li>
-    <li><a href="#Group.*">Group.*</a><br>
+    <li><a name="Group.*"></a>Group.*<br>
         Group.* is the wildcard for IR-Code groups. With these attributes one can define
         IR-Code parts, which may match to several Button-IR-Codes.<br>
         This is done by defining group-attributes that contain only parts of the IR-Code.
@@ -2535,11 +2553,11 @@ A line ending with \ will be concatenated with the next one, so long lines
         Group001   I02029A</pre>
         With this all IR-Codes starting with I02029A will match the Group001.
     </li><br>
-    <li><a href="#learncount">learncount</a><br>
+    <li><a name="learncount"></a>learncount<br>
         learncount is used to store the next button-code-number that needs to be learned.
         By manually modifying this attribute new button sequences can be arranged.
     </li><br>
-    <li><a href="#learnprefix">learnprefix</a><br>
+    <li><a name="learnprefix"></a>learnprefix<br>
         learnprefix is a string which will be added to the button-attribute-name. <br>
         A button-attribute-name is constructed by:
         <pre>
