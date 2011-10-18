@@ -23,6 +23,8 @@ updatefhem_Initialize($$)
   my %chash = ( Fn=>"CommandCULflash",
                 Hlp=>"<cul> <type>,flash the CUL from the nightly CVS" );
   $cmds{CULflash} = \%chash;
+
+  $modules{Global}{AttrList} .= " backupdir";
 }
 
 
@@ -35,6 +37,41 @@ CommandUpdatefhem($$)
   my $ret = "";
   my $moddir = "$attr{global}{modpath}/FHEM";
   #my $moddir = "XXX";
+
+  ## backup by RueBe
+  my @commandchain = split(/ +/,$param);
+
+  #  Check if the first parameter is "backup"
+  if(uc($commandchain[0]) eq "BACKUP") {
+    my $backupdir = AttrVal("global", "backupdir", "/tmp/FHEM_Backup");
+    # create the backupfolder
+    if(!-d $backupdir) {
+      if(!mkdir($backupdir)) {
+        return "Can't create backup folder $!";
+      }
+    }
+    # full backup, for compatibility, we use the native copy unction, not
+    # dircopy from File::Copy::Recursive
+    if($commandchain[1] eq "") {
+      opendir(IMD, $moddir) || return "Cannot open fhem-module directory";
+      my @files= readdir(IMD);
+      closedir(IMD);
+      my $f;
+
+      foreach $f (@files) {
+        unless ( ($f eq ".") || ($f eq "..") ) {
+          my $ret = copy("$moddir/$f", "$backupdir/$f");
+        }
+      }
+      $param = "";
+
+    } else {
+      # one file backup
+      copy("$moddir/$commandchain[1]", "$backupdir/$commandchain[1]");
+      # recreate $param for further use
+      $param = $commandchain[1];
+    }
+  }
 
   # Read in the OLD filetimes.txt
   my %oldtime;
