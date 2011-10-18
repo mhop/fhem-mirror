@@ -548,7 +548,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="updatefhem"></a>
 <h3>updatefhem</h3>
 <ul>
-  <code>updatefhem [filename]</code> <br>
+  <code>updatefhem [backup] [filename]</code> <br>
   <br>
     Update the fhem modules and documentation from a nightly CVS chekout.  For
     this purpose fhem contacts http://fhem.de/fhemupdate, compares the stored
@@ -557,9 +557,31 @@ A line ending with \ will be concatenated with the next one, so long lines
     reload will be scheduled if the corresponding module is loaded.<br>
     If an explicit filename is given, then only this file will be downloaded.
     <br>
+
     Note: if the main program (fhem.pl) is changed, a manual restart of fhem
     will be necessary to apply the changes.
     <br>
+
+    If backup is specified, then the old files are saved before overwriting
+    them. They are copied to the folder given in global <backupdir> or as
+    default to /tmp/FHEM_Backup.  Please check if the fhem user has the rights
+    to create a folder for backup.
+    <br>
+    <br>
+
+  <b>Attributes</b> <ul>
+    <a name="backupdir"></a>
+    <li>backupdir<br>
+      A folder where updatefhem can store all files from <a
+      href="#modpath">modpath</a> before executing the update. Please check if
+      the fhem user has the rights to create this folder.
+    </li><br>
+    Note: this is a global attribute, e.g.<br>
+    <ul>
+      attr global backup /Volumes/BigHD<br>
+    </ul>
+  </ul><br>
+
 </ul>
 
 <a name="CULflash"></a>
@@ -925,26 +947,12 @@ A line ending with \ will be concatenated with the next one, so long lines
         the INITIALIZED event to execute commands after initialization.
     </li><br>
     
-    <a name="latitude"></a>
-    <li>latitude<br>
-      If set, this latitude is used to calculate sunset/sunrise<br>
-      Notation need to be in decimal format (for example Berlin = 52.666)
-      As default Frankfurt/Main, Germany (50.112) is used.
-    </li><br>
-
     <a name="logfile"></a>
     <li>logfile<br>
         Specify the logfile to write.  You can use "-" for
         stdout, in this case the server won't background itself.<br>
         The logfile name can also take wildcards for easier logfile rotation,
         see the <a href="#FileLog">FileLog</a> section.
-    </li><br>
-
-    <a name="longitude></a>
-    <li>longitude<br>
-        If set, this longitude is used to calculate sunset/sunrise<br>
-        Notation need to be in decimal format (for example Berlin = 13.400)
-        As default Frankfurt/Main, Germany (8.686) is used.
     </li><br>
 
     <a name="modpath"></a>
@@ -3071,10 +3079,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>desired-temp &lt;value&gt;<br>
          Use the builtin PI regulator, and set the desired temperature to the
          specified degree. The actual value will be taken from the temperature
-         reported by the MD15.</li>
-      <li>desired+actual &lt;value1&gt; &lt;value2&gt;<br>
-         Use the builtin PI regulator, and set the desired temperature to
-         &lt;value1&gt;. The actual value is supplied in &lt;value2&gt;</li>
+         reported by the MD15 or from the attribute actualTemp if it is set</li>
       <li>unattended<br>
          Do not regulate the MD15.</li>
     </ul></li>
@@ -3126,6 +3131,11 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#subType">subType</a></li>
+    <li><a name="actualTemp">actualTemp</a><br>
+      The value of the actual temperature, used when controlling MD15 devices.
+      Should by filled via a notify from a distinct temperature sensor. If
+      absent, the reported temperature from the MD15 is used.
+      </li>
   </ul>
   <br>
 
@@ -7472,10 +7482,10 @@ sunrise_rel, sunset_rel
 sunrise_abs, sunset_abs
 isday</pre>
   perl functions, to be used in <a href="#at">at</a> or FS20 on-till commands.<br>
-  First you should edit SUNRISE_EL.pm, and set long and lat to the exact longitude
-  and latitude values (see e.g. maps.google.com for the exact values, which
-  should be in the form of a floating point value).  The default value is
-  Frankfurt am Main, Germany.
+  First you should set the longitude and latitude global attributes to the
+  exact longitude and latitude values (see e.g. maps.google.com for the exact
+  values, which should be in the form of a floating point value).  The default
+  value is Frankfurt am Main, Germany.
   <br><br>
   The default altitude ($altit in SUNRISE_EL.pm) defines the sunrise/sunset
   for Civil twilight (i.e. one can no longer read outside without artificial
@@ -7509,7 +7519,27 @@ isday</pre>
 
   <b>Get</b> <ul>N/A</ul><br>
 
-  <b>Attributes</b> <ul>N/A</ul><br>
+  <b>Attributes</b> <ul>
+    <a name="latitude"></a>
+    <li>latitude<br>
+      If set, this latitude is used to calculate sunset/sunrise<br>
+      Notation need to be in decimal format (for example Berlin = 52.666)
+      As default Frankfurt/Main, Germany (50.112) is used.
+    </li><br>
+    <a name="longitude"></a>
+    <li>longitude<br>
+        If set, this longitude is used to calculate sunset/sunrise<br>
+        Notation need to be in decimal format (for example Berlin = 13.400)
+        As default Frankfurt/Main, Germany (8.686) is used.
+    </li><br>
+    Note: these are global attributes, e.g.<br>
+    <ul>
+      attr global latitude 50.112<br>
+      attr global longitude 8.686<br>
+    </ul>
+  </ul><br>
+
+
 </ul>
 
 <a name="FHEMRENDERER"></a>

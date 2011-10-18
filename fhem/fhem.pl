@@ -167,7 +167,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.155 2011-10-16 07:55:20 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.156 2011-10-18 08:19:07 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -185,7 +185,7 @@ $modules{Global}{AttrList} =
         "archivecmd allowfrom archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
-        "autoload_undefined_devices dupTimeout latitude longitude";
+        "autoload_undefined_devices dupTimeout";
 $modules{Global}{AttrFn} = "GlobalAttr";
 my $commonAttr = "eventMap";
 
