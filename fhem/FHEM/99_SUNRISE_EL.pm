@@ -33,7 +33,6 @@ sub
 SUNRISE_EL_Initialize($)
 {
   my ($hash) = @_;
-  $modules{Global}{AttrList} .= " latitude longitude";
 }
 
 
