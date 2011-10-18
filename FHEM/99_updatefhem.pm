@@ -23,8 +23,6 @@ updatefhem_Initialize($$)
   my %chash = ( Fn=>"CommandCULflash",
                 Hlp=>"<cul> <type>,flash the CUL from the nightly CVS" );
   $cmds{CULflash} = \%chash;
-
-  $modules{Global}{AttrList} .= " backupdir";
 }
 
 
