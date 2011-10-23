@@ -159,7 +159,6 @@ FHT_Initialize($)
 #                        810c0d20 0909a001 3232 7e006724 (NYI)
   $hash->{Match}     = "^81..(04|09|0d)..(0909a001|83098301|c409c401)..";
   $hash->{SetFn}     = "FHT_Set";
-  $hash->{StateFn}   = "FHT_SetState";
   $hash->{DefFn}     = "FHT_Define";
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
@@ -299,19 +298,6 @@ FHT_Set($@)
   }
 
   return $ret;
-}
-
-
-#####################################
-sub
-FHT_SetState($$$$)
-{
-  my ($hash, $tim, $vt, $val) = @_;
-
-  return "Ignoring FHZ state" if($vt =~ m/^FHZ:/);
-  $vt =~ s/^FHZ://;
-  return "Undefined type $vt" if(!defined($c2b{$vt}) && !defined($warnings{$vt}));
-  return undef;
 }
 
 

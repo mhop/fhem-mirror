@@ -150,6 +150,7 @@ use vars qw(%cmds);             # Global command name hash. To be expanded
 use vars qw(%data);		# Hash for user data
 use vars qw($devcount);	        # To sort the devices
 use vars qw(%defaultattr);    	# Default attributes, used by FHEM2FHEM
+use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 
 use vars qw($reread_active);
 
@@ -167,7 +168,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
-my $cvsid = '$Id: fhem.pl,v 1.157 2011-10-18 08:31:19 rudolfkoenig Exp $';
+my $cvsid = '$Id: fhem.pl,v 1.158 2011-10-23 09:23:55 rudolfkoenig Exp $';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
@@ -2097,7 +2098,6 @@ DoTrigger($$)
     }
   }
 
-
   ################
   # Log/notify modules
   # If modifying a device in its own trigger, do not call the triggers from
@@ -2126,6 +2126,21 @@ DoTrigger($$)
   delete($defs{$dev}{CHANGED}) if(!defined($defs{$dev}{INTRIGGER}));
 
   Log 3, "NTFY return: $ret" if($ret);
+
+  # Enhancers like avarage need this
+  if(!defined($defs{$dev}{InNtfyCb}) && %addNotifyCB) {
+    $defs{$dev}{InNtfyCb}=1;
+    foreach my $cb (keys %addNotifyCB) {
+      my ($fn, $arg) = split(" ", $addNotifyCB{$cb}, 2);
+      delete $addNotifyCB{$cb};
+      no strict "refs";
+      &{$fn}($arg);
+      use strict "refs";
+    } 
+    delete($defs{$dev}{CHANGED});
+    delete($defs{$dev}{InNtfyCb});
+  }
+
   return $ret;
 }
 
