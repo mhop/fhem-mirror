@@ -149,6 +149,7 @@
     <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
     <a href="#at">at</a> &nbsp;
     <a href="#autocreate">autocreate</a> &nbsp;
+    <a href="#average">average</a> &nbsp;
     <a href="#dummy">dummy</a> &nbsp;
     <a href="#dumpdef">dumpdef</a> &nbsp;
     <a href="#holiday">holiday</a> &nbsp;
@@ -6828,6 +6829,68 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     createlog to add the corresponding logs.  </ul> <br>
 
 </ul>
+
+<a name="average"></a>
+<h3>average</h3>
+<ul>
+
+  Compute additional average_day and average_month values.
+  <br>
+
+  <a name="averagedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; average &lt;regexp&gt;</code><br>
+    <br>
+    <ul>
+      The syntax for &lt;regexp&gt; is the same as the
+      regexp for <a href="#notify">notify</a>.<br>
+      If it matches, and the event is of the form "eventname number", then this
+      module computes the daily and monthly average, and generates an event of the form
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_avg_day: &lt;computed_average&gt;
+      </ul>
+      and
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_avg_month: &lt;computed_average&gt;
+      </ul>
+      at the beginning of the next day or month respectively.<br>
+      The current average and the cumulated values are stored in the device readings.
+    </ul>
+    <br>
+
+    Example:<PRE>
+    # Compute the average for the temperature events of the ws1 device
+    define avg_temp_ws1 average ws1:temperature.*
+
+    # Compute the average for each temperature event
+    define avg_temp_ws1 average .*:temperature.*
+
+    # Compute the average for all temperature and humidity events
+    define avg_temp_ws1 average .*:(temperature|humidity).*
+    </PRE>
+  </ul>
+
+  <a name="averageset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="averageget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="averageattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+  </ul>
+
+  <a name="KM271events"></a>
+  <b>Generated events:</b>
+  <ul>
+    <li>&lt;eventname&gt;_avg_day: $avg_day
+    <li>&lt;eventname&gt;_avg_month: $avg_month
+  </ul>
+</ul>
+
 
 <a name="holiday"></a>
 <h3>holiday</h3>
