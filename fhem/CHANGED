@@ -12,6 +12,7 @@
   - feature: FritzBox 7270 ZIP file
   - buxgfix: prevent fhem from stalling if telnet times out in 66_ECMD.pm
   - feature: FHEMWEB longpoll mode, small fixes, tuned smallscreen mode
+  - feature: average module added
   
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
