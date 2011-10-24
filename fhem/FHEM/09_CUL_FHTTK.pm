@@ -57,7 +57,7 @@
 # able for any alerting uses (unless a delay of said
 # amount of time doesn't matter, of course ;)).
 #
-# $Id: 09_CUL_FHTTK.pm,v 1.6 2010-01-22 09:51:55 painseeker Exp $
+# $Id: 09_CUL_FHTTK.pm,v 1.7 2011-10-24 09:49:44 rudolfkoenig Exp $
 ##############################################
 package main;
 
@@ -109,7 +109,7 @@ CUL_FHTTK_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^T........";
+  $hash->{Match}     = "^T[A-F0-9]{8}",
   $hash->{DefFn}     = "CUL_FHTTK_Define";
   $hash->{UndefFn}   = "CUL_FHTTK_Undef";
   $hash->{ParseFn}   = "CUL_FHTTK_Parse";
