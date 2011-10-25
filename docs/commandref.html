@@ -4701,9 +4701,9 @@ Attributes:<br>
         <br>
         In the fhem configuration file or on the fhem command line we do the following:<br><br>
         <code>
-                define AVRNETIO telnet 192.168.0.91:2701        # define the physical device<br>
+                define AVRNETIO ECMD telnet 192.168.0.91:2701        # define the physical device<br>
                 set AVRNETIO classdef ADC /etc/fhem/ADC.classdef       # define the device class ADC<br>
-                define myADC ADC # define the logical device myADC with device class ADC<br>
+                define myADC ECDMDevice ADC # define the logical device myADC with device class ADC<br>
                 get myADC value 1 # retrieve the value of analog/digital converter number 1<br>
         </code>
         <br>
