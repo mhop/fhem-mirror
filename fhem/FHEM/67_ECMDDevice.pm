@@ -150,7 +150,8 @@ ECMDDevice_Set($@)
         my $IOhash= $hash->{IODev};
         my $classname= $hash->{fhem}{classname};
         if(!defined($IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname})) {
-                return "$name error: unknown command $cmdname";
+		my $sets= $IOhash->{fhem}{classDefs}{$classname}{sets};
+                return "Unknown argument ?, choose one of " . join(' ', keys %$sets);
         }
 
         my $ecmd= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{cmd};
