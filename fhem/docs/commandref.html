@@ -4731,9 +4731,9 @@ Attributes:<br>
         <br>
         In the fhem configuration file or on the fhem command line we do the following:<br><br>
         <code>
-                define AVRNETIO telnet 192.168.0.91:2701        # define the physical device<br>
+                define AVRNETIO ECMD telnet 192.168.0.91:2701        # define the physical device<br>
                 set AVRNETIO classdef relais /etc/fhem/relais.classdef       # define the device class relais<br>
-                define myRelais 8 # define the logical device myRelais with pin mask 8<br>
+                define myRelais ECMDDevice 8 # define the logical device myRelais with pin mask 8<br>
                 set myRelais on # execute the "on" command<br>
         </code>
         <br>
