@@ -1,0 +1,20 @@
+The source of this project is hosted on sourceforge, if you wish you can get
+the latest version with the following command:
+
+  svn co https://fhem.svn.sourceforge.net/svnroot/fhem/trunk/fhem fhem
+
+If you wish to contribute to the project, then
+- create a sourceforge account 
+- send an email to the project manager to add you as developer to the project
+  (right know this is r dot koenig at koeniglich dot de)
+- check out the source
+- if it is already checked out, it makes sense to do an update before
+  implementing your changes:
+   % cvs update
+- make your changes
+- test if it is working (Really !!!)
+- make an entry in the CHANGED file, giving your changes a "title".
+- describe your changes in the file HISTORY, and dont forget to mention your
+  name and the date of change
+- it makes sense to do a "svn diff" before checking in the stuff with
+  svn commit
