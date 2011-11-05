@@ -17,11 +17,11 @@ sub
 updatefhem_Initialize($$)
 {
   my %fhash = ( Fn=>"CommandUpdatefhem",
-                Hlp=>",update fhem from the nightly CVS" );
+                Hlp=>",update fhem from the nightly SVN" );
   $cmds{updatefhem} = \%fhash;
 
   my %chash = ( Fn=>"CommandCULflash",
-                Hlp=>"<cul> <type>,flash the CUL from the nightly CVS" );
+                Hlp=>"<cul> <type>,flash the CUL from the nightly SVN" );
   $cmds{CULflash} = \%chash;
 }
 

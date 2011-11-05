@@ -65,7 +65,8 @@ EnOcean_Initialize($)
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-                       "subType:switch,contact,sensor,windowHandle,SR04,MD15";
+                       "subType:switch,contact,sensor,windowHandle,SR04,MD15 ".
+                       "actualTemp";
 
   for(my $i=0; $i<@ptm200btn;$i++) {
     $ptm200btn{$ptm200btn[$i]} = "$i:30";
@@ -105,11 +106,42 @@ EnOcean_Set($@)
   my $ll2 = GetLogLevel($name, 2);
 
   shift @a;
+  my $tn = TimeNow();
+
   for(my $i = 0; $i < @a; $i++) {
     my $cmd = $a[$i];
 
+    #####################
+    # See also http://www.oscat.de/community/index.php/topic,985.30.html
     if($st eq "MD15") {
+      my %sets = (
+        "desired-temp"   => "\\d+\\.\\d+",
+        "actuator"       => "\\d+",
+        "unattended"     => "",
+      );
+      my $re = $sets{$a[0]};
+      return "Unknown argument $cmd, choose one of ".join(" ", sort keys %sets)
+        if(!defined($re));
+      return "Need a parameter" if($re && @a < 2);
+      return "Argument $a[1] is incorrect (expect $re)"
+        if($re && $a[1] !~ m/^$re$/);
 
+      $hash->{CMD} = $cmd;
+      $hash->{READINGS}{CMD}{TIME} = $tn;
+      $hash->{READINGS}{CMD}{VAL} = $cmd;
+
+      my $arg = 1;
+      if($re) {
+        $hash->{READINGS}{CMD_ARG}{TIME} = $tn;
+        $hash->{READINGS}{CMD_ARG}{VAL} = $a[1];
+        $arg = $a[1];
+        shift(@a);
+      }
+
+      $hash->{READINGS}{$cmd}{TIME} = $tn;
+      $hash->{READINGS}{$cmd}{VAL} = $arg;
+
+    ###########################
     } else {                                          # Simulate a PTM
       my ($c1,$c2) = split(",", $cmd, 2);
       return "Unknown argument $cmd, choose one of " .
@@ -129,11 +161,9 @@ EnOcean_Set($@)
 
     }
 
-
     select(undef, undef, undef, 0.1) if($i < int(@a)-1);
   }
 
-  my $tn = TimeNow();
   my $cmd = join(" ", @a);
   $hash->{CHANGED}[0] = $cmd;
   $hash->{STATE} = $cmd;
@@ -148,6 +178,11 @@ EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
   my (undef,$rorg,$data,$id,$status,$odata) = split(":", $msg);
+  #Log 1, "RORG: $rorg";
+  #Log 1, "DATA: $data";
+  #Log 1, "ID: $id";
+  #Log 1, "STATUS: $status";
+  #Log 1, "ODATA: $odata";
 
   my $rorgname = $rorgname{$rorg};
   if(!$rorgname) {
@@ -280,7 +315,27 @@ EnOcean_Parse($$)
       push @event, "3:tempSensor:"   . (($db_2 & 0x04) ? "failed" : "ok");
       push @event, "3:window:"       . (($db_2 & 0x02) ? "open" : "closed");
       push @event, "3:actuator:"     . (($db_2 & 0x01) ? "ok" : "obstructed");
-      push @event, "3:temperature:"  . sprintf "%.1f", ($db_1*40/255);
+      push @event, "3:measured-temp:". sprintf "%.1f", ($db_1*40/255);
+
+      my $cmd = ReadingsVal($name, "CMD", undef);
+      if($cmd) {
+        my $msg;
+        my $arg1 = ReadingsVal($name, "CMD_ARG", 20);
+
+        if($cmd eq "actuator") {
+          $msg = sprintf("%02X000000", $arg1);
+
+        } elsif($cmd eq "desired-temp") {
+          $msg = sprintf("%02X%02X0400", $arg1*255/40, 
+                         AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40);
+
+        }
+        select(undef, undef, undef, 0.1);
+        IOWrite($hash, "000A0701",
+                sprintf("A5%s%s0001%sFF00",$msg,$hash->{DEF},$hash->{DEF}))
+          if($msg);
+      }
+
       
     } else {
       push @event, "3:state:$db_3";

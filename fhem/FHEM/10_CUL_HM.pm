@@ -215,7 +215,7 @@ CUL_HM_Parse($$)
     return "";
   }
 
-  CUL_HM_DumpProtocol("CUL_HM RCV", $iohash, @msgarr);
+  CUL_HM_DumpProtocol("RCV", $iohash, @msgarr);
 
   # Generate an UNKNOWN event with a better name
   if(!$shash) {
@@ -253,15 +253,14 @@ CUL_HM_Parse($$)
 
   if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
     if($shash->{cmdStack}) {
-      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1);
-    } else {
-      push @event, CUL_HM_Pair($name, $shash, @msgarr);
-    }
+        CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1);
+      } else {
+        push @event, CUL_HM_Pair($name, $shash, @msgarr);
+      }
 
   } elsif($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
     push @event, "";
-
 
   } elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
 
@@ -304,11 +303,20 @@ CUL_HM_Parse($$)
       $t = ($t & 0x3fff)/10;
       $t = sprintf("%0.1f", $t-1638.4) if($tsgn);
       push @event, "state:T: $t H: $h";
+      push @event, "measured-temp:$t";
       push @event, "temperature:$t";
       push @event, "humidity:$h";
 
       # If we have something to tell:
-      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
+      my $sdt = $shash->{SET_DESIRED_TEMP};     # DOES NOT WORK
+      if($sdt) {
+        CUL_HM_SendCmd($shash, 
+                sprintf("++A011%s%s0201${sdt}0000", $id,$dst), 1, 1);
+        delete($shash->{SET_DESIRED_TEMP});
+
+      } else {
+        CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
+      }
     }
 
     if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
@@ -329,7 +337,7 @@ CUL_HM_Parse($$)
     # slot 01.
     if($cmd eq "A410" && $p =~ m/^0403(......)(..)(..)(..)(..)(....)/) {
       my ( $tdev,   $tchan,  $plist, $o1,     $v1,  $rest) = 
-         (($1), hex($2), hex($3),   ($4), hex($5), ($6));
+       (($1), hex($2), hex($3),   ($4), hex($5), ($6));
       my $msg;
       if($plist == 5) {
       	if($o1 eq "05") {
@@ -363,13 +371,13 @@ CUL_HM_Parse($$)
         if($idx % 4 == 0 && $dayidx < $maxdays) {
           $idx -= 48*$dayidx;
 	  $idx /= 2;
-          my $day = $days[$dayidx+$dayoff];
-          $shash->{TEMPLIST}{$day}{$idx}{HOUR} = int($v1/6);
-          $shash->{TEMPLIST}{$day}{$idx}{MINUTE} = ($v1 - int($v1/6)*6)*10;
-          $shash->{TEMPLIST}{$day}{$idx}{TEMP} = $v2/2;
-          $shash->{TEMPLIST}{$day}{$idx+1}{HOUR} = int($v3/6);
-          $shash->{TEMPLIST}{$day}{$idx+1}{MINUTE} = ($v3 - int($v3/6)*6)*10;
-          $shash->{TEMPLIST}{$day}{$idx+1}{TEMP} = $v4/2;
+          my $ptr = $shash->{TEMPLIST}{$days[$dayidx+$dayoff]};
+          $ptr->{$idx}{HOUR} = int($v1/6);
+          $ptr->{$idx}{MINUTE} = ($v1 - int($v1/6)*6)*10;
+          $ptr->{$idx}{TEMP} = $v2/2;
+          $ptr->{$idx+1}{HOUR} = int($v3/6);
+          $ptr->{$idx+1}{MINUTE} = ($v3 - int($v3/6)*6)*10;
+          $ptr->{$idx+1}{TEMP} = $v4/2;
         }
       }
 
@@ -377,21 +385,17 @@ CUL_HM_Parse($$)
 	my $twentyfour = 0;
         my $msg = sprintf("tempList%s:", $wd);
         foreach(my $idx=0; $idx<24; $idx+=1) {
-          if(defined ($shash->{TEMPLIST}{$wd}{$idx}{TEMP}) &&
-                      $shash->{TEMPLIST}{$wd}{$idx}{TEMP} ne "") {
+          my $ptr = $shash->{TEMPLIST}{$wd}{$idx};
+          if(defined ($ptr->{TEMP}) && $ptr->{TEMP} ne "") {
 	    if($twentyfour == 0) {
               $msg .= sprintf(" %02d:%02d %.1f",
-                                $shash->{TEMPLIST}{$wd}{$idx}{HOUR},
-                                $shash->{TEMPLIST}{$wd}{$idx}{MINUTE},
-                                $shash->{TEMPLIST}{$wd}{$idx}{TEMP});
+                                $ptr->{HOUR}, $ptr->{MINUTE}, $ptr->{TEMP});
 	    } else {
-	      $shash->{TEMPLIST}{$wd}{$idx}{HOUR} = "";
-	      $shash->{TEMPLIST}{$wd}{$idx}{MINUTE} = "";
-	      $shash->{TEMPLIST}{$wd}{$idx}{TEMP} = "";
+	      $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
+
 	    }
           }
-          if(defined ($shash->{TEMPLIST}{$wd}{$idx}{HOUR}) &&
-	            0+$shash->{TEMPLIST}{$wd}{$idx}{HOUR} == 24) {
+          if(defined ($ptr->{HOUR}) && 0+$ptr->{HOUR} == 24) {
 	    $twentyfour = 1;  # next value uninteresting, only first counts.
 	  }
       	}
@@ -416,7 +420,8 @@ CUL_HM_Parse($$)
 
   } elsif($model eq "HM-CC-VD") { ###################
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
-    if($cmd eq "8202" && $p =~ m/^(..)(..)(..)(..)/) { # status ACK to controlling HM-CC-TC
+    # status ACK to controlling HM-CC-TC
+    if($cmd eq "8202" && $p =~ m/^(..)(..)(..)(..)/) {
       my (   $vp,     $d1) =
          (hex($3), $4);
       $vp = int($vp)/2;   # valve position in %
@@ -738,9 +743,10 @@ my %culHmSubTypeSets = (
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>
-        { "day-temp"   => "temp",
-          "night-temp" => "temp",
-          "party-temp" => "temp",
+        { "day-temp"     => "temp",
+          "night-temp"   => "temp",
+          "party-temp"   => "temp",
+          #"desired-temp" => "temp", # does not work
           "tempListSat"=> "HH:MM temp ...",
           "tempListSun"=> "HH:MM temp ...",
           "tempListMon"=> "HH:MM temp ...",
@@ -880,12 +886,18 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash, $id, $dst, $bn, 1, $l1);
     return "Set your remote in learning mode to transmit the data";
 
-  } elsif($cmd =~ m/^(day|night|party)-temp$/) { ###############################
+  } elsif($cmd =~ m/^desired-temp$/) { ##################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5,
-                             $st eq "day-temp" ? "03$temp" : 
-                            $st eq "night-temp" ? "04$temp" : "06$temp");
+    $hash->{SET_DESIRED_TEMP} = $temp;
+    return;
+
+  } elsif($cmd =~ m/^(day|night|party)-temp$/) { ##################
+    my %tt = (day=>"03", night=>"04", party=>"06");
+    my $tt = $tt{$1};
+    my $temp = CUL_HM_convTemp($a[2]);
+    return $temp if(length($temp) > 2);
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "$tt$temp");      # List 5
     return;
 
   } elsif($cmd =~ m/^tempList(...)/) { ##################################
@@ -1144,7 +1156,7 @@ CUL_HM_SendCmd($$$$)
     }
   }
   $cmd =~ m/As(..)(..)(....)(......)(......)(.*)/;
-  CUL_HM_DumpProtocol("CUL_HM SND", $io, ($1,$2,$3,$4,$5,$6));
+  CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6));
 }
 
 ###################################
