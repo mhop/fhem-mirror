@@ -101,7 +101,7 @@ TCM_Write($$$)
 
   } else {      # 310 / ESP3
 
-    if(!$fn) { # Radio Paket from the EnOcean Module
+    if(!$fn) { # "Old-Type" Radio Packet
       $msg =~ m/^6B05(..)000000(........)(..)$/;
       $fn = "00070701";
       $msg = "F6$1$2${3}03FFFFFFFFFF00";
@@ -232,6 +232,7 @@ TCM_Read($)
   } else {                              # TCM310 / ESP3
     if($data =~ m/^55(....)(..)(..)(..)/) {
       my ($l1, $l2, $t, $crc) = (hex($1), hex($2), $3, $4);
+
       my $tlen = 2*(7+$l1+$l2);
       if(length($data) < $tlen) {
         $hash->{PARTIAL} = $data;

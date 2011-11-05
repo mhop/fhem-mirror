@@ -54,10 +54,9 @@ install-base:
 dist:
 	@echo Version is $(VERS), Date is $(DATE)
 	mkdir .f
-	cp -r CHANGED FHEM HISTORY Makefile README.CVS\
+	cp -r CHANGED FHEM HISTORY Makefile README.SVN\
                 TODO contrib docs examples fhem.pl webfrontend .f
-	find .f -name CVS -print | xargs rm -rf
-	find .f -name example.CVS -print | xargs rm -rf
+	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print |\
@@ -72,8 +71,10 @@ deb:
 	rm -rf .f
 	make ROOT=`pwd`/.f install
 	cp -r contrib/DEBIAN .f
-	find .f -name CVS -print | xargs rm -rf
-	find .f -name example.CVS -print | xargs rm -rf
+	rm -rf .f/$(MODDIR)/contrib/FB7*/var
+	rm -rf .f/$(MODDIR)/contrib/FB7*/*.image
+	rm -rf .f/$(MODDIR)/contrib/FB7*/*.zip
+	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
 	find .f -type f -print |\
