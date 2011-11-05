@@ -1,14 +1,14 @@
 #!/usr/bin/perl
 
-# Server-Side script to check out the fhem CVS repository, and upload the
+# Server-Side script to check out the fhem SVN repository, and upload the
 # changed files to the server
 
 print localtime() . "\n";
 
 chdir("/home/rudi/fhemupdate/fhem");
 system("mkdir -p UPLOAD");
-system("cvs update . > /dev/null 2>&1");
-die "CVS failed, exiting\n" if($?);
+system("svn update . > /dev/null 2>&1");
+die "SVN failed, exiting\n" if($?);
 
 my @filelist = (
  "./fhem.pl",
