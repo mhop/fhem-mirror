@@ -124,7 +124,7 @@ CUL_HM_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^A......................";
+  $hash->{Match}     = "^A....................";
   $hash->{DefFn}     = "CUL_HM_Define";
   $hash->{ParseFn}   = "CUL_HM_Parse";
   $hash->{SetFn}     = "CUL_HM_Set";
@@ -187,7 +187,9 @@ CUL_HM_Parse($$)
   $msg =~ m/A(..)(..)(....)(......)(......)(.*)/;
   my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
   my ($len,$msgcnt,$cmd,$src,$dst,$p) = @msgarr;
+  $p = "" if(!defined($p));
 
+  # cmdX / msgX used for duplicate detection
   my $cmdX = $cmd;
   $cmdX =~ s/^A4/A0/;
   $cmdX =~ s/^0B/0A/;
@@ -197,12 +199,12 @@ CUL_HM_Parse($$)
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $lcm = "$len$cmd";
-
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   my $dname = $dhash ? $dhash->{NAME} :
                        ($dst eq "000000" ? "broadcast" : 
                        ($dst eq $id ? $iohash->{NAME} : $dst));
   my $target = ($dst eq $id) ? "" : " (to $dname)";
+
 
   if($p =~ m/NACK$/) {  # HMLAN special
     if($dhash) {
@@ -217,13 +219,14 @@ CUL_HM_Parse($$)
 
   CUL_HM_DumpProtocol("RCV", $iohash, @msgarr);
 
-  # Generate an UNKNOWN event with a better name
-  if(!$shash) {
-    my $sname = "CUL_HM_$src";
-    if($lcm =~ m/1A8.00/) {     #  Pairing request
+  if(!$shash) {      #  Unknown source
 
-      # Prefer subType over model to make autocreate easier.
-      # besides the model names are quite cryptic
+    # Generate an UNKNOWN event for pairing requests, ignore everything else
+    if($lcm =~ m/1A8.00/) {
+      my $sname = "CUL_HM_$src";
+
+      # prefer subType over model to make autocreate easier
+      # model names are quite cryptic anyway
       my $model = substr($p, 2, 4);
       my $stc = substr($p, 26, 2);        # subTypeCode
       if($culHmDevProps{$stc}) {
@@ -237,6 +240,7 @@ CUL_HM_Parse($$)
       Log 3, "CUL_HM Unknown device $sname, please define it";
       return "UNDEFINED $sname CUL_HM $src $msg";
     }
+
     return "";
   }
 
@@ -246,17 +250,48 @@ CUL_HM_Parse($$)
   my $model = AttrVal($name, "model", "");
   my $tn = TimeNow();
 
-  if($cmd eq "8002") {                       # Ack
-    CUL_HM_ProcessCmdStack($shash);
-    push @event, "";
+  if($cmd eq "8002") {                  # Ack / Nack
+
+    # Multi-channel device: Switch to the shadow source hash
+    my $chn = $2 if($p =~ m/^(..)(..)/);
+    if($chn && $chn ne "01" && $chn ne "00") {
+      my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
+      $shash = $sshash if($sshash);
+    }
+
+    if($p =~ m/^8/) {
+      delete($shash->{cmdStack});
+      push @event, "state:NACK";
+
+    } else {
+      CUL_HM_ProcessCmdStack($shash);
+      push @event, "";
+    }
+    $shash->{READINGS}{CommandAccepted}{TIME} = $tn;
+    $shash->{READINGS}{CommandAccepted}{VAL} = ($p =~ m/^8/ ? "no" : "yes");
+
   }
 
-  if($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
+  if($cmd ne "8002" && $shash->{cmdStack}) { 
+    # i have to tell something, dont care what it said
+    CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
+      if($id eq $dst && $cmd ne "8002");
+    CUL_HM_ProcessCmdStack($shash);
+    push @event, "";
+
+  } elsif($lcm eq "09A112") {      ### Another fhem wants to talk (HAVE_DATA)
+    ;
+
+  } elsif($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
+
     if($shash->{cmdStack}) {
-        CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1);
-      } else {
-        push @event, CUL_HM_Pair($name, $shash, @msgarr);
-      }
+      #CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1); # HAVE_DATA
+      CUL_HM_ProcessCmdStack($shash);
+
+    } else {
+      push @event, CUL_HM_Pair($name, $shash, @msgarr);
+
+    }
 
   } elsif($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00", 1, 0);  # Ack
@@ -308,15 +343,7 @@ CUL_HM_Parse($$)
       push @event, "humidity:$h";
 
       # If we have something to tell:
-      my $sdt = $shash->{SET_DESIRED_TEMP};     # DOES NOT WORK
-      if($sdt) {
-        CUL_HM_SendCmd($shash, 
-                sprintf("++A011%s%s0201${sdt}0000", $id,$dst), 1, 1);
-        delete($shash->{SET_DESIRED_TEMP});
-
-      } else {
-        CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
-      }
+      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
     }
 
     if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
@@ -411,7 +438,7 @@ CUL_HM_Parse($$)
     }
 
     if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
-      push @event, "desired-temp: " .hex($1)/2;
+      push @event, "desired-temp:" .hex($1)/2;
     }
 
     CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
@@ -426,9 +453,11 @@ CUL_HM_Parse($$)
          (hex($3), $4);
       $vp = int($vp)/2;   # valve position in %
       push @event, "actuator:$vp %";
-           if($d1 eq "10") { push @event, "actuator:movement_open";
-      } elsif($d1 eq "20") { push @event, "actuator:movement_close";
-      }
+
+      # I think this is too much info:
+      #      if($d1 eq "10") { push @event, "actuator:movement_open";
+      # } elsif($d1 eq "20") { push @event, "actuator:movement_close";
+      # }
     }
 
     # CMD:A010 SRC:13F251 DST:5D24C9 0401000000000509000A070000
@@ -486,7 +515,9 @@ CUL_HM_Parse($$)
        && $cmd ne "A002") {
       my $msgType = $1;
       my $chn = $2;
-      if($chn ne "01" && $chn ne "00") {   # Switch to the shadow device
+
+      # Multi-channel device: Switch to the shadow source hash
+      if($chn ne "01" && $chn ne "00") {
         my $cSrc = "$src$chn";
         if($modules{CUL_HM}{defptr}{$cSrc}) {
           $shash = $modules{CUL_HM}{defptr}{$cSrc};
@@ -737,16 +768,19 @@ my %culHmSubTypeSets = (
         { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"" },
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>",
-          devicepair => "<btn> device", },
+          devicepair => "<btnNumber> device", },
   winMatic =>
-        { matic => "<btn>", read => "<btn>", keydef => "<btn> <txt1> <txt2>", create => "<txt>" },
+        { matic  => "<btn>",
+          read   => "<btn>",
+          keydef => "<btn> <txt1> <txt2>",
+          create => "<txt>" },
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>
         { "day-temp"     => "temp",
           "night-temp"   => "temp",
           "party-temp"   => "temp",
-          #"desired-temp" => "temp", # does not work
+          "desired-temp" => "temp", # does not work
           "tempListSat"=> "HH:MM temp ...",
           "tempListSun"=> "HH:MM temp ...",
           "tempListMon"=> "HH:MM temp ...",
@@ -762,8 +796,7 @@ sub
 CUL_HM_Set($@)
 {
   my ($hash, @a) = @_;
-  my $ret = "";
-  my $tval;
+  my ($ret, $tval);
 
   return "no set value specified" if(@a < 2);
 
@@ -784,6 +817,10 @@ CUL_HM_Set($@)
   $h = $culHmModelSets{$md}{$cmd}   if(!defined($h) && $culHmModelSets{$md});
   my @h;
   @h = split(" ", $h) if($h);
+
+  my $isSender = (AttrVal($name, "hmClass", "") eq "sender" ||
+                  AttrVal($name, "model", "") eq "HM-CC-TC");
+
 
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
     $cmd = "pct";
@@ -808,61 +845,70 @@ CUL_HM_Set($@)
   }
 
   my $id = CUL_HM_Id($hash->{IODev});
-  my $sndcmd;
   my $state = join(" ", @a[1..(int(@a)-1)]);
 
   if($cmd eq "raw") {  ##################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
-    $sndcmd = $a[2];
-    for (my $i = 3; $i < @a; $i++) {
+    for (my $i = 2; $i < @a; $i++) {
       CUL_HM_PushCmdStack($hash, $a[$i]);
     }
     $state = "";
 
   } elsif($cmd eq "reset") { ############################################
-    $sndcmd = sprintf("++A011%s%s0400", $id,$dst);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A011%s%s0400", $id,$dst));
 
   } elsif($cmd eq "pair") { #############################################
+
+    return "pair is not enabled for this device, use set <IODev> hmPairForSec"
+        if($isSender);
+
     my $serialNr = AttrVal($name, "serialNr", undef);
     return "serialNr is not set" if(!$serialNr);
-    $sndcmd = sprintf("++A401%s000000010A%s", $id, unpack("H*",$serialNr));
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A401%s000000010A%s", $id, unpack("H*",$serialNr)));
     $hash->{hmPairSerial} = $serialNr;
 
   } elsif($cmd eq "unpair") { ###########################################
     CUL_HM_pushConfig($hash, $id, $dst, 0, 0, "02010A000B000C00");
-    $sndcmd = shift @{$hash->{cmdStack}};
 
   } elsif($cmd eq "sign") { ############################################
     CUL_HM_pushConfig($hash, $id, $dst, $chn, $chn,
                     "08" . ($a[2] eq "on" ? "01":"02"));
-    $sndcmd = shift @{$hash->{cmdStack}};
 
   } elsif($cmd eq "statusRequest") { ####################################
-    $sndcmd = sprintf("++A001%s%s%s0E", $id,$dst, $chn);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A001%s%s%s0E", $id,$dst, $chn));
 
   } elsif($cmd eq "on") { ###############################################
-    $sndcmd = sprintf("++A011%s%s02%sC80000", $id,$dst, $chn);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A011%s%s02%sC80000", $id,$dst, $chn));
 
   } elsif($cmd eq "off") { ##############################################
-    $sndcmd = sprintf("++A011%s%s02%s000000", $id,$dst,$chn);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A011%s%s02%s000000", $id,$dst,$chn));
 
   } elsif($cmd eq "on-for-timer") { #####################################
     ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
-    $sndcmd = sprintf("++A011%s%s02%sC80000%s", $id,$dst, $chn, $tval);
+    Log 1, $ret if($ret);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A011%s%s02%sC80000%s", $id,$dst, $chn, $tval));
 
   } elsif($cmd eq "toggle") { ###########################################
     $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
     $hash->{toggleIndex} = (($hash->{toggleIndex}+1) % 128);
-    $sndcmd = sprintf("++A03E%s%s%s40%s%02X", $id, $dst,
-                                      $dst, $chn, $hash->{toggleIndex});
+    CUL_HM_PushCmdStack($hash, sprintf("++A03E%s%s%s40%s%02X", $id, $dst,
+                                      $dst, $chn, $hash->{toggleIndex}));
 
   } elsif($cmd eq "pct") { ##############################################
     $a[1] = 100 if ($a[1] > 100);
-    $sndcmd = sprintf("++A011%s%s02%s%02X0000", $id, $dst, $chn, $a[1]*2);
+    my $cmd = sprintf("++A011%s%s02%s%02X0000", $id, $dst, $chn, $a[1]*2);
     if(@a > 2) {
       ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
-      $sndcmd .= $tval;
+      Log 1, $ret if($ret);
+      $cmd .= $tval;
     }
+    CUL_HM_PushCmdStack($hash, $cmd);
 
   } elsif($cmd eq "text") { #############################################
     $state = "";
@@ -884,13 +930,12 @@ CUL_HM_Set($@)
     $l1 .= $l2;
 
     CUL_HM_pushConfig($hash, $id, $dst, $bn, 1, $l1);
-    return "Set your remote in learning mode to transmit the data";
 
   } elsif($cmd =~ m/^desired-temp$/) { ##################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
-    $hash->{SET_DESIRED_TEMP} = $temp;
-    return;
+    CUL_HM_PushCmdStack($hash,
+                sprintf("++A011%s%s0201%s0000", $id,$dst,$temp));
 
   } elsif($cmd =~ m/^(day|night|party)-temp$/) { ##################
     my %tt = (day=>"03", night=>"04", party=>"06");
@@ -898,7 +943,6 @@ CUL_HM_Set($@)
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "$tt$temp");      # List 5
-    return;
 
   } elsif($cmd =~ m/^tempList(...)/) { ##################################
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
@@ -908,12 +952,10 @@ CUL_HM_Set($@)
     my ($list,$addr) = split(" ", $day2off{$wd});
     $addr = hex($addr);
 
-
     return "To few arguments"                   if(@a < 4);
     return "To many arguments, max is 24 pairs" if(@a > 50);
     return "Bad format, use HH:MM TEMP ..."     if(@a % 2);
     return "Last time spec must be 24:00"       if($a[@a-2] ne "24:00");
-
     my $data = "";
     my $msg = "";
     for(my $idx = 2; $idx < @a; $idx += 2) {
@@ -935,51 +977,55 @@ CUL_HM_Set($@)
     $hash->{READINGS}{$vn}{TIME} = TimeNow();
     $hash->{READINGS}{$vn}{VAL} = $msg;
 
-    return;
-
   } elsif($cmd eq "matic") { ##################################### 
     # Trigger pre-programmed action in the winmatic. These actions must be
     # programmed via the original software.
 
-    $sndcmd = sprintf("++B03E%s%s%s40%02X%s", $id, $dst, $id, $a[2], $chn);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++B03E%s%s%s40%02X%s", $id, $dst, $id, $a[2], $chn));
 
   } elsif($cmd eq "create") { ###################################
-    $sndcmd = sprintf("++B001%s%s0101%s%02X%s", $id, $dst, $id, $a[2], $chn);
-    CUL_HM_SendCmd($hash, $sndcmd, 1, 1);
-    sleep(2);
-    $sndcmd = sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn);
+    CUL_HM_PushCmdStack($hash, 
+        sprintf("++B001%s%s0101%s%02X%s", $id, $dst, $id, $a[2], $chn));
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn));
 
   } elsif($cmd eq "read") { ###################################
-    $sndcmd = sprintf("++B001%s%s0104%s%02X03", $id, $dst, $id, $a[2]);
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++B001%s%s0104%s%02X03", $id, $dst, $id, $a[2]));
 
   } elsif($cmd eq "keydef") { #####################################
 
-   if ($a[3] eq "tilt") {
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],"0B220D838B228D83");
+    my $cmd;
+    if ($a[3] eq "tilt") {
+      $cmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],"0B220D838B228D83");
 
     } elsif ($a[3] eq "close") {
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0B550D838B558D83");
+      $cmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0B550D838B558D83");
 
     } elsif ($a[3] eq "closed") {
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0F008F00");
+      $cmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0F008F00");
 
     } elsif ($a[3] eq "bolt") {
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0FFF8FFF");
+      $cmd = CUL_HM_maticFn($hash, $id, $dst, $a[2], "0FFF8FFF");
 
     } elsif ($a[3] eq "delete") {
-      $sndcmd = sprintf("++B001%s%s0102%s%02X%s", $id, $dst, $id, $a[2], $chn);
+      $cmd = sprintf("++B001%s%s0102%s%02X%s", $id, $dst, $id, $a[2], $chn);
 
     } elsif ($a[3] eq "speedclose") {
-      $sndcmd = $a[4]*2;
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
-                                sprintf("23%02XA3%02X", $sndcmd, $sndcmd));
+      $cmd = $a[4]*2;
+      $cmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
+                                sprintf("23%02XA3%02X", $cmd, $cmd));
 
     } elsif ($a[3] eq "speedtilt") {
-      $sndcmd = $a[4]*2;
-      $sndcmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
-                                sprintf("22%02XA2%02X", $sndcmd, $sndcmd));
-    }
+      $cmd = $a[4]*2;
+      $cmd = CUL_HM_maticFn($hash, $id, $dst, $a[2],
+                                sprintf("22%02XA2%02X", $cmd, $cmd));
+    } else {
+      return "unknown argument $a[3]";
 
+    }
+    CUL_HM_PushCmdStack($hash, $cmd) if($cmd);
 
   } elsif($cmd eq "devicepair") { #####################################
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
@@ -992,36 +1038,36 @@ CUL_HM_Set($@)
 
     my $dst2 = $dhash->{DEF};
     my $chn2 = "01";
-    if(length($dst) == 8) {      # shadow switch device for multi-channel switch
+    if(length($dst2) == 8) {      # shadow switch device for multi-channel switch
       $chn2 = substr($dst2, 6, 2);
       $dst2 = substr($dst2, 0, 6);
+      $dhash = $modules{CUL_HM}{defptr}{$dst2};
     }
 
-    # First the remote
+    # First the remote (one loop for on, one for off)
     for(my $i = 1; $i <= 2; $i++) {
       my $b = ($i==1 ? $b1 : $b2);
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}03");
+
+      # PEER_ADD, START, WRITE_INDEX, END
       CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}01${dst2}${chn2}00");
       CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}05${dst2}${chn2}04");
       CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}080100");
       CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}06");
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}04${dst2}${chn2}04");
     }
 
-    # Now the switch.
-                      $sndcmd = "++A001${id}${dst2}${chn2}01${dst}${b2}${b1}";
+    # Now the switch: PEER_ADD, PARAM_REQ:on, PARAM_REQ:off
+    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}01${dst}${b2}${b1}");
     CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b1}03");
     CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b2}03");
     $hash = $dhash; # Exchange the hash, as the switch is always alive.
+    $isSender=0;    # the other device is a switch. ahem.
 
   }
 
-  if($state) {
-    $hash->{STATE} = $state;
-    $hash->{cmdSent} = $state;
-  }
-  CUL_HM_SendCmd($hash, $sndcmd, 0, 1) if($sndcmd);
-  return $ret;
+  $hash->{STATE} = $state if($state);
+
+  CUL_HM_ProcessCmdStack($hash) if(!$isSender);
+  return "";
 }
 
 
@@ -1057,22 +1103,26 @@ CUL_HM_Pair(@)
   my $model = substr($p, 2, 4);
   my $dp = $culHmDevProps{$stc};
 
-  $attr{$name}{model}    = $culHmModel{$model}? $culHmModel{$model} :"unknown";
+  $model = $culHmModel{$model} ? $culHmModel{$model} :"unknown";
+  my $serNo = pack('H*', substr($p, 6, 20));
+  my $devInfo = substr($p,28);
+
+  $attr{$name}{model}    = $model;
   $attr{$name}{subType}  = $dp ? $dp->{st} : "unknown";
   $attr{$name}{hmClass}  = $dp ? $dp->{cl} : "unknown";
-  $attr{$name}{serialNr} = pack('H*', substr($p, 6, 20));
-  $attr{$name}{firmware} = sprintf("%d.%d", hex(substr($p,0,1)),hex(substr($p,1,1)));
-  $attr{$name}{devInfo}  = substr($p,28);
+  $attr{$name}{serialNr} = $serNo;
+  $attr{$name}{firmware} = 
+        sprintf("%d.%d", hex(substr($p,0,1)),hex(substr($p,1,1)));
+  $attr{$name}{devInfo}  = $devInfo;
   my $stn = $attr{$name}{subType};    # subTypeName
   my $stt = $stn eq "unknown" ? "subType unknown" : "is a $stn";
 
   Log GetLogLevel($name,2),
-        "CUL_HM pair: $name $stt, model $attr{$name}{model} ".
-        "serialNr $attr{$name}{serialNr}";
+        "CUL_HM pair: $name $stt, model $model serialNr $serNo";
 
   # Create shadow device for multi-channel
   if($stn eq "switch" &&
-     $attr{$name}{devInfo} =~ m,(..)(..)(..), ) {
+     $devInfo =~ m,(..)(..)(..), ) {
     my ($b1, $b2, $b3) = (hex($1), hex($2), $3);
     for(my $i = $b2+1; $i<=$b1; $i++) {
       my $nSrc = sprintf("%s%02X", $src, $i);
@@ -1085,7 +1135,8 @@ CUL_HM_Pair(@)
 
   # Abort if we are not authorized
   if($dst eq "000000") {
-    if(!$iohash->{hmPair}) {
+    if(!$iohash->{hmPair} &&
+       (!$iohash->{hmPairSerial} || $iohash->{hmPairSerial} ne $serNo)) {
       Log GetLogLevel($name,2),
         $iohash->{NAME}. " pairing (hmPairForSec) not enabled";
       return "";
@@ -1099,24 +1150,10 @@ CUL_HM_Pair(@)
 
   }
 
-  # delete($hash->{cmdStack}); # Why? Disables 4Dis text commands
-  if($stn ne "remote") {
-    CUL_HM_pushConfig($hash, $id, $src, 0, 0, "0201$idstr");
-    CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
-
-  } else {
-    # remotes are AES per default, so the method above does not work. the
-    # following works at least for the 4Dis, not for the HM-RC-4
-    my ($fwvers, $mystc, $mymodel, $mybtn,  $myserNr) = 
-       ("10",    "10",   "0011",   "010100", unpack('H*',"FHEM$id"));
-
-    CUL_HM_SendCmd($hash,
-        $msgcnt."A000".$id.$src.$fwvers.$mymodel.$myserNr.$mystc.$mybtn, 1, 1);
-    CUL_HM_SendCmd($hash,      "++A001$id${src}0105${src}0104", 1, 1);
-    CUL_HM_PushCmdStack($hash, "++A001$id${src}01080201$idstr");
-    CUL_HM_PushCmdStack($hash, "++A001$id${src}0106");
-
-  }
+  my $chn = 0;
+  #$chn = hex($2) if($devInfo =~ m,(..)(..), && $stn eq "remote");
+  CUL_HM_pushConfig($hash, $id, $src, $chn, 0, "0201$idstr");
+  CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
 
   return "";
 }
@@ -1302,6 +1339,7 @@ my %culHmBits = (
                        LONG          => '00,02,$val=(hex($val)&0x40)?1:0',
                        LOWBAT        => '00,02,$val=(hex($val)&0x80)?1:0',
                        COUNTER       => "02,02", } },
+  "A112"          => { txt => "HAVE_DATA"},
 );
 
 sub
