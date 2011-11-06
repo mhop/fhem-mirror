@@ -1327,7 +1327,6 @@ PrintHash($$)
 
   my ($str,$sstr) = ("","");
   foreach my $c (sort keys %{$h}) {
-
     if(ref($h->{$c})) {
       if(ref($h->{$c}) eq "HASH") {
         if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
@@ -1335,11 +1334,17 @@ PrintHash($$)
                           $lev," ", $h->{$c}{TIME},$c,$h->{$c}{VAL});
         } elsif($c eq "IODev" || $c eq "HASH") {
           $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c}{NAME});
+
         } else {
           $sstr .= sprintf("%*s %s:\n",
                           $lev, " ", uc(substr($c,0,1)).lc(substr($c,1)));
           $sstr .= PrintHash($h->{$c}, $lev+2);
         }
+      } elsif(ref($h->{$c}) eq "ARRAY") {
+         $sstr .= sprintf("%*s %s:\n", $lev, " ", $c);
+         foreach my $v (@{$h->{$c}}) {
+           $sstr .= sprintf("%*s %s\n", $lev+2, " ", $v);
+         }
       }
     } else {
       $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c});
@@ -1651,7 +1656,8 @@ CommandAttr($$)
          }
       }
       if(!$found) {
-        push @rets, "Unknown attribute $a[1], use attr global userattr $a[1]";
+        push @rets, "Unknown attribute $a[1], ".
+                        "choose one of $list or use attr global userattr $a[1]";
         next;
       }
     }
@@ -1787,15 +1793,21 @@ CommandInform($$)
     return;
   }
 
-  $param = lc($param);
+  return "Usage: inform {on|timer|raw|off} [regexp]"
+        if($param !~ m/^(on|off|raw|timer)/);
 
-  return "Usage: inform {on|timer|raw|off}"
-        if($param !~ m/^(on|off|raw|timer)$/);
-  if($param =~ m/off/) {
-    delete($client{$cl}{inform});
-  } else {
-    $client{$cl}{inform} = $param;
+  delete($client{$cl}{inform});
+  delete($client{$cl}{informRegexp});
+  if($param !~ m/^off/) {
+    my ($type, $regexp) = split(" ", $param);
+    $client{$cl}{inform} = $type;
+    if($regexp) {
+      eval { "Hallo" =~ m/$regexp/ };
+      return "Bad regexp: $@" if($@);
+      $client{$cl}{informRegexp} = $regexp;
+    }
     Log 4, "Setting inform to $param";
+
   }
 
   return undef;
@@ -2090,8 +2102,10 @@ DoTrigger($$)
       my ($seconds, $microseconds) = gettimeofday();
       $tn .= sprintf(".%03d", $microseconds/1000);
     }
+    my $re = $client{$c}{informRegexp};
     for(my $i = 0; $i < $max; $i++) {
       my $state = $defs{$dev}{CHANGED}[$i];
+      next if($re && $state !~ m/$re/);
       syswrite($client{$c}{fd},
         ($client{$c}{inform} eq "timer" ? "$tn " : "") .
         "$defs{$dev}{TYPE} $dev $state\n");
