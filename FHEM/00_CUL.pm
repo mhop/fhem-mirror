@@ -65,7 +65,7 @@ my %matchListSlowRF = (
     "E:CUL_TX"    => "^TX[A-F0-9]{10}",
 );
 my %matchListHomeMatic = (
-    "1:CUL_HM" => "^A......................",
+    "1:CUL_HM" => "^A....................",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
 );
@@ -813,9 +813,9 @@ CUL_Parse($$$$$)
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
     $rssi = ($rssi>=128 ? (($rssi-256)/2-74) : ($rssi/2-74));
-    Log GetLogLevel($name,4), "$name: $dmsg $rssi";
+    Log GetLogLevel($name,5), "$name: $dmsg $rssi";
   } else {
-    Log GetLogLevel($name,4), "$name: $dmsg";
+    Log GetLogLevel($name,5), "$name: $dmsg";
   }
 
   ###########################################

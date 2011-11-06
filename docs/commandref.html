@@ -534,7 +534,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="inform"></a>
 <h3>inform</h3>
 <ul>
-  <code>inform [on|off|timer|raw]</code> <br>
+  <code>inform {on|off|timer|raw} [regexp]</code> <br>
   <br>
   If set to on, and a device state changes, send a notification to the current
   client. This command can be used by other programs/modules to receive a
@@ -2755,6 +2755,7 @@ A line ending with \ will be concatenated with the next one, so long lines
           <li>toggle - toggle the switch.</li>
        </ul></li>
      <br>
+
      <li>dimmer, blindActuator
        <ul>
          <li>0 - 100 with a resolution of 0.5:<br>
@@ -2763,6 +2764,15 @@ A line ending with \ will be concatenated with the next one, so long lines
              this corresponds to 100 or 0 %.
        </ul></li>
      <br>
+
+     <li>remotes
+       <ul>
+         devicepair <btnNumber> hmDevice<br>
+         Pair a remote directly with a switch. The command for the switch is
+         sent out directly, the remote must be set into learning mode first.
+       </ul>
+     <br>
+
      <li>4Dis (HM-PB-4DIS-WM)
        <ul>
          <li>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;<br>
@@ -2776,12 +2786,14 @@ A line ending with \ will be concatenated with the next one, so long lines
              </ul>
        </ul></li>
      <br>
+
      <li>Climate-Control (HM-CC-TC)
        <ul>
          <li>day-temp &lt;tmp&gt;<br>
              night-temp &lt;tmp&gt;<br>
              party-temp &lt;tmp&gt;<br>
-             Set the day or night temperature. Temp must be between 6 and 30
+             desired-temp &lt;tmp&gt;<br>
+             Set different temperatures. Temp must be between 6 and 30
              Celsius, and precision is half a degree.
          <li>tempListSat HH:MM temp ... 24:00 temp<br>
              tempListSun HH:MM temp ... 24:00 temp<br>
