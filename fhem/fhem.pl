@@ -903,6 +903,7 @@ CommandRereadCfg($$)
   WriteStatefile();
 
   $reread_active=1;
+  $init_done = 0;
 
   foreach my $d (keys %defs) {
     my $ret = CallFn($d, "UndefFn", $defs{$d}, $d);
@@ -923,6 +924,7 @@ CommandRereadCfg($$)
   }
   DoTrigger("global", "REREADCFG");
 
+  $init_done = 1;
   $reread_active=0;
   return $ret;
 }
@@ -1940,7 +1942,7 @@ CommandChain($$)
   my $ov = $attr{global}{verbose};
   my $oid = $init_done;
 
-  $init_done = 0;
+  $init_done = 0;       # Rudi: ???
   $attr{global}{verbose} = 1;
   foreach my $cmd (@{$list}) {
     for(my $n = 0; $n < $retry; $n++) {
