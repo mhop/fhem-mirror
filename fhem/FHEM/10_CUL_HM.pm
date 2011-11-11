@@ -182,7 +182,6 @@ CUL_HM_Parse($$)
   my ($iohash, $msg) = @_;
   my $id = CUL_HM_Id($iohash);
 
-
   # Msg format: Allnnccttssssssddddddpp...
   $msg =~ m/A(..)(..)(....)(......)(......)(.*)/;
   my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
@@ -282,7 +281,9 @@ CUL_HM_Parse($$)
   } elsif($lcm eq "09A112") {      ### Another fhem wants to talk (HAVE_DATA)
     ;
 
-  } elsif($lcm eq "1A8400" || $lcm eq "1A8000") {     #### Pairing-Request
+  } elsif($lcm eq "1A8400" ||      #### Pairing-Request
+          $lcm eq "1A8000" ||
+          $lcm eq "1A0400") {
 
     if($shash->{cmdStack}) {
       #CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1); # HAVE_DATA
@@ -1145,6 +1146,9 @@ CUL_HM_Pair(@)
   } elsif($dst ne $id) {
     return "" ;
 
+  } elsif($cmd eq "0400") {     # WDC7000
+    return "" ;
+
   } elsif($iohash->{hmPairSerial}) {
     delete($iohash->{hmPairSerial});
 
@@ -1357,7 +1361,7 @@ CUL_HM_DumpProtocol($$@)
 
   $cmd = "0A$1" if($cmd =~ m/0B(..)/);
   $cmd = "A4$1" if($cmd =~ m/84(..)/);
-  $cmd = "8000" if($cmd =~ m/A40./ && $len eq "1A");
+  $cmd = "8000" if(($cmd =~ m/A40./ || $cmd eq "0400") && $len eq "1A");
   $cmd = "A0$1" if($cmd =~ m/A4(..)/);
 
   my $ps;
