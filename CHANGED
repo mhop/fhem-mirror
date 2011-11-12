@@ -1,4 +1,4 @@
-- CVS
+- SVN
   - bugfix:  applying smallscreen attributes to firefox/opera
   - feature: CUL_TX added (thanks to Peterp)
   - feature: TCM120/TCM310 + EnOcean parser added
@@ -11,6 +11,7 @@
   - feature: CUL directio mode (No Device::SerialPort needed)
   - feature: FritzBox 7270 ZIP file
   - buxgfix: prevent fhem from stalling if telnet times out in 66_ECMD.pm
+  - feature: added postproc ability to classdef in 66_ECMD.pm (Boris, Heinz)
   - feature: FHEMWEB longpoll mode, small fixes, tuned smallscreen mode
   - feature: average module added
   - change:  moved the berliOS CVS repository to a sourceforge SVN repository

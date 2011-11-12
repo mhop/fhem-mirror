@@ -4602,11 +4602,20 @@ Attributes:<br>
                 </li>
 
                 <li>
-                <code>set &lt;name&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br>
-                <code>get &lt;name&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
+		<code>set &lt;commandname&gt; postproc { &lt;perl command&gt }</code><br>
+		<code>get &lt;commandname&gt; postproc { &lt;perl command&gt }</code>
+                <br><br>
+                Declares a postprocessor for the command <code>&lt;commandname&gt;</code>.
+                <br><br>
+                </li>
+
+
+                <li>
+                <code>set &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br>
+                <code>get &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
                 <br><br>
                 Declares the names of the named parameters that must be present in the
-                set or get command <code>&lt;name&gt;</code></a>. Be careful not to use a parameter name that
+                set or get command <code>&lt;commandname&gt;</code></a>. Be careful not to use a parameter name that
                 is already used in the device definition (see <code>params</code> above).
                 <br><br>
                 </li>
@@ -4634,9 +4643,15 @@ Attributes:<br>
 
           <li>If in doubt what happens, run the commands with loglevel 5 and
           observe the log file.</li>
+      </ul><br><br>
 
-   </ul>
-</ul>
+      Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a> 
+      for the <code>&lt;perl command&gt</code> in the postprocessor definitions nor can it contain macros.
+      This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>
+    
+      The <code>perl command</code> acts on <code>$_</code>. The result of the perl command is the
+      final result of the get or set command.
+    </ul>
 
 <a name="ECMDDevice"></a>
 <h3>ECMDDevice</h3>
@@ -4731,7 +4746,7 @@ Attributes:<br>
 
   <b>Example 2</b>
   <br><br>
-  <ul>
+    <ul>
         The following example shows how to switch a relais driven by pin 3 (bit mask 0x08) of I/O port 2 on for
         one second and then off again.<br><br>
 
@@ -4739,6 +4754,7 @@ Attributes:<br>
         <code>
                 params pinmask<br>
                 set on cmd {"io set ddr 2 ff\nioset port 2 0%pinmask\nwait 1000\nio set port 2 00"}<br>
+		set on postproc {s/OK;OK;OK;OK/success/; "$_" eq "success" ? "ok" : "error"; }<br>
         </code>
         <br>
         In the fhem configuration file or on the fhem command line we do the following:<br><br>
@@ -4753,7 +4769,11 @@ Attributes:<br>
         is replaced by <code>8</code> to yield
         <code>"io set ddr 2 ff\nioset port 2 08\nwait 1000\nio set port 2 00"</code> after macro substitution. Perl
         evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO line by line.
-        <br><br>
+        <br>
+	For any of the four plain ethersex commands, the AVR-NET-IO returns the string <code>OK</code>. They are
+	concatenated and separated by semicolons. The postprocessor takes the result from <code>$_</code>,
+	substitutes it by the string <code>success</code> if it is <code>OK;OK;OK;OK</code>, and then either
+	returns the string <code>ok</code> or the string <code>error</code>.
 
    </ul>
 </ul>

@@ -510,14 +510,28 @@ ECMD_EvalClassDef($$$)
                                         Log 1, "$name: command for $cmd $cmdname is not a perl command.";
                                         next;
                                 }
-                                $arg =~ s/^(\\\n|[ \t])*//;           # Strip space or \\n at the begginning
+                                $arg =~ s/^(\\\n|[ \t])*//;           # Strip space or \\n at the beginning
                                 $arg =~ s/[ \t]*$//;
                                 if($cmd eq "set") {
-                                        Log 5, "$name: set $cmdname defined as $arg";
+                                        Log 5, "$name: set $cmdname command defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{cmd}= $arg;
                                 } elsif($cmd eq "get") {
-                                        Log 5, "$name: get $cmdname defined as $arg";
+                                        Log 5, "$name: get $cmdname command defined as $arg";
                                         $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{cmd}= $arg;
+                                }
+                        } elsif($spec eq "postproc") {
+                                if($arg !~ m/^{.*}$/s) {
+                                        Log 1, "$name: postproc command for $cmd $cmdname is not a perl command.";
+                                        next;
+                                }
+                                $arg =~ s/^(\\\n|[ \t])*//;           # Strip space or \\n at the beginning
+                                $arg =~ s/[ \t]*$//;
+                                if($cmd eq "set") {
+                                        Log 5, "$name: set $cmdname postprocessor defined as $arg";
+                                        $hash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{postproc}= $arg;
+                                } elsif($cmd eq "get") {
+                                        Log 5, "$name: get $cmdname postprocessor defined as $arg";
+                                        $hash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{postproc}= $arg;
                                 }
                         }
                 } else {

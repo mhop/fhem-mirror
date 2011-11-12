@@ -35,6 +35,7 @@ ECMDDevice_Initialize($)
   $hash->{AttrList}  = "loglevel 0,1,2,3,4,5";
 }
 
+###################################
 sub
 ECMDDevice_AnalyzeCommand($)
 {
@@ -96,6 +97,29 @@ ECMDDevice_Changed($$$)
 
 ###################################
 sub
+ECMDDevice_PostProc($$$)
+{
+  my ($hash, $postproc, $value)= @_;
+
+  # the following lines are commented out because we do not want specials to be evaluated
+  # this is mainly due to the unwanted substitution of single semicolons by double semicolons
+  #my %specials= ECMDDevice_DeviceParams2Specials($hash);
+  #my $command= EvalSpecials($postproc, %specials);
+  # we pass the command verbatim instead
+  my $command= $postproc;
+
+  if($postproc) {
+	$_= $value;
+	Log 5, "Postprocessing $value with perl command $command.";
+	$value= AnalyzePerlCommand(undef, $command);
+  }
+  return $value;
+}
+
+
+###################################
+
+sub
 ECMDDevice_Get($@)
 {
         my ($hash, @a)= @_;
@@ -113,6 +137,7 @@ ECMDDevice_Get($@)
 
         my $ecmd= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{cmd};
         my $params= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{params};
+        my $postproc= $IOhash->{fhem}{classDefs}{$classname}{gets}{$cmdname}{postproc};
 
         my %specials= ECMDDevice_DeviceParams2Specials($hash);
         # add specials for command
@@ -132,6 +157,8 @@ ECMDDevice_Get($@)
         my $r = ECMDDevice_AnalyzeCommand($ecmd);
 
         my $v= IOWrite($hash, $r);
+
+	$v= ECMDDevice_PostProc($hash, $postproc, $v);
 
         return ECMDDevice_Changed($hash, $cmdname, $v);
 }
@@ -157,6 +184,7 @@ ECMDDevice_Set($@)
 
         my $ecmd= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{cmd};
         my $params= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{params};
+        my $postproc= $IOhash->{fhem}{classDefs}{$classname}{sets}{$cmdname}{postproc};
 
         my %specials= ECMDDevice_DeviceParams2Specials($hash);
         # add specials for command
@@ -175,7 +203,10 @@ ECMDDevice_Set($@)
         my $r = ECMDDevice_AnalyzeCommand($ecmd);
 
         my $v= IOWrite($hash, $r);
-        $v= join(" ", @a) if($params);
+
+	$v= ECMDDevice_PostProc($hash, $postproc, $v);
+
+#        $v= join(" ", @a) if($params);
 
         return ECMDDevice_Changed($hash, $cmdname, $v);
 
