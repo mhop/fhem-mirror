@@ -1,4 +1,5 @@
 ##############################################
+# $Id$
 # This module is derived from the contrib/99_PID by Alexander Titzel.
 
 package main;

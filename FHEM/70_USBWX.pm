@@ -11,6 +11,7 @@
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
 ##############################################
+# $Id$
 package main;
 
 use strict;

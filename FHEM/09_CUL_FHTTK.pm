@@ -57,7 +57,7 @@
 # able for any alerting uses (unless a delay of said
 # amount of time doesn't matter, of course ;)).
 #
-# $Id: 09_CUL_FHTTK.pm,v 1.7 2011-10-24 09:49:44 rudolfkoenig Exp $
+# $Id$
 ##############################################
 package main;
 

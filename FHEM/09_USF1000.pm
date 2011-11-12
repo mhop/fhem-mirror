@@ -5,6 +5,7 @@
 # e-mail: omega at online dot de
 #
 ##############################################
+# $Id$
 package main;
 
 use strict;

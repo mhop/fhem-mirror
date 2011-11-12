@@ -1,4 +1,5 @@
 ##############################################
+# $Id$
 package main;
 
 sub DevIo_SimpleRead($);

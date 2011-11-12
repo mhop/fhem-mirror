@@ -5,7 +5,7 @@
 # 80_xxLG7000.pm for a serial connection.
 #
 # Written by Kai 'wusel' Siering <wusel+fhem@uu.org> around 2010-01-20
-# $Id: 82_LGTV.pm,v 1.2 2010-01-22 09:51:56 painseeker Exp $
+# $Id$
 #
 # re-using code of 82_M232Voltage.pm
 # written by Dr. Boris Neubert 2007-12-24

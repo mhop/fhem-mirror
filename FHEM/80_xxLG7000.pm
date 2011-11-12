@@ -3,7 +3,7 @@
 # with LG's Scarlet Series of LCDs (e. g. LG 47LG7000)
 #
 # Written by Kai 'wusel' Siering <wusel+fhem@uu.org> around 2010-01-20
-# $Id: 80_xxLG7000.pm,v 1.2 2010-01-22 09:51:56 painseeker Exp $
+# $Id$
 #
 # re-using code of 80_M232.pm by Dr. Boris Neubert
 ##############################################
