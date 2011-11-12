@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_SISPM.pm,v 1.5 2010-01-22 09:59:14 painseeker Exp $
+# $Id$
 ###########################
 
 package main;

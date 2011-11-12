@@ -4,6 +4,7 @@
 # http://www.mikrocontroller.net/attachment/63563/km271-protokoll.txt
 # Buderus documents: 63011376, 63011377, 63011378
 # e.g. http://www.buderus.de/pdf/unterlagen/0063061377.pdf
+# $Id$
 
 package main;
 
