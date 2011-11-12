@@ -3,7 +3,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
-  <title>fhem on the Fritz!Box 7170 and 7270</title>
+  <title>fhem on the Fritz!Box</title>
   <style type="text/css">
     body   { background-color: #FFFFE7;}
     #left  { position:absolute; top:20px; left:20px; width:140px; }
@@ -22,7 +22,7 @@
 
   <div id="left">
     <img src="fhem.png">
-    <h3>Fhem on the Fritzbox 7270 and 7170</h3>
+    <h3>Fhem on the Fritz!Box</h3>
   </div>
 
   <div id="right">
@@ -73,20 +73,13 @@
           echo "&lt;name-of-the-stick&gt;/fhem/startfhem" >> /var/flash/debug.cfg
       <li>Start fhem manually with "&lt;name-of-the-stick&gt;/fhem/startfhem"
     </ul>
-    Note: As the perl in this package does <b>not</b> contain the
-    Device::SerialPort module, currently only the CUL and devices connected via
-    TCP/IP are supported. To define the CUL, the following command should be used:<br>
-      <ul>
-        define MyCUL CUL /dev/ttyACM0@directio 1234
-      </ul>
-    for details see the <a href="commandref.html#CUL">CUL</a> documentation.
     </ul>
 
-<h3>Fritzbox 7170 in <a href="http://fhemwiki.de/index.php/AVM_Fritz!Box">fhemwiki</a></h3>
+<h3>Fritz!Box 7170 in <a href="http://fhemwiki.de/index.php/AVM_Fritz!Box">fhemwiki</a></h3>
 
-<h3>Fritzbox 7170 (from Achim, as of 2009-10-19)</h3>
+<h3>Fritz!Box 7170 (from Achim, as of 2009-10-19)</h3>
 <ul>
-    <li>Flash the FritzBox with the Freetz firmware using the Fritzbox
+    <li>Flash the FritzBox with the Freetz firmware using the Fritz!Box
     web-frontend.  As we are not allowed to offer a FritzBox binary image for
     download, here is a mini HOWTO:<br>
     <ul>
@@ -156,7 +149,7 @@
     <li>Restart the box
 </ul>
 
-<h3>Fritzbox 7270 (from Volker, as of 2009-10-19)</h3>
+<h3>Fritz!Box 7270 (from Volker, as of 2009-10-19)</h3>
 <ul>
   <li>Unpack <a href="fb7270/fhem45-on-fritzbox.tgz">fhem45-on-fritzbox.tgz</a>
     to the USB-stick.<br><br>
