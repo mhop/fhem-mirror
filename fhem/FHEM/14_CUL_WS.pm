@@ -1,6 +1,5 @@
-# $Id: 14_CUL_WS.pm,v 1.30 2010-10-25 15:17:29 rudolfkoenig Exp $
-#
 ##############################################
+# $Id$
 package main;
 
 use strict;

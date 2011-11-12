@@ -33,6 +33,7 @@
 # define ws300		WS300	9		(always 9)
 # set WS300Device <interval(5-60 min.)> <height(0-2000 m)> <rainvalume(ml)>
 ################################################################
+# $Id$
 
 package main;
 

@@ -29,7 +29,7 @@ package main;
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2009/2010
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_WS3600.pm,v 1.3 2010-01-30 16:25:37 painseeker Exp $
+# $Id$
 ###########################
 
 use strict;

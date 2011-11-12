@@ -5,6 +5,7 @@
 # 
 # Published under GNU GPL License
 ######################################################
+# $Id$
 package main;
 
 use strict;

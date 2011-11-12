@@ -1,4 +1,5 @@
 ##############################################
+# $Id$
 # Avarage computing
 
 package main;

@@ -21,6 +21,7 @@
 #  GNU General Public License for more details.
 #
 ################################################################
+# $Id$
 package main;
 
 use strict;

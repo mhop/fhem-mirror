@@ -1,5 +1,6 @@
 ##############################################
 # CUL HomeMatic handler
+# $Id$
 package main;
 
 use strict;

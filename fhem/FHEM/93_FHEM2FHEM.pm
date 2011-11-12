@@ -1,4 +1,5 @@
 ##############################################
+# $Id$
 package main;
 
 use strict;
@@ -63,7 +64,7 @@ FHEM2FHEM_Define($$)
 
   my $dev = $a[2];
   if($dev !~ m/^.+:[0-9]+$/) {       # host:port
-    $dev = "$dev:2323";
+    $dev = "$dev:7072";
     $hash->{Host} = $dev;
   }
   $hash->{Host} = $dev;
