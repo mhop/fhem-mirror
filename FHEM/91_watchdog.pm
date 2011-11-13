@@ -15,7 +15,7 @@ watchdog_Initialize($)
   $hash->{DefFn} = "watchdog_Define";
   $hash->{UndefFn} = "watchdog_Undef";
   $hash->{NotifyFn} = "watchdog_Notify";
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} = "disable:0,1 regexp1WontReactivate:0,1";
 }
 
 
@@ -89,12 +89,12 @@ watchdog_Notify($$)
 
     }
 
-    if($n =~ m/^$re1$/ ||
-       "$n:$s" =~ m/^$re1$/ ||
-       ($ln eq $n && $s eq ".")) {
-      watchdog_Activate($ntfy);
-
+    if(($ln eq $n && $s eq ".") ||                        # trigger w .
+       (($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/) &&
+       !AttrVal($ln, "regexp1WontReactivate", 0))) {
+      watchdog_Activate($ntfy)
     }
+
   }
   return "";
 }
