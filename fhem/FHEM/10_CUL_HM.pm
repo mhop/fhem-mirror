@@ -1345,6 +1345,11 @@ my %culHmBits = (
                        LOWBAT        => '00,02,$val=(hex($val)&0x80)?1:0',
                        COUNTER       => "02,02", } },
   "A112"          => { txt => "HAVE_DATA"},
+  "A610;p01=06"   => { txt => "INFO_SYSTEM_STATUS", params => {
+                       CHANNEL => "2,2",
+                       STATUS  => '4,2',
+                       UNKNOWN => "6,2" } },
+
 );
 
 sub
