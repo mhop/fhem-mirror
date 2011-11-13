@@ -30,7 +30,7 @@ XmlEscape($)
   $a =~ s/"/&quot;/g;
   $a =~ s/</&lt;/g;
   $a =~ s/>/&gt;/g;
-  $a =~ s/([^ -~])/sprintf("#%02x;", ord($1))/ge;
+  $a =~ s/([^ -~])/sprintf("&#%02x;", ord($1))/ge;
   return $a;
 }
 
