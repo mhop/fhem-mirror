@@ -155,7 +155,7 @@ CUL_WS_Parse($$)
     if($typbyte == 2 && int(@a) > 5) {           # rain
       #my $more = ($firstbyte&8) ? 0 : 1000;
       my $c = $hash->{corr1} ? $hash->{corr1} : 1;
-      $rain = hex($a[5].$a[3].$a[4]) + $c;
+      $rain = hex($a[5].$a[3].$a[4]) * $c;
       $val = "R: $rain";
       $devtype =  "Rain";
       $family = "WS7000";
