@@ -7241,20 +7241,31 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <pre>
     # Talk to the FHT80 if we do not receive any message for 15 Minutes
     define w watchdog FHT80 00:15:00 SAME set FHT80 time
+
     # Shout if the HMS100-FIT is not alive
     define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"
+
+    # Send mail if the window is left open
+    define w watchdog contact1:open 00:15 contact1:closed "mail_me close window1"
+    attr w regexp1WontReactivate
     </pre>
 
     Notes:<br>
     <ul>
       <li>if &lt;regexp1&gt; is . (dot), then activate the watchdog at
-      definition time. Else it will be activated when the first matching event
-      is received.</li>
-
+          definition time. Else it will be activated when the first matching
+          event is received.</li>
+      <li>&lt;regexp1&gt; reactivates a running watchdog, to avoid it use the
+          regexp1WontReactivate attribute.
       <li>if &lt;regexp2&gt; is SAME, then it will be the same as the first
-      regexp, and it will be reactivated, when it is received. This is probably
-      the normal operation.</li>
+          regexp, and it will be reactivated, when it is received. This is
+          probably the normal operation.</li>
+      <li>trigger &lt;watchdogname&gt; . will activate/reactivate the
+          watchdog</li>
+      <li>generic watchdogs (one watchdog responsible for more devices) is
+          currently not possible.</li>
     </ul>
+
     <br>
   </ul>
 
@@ -7268,6 +7279,10 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
+        When a watchdog is active, a second event matching regexp1 will
+        normally reset the timeout. Set this attribute to prevents this.
+    </li>
   </ul>
   <br>
 
