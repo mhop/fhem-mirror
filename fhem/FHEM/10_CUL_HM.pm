@@ -592,6 +592,11 @@ CUL_HM_Parse($$)
 
     }
 
+    $p =~ m/^....(..)$/;
+    my $lst = defined($1) ? $1 : "00";
+    CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
+          if($id eq $dst);
+    push @event, "unknownMsg:$p" if(!@event);
 
   } elsif($st eq "threeStateSensor") { #####################################
 
