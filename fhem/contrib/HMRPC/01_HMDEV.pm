@@ -2,7 +2,7 @@
 # HMRPC Device Handler
 # Written by Oliver Wagner <owagner@vapor.com>
 #
-# V0.4
+# V0.5
 #
 ################################################
 #
@@ -84,6 +84,13 @@ HMDEV_Parse($$)
   	  return "UNDEFINED HMDEV_$addr HMDEV $addr";
   }
   
+  # Let's see whether we can update our devinfo now
+  if(!defined $hash->{devinfo})
+  {
+  	  $hash->{hmdevinfo}=$hash->{IODev}{devicespecs}{$addr};
+	  $hash->{hmdevtype}=$hash->{devinfo}{TYPE};	  
+  }
+  
   #
   # Ok update the relevant reading
   #
@@ -92,13 +99,25 @@ HMDEV_Parse($$)
   $hash->{READINGS}{$attrid}{TIME}=TimeNow();
   # Note that we always trigger a change on PRESS_LONG/PRESS_SHORT events
   # (they are sent whenever a button is pressed, and there is no change back)
+  # We also never trigger a change on the RSSI readings, for efficiency purposes
   if(!defined $currentval || ($currentval ne $mp[3]) || ($attrid =~ /^PRESS_/))
   {
-  	if(!($currentval =~ m/^RSSI_/))
+  	if(defined $currentval && !($currentval =~ m/^RSSI_/))
   	{
 		push @changed, "$attrid: $mp[3]";
 	}
 	$hash->{READINGS}{$attrid}{VAL}=$mp[3];
+	# Also update the STATE
+	my $state="";
+	foreach my $key (sort(keys(%{$hash->{READINGS}})))
+	{
+		if(length($state))
+		{
+			$state.="  ";
+		}
+		$state.=$key.": ".$hash->{READINGS}{$key}{VAL};
+	}
+	$hash->{STATE}=$state;
   }
   $hash->{CHANGED}=\@changed;
   
