@@ -3,7 +3,7 @@
 # HomeMatic XMLRPC API Device Provider
 # Written by Oliver Wagner <owagner@vapor.com>
 #
-# V0.4
+# V0.5
 #
 ###########################################################
 #

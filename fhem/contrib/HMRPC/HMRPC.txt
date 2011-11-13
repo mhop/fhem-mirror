@@ -2,7 +2,7 @@ HMRPC - xmlrpc-basierte Homematic-Integration fuer fhem
 =======================================================
 Von Oliver Wagner <owagner@vapor.com>
 
-V0.4
+V0.5
 
 Uebersicht
 ----------
@@ -132,6 +132,13 @@ V0.4 - HMRPC: Fehlermeldung statt Abbruch, wenn eine Testverbindung zum
        HMRPC: PRESS_ loest nun wirklich jedesmal ein changed aus.
        import_webui: Pattern korrigiert, so dass nun auch die virtuellen
        Taster erkannt werden
+       
+V0.5 - HMDEV: Es wird nun STATE sinnvoll gesetzt, als Zusammenfasung aller
+       READINGS
+       HMRPC: Der newDevices-Aufruf wird nun ausgewertet und die uebermittelten
+       Device/Channel-Informationen werden an die HMDEV-Objekte gehanden, als
+       "hmdevinfo"; gleichzeitig wird "hmdevtype" auf den HM-Devicetyp
+       
 
 Anhang
 ------
