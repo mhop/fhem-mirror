@@ -1,11 +1,11 @@
-##############################################
+###########################################################
 #
 # HomeMatic XMLRPC API Device Provider
 # Written by Oliver Wagner <owagner@vapor.com>
 #
-# V0.3
+# V0.4
 #
-##############################################
+###########################################################
 #
 # This module implements the documented XML-RPC based API
 # of the Homematic system software (currently offered as 
@@ -46,7 +46,11 @@ HMRPC_Shutdown($)
 {
 	my ($hash) = @_;
 	# Uninitialize again
-	$hash->{client}->send_request("init",$hash->{callbackurl},"");	
+	if($hash->{callbackurl})
+	{
+		Log(2,"HMRPC unitializing callback ".$hash->{callbackurl});
+		$hash->{client}->send_request("init",$hash->{callbackurl});
+	}
 	return undef;
 }
 
@@ -81,19 +85,16 @@ HMRPC_Define($$)
 	
 	# Add the XMLRPC methods we do expose
 	$hash->{server}->add_method(
-		{name=>"event",signature=> ["string string string string int","string string string string double","string string string string boolean"],code=>\&HMRPC_EventCB}
+		{name=>"event",signature=> ["string string string string int","string string string string double","string string string string boolean","string string string string i4"],code=>\&HMRPC_EventCB}
+	);
+	$hash->{server}->add_method(
+		{name=>"newDevices",signature=>["array string array"],code=>\&HMRPC_NewDevicesCB }
 	);
 	#
 	# Dummy implementation, always return an empty array
 	#
 	$hash->{server}->add_method(
 		{name=>"listDevices",signature=>["array string"],code=>sub{return RPC::XML::array->new()} }
-	);
-	#
-	# TOFIX! We can use this to store device types, autocreate devices and other niceties
-	#
-	$hash->{server}->add_method(
-		{name=>"newDevices",signature=>["array string array"],code=>sub{return RPC::XML::array->new()} }
 	);
 	
 	$hash->{STATE} = "Initialized";
@@ -143,16 +144,43 @@ HMRPC_RegisterCallback($)
 	# and then look at the local socket address assigned to us.
 	#
 	my $dummysock=IO::Socket::INET->new(PeerAddr=>$hash->{serveraddr},PeerPort=>$hash->{serverport});
-	$hash->{callbackurl}="http://".$dummysock->sockhost().":".$hash->{PORT}."/fhemhmrpc";
+	if(!$dummysock)
+	{
+		Log(2,"HMRPC unable to connect to ".$hash->{serveraddr}.":".$hash->{serverport}." ($!), will retry later");
+		return;
+	}
+	$hash->{callbackurl}="http://".$dummysock->sockhost().":".$hash->{PORT}."/fh";
 	$dummysock->close();
 	Log(2, "HMRPC callback listening on $hash->{callbackurl}");
 	# We need to fork here, as the xmlrpc server will synchronously call us
 	if(!fork())
 	{
-		$hash->{client}->send_request("init",$hash->{callbackurl},"cb");
-		Log(2, "HMRPC callback initialized");	
+		$hash->{client}->send_request("init",$hash->{callbackurl},"CB1");
+		Log(2, "HMRPC callback with URL ".$hash->{callbackurl}." initialized");	
 		exit(0);
 	}
+}
+
+#####################################
+# Process device info
+sub
+HMRPC_NewDevicesCB($$$)
+{
+	my ($server, $cb, $a) = @_;
+	
+	my $hash=$server->{fhemdef};
+	
+	Log(2,"HMRPC received ".scalar(@$a)." device specifications");
+	
+	# We receive an array of hashes with the device information. We
+	# store those hashes again in a hash, keyed by address, for later
+	# use by the individual devices
+	for my $dev (@$a)
+	{
+		my $addr=$dev->{ADDRESS};
+		$hash->{devicespecs}{$addr}=$dev;
+	}
+	return RPC::XML::array->new();
 }
 
 #####################################
@@ -175,7 +203,7 @@ HMRPC_Read($)
 	# Handle an incoming callback
 	#
 	my $conn=$hash->{server}->{__daemon}->accept();
-	$conn->timeout(3);
+	$conn->timeout(20);
 	$hash->{server}->process_request($conn);
 	$conn->close;
 	undef $conn;

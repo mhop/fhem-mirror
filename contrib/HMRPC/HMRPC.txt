@@ -118,6 +118,20 @@ V0.3 - get-Methoden implementiert, als Aufruf von XML-RPC getValue()
      - bei Boolean-Werten wurde bei false bei jedem event-Empfang 
        faelschlicherweise eine Notification ausgeloest
 
+V0.4 - HMRPC: Fehlermeldung statt Abbruch, wenn eine Testverbindung zum
+       entsprechenden Daemon nicht moeglich ist
+       HMRPC: Beim Abmelden wird nun korrekterweise kein Callback-Parameter
+       uebergeben
+       HMRPC: Das Default-Timeout fuer eingehende Requests ist nun auf 20s
+       gesetzt, da die 3s bei sehr grossen eingehenden Requests offenbar
+       zu kurz war und so z.B. der initiale newDevices-Aufruf nach dem init
+       abgebrochen wurde, was zu einem Absturz des rfd fuehrt
+       HMRPC: Ist ein Channel unbekannt, wird nun der Event an das entsprechende
+       Device delegiert, fuer Channel != 0 dann mit dem Suffix _ChannelID
+       (z.B. STATE_1)
+       HMRPC: PRESS_ loest nun wirklich jedesmal ein changed aus.
+       import_webui: Pattern korrigiert, so dass nun auch die virtuellen
+       Taster erkannt werden
 
 Anhang
 ------

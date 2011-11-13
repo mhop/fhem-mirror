@@ -17,7 +17,7 @@ export LANG=de_DE.ISO-8859-1
 wget http://$1:8181/tclrega.exe --post-data='
 string id; 
 string chid;
-foreach(id, root.Devices().EnumUsedIDs()) 
+foreach(id, dom.GetObject(ID_DEVICES).EnumUsedIDs()) 
 { 
  var d=dom.GetObject(id);
  foreach(chid,d.Channels().EnumUsedIDs())
@@ -69,7 +69,7 @@ function roomName(n)
 	return n;
 }
 
-/^BidCos-|^[A-Z0-9]{10}(:[0-9]+)?/ {
+/^BidCoS-|^[A-Z0-9]{10}(:[0-9]+)?/ {
 	name=sanitizeName($3)
 	while(usednames[name])
 	{

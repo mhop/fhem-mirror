@@ -1,10 +1,10 @@
-##############################################
+################################################
 # HMRPC Device Handler
 # Written by Oliver Wagner <owagner@vapor.com>
 #
-# V0.3
+# V0.4
 #
-##############################################
+################################################
 #
 # This module handles individual devices via the
 # HMRPC provider.
@@ -43,7 +43,10 @@ HMDEV_Define($$)
   $modules{HMDEV}{defptr}{$addr} = $hash;
   AssignIoPort($hash);
   
-  Log 5,"Assigned $name to $hash->{IODev}->{NAME}";
+  if($hash->{IODev}->{NAME})
+  {
+  	Log 5,"Assigned $name to $hash->{IODev}->{NAME}";
+  }
  
   return undef;
 }
@@ -58,8 +61,23 @@ HMDEV_Parse($$)
   
   my @mp=split(" ",$msg);
   my $addr=$mp[1];
+  my $attrid=$mp[2];
   
   $hash=$modules{HMDEV}{defptr}{$addr};
+  
+  if(!$hash)
+  {
+  	# If not explicitely defined, reroute this event to the main device
+  	# with a suffixed attribute name
+  	$addr=~s/:([0-9]{1,2})//;
+  	my $subdev=$1;
+  	if($subdev>0)
+  	{
+  		$attrid.="_$subdev";
+  	}
+  	$hash=$modules{HMDEV}{defptr}{$addr};
+  }
+  
   if(!$hash)
   {
   	  Log(2,"Received callback for unknown device $msg");
@@ -70,14 +88,17 @@ HMDEV_Parse($$)
   # Ok update the relevant reading
   #
   my @changed;
-  my $currentval=$hash->{READINGS}{$mp[2]}{VAL};
-  $hash->{READINGS}{$mp[2]}{TIME}=TimeNow();
+  my $currentval=$hash->{READINGS}{$attrid}{VAL};
+  $hash->{READINGS}{$attrid}{TIME}=TimeNow();
   # Note that we always trigger a change on PRESS_LONG/PRESS_SHORT events
-  # (they are sent whenever a button is presed, and there is no change back)
-  if(!defined $currentval || ($currentval ne $mp[3]) || ($currentval =~ m/^PRESS_/))
+  # (they are sent whenever a button is pressed, and there is no change back)
+  if(!defined $currentval || ($currentval ne $mp[3]) || ($attrid =~ /^PRESS_/))
   {
-	push @changed, "$mp[2]: $mp[3]";
-	$hash->{READINGS}{$mp[2]}{VAL}=$mp[3];
+  	if(!($currentval =~ m/^RSSI_/))
+  	{
+		push @changed, "$attrid: $mp[3]";
+	}
+	$hash->{READINGS}{$attrid}{VAL}=$mp[3];
   }
   $hash->{CHANGED}=\@changed;
   
