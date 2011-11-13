@@ -88,7 +88,7 @@ HMDEV_Parse($$)
   if(!defined $hash->{devinfo})
   {
   	  $hash->{hmdevinfo}=$hash->{IODev}{devicespecs}{$addr};
-	  $hash->{hmdevtype}=$hash->{devinfo}{TYPE};	  
+	  $hash->{hmdevtype}=$hash->{hmdevinfo}{TYPE};	  
   }
   
   #
