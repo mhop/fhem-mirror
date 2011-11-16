@@ -53,7 +53,7 @@ if(open FH, "UPLOAD/filetimes.txt") {
 chdir("UPLOAD");
 open FH, ">filetimes.txt" || die "Can't open filetimes.txt: $!\n";
 open FTP, ">script.txt" || die "Can't open script.txt: $!\n";
-print FTP "cd fhem.de/fhemupdate\n";
+print FTP "cd fhem/fhemupdate\n";
 print FTP "put filetimes.txt\n";
 print FTP "pas\n";      # Without passive only 28 files can be transferred
 my $cnt;
