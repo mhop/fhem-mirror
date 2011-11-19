@@ -482,13 +482,17 @@ ECMD_EvalClassDef($$$)
         #       set stop cmd {"io set ddr 2 ff\nio set port 2 1%btnstop\nwait 1000\nio set port 2 00"}
         #       set down cmd {"io set ddr 2 ff\nio set port 2 1%btndown\nwait 1000\nio set port 2 00"}
 
+	my $cont= "";
         foreach my $line (@classdef) {
                 # kill trailing newline
                 chomp $line;
                 # kill comments and blank lines
                 $line=~ s/\#.*$//;
                 $line=~ s/\s+$//;
+		$line= $cont . $line;
+		if($line=~ s/\\$//) { $cont= $line; undef $line; }
                 next unless($line);
+		$cont= "";
                 Log 5, "$name: evaluating >$line<";
                 # split line into command and definition
                 my ($cmd, $def)= split("[ \t]+", $line, 2);
