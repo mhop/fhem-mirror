@@ -47,8 +47,13 @@ watchdog_Define($$)
   $ntfy->{CMD} = $command;
 
 
-  $ntfy->{STATE} = ($re1 eq ".") ? "active" : "defined";
-  watchdog_Activate($ntfy) if($ntfy->{STATE} eq "active");
+  if($re1 eq ".") {
+    watchdog_Activate($ntfy)
+
+  } else {
+    $ntfy->{STATE} = "defined";
+
+  }
 
   return undef;
 }
@@ -71,12 +76,15 @@ watchdog_Notify($$)
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
+    my $dotTrigger = ($ln eq $n && $s eq "."); # trigger w .
+    my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
 
     if($ntfy->{STATE} =~ m/Next:/) {
+
       if($n =~ m/^$re2$/ || "$n:$s" =~ m/^$re2$/) {
         RemoveInternalTimer($ntfy);
 
-        if($re1 eq $re2 || $re1 eq ".") {
+        if(($re1 eq $re2 || $re1 eq ".") && !$dontReAct) {
           watchdog_Activate($ntfy);
           return "";
 
@@ -85,14 +93,20 @@ watchdog_Notify($$)
 
         }
 
+      } elsif($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/) {
+        watchdog_Activate($ntfy) if(!$dontReAct);
+
       }
 
-    }
+    } elsif($ntfy->{STATE} eq "defined") {
+      if($dotTrigger ||      # trigger w .
+         ($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/)) {
+        watchdog_Activate($ntfy)
+      }
 
-    if(($ln eq $n && $s eq ".") ||                        # trigger w .
-       (($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/) &&
-       !AttrVal($ln, "regexp1WontReactivate", 0))) {
-      watchdog_Activate($ntfy)
+    } elsif($dotTrigger) {
+      $ntfy->{STATE} = "defined";       # trigger w . 
+
     }
 
   }
@@ -129,6 +143,5 @@ watchdog_Undef($$)
   RemoveInternalTimer($hash);
   return undef;
 }
-
 
 1;
