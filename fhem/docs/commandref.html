@@ -7260,9 +7260,11 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       <li>if &lt;regexp2&gt; is SAME, then it will be the same as the first
           regexp, and it will be reactivated, when it is received. This is
           probably the normal operation.</li>
-      <li>trigger &lt;watchdogname&gt; . will activate/reactivate the
-          watchdog</li>
-      <li>generic watchdogs (one watchdog responsible for more devices) is
+      <li>trigger &lt;watchdogname&gt; . will activate the trigger if its state
+          is defined, and set it into state defined if its state is
+          triggered</li>
+      </ul>
+      <li>a generic watchdog (one watchdog responsible for more devices) is
           currently not possible.</li>
     </ul>
 
