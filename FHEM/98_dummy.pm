@@ -24,10 +24,10 @@ dummy_Set($@)
   return "no set value specified" if(int(@a) < 2);
   return "Unknown argument $a[1], choose one of *" if($a[1] eq "?");
 
-  Log GetLogLevel($name,2), "dummy set @a";
-
   my $name = shift @a;
   my $v = join(" ", @a);
+
+  Log GetLogLevel($name,2), "dummy set $name $v";
 
   $hash->{CHANGED}[0] = $v;
   $hash->{STATE} = $v;
