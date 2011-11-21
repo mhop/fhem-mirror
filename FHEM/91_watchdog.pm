@@ -66,7 +66,6 @@ watchdog_Notify($$)
 
   my $ln = $ntfy->{NAME};
   return "" if($attr{$ln} && $attr{$ln}{disable});
-  return "" if($ntfy->{INWATCHDOG});
 
   my $n   = $dev->{NAME};
   my $re1 = $ntfy->{RE1};
@@ -120,10 +119,8 @@ watchdog_Trigger($)
   Log(3, "Watchdog $ntfy->{NAME} triggered");
   my $exec = SemicolonEscape($ntfy->{CMD});;
   $ntfy->{STATE} = "triggered";
-  $ntfy->{INWATCHDOG} = 1;
   my $ret = AnalyzeCommandChain(undef, $exec);
   Log 3, $ret if($ret);
-  $ntfy->{INWATCHDOG} = 0;
 }
 
 sub
