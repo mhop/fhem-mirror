@@ -34,8 +34,9 @@ SVG_render($$$$$$$)
   my $confp = shift; # lines from the .gplot file, w/o FileLog and plot
   my $dp = shift;    # pointer to data (one string)
   my $plot = shift;  # Plot lines from the .gplot file
-  my $SVG_ss = shift;  # small screen
+  my $FW_wname = shift;  # FHEMWEB instance name
 
+  my $SVG_ss = AttrVal($FW_wname, "smallscreen", 0);
   return "" if(!defined($dp));
   my $th = 16;                          # "Font" height
   my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
@@ -58,8 +59,10 @@ SVG_render($$$$$$$)
   pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
          'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
+  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
   pO "<style type=\"text/css\"><![CDATA[";
-  if(open(FH, "$FW_dir/svg_style.css")) {
+  if(open(FH, "$FW_dir/${prf}svg_style.css") ||
+     open(FH, "$FW_dir/svg_style.css")) {
     pO join("", <FH>);
     close(FH);
   } else {
@@ -67,7 +70,8 @@ SVG_render($$$$$$$)
   }
   pO "]]></style>";
 
-  if(open(FH, "$FW_dir/svg_defs.svg")) { # gradient definitions
+  if(open(FH, "$FW_dir/${prf}svg_defs.svg") ||
+     open(FH, "$FW_dir/svg_defs.svg")) { # gradient definitions
     pO join("", <FH>);
     close(FH);
   } else {

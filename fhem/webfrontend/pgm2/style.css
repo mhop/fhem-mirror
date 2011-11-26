@@ -3,8 +3,9 @@ body     { background-color: #FFFFE7;
 input    { font-family:Arial, sans-serif; font-size:16px; }
 select   { font-family:Arial, sans-serif; font-size:16px; }
 
-#logo    { position:absolute; top:10px; left:20px; width:140px; }
-#menu    { position:absolute; top:120px;left:20px; width:140px; }
+#logo    { position:fixed; top:10px; left:20px;
+            width:100px;  height:105px; background-image:url(fhem.png); }
+#menu    { position:fixed; top:120px;left:20px; width:140px; }
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
 
@@ -21,3 +22,10 @@ table { -moz-border-radius:8px; border-radius:8px; }
 
 table#room { border:1px solid gray; width: 100%; background: #D7FFFF; }
 table#room tr.sel { background: #A0FFFF; }
+
+#right { position:absolute; top:20px; left:180px; bottom:20px; right:10px; }
+h2,h3,h4 { color:#52865D; line-height:1.3;
+           margin-top:1.5em; font-family:Arial,Sans-serif; }
+div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
+div#dist { padding-top:0.3em; }
+

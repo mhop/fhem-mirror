@@ -87,7 +87,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheet hiddenroom HTTPS longpoll";
+                     "stylesheetPrefix hiddenroom HTTPS longpoll";
 
   ###############
   # Initialize internal structures
@@ -334,7 +334,12 @@ FW_AnswerCall($)
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/(.*).css,) {
-    open(FH, "$FW_dir/$1.css") || return 0;
+    my $cssName = $1;
+    my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
+    $prf = "smallscreen" if(!$prf && $FW_ss);
+    $prf = "touchpad"    if(!$prf && $FW_tp);
+    return 0 if(!open(FH, "$FW_dir/$prf$cssName.css") && 
+                !open(FH, "$FW_dir/$cssName.css"));
     pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "text/css";
@@ -459,10 +464,7 @@ FW_AnswerCall($)
 
   my $rf = AttrVal($FW_wname, "refresh", "");
   pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
-  my $stylecss = ($FW_ss ? "style_smallscreen.css" :
-                  $FW_tp ? "style_touchpad.css" : "style.css");
-  $stylecss = AttrVal($FW_wname, "stylesheet", $stylecss);
-  pO "<link href=\"$FW_ME/$stylecss\" rel=\"stylesheet\"/>";
+  pO "<link href=\"$FW_ME/style.css\" rel=\"stylesheet\"/>";
   pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
@@ -698,8 +700,7 @@ FW_roomOverview($)
     return;
 
   } else {
-    my $logo = $FW_ss ? "fhem_smallscreen.png" : "fhem.png";
-    pO "<div id=\"logo\"><img src=\"$FW_ME/$logo\"></div>";
+    pO "<div id=\"logo\"></div>";
 
   }
 
@@ -749,6 +750,7 @@ FW_roomOverview($)
      "Details",    "$FW_ME/commandref.html",
      "Examples",   "$FW_ME/cmd=style%20examples",
      "Edit files", "$FW_ME/cmd=style%20list",
+     "Select style","$FW_ME/cmd=style%20select",
      "",           "");
   my $lastname = ","; # Avoid double "".
   for(my $idx = 0; $idx < @list; $idx+= 2) {
@@ -1166,7 +1168,7 @@ FW_showLog($)
     }
     $ret = fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_ss);
+    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_wname);
     $FW_RETTYPE = "image/svg+xml";
 
   }
@@ -1380,22 +1382,21 @@ FW_style($$)
   my ($cmd, $msg) = @_;
   my @a = split(" ", $cmd);
 
+  my $start = "<div id=\"content\"><table><tr><td>";
+  my $end   = "</td></tr></table></div>";
   if($a[1] eq "list") {
 
-    my @fl;
-    push(@fl, "fhem.cfg");
+    my @fl = ("fhem.cfg");
     push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/.*.sh"));
-    push(@fl, FW_fileList("$FW_dir/.*Util.*"));
-    push(@fl, FW_fileList("$FW_dir/.*.css"));
-    push(@fl, FW_fileList("$FW_dir/.*.js"));
+    push(@fl, FW_fileList("$FW_dir/(.*.sh|.*Util.*)"));
+    push(@fl, "");
+    push(@fl, FW_fileList("$FW_dir/.*.(css|svg|js)"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.gplot"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*html"));
 
-    pO "<div id=\"content\">";
-    pO "<table><tr><td>";
+    pO $start;
     pO "$msg<br><br>" if($msg);
     pO "<table class=\"block\" id=\"at\">";
     my $row = 0;
@@ -1409,17 +1410,37 @@ FW_style($$)
       pO "</tr>";
       $row = ($row+1)%2;
     }
-    pO "</table>";
-    pO "</td></tr></table>";
-    pO "</div>";
+    pO "</table>$end";
+
+  } elsif($a[1] eq "select") {
+
+    my @fl = FW_fileList("$FW_dir/.*style.css");
+
+    pO "$start<table class=\"block\" id=\"at\">";
+    my $row = 0;
+    foreach my $file (@fl) {
+      next if($file =~ m/(svg_|smallscreen|touchpad)style.css/);
+      $file =~ s/style.css//;
+      $file = "Default" if($file eq "");
+      pO "<tr class=\"" . ($row?"odd":"even") . "\">";
+      pH "cmd=style set $file", "$file", 1;
+      pO "</tr>";
+      $row = ($row+1)%2;
+    }
+    pO "</table>$end";
+
+  } elsif($a[1] eq "set") {
+    if($a[2] eq "Default") {
+      delete($attr{$FW_wname}{stylesheetPrefix});
+    } else {
+      $attr{$FW_wname}{stylesheetPrefix} = $a[2];
+    }
+    pO "${start}Reload the page in the browser.$end";
 
   } elsif($a[1] eq "examples") {
 
     my @fl = FW_fileList("$FW_dir/example.*");
-    pO "<div id=\"content\">";
-    pO "<table><tr><td>";
-    pO "$msg<br><br>" if($msg);
-    pO "<table class=\"block\" id=\"at\">";
+    pO "$start<table class=\"block\" id=\"at\">";
     my $row = 0;
     foreach my $file (@fl) {
       pO "<tr class=\"" . ($row?"odd":"even") . "\">";
@@ -1427,9 +1448,7 @@ FW_style($$)
       pO "</tr>";
       $row = ($row+1)%2;
     }
-    pO "</table>";
-    pO "</td></tr></table>";
-    pO "</div>";
+    pO "</table>$end";
 
   } elsif($a[1] eq "edit") {
 
