@@ -15,6 +15,13 @@
   - feature: FHEMWEB longpoll mode, small fixes, tuned smallscreen mode
   - feature: average module added
   - change:  moved the berliOS CVS repository to a sourceforge SVN repository
+  - feature: all FHEM modules have now a subversion id.
+  - bugfix:  new perl compiled for the FritzBox 7270
+  - feature: regexp1WontReactivate Attribute added
+  - bugfix:  XmlList special handling
+  - bugfix:  CUL_WS rain sensor corr1 fix
+  - feature: FHEMWEB stylesheet attribute repaced with stylesheetPrefix
+
   
 - 2011-07-08 (5.1)
   - feature: smallscreen optimizations for iPhone
