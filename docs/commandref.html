@@ -6597,10 +6597,23 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       <br><br>
     </li>
 
-    <a name="stylesheet"></a>
-    <li>stylesheet<br>
-      name of the alternative stylesheet file in the FHEM directory.
-      <br><br>
+    <a name="stylesheetPrefix"></a>
+    <li>stylesheetPrefix<br>
+      prefix for the files style.css, svg_style.css and svg_defs.svg. If the file
+      with the prefix is missing, the default file (without prefix) will be used.
+      These files have to be placed into the FHEM directory, and can be selected
+      directly from the "Select style" FHEMWEB menu entry. Example:
+      <ul>
+        attr WEB stylesheetPrefix dark<br>
+        <br>
+        Referenced files:<br>
+        <ul>
+        darksvg_defs.svg<br>
+        darksvg_style.css<br>
+        darkstyle.css<br>
+        </ul>
+        <br>
+      </ul>
       </li>
 
     <a name="hiddenroom"></a>
