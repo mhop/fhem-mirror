@@ -12,8 +12,8 @@
 
 <body>
 
-  <div id="left">
-    <img src="fhem.png" alt="fhem-logo"/>
+  <div id="logo"></div>
+  <div id="menu">
     <h3>fhem.pl reference</h3>
   </div>
 
@@ -496,14 +496,13 @@ A line ending with \ will be concatenated with the next one, so long lines
   Output a short space seperated status for &lt;devspec&gt;. It is useful for
   monitoring the device in e.g. Cacti.<br>
   Examples:
-  <ul>
-    <pre><code>  getstate lamp
-  state:1
-
-  getstate fl
+  <ul><code>
+  getstate lamp<br>
+  state:1<br>
+  <br>
+  getstate fl<br>
   ack:0 actuator:2 day-temp:21.5 desired-temp:22.5 [...] measured-temp:22.9 [...]
-    </code></pre>
-  </ul>
+  <code></ul>
   Note: to use this command copy the file contrib/getstate/99_getstate.pm into
   your FHEM directory.
   <br>
@@ -2438,8 +2437,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 <h3>CUL_IR</h3>
 <ul>
 
-  <table>
-  <tr><td>
   The CUL_IR module interprets Infrared messages received by the CUN/CUNO/CUNOv2/TuxRadio.
   Those devices can receive Infrared Signals from basically any Remote controller and will transform
   that information in a so called Button-Code  <br><br>

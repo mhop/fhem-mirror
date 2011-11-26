@@ -11,8 +11,8 @@
 
 <body>
 
-  <div id="left">
-    <img src="fhem.png">
+  <div id="logo"></div>
+  <div id="menu">
     <h3>FHEM Howto</h3>
   </div>
 
@@ -114,8 +114,10 @@
       Just wait for a while, watch the log and re-check your browser for newly
       appeared devices. You can use <a href="commandref.html#rename">
       rename</a> to rename the automatically created device, e.g. type in the
-      input field of the web frontend:<pre>
+      input field of the web frontend:
+      <ul><code>
       rename FHT_1234 fht.kitchen</pre> 
+      </code></ul>
 
       <b>Note</b>: if you rename the device itself, the attached FileLog
       and weblink will be renamed automatically. The other way round (renaming
@@ -125,14 +127,20 @@
       If you want to do the same manually:<br>
       Wait a while, until the transmitter sent some data. In the logfile
       (Browser window: "Unsorted -> Logs / Fhemlog / text) a line
-      will  appear:<pre>
-      FS20 Unknown device &lt;HOUSECODE&gt;, Button &lt;BTN&gt; Code &lt;CDE&gt;, please define it</pre>
+      will  appear:
+      <ul><code>
+      FS20 Unknown device &lt;HOUSECODE&gt;, Button &lt;BTN&gt; Code &lt;CDE&gt;, please define it
+      </code></ul>
 
-      Now define the fhem device:<pre>
-      define piri1 FS20 &lt;HOUSECODE&gt; &lt;BTN&gt;</pre>
+      Now define the fhem device:
+      <ul><code>
+      define piri1 FS20 &lt;HOUSECODE&gt; &lt;BTN&gt;
+      </code></ul>
 
-      Set the model attribute of the device:<pre>
-      attr piri1 model fs20piri</pre>
+      Set the model attribute of the device:
+      <ul><code>
+      attr piri1 model fs20piri
+      </code></ul>
 
       to get only the commands available for this device.
       <a href="commandref.html#model">Here</a> is a complete list of FS20
