@@ -604,11 +604,11 @@ CUL_HM_Parse($$)
     my $lst = defined($1) ? $1 : "00";
 
     if($p =~ m/^0601000E$/) {
-      push @event, "state:alive";
+      push @event, "alive:yes";
 
     } elsif($p =~ m/^0601..00$/) {
       push @event, "cover:closed";
-      push @event, "state:alive";
+      push @event, "alive:yes";
 
     } elsif($p =~ m/^0601..0E$/) {
       push @event, "cover:open";
@@ -622,7 +622,7 @@ CUL_HM_Parse($$)
                    if($model eq "HM-SEC-WDS");
 
       if($txt{$lst}) {
-        push @event, "contact:$txt{$lst}$target";
+        push @event, "state:$txt{$lst}$target";
 
       } else {
         $lst = "00"; # for the ack
