@@ -14,7 +14,7 @@ notify_Initialize($)
   $hash->{DefFn} = "notify_Define";
   $hash->{NotifyFn} = "notify_Exec";
   $hash->{AttrFn}   = "notify_Attr";
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} = "disable:0,1 forwardReturnValue:0,1 loglevel:0,1,2,3,4,5,6";
 }
 
 
@@ -67,6 +67,7 @@ notify_Exec($$)
       $found = ("$n:$s" =~ m/^$re$/);
     }
     if($found) {
+      Log GetLogLevel($ln, 5), "Triggering $ln";
       my (undef, $exec) = split("[ \t]+", $ntfy->{DEF}, 2);
 
       my %specials= (
@@ -77,11 +78,12 @@ notify_Exec($$)
       $exec= EvalSpecials($exec, %specials);
 
       my $r = AnalyzeCommandChain(undef, $exec);
-      Log 3, $r if($r);
+      Log GetLogLevel($ln, 3), "$ln return value: $r" if($r);
       $ret .= " $r" if($r);
     }
   }
-  return $ret;
+  return $ret if(AttrVal($ln, "forwardReturnValue", 0));
+  return undef;
 }
 
 sub
