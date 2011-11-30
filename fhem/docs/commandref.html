@@ -6748,10 +6748,9 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <a name="disable"></a>
     <li>disable<br>
         Can be applied to at/watchdog/notify/FileLog devices.<br>
-    Disables the corresponding at/notify or FileLog device. Note:
+        Disables the corresponding at/notify or FileLog device. Note:
         If applied to an <a href="#at">at</a>, the command will not be executed,
         but the next time will be computed.</li><br>
-
     <a name="skip_next"></a>
     <li>skip_next<br>
     Used for at commands: skip the execution of the command the next
@@ -7111,6 +7110,14 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <a name="forwardReturnValue"></a>
+    <li>forwardReturnValue<br>
+        Forward the return value of the executed command to the caller,
+        default is disabled (0).  If enabled (1), then e.g. a set command which
+        triggers this notify will also return this value. This can cause e.g
+        FHEMWEB to display this value, when clicking "on" or "off", which is
+        often not intended.</li>
   </ul>
   <br>
 
@@ -7849,7 +7856,6 @@ isday</pre>
   <ul>
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
-    <a name="disable"></a>
     <li>disable<br>
         Disables PachLog.
         Nor more Logging to www.pachube.com
