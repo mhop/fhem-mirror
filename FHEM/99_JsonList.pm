@@ -1,4 +1,5 @@
 ################################################################
+# $Id$
 #
 #  Copyright notice
 #
@@ -133,11 +134,11 @@ CommandJsonList($$)
 
     my $q = "";
 
-    # Open JSON object 
+    # open JSON object 
     $str = "{\n";
-    $str .= sprintf("%*s\"ResultSet\": {\n", $lev, " ");
-    # Open JSON array
-    $str .= sprintf("%*s\"Results\": [\n", $lev+2, " ");
+    $str .= sprintf("%*s\"ResultSet\": \"%s\",\n", $lev, " ","full");
+    # open JSON array
+    $str .= sprintf("%*s\"Results\": [\n", $lev, " ");
 
     delete($modules{""}) if(defined($modules{""}));
     @dc = keys(%defs);
@@ -151,18 +152,9 @@ CommandJsonList($$)
       my $t = $p->{TYPE};
       $t = $q if($q ne "");
 
-      $str .= sprintf("} ") if($t eq $lt);
-      $str .= sprintf("},\n") if($t eq $lt);
-
-      if($t ne $lt) {
-        $str .= sprintf("} ") if($lt);
-        $str .= sprintf("}\n") if($lt);
-        $str .= sprintf("%*s]\n", $lev+6, " ") if($lt);
-        $str .= sprintf("%*s},\n", $lev+4, " ") if($lt);
-        #$str .= sprintf("%*s{\n", $lev+4, " ");
-        $str .= sprintf("%*s\{ \"%s_LIST\": [\n", $lev+4, " ", $t);
-      }
-      $lt = $t;
+      #$str .= sprintf("} ") if($t eq $lt);
+      #$str .= sprintf("},\n") if($t eq $lt);
+      #$str .= sprintf("%*s},\n", $lev+6, " ") if($t eq $lt);
 
       my $a1 = JsonEscape($p->{STATE});
       my $a2 = JsonEscape(getAllSets($d));
@@ -176,35 +168,39 @@ CommandJsonList($$)
         push @attrs, $k3;
       }
 
+      # close device object
+      $str .= sprintf("%*s},\n", $lev+6, " ") if($t eq $lt);
+
+      if($t ne $lt) {
+        # close device opject
+        $str .= sprintf("%*s}\n", $lev+6, " ") if($lt && $t ne $lt);
+        #$str .= sprintf("}\n") if($lt);
+
+        # close devices array
+        $str .= sprintf("%*s]\n", $lev+4, " ") if($lt);
+
+        # close list object
+        $str .= sprintf("%*s},\n", $lev+2, " ") if($lt);
+
+       	#$str .= sprintf("%*s{\n", $lev+4, " ");
+        # open  list object
+        $str .= sprintf("%*s\{\n", $lev+2, " ");
+        $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev+4, " ", "list", $t);
+
+        # open devices array
+        $str .= sprintf("%*s\"%s\": [\n", $lev+4, " ", "devices");
+      }
+
+      $lt = $t;
+
       #$str .= sprintf("%*s{\n", $lev+8, " ");
-      $str .= sprintf("%*s{ \"%s\": { ", $lev+8, " ", $t);
-      $str .= sprintf("\"name\": \"%s\", ", $d);
-      $str .= sprintf("\"state\": \"%s\", ", $a1);
-      $str .= sprintf("\"sets\": [ ");
 
-      $ac = @sets;
-      $cc = 0;
-      foreach my $set (@sets) {
-        $str .= sprintf("{ \"VAL\": \"%s\" }", $set);
-        $cc++;
-        #$str .= ",\n" if($cc != $ac);
-        $str .= ", " if($cc != $ac);
-        #$str .= "\n" if($cc == $ac);
-      } 
-      $str .= sprintf(" ], ");
-      $str .= sprintf("\"attrs\": [ ");
-      $ac = @attrs;
-      $cc = 0;
-      foreach my $attr (@attrs) {
-        $str .= sprintf("{ \"VAL\": \"%s\" }", $attr);
-        $cc++;
-        #$str .= ",\n" if($cc != $ac);
-        $str .= "," if($cc != $ac);
-        #$str .= "\n" if($cc == $ac);
-      } 
-      $str .= sprintf(" ], ");
+      # open device object
+      $str .= sprintf("%*s{\n", $lev+6, " ");
 
-      $str .= sprintf("\"INT\": { ");
+      #$str .= sprintf("%*s\"name\": \"%s\",\n", $lev+8, " ", $d);
+      #$str .= sprintf("%*s\"state\": \"%s\",\n", $lev+8, " ", $a1);
+      #$str .= sprintf("\"INT\": { ");
       @ac = keys(%{$p});
       $ac = 0;
       foreach my $k (sort @ac) {
@@ -215,62 +211,107 @@ CommandJsonList($$)
 
       foreach my $c (sort keys %{$p}) {
         next if(ref($p->{$c}));
-        $str .= sprintf("\"%s\": \"%s\"",
+        $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev+8, " ",
                         JsonEscape($c), JsonEscape($p->{$c}));
         $cc++;
         #$str .= ",\n" if($cc != $ac || ($cc == $ac && $p->{IODev}));
-        $str .= ", " if($cc != $ac || ($cc == $ac && $p->{IODev}));
+        #$str .= ",\n" if($cc != $ac || ($cc == $ac && $p->{IODev}));
         #$str .= "\n" if($cc == $ac && !$p->{IODev});
       }
-      $str .= sprintf("\"IODev\": \"%s\" ",
+      $str .= sprintf("%*s\"IODev\": \"%s\",\n", $lev+8, " ",
                       $p->{IODev}{NAME}) if($p->{IODev});
-      $str .= sprintf(" }, ");
+      #$str .= sprintf(" }, ");
 
-      $str .= sprintf("\"ATTR\": { ");
       @ac = keys(%{$attr{$d}});
       $ac = @ac;
       $cc = 0;
-      foreach my $c (sort keys %{$attr{$d}}) {
-        $str .= sprintf("\"%s\": \"%s\"",
-                        JsonEscape($c), JsonEscape($attr{$d}{$c}));
-        $cc++;
-        #$str .= ",\n" if($cc != $ac);
-        $str .= ", " if($cc != $ac);
-        #$str .= "\n" if($cc == $ac);
+      if($ac != 0) {
+        $str .= sprintf("%*s\"ATTR\": {\n", $lev+8, " ");
+        foreach my $c (sort keys %{$attr{$d}}) {
+          $str .= sprintf("%*s\"%s\": \"%s\"", $lev+10, " ",
+                          JsonEscape($c), JsonEscape($attr{$d}{$c}));
+          $cc++;
+          #$str .= ",\n" if($cc != $ac);
+          $str .= ",\n" if($cc != $ac);
+          #$str .= "\n" if($cc == $ac);
+        }
+        $str .= "\n";
+        #$str .= sprintf("%*s]\n", $lev+8, " ") if(!$p->{READINGS});
+        #$str .= sprintf("%*s],\n", $lev+8, " ") if($p->{READINGS});
+        $str .= sprintf("%*s},\n", $lev+8, " ");
+      } else {
+        $str .= sprintf("%*s\"ATTR\": {},\n", $lev+8, " ");
       }
-      $str .= sprintf(" }, ") if($p->{READINGS});
-      $str .= sprintf(" } ") if(!$p->{READINGS});
+      #$str .= sprintf("%*s],\n", $lev+8, " ") if($p->{READINGS});
+      #$str .= sprintf("%*s]\n", $lev+8, " ") if(!$p->{READINGS});
 
       my $r = $p->{READINGS};
       if($r) {
-        $str .= sprintf("\"STATE\": { ");
+        $str .= sprintf("%*s\"READINGS\": [\n", $lev+8, " ");
         @ac = keys(%{$r});
         $ac = @ac;
         $cc = 0;
         foreach my $c (sort keys %{$r}) {
-	  $str .=
-            sprintf("\"%s\": \"%s\", \"measured\": \"%s\"",
-                   JsonEscape($c), JsonEscape($r->{$c}{VAL}), $r->{$c}{TIME});
-            $cc++;
-            #$str .= ",\n" if($cc != $ac);
-            $str .= ", " if($cc != $ac);
-            #$str .= "\n" if($cc == $ac);
+          $str .= sprintf("%*s{\n", $lev+10, " ");
+	  $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev+12, " ", JsonEscape($c), JsonEscape($r->{$c}{VAL}));
+          $str .= sprintf("%*s\"measured\": \"%s\"\n", $lev+12, " ", $r->{$c}{TIME});
+          $cc++;
+          #$str .= ",\n" if($cc != $ac);
+          $str .= sprintf("%*s},\n", $lev+10, " ") if($cc != $ac);
+          $str .= sprintf("%*s}\n", $lev+10, " ") if($cc == $ac);
         }
-        $str .= sprintf(" } ");
+        $str .= sprintf("%*s]\n", $lev+8, " ");
+      } else {
+        $str .= sprintf("%*s\"READINGS\": []\n", $lev+8, " ");
       }
+
+if($cc gt $ac) {
+      # corresponding set parameters
+      $str .= sprintf("%*s\"sets\": [\n", $lev+6, " ");
+
+      $ac = @sets;
+      $cc = 0;
+      foreach my $set (@sets) {
+        $str .= sprintf("%*s\"%s\"", $lev+8, " ", $set);
+        $cc++;
+        #$str .= ",\n" if($cc != $ac);
+        $str .= ",\n" if($cc != $ac);
+        #$str .= "\n" if($cc == $ac);
+      } 
+      $str .= sprintf("\n%*s],\n", $lev+6, " ");
+
+      # corresponding attributes
+      $str .= sprintf("%*s\"attrs\": [\n", $lev+6, " ");
+      $ac = @attrs;
+      $cc = 0;
+      foreach my $attr (@attrs) {
+        $str .= sprintf("%*s\"%s\"", $lev+8, " ", $attr);
+        $cc++;
+        #$str .= ",\n" if($cc != $ac);
+        $str .= ",\n" if($cc != $ac);
+        $str .= "\n" if($cc == $ac);
+      } 
+}
+
       $tc++;
       $tr = $tc if($q eq "");
       $tr++ if($q ne "" && $p->{TYPE} eq $t);
-      $str .= sprintf("} ") if(($tc == $dc) || (!$lt));
-      $str .= sprintf("}\n") if(($tc == $dc) || (!$lt));
-      $str .= sprintf("%*s]\n", $lev+6, " ") if(($tc == $dc) || (!$lt));
+      #$str .= sprintf("} ") if(($tc == $dc) || (!$lt));
+      #$str .= sprintf("+++}\n") if(($tc == $dc) || (!$lt));
+      $str .= sprintf("%*s}\n", $lev+6, " ") if(($tc == $dc) || (!$lt));
     }
-    $str .= sprintf("%*s}\n", $lev+4, " ") if($lt);
-    $str .= sprintf("%*s],\n", $lev+2, " ");
-    $str .= sprintf("%*s\"totalResultsAvailable\": %s,\n", $lev+2, " ",$tc);
-    $str .= sprintf("%*s\"totalResultsReturned\": %s\n", $lev+2, " ",$tr);
-    $str .= sprintf("%*s}\n", $lev, " ");
-    $str .= "}";
+    $str .= sprintf("%*s]\n", $lev+4, " ") if($lt);
+    $str .= sprintf("%*s}\n", $lev+2, " ") if($lt);
+
+    # close JSON array
+    $str .= sprintf("%*s],\n", $lev, " ");
+
+    # return number of results
+    $str .= sprintf("%*s\"totalResultsReturned\": %s\n", $lev, " ",$tr);
+
+    # close JSON object
+    $str .= "}\n";
+
   } else {
     if($param eq "ROOMS") {
       my @rooms;
@@ -287,24 +328,23 @@ CommandJsonList($$)
 
       # Open JSON object
       $str .= "{\n";
-      $str .= sprintf("%*s\"%s\": {\n", $lev, " ", "ResultSet");
+      $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev, " ", "ResultSet", "rooms");
       # Open JSON array
-      $str .= sprintf("%*s\"%s\": [", $lev+2, " ", "Results");
+      $str .= sprintf("%*s\"%s\": [", $lev, " ", "Results");
 
       for (my $i=0; $i<@rooms; $i++) {
-        $str .= " }," if($i <= $#rooms && $i > 0);
-        $str .= sprintf("\n%*s{ \"NAME\": \"%s\"", $lev+4, " ", $rooms[$i]);
+        $str .= "," if($i <= $#rooms && $i > 0);
+        $str .= sprintf("\n%*s\"%s\"", $lev+2, " ", $rooms[$i]);
         $c++;
       }
 
-      $str .= " }\n";
+      $str .= "\n";
       # Close JSON array
-      $str .= sprintf("%*s],\n", $lev+2, " ");
+      $str .= sprintf("%*s],\n", $lev, " ");
       # Result summary
-      $str .= sprintf("%*s\"%s\": %s,\n", $lev+2, " ", "totalResultsAvailable", $c);
-      $str .= sprintf("%*s\"%s\": %s\n", $lev+2, " ", "totalResultsReturned", $c);
+      #$str .= sprintf("%*s\"%s\": %s,\n", $lev, " ", "totalResultsAvailable", $c);
+      $str .= sprintf("%*s\"%s\": %s\n", $lev, " ", "totalResultsReturned", $c);
       # Close JSON object
-      $str .= sprintf("%*s}\n", $lev, " ");
       $str .= "}";
 
     } else {
@@ -328,9 +368,9 @@ CommandJsonList($$)
 
         # Open JSON object
         $str .= "{\n";
-        $str .= sprintf("%*s\"%s\": {\n", $lev, " ", "ResultSet");
+        $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev, " ", "ResultSet", "devices#$listDev");
         # Open JSON array
-        $str .= sprintf("%*s\"%s\": [", $lev+2, " ", "Results");
+        $str .= sprintf("%*s\"%s\": [", $lev, " ", "Results");
 
         # Sort first by type then by name
         for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER} cmp
@@ -338,23 +378,22 @@ CommandJsonList($$)
                              $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
           if($defs{$d}{TYPE} eq $param) {
             my $t = $defs{$d}{TYPE};
-            $str .= " }," if($d ne $ld && $lt ne "");
-            $str .= sprintf("\n%*s{ \"NAME\": \"%s\", \"STATE\": \"%s\"",
-                             $lev+4, " ", $d, $defs{$d}{STATE});
+            $str .= sprintf("\n%*s},",$lev+2, " ") if($d ne $ld && $lt ne "");
+            $str .= sprintf("\n%*s{",$lev+2, " ");
+            $str .= sprintf("\n%*s\"name\": \"%s\",",$lev+4, " ", $d);
+            $str .= sprintf("\n%*s\"state\": \"%s\"",$lev+4, " ", $defs{$d}{STATE});
             $lt = $t;
             $ld = $d;
             $c++;
           }
         }
 
-        $str .= " }\n";
+        $str .= sprintf("\n%*s}\n",$lev+2, " ");
         # Close JSON array
-        $str .= sprintf("%*s],\n", $lev+2, " ");
+        $str .= sprintf("%*s],\n", $lev, " ");
         # Result summary
-        $str .= sprintf("%*s\"%s\": %s,\n", $lev+2, " ", "totalResultsAvailable", $c);
-        $str .= sprintf("%*s\"%s\": %s\n", $lev+2, " ", "totalResultsReturned", $c);
+        $str .= sprintf("%*s\"%s\": %s\n", $lev, " ", "totalResultsReturned", $c);
         # Close JSON object
-        $str .= sprintf("%*s}\n", $lev, " ");
         $str .= "}";
 
       } else {
