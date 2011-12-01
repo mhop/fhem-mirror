@@ -39,9 +39,6 @@
   STefan's "presence simulator" for holidays
 - garden.pl
   Garden irrigation regulator with weather dependency (KS300 temp + rain)
-- JsonList
-  99_JsonList.pm adds a jsonlist command, which is list in JSON format.
-  See JsonList/README.JsonList for more. By Martin.
 - fhem-speech
   Martins instructions on how to make FHEM talk using the MBROLA speech
   synthesizer

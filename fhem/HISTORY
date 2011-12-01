@@ -481,3 +481,7 @@
   
 - Thu Aug 04 2011 (Boris)
   - enabled logging for 59_Weather.pm
+
+- Thu Dec 01 2011 (Martin F.)
+  - Move JsonList from contrib to main modules. Jsonlist output is optimized
+    and now be more structured.
