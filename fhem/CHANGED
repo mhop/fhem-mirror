@@ -22,6 +22,8 @@
   - bugfix:  CUL_WS rain sensor corr1 fix
   - feature: FHEMWEB stylesheet attribute repaced with stylesheetPrefix
   - feature: notify attribute forwardReturnValue
+  - change:  move JsonList from contrib to main-modules
+  - change:  JsonList output optimized and more structured
 
   
 - 2011-07-08 (5.1)

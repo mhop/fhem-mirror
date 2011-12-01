@@ -39,6 +39,7 @@
       <a href="#help">?,help</a> &nbsp;
       <a href="#include">include</a> &nbsp;
       <a href="#inform">inform</a> &nbsp;
+      <a href="#jsonlist">jsonlist</a> &nbsp;
       <a href="#list">list</a> &nbsp;
       <a href="#modify">modify</a> &nbsp;
       <a href="#quit">quit</a> &nbsp;
@@ -533,6 +534,155 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a> entries.
 
   <br>
+</ul>
+
+<a name="jsonlist"></a>
+<h3>jsonlist</h3>
+<ul>
+  <code>jsonlist [&lt;devspec&gt;|&lt;typespec&gt;|ROOMS]</code>
+  <br><br>
+  Returns an JSON tree of all definitions, all notify settings and all at
+  entries if no parameter is given.
+  <br><br>
+  Example:
+  <pre><code>  fhem> jsonlist
+  {
+    "ResultSet": "full",
+    "Results": [
+      {
+        "list": "Global",
+        "devices": [
+          {
+            "DEF": "<no definition>",
+            "NAME": "global",
+            "NR": "1",
+            "STATE": "<no definition>",
+            "TYPE": "Global",
+            "currentlogfile": "/var/log/fhem/fhem-2011-12.log",
+            "logfile": "/var/log/fhem/fhem-%Y-%m.log",
+            "ATTR": {
+              "configfile": "/etc/fhem/fhem.conf",
+              "logfile": "/var/log/fhem/fhem-%Y-%m.log",
+              "modpath": "/usr/share/fhem",
+              "pidfilename": "/var/run/fhem.pid",
+              "port": "7072 global",
+              "room": "Server",
+              "statefile": "/var/cache/fhem/fhem.save",
+              "verbose": "4",
+              "version": "=VERS= from =DATE= ($Id: fhem.pl,v 1.150 2011-08-16 18:06:38 rudolfkoenig Exp $)"
+            },
+            "READINGS": []
+          }
+        ]
+      },
+      {
+      "list": "CM11",
+        "devices": [
+          {
+            "DEF": "/dev/cm11",
+            "DeviceName": "/dev/cm11",
+            "FD": "14",
+            "NAME": "CM11",
+            "NR": "19",
+            "PARTIAL": "null",
+            "STATE": "Initialized",
+            "TYPE": "CM11",
+            "ATTR": {
+              "model": "CM11"
+            },
+            "READINGS": []
+          }
+        ]
+      },
+      {
+              [...placeholder for more entrys...]
+      },
+    ],
+    "totalResultsReturned": 235
+  }
+  </code></pre>
+  If specifying <code>&lt;devspec&gt;</code>, then a detailed status for
+  <code>&lt;devspec&gt;</code>  will be displayed, e.g.:
+  <pre><code>  fhem> jsonlist lamp1
+  {
+    "ResultSet": {
+      "Results": {
+        "ATTRIBUTES": {
+          "alias": "Lamp on Sideboard",
+          "model": "fs20st",
+          "room": "Livingroom"
+        },
+        "BTN": "01",
+        "CHANGED": "ARRAY",
+        "CHANGETIME": "ARRAY",
+        "CODE": {
+          "1": "0b0b 01",
+          "2": "0b0b 0f",
+          "3": "0b0b f0",
+          "4": "0b0b ff"
+        },
+        "DEF": "12341234 1112 lm 1144 fg 4411 gm 4444",
+        "IODev": "CUN868",
+        "NAME": "lamp1",
+        "NR": "155",
+        "READINGS": {
+          "state": {
+            "TIME": "2011-12-01 16:23:01",
+            "VAL": "on"
+          }
+        },
+        "STATE": "on",
+        "TYPE": "FS20",
+        "XMIT": "0b0b"
+      }
+    }
+  }
+  </code></pre>
+  If specifying <code>&lt;typespec&gt;</code>, then a list with the status for
+  the defined <code>&lt;typespec&gt;</code> devices will be displayed, e.g.:
+  <pre><code>  fhem> jsonlist HMS
+  {
+    "ResultSet": "devices#HMS",
+    "Results": [
+      {
+        "name": "KG.ga.WD.01",
+        "state": "Water Detect: off"
+      },
+      {
+        "name": "KG.hz.GD.01",
+        "state": "Gas Detect: off"
+      },
+      {
+        "name": "KG.k1.TF.01",
+        "state": "T: 16.6  H: 51.2  Bat: ok"
+      },
+      {
+        "name": "NN.xx.RM.xx",
+        "state": "smoke_detect: off"
+      }
+    ],
+    "totalResultsReturned": 4
+  }
+  </code></pre>
+  If specifying <code>ROOMS</code>, then a list with the defined rooms
+  will be displayed, e.g.:
+  <pre><code>  fhem> jsonlist ROOMS
+  {
+    "ResultSet": "rooms",
+    "Results": [
+      "Bathroom",
+      "Bedroom",
+      "Children",
+      "Diningroom",
+      "Garden",
+      "House",
+      "Livingroom",
+      "Office",
+      "hidden"
+    ],
+    "totalResultsReturned": 15
+  }
+  </code></pre>
 </ul>
 
 <a name="updatefhem"></a>
