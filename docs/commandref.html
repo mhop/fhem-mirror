@@ -6485,37 +6485,6 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       </ul>
       </li>
 
-    <a name="label"></a>
-    <li>label<br>
-      Double-Colon separated list of values. The values will be used to replace
-      &lt;L#&gt; type of strings in the .gplot file, with # beginning at 1
-      (&lt;L1&gt;, &lt;L2&gt;, etc.). Each value will be evaluated as a perl
-      expression, so you have access e.g. to the Value functions.<br><br>
-
-      If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      avg, cnt, sum, lastv (last value) and lastd (last date) values of the
-      individual curves, by accessing the corresponding values from the data
-      hash, see the example below:<br>
-
-      <ul>
-        <li>Fixed text for the right and left axis:<br>
-          <ul>
-            <li>Fhem config:<br>
-                attr wl_1 label "Temperature"::"Humidity"</li>
-            <li>.gplot file entry:<br>
-                set ylabel &lt;L1&gt;<br>
-                set y2label &lt;L2&gt;</li>
-          </ul></li>
-        <li>Title with maximum and current values of the 1st curve (FileLog)
-          <ul>
-            <li>Fhem config:<br>
-                attr wl_1 label "Max $data{max1}, Current $data{currval1}"</li>
-            <li>.gplot file entry:<br>
-                set title &lt;L1&gt;<br>
-          </ul></li>
-      </ul>
-      </li>
-
     <a name="title"></a>
     <li>title<br>
       A special form of label (see above), which replaces the string &lt;TL&gt;
