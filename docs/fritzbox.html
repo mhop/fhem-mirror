@@ -35,25 +35,32 @@
 
     The bad news with this fhem-image is, that it will start fhem in a chroot
     environment, i.e. you will not be able to trigger arbitrary FritzBox
-    functions out of fhem, e.g. sending mail, enabling WLAN, etc.
-    <br><br>
+    functions out of fhem, e.g. sending mail, enabling WLAN, etc., it relies
+    only on the commands provided by a busybox copied to the chroot
+    environment.  <br><br>
 
-    <a href="fhem-=VERS=-fb7390.image">This</a> fhem-image contains a stripped
-    down version of the perl package from the AVM fhem-image, a newer version
-    of fhem, and a modified installation script. The main difference is
-    starting fhem in a normal (non-chroot) environment, and enabling
-    autocreate.  When installing it, you have to confirm with an extra click
-    that it does not have a valid AVM signature. It will reuse your old
-    logfiles and configuration, unlike the "original" AVM firmware. Autocreate
-    is on, and there are NO CUL devices defined in the initial configuration,
-    you'll have to do this manually, e.g. by following the HOWTO or the command
-    reference. 
+    <a href="fhem-=VERS=-fb7390.image">This</a> image from fhem.de contains a
+    stripped down version of the perl package from the AVM fhem-image, the fhem
+    package, a dfu-programmer for flashing the CUL, and a modified installation
+    script.
+
+    The main difference is starting fhem in a normal (non-chroot) environment,
+    and enabling autocreate.  When installing it, you have to confirm with an
+    extra click that it does not have a valid AVM signature. It will reuse your
+    old logfiles and configuration, unlike the "original" AVM firmware.
+    Autocreate is on, and there are NO CUL devices defined in the initial
+    configuration, you'll have to do this manually, e.g. by following the HOWTO
+    or the command reference. 
+
     </ul>
 
-<h3>Fritz!Box 7270 (as of 2011-09-03)</h3>
+<h3>Fritz!Box 7170/7270 (as of 2011-09-03)</h3>
     <ul>
     Thank to Eyk's work there is also a <a
-    href="fhem-=VERS=-fb7270.zip">ZIP</a> file for the Fritz!Box7270. To install it:
+    href="fhem-=VERS=-fb7270.zip">ZIP</a> file for the Fritz!Box 7170 and 7270
+    models. As the FB720/7170 has not enough internal storage to install fhem
+    on it, you have to use an external USB Drive, and this package follows a
+    different approach than the FB7390 image.To install it:
     <ul>
       <li>First unzip the .ZIP file in the root directory of the USB-disk/USB-stick.
       <li>Attach the stick to the FB
@@ -61,8 +68,8 @@
       <li>With the command df check the name of the stick on the FB.
       <li>Execute the following command in the FB telnet window to start fhem
           when the FB reboots:<br>
-          echo "&lt;name-of-the-stick&gt;/fhem/startfhem" >> /var/flash/debug.cfg
-      <li>Start fhem manually with "&lt;name-of-the-stick&gt;/fhem/startfhem"
+          echo "&lt;path-of-the-stick&gt;/fhem/startfhem" >> /var/flash/debug.cfg
+      <li>Start fhem manually with "&lt;path-of-the-stick&gt;/fhem/startfhem"
     </ul>
     </ul>
 
