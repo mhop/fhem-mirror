@@ -36,15 +36,22 @@
     <a name="starting"></a>
     <h3>Starting fhem</h3>
       <ul>
-      Skip this section if you installed fhem via the Debian
-      <a href="http://fhem.de/fhem-=VERS=.deb">package</a> or via the Fritzbox7390 
-      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">image</a><br><br>
+      Skip this section if you installed fhem via the Debian <a
+      href="http://fhem.de/fhem-=VERS=.deb">package</a>, the Fritz!Box 7390
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">image</a>, or the FB
+      7170/7270 <a href="http://fhem.de/fhem-=VERS=.fb7270.zip">zip file</a>.
+      <br><br>
 
-      First install the Device::SerialPort (or Win32::SerialPort)  perl module
-      with the command <code>"sudo cpan Device::SerialPort"</code>. There are
-      also precompiled debian packages (libdevice-serialport-perl), and this
-      module is already installed on OSX. You will need it to access the USB
-      devices<br><br>
+      As most fhem installations access the "outer world" via a USB device
+      connected to the fhem computer (CUL, FHZ1x00, etc), we most probably need
+      the perl serial module.<br>
+
+      This is why you should first install the Device::SerialPort (or
+      Win32::SerialPort)  perl module with the command <code>"sudo cpan
+      Device::SerialPort"</code>. There are also precompiled debian packages
+      (libdevice-serialport-perl), and this module is already installed on OSX
+      10.6. If you cannot install it, you then take a look at the directio
+      option<br><br>
 
       The default configuration will install fhem into /usr/bin,
       /usr/share/fhem and /var/log/fhem and /etc/fhem.cfg, according to the
@@ -62,7 +69,7 @@
       </ul>
 
     <a name="FHZ"></a>
-    <h3>Attaching the USB device for the PC (CUL / FHZ1x00PC / EM1010PC)</h3>
+    <h3>Attaching the USB device for the PC (CUL / FHZ1x00PC / etc)</h3>
       <ul>
       Connect to fhem with an internet browser:
       <a href="http://localhost:8083/fhem">http://fhem-host:8083/fhem</a>
@@ -72,7 +79,7 @@
       <a href="http://localhost:8084/fhem">http://fhem-host:8085/fhem</a> if
       you are using a tablet like the iPad.<br><br>
 
-      Attach the USB device (CUL, FHZ1000PC/FHZ1300, EM1010PC) to your
+      Attach the USB device (CUL, FHZ1000PC/FHZ1300, TUL, EUL, etc) to your
       computer, and look for the corresponding device in the /dev
       directory. For <a href="commandref.html#CUL">CUL</a> a file named
       /dev/ttyACM* will be created under
@@ -105,7 +112,7 @@
       </ul>
 
     <a name="autocreate"></a>
-    <h3>Configuring transmitter devices</h3>
+    <h3>Configuring transmitter devices (sensors)</h3>
       <ul>
       The sample configuration file installed via "make install-pgm2" has
       configured an <a href="commandref.html#autocreate">autocreate</a>
@@ -155,7 +162,7 @@
       </ul>
 
     <a name="FS20rx"></a>
-    <h3>Configuring FS20 receivers</h3>
+    <h3>Configuring FS20 receivers (actors)</h3>
       <ul>
       Configure the <a href="commandref.html#FS20">FS20</a> device in
       fhem first with:<pre>
@@ -168,7 +175,11 @@
       Now set the model attribute of the device:<pre>
       attr lamp1 model fs20st</pre>
 
-      to get only the commands available for this device.
+      to get only the commands available for this device.<br><br>
+
+      Other systems (EnOcean/HomeMatic) require a more elaborate procedure, and
+      the corresponding USB device is to be set into a pairing mode first. See
+      the commandref entry for your device.
       </ul>
 
 
@@ -194,7 +205,13 @@
       notifies/watchdogs do. You can even simulate events by using the 
       <a href="commandref.html#trigger">trigger</a> command:<pre>
       trigger lamp1 on</pre>
-      </ul>
+
+      For a more complex automation you can either control fhem by an external
+      program via telnet or HTTP, or (the usual way) do this via the fhem at
+      and notify commands. at and notify takes either simple fhem commands,
+      shell skripts or "perl oneliners" as argument. For details and tips on
+      the perl oneliners read the <a href="commandref.html#perl">Perl
+      specials</a> section in the commandref.html</ul>
 
     <a name="rooms"></a>
     <h3>FHEMWEB (pgm2) look and feel</h3>
@@ -203,12 +220,21 @@
       attribute. FHEMWEB puts devices without a room attribute into the
       "Unsorted" room. Devices in the room "hidden" will not be shown.
       <br><br>
+      You can also define a stripped down FHEMWEB instance, by defining the
+      Menu entries to be hidden in the 
+      <a href="commandref.html#hiddenroom">hiddenroom</a> FHEMWEB attribute.
+      <br><br>
 
-      Set the title of the webpage by setting the <code>title</code> attribute of the global
-      device ("All together" -> global)<br><br>
+
+      Set the title of the webpage by setting the <code>title</code> attribute
+      of the global device ("All together" -> global)<br><br>
 
       Edit the colors / fonts by changing the style.css ("Edit files" ->
-      style.css)<br><br>
+      style.css), or create you own style (see <a
+      href="commandref.html#stylesheetPrefix">stylesheetPrefix</a> , so it
+      won't be overwritten by the next <a
+      href="commandref.html#updatefhem">updatefhem</a> command.
+      <br><br>
 
       Further FHEMWEB attributes:
       <a href="commandref.html#webname">webname</a>,
@@ -245,7 +271,8 @@
     <h3>Plotting logs</h3>
       <ul>
       Autocreate will create weblinks (i.e. plots) for newly detected devices.
-      The following section describes how to do it manually.<br><br>
+      The following section describes how to do it manually, e.g. if you want
+      to plot data from different sensors together.<br><br>
 
       To convert a FileLog into a plot (chart) in FHEMWEB, set the
       <a href="commandref.html#logtype">logtype</a> attribute of the
@@ -260,22 +287,21 @@
         attr hms100th_log logtype temp4hum6:Plot,text
       </pre>
 
-      When displaying the plot, you can convert it into a "weblink" device,
-      so that we can in turn have a room attribute to group more than one Plot
-      together. If the weblink refers to the current logfile, then it will be
-      stored as a CURRENT weblink, and it will always display the most recent
-      log (you do not have to redefine it if the logfile changes due to
-      year/month/date parameters in its name).
+      When displaying the plot, you can convert it into a
+      <a href="commandref.html#weblink">weblink</a>, which
+      has its own attributes. If the weblink refers to the current
+      logfile, then it will be stored as a CURRENT weblink, and it will always
+      display the most recent log (you do not have to redefine it if the
+      logfile changes due to year/month/date parameters in its name).
 
       <br><br>
 
 
       The logs can be converted to a plot either with gnuplot (which must be
       installed and in your PATH), or via the builtin SVG module, in this case
-      your browser must support SVG. Firefox, Opera, Chrome, Safari
-      (both on OSX and iOS) support SVG out of the box, Internet Explorer
-      from version 9. IE prior to version 9 does it via the Adobe "SVG viewer"
-      plugin, on Android you need Opera or Firefox.<br><br>
+      your browser must support SVG. All browsers support SVG, the notable
+      exception is Internet Explorer prior to version 9 and Android prior to
+      version 3.0. For such Android devices try Opera or Firefox.<br><br>
 
       SVG mode is the default, to change it set the <a
       href="commandref.html#plotmode">plotmode</a> attribute to gnuplot or
@@ -288,17 +314,17 @@
       magnifier icons at the top of the page.<br><br>
 
       Note: the gnuplot files must have #FileLog entries in order to be useable
-      with gnuplot-scroll or SVG, as the filtering happens with the FileLog get
+      with gnuplot-scroll or SVG (these lines are treated as comment by
+      gnuplot, but not by fhem!), as the filtering happens with the FileLog get
       function, see the supplied gnuplot files or the column_spec paragraph <a
       href="commandref.html#FileLogget">here</a> for the syntax.<br><br>
 
       The order of the #FileLog lines must match the corresponding 'awk'
       entries.<br><br>
 
-      It make sense to build large logfiles for scrolling in them (year
-      resolution), or smaller ones if you do not want to use the zoom/scroll
-      feature. The size of the logfiles will be determined by its wildcard
-      characters (year/month/week/day), look at the FileLog definition.
+      I recommend using log files with year resolution, this is determined by
+      its wildcard characters (year/month/week/day), look at the FileLog
+      definition.
       </ul>
 
     <a name="tips"></a>
@@ -313,7 +339,11 @@
       <ul>
         <li>Using the builtin features of FHEMWEB for <a
         href="commandref.html#basicAuth">basic</a> html authentication and <a
-        href="commandref.html#HTTPS">HTTPS</a>. <br><br>
+        href="commandref.html#HTTPS">HTTPS</a>. The perl modules needed for
+        HTTPS are missing from the FritzBox distribution, I recommend a direct
+        VPN connection here.<br><br>
+
+
 
         <li>Using apache to implement this features, and redirect a certain prefix to
         each FHEMWEB instance.<br>
@@ -348,7 +378,7 @@
         <br><br>
       </ul>
 
-      To display "foreign" (non fhem) files as a plot or a just as plain text,
+      To display "foreign" (non fhem) files as a plot or just as plain text,
       configure a fake logfile with the correct filename and an unused regexp,
       e.g.<br><pre>
       define messages FileLog /var/log/messages fakelog</pre>

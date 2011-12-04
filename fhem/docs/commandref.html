@@ -31,6 +31,7 @@
 
       <a href="#attr">attr</a> &nbsp;
       <a href="#CULflash">CULflash</a> &nbsp;
+      <a href="#createlog">createlog</a> &nbsp;
       <a href="#define">define</a> &nbsp;
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
@@ -542,7 +543,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <code>jsonlist [&lt;devspec&gt;|&lt;typespec&gt;|ROOMS]</code>
   <br><br>
   Returns an JSON tree of all definitions, all notify settings and all at
-  entries if no parameter is given.
+  entries if no parameter is given. Can also be called via HTTP by
+    http://fhemhost:8083/fhem?cmd=jsonlist&XHR=1
   <br><br>
   Example:
   <pre><code>  fhem> jsonlist
@@ -732,7 +734,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     Download the CUL firmware from a nightly SVN chekout and flash the
     hardware. Currently only the CUL is supported with its versions:
     CUL_V2, CUL_V2_HM, CUL_V3, CUL_V4.<br>
-    <b>Note:</b> dfu-programmer has to be installed in the path.<br>
+    <b>Note:</b> dfu-programmer has to be installed in the path, this is
+    already the case with the Fritz!Box 7390 image from fhem.de<br>
+
     If the CUL is not yet flashed, then first define a <a href="#CUL">CUL</a>
     device (even if fhem won't be able to open the device), insert it with the
     button pressed (this will set the device into flash-mode), then issue the
@@ -8093,13 +8097,7 @@ isday</pre>
       <li>min(a,b), max(a,b)</li>
       <li>time_str2num("YYYY-MM-DD HH:MM:SS") returns a numerical value,
           which makes computation of time differences easier</li>
-      <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one,
-          to compare it with the sunrise commands in the following example:<br>
-          # Switch lamp1 on at sunrise, but not before 07:00<br>
-          define a13 at +*{max(abstime2rel("07:00"),sunrise_rel())} set lamp1
-          on<br>
-          # Note that this functionality is easier to achieve with:<br>
-          define a13 at +*{sunrise_rel(0,"07:00",undef)} set lamp1 on<br>
+      <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one
           </li>
     </ul>
     </li>
@@ -8136,10 +8134,8 @@ isday</pre>
     By using the 99_SUNRISE_EL.pm module, you have access to the following
     functions: <br>
     <ul>
-    sunset_rel($offset, $min, $max)<br>
-    sunset_abs($offset, $min, $max)<br>
-    sunrise_rel($offset, $min, $max)<br>
-    sunrise_abs($offset, $min, $max)<br>
+    sunset($offset, $min, $max)<br>
+    sunrise($offset, $min, $max)<br>
     isday()<br>
     </ul>
     offset is in seconds, and the format of min/max is "HH:MM" or "HH:MM:SS".
