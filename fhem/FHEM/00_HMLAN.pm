@@ -348,7 +348,16 @@ HMLAN_DoInit($)
   my $id  = AttrVal($name, "hmId", undef);
   my $key = AttrVal($name, "hmKey", "");        # 36(!) hex digits
 
-  my $s2000 = sprintf("%02X", time()-946681200); # sec since 2000
+  #my $s2000 = sprintf("%02X", time()-946681200); # sec since 2000
+
+  # Calculate the local time in seconds from 2000.
+  my $t = time();
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
+  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
+  $t -= 1*3600; # Timezone offset from UTC * 3600 (MEZ=1). FIXME/HARDCODED
+  $t += 3600 if $isdst;
+  my $s2000 = sprintf("%02X", $t); 
+
   HMLAN_SimpleWrite($hash, "A$id") if($id);
   HMLAN_SimpleWrite($hash, "C");
   HMLAN_SimpleWrite($hash, "Y01,01,$key");
