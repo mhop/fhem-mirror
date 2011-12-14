@@ -52,7 +52,7 @@ TCM_Initialize($)
   $hash->{DefFn}   = "TCM_Define";
   $hash->{GetFn}   = "TCM_Get";
   $hash->{SetFn}   = "TCM_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6 ";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -480,7 +480,16 @@ TCM_Get($@)
 
 }
 
+########################
+sub
+TCM_RemovePair($)
+{
+  my $hash = shift;
+  delete($hash->{pair});
+}
+
 my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
+  "pairForSec"   => { cmd=>"AB18", arg=>"\\d+" },
   "idbase"       => { cmd=>"AB18", arg=>"FF[8-9A-F][0-9A-F]{5}" },
   "sensitivity"  => { cmd=>"AB08", arg=>"0[01]" },
   "sleep"        => { cmd=>"AB09" },
@@ -491,6 +500,7 @@ my %sets120 = (    # Name, Data to send to the CUL, Regexp for the answer
 );
 
 my %sets310 = (
+  "pairForSec"   => { cmd=>"AB18", arg=>"\\d+" },
   "idbase"       => { cmd=>"07", arg=>"FF[8-9A-F][0-9A-F]{5}" },
 # The following 3 does not seem to work / dont get an answer
 #  "sleep"        => { cmd=>"01", arg=>"00[0-9A-F]{6}" },
@@ -523,6 +533,11 @@ TCM_Set($@)
     $cmdHex .= $arg;
   }
 
+  if($cmd eq "pairForSec") {
+    $hash->{pair} = 1;
+    InternalTimer(gettimeofday()+$arg, "TCM_RemovePair", $hash, 1);
+    return;
+  }
 
   ##############################
   if($hash->{MODEL} eq "120") {
