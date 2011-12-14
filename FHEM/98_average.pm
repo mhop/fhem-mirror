@@ -65,6 +65,7 @@ average_Notify($$)
       $val = $reArg if(defined($reArg) && $reArg =~ m/^(-?\d+\.?\d*)/);
     }
     next if(!defined($val) || $val !~ m/^(-?\d+\.?\d*)/);
+    $val = $1;
 
     ################
     # Avg computing
