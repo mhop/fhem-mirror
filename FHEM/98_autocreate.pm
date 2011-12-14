@@ -153,7 +153,7 @@ autocreate_Notify($$)
       }
       $hash = $defs{$name};
       $nrcreated++;
-      my $room = replace_wildcards($hash, $attr{$me}{device_room});
+      my $room = replace_wildcards($hash, AttrVal($me, "device_room", "%TYPE"));
       $attr{$name}{room} = $room if($room);
 
       # BlackList processing
@@ -164,7 +164,7 @@ autocreate_Notify($$)
       last if($blfound);
 
       ####################
-      my $fl = replace_wildcards($hash, $attr{$me}{filelog});
+      my $fl = replace_wildcards($hash, AttrVal($me, "filelog", ""));
       next if(!$fl);
       my $flname = "FileLog_$name";
       delete($defs{$flname});   # If we are re-creating it with createlog.
@@ -186,8 +186,8 @@ autocreate_Notify($$)
 
 
       ####################
-      next if(!$attr{$me}{weblink} || !$gplot);
-      $room = replace_wildcards($hash, $attr{$me}{weblink_room});
+      next if(!AttrVal($me, "weblink", 1) || !$gplot);
+      $room = replace_wildcards($hash, AttrVal($me, "weblink_room", "Plots"));
       my $wnr = 1;
       foreach my $wdef (split(/,/, $gplot)) {
         next if(!$wdef);
@@ -243,7 +243,7 @@ autocreate_Notify($$)
 
   }
 
-  CommandSave(undef, undef) if(!$ret && $nrcreated && $attr{$me}{autosave});
+  CommandSave(undef, undef) if(!$ret && $nrcreated && AttrVal($me,"autosave",1));
   return $ret;
 }
 
