@@ -571,7 +571,7 @@ A line ending with \ will be concatenated with the next one, so long lines
               "room": "Server",
               "statefile": "/var/cache/fhem/fhem.save",
               "verbose": "4",
-              "version": "=VERS= from =DATE= ($Id: fhem.pl,v 1.150 2011-08-16 18:06:38 rudolfkoenig Exp $)"
+              "version": "=VERS= from =DATE= ($Id: fhem.pl,v $)"
             },
             "READINGS": []
           }
@@ -2262,7 +2262,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="CULdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; CUL &lt;device&gt; &lt;housecode&gt;</code> <br>
+    <code>define &lt;name&gt; CUL &lt;device&gt; &lt;FHTID&gt;</code> <br>
     <br>
     USB-connected devices (CUL/CUR/CUN):<br><ul>
       &lt;device&gt; specifies the serial port to communicate with the CUL or
@@ -2292,8 +2292,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     If the device is called none, then no device will be opened, so you
     can experiment without hardware attached.<br>
 
-    The housecode is a 4 digit hex number, and it is used when the CUL/CUR
-    talks to FHT devices or when CUR requests data.
+    The FHTID is a 4 digit hex number, and it is used when the CUL/CUR talks to
+    FHT devices or when CUR requests data. Set it to 0000 to avoid answering
+    any FHT80b request by the CUL.
   </ul>
   <br>
 
@@ -6810,7 +6811,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     define a4 at *17:00:00 set lamp on                           # every day
 
     # relative ones
-    define a5 at +00:00:10 set lamp on                  # switch the lamp on in 10 seconds
+    define a5 at +00:00:10 set lamp on                  # switch on in 10 seconds
     define a6 at +00:00:02 set lamp on-for-timer 1      # Blink once in 2 seconds
     define a7 at +*{3}00:00:02 set lamp on-for-timer 1  # Blink 3 times
 
@@ -7022,7 +7023,15 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     define avg_temp_ws1 average .*:temperature.*
 
     # Compute the average for all temperature and humidity events
+    # Events:
+    # ws1 temperature: 22.3
+    # ws1 humidity: 67.4
     define avg_temp_ws1 average .*:(temperature|humidity).*
+
+    # Hunt only for the humidity: take the value from the first
+    # parenthesis ($1 in perl regexp) if it is a number
+    # Event: ws1 T: 52.3  H: 67.4
+    define avg_temp_ws1 average ws1:.*H:.([-\d\.]+)
     </PRE>
   </ul>
 

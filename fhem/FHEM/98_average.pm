@@ -60,9 +60,11 @@ average_Notify($$)
     next if(!defined($s));
     my ($evName, $val) = split(" ", $s, 2); # resets $1
     next if($devName !~ m/^$re$/ && "$devName:$s" !~ m/^$re$/ || $s =~ m/_avg_/);
-    $val = $1 if(defined($1));
-    next if(!defined($val) || $val !~ m/^(\d+\.?\d*)/);
-    $val = $1;
+    if(defined($1)) {
+      my $reArg = $1;
+      $val = $reArg if(defined($reArg) && $reArg =~ m/^(-?\d+\.?\d*)/);
+    }
+    next if(!defined($val) || $val !~ m/^(-?\d+\.?\d*)/);
 
     ################
     # Avg computing
@@ -96,7 +98,6 @@ average_Notify($$)
         my $cum = $r->{$cumName}{VAL} + ($secNow-$secLast) * $val;
         $r->{$cumName}{VAL} = $cum;
         $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$secNow);
-
       } else {
         $trigger .= " $avgName:".$r->{$avgName}{VAL};
         $r->{$cumName}{VAL} = $secNow*$val;
