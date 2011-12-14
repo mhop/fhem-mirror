@@ -9,6 +9,7 @@ sub EnOcean_Define($$);
 sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Set($@);
+sub EnOcean_MD15Cmd($$$);
 
 my %rorgname = ("F6"=>"switch",     # RPS
                 "D5"=>"contact",    # 1BS
@@ -82,7 +83,6 @@ EnOcean_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
-
   return "wrong syntax: define <name> EnOcean 8-digit-hex-code"
         if(int(@a)!=3 || $a[2] !~ m/^[A-F0-9]{8}$/i);
 
@@ -90,7 +90,7 @@ EnOcean_Define($$)
   AssignIoPort($hash);
   # Help FHEMWEB split up devices
   $attr{$name}{subType} = $1 if($name =~ m/EnO_(.*)_$a[2]/);
-
+  return undef;
 }
 
 
@@ -115,9 +115,10 @@ EnOcean_Set($@)
     # See also http://www.oscat.de/community/index.php/topic,985.30.html
     if($st eq "MD15") {
       my %sets = (
-        "desired-temp"   => "\\d+\\.\\d+",
+        "desired-temp"   => "\\d+(\\.\\d)?",
         "actuator"       => "\\d+",
         "unattended"     => "",
+        "initialize"     => "",
       );
       my $re = $sets{$a[0]};
       return "Unknown argument $cmd, choose one of ".join(" ", sort keys %sets)
@@ -130,10 +131,8 @@ EnOcean_Set($@)
       $hash->{READINGS}{CMD}{TIME} = $tn;
       $hash->{READINGS}{CMD}{VAL} = $cmd;
 
-      my $arg = 1;
+      my $arg = "true";
       if($re) {
-        $hash->{READINGS}{CMD_ARG}{TIME} = $tn;
-        $hash->{READINGS}{CMD_ARG}{VAL} = $a[1];
         $arg = $a[1];
         shift(@a);
       }
@@ -178,11 +177,6 @@ EnOcean_Parse($$)
 {
   my ($iohash, $msg) = @_;
   my (undef,$rorg,$data,$id,$status,$odata) = split(":", $msg);
-  #Log 1, "RORG: $rorg";
-  #Log 1, "DATA: $data";
-  #Log 1, "ID: $id";
-  #Log 1, "STATUS: $status";
-  #Log 1, "ODATA: $odata";
 
   my $rorgname = $rorgname{$rorg};
   if(!$rorgname) {
@@ -282,6 +276,13 @@ EnOcean_Parse($$)
         $st = $subTypes{$st} if($subTypes{$st});
         $attr{$name}{subType} = $st;
 
+        if("$fn.$tp" eq "20.01" && $iohash->{pair}) {      # MD15
+          select(undef, undef, undef, 0.1);                # max 10 Seconds
+          EnOcean_A5Cmd($hash, "800800F0", "00000000");
+          select(undef, undef, undef, 0.5);
+          EnOcean_MD15Cmd($hash, $name, 128); # 128 == 20 degree C
+        }
+
       } else {
         push @event, "3:teach-in:no type/manuf. data transmitted";
 
@@ -314,28 +315,9 @@ EnOcean_Parse($$)
       push @event, "3:cover:"        . (($db_2 & 0x08) ? "open" : "closed");
       push @event, "3:tempSensor:"   . (($db_2 & 0x04) ? "failed" : "ok");
       push @event, "3:window:"       . (($db_2 & 0x02) ? "open" : "closed");
-      push @event, "3:actuator:"     . (($db_2 & 0x01) ? "ok" : "obstructed");
+      push @event, "3:actuatorStatus:".(($db_2 & 0x01) ? "obstructed" : "ok");
       push @event, "3:measured-temp:". sprintf "%.1f", ($db_1*40/255);
-
-      my $cmd = ReadingsVal($name, "CMD", undef);
-      if($cmd) {
-        my $msg;
-        my $arg1 = ReadingsVal($name, "CMD_ARG", 20);
-
-        if($cmd eq "actuator") {
-          $msg = sprintf("%02X000000", $arg1);
-
-        } elsif($cmd eq "desired-temp") {
-          $msg = sprintf("%02X%02X0400", $arg1*255/40, 
-                         AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40);
-
-        }
-        select(undef, undef, undef, 0.1);
-        IOWrite($hash, "000A0701",
-                sprintf("A5%s%s0001%sFF00",$msg,$hash->{DEF},$hash->{DEF}))
-          if($msg);
-      }
-
+      EnOcean_MD15Cmd($hash, $name, $db_1);
       
     } else {
       push @event, "3:state:$db_3";
@@ -378,6 +360,47 @@ EnOcean_Parse($$)
   $hash->{CHANGED} = \@changed;
   
   return $name;
+}
+
+sub
+EnOcean_MD15Cmd($$$)
+{
+  my ($hash, $name, $db_1) = @_;
+  my $cmd = ReadingsVal($name, "CMD", undef);
+  if($cmd) {
+    my $msg;        # Unattended
+    my $arg1 = ReadingsVal($name, $cmd, 0); # Command-Argument
+
+    if($cmd eq "actuator") {
+      $msg = sprintf("%02X000000", $arg1);
+
+    } elsif($cmd eq "desired-temp") {
+      $msg = sprintf("%02X%02X0400", $arg1*255/40, 
+                     AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40);
+
+    } elsif($cmd eq "initialize") {
+      $msg = sprintf("00006400");
+
+    }
+
+    if($msg) {
+      select(undef, undef, undef, 0.2);
+      EnOcean_A5Cmd($hash, $msg, "00000000");
+      if($cmd eq "initialize") {
+        delete($defs{$name}{READINGS}{CMD});
+        delete($defs{$name}{READINGS}{$cmd});
+      }
+    }
+  }
+}
+
+sub
+EnOcean_A5Cmd($$$)
+{
+  my ($hash, $msg, $org) = @_; 
+  IOWrite($hash, "000A0701", # varLen=0A optLen=07 msgType=01=radio, 
+          sprintf("A5%s%s0001%sFF00",$msg,$org,$hash->{DEF}));
+          # type=A5 msg:4 senderId:4 status=00 subTelNum=01 destId:4 dBm=FF Security=00
 }
 
 1;
