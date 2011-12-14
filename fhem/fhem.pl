@@ -1580,6 +1580,7 @@ GlobalAttr($$)
       return "$!" if($init_done);
       die "Can't open server port at $port: $!\n";
     }
+    Log 2, "Telnet port $port opened";
     close($server) if($server);
     $server = $server2;
   }
