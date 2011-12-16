@@ -24,6 +24,7 @@
   - feature: notify attribute forwardReturnValue
   - change:  move JsonList from contrib to main-modules
   - change:  JsonList output optimized and more structured
+  - feature: FHEMWEB save button, smallscreen first screen fix
 
   
 - 2011-07-08 (5.1)

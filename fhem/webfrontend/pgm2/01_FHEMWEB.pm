@@ -526,7 +526,7 @@ FW_digestCgi($)
     if($p =~ m/^arg\.(.*)$/) { $arg{$1} = $v; }
     if($p =~ m/^val\.(.*)$/) { $val{$1} = $v; }
     if($p =~ m/^dev\.(.*)$/) { $dev{$1} = $v; }
-    if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c= $1; }
+    if($p =~ m/^cmd\.(.*)$/) { $cmd = $v; $c = $1; }
     if($p eq "pos")          { %FW_pos =  split(/[=;]/, $v); }
     if($p eq "data")         { $FW_data = $v; }
     if($p eq "XHR")          { $FW_XHR = 1; }
@@ -536,6 +536,7 @@ FW_digestCgi($)
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
   $cmd.=" $arg{$c}" if(defined($arg{$c}));
   $cmd.=" $val{$c}" if(defined($val{$c}));
+
   return $cmd;
 }
 
@@ -707,14 +708,17 @@ FW_roomOverview($)
 
   ##############
   # HEADER
-  pO "<form method=\"get\" action=\"$FW_ME\">";
   pO "<div id=\"hdr\">";
   pO '<table border="0"><tr><td style="padding:0">';
+  pO "<form method=\"get\" action=\"$FW_ME\">";
   pO FW_hidden("room", "$FW_room") if($FW_room);
   pO FW_textfield("cmd", $FW_ss ? 25 : 40);
+  if(!$FW_ss) {
+    pO "</form></td><td><form>" . FW_submit("cmd", "save");
+  }
+  pO "</form>";
   pO "</td></tr></table>";
   pO "</div>";
-  pO "</form>";
 
   ##############
   # MENU
@@ -738,6 +742,7 @@ FW_roomOverview($)
   # Rooms and other links
   foreach my $r (sort keys %FW_rooms) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
+    $FW_room = $r if(!$FW_room && $FW_ss);
     push @list1, $r;
     push @list2, "$FW_ME?room=$r";
   }
@@ -771,7 +776,9 @@ FW_roomOverview($)
       my $sel = ($list1[$idx] eq $FW_room ? " selected=\"selected\""  : "");
       pO "<option value=$list2[$idx]$sel>$list1[$idx]</option>";
     }
-    pO "</select></td></tr>";
+    pO "</select></td>";
+    pO "<td><form method=\"get\" action=\"$FW_ME\">" .
+        FW_submit("cmd", "save")."</form></td></tr>";
 
   } else {
 
@@ -1819,7 +1826,8 @@ FW_devState($$)
   my $txt = $state;
 
   if(defined(AttrVal($d, "showtime", undef))) {
-    $txt = $defs{$d}{READINGS}{state}{TIME};
+    my $v = $defs{$d}{READINGS}{state}{TIME};
+    $txt = $v if(defined($v));
 
   } elsif($allSets && $allSets =~ m/ desired-temp /) {
     $txt = ReadingsVal($d, "measured-temp", "");
