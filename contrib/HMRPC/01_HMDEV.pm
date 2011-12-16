@@ -37,7 +37,7 @@ HMDEV_Define($$)
 
   return "wrong syntax: define <name> HMDEV deviceaddress" if int(@a)!=3;
   
-  my $addr=uc($a[2]);
+  my $addr=$a[2];
 
   $hash->{hmaddr}=$addr;
   $modules{HMDEV}{defptr}{$addr} = $hash;
