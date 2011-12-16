@@ -1,0 +1,18 @@
+diff -upr remote/remote.c remote_patched/remote.c
+--- remote/remote.c	2010-09-27 00:42:45.273924974 +0200
++++ remote_patched/remote.c	2010-09-27 00:58:26.477924549 +0200
+@@ -268,14 +268,7 @@ cRemoteDevInput::cRemoteDevInput(const c
+         polldelay = repeatdelay = repeatfreq = repeattimeout = 0;
+     }
+ 
+-    // grab device if possible (kernel 2.6)
+-#ifndef EVIOCGRAB
+-    // required if an old /usr/include/linux/input.h is used with a new kernel :-(
+-#define EVIOCGRAB  _IOW('E', 0x90, int)   /* Grab/Release device */
+-#endif
+     data[0] = 1;
+-    if (ioctl(f, EVIOCGRAB, data) == 0)
+-        dsyslog("%s: exclusive access granted", name);
+ 
+     // setup keymap
+     const char *setupStr = GetSetup();
