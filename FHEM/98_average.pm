@@ -108,8 +108,7 @@ average_Notify($$)
       $r->{$cumName}{TIME} = $r->{$avgName}{TIME} = $tn;
     }
   }
-
-  $addNotifyCB{"avg:$devName"} = "average_Callback $devName $trigger"
+  $addNotifyCB{"avg:$avgName:$devName"} = "average_Callback $devName $trigger"
     if($trigger);
 
   return undef;
