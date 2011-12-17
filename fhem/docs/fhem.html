@@ -36,31 +36,29 @@
     <ul>
       Fhem is a GPL'd perl server for house automation. It is used to automate
       some common tasks in the household like switching lamps / shutters /
-      heating / etc.  and to log events like temperature/humidity/power
+      heating / etc.  and to log events like temperature / humidity / power
       consumption.<br><br>
 
       The program runs as a server, you can control it via web-frontends,
       telnet, command line program or TCP/IP directly.<br><br>
 
       In order to use fhem you'll need a 24/7 server (PC, MacMini, Fritz!Box,
-      NAS, etc) with a perl interpreter and some hardware to access the
-      devices, see the "Supported hardware" section below. Some of the fhem
-      hardware-modules need special perl modules (e.g.  Device::SerialPort) in
-      order to work, see the corresponding section in the commandref.html.
-
+      NAS, etc) with a perl interpreter and some attached hardware like the
+      CUL, FHZ1300PC, etc. to access the actors and sensors. See the "Supported
+      hardware" section below.
     </ul>
 
 
     <a name="Download"></a>
     <h3>Download</h3>
     <ul>
-      Current Version: (as of =DATE=): 
+      Last released version: (as of =DATE=): 
       <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
       <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
       <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>,
-      <a href="http://fhem.de/fhem-=VERS=-fb7270.image">fhem-=VERS=-fb7270.zip</a>
+      <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">fhem-=VERS=-fb7270.zip</a>
       <br>
-      See the <a href="CHANGED">CHANGED</a> file for current changes.
+      See the <a href="CHANGED">CHANGED</a> file for the change history.
       <br>
       Nightly SVN version: a 
       <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
@@ -224,7 +222,7 @@
     <h3>Documentation</h3>
     <ul>
 
-      <div id="dist"><a href="fhem-fuer-Einsteiger_V1.pdf">fhem fuer
+      <div id="dist"><a href="fhem-fuer-Einsteiger_V1.pdf">fhem f&uuml;r
       Einsteiger</a> (pdf, german)</div>
 
       <div id="dist"><a href="HOWTO.html">HOWTO.html</a> for a short
@@ -332,7 +330,7 @@
     <h4>Fritz!Box</h4>
     <ul>
       <li>See the detailed documentation <a href="fritzbox.html">here</a>, and
-          after installation connect to http://localhost:8083/fhem. Follow the <a
+          after installation connect to http://fritz.box:8083/fhem. Follow the <a
           href="HOWTO.html">HOWTO</a> for adding devices.
      </ul>
 
