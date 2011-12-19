@@ -25,6 +25,7 @@
   - change:  move JsonList from contrib to main-modules
   - change:  JsonList output optimized and more structured
   - feature: FHEMWEB save button, smallscreen first screen fix
+  - feature: FHEMWEB encoding is now UTF-8, alias attribute is respected
 
   
 - 2011-07-08 (5.1)

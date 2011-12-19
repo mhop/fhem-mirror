@@ -71,6 +71,8 @@ my %FW_hiddenroom; # hash of hidden rooms
 my $FW_longpoll;
 my $FW_inform;
 my $FW_XHR;
+#my $FW_encoding="ISO-8859-1";
+my $FW_encoding="UTF-8";
 
 
 #####################################
@@ -317,7 +319,7 @@ FW_AnswerCall($)
   my ($arg) = @_;
 
   $FW_RET = "";
-  $FW_RETTYPE = "text/html; charset=ISO-8859-1";
+  $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
   $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
@@ -330,7 +332,7 @@ FW_AnswerCall($)
     open(FH, "$FW_dir/$f") || return 0;
     pO join("", <FH>);
     close(FH);
-    $FW_RETTYPE = "text/plain; charset=ISO-8859-1" if($f !~ m/\.*html$/);
+    $FW_RETTYPE = "text/plain; charset=$FW_encoding" if($f !~ m/\.*html$/);
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/(.*).css,) {
@@ -409,12 +411,12 @@ FW_AnswerCall($)
     $defs{$FW_cname}{inform} = $FW_room;
     my $c = $defs{$FW_cname}{CD};
     print $c "HTTP/1.1 200 OK\r\n",
-             "Content-Type: text/plain; charset=ISO-8859-1\r\n\r\n";
+             "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
     return -1;
   }
 
   if($FW_XHR) {
-    $FW_RETTYPE = "text/plain; charset=ISO-8859-1";
+    $FW_RETTYPE = "text/plain; charset=$FW_encoding";
     pO $FW_cmdret;
     return 0;
   }
@@ -841,11 +843,12 @@ FW_showRoom()
       my $type = $defs{$d}{TYPE};
 
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
+      my $devName = AttrVal($d, "alias", $d);
       if($FW_hiddenroom{detail}) {
-        pO "<td><div class=\"col1\">$d</div></td>";
+        pO "<td><div class=\"col1\">$devName</div></td>";
 
       } else {
-        pH "detail=$d", $d, 1, "col1";
+        pH "detail=$d", $devName, 1, "col1";
 
       }
 
