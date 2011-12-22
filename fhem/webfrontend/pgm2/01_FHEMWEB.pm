@@ -715,7 +715,7 @@ FW_roomOverview($)
   pO "<form method=\"get\" action=\"$FW_ME\">";
   pO FW_hidden("room", "$FW_room") if($FW_room);
   pO FW_textfield("cmd", $FW_ss ? 25 : 40);
-  if(!$FW_ss) {
+  if(!$FW_ss && !$FW_hiddenroom{save}) {
     pO "</form></td><td><form>" . FW_submit("cmd", "save");
   }
   pO "</form>";
@@ -779,8 +779,12 @@ FW_roomOverview($)
       pO "<option value=$list2[$idx]$sel>$list1[$idx]</option>";
     }
     pO "</select></td>";
-    pO "<td><form method=\"get\" action=\"$FW_ME\">" .
-        FW_submit("cmd", "save")."</form></td></tr>";
+    if(!$FW_hiddenroom{save}) {
+      pO "<td><form method=\"get\" action=\"$FW_ME\">" .
+            FW_submit("cmd", "save").
+          "</form></td>";
+    }
+    pO "</tr>";
 
   } else {
 
