@@ -2420,7 +2420,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
     <li><a name="hmId">hmId</a><br>
         Set the HomeMatic ID of this device. If this attribute is absent, the
-        ID will be F1&lt;housecode&gt;. Note 1: after setting or changing this
+        ID will be F1&lt;FHTID&gt;. Note 1: after setting or changing this
         attribute you have to relearn all your HomeMatic devices. Note 2: the
         value _must_ be a 6 digit hex number, and 000000 is not valid. fhem
         wont complain if it is not correct, but the communication won't work.
@@ -6941,7 +6941,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <a name="autosave"></a>
     <li>autosave<br>
         After creating a device, automatically save the config file with the
-        command <a href="#save">save</a> command.</li><br>
+        command <a href="#save">save</a> command. Default is 1 (i.e. on), set
+        it to 0 to switch it off.</li><br>
 
     <a name="device_room"></a>
     <li>device_room<br>
