@@ -26,6 +26,7 @@
   - change:  JsonList output optimized and more structured
   - feature: FHEMWEB save button, smallscreen first screen fix
   - feature: FHEMWEB encoding is now UTF-8, alias attribute is respected
+  - change:  HTTPS certs directory moved from cwd into modpath
 
   
 - 2011-07-08 (5.1)
