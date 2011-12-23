@@ -208,7 +208,13 @@ FW_Read($)
     $selectlist{$nhash{NAME}} = \%nhash;
 
     if($hash->{SSL}) {
-      my $ret = IO::Socket::SSL->start_SSL($nhash{CD}, { SSL_server=>1, });
+      # Certs directory must be in the modpath, i.e. at the same level as the FHEM directory
+      my $mp = AttrVal("global", "modpath", ".");
+      my $ret = IO::Socket::SSL->start_SSL($nhash{CD}, {
+        SSL_server    => 1, 
+        SSL_key_file  => "$mp/certs/server-key.pem",
+        SSL_cert_file => "$mp/certs/server-cert.pem",
+        });
       Log 1, "FHEMWEB HTTPS: $!" if(!$ret && $! ne "Socket is not connected");
     }
 
