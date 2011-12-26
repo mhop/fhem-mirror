@@ -7,9 +7,6 @@ attr global port 7072 global           # our TCP/IP port
 attr global statefile /tmp/fhem.save   # where to save the state of the devices
 attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 
-#define CUL CUL /dev/ttyACM0 1234
-#define FHZ FHZ /dev/USB0
-
 define WEB FHEMWEB 8083 global
 
 define WEBphone FHEMWEB 8084 global
@@ -18,7 +15,7 @@ attr WEBphone smallscreen
 define WEBtablet FHEMWEB 8085 global
 attr WEBtablet touchpad
 
-# Fake logfile, to access the global log
+# Fake FileLog entry, to access the fhem log from FHEMWEB 
 define Logfile FileLog /tmp/fhem-%Y-%m.log fakelog
 
 define autocreate autocreate
@@ -27,3 +24,15 @@ attr autocreate device_room %TYPE
 attr autocreate filelog /tmp/%NAME-%Y.log
 attr autocreate weblink
 attr autocreate weblink_room Plots
+
+
+# You probably have to enable some of the following lines.
+# Verify first that /dev/xxx ist correct.
+
+#define FHZ FHZ /dev/USB0
+#define CUL CUL /dev/ttyACM0@9600 1234
+#attr CUL rfmode HomeMatic
+
+#define EUL TCM 310 /dev/ttyACM0@57600
+#define BscBor TCM 120 /dev/ttyUSB0@9600
+#define BscSmartConnect TCM 310 /dev/ttyUSB0@57600
