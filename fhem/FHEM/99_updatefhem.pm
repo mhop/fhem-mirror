@@ -35,8 +35,7 @@ CommandUpdatefhem($$)
   my ($cl, $param) = @_;
   my $lt = "";
   my $ret = "";
-  my $moddir = "$attr{global}{modpath}/FHEM";
-  #my $moddir = "XXX";
+  my $moddir = (-d "FHEM.X" ? "FHEM.X" : "$attr{global}{modpath}/FHEM");
 
   ## backup by RueBe
   my @commandchain = split(/ +/,$param);
