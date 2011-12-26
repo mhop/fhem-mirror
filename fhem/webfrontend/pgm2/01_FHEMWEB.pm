@@ -1868,6 +1868,8 @@ FW_devState($$)
   }
 
   if($link) {
+    my $room = AttrVal($d, "room", undef);
+    $link .= "&room=$room" if($room);
     if($FW_longpoll) {
       $txt = "<a onClick=\"cmd('$FW_ME?XHR=1&$link')\">$txt</a>";
 
