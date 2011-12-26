@@ -233,7 +233,7 @@ my $commonAttr = "eventMap";
   "setdefaultattr" => { Fn=>"CommandDefaultAttr",
 	    Hlp=>"<attrname> <attrvalue>,set attr for following definitions" },
   "shutdown"=> { Fn=>"CommandShutdown",
-	    Hlp=>",terminate the server" },
+	    Hlp=>"[restart],terminate the server" },
   "sleep"  => { Fn=>"CommandSleep",
             Hlp=>"<sec>,sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
@@ -1042,6 +1042,9 @@ CommandShutdown($$)
 
   WriteStatefile();
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
+  if($param && $param eq "restart") {
+    system("(sleep 2; exec perl $0 $attr{global}{configfile})&");
+  }
   exit(0);
 }
 
