@@ -10,7 +10,7 @@
   - bugfix:  FHEM2FHEM should work with CUL again, after syntax change
   - feature: CUL directio mode (No Device::SerialPort needed)
   - feature: FritzBox 7270 ZIP file
-  - buxgfix: prevent fhem from stalling if telnet times out in 66_ECMD.pm
+  - bugfix:  prevent fhem from stalling if telnet times out in 66_ECMD.pm
   - feature: added postproc ability to classdef in 66_ECMD.pm (Boris, Heinz)
   - feature: FHEMWEB longpoll mode, small fixes, tuned smallscreen mode
   - feature: average module added
@@ -27,6 +27,7 @@
   - feature: FHEMWEB save button, smallscreen first screen fix
   - feature: FHEMWEB encoding is now UTF-8, alias attribute is respected
   - change:  HTTPS certs directory moved from cwd into modpath
+  - feature: shutdwown parameter restart added
 
   
 - 2011-07-08 (5.1)
