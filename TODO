@@ -1,14 +1,12 @@
 FHEM:
-- uniform .gplot "set title" and naming (ks300_1.gplot -> tempRain.gplot)
+- FHEM2FHEM reconnect
 - HomeMatic set log 2
-- mergelog
 
 - autodetect physical hardware
 - RFR: Error message for uncomplete last message
 - implement wiki decisions
 
 Webpgm2
-- setting the dummy state via dropdown is not possible
 - click on the graph only correct for the day zoom
 - integrate weblink details in the SVG
 - autocreate: multiple plots

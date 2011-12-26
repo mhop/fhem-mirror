@@ -962,14 +962,16 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="shutdown"></a>
 <h3>shutdown</h3>
 <ul>
-  <code>shutdown</code>
+  <code>shutdown [restart]</code>
   <br><br>
   Shut down the server (after saving the <a href="#statefile">state information
-  </a>). It triggers the global:SHUTDOWN event.
+  </a>). It triggers the global:SHUTDOWN event.  If the optional restart
+  parameter is specified, fhem tries to restart itself.
   <br><br>
   Example:
   <ul>
-    <code>shutdown</code>
+    <code>shutdown</code><br>
+    <code>shutdown restart</code>
   </ul>
 </ul>
 
