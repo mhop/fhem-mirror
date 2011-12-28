@@ -239,7 +239,7 @@ FHZ_Get($@)
   FHZ_Write($hash, $fn, $arg) if(!IsDummy($hash->{NAME}));
 
   my $msg = FHZ_ReadAnswer($hash, $a[1], 1.0);
-  Log 5, "GET Got: $msg";
+  Log 5, "GET Got: $msg" if(defined($msg));
   return $msg if(!$msg || $msg !~ /^81..c9..0102/);
 
   if($a[1] eq "serial") {

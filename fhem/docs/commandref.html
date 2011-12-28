@@ -55,6 +55,7 @@
       <a href="#sleep">sleep</a> &nbsp;
       <a href="#trigger">trigger</a> &nbsp;
       <a href="#updatefhem">updatefhem</a> &nbsp;
+      <a href="#usb">usb</a> &nbsp;
       <a href="#xmllist">xmllist</a> &nbsp;
 
   </ul>
@@ -6979,16 +6980,36 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 
   </ul>
   <br>
+
   <a name="createlog"></a>
   <b>createlog</b>
   <ul>
-    Use this command to manually add a FileLog and a weblink to an existing
-    device. E.g. if a HomeMatic device is created automatically by something
-    else then a pairing message, the model is unknown, so no plots will be
-    generated.  You can set the model/subtype attribute manually, and then call
-    createlog to add the corresponding logs.  </ul> <br>
+      Use this command to manually add a FileLog and a weblink to an existing
+      device. E.g. if a HomeMatic device is created automatically by something
+      else then a pairing message, the model is unknown, so no plots will be
+      generated.  You can set the model/subtype attribute manually, and then call
+      createlog to add the corresponding logs.<br><br>
+      This command is part of the autocreate module.
+  </ul>
+  <br>
 
-</ul>
+  <a name="usb"></a>
+  <b>usb</b>
+  <ul>
+      Usage:
+      <ul><code>
+        usb scan<br>
+        usb create<br>
+      </code></ul>
+      This command will scan the /dev directory for attached USB devices, and
+      will try to identify them. With the argument scan you'll get back a list
+      of fhem commands to execute, with the argument create there will be no
+      feedback, and the devices will be created instead.<br><br> This command
+      is part of the autocreate module.
+  </ul>
+</ul> <!-- End of autocreate -->
+<br>
+
 
 <a name="average"></a>
 <h3>average</h3>

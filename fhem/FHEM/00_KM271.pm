@@ -268,7 +268,7 @@ KM271_Set($@)
   my $data = ($val ? sprintf($fmt, $val) : $fmt);
 
   push @{$hash->{SENDBUFFER}}, $data;
-  DevIo_SimpleWrite($hash, "02") if(!$hash->{WAITING});
+  DevIo_SimpleWrite($hash, "02", 1) if(!$hash->{WAITING});
 
   return undef;
 }
@@ -292,31 +292,31 @@ KM271_Read($)
   if(@{$hash->{SENDBUFFER}} || $hash->{DATASENT}) {               # Send data
 
     if($buf eq "02") {                    # KM271 Wants to send, override
-      DevIo_SimpleWrite($hash, "02");
+      DevIo_SimpleWrite($hash, "02", 1);
       return;
     }
 
     if($buf eq "10") {
       if($hash->{DATASENT}) {
         delete($hash->{DATASENT});
-        DevIo_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});
+        DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}});
         return;
       }
       $data = pop @{ $hash->{SENDBUFFER} };
       $data =~ s/10/1010/g;
       $crc = KM271_crc($data);
-      DevIo_SimpleWrite($hash, $data."1003$crc");  # Send the data
+      DevIo_SimpleWrite($hash, $data."1003$crc", 1);  # Send the data
     }
 
     if($buf eq "15") {                        # NACK from the KM271
       Log 1, "$name: NACK!";
       delete($hash->{DATASENT});
-      DevIo_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}});
+      DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}});
       return;
     }
 
   } elsif($buf eq "02") {                    # KM271 Wants to send
-    DevIo_SimpleWrite($hash, "10");     # We are ready
+    DevIo_SimpleWrite($hash, "10", 1);     # We are ready
     $hash->{PARTIAL} = "";
     $hash->{WAITING} = 1;
     return;
@@ -333,12 +333,12 @@ KM271_Read($)
 
   if(KM271_crc($data) ne $crc) {
     Log 1, "Wrong CRC in $hash->{PARTIAL}: $crc vs. ". KM271_crc($data);
-    DevIo_SimpleWrite($hash, "15"); # NAK
-    DevIo_SimpleWrite($hash, "02") if(@{$hash->{SENDBUFFER}}); # want to send
+    DevIo_SimpleWrite($hash, "15", 1); # NAK
+    DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}}); # want to send
     return;
   }
 
-  DevIo_SimpleWrite($hash, "10");       # ACK, Data received ok
+  DevIo_SimpleWrite($hash, "10", 1);       # ACK, Data received ok
 
 
   $data =~ s/1010/10/g;
@@ -414,7 +414,7 @@ KM271_DoInit($)
 {
   my ($hash) = @_;
   push @{$hash->{SENDBUFFER}}, "EE0000";
-  DevIo_SimpleWrite($hash, "02");      # STX
+  DevIo_SimpleWrite($hash, "02", 1);      # STX
   return undef;
 }
 

@@ -113,7 +113,7 @@ TCM_Write($$$)
   }
   Log $ll5, "$hash->{NAME} sending $bstring";
 
-  DevIo_SimpleWrite($hash, $bstring);
+  DevIo_SimpleWrite($hash, $bstring, 1);
 }
 
 #####################################
@@ -542,7 +542,7 @@ TCM_Set($@)
   ##############################
   if($hash->{MODEL} eq "120") {
     if($cmdHex eq "") {            # wake is very special
-      DevIo_SimpleWrite($hash, "AA");
+      DevIo_SimpleWrite($hash, "AA", 1);
       return "";
     }
 
