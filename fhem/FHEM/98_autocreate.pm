@@ -90,6 +90,10 @@ autocreate_Initialize($)
   my %ahash = ( Fn=>"CommandCreateLog",
                 Hlp=>"<device>,create log/weblink for <device>" );
   $cmds{createlog} = \%ahash;
+
+  my %bhash = ( Fn=>"CommandUsb",
+                Hlp=>"[scan|create],display or create fhem-entries for USB devices" );
+  $cmds{usb} = \%bhash;
 }
 
 #####################################
@@ -273,6 +277,117 @@ CommandCreateLog($$)
   delete $acd->{CHANGED};
 
   $attr{$ac}{disable} = 1 if($disabled);
+}
+
+
+##########################
+# Table for automatically creating IO devices
+my @usbtable = (
+    { NAME      => "CUL",
+      matchList => ["cu.usbmodem(.*)", "ttyACM(.*)"],
+      DeviceName=> "DEVICE\@9600",
+      flush     => "\n",
+      request   => "V\n",
+      response  => "V .* CU.*",
+      define    => "CUL_PARAM CUL DEVICE\@9600 1234", },
+
+    { NAME      => "TCM310",
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)"],
+      DeviceName=> "DEVICE\@57600",
+      request   => pack("H*", "5500010005700838"),   # get idbase
+      response  => "\x00\xFF....",
+      define    => "TCM310_PARAM TCM 310 DEVICE\@57600", },
+
+    { NAME      => "TCM120",
+      matchList => ["ttyUSB(.*)"],
+      DeviceName=> "DEVICE\@9600",
+      request   => pack("H*", "A55AAB5800000000000000000003"),   # get idbase
+      response  => "\xA5\x5A............",
+      define    => "TCM120_PARAM TCM 120 DEVICE\@9600", },
+
+    { NAME      => "FHZ",
+      matchList => ["cu.usbserial(.*)", "ttyUSB(.*)"],
+      DeviceName=> "DEVICE\@9600",
+      request   => pack("H*", "8105044fc90185"),   # get fhtbuf
+      response  => "\x81........",
+      define    => "FHZ_PARAM FHZ DEVICE", },
+);
+
+
+sub
+CommandUsb($$)
+{
+  my ($cl, $n) = @_;
+
+  return "Usage: usb [scan|create]" if("$n" !~ m/^(scan|create)$/);
+  my $scan = 1 if($n =~ m/scan/);
+  my $ret = "";
+  my $msg;
+  my $dir = "/dev";
+
+  require "$attr{global}{modpath}/FHEM/DevIo.pm";
+
+  foreach my $dev (sort split("\n", `ls $dir`)) {
+    foreach my $thash (@usbtable) {
+      foreach my $ml (@{$thash->{matchList}}) {
+        if($dev =~ m/$ml/) {
+          my $PARAM = $1;
+          $PARAM =~ s/[^A-Za-z0-9]//g;
+          my $name = $thash->{NAME};
+          $msg = "$dev: checking if it is a $name";
+          Log 4, $msg; $ret .= $msg . "\n";
+
+          # Check if it already used
+          foreach my $d (keys %defs) {
+            if($defs{$d}{DeviceName} &&
+               $defs{$d}{DeviceName} =~ m/$dev/ &&
+               $defs{$d}{FD}) {
+              $msg = "$dev: already used by the $d fhem device";
+              Log 4, $msg; $ret .= $msg . "\n";
+              goto NEXTDEVICE;
+            }
+          }
+
+          # Open the device
+          my $dname = $thash->{DeviceName};
+          $dname =~ s,DEVICE,$dir/$dev,g;
+          my $hash = { NAME=>$name, DeviceName=>$dname };
+          DevIo_OpenDev($hash, 0, 0);
+          if(!defined($hash->{USBDev})) {
+            $msg = "$dev: Cannot open the device, check the log";
+            Log 4, $msg; $ret .= $msg . "\n";
+            goto NEXTDEVICE;
+          }
+
+          # Clear the USB buffer
+          if($thash->{flush}) {
+            DevIo_SimpleWrite($hash, $thash->{flush}, 0);
+            DevIo_TimeoutRead($hash, 0.1);
+          }
+          DevIo_SimpleWrite($hash, $thash->{request}, 0);
+          my $answer = DevIo_TimeoutRead($hash, 0.1);
+          DevIo_CloseDev($hash);
+
+          if($answer !~ m/$thash->{response}/) {
+            $msg = "$dev: got wrong answer for a $name";
+            Log 4, $msg; $ret .= $msg . "\n";
+            next;
+          }
+
+          my $define = $thash->{define};
+          $define =~ s/PARAM/$PARAM/g;
+          $define =~ s,DEVICE,$dir/$dev,g;
+          $msg = "$dev: create as a fhem device with: define $define";
+          Log 4, $msg; $ret .= $msg . "\n";
+          CommandDefine($cl, $define);
+
+          goto NEXTDEVICE;
+        }
+      }
+    }
+NEXTDEVICE:
+  }
+  return ($scan ? $ret : undef);
 }
 
 1;
