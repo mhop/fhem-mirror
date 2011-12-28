@@ -3,7 +3,8 @@
 package main;
 
 sub DevIo_SimpleRead($);
-sub DevIo_SimpleWrite($$);
+sub DevIo_TimeoutRead($$);
+sub DevIo_SimpleWrite($$$);
 sub DevIo_OpenDev($$$);
 sub DevIo_CloseDev($);
 sub DevIo_Disconnected($);
@@ -50,20 +51,40 @@ DevIo_SimpleRead($)
   return $buf;
 }
 
+########################
+# Read until you get the timeout. Use it with care
+sub
+DevIo_TimeoutRead($$)
+{
+  my ($hash, $timeout) = @_;
+
+  my $answer = "";
+  for(;;) {
+    my $rin = "";
+    vec($rin, $hash->{FD}, 1) = 1;
+    my $nfound = select($rin, undef, undef, $timeout);
+    last if($nfound <= 0);
+    my $r = DevIo_DoSimpleRead($hash);
+    last if(!defined($r));
+    $answer .= $r;
+  }
+  return $answer;
+}
+
 
 ########################
 # Input is HEX, with header and CRC
 sub
-DevIo_SimpleWrite($$)
+DevIo_SimpleWrite($$$)
 {
-  my ($hash, $msg) = @_;
+  my ($hash, $msg, $ishex) = @_;
   return if(!$hash);
 
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   Log $ll5, "SW: $msg";
 
-  $msg = pack('H*', $msg);
+  $msg = pack('H*', $msg) if($ishex);
   $hash->{USBDev}->write($msg)    if($hash->{USBDev});
   syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
   syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
@@ -81,7 +102,6 @@ DevIo_OpenDev($$$)
   my $po;
   my $baudrate;
   ($dev, $baudrate) = split("@", $dev);
-
 
   $hash->{PARTIAL} = "";
   Log 3, "Opening $name device $dev"
