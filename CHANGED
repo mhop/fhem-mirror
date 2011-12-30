@@ -30,6 +30,7 @@
   - feature: shutdown parameter restart added
   - feature: usb scan/create command added (part of autocreate).
   - feature: SaveAs added to FHEMWEB Edit-Files
+  - feature: EnOcean ElTako dimmer by Marc.
 
   
 - 2011-07-08 (5.1)
