@@ -184,7 +184,7 @@ FileLog_Get($@)
   } else {
     my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,o);
     if(!-f $linf) {
-      $linf = $attr{$hash->{NAME}}{archivedir} . "/" . $inf;
+      $linf = AttrValue($hash->{NAME},"archivedir",".") ."/". $inf;
       return "Error: cannot access $linf" if(!-f $linf);
     }
     $inf = $linf;
