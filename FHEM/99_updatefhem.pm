@@ -121,8 +121,10 @@ CommandUpdatefhem($$)
     }
 
     my $content = GetHttpFile($server, "$sdir/$remfile");
-    return "File size for $f does not correspond to filetimes.txt entry"
-        if(length($content) ne $filesize{$f});
+    my $l1 = length($content);
+    my $l2 = $filesize{$f};
+    return "File size for $f ($l1) does not correspond to ".
+                "filetimes.txt entry ($l2)" if($l1 ne $l2);
     open(FH,">$localfile") || return "Can't write $localfile";
     print FH $content;
     close(FH)
@@ -210,6 +212,7 @@ GetHttpFile($$)
 {
   my ($host, $filename) = @_;
 
+  $filename =~ s/%/%25/g;
   my $conn = IO::Socket::INET->new(PeerAddr => $host);
   if(!$conn) {
     Log 1, "Can't connect to $host\n";
@@ -219,10 +222,10 @@ GetHttpFile($$)
   my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
   syswrite $conn, $req;
   my ($buf, $ret);
-  while(sysread($conn, $buf, 65536) > 0) {
+  while(sysread($conn,$buf,65536) > 0) {
     $ret .= $buf;
   }
-  $ret=~ s/.*?\r\n\r\n//s;
+  $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
   Log 1, "Got http://$host$filename, length: ".length($ret);
   return $ret;
 }
