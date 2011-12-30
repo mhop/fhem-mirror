@@ -48,6 +48,7 @@ my $try_zlib = 1;
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
+my %FW_webArgs;    # all arguments specifie in the GET
 my $FW_cmdret;     # Returned data by the fhem call
 my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
@@ -519,6 +520,7 @@ FW_digestCgi($)
   $FW_XHR = undef;
   $FW_inform = undef;
 
+  %FW_webArgs = ();
   $arg =~ s,^[?/],,;
   foreach my $pv (split("&", $arg)) {
     $pv =~ s/\+/ /g;
@@ -527,6 +529,7 @@ FW_digestCgi($)
 
     # Multiline: escape the NL for fhem
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
+    $FW_webArgs{$p} = $v;
 
     if($p eq "detail")       { $FW_detail = $v; }
     if($p eq "room")         { $FW_room = $v; }
@@ -544,7 +547,7 @@ FW_digestCgi($)
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
   $cmd.=" $arg{$c}" if(defined($arg{$c}));
   $cmd.=" $val{$c}" if(defined($val{$c}));
-
+Log 1, "CMD: $cmd";
   return $cmd;
 }
 
@@ -759,9 +762,9 @@ FW_roomOverview($)
      "",           "",
      "Howto",      "$FW_ME/HOWTO.html",
      "Wiki",       "http://fhemwiki.de",
-     "FAQ",        "$FW_ME/faq.html",
+#     "FAQ",        "$FW_ME/faq.html",
      "Details",    "$FW_ME/commandref.html",
-     "Examples",   "$FW_ME/cmd=style%20examples",
+#     "Examples",   "$FW_ME/cmd=style%20examples",
      "Edit files", "$FW_ME/cmd=style%20list",
      "Select style","$FW_ME/cmd=style%20select",
      "",           "");
@@ -1410,11 +1413,11 @@ FW_style($$)
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/(.*.sh|.*Util.*)"));
     push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/.*.(css|svg|js)"));
+    push(@fl, FW_fileList("$FW_dir/.*.(css|svg)"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.gplot"));
-    push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/.*html"));
+#    push(@fl, "");
+#    push(@fl, FW_fileList("$FW_dir/.*html"));
 
     pO $start;
     pO "$msg<br><br>" if($msg);
@@ -1486,7 +1489,11 @@ FW_style($$)
     pO "<div id=\"content\">";
     pO "<form>";
     $f =~ s,^.*/,,;
-    pO     FW_submit("save", "Save $f") . "<br><br>";
+    pO     FW_submit("save", "Save $f");
+    pO     "&nbsp;&nbsp;";
+    pO     FW_submit("saveAs", "Save as");
+    pO     FW_textfield("saveName", 30);
+    pO     "<br><br>";
     pO     FW_hidden("cmd", "style save $a[2]");
     pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
@@ -1494,21 +1501,22 @@ FW_style($$)
     pO "</div>";
 
   } elsif($a[1] eq "save") {
-
-    $a[2] =~ s,/,,g;    # little bit of security
-    my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$FW_dir/$a[2]");
-    if(!open(FH, ">$f")) {
-      pO "$f: $!";
+    my $fName = $a[2];
+    $fName = $FW_webArgs{saveName}
+        if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
+    $fName =~ s,/,,g;    # little bit of security
+    $fName = ($fName eq "fhem.cfg" ? $attr{global}{configfile} :
+                                   "$FW_dir/$fName");
+    if(!open(FH, ">$fName")) {
+      pO "$fName: $!";
       return;
     }
     $FW_data =~ s/\r//g if($^O !~ m/Win/);
     binmode (FH);
     print FH $FW_data;
     close(FH);
-    $f =~ s,^.*/,,;
-    FW_style("style list", "Saved the file $f");
-    fC("rereadcfg") if($a[2] eq "fhem.cfg");
+    FW_style("style list", "Saved the file $fName");
+    fC("rereadcfg") if($fName eq $attr{global}{configfile});
   }
 
 }

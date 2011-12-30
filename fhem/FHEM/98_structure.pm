@@ -173,6 +173,7 @@ structure_Attr($@)
 {
   my ($type, @list) = @_;
 
+  return undef if($list[1] eq "alias");
   my $hash = $defs{$list[0]};
   $hash->{INATTR} = 1;
   my $ret = "";
