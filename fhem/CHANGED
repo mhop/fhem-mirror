@@ -29,6 +29,7 @@
   - change:  HTTPS certs directory moved from cwd into modpath
   - feature: shutdown parameter restart added
   - feature: usb scan/create command added (part of autocreate).
+  - feature: SaveAs added to FHEMWEB Edit-Files
 
   
 - 2011-07-08 (5.1)
