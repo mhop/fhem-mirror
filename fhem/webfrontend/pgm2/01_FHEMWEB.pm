@@ -547,7 +547,6 @@ FW_digestCgi($)
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
   $cmd.=" $arg{$c}" if(defined($arg{$c}));
   $cmd.=" $val{$c}" if(defined($val{$c}));
-Log 1, "CMD: $cmd";
   return $cmd;
 }
 
