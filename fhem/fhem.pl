@@ -2481,6 +2481,20 @@ ReadingsVal($$$)
 }
 
 sub
+ReadingsTimestamp($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{READINGS}) &&
+     defined($defs{$d}{READINGS}{$n}) &&
+     defined($defs{$d}{READINGS}{$n}{TIME})) {
+     return $defs{$d}{READINGS}{$n}{TIME};
+  }
+  return $default;
+}
+
+
+sub
 Value($)
 {
   my ($d) = @_;

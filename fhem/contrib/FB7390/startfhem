@@ -6,6 +6,7 @@ cd $home
 
 trap "" SIGHUP
 modprobe cdc_acm
+modprobe ftdi_sio
 sleep 2
 
 ln -sf $home/FHEM/fhemcmd.sh /var/fhemcmd
@@ -15,5 +16,16 @@ export PATH
 
 export LD_LIBRARY_PATH=$home/lib
 export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
+
+# let FHEM run as user boxusr80
+# add user fhem with uid of boxusr80
+id fhem > /dev/null 2>&1
+if [ "$?" -ne "0" ]; then
+  echo "user fhem does not exist. Adding it."
+  echo "fhem:any:1080:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
+  # set files ownership
+  chown -R boxusr80 ${home}/log
+  chown -R boxusr80 ${home}/FHEM
+fi 
 
 perl fhem.pl fhem.cfg
