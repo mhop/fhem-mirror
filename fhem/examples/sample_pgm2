@@ -24,10 +24,12 @@ attr autocreate device_room %TYPE
 attr autocreate filelog /tmp/%NAME-%Y.log
 attr autocreate weblink
 attr autocreate weblink_room Plots
+# Disable this to avoid looking for new USB devices on startup
+define initialUsbCheck notify global:INITIALIZED usb create 
 
 
-# You probably have to enable some of the following lines.
-# Verify first that /dev/xxx ist correct.
+# If the above notify did not helped, then you probably have to enable some of
+# the following lines.  Verify first that /dev/xxx ist correct.
 
 #define FHZ FHZ /dev/USB0
 #define CUL CUL /dev/ttyACM0@9600 1234
