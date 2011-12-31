@@ -1,4 +1,4 @@
-- SVN
+- 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
   - feature: CUL_TX added (thanks to Peterp)
   - feature: TCM120/TCM310 + EnOcean parser added
