@@ -288,28 +288,28 @@ my @usbtable = (
       DeviceName=> "DEVICE\@9600",
       flush     => "\n",
       request   => "V\n",
-      response  => "V .* CU.*",
+      response  => "^V .* CU.*",
       define    => "CUL_PARAM CUL DEVICE\@9600 1234", },
 
     { NAME      => "TCM310",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)"],
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
-      response  => "\x00\xFF....",
+      response  => "^\x00\xFF....",
       define    => "TCM310_PARAM TCM 310 DEVICE\@57600", },
 
     { NAME      => "TCM120",
       matchList => ["ttyUSB(.*)"],
       DeviceName=> "DEVICE\@9600",
       request   => pack("H*", "A55AAB5800000000000000000003"),   # get idbase
-      response  => "\xA5\x5A............",
+      response  => "^\xA5\x5A............",
       define    => "TCM120_PARAM TCM 120 DEVICE\@9600", },
 
     { NAME      => "FHZ",
       matchList => ["cu.usbserial(.*)", "ttyUSB(.*)"],
       DeviceName=> "DEVICE\@9600",
       request   => pack("H*", "8105044fc90185"),   # get fhtbuf
-      response  => "\x81........",
+      response  => "^\x81........",
       define    => "FHZ_PARAM FHZ DEVICE", },
 );
 
