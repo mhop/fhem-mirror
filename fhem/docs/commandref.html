@@ -2983,13 +2983,13 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
-    <li><a name="#model">hmClass</a>,
-        <a name="#model">model</a>,
-        <a name="#subType">subType</a><br>
+    <li><a name="hmClass">hmClass</a>,
+        <a name="model">model</a>,
+        <a name="subType">subType</a><br>
         These attributes are set automatically after a successful pairing.
         They are not supposed to be set by hand, and are necessary in order to
         correctly interpret device messages or to be able to send them.</li>
-    <li><a name="#rawToReadable">rawToReadable</a><br>
+    <li><a name="rawToReadable">rawToReadable</a><br>
         Used to convert raw KFM100 values to readable data, based on measured
         values. E.g.  fill slowly your container, while monitoring the
         values reported with <a href="#inform">inform</a>. You'll see:
@@ -3002,7 +3002,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Apply these values with: "attr KFM100 rawToReadable 10:0 50:20 79:40 270:100".
         fhem will do a linear interpolation for values between the bounderies.
         </li>
-    <li><a name="#unit">unit</a><br>
+    <li><a name="unit">unit</a><br>
         set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
         attr KFM100 unit Liter
         </li>
@@ -6470,7 +6470,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       expression, so you have access e.g. to the Value functions.<br><br>
 
       If the plotmode is gnuplot-scroll or SVG, you can also use the min, max,
-      avg, cnt, sum, lastv (last value) and lastd (last date) values of the
+      avg, cnt, sum, currval (last value) and currdate (last date) values of the
       individual curves, by accessing the corresponding values from the data
       hash, see the example below:<br>
 
