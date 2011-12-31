@@ -36,7 +36,8 @@ longpoll()
     if(sa[i].substring(0,5) == "room=")
       room=sa[i];
   }
-  pollConn.open("GET", document.location.pathname+room+"&XHR=1&inform=1", true);
+  var query = document.location.pathname+"?"+room+"&XHR=1&inform=1";
+  pollConn.open("GET", query, true);
   pollConn.onreadystatechange = doUpdate;
   pollConn.send(null);
 }
