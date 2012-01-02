@@ -155,7 +155,7 @@ FileLog_Set($@)
 #
 # It will set the %data values
 #  min<x>, max<x>, avg<x>, cnt<x>, currdate<x>, currval<x>, sum<x>
-# for each requested column, beggining with <x> = 1
+# for each requested column, beginning with <x> = 1
 
 sub
 FileLog_Get($@)
