@@ -1,0 +1,61 @@
+###########################################################################
+### Display Temperature/Humidity values from a KS550
+
+# This file uses placeholders. For good results the following
+# attribute settings in the WebLink object are recommended:
+#
+# label: "Rel. Humidity [%]"::"Temperature [C]"::"Temperature"::"rel. Humidity"
+# title: "Temperature $data{currval1} ($data{min1}-$data{max1}), Humidity $data{currval2} ($data{min2}-$data{max2}) @ $data{currdate1}"
+
+### FileLog definition corresponding to this file
+
+# define <filelogname> FileLog /var/log/fhem/KS550_%Y.log <ks550name>:T:.*
+
+### FileLog content
+
+# 2012-01-01_00:00:03 KS550 T: 10.4 H: 97 W: 0 R: 976.45 IR: 0 WD: 40 WDR: 67.5 S: 155 B: 8
+
+# This is the status line, which is printed to the logfile. For each of
+# the data there is also a separate line available, which you can select 
+# using a different regular expression in the FileLog define. 
+# Try .* as an all quantor to see, which lines are available.
+#
+# Field description:
+# T: Temperature
+# H: Humidity
+# W: Wind velocity
+# R: Rain quantity
+# IR: Rain indicator
+# WD: Direction of wind
+# WDR: Range of wind directions (67.5 is the maximum range)
+# S: Sunshine duration
+# B: Brightness (minimum:8, maximum:255)
+
+### Settings
+
+set terminal size <SIZE>
+set title '<TL>'
+set ylabel '<L1>'
+set y2label '<L2>'
+set ytics
+set y2tics
+
+# Maybe define your own ranges (not really needed):
+#set yrange [1:10]
+#set y2range [0:300]
+
+### Data extraction
+
+# The following FileLog directives extract the values from the logfile
+# lines. If you have only the status lines in the logfile, you do not
+# need any regular expression, since the line is valid anyhow. No
+# defaults are used here either.
+
+#FileLog 4:::
+#FileLog 6:::
+
+### Data plotting
+
+plot \
+     axes x1y2 title '<L3>' with lines,\
+     axes x1y1 title '<L4>' with lines
