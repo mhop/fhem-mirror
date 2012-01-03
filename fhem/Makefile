@@ -59,7 +59,7 @@ dist:
 	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
-	find .f -type f -print |\
+	find .f -type f -print | grep -v Makefile |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
 	mv .f $(DESTDIR)
 	tar cf - $(DESTDIR) | gzip > $(DESTDIR).tar.gz
@@ -77,7 +77,7 @@ deb:
 	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
-	find .f -type f -print |\
+	find .f -type f -print | grep -v Makefile |\
 		xargs perl -pi -e 's/=VERS=/$(VERS)/g;s/=DATE=/$(DATE)/g'
 	find .f -type f | xargs chmod 644
 	find .f -type d | xargs chmod 755
@@ -90,3 +90,6 @@ deb:
 
 fb7390:
 	cd contrib/FB7390 && ./makeimage $(DESTDIR)
+
+fb7270:
+	cd contrib/FB7270 && ./makeimage $(DESTDIR)
