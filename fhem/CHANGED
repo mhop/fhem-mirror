@@ -1,3 +1,7 @@
+- SVN
+  - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
+
+
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
   - feature: CUL_TX added (thanks to Peterp)

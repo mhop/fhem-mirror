@@ -416,6 +416,7 @@ FW_AnswerCall($)
 
   if($FW_inform) {      # Longpoll header
     $defs{$FW_cname}{inform} = $FW_room;
+    $defs{$FW_cname}{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $defs{$FW_cname}{CD};
     print $c "HTTP/1.1 200 OK\r\n",
              "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";

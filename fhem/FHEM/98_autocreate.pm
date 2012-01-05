@@ -325,6 +325,10 @@ CommandUsb($$)
   my $msg;
   my $dir = "/dev";
 
+  if($^O =~ m/Win/) {
+    return "This command is not yet supported on windows";
+  }
+
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
   foreach my $dev (sort split("\n", `ls $dir`)) {
