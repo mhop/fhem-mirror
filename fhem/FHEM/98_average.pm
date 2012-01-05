@@ -13,6 +13,7 @@ average_Initialize($)
   my ($hash) = @_;
   $hash->{DefFn}   = "average_Define";
   $hash->{NotifyFn} = "average_Notify";
+  $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
   $hash->{AttrList} = "disable:0,1";
 }
 
@@ -50,8 +51,8 @@ average_Notify($$)
   my $re = $avg->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
   my $tn;
+  my $myIdx = $max;
 
-  my $trigger = "";
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
 
@@ -100,7 +101,7 @@ average_Notify($$)
         $r->{$cumName}{VAL} = $cum;
         $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$secNow);
       } else {
-        $trigger .= " $avgName:".$r->{$avgName}{VAL};
+        $dev->{CHANGED}[$myIdx++] = "$avgName:".$r->{$avgName}{VAL};
         $r->{$cumName}{VAL} = $secNow*$val;
         $r->{$avgName}{VAL} = $val;
 
@@ -108,24 +109,7 @@ average_Notify($$)
       $r->{$cumName}{TIME} = $r->{$avgName}{TIME} = $tn;
     }
   }
-  $addNotifyCB{"avg:$avgName:$devName"} = "average_Callback $devName $trigger"
-    if($trigger);
-
   return undef;
-}
-
-sub
-average_Callback($)
-{
-  my ($arg) = @_;
-  my ($dev, @list) = split(" ", $arg);
-
-  my $n = 0;
-  for(my $n = 0; $n < @list; $n++) {
-    my ($name, $value) = split(":", $list[$n]);
-    $defs{$dev}{CHANGED}[$n] = "$name: $value";
-  }
-  DoTrigger($dev, undef);
 }
 
 1;
