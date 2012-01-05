@@ -1148,12 +1148,13 @@ CommandDefine($$)
 {
   my ($cl, $def) = @_;
   my @a = split("[ \t][ \t]*", $def, 3);
+  my $name = $a[0];
 
   return "Usage: define <name> <type> <type dependent arguments>"
   					if(int(@a) < 2);
-  return "$a[0] already defined, delete it first" if(defined($defs{$a[0]}));
-  return "Invalid characters in name (not A-Za-z0-9.:_): $a[0]"
-                        if($a[0] !~ m/^[a-z0-9.:_]*$/i);
+  return "$name already defined, delete it first" if(defined($defs{$name}));
+  return "Invalid characters in name (not A-Za-z0-9.:_): $name"
+                        if($name !~ m/^[a-z0-9.:_]*$/i);
 
   my $m = $a[1];
   if(!$modules{$m}) {                           # Perhaps just wrong case?
@@ -1175,7 +1176,7 @@ CommandDefine($$)
 
   my %hash;
 
-  $hash{NAME}  = $a[0];
+  $hash{NAME}  = $name;
   $hash{TYPE}  = $m;
   $hash{STATE} = "???";
   $hash{DEF}   = $a[2] if(int(@a) > 2);
@@ -1183,19 +1184,24 @@ CommandDefine($$)
 
   # If the device wants to issue initialization gets/sets, then it needs to be
   # in the global hash.
-  $defs{$a[0]} = \%hash;
+  $defs{$name} = \%hash;
 
-  my $ret = CallFn($a[0], "DefFn", \%hash, $def);
+  my $ret = CallFn($name, "DefFn", \%hash, $def);
   if($ret) {
     Log 1, "define: $ret";
-    delete $defs{$a[0]};                            # Veto
-    delete $attr{$a[0]};
+    delete $defs{$name};                            # Veto
+    delete $attr{$name};
 
   } else {
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
-      CommandAttr($cl, "$a[0] $da $defaultattr{$da}");
+      CommandAttr($cl, "$name $da $defaultattr{$da}");
     }
-    DoTrigger("global", "DEFINED $a[0]");
+    DoTrigger("global", "DEFINED $name");
+
+    if($modules{$m}{NotifyFn} && !$hash{NTFY_ORDER}) {
+      $hash{NTFY_ORDER} = ($modules{$m}{NotifyOrderPrefix} ?
+                $modules{$m}{NotifyOrderPrefix} : "50-") . $name;
+    }
 
   }
   return $ret;
@@ -2100,7 +2106,25 @@ DoTrigger($$)
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
   ################
+  # Log/notify modules
+  # If modifying a device in its own trigger, do not call the triggers from
+  # the inner loop.
+  if(!defined($defs{$dev}{INTRIGGER})) {
+    $defs{$dev}{INTRIGGER}=1;
+    my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
+                   grep { $defs{$_}{NTFY_ORDER} } keys %defs;
+    foreach my $n (@ntfyList) {
+      next if(!defined($defs{$n}));     # Was deleted in a previous notify
+      Log 5, "$dev trigger: Checking $n for notify";
+      my $r = CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+      $ret .= $r if($r);
+    }
+    delete($defs{$dev}{INTRIGGER});
+  }
+
+  ################
   # Inform
+  $max = int(@{$defs{$dev}{CHANGED}}); # can be enriched in the notifies
   foreach my $c (keys %client) {        # Do client loop first, is cheaper
     next if(!$client{$c}{inform} || $client{$c}{inform} eq "raw");
     my $tn = TimeNow();
@@ -2118,24 +2142,6 @@ DoTrigger($$)
     }
   }
 
-  ################
-  # Log/notify modules
-  # If modifying a device in its own trigger, do not call the triggers from
-  # the inner loop.
-  if(!defined($defs{$dev}{INTRIGGER})) {
-    $defs{$dev}{INTRIGGER}=1;
-    foreach my $n (sort keys %defs) {
-      next if(!defined($defs{$n}));     # Was deleted in a previous notify
-      if(defined($modules{$defs{$n}{TYPE}})) {
-        if($modules{$defs{$n}{TYPE}}{NotifyFn}) {
-          Log 5, "$dev trigger: Checking $n for notify";
-          my $r = CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
-          $ret .= $r if($r);
-        }
-      }
-    }
-    delete($defs{$dev}{INTRIGGER});
-  }
 
   ####################
   # Used by triggered perl programs to check the old value
@@ -2146,20 +2152,6 @@ DoTrigger($$)
   delete($defs{$dev}{CHANGED}) if(!defined($defs{$dev}{INTRIGGER}));
 
   Log 3, "NTFY return: $ret" if($ret);
-
-  # Enhancers like avarage need this
-  if(!defined($defs{$dev}{InNtfyCb}) && %addNotifyCB) {
-    $defs{$dev}{InNtfyCb}=1;
-    foreach my $cb (keys %addNotifyCB) {
-      my ($fn, $arg) = split(" ", $addNotifyCB{$cb}, 2);
-      delete $addNotifyCB{$cb};
-      no strict "refs";
-      &{$fn}($arg);
-      use strict "refs";
-    } 
-    delete($defs{$dev}{CHANGED});
-    delete($defs{$dev}{InNtfyCb});
-  }
 
   return $ret;
 }
