@@ -101,7 +101,7 @@ average_Notify($$)
         $r->{$cumName}{VAL} = $cum;
         $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$secNow);
       } else {
-        $dev->{CHANGED}[$myIdx++] = "$avgName:".$r->{$avgName}{VAL};
+        $dev->{CHANGED}[$myIdx++] = "$avgName: ".$r->{$avgName}{VAL};
         $r->{$cumName}{VAL} = $secNow*$val;
         $r->{$avgName}{VAL} = $val;
 
