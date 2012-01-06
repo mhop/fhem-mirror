@@ -54,48 +54,48 @@ SVG_render($$$$$$$)
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
  # Html Header
-  pO '<?xml version="1.0" encoding="UTF-8"?>';
-  pO '<!DOCTYPE svg>';
-  pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
+  FW_pO '<?xml version="1.0" encoding="UTF-8"?>';
+  FW_pO '<!DOCTYPE svg>';
+  FW_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
          'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
   my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
-  pO "<style type=\"text/css\"><![CDATA[";
+  FW_pO "<style type=\"text/css\"><![CDATA[";
   if(open(FH, "$FW_dir/${prf}svg_style.css") ||
      open(FH, "$FW_dir/svg_style.css")) {
-    pO join("", <FH>);
+    FW_pO join("", <FH>);
     close(FH);
   } else {
     Log 0, "Can't open $FW_dir/svg_style.css"
   }
-  pO "]]></style>";
+  FW_pO "]]></style>";
 
   if(open(FH, "$FW_dir/${prf}svg_defs.svg") ||
      open(FH, "$FW_dir/svg_defs.svg")) { # gradient definitions
-    pO join("", <FH>);
+    FW_pO join("", <FH>);
     close(FH);
   } else {
     Log 0, "Can't open $FW_dir/svg_defs.svg"
   }
 
   # Background
-  pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
+  FW_pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
   # Rectangle
-  pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
+  FW_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
         "fill=\"none\" class=\"border\"/>";
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
   $title =~ s/</&lt;/g;
   $title =~ s/>/&gt;/g;
-  pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
+  FW_pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
         "class=\"title\" text-anchor=\"middle\">$title</text>";
 
   # Copy and Paste labels, hidden by default
-  pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
+  FW_pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
         "class=\"paste\" text-anchor=\"end\"> </text>";
-  pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
+  FW_pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_copy(evt)\" " .
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
@@ -104,13 +104,13 @@ SVG_render($$$$$$$)
   $t =~ s/"//g;
   if(!$SVG_ss) {
     ($off1,$off2) = (3*$th/4, $oh/2);
-    pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+    FW_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
         "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
 
     $t = ($conf{y2label} ? $conf{y2label} : "");
     $t =~ s/"//g;
     ($off1,$off2) = ($ow-$th/4, $oh/2);
-    pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+    FW_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
         "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
   }
 
@@ -138,7 +138,7 @@ SVG_render($$$$$$$)
       $desc = sprintf("%s: Min:%g Max:%g Last:%g",
         $t, $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
     }
-    pO "<text title=\"$desc\" ".
+    FW_pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
           "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l" .
                 (defined($linestyle[$i]) ? $linestyle[$i] : $i) . "\">$t</text>";
@@ -195,7 +195,7 @@ SVG_render($$$$$$$)
 
   $dxp = $hdx[0];
   if($dxp && int(@{$dxp}) < 2 && !$tosec) { # not enough data and no range...
-    pO "</svg>";
+    FW_pO "</svg>";
     return;
   }
 
@@ -238,24 +238,24 @@ SVG_render($$$$$$$)
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $tstep) {
     $i = time_align($i,$aligntics);
     $off1 = int($x+($i-$fromsec)*$tmul);
-    pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
-    pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
+    FW_pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
+    FW_pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
   }
 
   # then the text and the grid
   $off1 = $x;
   $off2 = $y+$h+$th;
   $t = fmtTime($first_tag, $fromsec);
-  pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
+  FW_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
   $initoffset = $step;
   $initoffset = int(($step/2)/86400)*86400 if($aligntext);
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $step) {
     $i = time_align($i,$aligntext);
     $off1 = int($x+($i-$fromsec)*$tmul);
     $t = fmtTime($tag, $i);
-    pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
+    FW_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
               "text-anchor=\"middle\">$t</text>";
-    pO "  <polyline points=\"$off1,$y $off1,$off4\" class=\"hgrid\"/>";
+    FW_pO "  <polyline points=\"$off1,$y $off1,$off4\" class=\"hgrid\"/>";
   }
 
 
@@ -313,10 +313,10 @@ SVG_render($$$$$$$)
         $tlabel =~ s/^"(.*)"$/$1/;
 
         $off2 = int($y+($ma-$tvalue)*$hmul);
-        pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>";
+        FW_pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>";
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
-        pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>
+        FW_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>
                 $tlabel</text>";
       }
 
@@ -324,16 +324,16 @@ SVG_render($$$$$$$)
 
       for(my $i = $mi; $i <= $ma; $i += $step) {
         $off2 = int($y+($ma-$i)*$hmul);
-        pO "  <polyline points=\"$off3,$off2 $off4,$off2\"/>";
+        FW_pO "  <polyline points=\"$off3,$off2 $off4,$off2\"/>";
         if($axis eq "x1y2")  {
           my $o6 = $x+$w;
-          pO "  <polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>"
+          FW_pO "  <polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>"
             if($i > $mi && $i < $ma);
         }
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
         my $txt = sprintf("%g", $i);
-        pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
+        FW_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
       }
     }
 
@@ -372,7 +372,7 @@ SVG_render($$$$$$$)
           $ly = $x1; $ly = $y1;
           $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
                 $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
-          pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+          FW_pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
         }
 
     } elsif($type[$idx] eq "steps" || $type[$idx] eq "fsteps" ) {
@@ -394,7 +394,7 @@ SVG_render($$$$$$$)
           }
         }
       }
-      pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+      FW_pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
 
     } elsif($type[$idx] eq "histeps" ) {
       if(@{$dxp} == 1) {
@@ -411,7 +411,7 @@ SVG_render($$$$$$$)
              $x1,$y1, ($x1+$x2)/2,$y1, ($x1+$x2)/2,$y2, $x2,$y2);
         }
       }
-      pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+      FW_pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
 
     } else {                            # lines and everything else
       foreach my $i (0..int(@{$dxp})-1) {
@@ -422,7 +422,7 @@ SVG_render($$$$$$$)
         $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
 
-      pO "<polyline $js_helpers points=\"$ret\" style=\"stroke-width:" .
+      FW_pO "<polyline $js_helpers points=\"$ret\" style=\"stroke-width:" .
         (defined($linewidth[$idx]) ? $linewidth[$idx] : 1) .
         "\" class=\"l" .
         (defined($linestyle[$idx]) ? $linestyle[$idx] : $idx) . "\"/>";
@@ -430,7 +430,7 @@ SVG_render($$$$$$$)
     }
 
   }
-  pO "</svg>";
+  FW_pO "</svg>";
 }
 
 sub
