@@ -955,6 +955,8 @@ CUL_Attr(@)
     my $name = $a[1];
     my $hash = $defs{$name};
 
+    $a[3] = "SlowRF" if(!$a[3] || $a[3] ne "HomeMatic");
+
     if($a[3] eq "HomeMatic") {
       return if($hash->{initString} =~ m/Ar/);
       $hash->{Clients} = $clientsHomeMatic;
