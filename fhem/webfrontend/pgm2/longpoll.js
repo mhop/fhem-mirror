@@ -42,4 +42,10 @@ longpoll()
   pollConn.send(null);
 }
 
-window.onload = longpoll;
+function
+delayedStart()
+{
+  setTimeout("longpoll()", 1000);
+}
+
+window.onload = delayedStart;
