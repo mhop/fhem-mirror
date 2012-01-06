@@ -1032,7 +1032,11 @@ FW_substcfg($$$$$$)
 
   my $oll = $attr{global}{verbose};
   $attr{global}{verbose} = 0;         # Else the filenames will be Log'ged
-  my $title = AttrVal($wl, "title", "\"$file\"");
+
+  my $fileesc = $file;
+  $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
+  my $title = AttrVal($wl, "title", "\"$fileesc\"");
+
   $title = AnalyzeCommand(undef, "{ $title }");
   my $label = AttrVal($wl, "label", undef);
   my @g_label;
