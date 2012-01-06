@@ -505,7 +505,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
   getstate fl<br>
   ack:0 actuator:2 day-temp:21.5 desired-temp:22.5 [...] measured-temp:22.9 [...]
-  <code></ul>
+  </code></ul>
   Note: to use this command copy the file contrib/getstate/99_getstate.pm into
   your FHEM directory.
   <br>
@@ -1099,7 +1099,9 @@ A line ending with \ will be concatenated with the next one, so long lines
         Specify the logfile to write.  You can use "-" for
         stdout, in this case the server won't background itself.<br>
         The logfile name can also take wildcards for easier logfile rotation,
-        see the <a href="#FileLog">FileLog</a> section.
+        see the <a href="#FileLog">FileLog</a> section. Just apply the 
+        <code>archivecmd / archivedir / nrarchive</code> attributes to the
+        <code>global</code> device as you would do for a FileLog device.
     </li><br>
 
     <a name="modpath"></a>
@@ -7654,9 +7656,10 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         shell command (no enclosing " is needed), and each % in the command
         will be replaced with the name of the old logfile.<br>
 
-        If this attribute is not set, but nrarchive and/or archivecmd is set,
-        then all superfluous logfiles will be moved to archivedir (or deleted if
-        archivedir is not set).</li><br>
+        If this attribute is not set, but nrarchive and/or archivecmd are set,
+        then nrarchive logfiles are kept while older ones are moved to 
+        archivedir (or deleted if archivedir is not set).
+        </li><br>
 
     <li><a href="#disable">disable</a></li>
 
