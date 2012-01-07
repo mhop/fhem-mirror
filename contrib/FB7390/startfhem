@@ -22,13 +22,13 @@ id fhem > /dev/null 2>&1
 if [ "$?" -ne "0" ]; then
   echo "user fhem does not exist. Adding it."
   echo "fhem:any:1080:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
-
-  # set file ownership
-  chown -R boxusr80 ${home}/log
-  chown -R boxusr80 ${home}/FHEM
-
-  chown root ${home}/dfu-programmer
-  chmod 4755 ${home}/dfu-programmer
 fi 
+
+# set file ownership
+chown -R boxusr80 ${home}/log
+chown -R boxusr80 ${home}/FHEM
+
+chown root ${home}/dfu-programmer
+chmod 4755 ${home}/dfu-programmer
 
 perl fhem.pl fhem.cfg
