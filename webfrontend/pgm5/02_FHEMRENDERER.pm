@@ -1,7 +1,7 @@
 #################################################################################
 #  Copyright notice
 #
-#  (c) 2008-2009
+#  (c) 2008-2012
 #  Copyright: Dr. Olaf Droegehorn
 #  o.droegehorn@dhs-computertechnik.de
 #  www.dhs-computertechnik.de
@@ -52,8 +52,8 @@ sub FHEMRENDERER_setAttr($$);
 sub FHEMRENDERER_parseXmlList($);
 sub FHEMRENDERER_render($);
 sub FHEMRENDERER_fatal($);
-sub pF($@);
-sub pO(@);
+sub FHEMRENDERER_pF($@);
+sub FHEMRENDERER_pO(@);
 #sub FHEMRENDERER_zoomLink($$$$);
 sub FHEMRENDERER_calcWeblink($$);
 
@@ -221,7 +221,7 @@ FHEMRENDERER_Get($@)
           if($t eq "fileplot") {
             my @va = split(":", $v, 3);
             if(@va != 3 || !$__devs{$va[0]}{INT}{currentlogfile}) {
-		  			    pO "<td>Broken definition: $v</a></td>";
+		  			    FHEMRENDERER_pO "<td>Broken definition: $v</a></td>";
             } else {
               if($va[2] eq "CURRENT") {
                 $__devs{$va[0]}{INT}{currentlogfile}{VAL} =~ m,([^/]*)$,;
@@ -295,7 +295,7 @@ FHEMRENDERER_parseXmlList($)
   %__types = ();
   $__title = "";
 
-  foreach my $l (split("\n", fC("xmllist"))) {
+  foreach my $l (split("\n", FHEMRENDERER_fC("xmllist"))) {
 
     ####### Device
     if($l =~ m/^\t\t<(.*) name="(.*)" state="(.*)" sets="(.*)" attrs="(.*)">/){
@@ -428,7 +428,7 @@ FHEMRENDERER_render($)
 
       my ($f,$t)=($__devs{$d}{from}, $__devs{$d}{to});
 
-      my @path = split(" ", fC("get $d $file $FHEMRENDERER_tmpfile$wl $f $t " .
+      my @path = split(" ", FHEMRENDERER_fC("get $d $file $FHEMRENDERER_tmpfile$wl $f $t " .
                                   join(" ", @filelog)));
       my $i = 0;
       $plot =~ s/\".*?using 1:[^ ]+ /"\"$path[$i++]\" using 1:2 "/gse;
@@ -466,7 +466,7 @@ FHEMRENDERER_render($)
 #    $f = 0 if(!$f);     # From the beginning of time...
 #    $t = 9 if(!$t);     # till the end
 #
-#    my $ret = fC("get $d $file INT $f $t " . join(" ", @filelog));
+#    my $ret = FHEMRENDERER_fC("get $d $file INT $f $t " . join(" ", @filelog));
 #    SVG_render($file, $__plotsize, $f, $t, \@data, $internal_data, $plot);
 #
 #		open (FH, ">$FHEMRENDERER_tmpfile$wl.svg");
@@ -482,13 +482,13 @@ sub
 FHEMRENDERER_fatal($)
 {
   my ($msg) = @_;
-  pO "<html><body>$msg</body></html>";
+  FHEMRENDERER_pO "<html><body>$msg</body></html>";
 }
 
 ##################
 # print formatted
 sub
-pF($@)
+FHEMRENDERER_pF($@)
 {
   my $fmt = shift;
   $__RET .= sprintf $fmt, @_;
@@ -497,7 +497,7 @@ pF($@)
 ##################
 # print output
 sub
-pO(@)
+FHEMRENDERER_pO(@)
 {
   $__RET .= shift;
 }
@@ -505,7 +505,7 @@ pO(@)
 ##################
 # fhem command
 sub
-fC($)
+FHEMRENDERER_fC($)
 {
   my ($cmd) = @_;
   #Log 0, "Calling $cmd";
