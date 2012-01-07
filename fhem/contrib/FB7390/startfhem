@@ -28,7 +28,7 @@ if [ "$?" -ne "0" ]; then
   chown -R boxusr80 ${home}/FHEM
 
   chown root ${home}/dfu-programmer
-  chmod 2755 ${home}/dfu-programmer
+  chmod 4755 ${home}/dfu-programmer
 fi 
 
 perl fhem.pl fhem.cfg

@@ -343,12 +343,13 @@ CommandUsb($$)
     $culType = "CUL_V4" if($lsusb =~ m/03eb:2ff0/);
     $culType = "CUL_V3" if($lsusb =~ m/03eb:2ff4/);
     $culType = "CUL_V2" if($lsusb =~ m/03eb:2ffa/);
-    last if(!$culType);
-    $msg = "$culType: flash it with: CULflash none $culType";
-    Log 4, $msg; $ret .= $msg . "\n";
-    if(!$scan) {
-      CommandCULflash(undef, "none $culType");
-      sleep(4);      # Leave time for linux to load th drivers
+    if($culType) {
+      $msg = "$culType: flash it with: CULflash none $culType";
+      Log 4, $msg; $ret .= $msg . "\n";
+      if(!$scan) {
+        CommandCULflash(undef, "none $culType");
+        sleep(4);      # Leave time for linux to load th drivers
+      }
     }
   }
 
@@ -407,7 +408,10 @@ CommandUsb($$)
           $msg = "$dev: create as a fhem device with: define $define";
           Log 4, $msg; $ret .= $msg . "\n";
 
-          CommandDefine($cl, $define) if($scan);
+          if(!$scan) {
+            Log 1, "define $define";
+            CommandDefine($cl, $define);
+          }
 
           goto NEXTDEVICE;
         }
