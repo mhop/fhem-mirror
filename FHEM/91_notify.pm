@@ -54,6 +54,7 @@ notify_Exec($$)
 
   my $n = $dev->{NAME};
   my $re = $ntfy->{REGEXP};
+  return if(!$dev->{CHANGED}); # Some previous notify deleted the array.
   my $max = int(@{$dev->{CHANGED}});
   my $t = $dev->{TYPE};
 
