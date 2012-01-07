@@ -1101,7 +1101,8 @@ A line ending with \ will be concatenated with the next one, so long lines
         The logfile name can also take wildcards for easier logfile rotation,
         see the <a href="#FileLog">FileLog</a> section. Just apply the 
         <code>archivecmd / archivedir / nrarchive</code> attributes to the
-        <code>global</code> device as you would do for a FileLog device.
+        <code>global</code> device as you would do for a FileLog device.<br>
+        You can access the current name of the logfile with <code>{ $currlogfile }</code>.
     </li><br>
 
     <a name="modpath"></a>
