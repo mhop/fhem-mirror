@@ -164,10 +164,9 @@ CommandCULflash($$)
   my @a = split("[ \t]+", $param);
   return "Usage: CULflash <Fhem-CUL-Device> <CUL-type>, ".
                 "where <CUL-type> is one of ". join(" ", sort keys %ctypes)
-      if(int(@a) != 2 ||
-         !$defs{$a[0]} ||
-         $defs{$a[0]}{TYPE} ne "CUL" ||
-         !$ctypes{$a[1]});
+      if(!(int(@a) == 2 &&
+          ($a[0] eq "none" || ($defs{$a[0]} && $defs{$a[0]}{TYPE} eq "CUL")) &&
+          $ctypes{$a[1]}));
 
   my $cul  = $a[0];
   my $target = $a[1];
@@ -202,8 +201,10 @@ CommandCULflash($$)
   $cmd =~ s/MCU/$mcu/g;
   $cmd =~ s/TARGET/$localfile/g;
 
-  CUL_SimpleWrite($defs{CUL}, "B01");
-  sleep(4);     # B01 needs 2 seconds for the reset
+  if($cul ne "none") {
+    CUL_SimpleWrite($defs{$cul}, "B01");
+    sleep(4);     # B01 needs 2 seconds for the reset
+  }
   Log 1, $cmd;
   my $result = `$cmd`;
   Log 1, $result;

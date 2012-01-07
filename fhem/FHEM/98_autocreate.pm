@@ -289,7 +289,7 @@ my @usbtable = (
       flush     => "\n",
       request   => "V\n",
       response  => "^V .* CU.*",
-      define    => "CUL_PARAM CUL DEVICE\@9600 1234", },
+      define    => "CUL_PARAM CUL DEVICE\@9600 1PARAM34", },
 
     { NAME      => "TCM310",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)"],
@@ -320,7 +320,7 @@ CommandUsb($$)
   my ($cl, $n) = @_;
 
   return "Usage: usb [scan|create]" if("$n" !~ m/^(scan|create)$/);
-  my $scan = 1 if($n =~ m/scan/);
+  my $scan = 1 if($n eq "scan");
   my $ret = "";
   my $msg;
   my $dir = "/dev";
@@ -331,6 +331,29 @@ CommandUsb($$)
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
+  ################
+  # First try to flash unflashed CULs
+  if($^O eq "linux") {
+    # One device at a time to avoid endless loop
+    my $lsusb = `lsusb`;
+    my $culType;
+    $culType = "CUL_V4" if($lsusb =~ m/VID=03eb.PID=2ff0/s); # FritzBox
+    $culType = "CUL_V3" if($lsusb =~ m/VID=03eb.PID=2ff4/s); # FritzBox
+    $culType = "CUL_V2" if($lsusb =~ m/VID=03eb.PID=2ffa/s); # FritzBox
+    $culType = "CUL_V4" if($lsusb =~ m/03eb:2ff0/);
+    $culType = "CUL_V3" if($lsusb =~ m/03eb:2ff4/);
+    $culType = "CUL_V2" if($lsusb =~ m/03eb:2ffa/);
+    last if(!$culType);
+    $msg = "$culType: flash it with: CULflash none $culType";
+    Log 4, $msg; $ret .= $msg . "\n";
+    if(!$scan) {
+      CommandCULflash(undef, "none $culType");
+      sleep(4);      # Leave time for linux to load th drivers
+    }
+  }
+
+  ################
+  # Now the /dev scan
   foreach my $dev (sort split("\n", `ls $dir`)) {
     foreach my $thash (@usbtable) {
       foreach my $ml (@{$thash->{matchList}}) {
@@ -383,7 +406,8 @@ CommandUsb($$)
           $define =~ s,DEVICE,$dir/$dev,g;
           $msg = "$dev: create as a fhem device with: define $define";
           Log 4, $msg; $ret .= $msg . "\n";
-          CommandDefine($cl, $define);
+
+          CommandDefine($cl, $define) if($scan);
 
           goto NEXTDEVICE;
         }
