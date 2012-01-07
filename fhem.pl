@@ -2124,21 +2124,23 @@ DoTrigger($$)
 
   ################
   # Inform
-  $max = int(@{$defs{$dev}{CHANGED}}); # can be enriched in the notifies
-  foreach my $c (keys %client) {        # Do client loop first, is cheaper
-    next if(!$client{$c}{inform} || $client{$c}{inform} eq "raw");
-    my $tn = TimeNow();
-    if($attr{global}{mseclog}) {
-      my ($seconds, $microseconds) = gettimeofday();
-      $tn .= sprintf(".%03d", $microseconds/1000);
-    }
-    my $re = $client{$c}{informRegexp};
-    for(my $i = 0; $i < $max; $i++) {
-      my $state = $defs{$dev}{CHANGED}[$i];
-      next if($re && $state !~ m/$re/);
-      syswrite($client{$c}{fd},
-        ($client{$c}{inform} eq "timer" ? "$tn " : "") .
-        "$defs{$dev}{TYPE} $dev $state\n");
+  if($defs{$dev}{CHANGED}) {    # It gets deleted sometimes (?)
+    $max = int(@{$defs{$dev}{CHANGED}}); # can be enriched in the notifies
+    foreach my $c (keys %client) {        # Do client loop first, is cheaper
+      next if(!$client{$c}{inform} || $client{$c}{inform} eq "raw");
+      my $tn = TimeNow();
+      if($attr{global}{mseclog}) {
+        my ($seconds, $microseconds) = gettimeofday();
+        $tn .= sprintf(".%03d", $microseconds/1000);
+      }
+      my $re = $client{$c}{informRegexp};
+      for(my $i = 0; $i < $max; $i++) {
+        my $state = $defs{$dev}{CHANGED}[$i];
+        next if($re && $state !~ m/$re/);
+        syswrite($client{$c}{fd},
+          ($client{$c}{inform} eq "timer" ? "$tn " : "") .
+          "$defs{$dev}{TYPE} $dev $state\n");
+      }
     }
   }
 
