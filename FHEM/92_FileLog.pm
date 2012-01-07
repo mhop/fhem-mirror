@@ -62,6 +62,29 @@ FileLog_Undef($$)
   return undef;
 }
 
+sub
+FileLog_Switch($)
+{
+  my ($log) = @_;
+
+  my $fh = $log->{FH};
+  my @t = localtime;
+  my $cn = ResolveDateWildcards($log->{logfile},  @t);
+
+  if($cn ne $log->{currentlogfile}) { # New logfile
+    $fh->close();
+    HandleArchiving($log);
+    $fh = new IO::File ">>$cn";
+    if(!defined($fh)) {
+      Log(0, "Can't open $cn");
+      return;
+    }
+    $log->{currentlogfile} = $cn;
+    $log->{FH} = $fh;
+  }
+
+}
+
 #####################################
 sub
 FileLog_Log($$)
@@ -81,24 +104,11 @@ FileLog_Log($$)
     if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
       my $t = TimeNow();
       $t = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
-      $t =~ s/ /_/o; # Makes it easier to parse with gnuplot
+      $t =~ s/ /_/; # Makes it easier to parse with gnuplot
+
+      FileLog_Switch($log);
 
       my $fh = $log->{FH};
-      my @t = localtime;
-      my $cn = ResolveDateWildcards($log->{logfile},  @t);
-
-      if($cn ne $log->{currentlogfile}) { # New logfile
-	$fh->close();
-        HandleArchiving($log);
-	$fh = new IO::File ">>$cn";
-	if(!defined($fh)) {
-	  Log(0, "Can't open $cn");
-	  return;
-	}
-	$log->{currentlogfile} = $cn;
-	$log->{FH} = $fh;
-      }
-
       print $fh "$t $n $s\n";
       $fh->flush;
       $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
@@ -179,12 +189,14 @@ FileLog_Get($@)
     $internal = 1;
   }
 
+  FileLog_Switch($hash);
+
   if($inf eq "-") {
     $inf = $hash->{currentlogfile};
   } else {
     my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,o);
     if(!-f $linf) {
-      $linf = AttrValue($hash->{NAME},"archivedir",".") ."/". $inf;
+      $linf = AttrVal($hash->{NAME},"archivedir",".") ."/". $inf;
       return "Error: cannot access $linf" if(!-f $linf);
     }
     $inf = $linf;
