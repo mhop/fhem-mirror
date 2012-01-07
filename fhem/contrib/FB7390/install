@@ -57,9 +57,7 @@ if test $r != 0; then
 fi
 rm -f /var/nvi.tmp
 
-echo "########################### Starting fhem ############################"
-sync
-$home/startfhem
-
+# We have to restart with exit code 1, else the frontend tells us:
+# update failed: no error
 echo "########################### FHEM INSTALL END #########################"
-exit 1 # INSTALL_SUCCESS_REBOOT
+exit 1
