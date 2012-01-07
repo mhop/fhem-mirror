@@ -738,14 +738,14 @@ A line ending with \ will be concatenated with the next one, so long lines
     <b>Note:</b> dfu-programmer has to be installed in the path, this is
     already the case with the Fritz!Box 7390 image from fhem.de<br>
 
-    If the CUL is not yet flashed, then first define a <a href="#CUL">CUL</a>
-    device (even if fhem won't be able to open the device), insert it with the
-    button pressed (this will set the device into flash-mode), then issue the
-    CULflash command.<br>
+    If the CUL is not yet flashed, then specify "none" as CUL-Name.
     Example:
     <ul>
-    <code>CULflash CUL CUL_V3</code>
+    <code>CULflash CUL CUL_V3<br>
+          CULflash none CUL_V3</code>
     </ul>
+    Note: the message "dfu-programmer: failed to release interface 0." is
+    normal on the FB7390.
 </ul>
 
 
@@ -1102,7 +1102,8 @@ A line ending with \ will be concatenated with the next one, so long lines
         see the <a href="#FileLog">FileLog</a> section. Just apply the 
         <code>archivecmd / archivedir / nrarchive</code> attributes to the
         <code>global</code> device as you would do for a FileLog device.<br>
-        You can access the current name of the logfile with <code>{ $currlogfile }</code>.
+        You can access the current name of the logfile with
+        <code>{ $currlogfile }</code>.
     </li><br>
 
     <a name="modpath"></a>
@@ -7007,8 +7008,17 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       This command will scan the /dev directory for attached USB devices, and
       will try to identify them. With the argument scan you'll get back a list
       of fhem commands to execute, with the argument create there will be no
-      feedback, and the devices will be created instead.<br><br> This command
-      is part of the autocreate module.
+      feedback, and the devices will be created instead.<br><br>
+
+      Note that switching a CUL to HomeMatic mode is still has to be done
+      manually.<br><br>
+
+      On Linux it will also check with the lsusb command, if unflashed CULs are
+      attached. If this is the case, it will call CULflash with the appropriate
+      parameters (or display the CULflash command if scan is specified). Only
+      one device to flash is displayed at a time.<br><br>
+
+      This command is part of the autocreate module.
   </ul>
 </ul> <!-- End of autocreate -->
 <br>
@@ -7030,7 +7040,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
       The syntax for &lt;regexp&gt; is the same as the
       regexp for <a href="#notify">notify</a>.<br>
       If it matches, and the event is of the form "eventname number", then this
-      module computes the daily and monthly average, and generates an event of the form
+      module computes the daily and monthly average, and generates an event of
+      the form
       <ul>
         &lt;device&gt; &lt;eventname&gt;_avg_day: &lt;computed_average&gt;
       </ul>
@@ -7039,7 +7050,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         &lt;device&gt; &lt;eventname&gt;_avg_month: &lt;computed_average&gt;
       </ul>
       at the beginning of the next day or month respectively.<br>
-      The current average and the cumulated values are stored in the device readings.
+      The current average and the cumulated values are stored in the device
+      readings.
     </ul>
     <br>
 

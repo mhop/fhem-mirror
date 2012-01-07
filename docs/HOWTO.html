@@ -79,6 +79,19 @@
       <a href="http://localhost:8084/fhem">http://fhem-host:8085/fhem</a> if
       you are using a tablet like the iPad.<br><br>
 
+      In the default configuration, fhem will look for USB attached FHZ, CUL
+      and TCM devices on startup (unix/OSX only) and will create
+      appropriate fhem devices.<br><br>
+
+      On linux (esp. FB7390) it will even try to
+      flash the unflashed CUL, if it is attached at startup. See the <a
+      href="commandref.html#usb">usb</a> and <a
+      href="commandref.html#CULflash">CULflash</a> commands for details, and
+      check the "unsorted" room in FHEMWEB for the newly created
+      devices. Note that switching a CUL to HomeMatic mode is still has to be
+      done manually. Only one device is flashed per fhem-startup.<br><br>
+
+      For doing it manually (or if fhem failed to discover your device):
       Attach the USB device (CUL, FHZ1000PC/FHZ1300, TUL, EUL, etc) to your
       computer, and look for the corresponding device in the /dev
       directory. For <a href="commandref.html#CUL">CUL</a> a file named
