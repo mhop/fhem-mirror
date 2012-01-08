@@ -251,7 +251,6 @@ CUL_HM_Parse($$)
   my $tn = TimeNow();
 
   if($cmd eq "8002") {                  # Ack / Nack
-
     # Multi-channel device: Switch to the shadow source hash
     my $chn = $2 if($p =~ m/^(..)(..)/);
     if($chn && $chn ne "01" && $chn ne "00") {
@@ -275,7 +274,7 @@ CUL_HM_Parse($$)
   if($cmd ne "8002" && $shash->{cmdStack}) { 
     # i have to tell something, dont care what it said
     CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
-      if($id eq $dst && $cmd ne "8002");
+      if($id eq $dst && $p ne "00");
     CUL_HM_ProcessCmdStack($shash);
     push @event, "";
 
@@ -344,8 +343,6 @@ CUL_HM_Parse($$)
       push @event, "temperature:$t";
       push @event, "humidity:$h";
 
-      # If we have something to tell:
-      CUL_HM_SendCmd($shash, "++A112$id$src", 1, 1) if($shash->{cmdStack});
     }
 
     if($cmd eq "A258" && $p =~ m/^(..)(..)/) {
@@ -440,6 +437,10 @@ CUL_HM_Parse($$)
     }
 
     if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
+      push @event, "desired-temp:" .hex($1)/2;
+    }
+
+    if($cmd eq "A112" && $p =~ m/^0202(..)$/) { # Set desired temp
       push @event, "desired-temp:" .hex($1)/2;
     }
 
@@ -825,8 +826,7 @@ CUL_HM_Set($@)
   my @h;
   @h = split(" ", $h) if($h);
 
-  my $isSender = (AttrVal($name, "hmClass", "") eq "sender" ||
-                  AttrVal($name, "model", "") eq "HM-CC-TC");
+  my $isSender = (AttrVal($name,"hmClass","") eq "sender" || $md eq "HM-CC-TC");
 
 
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
@@ -866,8 +866,8 @@ CUL_HM_Set($@)
         sprintf("++A011%s%s0400", $id,$dst));
 
   } elsif($cmd eq "pair") { #############################################
-
-    return "pair is not enabled for this device, use set <IODev> hmPairForSec"
+    return "pair is not enabled for this type of device, ".
+                "use set <IODev> hmPairForSec"
         if($isSender);
 
     my $serialNr = AttrVal($name, "serialNr", undef);
@@ -941,14 +941,16 @@ CUL_HM_Set($@)
   } elsif($cmd =~ m/^desired-temp$/) { ##################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
+    CUL_HM_PushCmdStack($hash, "++A112$id$dst");     # Wakeup...
     CUL_HM_PushCmdStack($hash,
-                sprintf("++A011%s%s0201%s0000", $id,$dst,$temp));
+                sprintf("++A011%s%s0202%s", $id,$dst,$temp));
 
   } elsif($cmd =~ m/^(day|night|party)-temp$/) { ##################
     my %tt = (day=>"03", night=>"04", party=>"06");
     my $tt = $tt{$1};
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
+    CUL_HM_PushCmdStack($hash, "++A112$id$dst");     # Wakeup...
     CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "$tt$temp");      # List 5
 
   } elsif($cmd =~ m/^tempList(...)/) { ##################################
@@ -978,6 +980,7 @@ CUL_HM_Set($@)
       $hash->{TEMPLIST}{$wd}{($idx-2)/2}{TEMP} = $a[$idx+1];
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
+    CUL_HM_PushCmdStack($hash, "++A112$id$dst");     # Wakeup...
     CUL_HM_pushConfig($hash, $id, $dst, 2, $list, $data);
 
     my $vn = "tempList$wd";
@@ -1045,7 +1048,7 @@ CUL_HM_Set($@)
 
     my $dst2 = $dhash->{DEF};
     my $chn2 = "01";
-    if(length($dst2) == 8) {      # shadow switch device for multi-channel switch
+    if(length($dst2) == 8) {     # shadow switch device for multi-channel switch
       $chn2 = substr($dst2, 6, 2);
       $dst2 = substr($dst2, 0, 6);
       $dhash = $modules{CUL_HM}{defptr}{$dst2};
@@ -1212,6 +1215,7 @@ CUL_HM_PushCmdStack($$)
 {
   my ($hash, $cmd) = @_;
   my @arr = ();
+
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
   push(@{$hash->{cmdStack}}, $cmd);
 }
