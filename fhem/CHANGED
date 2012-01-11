@@ -1,6 +1,7 @@
 - SVN
   - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
   - feature: the usb command tries to flash unflashed CULs on linux
+  - feature: FHEMWEB: jsonp support, .holiday and .cfg added to Edit Files
 
 
 - 2011-12-31 (5.2)

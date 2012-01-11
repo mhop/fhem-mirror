@@ -72,6 +72,7 @@ my %FW_hiddenroom; # hash of hidden rooms
 my $FW_longpoll;
 my $FW_inform;
 my $FW_XHR;
+my $FW_jsonp;
 #my $FW_encoding="ISO-8859-1";
 my $FW_encoding="UTF-8";
 
@@ -423,9 +424,14 @@ FW_AnswerCall($)
     return -1;
   }
 
-  if($FW_XHR) {
+  if($FW_XHR || $FW_jsonp) {
     $FW_RETTYPE = "text/plain; charset=$FW_encoding";
-    FW_pO $FW_cmdret;
+    if($FW_jsonp) {
+      $FW_cmdret =~ s/'/\\'/g;
+      FW_pO "$FW_jsonp('$FW_cmdret');";
+    } else {
+      FW_pO $FW_cmdret;
+    }
     return 0;
   }
 
@@ -519,6 +525,7 @@ FW_digestCgi($)
   $FW_room = "";
   $FW_detail = "";
   $FW_XHR = undef;
+  $FW_jsonp = undef;
   $FW_inform = undef;
 
   %FW_webArgs = ();
@@ -542,6 +549,7 @@ FW_digestCgi($)
     if($p eq "pos")          { %FW_pos =  split(/[=;]/, $v); }
     if($p eq "data")         { $FW_data = $v; }
     if($p eq "XHR")          { $FW_XHR = 1; }
+    if($p eq "jsonp")        { $FW_jsonp = $v; }
     if($p eq "inform")       { $FW_inform = $v; }
 
   }
