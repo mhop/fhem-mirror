@@ -1415,13 +1415,11 @@ FW_style($$)
 
     my @fl = ("fhem.cfg");
     push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/(.*.sh|.*Util.*)"));
+    push(@fl, FW_fileList("$FW_dir/.*(sh|Util.*|cfg|holiday)"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.(css|svg)"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.gplot"));
-#    push(@fl, "");
-#    push(@fl, FW_fileList("$FW_dir/.*html"));
 
     FW_pO $start;
     FW_pO "$msg<br><br>" if($msg);
