@@ -10,6 +10,7 @@ sub EnOcean_Initialize($);
 sub EnOcean_Parse($$);
 sub EnOcean_Set($@);
 sub EnOcean_MD15Cmd($$$);
+sub EnOcean_GetMyDeviceId($);
 
 my %EnO_rorgname = ("F6"=>"switch",     # RPS
                 "D5"=>"contact",    # 1BS
@@ -57,8 +58,8 @@ my %EnO_subType = (
   2          => "contact",
   3          => "sensor",
   4          => "windowHandle",
-  5          => "dimmer",
-  6          => "dimmCtrl",
+  5          => "eltakoDimmer",
+  6          => "eltakoRoll",
   7          => "FAH",
   8          => "FBH",
   9          => "FTF",
@@ -90,7 +91,7 @@ EnOcean_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "model:".join(",",@EnO_models)." ".
                        "subType:".join(",",values %EnO_subType)." ".
-                       "actualTemp";
+                       "subId actualTemp";
 
   for(my $i=0; $i<@EnO_ptm200btn;$i++) {
     $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
@@ -163,30 +164,33 @@ EnOcean_Set($@)
       $hash->{READINGS}{$cmd}{TIME} = $tn;
       $hash->{READINGS}{$cmd}{VAL} = $arg;
 
-    } elsif($st eq "dimmCtrl") { # Tested for Eltako-Dimmer
-      if($cmd eq "teach") {
-        my $data=sprintf("A502000000%s00", $hash->{DEF});
-        Log $ll2, "dimmCtrl.Teach: " . $data;
-        IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
+   } elsif($st eq "eltakoDimmer") {
+     if($cmd eq "teach") {
+       my $idSrc=EnOcean_GetMyDeviceId($hash);
+			 my $data=sprintf("A502000000%s00", $idSrc);
+			 Log $ll2, "$st.Teach: " . $data;
+       IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
 
-      } elsif($cmd eq "dimm") {
-        return "Usage: dimm percent [time 01-FF FF:slowest] [on/off]" if(@a<2);
-        my $time=0;
-        my $onoff=1;
-        # for eltako relative (0-100) (but not compliant to EEP because DB0.2 is 0)
-        my $dimVal=$a[1];
-        shift(@a);
-        if(defined($a[1])) { $time=$a[1]; shift(@a); }
-        if(defined($a[1])) { $onoff=($a[1] eq "off") ? 0 : 1; shift(@a); }
-        # EEP: A5/38/08 Central Command ->Typ 0x02: Dimming
-        my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $hash->{DEF});
-        IOWrite($hash, "000A0001", $data);
-        Log $ll2, "dimmCtrl.dimm: " . $data;
- 
-      } else {
-        return "Unknown argument $cmd, choose one of: teach, dimm:slider,0,1,100"
+     } elsif($cmd eq "dimto") {
+       return "Usage: $cmd percent [time 01-FF FF:slowest] [on/off]" if(@a<2);
+       my $time=0;
+       my $onoff=1;
+       # for eltako relative (0-100) (but not compliant to EEP because DB0.2 is 0)
+       my $dimVal=$a[1];
+       shift(@a);
+       if(defined($a[1])) { $time=$a[1]; shift(@a); }
+       if(defined($a[1])) { $onoff=($a[1] eq "off") ? 0 : 1; shift(@a); }
+       # EEP: A5/38/08 Central Command ->Typ 0x02: Dimming
+       my $idSrc=EnOcean_GetMyDeviceId($hash);
+       #my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $hash->{DEF});
+       my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $idSrc);
+       IOWrite($hash, "000A0001", $data);
+       Log $ll2, "$st.$cnd: " . $data;
 
-      }
+     } else {
+      return "Unknown argument $cmd, choose one of: teach, dimto"
+
+     }
 
     ###########################
     } else {                                          # Simulate a PTM
@@ -328,7 +332,7 @@ EnOcean_Parse($$)
 
         if("$fn.$tp" eq "20.01" && $iohash->{pair}) {      # MD15
           select(undef, undef, undef, 0.1);                # max 10 Seconds
-          EnOcean_A5Cmd($hash, "800800F0", "00000000");
+          EnOcean_A5Cmd($hash, "800800F0", EnOcean_GetMyDeviceId($hash));
           select(undef, undef, undef, 0.5);
           EnOcean_MD15Cmd($hash, $name, 128); # 128 == 20 degree C
         }
@@ -430,15 +434,13 @@ EnOcean_Parse($$)
       # Eltako FTF55
       # (EEP: 07-02-05)
       ####################################
-      # $db_1 is the temperature where 0x00 = 40°C and 0xFF 0°C
+      # $db_1 is the temperature where 0x00 = 40Â°C and 0xFF 0Â°C
       my $temp = sprintf "%3d", $db_1;
       $temp = sprintf "%0.1f", ( 40 - $temp * 40 / 255 ) ;
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
 
-    } elsif($st eq "dimmer") {
-      # todo: create a more general solution for the central-command responses
-
+    } elsif($st eq "eltakoDimmer") {
       # response command from (Eltako-)Actor ( Central-Command:A5/38/08 )
       if($db_3 eq 0x01) { # switch
         push @event, "3:state:" . (($db_0 & 0x01) ? "on": "off");
@@ -447,7 +449,7 @@ EnOcean_Parse($$)
 
       } elsif($db_3 eq 0x02) { # dimm
         push @event, "3:state:" . (($db_0 & 0x01) ? "on": "off");
-        push @event, "3:dimmValue:$db_2";
+        push @event, "3:value:$db_2";
 
       } elsif($db_3 eq 0x03) { # setpoint-switch, todo
       } elsif($db_3 eq 0x04) { # basic setpoint, todo
@@ -521,7 +523,7 @@ EnOcean_MD15Cmd($$$)
 
     if($msg) {
       select(undef, undef, undef, 0.2);
-      EnOcean_A5Cmd($hash, $msg, "00000000");
+      EnOcean_A5Cmd($hash, $msg, EnOcean_GetMyDeviceId($hash));
       if($cmd eq "initialize") {
         delete($defs{$name}{READINGS}{CMD});
         delete($defs{$name}{READINGS}{$cmd});
@@ -538,6 +540,26 @@ EnOcean_A5Cmd($$$)
           sprintf("A5%s%s0001%sFF00",$msg,$org,$hash->{DEF}));
           # type=A5 msg:4 senderId:4 status=00 subTelNum=01 destId:4 dBm=FF Security=00
 }
+
+# ---------------------------------------------
+
+#
+# compose the Src-Id for a command to send
+#
+sub EnOcean_GetMyDeviceId($)
+{
+  my ($hash) = @_;
+  my $myId=0;  # default: use Device-ID of EUL
+  my $name = $hash->{NAME};
+  my $baseId=hex($hash->{IODev}{BASEID}) if(defined $hash->{IODev}{BASEID});
+	my $subId = AttrVal($name, "subId", "");
+  if(defined $baseId and defined $subId) {
+    # if there is a base-id an a subid -> use this combination
+		$myId=sprintf("%08X", $baseId | $subId);
+  }
+  return $myId;
+}
+
 
 1;
 
