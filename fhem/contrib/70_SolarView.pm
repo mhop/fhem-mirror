@@ -2,7 +2,7 @@
 #
 # 70_SolarView.pm
 #
-# A FHEM module to read the current power/energy values from solarview.
+# A FHEM module to read power/energy values from solarview.
 #
 # written 2012 by Tobe Toben <fhem@toben.net>
 #
@@ -12,7 +12,7 @@
 #
 # SolarView is a powerful datalogger for photovoltaic systems that runs on
 # an AVM Fritz!Box (and also on x86 systems). For details see the SV homepage:
-# http://www.amhamberg.de/solarlogger.aspx
+# http://www.amhamberg.de/solarview_fritzbox.aspx
 #
 # SV supports many different inverters. To read the SV power values using
 # this module, a TCP-Server must be enabled for SV by adding the parameter
@@ -190,7 +190,7 @@ SolarView_Get($@)
 
   Log 2, "$args[0] $get => $val";
 
-  return "$args[0] $get => $val";
+  return $val;
 }
 
 sub
