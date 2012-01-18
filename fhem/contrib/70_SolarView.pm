@@ -23,7 +23,7 @@
 #
 # If <interval> is positive, new values are read every <interval> seconds.
 # If <interval> is 0, new values are read whenever a get request is called 
-# on <name>. The default for <interval> is 3600.
+# on <name>. The default for <interval> is 300 (i.e. 5 minutes).
 #
 # get <name> <key>
 #
@@ -86,7 +86,7 @@ SolarView_Define($$)
 
   $hash->{HOST}     = $args[2];
   $hash->{PORT}     = $args[3];
-  $hash->{INTERVAL} = (@args>=5) ? int($args[4]) : 3600;
+  $hash->{INTERVAL} = (@args>=5) ? int($args[4]) : 300;
   $hash->{TIMEOUT}  = (@args>=6) ? int($args[5]) : 4;
   $hash->{INVALID}  = -1;
 
@@ -94,7 +94,7 @@ SolarView_Define($$)
 
   $hash->{STATE} = 'Initialized';
 
-  Log 1, "$hash->{NAME} will read power values from solarview at $hash->{HOST}:$hash->{PORT} " . 
+  Log 2, "$hash->{NAME} will read power values from solarview at $hash->{HOST}:$hash->{PORT} " . 
          ($hash->{INTERVAL} ? "every $hash->{INTERVAL} seconds" : "for every 'get $hash->{NAME} <key>' request");
 
   return undef;
@@ -118,7 +118,7 @@ SolarView_Update($)
     InternalTimer(gettimeofday() + $hash->{INTERVAL}, "SolarView_Update", $hash, 0);
   }
 
-  Log 3, "$hash->{NAME} tries to connect solarview at $hash->{HOST}:$hash->{PORT}";
+  Log 4, "$hash->{NAME} tries to connect solarview at $hash->{HOST}:$hash->{PORT}";
 
   eval {
     local $SIG{ALRM} = sub { die 'timeout'; };
@@ -154,9 +154,9 @@ SolarView_Update($)
   alarm 0;
 
   if ($gets{'currentPower'} != $hash->{INVALID}) {
-    Log 3, "$hash->{NAME} got fresh values from solarview, currentPower: $gets{'currentPower'}";
+    Log 4, "$hash->{NAME} got fresh values from solarview, currentPower: $gets{'currentPower'}";
   } else {
-    Log 3, "$hash->{NAME} was unable to get fresh values from solarview";
+    Log 4, "$hash->{NAME} was unable to get fresh values from solarview";
   }
 
   while ( my ($key,$val) = each(%gets) )
@@ -164,7 +164,7 @@ SolarView_Update($)
     $hash->{READINGS}{$key}{VAL}  = $val;
     $hash->{READINGS}{$key}{TIME} = $timenow;
 
-    Log 4, "$hash->{NAME} $key => $gets{$key}";
+    Log 5, "$hash->{NAME} $key => $gets{$key}";
   }
 
   return undef;
@@ -188,7 +188,7 @@ SolarView_Get($@)
     return "SolarView_Get: no such reading: $get";
   }
 
-  Log 2, "$args[0] $get => $val";
+  Log 3, "$args[0] $get => $val";
 
   return $val;
 }
