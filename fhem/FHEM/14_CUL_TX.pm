@@ -58,7 +58,7 @@ CUL_TX_Parse($$)
 {
   my ($hash, $msg) = @_;
   $msg = substr($msg, 1);
-  # Msg format: taTHHXYZXY, see http://www.f6fbb.org/domo/sensors/tx3_th.php
+  # Msg format: TXTHHXYZXY, see http://www.f6fbb.org/domo/sensors/tx3_th.php
   my @a = split("", $msg);
   my $id2 = hex($a[4]) & 1; #meaning unknown
   my $id3 = (hex($a[3])<<3) + (hex($a[4])>>1);
@@ -79,36 +79,51 @@ CUL_TX_Parse($$)
   my $ll4 = GetLogLevel($name,4);
   Log $ll4, "CUL_TX $name $id3 ($msg)";
 
-  my ($devtype, $val, $no);
+  my ($msgtype, $val, $changedTxt);
   my $valraw = ($a[5].$a[6].".".$a[7]);
   my $type = $a[2];
   if($type eq "0") {
-     $devtype = "temperature";
-     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
-     Log $ll4, "CUL_TX $devtype $name $id3 T: $val F: $id2";
-     $no = "temperature: $val";
+    $msgtype = "temperature";
+    $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
+    Log $ll4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
+    $changedTxt = "temperature: $val";
 
   } elsif ($type eq "E") {
-     $devtype = "humidity";
-     $val = $valraw;
-     Log $ll4, "CUL_TX $devtype $name $id3 H: $val F: $id2";
-     $no = "humidity: $val";
+    $msgtype = "humidity";
+    $val = $valraw;
+    Log $ll4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
+    $changedTxt = "humidity: $val";
 
   } else {
-     my $ll2 = GetLogLevel($name,4);
-     Log $ll2, "CUL_TX $type $name $id3 ($msg) unknown type";
-     return "";
+    my $ll2 = GetLogLevel($name,4);
+    Log $ll2, "CUL_TX $type $name $id3 ($msg) unknown type";
+    return "";
+
+  }
+
+
+  my $state="";
+  my $t = ReadingsVal($name, "temperature", undef);
+  my $h = ReadingsVal($name, "humidity", undef);
+  if(defined($t) && defined($h)) {
+    $state="T: $t H: $h";
+
+  } elsif(defined($t)) {
+    $state="T: $t";
+
+  } elsif(defined($h)) {
+    $state="H: $h";
 
   }
 
   my $tn = TimeNow();
-  $def->{STATE} = $no;
+  $def->{STATE} = $state;
   $def->{READINGS}{state}{TIME} = $tn;
-  $def->{READINGS}{state}{VAL} = $val;
-  $def->{CHANGED}[0] = $no;
+  $def->{READINGS}{state}{VAL} = $state;
+  $def->{CHANGED}[0] = $changedTxt;
 
-  $def->{READINGS}{$devtype}{VAL} = $val;
-  $def->{READINGS}{$devtype}{TIME} = $tn;
+  $def->{READINGS}{$msgtype}{VAL} = $val;
+  $def->{READINGS}{$msgtype}{TIME} = $tn;
 
   DoTrigger($name, undef) if($init_done);
   return $name;
