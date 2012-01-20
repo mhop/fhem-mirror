@@ -219,12 +219,16 @@ FHT_Set($@)
 
     if ($cmd =~ m/-temp/) {
 
-      return "Invalid temperature, use NN.N" if($val !~ m/^\d*\.?\d+$/);
-      return "Invalid temperature, must between 5.5 and 30.5"
-                          if($val < 5.5 || $val > 30.5);
+      my @list = map { ($_.".0", $_+0.5) } (6..30);
+      pop @list;
+      return "Invalid temperature $val, choose one of on off " . join(" ",@list)
+        if(!($val eq "on" || $val eq "off" ||
+             ($val =~ m/^\d*\.?\d+$/ && $val >= 5.5 && $val <= 30.5)));
+
+      $val = 30.5 if($val eq "on");
+      $val =  5.5 if($val eq "off");
       my $a = int($val*2);
       $arg .= sprintf("%02x", $a);
-      $ret .= sprintf("Rounded temperature to %.1f", $a/2) if($a/2 != $val);
       $val = sprintf("%.1f", $a/2);
 
     } elsif($cmd =~ m/-from/ || $cmd =~ m/-to/) {
@@ -239,7 +243,7 @@ FHT_Set($@)
 
     } elsif($cmd eq "mode") {
 
-      return "Invalid mode, use one of " . join(" ", sort keys %m2c)
+      return "Invalid mode, choose one of " . join(" ", sort keys %m2c)
         if(!defined($m2c{$val}));
       $arg .= sprintf("%02x", $m2c{$val});
 

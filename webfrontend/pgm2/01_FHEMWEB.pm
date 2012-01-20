@@ -889,8 +889,7 @@ FW_showRoom()
           $txt = ReadingsVal($d, "measured-temp", "");
           $txt =~ s/ .*//;
           $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-          my @tv = map { ($_.".0", $_+0.5) } (5..30);
-          shift(@tv);     # 5.0 is not valid
+          my @tv = split(" ", getAllSets("$d desired-temp"));
           $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
 
           FW_pO "<td>".
