@@ -218,7 +218,7 @@ telnet) or single client command (via fhem.pl). Example:
 </ul>
 
 
-<a href="#command"></a>
+<a name="command"></a>
 <h3>Fhem command types</h3>
 <ul>
 There are three types of commands: "fhem" commands (described in this
@@ -7688,21 +7688,20 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
            <li>fs20<br>
                Plots on as 1 and off as 0. The corresponding filelog definition
                for the device fs20dev is:<br>
-               define FileLog fslog fs20dev /var/log/fs20dev-%Y-%U.log
+               define fslog FileLog log/fs20dev-%Y-%U.log fs20dev
           </li>
            <li>fht<br>
                Plots the measured-temp/desired-temp/actuator lines. The
                corresponding filelog definitions (for the FHT device named
                fht1) looks like:<br>
-               <code>define fhtlog1 FileLog fht1:.*(temp|actuator).* /var/log/fht1-%Y-%U.log</code>
+               <code>define fhtlog1 FileLog log/fht1-%Y-%U.log fht1:.*(temp|actuator).*</code>
 
           </li>
            <li>temp4rain10<br>
                Plots the temperature and rain (per hour and per day) of a
                ks300. The corresponding filelog definitions (for the KS300
                device named ks300) looks like:<br>
-               define FileLog ks300log ks300:.*H:.*
-               /var/log/ks300-%Y-%U.log
+               define ks300log FileLog log/fht1-%Y-%U.log ks300:.*H:.*
           </li>
            <li>hum6wind8<br>
                Plots the humidity and wind values of a
