@@ -1604,7 +1604,6 @@ FW_showWeblink($$$$)
   my ($d, $v, $t, $buttons) = @_;
 
   my $attr = AttrVal($d, "htmlattr", "");
-
   if($t eq "link") {
     FW_pO "<a href=\"$v\" $attr>$d</a>";    # no FW_pH, want to open extra browser
 
@@ -1638,7 +1637,7 @@ FW_showWeblink($$$$)
 
     my @va = split(":", $v, 3);
     if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {
-      FW_pO "Broken definition: $v<br>";
+      FW_pO "Broken definition for $d: $v<br>";
 
     } else {
       if($va[2] eq "CURRENT") {
