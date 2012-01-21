@@ -24,7 +24,7 @@ set yrange [0:]
 #FileLog 10:IR\x3a:0:delta-h
 #FileLog 10:IR\x3a:0:delta-d
 
-plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines,\
+plot "<IN>" using 1:4 axes x1y2 ls l0 title 'Temperature' with lines,\
      "<grep -v avg_ <IN> | perl -ane '\
         @a = split(\"[_:]\", $F[0]);\
         if(defined($lh) && $lh ne $a[1])\
@@ -32,7 +32,7 @@ plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines,\
         if($lv) { $hv += ($F[9]-$lv); }\
         $lh = $a[1]; $ld = $a[0]; $lv = $F[9];\
         END { printf(\"${ld}_$lh:30:00 %f\n\", $hv) }'"\
-     using 1:2 axes x1y1 title 'Rain/h' with histeps,\
+     using 1:2 axes x1y1 ls l1fill title 'Rain/h' with histeps,\
      "<grep -v avg_ <IN> | perl -ane '\
         @a = split(\"[_]\", $F[0]);\
         if(defined($ld) && $ld ne $a[0]) {\
@@ -40,4 +40,4 @@ plot "<IN>" using 1:4 axes x1y2 title 'Temperature' with lines,\
           if($lv) { $dv += ($F[9]-$lv); }\
           $ld = $a[0]; $lv = $F[9];\
           END {printf(\"${ld}_12:00:00 %f\n\", $dv)}'"\
-     using 1:2 axes x1y1 title 'Rain/day' with histeps
+     using 1:2 axes x1y1 ls l2 title 'Rain/day' with histeps
