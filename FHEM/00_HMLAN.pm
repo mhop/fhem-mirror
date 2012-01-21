@@ -213,6 +213,10 @@ HMLAN_Write($$$)
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",
                 $tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
+
+  # Avoid problems with structure set
+  # TODO: rewrite it to use a queue+internaltimer like the CUL
+  select(undef, undef, undef, 0.03);
 }
 
 #####################################
