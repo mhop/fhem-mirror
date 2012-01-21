@@ -157,6 +157,7 @@
 
   <br>
   <a href="#perl">Perl specials</a><br>
+  <a href="#gnuplot-syntax">gnuplot file syntax</a><br>
 </ul>
 
 
@@ -8194,9 +8195,107 @@ isday</pre>
 
   <br>
   <br>
-  <br>
-  <br>
 
+<a name="gnuplot-syntax"></a>
+<h3>gnuplot file syntax</h3>
+
+The .gplot files are also used by the <a href="#FHEMWEB">FHEMWEB</a>/SVG module
+when the <a href="#plotmode">plotmode</a> attribute is set to SVG. In this case
+only a subset of the .gnuplot attributes are used, and some lines have special
+meanings: the difference will be explained in this chapter. See also <a
+href="http://fhemwiki.de/wiki/Creating_Plots">this</a> fhemwiki entry on
+creating logs.<br>
+Following is a minimal .gplot definition (valid only for plotmode SVG):<br>
+<pre>
+  set terminal size &lt;SIZE&gt;
+  #FileLog 4:::
+  plot title 'Temperature' with lines
+</pre>
+The .gnuplot file consists of 3 parts:
+<ul>
+  <li>set commands<br>
+    Following sets are recognized:
+    <ul>
+    <li>terminal, only the size parameter.<br>
+        This is usually set to &lt;SIZE&gt;, which is replaced by the <a
+        href="#plotsize">plotsize</a> attribute of the FHEMWEB or weblink
+        instance.</li>
+
+    <li>title<br>
+        Usually set to &lt;TL&gt; which is replace by the weblink <a
+        href="#title">title</a> attribute, or to &lt;Lx&gt;, which is replaced
+        by the weblink <a href="#label">label</a> attribute.</li>
+
+    <li>ylabel,y2label<br>
+        Left and right labels, printed vertically. Are also subject to label
+        replacement.</li>
+
+    <li>yrange,y2range<br>
+        Specify the range of the left and right axis. Examples:<br>
+        <ul>
+          set yrange [-0.1:1.1]<br>
+          set y2range [0:]<br>
+        </ul>
+        </li>
+    <li>ytics,y2tics<br>
+        the label for the left/right axis tics.  Examples:<br>
+        <ul>
+          set ytics ("on" 0, "off" 1)<br>
+          set y2tics<br>
+        </ul>
+        </li>
+    </ul>
+    </li>
+    <br>
+
+  <li>#FileLog entries<br>
+      Each line from the plot section must have one corresponding #FileLog
+      line. For the syntax see the column_spec paragraph of the <a
+      href="#FileLogget">Filelog get</a> description.
+      Note that for SVG plots the first column of the input file always has to
+      be in the standard fhem timestamp format (YYYY-MM-DD_HH:MM:SS)
+      </li>
+      <br>
+
+  <li>plot entries<br>
+      There is always one plot command with comma separated argument-blocks.
+      Each argument-block represents one line, and has its own parameters.
+      Following parameters are recognized:
+      <ul>
+      <li>axes x1y1 / x1y2<br>
+        tells the program to assign the current line to one of the two axes
+        (left or right).
+        </li>
+      <li>title<br>
+        Caption of the line. Whan clicking on  this title, a small javascript
+        program will change the title to the min/max and last values of the plot,
+        will enable copying this line or pasting an already copied one (the
+        existing scale of the plot wont'be changed, only the pasted line will
+        be scaled), and other lines of the plot will temporarily be hidden.
+        </li>
+      <li>with &lt;linetype&gt;<br>
+        Specify the line type. Following types are recognized: points,
+        steps, fsteps, histeps and lines. Everything unknown will be mapped to
+        the type lines.
+        </li>
+      <li>ls &lt;linestyle&gt;<br>
+        The linestyle defaults to l0 for the first line, l1 for the second, and
+        so on. It is defined in the svg_style.css file. There are two sets
+        defined here: l0-l8 and l0fill-l6fill. The second set must be specified
+        explicitly. If the name of the linestyle contains the word fill, then
+        plots of the lineytype "lines" will have an additional starting and
+        ending segment, so that filling is done correctly.<br>
+        See the SVG spec for details of this CSS file.
+        </li>
+      <li>lw &lt;linewidth&gt;<br>
+        Sets the stroke-width style of the line. This attribute is deprecated,
+        the corresponding feature of the CSS file / (attribute ls) should be
+        used instead.
+
+        </li>
+      </ul>
+</ul>
+</li>
 
 </body>
 </html>
