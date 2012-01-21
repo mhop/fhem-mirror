@@ -42,6 +42,7 @@ SVG_render($$$$$$$)
   my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
   my %conf;                             # gnuplot file settings
 
+  ######################
   # Convert the configuration to a "readable" form -> array to hash
   map { chomp; my @a=split(" ",$_, 3);
          if($a[0] && $a[0] eq "set") { $conf{$a[1]} = $a[2]; } } @{$confp};
@@ -53,14 +54,15 @@ SVG_render($$$$$$$)
   my ($ow,$oh) = split(",", $ps);       # Original width
   my ($w, $h) = ($ow-2*$x, $oh-2*$y);   # Rect size
 
- # Html Header
+  ######################
+  # Html Header
   FW_pO '<?xml version="1.0" encoding="UTF-8"?>';
   FW_pO '<!DOCTYPE svg>';
   FW_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
          'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
   my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
-  FW_pO "<style type=\"text/css\"><![CDATA[";
+  FW_pO "<style lType=\"text/css\"><![CDATA[";
   if(open(FH, "$FW_dir/${prf}svg_style.css") ||
      open(FH, "$FW_dir/svg_style.css")) {
     FW_pO join("", <FH>);
@@ -70,15 +72,18 @@ SVG_render($$$$$$$)
   }
   FW_pO "]]></style>";
 
+  ######################
+  # gradient definitions
   if(open(FH, "$FW_dir/${prf}svg_defs.svg") ||
-     open(FH, "$FW_dir/svg_defs.svg")) { # gradient definitions
+     open(FH, "$FW_dir/svg_defs.svg")) {
     FW_pO join("", <FH>);
     close(FH);
   } else {
     Log 0, "Can't open $FW_dir/svg_defs.svg"
   }
 
-  # Background
+  ######################
+  # Draw the background
   FW_pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
   # Rectangle
   FW_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
@@ -91,6 +96,7 @@ SVG_render($$$$$$$)
   FW_pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
         "class=\"title\" text-anchor=\"middle\">$title</text>";
 
+  ######################
   # Copy and Paste labels, hidden by default
   FW_pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
@@ -100,6 +106,8 @@ SVG_render($$$$$$$)
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
 
+  ######################
+  # Left and right labels
   my $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
   if(!$SVG_ss) {
@@ -114,25 +122,30 @@ SVG_render($$$$$$$)
         "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
   }
 
-  # Digest axes/title/type from $plot (gnuplot) and draw the line-titles
-  my (@axes,@ltitle,@type,@linestyle,@linewidth);
-  my $i;
-  $i = 0; $plot =~ s/ axes (\w+)/$axes[$i++]=$1/gse;
-  $i = 0; $plot =~ s/ title '([^']*)'/$ltitle[$i++]=$1/gse;
-  $i = 0; $plot =~ s/ with (\w+)/$type[$i++]=$1/gse;
-  $i = 0; $plot =~ s/ ls (\d+)/$linestyle[$i++]=$1/gse;
-  $i = 0; $plot =~ s/ lw (\d+)/$linewidth[$i++]=$1/gse;
+  ######################
+  # Digest axes/title/etc from $plot (gnuplot) and draw the line-titles
+  my (@lAxis,@lTitle,@lType,@lStyle,@lWidth);
+  my ($i, $pTemp);
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ axes (\w+)/$lAxis[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ title '([^']*)'/$lTitle[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ with (\w+)/$lType[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ ls (\w+)/$lStyle[$i++]=$1/gse;
+  $pTemp = $plot; $i = 0; $pTemp =~ s/ lw (\w+)/$lWidth[$i++]=$1/gse;
 
-  for my $i (0..int(@type)-1) {         # axes is optional
-    $axes[$i] = "x1y2" if(!$axes[$i]);
+  for my $i (0..int(@lType)-1) {         # lAxis is optional
+    $lAxis[$i] = "x1y2" if(!$lAxis[$i]);
+    $lStyle[$i] = "class=\"". (defined($lStyle[$i]) ? $lStyle[$i] : "l$i") . "\"";
+    $lWidth[$i] = (defined($lWidth[$i]) ? "style=\"stroke-width:$lWidth[$i]\"" :"");
   }
 
   ($off1,$off2) = ($ow-$x-$th, $y+$th);
 
 
-  for my $i (0..int(@ltitle)-1) {
+  ######################
+  # Plot caption (title)
+  for my $i (0..int(@lTitle)-1) {
     my $j = $i+1;
-    my $t = $ltitle[$i];
+    my $t = $lTitle[$i];
     my $desc = "";
     if(defined($data{"min$j"}) && $data{"min$j"} ne "undef") {
       $desc = sprintf("%s: Min:%g Max:%g Last:%g",
@@ -140,11 +153,11 @@ SVG_render($$$$$$$)
     }
     FW_pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
-          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" class=\"l" .
-                (defined($linestyle[$i]) ? $linestyle[$i] : $i) . "\">$t</text>";
+          "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" $lStyle[$i]>$t</text>";
     $off2 += $th;
   }
 
+  ######################
   # Loop over the input, digest dates, calculate min/max values
   my ($fromsec, $tosec);
   $fromsec = time_to_sec($from) if($from ne "0"); # 0 is special
@@ -168,7 +181,7 @@ SVG_render($$$$$$$)
     }
     $dpoff = $ndpoff+1;
     if($l =~ m/^#/) {
-      my $a = $axes[$idx];
+      my $a = $lAxis[$idx];
       if(defined($a)) {
         $hmin{$a} = $min if(!defined($hmin{$a}) || $hmin{$a} > $min);
         $hmax{$a} = $max if(!defined($hmax{$a}) || $hmax{$a} < $max);
@@ -213,6 +226,7 @@ SVG_render($$$$$$$)
   }
 
 
+  ######################
   # Compute & draw vertical tics, grid and labels
   my $ddur = ($tosec-$fromsec)/86400;
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
@@ -230,6 +244,7 @@ SVG_render($$$$$$$)
     $aligntext = 2; $aligntics = 2;
   }
 
+  ######################
   # First the tics
   $off2 = $y+4;
   my ($off3, $off4) = ($y+$h-4, $y+$h);
@@ -242,6 +257,7 @@ SVG_render($$$$$$$)
     FW_pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
   }
 
+  ######################
   # then the text and the grid
   $off1 = $x;
   $off2 = $y+$h+$th;
@@ -259,6 +275,7 @@ SVG_render($$$$$$$)
   }
 
 
+  ######################
   # Left and right axis tics / text / grid
   $hmin{x1y1}=$hmin{x1y2}, $hmax{x1y1}=$hmax{x1y2} if(!defined($hmin{x1y1}));
   $hmin{x1y2}=$hmin{x1y1}, $hmax{x1y2}=$hmax{x1y1} if(!defined($hmin{x1y2}));
@@ -340,9 +357,10 @@ SVG_render($$$$$$$)
   }
 
 
+  ######################
   # Second loop over the data: draw the measured points
-  for my $idx (0..int(@hdx)-1) {
-    my $a = $axes[$idx];
+  for(my $idx=$#hdx; $idx >= 0; $idx--) {
+    my $a = $lAxis[$idx];
 
     next if(!defined($a));
     $min = $hmin{$a};
@@ -353,30 +371,32 @@ SVG_render($$$$$$$)
     next if(!defined($dxp));
 
     my $yh = $y+$h;
-    my $tl = $ltitle[$idx] ? $ltitle[$idx]  : "";
-    #my $dec = int(log($hmul*3)/log(10)); # Some perl implementations do not have log()
+    my $tl = $lTitle[$idx] ? $lTitle[$idx]  : "";
+    #my $dec = int(log($hmul*3)/log(10)); # perl can be compiled without log() !
     my $dec = length(sprintf("%d",$hmul*3))-1;
     $dec = 0 if($dec < 0);
-    my $js_helpers = "id=\"line_$idx\" decimals=\"$dec\" ".
+    my $attributes = "id=\"line_$idx\" decimals=\"$dec\" ".
           "x_off=\"$fromsec\" x_min=\"$x\" x_mul=\"$tmul\" ".
           "y_h=\"$yh\" y_min=\"$min\" y_mul=\"$hmul\" title=\"$tl\" ".
-          "onclick=\"parent.svg_click(evt)\"";
+          "onclick=\"parent.svg_click(evt)\" $lWidth[$idx] $lStyle[$idx]";
+    my $isFill = ($lStyle[$idx] =~ m/fill/);
 
     my ($lx, $ly) = (-1,-1);
-    if($type[$idx] eq "points" ) {
+    if($lType[$idx] eq "points" ) {
 
-        foreach my $i (0..int(@{$dxp})-1) {
-          my ($x1, $y1) = (int($x+$dxp->[$i]),
-                           int($y+$h-($dyp->[$i]-$min)*$hmul));
-          next if($x1 == $lx && $y1 == $ly);
-          $ly = $x1; $ly = $y1;
-          $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
-                $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
-          FW_pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
-        }
+      foreach my $i (0..int(@{$dxp})-1) {
+        my ($x1, $y1) = (int($x+$dxp->[$i]),
+                         int($y+$h-($dyp->[$i]-$min)*$hmul));
+        next if($x1 == $lx && $y1 == $ly);
+        $ly = $x1; $ly = $y1;
+        $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
+              $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
+        FW_pO "<polyline $attributes points=\"$ret\"/>";
+      }
 
-    } elsif($type[$idx] eq "steps" || $type[$idx] eq "fsteps" ) {
+    } elsif($lType[$idx] eq "steps" || $lType[$idx] eq "fsteps" ) {
 
+      $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
@@ -387,16 +407,19 @@ SVG_render($$$$$$$)
           my ($x2, $y2) = ($x+$dxp->[$i],   $y+$h-($dyp->[$i]  -$min)*$hmul);
           next if(int($x2) == $lx && int($y1) == $ly);
           $lx = int($x2); $ly = int($y2);
-          if($type[$idx] eq "steps") {
+          if($lType[$idx] eq "steps") {
             $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x2,$y1, $x2,$y2);
           } else {
             $ret .=  sprintf(" %d,%d %d,%d %d,%d", $x1,$y1, $x1,$y2, $x2,$y2);
           }
         }
       }
-      FW_pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+      $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
 
-    } elsif($type[$idx] eq "histeps" ) {
+      FW_pO "<polyline $attributes points=\"$ret\"/>";
+
+    } elsif($lType[$idx] eq "histeps" ) {
+      $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
       if(@{$dxp} == 1) {
           my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
           $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
@@ -411,22 +434,21 @@ SVG_render($$$$$$$)
              $x1,$y1, ($x1+$x2)/2,$y1, ($x1+$x2)/2,$y2, $x2,$y2);
         }
       }
-      FW_pO "<polyline $js_helpers points=\"$ret\" class=\"l$idx\"/>";
+      $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
+      FW_pO "<polyline $attributes points=\"$ret\"/>";
 
     } else {                            # lines and everything else
       foreach my $i (0..int(@{$dxp})-1) {
         my ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
         next if($x1 == $lx && $y1 == $ly);
+        $ret .=  sprintf(" %d,%d", $x1, $y+$h) if($i == 0 && $isFill);
         $lx = $x1; $ly = $y1;
         $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
+      $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
 
-      FW_pO "<polyline $js_helpers points=\"$ret\" style=\"stroke-width:" .
-        (defined($linewidth[$idx]) ? $linewidth[$idx] : 1) .
-        "\" class=\"l" .
-        (defined($linestyle[$idx]) ? $linestyle[$idx] : $idx) . "\"/>";
-    
+      FW_pO "<polyline $attributes points=\"$ret\"/>";
     }
 
   }

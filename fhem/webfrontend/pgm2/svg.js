@@ -93,12 +93,23 @@ svg_paste(evt)
 }
 
 
+function
+showOtherLines(d, lid, on)
+{
+  for(var i=0; i < 9; i++) {
+    var id="line_"+i;
+    var el = d.getElementById(id);
+    if(el)
+      el.setAttribute("display", (on||id==lid) ? "block" : "none");
+  }
+}
 
 function
 svg_labelselect(evt)
 {
   var d = evt.target.ownerDocument;
-  var sel = d.getElementById(evt.target.getAttribute("line_id"));
+  var lid = evt.target.getAttribute("line_id");
+  var sel = d.getElementById(lid);
   var tl = d.getElementById("svg_title");
   var cp = d.getElementById("svg_copy");
   var ps = d.getElementById("svg_paste");
@@ -109,6 +120,7 @@ svg_labelselect(evt)
     tl.firstChild.nodeValue = old_title;
     cp.firstChild.nodeValue = " ";
     ps.firstChild.nodeValue = " ";
+    showOtherLines(d, lid, true);
 
   } else {
     if(old_sel == null)
@@ -122,6 +134,7 @@ svg_labelselect(evt)
       cp.firstChild.nodeValue = "Copy";
       ps.firstChild.nodeValue = (get_cookie()==""?" ":"Paste");
     }
+    showOtherLines(d, lid, false);
 
   }
 }
