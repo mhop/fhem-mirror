@@ -29,5 +29,5 @@ set ylabel "Humidity (%)"
 #FileLog 6:H\x3a:0:
 
 plot \
-  "< awk '/T:/ {print $1, $4}' <IN>" using 1:2 axes x1y2 title 'Temperature' with lines,\
-  "< awk '/H:/ {print $1, $6}' <IN>" using 1:2 axes x1y1 title 'Humidity' with lines
+  "< awk '/T:/ {print $1, $4}' <IN>" using 1:2 ls l0 axes x1y2 title 'Temperature' with lines,\
+  "< awk '/H:/ {print $1, $6}' <IN>" using 1:2 ls l2fill axes x1y1 title 'Humidity' with lines
