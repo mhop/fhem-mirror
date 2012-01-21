@@ -40,15 +40,16 @@ SVG_render($$$$$$$)
   return "" if(!defined($dp));
   my $th = 16;                          # "Font" height
   my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
-  my %conf;                             # gnuplot file settings
 
   ######################
   # Convert the configuration to a "readable" form -> array to hash
+  my %conf;                             # gnuplot file settings
   map { chomp; my @a=split(" ",$_, 3);
-         if($a[0] && $a[0] eq "set") { $conf{$a[1]} = $a[2]; } } @{$confp};
+         if($a[0] && $a[0] eq "set") { $conf{lc($a[1])} = $a[2]; } } @{$confp};
 
   my $ps = "800,400";
   $ps = $1 if($conf{terminal} =~ m/.*size[ ]*([^ ]*)/);
+  $conf{title} = "" if(!defined($conf{title}));
   $conf{title} =~ s/'//g;
 
   my ($ow,$oh) = split(",", $ps);       # Original width
