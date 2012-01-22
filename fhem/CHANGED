@@ -2,6 +2,8 @@
   - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
   - feature: the usb command tries to flash unflashed CULs on linux
   - feature: FHEMWEB: jsonp support, .holiday and .cfg added to Edit Files
+  - feature: SVG: filled area support, some ls/lw fixes
+  - feature: WOL (wake on lan) module added
 
 
 - 2011-12-31 (5.2)
@@ -37,6 +39,7 @@
   - feature: usb scan/create command added (part of autocreate).
   - feature: SaveAs added to FHEMWEB Edit-Files
   - feature: EnOcean ElTako dimmer by Marc.
+  - feature: fhem is started as user fhem on the FB7390
 
   
 - 2011-07-08 (5.1)
