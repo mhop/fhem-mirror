@@ -60,9 +60,9 @@ sub Weather_UpdateReading($$$$$$) {
   $r->{$reading}{VAL} = $value;
 
   my $name= $hash->{NAME};
-  Log 1, "Weather $name: $reading= $value";
+  # Log 1, "Weather $name: $reading= $value";
 
-  $hash->{CHANGED}[$n]= "$key: $value";
+  $hash->{CHANGED}[$n]= "$reading: $value";
   
   return 1;
 }
@@ -125,6 +125,11 @@ sub Weather_GetUpdate($)
   	}
   }
 
+  if(!$hash->{LOCAL}) {
+    DoTrigger($name, undef) if($init_done);
+  }
+
+  
   return 1;
 }
 
