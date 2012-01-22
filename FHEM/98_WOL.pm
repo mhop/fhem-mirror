@@ -30,25 +30,22 @@ WOL_Set($@)
   
   my $name = shift @a;
   my $v = join(" ", @a);
+  my $logLevel = GetLogLevel($name,2);
 
-  Log GetLogLevel($name,2), "WOL set $name $v";
-
-
-  
-  my $mac = $hash->{MAC};
+  Log $logLevel, "WOL set $name $v";
   
   if($v eq "on") 
   {
     eval {
-    #for(my $i = 1; $i <= 3; $i++) {
-      wake($mac);
-    #}
+      for(my $i = 1; $i <= 3; $i++) {
+        wake($hash, $logLevel);
+      }
     };
     if ($@){
       ### catch block
-      Log GetLogLevel($name,2), "WOL error: $@";
+      Log $logLevel, "WOL error: $@";
     };
-    Log GetLogLevel($name,2), "WOL waking $name ($mac)";
+    Log $logLevel, "WOL waking $name";
     
   } elsif ($v eq "refresh") 
   {
@@ -111,17 +108,18 @@ sub WOL_GetUpdate($)
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "WOL_GetUpdate", $hash, 0);
 }
 
-sub wake($)
+sub wake
 {
-  my ($mac) = @_;
+  my ($hash, $logLevel) = @_;
+  my $mac = $hash->{MAC};
   
-  Log GetLogLevel("WOL",2), "trying to wake $mac";
+  Log $logLevel, "trying to wake $mac";
 
   my $response = `/usr/bin/ether-wake $mac`;
-  Log GetLogLevel("WOL",4), "trying etherwake with response: $response";
+  Log $logLevel, "trying etherwake with response: $response";
   
   wol_by_udp($mac);
-  Log GetLogLevel("WOL",4), "trying direct socket via UDP";
+  Log $logLevel, "trying direct socket via UDP";
 }
 
 # method to wake via lan, taken from Net::Wake package
