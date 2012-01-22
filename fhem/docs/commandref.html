@@ -123,6 +123,7 @@
       <a href="#WS300">WS300</a> &nbsp;
       <a href="#WS3600">WS3600</a> &nbsp;
       <a href="#Weather">Weather</a> &nbsp;
+      <a href="#WOL">WOL</a> &nbsp;
       <a href="#X10">X10</a> &nbsp;
       <a href="#xxLG7000">xxLG7000</a> &nbsp;
 
@@ -3878,6 +3879,53 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><a href="#model">model</a> (CM11)</li>
   </ul>
   <br>
+</ul>
+
+<a name="WOL"></a>
+<h3>WOL</h3>
+<ul>
+  <a name="WOLdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WOL &lt;MAC&gt; &lt;IP&gt;
+          &lt;unitcode&gt;</code>
+    <br><br>
+    
+    Defines a WOL device via its MAC and IP address.<br><br>
+    
+    Example:
+    <ul>
+      <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24</code><br>
+    </ul>
+    Notes:
+    <ul>
+      <li>Module uses <code>ether-wake</code> on FritzBoxes.</li>
+      <li>For other computers the WOL implementation of <a href="http://search.cpan.org/~clintdw/Net-Wake-0.02/lib/Net/Wake.pm">Net::Wake</a> is used</li>
+    </ul>
+  </ul>
+  
+  <a name="WOLset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    refresh           # checks whether the computer is currently running
+    on                # sends a magic packet to the defined MAC address
+    </pre>
+    
+    Examples:
+    <ul>
+      <code>set computer1 on</code><br>
+      <code>set computer1 refresh</code><br>
+    </ul>
+  </ul>
+  <a name="WOLget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="WOLattr"></a>
+  <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
 
 <a name="X10"></a>
@@ -8286,6 +8334,8 @@ The .gnuplot file consists of 3 parts:
         plots of the lineytype "lines" will have an additional starting and
         ending segment, so that filling is done correctly.<br>
         See the SVG spec for details of this CSS file.
+        Note: if you plan to use this attribute, you have to specify it for all 
+        the lines (attribute-blocks) in the plot command.
         </li>
       <li>lw &lt;linewidth&gt;<br>
         Sets the stroke-width style of the line. This attribute is deprecated,
