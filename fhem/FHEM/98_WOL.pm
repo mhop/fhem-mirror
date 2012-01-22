@@ -93,7 +93,8 @@ sub WOL_GetUpdate($)
   my ($hash) = @_;
   
   my $ip = $hash->{IP};
-  if (system("ping -q -c 1 $ip > /dev/null") == 0)
+  #if (system("ping -q -c 1 $ip > /dev/null") == 0)
+  if (`ping -c 1 $ip` =~ m/0\% packet loss/)
   {
     $hash->{READINGS}{state}{VAL} = "on";
     $hash->{READINGS}{isRunning}{VAL} = "true";
