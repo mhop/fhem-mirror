@@ -3,8 +3,8 @@
   - feature: the usb command tries to flash unflashed CULs on linux
   - feature: FHEMWEB: jsonp support, .holiday and .cfg added to Edit Files
   - feature: SVG: filled area support, some ls/lw fixes
-  - feature: WOL (wake on lan) module added
-
+  - feature: WOL (wake on lan) module added (by Matthias)
+  - feature: additional groups from /etc/groups are applied (Christopher)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera

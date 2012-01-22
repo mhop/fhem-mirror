@@ -253,17 +253,29 @@ if(int(@ARGV) != 1 && int(@ARGV) != 2) {
 # If started as root, and there is a fhem user in the /etc/passwd, su to it
 if($^O !~ m/Win/ && $< == 0) {
 
-  my @gr = getgrnam("dialout");
-  if(@gr) {
-    use POSIX qw(setgid);
-    setgid($gr[2]);
-  }
-
   my @pw = getpwnam("fhem");
   if(@pw) {
-    use POSIX qw(setuid);
+    use POSIX qw(setuid setgid);
+
+    # set primary group
+    setgid($pw[3]);
+
+    # read all secondary groups into an array:
+    my @groups;
+    while ( my ($name, $pw, $gid, $members) = getgrent() ) {
+      push(@groups, $gid) if ( grep($_ eq $pw[0],split(/\s+/,$members)) );
+    }
+
+    # set the secondary groups via $)
+    if (@groups) {
+      $) = "$pw[3] ".join(" ",@groups);
+    } else {
+      $) = "$pw[3] $pw[3]";
+    }
+
     setuid($pw[2]);
   }
+
 }
 
 ###################################################
