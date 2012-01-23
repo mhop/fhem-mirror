@@ -95,6 +95,7 @@
       <a href="#HMS">HMS</a> &nbsp;
       <a href="#HMLAN">HMLAN</a> &nbsp;
       <a href="#IPWE">IPWE</a> &nbsp;
+      <a href="#IT">IT</a> &nbsp;
       <a href="#ITACH_RELAY">ITACH_RELAY</a> &nbsp;
       <a href="#KM271">KM271</a> &nbsp;
       <a href="#KS300">KS300</a> &nbsp;
@@ -4621,6 +4622,178 @@ Attributes:<br>
 
 </ul>
 
+
+<a name="IT"></a>
+<h3>IT - InterTechno</h3>
+<ul>
+  The InterTechno 433MHZ protocol is used by a wide range of devices, which are either of
+  the sender/sensor category or the receiver/actuator category. As we right now are only
+  able to SEND InterTechno commands, but CAN'T receive them, this module at the moment 
+  supports just switches devices like switches, dimmers, etc. through an an 
+  <a href="#CUL">CUL</a> device, so this must be defined first.
+
+  <br><br>
+
+  <a name="ITdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; IT &lt;housecode&gt; &lt;off-code&gt; &lt;on-code&gt;
+    [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
+    <br><br>
+
+   The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is 
+   defined as a tri-state protocol. These digits depend on your device you are using.
+   <br>
+   Bit 11/12 are used for switching/dimming. As different manufacturers are using
+   different bit-codes you can specifiy here the 2-digit code for off/on/dimup/dimdown
+   in the same form: 0/1/F.
+	<br>
+
+   <ul>
+   <li><code>&lt;housecode&gt;</code> is a 10 digit tri-state number (0/1/F) depending on
+	 your device setting (see list below).</li>
+   <li><code>&lt;off-code&gt;</code> is a 2 digit tri-state number for switching your device off; 
+     It is appended to the housecode to build the 12-digits IT-Message.</li>
+   <li><code>&lt;on-code&gt;</code> is a 2 digit tri-state number for switching your device on; 
+     It is appended to the housecode to build the 12-digits IT-Message.</li>
+   <li>The optional <code>&lt;dimup-code&gt;</code> is a 2 digit tri-state number for dimming your device up; 
+     It is appended to the housecode to build the 12-digits IT-Message.</li>
+   <li>The optional <code>&lt;dimdown-code&gt;</code> is a 2 digit tri-state number for dimming your device down; 
+     It is appended to the housecode to build the 12-digits IT-Message.</li>
+   </ul>
+   <br>
+
+    Examples:
+    <ul>
+      <code>define lamp IT 01FF010101 00 11 01 10</code><br>
+      <code>define roll1 IT 111111111F 00 11 01 10</code><br>
+      <code>define otherlamp IT 000000000F 11 10 00 00</code><br>
+      <code>define otherroll1 IT FFFFFFF00F 11 10</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="ITset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    dimdown
+    dimup
+    off
+    on         
+    on-till           # Special, see the note
+</pre>
+    Examples:
+    <ul>
+      <code>set lamp on</code><br>
+      <code>set lamp1,lamp2,lamp3 on</code><br>
+      <code>set lamp1-lamp3 on</code><br>
+      <code>set lamp off</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
+      or { &lt;perl code&gt; }, where the perl-code returns a time
+          specification).
+      If the current time is greater than the specified time, then the
+      command is ignored, else an "on" command is generated, and for the
+      given "till-time" an off command is scheduleld via the at command.
+      </li>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="ITattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="IODev"></a>
+    <li>IODev<br>
+        Set the IO or physical device which should be used for sending signals
+        for this "logical" device. An example for the physical device is a CUL.
+		Note: Upon startup fhem DOES NOT assigns an InterTechno device an
+		IODevice! The attribute IODev needs to be used AT ANY TIME!</li><br>
+
+    <a name="eventMap"></a>
+    <li>eventMap<br>
+        Replace event names and set arguments. The value of this attribute
+        consists of a list of space separated values, each value is a colon
+        separated pair. The first part specifies the "old" value, the second
+        the new/desired value. If the first character is slash(/) or komma(,)
+        then split not by space but by this character, enabling to embed spaces.
+        Examples:<ul><code>
+        attr store eventMap on:open off:closed<br>
+        attr store eventMap /on-for-timer 10:open/off:closed/<br>
+        set store open
+        </code></ul>
+        </li><br>
+
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <a name="attrdummy"></a>
+    <li>dummy<br>
+    Set the device attribute dummy to define devices which should not
+    output any radio signals. Associated notifys will be executed if
+    the signal is received. Used e.g. to react to a code from a sender, but
+    it will not emit radio signal if triggered in the web frontend.
+    </li><br>
+
+    <li><a href="#loglevel">loglevel</a></li><br>
+
+    <li><a href="#showtime">showtime</a></li><br>
+
+    <a name="model"></a>
+    <li>model<br>
+        The model attribute denotes the model type of the device.
+        The attributes will (currently) not be used by the fhem.pl directly.
+        It can be used by e.g. external programs or web interfaces to
+        distinguish classes of devices and send the appropriate commands
+        (e.g. "on" or "off" to a switch, "dim..%" to dimmers etc.).
+        The spelling of the model names are as quoted on the printed
+        documentation which comes which each device. This name is used
+        without blanks in all lower-case letters. Valid characters should be
+        <code>a-z 0-9</code> and <code>-</code> (dash),
+        other characters should be ommited. Here is a list of "official"
+        devices:<br>
+          <b>Sender/Sensor</b>: itremote<br>
+
+          <b>Dimmer</b>: itdimmer<br>
+
+          <b>Receiver/Actor</b>: itswitch
+    </li><br>
+
+
+    <a name="ignore"></a>
+    <li>ignore<br>
+        Ignore this device, e.g. if it belongs to your neighbour. The device
+        won't trigger any FileLogs/notifys, issued commands will silently
+        ignored (no RF signal will be sent out, just like for the <a
+        href="#attrdummy">dummy</a> attribute). The device won't appear in the
+        list command (only if it is explicitely asked for it), nor will it
+        appear in commands which use some wildcard/attribute as name specifiers
+        (see <a href="#devspec">devspec</a>). You still get them with the
+        "ignored=1" special devspec.
+        </li><br>
+
+  </ul>
+  <br>
+
+  <a name="ITevents"></a>
+  <b>Generated events:</b>
+  <ul>
+     From an IT device you can receive one of the following events.
+     <li>on
+     <li>off
+     <li>dimdown
+     <li>dimup<br>
+      Which event is sent is device dependent and can sometimes configured on
+     the device.
+  </ul>
+</ul>
 
 
 
