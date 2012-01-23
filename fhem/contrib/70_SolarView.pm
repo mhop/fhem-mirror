@@ -28,7 +28,8 @@
 # get <name> <key>
 #
 # where <key> is one of currentPower, totalEnergy, totalEnergyDay, 
-# totalEnergyMonth, totalEnergyYear and temperature.
+# totalEnergyMonth, totalEnergyYear, UDC, IDC, UDCB, IDCB, UDCC, IDCC,
+# gridVoltage, gridPower and temperature.
 #
 ##############################################################################
 #
@@ -60,6 +61,16 @@ use warnings;
 
 use IO::Socket::INET;
 
+my @gets = ('totalEnergyDay',            # kWh
+            'totalEnergyMonth',          # kWh
+            'totalEnergyYear',           # kWh
+            'totalEnergy',               # kWh
+            'currentPower',              # W
+            'UDC', 'IDC', 'UDCB',        # V, A, V
+            'IDCB', 'UDCC', 'IDCC',      # A, V, A
+            'gridVoltage', 'gridPower',  # V, A
+            'temperature');              # °C
+
 sub
 SolarView_Initialize($)
 {
@@ -84,18 +95,30 @@ SolarView_Define($$)
            "define <name> SolarView <host> <port> [<interval> [<timeout>]]";
   }
 
-  $hash->{HOST}     = $args[2];
-  $hash->{PORT}     = $args[3];
-  $hash->{INTERVAL} = (@args>=5) ? int($args[4]) : 300;
-  $hash->{TIMEOUT}  = (@args>=6) ? int($args[5]) : 4;
-  $hash->{INVALID}  = -1;
+  $hash->{Host}     = $args[2];
+  $hash->{Port}     = $args[3];
+  $hash->{Interval} = (@args>=5) ? int($args[4]) : 300;
+  $hash->{Timeout}  = (@args>=6) ? int($args[5]) : 4;
+
+  $hash->{Invalid}  = -1;
+  $hash->{NightOff} = 1;
+  $hash->{Debounce} = 50;
+  $hash->{Sleep}    = 0;
+
+  $hash->{STATE} = 'Initializing';
+
+  my $timenow = TimeNow();
+
+  for my $get (@gets)
+  {
+    $hash->{READINGS}{$get}{VAL}  = $hash->{Invalid};
+    $hash->{READINGS}{$get}{TIME} = $timenow;
+  }
 
   SolarView_Update($hash);
 
-  $hash->{STATE} = 'Initialized';
-
-  Log 2, "$hash->{NAME} will read power values from solarview at $hash->{HOST}:$hash->{PORT} " . 
-         ($hash->{INTERVAL} ? "every $hash->{INTERVAL} seconds" : "for every 'get $hash->{NAME} <key>' request");
+  Log 2, "$hash->{NAME} will read from solarview at $hash->{Host}:$hash->{Port} " . 
+         ($hash->{Interval} ? "every $hash->{Interval} seconds" : "for every 'get $hash->{NAME} <key>' request");
 
   return undef;
 }
@@ -105,66 +128,88 @@ SolarView_Update($)
 {
   my ($hash) = @_;
 
-  my $timenow = TimeNow();
-
-  my %gets = ('totalEnergy'      => $hash->{INVALID},
-              'totalEnergyDay'   => $hash->{INVALID},
-              'totalEnergyMonth' => $hash->{INVALID},
-              'totalEnergyYear'  => $hash->{INVALID},
-              'currentPower'     => $hash->{INVALID},
-              'temperature'      => $hash->{INVALID},);
-
-  if ($hash->{INTERVAL} > 0) {
-    InternalTimer(gettimeofday() + $hash->{INTERVAL}, "SolarView_Update", $hash, 0);
+  if ($hash->{Interval} > 0) {
+    InternalTimer(gettimeofday() + $hash->{Interval}, "SolarView_Update", $hash, 0);
   }
 
-  Log 4, "$hash->{NAME} tries to connect solarview at $hash->{HOST}:$hash->{PORT}";
+  # if NightOff is set and there has been a successful 
+  # reading before, then skip this update "at night"
+  #
+  if ($hash->{NightOff} and $hash->{READINGS}{currentPower}{VAL} != $hash->{Invalid})
+  {
+    my ($sec,$min,$hour) = localtime(time);
+    return undef if ($hour < 6 or $hour > 22);
+  }
+
+  sleep($hash->{Sleep}) if $hash->{Sleep};
+
+  Log 4, "$hash->{NAME} tries to connect solarview at $hash->{Host}:$hash->{Port}";
+
+  my $success = 0;
 
   eval {
     local $SIG{ALRM} = sub { die 'timeout'; };
-    alarm $hash->{TIMEOUT};
+    alarm $hash->{Timeout};
 
-    my $socket = IO::Socket::INET->new(PeerAddr => $hash->{HOST}, 
-                                       PeerPort => $hash->{PORT}, 
-                                       Timeout  => $hash->{TIMEOUT});
+    my $socket = IO::Socket::INET->new(PeerAddr => $hash->{Host}, 
+                                       PeerPort => $hash->{Port}, 
+                                       Timeout  => $hash->{Timeout});
 
     if ($socket and $socket->connected())
     {
       $socket->autoflush(1);
       print $socket "00*\r\n";
       my $res = <$socket>;
-      $timenow = TimeNow();
       close($socket);
+
       alarm 0;
 
-      if ($res and $res =~ /^\{(00,.*)\},.+$/)
+      if ($res and $res =~ /^\{(00,[\d\.,]+)\},/)
       {
         my @vals = split(/,/, $1);
 
-        $gets{'totalEnergyDay'}   = 0 + $vals[6]   if defined($vals[6]);
-        $gets{'totalEnergyMonth'} = 0 + $vals[7]   if defined($vals[7]);
-        $gets{'totalEnergyYear'}  = 0 + $vals[8]   if defined($vals[8]);
-        $gets{'totalEnergy'}      = 0 + $vals[9]   if defined($vals[9]);
-        $gets{'currentPower'}     = 0 + $vals[10]  if defined($vals[10]);
-        $gets{'temperature'}      = 0 + $vals[19]  if defined($vals[19]);
+        my $tn = sprintf("%04d-%02d-%02d %02d:%02d:00",
+                   $vals[3], $vals[2], $vals[1], $vals[4], $vals[5]);
+
+        my $cpVal  = $hash->{READINGS}{currentPower}{VAL};
+        my $cpTime = $hash->{READINGS}{currentPower}{TIME};
+
+        for my $i (6..19)
+        {
+          my $getIdx = $i-6;
+
+          if (defined($vals[$i]))
+          {
+            $hash->{READINGS}{$gets[$getIdx]}{VAL}  = 0 + $vals[$i];
+            $hash->{READINGS}{$gets[$getIdx]}{TIME} = $tn;
+          }
+        }
+
+        # if Debounce is enabled, then skip one drop of
+        # currentPower from 'greater than Debounce' to 'Zero'
+        #
+        if ($hash->{Debounce} > 0 and
+            $hash->{Debounce} < $cpVal and
+            $hash->{READINGS}{currentPower}{VAL} == 0)
+        {
+            $hash->{READINGS}{currentPower}{VAL}  = $cpVal;
+            $hash->{READINGS}{currentPower}{TIME} = $cpTime;
+        }
+
+        $success = 1;
       }
     }
   };
 
   alarm 0;
 
-  if ($gets{'currentPower'} != $hash->{INVALID}) {
-    Log 4, "$hash->{NAME} got fresh values from solarview, currentPower: $gets{'currentPower'}";
-  } else {
-    Log 4, "$hash->{NAME} was unable to get fresh values from solarview";
-  }
-
-  while ( my ($key,$val) = each(%gets) )
+  if ($success)
   {
-    $hash->{READINGS}{$key}{VAL}  = $val;
-    $hash->{READINGS}{$key}{TIME} = $timenow;
-
-    Log 5, "$hash->{NAME} $key => $gets{$key}";
+    $hash->{STATE} = 'Initialized';
+    Log 4, "$hash->{NAME} got fresh values from solarview";
+  } else {
+    $hash->{STATE} = 'Failure';
+    Log 4, "$hash->{NAME} was unable to get fresh values from solarview";
   }
 
   return undef;
@@ -177,10 +222,10 @@ SolarView_Get($@)
 
   return 'SolarView_Get needs two arguments' if (@args != 2);
 
-  SolarView_Update($hash) unless $hash->{INTERVAL};
+  SolarView_Update($hash) unless $hash->{Interval};
 
   my $get = $args[1];
-  my $val = $hash->{INVALID};
+  my $val = $hash->{Invalid};
 
   if (defined($hash->{READINGS}{$get})) {
     $val = $hash->{READINGS}{$get}{VAL};
@@ -198,7 +243,7 @@ SolarView_Undef($$)
 {
   my ($hash, $args) = @_;
 
-  RemoveInternalTimer($hash) if $hash->{INTERVAL};
+  RemoveInternalTimer($hash) if $hash->{Interval};
 
   return undef;
 }
