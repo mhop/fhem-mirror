@@ -6804,8 +6804,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         still can be addressed through url manipulation).<br>
         The list can also contain values from the additional "Howto/Wiki/FAQ"
         block.
-        <br><br>
         </li>
+        <br>
 
     <a name="longpoll"></a>
     <li>longpoll<br>
@@ -6813,8 +6813,8 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         In this mode status update is refreshed more or less instantaneously,
         and state change (on/off only) is done without requesting a complete
         refresh from the server.
-        <br><br>
         </li>
+        <br>
 
     <a name="webCmd"></a>
     <li>webCmd<br>
@@ -6823,8 +6823,24 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         <ul>
           attr lamp webCmd on:off:on-for-timer 10
         </ul>
-        On smallscreen devices only the first value is accessible.
+        On smallscreen devices only the first value is accessible.<br>
+        Note: this a device, not a FHEMWEB attribute.
         </li>
+        <br>
+
+    <a name="fwmodpath"></a>
+    <li>fwmodpath<br>
+        Set the "modpath" for this intance of FHEMWEB. Used to search .gplot
+        files, pictures, etc. Default is the <a href="#modpath">modpath</a>/FHEM directory.
+        </li>
+        <br>
+
+    <a name="fwcompress"></a>
+    <li>fwcompress<br>
+        Enable compressing the HTML data (default is yes).
+        </li>
+        <br>
+
 
     </ul>
 
