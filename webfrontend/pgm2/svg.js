@@ -3,6 +3,7 @@ var old_title;
 var old_sel;
 var svgdoc;
 var b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+var to;
 
 // Base64 encode the xy points (12 bit x, 12 bit y).
 function
@@ -92,15 +93,22 @@ svg_paste(evt)
   d.documentElement.appendChild(o);
 }
 
-
 function
-showOtherLines(d, lid, on)
+showOtherLines(d, lid, currval, maxval)
 {
   for(var i=0; i < 9; i++) {
     var id="line_"+i;
     var el = d.getElementById(id);
-    if(el)
-      el.setAttribute("display", (on||id==lid) ? "block" : "none");
+    if(el && id != lid) {
+      var h = parseFloat(el.getAttribute("y_h"));
+      el.setAttribute("transform", "translate(0,"+h*(1-currval)+") "+
+                                   "scale(1,"+currval+")");
+    }
+  }
+  if(currval != maxval) {
+    currval += (currval<maxval ? 0.02 : -0.02);
+    currval = Math.round(currval*100)/100;
+    to=setTimeout(function(){showOtherLines(d,lid,currval,maxval)},10);
   }
 }
 
@@ -114,13 +122,14 @@ svg_labelselect(evt)
   var cp = d.getElementById("svg_copy");
   var ps = d.getElementById("svg_paste");
 
+  clearTimeout(to);
   if(old_sel == sel) {
     sel.setAttribute("stroke-width", 1);
     old_sel = null;
     tl.firstChild.nodeValue = old_title;
     cp.firstChild.nodeValue = " ";
     ps.firstChild.nodeValue = " ";
-    showOtherLines(d, lid, true);
+    showOtherLines(d, lid, 0, 1);
 
   } else {
     if(old_sel == null)
@@ -134,7 +143,7 @@ svg_labelselect(evt)
       cp.firstChild.nodeValue = "Copy";
       ps.firstChild.nodeValue = (get_cookie()==""?" ":"Paste");
     }
-    showOtherLines(d, lid, false);
+    showOtherLines(d, lid, 1, 0);
 
   }
 }
