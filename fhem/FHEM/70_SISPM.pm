@@ -49,7 +49,7 @@ SISPM_Initialize($)
   $hash->{Clients} =
         ":SIS_PMS:";
   my %mc = (
-    "1:SIS_PMS"   => "^socket ..:..:..:..:.. . state o.*",
+    "1:SIS_PMS"   => "^socket ..:..:..:..:.. .+ state o.*",
   );
   $hash->{MatchList} = \%mc;
   $hash->{AttrList}= "model:SISPM loglevel:0,1,2,3,4,5,6";
@@ -111,6 +111,7 @@ SISPM_GetCurrentConfig($)
       return "Can't start $tmpdev: $!";
   }
 
+  my $tmpnr=-1;
   local $_;
   while (<$FH>) {
       if(/^(No GEMBIRD SiS-PM found.)/) {
@@ -124,10 +125,31 @@ SISPM_GetCurrentConfig($)
 	  $numdetected++;
  	  $hash->{NUMUNITS}=$numdetected;
       }
+      if(/^Gembird #(\d+)$/) {
+	  Log 3, "SISPM_GetCurrentConfig: Found SISPM device number $1 (sispmctl v3)";
+	  $currentdevice=$1;
+	  $numdetected++;
+ 	  $hash->{NUMUNITS}=$numdetected;
+      }
+      if(/^USB information:  bus .*, device (\d+)/) {
+	  Log 3, "SISPM_GetCurrentConfig: SISPM device number $currentdevice is USB device $1 (sispmctl v3)";
+	  $hash->{UNITS}{$currentdevice}{USB}=$1;
+      }
 
       if(/^This device has a serial number of (.*)/) {
 	  my $serial=$1;
 	  Log 3, "SISPM_GetCurrentConfig: Device number " . $currentdevice . " has serial $serial";
+	  if(length($serial)!=length("..:..:..:..:..")){
+	      $serial = FixSISPMSerial($serial);
+	      Log 3, "SISPM_GetCurrentConfig: Whoopsi, weird serial format; fixing to $serial.";
+	  }
+	  $hash->{UNITS}{$currentdevice}{SERIAL}=$serial;
+ 	  $hash->{SERIALS}{$serial}{UNIT}=$currentdevice;
+  	  $hash->{SERIALS}{$serial}{USB}=$hash->{UNITS}{$currentdevice}{USB};
+      }
+      if(/^serial number:\s+(.*)/) { # sispmctl v3
+	  my $serial=$1;
+	  Log 3, "SISPM_GetCurrentConfig: Device number " . $currentdevice . " has serial $serial (sispmctl v3)";
 	  if(length($serial)!=length("..:..:..:..:..")){
 	      $serial = FixSISPMSerial($serial);
 	      Log 3, "SISPM_GetCurrentConfig: Whoopsi, weird serial format; fixing to $serial.";
@@ -141,8 +163,8 @@ SISPM_GetCurrentConfig($)
   Log 3, "SISPM_GetCurrentConfig: Initial read done";
 
   if ($numdetected==0) {
-      Log 3, "SISPM_GetCurrentConfig: No SIMPM devices found.";
-     return "no SIMPM devices found.";
+      Log 3, "SISPM_GetCurrentConfig: No SISPM devices found.";
+     return "no SISPM devices found.";
   }
 
   $hash->{NUMUNITS} = $numdetected;
@@ -178,7 +200,7 @@ SISPM_Define($$)
   }
 
   if($hash->{NUMUNITS} < 1) {
-      return "SISPM no SIMPM devices found.";
+      return "SISPM no SISPM devices found.";
   }
 
   $hash->{Timer} = 30;
@@ -286,6 +308,7 @@ SISPM_Read($)
     my $currentusbid=0;
     my $renumbered=0;
     my $newPMfound=0;
+    my $tmpnr=-1;
 
     ($eof, @lines) = nonblockGetLinesSISPM($FH);
 
@@ -301,6 +324,7 @@ SISPM_Read($)
     if($eof != 1) {
     foreach my $inputline ( @lines ) {
 	$inputline =~ s/\s+$//;
+	Log 5, "SISPM_Read: read /$inputline/";
 
 	# wusel, 2010-01-16: Seems as if reading not always works as expected;
 	#                    throw away the whole readings if there's a NULL
@@ -351,7 +375,35 @@ SISPM_Read($)
 	    }
 	}
 
-	if($inputline =~ /^This device has a serial number of (.*)/) {
+	# New for SiS PM Control for Linux 3.1
+	if($inputline =~ /^Gembird #(\d+)$/) {
+	    Log 5, "SISPM found SISPM device number $1 (sispmctl v3)";
+	    $tmpnr=$1;
+	}
+	if($tmpnr >= 0 && $inputline =~ /^USB information:  bus 001, device (\d+)/) {
+	    Log 5, "SISPM found SISPM device number $tmpnr as USB $1";
+	    if($tmpnr < $hash->{NUMUNITS}) {
+		if($hash->{UNITS}{$tmpnr}{USB}!=$1) {
+		    Log 3, "SISPM: USB ids changed (unit $tmpnr is now USB $1 but was " .  $hash->{UNITS}{$tmpnr}{USB} . "); will fix.";
+		    $renumbered=1;
+		    $hash->{FIXRENUMBER}="yes";
+		}   
+	    } else { # Something wonderful has happened, we have a new SIS PM!
+		Log 3, "SISPM: Wuuuhn! Found a new unit $tmpnr as USB $1 with sispmctl v3. Will assimilate it.";
+		$newPMfound=1;
+		$hash->{FIXNEW}="yes";
+	    }
+	    $currentdevice=$tmpnr;
+	    $currentusbid=$1;
+	    $currentserial="none";
+	    if(defined($hash->{UNITS}{$currentdevice}{SERIAL})) {
+		$currentserial=$hash->{UNITS}{$currentdevice}{SERIAL};
+	    }
+	    $tmpnr=-1;
+	}
+
+	if($inputline =~ /^This device has a serial number of (.*)/ ||
+	   $inputline =~ /^serial number:\s+(.*)/) {
 	    $currentserial=FixSISPMSerial($1);
 	    if($currentserial eq "00:00:00:00:00") {
 		Log 3, "SISPM Whooopsie! Your serial nullified ($currentserial). Skipping ...";

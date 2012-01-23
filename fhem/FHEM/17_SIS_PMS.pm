@@ -44,7 +44,7 @@ SIS_PMS_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^socket ..:..:..:..:.. . state o.*";
+  $hash->{Match}     = "^socket ..:..:..:..:.. .+ state o.*";
   $hash->{SetFn}     = "SIS_PMS_Set";
 #  $hash->{StateFn}   = "SIS_PMS_SetState";
   $hash->{DefFn}     = "SIS_PMS_Define";
@@ -141,7 +141,12 @@ SIS_PMS_Parse($$)
 	
 	$devname =~ s/:/_/g;
 	Log 3, "SIS_PMS Unknown device $serial $socknr, please define it";
-	return "UNDEFINED SIS_PMS_$devname.$socknr SIS_PMS $serial $socknr";
+	if(defined($hash->{TMPLABEL})) {
+	    $devname=$hash->{TMPLABEL};
+	    return "UNDEFINED $devname SIS_PMS $serial $socknr";
+	} else {
+	    return "UNDEFINED SIS_PMS_$devname.$socknr SIS_PMS $serial $socknr";
+	}
     }
 }
 
