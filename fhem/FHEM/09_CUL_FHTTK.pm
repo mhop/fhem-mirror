@@ -194,8 +194,10 @@ CUL_FHTTK_Parse($$)
       }
   }
   
-  if ($defs{$self}{PREV}{STATE} ne $state) {
-    $defs{$self}{READINGS}{"PreviousWindow"}{VAL} = $def->{PREVSTATE};
+  my $prevState = $defs{$self}{PREV}{STATE};
+  if ($prevState != $state) {
+    my ($windowReading,$windowState) = split(/:/, $fhttfk_codes{$prevState});
+    $defs{$self}{READINGS}{"PreviousWindow"}{VAL} = $windowState;
     $defs{$self}{READINGS}{"PreviousWindow"}{TIME} = $def->{PREVTIMESTAMP};
   }
  
