@@ -7,7 +7,7 @@ Description of the pgm5 webfrontend:
 #################################################################################
 #  Copyright notice
 #
-#  (c) 2008-2009
+#  (c) 2008-2012
 #  Copyright: Dr. Olaf Droegehorn
 #  All rights reserved
 #
