@@ -138,6 +138,8 @@ TUL_Set($@)
   my $arg = join("", @a);
   my $ll = GetLogLevel($name,3);
 
+  return "No $a[1] for dummies" if(IsDummy($name));
+
   if($type eq "raw") {
     Log $ll, "set $name $type $arg";
     TUL_SimpleWrite($hash, $arg);
