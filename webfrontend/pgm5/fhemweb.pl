@@ -3,7 +3,7 @@
 #################################################################################
 #  Copyright notice
 #
-#  (c) 2008-2009
+#  (c) 2008-2012
 #  Copyright: Dr. Olaf Droegehorn
 #  All rights reserved
 #
@@ -572,10 +572,18 @@ showRoom()
     # Print the table headers
     my $t = $type;
     $t = "EM" if($t =~ m/^EM.*$/);
+    if (!(($t eq "FS20") || ($t eq "IT") || ($t eq "FHT") || ($t eq "FileLog") || ($t eq "at") || ($t eq "notify") || ($t eq "KS300") || ($t eq "FHZ") || ($t eq "FHEMWEB") || ($t eq "EM") || ($t eq "FHEMRENDERER"))) {
+ 			$t = "_internal_";   
+ 		}  
     print "  <table class=\"$t\" summary=\"List of $type devices\">\n";
 
     if($type eq "FS20") {
       print "    <tr><th>FS20 dev.</th><th>State</th>";
+      print "<th colspan=\"2\">Set to</th>";
+      print "</tr>\n";
+    }
+    if($type eq "IT") {
+      print "    <tr><th>IT dev.</th><th>State</th>";
       print "<th colspan=\"2\">Set to</th>";
       print "</tr>\n";
     }
@@ -607,7 +615,7 @@ showRoom()
 
       my $v = $devs{$d}{state};
 
-      if($type eq "FS20") {
+      if(($type eq "FS20") || ($type eq "IT")) {
 
         my $v = $devs{$d}{state};
         my $iv = $v;
@@ -651,7 +659,7 @@ showRoom()
         $v = int($v*20)/$v if($v =~ m/^[0-9].$/);
         print $q->hidden("arg.$d", "desired-temp");
         print $q->hidden("dev.$d", $d);
-        print "<td>" .
+        print "<td align=\"center\">" .
             $q->popup_menu(-name=>"val.$d", -values=>\@tv, -default=>$v) .
             $q->submit(-name=>"cmd.$d", -value=>"set") . "</td>";
 

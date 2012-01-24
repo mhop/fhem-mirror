@@ -1,6 +1,9 @@
 body { color: black; background: #FFFFD7; }
 
 table { -moz-border-radius:8px; }
+table { border:thin solid; width: 100%; background: #EAEAEA; }
+table tr.odd { background: #F5F5F5; }
+
 
 table.room { border:thin solid; width: 100%; background: #D7FFFF; }
 table.room tr.sel { background: #A0FFFF; }
@@ -14,11 +17,14 @@ table.notify tr.odd { background: #FFFFC0; }
 table.FileLog { border:thin solid; width: 100%; background: #FFC0C0; }
 table.FileLog tr.odd { background: #FFD7D7; }
 
-table._internal_ { border:thin solid; width: 100%; background: #C0C0C0; }
-table._internal_ tr.odd { background: #D7D7D7; }
+table._internal_ { border:thin solid; width: 100%; background: #EAEAEA; }
+table._internal_ tr.odd { background: #F5F5F5; }
 
 table.FS20 { border:thin solid; width: 100%; background: #C0FFFF; }
 table.FS20 tr.odd { background: #D7FFFF; }
+
+table.IT { border:thin solid; width: 100%; background: #C0FFFF; }
+table.IT tr.odd { background: #D7FFFF; }
 
 table.FHT { border:thin solid; width: 100%; background: #FFC0C0; }
 table.FHT  tr.odd { background: #FFD7D7; }
