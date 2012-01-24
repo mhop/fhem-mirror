@@ -572,7 +572,7 @@ showRoom()
     # Print the table headers
     my $t = $type;
     $t = "EM" if($t =~ m/^EM.*$/);
-    if (!(($t eq "FS20") || ($t eq "IT") || ($t eq "FHT") || ($t eq "FileLog") || ($t eq "at") || ($t eq "notify") || ($t eq "KS300") || ($t eq "FHZ") || ($t eq "FHEMWEB") || ($t eq "EM") || ($t eq "FHEMRENDERER"))) {
+    if (!(($t eq "FS20") || ($t eq "IT") || ($t eq "FHT") || ($t eq "FileLog") || ($t eq "at") || ($t eq "notify") || ($t eq "KS300") || ($t eq "FHZ") || ($t eq "FHEMWEB") || ($t eq "EM") || ($t eq "FHEMRENDERER") || ($t eq "weblink"))) {
  			$t = "_internal_";   
  		}  
     print "  <table class=\"$t\" summary=\"List of $type devices\">\n";
