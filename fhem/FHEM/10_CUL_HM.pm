@@ -114,7 +114,7 @@ my %culHmModel=(
   "005C" => "HM-OU-CF-PL",
   "005F" => "HM-SCI-3-FM",
   "0060" => "HM-PB-4DIS-WM",   # Tested
-  "0061" => "HM-LC-SW4-DR",
+  "0061" => "HM-LC-SW4-DR",    # Tested by fhem-hm-knecht.
   "0062" => "HM-LC-SW2-DR",
   "0066" => "HM_LC_Sw4-WM",    # Tested by peterp
 );
