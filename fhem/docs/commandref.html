@@ -4638,7 +4638,7 @@ Attributes:<br>
   <a name="ITdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; IT &lt;housecode&gt; &lt;off-code&gt; &lt;on-code&gt;
+    <code>define &lt;name&gt; IT &lt;housecode&gt; &lt;on-code&gt; &lt;off-code&gt;
     [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
     <br><br>
 
@@ -4653,9 +4653,9 @@ Attributes:<br>
    <ul>
    <li><code>&lt;housecode&gt;</code> is a 10 digit tri-state number (0/1/F) depending on
 	 your device setting (see list below).</li>
-   <li><code>&lt;off-code&gt;</code> is a 2 digit tri-state number for switching your device off; 
-     It is appended to the housecode to build the 12-digits IT-Message.</li>
    <li><code>&lt;on-code&gt;</code> is a 2 digit tri-state number for switching your device on; 
+     It is appended to the housecode to build the 12-digits IT-Message.</li>
+   <li><code>&lt;off-code&gt;</code> is a 2 digit tri-state number for switching your device off; 
      It is appended to the housecode to build the 12-digits IT-Message.</li>
    <li>The optional <code>&lt;dimup-code&gt;</code> is a 2 digit tri-state number for dimming your device up; 
      It is appended to the housecode to build the 12-digits IT-Message.</li>
@@ -4666,8 +4666,8 @@ Attributes:<br>
 
     Examples:
     <ul>
-      <code>define lamp IT 01FF010101 00 11 01 10</code><br>
-      <code>define roll1 IT 111111111F 00 11 01 10</code><br>
+      <code>define lamp IT 01FF010101 11 00 01 10</code><br>
+      <code>define roll1 IT 111111111F 11 00 01 10</code><br>
       <code>define otherlamp IT 000000000F 11 10 00 00</code><br>
       <code>define otherroll1 IT FFFFFFF00F 11 10</code>
     </ul>
