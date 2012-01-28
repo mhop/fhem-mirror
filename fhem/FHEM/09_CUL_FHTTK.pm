@@ -197,8 +197,8 @@ CUL_FHTTK_Parse($$)
   my $prevState = $defs{$self}{PREV}{STATE};
   if ($prevState != $state) {
     my ($windowReading,$windowState) = split(/:/, $fhttfk_codes{$prevState});
-    $defs{$self}{READINGS}{"PreviousWindow"}{VAL} = $windowState;
-    $defs{$self}{READINGS}{"PreviousWindow"}{TIME} = $def->{PREVTIMESTAMP};
+    $defs{$self}{READINGS}{"Previous"}{VAL} = $windowState;
+    $defs{$self}{READINGS}{"Previous"}{TIME} = TimeNow();
   }
  
   $def->{PREVTIMESTAMP} = defined($defs{$self}{PREV}{TIMESTAMP})?$defs{$self}{PREV}{TIMESTAMP}:time();
