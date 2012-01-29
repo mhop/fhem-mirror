@@ -485,3 +485,8 @@
 - Thu Dec 01 2011 (Martin F.)
   - Move JsonList from contrib to main modules. Jsonlist output is optimized
     and now be more structured.
+
+- Sun Jan 29 2012 (Maz Rashid)
+  - Improving 10_EIB.pm by introducing Get and interpreting received value according 
+    to the selected model (based on datapoint types.)
+  - Introduced documentation for TUL / EIB modules.  
