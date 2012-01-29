@@ -41,7 +41,6 @@ my %eib_dpttypes = (
   "timeperiod-ms"		=> {"CODE"=>"dpt7", "UNIT"=>"ms"},
   "timeperiod-min"		=> {"CODE"=>"dpt7", "UNIT"=>"min"},
   "timeperiod-h"		=> {"CODE"=>"dpt7", "UNIT"=>"h"},
-  "timeperiod-h"		=> {"CODE"=>"dpt7", "UNIT"=>"h"},
 
   # 2-Octet unsigned Value (Temp / Light)
   "dpt9" 		=> {"CODE"=>"dpt9", "UNIT"=>""},
