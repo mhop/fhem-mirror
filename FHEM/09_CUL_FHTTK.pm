@@ -194,10 +194,15 @@ CUL_FHTTK_Parse($$)
       }
   }
   
+  if (! defined($defs{$self}{READINGS}{"Previous"})) {
+    $defs{$self}{READINGS}{"Previous"}{VAL} = "";
+    $defs{$self}{READINGS}{"Previous"}{TIME} = "";
+  }
+  
   my $prevState = $defs{$self}{PREV}{STATE};
   if ($prevState != $state) {
     my ($windowReading,$windowState) = split(/:/, $fhttfk_codes{$prevState});
-    $defs{$self}{READINGS}{"Previous"}{VAL} = $windowState;
+    $defs{$self}{READINGS}{"Previous"}{VAL} = $windowState if $windowState ne "";
     $defs{$self}{READINGS}{"Previous"}{TIME} = TimeNow();
   }
  
