@@ -162,7 +162,7 @@ TUL_Get($@)
   my $rsp;
   my $name = $a[0];
 
-  return "No $a[1] for dummies" if(IsDummy($name));
+  #return "No $a[1] for dummies" if(IsDummy($name));
 
   TUL_SimpleWrite($hash, "B".$gets{$a[1]}[0] . $arg);
   $rsp = TUL_SimpleRead($hash);
