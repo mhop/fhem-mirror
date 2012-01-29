@@ -82,6 +82,7 @@
       <a href="#ECMD">ECMD</a> &nbsp;
       <a href="#ECMDDevice">ECMDDevice</a> &nbsp;
       <a href="#DS18S20">DS18S20</a> &nbsp;
+      <a href="#EIB">EIB</a> &nbsp;
       <a href="#EnOcean">EnOcean</a> &nbsp;
       <a href="#EM">EM</a> &nbsp;
       <a href="#EMEM">EMEM</a> &nbsp;
@@ -115,6 +116,7 @@
       <a href="#SIS_PMS">SIS_PMS</a> &nbsp;
       <a href="#TCM">TCM</a> &nbsp;
       <a href="#TellStick">TellStick</a> &nbsp;
+      <a href="#TUL">TUL</a> &nbsp;
       <a href="#USF1000">USF1000</a> &nbsp;
       <a href="#USBWX">USBWX</a> &nbsp;
       <a href="#VantagePro2">VantagePro2</a> &nbsp;
@@ -3210,6 +3212,110 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
+<a name="EIB"></a>
+<h3>EIB / KNX</h3>
+<ul>
+  EIB/KNX is a standard for building automation / home automation. 
+  It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.
+  
+  While the module <a href="#TUL">TUL</a> represents the connection to the EIB network, 
+  the EIB modules represent individual EIB devices. This module provides a basic set of operations (on, off, on-till, etc.) 
+  to switch on/off EIB devices. Sophisticated setups can be achieved by combining a number of 
+  EIB module instances or by sending raw hex values to the network (set <devname> raw <hexval>).
+  
+  EIB/KNX defines a series of Datapoint Type as standard data types used 
+  to allow general interpretation of values of devices manufactured by diferent companies. 
+  This datatypes are used to interpret the status of a device, so the state in FHEM will then 
+  show the correct value.  
+    
+  <br><br>
+  <a name="EIBdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EIB &lt;main group&gt; [&lt;additional group&gt; ..]</code>
+    <br><br>
+
+    Define an EIB device, connected via a <a href="#TUL">TUL</a>. The
+    &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff). 
+    The &lt;main group&gt;  is used for sending of commands to the EIB network. 
+    The state of the instance will be updated when a new state is received from the network for any of the given groups. 
+    This is usefull for example for toggle switches where a on command is send to one group and the real state (on or off) is 
+    responded back on a second group.
+    
+    For actors and sensors the
+    <a href="#autocreate">autocreate</a> module may help.<br>
+
+    Example:
+    <ul>
+      <code>define lamp1 EIB 0/10/12</code><br>
+      <code>define lamp1 EIB 0/10/12 0/0/5</code><br>
+      <code>define lamp1 EIB 0A0C</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EIBset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt;]</code><br>
+    where value one of:
+	<li><b>on</b> switch on device
+	<li><b>off</b> switch off device
+	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.
+	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.
+    <li><b>value</b> <hexvalue> sends the given value as raw data to the device.
+    
+    <br>Example:
+    <ul><code>
+      set lamp1 on<br>
+      set lamp1 off<br>
+      set lamp1 on-for-timer 10<br>
+      set lamp1 on-till 13:15:00<br>
+      set lamp1 value 234578<br>
+    </code></ul>
+    </li>
+
+    </ul>
+  </ul>
+  <br>
+  
+  <a name="EIBattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#webCmd">webCmd</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a>
+      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>).<br>
+      The device state in FHEM is interpreted and shown according to the specification.
+      <ul>
+      	<li>dpt5</li>
+      	<li>percent</li>
+      	<li>dpt7</li>
+      	<li>length-mm</li>
+      	<li>current-mA</li>
+      	<li>brightness</li>
+      	<li>timeperiod-ms</li>
+      	<li>timeperiod-min</li>
+      	<li>timeperiod-h</li>
+      	<li>dpt9</li>
+      	<li>tempsensor</li>
+      	<li>lightsensor</li>
+      	<li>dpt10</li>
+      	<li>time</li>
+      	<li>dpt11</li>
+      	<li>date</li>
+      	<li>dpt12</li>
+      </ul>
+    </li>
+  </ul>
+  <br>
+  
 
 <a name="EnOcean"></a>
 <h3>EnOcean</h3>
@@ -6686,6 +6792,92 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#attrdummy">dummy</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+<a name="TUL"></a>
+<h3>TUL</h3>
+<ul>
+
+  <table>
+  <tr><td>
+  The TUL module is the representation of a EIB / KNX connector in FHEM. 
+  <a href="#EIB">EIB</a> instances represent the EIB / KNX devices and will need a TUL as IODev to communicate with the EIB / KNX network.<br>
+  The TUL module is designed to connect to EIB network either using EIBD or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de    
+
+  Note: this module may require the Device::SerialPort or Win32::SerialPort
+  module if you attach the device via USB and the OS sets strange default
+  parameters for serial devices.
+
+  </td><td>
+  <img src="http://busware.de/show_image.php?id=269" width="100%" height="100%"/>
+  </td></tr>
+  </table>
+
+  <a name="TULdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TUL &lt;device&gt; &lt;physical address&gt;</code> <br>
+    <br>
+    TUL usb stick / TPUART serial devices:<br><ul>
+      &lt;device&gt; specifies the serial port to communicate with the TUL.
+      The name of the serial-device depends on your distribution, under
+      linux the cdc_acm kernel module is responsible, and usually a
+      /dev/ttyACM0 device will be created. If your distribution does not have a
+      cdc_acm module, you can force usbserial to handle the TUL by the
+      following command:<ul>modprobe usbserial vendor=0x03eb
+      product=0x204b</ul>In this case the device is most probably
+      /dev/ttyUSB0.<br><br>
+
+      You can also specify a baudrate if the device name contains the @
+      character, e.g.: /dev/ttyACM0@19200<br><br>
+	  Note: For TUL usb stick the baudrate 19200 is needed and this is the default 
+	  when no baudrate is given.      
+	  <br><br>
+	  
+	  Example:<br>
+	  <code>define tul TUL tul:/dev/ttyACM0 1.1.249</code>
+    </ul>
+    EIBD:<br><ul>
+    &lt;device&gt; specifies the host:port of the eibd device. E.g.
+    eibd:192.168.0.244:2323. When using the standard port, the port can be omitted.
+    <br><br>
+	  
+	  Example:<br>
+	  <code>define tul TUL eibd:localhost 1.1.249</code>
+    </ul>
+    <br>
+    If the device is called none, then no device will be opened, so you
+    can experiment without hardware attached.<br>
+
+    The physical address is used as the source address of telegrams sent to EIB network.
+  </ul>
+  <br>
+
+  <a name="TULset"></a>
+  <b>Set </b>
+  <ul>
+    <li>raw<br>
+        Issue a TUL raw telegram message 
+        </li><br>
+  </ul>
+
+  <a name="TULget"></a>
+  <b>Get</b>
+  <ul>
+    <li>raw<br>
+        sends a read telegram
+        </li><br>
+  </ul>
+
+  <a name="TULattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
   </ul>
   <br>
 </ul>
