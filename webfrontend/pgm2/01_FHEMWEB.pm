@@ -417,6 +417,7 @@ FW_AnswerCall($)
 
   if($FW_inform) {      # Longpoll header
     $defs{$FW_cname}{inform} = $FW_room;
+    # NTFY_ORDER is larger than the normal order (50-)
     $defs{$FW_cname}{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $defs{$FW_cname}{CD};
     print $c "HTTP/1.1 200 OK\r\n",
@@ -1814,6 +1815,7 @@ FW_Notify($$)
   my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
   ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp) = @old;
 
+  # Collect multiple changes (e.g. from noties) into one message
   $ntfy->{INFORMBUF} = "" if(!defined($ntfy->{INFORMBUF}));
   $ntfy->{INFORMBUF} .= "$dn;$dev->{STATE};$txt\n";
   RemoveInternalTimer($ln);
@@ -1827,6 +1829,7 @@ FW_FlushInform($)
 {
   my ($name) = @_;
   my $hash = $defs{$name};
+  return if(!$hash);
   my $c = $hash->{CD};
   print $c $hash->{INFORMBUF};
 
