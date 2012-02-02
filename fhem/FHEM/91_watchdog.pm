@@ -119,6 +119,10 @@ watchdog_Trigger($)
   Log(3, "Watchdog $ntfy->{NAME} triggered");
   my $exec = SemicolonEscape($ntfy->{CMD});;
   $ntfy->{STATE} = "triggered";
+  
+  $ntfy->{READINGS}{Triggered}{TIME} = TimeNow();
+  $ntfy->{READINGS}{Triggered}{VAL} = $ntfy->{STATE};
+  
   my $ret = AnalyzeCommandChain(undef, $exec);
   Log 3, $ret if($ret);
 }
