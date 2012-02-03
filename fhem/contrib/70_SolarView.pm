@@ -29,7 +29,7 @@
 #
 # where <key> is one of currentPower, totalEnergy, totalEnergyDay, 
 # totalEnergyMonth, totalEnergyYear, UDC, IDC, UDCB, IDCB, UDCC, IDCC,
-# gridVoltage, gridPower and temperature.
+# gridVoltage, gridCurrent and temperature.
 #
 ##############################################################################
 #
@@ -61,15 +61,15 @@ use warnings;
 
 use IO::Socket::INET;
 
-my @gets = ('totalEnergyDay',            # kWh
-            'totalEnergyMonth',          # kWh
-            'totalEnergyYear',           # kWh
-            'totalEnergy',               # kWh
-            'currentPower',              # W
-            'UDC', 'IDC', 'UDCB',        # V, A, V
-            'IDCB', 'UDCC', 'IDCC',      # A, V, A
-            'gridVoltage', 'gridPower',  # V, A
-            'temperature');              # °C
+my @gets = ('totalEnergyDay',              # kWh
+            'totalEnergyMonth',            # kWh
+            'totalEnergyYear',             # kWh
+            'totalEnergy',                 # kWh
+            'currentPower',                # W
+            'UDC', 'IDC', 'UDCB',          # V, A, V
+            'IDCB', 'UDCC', 'IDCC',        # A, V, A
+            'gridVoltage', 'gridCurrent',  # V, A
+            'temperature');                # oC
 
 sub
 SolarView_Initialize($)
@@ -100,10 +100,17 @@ SolarView_Define($$)
   $hash->{Interval} = (@args>=5) ? int($args[4]) : 300;
   $hash->{Timeout}  = (@args>=6) ? int($args[5]) : 4;
 
-  $hash->{Invalid}  = -1;
-  $hash->{NightOff} = 1;
-  $hash->{Debounce} = 50;
-  $hash->{Sleep}    = 0;
+  # config variables
+  $hash->{Invalid}    = -1;     # default value for invalid readings
+  $hash->{Sleep}      = 0;      # seconds to sleep before connect
+  $hash->{Debounce}   = 50;     # minimum level for enabling debounce (0 to disable)
+  $hash->{Rereads}    = 2;      # number of retries when reading curPwr of 0
+  $hash->{NightOff}   = 'yes';  # skip connection to SV at night?
+  $hash->{UseSVNight} = 'yes';  # use the on/off timings from SV (else: SUNRISE_EL)
+  $hash->{UseSVTime}  = '';     # use the SV time as timestamp (else: TimeNow())
+
+  # internal variables
+  $hash->{Debounced}  = 0;
 
   $hash->{STATE} = 'Initializing';
 
@@ -135,22 +142,29 @@ SolarView_Update($)
   # if NightOff is set and there has been a successful 
   # reading before, then skip this update "at night"
   #
-  if ($hash->{NightOff} and $hash->{READINGS}{currentPower}{VAL} != $hash->{Invalid})
+  if ($hash->{NightOff} and SolarView_IsNight($hash) and
+      $hash->{READINGS}{currentPower}{VAL} != $hash->{Invalid})
   {
-    my ($sec,$min,$hour) = localtime(time);
-    return undef if ($hour < 6 or $hour > 22);
+    $hash->{STATE} = 'Pausing';
+    return undef;
   }
 
   sleep($hash->{Sleep}) if $hash->{Sleep};
 
-  Log 4, "$hash->{NAME} tries to connect solarview at $hash->{Host}:$hash->{Port}";
+  Log 4, "$hash->{NAME} tries to contact solarview at $hash->{Host}:$hash->{Port}";
+
+  # save the previous value of currentPower for debouncing 
+  my $cpVal  = $hash->{READINGS}{currentPower}{VAL};
+  my $cpTime = $hash->{READINGS}{currentPower}{TIME};
 
   my $success = 0;
+  my $rereads = $hash->{Rereads};
 
   eval {
     local $SIG{ALRM} = sub { die 'timeout'; };
     alarm $hash->{Timeout};
 
+    READ_SV:
     my $socket = IO::Socket::INET->new(PeerAddr => $hash->{Host}, 
                                        PeerPort => $hash->{Port}, 
                                        Timeout  => $hash->{Timeout});
@@ -162,17 +176,17 @@ SolarView_Update($)
       my $res = <$socket>;
       close($socket);
 
-      alarm 0;
-
       if ($res and $res =~ /^\{(00,[\d\.,]+)\},/)
       {
         my @vals = split(/,/, $1);
 
-        my $tn = sprintf("%04d-%02d-%02d %02d:%02d:00",
-                   $vals[3], $vals[2], $vals[1], $vals[4], $vals[5]);
+        my $timenow = TimeNow();
 
-        my $cpVal  = $hash->{READINGS}{currentPower}{VAL};
-        my $cpTime = $hash->{READINGS}{currentPower}{TIME};
+        if ($hash->{UseSVTime}) 
+        {
+          $timenow = sprintf("%04d-%02d-%02d %02d:%02d:00",
+                       $vals[3], $vals[2], $vals[1], $vals[4], $vals[5]);
+        }
 
         for my $i (6..19)
         {
@@ -181,19 +195,33 @@ SolarView_Update($)
           if (defined($vals[$i]))
           {
             $hash->{READINGS}{$gets[$getIdx]}{VAL}  = 0 + $vals[$i];
-            $hash->{READINGS}{$gets[$getIdx]}{TIME} = $tn;
+            $hash->{READINGS}{$gets[$getIdx]}{TIME} = $timenow;
           }
         }
 
-        # if Debounce is enabled, then skip one drop of
+        if ($rereads and $hash->{READINGS}{currentPower}{VAL} == 0)
+        { 
+          sleep(1);
+          $rereads = $rereads - 1;
+          goto READ_SV;
+        }
+
+        alarm 0;
+
+        # if Debounce is enabled (>0), then skip one! drop of
         # currentPower from 'greater than Debounce' to 'Zero'
         #
         if ($hash->{Debounce} > 0 and
             $hash->{Debounce} < $cpVal and
-            $hash->{READINGS}{currentPower}{VAL} == 0)
+            $hash->{READINGS}{currentPower}{VAL} == 0 and
+            not $hash->{Debounced})
         {
             $hash->{READINGS}{currentPower}{VAL}  = $cpVal;
             $hash->{READINGS}{currentPower}{TIME} = $cpTime;
+
+            $hash->{Debounced} = 1;
+        } else {
+            $hash->{Debounced} = 0;
         }
 
         $success = 1;
@@ -246,6 +274,71 @@ SolarView_Undef($$)
   RemoveInternalTimer($hash) if $hash->{Interval};
 
   return undef;
+}
+
+sub
+SolarView_IsNight($)
+{
+  my ($hash) = @_;
+  my $isNight = 0;
+  my ($sec,$min,$hour,$mday,$mon) = localtime(time);
+
+  # reset totalEnergyX if needed
+  if ($hour == 0) 
+  {
+    my $timenow = TimeNow();
+
+    $hash->{READINGS}{totalEnergyDay}{VAL}  = 0;
+    $hash->{READINGS}{totalEnergyDay}{TIME} = $timenow;
+    #
+    if ($mday == 1)
+    {
+      $hash->{READINGS}{totalEnergyMonth}{VAL}  = 0;
+      $hash->{READINGS}{totalEnergyMonth}{TIME} = $timenow;
+      #
+      if ($mon == 0)
+      {
+        $hash->{READINGS}{totalEnergyYear}{VAL}  = 0;
+        $hash->{READINGS}{totalEnergyYear}{TIME} = $timenow;
+      }
+    }
+  }
+
+  if ($hash->{UseSVNight})
+  {
+    # These are the on/off timings from Solarview, see
+    # http://www.amhamberg.de/solarview-fb_Installieren.pdf
+    #
+    if ($mon == 0) { # Jan
+      $isNight = ($hour < 7 or $hour > 17);
+    } elsif ($mon == 1) {  # Feb
+      $isNight = ($hour < 7 or $hour > 18);
+    } elsif ($mon == 2) {  # Mar
+      $isNight = ($hour < 6 or $hour > 19);
+    } elsif ($mon == 3) {  # Apr
+      $isNight = ($hour < 5 or $hour > 20);
+    } elsif ($mon == 4) {  # May
+      $isNight = ($hour < 5 or $hour > 21);
+    } elsif ($mon == 5) {  # Jun
+      $isNight = ($hour < 5 or $hour > 21);
+    } elsif ($mon == 6) {  # Jul
+      $isNight = ($hour < 5 or $hour > 21);
+    } elsif ($mon == 7) {  # Aug
+      $isNight = ($hour < 5 or $hour > 21);
+    } elsif ($mon == 8) {  # Sep
+      $isNight = ($hour < 6 or $hour > 20);
+    } elsif ($mon == 9) {  # Oct
+      $isNight = ($hour < 7 or $hour > 19);
+    } elsif ($mon == 10) { # Nov
+      $isNight = ($hour < 7 or $hour > 17);
+    } elsif ($mon == 11) { # Dec
+      $isNight = ($hour < 8 or $hour > 16);
+    }
+  } else { # we use SUNRISE_EL 
+    $isNight = not isday();
+  }
+
+  return $isNight;
 }
 
 1;
