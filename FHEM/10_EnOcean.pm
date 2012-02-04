@@ -87,17 +87,39 @@ EnOcean_Initialize($)
   $hash->{DefFn}     = "EnOcean_Define";
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
+  $hash->{AttrFn}    = "EnOcean_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "model:".join(",",@EnO_models)." ".
                        "subType:".join(",",values %EnO_subType)." ".
-                       "subId actualTemp";
+                       "subId actualTemp dimTime";
 
   for(my $i=0; $i<@EnO_ptm200btn;$i++) {
     $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
   }
   $EnO_ptm200btn{released} = "0:20";
   return undef;
+}
+
+# ---------------------------------------------
+
+sub EnOcean_Attr($)
+{
+  my @a = @_;
+
+  my $name= $a[1];
+  my $ll2 = GetLogLevel($name, 2);
+
+  if($a[2] eq "subType") {
+    Log $ll2, "EO_Attr subtype";
+
+    if($a[3] eq "eltakoDimmer") {
+			Log $ll2, "EO_Attr subtype dimmer";
+			$attr{$name}{eventMap}="B0:on B1:off"
+		}
+	}
+  return undef;
+
 }
 
 #############################
@@ -165,6 +187,12 @@ EnOcean_Set($@)
       $hash->{READINGS}{$cmd}{VAL} = $arg;
 
    } elsif($st eq "eltakoDimmer") {
+     my $sendDimCmd=0;
+		 my $time=AttrVal($name, "dimTime", 0);
+		 my $onoff=1;
+     my $dimVal=100;
+     $dimVal=$hash->{VALUE} if(defined $hash->{VALUE});
+
      if($cmd eq "teach") {
        my $idSrc=EnOcean_GetMyDeviceId($hash);
 			 my $data=sprintf("A502000000%s00", $idSrc);
@@ -172,24 +200,66 @@ EnOcean_Set($@)
        IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
 
      } elsif($cmd eq "dimto") {
-       return "Usage: $cmd percent [time 01-FF FF:slowest] [on/off]" if(@a<2);
-       my $time=0;
-       my $onoff=1;
+       return "Usage: $cmd percent" if(@a<2);
        # for eltako relative (0-100) (but not compliant to EEP because DB0.2 is 0)
-       my $dimVal=$a[1];
+       $dimVal=$a[1];
        shift(@a);
        if(defined($a[1])) { $time=$a[1]; shift(@a); }
        if(defined($a[1])) { $onoff=($a[1] eq "off") ? 0 : 1; shift(@a); }
-       # EEP: A5/38/08 Central Command ->Typ 0x02: Dimming
-       my $idSrc=EnOcean_GetMyDeviceId($hash);
-       #my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $hash->{DEF});
-       my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $idSrc);
-       IOWrite($hash, "000A0001", $data);
-       Log $ll2, "$st.$cnd: " . $data;
+       $sendDimCmd=1;
+
+     } elsif($cmd eq "dimup") {
+       return "Usage: $cmd percent" if(@a<2 or $a[1]>100);
+       $dimVal+=$a[1];
+       Log $ll2, "$st.$cmd val:" . $hash->{VALUE} . " par:" . $a[1] . " val:" . $dimVal;
+       shift(@a);
+       $sendDimCmd=1;
+
+     } elsif($cmd eq "dimdown") {
+       return "Usage: $cmd percent" if(@a<2 or $a[1]>100);
+       $dimVal-=$a[1];
+       shift(@a);
+       $sendDimCmd=1;
+
+     } elsif($cmd eq "on" or $cmd eq "B0") {
+       $sendDimCmd=1;
+
+     } elsif($cmd eq "off" or $cmd eq "B1") {
+			 $onoff=0;
+       $sendDimCmd=1;
 
      } else {
-      return "Unknown argument $cmd, choose one of: teach, dimto"
+      return "Unknown argument $cmd, choose one of: teach, dimto, dimup, dimdown, on ,off";
 
+     }
+     if($sendDimCmd) {
+       if($dimVal >  100) { $dimVal=100; }
+       if($dimVal <= 0)   { $dimVal=0; $onoff=0; }
+       # EEP: A5/38/08 Central Command ->Typ 0x02: Dimming
+       my $idSrc=EnOcean_GetMyDeviceId($hash);
+       my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $idSrc);
+       IOWrite($hash, "000A0001", $data);
+       Log $ll2, "$st.$cmd: " . $data;
+     }
+
+   ###########################
+   } elsif($st eq "eltakoRoll") {
+     if($cmd eq "teach") {
+      my $data=sprintf("A5FFF80D80%s00", $hash->{DEF});
+      Log $ll2, "eltakoRollCtrl.Teach: " . $data;
+       IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
+     } else {
+			 my %eltakoRollCtrlCommands = ( down=>0x02, up=>0x01, stop=>0x00 );
+       my $usage = "Usage: (" . join("|", sort keys %eltakoRollCtrlCommands) . ") [time 0-255 sek]";
+       my $rollcmd= $eltakoRollCtrlCommands{$cmd};
+			 return $usage if( (!defined($rollcmd)) or (@a<1) );
+       my $time=0;
+       if(defined($a[1])) { $time=$a[1]; shift(@a); } # time
+       # EEP: A5/3F/7F Universal ???
+       my $idSrc=EnOcean_GetMyDeviceId($hash);
+       my $data=sprintf("A5%02X%02X%02X%02X%s00", 0, $time, $rollcmd, 0x08, $idSrc);
+       IOWrite($hash, "000A0001", $data);
+       Log $ll2, "eltakoRoll.$cmd" . $data;
      }
 
     ###########################
@@ -236,7 +306,7 @@ EnOcean_Parse($$)
     return "";
   }
 
-  my $hash = $modules{EnOcean}{defptr}{$id}; 
+  my $hash = $modules{EnOcean}{defptr}{$id};
   if(!$hash) {
     Log 3, "EnOcean Unknown device with ID $id, please define it";
     return "UNDEFINED EnO_${rorgname}_$id EnOcean $id";
@@ -289,15 +359,17 @@ EnOcean_Parse($$)
       } else {
         if($st eq "keycard") {
           $msg = "keycard removed";
-          
+
         } else {
           $msg = (($db_3&0x10) ? "pressed" : "released");
 
         }
 
       }
-      
+
     }
+    # eltakoRoll: BI: unten / B0: oben / released:running/stopped
+
 
     # released events are disturbing when using a remote, since it overwrites
     # the "real" state immediately.
@@ -483,10 +555,11 @@ EnOcean_Parse($$)
       if($vn eq "state") {
         $hash->{STATE} = $vv;
         push @changed, $vv;
-
+			} elsif($vn eq "value") {
+        $hash->{VALUE} = $vv if($vv>0);
+        push @changed, "$vn: $vv";
       } else {
         push @changed, "$vn: $vv";
-
       }
     }
 
@@ -496,7 +569,7 @@ EnOcean_Parse($$)
     }
   }
   $hash->{CHANGED} = \@changed;
-  
+
   return $name;
 }
 
@@ -513,7 +586,7 @@ EnOcean_MD15Cmd($$$)
       $msg = sprintf("%02X000000", $arg1);
 
     } elsif($cmd eq "desired-temp") {
-      $msg = sprintf("%02X%02X0400", $arg1*255/40, 
+      $msg = sprintf("%02X%02X0400", $arg1*255/40,
                      AttrVal($name, "actualTemp", ($db_1*40/255)) * 255/40);
 
     } elsif($cmd eq "initialize") {
@@ -535,8 +608,8 @@ EnOcean_MD15Cmd($$$)
 sub
 EnOcean_A5Cmd($$$)
 {
-  my ($hash, $msg, $org) = @_; 
-  IOWrite($hash, "000A0701", # varLen=0A optLen=07 msgType=01=radio, 
+  my ($hash, $msg, $org) = @_;
+  IOWrite($hash, "000A0701", # varLen=0A optLen=07 msgType=01=radio,
           sprintf("A5%s%s0001%sFF00",$msg,$org,$hash->{DEF}));
           # type=A5 msg:4 senderId:4 status=00 subTelNum=01 destId:4 dBm=FF Security=00
 }
