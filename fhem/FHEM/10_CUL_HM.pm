@@ -662,8 +662,9 @@ CUL_HM_Parse($$)
 
     if($p =~ m/^(....)(..)$/) {
       my ($t, $h) = ($1, $2);
-      $t = hex($t)/10;
-      $t -= 3276.8 if($t > 1638.4);
+      $t = hex($t);
+      $t -= 32768 if($t > 16384);
+      $t = sprintf("%0.1f", $t/10);
       $h = hex($h);
       push @event, "state:T: $t H: $h";
       push @event, "temperature:$t";
