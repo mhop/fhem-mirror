@@ -27,7 +27,6 @@ updatefhem_Initialize($$)
   $cmds{CULflash} = \%chash;
 }
 
-
 #####################################
 sub
 CommandUpdatefhem($$)
@@ -37,42 +36,18 @@ CommandUpdatefhem($$)
   my $ret = "";
   my $moddir = (-d "FHEM.X" ? "FHEM.X" : "$attr{global}{modpath}/FHEM");
 
-  ## backup by RueBe
-  my @commandchain = split(/ +/,$param);
+  ## backup by RueBe, simplified by rudi
+  my @args = split(/ +/,$param);
 
   #  Check if the first parameter is "backup"
-  if($param) {
-    my @commandchain = split(/ +/,$param);
-    if(uc($commandchain[0]) eq "BACKUP") {
-      my $backupdir = AttrVal("global", "backupdir", "/tmp/FHEM_Backup");
-      # create the backupfolder
-      if(!-d $backupdir) {
-        if(!mkdir($backupdir)) {
-          return "Can't create backup folder $!";
-        }
-      }
-      # full backup, for compatibility, we use the native copy unction, not
-      # dircopy from File::Copy::Recursive
-      if($commandchain[1] eq "") {
-        opendir(IMD, $moddir) || return "Cannot open fhem-module directory";
-        my @files= readdir(IMD);
-        closedir(IMD);
-        my $f;
-
-        foreach $f (@files) {
-          unless ( ($f eq ".") || ($f eq "..") ) {
-            my $ret = copy("$moddir/$f", "$backupdir/$f");
-          }
-        }
-        $param = "";
-
-      } else {
-        # one file backup
-        copy("$moddir/$commandchain[1]", "$backupdir/$commandchain[1]");
-        # recreate $param for further use
-        $param = $commandchain[1];
-      }
-    }
+  if(@args && uc($args[0]) eq "BACKUP") {
+    my $bdir = AttrVal("global", "backupdir", "$moddir.backup");
+    my $dateTime = TimeNow();
+    $dateTime =~ s/ /_/g;
+    my $ret = `(mkdir -p $bdir && tar cf - $moddir | gzip > $bdir/FHEM.$dateTime.tgz) 2>&1`;
+    return $ret if($ret);
+    shift @args;
+    $param = join("", @args);
   }
 
   # Read in the OLD filetimes.txt
@@ -226,6 +201,8 @@ GetHttpFile($$)
   my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
   syswrite $conn, $req;
   my ($buf, $ret);
+
+  # Note: should add a timeout
   while(sysread($conn,$buf,65536) > 0) {
     $ret .= $buf;
   }
