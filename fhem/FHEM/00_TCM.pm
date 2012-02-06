@@ -50,6 +50,7 @@ TCM_Initialize($)
 
 # Normal devices
   $hash->{DefFn}   = "TCM_Define";
+  $hash->{UndefFn} = "TCM_Undef";
   $hash->{GetFn}   = "TCM_Get";
   $hash->{SetFn}   = "TCM_Set";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 loglevel:0,1,2,3,4,5,6";
@@ -610,7 +611,7 @@ TCM_ReadAnswer($$)
 
     if(defined($buf)) {
       $data .= uc(unpack('H*', $buf));
-      Log 5, "TCM/RAW (ReadAnswer): $data";
+      Log $ll5, "TCM/RAW (ReadAnswer): $data";
 
       if($hash->{MODEL} eq "120") {
         if(length($data) >= 28) {
@@ -645,7 +646,26 @@ TCM_ReadAnswer($$)
       }
     }
   }
+}
 
+sub
+TCM_Undef($$)
+{
+  my ($hash, $arg) = @_;
+  my $name = $hash->{NAME};
+
+  foreach my $d (sort keys %defs) {
+    if(defined($defs{$d}) &&
+       defined($defs{$d}{IODev}) &&
+       $defs{$d}{IODev} == $hash)
+      {
+        my $lev = ($reread_active ? 4 : 2);
+        Log GetLogLevel($name,$lev), "deleting port for $d";
+        delete $defs{$d}{IODev};
+      }
+  }
+  DevIo_CloseDev($hash); 
+  return undef;
 }
 
 1;
