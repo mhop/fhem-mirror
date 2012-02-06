@@ -8,6 +8,7 @@
   - feature: updatefhem backup is using tar+gzip now
   - feature: EIB: introduce Get, interpret received values upon defined model
              (by datapoint types) (Maz)
+  - feature: NetIO230B module by Andy
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
