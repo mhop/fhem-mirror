@@ -105,6 +105,7 @@
       <a href="#M232">M232</a> &nbsp;
       <a href="#M232Counter">M232Counter</a> &nbsp;
       <a href="#M232Voltage">M232Voltage</a> &nbsp;
+      <a href="#NetIO230B">NetIO230B</a> &nbsp;
       <a href="#OREGON">OREGON</a> &nbsp;
       <a href="#OWFS">OWFS</a> &nbsp;
       <a href="#OWTEMP">OWTEMP</a> &nbsp;
@@ -6492,6 +6493,103 @@ Terminating
     <li><a href="#loglevel">loglevel</a></li><br>
   </ul>
 </ul>
+
+
+<a name="NetIO230B"></a>
+<h3>NetIO230B</h3>
+<ul>
+  <p>
+  fhem-module for NetIO 230B Power Distribution Unit &nbsp;&nbsp; (see: <a
+  href="http://www.koukaam.se/showproduct.php?article_id=1502">NetIO 230B
+  (koukaam.se)</a>)
+  </p>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br />
+  Please also note: the PDU must use firmware 3.1 or later and set to unencrypted mode.
+  <br /><br />
+  <a name="NETIO230Bdefine"></a>
+  <b>Define</b>
+  <ul>
+
+    <li><code>define &lt;name&gt; NetIO230B &lt;ip-address&gt; &lt;socket number
+    &gt; [&lt;user name&gt; &lt;password&gt;]</code></li>
+
+    <li><code>define &lt;name&gt; NetIO230B &lt;ip-address&gt; &lt;socket number
+    &gt; [&lt;config file path&gt;]</code></li>
+
+    <p>
+	    Defines a switching device, where sockets can be switched
+    </p>
+    <ul>
+    	<li>separately 	(just use 0-4 as socket number)</li>
+		<li>all together  (use 1234 as socket number)</li>
+                <li>in arbitrary groups (e.g 13 switches socket 1 and 3, 42
+                switches socket 2 and 4, etc...), invalid numbers are
+                ignored</li>
+	</ul>
+	<p>
+                User name and password are optional. When no user name or
+                password is passed, the module looks for a configfile at
+                '/var/log/fhem/netio.conf'.  If no config file is found, it
+                uses 'admin/admin' as user/pass, since this is the default
+                configuration for the device.
+        <p>
+                Alternatively you can pass a path to a configfile instead of
+                the user/pass combo. (e.g. /var/tmp/tmp.conf)
+                Configfile-Format:<br />
+		<ul>
+			<code>
+			%config= (<br />
+					&nbsp;&nbsp;&nbsp;host => "192.168.61.40",<br />
+					&nbsp;&nbsp;&nbsp;user => "admin",<br />
+					&nbsp;&nbsp;&nbsp;password => "admin"<br />
+			);</code>
+			<br /><br /><small>(All settings optional)</small>
+		</ul>
+    </p>
+    <p>Examples:</p>
+    <ul>
+    	<li><code>define Socket3 NetIO230B 192.168.178.10 3</code></li>
+    	<li><code>define Socket1_and_4 NetIO230B 192.168.178.10 14</code></li>
+    	<li><code>define coffeemaker NetIO230B 192.168.178.10 1 username secretpassword</code></li>
+    	<li><code>define coffeemaker_and_light NetIO230B 192.168.178.10 23 /var/log/kitchen.conf</code></li>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="NETIO230Bget"></a>
+  <b>Get </b>
+ 	 <ul>
+		<code>get &lt;name&gt; state</code>
+		<br><br>
+		returns the state of the socket(s)<br>
+
+		Example:
+		<ul>
+		  <code>get coffeemaker_and_light</code>&nbsp;&nbsp; => <code>on or off</code><br>
+		</ul>
+		<br>
+	  </ul>
+
+	  <a name="NETIO230Bset"></a>
+  <b>Set </b>
+ 	 <ul>
+		<code>set &lt;name&gt; &lt;value&gt;</code>
+		<br><br>
+		where <code>value</code> is one of:<br>
+		<pre>
+		on
+		off
+		</pre>
+		Examples:
+		<ul>
+		  <code>set coffeemaker_and_light on</code><br>
+		</ul>
+		<br>
+	  </ul>
+  </ul>
+
+
 <a name="TellStick"></a>
 <h3>TellStick</h3>
 <ul>
