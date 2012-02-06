@@ -5,7 +5,9 @@
   - feature: SVG: filled area support, some ls/lw fixes
   - feature: WOL (wake on lan) module added (by Matthias)
   - feature: additional groups from /etc/groups are applied (Christopher)
-  - feature: EIB: introduce Get, interpret received values upon defined model (by datapoint types) (Maz)
+  - feature: updatefhem backup is using tar+gzip now
+  - feature: EIB: introduce Get, interpret received values upon defined model
+             (by datapoint types) (Maz)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
