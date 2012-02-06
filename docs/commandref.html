@@ -711,24 +711,23 @@ A line ending with \ will be concatenated with the next one, so long lines
     will be necessary to apply the changes.
     <br>
 
-    If backup is specified, then the old files are saved before overwriting
-    them. They are copied to the folder given in global <backupdir> or as
-    default to /tmp/FHEM_Backup.  Please check if the fhem user has the rights
-    to create a folder for backup.
+    If backup is specified, then the complete FHEM directory (containing the
+    modules and .gplot files) will be saved into a .tar.gz file with a
+    timestamp in the <a href="#modpath">modpath</a>/FHEM.backup directory or to
+    a directory specified by the <a href="#backupdir">backupdir</a> global
+    attribute. Note: tar and gzip must be installed to use this feature.
     <br>
     <br>
 
   <b>Attributes</b> <ul>
     <a name="backupdir"></a>
     <li>backupdir<br>
-      A folder where updatefhem can store all files from <a
-      href="#modpath">modpath</a> before executing the update. Please check if
-      the fhem user has the rights to create this folder.
+      A folder where updatefhem will store the compressed backup file.
+      Note: this is a global attribute.<br>Example:
+      <ul>
+        attr global backupdir /Volumes/BigHD<br>
+      </ul>
     </li><br>
-    Note: this is a global attribute, e.g.<br>
-    <ul>
-      attr global backup /Volumes/BigHD<br>
-    </ul>
   </ul><br>
 
 </ul>
