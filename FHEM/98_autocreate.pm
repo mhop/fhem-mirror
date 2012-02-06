@@ -292,10 +292,10 @@ my @usbtable = (
       define    => "CUL_PARAM CUL DEVICE\@9600 1PARAM34", },
 
     { NAME      => "TCM310",
-      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)"],
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)", "ttyACM(.*)"],
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
-      response  => "^\x00\xFF....",
+      response  => "^\x55\x00\x05\x01",
       define    => "TCM310_PARAM TCM 310 DEVICE\@57600", },
 
     { NAME      => "TCM120",
@@ -336,19 +336,21 @@ CommandUsb($$)
   if($^O eq "linux") {
     # One device at a time to avoid endless loop
     my $lsusb = `lsusb`;
-    my $culType;
-    $culType = "CUL_V4" if($lsusb =~ m/VID=03eb.PID=2ff0/s); # FritzBox
-    $culType = "CUL_V3" if($lsusb =~ m/VID=03eb.PID=2ff4/s); # FritzBox
-    $culType = "CUL_V2" if($lsusb =~ m/VID=03eb.PID=2ffa/s); # FritzBox
-    $culType = "CUL_V4" if($lsusb =~ m/03eb:2ff0/);
-    $culType = "CUL_V3" if($lsusb =~ m/03eb:2ff4/);
-    $culType = "CUL_V2" if($lsusb =~ m/03eb:2ffa/);
-    if($culType) {
-      $msg = "$culType: flash it with: CULflash none $culType";
-      Log 4, $msg; $ret .= $msg . "\n";
-      if(!$scan) {
-        CommandCULflash(undef, "none $culType");
-        sleep(4);      # Leave time for linux to load th drivers
+    if($lsusb) {
+      my $culType;
+      $culType = "CUL_V4" if($lsusb =~ m/VID=03eb.PID=2ff0/s); # FritzBox
+      $culType = "CUL_V3" if($lsusb =~ m/VID=03eb.PID=2ff4/s); # FritzBox
+      $culType = "CUL_V2" if($lsusb =~ m/VID=03eb.PID=2ffa/s); # FritzBox
+      $culType = "CUL_V4" if($lsusb =~ m/03eb:2ff0/);
+      $culType = "CUL_V3" if($lsusb =~ m/03eb:2ff4/);
+      $culType = "CUL_V2" if($lsusb =~ m/03eb:2ffa/);
+      if($culType) {
+        $msg = "$culType: flash it with: CULflash none $culType";
+        Log 4, $msg; $ret .= $msg . "\n";
+        if(!$scan) {
+          CommandCULflash(undef, "none $culType");
+          sleep(4);      # Leave time for linux to load th drivers
+        }
       }
     }
   }
@@ -362,7 +364,7 @@ CommandUsb($$)
           my $PARAM = $1;
           $PARAM =~ s/[^A-Za-z0-9]//g;
           my $name = $thash->{NAME};
-          $msg = "$dev: checking if it is a $name";
+          $msg = "### $dev: checking if it is a $name";
           Log 4, $msg; $ret .= $msg . "\n";
 
           # Check if it already used
@@ -370,7 +372,7 @@ CommandUsb($$)
             if($defs{$d}{DeviceName} &&
                $defs{$d}{DeviceName} =~ m/$dev/ &&
                $defs{$d}{FD}) {
-              $msg = "$dev: already used by the $d fhem device";
+              $msg = "already used by the $d fhem device";
               Log 4, $msg; $ret .= $msg . "\n";
               goto NEXTDEVICE;
             }
@@ -382,22 +384,21 @@ CommandUsb($$)
           my $hash = { NAME=>$name, DeviceName=>$dname };
           DevIo_OpenDev($hash, 0, 0);
           if(!defined($hash->{USBDev})) {
-            $msg = "$dev: Cannot open the device, check the log";
+            DevIo_CloseDev($hash);      # remove the ReadyFn loop
+            $msg = "cannot open the device";
             Log 4, $msg; $ret .= $msg . "\n";
             goto NEXTDEVICE;
           }
 
           # Clear the USB buffer
-          if($thash->{flush}) {
-            DevIo_SimpleWrite($hash, $thash->{flush}, 0);
-            DevIo_TimeoutRead($hash, 0.1);
-          }
+          DevIo_SimpleWrite($hash, $thash->{flush}, 0) if($thash->{flush});
+          DevIo_TimeoutRead($hash, 0.1);
           DevIo_SimpleWrite($hash, $thash->{request}, 0);
           my $answer = DevIo_TimeoutRead($hash, 0.1);
           DevIo_CloseDev($hash);
 
           if($answer !~ m/$thash->{response}/) {
-            $msg = "$dev: got wrong answer for a $name";
+            $msg = "got wrong answer for a $name";
             Log 4, $msg; $ret .= $msg . "\n";
             next;
           }
@@ -405,7 +406,7 @@ CommandUsb($$)
           my $define = $thash->{define};
           $define =~ s/PARAM/$PARAM/g;
           $define =~ s,DEVICE,$dir/$dev,g;
-          $msg = "$dev: create as a fhem device with: define $define";
+          $msg = "create as a fhem device with: define $define";
           Log 4, $msg; $ret .= $msg . "\n";
 
           if(!$scan) {
