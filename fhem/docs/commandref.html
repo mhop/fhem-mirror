@@ -1099,13 +1099,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         This attribute is DEPRECATED, use <a href="#notify">notify</a>, with
         the INITIALIZED event to execute commands after initialization.
     </li><br>
-    
+
     <a name="logfile"></a>
     <li>logfile<br>
         Specify the logfile to write.  You can use "-" for
         stdout, in this case the server won't background itself.<br>
         The logfile name can also take wildcards for easier logfile rotation,
-        see the <a href="#FileLog">FileLog</a> section. Just apply the 
+        see the <a href="#FileLog">FileLog</a> section. Just apply the
         <code>archivecmd / archivedir / nrarchive</code> attributes to the
         <code>global</code> device as you would do for a FileLog device.<br>
         You can access the current name of the logfile with
@@ -2265,7 +2265,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   Note: this module may require the Device::SerialPort or Win32::SerialPort
   module if you attach the device via USB and the OS sets strange default
   parameters for serial devices.
-  
+
 
   </td><td>
   <img src="ccc.jpg"/>
@@ -2627,8 +2627,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <a name="irLearnForSec"></a>
     <li>irLearnForSec<br>
-       Sets the CUL_IR device in an IR-Code Learning mode for the given seconds. Any received IR-Code will 
-       be stored as a Button attribute for this devices. The name of these attributes is dependent on the two 
+       Sets the CUL_IR device in an IR-Code Learning mode for the given seconds. Any received IR-Code will
+       be stored as a Button attribute for this devices. The name of these attributes is dependent on the two
        attributes <a href="#CUL_IRattr">learncount</a> and <a href="#CUL_IRattr">learnprefix</a>.<br>
        Attention: Before learning IR-Codes the CUL_IR device needs to be set in IR-Receiving mode
        by modifying the <a href="#irReceive">irReceive</a> attribute.
@@ -2649,8 +2649,8 @@ A line ending with \ will be concatenated with the next one, so long lines
 	   Example: <br>
    	   <code>set IR-Dev irSend 0A07070F0F02<br>
 	   set IR-Dev irSend I0A07070F0F00 </code>
-	   
-     </li> 
+
+     </li>
   </ul>
 
   <a name="CUL_IRget"></a>
@@ -2671,11 +2671,11 @@ A line ending with \ will be concatenated with the next one, so long lines
             Switching off the reception of IR signals. This is the default.
 
         <li>ON<br>
-            Switching on the reception of IR signals. This is WITHOUT filtering repetitions. This is 
+            Switching on the reception of IR signals. This is WITHOUT filtering repetitions. This is
             not recommended as many remote controls do repeat their signals.
 
         <li>ON_NR<br>
-            Switching on the reception of IR signals with filtering of repetitions. This is 
+            Switching on the reception of IR signals with filtering of repetitions. This is
             the recommended modus operandi.
         </ul>
     </li><br>
@@ -2686,7 +2686,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         <pre>
         Button&lt;learnprefix&gt;&lt;learncount&gt;
         </pre>
-        When the CUL_IR device is set into <a href="#irLearnForSec">learning mode</a> it will generate a 
+        When the CUL_IR device is set into <a href="#irLearnForSec">learning mode</a> it will generate a
         new button-attribute for each new IR-Code received.This is done according to the following syntax:<br>
         <pre>
         &lt;Button-Attribute-Name&gt; &lt;IR-Code&gt;</pre>
@@ -2694,7 +2694,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         <pre>
         Button001   I02029A000000
         Button002   I02029A000001</pre>
-        To make sure that something happens when this IR-code is received later on one has to modify the attribute 
+        To make sure that something happens when this IR-code is received later on one has to modify the attribute
         and to add commands as attribute values.
         Examples:
         <pre>
@@ -2728,7 +2728,7 @@ A line ending with \ will be concatenated with the next one, so long lines
         Button&lt;learnprefix&gt;&lt;learncount&gt;    </pre>
         If learnprefix is empty the button-attribute-name only contains the term
         "Button" and the actual number of <a href="#learncount">learncount</a>.
-    </li><br> 
+    </li><br>
   </ul>
   <br>
 </ul>
@@ -3215,19 +3215,19 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="EIB"></a>
 <h3>EIB / KNX</h3>
 <ul>
-  EIB/KNX is a standard for building automation / home automation. 
+  EIB/KNX is a standard for building automation / home automation.
   It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.
-  
-  While the module <a href="#TUL">TUL</a> represents the connection to the EIB network, 
-  the EIB modules represent individual EIB devices. This module provides a basic set of operations (on, off, on-till, etc.) 
-  to switch on/off EIB devices. Sophisticated setups can be achieved by combining a number of 
+
+  While the module <a href="#TUL">TUL</a> represents the connection to the EIB network,
+  the EIB modules represent individual EIB devices. This module provides a basic set of operations (on, off, on-till, etc.)
+  to switch on/off EIB devices. Sophisticated setups can be achieved by combining a number of
   EIB module instances or by sending raw hex values to the network (set <devname> raw <hexval>).
-  
-  EIB/KNX defines a series of Datapoint Type as standard data types used 
-  to allow general interpretation of values of devices manufactured by diferent companies. 
-  This datatypes are used to interpret the status of a device, so the state in FHEM will then 
-  show the correct value.  
-    
+
+  EIB/KNX defines a series of Datapoint Type as standard data types used
+  to allow general interpretation of values of devices manufactured by diferent companies.
+  This datatypes are used to interpret the status of a device, so the state in FHEM will then
+  show the correct value.
+
   <br><br>
   <a name="EIBdefine"></a>
   <b>Define</b>
@@ -3236,12 +3236,12 @@ A line ending with \ will be concatenated with the next one, so long lines
     <br><br>
 
     Define an EIB device, connected via a <a href="#TUL">TUL</a>. The
-    &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff). 
-    The &lt;main group&gt;  is used for sending of commands to the EIB network. 
-    The state of the instance will be updated when a new state is received from the network for any of the given groups. 
-    This is usefull for example for toggle switches where a on command is send to one group and the real state (on or off) is 
+    &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff).
+    The &lt;main group&gt;  is used for sending of commands to the EIB network.
+    The state of the instance will be updated when a new state is received from the network for any of the given groups.
+    This is usefull for example for toggle switches where a on command is send to one group and the real state (on or off) is
     responded back on a second group.
-    
+
     For actors and sensors the
     <a href="#autocreate">autocreate</a> module may help.<br>
 
@@ -3264,7 +3264,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.
 	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.
     <li><b>value</b> <hexvalue> sends the given value as raw data to the device.
-    
+
     <br>Example:
     <ul><code>
       set lamp1 on<br>
@@ -3278,7 +3278,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     </ul>
   </ul>
   <br>
-  
+
   <a name="EIBattr"></a>
   <b>Attributes</b>
   <ul>
@@ -3315,7 +3315,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     </li>
   </ul>
   <br>
-  
+
 
 <a name="EnOcean"></a>
 <h3>EnOcean</h3>
@@ -3463,7 +3463,7 @@ A line ending with \ will be concatenated with the next one, so long lines
          subType must be MD15. This is done if the device was created by
          autocreate.<br>
      <ul>
-       <li>$actuator %      
+       <li>$actuator %
        <li>currentValue: $actuator
        <li>serviceOn: [yes|no]
        <li>energyInput: [enabled|disabled]
@@ -3767,7 +3767,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
-  
+
   <a name="KM271events"></a>
   <b>Generated events:</b>
   <ul>
@@ -3998,9 +3998,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>define &lt;name&gt; WOL &lt;MAC&gt; &lt;IP&gt;
           &lt;unitcode&gt;</code>
     <br><br>
-    
+
     Defines a WOL device via its MAC and IP address.<br><br>
-    
+
     Example:
     <ul>
       <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24</code><br>
@@ -4011,7 +4011,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>For other computers the WOL implementation of <a href="http://search.cpan.org/~clintdw/Net-Wake-0.02/lib/Net/Wake.pm">Net::Wake</a> is used</li>
     </ul>
   </ul>
-  
+
   <a name="WOLset"></a>
   <b>Set </b>
   <ul>
@@ -4022,7 +4022,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     refresh           # checks whether the computer is currently running
     on                # sends a magic packet to the defined MAC address
     </pre>
-    
+
     Examples:
     <ul>
       <code>set computer1 on</code><br>
@@ -4276,7 +4276,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
 
-    The optional language parameter may be one of <code>en</code>, <code>de</code>, <code>fr</code>, 
+    The optional language parameter may be one of <code>en</code>, <code>de</code>, <code>fr</code>,
     <code>es</code>. It determines the natural language in which the forecast information appears.
     It defaults to en. If you want to set the language you also have to set the interval.<br><br>
 
@@ -4735,8 +4735,8 @@ Attributes:<br>
 <ul>
   The InterTechno 433MHZ protocol is used by a wide range of devices, which are either of
   the sender/sensor category or the receiver/actuator category. As we right now are only
-  able to SEND InterTechno commands, but CAN'T receive them, this module at the moment 
-  supports just switches devices like switches, dimmers, etc. through an an 
+  able to SEND InterTechno commands, but CAN'T receive them, this module at the moment
+  supports just switches devices like switches, dimmers, etc. through an an
   <a href="#CUL">CUL</a> device, so this must be defined first.
 
   <br><br>
@@ -4748,7 +4748,7 @@ Attributes:<br>
     [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
     <br><br>
 
-   The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is 
+   The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is
    defined as a tri-state protocol. These digits depend on your device you are using.
    <br>
    Bit 11/12 are used for switching/dimming. As different manufacturers are using
@@ -4759,13 +4759,13 @@ Attributes:<br>
    <ul>
    <li><code>&lt;housecode&gt;</code> is a 10 digit tri-state number (0/1/F) depending on
 	 your device setting (see list below).</li>
-   <li><code>&lt;on-code&gt;</code> is a 2 digit tri-state number for switching your device on; 
+   <li><code>&lt;on-code&gt;</code> is a 2 digit tri-state number for switching your device on;
      It is appended to the housecode to build the 12-digits IT-Message.</li>
-   <li><code>&lt;off-code&gt;</code> is a 2 digit tri-state number for switching your device off; 
+   <li><code>&lt;off-code&gt;</code> is a 2 digit tri-state number for switching your device off;
      It is appended to the housecode to build the 12-digits IT-Message.</li>
-   <li>The optional <code>&lt;dimup-code&gt;</code> is a 2 digit tri-state number for dimming your device up; 
+   <li>The optional <code>&lt;dimup-code&gt;</code> is a 2 digit tri-state number for dimming your device up;
      It is appended to the housecode to build the 12-digits IT-Message.</li>
-   <li>The optional <code>&lt;dimdown-code&gt;</code> is a 2 digit tri-state number for dimming your device down; 
+   <li>The optional <code>&lt;dimdown-code&gt;</code> is a 2 digit tri-state number for dimming your device down;
      It is appended to the housecode to build the 12-digits IT-Message.</li>
    </ul>
    <br>
@@ -4790,7 +4790,7 @@ Attributes:<br>
     dimdown
     dimup
     off
-    on         
+    on
     on-till           # Special, see the note
 </pre>
     Examples:
@@ -5123,10 +5123,10 @@ Attributes:<br>
           observe the log file.</li>
       </ul><br><br>
 
-      Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a> 
+      Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a>
       for the <code>&lt;perl command&gt</code> in the postprocessor definitions nor can it contain macros.
       This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>
-    
+
       The <code>perl command</code> acts on <code>$_</code>. The result of the perl command is the
       final result of the get or set command.
     </ul>
@@ -6511,10 +6511,10 @@ Terminating
   <b>Define</b>
   <ul>
 
-    <li><code>define &lt;name&gt; NetIO230B &lt;ip-address&gt; &lt;socket number
+    <li><code>define &lt;name&gt; NetIO230B &lt;ip-address&gt; &lt;socket number(s)
     &gt; [&lt;user name&gt; &lt;password&gt;]</code></li>
 
-    <li><code>define &lt;name&gt; NetIO230B &lt;ip-address&gt; &lt;socket number
+    <li><code>define &lt;name&gt; NetIO230B &lt;ip-address&gt; &lt;socket number(s)
     &gt; [&lt;config file path&gt;]</code></li>
 
     <p>
@@ -6899,9 +6899,9 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 
   <table>
   <tr><td>
-  The TUL module is the representation of a EIB / KNX connector in FHEM. 
+  The TUL module is the representation of a EIB / KNX connector in FHEM.
   <a href="#EIB">EIB</a> instances represent the EIB / KNX devices and will need a TUL as IODev to communicate with the EIB / KNX network.<br>
-  The TUL module is designed to connect to EIB network either using EIBD or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de    
+  The TUL module is designed to connect to EIB network either using EIBD or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de
 
   Note: this module may require the Device::SerialPort or Win32::SerialPort
   module if you attach the device via USB and the OS sets strange default
@@ -6929,10 +6929,10 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 
       You can also specify a baudrate if the device name contains the @
       character, e.g.: /dev/ttyACM0@19200<br><br>
-	  Note: For TUL usb stick the baudrate 19200 is needed and this is the default 
-	  when no baudrate is given.      
+	  Note: For TUL usb stick the baudrate 19200 is needed and this is the default
+	  when no baudrate is given.
 	  <br><br>
-	  
+
 	  Example:<br>
 	  <code>define tul TUL tul:/dev/ttyACM0 1.1.249</code>
     </ul>
@@ -6940,7 +6940,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     &lt;device&gt; specifies the host:port of the eibd device. E.g.
     eibd:192.168.0.244:2323. When using the standard port, the port can be omitted.
     <br><br>
-	  
+
 	  Example:<br>
 	  <code>define tul TUL eibd:localhost 1.1.249</code>
     </ul>
@@ -6956,7 +6956,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
   <b>Set </b>
   <ul>
     <li>raw<br>
-        Issue a TUL raw telegram message 
+        Issue a TUL raw telegram message
         </li><br>
   </ul>
 
@@ -7250,7 +7250,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         devices (i.e. tablets)<br>
         Note: The default configuration installed with make install-pgm2
         installs 2 FHEMWEB instances: port 8083 for desktop browsers and
-        port 8084 for smallscreen browsers, both using SVG rendering. 
+        port 8084 for smallscreen browsers, both using SVG rendering.
         On Android SVG is supported by Opera/Firefox.<br>
 
         WebApp suppport if specifying one of the above options: After viewing
@@ -8255,7 +8255,7 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
         will be replaced with the name of the old logfile.<br>
 
         If this attribute is not set, but nrarchive and/or archivecmd are set,
-        then nrarchive logfiles are kept while older ones are moved to 
+        then nrarchive logfiles are kept while older ones are moved to
         archivedir (or deleted if archivedir is not set).
         </li><br>
 
@@ -8746,7 +8746,7 @@ isday</pre>
         <br><br>
       <li>OldValue(&lt;devicename&gt;)
       <li>OldTimestamp(&lt;devicename&gt;)<br>
-        returns the old value/timestamp of the device. 
+        returns the old value/timestamp of the device.
         <br><br>
       <li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
@@ -8870,7 +8870,7 @@ The .gnuplot file consists of 3 parts:
         plots of the lineytype "lines" will have an additional starting and
         ending segment, so that filling is done correctly.<br>
         See the SVG spec for details of this CSS file.
-        Note: if you plan to use this attribute, you have to specify it for all 
+        Note: if you plan to use this attribute, you have to specify it for all
         the lines (attribute-blocks) in the plot command.
         </li>
       <li>lw &lt;linewidth&gt;<br>
