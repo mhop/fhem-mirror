@@ -1,5 +1,5 @@
 ##############################################
-# $Id$
+# $Id: 10_EnOcean.pm 1130 2011-12-14 07:57:59Z rudolfkoenig $
 package main;
 
 use strict;
@@ -188,7 +188,7 @@ EnOcean_Set($@)
 
    } elsif($st eq "eltakoDimmer") {
      my $sendDimCmd=0;
-		 my $time=AttrVal($name, "dimTime", 0);
+		 my $time=AttrVal($name, "time", 0);
 		 my $onoff=1;
      my $dimVal=100;
      $dimVal=$hash->{VALUE} if(defined $hash->{VALUE});
@@ -200,7 +200,7 @@ EnOcean_Set($@)
        IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
 
      } elsif($cmd eq "dimto") {
-       return "Usage: $cmd percent" if(@a<2);
+       return "Usage: $cmd percent" if(@a<2 or $a[1]>100);
        # for eltako relative (0-100) (but not compliant to EEP because DB0.2 is 0)
        $dimVal=$a[1];
        shift(@a);
@@ -250,17 +250,38 @@ EnOcean_Set($@)
        IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
      } else {
 			 my %eltakoRollCtrlCommands = ( down=>0x02, up=>0x01, stop=>0x00 );
-       my $usage = "Usage: (" . join("|", sort keys %eltakoRollCtrlCommands) . ") [time 0-255 sek]";
+       my $usage = "Usage: (" . join("|", sort keys %eltakoRollCtrlCommands) . ")";
        my $rollcmd= $eltakoRollCtrlCommands{$cmd};
-			 return $usage if( (!defined($rollcmd)) or (@a<1) );
-       my $time=0;
-       if(defined($a[1])) { $time=$a[1]; shift(@a); } # time
+			 return $usage if(!defined($rollcmd));
+			 my $time=AttrVal($name, "time", 0);
        # EEP: A5/3F/7F Universal ???
        my $idSrc=EnOcean_GetMyDeviceId($hash);
        my $data=sprintf("A5%02X%02X%02X%02X%s00", 0, $time, $rollcmd, 0x08, $idSrc);
        IOWrite($hash, "000A0001", $data);
        Log $ll2, "eltakoRoll.$cmd" . $data;
-     }
+		 }
+
+	 ###########################
+
+   } elsif($st eq "eltakoRollCtrl") {
+     if($cmd eq "teach") {
+      my $data=sprintf("A5FFF80D80%s00", $hash->{DEF});
+      Log $ll2, "eltakoRollCtrl.Teach: " . $data;
+       IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
+
+     } else {
+			 my %eltakoRollCtrlCommands = ( down=>0x02, up=>0x01, stop=>0x00 );
+       my $usage = "Usage: (" . join("|", sort keys %eltakoRollCtrlCommands) . ") [time 0-255 sek]";
+       my $rollcmd= $eltakoRollCtrlCommands{$cmd};
+			 return $usage if( (!defined($rollcmd)) or (@a<1) );
+       my $time=0;
+       if(defined($a[1])) { $time=$a[1]; } # time
+       shift(@a);
+       # EEP: A5/3F/7F Universal ???
+       my $data=sprintf("A5%02X%02X%02X%02X%s00", 0, $time, $rollcmd, 0x08, $hash->{DEF});
+       IOWrite($hash, "000A0001", $data);
+       Log $ll2, "eltakoRollCtrl.$cmd" . $data;
+		 }
 
     ###########################
     } else {                                          # Simulate a PTM
@@ -273,14 +294,14 @@ EnOcean_Set($@)
       my ($db_3, $status) = split(":", $EnO_ptm200btn{$c1}, 2);
       $db_3 <<= 5;
       $db_3 |= 0x10 if($c1 ne "released"); # set the pressed flag
-      if($c2) {
+		 if($c2) {
         my ($d2, undef) = split(":", $EnO_ptm200btn{$c2}, 2);
-        $db_3 |= ($d2<<1) | 0x01;
-      }
-      IOWrite($hash, "",
-                sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
+			 $db_3 |= ($d2<<1) | 0x01;
+		 }
+		 IOWrite($hash, "",
+						 sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
 
-    }
+	 }
 
     select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
   }
