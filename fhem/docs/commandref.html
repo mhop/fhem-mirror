@@ -2949,7 +2949,7 @@ A line ending with \ will be concatenated with the next one, so long lines
              party-temp &lt;tmp&gt;<br>
              desired-temp &lt;tmp&gt;<br>
              Set different temperatures. Temp must be between 6 and 30
-             Celsius, and precision is half a degree.
+             Celsius, and precision is half a degree.</li>
          <li>tempListSat HH:MM temp ... 24:00 temp<br>
              tempListSun HH:MM temp ... 24:00 temp<br>
              tempListMon HH:MM temp ... 24:00 temp<br>
@@ -2961,6 +2961,13 @@ A line ending with \ will be concatenated with the next one, so long lines
              specified for each week day, the resolution is 10 Minutes. The
              last time spec must always be 24:00.<br>
              Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
+             Meaning: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
+             22.5, thereafter until midnight, 19 degrees celsius is desired.</li>
+         <li>displayMode [temp-only|temp-hum]<br>
+             displayTemp [actual|setpoint]<br>
+             displayTempUnit [celsius|fahrenheit]<br>
+             controlMode [manual|auto|central|party]<br>
+             decalcDay &lt;day&gt;</li>
        </ul></li>
      </ul>
      <br>
