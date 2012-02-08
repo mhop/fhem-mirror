@@ -480,7 +480,7 @@ CUL_HM_Parse($$)
     }
 
     if($cmd eq "8002" && $p =~ m/^0102(..)(....)/) { # Ack for fhem-command
-      push @event, "desired-temp:" .hex($1)/2;
+      push @event, "desired-temp-ack:" .hex($1)/2;
     }
 
     CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
