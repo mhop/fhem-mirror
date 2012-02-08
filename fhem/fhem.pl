@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-20011
+#  (c) 2005-20012
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -157,8 +157,10 @@ use vars qw($reread_active);
 my $AttrList = "room comment alias";
 
 my $server;			# Server socket
+my %comments;			# Comments from the include files
 my $ipv6;			# Using IPV6
 my $currlogfile;		# logfile, without wildcards
+my $currcfgfile="";		# current config/include file
 my $logopened = 0;              # logfile opened or using stdout
 my %client;			# Client array
 my $rcvdquit;			# Used for quit handling in init files
@@ -306,7 +308,7 @@ setGlobalAttrBeforeFork();
 
 if($^O =~ m/Win/ && !$attr{global}{nofork}) {
   Log 1, "Forcing 'attr global nofork' on WINDOWS";
-  Log 1, "set it in the config file to avoud this message";
+  Log 1, "set it in the config file to avoid this message";
   $attr{global}{nofork}=1;
 }
 
@@ -658,7 +660,20 @@ AnalyzeCommandChain($$)
   my ($c, $cmd) = @_;
   my @ret;
 
+  if($cmd =~ m/^[ \t]*(#.*)?$/) {      # Save comments
+    if(!$init_done) {
+      if($currcfgfile ne AttrVal("global", "statefile", "")) {
+        my $nr =  $devcount++;
+        $comments{$nr}{TEXT} = $cmd;
+        $comments{$nr}{CFGFN} = $currcfgfile
+            if($currcfgfile ne AttrVal("global", "configfile", ""));
+      }
+    }
+    return undef;
+  }
+
   $cmd =~ s/#.*$//s;
+
   $cmd =~ s/;;/SeMiCoLoN/g;
   foreach my $subcmd (split(";", $cmd)) {
     $subcmd =~ s/SeMiCoLoN/;/g;
@@ -834,10 +849,22 @@ CommandInclude($$)
   my ($cl, $arg) = @_;
   my $fh;
   my @ret;
+  my $oldcfgfile;
 
   if(!open($fh, $arg)) {
     return "Can't open $arg: $!";
   }
+
+  if(!$init_done &&
+     $arg ne AttrVal("global", "statefile", "") &&
+     $arg ne AttrVal("global", "configfile", "")) {
+    my $nr =  $devcount++;
+    $comments{$nr}{TEXT} = "include $arg";
+    $comments{$nr}{CFGFN} = $currcfgfile
+          if($currcfgfile ne AttrVal("global", "configfile", ""));
+  }
+  $oldcfgfile  = $currcfgfile;
+  $currcfgfile = $arg;
 
   my $bigcmd = "";
   $rcvdquit = 0;
@@ -854,6 +881,7 @@ CommandInclude($$)
     last if($rcvdquit);
 
   }
+  $currcfgfile = $oldcfgfile;
   close($fh);
   return join("\n", @ret) if(@ret);
   return undef;
@@ -1012,31 +1040,58 @@ CommandSave($$)
   if(!open(SFH, ">$param")) {
     return "Cannot open $param: $!";
   }
+  my %fh = ("configfile" => *SFH);
 
-  foreach my $d (sort { $defs{$a}{NR} <=> $defs{$b}{NR} } keys %defs) {
-    next if($defs{$d}{TEMPORARY} || # e.g. WEBPGM connections
-            $defs{$d}{VOLATILE});   # e.g at, will be saved to the statefile
+  my %devByNr;
+  map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
+
+  for(my $i = 0; $i < $devcount; $i++) {
+
+    my ($h, $d);
+    if($comments{$i}) {
+      $h = $comments{$i};
+
+    } else {
+      $d = $devByNr{$i};
+      next if(!defined($d) ||
+              $defs{$d}{TEMPORARY} || # e.g. WEBPGM connections
+              $defs{$d}{VOLATILE});   # e.g at, will be saved to the statefile
+      $h = $defs{$d};
+    }
+
+    my $cfgfile = $h->{CFGFN} ? $h->{CFGFN} : "configfile";
+    my $fh = $fh{$cfgfile};
+    if(!$fh) {
+      return "Can't open $cfgfile: $!" if(!(open($fh, ">$cfgfile")));
+      $fh{$cfgfile} = $fh;
+    }
+
+    if(!defined($d)) {
+      print $fh $h->{TEXT},"\n";
+      next;
+    }
 
     if($d ne "global") {
       if($defs{$d}{DEF}) {
         my $def = $defs{$d}{DEF};
         $def =~ s/;/;;/g;
-        print SFH "\ndefine $d $defs{$d}{TYPE} $def\n";
+        print $fh "define $d $defs{$d}{TYPE} $def\n";
       } else {
-        print SFH "\ndefine $d $defs{$d}{TYPE}\n";
+        print $fh "define $d $defs{$d}{TYPE}\n";
       }
     }
     foreach my $a (sort keys %{$attr{$d}}) {
       next if($d eq "global" &&
               ($a eq "configfile" || $a eq "version"));
-      print SFH "attr $d $a $attr{$d}{$a}\n";
+      print $fh "attr $d $a $attr{$d}{$a}\n";
     }
   }
   print SFH "include $attr{global}{lastinclude}\n"
         if($attr{global}{lastinclude});
 
-
-  close(SFH);
+  foreach my $fh (values %fh) {
+    close($fh);
+  }
   return undef;
 }
 
@@ -1193,6 +1248,8 @@ CommandDefine($$)
   $hash{STATE} = "???";
   $hash{DEF}   = $a[2] if(int(@a) > 2);
   $hash{NR}    = $devcount++;
+  $hash{CFGFN} = $currcfgfile
+        if($currcfgfile ne AttrVal("global", "configfile", ""));
 
   # If the device wants to issue initialization gets/sets, then it needs to be
   # in the global hash.
