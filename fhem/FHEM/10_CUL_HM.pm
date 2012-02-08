@@ -367,9 +367,9 @@ CUL_HM_Parse($$)
       my $msg;
       if($plist == 5) {
       	if($o1 eq "05") {
-	  $msg = sprintf("windowopen-temp-%d: %.1f (sensor:%s)",
+          $msg = sprintf("windowopen-temp-%d: %.1f (sensor:%s)",
                         $tchan, $v1/2, $tdev);
-	}
+        }
       }
       push @event, $msg if $msg;
     }
@@ -396,7 +396,7 @@ CUL_HM_Parse($$)
         my $dayidx = int($idx/48);
         if($idx % 4 == 0 && $dayidx < $maxdays) {
           $idx -= 48*$dayidx;
-	  $idx /= 2;
+          $idx /= 2;
           my $ptr = $shash->{TEMPLIST}{$days[$dayidx+$dayoff]};
           $ptr->{$idx}{HOUR} = int($v1/6);
           $ptr->{$idx}{MINUTE} = ($v1 - int($v1/6)*6)*10;
@@ -408,25 +408,60 @@ CUL_HM_Parse($$)
       }
 
       foreach my $wd (@days) {
-	my $twentyfour = 0;
+        my $twentyfour = 0;
         my $msg = sprintf("tempList%s:", $wd);
         foreach(my $idx=0; $idx<24; $idx+=1) {
           my $ptr = $shash->{TEMPLIST}{$wd}{$idx};
           if(defined ($ptr->{TEMP}) && $ptr->{TEMP} ne "") {
-	    if($twentyfour == 0) {
+            if($twentyfour == 0) {
               $msg .= sprintf(" %02d:%02d %.1f",
                                 $ptr->{HOUR}, $ptr->{MINUTE}, $ptr->{TEMP});
-	    } else {
-	      $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
+            } else {
+              $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
 
-	    }
+            }
           }
           if(defined ($ptr->{HOUR}) && 0+$ptr->{HOUR} == 24) {
-	    $twentyfour = 1;  # next value uninteresting, only first counts.
-	  }
+            $twentyfour = 1;  # next value uninteresting, only first counts.
+          }
       	}
         push @event, $msg if($msg);
       }
+#                                      0402000000000501090000
+    } elsif($cmd eq "A410" && $p =~ m/^0402000000000(.)(..)(..)/) {
+      my ($plist, $o1,    $v1) =
+         (hex($1),hex($2),hex($3));
+      my $msg;
+      my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+      if($plist == 5) {
+        $msg = sprintf("param-change: offset=%s, value=%s", $o1, $v1);
+      	if($o1 == 1) { ### bitfield containing multiple values...
+          $msg = "displayMode:temperature only" if ($v1 & 1) == 0;
+          $msg = "displayMode:temperature and humidity" if ($v1 & 1) == 1;
+          push @event, $msg if $msg;
+          $msg = "displayTemp:actual" if ($v1 & 2) == 0;
+          $msg = "displayTemp:setpoint" if ($v1 & 2) == 2;
+          push @event, $msg if $msg;
+          $msg = "displayTempUnit:celsius" if ($v1 & 4) == 0;
+          $msg = "displayTempUnit:fahrenheit" if ($v1 & 4) == 4;
+          push @event, $msg if $msg;
+          $msg = "controlMode:manual" if ($v1 & 0x18) == 0;
+          $msg = "controlMode:auto" if ($v1 & 0x18) == 8;
+          $msg = "controlMode:central" if ($v1 & 0x18) == 0x10;
+          $msg = "controlMode:party" if ($v1 & 0x18) == 0x18;
+          push @event, $msg if $msg;
+          my $day = $days[($v1 & 0xE0) - 0xD9 + 1];
+          $msg = sprintf("decalcDay:%s", $day);
+
+          # remember state for subsequent set operations
+          $shash->{helper}{state251} = $v1;
+        } elsif($o1 == 2) {
+          $msg = "tempValveMode:Auto" if ($v1 & 0xC0) == 0;
+          $msg = "tempValveMode:Closed" if ($v1 & 0xC0) == 0x40;
+          $msg = "tempValveMode:Open" if ($v1 & 0xC0) == 0x80;
+        }
+      }
+      push @event, $msg if $msg;
     }
 
     if($cmd eq "A001" && $p =~ m/^01080900(..)(..)/) {
@@ -441,6 +476,10 @@ CUL_HM_Parse($$)
     }
 
     if($cmd eq "A112" && $p =~ m/^0202(..)$/) { # Set desired temp
+      push @event, "desired-temp:" .hex($1)/2;
+    }
+
+    if($cmd eq "8002" && $p =~ m/^0102(..)(....)/) { # Ack for fhem-command
       push @event, "desired-temp:" .hex($1)/2;
     }
 
@@ -717,6 +756,7 @@ CUL_HM_Parse($$)
   }
 
   #push @event, "unknownMsg:$p" if(!@event);
+  push @event, "unknownMsg:($cmd) $p" if(!@event);
 
   my @changed;
   for(my $i = 0; $i < int(@event); $i++) {
@@ -760,6 +800,23 @@ CUL_HM_Parse($$)
   return $name;
 }
 
+###################################
+sub
+CUL_HM_TC_missing($)
+{
+  #
+  # find out missing configuration parameters
+  #
+  my ($hash) = @_ ;
+  my $missingSettings = "please complete settings for ";
+  $missingSettings .= "displayTemp " unless($hash->{READINGS}{displayTemp}{VAL});
+  $missingSettings .= "displayTempUnit " unless($hash->{READINGS}{displayTempUnit}{VAL});
+  $missingSettings .= "displayMode " unless($hash->{READINGS}{displayMode}{VAL});
+  $missingSettings .= "controlMode " unless($hash->{READINGS}{controlMode}{VAL});
+  $missingSettings .= "decalcDay " unless($hash->{READINGS}{decalcDay}{VAL});
+  return $missingSettings;
+}
+
 my %culHmGlobalSets = (
   raw      => "data ...",
   reset    => "",
@@ -797,6 +854,11 @@ my %culHmModelSets = (
           "tempListThu"=> "HH:MM temp ...",
           "tempListWed"=> "HH:MM temp ...",
           "tempListFri"=> "HH:MM temp ...",
+          "displayMode"  => "[temp-only|temp-hum]",
+          "displayTemp"  => "[actual|setpoint]",
+          "displayTempUnit" => "[celsius|fahrenheit]",
+          "controlMode"  => "[manual|auto|central|party]",
+          "decalcDay"    => "day",
         },
 );
 
@@ -829,6 +891,10 @@ CUL_HM_Set($@)
 
   my $isSender = (AttrVal($name,"hmClass","") eq "sender" || $md eq "HM-CC-TC");
 
+  # HM-CC-TC control mode bits for day encoding
+  my %tc_day2bits = ( "Sat"=>"0", "Sun"=>"0x20", "Mon"=>"0x40",
+        	      "Tue"=>"0x60", "Wed"=>"0x80", "Thu"=>"0xA0",
+        	      "Fri"=>"0xC0");
 
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
     $cmd = "pct";
@@ -938,6 +1004,198 @@ CUL_HM_Set($@)
     $l1 .= $l2;
 
     CUL_HM_pushConfig($hash, $id, $dst, $bn, 1, $l1);
+
+  } elsif($cmd =~ m/^displayMode$/) { ###############################
+    my $tcnf;
+    if($hash->{helper}{state251}) {
+      $tcnf = $hash->{helper}{state251};
+      if($a[2] eq "temp-only") {
+        $tcnf &= 0xFE;
+      } else {
+        $tcnf |= 0x1;
+      }
+    } else {
+      # look if index 1 subfields are complete, construct state251,
+      # if incomplete, issue errormessage, set reading and wait for
+      # completion of state251
+      if($hash->{READINGS}{displayTemp}{VAL} &&
+         $hash->{READINGS}{displayTempUnit}{VAL} &&
+         $hash->{READINGS}{controlMode}{VAL} &&
+         $hash->{READINGS}{decalcDay}{VAL}) {
+        
+        $tcnf = 0;
+        $tcnf |= 1 if($a[2] ne "temp-only");	# the parameter actually to be changed
+        $tcnf |= 2 if($hash->{READINGS}{displayTemp}{VAL} eq "setpoint");
+        $tcnf |= 4 if($hash->{READINGS}{displayTempUnit}{VAL} eq "fahrenheit");
+        $tcnf |= 8 if($hash->{READINGS}{controlMode}{VAL} eq "auto");
+        $tcnf |= 0x10 if($hash->{READINGS}{controlMode}{VAL} eq "central");
+        $tcnf |= 0x18 if($hash->{READINGS}{controlMode}{VAL} eq "party");
+        my $dbit = $tc_day2bits{$hash->{READINGS}{decalcDay}{VAL}};
+        $tcnf |= $dbit;
+      } else {
+        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+        $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+        return CUL_HM_TC_missing($hash);
+      }
+    }
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    $hash->{helper}{state251} = $tcnf;
+    $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+    $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+    return;
+
+  } elsif($cmd =~ m/^displayTemp$/) { ###############################
+    my $tcnf;
+    if($hash->{helper}{state251}) {
+      $tcnf = $hash->{helper}{state251};
+      if($a[2] eq "setpoint") {
+        $tcnf &= 0xFD;
+      } else {
+        $tcnf |= 0x2;
+      }
+    } else {
+      # look if index 1 subfields are complete, construct state251,
+      # if incomplete, issue errormessage, set reading and wait for
+      # completion of state251
+      if($hash->{READINGS}{displayMode}{VAL} &&
+         $hash->{READINGS}{displayTempUnit}{VAL} &&
+         $hash->{READINGS}{controlMode}{VAL} &&
+         $hash->{READINGS}{decalcDay}{VAL}) {
+        
+        $tcnf = 0;
+        $tcnf |= 1 if($hash->{READINGS}{displayMode}{VAL} ne "temp-only");
+        $tcnf |= 2 if($a[2] ne "setpoint");	# the parameter actually to be changed
+        $tcnf |= 4 if($hash->{READINGS}{displayTempUnit}{VAL} eq "fahrenheit");
+        $tcnf |= 8 if($hash->{READINGS}{controlMode}{VAL} eq "auto");
+        $tcnf |= 0x10 if($hash->{READINGS}{controlMode}{VAL} eq "central");
+        $tcnf |= 0x18 if($hash->{READINGS}{controlMode}{VAL} eq "party");
+        my $dbit = $tc_day2bits{$hash->{READINGS}{decalcDay}{VAL}};
+        $tcnf |= $dbit;
+      } else {
+        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+        $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+        return CUL_HM_TC_missing($hash);
+      }
+    }
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    $hash->{helper}{state251} = $tcnf;
+    $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+    $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+    return;
+
+  } elsif($cmd =~ m/^displayTempUnit$/) { ###############################
+    my $tcnf;
+    if($hash->{helper}{state251}) {
+      $tcnf = $hash->{helper}{state251};
+      if($a[2] eq "celsius") {
+        $tcnf &= 0xFD;
+      } else {
+        $tcnf |= 0xFB;
+      }
+    } else {
+      # look if index 1 subfields are complete, construct state251,
+      # if incomplete, issue errormessage, set reading and wait for
+      # completion of state251
+      if($hash->{READINGS}{displayTemp}{VAL} &&
+         $hash->{READINGS}{displayMode}{VAL} &&
+         $hash->{READINGS}{controlMode}{VAL} &&
+         $hash->{READINGS}{decalcDay}{VAL}) {
+        
+        $tcnf = 0;
+        $tcnf |= 1 if($hash->{READINGS}{displayMode}{VAL} ne "temp-only");
+        $tcnf |= 2 if($hash->{READINGS}{displayTemp}{VAL} eq "setpoint");
+        $tcnf |= 4 if($a[2] ne "fahrenheit");	# the parameter actually to be changed
+        $tcnf |= 8 if($hash->{READINGS}{controlMode}{VAL} eq "auto");
+        $tcnf |= 0x10 if($hash->{READINGS}{controlMode}{VAL} eq "central");
+        $tcnf |= 0x18 if($hash->{READINGS}{controlMode}{VAL} eq "party");
+        my $dbit = $tc_day2bits{$hash->{READINGS}{decalcDay}{VAL}};
+        $tcnf |= $dbit;
+      } else {
+        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+        $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+        return CUL_HM_TC_missing($hash);
+      }
+    }
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    $hash->{helper}{state251} = $tcnf;
+    $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+    $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+    return;
+
+  } elsif($cmd =~ m/^controlMode$/) { ###############################
+    my $tcnf;
+    if($hash->{helper}{state251}) {
+      $tcnf = $hash->{helper}{state251};
+      $tcnf &= 0xE7;		# blank out the control mode bits (equals mode manual)
+      $tcnf |= 0x08 if($a[2] eq "auto");
+      $tcnf |= 0x10 if($a[2] eq "central");
+      $tcnf |= 0x18 if($a[2] eq "party");
+    } else {
+      # look if index 1 subfields are complete, construct state251,
+      # if incomplete, issue errormessage, set reading and wait for
+      # completion of state251
+      if($hash->{READINGS}{displayTemp}{VAL} &&
+         $hash->{READINGS}{displayMode}{VAL} &&
+         $hash->{READINGS}{displayTempUnit}{VAL} &&
+         $hash->{READINGS}{decalcDay}{VAL}) {
+        
+        $tcnf = 0;
+        $tcnf |= 1 if($hash->{READINGS}{displayMode}{VAL} ne "temp-only");
+        $tcnf |= 2 if($hash->{READINGS}{displayTemp}{VAL} eq "setpoint");
+        $tcnf |= 4 if($hash->{READINGS}{displayTempUnit}{VAL} eq "fahrenheit");
+        $tcnf |= 8 if($a[2] eq "auto");	# the parameter actually to be changed
+        $tcnf |= 0x10 if($a[2] eq "central");
+        $tcnf |= 0x18 if($a[2] eq "party");
+        my $dbit = $tc_day2bits{$hash->{READINGS}{decalcDay}{VAL}};
+        $tcnf |= $dbit;
+      } else {
+        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+        $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+        return CUL_HM_TC_missing($hash);
+      }
+    }
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    $hash->{helper}{state251} = $tcnf;
+    $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+    $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+    return;
+
+  } elsif($cmd =~ m/^decalcDay$/) { ###############################
+    my $tcnf;
+    my $dbit = $tc_day2bits{$a[2]};
+
+    if($hash->{helper}{state251}) {
+      $tcnf = $hash->{helper}{state251};
+      $tcnf &= 0x1F;		# blank out the decalc day bits (equals Sat)
+      $tcnf |= $dbit;
+    } else {
+      # look if index 1 subfields are complete, construct state251,
+      # if incomplete, issue errormessage, set reading and wait for
+      # completion of state251
+      if($hash->{READINGS}{displayTemp}{VAL} &&
+         $hash->{READINGS}{displayMode}{VAL} &&
+         $hash->{READINGS}{displayTempUnit}{VAL} &&
+         $hash->{READINGS}{controlMode}{VAL}) {
+        
+        $tcnf = 0;
+        $tcnf |= 1 if($hash->{READINGS}{displayMode}{VAL} ne "temp-only");
+        $tcnf |= 2 if($hash->{READINGS}{displayTemp}{VAL} eq "setpoint");
+        $tcnf |= 4 if($hash->{READINGS}{displayTempUnit}{VAL} eq "fahrenheit");
+        $tcnf |= 8 if($hash->{READINGS}{controlMode}{VAL} eq "auto");
+        $tcnf |= 0x10 if($hash->{READINGS}{controlMode}{VAL} eq "central");
+        $tcnf |= 0x18 if($hash->{READINGS}{controlMode}{VAL} eq "party");
+        $tcnf |= $dbit;	# the parameter actually to be changed
+      } else {
+        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+        $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+        return CUL_HM_TC_missing($hash);
+      }
+    }
+    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    $hash->{helper}{state251} = $tcnf;
+    $hash->{READINGS}{$cmd}{TIME} = TimeNow();
+    $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
+    return;
 
   } elsif($cmd =~ m/^desired-temp$/) { ##################
     my $temp = CUL_HM_convTemp($a[2]);
