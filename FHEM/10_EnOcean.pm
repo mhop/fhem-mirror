@@ -66,7 +66,7 @@ EnOcean_Initialize($)
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-                       "subType:switch,contact,sensor,windowHandle,SR04,MD15,".
+                       "subType:switch,contact,sensor,windowHandle,SR04,MD15,PM101,".
                        "dimmer,dimmCtrl actualTemp";
 
   for(my $i=0; $i<@ptm200btn;$i++) {
@@ -344,6 +344,16 @@ EnOcean_Parse($$)
       push @event, "3:measured-temp:". sprintf "%.1f", ($db_1*40/255);
       EnOcean_MD15Cmd($hash, $name, $db_1);
       
+    } elsif($st eq "PM101") {
+      ####################################
+      # Ratio Presence Sensor Eagle PM101, code by aicgazi
+      ####################################
+      my $lux = sprintf "%3d", $db_2;
+      # content  of $db_2 is the illuminance where max value 0xFF stands for 1000 lx
+      $lux = sprintf "%04.2f", ( $lux * 1000 / 255 ) ;
+      push @event, "3:brightness:$lux";
+      push @event, "3:channel1:" . ($db_0 & 0x01 ? "off" : "on");
+      push @event, "3:channel2:" . ($db_0 & 0x02 ? "off" : "on");
 
     } elsif($st eq "dimmer") {
       # todo: create a more general solution for the central-command responses
