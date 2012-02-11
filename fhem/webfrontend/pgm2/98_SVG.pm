@@ -9,9 +9,13 @@ use POSIX;
 
 
 
-sub SVG_render($$$$$$$);
-sub time_to_sec($);
-sub fmtTime($$);
+sub SVG_render($$$$$$$$);
+sub SVG_time_to_sec($);
+sub SVG_fmtTime($$);
+sub SVG_time_align($$);
+sub SVG_doround($$$);
+sub SVG_pO($);
+my $SVG_RET;        # Returned data (SVG)
 
 
 my ($SVG_lt, $SVG_ltstr);
@@ -26,7 +30,7 @@ SVG_Initialize($)
 
 #####################################
 sub
-SVG_render($$$$$$$)
+SVG_render($$$$$$$$)
 {
   my $name = shift;  # e.g. wl_8
   my $from = shift;  # e.g. 2008-01-01
@@ -34,10 +38,13 @@ SVG_render($$$$$$$)
   my $confp = shift; # lines from the .gplot file, w/o FileLog and plot
   my $dp = shift;    # pointer to data (one string)
   my $plot = shift;  # Plot lines from the .gplot file
-  my $FW_wname = shift;  # FHEMWEB instance name
+  my $parent_name = shift;  # e.g. FHEMWEB instance name
+  my $parent_dir  = shift;  # FW_dir
 
-  my $SVG_ss = AttrVal($FW_wname, "smallscreen", 0);
-  return "" if(!defined($dp));
+  $SVG_RET="";
+
+  my $SVG_ss = AttrVal($parent_name, "smallscreen", 0);
+  return $SVG_RET if(!defined($dp));
   my $th = 16;                          # "Font" height
   my ($x, $y) = (($SVG_ss ? 2 : 3)*$th,  1.2*$th);      # Rect offset
 
@@ -57,52 +64,52 @@ SVG_render($$$$$$$)
 
   ######################
   # Html Header
-  FW_pO '<?xml version="1.0" encoding="UTF-8"?>';
-  FW_pO '<!DOCTYPE svg>';
-  FW_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
+  SVG_pO '<?xml version="1.0" encoding="UTF-8"?>';
+  SVG_pO '<!DOCTYPE svg>';
+  SVG_pO '<svg version="1.1" xmlns="http://www.w3.org/2000/svg" '.
          'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
-  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
-  FW_pO "<style lType=\"text/css\"><![CDATA[";
-  if(open(FH, "$FW_dir/${prf}svg_style.css") ||
-     open(FH, "$FW_dir/svg_style.css")) {
-    FW_pO join("", <FH>);
+  my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
+  SVG_pO "<style lType=\"text/css\"><![CDATA[";
+  if(open(FH, "$parent_dir/${prf}svg_style.css") ||
+     open(FH, "$parent_dir/svg_style.css")) {
+    SVG_pO join("", <FH>);
     close(FH);
   } else {
-    Log 0, "Can't open $FW_dir/svg_style.css"
+    Log 0, "Can't open $parent_dir/svg_style.css"
   }
-  FW_pO "]]></style>";
+  SVG_pO "]]></style>";
 
   ######################
   # gradient definitions
-  if(open(FH, "$FW_dir/${prf}svg_defs.svg") ||
-     open(FH, "$FW_dir/svg_defs.svg")) {
-    FW_pO join("", <FH>);
+  if(open(FH, "$parent_dir/${prf}svg_defs.svg") ||
+     open(FH, "$parent_dir/svg_defs.svg")) {
+    SVG_pO join("", <FH>);
     close(FH);
   } else {
-    Log 0, "Can't open $FW_dir/svg_defs.svg"
+    Log 0, "Can't open $parent_dir/svg_defs.svg"
   }
 
   ######################
   # Draw the background
-  FW_pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
+  SVG_pO "<rect width =\"$ow\" height=\"$oh\" class=\"background\"/>";
   # Rectangle
-  FW_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
+  SVG_pO "<rect x=\"$x\" y=\"$y\" width =\"$w\" height =\"$h\" rx=\"8\" ry=\"8\" ".
         "fill=\"none\" class=\"border\"/>";
 
   my ($off1,$off2) = ($ow/2, 3*$y/4);
   my $title = ($conf{title} ? $conf{title} : " ");
   $title =~ s/</&lt;/g;
   $title =~ s/>/&gt;/g;
-  FW_pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_title\" x=\"$off1\" y=\"$off2\" " .
         "class=\"title\" text-anchor=\"middle\">$title</text>";
 
   ######################
   # Copy and Paste labels, hidden by default
-  FW_pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_paste\" x=\"" . ($ow-$x) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_paste(evt)\" " .
         "class=\"paste\" text-anchor=\"end\"> </text>";
-  FW_pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
+  SVG_pO "<text id=\"svg_copy\" x=\"" . ($ow-2*$x) . "\" y=\"$off2\" " .
         "onclick=\"parent.svg_copy(evt)\" " .
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
@@ -113,13 +120,13 @@ SVG_render($$$$$$$)
   $t =~ s/"//g;
   if(!$SVG_ss) {
     ($off1,$off2) = (3*$th/4, $oh/2);
-    FW_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+    SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
         "class=\"ylabel\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
 
     $t = ($conf{y2label} ? $conf{y2label} : "");
     $t =~ s/"//g;
     ($off1,$off2) = ($ow-$th/4, $oh/2);
-    FW_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
+    SVG_pO "<text x=\"$off1\" y=\"$off2\" text-anchor=\"middle\" " .
         "class=\"y2label\" transform=\"rotate(270,$off1,$off2)\">$t</text>";
   }
 
@@ -152,7 +159,7 @@ SVG_render($$$$$$$)
       $desc = sprintf("%s: Min:%g Max:%g Last:%g",
         $t, $data{"min$j"}, $data{"max$j"}, $data{"currval$j"});
     }
-    FW_pO "<text title=\"$desc\" ".
+    SVG_pO "<text title=\"$desc\" ".
           "onclick=\"parent.svg_labelselect(evt)\" line_id=\"line_$i\" " .
           "x=\"$off1\" y=\"$off2\" text-anchor=\"end\" $lStyle[$i]>$t</text>";
     $off2 += $th;
@@ -161,8 +168,8 @@ SVG_render($$$$$$$)
   ######################
   # Loop over the input, digest dates, calculate min/max values
   my ($fromsec, $tosec);
-  $fromsec = time_to_sec($from) if($from ne "0"); # 0 is special
-  $tosec   = time_to_sec($to)   if($to ne "9");   # 9 is special
+  $fromsec = SVG_time_to_sec($from) if($from ne "0"); # 0 is special
+  $tosec   = SVG_time_to_sec($to)   if($to ne "9");   # 9 is special
   my $tmul; 
   $tmul = $w/($tosec-$fromsec) if($tosec && $fromsec);
 
@@ -195,7 +202,7 @@ SVG_render($$$$$$$)
     } else {
       ($d, $v) = split(" ", $l);
 
-      $d =  ($tmul ? int((time_to_sec($d)-$fromsec)*$tmul) : $d);
+      $d =  ($tmul ? int((SVG_time_to_sec($d)-$fromsec)*$tmul) : $d);
       if($ld ne $d || $lv ne $v) {              # Saves a lot on year zoomlevel
         $ld = $d; $lv = $v;
         push @{$dxp}, $d;
@@ -209,19 +216,19 @@ SVG_render($$$$$$$)
 
   $dxp = $hdx[0];
   if($dxp && int(@{$dxp}) < 2 && !$tosec) { # not enough data and no range...
-    FW_pO "</svg>";
-    return;
+    SVG_pO "</svg>";
+    return $SVG_RET;
   }
 
   if(!$tmul) {                     # recompute the x data if no range sepcified
-    $fromsec = time_to_sec($dxp->[0]) if(!$fromsec);
-    $tosec = time_to_sec($dxp->[int(@{$dxp})-1]) if(!$tosec);
+    $fromsec = SVG_time_to_sec($dxp->[0]) if(!$fromsec);
+    $tosec = SVG_time_to_sec($dxp->[int(@{$dxp})-1]) if(!$tosec);
     $tmul = $w/($tosec-$fromsec);
 
     for my $i (0..@hdx-1) {
       $dxp = $hdx[$i];
       for my $i (0..@{$dxp}-1) {
-        $dxp->[$i] = int((time_to_sec($dxp->[$i])-$fromsec)*$tmul);
+        $dxp->[$i] = int((SVG_time_to_sec($dxp->[$i])-$fromsec)*$tmul);
       }
     }
   }
@@ -252,27 +259,27 @@ SVG_render($$$$$$$)
   my $initoffset = $tstep;
   $initoffset = int(($tstep/2)/86400)*86400 if($aligntics);
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $tstep) {
-    $i = time_align($i,$aligntics);
+    $i = SVG_time_align($i,$aligntics);
     $off1 = int($x+($i-$fromsec)*$tmul);
-    FW_pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
-    FW_pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
+    SVG_pO "<polyline points=\"$off1,$y $off1,$off2\"/>";
+    SVG_pO "<polyline points=\"$off1,$off3 $off1,$off4\"/>";
   }
 
   ######################
   # then the text and the grid
   $off1 = $x;
   $off2 = $y+$h+$th;
-  $t = fmtTime($first_tag, $fromsec);
-  FW_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
+  $t = SVG_fmtTime($first_tag, $fromsec);
+  SVG_pO "<text x=\"0\" y=\"$off2\" class=\"ylabel\">$t</text>";
   $initoffset = $step;
   $initoffset = int(($step/2)/86400)*86400 if($aligntext);
   for(my $i = $fromsec+$initoffset; $i < $tosec; $i += $step) {
-    $i = time_align($i,$aligntext);
+    $i = SVG_time_align($i,$aligntext);
     $off1 = int($x+($i-$fromsec)*$tmul);
-    $t = fmtTime($tag, $i);
-    FW_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
+    $t = SVG_fmtTime($tag, $i);
+    SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\" " .
               "text-anchor=\"middle\">$t</text>";
-    FW_pO "  <polyline points=\"$off1,$y $off1,$off4\" class=\"hgrid\"/>";
+    SVG_pO "  <polyline points=\"$off1,$y $off1,$off4\" class=\"hgrid\"/>";
   }
 
 
@@ -301,13 +308,13 @@ SVG_render($$$$$$$)
     for my $li (0..int(@limit)-1) {
       my $l = $limit[$li];
       next if($dh > $l);
-      $ma = doround($hmax{$axis}, $l/10, 1);
-      $mi = doround($hmin{$axis}, $l/10, 0);
+      $ma = SVG_doround($hmax{$axis}, $l/10, 1);
+      $mi = SVG_doround($hmin{$axis}, $l/10, 0);
 
       if(($ma-$mi)/($l/10) >= 7) {    # If more then 7 steps, then choose next
         $l = $limit[$li+1];
-        $ma = doround($hmax{$axis}, $l/10, 1);
-        $mi = doround($hmin{$axis}, $l/10, 0);
+        $ma = SVG_doround($hmax{$axis}, $l/10, 1);
+        $mi = SVG_doround($hmin{$axis}, $l/10, 0);
       }
       $step = $l/10;
       last;
@@ -331,10 +338,10 @@ SVG_render($$$$$$$)
         $tlabel =~ s/^"(.*)"$/$1/;
 
         $off2 = int($y+($ma-$tvalue)*$hmul);
-        FW_pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>";
+        SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>";
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
-        FW_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>
+        SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>
                 $tlabel</text>";
       }
 
@@ -342,16 +349,16 @@ SVG_render($$$$$$$)
 
       for(my $i = $mi; $i <= $ma; $i += $step) {
         $off2 = int($y+($ma-$i)*$hmul);
-        FW_pO "  <polyline points=\"$off3,$off2 $off4,$off2\"/>";
+        SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\"/>";
         if($axis eq "x1y2")  {
           my $o6 = $x+$w;
-          FW_pO "  <polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>"
+          SVG_pO "  <polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>"
             if($i > $mi && $i < $ma);
         }
         $off2 += $th/4;
         my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
         my $txt = sprintf("%g", $i);
-        FW_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
+        SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
       }
     }
 
@@ -392,7 +399,7 @@ SVG_render($$$$$$$)
         $ly = $x1; $ly = $y1;
         $ret =  sprintf(" %d,%d %d,%d %d,%d %d,%d %d,%d",
               $x1-3,$y1, $x1,$y1-3, $x1+3,$y1, $x1,$y1+3, $x1-3,$y1);
-        FW_pO "<polyline $attributes points=\"$ret\"/>";
+        SVG_pO "<polyline $attributes points=\"$ret\"/>";
       }
 
     } elsif($lType[$idx] eq "steps" || $lType[$idx] eq "fsteps" ) {
@@ -417,7 +424,7 @@ SVG_render($$$$$$$)
       }
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
 
-      FW_pO "<polyline $attributes points=\"$ret\"/>";
+      SVG_pO "<polyline $attributes points=\"$ret\"/>";
 
     } elsif($lType[$idx] eq "histeps" ) {
       $ret .=  sprintf(" %d,%d", $x+$dxp->[0], $y+$h) if($isFill && @{$dxp});
@@ -436,7 +443,7 @@ SVG_render($$$$$$$)
         }
       }
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
-      FW_pO "<polyline $attributes points=\"$ret\"/>";
+      SVG_pO "<polyline $attributes points=\"$ret\"/>";
 
     } else {                            # lines and everything else
       foreach my $i (0..int(@{$dxp})-1) {
@@ -449,15 +456,16 @@ SVG_render($$$$$$$)
       }
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
 
-      FW_pO "<polyline $attributes points=\"$ret\"/>";
+      SVG_pO "<polyline $attributes points=\"$ret\"/>";
     }
 
   }
-  FW_pO "</svg>";
+  SVG_pO "</svg>";
+  return $SVG_RET;
 }
 
 sub
-time_to_sec($)
+SVG_time_to_sec($)
 {
   my ($str) = @_;
   if(!$str) {
@@ -478,7 +486,7 @@ time_to_sec($)
 }
 
 sub
-fmtTime($$)
+SVG_fmtTime($$)
 {
   my ($sepfmt, $sec) = @_;
   my @tarr = split("[ :]+", localtime($sec));
@@ -492,7 +500,7 @@ fmtTime($$)
 }
 
 sub
-time_align($$)
+SVG_time_align($$)
 {
   my ($v,$align) = @_;
   return $v if(!$align);
@@ -513,7 +521,7 @@ time_align($$)
 }
 
 sub
-doround($$$)
+SVG_doround($$$)
 {
   my ($v, $step, $isup) = @_;
   if($v >= 0) {
@@ -522,4 +530,16 @@ doround($$$)
     return (int($v/$step))*$step+($isup ? 0 : -$step);
   }
 }
+
+##################
+# print (append) to output
+sub
+SVG_pO($)
+{
+  my $arg = shift;
+  return if(!defined($arg));
+  $SVG_RET .= $arg;
+  $SVG_RET .= "\n";
+}
+
 1;
