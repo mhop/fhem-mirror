@@ -44,7 +44,7 @@ my %eib_dpttypes = (
 
   # 2-Octet unsigned Value (Temp / Light)
   "dpt9" 		=> {"CODE"=>"dpt9", "UNIT"=>""},
-  "tempsensor"  => {"CODE"=>"dpt9", "UNIT"=>"°C"},
+  "tempsensor"  => {"CODE"=>"dpt9", "UNIT"=>"Celsius"},
   "lightsensor" => {"CODE"=>"dpt9", "UNIT"=>"Lux"},
   
   # Time of Day
@@ -262,34 +262,41 @@ EIB_Parse($$)
 
 	my $v = $codes{$val};
     $v = "$val" if(!defined($v));
+    my $rawv = $v;
 
+	my @list;
+	my $found = 0;
+	
     my $def = $modules{EIB}{defptr}{"$dev"};
     if($def) {
-      	my @list;
 	    foreach my $n (keys %{ $def }) {
 	      my $lh = $def->{$n};
 	      $n = $lh->{NAME};        # It may be renamed
 	
 	      return "" if(IsIgnored($n));   # Little strange.
 	
+	      # parse/translate by datapoint type
+	      $v = EIB_ParseByDatapointType($lh,$n,$v);
+	
 	      $lh->{CHANGED}[0] = $v;
 	      $lh->{STATE} = $v;
-	      $lh->{RAWSTATE} = $v;
+	      $lh->{RAWSTATE} = $rawv;
 	      $lh->{LASTGROUP} = $dev;
 	      $lh->{READINGS}{state}{TIME} = TimeNow();
 	      $lh->{READINGS}{state}{VAL} = $v;
-	      Log GetLogLevel($n,2), "EIB $n $v";
 
-	      # parse/translate by datapoint type
-	      EIB_ParseByDatapointType($lh,$n,$v);
+	      Log 2, "EIB $n $v";
 	
 	      push(@list, $n);
+	      $found = 1;
 	    }
-        return @list;
-    } else {
-    	
+        #return @list;
+    } 
+    
+    # check also the further codes
+    {
     	# check if the code is within the read groups
-    	my $found = 0;
+    	
     	foreach my $mod (keys %{$modules{EIB}{defptr}})
     	{
     		my $def = $modules{EIB}{defptr}{"$mod"};
@@ -306,32 +313,34 @@ EIB_Parse($$)
 				
 				      return "" if(IsIgnored($n));   # Little strange.
 				
+					  # parse/translate by datapoint type
+				      $v = EIB_ParseByDatapointType($lh,$n,$v);
+				
 				      $lh->{CHANGED}[0] = $v;
 				      $lh->{STATE} = $v;
-				      $lh->{RAWSTATE} = $v;
+				      $lh->{RAWSTATE} = $rawv;
 				      $lh->{LASTGROUP} = $dev;
 				      $lh->{READINGS}{state}{TIME} = TimeNow();
 				      $lh->{READINGS}{state}{VAL} = $v;
-				      Log GetLogLevel($n,2), "EIB $n $v";
-				      
-				      # parse/translate by datapoint type
-				      EIB_ParseByDatapointType($lh,$n,$v);
-				
+	      			  Log 2, "EIB $n $v";
+	      			  
 				      push(@list, $n);
 				      $found = 1;
 		    	    }
 			    }}
-		        return @list if $found>0;
 		    }
-    	}    		
-    		
-    	if($found==0)
-    	{
-		    my $dev_name = eib_hex2name($dev);
-    		Log(3, "EIB Unknown device $dev ($dev_name), Value $val, please define it");
-    		return "UNDEFINED EIB_$dev EIB $dev";
     	}
-    }
+    }    		
+    	
+  	return @list if $found>0;
+    		
+   	if($found==0)
+   	{
+	    my $dev_name = eib_hex2name($dev);
+   		Log(3, "EIB Unknown device $dev ($dev_name), Value $val, please define it");
+   		return "UNDEFINED EIB_$dev EIB $dev";
+   	}
+
   }
 
 }
@@ -343,12 +352,12 @@ EIB_ParseByDatapointType($$$)
 	my $model = $attr{$name}{"model"};
 	
 	# nothing to do if no model is given
-	return undef if(!defined($model));
+	return $value if(!defined($model));
 	
 	my $dpt = $eib_dpttypes{"$model"};
 	
 	Log(4,"EIB parse $value for $name model: $model dpt: $dpt");
-	return undef if(!defined($dpt));
+	return $value if(!defined($dpt));
 	
 	my $code = $eib_dpttypes{"$model"}{"CODE"};
 	my $unit = $eib_dpttypes{"$model"}{"UNIT"};
@@ -408,13 +417,15 @@ EIB_ParseByDatapointType($$$)
 	# set state to translated value
 	if(defined($transval))
 	{
-		Log(4,"EIB $name translated to $transval");
-		$hash->{STATE} = "$transval $unit";
+		Log(4,"EIB $name translated to $transval $unit");
+		$value = "$transval $unit";
 	}
 	else
 	{
-		Log(4,"EIB $name model $model could not be translated.");
+		Log(4,"EIB $name model $model value $value could not be translated.");
 	}
+	
+	return $value;
 }
 
 #############################
