@@ -1621,6 +1621,8 @@ my %culHmBits = (
 
 );
 
+my @culHmCmdBits = ( "", "WAKEMEUP", "BCAST", "WAKEUP", "BURST", "BIDI", "RPTED", "RPTEN");
+
 sub
 CUL_HM_DumpProtocol($$@)
 {
@@ -1633,6 +1635,12 @@ CUL_HM_DumpProtocol($$@)
   my $p01 = substr($p,0,2);
   my $p02 = substr($p,0,4);
   my $p11 = (length($p) > 2 ? substr($p,2,2) : "");
+
+  my $cmdInt = hex($cmd)>>8;
+  my $cmdBits="TYPE=".(hex($cmd)&0xff);
+  for(my $i = 0; $i < @culHmCmdBits; $i++) {
+    $cmdBits .= ",$culHmCmdBits[$i]" if($cmdInt & (1<<$i));
+  }
 
   $cmd = "0A$1" if($cmd =~ m/0B(..)/);
   $cmd = "A4$1" if($cmd =~ m/84(..)/);
@@ -1659,7 +1667,7 @@ CUL_HM_DumpProtocol($$@)
     }
     $txt = " ($txt)" if($txt);
   }
-  my $msg  = "$prefix L:$len N:$cnt CMD:$cmd SRC:$src DST:$dst $p$txt";
+  my $msg  = "$prefix L:$len N:$cnt CMD:$cmd ($cmdBits) SRC:$src DST:$dst $p$txt";
   Log $l4, $msg;
   DoTrigger($iname, $msg) if($ev);
 }
