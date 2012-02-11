@@ -1203,7 +1203,7 @@ FW_showLog($)
     }
     $ret = FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_wname);
+    FW_pO SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_wname, $FW_dir);
     $FW_RETTYPE = "image/svg+xml";
 
   }
