@@ -160,7 +160,7 @@ EIB_Set($@)
   my $ret = undef;
   my $na = int(@a);
 
-  return "no set value specified" if($na < 2 || $na > 3);
+  return "no set value specified" if($na < 2 || $na > 4);
   return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
   return "No $a[1] for dummies" if(IsDummy($hash->{NAME}));
 
@@ -169,18 +169,27 @@ EIB_Set($@)
     return "Unknown argument $a[1], choose one of " .
                                 join(" ", sort keys %eib_c2b);
   }
+  
+  # the command can be send to any of the defined groups indexed starting by 1
+  my $groupnr = 1;
+  if($a[1] eq "value" && $na > 3){$groupnr=$a[3]}
+  elsif ($na>2){$groupnr=$a[2]}
+  return "groupnr argument $groupnr must be numeric." if( $groupnr !~ m/[0-9]*/i);
+  return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
 
   my $v = join(" ", @a);
   Log GetLogLevel($a[0],2), "EIB set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
-  if($a[1] eq "value" && $na == 3) {                                
+  if($a[1] eq "value" && $na > 2) {                                
   	# complex value command.
   	# the additional argument is transfered alone.
     $c = $a[2];
   }
 
-  IOWrite($hash, "B", "w" . $hash->{GROUP} . $c);
+  my $groupcode = $hash->{CODE}{$groupnr};
+
+  IOWrite($hash, "B", "w" . $groupcode . $c);
 
   ###########################################
   # Delete any timer for on-for_timer
