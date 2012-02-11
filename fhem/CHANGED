@@ -11,6 +11,7 @@
   - feature: NetIO230B module by Andy
   - feature: Retaining configfile comments (not within a define statement)
   - feature: EnOcean PM101 by Ignaz
+  - feature: FHEMWEB redirectCmds attribute added
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera

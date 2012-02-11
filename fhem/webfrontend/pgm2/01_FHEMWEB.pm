@@ -91,7 +91,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheetPrefix hiddenroom HTTPS longpoll";
+                     "stylesheetPrefix hiddenroom HTTPS longpoll redirectCmds";
 
   ###############
   # Initialize internal structures
@@ -436,6 +436,19 @@ FW_AnswerCall($)
     return 0;
   }
 
+  # Redirect after a command, to clean the browser URL window
+  if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
+    my $tgt = $FW_ME;
+       if($FW_detail) { $tgt .= "?detail=$FW_detail" }
+    elsif($FW_room)   { $tgt .= "?room=$FW_room" }
+    my $c = $defs{$FW_cname}{CD};
+    print $c "HTTP/1.1 302 Found\r\n",
+             "Content-Length: 0\r\n",
+             "Location: $tgt\r\n",
+             "\r\n";
+    return -1;
+  }
+
   FW_updateHashes();
   if($cmd =~ m/^showlog /) {
     FW_showLog($cmd);
@@ -501,7 +514,8 @@ FW_AnswerCall($)
       FW_pO $FW_cmdret;
     }
     FW_pO "</div>";
-  }
+
+  } 
 
   FW_roomOverview($cmd);
   FW_style($cmd,undef)    if($cmd =~ m/^style /);
@@ -1528,6 +1542,7 @@ FW_style($$)
     my $ret = FW_fC("rereadcfg") if($fName eq $attr{global}{configfile});
     $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fName");
     FW_style("style list", $ret);
+    $ret = "";
   }
 
 }
