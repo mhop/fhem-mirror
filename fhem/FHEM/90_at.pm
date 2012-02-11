@@ -20,6 +20,7 @@ at_Initialize($)
 
 
 my $at_tdiff;
+my $oldattr;
 
 #####################################
 sub
@@ -73,8 +74,7 @@ at_Define($$)
   RemoveInternalTimer($name);
   InternalTimer($nt, "at_Exec", $name, 0);
 
-  $hash->{STATE} = ("Next: " . FmtTime($nt))
-     if(!($attr{$name} && $attr{$name}{disable}));
+  $hash->{STATE} = ($oldattr && $oldattr->{disable} ? "disabled" : ("Next: ".FmtTime($nt)));
   
   return undef;
 }
@@ -112,7 +112,7 @@ at_Exec($)
   my $count = $defs{$name}{REP};
   my $def = $defs{$name}{DEF};
 
-  my $oldattr = $attr{$name};           # delete removes the attributes too
+  $oldattr = $attr{$name};           # delete removes the attributes too
 
   # Correct drift when the timespec is relative
   $at_tdiff = $defs{$name}{TRIGGERTIME}-gettimeofday() if($def =~ m/^\+/);
@@ -126,6 +126,7 @@ at_Exec($)
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
     delete($data{AT_RECOMPUTE});
     $attr{$name} = $oldattr;
+    $oldattr = undef;
   }
   $at_tdiff = undef;
 }
@@ -141,10 +142,10 @@ at_Attr(@)
   }
   $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
   return if(!$do);
-
   $defs{$a[1]}{STATE} = ($do == 1 ?
         "disabled" :
         "Next: " . FmtTime($defs{$a[1]}{TRIGGERTIME}));
+Log 1, "ATTR: $a[1] $defs{$a[1]}{STATE}";
 
   return undef;
 }
