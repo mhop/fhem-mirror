@@ -145,7 +145,6 @@ at_Attr(@)
   $defs{$a[1]}{STATE} = ($do == 1 ?
         "disabled" :
         "Next: " . FmtTime($defs{$a[1]}{TRIGGERTIME}));
-Log 1, "ATTR: $a[1] $defs{$a[1]}{STATE}";
 
   return undef;
 }
