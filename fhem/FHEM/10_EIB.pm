@@ -291,10 +291,10 @@ EIB_Parse($$)
 	    	    {
 			      $n = $lh->{NAME};        # It may be renamed
 			
-			      return "" if(IsIgnored($n));   # Little strange.
+			      next if(IsIgnored($n));   # Little strange.
 			
 				  # parse/translate by datapoint type
-			      $v = EIB_ParseByDatapointType($lh,$n,$v);
+			      $v = EIB_ParseByDatapointType($lh,$n,$rawv);
 			
 			      $lh->{CHANGED}[0] = $v;
 			      $lh->{STATE} = $v;
