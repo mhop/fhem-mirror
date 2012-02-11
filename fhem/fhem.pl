@@ -4,7 +4,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2005-20012
+#  (c) 2005-2012
 #  Copyright: Rudolf Koenig (r dot koenig at koeniglich dot de)
 #  All rights reserved
 #
@@ -2668,3 +2668,97 @@ setGlobalAttrBeforeFork()
   }
   close(FH);
 }
+
+
+################################################################
+#
+# What follows are wrappers for commonly used core functions
+# in device-specific modules. 
+# This part written by Boris Neubert omega at online dot de
+#
+################################################################
+
+#
+# Call readingsBeginUpdate before you start updating readings.
+# The updated readings will all get the same timestamp,
+# which is the time when you called this subroutine.
+#
+sub 
+readingsBeginUpdate($) {
+
+  my ($hash)= @_;
+  
+  # get timestamp
+  $hash->{helper}{updating}{latestUpdate}= TimeNow();
+  
+  return $hash->{helper}{updating}{latestUpdate};
+
+}
+
+#
+# Call readingsEndUpdate when you are done updating readings.
+# This optionally calls DoTrigger to propagate the changes.
+# Rule: DoTrigger should only be called when the sub that
+# changes the readings is not called by Dispatch.
+#
+sub
+readingsEndUpdate($$) {
+
+  my ($hash,$dotrigger)= @_;
+  
+  # turn off updating mode
+  delete $hash->{helper}{updating};
+
+  # propagate changes
+  if($dotrigger)  {
+    DoTrigger($hash->{NAME}, undef) if($init_done);
+  }
+  
+  return undef;
+}
+
+#
+# Call readingsUpdate to update the reading.
+# Example: readingsUpdate($hash,"temperature",$value);
+#
+sub
+readingsUpdate($$$) {
+
+  my ($hash,$reading,$value)= @_;
+  my $name= $hash->{NAME};
+  
+  
+  # sanity check
+  defined($hash->{helper}{updating}) || 
+    die "fhem.pl: readingsUpdateReading: you must call readingsBeginUpdate first.";
+    
+  # here we can add a lot of convenient functionality later:
+  # - create CHANGED events only for readings the user has subscribed to (e.g. see repchanged hash in 13_KS300.pm
+  # - create CHANGED events only for readings whose values have changed (are different from current entry)
+    
+
+  # determine if an event should be created
+  my $readings= $hash->{READINGS};
+  my $changed= 1;
+  if(defined($attr{$name}{"event-on-change-reading"})) {
+      $changed= grep($_ eq $reading, split /,/,$attr{$name}{"event-on-change-reading"}) if($value eq $readings->{$reading}{VAL});
+  }
+  if(defined($attr{$name}{"event-on-update-reading"})) {
+      $changed= grep($_ eq $reading, split /,/,$attr{$name}{"event-on-update-reading"});
+  }
+
+  # update reading 5.x
+  $readings->{$reading}{TIME}= $hash->{helper}{updating}{latestUpdate}; 
+  $readings->{$reading}{VAL}= $value;
+  # update reading (upward compatibility), see http://fhemwiki.de/wiki/DevelopmentGuidelines#Struktur_im_Code
+  #$hash->{"readings"}{$reading}{"time"}= $hash->{helper}{updating}{latestUpdate}; 
+  #$hash->{"readings"}{$reading}{"value"}= $value;
+  
+  # add to CHANGED hash
+  my $rv= "$reading: $value";
+  push(@{$hash->{CHANGED}}, $rv) if($changed);
+  
+  return $rv;
+}
+  
+1;
