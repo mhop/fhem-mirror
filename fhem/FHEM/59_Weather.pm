@@ -63,7 +63,7 @@ sub Weather_UpdateReading($$$$) {
   if($reading eq "temp_c") { 
     readingsUpdate($hash,"temperature",$value); # additional entry for compatability
   }
-  if($key eq "wind_condition") {
+  if($reading eq "wind_condition") {
     $value=~ s/.*?(\d+).*/$1/; # extract numeric
     readingsUpdate($hash,"wind",$value); # additional entry for compatability
   }
