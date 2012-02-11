@@ -276,70 +276,41 @@ EIB_Parse($$)
 	my @list;
 	my $found = 0;
 	
-    my $def = $modules{EIB}{defptr}{"$dev"};
-    if($def) {
-	    foreach my $n (keys %{ $def }) {
-	      my $lh = $def->{$n};
-	      $n = $lh->{NAME};        # It may be renamed
-	
-	      return "" if(IsIgnored($n));   # Little strange.
-	
-	      # parse/translate by datapoint type
-	      $v = EIB_ParseByDatapointType($lh,$n,$v);
-	
-	      $lh->{CHANGED}[0] = $v;
-	      $lh->{STATE} = $v;
-	      $lh->{RAWSTATE} = $rawv;
-	      $lh->{LASTGROUP} = $dev;
-	      $lh->{READINGS}{state}{TIME} = TimeNow();
-	      $lh->{READINGS}{state}{VAL} = $v;
-
-	      Log 2, "EIB $n $v";
-	
-	      push(@list, $n);
-	      $found = 1;
+   	# check if the code is within the read groups
+    # we will inform all definitions subsribed to this code	
+   	foreach my $mod (keys %{$modules{EIB}{defptr}})
+   	{
+   		my $def = $modules{EIB}{defptr}{"$mod"};
+	    if($def) {
+		    foreach my $n (keys %{ $def }) {
+		      my $lh = $def->{$n};
+	          foreach my $c (keys %{ $lh->{CODE} } ) 
+		      {
+	    	    $c = $lh->{CODE}{$c};
+	    	    if($c eq $dev)
+	    	    {
+			      $n = $lh->{NAME};        # It may be renamed
+			
+			      return "" if(IsIgnored($n));   # Little strange.
+			
+				  # parse/translate by datapoint type
+			      $v = EIB_ParseByDatapointType($lh,$n,$v);
+			
+			      $lh->{CHANGED}[0] = $v;
+			      $lh->{STATE} = $v;
+			      $lh->{RAWSTATE} = $rawv;
+			      $lh->{LASTGROUP} = $dev;
+			      $lh->{READINGS}{state}{TIME} = TimeNow();
+			      $lh->{READINGS}{state}{VAL} = $v;
+      			  Log 2, "EIB $n $v";
+      			  
+			      push(@list, $n);
+			      $found = 1;
+	    	    }
+		    }}
 	    }
-        #return @list;
-    } 
-    
-    # check also the further codes
-    {
-    	# check if the code is within the read groups
-    	
-    	foreach my $mod (keys %{$modules{EIB}{defptr}})
-    	{
-    		my $def = $modules{EIB}{defptr}{"$mod"};
-		    if($def) {
-		      	my @list;
-			    foreach my $n (keys %{ $def }) {
-			      my $lh = $def->{$n};
-		          foreach my $c (keys %{ $lh->{CODE} } ) 
-			      {
-		    	    $c = $lh->{CODE}{$c};
-		    	    if($c eq $dev)
-		    	    {
-				      $n = $lh->{NAME};        # It may be renamed
-				
-				      return "" if(IsIgnored($n));   # Little strange.
-				
-					  # parse/translate by datapoint type
-				      $v = EIB_ParseByDatapointType($lh,$n,$v);
-				
-				      $lh->{CHANGED}[0] = $v;
-				      $lh->{STATE} = $v;
-				      $lh->{RAWSTATE} = $rawv;
-				      $lh->{LASTGROUP} = $dev;
-				      $lh->{READINGS}{state}{TIME} = TimeNow();
-				      $lh->{READINGS}{state}{VAL} = $v;
-	      			  Log 2, "EIB $n $v";
-	      			  
-				      push(@list, $n);
-				      $found = 1;
-		    	    }
-			    }}
-		    }
-    	}
-    }    		
+   	}
+   		
     	
   	return @list if $found>0;
     		
@@ -349,9 +320,7 @@ EIB_Parse($$)
    		Log(3, "EIB Unknown device $dev ($dev_name), Value $val, please define it");
    		return "UNDEFINED EIB_$dev EIB $dev";
    	}
-
   }
-
 }
 
 sub
