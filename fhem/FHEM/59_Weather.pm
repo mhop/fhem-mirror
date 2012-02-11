@@ -13,6 +13,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 use Weather::Google;
 
+
 #####################################
 sub Weather_Initialize($) {
 
@@ -25,7 +26,7 @@ sub Weather_Initialize($) {
   $hash->{DefFn}   = "Weather_Define";
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -37,33 +38,36 @@ sub f_to_c($) {
 }
 
 ###################################
-sub Weather_UpdateReading($$$$$$) {
+sub Weather_UpdateReading($$$$) {
 
-  my ($hash,$prefix,$key,$tn,$value,$n)= @_;
+  my ($hash,$prefix,$key,$value)= @_;
 
   return 0 if(!defined($value) || $value eq "");
+
+  #Log 1, "DEBUG WEATHER: $prefix $key $value"; 
   
-  if($key eq "temp") {
-  	$key= "temp_c";
-   	$value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  # assume F to C conversion required
-  } elsif($key eq "low") {
-  	$key= "low_c";
-      	$value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
+  if($key eq "low") {
+        $key= "low_c";
+        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
   } elsif($key eq "high") {
-  	$key= "high_c"; 
-    	$value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
+        $key= "high_c"; 
+        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
+  } elsif($key eq "humidity") {
+        # standardize reading - allow generic logging of humidity.
+        $value=~ s/.*?(\d+).*/$1/; # extract numeric
   }
 
   my $reading= $prefix . $key;
-  my $r= $hash->{READINGS};
-  $r->{$reading}{TIME}= $tn;
-  $r->{$reading}{VAL} = $value;
-
-  my $name= $hash->{NAME};
-  # Log 1, "Weather $name: $reading= $value";
-
-  $hash->{CHANGED}[$n]= "$reading: $value";
   
+  readingsUpdate($hash,$reading,$value);
+  if($reading eq "temp_c") { 
+    readingsUpdate($hash,"temperature",$value); # additional entry for compatability
+  }
+  if($key eq "wind_condition") {
+    $value=~ s/.*?(\d+).*/$1/; # extract numeric
+    readingsUpdate($hash,"wind",$value); # additional entry for compatability
+  }
+   
   return 1;
 }
 
@@ -78,11 +82,8 @@ sub Weather_GetUpdate($)
 
   my $name = $hash->{NAME};
 
-  my $n= 0;
-
-
-  # time
-  my $tn = TimeNow();
+  
+  readingsBeginUpdate($hash);
 
 
   # get weather information from Google weather API
@@ -93,43 +94,39 @@ sub Weather_GetUpdate($)
   my $WeatherObj;
   Log 4, "$name: Updating weather information for $location, language $lang."; 
   eval {
- 	$WeatherObj= new Weather::Google($location, {language => $lang}); 
+        $WeatherObj= new Weather::Google($location, {language => $lang}); 
   };
   if($@) {
-	Log 1, "$name: Could not retrieve weather information.";
-	return 0;
+        Log 1, "$name: Could not retrieve weather information.";
+        return 0;
   }
 
+  # the current conditions contain temp_c and temp_f
   my $current = $WeatherObj->current_conditions;
   foreach my $condition ( keys ( %$current ) ) {
-  	my $value= $current->{$condition};
-  	Weather_UpdateReading($hash,"",$condition,$tn,$value,$n);
-  	$n++;
+        my $value= $current->{$condition};
+        Weather_UpdateReading($hash,"",$condition,$value);
   }
 
   my $fci= $WeatherObj->forecast_information;
   foreach my $i ( keys ( %$fci ) ) {
-  	my $reading= $i;
-  	my $value= $fci->{$i};
-  	Weather_UpdateReading($hash,"",$i,$tn,$value,$n);
-        $n++;
+        my $reading= $i;
+        my $value= $fci->{$i};
+        Weather_UpdateReading($hash,"",$i,$value);
   }
 
+  # the forecast conditions contain high and low (temperature)
   for(my $t= 0; $t<= 3; $t++) {
-  	my $fcc= $WeatherObj->forecast_conditions($t);
-  	my $prefix= sprintf("fc%d_", $t);
-	foreach my $condition ( keys ( %$fcc ) ) {
-  		my $value= $fcc->{$condition};
-	  	Weather_UpdateReading($hash,$prefix,$condition,$tn,$value,$n);
-        $n++;
-  	}
+        my $fcc= $WeatherObj->forecast_conditions($t);
+        my $prefix= sprintf("fc%d_", $t);
+        foreach my $condition ( keys ( %$fcc ) ) {
+                my $value= $fcc->{$condition};
+                Weather_UpdateReading($hash,$prefix,$condition,$value);
+        }
   }
 
-  if(!$hash->{LOCAL}) {
-    DoTrigger($name, undef) if($init_done);
-  }
-
-  
+  readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
+      
   return 1;
 }
 
@@ -151,9 +148,9 @@ sub Weather_Get($@) {
   my $value;
 
   if(defined($hash->{READINGS}{$reading})) {
-  	$value= $hash->{READINGS}{$reading}{VAL};
+        $value= $hash->{READINGS}{$reading}{VAL};
   } else {
-  	return "no such reading: $reading";
+        return "no such reading: $reading";
   }
 
   return "$a[0] $reading => $value";
@@ -175,16 +172,16 @@ sub Weather_Define($$) {
 
   $hash->{STATE} = "Initialized";
 
-  my $name	= $a[0];
-  my $location	= $a[2];
-  my $interval	= 3600;
-  my $lang	= "en"; 
+  my $name      = $a[0];
+  my $location  = $a[2];
+  my $interval  = 3600;
+  my $lang      = "en"; 
   if(int(@a)>=4) { $interval= $a[3]; }
   if(int(@a)==5) { $lang= $a[4]; } 
 
-  $hash->{LOCATION}	= $location;
-  $hash->{INTERVAL}	= $interval;
-  $hash->{LANG}		= $lang; 
+  $hash->{LOCATION}     = $location;
+  $hash->{INTERVAL}     = $interval;
+  $hash->{LANG}         = $lang; 
   $hash->{READINGS}{current_date_time}{TIME}= TimeNow();
   $hash->{READINGS}{current_date_time}{VAL}= "none";
 
