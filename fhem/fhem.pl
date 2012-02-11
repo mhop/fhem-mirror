@@ -2690,6 +2690,7 @@ readingsBeginUpdate($) {
   
   # get timestamp
   $hash->{helper}{updating}{latestUpdate}= TimeNow();
+  $hash->{CHANGED}= ();
   
   return $hash->{helper}{updating}{latestUpdate};
 
@@ -2731,21 +2732,26 @@ readingsUpdate($$$) {
   # sanity check
   defined($hash->{helper}{updating}) || 
     die "fhem.pl: readingsUpdateReading: you must call readingsBeginUpdate first.";
-    
-  # here we can add a lot of convenient functionality later:
-  # - create CHANGED events only for readings the user has subscribed to (e.g. see repchanged hash in 13_KS300.pm
-  # - create CHANGED events only for readings whose values have changed (are different from current entry)
-    
+  
+  # shorthand
+  my $readings= $hash->{READINGS};
+  
+  # these flags determine if any of the "event-on" attributes are set;
+  my $attreocr= defined($attr{$name}{"event-on-change-reading"});
+  my $attreour= defined($attr{$name}{"event-on-update-reading"});
+
+  # these flags determine whether the reading is listed in any of the attributes
+  my $eocr= $attreocr && grep($_ eq $reading, split /,/,$attr{$name}{"event-on-change-reading"});
+  my $eour= $attreour && grep($_ eq $reading, split /,/,$attr{$name}{"event-on-update-reading"});
 
   # determine if an event should be created
-  my $readings= $hash->{READINGS};
-  my $changed= 1;
-  if(defined($attr{$name}{"event-on-change-reading"})) {
-      $changed= grep($_ eq $reading, split /,/,$attr{$name}{"event-on-change-reading"}) if($value eq $readings->{$reading}{VAL});
-  }
-  if(defined($attr{$name}{"event-on-update-reading"})) {
-      $changed= grep($_ eq $reading, split /,/,$attr{$name}{"event-on-update-reading"});
-  }
+  my $changed= !($attreocr || $attreour)  # always create event if no attribute is set
+                || $eour                  # or if the reading is listed in event-on-change-reading
+                || ($eocr &&              # or if the reading is listed in event-on-update-reading...
+                ($value ne $readings->{$reading}{VAL})); # ...and its value has changed.
+                
+ 
+  #Log 1, "changed!" if($changed); # DEBUG
 
   # update reading 5.x
   $readings->{$reading}{TIME}= $hash->{helper}{updating}{latestUpdate}; 
