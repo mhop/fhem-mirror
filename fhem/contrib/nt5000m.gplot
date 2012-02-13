@@ -1,0 +1,46 @@
+################################################
+# Display the monthly data from an NT5000 solar inverter
+#
+# Prof. Dr. Peter A. Henning, April 2011
+#
+# Corresponding FileLog definition: 
+# define <filelogname> FileLog <filename>
+#
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+set xdata
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set ytics 
+set y2tics nomirror
+set title '<L1>'
+set grid xtics y2tics
+
+set ylabel "Wd [kWh]"
+set y2label "Wm [%]"
+set y3label "Wm [kWh]"
+
+set yrange [0:35]
+set y2range [0:190]
+set y3range [0:750]
+
+## These are passed to the FileLog module to sort out data
+## column_spec is <col>:<regexp>:<default>:<fn>
+## <col> may be written as <col1>,<col2>, then the first column is interpreted as the time value
+## The following functions are implemented:
+## - int (to cut off % from a number, as for the actuator)
+## - delta-h / delta-d to get rain/h and rain/d values from continuous data.
+#
+#FileLog 4,5:DEV,nt5000,LASTM,END.*W_D:0:
+#FileLog 4,7:DEV,nt5000,LASTM,END.*W_D:0:
+#FileLog 4,6:DEV,nt5000,LASTM,END.*W_D:0:
+
+## These are either passed to the gnuplot program
+## or to the SVG module
+plot \
+  "< egrep 'W_D' <IN>" using 4:5 axes x1y1 title 'Wd [kWh]' with bars ls l2fill,\
+  "< egrep 'W_D' <IN>" using 4:7 axes x1y2 title 'Wm [%]' with lines ls l4,\
+  "< egrep 'W_D' <IN>" using 4:6 axes x1y3 title 'Wm [kWh]' with histeps ls l3
+
+ 
