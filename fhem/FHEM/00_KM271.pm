@@ -16,7 +16,6 @@ sub KM271_Read($);
 sub KM271_Ready($);
 sub KM271_crc($);
 sub KM271_setbits($$);
-sub KM271_GetReading($$);
 sub KM271_SetReading($$$$$);
 
 my %km271_sets = (
@@ -351,7 +350,7 @@ KM271_Read($)
   # Analyze the data
   my ($fn, $arg) = ($1, $2);
   my $msghash = $km271_rev{$fn};
-  my $all_events = KM271_attr($name, "all_km271_events") ;
+  my $all_events = AttrVal($name, "all_km271_events", "") ;
   my $tn = TimeNow();
 
   #Log 1, "$data" if($fn ne "0400");
@@ -374,8 +373,8 @@ KM271_Read($)
         elsif($f eq "bf") { $val = KM271_setbits($val, $farg); }
         elsif($f eq "a")  { $val = $km271_arrays[$farg][$val]; }
         elsif($f eq "mb") {
-          $val += KM271_GetReading($hash, $key."1") * 256;
-          $val += KM271_GetReading($hash, $key."2") * 65536 if($farg == 3);
+          $val += ReadingsVal($name, $key."1", 0) * 256;
+          $val += ReadingsVal($name, $key."2", 0) * 65536 if($farg == 3);
         } 
       }
       KM271_SetReading($hash, $tn, $key, $val, $ntfy);
@@ -444,30 +443,12 @@ KM271_crc($)
 }
 
 sub
-KM271_attr($$)
-{
-  my ($name, $attr) = @_;
-  return $attr{$name}{$attr} if($attr{$name} && $attr{$name}{$attr});
-  return "";
-}
-
-sub
-KM271_GetReading($$)
-{
-  my ($hash, $msg) = @_;
-  return $hash->{READINGS}{$msg}{VAL}
-    if($hash->{READINGS} && $hash->{READINGS}{$msg});
-  return 0;
-}
-
-sub
 KM271_SetReading($$$$$)
 {
   my ($hash,$tn,$key,$val,$ntfy) = @_;
   my $name = $hash->{NAME};
   Log GetLogLevel($name,4), "$name: $key $val" if($key ne "NoData");
-  $hash->{READINGS}{$key}{TIME} = $tn;
-  $hash->{READINGS}{$key}{VAL} = $val;
+  setReadingsVal($hash, $key, $val, $tn);
   DoTrigger($name, "$key: $val") if($ntfy);
 }
 

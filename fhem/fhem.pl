@@ -83,6 +83,8 @@ sub IsDummy($);
 sub IsIgnored($);
 sub setGlobalAttrBeforeFork();
 sub redirectStdinStdErr();
+sub setReadingsVal($$$$);
+sub addEvent($$);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -2530,71 +2532,6 @@ SecondsTillTomorrow($)  # 86400, if tomorrow is no DST change
   return $stt_sec;
 }
 
-sub
-ReadingsVal($$$)
-{
-  my ($d,$n,$default) = @_;
-  if(defined($defs{$d}) &&
-     defined($defs{$d}{READINGS}) &&
-     defined($defs{$d}{READINGS}{$n}) &&
-     defined($defs{$d}{READINGS}{$n}{VAL})) {
-     return $defs{$d}{READINGS}{$n}{VAL};
-  }
-  return $default;
-}
-
-sub
-ReadingsTimestamp($$$)
-{
-  my ($d,$n,$default) = @_;
-  if(defined($defs{$d}) &&
-     defined($defs{$d}{READINGS}) &&
-     defined($defs{$d}{READINGS}{$n}) &&
-     defined($defs{$d}{READINGS}{$n}{TIME})) {
-     return $defs{$d}{READINGS}{$n}{TIME};
-  }
-  return $default;
-}
-
-
-sub
-Value($)
-{
-  my ($d) = @_;
-  if(defined($defs{$d}) &&
-     defined($defs{$d}{STATE})) {
-     return $defs{$d}{STATE};
-  }
-  return "";
-}
-
-sub
-OldValue($)
-{
-  my ($d) = @_;
-  return $oldvalue{$d}{VAL} if(defined($oldvalue{$d})) ;
-  return "";
-}
-
-sub
-OldTimestamp($)
-{
-  my ($d) = @_;
-  return $oldvalue{$d}{TIME} if(defined($oldvalue{$d})) ;
-  return "";
-}
-
-
-
-
-sub
-AttrVal($$$)
-{
-  my ($d,$n,$default) = @_;
-  return $attr{$d}{$n} if($d && defined($attr{$d}) && defined($attr{$d}{$n}));
-  return $default;
-}
-
 # Add an attribute to the userattr list, if not yet present
 sub
 addToAttrList($)
@@ -2670,10 +2607,92 @@ setGlobalAttrBeforeFork()
 }
 
 
+###########################################
+# Functions used to make fhem-oneliners more readable,
+# but also recommended to be used by modules
+sub
+ReadingsVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{READINGS}) &&
+     defined($defs{$d}{READINGS}{$n}) &&
+     defined($defs{$d}{READINGS}{$n}{VAL})) {
+     return $defs{$d}{READINGS}{$n}{VAL};
+  }
+  return $default;
+}
+
+sub
+ReadingsTimestamp($$$)
+{
+  my ($d,$n,$default) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{READINGS}) &&
+     defined($defs{$d}{READINGS}{$n}) &&
+     defined($defs{$d}{READINGS}{$n}{TIME})) {
+     return $defs{$d}{READINGS}{$n}{TIME};
+  }
+  return $default;
+}
+
+sub
+Value($)
+{
+  my ($d) = @_;
+  if(defined($defs{$d}) &&
+     defined($defs{$d}{STATE})) {
+     return $defs{$d}{STATE};
+  }
+  return "";
+}
+
+sub
+OldValue($)
+{
+  my ($d) = @_;
+  return $oldvalue{$d}{VAL} if(defined($oldvalue{$d})) ;
+  return "";
+}
+
+sub
+OldTimestamp($)
+{
+  my ($d) = @_;
+  return $oldvalue{$d}{TIME} if(defined($oldvalue{$d})) ;
+  return "";
+}
+
+sub
+AttrVal($$$)
+{
+  my ($d,$n,$default) = @_;
+  return $attr{$d}{$n} if($d && defined($attr{$d}) && defined($attr{$d}{$n}));
+  return $default;
+}
+
+################################################################
+# Functions used by modules.
+sub
+setReadingsVal($$$$)
+{
+  my ($hash,$rname,$val,$ts) = @_;
+  $hash->{READINGS}{$rname}{VAL} = $val;
+  $hash->{READINGS}{$rname}{TIME} = $ts;
+}
+
+sub
+addEvent($$)
+{
+  my ($hash,$event) = @_;
+  push(@{$hash->{CHANGED}}, $event);
+}
+
+
+
 ################################################################
 #
-# What follows are wrappers for commonly used core functions
-# in device-specific modules. 
+# Wrappers for commonly used core functions in device-specific modules. 
 # This part written by Boris Neubert omega at online dot de
 #
 ################################################################
@@ -2728,7 +2747,6 @@ readingsUpdate($$$) {
   my ($hash,$reading,$value)= @_;
   my $name= $hash->{NAME};
   
-  
   # sanity check
   defined($hash->{helper}{updating}) || 
     die "fhem.pl: readingsUpdateReading: you must call readingsBeginUpdate first.";
@@ -2737,32 +2755,26 @@ readingsUpdate($$$) {
   my $readings= $hash->{READINGS};
   
   # these flags determine if any of the "event-on" attributes are set;
-  my $attreocr= defined($attr{$name}{"event-on-change-reading"});
-  my $attreour= defined($attr{$name}{"event-on-update-reading"});
+  my $attreocr= AttrVal($name, "event-on-change-reading", "");
+  my $attreour= AttrVal($name, "event-on-update-reading", "");
 
   # these flags determine whether the reading is listed in any of the attributes
-  my $eocr= $attreocr && grep($_ eq $reading, split /,/,$attr{$name}{"event-on-change-reading"});
-  my $eour= $attreour && grep($_ eq $reading, split /,/,$attr{$name}{"event-on-update-reading"});
+  my $eocr= $attreocr && grep($_ eq $reading, split /,/,$attreocr);
+  my $eour= $attreour && grep($_ eq $reading, split /,/,$attreour);
 
   # determine if an event should be created
   my $changed= !($attreocr || $attreour)  # always create event if no attribute is set
-                || $eour                  # or if the reading is listed in event-on-change-reading
-                || ($eocr &&              # or if the reading is listed in event-on-update-reading...
+                || $eour                  # or if the reading is listed in event-on-update-reading
+                || ($eocr &&              # or if the reading is listed in event-on-change-reading...
                 ($value ne $readings->{$reading}{VAL})); # ...and its value has changed.
                 
  
-  #Log 1, "changed!" if($changed); # DEBUG
-
-  # update reading 5.x
-  $readings->{$reading}{TIME}= $hash->{helper}{updating}{latestUpdate}; 
-  $readings->{$reading}{VAL}= $value;
-  # update reading (upward compatibility), see http://fhemwiki.de/wiki/DevelopmentGuidelines#Struktur_im_Code
-  #$hash->{"readings"}{$reading}{"time"}= $hash->{helper}{updating}{latestUpdate}; 
-  #$hash->{"readings"}{$reading}{"value"}= $value;
+  setReadingsVal($hash, $reading, $value, $hash->{helper}{updating}{latestUpdate}); 
   
   # add to CHANGED hash
+  #Log 1, "changed!" if($changed); # DEBUG
   my $rv= "$reading: $value";
-  push(@{$hash->{CHANGED}}, $rv) if($changed);
+  addEvent($hash, $rv) if($changed);
   
   return $rv;
 }
