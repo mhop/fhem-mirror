@@ -1392,8 +1392,8 @@ CUL_HM_Pair(@)
 
   # Create shadow device for multi-channel
   if($stn eq "switch" &&
-     $devInfo =~ m,(..)(..)(..), ) {
-    my ($b1, $b2, $b3) = (hex($1), hex($2), $3);
+    $devInfo =~ m,(..)(..)(..), ) {
+    my ($b1, $b2, $b3) = (hex($1)&0xf, hex($2), $3);
     for(my $i = $b2+1; $i<=$b1; $i++) {
       my $nSrc = sprintf("%s%02X", $src, $i);
       if(!defined($modules{CUL_HM}{defptr}{$nSrc})) {
