@@ -13,16 +13,16 @@ my @hw = qw(
   OWFS X10 OWTEMP ALL3076 ALL4027 WEBIO WEBIO_12DIGITAL WEBTHERM RFXCOM OREGON
   RFXMETER RFXX10REC RFXELSE WS300 Weather EM EMWZ EMEM EMGZ ESA2000 ECMD
   ECMDDevice SCIVT SISPM USBWX WS3600 M232 xxLG7000 M232Counter LGTV
-  M232Voltage WS2000 ALL4000T IPWE VantagePro2
+  M232Voltage WS2000 ALL4000T IPWE VantagePro2 WOL NetIO230B IT CUL_IR
   );
 my @help = qw(
-  at notify sequence watchdog FileLog FHEM2FHEM PachLog holiday PID autocreate
-  dummy structure SUNRISE_EL Utils XmlList updatefhem
+  at average notify sequence watchdog FileLog FHEM2FHEM PachLog holiday PID
+  autocreate dummy structure JsonList SUNRISE_EL Utils XmlList updatefhem
   );
 my @fe = (
   "FHEMRENDERER", "fheME", "iPhone: dhs-computertechnik", "iPhone: fhemgw",
   "iPhone: fhemobile", "iPhone: phyfhem", "myHCE", "pgm2/FHEMWEB with SVG",
-  "pgm2/FHEMWEB with gnuplot", "pgm3", "pgm5", "HomeMini",
+  "pgm2/FHEMWEB with gnuplot", "pgm3", "pgm5", "HomeMini", "android: andFHEM",
   );
 my @platform = (
   "PC: Linux", "OSX", "PC: Windows", "PC: BSD", "Fritz!Box 7390", "Fritz!Box 7270",

@@ -47,7 +47,7 @@ my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS: " .
                     ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
                     ":ESA2000:CUL_IR:CUL_TX";
 
-my $clientsHomeMatic = ":CUL_HM:HMS:";
+my $clientsHomeMatic = ":CUL_HM:HMS:";  # OneWire emulated as HMS on a CUNO
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -715,7 +715,7 @@ CUL_SendFromQueue($$)
 
   if($bstring ne "") {
     my $sp = AttrVal($name, "sendpool", undef);
-    if($sp) {                           # Is one of the CUL-fellows sending data?
+    if($sp) {   # Is one of the CUL-fellows sending data?
       my @fellows = split(",", $sp);
       foreach my $f (@fellows) {
         if($f ne $name &&
