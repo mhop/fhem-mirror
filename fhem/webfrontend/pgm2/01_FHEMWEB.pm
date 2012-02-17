@@ -682,8 +682,19 @@ FW_doDetail($)
   FW_pO FW_hidden("detail", $d);
 
   my $t = $defs{$d}{TYPE};
-
   FW_pO "<div id=\"content\">";
+  if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
+    my $webCmd = AttrVal($d, "webCmd", undef);
+    if($webCmd) {
+      FW_pO "<table>";
+      foreach my $cmd (split(":", $webCmd)) {
+        FW_pO "<tr>";
+        FW_pH "cmd.$d=set $d $cmd&detail=$d",  ReplaceEventMap($d,$cmd,1), 1, "col1";
+        FW_pO "</tr>";
+      }
+      FW_pO "</table>";
+    }
+  }
   FW_pO "<table><tr><td>";
   FW_makeSelect($d, "set", getAllSets($d));
   FW_makeTable($d, $defs{$d});

@@ -13,6 +13,7 @@
   - feature: EnOcean PM101 by Ignaz
   - feature: FHEMWEB redirectCmds attribute added
   - feature: CUL_TX minsecs attribute (by Arno)
+  - feature: webCmd in smallScreen added
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
