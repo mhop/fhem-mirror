@@ -190,12 +190,15 @@ FileLog_Get($@)
   }
 
   FileLog_Switch($hash);
-
   if($inf eq "-") {
     $inf = $hash->{currentlogfile};
+
   } else {
-    my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,o);
+    # Look for the file in the log directory...
+    my $linf = "$1/$inf" if($hash->{currentlogfile} =~ m,^(.*)/[^/]*$,);
+    return undef if(!$linf);
     if(!-f $linf) {
+      # ... or in the archivelog
       $linf = AttrVal($hash->{NAME},"archivedir",".") ."/". $inf;
       return "Error: cannot access $linf" if(!-f $linf);
     }
