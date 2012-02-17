@@ -471,16 +471,15 @@ CUL_HM_Parse($$)
       push @event, "ValveOffset $dname: $of %";
     }
 
-    if($cmd eq "A410" && $p =~ m/^0602(..)........$/) {
-      push @event, "desired-temp:" .hex($1)/2;
-    }
-
-    if($cmd eq "A112" && $p =~ m/^0202(..)$/) { # Set desired temp
-      push @event, "desired-temp:" .hex($1)/2;
+    if(($cmd eq "A410" && $p =~ m/^0602(..)........$/) ||
+       ($cmd eq "A112" && $p =~ m/^0202(..)$/)) { # Set desired temp
+      push @event, "desired-temp:" .sprintf("%0.1f", hex($1)/2);
     }
 
     if($cmd eq "8002" && $p =~ m/^0102(..)(....)/) { # Ack for fhem-command
-      push @event, "desired-temp-ack:" .hex($1)/2;
+      push @event, "desired-temp-ack:" .sprintf("%0.1f", hex($1)/2);
+      # FIXME: following is needed, else a set won't show up.
+      push @event, "desired-temp:" .sprintf("%0.1f", hex($1)/2);
     }
 
     CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
