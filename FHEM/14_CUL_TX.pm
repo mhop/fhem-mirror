@@ -28,11 +28,14 @@ CUL_TX_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  return "wrong syntax: define <name> CUL_TX <code> [corr]"
-        if(int(@a) < 3 || int(@a) > 4);
+  return "wrong syntax: define <name> CUL_TX <code> [corr] [minsecs]"
+        if(int(@a) < 3 || int(@a) > 5);
 
   $hash->{CODE} = $a[2];
   $hash->{corr} = ((int(@a) > 3) ? $a[3] : 0);
+  $hash->{minsecs} = ((int(@a) > 4) ? $a[4] : 0);
+  $hash->{lastT} =  0;
+  $hash->{lastH} =  0;
 
   $modules{CUL_TX}{defptr}{$a[2]} = $hash;
   $hash->{STATE} = "Defined";
@@ -73,6 +76,7 @@ CUL_TX_Parse($$)
     Log 2, "CUL_TX Unknown device $id3, please define it";
     return "UNDEFINED CUL_TX_$id3 CUL_TX $id3" if(!$def);
   }
+  my $now = time();
 
   my $name = $def->{NAME};
 
@@ -83,12 +87,20 @@ CUL_TX_Parse($$)
   my $valraw = ($a[5].$a[6].".".$a[7]);
   my $type = $a[2];
   if($type eq "0") {
+    if($now - $def->{lastT} < $def->{minsecs} ) {
+      return ""; 
+    }
+    $def->{lastT} = $now;
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
     Log $ll4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
     $changedTxt = "temperature: $val";
 
   } elsif ($type eq "E") {
+   if($now - $def->{lastH} < $def->{minsecs} ) {
+      return ""; 
+    } else {
+    $def->{lastH} = $now;
     $msgtype = "humidity";
     $val = $valraw;
     Log $ll4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
