@@ -518,10 +518,10 @@ FW_AnswerCall($)
   } 
 
   FW_roomOverview($cmd);
-  FW_style($cmd,undef)    if($cmd =~ m/^style /);
-  FW_doDetail($FW_detail) if($FW_detail);
-  FW_showRoom()           if($FW_room && !$FW_detail);
-  FW_logWrapper($cmd)     if($cmd =~ /^logwrapper/);
+     if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
+  elsif($FW_detail)            { FW_doDetail($FW_detail); }
+  elsif($FW_room)              { FW_showRoom();           }
+  elsif($cmd =~ /^logwrapper/) { FW_logWrapper($cmd);     }
   FW_pO "</body></html>";
   return 0;
 }
