@@ -117,6 +117,7 @@ my %culHmModel=(
   "0061" => "HM-LC-SW4-DR",    # Tested by fhem-hm-knecht.
   "0062" => "HM-LC-SW2-DR",
   "0066" => "HM_LC_Sw4-WM",    # Tested by peterp
+  "006C" => "HM-LC-SW1-PCB",   # By jan (unsure if working)
 );
 
 
@@ -1620,7 +1621,8 @@ my %culHmBits = (
 
 );
 
-my @culHmCmdBits = ( "", "WAKEMEUP", "BCAST", "WAKEUP", "BURST", "BIDI", "RPTED", "RPTEN");
+my @culHmCmdBits = ( "WAKEUP", "WAKEMEUP", "BCAST", "", "BURST", "BIDI", "RPTED", "RPTEN");
+
 
 sub
 CUL_HM_DumpProtocol($$@)
