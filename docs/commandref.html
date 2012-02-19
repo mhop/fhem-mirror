@@ -3269,7 +3269,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="EIBset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt;]</code><br>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code><br>
     where value one of:
 	<li><b>on</b> switch on device
 	<li><b>off</b> switch off device
@@ -3287,7 +3287,14 @@ A line ending with \ will be concatenated with the next one, so long lines
     </code></ul>
     </li>
 
-    </ul>
+	When as last argument a g&lt;groupnr&gt; is present, the command will be sent 
+	to the EIB group indexed by the groupnr (starting by 1, in the order as given in Define).
+	<br>Example:
+	<ul><code>
+	   define lamp1 EIB 0/10/01 0/10/02<br>
+	   set lamp1 on g2 (will send "on" to 0/10/02)
+	</code></ul>
+   
   </ul>
   <br>
 

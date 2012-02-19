@@ -164,61 +164,67 @@ EIB_Set($@)
   return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
   return "No $a[1] for dummies" if(IsDummy($hash->{NAME}));
 
-  my $c = $eib_c2b{$a[1]};
+  my $name  = $a[0];
+  my $value = $a[1];
+  my $arg1  = undef;
+  my $arg2  = undef;
+  
+  $arg1 = $a[2] if($na>2);
+  $arg2 = $a[3] if($na>3);
+
+  my $c = $eib_c2b{$value};
   if(!defined($c)) {
-    return "Unknown argument $a[1], choose one of " .
+    return "Unknown argument $value, choose one of " .
                                 join(" ", sort keys %eib_c2b);
   }
   
   # the command can be send to any of the defined groups indexed starting by 1
+  # optional last argument starting with g indicates the group
   my $groupnr = 1;
-  if($a[1] eq "value" && $na > 3){$groupnr=$a[3]}
-  elsif ($na>2){$groupnr=$a[2]}
-  return "groupnr argument $groupnr must be numeric." if( $groupnr !~ m/[0-9]*/i);
+  $groupnr = $1 if($na>2 && $a[$na-1]=~ m/g([0-9]*)/);
   return "groupnr $groupnr not known." if(!$hash->{CODE}{$groupnr}); 
 
   my $v = join(" ", @a);
-  Log GetLogLevel($a[0],2), "EIB set $v";
+  Log GetLogLevel($name,2), "EIB set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
-  if($a[1] eq "value" && $na > 2) {                                
+  if($value eq "value" && defined($arg1)) {                                
   	# complex value command.
   	# the additional argument is transfered alone.
-    $c = $a[2];
+    $c = $arg1;
   }
 
   my $groupcode = $hash->{CODE}{$groupnr};
-
   IOWrite($hash, "B", "w" . $groupcode . $c);
 
   ###########################################
   # Delete any timer for on-for_timer
-  if($modules{EIB}{ldata}{$a[0]}) {
-    CommandDelete(undef, $a[0] . "_timer");
-    delete $modules{EIB}{ldata}{$a[0]};
+  if($modules{EIB}{ldata}{$name}) {
+    CommandDelete(undef, $name . "_timer");
+    delete $modules{EIB}{ldata}{$name};
   }
    
   ###########################################
   # Add a timer if any for-timer command has been chosen
-  if($a[1] =~ m/for-timer/ && $na == 3) {
-    my $dur = $a[2];
+  if($value =~ m/for-timer/ && defined($arg1)) {
+    my $dur = $arg1;
     my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
-    $modules{EIB}{ldata}{$a[0]} = $to;
-    Log 4, "Follow: +$to set $a[0] off";
-    CommandDefine(undef, $a[0] . "_timer at +$to set $a[0] off");
+    $modules{EIB}{ldata}{$name} = $to;
+    Log 4, "Follow: +$to set $name off g$groupnr";
+    CommandDefine(undef, $name . "_timer at +$to set $name off g$groupnr");
   }
 
   ###########################################
   # Delete any timer for on-till
-  if($modules{EIB}{till}{$a[0]}) {
-    CommandDelete(undef, $a[0] . "_till");
-    delete $modules{EIB}{till}{$a[0]};
+  if($modules{EIB}{till}{$name}) {
+    CommandDelete(undef, $name . "_till");
+    delete $modules{EIB}{till}{$name};
   }
   
   ###########################################
   # Add a timer if on-till command has been chosen
-  if($a[1] =~ m/on-till/ && $na == 3) {
-	  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+  if($value =~ m/on-till/ && defined($arg1)) {
+	  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($arg1);
 	  if($err) {
 	  	Log(2,"Error trying to parse timespec for $a[0] $a[1] $a[2] : $err");
 	  }
@@ -230,9 +236,9 @@ EIB_Set($@)
 		    Log 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
 		  }
 		  else {
-		    $modules{EIB}{till}{$a[0]} = $hms_till;
-		    Log 4, "Follow: $hms_till set $a[0] off";
-		    CommandDefine(undef, $a[0] . "_till at $hms_till set $a[0] off");
+		    $modules{EIB}{till}{$name} = $hms_till;
+		    Log 4, "Follow: $hms_till set $name off g$groupnr";
+		    CommandDefine(undef, $name . "_till at $hms_till set $name off g$groupnr");
 		  }
 	  }
   }
