@@ -1621,7 +1621,8 @@ my %culHmBits = (
 
 );
 
-my @culHmCmdBits = ( "WAKEUP", "WAKEMEUP", "BCAST", "", "BURST", "BIDI", "RPTED", "RPTEN");
+my @culHmCmdBits = ( "WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
+                     "BURST", "BIDI", "RPTED", "RPTEN");
 
 
 sub
