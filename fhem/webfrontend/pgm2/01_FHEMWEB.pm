@@ -856,19 +856,11 @@ FW_roomOverview($)
 
 ########################
 # Show the overview of devices in one room
+
+# API v1.0
 sub
-FW_showRoom()
-{
-  return if(!$FW_room);
-
-  # (re-) list the icons
-  FW_ReadIcons();
-
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
-  FW_pO "<div id=\"content\">";
-  FW_pO "<table>";  # Need for equal width of subtables
-
-  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
+FW_showRoom1($) {
+  my $rf= shift;
 
   my $row=1;
   foreach my $type (sort keys %FW_types) {
@@ -936,6 +928,39 @@ FW_showRoom()
     FW_pO "</td></tr>";
   }
   FW_pO "</table><br>";
+
+}
+
+# API v1.0
+sub
+FW_showRoom2($) {
+  my $rf= shift;
+  FW_pO "API v2<P>";
+}
+
+
+
+sub
+FW_showRoom()
+{
+  return if(!$FW_room);
+
+  # (re-) list the icons
+  FW_ReadIcons();
+
+  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<div id=\"content\">";
+  FW_pO "<table>";  # Need for equal width of subtables
+
+  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
+ 
+  my $apiversion= AttrVal("global", "apiversion", 1);
+  if($apiversion==1) {
+    FW_showRoom1($rf);
+  } else {
+    FW_showRoom2($rf);
+  };
+  
 
   # Now the weblinks
   my $buttons = 1;
