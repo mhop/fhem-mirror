@@ -106,6 +106,13 @@ my %models = (
     tm13        => 'switch',
 );
 
+my %interfaces = (
+    lm12        => 'dimmer',
+    lm15        => 'switch_passive',
+    am12        => 'switch_passive',
+    tm13        => 'switch_passive',
+);
+
 my @lampmodules = ('lm12','lm15'); # lamp modules
 
 
@@ -408,12 +415,7 @@ X10_Define($$)
   $hash->{HOUSE}  = $housecode;
   $hash->{UNIT}   = $unitcode;
 
-  if($models{$model} eq "switch") {
-    $hash->{INTERFACES}= "switch"
-  }
-  elsif($models{$model} eq "dimmer") {
-    $hash->{INTERFACES}= "dimmer"
-  };
+  $hash->{internals}{interfaces}= $interfaces{$model};
 
   if(defined($modules{X10}{defptr}{$housecode}{$unitcode})) {
     return "Error: duplicate X10 device $housecode $unitcode definition " .

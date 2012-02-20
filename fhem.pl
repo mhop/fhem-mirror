@@ -85,6 +85,7 @@ sub setGlobalAttrBeforeFork();
 sub redirectStdinStdErr();
 sub setReadingsVal($$$$);
 sub addEvent($$);
+sub createInterfaceDefinitions();
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -139,6 +140,7 @@ sub CommandTrigger($$);
 use vars qw(%modules);		# List of loaded modules (device/log/etc)
 use vars qw(%defs);		# FHEM device/button definitions
 use vars qw(%attr);		# Attributes
+use vars qw(%interfaces);       # Global interface definitions, see createInterfaceDefinitions below
 use vars qw(%selectlist);	# devices which want a "select"
 use vars qw(%readyfnlist);	# devices which want a "readyfn"
 use vars qw($readytimeout);	# Polling interval. UNIX: device search only
@@ -187,12 +189,13 @@ $init_done = 0;
 $modules{Global}{ORDER} = -1;
 $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
-        "archivecmd allowfrom archivedir configfile lastinclude logfile " .
+        "archivecmd allowfrom apiversion archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
         "autoload_undefined_devices dupTimeout latitude longitude  backupdir";
 $modules{Global}{AttrFn} = "GlobalAttr";
 my $commonAttr = "eventMap";
+
 
 
 %cmds = (
@@ -344,6 +347,9 @@ if($pfn) {
   print PID $$ . "\n";
   close(PID);
 }
+
+# create the global interface definitions
+createInterfaceDefinitions();
 
 $init_done = 1;
 DoTrigger("global", "INITIALIZED");
@@ -1604,6 +1610,12 @@ sub
 getAllSets($)
 {
   my $d = shift;
+  
+  if(AttrVal("global", "apiversion", 1)> 1) {
+    my @setters= getSetters($defs{$d});
+    return join(" ", @setters);
+  }
+
   my $a2 = CommandSet(undef, "$d ?");
   $a2 =~ s/.*choose one of //;
   $a2 = "" if($a2 =~ /^No set implemented for/);
@@ -2688,12 +2700,156 @@ addEvent($$)
   push(@{$hash->{CHANGED}}, $event);
 }
 
+################################################################
+#
+# Meta-information for devices
+# This part maintained by Boris Neubert omega at online dot de
+#
+################################################################
+
+sub
+Debug($) {
+  my $msg= shift;
+  Log 1, "DEBUG>" . $msg;
+}
+
+# get the names of interfaces for the device represented by the $hash
+# empty list is returned if interfaces are not defined
+sub
+getInterfaces($) {
+  my ($hash)= @_;
+  #Debug "getInterfaces(" . $hash->{NAME} .")= " . $hash->{internals}{interfaces};
+  if(defined($hash->{internals}{interfaces})) {
+    return split(/:/, $hash->{internals}{interfaces});
+  } else {
+    return ();
+  }
+}
+
+# get the names of the setters for a named interface
+# empty list is returned if interface is not defined
+sub
+getSettersForInterface($) {
+  my $interface= shift;
+  if(defined($interface)) {
+    return split /:/, $interfaces{$interface}{setters};
+  } else {
+    return ();
+  }
+}
+
+# get the names of the getters for a named interface
+# empty list is returned if interface is not defined
+sub
+getGettersForInterface($) {
+  my $interface= shift;
+  if(defined($interface)) {
+    return split /:/, $interfaces{$interface}{getters};
+  } else {
+    return ();
+  }
+}
+
+# get the names of the readings for a named interface
+# empty list is returned if interface is not defined
+sub
+getReadingsForInterface($) {
+  my $interface= shift;
+  if(defined($interface)) {
+    return split /:/, $interfaces{$interface}{readings};
+  } else {
+    return ();
+  }
+}
+
+# get the names of the setters for the device represented by the $hash
+# empty list is returned if interfaces are not defined
+sub
+getSetters($) {
+  my ($hash)= @_;
+  my ($interface, @setters);
+  #Debug "getSetters...";
+  foreach $interface (getInterfaces($hash)) {
+    #Debug "Interface $interface";
+    push @setters, getSettersForInterface($interface);
+  } 
+  return @setters;
+}
+
+# get the names of the getters for the device represented by the $hash
+# empty list is returned if interfaces are not defined
+sub
+getGetters($) {
+  my ($hash)= @_;
+  my @getters;
+  my $interface;
+  foreach $interface (getInterfaces($hash)) {
+    push @getters, getGettersForInterface($interface);
+  }
+  return @getters;
+}
+
+sub 
+concatc($$$) {
+  my ($separator,$a,$b)= @_;;
+  return($a && $b ?  $a . $separator . $b : $a . $b);
+}
+
+
+# this creates the standard interface definitions as in
+# http://fhemwiki.de/wiki/DevelopmentInterfaces
+sub
+createInterfaceDefinitions() {
+
+  Log 2, "Creating interface definitions...";
+  # The interfaces list below consists of lines with the 
+  # pipe-separated parts
+  # - name
+  # - ancestor
+  # - colon separated list of readings
+  # - colon-separated list of getters
+  # - colon-separated list of setters
+  # If no getters are listed they are considered identical
+  # to the readings.
+  # Ancestors must be listed before descendants.
+  # Two interfaces can share a subset of readings, getters and setters
+  # if and only if one interface is the ancestor of the other.
+  my $IDefs= <<EOD;
+interface||||
+switch|interface|onoff||
+switch_active|switch|||
+switch_passive|switch|||on:off
+dimmer|switch_passive|level||dimto:dimup:dimdown
+temperature|interface|temperature||
+humidity|interface|humidity||
+wind|interface|wind||
+power|interface|power:maxPower:energy||
+EOD
+  
+  my ($i,@p);
+  foreach $i (split /\n/, $IDefs) {
+    my ($interface,$ancestor,$readings,$getters,$setters)= split /\|/, $i;
+    $getters= $readings unless($getters);
+    if($ancestor) {
+      $readings=  concatc(":", $interfaces{$ancestor}{readings}, $readings);
+      $getters=  concatc(":", $interfaces{$ancestor}{getters}, $getters);
+      $setters=  concatc(":", $interfaces{$ancestor}{setters}, $setters);
+    }
+    $interfaces{$interface}{ancestor}= $ancestor;
+    $interfaces{$interface}{readings}= $readings;
+    $interfaces{$interface}{getters}= $getters;
+    $interfaces{$interface}{setters}= $setters;
+    Log 5, "Interface \"$interface\": " .
+           "readings \"$readings\", getters \"$getters\", setters \"$setters\"";
+  }
+
+}
 
 
 ################################################################
 #
 # Wrappers for commonly used core functions in device-specific modules. 
-# This part written by Boris Neubert omega at online dot de
+# This part maintained by Boris Neubert omega at online dot de
 #
 ################################################################
 
