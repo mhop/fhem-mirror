@@ -8175,8 +8175,9 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     The regexp will be checked against the (complete!) device name
     or against the (complete!) devicename:event combination.
     <br>
-    <code>&lt;filename&gt;</code> may contain one or more of the following
-    wildcards (a subset of the Unix date command arguments):
+    <code>&lt;filename&gt;</code> may contain %-wildcards of the 
+    POSIX strftime function of the underlying OS (see your strftime manual). 
+    Common used wildcards are:
     <ul>
     <li><code>%d</code> day of month (01..31)</li>
     <li><code>%m</code> month (01..12)</li>
@@ -8184,13 +8185,22 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
     <li><code>%w</code> day of week (0..6);  0 represents Sunday
     <li><code>%j</code> day of year (001..366)
     <li><code>%U</code> week number of year with Sunday as first day of week (00..53)
-    <li><code>%V</code> week number of year with Monday as first day of week (01..53)
+    <li><code>%W</code> week number of year with Monday as first day of week (00..53)
     </ul>
-
+    FHEM also replaces <code>%L</code> by the value of the global logdir attribute.<br>
+    Before using <code>%V</code> for ISO 8601 week numbers check if it is 
+    correctly supported by your system (%V may not be replaced, replaced by an 
+    empty string or by an incorrect ISO-8601 week number, especially 
+    at the beginning of the year)
+    If you use <code>%V</code> you will also have to use %G 
+    instead of %Y for the year!<br>
     Examples:
     <ul>
-      <code>define lamplog FileLog /var/tmp/lamp.log lamp</code><br>
+      <code>define lamplog FileLog %L/lamp.log lamp</code><br>
       <code>define wzlog FileLog /var/tmp/wz-%Y-%U.log
+              wz:(measured-temp|actuator).*</code><br>
+      With ISO 8601 week numbers, if supported:<br>
+      <code>define wzlog FileLog /var/tmp/wz-%G-%V.log
               wz:(measured-temp|actuator).*</code><br>
     </ul>
     <br>
