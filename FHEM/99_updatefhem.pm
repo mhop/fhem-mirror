@@ -44,7 +44,7 @@ CommandUpdatefhem($$)
     my $bdir = AttrVal("global", "backupdir", "$moddir.backup");
     my $dateTime = TimeNow();
     $dateTime =~ s/ /_/g;
-    my $ret = `(mkdir -p $bdir && tar cf - $moddir | gzip > $bdir/FHEM.$dateTime.tgz) 2>&1`;
+    my $ret = `(mkdir -p $bdir && tar hcf - $moddir | gzip > $bdir/FHEM.$dateTime.tgz) 2>&1`;
     return $ret if($ret);
     shift @args;
     $param = join("", @args);
