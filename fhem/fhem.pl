@@ -2052,23 +2052,13 @@ CommandChain($$)
 sub
 ResolveDateWildcards($@)
 {
+  use POSIX qw(strftime);
+
   my ($f, @t) = @_;
   return $f if(!$f);
   return $f if($f !~ m/%/);	# Be fast if there is no wildcard
-
-  my $S = sprintf("%02d", $t[0]);      $f =~ s/%S/$S/g;
-  my $M = sprintf("%02d", $t[1]);      $f =~ s/%M/$M/g;
-  my $H = sprintf("%02d", $t[2]);      $f =~ s/%H/$H/g;
-  my $d = sprintf("%02d", $t[3]);      $f =~ s/%d/$d/g;
-  my $m = sprintf("%02d", $t[4]+1);    $f =~ s/%m/$m/g;
-  my $Y = sprintf("%04d", $t[5]+1900); $f =~ s/%Y/$Y/g;
-  my $w = sprintf("%d",   $t[6]);      $f =~ s/%w/$w/g;
-  my $j = sprintf("%03d", $t[7]+1);    $f =~ s/%j/$j/g;
-  my $U = sprintf("%02d", int(($t[7]-$t[6]+6)/7));   $f =~ s/%U/$U/g;
-  my $V = sprintf("%02d", int(($t[7]-$t[6]+7)/7)+1); $f =~ s/%V/$V/g;
-  $f =~ s/%ld/$attr{global}{logdir}/g if($attr{global}{logdir}); #log directory
-
-  return $f;
+  $f =~ s/%L/$attr{global}{logdir}/g if($attr{global}{logdir}); #log directory
+  return strftime($f,@t);
 }
 
 sub
