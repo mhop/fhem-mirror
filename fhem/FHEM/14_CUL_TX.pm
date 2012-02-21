@@ -97,9 +97,9 @@ CUL_TX_Parse($$)
     $changedTxt = "temperature: $val";
 
   } elsif ($type eq "E") {
-   if($now - $def->{lastH} < $def->{minsecs} ) {
+    if($now - $def->{lastH} < $def->{minsecs} ) {
       return ""; 
-    } else {
+    }
     $def->{lastH} = $now;
     $msgtype = "humidity";
     $val = $valraw;
