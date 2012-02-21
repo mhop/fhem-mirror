@@ -2377,9 +2377,8 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
     <li>fhtbuf<br>
         CUL has a message buffer for the FHT. If the buffer is full, then newly
-        issued commands will be dropped, if the attribute <a
-        href="#fhtsoftbuffer">fhtsoftbuffer</a> is not set.
-        Instead, a "EOB" message is issued.
+        issued commands will be dropped, and an "EOB" message is issued to the
+        fhem log.
         <code>fhtbuf</code> returns the free memory in this buffer (in hex),
         an empty buffer in the CUL-V2 is 74 bytes, in CUL-V3/CUN 200 Bytes.
         A message occupies 3 + 2x(number of FHT commands) bytes,
