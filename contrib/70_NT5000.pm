@@ -2,13 +2,11 @@
 #
 # NT5000.pm
 #
-# An FHEM module to read the data from a Sunways NT5000 solar inverter
-#
-# Version 0.96 - January 2, 2012
+# FHEM module to read the data from a Sunways NT5000 solar inverter
 #
 # Prof. Dr. Peter A. Henning, 2011
 # 
-# still some beta functionality
+# Version 1.0 - February 21, 2012
 #
 # Setup as:
 # define  nt5000 NT5000  <device>
@@ -41,9 +39,22 @@
 #  attr    nt5000 Wx_M12 150
 #  attr    nt5000 Wx_Y 4800
 #
-# TODO:
-#  Anzeige month, year im State ist falsch (Juli: Month M:30, year Y:6)
-#  Anzeige cmd aus dem state heraus. 
+########################################################################################
+#
+#  This programm is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
 ########################################################################################
 package main;
