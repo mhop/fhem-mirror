@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.0 - February 21, 2012
+# Version 1.01 - February 23, 2012
 #   
 # Setup bus device in fhem.cfg as
 # define <name> OWTEMP [<model>] <ROM_ID> [interval] [alarminterval]
@@ -81,7 +81,7 @@ my $scale;
   #"family"      => "10",
   #"id"          => "",
   #"locator"     => "",
-  #"power"       => "",
+  "interval"    => "",
   "present"     => "",
   "temperature" => "",
   "temphigh"    => "",
@@ -169,7 +169,7 @@ sub OWTEMP_Define ($$) {
     Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
       if(int(@a) == 6);
   } else {    
-    return "OWTEMP: $a[0] hat missing ID or wrong ID format $a[2], specify a 12 digit value or set it to none for demo mode";
+    return "OWTEMP: $a[0] ID $a[2] invalid, specify a 12 digit value or set it to none for demo mode";
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
@@ -287,6 +287,12 @@ sub OWTEMP_Get($@) {
     $value = $hash->{INTERVAL};
      return "$a[0] $reading => $value";
   } 
+  
+  # get present
+  if($a[1] eq "present") {
+    $value = $hash->{PRESENT};
+     return "$a[0] $reading => $value";
+  } 
 
   #-- Get other values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -323,6 +329,7 @@ sub OWTEMP_Get($@) {
   $hash->{READINGS}{temphigh}{TIME} = $tn;
   
   #-- return the special reading
+  $reading = "temp" if( $reading eq "temperature");
   if(defined($hash->{READINGS}{$reading})) {
     $value = $hash->{READINGS}{$reading}{VAL};
   }
@@ -371,6 +378,7 @@ sub OWTEMP_GetUpdate($@) {
   my $interface= $hash->{IODev}->{TYPE};
   #-- real sensor
   if($hash->{OW_ID} ne "none") {
+    $hash->{PRESENT}    = 0;
     #-- Get values according to interface type
     my $interface= $hash->{IODev}->{TYPE};
     if( $interface eq "OWX" ){
@@ -516,13 +524,13 @@ sub OWTEMP_Set($@) {
 #
 # OWTEMP_Undef - Implements UndefFn function
 #
-# Parameter hash = hash of device addressed, name
+# Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWTEMP_Undef ($$) {
-  my ($hash, $name) = @_;
-  delete($modules{OWTEMP}{defptr}{$hash->{CODE}});
+sub OWTEMP_Undef ($) {
+  my ($hash) = @_;
+  #delete($modules{OWTEMP}{defptr}{$hash->{CODE}});
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -645,9 +653,17 @@ sub OWXTEMP_GetValues($) {
   if( $res eq 0 ){
     return "OWXTEMP: Device $owx_dev not accessible in 2nd step"; 
   }
+  my $res2 = "====> OWXTEMP Received ";
+  for(my $i=0;$i<19;$i++){  
+    my $j=int(ord(substr($res,$i,1))/16);
+    my $k=ord(substr($res,$i,1))%16;
+    $res2.=sprintf "0x%1x%1x ",$j,$k;
+  }
+  Log 1, $res2;
+     
   #-- process results
   my  @data=split(//,$res);
-  if (@data == 19){
+  if ( (@data == 19) && (ord($data[17])>0) ){
     my $count_remain = ord($data[16]);
     my $count_perc   = ord($data[17]);
     my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
@@ -660,10 +676,12 @@ sub OWXTEMP_GetValues($) {
     }
     $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
     $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+    
+    Log 1, "====> OWXTEMP Conversion result is temp = $owg_temp, delta $delta";
    
     return undef;
   } else {
-    return "OWXTEMP: Device $owx_dev returns wrong number @data of bytes";
+    return "OWXTEMP: Device $owx_dev returns invalid data";
   }
 }
 
