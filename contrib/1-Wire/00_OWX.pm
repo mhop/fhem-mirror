@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.0 - February 21, 2012
+# Version 1.01 - February 23, 2012
 #
 # Prof. Dr. Peter A. Henning, 2011
 #
@@ -366,53 +366,62 @@ sub OWX_Discover ($) {
   while( $owx_LastDeviceFlag==0 && $res!=0 ){
     $res = $res & OWX_Next($hash,"discover"); 
   }
-  if( @owx_devs == 0){
-     return "OWX: No devices found ";
-  }
    
   #-- Check, which of these is already defined in the cfg file
-  foreach my $owx_dev  (@owx_devs) {
-    #-- two pieces of the ROM ID found on the bus
-    my $owx_rnf = substr($owx_dev,3,12);
-    my $owx_f   = substr($owx_dev,0,2);
-    my $id_owx  = $owx_f.".".$owx_rnf;
+    foreach my $owx_dev  (@owx_devs) {
+      #-- two pieces of the ROM ID found on the bus
+      my $owx_rnf = substr($owx_dev,3,12);
+      my $owx_f   = substr($owx_dev,0,2);
+      my $id_owx  = $owx_f.".".$owx_rnf;
       
-    my $match = 0;
+      my $match = 0;
     
-    #-- check against all existing devices  
-    foreach my $fhem_dev (sort keys %main::defs) { 
-      #-- all OW types start with OW
-      next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
-      next if( $main::defs{$fhem_dev}{ROM_ID} eq "FF");
-      my $id_fhem = substr($main::defs{$fhem_dev}{ROM_ID},0,15);
-      #-- testing if present in defined devices   
-      if( $id_fhem eq $id_owx ){
-        push(@owx_names,$main::defs{$fhem_dev}{NAME});
-        #-- replace the ROM ID by the proper value 
-        $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
-        $match = 1;
-        last;
+      #-- check against all existing devices  
+      foreach my $fhem_dev (sort keys %main::defs) { 
+        #-- all OW types start with OW
+        next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
+        next if( $main::defs{$fhem_dev}{ROM_ID} eq "FF");
+        my $id_fhem = substr($main::defs{$fhem_dev}{ROM_ID},0,15);
+        #-- testing if present in defined devices   
+        if( $id_fhem eq $id_owx ){
+          push(@owx_names,$main::defs{$fhem_dev}{NAME});
+          #-- replace the ROM ID by the proper value 
+          $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
+          $main::defs{$fhem_dev}{PRESENT}=1;
+          $match = 1;
+          last;
+        }
       }
-    }
     
-    #-- autocreate the device
-    if( $match==0 ){
-      #-- Default name OWX_FF_XXXXXXXXXXXX, default type = OWX_FF
-      my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
+      #-- autocreate the device
+      if( $match==0 ){
+        #-- Default name OWX_FF_XXXXXXXXXXXX, default type = OWX_FF
+        my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
      
-      if( $owx_f eq "10" ){
-        #-- Family 10 = Temperature sensor, assume DS1820 as default
-        CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf"); 
-        #-- default room
-        CommandAttr (undef,"$name IODev $hash->{NAME}"); 
-        CommandAttr (undef,"$name room OWX"); 
-        push(@owx_names,$name);
-      } else {
-        Log 1, "OWX: Undefined device family $owx_f";
+        if( $owx_f eq "10" ){
+          #-- Family 10 = Temperature sensor, assume DS1820 as default
+          CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf"); 
+          $main::defs{$name}{PRESENT}=1;
+          #-- default room
+          CommandAttr (undef,"$name IODev $hash->{NAME}"); 
+          CommandAttr (undef,"$name room OWX"); 
+          push(@owx_names,$name);
+        } else {
+          Log 1, "OWX: Undefined device family $owx_f";
+        }
+        #-- replace the ROM ID by the proper value 
+        $main::defs{$name}{ROM_ID}=$owx_dev;
       }
-      #-- replace the ROM ID by the proper value 
-      $main::defs{$name}{ROM_ID}=$owx_dev;
     }
+
+  #-- final step: Undefine all 1-Wire devices which are not on the bus
+  #   TODO: IF WE HAVE MULTIPLE IO Devices ???
+  foreach my $fhem_dev (sort keys %main::defs) { 
+    #-- all OW types start with OW
+    next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
+    next if( $main::defs{$fhem_dev}{ROM_ID} eq "FF");
+    next if( $main::defs{$fhem_dev}{PRESENT} == 1);
+    CommandDelete(undef,$main::defs{$fhem_dev}{NAME});
   }
   Log 1, "OWX: 1-Wire devices found (".join(",",@owx_names).")";
   return "OWX: 1-Wire devices found (".join(",",@owx_names).")";
@@ -566,7 +575,6 @@ sub OWX_Search ($$) {
     $owx_LastFamilyDiscrepancy = 0;
     return 0;
   }
-  #print "Reset ok when starting search \n";
   
   #-- Here we call the device dependent part
   if( $owx_interface eq "DS2480" ){
@@ -577,7 +585,6 @@ sub OWX_Search ($$) {
     Log 1,"OWX: Search called with unknown interface";
     return 0;
   }
-  
   #--check if we really found a device
   if( OWX_CRC()!= 0){  
   #-- reset the search
@@ -750,7 +757,6 @@ sub OWX_Verify ($$) {
   if ($dev eq $dev2){
     return 1;
   }else{
-    # print "Searching for $dev, but found $dev2\n";
     return 0;
   }
 }
@@ -793,8 +799,8 @@ sub OWX_Block_2480 ($$) {
     Log 5, "OWX_Block: OK";
     return $res;
   } else {
-    Log 3, "OWX_Block: failure, length=".length($res);
-    return $res;
+    Log 3, "OWX_Block: DAS 2480 failure, received ".length($data)." bytes";
+    return 0;
   }
 }
 
@@ -890,7 +896,7 @@ sub OWX_Query_2480 ($$) {
     my $count_out = $owx_serport->write($cmd);
 
     Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
-    #-- sleeping 0.03 seconds
+    #-- sleeping for some time
     select(undef,undef,undef,0.04);
  
     #-- read the data
@@ -906,7 +912,7 @@ sub OWX_Query_2480 ($$) {
       Log 3, $res;
     }
 	
-    #-- sleeping 0.03 seconds
+    #-- sleeping for some time
     select(undef,undef,undef,0.04);
    
     $owx_serport->close();
@@ -1123,14 +1129,16 @@ sub OWX_Block_9097 ($$) {
   my ($hash,$data) =@_;
   
    my $data2="";
+   my $res=0;
    for (my $i=0; $i<length($data);$i++){
-     $data2 = $data2.OWX_TouchByte_9097($hash,ord(substr($data,$i,1)));
+     $res = OWX_TouchByte_9097($hash,ord(substr($data,$i,1)));
+     $data2 = $data2.chr($res);
    }
    #-- process result
    if( length($data2) == length($data) ){
      return $data2;
    } else {
-     Log 3, "OWX: DS9097 block failure";
+     Log 3, "OWX: DS9097 block failure, received ".length($data2)." bytes";
      return 0;
    }
 }
@@ -1178,9 +1186,8 @@ sub OWX_Query_9097 ($$) {
     my $count_out = $owx_serport->write($cmd);
 
     Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
-    #-- sleeping 0.03 seconds
-    #select(undef,undef,undef,0.03);
-    #select(undef,undef,undef,0.05);
+    #-- sleeping for some time
+    select(undef,undef,undef,0.01);
  
     #-- read the data
     my ($count_in, $string_in) = $owx_serport->read(32);
@@ -1195,9 +1202,8 @@ sub OWX_Query_9097 ($$) {
       Log 3, $res;
     }
 	
-    #-- sleeping 0.03 seconds
-    #select(undef,undef,undef,0.03);
-    select(undef,undef,undef,0.05);
+    #-- sleeping for some time
+    select(undef,undef,undef,0.01);
    
     $owx_serport->close();
     return($string_in);
@@ -1408,6 +1414,7 @@ sub OWX_TouchByte_9097 ($$) {
   
   my $loop;
   my $result=0;
+  my $bytein=$byte;
   
   for( $loop=0; $loop < 8; $loop++ ){
     #-- shift result to get ready for the next bit
@@ -1422,6 +1429,10 @@ sub OWX_TouchByte_9097 ($$) {
     }
     $byte >>= 1;
   }
+  #print "-----------------------\n";
+  #printf "Sending byte /%02x/\n",$bytein;
+  #printf "Receiving byte /%02x/\n",$result;
+  #print "-----------------------\n";
   return $result;
 }
 
