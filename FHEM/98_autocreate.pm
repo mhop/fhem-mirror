@@ -47,8 +47,15 @@ my %flogpar = (
       => { GPLOT => "rain4:RainRate",  FILTER => "%NAME" },
 
   # X10 sensors received by RFXCOM
-  "RFXX10SEC.*"
+  "(RFXX10SEC|TRX_DS10A).*"
       => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
+  # X10 Window sensors received by RFXTRX
+  "TRX_DS10A.*"
+       => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
+  # TX3 temperature sensors received by RFXTRX
+  "TX3_T.*"
+       => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
+
 
   # USB-WDE1
   "USBWX_[0-8]"
@@ -311,6 +318,15 @@ my @usbtable = (
       request   => pack("H*", "8105044fc90185"),   # get fhtbuf
       response  => "^\x81........",
       define    => "FHZ_PARAM FHZ DEVICE", },
+
+    { NAME      => "TRX",
+      matchList => ["cu.usbserial(.*)", "ttyUSB(.*)"],
+      DeviceName=> "DEVICE\@38400",
+      init      => pack("H*", "0D00000000000000000000000000"),   # Reset 
+      request   => pack("H*", "0D00000102000000000000000000"),   # GetStatus 
+      response  => "^\x0d\x01\x00...........",
+      define    => "TRX_PARAM TRX DEVICE\@38400", },
+
 );
 
 
@@ -388,6 +404,12 @@ CommandUsb($$)
             $msg = "cannot open the device";
             Log 4, $msg; $ret .= $msg . "\n";
             goto NEXTDEVICE;
+          }
+
+          # Send reset (optional)
+          if(defined($thash->{init})) {
+            DevIo_SimpleWrite($hash, $thash->{init}, 0);
+            DevIo_TimeoutRead($hash, 0.5);
           }
 
           # Clear the USB buffer
