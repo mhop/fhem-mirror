@@ -14,6 +14,7 @@
   - feature: FHEMWEB redirectCmds attribute added
   - feature: CUL_TX minsecs attribute (by Arno)
   - feature: webCmd in smallScreen added
+  - feature: TRX modules by Willi
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
