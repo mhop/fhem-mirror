@@ -490,3 +490,7 @@
   - Improving 10_EIB.pm by introducing Get and interpreting received value according 
     to the selected model (based on datapoint types.)
   - Introduced documentation for TUL / EIB modules.  
+
+- Fr Feb 24 2012 (Willi)
+  - New modules TRX for RFXCOM RFXtrx transceiver
+
