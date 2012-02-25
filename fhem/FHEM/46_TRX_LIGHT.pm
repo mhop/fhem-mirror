@@ -148,12 +148,12 @@ TRX_LIGHT_Set($@)
   my $seqnr = 0;
   my $cmnd = $i;
 
-  my $hex_command = sprintf "0710%02x%02x%02x%02x%02x00", $device_type_num, $seqnr, $house, $unit, $cmnd; 
+  my $hex_prefix = sprintf "0710";
+  my $hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num, $seqnr, $house, $unit, $cmnd; 
   Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command" if ($TRX_LIGHT_debug == 1);
   Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
 
-  #IOWrite($hash, pack('H*', $hex_command));
-  IOWrite($hash, "", $hex_command);
+  IOWrite($hash, $hex_prefix, $hex_command);
 
   my $tn = TimeNow();
   $hash->{CHANGED}[0] = $command;
