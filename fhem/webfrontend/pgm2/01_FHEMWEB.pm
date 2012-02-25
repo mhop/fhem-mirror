@@ -21,14 +21,14 @@ sub FW_makeEdit($$$);
 sub FW_makeTable($$@);
 sub FW_ReadIcons();
 sub FW_roomOverview($);
-sub FW_select($$$);
+sub FW_select($$$$);
 sub FW_showLog($);
 sub FW_showRoom();
 sub FW_showWeblink($$$$);
 sub FW_style($$);
 sub FW_submit($$);
 sub FW_substcfg($$$$$$);
-sub FW_textfield($$);
+sub FW_textfield($$$);
 sub FW_updateHashes();
 sub FW_zoomLink($$$);
 sub pF($@);
@@ -656,9 +656,9 @@ FW_makeTable($$@)
 
 ##############################
 sub
-FW_makeSelect($$$)
+FW_makeSelect($$$$)
 {
-  my ($d, $cmd, $list) = @_;
+  my ($d, $cmd, $list,$class) = @_;
   return if(!$list || $FW_hiddenroom{input});
   my @al = map { s/[:;].*//;$_ } split(" ", $list);
 
@@ -666,8 +666,8 @@ FW_makeSelect($$$)
   FW_pO FW_hidden("detail", $d);
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd) . "&nbsp;$d";
-  FW_pO FW_select("arg.$cmd$d",\@al,undef);
-  FW_pO FW_textfield("val.$cmd$d", 30);
+  FW_pO FW_select("arg.$cmd$d",\@al,undef,$class);
+  FW_pO FW_textfield("val.$cmd$d", 30, $class);
   FW_pO "</form>";
 }
 
@@ -696,12 +696,13 @@ FW_doDetail($)
     }
   }
   FW_pO "<table><tr><td>";
-  FW_makeSelect($d, "set", getAllSets($d));
+  FW_makeSelect($d, "set", getAllSets($d),"set");
   FW_makeTable($d, $defs{$d});
   FW_pO "Readings" if($defs{$d}{READINGS});
   FW_makeTable($d, $defs{$d}{READINGS});
-  FW_makeSelect($d, "attr", getAllAttr($d));
+  FW_makeSelect($d, "attr", getAllAttr($d),"attr");
   FW_makeTable($d, $attr{$d}, "deleteattr");
+
 
   if($t eq "FileLog" ) {
     FW_pO "<table class=\"block wide\">";
@@ -757,7 +758,7 @@ FW_roomOverview($)
   FW_pO '<table border="0"><tr><td style="padding:0">';
   FW_pO "<form method=\"get\" action=\"$FW_ME\">";
   FW_pO FW_hidden("room", "$FW_room") if($FW_room);
-  FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40);
+  FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
   if(!$FW_ss && !$FW_hiddenroom{save}) {
     FW_pO "</form></td><td><form>" . FW_submit("cmd", "save");
   }
@@ -913,7 +914,7 @@ FW_showRoom1($) {
           FW_pO "<td>".
              FW_hidden("arg.$d", "desired-temp") .
              FW_hidden("dev.$d", $d) .
-             FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt)) .
+             FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt),"fht") .
              "</td><td>".
              FW_submit("cmd.$d", "set").
              "</td>";
@@ -1279,10 +1280,10 @@ FW_hidden($$)
 ##################
 # Generate a select field with option list
 sub
-FW_select($$$)
+FW_select($$$$)
 {
-  my ($n, $va, $def) = @_;
-  my $s = "<select name=\"$n\">";
+  my ($n, $va, $def,$class) = @_;
+  my $s = "<select name=\"$n\" class=\"$class\">";
 
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
@@ -1297,11 +1298,11 @@ FW_select($$$)
 
 ##################
 sub
-FW_textfield($$)
+FW_textfield($$$)
 {
-  my ($n, $z) = @_;
+  my ($n, $z, $class) = @_;
   return if($FW_hiddenroom{input});
-  my $s = "<input type=\"text\" name=\"$n\" size=\"$z\"/>";
+  my $s = "<input type=\"text\" name=\"$n\" class=\"$class\" size=\"$z\"/>";
   return $s;
 }
 
@@ -1552,7 +1553,7 @@ FW_style($$)
     FW_pO     FW_submit("save", "Save $f");
     FW_pO     "&nbsp;&nbsp;";
     FW_pO     FW_submit("saveAs", "Save as");
-    FW_pO     FW_textfield("saveName", 30);
+    FW_pO     FW_textfield("saveName", 30, "saveName");
     FW_pO     "<br><br>";
     FW_pO     FW_hidden("cmd", "style save $a[2]");
     FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
