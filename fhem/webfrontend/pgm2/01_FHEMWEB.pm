@@ -91,7 +91,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheetPrefix hiddenroom HTTPS longpoll redirectCmds";
+                     "stylesheetPrefix hiddenroom HTTPS longpoll redirectCmds ";
 
   ###############
   # Initialize internal structures
@@ -157,7 +157,7 @@ FW_Undef($$)
 
   return undef if($hash->{INUSE});
 
-  if(defined($hash->{CD})) {                   # Clients
+  if(defined($hash->{CD})) { # Clients
     close($hash->{CD});
     delete($selectlist{$name});
   }
@@ -325,6 +325,7 @@ sub
 FW_AnswerCall($)
 {
   my ($arg) = @_;
+  my $me=$defs{$FW_cname};      # cache, else rereadcfg will delete us
 
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
@@ -412,14 +413,13 @@ FW_AnswerCall($)
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");
   $FW_reldoc = "$FW_ME/commandref.html";
-
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
   if($FW_inform) {      # Longpoll header
-    $defs{$FW_cname}{inform} = $FW_room;
+    $me->{inform} = $FW_room;
     # NTFY_ORDER is larger than the normal order (50-)
-    $defs{$FW_cname}{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
-    my $c = $defs{$FW_cname}{CD};
+    $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
+    my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
              "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
     return -1;
@@ -441,7 +441,7 @@ FW_AnswerCall($)
     my $tgt = $FW_ME;
        if($FW_detail) { $tgt .= "?detail=$FW_detail" }
     elsif($FW_room)   { $tgt .= "?room=$FW_room" }
-    my $c = $defs{$FW_cname}{CD};
+    my $c = $me->{CD};
     print $c "HTTP/1.1 302 Found\r\n",
              "Content-Length: 0\r\n",
              "Location: $tgt\r\n",
