@@ -12,7 +12,7 @@
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id: 
+# $Id$ 
 package main;
 
 use strict;

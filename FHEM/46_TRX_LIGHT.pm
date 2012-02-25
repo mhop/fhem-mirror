@@ -22,7 +22,7 @@
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id: 43_TRX_LIGHT.pm 1098 2011-11-12 07:51:08Z rudolfkoenig $
+# $Id$
 package main;
 
 use strict;

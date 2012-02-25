@@ -27,7 +27,7 @@
 # derived from 00_CUL.pm
 #
 ###########################
-# $Id:
+# $Id$
 package main;
 
 use strict;
