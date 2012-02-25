@@ -606,7 +606,7 @@ CommandIOWrite($$)
   my ($cl, $param) = @_;
   my @a = split(" ", $param);
 
-  return "Usage: iowrite <iodev> <param> ..." if(int(@a) <= 2);
+  return "Usage: iowrite <iodev> <param> ..." if(int(@a) < 2);
 
   my $name = shift(@a);
   my $hash = $defs{$name};
