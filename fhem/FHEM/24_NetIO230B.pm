@@ -37,7 +37,7 @@
 # Changes:
 #---------
 # 2012-02-03	0.1		initial realease
-#
+# 2012-02-25	0.2		removed dependencies for LWP::UserAgent and HTTP::Request;
 
 ################################################################
 package main;
@@ -45,8 +45,7 @@ package main;
 use strict;
 use warnings;
 use Data::Dumper;
-use LWP::UserAgent;
-use HTTP::Request;
+use IO::Socket;
 
 use constant PARAM_NAME 	=> 1;
 use constant PARAM_HOST 	=> 2;
@@ -121,46 +120,29 @@ NetIO230B_Request($@)
 	my $URL='';
 	my $log='';
 
-	$URL="http://".$hash->{HOST}."/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=";
-	if($cmd eq "set") {
-		$URL .= "$list";
-	} else {
-		$URL .= "l";
-	}
-
-	my $agent = LWP::UserAgent->new(env_proxy => 1,keep_alive => 1, timeout => 30);
-	my $header = HTTP::Request->new(GET => $URL);
-	my $request = HTTP::Request->new('GET', $URL, $header);
-	my $response = $agent->request($request);
-
-	$log.= "Can't get $URL -- ".$response->status_line
-		unless $response->is_success;
-
-	if($log ne "")
+	my $response = GetHttpFile($hash->{HOST}.":80","/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=l");
+	if(!$response or length($response)==0)
 	{
-		Log 3, "NetIO230B_Request: ".$log;
+		Log 3, "NetIO230B_Request failed: ".$log;
 		return("");
   	}
 
-	# read decoded content
-	my $buffer =  $response->decoded_content;
-
 	# strip html tags
-	$buffer =~ s/<(?:[^>'"]*|(['"]).*?\1)*>//gs;
+	$response =~ s/<(?:[^>'"]*|(['"]).*?\1)*>//gs;
 
 	# strip leading whitespace
-	$buffer =~ s/^\s+//;
+	$response =~ s/^\s+//;
 
 	#strip trailing whitespace
-	$buffer =~ s/\s+$//;
+	$response =~ s/\s+$//;
 
-	return $buffer if ($cmd eq "set");
+	return $response if ($cmd eq "set");
 
 	#+++todo
 	#555 FORBIDDEN
 
 	#split the result into an array
-	my @values=split(/ */,$buffer);
+	my @values=split(/ */,$response);
 
 	#save the values to the readings hash
 	my $state = "???";
@@ -183,7 +165,7 @@ NetIO230B_Request($@)
 	#	Log 1,  "$r  S: $k{$r}{VAL}  T: $k{$r}{TIME}";
 	#}
 
-    return $buffer;
+    return $response;
 }
 
 ### _Define routing is called when fhem starts -> 'reloading' of the module does not call the define routine!!
