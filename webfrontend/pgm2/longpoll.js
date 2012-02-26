@@ -1,14 +1,6 @@
 var pollConn;
 
 function
-cmd(arg)
-{
-  var req = new XMLHttpRequest();
-  req.open("GET", arg, true);
-  req.send(null);
-}
-
-function
 doUpdate()
 {
   if(pollConn.readyState != 4 || pollConn.status != 200)
