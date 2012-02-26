@@ -87,7 +87,7 @@ CommandUpdatefhem($$)
     my $remfile = $f;
 
     if($f eq "fhem.pl") {
-      $ret .= "updated fhem.pl, restart of fhem is required\n";
+      $ret .= "updated fhem.pl, 'shutdown restart' is required\n";
       $newfhem = 1;
       $localfile = $0;
       $remfile = "$f.txt";
