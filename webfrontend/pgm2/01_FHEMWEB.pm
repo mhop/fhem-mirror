@@ -100,6 +100,7 @@ FHEMWEB_Initialize($)
   %FW_zoom = map { $_, $n++ } @FW_zoom;
 
   addToAttrList("webCmd");
+  addToAttrList("icon");
 }
 
 #####################################
@@ -660,7 +661,7 @@ FW_makeSelect($$$$)
 {
   my ($d, $cmd, $list,$class) = @_;
   return if(!$list || $FW_hiddenroom{input});
-  my @al = map { s/[:;].*//;$_ } split(" ", $list);
+  my @al = sort map { s/[:;].*//;$_ } split(" ", $list);
 
   FW_pO "<form method=\"get\" action=\"$FW_ME\">";
   FW_pO FW_hidden("detail", $d);
@@ -712,9 +713,12 @@ FW_doDetail($)
 
   FW_pO "</td></tr></table>";
 
-  FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, 1) if($t eq "weblink");
+  if($t eq "weblink") {
+    FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, 1);
+    FW_pO "<br><br>";
+  }
 
-  FW_pO "<br><br>";
+  FW_pH "cmd=style iconFor $d", "Select icon";
   FW_pH "$FW_reldoc#${t}", "Device specific help";
   FW_pO "<br><br>";
   FW_pO "</div>";
@@ -832,6 +836,7 @@ FW_roomOverview($)
 
   } else {
 
+    FW_ReadIcons();
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
@@ -840,10 +845,14 @@ FW_roomOverview($)
           if($idx<int(@list1)-1);
       } else {
         pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
+        my $icon = "";
+        $icon = "<img src=\"$FW_ME/icons/".$FW_icons{"ico$l1"}."\">&nbsp;"
+                if($FW_icons{"ico$l1"});
+
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
-           FW_pO "<td><a href=\"$l2\">$l1</a></td>";
+           FW_pO "<td><a href=\"$l2\">$icon$l1</a></td>";
         } else {
-          FW_pH $l2, $l1, 1;
+          FW_pH $l2, "$icon$l1", 1;
         }
         FW_pO "</tr>";
       }
@@ -857,12 +866,19 @@ FW_roomOverview($)
 
 ########################
 # Show the overview of devices in one room
-
-# API v1.0
 sub
-FW_showRoom1($) {
-  my $rf= shift;
+FW_showRoom()
+{
+  return if(!$FW_room);
 
+  # (re-) list the icons
+  FW_ReadIcons();
+
+  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<div id=\"content\">";
+  FW_pO "<table>";  # Need for equal width of subtables
+
+  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
   my $row=1;
   foreach my $type (sort keys %FW_types) {
 
@@ -884,14 +900,14 @@ FW_showRoom1($) {
 
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
       my $devName = AttrVal($d, "alias", $d);
+      my $icon = AttrVal($d, "icon", "");
+      $icon = "<img src=\"$FW_ME/icons/$icon\">&nbsp;" if($icon);
+
       if($FW_hiddenroom{detail}) {
-        FW_pO "<td><div class=\"col1\">$devName</div></td>";
-
+        FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
       } else {
-        FW_pH "detail=$d", $devName, 1, "col1";
-
+        FW_pH "detail=$d", "$icon$devName", 1, "col1";
       }
-
       $row++;
 
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
@@ -929,39 +945,6 @@ FW_showRoom1($) {
     FW_pO "</td></tr>";
   }
   FW_pO "</table><br>";
-
-}
-
-# API v1.0
-sub
-FW_showRoom2($) {
-  my $rf= shift;
-  FW_pO "API v2<P>";
-}
-
-
-
-sub
-FW_showRoom()
-{
-  return if(!$FW_room);
-
-  # (re-) list the icons
-  FW_ReadIcons();
-
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
-  FW_pO "<div id=\"content\">";
-  FW_pO "<table>";  # Need for equal width of subtables
-
-  my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
- 
-  my $apiversion= AttrVal("global", "apiversion", 1);
-  if($apiversion==1) {
-    FW_showRoom1($rf);
-  } else {
-    FW_showRoom2($rf);
-  };
-  
 
   # Now the weblinks
   my $buttons = 1;
@@ -1580,6 +1563,19 @@ FW_style($$)
     $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fName");
     FW_style("style list", $ret);
     $ret = "";
+
+  } elsif($a[1] eq "iconFor") {
+    FW_ReadIcons();
+    FW_pO "<div id=\"content\"><table class=\"iconFor\">";
+    foreach my $i (sort grep {/^ico/} keys %FW_icons) {
+      FW_pO "<tr><td>";
+      FW_pO "<a href=\"$FW_ME?cmd=attr $a[2] icon $FW_icons{$i}\">$i</a>";
+      FW_pO "</td><td>";
+      FW_pO "<img src=\"$FW_ME/icons/$FW_icons{$i}\">";
+      FW_pO "</td></tr>";
+    }
+    FW_pO "</table></div>";
+
   }
 
 }
