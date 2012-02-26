@@ -417,7 +417,7 @@ FW_AnswerCall($)
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
   if($FW_inform) {      # Longpoll header
-    $me->{inform} = $FW_room;
+    $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $me->{CD};
@@ -806,6 +806,7 @@ FW_roomOverview($)
 #     "Examples",   "$FW_ME/cmd=style%20examples",
      "Edit files", "$FW_ME/cmd=style%20list",
      "Select style","$FW_ME/cmd=style%20select",
+     "Console",     "$FW_ME/cmd=style%20console",
      "",           "");
   my $lastname = ","; # Avoid double "".
   for(my $idx = 0; $idx < @list; $idx+= 2) {
@@ -1576,6 +1577,12 @@ FW_style($$)
     }
     FW_pO "</table></div>";
 
+  } elsif($a[1] eq "console") {
+    FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/console.js\"></script>";
+    FW_pO "<div id=\"content\">";
+    FW_pO "<div id=\"console\">";
+    FW_pO "</div>";
+    FW_pO "</div>";
   }
 
 }
@@ -1849,26 +1856,44 @@ FW_Notify($$)
   return undef if(!$filter);
 
   my $ln = $ntfy->{NAME};
-
   my $dn = $dev->{NAME};
-  return undef if($filter ne "all" && AttrVal($dn, "room", "") ne $filter);
+  my $data;
 
-  FW_ReadIcons();
+  if($filter eq "all" || AttrVal($dn, "room", "") eq $filter) {
+    FW_ReadIcons();
 
-  my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp);
-  $FW_wname = $ntfy->{SNAME};
-  $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
-  $FW_longpoll = 1;
-  $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
-  $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
-  my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
-  ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp) = @old;
+    my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp);
+    $FW_wname = $ntfy->{SNAME};
+    $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
+    $FW_longpoll = 1;
+    $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
+    $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
+    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
+    ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp) = @old;
+    $data = "$dn;$dev->{STATE};$txt\n";
 
-  # Collect multiple changes (e.g. from noties) into one message
-  $ntfy->{INFORMBUF} = "" if(!defined($ntfy->{INFORMBUF}));
-  $ntfy->{INFORMBUF} .= "$dn;$dev->{STATE};$txt\n";
-  RemoveInternalTimer($ln);
-  InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+  } elsif($filter eq "console") {
+    if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
+      my $tn = TimeNow();
+      if($attr{global}{mseclog}) {
+        my ($seconds, $microseconds) = gettimeofday();
+        $tn .= sprintf(".%03d", $microseconds/1000);
+      }
+      my $max = int(@{$dev->{CHANGED}});
+      my $dt = $dev->{TYPE};
+      for(my $i = 0; $i < $max; $i++) {
+        $data .= "$tn $dt $dn ".$dev->{CHANGED}[$i]."<br>\n";
+      }
+    }
+
+  }
+
+  if($data) {
+    # Collect multiple changes (e.g. from noties) into one message
+    $ntfy->{INFORMBUF} .= $data;
+    RemoveInternalTimer($ln);
+    InternalTimer(gettimeofday()+0.1, "FW_FlushInform", $ln, 0);
+  }
 
   return undef;
 }
@@ -1881,6 +1906,7 @@ FW_FlushInform($)
   return if(!$hash);
   my $c = $hash->{CD};
   print $c $hash->{INFORMBUF};
+  $hash->{INFORMBUF}="";
 
   CommandDelete(undef, $name);
 }

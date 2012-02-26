@@ -16,6 +16,7 @@
   - feature: webCmd in smallScreen added
   - feature: TRX modules by Willi
   - feature: FHEMWEB icons (by Joerg)
+  - feature: FHEMWEB console (== inform timer)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
