@@ -289,7 +289,7 @@ HMLAN_Parse($$)
     $hash->{owner} = $owner;
     $hash->{uptime} = HMLAN_uptime($msec);
     my $myId = AttrVal($name, "hmId", $owner);
-    if($owner ne $myId && !AttrVal($name, "dummy", 0)) {
+    if(lc($owner) ne lc($myId) && !AttrVal($name, "dummy", 0)) {
       Log 1, "HMLAN setting owner to $myId from $owner";
       HMLAN_SimpleWrite($hash, "A$myId");
     }
