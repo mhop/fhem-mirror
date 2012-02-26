@@ -30,3 +30,4 @@ div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
 div#dist { padding-top:0.3em; }
 
 select.attr,input.attr,select.set,input.set { margin-bottom:5px; }
+a img { border-style:none; }
