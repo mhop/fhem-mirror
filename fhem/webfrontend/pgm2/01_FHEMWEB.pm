@@ -387,6 +387,9 @@ FW_AnswerCall($)
 
   }
 
+  $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
+  $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
+                                                $FW_tp ? "640,160" : "800,160");
   ##############################
   # Axels FHEMWEB modules...
   $arg = $1;
@@ -410,9 +413,6 @@ FW_AnswerCall($)
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
-  $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
-  $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
-                                                $FW_tp ? "640,160" : "800,160");
   $FW_reldoc = "$FW_ME/commandref.html";
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
