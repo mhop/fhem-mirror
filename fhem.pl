@@ -1224,7 +1224,6 @@ CommandDefine($$)
   my ($cl, $def) = @_;
   my @a = split("[ \t][ \t]*", $def, 3);
   my $name = $a[0];
-
   return "Usage: define <name> <type> <type dependent arguments>"
   					if(int(@a) < 2);
   return "$name already defined, delete it first" if(defined($defs{$name}));
@@ -2157,7 +2156,11 @@ DoTrigger($$)
   return "" if(!defined($defs{$dev}));
 
   if(defined($ns)) {
-    $defs{$dev}{CHANGED}[0] = $ns;
+    if($defs{$dev}{CHANGED}) {
+      push @{$defs{$dev}{CHANGED}}, $ns;
+    } else {
+      $defs{$dev}{CHANGED}[0] = $ns;
+    }
   } elsif(!defined($defs{$dev}{CHANGED})) {
     return "";
   }
@@ -2192,29 +2195,30 @@ DoTrigger($$)
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
       $ret .= $r if($r);
     }
-    delete($defs{$dev}{INTRIGGER});
-  }
 
-  ################
-  # Inform
-  if($defs{$dev}{CHANGED}) {    # It gets deleted sometimes (?)
-    $max = int(@{$defs{$dev}{CHANGED}}); # can be enriched in the notifies
-    foreach my $c (keys %client) {        # Do client loop first, is cheaper
-      next if(!$client{$c}{inform} || $client{$c}{inform} eq "raw");
-      my $tn = TimeNow();
-      if($attr{global}{mseclog}) {
-        my ($seconds, $microseconds) = gettimeofday();
-        $tn .= sprintf(".%03d", $microseconds/1000);
-      }
-      my $re = $client{$c}{informRegexp};
-      for(my $i = 0; $i < $max; $i++) {
-        my $state = $defs{$dev}{CHANGED}[$i];
-        next if($re && $state !~ m/$re/);
-        syswrite($client{$c}{fd},
-          ($client{$c}{inform} eq "timer" ? "$tn " : "") .
-          "$defs{$dev}{TYPE} $dev $state\n");
+    ################
+    # Inform
+    if($defs{$dev}{CHANGED}) {    # It gets deleted sometimes (?)
+      $max = int(@{$defs{$dev}{CHANGED}}); # can be enriched in the notifies
+      foreach my $c (keys %client) {        # Do client loop first, is cheaper
+        next if(!$client{$c}{inform} || $client{$c}{inform} eq "raw");
+        my $tn = TimeNow();
+        if($attr{global}{mseclog}) {
+          my ($seconds, $microseconds) = gettimeofday();
+          $tn .= sprintf(".%03d", $microseconds/1000);
+        }
+        my $re = $client{$c}{informRegexp};
+        for(my $i = 0; $i < $max; $i++) {
+          my $state = $defs{$dev}{CHANGED}[$i];
+          next if($re && $state !~ m/$re/);
+          syswrite($client{$c}{fd},
+            ($client{$c}{inform} eq "timer" ? "$tn " : "") .
+            "$defs{$dev}{TYPE} $dev $state\n");
+        }
       }
     }
+
+    delete($defs{$dev}{INTRIGGER});
   }
 
 
