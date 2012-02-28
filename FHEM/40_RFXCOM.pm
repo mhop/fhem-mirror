@@ -290,7 +290,7 @@ RFXCOM_Read($)
   #Log 1, "RFXCOM: RFXCOM_Read '$hexline'";
 
   # first char as byte represents number of bits of the message
-  my $bits = ord($rfxcom_data);
+  my $bits = ord(substr($rfxcom_data,0,1));
   my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
 
   while(length($rfxcom_data) > $num_bytes) {
@@ -304,6 +304,8 @@ RFXCOM_Read($)
     #Log 1, "RFXCOM_Read rfxcom_data '$hexline'";
     #
     RFXCOM_Parse($hash, $hash, $name, $rmsg);
+    $bits = ord(substr($rfxcom_data,0,1));
+    $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
   }
   #Log 1, "RFXCOM_Read END";
 
