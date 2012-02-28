@@ -297,7 +297,7 @@ TRX_Read($)
   #Log 1, "TRX: TRX_Read '$hexline'";
 
   # first char as byte represents number of bytes of the message
-  my $num_bytes = ord($TRX_data);
+  my $num_bytes = ord(substr($TRX_data,0,1));
 
   while(length($TRX_data) > $num_bytes) {
     # the buffer contains at least the number of bytes we need
@@ -310,6 +310,7 @@ TRX_Read($)
     #Log 1, "TRX_Read TRX_data '$hexline'";
     #
     TRX_Parse($hash, $hash, $name, unpack('H*', $rmsg));
+    $num_bytes = ord(substr($TRX_data,0,1));
   }
   #Log 1, "TRX_Read END";
 
