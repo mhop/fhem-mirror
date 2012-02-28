@@ -19,6 +19,9 @@ use strict;
 use warnings;
 use Switch;
 
+# Debug this module? YES = 1, NO = 0
+my $TRX_ELSE_debug = 0;
+
 my $time_old = 0;
 
 sub
@@ -31,8 +34,8 @@ TRX_ELSE_Initialize($)
   $hash->{UndefFn}   = "TRX_ELSE_Undef";
   $hash->{ParseFn}   = "TRX_ELSE_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
-Log 1, "TRX_ELSE: Initialize";
 
+  Log 1, "TRX_ELSE: Initialize" if ($TRX_ELSE_debug == 1);
 }
 
 #####################################
@@ -85,7 +88,6 @@ TRX_ELSE_Parse($$)
 
   # convert to binary
   my $bin_msg = pack('H*', $msg);
-  #my $hexline = unpack('H*', $bin_msg);
   #Log 1, "TRX_ELSE: 2 hex=$hexline";
 
   # convert string to array of bytes. Skip length byte
@@ -94,9 +96,28 @@ TRX_ELSE_Parse($$)
     push (@rfxcom_data_array, ord($_) );
   }
 
-  Log 0, "TRX_ELSE: hex=$msg";
+  my $num_bytes = ord(substr($msg,0,1));
 
-  return "Test";
+  if ($num_bytes < 3) {
+    return;
+  }
+
+  my $type = $rfxcom_data_array[0];
+
+  Log 1, "TRX_ELSE: num_bytes=$num_bytes hex=$msg type=$type" if ($TRX_ELSE_debug == 1);
+  my $res = "";
+  if ($type == 0x02) {
+	my $subtype = $rfxcom_data_array[1];
+	my $msg = $rfxcom_data_array[2];
+	if (($msg != 0x00) && ($msg != 0x01)) {
+  		Log 0, "TRX_ELSE: error transmit NACK=".sprintf("%02x",$msg);
+	} 
+  } else {
+  	Log 0, "TRX_ELSE: hex=$msg";
+  }
+
+
+  return "";
 }
 
 1;
