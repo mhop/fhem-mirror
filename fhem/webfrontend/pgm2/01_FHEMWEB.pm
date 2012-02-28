@@ -393,13 +393,23 @@ FW_AnswerCall($)
   ##############################
   # Axels FHEMWEB modules...
   $arg = $1;
+  my $fwextPtr;
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       if($arg =~ m/^$k/) {
-        no strict "refs";
-        ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
-        use strict "refs";
-        return 0;
+
+        if($data{FWEXT}{$k}{EMBEDDED}) {
+          $fwextPtr = $data{FWEXT}{$k};
+          last;
+
+        } else {
+          no strict "refs";
+          ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
+          use strict "refs";
+          return 0;
+
+        }
+
       }
     }
   }
@@ -496,10 +506,14 @@ FW_AnswerCall($)
   my $rf = AttrVal($FW_wname, "refresh", "");
   FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   FW_pO "<link href=\"$FW_ME/style.css\" rel=\"stylesheet\"/>";
+  FW_pO "<link href=\"$fwextPtr->{STYLESHEET}\" rel=\"stylesheet\"/>"
+                        if($fwextPtr && $fwextPtr->{STYLESHEET});
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
                         if($FW_longpoll);
+  FW_pO "<script type=\"text/javascript\" src=\"$fwextPtr->{JAVASCRIPT}\"></script>"
+                        if($fwextPtr && $fwextPtr->{JAVASCRIPT});
   FW_pO "</head>\n<body name=\"$t\">";
 
   if($FW_cmdret) {
@@ -519,7 +533,8 @@ FW_AnswerCall($)
   } 
 
   FW_roomOverview($cmd);
-     if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
+     if($fwextPtr)             { &{$fwextPtr->{FUNC}}($arg); }
+  elsif($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
   elsif($cmd =~ /^logwrapper/) { FW_logWrapper($cmd);     }
