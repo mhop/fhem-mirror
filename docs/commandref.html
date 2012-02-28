@@ -920,7 +920,12 @@ A line ending with \ will be concatenated with the next one, so long lines
     commands which were previously part of the config file. If you need such
     commands after the initialization (e.g.  <a href="FHZset">FHTcode</a>), you
     should trigger them via <a href="#notify">notify</a>, when receiving the
-    INITIALIZED event.
+    INITIALIZED event.</li>
+
+    <li>save tries to preserve comments (lines starting with #) and include
+    structures, but it won't work correctly if some of these files are not
+    writeable.</li>
+
   </ul>
 </ul>
 
