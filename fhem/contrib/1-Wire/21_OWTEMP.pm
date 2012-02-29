@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.01 - February 23, 2012
+# Version 1.02 - February 29, 2012
 #   
 # Setup bus device in fhem.cfg as
 # define <name> OWTEMP [<model>] <ROM_ID> [interval] [alarminterval]
@@ -52,6 +52,9 @@
 #  GNU General Public License for more details.
 #
 ########################################################################################
+#
+# TODO: offset in alarm values
+#
 package main;
 
 #-- Prototypes to make komodo happy
@@ -71,32 +74,18 @@ my $owg_temp=0;
 my $owg_th=0;
 my $owg_tl=0;
 
-# temperature scale from IODev
-my $scale;
-
 %gets = (
-  #"address"     => "",
-  #"alias"       => "",
-  #"crc8"        => "",
-  #"family"      => "10",
-  #"id"          => "",
-  #"locator"     => "",
-  "interval"    => "",
   "present"     => "",
+  "interval"    => "",
   "temperature" => "",
   "temphigh"    => "",
   "templow"     => ""
-  #,
-  #"type"        => "",
 );
 
 %sets = (
-  #-- obsolete "alias"         => "",
+  "interval"      => "",
   "temphigh"      => "",
-  "templow"       => "",
-  "interval"      => ""
-  #-- taken out into I/O-Device parameters,
-  #"alarminterval" => "",
+  "templow"       => ""
 );
 
 %updates = (
@@ -120,11 +109,32 @@ my %dummy = (
 
 ########################################################################################
 #
-# The following subroutines in alphabetical order are independent of the bus interface
+# The following subroutines are independent of the bus interface
 #
 # Prefix = OWTEMP
 #
-#########################################################################################
+########################################################################################
+#
+# OWTEMP_Initialize
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWTEMP_Initialize ($) {
+  my ($hash) = @_;
+
+  $hash->{DefFn}   = "OWTEMP_Define";
+  $hash->{UndefFn} = "OWTEMP_Undef";
+  $hash->{GetFn}   = "OWTEMP_Get";
+  $hash->{SetFn}   = "OWTEMP_Set";
+  #offset = a temperature offset added to the temperature reading for correction 
+  #scale  = a unit of measure: C/F/K/R
+  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS18S20 loglevel:0,1,2,3,4,5 ".
+                     "offset scale:C,F,K,R";
+  }
+  
+########################################################################################
 #
 # OWTEMP_Define - Implements DefFn function
 # 
@@ -139,12 +149,12 @@ sub OWTEMP_Define ($$) {
   # e.g.: define flow OWTEMP 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$model,$id,$interval,$alarminterval,$scale,$ret);
+  my ($name,$model,$id,$interval,$alarminterval,$ret);
+  my $tn = TimeNow();
   
   #-- default
   $name          = $a[0];
   $interval      = 300;
-  $scale         = "";
   $ret           = "";
 
   #-- check syntax
@@ -171,17 +181,15 @@ sub OWTEMP_Define ($$) {
   } else {    
     return "OWTEMP: $a[0] ID $a[2] invalid, specify a 12 digit value or set it to none for demo mode";
   }
-  
+
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #    
-  #   Careful: For now this is effectively only 14 characters = 7 byte long and 
-  #   must not be passed back to the 1-Wire bus. The 8th byte is the CRC code
-  #   and will be appended in the first call of GetTemperatures
-  #   TODO: should be replaced by a calculation of the CRC value !
+  #   YY must be determined from id
+  my $crc = sprintf("%02x",OWX_CRC("10.".$id."00"));
+  
   #-- define device internals
   $hash->{ALARM}      = 0;
   $hash->{INTERVAL}   = $interval;
-  $hash->{ROM_ID}     = "10.".$id."00";
+  $hash->{ROM_ID}     = "10.".$id.$crc;
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = 10;
   $hash->{PRESENT}    = 0;
@@ -192,24 +200,15 @@ sub OWTEMP_Define ($$) {
   Log 3, "OWTEMP: Warning, no 1-Wire I/O device found for $name."
     if(!defined($hash->{IODev}->{NAME}));
 
-  #-- get scale from I/O device
-  $scale = $attr{$hash->{IODev}->{NAME}}{"temp-scale"};
-  # define scale for temperature values
-  $scale = "Celsius"    if ($scale eq "C");
-  $scale = "Fahrenheit" if ($scale eq "F");
-  $scale = "Kelvin"     if ($scale eq "K");
-  $scale = "Rankine"    if ($scale eq "R");
-  $hash->{OW_SCALE} = $scale;
-
   #-- define dummy values for testing
   if($hash->{OW_ID} eq "none") {
     my $now   = TimeNow();
     $dummy{address}     = $hash->{OW_FAMILY}.$hash->{OW_ID}.$dummy{crc8};
     $dummy{family}      = $hash->{OW_FAMILY};
     $dummy{id}          = $hash->{OW_ID};
-    $dummy{temperature} = "80.0000 (".$hash->{OW_SCALE}.")";
+    $dummy{temperature} = "80.0000";
     foreach my $r (sort keys %gets) {
-      $hash->{READINGS}{$r}{TIME} = $now;
+      $hash->{READINGS}{$r}{TIME} = $tn;
       $hash->{READINGS}{$r}{VAL}  = $dummy{$r};
       Log 4, "OWTEMP: $hash->{NAME} $r: ".$dummy{$r};
     }
@@ -224,39 +223,12 @@ sub OWTEMP_Define ($$) {
     $hash->{STATE}                    = "Defined";
     Log 3, "OWTEMP: Device $name defined."; 
   }  
-  # start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 0);
+  #-- Start timer for updates
+  InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 0);
 
-  # initialize device
-  #$ret = OWFS_InitializeDevice($hash);
-  #return "OWFS Can't initialize Device $name" if (!defined($ret));
-  #$hash->{STATE} = "Initialized";
-  
-  #-- InternalTimer blocks if init_done is not true
-  #my $oid = $init_done;
   $hash->{STATE} = "Initialized";
   return undef; 
 }
-
-#########################################################################################
-#
-# OWTEMP_Initialize
-#
-# Parameter hash = hash of device addressed
-#
-########################################################################################
-
-sub OWTEMP_Initialize ($) {
-  my ($hash) = @_;
-
-  $hash->{DefFn}   = "OWTEMP_Define";
-  $hash->{UndefFn} = "OWTEMP_Undef";
-  $hash->{GetFn}   = "OWTEMP_Get";
-  $hash->{SetFn}   = "OWTEMP_Set";
-    #offset = a temperature offset added to the temperature reading 
-  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS18S20 loglevel:0,1,2,3,4,5 ".
-                       "offset ";
-  }
   
 ########################################################################################
 #
@@ -268,8 +240,12 @@ sub OWTEMP_Initialize ($) {
 
 sub OWTEMP_Get($@) {
   my ($hash, @a) = @_;
-  my $name  = $hash->{NAME};
-  my $ret;
+  
+  my $reading = $a[1];
+  my $name    = $hash->{NAME};
+  my $model   = $hash->{OW_MODEL};
+  my $value   = undef;
+  my $ret     = "";
 
   #-- check argument
   return "OWTEMP: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
@@ -278,17 +254,13 @@ sub OWTEMP_Get($@) {
   return "OWTEMP: Get argument is missing @a"
     if(int(@a) != 2);
 
-  # define vars
-  my $reading = $a[1];
-  my $value = undef;
-
-  # get interval
+  #-- get interval
   if($a[1] eq "interval") {
     $value = $hash->{INTERVAL};
      return "$a[0] $reading => $value";
   } 
   
-  # get present
+  #-- get present
   if($a[1] eq "present") {
     $value = $hash->{PRESENT};
      return "$a[0] $reading => $value";
@@ -342,38 +314,26 @@ sub OWTEMP_Get($@) {
 
 #######################################################################################
 #
-# OWTEMP_GetUpdate - Updates the reading from one device
+# OWTEMP_GetValues - Updates the readings from device
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWTEMP_GetUpdate($@) {
-  my $hash  = shift;
+sub OWTEMP_GetValues($@) {
+  my $hash    = shift;
   
-  my $name  = $hash->{NAME};
-  my $model = $hash->{OW_MODEL};
-  my $owx_dev  = $hash->{ROM_ID};
-    my $now     = TimeNow();
+  my $name    = $hash->{NAME};
+  my $model   = $hash->{OW_MODEL};
   my $value   = "";
-  my $temp    = "";
   my $ret     = "";
-  my $count   = 0;
   
   #-- define warnings
-  my $warn        = "none";
   $hash->{ALARM}  = "0";
 
   #-- restart timer for updates
-  #if(!$hash->{LOCAL}) {
-    RemoveInternalTimer($hash);
-    InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 1);
-  #}
-
-  # set new state
-  #($temp,undef) = split(" ",$hash->{READINGS}{temperature}{VAL});
-  #$warn = $hash->{READINGS}{warnings}{VAL};
-  #$hash->{STATE} = "T: $temp  W: $warn";
+  RemoveInternalTimer($hash);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 1);
 
   my $interface= $hash->{IODev}->{TYPE};
   #-- real sensor
@@ -386,7 +346,7 @@ sub OWTEMP_GetUpdate($@) {
     }elsif( $interface eq "OWFS" ){
       $ret = OWFSTEMP_GetValues($hash);
     }else{
-      return "OWTEMP: GetUpdate with wrong IODev type $interface";
+      return "OWTEMP: GetValues with wrong IODev type $interface";
     }
   #-- dummy sensor
   } else {
@@ -427,7 +387,7 @@ sub OWTEMP_GetUpdate($@) {
 
 #######################################################################################
 #
-# OWTEMP_Set - Set values for one device
+# OWTEMP_Set - Set on values for device
 #
 #  Parameter hash = hash of device addressed
 #            a = argument string
@@ -436,6 +396,7 @@ sub OWTEMP_GetUpdate($@) {
 
 sub OWTEMP_Set($@) {
   my ($hash, @a) = @_;
+  
   my $name  = $hash->{NAME};
   my $model = $hash->{OW_MODEL};
   my $path  = "10.".$hash->{OW_ID};
@@ -469,7 +430,7 @@ sub OWTEMP_Set($@) {
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 1);
     return undef;
   }
 
@@ -530,7 +491,8 @@ sub OWTEMP_Set($@) {
 
 sub OWTEMP_Undef ($) {
   my ($hash) = @_;
-  #delete($modules{OWTEMP}{defptr}{$hash->{CODE}});
+  
+  delete($modules{OWTEMP}{defptr}{$hash->{OW_ID}});
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -608,7 +570,7 @@ sub OWXTEMP_GetValues($) {
 
   my ($hash) = @_;
   
-  #-- For now, switch of temperature conversion command
+  #-- For now, switch off temperature conversion command
   my $con=0;
   
   #-- ID of the device
