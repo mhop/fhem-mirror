@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.01 - February 23, 2012
+# Version 1.02 - February 29, 2012
 #
 # Prof. Dr. Peter A. Henning, 2011
 #
@@ -203,9 +203,13 @@ sub OWX_Convert($) {
 #
 # OWX_CRC - Check the CRC8 code of a device address in @owx_ROM_ID
 #
+# Parameter romid = if not zero, return the CRC8 value instead of checking it
+#
 ########################################################################################
 
-sub OWX_CRC () {
+sub OWX_CRC ($) {
+  my ($romid) = @_;
+  
   my @crc8_table = (
     0, 94,188,226, 97, 63,221,131,194,156,126, 32,163,253, 31, 65,
     157,195, 33,127,252,162, 64, 30, 95, 1,227,189, 62, 96,130,220,
@@ -225,12 +229,74 @@ sub OWX_CRC () {
     116, 42,200,150, 21, 75,169,247,182,232, 10, 84,215,137,107, 53);
 
   my $crc8=0;  
-  
-  for(my $i=0; $i<8; $i++){
-    $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
-  }  
-  return $crc8;
+
+  if( $romid eq "0" ){  
+    for(my $i=0; $i<8; $i++){
+      $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
+    }  
+    return $crc8;
+  } else {
+    #-- from search string to byte id
+    $romid=~s/\.//g;
+    for(my $i=0;$i<8;$i++){
+      $owx_ROM_ID[$i]=hex(substr($romid,2*$i,2));
+    }
+    for(my $i=0; $i<7; $i++){
+      $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
+    }  
+    return $crc8;
+  }
 }  
+
+########################################################################################
+#
+# OWX_CRC16 - Calculate the CRC16 code of a string
+#
+# Parameter crc - previous CRC code, c next character
+#
+########################################################################################
+
+sub OWX_CRC16($) {
+  my ($data) = @_;
+
+  my $crc=0;
+  for( my $i=0; $i<length($data); $i++) {
+    $crc = OWX_DOCRC16($crc,substr($data,$i,1));
+    printf "=====> New CRC value = %x",$crc;
+  }
+  return $crc;
+}
+  
+  
+sub OWX_DOCRC16($$) {
+  my ($crc,$c) = @_;
+
+  #-- polynomial for x^16 + x^15 + x^2 + 1
+  my $mask = 0xA001;
+  
+  my $i;
+  for($i=0;$i<8;$i++) {
+    if(($crc ^ ord($c)) & 1) { 
+      $crc=($crc>>1)^$mask; 
+    } else {
+      $crc>>=1;
+    }
+    $c>>=1;
+  }
+  return ($crc);
+}
+
+#//-------------------------------------------------------------------#
+
+#Aufruf der Funktion im Programm:
+
+#{
+#//...
+#  unsigned int DEVICE_CRC16=0;
+#  DEVICE_CRC16 = calcCRC16r (DEVICE_CRC16,chr,0xA001);
+#//...
+#}
+
 
 
 ########################################################################################
@@ -312,26 +378,39 @@ sub OWX_Define ($$) {
 sub OWX_Detect ($) {
   my ($hash) = @_;
   
-  my ($i,$j,$k);
+  my ($i,$j,$k,$l,$res,$ret);
   #-- timing byte for DS2480
   OWX_Query_2480($hash,"\xC1");
-  #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
-  my $res = OWX_Query_2480($hash,"\x17\x45\x5B\x0F\x91");
   
-  #-- process 4/5-byte string for detection
-  if( $res eq "\x16\x44\x5A\x00\x93"){
-    Log 1, "OWX: 1-Wire bus master DS2480 detected for the first time";
-    $owx_interface="DS2480";
-    return 1;
-  } elsif( $res eq "\x17\x45\x5B\x0F\x91"){
-    Log 1, "OWX: 1-Wire bus master DS2480 re-detected";
-    $owx_interface="DS2480";
-    return 1;
-  } elsif( ($res eq "\x17\x0A\x5B\x0F\x02") || ($res eq "\x00\x17\x0A\x5B\x0F\x02") ){
-    Log 1, "OWX: Passive 1-Wire bus interface DS9097 detected";
-    $owx_interface="DS9097";
-    return 1;
-  } else {
+  #-- Max 4 tries to detect an interface
+  
+  for($l=0;$l<4;$l++) {
+    #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
+    $res = OWX_Query_2480($hash,"\x17\x45\x5B\x0F\x91");
+  
+    #-- process 4/5-byte string for detection
+    if( $res eq "\x16\x44\x5A\x00\x93"){
+      Log 1, "OWX: 1-Wire bus master DS2480 detected for the first time";
+      $owx_interface="DS2480";
+      $ret=1;
+    } elsif( $res eq "\x17\x45\x5B\x0F\x91"){
+      Log 1, "OWX: 1-Wire bus master DS2480 re-detected";
+      $owx_interface="DS2480";
+      $ret=1;
+    } elsif( ($res eq "\x17\x0A\x5B\x0F\x02") || ($res eq "\x00\x17\x0A\x5B\x0F\x02") ){
+      Log 1, "OWX: Passive 1-Wire bus interface DS9097 detected";
+      $owx_interface="DS9097";
+      $ret=1;
+    } else {
+      $ret=0;
+    }
+    last 
+      if( $ret==1 );
+    Log 1, "OWX: Trying again to detect an interface";
+    #-- sleeping for some time
+    select(undef,undef,undef,0.5);
+  }
+  if( $ret == 0 ){
     my $ress = "OWX: No 1-Wire bus interface detected, answer was ";
     for($i=0;$i<length($res);$i++){
       $j=int(ord(substr($res,$i,1))/16);
@@ -339,8 +418,8 @@ sub OWX_Detect ($) {
       $ress.=sprintf "0x%1x%1x ",$i,$j,$k;
     }
     Log 1, $ress;
-    return 0;
   }
+  return $ret;
 }
 
 ########################################################################################
@@ -401,6 +480,14 @@ sub OWX_Discover ($) {
         if( $owx_f eq "10" ){
           #-- Family 10 = Temperature sensor, assume DS1820 as default
           CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf"); 
+          $main::defs{$name}{PRESENT}=1;
+          #-- default room
+          CommandAttr (undef,"$name IODev $hash->{NAME}"); 
+          CommandAttr (undef,"$name room OWX"); 
+          push(@owx_names,$name);
+        } elsif( $owx_f eq "20" ){
+          #-- Family 20 = A/D converter, assume DS2450 as default
+          CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
           $main::defs{$name}{PRESENT}=1;
           #-- default room
           CommandAttr (undef,"$name IODev $hash->{NAME}"); 
@@ -494,7 +581,7 @@ sub OWX_Initialize ($) {
   my ($hash) = @_;
   #-- Provider
   #$hash->{Clients}    = ":OWCOUNT:OWHUB:OWLCD:OWMULTI:OWSWITCH:OWTEMP:";
-  $hash->{Clients}    = ":OWTEMP:";
+  $hash->{Clients}    = ":OWTEMP:OWAD:";
 
   #-- Normal Devices
   $hash->{DefFn}   = "OWX_Define";
@@ -586,7 +673,7 @@ sub OWX_Search ($$) {
     return 0;
   }
   #--check if we really found a device
-  if( OWX_CRC()!= 0){  
+  if( OWX_CRC(0)!= 0){  
   #-- reset the search
     Log 1, "OWX: Search CRC failed ";
     $owx_LastDiscrepancy = 0;
@@ -707,25 +794,6 @@ sub OWX_Undef ($$) {
 
 ########################################################################################
 #
-# OBSOLETE subroutine OWX_Values - stub function for OWX_yy
-# Necessary, because at time of first scheduling the OWX_yy subs are not yet knwon
-#
-# Parameter hash = hash of device addressed
-#
-########################################################################################
-
- sub OWX_Values ($) {
-  my ($hash) = @_; 
-  
-  my $fam;
-  foreach $fam (@owx_fams) {
-  } 
-  my $res=OWXTEMP_Values($hash);
-  return $res;
-}
-
-########################################################################################
-#
 # OWX_Verify - Verify a particular device on the 1-Wire bus
 #
 # Parameter hash = hash of bus master, dev =  8 Byte ROM ID of device to be tested
@@ -794,14 +862,7 @@ sub OWX_Block_2480 ($$) {
   }
   #-- write 1-Wire bus as a single string
   my $res =OWX_Query_2480($hash,$data2);
-  #-- process result
-  if( length($res) == length($data) ){
-    Log 5, "OWX_Block: OK";
-    return $res;
-  } else {
-    Log 3, "OWX_Block: DAS 2480 failure, received ".length($data)." bytes";
-    return 0;
-  }
+  return $res;
 }
 
 ########################################################################################
@@ -900,7 +961,7 @@ sub OWX_Query_2480 ($$) {
     select(undef,undef,undef,0.04);
  
     #-- read the data
-    my ($count_in, $string_in) = $owx_serport->read(32);
+    my ($count_in, $string_in) = $owx_serport->read(48);
     
     if( $owx_debug > 1){
       my $res = "OWX: Receiving ";
@@ -941,7 +1002,7 @@ sub OWX_Reset_2480 ($) {
     $cmd = "\xE3";
   }
   #-- Reset command \xC5
-  $cmd  = $cmd."\xC5"; 
+  $cmd  = $cmd."\xC1"; 
   #-- write 1-Wire bus
   my $res =OWX_Query_2480($hash,$cmd);
   #-- process result
@@ -1134,13 +1195,7 @@ sub OWX_Block_9097 ($$) {
      $res = OWX_TouchByte_9097($hash,ord(substr($data,$i,1)));
      $data2 = $data2.chr($res);
    }
-   #-- process result
-   if( length($data2) == length($data) ){
-     return $data2;
-   } else {
-     Log 3, "OWX: DS9097 block failure, received ".length($data2)." bytes";
-     return 0;
-   }
+   return $data2;
 }
 
 ########################################################################################
@@ -1190,7 +1245,7 @@ sub OWX_Query_9097 ($$) {
     select(undef,undef,undef,0.01);
  
     #-- read the data
-    my ($count_in, $string_in) = $owx_serport->read(32);
+    my ($count_in, $string_in) = $owx_serport->read(48);
     
      if( $owx_debug > 1){
       my $res = "OWX: Receiving ";
