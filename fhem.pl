@@ -959,6 +959,7 @@ CommandRereadCfg($$)
   }
 
   my $cfgfile = $attr{global}{configfile};
+  %comments = ();
   %defs = ();
   %attr = ();
   %selectlist = ();
