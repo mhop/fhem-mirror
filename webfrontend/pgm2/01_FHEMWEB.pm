@@ -568,6 +568,7 @@ FW_digestCgi($)
 
     # Multiline: escape the NL for fhem
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
+    $v =~ s/%([0-9A-F][0-9A-F])/sprintf("%c", $1)/gi;
     $FW_webArgs{$p} = $v;
 
     if($p eq "detail")       { $FW_detail = $v; }
@@ -808,7 +809,10 @@ FW_roomOverview($)
   foreach my $r (sort keys %FW_rooms) {
     next if($r eq "hidden" || $FW_hiddenroom{$r});
     $FW_room = $r if(!$FW_room && $FW_ss);
+    $r =~ s/</&lt;/g;
+    $r =~ s/>/&lt;/g;
     push @list1, $r;
+    $r =~ s/ /%20/g;
     push @list2, "$FW_ME?room=$r";
   }
   my @list = (
