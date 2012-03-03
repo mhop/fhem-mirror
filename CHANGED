@@ -17,6 +17,8 @@
   - feature: TRX modules by Willi
   - feature: FHEMWEB icons (by Joerg)
   - feature: FHEMWEB console (== inform timer)
+  - feature: remove dependency on Google::Weather, major rewrite (Boris)
+  - feature: started experimental interface implementation (fhem API v2) (Boris)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
