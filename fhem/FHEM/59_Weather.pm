@@ -8,10 +8,14 @@
 # $Id$
 package main;
 
+my $UseWeatherGoogle= 0;
+
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-use Weather::Google;
+if($UseWeatherGoogle) {
+  use Weather::Google;
+}
 
 
 #####################################
@@ -44,58 +48,78 @@ sub Weather_UpdateReading($$$$) {
 
   return 0 if(!defined($value) || $value eq "");
 
-  #Log 1, "DEBUG WEATHER: $prefix $key $value"; 
-  
+  #Log 1, "DEBUG WEATHER: $prefix $key $value";
+
   if($key eq "low") {
         $key= "low_c";
-        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
+        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");
   } elsif($key eq "high") {
-        $key= "high_c"; 
-        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");  
+        $key= "high_c";
+        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");
   } elsif($key eq "humidity") {
         # standardize reading - allow generic logging of humidity.
         $value=~ s/.*?(\d+).*/$1/; # extract numeric
   }
 
   my $reading= $prefix . $key;
-  
+
   readingsUpdate($hash,$reading,$value);
-  if($reading eq "temp_c") { 
+  if($reading eq "temp_c") {
     readingsUpdate($hash,"temperature",$value); # additional entry for compatability
   }
   if($reading eq "wind_condition") {
     $value=~ s/.*?(\d+).*/$1/; # extract numeric
     readingsUpdate($hash,"wind",$value); # additional entry for compatability
   }
-   
+
   return 1;
 }
 
 ###################################
-sub Weather_GetUpdate($)
+sub Weather_RetrieveDataDirectly($)
 {
-  my ($hash) = @_;
+  my ($hash)= @_;
+  my $location= $hash->{LOCATION};
+  #$location =~ s/([^\w()â€™*~!.-])/sprintf '%%%02x', ord $1/eg;
+  my $lang= $hash->{LANG}; 
 
-  if(!$hash->{LOCAL}) {
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Weather_GetUpdate", $hash, 1);
+  my $fc = undef;
+  my $xml = GetHttpFile("www.google.com:80", "/ig/api?weather=" . $location . "&hl=" . $lang);
+  foreach my $l (split("<",$xml)) {
+          #Log 1, "DEBUG WEATHER: line=\"$l\"";
+          next if($l eq "");                   # skip empty lines
+          $l =~ s/(\/|\?)?>$//;                # strip off /> and >
+          my ($tag,$value)= split(" ", $l, 2); # split tag data=..... at the first blank
+          #Log 1, "DEBUG WEATHER: tag=\"$tag\" value=\"$value\"";
+          $fc= 0 if($tag eq "current_conditions");
+          $fc++ if($tag eq "forecast_conditions");
+          next if(!defined($value) || ($value !~ /^data=/));
+          my $prefix= $fc ? "fc" . $fc ."_" : "";
+          my $key= $tag;
+          $value=~ s/^data=\"(.*)\"$/$1/;      # extract DATA from data="DATA"
+          #Log 1, "DEBUG WEATHER: prefix=\"$prefix\" tag=\"$tag\" value=\"$value\"";
+          Weather_UpdateReading($hash,$prefix,$key,$value);
   }
+}
 
-  my $name = $hash->{NAME};
-
-  
-  readingsBeginUpdate($hash);
-
+###################################
+sub Weather_RetrieveDataViaWeatherGoogle($)
+{
+  my ($hash)= @_;
 
   # get weather information from Google weather API
   # see http://search.cpan.org/~possum/Weather-Google-0.03/lib/Weather/Google.pm
 
   my $location= $hash->{LOCATION};
-  my $lang= $hash->{LANG}; 
+  my $lang= $hash->{LANG};
+  my $name = $hash->{NAME};
   my $WeatherObj;
-  Log 4, "$name: Updating weather information for $location, language $lang."; 
+
+  Log 4, "$name: Updating weather information for $location, language $lang.";
   eval {
-        $WeatherObj= new Weather::Google($location, {language => $lang}); 
+        $WeatherObj= new Weather::Google($location, {language => $lang});
   };
+
   if($@) {
         Log 1, "$name: Could not retrieve weather information.";
         return 0;
@@ -123,6 +147,26 @@ sub Weather_GetUpdate($)
                 my $value= $fcc->{$condition};
                 Weather_UpdateReading($hash,$prefix,$condition,$value);
         }
+  }
+
+}
+
+###################################
+sub Weather_GetUpdate($)
+{
+  my ($hash) = @_;
+
+  if(!$hash->{LOCAL}) {
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "Weather_GetUpdate", $hash, 1);
+  }
+
+  
+  readingsBeginUpdate($hash);
+
+  if($UseWeatherGoogle) {
+    Weather_RetrieveDataViaWeatherGoogle($hash);
+  } else {
+    Weather_RetrieveDataDirectly($hash);
   }
 
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
