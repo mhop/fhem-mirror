@@ -825,7 +825,7 @@ FW_roomOverview($)
 #     "Examples",   "$FW_ME/cmd=style%20examples",
      "Edit files", "$FW_ME/cmd=style%20list",
      "Select style","$FW_ME/cmd=style%20select",
-     "Console",     "$FW_ME/cmd=style%20console",
+     "Event monitor","$FW_ME/cmd=style%20eventMonitor",
      "",           "");
   my $lastname = ","; # Avoid double "".
   for(my $idx = 0; $idx < @list; $idx+= 2) {
@@ -1596,10 +1596,11 @@ FW_style($$)
     }
     FW_pO "</table></div>";
 
-  } elsif($a[1] eq "console") {
+  } elsif($a[1] eq "eventMonitor") {
     FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/console.js\"></script>";
     FW_pO "<div id=\"content\">";
     FW_pO "<div id=\"console\">";
+    FW_pO "Events:<br>\n";
     FW_pO "</div>";
     FW_pO "</div>";
   }
