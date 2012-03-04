@@ -1681,7 +1681,12 @@ FW_showWeblink($$$$)
   my ($d, $v, $t, $buttons) = @_;
 
   my $attr = AttrVal($d, "htmlattr", "");
-  if($t eq "link") {
+
+  if($t eq "htmlCode") {
+    $v = AnalyzePerlCommand(undef, $v) if($v =~ m/^{(.*)}$/);
+    FW_pO $v;
+
+  } elsif($t eq "link") {
     FW_pO "<a href=\"$v\" $attr>$d</a>";    # no FW_pH, want to open extra browser
 
   } elsif($t eq "image") {
