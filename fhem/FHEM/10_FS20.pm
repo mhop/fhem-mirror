@@ -249,6 +249,8 @@ FS20_Set($@)
     $lh->{STATE} = $v;
     $lh->{READINGS}{state}{TIME} = $tn;
     $lh->{READINGS}{state}{VAL} = $v;
+    my $lhname = $lh->{NAME};
+    DoTrigger($lhname, undef) if($name ne $lhname);
   }
   return $ret;
 }
