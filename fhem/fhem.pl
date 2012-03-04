@@ -1139,7 +1139,8 @@ DoSet(@)
   return $ret if($ret);
 
   shift @a;
-  return DoTrigger($dev, join(" ", @a));
+  my $arg = $defs{$dev}{CHANGED} ? undef : join(" ", @a);
+  return DoTrigger($dev, $arg);
 }
 
 
