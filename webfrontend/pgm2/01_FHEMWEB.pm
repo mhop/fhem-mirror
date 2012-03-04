@@ -2003,4 +2003,34 @@ FW_devState($$)
   return ($allSets, $cmdlist, $txt);
 }
 
+#####################################
+# This has to be modularized in the future.
+sub
+WeatherAsHtml($)
+{
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a Weather instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
+  my $imgHome="http://www.google.com";
+
+  my $ret = "<table>";
+  $ret .= sprintf('<tr><td><img src="%s%s"></td><td>%s<br>temp %s, hum %s, %s</td></tr>',
+        $imgHome, ReadingsVal($d, "icon", ""),
+        ReadingsVal($d, "condition", ""),
+        ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
+        ReadingsVal($d, "wind_condition", ""));
+
+  for(my $i=1; $i<=4; $i++) {
+    $ret .= sprintf('<tr><td><img src="%s%s"></td><td>%s: %s<br>min %s max %s</td></tr>',
+        $imgHome, ReadingsVal($d, "fc${i}_icon", ""),
+        ReadingsVal($d, "fc${i}_day_of_week", ""),
+        ReadingsVal($d, "fc${i}_condition", ""),
+        ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
+  }
+
+  $ret .= "</table>";
+  return $ret;
+}
+
 1;
