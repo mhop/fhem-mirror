@@ -8,14 +8,14 @@
 # $Id$
 package main;
 
-my $UseWeatherGoogle= 0;
+
 
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
-if($UseWeatherGoogle) {
-  use Weather::Google;
-}
+
+my $UseWeatherGoogle= 0; # if you want Weather:Google back please set this to 1 and uncomment below.
+#  use Weather::Google;
 
 
 #####################################
