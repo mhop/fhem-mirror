@@ -7285,7 +7285,7 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
   <a name="weblinkdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weblink [link|fileplot|image|iframe]
+    <code>define &lt;name&gt; weblink [link|fileplot|image|iframe|htmlCode]
                 &lt;argument&gt;</code>
     <br><br>
     This is a placeholder used with webpgm2 to be able to integrate links
@@ -7297,6 +7297,8 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
       <code>define homepage weblink link http://www.fhem.de</code><br>
       <code>define webcam_picture weblink image http://w.x.y.z/current.jpg</code><br>
       <code>define interactive_webcam weblink iframe http://w.x.y.z/webcam.cgi</code><br>
+      <code>define define hr weblink htmlCode <hr><code><br>
+      <code>define define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }</code><br>
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
     </ul>
     <br>
