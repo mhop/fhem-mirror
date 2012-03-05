@@ -16,10 +16,10 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.02 - February 29, 2012
+# Version 1.03 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
-# define <name> OWTEMP [<model>] <ROM_ID> [interval] [alarminterval]
+# define <name> OWTEMP [<model>] <ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
@@ -28,7 +28,6 @@
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
-#       [alarminterval] as an additional parameter is ignored so far !
 #
 # Additional attributes are defined in fhem.cfg as
 #
@@ -63,48 +62,29 @@ use strict;
 use warnings;
 sub Log($$);
 
-#-- declare variables
-my $ownet;
-my %gets    = ();
-my %sets    = ();
-my %updates = ();
-
 #-- temperature globals
 my $owg_temp=0;
 my $owg_th=0;
 my $owg_tl=0;
 
-%gets = (
+my %gets = (
+  "id"          => "",
   "present"     => "",
   "interval"    => "",
   "temperature" => "",
-  "temphigh"    => "",
-  "templow"     => ""
+  "alarm"       => ""
 );
 
-%sets = (
-  "interval"      => "",
-  "temphigh"      => "",
-  "templow"       => ""
+my %sets = (
+  "interval"    => "",
+  "tempHigh"    => "",
+  "tempLow"     => ""
 );
 
-%updates = (
+my %updates = (
   "present"     => "",
   "temperature" => "",
-  "templow"     => "",
-  "temphigh"    => "",
-);
-
-my %dummy = (
-  "crc8"         => "4D",
-  "alias"        => "dummy",
-  "locator"      => "FFFFFFFFFFFFFFFF",
-  "power"        => "0",
-  "present"      => "1",
-  "temphigh"     => "75",
-  "templow"      => "10",
-  "type"         => "DS18S20",
-  "warnings"     => "none",
+  "alarm"       => ""
 );
 
 ########################################################################################
@@ -131,7 +111,7 @@ sub OWTEMP_Initialize ($) {
   #offset = a temperature offset added to the temperature reading for correction 
   #scale  = a unit of measure: C/F/K/R
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS18S20 loglevel:0,1,2,3,4,5 ".
-                     "offset scale:C,F,K,R";
+                     "tempOffset tempScale:Celsius,Fahrenheit,Kelvin,Reaumur";
   }
   
 ########################################################################################
@@ -145,11 +125,11 @@ sub OWTEMP_Initialize ($) {
 sub OWTEMP_Define ($$) {
   my ($hash, $def) = @_;
   
-  # define <name> OWTEMP [<model>] <id> [interval] [alarminterval]
+  # define <name> OWTEMP [<model>] <id> [interval]
   # e.g.: define flow OWTEMP 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$model,$id,$interval,$alarminterval,$ret);
+  my ($name,$model,$id,$interval,$ret);
   my $tn = TimeNow();
   
   #-- default
@@ -158,19 +138,21 @@ sub OWTEMP_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWTEMP: Wrong syntax, must be define <name> OWTEMP [<model>] <id> [interval] [alarminterval]"
+  return "OWTEMP: Wrong syntax, must be define <name> OWTEMP [<model>] <id> [interval]"
        if(int(@a) < 2 || int(@a) > 6);
        
   #-- check if this is an old style definition, e.g. <model> is missing
   my $a2 = lc($a[2]);
   my $a3 = defined($a[3]) ? lc($a[3]) : "";
-  if(  ($a2 eq "none") || ($a2 =~ m/^[0-9|a-f]{12}$/) ) {
+  if(  ($a2 eq "none") || ($a3 eq "none")  ) {
+    return "OWTEMP: ID = none is obsolete now, please redefine";
+  } elsif( $a2 =~ m/^[0-9|a-f]{12}$/ ) {
     $model         = "DS1820";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
     Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
       if(int(@a) == 5);
-  } elsif(  ($a3 eq "none") || ($a3 =~ m/^[0-9|a-f]{12}$/) ) {
+  } elsif( $a3 =~ m/^[0-9|a-f]{12}$/ ) {
     $model         = $a[2];
     return "OWTEMP: Wrong 1-Wire device model $model"
       if( $model ne "DS1820");
@@ -179,7 +161,7 @@ sub OWTEMP_Define ($$) {
     Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
       if(int(@a) == 6);
   } else {    
-    return "OWTEMP: $a[0] ID $a[2] invalid, specify a 12 digit value or set it to none for demo mode";
+    return "OWTEMP: $a[0] ID $a[2] invalid, specify a 12 digit value";
   }
 
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
@@ -194,35 +176,25 @@ sub OWTEMP_Define ($$) {
   $hash->{OW_FAMILY}  = 10;
   $hash->{PRESENT}    = 0;
 
-  $modules{OWTEMP}{defptr}{$id} = $hash;
-
+  #-- Couple to I/O device
   AssignIoPort($hash);
   Log 3, "OWTEMP: Warning, no 1-Wire I/O device found for $name."
     if(!defined($hash->{IODev}->{NAME}));
+    
+  $modules{OWTEMP}{defptr}{$id} = $hash;
 
-  #-- define dummy values for testing
-  if($hash->{OW_ID} eq "none") {
-    my $now   = TimeNow();
-    $dummy{address}     = $hash->{OW_FAMILY}.$hash->{OW_ID}.$dummy{crc8};
-    $dummy{family}      = $hash->{OW_FAMILY};
-    $dummy{id}          = $hash->{OW_ID};
-    $dummy{temperature} = "80.0000";
-    foreach my $r (sort keys %gets) {
-      $hash->{READINGS}{$r}{TIME} = $tn;
-      $hash->{READINGS}{$r}{VAL}  = $dummy{$r};
-      Log 4, "OWTEMP: $hash->{NAME} $r: ".$dummy{$r};
-    }
   #-- Initial readings temperature sensor
-  } else {
-    $hash->{READINGS}{temp}{VAL}      = 0.0;
-    $hash->{READINGS}{templow}{VAL}   = 0.0;
-    $hash->{READINGS}{temphigh}{VAL}  = 0.0;
-    $hash->{READINGS}{temp}{TIME}     = "";
-    $hash->{READINGS}{templow}{TIME}  = "";
-    $hash->{READINGS}{temphigh}{TIME} = "";
-    $hash->{STATE}                    = "Defined";
-    Log 3, "OWTEMP: Device $name defined."; 
-  }  
+  $hash->{READINGS}{"temperature"}{VAL}  = 0.0;
+  #$hash->{READINGS}{"temperature"}{UNIT} = "celsius";
+  #$hash->{READINGS}{"temperature"}{TYPE} = "temperature";
+  $hash->{READINGS}{"tempLow"}{VAL}      = 0.0;
+  $hash->{READINGS}{"tempHigh"}{VAL}     = 0.0;
+  $hash->{READINGS}{"temperature"}{TIME} = "";
+  $hash->{READINGS}{"tempLow"}{TIME}     = "";
+  $hash->{READINGS}{"tempHigh"}{TIME}    = "";
+  $hash->{STATE}                       = "Defined";
+  Log 3, "OWTEMP: Device $name defined."; 
+   
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 0);
 
@@ -247,28 +219,40 @@ sub OWTEMP_Get($@) {
   my $value   = undef;
   my $ret     = "";
 
-  #-- check argument
-  return "OWTEMP: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
-    if(!defined($gets{$a[1]}));
   #-- check syntax
   return "OWTEMP: Get argument is missing @a"
     if(int(@a) != 2);
-
-  #-- get interval
-  if($a[1] eq "interval") {
-    $value = $hash->{INTERVAL};
+    
+  #-- check argument
+  return "OWTEMP: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
+    if(!defined($gets{$a[1]}));
+  
+  #-- get id
+  if($a[1] eq "id") {
+    $value = $hash->{ROM_ID};
      return "$a[0] $reading => $value";
   } 
   
   #-- get present
   if($a[1] eq "present") {
-    $value = $hash->{PRESENT};
+    #-- hash of the busmaster
+    my $master       = $hash->{IODev};
+    $value           = OWX_Verify($master,$hash->{ROM_ID});
+    $hash->{PRESENT} = $value;
+    return "$a[0] $reading => $value";
+  } 
+  #-- get interval
+  if($reading eq "interval") {
+    $value = $hash->{INTERVAL};
      return "$a[0] $reading => $value";
   } 
+  
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
 
   #-- Get other values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-   #-- OWX interface
+  #-- OWX interface
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
     $ret = OWXTEMP_GetValues($hash);
@@ -281,35 +265,44 @@ sub OWTEMP_Get($@) {
   }
   
   #-- process results
+  if( defined($ret)  ){
+    return "OWTEMP: Could not get values from device $name";
+  }
+  $hash->{PRESENT} = 1; 
   my $tn = TimeNow();
   
   #-- correct for proper offset
-  $owg_temp += $attr{$name}{offset} if ($attr{$name}{offset} );
-  #-- Test for alarm condition
-  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
-    $hash->{STATE} = "Alarmed";
-  } else {
-    $hash->{STATE} = "Normal";
+  my $offset = $attr{$name}{tempOffset};
+  if( $offset ){
+    $owg_temp += $offset;
+    #$owg_tl   += $offset;
+    #$owg_tl   += $offset;
   }
   
   #-- put into READINGS
-  $hash->{READINGS}{temp}{VAL}      = $owg_temp;
-  $hash->{READINGS}{temp}{TIME}     = $tn;
-  $hash->{READINGS}{templow}{VAL}   = $owg_tl;
-  $hash->{READINGS}{templow}{TIME}  = $tn;
-  $hash->{READINGS}{temphigh}{VAL}  = $owg_th;
-  $hash->{READINGS}{temphigh}{TIME} = $tn;
+  $hash->{READINGS}{"temperature"}{VAL}   = $owg_temp;
+  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
+  $hash->{READINGS}{"tempLow"}{VAL}       = $owg_tl;
+  $hash->{READINGS}{"tempLow"}{TIME}      = $tn;
+  $hash->{READINGS}{"tempHigh"}{VAL}      = $owg_th;
+  $hash->{READINGS}{"tempHigh"}{TIME}     = $tn;
+  
+    #-- Test for alarm condition
+  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
+    $hash->{STATE} = "Alarmed";
+    $hash->{ALARM} = 1;
+  } else {
+    $hash->{STATE} = "Normal";
+    $hash->{ALARM} = 0;
+  }
   
   #-- return the special reading
-  $reading = "temp" if( $reading eq "temperature");
-  if(defined($hash->{READINGS}{$reading})) {
-    $value = $hash->{READINGS}{$reading}{VAL};
+  if ($reading eq "temperature") {
+    return "OWTEMP: $name.temperature => $owg_temp";
+  } elsif ($reading eq "alarm") {
+    return "OWTEMP: $name.alarm => L $owg_tl H $owg_th";
   }
- if(!defined($value)) {
-    Log GetLogLevel($name,4), "OWTEMP: Can't get value for $name.$reading";
-    return "OWTEMP: Can't get value for $name.$reading";
-  }
-  return "OWTEMP: $name.$reading => $value";
+  return undef;
 }
 
 #######################################################################################
@@ -328,56 +321,57 @@ sub OWTEMP_GetValues($@) {
   my $value   = "";
   my $ret     = "";
   
-  #-- define warnings
-  $hash->{ALARM}  = "0";
-
   #-- restart timer for updates
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 1);
 
+  #-- reset presence
+  $hash->{PRESENT}  = 0;
+
+  #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  #-- real sensor
-  if($hash->{OW_ID} ne "none") {
-    $hash->{PRESENT}    = 0;
-    #-- Get values according to interface type
-    my $interface= $hash->{IODev}->{TYPE};
-    if( $interface eq "OWX" ){
-      $ret = OWXTEMP_GetValues($hash);
-    }elsif( $interface eq "OWFS" ){
-      $ret = OWFSTEMP_GetValues($hash);
-    }else{
-      return "OWTEMP: GetValues with wrong IODev type $interface";
-    }
-  #-- dummy sensor
-  } else {
-    $owg_temp = sprintf("%.4f",rand(85));
-    $dummy{temperature} = $owg_temp;
-    $dummy{present}     = "1";
-    $hash->{PRESENT}    = 1;
+  if( $interface eq "OWX" ){
+    $ret = OWXTEMP_GetValues($hash);
+  }elsif( $interface eq "OWFS" ){
+    $ret = OWFSTEMP_GetValues($hash);
+  }else{
+    return "OWTEMP: GetValues with wrong IODev type $interface";
   }
-  
+
   #-- process results
+  if( defined($ret)  ){
+    return "OWTEMP: Could not get values from device $name";
+  }
+  $hash->{PRESENT} = 1; 
   my $tn = TimeNow();
   
   #-- correct for proper offset
-  $owg_temp += $attr{$name}{offset} if ($attr{$name}{offset} );
-  #-- Test for alarm condition
-  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
-    $hash->{STATE} = "Alarmed";
-  } else {
-    $hash->{STATE} = "Normal";
+  my $offset = $attr{$name}{tempOffset};
+  if( $offset ){
+    $owg_temp += $offset;
+    #$owg_tl   += $offset;
+    #$owg_tl   += $offset;
   }
   
   #-- put into READINGS
-  $hash->{READINGS}{temp}{VAL}      = $owg_temp;
-  $hash->{READINGS}{temp}{TIME}     = $tn;
-  $hash->{READINGS}{templow}{VAL}   = $owg_tl;
-  $hash->{READINGS}{templow}{TIME}  = $tn;
-  $hash->{READINGS}{temphigh}{VAL}  = $owg_th;
-  $hash->{READINGS}{temphigh}{TIME} = $tn;
+  $hash->{READINGS}{"temperature"}{VAL}    = $owg_temp;
+  $hash->{READINGS}{"temperature"}{TIME}   = $tn;
+  $hash->{READINGS}{"tempLow"}{VAL}        = $owg_tl;
+  $hash->{READINGS}{"tempLow"}{TIME}       = $tn;
+  $hash->{READINGS}{"tempHigh"}{VAL}       = $owg_th;
+  $hash->{READINGS}{"tempHigh"}{TIME}      = $tn;
+  
+  #-- Test for alarm condition
+  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
+    $hash->{STATE} = "Alarmed";
+    $hash->{ALARM} = 1;
+  } else {
+    $hash->{STATE} = "Normal";
+    $hash->{ALARM} = 0;
+  }
   
   #--logging
-  my $rv = sprintf "temp: %3.1f templow: %3.0f temphigh: %3.0f",$owg_temp,$owg_tl,$owg_th;
+  my $rv = sprintf "temperature: %5.3f tLow: %3.0f tHigh: %3.0f",$owg_temp,$owg_tl,$owg_th;
   Log 5, $rv;
   $hash->{CHANGED}[0] = $rv;
   DoTrigger($name, undef);
@@ -387,7 +381,7 @@ sub OWTEMP_GetValues($@) {
 
 #######################################################################################
 #
-# OWTEMP_Set - Set on values for device
+# OWTEMP_Set - Set one value for device
 #
 #  Parameter hash = hash of device addressed
 #            a = argument string
@@ -396,10 +390,6 @@ sub OWTEMP_GetValues($@) {
 
 sub OWTEMP_Set($@) {
   my ($hash, @a) = @_;
-  
-  my $name  = $hash->{NAME};
-  my $model = $hash->{OW_MODEL};
-  my $path  = "10.".$hash->{OW_ID};
 
   #-- for the selector: which values are possible
   return join(" ", sort keys %sets) if(@a == 2);
@@ -414,9 +404,12 @@ sub OWTEMP_Set($@) {
   my $key   = $a[1];
   my $value = $a[2];
   my $ret   = undef;
+  my $name  = $hash->{NAME};
+  my $model = $hash->{OW_MODEL};
+  my $path  = "10.".$hash->{OW_ID};
 
   #-- set warnings
-  if($key eq "templow" || $key eq "temphigh") {
+  if($key eq "tempLow" || $key eq "tempHigh") {
     # check range
     return "OWTEMP: Set with wrong temperature value, range is  -55°C - 125°C"
       if(int($value) < -55 || int($value) > 125);
@@ -425,7 +418,7 @@ sub OWTEMP_Set($@) {
  #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWTEMP: Set with too short time value, interval must be > 10"
+    return "OWTEMP: Set with short interval, must be > 10"
       if(int($value) < 10);
     # update timer
     $hash->{INTERVAL} = $value;
@@ -435,48 +428,54 @@ sub OWTEMP_Set($@) {
   }
 
   #-- set other values depending on interface type
-  Log 4, "OWTEMP: Set $hash->{NAME} $key $value";
-  
   my $interface= $hash->{IODev}->{TYPE};
-  #-- real sensor
-  if($hash->{OW_ID} ne "none") {
-    #-- OWX interface
-    if( $interface eq "OWX" ){
-      $ret = OWXTEMP_SetValues($hash,@a);
-      return $ret
-        if(defined($ret));
-    #-- OWFS interface
-    }elsif( $interface eq "OWFS" ){
-      $ret = OWFSTEMP_SetValues($hash,@a);
-      return $ret
-        if(defined($ret));
-    } else {
-    return "OWTEMP: Set with wrong IODev type $interface";
-    }
-  #-- dummy sensor
-  } else {
-      $dummy{$key} = $value;
-  }
   
+  #-- careful: the input values have to be corrected 
+  #   with the proper offset 
+  
+  #-- OWX interface
+  if( $interface eq "OWX" ){
+    $ret = OWXTEMP_SetValues($hash,@a);
+    return $ret
+      if(defined($ret));
+  #-- OWFS interface
+  }elsif( $interface eq "OWFS" ){
+    $ret = OWFSTEMP_SetValues($hash,@a);
+    return $ret
+      if(defined($ret));
+  } else {
+  return "OWTEMP: Set with wrong IODev type $interface";
+  }
+
   #-- process results
   my $tn = TimeNow();
   
-  #-- correct for proper offset
-  $owg_temp += $attr{$name}{offset} if ($attr{$name}{offset} );
+#-- correct for proper offset
+  my $offset = $attr{$name}{tempOffset};
+  if( $offset ){
+    $owg_temp += $offset;
+    #$owg_tl   += $offset;
+    #$owg_tl   += $offset;
+  }
+  
   #-- Test for alarm condition
   if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
     $hash->{STATE} = "Alarmed";
+    $hash->{ALARM} = 1;
   } else {
     $hash->{STATE} = "Normal";
+    $hash->{ALARM} = 0;
   }
   
   #-- put into READINGS
-  $hash->{READINGS}{temp}{VAL}      = $owg_temp;
-  $hash->{READINGS}{temp}{TIME}     = $tn;
-  $hash->{READINGS}{templow}{VAL}   = $owg_tl;
-  $hash->{READINGS}{templow}{TIME}  = $tn;
-  $hash->{READINGS}{temphigh}{VAL}  = $owg_th;
-  $hash->{READINGS}{temphigh}{TIME} = $tn;
+  $hash->{READINGS}{"temperature"}{VAL}   = $owg_temp;
+  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
+  $hash->{READINGS}{"tempLow"}{VAL}       = $owg_tl;
+  $hash->{READINGS}{"tempLow"}{TIME}      = $tn;
+  $hash->{READINGS}{"tempHigh"}{VAL}      = $owg_th;
+  $hash->{READINGS}{"tempHigh"}{TIME}     = $tn;
+  
+  Log 4, "OWTEMP: Set $hash->{NAME} $key $value";
   
   return undef;
 }
@@ -530,14 +529,14 @@ sub OWFSTEMP_GetValues($)
   }
 
   return undef;
-  
 }
 
 #######################################################################################
 #
 # OWFSTEMP_SetValues - Implements SetFn function
 # 
-# Parameter hash = hash of the device addressed here, a = argument array
+# Parameter hash = hash of device addressed
+#           a = argument array
 #
 ########################################################################################
 
@@ -570,7 +569,7 @@ sub OWXTEMP_GetValues($) {
 
   my ($hash) = @_;
   
-  #-- For now, switch off temperature conversion command
+  #-- For default, perform the conversion NOT now
   my $con=0;
   
   #-- ID of the device
@@ -591,6 +590,11 @@ sub OWXTEMP_GetValues($) {
   for($i=0;$i<8;$i++){
      $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
   }
+  
+  #-- check, if the conversion has been called before - only on devices with real power
+  if( defined($attr{$hash->{IODev}->{NAME}}{buspower}) && ( $attr{$hash->{IODev}->{NAME}}{buspower} eq "parasitic") ){
+    $con=1;
+  }  
 
   #-- if the conversion has not been called before 
   if( $con==1 ){
@@ -600,8 +604,8 @@ sub OWXTEMP_GetValues($) {
     if( OWX_Block($master,$select) eq 0 ){
       return "OWXTEMP: Device $owx_dev not accessible";
     } 
-    #-- conversion needs some 950 ms
-    sleep(1);
+    #-- conversion needs some 950 ms - but we may also do it in shorter time !
+    select(undef,undef,undef,1.0);
   }
 
   #-- NOW ask the specific device 
@@ -615,13 +619,13 @@ sub OWXTEMP_GetValues($) {
   if( $res eq 0 ){
     return "OWXTEMP: Device $owx_dev not accessible in 2nd step"; 
   }
-  my $res2 = "====> OWXTEMP Received ";
-  for(my $i=0;$i<19;$i++){  
-    my $j=int(ord(substr($res,$i,1))/16);
-    my $k=ord(substr($res,$i,1))%16;
-    $res2.=sprintf "0x%1x%1x ",$j,$k;
-  }
-  Log 1, $res2;
+  #my $res2 = "====> OWXTEMP Received ";
+  #for(my $i=0;$i<19;$i++){  
+  #  my $j=int(ord(substr($res,$i,1))/16);
+  #  my $k=ord(substr($res,$i,1))%16;
+  #  $res2.=sprintf "0x%1x%1x ",$j,$k;
+  #}
+  #Log 1, $res2;
      
   #-- process results
   my  @data=split(//,$res);
@@ -639,7 +643,7 @@ sub OWXTEMP_GetValues($) {
     $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
     $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
     
-    Log 1, "====> OWXTEMP Conversion result is temp = $owg_temp, delta $delta";
+    # Log 1, "====> OWXTEMP Conversion result is temp = $owg_temp, delta $delta";
    
     return undef;
   } else {
@@ -651,7 +655,8 @@ sub OWXTEMP_GetValues($) {
 #
 # OWXTEMP_SetValues - Implements SetFn function
 # 
-# Parameter hash = hash of the device addressed here, a = argument array
+# Parameter hash = hash of device addressed
+#           a = argument array
 #
 ########################################################################################
 
@@ -684,12 +689,12 @@ sub OWXTEMP_SetValues($@) {
   my $value = $a[2];
   
   #-- get the old values
-  $owg_temp = $hash->{READINGS}{temp}{VAL};
-  $owg_tl   = $hash->{READINGS}{templow}{VAL};
-  $owg_th   = $hash->{READINGS}{temphigh}{VAL};
+  $owg_temp = $hash->{READINGS}{"temperature"}{VAL};
+  $owg_tl   = $hash->{READINGS}{"tempLow"}{VAL};
+  $owg_th   = $hash->{READINGS}{"tempHigh"}{VAL};
   
-  $owg_tl = int($value) if( $key eq "templow" );
-  $owg_th = int($value) if( $key eq "temphigh" );
+  $owg_tl = int($value) if( $key eq "tempLow" );
+  $owg_th = int($value) if( $key eq "tempHigh" );
 
   #-- put into 2's complement formed (signed byte)
   my $tlp = $owg_tl < 0 ? 128 - $owg_tl : $owg_tl; 
