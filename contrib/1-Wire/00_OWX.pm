@@ -21,6 +21,9 @@
 #
 # set interval => set period for temperature conversion and alarm testing
 #
+# attr <name> buspower real/parasitic - whether the 1-Wire bus is really powered or 
+#                 the devices take their power from the data wire (parasitic is default !)
+#
 # Ordering of subroutines in this module
 # 1. Subroutines independent of bus interface type
 # 2. Subroutines for a specific type of the interface
@@ -72,6 +75,7 @@ my %attrs = (
 );
 
 #-- some globals needed for the 1-Wire module
+my $owx_serport;
 #-- baud rate serial interface
 my $owx_baud=9600;
 #-- Debugging
@@ -96,8 +100,30 @@ my $owx_LastDeviceFlag = 0;
 
 ########################################################################################
 #
-# The following subroutines in alphabetical order are independent of the bus interface
+# The following subroutines are independent of the bus interface
 #
+########################################################################################
+#
+# OWX_Initialize
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWX_Initialize ($) {
+  my ($hash) = @_;
+  #-- Provider
+  #$hash->{Clients}    = ":OWCOUNT:OWHUB:OWLCD:OWMULTI:OWSWITCH:OWTEMP:";
+  $hash->{Clients}     = ":OWAD:OWID:OWTEMP:";
+
+  #-- Normal Devices
+  $hash->{DefFn}   = "OWX_Define";
+  $hash->{UndefFn} = "OWX_Undef";
+  $hash->{GetFn}   = "OWX_Get";
+  $hash->{SetFn}   = "OWX_Set";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic";
+}
+
 ########################################################################################
 #
 # OWX_Alarms - Find devices on the 1-Wire bus, 
@@ -126,10 +152,10 @@ sub OWX_Alarms ($) {
 
   #-- walk through all the devices to get their proper fhem names
   foreach my $fhem_dev (sort keys %main::defs) {
-  
-  #-- all OW types start with OW
-    next if(  substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
-    next if($main::defs{$fhem_dev}{ROM_ID} eq "FF");
+    #-- skip if busmaster
+    next if( $hash->{NAME} eq $main::defs{$fhem_dev}{NAME} );
+    #-- all OW types start with OW
+    next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
     foreach my $owx_dev  (@owx_alarm_devs) {
       #-- two pieces of the ROM ID found on the bus
       my $owx_rnf = substr($owx_dev,3,12);
@@ -169,34 +195,6 @@ sub OWX_Block ($$) {
     Log 1,"OWX: Block called with unknown interface";
     return 0;
   }
-}
-
-########################################################################################
-#
-# OWX_Convert - Initiate temperature conversion in all devices
-#
-# Parameter hash = hash of bus master
-#
-# Return 1 : OK
-#        0 : Not OK
-#
-########################################################################################
-
-sub OWX_Convert($) {
-  
-  my($hash) = @_;
-  
-  #-- Call us in n seconds again.
-  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Convert", $hash,1);
-  
-  OWX_Reset($hash);
-  
-  #-- issue the skip ROM command \xCC followed by start conversion command \x44
-  if( OWX_Block($hash,"\xCC\x44") eq 0) {
-    Log 3, "OWX: Failure in temperature conversion\n";
-    return 0;
-  }
-  return 1;
 }
 
 ########################################################################################
@@ -320,42 +318,45 @@ sub OWX_Define ($$) {
 
     #-- First step: open the serial device to test it
     #Log 3, "OWX opening device $dev";
-    my $owx_serport = new Device::SerialPort ($dev);
+    $owx_serport = new Device::SerialPort ($dev);
     return "OWX: Can't open $dev: $!" if(!$owx_serport);
     Log 3, "OWX: opened device $dev";
     $owx_serport->reset_error();
-    $owx_serport->baudrate(9600)    || die "failed setting baudrate";
-    $owx_serport->databits(8)       || die "failed setting databits";
-    $owx_serport->parity('none')    || die "failed setting parity";
-    $owx_serport->stopbits(1)       || die "failed setting stopbits";
-    $owx_serport->handshake('none') || die "failed setting handshake";
-    $owx_serport->write_settings    || die "no settings";
-    sleep(1); 
-    $owx_serport->close();
+    $owx_serport->baudrate(9600);
+    $owx_serport->databits(8);
+    $owx_serport->parity('none');
+    $owx_serport->stopbits(1);
+    $owx_serport->handshake('none');
+    $owx_serport->write_settings;
+    #-- sleeping for some time
+    select(undef,undef,undef,0.1); 
+    #$owx_serport->close();
  
     #-- Second step: see, if a bus interface is detected
     if (!OWX_Detect($hash)){
       $hash->{STATE} = "Failed";
+      $hash->{PRESENT} = 0;
       $init_done = 1; 
       return undef;
     }
   
-    #-- default temperature-scale: C
-    # C: Celsius, F: Fahrenheit, K: Kelvin, R: Rankine
-    $attr{$hash->{NAME}}{"temp-scale"} = "C";
-  
     #-- In 10 seconds discover all devices on the 1-Wire bus
     InternalTimer(gettimeofday()+5, "OWX_Discover", $hash,0);
-    $hash->{interval} = 60;        # call every minute
+    
+    #-- Default settings
+    $hash->{interval} = 60;          # kick every minute
     
     #-- InternalTimer blocks if init_done is not true
     my $oid = $init_done;
-    $hash->{STATE} = "Initialized";
-    $hash->{INTERFACE} = $owx_interface;
+    $hash->{PRESENT} = 1;
+    #$hash->{TYPE}       = "OWX";
+    #$hash->{T}       = "OWX";
+    $hash->{STATE}      = "Initialized";
+    $hash->{INTERFACE}  = $owx_interface;
     $init_done = 1;
 
-    #-- Intiate the first temp conversion only after the proper subroutines have been defined
-    InternalTimer(gettimeofday() + 5, "OWX_Convert", $hash,1);
+    #-- Intiate first alarm detection and eventually conversion in a minute or so
+    InternalTimer(gettimeofday() + 60, "OWX_Kick", $hash,1);
     $init_done = $oid;
     $hash->{STATE} = "Active";
     return undef;
@@ -378,16 +379,22 @@ sub OWX_Define ($$) {
 sub OWX_Detect ($) {
   my ($hash) = @_;
   
-  my ($i,$j,$k,$l,$res,$ret);
+  my ($i,$j,$k,$l,$res,$ret,$ress);
   #-- timing byte for DS2480
-  OWX_Query_2480($hash,"\xC1");
+  OWX_Query_2480($hash,"\xC1\xC1");
   
   #-- Max 4 tries to detect an interface
-  
   for($l=0;$l<4;$l++) {
     #-- write 1-Wire bus (Fig. 2 of Maxim AN192)
     $res = OWX_Query_2480($hash,"\x17\x45\x5B\x0F\x91");
-  
+    #$ress = "OWX: Answer was ";
+    #for($i=0;$i<length($res);$i++){
+    #  $j=int(ord(substr($res,$i,1))/16);
+    #  $k=ord(substr($res,$i,1))%16;
+    #  $ress.=sprintf "0x%1x%1x ",$j,$k;
+    #}
+    #Log 1, $ress;
+    
     #-- process 4/5-byte string for detection
     if( $res eq "\x16\x44\x5A\x00\x93"){
       Log 1, "OWX: 1-Wire bus master DS2480 detected for the first time";
@@ -406,16 +413,22 @@ sub OWX_Detect ($) {
     }
     last 
       if( $ret==1 );
-    Log 1, "OWX: Trying again to detect an interface";
+    $ress = "OWX: Trying again to detect an interface, answer was ";
+    for($i=0;$i<length($res);$i++){
+      $j=int(ord(substr($res,$i,1))/16);
+      $k=ord(substr($res,$i,1))%16;
+      $ress.=sprintf "0x%1x%1x ",$j,$k;
+    }
+    Log 1, $ress;
     #-- sleeping for some time
     select(undef,undef,undef,0.5);
   }
   if( $ret == 0 ){
-    my $ress = "OWX: No 1-Wire bus interface detected, answer was ";
+    $ress = "OWX: No 1-Wire bus interface detected, answer was ";
     for($i=0;$i<length($res);$i++){
       $j=int(ord(substr($res,$i,1))/16);
       $k=ord(substr($res,$i,1))%16;
-      $ress.=sprintf "0x%1x%1x ",$i,$j,$k;
+      $ress.=sprintf "0x%1x%1x ",$j,$k;
     }
     Log 1, $ress;
   }
@@ -451,15 +464,17 @@ sub OWX_Discover ($) {
       #-- two pieces of the ROM ID found on the bus
       my $owx_rnf = substr($owx_dev,3,12);
       my $owx_f   = substr($owx_dev,0,2);
+      my $owx_crc = substr($owx_dev,15,3);
       my $id_owx  = $owx_f.".".$owx_rnf;
       
       my $match = 0;
     
       #-- check against all existing devices  
       foreach my $fhem_dev (sort keys %main::defs) { 
+        #-- skip if busmaster
+        # next if( $hash->{NAME} eq $main::defs{$fhem_dev}{NAME} );
         #-- all OW types start with OW
         next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
-        next if( $main::defs{$fhem_dev}{ROM_ID} eq "FF");
         my $id_fhem = substr($main::defs{$fhem_dev}{ROM_ID},0,15);
         #-- testing if present in defined devices   
         if( $id_fhem eq $id_owx ){
@@ -476,26 +491,22 @@ sub OWX_Discover ($) {
       if( $match==0 ){
         #-- Default name OWX_FF_XXXXXXXXXXXX, default type = OWX_FF
         my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
-     
+        #-- Family 10 = Temperature sensor, assume DS1820 as default
         if( $owx_f eq "10" ){
-          #-- Family 10 = Temperature sensor, assume DS1820 as default
-          CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf"); 
-          $main::defs{$name}{PRESENT}=1;
-          #-- default room
-          CommandAttr (undef,"$name IODev $hash->{NAME}"); 
-          CommandAttr (undef,"$name room OWX"); 
-          push(@owx_names,$name);
+          CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf");         
+        #-- Family 20 = A/D converter, assume DS2450 as default
         } elsif( $owx_f eq "20" ){
-          #-- Family 20 = A/D converter, assume DS2450 as default
-          CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
-          $main::defs{$name}{PRESENT}=1;
-          #-- default room
-          CommandAttr (undef,"$name IODev $hash->{NAME}"); 
-          CommandAttr (undef,"$name room OWX"); 
-          push(@owx_names,$name);
+          CommandDefine(undef,"$name OWAD DS2450 $owx_rnf");      
+        #-- All unknown families are ID only
         } else {
-          Log 1, "OWX: Undefined device family $owx_f";
+          CommandDefine(undef,"$name OWID $owx_rnf");    
         }
+        #-- yes, it is on the bus and therefore present
+        push(@owx_names,$name);
+        $main::defs{$name}{PRESENT}=1;
+        #-- default room
+        CommandAttr (undef,"$name IODev $hash->{NAME}"); 
+        CommandAttr (undef,"$name room OWX"); 
         #-- replace the ROM ID by the proper value 
         $main::defs{$name}{ROM_ID}=$owx_dev;
       }
@@ -504,10 +515,13 @@ sub OWX_Discover ($) {
   #-- final step: Undefine all 1-Wire devices which are not on the bus
   #   TODO: IF WE HAVE MULTIPLE IO Devices ???
   foreach my $fhem_dev (sort keys %main::defs) { 
+    #-- skip if malformed device
+    #next if( !defined($main::defs{$fhem_dev}{NAME}) );
     #-- all OW types start with OW
     next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
-    next if( $main::defs{$fhem_dev}{ROM_ID} eq "FF");
+    #-- skip if the device is present.
     next if( $main::defs{$fhem_dev}{PRESENT} == 1);
+    Log 1, "OWX: Deleting unused 1-Wire device $main::defs{$fhem_dev}{NAME} of type $main::defs{$fhem_dev}{TYPE}";
     CommandDelete(undef,$main::defs{$fhem_dev}{NAME});
   }
   Log 1, "OWX: 1-Wire devices found (".join(",",@owx_names).")";
@@ -569,26 +583,40 @@ sub OWX_Get($@) {
   }
 }
 
-#########################################################################################
+########################################################################################
 #
-# OWX_Initialize
+# OWX_Kick - Initiate some processes in all devices
 #
-# Parameter hash = hash of device addressed
+# Parameter hash = hash of bus master
+#
+# Return 1 : OK
+#        0 : Not OK
 #
 ########################################################################################
 
-sub OWX_Initialize ($) {
-  my ($hash) = @_;
-  #-- Provider
-  #$hash->{Clients}    = ":OWCOUNT:OWHUB:OWLCD:OWMULTI:OWSWITCH:OWTEMP:";
-  $hash->{Clients}    = ":OWTEMP:OWAD:";
-
-  #-- Normal Devices
-  $hash->{DefFn}   = "OWX_Define";
-  $hash->{UndefFn} = "OWX_Undef";
-  $hash->{GetFn}   = "OWX_Get";
-  $hash->{SetFn}   = "OWX_Set";
-  $hash->{AttrList}= "temp-scale:C,F,K,R loglevel:0,1,2,3,4,5,6";
+sub OWX_Kick($) {
+  
+  my($hash) = @_;
+  
+  my $ret;
+  #-- Call us in n seconds again.
+  InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,1);
+  
+  OWX_Reset($hash);
+  
+  #-- Only if we have real power on the bus
+  if( defined($attr{$hash->{NAME}}{buspower}) ||  ($attr{$hash->{NAME}}{buspower} eq "real") ){
+    #-- issue the skip ROM command \xCC followed by start conversion command \x44
+    $ret = OWX_Block($hash,"\xCC\x44");
+    if( $ret eq 0 ){
+      Log 3, "OWX: Failure in temperature conversion\n";
+      return 0;
+    }
+    #-- sleeping for some time
+    select(undef,undef,undef,0.5);
+  }
+  
+  return 1;
 }
 
 ########################################################################################
@@ -723,6 +751,7 @@ sub OWX_Search ($$) {
       Log 5, "OWX: New device found $dev";
     }  
     return 1;
+    
   #-- mode was to discover alarm devices 
   } else {
     for(my $i=0;$i<@owx_alarm_devs;$i++){
@@ -788,7 +817,7 @@ sub OWX_Set($@) {
 
 sub OWX_Undef ($$) {
   my ($hash, $name) = @_;
-  delete($modules{OWX}{defptr}{$hash->{CODE}});
+  RemoveInternalTimer($hash);
   return undef;
 }
 
@@ -929,56 +958,54 @@ sub OWX_Query_2480 ($$) {
   my ($hash,$cmd) = @_;
   my ($i,$j,$k);
   my $dev = $hash->{DeviceName};
-  
-  if( $dev ne "emulator") {
-    #Log 3, "OWX opening device $dev";
-    my $owx_serport = new Device::SerialPort ($dev);
-    return "OWX: Can't open $dev: $!" if(!$owx_serport);
-    Log 4, "OWX: Opened device $dev";
-    
-    $owx_serport->reset_error();
-    $owx_serport->baudrate($owx_baud)    || die "failed setting baudrate";
-    $owx_serport->databits(8)       || die "failed setting databits";
-    $owx_serport->parity('none')    || die "failed setting parity";
-    $owx_serport->stopbits(1)       || die "failed setting stopbits";
-    $owx_serport->handshake('none') || die "failed setting handshake";
-    $owx_serport->write_settings    || die "no settings";
 
-    if( $owx_debug > 1){
-      my $res = "OWX: Sending out ";
-      for($i=0;$i<length($cmd);$i++){  
-        $j=int(ord(substr($cmd,$i,1))/16);
-        $k=ord(substr($cmd,$i,1))%16;
-    	$res.=sprintf "0x%1x%1x ",$j,$k;
-      }
-      Log 3, $res;
-    }
-	
-    my $count_out = $owx_serport->write($cmd);
-
-    Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
-    #-- sleeping for some time
-    select(undef,undef,undef,0.04);
- 
-    #-- read the data
-    my ($count_in, $string_in) = $owx_serport->read(48);
+  #Log 3, "OWX opening device $dev";
+  #my $owx_serport = new Device::SerialPort ($dev);
+  #return "OWX: Can't open $dev: $!" if(!$owx_serport);
+  #Log 4, "OWX: Opened device $dev";
     
-    if( $owx_debug > 1){
-      my $res = "OWX: Receiving ";
-      for($i=0;$i<$count_in;$i++){  
-        $j=int(ord(substr($string_in,$i,1))/16);
-        $k=ord(substr($string_in,$i,1))%16;
-        $res.=sprintf "0x%1x%1x ",$j,$k;
-      }
-      Log 3, $res;
+  #$owx_serport->reset_error();
+  $owx_serport->baudrate($owx_baud);
+  #$owx_serport->databits(8)       || die "failed setting databits";
+  #$owx_serport->parity('none')    || die "failed setting parity";
+  #$owx_serport->stopbits(1)       || die "failed setting stopbits";
+  #$owx_serport->handshake('none') || die "failed setting handshake";
+  $owx_serport->write_settings;
+
+  if( $owx_debug > 1){
+    my $res = "OWX: Sending out ";
+    for($i=0;$i<length($cmd);$i++){  
+      $j=int(ord(substr($cmd,$i,1))/16);
+      $k=ord(substr($cmd,$i,1))%16;
+  	$res.=sprintf "0x%1x%1x ",$j,$k;
     }
-	
-    #-- sleeping for some time
-    select(undef,undef,undef,0.04);
-   
-    $owx_serport->close();
-    return($string_in);
+    Log 3, $res;
   }
+	
+  my $count_out = $owx_serport->write($cmd);
+
+  Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
+  #-- sleeping for some time
+  select(undef,undef,undef,0.04);
+ 
+  #-- read the data
+  my ($count_in, $string_in) = $owx_serport->read(48);
+    
+  if( $owx_debug > 1){
+    my $res = "OWX: Receiving ";
+    for($i=0;$i<$count_in;$i++){  
+      $j=int(ord(substr($string_in,$i,1))/16);
+      $k=ord(substr($string_in,$i,1))%16;
+      $res.=sprintf "0x%1x%1x ",$j,$k;
+    }
+    Log 3, $res;
+  }
+	
+  #-- sleeping for some time
+  select(undef,undef,undef,0.04);
+   
+  #$owx_serport->close();
+  return($string_in);
 }
 
 ########################################################################################
@@ -997,22 +1024,30 @@ sub OWX_Reset_2480 ($) {
   my ($hash)=@_;
   my $cmd="";
  
+  my ($res,$r1,$r2);
   #-- if necessary, prepend \xE3 character for command mode
   if( $owx_mode ne "command" ) {
     $cmd = "\xE3";
   }
   #-- Reset command \xC5
-  $cmd  = $cmd."\xC1"; 
+  $cmd  = $cmd."\xC5"; 
   #-- write 1-Wire bus
-  my $res =OWX_Query_2480($hash,$cmd);
+  $res =OWX_Query_2480($hash,$cmd);
+
+  #-- if not ok, try for max. a second time
+  $r1  = ord(substr($res,0,1)) & 192;
+  if( $r1 != 192){
+    $res =OWX_Query_2480($hash,$cmd);
+  }
+
   #-- process result
-  my $r1  = ord(substr($res,0,1)) & 192;
+  $r1  = ord(substr($res,0,1)) & 192;
   if( $r1 != 192){
     Log 3, "OWX: Reset failure";
     return 0;
   }
   
-  my $r2 = ord(substr($res,0,1)) & 3;
+  $r2 = ord(substr($res,0,1)) & 3;
   
   if( $r2 == 3 ){
     Log 3, "OWX: No presence detected";
@@ -1214,55 +1249,54 @@ sub OWX_Query_9097 ($$) {
   my ($i,$j,$k);
   my $dev = $hash->{DeviceName};
   
-  if( $dev ne "emulator") {
-    #Log 3, "OWX opening device $dev";
-    my $owx_serport = new Device::SerialPort ($dev);
-    return "OWX: Can't open $dev: $!" if(!$owx_serport);
-    Log 4, "OWX: Opened device $dev";
+
+  #Log 3, "OWX opening device $dev";
+  #my $owx_serport = new Device::SerialPort ($dev);
+  #return "OWX: Can't open $dev: $!" if(!$owx_serport);
+  #Log 4, "OWX: Opened device $dev";
     
-    #$owx_serport->reset_error();
-    $owx_serport->baudrate($owx_baud)    || die "failed setting baudrate";
-    $owx_serport->databits(8)       || die "failed setting databits";
-    $owx_serport->parity('none')    || die "failed setting parity";
-    $owx_serport->stopbits(1)       || die "failed setting stopbits";
-    $owx_serport->handshake('none') || die "failed setting handshake";
-    $owx_serport->write_settings    || die "no settings";
+  #$owx_serport->reset_error();
+  $owx_serport->baudrate($owx_baud);
+  #$owx_serport->databits(8)       || die "failed setting databits";
+  #$owx_serport->parity('none')    || die "failed setting parity";
+  #$owx_serport->stopbits(1)       || die "failed setting stopbits";
+  #$owx_serport->handshake('none') || die "failed setting handshake";
+  $owx_serport->write_settings;
 
-    if( $owx_debug > 1){
-      my $res = "OWX: Sending out ";
-      for($i=0;$i<length($cmd);$i++){  
-        $j=int(ord(substr($cmd,$i,1))/16);
-        $k=ord(substr($cmd,$i,1))%16;
-    	$res.=sprintf "0x%1x%1x ",$j,$k;
-      }
-      Log 3, $res;
+  if( $owx_debug > 1){
+    my $res = "OWX: Sending out ";
+    for($i=0;$i<length($cmd);$i++){  
+      $j=int(ord(substr($cmd,$i,1))/16);
+      $k=ord(substr($cmd,$i,1))%16;
+      $res.=sprintf "0x%1x%1x ",$j,$k;
     }
+    Log 3, $res;
+  } 
 	
-    my $count_out = $owx_serport->write($cmd);
+  my $count_out = $owx_serport->write($cmd);
 
-    Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
-    #-- sleeping for some time
-    select(undef,undef,undef,0.01);
+  Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
+  #-- sleeping for some time
+  select(undef,undef,undef,0.01);
  
-    #-- read the data
-    my ($count_in, $string_in) = $owx_serport->read(48);
+  #-- read the data
+  my ($count_in, $string_in) = $owx_serport->read(48);
     
-     if( $owx_debug > 1){
-      my $res = "OWX: Receiving ";
-      for($i=0;$i<$count_in;$i++){  
-        $j=int(ord(substr($string_in,$i,1))/16);
-        $k=ord(substr($string_in,$i,1))%16;
-        $res.=sprintf "0x%1x%1x ",$j,$k;
-      }
-      Log 3, $res;
+   if( $owx_debug > 1){
+    my $res = "OWX: Receiving ";
+    for($i=0;$i<$count_in;$i++){  
+      $j=int(ord(substr($string_in,$i,1))/16);
+      $k=ord(substr($string_in,$i,1))%16;
+      $res.=sprintf "0x%1x%1x ",$j,$k;
     }
-	
-    #-- sleeping for some time
-    select(undef,undef,undef,0.01);
-   
-    $owx_serport->close();
-    return($string_in);
+    Log 3, $res;
   }
+	
+  #-- sleeping for some time
+  select(undef,undef,undef,0.01);
+  
+  #$owx_serport->close();
+  return($string_in);
 }
 
 ########################################################################################
