@@ -568,7 +568,6 @@ FW_digestCgi($)
 
     # Multiline: escape the NL for fhem
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
-    $v =~ s/%([0-9A-F][0-9A-F])/sprintf("%c", $1)/gi;
     $FW_webArgs{$p} = $v;
 
     if($p eq "detail")       { $FW_detail = $v; }
