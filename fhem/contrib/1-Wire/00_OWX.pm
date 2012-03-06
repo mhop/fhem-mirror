@@ -6,20 +6,21 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.04 - March, 2012
+# Version 1.05 - March, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
 # Setup interface as:
+#
 # define <name> OWX <device>
 #    
 # where <name> may be replaced by any name string 
 #       <device> is a serial (USB) device
 #
-# get alarms  => find alarmed 1-Wire devices
-# get devices => find all 1-Wire devices 
+# get <name> alarms   => find alarmed 1-Wire devices
+# get <name> devices  => find all 1-Wire devices 
 #
-# set interval => set period for temperature conversion and alarm testing
+# set <name> interval => set period for temperature conversion and alarm testing
 #
 # attr <name> buspower real/parasitic - whether the 1-Wire bus is really powered or 
 #      the 1-Wire devices take their power from the data wire (parasitic is default !)
@@ -496,7 +497,10 @@ sub OWX_Discover ($) {
           CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf");         
         #-- Family 20 = A/D converter, assume DS2450 as default
         } elsif( $owx_f eq "20" ){
-          CommandDefine(undef,"$name OWAD DS2450 $owx_rnf");      
+          CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
+        #-- Family 10 = Temperature sensor, assume DS1820 as default
+        }elsif( $owx_f eq "22" ){
+          CommandDefine(undef,"$name OWTEMP DS1822 $owx_rnf");        
         #-- All unknown families are ID only
         } else {
           CommandDefine(undef,"$name OWID $owx_f $owx_rnf");    
