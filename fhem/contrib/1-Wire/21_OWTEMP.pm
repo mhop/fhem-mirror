@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.03 - March, 2012
+# Version 1.04 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 # define <name> OWTEMP [<model>] <ROM_ID> [interval]
@@ -31,7 +31,8 @@
 #
 # Additional attributes are defined in fhem.cfg as
 #
-# attr <name> offset <float> = a temperature offset added to the temperature reading 
+# attr <name> tempOffset <float> = a temperature offset added to the temperature reading 
+# attr <name> tempUnit  <string> = a a unit of measurement, e.g. Celsius/Kelvin/Fahrenheit/Reaumur 
 #
 ########################################################################################
 #
@@ -111,7 +112,7 @@ sub OWTEMP_Initialize ($) {
   #offset = a temperature offset added to the temperature reading for correction 
   #scale  = a unit of measure: C/F/K/R
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS18S20 loglevel:0,1,2,3,4,5 ".
-                     "tempOffset tempScale:Celsius,Fahrenheit,Kelvin,Reaumur";
+                     "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin,Reaumur";
   }
   
 ########################################################################################
@@ -570,7 +571,7 @@ sub OWXTEMP_GetValues($) {
   my ($hash) = @_;
   
   #-- For default, perform the conversion NOT now
-  my $con=0;
+  my $con=1;
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -592,8 +593,8 @@ sub OWXTEMP_GetValues($) {
   }
   
   #-- check, if the conversion has been called before - only on devices with real power
-  if( defined($attr{$hash->{IODev}->{NAME}}{buspower}) && ( $attr{$hash->{IODev}->{NAME}}{buspower} eq "parasitic") ){
-    $con=1;
+  if( defined($attr{$hash->{IODev}->{NAME}}{buspower}) && ( $attr{$hash->{IODev}->{NAME}}{buspower} eq "real") ){
+    $con=0;
   }  
 
   #-- if the conversion has not been called before 

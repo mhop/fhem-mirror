@@ -6,11 +6,11 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.02 - February 29, 2012
+# Version 1.04 - March, 2012
 #
-# Prof. Dr. Peter A. Henning, 2011
+# Prof. Dr. Peter A. Henning, 2012
 #
-# Setup bus master as:
+# Setup interface as:
 # define <name> OWX <device>
 #    
 # where <name> may be replaced by any name string 
@@ -22,7 +22,7 @@
 # set interval => set period for temperature conversion and alarm testing
 #
 # attr <name> buspower real/parasitic - whether the 1-Wire bus is really powered or 
-#                 the devices take their power from the data wire (parasitic is default !)
+#      the 1-Wire devices take their power from the data wire (parasitic is default !)
 #
 # Ordering of subroutines in this module
 # 1. Subroutines independent of bus interface type
@@ -499,7 +499,7 @@ sub OWX_Discover ($) {
           CommandDefine(undef,"$name OWAD DS2450 $owx_rnf");      
         #-- All unknown families are ID only
         } else {
-          CommandDefine(undef,"$name OWID $owx_rnf");    
+          CommandDefine(undef,"$name OWID $owx_f $owx_rnf");    
         }
         #-- yes, it is on the bus and therefore present
         push(@owx_names,$name);
@@ -605,7 +605,7 @@ sub OWX_Kick($) {
   OWX_Reset($hash);
   
   #-- Only if we have real power on the bus
-  if( defined($attr{$hash->{NAME}}{buspower}) ||  ($attr{$hash->{NAME}}{buspower} eq "real") ){
+  if( defined($attr{$hash->{NAME}}{buspower}) &&  ($attr{$hash->{NAME}}{buspower} eq "real") ){
     #-- issue the skip ROM command \xCC followed by start conversion command \x44
     $ret = OWX_Block($hash,"\xCC\x44");
     if( $ret eq 0 ){
@@ -959,17 +959,7 @@ sub OWX_Query_2480 ($$) {
   my ($i,$j,$k);
   my $dev = $hash->{DeviceName};
 
-  #Log 3, "OWX opening device $dev";
-  #my $owx_serport = new Device::SerialPort ($dev);
-  #return "OWX: Can't open $dev: $!" if(!$owx_serport);
-  #Log 4, "OWX: Opened device $dev";
-    
-  #$owx_serport->reset_error();
   $owx_serport->baudrate($owx_baud);
-  #$owx_serport->databits(8)       || die "failed setting databits";
-  #$owx_serport->parity('none')    || die "failed setting parity";
-  #$owx_serport->stopbits(1)       || die "failed setting stopbits";
-  #$owx_serport->handshake('none') || die "failed setting handshake";
   $owx_serport->write_settings;
 
   if( $owx_debug > 1){
@@ -1248,19 +1238,8 @@ sub OWX_Query_9097 ($$) {
   my ($hash,$cmd) = @_;
   my ($i,$j,$k);
   my $dev = $hash->{DeviceName};
-  
 
-  #Log 3, "OWX opening device $dev";
-  #my $owx_serport = new Device::SerialPort ($dev);
-  #return "OWX: Can't open $dev: $!" if(!$owx_serport);
-  #Log 4, "OWX: Opened device $dev";
-    
-  #$owx_serport->reset_error();
   $owx_serport->baudrate($owx_baud);
-  #$owx_serport->databits(8)       || die "failed setting databits";
-  #$owx_serport->parity('none')    || die "failed setting parity";
-  #$owx_serport->stopbits(1)       || die "failed setting stopbits";
-  #$owx_serport->handshake('none') || die "failed setting handshake";
   $owx_serport->write_settings;
 
   if( $owx_debug > 1){
@@ -1508,7 +1487,7 @@ sub OWX_TouchByte_9097 ($$) {
   for( $loop=0; $loop < 8; $loop++ ){
     #-- shift result to get ready for the next bit
     $result >>=1;
-    #-- if sending a 1 then read a bit else write a 0
+    #-- if sending a 1 then read a bit else write 0
     if( $byte & 0x01 ){
       if( OWX_ReadBit_9097($hash) ){
         $result |= 0x80;

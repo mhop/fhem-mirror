@@ -2,7 +2,7 @@
 #
 # OWID.pm
 #
-# FHEM module to commmunicate with 1-Wire ID-ROMS
+# FHEM module to commmunicate with general 1-Wire ID-ROMS
 #
 # Attention: This module may communicate with the OWX module,
 #            but currently not with the 1-Wire File System OWFS
@@ -12,14 +12,15 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.03 - March, 2012
+# Version 1.04 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
-# define <name> OWID [<model>] <ROM_ID>
+# define <name> OWID <FAM_ID> <ROM_ID>
 #
 # where <name> may be replaced by any name string 
-#     
-#       <model> is a 1-Wire device type. If omitted, we assume this to be a DS2502
+#   
+#       <FAM_ID> is a 2 character (1 byte) 1-Wire Family ID 
+#  
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #
@@ -80,7 +81,7 @@ sub OWID_Initialize ($) {
   $hash->{UndefFn}  = "OWID_Undef";
   $hash->{GetFn}    = "OWID_Get";
   $hash->{SetFn}    = undef;
-  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 model:DS2502 loglevel:0,1,2,3,4,5 ";
+  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ";
   $hash->{AttrList} = $attlist; 
 }
 
@@ -95,43 +96,39 @@ sub OWID_Initialize ($) {
 sub OWID_Define ($$) {
   my ($hash, $def) = @_;
   
-  # define <name> OWID [<model>] <id> 
-  # e.g.: define flow OWID 525715020000
+  #-- define <name> OWID <id> 
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$model,$id,$scale,$ret);
+  my ($name,$fam,$id,$ret);
   
   #-- default
   $name          = $a[0];
   $ret           = "";
 
   #-- check syntax
-  return "OWID: Wrong syntax, must be define <name> OWID [<model>] <id>"
-       if(int(@a) < 2 || int(@a) > 4);
+  return "OWID: Wrong syntax, must be define <name> OWID <id>"
+       if(int(@a) !=4 );
        
-  #-- check if this is an old style definition, e.g. <model> is missing
-  my $a2 = lc($a[2]);
-  my $a3 = defined($a[3]) ? lc($a[3]) : "";
-  if( $a2 =~ m/^[0-9|a-f]{12}$/ ) {
-    $model         = "DS2502";
-    $id            = $a[2];
-  } elsif(  $a3 =~ m/^[0-9|a-f]{12}$/ ) {
-    $model         = $a[2];
-    return "OWID: Wrong 1-Wire device model $model"
-      if( $model ne "DS2502");
+  #-- check id
+  if(  $a[2] =~ m/^[0-9|a-f]{2}$/ ) {
+    $fam            = $a[2];
+  } else {    
+    return "OWID: $a[0] ID $a[2] invalid, specify a 2 digit value";
+  }
+  if(  $a[3] =~ m/^[0-9|a-f]{12}$/ ) {
     $id            = $a[3];
   } else {    
-    return "OWID: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWID: $a[0] ID $a[3] invalid, specify a 12 digit value";
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
   #   YY must be determined from id
-  my $crc = sprintf("%02x",OWX_CRC("09.".$id."00"));
+  my $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
   
   #-- Define device internals
-  $hash->{ROM_ID}     = "09.".$id.$crc;
+  $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{OW_ID}      = $id;
-  $hash->{OW_FAMILY}  = 9;
+  $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
   
   #-- Couple to I/O device
@@ -141,54 +138,12 @@ sub OWID_Define ($$) {
     
   $modules{OWID}{defptr}{$id} = $hash;
   
-  #-- Take channel names from $owg_channel
-  #my $channels;
-  
-  #foreach my $a (sort keys %attr) {
-  #    print "attr $a $attr{$a}\n"; 
-  #    foreach my $b (sort keys %{$attr{$a}}) {
-  #      print "============> attr $a $b $attr{$a}{$b}\n"; 
-  #  }
-  #}
-  #if ( $channels ){
-  #  my $i=0;
-  #  $channels =~ s/(\w+)/$owg_channel[$i++]=$1/gse;
-  #}
-  
-  #print "$name channels = ".join(" ",@owg_channel)."\n";
-     
   $hash->{STATE} = "Defined";
   Log 3, "OWID:   Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  #-- OWX interface
-  #if( $interface eq "OWX" ){
-  #  OWXAD_SetPage($hash,"alarm");
-  #  OWXAD_SetPage($hash,"status");
-  #-- OWFS interface
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSAD_GetPage($hash,"reading");
-  #-- Unknown interface
-  #}else{
-  #  return "OWID: Define with wrong IODev type $interface";
-  #}
  
-  #-- redefine attributes according to channel names
-  #my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
-  #              "channels ";
-  #for( my $i=0;$i<4;$i++ ){
-  #  $attlist .= " ".$owg_channel[$i]."Offset";
-  #  $attlist .= " ".$owg_channel[$i]."Factor";
-  #  $attlist .= " ".$owg_channel[$i]."Scale";
-  #}
-  #$hash->{AttrList} = $attlist; 
-   
-  #-- Start timer for updates
-  #InternalTimer(time()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
-  
-  #-- InternalTimer blocks if init_done is not true
-  #my $oid = $init_done;
   $hash->{STATE} = "Initialized";
   return undef; 
 }
