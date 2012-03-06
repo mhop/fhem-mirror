@@ -14,9 +14,10 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.04 - March, 2012
+# Version 1.05 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
+#
 # define <name> OWAD [<model>] <ROM_ID> [interval] 
 #
 # where <name> may be replaced by any name string 
@@ -26,6 +27,15 @@
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
+#
+# get <name> id       => FAM_ID.ROM_ID.CRC 
+# get <name> present  => 1 if device present, 0 if not
+# get <name> interval => query interval
+# get <name> reading  => measurement for all channels
+# get <name> alarm    => alarm measurement settings for all channels
+# get <name> status   => alarm and i/o status for all channels
+#
+# set <name> interval => set period for measurement
 #
 # Additional attributes are defined in fhem.cfg per channel, where <channel>=A,B,C,D
 #
@@ -152,7 +162,7 @@ sub OWAD_Define ($$) {
   # e.g.: define flow OWAD 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$model,$id,$interval,$scale,$ret);
+  my ($name,$model,$fam,$id,$crc,$interval,$scale,$ret);
   
   #-- default
   $name          = $a[0];
@@ -182,7 +192,7 @@ sub OWAD_Define ($$) {
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
   #   YY must be determined from id
-  my $crc = sprintf("%02x",OWX_CRC("20.".$id."00"));
+  $crc = sprintf("%02x",OWX_CRC("20.".$id."00"));
   
   #-- Define device internals
   $hash->{INTERVAL}   = $interval;
@@ -589,8 +599,8 @@ sub OWAD_Set($@) {
  #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWAD: Set with short interval, must be > 10"
-      if(int($value) < 10);
+    return "OWAD: Set with short interval, must be > 1"
+      if(int($value) < 1);
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);

@@ -16,18 +16,30 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.04 - March, 2012
+# Version 1.05 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
+#
 # define <name> OWTEMP [<model>] <ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
 #              DS1820 temperature sensor 
+#              Currently allowed values are DS1820, DS1822
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
+#
+# get <name> id          => FAM_ID.ROM_ID.CRC 
+# get <name> present     => 1 if device present, 0 if not
+# get <name> interval    => query interval
+# get <name> temperature => temperature measurement
+# get <name> alarm       => alarm temperature settings
+#
+# set <name> interval    => set period for measurement
+# set <name> tempLow     => lower alarm temperature setting
+# set <name> tempHigh    => higher alarm temperature setting
 #
 # Additional attributes are defined in fhem.cfg as
 #
@@ -130,7 +142,7 @@ sub OWTEMP_Define ($$) {
   # e.g.: define flow OWTEMP 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$model,$id,$interval,$ret);
+  my ($name,$model,$fam,$id,$crc,$interval,$ret);
   my $tn = TimeNow();
   
   #-- default
@@ -155,8 +167,6 @@ sub OWTEMP_Define ($$) {
       if(int(@a) == 5);
   } elsif( $a3 =~ m/^[0-9|a-f]{12}$/ ) {
     $model         = $a[2];
-    return "OWTEMP: Wrong 1-Wire device model $model"
-      if( $model ne "DS1820");
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
     Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
@@ -166,15 +176,23 @@ sub OWTEMP_Define ($$) {
   }
 
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
+  #   FF = family id follows from the model
   #   YY must be determined from id
-  my $crc = sprintf("%02x",OWX_CRC("10.".$id."00"));
+  if( $model eq "DS1820" ){
+    $fam = 20;
+  }elsif( $model eq "DS1822" ){
+    $fam = 22;
+  }else{
+    return "OWTEMP: Wrong 1-Wire device model $model";
+  }
+  $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
   
   #-- define device internals
   $hash->{ALARM}      = 0;
   $hash->{INTERVAL}   = $interval;
-  $hash->{ROM_ID}     = "10.".$id.$crc;
+  $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{OW_ID}      = $id;
-  $hash->{OW_FAMILY}  = 10;
+  $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
 
   #-- Couple to I/O device
@@ -407,7 +425,6 @@ sub OWTEMP_Set($@) {
   my $ret   = undef;
   my $name  = $hash->{NAME};
   my $model = $hash->{OW_MODEL};
-  my $path  = "10.".$hash->{OW_ID};
 
   #-- set warnings
   if($key eq "tempLow" || $key eq "tempHigh") {
@@ -419,8 +436,8 @@ sub OWTEMP_Set($@) {
  #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWTEMP: Set with short interval, must be > 10"
-      if(int($value) < 10);
+    return "OWTEMP: Set with short interval, must be > 1"
+      if(int($value) < 1);
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
@@ -516,12 +533,12 @@ sub OWFSTEMP_GetValues($)
 {
   my ($hash) = @_;
 
-  my $ret = OW::get("/uncached/10.".$hash->{OW_ID}."/temperature");
+  my $ret = OW::get("/uncached/".$hash->{OW_ID}.".".$hash->{OW_ID}."/temperature");
   if( defined($ret) ) {
     $hash->{PRESENT} = 1;
     $owg_temp = $ret;
-    $owg_th   = OW::get("/uncached/10.".$hash->{OW_ID}."/temphigh");
-    $owg_tl   = OW::get("/uncached/10.".$hash->{OW_ID}."/templow");
+    $owg_th   = OW::get("/uncached/".$hash->{OW_ID}.".".$hash->{OW_ID}."/temphigh");
+    $owg_tl   = OW::get("/uncached/".$hash->{OW_ID}.".".$hash->{OW_ID}."/templow");
   } else {
     $hash->{PRESENT} = 0;
     $owg_temp = 0.0;
@@ -548,7 +565,7 @@ sub OWFSTEMP_SetValues($@) {
   my $key   = $a[1];
   my $value = $a[2];
   
-  return OW::put("10.".$hash->{OW_ID}."/$key",$value);
+  return OW::put($hash->{OW_ID}.".".$hash->{OW_ID}."/$key",$value);
 }
 
 ########################################################################################

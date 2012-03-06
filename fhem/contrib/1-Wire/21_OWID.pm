@@ -12,9 +12,10 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.04 - March, 2012
+# Version 1.05 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
+#
 # define <name> OWID <FAM_ID> <ROM_ID>
 #
 # where <name> may be replaced by any name string 
@@ -24,7 +25,9 @@
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #
-# Additional attributes are defined in fhem.cfg as
+# get <name> id       => FAM_ID.ROM_ID.CRC 
+# get <name> present  => 1 if device present, 0 if not
+#
 #
 ########################################################################################
 #
@@ -55,7 +58,7 @@ sub Log($$);
 #-- declare variables
 my %gets = (
   "present"     => "",
-  "id"    => ""
+  "id"          => ""
 );
 my %sets    = ();
 my %updates = ();
@@ -99,7 +102,7 @@ sub OWID_Define ($$) {
   #-- define <name> OWID <id> 
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$fam,$id,$ret);
+  my ($name,$fam,$id,$crc,$ret);
   
   #-- default
   $name          = $a[0];
@@ -123,7 +126,7 @@ sub OWID_Define ($$) {
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
   #   YY must be determined from id
-  my $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
+  $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
   
   #-- Define device internals
   $hash->{ROM_ID}     = $fam.".".$id.$crc;
