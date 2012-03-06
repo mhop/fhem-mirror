@@ -40,10 +40,16 @@ use vars qw($FW_dir);  # moddir (./FHEM), needed by SVG
 use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
 use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
 use vars qw($FW_tp);   # is touchpad (iPad / etc)
-use vars qw(%FW_types);# device types, for 97_GROUP/95_VIEW
+
+# global variables, also used by 97_GROUP/95_VIEW/95_FLOORPLAN
+use vars qw(%FW_types);  # device types,
+use vars qw($FW_RET);    # Returned data (html)
+use vars qw($FW_wname);  # Web instance
+use vars qw($FW_subdir); # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
+use vars qw(%FW_pos);    # scroll position
+
 my $zlib_loaded;
 my $try_zlib = 1;
-
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
@@ -57,14 +63,11 @@ my %FW_icons;      # List of icons
 my $FW_iconsread;  # Timestamp of last icondir check
 my $FW_plotmode;   # Global plot mode (WEB attribute)
 my $FW_plotsize;   # Global plot size (WEB attribute)
-my %FW_pos;        # scroll position
 my $FW_reldoc;     # $FW_ME/commandref.html;
-my $FW_RET;        # Returned data (html)
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
 my %FW_types;      # device types, for sorting
-my $FW_wname;      # Web instance 
 my $FW_cname;      # Current connection
 my @FW_zoom;       # "qday", "day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
@@ -227,6 +230,8 @@ FW_Read($)
 
   $FW_wname = $hash->{SNAME};
   $FW_cname = $name;
+  $FW_subdir = "";
+
   my $ll = GetLogLevel($FW_wname,4);
   my $c = $hash->{CD};
   if(!$zlib_loaded && $try_zlib && AttrVal($FW_wname, "fwcompress", 1)) {
@@ -467,8 +472,7 @@ FW_AnswerCall($)
   }
 
   $FW_longpoll = (AttrVal($FW_wname, "longpoll", undef) &&
-                  $FW_room &&
-                  !$FW_detail);
+                  (($FW_room && !$FW_detail) || ($FW_subdir ne "")));
 
   if($cmd =~ m/^toweblink (.*)$/) {
     my @aa = split(":", $1);
@@ -678,7 +682,7 @@ FW_makeSelect($$$$)
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/[:;].*//;$_ } split(" ", $list);
 
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<form method=\"get\" action=\"$FW_ME$FW_subdir\">";
   FW_pO FW_hidden("detail", $d);
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd) . "&nbsp;$d";
@@ -1625,7 +1629,7 @@ FW_pH(@)
    my ($link, $txt, $td, $class) = @_;
 
    FW_pO "<td>" if($td);
-   $link = ($link =~ m,^/,) ? $link : "$FW_ME?$link";
+   $link = ($link =~ m,^/,) ? $link : "$FW_ME$FW_subdir?$link";
    $class = "" if(!defined($class));
    $class  = " class=\"$class\"" if($class);
 
@@ -1645,9 +1649,9 @@ FW_pHPlain(@)
 
    FW_pO "<td>" if($td);
    if($FW_ss || $FW_tp) {
-     FW_pO "<a onClick=\"location.href='$FW_ME?$link'\">$txt</a>";
+     FW_pO "<a onClick=\"location.href='$FW_ME$FW_subdir?$link'\">$txt</a>";
    } else {
-     FW_pO "<a href=\"$FW_ME?$link\">$txt</a>";
+     FW_pO "<a href=\"$FW_ME$FW_subdir?$link\">$txt</a>";
    }
    FW_pO "</td>" if($td);
 }
@@ -1691,13 +1695,13 @@ FW_showWeblink($$$$)
   } elsif($t eq "image") {
     FW_pO "<img src=\"$v\" $attr><br>";
     FW_pO "<br>";
-    FW_pHPlain "detail=$d", $d;
+    FW_pHPlain "detail=$d", $d if(!$FW_subdir);
     FW_pO "<br>";
 
   } elsif($t eq "iframe") {
     FW_pO "<iframe src=\"$v\" $attr>Iframes disabled</iframe>";
     FW_pO "<br>";
-    FW_pHPlain "detail=$d", $d;
+    FW_pHPlain "detail=$d", $d if(!$FW_subdir);
     FW_pO "<br>";
 
 
@@ -1739,7 +1743,7 @@ FW_showWeblink($$$$)
       }
 
       FW_pO "<br>";
-      FW_pHPlain "detail=$d", $d;
+      FW_pHPlain "detail=$d", $d if(!$FW_subdir);
       FW_pO "<br>";
 
     }
@@ -1886,14 +1890,15 @@ FW_Notify($$)
   if($filter eq "all" || AttrVal($dn, "room", "") eq $filter) {
     FW_ReadIcons();
 
-    my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp);
+    my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
+    $FW_subdir = "";
     $FW_longpoll = 1;
     $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
     $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
-    ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp) = @old;
+    ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir) = @old;
     $data = "$dn;$dev->{STATE};$txt\n";
 
   } elsif($filter eq "console") {
@@ -1989,13 +1994,13 @@ FW_devState($$)
     my $room = AttrVal($d, "room", undef);
     $link .= "&room=$room" if($room);
     if($FW_longpoll) {
-      $txt = "<a onClick=\"cmd('$FW_ME?XHR=1&$link')\">$txt</a>";
+      $txt = "<a onClick=\"cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
-      $txt = "<a onClick=\"location.href='$FW_ME?$link$rf'\">$txt</a>";
+      $txt = "<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf'\">$txt</a>";
 
     } else {
-      $txt = "<a href=\"$FW_ME?$link\">$txt</a>";
+      $txt = "<a href=\"$FW_ME$FW_subdir?$link\">$txt</a>";
 
     }
   }
