@@ -3048,17 +3048,18 @@ A line ending with \ will be concatenated with the next one, so long lines
       temperature $t<br>
       humidity $h<br>
       actuator $vp %<br>
-      desired-temp: $t<br>
-      tempList$wd: hh:mm $t hh:mm $t ...<br>
-      ValveErrorPosition $dname: $vep %<br>
-      ValveOffset $dname: $of %<br>
-      windowopentemp-$tchan: $t (sensor:$tdev)<br>
+      desired-temp $t<br>
+      desired-temp-ack $t<br>
+      tempList$wd  hh:mm $t hh:mm $t ...<br>
+      ValveErrorPosition $dname $vep %<br>
+      ValveOffset $dname $of %<br>
+      windowopentemp-$tchan $t (sensor:$tdev)<br>
   <li>HM-CC-VD:<br>
       actuator $vp %<br>
-      actuator:movement_open<br>
-      actuator:movement_close<br>
-      ValveErrorPosition:$vep %<br>
-      ValveOffset $dname: $of %<br>
+      motor [opening|closing|blocked|loose|adjusting range too small|ok]<br>
+      battery [low|ok]<br>
+      ValveErrorPosition $vep %<br>
+      ValveOffset $dname $of %<br>
   <li>KFM100:<br>
       rawValue $v<br>
       Sequence $s<br>
