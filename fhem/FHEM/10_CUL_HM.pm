@@ -491,15 +491,20 @@ CUL_HM_Parse($$)
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
     # status ACK to controlling HM-CC-TC
     if($cmd eq "8202" && $p =~ m/^(..)(..)(..)(..)/) {
-      my (   $vp,     $d1) =
-         (hex($3), $4);
+      my (   $vp,     $st) =
+         (hex($3), hex($4));
       $vp = int($vp)/2;   # valve position in %
       push @event, "actuator:$vp %";
 
-      # I think this is too much info:
-      #      if($d1 eq "10") { push @event, "actuator:movement_open";
-      # } elsif($d1 eq "20") { push @event, "actuator:movement_close";
-      # }
+      # Status-Byte Auswertung
+      push @event, "motor:opening" if($st&0x10);
+      push @event, "motor:closing" if($st&0x20);
+      push @event, "motor:blocked" if($st&0x06) == 2;
+      push @event, "motor:loose" if($st&0x06) == 4;
+      push @event, "motor:adjusting range too small" if($st&0x06) == 6;
+      push @event, "motor:ok" if($st&0x06) == 0;
+      push @event, "battery:low" if($st&0x08);
+      push @event, "battery:ok" if(($st&0x08) == 0);
     }
 
     # CMD:A010 SRC:13F251 DST:5D24C9 0401000000000509000A070000
