@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.03 - March, 2012
+# Version 1.04 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 # define <name> OWAD [<model>] <ROM_ID> [interval] 
@@ -27,12 +27,12 @@
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
 #
-# Additional attributes are defined in fhem.cfg as
+# Additional attributes are defined in fhem.cfg per channel, where <channel>=A,B,C,D
 #
-# attr <name> <channel>Name string    = a name for the channel, where <channel>=A,B,C,D
+# attr <name> <channel>Name <string>  = a name for the channel
 # attr <name> <channel>Offset <float> = an offset added to the reading in this channel 
 # attr <name> <channel>Factor <float> = a factor multiplied to (reading+offset) in this channel 
-# attr <name> <channel>Unit <string>  = a scale description for this channel 
+# attr <name> <channel>Unit <string>  = a unit of measurement for this channel 
 #
 ########################################################################################
 #
@@ -129,10 +129,10 @@ sub OWAD_Initialize ($) {
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
                 "channels ";
   for( my $i=0;$i<4;$i++ ){
-    $attlist .= " ".$owg_fixed[$i]."name";
-    $attlist .= " ".$owg_fixed[$i]."offset";
-    $attlist .= " ".$owg_fixed[$i]."factor";
-    $attlist .= " ".$owg_fixed[$i]."unit";
+    $attlist .= " ".$owg_fixed[$i]."Name";
+    $attlist .= " ".$owg_fixed[$i]."Offset";
+    $attlist .= " ".$owg_fixed[$i]."Factor";
+    $attlist .= " ".$owg_fixed[$i]."Unit";
   }
   $hash->{AttrList} = $attlist; 
 }
@@ -241,8 +241,8 @@ sub OWAD_InitializeDevice($) {
   my $name    = $hash->{NAME};
   #-- name attribute present ?
   for( my $i=0;$i<4;$i++) { 
-    if( defined($attr{$name}{$owg_fixed[$i]."name"}) ){
-        $owg_channel[$i]= $attr{$name}{$owg_fixed[$i]."name"};
+    if( defined($attr{$name}{$owg_fixed[$i]."Name"}) ){
+        $owg_channel[$i]= $attr{$name}{$owg_fixed[$i]."Name"};
     }
   }
   
@@ -341,8 +341,8 @@ sub OWAD_Get($@) {
     
     for (my $i=0;$i<4;$i++){
       #-- correct values for proper offset, factor 
-      $offset = $attr{$name}{$owg_fixed[$i]."offset"};
-      $factor = $attr{$name}{$owg_fixed[$i]."factor"};
+      $offset = $attr{$name}{$owg_fixed[$i]."Offset"};
+      $factor = $attr{$name}{$owg_fixed[$i]."Factor"};
       $owg_val[$i] += $offset if ($offset );
       $owg_val[$i] *= $factor if ($factor );
      
@@ -377,8 +377,8 @@ sub OWAD_Get($@) {
     
     for (my $i=0;$i<4;$i++){
       #-- correct alarm values for proper offset, factor 
-      $offset = $attr{$name}{$owg_fixed[$i]."offset"};
-      $factor = $attr{$name}{$owg_fixed[$i]."factor"};
+      $offset = $attr{$name}{$owg_fixed[$i]."Offset"};
+      $factor = $attr{$name}{$owg_fixed[$i]."Factor"};
       $owg_low[$i] += $offset if ($offset );
       $owg_low[$i] *= $factor if ($factor );
       $owg_high[$i] += $offset if ($offset );
@@ -494,8 +494,8 @@ sub OWAD_GetValues($@) {
   
   for (my $i=0;$i<4;$i++){
     #-- correct values for proper offset, factor 
-    $offset = $attr{$name}{$owg_fixed[$i]."offset"};
-    $factor = $attr{$name}{$owg_fixed[$i]."factor"};
+    $offset = $attr{$name}{$owg_fixed[$i]."Offset"};
+    $factor = $attr{$name}{$owg_fixed[$i]."Factor"};
     $owg_val[$i] += $offset if ($offset );
     $owg_val[$i] *= $factor if ($factor );
     #-- correct alarm values for proper offset, factor 
@@ -644,8 +644,8 @@ sub OWAD_Set($@) {
       return "OWAD: Set with wrong IODev type $interface";
     }
   }elsif( $key =~ m/(.*)(Low|High)/ ) {
-    $offset = $attr{$name}{$owg_fixed[$channo]."offset"};
-    $factor = $attr{$name}{$owg_fixed[$channo]."factor"};
+    $offset = $attr{$name}{$owg_fixed[$channo]."Offset"};
+    $factor = $attr{$name}{$owg_fixed[$channo]."Factor"};
     
     #-- find upper and lower boundaries for given offset/factor
     my $mmin = 0.0;
