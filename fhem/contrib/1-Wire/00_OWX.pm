@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.05 - March, 2012
+# Version 1.06 - March, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -503,7 +503,7 @@ sub OWX_Discover ($) {
           CommandDefine(undef,"$name OWTEMP DS1822 $owx_rnf");        
         #-- All unknown families are ID only
         } else {
-          CommandDefine(undef,"$name OWID $owx_f $owx_rnf");    
+          CommandDefine(undef,"$name OWID $owx_f $owx_rnf");   
         }
         #-- yes, it is on the bus and therefore present
         push(@owx_names,$name);
