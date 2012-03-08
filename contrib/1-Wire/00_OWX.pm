@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.06 - March, 2012
+# Version 1.07 - March, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -498,9 +498,12 @@ sub OWX_Discover ($) {
         #-- Family 20 = A/D converter, assume DS2450 as default
         } elsif( $owx_f eq "20" ){
           CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
-        #-- Family 10 = Temperature sensor, assume DS1820 as default
+        #-- Family 22 = Temperature sensor, assume DS1822 as default
         }elsif( $owx_f eq "22" ){
-          CommandDefine(undef,"$name OWTEMP DS1822 $owx_rnf");        
+          CommandDefine(undef,"$name OWTEMP DS1822 $owx_rnf");  
+        #-- Family 10 28 = Temperature sensor, assume DS18B20 as default
+        }elsif( $owx_f eq "28" ){
+          CommandDefine(undef,"$name OWTEMP DS18B20 $owx_rnf");       
         #-- All unknown families are ID only
         } else {
           CommandDefine(undef,"$name OWID $owx_f $owx_rnf");   

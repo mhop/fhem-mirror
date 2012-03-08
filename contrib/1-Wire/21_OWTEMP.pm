@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.06 - March, 2012
+# Version 1.07 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -31,7 +31,7 @@
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
 #
-# get <name> id          => FAM_ID.ROM_ID.CRC 
+# get <name> id          => OW_FAMILY.ROM_ID.CRC 
 # get <name> present     => 1 if device present, 0 if not
 # get <name> interval    => query interval
 # get <name> temperature => temperature measurement
@@ -182,6 +182,8 @@ sub OWTEMP_Define ($$) {
     $fam = 20;
   }elsif( $model eq "DS1822" ){
     $fam = 22;
+  }elsif( $model eq "DS18B20" ){
+    $fam = 28;
   }else{
     return "OWTEMP: Wrong 1-Wire device model $model";
   }
@@ -285,7 +287,7 @@ sub OWTEMP_Get($@) {
   
   #-- process results
   if( defined($ret)  ){
-    return "OWTEMP: Could not get values from device $name";
+    return "OWTEMP: Could not get values from device $name, return was $ret";
   }
   $hash->{PRESENT} = 1; 
   my $tn = TimeNow();
@@ -647,25 +649,50 @@ sub OWXTEMP_GetValues($) {
      
   #-- process results
   my  @data=split(//,$res);
-  if ( (@data == 19) && (ord($data[17])>0) ){
-    my $count_remain = ord($data[16]);
-    my $count_perc   = ord($data[17]);
-    my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
+  #-- this must be different for the different device types
+  #   family = 10 => DS1820, DS18S20
+  if( $hash->{OW_FAMILY} eq "10" ) {
+    if ( (@data == 19) && (ord($data[17])>0) ){
+      my $count_remain = ord($data[16]);
+      my $count_perc   = ord($data[17]);
+      my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
   
-    #-- 2's complement form = signed bytes
-    if( $data[11] eq "\x00" ){
-      $owg_temp = int(ord($data[10])/2) + $delta;
+      my $lsb  = ord($data[10]);
+      my $msb  = 0;
+      my $sign = ord($data[11]) & 255;
+      
+      #-- 2's complement form = signed bytes
+      if( $sign == 0 ){
+        $owg_temp = int($lsb/2) + $delta;
+      } else {
+        $owg_temp = 128-(int($lsb/2) + $delta);
+      }
+      $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
+      $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+      return undef;
     } else {
-      $owg_temp = 128-(int(ord($data[10])/2) + $delta);
+      return "OWXTEMP: Device $owx_dev returns invalid data";
     }
-    $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
-    $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
-    
-    # Log 1, "====> OWXTEMP Conversion result is temp = $owg_temp, delta $delta";
+  } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
+    if ( (@data == 19) && (ord($data[17])>0) ){
    
-    return undef;
+      my $lsb  = ord($data[10]);
+      my $msb  = ord($data[11]) & 7;
+      my $sign = ord($data[11]) & 248;
+      
+      #-- 2's complement form = signed bytes
+      $owg_temp = $msb*16+ $lsb/16;   
+      if( $sign !=0 ){
+        $owg_temp = 128-$owg_temp;
+      }
+      $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
+      $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+      return undef;
+    } else {
+      return "OWXTEMP: Device $owx_dev returns invalid data";
+    }
   } else {
-    return "OWXTEMP: Device $owx_dev returns invalid data";
+    return "OWXTEMP: Unknown device family $hash->{OW_FAMILY}\n";
   }
 }
 
