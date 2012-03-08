@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.05 - March, 2012
+# Version 1.06 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -123,7 +123,7 @@ sub OWTEMP_Initialize ($) {
   $hash->{SetFn}   = "OWTEMP_Set";
   #offset = a temperature offset added to the temperature reading for correction 
   #scale  = a unit of measure: C/F/K/R
-  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS18S20 loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
                      "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin,Reaumur";
   }
   
@@ -155,17 +155,17 @@ sub OWTEMP_Define ($$) {
        if(int(@a) < 2 || int(@a) > 6);
        
   #-- check if this is an old style definition, e.g. <model> is missing
-  my $a2 = lc($a[2]);
-  my $a3 = defined($a[3]) ? lc($a[3]) : "";
+  my $a2 = $a[2];
+  my $a3 = defined($a[3]) ? $a[3] : "";
   if(  ($a2 eq "none") || ($a3 eq "none")  ) {
     return "OWTEMP: ID = none is obsolete now, please redefine";
-  } elsif( $a2 =~ m/^[0-9|a-f]{12}$/ ) {
+  } elsif( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS1820";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
     Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
       if(int(@a) == 5);
-  } elsif( $a3 =~ m/^[0-9|a-f]{12}$/ ) {
+  } elsif( $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }

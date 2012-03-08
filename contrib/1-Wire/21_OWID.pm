@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.05 - March, 2012
+# Version 1.06 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -99,7 +99,7 @@ sub OWID_Initialize ($) {
 sub OWID_Define ($$) {
   my ($hash, $def) = @_;
   
-  #-- define <name> OWID <id> 
+  #-- define <name> OWID <FAM_ID> <ROM_ID>
   my @a = split("[ \t][ \t]*", $def);
   
   my ($name,$fam,$id,$crc,$ret);
@@ -113,12 +113,12 @@ sub OWID_Define ($$) {
        if(int(@a) !=4 );
        
   #-- check id
-  if(  $a[2] =~ m/^[0-9|a-f]{2}$/ ) {
+  if(  $a[2] =~ m/^[0-9|a-f|A-F]{2}$/ ) {
     $fam            = $a[2];
   } else {    
-    return "OWID: $a[0] ID $a[2] invalid, specify a 2 digit value";
+    return "OWID: $a[0] family id $a[2] invalid, specify a 2 digit value";
   }
-  if(  $a[3] =~ m/^[0-9|a-f]{12}$/ ) {
+  if(  $a[3] =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $id            = $a[3];
   } else {    
     return "OWID: $a[0] ID $a[3] invalid, specify a 12 digit value";

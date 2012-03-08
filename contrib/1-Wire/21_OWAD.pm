@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.05 - March, 2012
+# Version 1.06 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -175,13 +175,13 @@ sub OWAD_Define ($$) {
        if(int(@a) < 2 || int(@a) > 5);
        
   #-- check if this is an old style definition, e.g. <model> is missing
-  my $a2 = lc($a[2]);
-  my $a3 = defined($a[3]) ? lc($a[3]) : "";
-  if( $a2 =~ m/^[0-9|a-f]{12}$/ ) {
+  my $a2 = $a[2];
+  my $a3 = defined($a[3]) ? $a[3] : "";
+  if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS2450";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
-  } elsif(  $a3 =~ m/^[0-9|a-f]{12}$/ ) {
+  } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
     return "OWAD: Wrong 1-Wire device model $model"
       if( $model ne "DS2450");
