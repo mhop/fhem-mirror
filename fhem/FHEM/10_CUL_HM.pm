@@ -872,7 +872,7 @@ sub
 CUL_HM_Set($@)
 {
   my ($hash, @a) = @_;
-  my ($ret, $tval);
+  my ($ret, $tval, $rval); #added rval for ramptime by unimatrix
 
   return "no set value specified" if(@a < 2);
 
@@ -981,12 +981,16 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "pct") { ##############################################
     $a[1] = 100 if ($a[1] > 100);
-    my $cmd = sprintf("++A011%s%s02%s%02X0000", $id, $dst, $chn, $a[1]*2);
+    if(@a == 2) {$tval="";$rval="0000";}
     if(@a > 2) {
       ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
       Log 1, $ret if($ret);
-      $cmd .= $tval;
     }
+    if(@a > 3) {
+      ($rval,$ret) = CUL_HM_encodeTime16($a[3]);
+      Log 1, $ret if($ret);
+    }
+    my $cmd = sprintf("++A011%s%s02%s%02X%s%s", $id, $dst, $chn, $a[1]*2,$rval,$tval);
     CUL_HM_PushCmdStack($hash, $cmd);
 
   } elsif($cmd eq "text") { #############################################
@@ -1593,8 +1597,7 @@ my %culHmBits = (
   "A011;p01=02"   => { txt => "SET" , params => {
                        CHANNEL  => "02,2", 
                        VALUE    => "04,2", 
-                       RAMPTIME => "06,2", 
-                       ONTIME   => "08,2",
+                       RAMPTIME => '06,4,$val=CUL_HM_decodeTime16($val)', 
                        DURATION => '10,4,$val=CUL_HM_decodeTime16($val)', } }, 
   "A03E"          => { txt => "SWITCH", params => {
                        DST      => "00,6", 

@@ -2927,9 +2927,13 @@ A line ending with \ will be concatenated with the next one, so long lines
      <li>dimmer, blindActuator
        <ul>
          <li>0 - 100 with a resolution of 0.5:<br>
-             set the dimmer / blindActuator to the given value (in percent).
+             set the dimmer / blindActuator to the given value (in percent).<br>
+			 as a second optional parameter you can give the On-Time in seconds (analog "on-for-timer"). 0 means infinite<br>
+			 as a third optional parameter you can give the Ramp-Time in seconds (steps of 0.1) for a "slow-dim". 0 means instant. Default: 0.5<br></li>
          <li>on / off<br>
              this corresponds to 100 or 0 %.
+		 <li>toggle - toggle the dimmer between off and the last on-value</li>
+		 <li>on-for-timer sec - set the dimmer on for the given seconds. Redundant with 0-100 and on/off for compatability purposes</li>
        </ul></li>
      <br>
 
