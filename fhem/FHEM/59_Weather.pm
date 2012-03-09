@@ -17,6 +17,28 @@ use Time::HiRes qw(gettimeofday);
 my $UseWeatherGoogle= 0; # if you want Weather:Google back please set this to 1 and uncomment below.
 #  use Weather::Google;
 
+# taken from Daniel "Possum" LeWarne's Google::Weather module
+# http://cpansearch.perl.org/src/POSSUM/Weather-Google-0.05/lib/Weather/Google.pm
+
+# Mapping of current supported encodings
+my %DEFAULT_ENCODINGS = (
+    en      => 'latin1',
+    da      => 'latin1',
+    de      => 'latin1',
+    es      => 'latin1',
+    fi      => 'latin1',
+    fr      => 'latin1',
+    it      => 'latin1',
+    ja      => 'utf-8',
+    ko      => 'utf-8',
+    nl      => 'latin1',
+    no      => 'latin1',
+    'pt-BR' => 'latin1',
+    ru      => 'utf-8',
+    sv      => 'latin1',
+    'zh-CN' => 'utf-8',
+    'zh-TW' => 'utf-8',
+);
 
 #####################################
 sub Weather_Initialize($) {
@@ -35,10 +57,24 @@ sub Weather_Initialize($) {
 }
 
 ###################################
-sub f_to_c($) {
+sub latin1_to_utf8($) {
 
-  my ($f)= @_;
-  return int(($f-32)*5/9+0.5);
+  # http://perldoc.perl.org/perluniintro.html, UNICODE IN OLDER PERLS
+  my ($s)= @_;
+  $s =~ s/([\x80-\xFF])/chr(0xC0|ord($1)>>6).chr(0x80|ord($1)&0x3F)/eg;
+  return $s;
+}
+
+###################################
+
+sub temperature_in_c {
+  my ($temperature, $unitsystem)= @_;
+  return $unitsystem ne "SI" ? int(($temperature-32)*5/9+0.5) : $temperature;
+}
+
+sub wind_in_km_per_h {
+  my ($wind, $unitsystem)= @_;
+  return $unitsystem ne "SI" ? int(1.609344*$wind+0.5) : $wind;
 }
 
 ###################################
@@ -50,12 +86,14 @@ sub Weather_UpdateReading($$$$) {
 
   #Log 1, "DEBUG WEATHER: $prefix $key $value";
 
+  my $unitsystem= $hash->{READINGS}{unit_system}{VAL};
+  
   if($key eq "low") {
         $key= "low_c";
-        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");
+        $value= temperature_in_c($value,$unitsystem);
   } elsif($key eq "high") {
         $key= "high_c";
-        $value= f_to_c($value) if($hash->{READINGS}{unit_system}{VAL} ne "SI");
+        $value= temperature_in_c($value,$unitsystem);
   } elsif($key eq "humidity") {
         # standardize reading - allow generic logging of humidity.
         $value=~ s/.*?(\d+).*/$1/; # extract numeric
@@ -65,11 +103,11 @@ sub Weather_UpdateReading($$$$) {
 
   readingsUpdate($hash,$reading,$value);
   if($reading eq "temp_c") {
-    readingsUpdate($hash,"temperature",$value); # additional entry for compatability
+    readingsUpdate($hash,"temperature",$value); # additional entry for compatibility
   }
   if($reading eq "wind_condition") {
     $value=~ s/.*?(\d+).*/$1/; # extract numeric
-    readingsUpdate($hash,"wind",$value); # additional entry for compatability
+    readingsUpdate($hash,"wind",wind_in_km_per_h($value,$unitsystem)); # additional entry for compatibility
   }
 
   return 1;
@@ -97,6 +135,9 @@ sub Weather_RetrieveDataDirectly($)
           my $prefix= $fc ? "fc" . $fc ."_" : "";
           my $key= $tag;
           $value=~ s/^data=\"(.*)\"$/$1/;      # extract DATA from data="DATA"
+          if($DEFAULT_ENCODINGS{$lang} eq "latin1") {
+            $value= latin1_to_utf8($value); # latin1 -> UTF-8
+          }
           #Log 1, "DEBUG WEATHER: prefix=\"$prefix\" tag=\"$tag\" value=\"$value\"";
           Weather_UpdateReading($hash,$prefix,$key,$value);
   }
@@ -169,6 +210,13 @@ sub Weather_GetUpdate($)
     Weather_RetrieveDataDirectly($hash);
   }
 
+  my $temperature= $hash->{READINGS}{temperature}{VAL};
+  my $humidity= $hash->{READINGS}{humidity}{VAL};
+  my $wind= $hash->{READINGS}{wind}{VAL};
+  my $val= "T: $temperature  H: $humidity  W: $wind";
+  Log GetLogLevel($hash->{NAME},4), "Weather ". $hash->{NAME} . ": $val";
+  $hash->{STATE}= $val;
+  
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
       
   return 1;
