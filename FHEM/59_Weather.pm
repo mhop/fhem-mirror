@@ -82,8 +82,6 @@ sub Weather_UpdateReading($$$$) {
 
   my ($hash,$prefix,$key,$value)= @_;
 
-  return 0 if(!defined($value) || $value eq "");
-
   #Log 1, "DEBUG WEATHER: $prefix $key $value";
 
   my $unitsystem= $hash->{READINGS}{unit_system}{VAL};

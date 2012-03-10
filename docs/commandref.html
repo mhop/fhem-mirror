@@ -4296,33 +4296,52 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="Weatherdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [en|de|fr|es]]</code><br>
+    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
     <br>
-    Defines a virtual device for weather forecasts. You need to have the perl
+    Defines a virtual device for weather forecasts. <!--You need to have the perl
     module Weather::Google installed to use this device. If you do not have it,
-    use <i>cpan -i Weather::Google</i> to install it.<br><br>
+    use <i>cpan -i Weather::Google</i> to install it.--><br><br>
 
     A Weather device periodically gathers current and forecast weather conditions
     from the Google Weather API.<br><br>
 
     The parameter <code>location</code> is any string that is recognized as a
-    location, either a town name or a zip code. Browse to the URL
+    location, either a town name or a zip code or latitude/longitude (in decimal notation,
+    multiplied by one million). Browse to the URL
     <code>http://www.google.de/ig/api?weather=location&hl=en</code>
     to see the raw output for your location.<br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
 
-    The optional language parameter may be one of <code>en</code>, <code>de</code>, <code>fr</code>,
-    <code>es</code>. It determines the natural language in which the forecast information appears.
-    It defaults to en. If you want to set the language you also have to set the interval.<br><br>
+    The optional language parameter may be one of
+    <code>da</code>,
+    <code>de</code>,
+    <code>en</code>,
+    <code>es</code>,
+    <code>fi</code>,
+    <code>fr</code>,
+    <code>it</code>,
+    <code>ja</code>,
+    <code>ko</code>,
+    <code>nl</code>,
+    <code>no</code>,
+    <code>pt-BR</code>,
+    <code>ru</code>,
+    <code>sv</code>,
+    <code>zv-CN</code>,
+    <code>zv-TW</code>.
+
+    It determines the natural language in which the forecast information appears.
+    It defaults to <code>en</code>. If you want to set the language you also have to set the interval.<br><br>
 
     Examples:
     <pre>
       define MyWeather Weather "Frankfurt,HE"
       define Forecast Weather "Amsterdam,NL" 1800
       define weather Weather "30000,France" 3600 fr
-    </pre>
+      define W Weather ,,,50500000,30500000 600 es
+      </pre>
   </ul>
   <br>
 
@@ -4339,7 +4358,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
-    Valid readings and their meaning (? can be one of 0, 1, 2, 3 and stands
+    Valid readings and their meaning (? can be one of 0, 1, 2, 3, 4 and stands
     for today, tomorrow, ...):<br>
     <table>
     <tr><td>city</td><td>name of town returned for location</td></tr>
@@ -4350,11 +4369,13 @@ A line ending with \ will be concatenated with the next one, so long lines
     <tr><td>fc?_high_c</td><td>forecasted daily high in degrees centigrade</td></tr>
     <tr><td>fc?_icon</td><td>relative path for forecast icon, prefix with <code>http://www.google.com</code> to form a valid URL for display in web interfaces</td></tr>
     <tr><td>fc?_low_c</td><td>forecasted daily low in degrees centigrade</td></tr>
-    <tr><td>humidity</td><td>current humidity</td></tr>
+    <tr><td>humidity</td><td>current humidity in %</td></tr>
     <tr><td>icon</td><td>relative path for current icon</td></tr>
     <tr><td>postal_code</td><td>location sent to server</td></tr>
+    <tr><td>temperature</td><td>current temperature in degrees centigrade</td></tr>
     <tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
     <tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
+    <tr><td>wind</td><td>wind speed in km/h</td></tr>
     <tr><td>wind_condition</td><td>wind direction and speed</td></tr>
     </table>
 
