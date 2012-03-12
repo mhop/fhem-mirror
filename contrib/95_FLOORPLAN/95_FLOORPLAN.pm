@@ -13,6 +13,7 @@
 # 0006: kicked out various routines previously copied from FHEMWEB - now using FW_*-versions thanks to addtl. global variables $FW_RET, $FW_wname, $FW_subdir, %FW_pos
 # 0007: Added fp_default
 # 0008: Changed name of background-picture from <floorplan-name> to fp_<floorplan-name> to avoid display of picture in device-list at fhem-menu 'Everything'
+# 0009: updated selection of add-device-list: suppress CUL$ only (instead of CUL.*)
 #
 ################################################################
 #
@@ -480,7 +481,7 @@ FP_menuArrange() {
 	foreach my $d (@devs) {                                                                    # loop all devices
 		my $type = $defs{$d}{TYPE};
 		# exclude these types from list of available devices
-		next if($type =~ m/(WEB|CUL.*|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify)/ );
+		next if($type =~ m/(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify)/ );
 		my $av = AttrVal("$d","fp_$FP_name", undef);
 		push(@fpl, $d)  if ($av);
 		push(@nfpl, $d) if (!$av);
