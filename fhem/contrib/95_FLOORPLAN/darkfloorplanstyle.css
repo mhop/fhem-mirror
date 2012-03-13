@@ -1,0 +1,41 @@
+body     { background-color: #444444; font-family:Verdana, sans-serif; font-size:9px; background-image:url(darklogo.png); background-repeat:no-repeat;  }
+body[name~=Media]     { background-color: #A5A5A5;
+                        font-family:Verdana, sans-serif; 
+                        font-size:9px;  
+                        background-image:url(Media.bak.png); 
+                        background-repeat:no-repeat;  }
+#menu.fp-list   { position:absolute; top:190px;left:20px; width:140px; font-size:11px;  }
+
+#logo    { position:absolute; top: 10px; left: 10px; width:180px;  height:600px; background-image:url(darklogo.png); visibility:hidden;}
+#fp_menu    { position:absolute; top:190px;left:20px; width:140px; font-size:12px;  }
+#menu    { position:absolute; top:190px; left:20px; width:140px; }
+#menu.floorplan   { position:absolute; top:190px; left:40px; width:140px; font-size:12px; }
+#fpmenu.fp_arrange   { position:absolute; bottom:20px; left:20px; width:310px; font-size:9px; border:1px solid gray;}
+#hdr     { position:absolute; top:10px; left:180px; }
+#content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
+
+a { color:#CCCCCC; }
+img {  border-style: none; position:absolute; top:15px; left:190px;}
+table { -moz-border-radius:8px; border-radius:8px; }
+
+.fp_Grundriss   {border:0px solid gray;}
+
+.devicename     {font-size: 11px; text-align:center; }
+.devicestate    {text-align:center; }
+.devicecommands {font-size:14px; text-align:center; }
+
+#sz_Rollo.devicename     {font-size:14px;}
+#sz_Rollo.devicecommands {font-size:12px; text-align:center; }
+#ez_Aussentemperatur_dummy.devicestate  {color:green; font-size:30px; }
+#HomeStatus.devicestate  {color:green; font-size:30px; }
+table.dummy              {width:100px; }
+table.FHT                {width:100px; }
+#wakeup.devicestate      {color:green; font-size:11px; }
+#ez_FHT.devicestate      {color:green; font-size:30px; }
+#Home.fp_Grundriss       {font-size:14px; width:100px; }
+#Home.fp_Media           {font-size:14px; text-align:left; }
+#Media                   {font-size:14px; }
+#Grundriss               {font-size:14px; text-align:left; }
+
+h2,h3,h4 { color:#52865D; line-height:1.3;
+           margin-top:1.5em; font-family:Verdana,Sans-serif; }
