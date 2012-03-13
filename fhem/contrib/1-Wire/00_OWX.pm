@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.07 - March, 2012
+# Version 1.08 - March, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -17,10 +17,12 @@
 # where <name> may be replaced by any name string 
 #       <device> is a serial (USB) device
 #
-# get <name> alarms   => find alarmed 1-Wire devices
-# get <name> devices  => find all 1-Wire devices 
+# get <name> alarms                 => find alarmed 1-Wire devices
+# get <name> devices                => find all 1-Wire devices 
 #
-# set <name> interval => set period for temperature conversion and alarm testing
+# set <name> interval <seconds>     => set period for temperature conversion and alarm testing
+# set <name> followAlarms on/off    => determine whether an alarm is followed by a search for
+#                                      alarmed devices
 #
 # attr <name> buspower real/parasitic - whether the 1-Wire bus is really powered or 
 #      the 1-Wire devices take their power from the data wire (parasitic is default !)
@@ -68,7 +70,8 @@ my %gets = (
 
 # These occur in a pulldown menu as settable values for the bus master
 my %sets = (
-   "interval" => "T"
+   "interval" => "T",
+   "followAlarms" => "F"
 );
 
 # These are attributes
@@ -345,7 +348,9 @@ sub OWX_Define ($$) {
     InternalTimer(gettimeofday()+5, "OWX_Discover", $hash,0);
     
     #-- Default settings
-    $hash->{interval} = 60;          # kick every minute
+    $hash->{interval}     = 60;          # kick every minute
+    $hash->{followAlarms} = "off";
+    $hash->{ALARMED}      = "no";
     
     #-- InternalTimer blocks if init_done is not true
     my $oid = $init_done;
@@ -608,12 +613,12 @@ sub OWX_Kick($) {
   my $ret;
   #-- Call us in n seconds again.
   InternalTimer(gettimeofday()+ $hash->{interval}, "OWX_Kick", $hash,1);
-  
+  #-- During reset we see if an alarmed device is present.
   OWX_Reset($hash);
-  
+   
   #-- Only if we have real power on the bus
   if( defined($attr{$hash->{NAME}}{buspower}) &&  ($attr{$hash->{NAME}}{buspower} eq "real") ){
-    #-- issue the skip ROM command \xCC followed by start conversion command \x44
+    #-- issue the skip ROM command \xCC followed by start conversion command \x44 
     $ret = OWX_Block($hash,"\xCC\x44");
     if( $ret eq 0 ){
       Log 3, "OWX: Failure in temperature conversion\n";
@@ -808,10 +813,25 @@ sub OWX_Set($@) {
   	} else {
   	  $res = 0;
   	}
-    Log GetLogLevel($name,3), "OWX_Set $name ".join(" ",@a)." => $res";  
-  	DoTrigger($name, undef) if($init_done);
-    return "OWX_Set => $name ".join(" ",@a)." => $res";
   }
+  
+  #-- Set alarm behaviour
+  if( $a[0] eq "followAlarms" ){
+    #-- only values >= 15 secs allowed
+    if( (lc($a[1]) eq "off") && ($hash->{followAlarms} eq "on") ){
+      $hash->{interval} = "off";  
+  	  $res = 1;
+  	}elsif( (lc($a[1]) eq "on") && ($hash->{followAlarms} eq "off") ){
+      $hash->{interval} = "off";  
+  	  $res = 1;
+  	} else {
+  	  $res = 0;
+  	}
+    
+  }
+  Log GetLogLevel($name,3), "OWX_Set $name ".join(" ",@a)." => $res";  
+  DoTrigger($name, undef) if($init_done);
+  return "OWX_Set => $name ".join(" ",@a)." => $res";
 }
 
 ########################################################################################
@@ -1043,6 +1063,7 @@ sub OWX_Reset_2480 ($) {
     Log 3, "OWX: Reset failure";
     return 0;
   }
+  $hash->{ALARMED} = "no";
   
   $r2 = ord(substr($res,0,1)) & 3;
   
@@ -1051,6 +1072,7 @@ sub OWX_Reset_2480 ($) {
     return 0;
   }elsif( $r2 ==2 ){
     Log 1, "OWX: Alarm presence detected";
+    $hash->{ALARMED} = "yes";
   }
   return 1;
 }
