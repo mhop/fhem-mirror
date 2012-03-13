@@ -61,15 +61,15 @@ use warnings;
 
 use IO::Socket::INET;
 
-my @gets = ('totalEnergyDay',              # kWh
-            'totalEnergyMonth',            # kWh
-            'totalEnergyYear',             # kWh
-            'totalEnergy',                 # kWh
-            'currentPower',                # W
-            'UDC', 'IDC', 'UDCB',          # V, A, V
-            'IDCB', 'UDCC', 'IDCC',        # A, V, A
-            'gridVoltage', 'gridCurrent',  # V, A
-            'temperature');                # oC
+my @gets = ('totalEnergyDay',               # kWh
+            'totalEnergyMonth',             # kWh
+            'totalEnergyYear',              # kWh
+            'totalEnergy',                  # kWh
+            'currentPower',                 # W
+            'UDC', 'IDC', 'UDCB',           # V, A, V
+            'IDCB', 'UDCC', 'IDCC',         # A, V, A
+            'gridVoltage', 'gridCurrent',   # V, A
+            'temperature');                 # oC
 
 sub
 SolarView_Initialize($)
@@ -89,7 +89,7 @@ SolarView_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  if (@args < 4)
+  if (int(@args) < 4)
   {
     return "SolarView_Define: too few arguments. Usage:\n" .
            "define <name> SolarView <host> <port> [<interval> [<timeout>]]";
@@ -97,17 +97,17 @@ SolarView_Define($$)
 
   $hash->{Host}     = $args[2];
   $hash->{Port}     = $args[3];
-  $hash->{Interval} = (@args>=5) ? int($args[4]) : 300;
-  $hash->{Timeout}  = (@args>=6) ? int($args[5]) : 4;
+  $hash->{Interval} = int(@args) >= 5 ? int($args[4]) : 300;
+  $hash->{Timeout}  = int(@args) >= 6 ? int($args[5]) : 4;
 
   # config variables
-  $hash->{Invalid}    = -1;     # default value for invalid readings
-  $hash->{Sleep}      = 0;      # seconds to sleep before connect
-  $hash->{Debounce}   = 50;     # minimum level for enabling debounce (0 to disable)
-  $hash->{Rereads}    = 2;      # number of retries when reading curPwr of 0
-  $hash->{NightOff}   = 'yes';  # skip connection to SV at night?
-  $hash->{UseSVNight} = 'yes';  # use the on/off timings from SV (else: SUNRISE_EL)
-  $hash->{UseSVTime}  = '';     # use the SV time as timestamp (else: TimeNow())
+  $hash->{Invalid}    = -1;    # default value for invalid readings
+  $hash->{Sleep}      = 0;     # seconds to sleep before connect
+  $hash->{Debounce}   = 50;    # minimum level for debouncing (0 to disable)
+  $hash->{Rereads}    = 2;     # number of retries when reading curPwr of 0
+  $hash->{NightOff}   = 'yes'; # skip connection to SV at night?
+  $hash->{UseSVNight} = 'yes'; # use the on/off timings from SV (else: SUNRISE_EL)
+  $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
 
   # internal variables
   $hash->{Debounced}  = 0;
@@ -145,7 +145,7 @@ SolarView_Update($)
   if ($hash->{NightOff} and SolarView_IsNight($hash) and
       $hash->{READINGS}{currentPower}{VAL} != $hash->{Invalid})
   {
-    $hash->{STATE} = 'Pausing';
+    $hash->{STATE} = '0 W, '.$hash->{READINGS}{totalEnergyDay}{VAL}.' kWh (Night)';
     return undef;
   }
 
@@ -153,12 +153,10 @@ SolarView_Update($)
 
   Log 4, "$hash->{NAME} tries to contact solarview at $hash->{Host}:$hash->{Port}";
 
-  # save the previous value of currentPower for debouncing 
-  my $cpVal  = $hash->{READINGS}{currentPower}{VAL};
-  my $cpTime = $hash->{READINGS}{currentPower}{TIME};
-
-  my $success = 0;
-  my $rereads = $hash->{Rereads};
+  my $success  = 0;
+  my %readings = ();
+  my $timenow  = TimeNow();
+  my $rereads  = $hash->{Rereads};
 
   eval {
     local $SIG{ALRM} = sub { die 'timeout'; };
@@ -180,8 +178,6 @@ SolarView_Update($)
       {
         my @vals = split(/,/, $1);
 
-        my $timenow = TimeNow();
-
         if ($hash->{UseSVTime}) 
         {
           $timenow = sprintf("%04d-%02d-%02d %02d:%02d:00",
@@ -190,16 +186,13 @@ SolarView_Update($)
 
         for my $i (6..19)
         {
-          my $getIdx = $i-6;
-
           if (defined($vals[$i]))
-          {
-            $hash->{READINGS}{$gets[$getIdx]}{VAL}  = 0 + $vals[$i];
-            $hash->{READINGS}{$gets[$getIdx]}{TIME} = $timenow;
+          { 
+            $readings{$gets[$i - 6]} = 0 + $vals[$i]; 
           }
         }
 
-        if ($rereads and $hash->{READINGS}{currentPower}{VAL} == 0)
+        if ($rereads and $readings{currentPower} == 0)
         { 
           sleep(1);
           $rereads = $rereads - 1;
@@ -212,13 +205,11 @@ SolarView_Update($)
         # currentPower from 'greater than Debounce' to 'Zero'
         #
         if ($hash->{Debounce} > 0 and
-            $hash->{Debounce} < $cpVal and
-            $hash->{READINGS}{currentPower}{VAL} == 0 and
-            not $hash->{Debounced})
+            $hash->{Debounce} < $hash->{READINGS}{currentPower}{VAL} and
+            $readings{currentPower} == 0 and not $hash->{Debounced})
         {
-            $hash->{READINGS}{currentPower}{VAL}  = $cpVal;
-            $hash->{READINGS}{currentPower}{TIME} = $cpTime;
-
+            # revert to the previous value
+            $readings{currentPower} = $hash->{READINGS}{currentPower}{VAL};
             $hash->{Debounced} = 1;
         } else {
             $hash->{Debounced} = 0;
@@ -233,10 +224,26 @@ SolarView_Update($)
 
   if ($success)
   {
-    $hash->{STATE} = 'Initialized';
+    for my $get (@gets)
+    {
+      # update and notify readings if they have changed
+      if ($hash->{READINGS}{$get}{VAL} != $readings{$get})
+      {
+        $hash->{READINGS}{$get}{VAL}  = $readings{$get};
+        $hash->{READINGS}{$get}{TIME} = $timenow;
+        #
+        push @{$hash->{CHANGED}}, "$get: $readings{$get}";
+      }
+    }
+    DoTrigger($hash->{NAME}, undef) if ($init_done);
+  }
+
+  $hash->{STATE} = $hash->{READINGS}{currentPower}{VAL}.' W, '.$hash->{READINGS}{totalEnergyDay}{VAL}.' kWh';
+
+  if ($success) {
     Log 4, "$hash->{NAME} got fresh values from solarview";
   } else {
-    $hash->{STATE} = 'Failure';
+    $hash->{STATE} .= ' (Fail)';
     Log 4, "$hash->{NAME} was unable to get fresh values from solarview";
   }
 
@@ -280,7 +287,9 @@ sub
 SolarView_IsNight($)
 {
   my ($hash) = @_;
+
   my $isNight = 0;
+
   my ($sec,$min,$hour,$mday,$mon) = localtime(time);
 
   # reset totalEnergyX if needed
