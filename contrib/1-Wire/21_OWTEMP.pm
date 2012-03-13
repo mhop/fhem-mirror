@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.07 - March, 2012
+# Version 1.08 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -38,13 +38,18 @@
 # get <name> alarm       => alarm temperature settings
 #
 # set <name> interval    => set period for measurement
-# set <name> tempLow     => lower alarm temperature setting
+# set <name> tempLow     => lower alarm temperature setting 
 # set <name> tempHigh    => higher alarm temperature setting
 #
-# Additional attributes are defined in fhem.cfg as
+# Additional attributes are defined in fhem.cfg
+# Note: attributes "tempXXXX" are read during every update operation.
 #
-# attr <name> tempOffset <float> = a temperature offset added to the temperature reading 
-# attr <name> tempUnit  <string> = a a unit of measurement, e.g. Celsius/Kelvin/Fahrenheit/Reaumur 
+# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is red down triangle
+# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is red up triangle
+# attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
+# attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
+# attr <name> tempLow   <float>    = measurement value for low alarm 
+# attr <name> tempHigh  <float>    = measurement for high alarm 
 #
 ########################################################################################
 #
@@ -75,10 +80,14 @@ use strict;
 use warnings;
 sub Log($$);
 
-#-- temperature globals
-my $owg_temp=0;
-my $owg_th=0;
-my $owg_tl=0;
+#-- temperature globals - always the raw values from the device
+my $owg_temp     = 0;
+my $owg_th       = 0;
+my $owg_tl       = 0;
+
+#-- variables for display strings
+my $stateal;
+my $stateah;
 
 my %gets = (
   "id"          => "",
@@ -121,10 +130,12 @@ sub OWTEMP_Initialize ($) {
   $hash->{UndefFn} = "OWTEMP_Undef";
   $hash->{GetFn}   = "OWTEMP_Get";
   $hash->{SetFn}   = "OWTEMP_Set";
-  #offset = a temperature offset added to the temperature reading for correction 
-  #scale  = a unit of measure: C/F/K/R
+  #tempOffset = a temperature offset added to the temperature reading for correction 
+  #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
-                     "tempOffset tempUnit:Celsius,Fahrenheit,Kelvin,Reaumur";
+                     "stateAL stateAH ".
+                     "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
+                     "tempLow tempHigh";
   }
   
 ########################################################################################
@@ -179,7 +190,7 @@ sub OWTEMP_Define ($$) {
   #   FF = family id follows from the model
   #   YY must be determined from id
   if( $model eq "DS1820" ){
-    $fam = 20;
+    $fam = 10;
   }elsif( $model eq "DS1822" ){
     $fam = 22;
   }elsif( $model eq "DS18B20" ){
@@ -191,36 +202,142 @@ sub OWTEMP_Define ($$) {
   
   #-- define device internals
   $hash->{ALARM}      = 0;
-  $hash->{INTERVAL}   = $interval;
-  $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
+  $hash->{ROM_ID}     = $fam.".".$id.$crc;
+  $hash->{INTERVAL}   = $interval;
 
   #-- Couple to I/O device
   AssignIoPort($hash);
   Log 3, "OWTEMP: Warning, no 1-Wire I/O device found for $name."
     if(!defined($hash->{IODev}->{NAME}));
-    
   $modules{OWTEMP}{defptr}{$id} = $hash;
-
-  #-- Initial readings temperature sensor
-  $hash->{READINGS}{"temperature"}{VAL}  = 0.0;
-  #$hash->{READINGS}{"temperature"}{UNIT} = "celsius";
-  #$hash->{READINGS}{"temperature"}{TYPE} = "temperature";
-  $hash->{READINGS}{"tempLow"}{VAL}      = 0.0;
-  $hash->{READINGS}{"tempHigh"}{VAL}     = 0.0;
-  $hash->{READINGS}{"temperature"}{TIME} = "";
-  $hash->{READINGS}{"tempLow"}{TIME}     = "";
-  $hash->{READINGS}{"tempHigh"}{TIME}    = "";
-  $hash->{STATE}                       = "Defined";
+  $hash->{STATE} = "Defined";
   Log 3, "OWTEMP: Device $name defined."; 
+  
+  #-- Start timer for initialization in a few seconds
+  InternalTimer(time()+1, "OWTEMP_InitializeDevice", $hash, 0);
    
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 0);
 
-  $hash->{STATE} = "Initialized";
   return undef; 
+}
+  
+########################################################################################
+#
+# OWTEMP_InitializeDevice - delayed setting of initial readings and channel names  
+#
+#  Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWTEMP_InitializeDevice($) {
+  my ($hash) = @_;
+  
+  my $name   = $hash->{NAME};
+  
+  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "<span style=\"color:red\">&#x25BE;</span>";
+  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "<span style=\"color:red\">&#x25B4;</span>";
+  
+  #-- unit attribute defined ?
+  $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
+  $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
+  
+  #-- Initial readings temperature sensor
+  $owg_temp  =  0.0;
+  $owg_tl    = -15.0;
+  $owg_th    =  70.0;
+ 
+  #-- Initialize all the display stuff  
+  OWTEMP_FormatValues($hash);
+}
+
+########################################################################################
+#
+# OWTEMP_FormatValues - put together various format strings 
+#
+#  Parameter hash = hash of device addressed, fs = format string
+#
+########################################################################################
+
+sub OWTEMP_FormatValues($) {
+  my ($hash) = @_;
+  
+  my $name    = $hash->{NAME}; 
+  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
+  my ($value1,$value2,$value3)   = ("","","");
+
+  my $tn = TimeNow();
+  
+  #-- attributes defined ?
+  $unit   = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
+  $offset = defined($attr{$name}{"tempoffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $factor = 1.0;
+  
+  if( $unit eq "Celsius" ){
+    $abbr   = "&deg;C";
+  } elsif ($unit eq "Kelvin" ){
+    $abbr   = "K";
+    $offset += "273.16"
+  } elsif ($unit eq "Fahrenheit" ){
+    $abbr   = "&deg;F";
+    $offset = ($offset+32)/1.8;
+    $factor = 1.8;
+  } else {
+    $abbr="?";
+    Log 1, "OWTEMP_FormatValues: unknown unit $unit";
+  }
+  #-- these values are rather coplex to obtain, therefore save them in the hash
+  $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
+  $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
+  $hash->{tempf}{offset}                     = $offset;
+  $hash->{tempf}{factor}                     = $factor;
+  
+  #-- correct values for proper offset, factor 
+  $vval  = ($owg_temp + $offset)*$factor;
+  
+  #-- put into READINGS
+  $hash->{READINGS}{"temperature"}{VAL}   = $vval;
+  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
+    
+  #-- correct alarm values for proper offset, factor 
+  $vlow   = ($owg_tl + $offset)*$factor;
+  $vhigh  = ($owg_th + $offset)*$factor;
+  
+  #-- put into READINGS
+  $hash->{READINGS}{"tempLow"}{VAL}     = $vlow;
+  $hash->{READINGS}{"tempLow"}{TIME}    = $tn;
+  $hash->{READINGS}{"tempHigh"}{VAL}    = $vhigh;
+  $hash->{READINGS}{"tempHigh"}{TIME}   = $tn;   
+         
+  #-- formats for output
+  $statef  = "%5.2f ".$abbr;
+  $value1 = sprintf($statef,$vval);
+  $value2 = sprintf($statef,$vval);
+  $hash->{ALARM} = 1;
+  
+  #-- Test for alarm condition
+  if( ($vval <= $vlow) && ( $vval >= $vhigh ) ){
+    $value2 .= " ".$stateal.$stateah;
+    $value3 .= " ".$stateal.$stateah;
+  }elsif( $vval <= $vlow ){
+    $value2 .= " ".$stateal;
+    $value3 .= " ".$stateal; 
+  }elsif( $vval >= $vhigh ){
+    $value2 .= " ".$stateah;
+    $value3 .= " ".$stateah;
+  } else {
+    $hash->{ALARM} = 0;
+  }
+  
+  #-- STATE
+  $hash->{STATE} = $value2;
+  #-- alarm
+  #$hash->{READINGS}{alarms}{VAL}  = $value3;
+  #$hash->{READINGS}{alarms}{TIME}   = $tn;
+  return $value1;
 }
   
 ########################################################################################
@@ -290,38 +407,15 @@ sub OWTEMP_Get($@) {
     return "OWTEMP: Could not get values from device $name, return was $ret";
   }
   $hash->{PRESENT} = 1; 
-  my $tn = TimeNow();
-  
-  #-- correct for proper offset
-  my $offset = $attr{$name}{tempOffset};
-  if( $offset ){
-    $owg_temp += $offset;
-    #$owg_tl   += $offset;
-    #$owg_tl   += $offset;
-  }
-  
-  #-- put into READINGS
-  $hash->{READINGS}{"temperature"}{VAL}   = $owg_temp;
-  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
-  $hash->{READINGS}{"tempLow"}{VAL}       = $owg_tl;
-  $hash->{READINGS}{"tempLow"}{TIME}      = $tn;
-  $hash->{READINGS}{"tempHigh"}{VAL}      = $owg_th;
-  $hash->{READINGS}{"tempHigh"}{TIME}     = $tn;
-  
-    #-- Test for alarm condition
-  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
-    $hash->{STATE} = "Alarmed";
-    $hash->{ALARM} = 1;
-  } else {
-    $hash->{STATE} = "Normal";
-    $hash->{ALARM} = 0;
-  }
+  OWAD_FormatValues($hash);
   
   #-- return the special reading
   if ($reading eq "temperature") {
-    return "OWTEMP: $name.temperature => $owg_temp";
+    return "OWTEMP: $name.temperature => ".
+      $hash->{READINGS}{"temperature"}{VAL};
   } elsif ($reading eq "alarm") {
-    return "OWTEMP: $name.alarm => L $owg_tl H $owg_th";
+    return "OWTEMP: $name.alarm => L ".$hash->{READINGS}{"tempLow"}{VAL}.
+      " H ".$hash->{READINGS}{"tempHigh"}{VAL};
   }
   return undef;
 }
@@ -338,7 +432,6 @@ sub OWTEMP_GetValues($@) {
   my $hash    = shift;
   
   my $name    = $hash->{NAME};
-  my $model   = $hash->{OW_MODEL};
   my $value   = "";
   my $ret     = "";
   
@@ -364,37 +457,11 @@ sub OWTEMP_GetValues($@) {
     return "OWTEMP: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
-  my $tn = TimeNow();
-  
-  #-- correct for proper offset
-  my $offset = $attr{$name}{tempOffset};
-  if( $offset ){
-    $owg_temp += $offset;
-    #$owg_tl   += $offset;
-    #$owg_tl   += $offset;
-  }
-  
-  #-- put into READINGS
-  $hash->{READINGS}{"temperature"}{VAL}    = $owg_temp;
-  $hash->{READINGS}{"temperature"}{TIME}   = $tn;
-  $hash->{READINGS}{"tempLow"}{VAL}        = $owg_tl;
-  $hash->{READINGS}{"tempLow"}{TIME}       = $tn;
-  $hash->{READINGS}{"tempHigh"}{VAL}       = $owg_th;
-  $hash->{READINGS}{"tempHigh"}{TIME}      = $tn;
-  
-  #-- Test for alarm condition
-  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
-    $hash->{STATE} = "Alarmed";
-    $hash->{ALARM} = 1;
-  } else {
-    $hash->{STATE} = "Normal";
-    $hash->{ALARM} = 0;
-  }
-  
+  $value=OWTEMP_FormatValues($hash);
   #--logging
-  my $rv = sprintf "temperature: %5.3f tLow: %3.0f tHigh: %3.0f",$owg_temp,$owg_tl,$owg_th;
-  Log 5, $rv;
-  $hash->{CHANGED}[0] = $rv;
+  Log 5, $value;
+  $hash->{CHANGED}[0] = $value;
+  
   DoTrigger($name, undef);
   
   return undef;
@@ -428,13 +495,6 @@ sub OWTEMP_Set($@) {
   my $name  = $hash->{NAME};
   my $model = $hash->{OW_MODEL};
 
-  #-- set warnings
-  if($key eq "tempLow" || $key eq "tempHigh") {
-    # check range
-    return "OWTEMP: Set with wrong temperature value, range is  -55°C - 125°C"
-      if(int($value) < -55 || int($value) > 125);
-  }
-
  #-- set new timer interval
   if($key eq "interval") {
     # check value
@@ -448,11 +508,19 @@ sub OWTEMP_Set($@) {
   }
 
   #-- set other values depending on interface type
-  my $interface= $hash->{IODev}->{TYPE};
-  
-  #-- careful: the input values have to be corrected 
-  #   with the proper offset 
-  
+  my $interface = $hash->{IODev}->{TYPE};
+  my $offset    = $hash->{tempf}{offset};
+  my $factor    = $hash->{tempf}{factor};
+    
+  #-- find upper and lower boundaries for given offset/factor
+  my $mmin = (-55+$offset)*$factor;
+  my $mmax = (125+$offset)*$factor;
+  return sprintf("OWTEMP: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
+    if($value < $mmin || $value > $mmax);
+    
+  #-- seems to be ok, put into the device
+  $a[2]  = int($value/$factor-$offset);
+
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXTEMP_SetValues($hash,@a);
@@ -466,34 +534,7 @@ sub OWTEMP_Set($@) {
   } else {
   return "OWTEMP: Set with wrong IODev type $interface";
   }
-
-  #-- process results
-  my $tn = TimeNow();
-  
-#-- correct for proper offset
-  my $offset = $attr{$name}{tempOffset};
-  if( $offset ){
-    $owg_temp += $offset;
-    #$owg_tl   += $offset;
-    #$owg_tl   += $offset;
-  }
-  
-  #-- Test for alarm condition
-  if( ($owg_temp <= $owg_tl) | ($owg_temp >= $owg_th) ){
-    $hash->{STATE} = "Alarmed";
-    $hash->{ALARM} = 1;
-  } else {
-    $hash->{STATE} = "Normal";
-    $hash->{ALARM} = 0;
-  }
-  
-  #-- put into READINGS
-  $hash->{READINGS}{"temperature"}{VAL}   = $owg_temp;
-  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
-  $hash->{READINGS}{"tempLow"}{VAL}       = $owg_tl;
-  $hash->{READINGS}{"tempLow"}{TIME}      = $tn;
-  $hash->{READINGS}{"tempHigh"}{VAL}      = $owg_th;
-  $hash->{READINGS}{"tempHigh"}{TIME}     = $tn;
+  OWTEMP_FormatValues($hash);
   
   Log 4, "OWTEMP: Set $hash->{NAME} $key $value";
   
@@ -729,22 +770,16 @@ sub OWXTEMP_SetValues($@) {
      $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
   }
   
-  # define vars
+  #-- define vars
   my $key   = $a[1];
   my $value = $a[2];
-  
-  #-- get the old values
-  $owg_temp = $hash->{READINGS}{"temperature"}{VAL};
-  $owg_tl   = $hash->{READINGS}{"tempLow"}{VAL};
-  $owg_th   = $hash->{READINGS}{"tempHigh"}{VAL};
-  
-  $owg_tl = int($value) if( $key eq "tempLow" );
-  $owg_th = int($value) if( $key eq "tempHigh" );
+  $owg_tl = $value if( $key eq "tempLow" );
+  $owg_th = $value if( $key eq "tempHigh" );
 
   #-- put into 2's complement formed (signed byte)
   my $tlp = $owg_tl < 0 ? 128 - $owg_tl : $owg_tl; 
   my $thp = $owg_th < 0 ? 128 - $owg_th : $owg_th; 
-  
+
   OWX_Reset($master);
   
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E,
