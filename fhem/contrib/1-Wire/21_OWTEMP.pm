@@ -16,7 +16,7 @@
 # Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.08 - March, 2012
+# Version 1.09 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -198,7 +198,8 @@ sub OWTEMP_Define ($$) {
   }else{
     return "OWTEMP: Wrong 1-Wire device model $model";
   }
-  $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
+  # determine CRC Code - only if this is a direct interface
+  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- define device internals
   $hash->{ALARM}      = 0;
@@ -314,7 +315,7 @@ sub OWTEMP_FormatValues($) {
          
   #-- formats for output
   $statef  = "%5.2f ".$abbr;
-  $value1 = sprintf($statef,$vval);
+  $value1 = "temperature: ".sprintf($statef,$vval);
   $value2 = sprintf($statef,$vval);
   $hash->{ALARM} = 1;
   
@@ -371,14 +372,23 @@ sub OWTEMP_Get($@) {
      return "$a[0] $reading => $value";
   } 
   
+  #-- Get other values according to interface type
+  my $interface= $hash->{IODev}->{TYPE};
+  
   #-- get present
-  if($a[1] eq "present") {
-    #-- hash of the busmaster
-    my $master       = $hash->{IODev};
-    $value           = OWX_Verify($master,$hash->{ROM_ID});
-    $hash->{PRESENT} = $value;
-    return "$a[0] $reading => $value";
+  if($a[1] eq "present" ) {
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      #-- hash of the busmaster
+      my $master       = $hash->{IODev};
+      $value           = OWX_Verify($master,$hash->{ROM_ID});
+      $hash->{PRESENT} = $value;
+      return "$a[0] $reading => $value";
+    } else {
+      return "OWTEMP: Verification not yet implemented for interface $interface";
+    }
   } 
+  
   #-- get interval
   if($reading eq "interval") {
     $value = $hash->{INTERVAL};
@@ -388,8 +398,6 @@ sub OWTEMP_Get($@) {
   #-- reset presence
   $hash->{PRESENT}  = 0;
 
-  #-- Get other values according to interface type
-  my $interface= $hash->{IODev}->{TYPE};
   #-- OWX interface
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
@@ -407,7 +415,7 @@ sub OWTEMP_Get($@) {
     return "OWTEMP: Could not get values from device $name, return was $ret";
   }
   $hash->{PRESENT} = 1; 
-  OWAD_FormatValues($hash);
+  OWTEMP_FormatValues($hash);
   
   #-- return the special reading
   if ($reading eq "temperature") {
@@ -576,12 +584,12 @@ sub OWFSTEMP_GetValues($)
 {
   my ($hash) = @_;
 
-  my $ret = OW::get("/uncached/".$hash->{OW_ID}.".".$hash->{OW_ID}."/temperature");
+  my $ret = OW::get("/uncached/".$hash->{OW_FAMILY}.".".$hash->{OW_ID}."/temperature");
   if( defined($ret) ) {
     $hash->{PRESENT} = 1;
     $owg_temp = $ret;
-    $owg_th   = OW::get("/uncached/".$hash->{OW_ID}.".".$hash->{OW_ID}."/temphigh");
-    $owg_tl   = OW::get("/uncached/".$hash->{OW_ID}.".".$hash->{OW_ID}."/templow");
+    $owg_th   = OW::get("/uncached/".$hash->{OW_FAMILY}.".".$hash->{OW_ID}."/temphigh");
+    $owg_tl   = OW::get("/uncached/".$hash->{OW_FAMILY}.".".$hash->{OW_ID}."/templow");
   } else {
     $hash->{PRESENT} = 0;
     $owg_temp = 0.0;
@@ -605,10 +613,10 @@ sub OWFSTEMP_SetValues($@) {
   my ($hash, @a) = @_;
   
   #-- define vars
-  my $key   = $a[1];
+  my $key   = lc($a[1]);
   my $value = $a[2];
   
-  return OW::put($hash->{OW_ID}.".".$hash->{OW_ID}."/$key",$value);
+  return OW::put($hash->{OW_FAMILY}.".".$hash->{OW_ID}."/$key",$value);
 }
 
 ########################################################################################
