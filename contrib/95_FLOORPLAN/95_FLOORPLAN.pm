@@ -2,7 +2,7 @@
 # 95 FLOORPLAN
 # Feedback: http://groups.google.com/group/fhem-users
 # Define Custom Floorplans
-# Date     : 26.02.2012
+# Released : 26.02.2012
 # Version  : 1.01
 # Revisions:
 # 0001: Released
@@ -14,6 +14,7 @@
 # 0007: Added fp_default
 # 0008: Changed name of background-picture from <floorplan-name> to fp_<floorplan-name> to avoid display of picture in device-list at fhem-menu 'Everything'
 # 0009: updated selection of add-device-list: suppress CUL$ only (instead of CUL.*)
+# 0010: Added Style3, fp_stylesheetPrefix, fp_noMenu (Mar 13, 2012)
 #
 ################################################################
 #
@@ -111,7 +112,7 @@ FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn} = "FP_define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange commandfield fp_default";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange commandfield fp_default fp_stylesheetPrefix fp_noMenu";
   # fp_arrange: show addtl. menu for  attr fp_<name> ....
   # commandfield: shows an fhem-commandline inputfield on floorplan
   
@@ -273,13 +274,14 @@ FP_digestCgi($) {
 # Page header, set webapp & css
 sub 
 FP_htmlHeader($) {
-  my $title = @_;
+  my $title = shift;
   $title = "FHEM floorplan" if (!$title);
   ### Page start
   $FW_RET = "";
   $FW_RET .= '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">'."\n";
   $FW_RET .= '<html xmlns="http://www.w3.org/1999/xhtml">'."\n";
   FW_pO  "<head>";
+  FW_pO  "<title>".$title."</title>";
   # Enable WebApp
   if($FW_tp || $FW_ss) { 
     FW_pO "<link rel=\"apple-touch-icon-precomposed\" href=\"$FW_ME/fhemicon.png\"/>";
@@ -298,7 +300,8 @@ FP_htmlHeader($) {
   if($css){
 	FW_pO  "<link href=\"$FW_ME/$css\" rel=\"stylesheet\"/>";                   #always use $css if set as attribute
   } elsif ($FP_name) {
-  	FW_pO  "<link href=\"$FW_ME/floorplanstyle.css\" rel=\"stylesheet\"/>";     #use floorplanstyle.css for floorplans
+    my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
+  	FW_pO  ("<link href=\"$FW_ME/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix
   } else {
     FW_pO  "<link href=\"$FW_ME/style.css\" rel=\"stylesheet\"/>";              #use style.css for fp-start-screen
   }
@@ -366,10 +369,10 @@ FP_show(){
 		my $attr = AttrVal("$d","fp_$FP_name", undef);
 		next if(!$attr || $type eq "weblink");                                                 # skip if device-attribute not set for current floorplan-name
 		
-		my ($top, $left, $style, $text) = split(/,/ , $attr);
+		my ($top, $left, $style, $text, $text2) = split(/,/ , $attr);
 		# $top   = position in px, top
 		# $left  = position in px, left
-		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands)
+		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands, 3=name from $text2+reading))
 		# $text  = alternativeCaption
 		$left = 0 if (!$left);
 		$style = 0 if (!$style);
@@ -377,13 +380,19 @@ FP_show(){
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"$d\" align=\"center\">";               # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
+		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3);		   # Style3 = DeviceReading given in $text
 		my $cols = ($cmdlist ? (split(":", $cmdlist)) : 0);                                    # Need command-count for colspan of devicename+state
 		
     ########################
     # Device-name per device
 		if ($style gt 0) {
 			FW_pO "   <tr class=\"devicename fp_$FP_name\" id=\"$d\">";                        # For css: class=devicename, id=devicename
-			my $devName = ($text ? $text : AttrVal($d, "alias", $d));
+			my $devName = "";
+			if ($style == 3) {
+				$devName = $text2;														   # Style 3 = Reading - use last part of comma-separated description
+				} else {
+				$devName = ($text ? $text : AttrVal($d, "alias", $d));
+			}
 			FW_pO "<td colspan=\"$cols\">";
 			FW_pO "$devName" ;
 			FW_pO "</td></tr>";
@@ -451,6 +460,7 @@ FP_show(){
 # Floorplan menu left
 sub
 FP_menu() {
+    return if ($FP_name && AttrVal($FP_name, "fp_noMenu", 0));                       # fp_noMenu suppresses the menu
 	FW_pO "<div class=\"floorplan\" id=\"menu\">";
   # List FPs
 	FW_pO "<table class=\"start\" id=\"floorplans\">";
@@ -512,8 +522,9 @@ FP_menuArrange() {
 	# fields for top,left,style,text
 	if ($attrd) {
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
-		my ($top, $left, $style, $text) = split(",", $attrd);
-		my @styles = ("0","1","2");
+		my ($top, $left, $style, $text, $text2) = split(",", $attrd);
+		$text .= ','.$text2 if ($text2);														# re-append Description after reading-ID for style3
+		my @styles = ("0","1","2","3");
 		FW_pO "<div class=\"menu-arrange\" id=\"fpmenu\">\n" .
 			FP_input("deva.$d", $d, "hidden") . "\n" .
 			FP_input("dscr.$d", $d, "text", "Selected device", 45, "", "disabled") . "\n<br>\n" .
