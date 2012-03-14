@@ -40,6 +40,8 @@ table.FHT                {width:100px; }
 #Home.fp_Media           {font-size:14px; text-align:left; }
 #Media                   {font-size:14px; }
 #Grundriss               {font-size:14px; text-align:left; }
+.fp_tempvalue            {color:red; font-size:20px; }
+.fp_humvalue             {color:blue; font-size:20px; } 
 
 h2,h3,h4 { color:#52865D; line-height:1.3;
            margin-top:1.5em; font-family:Arial,Sans-serif; }
