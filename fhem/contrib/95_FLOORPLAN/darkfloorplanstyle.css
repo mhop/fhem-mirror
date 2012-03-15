@@ -15,7 +15,7 @@ body[name~=Media]     { background-color: #A5A5A5;
 #content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
 
 a { color:#CCCCCC; }
-img {  border-style: none; position:absolute; top:15px; left:190px;}
+img {  border-style: none; }
 table { -moz-border-radius:8px; border-radius:8px; }
 
 .fp_Grundriss   {border:0px solid gray;}
