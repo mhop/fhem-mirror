@@ -121,6 +121,7 @@ sub Weather_RetrieveDataDirectly($)
 
   my $fc = undef;
   my $xml = GetHttpFile("www.google.com:80", "/ig/api?weather=" . $location . "&hl=" . $lang);
+  return 0 if($xml eq "");
   foreach my $l (split("<",$xml)) {
           #Log 1, "DEBUG WEATHER: line=\"$l\"";
           next if($l eq "");                   # skip empty lines
