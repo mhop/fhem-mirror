@@ -352,11 +352,7 @@ FW_AnswerCall($)
 
   } elsif($arg =~ m,^$FW_ME/(.*).css,) {
     my $cssName = $1;
-    my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
-    $prf = "smallscreen" if(!$prf && $FW_ss);
-    $prf = "touchpad"    if(!$prf && $FW_tp);
-    return 0 if(!open(FH, "$FW_dir/$prf$cssName.css") && 
-                !open(FH, "$FW_dir/$cssName.css"));
+    return 0 if(!open(FH, "$FW_dir/$cssName.css"));
     FW_pO join("", <FH>);
     close(FH);
     $FW_RETTYPE = "text/css";
@@ -509,7 +505,11 @@ FW_AnswerCall($)
 
   my $rf = AttrVal($FW_wname, "refresh", "");
   FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
-  FW_pO "<link href=\"$FW_ME/style.css\" rel=\"stylesheet\"/>";
+  
+  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
+  $prf = "smallscreen" if(!$prf && $FW_ss);
+  $prf = "touchpad"    if(!$prf && $FW_tp);
+  FW_pO "<link href=\"$FW_ME/".$prf."style.css\" rel=\"stylesheet\"/>";
   FW_pO "<link href=\"$fwextPtr->{STYLESHEET}\" rel=\"stylesheet\"/>"
                         if($fwextPtr && $fwextPtr->{STYLESHEET});
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
