@@ -33,7 +33,7 @@ my %flogpar = (
   "(THR128|THWR288A|THN132N).*"
       => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
   # * temperature, humidity
-  "(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T).*"
+  "(THGR228N|THGR810|THGR918|THGR328N|RTGR328N|WTGR800_T|WT450H).*"
       => { GPLOT => "temp4hum4:Temp/Hum,",  FILTER => "%NAME" },
   # * temperature, humidity, pressure
   "(BTHR918N|BTHR918|BTHR918N).*"
