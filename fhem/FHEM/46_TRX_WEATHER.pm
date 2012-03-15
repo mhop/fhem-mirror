@@ -19,6 +19,7 @@
 # * "WTGR800_T"	is WTGR800
 # * "THGR918"	is THGR918, THGRN228, THGN500
 # * "TFATS34C"	is TFA TS34C
+# * "WT450H"	is UPM WT450H
 #
 # temperature/humidity/pressure sensors (TEMPHYDROBARO):
 # * "BTHR918"	is BTHR918
@@ -320,7 +321,7 @@ sub common_anemometer {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"TRX_WEATHER: error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_anemometer error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -392,7 +393,7 @@ sub common_temp {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: error undefined subtype=$subtype";
+  	Log 1,"RFX_WEATHER: common_temp error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -441,12 +442,13 @@ sub common_temphydro {
 	0x05 => "WTGR800_T",
 	0x06 => "THGR918",
 	0x07 => "TFATS34C",
+	0x08 => "WT450H",
   );
 
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: error undefined subtype=$subtype";
+  	Log 1,"RFX_WEATHER: common_temp error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -493,7 +495,7 @@ sub common_temphydrobaro {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: error undefined subtype=$subtype";
+  	Log 1,"RFX_WEATHER: common_temphydrobaro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -543,7 +545,7 @@ sub common_rain {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: error undefined subtype=$subtype";
+  	Log 1,"RFX_WEATHER: common_rain error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
