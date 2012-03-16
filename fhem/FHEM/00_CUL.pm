@@ -47,7 +47,7 @@ my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS: " .
                     ":CUL_EM:CUL_WS:CUL_FHTTK:CUL_RFR:CUL_HOERMANN: " .
                     ":ESA2000:CUL_IR:CUL_TX";
 
-my $clientsHomeMatic = ":CUL_HM:HMS:";  # OneWire emulated as HMS on a CUNO
+my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:";  # OneWire emulated as HMS on a CUNO
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
