@@ -1117,6 +1117,7 @@ FW_substcfg($$$$$$)
   $gplot_script .=  $plot if(!$splitret);
 
   $gplot_script =~ s/<OUT>/$tmpfile/g;
+  $gplot_script =~ s/<IN>/$file/g;
 
   my $ps = AttrVal($wl,"plotsize",$FW_plotsize);
   $gplot_script =~ s/<SIZE>/$ps/g;
