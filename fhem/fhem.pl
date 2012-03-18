@@ -2564,6 +2564,7 @@ ReplaceEventMap($$$)
   my ($dev, $str, $dir) = @_;
   my $em = $attr{$dev}{eventMap};
   return $str if(!$em);
+  my $dname = shift @{$str} if(!$dir);
 
   my $sc = " ";               # Split character
   my $fc = substr($em, 0, 1); # First character of the eventMap
@@ -2594,8 +2595,15 @@ ReplaceEventMap($$$)
     }
   }
   return $str if($dir);
-  return split(" ",$nstr) if($changed);
-  return @{$str};
+
+  if($changed) {
+    my @arr = split(" ",$nstr);
+    push @arr, $dname;
+    return @arr;
+  } else {
+    unshift @{$str}, $dname;
+    return @{$str};
+  }
 }
 
 sub
