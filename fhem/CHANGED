@@ -19,10 +19,6 @@
   - feature: FHEMWEB console (== inform timer)
   - feature: remove dependency on Google::Weather, major rewrite (Boris)
   - feature: started experimental interface implementation (fhem API v2) (Boris)
-  - change:  Makefile: additional targets, moderate output (M.Fischer)
-  - change:  Housekeeping (M.Fischer)
-             - modpath/FHEM: only contains modules
-             - modpath/www/pgm2: includes all files from pgm2 now
 
 
 - 2011-12-31 (5.2)
