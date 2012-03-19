@@ -16,7 +16,9 @@
 #       -> general release
 # 0009: updated selection of add-device-list: suppress CUL$ only (instead of CUL.*)
 # 0010: Added Style3, fp_stylesheetPrefix, fp_noMenu (Mar 13, 2012)
-# 0011: Added Style4, code beautification, css review, minor $text2-fix
+# 0011: Added Style4, code beautification, css review, minor $text2-fix (SVN 1342)
+# 0012: Added startscreen-text when no floorplans defined, fixed startscreen-stylesheet, added div for bg-img, added arrangeByMouse
+#
 #
 ################################################################
 #
@@ -184,7 +186,7 @@ FP_CGI(){
   ### set global parameters, check florplan-name
   $FP_name = $htmlpart[0] if (!$FP_name);
   
-  if ($FP_name) {
+  if ($FP_name) {																   # a floorplan-name is part of URL
 	addToAttrList("fp_$FP_name");                                                  # create userattr fp_<name> if it doesn't exist yet
 	$FP_arrange = AttrVal($FP_name, "fp_arrange", 0) if ($FP_name);				   # set arrange mode
 	if(!defined($defs{$FP_name})){
@@ -192,14 +194,17 @@ FP_CGI(){
 		return ("text/plain; charset=$FW_encoding", $FW_RET);
 	}
 	$FW_subdir = "/floorplan/$FP_name";
-  } else {
+  } else {																		   # no floorplan-name in URL
     $FW_subdir = "/floorplan";
 	my $dev = undef;
 	my @devs = devspec2array("*");
 	foreach my $fp (@devs) {
-	   if (AttrVal($fp, "fp_default", undef)) {
+	   if (AttrVal($fp, "fp_default", undef)) {									   # use floorplan with attr fp_default
 			$FP_name = $fp;
 			$FW_subdir = "/floorplan/$fp";
+			$FP_arrange = AttrVal($fp, "fp_arrange", undef);
+			$FP_arrange_default = undef;
+			$FP_arrange_selected = undef;
 	   }
 	}
   }  
@@ -297,9 +302,9 @@ FP_htmlHeader($) {
   	FW_pO  ("<link href=\"$FW_ME/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix
 	$data{FWEXT}{$fhem_url}{STYLESHEET} = "$prf"."floorplanstyle.css";
   } else {  
-	my $css = $attr{global}{VIEW_CSS};
-	$css = "style.css" if (!$css); 
-    FW_pO  "<link href=\"$FW_ME/$css\" rel=\"stylesheet\"/>";              			#use VIEW_CSS or style.css for fp-start-screen
+	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
+    FW_pO  "<link href=\"$FW_ME/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen
+	$data{FWEXT}{$fhem_url}{STYLESHEET} = $css;
   }
   #set sripts
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
@@ -316,13 +321,25 @@ FP_showStart() {
   FP_htmlHeader("Floorplans");
   FW_pO "<body>";  
   FW_pO "<div id=\"logo\"></div>";
+  FP_menu();
   FW_pO "<div class=\"screen\" id=\"hdr\">";
   FW_pO "<form method=\"get\" action=\"" . $FW_ME . "\">";
   FW_pO "<table WIDTH=\"100%\"><tr>";
   FW_pO "<td><input type=\"text\" name=\"cmd\" size=\"30\"/></td>";   						  #input-field
   FW_pO "</tr></table>";
-  FP_menu();
+
   # add edit *floorplanstyle.css if FP_arrange ?
+  # no floorplans defined? -> show message
+  my $count=0;
+  foreach my $f (sort keys %defs) {
+	next if ($defs{$f}{TYPE} ne "FLOORPLAN");
+	$count++;
+  }
+  if ($count == 0) {
+	FW_pO "<br><br><br><br>No floorplans have been defined yet. For definition, use<br>";
+	FW_pO "<ul><code>define &lt;name&gt; FLOORPLAN</code></ul>";
+	FW_pO 'Also check the <a href="/fhem/commandref.html#FLOORPLAN">commandref</a><br>';
+  }
   FW_pO "</form></div>";
   FW_pO "</body>";
 }
@@ -334,11 +351,14 @@ FP_show(){
   ### Page start
   FP_htmlHeader("$FP_name");
   ## body
-  FW_pO "<body>\n";
-  FW_pO "<img src=\"$FW_ME/fp_$FP_name.png\">\n";            								  # alternative: jpg - how?
+  FW_pO "<body id=\"$FP_name-body\">\n";
+  FW_pO "<div id=\"backimg\" style=\"width: 100%; height: 100%;\">";
+  FW_pO "<img src=\"$FW_ME/fp_$FP_name.png\">";            								  # alternative: jpg - how?
+  FW_pO "</div>\n";
+
   ## menus
   FP_menu();
-  FP_menuArrange() if ($FP_arrange);
+  FP_menuArrange() if ($FP_arrange); #shows the arrange-menu
   # (re-) list the icons
   FW_ReadIcons();
   ## start floorplan  
@@ -353,8 +373,7 @@ FP_show(){
        FW_pO "</div>\n";
    }
     
-  my @devs = devspec2array("*");
-	foreach my $d (@devs) {                                                                    # loop all devices
+   foreach my $d (sort keys %defs) {                                                          # loop all devices
 		my $type = $defs{$d}{TYPE};
 		my $attr = AttrVal("$d","fp_$FP_name", undef);
 		next if(!$attr || $type eq "weblink");                                                 # skip if device-attribute not set for current floorplan-name
@@ -368,7 +387,7 @@ FP_show(){
 		$left = 0 if (!$left);
 		$style = 0 if (!$style);
 
-		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px\">";
+		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">";
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"$d\" align=\"center\">";               # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
@@ -423,9 +442,8 @@ FP_show(){
              FW_submit("cmd.$d", "set").
              "</td></tr>";
         } 
-	  FW_pO "\n";
-	  FW_pO "</table></div>\n";
-	  FW_pO "</form>";
+	  FW_pO "</table></form>";
+	  FW_pO "</div>\n";
 	}
    
  	########################  
@@ -441,12 +459,16 @@ FP_show(){
         next if($type ne "weblink");
 		# set position per weblink
 		my ($top, $left, $style, $text) = split(/,/ , AttrVal("$d", "fp_$FP_name", undef));
-		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px\" class = \"fp_$type fp_$FP_name\" id = \"$d\">";
+		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px\" id = \"div-$d\">";              # div to position the weblink
+		FW_pO "<div class = \"fp_$type fp_$FP_name weblink\" id = \"$d\">";											# div to make it accessible to arrangeByMouse
 		# print weblink
 		$buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
-		FW_pO "</div>";
+		FW_pO "</div></div>";
 	}
 	FW_pO "</div>";
+
+#    FP_menuArrange() if ($FP_arrange); #shows the arrange-menu
+	
 	FW_pO "</body>\n";
 }
 #-------------------------------------------------------------------------------
@@ -458,14 +480,14 @@ FP_menu() {
 	FW_pO "<div class=\"floorplan\" id=\"menu\">";
   # List FPs
 	FW_pO "<table class=\"start\" id=\"floorplans\">";
-	FW_pO "<tr>";
+	FW_pO "<tr><td>";
 	FW_pH "$FW_ME", "fhem", 1;
-	FW_pO "</tr>";
+	FW_pO "</td></tr>";
 	foreach my $f (sort keys %defs) {
 		next if ($defs{$f}{TYPE} ne "FLOORPLAN");
-    	FW_pO "<tr>";
+    	FW_pO "<tr><td>";
 		FW_pH "$FW_ME/floorplan/$f", $f, 1;
-    	FW_pO "</tr>";
+    	FW_pO "</td></tr>";
 	}
 	FW_pO "</table><br>";
 	FW_pO "</div>\n";
@@ -491,7 +513,7 @@ FP_menuArrange() {
 	my $attrd = "";
 	my $d = $FP_arrange_selected;
 	$attrd = AttrVal($d, "fp_$FP_name", undef) if ($d);
-	FW_pO "<div class=\"fp_arrange\" id=\"fpmenu\">\n";
+	FW_pO "<div style=\"z-index:999\" class=\"fp_arrange\" id=\"fpmenu\">";
 
 	# add device to floorplan
 	if (!defined($FP_arrange_selected)) {
@@ -513,6 +535,22 @@ FP_menuArrange() {
 
 	# fields for top,left,style,text
 	if ($attrd) {
+	#### arrangeByMouse by Torsten
+		FW_pO "<script type=\"text/javascript\">";
+		FW_pO "function show_coords(e){";
+		FW_pO "  var device = document.getElementById(\"fp_ar_input_top\").name.replace(/top\./,\"\");";		# get device-ID from 'top'-field
+		FW_pO "  var X = e.pageX;";    																		    # e is the event, pageX and pageY the click-ccordinates
+		FW_pO "  var Y = e.pageY;";
+		FW_pO "  document.getElementById(\"fp_ar_input_top\").value = Y;";									    # updates the input-fields top and left with the click-coordinates
+		FW_pO "  document.getElementById(\"fp_ar_input_left\").value = X;";
+		FW_pO "  document.getElementById(\"div-\"+device).style.top = Y+\"px\";"; 						    	# moves the device
+		FW_pO "  document.getElementById(\"div-\"+device).style.left = X+\"px\";"; 
+		FW_pO "}";
+		FW_pO "document.getElementById(\"backimg\").addEventListener(\"click\",show_coords,false);";			# attach event-handler to background-picture
+		FW_pO "</script>";
+
+		
+	### build the form
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
 		my ($top, $left, $style, $text, $text2) = split(",", $attrd);
 		$text .= ','.$text2 if ($text2);														# re-append Description after reading-ID for style3
@@ -521,8 +559,8 @@ FP_menuArrange() {
 			FP_input("deva.$d", $d, "hidden") . "\n" .
 			FP_input("dscr.$d", $d, "text", "Selected device", 45, "", "disabled") . "\n<br>\n" .
 			FP_input("attr.$d", "fp_$FP_name", "hidden") . "\n" .
-			FP_input("top.$d", $top ? $top : 10, "text", "Top", 4, 4 ) . "\n" .
-			FP_input("left.$d", $left ? $left : 10, "text", "Left", 4, 4 ) . "\n" .
+			FP_input("top.$d", $top ? $top : 10, "text", "Top", 4, 4, 'id="fp_ar_input_top"') . "\n" .
+			FP_input("left.$d", $left ? $left : 10, "text", "Left", 4, 4, 'id="fp_ar_input_left"' ) . "\n" .
 			FW_select("style.$d", \@styles, $style ? $style : 0, "menu-arrange") . "\n" .
 			FP_input("text.$d", $text ? $text : "", "text", "Description", 15) . "\n" .
 			FW_submit("cmd.$d", "attr") ;
