@@ -336,7 +336,8 @@ FW_AnswerCall($)
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
-  $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/www/pgm2");
+  #$FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/www/pgm2");
+  $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
 
