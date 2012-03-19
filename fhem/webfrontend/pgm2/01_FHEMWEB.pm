@@ -1529,19 +1529,6 @@ FW_style($$)
     }
     FW_pO "${start}Reload the page in the browser.$end";
 
-  } elsif($a[1] eq "examples") {
-
-    my @fl = FW_fileList("$FW_dir/example.*");
-    FW_pO "$start<table class=\"block\" id=\"at\">";
-    my $row = 0;
-    foreach my $file (@fl) {
-      FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      FW_pO "<td><a href=\"$FW_ME/$file\">$file</a></td>"; 
-      FW_pO "</tr>";
-      $row = ($row+1)%2;
-    }
-    FW_pO "</table>$end";
-
   } elsif($a[1] eq "edit") {
 
     $a[2] =~ s,/,,g;    # little bit of security
