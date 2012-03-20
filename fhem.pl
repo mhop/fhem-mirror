@@ -2598,7 +2598,7 @@ ReplaceEventMap($$$)
 
   if($changed) {
     my @arr = split(" ",$nstr);
-    push @arr, $dname;
+    unshift @arr, $dname;
     return @arr;
   } else {
     unshift @{$str}, $dname;
