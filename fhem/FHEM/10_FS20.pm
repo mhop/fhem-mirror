@@ -250,7 +250,10 @@ FS20_Set($@)
     $lh->{READINGS}{state}{TIME} = $tn;
     $lh->{READINGS}{state}{VAL} = $v;
     my $lhname = $lh->{NAME};
-    DoTrigger($lhname, undef) if($name ne $lhname);
+    if($name ne $lhname) {
+Log 1, "Secondary trigger: $lhname / $name";
+      DoTrigger($lhname, undef)
+    }
   }
   return $ret;
 }
