@@ -251,7 +251,6 @@ FS20_Set($@)
     $lh->{READINGS}{state}{VAL} = $v;
     my $lhname = $lh->{NAME};
     if($name ne $lhname) {
-Log 1, "Secondary trigger: $lhname / $name";
       DoTrigger($lhname, undef)
     }
   }
