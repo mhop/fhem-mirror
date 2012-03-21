@@ -47,6 +47,7 @@ use vars qw($FW_RET);    # Returned data (html)
 use vars qw($FW_wname);  # Web instance
 use vars qw($FW_subdir); # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
 use vars qw(%FW_pos);    # scroll position
+use vars qw($FW_cname);  # Current connection name
 
 my $zlib_loaded;
 my $try_zlib = 1;
@@ -68,7 +69,6 @@ my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
 my %FW_types;      # device types, for sorting
-my $FW_cname;      # Current connection
 my @FW_zoom;       # "qday", "day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
 my %FW_hiddenroom; # hash of hidden rooms
@@ -389,12 +389,13 @@ FW_AnswerCall($)
 
   }
 
+  $arg = $1; # The stuff behind FW_ME
+
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");
   ##############################
   # Axels FHEMWEB modules...
-  $arg = $1;
   my $fwextPtr;
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
