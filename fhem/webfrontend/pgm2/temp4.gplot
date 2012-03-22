@@ -26,7 +26,7 @@ set grid xtics y2tics
 
 set y2label "Temperature in C"
 
-#FileLog 4:T\x3a:|temperature:0:
+#FileLog 4:T\x3a|temperature:0:
 
 plot \
   "< egrep 'T:|temperature:' <IN>"\
