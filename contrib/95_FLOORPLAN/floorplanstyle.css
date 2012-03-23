@@ -2,23 +2,24 @@ body     { background-color: #F0F0F0;
            font-family:Arial, sans-serif; 
            font-size:9px; background-image:url(Grundriss.bak.png); 
            background-repeat:no-repeat;  }
-body[name~=Media]     { background-color: #A5A5A5;
+
+body[id~=Media]     { background-color: #A5A5A5;
                         font-family:Arial, sans-serif; 
                         font-size:9px;  
                         background-image:url(Media.bak.png); 
                         background-repeat:no-repeat;  }
-#menu.fp-list   { position:absolute; top:120px;left:20px; width:140px; font-size:11px;  }
 
 #logo    { position:absolute; top: 10px; left: 10px; 
            width:64px;  height:67px; background-image:url(fhem_smallscreen.png); }
-#fp_menu    { position:absolute; top:120px;left:20px; width:140px; font-size:11px;  }
-#menu    { position:absolute; top:120px; left:20px; width:140px; }
-#menu.floorplan   { position:absolute; top:120px; left:20px; width:140px; font-size:11px; }
-#fpmenu.fp_arrange   { position:absolute; bottom:20px; left:20px; width:310px; font-size:9px; border:1px solid gray;}
-#hdr     { position:absolute; top:10px; left:180px; }
+#backimg {position:absolute; top:15px; left:190px;}
+#menu    { position:absolute; top:120px; left:20px; min-width:60px; }
+#menu.floorplan   { position:absolute; top:120px; left:20px; min-width:80px; font-size:14px; line-height:22px; }
+#fpmenu.fp_arrange   { position:absolute; bottom:20px; left:20px; min-width:310px; font-size:9px; border:1px solid gray;}
+#startcontent {position:absolute; top:20px; left:180px; text-align:left; font-size: 16px; } 
+table a:hover {font-weight:bold;}
+#hdr     { position:absolute; top:10px; left:180px; border:1px solid gray; }
 #content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
-
-a {  color: #278727; }
+a { color: #278727; }
 img {  border-style: none; }
 table { -moz-border-radius:8px; border-radius:8px; }
 
@@ -30,7 +31,7 @@ table { -moz-border-radius:8px; border-radius:8px; }
 
 #sz_Rollo.devicename     {font-size:14px;}
 #sz_Rollo.devicecommands {font-size:12px; text-align:center; }
-#ez_Aussentemperatur_dummy.devicestate  {color:green; font-size:30px; }
+#ez_Aussensensor.devicestate  {color:green; font-size:30px; }
 #HomeStatus.devicestate  {color:green; font-size:30px; }
 table.dummy              {width:100px; }
 table.FHT                {width:100px; }

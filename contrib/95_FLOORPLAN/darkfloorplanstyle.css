@@ -9,9 +9,12 @@ body[id~=Media]     { background-color: #A5A5A5; font-family:Verdana; font-size:
 #menu    { position:absolute; top:180px; left:30px; width:140px; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding-bottom: 6px; padding-top: 6px;}
 #menu.floorplan   { position:absolute; top:180px; left:30px; width:128px; font-size:12px; border:1px solid #CCCCCC; background: #111111; box-shadow:5px 5px 5px #000; padding: 6px;}
 
+
+
 #hdr     { position:absolute; top:15px; left:190px; border:1px solid #CCCCCC; background: #111111; -moz-border-radius:8px; border-radius:8px; border-spacing: 6px; padding: 6px;
 	box-shadow:5px 5px 5px #000; margin-bottom: 10px;}
 #content { position:absolute; top:50px; left:180px; bottom:10px; right:10px; text-align:center}
+#startcontent {position:absolute; top:20px; left:200px; text-align:left; font-size: 16px; color:gray; } 
 
 a { color:#CCCCCC; }
 
@@ -25,6 +28,7 @@ table a:hover {color: #ffffff;}
 	.devicename     { font-size: 14px; text-align:center; color: #111111; }
 	.devicestate    { text-align:center; color: #111111; }
 	.devicecommands { font-size:14px; text-align:center; color: #111111; }
+
 
 #sz_Rollo.devicename     {font-size:14px;}
 #sz_Rollo.devicecommands {font-size:12px; text-align:center; }
