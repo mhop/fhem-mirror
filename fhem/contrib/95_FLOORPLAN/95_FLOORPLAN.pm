@@ -17,8 +17,8 @@
 # 0009: updated selection of add-device-list: suppress CUL$ only (instead of CUL.*)
 # 0010: Added Style3, fp_stylesheetPrefix, fp_noMenu (Mar 13, 2012)
 # 0011: Added Style4, code beautification, css review, minor $text2-fix (SVN 1342)
-# 0012: Added startscreen-text when no floorplans defined, fixed startscreen-stylesheet, added div for bg-img, added arrangeByMouse
-#
+# 0012: Added startscreen-text when no floorplans defined, fixed startscreen-stylesheet, added div for bg-img, added arrangeByMouse (1368)
+# 0013: implemented redirectCmd, fixed minor </td></tr>-error in html-output, fp_arrange for single web-devices, fp_arrange detail (Mar 23, 2012)
 #
 ################################################################
 #
@@ -112,6 +112,7 @@ my $FW_detail;                   # copied from FHEMWEB - using local version to 
 my %FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
 my @FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
 #  $FW_subdir					 # from FHEMWEB: path of floorplan-subdir - enables reusability of FHEMWEB-routines for sub-URLS like floorplan
+#  $FW_cname                     # from FHEMWEB: Current connection name
 
 #-------------------------------------------------------------------------------
 sub 
@@ -135,7 +136,6 @@ FLOORPLAN_Initialize($)
 #  $data{FWEXT}{$fhem_url}{EMBEDDED} = 1;             # not using embedded-mode to save screen-space
   $data{FWEXT}{$fhem_url}{STYLESHEET} = "floorplanstyle.css";
   # Global-Config for CSS
-#  $attr{global}{VIEW_CSS} = "";						# mod20120314
   $modules{_internal_}{AttrList} .= " VIEW_CSS";
   my $n = 0;
   @FW_zoom = ("qday", "day","week","month","year");    #copied from FHEMWEB - using local version to avoid global variable
@@ -196,6 +196,8 @@ FP_CGI(){
 	$FW_subdir = "/floorplan/$FP_name";
   } else {																		   # no floorplan-name in URL
     $FW_subdir = "/floorplan";
+	$FP_arrange_default = undef;
+	$FP_arrange_selected = undef;
 	my $dev = undef;
 	my @devs = devspec2array("*");
 	foreach my $fp (@devs) {
@@ -203,13 +205,25 @@ FP_CGI(){
 			$FP_name = $fp;
 			$FW_subdir = "/floorplan/$fp";
 			$FP_arrange = AttrVal($fp, "fp_arrange", undef);
-			$FP_arrange_default = undef;
-			$FP_arrange_selected = undef;
+
 	   }
 	}
   }  
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
   my $FP_ret = AnalyzeCommand(undef, $commands) if $commands;                      # Execute commands
+
+  #####redirect commands - to suppress repeated execution of commands upon browser refresh
+  my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
+  if( AttrVal($FW_wname, "redirectCmds", 1) && $me && $commands && !$FP_ret) {
+    my $tgt = $FW_ME;
+    if($FP_name) { $tgt .= "/floorplan/$FP_name" }
+      else       { $tgt .= "/floorplan" }
+    my $c = $me->{CD};
+    print $c "HTTP/1.1 302 Found\r\n",
+            "Content-Length: 0\r\n",
+            "Location: $tgt\r\n",
+            "\r\n";
+  }
 
   ######################################
   ### output html-pages  
@@ -244,8 +258,8 @@ FP_digestCgi($) {
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
     $FP_webArgs{$p} = $v;
 
-    if($p eq "arr.dev")        { $FP_arrange_selected = $v; $FP_arrange_default = $v; }
-    if($p eq "add.dev")        { $cmd = "attr $v fp_$FP_name 50,100"; }
+    if($p eq "arr.dev")        { $v =~ m,^(\w*)\s\(,; $v = $1 if ($1); $FP_arrange_selected = $v; $FP_arrange_default = $v; }
+    if($p eq "add.dev")        { $v =~ m,^(\w*)\s\(,; $v = $1 if ($1); $cmd = "attr $v fp_$FP_name 50,100"; }
     if($p eq "cmd")            { $cmd = $v; }
     if($p =~ m/^cmd\.(.*)$/)   { $cmd = $v; $c = $1; }
     if($p =~ m/^dev\.(.*)$/)   { $dev{$1} = $v; }
@@ -327,7 +341,7 @@ FP_showStart() {
   FW_pO "<table WIDTH=\"100%\"><tr>";
   FW_pO "<td><input type=\"text\" name=\"cmd\" size=\"30\"/></td>";   						  #input-field
   FW_pO "</tr></table>";
-
+  FW_pO "</form></div>";
   # add edit *floorplanstyle.css if FP_arrange ?
   # no floorplans defined? -> show message
   my $count=0;
@@ -336,11 +350,12 @@ FP_showStart() {
 	$count++;
   }
   if ($count == 0) {
+    FW_pO '<div id="startcontent">';
 	FW_pO "<br><br><br><br>No floorplans have been defined yet. For definition, use<br>";
 	FW_pO "<ul><code>define &lt;name&gt; FLOORPLAN</code></ul>";
 	FW_pO 'Also check the <a href="/fhem/commandref.html#FLOORPLAN">commandref</a><br>';
+	FW_pO "</div>";
   }
-  FW_pO "</form></div>";
   FW_pO "</body>";
 }
 #-------------------------------------------------------------------------------
@@ -358,7 +373,7 @@ FP_show(){
 
   ## menus
   FP_menu();
-  FP_menuArrange() if ($FP_arrange); #shows the arrange-menu
+  FP_menuArrange() if ($FP_arrange && ($FP_arrange eq "1" || ($FP_arrange eq $FW_wname) || $FP_arrange eq "detail"));   #shows the arrange-menu
   # (re-) list the icons
   FW_ReadIcons();
   ## start floorplan  
@@ -414,7 +429,7 @@ FP_show(){
 
     ########################
     # Device-state per device
-		FW_pO "</tr><tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
+		FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
 		FW_pO "<td colspan=\"$cols\">$txt";
 		FW_pO "</td></tr>";
 
@@ -480,13 +495,13 @@ FP_menu() {
 	FW_pO "<div class=\"floorplan\" id=\"menu\">";
   # List FPs
 	FW_pO "<table class=\"start\" id=\"floorplans\">";
-	FW_pO "<tr><td>";
+	FW_pO "<tr>";
 	FW_pH "$FW_ME", "fhem", 1;
-	FW_pO "</td></tr>";
+	FW_pO "</tr>";
 	foreach my $f (sort keys %defs) {
 		next if ($defs{$f}{TYPE} ne "FLOORPLAN");
     	FW_pO "<tr><td>";
-		FW_pH "$FW_ME/floorplan/$f", $f, 1;
+		FW_pH "$FW_ME/floorplan/$f", $f, 0;
     	FW_pO "</td></tr>";
 	}
 	FW_pO "</table><br>";
@@ -497,19 +512,29 @@ FP_menu() {
 # Arrange-menu
 sub
 FP_menuArrange() {
+	my %desc=();
 	# collect data
 	$FP_arrange_default  = "" if (!$FP_arrange_default);
 	my @fpl;
 	my @nfpl;
-	my @devs = devspec2array("*");
-	foreach my $d (@devs) {                                                                    # loop all devices
+	foreach my $d (sort keys %defs) {                                       # loop all devices
 		my $type = $defs{$d}{TYPE};
 		# exclude these types from list of available devices
-		next if($type =~ m/(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify)/ );
-		my $av = AttrVal("$d","fp_$FP_name", undef);
-		push(@fpl, $d)  if ($av);
-		push(@nfpl, $d) if (!$av);
+		next if($type =~ m/^(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify|autocreate)/ );
+		my $disp = $d;
+		if ($FP_arrange eq "detail") {
+			$disp .= ' (' . AttrVal($d,"room","Unsorted").") $type";
+			my $alias = AttrVal($d, "alias", undef);
+			$disp .= ' (' . $alias . ')' if ($alias);
+		}
+		$desc{$d} = $disp;
+		if (AttrVal("$d","fp_$FP_name", undef)) {
+			push(@fpl, $disp);
+		} else {
+			push(@nfpl, $disp);
+		}
 	}
+	
 	my $attrd = "";
 	my $d = $FP_arrange_selected;
 	$attrd = AttrVal($d, "fp_$FP_name", undef) if ($d);
@@ -526,9 +551,11 @@ FP_menuArrange() {
 
 	# select device to be arranged
 	if (!defined($FP_arrange_selected)) {
+		my $dv = $FP_arrange_default;
+		$dv =  $desc{$dv} if ($dv && $FP_arrange eq "detail");
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form2
 		FW_pO "<div class=\"menu-select\" id=\"fpmenu\">\n" .                                       
-		FW_select("arr.dev", \@fpl, $FP_arrange_default, "menu-select") .
+		FW_select("arr.dev", \@fpl, $dv, "menu-select") .
 		FW_submit("ccc.one", "select");
 		FW_pO "</div></form>"; #form2
 	}
@@ -549,15 +576,15 @@ FP_menuArrange() {
 		FW_pO "document.getElementById(\"backimg\").addEventListener(\"click\",show_coords,false);";			# attach event-handler to background-picture
 		FW_pO "</script>";
 
-		
 	### build the form
+		my $disp =  $FP_arrange eq "detail" ? $desc{$d} : $d;
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
 		my ($top, $left, $style, $text, $text2) = split(",", $attrd);
 		$text .= ','.$text2 if ($text2);														# re-append Description after reading-ID for style3
 		my @styles = ("0","1","2","3","4");
 		FW_pO "<div class=\"menu-arrange\" id=\"fpmenu\">\n" .
 			FP_input("deva.$d", $d, "hidden") . "\n" .
-			FP_input("dscr.$d", $d, "text", "Selected device", 45, "", "disabled") . "\n<br>\n" .
+			FP_input("dscr.$d", $disp, "text", "Selected device", 45, "", "disabled") . "\n<br>\n" . 
 			FP_input("attr.$d", "fp_$FP_name", "hidden") . "\n" .
 			FP_input("top.$d", $top ? $top : 10, "text", "Top", 4, 4, 'id="fp_ar_input_top"') . "\n" .
 			FP_input("left.$d", $left ? $left : 10, "text", "Left", 4, 4, 'id="fp_ar_input_left"' ) . "\n" .
