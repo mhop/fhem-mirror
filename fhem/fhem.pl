@@ -1092,7 +1092,9 @@ CommandSave($$)
     foreach my $a (sort keys %{$attr{$d}}) {
       next if($d eq "global" &&
               ($a eq "configfile" || $a eq "version"));
-      print $fh "attr $d $a $attr{$d}{$a}\n";
+      my $val = $attr{$d}{$a};
+      $val =~ s/;/;;/g;
+      print $fh "attr $d $a $val\n";
     }
   }
   print SFH "include $attr{global}{lastinclude}\n"
