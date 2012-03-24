@@ -821,16 +821,15 @@ FW_roomOverview($)
     push @list2, "$FW_ME?room=$r";
   }
   my @list = (
-     "Everything", "$FW_ME?room=all",
-     "",           "",
-     "Howto",      "$FW_ME/HOWTO.html",
-     "Wiki",       "http://fhemwiki.de",
-#     "FAQ",        "$FW_ME/faq.html",
-     "Details",    "$FW_ME/commandref.html",
-#     "Examples",   "$FW_ME/cmd=style%20examples",
-     "Edit files", "$FW_ME/cmd=style%20list",
-     "Select style","$FW_ME/cmd=style%20select",
-     "Event monitor","$FW_ME/cmd=style%20eventMonitor",
+     "Everything",    "$FW_ME?room=all",
+     "",              "",
+     "Howto",         "$FW_ME/HOWTO.html",
+     "Wiki",          "http://fhemwiki.de",
+     "Details",       "$FW_ME/commandref.html",
+     "Definition...", "$FW_ME/cmd=style%20addDef",
+     "Edit files",    "$FW_ME/cmd=style%20list",
+     "Select style",  "$FW_ME/cmd=style%20select",
+     "Event monitor", "$FW_ME/cmd=style%20eventMonitor",
      "",           "");
   my $lastname = ","; # Avoid double "".
   for(my $idx = 0; $idx < @list; $idx+= 2) {
@@ -1444,8 +1443,7 @@ FW_calcWeblink($$)
     @l = localtime($t+7*86400);
     $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
 
-
-  } elsif($zoom eq "month") {
+ } elsif($zoom eq "month") {
 
     my @l = localtime($now);
     while($off < -12) {
@@ -1596,6 +1594,70 @@ FW_style($$)
     FW_pO "Events:<br>\n";
     FW_pO "</div>";
     FW_pO "</div>";
+
+  } elsif($a[1] eq "addDef") {
+    my $cnt = 0;
+    my %isHelper;
+    my $colCnt = ($FW_ss ? 2 : 8);
+    FW_pO "<div id=\"content\">";
+
+    FW_pO "Helpers:";
+    FW_pO "<div id=\"block\"><table><tr>";
+    foreach my $mn ( "at", "notify", "average", "dummy", "holiday", "sequence",
+                     "structure", "watchdog", "weblink", "FileLog", "PID", "Twilight") {
+      $isHelper{$mn} = 1;
+      FW_pH "cmd=style addDef $mn", "$mn", 1;
+      FW_pO "</tr><tr>" if(++$cnt % $colCnt == 0);
+    }
+    FW_pO "</tr>" if($cnt % $colCnt);
+    FW_pO "</table></div>";
+
+    $cnt = 0;
+    FW_pO "<br>Other Modules:";
+    FW_pO "<div id=\"block\"><table><tr>";
+    foreach my $mn (sort keys %modules) {
+      my $mp = $modules{$mn};
+      next if($isHelper{$mn});
+      # If it is not loaded, read it through to check if it has a Define Function
+      if(!$mp->{LOADED} && !$mp->{defChecked}) {
+        $mp->{defChecked} = 1;
+        if(open(FH, "$attr{global}{modpath}/FHEM/$modules{$mn}{ORDER}_$mn.pm")) {
+          while(my $l = <FH>) {
+            $mp->{DefFn} = 1 if(index($l, "{DefFn}")   > 0);
+          }
+          close(FH);
+        }
+      }
+
+      next if(!$mp->{DefFn});
+      FW_pH "cmd=style addDef $mn", "$mn", 1;
+      FW_pO "</tr><tr>" if(++$cnt % $colCnt == 0);
+    }
+    FW_pO "</tr>" if($cnt % $colCnt);
+    FW_pO "</table></div><br>";
+
+    if($a[2]) {
+      if(!open(FH, "$FW_dir/commandref.html")) {
+        FW_pO "<h3>comandref.html is missing</h3>";
+      } else {
+        my $inDef;
+        while(my $l = <FH>) {
+          if($l =~ m/<h3>$a[2]</) {
+            $inDef = 1;
+          } else {
+            next if (!$inDef);
+            last if($l =~ m/<h3>/);
+          }
+          chomp($l);
+          $l =~ s/href="#/href="$FW_reldoc#/g;
+          FW_pO $l;
+        }
+        close(FH);
+      }
+    }
+
+    FW_pO "</div>";
+
   }
 
 }
