@@ -210,6 +210,9 @@ TUL_DoInit($)
   # send any initializing request if needed
   # TODO move to device init 
   return 1 unless openGroupSocket($hash);
+  
+  # reset buffer
+  purgeReceiverBuf($hash);
 
   $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
@@ -240,8 +243,19 @@ TUL_Read($)
 {
   my ($hash) = @_;
 
+  #reset the refused flag, so we can check if a telegram was refused
+  # and therefor we did not get a response
+  $hash->{REFUSED} = undef;	
   my $buf = TUL_SimpleRead($hash);
   my $name = $hash->{NAME};
+
+  # check if refused
+  if(defined($hash->{REFUSED}))
+  {
+  	Log(3,"TUL $name refused message: $hash->{REFUSED}");
+  	$hash->{REFUSED} = undef;
+  	return "";
+  }
 
   ###########
   # Lets' try again: Some drivers return len(0) on the first read...
@@ -728,12 +742,14 @@ sub decode_tpuart($)
     	Log(3,"Control Byte " . sprintf("0x%02x",$ctrl) . " does not match expected mask 0xB0");
     	return undef;
     }
+
+   Log(5,"msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len");
    
    my $apci = ($cmd >> 6) & 0x0F;
    if($len == 2) { # 1 byte data
    	$bytes = pack("C",$cmd & 0x3F);
    }
-   
+
    Log(5,"msg cmd: " . sprintf("0x%02x",$cmd) ." datalen: $len apci: $apci");
    
     my %msg;
@@ -870,6 +886,23 @@ sub sendGroup($$)
     return 1;
 }
 
+# will read as much byte as exists at the 
+# serial buffer.
+sub purgeReceiverBuf($)
+{
+	my ($hash) = @_;
+	if($hash->{DevType} eq 'TPUART')
+	{
+	  Log(5,"purging receiver buffer ");
+	  my $data = undef;
+	  do
+	  {
+	    my(undef,$data) =  $hash->{USBDev}->read(100);
+	    Log(5,"purging packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
+	  } while(defined($data) and length($data)>0)
+	}
+}
+
 sub getRequestFixLength($$)
 {
 	my ($hash, $len) = @_;
@@ -885,15 +918,19 @@ sub getRequestFixLength($$)
 	    	Log(5,"Received fixlen packet: ". unpack("H*",$data) . "\n") if(defined($data) and length($data)>0);
 				
 			$buf .= $data if(defined($data));
-			Log(5,"buf len: " . length($buf) . " expected: $len");
+			#Log(5,"buf len: " . length($buf) . " expected: $len");
+			# TODO: if we are longer than 5 seconds here, we should reset
 		}
 		
 #		# we got more than needed
 		if(length($buf)>$len)
 		{
-			my $remainpart = substr($buf,$len+1);
+			#check if this is ok
+			my $remainpart = substr($buf,$len);
 			$hash->{PARTIAL} .= $remainpart;
-			$buf = substr($buf,$len);
+			$buf = substr($buf,0,$len);
+			
+			Log(5,"we got too much.. buf(" .unpack("H*",$buf).") remainingpart(" .unpack("H*",$remainpart).")");
 		}
 		
 		Log(5,"getRequest len: $len packet: ". unpack("H*",$buf) . "\n");
@@ -961,11 +998,14 @@ sub getGroup($)
 		}
 		while(!defined($telegram));
 	    
-	    Log(5, "Telegram: ($reqlen): " . unpack("H*",$telegram));
+	    Log(5, "Telegram: (".length($telegram)."): " . unpack("H*",$telegram));
 	    Log(5, "Buf: (".length($buf)."): " . unpack("H*",$buf));
 	    
 	    $hash->{PARTIAL} = $buf;	
 	    my $msg = decode_tpuart($telegram);
+	    
+	    #check if we refused a telegram (i.e. repeats)
+	    $hash->{REFUSED} = unpack("H*",$telegram) if(!defined($msg));
 	    
 # We are always too late for Ack	    
 #	    if(defined($msg) && (substr($msg->{'dst'},0,2) eq $ackdst))
