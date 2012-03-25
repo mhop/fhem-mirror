@@ -213,10 +213,11 @@ sub Twilight_GetUpdate($){
 		    $nexttime=120 if($nexttime<120);
 		    $nexttime=900 if($nexttime>900);
          }else{
-		    $nexttime = $nexttime+10;
+		    $nexttime = $nexttime-$now+10;
 	 }
 	 if(!$hash->{LOCAL}) {
 	    InternalTimer(sprintf("%.0f",$now+$nexttime), "Twilight_GetUpdate", $hash, 0);
+ 	    readingsUpdate($hash,"nextUpdate",strftime("%H:%M:%S",localtime($now+$nexttime)));
 	 }
 	 $hash->{STATE}=$i;
 	 last;
