@@ -209,14 +209,14 @@ sub Twilight_GetUpdate($){
 		 }
          readingsUpdate($hash,"nextEventTime",strftime("%H:%M:%S",localtime($nexttime)));
          if($i==5 || $i==6){
-		    $nexttime = ($nexttime-$now)/5;
+		    $nexttime = ($nexttime-$now)/2;
 		    $nexttime=120 if($nexttime<120);
 		    $nexttime=900 if($nexttime>900);
          }else{
 		    $nexttime = $nexttime+10;
 	 }
 	 if(!$hash->{LOCAL}) {
-	    InternalTimer(sprintf("%.0f",$nexttime), "Twilight_GetUpdate", $hash, 0);
+	    InternalTimer(sprintf("%.0f",$now+$nexttime), "Twilight_GetUpdate", $hash, 0);
 	 }
 	 $hash->{STATE}=$i;
 	 last;
