@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.09 - March, 2012
+# Version 1.10 - March, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -118,7 +118,7 @@ sub OWX_Initialize ($) {
   my ($hash) = @_;
   #-- Provider
   #$hash->{Clients}    = ":OWCOUNT:OWHUB:OWLCD:OWMULTI:OWSWITCH:OWTEMP:";
-  $hash->{Clients}     = ":OWAD:OWID:OWTEMP:";
+  $hash->{Clients}     = ":OWAD:OWID:OWLCD:OWTEMP:";
 
   #-- Normal Devices
   $hash->{DefFn}   = "OWX_Define";
@@ -313,7 +313,10 @@ sub OWX_Define ($$) {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   
-  if(@a == 3){
+  if(int(@a) >= 3){
+   #-- check syntax
+    Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX"
+       if(int(@a) > 3);
     #-- If this line contains 3 parameters, it is the bus master definition
     my $dev = $a[2];
     $hash->{DeviceName} = $dev;
@@ -366,7 +369,10 @@ sub OWX_Define ($$) {
     $init_done = $oid;
     $hash->{STATE} = "Active";
     return undef;
-  }  
+  } else {
+   #-- check syntax
+    return "OWX: Syntax error - must be define <name> OWX"
+  }
 }
 
 ########################################################################################
@@ -402,7 +408,7 @@ sub OWX_Detect ($) {
     #Log 1, $ress;
     
     #-- process 4/5-byte string for detection
-    if( $res eq "\x16\x44\x5A\x00\x93"){
+    if( ($res eq "\x16\x44\x5A\x00\x90") || ($res eq "\x16\x44\x5A\x00\x93")){
       Log 1, "OWX: 1-Wire bus master DS2480 detected for the first time";
       $owx_interface="DS2480";
       $ret=1;
@@ -482,15 +488,26 @@ sub OWX_Discover ($) {
         #-- all OW types start with OW
         next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
         my $id_fhem = substr($main::defs{$fhem_dev}{ROM_ID},0,15);
-        #-- testing if present in defined devices   
-        if( $id_fhem eq $id_owx ){
+        #-- skip interface device
+        next if( length($id_fhem) != 15 );
+        #-- testing if present in defined devices 
+        #   even with improper family
+        #print " FHEM-Device = ".substr($id_fhem,3,12)." OWX discovered device ".substr($id_owx,3,12)."\n";
+        if( substr($id_fhem,3,12) eq substr($id_owx,3,12) ) {
+          #-- warn if improper family id
+          if( substr($id_fhem,0,2) ne substr($id_owx,0,2) ){
+            Log 1, "OWX: Warning, $fhem_dev is defined with improper family id ".substr($id_fhem,0,2). 
+             ", correcting to ".substr($id_owx,0,2);
+             $main::defs{$fhem_dev}{OW_FAMILY} = substr($id_owx,0,2);
+          }
           push(@owx_names,$main::defs{$fhem_dev}{NAME});
-          #-- replace the ROM ID by the proper value 
+          #-- replace the ROM ID by the proper value including CRC
           $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
-          $main::defs{$fhem_dev}{PRESENT}=1;
+          $main::defs{$fhem_dev}{PRESENT}=1;    
           $match = 1;
           last;
         }
+        #
       }
     
       #-- autocreate the device
@@ -508,7 +525,10 @@ sub OWX_Discover ($) {
           CommandDefine(undef,"$name OWTEMP DS1822 $owx_rnf");  
         #-- Family 10 28 = Temperature sensor, assume DS18B20 as default
         }elsif( $owx_f eq "28" ){
-          CommandDefine(undef,"$name OWTEMP DS18B20 $owx_rnf");       
+          CommandDefine(undef,"$name OWTEMP DS18B20 $owx_rnf");   
+        #-- Family FF = LCD display    
+        }elsif( $owx_f eq "FF" ){
+          CommandDefine(undef,"$name OWLCD $owx_rnf");       
         #-- All unknown families are ID only
         } else {
           CommandDefine(undef,"$name OWID $owx_f $owx_rnf");   
