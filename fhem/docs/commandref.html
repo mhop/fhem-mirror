@@ -112,6 +112,7 @@
       <a href="#RFXCOM">RFXCOM</a> &nbsp;
       <a href="#RFXMETER">RFXMETER</a> &nbsp;
       <a href="#RFXX10REC">RFXX10REC</a> &nbsp;
+      <a href="#RSS">RSS</a> &nbsp;
       <a href="#SCIVT">SCIVT</a> &nbsp;
       <a href="#SISPM">SISPM</a> &nbsp;
       <a href="#SIS_PMS">SIS_PMS</a> &nbsp;
@@ -5092,6 +5093,164 @@ Attributes:<br>
 </ul>
 
 
+<a name="RSS"></a>
+<h3>RSS</h3>
+<ul>
+  Provides a freely configurable RSS feed.<p>
+
+  Currently a media RSS feed delivering status pictures in JPEG format is supported. This media
+  RSS feed can be used to feed a status display to a network-enabled photo frame.<p>
+  
+  You need to have the perl module <code>GD</code> installed. This module is most likely not
+  available for small systems like Fritz!Box.<p>
+
+  RSS is an extension to <a href="#FHEMWEB">FHEMWEB</a>. You must install FHEMWEB to use RSS.</p>
+
+  <a name="RSSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; RSS jpg &lt;hostname&gt; &lt;filename&gt;</code><br><br>
+
+    Defines the RSS feed. <code>jpg</code> is a fixed literal to allow for future
+    extensions. <code>&lt;hostname&gt;</code> is the hostname of the fhem server as
+    seen from the consumer of the RSS feed. <code>&lt;filename&gt;</code> is the
+    name of the file that contains the <a href="RSSlayout">layout definition</a>.<p>
+
+    Examples:
+    <ul>
+      <code>define FrameRSS RSS jpg host.example.org /etc/fhem/layout</code><br>
+      <code>define MyRSS RSS jpg 192.168.1.222 /var/fhem/conf/layout.txt</code><br>
+    </ul>
+    <br>
+  </ul>
+    
+  <a name="RSSset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; rereadcfg</code>
+    <br><br>
+    Rereads the <a href="RSSlayout">layout definition</a> from the file. Useful to enable
+    changes in the layout on-the-fly.
+    <br><br>
+  </ul>
+
+  <a name="RSSattr"></a>
+  <b>Attributes</b>
+  <br><br>
+  <ul>
+    <li>size<br>The dimensions of the JPEG picture in the format
+    <code>&lt;width&gt;x&lt;height&gt;</code>.</li><br>
+    <li>bg<br>The directory that contains the background pictures (must be in JPEG format).</li><br>
+    <li>tmin<br>The background picture is shown at least <code>tmin</code> seconds,
+    no matter how frequently the RSS feed consumer accesses the page.</li><br>
+  </ul>
+  <br><br>
+
+  <b>Usage information</b>
+  <br><br>
+  <ul>
+  If a least one RSS feed is defined, the menu entry <code>RSS</code> appears in the FHEMWEB
+  side menu. If you click it you get a list of all defined RSS feeds. The URL of any such is
+  RSS feed is <code>http://hostname:port/fhem/rss/name.rss</code> with <code>hostname</code> and
+  <code>name</code> from the RSS feed's <a href="RSSdefine">definition</a> and the <code>port</code>
+  (usually 8083) and literal <code>/fhem</code> from the underlying <a href="#FHEMWEB">FHEMWEB</a>
+  definition.<p>
+
+  Example:
+  <ul><code>http://host.example.org:8083/fhem/rss/FrameRSS.rss</code></ul><p>
+
+  The media RSS feed points to a dynamically generated JPEG picture. The URL of the JPEG picture
+  belonging to the RSS feed is <code>http://hostname:port/fhem/rss/name.jpg</code>, i.e. the URL
+  of the RSS feed with the extension <code>rss</code> changed to <code>jpg</code>.<p>
+
+  Example:
+  <ul><code>http://host.example.org:8083/fhem/rss/FrameRSS.jpg</code></ul><p>
+
+  To render the JPEG picture the current, or, if <code>tmin</code> seconds have elapsed, the next
+  JPEG picture from the directory <code>bg</code> is chosen and scaled to the dimensions given
+  in <code>size</code>. The background is black if no usable JPEG picture can be found. Next the
+  script in the <a href="RSSlayout">layout definition</a> is used to superimpose items on
+  the background.<p>
+  
+  You can directly access the URL of the JPEG picture in your browser. Reload the page to see
+  how it works.<p>
+  
+  The media RSS feed advertises to refresh after 1 minute (ttl). Some photo frames ignore it and
+  use their preset refresh rate. Go for a photo frame with an adjustable refresh rate (e.g
+  every 5 seconds) if you have the choice!<p>
+
+  This is how the fhem config part might look like:<p>
+  <code>
+  define ui FHEMWEB 8083 global<br><br>
+
+  define FrameRSS RSS jpg host.example.org /etc/fhem/layout<br>
+  attr FrameRSS size 800x600<br>
+  attr FrameRSS bg /usr/share/pictures<br>
+  attr FrameRSS tmin 10<br>
+  </code>
+ 
+  </ul>
+
+  <a name="RSSlayout"></a>
+  <b>Layout definition</b>
+  <br><br>
+  <ul>
+    The layout definition is a script for placing items on the background. It is read top-down.
+    It consists of layout control commands and items placement commands. Layout control
+    commands define the appearance of subsequent items. Item placement commands actually
+    render items.<p>
+
+    Everything after a # is treated as a comment and ignored. You can fold long lines by
+    putting a \ at the end.<p>
+
+    <i>Layout control commands</i>
+    <ul>
+    <li>font &lt;font&gt;<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
+    <code>Arial</code>) or the full path to a TrueType font (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
+    whatever works on your system.</li><br>
+
+    <li>rgb &lt;color&gt;<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
+    determining the red, green and blue color components as in HTML color codes (e.g.
+    <code>FF0000</code> for red, <code>C0C0C0</code> for light gray).</li><br>
+
+    <li>pt &lt;pt&gt;<br>Sets the font size in points.</li><br>
+    </ul>
+
+    <i>Item placement commands</i>
+    <ul>
+    <li>text &lt;x&gt; &lt;y&gt; &lt;text&gt;<br>Renders the text &lt;text&gt; at the
+    position (&lt;x&gt;, &lt;y&gt;) using the current font, font size and color.
+    (0,0) is the upper left corner. Coordinates equal or
+    greater than 1 are considered to be pixels, coordinates between 0 and 1 are considered to
+    be relative to the total width or height of the picture. You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;text&gt; to fully
+    access device readings and do some programming on the fly. See below for examples.</li><br>
+
+    <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
+    </ul>
+
+    This is how a layout definition might look like:<p>
+    <code>
+    font /usr/share/fonts/truetype/arial.ttf # must be a TrueType font<br>
+    rgb c0c0c0 # HTML color notation, RGB<br>
+    pt 48 # font size in points<br>
+    time 0.10 0.90<br>
+    pt 24<br>
+    text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "°C" }<br>
+    </code>
+    
+  </ul>
+
+
+
+
+  
+
+
+  
+</ul>
+
+
 <a name="ECMD"></a>
 <h3>ECMD</h3>
 <ul>
@@ -5177,7 +5336,7 @@ Attributes:<br>
   </ul>
   <br><br>
 
-  <a name="M232attr"></a>
+  <a name="ECMDattr"></a>
   <b>Attributes</b>
   <br><br>
   <ul>
