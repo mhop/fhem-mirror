@@ -14,9 +14,8 @@
 # where nt5000 may be replaced by any name string and <device> 
 # is a serial (USB) device or the keyword "emulator".
 # In the latter case, a 4.5 kWP solar installation is simulated
-#   
-# Attributes are set as (examples !)
 #
+# Additional attributes are defined in fhem.cfg as 
 #  attr    nt5000 room Solaranlage
 # Area of solar installation
 #  attr    nt5000 Area 32.75
@@ -63,14 +62,14 @@ use strict;
 use warnings;
 use Device::SerialPort;
 
-# Prototypes to make komodo happy
+#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 sub Log($$);
 
-# Line counter 
+#-- Line counter 
 my $cline=0;
 
-# These we may get on request
+#-- These we may get on request
 my %gets = (
   "reading"   => "R",
   "month"     => "M",
@@ -79,12 +78,12 @@ my %gets = (
   "proto"     => "P"
 );
 
-# These occur in a pulldown menu as settable values
+#-- These occur in a pulldown menu as settable values
 my %sets = (
   "time" => "T"
 );
 
-# These we may get on request
+#-- These we may get on request
 my %attrs = (
   "Wyx"   => "R",
 );
@@ -113,7 +112,10 @@ sub NT5000_Initialize ($) {
   #        which is the following one.
   # WxM1 .. WxM12 = Expected yield from January .. December
   # WxY  = Expected yield per year 
-  $hash->{AttrList}= "Area PSP MERR Wx_M1 Wx_M2 Wx_M3 Wx_M4 Wx_M5 Wx_M6 Wx_M7 Wx_M8 Wx_M9 Wx_M10 Wx_M11 Wx_M12 Wx_Y loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "Area PSP MERR ".
+           "Wx_M1 Wx_M2 Wx_M3 Wx_M4 Wx_M5 Wx_M6 Wx_M7 Wx_M8 Wx_M9 Wx_M10 Wx_M11 Wx_M12 ".
+           "Wx_Y ".
+           "loglevel:0,1,2,3,4,5,6";
 }
 
 #######################################################################################
@@ -152,22 +154,16 @@ sub NT5000_Define($$) {
     
   }
 
-  $hash->{DeviceName} = $dev;
-  $hash->{Timer} = 60;        # call every 60 seconds
-  $hash->{Cmd} = "reading";   # get all data,  min/max unchange
+  $hash->{DeviceName}   = $dev;
+  $hash->{Timer}        = 60;        # call every 60 seconds
+  $hash->{Cmd}          = "reading";   # get all data,  min/max unchange
   $hash->{SerialNumber} = "";
-  $hash->{Protocol} = "";
-  $hash->{Firmware} = "";
-  $hash->{STATE} = "offline";
+  $hash->{Protocol}     = "";
+  $hash->{Firmware}     = "";
+  $hash->{STATE}        = "offline";
   my $tn = TimeNow();
-  #$hash->{READINGS}{"freq"}{TIME} = $tn;
-  #$hash->{READINGS}{"freq"}{VAL} = $hash->{Timer};
-  #$hash->{READINGS}{"cmd"}{TIME} = $tn;
-  #$hash->{READINGS}{"cmd"}{VAL} = $hash->{Cmd};
-  #$hash->{CHANGED}[$main::cline++] = "freq: $hash->{Timer}";
-  #$hash->{CHANGED}[$main::cline++] = "cmd: $hash->{Cmd}";
 
-  # InternalTimer blocks if init_done is not true
+  #-- InternalTimer blocks if init_done is not true
   my $oid = $init_done;
   $init_done = 1;
   NT5000_GetStatus($hash);
@@ -303,7 +299,7 @@ sub NT5000_GetStatus ($) {
     my $tn = TimeNow();
     my @names = ("Udc", "Idc", "Pdc", "Uac", "Iac", "Pac", "Temp", "S", "Wd", "Wtot", "Eta");
     
-    if( $hash->{STATE} ne "online" ) {
+    if( !($hash->{STATE} =~ m/.*kW/) ) {
       # we have turned online recently
       Log GetLogLevel($name,2), "NT5000 inverter is online";
       $hash->{STATE} = "starting";
@@ -315,8 +311,8 @@ sub NT5000_GetStatus ($) {
       my $proto  = NT5000_GetLine($hash, "proto");
       $proto =~ s/^.*P://;
       $proto =~ s/[\r\n ]//g;
-      $hash->{Protocol} = substr($proto,0,1).".".substr($proto,1,1);
-      $hash->{Firmware} = substr($proto,2,1).".".substr($proto,4,2);
+      $hash->{Firmware} = substr($proto,0,1).".".substr($proto,1,1);
+      $hash->{Protocol} = substr($proto,2,1).".".substr($proto,4,2);
       
       # Obtain monthly readings in 70 seconds - only once
       InternalTimer(gettimeofday()+ 20, "NT5000_GetMonth", $hash,1);
@@ -331,11 +327,7 @@ sub NT5000_GetStatus ($) {
       }
       $hash->{CHANGED}[$main::cline++] = "$resmod";
     }; 
-      
-    $hash->{STATE} = "online";
-    #$result =~ s/^.*R://;
-    #$result =~ s/[\r\n ]//g;   
-    #$result=~ s/,/./g;
+    
     #-- Log level 5
     Log GetLogLevel($name,5), "NT5000 online result = $result";
 
@@ -346,10 +338,11 @@ sub NT5000_GetStatus ($) {
    
     #-- split result for writing into hash
     my @data = split(' ',$result);
+    $hash->{STATE} = sprintf("%5.3f kW",$data[5]);
     for(my $i = 0; $i < int(@names); $i++)  {
       # This puts individual pairs into the tabular view
-      $hash->{READINGS}{$names[$i]}{TIME} = $tn;
       $hash->{READINGS}{$names[$i]}{VAL} = $data[$i];
+      $hash->{READINGS}{$names[$i]}{TIME} = $tn;
     } 
     
     DoTrigger($name, undef) if($init_done);

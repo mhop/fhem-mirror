@@ -13,10 +13,10 @@
 # OWFS = 1-Wire file system (Martin Fischer)
 # OWX  = 1-Wire bus master interface (Peter Henning)
 #
-# Martin Fischer, 2011
 # Prof. Dr. Peter A. Henning, 2012
+# Martin Fischer, 2011
 # 
-# Version 1.09 - March, 2012
+# Version 1.10 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -69,9 +69,6 @@
 #  GNU General Public License for more details.
 #
 ########################################################################################
-#
-# TODO: offset in alarm values
-#
 package main;
 
 #-- Prototypes to make komodo happy
@@ -190,11 +187,11 @@ sub OWTEMP_Define ($$) {
   #   FF = family id follows from the model
   #   YY must be determined from id
   if( $model eq "DS1820" ){
-    $fam = 10;
+    $fam = "10";
   }elsif( $model eq "DS1822" ){
-    $fam = 22;
+    $fam = "22";
   }elsif( $model eq "DS18B20" ){
-    $fam = 28;
+    $fam = "28";
   }else{
     return "OWTEMP: Wrong 1-Wire device model $model";
   }
