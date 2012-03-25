@@ -1,4 +1,3 @@
-
 #
 # 59_Twilight.pm
 # written by Sebastian Stuecker based on Twilight.tcl http://www.homematic-wiki.info/mw/index.php/TCLScript:twilight
@@ -8,7 +7,6 @@
 package main;
 use strict;
 use warnings;
-use Time::HiRes qw(gettimeofday);
 use Switch;
 use POSIX;
 
@@ -22,6 +20,27 @@ sub dayofyear {
     return ++$doy unless $year % 100 == 0;
     return $doy unless $year % 400 == 0;
     return ++$doy;
+}
+
+sub my_gmt_offset {
+	# inspired by http://stackoverflow.com/questions/2143528/whats-the-best-way-to-get-the-utc-offset-in-perl
+	# avoid use of any CPAN module and ensure system independent behavior
+	my $t = time;
+    my @a = localtime($t);
+    my @b = gmtime($t);
+    my $hh = $a[2] - $b[2];
+    my $mm = $a[1] - $b[1];
+    # in the unlikely event that localtime and gmtime are in different years
+    if ($a[5]*366+$a[4]*31+$a[3] > $b[5]*366+$b[4]*31+$b[3]) {
+      $hh += 24;
+    } elsif ($a[5]*366+$a[4]*31+$a[3] < $b[5]*366+$b[4]*31+$b[3]) {
+      $hh -= 24;
+    }
+    if ($hh < 0 && $mm > 0) {
+      $hh++;
+      $mm = 60-$mm;
+    }
+    return $hh+($mm/60);
 }
 
 ##################################### 
@@ -42,13 +61,11 @@ sub Twilight_Initialize($) {
 sub Twilight_Get($@) {
 
   my ($hash, @a) = @_;
-
   return "argument is missing" if(int(@a) != 2);
 
   $hash->{LOCAL} = 1;
   Twilight_GetUpdate($hash);
   delete $hash->{LOCAL};
-
   my $reading= $a[1];
   my $value;
 
@@ -57,7 +74,6 @@ sub Twilight_Get($@) {
   } else {
         return "no such reading: $reading";
   }
-
   return "$a[0] $reading => $value";
 }
 
@@ -65,7 +81,6 @@ sub Twilight_Get($@) {
 sub Twilight_Define($$) {
 
   my ($hash, $def) = @_;
-
   # define <name> Twilight <latitude> <longitude> [indoor_horizon [Weather_Position]]
   # define MyTwilight Twilight 48.47 11.92 Weather_Position
 
@@ -77,7 +92,6 @@ sub Twilight_Define($$) {
   $hash->{STATE} = "0";
   my $latitude;
   my $longitude;
- 
   my $name      = $a[0];
   if ($a[2] =~ /^[\+-]*[0-9]*\.*[0-9]*$/ && $a[2] !~ /^[\. ]*$/ ) {
      $latitude  = $a[2];
@@ -104,7 +118,6 @@ sub Twilight_Define($$) {
   $hash->{INDOOR_HORIZON} = $indoor_horizon;
  
    Twilight_GetUpdate($hash);
-  
    return undef;
 }
 
@@ -138,7 +151,7 @@ sub Twilight_GetUpdate($){
    my $day=strftime("%d",localtime);
    my $doy = dayofyear($day,$month,$year)+(($year%4)/4);
    $doy+=($doy/365.0)/4.0;
-   my $timezone=(mktime(localtime($now))-mktime(gmtime($now)))/3600;
+   my $timezone=my_gmt_offset();
    my $timediff=-0.171*sin(0.0337*$doy+0.465) - 0.1299*sin(0.01787 * $doy - 0.168);
    my $declination=0.4095*sin(0.016906*($doy-80.086));
    my $twilight_midnight=$now+(0-$timediff-$longitude/15+$timezone)*3600;
