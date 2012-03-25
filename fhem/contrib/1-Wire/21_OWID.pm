@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.09 - March, 2012
+# Version 1.10 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -109,7 +109,7 @@ sub OWID_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWID: Wrong syntax, must be define <name> OWID <id>"
+  return "OWID: Wrong syntax, must be define <name> OWID <fam> <id>"
        if(int(@a) !=4 );
        
   #-- check id
@@ -125,8 +125,8 @@ sub OWID_Define ($$) {
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   YY must be determined from id
-  $crc = sprintf("%02x",OWX_CRC($fam.".".$id."00"));
+  # determine CRC Code YY - only if this is a direct interface
+  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- Define device internals
   $hash->{ROM_ID}     = $fam.".".$id.$crc;

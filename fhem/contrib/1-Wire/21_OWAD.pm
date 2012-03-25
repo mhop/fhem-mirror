@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.09 - March, 2012
+# Version 1.10 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -206,13 +206,13 @@ sub OWAD_Define ($$) {
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   YY must be determined from id
-  $crc = sprintf("%02x",OWX_CRC("20.".$id."00"));
+  #   determine CRC Code - only if this is a direct interface
+  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC("20.".$id."00")) : "00";
   
   #-- Define device internals
   $hash->{ROM_ID}     = "20.".$id.$crc;
   $hash->{OW_ID}      = $id;
-  $hash->{OW_FAMILY}  = 20;
+  $hash->{OW_FAMILY}  = "20";
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   
@@ -300,7 +300,9 @@ sub OWAD_InitializeDevice($) {
   my $interface= $hash->{IODev}->{TYPE};
   
   #-- OWX interface
-  if( $interface eq "OWX" ){
+  if( !defined($interface) ){
+    return "OWAD: Interface missing";
+  } elsif( $interface eq "OWX" ){
     OWXAD_SetPage($hash,"alarm");
     OWXAD_SetPage($hash,"status");
   #-- OWFS interface
@@ -957,9 +959,6 @@ sub OWXAD_SetPage($$) {
 
   my ($hash,$page) = @_;
   
-  #-- For now, switch on conversion command
-  my $con=1;
-  
   my ($select, $res, $res2, $res3, @data);
   
   #-- ID of the device
@@ -982,7 +981,7 @@ sub OWXAD_SetPage($$) {
   }
   
   #=============== set the alarm values ===============================
-  if ( $page eq "alarm" ) {
+  if ( $page eq "test" ) {
     #-- issue the match ROM command \x55 and the set alarm page command 
     #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
     $select=sprintf("\x55%c%c%c%c%c%c%c%c\x55\x10\x00",
@@ -990,7 +989,6 @@ sub OWXAD_SetPage($$) {
     for( $i=0;$i<4;$i++){
       $select .= sprintf "%c\xFF\xFF\xFF",int($owg_vlow[$i]*255000/$owg_range[$i]);
       $select .= sprintf "%c\xFF\xFF\xFF",int($owg_vhigh[$i]*255000/$owg_range[$i]);
-      #print "XXXXXX> Setting alarm values to ".int($owg_vlow[$i]*255000/$owg_range[$i])." ".int($owg_vhigh[$i]*255000/$owg_range[$i])."\n";
     }
   #=============== set the status ===============================
   } elsif ( $page eq "status" ) {
@@ -1015,9 +1013,8 @@ sub OWXAD_SetPage($$) {
       }
       $select .= sprintf "%c\xFF\xFF\xFF",$sb1;
       $select .= sprintf "%c\xFF\xFF\xFF",$sb2;
-      #print "YYYYYYYYYYY>setting status bytes $sb1 $sb2\n";
     }
-  #=============== wrong value requested ===============================
+  #=============== wrong pag ewrit eattempt  ===============================
   } else {
     return "OWXAD: Wrong memory page write attempt";
   } 
@@ -1027,7 +1024,7 @@ sub OWXAD_SetPage($$) {
   
   #-- process results
   if( $res eq 0 ){
-    return "OWXAD: Device $owx_dev not accessible for initialization"; 
+    return "OWXAD: Device $owx_dev not accessible for writing"; 
   }
   
   return undef;
