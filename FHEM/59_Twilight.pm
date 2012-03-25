@@ -133,7 +133,7 @@ sub Twilight_Undef($$) {
 sub twilight_midnight_seconds() { my @time = localtime(); my $secs = ($time[2] * 3600) + ($time[1] * 60) + $time[0]; return $secs; }
 
 
-sub Twilight_GetUpdate($){
+sub Twilight_GetUpdate{
    my ($hash) = @_; 
    my @sunrise_set;   
    
@@ -239,7 +239,7 @@ sub Twilight_GetUpdate($){
    return 1;
 }
 
-sub twilight_calc() {
+sub twilight_calc {
    my $latitude=shift;
    my $longitude=shift;
    my $horizon=shift;
@@ -262,7 +262,7 @@ sub twilight_calc() {
    return $sunrise, $sunset;
 }
 
-sub Twilight_getWeatherHorizon(){
+sub Twilight_getWeatherHorizon{
    my $location=shift;
    #my $xml = GetHttpFile("www.google.com:80", "/ig/api?weather=" . $location . "&hl=en");
    #$xml =~/\<current_conditions\>(.*)\<\/current_conditions\>/;
