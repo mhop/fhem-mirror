@@ -55,6 +55,8 @@ my %flogpar = (
   # TX3 temperature sensors received by RFXTRX
   "TX3_T.*"
        => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
+  "TX3_H.*"
+       => { GPLOT => "temp4hum4:Temp/Hum,",  FILTER => "%NAME" },
 
 
   # USB-WDE1
