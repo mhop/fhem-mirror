@@ -50,7 +50,7 @@
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id$
+# $Id: $
 package main;
 
 use strict;
@@ -144,6 +144,11 @@ my %types =
    type_length_key(0x50, 0x08) =>
    {
     part => 'TEMP', method => \&common_temp,
+   },
+   # HYDRO
+   type_length_key(0x51, 0x08) =>
+   {
+    part => 'HYDRO', method => \&common_hydro,
    },
    # TEMP HYDRO
    type_length_key(0x52, 0x0a) =>
@@ -387,7 +392,7 @@ sub common_temp {
 	0x02 => "THGR132N", # was THGR228N,
 	0x03 => "THWR800",
 	0x04 => "RTHN318",
-	0x05 => "TX3_T",
+	0x05 => "TX3_T", # LaCrosse TX3
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -424,6 +429,51 @@ sub common_temp {
 }
 
 # -----------------------------
+sub common_hydro {
+  my $type = shift;
+  my $longids = shift;
+  my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  #Log 1,"subtype=$subtype";
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "TX3_H", # LaCrosse TX3
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log 1,"RFX_WEATHER: common_hydro error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  my $dev_str = $dev_type;
+  if (use_longid($longids,$dev_type)) {
+  	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
+  }
+  if ($bytes->[4] > 0) {
+  	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
+  }
+  #Log 1,"dev_str=$dev_str";
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  humidity($bytes, $dev_str, \@res, 5); 
+  simple_battery($bytes, $dev_str, \@res, 7);
+  return @res;
+}
+
+# -----------------------------
 sub common_temphydro {
   my $type = shift;
   my $longids = shift;
@@ -448,7 +498,7 @@ sub common_temphydro {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_temp error undefined subtype=$subtype";
+  	Log 1,"RFX_WEATHER: common_temphydro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
