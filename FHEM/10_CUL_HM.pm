@@ -661,6 +661,15 @@ CUL_HM_Parse($$)
 
     } else {
 
+      # Multi-channel device: Switch to the shadow source hash
+      # for the HM-SCI-3-FM
+      my $chn = $2 if($p =~ m/^(..)(..)/);
+      if($chn && $chn ne "01" && $chn ne "00") {
+        my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
+        $shash = $sshash if($sshash);
+        $name = $shash->{NAME};
+      }
+
       my %txt;
       %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
       %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
