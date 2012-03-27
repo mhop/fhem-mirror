@@ -1409,7 +1409,7 @@ CUL_HM_Pair(@)
         "CUL_HM pair: $name $stt, model $model serialNr $serNo";
 
   # Create shadow device for multi-channel
-  if($stn eq "switch" &&
+  if(($stn eq "switch" || $stn eq "threeStateSensor") &&
     $devInfo =~ m,(..)(..)(..), ) {
     my ($b1, $b2, $b3) = (hex($1)&0xf, hex($2), $3);
     for(my $i = $b2+1; $i<=$b1; $i++) {
