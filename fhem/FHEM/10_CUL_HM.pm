@@ -194,7 +194,7 @@ CUL_HM_Parse($$)
   my $cmdX = $cmd;
   $cmdX =~ s/^A4/A0/;
   $cmdX =~ s/^0B/0A/;
-  $cmdX =~ s/^84/A0/;
+  #$cmdX =~ s/^84/A0/;
   my $msgX = "$len$msgcnt$cmdX$src$dst$p";
 
   # $shash will be replaced for multichannel commands
@@ -585,10 +585,19 @@ CUL_HM_Parse($$)
 
     if($cmd =~ m/^..4./ && $p =~ m/^(..)(..)$/) {
       my ($button, $bno) = (hex($1), hex($2));
-
+	  if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
+	    $shash->{BNO}=$bno;$shash->{BNOCNT}=1;
+	  }else{
+	    $shash->{BNOCNT}+=1;
+	  }
       my $btn = int((($button&0x3f)+1)/2);
-      my $state = ($button&1 ? "off" : "on") . ($button & 0x40 ? "Long" : "");
-
+	  my $state;
+      if($button & 0x40){
+	     $state = ($button&1 ? "off" : "on") . "Long" .($cmd=~m/^A04./ ? "Release" : "")." ".$shash->{BNOCNT};
+      }else{
+	     $state = ($button&1 ? "off" : "on");
+      }
+	  Log 1, $cmd;
       push @event, "state:Btn$btn $state$target";
       if($id eq $dst && $cmd ne "8002") {  # Send Ack
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
@@ -1004,8 +1013,9 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "pct") { ##############################################
     $a[1] = 100 if ($a[1] > 100);
-    if(@a == 2) {$tval="";$rval="0000";}
-    if(@a > 2) {
+    $tval="FFFF";
+    $rval="0140";
+    if(@a > 2 && $a[2] !=0) {
       ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
       Log 1, $ret if($ret);
     }
