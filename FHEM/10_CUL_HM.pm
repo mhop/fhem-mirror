@@ -585,19 +585,19 @@ CUL_HM_Parse($$)
 
     if($cmd =~ m/^..4./ && $p =~ m/^(..)(..)$/) {
       my ($button, $bno) = (hex($1), hex($2));
-	  if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
-	    $shash->{BNO}=$bno;$shash->{BNOCNT}=1;
-	  }else{
-	    $shash->{BNOCNT}+=1;
-	  }
-      my $btn = int((($button&0x3f)+1)/2);
-	  my $state;
-      if($button & 0x40){
-	     $state = ($button&1 ? "off" : "on") . "Long" .($cmd=~m/^A04./ ? "Release" : "")." ".$shash->{BNOCNT};
+      if(!(exists($shash->{BNO})) || $shash->{BNO} ne $bno){
+        $shash->{BNO}=$bno;$shash->{BNOCNT}=1;
       }else{
-	     $state = ($button&1 ? "off" : "on");
+        $shash->{BNOCNT}+=1;
       }
-	  Log 1, $cmd;
+      my $btn = int((($button&0x3f)+1)/2);
+      my $state;
+      if($button & 0x40){
+        $state = ($button&1 ? "off" : "on") . "Long" .($cmd=~m/^A04./ ? "Release" : "")." ".$shash->{BNOCNT};
+      }else{
+        $state = ($button&1 ? "off" : "on");
+      }
+      #Log 1, $cmd;
       push @event, "state:Btn$btn $state$target";
       if($id eq $dst && $cmd ne "8002") {  # Send Ack
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
@@ -653,9 +653,9 @@ CUL_HM_Parse($$)
     push @event, "unknownMsg:$p" if(!@event);
 
   } elsif($st eq "threeStateSensor") { #####################################
-
     $p =~ m/^....(..)$/;
     my $lst = defined($1) ? $1 : "00";
+    my $chn = "01";
 
     if($p =~ m/^0601000E$/) {
       push @event, "alive:yes";
@@ -672,7 +672,7 @@ CUL_HM_Parse($$)
 
       # Multi-channel device: Switch to the shadow source hash
       # for the HM-SCI-3-FM
-      my $chn = $2 if($p =~ m/^(..)(..)/);
+      $chn = $1 if($p =~ m/^(..)(..)/);
       if($chn && $chn ne "01" && $chn ne "00") {
         my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
         $shash = $sshash if($sshash);
@@ -694,7 +694,7 @@ CUL_HM_Parse($$)
 
     }
 
-    CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
+    CUL_HM_SendCmd($shash, "++8002$id$src${chn}01${lst}00",1,0)  # Send Ack
       if($id eq $dst);
     push @event, "unknownMsg:$p" if(!@event);
 
