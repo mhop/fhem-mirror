@@ -106,7 +106,7 @@ my %culHmModel=(
   "0051" => "HM-LC-SW1-PB-FM",
   "0052" => "HM-LC-SW2-PB-FM", # Tested
   "0053" => "HM-LC-BL1-PB-FM", # Tested by ruebezahl (2011-09-22)
-  "0056" => "HM-CC-SCD",
+  "0056" => "HM-CC-SCD",	   
   "0057" => "HM-LC-DIM1T-PL",
   "0058" => "HM-LC-DIM1T-CV",
   "0059" => "HM-LC-DIM1T-FM",
@@ -710,6 +710,20 @@ CUL_HM_Parse($$)
       push @event, "temperature:$t";
 
     }
+ 
+  } elsif($model eq "HM-CC-SCD") { ##########################################
+  
+    if($p =~ m/^....00$/) {
+    	push @event, "state:normal";
+    	
+    } elsif($p =~ m/^....64$/) {
+    	push @event, "state:added";
+    	
+    } elsif($p =~ m/^....C8$/) {
+    	push @event, "state:added_strong";
+    	
+    }
+
 
   } elsif($st eq "THSensor") { ##########################################
 
