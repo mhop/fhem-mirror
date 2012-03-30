@@ -1020,12 +1020,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   Example:
   <ul>
     <code>sleep 0.5</code><br>
-    <code>notify btn3 set lamp toggle;;sleep 0.5;;set lamp toggle</code>
+    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp toggle</code>
   </ul>
   <br>
-  Note: As the server is <b>not</b> multithreaded, everything is blocked for
-  the given amount.<br>
-
+  Note: sleep followed by another command and issued in at/notify/etc is not
+  blocking fhem.<br>
 </ul>
 
 

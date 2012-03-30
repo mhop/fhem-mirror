@@ -183,6 +183,7 @@ my $namedef =
   "- a range seperated by dash (-)\n";
 my $stt_sec;                    # Used by SecondsTillTomorrow()
 my $stt_day;                    # Used by SecondsTillTomorrow()
+my @cmdList;                    # Remaining commands in a chain. Used by sleep
 
 $init_done = 0;
 
@@ -683,7 +684,8 @@ AnalyzeCommandChain($$)
   $cmd =~ s/#.*$//s;
 
   $cmd =~ s/;;/SeMiCoLoN/g;
-  foreach my $subcmd (split(";", $cmd)) {
+  @cmdList = split(";", $cmd);
+  while(my $subcmd = shift @cmdList) {
     $subcmd =~ s/SeMiCoLoN/;/g;
     my $lret = AnalyzeCommand($c, $subcmd);
     push(@ret, $lret) if(defined($lret));
@@ -724,7 +726,6 @@ AnalyzeCommand($$)
 
   $cmd =~ s/^(\\\n|[ \t])*//;# Strip space or \\n at the begginning
   $cmd =~ s/[ \t]*$//;
-
 
   Log 5, "Cmd: >$cmd<";
   return undef if(!$cmd);
@@ -1929,8 +1930,24 @@ CommandSleep($$)
 
   return "Cannot interpret $param as seconds" if($param !~ m/^[0-9\.]+$/);
   Log 4, "sleeping for $param";
-  select(undef, undef, undef, $param);
+
+  if(!$cl && @cmdList && $param && $init_done) {
+    InternalTimer(gettimeofday()+$param, "WakeUpFn", join(";;", @cmdList), 0);
+    @cmdList=();
+
+  } else {
+    select(undef, undef, undef, $param);
+
+  }
   return undef;
+}
+
+sub
+WakeUpFn($)
+{
+  my $param = shift;
+  my $ret = AnalyzeCommandChain(undef, $param);
+  Log 2, "After sleep: $ret" if($ret);
 }
 
 
