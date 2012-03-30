@@ -20,6 +20,7 @@
   - feature: FHEMWEB console (== inform timer)
   - feature: remove dependency on Google::Weather, major rewrite (Boris)
   - feature: started experimental interface implementation (fhem API v2) (Boris)
+  - feature: sleep issued in at/notify/etc is not blocking fhem anymore
 
 
 - 2011-12-31 (5.2)
