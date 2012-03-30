@@ -2079,42 +2079,43 @@ SemicolonEscape($)
 sub
 EvalSpecials($%)
 {
-     # The character % will be replaced with the received event,
-     #     e.g. with on or off or measured-temp: 21.7 (Celsius)
-     # The character @ will be replaced with the device name.
-     # To use % or @ in the text itself, use the double mode (%% or @@).
-     # Instead of % and @, the parameters %EVENT (same as %),
-     #     %NAME (same as @) and %TYPE (contains the device type, e.g. FHT)
-     #     can be used. A single % looses its special meaning if any of these
-     #     parameters appears in the definition.
+  # The character % will be replaced with the received event,
+  #     e.g. with on or off or measured-temp: 21.7 (Celsius)
+  # The character @ will be replaced with the device name.
+  # To use % or @ in the text itself, use the double mode (%% or @@).
+  # Instead of % and @, the parameters %EVENT (same as %),
+  #     %NAME (same as @) and %TYPE (contains the device type, e.g. FHT)
+  #     can be used. A single % looses its special meaning if any of these
+  #     parameters appears in the definition.
+  my ($exec, %specials)= @_;
+  $exec = SemicolonEscape($exec);
 
-      my ($exec, %specials)= @_;
-      $exec = SemicolonEscape($exec);
+  $exec =~ s/%%/____/g;
 
-      $exec =~ s/%%/____/g;
+  # %EVTPART due to HM remote logic
+  my $idx = 0;
+  if(defined($specials{"%EVENT"})) {
+    foreach my $part (split(" ", $specials{"%EVENT"})) {
+      $specials{"%EVTPART$idx"} = $part;
+      $idx++;
+    }
+  }
 
-      # %EVTPART due to HM remote logic
-      my $idx = 0;
-      foreach my $part (split(" ", $specials{"%EVENT"})) {
-        $specials{"%EVTPART$idx"} = $part;
-        $idx++;
-      }
+  # perform macro substitution
+  my $extsyntax= 0;
+  foreach my $special (keys %specials) {
+    $extsyntax+= ($exec =~ s/$special/$specials{$special}/g);
+  }
+  if(!$extsyntax) {
+    $exec =~ s/%/$specials{"%EVENT"}/g;
+  }
+  $exec =~ s/____/%/g;
 
-      # perform macro substitution
-      my $extsyntax= 0;
-      foreach my $special (keys %specials) {
-        $extsyntax+= ($exec =~ s/$special/$specials{$special}/g);
-      }
-      if(!$extsyntax) {
-        $exec =~ s/%/$specials{"%EVENT"}/g;
-      }
-      $exec =~ s/____/%/g;
+  $exec =~ s/@@/____/g;
+  $exec =~ s/@/$specials{"%NAME"}/g;
+  $exec =~ s/____/@/g;
 
-      $exec =~ s/@@/____/g;
-      $exec =~ s/@/$specials{"%NAME"}/g;
-      $exec =~ s/____/@/g;
-
-      return $exec;
+  return $exec;
 }
 
 #####################################
