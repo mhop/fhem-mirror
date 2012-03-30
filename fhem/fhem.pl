@@ -1932,7 +1932,7 @@ CommandSleep($$)
   Log 4, "sleeping for $param";
 
   if(!$cl && @cmdList && $param && $init_done) {
-    InternalTimer(gettimeofday()+$param, "WakeUpFn", join(";;", @cmdList), 0);
+    InternalTimer(gettimeofday()+$param, "WakeUpFn", join(";", @cmdList), 0);
     @cmdList=();
 
   } else {
