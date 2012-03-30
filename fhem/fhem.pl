@@ -1011,10 +1011,15 @@ WriteStatefile()
     next if($defs{$d}{TEMPORARY});
     print SFH "define $d $defs{$d}{TYPE} $defs{$d}{DEF}\n"
         if($defs{$d}{VOLATILE});
-    print SFH "setstate $d $defs{$d}{STATE}\n"
-        if(defined($defs{$d}{STATE}) &&
-           $defs{$d}{STATE} ne "unknown" &&
-           $defs{$d}{STATE} ne "Initialized");
+
+    my $val = $defs{$d}{STATE};
+    if(defined($val) &&
+       $val ne "unknown" &&
+       $val ne "Initialized" &&
+       $val ne "???") {
+      $val =~ s/;/;;/g;
+      print SFH "setstate $d $val\n"
+    }
 
     #############
     # Now the detailed list
@@ -1022,14 +1027,19 @@ WriteStatefile()
     if($r) {
       foreach my $c (sort keys %{$r}) {
 
-	if(!defined($r->{$c}{TIME})) {
-	  Log 3, "WriteStatefile $d $c: Missing TIME";
-	} elsif(!defined($r->{$c}{VAL})) {
-	  Log 3, "WriteStatefile $d $c: Missing VAL";
-	} else {
-	  print SFH "setstate $d $r->{$c}{TIME} $c $r->{$c}{VAL}\n";
-        }
+	my $rd = $r->{$c};
+	if(!defined($rd->{TIME})) {
+	  Log 4, "WriteStatefile $d $c: Missing TIME, using current time";
+	  $rd->{TIME} = TimeNow();
+	}
 
+        if(!defined($rd->{VAL})) {
+	  Log 4, "WriteStatefile $d $c: Missing VAL, setting it to 0";
+	  $rd->{VAL} = 0;
+        }
+        my $val = $rd->{VAL};
+        $val =~ s/;/;;/g;
+	print SFH "setstate $d $rd->{TIME} $c $val\n";
       }
     }
   }
