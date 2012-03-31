@@ -1998,20 +1998,26 @@ FW_devState($$)
   my ($d, $rf) = @_;
 
   my ($allSets, $hasOnOff, $cmdlist, $link);
-  my $webCmd = AttrVal($d, "webCmd", undef);
-
-  if(!$webCmd) {
-    $allSets = " " . getAllSets($d) . " ";
-    $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
-    if(!$hasOnOff) {    # Check the eventMap
-      my $em = AttrVal($d, "eventMap", "") . " ";
-      $hasOnOff = ($em =~ m/:on\b/ && $em =~ m/:off\b/);
-    }
-  }
+  my $webCmd = AttrVal($d, "webCmd", "");
 
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
   my $txt = $state;
+
+  if(!$webCmd) {
+    $allSets = " " . getAllSets($d) . " ";
+    $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
+
+    my $em = AttrVal($d, "eventMap", "");
+    if($em) {
+      if(!$hasOnOff) {
+        $em .= " ";
+        $hasOnOff = ($em =~ m/:on\b/ && $em =~ m/:off\b/);
+      } else {
+        (undef, $state) = ReplaceEventMap($d,[$d, $state],0);
+      }
+    }
+  }
 
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
