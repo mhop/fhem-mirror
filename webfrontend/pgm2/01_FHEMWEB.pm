@@ -1939,7 +1939,8 @@ FW_Notify($$)
   my $dn = $dev->{NAME};
   my $data;
 
-  if($filter eq "all" || AttrVal($dn, "room", "") eq $filter) {
+  my $rn = AttrVal($dn, "room", "");
+  if($filter eq "all" || $rn =~ m/\b$filter\b/) {
     FW_ReadIcons();
 
     my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir);
@@ -2050,7 +2051,14 @@ FW_devState($$)
 
   if($link) {
     my $room = AttrVal($d, "room", undef);
-    $link .= "&room=$room" if($room);
+    if($room) {
+      if($FW_room && $room =~ m/\b$FW_room\b/) {
+        $room = $FW_room;
+      } else {
+        $room =~ s/,.*//;
+      }
+      $link .= "&room=$room";
+    }
     if($FW_longpoll) {
       $txt = "<a onClick=\"cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
