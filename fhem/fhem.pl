@@ -1841,6 +1841,7 @@ CommandSetstate($$)
     if($a[1] =~ m/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +([^ ].*)$/) {
       my ($tim, $nameval) =  ($1, $2);
       my ($sname, $sval) = split(" ", $nameval, 2);
+      (undef, $sval) = ReplaceEventMap($d, [$d, $sval], 0) if($attr{$d}{eventMap});
       my $ret = CallFn($sdev, "StateFn", $d, $tim, $sname, $sval);
       if($ret) {
         push @rets, $ret;
