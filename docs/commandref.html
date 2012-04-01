@@ -5209,7 +5209,8 @@ Attributes:<br>
     <i>Layout control commands</i>
     <ul>
     <li>font &lt;font&gt;<br>Sets the font. &lt;font&gt; is the name of a TrueType font (e.g.
-    <code>Arial</code>) or the full path to a TrueType font (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
+    <code>Arial</code>) or the full path to a TrueType font
+    (e.g. <code>/usr/share/fonts/truetype/arial.ttf</code>),
     whatever works on your system.</li><br>
 
     <li>rgb &lt;color&gt;<br>Sets the color. &lt;color&gt; is a 6-digit hex number, every 2 digits
@@ -5230,6 +5231,10 @@ Attributes:<br>
     access device readings and do some programming on the fly. See below for examples.</li><br>
 
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
+    <li>gif &lt;x&gt; &lt;y&gt; &lt;hostname&gt; &lt;filename&gt; <br>Renders the GIF picture
+    that is downloaded from the given host. You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;filename&gt. See below for example.</li><br>
+    </li><br>
     </ul>
 
     This is how a layout definition might look like:<p>
@@ -5240,6 +5245,7 @@ Attributes:<br>
     time 0.10 0.90<br>
     pt 24<br>
     text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "°C" }<br>
+    gif 20 530 www.google.com:80 { ReadingsVal("e.ext.Weather","icon","") }<br>
     </code>
     
   </ul>
