@@ -198,6 +198,14 @@ RSS_returnRSS($) {
 ##################
 
 sub
+RSS_xy($$$) {
+  my ($S,$x,$y)= @_;
+  if($x<1) { $x*= $S->width; }
+  if($y<1) { $y*= $S->height; }
+  return($x,$y);
+}
+
+sub
 RSS_color {
   my ($S,$rgb)= @_;
   my @d= split("", $rgb);
@@ -207,8 +215,7 @@ RSS_color {
 sub
 RSS_itemText {
   my ($S,$x,$y,$text,%params)= @_;
-  if($x<1) { $x*= $S->width; }
-  if($y<1) { $y*= $S->height; }
+  ($x,$y)= RSS_xy($S,$x,$y);
   $S->stringFT(RSS_color($S,$params{rgb}),$params{font},$params{pt},0,$x,$y,$text);
 }
 
@@ -218,6 +225,20 @@ RSS_itemTime {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   RSS_itemText($S,$x,$y,sprintf("%02d:%02d", $hour, $min),%params);
 }
+
+sub
+RSS_itemGif {
+  my ($S,$x,$y,$host,$filename,%params)= @_;
+  return if($host eq "");
+  return if($filename eq "");
+  ($x,$y)= RSS_xy($S,$x,$y);
+  my $data = GetHttpFile($host,$filename);
+  return unless(defined($data));
+  my $I= GD::Image->newFromGifData($data);
+  my ($width,$height)= $I->getBounds();
+  Log 5, "RSS placing $host$filename ($width x $height) at ($x,$y)";
+  $S->copy($I,$x,$y,0,0,$width,$height);
+}  
 
 
 ##################
@@ -232,7 +253,7 @@ RSS_evalLayout($$@) {
   $params{pt}= 12;
   $params{rgb}= "ffffff";
 
-  my ($x,$y, $text);
+  my ($x,$y,$text,$host,$filename);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -263,6 +284,10 @@ RSS_evalLayout($$@) {
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
             RSS_itemTime($S,$x,$y,%params);
+          } elsif($cmd eq "gif") {
+            ($x,$y,$host,$filename)= split("[ \t]+", $def,4);
+            my $fn= AnalyzePerlCommand(undef, $filename);
+            RSS_itemGif($S,$x,$y,$host,$fn,%params);
           } else {
             Log 1, "$name: Illegal command $cmd in layout definition.";
           }  
