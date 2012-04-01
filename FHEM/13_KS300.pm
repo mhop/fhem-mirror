@@ -235,7 +235,8 @@ KS300_Parse($$)
 
     for(my $i = 0; $i < $max; $i++) {
       $r->{$txt[$i]}{TIME} = $tm;
-      $val = "$v[$i] $sfx[$i]";
+      #$val = "$v[$i] $sfx[$i]";
+      $val = $v[$i];
       $r->{$txt[$i]}{VAL} = $val;
       $def->{CHANGED}[$n++] = "$txt[$i]: $val"
                 if(defined($repchanged{$txt[$i]}));
