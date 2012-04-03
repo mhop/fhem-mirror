@@ -321,10 +321,16 @@ RSS_returnJPEG($) {
   #
   # set the background
   #
-  my $bgdir= AttrVal($name,"bg","");
-  my $bgnr= 0; # item number
   # check if background directory is set
+  my $bgdir= AttrVal($name,"bg","");
   goto SKIPBG unless($bgdir ne "");
+
+  my $bgnr; # item number
+  if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
+      $bgnr= $defs{$name}{fhem}{bgnr};
+  } else {
+      $bgnr= 0;
+  }
   # check if at least tmin seconds have passed
   my $t0= 0;
   my $tmin= AttrVal($name,"tmin",0);
@@ -334,9 +340,7 @@ RSS_returnJPEG($) {
   my $t1= time();
   if($t1-$t0>= $tmin) {
     $defs{$name}{fhem}{t}= $t1;
-    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
-      $bgnr= $defs{$name}{fhem}{bgnr}+1;
-    }
+    $bgnr++;
   }
   # detect pictures
   goto SKIPBG unless(opendir(BGDIR, $bgdir));
