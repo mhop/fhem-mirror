@@ -93,8 +93,8 @@ TRX_SECURITY_Define($$)
   my $device_name = "TRX".$DOT.$type.$DOT.$deviceid;
 
   if ($type ne "DS10A" && $type ne "SD90" && $type ne "MS10A" && $type ne "MS14A" && $type ne "KR18" && $type ne "KD101" && $type ne "VISONIC_WINDOW" & $type ne "VISONIC_MOTION" & $type ne "VISONIC_REMOTE") {
-  	Log 1,"RFX10SEC define: wrong type: $type";
-  	return "RFX10SEC: wrong type: $type";
+  	Log 1,"TRX_SECURITY define: wrong type: $type";
+  	return "TRX_SECURITY: wrong type: $type";
   }
 
   $hash->{TRX_SECURITY_deviceid} = $deviceid;
