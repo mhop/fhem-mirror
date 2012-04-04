@@ -2,7 +2,7 @@
 #
 # OWAD.pm
 #
-# FHEM module to commmunicate with 1-Wire A/D converters
+# FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
 # Attention: This module may communicate with the OWX module,
 #            but currently not with the 1-Wire File System OWFS
@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.10 - March, 2012
+# Version 1.11 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -948,7 +948,7 @@ sub OWXAD_GetPage($$) {
 
 ########################################################################################
 #
-# OWXAD_SetPage - Setup one memory page of device
+# OWXAD_SetPage - Set one page of device
 #
 # Parameter hash = hash of device addressed
 #           page = "alarm" or "status"
@@ -1014,7 +1014,7 @@ sub OWXAD_SetPage($$) {
       $select .= sprintf "%c\xFF\xFF\xFF",$sb1;
       $select .= sprintf "%c\xFF\xFF\xFF",$sb2;
     }
-  #=============== wrong pag ewrit eattempt  ===============================
+  #=============== wrong page write attempt  ===============================
   } else {
     return "OWXAD: Wrong memory page write attempt";
   } 

@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.10 - March, 2012
+# Version 1.11 - March, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -118,7 +118,7 @@ sub OWX_Initialize ($) {
   my ($hash) = @_;
   #-- Provider
   #$hash->{Clients}    = ":OWCOUNT:OWHUB:OWLCD:OWMULTI:OWSWITCH:OWTEMP:";
-  $hash->{Clients}     = ":OWAD:OWID:OWLCD:OWTEMP:";
+  $hash->{Clients}     = ":OWAD:OWCOUNT:OWID:OWLCD:OWTEMP:";
 
   #-- Normal Devices
   $hash->{DefFn}   = "OWX_Define";
@@ -516,7 +516,10 @@ sub OWX_Discover ($) {
         my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
         #-- Family 10 = Temperature sensor, assume DS1820 as default
         if( $owx_f eq "10" ){
-          CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf");         
+          CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf");    
+           #-- Family 1D = Counter/RAM, assume DS2423 as default
+        }elsif( $owx_f eq "1D" ){
+          CommandDefine(undef,"$name OWCOUNT DS2423 $owx_rnf");            
         #-- Family 20 = A/D converter, assume DS2450 as default
         } elsif( $owx_f eq "20" ){
           CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
