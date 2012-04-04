@@ -127,6 +127,9 @@ TRX_LIGHT_Set($@)
 	return "error set name=$name  deviveid=$deviceid";
   }
 
+  if ($device_type eq "MS14A") {
+	return "No set implemented for $device_type";	
+  }
   my $device_type_num = $light_device_c2b{$device_type};
   if(!defined($device_type_num)) {
 	return "Unknown device_type, choose one of " .
