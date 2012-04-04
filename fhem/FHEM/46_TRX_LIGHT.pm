@@ -189,12 +189,19 @@ TRX_LIGHT_Define($$)
 
   $type = uc($type);
 
-  my $device_name = "TRX".$DOT.$type.$DOT.$deviceid;
-
   if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS") {
-  	Log 1,"RFX10SEC define: wrong type: $type";
-  	return "RFX10SEC: wrong type: $type";
+  	Log 1,"TRX_LIGHT define: wrong type: $type";
+  	return "TRX_LIGHT: wrong type: $type";
   }
+
+  my $my_type;
+  if ($type eq "MS14A") {
+	$my_type = "X10"; # device will be received as X10	
+  } else {
+	$my_type = $type;
+  }
+
+  my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
 
   $hash->{TRX_LIGHT_deviceid} = $deviceid;
   $hash->{TRX_LIGHT_devicelog} = $devicelog;
