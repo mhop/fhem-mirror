@@ -2,7 +2,7 @@
 #
 # OWTEMP.pm
 #
-# FHEM module to commmunicate with 1-Wire temperature sensors
+# FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
 # Attention: This module works as a replacement for the standard 21_OWTEMP.pm,
 #            therefore may communicate with the 1-Wire File System OWFS,
@@ -16,7 +16,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 1.10 - March, 2012
+# Version 1.11 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
