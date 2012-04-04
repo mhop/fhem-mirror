@@ -2969,5 +2969,18 @@ readingsUpdate($$$) {
   
   return $rv;
 }
+
+##################
+sub
+secSince2000()
+{
+  # Calculate the local time in seconds from 2000.
+  my $t = time();
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
+  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
+  $t -= 1*3600; # Timezone offset from UTC * 3600 (MEZ=1). FIXME/HARDCODED
+  $t += 3600 if $isdst;
+  return $t;
+}
   
 1;

@@ -225,7 +225,6 @@ CUL_HM_Parse($$)
     # Generate an UNKNOWN event for pairing requests, ignore everything else
     if($lcm =~ m/1A8.00/) {
       my $sname = "CUL_HM_$src";
-
       # prefer subType over model to make autocreate easier
       # model names are quite cryptic anyway
       my $model = substr($p, 2, 4);
@@ -428,6 +427,7 @@ CUL_HM_Parse($$)
       	}
         push @event, $msg if($msg);
       }
+
 #                                      0402000000000501090000
     } elsif($cmd eq "A410" && $p =~ m/^0402000000000(.)(..)(..)/) {
       my ($plist, $o1,    $v1) =
@@ -483,10 +483,20 @@ CUL_HM_Parse($$)
       push @event, "desired-temp:" .sprintf("%0.1f", hex($1)/2);
     }
 
-    CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
-      if($id eq $dst && $cmd ne "8002");
-      
 
+    if($id eq $dst) {
+      if($cmd eq "A03F") {                 # Timestamp request
+        my $s2000 = sprintf("%02X", secSince2000());
+        CUL_HM_SendCmd($shash, "++803F$id${src}0204$s2000",1,0);
+        push @event, "time-request";
+
+      } elsif($cmd ne "8002" && $cmd ne "A03F") {
+        CUL_HM_SendCmd($shash, "++8002$id${src}00",1,0)  # Send Ack
+
+      }
+    }
+
+      
   } elsif($model eq "HM-CC-VD") { ###################
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
     # status ACK to controlling HM-CC-TC
@@ -1436,6 +1446,7 @@ CUL_HM_Pair(@)
   if(($stn eq "switch" || $stn eq "threeStateSensor") &&
     $devInfo =~ m,(..)(..)(..), ) {
     my ($b1, $b2, $b3) = (hex($1)&0xf, hex($2), $3);
+
     for(my $i = $b2+1; $i<=$b1; $i++) {
       my $nSrc = sprintf("%s%02X", $src, $i);
       if(!defined($modules{CUL_HM}{defptr}{$nSrc})) {
