@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.10 - March, 2012
+# Version 1.11 - March, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -163,13 +163,17 @@ sub OWLCD_Define ($$) {
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  
-  OWXLCD_InitializeDevice($hash);
-  #-- set backlight on
-  OWXLCD_SetFunction($hash,"bklon",0); 
-  #-- erase all icons
-  OWXLCD_SetIcon($hash,0,0);
- 
+  #-- OWX interface
+  if( $interface eq "OWX" ){
+    OWXLCD_InitializeDevice($hash);
+    #-- set backlight on
+    OWXLCD_SetFunction($hash,"bklon",0); 
+    #-- erase all icons
+    OWXLCD_SetIcon($hash,0,0);
+  #-- Unknown interface
+  }else{
+    return "OWLCD: Wrong IODev type $interface";
+  }
   $hash->{STATE} = "Initialized";
   return undef; 
 }
