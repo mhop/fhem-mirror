@@ -219,7 +219,7 @@ TRX_LIGHT_Define($$)
   	my $deviceid2 = $a[5];
   	my $devicelog2 = $a[6];
 
-  	my $device_name2 = "TRX".$DOT.$type.$DOT.$deviceid2;
+  	my $device_name2 = "TRX".$DOT.$my_type.$DOT.$deviceid2;
 
   	$hash->{TRX_LIGHT_deviceid2} = $deviceid2;
   	$hash->{TRX_LIGHT_devicelog2} = $devicelog2;
