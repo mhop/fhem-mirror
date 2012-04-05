@@ -263,68 +263,18 @@ sub twilight_calc {
 }
 
 sub Twilight_getWeatherHorizon{
+   my @a_current = (25,25,25,25,20,10,10,10,10,10,10,7,7,7,5,10,10,6,6,6,10,6,6,6,6,6,6,5,5,3,3,0,0,0,0,7,0,15,15,15,9,15,8,5,12,6,8,8);
+   #condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
    my $location=shift;
-   #my $xml = GetHttpFile("www.google.com:80", "/ig/api?weather=" . $location . "&hl=en");
-   #$xml =~/\<current_conditions\>(.*)\<\/current_conditions\>/;
-   #my $current=$1;
-   #$current=~/<condition data="(.*)"\/\>\<temp_f/;
-   
    my $xml = GetHttpFile("weather.yahooapis.com:80","/forecastrss?w=".$location."&u=c");
    $xml=~/code="(.*)"(\ *)temp/;
    my $current=$1;
-   switch($current){
-      case 0				{return 25;}
-	  case 1				{return 25;}
-	  case 2				{return 25;}
-	  case 3				{return 25;}
-	  case 4				{return 20;}
-	  case 5				{return 10;}
-	  case 6				{return 10;}
-	  case 7				{return 10;}
-	  case 8				{return 10;}
-	  case 9				{return 10;}
-	  case 10				{return 10;}
-	  case 11				{return 7;}
-	  case 12				{return 7;}
-	  case 13				{return 7;}
-	  case 14				{return 5;}
-	  case 15				{return 10;}
-	  case 17				{return 6;}
-	  case 18				{return 6;}
-	  case 19				{return 6;}
-	  case 20				{return 10;}
-	  case 21				{return 6;}
-	  case 22				{return 6;}
-	  case 23				{return 6;}
-	  case 24				{return 6;}
-	  case 25				{return 6;}
-	  case 26				{return 6;}
-	  case 27				{return 5;}
-	  case 28				{return 5;}
-	  case 29				{return 3;}
-	  case 30				{return 3;}
-	  case 31				{return 0;}
-	  case 32				{return 0;}
-	  case 33				{return 0;}
-	  case 34				{return 0;}
-	  case 35				{return 7;}
-	  case 36				{return 0;}
-	  case 37				{return 15;}
-	  case 38				{return 15;}
-	  case 39				{return 15;}
-	  case 40				{return 9;}
-	  case 41				{return 15;}
-	  case 42				{return 8;}
-	  case 43				{return 5;}
-	  case 44				{return 12;}
-	  case 45				{return 6;}
-	  case 46				{return 8;}
-	  case 47				{return 8;}
-	  else					{return 1;}
-	  }
-   if($current eq "Light rain"){return 2;}else{return 15;}
+   if(($current>=0) && ($current <=47)) {
+     return $a_current[$current];
+   } else {
+     return 1;
+   }
 }
-
 
 1;
 
