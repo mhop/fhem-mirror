@@ -158,7 +158,7 @@ use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 
 use vars qw($reread_active);
 
-my $AttrList = "room comment alias";
+my $AttrList = "room comment alias eventMap";
 
 my $server;			# Server socket
 my %comments;			# Comments from the include files
@@ -195,7 +195,6 @@ $modules{Global}{AttrList} =
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
         "autoload_undefined_devices dupTimeout latitude longitude  backupdir";
 $modules{Global}{AttrFn} = "GlobalAttr";
-my $commonAttr = "eventMap";
 
 
 
@@ -1615,7 +1614,6 @@ getAllAttr($)
         if($modules{$defs{$d}{TYPE}}{AttrList});
   $list .= " " . $attr{global}{userattr}
         if($attr{global}{userattr});
-  $list .= " " . $commonAttr;
   return $list;
 }
 
@@ -2582,9 +2580,9 @@ addToAttrList($)
   my @al = split(" ", $ua);
   my %hash;
   foreach my $a (@al) {
-    $hash{$a} = 1;
+    $hash{$a} = 1 if(" $AttrList " !~ m/ $a /); # Cleanse old ones
   }
-  $hash{$arg} = 1;
+  $hash{$arg} = 1 if(" $AttrList " !~ m/ $arg /);
   $attr{global}{userattr} = join(" ", sort keys %hash);
 }
 
