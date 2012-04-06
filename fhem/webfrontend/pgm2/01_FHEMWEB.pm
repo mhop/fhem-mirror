@@ -55,7 +55,8 @@ my $try_zlib = 1;
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
-my %FW_webArgs;    # all arguments specifie in the GET
+my @FW_httpheader; # HTTP header, line by line
+my %FW_webArgs;    # all arguments specified in the GET
 my $FW_cmdret;     # Returned data by the fhem call
 my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
@@ -214,7 +215,8 @@ FW_Read($)
     $selectlist{$nhash{NAME}} = \%nhash;
 
     if($hash->{SSL}) {
-      # Certs directory must be in the modpath, i.e. at the same level as the FHEM directory
+      # Certs directory must be in the modpath, i.e. at the same level as the
+      # FHEM directory
       my $mp = AttrVal("global", "modpath", ".");
       my $ret = IO::Socket::SSL->start_SSL($nhash{CD}, {
         SSL_server    => 1, 
@@ -265,13 +267,13 @@ FW_Read($)
   return if($hash->{BUF} !~ m/\n\n$/ && $hash->{BUF} !~ m/\r\n\r\n$/);
 
   #Log 0, "Got: >$hash->{BUF}<";
-  my @lines = split("[\r\n]", $hash->{BUF});
+  @FW_httpheader = split("[\r\n]", $hash->{BUF});
 
   #############################
   # BASIC HTTP AUTH
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
   if($basicAuth) {
-    my @auth = grep /^Authorization: Basic $basicAuth/, @lines;
+    my @auth = grep /^Authorization: Basic $basicAuth/, @FW_httpheader;
     if(!@auth) {
       my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
       print $c "HTTP/1.1 401 Authorization Required\r\n",
@@ -282,8 +284,8 @@ FW_Read($)
   }
   #############################
   
-  my @enc = grep /Accept-Encoding/, @lines;
-  my ($mode, $arg, $method) = split(" ", $lines[0]);
+  my @enc = grep /Accept-Encoding/, @FW_httpheader;
+  my ($mode, $arg, $method) = split(" ", $FW_httpheader[0]);
   $hash->{BUF} = "";
 
   Log $ll, "HTTP $name GET $arg";
@@ -304,9 +306,9 @@ FW_Read($)
   }
 
   my $compressed = "";
-  if(($FW_RETTYPE=~m/text/i ||
-      $FW_RETTYPE=~m/svg/i ||
-      $FW_RETTYPE=~m/script/i) &&
+  if(($FW_RETTYPE =~ m/text/i ||
+      $FW_RETTYPE =~ m/svg/i ||
+      $FW_RETTYPE =~ m/script/i) &&
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
      $try_zlib &&
      AttrVal($FW_wname, "fwcompress", 1)) {
@@ -342,28 +344,21 @@ FW_AnswerCall($)
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
 
   # Lets go:
-  if($arg =~ m,^${FW_ME}/(example.*|.*html)$,) {
-    my $f = $1;
-    $f =~ s,/,,g;    # little bit of security
-    open(FH, "$FW_dir/$f") || return 0;
+  if($arg =~ m,^${FW_ME}/(.*)\.(css|html|js)$,) {
+    my ($file, $ext) = ($1, $2);
+    $file =~ s,/,,g;    # little bit of security
+    open(FH, "$FW_dir/$file.$ext") || return 0;
     FW_pO join("", <FH>);
     close(FH);
-    $FW_RETTYPE = "text/plain; charset=$FW_encoding" if($f !~ m/\.*html$/);
-    return 1;
-
-  } elsif($arg =~ m,^$FW_ME/(.*).css,) {
-    my $cssName = $1;
-    return 0 if(!open(FH, "$FW_dir/$cssName.css"));
-    FW_pO join("", <FH>);
-    close(FH);
-    $FW_RETTYPE = "text/css";
+    $FW_RETTYPE = "text/css"               if($ext eq "css");
+    $FW_RETTYPE = "application/javascript" if($ext eq "js");
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$, ||
           $arg =~ m,^$FW_ME/(.*.png)$,i) {
     my $img = $1;
     my $cachable = 1;
-    if(!open(FH, "$FW_dir/$img")) {
+    if(!open(FH, "$FW_dir/$img")) { # Hack: convert device state to icon name
       FW_ReadIcons();
       $img = FW_dev2image($img);
       $cachable = 0;
@@ -376,16 +371,13 @@ FW_AnswerCall($)
     $FW_RETTYPE = "image/$f_ext[-1]";
     return $cachable;
 
- } elsif($arg =~ m,^$FW_ME/(.*).js,) { #kpb java include
-    open(FH, "$FW_dir/$1.js") || return 0;
-    FW_pO join("", <FH>);
-    close(FH);
-    $FW_RETTYPE = "application/javascript";
-    return 1;
-
   } elsif($arg !~ m/^$FW_ME(.*)/) {
-    Log(5, "Unknown document $arg requested");
-    return 0;
+    my $c = $me->{CD};
+    Log 2, "$FW_wname: redirecting $arg to $FW_ME";
+    print $c "HTTP/1.1 302 Found\r\n",
+             "Content-Length: 0\r\n",
+             "Location: $FW_ME\r\n\r\n";
+    return -1;
 
   }
 
@@ -826,10 +818,10 @@ FW_roomOverview($)
      "Howto",         "$FW_ME/HOWTO.html",
      "Wiki",          "http://fhemwiki.de",
      "Details",       "$FW_ME/commandref.html",
-     "Definition...", "$FW_ME/cmd=style%20addDef",
-     "Edit files",    "$FW_ME/cmd=style%20list",
-     "Select style",  "$FW_ME/cmd=style%20select",
-     "Event monitor", "$FW_ME/cmd=style%20eventMonitor",
+     "Definition...", "$FW_ME?cmd=style%20addDef",
+     "Edit files",    "$FW_ME?cmd=style%20list",
+     "Select style",  "$FW_ME?cmd=style%20select",
+     "Event monitor", "$FW_ME?cmd=style%20eventMonitor",
      "",           "");
   my $lastname = ","; # Avoid double "".
   for(my $idx = 0; $idx < @list; $idx+= 2) {
