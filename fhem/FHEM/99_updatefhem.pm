@@ -7,6 +7,7 @@ use IO::Socket;
 
 sub CommandUpdatefhem($$);
 sub CommandCULflash($$);
+sub GetHttpFile($$@);
 
 my $server = "fhem.de:80";
 my $sdir   = "/fhemupdate";
@@ -89,7 +90,7 @@ CommandUpdatefhem($$)
     if($f eq "fhem.pl") {
       $ret .= "updated fhem.pl, 'shutdown restart' is required\n";
       $newfhem = 1;
-      $localfile = $0;
+      $localfile = $0 if(! -d "FHEM.X");
       $remfile = "$f.txt";
     }
 
@@ -105,7 +106,8 @@ CommandUpdatefhem($$)
                 "filetimes.txt entry ($l2)" if($l1 ne $l2);
     open(FH,">$localfile") || return "Can't write $localfile";
     print FH $content;
-    close(FH)
+    close(FH);
+    Log 1, "updated $remfile";
   }
 
   return "Can't write $moddir/$ftime" if(!open(FH, ">$moddir/$ftime"));
@@ -127,8 +129,7 @@ sub
 CommandCULflash($$)
 {
   my ($cl, $param) = @_;
-  my $moddir = "$attr{global}{modpath}/FHEM";
-  #my $moddir = "XXX";
+  my $moddir = (-d "FHEM.X" ? "FHEM.X" : "$attr{global}{modpath}/FHEM");
 
   my %ctypes = (
     CUL_V2     => "at90usb162",
@@ -187,9 +188,10 @@ CommandCULflash($$)
 }
 
 sub
-GetHttpFile($$)
+GetHttpFile($$@)
 {
-  my ($host, $filename) = @_;
+  my ($host, $filename, $timeout) = @_;
+  $timeout = 2.0 if(!defined($timeout));
 
   $filename =~ s/%/%25/g;
   my $conn = IO::Socket::INET->new(PeerAddr => $host);
@@ -200,14 +202,26 @@ GetHttpFile($$)
   $host =~ s/:.*//;
   my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
   syswrite $conn, $req;
+  shutdown $conn, 1; # stopped writing data
   my ($buf, $ret);
 
-  # Note: should add a timeout
-  while(sysread($conn,$buf,65536) > 0) {
+  $conn->timeout($timeout);
+  for(;;) {
+    my ($rout, $rin) = ('', '');
+    vec($rin, $conn->fileno(), 1) = 1;
+    my $nfound = select($rout=$rin, undef, undef, $timeout);
+    if($nfound <= 0) {
+      Log 1, "GetHttpFile: Select timeout/error: $!";
+      return undef;
+    }
+
+    my $len = sysread($conn,$buf,65536);
+    last if(!defined($len) || $len <= 0);
     $ret .= $buf;
   }
+
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
-  Log 1, "Got http://$host$filename, length: ".length($ret);
+  Log 4, "Got http://$host$filename, length: ".length($ret);
   return $ret;
 }
 
