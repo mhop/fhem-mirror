@@ -355,10 +355,12 @@ FW_AnswerCall($)
     return 1;
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$, ||
-          $arg =~ m,^$FW_ME/(.*.png)$,i) {
-    my $img = $1;
-    my $cachable = 1;
+          $arg =~ m,^$FW_ME/(.*.png)$,i  ||
+          $arg =~ m,^/(favicon.ico)$,) {
+    my ($img, $cachable) = ($1, 1);
+    $img =~ s,/,,g;
     if(!open(FH, "$FW_dir/$img")) { # Hack: convert device state to icon name
+      return 0 if($arg eq "/favicon.ico");
       FW_ReadIcons();
       $img = FW_dev2image($img);
       $cachable = 0;
