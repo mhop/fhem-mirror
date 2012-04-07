@@ -311,6 +311,8 @@ RSS_returnJPEG($) {
     $defs{$name}{fhem}{counter}= 1;
   }
 
+  # true color
+  GD::Image->trueColor(1);
   
   #
   # create the image
@@ -353,7 +355,16 @@ RSS_returnJPEG($) {
     my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
     my $bg= newFromJpeg GD::Image($bgfile);
     my ($bgwidth,$bgheight)= $bg->getBounds();
-    $S->copyResized($bg,0,0,0,0,$width,$height,$bgwidth,$bgheight);
+    my ($w,$h);
+    my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
+    if($u>$v) {
+        $w= $width;
+        $h= $bgheight/$u;
+    } else {
+        $h= $height;
+        $w= $bgwidth/$v;
+    }
+    $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
   }
   SKIPBG:
 
