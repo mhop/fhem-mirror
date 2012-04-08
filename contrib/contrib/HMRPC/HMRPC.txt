@@ -1,0 +1,150 @@
+HMRPC - xmlrpc-basierte Homematic-Integration fuer fhem
+=======================================================
+Von Oliver Wagner <owagner@vapor.com>
+
+V0.5
+
+Uebersicht
+----------
+HMRPC ist ein Modul zur Integration des Homematic-Systems der Firma EQ-3
+mit fhem. Es verfolgt im Gegensatz zu den bereits vorhandenen CUL_HM/HMLAN-
+Modulen einen anderen Ansatz: Statt direkt mit der Funk-Hardware zu
+kommunizieren, verwendet es die offizielle bereitgestellte xmlrpc-basierte
+API der EQ-3-Software (siehe [1]). Daraus ergeben sich Vorteile und
+Nachteile: So sind implizit alle derzeitigen und auch zukuenftigen Geraete
+vollumfaenglich unterstuetzt, auch die RS485 Wired-Module. 
+
+Der wesentliche Nachteil, oder zumindestens eine Vorraussetzung, ist, dass
+man eine Instanz der xmlrpc-Server benoetigt. Dazu gibt es aktuell drei
+Moeglichkeiten:
+
+1) auf der CCU1 selbst laufen "rfd" fuer die Funkkommunikation und
+"hs485d" fuer die Wired-Kommunikaiton.
+
+Eine Uebersicht der Softwarearchitektur der CCU1 findet sich unter [2]
+
+2) als Teil der Verwaltungssoftware fuer den HM-LAN-Aadapter (siehe [3]) gibt
+es einen xmlrpc-Dienst fuer Funkkommunikation als Windows-Service. Dieser
+entspricht dem "rfd" auf der CCU1.
+
+3) Nutzung des "rfd" aus einem CCU1-Firmware-Image mittels "qemu-arm"
+
+Es ist aber nicht auszuschliessen, das EQ-3 in Zukunft z.B. einen rfd fuer
+Linux/x86 veroeffentlicht.
+
+
+Geschichte und Status
+---------------------
+Diese Module sind aus der Middleware "HMCompanion" [4] entstanden, die ich mir
+fuer die HM-Integration in meinen Haussteuerungswildwuchs geschrieben habe.
+
+HMRPC hat aktuell eher experimentellen Charakter. Ohne genaue Kenntnisse
+von fhem, perl und HM-Internas haben die Module nur eingeschraenkten Nutzwert,
+die Veroeffentlichung dient erstmal nur dazu, fruehes Feedback zur
+Implementierung zu bekommen.
+
+Das ist im iebrigen mein erstes nicht komplett triviales Stueck perl-code -- 
+ueber Hinweise diesbezueglich wuerde ich mich ebenso freuen wie ueber allgemeines
+Feedback zu HMRPC.
+
+
+Benutzung
+---------
+Es gibt zwei Module:
+
+00_HMRPC.pm ist der Provider fuer die Kommunikation mit eineml
+xmlrpc-Service
+
+01_HMDEV.pm ist jeweils die Abstraktion eines einzelnen Devices
+
+Beispielkonfiguration fuer fhem:
+
+# Wired-Schnittstelle auf einer CCU1 mit IP 192.168.5.2)
+define hmw HMRPC 192.168.5.2 2000
+# Ein Kanal eines Wired-Aktors
+define light_buero_olli HMDEV GEQ0009019:3
+
+Nutzung dann z.B. mit 
+
+set light_buero_olli STATE false
+
+Ein putParamset (Konfigurationsupdate) wird dann durch zusätzliche Angabe
+der Paramset-ID generiert:
+
+set light_buero_olli MASTER LOGGING 0
+
+Die Attribute eines Geraetes entsprechen den in dem Dokument unter [1]
+"HomeMatic-Script Dokumentation: Teil 4 - Datenpunkte" beschriebenen.
+Die Inhalte der Paramsets sind aktuell nicht dokumentiert, man muss diese
+anhand des xmlrpc-Requests getParamsetDescription oder durch Browsen der
+XML-Beschreibungen im /firmware-Verzeichnis der CCU-Software
+ermitteln.
+
+Über die set-Methode des HMRPC-Devices lassen sich auch andere weitere
+Operationen durchführen:
+
+set <hmlrpc-device> req <xmlrpc-request> <parameter>
+
+generiert einen direkten XMLRPC-Request und gibt das Ergebnis in Textform
+zurück. Das dient im wesentlichen Diagnose/Entwicklungszwecken. Beispiel:
+
+set hmw req getDeviceDescription IEQ0208603
+
+Der get-Aufruf ist ebenfalls implementiert und fuehrt einen synchronen
+"getValue()"-Aufruf durch:
+
+get light_buero_olli STATE
+
+Design
+------
+Ich habe ueberlegt, ob HMRPC als Provider für CUL_HM dienen koennte, habe aber
+keine praktikable Loesung dafür gefunden -- HMDEV ist aktuell im Vergleich zu
+CUL_HM sehr dumm und dient mehr oder weniger nur als Cache für Adresse und
+Readings.
+
+HMRPC meldet sich beim jeweiligen Service per "init" an und erhält dann per
+xmlrpc-Callback Mitteilungen über Zustandsaenderungen. Wird der Service neu
+gestartet (CCU Reboot o.ae.), ist diese Anmeldung hinfaellig. Es gibt aktuell
+keine gute Methode, dies festzustelle -- als Workaround meldet sich HMRPC
+15 Minuten nach dem letzten empfangenen Callback neu an. Je nach Art der
+verwendeten Aktoren in einer Installation kann diese Zeit sehr kurz sein
+und daher unnoetige re-inits verursachen. Diese scheinen aber grundsaetzlich kein
+Problem auf der Service-Seite darzustellen.
+
+
+Aenderungen
+-----------
+V0.3 - get-Methoden implementiert, als Aufruf von XML-RPC getValue()
+     - bei Boolean-Werten wurde bei false bei jedem event-Empfang 
+       faelschlicherweise eine Notification ausgeloest
+
+V0.4 - HMRPC: Fehlermeldung statt Abbruch, wenn eine Testverbindung zum
+       entsprechenden Daemon nicht moeglich ist
+       HMRPC: Beim Abmelden wird nun korrekterweise kein Callback-Parameter
+       uebergeben
+       HMRPC: Das Default-Timeout fuer eingehende Requests ist nun auf 20s
+       gesetzt, da die 3s bei sehr grossen eingehenden Requests offenbar
+       zu kurz war und so z.B. der initiale newDevices-Aufruf nach dem init
+       abgebrochen wurde, was zu einem Absturz des rfd fuehrt
+       HMRPC: Ist ein Channel unbekannt, wird nun der Event an das entsprechende
+       Device delegiert, fuer Channel != 0 dann mit dem Suffix _ChannelID
+       (z.B. STATE_1)
+       HMRPC: PRESS_ loest nun wirklich jedesmal ein changed aus.
+       import_webui: Pattern korrigiert, so dass nun auch die virtuellen
+       Taster erkannt werden
+       
+V0.5 - HMDEV: Es wird nun STATE sinnvoll gesetzt, als Zusammenfasung aller
+       READINGS
+       HMRPC: Der newDevices-Aufruf wird nun ausgewertet und die uebermittelten
+       Device/Channel-Informationen werden an die HMDEV-Objekte gehanden, als
+       "hmdevinfo"; gleichzeitig wird "hmdevtype" auf den HM-Devicetyp
+       
+
+Anhang
+------
+
+[1] http://www.homematic.com/index.php?id=156
+[2] http://www.homematic-wiki.info/mw/index.php/HomeMatic_Software
+[3] http://www.homematic.com/index.php?id=644
+[4] http://www.fhz-forum.de/viewtopic.php?f=26&t=4639
+

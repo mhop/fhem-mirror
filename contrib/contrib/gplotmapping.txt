@@ -1,0 +1,16 @@
+
+   fhem <= 5.1                  fhem >= 5.2
+=====================================================
+   ks300_3.gplot            ->  dayAvgTemp5rain11.gplot 
+   ks300_2.gplot            ->  hum6wind8.gplot     
+   ks300_4.gplot            ->  monthAvgTemp5Rain11.gplot
+   em.gplot                 ->  power4.gplot        
+   cul_em.gplot             ->  power8.gplot        
+   cul_emem.gplot           ->  power8top10.gplot   
+   oregon_rain.gplot        ->  rain4.gplot         
+   oregon_temp_press.gplot  ->  rain4press4.gplot   
+   hms_t.gplot              ->  temp4.gplot         
+   hms.gplot                ->  temp4hum6.gplot     
+   ks300.gplot              ->  temp4rain10.gplot   
+   oregon_wind.gplot        ->  wind4windDir4.gplot 
+
