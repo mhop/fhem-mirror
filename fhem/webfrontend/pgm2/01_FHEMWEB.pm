@@ -2060,7 +2060,7 @@ FW_devState($$)
       $txt = "<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf'\">$txt</a>";
 
     } else {
-      $txt = "<a href=\"$FW_ME$FW_subdir?$link\">$txt</a>";
+      $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf\">$txt</a>";
 
     }
   }
