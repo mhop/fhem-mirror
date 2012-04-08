@@ -8663,8 +8663,9 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
     delstruct commands. Each attached device will get the attribute
     &lt;struct_type&gt;=&lt;name&gt;<br> when it is added to the list, and the
     attribute will be deleted if the device is deleted from the structure.
-    The structure devices can also be added to a structure, e.g. you can have
-    a building consisting of levels which consists of rooms of devices.
+    Exception to this are the attributes room and alias.  The structure devices
+    can also be added to a structure, e.g. you can have a building consisting
+    of levels which consists of rooms of devices.
     <br>
     Example:<br>
     <ul>
@@ -9078,6 +9079,11 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
   <b>Attributes</b>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a name="setList">setList</a><br>
+        Space separated list of commands, which will be returned upon "set name ?",
+        so the FHEMWEB frontend can construct a dropdown and offer on/off
+        switches. Example: attr dummyName setList on off
+        </li>
   </ul>
   <br>
 
