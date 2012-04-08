@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# This script gets the full device list from a running
+# CCU1 and creates a prototype config file fragment
+# for use with fhem and HMRPC.
+#
+# Note that this script assumes that the wired HMRPC
+# device is called "hmw" and the RF HMRPC device
+# is called "hmrf"
+#
+if [ -z "$1" ]; then
+	echo "Usage: import_from_webui.bsh <ccu hostname>"
+	exit 1
+fi
+# We need a ISO-8859-1 locale now
+export LANG=de_DE.ISO-8859-1
+wget http://$1:8181/tclrega.exe --post-data='
+string id; 
+string chid;
+foreach(id, dom.GetObject(ID_DEVICES).EnumUsedIDs()) 
+{ 
+ var d=dom.GetObject(id);
+ foreach(chid,d.Channels().EnumUsedIDs())
+ {
+  var ch=dom.GetObject(chid);
+  var i=dom.GetObject(ch.Interface());
+  string rspec;
+  string rid;
+  foreach(rid,ch.ChnRoom())
+  {
+   var r=dom.GetObject(rid);
+   rspec = rspec # r.Name() # "%";
+  }
+  WriteLine(ch.Address() # "\t" # i.Name() # "\t" # ch.Name() # "\t" # rspec);
+ }
+ var i=dom.GetObject(d.Interface());
+ WriteLine(d.Address()+"\t"+i.Name()+"\t"+d.Name()); 
+}' -q -O- | dos2unix | gawk --re-interval -- '
+BEGIN {
+	FS="\t"
+}
+
+#
+# Convert a WebUI name into something which fhem accepts in a config file
+#
+function sanitizeName(n)
+{
+	# Blanks
+	gsub(" ","_",n)
+	# Umlauts
+	gsub("\xe4","ae",n);
+	gsub("\xf6","oe",n);
+	gsub("\xfc","ue",n);
+	gsub("\xdf","ss",n);
+	gsub("\xc4","Ae",n);
+	gsub("\xd6","Oe",n);
+	gsub("\xdc","Ue",n);
+	# : (for unnamed devices)
+	gsub(":|/|-","_",n);
+	gsub("\\(|\\)","",n);
+	return tolower(n)
+}
+
+function roomName(n)
+{
+	gsub(" ","",n)
+	gsub("%$","",n)
+	gsub("%",",",n)
+	return n;
+}
+
+/^BidCoS-|^[A-Z0-9]{10}(:[0-9]+)?/ {
+	name=sanitizeName($3)
+	while(usednames[name])
+	{
+		# Ok name is in use. Are we perhaps the master device?
+		if(!index($1,":"))
+		{
+			name=name "_dev"
+			continue;
+		}
+		# Are suffixed by a name? Inc
+		if(match(name,"(.*)([0-9]+)",pa))
+		{
+			name=pa[1] (pa[2]+1)					
+			continue;
+		}
+		# Just append a "1" (might get inced in next iteration)
+		name = name "1"
+	}
+	usednames[name]=1
+	print "define " name " HMDEV " $1
+	print "attr " name " IODev " (index($2,"BidCos-RF")?"hmrf":"hmw")
+	if($4)
+	{
+		print "attr " name " room " roomName($4)
+	}
+	print ""
+}
+'

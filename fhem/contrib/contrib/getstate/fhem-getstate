@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# $Id: fhem-getstate,v 1.2 2009-01-12 09:21:53 rudolfkoenig Exp $
+#
+#  Copyright notice
+#
+#  (c) 2008 Copyright: Martin Fischer (m_fischer at gmx dot de)
+#  All rights reserved
+#
+#  This script free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+################################################################
+
+NCAT=`which netcat`
+
+HOST="localhost"
+PORT="7072"
+VERS="$Revision: 1.2 $"
+
+# Functions
+function version {
+  echo "fhem-getstate, Version$VERS
+Copyright (C) 2008 Martin Fischer <m_fischer@gmx.de>
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+
+Written by Martin Fischer"
+  exit $1
+}
+
+function longhelp {
+ echo "\
+Usage: fhem-getstate [OPTION] DEVICE
+
+Connect to a FHEM-Server running on 'localhost 7072' and print the status for
+the given DEVICE as a space seperated list for use in e.g. Cacti.
+
+Mandatory arguments:
+  -d DEVICE   print the status for DEVICE as defined in FHEM
+
+Optional:
+  -s SERVER   Resolvable Hostname or IP address of FHEM (default: localhost)
+  -p PORT     Listening Port of FHEM (default: 7072)
+  -q          quiet mode
+  -h          show this help
+  -v          show version
+
+Reports bugs to <m_fischer@gmx.de>.
+"
+  exit $1
+}
+
+function usage {
+  echo >&2 "Usage: fhem-getstate [-s <server>] [-p <port>] -d <devspec> [-h] [-v]" && exit $1;
+}
+
+# check for arguments
+if (( $# <= 0 )); then
+  usage 1;
+fi
+
+# get options
+while getopts "s:p:d:hv" option; do
+  case $option in
+    d) DEV=$OPTARG;;
+    h) longhelp 0;;
+    p) PORT=$OPTARG;;
+    s) HOST="$OPTARG";;
+    v) version 0;;
+    ?) usage 1;;
+  esac
+done
+
+(echo "getstate ${DEV}" | $NCAT -w1 ${HOST} ${PORT})
+
+exit 0;
+
