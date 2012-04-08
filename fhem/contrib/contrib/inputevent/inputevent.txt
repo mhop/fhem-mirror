@@ -1,0 +1,21 @@
+InputEvent - Linux InputEvent handling für fhem
+===============================================
+Von Dirk Hoffmann <hoffmann@vmd-jena.de>
+
+V0.1
+
+InputEvent ist ein Modul für FHEM um auf Linux Input Events zu reagieren.
+Damit ist es möglich z.B. auf Tastatur Ereignisse zu reagieren.
+
+Ich benutze InpuEvent um FHEM mit einer Infrarotfernbedienung an einer DVB-S Karte
+zu koppeln. Damit lassen sich über FHEM z.B. Befehle an alle unterstützen Geräte
+Senden.
+ 
+in der Datei sample.conf ist eine Beispielkonfiguration enthalten.
+
+History
+-----------
+V0.1 - Initiale Version
+
+V0.2 - Events werden jetzt nur noch einmal innerhalb einer bestimmten Zeit ausgeführt
+       (Siehe sample.conf)
