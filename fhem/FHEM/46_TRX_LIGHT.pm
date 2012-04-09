@@ -8,6 +8,10 @@
 # "WAVEMAN" -> Waveman
 # "EMW200" -> Chacon EMW200
 # "IMPULS" -> IMPULS
+# "AC" -> KlikAanKlikUit, NEXA, CHACON, HomeEasy UK
+# "HOMEEASY" -> HomeEasy EU
+# "ANSLUT" -> ANSLUT
+# "KOPPLA" -> Ikea Koppla
 #
 #		- ms14a: motion sensor
 #		- x10: generic X10 sensor
@@ -40,33 +44,39 @@ my $TRX_LIGHT_X10_type_default = "x10";
 my $DOT = q{_};
 
 my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading", 
-	0x00 => [ "X10", "light" ],
-	0x01 => [ "ARC", "light" ],
-	0x02 => [ "AB400D", "light" ],
-	0x03 => [ "WAVEMAN", "light" ],
-	0x04 => [ "EMW200", "light"],
-	0x05 => [ "IMPULS", "light"],
+	# 0x10: Lighting1
+	0x1000 => [ "X10", "light" ],
+	0x1001 => [ "ARC", "light" ],
+	0x1002 => [ "AB400D", "light" ],
+	0x1003 => [ "WAVEMAN", "light" ],
+	0x1004 => [ "EMW200", "light"],
+	0x1005 => [ "IMPULS", "light"],
+	# 0x11: Lighting2
+	0x1100 => [ "AC", "light"],
+	0x1101 => [ "HOMEEASY", "light"],
+	0x1102 => [ "ANSLUT", "light"],
+	# 0x12: Lighting3
+	0x1200 => [ "KOPPLA", "light"], # IKEA Koppla
 );
 
 my %light_device_commands = (	# HEXSTRING => commands
-	0x00 => [ "off", "on", "dim", "bright", "all_off", "all_on", ""],
-	0x01 => [ "off", "on", "", "", "all_off", "all_on", "chime"],
-	0x02 => [ "off", "on", "", "", "", "", ""],
-	0x03 => [ "off", "on", "", "", "", "", ""],
-	0x04 => [ "off", "on", "", "", "all_off", "all_on", ""],
-	0x05 => [ "off", "on", "", "", "", "", ""],
+	# 0x10: Lighting1
+	0x1000 => [ "off", "on", "dim", "bright", "all_off", "all_on", ""], # X10
+	0x1001 => [ "off", "on", "", "", "all_off", "all_on", "chime"], # ARC
+	0x1002 => [ "off", "on", "", "", "", "", ""], # AB400D
+	0x1003 => [ "off", "on", "", "", "", "", ""], # WAVEMAN
+	0x1004 => [ "off", "on", "", "", "all_off", "all_on", ""], # EMW200
+	0x1005 => [ "off", "on", "", "", "", "", ""], # IMPULS
+	# 0x11: Lighting2
+	0x1100 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # AC
+	0x1101 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # HOMEEASY
+	0x1102 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # ANSLUT
+	# 0x12: Lighting3
+	0x1200 => [ "bright", "", "", "", "", "", "", "dim", "", "", "", "", "", "", "", "", "",
+		    "on", "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "off", "", "program", "", "", "", "",], # Koppla
 );
 
 my %light_device_c2b;        # DEVICE_TYPE->hash (reverse of light_device_codes)
-
-# Get the binary value for a command
-# return -1 if command not valid dor dev_type
-sub TRX_LIGHT_cmd_to_binary {
-  my ($dev_type, $command) = @_;
-
-  return -1;
-}
-
 
 sub
 TRX_LIGHT_Initialize($)
@@ -107,34 +117,27 @@ TRX_LIGHT_Set($@)
   my $ret = undef;
   my $na = int(@a);
 
-  return "no set value specified" if($na < 2 || $na > 3);
+  return "no set value specified" if($na < 2 || $na > 4);
 
   # look for device_type
 
   my $name = $a[0];
   my $command = $a[1];
+  my $level = $a[2];
 
   my $device_type = $hash->{TRX_LIGHT_type};
   my $deviceid = $hash->{TRX_LIGHT_deviceid};
 
-  my $house;
-  my $unit;
-  if ($deviceid =~ /(.)(.*)/ ) {
-	$house = ord("$1");
-	$unit = $2;
-  } else {
-	Log 4,"TRX_LIGHT_Set wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
-	return "error set name=$name  deviveid=$deviceid";
-  }
-
   if ($device_type eq "MS14A") {
 	return "No set implemented for $device_type";	
   }
+
   my $device_type_num = $light_device_c2b{$device_type};
   if(!defined($device_type_num)) {
 	return "Unknown device_type, choose one of " .
                                 join(" ", sort keys %light_device_c2b);
   }
+  my $protocol_type = $device_type_num >> 8; # high bytes
 
   # Now check if the command is valid and retrieve the command id:
   my $rec = $light_device_commands{$device_type_num};
@@ -147,14 +150,49 @@ TRX_LIGHT_Set($@)
 	return $error;
   }
 
+  if ($na == 4 && $command ne "level") {
+	my $error = "Error: level not possible for command $command";
+  }
 
   my $seqnr = 0;
   my $cmnd = $i;
 
-  my $hex_prefix = sprintf "0710";
-  my $hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num, $seqnr, $house, $unit, $cmnd; 
-  Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command" if ($TRX_LIGHT_debug == 1);
-  Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
+  my $hex_prefix;
+  my $hex_command;
+  if ($protocol_type == 0x10) {
+  	my $house;
+  	my $unit;
+  	if ($deviceid =~ /(.)(.*)/ ) {
+		$house = ord("$1");
+		$unit = $2;
+  	} else {
+		Log 4,"TRX_LIGHT_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviveid=$deviceid";
+  	}
+
+	# lightning1
+  	$hex_prefix = sprintf "0710";
+  	$hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num, $seqnr, $house, $unit, $cmnd; 
+  	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
+  } elsif ($protocol_type == 0x11) {
+	# lightning2
+  	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
+		;
+  	} else {
+		Log 4,"TRX_LIGHT_Set lightning2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviveid=$deviceid";
+  	}
+  	$hex_prefix = sprintf "0711";
+  	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num, $seqnr, $deviceid, $cmnd, $level; 
+	if ($command eq "level") {
+		$command .= sprintf " %d", $level;
+	} 
+  	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
+  } else {
+	return "No set implemented for $device_type . Unknown protocol type";	
+  }
 
   IOWrite($hash, $hex_prefix, $hex_command);
 
@@ -192,7 +230,7 @@ TRX_LIGHT_Define($$)
 
   $type = uc($type);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA") {
   	Log 1,"TRX_LIGHT define: wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
@@ -246,76 +284,90 @@ TRX_LIGHT_Undef($$)
 sub TRX_LIGHT_parse_X10 {
   my $bytes = shift;
 
-  my $error;
+  my $error = "";
 
 
   #my $device;
 
+  my $type = $bytes->[0];
   my $subtype = $bytes->[1];
   my $dev_type;
   my $dev_reading;
   my $rest;
-  if (exists $light_device_codes{$subtype}) {
-    my $rec = $light_device_codes{$subtype};
+
+  my $type_subtype = ($type << 8) + $subtype;
+
+  if (exists $light_device_codes{$type_subtype}) {
+    my $rec = $light_device_codes{$type_subtype};
     ($dev_type, $dev_reading) = @$rec;
   } else {
- 	$error = sprintf "TRX_LIGHT: error undefined subtype=%02x", $subtype;
+ 	$error = sprintf "TRX_LIGHT: error undefined type=%02x, subtype=%02x", $type, $subtype;
 	Log 1, $error;
   	return $error;
   }
 
-  my $dev_first = "?";
 
-  my %x10_housecode =
-    (
-	0x41 => "A",
-	0x42 => "B",
-	0x43 => "C",
-	0x44 => "D",
-	0x45 => "E",
-	0x46 => "F",
-	0x47 => "G",
-	0x48 => "H",
-	0x49 => "I",
-	0x4A => "J",
-	0x4B => "K",
-	0x4C => "L",
-	0x4D => "M",
-	0x4E => "N",
-	0x4F => "O",
-	0x50 => "P",
-  );
-  my $devnr = $bytes->[3]; # housecode
-  if (exists $x10_housecode{$devnr}) {
-  	$dev_first = $x10_housecode{$devnr};
+  my $device;
+  my $data;
+  if ($type == 0x10) {
+  	my $dev_first = "?";
+
+  	my %x10_housecode =
+    	(
+		0x41 => "A",
+		0x42 => "B",
+		0x43 => "C",
+		0x44 => "D",
+		0x45 => "E",
+		0x46 => "F",
+		0x47 => "G",
+		0x48 => "H",
+		0x49 => "I",
+		0x4A => "J",
+		0x4B => "K",
+		0x4C => "L",
+		0x4D => "M",
+		0x4E => "N",
+		0x4F => "O",
+		0x50 => "P",
+  	);
+  	my $devnr = $bytes->[3]; # housecode
+  	if (exists $x10_housecode{$devnr}) {
+  		$dev_first = $x10_housecode{$devnr};
+  	} else {
+		$error = sprintf "TRX_LIGHT: x10_housecode wrong housecode=%02x", $devnr;
+		Log 1, $error;
+  		return $error;
+  	}
+	my $unit = $bytes->[4]; # unitcode
+  	$device = sprintf '%s%0d', $dev_first, $unit;
+  	$data = $bytes->[5];
+
+  } elsif ($type == 0x11) {
+  	$device = sprintf '%02x%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6], $bytes->[7];
+  	$data = $bytes->[8];
   } else {
-	$error = sprintf "TRX_SECURITY: x10_housecode wrong housecode=%02x", $devnr;
+	$error = sprintf "TRX_LIGHT: wrong type=%02x", $type;
 	Log 1, $error;
   	return $error;
   }
-
-  my $unit = $bytes->[4]; # unitcode
-
-  my $device = sprintf '%s%0d', $dev_first, $unit;
-
-  my $data = $bytes->[5];
   my $hexdata = sprintf '%02x', $data;
 
 
   my $command = "";
-  if ($data == 0xff) {
-	$command = "illegal_cmd";	
+  if (exists $light_device_commands{$type_subtype}) {
+  	my $code = $light_device_commands{$type_subtype};
+  	if (exists $code->[$data]) {
+  		$command = $code->[$data];
+  	} else {
+ 		$error = sprintf "TRX_LIGHT: unknown cmd type_subtype=%02x cmd=%02x", $type_subtype, $data;
+		Log 1, $error;
+		return $error;
+  	}
   } else {
-  	if (exists $light_device_commands{$subtype}) {
-    		my $code = $light_device_commands{$subtype};
-    		if (exists $code->[$data]) {
-    			$command = $code->[$data];
-  		} else {
- 			$error = sprintf "TRX_LIGHT: out of range for subtype=%02x data=%02x", $subtype, $data;
-			Log 1, $error;
-  			return $error;
-  		}
-	}
+	$error = sprintf "TRX_LIGHT: unknown type_subtype %02x data=%02x", $type_subtype, $data;
+	Log 1, $error;
+	return $error;
   }
 
   #my @res;
@@ -331,7 +383,7 @@ sub TRX_LIGHT_parse_X10 {
   	$firstdevice = 0;
 	$def = $modules{TRX_LIGHT}{defptr2}{$device_name};
 	if (!$def) {
-		Log 1, "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading" if ($TRX_LIGHT_debug == 1);
+		Log 1, "UNDEFINED $device_name TRX_LIGHT $dev_type $device $dev_reading" if ($TRX_LIGHT_debug == 1);
         	Log 3, "TRX_LIGHT: TRX_LIGHT Unknown device $device_name, please define it";
        		return "UNDEFINED $device_name TRX_LIGHT $dev_type $device $dev_reading";
 
@@ -361,10 +413,14 @@ sub TRX_LIGHT_parse_X10 {
 	}
   }
 
-  #if ($device_type eq "X10") {
-  if (1) {
+  if ($type == 0x10 || $type == 0x11) {
 	# try to use it for all types:
 	$current = $command;
+	if ($type == 0x11 && $command eq "level") {
+		# append level number
+		my $level = $bytes->[9];
+		$current .= sprintf " %d", $level;
+	}
 
 	$sensor = $firstdevice == 1 ? $def->{TRX_LIGHT_devicelog} : $def->{TRX_LIGHT_devicelog2};
 	$val .= $current;
@@ -372,8 +428,9 @@ sub TRX_LIGHT_parse_X10 {
   	$def->{READINGS}{$sensor}{VAL} = $current;
   	$def->{CHANGED}[$n++] = $sensor . ": " . $current;
   } else {
-  	Log 1, "TRX_LIGHT: X10 error unknown sensor type=$device_type $name devn=$device_name first=$firstdevice type=$command, user=$device (hex $hexdata)";
-        return "TRX_LIGHT X10 error unknown sensor type=$device_type for $device_name device=$device";
+	$error = sprintf "TRX_LIGHT: error unknown sensor type=%x device_type=%s devn=%s first=%d command=%s", $type, $device_type, $device_name, $firstdevice, $command;
+	Log 1, $error;
+	return $error;
   }
 
   if (($firstdevice == 1) && $val) {
@@ -420,7 +477,7 @@ TRX_LIGHT_Parse($$)
 
   #Log 1, "TRX_LIGHT: num_bytes=$num_bytes hex=$hexline type=$type" if ($TRX_LIGHT_debug == 1);
   my $res = "";
-  if ($type == 0x10) {
+  if ($type == 0x10 || $type == 0x11 || $type == 0x12) {
 	Log 1, "TRX_LIGHT: X10 num_bytes=$num_bytes hex=$hexline" if ($TRX_LIGHT_debug == 1);
         $res = TRX_LIGHT_parse_X10(\@rfxcom_data_array);
   	Log 1, "TRX_LIGHT: unsupported hex=$hexline" if ($res ne "" && $res !~ /^UNDEFINED.*/);
