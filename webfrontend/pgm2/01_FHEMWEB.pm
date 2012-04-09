@@ -342,11 +342,12 @@ FW_AnswerCall($)
   $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
+  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
 
   # Lets go:
   if($arg =~ m,^${FW_ME}/(.*)\.(css|html|js)$,) {
     my ($file, $ext) = ($1, $2);
-    $file =~ s,/,,g;    # little bit of security
+    $file =~ s,\.\./,,g;    # little bit of security
     open(FH, "$FW_dir/$file.$ext") || return 0;
     FW_pO join("", <FH>);
     close(FH);
@@ -358,14 +359,19 @@ FW_AnswerCall($)
           $arg =~ m,^$FW_ME/(.*.png)$,i  ||
           $arg =~ m,^/(favicon.ico)$,) {
     my ($img, $cachable) = ($1, 1);
-    $img =~ s,/,,g;
-    if(!open(FH, "$FW_dir/$img")) { # Hack: convert device state to icon name
-      return 0 if($arg eq "/favicon.ico");
+    $img =~ s,\.\./,,g;
+
+    my $fnd;
+    $fnd = open(FH, "$FW_dir/$prf/$img") if($prf); 
+    $fnd = open(FH, "$FW_dir/$img") if(!$fnd); 
+    if(!$fnd && $arg =~ m,/icons/,) { # Hack: convert device state to icon name
       FW_ReadIcons();
       $img = FW_dev2image($img);
       $cachable = 0;
-      return 0 if(!$img || !open(FH, "$FW_dir/$img"));
+      $fnd = open(FH, "$FW_dir/$prf/$img") if($img); 
+      $fnd = open(FH, "$FW_dir/$img") if(!$fnd && $img); 
     }
+    return 0 if(!$fnd);
     binmode (FH); # necessary for Windows
     FW_pO join("", <FH>);
     close(FH);
@@ -502,7 +508,6 @@ FW_AnswerCall($)
   my $rf = AttrVal($FW_wname, "refresh", "");
   FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   
-  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
   $prf = "smallscreen" if(!$prf && $FW_ss);
   $prf = "touchpad"    if(!$prf && $FW_tp);
   FW_pO "<link href=\"$FW_ME/".$prf."style.css\" rel=\"stylesheet\"/>";
@@ -1820,17 +1825,26 @@ FW_ReadIcons()
 {
   my $now = time();
   return if($FW_iconsread && ($now - $FW_iconsread) <= 5);
+
   %FW_icons = ();
+  my @files;
   if(opendir(DH, $FW_dir)) {
-    my @files = readdir(DH);
+    @files = readdir(DH);
     closedir(DH);
-    foreach my $l (sort @files) {     # Order: .gif,.jpg,.png
-      next if($l !~ m/\.(png|gif|jpg)$/i);
-      my $x = $l;
-      $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
-      $FW_icons{$x} = $l;
-    }
   }
+  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
+  if($prf && opendir(DH, "$FW_dir/$prf")) {
+    push @files, readdir(DH);
+    closedir(DH);
+  }
+
+  foreach my $l (sort @files) {     # Order: .gif,.jpg,.png
+    next if($l !~ m/\.(png|gif|jpg)$/i);
+    my $x = $l;
+    $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
+    $FW_icons{$x} = $l;
+  }
+
   $FW_iconsread = $now;
 }
 
