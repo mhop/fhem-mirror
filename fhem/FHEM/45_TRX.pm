@@ -1,30 +1,27 @@
 #################################################################################
 # 45_TRX.pm
-# Module for FHEM
 #
-# Tested with RFXtrx-Receiver (433.92MHz, USB)
-# (see http://www.RFXCOM.com/).
-# To use this module, you need to define an RFXTRX transceiver:
-#	define RFXTRX TRX /dev/ttyUSB0
+# FHEM Module for RFXtrx433
 #
-# The module also has code to access a RFXtrx transceiver attached via LAN.
+# Derived from 00_CUL.pm: Copyright (C) Rudolf Koenig"
 #
-# To use it define the IP-Adresss and the Port:
-#	define RFXTRX TRX 192.168.169.111:10001
-# optionally you may issue not to initialize the device (useful if you share an RFXtrx device with other programs) 
-#	define RFXTRX TRX 192.168.169.111:10001 noinit
+# Copyright (C) 2012 Willi Herzig
 #
-# The RFXtrx transceivers supports lots of protocols that may be implemented for FHEM 
-# writing the appropriate FHEM modules. See the 
-#
-#  Willi Herzig, 2012
-#
-#  This script is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
 # 
-#################################################################################
-# derived from 00_CUL.pm
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#
+# The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 #
 ###########################
 # $Id$
@@ -260,6 +257,52 @@ TRX_DoInit($)
   } else {
     	Log 1, "TRX: Init OK";
   	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
+	# Analyse result and display it:
+	if ($buf =~ m/^\x0d\x01\x00(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)(.)/) {
+		my $status = "";
+
+		my $seqnbr = $1;
+		my $cmnd = $2;
+		my $msg1 = ord($3);
+		my $msg2 = ord($4);
+		my $msg3 = ord($5);
+		my $msg4 = ord($6);
+		my $msg5 = ord($7);
+  		my $freq = { 
+			0x50 => '310MHz',
+			0x51 => '315MHz',
+			0x52 => '433.92MHz receiver only',
+			0x53 => '433.92MHz transceiver',
+			0x55 => '868.00MHz',
+			0x56 => '868.00MHz FSK',
+			0x57 => '868.30MHz',
+			0x58 => '868.30MHz FSK',
+			0x59 => '868.35MHz',
+			0x5A => '868.35MHz FSK',
+			0x5B => '868.95MHz'
+                 }->{$msg1} || 'unknown Mhz';
+		$status .= $freq;
+		$status .= ", " . sprintf "firmware=%d",$msg2;
+		$status .= ", protocols enabled: ";
+		$status .= sprintf "undecoded, " if ($msg3 & 0x80); 
+		$status .= "ProGuard " if ($msg4 & 0x20); 
+		$status .= "FS20 " if ($msg4 & 0x10); 
+		$status .= "LaCrosse " if ($msg4 & 0x08); 
+		$status .= "Hideki " if ($msg4 & 0x04); 
+		$status .= "LightwaveRF " if ($msg4 & 0x02); 
+		$status .= "Mertik " if ($msg4 & 0x01); 
+		$status .= "Visonic " if ($msg5 & 0x80); 
+		$status .= "ATI " if ($msg5 & 0x40); 
+		$status .= "OREGON " if ($msg5 & 0x20); 
+		$status .= "KOPPLA " if ($msg5 & 0x10); 
+		$status .= "HOMEEASY " if ($msg5 & 0x08); 
+		$status .= "AC " if ($msg5 & 0x04); 
+		$status .= "ARC " if ($msg5 & 0x02); 
+		$status .= "X10 " if ($msg5 & 0x01); 
+		my $hexline = unpack('H*', $buf);
+    		Log 4, "TRX: Init status hexline='$hexline'";
+    		Log 1, "TRX: Init status: '$status'";
+	}
   }
   #
 

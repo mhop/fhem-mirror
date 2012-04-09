@@ -1,6 +1,6 @@
 #################################################################################
 # 46_TRX_WEATHER.pm
-# Module for FHEM to decode weather sensor messages for RFXtrx
+# FHEM module to decode weather sensor messages for RFXtrx
 #
 # The following devices are implemented to be received:
 #
@@ -36,21 +36,34 @@
 # * "WGR918_A"	is STR918, WGR918
 # * "TFA_WIND"	is TFA
 #
-# derived from 41_OREGON.pm
-#
-#  Willi Herzig, 2012
+# Copyright (C) 2012 Willi Herzig
 #
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #
+# Some code was derived and modified from xpl-perl 
+# from the following two files:
+#	xpl-perl/lib/xPL/Utils.pm:
+#	xpl-perl/lib/xPL/RF/Oregon.pm:
+#
+#SEE ALSO
+# Project website: http://www.xpl-perl.org.uk/
+# AUTHOR: Mark Hindess, soft-xpl-perl@temporalanomaly.com
+#
+# Copyright (C) 2007, 2009 by Mark Hindess
+#
+# This library is free software; you can redistribute it and/or modify
+# it under the same terms as Perl itself, either Perl version 5.8.7 or,
+# at your option, any later version of Perl 5 you may have available.
+
 ##################################
 #
 # values for "set global verbose"
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id: $
+# $Id$
 package main;
 
 use strict;
@@ -90,7 +103,6 @@ TRX_WEATHER_Define($$)
   my $code = $a[2];
 
   $hash->{CODE} = $code;
-  #$modules{TRX_WEATHER}{defptr}{$name} = $hash;
   $modules{TRX_WEATHER}{defptr}{$code} = $hash;
   AssignIoPort($hash);
 
@@ -106,72 +118,24 @@ TRX_WEATHER_Undef($$)
   return undef;
 }
 
-
-
-#########################################
-# From xpl-perl/lib/xPL/Util.pm:
-sub hi_nibble {
-  ($_[0]&0xf0)>>4;
-}
-sub lo_nibble {
-  $_[0]&0xf;
-}
-sub nibble_sum {
-  my $c = $_[0];
-  my $s = 0;
-  foreach (0..$_[0]-1) {
-    $s += hi_nibble($_[1]->[$_]);
-    $s += lo_nibble($_[1]->[$_]);
-  }
-  $s += hi_nibble($_[1]->[$_[0]]) if (int($_[0]) != $_[0]);
-  return $s;
-}
-
-# --------------------------------------------
-# From xpl-perl/lib/xPL/RF/Oregon.pm:
-# This function creates a simple key from a device type and message
-# length (in bits).  It is used to as the index for the parts table.
-sub type_length_key {
-  ($_[0] << 8) + $_[1]
-}
-
 # --------------------------------------------
 # sensor types 
 
 my %types =
   (
    # TEMP
-   type_length_key(0x50, 0x08) =>
-   {
-    part => 'TEMP', method => \&common_temp,
-   },
+   0x5008 => { part => 'TEMP', method => \&common_temp, },
    # HYDRO
-   type_length_key(0x51, 0x08) =>
-   {
-    part => 'HYDRO', method => \&common_hydro,
-   },
+   0x5108 => { part => 'HYDRO', method => \&common_hydro, },
    # TEMP HYDRO
-   type_length_key(0x52, 0x0a) =>
-   {
-    part => 'TEMPHYDRO', method => \&common_temphydro,
-   },
+   0x520a => { part => 'TEMPHYDRO', method => \&common_temphydro, },
    # TEMP HYDRO BARO
-   type_length_key(0x54, 0x0d) =>
-   {
-    part => 'TEMPHYDROBARO', method => \&common_temphydrobaro,
-   },
+   0x540d => { part => 'TEMPHYDROBARO', method => \&common_temphydrobaro, },
    # RAIN
-   type_length_key(0x55, 0x0b) =>
-   {
-    part => 'RAIN', method => \&common_rain,
-   },
+   0x550b => { part => 'RAIN', method => \&common_rain, },
    # WIND
-   type_length_key(0x56, 0x10) =>
-   {
-    part => 'WIND', method => \&common_anemometer,
-   },
+   0x5610 => { part => 'WIND', method => \&common_anemometer, },
   );
-
 
 # --------------------------------------------
 
@@ -209,12 +173,12 @@ sub humidity {
   my $hum = $bytes->[$off];
   my $hum_str = ['dry', 'comfortable', 'normal',  'wet']->[$bytes->[$off+1]];
   push @$res, {
-		device => $dev,
-                type => 'humidity',
-                current => $hum,
-                string => $hum_str,
-		units => '%'
-	}
+	device => $dev,
+	type => 'humidity',
+	current => $hum,
+	string => $hum_str,
+	units => '%'
+  }
 }
 
 sub pressure {
@@ -229,12 +193,12 @@ sub pressure {
                    0x04 => 'rain',
                  }->{$bytes->[$off+2]} || 'unknown';
   push @$res, {
-		device => $dev,
-                type => 'pressure',
-                current => $hpa,
-                units => 'hPa',
-                forecast => $forecast,
-   	}
+	device => $dev,
+	type => 'pressure',
+	current => $hpa,
+	units => 'hPa',
+	forecast => $forecast,
+  };
 }
 
 sub simple_battery {
@@ -250,10 +214,10 @@ sub simple_battery {
   }
 
   push @$res, {
-		device => $dev,
-		type => 'battery',
-		current => $battery,
-	}
+	device => $dev,
+	type => 'battery',
+	current => $battery,
+  };
 }
 
 sub battery {
@@ -270,24 +234,12 @@ sub battery {
   }
 
   push @$res, {
-		device => $dev,
-		type => 'battery',
-		current => $battery,
-	}
+	device => $dev,
+	type => 'battery',
+	current => $battery,
+  };
 }
 
-
-my @uv_str =
-  (
-   qw/low low low/, # 0 - 2
-   qw/medium medium medium/, # 3 - 5
-   qw/high high/, # 6 - 7
-   'very high', 'very high', 'very high', # 8 - 10
-  );
-
-sub uv_string {
-  $uv_str[$_[0]] || 'dangerous';
-}
 
 # Test if to use longid for device type
 sub use_longid {
@@ -356,20 +308,20 @@ sub common_anemometer {
   my $avspeed = $bytes->[7]*256 + $bytes->[8];
   my $speed = $bytes->[9]*256 + $bytes->[10];
 
- 	push @res, {
-                               device => $dev_str,
-                               type => 'speed',
-                               current => $speed,
-                               average => $avspeed,
-                               units => 'mps',
-                              } , {
-                               device => $dev_str,
-                               type => 'direction',
-                               current => $dir,
-                               string => $dirname,
-                               units => 'degrees',
-                              } 
-	;
+  push @res, {
+	device => $dev_str,
+	type => 'speed',
+	current => $speed,
+	average => $avspeed,
+	units => 'mps',
+  } , {
+	device => $dev_str,
+	type => 'direction',
+	current => $dir,
+	string => $dirname,
+	units => 'degrees',
+  };
+
   simple_battery($bytes, $dev_str, \@res, 15);
 
   return @res;
@@ -510,7 +462,6 @@ sub common_temphydro {
   if ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
-  #Log 1,"dev_str=$dev_str";
 
   my @res = ();
 
@@ -607,7 +558,6 @@ sub common_rain {
   if ($bytes->[4] > 0) {
   	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
   }
-  #Log 1,"dev_str=$dev_str";
 
   my @res = ();
 
@@ -621,27 +571,23 @@ sub common_rain {
   my $train = $bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9];
 
   push @res, {
-                               device => $dev_str,
-                               type => 'rain',
-                               current => $rain,
-                               units => 'mm/h',
-                              } ;
+	device => $dev_str,
+	type => 'rain',
+	current => $rain,
+	units => 'mm/h',
+  };
   push @res, {
-                               device => $dev_str,
-                               type => 'train',
-                               current => $train,
-                               units => 'mm',
-                              };
+	device => $dev_str,
+	type => 'train',
+	current => $train,
+	units => 'mm',
+  };
+
   battery($bytes, $dev_str, \@res, 10);
   return @res;
 }
 
-sub raw {
-  $_[0]->{raw} or $_[0]->{raw} = pack 'H*', $_[0]->{hex};
-}
-
 # -----------------------------
-
 sub
 TRX_WEATHER_Parse($$)
 {
@@ -683,15 +629,14 @@ TRX_WEATHER_Parse($$)
   my $type = $rfxcom_data_array[0];
 
   my $sensor_id = unpack('H*', chr $type);
-  #Log 1, "TRX_WEATHER: sensor_id=$sensor_id";
 
-  my $key = type_length_key($type, $num_bytes);
+  my $key = ($type << 8) + $num_bytes;
 
-  my $rec = $types{$key} || $types{$key&0xfffff};
+  my $rec = $types{$key};
+
   unless ($rec) {
-#Log 3, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id num_bytes=$num_bytes message='$hexline'.";
     Log 4, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
-Log 1, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
+    Log 1, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
     return "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id \n";
   }
   
@@ -866,11 +811,6 @@ Log 1, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
     $def->{TIME} = $tm;
     $def->{CHANGED}[$n++] = $val;
   }
-
-  #
-  #$def->{READINGS}{state}{TIME} = $tm;
-  #$def->{READINGS}{state}{VAL} = $val;
-  #$def->{CHANGED}[$n++] = "state: ".$val;
 
   DoTrigger($name, undef);
 
