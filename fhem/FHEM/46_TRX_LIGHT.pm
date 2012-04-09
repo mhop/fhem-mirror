@@ -1,24 +1,28 @@
 #################################################################################
 # 46_TRX_LIGHT.pm
 #
-# Modul for FHEM for 
-# "X10" -> X10 lighting
-# "ARC" -> ARC
-# "AB400D" -> ELRO AB400D
-# "WAVEMAN" -> Waveman
-# "EMW200" -> Chacon EMW200
-# "IMPULS" -> IMPULS
-# "AC" -> KlikAanKlikUit, NEXA, CHACON, HomeEasy UK
-# "HOMEEASY" -> HomeEasy EU
-# "ANSLUT" -> ANSLUT
-# "KOPPLA" -> Ikea Koppla
+# FHEM module for lighting protocols: 
+#   X10 lighting, ARC, ELRO AB400D, Waveman, Chacon EMW200, 
+#   IMPULS, AC (KlikAanKlikUit, NEXA, CHACON, HomeEasy UK), 
+#   HomeEasy EU, ANSLUT, Ikea Koppla
 #
-#		- ms14a: motion sensor
-#		- x10: generic X10 sensor
+# Copyright (C) 2012 Willi Herzig
 #
-#  This script is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#
+# The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 #
 ##################################
 #

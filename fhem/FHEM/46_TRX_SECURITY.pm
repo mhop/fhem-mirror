@@ -1,35 +1,25 @@
 #################################################################################
 # 46_TRX_SECURITY.pm
 #
-# Modul for FHEM for X10, KD101, Visonic
-# - X10 security messages tested for 
-#               - ds10a: X10 Door / Window Sensor or compatible devices
-#               - ss10a: X10 motion sensor
-#               - sd90: Marmitek smoke detector
-#		- kr18: X10 remote control
+# FHEM module for X10, KD101, Visonic
 #
-##################################
+# Copyright (C) 2012 Willi Herzig
 #
-#  Willi Herzig, 2012
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#  This script is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-##################################
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
-# Some code from X10security code is derived from http://www.xpl-perl.org.uk/.
-#       xpl-perl/lib/xPL/RF/X10Security.pm:
-# Thanks a lot to Mark Hindess who wrote xPL.
-#
-#SEE ALSO
-# Project website: http://www.xpl-perl.org.uk/
-# AUTHOR: Mark Hindess, soft-xpl-perl@temporalanomaly.com
-#
-#Copyright (C) 2007, 2009 by Mark Hindess
-#
-#This library is free software; you can redistribute it and/or modify
-#it under the same terms as Perl itself, either Perl version 5.8.7 or,
-#at your option, any later version of Perl 5 you may have available.
+# The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 #
 ##################################
 #
