@@ -203,7 +203,7 @@ GetHttpFile($$@)
   my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
   syswrite $conn, $req;
   shutdown $conn, 1; # stopped writing data
-  my ($buf, $ret);
+  my ($buf, $ret) = ("", "");
 
   $conn->timeout($timeout);
   for(;;) {
