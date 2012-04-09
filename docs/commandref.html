@@ -7210,7 +7210,8 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
   Until now the following Oregon Scientific weather sensors have been tested successfully: BTHR918, BTHR918N, PCR800, RGR918, THGR228N, THGR810, THR128, THWR288A, WTGR800, WGR918. It will also work with many other Oregon sensors supported by RFXtrx433. Please give feedback if you use other sensors.<br>
     </li>
     <li> 46_TRX_SECURITY.pm (see device <a href="#TRX_SECURITY">TRX_SECURITY</a>): Receive X10, KD101 and Visonic security sensors.</li>
-    <li> 46_TRX_LIGHT.pm (see device <a href="#RFXX10REC">RFXX10REC</a>): Process X10, ARC, ELRO AB400D, Waveman, Chacon EMW200 and IMPULS lighting devices (switches and remote control). ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. </li>
+    <li> 46_TRX_LIGHT.pm (see device <a href="#RFXX10REC">RFXX10REC</a>): Process X10, ARC, ELRO AB400D, Waveman, Chacon EMW200, IMPULS, AC, HomeEasy EU and ANSLUT lighting devices (switches and remote control). ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. AC is the protocol used by different brands with units having a learning mode button:
+KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
     <li> 46_TRX_ELSE.pm: Process and display all other messages. This module shows you messages that could not be handled by the other modules. It is useful to see RF receiption problems.</li>
     </ul>
   <br>
@@ -7332,7 +7333,8 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
 <a name="TRX_LIGHT"></a>
 <h3>TRX_LIGHT</h3>
 <ul>
-  The TRX_LIGHT module receives and sends X10, ARC, ELRO AB400D, Waveman, Chacon EMW200 and IMPULS lighting messages by a RFXtrx433 RF transceiver. ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. <br> You need to define an RFXtrx433 transceiver receiver first.
+  The TRX_LIGHT module receives and sends X10, ARC, ELRO AB400D, Waveman, Chacon EMW200, IMPULS, AC, HomeEasy EU and ANSLUT lighting devices (switches and remote control). ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. AC is the protocol used by different brands with units having a learning mode button:
+KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 transceiver receiver first.
   See <a href="#TRX">TRX</a>.
 
   <br><br>
@@ -7348,12 +7350,15 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
     X10 lighting devices:
         <ul>
           <li> <code>MS14A</code> (X10 motion sensor. Reports [normal|alert] on the first deviceid (motion sensor) and [on|off] for the second deviceid (light sensor)) </li>
-          <li> <code>X10</code> (All other x10 devices. Report [on|off] on both deviceids.)</li>
-          <li> <code>ARC</code> (ARC devices. ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. Report [on|off] on both deviceids.)</li>
-          <li> <code>AB400D</code> (ELRO AB400D devices. Report [on|off] on both deviceids.)</li>
-          <li> <code>WAVEMAN</code> (Waveman devices. Report [on|off] on both deviceids.)</li>
-          <li> <code>EMW200</code> (Chacon EMW200 devices. Report [on|off] on both deviceids.)</li>
-          <li> <code>IMPULS</code> (IMPULS devices. Report [on|off] on both deviceids.)</li>
+          <li> <code>X10</code> (All other x10 devices. Report [off|on|dim|bright|all_off|all_on] on both deviceids.)</li>
+          <li> <code>ARC</code> (ARC devices. ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. Report [off|on|all_off|all_on|chime].)</li>
+          <li> <code>AB400D</code> (ELRO AB400D devices. Report [off|on].)</li>
+          <li> <code>WAVEMAN</code> (Waveman devices. Report [off|on].)</li>
+          <li> <code>EMW200</code> (Chacon EMW200 devices. Report [off|on|all_off|all_on].)</li>
+          <li> <code>IMPULS</code> (IMPULS devices. Report [off|on].)</li>
+          <li> <code>AC</code> (AC devices. AC is the protocol used by different brands with units having a learning mode button: KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. Report [off|on|level &lt;NUM&gt;|all_off|all_on|all_level &lt;NUM&gt;].)</li>
+          <li> <code>HOMEEASY</code> (HomeEasy EU devices. Report [off|on|level|all_off|all_on|all_level].)</li>
+          <li> <code>ANSLUT</code> (Anslut devices. Report [off|on|level|all_off|all_on|all_level].)</li>
         </ul>
     </ul>
     <br>
@@ -7389,17 +7394,18 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
   <a name="TRX_LIGHTset"></a>
   <b>Set </b>
   <ul>
-    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;levelnum&gt;]</code>
     <br><br>
     where <code>value</code> is one of:<br>
     <pre>
     off
     on                 
-    dim                # only for X10
-    bright             # only for X10
-    all_off            # only for X10, ARC, EMW200
-    all_on             # only for X10, ARC, EMW200
+    dim                # only for X10, KOPPLA
+    bright             # only for X10, KOPPLA
+    all_off            # only for X10, ARC, EMW200, AC, HOMEEASY, ANSLUT
+    all_on             # only for X10, ARC, EMW200, AC, HOMEEASY, ANSLUT
     chime              # only for ARC
+    level &lt;levelnum&gt;    # only AC, HOMEEASY, ANSLUT: set level to &lt;levelnum&gt; (range: 0=0% to 15=100%)
     </pre>
       Example: <br>
     	<code>set Steckdose on</code>
