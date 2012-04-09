@@ -58,7 +58,7 @@ TRX_Initialize($)
   my %mc = (
     "1:TRX_WEATHER"   	=> "^..(50|52|54|55|56).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
-    "3:TRX_LIGHT"	=> "^..(10).*", 
+    "3:TRX_LIGHT"	=> "^..(10|11|12).*", 
     "4:TRX_ELSE"   	=> "^..(0|3|4|6|7|8|9).*",
   );
   $hash->{MatchList} = \%mc;
@@ -226,13 +226,6 @@ TRX_DoInit($)
   my $char = undef ;
 
 
-  # Reset
-  my $init = pack('H*', "0D00000000000000000000000000");
-  DevIo_SimpleWrite($hash, $init, 0);
-  DevIo_TimeoutRead($hash, 0.5);
-
-  TRX_Clear($hash);
-
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
     	Log 1, "TRX: defined with noinit. Do not send init string to device.";
   	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
@@ -243,6 +236,13 @@ TRX_DoInit($)
 
 	return undef;
   }
+
+  # Reset
+  my $init = pack('H*', "0D00000000000000000000000000");
+  DevIo_SimpleWrite($hash, $init, 0);
+  DevIo_TimeoutRead($hash, 0.5);
+
+  TRX_Clear($hash);
 
   #
   # Get Status
