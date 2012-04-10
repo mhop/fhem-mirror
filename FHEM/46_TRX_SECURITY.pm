@@ -32,7 +32,6 @@ package main;
 
 use strict;
 use warnings;
-use Switch;
 
 # Debug this module? YES = 1, NO = 0
 my $TRX_SECURITY_debug = 0;

@@ -17,7 +17,6 @@ package main;
 
 use strict;
 use warnings;
-use Switch;
 
 my $time_old = 0;
 

@@ -47,7 +47,6 @@ package main;
 
 use strict;
 use warnings;
-use Switch;
 
 # Debug this module? YES = 1, NO = 0
 my $RFXX10REC_debug = 0;
