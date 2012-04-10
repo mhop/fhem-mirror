@@ -7,7 +7,6 @@
 package main;
 use strict;
 use warnings;
-use Switch;
 use POSIX;
 
 sub dayofyear {
@@ -266,13 +265,17 @@ sub Twilight_getWeatherHorizon{
    my @a_current = (25,25,25,25,20,10,10,10,10,10,10,7,7,7,5,10,10,6,6,6,10,6,6,6,6,6,6,5,5,3,3,0,0,0,0,7,0,15,15,15,9,15,8,5,12,6,8,8);
    #condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
    my $location=shift;
-   my $xml = GetHttpFile("weather.yahooapis.com:80","/forecastrss?w=".$location."&u=c");
-   $xml=~/code="(.*)"(\ *)temp/;
-   my $current=$1;
-   if(($current>=0) && ($current <=47)) {
-     return $a_current[$current];
-   } else {
-     return 1;
+   my $xml = GetHttpFile("weather.yahooapis.com:80","/forecastrss?w=".$location."&u=c",4.0);
+   my $current;
+   if($xml=~/code="(.*)"(\ *)temp/){
+    $current=$1;
+    if(($current>=0) && ($current <=47)) {
+      return $a_current[$current];
+    } else {
+      return 0;
+    }
+   }else{
+      return 0;
    }
 }
 
