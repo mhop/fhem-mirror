@@ -130,7 +130,7 @@ CUL_HM_Initialize($)
   $hash->{DefFn}     = "CUL_HM_Define";
   $hash->{ParseFn}   = "CUL_HM_Parse";
   $hash->{SetFn}     = "CUL_HM_Set";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
                        "subType:switch,dimmer,blindActuator,remote,sensor,".
                          "swi,pushButton,threeStateSensor,motionDetector,".
