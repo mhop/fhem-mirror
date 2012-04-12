@@ -1091,8 +1091,8 @@ CommandSave($$)
     }
 
     if($d ne "global") {
-      if($defs{$d}{DEF}) {
-        my $def = $defs{$d}{DEF};
+      my $def = $defs{$d}{DEF};
+      if(defined($def)) {
         $def =~ s/;/;;/g;
         print $fh "define $d $defs{$d}{TYPE} $def\n";
       } else {
