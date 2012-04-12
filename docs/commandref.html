@@ -7977,9 +7977,9 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   Devices can be displayed at a defined coordinate on the screen, usually with a clickable icon allowing to switch 
   the device on or off by clicking on it. A background-picture can be used - use e.g. a floorplan of your house, or any picture.
   Use floorplanstyle.css to adapt the representation.<br>
-  FLOORPLAN is not part of the fhem standard delivery. Download it from 
-  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/95_FLOORPLAN/?sortby=file">this SVN folder</a>, 
-  where you also find pdf-files (english and german) with a step-by-step guide for setup. <br>
+  Step-by-step guides are available in 
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">english</a> and 
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf">german</a>. <br>
   <br>
 
   <a name="FLOORPLANdefine"></a>
@@ -8048,7 +8048,9 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  allowing to place devices easily on the screen.<br>
 	  Example:
 	<ul>
-      <code>attr Groundfloor fp_arrange 1</code><br><br>
+      <code>attr Groundfloor fp_arrange 1</code><br>
+	  <code>attr Groundfloor fp_arrange detail  #displays the devices with infos room, type, alias</code><br>
+	  <code>attr Groundfloor fp_arrange WEB     #activates arrange mode for frontend-device WEB only</code><br><br>
     </ul>
 	</li>
 	<li><a name="fp_stylesheetPrefix">fp_stylesheetPrefix</a><br>
@@ -8093,6 +8095,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 		<a href="#plotmode">plotmode</a><br>	
 		<a href="#plotsize">plotsize</a><br>
 		<a href="#webname">webname</a><br>	
+		<a href="#redirectCmds">redirectCmds</a><br>	
     </ul>
     </li><br>
   </ul>
