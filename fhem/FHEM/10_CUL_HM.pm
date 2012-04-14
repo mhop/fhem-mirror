@@ -667,41 +667,33 @@ CUL_HM_Parse($$)
     my $lst = defined($1) ? $1 : "00";
     my $chn = "01";
 
-    if($p =~ m/^0601000E$/) {
+    if($p =~ m/^0601..00$/) {
       push @event, "alive:yes";
 
-    } elsif($p =~ m/^0601..00$/) {
-      push @event, "cover:closed";
-      push @event, "alive:yes";
+    }
+    # Multi-channel device: Switch to the shadow source hash
+    # for the HM-SCI-3-FM
+    $chn = $1 if($p =~ m/^(..)(..)/);
+    if($chn && $chn ne "01" && $chn ne "00") {
+      my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
+      $shash = $sshash if($sshash);
+      $name = $shash->{NAME};
+    }
 
-    } elsif($p =~ m/^0601..0E$/) {
-      push @event, "cover:open";
-      push @event, "state:sabotage";
+    my %txt;
+    %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
+    %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
+                 if($model eq "HM-SEC-WDS");
+
+    if($txt{$lst}) {
+      push @event, "state:$txt{$lst}$target";
 
     } else {
+      $lst = "00"; # for the ack
+    }
 
-      # Multi-channel device: Switch to the shadow source hash
-      # for the HM-SCI-3-FM
-      $chn = $1 if($p =~ m/^(..)(..)/);
-      if($chn && $chn ne "01" && $chn ne "00") {
-        my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
-        $shash = $sshash if($sshash);
-        $name = $shash->{NAME};
-      }
-
-      my %txt;
-      %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
-      %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
-                   if($model eq "HM-SEC-WDS");
-
-      if($txt{$lst}) {
-        push @event, "state:$txt{$lst}$target";
-
-      } else {
-        $lst = "00"; # for the ack
-
-      }
-
+    if($p =~ m/^0601..0E$/) {
+      push @event, "state:sabotage";
     }
 
     CUL_HM_SendCmd($shash, "++8002$id$src${chn}01${lst}00",1,0)  # Send Ack
