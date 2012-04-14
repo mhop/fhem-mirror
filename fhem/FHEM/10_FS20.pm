@@ -67,17 +67,18 @@ my %models = (
     fs20s4ub    => 'sender',
     fs20s8      => 'sender',
     fs20s8m     => 'sender',
-    fs20sd      => 'sender',
-    fs20sn      => 'sender',
-    fs20sr      => 'sender',
-    fs20ss      => 'sender',
-    fs20str     => 'sender',
+    fs20sd      => 'sender',    # Sensor: Daemmerung
+    fs20sn      => 'sender',    # Sensor: Naeherung
+    fs20sr      => 'sender',    # Sensor: Regen
+    fs20ss      => 'sender',    # Sensor: Sprache
+    fs20str     => 'sender',    # Sensor: Thermostat+Regelung
     fs20tc1     => 'sender',
-    fs20tc6     => 'sender',
-    fs20tfk     => 'sender',
-    fs20tk      => 'sender',
-    fs20uts     => 'sender',
-    fs20ze      => 'sender',
+    fs20tc6     => 'sender',    # TouchControl x 6
+    fs20tfk     => 'sender',    # TuerFensterKontakt
+    fs20tk      => 'sender',    # TuerKlingel
+    fs20uts     => 'sender',    # Universal Thermostat Sender
+    fs20ze      => 'sender',    # FunkTimer (ZeitEinheit?)
+    fs20bf      => 'sender',    # BodenFeuchte
 
     fs20di      => 'dimmer',
     fs20di10    => 'dimmer',
@@ -121,8 +122,7 @@ FS20_Initialize($)
   $hash->{DefFn}     = "FS20_Define";
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
-  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 model;fs20hgs,fs20hgs,fs20pira,fs20piri,fs20s20,fs20s8,fs20s4,fs20s4a,fs20s4m,fs20s4u,fs20s4ub,fs20sd,fs20sn,fs20sr,fs20ss,fs20str,fs20tfk,fs20tfk,fs20tk,fs20uts,fs20ze,fs20as1,fs20as4,fs20di,fs20du,fs20ls,fs20ms2,fs20rst,fs20sa,fs20sig,fs20st,fs20sv,fs20usr loglevel:0,1,2,3,4,5,6";
-
+  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 model:fs20as1,fs20as4,fs20bf,fs20di,fs20du,fs20hgs,fs20hgs,fs20ls,fs20ms2,fs20pira,fs20piri,fs20rst,fs20s20,fs20s4,fs20s4a,fs20s4m,fs20s4u,fs20s4ub,fs20s8,fs20sa,fs20sd,fs20sig,fs20sn,fs20sr,fs20ss,fs20st,fs20str,fs20sv,fs20tfk,fs20tfk,fs20tk,fs20usr,fs20uts,fs20ze loglevel:0,1,2,3,4,5,6";
 }
 
 #####################################
@@ -132,6 +132,9 @@ FS20_SetState($$$$)
   my ($hash, $tim, $vt, $val) = @_;
 
   $val = $1 if($val =~ m/^(.*) \d+$/);
+  my $name = $hash->{NAME};
+  (undef, $val) = ReplaceEventMap($name, [$name, $val], 0)
+        if($attr{$name}{eventMap});
   return "Undefined value $val" if(!defined($fs20_c2b{$val}));
   return undef;
 }
