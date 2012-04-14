@@ -968,8 +968,9 @@ CommandRereadCfg($$)
   doGlobalDef($cfgfile);
 
   my $ret = CommandInclude($cl, $cfgfile);
-  if(!$ret && $attr{global}{statefile} && -r $attr{global}{statefile}) {
-    $ret = CommandInclude($cl, $attr{global}{statefile});
+  if($attr{global}{statefile} && -r $attr{global}{statefile}) {
+    my $ret2 = CommandInclude($cl, $attr{global}{statefile});
+    $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
   }
   DoTrigger("global", "REREADCFG");
 
