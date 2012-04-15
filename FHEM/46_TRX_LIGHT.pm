@@ -175,7 +175,7 @@ TRX_LIGHT_Set($@)
 
 	# lightning1
   	$hex_prefix = sprintf "0710";
-  	$hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num, $seqnr, $house, $unit, $cmnd; 
+  	$hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num & 0xff, $seqnr, $house, $unit, $cmnd; 
   	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command" if ($TRX_LIGHT_debug == 1);
   	Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
   } elsif ($protocol_type == 0x11) {
@@ -187,7 +187,7 @@ TRX_LIGHT_Set($@)
 		return "error set name=$name  deviveid=$deviceid";
   	}
   	$hex_prefix = sprintf "0711";
-  	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num, $seqnr, $deviceid, $cmnd, $level; 
+  	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
 	} 
