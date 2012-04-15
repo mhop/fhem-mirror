@@ -92,7 +92,7 @@ my %culHmModel=(
   "0043" => "HM-SEC-TIS",
   "0044" => "HM-SEN-EP",
   "0045" => "HM-SEC-WDS",     # Tested by peterp
-  "0046" => "HM-SWI-3-FM",
+  "0046" => "HM-SWI-3-FM",    # Tested by NorbertW
   "0047" => "KFM-Display",
   "0048" => "IS-WDS-TH-OD-S-R3",
   "0049" => "KFM-Sensor",
@@ -112,9 +112,9 @@ my %culHmModel=(
   "0059" => "HM-LC-DIM1T-FM",
   "005A" => "HM-LC-DIM2T-SM",
   "005C" => "HM-OU-CF-PL",
-  "005F" => "HM-SCI-3-FM",
+  "005F" => "HM-SCI-3-FM",     # Tested by fhem-hm-knecht
   "0060" => "HM-PB-4DIS-WM",   # Tested
-  "0061" => "HM-LC-SW4-DR",    # Tested by fhem-hm-knecht.
+  "0061" => "HM-LC-SW4-DR",    # Tested by fhem-hm-knecht
   "0062" => "HM-LC-SW2-DR",
   "0066" => "HM_LC_Sw4-WM",    # Tested by peterp
   "006C" => "HM-LC-SW1-PCB",   # By jan (unsure if working)
@@ -613,7 +613,17 @@ CUL_HM_Parse($$)
         CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
                 ($state =~ m/on/?"C8":"00")."00", 1, 0);
       }
+    }
 
+  } elsif($st eq "swi") { ################################################
+    # Raw data by NorbertW
+    if($cmd =~ m/^..4./ && $p =~ m/^(..)(..)$/) {
+      my ($button, $bno) = (hex($1), hex($2));
+      push @event, "state:Btn$button toggle$target";
+
+      if($id eq $dst && $cmd ne "8002") {  # Send Ack
+        CUL_HM_SendCmd($shash, "++8002".$id.$src."01010000",1,0) # Send Ack.
+      }
     }
 
   } elsif($st eq "motionDetector") { #####################################
