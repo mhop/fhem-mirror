@@ -138,7 +138,7 @@ FHEM2FHEM_Read($)
         LoadModule($type);
         $defs{$name}{NAME}  = $name;
         $defs{$name}{TYPE}  = $type;
-        $defs{$name}{READINGS}{STATE} = 'fake';
+        $defs{$name}{READINGS}{state} = 'fake';
         DoTrigger($name, $msg);
         delete($defs{$name});
 
