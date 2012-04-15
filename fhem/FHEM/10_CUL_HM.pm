@@ -354,8 +354,8 @@ CUL_HM_Parse($$)
       # Set the valve state too, without an extra trigger
       if($dhash) {
         $dhash->{STATE} = "$vp %";
-        $dhash->{READINGS}{STATE}{TIME} = $tn;
-        $dhash->{READINGS}{STATE}{VAL} = "$vp %";
+        $dhash->{READINGS}{state}{TIME} = $tn;
+        $dhash->{READINGS}{state}{VAL} = "$vp %";
       }
     }
 
