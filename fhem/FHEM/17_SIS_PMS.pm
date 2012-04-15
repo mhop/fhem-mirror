@@ -131,8 +131,8 @@ SIS_PMS_Parse($$)
 	    DoTrigger($def->{NAME}, undef);
 	}
 	$def->{STATE} = $sockst;
-	$def->{READINGS}{STATE}{TIME} = TimeNow();
-	$def->{READINGS}{STATE}{VAL} = $sockst;
+	$def->{READINGS}{state}{TIME} = TimeNow();
+	$def->{READINGS}{state}{VAL} = $sockst;
 	Log 5, "SIS_PMS " . $def->{NAME} ." state $sockst";
 
 	return $def->{NAME};
@@ -251,8 +251,8 @@ SIS_PMS_Set($@)
 	$hash->{PREV}{STATE} = $prevstate;
 	$hash->{CHANGED}[0] = $currstate;
 	$hash->{STATE} = $currstate;
-	$hash->{READINGS}{STATE}{TIME} = TimeNow();
-	$hash->{READINGS}{STATE}{VAL} = $currstate;
+	$hash->{READINGS}{state}{TIME} = TimeNow();
+	$hash->{READINGS}{state}{VAL} = $currstate;
 #	DoTrigger($hash->{NAME}, undef);
     }
 
