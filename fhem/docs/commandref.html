@@ -8202,10 +8202,26 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
         Disables the corresponding at/notify or FileLog device. Note:
         If applied to an <a href="#at">at</a>, the command will not be executed,
         but the next time will be computed.</li><br>
+
     <a name="skip_next"></a>
     <li>skip_next<br>
-    Used for at commands: skip the execution of the command the next
+        Used for at commands: skip the execution of the command the next
         time.</li><br>
+
+    <a name="alignTime"></a>
+    <li>alignTime<br>
+        Applies only to relative at definitions: adjust the time of the next
+        command execution so, that it will also be executed at the desired
+        alignTime. The argument is a timespec, see above for the
+        definition.<br>
+        Example:<br>
+        <ul>
+        # Make sure that it chimes when the new hour begins<br>
+        define at2 at +*01:00 set Chime on-for-timer 1<br>
+        attr atr2 alignTime 00:00<br>
+        </ul>
+        </li><br>
+
   </ul>
   <br>
 
