@@ -49,6 +49,7 @@ at_Define($$)
   $cnt = "" if(!defined($cnt));
 
   my $ot = $data{AT_TRIGGERTIME} ? $data{AT_TRIGGERTIME} : gettimeofday();
+  $ot = int($ot) if(!$rel);     # No way to specify subseconds
   my @lt = localtime($ot);
   my $nt = $ot;
 
