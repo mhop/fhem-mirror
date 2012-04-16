@@ -25,7 +25,7 @@ M232Voltage_Initialize($)
   $hash->{GetFn}     = "M232Voltage_Get";
   $hash->{DefFn}     = "M232Voltage_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model;M232Voltage loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "dummy:1,0 model:M232Voltage loglevel:0,1,2,3,4,5";
 }
 
 ###################################

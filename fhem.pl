@@ -2017,7 +2017,6 @@ RemoveInternalTimer($)
   }
 }
 
-
 #####################################
 sub
 SignalHandling()
@@ -2835,7 +2834,7 @@ concatc($$$) {
 sub
 createInterfaceDefinitions() {
 
-  Log 2, "Creating interface definitions...";
+  #Log 2, "Creating interface definitions...";
   # The interfaces list below consists of lines with the 
   # pipe-separated parts
   # - name
