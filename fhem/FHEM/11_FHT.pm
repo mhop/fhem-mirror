@@ -163,9 +163,9 @@ FHT_Initialize($)
   $hash->{DefFn}     = "FHT_Define";
   $hash->{UndefFn}   = "FHT_Undef";
   $hash->{ParseFn}   = "FHT_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 model;fht80b dummy:0,1 " .
-                       "showtime:0,1 loglevel:0,1,2,3,4,5,6 retrycount " .
-                       "minfhtbuffer lazy tmpcorr ignore:0,1";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 model:fht80b dummy:1,0 " .
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 retrycount " .
+                       "minfhtbuffer lazy tmpcorr ignore:1,0";
 }
 
 
@@ -421,7 +421,10 @@ FHT_Parse($$)
     $val = $c2m{$val} if(defined($c2m{$val}));
 
   } elsif($cmd =~ m/.*-temp/) {
-    $val = sprintf("%.1f", $val / 2)
+    $val = sprintf("%.1f", $val / 2);
+    if($cmd eq "desired-temp") {
+      $val = ($val > 30 ? "on" : ($val < 6 ? "off" : $val));
+    }
 
   } elsif($cmd eq "lowtemp-offset") {
     $val = sprintf("%d.0", $val)

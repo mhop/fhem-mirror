@@ -43,7 +43,7 @@ IT_Initialize($)
   $hash->{DefFn}     = "IT_Define";
   $hash->{UndefFn}   = "IT_Undef";
 #  $hash->{ParseFn}   = "IT_Parse";
-  $hash->{AttrList}  = "IODev switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 model;itremote,itswitch,itdimmer loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev switch_rfmode:1,0 do_not_notify:1,0 ignore:0,1 dummy:1,0 model:itremote,itswitch,itdimmer loglevel:0,1,2,3,4,5,6";
 
 }
 

@@ -28,7 +28,7 @@ M232Counter_Initialize($)
   $hash->{SetFn}     = "M232Counter_Set";
   $hash->{DefFn}     = "M232Counter_Define";
 
-  $hash->{AttrList}  = "dummy:1,0 model;M232Counter loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "dummy:1,0 model:M232Counter loglevel:0,1,2,3,4,5";
 }
 
 ###################################
