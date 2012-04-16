@@ -130,13 +130,12 @@ CUL_HM_Initialize($)
   $hash->{DefFn}     = "CUL_HM_Define";
   $hash->{ParseFn}   = "CUL_HM_Parse";
   $hash->{SetFn}     = "CUL_HM_Set";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-                       "subType:switch,dimmer,blindActuator,remote,sensor,".
-                         "swi,pushButton,threeStateSensor,motionDetector,".
-                         "keyMatic,winMatic,smokeDetector " .
-                       "hmClass:receiver,sender serialNr firmware devInfo ".
-                       "rawToReadable unit";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 " .
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
+                       "hmClass:receiver,sender serialNr firmware devInfo";
+  $hash->{AttrList}  .= " model:"  .join(",", sort values %culHmModel);
+  $hash->{AttrList}  .= " subType:".join(",", sort 
+                map { $culHmDevProps{$_}{st} } keys %culHmDevProps);
 }
 
 
