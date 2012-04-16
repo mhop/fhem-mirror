@@ -21,7 +21,7 @@ sub FW_makeEdit($$$);
 sub FW_makeTable($$@);
 sub FW_ReadIcons();
 sub FW_roomOverview($);
-sub FW_select($$$$);
+sub FW_select($$$$@);
 sub FW_showLog($);
 sub FW_showRoom();
 sub FW_showWeblink($$$$);
@@ -396,23 +396,13 @@ FW_AnswerCall($)
                                                 $FW_tp ? "640,160" : "800,160");
   ##############################
   # Axels FHEMWEB modules...
-  my $fwextPtr;
   if(defined($data{FWEXT})) {
     foreach my $k (sort keys %{$data{FWEXT}}) {
       if($arg =~ m/^$k/) {
-
-        if($data{FWEXT}{$k}{EMBEDDED}) {
-          $fwextPtr = $data{FWEXT}{$k};
-          last;
-
-        } else {
-          no strict "refs";
-          ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
-          use strict "refs";
-          return 0;
-
-        }
-
+        no strict "refs";
+        ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
+        use strict "refs";
+        return 0;
       }
     }
   }
@@ -497,7 +487,6 @@ FW_AnswerCall($)
   if($FW_tp || $FW_ss) {
     FW_pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/fhemicon.png"/>';
     FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
-    #FW_pO '<meta name="viewport" content="width=device-width"/>'
     if($FW_ss) {
       FW_pO '<meta name="viewport" content="width=320"/>';
     } elsif($FW_tp) {
@@ -511,15 +500,11 @@ FW_AnswerCall($)
   $prf = "smallscreen" if(!$prf && $FW_ss);
   $prf = "touchpad"    if(!$prf && $FW_tp);
   FW_pO "<link href=\"$FW_ME/".$prf."style.css\" rel=\"stylesheet\"/>";
-  FW_pO "<link href=\"$fwextPtr->{STYLESHEET}\" rel=\"stylesheet\"/>"
-                        if($fwextPtr && $fwextPtr->{STYLESHEET});
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
-                        if($FW_longpoll);
-  FW_pO "<script type=\"text/javascript\" src=\"$fwextPtr->{JAVASCRIPT}\"></script>"
-                        if($fwextPtr && $fwextPtr->{JAVASCRIPT});
-  FW_pO "</head>\n<body name=\"$t\">";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/fhemweb.js\"></script>";
+  my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
+  FW_pO "</head>\n<body name=\"$t\" $onload>";
 
   if($FW_cmdret) {
     $FW_detail = "";
@@ -538,8 +523,7 @@ FW_AnswerCall($)
   } 
 
   FW_roomOverview($cmd);
-     if($fwextPtr)             { &{$fwextPtr->{FUNC}}($arg); }
-  elsif($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
+     if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
   elsif($cmd =~ /^logwrapper/) { FW_logWrapper($cmd);     }
@@ -681,13 +665,14 @@ FW_makeSelect($$$$)
 {
   my ($d, $cmd, $list,$class) = @_;
   return if(!$list || $FW_hiddenroom{input});
-  my @al = sort map { s/[:;].*//;$_ } split(" ", $list);
+  my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
   FW_pO "<form method=\"get\" action=\"$FW_ME$FW_subdir\">";
   FW_pO FW_hidden("detail", $d);
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd) . "&nbsp;$d";
-  FW_pO FW_select("arg.$cmd$d",\@al,undef,$class);
+  FW_pO FW_select("arg.$cmd$d",\@al, undef, $class,
+        "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
   FW_pO "</form>";
 }
@@ -721,7 +706,11 @@ FW_doDetail($)
   FW_makeTable($d, $defs{$d});
   FW_pO "Readings" if($defs{$d}{READINGS});
   FW_makeTable($d, $defs{$d}{READINGS});
-  FW_makeSelect($d, "attr", getAllAttr($d),"attr");
+  my $attrList = getAllAttr($d);
+  my $roomList = join(",", sort keys %FW_rooms);
+  $roomList=~s/ /\&nbsp;/g;
+  $attrList =~ s/room /room:$roomList /;
+  FW_makeSelect($d, "attr", $attrList,"attr");
   FW_makeTable($d, $attr{$d}, "deleteattr");
 
 
@@ -1287,10 +1276,11 @@ FW_hidden($$)
 ##################
 # Generate a select field with option list
 sub
-FW_select($$$$)
+FW_select($$$$@)
 {
-  my ($n, $va, $def,$class) = @_;
-  my $s = "<select name=\"$n\" class=\"$class\">";
+  my ($n, $va, $def,$class,$jfn) = @_;
+  $jfn = ($jfn ? "onchange=\"$jfn\"" : "");
+  my $s = "<select $jfn name=\"$n\" class=\"$class\">";
 
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
@@ -2068,7 +2058,7 @@ FW_devState($$)
       $link .= "&room=$room";
     }
     if($FW_longpoll) {
-      $txt = "<a onClick=\"cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
+      $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
       $txt = "<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf'\">$txt</a>";
