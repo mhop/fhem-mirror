@@ -23,6 +23,7 @@
   - feature: sleep issued in at/notify/etc is not blocking fhem anymore
   - feature: dummy got a setList attribute
   - feature: new module 02_RSS.pm 
+  - feature: at attribute alignTime added
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
