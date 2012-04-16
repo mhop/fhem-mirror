@@ -15,11 +15,11 @@ at_Initialize($)
   $hash->{DefFn}    = "at_Define";
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
-  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6 ".
+                      "alignTime";
 }
 
 
-my $at_tdiff;
 my $oldattr;
 
 #####################################
@@ -48,7 +48,7 @@ at_Define($$)
   $rep = "" if(!defined($rep));
   $cnt = "" if(!defined($cnt));
 
-  my $ot = gettimeofday();
+  my $ot = $data{AT_TRIGGERTIME} ? $data{AT_TRIGGERTIME} : gettimeofday();
   my @lt = localtime($ot);
   my $nt = $ot;
 
@@ -56,7 +56,6 @@ at_Define($$)
                         if($rel ne "+");
   $nt += ($hr*3600+$min*60+$sec); # Plus relative time
   $nt += SecondsTillTomorrow($ot) if($ot >= $nt);  # Do it tomorrow...
-  $nt += $at_tdiff if(defined($at_tdiff));
 
   @lt = localtime($nt);
   my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
@@ -114,8 +113,8 @@ at_Exec($)
 
   $oldattr = $attr{$name};           # delete removes the attributes too
 
-  # Correct drift when the timespec is relative
-  $at_tdiff = $defs{$name}{TRIGGERTIME}-gettimeofday() if($def =~ m/^\+/);
+  # Avoid drift when the timespec is relative
+  $data{AT_TRIGGERTIME} = $defs{$name}{TRIGGERTIME} if($def =~ m/^\+/);
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
@@ -128,23 +127,50 @@ at_Exec($)
     $attr{$name} = $oldattr;
     $oldattr = undef;
   }
-  $at_tdiff = undef;
+  delete($data{AT_TRIGGERTIME});
 }
 
 sub
 at_Attr(@)
 {
-  my @a = @_;
+  my ($cmd, $name, $attrName, $attrVal) = @_;
   my $do = 0;
 
-  if($a[0] eq "set" && $a[2] eq "disable") {
-    $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
+  if($cmd eq "set" && $attrName eq "alignTime") {
+    return "alignTime needs a list of timespec parameters" if(!$attrVal);
+    my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
+    return "$name alignTime: $alErr" if($alErr);
+
+    my ($tm, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
+    $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
+    my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
+    return "startTimes: $name is not relative" if(!$rel);
+    my (undef, $hr, $min, $sec, undef) = GetTimeSpec($tspec);
+
+    my $alTime = ($alHr*60+$alMin)*60+$alSec;
+    my $step = ($hr*60+$min)*60+$sec;
+    my $ttime = int($defs{$name}{TRIGGERTIME});
+    my $off = ($ttime % 86400) - 86400;
+    while($off < $alTime) {
+      $off += $step;
+    }
+    $ttime += ($alTime-$off);
+    $ttime += $step if($ttime < time());
+
+    RemoveInternalTimer($name);
+    InternalTimer($ttime, "at_Exec", $name, 0);
+    $defs{$name}{TRIGGERTIME} = $ttime;
+    $defs{$name}{STATE} = "Next: " . FmtTime($ttime);
   }
-  $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
+
+  if($cmd eq "set" && $attrName eq "disable") {
+    $do = (!defined($attrVal) || $attrVal) ? 1 : 2;
+  }
+  $do = 2 if($cmd eq "del" && (!$attrName || $attrName eq "disable"));
   return if(!$do);
-  $defs{$a[1]}{STATE} = ($do == 1 ?
+  $defs{$name}{STATE} = ($do == 1 ?
         "disabled" :
-        "Next: " . FmtTime($defs{$a[1]}{TRIGGERTIME}));
+        "Next: " . FmtTime($defs{$name}{TRIGGERTIME}));
 
   return undef;
 }
