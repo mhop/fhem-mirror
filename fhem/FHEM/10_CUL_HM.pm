@@ -117,7 +117,7 @@ my %culHmModel=(
   "0061" => "HM-LC-SW4-DR",    # Tested by fhem-hm-knecht
   "0062" => "HM-LC-SW2-DR",
   "0066" => "HM_LC_Sw4-WM",    # Tested by peterp
-  "006C" => "HM-LC-SW1-PCB",   # By jan (unsure if working)
+  "006C" => "HM-LC-SW1-BA-PCB",   # Tested by MartiMcFly
 );
 
 
@@ -1003,12 +1003,14 @@ CUL_HM_Set($@)
         sprintf("++A001%s%s%s0E", $id,$dst, $chn));
 
   } elsif($cmd eq "on") { ###############################################
+  	my $headerbytes = $md eq "HM-LC-SW1-BA-PCB" ? "FF" : "A0"; # Needs Burst Headerbyte See CC1100 FM transceiver
     CUL_HM_PushCmdStack($hash,
-        sprintf("++A011%s%s02%sC80000", $id,$dst, $chn));
+        sprintf("++%s11%s%s02%sC80000", $headerbytes, $id,$dst, $chn));
 
   } elsif($cmd eq "off") { ##############################################
+ 	my $headerbytes = $md eq "HM-LC-SW1-BA-PCB" ? "FF" : "A0"; # Needs Burst Headerbyte See CC1100 FM transceiver
     CUL_HM_PushCmdStack($hash,
-        sprintf("++A011%s%s02%s000000", $id,$dst,$chn));
+        sprintf("++%s11%s%s02%s000000", $headerbytes, $id,$dst,$chn));
 
   } elsif($cmd eq "on-for-timer") { #####################################
     ($tval,$ret) = CUL_HM_encodeTime16($a[2]);
