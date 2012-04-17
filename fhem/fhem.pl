@@ -1539,12 +1539,11 @@ CommandReload($$)
   Log 5, "Loading $file";
 
   no strict "refs";
-  eval {
+  my $ret = eval {
     my $ret=do "$file";
     if(!$ret) {
       Log 1, "reload: Error:Modul $param deactivated:\n $@";
-      use strict "refs";
-      return "$@";
+      return $@;
     }
 
     # Get the name of the initialize function. This may differ from the
@@ -1556,12 +1555,14 @@ CommandReload($$)
         last;
       }
     }
-    $ret = &{ "${fnname}_Initialize" }(\%hash);
+    &{ "${fnname}_Initialize" }(\%hash);
     $m = $fnname;
+    return undef;
   };
   use strict "refs";
 
   return "$@" if($@);
+  return $ret if($ret);
 
   my ($defptr, $ldata);
   if($modules{$m}) {
