@@ -1560,6 +1560,7 @@ FW_style($$)
     print FH $FW_data;
     close(FH);
     my $ret = FW_fC("rereadcfg") if($fName eq $attr{global}{configfile});
+    $ret = FW_fC("reload $1") if($fName =~ m,.*/([^/]*).pm,);
     $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fName");
     FW_style("style list", $ret);
     $ret = "";
