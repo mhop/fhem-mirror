@@ -1748,19 +1748,20 @@ A line ending with \ will be concatenated with the next one, so long lines
               </ul>
           </ul>
           The temperature for the holiday period is set by the desired-temperature
-          parameter.  Note that you cannot set holiday mode for days earlier than the
+          parameter. <br> Note that you cannot set holiday mode for days earlier than the
           day after tomorrow, for this you must use holiday_short.<br>
-          Note also, sou cannot set parameters seperately, you must set them in one command.
+          Note also, you cannot set parameters seperately, you must set them in one command.
           Example:
           <br>
-	  set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14
+	  <code>set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14</code>
+          </li>
           <br>
 
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
       spec as argument in the HH:MM format. They define the periods, where
       the day-temp is valid. The minute (MM) will be rounded to 10, and
       24:00 means off.
-          <br><br>
+          <br><br></li>
 
       <li>To synchronize the FHT time and to "wake" muted FHTs it is adviseable
           to schedule following command:<br>
@@ -1771,13 +1772,13 @@ A line ending with \ will be concatenated with the next one, so long lines
           monday till sunday to be sent. The argument is a bitfield, to request
           unique values add up the following:
           <ul>
-            <li> 1: monday
-            <li> 2: tuesday
-            <li> 4: thursday
-            <li> 8: wednesday
-            <li>16: friday
-            <li>32: saturday
-            <li>64: sunday
+            <li> 1: monday</li>
+            <li> 2: tuesday</li>
+            <li> 4: thursday</li>
+            <li> 8: wednesday</li>
+            <li>16: friday</li>
+            <li>32: saturday</li>
+            <li>64: sunday</li>
           </ul>
           measured-temp and actuator is sent along if it is considered
           appropriate
@@ -1785,7 +1786,7 @@ A line ending with \ will be concatenated with the next one, so long lines
           <br><br>
           <b>Note:</b> This command generates a lot of RF traffic, which can
           lead to further problems, especially if the reception is not clear.
-          <br><br>
+          <br><br></li>
 
       <li><code>report2</code> with parameter 255 requests the following
           settings to be reported: day-temp night-temp windowopen-temp
