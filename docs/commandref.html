@@ -1650,7 +1650,7 @@ A line ending with \ will be concatenated with the next one, so long lines
       report1 report2
       refreshvalues
       mode
-      holiday1 holiday2      # Not verified
+      holiday1 holiday2      # see mode holiday_short or holiday
       manu-temp              # No clue what it does.
       year month day hour minute
       time date
@@ -1728,18 +1728,18 @@ A line ending with \ will be concatenated with the next one, so long lines
 
       <li><code>mode</code> is one of <code>auto, manual, holiday or
           holiday_short.</code><br>
-          If the mode is holiday, then
+          If the mode is holiday, then the mode switches back to either auto or
+          manual at 00:00 of the day specified by the following:
             <ul>
-              <li>holiday1 sets the end-time of the holiday, in 10-minute steps</li>
-              <li>holiday2 sets the end-day of the holiday</li>
+              <li>holiday1 sets the end-day of the holiday</li>
+              <li>holiday2 sets the end-month of the holiday</li>
             </ul>
           For holiday_short (party mode)
           <ul>
               <li> holiday1 sets the absolute hour to switch back from this
               mode (in 10-minute steps, max 144)
               <li> holiday2 sets the day of month to switch back from this mode
-              (if holiday1 exceeds 144, subtract 144 and increase holiday2 with
-              1).
+              (can only be today or tomorrow, since holiday1 accepts only 24 hours).
               Example:
               <ul>
                   <li> current date is 29 Jan, time is 18:05
@@ -1747,6 +1747,13 @@ A line ending with \ will be concatenated with the next one, so long lines
                   <li> set holiday1 to 6 (6 x 10min = 1hour) and holiday2 to 30
               </ul>
           </ul>
+          The temperature for the holiday period is set by the desired-temperature
+          parameter.  Note that you cannot set holiday mode for days earlier than the
+          day after tomorrow, for this you must use holiday_short.<br>
+          Note also, sou cannot set parameters seperately, you must set them in one command.
+          Example:
+          <br>
+	  set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14
           <br>
 
       <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
