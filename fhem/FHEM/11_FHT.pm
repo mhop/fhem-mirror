@@ -207,8 +207,15 @@ FHT_Set($@)
   while(@a) {
     $cmd = shift(@a);
 
-    return "Unknown argument $cmd, choose one of " . join(" ",sort keys %c2bset)
-                if(!defined($c2b{$cmd}));
+    if(!defined($c2b{$cmd})) {
+      my $cmdList = join(" ",sort keys %c2bset);
+      my @list = map { ($_.".0", $_+0.5) } (6..30);
+      pop @list;
+      my $tmpList="on,off,".join(",",@list);
+      $cmdList =~ s/-temp/-temp:$tmpList/g;
+      return "Unknown argument $cmd, choose one of $cmdList";
+    }
+
     return "Readonly parameter $cmd"
                 if(defined($cantset{$cmd}));
     return "\"set $name $cmd\" needs a parameter"
@@ -219,11 +226,13 @@ FHT_Set($@)
 
     if ($cmd =~ m/-temp/) {
 
-      my @list = map { ($_.".0", $_+0.5) } (6..30);
-      pop @list;
-      return "Invalid temperature $val, choose one of on off " . join(" ",@list)
-        if(!($val eq "on" || $val eq "off" ||
-             ($val =~ m/^\d*\.?\d+$/ && $val >= 5.5 && $val <= 30.5)));
+      if(!($val eq "on" || $val eq "off" ||
+          ($val =~ m/^\d*\.?\d+$/ && $val >= 5.5 && $val <= 30.5))) {
+        my @list = map { ($_.".0", $_+0.5) } (6..30);
+        pop @list;
+        return "Invalid temperature $val, choose one of on off "
+                . join(" ",@list);
+      }
 
       $val = 30.5 if($val eq "on");
       $val =  5.5 if($val eq "off");
