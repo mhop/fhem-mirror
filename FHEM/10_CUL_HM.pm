@@ -955,8 +955,18 @@ CUL_HM_Set($@)
                   if($culHmSubTypeSets{$st});
     $usg .= " ". join(" ",sort keys %{$culHmModelSets{$md}})
                   if($culHmModelSets{$md});
-    my $pct = join(" ", (0..100));
-    $usg =~ s/ pct/ $pct/;
+
+    if($usg =~ m/ pct/) {
+      my $pct = join(" ", (0..100));
+      $usg =~ s/ pct/ $pct/;
+
+    } elsif($md eq "HM-CC-TC") {
+      my @list = map { ($_.".0", $_+0.5) } (6..30);
+      pop @list;
+      my $list = "on,off," . join(",",@list);
+      $usg =~ s/-temp/-temp:$list/g;
+    }
+
     return $usg;
 
   } elsif($h eq "" && @a != 2) {
@@ -1786,11 +1796,12 @@ CUL_HM_convTemp($)
 {
   my ($val) = @_;
 
-  my @list = map { ($_.".0", $_+0.5) } (6..30);
-  pop @list;
-  return "Invalid temperature $val, choose one of on off " . join(" ",@list)
-    if(!($val eq "on" || $val eq "off" ||
-         ($val =~ m/^\d*\.?\d+$/ && $val >= 6 && $val <= 30)));
+  if(!($val eq "on" || $val eq "off" ||
+      ($val =~ m/^\d*\.?\d+$/ && $val >= 6 && $val <= 30))) {
+    my @list = map { ($_.".0", $_+0.5) } (6..30);
+    pop @list;
+    return "Invalid temperature $val, choose one of on off " . join(" ",@list);
+  }
   $val = 100 if($val eq "on");
   $val =   0 if($val eq "off");
   return sprintf("%02X", $val*2);
