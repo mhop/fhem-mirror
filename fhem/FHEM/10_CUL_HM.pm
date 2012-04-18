@@ -132,7 +132,8 @@ CUL_HM_Initialize($)
   $hash->{SetFn}     = "CUL_HM_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
-                       "hmClass:receiver,sender serialNr firmware devInfo";
+                       "hmClass:receiver,sender serialNr firmware devInfo ".
+                       "rawToReadable unit";
   $hash->{AttrList}  .= " model:"  .join(",", sort values %culHmModel);
   $hash->{AttrList}  .= " subType:".join(",", sort 
                 map { $culHmDevProps{$_}{st} } keys %culHmDevProps);
@@ -550,8 +551,8 @@ CUL_HM_Parse($$)
             my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
             my $unit = AttrVal($name, "unit", "");
             $unit = " $unit" if($unit);
-            push @event, "state:$cv $unit";
-            push @event, "content:$cv $unit";
+            push @event, sprintf("state:%.1f %s",$cv,$unit);
+            push @event, sprintf("content:%.1f %s",$cv,$unit);
             last;
           }
         }
