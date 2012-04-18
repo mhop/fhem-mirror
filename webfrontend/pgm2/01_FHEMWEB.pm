@@ -92,10 +92,11 @@ FHEMWEB_Initialize($)
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
   $hash->{NotifyFn}= "FW_Notify";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress " .
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress:0,1 ".
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheetPrefix hiddenroom HTTPS longpoll redirectCmds ";
+                     "stylesheetPrefix hiddenroom HTTPS longpoll:1,0 ".
+                     "redirectCmds:0,1 ";
 
   ###############
   # Initialize internal structures
@@ -929,23 +930,26 @@ FW_showRoom()
         FW_pO "</td>";
         if($cmdlist) {
           foreach my $cmd (split(":", $cmdlist)) {
-            FW_pH "cmd.$d=set $d $cmd$rf",  ReplaceEventMap($d,$cmd,1), 1, "col3";
+            FW_pH "cmd.$d=set $d $cmd$rf", ReplaceEventMap($d,$cmd,1),1,"col3";
           }
 
-        } elsif($allSets =~ m/ desired-temp /) {
+        } elsif($allSets =~ m/ desired-temp:([^ ]*)/) {
+          my @tv = split(",", $1);
           $txt = ReadingsVal($d, "measured-temp", "");
           $txt =~ s/ .*//;
           $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-          my @tv = split(" ", getAllSets("$d desired-temp"));
           $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
 
           FW_pO "<td>".
-             FW_hidden("arg.$d", "desired-temp") .
-             FW_hidden("dev.$d", $d) .
-             FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt),"fht") .
-             "</td><td>".
-             FW_submit("cmd.$d", "set").
-             "</td>";
+            FW_hidden("arg.$d", "desired-temp") .
+            FW_hidden("dev.$d", $d) .
+            ($FW_room ? FW_hidden("room", $FW_room) : "") .
+            FW_select("val.$d", \@tv,
+                        ReadingsVal($d, "desired-temp", $txt),"fht") .
+            "</td><td>".
+            FW_submit("cmd.$d", "set").
+            "</td>";
+
         } elsif($type eq "FileLog") {
           $row = FW_dumpFileLog($d, 1, $row);
 
