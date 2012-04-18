@@ -79,10 +79,13 @@ my %models = (
     fs20uts     => 'sender',    # Universal Thermostat Sender
     fs20ze      => 'sender',    # FunkTimer (ZeitEinheit?)
     fs20bf      => 'sender',    # BodenFeuchte
+    fs20bs      => 'sender',    # Beschattung
+    dummySender => 'sender',
 
     fs20di      => 'dimmer',
     fs20di10    => 'dimmer',
     fs20du      => 'dimmer',
+    dummyDimmer => 'dimmer',
 
     fs20as1     => 'simple',
     fs20as4     => 'simple',
@@ -100,6 +103,7 @@ my %models = (
     fs20ue1     => 'simple',
     fs20usr     => 'simple',
     fs20ws1     => 'simple',
+    dummySimple => 'simple',
 
 );
 
@@ -122,7 +126,10 @@ FS20_Initialize($)
   $hash->{DefFn}     = "FS20_Define";
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
-  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 model:fs20as1,fs20as4,fs20bf,fs20di,fs20du,fs20hgs,fs20hgs,fs20ls,fs20ms2,fs20pira,fs20piri,fs20rst,fs20s20,fs20s4,fs20s4a,fs20s4m,fs20s4u,fs20s4ub,fs20s8,fs20sa,fs20sd,fs20sig,fs20sn,fs20sr,fs20ss,fs20st,fs20str,fs20sv,fs20tfk,fs20tfk,fs20tk,fs20usr,fs20uts,fs20ze loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 ".
+                        "ignore:1,0 dummy:1,0 showtime:1,0 ".
+                        "loglevel:0,1,2,3,4,5,6 " .
+                        "model:".join(",", sort keys %models);
 }
 
 #####################################
