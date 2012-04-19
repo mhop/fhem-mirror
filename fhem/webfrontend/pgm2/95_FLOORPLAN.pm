@@ -431,9 +431,7 @@ FP_show(){
     ########################
     # Device-state per device
 		FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
-		Log 1, "Reading is $txt";
         $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;
-		Log 1, "replaced reading is $txt";
 		FW_pO "<td colspan=\"$cols\">$txt";
 		FW_pO "</td></tr>";
 
