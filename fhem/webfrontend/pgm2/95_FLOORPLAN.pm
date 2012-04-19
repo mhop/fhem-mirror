@@ -19,6 +19,7 @@
 # 0011: Added Style4, code beautification, css review, minor $text2-fix (SVN 1342)
 # 0012: Added startscreen-text when no floorplans defined, fixed startscreen-stylesheet, added div for bg-img, added arrangeByMouse (1368)
 # 0013: implemented redirectCmd, fixed minor </td></tr>-error in html-output, fp_arrange for single web-devices, fp_arrange detail (Mar 23, 2012)
+# 0014: deleted $data{FWEXT}{$fhem_url}{STYLESHEET} , added attr-values for FHEMWEB-detail-screen, adapted FHT-representation to FHT.pm updates
 #
 ################################################################
 #
@@ -120,7 +121,7 @@ FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn} = "FP_define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange commandfield fp_default fp_stylesheetPrefix fp_noMenu";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 fp_stylesheetPrefix fp_noMenu:1,0";
   # fp_arrange			: show addtl. menu for  attr fp_<name> ....
   # commandfield		: shows an fhem-commandline inputfield on floorplan
   # fp_default			: set for ONE floorplan. If set, floorplan-startscreen is skipped.
@@ -134,7 +135,7 @@ FLOORPLAN_Initialize($)
   $data{FWEXT}{$fhem_url}{LINK} = $name;
   $data{FWEXT}{$fhem_url}{NAME} = "Floorplans";
 #  $data{FWEXT}{$fhem_url}{EMBEDDED} = 1;             # not using embedded-mode to save screen-space
-  $data{FWEXT}{$fhem_url}{STYLESHEET} = "floorplanstyle.css";
+#  $data{FWEXT}{$fhem_url}{STYLESHEET} = "floorplanstyle.css";
   # Global-Config for CSS
   $modules{_internal_}{AttrList} .= " VIEW_CSS";
   my $n = 0;
@@ -314,11 +315,11 @@ FP_htmlHeader($) {
   if ($FP_name) {
 	my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
   	FW_pO  ("<link href=\"$FW_ME/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix
-	$data{FWEXT}{$fhem_url}{STYLESHEET} = "$prf"."floorplanstyle.css";
+#	$data{FWEXT}{$fhem_url}{STYLESHEET} = "$prf"."floorplanstyle.css";
   } else {  
 	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
     FW_pO  "<link href=\"$FW_ME/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen
-	$data{FWEXT}{$fhem_url}{STYLESHEET} = $css;
+#	$data{FWEXT}{$fhem_url}{STYLESHEET} = $css;
   }
   #set sripts
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
@@ -430,6 +431,9 @@ FP_show(){
     ########################
     # Device-state per device
 		FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
+		Log 1, "Reading is $txt";
+        $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;
+		Log 1, "replaced reading is $txt";
 		FW_pO "<td colspan=\"$cols\">$txt";
 		FW_pO "</td></tr>";
 
@@ -443,17 +447,20 @@ FP_show(){
           FW_pO "  </tr>";
 		} elsif($type eq "FileLog") {
 		# devices with desired-temp-reading, e.g. FHT
-		} elsif($style == 2 && $allSets =~ m/ desired-temp /) {                                # FHT-set
+		} elsif($style == 2 && $allSets =~ m/ desired-temp:([^ ]*)/) {                                # FHT-set
+		  my @tv = split(",", $1);
     	  FW_pO "  <tr class=\"devicecommands\" id=\"$d\">";
           $txt = ReadingsVal($d, "measured-temp", "");
           $txt =~ s/ .*//;
           $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-          my @tv = split(" ", getAllSets("$d desired-temp"));
+#          my @tv = split(" ", getAllSets("$d desired-temp"));
           $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
           FW_pO "<td>".
              FP_input("dev.$d", $d, "hidden") .
              FP_input("arg.$d", "desired-temp", "hidden") .
              FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt),"devicecommands") .
+#            FW_select("val.$d", \@tv,
+#                        ReadingsVal($d, "desired-temp", $txt),"fht") .			 
              FW_submit("cmd.$d", "set").
              "</td></tr>";
         } 
