@@ -57,10 +57,21 @@ Slider(slider, min, stp, max)
   var sh = slider.firstChild;
   var lastX=-1, offX=-1, minX, maxX, val=-1;
 
-  sh.onselectstart = function() { return false; }
-  sh.onmousedown = function(e) {
-    var oldMoveFn = document['onmousemove'];
-    var oldUpFn = document['onmouseup'];
+  function
+  touchFn(e, fn)
+  {
+    e.preventDefault(); // Prevents Safari from scrolling!
+    if(e.touches == null || e.touches.length == 0)
+      return;
+    e.clientX = e.touches[0].clientX;
+    fn(e);
+  }
+
+  function
+  mouseDown(e)
+  {
+    var oldFn1 = document.onmousemove, oldFn2 = document.onmouseup,
+        oldFn3 = document.ontouchmove, oldFn4 = document.ontouchend;
 
     if(offX == -1) {
       minX = offX = slider.offsetLeft;
@@ -68,7 +79,9 @@ Slider(slider, min, stp, max)
     }
     lastX = e.clientX;
 
-    document['onmousemove'] = function(e) {
+    function
+    mouseMove(e)
+    {
       var diff = e.clientX-lastX; lastX = e.clientX;
       offX += diff;
       if(offX < minX) offX = minX;
@@ -78,13 +91,20 @@ Slider(slider, min, stp, max)
       sh.innerHTML = val;
       sh.setAttribute('style', 'left:'+offX+'px;');
     }
+    document.onmousemove = mouseMove;
+    document.ontouchmove = function(e) { touchFn(e, mouseMove); }
 
-    document.onmouseup = function(e) {
-      document['onmousemove'] = oldMoveFn;
-      document['onmouseup'] = oldUpFn;
+    document.onmouseup = document.ontouchend = function(e)
+    {
+      document.onmousemove = oldFn1; document.onmouseup  = oldFn2;
+      document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
       slider.nextSibling.setAttribute('value', val);
     };
   };
+
+  sh.onselectstart = function() { return false; }
+  sh.onmousedown = mouseDown;
+  sh.ontouchstart = function(e) { touchFn(e, mouseDown); }
 
 }
 
