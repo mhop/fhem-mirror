@@ -24,7 +24,7 @@
   - feature: dummy got a setList attribute
   - feature: new module 02_RSS.pm 
   - feature: at attribute alignTime added
-  - feature: FHEMWEB attribute values via dropdown
+  - feature: FHEMWEB attribute values via dropdown, slider for dimmer
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera

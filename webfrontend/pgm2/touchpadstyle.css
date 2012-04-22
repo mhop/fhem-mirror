@@ -23,3 +23,10 @@ table { -moz-border-radius:8px; border-radius:8px; }
 
 table#room { border:1px solid gray; width: 100%; background: #D7FFFF; }
 table#room tr.sel { background: #A0FFFF; }
+
+.set,.attr { margin-bottom:5px; float:left; }
+.slider { float:right; width:250px; height:26px; background:#F0F0D8;
+          margin-left:10px; -moz-border-radius:8px; border-radius:8px; }
+.handle { position:absolute; cursor:pointer; width:50px; height:20px; line-height:20px;
+          border:3px solid; color:#278727; text-align:center; } 
+.downText { margin-top:2px; }
