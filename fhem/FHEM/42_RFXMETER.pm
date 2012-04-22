@@ -34,7 +34,7 @@ RFXMETER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^0.*";
+  $hash->{Match}     = "^30.*";
   $hash->{DefFn}     = "RFXMETER_Define";
   $hash->{UndefFn}   = "RFXMETER_Undef";
   $hash->{ParseFn}   = "RFXMETER_Parse";
@@ -142,7 +142,7 @@ sub parse_RFXmeter {
   }
   #my $kwh = ( ($bytes->[4]<<16) + ($bytes->[2]<<8) + ($bytes->[3]) ) / 100;
   #Log 1, "RFXMETER: kwh=$kwh";
-  my $current = ($bytes->[4]<<16) + ($bytes->[2]<<8) + ($bytes->[3]) ;
+  my $current = ($bytes->[4] << 16)  + ($bytes->[2] << 8)  + ($bytes->[3]);
   Log 4, "RFXMETER: current=$current";
 
   my $device_name = "RFXMeter".$DOT.$device;
@@ -194,24 +194,26 @@ RFXMETER_Parse($$)
   my ($hash, $msg) = @_;
 
   my $time = time();
-  my $hexline = unpack('H*', $msg);
   if ($time_old ==0) {
-  	Log 5, "RFXMETER: decoding delay=0 hex=$hexline";
+  	Log 5, "RFXMETER: decoding delay=0 hex=$msg";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "RFXMETER: decoding delay=$time_diff hex=$hexline";
+  	Log 5, "RFXMETER: decoding delay=$time_diff hex=$msg";
   }
   $time_old = $time;
 
+  # convert to binary
+  my $bin_msg = pack('H*', $msg);
+
   # convert string to array of bytes. Skip length byte
   my @rfxcom_data_array = ();
-  foreach (split(//, substr($msg,1))) {
+  foreach (split(//, substr($bin_msg,1))) {
     push (@rfxcom_data_array, ord($_) );
   }
 
-  my $bits = ord($msg);
+  my $bits = ord($bin_msg);
   my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
-  Log 4, "RFXMETER: bits=$bits num_bytes=$num_bytes hex=$hexline";
+  Log 4, "RFXMETER: bits=$bits num_bytes=$num_bytes hex=$msg";
 
   my @res = "";
   if ($bits == 48) {
@@ -219,8 +221,7 @@ RFXMETER_Parse($$)
 	#parse_RFXmeter(\@rfxcom_data_array);
   } else {
 	# this should never happen as this module parses only RFXmeter messages
-  	my $hexline = unpack('H*', $msg);
-  	Log 1, "RFXMETER: error unknown hex=$hexline";
+  	Log 1, "RFXMETER: error unknown hex=$msg";
   }
  
   return @res;
