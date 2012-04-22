@@ -949,16 +949,13 @@ CUL_HM_Set($@)
     $cmd = "pct";
 
   } elsif(!defined($h)) {
-    my $usg = "Unknown argument $cmd, choose one of " .
-                 join(" ",sort keys %culHmGlobalSets);
-    $usg .= " ". join(" ",sort keys %{$culHmSubTypeSets{$st}})
-                  if($culHmSubTypeSets{$st});
-    $usg .= " ". join(" ",sort keys %{$culHmModelSets{$md}})
-                  if($culHmModelSets{$md});
+    my @arr = keys %culHmGlobalSets;
+    push @arr, keys %{$culHmSubTypeSets{$st}} if($culHmSubTypeSets{$st});
+    push @arr, keys %{$culHmModelSets{$md}} if($culHmModelSets{$md});
+    my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
 
     if($usg =~ m/ pct/) {
-      my $pct = join(" ", (0..100));
-      $usg =~ s/ pct/ $pct/;
+      $usg =~ s/ pct/ pct:slider,0,1,100/;
 
     } elsif($md eq "HM-CC-TC") {
       my @list = map { ($_.".0", $_+0.5) } (6..30);
@@ -968,6 +965,9 @@ CUL_HM_Set($@)
     }
 
     return $usg;
+
+  } elsif($cmd eq "pct") {
+    splice @a, 1, 1;
 
   } elsif($h eq "" && @a != 2) {
     return "$cmd requires no parameters";

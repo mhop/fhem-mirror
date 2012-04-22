@@ -26,7 +26,7 @@ sub FW_showLog($);
 sub FW_showRoom();
 sub FW_showWeblink($$$$);
 sub FW_style($$);
-sub FW_submit($$);
+sub FW_submit($$@);
 sub FW_substcfg($$$$$$);
 sub FW_textfield($$$);
 sub FW_updateHashes();
@@ -668,13 +668,22 @@ FW_makeSelect($$$$)
   return if(!$list || $FW_hiddenroom{input});
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
+  my $selEl = $al[0];
+  $selEl = $1 if($list =~ m/([^ ]*):slider,/); # if available
+  $selEl = "room" if($list =~ m/room:/);
+
   FW_pO "<form method=\"get\" action=\"$FW_ME$FW_subdir\">";
   FW_pO FW_hidden("detail", $d);
   FW_pO FW_hidden("dev.$cmd$d", $d);
-  FW_pO FW_submit("cmd.$cmd$d", $cmd) . "&nbsp;$d";
-  FW_pO FW_select("arg.$cmd$d",\@al, undef, $class,
+  FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
+  FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
+  FW_pO FW_select("arg.$cmd$d",\@al, $selEl, $class,
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
+
+  # Initial setting
+  FW_pO "<script type=\"text/javascript\">" .
+        "FW_selChange('$selEl','$list','val.$cmd$d')</script>";
   FW_pO "</form>";
 }
 
@@ -696,7 +705,8 @@ FW_doDetail($)
       FW_pO "<table>";
       foreach my $cmd (split(":", $webCmd)) {
         FW_pO "<tr>";
-        FW_pH "cmd.$d=set $d $cmd&detail=$d",  ReplaceEventMap($d,$cmd,1), 1, "col1";
+        FW_pH "cmd.$d=set $d $cmd&detail=$d",
+                ReplaceEventMap($d,$cmd,1), 1, "col1";
         FW_pO "</tr>";
       }
       FW_pO "</table>";
@@ -707,10 +717,12 @@ FW_doDetail($)
   FW_makeTable($d, $defs{$d});
   FW_pO "Readings" if($defs{$d}{READINGS});
   FW_makeTable($d, $defs{$d}{READINGS});
+
   my $attrList = getAllAttr($d);
   my $roomList = join(",", sort keys %FW_rooms);
   $roomList=~s/ /\&nbsp;/g;
   $attrList =~ s/room /room:$roomList /;
+
   FW_makeSelect($d, "attr", $attrList,"attr");
   FW_makeTable($d, $attr{$d}, "deleteattr");
 
@@ -1282,9 +1294,9 @@ FW_hidden($$)
 sub
 FW_select($$$$@)
 {
-  my ($n, $va, $def,$class,$jfn) = @_;
-  $jfn = ($jfn ? "onchange=\"$jfn\"" : "");
-  my $s = "<select $jfn name=\"$n\" class=\"$class\">";
+  my ($n, $va, $def, $class, $jSelFn) = @_;
+  $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
+  my $s = "<select $jSelFn name=\"$n\" class=\"$class\">";
 
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
@@ -1309,10 +1321,11 @@ FW_textfield($$$)
 
 ##################
 sub
-FW_submit($$)
+FW_submit($$@)
 {
-  my ($n, $v) = @_;
-  my $s ="<input type=\"submit\" name=\"$n\" value=\"$v\"/>";
+  my ($n, $v, $class) = @_;
+  $class = ($class ? "class=\"$class\"" : "");
+  my $s ="<input type=\"submit\" name=\"$n\" value=\"$v\" $class/>";
   return $s;
 }
 

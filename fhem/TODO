@@ -1,9 +1,6 @@
 FHEM:
 - FHEM2FHEM reconnect
 - HomeMatic set log 2
-
-- autodetect physical hardware
-- RFR: Error message for uncomplete last message
 - implement wiki decisions
 
 Webpgm2
