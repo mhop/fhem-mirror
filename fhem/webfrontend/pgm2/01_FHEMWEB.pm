@@ -904,11 +904,7 @@ FW_showRoom()
   FW_pO "<div id=\"content\">";
   FW_pO "<table>";  # Need for equal width of subtables
 
-  foreach my $ty (sort keys %FW_types) {
-    FW_pO "$ty<BR>\n";
-  }
 
-  
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
   my $row=1;
   foreach my $type (sort keys %FW_types) {
