@@ -63,8 +63,7 @@ RFXX10REC_Initialize($)
 {
   my ($hash) = @_;
 
-  #$hash->{Match}     = "^\\).*"; # 0x29
-  $hash->{Match}     = "^(\\ |\\)).*"; # 0x20 or 0x29
+  $hash->{Match}     = "^(20|29).*";
   $hash->{DefFn}     = "RFXX10REC_Define";
   $hash->{UndefFn}   = "RFXX10REC_Undef";
   $hash->{ParseFn}   = "RFXX10REC_Parse";
@@ -525,37 +524,39 @@ RFXX10REC_Parse($$)
   my ($hash, $msg) = @_;
 
   my $time = time();
-  my $hexline = unpack('H*', $msg);
   if ($time_old ==0) {
-  	Log 5, "RFXX10REC: decoding delay=0 hex=$hexline";
+  	Log 5, "RFXX10REC: decoding delay=0 hex=$msg";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "RFXX10REC: decoding delay=$time_diff hex=$hexline";
+  	Log 5, "RFXX10REC: decoding delay=$time_diff hex=$msg";
   }
   $time_old = $time;
 
+  # convert to binary
+  my $bin_msg = pack('H*', $msg);
+
   # convert string to array of bytes. Skip length byte
   my @rfxcom_data_array = ();
-  foreach (split(//, substr($msg,1))) {
+  foreach (split(//, substr($bin_msg,1))) {
     push (@rfxcom_data_array, ord($_) );
   }
 
-  my $bits = ord($msg);
+  my $bits = ord($bin_msg);
   my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
 
   my $res = "";
   if ($bits == 41) {
-	Log 1, "RFXX10REC: bits=$bits num_bytes=$num_bytes hex=$hexline" if ($RFXX10REC_debug == 1);
+	Log 1, "RFXX10REC: bits=$bits num_bytes=$num_bytes hex=$msg" if ($RFXX10REC_debug == 1);
         $res = RFXX10REC_parse_X10Sec(\@rfxcom_data_array);
-  	Log 1, "RFXX10REC: unsupported hex=$hexline" if ($res ne "" && $res !~ /^UNDEFINED.*/);
+  	Log 1, "RFXX10REC: unsupported hex=$msg" if ($res ne "" && $res !~ /^UNDEFINED.*/);
 	return $res;
   } elsif ($bits == 32) {
-	Log 1, "RFXX10REC: bits=$bits num_bytes=$num_bytes hex=$hexline" if ($RFXX10REC_debug == 1);
+	Log 1, "RFXX10REC: bits=$bits num_bytes=$num_bytes hex=$msg" if ($RFXX10REC_debug == 1);
         $res = RFXX10REC_parse_X10(\@rfxcom_data_array);
-  	Log 1, "RFXX10REC: unsupported hex=$hexline" if ($res ne "" && $res !~ /^UNDEFINED.*/);
+  	Log 1, "RFXX10REC: unsupported hex=$msg" if ($res ne "" && $res !~ /^UNDEFINED.*/);
 	return $res;
   } else {
-	Log 0, "RFXX10REC: bits=$bits num_bytes=$num_bytes hex=$hexline";
+	Log 0, "RFXX10REC: bits=$bits num_bytes=$num_bytes hex=$msg";
   }
 
   return "";

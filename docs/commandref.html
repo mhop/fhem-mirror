@@ -6225,7 +6225,6 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
     </li>
     <li> 42_RFXMETER.pm (see device <a href="#RFXMETER">RFXMETER</a>): Process RFXCOM RFXMeter devices. See <a href="http://www.rfxcom.com/sensors.htm">http://www.rfxcom.com/sensors.htm</a>.</li>
     <li> 43_RFXX10REC.pm (see device <a href="#RFXX10REC">RFXX10REC</a>): Process X10 security and X10 lighting devices. </li>
-    <li> 44_RFXELSE.pm: Process and display all other messages. This module shows you messages that could not be handled by the other modules. It is useful to see RF receiption problems.</li>
     </ul>
   <br>
   Note: this module requires the Device::SerialPort or Win32::SerialPort module
@@ -6253,7 +6252,7 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
     192.168.1.5:10001
     </ul>
     <ul>
-    noninit is optional and issues that the RFXCOM device should not be initialized. This is useful if you share a RFXCOM device. It is also useful for testing to simulate a RFXCOM receiver via netcat.
+    noninit is optional and issues that the RFXCOM device should not be initialized. This is useful if you share a RFXCOM device. It is also useful for testing to simulate a RFXCOM receiver via netcat or via FHEM2FHEM.
       <br>
       <br>
       Example: <br>
@@ -7218,7 +7217,6 @@ AB600, Duewi, DomiaLite, COCO) and others. <br>
     <li> 46_TRX_SECURITY.pm (see device <a href="#TRX_SECURITY">TRX_SECURITY</a>): Receive X10, KD101 and Visonic security sensors.</li>
     <li> 46_TRX_LIGHT.pm (see device <a href="#RFXX10REC">RFXX10REC</a>): Process X10, ARC, ELRO AB400D, Waveman, Chacon EMW200, IMPULS, AC, HomeEasy EU and ANSLUT lighting devices (switches and remote control). ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. AC is the protocol used by different brands with units having a learning mode button:
 KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
-    <li> 46_TRX_ELSE.pm: Process and display all other messages. This module shows you messages that could not be handled by the other modules. It is useful to see RF receiption problems.</li>
     </ul>
   <br>
   Note: this module requires the Device::SerialPort or Win32::SerialPort module
@@ -7246,7 +7244,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
     192.168.1.5:10001
     </ul>
     <ul>
-    noninit is optional and issues that the RFXtrx433 device should not be initialized. This is useful if you share a RFXtrx433 device via LAN. It is also useful for testing to simulate a RFXtrx433 receiver via netcat.
+    noninit is optional and issues that the RFXtrx433 device should not be initialized. This is useful if you share a RFXtrx433 device via LAN. It is also useful for testing to simulate a RFXtrx433 receiver via netcat or via FHEM2FHEM.
       <br>
       <br>
       Example: <br>
@@ -7705,7 +7703,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     fhem device <i>devicename</i>, just like if it would be attached to the
     local fhem.
     Drawback: only devices using the Dispatch function (CUL, FHZ, CM11,
-    SISPM, RFXCOM, TCM, TUL) generate raw messages.<br>
+    SISPM, RFXCOM, TCM, TRX, TUL) generate raw messages.<br>
     <i>devicename</i> must exist on the local
     fhem server too with the same name and same type as the remote device, but
     usually with the device-node "none", so it is only a dummy device.  All

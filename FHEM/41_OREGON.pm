@@ -51,8 +51,7 @@ OREGON_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^[\x38-\x78].*";
-  #$hash->{Match}     = "^[^\x30]";
+  $hash->{Match}     = "^(3[8-9A-F]|[4-6][0-9A-F]|7[0-8]).*", #38-78
   $hash->{DefFn}     = "OREGON_Define";
   $hash->{UndefFn}   = "OREGON_Undef";
   $hash->{ParseFn}   = "OREGON_Parse";
@@ -204,6 +203,10 @@ my %types =
     part => 'WGR918',  checksum => \&checksum4, method => \&wgr918_anemometer,
    },
    # RGR126, RGR682, RGR918:
+   type_length_key(0x2a1d, 80) =>
+   {
+    part => 'RGR918', checksum => \&checksum6plus, method => \&common_rain,
+   },
    type_length_key(0x2a1d, 84) =>
    {
     part => 'RGR918', checksum => \&checksum6plus, method => \&common_rain,
@@ -716,30 +719,32 @@ sub raw {
   $_[0]->{raw} or $_[0]->{raw} = pack 'H*', $_[0]->{hex};
 }
 
-# -----------------------------
 
+# -----------------------------
 sub
 OREGON_Parse($$)
 {
   my ($hash, $msg) = @_;
 
   my $time = time();
-  my $hexline = unpack('H*', $msg);
   if ($time_old ==0) {
-  	Log 5, "OREGON: decoding delay=0 hex=$hexline";
+  	Log 5, "OREGON: decoding delay=0 hex=$msg";
   } else {
   	my $time_diff = $time - $time_old ;
-  	Log 5, "OREGON: decoding delay=$time_diff hex=$hexline";
+  	Log 5, "OREGON: decoding delay=$time_diff hex=$msg";
   }
   $time_old = $time;
 
+  # convert to binary
+  my $bin_msg = pack('H*', $msg);
+
   # convert string to array of bytes. Skip length byte
   my @rfxcom_data_array = ();
-  foreach (split(//, substr($msg,1))) {
+  foreach (split(//, substr($bin_msg,1))) {
     push (@rfxcom_data_array, ord($_) );
   }
 
-  my $bits = ord($msg);
+  my $bits = ord($bin_msg);
   my $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
 
   my $type1 = $rfxcom_data_array[0];
@@ -754,8 +759,8 @@ OREGON_Parse($$)
 
   my $rec = $types{$key} || $types{$key&0xfffff};
   unless ($rec) {
-#Log 3, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$hexline'.";
-    Log 4, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$hexline'.";
+    #Log 1, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$msg'.";
+    Log 4, "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits message='$msg'.";
     return "OREGON: ERROR: Unknown sensor_id=$sensor_id bits=$bits.\n";
   }
   
@@ -821,7 +826,7 @@ OREGON_Parse($$)
 			$sensor = "humidity";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
 	}
 	elsif ($i->{type} eq "battery") { 
 			#printf "Batterie %d%s; ",$i->{current},$i->{units};

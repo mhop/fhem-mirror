@@ -8,13 +8,11 @@
 #	define RFXCOM RFXCOM /dev/ttyUSB0
 #
 # The module also has code to access LAN based RFXCOM receivers like 81003 and 83003.
-# This was tested by me with the help of the RFXCOM people (Thanks to Bert!) and works
-# for the basic functions. However a disconnect of the TCP connection is currectly
-# not detected. 
 #
 # To use it define the IP-Adresss and the Port:
 #	define RFXCOM RFXCOM 192.168.169.111:10001
-# optionally you may issue not to initialize the device (useful if you share an RFXCOM device with other programs) 
+# optionally you may issue not to initialize the device (useful for FHEM2FHEM raw 
+# and if you share an RFXCOM device with other programs) 
 #	define RFXCOM RFXCOM 192.168.169.111:10001 noinit
 #
 # The RFXCOM receivers supports lots of protocols that may be implemented for FHEM 
@@ -26,15 +24,25 @@
 # It is derived from xPL Perl (http://www.xpl-perl.org.uk/). I suggest to look there 
 # if you want to implement other protocols.
 # 
-#  Willi Herzig, 2010
+###########################
 #
-#  This script is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+# Copyright (C) 2010,2012 Willi Herzig
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
 # 
-#################################################################################
-# derived from 00_CUL.pm
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#
+# The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 ###########################
 # $Id$
 package main;
@@ -62,27 +70,30 @@ RFXCOM_Initialize($)
 {
   my ($hash) = @_;
 
-# Provider
+  require "$attr{global}{modpath}/FHEM/DevIo.pm";
+
+  # Provider
   $hash->{ReadFn}  = "RFXCOM_Read";
+  $hash->{WriteFn} = "RFXCOM_Write";
   $hash->{Clients} =
         ":RFXMETER:OREGON:RFXX10REC:RFXELSE:";
   my %mc = (
-    "1:RFXMETER"   => "^0.*",
-    "2:OREGON"   => "^[\x38-\x78].*",
-    "3:RFXX10REC"   => "^(\\ |\\)).*", # 0x20 or 0x29
-    "4:RFXELSE"   => "^.*",
+    "1:RFXMETER"   => "^30.*",
+    "2:OREGON"   => "^(3[8-9A-F]|[4-6][0-9A-F]|7[0-8]).*", #38-78
+    "3:RFXX10REC"   => "^(20|29).*",
+    #"4:RFXELSE"   => "^.*", # RFXELSE no longer after changing from bin to hexstring
   );
   $hash->{MatchList} = \%mc;
 
   $hash->{ReadyFn} = "RFXCOM_Ready";
 
-# Normal devices
+  # Normal devices
   $hash->{DefFn}   = "RFXCOM_Define";
   $hash->{UndefFn} = "RFXCOM_Undef";
   $hash->{GetFn}   = "RFXCOM_Get";
   $hash->{SetFn}   = "RFXCOM_Set";
   $hash->{StateFn} = "RFXCOM_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 do_not_init:1:0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1:0 loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "RFXCOM_Shutdown";
 }
 
@@ -96,7 +107,7 @@ RFXCOM_Define($$)
   return "wrong syntax: define <name> RFXCOM devicename [noinit]"
     if(@a != 3 && @a != 4);
 
-  RFXCOM_CloseDev($hash);
+  DevIo_CloseDev($hash);
 
   my $name = $a[0];
   my $dev = $a[2];
@@ -106,6 +117,11 @@ RFXCOM_Define($$)
     Log 1, "RFXCOM: $name device is none, commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
+  }
+
+  if($dev !~ /\@/) {
+	Log 1,"RFXCOM: added baudrate 4800 as default";
+	$dev .= "\@4800";
   }
 
   if(defined($opt)) {
@@ -119,10 +135,27 @@ RFXCOM_Define($$)
   
   
   $hash->{DeviceName} = $dev;
-  my $ret = RFXCOM_OpenDev($hash, 0);
+  my $ret = DevIo_OpenDev($hash, 0, "RFXCOM_DoInit");
   return $ret;
 }
 
+#####################################
+# Input is hexstring
+sub
+RFXCOM_Write($$$)
+{
+  my ($hash,$fn,$msg) = @_;
+  my $name = $hash->{NAME};
+  my $ll5 = GetLogLevel($name,5);
+
+  return if(!defined($fn));
+
+  my $bstring;
+  $bstring = "$fn$msg";
+  Log $ll5, "$hash->{NAME} sending $bstring";
+
+  DevIo_SimpleWrite($hash, $bstring, 1);
+}
 
 #####################################
 sub
@@ -142,7 +175,7 @@ RFXCOM_Undef($$)
       }
   }
 
-  RFXCOM_CloseDev($hash); 
+  DevIo_CloseDev($hash);
   return undef;
 }
 
@@ -164,7 +197,8 @@ RFXCOM_Set($@)
   my $name=$a[0];
   my $reading= $a[1];
   $msg="$name => No Set function ($reading) implemented";
-    return $msg;
+
+  return $msg;
 }
 
 #####################################
@@ -198,18 +232,13 @@ RFXCOM_Clear($)
   # clear buffer:
   if($hash->{USBDev}) {
     while ($hash->{USBDev}->lookfor()) { 
-    	$buf = RFXCOM_SimpleRead($hash);
+    	$buf = DevIo_SimpleRead($hash);
     }
   }
   if($hash->{TCPDev}) {
    # TODO
-   # while ($hash->{USBDev}->lookfor()) { 
-   # 	$buf = RFXCOM_SimpleRead($hash);
-   # }
     return $buf;
   }
-
-
 }
 
 #####################################
@@ -223,8 +252,6 @@ RFXCOM_DoInit($)
   my $buf;
   my $char = undef ;
 
-  RFXCOM_Clear($hash);
-
   if(defined($attr{$name}) && defined($attr{$name}{"do_not_init"})) {
     	Log 1, "RFXCOM: defined with noinit. Do not send init string to device.";
   	$hash->{STATE} = "Initialized" if(!$hash->{STATE});
@@ -236,15 +263,18 @@ RFXCOM_DoInit($)
 	return undef;
   }
 
+  RFXCOM_Clear($hash);
+
   #
   # Init
   my $init = pack('H*', 'F02C');
-  RFXCOM_SimpleWrite($hash, $init);
+  DevIo_SimpleWrite($hash, $init, 0);
   sleep(1);
 
-  $buf = RFXCOM_SimpleRead($hash);
+  $buf = DevIo_TimeoutRead($hash, 0.1);
   if (defined($buf)) { $char = ord($buf); }
   if (! $buf) {
+    	Log 1, "RFXCOM: Initialization Error $name: no char read";
 	return "RFXCOM: Initialization Error $name: no char read";
   } elsif ($char ne 0x2c) {
 	my $hexline = unpack('H*', $buf);
@@ -275,10 +305,10 @@ RFXCOM_Read($)
 
   my $char;
 
-  my $mybuf = RFXCOM_SimpleRead($hash);
+  my $mybuf = DevIo_SimpleRead($hash);
 
   if(!defined($mybuf) || length($mybuf) == 0) {
-    RFXCOM_Disconnected($hash);
+    DevIo_Disconnected($hash);
     return "";
   }
 
@@ -303,7 +333,7 @@ RFXCOM_Read($)
     #$hexline = unpack('H*', $rfxcom_data);
     #Log 1, "RFXCOM_Read rfxcom_data '$hexline'";
     #
-    RFXCOM_Parse($hash, $hash, $name, $rmsg);
+    RFXCOM_Parse($hash, $hash, $name, unpack('H*', $rmsg));
     $bits = ord(substr($rfxcom_data,0,1));
     $num_bytes = $bits >> 3; if (($bits & 0x7) != 0) { $num_bytes++; }
   }
@@ -312,34 +342,30 @@ RFXCOM_Read($)
   $hash->{PARTIAL} = $rfxcom_data;
 }
 
+
 sub
 RFXCOM_Parse($$$$)
 {
   my ($hash, $iohash, $name, $rmsg) = @_;
 
-  my $hexline = unpack('H*', $rmsg);
-  Log 5, "RFXCOM_Parse1 '$hexline'";
+  Log 5, "RFXCOM_Parse1 '$rmsg'";
 
   my %addvals;
   # Parse only if message is different within 2 seconds 
   # (some Oregon sensors always sends the message twice, X10 security sensors even sends the message five times)
   if (("$last_rmsg" ne "$rmsg") || (time() - $last_time) > 1) { 
-    Log 5, "RFXCOM_Dispatch '$hexline'";
-    #Log 1, "RFXCOM_Dispatch '$hexline'";
+    Log 5, "RFXCOM_Dispatch '$rmsg'";
     Dispatch($hash, $rmsg, \%addvals); 
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
     $hash->{RAWMSG} = $rmsg;
   } else { 
-    #Log 1, "RFXCOM_Dispatch '$hexline' dup";
+    #Log 1, "RFXCOM_Dispatch '$rmsg' dup";
     #Log 1, "<-duplicate->";
   }
 
   $last_rmsg = $rmsg;
   $last_time = time();
-
-  #$hexline = unpack('H*', $rmsg);
-  #Log 1, "RFXCOM_Parse2 '$hexline'";
 
 }
 
@@ -350,214 +376,13 @@ RFXCOM_Ready($)
 {
   my ($hash) = @_;
 
-  return RFXCOM_OpenDev($hash, 1)
+  return DevIo_OpenDev($hash, 1, "RFXCOM_Ready")
                 if($hash->{STATE} eq "disconnected");
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
   my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
   return ($InBytes>0);
-}
-
-########################
-sub
-RFXCOM_SimpleWrite(@)
-{
-  my ($hash, $msg) = @_;
-  return if(!$hash);
-
-  $hash->{USBDev}->write($msg) if($hash->{USBDev});
-  syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
-
-  #my $hexline = unpack('H*', $msg);
-  #Log 1, "RFXCOM_SimpleWrite '$hexline'";
-  select(undef, undef, undef, 0.001);
-}
-
-########################
-sub
-RFXCOM_SimpleRead($)
-{
-  my ($hash) = @_;
-  my $buf;
-
-  if($hash->{USBDev}) {
-    $buf = $hash->{USBDev}->read(1) ; 
-    #my $hexline = unpack('H*', $buf);
-    #Log 1, "RFXCOM: RFXCOM_SimpleRead1 '$hexline'";
-    if (!defined($buf) || length($buf) == 0) {
-	#sleep(1); 
-	$buf = $hash->{USBDev}->read(1) ; 
-    }
-    return $buf;
-  }
-
-  if($hash->{TCPDev}) {
-    my $buf;
-    if(!defined(sysread($hash->{TCPDev}, $buf, 1))) {
-      RFXCOM_Disconnected($hash);
-      return undef;
-    }
-    return $buf;
-  }
-
-  return undef;
-}
-
-########################
-sub
-RFXCOM_CloseDev($)
-{
-  my ($hash) = @_;
-  my $name = $hash->{NAME};
-  my $dev = $hash->{DeviceName};
-
-  return if(!$dev);
-  
-  Log 1, "RFXCOM: closing $dev";
-  if($hash->{TCPDev}) {
-    $hash->{TCPDev}->close();
-    delete($hash->{TCPDev});
-
-  } elsif($hash->{USBDev}) {
-    $hash->{USBDev}->close() ;
-    delete($hash->{USBDev});
-
-  }
-  delete($selectlist{"$name.$dev"});
-  delete($readyfnlist{"$name.$dev"});
-  delete($hash->{FD});
-}
-
-########################
-sub
-RFXCOM_OpenDev($$)
-{
-  my ($hash, $reopen) = @_;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-  my $po;
-
-
-  $hash->{PARTIAL} = "";
-  Log 3, "RFXCOM opening $name device $dev"
-        if(!$reopen);
-
-  if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
-
-    # This part is called every time the timeout (5sec) is expired _OR_
-    # somebody is communicating over another TCP connection. As the connect
-    # for non-existent devices has a delay of 3 sec, we are sitting all the
-    # time in this connect. NEXT_OPEN tries to avoid this problem.
-    if($hash->{NEXT_OPEN} && time() < $hash->{NEXT_OPEN}) {
-      return;
-    }
-
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
-    if($conn) {
-      delete($hash->{NEXT_OPEN});
-    } else {
-      Log(3, "RFXCOM: Can't connect to $dev: $!") if(!$reopen);
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      $hash->{NEXT_OPEN} = time()+60;
-      RFXCOM_Disconnected($hash);
-      return "";
-    }
-
-    $hash->{TCPDev} = $conn;
-    $hash->{FD} = $conn->fileno();
-    delete($readyfnlist{"$name.$dev"});
-    $selectlist{"$name.$dev"} = $hash;
-
-  } else {                              # USB Device
-
-    if ($^O=~/Win/) {
-     require Win32::SerialPort;
-     $po = new Win32::SerialPort ($dev);
-    } else  {
-     #Log(1, "RFXCOM: new Device");
-     require Device::SerialPort;
-     $po = new Device::SerialPort ($dev);
-    }
-
-    if(!$po) {
-      return undef if($reopen);
-      Log(3, "RFXCOM: Can't open $dev: $!");
-      $readyfnlist{"$name.$dev"} = $hash;
-      $hash->{STATE} = "disconnected";
-      return "";
-    }
-    $hash->{USBDev} = $po;
-    if( $^O =~ /Win/ ) {
-      $readyfnlist{"$name.$dev"} = $hash;
-    } else {
-      $hash->{FD} = $po->FILENO;
-      delete($readyfnlist{"$name.$dev"});
-      $selectlist{"$name.$dev"} = $hash;
-    }
-
-    #$po->reset_error || Log 1, "RFXCOM reset_error";
-    $po->databits(8) || Log 1, "RFXCOM could not set databits";
-    $po->baudrate(4800) || Log 1, "RFXCOM could not set baudrate";
-    $po->parity('none') || Log 1, "RFXCOM could not set parity";
-    $po->stopbits(1) || Log 1, "RFXCOM could not set stopbits";
-    $po->handshake('none') || Log 1, "RFXCOM could not set handshake";
-    $po->datatype('raw') || Log 1, "RFXCOM could not set datatype";
-    #$po->lookclear || Log 1, "RFXCOM could not set lookclear";
-
-
-    $po->write_settings || Log 1, "RFXCOM could not write_settings $dev";
-
-    $hash->{po} = $po;
-    $hash->{socket} = 0;
-
-  Log 1, "RFXCOM: RFXCOM_OpenDev $dev done";
-  }
-
-  if($reopen) {
-    Log 1, "RFXCOM: $dev reappeared ($name)";
-  } else {
-    Log 3, "RFXCOM: device opened";
-  }
-
-  $hash->{STATE}="";       # Allow InitDev to set the state
-  my $ret  = RFXCOM_DoInit($hash);
-
-  if($ret) {
-    #  try again
-    Log 1, "RFXCOM: Cannot init $dev, at first try. Trying again.";
-    my $ret  = RFXCOM_DoInit($hash);
-    if($ret) {
-      RFXCOM_CloseDev($hash);
-      Log 1, "RFXCOM: Cannot init $dev, ignoring it";
-      return "RFXCOM: Error Init string.";
-    }
-  }
-
-  DoTrigger($name, "CONNECTED") if($reopen);
-  return $ret;
-}
-
-sub
-RFXCOM_Disconnected($)
-{
-  my $hash = shift;
-  my $dev = $hash->{DeviceName};
-  my $name = $hash->{NAME};
-
-  return if(!defined($hash->{FD}));                 # Already deleted or RFR
-
-  Log 1, "RFXCOM: $dev disconnected, waiting to reappear";
-  RFXCOM_CloseDev($hash);
-  $readyfnlist{"$name.$dev"} = $hash;               # Start polling
-  $hash->{STATE} = "disconnected";
-
-  # Without the following sleep the open of the device causes a SIGSEGV,
-  # and following opens block infinitely. Only a reboot helps.
-  sleep(5);
-
-  DoTrigger($name, "DISCONNECTED");
 }
 
 1;
