@@ -184,6 +184,12 @@ FS20_Set($@)
   return "no set value specified" if($na < 2 || $na > 3);
   return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
 
+  if($na > 2 && $a[1] eq "dim") {
+    $a[1] = ($a[2] eq "0" ? "off" : "dim$a[2]%");
+    splice @a, 2, 1;
+    $na = int(@a);
+  }
+
   my $c = $fs20_c2b{$a[1]};
   my $name = $a[0];
   if(!defined($c)) {
@@ -197,7 +203,8 @@ FS20_Set($@)
                                                if($mt && $mt eq "simple");
     }
     return "Unknown argument $a[1], choose one of " .
-                                join(" ", sort keys %fs20_c2b);
+                                join(" ", sort keys %fs20_c2b) .
+                                " dim:slider,0,6.25,100";
 
   }
 
