@@ -82,6 +82,10 @@ HMS_Parse($$)
 #                        012345678901234567890123456789
 #                        810e047f0214a001a81f000001000000 HMS100TFK
   my $val = substr($msg, 24, 8) if(length($msg) == 32);
+  if(!defined($val)) {
+    Log 3, "Strange HMS message $msg";
+    return "";
+  }
 
   my $type = "";
   foreach my $c (keys %codes) {
