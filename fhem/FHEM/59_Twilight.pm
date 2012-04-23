@@ -182,7 +182,8 @@ sub Twilight_GetUpdate{
    $sunrise_set[4]{DEGREE}=$hash->{INDOOR_HORIZON};
    $sunrise_set[5]{SR_NAME}="sr_weather";
    $sunrise_set[5]{SS_NAME}="ss_weather";
-   $hash->{WEATHER_HORIZON}=Twilight_getWeatherHorizon($hash->{WEATHER})+$hash->{INDOOR_HORIZON};
+   Twilight_getWeatherHorizon($hash);
+   readingsUpdate($hash,"condition",$hash->{CONDITION});
    if($hash->{WEATHER_HORIZON}>(89-$hash->{LATITUDE}+$declination)){$hash->{WEATHER_HORIZON}=89-$hash->{LATITUDE}+$declination;}
    $sunrise_set[5]{DEGREE}=$hash->{WEATHER_HORIZON};
    
@@ -264,13 +265,16 @@ sub twilight_calc {
 sub Twilight_getWeatherHorizon{
    my @a_current = (25,25,25,25,20,10,10,10,10,10,10,7,7,7,5,10,10,6,6,6,10,6,6,6,6,6,6,5,5,3,3,0,0,0,0,7,0,15,15,15,9,15,8,5,12,6,8,8);
    #condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
-   my $location=shift;
+   my $hash=shift;
+   my $location=$hash->{WEATHER};
    my $xml = GetHttpFile("weather.yahooapis.com:80","/forecastrss?w=".$location."&u=c",4.0);
    my $current;
    if($xml=~/code="(.*)"(\ *)temp/){
     $current=$1;
     if(($current>=0) && ($current <=47)) {
-      return $a_current[$current];
+      $hash->{WEATHER_HORIZON}=$a_current[$current]+$hash->{INDOOR_HORIZON};
+      $hash->{CONDITION}=$current;
+      return 1;
     } else {
       return 0;
     }
