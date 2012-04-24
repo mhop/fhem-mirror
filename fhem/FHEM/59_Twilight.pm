@@ -270,18 +270,20 @@ sub Twilight_getWeatherHorizon{
    my $xml = GetHttpFile("weather.yahooapis.com:80","/forecastrss?w=".$location."&u=c",4.0);
    my $current;
    if($xml=~/code="(.*)"(\ *)temp/){
-    $current=$1;
+    if(defined($1)){
+       $current=$1;
+    }else{
+      $current=-1;
+    }
     if(($current>=0) && ($current <=47)) {
       $hash->{WEATHER_HORIZON}=$a_current[$current]+$hash->{INDOOR_HORIZON};
       $hash->{CONDITION}=$current;
       return 1;
-    } else {
-      return 0;
     }
-   }else{
-      return 0;
-   }
+  }
+  Log 1, "[TWILIGHT] No Weather location found at yahoo weather for location ID: $location";
+  $hash->{WEATHER_HORIZON}="0";
+  $hash->{CONDITION}="-1";
 }
-
 1;
 
