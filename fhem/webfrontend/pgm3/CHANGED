@@ -210,3 +210,6 @@ It is not necessary to tell fhem that there are other logs.
 2012-04-24
 	-- Bugfix: check for FHEM-Version not needed any more
 
+2012-04-25
+	-- Feature: debugging for xmllist included
+
