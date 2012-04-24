@@ -1000,10 +1000,11 @@ FW_fileList($)
   my ($dir,$re) = ($1, $2);
   return if(!$re);
   # note: this fails if the filenames of several FileLogs match the same regexp.
-  # This is the case e.g. fore
+  # This is the case e.g. for
   # /var/log/fhem/foo-%Y.log
   # /var/log/fhem/foo-%Y-%m-%d.log
-  # I do not fix it because this could easily be avoided by using a different naming. 
+  # I do not fix it because this could easily be avoided by using a different
+  # naming. 
   # BN 2012-04-22
   $re =~ s/%./\.*/g; 
   my @ret;
@@ -1872,10 +1873,10 @@ FW_dev2image($)
   return $icon if(!$name || !$defs{$name});
 
   my ($type, $state) = ($defs{$name}{TYPE}, $defs{$name}{STATE});
-  return $icon if(!$type || !$state);
+  return $icon if(!$type || !defined($state));
 
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-  $icon = $FW_icons{$state}         if($FW_icons{$state});         # on.png
+  $icon = $FW_icons{$state}         if(defined($FW_icons{$state}));# on.png
   $icon = $FW_icons{$type}          if($FW_icons{$type});          # FS20.png
   $icon = $FW_icons{"$type.$state"} if($FW_icons{"$type.$state"}); # FS20.on.png
   $icon = $FW_icons{$name}          if($FW_icons{$name});          # lamp.png
