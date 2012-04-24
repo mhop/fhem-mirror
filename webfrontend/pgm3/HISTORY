@@ -109,4 +109,7 @@
   -- Bugfix: better check of availability of google-weather
   -- Feature: DBLog added for everything except UserDefs
 -Martin 201004-26
+
+- Martin 2012-04-24
+  -- Bugfix: no need for checking FHEM-Version any more
   -- Bugfxi: the FS20-Type from Userdef the first time with a broken graphic

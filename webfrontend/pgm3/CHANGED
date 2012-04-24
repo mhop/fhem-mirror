@@ -207,3 +207,6 @@ It is not necessary to tell fhem that there are other logs.
 2010-04-26
 	-- Bugfix: userdefs.php: FS20-Type the first time with broken graphic
 
+2012-04-24
+	-- Bugfix: check for FHEM-Version not needed any more
+
