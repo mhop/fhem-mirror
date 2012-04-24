@@ -113,3 +113,6 @@
 - Martin 2012-04-24
   -- Bugfix: no need for checking FHEM-Version any more
   -- Bugfxi: the FS20-Type from Userdef the first time with a broken graphic
+
+- Martin 2012-04-25
+  -- Feature: debugging for xmllist included

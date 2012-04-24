@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='120424';
+$pgm3version='120425';
 	
 
 
@@ -318,23 +318,26 @@ if (!(list($xml_parser, $live) = new_xml_parser($live))) {
    die("could not parse XML input");
 }
 
+
 foreach($output as $data) {
   if (!xml_parse($xml_parser, $data)) {
-       die(sprintf("XML error: %s at line %d\n",
-                   xml_error_string(xml_get_error_code($xml_parser)),
-                   xml_get_current_line_number($xml_parser)));
-   }
+	echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml<br><br>");
+	$handle=fopen("tmp/debugxml","w");
+	fwrite($handle,$outputvar);
+	fclose($handle);
+	die(sprintf("XML error: %s at line %d\n",
+           xml_error_string(xml_get_error_code($xml_parser)),
+           xml_get_current_line_number($xml_parser)));
+			};
 }
+
 
 xml_parser_free($xml_parser);
 
 
-
-
-
-
 #print_r($stack);
 #exit;
+
 
 
 #searching for rooms/fs20/Logpaths
