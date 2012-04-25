@@ -319,10 +319,12 @@ if (!(list($xml_parser, $live) = new_xml_parser($live))) {
 }
 
 
+#change the xmllist into an intern array
 foreach($output as $data) {
   if (!xml_parse($xml_parser, $data)) {
-	echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml<br><br>");
-	$handle=fopen("tmp/debugxml","w");
+ 	$now=date($timeformat);
+	echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml$now<br><br>");
+	$handle=fopen("tmp/debugxml$now","w");
 	fwrite($handle,$outputvar);
 	fclose($handle);
 	die(sprintf("XML error: %s at line %d\n",
