@@ -262,7 +262,7 @@ sub Weather_Define($$) {
     if(int(@a) < 3 && int(@a) > 5); 
 
   $hash->{STATE} = "Initialized";
-  $hash->{internals}{interfaces}= "temperature:humidity:wind";
+  $hash->{fhem}{interfaces}= "temperature;humidity;wind";
 
   my $name      = $a[0];
   my $location  = $a[2];
