@@ -904,25 +904,49 @@ FW_showRoom()
   FW_pO "<div id=\"content\">";
   FW_pO "<table>";  # Need for equal width of subtables
 
-
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
-  my $row=1;
-  foreach my $type (sort keys %FW_types) {
+  
+  # array of all device names in the room except weblinkes
+  my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
+                      !IsIgnored($_) } keys %defs;
+  # hash devicename => groups, the name of the default group is the name of the device type
+  my %group;
+  my @groups;
+  my %seen = ();
+  foreach my $dev (@devs) {
+  	# ignore weblinks
+  	next if($defs{$dev}{TYPE} eq "weblink");
+  	# please note that a device can be in more than one group: attr <name> group <group1>,<group2>,<group3>
+  	# we determine it here once including its default value; in the future the default might become
+  	# configurable 
+  	$group{$dev}= AttrVal($dev,"group",$defs{$dev}{TYPE});
+  	push @groups, grep { !$seen{$_}++ } split(",",$group{$dev}); # unique addition
+  }   
 
-    next if(!$type || $type eq "weblink");
+  # row counter
+  my $row=1;
+    
+  # iterate over the distinct groups  
+  foreach my $g (sort @groups) {
 
     #################
     # Check if there is a device of this type in the room
-    $FW_room = "" if(!defined($FW_room));
-    my @devs = grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
-                      !IsIgnored($_) } keys %{$FW_types{$type}};
-    next if(!@devs);
 
-    FW_pO "\n<tr><td><div class=\"devType\">$type</div></td></tr>";
+    FW_pO "\n<tr><td><div class=\"devType\">$g</div></td></tr>";
     FW_pO "<tr><td>";
-    FW_pO "<table class=\"block wide\" id=\"$type\">";
+    FW_pO "<table class=\"block wide\" id=\"$g\">";
 
     foreach my $d (sort @devs) {
+      next unless(grep {$_ =~ $g} $group{$d}); 
+      
+      
+#      if(defined($devs{$d}{fhem}{interface})) {
+#      	display the device according to the interface library items	
+#       } else {
+#       	display the device according to its device type (as below)
+#       }
+      
+      	
       my $type = $defs{$d}{TYPE};
 
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
@@ -978,6 +1002,7 @@ FW_showRoom()
 
   # Now the weblinks
   my $buttons = 1;
+  $FW_room = "" if(!defined($FW_room));
   my @list = ($FW_room eq "all" ? keys %defs : keys %{$FW_rooms{$FW_room}});
   foreach my $d (sort @list) {
     next if(IsIgnored($d));
