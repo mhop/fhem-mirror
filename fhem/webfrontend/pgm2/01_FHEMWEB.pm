@@ -2049,7 +2049,7 @@ FW_devState($$)
     my $v = $defs{$d}{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
 
-  } elsif($allSets && $allSets =~ m/ desired-temp /) {
+  } elsif($allSets && $allSets =~ m/ desired-temp:/) {
     $txt = ReadingsVal($d, "measured-temp", "");
     $txt =~ s/ .*//;
     $txt .= "&deg;"
