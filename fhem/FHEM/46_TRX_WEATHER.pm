@@ -79,8 +79,7 @@ TRX_WEATHER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^[\x38-\x78].*";
-  #$hash->{Match}     = "^[^\x30]";
+  $hash->{Match}     = "^..(50|51|52|54|55|56|5d).*";
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
@@ -135,6 +134,8 @@ my %types =
    0x550b => { part => 'RAIN', method => \&common_rain, },
    # WIND
    0x5610 => { part => 'WIND', method => \&common_anemometer, },
+   # WEIGHT
+   0x5D08 => { part => 'WEIGHT', method => \&common_weight, },
   );
 
 # --------------------------------------------
@@ -344,7 +345,7 @@ sub common_temp {
 	0x02 => "THGR132N", # was THGR228N,
 	0x03 => "THWR800",
 	0x04 => "RTHN318",
-	0x05 => "TX3_T", # LaCrosse TX3
+	0x05 => "TX3", # LaCrosse TX3
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -392,7 +393,7 @@ sub common_hydro {
 
   my %devname =
     (	# HEXSTRING => "NAME"
-	0x01 => "TX3_H", # LaCrosse TX3
+	0x01 => "TX3", # LaCrosse TX3
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -586,6 +587,65 @@ sub common_rain {
   battery($bytes, $dev_str, \@res, 10);
   return @res;
 }
+
+# ------------------------------------------------------------
+#
+sub common_weight {
+    	my $type = shift;
+	my $longids = shift;
+    	my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  #Log 1,"subtype=$subtype";
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "BWR101",
+	0x02 => "GR101",
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log 1,"TRX_WEATHER: common_weight error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  #my $seqnbr = sprintf "%02x", $bytes->[2];
+  #Log 1,"seqnbr=$seqnbr";
+
+  my $dev_str = $dev_type;
+  if (use_longid($longids,$dev_type)) {
+  	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
+  }
+  if ($bytes->[4] > 0) {
+  	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
+  }
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  my $weight = ($bytes->[5]*256 + $bytes->[6])/10;
+
+  push @res, {
+	device => $dev_str,
+	type => 'weight',
+	current => $weight,
+	units => 'kg',
+  };
+
+  simple_battery($bytes, $dev_str, \@res, 7);
+
+  return @res;
+}
+
 
 # -----------------------------
 sub
@@ -789,6 +849,14 @@ TRX_WEATHER_Parse($$)
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{risk};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{risk};;
+	}
+	elsif ($i->{type} eq "weight") { 
+			$val .= "W: ".$i->{current}." ";
+
+			$sensor = "weight";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
 	}
 	elsif ($i->{type} eq "hexline") { 
 			$sensor = "hexline";			
