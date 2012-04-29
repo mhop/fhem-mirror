@@ -1132,7 +1132,7 @@ CommandShutdown($$)
   WriteStatefile();
   unlink($attr{global}{pidfilename}) if($attr{global}{pidfilename});
   if($param && $param eq "restart") {
-    system("(sleep 2; exec perl $0 $attr{global}{configfile})&");
+    system("(sleep 2; exec $^X $0 $attr{global}{configfile})&");
   }
   exit(0);
 }
