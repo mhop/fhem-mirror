@@ -215,7 +215,7 @@ LUXTRONIK2_GetStatus($)
   $value = $wpOpStat1{$switch};
   $value = "unbekannt (".$switch.")" unless $value;
 
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
+  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
       $hash->{READINGS}{$sensor}{VAL} = $value;
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
@@ -235,7 +235,7 @@ LUXTRONIK2_GetStatus($)
   }
   $value = "unbekannt (".$switch.")" unless $value;
   
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
+  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
       $hash->{READINGS}{$sensor}{VAL} = $value;
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
@@ -253,7 +253,7 @@ LUXTRONIK2_GetStatus($)
   $value = $wpMode{$switch};
   $value = "unbekannt (".$switch.")" unless $value;
  
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
+  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
       $hash->{READINGS}{$sensor}{VAL} = $value;
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
@@ -265,7 +265,7 @@ LUXTRONIK2_GetStatus($)
   $value = $wpMode{$switch};
   $value = "unbekannt (" . $switch . ")" unless $value;
  
-  if($hash->{READINGS}{$sensor}{VAL} != $value) {
+  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
       $hash->{READINGS}{$sensor}{VAL} = $value;
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
