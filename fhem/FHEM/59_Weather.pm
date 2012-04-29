@@ -52,7 +52,7 @@ sub Weather_Initialize($) {
   $hash->{DefFn}   = "Weather_Define";
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 event-on-update-reading event-on-change-reading";
 
 }
 
