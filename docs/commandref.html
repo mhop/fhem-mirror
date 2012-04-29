@@ -376,7 +376,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="group"></a>
     <li>group<br>
-        Group devices. Recognized by web-pgm2 (module <a href="#FHEMWEB">FHEMWEB</a>, it makes
+        Group devices. Recognized by web-pgm2 (module <a href="#FHEMWEB">FHEMWEB</a>), it makes
         devices in the same group appear in the same box).
         This is used to further group
         devices together. A device can appear in more than one group, in this
@@ -392,8 +392,9 @@ A line ending with \ will be concatenated with the next one, so long lines
         devices.
     </li>
 
-    <br><br>The following attributes are accepted but not yet honored by all modules. Only modules
-    that make use of the standardized readings updating mechanism in fhem.pl react on it.
+    <br><br>The following attributes are honored by the modules that make use
+    of the standardized readings updating mechanism in fhem.pl. Check the modules
+    Attributes list if you want to know if it is supporting it.
     <br><br>
     
     <a name="event-on-update-reading"></a>
@@ -4440,7 +4441,8 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="Weatherattr"></a>
   <b>Attributes</b>
   <ul>
-    N/A
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
   </ul>
   <br>
 </ul>
@@ -4515,10 +4517,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   </ul>
   <br>
 
-  <a name="Weatherattr"></a>
+  <a name="Twilightattr"></a>
   <b>Attributes</b>
   <ul>
-    N/A
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
   </ul>
   <br>
 </ul>
