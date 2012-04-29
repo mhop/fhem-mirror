@@ -4,7 +4,6 @@ package main;
 use strict;
 use warnings;
 
-
 my %codes = (
   "00" => "off",
   "01" => "dim06%",
@@ -142,7 +141,7 @@ FS20_SetState($$$$)
   my $name = $hash->{NAME};
   (undef, $val) = ReplaceEventMap($name, [$name, $val], 0)
         if($attr{$name}{eventMap});
-  return "Undefined value $val" if(!defined($fs20_c2b{$val}));
+  return "setstate $name: undefined value $val" if(!defined($fs20_c2b{$val}));
   return undef;
 }
 
