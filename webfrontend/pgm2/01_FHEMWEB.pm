@@ -1024,14 +1024,7 @@ FW_fileList($)
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
   my ($dir,$re) = ($1, $2);
   return if(!$re);
-  # note: this fails if the filenames of several FileLogs match the same regexp.
-  # This is the case e.g. for
-  # /var/log/fhem/foo-%Y.log
-  # /var/log/fhem/foo-%Y-%m-%d.log
-  # I do not fix it because this could easily be avoided by using a different
-  # naming. 
-  # BN 2012-04-22
-  $re =~ s/%./\.*/g; 
+  $re =~ s/%./[A-Za-z0-9]*/g; 
   my @ret;
   return @ret if(!opendir(DH, $dir));
   while(my $f = readdir(DH)) {
