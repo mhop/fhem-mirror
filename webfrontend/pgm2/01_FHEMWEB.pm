@@ -909,25 +909,18 @@ FW_showRoom()
   # array of all device names in the room except weblinkes
   my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
                       !IsIgnored($_) } keys %defs;
-  # hash devicename => groups, the name of the default group is the name of the device type
+
   my %group;
-  my @groups;
-  my %seen = ();
   foreach my $dev (@devs) {
-  	# ignore weblinks
-  	next if($defs{$dev}{TYPE} eq "weblink");
-  	# please note that a device can be in more than one group: attr <name> group <group1>,<group2>,<group3>
-  	# we determine it here once including its default value; in the future the default might become
-  	# configurable 
-  	$group{$dev}= AttrVal($dev,"group",$defs{$dev}{TYPE});
-  	push @groups, grep { !$seen{$_}++ } split(",",$group{$dev}); # unique addition
-  }   
+    next if($defs{$dev}{TYPE} eq "weblink");
+    $group{AttrVal($dev, "group", $defs{$dev}{TYPE})}{$dev} = 1;
+  }
 
   # row counter
   my $row=1;
     
   # iterate over the distinct groups  
-  foreach my $g (sort @groups) {
+  foreach my $g (sort keys %group) {
 
     #################
     # Check if there is a device of this type in the room
@@ -937,16 +930,8 @@ FW_showRoom()
     FW_pO "<table class=\"block wide\" id=\"$g\">";
 
     foreach my $d (sort @devs) {
-      next unless(grep {$_ =~ $g} $group{$d}); 
+      next if(!$group{$g}{$d}); 
       
-      
-#      if(defined($devs{$d}{fhem}{interface})) {
-#      	display the device according to the interface library items	
-#       } else {
-#       	display the device according to its device type (as below)
-#       }
-      
-      	
       my $type = $defs{$d}{TYPE};
 
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
