@@ -190,7 +190,13 @@ LUXTRONIK2_GetStatus($)
   $sensor = "hotWaterOperatingMode";
   $switch = $heatpump_parameters[4];
   
-  if ($switch==0) { $value = "Automatik"; }
+  if ($switch==0) {  
+	  if($heatpump_values[16]>=$heatpump_parameters[700] && $heatpump_parameters[699]==1) {
+		$value = "Automatik - Sommerbetrieb (Aus)";
+	  } else {
+		$value = "Automatik";
+	  }
+	}
   elsif ($switch==1) { $value = "Zusatzheizung"; }
   elsif ($switch==2) { $value = "Party"; }
   elsif ($switch==3) { $value = "Ferien"; }
