@@ -53,9 +53,7 @@ my %flogpar = (
   "TRX_DS10A.*"
        => { GPLOT => "fht80tf:Window,", FILTER => "%NAME" },
   # TX3 temperature sensors received by RFXTRX
-  "TX3_T.*"
-       => { GPLOT => "temp4:Temp,",  FILTER => "%NAME" },
-  "TX3_H.*"
+  "TX3.*"
        => { GPLOT => "temp4hum4:Temp/Hum,",  FILTER => "%NAME" },
 
 
