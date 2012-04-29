@@ -158,7 +158,7 @@ use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 
 use vars qw($reread_active);
 
-my $AttrList = "room group comment alias eventMap event-on-update-reading event-on-change-reading";
+my $AttrList = "room group comment alias eventMap";
 
 my $server;			# Server socket
 my %comments;			# Comments from the include files
