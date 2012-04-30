@@ -10,6 +10,7 @@
 # * "THWR800" 	is THWR800
 # * "RTHN318"	is RTHN318
 # * "TX3_T" 	is LaCrosse TX3, TX4, TX17
+# * "TS15C" 	is TS15C
 #
 # temperature/humidity sensors (TEMPHYDRO):
 # * "THGR228N"	is THGN122/123, THGN132, THGR122/228/238/268
@@ -29,12 +30,18 @@
 # * "RGR918" 	is RGR126/682/918
 # * "PCR800"	is PCR800
 # * "TFA_RAIN"	is TFA
+# * "RG700"	is UPM RG700
 #
 # wind sensors (WIND):
 # * "WTGR800_A" is WTGR800
 # * "WGR800_A"	is WGR800
 # * "WGR918_A"	is STR918, WGR918
 # * "TFA_WIND"	is TFA
+# * "WDS500" is UPM WDS500
+#
+# Weighing scales (WEIGHT): 
+# "BWR101" is Oregon Scientific BWR101
+# "GR101" is Oregon Scientific GR101
 #
 # Copyright (C) 2012 Willi Herzig
 #
@@ -274,6 +281,7 @@ sub common_anemometer {
 	0x02 => "WGR800_A",
 	0x03 => "WGR918_A",
 	0x04 => "TFA_WIND",
+	0x05 => "WDS500", # UPM WDS500
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -346,6 +354,7 @@ sub common_temp {
 	0x03 => "THWR800",
 	0x04 => "RTHN318",
 	0x05 => "TX3", # LaCrosse TX3
+	0x06 => "TS15C", 
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -542,12 +551,13 @@ sub common_rain {
 	0x01 => "RGR918",
 	0x02 => "PCR800",
 	0x03 => "TFA_RAIN",
+	0x04 => "RG700",
   );
 
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_rain error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_rain error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -569,14 +579,24 @@ sub common_rain {
   }
 
   my $rain = $bytes->[5]*256 + $bytes->[6];
-  my $train = $bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9];
+  if ($dev_type eq "RGR918") {
+  	push @res, {
+		device => $dev_str,
+		type => 'rain',
+		current => $rain,
+		units => 'mm/h',
+  	};
+  } elsif ($dev_type eq "PCR800") {
+	$rain = $rain / 100;
+  	push @res, {
+		device => $dev_str,
+		type => 'rain',
+		current => $rain,
+		units => 'mm/h',
+  	};
+  }
 
-  push @res, {
-	device => $dev_str,
-	type => 'rain',
-	current => $rain,
-	units => 'mm/h',
-  };
+  my $train = ($bytes->[7]*256*256 + $bytes->[8]*256 + $bytes->[9])/10; # total rain
   push @res, {
 	device => $dev_str,
 	type => 'train',
@@ -641,7 +661,7 @@ sub common_weight {
 	units => 'kg',
   };
 
-  simple_battery($bytes, $dev_str, \@res, 7);
+  #simple_battery($bytes, $dev_str, \@res, 7);
 
   return @res;
 }
