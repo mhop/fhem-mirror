@@ -42,7 +42,7 @@ TRX_ELSE_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^.*";
+  $hash->{Match}     = "^...*";
   $hash->{DefFn}     = "TRX_ELSE_Define";
   $hash->{UndefFn}   = "TRX_ELSE_Undef";
   $hash->{ParseFn}   = "TRX_ELSE_Parse";

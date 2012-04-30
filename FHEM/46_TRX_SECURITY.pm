@@ -47,7 +47,7 @@ TRX_SECURITY_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^(\\ |\\)).*"; # 0x20 or 0x29
+  $hash->{Match}     = "^..(20).*";
   $hash->{DefFn}     = "TRX_SECURITY_Define";
   $hash->{UndefFn}   = "TRX_SECURITY_Undef";
   $hash->{ParseFn}   = "TRX_SECURITY_Parse";
