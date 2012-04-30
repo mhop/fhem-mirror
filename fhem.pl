@@ -294,6 +294,7 @@ if(int(@ARGV) == 2) {
   $server = IO::Socket::INET->new(PeerAddr => $addr);
   die "Can't connect to $addr\n" if(!$server);
   syswrite($server, "$ARGV[1] ; quit\n");
+  shutdown($server, 1);
   while(sysread($server, $buf, 256) > 0) {
     print($buf);
   }
