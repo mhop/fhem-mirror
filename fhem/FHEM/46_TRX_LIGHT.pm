@@ -90,8 +90,7 @@ TRX_LIGHT_Initialize($)
     $light_device_c2b{$light_device_codes{$k}->[0]} = $k;
   }
 
-  #$hash->{Match}     = "^\\).*"; # 0x29
-  $hash->{Match}     = "^(\\ |\\)).*"; # 0x20 or 0x29
+  $hash->{Match}     = "^..(10|11|12).*";
   $hash->{SetFn}     = "TRX_LIGHT_Set";
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
