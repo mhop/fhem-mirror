@@ -2096,7 +2096,7 @@ FW_devState($$)
   } elsif($allSets =~ m/ desired-temp:/) {
     $txt = ReadingsVal($d, "measured-temp", "");
     $txt =~ s/ .*//;
-    $txt .= "&deg;";
+    $txt .= "&deg;C";
     $cmdlist = "desired-temp";
 
   } else {
