@@ -575,7 +575,8 @@ FW_digestCgi($)
 
   }
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
-  $cmd.=" $arg{$c}" if(defined($arg{$c}));
+  $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
+                       ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
   return $cmd;
 }
@@ -669,7 +670,7 @@ FW_makeSelect($$$$)
   my @al = sort map { s/:.*//;$_ } split(" ", $list);
 
   my $selEl = $al[0];
-  $selEl = $1 if($list =~ m/([^ ]*):slider,/); # if available
+  $selEl = $1 if($list =~ m/([^ ]*):slider,/); # promote a slider if available
   $selEl = "room" if($list =~ m/room:/);
 
   FW_pO "<form method=\"get\" action=\"$FW_ME$FW_subdir\">";
@@ -699,6 +700,7 @@ FW_doDetail($)
 
   my $t = $defs{$d}{TYPE};
   FW_pO "<div id=\"content\">";
+
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
     my $webCmd = AttrVal($d, "webCmd", undef);
     if($webCmd) {
@@ -713,7 +715,7 @@ FW_doDetail($)
     }
   }
   FW_pO "<table><tr><td>";
-  FW_makeSelect($d, "set", getAllSets($d),"set");
+  FW_makeSelect($d, "set", getAllSets($d), "set");
   FW_makeTable($d, $defs{$d});
   FW_pO "Readings" if($defs{$d}{READINGS});
   FW_makeTable($d, $defs{$d}{READINGS});
@@ -913,7 +915,9 @@ FW_showRoom()
   my %group;
   foreach my $dev (@devs) {
     next if($defs{$dev}{TYPE} eq "weblink");
-    $group{AttrVal($dev, "group", $defs{$dev}{TYPE})}{$dev} = 1;
+    foreach my $grp (split(",", AttrVal($dev, "group", $defs{$dev}{TYPE}))) {
+      $group{$grp}{$dev} = 1;
+    }
   }
 
   # row counter
@@ -952,26 +956,61 @@ FW_showRoom()
       if(!$FW_ss) {
         FW_pO "</td>";
         if($cmdlist) {
-          foreach my $cmd (split(":", $cmdlist)) {
-            FW_pH "cmd.$d=set $d $cmd$rf", ReplaceEventMap($d,$cmd,1),1,"col3";
+          my @cList = split(":", $cmdlist);
+          my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
+          my $firstIdx = 0;
+
+          # Special handling (slider, dropdown)
+          my $cmd = $cList[0];
+          if($allSets && $allSets =~ m/$cmd:([^ ]*)/) {
+            my $values = $1;
+
+            if($values =~ m/^slider,(.*),(.*),(.*)/) { ##### Slider
+              my ($min,$stp, $max) = ($1, $2, $3);
+              my $srf = $FW_room ? "&room=$FW_room" : "";
+              my $curr = ReadingsVal($d, $cmd, Value($d));
+              $cmd = "" if($cmd eq "state");
+              $curr=~s/[^\d\.]//g;
+              FW_pO "<td colspan='2'>".
+                      "<div class='slider' id='slider.$d'>".
+                        "<div class='handle'>$min</div></div>".
+                      "</div>".
+                      "<script type=\"text/javascript\">" .
+                        "Slider(document.getElementById('slider.$d'),".
+                              "'$min','$stp','$max','$curr',".
+                              "'$FW_ME?cmd=set $d $cmd %$srf')".
+                      "</script>".
+                    "</td>";
+              $firstIdx=1;
+
+            } else {    ##### Dropdown
+              $firstIdx=1;
+              my @tv = split(",", $values);
+              if($cmd eq "desired-temp") {
+                $txt = ReadingsVal($d, "measured-temp", "");
+                $txt =~ s/ .*//;        # Cut off Celsius
+                $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
+                $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/); # ???
+              } else {
+                $txt = Value($d);
+                $txt =~ s/$cmd //;
+              }
+              FW_pO "<td>".
+                FW_hidden("arg.$d", $cmd) .
+                FW_hidden("dev.$d", $d) .
+                ($FW_room ? FW_hidden("room", $FW_room) : "") .
+                FW_select("val.$d", \@tv, $txt, "dropdown").
+                "</td><td>".
+                FW_submit("cmd.$d", "set").
+                "</td>";
+            }
           }
 
-        } elsif($allSets =~ m/ desired-temp:([^ ]*)/) {
-          my @tv = split(",", $1);
-          $txt = ReadingsVal($d, "measured-temp", "");
-          $txt =~ s/ .*//;
-          $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-          $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
+          for(my $idx=$firstIdx; $idx < @cList; $idx++) {
+            FW_pH "cmd.$d=set $d $cList[$idx]$rf",
+                ReplaceEventMap($d,$cList[$idx],1),1,"col3";
+          }
 
-          FW_pO "<td>".
-            FW_hidden("arg.$d", "desired-temp") .
-            FW_hidden("dev.$d", $d) .
-            ($FW_room ? FW_hidden("room", $FW_room) : "") .
-            FW_select("val.$d", \@tv,
-                        ReadingsVal($d, "desired-temp", $txt),"fht") .
-            "</td><td>".
-            FW_submit("cmd.$d", "set").
-            "</td>";
 
         } elsif($type eq "FileLog") {
           $row = FW_dumpFileLog($d, 1, $row);
@@ -2021,20 +2060,21 @@ FW_FlushInform($)
   CommandDelete(undef, $name);
 }
 
+###################
+# Compute the state (==second) column
 sub
 FW_devState($$)
 {
   my ($d, $rf) = @_;
 
-  my ($allSets, $hasOnOff, $cmdlist, $link);
-  my $webCmd = AttrVal($d, "webCmd", "");
+  my ($hasOnOff, $cmdlist, $link);
 
+  my $webCmd = AttrVal($d, "webCmd", "");
+  my $allSets = " " . getAllSets($d) . " ";
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
-  my $txt = $state;
 
   if(!$webCmd) {
-    $allSets = " " . getAllSets($d) . " ";
     $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
 
     my $em = AttrVal($d, "eventMap", "");
@@ -2048,14 +2088,16 @@ FW_devState($$)
     }
   }
 
+  my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
 
-  } elsif($allSets && $allSets =~ m/ desired-temp:/) {
+  } elsif($allSets =~ m/ desired-temp:/) {
     $txt = ReadingsVal($d, "measured-temp", "");
     $txt =~ s/ .*//;
-    $txt .= "&deg;"
+    $txt .= "&deg;";
+    $cmdlist = "desired-temp";
 
   } else {
     my $icon;
