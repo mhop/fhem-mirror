@@ -677,13 +677,24 @@ CUL_HM_Parse($$)
     my $lst = defined($1) ? $1 : "00";
     my $chn = "01";
 
-    if($p =~ m/^0601..00$/) {
+    #tobi73: modified 0601.. ->> 06.. 
+    # for multichannel Alive Message - Bytes 3/4=channel ID to be ignored...
+    if($p =~ m/^06....00$/) {
       push @event, "alive:yes";
 
+      #tobi73: For Alive Message of SCI: Bytes 5/6 used for status
+      if($model eq "HM-SCI-3-FM") {
+	$p =~ m/^....(..)..$/;
+	$lst = defined($1) ? $1  : "00";
+      }
     }
     # Multi-channel device: Switch to the shadow source hash
     # for the HM-SCI-3-FM
-    $chn = $1 if($p =~ m/^(..)(..)/);
+    if($p =~ m/^(..)(..)/) {
+      #tobi73: For Alive Message of SCI channel ID in byte 3/4
+      $chn = ($model eq "HM-SCI-3-FM") ? $2 : $1;
+    }
+
     if($chn && $chn ne "01" && $chn ne "00") {
       my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
       $shash = $sshash if($sshash);
