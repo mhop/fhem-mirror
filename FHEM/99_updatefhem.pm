@@ -107,7 +107,8 @@ CommandUpdatefhem($$)
     open(FH,">$localfile") || return "Can't write $localfile";
     print FH $content;
     close(FH);
-    Log 1, "updated $remfile";
+    $ret .= "updated $f\n";
+    Log 1, "updated $f";
   }
 
   return "Can't write $moddir/$ftime" if(!open(FH, ">$moddir/$ftime"));
@@ -122,6 +123,7 @@ CommandUpdatefhem($$)
     }
   }
   
+  $ret .= "update finished\n";
   return $ret;
 }
 
