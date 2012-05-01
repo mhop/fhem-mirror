@@ -140,8 +140,8 @@ HMS_Parse($$)
     $v[2] = $batstr1;
 
     $val = "T: $v[0]  H: $v[1]  Bat: $v[2]";
-    $v[0] = "$v[0] (Celsius)";
-    $v[1] = "$v[1] (%)";
+    #$v[0] = "$v[0] (Celsius)";
+    #$v[1] = "$v[1] (%)";
 
   } elsif ($type eq "HMS100T") {
 
@@ -152,7 +152,7 @@ HMS_Parse($$)
     $v[1] = $batstr1;
 
     $val = "T: $v[0]  Bat: $v[1]";
-    $v[0] = "$v[0] (Celsius)";
+    #$v[0] = "$v[0] (Celsius)";
 
   } elsif ($type eq "HMS100WD") {
 
