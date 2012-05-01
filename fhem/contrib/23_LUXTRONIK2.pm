@@ -210,10 +210,10 @@ LUXTRONIK2_GetStatus($)
 
   # Erst die operativen Stati und Parameterenstellungen
 
-  if(AttrVal($hash->{NAME}, "firmware", "none") ne "none") {
-      $attr{$hash->{NAME}}{firmware} = $heatpump_values[81];
+  if(AttrVal($hash->{NAME}, "firmware", "none") eq "none") {
+      $attr{$hash->{NAME}}{firmware} = chr($heatpump_values[81]);
       for(my $fi=82; $fi<91; $fi++) {
-	  $attr{$hash->{NAME}}{firmware} .= $heatpump_values[$fi];
+	  $attr{$hash->{NAME}}{firmware} .= chr($heatpump_values[$fi]);
       }
   }
 
