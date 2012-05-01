@@ -19,7 +19,9 @@
 # 0011: Added Style4, code beautification, css review, minor $text2-fix (SVN 1342)
 # 0012: Added startscreen-text when no floorplans defined, fixed startscreen-stylesheet, added div for bg-img, added arrangeByMouse (1368)
 # 0013: implemented redirectCmd, fixed minor </td></tr>-error in html-output, fp_arrange for single web-devices, fp_arrange detail (Mar 23, 2012)
-# 0014: deleted $data{FWEXT}{$fhem_url}{STYLESHEET} , added attr-values for FHEMWEB-detail-screen, adapted FHT-representation to FHT.pm updates
+# 0014: deleted $data{FWEXT}{$fhem_url}{STYLESHEET} , added attr-values for FHEMWEB-detail-screen, adapted FHT-representation to FHT.pm updates (Apr 19, 2012)
+# 0015: implemented Tobias' icon subfolder solution, fp_arrange detail always (fp_arrange detail deprecated, fp_arrange 1 shows all detail),
+#       changed backimg-size to 99% to avoid scrollbars , adopted slider & new FHT representation (May 1, 2012)
 #
 ################################################################
 #
@@ -28,15 +30,13 @@
 #  (c) 2012 Copyright: Ulrich Maass
 #  All rights reserved
 #
-#  This script free software; you can redistribute it and/or modify
+#  This script is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
 #  (at your option) any later version.
 #
 #  The GNU General Public License can be found at
 #  http://www.gnu.org/copyleft/gpl.html.
-#  A copy is found in the textfile GPL.txt and important notices to the license
-#  from the author is found in LICENSE.txt distributed with these scripts.
 #
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -63,12 +63,12 @@
 # To make objects display, they will thereby get assigned
 # attr <device> fp_<name> <top>,<left>,<style>,<text>
 # displays device <device> on floorplan <name> at position top:<top>,left:<left> with style <style> and description <text>
-# styles: 0: icon/state only, 1: name+icon, 2: name+icon+commands 3:Device-Readings(+name)
+# styles: 0: icon/state only, 1: name+icon, 2: name+icon+commands 3:Device-Readings(+name) 3:S300TH
 # Example: attr lamp fp_Groundfloor 100,100,1,TableLamp #displays lamp at position 100px,100px
 #
 # Repeat step 3 to add further devices. Delete attr fp_<name> when all devices are arranged on your screen. Enjoy.
 #
-# Check the colorful pdf-docu in http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/95_FLOORPLAN/?sortby=file
+# Check the colorful pdf-docu in http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/?sortby=file
 #
 ################################################################################
 
@@ -135,7 +135,6 @@ FLOORPLAN_Initialize($)
   $data{FWEXT}{$fhem_url}{LINK} = $name;
   $data{FWEXT}{$fhem_url}{NAME} = "Floorplans";
 #  $data{FWEXT}{$fhem_url}{EMBEDDED} = 1;             # not using embedded-mode to save screen-space
-#  $data{FWEXT}{$fhem_url}{STYLESHEET} = "floorplanstyle.css";
   # Global-Config for CSS
   $modules{_internal_}{AttrList} .= " VIEW_CSS";
   my $n = 0;
@@ -212,6 +211,7 @@ FP_CGI(){
   }  
   my $commands = FP_digestCgi($htmlpart[1]) if $htmlpart[1];                       # analyze URL-commands
   my $FP_ret = AnalyzeCommand(undef, $commands) if $commands;                      # Execute commands
+  Log 1, "regex-error. commands: $commands; FP_ret: $FP_ret" if($FP_ret && ($FP_ret =~ m/regex/ ));  #test
 
   #####redirect commands - to suppress repeated execution of commands upon browser refresh
   my $me = $defs{$FW_cname};                                                       # from FHEMWEB: Current connection name
@@ -315,11 +315,9 @@ FP_htmlHeader($) {
   if ($FP_name) {
 	my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
   	FW_pO  ("<link href=\"$FW_ME/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix
-#	$data{FWEXT}{$fhem_url}{STYLESHEET} = "$prf"."floorplanstyle.css";
   } else {  
 	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
     FW_pO  "<link href=\"$FW_ME/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen
-#	$data{FWEXT}{$fhem_url}{STYLESHEET} = $css;
   }
   #set sripts
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
@@ -368,7 +366,7 @@ FP_show(){
   FP_htmlHeader("$FP_name");
   ## body
   FW_pO "<body id=\"$FP_name-body\">\n";
-  FW_pO "<div id=\"backimg\" style=\"width: 100%; height: 100%;\">";
+  FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
   FW_pO "<img src=\"$FW_ME/fp_$FP_name.png\">";            								  # alternative: jpg - how?
   FW_pO "</div>\n";
 
@@ -431,29 +429,66 @@ FP_show(){
     ########################
     # Device-state per device
 		FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
-        $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;
+        $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                               # format FHT-temperature
+		### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
+		my $fp_image = AttrVal("$d", "fp_image", undef);                                  # floorplan-independent icon
+        my $fp_fpimage = AttrVal("$d","fp_$FP_name".".image", undef);                     # floorplan-dependent icon
+        if ($fp_image) {
+            my $state = ReadingsVal($d, "state", undef);
+		    $fp_image =~ s/\{state\}/$state/;                                             # replace {state} by actual device-status
+            $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;     # replace icon-link in html          
+        }
+        if ($fp_fpimage) {
+            my $state = ReadingsVal($d, "state", undef);
+            $fp_fpimage =~ s/\{state\}/$state/;                                           # replace {state} by actual device-status
+            $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;   # replace icon-link in html           
+        }
 		FW_pO "<td colspan=\"$cols\">$txt";
 		FW_pO "</td></tr>";
 
     ########################
     # Commands per device		  
-		if($style == 2 && $cols gt 0) {
-    	  FW_pO "  <tr class=\"devicecommands\" id=\"$d\">";                                   # For css: class=devicecommands, id=devicename
-		  foreach my $cmd (split(":", $cmdlist)) {
-			FW_pH "cmd.$d=set $d $cmd",  ReplaceEventMap($d,$cmd,1), 1, "devicecommands"; 
-		  }
-          FW_pO "  </tr>";
-		} elsif($type eq "FileLog") {
-		# devices with desired-temp-reading, e.g. FHT
-		} elsif($style == 2 && $allSets =~ m/ desired-temp:([^ ]*)/) {                                # FHT-set
-		  my @tv = split(",", $1);
-    	  FW_pO "  <tr class=\"devicecommands\" id=\"$d\">";
-          $txt = ReadingsVal($d, "measured-temp", "");
-          $txt =~ s/ .*//;
-          $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-#          my @tv = split(" ", getAllSets("$d desired-temp"));
-          $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/);
-          FW_pO "<td>".
+        if($cmdlist && $style == 2) {
+          my @cList = split(":", $cmdlist);
+          my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
+          my $firstIdx = 0;
+
+          # Special handling (slider, dropdown)
+          my $cmd = $cList[0];
+          if($allSets && $allSets =~ m/$cmd:([^ ]*)/) {
+            my $values = $1;
+
+            if($values =~ m/^slider,(.*),(.*),(.*)/) { ##### Slider
+              my ($min,$stp, $max) = ($1, $2, $3);
+              my $srf = "";
+              my $curr = ReadingsVal($d, $cmd, Value($d));
+              $cmd = "" if($cmd eq "state");
+              $curr=~s/[^\d\.]//g;
+              FW_pO "<td colspan='2'>".
+                      "<div class='slider' id='slider.$d'>".
+                        "<div class='handle'>$min</div></div>".
+                      "</div>".
+                      "<script type=\"text/javascript\">" .
+                        "Slider(document.getElementById('slider.$d'),".
+                              "'$min','$stp','$max','$curr',".
+                              "'$FW_ME?cmd=set $d $cmd %$srf')".
+                      "</script>".
+                    "</td>";
+              $firstIdx=1;
+
+            } else {    ##### Dropdown
+              $firstIdx=1;
+              my @tv = split(",", $values);
+              if($cmd eq "desired-temp") {
+                $txt = ReadingsVal($d, "measured-temp", "");
+                $txt =~ s/ .*//;        # Cut off Celsius
+                $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
+                $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/); # ???
+              } else {
+                $txt = Value($d);
+                $txt =~ s/$cmd //;
+              }
+			 FW_pO "<td>".
              FP_input("dev.$d", $d, "hidden") .
              FP_input("arg.$d", "desired-temp", "hidden") .
              FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt),"devicecommands") .
@@ -461,7 +496,18 @@ FP_show(){
 #                        ReadingsVal($d, "desired-temp", $txt),"fht") .			 
              FW_submit("cmd.$d", "set").
              "</td></tr>";
-        } 
+			 }
+          }
+          for(my $idx=$firstIdx; $idx < @cList; $idx++) {
+            FW_pH "cmd.$d=set $d $cList[$idx]",
+                ReplaceEventMap($d,$cList[$idx],1),1,"devicecommands";
+          }
+
+        } elsif($type eq "FileLog") {
+#          $row = FW_dumpFileLog($d, 1, $row);
+        }
+      FW_pO "</td>";
+
 	  FW_pO "</table></form>";
 	  FW_pO "</div>\n";
 	}
@@ -487,8 +533,6 @@ FP_show(){
 	}
 	FW_pO "</div>";
 
-#    FP_menuArrange() if ($FP_arrange); #shows the arrange-menu
-	
 	FW_pO "</body>\n";
 }
 #-------------------------------------------------------------------------------
@@ -520,18 +564,16 @@ FP_menuArrange() {
 	my %desc=();
 	# collect data
 	$FP_arrange_default  = "" if (!$FP_arrange_default);
-	my @fpl;
-	my @nfpl;
+	my @fpl;                                                                # devices assigned to floorplan
+	my @nfpl;                                                               # devices not assigned to floorplan
 	foreach my $d (sort keys %defs) {                                       # loop all devices
 		my $type = $defs{$d}{TYPE};
 		# exclude these types from list of available devices
 		next if($type =~ m/^(WEB|CUL$|FHEM.*|FileLog|PachLog|PID|SUNRISE.*|FLOORPLAN|holiday|Global|notify|autocreate)/ );
 		my $disp = $d;
-		if ($FP_arrange eq "detail") {
-			$disp .= ' (' . AttrVal($d,"room","Unsorted").") $type";
-			my $alias = AttrVal($d, "alias", undef);
-			$disp .= ' (' . $alias . ')' if ($alias);
-		}
+		$disp .= ' (' . AttrVal($d,"room","Unsorted").") $type";
+		my $alias = AttrVal($d, "alias", undef);
+		$disp .= ' (' . $alias . ')' if ($alias);
 		$desc{$d} = $disp;
 		if (AttrVal("$d","fp_$FP_name", undef)) {
 			push(@fpl, $disp);
@@ -539,7 +581,7 @@ FP_menuArrange() {
 			push(@nfpl, $disp);
 		}
 	}
-	
+
 	my $attrd = "";
 	my $d = $FP_arrange_selected;
 	$attrd = AttrVal($d, "fp_$FP_name", undef) if ($d);
@@ -557,7 +599,7 @@ FP_menuArrange() {
 	# select device to be arranged
 	if (!defined($FP_arrange_selected)) {
 		my $dv = $FP_arrange_default;
-		$dv =  $desc{$dv} if ($dv && $FP_arrange eq "detail");
+		$dv =  $desc{$dv} if ($dv);
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form2
 		FW_pO "<div class=\"menu-select\" id=\"fpmenu\">\n" .                                       
 		FW_select("arr.dev", \@fpl, $dv, "menu-select") .
