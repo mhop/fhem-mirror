@@ -52,10 +52,22 @@ FW_delayedStart()
 
 /*************** SLIDER **************/
 function
-Slider(slider, min, stp, max)
+Slider(slider, min, stp, max, curr, cmd)
 {
   var sh = slider.firstChild;
-  var lastX=-1, offX=-1, minX, maxX, val=-1;
+  var lastX=-1, offX=0, maxX=0, val=-1;
+
+  function
+  init()
+  {
+    maxX = slider.offsetWidth-sh.offsetWidth;
+    if(curr) {
+      offX += curr*maxX/(max-min);
+      sh.innerHTML = curr;
+      sh.setAttribute('style', 'left:'+offX+'px;');
+    }
+  }
+  init();
 
   function
   touchFn(e, fn)
@@ -73,10 +85,8 @@ Slider(slider, min, stp, max)
     var oldFn1 = document.onmousemove, oldFn2 = document.onmouseup,
         oldFn3 = document.ontouchmove, oldFn4 = document.ontouchend;
 
-    if(offX == -1) {
-      minX = offX = slider.offsetLeft;
-      maxX = minX+slider.offsetWidth-sh.offsetWidth;
-    }
+    if(maxX == 0)
+      init();
     lastX = e.clientX;
 
     function
@@ -84,9 +94,9 @@ Slider(slider, min, stp, max)
     {
       var diff = e.clientX-lastX; lastX = e.clientX;
       offX += diff;
-      if(offX < minX) offX = minX;
+      if(offX < 0) offX = 0;
       if(offX > maxX) offX = maxX;
-      val = min+((offX-minX)/(maxX-minX) * (max-min));
+      val = min+(offX/maxX * (max-min));
       val = Math.floor(Math.floor(val/stp)*stp);
       sh.innerHTML = val;
       sh.setAttribute('style', 'left:'+offX+'px;');
@@ -98,7 +108,11 @@ Slider(slider, min, stp, max)
     {
       document.onmousemove = oldFn1; document.onmouseup  = oldFn2;
       document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
-      slider.nextSibling.setAttribute('value', val);
+      if(cmd) {
+        document.location = cmd.replace('%',val);
+      } else {
+        slider.nextSibling.setAttribute('value', val);
+      }
     };
   };
 
@@ -140,7 +154,7 @@ FW_selChange(sel, list, elName)
       newEl.innerHTML=
         '<div class="slider"><div class="handle">'+min+'</div></div>'+
         '<input type="hidden" name="'+name+'" value="'+min+'">';
-      Slider(newEl.firstChild, min, stp, max);
+      Slider(newEl.firstChild, min, stp, max, undefined, undefined);
 
     } else {
       newEl = document.createElement('select');
