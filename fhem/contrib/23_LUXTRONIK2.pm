@@ -281,6 +281,10 @@ LUXTRONIK2_GetStatus($)
   $switch = $heatpump_parameters[3];
   
   $value = $wpMode{$switch};
+  if ($switch == 0 
+		&& $heatpump_values[16] >= $heatpump_parameters[700] 
+		&& $heatpump_parameters[699] == 1)
+	{$value = "Automatik - Sommerbetrieb (Aus)";}
   $value = "unbekannt (" . $switch . ")" unless $value;
  
   if($hash->{READINGS}{$sensor}{VAL} ne $value) {
