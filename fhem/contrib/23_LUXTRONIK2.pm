@@ -163,14 +163,25 @@ LUXTRONIK2_GetStatus($)
  
   $socket->recv($result, $count*4+4);
   if(length($result) != $count*4) {
-      Log 1, "LUXTRONIK2_GetStatus parameter settings length check: $name $host ".length($result)." should have been ". $count * 4;
-#      return "Value read mismatch Lux2 ( $!)\n";
+      Log GetLogLevel($name, 3), "LUXTRONIK2_GetStatus parameter settings length check: $name $host "
+	  . length($result) . " should have been " . $count * 4;
+      my $loop = 4; # safety net in case of communication problems
+      while((length($result) < ($count * 4)) && ($loop-- > 0) ) {
+	  my $result2;
+	  my $newcnt = ($count * 4) - length($result);
+	  $socket->recv($result2, $newcnt);
+	  $result .= $result2;
+	  Log GetLogLevel($name, 3), "LUXTRONIK2_GetStatus read additional " . length($result2)
+	      . " bytes of expected " . $newcnt . " bytes, total should be "
+	      . $count * 4 . " buflen=" . length($result);
+      }
   }
   @heatpump_parameters = unpack("N$count", $result);
   if(scalar(@heatpump_parameters) != $count) {
-      Log 2, "LUXTRONIK2_GetStatus: $name $host pump parameter problem: received parameter count ("
+      Log 1, "LUXTRONIK2_GetStatus: $name $host pump parameter problem: received parameter count ("
 	  . scalar(@heatpump_parameters) .
 	  ") is not equal to announced parameter count(" . $count . ")!";
+      return "Parameter read mismatch LUXTRONIK2 ( $!)\n";
   }
  
   $socket->close();
