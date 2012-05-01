@@ -39,7 +39,7 @@ LUXTRONIK2_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn}     = "LUXTRONIK2_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 firmware statusHTML";
 }
 
 sub
@@ -178,7 +178,7 @@ LUXTRONIK2_GetStatus($)
   if($err_log ne "")
   {
       Log GetLogLevel($name,2), "LUXTRONIK2 ".$err_log;
-      return("");
+      return("LUXTRONIK2 general problem with heatpump connection");
   }
   
   my %wpOpStat1 = ( 0 => "Waermepumpe laeuft",
@@ -209,6 +209,13 @@ LUXTRONIK2_GetStatus($)
 		 4 => "Aus" );
 
   # Erst die operativen Stati und Parameterenstellungen
+
+  if(AttrVal($hash->{NAME}, "firmware", "none") ne "none") {
+      $attr{$hash->{NAME}}{firmware} = $heatpump_values[81];
+      for(my $fi=82; $fi<91; $fi++) {
+	  $attr{$hash->{NAME}}{firmware} .= $heatpump_values[$fi];
+      }
+  }
 
   $sensor = "currentOperatingStatus1";
   $switch = $heatpump_values[117];
@@ -288,17 +295,17 @@ LUXTRONIK2_GetStatus($)
   LUXTRONIK2_TempValueMerken($hash,$heatpump_values[17],"hotWaterTemperature");
   
   # Wert 10 gibt die Vorlauftemperatur an, die 
-  # korrekte Übersetzung ist flow temperature.
+  # korrekte Uebersetzung ist flow temperature.
   LUXTRONIK2_TempValueMerken($hash,$heatpump_values[10],"flowTemperature");
-  # Rücklauftempereatur
+  # Ruecklauftempereatur
   LUXTRONIK2_TempValueMerken($hash,$heatpump_values[11],"returnTemperature");
-  # Rücklauftemperatur Sollwert
+  # Ruecklauftemperatur Sollwert
   LUXTRONIK2_TempValueMerken($hash,$heatpump_values[12],"returnTemperatureTarget");
-  # Rücklauftemperatur am externen Sensor.
+  # Ruecklauftemperatur am externen Sensor.
   LUXTRONIK2_TempValueMerken($hash,$heatpump_values[13],"returnTemperatureExtern");
- 
-  # Durchfluss Wärmemengenzähler
-  # Durchfluss W�rmemengenz�hler
+
+
+  # Durchfluss Waermemengenzaehler
   $sensor = "flowRate";
   $value = $heatpump_values[155];
   if($hash->{READINGS}{$sensor}{VAL} != $value) {
@@ -307,7 +314,18 @@ LUXTRONIK2_GetStatus($)
       $hash->{READINGS}{$sensor}{UNIT} = "l/h";
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
   }
-  
+
+  if(AttrVal($hash->{NAME}, "statusHTML", "none") ne "none") {
+      $sensor = "floorplanHTML";
+      $value = '<div class=fp_' . $name . '_title>' . $name . "</div>";
+      $value .= $hash->{READINGS}{'currentOperatingStatus1'}{VAL} . '<br>';
+      $value .= $hash->{READINGS}{'currentOperatingStatus2'}{VAL} . '<br>';
+      $value .= "Brauchwasser:" . $hash->{READINGS}{hotWaterTemperature}{VAL} . '&deg;C';
+      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+      $hash->{READINGS}{$sensor}{VAL} = $value;
+      $hash->{READINGS}{$sensor}{UNIT} = "HTML";
+  }
+
   DoTrigger($name, undef) if($init_done);
 }
 

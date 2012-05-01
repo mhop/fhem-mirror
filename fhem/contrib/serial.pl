@@ -6,13 +6,14 @@ use Device::SerialPort;
 use Time::HiRes qw(gettimeofday);
 sub pp($$);
 
-if(@ARGV != 3) {
-  printf("Usage: perl serial.pl serial-device outfile initial-hex-msg\n");
+if(@ARGV != 4) {
+  printf("Usage: perl serial.pl serial-device baudrate outfile initial-hex-msg\n");
   exit(1);
 }
 my $ser = $ARGV[0];
-my $fil = $ARGV[1];
-my $hm  = $ARGV[2];
+my $baud = $ARGV[1];
+my $fil = $ARGV[2];
+my $hm  = $ARGV[3];
 
 my $fd;
 open($fd, ">$fil") || die("Can't open $fil for writing\n");
@@ -22,7 +23,7 @@ $| = 1;
 my $serport = new Device::SerialPort ($ser);
 die "Can't open $ser: $!\n" if(!$serport);
 $serport->reset_error();
-$serport->baudrate(38400);
+$serport->baudrate($baud);
 $serport->databits(8);
 $serport->parity('none');
 $serport->stopbits(1);
