@@ -22,7 +22,7 @@
 # 0014: deleted $data{FWEXT}{$fhem_url}{STYLESHEET} , added attr-values for FHEMWEB-detail-screen, adapted FHT-representation to FHT.pm updates (Apr 19, 2012)
 # 0015: implemented Tobias' icon subfolder solution, fp_arrange detail always (fp_arrange detail deprecated, fp_arrange 1 shows all detail),
 #       changed backimg-size to 99% to avoid scrollbars , adopted slider & new FHT representation (May 1, 2012)
-# 0016: Minor repair of html-output
+# 0016: Minor repair of html-output, allowed devices with dot in name (May 2, 2012)
 #
 ################################################################
 #
@@ -260,8 +260,8 @@ FP_digestCgi($) {
     $v =~ s/[\r]\n/\\\n/g if($v && $p && $p ne "data");
     $FP_webArgs{$p} = $v;
 
-    if($p eq "arr.dev")        { $v =~ m,^(\w*)\s\(,; $v = $1 if ($1); $FP_arrange_selected = $v; $FP_arrange_default = $v; }
-    if($p eq "add.dev")        { $v =~ m,^(\w*)\s\(,; $v = $1 if ($1); $cmd = "attr $v fp_$FP_name 50,100"; }
+    if($p eq "arr.dev")        { $v =~ m,^([\.\w]*)\s\(,; $v = $1 if ($1); $FP_arrange_selected = $v; $FP_arrange_default = $v; }
+    if($p eq "add.dev")        { $v =~ m,^([\.\w]*)\s\(,; $v = $1 if ($1); $cmd = "attr $v fp_$FP_name 50,100"; }
     if($p eq "cmd")            { $cmd = $v; }
     if($p =~ m/^cmd\.(.*)$/)   { $cmd = $v; $c = $1; }
     if($p =~ m/^dev\.(.*)$/)   { $dev{$1} = $v; }
