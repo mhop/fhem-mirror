@@ -183,7 +183,7 @@ dewpoint_Notify($$)
     	# Filtering
     	next if(!defined($s));
     	my ($evName, $val, $rest) = split(" ", $s, 3); # resets $1
-
+    	next if(!defined($evName));
     	Log 1, "dewpoint_notify: evName='$evName' val=$val'" if ($dewpoint_debug == 1);
 	if (($evName eq "T:") && ($temp_name eq "T")) {
 		$n = $i;
