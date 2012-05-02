@@ -22,6 +22,7 @@
 # 0014: deleted $data{FWEXT}{$fhem_url}{STYLESHEET} , added attr-values for FHEMWEB-detail-screen, adapted FHT-representation to FHT.pm updates (Apr 19, 2012)
 # 0015: implemented Tobias' icon subfolder solution, fp_arrange detail always (fp_arrange detail deprecated, fp_arrange 1 shows all detail),
 #       changed backimg-size to 99% to avoid scrollbars , adopted slider & new FHT representation (May 1, 2012)
+# 0016: Minor repair of html-output
 #
 ################################################################
 #
@@ -452,7 +453,7 @@ FP_show(){
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
-
+		  FW_pO "  <tr class=\"devicecommands\" id=\"$d\">";
           # Special handling (slider, dropdown)
           my $cmd = $cList[0];
           if($allSets && $allSets =~ m/$cmd:([^ ]*)/) {
@@ -488,25 +489,22 @@ FP_show(){
                 $txt = Value($d);
                 $txt =~ s/$cmd //;
               }
-			 FW_pO "<td>".
+			 FW_pO "<td>\n".
              FP_input("dev.$d", $d, "hidden") .
              FP_input("arg.$d", "desired-temp", "hidden") .
              FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt),"devicecommands") .
-#            FW_select("val.$d", \@tv,
-#                        ReadingsVal($d, "desired-temp", $txt),"fht") .			 
              FW_submit("cmd.$d", "set").
-             "</td></tr>";
+             "</td>";
 			 }
           }
           for(my $idx=$firstIdx; $idx < @cList; $idx++) {
             FW_pH "cmd.$d=set $d $cList[$idx]",
                 ReplaceEventMap($d,$cList[$idx],1),1,"devicecommands";
           }
-
+		  FW_pO "</tr>"; 
         } elsif($type eq "FileLog") {
 #          $row = FW_dumpFileLog($d, 1, $row);
         }
-      FW_pO "</td>";
 
 	  FW_pO "</table></form>";
 	  FW_pO "</div>\n";
