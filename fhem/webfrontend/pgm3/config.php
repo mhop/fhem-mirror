@@ -360,9 +360,6 @@ $userdef[$sortnumber]['logrotatelines']=30;
 	$winsize=800;			# width of the pgm3
 
 
-##### use netcat if your have problems with the stream_socket-tcp-connection
-## package netcat must be installed
-	$usenetcat=0;
                                                                                 
 ##########################                                                      
 ##### SKINS - change your colors                                                

@@ -213,3 +213,8 @@ It is not necessary to tell fhem that there are other logs.
 2012-04-25
 	-- Feature: debugging for xmllist included
 
+2012-05-02
+	-- Bugfix: getting xmllist from FHEM without \r\n, no netcat any more
+	   Changed: index.php, config.php
+	  
+

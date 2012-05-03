@@ -6,7 +6,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2006-2010 Copyright: Martin Haas (fhz@martin-haas.de)
+#  (c) 2006-2012 Copyright: Martin Haas (fhz@martin-haas.de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='120425';
+$pgm3version='120503';
 	
 
 
@@ -226,32 +226,28 @@ if (! isset($showroom)) $showroom="ALL";
 if (($taillog==1) and (isset ($showhist)) ) exec($taillogorder,$tailoutput);
 
 
+
+
+
 #executes over the network to the fhem.pl (or localhost)
 function execFHZ($order,$machine,$port)
 {
 global $errormessage;
 
 
-if ($usenetcat=='1')
- {
-	$order="$echo xmllist | netcat -w3 $machine $port";  
-	exec($order,$res);
-        $errormessage = $res[0]; 
- }
- else
- {
  $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
          if (!$fp) {
            echo "$errstr ($errno)<br />\n";
         } else {
-           fwrite($fp, "$order\n;quit\n");
+           fwrite($fp, "$order;quit\n");
                	$errormessage= fgets($fp);
            fclose($fp);
         }
- }
-#}
+
 return $errormessage;
 }
+
+
 
 
 
@@ -264,19 +260,18 @@ unset($longxml);
 $version = explode('.', phpversion());
 
 
-
+################################################################################
 # get the xmllist from fhem
 	$fp = stream_socket_client("tcp://$fhem:$fhemport", $errno, $errstr, 30);
 	if (!$fp) {
 	   echo "$errstr ($errno)<br />\n";
 	} else {
-	   fwrite($fp, "xmllist\r\n;quit\r\n");
+	   fwrite($fp, "xmllist;quit\n");
 	   $outputvar=stream_get_contents($fp);
 	   array_push($output,$outputvar);
 	   fclose($fp);
+
 	}
-
-
 
 
 
@@ -636,7 +631,8 @@ xml_parser_free($xml_parser);
 
 
 
-       ############################ FHZ
+       
+	############################ FHZ
 	if ($show_fs20pulldown==1 or $show_general==1 or $show_fhtpulldown==1)
 	{
 	echo "<tr><td $bg1 colspan=4><font $fontcolor1>\r<table  cellspacing='0' cellpadding='0' width='100%'>
