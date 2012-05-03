@@ -685,7 +685,8 @@ AnalyzeCommandChain($$)
 
   $cmd =~ s/;;/SeMiCoLoN/g;
   @cmdList = split(";", $cmd);
-  while(my $subcmd = shift @cmdList) {
+  my $subcmd;
+  while(defined($subcmd = shift @cmdList)) {
     $subcmd =~ s/SeMiCoLoN/;/g;
     my $lret = AnalyzeCommand($c, $subcmd);
     push(@ret, $lret) if(defined($lret));
