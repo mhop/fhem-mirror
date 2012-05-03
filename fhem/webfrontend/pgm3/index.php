@@ -702,10 +702,6 @@ ht><font $fontcolor1><b>
 
 #####################################################################################################################
 
-	##### Check Version of FHEM   -- not neccessary any more...
-	#      if (! ($stack[0][children][0][name]=='_internal__LIST')) ##older FHZ100 have no Internal_LIST
-	#	{echo "Error!! There is no FHEM. You need at least FHEM-4.0 to run this pgm3!!";}
-
 
 	## now the xmllist will be writen on screen as html
 	##### Let's go.... :-)))))
