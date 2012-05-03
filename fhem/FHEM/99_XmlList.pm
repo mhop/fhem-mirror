@@ -30,8 +30,10 @@ XmlEscape($)
   $a =~ s/"/&quot;/g;
   $a =~ s/</&lt;/g;
   $a =~ s/>/&gt;/g;
-# Not needed since we've gone UTF-8
-# $a =~ s/([^ -~])/sprintf("&#%02x;", ord($1))/ge;
+  # Not needed since we've gone UTF-8
+  # $a =~ s/([^ -~])/sprintf("&#%02x;", ord($1))/ge;
+  # Esacape characters 0-31, as they are not part of UTF-8
+  $a =~ s/(\x00-\x19)//g;
 
   return $a;
 }
