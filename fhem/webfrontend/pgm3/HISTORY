@@ -116,3 +116,6 @@
 
 - Martin 2012-04-25
   -- Feature: debugging for xmllist included
+
+- Martin 2012-05-03
+  -- Bugfix: getting xmllist from FHEM without \r\n
