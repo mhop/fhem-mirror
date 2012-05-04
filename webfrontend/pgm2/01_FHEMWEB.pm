@@ -987,10 +987,9 @@ FW_showRoom()
               $firstIdx=1;
               my @tv = split(",", $values);
               if($cmd eq "desired-temp") {
-                $txt = ReadingsVal($d, "measured-temp", "");
+                $txt = ReadingsVal($d, "desired-temp", 20);
                 $txt =~ s/ .*//;        # Cut off Celsius
                 $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-                $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/); # ???
               } else {
                 $txt = Value($d);
                 $txt =~ s/$cmd //;
@@ -2070,30 +2069,18 @@ FW_devState($$)
   my ($hasOnOff, $cmdlist, $link);
 
   my $webCmd = AttrVal($d, "webCmd", "");
-  my $allSets = " " . getAllSets($d) . " ";
+  my $allSets = getAllSets($d);
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
-  if(!$webCmd) {
-    $hasOnOff = ($allSets =~ m/ on / && $allSets =~ m/ off /);
-
-    my $em = AttrVal($d, "eventMap", "");
-    if($em) {
-      if(!$hasOnOff) {
-        $em .= " ";
-        $hasOnOff = ($em =~ m/:on\b/ && $em =~ m/:off\b/);
-      } else {
-        (undef, $state) = ReplaceEventMap($d,[$d, $state],0);
-      }
-    }
-  }
+  $hasOnOff = (!$webCmd && $allSets =~ m/\bon\b/ && $allSets =~ m/\boff\b/);
 
   my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
     $txt = $v if(defined($v));
 
-  } elsif($allSets =~ m/ desired-temp:/) {
+  } elsif($allSets =~ m/\bdesired-temp:/) {
     $txt = ReadingsVal($d, "measured-temp", "");
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
@@ -2113,7 +2100,7 @@ FW_devState($$)
     $link = "cmd.$d=set $d $a[0]";
     $cmdlist = $webCmd;
 
-  } elsif($hasOnOff) {
+  } elsif($hasOnOff && !$cmdlist) {
     $link = "cmd.$d=set $d ".($state eq "on" ? "off":"on");
     $cmdlist = "on:off";
 
