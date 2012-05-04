@@ -91,7 +91,9 @@ LUXTRONIK2_GetStatus($)
   my $host = $hash->{Host};
   my $sensor = '';
   my $state = '';
- 
+  my $firmware;
+  my $serialno;
+
   $cc = 0; #initialize counter
  
   InternalTimer(gettimeofday() + $hash->{INTERVAL}, "LUXTRONIK2_GetStatus", $hash, 0);
@@ -163,7 +165,7 @@ LUXTRONIK2_GetStatus($)
  
   $socket->recv($result, $count*4+4);
   if(length($result) != $count*4) {
-      Log GetLogLevel($name, 3), "LUXTRONIK2_GetStatus parameter settings length check: $name $host "
+      Log 3, "LUXTRONIK2_GetStatus parameter settings length check: $name $host "
 	  . length($result) . " should have been " . $count * 4;
       my $loop = 4; # safety net in case of communication problems
       while((length($result) < ($count * 4)) && ($loop-- > 0) ) {
@@ -171,7 +173,7 @@ LUXTRONIK2_GetStatus($)
 	  my $newcnt = ($count * 4) - length($result);
 	  $socket->recv($result2, $newcnt);
 	  $result .= $result2;
-	  Log GetLogLevel($name, 3), "LUXTRONIK2_GetStatus read additional " . length($result2)
+	  Log 3, "LUXTRONIK2_GetStatus read additional " . length($result2)
 	      . " bytes of expected " . $newcnt . " bytes, total should be "
 	      . $count * 4 . " buflen=" . length($result);
       }
@@ -221,11 +223,15 @@ LUXTRONIK2_GetStatus($)
 
   # Erst die operativen Stati und Parameterenstellungen
 
-  if(AttrVal($hash->{NAME}, "firmware", "none") eq "none") {
-      $attr{$hash->{NAME}}{firmware} = chr($heatpump_values[81]);
-      for(my $fi=82; $fi<91; $fi++) {
-	  $attr{$hash->{NAME}}{firmware} .= chr($heatpump_values[$fi]);
-      }
+  $sensor = "firmware";
+  $value = '';
+  for(my $fi=81; $fi<91; $fi++) {
+      $value .= chr($heatpump_values[$fi]) if $heatpump_values[$fi];
+  }
+  if($hash->{READINGS}{$sensor}{VAL} ne $value) {
+      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+      $hash->{READINGS}{$sensor}{VAL} = $value;
+      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
   }
 
   $sensor = "currentOperatingStatus1";
@@ -258,12 +264,10 @@ LUXTRONIK2_GetStatus($)
       $hash->{READINGS}{$sensor}{VAL} = $value;
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
   }
-#
-# TODO: STATE Ã¤ndern nach Developer-Wiki.
-#
-  $state = $state." - ".$value;
-  $hash->{STATE} = $state;
 
+  $state = $state." - ".$value;
+  $hash->{READINGS}{state}{VAL} = $state;
+  $hash->{READINGS}{state}{TIME} = TimeNow();
   
   $sensor = "hotWaterOperatingMode";
   $switch = $heatpump_parameters[4];
@@ -319,6 +323,10 @@ LUXTRONIK2_GetStatus($)
   # Ruecklauftemperatur am externen Sensor.
   LUXTRONIK2_TempValueMerken($hash,$heatpump_values[13],"returnTemperatureExtern");
 
+# Wärmequellen
+  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[19],"heatSourceIN");
+  LUXTRONIK2_TempValueMerken($hash,$heatpump_values[20],"heatSourceOUT");
+
 
   # Durchfluss Waermemengenzaehler
   $sensor = "flowRate";
@@ -327,6 +335,24 @@ LUXTRONIK2_GetStatus($)
       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
       $hash->{READINGS}{$sensor}{VAL} = $value;
       $hash->{READINGS}{$sensor}{UNIT} = "l/h";
+      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
+  }
+  # Waermemengenzaehler
+  $sensor = "flowCountHeating";
+  $value = $heatpump_values[151];
+  if($hash->{READINGS}{$sensor}{VAL} != $value) {
+      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+      $hash->{READINGS}{$sensor}{VAL} = $value;
+      $hash->{READINGS}{$sensor}{UNIT} = "Wh";
+      $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
+  }
+  # Waermemengenzaehler                                                                                                                                           
+  $sensor = "flowCountHotWater";
+  $value = $heatpump_values[152];
+  if($hash->{READINGS}{$sensor}{VAL} != $value) {
+      $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+      $hash->{READINGS}{$sensor}{VAL} = $value;
+      $hash->{READINGS}{$sensor}{UNIT} = "Wh";
       $hash->{CHANGED}[$cc++] = $sensor.": ".$value;
   }
 
