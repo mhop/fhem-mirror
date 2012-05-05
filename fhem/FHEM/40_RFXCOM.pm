@@ -93,7 +93,7 @@ RFXCOM_Initialize($)
   $hash->{GetFn}   = "RFXCOM_Get";
   $hash->{SetFn}   = "RFXCOM_Set";
   $hash->{StateFn} = "RFXCOM_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1:0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "dummy:1,0 do_not_init:1:0 longids loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "RFXCOM_Shutdown";
 }
 

@@ -51,7 +51,7 @@ TRX_SECURITY_Initialize($)
   $hash->{DefFn}     = "TRX_SECURITY_Define";
   $hash->{UndefFn}   = "TRX_SECURITY_Undef";
   $hash->{ParseFn}   = "TRX_SECURITY_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -188,6 +188,7 @@ sub TRX_SECURITY_parse_X10Sec {
 
   # Use $def->{NAME}, because the device may be renamed:
   my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
 
   my $data = $bytes->[6];
 
