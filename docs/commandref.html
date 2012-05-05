@@ -2975,14 +2975,27 @@ A line ending with \ will be concatenated with the next one, so long lines
 
      <li>dimmer, blindActuator
        <ul>
-         <li>0 - 100 with a resolution of 0.5:<br>
-             set the dimmer / blindActuator to the given value (in percent).<br>
-			 as a second optional parameter you can give the On-Time in seconds (analog "on-for-timer"). 0 means infinite<br>
-			 as a third optional parameter you can give the Ramp-Time in seconds (steps of 0.1) for a "slow-dim". 0 means instant. Default: 0.5<br></li>
+         <li>0 - 100 [on-time] [ramp-time]<br>
+             set the dimmer / blindActuator to the given value (in percent)
+             with a resolution of 0.5.<br>
+             As a second optional parameter you can give the on-time in seconds
+             (analog "on-for-timer"), 0 means infinite.<br>
+             As a third optional parameter you can give the Ramp-Time in
+             seconds (steps of 0.1) for a "slow-dim". 0 means instant. Default:
+             0.5<br>
+             </li>
          <li>on / off<br>
              this corresponds to 100 or 0 %.
-		 <li>toggle - toggle the dimmer between off and the last on-value</li>
-		 <li>on-for-timer sec - set the dimmer on for the given seconds. Redundant with 0-100 and on/off for compatability purposes</li>
+             </li>
+         <li>toggle - toggle the dimmer between off and the last on-value
+             </li>
+         <li>on-for-timer sec - set the dimmer on for the given seconds.
+             Redundant with 0-100 and on/off for compatability purposes</li>
+       </ul></li>
+     <li> blindActuator
+       <ul>
+         <li>stop - stop the motion
+             </li>
        </ul></li>
      <br>
 
@@ -7742,8 +7755,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
       <code>define homepage weblink link http://www.fhem.de</code><br>
       <code>define webcam_picture weblink image http://w.x.y.z/current.jpg</code><br>
       <code>define interactive_webcam weblink iframe http://w.x.y.z/webcam.cgi</code><br>
-      <code>define define hr weblink htmlCode <hr></code><br>
-      <code>define define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }</code><br>
+      <code>define hr weblink htmlCode &lt;hr&gt</code><br>
+      <code>define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }</code><br>
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
     </ul>
     <br>
