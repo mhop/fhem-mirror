@@ -17,6 +17,7 @@ sub CUL_HM_SendCmd($$$$);
 sub CUL_HM_Set($@);
 sub CUL_HM_DumpProtocol($$@);
 sub CUL_HM_convTemp($);
+sub CUL_HM_pushConfig($$$$$$$$);
 
 my %culHmDevProps=(
   "01" => { st => "AlarmControl",    cl => "controller" }, # by peterp
@@ -33,7 +34,7 @@ my %culHmDevProps=(
   "81" => { st => "motionDetector",  cl => "sender" },
   "C0" => { st => "keyMatic",        cl => "sender" },
   "C1" => { st => "winMatic",        cl => "receiver" },
-  "CD" => { st => "smokeDetector",   cl => "sender" },   # Parse
+  "CD" => { st => "smokeDetector",   cl => "receiver" }, # Parse,set unfinished
 );
 
 my %culHmModel=(
@@ -666,10 +667,8 @@ CUL_HM_Parse($$)
 
     }
 
-    $p =~ m/^....(..)$/;
-    my $lst = defined($1) ? $1 : "00";
-    CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".$lst."00",1,0)  # Send Ack
-          if($id eq $dst);
+    CUL_HM_SendCmd($shash, "++8002".$id.$src.($cmd eq "A001" ? "80":"00"),1,0)
+      if($id eq $dst && $cmd ne "8002");  # Send Ack/Nack
     push @event, "unknownMsg:$p" if(!@event);
 
   } elsif($st eq "threeStateSensor") { #####################################
@@ -895,6 +894,8 @@ my %culHmSubTypeSets = (
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>",
           devicepair => "<btnNumber> device", },
+  smokeDetector =>
+        { test => "", "alarmOn"=>"", "alarmOff"=>"" },
   winMatic =>
         { matic  => "<btn>",
           read   => "<btn>",
@@ -1014,10 +1015,10 @@ CUL_HM_Set($@)
     $hash->{hmPairSerial} = $serialNr;
 
   } elsif($cmd eq "unpair") { ###########################################
-    CUL_HM_pushConfig($hash, $id, $dst, 0, 0, "02010A000B000C00");
+    CUL_HM_pushConfig($hash, $id, $dst, 0,0,0,0, "02010A000B000C00");
 
   } elsif($cmd eq "sign") { ############################################
-    CUL_HM_pushConfig($hash, $id, $dst, $chn, $chn,
+    CUL_HM_pushConfig($hash, $id, $dst, $chn,0,0,$chn,
                     "08" . ($a[2] eq "on" ? "01":"02"));
 
   } elsif($cmd eq "statusRequest") { ####################################
@@ -1080,9 +1081,9 @@ CUL_HM_Set($@)
     $l2 =~ s/(.)/sprintf("%02X%02X",$s++,ord($1))/ge;
     $l1 .= $l2;
 
-    CUL_HM_pushConfig($hash, $id, $dst, $bn, 1, $l1);
+    CUL_HM_pushConfig($hash, $id, $dst, $bn,0,0,1, $l1);
 
-  } elsif($cmd =~ m/^displayMode$/) { ###############################
+  } elsif($cmd eq "displayMode") { ###############################
     my $tcnf;
     if($hash->{helper}{state251}) {
       $tcnf = $hash->{helper}{state251};
@@ -1115,13 +1116,13 @@ CUL_HM_Set($@)
         return CUL_HM_TC_missing($hash);
       }
     }
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01$tcnf");
     $hash->{helper}{state251} = $tcnf;
     $hash->{READINGS}{$cmd}{TIME} = TimeNow();
     $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
     return;
 
-  } elsif($cmd =~ m/^displayTemp$/) { ###############################
+  } elsif($cmd eq "displayTemp") { ###############################
     my $tcnf;
     if($hash->{helper}{state251}) {
       $tcnf = $hash->{helper}{state251};
@@ -1154,13 +1155,13 @@ CUL_HM_Set($@)
         return CUL_HM_TC_missing($hash);
       }
     }
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01$tcnf");
     $hash->{helper}{state251} = $tcnf;
     $hash->{READINGS}{$cmd}{TIME} = TimeNow();
     $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
     return;
 
-  } elsif($cmd =~ m/^displayTempUnit$/) { ###############################
+  } elsif($cmd eq "displayTempUnit") { ###############################
     my $tcnf;
     if($hash->{helper}{state251}) {
       $tcnf = $hash->{helper}{state251};
@@ -1193,13 +1194,13 @@ CUL_HM_Set($@)
         return CUL_HM_TC_missing($hash);
       }
     }
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01$tcnf");
     $hash->{helper}{state251} = $tcnf;
     $hash->{READINGS}{$cmd}{TIME} = TimeNow();
     $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
     return;
 
-  } elsif($cmd =~ m/^controlMode$/) { ###############################
+  } elsif($cmd eq "controlMode") { ###############################
     my $tcnf;
     if($hash->{helper}{state251}) {
       $tcnf = $hash->{helper}{state251};
@@ -1231,13 +1232,13 @@ CUL_HM_Set($@)
         return CUL_HM_TC_missing($hash);
       }
     }
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01$tcnf");
     $hash->{helper}{state251} = $tcnf;
     $hash->{READINGS}{$cmd}{TIME} = TimeNow();
     $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
     return;
 
-  } elsif($cmd =~ m/^decalcDay$/) { ###############################
+  } elsif($cmd eq "decalcDay") { ###############################
     my $tcnf;
     my $dbit = $tc_day2bits{$a[2]};
 
@@ -1268,13 +1269,13 @@ CUL_HM_Set($@)
         return CUL_HM_TC_missing($hash);
       }
     }
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "01$tcnf");
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01$tcnf");
     $hash->{helper}{state251} = $tcnf;
     $hash->{READINGS}{$cmd}{TIME} = TimeNow();
     $hash->{READINGS}{$cmd}{VAL} = sprintf("%s", $a[2]);
     return;
 
-  } elsif($cmd =~ m/^desired-temp$/) { ##################
+  } elsif($cmd eq "desired-temp") { ##################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_PushCmdStack($hash, "++A112$id$dst");     # Wakeup...
@@ -1287,7 +1288,7 @@ CUL_HM_Set($@)
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_PushCmdStack($hash, "++A112$id$dst");     # Wakeup...
-    CUL_HM_pushConfig($hash, $id, $dst, 2, 5, "$tt$temp");      # List 5
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "$tt$temp");      # List 5
 
   } elsif($cmd =~ m/^tempList(...)/) { ##################################
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
@@ -1317,7 +1318,7 @@ CUL_HM_Set($@)
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
     CUL_HM_PushCmdStack($hash, "++A112$id$dst");     # Wakeup...
-    CUL_HM_pushConfig($hash, $id, $dst, 2, $list, $data);
+    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
 
     my $vn = "tempList$wd";
     $hash->{READINGS}{$vn}{TIME} = TimeNow();
@@ -1372,6 +1373,15 @@ CUL_HM_Set($@)
 
     }
     CUL_HM_PushCmdStack($hash, $cmd) if($cmd);
+
+  } elsif($cmd eq "test" && $st eq "smokeDetector") { #################
+    my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+    $hash->{TESTNR} = $testnr;
+    CUL_HM_SendCmd($hash, sprintf("++9440%s%s00%02X",$id,$id,$testnr), 1, 0);
+
+  } elsif($cmd eq "alarm(.*)" && $st eq "smokeDetector") { #################
+    CUL_HM_SendCmd($hash, sprintf("++9441%s%s01%s",
+        $id,$id, $1 eq "on" ? "0BC8" : "0C01"), 1, 0);
 
   } elsif($cmd eq "devicepair") { #####################################
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
@@ -1503,8 +1513,9 @@ CUL_HM_Pair(@)
 
   my $chn = 0;
   #$chn = hex($2) if($devInfo =~ m,(..)(..), && $stn eq "remote");
-  CUL_HM_pushConfig($hash, $id, $src, $chn, 0, "0201$idstr");
+  CUL_HM_pushConfig($hash, $id, $src, $chn,0,0,0, "0201$idstr");
   CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
+
 
   return "";
 }
@@ -1622,6 +1633,7 @@ my %culHmBits = (
                        STATUS         => "04,2",
                        RSSI           => "08,2", } },
   "8002;p01=00"   => { txt => "ACK" },
+  "8002;p01=02"   => { txt => "ACK2" }, # smokeDetector pairing only?
   "8002;p01=80"   => { txt => "NACK" },
   "8002;p01=84"   => { txt => "NACK_TARGET_INVALID" },
   "A001;p11=01"   => { txt => "CONFIG_PEER_ADD", params => {
@@ -1746,7 +1758,7 @@ CUL_HM_DumpProtocol($$@)
     }
     $txt = " ($txt)" if($txt);
   }
-  my $msg  = "$prefix L:$len N:$cnt CMD:$cmd ($cmdBits) SRC:$src DST:$dst $p$txt";
+  my $msg ="$prefix L:$len N:$cnt CMD:$cmd SRC:$src DST:$dst $p$txt ($cmdBits)";
   Log $l4, $msg;
   DoTrigger($iname, $msg) if($ev);
 }
@@ -1834,12 +1846,13 @@ CUL_HM_decodeTime16($)
 
 #############################
 sub
-CUL_HM_pushConfig($$$$$$)
+CUL_HM_pushConfig($$$$$$$$)
 {
-  my ($hash,$src,$dst,$chn,$list,$content) = @_;
+  my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$param,$content) = @_;
 
-  CUL_HM_PushCmdStack($hash,
-        sprintf("++A001%s%s%02X0500000000%02X",$src,$dst,$chn,$list));
+  $peerAddr = "000000" if(!$peerAddr);
+  CUL_HM_PushCmdStack($hash, sprintf("++A001%s%s%02X05%s%02X%02X",
+        $src, $dst, $chn, $peerAddr, $peerChn, $param));
   my $tl = length($content);
   for(my $l = 0; $l < $tl; $l+=28) {
     my $ml = $tl-$l < 28 ? $tl-$l : 28;
