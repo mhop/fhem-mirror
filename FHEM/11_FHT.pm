@@ -165,7 +165,7 @@ FHT_Initialize($)
   $hash->{ParseFn}   = "FHT_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 model:fht80b dummy:1,0 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 retrycount " .
-                       "minfhtbuffer lazy tmpcorr ignore:1,0";
+                       "minfhtbuffer lazy tmpcorr ignore:1,0 event-on-update-reading event-on-change-reading";
 }
 
 
@@ -413,13 +413,37 @@ FHT_Parse($$)
     return $name;
   }
 
-  my $tn = TimeNow();
 
-  # counter for notifies
-  my $nc = 0;
+  #
+  # special treatment for measured-temp which is actually sent in two bytes
+  #
 
-  ###########################
-  # Reformat the values so they are readable.
+  # the measured temperature comes in two bytes: measured-low and measured-high
+  # measured-temp= (measured-high * 256 + measured-low) / 10.
+  # measured-low and measured-high will only be stored as internals
+  if($cmd eq "measured-low") {
+  
+        $def->{fhem}{measuredLow}= $val;
+        return "";
+        
+  } elsif($cmd eq "measured-high") {
+
+        $def->{fhem}{measuredHigh}= $val;
+
+        if(defined($def->{fhem}{measuredLow})) {
+
+            $val = ($val*256.0 + $def->{fhem}{measuredLow})/10.0+ AttrVal($name, "tmpcorr", 0.0);
+            $cmd = "measured-temp";
+        } else {
+            return "";
+        }
+  }
+
+  #
+  # from here readings are effectively updated
+  #
+  readingsBeginUpdate($def);
+
   # The first four are confirmation messages, so they must be converted to
   # the same format as the input (for the softbuffer)
 
@@ -429,7 +453,7 @@ FHT_Parse($$)
   } elsif($cmd eq "mode") {
     $val = $c2m{$val} if(defined($c2m{$val}));
 
-  } elsif($cmd =~ m/.*-temp/) {
+  } elsif($cmd =~ m/.*-temp/ && $cmd ne "measured-temp") {
     $val = sprintf("%.1f", $val / 2);
     if($cmd eq "desired-temp") {
       $val = ($val > 30 ? "on" : ($val < 6 ? "off" : $val));
@@ -457,30 +481,8 @@ FHT_Parse($$)
 
     else { $val = "unknown_$sval: $fv" }
 
-  } elsif($cmd eq "measured-low") {
-    $def->{READINGS}{$cmd}{TIME} = $tn;
-    $def->{READINGS}{$cmd}{VAL} = $val;
-    return "";
-
-  } elsif($cmd eq "measured-high") {
-    $def->{READINGS}{$cmd}{TIME} = $tn;
-    $def->{READINGS}{$cmd}{VAL} = $val;
-
-    if(defined($def->{READINGS}{"measured-low"}) &&
-       defined($def->{READINGS}{"measured-low"}{VAL})) {
-
-      my $off = ($attr{$name} && $attr{$name}{tmpcorr}) ?
-                        $attr{$name}{tmpcorr} : 0;
-      $val = $val*256 + $def->{READINGS}{"measured-low"}{VAL};
-      $val /= 10;
-      $val = sprintf("%.1f (Celsius)", $val+$off);
-      $cmd = "measured-temp";
-
-    } else {
-      return "";
-    }
-
   } elsif($cmd eq "warnings") {
+
     my $nVal;
 
     # initialize values for additional warnings
@@ -519,42 +521,36 @@ FHT_Parse($$)
     $val = $nVal? $nVal : "none";
 
     # set additional warnings and trigger notify
-    $def->{READINGS}{'battery'}{TIME} = $tn;
-    $def->{READINGS}{'battery'}{VAL} = $valBattery;
-    $def->{CHANGED}[$nc] = "battery: $valBattery";
+    readingsUpdate($def, "battery", $valBattery);
     Log $ll4, "FHT $name battery: $valBattery";
-    $nc++;
 
-    $def->{READINGS}{'lowtemp'}{TIME} = $tn;
-    $def->{READINGS}{'lowtemp'}{VAL} = $valLowTemp;
-    $def->{CHANGED}[$nc] = "lowtemp: $valLowTemp";
+    readingsUpdate($def, "lowtemp", $valLowTemp);
     Log $ll4, "FHT $name lowtemp: $valLowTemp";
-    $nc++;
 
-    $def->{READINGS}{'window'}{TIME} = $tn;
-    $def->{READINGS}{'window'}{VAL} = $valWindow;
-    $def->{CHANGED}[$nc] = "window: $valWindow";
+    readingsUpdate($def, "window", $valWindow);
     Log $ll4, "FHT $name window: $valWindow";
-    $nc++;
 
-    $def->{READINGS}{'windowsensor'}{TIME} = $tn;
-    $def->{READINGS}{'windowsensor'}{VAL} = $valSensor;
-    $def->{CHANGED}[$nc] = "windowsensor: $valSensor";
+    readingsUpdate($def, "windowsensor", $valSensor);
     Log $ll4, "FHT $name windowsensor: $valSensor";
-    $nc++;
   }
 
   if(substr($msg,24,1) eq "7") {        # Do not store FHZ acks.
     $cmd = "FHZ:$cmd";
 
   } else {
-    $def->{READINGS}{$cmd}{TIME} = $tn;
-    $def->{READINGS}{$cmd}{VAL} = $val;
-    $def->{STATE} = "$cmd: $val" if($cmd eq "measured-temp");
+    readingsUpdate($def, $cmd, $val);
+    if($cmd eq "measured-temp") {
+        $def->{STATE} = "$cmd: $val";
+        readingsUpdate($def, "temperature", $val);
+    }    
   }
-  $def->{CHANGED}[$nc] = "$cmd: $val";
 
   Log $ll4, "FHT $name $cmd: $val";
+
+  #
+  # now we are done with updating readings
+  #
+  readingsEndUpdate($def, 0);
 
   ################################
   # Softbuffer: delete confirmed commands
@@ -577,7 +573,7 @@ FHT_Parse($$)
   return $name;
 }
 
-
+#####################################
 # Check the softwarebuffer and send/resend commands
 sub
 doSoftBuffer($)
