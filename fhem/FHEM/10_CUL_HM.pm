@@ -890,7 +890,7 @@ my %culHmSubTypeSets = (
   dimmer =>
         { "on-for-timer"=>"sec", on=>"", off=>"", toggle=>"", pct=>"" },
   blindActuator=>
-        { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"" },
+        { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"", stop=>"" },
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>",
           devicepair => "<btnNumber> device", },
@@ -1061,6 +1061,11 @@ CUL_HM_Set($@)
     }
     my $cmd = sprintf("++A011%s%s02%s%02X%s%s", $id, $dst, $chn, $a[1]*2,$rval,$tval);
     CUL_HM_PushCmdStack($hash, $cmd);
+
+  } elsif($cmd eq "stop") { #####################################
+    my $headerbytes = $md eq "HM-LC-SW1-BA-PCB" ? "FF" : "A0";
+    CUL_HM_PushCmdStack($hash,
+        sprintf("++%s11%s%s03%s", $headerbytes, $id,$dst, $chn));
 
   } elsif($cmd eq "text") { #############################################
     $state = "";
