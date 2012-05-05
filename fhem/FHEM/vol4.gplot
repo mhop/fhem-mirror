@@ -1,0 +1,26 @@
+############################
+# Display volume log (USF1000) of the form
+# 2012-05-05_17:18:49 e.ext.tank v: 62  V: 1850
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+
+set title '<TL>'
+
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set grid xtics y2tics
+
+set ytics nomirror
+set ylabel "%"
+set yrange [0:100]
+
+set y2tics
+set y2label "%"
+set y2range [0:100]
+
+#FileLog 4:::
+
+plot "<IN>" x1y1 title 'Volume' with lines
+
