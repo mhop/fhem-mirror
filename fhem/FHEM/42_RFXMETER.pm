@@ -38,7 +38,7 @@ RFXMETER_Initialize($)
   $hash->{DefFn}     = "RFXMETER_Define";
   $hash->{UndefFn}   = "RFXMETER_Undef";
   $hash->{ParseFn}   = "RFXMETER_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -157,6 +157,7 @@ sub parse_RFXmeter {
   # Use $def->{NAME}, because the device may be renamed:
   my $name = $def->{NAME};
   #Log 1, "name=$new_name";
+  return "" if(IsIgnored($name));
 
   my $n = 0;
   my $tm = TimeNow();

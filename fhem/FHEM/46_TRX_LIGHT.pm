@@ -95,7 +95,7 @@ TRX_LIGHT_Initialize($)
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
   $hash->{ParseFn}   = "TRX_LIGHT_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -394,6 +394,7 @@ sub TRX_LIGHT_parse_X10 {
 
   # Use $def->{NAME}, because the device may be renamed:
   my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
 
   Log 1, "TRX_LIGHT: $name devn=$device_name first=$firstdevice command=$command, cmd=$hexdata" if ($TRX_LIGHT_debug == 1);
 
