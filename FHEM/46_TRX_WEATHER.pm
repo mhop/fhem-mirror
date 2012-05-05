@@ -35,7 +35,7 @@
 # wind sensors (WIND):
 # * "WTGR800_A" is WTGR800
 # * "WGR800_A"	is WGR800
-# * "WGR918_A"	is STR918, WGR918
+# * "WGR918"	is STR918, WGR918
 # * "TFA_WIND"	is TFA
 # * "WDS500" is UPM WDS500
 #
@@ -90,7 +90,7 @@ TRX_WEATHER_Initialize($)
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -130,19 +130,19 @@ TRX_WEATHER_Undef($$)
 my %types =
   (
    # TEMP
-   0x5008 => { part => 'TEMP', method => \&common_temp, },
+   0x5008 => { part => 'TEMP', method => \&TRX_WEATHER_common_temp, },
    # HYDRO
-   0x5108 => { part => 'HYDRO', method => \&common_hydro, },
+   0x5108 => { part => 'HYDRO', method => \&TRX_WEATHER_common_hydro, },
    # TEMP HYDRO
-   0x520a => { part => 'TEMPHYDRO', method => \&common_temphydro, },
+   0x520a => { part => 'TEMPHYDRO', method => \&TRX_WEATHER_common_temphydro, },
    # TEMP HYDRO BARO
-   0x540d => { part => 'TEMPHYDROBARO', method => \&common_temphydrobaro, },
+   0x540d => { part => 'TEMPHYDROBARO', method => \&TRX_WEATHER_common_temphydrobaro, },
    # RAIN
-   0x550b => { part => 'RAIN', method => \&common_rain, },
+   0x550b => { part => 'RAIN', method => \&TRX_WEATHER_common_rain, },
    # WIND
-   0x5610 => { part => 'WIND', method => \&common_anemometer, },
+   0x5610 => { part => 'WIND', method => \&TRX_WEATHER_common_anemometer, },
    # WEIGHT
-   0x5D08 => { part => 'WEIGHT', method => \&common_weight, },
+   0x5D08 => { part => 'WEIGHT', method => \&TRX_WEATHER_common_weight, },
   );
 
 # --------------------------------------------
@@ -158,7 +158,7 @@ my @TRX_WEATHER_winddir_name=("N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW
 #	- some parameter like "parent" and others are removed
 #	- @res array return the values directly (no usage of xPL::Message)
 
-sub temperature {
+sub TRX_WEATHER_temperature {
   my ($bytes, $dev, $res, $off) = @_;
 
   my $temp =
@@ -176,7 +176,7 @@ sub temperature {
 
 }
 
-sub humidity {
+sub TRX_WEATHER_humidity {
   my ($bytes, $dev, $res, $off) = @_;
   my $hum = $bytes->[$off];
   my $hum_str = ['dry', 'comfortable', 'normal',  'wet']->[$bytes->[$off+1]];
@@ -189,7 +189,7 @@ sub humidity {
   }
 }
 
-sub pressure {
+sub TRX_WEATHER_pressure {
   my ($bytes, $dev, $res, $off) = @_;
 
   #my $offset = 795 unless ($offset);
@@ -209,7 +209,7 @@ sub pressure {
   };
 }
 
-sub simple_battery {
+sub TRX_WEATHER_simple_battery {
   my ($bytes, $dev, $res, $off) = @_;
 
   my $battery;
@@ -228,7 +228,7 @@ sub simple_battery {
   };
 }
 
-sub battery {
+sub TRX_WEATHER_battery {
   my ($bytes, $dev, $res, $off) = @_;
 
   my $battery;
@@ -250,7 +250,7 @@ sub battery {
 
 
 # Test if to use longid for device type
-sub use_longid {
+sub TRX_WEATHER_use_longid {
   my ($longids,$dev_type) = @_;
 
   return 0 if ($longids eq "");
@@ -266,7 +266,7 @@ sub use_longid {
 
 # ------------------------------------------------------------
 #
-sub common_anemometer {
+sub TRX_WEATHER_common_anemometer {
     	my $type = shift;
 	my $longids = shift;
     	my $bytes = shift;
@@ -278,8 +278,8 @@ sub common_anemometer {
   my %devname =
     (	# HEXSTRING => "NAME"
 	0x01 => "WTGR800_A",
-	0x02 => "WGR800_A",
-	0x03 => "WGR918_A",
+	0x02 => "WGR800",
+	0x03 => "WGR918",
 	0x04 => "TFA_WIND",
 	0x05 => "WDS500", # UPM WDS500
   );
@@ -296,7 +296,7 @@ sub common_anemometer {
   #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -331,14 +331,14 @@ sub common_anemometer {
 	units => 'degrees',
   };
 
-  simple_battery($bytes, $dev_str, \@res, 15);
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 15);
 
   return @res;
 }
 
 
 # -----------------------------
-sub common_temp {
+sub TRX_WEATHER_common_temp {
   my $type = shift;
   my $longids = shift;
   my $bytes = shift;
@@ -369,7 +369,7 @@ sub common_temp {
   #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -385,13 +385,13 @@ sub common_temp {
     push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
   }
 
-  temperature($bytes, $dev_str, \@res, 5); 
-  simple_battery($bytes, $dev_str, \@res, 7);
+  TRX_WEATHER_temperature($bytes, $dev_str, \@res, 5); 
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 7);
   return @res;
 }
 
 # -----------------------------
-sub common_hydro {
+sub TRX_WEATHER_common_hydro {
   my $type = shift;
   my $longids = shift;
   my $bytes = shift;
@@ -414,7 +414,7 @@ sub common_hydro {
   }
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -430,13 +430,13 @@ sub common_hydro {
     push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
   }
 
-  humidity($bytes, $dev_str, \@res, 5); 
-  simple_battery($bytes, $dev_str, \@res, 7);
+  TRX_WEATHER_humidity($bytes, $dev_str, \@res, 5); 
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 7);
   return @res;
 }
 
 # -----------------------------
-sub common_temphydro {
+sub TRX_WEATHER_common_temphydro {
   my $type = shift;
   my $longids = shift;
   my $bytes = shift;
@@ -466,7 +466,7 @@ sub common_temphydro {
   }
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -481,14 +481,14 @@ sub common_temphydro {
     push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
   }
 
-  temperature($bytes, $dev_str, \@res, 5);
-  humidity($bytes, $dev_str, \@res, 7); 
-  simple_battery($bytes, $dev_str, \@res, 9);
+  TRX_WEATHER_temperature($bytes, $dev_str, \@res, 5);
+  TRX_WEATHER_humidity($bytes, $dev_str, \@res, 7); 
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 9);
   return @res;
 }
 
 # -----------------------------
-sub common_temphydrobaro {
+sub TRX_WEATHER_common_temphydrobaro {
   my $type = shift;
   my $longids = shift;
   my $bytes = shift;
@@ -512,7 +512,7 @@ sub common_temphydrobaro {
   }
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -528,15 +528,15 @@ sub common_temphydrobaro {
     push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
   }
 
-  temperature($bytes, $dev_str, \@res, 5); 
-  humidity($bytes, $dev_str, \@res, 7); 
-  pressure($bytes, $dev_str, \@res, 9);
-  simple_battery($bytes, $dev_str, \@res, 12);
+  TRX_WEATHER_temperature($bytes, $dev_str, \@res, 5); 
+  TRX_WEATHER_humidity($bytes, $dev_str, \@res, 7); 
+  TRX_WEATHER_pressure($bytes, $dev_str, \@res, 9);
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 12);
   return @res;
 }
 
 # -----------------------------
-sub common_rain {
+sub TRX_WEATHER_common_rain {
   my $type = shift;
   my $longids = shift;
   my $bytes = shift;
@@ -563,7 +563,7 @@ sub common_rain {
   }
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -604,13 +604,13 @@ sub common_rain {
 	units => 'mm',
   };
 
-  battery($bytes, $dev_str, \@res, 10);
+  TRX_WEATHER_battery($bytes, $dev_str, \@res, 10);
   return @res;
 }
 
 # ------------------------------------------------------------
 #
-sub common_weight {
+sub TRX_WEATHER_common_weight {
     	my $type = shift;
 	my $longids = shift;
     	my $bytes = shift;
@@ -637,7 +637,7 @@ sub common_weight {
   #Log 1,"seqnbr=$seqnbr";
 
   my $dev_str = $dev_type;
-  if (use_longid($longids,$dev_type)) {
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
   	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
   }
   if ($bytes->[4] > 0) {
@@ -661,7 +661,7 @@ sub common_weight {
 	units => 'kg',
   };
 
-  #simple_battery($bytes, $dev_str, \@res, 7);
+  #TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 7);
 
   return @res;
 }
@@ -754,7 +754,7 @@ TRX_WEATHER_Parse($$)
   }
   # Use $def->{NAME}, because the device may be renamed:
   my $name = $def->{NAME};
-  #Log 1, "name=$new_name";
+  return "" if(IsIgnored($name));
 
   my $n = 0;
   my $tm = TimeNow();
@@ -787,7 +787,7 @@ TRX_WEATHER_Parse($$)
 			#printf "Batterie %d%s; ",$i->{current},$i->{units};
 			my $tmp_battery = $i->{current};
 			my @words = split(/\s+/,$i->{current});
-			$val .= "BAT: ".$words[0]." "; #user only first word
+			$val .= "BAT: ".$words[0]." "; #use only first word
 
 			$sensor = "battery";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
