@@ -1382,11 +1382,11 @@ CUL_HM_Set($@)
   } elsif($cmd eq "test" && $st eq "smokeDetector") { #################
     my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
     $hash->{TESTNR} = $testnr;
-    CUL_HM_SendCmd($hash, sprintf("++9440%s%s00%02X",$id,$id,$testnr), 1, 0);
+    CUL_HM_SendCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr), 1, 0);
 
   } elsif($cmd eq "alarm(.*)" && $st eq "smokeDetector") { #################
     CUL_HM_SendCmd($hash, sprintf("++9441%s%s01%s",
-        $id,$id, $1 eq "on" ? "0BC8" : "0C01"), 1, 0);
+        $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"), 1, 0);
 
   } elsif($cmd eq "devicepair") { #####################################
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
