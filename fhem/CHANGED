@@ -26,6 +26,7 @@
   - feature: at attribute alignTime added
   - feature: FHEMWEB attribute values via dropdown, slider for dimmer
   - feature: new attribute group for FHEMWEB (Boris)
+  - change:  11_FHT.pm, 50_WS300.pm, 59_Weather.pm migrated to redingsUpdate mechanism (Boris)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
