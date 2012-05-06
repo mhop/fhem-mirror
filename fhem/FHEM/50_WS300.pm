@@ -64,7 +64,7 @@ WS300_Initialize($)
   my ($hash) = @_;
 
   # Provider
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 loglevel:0,1,2,3,4,5,6 event-on-update-reading event-on-change-reading";
   $hash->{DefFn}     = "WS300_Define";
   $hash->{GetFn}     = "WS300_Get";
   $hash->{ParseFn}   = "WS300_Parse";
@@ -204,7 +204,6 @@ WS300_Parse($$)
   my $def;
   my $zeit;
   my @txt = ( "temperature", "humidity", "wind", "rain_raw", "israining", "battery", "lost_receives", "pressure", "rain_cum", "rain_hour", "rain_day", "rain_month");
-  my @sfx = ( "(Celsius)", "(%)", "(km/h)", "(counter)", "(yes/no)", " ", "(counter)", "(hPa)", "(mm)", "(mm)", "(mm)", "(mm)");
   #           1         2         3         4         5         6         7         8
   # 012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789
   # 3180800001005d4e00000000000000000000000000000000000000000000594a0634001e00f62403f1fc	stored
@@ -247,6 +246,8 @@ WS300_Parse($$)
   $rain *= $rainc;
   $rain /= 1000;
   $rain = sprintf("%.1f",$rain);
+
+  
   for(my $s=0;$s<9;$s++)
   {
     if((ord($c[$s+1])&0x10))
@@ -277,96 +278,55 @@ WS300_Parse($$)
           $b = "Ok"
         }
         $l = (ord($c[$s+1])&0x0f);
+
+
+        
         if($s < 8)
         {
+          readingsBeginUpdate($def);
           # state
 	  $val = "T: $t  H: $h  Bat: $b  LR: $l";
 	  $def->{STATE} = $val;
-          $def->{CHANGED}[0] = $val;
-          $def->{CHANGETIME}[0] = $tm;
-          # temperatur
-          $ref->{$txt[0]}{TIME} = $tm;
-          $value = "$t $sfx[0]";
-          $ref->{$txt[0]}{VAL} = $value;
-          $def->{CHANGED}[1] = "$txt[0]: $value";
-          $def->{CHANGETIME}[1] = $tm;
+          readingsUpdate($def, 'state', $val);
+          # temperature
+          readingsUpdate($def, $txt[0], $t);
           # humidity
-          $ref->{$txt[1]}{TIME} = $tm;
-          $value = "$h $sfx[1]";
-          $ref->{$txt[1]}{VAL} = $value;
-          $def->{CHANGED}[2] = "$txt[1]: $value";
-          $def->{CHANGETIME}[2] = $tm;
+          readingsUpdate($def, $txt[1], $h);
           # battery
-          $ref->{$txt[5]}{TIME} = $tm;
-          $value = "$b $sfx[5]";
-          $ref->{$txt[5]}{VAL} = $value;
-          $def->{CHANGED}[3] = "$txt[5]: $value";
-          $def->{CHANGETIME}[3] = $tm;
+          readingsUpdate($def, $txt[5], $b);
           # lost receives
-          $ref->{$txt[6]}{TIME} = $tm;
-          $value = "$l $sfx[6]";
-          $ref->{$txt[6]}{VAL} = $value;
-          $def->{CHANGED}[4] = "$txt[6]: $value";
-          $def->{CHANGETIME}[4] = $tm;
+          readingsUpdate($def, $txt[6], $l);
           
-          Log $ll,"WS300 $def->{NAME}: $val";
-          DoTrigger($def->{NAME},undef);
+          Log $ll, "WS300 $def->{NAME}: $val";
+
+          readingsEndUpdate($def, 1);
         }
         else
         {
+          readingsBeginUpdate($def);
           # state
           $val = "T: $t  H: $h  W: $wind  R: $rain  IR: $ir  Bat: $b  LR: $l";
 	  $def->{STATE} = $val;
+          readingsUpdate($def, 'state', $val);
+
           $def->{CHANGED}[0] = $val;
           $def->{CHANGETIME}[0] = $tm;
           # temperature
-          $ref->{$txt[0]}{TIME} = $tm;
-          $value = "$t $sfx[0]";
-          $ref->{$txt[0]}{VAL} = $value;
-          $def->{CHANGED}[1] = "$txt[0]: $value";
-          $def->{CHANGETIME}[1] = $tm;
+          readingsUpdate($def, $txt[0], $t);
           # humidity
-          $ref->{$txt[1]}{TIME} = $tm;
-          $value = "$h $sfx[1]";
-          $ref->{$txt[1]}{VAL} = $value;
-          $def->{CHANGED}[2] = "$txt[1]: $value";
-          $def->{CHANGETIME}[2] = $tm;
+          readingsUpdate($def, $txt[1], $h);
           # wind
-          $ref->{$txt[2]}{TIME} = $tm;
-          $value = "$wind $sfx[2]";
-          $ref->{$txt[2]}{VAL} = $value;
-          $def->{CHANGED}[3] = "$txt[2]: $value";
-          $def->{CHANGETIME}[3] = $tm;
-          #rain counter
-          $ref->{$txt[3]}{TIME} = $tm;
-          $value = "$rainc $sfx[3]";
-          $ref->{$txt[3]}{VAL} = $value;
-          $def->{CHANGED}[4] = "$txt[3]: $value";
-          $def->{CHANGETIME}[4] = $tm;
+          readingsUpdate($def, $txt[2], $wind);
+          # rain counter
+          readingsUpdate($def, $txt[3], $rainc);
           # is raining
-          $ref->{$txt[4]}{TIME} = $tm;
-          $value = "$ir $sfx[4]";
-          $ref->{$txt[4]}{VAL} = $value;
-          $def->{CHANGED}[5] = "$txt[4]: $value";
-          $def->{CHANGETIME}[5] = $tm;
+          readingsUpdate($def, $txt[4], $ir);
           # battery
-          $ref->{$txt[5]}{TIME} = $tm;
-          $value = "$b $sfx[5]";
-          $ref->{$txt[5]}{VAL} = $value;
-          $def->{CHANGED}[6] = "$txt[5]: $value";
-          $def->{CHANGETIME}[6] = $tm;
+          readingsUpdate($def, $txt[5], $b);
           # lost receives
-          $ref->{$txt[6]}{TIME} = $tm;
-          $value = "$l $sfx[6]";
-          $ref->{$txt[6]}{VAL} = $value;
-          $def->{CHANGED}[7] = "$txt[6]: $value";
-          $def->{CHANGETIME}[7] = $tm;
+          readingsUpdate($def, $txt[6], $l);
           # rain cumulative
-          $ref->{$txt[8]}{TIME} = $tm;
-          $value = "$rain $sfx[8]";
-          $ref->{$txt[8]}{VAL} = $value;
-          $def->{CHANGED}[8] = "$txt[8]: $value";
-          $def->{CHANGETIME}[8] = $tm;
+          readingsUpdate($def, $txt[8], $rain);
           # statistics
           if($actday == 99)
           {
@@ -386,18 +346,9 @@ WS300_Parse($$)
             $rain_month = sprintf("%.1f",$rain_month);
             $ref->{acthour}{TIME} = $tm;
             $ref->{acthour}{VAL} = "$acthour";
-            $ref->{$txt[9]}{TIME} = $tm;
-            $ref->{$txt[9]}{VAL} = $rain_hour;
-            $def->{CHANGED}[9] = "$txt[9]: $rain_hour $sfx[9]";
-            $def->{CHANGETIME}[9] = $tm;
-            $ref->{$txt[10]}{TIME} = $tm;
-            $ref->{$txt[10]}{VAL} = $rain_day;
-            $def->{CHANGED}[10] = "$txt[10]: $rain_day $sfx[10]";
-            $def->{CHANGETIME}[10] = $tm;
-            $ref->{$txt[11]}{TIME} = $tm;
-            $ref->{$txt[11]}{VAL} = $rain_month;
-            $def->{CHANGED}[11] = "$txt[11]: $rain_month $sfx[11]";
-            $def->{CHANGETIME}[11] = $tm;
+            readingsUpdate($def, $txt[9], $rain_hour);
+            readingsUpdate($def, $txt[10], $rain_day);
+            readingsUpdate($def, $txt[11], $rain_month);
             $rain_hour=0;
           }
           if($actday != $lt[3])
@@ -423,35 +374,31 @@ WS300_Parse($$)
             $rain_month += ($rain-$oldrain);
             $rain_month = sprintf("%.1f",$rain_month);
             $oldrain = $rain;
-
             $ref->{acthour}{TIME} = $tm;
             $ref->{acthour}{VAL} = "$acthour";
-            $ref->{$txt[9]}{TIME} = $tm;
-            $ref->{$txt[9]}{VAL} = $rain_hour;
-            $def->{CHANGED}[9] = "$txt[9]: $rain_hour $sfx[9]";
-            $def->{CHANGETIME}[9] = $tm;
-            $ref->{$txt[10]}{TIME} = $tm;
-            $ref->{$txt[10]}{VAL} = $rain_day;
-            $def->{CHANGED}[10] = "$txt[10]: $rain_day $sfx[10]";
-            $def->{CHANGETIME}[10] = $tm;
-            $ref->{$txt[11]}{TIME} = $tm;
-            $ref->{$txt[11]}{VAL} = $rain_month;
-            $def->{CHANGED}[11] = "$txt[11]: $rain_month $sfx[11]";
-            $def->{CHANGETIME}[11] = $tm;
+            readingsUpdate($def, $txt[9], $rain_hour);
+            readingsUpdate($def, $txt[10], $rain_day);
+            readingsUpdate($def, $txt[11], $rain_month);
           }
           Log $ll,"WS300 $def->{NAME}: $val";
-          DoTrigger($def->{NAME},undef);
+
+          readingsEndUpdate($def, 1);
+          
         }
+        
       }
     }
   }
-  if(!defined($modules{WS300}{defptr}{9})) 
+
+  if(!defined($modules{WS300}{defptr}{9}))
   {
     Log 3, "WS300 Unknown device 9, please define it";
     return "UNDEFINED WS300_9 WS300 9";
   }
   else
   {
+    readingsBeginUpdate($def);
+
     $def = $modules{WS300}{defptr}{9};
     $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
     $ref = $def->{READINGS};
@@ -463,36 +410,21 @@ WS300_Parse($$)
     # state
     $val = "T: $t  H: $h  P: $press  Willi: $willi";
     $def->{STATE} = $val;
-    $def->{CHANGED}[0] = $val;
-    $def->{CHANGETIME}[0] = $tm;
+    readingsUpdate($def, 'state', $val);
     # temperature
-    $ref->{$txt[0]}{TIME} = $tm;
-    $value = "$t $sfx[0]";
-    $ref->{$txt[0]}{VAL} = $value;
-    $def->{CHANGED}[1] = "$txt[0]: $value";
-    $def->{CHANGETIME}[1] = $tm;
+    readingsUpdate($def, $txt[0], $t);
     # humidity
-    $ref->{$txt[1]}{TIME} = $tm;
-    $value = "$h $sfx[1]";
-    $ref->{$txt[1]}{VAL} = $value;
-    $def->{CHANGED}[2] = "$txt[1]: $value";
-    $def->{CHANGETIME}[2] = $tm;
+    readingsUpdate($def, $txt[1], $h);
     # pressure
-    $ref->{$txt[7]}{TIME} = $tm;
-    $value = "$press $sfx[7]";
-    $ref->{$txt[7]}{VAL} = $value;
-    $def->{CHANGED}[3] = "$txt[7]: $value";
-    $def->{CHANGETIME}[3] = $tm;
+    readingsUpdate($def, $txt[7], $press);
     # willi
-    $ref->{willi}{TIME} = $tm;
-    $value = "$willi";
-    $ref->{willi}{VAL} = $value;
-    $def->{CHANGED}[4] = "willi: $value";
-    $def->{CHANGETIME}[4] = $tm;
+    readingsUpdate($def, 'willi', $willi);
     
     Log $ll,"WS300 $def->{NAME}: $val";
-    DoTrigger($def->{NAME},undef);
+
+    readingsEndUpdate($def, 1);
   }
+
   return undef;
 }
 
