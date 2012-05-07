@@ -119,3 +119,6 @@
 
 - Martin 2012-05-03
   -- Bugfix: getting xmllist from FHEM without \r\n
+
+- Martin 2012-05-07
+  -- bugfix: userdefs.php. Now wokrs with new Gnuplot (imagecopy)
