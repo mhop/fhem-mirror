@@ -171,8 +171,9 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$gnuplotpng=$drawuserdef.".sm.png";
 			
 			$messageA=<<<EOD
+			set terminal png transparent crop
 			set output '$AbsolutPath/tmp/$gnuplotpng' 
-			set terminal png transparent 
+			set key off
 			set xdata time 
 			set timefmt '%Y-%m-%d_%H:%M:%S' 
 			set noytics 
@@ -252,10 +253,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$im2 = imagecreatefrompng("$AbsolutPath/tmp/$gnuplotpng");
 			$w2 = imagesx($im2);
 			$h2 = imagesy($im2);
-			#Old Gnuplot
-			#ImageCopy($im,$im2,163,0,0,10,$w2-20,$h2);
-			#New Gnuplot
-			ImageCopy($im,$im2,163,0,10,420,$w2-20,50);
+			ImageCopy($im,$im2,163,10,0,0,$w2,$h2);
 }
 
 
