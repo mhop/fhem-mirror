@@ -69,6 +69,24 @@ RFXMETER_Define($$)
   return undef;
 }
 
+#########################################
+# From xpl-perl/lib/xPL/Util.pm:
+sub RFXMETER_hi_nibble {
+  ($_[0]&0xf0)>>4;
+}
+sub RFXMETER_lo_nibble {
+  $_[0]&0xf;
+}
+sub RFXMETER_nibble_sum {
+  my $c = $_[0];
+  my $s = 0;
+  foreach (0..$_[0]-1) {
+    $s += RFXMETER_hi_nibble($_[1]->[$_]);
+    $s += RFXMETER_lo_nibble($_[1]->[$_]);
+  }
+  $s += RFXMETER_hi_nibble($_[1]->[$_[0]]) if (int($_[0]) != $_[0]);
+  return $s;
+}
 #####################################
 sub
 RFXMETER_Undef($$)
@@ -95,13 +113,13 @@ sub parse_RFXmeter {
   my $device = sprintf "%02x", $bytes->[0];
   Log 4, "RFXMETER: device=$device";
 
-  my $type = hi_nibble($bytes->[5]);
+  my $type = RFXMETER_hi_nibble($bytes->[5]);
   #Log 1, "RFXMETER: type=$type";
 
-  my $check = lo_nibble($bytes->[5]);
+  my $check = RFXMETER_lo_nibble($bytes->[5]);
   #Log 1, "RFXMETER: check=$check";
 
-  my $nibble_sum = nibble_sum(5.5, $bytes);
+  my $nibble_sum = RFXMETER_nibble_sum(5.5, $bytes);
   my $parity = 0xf^($nibble_sum&0xf);
   unless ($parity == $check) {
     #warn "RFXMeter parity error $parity != $check\n";
