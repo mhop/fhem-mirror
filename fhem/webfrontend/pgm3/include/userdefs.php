@@ -12,6 +12,7 @@ include "functions.php";
 
 
 	$userdefnr=$_GET['userdefnr'];
+#$userdefnr=0;
 
 	$room=$userdef[$userdefnr]['room'];
 
@@ -29,7 +30,9 @@ include "functions.php";
 	$gnuplottype=$userdef[$userdefnr]['gnuplottype'];
 
 
-
+#	echo "userdefnr: $userdefnr";
+#	echo "file: $file";
+#exit;
         if (! file_exists($file)) show_error($file,$drawuserdef,$imgmaxxuserdef,$imgmaxyuserdef,$type,$userdefnr);
 	
 
@@ -76,6 +79,7 @@ include "functions.php";
 	#Logrotate
 	if ((($logrotateUSERDEFlines+100) < $counter) and ($logrotate == 'yes')) LogRotate($array,$file,$logrotateUSERDEFlines);
 
+#echo "test1";
 #print_r($array[1]);  
 #print_r($array[1][12]);  exit;
 ###########################################################################
@@ -106,7 +110,6 @@ include "functions.php";
 		}
      	}
 	
-
 
 
 	# Start Graphic
@@ -156,6 +159,7 @@ include "functions.php";
 	if ($maxcountUSERDEF <   $_SESSION["maxdata"])  {$anzlines=$maxcountUSERDEF;} else {$anzlines= $_SESSION["maxdata"];}
 
 
+
 if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 {
 			$datumtomorrow= mktime (0,0,0,date("m")  ,date("d")+1,date("Y"));
@@ -168,7 +172,7 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			
 			$messageA=<<<EOD
 			set output '$AbsolutPath/tmp/$gnuplotpng' 
-			set terminal png transparent
+			set terminal png transparent 
 			set xdata time 
 			set timefmt '%Y-%m-%d_%H:%M:%S' 
 			set noytics 
@@ -205,7 +209,6 @@ EOD;
                         fclose($f1);
 
 
-			#plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 0.8 : $3==\"dimdown\"? 0.2 : $3==\"off\"? 0 : 0.5;}' \
 			$messageB=<<<EOD
 			plot "< awk '{print $1, $3==\"on\"? 1 : $3==\"dimup\"? 1 : $3==\"dimdown\"? 0 : $3==\"off\"? 0 : 0.5;}' \
 			$filename" using 1:2 title '' with steps
@@ -240,7 +243,8 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			fputs($f1,$message);
 			fclose($f1);
 			exec("$gnuplot $AbsolutPath/tmp/$drawuserdef",$output);
-		sleep(3);
+			#echo "output: $output";exit;
+		#sleep(3);
 
 			$w = imagesx($im);
 			$h = imagesy($im);
@@ -248,7 +252,10 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$im2 = imagecreatefrompng("$AbsolutPath/tmp/$gnuplotpng");
 			$w2 = imagesx($im2);
 			$h2 = imagesy($im2);
-			ImageCopy($im,$im2,163,0,0,10,$w2-20,$h2);
+			#Old Gnuplot
+			#ImageCopy($im,$im2,163,0,0,10,$w2-20,$h2);
+			#New Gnuplot
+			ImageCopy($im,$im2,163,0,10,420,$w2-20,50);
 }
 
 
