@@ -77,9 +77,9 @@
 		}
 
 		echo "</select>
-		<select name=valuetime size=1>     ### <------ valuetime muß eindeutig werden !!! 
+		<select name=valuetime size=1>     
 		<option value=>HH:MM:SS</option>";
-		for ($m=0; $m < 15360; $m++) {
+		for ($m=1; $m < 15360; $m++) {
        	                  if ( $m > 16) $m = $m+1;
        	                  if ( $m > 32) $m = $m+2;
        	                  if ( $m > 64) $m = $m+4;
