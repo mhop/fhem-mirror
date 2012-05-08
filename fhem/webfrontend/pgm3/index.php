@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='120508';
+$pgm3version='120508a';
 	
 
 
@@ -325,26 +325,25 @@ if (!(list($xml_parser, $live) = new_xml_parser($live))) {
 
 
 
+
 #change the xmllist into an intern array
-foreach($output as $data) {
+$data = $output[0];
   if (!xml_parse($xml_parser, $data)) {
         $now=date($timeformat);
         echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml$now<br><br>");
         $handle=fopen("tmp/debugxml$now","w");
         fwrite($handle,$outputvar);
         fclose($handle);
-        die(sprintf("XML error: %s at line %d\n",
+        $warning=sprintf("XML error: %s at line %d\n",
            xml_error_string(xml_get_error_code($xml_parser)),
-           xml_get_current_line_number($xml_parser)));
-                        };
-}
+           xml_get_current_line_number($xml_parser));
+	echo $warning;
+  };
 
 
 
 
 xml_parser_free($xml_parser);
-
-
 
 
 
