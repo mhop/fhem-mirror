@@ -6,7 +6,7 @@
 #
 #  Copyright notice
 #
-#  (c) 2006-2012 Copyright: Martin Haas (fhz@martin-haas.de)
+#  (c) 2006-2010 Copyright: Martin Haas (fhz@martin-haas.de)
 #  All rights reserved
 #
 #  This script is free software; you can redistribute it and/or modify
@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='120503';
+$pgm3version='120508';
 	
 
 
@@ -64,7 +64,10 @@ $pgm3version='120503';
 
 	$fhtdev		=	$_POST['fhtdev'];
 	$fs20dev	=	$_POST['fs20dev'];
+	$culhmdev	=	$_POST['culhmdev'];
 	$errormessage	=	$_POST['errormessage'];
+
+
 
 	if (! isset($showrss)) $showrss=$_GET['showrss'];
 	if (! isset($rssorder)) $rssorder=$_GET['rssorder'];
@@ -134,6 +137,9 @@ $pgm3version='120503';
 	if (! isset($fs20dev)) $fs20dev=$_GET['fs20dev'];
 	if ($fs20dev=="") unset($fs20dev);
 
+	if (! isset($culhmdev)) $culhmdev=$_GET['culhmdev'];
+	if ($culhmdev=="") unset($culhmdev);
+
 	if (! isset($errormessage)) $errormessage=$_GET['errormessage'];
 	if ($errormessage=="") unset($errormessage);
 	
@@ -161,6 +167,8 @@ $pgm3version='120503';
 	if (isset ($showfht)) { $forwardurl=$forwardurl.'&showfht='.$showfht;};
 	if (isset ($fs20dev)) 
 	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&showmenu='.$showmenu.'&showroom='.$showroom.'&showweath'.$showweath;};
+	if (isset ($culhmdev)) 
+	{ $forwardurl=$forwardurl.'&culhmdev='.$culhmdev.'&orderpulldown='.$orderpulldown.'&showmenu='.$showmenu.'&showroom='.$showroom.'&showweath'.$showweath;};
 	if (isset ($showks)) { $forwardurl=$forwardurl.'&showks='.$showks.'&kstyp='.$kstyp;};
 	if (isset ($showhmsgnu)) { $forwardurl=$forwardurl.'&showhmsgnu='.$showhmsgnu;};
 	if (isset ($showuserdefgnu)) { $forwardurl=$forwardurl.'&showuserdefgnu='.$showuserdefgnu;};
@@ -171,6 +179,7 @@ $pgm3version='120503';
 	if (isset ($showpics)) { $forwardurl=$forwardurl.'&showpics';};
 	if (isset ($showhist)) { $forwardurl=$forwardurl.'&showhist';};
 	if (isset ($showfs20)) { $forwardurl=$forwardurl.'&showfs20='.$showfs20;};
+	if (isset ($showculhm)) { $forwardurl=$forwardurl.'&showculhm='.$showculhm;};
 	if (isset ($showweath)) { $forwardurl=$forwardurl.'&showweath='.$showweath;};
 	if (isset ($showmenu)) 
 	{ $forwardurl=$forwardurl.'&fs20dev='.$fs20dev.'&orderpulldown='.$orderpulldown.'&valuetime='.$valuetime.'&showmenu='.$showmenu.'&showroom='.$showroom;}
@@ -210,6 +219,12 @@ switch ($Action):
 		if (! isset($fhtdev)) {echo "FHT-Device not set - exit"; break;}
 		$order="$atorder $attime set $fhtdev $orderpulldown $valuetime";
 		if ($kioskmode=='off') execFHZ($order,$fhem,$fhemport);
+	Case exec4:
+		if ($atorder=='at') 
+		{ $atorder='define '.randdefine().' '.$atorder; }
+		$order="$atorder $attime set $culhmdev $orderpulldown $valuetime";
+		if ($kioskmode=='off') execFHZ($order,$fhem,$fhemport);
+		header("Location:  $forwardurl");
 	Case execfht:
 		$order="set $dofht desired-temp $temp";
 		if ($kioskmode=='off') execFHZ($order,$fhem,$fhemport);
@@ -225,10 +240,7 @@ endswitch;
 if (! isset($showroom)) $showroom="ALL";
 if (($taillog==1) and (isset ($showhist)) ) exec($taillogorder,$tailoutput);
 
-
-
-
-
+#####################################################################################################################################
 #executes over the network to the fhem.pl (or localhost)
 function execFHZ($order,$machine,$port)
 {
@@ -243,11 +255,8 @@ global $errormessage;
                	$errormessage= fgets($fp);
            fclose($fp);
         }
-
 return $errormessage;
 }
-
-
 
 
 
@@ -260,7 +269,7 @@ unset($longxml);
 $version = explode('.', phpversion());
 
 
-################################################################################
+######################################################################
 # get the xmllist from fhem
 	$fp = stream_socket_client("tcp://$fhem:$fhemport", $errno, $errstr, 30);
 	if (!$fp) {
@@ -270,8 +279,9 @@ $version = explode('.', phpversion());
 	   $outputvar=stream_get_contents($fp);
 	   array_push($output,$outputvar);
 	   fclose($fp);
-
 	}
+
+
 
 
 
@@ -314,34 +324,42 @@ if (!(list($xml_parser, $live) = new_xml_parser($live))) {
 }
 
 
+
 #change the xmllist into an intern array
 foreach($output as $data) {
   if (!xml_parse($xml_parser, $data)) {
- 	$now=date($timeformat);
-	echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml$now<br><br>");
-	$handle=fopen("tmp/debugxml$now","w");
-	fwrite($handle,$outputvar);
-	fclose($handle);
-	die(sprintf("XML error: %s at line %d\n",
+        $now=date($timeformat);
+        echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml$now<br><br>");
+        $handle=fopen("tmp/debugxml$now","w");
+        fwrite($handle,$outputvar);
+        fclose($handle);
+        die(sprintf("XML error: %s at line %d\n",
            xml_error_string(xml_get_error_code($xml_parser)),
            xml_get_current_line_number($xml_parser)));
-			};
+                        };
 }
 
 
+
+
 xml_parser_free($xml_parser);
+
+
+
+
 
 
 #print_r($stack);
 #exit;
 
 
-
-#searching for rooms/fs20/Logpaths
+#searching for rooms/fs20/HomeMatic/Logpaths
 	$rooms=array();
 	$fs20devs=array();
+	$culhmdevs=array();
 	$fhtdevs=array();
 	$logpaths=array();
+
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
 	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_') 
@@ -352,19 +370,44 @@ xml_parser_free($xml_parser);
 			 $fs20devxml=$stack[0][children][$i][children][$j][attrs][name];
 			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
 			{
-			   $check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
-			 if ($check='ATTR')
-			  {
+			   #$check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
+			# if ($check=='ATTR')
+			  #{
 				if (($stack[0][children][$i][children][$j][children][$k][attrs][key])=='room')
 				{
 			  	  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 				  	 if (! in_array($room,$rooms)) array_push($rooms,$room);
 				}
-			  }
+			  #}#
 			}
 		  	 if ((! in_array($fs20devxml,$fs20devs)) AND ( $room != 'hidden')) array_push($fs20devs,$fs20devxml);
 			}
 	      }#FS20
+
+
+
+####################################################  HomeMatic
+
+	      elseif ((substr($stack[0][children][$i][name],0,7)=='CUL_HM_')) 
+	      {
+		 	for($j=0; $j < count($stack[0][children][$i][children]); $j++)
+			 {
+			 $culhmdevxml=$stack[0][children][$i][children][$j][attrs][name];
+			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
+			{
+			  # $check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
+			 #if ($check='ATTR')
+			  #{
+				if (($stack[0][children][$i][children][$j][children][$k][attrs][key])=='room')
+				{
+			  	  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+				  	 if (! in_array($room,$rooms)) array_push($rooms,$room);
+				}
+			  #}#
+			}
+		  	 if ((! in_array($culhmdevxml,$culhmdevs)) AND ( $room != 'hidden')) array_push($culhmdevs,$culhmdevxml);
+			}
+	      }#HomeMatic
 
 
 ####################################################  FHTs
@@ -474,15 +517,15 @@ xml_parser_free($xml_parser);
 			 {
 			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
 			{
-			   $check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
-			 if ($check='ATTR')
-			  {
+			 #  $check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
+			 #if ($check='ATTR')
+			  #{
 				if (($stack[0][children][$i][children][$j][children][$k][attrs][key])=='room')
 				{
 			  	  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
 				  	 if (! in_array($room,$rooms)) array_push($rooms,$room);
 					}
-				}
+			#	}
 			  }
 			}
 		}
@@ -505,7 +548,9 @@ xml_parser_free($xml_parser);
 
 
 #print_r($rooms); echo "Count: $countrooms"; exit;
-#print_r($fs20devs);  exit;
+#print_r($fs20devs); # exit;
+#echo "#################################";
+#print_r($culhmdevs);  exit;
 #echo count($stack[0][children]);exit;
 #print_r($logpaths);  exit;
 #exit;
@@ -550,8 +595,7 @@ xml_parser_free($xml_parser);
 	              <tr> <td>
 	\r<table width='100%' cellspacing='2' cellpadding='2' align=center border='0'>
 	<tr><td $bg1 colspan=4><br>
-		<font size=+1 $fontcolor1><center><b>$titel</b></font>
-	 	<font size=3 $fontcolor1><br><b>$now</b>
+		<font size=3 $fontcolor1><center><b>$titel $now</b></font>
 		</font></center>
 		 <font size=-2 $fontcolor1><div align='right'>v$pgm3version</div></font>
 		</td></tr>";
@@ -590,7 +634,6 @@ xml_parser_free($xml_parser);
 		{
 			$webcamname=str_replace("/","",$webcam1);
 			$webcamname=str_replace(":","",$webcamname);
-#			$order="$wgetpath -O tmp/$webcamname $webcam1; /usr/bin/touch tmp/$webcamname";
 			$order="$wgetpath -O tmp/$webcamname $webcam1";
 			exec($order,$res);
         		$errormessage = $res[0];
@@ -631,9 +674,8 @@ xml_parser_free($xml_parser);
 
 
 
-       
-	############################ FHZ
-	if ($show_fs20pulldown==1 or $show_general==1 or $show_fhtpulldown==1)
+       ############################ FHZ
+	if ($show_fs20pulldown==1 or $show_general==1 or $show_hmpulldown==1 or $show_fhtpulldown==1)
 	{
 	echo "<tr><td $bg1 colspan=4><font $fontcolor1>\r<table  cellspacing='0' cellpadding='0' width='100%'>
 		<tr><td><font $fontcolor1>FHZ_DEVICE</td><td align=right><font $fontcolor1><b>";
@@ -655,7 +697,7 @@ xml_parser_free($xml_parser);
 		<td colspan=1 align=right $bg2><font  $fontcolor3> General: </font></td>
 		<td align=left $bg2 colspan=1><font $fontcolor3>
 		<form action=$forwardurl method='POST'>
-		<input type=text name=order size=30>
+		<input type=text name=order size=61>
 		<input type=hidden name=showfht value=$showfht>
 		<input type=hidden name=showhms value=$showhms>
 		<input type=hidden name=showmenu value=$showmenu>
@@ -663,13 +705,12 @@ xml_parser_free($xml_parser);
 		<input type=submit value='go!'></form></td>
 		</tr>";
 		};
-	
+
 	if ($show_fs20pulldown=='1') include 'include/fs20pulldown.php';
+	if ($show_hmpulldown=='1') include 'include/hmpulldown.php';
 	if ($show_fhtpulldown=='1') include 'include/fhtpulldown.php';
 	if ($show_logpulldown=='1') include 'include/logpulldown.php';
 	};
-
-
 
 
 
@@ -702,17 +743,16 @@ ht><font $fontcolor1><b>
 
 #####################################################################################################################
 
-
 	## now the xmllist will be writen on screen as html
 	##### Let's go.... :-)))))
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
 	############################
-	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_') || (substr( $stack[0][children][$i][name],0,4)=='X10_'))
+	      if ((substr($stack[0][children][$i][name],0,5)=='FS20_')
+		  || (substr( $stack[0][children][$i][name],0,4)=='X10_')
+		  || (substr( $stack[0][children][$i][name],0,7)=='CUL_HM_'))
 	      {
 			$type=$stack[0][children][$i][name];
-			#echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>";
-	      		#echo "$type</font></td></tr>";
 			echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
                         \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
                         <tr><td><font $fontcolor1>$type</td><td align=right><font $fontcolor1><b>
@@ -723,40 +763,116 @@ ht><font $fontcolor1><b>
 			 {
 			 $fs20=$stack[0][children][$i][children][$j][attrs][name];
 			 $state=$stack[0][children][$i][children][$j][attrs][state];
-			$room='';
 			for($k=0; $k < count($stack[0][children][$i][children][$j][children]); $k++)
 			{
-			   $check=$stack[0][children][$i][children][$j][children][$k][attrs][name];
-			 if ($check='STATE')
-			  {
-				$measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
-			  }
-			 if ($check='ATTR')
-			  {
-				if (($stack[0][children][$i][children][$j][children][$k][attrs][key])=='room')
-				{
-			  	  $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];
+			$check=$stack[0][children][$i][children][$j][children][$k][name];
+				switch ($check) {
+				   case 'STATE':
+			      	   $measured=$stack[0][children][$i][children][$j][children][$k][attrs][measured];
+					break;
 				}
+			
+
+			$check=$stack[0][children][$i][children][$j][children][$k][attrs][key];
+			 switch ($check) {
+				case 'room':
+			  	        $room=$stack[0][children][$i][children][$j][children][$k][attrs][value];break;
+				case 'webCmd':
+			  	  	$wcmd=$stack[0][children][$i][children][$j][children][$k][attrs][value];break;
+				case 'follow-on-for-timer':
+			  	  	$foft=$stack[0][children][$i][children][$j][children][$k][attrs][value];break;
+				case 'icon':
+			  	  	$icon=$stack[0][children][$i][children][$j][children][$k][attrs][value];break;
+				case 'eventMap':
+			  	  	$eventMap=$stack[0][children][$i][children][$j][children][$k][attrs][value];break;
+				case 'subType':
+			  	  	$subType=$stack[0][children][$i][children][$j][children][$k][attrs][value];break;
 			  }
+					
 			}
-			 if (($state=='on') or ($state=='dimup'))
-			 {$order="set $fs20 off";}
-			 else
-			 {$order="set $fs20 on";};
+
+
+
+			 If (($eventMap!='')) {
+			    If ((substr($eventMap,0,1)==',') or (substr($eventMap,0,1)=='/')) {
+				$eMap_sign=(substr($eventMap,0,1));
+				$eventMap=substr($eventMap,1);
+				$eventMap=str_replace($eMap_sign, ":", $eventMap);
+			    }
+			    else {
+				$eventMap=str_replace(" ", ":", $eventMap);
+			    }
+			    $eMapsep=explode(":",$eventMap);
+			    if ($state==$eMapsep[1]) {
+			      $state=$eMapsep[0];
+			      $emap=$eMapsep[1];
+			    }
+			    elseif ($state==$eMapsep[3]) {
+			      $state=$eMapsep[2];
+			      $emap=$eMapsep[3];
+			    }
+			    elseif ($state=='off') {
+			      $emap=$eMapsep[3];
+			    }
+			    elseif ($state!='off') {
+			      $emap=$eMapsep[1];
+			    }
+			 };
+
+			 $tmp_file=$AbsolutPath."/tmp/FS20.".$fs20."_foft.txt";
+			 if (($state=='off') and (file_exists($tmp_file))) {
+			    $delfile2=$AbsolutPath."/tmp/FS20.".$fs20.".log.".$measured.".png";
+			       unlink ($tmp_file);
+			       unlink ($delfile2);
+			 }
+
+			 if (($state=='off') and (substr($wcmd,0,12)=='on-for-timer')) {
+			    $wcmd_count = strpos($wcmd, ':',0); 
+			    $wcmd_order = substr($wcmd, 0, $wcmd_count);
+			    $order="set $fs20 $wcmd_order";
+			 }
+			 elseif (($state!='off')) {
+			    $order="set $fs20 off";
+			    if ((substr($state,0,12)=='on-for-timer')) {
+			       if (file_exists($tmp_file))
+			       {}
+			       else{
+				      $x1=fopen ($tmp_file, "w");
+				      fwrite ($x1,$foft);
+				      fclose ($x1);
+			       }
+			    }
+			 }
+			 else {
+			 $order="set $fs20 on";
+			 };
+
+
 			 if (($room != 'hidden') and ($showroom=='ALL' or $showroom==$room))
 			 {
 			 	$counter++;
-				echo"<a href='$phpfileurl?Action=exec&order=$order&showroom=$showroom$link'><img src='include/fs20.php?drawfs20=$fs20&statefs20=$state&datefs20=$measured&room=$room'></a>";
+				echo"<a href='$phpfileurl?Action=exec&order=$order&showroom=$showroom$link'><img src='include/fs20.php?drawfs20=$fs20&statefs20=$state&datefs20=$measured&icon=$icon&emap=$emap&subType=$subType&room=$room'></a>";
 				if  (fmod($counter,$fs20maxiconperline)== 0.0) echo "<br>";
 			 };
+#			 $fs20="";
+			 $state="";
+			 $check="";
+			 $measured="";
+			 $room="";
+			 $wcmd="";
+			 $foft="";
+			 $icon="";
+			 $eventMap="";
+			 $subType="";
+			 $emap="";
 			 }
 			 	echo "</td></tr>\r";
 				if (isset($showfs20) and $showgnuplot == 1)
 			 	{   
                                  	drawgnuplot($showfs20,"FS20",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range,$DBUse);
 					$FS20dev1=$showfs20.'1';
-                                	echo "\r<tr><td colspan=5 align=center><img src='tmp/$showfs20.$pictype'><br>
-					<img src='tmp/$FS20dev1.$pictype'>
+                                	echo "\r<tr><td colspan=5 align=center><br><img src='tmp/$showfs20.$pictype'><br><br><br>
+					<img src='tmp/$FS20dev1.$pictype'><br><br>
                                         </td></tr>
 			 		      <tr><td colspan=4><hr color='#AFC6DB'></td></tr>";
 				}
@@ -821,8 +937,8 @@ ht><font $fontcolor1><b>
 			 	{   
                                  	drawgnuplot($FHTdev,"FHT",$gnuplot,$pictype,$logpath, $FHTyrange,$FHTy2range,$DBUse);
 					$FHTdev1=$FHTdev.'1';
-                                	echo "\r<tr><td colspan=5 align=center><img src='tmp/$FHTdev.$pictype'><br>
-					<img src='tmp/$FHTdev1.$pictype'>
+                                	echo "\r<tr><td colspan=5 align=center><br><img src='tmp/$FHTdev.$pictype'><br><br><br>
+					<img src='tmp/$FHTdev1.$pictype'><br><br>
                                         </td></tr>
 			 		      <tr><td colspan=4><hr color='#AFC6DB'></td></tr>";
 				}
@@ -895,8 +1011,8 @@ ht><font $fontcolor1><b>
 		if ($showhmsgnu == $HMSdev and $showgnuplot == 1)
                                 { drawgnuplot($HMSdev,$type,$gnuplot,$pictype,$logpath,0,0,$DBUse);
 				$HMSdev1=$HMSdev.'1';
-                                echo "\r<tr><td colspan=5 align=center><img src='tmp/$HMSdev.$pictype'><br>
-					<img src='tmp/$HMSdev1.$pictype'>
+                                echo "\r<tr><td colspan=5 align=center><br><img src='tmp/$HMSdev.$pictype'><br><br><br>
+					<img src='tmp/$HMSdev1.$pictype'><br><br>
                                         </td></tr>";
                 }
 		}
@@ -907,8 +1023,6 @@ ht><font $fontcolor1><b>
 	       elseif (substr($stack[0][children][$i][name],0,6)=='KS300_' or substr($stack[0][children][$i][name],0,6)=='WS300_')
 	       {
 			$type=$stack[0][children][$i][name];
-                        #echo "\r<tr><td $bg1 colspan=4><font $fontcolor1>";
-                        #echo "$type</font></td></tr>";
 			echo "\r\r<tr><td $bg1 colspan=4><font $fontcolor1>
                         \r\r<table  cellspacing='0' cellpadding='0' width='100%'>
                         <tr><td><font $fontcolor1>$type</td><td align=right><font $fontcolor1><b>
@@ -974,8 +1088,8 @@ ht><font $fontcolor1><b>
                                         drawgnuplot($KSdev,$drawtype."_t2",$gnuplot,$pictype,$logpath,0,0,$DBUse);
                                 }
                                 $KSdev1=$KSdev.'1';
-                                echo "\r<tr><td colspan=5 align=center><img src='tmp/$KSdev.$pictype'><br>
-                                        <img src='tmp/$KSdev1.$pictype'>
+                                echo "\r<tr><td colspan=5 align=center><br><img src='tmp/$KSdev.$pictype'><br><br><br>
+                                        <img src='tmp/$KSdev1.$pictype'><br><br>
                                         </td></tr>";
                         }
 
@@ -1106,10 +1220,10 @@ ht><font $fontcolor1><b>
                         echo "\r<img src='include/userdefs.php?userdefnr=$i' width='$imgmaxxuserdef' height='$imgmaxyuserdef'></td> </tr>";
 
                 if ($showuserdefgnu == $UserDef and $showgnuplot == 1)
-                                { drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],$i,$DBUse);
+                                {drawgnuplot($UserDef,$type,$gnuplot,$pictype,$logpath,$userdef[$i],$i,$DBUse);
                                 $UserDef1=$UserDef.'1';
-                                echo "\r<tr><td colspan=5 align=center><img src='tmp/$UserDef.$pictype'><br>
-                                        <img src='tmp/$UserDef1.$pictype'>
+                                echo "\r<tr><td colspan=5 align=center><br><img src='tmp/$UserDef.$pictype'><br><br><br>
+                                        <img src='tmp/$UserDef1.$pictype'><br><br>
                                         </td></tr>";
                 }
                 }# /not room hidden

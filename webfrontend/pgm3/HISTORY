@@ -122,3 +122,6 @@
 
 - Martin 2012-05-07
   -- bugfix: userdefs.php. Now wokrs with new Gnuplot (imagecopy)
+
+. Martin 2012-05-08
+  -- Feature: Homematic added, FS20-Buttons now depending of the state
