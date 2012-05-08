@@ -1384,7 +1384,7 @@ CUL_HM_Set($@)
     $hash->{TESTNR} = $testnr;
     CUL_HM_SendCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr), 1, 0);
 
-  } elsif($cmd eq "alarm(.*)" && $st eq "smokeDetector") { #################
+  } elsif($cmd =~ m/alarm(.*)/ && $st eq "smokeDetector") { #################
     CUL_HM_SendCmd($hash, sprintf("++9441%s%s01%s",
         $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"), 1, 0);
 
