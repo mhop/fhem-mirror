@@ -51,7 +51,7 @@ function drawgnuplot($gnudraw,$gnutyp,$gnuplot,$pictype,$logpath,$FHTyrange,$FHT
 	$OUT2="set output 'tmp/$gnudraw1.$pictype'";
 
 $gplothdr="
-	set terminal $pictype 
+	set terminal $pictype crop
 	set xdata time 
 	set timefmt '%Y-%m-%d_%H:%M:%S' 
 	set xlabel ' ' 
