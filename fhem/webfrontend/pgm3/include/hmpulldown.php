@@ -1,21 +1,23 @@
 <?php
 
-##Pulldown for FS20-Devices
+##Pulldown for HomeMatic-Devices
 
 
-		$orders=array("on","off","dimup","dimdown","on-for-timer","off-for-timer","dim06%","dim12%",
-			"dim18%","dim25%","dim31%","dim37%","dim43%","dim50%","dim56%","dim62%","dim68%",
-			"dim75%","dim81%","dim87%","dim93%","dim100%","dimupdown","on-old-for-timer","reset",
-			"sendstate","timer","toggle");
+		$order1=array("on","off","toggle","on-for-timer");
+		$order2=range(0, 100, 1);
+		$order3=array("pair","unpair","statusRequest","sign","raw","reset");
+		$order8=array("-- Dim in % --");
+		$order9=array("---------------");
+		$orders=array_merge($order1, $order9, $order8, $order2, $order9, $order3);
 
 		echo "
 		<tr>
-		<td colspan=1 align=right $bg2><font $fontcolor3>FS20: </font></td><td align=left $bg2><font $fontcolor3>
+		<td colspan=1 align=right $bg2><font $fontcolor3>HomeMatic: </font></td><td align=left $bg2><font $fontcolor3>
 		<form action=$forwardurl method='POST'>
 		<input type=hidden name=showfht value=$showfht>
 		<input type=hidden name=showhms value=$showhms>
 		<input type=hidden name=showmenu value=$showmenu>
-		<input type=hidden name=Action value=exec2>
+		<input type=hidden name=Action value=exec4>
 		
 		<select name=atorder size=1>
 		<option></option>;
@@ -40,16 +42,16 @@
 
 		echo"
 		set 
-		<select name=fs20dev size=1>
+		<select name=culhmdev size=1>
 		<option></option>";
-		for ($m=0; $m < count($fs20devs); $m++)
+		for ($m=0; $m < count($culhmdevs); $m++)
                         {
-				echo $fs20dev;
-				if ($fs20dev==$fs20devs[$m])
+				echo $culhmdev;
+				if ($culhmdev==$culhmdevs[$m])
 				{
-					echo "<option selected>$fs20devs[$m]</option>";
+					echo "<option selected>$culhmdevs[$m]</option>";
 				} else {
-					echo "<option>$fs20devs[$m]</option>";
+					echo "<option>$culhmdevs[$m]</option>";
 				}
 			};
 
@@ -67,13 +69,13 @@
 				}
 			};
 
-		function mknullfs20($zahl,$stellen) {
+		function mknullhm($zahl,$stellen) {
 		for($i=strlen($zahl);$i<$stellen;$i++){
 		$zahl="0" . $zahl;
 		}
 		return $zahl;
 		}
- 
+
 		echo "</select>
 		<select name=valuetime size=1>     ### <------ valuetime muß eindeutig werden !!! 
 		<option></option>";
@@ -118,21 +120,12 @@
 					$std=floor($sek/3600);
 					$min=floor(($sek-$std*3600)/60);
 					$sec=$sek-$std*3600-$min*60;
-					$std=mknullfs20($std,2);
-					$min=mknullfs20($min,2);
-					$sec=mknullfs20($sec,2); 
+					$std=mknullhm($std,2);
+					$min=mknullhm($min,2);
+					$sec=mknullhm($sec,2); 
 				echo "<option value=$m>$std:$min:$sec</option>";}
 		
 		echo"</select>
 		<input type=submit value='go!'></form></td></tr>";
-
-#		<select name=valuetime size=1>
-#		<option></option>";
-#		for ($m=0; $m < 6000; $m++)
-#       	                 {if ( $m > 20) $m = $m+4;
-#       	                 if ( $m > 60) $m = $m+55;
-#				echo "<option>$m</option>";}
-#		
-#		echo"</select>
 
 ?>
