@@ -119,13 +119,19 @@ TRX_LIGHT_Set($@)
   my $ret = undef;
   my $na = int(@a);
 
-  return "no set value specified" if($na < 2 || $na > 4);
+  return "no set value specified" if($na < 2 || $na > 3);
 
   # look for device_type
 
   my $name = $a[0];
   my $command = $a[1];
-  my $level = $a[2];
+  my $level;
+
+  if ($na == 3) {
+  	$level = $a[2];
+  } else {
+	$level = 0;
+  }
 
   my $device_type = $hash->{TRX_LIGHT_type};
   my $deviceid = $hash->{TRX_LIGHT_deviceid};
@@ -185,7 +191,7 @@ TRX_LIGHT_Set($@)
 		Log 4,"TRX_LIGHT_Set lightning2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviveid=$deviceid";
   	}
-  	$hex_prefix = sprintf "0711";
+  	$hex_prefix = sprintf "0B11";
   	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
