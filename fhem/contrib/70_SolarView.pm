@@ -10,22 +10,30 @@
 #
 ##############################################################################
 #
-# SolarView is a powerful datalogger for photovoltaic systems that runs on
+# SolarView is a powerful ;) datalogger for photovoltaic systems that runs on
 # an AVM Fritz!Box (and also on x86 systems). For details see the SV homepage:
-# http://www.amhamberg.de/solarview_fritzbox.aspx
+# http://www.solarview.info
 #
 # SV supports many different inverters. To read the SV power values using
 # this module, a TCP-Server must be enabled for SV by adding the parameter
 # "-TCP <port>" to the startscript (see the SV manual).
 #
 # usage:
-# define <name> SolarView <host> <port> [<interval> [<timeout>]]
+# define <name> SolarView <host> <port> [wr<i> wr...] [<interval> [<timeout>]]
+#
+# example: 
+# define sv SolarView fritz.box 15000 wr1 wr2 60
 #
 # If <interval> is positive, new values are read every <interval> seconds.
 # If <interval> is 0, new values are read whenever a get request is called 
 # on <name>. The default for <interval> is 300 (i.e. 5 minutes).
 #
-# get <name> <key>
+# The parameters wr<i> specify the number(s) of the inverter(s) to be read. 
+# When omitted, the sum of all inverters is read. If more than one inverter 
+# is specified, the names of the readings are prefixed with the inverter 
+# number, e.g. 'wr2_currentPower'.
+#
+# get <name> [wr<i>_]<key>
 #
 # where <key> is one of currentPower, totalEnergy, totalEnergyDay, 
 # totalEnergyMonth, totalEnergyYear, UDC, IDC, UDCB, IDCB, UDCC, IDCC,
@@ -92,11 +100,22 @@ SolarView_Define($$)
   if (int(@args) < 4)
   {
     return "SolarView_Define: too few arguments. Usage:\n" .
-           "define <name> SolarView <host> <port> [<interval> [<timeout>]]";
+           "define <name> SolarView <host> <port> [wr<i> wr...] [<interval> [<timeout>]]";
   }
 
-  $hash->{Host}     = $args[2];
-  $hash->{Port}     = $args[3];
+  $hash->{Host} = $args[2];
+  $hash->{Port} = $args[3];
+
+  # collect the set of inverters which are to be read
+  @{$hash->{WRs2Read}} = (0);
+  while ((int(@args) >= 5) && ($args[4] =~ /^[Ww][Rr](\d+)$/))
+  {
+    push @{$hash->{WRs2Read}}, $1 if int($1);
+    splice(@args, 4, 1);
+  }
+  # remove WR0 if exactly one inverter has been specified
+  shift @{$hash->{WRs2Read}} if (int(@{$hash->{WRs2Read}}) == 2);
+
   $hash->{Interval} = int(@args) >= 5 ? int($args[4]) : 300;
   $hash->{Timeout}  = int(@args) >= 6 ? int($args[5]) : 4;
 
@@ -109,17 +128,20 @@ SolarView_Define($$)
   $hash->{UseSVNight} = 'yes'; # use the on/off timings from SV (else: SUNRISE_EL)
   $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
 
-  # internal variables
-  $hash->{Debounced}  = 0;
-
   $hash->{STATE} = 'Initializing';
 
   my $timenow = TimeNow();
 
-  for my $get (@gets)
+  # initialization
+  for my $wr (@{$hash->{WRs2Read}})
   {
-    $hash->{READINGS}{$get}{VAL}  = $hash->{Invalid};
-    $hash->{READINGS}{$get}{TIME} = $timenow;
+    $hash->{SolarView_WR($hash, 'Debounced', $wr)}  = 0;
+
+    for my $get (@gets)
+    {
+      $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{VAL}  = $hash->{Invalid};
+      $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{TIME} = $timenow;
+    }
   }
 
   SolarView_Update($hash);
@@ -153,96 +175,102 @@ SolarView_Update($)
 
   Log 4, "$hash->{NAME} tries to contact solarview at $hash->{Host}:$hash->{Port}";
 
-  my $success  = 0;
-  my %readings = ();
-  my $timenow  = TimeNow();
-  my $rereads  = $hash->{Rereads};
+  my $success = 0;
+  my $timenow = TimeNow();
 
-  eval {
-    local $SIG{ALRM} = sub { die 'timeout'; };
-    alarm $hash->{Timeout};
-
-    READ_SV:
-    my $socket = IO::Socket::INET->new(PeerAddr => $hash->{Host}, 
-                                       PeerPort => $hash->{Port}, 
-                                       Timeout  => $hash->{Timeout});
-
-    if ($socket and $socket->connected())
-    {
-      $socket->autoflush(1);
-      print $socket "00*\r\n";
-      my $res = <$socket>;
-      close($socket);
-
-      if ($res and $res =~ /^\{(00,[\d\.,]+)\},/)
-      {
-        my @vals = split(/,/, $1);
-
-        if ($hash->{UseSVTime}) 
-        {
-          $timenow = sprintf("%04d-%02d-%02d %02d:%02d:00",
-                       $vals[3], $vals[2], $vals[1], $vals[4], $vals[5]);
-        }
-
-        for my $i (6..19)
-        {
-          if (defined($vals[$i]))
-          { 
-            $readings{$gets[$i - 6]} = 0 + $vals[$i]; 
-          }
-        }
-
-        if ($rereads and $readings{currentPower} == 0)
-        { 
-          sleep(1);
-          $rereads = $rereads - 1;
-          goto READ_SV;
-        }
-
-        alarm 0;
-
-        # if Debounce is enabled (>0), then skip one! drop of
-        # currentPower from 'greater than Debounce' to 'Zero'
-        #
-        if ($hash->{Debounce} > 0 and
-            $hash->{Debounce} < $hash->{READINGS}{currentPower}{VAL} and
-            $readings{currentPower} == 0 and not $hash->{Debounced})
-        {
-            # revert to the previous value
-            $readings{currentPower} = $hash->{READINGS}{currentPower}{VAL};
-            $hash->{Debounced} = 1;
-        } else {
-            $hash->{Debounced} = 0;
-        }
-
-        $success = 1;
-      }
-    }
-  };
-
-  alarm 0;
-
-  if ($success)
+  for my $wr (@{$hash->{WRs2Read}})
   {
-    for my $get (@gets)
-    {
-      # update and notify readings if they have changed
-      if ($hash->{READINGS}{$get}{VAL} != $readings{$get})
+    my %readings = ();
+    my $rereads  = $hash->{Rereads};
+
+    eval {
+      local $SIG{ALRM} = sub { die 'timeout'; };
+      alarm $hash->{Timeout};
+
+      READ_SV:
+      my $socket = IO::Socket::INET->new(PeerAddr => $hash->{Host}, 
+                                         PeerPort => $hash->{Port}, 
+                                         Timeout  => $hash->{Timeout});
+
+      if ($socket and $socket->connected())
       {
-        $hash->{READINGS}{$get}{VAL}  = $readings{$get};
-        $hash->{READINGS}{$get}{TIME} = $timenow;
-        #
-        push @{$hash->{CHANGED}}, "$get: $readings{$get}";
-      }
-    }
-    DoTrigger($hash->{NAME}, undef) if ($init_done);
-  }
+        $socket->autoflush(1);
+        printf $socket "%02d*\r\n", int($wr);
+        my $res = <$socket>;
+        close($socket);
+
+        if ($res and $res =~ /^\{(\d\d,[\d\.,]+)\},/)
+        {
+          my @vals = split(/,/, $1);
+
+          if ($hash->{UseSVTime}) 
+          {
+            $timenow = sprintf("%04d-%02d-%02d %02d:%02d:00",
+                         $vals[3], $vals[2], $vals[1], $vals[4], $vals[5]);
+          }
+
+          # parse the result from SV to dedicated values
+          for my $i (6..19)
+          {
+            if (defined($vals[$i]))
+            { 
+              $readings{$gets[$i - 6]} = 0 + $vals[$i]; 
+            }
+          }
+
+          # need to reread?
+          if ($rereads and $readings{currentPower} == 0)
+          { 
+            sleep(1);
+            $rereads = $rereads - 1;
+            goto READ_SV;
+          }
+
+          # if Debounce is enabled (>0), then skip one! drop of
+          # currentPower from 'greater than Debounce' to 'Zero'
+          #
+          if ($hash->{Debounce} > 0 and
+              $hash->{Debounce} < $hash->{READINGS}{SolarView_WR($hash, 'currentPower', $wr)}{VAL} and
+              $readings{currentPower} == 0 and not $hash->{SolarView_WR($hash, 'Debounced', $wr)})
+          {
+              # revert to the previous value
+              $readings{currentPower} = $hash->{READINGS}{SolarView_WR($hash, 'currentPower', $wr)}{VAL};
+              $hash->{SolarView_WR($hash, 'Debounced', $wr)} = 1;
+          } else {
+              $hash->{SolarView_WR($hash, 'Debounced', $wr)} = 0;
+          }
+
+          # copy the values to the READINGS
+          for my $get (@gets)
+          {
+            # update and notify readings if they have changed
+            if ($hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{VAL} != $readings{$get})
+            {
+              $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{VAL}  = $readings{$get};
+              $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{TIME} = $timenow;
+              #
+              push @{$hash->{CHANGED}}, sprintf("%s: %s (wr%s)", $get, $readings{$get}, $wr);
+            }
+          }
+          
+          alarm 0;
+          $success = 1;
+
+        } # res okay
+      } # socket okay
+    }; # eval
+    alarm 0;
+  } # wr loop
 
   $hash->{STATE} = $hash->{READINGS}{currentPower}{VAL}.' W, '.$hash->{READINGS}{totalEnergyDay}{VAL}.' kWh';
 
-  if ($success) {
+  if ($success) 
+  {
+    DoTrigger($hash->{NAME}, undef) if ($init_done);
     Log 4, "$hash->{NAME} got fresh values from solarview";
-  } else {
+  } 
+  else 
+  {
     $hash->{STATE} .= ' (Fail)';
     Log 4, "$hash->{NAME} was unable to get fresh values from solarview";
   }
@@ -292,23 +320,32 @@ SolarView_IsNight($)
 
   my ($sec,$min,$hour,$mday,$mon) = localtime(time);
 
-  # reset totalEnergyX if needed
+  # reset totalEnergyX at midnight
   if ($hour == 0) 
   {
     my $timenow = TimeNow();
 
-    $hash->{READINGS}{totalEnergyDay}{VAL}  = 0;
-    $hash->{READINGS}{totalEnergyDay}{TIME} = $timenow;
+    for my $wr (@{$hash->{WRs2Read}})
+    {
+      $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyDay', $wr)}{VAL}  = 0;
+      $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyDay', $wr)}{TIME} = $timenow;
+    }
     #
     if ($mday == 1)
     {
-      $hash->{READINGS}{totalEnergyMonth}{VAL}  = 0;
-      $hash->{READINGS}{totalEnergyMonth}{TIME} = $timenow;
+      for my $wr (@{$hash->{WRs2Read}})
+      {
+        $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyMonth', $wr)}{VAL}  = 0;
+        $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyMonth', $wr)}{TIME} = $timenow;
+      }
       #
       if ($mon == 0)
       {
-        $hash->{READINGS}{totalEnergyYear}{VAL}  = 0;
-        $hash->{READINGS}{totalEnergyYear}{TIME} = $timenow;
+        for my $wr (@{$hash->{WRs2Read}})
+        {
+          $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyYear', $wr)}{VAL}  = 0;
+          $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyYear', $wr)}{TIME} = $timenow;
+        }
       }
     }
   }
@@ -348,6 +385,22 @@ SolarView_IsNight($)
   }
 
   return $isNight;
+}
+
+# prefix the reading name with inverter number
+sub
+SolarView_WR($$$)
+{
+  my ($hash, $reading, $wr) = @_;
+
+  if ((int(@{$hash->{WRs2Read}}) > 1) && (int($wr) > 0))
+  {
+    return sprintf("wr%s_%s", $wr, $reading);
+  }
+  else
+  {
+    return $reading;
+  }
 }
 
 1;
