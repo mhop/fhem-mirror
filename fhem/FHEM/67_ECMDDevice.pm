@@ -79,16 +79,14 @@ ECMDDevice_Changed($$$)
 {
         my ($hash, $cmd, $value)= @_;
 
+
+        readingsBeginUpdate($hash);
+        readingsUpdate($hash, $cmd, $value);
+        readingsEndUpdate($hash, 1);
+
+        $hash->{STATE} = "$cmd $value";
+
         my $name= $hash->{NAME};
-
-        $hash->{READINGS}{$cmd}{TIME} = TimeNow();
-        $hash->{READINGS}{$cmd}{VAL} = $value;
-
-        $hash->{CHANGED}[0]= "$cmd: $value";
-
-        DoTrigger($name, undef) if($init_done);
-
-        $hash->{STATE} = "$cmd: $value";
         Log GetLogLevel($name, 4), "ECMDDevice $name $cmd: $value";
 
         return $hash->{STATE};
