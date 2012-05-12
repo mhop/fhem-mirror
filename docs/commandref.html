@@ -1535,10 +1535,6 @@ A line ending with \ will be concatenated with the next one, so long lines
       to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
           precision for large values, use <a href="#at">at</a> which has a 1
           sec resolution.</li>
-      <li>If the attribute follow-on-for-timer is set for the device and the
-          on-for-timer command is sent to the device with a time parameter,
-          the program automatically schedules a "setstate off" for the
-      specified time.</li>
       <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
       or { &lt;perl code&gt; }, where the perl-code returns a time
           specification).
@@ -1590,9 +1586,8 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="follow-on-for-timer"></a>
     <li>follow-on-for-timer<br>
-    the program automatically schedules a "setstate off" for the time
-    specified as argument to the on-for-timer command (for the specified
-    device only).
+    schedule a "setstate off;trigger off" for the time specified as argument to
+    the on-for-timer command.
     </li><br>
 
     <li><a href="#loglevel">loglevel</a></li><br>
