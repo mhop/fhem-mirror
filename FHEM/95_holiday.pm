@@ -197,8 +197,23 @@ holiday_Get($@)
   my ($hash, @a) = @_;
 
   return "argument is missing" if(int(@a) != 2);
-  return "wrong argument: need MM-DD" if($a[1] !~ m/^[01]\d-[0-3]\d$/);
-  return holiday_refresh($hash->{NAME}, $a[1]);
+  my $arg;
+
+  if($a[1] =~ m/^[01]\d-[0-3]\d/) {
+    $arg = $a[1];
+
+  } elsif($a[1] =~ m/^yesterday|today|tomorrow$/) {
+    my $t = time();
+    $t += 86400 if($a[1] eq "tomorrow");
+    $t -= 86400 if($a[1] eq "yesterday");
+    my @a = localtime($t);
+    $arg = sprintf("%02d-%02d", $a[4]+1, $a[3]);
+
+  } else {
+    return "wrong argument: need MM-DD/yesterday/today/tomorrow"
+
+  }
+  return holiday_refresh($hash->{NAME}, $arg);
 }
 
 sub
