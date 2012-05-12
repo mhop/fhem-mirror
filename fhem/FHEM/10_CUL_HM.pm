@@ -672,52 +672,47 @@ CUL_HM_Parse($$)
     push @event, "unknownMsg:$p" if(!@event);
 
   } elsif($st eq "threeStateSensor") { #####################################
-    $p =~ m/^....(..)$/;
-    my $lst = defined($1) ? $1 : "00";
-    my $chn = "01";
 
-    #tobi73: modified 0601.. ->> 06.. 
-    # for multichannel Alive Message - Bytes 3/4=channel ID to be ignored...
-    if($p =~ m/^06....00$/) {
-      push @event, "alive:yes";
+    if($p =~ m/^(..)(..)(..)(..)?$/) {
+      #tobi73
+      # "Normal": Byte1/2:chn, 3/4:counter, 5/6:State
+      # "State":  Byte1/2: 06, 3/4:channel, 5/6:State, 7/8:additional info
+      my ($b12, $b34, $b56, $b78) = ($1, $2, $3, $4);
+      my $lst = $b56; # Local state;
+      my $chn;
+      my $addState = "";
 
-      #tobi73: For Alive Message of SCI: Bytes 5/6 used for status
-      if($model eq "HM-SCI-3-FM") {
-	$p =~ m/^....(..)..$/;
-	$lst = defined($1) ? $1  : "00";
+      if($b12 eq "06") {
+        push @event, "alive:yes";
+        $chn = $b34;
+        if($b78) {
+          push(@event, "battery:". (hex($b78) & 0x80) ? "empty" : "ok");
+          $addState = " sabotage" if($b78 =~ m/^.E/);
+        }
+
+      } else {
+        $chn = $b12;
+
       }
-    }
-    # Multi-channel device: Switch to the shadow source hash
-    # for the HM-SCI-3-FM
-    if($p =~ m/^(..)(..)/) {
-      #tobi73: For Alive Message of SCI channel ID in byte 3/4
-      $chn = ($model eq "HM-SCI-3-FM") ? $2 : $1;
-    }
 
-    if($chn && $chn ne "01" && $chn ne "00") {
-      my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
-      $shash = $sshash if($sshash);
-      $name = $shash->{NAME};
-    }
+      # Multi-channel device: Switch to the shadow source hash
+      if($chn && $chn ne "01" && $chn ne "00") {
+        my $sshash = $modules{CUL_HM}{defptr}{"$src$chn"};
+        $shash = $sshash if($sshash);
+        $name = $shash->{NAME};
+      }
 
-    my %txt;
-    %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
-    %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
-                 if($model eq "HM-SEC-WDS");
-
-    if($txt{$lst}) {
-      push @event, "state:$txt{$lst}$target";
-
-    } else {
-      $lst = "00"; # for the ack
+      my %txt;
+      %txt = ("C8"=>"open", "64"=>"tilted", "00"=>"closed");
+      %txt = ("C8"=>"wet",  "64"=>"damp",   "00"=>"dry")  # by peterp
+                   if($model eq "HM-SEC-WDS");
+      my $txt = $txt{$lst};
+      $txt = "unknown:$lst" if(!$txt);
+      push @event, "state:$txt$addState$target";
+      CUL_HM_SendCmd($shash, "++8002$id$src${chn}00",1,0)  # Send Ack
+        if($id eq $dst);
     }
 
-    if($p =~ m/^0601..0E$/) {
-      push @event, "state:sabotage";
-    }
-
-    CUL_HM_SendCmd($shash, "++8002$id$src${chn}01${lst}00",1,0)  # Send Ack
-      if($id eq $dst);
     push @event, "unknownMsg:$p" if(!@event);
 
 
