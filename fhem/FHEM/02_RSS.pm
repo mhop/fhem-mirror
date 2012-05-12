@@ -320,59 +320,65 @@ RSS_returnJPEG($) {
   my $S= GD::Image->newTrueColor($width,$height);
   $S->colorAllocate(0,0,0); # black is the background
 
-  #
-  # set the background
-  #
-  # check if background directory is set
-  my $bgdir= AttrVal($name,"bg","");
-  goto SKIPBG unless($bgdir ne "");
+  # wrap to make problems with GD non-lethal
 
-  my $bgnr; # item number
-  if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
-      $bgnr= $defs{$name}{fhem}{bgnr};
-  } else {
-      $bgnr= 0;
-  }
-  # check if at least tmin seconds have passed
-  my $t0= 0;
-  my $tmin= AttrVal($name,"tmin",0);
-  if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{t})) {
-    $t0= $defs{$name}{fhem}{t};
-  }
-  my $t1= time();
-  if($t1-$t0>= $tmin) {
-    $defs{$name}{fhem}{t}= $t1;
-    $bgnr++;
-  }
-  # detect pictures
-  goto SKIPBG unless(opendir(BGDIR, $bgdir));
-  my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
-  closedir(BGDIR);
-  # get item number
-  if($#bgfiles>=0) {
-    if($bgnr > $#bgfiles) { $bgnr= 0; }
-    $defs{$name}{fhem}{bgnr}= $bgnr;
-    my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
-    my $bg= newFromJpeg GD::Image($bgfile);
-    my ($bgwidth,$bgheight)= $bg->getBounds();
-    my ($w,$h);
-    my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
-    if($u>$v) {
-        $w= $width;
-        $h= $bgheight/$u;
+  eval {
+
+    #
+    # set the background
+    #
+    # check if background directory is set
+    my $bgdir= AttrVal($name,"bg","");
+    goto SKIPBG unless($bgdir ne "");
+
+    my $bgnr; # item number
+    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{bgnr})) {
+        $bgnr= $defs{$name}{fhem}{bgnr};
     } else {
-        $h= $height;
-        $w= $bgwidth/$v;
+        $bgnr= 0;
     }
-    $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
-  }
-  SKIPBG:
+    # check if at least tmin seconds have passed
+    my $t0= 0;
+    my $tmin= AttrVal($name,"tmin",0);
+    if(defined($defs{$name}{fhem}) && defined($defs{$name}{fhem}{t})) {
+      $t0= $defs{$name}{fhem}{t};
+    }
+    my $t1= time();
+    if($t1-$t0>= $tmin) {
+      $defs{$name}{fhem}{t}= $t1;
+      $bgnr++;
+    }
+    # detect pictures
+    goto SKIPBG unless(opendir(BGDIR, $bgdir));
+    my @bgfiles= grep {$_ !~ /^\./} readdir(BGDIR);
+    closedir(BGDIR);
+    # get item number
+    if($#bgfiles>=0) {
+      if($bgnr > $#bgfiles) { $bgnr= 0; }
+      $defs{$name}{fhem}{bgnr}= $bgnr;
+      my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
+      my $bg= newFromJpeg GD::Image($bgfile);
+      my ($bgwidth,$bgheight)= $bg->getBounds();
+      my ($w,$h);
+      my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
+      if($u>$v) {
+          $w= $width;
+          $h= $bgheight/$u;
+      } else {
+          $h= $height;
+          $w= $bgwidth/$v;
+      }
+      $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
+    }
+    SKIPBG:
 
-  #
-  # evaluate layout
-  #
-  RSS_evalLayout($S, $name, $defs{$name}{fhem}{layout});
+    #
+    # evaluate layout
+    #
+    RSS_evalLayout($S, $name, $defs{$name}{fhem}{layout});
 
+  }; warn $@ if $@;
+    
   #
   # return jpeg image
   #
