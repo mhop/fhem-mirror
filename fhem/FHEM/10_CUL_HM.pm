@@ -327,7 +327,7 @@ CUL_HM_Parse($$)
       push @event, "brightness:$b";
 
     } else {
-      push @event, "KS550 unknown: $p";
+      push @event, "unknown:$p";
 
     }
 
@@ -675,8 +675,8 @@ CUL_HM_Parse($$)
 
     if($p =~ m/^(..)(..)(..)(..)?$/) {
       #tobi73
-      # "Normal": Byte1/2:chn, 3/4:counter, 5/6:State
-      # "State":  Byte1/2: 06, 3/4:channel, 5/6:State, 7/8:additional info
+      # "change": Byte1/2:chn, 3/4:counter, 5/6:State
+      # "report": Byte1/2: 06, 3/4:channel, 5/6:State, 7/8:additional info
       my ($b12, $b34, $b56, $b78) = ($1, $2, $3, $4);
       my $lst = $b56; # Local state;
       my $chn;
@@ -709,6 +709,7 @@ CUL_HM_Parse($$)
       my $txt = $txt{$lst};
       $txt = "unknown:$lst" if(!$txt);
       push @event, "state:$txt$addState$target";
+
       CUL_HM_SendCmd($shash, "++8002$id$src${chn}00",1,0)  # Send Ack
         if($id eq $dst);
     }
@@ -809,7 +810,6 @@ CUL_HM_Parse($$)
 
   }
 
-  #push @event, "unknownMsg:$p" if(!@event);
   push @event, "unknownMsg:($cmd) $p" if(!@event);
 
   my @changed;
@@ -821,10 +821,7 @@ CUL_HM_Parse($$)
     }
 
     my ($vn, $vv) = split(":", $event[$i], 2);
-    Log GetLogLevel($name,2), "CUL_HM $name $vn:$vv" if($vn eq "unknown");
-
     if($vn eq "state") {
-
       if($shash->{cmdSent} && $shash->{cmdSent} eq $vv) {
         delete($shash->{cmdSent}); # Skip second "on/off" after our own command
 
@@ -837,12 +834,10 @@ CUL_HM_Parse($$)
       push @changed, "$vn: $vv";
 
     }
-
     $shash->{READINGS}{$vn}{TIME} = $tn;
     $shash->{READINGS}{$vn}{VAL} = $vv;
   }
   $shash->{CHANGED} = \@changed;
-  
   $shash->{lastMsg} = $msgX;
 
   if($shash->{ackWaiting}) {
