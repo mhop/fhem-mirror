@@ -1000,7 +1000,7 @@ CommandQuit($$)
 sub
 WriteStatefile()
 {
-  return if(!$attr{global}{statefile});
+  return "No statefile specified" if(!$attr{global}{statefile});
   if(!open(SFH, ">$attr{global}{statefile}")) {
     my $msg = "WriteStateFile: Cannot open $attr{global}{statefile}: $!";
     Log 1, $msg;
@@ -1048,6 +1048,7 @@ WriteStatefile()
   }
 
   close(SFH);
+  return "";
 }
 
 #####################################
@@ -1055,7 +1056,9 @@ sub
 CommandSave($$)
 {
   my ($cl, $param) = @_;
-  my $ret = WriteStatefile();
+  my $ret = "";
+
+  WriteStatefile();
 
   $param = $attr{global}{configfile} if(!$param);
   return "No configfile attribute set and no argument specified" if(!$param);
@@ -1063,6 +1066,7 @@ CommandSave($$)
     return "Cannot open $param: $!";
   }
   my %fh = ("configfile" => *SFH);
+  my %skip;
 
   my %devByNr;
   map { $devByNr{$defs{$_}{NR}} = $_ } keys %defs;
@@ -1084,9 +1088,15 @@ CommandSave($$)
     my $cfgfile = $h->{CFGFN} ? $h->{CFGFN} : "configfile";
     my $fh = $fh{$cfgfile};
     if(!$fh) {
-      return "Can't open $cfgfile: $!" if(!(open($fh, ">$cfgfile")));
-      $fh{$cfgfile} = $fh;
+      if(!open($fh, ">$cfgfile")) {
+        $ret .= "Cannot open $cfgfile: $!, ignoring its content\n";
+        $fh{$cfgfile} = 1;
+        $skip{$cfgfile} = 1;
+      } else {
+        $fh{$cfgfile} = $fh;
+      }
     }
+    next if($skip{$cfgfile});
 
     if(!defined($d)) {
       print $fh $h->{TEXT},"\n";
@@ -1114,9 +1124,9 @@ CommandSave($$)
         if($attr{global}{lastinclude});
 
   foreach my $fh (values %fh) {
-    close($fh);
+    close($fh) if($fh ne "1");
   }
-  return undef;
+  return ($ret ? $ret : undef);
 }
 
 #####################################
@@ -1754,7 +1764,7 @@ CommandAttr($$)
 
     my $list = getAllAttr($sdev);
     if($a[1] eq "?") {
-      push @rets, "Unknown attribute $a[1], choose one of $list";
+      push @rets, "$sdev: unknown attribute $a[1], choose one of $list";
       next;
     }
 
@@ -1767,14 +1777,14 @@ CommandAttr($$)
          }
       }
       if(!$found) {
-        push @rets, "Unknown attribute $a[1], ".
+        push @rets, "$sdev: unknown attribute $a[1], ".
                         "choose one of $list or use attr global userattr $a[1]";
         next;
       }
     }
 
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
-      push @rets,"Unknown IODev specified";
+      push @rets,"$sdev: unknown IODev specified";
       next;
     }
 
