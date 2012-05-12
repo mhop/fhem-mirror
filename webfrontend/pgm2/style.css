@@ -35,6 +35,8 @@ a img { border-style:none; }
 .slider { float:right; width:250px; height:26px; }
 .set .slider { margin-left:10px; background:#F0F0D8;
           -moz-border-radius:8px; border-radius:8px; }
-.handle { position:relative; cursor:pointer; width:50px; height:20px; line-height:20px;
+.handle { position:relative; cursor:pointer; width:50px;
+          height:20px; line-height:20px;
+          -moz-user-select:none; user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
 .downText { margin-top:2px; }
