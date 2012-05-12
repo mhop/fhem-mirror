@@ -184,7 +184,7 @@ FS20_Set($@)
   return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
 
   if($na > 2 && $a[1] eq "dim") {
-    $a[1] = ($a[2] eq "0" ? "off" : "dim$a[2]%");
+    $a[1] = ($a[2] eq "0" ? "off" : sprintf("dim%02d%%",$a[2]) );
     splice @a, 2, 1;
     $na = int(@a);
   }
@@ -251,7 +251,8 @@ FS20_Set($@)
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
     $modules{FS20}{ldata}{$name} = $to;
     Log 4, "Follow: +$to setstate $name off";
-    CommandDefine(undef, $name . "_timer at +$to setstate $name off");
+    CommandDefine(undef,
+                $name."_timer at +$to setstate $name off; trigger $name off");
   }
 
   ##########################
