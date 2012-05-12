@@ -2074,7 +2074,6 @@ FW_devState($$)
   $state = "" if(!defined($state));
 
   $hasOnOff = (!$webCmd && $allSets =~ m/\bon\b/ && $allSets =~ m/\boff\b/);
-
   my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
@@ -2094,14 +2093,15 @@ FW_devState($$)
   }
 
   $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
-
   if($webCmd) {
     my @a = split(":", $webCmd);
     $link = "cmd.$d=set $d $a[0]";
     $cmdlist = $webCmd;
 
   } elsif($hasOnOff && !$cmdlist) {
-    $link = "cmd.$d=set $d ".($state eq "on" ? "off":"on");
+    my (undef, $nstate) = ReplaceEventMap($d, [$d, $state], 0);
+    $nstate = $state if(!defined($nstate));
+    $link = "cmd.$d=set $d " . ($nstate eq "on" ? "off" : "on");
     $cmdlist = "on:off";
 
   }
@@ -2120,7 +2120,7 @@ FW_devState($$)
       $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
-      $txt = "<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf'\">$txt</a>";
+      $txt ="<a onClick=\"location.href='$FW_ME$FW_subdir?$link$rf'\">$txt</a>";
 
     } else {
       $txt = "<a href=\"$FW_ME$FW_subdir?$link$rf\">$txt</a>";
