@@ -686,7 +686,7 @@ CUL_HM_Parse($$)
         push @event, "alive:yes";
         $chn = $b34;
         if($b78) {
-          push(@event, "battery:". (hex($b78) & 0x80) ? "empty" : "ok");
+          push(@event, "battery:". ((hex($b78) & 0x80) ? "low" : "ok"));
           $addState = " sabotage" if($b78 =~ m/^.E/);
         }
 
