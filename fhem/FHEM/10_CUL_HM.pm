@@ -1477,6 +1477,9 @@ CUL_HM_Pair(@)
     $devInfo =~ m,(..)(..)(..), ) {
     my ($b1, $b2, $b3) = (hex($1)&0xf, hex($2), $3);
 
+    ######## Hack for SCI: Channel B starting 0 not 1
+    $b2++ if($model eq "HM-SCI-3-FM");
+
     for(my $i = $b2+1; $i<=$b1; $i++) {
       my $nSrc = sprintf("%s%02X", $src, $i);
       if(!defined($modules{CUL_HM}{defptr}{$nSrc})) {
