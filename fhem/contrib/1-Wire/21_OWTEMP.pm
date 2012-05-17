@@ -16,7 +16,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 1.11 - March, 2012
+# Version 1.12 - April, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -48,8 +48,8 @@
 # attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is red up triangle
 # attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
-# attr <name> tempLow   <float>    = measurement value for low alarm 
-# attr <name> tempHigh  <float>    = measurement for high alarm 
+# attr <name> tempLow   <float>    = value for low alarm 
+# attr <name> tempHigh  <float>    = value for high alarm 
 #
 ########################################################################################
 #
