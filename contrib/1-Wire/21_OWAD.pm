@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.11 - March, 2012
+# Version 1.12 - April, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -260,7 +260,7 @@ sub OWAD_InitializeDevice($) {
   @owg_shigh = (0,0,0,0);  
    
   #-- Set channel names, channel units and alarm values
-  for( my $i=0;$i<4;$i++) { 
+  for( my $i=0;$i<int(@owg_fixed);$i++) { 
     #-- name
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
     my @cnama = split(/\|/,$cname);
@@ -336,7 +336,7 @@ sub OWAD_FormatValues($) {
   my $tn = TimeNow();
   
   #-- formats for output
-  for (my $i=0;$i<4;$i++){
+  for (my $i=0;$i<int(@owg_fixed);$i++){
     $offset = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
     $factor = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
     #-- correct values for proper offset, factor 
@@ -395,7 +395,7 @@ sub OWAD_FormatValues($) {
     }
     
     #-- insert comma
-    if( $i<3 ){
+    if( $i<int(@owg_fixed)-1 ){
       $value1 .= " ";
       $value2 .= ", ";
       $value3 .= ", ";
@@ -505,7 +505,7 @@ sub OWAD_Get($@) {
     
     #-- output string looks differently here
     $value = "";
-    for (my $i=0;$i<4;$i++){
+    for (my $i=0;$i<int(@owg_fixed);$i++){
       $value .= sprintf "%s:[%4.2f,%4.2f] ",$owg_channel[$i],
       $hash->{READINGS}{$owg_channel[$i]."Low"}{VAL},
       $hash->{READINGS}{$owg_channel[$i]."High"}{VAL}; 
@@ -610,7 +610,7 @@ sub OWAD_Set($@) {
   #-- for the selector: which values are possible
   if (@a == 2){
     my $newkeys = join(" ", sort keys %sets);
-    for( my $i=0;$i<4;$i++ ){
+    for( my $i=0;$i<int(@owg_fixed);$i++ ){
       $newkeys .= " ".$owg_channel[$i]."Alarm";
       $newkeys .= " ".$owg_channel[$i]."Low";
       $newkeys .= " ".$owg_channel[$i]."High";
@@ -652,13 +652,13 @@ sub OWAD_Set($@) {
   #-- find out which channel we have
   my $tc =$key;
   if( $tc =~ s/(.*)(Alarm|Low|High)/$channel=$1/se ) {
-    for (my $i=0;$i<4;$i++){
+    for (my $i=0;$i<int(@owg_fixed);$i++){
       if( $tc eq $owg_channel[$i] ){
         $channo  = $i;
         $channel = $tc;
         last;
-     }
-   }
+      }
+    }
   }
   return "OWAD: Cannot determine channel from parameter $a[1]"
     if( !(defined($channo)));  
@@ -869,19 +869,19 @@ sub OWXAD_GetPage($$) {
   
   #=============== get the voltage reading ===============================
   if( $page eq "reading"){
-    for( $i=0;$i<4;$i++){
+    for( $i=0;$i<int(@owg_fixed);$i++){
       $owg_val[$i]= int((ord($data[12+2*$i])+256*ord($data[13+2*$i]))/((1<<$owg_resoln[$i])-1) * $owg_range[$i])/1000;
     }
   #=============== get the alarm reading ===============================
   } elsif ( $page eq "alarm" ) {
-    for( $i=0;$i<4;$i++){
+    for( $i=0;$i<int(@owg_fixed);$i++){
       $owg_vlow[$i]  = int(ord($data[12+2*$i])/255 * $owg_range[$i])/1000;
       $owg_vhigh[$i] = int(ord($data[13+2*$i])/255 * $owg_range[$i])/1000;
     }
   #=============== get the status reading ===============================
   } elsif ( $page eq "status" ) {
    my ($sb1,$sb2);
-   for( $i=0;$i<4;$i++){
+   for( $i=0;$i<int(@owg_fixed);$i++){
       $sb1 = ord($data[12+2*$i]); 
       $sb2 = ord($data[12+2*$i+1]);
       
