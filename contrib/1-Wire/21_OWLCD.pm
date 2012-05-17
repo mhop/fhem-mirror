@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.11 - March, 2012
+# Version 1.12 - April, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -28,6 +28,17 @@
 # get <name> gpio     => current state of the gpio pins (15 = all off, 0 = all on)
 # get <name> counter  => four values (16 Bit) of the gpio counter
 # get <name> version  => firmware version of the LCD adapter
+# get <name> memory <page> => get one of the internal memory pages 0..6
+#
+# set <name> icon <num> on|off|blink  => set one of the icons 0..14
+# set <name> icon 15 0..6             => set icon no. 15 in one of its values
+# set <name> line <line> <string(s)>  => set one of the display lines 0..3
+# set <name> memory <page> <string(s) => set one of the internal memory pages 0..6
+# set <name> gpio                     => state of the gpio pins 0..7 
+# set <name> backlight on|off         => set backlight on or off
+# set <name> lcd       on|off         => set LCD power on or off
+# set <name> reset                    => reset the display
+# set <name> test                     => display a test content
 #
 # Careful: Not ASCII ! strange Codepage
 ########################################################################################
@@ -61,13 +72,16 @@ my $lcdcontroller = "KS0073";
 my $lcdlines      = 4;
 my $lcdchars      = 20;
 
+#-- global variable;
+my $lcddata;
+
 #-- declare variables
 my %gets = (
   "present"     => "",
   "id"          => "",
+  "memory"      => "",
   "gpio"        => "",
   "counter"     => "",
-  #"memory"      => "",
   "version"     => "",
   #"register"    => "",
   #"data"        => ""
@@ -75,6 +89,7 @@ my %gets = (
 my %sets    = (
   "icon"        => "",
   "line"        => "",
+  "memory"      => "",
   "gpio"        => "",
   "backlight"   => "",
   "lcd"         => "",
@@ -170,6 +185,8 @@ sub OWLCD_Define ($$) {
     OWXLCD_SetFunction($hash,"bklon",0); 
     #-- erase all icons
     OWXLCD_SetIcon($hash,0,0);
+    #-- erase alarm state
+    OWXLCD_SetFunction($hash,"gpio",15);
   #-- Unknown interface
   }else{
     return "OWLCD: Wrong IODev type $interface";
@@ -199,7 +216,7 @@ sub OWLCD_Get($@) {
 
    #-- check syntax
   return "OWLCD: Get argument is missing @a"
-    if(int(@a) != 2);
+    if(int(@a) < 2);
     
   #-- check argument
   return "OWLCD: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
@@ -222,39 +239,29 @@ sub OWLCD_Get($@) {
   
   #-- get gpio states
   if($a[1] eq "gpio") {
-    $value = OWXLCD_Get($hash,"gpio",0);
+    $value = OWXLCD_Get($hash,"gpio");
     return "$a[0] $reading => $value";
   } 
   
   #-- get gpio counters
   if($a[1] eq "counter") {
-    $value = OWXLCD_Get($hash,"counter",0);
-    return "$a[0] $reading => $value";
-  } 
-  
-   #-- get EEPROM counters
-  if($a[1] eq "memory") {
-    $value = OWXLCD_Get($hash,"memory",0);
+    $value = OWXLCD_Get($hash,"counter");
     return "$a[0] $reading => $value";
   } 
   
   #-- get version
   if($a[1] eq "version") {
-    $value = OWXLCD_Get($hash,"version",0);
+    $value = OWXLCD_Get($hash,"version");
     return "$a[0] $reading => $value";
-  } 
+  }
   
-  #-- get register
-  if($a[1] eq "register") {
-    $value = OWXLCD_Get($hash,"register",0);
-    return "$a[0] $reading => $value";
-  } 
-  
-  #-- get data
-  if($a[1] eq "data") {
-    $value = OWXLCD_Get($hash,"data",0);
-    return "$a[0] $reading => $value";
-  } 
+  #-- get EEPROM content
+  if($a[1] eq "memory") {
+   my $page  = ($a[2] =~ m/\d/) ? int($a[2]) : 0;
+   Log 1,"Calling GetMemory with page $page";
+    $value = OWXLCD_GetMemory($hash,$page);
+    return "$a[0] $reading $page => $value";
+  }  
 }
 
 #######################################################################################
@@ -291,6 +298,15 @@ sub OWLCD_Set($@) {
     for( $i=4; $i< int(@a); $i++){
       $value .= " ".$a[$i];
     }
+  #-- check syntax for setting memory
+  } elsif( $key eq "memory" ){
+    return "OWLCD: Set needs two parameters when setting memory page: <#page> <string>"
+      if( int(@a)<3 );
+    $line  = ($a[2] =~ m/\d/) ? int($a[2]) : 0;
+    $value = $a[3]; 
+    for( $i=4; $i< int(@a); $i++){
+      $value .= " ".$a[$i];
+    }
   #-- check syntax for setting icon
   } elsif ( $key eq "icon" ){
     if( ($a[2] ne "0") && ($a[2] ne "none") ){
@@ -322,7 +338,7 @@ sub OWLCD_Set($@) {
   if($key eq "gpio") {
     #-- check value and write to device
     return "OWLCD: Set with wrong value for gpio port, must be 0 <= gpio <= 7"
-      if( ! ((int($value) > 0) && (int($value) < 7)) );
+      if( ! ((int($value) >= 0) && (int($value) <= 7)) );
     OWXLCD_SetFunction($hash, "gpio", int($value));
     return undef;
   }
@@ -357,6 +373,7 @@ sub OWLCD_Set($@) {
   if($key eq "reset") {
     OWXLCD_SetFunction($hash,"reset",0);
     OWXLCD_SetIcon($hash,0,0);
+    OWXLCD_SetFunction($hash,"gpio",15);
     return undef;
   }
   
@@ -397,6 +414,18 @@ sub OWLCD_Set($@) {
       if( length($value) > $lcdchars );
     #-- check value and write to device   
      OWXLCD_SetLine($hash,$line,$value);
+    return undef;
+  }
+  
+  #-- set memory page 0..6
+  if($key eq "memory") {
+    return "OWLCD: Wrong page number, choose 0..6" 
+      if( (0 > $line) || ($line > 6) );
+    return "OWLCD: Wrong line length, must be <=16 " 
+      if( length($value) > 16 );
+    #-- check value and write to device   
+     Log 1,"Calling SetMemory with page $line";
+     OWXLCD_SetMemory($hash,$line,$value);
     return undef;
   }
   
@@ -493,11 +522,10 @@ sub OWXLCD_Byte($$$) {
 #
 # Parameter hash = hash of device addressed
 #           cmd  = command string
-#           page = memory page address
 #
 ########################################################################################
 
-sub OWXLCD_Get($$$) {
+sub OWXLCD_Get($$) {
 
   my ($hash,$cmd,$value) = @_;
 
@@ -537,42 +565,22 @@ sub OWXLCD_Get($$$) {
     #-- issue the read counter command \x23 (8 bytes)
     $select .= "\x23";
     $len     = 8;
-  #=============== fill scratch with EEPROM ===============================
-  #}elsif ( $cmd eq "memory" ) {
-  #  #-- issue the read EEPROM command \x37
-  #  $len=16;
-  #  $select .= "\x37";  
   #=============== fill scratch with version ===============================
   }elsif ( $cmd eq "version" ) {
     #-- issue the read version command \x41
     $select .= "\x41";
     $len     = 16;
-  #=============== fill scratch with LCD register ===============================
-  #}elsif ( $cmd eq "register" ) {
-  #  #-- issue the read LCD register command \x11
-  #  $select .= "\x11";
-  #      $len     = 16;
-  #=============== fill scratch with LCD data ===============================
-  #}elsif ( $cmd eq "data" ) {
-  #  #-- issue the read LCD data command \x13
-  #  $addr = 0;
-  #  $len = 16;
-  #  #$select .= sprintf("\x13%c",$addr); 
-  #  $select .= "\x13\x00\x10";
-  #=============== wrong value requested ===============================
   } else {
     return "OWXLCD: Wrong get attempt";
   } 
   #-- write to device
   OWX_Reset($master);
   $res=OWX_Block($master,$select);
+  
   #-- process results
   if( $res eq 0 ){
     return "OWLCD: Device $owx_dev not accessible for reading"; 
   }
-  
-  #-- sleeping for some time
-  #select(undef,undef,undef,0.5);
   
   #-- fill according to expected length
   for($i=0;$i<$len;$i++){
@@ -581,6 +589,7 @@ sub OWXLCD_Get($$$) {
   #-- write to device
   OWX_Reset($master);
   $res=OWX_Block($master,$select2); 
+  
   #-- process results
   if( $res eq 0 ){
     return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
@@ -588,13 +597,6 @@ sub OWXLCD_Get($$$) {
   
   #-- process results (10 byes or more have been sent)
   $res = substr($res,10);
-  #my $ress = "OWXLCD: Answer was ";
-  #  for($i=0;$i<length($res);$i++){
-  #    my $j=int(ord(substr($res,$i,1))/16);
-  #    my $k=ord(substr($res,$i,1))%16;
-  #    $ress.=sprintf "0x%1x%1x ",$j,$k;
-  #  }
-  #Log 1, $ress;
     
   #=============== gpio ports ===============================
   if ( $cmd eq "gpio" ) {
@@ -605,20 +607,81 @@ sub OWXLCD_Get($$$) {
       $data[$i] = ord(substr($res,2*$i+1,1))*256+ord(substr($res,2*$i,1));
     }
     return join(" ",@data); 
-  ##=============== EEPROM ===============================
-  #}elsif ( $cmd eq "memory" ) {
   #=============== version ===============================
   }elsif ( $cmd eq "version" ) {
     return $res;
-  ##=============== LCD register ===============================
-  #}elsif ( $cmd eq "register" ) {
-    
-    
-  #=============== fill scratch with LCD data ===============================
-  #}elsif ( $cmd eq "data" ) {
-  } 
+  }
    
   return $res;
+}
+
+########################################################################################
+#
+# OWXLCD_GetMemory - get memory page from LCD device
+#
+# Parameter hash = hash of device addressed
+#           page = memory page address
+#
+########################################################################################
+
+sub OWXLCD_GetMemory($$) {
+
+  my ($hash,$page) = @_;
+
+  my ($select, $res, $res2, $res3);
+  
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  my $owx_rnf = substr($owx_dev,3,12);
+  my $owx_f   = substr($owx_dev,0,2);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  
+  my ($i,$j,$k);
+
+  #-- 8 byte 1-Wire device address
+  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
+  #-- from search string to byte id
+  my $devs=$owx_dev;
+  $devs=~s/\.//g;
+  for($i=0;$i<8;$i++){
+     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
+  }
+  
+  #-- issue the match ROM command \x55 
+  $select  = sprintf("\x55%c%c%c%c%c%c%c%c",
+      @owx_ROM_ID); 
+  #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \xBE
+  Log 1," page read is ".$page;
+  $select .= sprintf("\4E%c\x10\x37",$page);  
+  OWX_Reset($master);
+  $res=OWX_Block($master,$select);
+   
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for reading"; 
+  }
+  
+  #-- sleeping for some time
+  #select(undef,undef,undef,0.5);
+  
+  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
+  $select  = sprintf("\x55%c%c%c%c%c%c%c%c\xBE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
+      @owx_ROM_ID); 
+  OWX_Reset($master);
+  $res=OWX_Block($master,$select); 
+  
+  #-- process results
+  if( $res eq 0 ){
+    return "OWLCD: Device $owx_dev not accessible for reading in 2nd step"; 
+  }
+  
+  #-- process results (10 byes or more have been sent)
+  $res2 = substr($res,11,16);
+   
+  Log 1," Having received ".length($res)." bytes"; 
+  return $res2;
 }
 
 ########################################################################################
@@ -910,7 +973,7 @@ sub OWXLCD_SetLine($$$) {
   my $master = $hash->{IODev};
 
   #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
+  my @owx_ROM_ID  =(0,0,0,0,0,0,0,0); 
   #-- from search string to byte id
   my $devs=$owx_dev;
   $devs=~s/\.//g;
@@ -919,10 +982,11 @@ sub OWXLCD_SetLine($$$) {
   }
   
   #-- split if longer than 16 bytes, fill each with blanks
+  #   has already been checked to be <= $lcdchars
   if( length($msg) > 16 ) {
     $msgA = substr($msg,0,16);
     $msgB = substr($msg,16,length($msg)-16);
-    for($i = 0;$i<32-length($msg);$i++){
+    for($i = 0;$i<$lcdchars-length($msg);$i++){
       $msgB .= "\x20";
     }
   } else {
@@ -939,25 +1003,90 @@ sub OWXLCD_SetLine($$$) {
   OWX_Reset($master);
   $res=OWX_Block($master,$select);
   
+  #select(undef,undef,undef,0.005); 
   #-- issue the copy scratchpad to LCD command \x48
   $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
   OWX_Reset($master);
   $res3=OWX_Block($master,$select);
   
   #-- if second string available:
-  if( defined($msgB) ){
+  if( length($msg) > 16 ) {
+    #select(undef,undef,undef,0.005); 
     #-- issue the match ROM command \x55 and the write scratchpad command \x4E
     #   followed by LCD page address and the text 
     $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$line*32+16).$msgB;      
     OWX_Reset($master);
     $res2=OWX_Block($master,$select);
-  
+   
+    #select(undef,undef,undef,0.005); 
     #-- issue the copy scratchpad to LCD command \x48
     $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
     OWX_Reset($master);
     $res3=OWX_Block($master,$select);
   }
   
+  #-- process results
+  if( ($res eq 0) || ($res2 eq 0) || ($res3 eq 0) ){
+    return "OWLCD: Device $owx_dev not accessible for writing"; 
+  }
+  
+  return undef;
+
+}
+
+########################################################################################
+#
+# OWXLCD_SetMemory - set internal nonvolatile memory
+#
+# Parameter hash  = hash of device addressed
+#           page  = page number (0..14)
+#           msg   = data string to be written
+#
+########################################################################################
+
+sub OWXLCD_SetMemory($$$) {
+
+  my ($hash,$page,$msg) = @_;
+  
+  my ($select, $res, $res2, $res3, $i, $msgA);
+  $page = int($page);
+  $msg =   defined($msg) ? $msg : "";
+
+  #-- ID of the device
+  my $owx_dev = $hash->{ROM_ID};
+  my $owx_rnf = substr($owx_dev,3,12);
+  my $owx_f   = substr($owx_dev,0,2);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+
+  #-- 8 byte 1-Wire device address
+  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
+  #-- from search string to byte id
+  my $devs=$owx_dev;
+  $devs=~s/\.//g;
+  for($i=0;$i<8;$i++){
+     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
+  }
+  
+  #-- fillup with blanks
+  $msgA = $msg;
+  for($i = 0;$i<16-length($msg);$i++){
+    $msgA .= "\x20";
+  }
+   
+  #-- issue the match ROM command \x55 and the write scratchpad command \x4E
+  #   followed by LCD page address and the text 
+  Log 1," page written is ".$page;
+  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$page).$msgA;         
+  OWX_Reset($master);
+  $res=OWX_Block($master,$select);
+  
+  #-- issue the copy scratchpad to EEPROM command \x39
+  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x39",@owx_ROM_ID);  
+  OWX_Reset($master);
+  $res2=OWX_Block($master,$select);
+ 
   #-- process results
   if( ($res eq 0) || ($res2 eq 0) ){
     return "OWLCD: Device $owx_dev not accessible for writing"; 
