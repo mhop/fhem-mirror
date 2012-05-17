@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.11 - March, 2012
+# Version 1.12 - April, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -348,7 +348,7 @@ sub OWX_Define ($$) {
     }
   
     #-- In 10 seconds discover all devices on the 1-Wire bus
-    InternalTimer(gettimeofday()+5, "OWX_Discover", $hash,0);
+    InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
     
     #-- Default settings
     $hash->{interval}     = 60;          # kick every minute
@@ -358,15 +358,13 @@ sub OWX_Define ($$) {
     #-- InternalTimer blocks if init_done is not true
     my $oid = $init_done;
     $hash->{PRESENT} = 1;
-    #$hash->{TYPE}       = "OWX";
-    #$hash->{T}       = "OWX";
     $hash->{STATE}      = "Initialized";
     $hash->{INTERFACE}  = $owx_interface;
     $init_done = 1;
 
     #-- Intiate first alarm detection and eventually conversion in a minute or so
-    InternalTimer(gettimeofday() + 60, "OWX_Kick", $hash,1);
-    $init_done = $oid;
+    InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
+    $init_done     = $oid;
     $hash->{STATE} = "Active";
     return undef;
   } else {
