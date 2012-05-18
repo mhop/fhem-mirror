@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.12 - April, 2012
+# Version 1.13 - May, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -68,12 +68,12 @@ use warnings;
 sub Log($$);
 
 #-- controller may be HD44780 or KS0073 
+#   these values have to be changed for different display 
+#   geometries or memory maps
 my $lcdcontroller = "KS0073";
 my $lcdlines      = 4;
 my $lcdchars      = 20;
-
-#-- global variable;
-my $lcddata;
+my @lcdpage       = (0,32,64,96);
 
 #-- declare variables
 my %gets = (
@@ -89,6 +89,7 @@ my %gets = (
 my %sets    = (
   "icon"        => "",
   "line"        => "",
+  "alert"       => "",
   "memory"      => "",
   "gpio"        => "",
   "backlight"   => "",
@@ -291,7 +292,7 @@ sub OWLCD_Set($@) {
   
   #-- check syntax for setting line
   if( $key eq "line" ){
-    return "OWLCD: Set needs two parameters when setting line value: <#line> <string>"
+    return "OWLCD: Set needs one or two parameters when setting line value: <#line> <string>"
       if( int(@a)<3 );
     $line  = ($a[2] =~ m/\d/) ? $a[2] : 0;
     $value = $a[3]; 
@@ -301,12 +302,16 @@ sub OWLCD_Set($@) {
   #-- check syntax for setting memory
   } elsif( $key eq "memory" ){
     return "OWLCD: Set needs two parameters when setting memory page: <#page> <string>"
-      if( int(@a)<3 );
+      if( int(@a)<4 );
     $line  = ($a[2] =~ m/\d/) ? int($a[2]) : 0;
     $value = $a[3]; 
     for( $i=4; $i< int(@a); $i++){
       $value .= " ".$a[$i];
     }
+  #-- check syntax for setting alert
+  } elsif( $key eq "alert" ){
+    return "OWLCD: Set needs a parameter when setting alert: <type>"
+      if( int(@a)<3 );
   #-- check syntax for setting icon
   } elsif ( $key eq "icon" ){
     if( ($a[2] ne "0") && ($a[2] ne "none") ){
@@ -426,7 +431,26 @@ sub OWLCD_Set($@) {
     #-- check value and write to device   
      Log 1,"Calling SetMemory with page $line";
      OWXLCD_SetMemory($hash,$line,$value);
-    return undef;
+     return undef;
+  }
+  
+  #-- set alert
+  if($key eq "alert") {
+    if($value eq "beep") {
+      OWXLCD_SetFunction($hash,"gpio",14);
+      return undef;
+    }elsif($value eq "red") {
+      OWXLCD_SetFunction($hash,"gpio",13);
+      return undef;
+    }elsif($value eq "yellow") {
+      OWXLCD_SetFunction($hash,"gpio",11);
+      return undef;
+    }elsif($value eq "off") {
+      OWXLCD_SetFunction($hash,"gpio",15);
+      return undef;
+    }else{
+      return "OWLCD: Set with wrong value for alert type, must be beep/red/yellow/off";
+    }
   }
   
   #-- start test
@@ -617,7 +641,7 @@ sub OWXLCD_Get($$) {
 
 ########################################################################################
 #
-# OWXLCD_GetMemory - get memory page from LCD device
+# OWXLCD_GetMemory - get memory page from LCD device (EXPERIMENTAL)
 #
 # Parameter hash = hash of device addressed
 #           page = memory page address
@@ -983,15 +1007,25 @@ sub OWXLCD_SetLine($$$) {
   
   #-- split if longer than 16 bytes, fill each with blanks
   #   has already been checked to be <= $lcdchars
-  if( length($msg) > 16 ) {
-    $msgA = substr($msg,0,16);
-    $msgB = substr($msg,16,length($msg)-16);
-    for($i = 0;$i<$lcdchars-length($msg);$i++){
-      $msgB .= "\x20";
+  if( $lcdchars > 16 ){
+    if( length($msg) > 16 ) {
+      $msgA = substr($msg,0,16);
+      $msgB = substr($msg,16,length($msg)-16);
+      for($i = 0;$i<$lcdchars-length($msg);$i++){
+        $msgB .= "\x20";
+      }
+    } else {
+      $msgA = $msg;
+      for($i = 0;$i<16-length($msg);$i++){
+        $msgA .= "\x20";
+      }
+      for($i = 0;$i<$lcdchars-16;$i++){
+        $msgB .= "\x20";
+      }
     }
-  } else {
+  }else{
     $msgA = $msg;
-    for($i = 0;$i<16-length($msg);$i++){
+    for($i = 0;$i<$lcdchars-length($msg);$i++){
       $msgA .= "\x20";
     }
     $msgB = undef;
@@ -999,26 +1033,24 @@ sub OWXLCD_SetLine($$$) {
    
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E
   #   followed by LCD page address and the text 
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$line*32).$msgA;      
+  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$lcdpage[$line]).$msgA;      
   OWX_Reset($master);
   $res=OWX_Block($master,$select);
   
-  #select(undef,undef,undef,0.005); 
   #-- issue the copy scratchpad to LCD command \x48
   $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
   OWX_Reset($master);
   $res3=OWX_Block($master,$select);
   
   #-- if second string available:
-  if( length($msg) > 16 ) {
+  if( defined($msgB) ) {
     #select(undef,undef,undef,0.005); 
     #-- issue the match ROM command \x55 and the write scratchpad command \x4E
     #   followed by LCD page address and the text 
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$line*32+16).$msgB;      
+    $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$lcdpage[$line]+16).$msgB;      
     OWX_Reset($master);
     $res2=OWX_Block($master,$select);
    
-    #select(undef,undef,undef,0.005); 
     #-- issue the copy scratchpad to LCD command \x48
     $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
     OWX_Reset($master);
