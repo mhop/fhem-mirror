@@ -612,7 +612,7 @@ sub OWXCOUNT_GetPage($$) {
   #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
   my $ta2 = ($page*32) >> 8;
   my $ta1 = ($page*32) & 255;
-  Log 1, "OWXCOUNT: getting page Nr. $ta2 $ta1";
+  #Log 1, "OWXCOUNT: getting page Nr. $ta2 $ta1";
   $select=sprintf("\x55%c%c%c%c%c%c%c%c\xA5%c%c",
     @owx_ROM_ID,$ta1,$ta2);   
   #-- reset the bus
