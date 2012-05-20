@@ -36,7 +36,8 @@ sub FW_pH(@);
 sub FW_pHPlain(@);
 sub FW_pO(@);
 
-use vars qw($FW_dir);  # moddir (./FHEM), needed by SVG
+use vars qw($FW_dir);  # moddir (./FHEM in old structure, www/pgm2 in new structure), needed by SVG
+use vars qw($MW_dir);  # moddir (./FHEM), needed by edit Files in new structure
 use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
 use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
 use vars qw($FW_tp);   # is touchpad (iPad / etc)
@@ -339,8 +340,12 @@ FW_AnswerCall($)
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
-  #$FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/www/pgm2");
-  $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
+  if(-d "$attr{global}{modpath}/www/pgm2") {
+    $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/www/pgm2");
+  } else {
+    $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
+  }
+  $MW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
   my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
@@ -1537,7 +1542,8 @@ FW_style($$)
 
     my @fl = ("fhem.cfg");
     push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/.*(sh|Util.*|cfg|holiday)"));
+    #push(@fl, FW_fileList("$FW_dir/.*(sh|Util.*|cfg|holiday)"));
+    push(@fl, FW_fileList("$MW_dir/.*(sh|Util.*|cfg|holiday)"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.(css|svg)"));
     push(@fl, "");
@@ -1587,8 +1593,16 @@ FW_style($$)
   } elsif($a[1] eq "edit") {
 
     $a[2] =~ s,/,,g;    # little bit of security
-    my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$FW_dir/$a[2]");
+    #my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
+    #                               "$FW_dir/$a[2]");
+    my $f;
+    if($a[2] eq "fhem.cfg") {
+      $f = $attr{global}{configfile};
+    } elsif ($a[2] =~ m/.*(sh|Util.*|cfg|holiday)/ && $a[2] ne "fhem.cfg") {
+      $f = "$MW_dir/$a[2]";
+    } else {
+      $f = "$FW_dir/$a[2]";
+    }
     if(!open(FH, $f)) {
       FW_pO "$f: $!";
       return;
@@ -1616,8 +1630,15 @@ FW_style($$)
     $fName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
     $fName =~ s,/,,g;    # little bit of security
-    $fName = ($fName eq "fhem.cfg" ? $attr{global}{configfile} :
-                                   "$FW_dir/$fName");
+    #$fName = ($fName eq "fhem.cfg" ? $attr{global}{configfile} :
+    #                               "$FW_dir/$fName");
+    if($fName eq "fhem.cfg") {
+      $fName = $attr{global}{configfile};
+    } elsif ($fName =~ m/.*(sh|Util.*|cfg|holiday)/ && $fName ne "fhem.cfg") {
+      $fName = "$MW_dir/$fName";
+    } else {
+      $fName = "$FW_dir/$fName";
+    }
     if(!open(FH, ">$fName")) {
       FW_pO "$fName: $!";
       return;

@@ -1,5 +1,6 @@
 ##############################################
 # $Id$
+# modified by M. Fischer
 package main;
 use strict;
 use warnings;
@@ -8,9 +9,11 @@ use IO::Socket;
 sub CommandUpdatefhem($$);
 sub CommandCULflash($$);
 sub GetHttpFile($$@);
+sub CreateBackup($);
+sub FileList($);
 
 my $server = "fhem.de:80";
-my $sdir   = "/fhemupdate";
+my $sdir   = "/fhemupdate2";
 my $ftime  = "filetimes.txt";
 my $dfu    = "dfu-programmer";
 
@@ -35,24 +38,157 @@ CommandUpdatefhem($$)
   my ($cl, $param) = @_;
   my $lt = "";
   my $ret = "";
-  my $moddir = (-d "FHEM.X" ? "FHEM.X" : "$attr{global}{modpath}/FHEM");
+  my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir" : $attr{global}{modpath});
+  my $moddir = "$modpath/FHEM";
+  my $wwwdir = "$modpath/www";
+  my $backuppaths = "";
+  my $preserve = 0;
+  my $housekeeping = 0;
+  my $clean = 0;
+  my $msg;
 
-  ## backup by RueBe, simplified by rudi
+  if(!$param && !-d $wwwdir) {
+    $ret  = "Usage: updatefhem [<backup>|<filename>|<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]\n";
+    $ret .= "Please note: The update routine has changed! Please consider the manual of command 'updatefhem'!";
+    return $ret;
+  }
+
+  # split arguments
   my @args = split(/ +/,$param);
 
-  #  Check if the first parameter is "backup"
-  if(@args && uc($args[0]) eq "BACKUP") {
-    my $bdir = AttrVal("global", "backupdir", "$moddir.backup");
-    my $dateTime = TimeNow();
-    $dateTime =~ s/ /_/g;
-    my $ret = `(mkdir -p $bdir && tar hcf - $moddir | gzip > $bdir/FHEM.$dateTime.tgz) 2>&1`;
-    return $ret if($ret);
-    shift @args;
-    $param = join("", @args);
+  if(@args) {
+
+    # Check if the first parameter is "backup"
+    # backup by RueBe, simplified by rudi, modified by M.Fischer
+    if(uc($args[0]) eq "BACKUP") {
+      return "Usage: updatefhem <backup>" if(@args > 1);
+
+      if(-d $wwwdir) {
+        # backup new structure
+        $backuppaths = "FHEM www";
+      } else {
+        # backup old structure
+        $backuppaths = "FHEM";
+      }
+      my $ret = CreateBackup($backuppaths);
+      if($ret !~ m/backup done.*/) {
+        Log 1, "updatefhem backup: The operation was canceled. Please check manually!";
+        $msg  = "Something went wrong during backup:\n$ret\n";
+        $msg .= "The operation was canceled. Please check manually!";
+        return $msg;
+      } else {
+        Log 1, "updatefhem $ret";
+      }
+      return $ret if($ret);
+
+    # Check whether the old structure to be maintained
+    } elsif (uc($args[0]) eq "PRESERVE") {
+
+      # Check if new wwwdir already exists and an argument is given
+      if(-d $wwwdir && @args > 1) {
+        Log 1, "updatefhem The operation was canceled! Argument <preserve> not allowed in new structure!";
+        $ret  = "Usage: updatefhem [<backup>|<filename>]\n";
+        $ret .= "Please note: It seems as if 'updatefhem <housekeeping>' has already executed.\n";
+        $ret .= "The operation was canceled. Argument <preserve> is not allowed in new structure!";
+        return $ret;
+      }
+      # Check if new wwwdir already exists
+      if(-d $wwwdir) {
+        Log 1, "updatefhem The operation was canceled. Please check manually!";
+        $ret  = "Please note: It seems as if 'updatefhem <housekeeping>' has already executed.\n";
+        $ret .= "The operation was canceled. Please check manually!";
+        return $ret;
+      }
+      # set old sourcedir for update
+      $sdir = "/fhemupdate";
+      $preserve = 1;
+      # discard first argument
+      shift @args;
+      $param = join("", @args);
+
+    # Check whether the new structure is to be established.
+    } elsif (uc($args[0]) eq "HOUSEKEEPING") {
+
+      if(@args >3 ||
+          (defined($args[1]) && uc($args[1]) ne "CLEAN") ||
+          ((defined($args[1]) && uc($args[1]) eq "CLEAN") && (defined($args[2]) && uc($args[2]) ne "YES"))
+        ) {
+        return "Usage: updatefhem <housekeeping> [<clean>] [<yes>]";
+      }
+      # Check if new wwwdir already exists
+      if(-d $wwwdir && @args == 1) {
+        Log 1, "updatefhem The operation was canceled. Please check manually!";
+        $ret  = "Please note: It seems as if 'updatefhem <housekeeping>' has already executed.\n";
+        $ret .= "The operation is canceled now. Please check manually!";
+        return $ret;
+      }
+
+      # user decided to delete old files
+      if (@args == 2 && uc($args[1]) eq "CLEAN") {
+
+        # returns a warning
+        $ret  = "WARNING: The option <clean> will remove existing files!\n";
+        $ret .= "If local changes have been made, they will be lost!\n";
+        $ret .= "If you are sure, then call 'updatefhem <housekeeping> <clean> <yes>'.";
+        return $ret;
+
+      # user decided to delete old files, really
+      } elsif (@args == 3 && uc($args[1]) eq "CLEAN" && uc($args[2]) eq "YES") {
+
+        # set cleanup structure
+        $clean = 1;
+      }
+
+      # Backup existing structure
+      if(-d $wwwdir) {
+        # backup new structure
+        $backuppaths = "FHEM www";
+      } else {
+        # backup old structure
+        $backuppaths = "FHEM";
+      }
+      my $ret = CreateBackup($backuppaths);
+      if($ret !~ m/backup done.*/) {
+        Log 1, "updatefhem backup: The operation was canceled. Please check manually!";
+        $msg  = "Something went wrong during backup:\n$ret\n";
+        $msg .= "The operation was canceled. Please check manually!";
+        return $msg;
+      } else {
+        Log 1, "updatefhem $ret";
+      }
+
+      # prepare for housekeeping
+      $housekeeping = 1;
+      # set new sourcedir for update
+      $sdir = "/fhemupdate2";
+      # Create new pgm2 path
+      $ret = `(mkdir -p $wwwdir/pgm2)`;
+      chomp $ret;
+
+      # return on errors
+      if($ret) {
+        Log 1, "updatefhem \"$ret\"";
+        return $ret;
+      }
+
+      # remove old filetimes.txt
+      if(-e "$moddir/$ftime") {
+        unlink("$moddir/$ftime");
+      }
+
+      # discard arguments
+      @args = ();
+      $param = join("", @args);
+
+    # user wants to update a file / module of the old structure
+    } elsif (!-d $wwwdir) {
+      return "Usage: updatefhem [<backup>|<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]";
+    }
+
   }
 
   # Read in the OLD filetimes.txt
-  my %oldtime;
+  my %oldtime = ();
   if(open FH, "$moddir/$ftime") {
     while(my $l = <FH>) {
       chomp($l);
@@ -65,7 +201,7 @@ CommandUpdatefhem($$)
   my $filetimes = GetHttpFile($server, "$sdir/$ftime");
   return "Can't get $ftime from $server" if(!$filetimes);
 
-  my (%filetime, %filesize);
+  my (%filetime, %filesize) = ();
   foreach my $l (split("[\r\n]", $filetimes)) {
     chomp($l);
     return "Corrupted filetimes.txt file"
@@ -77,26 +213,41 @@ CommandUpdatefhem($$)
 
   my @reload;
   my $newfhem = 0;
+  my $localfile;
+  my $remfile;
+  my $oldfile;
+  my $delfile;
   foreach my $f (sort keys %filetime) {
     if($param) {
-      next if($f ne $param);
+      next if($f !~ m/$param/);
     } else {
-      next if($oldtime{$f} && $filetime{$f} eq $oldtime{$f});
+      if(!$clean) {
+        next if($oldtime{$f} && $filetime{$f} eq $oldtime{$f});
+      }
       next if($f =~ m/.hex$/);  # skip firmware files
     }
-    my $localfile = "$moddir/$f";
-    my $remfile = $f;
+    if(!$preserve) {
+      $localfile = "$modpath/$f";
+      if($f =~ m/^www\/pgm2\/(\d\d_.*\.pm)$/) {
+        my $pgm2 = $1;
+        $localfile = "$moddir/$pgm2";
+      }
+      $remfile = $f;
+    } else {
+      $localfile = "$moddir/$f";
+      $remfile = $f;
+    }
 
-    if($f eq "fhem.pl") {
-      $ret .= "updated fhem.pl, 'shutdown restart' is required\n";
+    if($f =~ m/fhem.pl$/) {
       $newfhem = 1;
-      $localfile = $0 if(! -d "FHEM.X");
+      $localfile = $0 if(! -d "updatefhem.dir");
       $remfile = "$f.txt";
     }
 
-    if($f =~ m/^(\d\d_)(.*).pm$/) {
-      my $m = $2;
-      push @reload, $f if($modules{$m} && $modules{$m}{LOADED});
+    if($f =~ m/^.*(\d\d_)(.*).pm$/) {
+      my $mf = "$1$2";
+      my $m  = $2;
+      push @reload, $mf if($modules{$m} && $modules{$m}{LOADED});
     }
 
     my $content = GetHttpFile($server, "$sdir/$remfile");
@@ -108,7 +259,19 @@ CommandUpdatefhem($$)
     print FH $content;
     close(FH);
     $ret .= "updated $f\n";
-    Log 1, "updated $f";
+    Log 1, "updatefhem updated $f";
+
+    if(!$preserve && $clean && $f =~ m/^www\/pgm2\/(.*)$/) {
+      my $oldfile = $1;
+      if($oldfile !~ m /^.*\.pm$/) {
+        $delfile = $oldfile;
+        if(-e "$moddir/$delfile") {
+          unlink("$moddir/$delfile");
+          $ret .= "deleted FHEM/$delfile\n";
+          Log 1, "updatefhem deleted FHEM/$delfile";
+        }
+      }
+    }
   }
 
   return "Can't write $moddir/$ftime" if(!open(FH, ">$moddir/$ftime"));
@@ -119,11 +282,41 @@ CommandUpdatefhem($$)
     foreach my $m (@reload) {
       $ret .= "reloading module $m\n";
       my $cret = CommandReload($cl, $m);
+      Log 1, "updatefhem reloaded module $m" if($cret);
       return "$ret$cret" if($cret);
     }
   }
-  
-  $ret .= "update finished\n";
+
+  # final housekeeping
+  if($clean) {
+    my @fl;
+    push(@fl, FileList("$moddir/.*(example.*|gplot|html|css|js|gif|jpg|png|svg)"));
+    foreach my $file (@fl) {
+      my $cmdret .= `(mv $moddir/$file $wwwdir/pgm2/)`;
+      $ret .= "moved $moddir/$file\n";
+      Log 1, "updatefhem move $file to www/pgm2 $cmdret";
+    }
+  }
+
+  if($housekeeping) {
+    $ret .= "Housekeeping finished. 'shutdown restart' is recommended!";
+    my $backupdir;
+    if ($attr{global}{backupdir}) {
+      $backupdir = $attr{global}{backupdir};
+    } else {
+      $backupdir = "$modpath/backup";
+    }
+    $ret .= "\n=> Files for WebGUI pgm2 were moved to '$wwwdir/pgm2'" if($clean);
+    $ret .= "\n=> A backup has been created in '$backupdir'";
+    Log 1, "updatefhem Housekeeping finished, 'shutdown restart' is recommended!";
+  } else {
+    $ret .= "update finished";
+  }
+
+  if($newfhem) {
+    $ret .= "\nA new version of fhem.pl was installed, 'shutdown restart' is required!";
+    Log 1, "updatefhem New version of fhem.pl, 'shutdown restart' is required!";
+  }
   return $ret;
 }
 
@@ -131,7 +324,8 @@ sub
 CommandCULflash($$)
 {
   my ($cl, $param) = @_;
-  my $moddir = (-d "FHEM.X" ? "FHEM.X" : "$attr{global}{modpath}/FHEM");
+  my $modpath = (-d "update" ? "update" : $attr{global}{modpath});
+  my $moddir = "$modpath/FHEM";
 
   my %ctypes = (
     CUL_V2     => "at90usb162",
@@ -183,9 +377,9 @@ CommandCULflash($$)
     CUL_SimpleWrite($defs{$cul}, "B01");
     sleep(4);     # B01 needs 2 seconds for the reset
   }
-  Log 1, $cmd;
+  Log 1, "updatefhem $cmd";
   my $result = `$cmd`;
-  Log 1, $result;
+  Log 1, "updatefhem $result";
   return $result;
 }
 
@@ -198,7 +392,8 @@ GetHttpFile($$@)
   $filename =~ s/%/%25/g;
   my $conn = IO::Socket::INET->new(PeerAddr => $host);
   if(!$conn) {
-    Log 1, "Can't connect to $host\n";
+    Log 1, "updatefhem Can't connect to $host\n";
+    undef $conn;
     return undef;
   }
   $host =~ s/:.*//;
@@ -213,7 +408,8 @@ GetHttpFile($$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log 1, "GetHttpFile: Select timeout/error: $!";
+      Log 1, "updatefhem GetHttpFile: Select timeout/error: $!";
+      undef $conn;
       return undef;
     }
 
@@ -223,8 +419,55 @@ GetHttpFile($$@)
   }
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
-  Log 4, "Got http://$host$filename, length: ".length($ret);
+  Log 4, "updatefhem Got http://$host$filename, length: ".length($ret);
+  undef $conn;
   return $ret;
+}
+
+sub
+CreateBackup($)
+{
+  my ($backuppaths) = shift;
+  my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir" : $attr{global}{modpath});
+  my ($dir,$conf) = $attr{global}{configfile} =~ m/(.*\/)(.*)$/;
+  my $backupdir;
+  my $ret;
+  if ($attr{global}{backupdir}) {
+    $backupdir = $attr{global}{backupdir};
+  } else {
+    $backupdir = "$modpath/backup";
+  }
+  $ret = `(cp $attr{global}{configfile} $modpath/)`;
+  $backuppaths .= " $conf";
+  my $dateTime = TimeNow();
+  $dateTime =~ s/ /_/g;
+  # prevents tar's output of "Removing leading /" and return total bytes of archive
+  $ret = `(mkdir -p $backupdir && tar -C $modpath -cf - $backuppaths | gzip > $backupdir/FHEM.$dateTime.tar.gz) 2>&1`;
+  unlink("$modpath/$conf");
+  if($ret) {
+    chomp $ret;
+    return $ret;
+  }
+  my $size = -s "$backupdir/FHEM.$dateTime.tar.gz";
+  return "backup done: FHEM.$dateTime.tar.gz ($size Bytes)";
+}
+
+sub
+FileList($)
+{
+  my ($fname) = @_;
+  $fname =~ m,^(.*)/([^/]*)$,;
+  my ($dir,$re) = ($1, $2);
+  return if(!$re);
+  $re =~ s/%./[A-Za-z0-9]*/g;
+  my @ret;
+  return @ret if(!opendir(DH, $dir));
+  while(my $f = readdir(DH)) {
+    next if($f !~ m,^$re$,);
+    push(@ret, $f);
+  }
+  closedir(DH);
+  return sort @ret;
 }
 
 1;
