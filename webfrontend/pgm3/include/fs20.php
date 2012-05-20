@@ -16,6 +16,7 @@ include "../config.php";
 
 	$img_path=$AbsolutPath."/include/img/";
 
+
 	## do we really need a new graphic??
 	#$execorder=$tailpath.' -1 '.$file;
 	#exec($execorder,$tail1);
@@ -24,8 +25,8 @@ include "../config.php";
 	
 
 	$savefile=$AbsolutPath."/tmp/FS20.".$drawfs20.".log.".$datefs20.".png";
-	if (file_exists($savefile)) {
 
+	if ((file_exists($savefile)) and (substr($statefs20,0,3) != 'MIS')) {
 		$im2 = @ImageCreateFromPNG($savefile);
 		header("Content-type: image/png");
 		imagePng($im2);
@@ -59,9 +60,17 @@ include "../config.php";
 	$datefs20sep=explode(" ",$datefs20);
 	$statefs20sep=explode(" ",$statefs20);
 
+
+#echo (substr($statefs20sep[0],0,3)); 
+#exit;
+
 	if (($icon!='')) {
 	   if ((substr($statefs20sep[0],0,3)=='dim')) {
 	      $statefs20tmp = 'on';
+	   }
+	   else 
+	   if ((substr($statefs20sep[0],0,3)=='MIS')) {
+	      $statefs20tmp = 'missing';
 	   }
 	   else {
 	      $statefs20tmp = $statefs20sep[0];
@@ -118,6 +127,8 @@ include "../config.php";
 	else {
 	   $text=$emap;
 	}
+#echo $text;
+#exit;
 
 	$txtcolor=$bg3p;
 	$fontsize=7;

@@ -125,3 +125,8 @@
 
 . Martin 2012-05-08
   -- Feature: Homematic added, FS20-Buttons now depending of the state
+
+- Martin 20120-05-20
+  -- Bugfix: time problem with notify within fhem
+  -- Feature: userdefs.php better gnuplot pictures
+
