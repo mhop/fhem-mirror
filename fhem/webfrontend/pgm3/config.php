@@ -116,7 +116,7 @@
 	$imgmaxxroom=$imgmaxxfs20; 				# Size of the pictures, default=$imgmaxxfs20
         $imgmaxyroom=22; 					# default=30 
 	$roomfontsizetitel=10;  				# default=9
-	$roommaxiconperline=$fs20maxiconperline; 		# default=$fs20maxiconperline
+	$roommaxiconperline=$fs20maxiconperline-1; 		# default=$fs20maxiconperline
 
 	$namesortroom='1';					# [1|0]
 	$namesortroomsign=')';				# If $namesortroom = 1 the Sign ")" will replace with " "  [x]

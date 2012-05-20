@@ -197,16 +197,19 @@ setlocale (LC_ALL, 'de_DE.utf8');
 	$fontsize=7;
         $txtcolor=$bg3p; 
         ImageTTFText ($im, $fontsize, 0, 3, 10, $txtcolor, $fontttf, $text);
-	$text=$resultreverse[0][2]." &#176;C";
-
+	$text=$resultreverse[0][2];
         ImageTTFText ($im, 9, 0, 90-$XcorrectMainText, 37, $txtcolor, $fontttfb, $text);
+	$text=" &#176;C";
+        ImageTTFText ($im, 9, 0, 120-$XcorrectMainText, 37, $txtcolor, $fontttfb, $text);
         
 	$text= $drawfht;
         ImageTTFText ($im, 8, 0, 90-$XcorrectMainText, 22, $txtcolor, $fontttfb, $text);
         $txtcolor=$bg3p; 
 	$fontsize=7;
-	$text="min= $mintemp max= $maxtemp";
+	$text="min= $mintemp";
         ImageTTFText ($im,  $fontsize, 0, 90-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
+	$text="max= $maxtemp";
+        ImageTTFText ($im,  $fontsize, 0, 145-$XcorrectMainText, 49, $txtcolor, $fontttf, $text);
         
 	$text=$txtroom.$room;
         ImageTTFText ($im,  $fontsize, 0, 3,  49, $txtcolor, $fontttf, $text);

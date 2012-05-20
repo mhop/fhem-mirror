@@ -41,7 +41,7 @@ include "include/gnuplot.php";
 include "include/functions.php";
 
 
-$pgm3version='120508a';
+$pgm3version='120520';
 	
 
 
@@ -246,13 +246,13 @@ function execFHZ($order,$machine,$port)
 {
 global $errormessage;
 
-
  $fp = stream_socket_client("tcp://$machine:$port", $errno, $errstr, 30);
          if (!$fp) {
            echo "$errstr ($errno)<br />\n";
         } else {
            fwrite($fp, "$order;quit\n");
-               	$errormessage= fgets($fp);
+		#buggy in fhem by notify?
+               	#$errormessage= fgets($fp);
            fclose($fp);
         }
 return $errormessage;
@@ -308,6 +308,7 @@ function new_xml_parser($live)
 {
    global $parser_live;
    $xml_parser = xml_parser_create();
+   xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, "UTF-8");
    xml_parser_set_option($xml_parser, XML_OPTION_CASE_FOLDING, 0);
    xml_set_element_handler($xml_parser, "startElement", "endElement");
  
@@ -330,15 +331,16 @@ if (!(list($xml_parser, $live) = new_xml_parser($live))) {
 $data = $output[0];
   if (!xml_parse($xml_parser, $data)) {
         $now=date($timeformat);
-        echo("There is a xmllist file for debugging under $AbsolutPath/tmp/debugxml$now<br><br>");
+        echo("There is a xmllist file for debugging: $AbsolutPath/tmp/debugxml$now<br><br>");
         $handle=fopen("tmp/debugxml$now","w");
         fwrite($handle,$outputvar);
-        fclose($handle);
         $warning=sprintf("XML error: %s at line %d\n",
            xml_error_string(xml_get_error_code($xml_parser)),
            xml_get_current_line_number($xml_parser));
 	echo $warning;
-  };
+	fwrite($handle,$warning);
+        fclose($handle);
+   }
 
 
 
@@ -358,6 +360,7 @@ xml_parser_free($xml_parser);
 	$culhmdevs=array();
 	$fhtdevs=array();
 	$logpaths=array();
+	$actors=array();
 
 	for($i=0; $i < count($stack[0][children]); $i++) 
 	{
@@ -852,6 +855,7 @@ ht><font $fontcolor1><b>
 			 	$counter++;
 				echo"<a href='$phpfileurl?Action=exec&order=$order&showroom=$showroom$link'><img src='include/fs20.php?drawfs20=$fs20&statefs20=$state&datefs20=$measured&icon=$icon&emap=$emap&subType=$subType&room=$room'></a>";
 				if  (fmod($counter,$fs20maxiconperline)== 0.0) echo "<br>";
+				array_push($actors,array($phpfileurl,$order,$showroom,$link,$fs20,$state,$measured,$icon,$emap,$subType,$room));
 			 };
 #			 $fs20="";
 			 $state="";
