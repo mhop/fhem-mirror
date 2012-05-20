@@ -749,29 +749,65 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="updatefhem"></a>
 <h3>updatefhem</h3>
 <ul>
-  <code>updatefhem [backup] [filename]</code> <br>
+  <code>updatefhem [&lt;backup&gt;|&lt;filename&gt;|&lt;housekeeping&gt; [&lt;clean&gt;] [&lt;yes&gt;]|&lt;preserve&gt; [&lt;filename&gt;]]</code> <br>
   <br>
-    Update the fhem modules and documentation from a nightly SVN chekout.  For
+    Update the fhem modules and documentation from a nightly SVN checkout. For
     this purpose fhem contacts http://fhem.de/fhemupdate, compares the stored
     timestamps of the local files with the filelist on the server, and
     downloads the files changed on the server. For all downloaded modules a
-    reload will be scheduled if the corresponding module is loaded.<br>
-    If an explicit filename is given, then only this file will be downloaded.
+    reload will be scheduled if the corresponding module is loaded.
+    <br>
+    <br>
+    Note: Since Version 5.3 a new directory structure is used by Fhem. The
+    WebInterface pgm2 is separated from <a href="#modpath">modpath</a>/FHEM
+    directory. The directory modpath/www/pgm2 is the new home of pgm2 and
+    of its files. It is recommended to update to the new structure via the
+    &lt;housekeeping&gt; arguments.
+    <br>
+    <br>
+    If &lt;backup&gt; is specified, then the complete FHEM directory (containing
+    the modules), the WebInterface pgm2 (if installed) and the config-file will
+    be saved into a .tar.gz file. The file is stored with a timestamp in the
+    modpath/backup directory or to a directory specified
+    by the <a href="#backupdir">backupdir</a> global attribute.<br>
+    Note: tar and gzip must be installed to use this feature.
+    <br>
+    <br>
+    If an explicit &lt;filename&gt; is given, then only this file will be
+    downloaded.
+    <br>
+    <br>
+    If &lt;housekeeping&gt; is specified, then updatefhem switch your Fhem
+    installation to the new directory structure for the pgm2 WebInterface.
+    The old files are archived like the &lt;backup&gt; argument and the new
+    files are stored to modpath/www/pgm2. None of the existing files of pgm2
+    in modpath/FHEM will be deleted, but are no longer in use.<br>
+    If you like to delete the no more needed files for pgm2 in modpath/FHEM,
+    you should call &lt;housekeeping&gt; with the argument &lt;clean&gt; &lt;yes&gt;.
+    All files of pgm2 are removed from modpath/FHEM and files like
+    .*example.*, .gplot, .html .css, .js, and .(gif|jpg|png|svg) are moved
+    to modpath/www/pgm2.
+    <br>
+    <br>
+    If &lt;preserve&gt; is specified, you could preserve the old directory
+    structure. All files of pgm2 are updated and stored in modpath/FHEM like
+    the former (before Fhem 5.3) updatefhem funktion. To update an explicit
+    file to the old structure append the file as &lt;filename&gt;.<br>
+    Note: After running the housekeeping process, the argument &lt;preserve&gt;
+    is no longer necessary and no more supported.
+    <br>
+    <br>
+    Notes:
+    <ul>
+      <li>If the main program (fhem.pl) is changed, a manual restart of fhem
+      will be necessary to apply the changes.</li>
+      <li>After running &lt;housekeeping&gt; it is recommended to restart Fhem.</li>
+    </ul>
     <br>
 
-    Note: if the main program (fhem.pl) is changed, a manual restart of fhem
-    will be necessary to apply the changes.
-    <br>
 
-    If backup is specified, then the complete FHEM directory (containing the
-    modules and .gplot files) will be saved into a .tar.gz file with a
-    timestamp in the <a href="#modpath">modpath</a>/FHEM.backup directory or to
-    a directory specified by the <a href="#backupdir">backupdir</a> global
-    attribute. Note: tar and gzip must be installed to use this feature.
-    <br>
-    <br>
-
-  <b>Attributes</b> <ul>
+  <b>Attributes</b>
+  <ul>
     <a name="backupdir"></a>
     <li>backupdir<br>
       A folder where updatefhem will store the compressed backup file.
@@ -779,8 +815,8 @@ A line ending with \ will be concatenated with the next one, so long lines
       <ul>
         attr global backupdir /Volumes/BigHD<br>
       </ul>
-    </li><br>
-  </ul><br>
+    </li>
+  </ul>
 
 </ul>
 
