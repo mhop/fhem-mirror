@@ -6,7 +6,7 @@
 # via an active DS2480/DS2490/DS9097U bus master interface or 
 # via a passive DS9097 interface
 #
-# Version 1.13 - May, 2012
+# Version 1.14 - May, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #

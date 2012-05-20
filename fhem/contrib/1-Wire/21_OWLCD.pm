@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.13 - May, 2012
+# Version 1.14 - May, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -74,6 +74,7 @@ my $lcdcontroller = "KS0073";
 my $lcdlines      = 4;
 my $lcdchars      = 20;
 my @lcdpage       = (0,32,64,96);
+#my @lcdpage       = (0,64,20,84);
 
 #-- declare variables
 my %gets = (
@@ -296,8 +297,12 @@ sub OWLCD_Set($@) {
       if( int(@a)<3 );
     $line  = ($a[2] =~ m/\d/) ? $a[2] : 0;
     $value = $a[3]; 
-    for( $i=4; $i< int(@a); $i++){
-      $value .= " ".$a[$i];
+    if( defined($value) ){
+      for( $i=4; $i< int(@a); $i++){
+        $value .= " ".$a[$i];
+      }
+    }else{
+      $value="";
     }
   #-- check syntax for setting memory
   } elsif( $key eq "memory" ){
@@ -310,7 +315,7 @@ sub OWLCD_Set($@) {
     }
   #-- check syntax for setting alert
   } elsif( $key eq "alert" ){
-    return "OWLCD: Set needs a parameter when setting alert: <type>"
+    return "OWLCD: Set needs a parameter when setting alert: <type>/none/off"
       if( int(@a)<3 );
   #-- check syntax for setting icon
   } elsif ( $key eq "icon" ){
@@ -436,16 +441,16 @@ sub OWLCD_Set($@) {
   
   #-- set alert
   if($key eq "alert") {
-    if($value eq "beep") {
+    if(lc($value) eq "beep") {
       OWXLCD_SetFunction($hash,"gpio",14);
       return undef;
-    }elsif($value eq "red") {
+    }elsif(lc($value) eq "red") {
       OWXLCD_SetFunction($hash,"gpio",13);
       return undef;
-    }elsif($value eq "yellow") {
+    }elsif(lc($value) eq "yellow") {
       OWXLCD_SetFunction($hash,"gpio",11);
       return undef;
-    }elsif($value eq "off") {
+    }elsif( (lc($value) eq "off") || (lc($value) eq "none") ) {
       OWXLCD_SetFunction($hash,"gpio",15);
       return undef;
     }else{
