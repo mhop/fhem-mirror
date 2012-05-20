@@ -494,3 +494,5 @@
 - Fr Feb 24 2012 (Willi)
   - New modules TRX for RFXCOM RFXtrx transceiver
 
+- So May 20 2012 (M. Fischer)
+  - Added support for a cleaner installation of pgm2 via updatefhem.
