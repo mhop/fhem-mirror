@@ -222,3 +222,6 @@ It is not necessary to tell fhem that there are other logs.
 	  
 2012-05-08
 	-- Feature: homematic added, FS20-Buttons now different depending of the state
+2012-05-20
+	-- Feature: userdefs.php better gnuplot picture
+        --  Bugfix: index.php: time problem by notify commands wihtin fhem

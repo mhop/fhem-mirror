@@ -171,17 +171,26 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$gnuplotpng=$drawuserdef.".sm.png";
 			
 			$messageA=<<<EOD
-			set terminal png transparent crop
+			#set terminal png transparent crop size 625,83
+			#set terminal png transparent crop size $imgmaxxuserdef-$x+5,83
+			set terminal png transparent crop size $imgmaxxuserdef-100,$imgmaxyuserdef+31
 			set output '$AbsolutPath/tmp/$gnuplotpng' 
 			set key off
 			set xdata time 
 			set timefmt '%Y-%m-%d_%H:%M:%S' 
 			set noytics 
+			#set border linecolor rgbcolor "#F5F5F5"
+			set border linecolor rgbcolor "#6394BD"
+			#set border linecolor rgbcolor "#6E94B7"
+			#set border linecolor rgb "$bg2"
+			#set border linecolor rgb "white"
+			#set noborder
+			#set noxtics
 			unset label
 			$xrange
-			set grid
+			set grid linetype 1 linecolor rgb "white"
 			set yrange [-0.3:1.3]
-			set size 0.8,0.15
+			#set size 0.8,0.15
 			set format x ''
 
 EOD;
@@ -253,7 +262,8 @@ if ($gnuplottype=='piri' or $gnuplottype=='fs20')
 			$im2 = imagecreatefrompng("$AbsolutPath/tmp/$gnuplotpng");
 			$w2 = imagesx($im2);
 			$h2 = imagesy($im2);
-			ImageCopy($im,$im2,163,10,0,0,$w2,$h2);
+			#ImageCopy($im,$im2,163,10,0,0,$w2,$h2);
+			ImageCopy($im,$im2,153,5,0,0,$w2,$h2);
 }
 
 
