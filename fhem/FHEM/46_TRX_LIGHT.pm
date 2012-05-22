@@ -64,12 +64,12 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 
 my %light_device_commands = (	# HEXSTRING => commands
 	# 0x10: Lighting1
-	0x1000 => [ "off", "on", "dim", "bright", "all_off", "all_on", ""], # X10
-	0x1001 => [ "off", "on", "", "", "all_off", "all_on", "chime"], # ARC
-	0x1002 => [ "off", "on", "", "", "", "", ""], # AB400D
-	0x1003 => [ "off", "on", "", "", "", "", ""], # WAVEMAN
-	0x1004 => [ "off", "on", "", "", "all_off", "all_on", ""], # EMW200
-	0x1005 => [ "off", "on", "", "", "", "", ""], # IMPULS
+	0x1000 => [ "off", "on", "dim", "bright", "", "all_off", "all_on"], # X10
+	0x1001 => [ "off", "on", "", "", "", "all_off", "all_on", "chime"], # ARC
+	0x1002 => [ "off", "on"], # AB400D
+	0x1003 => [ "off", "on"], # WAVEMAN
+	0x1004 => [ "off", "on"], # EMW200
+	0x1005 => [ "off", "on"], # IMPULS
 	# 0x11: Lighting2
 	0x1100 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # AC
 	0x1101 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # HOMEEASY
