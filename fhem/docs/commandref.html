@@ -7588,8 +7588,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br>
     <code>&lt;deviceid&gt;</code>
     <ul>
-    specifies the first device id of the device. 
-    A lighting device has a house code A..P followed by a unitcode 1..16 (example "B1").
+    specifies the first device id of the device. <br>
+    A lighting device normally has a house code A..P followed by a unitcode 1..16 (example "B1").<br>
+    For AC, HomeEasy EU and ANSLUT it is a 10 Character-Hex-String for the deviceid, consisting of <br>
+	- unid-id: 8-Char-Hex: 00000001 to 03FFFFFF<br>
+	- unit-code: 2-Char-Hex: 01 to 10  <br>
     </ul>
     <br>
     <code>&lt;devicelog&gt;</code>
@@ -7611,6 +7614,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     	<code>define motion_sensor2 TRX_LIGHT MS14A A1 motion A2 light</code>
 	<br>
     	<code>define Steckdose TRX_LIGHT ARC G2 light</code>
+	<br>
+    	<code>define light TRX_LIGHT AC 0101010101 light</code>
       <br>
   </ul>
   <br>
