@@ -288,7 +288,7 @@ CommandUpdatefhem($$)
   }
 
   # final housekeeping
-  if($clean) {
+#  if($clean) {
     my @fl;
     push(@fl, FileList("$moddir/.*(example.*|gplot|html|css|js|gif|jpg|png|svg)"));
     foreach my $file (@fl) {
@@ -296,7 +296,7 @@ CommandUpdatefhem($$)
       $ret .= "moved $moddir/$file\n";
       Log 1, "updatefhem move $file to www/pgm2 $cmdret";
     }
-  }
+#  }
 
   if($housekeeping) {
     $ret .= "Housekeeping finished. 'shutdown restart' is recommended!";
