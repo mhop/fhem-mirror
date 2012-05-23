@@ -7435,10 +7435,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
     USB-connected:<br><ul>
       &lt;device&gt; specifies the USB port to communicate with the RFXtrx433 receiver.
       Normally on Linux the device will be named /dev/ttyUSBx, where x is a number.
-      For example /dev/ttyUSB0.<br>
+      For example /dev/ttyUSB0. Please note that RFXtrx433 normally operates at 38400 baud. You may specify the baudrate used after the @ char.<br>
       <br>
       Example: <br>
-    <code>define RFXTRXUSB TRX /dev/ttyUSB0</code>
+    <code>define RFXTRXUSB TRX /dev/ttyUSB0@38400</code>
       <br>
      </ul>
     <br>
