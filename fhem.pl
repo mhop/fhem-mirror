@@ -2618,18 +2618,18 @@ ReplaceEventMap($$$)
   my $nstr = join(" ", @{$str}) if(!$dir);
   my $changed;
   foreach my $rv (split($sc, $em)) {
-    my ($re, $val) = split(":", $rv, 2);
+    my ($re, $val) = split(":", $rv, 2); # Real-Event-Regexp:GivenName
     next if(!defined($val));
-    if($dir) {  # event -> Presentation
+    if($dir) {  # event -> GivenName
       if($str =~ m/$re/) {
         $str =~ s/$re/$val/;
         $changed = 1;
         last;
       }
 
-    } else {    # Setting event
-      if($nstr =~ m/$val/) {
-        $nstr =~ s/$val/$re/;
+    } else {    # GivenName -> set command
+      if($nstr =~ m/\b$val\b/) {
+        $nstr =~ s/\b$val\b/$re/;
         $changed = 1;
         last;
       }
