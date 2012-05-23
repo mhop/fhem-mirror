@@ -117,8 +117,9 @@ my %culHmModel=(
   "0060" => "HM-PB-4DIS-WM",   # Tested
   "0061" => "HM-LC-SW4-DR",    # Tested by fhem-hm-knecht
   "0062" => "HM-LC-SW2-DR",
-  "0066" => "HM_LC_Sw4-WM",    # Tested by peterp
-  "006C" => "HM-LC-SW1-BA-PCB",   # Tested by MartiMcFly
+  "0066" => "HM_LC_Sw4-WM",      # Tested by peterp
+  "0067" => "HM-LC_Dim1PWM-CV",  # Tested by peterp
+  "006C" => "HM-LC-SW1-BA-PCB",  # Tested by MartiMcFly
 );
 
 
