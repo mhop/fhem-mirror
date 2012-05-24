@@ -163,8 +163,9 @@ CUL_HM_Define($$)
     if($chiefHash) {
       my $cname = $chiefHash->{NAME};
       if($attr{$cname}) {
-        foreach my $attrName (keys %{$attr{$cname}}) {
-          $attr{$name}{$attrName} = $attr{$cname}{$attrName};
+        foreach my $attrName ("model", "subtype", "hmclass") {
+          $attr{$name}{$attrName} = $attr{$cname}{$attrName}
+            if($attr{$cname}{$attrName});
         }
       }
     }
