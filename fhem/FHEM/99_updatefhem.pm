@@ -302,7 +302,7 @@ CommandUpdatefhem($$)
     $ret .= "Housekeeping finished. 'shutdown restart' is recommended!";
     my $backupdir;
     if ($attr{global}{backupdir}) {
-      $backupdir = $attr{global}{backupdir};
+      $backupdir = "$modpath/$attr{global}{backupdir}";
     } else {
       $backupdir = "$modpath/backup";
     }
