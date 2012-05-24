@@ -441,15 +441,16 @@ CreateBackup($)
   $backuppaths .= " $conf";
   my $dateTime = TimeNow();
   $dateTime =~ s/ /_/g;
+  $dateTime =~ s/(:|-)//g;
   # prevents tar's output of "Removing leading /" and return total bytes of archive
-  $ret = `(mkdir -p $backupdir && tar -C $modpath -cf - $backuppaths | gzip > $backupdir/FHEM.$dateTime.tar.gz) 2>&1`;
+  $ret = `(mkdir -p $backupdir && tar -C $modpath -cf - $backuppaths | gzip > $backupdir/FHEM-$dateTime.tar.gz) 2>&1`;
   unlink("$modpath/$conf");
   if($ret) {
     chomp $ret;
     return $ret;
   }
-  my $size = -s "$backupdir/FHEM.$dateTime.tar.gz";
-  return "backup done: FHEM.$dateTime.tar.gz ($size Bytes)";
+  my $size = -s "$backupdir/FHEM-$dateTime.tar.gz";
+  return "backup done: FHEM-$dateTime.tar.gz ($size Bytes)";
 }
 
 sub
