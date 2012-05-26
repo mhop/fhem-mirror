@@ -87,7 +87,7 @@ SolarView_Initialize($)
   $hash->{DefFn}    = "SolarView_Define";
   $hash->{UndefFn}  = "SolarView_Undef";
   $hash->{GetFn}    = "SolarView_Get";
-  $hash->{AttrList} = "loglevel:0,1,2,3,4,5";
+  $hash->{AttrList} = "loglevel:0,1,2,3,4,5 event-on-update-reading event-on-change-reading";
 }
 
 sub
@@ -107,42 +107,40 @@ SolarView_Define($$)
   $hash->{Port} = $args[3];
 
   # collect the set of inverters which are to be read
-  @{$hash->{WRs2Read}} = (0);
+  @{$hash->{Inverters}} = (0);
   while ((int(@args) >= 5) && ($args[4] =~ /^[Ww][Rr](\d+)$/))
   {
-    push @{$hash->{WRs2Read}}, $1 if int($1);
+    push @{$hash->{Inverters}}, $1 if int($1);
     splice(@args, 4, 1);
   }
   # remove WR0 if exactly one inverter has been specified
-  shift @{$hash->{WRs2Read}} if (int(@{$hash->{WRs2Read}}) == 2);
+  shift @{$hash->{Inverters}} if (int(@{$hash->{Inverters}}) == 2);
 
   $hash->{Interval} = int(@args) >= 5 ? int($args[4]) : 300;
   $hash->{Timeout}  = int(@args) >= 6 ? int($args[5]) : 4;
 
   # config variables
   $hash->{Invalid}    = -1;    # default value for invalid readings
-  $hash->{Sleep}      = 0;     # seconds to sleep before connect
   $hash->{Debounce}   = 50;    # minimum level for debouncing (0 to disable)
-  $hash->{Rereads}    = 2;     # number of retries when reading curPwr of 0
-  $hash->{NightOff}   = 'yes'; # skip connection to SV at night?
+  $hash->{NightOff}   = 'yes'; # skip reading at night? No sun, no power :-/
   $hash->{UseSVNight} = 'yes'; # use the on/off timings from SV (else: SUNRISE_EL)
-  $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
 
   $hash->{STATE} = 'Initializing';
 
-  my $timenow = TimeNow();
+  readingsBeginUpdate($hash);
 
   # initialization
-  for my $wr (@{$hash->{WRs2Read}})
+  for my $wr (@{$hash->{Inverters}})
   {
     $hash->{SolarView_WR($hash, 'Debounced', $wr)}  = 0;
 
     for my $get (@gets)
     {
-      $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{VAL}  = $hash->{Invalid};
-      $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{TIME} = $timenow;
+      readingsUpdate($hash, SolarView_WR($hash, $get, $wr), $hash->{Invalid});
     }
   }
+
+  readingsEndUpdate($hash, $init_done);
 
   SolarView_Update($hash);
 
@@ -168,20 +166,19 @@ SolarView_Update($)
       $hash->{READINGS}{currentPower}{VAL} != $hash->{Invalid})
   {
     $hash->{STATE} = '0 W, '.$hash->{READINGS}{totalEnergyDay}{VAL}.' kWh (Night)';
+
     return undef;
   }
-
-  sleep($hash->{Sleep}) if $hash->{Sleep};
 
   Log 4, "$hash->{NAME} tries to contact solarview at $hash->{Host}:$hash->{Port}";
 
   my $success = 0;
-  my $timenow = TimeNow();
 
-  for my $wr (@{$hash->{WRs2Read}})
+  # loop over all inverters
+  for my $wr (@{$hash->{Inverters}})
   {
     my %readings = ();
-    my $rereads  = $hash->{Rereads};
+    my $retries  = 2;
 
     eval {
       local $SIG{ALRM} = sub { die 'timeout'; };
@@ -195,19 +192,16 @@ SolarView_Update($)
       if ($socket and $socket->connected())
       {
         $socket->autoflush(1);
+
         printf $socket "%02d*\r\n", int($wr);
         my $res = <$socket>;
         close($socket);
 
-        if ($res and $res =~ /^\{(\d\d,[\d\.,]+)\},/)
+        if ($res and $res =~ /^\{(\d\d,[^\}]+)\},/)
         {
           my @vals = split(/,/, $1);
 
-          if ($hash->{UseSVTime}) 
-          {
-            $timenow = sprintf("%04d-%02d-%02d %02d:%02d:00",
-                         $vals[3], $vals[2], $vals[1], $vals[4], $vals[5]);
-          }
+          readingsBeginUpdate($hash);
 
           # parse the result from SV to dedicated values
           for my $i (6..19)
@@ -218,11 +212,11 @@ SolarView_Update($)
             }
           }
 
-          # need to reread?
-          if ($rereads and $readings{currentPower} == 0)
+          # need to retry?
+          if ($retries > 0 and $readings{currentPower} == 0)
           { 
             sleep(1);
-            $rereads = $rereads - 1;
+            $retries = $retries - 1;
             goto READ_SV;
           }
 
@@ -240,19 +234,14 @@ SolarView_Update($)
               $hash->{SolarView_WR($hash, 'Debounced', $wr)} = 0;
           }
 
-          # copy the values to the READINGS
+          # update Readings
           for my $get (@gets)
           {
-            # update and notify readings if they have changed
-            if ($hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{VAL} != $readings{$get})
-            {
-              $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{VAL}  = $readings{$get};
-              $hash->{READINGS}{SolarView_WR($hash, $get, $wr)}{TIME} = $timenow;
-              #
-              push @{$hash->{CHANGED}}, sprintf("%s: %s (wr%s)", $get, $readings{$get}, $wr);
-            }
+            readingsUpdate($hash, SolarView_WR($hash, $get, $wr), $readings{$get});
           }
           
+          readingsEndUpdate($hash, $init_done);
+
           alarm 0;
           $success = 1;
 
@@ -264,13 +253,9 @@ SolarView_Update($)
 
   $hash->{STATE} = $hash->{READINGS}{currentPower}{VAL}.' W, '.$hash->{READINGS}{totalEnergyDay}{VAL}.' kWh';
 
-  if ($success) 
-  {
-    DoTrigger($hash->{NAME}, undef) if ($init_done);
+  if ($success) {
     Log 4, "$hash->{NAME} got fresh values from solarview";
-  } 
-  else 
-  {
+  } else {
     $hash->{STATE} .= ' (Fail)';
     Log 4, "$hash->{NAME} was unable to get fresh values from solarview";
   }
@@ -323,31 +308,30 @@ SolarView_IsNight($)
   # reset totalEnergyX at midnight
   if ($hour == 0) 
   {
-    my $timenow = TimeNow();
+    readingsBeginUpdate($hash);
 
-    for my $wr (@{$hash->{WRs2Read}})
+    for my $wr (@{$hash->{Inverters}})
     {
-      $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyDay', $wr)}{VAL}  = 0;
-      $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyDay', $wr)}{TIME} = $timenow;
+      readingsUpdate($hash, SolarView_WR($hash, 'totalEnergyDay', $wr), 0);
     }
-    #
+    
     if ($mday == 1)
     {
-      for my $wr (@{$hash->{WRs2Read}})
+      for my $wr (@{$hash->{Inverters}})
       {
-        $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyMonth', $wr)}{VAL}  = 0;
-        $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyMonth', $wr)}{TIME} = $timenow;
+        readingsUpdate($hash, SolarView_WR($hash, 'totalEnergyMonth', $wr), 0);
       }
-      #
+      
       if ($mon == 0)
       {
-        for my $wr (@{$hash->{WRs2Read}})
+        for my $wr (@{$hash->{Inverters}})
         {
-          $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyYear', $wr)}{VAL}  = 0;
-          $hash->{READINGS}{SolarView_WR($hash, 'totalEnergyYear', $wr)}{TIME} = $timenow;
+          readingsUpdate($hash, SolarView_WR($hash, 'totalEnergyYear', $wr), 0);
         }
       }
     }
+
+    readingsEndUpdate($hash, $init_done);
   }
 
   if ($hash->{UseSVNight})
@@ -393,7 +377,7 @@ SolarView_WR($$$)
 {
   my ($hash, $reading, $wr) = @_;
 
-  if ((int(@{$hash->{WRs2Read}}) > 1) && (int($wr) > 0))
+  if ((int(@{$hash->{Inverters}}) > 1) && (int($wr) > 0))
   {
     return sprintf("wr%s_%s", $wr, $reading);
   }
