@@ -33,6 +33,7 @@
   - change:  FHEMWEB support for the new www/pgm2 directroy added (M. Fischer)
   - change:  Makefile support for for the new www/pgm2 directroy and new targets
              backup and uninstall added. More verbose output. (M. Fischer)
+  - feature: new command backup added (M. Fischer)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera

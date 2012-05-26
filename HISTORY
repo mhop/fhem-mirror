@@ -496,3 +496,7 @@
 
 - So May 20 2012 (M. Fischer)
   - Added support for a cleaner installation of pgm2 via updatefhem.
+
+- Sa May 26 2012 (M. Fischer)
+  - Added new command backup to separate this feature from updatefhem.
+
