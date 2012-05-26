@@ -193,7 +193,7 @@ $modules{Global}{AttrList} =
         "archivecmd allowfrom apiversion archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
-        "autoload_undefined_devices dupTimeout latitude longitude  backupdir";
+        "autoload_undefined_devices dupTimeout latitude longitude backupdir";
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 
@@ -1407,10 +1407,6 @@ CommandDeleteAttr($$)
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
 
-    if($sdev eq "global") {
-      push @rets, "Cannot delete global parameters";
-      next;
-    }
     if(!defined($defs{$sdev})) {
       push @rets, "Please define $sdev first";
       next;
