@@ -684,6 +684,7 @@ AnalyzeCommandChain($$)
   $cmd =~ s/#.*$//s;
 
   $cmd =~ s/;;/SeMiCoLoN/g;
+  my @saveCmdList = @cmdList;   # Needed for recursive calls
   @cmdList = split(";", $cmd);
   my $subcmd;
   while(defined($subcmd = shift @cmdList)) {
@@ -691,6 +692,7 @@ AnalyzeCommandChain($$)
     my $lret = AnalyzeCommand($c, $subcmd);
     push(@ret, $lret) if(defined($lret));
   }
+  @cmdList = @saveCmdList;
   return join("\n", @ret) if(@ret);
   return undef;
 }
