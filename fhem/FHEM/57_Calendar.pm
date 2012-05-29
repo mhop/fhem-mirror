@@ -136,10 +136,10 @@ sub uid {
 
 sub setState {
   my ($self,$state)= @_;
-  main::debug "Before setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
+  #main::debug "Before setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
   $self->{_previousState}= $self->{_state};
   $self->{_state}= $state;
-  main::debug "After setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
+  #main::debug "After setState $state: States(" . $self->uid() . ") " . $self->{_previousState} . " -> " . $self->{_state};
   return $state;
 }
 
@@ -174,9 +174,9 @@ sub isNew {
   return $self->isState("new");
 }
 
-sub isActive {
+sub isKnown {
   my ($self)= @_;
-  return $self->isState("active");
+  return $self->isState("known");
 }
 
 sub isUpdated {
@@ -273,18 +273,24 @@ sub fromVEvent {
   }
 }
 
-sub asString {
+# sub asString {
+#   my ($self)= @_;
+#   return sprintf("%s  %s(%s);%s;%s;%s;%s",
+#     $self->state(),
+#     $self->{uid},
+#     ts($self->{lastModified}),
+#     $self->{alarm} ? ts($self->{alarm}) : "",
+#     ts($self->{start}),
+#     ts($self->{end}),
+#     $self->{summary}
+#   );
+# }
+
+sub summary {
   my ($self)= @_;
-  return sprintf("%s  %s(%s);%s;%s;%s;%s",
-    $self->state(),
-    $self->{uid},
-    ts($self->{lastModified}),
-    $self->{alarm} ? ts($self->{alarm}) : "",
-    ts($self->{start}),
-    ts($self->{end}),
-    $self->{summary}
-  );
+  return $self->{summary};
 }
+
 
 sub asText {
   my ($self)= @_;
@@ -364,11 +370,11 @@ sub deleteEvent {
   delete $self->{events}{$uid};
 }
 
-sub ts {
-  my ($tm)= @_;
-  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
-  return sprintf("%02d.%02d.%4d %02d:%02d:%02d", $day,$month+1,$year+1900,$hour,$minute,$second);
-}
+# sub ts {
+#   my ($tm)= @_;
+#   my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
+#   return sprintf("%02d.%02d.%4d %02d:%02d:%02d", $day,$month+1,$year+1900,$hour,$minute,$second);
+# }
 
 sub updateFromCalendar {
   my ($self,$calendar)= @_;
@@ -391,17 +397,17 @@ sub updateFromCalendar {
     $event->fromVEvent($vevent);
 
     $uid= $event->uid();
-    main::debug "Processing event $uid.";
+    #main::debug "Processing event $uid.";
     if(defined($self->event($uid))) {
       # the event already exists
-      main::debug "Event $uid already exists.";
+      #main::debug "Event $uid already exists.";
       $event->setState($self->event($uid)->state()); # copy the state from the existing event
-      main::debug "Our lastModified: " . ts($self->event($uid)->lastModified());
-      main::debug "New lastModified: " . ts($event->lastModified());
+      #main::debug "Our lastModified: " . ts($self->event($uid)->lastModified());
+      #main::debug "New lastModified: " . ts($event->lastModified());
       if($self->event($uid)->lastModified() != $event->lastModified()) {
          $event->setState("updated")
       } else {
-         $event->setState("active")
+         $event->setState("known")
       }   
     };
     $event->touch($t);
@@ -485,31 +491,28 @@ sub Calendar_GetUpdate($$)
   #main::debug $ical->asString();
 
   # we now create the events from it
-  main::debug "Creating events...";
+  #main::debug "Creating events...";
   my $eventsObj= $hash->{fhem}{events};
   $eventsObj->updateFromCalendar(@{$ical->{entries}}[0]);
   $hash->{fhem}{events}= $eventsObj;
 
-  # we now run over all events and update the readings 
+  # we now update the readings
   my @allevents= $eventsObj->events();
-  my @changedevents= grep { $_->stateChanged() } @allevents;
+
   my @all= sort map { $_->uid() } @allevents;
-  my @changed= sort map { $_->uid() } @changedevents;
-  my @new= sort map { $_->uid() } grep { $_->isNew() } @changedevents;
-  my @active= sort map { $_->uid() } grep { $_->isActive() } @changedevents;
-  my @updated= sort map { $_->uid() } grep { $_->isUpdated() } @changedevents;
-  my @deleted = sort map { $_->uid() } grep { $_->isDeleted() } @changedevents;
-  
+  my @new= sort map { $_->uid() } grep { $_->isNew() } @allevents;
+  my @updated= sort map { $_->uid() } grep { $_->isUpdated() } @allevents;
+  my @deleted = sort map { $_->uid() } grep { $_->isDeleted() } @allevents;
+  my @changed= sort (@new, @updated, @deleted);
+
   #$hash->{STATE}= $val;
   readingsBeginUpdate($hash);
   readingsUpdate($hash, "all", join(";", @all));
-  readingsUpdate($hash, "changed", join(";", @changed));
   readingsUpdate($hash, "new", join(";", @new));
-  readingsUpdate($hash, "active", join(";", @active));
   readingsUpdate($hash, "updated", join(";", @updated));
   readingsUpdate($hash, "deleted", join(";", @deleted));
+  readingsUpdate($hash, "changed", join(";", @changed));
   readingsEndUpdate($hash, 1); # DoTrigger, because sub is called by a timer instead of dispatch
-
 
   Calendar_CheckTimes($hash);
   return 1;
@@ -518,15 +521,15 @@ sub Calendar_GetUpdate($$)
 ###################################
 sub Calendar_Set($@) {
   my ($hash, @a) = @_;
-  my $name = $a[0];
+
+  my $cmd= $a[1];
 
   # usage check
-  my $usage= "Usage: set $name update";
   if((@a == 2) && ($a[1] eq "update")) {
      Calendar_GetUpdate($hash,0);
      return undef;
   } else {
-    return $usage;
+    return "Unknown argument $cmd, choose one of update";
   }
 }
 
@@ -537,22 +540,44 @@ sub Calendar_Get($@) {
 
   return "argument is missing" if($#a != 2);
 
-  my $cmd= $a[1];
-  return "Unknown command $cmd" unless($cmd eq "text");
-  my $reading= $a[2];
-
-  if(!defined($hash->{READINGS}{$reading})) {
-        return "No such reading: $reading";
-  }
-
   my $eventsObj= $hash->{fhem}{events};
-  my @uids= split(";", $hash->{READINGS}{$reading}{VAL});
-  my @texts;
-  foreach my $uid (@uids) {
-    my $event= $eventsObj->event($uid);
-    push @texts, $event->asText();
+  my @uids;
+
+  my $cmd= $a[1];
+  if($cmd eq "text") {
+
+    
+    my $reading= $a[2];
+    
+    # $reading is alarmed, all, changed, deleted, new, running, updated
+    # if $reading does not match any of these it is assumed to be a uid
+    if(defined($hash->{READINGS}{$reading})) {
+      @uids= split(";", $hash->{READINGS}{$reading}{VAL});
+    } else {
+      @uids= sort map { $_->uid() } grep { $_->uid() eq $reading } $eventsObj->events();
+    }
+
+    my @texts;
+    if(@uids) {
+      foreach my $uid (@uids) {
+        my $event= $eventsObj->event($uid);
+        push @texts, $event->asText();
+      }
+    }  
+    return join("\n", @texts);
+    
+  } elsif($cmd eq "find") {
+
+    my $regexp= $a[2];
+    foreach my $event ($eventsObj->events()) {
+      push @uids, $event->uid() if($event->summary() =~ m/$regexp/);
+    }
+    return join(";", @uids);
+  
+  } else {
+    return "Unknown argument $cmd, choose one of text find";
   }
-  return join("\n", @texts);
+
 }
 
 
