@@ -32,9 +32,6 @@ my @platform = (
 
 my $title = "Used FHEM Modules & Components";
 
-my $TIMES_HOME = "/opt/times/TIMES.rko";
-#my $TIMES_HOME = "/home/ipqmbe/times/TIMES";
-
 my $q = new CGI;
 print $q->header,
       $q->start_html( -title  => $title, -style=>{-src=>"style.css"}), "\n";
