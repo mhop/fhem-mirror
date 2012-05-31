@@ -500,3 +500,5 @@
 - Sa May 26 2012 (M. Fischer)
   - Added new command backup to separate this feature from updatefhem.
 
+- Thu May 31 2012 (M. Fischer)
+  - Added new global attribute <backupsymlink>
