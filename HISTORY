@@ -502,3 +502,6 @@
 
 - Thu May 31 2012 (M. Fischer)
   - Added new global attribute <backupsymlink>
+
+- Fri Jun 01 2012 (M. Fischer)
+  - Added new global attribute <backupcmd>
