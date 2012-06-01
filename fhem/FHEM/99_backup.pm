@@ -39,16 +39,6 @@ backup_Initialize($$)
   my %hash = (  Fn => "CommandBackup",
                Hlp => ",create a backup of fhem configuration, state and modpath" );
   $cmds{backup} = \%hash;
-
-  $modules{Global}{AttrList} .= " backupsymlink";
-
-### remove me start
-#  my $dateTime = TimeNow();
-#  $dateTime =~ s/ /_/g;
-#  $dateTime =~ s/(:|-)//g;
-#  my $ret = `(cp /usr/share/fhem/FHEM/99_backup.pm /home/martin/src/fhem/build/backup/99_backup.pm-$dateTime) 2>&1`;
-#  Log 0, "==> copy 99_backup.pm to /home/martin/src/fhem/build/backup/99_backup.pm-$dateTime";
-### remove me end
 }
 
 #####################################
@@ -162,6 +152,7 @@ sub
 createArchiv($)
 {
   my $backupdir = shift;
+  my $backupcmd = (!defined($attr{global}{backupcmd}) ? undef : $attr{global}{backupcmd});
   my $symlink = (!defined($attr{global}{backupsymlink}) ? "no" : $attr{global}{backupsymlink});
   my $tarOpts;
   my $msg;
@@ -171,19 +162,23 @@ createArchiv($)
   $dateTime =~ s/ /_/g;
   $dateTime =~ s/(:|-)//g;
 
-  if (lc($symlink) eq "no") {
-    $tarOpts = "cf";
-  } else {
-    $tarOpts = "chf";
-  }
+  if (!defined($backupcmd)) {
+    if (lc($symlink) eq "no") {
+      $tarOpts = "cf";
+    } else {
+      $tarOpts = "chf";
+    }
 
-  # prevents tar's output of "Removing leading /" and return total bytes of archive
-  $ret = `(tar -$tarOpts - @pathname | gzip > $backupdir/FHEM-$dateTime.tar.gz) 2>&1`;
+    # prevents tar's output of "Removing leading /" and return total bytes of archive
+    $ret = `(tar -$tarOpts - @pathname | gzip > $backupdir/FHEM-$dateTime.tar.gz) 2>&1`;
+  } else {
+    $ret = `($backupcmd "@pathname") 2>&1`;
+  }
   if($ret) {
     chomp $ret;
     Log 1, "backup $ret";
   }
-  if (-e "$backupdir/FHEM-$dateTime.tar.gz") {
+  if (!defined($backupcmd) && -e "$backupdir/FHEM-$dateTime.tar.gz") {
     my $size = -s "$backupdir/FHEM-$dateTime.tar.gz";
     $msg = "backup done: FHEM-$dateTime.tar.gz ($size Bytes)";
     Log 1, $msg;
