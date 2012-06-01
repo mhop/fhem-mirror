@@ -35,6 +35,7 @@
              backup and uninstall added. More verbose output. (M. Fischer)
   - feature: new command backup added (M. Fischer)
   - feature: new global attribute <backupsymlink> added
+  - feature: new global attribute <backupcmd> added
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
