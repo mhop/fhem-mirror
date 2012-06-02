@@ -505,3 +505,7 @@
 
 - Fri Jun 01 2012 (M. Fischer)
   - Added new global attribute <backupcmd>
+
+- Sat Jun 02 2012 (M. Fischer)
+  - Added new global attribute <backup_before_update>
+  - Backuproutine from updatefhem removed. updatefhem use the command backup from now.

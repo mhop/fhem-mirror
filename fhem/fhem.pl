@@ -194,7 +194,7 @@ $modules{Global}{AttrList} =
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
         "autoload_undefined_devices dupTimeout latitude longitude ".
-        "backupcmd backupdir backupsymlink";
+        "backupcmd backupdir backupsymlink backup_before_update";
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 
