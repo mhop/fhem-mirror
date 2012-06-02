@@ -264,7 +264,7 @@ KM271_Set($@)
       join(" ", sort keys %km271_set_betriebsart) if(!defined($val));
   }
 
-  my $data = ($val ? sprintf($fmt, $val) : $fmt);
+  my $data = sprintf($fmt, $val);
 
   push @{$hash->{SENDBUFFER}}, $data;
   DevIo_SimpleWrite($hash, "02", 1) if(!$hash->{WAITING});
