@@ -481,9 +481,9 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
   The complete FHEM directory (containing the modules), the WebInterface
   pgm2 (if installed) and the config-file will be saved into a .tar.gz
-  file by default. The file is stored with a timestamp in the modpath/backup
-  directory or to a directory specified by the <a href="#backupdir">backupdir</a>
-  global attribute.<br>
+  file by default. The file is stored with a timestamp in the
+  <a href="#modpath">modpath</a>/backup directory or to a directory
+  specified by the global attribute <a href="#backupdir">backupdir</a>.<br>
   Note: tar and gzip must be installed to use this feature.
   <br>
   <br>
@@ -774,10 +774,10 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="updatefhem"></a>
 <h3>updatefhem</h3>
 <ul>
-  <code>updatefhem [&lt;backup&gt;|&lt;filename&gt;|&lt;housekeeping&gt; [&lt;clean&gt;] [&lt;yes&gt;]|&lt;preserve&gt; [&lt;filename&gt;]]</code> <br>
+  <code>updatefhem [&lt;filename&gt;|&lt;housekeeping&gt; [&lt;clean&gt;] [&lt;yes&gt;]|&lt;preserve&gt; [&lt;filename&gt;]]</code> <br>
   <br>
     Update the fhem modules and documentation from a nightly SVN checkout. For
-    this purpose fhem contacts http://fhem.de/fhemupdate, compares the stored
+    this purpose Fhem contacts http://fhem.de/fhemupdate, compares the stored
     timestamps of the local files with the filelist on the server, and
     downloads the files changed on the server. For all downloaded modules a
     reload will be scheduled if the corresponding module is loaded.
@@ -790,12 +790,9 @@ A line ending with \ will be concatenated with the next one, so long lines
     &lt;housekeeping&gt; arguments.
     <br>
     <br>
-    If &lt;backup&gt; is specified, then the complete FHEM directory (containing
-    the modules), the WebInterface pgm2 (if installed) and the config-file will
-    be saved into a .tar.gz file. The file is stored with a timestamp in the
-    modpath/backup directory or to a directory specified
-    by the <a href="#backupdir">backupdir</a> global attribute.<br>
-    Note: tar and gzip must be installed to use this feature.
+    The complete installation of Fhem will be saved via the <a href="#backup">backup</a>
+    command on every update. You can skip this backups by setting
+    the global attribute <a href="#backup_before_update">backup_before_update</a> to 0.
     <br>
     <br>
     If an explicit &lt;filename&gt; is given, then only this file will be
@@ -1175,6 +1172,19 @@ A line ending with \ will be concatenated with the next one, so long lines
         only connections from these addresses are allowed.
     </li><br>
 
+    <a name="backup_before_update"></a>
+    <li>backup_before_update<br>
+        If this attribute is set to 0, updatefhem skip always backing up your
+        installation via the <a href="#backup">backup</a> command. The default
+        is to backup always before updates.<br>
+        Note: Set this attribute only if you know what you do!<br>
+        This Attribute is used by the <a href="#updatefhem">updatefhem</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global backup_before_update 0
+        </ul>
+    </li><br>
+
     <a name="backupcmd"></a>
     <li>backupcmd<br>
         You could pass the backup to your own command / script by using this attribute.
@@ -1187,6 +1197,8 @@ A line ending with \ will be concatenated with the next one, so long lines
                 /usr/share/fhem/FHEM /usr/share/fhem/foo /usr/share/fhem/foobar
                 /usr/share/fhem/www"</code>
         </ul>
+        Note: Your command / script has to return the string "backup done" or
+        everything else to report errors, to work properly with updatefhem!<br>
         This Attribute is used by the <a href="#backup">backup</a> command.<br>
         Example:<br>
         <ul>
