@@ -26,7 +26,7 @@
   - feature: at attribute alignTime added
   - feature: FHEMWEB attribute values via dropdown, slider for dimmer
   - feature: new attribute group for FHEMWEB (Boris)
-  - change:  11_FHT.pm, 50_WS300.pm, 59_Weather.pm migrated to redingsUpdate
+  - change:  11_FHT.pm, 50_WS300.pm, 59_Weather.pm migrated to readingsUpdate
              mechanism (Boris)
   - change:  updatefhem modifications to support a clean install of fhem and
              pgm2 installation, see commandref.html (M. Fischer)
@@ -38,6 +38,7 @@
              new global attribute <backupsymlink> added
              new global attribute <backupcmd> added
              new global attribute <backup_before_update> added
+  - feature: new module 57_Calendar.pm (Boris(   
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
