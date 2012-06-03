@@ -253,15 +253,31 @@ FileLog_Get($@)
 
   my %lastdate;
   my $d;                    # Used by eval functions
-  while(my $l = <$ifh>) {
-    next if($l lt $from);
+
+  my ($rescan, $rescanNum, $rescanIdx, @rescanArr);
+  $rescan = 0;
+
+RESCAN:
+  for(;;) {
+    my $l;
+
+    if($rescan) {
+      last if($rescanIdx<=1 || !$rescanNum);
+      $l = $rescanArr[--$rescanIdx];
+    } else {
+      $l = <$ifh>;
+      last if(!$l);
+    }
+
+    next if($l lt $from && !$rescan);
     last if($l gt $to);
-    my @fld = split("[ \r\n]+", $l);     # 40%
+    my @fld = split("[ \r\n]+", $l);     # 40% CPU
 
     for my $i (0..int(@a)-1) {           # Process each req. field
       my $h = $d[$i];
+      next if($rescan && $h->{ret});
       my @missingvals;
-      next if($h->{re} && $l !~ m/$h->{re}/);      # 20%
+      next if($h->{re} && $l !~ m/$h->{re}/);      # 20% CPU
 
       my $col = $h->{col};
       my $t = $h->{type};
@@ -305,7 +321,6 @@ FileLog_Get($@)
         $val = $1 if($fld[$col] =~ m/^(\d+).*/o);
 
       } else {                              # evaluate
-
         $val = eval($h->{fn});
 
       }
@@ -317,23 +332,44 @@ FileLog_Get($@)
       $cnt[$i]++;
       $lastv[$i] = $val;
       $lastd[$i] = $dte;
-      foreach my $mval (@missingvals) { 
-        $cnt[$i]++;
-        $min[$i] = 0 if(0 < $min[$i]);
-      }
+      map { $cnt[$i]++; $min[$i] = 0 if(0 < $min[$i]); } @missingvals;
 
       if($outf eq "-") {
         $h->{ret} .= "$dte $val\n";
-        foreach my $mval (@missingvals) { $h->{ret} .= $mval }
+        map { $h->{ret} .= $_ } @missingvals;
+
       } else {
         my $fh = $h->{fh};      # cannot use $h->{fh} in print directly
         print $fh "$dte $val\n";
-        foreach my $mval (@missingvals) { print $fh $mval }
-        $h->{count}++;
+        map { print $fh $_ } @missingvals;
       }
+      $h->{count}++;
+      $rescanNum--;
+      last if(!$rescanNum);
 
     }
   }
+
+  # If no value found for some of the required columns, then look for the last
+  # matching entry outside of the range. Known as the "window left open
+  # yesterday" problem
+  if(!$rescan) {
+    $rescanNum = 0;
+    map { $rescanNum++ if(!$d[$_]->{count} && $d[$_]->{df} eq "") } (0..$#a);
+    if($rescanNum) {
+      $rescan=1;
+      my $buf;
+      my $end = $hash->{pos}{"$inf:$from"};
+      my $start = $end - 1024;
+      $start = 0 if($start < 0);
+      $ifh->seek($start, 0);
+      sysread($ifh, $buf, $end-$start);
+      @rescanArr = split("\n", $buf);
+      $rescanIdx = $#rescanArr;
+      goto RESCAN;
+    }
+  }
+
   $ifh->close();
 
   my $ret = "";
@@ -361,6 +397,7 @@ FileLog_Get($@)
         $h->{count}++;
       }
     }
+
     if($outf eq "-") {
       $h->{ret} .= "$from $h->{df}\n" if(!$h->{ret} && $h->{df} ne "");
       $ret .= $h->{ret} if($h->{ret});
