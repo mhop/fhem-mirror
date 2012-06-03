@@ -589,7 +589,7 @@ CUL_HM_Parse($$)
       $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
       my $msg = "unknown";
       $msg = "deviceMsg" if($msgType =~ m/0./);
-      $msg = "powerOn"   if($msgType =~ m/06/ && $chn eq "00");
+      $msg = "powerOn"   if($msgType =~ m/06/ && ($chn eq "00" || $chn eq "01"));
       push @event, "$msg:$val$target";
       push @event, "state:$val";
     }
