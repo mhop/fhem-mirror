@@ -40,6 +40,7 @@ my @filelist = (
  "docs/fhem.*.png",
  "docs/.*.jpg",
  "../culfw/Devices/CUL/.*.hex",
+ "./CHANGED",
 );
 
 # Read in the file timestamps
@@ -49,6 +50,7 @@ my %filedir;
 foreach my $fspec (@filelist) {
   $fspec =~ m,^(.+)/([^/]+)$,;
   my ($dir,$pattern) = ($1, $2);
+
   opendir DH, $dir || die("Can't open $dir: $!\n");
   foreach my $file (grep { /$pattern/ && -f "$dir/$_" } readdir(DH)) {
     my @st = stat("$dir/$file");
@@ -110,14 +112,21 @@ system("mkdir -p $uploaddir2");
 
 my %filelist2 = (
  "./fhem.pl.txt"                => ".",
+ "./CHANGED"                    => ".",
  "FHEM/.*.pm"                   => "FHEM",
  "../culfw/Devices/CUL/.*.hex"  => "FHEM",
+ "webfrontend/pgm2/.*.pm\$"     => "FHEM",
  "webfrontend/pgm2/.*"          => "www/pgm2",
  "docs/commandref.html"         => "www/pgm2",
  "docs/faq.html"                => "www/pgm2",
  "docs/HOWTO.html"              => "www/pgm2",
  "docs/fhem.*.png"              => "www/pgm2",
  "docs/.*.jpg"                  => "www/pgm2",
+);
+
+# Can't make negative regexp to work, so do it with extra logic
+my %skiplist2 = (
+ "www/pgm2"  => ".pm\$",
 );
 
 # Read in the file timestamps
@@ -131,6 +140,7 @@ foreach my $fspec (keys %filelist2) {
   my $tdir = $filelist2{$fspec};
   opendir DH, $dir || die("Can't open $dir: $!\n");
   foreach my $file (grep { /$pattern/ && -f "$dir/$_" } readdir(DH)) {
+    next if($skiplist2{$tdir} && $file =~ m/$skiplist2{$tdir}/);
     my @st = stat("$dir/$file");
     my @mt = localtime($st[9]);
     $filetime2{"$tdir/$file"} = sprintf "%04d-%02d-%02d_%02d:%02d:%02d",
