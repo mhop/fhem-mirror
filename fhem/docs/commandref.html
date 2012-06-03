@@ -775,7 +775,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="updatefhem"></a>
 <h3>updatefhem</h3>
 <ul>
-  <code>updatefhem [&lt;filename&gt;|&lt;housekeeping&gt; [&lt;clean&gt;] [&lt;yes&gt;]|&lt;preserve&gt; [&lt;filename&gt;]]</code> <br>
+  <code>updatefhem [&lt;changed&gt;|&lt;filename&gt;|&lt;housekeeping&gt; [&lt;clean&gt;] [&lt;yes&gt;]|&lt;preserve&gt; [&lt;filename&gt;]]</code> <br>
   <br>
     Update the fhem modules and documentation from a nightly SVN checkout. For
     this purpose Fhem contacts http://fhem.de/fhemupdate, compares the stored
@@ -794,6 +794,17 @@ A line ending with \ will be concatenated with the next one, so long lines
     The complete installation of Fhem will be saved via the <a href="#backup">backup</a>
     command on every update. You can skip this backups by setting
     the global attribute <a href="#backup_before_update">backup_before_update</a> to 0.
+    <br>
+    <br>
+    Have you change or replace original files of the Fhem Distribution,
+    these files will normally be overwritten during an update. To protect
+    your locally modified or replaced files during an update, you can exclude
+    these files with the global attribute <a href="#exclude_from_update">exclude_from_update</a>.
+    <br>
+    <br>
+    If &lt;changed&gt; is specified, updatefhem returns a list of new or
+    modified files since the last update. Furthermore it returns the last
+    changes from the CHANGED file (if the file exists on the update server).
     <br>
     <br>
     If an explicit &lt;filename&gt; is given, then only this file will be
@@ -1234,6 +1245,16 @@ A line ending with \ will be concatenated with the next one, so long lines
         Contains the name of the fhem configuration file. If <a
         href="#save">save</a> is called without argument, then the output will
         be written to this file.
+    </li><br>
+
+    <a name="exclude_from_update"></a>
+    <li>exclude_from_update<br>
+        Contains a space separated list of file which will be excluded by an update.
+        This Attribute is used by the <a href="#updatefhem">updatefhem</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot FS20.on.png FS20.off.png
+        </ul>
     </li><br>
 
     <a name="holiday2we"></a>

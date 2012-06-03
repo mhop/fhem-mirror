@@ -9,6 +9,9 @@ use IO::Socket;
 sub CommandUpdatefhem($$);
 sub CommandCULflash($$);
 sub GetHttpFile($$@);
+sub ParseChanges($);
+sub ReadOldFiletimes($);
+sub SplitNewFiletimes($);
 sub FileList($);
 
 my $server = "fhem.de:80";
@@ -46,7 +49,7 @@ CommandUpdatefhem($$)
   my $msg;
 
   if(!$param && !-d $wwwdir) {
-    $ret  = "Usage: updatefhem [<filename>|<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]\n";
+    $ret  = "Usage: updatefhem [<changed>|<filename>|<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]\n";
     $ret .= "Please note: The update routine has changed! Please consider the manual of command 'updatefhem'!";
     return $ret;
   }
@@ -56,7 +59,13 @@ CommandUpdatefhem($$)
 
   if(@args) {
 
-    if (uc($args[0]) eq "PRESERVE") {
+    # Get list of changes
+    if (uc($args[0]) eq "CHANGED") {
+      $ret = ParseChanges($moddir);
+      return $ret;
+
+    # Preserve current structur
+    } elsif (uc($args[0]) eq "PRESERVE") {
 
       # Check if new wwwdir already exists and an argument is given
       if(-d $wwwdir && @args > 1) {
@@ -138,45 +147,33 @@ CommandUpdatefhem($$)
 
     # help
     } elsif (uc($args[0]) eq "?") {
-      return "Usage: updatefhem [<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]";
+      return "Usage: updatefhem [<changed>|<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]";
     # user wants to update a file / module of the old structure
     } elsif (!-d $wwwdir) {
-      return "Usage: updatefhem [<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]";
+      return "Usage: updatefhem [<changed>|<housekeeping> [<clean>] [<yes>]|<preserve> [<filename>]]";
     }
 
   }
 
   # Read in the OLD filetimes.txt
-  my %oldtime = ();
-  if(open FH, "$moddir/$ftime") {
-    while(my $l = <FH>) {
-      chomp($l);
-      my ($ts, $fs, $file) = split(" ", $l, 3);
-      $oldtime{$file} = $ts;
-    }
-    close(FH);
-  }
+  my $oldtime = ReadOldFiletimes("$moddir/$ftime");
 
+  # Get new filetimes.txt
   my $filetimes = GetHttpFile($server, "$sdir/$ftime");
   return "Can't get $ftime from $server" if(!$filetimes);
 
-  my (%filetime, %filesize) = ();
-  foreach my $l (split("[\r\n]", $filetimes)) {
-    chomp($l);
-    return "Corrupted filetimes.txt file"
-        if($l !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /);
-    my ($ts, $fs, $file) = split(" ", $l, 3);
-    $filetime{$file} = $ts;
-    $filesize{$file} = $fs;
-  }
+  # split filetime and filesize
+  my ($sret, $filetime, $filesize) = SplitNewFiletimes($filetimes);
+  return "$sret" if($sret);
 
+  # Check for new / modified files
   my $c = 0;
-  foreach my $f (sort keys %filetime) {
+  foreach my $f (sort keys %$filetime) {
     if($param) {
       next if($f !~ m/$param/);
     } else {
       if(!$clean) {
-        next if($oldtime{$f} && $filetime{$f} eq $oldtime{$f});
+        next if($oldtime->{$f} && $filetime->{$f} eq $oldtime->{$f});
       }
       next if($f =~ m/.hex$/);  # skip firmware files
     }
@@ -189,14 +186,14 @@ CommandUpdatefhem($$)
   my $doBackup = (!defined($attr{global}{backup_before_update}) ? 1 : $attr{global}{backup_before_update});
 
   if ($doBackup) {
-    $ret = AnalyzeCommandChain(undef, "backup");
-    if($ret !~ m/backup done.*/) {
+    my $cmdret = AnalyzeCommandChain(undef, "backup");
+    if($cmdret !~ m/backup done.*/) {
       Log 1, "updatefhem: The operation was canceled. Please check manually!";
-      $msg  = "Something went wrong during backup:\n$ret\n";
+      $msg  = "Something went wrong during backup:\n$cmdret\n";
       $msg .= "The operation was canceled. Please check manually!";
       return $msg;
     }
-    $ret .= "\n";
+    $ret .= "$cmdret\n";
   }
 
   my @reload;
@@ -205,12 +202,19 @@ CommandUpdatefhem($$)
   my $remfile;
   my $oldfile;
   my $delfile;
-  foreach my $f (sort keys %filetime) {
+  my $excluded = (!defined($attr{global}{exclude_from_update}) ? "" : $attr{global}{exclude_from_update});
+
+  foreach my $f (sort keys %$filetime) {
+    my $ef = substr $f,rindex($f,'/')+1;
+    if($excluded =~ /$ef/) {
+      $ret .= "excluded $f\n";
+      next;
+    }
     if($param) {
       next if($f !~ m/$param/);
     } else {
       if(!$clean) {
-        next if($oldtime{$f} && $filetime{$f} eq $oldtime{$f});
+        next if($oldtime->{$f} && $filetime->{$f} eq $oldtime->{$f});
       }
       next if($f =~ m/.hex$/);  # skip firmware files
     }
@@ -240,7 +244,7 @@ CommandUpdatefhem($$)
 
     my $content = GetHttpFile($server, "$sdir/$remfile");
     my $l1 = length($content);
-    my $l2 = $filesize{$f};
+    my $l2 = $filesize->{$f};
     return "File size for $f ($l1) does not correspond to ".
                 "filetimes.txt entry ($l2)" if($l1 ne $l2);
     open(FH,">$localfile") || return "Can't write $localfile";
@@ -340,21 +344,15 @@ CommandCULflash($$)
   my $filetimes = GetHttpFile($server, "$sdir/$ftime");
   return "Can't get $ftime from $server" if(!$filetimes);
 
-  my (%filetime, %filesize);
-  foreach my $l (split("[\r\n]", $filetimes)) {
-    chomp($l);
-    return "Corrupted filetimes.txt file"
-        if($l !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /);
-    my ($ts, $fs, $file) = split(" ", $l, 3);
-    $filetime{$file} = $ts;
-    $filesize{$file} = $fs;
-  }
+  # split filetime and filesize
+  my ($ret, $filetime, $filesize) = SplitNewFiletimes($filetimes);
+  return $ret if($ret);
 
   ################################
   # Now get the firmware file:
-  my $content = GetHttpFile($server, "$sdir/$target.hex");
+  my $content = GetHttpFile($server, "$sdir/FHEM/$target.hex");
   return "File size for $target.hex does not correspond to filetimes.txt entry"
-          if(length($content) ne $filesize{"$target.hex"});
+          if(length($content) ne $filesize->{"FHEM/$target.hex"});
   my $localfile = "$moddir/$target.hex";
   open(FH,">$localfile") || return "Can't write $localfile";
   print FH $content;
@@ -414,6 +412,97 @@ GetHttpFile($$@)
   Log 4, "updatefhem Got http://$host$filename, length: ".length($ret);
   undef $conn;
   return $ret;
+}
+
+sub
+ParseChanges($)
+{
+  my $moddir = shift;
+  my $excluded = (!defined($attr{global}{exclude_from_update}) ? "" : $attr{global}{exclude_from_update});
+  my $ret = "List of new / modified files since last update:\n";
+
+  # get list of files
+  my $filetimes = GetHttpFile($server, "$sdir/$ftime");
+  return $ret."Can't get $ftime from $server" if(!$filetimes);
+
+  # split filetime and filesize
+  my ($sret, $filetime, $filesize) = SplitNewFiletimes($filetimes);
+  $ret .= "$sret\n" if($sret);
+
+  # Read in the OLD filetimes.txt
+  my $oldtime = ReadOldFiletimes("$moddir/$ftime");
+
+  # Check for new / modified files
+  my $c = 0;
+  foreach my $f (sort keys %$filetime) {
+    next if($oldtime->{$f} && $filetime->{$f} eq $oldtime->{$f});
+    next if($f =~ m/.hex$/);  # skip firmware files
+    $c = 1;
+    my $ef = substr $f,rindex($f,'/')+1;
+    if($excluded !~ /$ef/) {
+      $ret .= "$filetime->{$f} $f\n";
+    } else {
+      $ret .= "$filetime->{$f} $f ==> excluded from update!\n";
+    }
+  }
+
+  if (!$c) {
+    $ret .= "nothing to do...";
+  } else {
+    # get list of changes
+    $ret .= "\nList of changes:\n";
+    my $changed = GetHttpFile($server, "$sdir/CHANGED");
+    if(!$changed || $changed =~ m/Error 404/g) {
+      $ret .= "Can't get list of changes from $server";
+    } else {
+      my @lines = split(/\015\012|\012|\015/,$changed);
+      foreach my $line (@lines) {
+        last if($line eq "");
+        $ret .= $line."\n";
+      }
+    }
+  }
+
+  return $ret;
+}
+
+sub
+ReadOldFiletimes($)
+{
+  my $filetimes = shift;
+  my %oldtime = ();
+  my $excluded = (!defined($attr{global}{exclude_from_update}) ? "" : $attr{global}{exclude_from_update});
+
+  # Read in the OLD filetimes.txt
+  if(open FH, "$filetimes") {
+    while(my $l = <FH>) {
+      chomp($l);
+      my ($ts, $fs, $file) = split(" ", $l, 3);
+      my $ef = substr $file,rindex($file,'/')+1;
+      next if($excluded =~ /$ef/);
+      $oldtime{$file} = $ts;
+    }
+    close(FH);
+  }
+  return (\%oldtime);
+}
+
+sub
+SplitNewFiletimes($)
+{
+  my $filetimes = shift;
+  my $ret;
+  my (%filetime, %filesize) = ();
+  foreach my $l (split("[\r\n]", $filetimes)) {
+    chomp($l);
+    $ret = "Corrupted filetimes.txt file"
+        if($l !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /);
+    last if($ret);
+    my ($ts, $fs, $file) = split(" ", $l, 3);
+    $filetime{$file} = $ts;
+    $filesize{$file} = $fs;
+  }
+  return ($ret, \%filetime, \%filesize);
 }
 
 sub

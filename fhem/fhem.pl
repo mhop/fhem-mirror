@@ -193,11 +193,10 @@ $modules{Global}{AttrList} =
         "archivecmd allowfrom apiversion archivedir configfile lastinclude logfile " .
         "modpath nrarchive pidfilename port statefile title userattr " .
         "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
-        "autoload_undefined_devices dupTimeout latitude longitude ".
-        "backupcmd backupdir backupsymlink backup_before_update";
+        "autoload_undefined_devices dupTimeout latitude longitude " .
+        "backupcmd backupdir backupsymlink backup_before_update " .
+        "exclude_from_update ";
 $modules{Global}{AttrFn} = "GlobalAttr";
-
-
 
 %cmds = (
   "?"       => { Fn=>"CommandHelp",
