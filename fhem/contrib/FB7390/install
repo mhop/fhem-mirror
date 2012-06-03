@@ -9,8 +9,10 @@ sleep 1
 
 echo "########################### Extracting fhem.tar.gz ###################"
 cd $root
+
 if test -d fhem; then
-  mv fhem fhem.OLD
+  odir=fhem.old.`date +%Y-%m-%d_%H:%M:%S`
+  mv fhem $odir
 fi
 
 gzip -cd /var/fhem.tar.gz | tar xf -
@@ -18,34 +20,28 @@ gzip -cd /var/fhem.tar.gz | tar xf -
 cd $root
 
 # Save files from the AVM Style installation
-if test -f fhem.OLD/opt/etc/fhem.cfg; then
+if test -f $odir/etc/fhem.cfg; then
   echo "########################### Converting chroot style config ###########"
   export LD_LIBRARY_PATH=$home/lib
   export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
-  cp fhem.OLD/opt/etc/fhem.cfg fhem
-  fhem/perl -pi -e 's,/opt,$root,g;
-                    s,fhem/share,fhem,;
+  cp $odir/etc/fhem.cfg fhem
+  fhem/perl -pi -e 's,/usr/share/fhem,'$home',g;
+                    s,/var/log/fhem,'$home'/log,;
                     s,^#define autocreate,define autocreate,;
                     s,^#attr autocreate,attr autocreate,;
                     s,ttyACM(.)(@\d+)?,ttyACM$1\@38400,;' fhem/fhem.cfg
-  mv fhem.OLD/opt/fhem/log/* fhem/log
+  mv $odir/var/log/fhem/* fhem/log
 fi
 
 # Save files from our old version
-if test -f fhem.OLD/fhem.cfg; then
-  echo "########################### Copying non-chroot style config ##########"
-  mv fhem.OLD/FHEM/*.sh fhem/FHEM
-  mv fhem.OLD/FHEM/99.*Util.pm fhem/FHEM
-  mv fhem.OLD/FHEM/*.sh fhem/FHEM
-  mv fhem.OLD/log/* fhem/log
-  mv fhem.OLD/fhem.cfg fhem
+if test -f $odir/fhem.cfg; then
+  mv $odir/FHEM/*.sh fhem/FHEM
+  mv $odir/FHEM/99.*Util.pm fhem/FHEM
+  mv $odir/FHEM/*.sh fhem/FHEM
+  mv $odir/log/* fhem/log
+  mv $odir/*.cfg fhem
 fi
 chown -R boxusr80:root $home
-
-if test -d fhem.OLD; then
-  echo "########################### Deleting the old directory ###############"
-  rm -rf fhem.OLD
-fi
 
 cat /var/flash/debug.cfg > /var/nvi.tmp
 grep -q fhem /var/nvi.tmp

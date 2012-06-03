@@ -1,0 +1,8 @@
+rm -rf 5.12.2/unicore
+rm -rf 5.12.2/Pod
+rm -rf 5.12.2/CPAN*
+rm -rf 5.12.2/perl5db.pl
+rm -rf 5.12.2/mips-linux/Config.pod
+rm -rf 5.12.2/mips-linux/CORE
+rm -rf 5.12.2/mips-linux/auto/Encode/{CN,JP,KR,TW}
+find . -name \*.pod | xargs rm
