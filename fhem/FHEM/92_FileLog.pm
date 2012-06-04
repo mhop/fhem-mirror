@@ -262,8 +262,8 @@ RESCAN:
     my $l;
 
     if($rescan) {
-      last if($rescanIdx<=1 || !$rescanNum);
-      $l = $rescanArr[--$rescanIdx];
+      last if($rescanIdx<1 || !$rescanNum);
+      $l = $rescanArr[$rescanIdx--];
     } else {
       $l = <$ifh>;
       last if(!$l);
