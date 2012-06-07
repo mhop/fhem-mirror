@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.14 - May, 2012
+# Version 1.15 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -264,21 +264,27 @@ sub OWAD_InitializeDevice($) {
     #-- name
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
     my @cnama = split(/\|/,$cname);
-    Log 1, "OWAD: InitializeDevice with insufficient name specification $cname"
-      if( int(@cnama)!=2 );
-    $owg_channel[$i] = $cnama[0];  
+    if( int(@cnama)!=2){
+      Log 1, "OWAD: Incomplete channel name specification $cname. Better use $cname|<type of data>";
+      push(@cnama,"unknown");
+    }
+ 
     #-- unit
     my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "Volt|V";
     my @unarr= split(/\|/,$unit);
-    Log 1, "OWAD: InitializeDevice with insufficient unit specification $unit"
-      if( int(@unarr)!=2 );
+    if( int(@unarr)!=2 ){
+      Log 1, "OWAD: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>";
+      push(@unarr,"");  
+    }
+  
     #-- offset and scale factor 
     my $offset  = defined($attr{$name}{$owg_fixed[$i]."Offset"}) ? $attr{$name}{$owg_fixed[$i]."Offset"} : 0.0;
     my $factor  = defined($attr{$name}{$owg_fixed[$i]."Factor"}) ? $attr{$name}{$owg_fixed[$i]."Factor"} : 1.0; 
     #-- put into readings
-    $hash->{READINGS}{"$owg_channel[$i]"}{TYPE}     = defined($cnama[1]) ? $cnama[1] : "unknown";  
+    $owg_channel[$i] = $cnama[0]; 
+    $hash->{READINGS}{"$owg_channel[$i]"}{TYPE}     = $cnama[1];  
     $hash->{READINGS}{"$owg_channel[$i]"}{UNIT}     = $unarr[0];
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = defined($unarr[1]) ? $unarr[1] : "?";
+    $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = $unarr[1];
     $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET}   = $offset;  
     $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR}   = $factor;  
     
@@ -337,6 +343,9 @@ sub OWAD_FormatValues($) {
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
+    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
+    my @cnama = split(/\|/,$cname);
+    $owg_channel[$i]=$cnama[0];
     $offset = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
     $factor = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
     #-- correct values for proper offset, factor 
