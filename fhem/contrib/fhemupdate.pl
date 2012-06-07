@@ -167,8 +167,9 @@ open FH, ">filetimes.txt" || die "Can't open filetimes.txt: $!\n";
 open CTL, ">controls.txt" || die "Can't open controls.txt: $!\n";
 open FTP, ">script.txt" || die "Can't open script.txt: $!\n";
 print FTP "cd fhem/fhemupdate2\n";
-print FTP "put filetimes.txt\n";
 print FTP "pas\n";      # Without passive only 28 files can be transferred
+print FTP "put filetimes.txt\n";
+print FTP "put controls.txt\n";
 my $cnt;
 foreach my $f (sort keys %filetime2) {
   my $fn = $f;
