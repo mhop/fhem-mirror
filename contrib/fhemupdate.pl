@@ -164,6 +164,7 @@ if(open FH, "filetimes.txt") {
 }
 
 open FH, ">filetimes.txt" || die "Can't open filetimes.txt: $!\n";
+open CTL, ">controls.txt" || die "Can't open controls.txt: $!\n";
 open FTP, ">script.txt" || die "Can't open script.txt: $!\n";
 print FTP "cd fhem/fhemupdate2\n";
 print FTP "put filetimes.txt\n";
@@ -173,7 +174,7 @@ foreach my $f (sort keys %filetime2) {
   my $fn = $f;
   $fn =~ s/.txt$// if($fn =~ m/.pl.txt$/);
   print FH "$filetime2{$f} $filesize2{$f} $fn\n";
-
+  print CTL "UPD $filetime2{$f} $filesize2{$f} $fn\n";
   my $newfname = $f;
   if(!$oldtime{$f} || $oldtime{$f} ne $filetime2{$f}) {
     $f =~ m,^(.*)/([^/]*)$,;
@@ -186,6 +187,14 @@ foreach my $f (sort keys %filetime2) {
 }
 close FH;
 close FTP;
+
+if(open(ADD, "../contrib/fhemupdate.control")) {
+  while(my $l = <ADD>) {
+    print CTL $l;
+  }
+  close ADD;
+}
+close CTL;
 
 if($cnt) {
   print "FTP Upload needed for $cnt files\n";
