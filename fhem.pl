@@ -81,7 +81,7 @@ sub fhem($);
 sub fhz($);
 sub IsDummy($);
 sub IsIgnored($);
-sub setGlobalAttrBeforeFork();
+sub setGlobalAttrBeforeFork($);
 sub redirectStdinStdErr();
 sub setReadingsVal($$$$);
 sub addEvent($$);
@@ -310,7 +310,7 @@ doGlobalDef($ARGV[0]);
 # As newer Linux versions reset serial parameters after fork, we parse the
 # config file after the fork. Since need some global attr parameters before, we
 # read them here.
-setGlobalAttrBeforeFork();   
+setGlobalAttrBeforeFork($attr{global}{configfile});
 
 if($^O =~ m/Win/ && !$attr{global}{nofork}) {
   Log 1, "Forcing 'attr global nofork' on WINDOWS";
@@ -970,6 +970,7 @@ CommandRereadCfg($$)
   %readyfnlist = ();
 
   doGlobalDef($cfgfile);
+  setGlobalAttrBeforeFork($cfgfile);
 
   my $ret = CommandInclude($cl, $cfgfile);
   if($attr{global}{statefile} && -r $attr{global}{statefile}) {
@@ -2647,9 +2648,9 @@ ReplaceEventMap($$$)
 }
 
 sub
-setGlobalAttrBeforeFork()
+setGlobalAttrBeforeFork($)
 {
-  my $f = $attr{global}{configfile};
+  my ($f) = @_;
   open(FH, $f) || die("Cant open $f: $!\n");
   while(my $l = <FH>) {
     $l =~ s/[\r\n]//g;
