@@ -64,7 +64,7 @@ EnOcean_Initialize($)
   $hash->{DefFn}     = "EnOcean_Define";
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
                        "subType:switch,contact,sensor,windowHandle,SR04,MD15,PM101,".
                        "dimmer,dimmCtrl actualTemp";
