@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.14 - May, 2012
+# Version 1.15 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -993,6 +993,11 @@ sub OWXLCD_SetLine($$$) {
   $msg =~ s/Ü/\x5E/g;
   $msg =~ s/ß/\xBE/g;
   
+  #--take out degree sign
+  if( $msg ~ m/.*\&deg\;.*/ ) {
+    my @ma = split(/\&deg\;/,$msg);
+    $msg = $ma[0]."\x80".$ma[1];
+  }
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
   my $owx_rnf = substr($owx_dev,3,12);
