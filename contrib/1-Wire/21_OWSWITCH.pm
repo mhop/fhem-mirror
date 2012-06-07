@@ -1,14 +1,12 @@
 ########################################################################################
 #
-# OWCOUNT.pm
+# OWSWITCH.pm
 #
-# FHEM module to commmunicate with 1-Wire Counter/RAM DS2423
+# FHEM module to commmunicate with 1-Wire adressable switches DS2413
 #
 # Attention: This module may communicate with the OWX module,
 #            but currently not with the 1-Wire File System OWFS
 #
-#
-#  SO FAR ONLY external counter inputs A,B are available ! Neither memory content, nor internal counters are questioned. 
 #
 #
 # Prefixes for subroutines of this module:
@@ -22,12 +20,12 @@
 #   
 # Setup bus device in fhem.cfg as
 #
-# define <name> OWCOUNT [<model>] <ROM_ID> [interval] 
+# define <name> OWSWITCH [<model>] <ROM_ID> [interval] 
 #
 # where <name> may be replaced by any name string 
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
-#              DS2423 Counter/RAM  
+#              DS2413  
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
@@ -35,18 +33,18 @@
 # get <name> id       => FAM_ID.ROM_ID.CRC 
 # get <name> present  => 1 if device present, 0 if not
 # get <name> interval => query interval
-# get <name> counter  <channel> => value for counter
-# get <name> counters => values for counters
+# get <name> input <channel-name> => state for channel (name A, B or defined channel name)
+# get <name> gpio  => values for channels
 #
 # set <name> interval => set period for measurement
+# set <name> output <channel-name> |ON|OFF => set value for channel (name A, B or defined channel name)
+# set <name> gpio  value => set values for channels (0 = both OFF, 1 = A ON 2 = B ON 3 = both ON)
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
 #
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
-# attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
-# attr <name> <channel>Offset <float> = offset added to the reading in this channel 
-# attr <name> <channel>Factor <float> = factor multiplied to (reading+offset) in this channel 
+# attr <name> <channel>Unit <string>|<string> = values to display in state variable for on|off condition
 #
 ########################################################################################
 #
@@ -84,19 +82,19 @@ my %gets = (
   "id"          => "",
   "present"     => "",
   "interval"    => "",
-  #"page"        => "",
-  "counter"     => "",
-  "counters"     => ""
+  "input"       => "",
+  "gpio"        => ""
 );
 
 my %sets = (
-  "interval"    => ""
-  #"page"        => ""
+  "interval"    => "",
+  "output"      => "",
+  "gpio"        => ""
 );
 
 my %updates = (
   "present"     => "",
-  "counter"     => ""
+  "gpio"     => ""
 );
 
 
@@ -104,33 +102,31 @@ my %updates = (
 #
 # The following subroutines are independent of the bus interface
 #
-# Prefix = OWCOUNT
+# Prefix = OWSWITCH
 #
 ########################################################################################
 #
-# OWCOUNT_Initialize
+# OWSWITCH_Initialize
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWCOUNT_Initialize ($) {
+sub OWSWITCH_Initialize ($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}   = "OWCOUNT_Define";
-  $hash->{UndefFn} = "OWCOUNT_Undef";
-  $hash->{GetFn}   = "OWCOUNT_Get";
-  $hash->{SetFn}   = "OWCOUNT_Set";
+  $hash->{DefFn}   = "OWSWITCH_Define";
+  $hash->{UndefFn} = "OWSWITCH_Undef";
+  $hash->{GetFn}   = "OWSWITCH_Get";
+  $hash->{SetFn}   = "OWSWITCH_Set";
   #Name        = channel name
   #Offset      = an offset added to the reading
   #Factor      = a factor multiplied with (reading+offset)  
   #Unit        = a unit of measure
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 ";
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413 loglevel:0,1,2,3,4,5 ";
  
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
-    $attlist .= " ".$owg_fixed[$i]."Offset";
-    $attlist .= " ".$owg_fixed[$i]."Factor";
     $attlist .= " ".$owg_fixed[$i]."Unit";
   }
   $hash->{AttrList} = $attlist; 
@@ -138,17 +134,17 @@ sub OWCOUNT_Initialize ($) {
 
 #########################################################################################
 #
-# OWCOUNT_Define - Implements DefFn function
+# OWSWITCH_Define - Implements DefFn function
 # 
 # Parameter hash = hash of device addressed, def = definition string
 #
 #########################################################################################
 
-sub OWCOUNT_Define ($$) {
+sub OWSWITCH_Define ($$) {
   my ($hash, $def) = @_;
   
-  # define <name> OWCOUNT [<model>] <id> [interval]
-  # e.g.: define flow OWCOUNT 525715020000 300
+  # define <name> OWSWITCH [<model>] <id> [interval]
+  # e.g.: define flow OWSWITCH 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
   
   my ($name,$model,$fam,$id,$crc,$interval,$scale,$ret);
@@ -160,23 +156,23 @@ sub OWCOUNT_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWCOUNT: Wrong syntax, must be define <name> OWCOUNT [<model>] <id> [interval]"
+  return "OWSWITCH: Wrong syntax, must be define <name> OWSWITCH [<model>] <id> [interval]"
        if(int(@a) < 2 || int(@a) > 5);
        
   #-- check if this is an old style definition, e.g. <model> is missing
   my $a2 = $a[2];
   my $a3 = defined($a[3]) ? $a[3] : "";
   if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
-    $model         = "DS2423";
+    $model         = "DS2413";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
   } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
-    return "OWCOUNT: Wrong 1-Wire device model $model"
-      if( $model ne "DS2423");
+    return "OWSWITCH: Wrong 1-Wire device model $model"
+      if( $model ne "DS2413");
     $id            = $a[3];
   } else {    
-    return "OWCOUNT: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWSWITCH: $a[0] ID $a[2] invalid, specify a 12 digit value";
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
@@ -192,33 +188,33 @@ sub OWCOUNT_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWCOUNT: Warning, no 1-Wire I/O device found for $name."
+  Log 3, "OWSWITCH: Warning, no 1-Wire I/O device found for $name."
     if(!defined($hash->{IODev}->{NAME}));
-  $modules{OWCOUNT}{defptr}{$id} = $hash;
+  $modules{OWSWITCH}{defptr}{$id} = $hash;
   $hash->{STATE} = "Defined";
-  Log 3, "OWCOUNT:   Device $name defined."; 
+  Log 3, "OWSWITCH:   Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
  
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+1, "OWCOUNT_InitializeDevice", $hash, 0);
+  InternalTimer(time()+1, "OWSWITCH_InitializeDevice", $hash, 0);
   
   #-- Start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
 
   return undef; 
 }
 
 ########################################################################################
 #
-# OWCOUNT_InitializeDevice - delayed setting of initial readings and channel names  
+# OWSWITCH_InitializeDevice - delayed setting of initial readings and channel names  
 #
 #  Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWCOUNT_InitializeDevice($) {
+sub OWSWITCH_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
@@ -226,34 +222,29 @@ sub OWCOUNT_InitializeDevice($) {
   #-- Initial readings 
   @owg_val   = (0.0,0.0,0.0,0.0);
    
-  #-- Set channel names, channel units and alarm values
+  #-- Set channel names, channel units 
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
     #-- name
-    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|event";
+    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|onoff";
     my @cnama = split(/\|/,$cname);
     if( int(@cnama)!=2){
-      Log 1, "OWCOUNT: Incomplete channel name specification $cname. Better use $cname|<type of data>";
+      Log 1, "OWSWITCH: Incomplete channel name specification $cname. Better use $cname|<type of data>";
       push(@cnama,"unknown");
     }
  
     #-- unit
-    my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "counts|cts";
+    my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
     my @unarr= split(/\|/,$unit);
     if( int(@unarr)!=2 ){
-      Log 1, "OWCOUNT: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>";
-      push(@unarr,"");  
+      Log 1, "OWSWITCH: Wrong channel unit specification $unit, replaced by ON|OFF";
+      $unit="ON|OFF";
     }
 
-    #-- offset and scale factor 
-    my $offset  = defined($attr{$name}{$owg_fixed[$i]."Offset"}) ? $attr{$name}{$owg_fixed[$i]."Offset"} : 0;
-    my $factor  = defined($attr{$name}{$owg_fixed[$i]."Factor"}) ? $attr{$name}{$owg_fixed[$i]."Factor"} : 1; 
     #-- put into readings
     $owg_channel[$i] = $cnama[0];  
     $hash->{READINGS}{"$owg_channel[$i]"}{TYPE}     = $cnama[1];  
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNIT}     = $unarr[0];
-    $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = $unarr[1];
-    $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET}   = $offset;  
-    $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR}   = $factor;  
+    $hash->{READINGS}{"$owg_channel[$i]"}{UNIT}     = $unit;
+    $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = $unit;
   }
   
   #-- set status according to interface type
@@ -261,35 +252,34 @@ sub OWCOUNT_InitializeDevice($) {
   
   #-- OWX interface
   if( !defined($interface) ){
-    return "OWCOUNT: Interface missing";
+    return "OWSWITCH: Interface missing";
   } elsif( $interface eq "OWX" ){
   #-- OWFS interface
   #}elsif( $interface eq "OWFS" ){
   #  $ret = OWFSAD_GetPage($hash,"reading");
   #-- Unknown interface
   }else{
-    return "OWCOUNT: InitializeDevice with wrong IODev type $interface";
+    return "OWSWITCH: InitializeDevice with wrong IODev type $interface";
   }
 
   #-- Initialize all the display stuff  
-  OWCOUNT_FormatValues($hash);
+  OWSWITCH_FormatValues($hash);
 }
 
 ########################################################################################
 #
-# OWCOUNT_FormatValues - put together various format strings 
+# OWSWITCH_FormatValues - put together various format strings 
 #
 #  Parameter hash = hash of device addressed, fs = format string
 #
 ########################################################################################
 
-sub OWCOUNT_FormatValues($) {
+sub OWSWITCH_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
   my ($offset,$factor,$vval);
   my ($value1,$value2,$value3)   = ("","","");
-  my $galarm = 0;
 
   my $tn = TimeNow();
   
@@ -297,25 +287,18 @@ sub OWCOUNT_FormatValues($) {
   for (my $i=0;$i<int(@owg_fixed);$i++){
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
     my @cnama = split(/\|/,$cname);
-    $owg_channel[$i]=$cnama[0]; 
-    $offset = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
-    $factor = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
-    #-- correct values for proper offset, factor 
-    if( $factor == 1.0 ){
-      $vval    = ($owg_val[$i] + $offset)*$factor;
-      #-- string buildup for return value and STATE
-      $value1 .= sprintf( "%s: %d %s", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-      $value2 .= sprintf( "%s: %d %s ", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-    } else {
-      $vval    = int(($owg_val[$i] + $offset)*$factor*1000)/1000;
-      #-- string buildup for return value and STATE
-      $value1 .= sprintf( "%s: %5.3f %s", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-      $value2 .= sprintf( "%s: %5.2f %s ", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-    }
+    $owg_channel[$i]=$cnama[0];
+    
+    #-- result is zero or one
+    $vval    = $owg_val[$i];
+    #-- string buildup for return value and STATE
+    my @unarr=split(/\|/,$hash->{READINGS}{"$owg_channel[$i]"}{UNIT});
+    $value1 .= sprintf( "%s: %s", $owg_channel[$i], $unarr[1-$vval]);
+    $value2 .= sprintf( "%s: %s ", $owg_channel[$i], $unarr[1-$vval]);
     $value3 .= sprintf( "%s: " , $owg_channel[$i]);
     
     #-- put into READINGS
-    $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $vval;
+    $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $unarr[1-$vval];
     $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
     
     #-- insert comma
@@ -333,13 +316,13 @@ sub OWCOUNT_FormatValues($) {
 
 ########################################################################################
 #
-# OWCOUNT_Get - Implements GetFn function 
+# OWSWITCH_Get - Implements GetFn function 
 #
 #  Parameter hash = hash of device addressed, a = argument array
 #
 ########################################################################################
 
-sub OWCOUNT_Get($@) {
+sub OWSWITCH_Get($@) {
   my ($hash, @a) = @_;
   
   my $reading = $a[1];
@@ -352,11 +335,11 @@ sub OWCOUNT_Get($@) {
   my $page;
 
   #-- check syntax
-  return "OWCOUNT: Get argument is missing @a"
+  return "OWSWITCH: Get argument is missing @a"
     if(int(@a) < 2);
     
   #-- check argument
-  return "OWCOUNT: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
+  return "OWSWITCH: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
     if(!defined($gets{$a[1]}));
 
   #-- get id
@@ -383,65 +366,74 @@ sub OWCOUNT_Get($@) {
   #-- reset presence
   $hash->{PRESENT}  = 0;
   
-  #-- get memory page/counter according to interface type
+  #-- get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
-  
-  #-- check syntax for getting counter
+
+  #-- get single state
   # TODO: WAS passiert, wenn channel name noch falsch ist ?
-  if( $reading eq "counter" ){
-    return "OWCOUNT: get needs parameter when reading counter: <channel>"
+  if( $reading eq "input" ){
+    return "OWSWITCH: get needs parameter when reading input: <channel>"
       if( int(@a)<2 );
     #-- find out which channel we have
     if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
-      $page=14;
     }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
-      $page=15;
     } else {
-      return "OWCOUNT: invalid counter address, must be A, B or defined channel name"
+      return "OWSWITCH: invalid input address, must be A, B or defined channel name"
     }
 
     #-- OWX interface
     if( $interface eq "OWX" ){
-      $ret = OWXCOUNT_GetPage($hash,$page);
+      $ret = OWXSWITCH_GetState($hash);
     #-- OWFS interface
     #}elsif( $interface eq "OWFS" ){
     #  $ret = OWFSAD_GetPage($hash,"reading");
     #-- Unknown interface
     }else{
-      return "OWCOUNT: Get with wrong IODev type $interface";
+      return "OWSWITCH: Get with wrong IODev type $interface";
     }
-  #-- check syntax for getting counter
-  }elsif( $reading eq "counters" ){
-    return "OWCOUNT: get needs no parameter when reading counters"
+    #-- process results
+    OWSWITCH_FormatValues($hash);  
+    my @states = split(/,/,$hash->{STATE});
+    
+    if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
+      return $a[2]." = ".$states[0]; 
+    }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
+      return $a[2]." = ".$states[1]; 
+    } else {
+      return "OWSWITCH: invalid input address, must be A, B or defined channel name"
+    }
+    
+  #-- get all states
+  }elsif( $reading eq "gpio" ){
+    return "OWSWITCH: get needs no parameter when reading gpio"
       if( int(@a)==1 );
 
     if( $interface eq "OWX" ){
-      $ret = OWXCOUNT_GetPage($hash,14);
-      $ret = OWXCOUNT_GetPage($hash,15);
+      $ret = OWXSWITCH_GetState($hash);
     #}elsif( $interface eq "OWFS" ){
     #  $ret = OWFSAD_GetValues($hash);
     }else{
-      return "OWCOUNT: GetValues with wrong IODev type $interface";
+      return "OWSWITCH: GetValues with wrong IODev type $interface";
     }
   }
   #-- process results
   if( defined($ret)  ){
-    return "OWCOUNT: Could not get values from device $name";
+    return "OWSWITCH: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
-  return "OWCOUNT: $name.$reading => ".OWCOUNT_FormatValues($hash);  
+  return "OWSWITCH: $name.$reading => ".OWSWITCH_FormatValues($hash);  
  
 }
 
 #######################################################################################
 #
-# OWCOUNT_GetValues - Updates the reading from one device
+# OWSWITCH_GetValues - Updates the reading from one device
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWCOUNT_GetValues($) {
+sub OWSWITCH_GetValues($) {
   my $hash    = shift;
   
   my $name    = $hash->{NAME};
@@ -450,14 +442,10 @@ sub OWCOUNT_GetValues($) {
   my $ret     = "";
   my $offset;
   my $factor;
-  
-  #-- define warnings
-  my $warn        = "none";
-  $hash->{ALARM}  = "0";
 
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
   
   #-- reset presence
   $hash->{PRESENT}  = 0;
@@ -465,20 +453,19 @@ sub OWCOUNT_GetValues($) {
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    $ret = OWXCOUNT_GetPage($hash,14);
-    $ret = OWXCOUNT_GetPage($hash,15);
+    $ret = OWXSWITCH_GetState($hash);
   #}elsif( $interface eq "OWFS" ){
   #  $ret = OWFSAD_GetValues($hash);
   }else{
-    return "OWCOUNT: GetValues with wrong IODev type $interface";
+    return "OWSWITCH: GetValues with wrong IODev type $interface";
   }
   
   #-- process results
   if( defined($ret)  ){
-    return "OWCOUNT: Could not get values from device $name";
+    return "OWSWITCH: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
-  $value=OWCOUNT_FormatValues($hash);
+  $value=OWSWITCH_FormatValues($hash);
   #--logging
   Log 5, $value;
   $hash->{CHANGED}[0] = $value;
@@ -490,14 +477,14 @@ sub OWCOUNT_GetValues($) {
 
 #######################################################################################
 #
-# OWCOUNT_Set - Set one value for device
+# OWSWITCH_Set - Set one value for device
 #
 #  Parameter hash = hash of device addressed
 #            a = argument array
 #
 ########################################################################################
 
-sub OWCOUNT_Set($@) {
+sub OWSWITCH_Set($@) {
   my ($hash, @a) = @_;
   
   my $key     = $a[1];
@@ -509,49 +496,117 @@ sub OWCOUNT_Set($@) {
     return $newkeys ;    
   }
   
-  #-- check syntax
-  return "OWCOUNT: Set needs one parameter when setting this value"
-    if( int(@a)!=3 );
-  
   #-- check argument
   if( !defined($sets{$a[1]}) ){
-        return "OWCOUNT: Set with unknown argument $a[1]";
+        return "OWSWITCH: Set with unknown argument $a[1]";
   }
   
   #-- define vars
   my $ret     = undef;
   my $channel = undef;
   my $channo  = undef;
-  my $factor;
-  my $offset;
+  my $condx;
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
  
- #-- set new timer interval
+  #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWCOUNT: Set with short interval, must be > 1"
+    return "OWSWITCH: Set with short interval, must be > 1"
       if(int($value) < 1);
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
     return undef;
   }
  
+   
+  #-- Set readings according to interface type
+  my $interface= $hash->{IODev}->{TYPE};
+  
+  #-- set single state
+  # TODO: WAS passiert, wenn channel name noch falsch ist ?
+  if( $key eq "output" ){
+    return "OWSWITCH: get needs parameter when writing output: <channel>"
+      if( int(@a)<2 );
+    #-- find out which channel we have
+    if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
+    }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
+    } else {
+      return "OWSWITCH: invalid output address, must be A, B or defined channel name"
+    }
+    
+    #-- prepare gpio value
+    my $nval;
+    if( lc($a[3]) eq "on" ){
+      $nval = 1;
+    }elsif( lc($a[3]) eq "off" ){
+      $nval = 0;
+    }else{
+      return "OWSWITCH: Wrong data value $a[3]";
+    }
+
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      $ret = OWXSWITCH_GetState($hash);
+      if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
+         $value = $owg_val[1]*2+$nval;
+      }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
+         $value = 2*$nval+$owg_val[0];
+      }
+      $ret .= OWXSWITCH_SetState($hash,$value);
+    #-- OWFS interface
+    #}elsif( $interface eq "OWFS" ){
+    #  $ret = OWFSAD_GetPage($hash,"reading");
+    #-- Unknown interface
+    }else{
+      return "OWSWITCH: Get with wrong IODev type $interface";
+    }
+    #-- process results
+    OWSWITCH_FormatValues($hash);  
+    return undef;
+  }
+ 
+  #-- set state
+  if( $key eq "gpio" ){
+    #-- check value and write to device
+    return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= 3"
+      if( ! ((int($value) >= 0) && (int($value) <= 3)) );
+     
+    if( $interface eq "OWX" ){
+      $ret = OWXSWITCH_SetState($hash,int($value));
+    #}elsif( $interface eq "OWFS" ){
+    #  $ret = OWFSAD_GetValues($hash);
+    }else{
+      return "OWSWITCH: GetValues with wrong IODev type $interface";
+    }
+    
+    #-- process results
+    if( defined($ret) ){
+      return $ret;
+    } else {
+      $hash->{PRESENT} = 1; 
+      $value=OWSWITCH_FormatValues($hash);
+      #--logging
+      Log 5, $value;
+      $hash->{CHANGED}[0] = $value;
+      return $value;
+    }
+  }
 }
 
 ########################################################################################
 #
-# OWCOUNT_Undef - Implements UndefFn function
+# OWSWITCH_Undef - Implements UndefFn function
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWCOUNT_Undef ($) {
+sub OWSWITCH_Undef ($) {
   my ($hash) = @_;
-  delete($modules{OWCOUNT}{defptr}{$hash->{OW_ID}});
+  delete($modules{OWSWITCH}{defptr}{$hash->{OW_ID}});
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -561,11 +616,9 @@ sub OWCOUNT_Undef ($) {
 # The following subroutines in alphabetical order are only for a 1-Wire bus connected 
 # via OWFS
 #
-# Prefix = OWFSCOUNT
+# Prefix = OWFSSWITCH
 #
 ########################################################################################
-
-
 
 
 
@@ -574,19 +627,18 @@ sub OWCOUNT_Undef ($) {
 # The following subroutines in alphabetical order are only for a 1-Wire bus connected 
 # directly to the FHEM server
 #
-# Prefix = OWXCOUNT
+# Prefix = OWXSWITCH
 #
 ########################################################################################
 #
-# OWXAD_GetPage - Get one memory page + counter from device
+# OWXAD_GetState - Get gpio ports from device
 #
 # Parameter hash = hash of device addressed
-#           page = "reading", "alarm" or "status"
 #
 ########################################################################################
 
-sub OWXCOUNT_GetPage($$) {
-  my ($hash,$page) = @_;
+sub OWXSWITCH_GetState($) {
+  my ($hash) = @_;
   
   my ($select, $res, $res2, $res3, @data);
   
@@ -609,94 +661,58 @@ sub OWXCOUNT_GetPage($$) {
      $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
   }
 
-  #=============== wrong value requested ===============================
-  if( ($page<0) || ($page>15) ){
-    return "OWXCOUNT: Wrong memory page requested";
-  } 
-  #=============== get memory + counter ===============================
-  #-- issue the match ROM command \x55 and the read memory + counter command
-  #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
-  my $ta2 = ($page*32) >> 8;
-  my $ta1 = ($page*32) & 255;
-  #Log 1, "OWXCOUNT: getting page Nr. $ta2 $ta1";
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\xA5%c%c",
-    @owx_ROM_ID,$ta1,$ta2);   
+  #=============== get gpio values ===============================
+  #-- issue the match ROM command \x55 and the read gpio command
+  #   \xF5 plus 2 empty bytes
+  $select=sprintf("\x55%c%c%c%c%c%c%c%c\xF5\xFF\xFF\xFF",
+    @owx_ROM_ID);   
   #-- reset the bus
   OWX_Reset($master);
   #-- read the data
   $res=OWX_Block($master,$select);
   if( $res eq 0 ){
-    return "OWX: Device $owx_dev not accessible in reading $page page"; 
+    return "OWX: Device $owx_dev not accessible in reading"; 
   }
-  
-  #-- process results
-  if( length($res) != 12 ) {
-    Log 1, "OWXCOUNT: warning, have received ".length($res)." bytes in first step";
-  }
-  
-  #-- get 32, 36 or 28 bytes
-  $select="";
-  for( $i=0;$i<42;$i++){
-    $select .= "\xFF";
-  }
-  #-- read the data
-  $res=OWX_Block($master,$select);
-  
-  #-- get remaining bytes
-  $select="";
-  for( $i=0;$i<10;$i++){
-    $select .= "\xFF";
-  }
-  #-- read the data
-  $res.=OWX_Block($master,$select);
     
   #-- reset the bus
   OWX_Reset($master);
 
   #-- process results
-  if( length($res) != 54){
-    Log 1, "OWXCOUNT: warning, have received ".length($res)." bytes in second and third step";
-  }
-  @data=split(//,substr($res,32));
-  if ( ($data[4] | $data[5] | $data[6] | $data[7]) ne "\x00" ){
-    Log 1, "OWXCOUNT: Device $owx_dev returns invalid data";
-    return "OWXCOUNT: Device $owx_dev returns invalid data";
-  }
+  # TODO: could we put in a check if the two bytes are equal
+  @data=split(//,substr($res,10));
   
-  #-- for now ignore memory and only use counter
-  
-  my $value = ord($data[3])*4096 + ord($data[2])*256 +ord($data[1])*16 + ord($data[0]);
-  #my $ress = "OWXCOUNT: Lowest 8 data bytes are ";
-  #  for($i=0;$i<8;$i++){
+  #my $ress = "OWXSWITCH_Get: three data bytes ";
+  #  for($i=0;$i<3;$i++){
   #  my $j=int(ord($data[$i])/16);
   #  my $k=ord($data[$i])%16;
   #  $ress.=sprintf "0x%1x%1x ",$j,$k;
   #  }
   #Log 1, $ress;
-  #Log 1, "OWXCOUNT: calculating counter value $value";
-   
-  if( $page == 14) {
-    $owg_val[0] = $value;
-  }elsif( $page == 15) {
-    $owg_val[1] = $value;
-  }
+  
+  #-- This holds only for DS2413 
+  $owg_val[0] = ord($data[0]) % 2;
+  $owg_val[1] = (ord($data[0])>>2) % 2;
+  
+  #Log 1, "Values are ".ord($data[0])." $owg_val[0] and $owg_val[1]";
+
   return undef
 }
 
 ########################################################################################
 #
-# OWXCOUNT_SetPage - Set one memory page of device
+# OWXSWITCH_SetPage - Set gpio ports of device
 #
 # Parameter hash = hash of device addressed
-#           page = "alarm" or "status"
+#           value = integer value for device outputs
 #
 ########################################################################################
 
-sub OWXCOUNT_SetPage($$) {
+sub OWXSWITCH_SetState($$) {
 
-  my ($hash,$page) = @_;
+  my ($hash,$value) = @_;
   
-  my ($select, $res, $res2, $res3, @data);
+  
+  my ($select, $res, $res2, @data);
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
@@ -717,27 +733,44 @@ sub OWXCOUNT_SetPage($$) {
      $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
   }
   
-  #=============== set the alarm values ===============================
-  #if ( $page eq "test" ) {
-    #-- issue the match ROM command \x55 and the set alarm page command 
-    #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
-  #  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x55\x10\x00",
-  #    @owx_ROM_ID); 
- #
-  #=============== wrong page write attempt  ===============================
-  #} else {
-    return "OWXCOUNT: Wrong memory page write attempt";
-  #} 
-  
+  #=============== set gpio values ===============================
+  #-- issue the match ROM command \x55 and the write gpio command
+  #   \x5A plus the value byte and its complement
+  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x5A%c%c\xFF",
+    @owx_ROM_ID,252+$value,3-$value);   
+  #-- reset the bus
   OWX_Reset($master);
+  #-- read the data
   $res=OWX_Block($master,$select);
-  
-  #-- process results
   if( $res eq 0 ){
-    return "OWXCOUNT: Device $owx_dev not accessible for writing"; 
+    return "OWX: Device $owx_dev not accessible in reading"; 
   }
+
+  #-- reset the bus
+  OWX_Reset($master);
+
+  #-- process results
+  @data=split(//,substr($res,10));
   
-  return undef;
+  my $ress = "OWXSWITCH_Set: three data bytes ";
+    for($i=0;$i<3;$i++){
+    my $j=int(ord($data[$i])/16);
+    my $k=ord($data[$i])%16;
+    $ress.=sprintf "0x%1x%1x ",$j,$k;
+    }
+  Log 1, $ress;
+
+  if( $data[2] ne "\xAA"){
+    Log 1, "OWXSWITCH: State could not be set";
+    return "OWXSWITCH: State could not be set";
+  } 
+ 
+  #-- Put the new values in the system variables
+  #-- This holds only for DS2413 
+  $owg_val[0] = $value && 1;
+  $owg_val[1] = ($value>>2) && 1;
+  
+  return undef
 }
 
 1;
