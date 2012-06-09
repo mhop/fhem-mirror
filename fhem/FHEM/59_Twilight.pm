@@ -191,15 +191,20 @@ sub Twilight_GetUpdate{
    for(my $i=0;$i<6;$i++){
       ($sunrise_set[$i]{RISE},$sunrise_set[$i]{SET})=
          twilight_calc($latitude,$longitude,$sunrise_set[$i]{DEGREE},$declination,$timezone,$midseconds,$timediff);
-         readingsUpdate($hash,$sunrise_set[$i]{SR_NAME},strftime("%H:%M:%S",localtime($sunrise_set[$i]{RISE})));
-         readingsUpdate($hash,$sunrise_set[$i]{SS_NAME},strftime("%H:%M:%S",localtime($sunrise_set[$i]{SET})));
-   }     
+         readingsUpdate($hash, $sunrise_set[$i]{SR_NAME},
+             $sunrise_set[$i]{RISE} eq "nan" ? "undefined" : 
+             strftime("%H:%M:%S",localtime($sunrise_set[$i]{RISE})));
+         readingsUpdate($hash, $sunrise_set[$i]{SS_NAME},
+             $sunrise_set[$i]{SET} eq "nan" ? "undefined" : 
+             strftime("%H:%M:%S",localtime($sunrise_set[$i]{SET})));
+   }
    my $k=0;
    my $half="RISE";   
    my $nexttime;
    my $licht;
    for(my $i=0;$i < 12;$i++){
        $nexttime=$sunrise_set[6-abs($i-6)-$k]{$half};
+       next if($nexttime eq "undefined");
        if($nexttime > $now && $nexttime!=2000000000){
          readingsUpdate($hash,"light", 6-abs($i-6));
          if($i<6){
