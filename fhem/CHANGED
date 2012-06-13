@@ -33,14 +33,16 @@
   - change:  FHEMWEB support for the new www/pgm2 directroy added (M. Fischer)
   - change:  Makefile support for for the new www/pgm2 directroy and new targets
              backup and uninstall added. More verbose output. (M. Fischer)
-  - change:  backuproutine separated from updatefhem to a new command (M. Fischer)
+  - change:  backup separated from updatefhem to a new command (M. Fischer)
   - feature: new command backup added (M. Fischer)
              new global attribute <backupsymlink> added
              new global attribute <backupcmd> added
              new global attribute <backup_before_update> added
   - feature: new module 57_Calendar.pm (Boris)
+  - feature: new module 57_Calendar.pm (Boris)
   - feature: new parameter <changed> for updatefhem added (M. Fischer)
              new global attribute <exclude_from_update> added (M. Fischer)
+  - feature: optional telnet password added / telnet port is optional
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
