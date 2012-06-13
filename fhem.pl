@@ -190,12 +190,13 @@ $init_done = 0;
 $modules{Global}{ORDER} = -1;
 $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
-        "archivecmd allowfrom apiversion archivedir configfile lastinclude logfile " .
-        "modpath nrarchive pidfilename port statefile title userattr " .
-        "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
-        "autoload_undefined_devices dupTimeout latitude longitude " .
-        "backupcmd backupdir backupsymlink backup_before_update " .
-        "exclude_from_update ";
+  "archivecmd allowfrom apiversion archivedir configfile lastinclude logfile " .
+  "modpath nrarchive pidfilename port portpassword statefile title userattr " .
+  "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
+  "autoload_undefined_devices dupTimeout latitude longitude " .
+  "backupcmd backupdir backupsymlink backup_before_update " .
+  "exclude_from_update ";
+
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 %cmds = (
@@ -333,7 +334,7 @@ while(time() < 2*3600) {
 
 my $ret = CommandInclude(undef, $attr{global}{configfile});
 Log 1, "configfile: $ret" if($ret);
-die("No port specified in the configfile.\n") if(!$server);
+#die("No port specified in the configfile.\n") if(!$server);
 
 if($attr{global}{statefile} && -r $attr{global}{statefile}) {
   $ret = CommandInclude(undef, $attr{global}{statefile});
@@ -368,7 +369,7 @@ while (1) {
 
   my $timeout = HandleTimeout();
 
-  vec($rin, $server->fileno(), 1) = 1;
+  vec($rin, $server->fileno(), 1) = 1 if($server);
   foreach my $p (keys %selectlist) {
     vec($rin, $selectlist{$p}{FD}, 1) = 1;
   }
@@ -433,7 +434,7 @@ while (1) {
     }
   }
 
-  if(vec($rout, $server->fileno(), 1)) {
+  if($server && vec($rout, $server->fileno(), 1)) {
     my @clientinfo = $server->accept();
     if(!@clientinfo) {
       Log 1, "Accept failed: $!";
@@ -637,6 +638,18 @@ AnalyzeInput($)
   while($client{$c}{buffer} =~ m/\n/) {
     my ($cmd, $rest) = split("\n", $client{$c}{buffer}, 2);
     $client{$c}{buffer} = $rest;
+
+    if($attr{global}{portpassword} && !$client{$c}{pwEntered}) {
+      if($attr{global}{portpassword} eq $cmd) {
+        $client{$c}{pwEntered} = 1;
+        next;
+      } else {
+        syswrite($client{$c}{fd}, "Password required\r\n");
+        DoClose($c);
+        return;
+      }
+    }
+
     if($cmd) {
       if($cmd =~ m/\\ *$/) {                     # Multi-line
         $client{$c}{prevlines} .= $cmd . "\n";
@@ -866,7 +879,6 @@ CommandInclude($$)
   if(!open($fh, $arg)) {
     return "Can't open $arg: $!";
   }
-
   if(!$init_done &&
      $arg ne AttrVal("global", "statefile", "") &&
      $arg ne AttrVal("global", "configfile", "")) {
