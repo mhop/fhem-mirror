@@ -879,6 +879,7 @@ CommandInclude($$)
   if(!open($fh, $arg)) {
     return "Can't open $arg: $!";
   }
+  Log 1, "Including $arg";
   if(!$init_done &&
      $arg ne AttrVal("global", "statefile", "") &&
      $arg ne AttrVal("global", "configfile", "")) {
