@@ -1329,11 +1329,20 @@ A line ending with \ will be concatenated with the next one, so long lines
         will only listen for connections from the localhost per default. If
         there is a second value  "global" then the server will listen for
         non-localhost connections too.<br><br>
+        This attribute is optional starting with fhem 5.3.<br><br>
         To use IPV6, specify the port as IPV6:&lt;number&gt;, in this
         case the perl module IO::Socket:INET6 will be requested.
         On Linux you may have to install it with cpan -i IO::Socket::INET6 or
         apt-get libio-socket-inet6-perl; the OSX perl already has this module.
     </li><br>
+
+    <a name="portpassword"></a>
+    <li>portpassword<br>
+        Specify a port password, which has to be entered as the very first
+        string after the connection is established. Note: the password will be
+        visible when you are typing it in a the telnet connection.
+    </li><br>
+
 
     <a name="statefile"></a>
     <a name="statefile"></a>
@@ -2785,7 +2794,15 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li><br>
 
     <li><a name="hmProtocolEvents">hmProtocolEvents</a><br>
-        Generate events for HomeMatic protocol messages.
+        Generate events for HomeMatic protocol messages. These are normally
+        used for debugging, by activating "inform timer" in a telnet session,
+        or looking at the "Event Monitor" window in the FHEMWEB frontend.
+        Example:
+        <ul>
+        <code>
+        2012-05-17 09:44:22.515 CUL CULHM RCV L:0B N:81 CMD:A258 SRC:...... DST:...... 0000 (TYPE=88,WAKEMEUP,BIDI,RPTEN)
+        </code>
+        </ul>
         </li><br>
   </ul>
   <br>
@@ -8162,7 +8179,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <a name="FHEM2FHEMdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHEM2FHEM &lt;host:portnr&gt; [LOG:regexp|RAW:devicename]
+    <code>define &lt;name&gt; FHEM2FHEM &lt;host:portnr&gt; [LOG:regexp|RAW:devicename] {portpassword}
     </code>
   <br>
   <br>
@@ -8195,9 +8212,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     usually with the device-node "none", so it is only a dummy device.  All
     necessary attributes (e.g. <a href="#rfmode">rfmode</a> if the remote CUL
     is in HomeMatic mode) must also be set for the local device.
-
     </li>
   </ul>
+  The last parameter specifies an optional portpassword, if the remote server
+  activated <a href="#portpassword">portpassword</a>.
   <br>
   Examples:
   <ul>
