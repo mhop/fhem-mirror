@@ -463,6 +463,9 @@ while (1) {
     $client{$fd}{addr} = "$caddr:$port";
     $client{$fd}{buffer} = "";
     Log 4, "Connection accepted from $client{$fd}{addr}";
+    # Telnet is strange: tell "Will echo" to supress password
+    syswrite($fd, sprintf("%c%c%cPassword: ", 255, 251, 1))
+        if($attr{global}{portpassword});
   }
 
   foreach my $c (keys %client) {
@@ -480,6 +483,12 @@ while (1) {
       next;
     }
     $buf =~ s/\r//g;
+    if($attr{global}{portpassword}) {
+      $buf =~ s/\xff..//g;              # Telnet IAC stuff
+      $buf =~ s/\xfd(.)//;              # Telnet Do ?
+      syswrite($client{$c}{fd}, sprintf("%c%c%c", 0xff, 0xfc, ord($1)))
+                        if(defined($1)) # Wont / ^C handling
+    }
     $client{$c}{buffer} .= $buf;
     AnalyzeInput($c);
   }
@@ -640,11 +649,11 @@ AnalyzeInput($)
     $client{$c}{buffer} = $rest;
 
     if($attr{global}{portpassword} && !$client{$c}{pwEntered}) {
+      syswrite($client{$c}{fd}, sprintf("%c%c%c\n", 255, 252, 1)); # Wont echo.
       if($attr{global}{portpassword} eq $cmd) {
         $client{$c}{pwEntered} = 1;
         next;
       } else {
-        syswrite($client{$c}{fd}, "Password required\r\n");
         DoClose($c);
         return;
       }
