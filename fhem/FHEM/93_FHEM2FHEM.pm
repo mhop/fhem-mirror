@@ -70,7 +70,6 @@ FHEM2FHEM_Define($$)
   $hash->{Host} = $dev;
   $hash->{portpassword} = $a[4] if(@a == 5);
 
-
   FHEM2FHEM_CloseDev($hash);    # Modify...
   return FHEM2FHEM_OpenDev($hash, 0);
 }
@@ -94,6 +93,8 @@ FHEM2FHEM_Write($$)
     my $conn = IO::Socket::INET->new(PeerAddr => $dev);
     return if(!$conn);  # Hopefuly it is reported elsewhere
     $hash->{TCPDev2} = $conn;
+    syswrite($hash->{TCPDev2}, $hash->{portpassword} . "\n")
+        if($hash->{portpassword});
   }
   my $rdev = $hash->{rawDevice};
   syswrite($hash->{TCPDev2}, "iowrite $rdev $fn $msg\n");
