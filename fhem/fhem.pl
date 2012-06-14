@@ -463,8 +463,7 @@ while (1) {
     $client{$fd}{addr} = "$caddr:$port";
     $client{$fd}{buffer} = "";
     Log 4, "Connection accepted from $client{$fd}{addr}";
-    # Telnet is strange: tell "Will echo" to supress password
-    syswrite($fd, sprintf("%c%c%cPassword: ", 255, 251, 1))
+    syswrite($fd, sprintf("%c%c%cPassword: ", 255, 251, 1))   # WILL ECHO
         if($attr{global}{portpassword});
   }
 
@@ -643,13 +642,14 @@ AnalyzeInput($)
 {
   my $c = shift;
   my @ret;
+  my $gotCmd;
 
   while($client{$c}{buffer} =~ m/\n/) {
     my ($cmd, $rest) = split("\n", $client{$c}{buffer}, 2);
     $client{$c}{buffer} = $rest;
 
     if($attr{global}{portpassword} && !$client{$c}{pwEntered}) {
-      syswrite($client{$c}{fd}, sprintf("%c%c%c\n", 255, 252, 1)); # Wont echo.
+      syswrite($client{$c}{fd}, sprintf("%c%c%c\r\n", 255, 252, 1)); # WONT ECHO
       if($attr{global}{portpassword} eq $cmd) {
         $client{$c}{pwEntered} = 1;
         next;
@@ -658,7 +658,7 @@ AnalyzeInput($)
         return;
       }
     }
-
+    $gotCmd = 1;
     if($cmd) {
       if($cmd =~ m/\\ *$/) {                     # Multi-line
         $client{$c}{prevlines} .= $cmd . "\n";
@@ -678,8 +678,11 @@ AnalyzeInput($)
   my $ret = "";
   $ret .= (join("\n", @ret) . "\n") if(@ret);
   $ret .= ($client{$c}{prevlines} ? "> " : "fhem> ")
-          if($client{$c}{prompt} && !$client{$c}{rcvdQuit});
-  syswrite($client{$c}{fd}, $ret) if($ret);
+          if($gotCmd && $client{$c}{prompt} && !$client{$c}{rcvdQuit});
+  if($ret) {
+    $ret =~ s/\n/\r\n/g if($attr{global}{portpassword});
+    syswrite($client{$c}{fd}, $ret);
+  }
   DoClose($c) if($client{$c}{rcvdQuit});
 }
 
