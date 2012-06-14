@@ -1,0 +1,122 @@
+#!/bin/bash
+# -*- bash -*-
+# vim: ft=bash
+
+: << =cut
+
+=head1 NAME
+
+fhem_fht80b_ - plugin to graph temperature and other values of ELV FHT80B devices
+ (other devices may also work (untested))
+
+=head1 APPLICABLE SYSTEMS
+
+FHEM must be installed and configured and reacheable via telnet (network or localhost)
+
+Additionally the module 99_getstate.pm has to be enabled. Copy it from the contrib 
+directory to the FHEM directory and do a shutdown restart, ie:
+cp /usr/share/fhem/contrib/getstate/99_getstate.pm /usr/share/fhem/FHEM/
+
+You can test if your devices are able to be queried by submitting this line to FHEM (via telnet or web):
+  getstate <device>
+  i.e: getstate wz_thermostat
+    output should be something like this: day-temp:20.0 desired-temp:17.0 measured-temp:21.2 windowopen-temp:12.0 temperature:21.2 
+
+=head1 CONFIGURATION
+
+fhem_fht80b_ has to be linked to the device name, ie. fhem_fht80b_wz_thermostat
+
+The following environment variables are available
+
+  host - hostname of the fhem server (default: localhost)
+  port - telnet port (default: 7072)
+
+This is a typical configuration:
+
+ [fht_80b_*]
+   env.host fritz.box
+   env.port 7072
+
+=head1 INTERPRETATION
+
+Shows a graph with temperature
+
+=head1 MAGIC MARKERS
+
+ #%# family=auto
+ #%# capabilities=autoconf
+
+=head1 BUGS
+
+None known.
+
+=head1 AUTHOR
+
+2012 Oliver Voelker <code@magenbrot.net>
+
+=head1 LICENSE
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+=cut
+
+NC=`which nc 2>/dev/null`
+DEVICE=`echo $0 | sed -e 's/.*fhem_fht80b_\(.*\)/\1/'`
+
+HOST="localhost"
+PORT="7072"
+
+if [ "$host" ]; then HOST=$host; fi
+if [ "$port" ]; then PORT=$port; fi
+
+if [ "$1" = "autoconf" ]; then
+  if [ -z "$NC" -o ! -x "$NC" ] ; then 
+      echo "no (no nc executable)"
+      exit 0
+  fi
+fi
+
+if [ "$1" = "config" ]; then
+  echo "graph_title FHEM sensor (${DEVICE})"
+  echo "graph_vlabel temp"
+  echo "graph_category fhem"
+  echo "temp.label temperature"
+  echo "temp.colour 00FF00"
+  echo "actuator.label actuator"
+  echo "actuator.colour fe2e64"
+  echo "daytemp.label day temperature"
+  echo "daytemp.colour fa5858"
+  echo "desiredtemp.label desired temperature"
+  echo "desiredtemp.colour df0101"
+  echo "nighttemp.label night temperature"
+  echo "nighttemp.colour 610b0b"
+  echo "windowopentemp.label open window temperature"
+  echo "windowopentemp.colour 3b0b0b"
+  exit 0
+fi
+
+fhem=`echo -e "getstate ${DEVICE}\nquit" | ${NC} $HOST $PORT`
+temp=`echo $fhem | awk '{split($0,a,"temperature:"); split(a[2],b," "); print b[1]}'`
+actuator=`echo $fhem | awk '{split($0,a,"actuator:"); split(a[2],b," "); print b[1]}'`
+daytemp=`echo $fhem | awk '{split($0,a,"day-temp:"); split(a[2],b," "); print b[1]}'`
+desiredtemp=`echo $fhem | awk '{split($0,a,"desired-temp:"); split(a[2],b," "); print b[1]}'`
+nighttemp=`echo $fhem | awk '{split($0,a,"night-temp:"); split(a[2],b," "); print b[1]}'`
+windowopentemp=`echo $fhem | awk '{split($0,a,"windowopen-temp:"); split(a[2],b," "); print b[1]}'`
+
+echo temp.value $temp
+echo actuator.value $actuator
+echo daytemp.value $daytemp
+echo desiredtemp.value $desiredtemp
+echo nighttemp.value $nighttemp
+echo windowopentemp.value $windowopentemp
