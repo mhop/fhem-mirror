@@ -570,18 +570,19 @@ CUL_HM_Parse($$)
           $st eq "dimmer" ||
           $st eq "blindActuator") {
 
-    if($p =~ m/^(0.)(..)(..).0/
+    if($p =~ m/^(0.)(..)(..)(..)/
        && $cmd ne "A010"
        && $cmd ne "A002") {
       my $msgType = $1;
       my $chn = $2;
+      my $add = $4; # By peterp
 
       # Multi-channel device: Switch to the shadow source hash
       if($chn ne "01" && $chn ne "00") {
         my $cSrc = "$src$chn";
         if($modules{CUL_HM}{defptr}{$cSrc}) {
           $shash = $modules{CUL_HM}{defptr}{$cSrc};
-          $name = $shash->{NAME}
+          $name = $shash->{NAME};
         }
       }
 
@@ -592,6 +593,22 @@ CUL_HM_Parse($$)
       $msg = "powerOn"   if($msgType =~ m/06/ && ($chn eq "00" || $chn eq "01"));
       push @event, "$msg:$val$target";
       push @event, "state:$val";
+
+      if($model eq "HM-LC-BL1-PB-FM") {   # By peterp
+        push @event, "motor:opening" if(hex($add)&0x10);
+        push @event, "motor:closing" if(hex($add)&0x20);
+
+      } elsif($st eq "dimmer") {
+        push @event, "dim:up"   if(hex($add)&0x10);
+        push @event, "dim:down" if(hex($add)&0x20);
+        push @event, "dim:stop" if(hex($add)&0x40);
+
+      }
+
+      if($id eq $dst && $cmd ne "8002") {  # Send Ack
+        CUL_HM_SendCmd($shash, "++8002".$id.$src."00",1,0) # Send Ack. # By peterp
+      }
+
     }
 
   } elsif($st eq "remote" || $st eq "pushButton") { #######################
@@ -606,14 +623,16 @@ CUL_HM_Parse($$)
       my $btn = int((($button&0x3f)+1)/2);
       my $state;
       if($button & 0x40){
-        $state = ($button&1 ? "off" : "on") . "Long" .($cmd=~m/^A04./ ? "Release" : "")." ".$shash->{BNOCNT};
+        $state = ($button&1 ? "off" : "on") .
+                 "Long" .($cmd=~m/^A04./ ? "Release" : "")." ".$shash->{BNOCNT};
       }else{
         $state = ($button&1 ? "off" : "on");
       }
       #Log 1, $cmd;
       push @event, "state:Btn$btn $state$target";
+      push @event, "battery:". (($button & 0x80) ? "low" : "ok"); #By peterp
       if($id eq $dst && $cmd ne "8002") {  # Send Ack
-        CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".    # Send Ack.
+        CUL_HM_SendCmd($shash, "++8002".$id.$src."0101".
                 ($state =~ m/on/?"C8":"00")."00", 1, 0);
       }
     }
@@ -623,6 +642,7 @@ CUL_HM_Parse($$)
     if($cmd =~ m/^..4./ && $p =~ m/^(..)(..)$/) {
       my ($button, $bno) = (hex($1), hex($2));
       push @event, "state:Btn$button toggle$target";
+      push @event, "battery:". (($button & 0x80) ? "low" : "ok"); #By peterp
 
       if($id eq $dst && $cmd ne "8002") {  # Send Ack
         CUL_HM_SendCmd($shash, "++8002".$id.$src."01010000",1,0) # Send Ack.
@@ -1631,7 +1651,10 @@ my %culHmBits = (
   "8002;p01=01"   => { txt => "ACK_STATUS",  params => {
                        CHANNEL        => "02,2",
                        STATUS         => "04,2",
-                       RSSI           => "08,2", } },
+                       DOWN           => '06,02,$val=(hex($val)&0x20)?1:0',
+                       UP             => '06,02,$val=(hex($val)&0x10)?1:0',
+                       LOWBAT         => '06,02,$val=(hex($val)&0x80)?1:0',
+                       RSSI           => '08,02,$val=(-1)*(hex($val))', } },
   "8002;p01=00"   => { txt => "ACK" },
   "8002;p01=02"   => { txt => "ACK2" }, # smokeDetector pairing only?
   "8002;p01=80"   => { txt => "NACK" },
