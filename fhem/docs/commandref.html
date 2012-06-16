@@ -3445,12 +3445,12 @@ A line ending with \ will be concatenated with the next one, so long lines
       Sequence $s<br>
       $cv $unit<br>
   <li>switch/dimmer/blindActuator:<br>
-      deviceMsg on<br>
-      deviceMsg off<br>
-      deviceMsg $val %<br>
-      poweron on<br>
-      poweron off<br>
-      poweron $val %<br>
+      deviceMsg [on|off|$val %]<br>
+      poweron [on|off|$val]<br>
+  <li>dimmer:<br>
+      dim: [up|down|stop]<br>
+  <li>HM-LC-BL1-PB-FM:<br>
+      motor: [opening|closing]<br>
   <li>remote/pushButton<br>
       Btn$x on<br>
       Btn$x off<br>
@@ -3464,9 +3464,11 @@ A line ending with \ will be concatenated with the next one, so long lines
       Btn$x offLong $counter (to $dest)<br>
       Btn$x onLongRelease $counter (to $dest)<br>
       Btn$x offLongRelease $counter (to $dest)<br>
+      battery: [low|ok]<br>
   <li>swi<br>
       Btn$x toggle<br>
       Btn$x toggle (to $dest)<br>
+      battery: [low|ok]<br>
   <li>motionDetector<br>
       brightness:$b<br>
       alive<br>
