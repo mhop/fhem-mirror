@@ -43,6 +43,7 @@
   - feature: new parameter <changed> for updatefhem added (M. Fischer)
              new global attribute <exclude_from_update> added (M. Fischer)
   - feature: optional telnet password added / telnet port is optional
+  - feature: holiday returns all matches, not only the first.
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
