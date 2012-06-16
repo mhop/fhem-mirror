@@ -9165,14 +9165,14 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br><br>
     Define a set of holidays. The module will try to open the file
     &lt;name&gt;.holiday in the <a href="#modpath">modpath</a>/FHEM directory.
-    If an entry in the holiday file matches the current day, then the STATE of
+    If entries in the holiday file match the current day, then the STATE of
     this holiday instance displayed in the <a href="#list">list</a> command
-    will be set to the holiday, else the state is set to the text none. Most
-    probably you'll want to query this value in some perl script: see Value() in
-    the <a href="#perl">perl</a> section or the global attribute <a
-    href="#holiday2we"> holiday2we</a>.<br>
-    The file will be reread once every night, to compute the value for the
-    current day, and by each get command (see below).<br>
+    will be set to the corresponding values, else the state is set to the text
+    none. Most probably you'll want to query this value in some perl script:
+    see Value() in the <a href="#perl">perl</a> section or the global attribute
+    <a href="#holiday2we"> holiday2we</a>.<br> The file will be reread once
+    every night, to compute the value for the current day, and by each get
+    command (see below).<br>
     <br>
 
     Holiday file definition:<br>
