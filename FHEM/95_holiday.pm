@@ -62,17 +62,18 @@ holiday_refresh($$)
 
   my $fname = $attr{global}{modpath} . "/FHEM/" . $hash->{NAME} . ".holiday";
   return "Can't open $fname: $!" if(!open(FH, $fname));
-  my $found = "none";
+  my @foundList;
+
   while(my $l = <FH>) {
     next if($l =~ m/^\s*#/);
     next if($l =~ m/^\s*$/);
     chomp($l);
+    my $found;
 
     if($l =~ m/^1/) {               # Exact date: 1 MM-DD Holiday
       my @args = split(" +", $l, 3);
       if($args[1] eq $fordate) {
         $found = $args[2];
-        last;
       }
 
     } elsif($l =~ m/^2/) {          # Easter date: 2 +1 Ostermontag
@@ -98,7 +99,6 @@ holiday_refresh($$)
       next if($mday != $fd[3] || $mmonth != $fd[4]+1);
       $found = $a[2];
       Log 4, "$name: Match day: $a[2]\n";
-      last;
 
     } elsif($l =~ m/^3/) {          # Relative date: 3 -1 Mon 03 Holiday
       my @a = split(" +", $l, 5);
@@ -123,13 +123,11 @@ holiday_refresh($$)
       }
 
       $found = $a[4];
-      last;
 
     } elsif($l =~ m/^4/) {          # Interval: 4 MM-DD MM-DD Holiday
       my @args = split(" +", $l, 4);
       if($args[1] le $fordate && $args[2] ge $fordate) {
         $found = $args[3];
-        last;
       }
 
     } elsif($l =~ m/^5/) { # nth weekday since MM-DD / before MM-DD
@@ -155,26 +153,28 @@ holiday_refresh($$)
         $tgtmin -= $1*$weeksecs; # Minimum: target date minus $1 weeks
         $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
 	# needs to be lower than max and greater than or equal to min
-        if ( ($cd ge $tgtmin) && ( $cd lt $tgtmax) ) {
-		$found=$a[5];
-		last;
+        if( ($cd ge $tgtmin) && ( $cd lt $tgtmax) ) {
+          $found=$a[5];
 	}
       } elsif ( $a[1] =~ /^\+?([0-9])*$/ ) {
         $tgtmin += ($1-1)*$weeksecs; # Minimum: target date plus $1-1 weeks
         $tgtmax = $tgtmin+$weeksecs; # Maximum: one week after minimum
 	# needs to be lower than or equal to max and greater min
-        if ( ($cd gt $tgtmin) && ( $cd le $tgtmax) ) {
-		$found=$a[5];
-		last;
+        if( ($cd gt $tgtmin) && ( $cd le $tgtmax) ) {
+          $found=$a[5];
 	}
       } else {
         Log 1, "Wrong distance spec: $l";
         next;
       }
     }
+    push @foundList, $found if($found);
 
   }
   close(FH);
+
+  push @foundList, "none" if(!int(@foundList));
+  my $found = join(", ", @foundList);
 
   RemoveInternalTimer($name);
   $nt -= ($lt[2]*3600+$lt[1]*60+$lt[0]);         # Midnight
