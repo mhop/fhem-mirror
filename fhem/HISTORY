@@ -513,3 +513,6 @@
 - Sun Jun 03 2012 (M. Fischer)
   - Added new global attribute <exclude_from_update>
   - Added new parameter <changed> to updatefhem
+
+- Sun Jun 17 2012 (M. Fischer)
+  - CULflash routine from updatefhem removed. CULflash is a standalone module from now.
