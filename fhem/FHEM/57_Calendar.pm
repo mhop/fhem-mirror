@@ -8,10 +8,12 @@
 ##############################################
 # $Id $
 
+# Todos:
+#  Support recurring events
+#  update documentation (get MyCalendar full all, use URL-encoded URLs for Google Calendar
 
 use strict;
 use warnings;
-use Time::Local;
 
 
 ##############################################
@@ -88,7 +90,7 @@ sub parseSub {
     last if($line =~ m/^END:.*$/);
     if($line =~ m/^BEGIN:(.*)$/) {
       my $entry= ICal::Entry->new($1);
-      push $self->{entries}, $entry;
+      push @{$self->{entries}}, $entry;
       $ln= $entry->parseSub($ln,@ical);
     } else {
       $self->addproperty($line);
@@ -159,7 +161,7 @@ sub setMode {
   my ($self,$mode)= @_;
   $self->{_previousMode}= $self->{_mode};
   $self->{_mode}= $mode;
-  main::debug "After setMode $mode: Modes(" . $self->uid() . ") " . $self->{_previousMode} . " -> " . $self->{_mode};
+  #main::debug "After setMode $mode: Modes(" . $self->uid() . ") " . $self->{_previousMode} . " -> " . $self->{_mode};
   return $mode;
 }
 
@@ -231,14 +233,14 @@ sub modeChanged {
 # 20120520:         a date string has no time zone associated
 sub tm {
   my ($t)= @_;
-  #debug "convert $t";
+  #main::debug "convert $t";
   my ($year,$month,$day)= (substr($t,0,4), substr($t,4,2),substr($t,6,2));
   if(length($t)>8) {
       my ($hour,$minute,$second)= (substr($t,9,2), substr($t,11,2),substr($t,13,2));
-      return Time::Local::timegm($second,$minute,$hour,$day,$month-1,$year-1900);
+      return main::fhemTimeGm($second,$minute,$hour,$day,$month-1,$year-1900);
   } else {
-      #debug "$day $month $year";
-      return Time::Local::timelocal(0,0,0,$day,$month-1,$year-1900);
+      #main::debug "$day $month $year";
+      return main::fhemTimeLocal(0,0,0,$day,$month-1,$year-1900);
   }
 }
 
@@ -257,7 +259,7 @@ sub tm {
 sub d {
   my ($d)= @_;
 
-  main::debug "Duration $d";
+  #main::debug "Duration $d";
   
   my $sign= 1;
   my $t= 0;
@@ -266,6 +268,7 @@ sub d {
   $sign= -1 if($c[0] eq "-");
   shift @c if($c[0] =~ m/[\+\-]/);
   my ($dw,$dt)= split("T", $c[0]);
+  $dt="" unless defined($dt);
   if($dw =~ m/(\d+)D$/) {
     $t+= 86400*$1; # days
   } elsif($dw =~ m/(\d+)W$/) {
@@ -281,7 +284,7 @@ sub d {
 
 sub dt {
   my ($t0,$value,$parts)= @_;
-  main::debug "t0= $t0  parts= $parts  value= $value";
+  #main::debug "t0= $t0  parts= $parts  value= $value";
   if(defined($parts) && $parts =~ m/VALUE=DATE/) {
     return tm($value);
   } else {
@@ -416,12 +419,12 @@ sub new {
 
 sub uids {
   my ($self)= @_;
-  return keys $self->{events};
+  return keys %{$self->{events}};
 }
 
 sub events {
   my ($self)= @_;
-  return values $self->{events};
+  return values %{$self->{events}};
 }
 
 sub event {
@@ -503,6 +506,7 @@ sub updateFromCalendar {
 package main;
 
 
+
 #####################################
 sub Calendar_Initialize($) {
 
@@ -556,7 +560,7 @@ sub Calendar_CheckTimes($) {
   my @endedevents= grep { $_->isEnded($t) } @allevents;
 
   my $event;
-  main::debug "Updating modes...";
+  #main::debug "Updating modes...";
   foreach $event (@upcomingevents) { $event->setMode("upcoming"); }
   foreach $event (@alarmedevents) { $event->setMode("alarm"); }
   foreach $event (@startedevents) { $event->setMode("start"); }
@@ -595,22 +599,26 @@ sub Calendar_GetUpdate($) {
 
   my $url= $hash->{fhem}{url};
   
-  # split into hostname and filename, TODO: enable https
-  if($url =~ m,^http://(.+?)(/.+)$,) {
-    # well-formed, host now in $1, filename now in $2
-    #main::debug "Get $url";
-  } else {
-    Log 1, "Calendar " . $hash->{NAME} . ": $url is not a valid URL.";
+  my $ics= GetFileFromURL($url);
+  if(!defined($ics)) {
+    Log 1, "Calendar " . $hash->{NAME} . ": Could not retrieve $url";
     return 0;
   }
-  my $ics= GetHttpFile("$1:80",$2);
-  return 0 if($ics eq "");
 
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
   $ical->parse(split("\n",$ics));
   #main::debug "*** Result:\n";
   #main::debug $ical->asString();
+
+  my @entries= @{$ical->{entries}};
+  if($#entries<0) {
+    Log 1, "Calendar " . $hash->{NAME} . ": Not an ical file at $url";
+    $hash->{STATE}= "Not an ical file at URL";
+    return 0;
+  } else {
+    $hash->{STATE}= "Active";
+  }
 
   # we now create the events from it
   #main::debug "Creating events...";
@@ -705,7 +713,6 @@ sub Calendar_Get($@) {
   }
 
 }
-
 
 #####################################
 sub Calendar_Define($$) {
