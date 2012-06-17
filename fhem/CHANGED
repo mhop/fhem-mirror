@@ -39,12 +39,12 @@
              new global attribute <backupcmd> added
              new global attribute <backup_before_update> added
   - feature: new module 57_Calendar.pm (Boris)
-  - feature: new module 57_Calendar.pm (Boris)
   - feature: new parameter <changed> for updatefhem added (M. Fischer)
              new global attribute <exclude_from_update> added (M. Fischer)
   - feature: optional telnet password added / telnet port is optional
   - feature: holiday returns all matches, not only the first.
   - change:  CULflash separated from updatefhem to a new module (M. Fischer)
+  - feature: time and internet helper routines added to fhem.pl (Boris)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera

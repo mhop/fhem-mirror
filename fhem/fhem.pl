@@ -3005,7 +3005,55 @@ readingsUpdate($$$) {
   return $rv;
 }
 
-##################
+###############################################################################
+#
+# date and time routines
+#
+##############################################################################
+
+sub
+fhemTzOffset($) {
+    # see http://stackoverflow.com/questions/2143528/whats-the-best-way-to-get-the-utc-offset-in-perl
+    my $t = shift;
+    my @l = localtime($t);
+    my @g = gmtime($t);
+
+    # the offset is positive if the local timezone is ahead of GMT, e.g. we get 2*3600 seconds for CET DST vs GMT
+    return 60*(($l[2] - $g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24) * 60 + $l[1] - $g[1]);
+}
+
+sub
+fhemTimeGm($$$$$$) {
+    # see http://de.wikipedia.org/wiki/Unixzeit
+    my ($sec,$min,$hour,$mday,$month,$year) = @_;
+
+    # $mday= 1..
+    # $month= 0..11
+    # $year is year-1900
+    
+    $year+= 1900;
+    my $isleapyear= $year % 4 ? 0 : $year % 100 ? 1 : $year % 400 ? 0 : 1;
+    my $leapyears= int((($year-1)-1968)/4 - (($year-1)-1900)/100 + (($year-1)-1600)/400);
+    #Debug sprintf("%02d.%02d.%04d %02d:%02d:%02d", $mday,$month+1,$year,$hour,$min,$sec);
+
+    if ( $^O eq 'MacOS' ) {
+      $year-= 1904;
+    } else {
+      $year-= 1970; # the Unix Epoch
+    }
+
+    my @d= (0,31,59,90,120,151,181,212,243,273,304,334); # no leap day
+    # add one day in leap years if month is later than February
+    $mday++ if($month>1 && $isleapyear);
+    return $sec+60*($min+60*($hour+24*($d[$month]+$mday-1+365*$year+$leapyears)));
+}
+
+sub
+fhemTimeLocal($$$$$$) {
+    my $t= fhemTimeGm($_[0],$_[1],$_[2],$_[3],$_[4],$_[5]);
+    return $t-fhemTzOffset($t);
+}
+
 sub
 secSince2000()
 {
@@ -3013,9 +3061,87 @@ secSince2000()
   my $t = time();
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
   $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
-  $t -= 1*3600; # Timezone offset from UTC * 3600 (MEZ=1). FIXME/HARDCODED
-  $t += 3600 if $isdst;
+  $t -= fhemTzOffset($t);
   return $t;
 }
+
+###############################################################################
+#
+# internet stuff
+#
+##############################################################################
+
+sub
+urlEncode($) {
+  $_= $_[0];
+  s/([\x00-\x2F,\x3A-\x40,\x5B-\x60,\x7B-\xFF])/sprintf("%%%02x",ord($1))/eg;
+  return $_;
+}
+
+sub
+GetFileFromURL($@)
+{
+  my ($url,$timeout)= @_;
+  $timeout = 2.0 if(!defined($timeout));
+
+  if($url !~ /^(http):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
+    Log 1, "GetFileFromURL $url: malformed URL";
+    return undef;
+  }
   
+  my ($protocol,$host,$port,$path)= ($1,$2,$3,$4);
+  #Debug "Protocol $protocol, host $host port $port, path $path";
+
+  if(defined($port)) {
+    $port=~ s/^://;
+  } else {
+    $port= 80;
+  }
+  $path= '/' unless defined($path);
+  my $hostport= "$host:$port";
+
+  #Debug "Protocol $protocol, host:port $hostport, path $path";
+  
+
+  if($protocol ne "http") {
+    Log 1, "GetFileFromURL $url: invalid protocol";
+    return undef;
+  }
+
+  my $conn = IO::Socket::INET->new(PeerAddr => "$hostport");
+  if(!$conn) {
+    Log 1, "GetFileFromURL $url: Can't connect to $hostport\n";
+    undef $conn;
+    return undef;
+  }
+  my $req = "GET $path HTTP/1.0\r\nHost: $hostport\r\n\r\n\r\n";
+  syswrite $conn, $req;
+  shutdown $conn, 1; # stopped writing data
+  my ($buf, $ret) = ("", "");
+
+  $conn->timeout($timeout);
+  for(;;) {
+    my ($rout, $rin) = ('', '');
+    vec($rin, $conn->fileno(), 1) = 1;
+    my $nfound = select($rout=$rin, undef, undef, $timeout);
+    if($nfound <= 0) {
+      Log 1, "GetFileFromURL $url: Select timeout/error: $!";
+      undef $conn;
+      return undef;
+    }
+
+    my $len = sysread($conn,$buf,65536);
+    last if(!defined($len) || $len <= 0);
+    $ret .= $buf;
+  }
+
+  $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
+  Log 4, "GetFileFromURL $url: Got file, length: ".length($ret);
+  undef $conn;
+  return $ret;
+}
+
+
+##############################################################################
+
 1;
