@@ -4,16 +4,15 @@
 package main;
 use strict;
 use warnings;
-use IO::Socket;
+use HttpUtils;
 
 sub CommandUpdatefhem($$);
-sub GetHttpFile($$@);
 sub ParseChanges($);
 sub ReadOldFiletimes($);
 sub SplitNewFiletimes($);
 sub FileList($);
 
-my $server = "fhem.de:80";
+my $server = "http://fhem.de";
 my $sdir   = "/fhemupdate2";
 my $ftime  = "filetimes.txt";
 
@@ -34,7 +33,7 @@ CommandUpdatefhem($$)
   my ($cl, $param) = @_;
   my $lt = "";
   my $ret = "";
-  my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir" : $attr{global}{modpath});
+  my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir = "$modpath/FHEM";
   my $wwwdir = "$modpath/www";
   my $preserve = 0;
@@ -153,7 +152,7 @@ CommandUpdatefhem($$)
   my $oldtime = ReadOldFiletimes("$moddir/$ftime");
 
   # Get new filetimes.txt
-  my $filetimes = GetHttpFile($server, "$sdir/$ftime");
+  my $filetimes = GetFileFromURL("$server$sdir/$ftime");
   return "Can't get $ftime from $server" if(!$filetimes);
 
   # split filetime and filesize
@@ -236,7 +235,8 @@ CommandUpdatefhem($$)
       push @reload, $mf if($modules{$m} && $modules{$m}{LOADED});
     }
 
-    my $content = GetHttpFile($server, "$sdir/$remfile");
+    $remfile =~ s/%/%25/g;
+    my $content = GetFileFromURL("$server$sdir/$remfile");
     my $l1 = length($content);
     my $l2 = $filesize->{$f};
     return "File size for $f ($l1) does not correspond to ".
@@ -311,47 +311,6 @@ CommandUpdatefhem($$)
 }
 
 sub
-GetHttpFile($$@)
-{
-  my ($host, $filename, $timeout) = @_;
-  $timeout = 2.0 if(!defined($timeout));
-
-  $filename =~ s/%/%25/g;
-  my $conn = IO::Socket::INET->new(PeerAddr => $host);
-  if(!$conn) {
-    Log 1, "updatefhem Can't connect to $host\n";
-    undef $conn;
-    return undef;
-  }
-  $host =~ s/:.*//;
-  my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
-  syswrite $conn, $req;
-  shutdown $conn, 1; # stopped writing data
-  my ($buf, $ret) = ("", "");
-
-  $conn->timeout($timeout);
-  for(;;) {
-    my ($rout, $rin) = ('', '');
-    vec($rin, $conn->fileno(), 1) = 1;
-    my $nfound = select($rout=$rin, undef, undef, $timeout);
-    if($nfound <= 0) {
-      Log 1, "updatefhem GetHttpFile: Select timeout/error: $!";
-      undef $conn;
-      return undef;
-    }
-
-    my $len = sysread($conn,$buf,65536);
-    last if(!defined($len) || $len <= 0);
-    $ret .= $buf;
-  }
-
-  $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
-  Log 4, "updatefhem Got http://$host$filename, length: ".length($ret);
-  undef $conn;
-  return $ret;
-}
-
-sub
 ParseChanges($)
 {
   my $moddir = shift;
@@ -359,7 +318,7 @@ ParseChanges($)
   my $ret = "List of new / modified files since last update:\n";
 
   # get list of files
-  my $filetimes = GetHttpFile($server, "$sdir/$ftime");
+  my $filetimes = GetFileFromURL("$server$sdir/$ftime");
   return $ret."Can't get $ftime from $server" if(!$filetimes);
 
   # split filetime and filesize
@@ -388,7 +347,7 @@ ParseChanges($)
   } else {
     # get list of changes
     $ret .= "\nList of changes:\n";
-    my $changed = GetHttpFile($server, "$sdir/CHANGED");
+    my $changed = GetFileFromURL("$server$sdir/CHANGED");
     if(!$changed || $changed =~ m/Error 404/g) {
       $ret .= "Can't get list of changes from $server";
     } else {

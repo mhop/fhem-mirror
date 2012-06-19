@@ -45,6 +45,8 @@
   - feature: holiday returns all matches, not only the first.
   - change:  CULflash separated from updatefhem to a new module (M. Fischer)
   - feature: time and internet helper routines added to fhem.pl (Boris)
+  - change:  separating common functions used by the FHEM modules into
+             *Utils.pm files from fhem.pl
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
