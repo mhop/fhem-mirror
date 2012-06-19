@@ -226,6 +226,8 @@ $modules{Global}{AttrFn} = "GlobalAttr";
 	    Hlp=>"device <options>,modify the definition (e.g. at, notify)" },
   "quit"    => { Fn=>"CommandQuit",
 	    Hlp=>",end the client session" },
+  "exit"    => { Fn=>"CommandQuit",
+	    Hlp=>",end the client session" },
   "reload"  => { Fn=>"CommandReload",
 	    Hlp=>"<module-name>,reload the given module (e.g. 99_PRIV)" },
   "rename"  => { Fn=>"CommandRename",
@@ -1743,6 +1745,7 @@ GlobalAttr($$)
     my $modpath = "$val/FHEM";
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
+    push @INC, $modpath if(!grep(/$modpath/, @INC));
     my $counter = 0;
 
     foreach my $m (sort readdir(DH)) {
@@ -1759,6 +1762,7 @@ GlobalAttr($$)
              "subdirectory called \"FHEM\" exists wich in turn contains " .
              "the fhem module files <*>.pm";
     }
+
 
   }
 
@@ -3064,84 +3068,5 @@ secSince2000()
   $t -= fhemTzOffset($t);
   return $t;
 }
-
-###############################################################################
-#
-# internet stuff
-#
-##############################################################################
-
-sub
-urlEncode($) {
-  $_= $_[0];
-  s/([\x00-\x2F,\x3A-\x40,\x5B-\x60,\x7B-\xFF])/sprintf("%%%02x",ord($1))/eg;
-  return $_;
-}
-
-sub
-GetFileFromURL($@)
-{
-  my ($url,$timeout)= @_;
-  $timeout = 2.0 if(!defined($timeout));
-
-  if($url !~ /^(http):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log 1, "GetFileFromURL $url: malformed URL";
-    return undef;
-  }
-  
-  my ($protocol,$host,$port,$path)= ($1,$2,$3,$4);
-  #Debug "Protocol $protocol, host $host port $port, path $path";
-
-  if(defined($port)) {
-    $port=~ s/^://;
-  } else {
-    $port= 80;
-  }
-  $path= '/' unless defined($path);
-  my $hostport= "$host:$port";
-
-  #Debug "Protocol $protocol, host:port $hostport, path $path";
-  
-
-  if($protocol ne "http") {
-    Log 1, "GetFileFromURL $url: invalid protocol";
-    return undef;
-  }
-
-  my $conn = IO::Socket::INET->new(PeerAddr => "$hostport");
-  if(!$conn) {
-    Log 1, "GetFileFromURL $url: Can't connect to $hostport\n";
-    undef $conn;
-    return undef;
-  }
-  my $req = "GET $path HTTP/1.0\r\nHost: $hostport\r\n\r\n\r\n";
-  syswrite $conn, $req;
-  shutdown $conn, 1; # stopped writing data
-  my ($buf, $ret) = ("", "");
-
-  $conn->timeout($timeout);
-  for(;;) {
-    my ($rout, $rin) = ('', '');
-    vec($rin, $conn->fileno(), 1) = 1;
-    my $nfound = select($rout=$rin, undef, undef, $timeout);
-    if($nfound <= 0) {
-      Log 1, "GetFileFromURL $url: Select timeout/error: $!";
-      undef $conn;
-      return undef;
-    }
-
-    my $len = sysread($conn,$buf,65536);
-    last if(!defined($len) || $len <= 0);
-    $ret .= $buf;
-  }
-
-  $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
-  Log 4, "GetFileFromURL $url: Got file, length: ".length($ret);
-  undef $conn;
-  return $ret;
-}
-
-
-##############################################################################
 
 1;

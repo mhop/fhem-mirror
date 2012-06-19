@@ -4,13 +4,12 @@
 package main;
 use strict;
 use warnings;
-use IO::Socket;
+use HttpUtils;
 
 sub CommandCULflash($$);
-sub GetHttpFile($$@);
-sub SplitNewFiletimes($);
+sub CULflash_SplitNewFiletimes($);
 
-my $server = "fhem.de:80";
+my $server = "http://fhem.de:80";
 my $sdir   = "/fhemupdate2";
 my $ftime  = "filetimes.txt";
 my $dfu    = "dfu-programmer";
@@ -30,7 +29,7 @@ sub
 CommandCULflash($$)
 {
   my ($cl, $param) = @_;
-  my $modpath = (-d "update" ? "update" : $attr{global}{modpath});
+  my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir = "$modpath/FHEM";
 
   my %ctypes = (
@@ -51,16 +50,16 @@ CommandCULflash($$)
 
   ################################
   # First get the index file to prove the file size
-  my $filetimes = GetHttpFile($server, "$sdir/$ftime");
+  my $filetimes = GetFileFromURL("$server$sdir/$ftime");
   return "Can't get $ftime from $server" if(!$filetimes);
 
   # split filetime and filesize
-  my ($ret, $filetime, $filesize) = SplitNewFiletimes($filetimes);
+  my ($ret, $filetime, $filesize) = CULflash_SplitNewFiletimes($filetimes);
   return $ret if($ret);
 
   ################################
   # Now get the firmware file:
-  my $content = GetHttpFile($server, "$sdir/FHEM/$target.hex");
+  my $content = GetFileFromURL("$server$sdir/FHEM/$target.hex");
   return "File size for $target.hex does not correspond to filetimes.txt entry"
           if(length($content) ne $filesize->{"FHEM/$target.hex"});
   my $localfile = "$moddir/$target.hex";
@@ -84,48 +83,7 @@ CommandCULflash($$)
 }
 
 sub
-GetHttpFile($$@)
-{
-  my ($host, $filename, $timeout) = @_;
-  $timeout = 2.0 if(!defined($timeout));
-
-  $filename =~ s/%/%25/g;
-  my $conn = IO::Socket::INET->new(PeerAddr => $host);
-  if(!$conn) {
-    Log 1, "CULflash Can't connect to $host\n";
-    undef $conn;
-    return undef;
-  }
-  $host =~ s/:.*//;
-  my $req = "GET $filename HTTP/1.0\r\nHost: $host\r\n\r\n\r\n";
-  syswrite $conn, $req;
-  shutdown $conn, 1; # stopped writing data
-  my ($buf, $ret) = ("", "");
-
-  $conn->timeout($timeout);
-  for(;;) {
-    my ($rout, $rin) = ('', '');
-    vec($rin, $conn->fileno(), 1) = 1;
-    my $nfound = select($rout=$rin, undef, undef, $timeout);
-    if($nfound <= 0) {
-      Log 1, "CULflash GetHttpFile: Select timeout/error: $!";
-      undef $conn;
-      return undef;
-    }
-
-    my $len = sysread($conn,$buf,65536);
-    last if(!defined($len) || $len <= 0);
-    $ret .= $buf;
-  }
-
-  $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
-  Log 4, "CULflash Got http://$host$filename, length: ".length($ret);
-  undef $conn;
-  return $ret;
-}
-
-sub
-SplitNewFiletimes($)
+CULflash_SplitNewFiletimes($)
 {
   my $filetimes = shift;
   my $ret;
