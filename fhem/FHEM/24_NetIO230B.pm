@@ -46,6 +46,7 @@ use strict;
 use warnings;
 use Data::Dumper;
 use IO::Socket;
+use HttpUtils;
 
 use constant PARAM_NAME 	=> 1;
 use constant PARAM_HOST 	=> 2;
@@ -120,7 +121,7 @@ NetIO230B_Request($@)
 	my $URL='';
 	my $log='';
 
-	my $response = GetHttpFile($hash->{HOST}.":80","/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=l");
+	my $response = GetFileFromURL("http://".$hash->{HOST}."/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=l");
 	if(!$response or length($response)==0)
 	{
 		Log 3, "NetIO230B_Request failed: ".$log;

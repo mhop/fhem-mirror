@@ -8,6 +8,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
+uset HttpUtils;
 
 sub dayofyear {
     my ($day1,$month,$year)=@_;
@@ -274,7 +275,7 @@ sub Twilight_getWeatherHorizon{
    #condition codes are described in FHEM wiki and in the documentation of the yahoo weather API
    my $hash=shift;
    my $location=$hash->{WEATHER};
-   my $xml = GetHttpFile("weather.yahooapis.com:80","/forecastrss?w=".$location."&u=c",4.0);
+   my $xml = GetFileFromURL("http://weather.yahooapis.com/forecastrss?w=".$location."&u=c",4.0);
    my $current;
    if($xml=~/code="(.*)"(\ *)temp/){
     if(defined($1)){
