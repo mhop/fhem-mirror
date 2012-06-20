@@ -268,15 +268,27 @@ FW_Read($)
   $hash->{BUF} .= $buf;
   return if($hash->{BUF} !~ m/\n\n$/ && $hash->{BUF} !~ m/\r\n\r\n$/);
 
-  #Log 0, "Got: >$hash->{BUF}<";
   @FW_httpheader = split("[\r\n]", $hash->{BUF});
 
   #############################
   # BASIC HTTP AUTH
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
   if($basicAuth) {
-    my @auth = grep /^Authorization: Basic $basicAuth/, @FW_httpheader;
-    if(!@auth) {
+    $hash->{BUF} =~ m/^Authorization: Basic (.*)/m;
+    my $secret = $1;
+    my $pwok = ($secret && $secret eq $basicAuth);
+    if($secret && $basicAuth =~ m/^{.*}$/) {
+      eval "use MIME::Base64";
+      if($@) {
+        Log 1, $@;
+
+      } else {
+        my ($user, $password) = split(":", decode_base64($secret));
+        $pwok = eval $basicAuth;
+        Log 1, "basicAuth expression: $@" if($@);
+      }
+    }
+    if(!$pwok) {
       my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
       print $c "HTTP/1.1 401 Authorization Required\r\n",
              "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
@@ -628,7 +640,6 @@ FW_makeTable($$@)
     next if($r && ($r ne "HASH" || !defined($hash->{$n}{VAL})));
     pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
     $row++;
-
     my $val = $hash->{$n};
 
     if($n eq "DEF" && !$FW_hiddenroom{input}) {
@@ -1542,8 +1553,7 @@ FW_style($$)
 
     my @fl = ("fhem.cfg");
     push(@fl, "");
-    #push(@fl, FW_fileList("$FW_dir/.*(sh|Util.*|cfg|holiday)"));
-    push(@fl, FW_fileList("$MW_dir/.*(sh|Util.*|cfg|holiday)"));
+    push(@fl, FW_fileList("$MW_dir/.*(sh|[0-9].*Util.*|cfg|holiday)"));
     push(@fl, "");
     push(@fl, FW_fileList("$FW_dir/.*.(css|svg)"));
     push(@fl, "");
