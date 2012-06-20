@@ -12,6 +12,7 @@ use strict;
 use warnings;
 use GD;
 use vars qw(%data);
+use HttpUtils;
 
 # we can 
 # use vars qw(%FW_types);  # device types,
@@ -232,7 +233,7 @@ RSS_itemGif {
   return if($host eq "");
   return if($filename eq "");
   ($x,$y)= RSS_xy($S,$x,$y);
-  my $data = GetHttpFile($host,$filename);
+  my $data = GetFileFromURL("http://$host$filename");
   return unless(defined($data));
   my $I= GD::Image->newFromGifData($data);
   my ($width,$height)= $I->getBounds();
