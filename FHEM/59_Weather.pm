@@ -120,7 +120,7 @@ sub Weather_RetrieveDataDirectly($)
   my $lang= $hash->{LANG}; 
 
   my $fc = undef;
-  my $xml = GetHttpFile("www.google.com:80", "/ig/api?weather=" . $location . "&hl=" . $lang);
+  my $xml = GetFileFromURL("http://www.google.com/ig/api?weather=" . $location . "&hl=" . $lang);
   return 0 if($xml eq "");
   foreach my $l (split("<",$xml)) {
           #Log 1, "DEBUG WEATHER: line=\"$l\"";

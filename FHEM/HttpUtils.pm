@@ -83,4 +83,13 @@ GetFileFromURL($@)
   return $ret;
 }
 
+##################
+# Compatibility mode
+sub
+GetHttpFile($$)
+{
+  my ($host,$port) = @_;
+  return GetFileFromURL("http://$host$file);
+}
+
 1;
