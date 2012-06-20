@@ -88,7 +88,7 @@ GetFileFromURL($@)
 sub
 GetHttpFile($$)
 {
-  my ($host,$port) = @_;
+  my ($host,$file) = @_;
   return GetFileFromURL("http://$host$file");
 }
 
