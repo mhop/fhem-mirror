@@ -14,7 +14,7 @@
 
 use strict;
 use warnings;
-use HttpUtils.pm;
+use HttpUtils;
 
 
 ##############################################
