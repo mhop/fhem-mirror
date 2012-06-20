@@ -1340,7 +1340,15 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="portpassword"></a>
     <li>portpassword<br>
         Specify a port password, which has to be entered as the very first
-        string after the connection is established.
+        string after the connection is established. If the argument is enclosed
+        in {}, then it will be evaluated, and the $password variable will be
+        set to the password entered. If the return value is true, then the
+        password will be accepted.
+        Example:<br>
+        <code>
+        attr global portpassword secret<br>
+        attr global portpassword {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        </code>
     </li><br>
 
 
@@ -8519,7 +8527,19 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
         </ul>
         You can of course use other means of base64 encoding, e.g. online
         Base64 encoders. If basicAuthMsg is set, it will be displayed in the
-        popup window when requesting the username/password.
+        popup window when requesting the username/password.<br>
+        <br>
+        If the argument of basicAuth is enclosed in {}, then it will be
+        evaluated, and the $user and $password variable will be set to the
+        values entered. If the return value is true, then the password will be
+        accepted.
+        Example:<br>
+        <code>
+        attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
+        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        </code>
+
+
     </li><br>
 
     <a name="HTTPS"></a>

@@ -47,6 +47,7 @@
   - feature: time and internet helper routines added to fhem.pl (Boris)
   - change:  separating common functions used by the FHEM modules into
              *Utils.pm files from fhem.pl
+  - feature: portpassword and basicAuth may use evaluated functions
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera

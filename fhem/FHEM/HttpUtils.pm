@@ -22,7 +22,7 @@ sub
 GetFileFromURL($@)
 {
   my ($url, $timeout, $data, $noshutdown) = @_;
-  $timeout = 2.0 if(!defined($timeout));
+  $timeout = 4.0 if(!defined($timeout));
 
   if($url !~ /^(http):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
     Log 1, "GetFileFromURL $url: malformed URL";
