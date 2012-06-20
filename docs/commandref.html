@@ -4154,15 +4154,78 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="KM271set"></a>
   <b>Set </b>
   <ul>
-    <code>set KM271  &lt;param&gt; [&lt;value&gt;]</code><br><br>
+    <code>set KM271  &lt;param&gt; [&lt;value&gt; [&lt;values&gt;]]</code><br><br>
     where param is one of:
     <ul>
-      <li>hk1_nachtsoll &lt;temp&gt;<br>(0.5 celsius resolution)</li>
-      <li>hk1_tagsoll &lt;temp&gt;<br>(0.5 celsius resolution)</li>
-      <li>hk1_betriebsart [automatik|nacht|tag]</li>
-      <li>ww_soll &lt;temp&gt;<br>(1.0 celsius resolution)</li>
+      <li>hk1_tagsoll &lt;temp&gt;<br>
+          sets the by day temperature for heating circuit 1<br>
+          0.5 celsius resolution - temperature between 10 and 30 (°C)</li>
+      <li>hk2_tagsoll &lt;temp&gt;<br>
+          sets the by day temperature for heating circuit 2<br>
+          (see above)</li>
+      <li>hk1_nachtsoll &lt;temp&gt;<br>
+          sets the by night temperature for heating circuit 1<br>
+          (see above)</li>
+      <li>hk2_nachtsoll &lt;temp&gt;<br>
+          sets the by night temperature for heating circuit 2<br>
+          (see above)</li>
+      <li>hk1_betriebsart [automatik|nacht|tag]<br>
+          sets the working mode for heating circuit 1<br>
+          <ul>
+            <li>automatik: the timer program is active and the summer configuration is in effect</li>
+            <li>nacht: manual by night working mode, no timer program is in effect</li>
+            <li>tag: manual by day working mode, no timer program is in effect</li>
+          </ul></li>
+      </li>
+      <li>hk2_betriebsart [automatik|nacht|tag]<br>
+          sets the working mode for heating circuit 2<br>
+          (see above)</li>
+      <li>ww_soll &lt;temp&gt;<br>
+          sets the hot water temperature<br>
+          1.0 celsius resolution - temperature between 30 and 60 (°C)</li>
       <li>ww_betriebsart [automatik|nacht|tag]</li>
-      <li>logmode<br>set to logmode / request all parameters again</li>
+          sets the working mode for hot water<br>
+          <ul>
+            <li>automatik: hot water production according to the woking modes of both heating circuits</li>
+            <li>nacht: no hot water at all</li>
+            <li>tag: manual permanent hot water</li>
+          </ul></li>
+      <li>hk1_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
+          sets the timer program for heating circuit 1<br>
+          <ul>
+            <li>eigen: the custom program defined by the user (see below) is used</li>
+            <li>all others: predefined programs from Buderus for various situations (see Buderus manual for details)</li>
+          </ul></li>
+      <li>hk2_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
+          sets the timer program for heating circuit 2<br>
+          (see above)</li>
+      <li>hk1_timer [&lt;position&gt; delete|&lt;position&gt; &lt;on-day&gt; &lt;on-time&gt; &lt;off-day&gt; &lt;off-time&gt;]<br>
+          sets (or deactivates) a by day working mode time interval for the custom program of heating circuit 1<br>
+          <ul>
+            <li>position: addresses a slot of the custom timer program and must be between 1 and 21<br>
+                The slot will be set to the interval specified by the following on- and off-timepoints or is deactivated when the next argument is <b>delete</b>.</li>
+            <li>on-day: first part of the on-timepoint<br>
+                valid arguments are [mo|di|mi|do|fr|sa|so]</li>
+            <li>on-time: second part of the on-timepoint<br>
+                valid arguments have the format HH:MM (supported resolution: 10 min)</li>
+            <li>off-day: first part of the off-timepoint<br>
+                (see above)</li>
+            <li>off-time: second part of the off-timepoint<br>
+                valid arguments have the format HH:MM (supported resolution: 10 min)</li>
+          </ul>
+          As the on-timepoint is reached, the heating circuit is switched to by day working mode and when the off-timepoint is attained, the circuit falls back to by night working mode.
+          A program can be build up by chaining up to 21 of these intervals. They are ordered by the position argument. There's no behind the scene magic that will automatically consolidate the list.
+          The consistency of the program is in the responsibility of the user.
+          <br><br>
+          Example:
+          <ul>
+            <code>set KM271 hk1_timer 1 mo 06:30 mo 08:20</code><br>
+          </ul><br>
+          This will toogle the by day working mode every Monday at 6:30 and will fall back to by night working mode at 8:20 the same day.</li>
+      <li>hk2_timer [&lt;position&gt; delete|&lt;position&gt; &lt;on-day&gt; &lt;on-time&gt; &lt;off-day&gt; &lt;off-time&gt;]<br>
+          sets (or deactivates) a by day working mode time interval for the custom program of heating circuit 2<br>
+          (see above)</li>
+      <li>logmode<br>set to logmode / request all readings again</li>
     </ul>
   </ul>
   <br>
@@ -4196,60 +4259,66 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="KM271events"></a>
   <b>Generated events:</b>
   <ul>
-    <li>HK1_Betriebswerte1
-    <li>HK1_Betriebswerte2
-    <li>HK1_Vorlaufsolltemperatur
-    <li>HK1_Vorlaufisttemperatur
-    <li>HK1_Raumsolltemperatur
-    <li>HK1_Raumisttemperatur
-    <li>HK1_Einschaltoptimierungszeit
-    <li>HK1_Ausschaltoptimierungszeit
-    <li>HK1_Pumpenleistung
-    <li>HK1_Mischerstellung
-    <li>HK1_Heizkennlinie_bei_+_10_Grad
-    <li>HK1_Heizkennlinie_bei_0_Grad
-    <li>HK1_Heizkennlinie_bei_-_10_Grad
-    <li>HK2_Betriebswerte1
-    <li>HK2_Betriebswerte2
-    <li>HK2_Vorlaufsolltemperatur
-    <li>HK2_Vorlaufisttemperatur
-    <li>HK2_Raumsolltemperatur
-    <li>HK2_Raumisttemperatur
-    <li>HK2_Einschaltoptimierungszeit
-    <li>HK2_Ausschaltoptimierungszeit
-    <li>HK2_Pumpenleistung
-    <li>HK2_Mischerstellung
-    <li>HK2_Heizkennlinie_bei_+_10_Grad
-    <li>HK2_Heizkennlinie_bei_0_Grad
-    <li>HK2_Heizkennlinie_bei_-_10_Grad
-    <li>WW_Betriebswerte1
-    <li>WW_Betriebswerte2
-    <li>WW_Solltemperatur
-    <li>WW_Isttemperatur
-    <li>WW_Einschaltoptimierungszeit
-    <li>WW_Ladepumpe
-    <li>Kessel_Vorlaufsolltemperatur
-    <li>Kessel_Vorlaufisttemperatur
-    <li>Brenner_Einschalttemperatur
-    <li>Brenner_Ausschalttemperatur
-    <li>Kessel_Integral1
-    <li>Kessel_Integral
-    <li>Kessel_Fehler
-    <li>Kessel_Betrieb
-    <li>Brenner_Ansteuerung
     <li>Abgastemperatur
-    <li>Brenner_Stellwert
+    <li>Aussentemperatur
+    <li>Aussentemperatur_gedaempft
+    <li>Brenner_Ansteuerung
+    <li>Brenner_Ausschalttemperatur
+    <li>Brenner_Einschalttemperatur
     <li>Brenner_Laufzeit1_Minuten2
     <li>Brenner_Laufzeit1_Minuten1
     <li>Brenner_Laufzeit1_Minuten
     <li>Brenner_Laufzeit2_Minuten2
     <li>Brenner_Laufzeit2_Minuten1
     <li>Brenner_Laufzeit2_Minuten
-    <li>Aussentemperatur
-    <li>Aussentemperatur_gedaempft
-    <li>Versionsnummer_VK
-    <li>Versionsnummer_NK
+    <li>ERR_Fehlerspeicher1
+    <li>ERR_Fehlerspeicher2
+    <li>ERR_Fehlerspeicher3
+    <li>ERR_Fehlerspeicher4
+    <li>HK1_Ausschaltoptimierung
+    <li>HK1_Betriebswerte1
+    <li>HK1_Betriebswerte2
+    <li>HK1_Einschaltoptimierung
+    <li>HK1_Heizkennlinie_+10_Grad
+    <li>HK1_Heizkennlinie_-10_Grad
+    <li>HK1_Heizkennlinie_0_Grad
+    <li>HK1_Mischerstellung
+    <li>HK1_Pumpe
+    <li>HK1_Raumisttemperatur
+    <li>HK1_Raumsolltemperatur
+    <li>HK1_Vorlaufisttemperatur
+    <li>HK1_Vorlaufsolltemperatur
+    <li>HK2_Ausschaltoptimierung
+    <li>HK2_Betriebswerte1
+    <li>HK2_Betriebswerte2
+    <li>HK2_Einschaltoptimierung
+    <li>HK2_Heizkennlinie_+10_Grad
+    <li>HK2_Heizkennlinie_-10_Grad
+    <li>HK2_Heizkennlinie_0_Grad
+    <li>HK2_Mischerstellung
+    <li>HK2_Pumpe
+    <li>HK2_Raumisttemperatur
+    <li>HK2_Raumsolltemperatur
+    <li>HK2_Vorlaufisttemperatur
+    <li>HK2_Vorlaufsolltemperatur    
+    <li>Kessel_Betrieb
+    <li>Kessel_Fehler
+    <li>Kessel_Integral
+    <li>Kessel_Integral1
+    <li>Kessel_Vorlaufisttemperatur
+    <li>Kessel_Vorlaufsolltemperatur
+    <li>Letzter_Fehlerstatus
+    <li>Mod_Brenner_Stellglied
     <li>Modulkennung
+    <li>NoData
+    <li>Versionsnummer_NK
+    <li>Versionsnummer_VK
+    <li>WW_Betriebswerte1
+    <li>WW_Betriebswerte2
+    <li>WW_Einschaltoptimierung
+    <li>WW_Isttemperatur
+    <li>WW_Pumpentyp
+    <li>WW_Solltemperatur
   </ul>
   <br>
   As I cannot explain all the values, I logged data for a period and plotted
@@ -4270,8 +4339,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     </ul>
   All of these events are reported directly after initialization (or after
   requesting logmode), along with some 60 configuration records (6byte long
-  each). About 20 parameters from these records are reverse engeneered, they
-  all start with CFG_.
+  each). Most parameters from these records are reverse engeneered, they
+  all start with CFG_ for configuration and PRG_ for timer program information.
   </ul>
 
 
