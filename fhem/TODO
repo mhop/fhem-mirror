@@ -1,4 +1,8 @@
 FHEM:
+- FHEMWEB warning
+- finish updatefhem
+- autoload commands -> rename updatefhem, CULflash, etc
+
 - FHEM2FHEM reconnect
 - HomeMatic set log 2
 - implement wiki decisions

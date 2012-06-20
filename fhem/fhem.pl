@@ -652,7 +652,15 @@ AnalyzeInput($)
 
     if($attr{global}{portpassword} && !$client{$c}{pwEntered}) {
       syswrite($client{$c}{fd}, sprintf("%c%c%c\r\n", 255, 252, 1)); # WONT ECHO
-      if($attr{global}{portpassword} eq $cmd) {
+
+      my $ret = ($attr{global}{portpassword} eq $cmd);
+      if($attr{global}{portpassword} =~ m/^{.*}$/) {  # Expression as pw
+        my $password = $cmd;
+        $ret = eval $attr{global}{portpassword};
+        Log 1, "portpasswd expression: $@" if($@);
+      }
+
+      if($ret) {
         $client{$c}{pwEntered} = 1;
         next;
       } else {
