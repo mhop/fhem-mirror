@@ -8,7 +8,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-uset HttpUtils;
+use HttpUtils;
 
 sub dayofyear {
     my ($day1,$month,$year)=@_;
