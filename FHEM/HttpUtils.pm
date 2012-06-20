@@ -89,7 +89,7 @@ sub
 GetHttpFile($$)
 {
   my ($host,$port) = @_;
-  return GetFileFromURL("http://$host$file);
+  return GetFileFromURL("http://$host$file");
 }
 
 1;
