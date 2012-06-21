@@ -4167,7 +4167,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <ul>
       <li>hk1_tagsoll &lt;temp&gt;<br>
           sets the by day temperature for heating circuit 1<br>
-          0.5 celsius resolution - temperature between 10 and 30 (°C)</li>
+          0.5 celsius resolution - temperature between 10 and 30 celsius</li>
       <li>hk2_tagsoll &lt;temp&gt;<br>
           sets the by day temperature for heating circuit 2<br>
           (see above)</li>
@@ -4190,11 +4190,11 @@ A line ending with \ will be concatenated with the next one, so long lines
           (see above)</li>
       <li>ww_soll &lt;temp&gt;<br>
           sets the hot water temperature<br>
-          1.0 celsius resolution - temperature between 30 and 60 (°C)</li>
+          1.0 celsius resolution - temperature between 30 and 60 celsius</li>
       <li>ww_betriebsart [automatik|nacht|tag]</li>
           sets the working mode for hot water<br>
           <ul>
-            <li>automatik: hot water production according to the woking modes of both heating circuits</li>
+            <li>automatik: hot water production according to the working modes of both heating circuits</li>
             <li>nacht: no hot water at all</li>
             <li>tag: manual permanent hot water</li>
           </ul></li>
@@ -4253,8 +4253,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="all_km271_events"></a>
     <li>all_km271_events<br>
         If this attribute is set to 1, do not ignore following events:<br>
-        Vorlaufisttemperatur_HK1, Kesselvorlaufisttemperatur,
-        Kesselintegral_1, "Kesselintegral_2<br>
+        HK1_Vorlaufisttemperatur, HK2_Vorlaufisttemperatur, Kessel_Vorlaufisttemperatur,
+        Kessel_Integral, Kessel_Integral1<br>
         These events account for ca. 92% of all events.<br>
         All UNKNOWN events are ignored too, most of them were only seen
         directly after setting the device into logmode.
