@@ -92,7 +92,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
-  $hash->{NotifyFn}= "FW_Notify";
+  $hash->{NotifyFn}= "FW_SecurityCheck";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress:0,1 ".
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
@@ -107,6 +107,25 @@ FHEMWEB_Initialize($)
 
   addToAttrList("webCmd");
   addToAttrList("icon");
+}
+
+#####################################
+sub
+FW_SecurityCheck($$)
+{
+  my ($ntfy, $dev) = @_;
+  return if($dev->{NAME} ne "global" ||
+            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
+  my $motd = AttrVal("global", "motd", "");
+  if($motd =~ "^SecurityCheck") {
+    my @list = grep { !AttrVal($_, "basicAuth", undef) }
+               devspec2array("TYPE=FHEMWEB");
+    $motd .= (join(",", sort @list)." has no basicAuth attribute\n")
+        if(@list);
+    $attr{global}{motd} = $motd;
+  }
+  $modules{FHEMWEB}{NotifyFn}= "FW_Notify";
+  return undef;
 }
 
 #####################################
@@ -274,7 +293,7 @@ FW_Read($)
   # BASIC HTTP AUTH
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
   if($basicAuth) {
-    $hash->{BUF} =~ m/^Authorization: Basic (.*)/m;
+    $hash->{BUF} =~ m/Authorization: Basic ([^\r\n]*)/s;
     my $secret = $1;
     my $pwok = ($secret && $secret eq $basicAuth);
     if($secret && $basicAuth =~ m/^{.*}$/) {
@@ -293,6 +312,7 @@ FW_Read($)
       print $c "HTTP/1.1 401 Authorization Required\r\n",
              "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
              "Content-Length: 0\r\n\r\n";
+      $hash->{BUF}="";
       return;
     };
   }
@@ -302,6 +322,7 @@ FW_Read($)
   my ($mode, $arg, $method) = split(" ", $FW_httpheader[0]);
   $hash->{BUF} = "";
 
+  $arg = "" if(!defined($arg));
   Log $ll, "HTTP $name GET $arg";
   my $pid;
   if(AttrVal($FW_wname, "plotfork", undef)) {
@@ -545,6 +566,11 @@ FW_AnswerCall($)
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
   elsif($cmd =~ /^logwrapper/) { FW_logWrapper($cmd);     }
+  elsif(AttrVal("global", "motd", "none") ne "none") {
+    my $motd = AttrVal("global","motd",undef);
+    $motd =~ s/\n/<br>/g;
+    FW_pO "<div id=\"content\">$motd</div>";
+  }
   FW_pO "</body></html>";
   return 0;
 }
@@ -791,7 +817,7 @@ FW_roomOverview($)
     return;
 
   } else {
-    FW_pO "<div id=\"logo\"></div>";
+    FW_pH "", "<div id=\"logo\"></div>";
 
   }
 

@@ -70,7 +70,7 @@ SVG_render($$$$$$$$)
          'xmlns:xlink="http://www.w3.org/1999/xlink" >';
 
   my $prf = AttrVal($parent_name, "stylesheetPrefix", "");
-  SVG_pO "<style lType=\"text/css\"><![CDATA[";
+  SVG_pO "<style type=\"text/css\"><![CDATA[";
   if(open(FH, "$parent_dir/${prf}svg_style.css") ||
      open(FH, "$parent_dir/svg_style.css")) {
     SVG_pO join("", <FH>);
