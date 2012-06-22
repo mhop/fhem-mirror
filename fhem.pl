@@ -195,7 +195,7 @@ $modules{Global}{AttrList} =
   "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
   "autoload_undefined_devices dupTimeout latitude longitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
-  "exclude_from_update ";
+  "exclude_from_update motd";
 
 $modules{Global}{AttrFn} = "GlobalAttr";
 
@@ -355,8 +355,17 @@ if($pfn) {
 # create the global interface definitions
 createInterfaceDefinitions();
 
+$attr{global}{motd} = "SecurityCheck:\n\n"
+        if(!$attr{global}{motd} || $attr{global}{motd} =~ m/^SecurityCheck/);
+
 $init_done = 1;
 DoTrigger("global", "INITIALIZED");
+
+$attr{global}{motd} .=
+        "\nSet the global attribute motd to none to supress this message,\n".
+        "or restart fhem for a new check if the problem ist fixed.\n"
+        if($attr{global}{motd} =~ m/^SecurityCheck:\n\n./);
+delete($attr{global}{motd}) if($attr{global}{motd} eq "SecurityCheck:\n\n");
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
 
@@ -682,6 +691,11 @@ AnalyzeInput($)
       }
     } else {
       $client{$c}{prompt} = 1;                  # Empty return
+      if(!$client{$c}{motdDisplayed}) {
+        my $motd = $attr{global}{motd};
+        push @ret, $motd if($motd && $motd ne "none");
+        $client{$c}{motdDisplayed} = 1;
+      }
     }
     next if($rest);
   }
@@ -1155,6 +1169,7 @@ CommandSave($$)
               ($a eq "configfile" || $a eq "version"));
       my $val = $attr{$d}{$a};
       $val =~ s/;/;;/g;
+      $val =~ s/\n/\\\n/g;
       print $fh "attr $d $a $val\n";
     }
   }
