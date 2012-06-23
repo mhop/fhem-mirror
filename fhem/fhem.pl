@@ -28,6 +28,8 @@
 #  for inspiration.
 #
 #  Homepage:  http://fhem.de
+#
+# $Id$
 
 
 use strict;
