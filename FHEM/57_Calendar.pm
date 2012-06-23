@@ -6,11 +6,11 @@
 # e-mail: omega at online dot de
 #
 ##############################################
-# $Id $
+# $Id$
 
 # Todos:
 #  Support recurring events
-#  update documentation (get MyCalendar full all, use URL-encoded URLs for Google Calendar
+
 
 use strict;
 use warnings;
@@ -316,6 +316,28 @@ sub fromVEvent {
   $self->{summary}= $vevent->value("SUMMARY");
   #$self->{summary}=~ s/;/,/g;
 
+  #
+  # recurring events
+  #
+  # this part is under construction
+  # we have to think a lot about how to deal with the migration of states for recurring events
+  my $rrule= $vevent->value("RRULE");
+  if($rrule) {
+    my @rrparts= split(";", $rrule);
+    my %r= map { split("=", $_); } @rrparts;
+    #foreach my $k (keys %r) {
+    #  main::debug "Rule part $k is $r{$k}";
+    #}
+    my $freq= $r{"FREQ"};
+    #
+    # weekly
+    #
+    if($freq eq "WEEKLY") {
+      my @weekdays= split(",",$r{"BYDAY"});
+    }
+  }
+  
+
   # alarms
   my @valarms= grep { $_->{type} eq "VALARM" } @{$vevent->{entries}};
   my @alarmtimes= sort map { dt($self->{start}, $_->value("TRIGGER"), $_->parts("TRIGGER")) } @valarms;
@@ -366,10 +388,14 @@ sub asFull {
   );
 }
 
-# returns 1 if time is between alarm time and start time, else 0
+# returns 1 if time is before alarm time and before start time, else 0
 sub isUpcoming {
   my ($self,$t) = @_;
-  return $t< $self->{alarm} ? 1 : 0;
+  if($self->{alarm}) {
+    return $t< $self->{alarm} ? 1 : 0;
+  } else {
+    return $t< $self->{start} ? 1 : 0;
+  }
 }
 
 # returns 1 if time is between alarm time and start time, else 0
@@ -598,6 +624,7 @@ sub Calendar_GetUpdate($) {
 
   my ($hash) = @_;
 
+  #main::debug "Updating...";
   my $url= $hash->{fhem}{url};
   
   my $ics= GetFileFromURL($url);
@@ -617,14 +644,25 @@ sub Calendar_GetUpdate($) {
     Log 1, "Calendar " . $hash->{NAME} . ": Not an ical file at $url";
     $hash->{STATE}= "Not an ical file at URL";
     return 0;
+  };
+  
+  my $root= @{$ical->{entries}}[0];
+  my $calname= "?";
+  if($root->{type} ne "VCALENDAR") {
+    Log 1, "Calendar " . $hash->{NAME} . ": Root element is not a VCALENDAR";
+    $hash->{STATE}= "Root element is not a VCALENDAR";
+    return 0;
   } else {
-    $hash->{STATE}= "Active";
+    $calname= $root->value("X-WR-CALNAME");
   }
-
+  
+    
+  $hash->{STATE}= "Active";
+  
   # we now create the events from it
   #main::debug "Creating events...";
   my $eventsObj= $hash->{fhem}{events};
-  $eventsObj->updateFromCalendar(@{$ical->{entries}}[0]);
+  $eventsObj->updateFromCalendar($root);
   $hash->{fhem}{events}= $eventsObj;
 
   # we now update the readings
@@ -638,6 +676,7 @@ sub Calendar_GetUpdate($) {
 
   #$hash->{STATE}= $val;
   readingsBeginUpdate($hash);
+  readingsUpdate($hash, "calname", $calname);
   readingsUpdate($hash, "all", join(";", @all));
   readingsUpdate($hash, "stateNew", join(";", @new));
   readingsUpdate($hash, "stateUpdated", join(";", @updated));
