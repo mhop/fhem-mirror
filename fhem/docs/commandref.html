@@ -28,7 +28,6 @@
   <br>
   <b>fhem commands</b>
   <ul>
-
       <a href="#attr">attr</a> &nbsp;
       <a href="#backup">backup</a> &nbsp;
       <a href="#CULflash">CULflash</a> &nbsp;
@@ -167,6 +166,7 @@
     <a href="#notify">notify</a> &nbsp;
     <a href="#sequence">sequence</a> &nbsp;
     <a href="#structure">structure</a> &nbsp;
+    <a href="#telnet">telnet</a> &nbsp;
     <a href="#watchdog">watchdog</a> &nbsp;
     <a href="#weblink">weblink</a> &nbsp;
 
@@ -1004,6 +1004,7 @@ A line ending with \ will be concatenated with the next one, so long lines
   Note: The statefile will be saved first, then the config file will be read
   (all devices will be initialized again), and at last the statefile will be
   reloaded. It triggers upon completion the global:REREADCFG event.
+  All existing connections up to the one issuing the rereadcfg will be closed.
   <br><br>
   Example:
   <ul>
@@ -1179,12 +1180,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     </li><br>
 
 
-    <a name="allowfrom"></a>
-    <li>allowfrom<br>
-        Comma (,) separated list of ip-addresses or hostnames. If set,
-        only connections from these addresses are allowed.
-    </li><br>
-
     <a name="backup_before_update"></a>
     <li>backup_before_update<br>
         If this attribute is set to 0, updatefhem skip always backing up your
@@ -1304,6 +1299,14 @@ A line ending with \ will be concatenated with the next one, so long lines
         modpath attribute definition time).
     </li><br>
 
+    <a name="motd"></a>
+    <li>motd<br>
+        Message Of The Day. Displayed on the homescreen of the FHEMWEB package,
+        or directly after the telnet logon, before displaying the fhem> prompt. 
+        SecurityCheck is setting motd if it is not defined upon startup, to
+        avoid this set the motd value to none
+    </li><br>
+
     <a name="mseclog"></a>
     <li>mseclog<br>
         If set, the timestamp in the logfile will contain a millisecond part.
@@ -1322,35 +1325,6 @@ A line ending with \ will be concatenated with the next one, so long lines
         the pid if we are still running. The file will be deleted upon
         shutdown.
     </li><br>
-
-    <a name="port"></a>
-    <li>port<br>
-        Listen on the TCP/IP port <code>&lt;number&gt;</code> for incoming
-        connections. To offer at least a little bit of security, the server
-        will only listen for connections from the localhost per default. If
-        there is a second value  "global" then the server will listen for
-        non-localhost connections too.<br><br>
-        This attribute is optional starting with fhem 5.3.<br><br>
-        To use IPV6, specify the port as IPV6:&lt;number&gt;, in this
-        case the perl module IO::Socket:INET6 will be requested.
-        On Linux you may have to install it with cpan -i IO::Socket::INET6 or
-        apt-get libio-socket-inet6-perl; the OSX perl already has this module.
-    </li><br>
-
-    <a name="portpassword"></a>
-    <li>portpassword<br>
-        Specify a port password, which has to be entered as the very first
-        string after the connection is established. If the argument is enclosed
-        in {}, then it will be evaluated, and the $password variable will be
-        set to the password entered. If the return value is true, then the
-        password will be accepted.
-        Example:<br>
-        <code>
-        attr global portpassword secret<br>
-        attr global portpassword {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
-        </code>
-    </li><br>
-
 
     <a name="statefile"></a>
     <a name="statefile"></a>
@@ -5148,8 +5122,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="POKEYS"></a>
 <h3>POKEYS</h3>
 <ul>
-  <table>
-  <tr><td>
   The POKEYS module is used to control the LAN POKEYS device (<a href="http://www.poscope.com/pokeys56e">POKEYS56e</a>) which supports
   up to 56 digital input, analog inputs, counter inputs and digital outputs.
   Each port/pin has to be configured before it can be used.
@@ -5214,7 +5186,6 @@ A line ending with \ will be concatenated with the next one, so long lines
     todo <br>
   </ul>
   <br>
-  </ul>
 </ul>
 
 <a name="VantagePro2"></a>
@@ -8544,10 +8515,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 
     <a name="HTTPS"></a>
     <li>HTTPS<br>
-        use HTTPS instead of HTTP. This feature requires the perl module
+        Enable HTTPS connections. This feature requires the perl module
         IO::Socket::SSL, to be installed with cpan -i IO::Socket::SSL or
-        apt-get install libio-socket-ssl-perl; the OSX perl already has this
-        module.<br>
+        apt-get install libio-socket-ssl-perl; OSX and the FritzBox-7390
+        already have this module.<br>
+
         A local certificate has to be generated into a directory called certs,
         this directory <b>must</b> be in the <a href="#modpath">modpath</a>
         directory, at the same level as the FHEM directory.
@@ -8558,6 +8530,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
         </ul>
       <br><br>
     </li>
+
+    <li><a href="#allowfrom">allowfrom</a></li>
+    </li><br>
+    <li><a href="#loglevel">loglevel</a></li>
+    </li><br>
 
     <a name="stylesheetPrefix"></a>
     <li>stylesheetPrefix<br>
@@ -9624,6 +9601,98 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <br>
 
 </ul>
+
+<a name="telnet"></a>
+<h3>telnet</h3>
+<ul>
+  <br>
+  <a name="telnetdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code>
+    <br><br>
+
+    Listen on the TCP/IP port <code>&lt;portNumber&gt;</code> for incoming
+    connections. If the second parameter global is <b>not</b> specified,
+    the server will only listen to localhost connections.
+    <br><br>
+
+    To use IPV6, specify the portNumber as IPV6:&lt;number&gt;, in this
+    case the perl module IO::Socket:INET6 will be requested.
+    On Linux you may have to install it with cpan -i IO::Socket::INET6 or
+    apt-get libio-socket-inet6-perl; OSX and the FritzBox-7390 perl already has
+    this module.
+    <br><br>
+    Examples:
+    <ul>
+        <code>define tPort telnet 7072 global</code><br>
+        <code>attr tPort globalpasswort mySecret</code><br>
+        <code>attr tPort SSL</code><br>
+    </ul>
+    <br>
+    Note: The old global attribute port is automatically converted to a
+    telnet instance with the name telnetPort. The global allowfrom attibute is
+    lost in this conversion.
+  </ul>
+  <br>
+
+
+  <a name="telnetset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="telnetget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="telnetattr"></a>
+  <b>Attributes:</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <br>
+
+    <a name="password"></a>
+    <li>password<br>
+        Specify a password, which has to be entered as the very first string
+        after the connection is established. If the argument is enclosed in {},
+        then it will be evaluated, and the $password variable will be set to
+        the password entered. If the return value is true, then the password
+        will be accepted. If thies parameter is specified, fhem sends telnet
+        IAC requests to supress echo while entering the password.
+        Also all returned lines are terminated with \r\n.
+        Example:<br>
+        <code>
+        attr tPort password secret<br>
+        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        </code>
+        <br><br>
+
+    <a name="globalpassword"></a>
+    <li>globalpassword<br>
+        Just like the attribute password, but a password will only required for
+        non-local connections.
+        <br><br>
+
+    <a name="SSL"></a>
+    <li>SSL<br>
+        Enable SSL encryption of the connection, see the description <a 
+        href="#HTTPS">here</a> on generating the needed SSL certificates. To
+        connect to such a port use one of the following commands:
+        <ul>
+          socat openssl:fhemhost:fhemport,verify=0 readline<br>
+          ncat --ssl fhemhost fhemport<br>
+          openssl s_client -connect fhemhost:fhemport<br>
+        </ul>
+        <br><br>
+
+    <a name="allowfrom"></a>
+    <li>allowfrom<br>
+        Regexp of allowed ip-addresses or hostnames. If set,
+        only connections from these addresses are allowed.
+        <br><br>
+
+  </ul>
+
+</ul>
+
 
 <a name="DbLog"></a>
 <h3>DbLog</h3>

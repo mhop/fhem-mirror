@@ -4,7 +4,7 @@ package main;
 
 use strict;
 use warnings;
-use IO::Socket;
+use TcpServerUtils;
 
 #########################
 # Forward declaration
@@ -74,10 +74,11 @@ my %FW_types;      # device types, for sorting
 my @FW_zoom;       # "qday", "day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
 my %FW_hiddenroom; # hash of hidden rooms
-my $FW_longpoll;
+my $FW_longpoll;   # Set if longpoll (i.e. server notification) is active
 my $FW_inform;
-my $FW_XHR;
-my $FW_jsonp;
+my $FW_XHR;        # Data only answer, no HTML
+my $FW_jsonp;      # jasonp answer (sending function calls to the client)
+my $FW_chash;      # client fhem hash
 #my $FW_encoding="ISO-8859-1";
 my $FW_encoding="UTF-8";
 
@@ -97,7 +98,7 @@ FHEMWEB_Initialize($)
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
                      "stylesheetPrefix hiddenroom HTTPS longpoll:1,0 ".
-                     "redirectCmds:0,1 ";
+                     "redirectCmds:0,1 allowfrom ";
 
   ###############
   # Initialize internal structures
@@ -125,7 +126,7 @@ FW_SecurityCheck($$)
     $attr{global}{motd} = $motd;
   }
   $modules{FHEMWEB}{NotifyFn}= "FW_Notify";
-  return undef;
+  return;
 }
 
 #####################################
@@ -134,44 +135,10 @@ FW_Define($$)
 {
   my ($hash, $def) = @_;
   my ($name, $type, $port, $global) = split("[ \t]+", $def);
-  return "Usage: define <name> FHEMWEB <tcp-portnr> [global]"
+  return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
-  if($port =~ m/^IPV6:(\d+)$/i) {
-    $port = $1;
-    eval "require IO::Socket::INET6; use Socket6;";
-    if($@) {
-      Log 1, $@;
-      Log 1, "Can't load INET6, falling back to IPV4";
-    } else {
-      $hash->{IPV6} = 1;
-    }
-  }
-
-  my @opts = (
-    Domain    => ($hash->{IPV6} ? AF_INET6() : AF_UNSPEC), # Linux bug
-    LocalHost => ($global ? undef : "localhost"),
-    LocalPort => $port,
-    Listen    => 10,
-    ReuseAddr => 1
-  );
-  $hash->{STATE} = "Initialized";
-  $hash->{SERVERSOCKET} = $hash->{IPV6} ?
-        IO::Socket::INET6->new(@opts) : 
-        IO::Socket::INET->new(@opts);
-
-  if(!$hash->{SERVERSOCKET}) {
-    my $msg = "Can't open server port at $port: $!";
-    Log 1, $msg;
-    return $msg;
-  }
-
-  $hash->{FD} = $hash->{SERVERSOCKET}->fileno();
-  $hash->{PORT} = $port;
-
-  $selectlist{"$name.$port"} = $hash;
-  Log(2, "FHEMWEB port $port opened");
-  return undef;
+  return TcpServer_Open($hash, $port, $global);
 }
 
 #####################################
@@ -179,20 +146,7 @@ sub
 FW_Undef($$)
 {
   my ($hash, $arg) = @_;
-  my $name = $hash->{NAME};
-
-  return undef if($hash->{INUSE});
-
-  if(defined($hash->{CD})) { # Clients
-    close($hash->{CD});
-    delete($selectlist{$name});
-  }
-  if(defined($hash->{SERVERSOCKET})) {          # Server
-    close($hash->{SERVERSOCKET});
-    $name = $name . "." . $hash->{PORT};
-    delete($selectlist{$name});
-  }
-  return undef;
+  return TcpServer_Close($hash);
 }
 
 #####################################
@@ -203,54 +157,11 @@ FW_Read($)
   my $name = $hash->{NAME};
 
   if($hash->{SERVERSOCKET}) {   # Accept and create a child
-
-    my $ll = GetLogLevel($name,4);
-    my @clientinfo = $hash->{SERVERSOCKET}->accept();
-    if(!@clientinfo) {
-      Log(1, "Accept failed for HTTP port ($name: $!)");
-      return;
-    }
-    $hash->{CONNECTS}++;
-
-    my @clientsock = $hash->{IPV6} ? 
-        sockaddr_in6($clientinfo[1]) :
-        sockaddr_in($clientinfo[1]);
-
-    my %nhash;
-    my $cname = "FHEMWEB:".
-        ($hash->{IPV6} ?
-                inet_ntop(AF_INET6(), $clientsock[1]) :
-                inet_ntoa($clientsock[1])) .":".$clientsock[0];
-    $nhash{NR}    = $devcount++;
-    $nhash{NAME}  = $cname;
-    $nhash{FD}    = $clientinfo[0]->fileno();
-    $nhash{CD}    = $clientinfo[0];     # sysread / close won't work on fileno
-    $nhash{TYPE}  = "FHEMWEB";
-    $nhash{STATE} = "Connected";
-    $nhash{SNAME} = $name;
-    $nhash{TEMPORARY} = 1;              # Don't want to save it
-    $nhash{BUF}   = "";
-    $attr{$cname}{room} = "hidden";
-
-    $defs{$nhash{NAME}} = \%nhash;
-    $selectlist{$nhash{NAME}} = \%nhash;
-
-    if($hash->{SSL}) {
-      # Certs directory must be in the modpath, i.e. at the same level as the
-      # FHEM directory
-      my $mp = AttrVal("global", "modpath", ".");
-      my $ret = IO::Socket::SSL->start_SSL($nhash{CD}, {
-        SSL_server    => 1, 
-        SSL_key_file  => "$mp/certs/server-key.pem",
-        SSL_cert_file => "$mp/certs/server-cert.pem",
-        });
-      Log 1, "FHEMWEB HTTPS: $!" if(!$ret && $! ne "Socket is not connected");
-    }
-
-    Log($ll, "Connection accepted from $nhash{NAME}");
+    TcpServer_Accept($hash, "FHEMWEB");
     return;
   }
 
+  $FW_chash = $hash;
   $FW_wname = $hash->{SNAME};
   $FW_cname = $name;
   $FW_subdir = "";
@@ -330,15 +241,8 @@ FW_Read($)
     return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
   }
 
-  $hash->{INUSE} = 1;
   my $cacheable = FW_AnswerCall($arg);
-  delete($hash->{INUSE});
   return if($cacheable == -1); # Longpoll / inform request;
-
-  if(!$selectlist{$name}) {             # removed by rereadcfg, reinsert
-    $selectlist{$name} = $hash;
-    $defs{$name} = $hash;
-  }
 
   my $compressed = "";
   if(($FW_RETTYPE =~ m/text/i ||
@@ -1199,13 +1103,13 @@ FW_substcfg($$$$$$)
   $fileesc =~ s/\\/\\\\/g;      # For Windows, by MarkusRR
   my $title = AttrVal($wl, "title", "\"$fileesc\"");
 
-  $title = AnalyzeCommand(undef, "{ $title }");
+  $title = AnalyzeCommand($FW_chash, "{ $title }");
   my $label = AttrVal($wl, "label", undef);
   my @g_label;
   if ($label) {
     @g_label = split("::",$label);
     foreach (@g_label) {
-      $_ = AnalyzeCommand(undef, "{ $_ }");
+      $_ = AnalyzeCommand($FW_chash, "{ $_ }");
     }
   }
   $attr{global}{verbose} = $oll;
@@ -1839,7 +1743,7 @@ sub
 FW_fC($)
 {
   my ($cmd) = @_;
-  my $ret = AnalyzeCommand(undef, $cmd);
+  my $ret = AnalyzeCommand($FW_chash, $cmd);
   return $ret;
 }
 
@@ -1852,7 +1756,7 @@ FW_showWeblink($$$$)
   my $attr = AttrVal($d, "htmlattr", "");
 
   if($t eq "htmlCode") {
-    $v = AnalyzePerlCommand(undef, $v) if($v =~ m/^{(.*)}$/);
+    $v = AnalyzePerlCommand($FW_chash, $v) if($v =~ m/^{(.*)}$/);
     FW_pO $v;
 
   } elsif($t eq "link") {
@@ -1924,13 +1828,7 @@ FW_Attr(@)
   my $hash = $defs{$a[1]};
 
   if($a[0] eq "set" && $a[2] eq "HTTPS") {
-    eval "require IO::Socket::SSL";
-    if($@) {
-      Log 1, $@;
-      Log 1, "Can't load IO::Socket::SSL, falling back to HTTP";
-    } else {
-      $hash->{SSL} = 1;
-    }
+    TcpServer_SetSSL($hash);
   }
   return undef;
 }
@@ -2216,5 +2114,6 @@ WeatherAsHtml($)
   $ret .= "</table>";
   return $ret;
 }
+
 
 1;

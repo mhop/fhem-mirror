@@ -49,6 +49,7 @@
              *Utils.pm files from fhem.pl
   - feature: portpassword and basicAuth may use evaluated functions
   - feature: motd with SecurityCheck added
+  - feature: telnet module added, attr global port moved. allowfrom changed.
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
