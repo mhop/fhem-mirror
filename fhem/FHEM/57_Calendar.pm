@@ -714,7 +714,7 @@ sub Calendar_Get($@) {
   my @events;
 
   my $cmd= $a[1];
-  if($cmd eq "text" || $cmd eq "full") {
+  if($cmd eq "text" || $cmd eq "full" || $cmd eq "summary") {
 
     return "argument is missing" if($#a != 2);
     my $reading= $a[2];
@@ -734,6 +734,7 @@ sub Calendar_Get($@) {
       foreach my $event (sort { $a->start() <=> $b->start() } @events) {
         push @texts, $event->asText() if $cmd eq "text";
         push @texts, $event->asFull() if $cmd eq "full";
+        push @texts, $event->summary() if $cmd eq "summary";
       }
     }  
     return join("\n", @texts);
@@ -749,7 +750,7 @@ sub Calendar_Get($@) {
     return join(";", @uids);
   
   } else {
-    return "Unknown argument $cmd, choose one of text full find";
+    return "Unknown argument $cmd, choose one of text summary full find";
   }
 
 }

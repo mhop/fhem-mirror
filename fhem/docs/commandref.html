@@ -1374,8 +1374,6 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   <br>
 
-  Note: this module requires the Time::Local module.<br><br>
-
   <a name="Calendardefine"></a>
   <b>Define</b>
   <ul>
@@ -1387,8 +1385,10 @@ A line ending with \ will be concatenated with the next one, so long lines
     start with <code>http://</code>, not <code>https://</code>, and the file at the given URL
     must be in ICal format.<br><br>
 
-    Note for users of Google Calendar: You can literally use the private ICAL URL from your Google Calendar with the
-    <code>https://</code> replaced by <code>http://</code>.<br><br>
+    Note for users of Google Calendar: You can literally use the private ICal URL from your Google Calendar with the
+    <code>https://</code> replaced by <code>http://</code>. Google App accounts do not work since requests to the URL
+    get redirected first and the fhem mechanism for retrieving data via http cannot handle this. Neither can it
+    handle HTTPS.<br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
@@ -1415,10 +1415,11 @@ A line ending with \ will be concatenated with the next one, so long lines
   <a name="Calendarget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; full|text &lt;reading&gt|&lt;uid&gt;</code><br><br>
+    <code>get &lt;name&gt; full|text|summary &lt;reading&gt|&lt;uid&gt;</code><br><br>
 
-    Returns, line by line, the full state or a textual representation of the calendar event(s) listed in the
-    reading lt;reading&gt or identified by the UID &lt;uid&gt.<br><br>
+    Returns, line by line, the full state or a textual representation or the summary (subject, title)
+    of the calendar event(s) listed in the
+    reading &lt;reading&gt or identified by the UID &lt;uid&gt.<br><br>
 
     <code>get &lt;name&gt; find &lt;regexp&gt;</code><br><br>
 
@@ -1448,32 +1449,33 @@ A line ending with \ will be concatenated with the next one, so long lines
   are stripped off the UID to make your life easier.<p>
 
   A calendar event can be in one of the following states:
-  <table>
+  <table border="1">
   <tr><td>new</td><td>The calendar event was first seen at the most recent update. Either this was your first retrieval of
   the calendar or you newly added the calendar event to the source calendar.</td></tr>
   <tr><td>known</td><td>The calendar event was already there before the most recent update.</td></tr>
   <tr><td>updated</td><td>The calendar event was already there before the most recent update but it has changed since it
   was last retrieved.</td></tr>
   <tr><td>deleted</td><td>The calendar event was there before the most recent update but is no longer. You removed it from the source calendar. The calendar event will be removed from all lists at the next update.</td></tr>
-  </table>
+  </table><br>
   Calendar events that lie completely in the past (current time on wall clock is later than the calendar event's end time)
   are not retrieved and are thus not accessible through the calendar.
   <p>
 
   A calendar event can be in one of the following modes:
-  <table>
+  <table border="1">
   <tr><td>upcoming</td><td>Neither the alarm time nor the start time of the calendar event is reached.</td></tr>
   <tr><td>alarm</td><td>The alarm time has passed but the start time of the calendar event is not yet reached.</td></tr>
   <tr><td>start</td><td>The start time has passed but the end time of the calendar event is not yet reached.</td></tr>
   <tr><td>end</td><td>The end time of the calendar event has passed.</td></tr>
-  </table>
+  </table><br>
   A calendar event transitions from one mode to another immediately when the time for the change has come. This is done by waiting
   for the earliest future time among all alarm, start or end times of all calendar events.
   <p>
 
-  A calendar device has several readings. Each reading is a semicolon-separated list of UIDs of
+  A calendar device has several readings. Except for <code>calname</code>, each reading is a semicolon-separated list of UIDs of
   calendar events that satisfy certain conditions:
-  <table>
+  <table border="1">
+  <tr><td>calname</td><td>name of the calendar</td></tr>
   <tr><td>all</td><td>all events</td></tr>
   <tr><td>modeAlarm</td><td>events in alarm mode</td></tr>
   <tr><td>modeAlarmOrStart</td><td>events in alarm or start mode</td></tr>
@@ -1499,7 +1501,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>
     get MyCalendar full all<br>
     2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom   known    alarm 31.05.2012 17:00:00 07.06.2012 16:30:00-07.06.2012 18:00:00 Erna for coffee<br>
-    992hydf4;44awer5466lhfdsrgl7tin6b6mckf8glmhui4googlecom   known upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
+    992hydf4y44awer5466lhfdsrgl7tin6b6mckf8glmhui4googlecom   known upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
     </code><br><br>
     </ul>
 
@@ -1521,13 +1523,27 @@ A line ending with \ will be concatenated with the next one, so long lines
     get MyCalendar find .*Erna.*<br>
     2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom
     </code><br><br>
-    The define a notify:<br><br>
+    Then define a notify:<br><br>
     <code>
     define ErnaComes notify MyCalendar:modeStarted.*2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom.* set MyLight on
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
     define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom.* { Log 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    </code><br><br>
+    </ul>
+
+    <i>Switch actors on and off</i><br><br>
+    <ul>
+    Think about a calendar with calendar events whose summaries (subjects, titles) are the names of devices in your fhem installation.
+    You want the respective devices to switch on when the calendar event starts and to switch off when the calendar event ends.<br><br>
+    <code>
+    define SwitchActorOn notify MyCalendar:modeStarted.* { my $uid= "%EVTPART1";; my $actor= fhem("get C summary $uid");; fhem("set $actor on") }<br><br>
+    define SwitchActorOff notify MyCalendar:modeEnded.* { my $uid= "%EVTPART1";; my $actor= fhem("get C summary $uid");; fhem("set $actor off") }
+    </code><br><br>
+    You can also do some logging:<br><br>
+    <code>
+    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get C summary $uid");; Log 1, "Actor: $actor, Reading $reading" }
     </code><br><br>
     </ul>
 
