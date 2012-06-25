@@ -8321,12 +8321,14 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <a name="FHEM2FHEMdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FHEM2FHEM &lt;host:portnr&gt; [LOG:regexp|RAW:devicename] {portpassword}
+    <code>define &lt;name&gt; FHEM2FHEM &lt;host&gt;[:&lt;portnr&gt;][:SSL] [LOG:regexp|RAW:devicename] {portpassword}
     </code>
   <br>
   <br>
   Connect to the <i>remote</i> fhem on host. portnr is the global port
-  attribute of the remote fhem. The next parameter specifies the connection
+  attribute of the remote fhem, or 7072 if not defined. The optional :SSL
+  suffix is needed, if the remote fhem configured SSL for this port.<br>
+  The next parameter specifies the connection
   type:
   <ul>
   <li>LOG<br>
