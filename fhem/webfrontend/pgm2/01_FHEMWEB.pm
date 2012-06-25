@@ -470,7 +470,7 @@ FW_AnswerCall($)
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
   elsif($cmd =~ /^logwrapper/) { FW_logWrapper($cmd);     }
-  elsif(AttrVal("global", "motd", "none") ne "none") {
+  elsif(!$FW_cmdret && AttrVal("global", "motd", "none") ne "none") {
     my $motd = AttrVal("global","motd",undef);
     $motd =~ s/\n/<br>/g;
     FW_pO "<div id=\"content\">$motd</div>";
