@@ -16,39 +16,43 @@ urlEncode($) {
 
 
 ##################
-# if data (which is urlEncoded) is set, then a POST is performed, else a GET
-# noshutdown must be set for e.g the Fritz!Box
+# - if data (which is urlEncoded) is set, then a POST is performed, else a GET.
+# - noshutdown must be set for e.g the Fritz!Box
 sub
 GetFileFromURL($@)
 {
   my ($url, $timeout, $data, $noshutdown) = @_;
   $timeout = 4.0 if(!defined($timeout));
 
-  if($url !~ /^(http):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log 1, "GetFileFromURL $url: malformed URL";
+  if($url !~ /^(http|https):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
+    Log 1, "GetFileFromURL $url: malformed or unsupported URL";
     return undef;
   }
   
   my ($protocol,$host,$port,$path)= ($1,$2,$3,$4);
 
   if(defined($port)) {
-    $port=~ s/^://;
+    $port =~ s/^://;
   } else {
-    $port= 80;
+    $port = ($protocol eq "https" ? 443: 80);
   }
   $path= '/' unless defined($path);
 
-  if($protocol ne "http") {
-    Log 1, "GetFileFromURL $url: invalid protocol";
-    return undef;
-  }
 
-  my $conn = IO::Socket::INET->new(PeerAddr => "$host:$port");
+  my $conn;
+  if($protocol eq "https") {
+    eval "use IO::Socket::SSL";
+    Log 1, $@ if($@);
+    $conn = IO::Socket::SSL->new(PeerAddr => "$host:$port") if(!$@);
+  } else {
+    $conn = IO::Socket::INET->new(PeerAddr => "$host:$port");
+  }
   if(!$conn) {
-    Log 1, "GetFileFromURL: Can't connect to $host:$port\n";
+    Log 1, "GetFileFromURL: Can't connect to $protocol://$host:$port\n";
     undef $conn;
     return undef;
   }
+
   $host =~ s/:.*//;
   my $hdr = ($data ? "POST" : "GET")." $path HTTP/1.0\r\nHost: $host\r\n";
   if(defined($data)) {

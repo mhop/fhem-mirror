@@ -41,7 +41,7 @@ FHEM2FHEM_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a < 4 || @a > 5 || !($a[3] =~ m/^(LOG|RAW):(.*)$/)) {
-    my $msg = "wrong syntax: define <name> FHEM2FHEM host[:port] ".
+    my $msg = "wrong syntax: define <name> FHEM2FHEM host[:port][:SSL] ".
                         "[LOG:regexp|RAW:device] {portpasswort}";
     Log 2, $msg;
     return $msg;
@@ -63,6 +63,10 @@ FHEM2FHEM_Define($$)
   }
 
   my $dev = $a[2];
+  if($dev =~ m/^(.*):SSL$/) {
+    $dev = $1;
+    $hash->{SSL} = 1;
+  }
   if($dev !~ m/^.+:[0-9]+$/) {       # host:port
     $dev = "$dev:7072";
     $hash->{Host} = $dev;
@@ -90,7 +94,12 @@ FHEM2FHEM_Write($$)
   my $dev = $hash->{Host};
 
   if(!$hash->{TCPDev2}) {
-    my $conn = IO::Socket::INET->new(PeerAddr => $dev);
+    my $conn;
+    if($hash->{SSL}) {
+      $conn = IO::Socket::SSL->new(PeerAddr => $dev);
+    } else {
+      $conn = IO::Socket::INET->new(PeerAddr => $dev);
+    }
     return if(!$conn);  # Hopefuly it is reported elsewhere
     $hash->{TCPDev2} = $conn;
     syswrite($hash->{TCPDev2}, $hash->{portpassword} . "\n")
@@ -208,7 +217,15 @@ FHEM2FHEM_OpenDev($$)
     return;
   }
 
-  my $conn = IO::Socket::INET->new(PeerAddr => $dev);
+  my $conn;
+  if($hash->{SSL}) {
+    eval "use IO::Socket::SSL";
+    Log 1, $@ if($@);
+    $conn = IO::Socket::SSL->new(PeerAddr => "$dev") if(!$@);
+  } else {
+    $conn = IO::Socket::INET->new(PeerAddr => $dev);
+  }
+
   if($conn) {
     delete($hash->{NEXT_OPEN})
 
