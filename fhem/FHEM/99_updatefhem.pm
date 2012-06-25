@@ -197,6 +197,8 @@ CommandUpdatefhem($$)
   my $delfile;
   my $excluded = (!defined($attr{global}{exclude_from_update}) ? "" : $attr{global}{exclude_from_update});
 
+  `(mkdir -p $moddir/FhemUtils)` if(!-d "$moddir/FhemUtils");
+
   foreach my $f (sort keys %$filetime) {
     my $ef = substr $f,rindex($f,'/')+1;
     if($excluded =~ /$ef/) {
