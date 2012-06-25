@@ -149,14 +149,33 @@ VantagePro2_GetStatus($)
 	  $t=substr($answer,$offset+44,2);
 	  my ($solar)=unpack("s2",$t);
 
+	  $t=substr($answer,$offset+46,2);
+          my ($stormrain)=unpack("s2",$t);
+	  $stormrain=sprintf("%.02f",($stormrain/100*25.4));
+
 	  $t=substr($answer,$offset+50,2);
 	  my ($drain)=unpack("s2",$t);
+	  $drain=sprintf("%.02f",($drain*0.2)); #Es werden Anzahl ticks à 0.2mm übermittelt
 
 	  $t=substr($answer,$offset+52,2);
 	  my ($mrain)=unpack("s2",$t);
+	  $mrain=sprintf("%.02f",($mrain*0.2)); #Es werden Anzahl ticks à 0.2mm übermittelt
 
 	  $t=substr($answer,$offset+54,2);
 	  my ($yrain)=unpack("s2",$t);
+	  $yrain=sprintf("%.02f",($yrain*0.2)); # #Es werden Anzahl ticks à 0.2mm übermittelt
+
+	  $t=substr($answer,$offset+56,2);
+	  my ($etday)=unpack("s2",$t);
+	  $etday=sprintf("%.02f",($etday/1000*25.4));
+
+	  $t=substr($answer,$offset+58,2);
+	  my ($etmonth)=unpack("s2",$t);
+	  $etmonth=sprintf("%.02f",($etmonth/100*25.4));
+
+	  $t=substr($answer,$offset+60,2);
+	  my ($etyear)=unpack("s2",$t);
+	  $etyear=sprintf("%.02f",($etyear/100*25.4));
 
 	  $itemp=sprintf("%.02f",(($itemp/10)-32)*5/9);
 	  $otemp=sprintf("%.02f",(($otemp/10)-32)*5/9);
@@ -170,7 +189,30 @@ VantagePro2_GetStatus($)
 	  elsif($bartrend==-20) { $btrend="Falling Slowly"; }
 	  elsif($bartrend==-60) { $btrend="Falling Rapidly"; }
 
-	  $text="T-OUT: ".$otemp." T-IN: ".$itemp." H-OUT: ".$ohum." H-IN: ".$ihum." W: ".$windspeed." W-AV: ".$avgwindspeed." WD: ".$winddir." R: ".$rainrate." S: ".$solar." UV: ".$uv." RD: ".$drain." RM: ".$mrain. " RY: ".$yrain." BM: ".$barometer." BT: ".$btrend;
+	  # WindChill and HeatIndex by Andreas Berweger
+
+	  my $wct; #WindChill temperature
+	  my $hit; #HeatIndex temperature
+
+	  if($otemp<10 && $avgwindspeed>5) 
+	  {
+		$wct=sprintf("%.02f",(13.12+(0.6215*$otemp)-(11.37*$avgwindspeed**0.16)+(0.3965*$otemp*$avgwindspeed**0.16)));
+	  }
+	  else
+	  {
+		$wct=$otemp;
+	  }
+
+	  if($otemp>25 && $ohum>40)
+	  {
+		$hit=sprintf("%.02f",(-8.784695 + (1.61139411*$otemp) + (2.338549*$ohum) + (-0.14611605*$otemp*$ohum) + (-1.2308094*10**-2*$otemp**2) + (-1.6424828*10**-2*$ohum**2) + (2.211732*10**-3*$otemp**2*$ohum) + (7.2546*10**-4*$otemp*$ohum**2) + (-3.582*10**-6*$otemp**2*$ohum**2))); 
+	  }   
+	  else 
+	  {
+		$hit=$otemp;
+	  }
+
+	  $text="T-OUT: ".$otemp." T-WC-OUT: ".$wct." T-HI-OUT: ".$hit." T-IN: ".$itemp." H-OUT: ".$ohum." H-IN: ".$ihum." W: ".$windspeed." W-AV: ".$avgwindspeed." WD: ".$winddir." R: ".$rainrate." S: ".$solar." UV: ".$uv." RD: ".$drain." RM: ".$mrain. " RY: ".$yrain." SR: ".$stormrain." BM: ".$barometer." BT: ".$btrend. " ET-DAY: ".$etday." ET-MONTH: ".$etmonth." ET-YEAR: ".$etyear;
 	  my $n=0;
 
 	  Log 4,"$name: $text";
@@ -179,6 +221,16 @@ VantagePro2_GetStatus($)
 	       $hash->{CHANGED}[$n++] = "Temperature Outside: ".$otemp;
 	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
 	       $hash->{READINGS}{$sensor}{VAL} = $otemp." (Celsius)";;
+
+               $sensor="temperature-windchill";
+	       $hash->{CHANGED}[$n++] = "WCT: ".$wct;
+	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+	       $hash->{READINGS}{$sensor}{VAL} = $wct." (Celsius)";;
+
+               $sensor="temperature-heatindex";
+	       $hash->{CHANGED}[$n++] = "HeatT: ".$hit;
+	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+	       $hash->{READINGS}{$sensor}{VAL} = $hit." (Celsius)";;
 
                $sensor="temperature-inside";
 	       $hash->{CHANGED}[$n++] = "Temperature Inside: ".$itemp;
@@ -240,6 +292,11 @@ VantagePro2_GetStatus($)
 	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
 	       $hash->{READINGS}{$sensor}{VAL} = $yrain." (mm/year)";;
 
+		$sensor="storm rain";
+		$hash->{CHANGED}[$n++] = "SR: ".$stormrain;
+		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		$hash->{READINGS}{$sensor}{VAL} = $stormrain." (mm/storm)";;
+
 		$sensor="barometer";
 	       $hash->{CHANGED}[$n++] = "Barometer: ".$barometer;
 	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
@@ -249,6 +306,21 @@ VantagePro2_GetStatus($)
 	       $hash->{CHANGED}[$n++] = "Barometer Trend: ".$btrend;
 	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
 	       $hash->{READINGS}{$sensor}{VAL} = $btrend;
+
+		$sensor="ET Day";
+		$hash->{CHANGED}[$n++] = "ETD: ".$etday;
+		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		$hash->{READINGS}{$sensor}{VAL} = $etday." (mm/day)";;
+
+		$sensor="ET Month";
+		$hash->{CHANGED}[$n++] = "ETM: ".$etmonth;
+		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		$hash->{READINGS}{$sensor}{VAL} = $etmonth." (mm/month)";;
+
+		$sensor="ET Year";
+		$hash->{CHANGED}[$n++] = "ETY: ".$etyear;
+		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		$hash->{READINGS}{$sensor}{VAL} = $etyear." (mm/year)";;
 
 	       DoTrigger($name, undef) if($init_done);    
 	  }
