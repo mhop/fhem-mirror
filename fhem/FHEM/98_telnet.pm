@@ -37,7 +37,7 @@ telnet_SecurityCheck($$)
                         AttrVal($_, "globalpassword", undef)) }
                devspec2array("TYPE=telnet");
     $motd .= (join(",", sort @list).
-                        " has no password/globalpassword attribute\n")
+                        " has no password/globalpassword attribute.\n")
         if(@list);
     $attr{global}{motd} = $motd;
   }

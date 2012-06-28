@@ -369,15 +369,20 @@ $attr{global}{motd} = "$sc_text\n\n"
 $init_done = 1;
 DoTrigger("global", "INITIALIZED");
 
+$attr{global}{motd} .= "Running with root privileges."
+                                 if($^O !~ m/Win/ && $< == 0);
 $attr{global}{motd} .=
-        "\nRestart fhem for a new check if the problem ist fixed,\n".
+        "\nRestart fhem for a new check if the problem is fixed,\n".
         "or set the global attribute motd to none to supress this message.\n"
         if($attr{global}{motd} =~ m/^$sc_text\n\n./);
 my $motd = $attr{global}{motd};
 if($motd eq "$sc_text\n\n") {
   delete($attr{global}{motd});
 } else {
-  Log 2, $motd if($motd ne "none");
+  if($motd ne "none") {
+    $motd =~ s/\n/ /g;
+    Log 2, $motd;
+  }
 }
 
 Log 0, "Server started (version $attr{global}{version}, pid $$)";
