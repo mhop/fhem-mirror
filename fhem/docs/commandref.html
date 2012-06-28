@@ -1887,8 +1887,19 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="follow-on-for-timer"></a>
     <li>follow-on-for-timer<br>
     schedule a "setstate off;trigger off" for the time specified as argument to
-    the on-for-timer command.
+    the on-for-timer command. Or the same with on, if the command is
+    off-for-timer. 
     </li><br>
+
+    <a name="follow-on-timer"></a>
+    <li>follow-on-timer<br>
+    Like with follow-on-for-timer schedule a "setstate off;trigger off", but
+    this time for the time specified as argument in seconds to this attribute.
+    This is used to follow the pre-programmed timer, which was set previously
+    with the timer command or manually by pressing the button on the device,
+    see your manual for details.
+    </li><br>
+
 
     <li><a href="#loglevel">loglevel</a></li><br>
 
