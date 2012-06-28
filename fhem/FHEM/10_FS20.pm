@@ -125,10 +125,11 @@ FS20_Initialize($)
   $hash->{DefFn}     = "FS20_Define";
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
-  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 do_not_notify:1,0 ".
-                        "ignore:1,0 dummy:1,0 showtime:1,0 ".
-                        "loglevel:0,1,2,3,4,5,6 " .
-                        "model:".join(",", sort keys %models);
+  $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 follow-on-timer ".
+                       "do_not_notify:1,0 ".
+                       "ignore:1,0 dummy:1,0 showtime:1,0 ".
+                       "loglevel:0,1,2,3,4,5,6 " .
+                       "model:".join(",", sort keys %models);
 }
 
 #####################################
@@ -246,13 +247,28 @@ FS20_Set($@)
     CommandDelete(undef, $name . "_timer");
     delete $modules{FS20}{ldata}{$name};
   }
-  if($a[1] =~ m/for-timer/ && $na == 3 &&
-     defined($attr{$name}) && defined($attr{$name}{"follow-on-for-timer"})) {
+
+  my $newState="";
+  my $onTime = AttrVal($name, "follow-on-timer", undef);
+
+  ####################################
+  # following timers
+  if($a[1] eq "on" && $na == 2 && $onTime) {
+    $newState = "off";
+    $val = $onTime;
+
+  } elsif($a[1] =~ m/(on|off).*-for-timer/ && $na == 3 &&
+     AttrVal($name, "follow-on-for-timer", undef)) {
+    $newState = ($1 eq "on" ? "off" : "on");
+
+  }
+
+  if($newState) {
     my $to = sprintf("%02d:%02d:%02d", $val/3600, ($val%3600)/60, $val%60);
     $modules{FS20}{ldata}{$name} = $to;
-    Log 4, "Follow: +$to setstate $name off";
-    CommandDefine(undef,
-                $name."_timer at +$to setstate $name off; trigger $name off");
+    Log 4, "Follow: +$to setstate $name $newState";
+    CommandDefine(undef, $name."_timer at +$to ".
+        "setstate $name $newState; trigger $name $newState");
   }
 
   ##########################
@@ -404,12 +420,22 @@ FS20_Parse($$)
         CommandDelete(undef, $n . "_timer");
         delete $modules{FS20}{ldata}{$n};
       }
-      if($v =~ m/for-timer/ &&
-        defined($attr{$n}) &&
-        defined($attr{$n}{"follow-on-for-timer"})) {
+
+      my $newState = "";
+      if($v =~ m/(on|off).*-for-timer/ && $dur &&
+        AttrVal($n, "follow-on-for-timer", undef)) {
+        $newState = ($1 eq "on" ? "off" : "on");
+
+      } elsif($v eq "on" && (my $d = AttrVal($n, "follow-on-timer", undef))) {
+        $dur = $d;
+        $newState = "off";
+
+      }
+      if($newState) {
         my $to = sprintf("%02d:%02d:%02d", $dur/3600, ($dur%3600)/60, $dur%60);
-        Log 4, "Follow: +$to setstate $n off";
-        CommandDefine(undef, $n . "_timer at +$to setstate $n off");
+        Log 4, "Follow: +$to setstate $n $newState";
+        CommandDefine(undef, $n."_timer at +$to ".
+            "setstate $n $newState; trigger $n $newState");
         $modules{FS20}{ldata}{$n} = $to;
       }
 
