@@ -42,10 +42,10 @@ my %POKEYS_IOTYPE = (
 );
 
 my %sets = (
-  "OFF"       => 0,
-  "ON"        => 1,
-  "OFF_PULSE" => 2,
-  "ON_PULSE"  => 3
+  "off"           => 0,
+  "on"            => 1,
+  "off-for-timer" => 2,
+  "on-for-timer"  => 3
 );
 
 my %gets = (
@@ -143,26 +143,26 @@ POKEYS_Set($@)
 {
  	my ($hash, @a) = @_;
 
-  if (   (int(@a) == 0) #internal call by ON/OFF_PULSE
+  if (   (int(@a) == 0) #internal call by on/off-for-timer
       && (defined($hash->{NEXTSTATE}))) {
     $a[1] = $hash->{NEXTSTATE};
     delete($hash->{NEXTSTATE});
   }
   
   if ( (int(@a) < 2) ) {
-    return "Wrong syntax: use set <Name> <State> <holdTime in ms>" ;
+    return "Wrong syntax: use set <Name> <State> <hold time>" ;
   }
   if (!defined($sets{$a[1]})) {
     return "State \"$a[1]\" not known. Use ".join(",", sort keys %sets);
   }
   my $State       = $sets{$a[1]} % 2;
-  my $PulseActive = (($a[1] eq "ON_PULSE") || ($a[1] eq "OFF_PULSE"));
-  my $HoldTime    = (defined($a[2])) ? $a[2]/1000 : 1;
+  my $TimerActive = (($a[1] eq "on-for-timer") || ($a[1] eq "off-for-timer"));
+  my $HoldTime    = (defined($a[2])) ? $a[2] : 1;
   
 	if ($hash->{IOTYPE} eq "ExtDigOut" ) {
 		my $p = $hash->{PIN} - 101;
 		my @extPinArray = (0,0,0,0,0,0,0,0,0,0);
-		if ($State eq "ON") {
+		if ($State eq "on") {
 			$extPinArray[9- int($p/8)] = 2**($p % 8);
 		} else {
       #todo clear
@@ -198,8 +198,8 @@ POKEYS_Set($@)
 		return "Pin is no output";
 	}
  
-  if ($PulseActive != 0) {
-    $hash->{NEXTSTATE} = ($State == 0) ? "ON" : "OFF";
+  if ($TimerActive != 0) {
+    $hash->{NEXTSTATE} = ($State == 0) ? "on" : "off";
     RemoveInternalTimer($hash); #remove old trigger
     InternalTimer(gettimeofday()+ $HoldTime, "POKEYS_Set", $hash, 0);
   } 
@@ -214,7 +214,7 @@ POKEYS_Define($$)
 	my @a = split("[ \t][ \t]*", $def);
   
   if ( (int(@a) < 5) ) {
-    return "Wrong syntax: use define <name> POKEYS <PokeysName or IP> <Pin> <IOState> <updateTime in ms>" ;
+    return "Wrong syntax: use define <name> POKEYS <PokeysName or IP> <Pin> <IOState> <updateTime>" ;
   }
   
   #create connection to device
@@ -228,7 +228,7 @@ POKEYS_Define($$)
   $hash->{STATE}      = "undefined";
   $hash->{PIN}        = $a[3];
   $hash->{IOTYPE}     = $a[4];
-  $hash->{INTERVAL}   = (defined($a[5])) ? ($a[5]/1000) : 1; #if no time is defined -> default 1sec
+  $hash->{INTERVAL}   = (defined($a[5])) ? $a[5] : 1; #if no time is defined -> default 1sec
   $err = POKEYS_PinDefine($hash);
   if (defined($err)) {
     $hash->{PIN}      = undef;
@@ -248,7 +248,7 @@ POKEYS_ReDefine($)
   my $err = POKEYS_Connect($hash);
   if (defined($err)) {
     #connect failed retry in 5sec
-    InternalTimer(gettimeofday()+5, "POKEYS_Redefine", $hash, 0);
+    InternalTimer(gettimeofday()+5, "POKEYS_ReDefine", $hash, 0);
     return undef;
   }
  
@@ -392,7 +392,7 @@ POKEYS_UpdateDigIn($)
 
   my ($ReCtrl,$ReOp,$ReOP1,$ReOP2,$ReOP3,$ReOP4,$ReReqId,$Chk,$ReOPX) = unpack("CCCCCCCCH56", "$buf");
   if ($ReOP1 == 0) { #Pin state is OK
-    my $newSTATE = ($ReOP2)? "ON":"OFF";
+    my $newSTATE = ($ReOP2)? "on":"off";
     if ($hash->{STATE} ne $newSTATE) {
       $hash->{STATE}      = $newSTATE;
       $hash->{CHANGED}[0] = $newSTATE;
