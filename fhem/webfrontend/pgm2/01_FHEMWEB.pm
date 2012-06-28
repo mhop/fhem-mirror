@@ -121,7 +121,7 @@ FW_SecurityCheck($$)
   if($motd =~ "^SecurityCheck") {
     my @list = grep { !AttrVal($_, "basicAuth", undef) }
                devspec2array("TYPE=FHEMWEB");
-    $motd .= (join(",", sort @list)." has no basicAuth attribute\n")
+    $motd .= (join(",", sort @list)." has no basicAuth attribute.\n")
         if(@list);
     $attr{global}{motd} = $motd;
   }
