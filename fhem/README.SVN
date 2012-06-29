@@ -10,7 +10,7 @@ If you wish to contribute to the project, then
 - check out the source
 - if it is already checked out, it makes sense to do an update before
   implementing your changes:
-   % cvs update
+   % svn update
 - make your changes
 - test if it is working (Really !!!)
 - make an entry in the CHANGED file, giving your changes a "title".
