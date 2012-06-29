@@ -22,7 +22,7 @@ weblink_Define($$)
 {
   my ($hash, $def) = @_;
   my ($type, $name, $wltype, $link) = split("[ \t]+", $def, 4);
-  my %thash = ( link=>1, fileplot=>1, image=>1, iframe=>1, htmlCode=>1 );
+  my %thash = ( link=>1, fileplot=>1, dbplot=>1, image=>1, iframe=>1, htmlCode=>1 );
   
   if(!$link || !$thash{$wltype}) {
     return "Usage: define <name> weblink [" .

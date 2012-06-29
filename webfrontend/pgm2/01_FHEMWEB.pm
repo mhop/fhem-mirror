@@ -1043,8 +1043,9 @@ FW_logWrapper($)
     FW_zoomLink("cmd=$cmd;off=1",   "Next.png",    "next");
     FW_pO "<table><tr><td>";
     FW_pO "<td>";
+    my $logtype = $defs{$d}{TYPE};
     my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
-    my $arg = "$FW_ME?cmd=showlog undef $d $type $file$wl";
+    my $arg = "$FW_ME?cmd=showlog $logtype $d $type $file$wl";
     if(AttrVal($d,"plotmode",$FW_plotmode) eq "SVG") {
       my ($w, $h) = split(",", AttrVal($d,"plotsize",$FW_plotsize));
       FW_pO "<embed src=\"$arg\" type=\"image/svg+xml\" " .
@@ -1067,15 +1068,22 @@ sub
 FW_readgplotfile($$$)
 {
   my ($wl, $gplot_pgm, $file) = @_;
-  
+
   ############################
   # Read in the template gnuplot file.  Digest the #FileLog lines.  Replace
   # the plot directive with our own, as we offer a file for each line
   my (@filelog, @data, $plot);
+
+  my $wltype = "";
+  $wltype = $defs{$wl}{WLTYPE} if (defined($defs{$wl}{WLTYPE}));
+
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
   while(my $l = <FH>) {
     $l =~ s/\r//g;
-    if($l =~ m/^#FileLog (.*)$/) {
+#    if($l =~ m/^#FileLog (.*)$/) {
+    if($l =~ m/^#FileLog (.*)$/ && ($wltype eq "fileplot" || $wl eq "FileLog")) {
+      push(@filelog, $1);
+    } elsif ($l =~ m/^#DbLog (.*)$/ && ($wltype eq "dbplot" || $wl eq "DbLog")) {
       push(@filelog, $1);
     } elsif($l =~ "^plot" || $plot) {
       $plot .= $l;
@@ -1260,6 +1268,7 @@ FW_showLog($)
       $ret = CommandReload(undef, "98_SVG");
       Log 0, $ret if($ret);
     }
+    Log 5, "plotcommand: get $d $file INT $f $t " . join(" ", @{$flog});
     $ret = FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
     FW_pO SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_wname, $FW_dir);
@@ -1775,11 +1784,11 @@ FW_showWeblink($$$$)
     FW_pO "<br>";
 
 
-  } elsif($t eq "fileplot") {
+  } elsif($t eq "fileplot" || $t eq "dbplot" ) {
 
     # plots navigation buttons
-    if($buttons && 
-       $defs{$d}{WLTYPE} eq "fileplot" &&
+    if($buttons &&
+       ($defs{$d}{WLTYPE} eq "fileplot" || $defs{$d}{WLTYPE} eq "dbplot")&&
        !AttrVal($d, "fixedrange", undef)) {
 
       FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
@@ -1791,13 +1800,18 @@ FW_showWeblink($$$$)
     }
 
     my @va = split(":", $v, 3);
-    if(@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile}) {
-      FW_pO "Broken definition for $d: $v<br>";
-
+    if($defs{$d}{WLTYPE} eq "fileplot" && (@va != 3 || !$defs{$va[0]} || !$defs{$va[0]}{currentlogfile})) {
+      FW_pO "Broken definition for fileplot $d: $v<br>";
+    } elsif ($defs{$d}{WLTYPE} eq "dbplot" && (@va != 2 || !$defs{$va[0]})) {
+      FW_pO "Broken definition for dbplot $d: $v<br>";
     } else {
-      if($va[2] eq "CURRENT") {
+      if(defined($va[2]) && $va[2] eq "CURRENT") {
         $defs{$va[0]}{currentlogfile} =~ m,([^/]*)$,;
         $va[2] = $1;
+      }
+
+      if ($defs{$d}{WLTYPE} eq "dbplot") {
+        $va[2] = "-";
       }
 
       my $wl = "&amp;pos=" . join(";", map {"$_=$FW_pos{$_}"} keys %FW_pos);
