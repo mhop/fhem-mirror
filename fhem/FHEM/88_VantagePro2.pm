@@ -103,228 +103,233 @@ VantagePro2_GetStatus($)
 	  $tel->print("TEST");
 	  $answer=$tel->get();
 	  $tel->print("LOOP 1");
+	  sleep(1);
 	  $answer=$tel->get();
 	  $tel->close();  
 
+#	  print "Debug:".length($answer)."\n";
 
-	  my $offset=1;
-	  my $t;
-	  my $btrend="";
-
-	  $t=substr($answer,$offset+3,1);
-	  my ($bartrend)=unpack("c1",$t);
-
-	  $t=substr($answer,$offset+7,2);
-	  my ($barometer)=unpack("s2",$t);
-
-          $barometer=sprintf("%.02f",$barometer/1000*2.54);
-
-	  $t=substr($answer,$offset+9,2);
-	  my ($itemp)=unpack("s2",$t);
-
-	  $t=substr($answer,$offset+11,1);
-	  my ($ihum)=unpack("c1",$t);
-
-	  $t=substr($answer,$offset+12,2);
-	  my ($otemp)=unpack("s2",$t);
-
-	  $t=substr($answer,$offset+33,1);
-	  my ($ohum)=unpack("c1",$t);
-
-	  $t=substr($answer,$offset+14,1);
-	  my ($windspeed)=unpack("c1",$t);
-
-	  $t=substr($answer,$offset+15,1);
-	  my ($avgwindspeed)=unpack("c1",$t);
-
-	  $t=substr($answer,$offset+16,2);
-	  my ($winddir)=unpack("s1",$t);
-
-	  $t=substr($answer,$offset+41,2);
-	  my ($rainrate)=unpack("s2",$t);
-
-	  $t=substr($answer,$offset+43,1);
-	  my ($uv)=unpack("c1",$t);
-
-	  $t=substr($answer,$offset+44,2);
-	  my ($solar)=unpack("s2",$t);
-
-	  $t=substr($answer,$offset+46,2);
-          my ($stormrain)=unpack("s2",$t);
-	  $stormrain=sprintf("%.02f",($stormrain/100*25.4));
-
-	  $t=substr($answer,$offset+50,2);
-	  my ($drain)=unpack("s2",$t);
-	  $drain=sprintf("%.02f",($drain*0.2)); #Es werden Anzahl ticks à 0.2mm übermittelt
-
-	  $t=substr($answer,$offset+52,2);
-	  my ($mrain)=unpack("s2",$t);
-	  $mrain=sprintf("%.02f",($mrain*0.2)); #Es werden Anzahl ticks à 0.2mm übermittelt
-
-	  $t=substr($answer,$offset+54,2);
-	  my ($yrain)=unpack("s2",$t);
-	  $yrain=sprintf("%.02f",($yrain*0.2)); # #Es werden Anzahl ticks à 0.2mm übermittelt
-
-	  $t=substr($answer,$offset+56,2);
-	  my ($etday)=unpack("s2",$t);
-	  $etday=sprintf("%.02f",($etday/1000*25.4));
-
-	  $t=substr($answer,$offset+58,2);
-	  my ($etmonth)=unpack("s2",$t);
-	  $etmonth=sprintf("%.02f",($etmonth/100*25.4));
-
-	  $t=substr($answer,$offset+60,2);
-	  my ($etyear)=unpack("s2",$t);
-	  $etyear=sprintf("%.02f",($etyear/100*25.4));
-
-	  $itemp=sprintf("%.02f",(($itemp/10)-32)*5/9);
-	  $otemp=sprintf("%.02f",(($otemp/10)-32)*5/9);
-	  $rainrate=sprintf("%.02f",$rainrate/5);
-	  $windspeed=sprintf("%.02f",$windspeed*1.609);
-	  $avgwindspeed=sprintf("%.02f",$avgwindspeed*1.609);
-	  $uv=$uv/10;
-	  if($bartrend==0) { $btrend="Steady"; }
-	  elsif($bartrend==20) { $btrend="Rising Slowly"; }
-	  elsif($bartrend==60) { $btrend="Rising Rapidly"; }
-	  elsif($bartrend==-20) { $btrend="Falling Slowly"; }
-	  elsif($bartrend==-60) { $btrend="Falling Rapidly"; }
-
-	  # WindChill and HeatIndex by Andreas Berweger
-
-	  my $wct; #WindChill temperature
-	  my $hit; #HeatIndex temperature
-
-	  if($otemp<10 && $avgwindspeed>5) 
+	  if(length($answer)>=63)
 	  {
-		$wct=sprintf("%.02f",(13.12+(0.6215*$otemp)-(11.37*$avgwindspeed**0.16)+(0.3965*$otemp*$avgwindspeed**0.16)));
-	  }
-	  else
-	  {
-		$wct=$otemp;
-	  }
+		  my $offset=1;
+		  my $t;
+		  my $btrend="";
 
-	  if($otemp>25 && $ohum>40)
-	  {
-		$hit=sprintf("%.02f",(-8.784695 + (1.61139411*$otemp) + (2.338549*$ohum) + (-0.14611605*$otemp*$ohum) + (-1.2308094*10**-2*$otemp**2) + (-1.6424828*10**-2*$ohum**2) + (2.211732*10**-3*$otemp**2*$ohum) + (7.2546*10**-4*$otemp*$ohum**2) + (-3.582*10**-6*$otemp**2*$ohum**2))); 
-	  }   
-	  else 
-	  {
-		$hit=$otemp;
-	  }
+		  $t=substr($answer,$offset+3,1);
+		  my ($bartrend)=unpack("c1",$t);
 
-	  $text="T-OUT: ".$otemp." T-WC-OUT: ".$wct." T-HI-OUT: ".$hit." T-IN: ".$itemp." H-OUT: ".$ohum." H-IN: ".$ihum." W: ".$windspeed." W-AV: ".$avgwindspeed." WD: ".$winddir." R: ".$rainrate." S: ".$solar." UV: ".$uv." RD: ".$drain." RM: ".$mrain. " RY: ".$yrain." SR: ".$stormrain." BM: ".$barometer." BT: ".$btrend. " ET-DAY: ".$etday." ET-MONTH: ".$etmonth." ET-YEAR: ".$etyear;
-	  my $n=0;
+		  $t=substr($answer,$offset+7,2);
+		  my ($barometer)=unpack("s2",$t);
 
-	  Log 4,"$name: $text";
-	  if (!$hash->{local}){
-	       $sensor="temperature-outside";
-	       $hash->{CHANGED}[$n++] = "Temperature Outside: ".$otemp;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $otemp." (Celsius)";;
+		  $barometer=sprintf("%.02f",$barometer/1000*2.54);
 
-               $sensor="temperature-windchill";
-	       $hash->{CHANGED}[$n++] = "WCT: ".$wct;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $wct." (Celsius)";;
+		  $t=substr($answer,$offset+9,2);
+		  my ($itemp)=unpack("s2",$t);
 
-               $sensor="temperature-heatindex";
-	       $hash->{CHANGED}[$n++] = "HeatT: ".$hit;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $hit." (Celsius)";;
+		  $t=substr($answer,$offset+11,1);
+		  my ($ihum)=unpack("c1",$t);
 
-               $sensor="temperature-inside";
-	       $hash->{CHANGED}[$n++] = "Temperature Inside: ".$itemp;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $itemp." (Celsius)";;
+		  $t=substr($answer,$offset+12,2);
+		  my ($otemp)=unpack("s2",$t);
 
-		$sensor="humidity outside";
-	       $hash->{CHANGED}[$n++] = "Humidity Outside: ".$ohum;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $ohum." (%)";;
+		  $t=substr($answer,$offset+33,1);
+		  my ($ohum)=unpack("c1",$t);
 
-		$sensor="humidity inside";
-	       $hash->{CHANGED}[$n++] = "Humidity Inside: ".$ihum;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $ihum." (%)";;
+		  $t=substr($answer,$offset+14,1);
+		  my ($windspeed)=unpack("c1",$t);
 
-		$sensor="windspeed";
-	       $hash->{CHANGED}[$n++] = "Wind: ".$windspeed;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $windspeed." (km/h)";;
+		  $t=substr($answer,$offset+15,1);
+		  my ($avgwindspeed)=unpack("c1",$t);
 
-		$sensor="10 min. average windspeed";
-	       $hash->{CHANGED}[$n++] = "10 Min. Wind: ".$avgwindspeed;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $avgwindspeed." (km/h)";;
+		  $t=substr($answer,$offset+16,2);
+		  my ($winddir)=unpack("s1",$t);
 
-		$sensor="wind direction";
-	       $hash->{CHANGED}[$n++] = "Wind Direction: ".$winddir;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $winddir." (Degrees)";;
+		  $t=substr($answer,$offset+41,2);
+		  my ($rainrate)=unpack("s2",$t);
 
-		$sensor="solar";
-	       $hash->{CHANGED}[$n++] = "Solar: ".$solar;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $solar." (Watt/m^2)";;
+		  $t=substr($answer,$offset+43,1);
+		  my ($uv)=unpack("c1",$t);
 
-		$sensor="UV";
-	       $hash->{CHANGED}[$n++] = "UV: ".$uv;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $uv." (UV/Index)";;
+		  $t=substr($answer,$offset+44,2);
+		  my ($solar)=unpack("s2",$t);
 
-		$sensor="rainrate";
-	       $hash->{CHANGED}[$n++] = "Rainrate: ".$rainrate;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $rainrate." (mm/h)";;
+		  $t=substr($answer,$offset+46,2);
+		  my ($stormrain)=unpack("s2",$t);
+		  $stormrain=sprintf("%.02f",($stormrain/100*25.4));
 
-		$sensor="day rain";
-	       $hash->{CHANGED}[$n++] = "Dayrain: ".$drain;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $drain." (mm/day)";;
+		  $t=substr($answer,$offset+50,2);
+		  my ($drain)=unpack("s2",$t);
+		  $drain=sprintf("%.02f",($drain*0.2)); #Es werden Anzahl ticks à 0.2mm übermittelt
 
-		$sensor="month rain";
-	       $hash->{CHANGED}[$n++] = "Monthrain: ".$mrain;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $mrain." (mm/month)";;
+		  $t=substr($answer,$offset+52,2);
+		  my ($mrain)=unpack("s2",$t);
+		  $mrain=sprintf("%.02f",($mrain*0.2)); #Es werden Anzahl ticks à 0.2mm übermittelt
 
-		$sensor="year rain";
-	       $hash->{CHANGED}[$n++] = "Yearrain: ".$yrain;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $yrain." (mm/year)";;
+		  $t=substr($answer,$offset+54,2);
+		  my ($yrain)=unpack("s2",$t);
+		  $yrain=sprintf("%.02f",($yrain*0.2)); # #Es werden Anzahl ticks à 0.2mm übermittelt
 
-		$sensor="storm rain";
-		$hash->{CHANGED}[$n++] = "SR: ".$stormrain;
-		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
-		$hash->{READINGS}{$sensor}{VAL} = $stormrain." (mm/storm)";;
+		  $t=substr($answer,$offset+56,2);
+		  my ($etday)=unpack("s2",$t);
+		  $etday=sprintf("%.02f",($etday/1000*25.4));
 
-		$sensor="barometer";
-	       $hash->{CHANGED}[$n++] = "Barometer: ".$barometer;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $barometer." (Millimeters)";;
+		  $t=substr($answer,$offset+58,2);
+		  my ($etmonth)=unpack("s2",$t);
+		  $etmonth=sprintf("%.02f",($etmonth/100*25.4));
 
-		$sensor="barometer trend";
-	       $hash->{CHANGED}[$n++] = "Barometer Trend: ".$btrend;
-	       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
-	       $hash->{READINGS}{$sensor}{VAL} = $btrend;
+		  $t=substr($answer,$offset+60,2);
+		  my ($etyear)=unpack("s2",$t);
+		  $etyear=sprintf("%.02f",($etyear/100*25.4));
 
-		$sensor="ET Day";
-		$hash->{CHANGED}[$n++] = "ETD: ".$etday;
-		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
-		$hash->{READINGS}{$sensor}{VAL} = $etday." (mm/day)";;
+		  $itemp=sprintf("%.02f",(($itemp/10)-32)*5/9);
+		  $otemp=sprintf("%.02f",(($otemp/10)-32)*5/9);
+		  $rainrate=sprintf("%.02f",$rainrate/5);
+		  $windspeed=sprintf("%.02f",$windspeed*1.609);
+		  $avgwindspeed=sprintf("%.02f",$avgwindspeed*1.609);
+		  $uv=$uv/10;
+		  if($bartrend==0) { $btrend="Steady"; }
+		  elsif($bartrend==20) { $btrend="Rising Slowly"; }
+		  elsif($bartrend==60) { $btrend="Rising Rapidly"; }
+		  elsif($bartrend==-20) { $btrend="Falling Slowly"; }
+		  elsif($bartrend==-60) { $btrend="Falling Rapidly"; }
 
-		$sensor="ET Month";
-		$hash->{CHANGED}[$n++] = "ETM: ".$etmonth;
-		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
-		$hash->{READINGS}{$sensor}{VAL} = $etmonth." (mm/month)";;
+		  # WindChill and HeatIndex by Andreas Berweger
 
-		$sensor="ET Year";
-		$hash->{CHANGED}[$n++] = "ETY: ".$etyear;
-		$hash->{READINGS}{$sensor}{TIME} = TimeNow();
-		$hash->{READINGS}{$sensor}{VAL} = $etyear." (mm/year)";;
+		  my $wct; #WindChill temperature
+		  my $hit; #HeatIndex temperature
 
-	       DoTrigger($name, undef) if($init_done);    
-	  }
-	  $hash->{STATE} = $text;
+		  if($otemp<10 && $avgwindspeed>5) 
+		  {
+			$wct=sprintf("%.02f",(13.12+(0.6215*$otemp)-(11.37*$avgwindspeed**0.16)+(0.3965*$otemp*$avgwindspeed**0.16)));
+		  }
+		  else
+		  {
+			$wct=$otemp;
+		  }
+
+		  if($otemp>25 && $ohum>40)
+		  {
+			$hit=sprintf("%.02f",(-8.784695 + (1.61139411*$otemp) + (2.338549*$ohum) + (-0.14611605*$otemp*$ohum) + (-1.2308094*10**-2*$otemp**2) + (-1.6424828*10**-2*$ohum**2) + (2.211732*10**-3*$otemp**2*$ohum) + (7.2546*10**-4*$otemp*$ohum**2) + (-3.582*10**-6*$otemp**2*$ohum**2))); 
+		  }   
+		  else 
+		  {
+			$hit=$otemp;
+		  }
+
+		  $text="T-OUT: ".$otemp." T-WC-OUT: ".$wct." T-HI-OUT: ".$hit." T-IN: ".$itemp." H-OUT: ".$ohum." H-IN: ".$ihum." W: ".$windspeed." W-AV: ".$avgwindspeed." WD: ".$winddir." R: ".$rainrate." S: ".$solar." UV: ".$uv." RD: ".$drain." RM: ".$mrain. " RY: ".$yrain." SR: ".$stormrain." BM: ".$barometer." BT: ".$btrend. " ET-DAY: ".$etday." ET-MONTH: ".$etmonth." ET-YEAR: ".$etyear;
+		  my $n=0;
+
+		  Log 4,"$name: $text";
+		  if (!$hash->{local}){
+		       $sensor="temperature-outside";
+		       $hash->{CHANGED}[$n++] = "Temperature Outside: ".$otemp;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $otemp." (Celsius)";;
+
+		       $sensor="temperature-windchill";
+		       $hash->{CHANGED}[$n++] = "WCT: ".$wct;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $wct." (Celsius)";;
+
+		       $sensor="temperature-heatindex";
+		       $hash->{CHANGED}[$n++] = "HeatT: ".$hit;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $hit." (Celsius)";;
+
+		       $sensor="temperature-inside";
+		       $hash->{CHANGED}[$n++] = "Temperature Inside: ".$itemp;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $itemp." (Celsius)";;
+
+			$sensor="humidity outside";
+		       $hash->{CHANGED}[$n++] = "Humidity Outside: ".$ohum;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $ohum." (%)";;
+
+			$sensor="humidity inside";
+		       $hash->{CHANGED}[$n++] = "Humidity Inside: ".$ihum;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $ihum." (%)";;
+
+			$sensor="windspeed";
+		       $hash->{CHANGED}[$n++] = "Wind: ".$windspeed;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $windspeed." (km/h)";;
+
+			$sensor="10 min. average windspeed";
+		       $hash->{CHANGED}[$n++] = "10 Min. Wind: ".$avgwindspeed;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $avgwindspeed." (km/h)";;
+
+			$sensor="wind direction";
+		       $hash->{CHANGED}[$n++] = "Wind Direction: ".$winddir;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $winddir." (Degrees)";;
+
+			$sensor="solar";
+		       $hash->{CHANGED}[$n++] = "Solar: ".$solar;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $solar." (Watt/m^2)";;
+
+			$sensor="UV";
+		       $hash->{CHANGED}[$n++] = "UV: ".$uv;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $uv." (UV/Index)";;
+
+			$sensor="rainrate";
+		       $hash->{CHANGED}[$n++] = "Rainrate: ".$rainrate;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $rainrate." (mm/h)";;
+
+			$sensor="day rain";
+		       $hash->{CHANGED}[$n++] = "Dayrain: ".$drain;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $drain." (mm/day)";;
+
+			$sensor="month rain";
+		       $hash->{CHANGED}[$n++] = "Monthrain: ".$mrain;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $mrain." (mm/month)";;
+
+			$sensor="year rain";
+		       $hash->{CHANGED}[$n++] = "Yearrain: ".$yrain;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $yrain." (mm/year)";;
+
+			$sensor="storm rain";
+			$hash->{CHANGED}[$n++] = "SR: ".$stormrain;
+			$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+			$hash->{READINGS}{$sensor}{VAL} = $stormrain." (mm/storm)";;
+
+			$sensor="barometer";
+		       $hash->{CHANGED}[$n++] = "Barometer: ".$barometer;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $barometer." (Millimeters)";;
+
+			$sensor="barometer trend";
+		       $hash->{CHANGED}[$n++] = "Barometer Trend: ".$btrend;
+		       $hash->{READINGS}{$sensor}{TIME} = TimeNow();
+		       $hash->{READINGS}{$sensor}{VAL} = $btrend;
+
+			$sensor="ET Day";
+			$hash->{CHANGED}[$n++] = "ETD: ".$etday;
+			$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+			$hash->{READINGS}{$sensor}{VAL} = $etday." (mm/day)";;
+
+			$sensor="ET Month";
+			$hash->{CHANGED}[$n++] = "ETM: ".$etmonth;
+			$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+			$hash->{READINGS}{$sensor}{VAL} = $etmonth." (mm/month)";;
+
+			$sensor="ET Year";
+			$hash->{CHANGED}[$n++] = "ETY: ".$etyear;
+			$hash->{READINGS}{$sensor}{TIME} = TimeNow();
+			$hash->{READINGS}{$sensor}{VAL} = $etyear." (mm/year)";;
+
+		       DoTrigger($name, undef) if($init_done);    
+		  }
+		  $hash->{STATE} = $text;
+	}
   }
   return($text);
 }
