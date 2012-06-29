@@ -51,7 +51,7 @@ sub addproperty {
   my ($self,$line)= @_;
   # TRIGGER;VALUE=DATE-TIME:20120531T150000Z
   #main::debug "line= $line";
-  my ($property,$parameter)= split(":", $line); # TRIGGER;VALUE=DATE-TIME    20120531T150000Z
+  my ($property,$parameter)= split(":", $line,2); # TRIGGER;VALUE=DATE-TIME    20120531T150000Z
   #main::debug "property= $property parameter= $parameter";
   my ($key,$parts)= split(";", $property,2);
   #main::debug "key= $key parts= $parts";
@@ -295,12 +295,14 @@ sub dt {
 
 sub ts {
   my ($tm)= @_;
+  return "" unless($tm);
   my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
   return sprintf("%02d.%02d.%4d %02d:%02d:%02d", $day,$month+1,$year+1900,$hour,$minute,$second);
 }
 
 sub ts0 {
   my ($tm)= @_;
+  return "" unless($tm);
   my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
   return sprintf("%02d.%02d.%2d %02d:%02d", $day,$month+1,$year-100,$hour,$minute);
 }
@@ -314,6 +316,7 @@ sub fromVEvent {
   $self->{end}= tm($vevent->value("DTEND"));
   $self->{lastModified}= tm($vevent->value("LAST-MODIFIED"));
   $self->{summary}= $vevent->value("SUMMARY");
+  $self->{location}= $vevent->value("LOCATION");
   #$self->{summary}=~ s/;/,/g;
 
   #
@@ -366,6 +369,11 @@ sub summary {
   return $self->{summary};
 }
 
+sub location {
+  my ($self)= @_;
+  return $self->{location};
+}
+
 
 sub asText {
   my ($self)= @_;
@@ -387,6 +395,22 @@ sub asFull {
     $self->{summary}
   );
 }
+
+sub alarmTime {
+  my ($self)= @_;
+  return ts($self->{alarm});
+}
+
+sub startTime {
+  my ($self)= @_;
+  return ts($self->{start});
+}
+
+sub endTime {
+  my ($self)= @_;
+  return ts($self->{end});
+}
+
 
 # returns 1 if time is before alarm time and before start time, else 0
 sub isUpcoming {
@@ -554,19 +578,22 @@ sub Calendar_Wakeup($) {
   my $t= time();
 
   Calendar_GetUpdate($hash) if($t>= $hash->{fhem}{nxtUpdtTs});
+
+  $hash->{fhem}{lastChkTs}= $t;
+  $hash->{fhem}{lastCheck}= FmtDateTime($t);
   Calendar_CheckTimes($hash);
 
-  my $nt= $hash->{fhem}{nxtUpdtTs};
-
   # find next event
+  my $nt= $hash->{fhem}{nxtUpdtTs};
   foreach my $event ($hash->{fhem}{events}->events()) {
     my $et= $event->nextTime($t);
-    $nt= $et if(defined($et) && ($et< $nt));
+    # we only consider times in the future to avoid multiple
+    # invocations for calendar events with the event time
+    $nt= $et if(defined($et) && ($et< $nt) && ($et > $t));
   }
+  $hash->{fhem}{nextChkTs}= $nt;
+  $hash->{fhem}{nextCheck}= FmtDateTime($nt);
 
-  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($nt);
-  $hash->{fhem}{nextUpdate}= sprintf("%02d.%02d.%4d %02d:%02d:%02d", $day,$month+1,$year+1900,$hour,$minute,$second);
-  
   InternalTimer($nt, "Calendar_Wakeup", $hash, 0) ;
 
 }
@@ -605,6 +632,7 @@ sub Calendar_CheckTimes($) {
   my @changed= sort map { $_->uid() } @changedevents;
   
   readingsBeginUpdate($hash);
+  readingsUpdate($hash, "lastCheck", $hash->{fhem}{lastCheck});
   readingsUpdate($hash, "modeUpcoming", join(";", @upcoming));
   readingsUpdate($hash, "modeAlarm", join(";", @alarm));
   readingsUpdate($hash, "modeAlarmed", join(";", @alarmed));
@@ -624,6 +652,10 @@ sub Calendar_GetUpdate($) {
 
   my ($hash) = @_;
 
+  my $t= time();
+  $hash->{fhem}{lstUpdtTs}= $t;
+  $hash->{fhem}{lastUpdate}= FmtDateTime($t);
+  
   #main::debug "Updating...";
   my $url= $hash->{fhem}{url};
   
@@ -677,6 +709,7 @@ sub Calendar_GetUpdate($) {
   #$hash->{STATE}= $val;
   readingsBeginUpdate($hash);
   readingsUpdate($hash, "calname", $calname);
+  readingsUpdate($hash, "lastUpdate", $hash->{fhem}{lastUpdate});
   readingsUpdate($hash, "all", join(";", @all));
   readingsUpdate($hash, "stateNew", join(";", @new));
   readingsUpdate($hash, "stateUpdated", join(";", @updated));
@@ -684,7 +717,10 @@ sub Calendar_GetUpdate($) {
   readingsUpdate($hash, "stateChanged", join(";", @changed));
   readingsEndUpdate($hash, 1); # DoTrigger, because sub is called by a timer instead of dispatch
 
-  $hash->{fhem}{nxtUpdtTs}= time()+$hash->{fhem}{interval};
+  $t+= $hash->{fhem}{interval};
+  $hash->{fhem}{nxtUpdtTs}= $t;
+  $hash->{fhem}{nextUpdate}= FmtDateTime($t);
+
   return 1;
 }
 
@@ -714,7 +750,7 @@ sub Calendar_Get($@) {
   my @events;
 
   my $cmd= $a[1];
-  if($cmd eq "text" || $cmd eq "full" || $cmd eq "summary") {
+  if(grep(/^$cmd$/, ("text","full","summary","location","alarm","start","end"))) {
 
     return "argument is missing" if($#a != 2);
     my $reading= $a[2];
@@ -735,6 +771,10 @@ sub Calendar_Get($@) {
         push @texts, $event->asText() if $cmd eq "text";
         push @texts, $event->asFull() if $cmd eq "full";
         push @texts, $event->summary() if $cmd eq "summary";
+        push @texts, $event->location() if $cmd eq "location";
+        push @texts, $event->alarmTime() if $cmd eq "alarm";
+        push @texts, $event->startTime() if $cmd eq "start";
+        push @texts, $event->endTime() if $cmd eq "end";
       }
     }  
     return join("\n", @texts);
