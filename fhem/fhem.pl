@@ -370,7 +370,7 @@ $init_done = 1;
 DoTrigger("global", "INITIALIZED");
 
 $attr{global}{motd} .= "Running with root privileges."
-                                 if($^O !~ m/Win/ && $< == 0);
+        if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
 $attr{global}{motd} .=
         "\nRestart fhem for a new check if the problem is fixed,\n".
         "or set the global attribute motd to none to supress this message.\n"
