@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 
+use IO::File;
+
 # Server-Side script to check out the fhem SVN repository, and upload the
 # changed files to the server
 
@@ -33,6 +35,7 @@ if($ndiff != 4) {       # more than the standard stuff is different
 my @filelist = (
  "./fhem.pl.txt",
  "FHEM/.*.pm",
+ "FHEM/FhemUtils/.*.pm",
  "webfrontend/pgm2/.*",
  "docs/commandref.html",
  "docs/faq.html",
@@ -111,18 +114,20 @@ my $uploaddir2="UPLOAD2";
 system("mkdir -p $uploaddir2");
 
 my %filelist2 = (
- "./fhem.pl.txt"                => ".",
- "./CHANGED"                    => ".",
- "FHEM/.*.pm"                   => "FHEM",
- "../culfw/Devices/CUL/.*.hex"  => "FHEM",
- "webfrontend/pgm2/.*.pm\$"     => "FHEM",
- "webfrontend/pgm2/.*"          => "www/pgm2",
- "docs/commandref.html"         => "www/pgm2",
- "docs/faq.html"                => "www/pgm2",
- "docs/HOWTO.html"              => "www/pgm2",
- "docs/fhem.*.png"              => "www/pgm2",
- "docs/.*.jpg"                  => "www/pgm2",
+ "./fhem.pl.txt"               => { type=>",fhem,pgm2,", dir=>"." },
+ "./CHANGED"                   => { type=>",fhem,pgm2,", dir=>"." },
+ "FHEM/.*.pm"                  => { type=>",fhem,pgm2,", dir=>"FHEM" },
+ "FHEM/FhemUtils/.*.pm"        => { type=>",fhem,pgm2,", dir=>"FHEM/FhemUtils"},
+ "../culfw/Devices/CUL/.*.hex" => { type=>",fhem,pgm2,", dir=>"FHEM"},
+ "webfrontend/pgm2/.*.pm\$"    => { type=>",pgm2,",      dir=>"FHEM"},
+ "webfrontend/pgm2/.*"         => { type=>",pgm2,",      dir=>"www/pgm2"},
+ "docs/commandref.html"        => { type=>",pgm2,",      dir=>"www/pgm2"},
+ "docs/faq.html"               => { type=>",pgm2,",      dir=>"www/pgm2"},
+ "docs/HOWTO.html"             => { type=>",pgm2,",      dir=>"www/pgm2"},
+ "docs/fhem.*.png"             => { type=>",pgm2,",      dir=>"www/pgm2"},
+ "docs/.*.jpg"                 => { type=>",pgm2,",      dir=>"www/pgm2"},
 );
+
 
 # Can't make negative regexp to work, so do it with extra logic
 my %skiplist2 = (
@@ -133,11 +138,12 @@ my %skiplist2 = (
 my %filetime2;
 my %filesize2;
 my %filedir2;
+my %filetype2;
 chdir("$homedir/fhem");
 foreach my $fspec (keys %filelist2) {
   $fspec =~ m,^(.+)/([^/]+)$,;
   my ($dir,$pattern) = ($1, $2);
-  my $tdir = $filelist2{$fspec};
+  my $tdir = $filelist2{$fspec}{dir};
   opendir DH, $dir || die("Can't open $dir: $!\n");
   foreach my $file (grep { /$pattern/ && -f "$dir/$_" } readdir(DH)) {
     next if($skiplist2{$tdir} && $file =~ m/$skiplist2{$tdir}/);
@@ -147,6 +153,7 @@ foreach my $fspec (keys %filelist2) {
                 $mt[5]+1900, $mt[4]+1, $mt[3], $mt[2], $mt[1], $mt[0];
     $filesize2{"$tdir/$file"} = $st[7];
     $filedir2{"$tdir/$file"} = $dir;
+    $filetype2{"$tdir/$file"} = $filelist2{$fspec}{type};
   }
   closedir(DH);
 }
@@ -163,19 +170,30 @@ if(open FH, "filetimes.txt") {
   close(FH);
 }
 
-open FH, ">filetimes.txt" || die "Can't open filetimes.txt: $!\n";
-open CTL, ">controls.txt" || die "Can't open controls.txt: $!\n";
-open FTP, ">script.txt" || die "Can't open script.txt: $!\n";
+open FTP, ">script.txt"   || die "Can't open script.txt: $!\n";
 print FTP "cd fhem/fhemupdate2\n";
 print FTP "pas\n";      # Without passive only 28 files can be transferred
+
+open FH, ">filetimes.txt" || die "Can't open filetimes.txt: $!\n";
 print FTP "put filetimes.txt\n";
-print FTP "put controls.txt\n";
+
+my %controls = (fhem=>0, pgm2=>0);
+foreach my $k (keys %controls) {
+  my $fname = "controls_$k.txt";
+  $controls{$k} = new IO::File ">$fname" || die "Can't open $fname: $!\n";
+  print FTP "put $fname\n";
+}
+
 my $cnt;
 foreach my $f (sort keys %filetime2) {
   my $fn = $f;
   $fn =~ s/.txt$// if($fn =~ m/.pl.txt$/);
   print FH "$filetime2{$f} $filesize2{$f} $fn\n";
-  print CTL "UPD $filetime2{$f} $filesize2{$f} $fn\n";
+  foreach my $k (keys %controls) {
+    my $fh = $controls{$k};
+    print $fh "UPD $filetime2{$f} $filesize2{$f} $fn\n"
+        if(",$filetype2{$f}," =~ m/,$k,/);
+  }
   my $newfname = $f;
   if(!$oldtime{$f} || $oldtime{$f} ne $filetime2{$f}) {
     $f =~ m,^(.*)/([^/]*)$,;
@@ -189,13 +207,16 @@ foreach my $f (sort keys %filetime2) {
 close FH;
 close FTP;
 
-if(open(ADD, "../contrib/fhemupdate.control")) {
-  while(my $l = <ADD>) {
-    print CTL $l;
+foreach my $k (keys %controls) {
+  if(open(ADD, "../contrib/fhemupdate.control.$k")) {
+    while(my $l = <ADD>) {
+      my $fh = $controls{$k};
+      print $fh $l;
+    }
+    close ADD;
   }
-  close ADD;
+  close $controls{$k};
 }
-close CTL;
 
 if($cnt) {
   print "FTP Upload needed for $cnt files\n";
