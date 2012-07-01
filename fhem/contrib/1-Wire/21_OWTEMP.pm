@@ -4,10 +4,9 @@
 #
 # FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
-# Attention: This module works as a replacement for the standard 21_OWTEMP.pm,
-#            therefore may communicate with the 1-Wire File System OWFS,
-#            but also with the newer and more direct OWX module
-#
+# Attention: This module may communicate with the OWX module,
+#            and also with the 1-Wire File System OWFS
+
 # Prefixes for subroutines of this module:
 # OW   = General 1-Wire routines (Martin Fischer, Peter Henning)
 # OWFS = 1-Wire file system (Martin Fischer)
@@ -16,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 1.15 - June, 2012
+# Version 2.0 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -635,27 +634,16 @@ sub OWXTEMP_GetValues($) {
 
   my ($hash) = @_;
   
+  my ($i,$j,$k);
+  
   #-- For default, perform the conversion NOT now
   my $con=1;
   
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
   #-- hash of the busmaster
   my $master = $hash->{IODev};
-  
-  my ($i,$j,$k);
 
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
   
   #-- check, if the conversion has been called before - only on devices with real power
   if( defined($attr{$hash->{IODev}->{NAME}}{buspower}) && ( $attr{$hash->{IODev}->{NAME}}{buspower} eq "real") ){
@@ -666,8 +654,7 @@ sub OWXTEMP_GetValues($) {
   if( $con==1 ){
     OWX_Reset($master);
     #-- issue the match ROM command \x55 and the start conversion command
-    my $select=sprintf("\x55%c%c%c%c%c%c%c%c\x44",@owx_ROM_ID); 
-    if( OWX_Block($master,$select) eq 0 ){
+    if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
       return "OWXTEMP: Device $owx_dev not accessible";
     } 
     #-- conversion needs some 950 ms - but we may also do it in shorter time !
@@ -677,14 +664,14 @@ sub OWXTEMP_GetValues($) {
   #-- NOW ask the specific device 
   OWX_Reset($master);
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-  my $select=sprintf("\x55%c%c%c%c%c%c%c%c\xBE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
-     @owx_ROM_ID); 
-     
-  my $res=OWX_Block($master,$select);
+  #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
+  my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
+  #Log 1,"OWXTEMP: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
     return "OWXTEMP: Device $owx_dev not accessible in 2nd step"; 
   }
+  
   #my $res2 = "====> OWXTEMP Received ";
   #for(my $i=0;$i<19;$i++){  
   #  my $j=int(ord(substr($res,$i,1))/16);
@@ -754,27 +741,14 @@ sub OWXTEMP_GetValues($) {
 sub OWXTEMP_SetValues($@) {
   my ($hash, @a) = @_;
   
+  my ($i,$j,$k);
+  
   my $name = $hash->{NAME};
- 
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
   #-- hash of the busmaster
   my $master = $hash->{IODev};
  
-  my ($i,$j,$k);
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
-  
   #-- define vars
   my $key   = $a[1];
   my $value = $a[2];
@@ -795,22 +769,12 @@ sub OWXTEMP_SetValues($@) {
   #   2. \x48 appended to match ROM => command not ok. 
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
-  my $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E%c%c\x48",@owx_ROM_ID,$thp,$tlp); 
-  my $res=OWX_Block($master,$select);
+  my $select=sprintf("\x4E%c%c\x48",$thp,$tlp); 
+  my $res=OWX_Complex($master,$owx_dev,$select,0);
 
   if( $res eq 0 ){
     return "OWXTEMP: Device $owx_dev not accessible"; 
   } 
-  
-  #-- issue the match ROM command \x55 and the copy scratchpad command \x48
-  #$select=sprintf("\x55%c%c%c%c%c%c%c%c",@owx_ROM_ID); 
-  #$res=OWX_Block($hash,$select);
-  #$res=OWX_WriteBytePower($hash,"\x48");
-
-  #if( $res eq 0 ){
-  #  Log 3, "OWXTEMP_SetTemp: Device $romid not accessible in the second step"; 
-  #  return 0;
-  #} 
   
   DoTrigger($name, undef) if($init_done);
   return undef;

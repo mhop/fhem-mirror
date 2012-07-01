@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.15 - June, 2012
+# Version 2.0 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
