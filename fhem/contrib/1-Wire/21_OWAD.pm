@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.15 - June, 2012
+# Version 2.0 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -40,17 +40,17 @@
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B,C,D
 # Note: attributes are read only during initialization procedure - later changes are not used.
 #
-# attr <name> stateAL0  "<string>"    = character string for denoting low normal condition, default is green down triangle
-# attr <name> stateAH0  "<string>"    = character string for denoting high normal condition, default is green up triangle
-# attr <name> stateAL1  "<string>"    = character string for denoting low alarm condition, default is red down triangle
-# attr <name> stateAH1  "<string>"    = character string for denoting high alarm condition, default is red up triangle
-# attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
-# attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
-# attr <name> <channel>Offset <float> = offset added to the reading in this channel 
-# attr <name> <channel>Factor <float> = factor multiplied to (reading+offset) in this channel 
-# attr <name> <channel>Alarm          = alarm setting in this channel, either both, low, high or none (default) 
-# attr <name> <channel>Low <float>    = measurement value for low alarm 
-# attr <name> <channel>High <float>   = measurement for high alarm 
+# attr <name> stateAL0  "<string>"     = character string for denoting low normal condition, default is green down triangle
+# attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is green up triangle
+# attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is red down triangle
+# attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is red up triangle
+# attr <name> <channel>Name   <string>|<string> = name for the channel | a type description for the measured value
+# attr <name> <channel>Unit   <string>|<string> = unit of measurement for this channel | its abbreviation 
+# attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
+# attr <name> <channel>Factor <float>  = factor multiplied to (reading+offset) in this channel 
+# attr <name> <channel>Alarm  <string> = alarm setting in this channel, either both, low, high or none (default) 
+# attr <name> <channel>Low    <float>  = measurement value (on the scale determined by offset and factor) for low alarm 
+# attr <name> <channel>High   <float>  = measurement value (on the scale determined by offset and factor) for high alarm 
 #
 ########################################################################################
 #
@@ -201,6 +201,7 @@ sub OWAD_Define ($$) {
     return "OWAD: Wrong 1-Wire device model $model"
       if( $model ne "DS2450");
     $id            = $a[3];
+    if(int(@a)>=5) { $interval = $a[4]; }
   } else {    
     return "OWAD: $a[0] ID $a[2] invalid, specify a 12 digit value";
   }
@@ -228,7 +229,7 @@ sub OWAD_Define ($$) {
   my $interface= $hash->{IODev}->{TYPE};
  
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+1, "OWAD_InitializeDevice", $hash, 0);
+  InternalTimer(time()+10, "OWAD_InitializeDevice", $hash, 0);
   
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWAD_GetValues", $hash, 0);
@@ -808,24 +809,11 @@ sub OWXAD_GetPage($$) {
   
   my ($select, $res, $res2, $res3, @data);
   
-  #-- ID of the device
+  #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  my $master  = $hash->{IODev};
   
   my ($i,$j,$k);
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
 
   #=============== get the voltage reading ===============================
   if( $page eq "reading"){
@@ -833,8 +821,7 @@ sub OWXAD_GetPage($$) {
     if( $con==1 ){
       OWX_Reset($master);
       #-- issue the match ROM command \x55 and the start conversion command
-      $select = sprintf("\x55%c%c%c%c%c%c%c%c\x3C\x0F\x00\xFF\xFF",@owx_ROM_ID);  
-      $res= OWX_Block($master,$select);
+      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
       if( $res eq 0 ){
         return "OWXAD: Device $owx_dev not accessible for conversion";
       } 
@@ -842,21 +829,18 @@ sub OWXAD_GetPage($$) {
       select(undef,undef,undef,0.02);
     }
     #-- issue the match ROM command \x55 and the read conversion page command
-    #   \xAA\x00\x00 reading 8 data bytes and 2 CRC bytes
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\xAA\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
-      @owx_ROM_ID);   
+    #   \xAA\x00\x00 
+    $select="\xAA\x00\x00";
   #=============== get the alarm reading ===============================
   } elsif ( $page eq "alarm" ) {
     #-- issue the match ROM command \x55 and the read alarm page command 
-    #   \xAA\x10\x00 reading 8 data bytes and 2 CRC bytes
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\xAA\x10\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
-      @owx_ROM_ID); 
+    #   \xAA\x10\x00 
+    $select="\xAA\x10\x00";
   #=============== get the status reading ===============================
   } elsif ( $page eq "status" ) {
     #-- issue the match ROM command \x55 and the read status memory page command 
-    #   \xAA\x08\x00 reading 8 data bytes and 2 CRC bytes
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\xAA\x08\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
-     @owx_ROM_ID);  
+    #   \xAA\x08\x00 r
+  $select="\xAA\x08\x00";
   #=============== wrong value requested ===============================
   } else {
     return "OWXAD: Wrong memory page requested";
@@ -864,16 +848,21 @@ sub OWXAD_GetPage($$) {
   
   #-- reset the bus
   OWX_Reset($master);
-  #-- read the data
-  $res=OWX_Block($master,$select);
+  #-- reading 9 + 3 + 8 data bytes and 2 CRC bytes = 22 bytes
+  $res=OWX_Complex($master,$owx_dev,$select,10);
+  #Log 1, "OWXAD: Device $owx_dev returns data of length ".length($res);
   if( $res eq 0 ){
     return "OWXAD: Device $owx_dev not accessible in reading $page page"; 
   }
   
+   #-- reset the bus
+  OWX_Reset($master);
+  
   #-- process results
   @data=split(//,$res);
   if ( (@data != 22) ){
-   return "OWXAD: Device $owx_dev returns invalid data";
+   Log 1, "OWXAD: Device $owx_dev returns invalid data of length ".int(@data);
+   return "OWXAD: Device $owx_dev returns invalid data of length ".int(@data);
   }
   
   #=============== get the voltage reading ===============================
@@ -970,31 +959,17 @@ sub OWXAD_SetPage($$) {
   
   my ($select, $res, $res2, $res3, @data);
   
-  #-- ID of the device
+  #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  my $master  = $hash->{IODev};
   
   my ($i,$j,$k);
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
   
   #=============== set the alarm values ===============================
   if ( $page eq "test" ) {
     #-- issue the match ROM command \x55 and the set alarm page command 
     #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\x55\x10\x00",
-      @owx_ROM_ID); 
+    $select="\x55\x10\x00";
     for( $i=0;$i<4;$i++){
       $select .= sprintf "%c\xFF\xFF\xFF",int($owg_vlow[$i]*255000/$owg_range[$i]);
       $select .= sprintf "%c\xFF\xFF\xFF",int($owg_vhigh[$i]*255000/$owg_range[$i]);
@@ -1004,8 +979,7 @@ sub OWXAD_SetPage($$) {
     my ($sb1,$sb2);
     #-- issue the match ROM command \x55 and the set status memory page command 
     #   \x55\x08\x00 reading 8 data bytes and 2 CRC bytes
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\x55\x08\x00",
-       @owx_ROM_ID);  
+    $select="\x55\x08\x00";
     for( $i=0;$i<4;$i++){
       if( $owg_mode[$i] eq "input" ){
         #-- resolution (TODO: check !)
@@ -1029,7 +1003,7 @@ sub OWXAD_SetPage($$) {
   } 
   
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- process results
   if( $res eq 0 ){
