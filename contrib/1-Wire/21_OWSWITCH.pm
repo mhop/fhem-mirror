@@ -16,7 +16,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.15 - June, 2012
+# Version 2.0 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -291,14 +291,15 @@ sub OWSWITCH_FormatValues($) {
     
     #-- result is zero or one
     $vval    = $owg_val[$i];
+  
     #-- string buildup for return value and STATE
     my @unarr=split(/\|/,$hash->{READINGS}{"$owg_channel[$i]"}{UNIT});
-    $value1 .= sprintf( "%s: %s", $owg_channel[$i], $unarr[1-$vval]);
-    $value2 .= sprintf( "%s: %s ", $owg_channel[$i], $unarr[1-$vval]);
+    $value1 .= sprintf( "%s: %s", $owg_channel[$i], $unarr[$vval]);
+    $value2 .= sprintf( "%s: %s ", $owg_channel[$i], $unarr[$vval]);
     $value3 .= sprintf( "%s: " , $owg_channel[$i]);
     
     #-- put into READINGS
-    $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $unarr[1-$vval];
+    $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $unarr[$vval];
     $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
     
     #-- insert comma
@@ -540,9 +541,9 @@ sub OWSWITCH_Set($@) {
     #-- prepare gpio value
     my $nval;
     if( lc($a[3]) eq "on" ){
-      $nval = 1;
-    }elsif( lc($a[3]) eq "off" ){
       $nval = 0;
+    }elsif( lc($a[3]) eq "off" ){
+      $nval = 1;
     }else{
       return "OWSWITCH: Wrong data value $a[3]";
     }
@@ -555,7 +556,7 @@ sub OWSWITCH_Set($@) {
       }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
          $value = 2*$nval+$owg_val[0];
       }
-      $ret .= OWXSWITCH_SetState($hash,$value);
+      $ret = OWXSWITCH_SetState($hash,$value);
     #-- OWFS interface
     #}elsif( $interface eq "OWFS" ){
     #  $ret = OWFSAD_GetPage($hash,"reading");
@@ -664,22 +665,20 @@ sub OWXSWITCH_GetState($) {
   #=============== get gpio values ===============================
   #-- issue the match ROM command \x55 and the read gpio command
   #   \xF5 plus 2 empty bytes
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\xF5\xFF\xFF\xFF",
-    @owx_ROM_ID);   
   #-- reset the bus
   OWX_Reset($master);
   #-- read the data
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,"\xF5",2);
   if( $res eq 0 ){
     return "OWX: Device $owx_dev not accessible in reading"; 
   }
-    
-  #-- reset the bus
-  OWX_Reset($master);
 
   #-- process results
   # TODO: could we put in a check if the two bytes are equal
   @data=split(//,substr($res,10));
+  
+  #-- reset the bus
+  OWX_Reset($master);
   
   #my $ress = "OWXSWITCH_Get: three data bytes ";
   #  for($i=0;$i<3;$i++){
@@ -723,25 +722,15 @@ sub OWXSWITCH_SetState($$) {
   my $master = $hash->{IODev};
   
   my ($i,$j,$k);
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
   
   #=============== set gpio values ===============================
   #-- issue the match ROM command \x55 and the write gpio command
   #   \x5A plus the value byte and its complement
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x5A%c%c\xFF",
-    @owx_ROM_ID,252+$value,3-$value);   
+  $select=sprintf("\x5A%c%c",252+$value,3-$value);   
   #-- reset the bus
   OWX_Reset($master);
   #-- read the data
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,1);
   if( $res eq 0 ){
     return "OWX: Device $owx_dev not accessible in reading"; 
   }
@@ -752,13 +741,13 @@ sub OWXSWITCH_SetState($$) {
   #-- process results
   @data=split(//,substr($res,10));
   
-  my $ress = "OWXSWITCH_Set: three data bytes ";
-    for($i=0;$i<3;$i++){
-    my $j=int(ord($data[$i])/16);
-    my $k=ord($data[$i])%16;
-    $ress.=sprintf "0x%1x%1x ",$j,$k;
-    }
-  Log 1, $ress;
+  #my $ress = "OWXSWITCH_Set: three data bytes ";
+  #  for($i=0;$i<3;$i++){
+  #  my $j=int(ord($data[$i])/16);
+  #  my $k=ord($data[$i])%16;
+  #  $ress.=sprintf "0x%1x%1x ",$j,$k;
+  #  }
+  #Log 1, $ress;
 
   if( $data[2] ne "\xAA"){
     Log 1, "OWXSWITCH: State could not be set";
@@ -767,9 +756,9 @@ sub OWXSWITCH_SetState($$) {
  
   #-- Put the new values in the system variables
   #-- This holds only for DS2413 
-  $owg_val[0] = $value && 1;
-  $owg_val[1] = ($value>>2) && 1;
   
+  $owg_val[0] = $value % 2;
+  $owg_val[1] = int($value / 2);
   return undef
 }
 

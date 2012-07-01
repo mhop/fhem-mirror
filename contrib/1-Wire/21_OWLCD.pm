@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 1.15 - June, 2012
+# Version 2.0 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -508,27 +508,15 @@ sub OWXLCD_Byte($$$) {
   my $master = $hash->{IODev};
   
   my ($i,$j,$k);
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
   
-  #-- issue the match ROM command \x55 
-  $select  = sprintf("\x55%c%c%c%c%c%c%c%c",
-      @owx_ROM_ID); 
   #=============== write to LCD register ===============================
   if ( $cmd eq "register" ) {
     #-- issue the read LCD register command \x10
-    $select .= sprintf("\x10%c",$byte);
+    $select = sprintf("\x10%c",$byte);
   #=============== write to LCD data ===============================
   }elsif ( $cmd eq "data" ) {
     #-- issue the read LCD data command \x12
-    $select .= sprintf("\x12%c",$byte);
+    $select = sprintf("\x12%c",$byte);
   #=============== wrong value requested ===============================
   } else {
     return "OWXLCD: Wrong byte write attempt";
@@ -536,7 +524,7 @@ sub OWXLCD_Byte($$$) {
  
   #-- write to device
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   #-- process results
   if( $res eq 0 ){
     return "OWLCD: Device $owx_dev not accessible for writing a byte"; 
@@ -570,54 +558,38 @@ sub OWXLCD_Get($$) {
   
   my ($i,$j,$k);
 
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
-  
-  #-- issue the match ROM command \x55 
-  $select  = sprintf("\x55%c%c%c%c%c%c%c%c",
-      @owx_ROM_ID); 
-  #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-  $select2 = $select."\xBE";
   #=============== fill scratch with gpio ports ===============================
   if ( $cmd eq "gpio" ) {
     #-- issue the read GPIO command \x22 (1 byte)
-    $select .= "\x22";
+    $select = "\x22";
     $len     = 1;
   #=============== fill scratch with gpio counters ===============================
   }elsif ( $cmd eq "counter" ) {
     #-- issue the read counter command \x23 (8 bytes)
-    $select .= "\x23";
+    $select = "\x23";
     $len     = 8;
   #=============== fill scratch with version ===============================
   }elsif ( $cmd eq "version" ) {
     #-- issue the read version command \x41
-    $select .= "\x41";
+    $select = "\x41";
     $len     = 16;
   } else {
     return "OWXLCD: Wrong get attempt";
   } 
   #-- write to device
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- process results
   if( $res eq 0 ){
     return "OWLCD: Device $owx_dev not accessible for reading"; 
   }
   
-  #-- fill according to expected length
-  for($i=0;$i<$len;$i++){
-    $select2 .= "\xFF";
-  }
+  #-- issue the read scratchpad command \xBE
+  $select2 = "\xBE";
   #-- write to device
   OWX_Reset($master);
-  $res=OWX_Block($master,$select2); 
+  $res=OWX_Complex($master,$owx_dev,$select2,$len); 
   
   #-- process results
   if( $res eq 0 ){
@@ -669,23 +641,11 @@ sub OWXLCD_GetMemory($$) {
   
   my ($i,$j,$k);
 
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
-  
-  #-- issue the match ROM command \x55 
-  $select  = sprintf("\x55%c%c%c%c%c%c%c%c",
-      @owx_ROM_ID); 
-  #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \xBE
-  Log 1," page read is ".$page;
-  $select .= sprintf("\4E%c\x10\x37",$page);  
+  #-- issue the match ROM command \x55 and the copy eeprom to scratchpad command \x4E
+  #Log 1," page read is ".$page;
+  $select = sprintf("\4E%c\x10\x37",$page);  
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
    
   #-- process results
   if( $res eq 0 ){
@@ -696,10 +656,8 @@ sub OWXLCD_GetMemory($$) {
   #select(undef,undef,undef,0.5);
   
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
-  $select  = sprintf("\x55%c%c%c%c%c%c%c%c\xBE\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF",
-      @owx_ROM_ID); 
   OWX_Reset($master);
-  $res=OWX_Block($master,$select); 
+  $res=OWX_Complex($master,$owx_dev,"\xBE",16); 
   
   #-- process results
   if( $res eq 0 ){
@@ -733,15 +691,6 @@ sub OWXLCD_InitializeDevice($) {
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
 
   #-- supposedly we do not need to do anything with a HD44780
   if( $lcdcontroller eq "HD44780"){
@@ -803,43 +752,32 @@ sub OWXLCD_SetFunction($$$) {
   my $master = $hash->{IODev};
   
   my ($i,$j,$k);
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
-  #-- issue the match ROM command \x55 
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c",@owx_ROM_ID);
    
   #=============== set gpio ports ===============================
   if ( $cmd eq "gpio" ) {
     #-- issue the write GPIO command 
     #   \x21 followed by the data value (= integer 0 - 7)
-    $select .= sprintf("\x21%c",$value); 
+    $select = sprintf("\x21%c",$value); 
   #=============== switch LCD on ===============================
   }elsif ( $cmd eq "lcdon" ) {
     #-- issue the lcd on cmd
-    $select .= "\x03";
+    $select = "\x03";
   #=============== switch LCD off ===============================
   }elsif ( $cmd eq "lcdoff" ) {
     #-- issue the lcd off cmd
-    $select .= "\x05";
+    $select = "\x05";
   #=============== switch LCD backlight on ===============================
   }elsif ( $cmd eq "bklon" ) {
     #-- issue the backlight on cmd
-    $select .= "\x08";
+    $select = "\x08";
   #=============== switch LCD backlight off ===============================
   }elsif ( $cmd eq "bkloff" ) {
     #-- issue the backlight off cmd
-    $select .= "\x07";
+    $select = "\x07";
   #=============== switch LCD backlight off ===============================
   }elsif ( $cmd eq "reset" ) {
     #-- issue the clear LCD command
-    $select .= "\x49";
+    $select = "\x49";
   #=============== wrong write attempt ===============================
   } else {
     return "OWXLCD: Wrong function selected";
@@ -847,7 +785,7 @@ sub OWXLCD_SetFunction($$$) {
   
   #-- write to device
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   #-- process results
   if( $res eq 0 ){
     return "OWLCD: Device $owx_dev not accessible for writing"; 
@@ -880,36 +818,27 @@ sub OWXLCD_SetIcon($$$) {
   #-- hash of the busmaster
   my $master = $hash->{IODev};
 
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
-
   #-- only for KS0073
   if ( $lcdcontroller eq "KS0073"){
     
     #-- write 16 zeros to erase all icons
     if( $icon == 0){   
       #-- 4 bit data size, RE => 1, blink Enable = \x26     
-      $select = sprintf("\x55%c%c%c%c%c%c%c%c\x10\x26",@owx_ROM_ID);
+      $select = "\x10\x26";
       OWX_Reset($master);
-      $res=OWX_Block($master,$select);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- SEGRAM addres to 0 = \x40,
-      $select = sprintf("\x55%c%c%c%c%c%c%c%c\x10\x40",@owx_ROM_ID);
+      $select = "x10\x40";
       #-- write 16 zeros to scratchpad
       $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
       OWX_Reset($master);
-      $res=OWX_Block($master,$select);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- issue the copy scratchpad to LCD command \x48
-      $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
+      $select="\x48";  
       OWX_Reset($master);
-      $res=OWX_Block($master,$select);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
     } else {
       #-- determine data value
       if( int($icon) != 16 ){
@@ -942,24 +871,24 @@ sub OWXLCD_SetIcon($$$) {
         }
       }
       #-- 4 bit data size, RE => 1, blink Enable = \x26
-      $select = sprintf("\x55%c%c%c%c%c%c%c%c\x10\x26",@owx_ROM_ID);
+      $select = "\x10\x26";
       OWX_Reset($master);
-      $res=OWX_Block($master,$select);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
      
       #-- SEGRAM addres to 0 = \x40 + icon address
-      $select = sprintf("\x55%c%c%c%c%c%c%c%c\x10%c",@owx_ROM_ID,63+$icon);
+      $select = sprintf("\x10%c",63+$icon);
       OWX_Reset($master);
-      $res=OWX_Block($master,$select);
+      $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- data
-      $select = sprintf("\x55%c%c%c%c%c%c%c%c\x12%c",@owx_ROM_ID,$data);
+      $select = sprintf("\x12%c",$data);
       OWX_Reset($master);
-      $res=OWX_Block($master,$select);    
+      $res=OWX_Complex($master,$owx_dev,$select,0);   
     }  
     #-- return to normal state
-    $select = sprintf("\x55%c%c%c%c%c%c%c%c\x10\x20",@owx_ROM_ID);
+    $select = "\x10\x20";
     OWX_Reset($master);
-    $res=OWX_Block($master,$select);
+    $res=OWX_Complex($master,$owx_dev,$select,0);
   #-- or else
   } else {
     return "OWXLCD: Wrong LCD controller type";
@@ -1005,15 +934,6 @@ sub OWXLCD_SetLine($$$) {
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
   
   #-- split if longer than 16 bytes, fill each with blanks
   #   has already been checked to be <= $lcdchars
@@ -1043,28 +963,28 @@ sub OWXLCD_SetLine($$$) {
    
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E
   #   followed by LCD page address and the text 
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$lcdpage[$line]).$msgA;      
+  $select=sprintf("\x4E\%c",@owx_ROM_ID,$lcdpage[$line]).$msgA;      
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- issue the copy scratchpad to LCD command \x48
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
+  $select="\x48";  
   OWX_Reset($master);
-  $res3=OWX_Block($master,$select);
+  $res3=OWX_Complex($master,$owx_dev,$select,0);
   
   #-- if second string available:
   if( defined($msgB) ) {
     #select(undef,undef,undef,0.005); 
     #-- issue the match ROM command \x55 and the write scratchpad command \x4E
     #   followed by LCD page address and the text 
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$lcdpage[$line]+16).$msgB;      
+    $select=sprintf("\x4E\%c",@owx_ROM_ID,$lcdpage[$line]+16).$msgB;      
     OWX_Reset($master);
-    $res2=OWX_Block($master,$select);
+    $res2=OWX_Complex($master,$owx_dev,$select,0);
    
     #-- issue the copy scratchpad to LCD command \x48
-    $select=sprintf("\x55%c%c%c%c%c%c%c%c\x48",@owx_ROM_ID);  
+    $select="x48";  
     OWX_Reset($master);
-    $res3=OWX_Block($master,$select);
+    $res3=OWX_Complex($master,$owx_dev,$select,0);
   }
   
   #-- process results
@@ -1101,15 +1021,6 @@ sub OWXLCD_SetMemory($$$) {
   
   #-- hash of the busmaster
   my $master = $hash->{IODev};
-
-  #-- 8 byte 1-Wire device address
-  my @owx_ROM_ID  =(0,0,0,0 ,0,0,0,0); 
-  #-- from search string to byte id
-  my $devs=$owx_dev;
-  $devs=~s/\.//g;
-  for($i=0;$i<8;$i++){
-     $owx_ROM_ID[$i]=hex(substr($devs,2*$i,2));
-  }
   
   #-- fillup with blanks
   $msgA = $msg;
@@ -1119,15 +1030,14 @@ sub OWXLCD_SetMemory($$$) {
    
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E
   #   followed by LCD page address and the text 
-  Log 1," page written is ".$page;
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x4E\%c",@owx_ROM_ID,$page).$msgA;         
+  #Log 1," page written is ".$page;
+  $select=sprintf("\x4E\%c",$page).$msgA;         
   OWX_Reset($master);
-  $res=OWX_Block($master,$select);
+  $res=OWX_Complex($master,$owx_dev,$select,0);
   
-  #-- issue the copy scratchpad to EEPROM command \x39
-  $select=sprintf("\x55%c%c%c%c%c%c%c%c\x39",@owx_ROM_ID);  
+  #-- issue the copy scratchpad to EEPROM command \x39 
   OWX_Reset($master);
-  $res2=OWX_Block($master,$select);
+  $res2=OWX_Complex($master,$owx_dev,"\x39",0);
  
   #-- process results
   if( ($res eq 0) || ($res2 eq 0) ){
