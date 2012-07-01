@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.0 - June, 2012
+# Version 2.01 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -743,13 +743,9 @@ sub OWXLCD_SetFunction($$$) {
 
   my ($select, $res, $res2, $res3, @data);
   
-  #-- ID of the device
+  #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  my $master  = $hash->{IODev};
   
   my ($i,$j,$k);
    
@@ -810,13 +806,9 @@ sub OWXLCD_SetIcon($$$) {
 
   my ($i,$data,$select, $res);
     
-  #-- ID of the device
+  #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  my $master  = $hash->{IODev};
 
   #-- only for KS0073
   if ( $lcdcontroller eq "KS0073"){
@@ -829,7 +821,7 @@ sub OWXLCD_SetIcon($$$) {
       $res=OWX_Complex($master,$owx_dev,$select,0);
       
       #-- SEGRAM addres to 0 = \x40,
-      $select = "x10\x40";
+      $select = "\x10\x40";
       #-- write 16 zeros to scratchpad
       $select .= "\x4E\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00";
       OWX_Reset($master);
@@ -846,7 +838,7 @@ sub OWXLCD_SetIcon($$$) {
           $data = 0;
         } elsif ( $value == 1) {
           $data = 16;
-         } elsif ( $value == 2) {
+        } elsif ( $value == 2) {
           $data = 80;
         } else {
           return "OWXLCD: Wrong data value $value for icon $icon";
@@ -885,6 +877,7 @@ sub OWXLCD_SetIcon($$$) {
       OWX_Reset($master);
       $res=OWX_Complex($master,$owx_dev,$select,0);   
     }  
+    
     #-- return to normal state
     $select = "\x10\x20";
     OWX_Reset($master);
@@ -923,17 +916,13 @@ sub OWXLCD_SetLine($$$) {
   $msg =~ s/ß/\xBE/g;
   
   #--take out degree sign
-  if( $msg ~ m/.*\&deg\;.*/ ) {
+  if( $msg =~ m/.*\&deg\;.*/ ) {
     my @ma = split(/\&deg\;/,$msg);
     $msg = $ma[0]."\x80".$ma[1];
   }
-  #-- ID of the device
+  #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  my $master  = $hash->{IODev};
   
   #-- split if longer than 16 bytes, fill each with blanks
   #   has already been checked to be <= $lcdchars
@@ -963,7 +952,7 @@ sub OWXLCD_SetLine($$$) {
    
   #-- issue the match ROM command \x55 and the write scratchpad command \x4E
   #   followed by LCD page address and the text 
-  $select=sprintf("\x4E\%c",@owx_ROM_ID,$lcdpage[$line]).$msgA;      
+  $select=sprintf("\x4E%c",$lcdpage[$line]).$msgA;      
   OWX_Reset($master);
   $res=OWX_Complex($master,$owx_dev,$select,0);
   
@@ -977,12 +966,12 @@ sub OWXLCD_SetLine($$$) {
     #select(undef,undef,undef,0.005); 
     #-- issue the match ROM command \x55 and the write scratchpad command \x4E
     #   followed by LCD page address and the text 
-    $select=sprintf("\x4E\%c",@owx_ROM_ID,$lcdpage[$line]+16).$msgB;      
+    $select=sprintf("\x4E%c",$lcdpage[$line]+16).$msgB;      
     OWX_Reset($master);
     $res2=OWX_Complex($master,$owx_dev,$select,0);
    
     #-- issue the copy scratchpad to LCD command \x48
-    $select="x48";  
+    $select="\x48";  
     OWX_Reset($master);
     $res3=OWX_Complex($master,$owx_dev,$select,0);
   }
@@ -1014,13 +1003,9 @@ sub OWXLCD_SetMemory($$$) {
   $page = int($page);
   $msg =   defined($msg) ? $msg : "";
 
-  #-- ID of the device
+  #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
-  my $owx_rnf = substr($owx_dev,3,12);
-  my $owx_f   = substr($owx_dev,0,2);
-  
-  #-- hash of the busmaster
-  my $master = $hash->{IODev};
+  my $master  = $hash->{IODev};
   
   #-- fillup with blanks
   $msgA = $msg;
