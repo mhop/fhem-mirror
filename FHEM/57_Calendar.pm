@@ -385,14 +385,15 @@ sub asText {
 
 sub asFull {
   my ($self)= @_;
-  return sprintf("%s %7s %8s %s %s-%s %s",
+  return sprintf("%s %7s %8s %s %s-%s %s %s",
     $self->uid(),
     $self->state(),
     $self->mode(),
     $self->{alarm} ? ts($self->{alarm}) : "                   ",
     ts($self->{start}),
     ts($self->{end}),
-    $self->{summary}
+    $self->{summary},
+    $self->{location}
   );
 }
 
