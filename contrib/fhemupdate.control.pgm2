@@ -1,1 +1,1 @@
-MOV FHEM/*.gplot www/gplot
+MOV FHEM/*.gplot www/pgm2
