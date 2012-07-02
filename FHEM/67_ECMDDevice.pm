@@ -104,9 +104,11 @@ ECMDDevice_PostProc($$$)
   #my %specials= ECMDDevice_DeviceParams2Specials($hash);
   #my $command= EvalSpecials($postproc, %specials);
   # we pass the command verbatim instead
-  my $command= $postproc;
+  # my $command= $postproc;
 
   if($postproc) {
+        my %specials= ECMDDevice_DeviceParams2Specials($hash);
+        my $command= EvalSpecials($postproc, %specials);
 	$_= $value;
 	Log 5, "Postprocessing $value with perl command $command.";
 	$value= AnalyzePerlCommand(undef, $command);
