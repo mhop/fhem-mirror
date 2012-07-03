@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.0 - June, 2012
+# Version 2.01 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -694,12 +694,17 @@ sub OWXTEMP_GetValues($) {
       my $msb  = 0;
       my $sign = ord($data[11]) & 255;
       
+      #-- test with -25 degrees
+      #$lsb   =  12*16+14;
+      #$sign  = 1;
+      #$delta = 0;
+      
       #-- 2's complement form = signed bytes
-      if( $sign == 0 ){
-        $owg_temp = int($lsb/2) + $delta;
-      } else {
-        $owg_temp = 128-(int($lsb/2) + $delta);
+      $owg_temp = int($lsb/2) + $delta;
+      if( $sign !=0 ){
+        $owg_temp = -128+$owg_temp;
       }
+
       $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
       $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
       return undef;
@@ -710,13 +715,18 @@ sub OWXTEMP_GetValues($) {
     if ( (@data == 19) && (ord($data[17])>0) ){
    
       my $lsb  = ord($data[10]);
-      my $msb  = ord($data[11]) & 7;
+      my $msb  = ord($data[11]) && 7;
       my $sign = ord($data[11]) & 248;
+      
+      #-- test with -55 degrees
+      #$lsb   = 9*16;
+      #$sign  = 1;
+      #$msb   = 7;
       
       #-- 2's complement form = signed bytes
       $owg_temp = $msb*16+ $lsb/16;   
       if( $sign !=0 ){
-        $owg_temp = 128-$owg_temp;
+        $owg_temp = -128+$owg_temp;
       }
       $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
       $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
