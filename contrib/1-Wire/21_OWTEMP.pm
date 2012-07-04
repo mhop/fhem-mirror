@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.01 - June, 2012
+# Version 2.02 - June, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -715,7 +715,7 @@ sub OWXTEMP_GetValues($) {
     if ( (@data == 19) && (ord($data[17])>0) ){
    
       my $lsb  = ord($data[10]);
-      my $msb  = ord($data[11]) && 7;
+      my $msb  = ord($data[11]) & 7;
       my $sign = ord($data[11]) & 248;
       
       #-- test with -55 degrees
