@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.02 - June, 2012
+# Version 2.03 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -269,6 +269,8 @@ sub OWTEMP_FormatValues($) {
   my $tn = TimeNow();
   
   #-- attributes defined ?
+  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "<span style=\"color:red\">&#x25BE;</span>";
+  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "<span style=\"color:red\">&#x25B4;</span>";
   $unit   = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
   $offset = defined($attr{$name}{"tempoffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
   $factor = 1.0;
