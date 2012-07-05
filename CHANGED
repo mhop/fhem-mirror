@@ -52,7 +52,7 @@
   - feature: motd with SecurityCheck added
   - feature: telnet module added, attr global port moved. allowfrom changed.
   - feature: FhemUtils/release.pm for the new update process added. (M. Fischer)
-  - feature: new global attributes <updateserver>, <updatepath>, <updatectrlfile>
+  - feature: new global attributes updateserver, updatepath, updatectrlfile
              for the new update process added (M. Fischer)
 
 - 2011-12-31 (5.2)
