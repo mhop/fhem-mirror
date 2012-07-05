@@ -7,4 +7,4 @@ attr global verbose 3                  # "normal" verbosity (min 1, max 5)
 attr global modpath .                  # where our FHEM directory is
 
 define telnetPort telnet 7072          # our TCP/IP port (localhost only)
-attr telnetPort password secret
+#attr telnetPort password secret
