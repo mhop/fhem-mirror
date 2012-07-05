@@ -54,6 +54,7 @@ sub CommandChain($$);
 sub CheckDuplicate($$);
 sub DoTrigger($$);
 sub Dispatch($$$);
+sub EventMapAsList($);
 sub FmtDateTime($);
 sub FmtTime($);
 sub GetLogLevel(@);
@@ -1575,6 +1576,12 @@ getAllSets($)
   my $a2 = CommandSet(undef, "$d ?");
   $a2 =~ s/.*choose one of //;
   $a2 = "" if($a2 =~ /^No set implemented for/);
+
+  my $em = AttrVal($d, "eventMap", undef);
+  if($em) {
+    $em = join(" ", map { $_ =~ s/.*://s; $_ } EventMapAsList($em));
+    $a2 = "$em $a2";
+  }
   return $a2;
 }
 
@@ -2499,6 +2506,19 @@ addToAttrList($)
   $attr{global}{userattr} = join(" ", sort keys %hash);
 }
 
+sub
+EventMapAsList($)
+{
+  my ($em) = @_;
+  my $sc = " ";               # Split character
+  my $fc = substr($em, 0, 1); # First character of the eventMap
+  if($fc eq "," || $fc eq "/") {
+    $sc = $fc;
+    $em = substr($em, 1);
+  }
+  return split($sc, $em);
+}
+
 # $dir: 0 = User to Fhem (i.e. set), 1 = Fhem to User (i.e trigger)
 sub
 ReplaceEventMap($$$)
@@ -2508,16 +2528,10 @@ ReplaceEventMap($$$)
   return $str if(!$em);
   my $dname = shift @{$str} if(!$dir);
 
-  my $sc = " ";               # Split character
-  my $fc = substr($em, 0, 1); # First character of the eventMap
-  if($fc eq "," || $fc eq "/") {
-    $sc = $fc;
-    $em = substr($em, 1);
-  }
-
   my $nstr = join(" ", @{$str}) if(!$dir);
   my $changed;
-  foreach my $rv (split($sc, $em)) {
+  my @emList = EventMapAsList($em);
+  foreach my $rv (@emList) {
     my ($re, $val) = split(":", $rv, 2); # Real-Event-Regexp:GivenName
     next if(!defined($val));
     if($dir) {  # event -> GivenName
