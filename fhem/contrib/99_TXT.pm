@@ -3,6 +3,11 @@
 # Feedback: http://groups.google.com/group/fhem-users
 # TXT WEBINTERFACE
 #
+# Feedback: http://groups.google.com/group/fhem-users
+# Autor: Axel Rieger fhem[bei]anax.info
+# Stand: 05.07.2012
+# Version: 1.0
+#
 ################################################################################
 # Usage:
 # Values seperated by Semikolon
