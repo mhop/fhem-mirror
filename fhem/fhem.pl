@@ -1620,6 +1620,12 @@ GlobalAttr($$)
 
     opendir(DH, $modpath) || return "Can't read $modpath: $!";
     push @INC, $modpath if(!grep(/$modpath/, @INC));
+    eval { 
+      use vars qw($DISTRIB_DESCRIPTION);
+      require "FhemUtils/release.pm";
+      $attr{global}{version} = "$DISTRIB_DESCRIPTION, $cvsid";
+    };
+Log 1, "EVAL:$@";
     my $counter = 0;
 
     foreach my $m (sort readdir(DH)) {
@@ -2236,7 +2242,6 @@ doGlobalDef($)
   CommandAttr(undef, "global verbose 3");
   CommandAttr(undef, "global configfile $arg");
   CommandAttr(undef, "global logfile -");
-  CommandAttr(undef, "global version =VERS= from =DATE= ($cvsid)");
 }
 
 #####################################
