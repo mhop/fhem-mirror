@@ -1579,7 +1579,9 @@ getAllSets($)
 
   my $em = AttrVal($d, "eventMap", undef);
   if($em) {
-    $em = join(" ", map { $_ =~ s/.*://s; $_ } EventMapAsList($em));
+    $em = join(" ", map { $_ =~ s/.*://s; $_ } 
+                    grep { !/ / }
+                    EventMapAsList($em));
     $a2 = "$em $a2";
   }
   return $a2;

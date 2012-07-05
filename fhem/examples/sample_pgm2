@@ -3,9 +3,10 @@
 #
 attr global logfile /tmp/fhem-%Y-%m.log
 attr global modpath .                  # where our FHEM directory is
-attr global port 7072 global           # our TCP/IP port
 attr global statefile /tmp/fhem.save   # where to save the state of the devices
 attr global verbose 3                  # "normal" verbosity (min 1, max 5)
+
+define telnetPort telnet 7072 global   # our TCP/IP port
 
 define WEB FHEMWEB 8083 global
 
@@ -24,6 +25,7 @@ attr autocreate device_room %TYPE
 attr autocreate filelog /tmp/%NAME-%Y.log
 attr autocreate weblink
 attr autocreate weblink_room Plots
+
 # Disable this to avoid looking for new USB devices on startup
 define initialUsbCheck notify global:INITIALIZED usb create 
 
