@@ -1,13 +1,9 @@
 ################################################################################
 # 97 GROUP
 # Feedback: http://groups.google.com/group/fhem-users
-# Logging to RRDs
-# Autor: a[PUNKT]r[BEI]oo2p[PUNKT]net
-# Stand: 31.03.2010
-# Version: 1.1.0
-# Update 08/2010
-# Support for New-Style-Sheets div=menu div=content
-# Added SpecialReading DNW
+# Autor: Axel Rieger fhem[bei]anax.info
+# Stand: 05.07.2012
+# Version: 1.2
 ################################################################################
 # Usage:
 # define <New-Group-Name> GROUP <CATEGORY>
