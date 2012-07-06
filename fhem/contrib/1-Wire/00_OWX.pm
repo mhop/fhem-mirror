@@ -2,16 +2,16 @@
 #
 # OWX.pm
 #
-# FHEM module to commmunicate directly with 1-Wire bus devices
-# via an active DS2480/DS2490/DS9097U bus master interface or 
-# via a passive DS9097 interface or
-# via a network-attached CUNO
+# FHEM module to commmunicate with 1-Wire bus devices
+# * via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB port
+# * via a passive DS9097 interface attached to an USB port
+# * via a network-attached CUNO
+# Internally these interfaces are vastly different, read the corresponding Wiki pages 
+# http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.0 - June, 2012
+# Version 2.03 - July, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
-#
-# Setup interface as:
 #
 # define <name> OWX <serial-device> for USB interfaces or
 # define <name> OWX <cuno-device>   for a CUNO interface
@@ -20,7 +20,7 @@
 #       <serial-device> is a serial (USB) device
 #       <cuno-device>   is a CUNO device
 #
-# get <name> alarms                 => find alarmed 1-Wire devices
+# get <name> alarms                 => find alarmed 1-Wire devices (not with CUNO)
 # get <name> devices                => find all 1-Wire devices 
 #
 # set <name> interval <seconds>     => set period for temperature conversion and alarm testing
@@ -382,7 +382,7 @@ sub OWX_Define ($$) {
     InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
     
     #-- Default settings
-    $hash->{interval}     = 60;          # kick every minute
+    $hash->{interval}     = 300;          # kick every minute
     $hash->{followAlarms} = "off";
     $hash->{ALARMED}      = "no";
     

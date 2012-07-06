@@ -16,7 +16,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.0 - June, 2012
+# Version 2.03 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -37,8 +37,8 @@
 # get <name> gpio  => values for channels
 #
 # set <name> interval => set period for measurement
-# set <name> output <channel-name> |ON|OFF => set value for channel (name A, B or defined channel name)
-# set <name> gpio  value => set values for channels (0 = both OFF, 1 = A ON 2 = B ON 3 = both ON)
+# set <name> output <channel-name>  ON|OFF => set value for channel (name A, B or defined channel name)
+# set <name> gpio  value => set values for channels (3 = both OFF, 1 = B ON 2 = A ON 0 = both ON)
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
