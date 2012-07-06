@@ -108,7 +108,7 @@ fi
 
 fhem=`echo -e "getstate ${DEVICE}\nquit" | ${NC} $HOST $PORT`
 temp=`echo $fhem | awk '{split($0,a,"temperature:"); split(a[2],b," "); print b[1]}'`
-actuator=`echo $fhem | awk '{split($0,a,"actuator:"); split(a[2],b," "); print b[1]}'`
+actuator=`echo $fhem | awk '{split($0,a,"actuator:"); split(a[2],b," "); print b[1]}' | tr -d "%"`
 daytemp=`echo $fhem | awk '{split($0,a,"day-temp:"); split(a[2],b," "); print b[1]}'`
 desiredtemp=`echo $fhem | awk '{split($0,a,"desired-temp:"); split(a[2],b," "); print b[1]}'`
 nighttemp=`echo $fhem | awk '{split($0,a,"night-temp:"); split(a[2],b," "); print b[1]}'`
