@@ -196,8 +196,7 @@ $modules{Global}{AttrList} =
   "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
   "autoload_undefined_devices dupTimeout latitude longitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
-  "exclude_from_update motd updatebranch updateserver updatepath " .
-  "updatectrlfile ";
+  "exclude_from_update motd updatebranch ";
 
 $modules{Global}{AttrFn} = "GlobalAttr";
 
