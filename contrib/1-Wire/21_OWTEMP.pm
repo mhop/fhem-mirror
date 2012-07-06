@@ -6,7 +6,7 @@
 #
 # Attention: This module may communicate with the OWX module,
 #            and also with the 1-Wire File System OWFS
-
+#
 # Prefixes for subroutines of this module:
 # OW   = General 1-Wire routines (Martin Fischer, Peter Henning)
 # OWFS = 1-Wire file system (Martin Fischer)
