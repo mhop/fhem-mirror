@@ -2,6 +2,10 @@
 #
 # OWAD.pm
 #
+#
+#  TODO: Alarm limits ergeben "invalid page write attempt"
+#
+#
 # FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
 # Attention: This module may communicate with the OWX module,

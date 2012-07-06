@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.01 - June, 2012
+# Version 2.03 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -30,6 +30,7 @@
 # get <name> version  => firmware version of the LCD adapter
 # get <name> memory <page> => get one of the internal memory pages 0..6
 #
+# set <name> alert red|yellow|beep|none  => set one of the alert states (gpio pins)
 # set <name> icon <num> on|off|blink  => set one of the icons 0..14
 # set <name> icon 15 0..6             => set icon no. 15 in one of its values
 # set <name> line <line> <string(s)>  => set one of the display lines 0..3

@@ -18,7 +18,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.0 - June, 2012
+# Version 2.01 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -32,13 +32,17 @@
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
 #
-# get <name> id       => FAM_ID.ROM_ID.CRC 
-# get <name> present  => 1 if device present, 0 if not
-# get <name> interval => query interval
-# get <name> counter  <channel> => value for counter
-# get <name> counters => values for counters
+# get <name> id                  => FAM_ID.ROM_ID.CRC 
+# get <name> present             => 1 if device present, 0 if not
+# get <name> interval            => query interval
+# get <name> memory <page>       => 32 byte string from page 0..13
+# get <name> midnight  <channel> => todays starting value for counter
+# get <name> counter  <channel>  => value for counter
+# get <name> counters            => values for both counters
 #
-# set <name> interval => set period for measurement
+# set <name> interval            => set query interval for measurement
+# set <name> memory <page>       => 32 byte string into page 0..13
+# set <name> midnight  <channel> => todays starting value for counter
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
