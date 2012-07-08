@@ -216,6 +216,7 @@ RSS_color {
 sub
 RSS_itemText {
   my ($S,$x,$y,$text,%params)= @_;
+  return unless(defined($text));
   ($x,$y)= RSS_xy($S,$x,$y);
   $S->stringFT(RSS_color($S,$params{rgb}),$params{font},$params{pt},0,$x,$y,$text);
 }

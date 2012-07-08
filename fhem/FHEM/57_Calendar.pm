@@ -56,6 +56,7 @@ sub addproperty {
   my ($key,$parts)= split(";", $property,2);
   #main::debug "key= $key parts= $parts";
   $parts= "" unless(defined($parts));
+  $parameter= "" unless(defined($parameter));
   $self->{properties}{$key}= {
       PARTS => "$parts",
       VALUE => "$parameter"
@@ -336,7 +337,7 @@ sub fromVEvent {
     # weekly
     #
     if($freq eq "WEEKLY") {
-      my @weekdays= split(",",$r{"BYDAY"});
+      # my @weekdays= split(",",$r{"BYDAY"});# BYDAY is not always set
     }
   }
   
