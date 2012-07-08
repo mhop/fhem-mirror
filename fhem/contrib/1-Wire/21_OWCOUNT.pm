@@ -18,7 +18,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.03 - July, 2012
+# Version 2.1 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -672,6 +672,12 @@ sub OWCOUNT_Set($@) {
       return "OWCOUNT: Set with wrong IODev type $interface";
     }
   }
+    
+  #-- process results - we have to reread the device
+  $hash->{PRESENT} = 1; 
+  OWCOUNT_GetValues($hash);  
+  OWCOUNT_FormatValues($hash);  
+  Log 4, "OWCOUNT: Set $hash->{NAME} $key $value";
 }
 
 ########################################################################################
