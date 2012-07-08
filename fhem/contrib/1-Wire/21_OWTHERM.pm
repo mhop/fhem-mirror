@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.03 - July, 2012
+# Version 2.1 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -530,19 +530,19 @@ sub OWTHERM_Set($@) {
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_SetValues($hash,@a);
-    $ret = OWXTHERM_GetValues($hash);
   #-- OWFS interface
   }elsif( $interface eq "OWFS" ){
     $ret = OWFSTHERM_SetValues($hash,@a);
-    $ret = OWFSTHERM_GetValues($hash);
     return $ret
       if(defined($ret));
   } else {
   return "OWTHERM: Set with wrong IODev type $interface";
   }
-  #-- careful: globals may come from a different device
-  OWTHERM_FormatValues($hash);
   
+  #-- process results - we have to reread the device
+  $hash->{PRESENT} = 1; 
+  OWTHERM_GetValues($hash);
+  OWTHERM_FormatValues($hash);
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;

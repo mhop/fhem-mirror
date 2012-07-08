@@ -18,7 +18,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.03 - July, 2012
+# Version 2.1 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -723,7 +723,7 @@ sub OWAD_Set($@) {
     $mmax *= $factor if ( $factor ); 
 
     return sprintf("OWAD: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
-    if($value < $mmin || $value > $mmax);
+      if($value < $mmin || $value > $mmax);
     
     $value  /= $factor if ( $factor );
     $value  -= $offset if ( $offset );
@@ -751,12 +751,13 @@ sub OWAD_Set($@) {
       return "OWAD: Set with wrong IODev type $interface";
     }
   }
-  #-- process results
- 
+  
+  #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
+  OWAD_GetValues($hash);  
   OWAD_FormatValues($hash);  
- 
   Log 4, "OWAD: Set $hash->{NAME} $key $value";
+
   return undef;
 }
 

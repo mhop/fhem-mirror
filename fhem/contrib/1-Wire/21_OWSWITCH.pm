@@ -16,7 +16,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.03 - July, 2012
+# Version 2.1 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -564,13 +564,9 @@ sub OWSWITCH_Set($@) {
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
     }
-    #-- process results
-    OWSWITCH_FormatValues($hash);  
-    return undef;
-  }
  
   #-- set state
-  if( $key eq "gpio" ){
+  }elsif( $key eq "gpio" ){
     #-- check value and write to device
     return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= 3"
       if( ! ((int($value) >= 0) && (int($value) <= 3)) );
@@ -582,19 +578,15 @@ sub OWSWITCH_Set($@) {
     }else{
       return "OWSWITCH: GetValues with wrong IODev type $interface";
     }
-    
-    #-- process results
-    if( defined($ret) ){
-      return $ret;
-    } else {
-      $hash->{PRESENT} = 1; 
-      $value=OWSWITCH_FormatValues($hash);
-      #--logging
-      Log 5, $value;
-      $hash->{CHANGED}[0] = $value;
-      return $value;
-    }
   }
+  
+  #-- process results - we have to reread the device
+  $hash->{PRESENT} = 1; 
+  OWSWITCH_GetValues($hash);  
+  OWSWITCH_FormatValues($hash);  
+  Log 4, "OWSWITCH: Set $hash->{NAME} $key $value";
+  $hash->{CHANGED}[0] = $value;
+  return undef;
 }
 
 ########################################################################################
