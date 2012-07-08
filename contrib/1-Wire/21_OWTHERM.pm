@@ -1,6 +1,6 @@
 ########################################################################################
 #
-# OWTEMP.pm
+# OWTHERM.pm
 #
 # FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
@@ -19,7 +19,7 @@
 #   
 # Setup bus device in fhem.cfg as
 #
-# define <name> OWTEMP [<model>] <ROM_ID> [interval]
+# define <name> OWTHERM [<model>] <ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
@@ -109,23 +109,23 @@ my %updates = (
 #
 # The following subroutines are independent of the bus interface
 #
-# Prefix = OWTEMP
+# Prefix = OWTHERM
 #
 ########################################################################################
 #
-# OWTEMP_Initialize
+# OWTHERM_Initialize
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWTEMP_Initialize ($) {
+sub OWTHERM_Initialize ($) {
   my ($hash) = @_;
 
-  $hash->{DefFn}   = "OWTEMP_Define";
-  $hash->{UndefFn} = "OWTEMP_Undef";
-  $hash->{GetFn}   = "OWTEMP_Get";
-  $hash->{SetFn}   = "OWTEMP_Set";
+  $hash->{DefFn}   = "OWTHERM_Define";
+  $hash->{UndefFn} = "OWTHERM_Undef";
+  $hash->{GetFn}   = "OWTHERM_Get";
+  $hash->{SetFn}   = "OWTHERM_Set";
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
@@ -136,17 +136,17 @@ sub OWTEMP_Initialize ($) {
   
 ########################################################################################
 #
-# OWTEMP_Define - Implements DefFn function
+# OWTHERM_Define - Implements DefFn function
 # 
 # Parameter hash = hash of device addressed, def = definition string
 #
 ########################################################################################
 
-sub OWTEMP_Define ($$) {
+sub OWTHERM_Define ($$) {
   my ($hash, $def) = @_;
   
-  # define <name> OWTEMP [<model>] <id> [interval]
-  # e.g.: define flow OWTEMP 525715020000 300
+  # define <name> OWTHERM [<model>] <id> [interval]
+  # e.g.: define flow OWTHERM 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
   
   my ($name,$model,$fam,$id,$crc,$interval,$ret);
@@ -158,28 +158,28 @@ sub OWTEMP_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWTEMP: Wrong syntax, must be define <name> OWTEMP [<model>] <id> [interval]"
+  return "OWTHERM: Wrong syntax, must be define <name> OWTHERM [<model>] <id> [interval]"
        if(int(@a) < 2 || int(@a) > 6);
        
   #-- check if this is an old style definition, e.g. <model> is missing
   my $a2 = $a[2];
   my $a3 = defined($a[3]) ? $a[3] : "";
   if(  ($a2 eq "none") || ($a3 eq "none")  ) {
-    return "OWTEMP: ID = none is obsolete now, please redefine";
+    return "OWTHERM: ID = none is obsolete now, please redefine";
   } elsif( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS1820";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
-    Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
+    Log 1, "OWTHERM: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
       if(int(@a) == 5);
   } elsif( $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
-    Log 1, "OWTEMP: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
+    Log 1, "OWTHERM: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
       if(int(@a) == 6);
   } else {    
-    return "OWTEMP: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWTHERM: $a[0] ID $a[2] invalid, specify a 12 digit value";
   }
 
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
@@ -192,7 +192,7 @@ sub OWTEMP_Define ($$) {
   }elsif( $model eq "DS18B20" ){
     $fam = "28";
   }else{
-    return "OWTEMP: Wrong 1-Wire device model $model";
+    return "OWTHERM: Wrong 1-Wire device model $model";
   }
   # determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
@@ -207,30 +207,30 @@ sub OWTEMP_Define ($$) {
 
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWTEMP: Warning, no 1-Wire I/O device found for $name."
+  Log 3, "OWTHERM: Warning, no 1-Wire I/O device found for $name."
     if(!defined($hash->{IODev}->{NAME}));
-  $modules{OWTEMP}{defptr}{$id} = $hash;
+  $modules{OWTHERM}{defptr}{$id} = $hash;
   $hash->{STATE} = "Defined";
-  Log 3, "OWTEMP: Device $name defined."; 
+  Log 3, "OWTHERM: Device $name defined."; 
   
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+1, "OWTEMP_InitializeDevice", $hash, 0);
+  InternalTimer(time()+1, "OWTHERM_InitializeDevice", $hash, 0);
    
   #-- Start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 0);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
 
   return undef; 
 }
   
 ########################################################################################
 #
-# OWTEMP_InitializeDevice - delayed setting of initial readings and channel names  
+# OWTHERM_InitializeDevice - delayed setting of initial readings and channel names  
 #
 #  Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWTEMP_InitializeDevice($) {
+sub OWTHERM_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
@@ -248,18 +248,18 @@ sub OWTEMP_InitializeDevice($) {
   $owg_th    =  70.0;
  
   #-- Initialize all the display stuff  
-  OWTEMP_FormatValues($hash);
+  OWTHERM_FormatValues($hash);
 }
 
 ########################################################################################
 #
-# OWTEMP_FormatValues - put together various format strings 
+# OWTHERM_FormatValues - put together various format strings 
 #
 #  Parameter hash = hash of device addressed, fs = format string
 #
 ########################################################################################
 
-sub OWTEMP_FormatValues($) {
+sub OWTHERM_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
@@ -286,7 +286,7 @@ sub OWTEMP_FormatValues($) {
     $factor = 1.8;
   } else {
     $abbr="?";
-    Log 1, "OWTEMP_FormatValues: unknown unit $unit";
+    Log 1, "OWTHERM_FormatValues: unknown unit $unit";
   }
   #-- these values are rather coplex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
@@ -341,13 +341,13 @@ sub OWTEMP_FormatValues($) {
   
 ########################################################################################
 #
-# OWTEMP_Get - Implements GetFn function 
+# OWTHERM_Get - Implements GetFn function 
 #
 #  Parameter hash = hash of device addressed, a = argument array
 #
 ########################################################################################
 
-sub OWTEMP_Get($@) {
+sub OWTHERM_Get($@) {
   my ($hash, @a) = @_;
   
   my $reading = $a[1];
@@ -357,11 +357,11 @@ sub OWTEMP_Get($@) {
   my $ret     = "";
 
   #-- check syntax
-  return "OWTEMP: Get argument is missing @a"
+  return "OWTHERM: Get argument is missing @a"
     if(int(@a) != 2);
     
   #-- check argument
-  return "OWTEMP: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
+  return "OWTHERM: Get with unknown argument $a[1], choose one of ".join(",", sort keys %gets)
     if(!defined($gets{$a[1]}));
   
   #-- get id
@@ -383,7 +383,7 @@ sub OWTEMP_Get($@) {
       $hash->{PRESENT} = $value;
       return "$a[0] $reading => $value";
     } else {
-      return "OWTEMP: Verification not yet implemented for interface $interface";
+      return "OWTHERM: Verification not yet implemented for interface $interface";
     }
   } 
   
@@ -399,28 +399,28 @@ sub OWTEMP_Get($@) {
   #-- OWX interface
   if( $interface eq "OWX" ){
     #-- not different from getting all values ..
-    $ret = OWXTEMP_GetValues($hash);
+    $ret = OWXTHERM_GetValues($hash);
   #-- OWFS interface
   }elsif( $interface eq "OWFS" ){
-    $ret = OWFSTEMP_GetValues($hash);
+    $ret = OWFSTHERM_GetValues($hash);
   #-- Unknown interface
   }else{
-    return "OWTEMP: Get with wrong IODev type $interface";
+    return "OWTHERM: Get with wrong IODev type $interface";
   }
   
   #-- process results
   if( defined($ret)  ){
-    return "OWTEMP: Could not get values from device $name, return was $ret";
+    return "OWTHERM: Could not get values from device $name, return was $ret";
   }
   $hash->{PRESENT} = 1; 
-  OWTEMP_FormatValues($hash);
+  OWTHERM_FormatValues($hash);
   
   #-- return the special reading
   if ($reading eq "temperature") {
-    return "OWTEMP: $name.temperature => ".
+    return "OWTHERM: $name.temperature => ".
       $hash->{READINGS}{"temperature"}{VAL};
   } elsif ($reading eq "alarm") {
-    return "OWTEMP: $name.alarm => L ".$hash->{READINGS}{"tempLow"}{VAL}.
+    return "OWTHERM: $name.alarm => L ".$hash->{READINGS}{"tempLow"}{VAL}.
       " H ".$hash->{READINGS}{"tempHigh"}{VAL};
   }
   return undef;
@@ -428,13 +428,13 @@ sub OWTEMP_Get($@) {
 
 #######################################################################################
 #
-# OWTEMP_GetValues - Updates the readings from device
+# OWTHERM_GetValues - Updates the readings from device
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWTEMP_GetValues($@) {
+sub OWTHERM_GetValues($@) {
   my $hash    = shift;
   
   my $name    = $hash->{NAME};
@@ -443,7 +443,7 @@ sub OWTEMP_GetValues($@) {
   
   #-- restart timer for updates
   RemoveInternalTimer($hash);
-  InternalTimer(time()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 1);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
 
   #-- reset presence
   $hash->{PRESENT}  = 0;
@@ -451,19 +451,19 @@ sub OWTEMP_GetValues($@) {
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    $ret = OWXTEMP_GetValues($hash);
+    $ret = OWXTHERM_GetValues($hash);
   }elsif( $interface eq "OWFS" ){
-    $ret = OWFSTEMP_GetValues($hash);
+    $ret = OWFSTHERM_GetValues($hash);
   }else{
-    return "OWTEMP: GetValues with wrong IODev type $interface";
+    return "OWTHERM: GetValues with wrong IODev type $interface";
   }
 
   #-- process results
   if( defined($ret)  ){
-    return "OWTEMP: Could not get values from device $name";
+    return "OWTHERM: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
-  $value=OWTEMP_FormatValues($hash);
+  $value=OWTHERM_FormatValues($hash);
   #--logging
   Log 5, $value;
   $hash->{CHANGED}[0] = $value;
@@ -475,23 +475,23 @@ sub OWTEMP_GetValues($@) {
 
 #######################################################################################
 #
-# OWTEMP_Set - Set one value for device
+# OWTHERM_Set - Set one value for device
 #
 #  Parameter hash = hash of device addressed
 #            a = argument string
 #
 ########################################################################################
 
-sub OWTEMP_Set($@) {
+sub OWTHERM_Set($@) {
   my ($hash, @a) = @_;
 
   #-- for the selector: which values are possible
   return join(" ", sort keys %sets) if(@a == 2);
   #-- check syntax
-  return "OWTEMP: Set needs one parameter"
+  return "OWTHERM: Set needs one parameter"
     if(int(@a) != 3);
   #-- check argument
-  return "OWTEMP: Set with unknown argument $a[1], choose one of ".join(",", sort keys %sets)
+  return "OWTHERM: Set with unknown argument $a[1], choose one of ".join(",", sort keys %sets)
       if(!defined($sets{$a[1]}));
       
   #-- define vars
@@ -504,12 +504,12 @@ sub OWTEMP_Set($@) {
  #-- set new timer interval
   if($key eq "interval") {
     # check value
-    return "OWTEMP: Set with short interval, must be > 1"
+    return "OWTHERM: Set with short interval, must be > 1"
       if(int($value) < 1);
     # update timer
     $hash->{INTERVAL} = $value;
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetValues", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 1);
     return undef;
   }
 
@@ -521,7 +521,7 @@ sub OWTEMP_Set($@) {
   #-- find upper and lower boundaries for given offset/factor
   my $mmin = (-55+$offset)*$factor;
   my $mmax = (125+$offset)*$factor;
-  return sprintf("OWTEMP: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
+  return sprintf("OWTHERM: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
     if($value < $mmin || $value > $mmax);
     
   #-- seems to be ok, put into the device
@@ -529,36 +529,37 @@ sub OWTEMP_Set($@) {
 
   #-- OWX interface
   if( $interface eq "OWX" ){
-    $ret = OWXTEMP_SetValues($hash,@a);
-    return $ret
-      if(defined($ret));
+    $ret = OWXTHERM_SetValues($hash,@a);
+    $ret = OWXTHERM_GetValues($hash);
   #-- OWFS interface
   }elsif( $interface eq "OWFS" ){
-    $ret = OWFSTEMP_SetValues($hash,@a);
+    $ret = OWFSTHERM_SetValues($hash,@a);
+    $ret = OWFSTHERM_GetValues($hash);
     return $ret
       if(defined($ret));
   } else {
-  return "OWTEMP: Set with wrong IODev type $interface";
+  return "OWTHERM: Set with wrong IODev type $interface";
   }
-  OWTEMP_FormatValues($hash);
+  #-- careful: globals may come from a different device
+  OWTHERM_FormatValues($hash);
   
-  Log 4, "OWTEMP: Set $hash->{NAME} $key $value";
+  Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
 }
 
 ########################################################################################
 #
-# OWTEMP_Undef - Implements UndefFn function
+# OWTHERM_Undef - Implements UndefFn function
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWTEMP_Undef ($) {
+sub OWTHERM_Undef ($) {
   my ($hash) = @_;
   
-  delete($modules{OWTEMP}{defptr}{$hash->{OW_ID}});
+  delete($modules{OWTHERM}{defptr}{$hash->{OW_ID}});
   RemoveInternalTimer($hash);
   return undef;
 }
@@ -568,17 +569,17 @@ sub OWTEMP_Undef ($) {
 # The following subroutines in alphabetical order are only for a 1-Wire bus connected 
 # via OWFS
 #
-# Prefix = OWFSTEMP
+# Prefix = OWFSTHERM
 #
 ########################################################################################
 #
-# OWFSTEMP_GetValues - Get reading from one device
+# OWFSTHERM_GetValues - Get reading from one device
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWFSTEMP_GetValues($)
+sub OWFSTHERM_GetValues($)
 {
   my ($hash) = @_;
 
@@ -600,14 +601,14 @@ sub OWFSTEMP_GetValues($)
 
 #######################################################################################
 #
-# OWFSTEMP_SetValues - Implements SetFn function
+# OWFSTHERM_SetValues - Implements SetFn function
 # 
 # Parameter hash = hash of device addressed
 #           a = argument array
 #
 ########################################################################################
 
-sub OWFSTEMP_SetValues($@) {
+sub OWFSTHERM_SetValues($@) {
   my ($hash, @a) = @_;
   
   #-- define vars
@@ -622,17 +623,17 @@ sub OWFSTEMP_SetValues($@) {
 # The following subroutines in alphabetical order are only for a 1-Wire bus connected 
 # directly to the FHEM server
 #
-# Prefix = OWXTEMP
+# Prefix = OWXTHERM
 #
 ########################################################################################
 #
-# OWXTEMP_GetValues - Get reading from one device
+# OWXTHERM_GetValues - Get reading from one device
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWXTEMP_GetValues($) {
+sub OWXTHERM_GetValues($) {
 
   my ($hash) = @_;
   
@@ -657,7 +658,7 @@ sub OWXTEMP_GetValues($) {
     OWX_Reset($master);
     #-- issue the match ROM command \x55 and the start conversion command
     if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-      return "OWXTEMP: Device $owx_dev not accessible";
+      return "OWXTHERM: Device $owx_dev not accessible";
     } 
     #-- conversion needs some 950 ms - but we may also do it in shorter time !
     select(undef,undef,undef,1.0);
@@ -668,13 +669,13 @@ sub OWXTEMP_GetValues($) {
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 1 + 8 data bytes and 1 CRC byte = 19 bytes
   my $res=OWX_Complex($master,$owx_dev,"\xBE",9);
-  #Log 1,"OWXTEMP: data length from reading device is ".length($res)." bytes";
+  #Log 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
-    return "OWXTEMP: Device $owx_dev not accessible in 2nd step"; 
+    return "OWXTHERM: Device $owx_dev not accessible in 2nd step"; 
   }
   
-  #my $res2 = "====> OWXTEMP Received ";
+  #my $res2 = "====> OWXTHERM Received ";
   #for(my $i=0;$i<19;$i++){  
   #  my $j=int(ord(substr($res,$i,1))/16);
   #  my $k=ord(substr($res,$i,1))%16;
@@ -711,7 +712,7 @@ sub OWXTEMP_GetValues($) {
       $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
       return undef;
     } else {
-      return "OWXTEMP: Device $owx_dev returns invalid data";
+      return "OWXTHERM: Device $owx_dev returns invalid data";
     }
   } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
     if ( (@data == 19) && (ord($data[17])>0) ){
@@ -734,23 +735,23 @@ sub OWXTEMP_GetValues($) {
       $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
       return undef;
     } else {
-      return "OWXTEMP: Device $owx_dev returns invalid data";
+      return "OWXTHERM: Device $owx_dev returns invalid data";
     }
   } else {
-    return "OWXTEMP: Unknown device family $hash->{OW_FAMILY}\n";
+    return "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
   }
 }
 
 #######################################################################################
 #
-# OWXTEMP_SetValues - Implements SetFn function
+# OWXTHERM_SetValues - Implements SetFn function
 # 
 # Parameter hash = hash of device addressed
 #           a = argument array
 #
 ########################################################################################
 
-sub OWXTEMP_SetValues($@) {
+sub OWXTHERM_SetValues($@) {
   my ($hash, @a) = @_;
   
   my ($i,$j,$k);
@@ -785,7 +786,7 @@ sub OWXTEMP_SetValues($@) {
   my $res=OWX_Complex($master,$owx_dev,$select,0);
 
   if( $res eq 0 ){
-    return "OWXTEMP: Device $owx_dev not accessible"; 
+    return "OWXTHERM: Device $owx_dev not accessible"; 
   } 
   
   DoTrigger($name, undef) if($init_done);
