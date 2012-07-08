@@ -625,7 +625,7 @@ ECMD_Write($$)
         push @r, $answer;
         Log 5, $answer;
   }
-  return join(";", @r);
+  return join("\n", @r);
 }
 
 #####################################
