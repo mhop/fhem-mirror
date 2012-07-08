@@ -5681,8 +5681,7 @@ Attributes:<br>
   The InterTechno 433MHZ protocol is used by a wide range of devices, which are either of
   the sender/sensor category or the receiver/actuator category. As we right now are only
   able to SEND InterTechno commands, but CAN'T receive them, this module at the moment
-  supports just switches devices like switches, dimmers, etc. through an an
-  <a href="#CUL">CUL</a> device, so this must be defined first.
+  supports just  devices like switches, dimmers, etc. through an <a href="#CUL">CUL</a> device, so this must be defined first.
 
   <br><br>
 
@@ -5691,6 +5690,8 @@ Attributes:<br>
   <ul>
     <code>define &lt;name&gt; IT &lt;housecode&gt; &lt;on-code&gt; &lt;off-code&gt;
     [&lt;dimup-code&gt;] [&lt;dimdown-code&gt;] </code>
+    <br>or<br>
+    <code>define &lt;name&gt; IT &lt;ITRotarySwitches|FLS100RotarySwitches&gt; </code>
     <br><br>
 
    The value of housecode is a 10-digit InterTechno Code, consisting of 0/1/F as it is
@@ -5700,7 +5701,15 @@ Attributes:<br>
    different bit-codes you can specifiy here the 2-digit code for off/on/dimup/dimdown
    in the same form: 0/1/F.
 	<br>
-
+   The value of ITRotarySwitches consist of the value of the alpha switch A-P and
+   the numeric switch 1-16 as set on the intertechno device. E.g. A1 or G12.
+<br>
+   The value of FLS100RotarySwitches consist of the value of the I,II,II,IV switch
+   and the numeric 1,2,3,4 swicht. E.g. I2 or IV4.
+<br>
+   The value of ITRotarySwitches and FLS100RotarySwitches is internaly translated
+   into a houscode value.
+<br>
    <ul>
    <li><code>&lt;housecode&gt;</code> is a 10 digit tri-state number (0/1/F) depending on
 	 your device setting (see list below).</li>
@@ -5720,11 +5729,15 @@ Attributes:<br>
       <code>define lamp IT 01FF010101 11 00 01 10</code><br>
       <code>define roll1 IT 111111111F 11 00 01 10</code><br>
       <code>define otherlamp IT 000000000F 11 10 00 00</code><br>
-      <code>define otherroll1 IT FFFFFFF00F 11 10</code>
+      <code>define otherroll1 IT FFFFFFF00F 11 10</code><br>
+      <code>define itswitch1 IT A1</code><br>
+      <code>define lamp IT J10</code><br>
+      <code>define flsswitch1 IT IV1</code><br>
+      <code>define lamp IT II2</code>
     </ul>
   </ul>
   <br>
-
+  
   <a name="ITset"></a>
   <b>Set </b>
   <ul>
