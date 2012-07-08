@@ -6232,9 +6232,12 @@ Attributes:<br>
           observe the log file.</li>
       </ul><br><br>
 
-      Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a>
+      <!--Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a>
       for the <code>&lt;perl command&gt</code> in the postprocessor definitions nor can it contain macros.
-      This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>
+      This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>-->
+      The rules outlined in the <a href="#perl">documentation of perl specials</a>
+      for the <code>&lt;perl command&gt</code> in the postprocessor definitions apply.
+      <b>Note:</b> Beware of undesired side effects from e.g. doubling of semicolon!
 
       The <code>perl command</code> acts on <code>$_</code>. The result of the perl command is the
       final result of the get or set command.
@@ -6352,7 +6355,7 @@ Attributes:<br>
         <code>
                 params pinmask<br>
                 set on cmd {"io set ddr 2 ff\nioset port 2 0%pinmask\nwait 1000\nio set port 2 00"}<br>
-		set on postproc {s/OK;OK;OK;OK/success/; "$_" eq "success" ? "ok" : "error"; }<br>
+		set on postproc {s/^OK\nOK\nOK\nOK$/success/; "$_" eq "success" ? "ok" : "error"; }<br>
         </code>
         <br>
         In the fhem configuration file or on the fhem command line we do the following:<br><br>
@@ -6369,8 +6372,8 @@ Attributes:<br>
         evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO line by line.
         <br>
 	For any of the four plain ethersex commands, the AVR-NET-IO returns the string <code>OK</code>. They are
-	concatenated and separated by semicolons. The postprocessor takes the result from <code>$_</code>,
-	substitutes it by the string <code>success</code> if it is <code>OK;OK;OK;OK</code>, and then either
+	concatenated and separated by line breaks (\n). The postprocessor takes the result from <code>$_</code>,
+	substitutes it by the string <code>success</code> if it is <code>OK\nOK\nOK\nOK</code>, and then either
 	returns the string <code>ok</code> or the string <code>error</code>.
 
    </ul>
