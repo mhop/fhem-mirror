@@ -9,7 +9,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.04 - July, 2012
+# Version 2.1 - July, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -595,7 +595,7 @@ sub OWX_Discover ($) {
         my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
         #-- Family 10 = Temperature sensor, assume DS1820 as default
         if( $owx_f eq "10" ){
-          CommandDefine(undef,"$name OWTEMP DS1820 $owx_rnf");    
+          CommandDefine(undef,"$name OWTHERM DS1820 $owx_rnf");    
            #-- Family 1D = Counter/RAM, assume DS2423 as default
         }elsif( $owx_f eq "1D" ){
           CommandDefine(undef,"$name OWCOUNT DS2423 $owx_rnf");            
@@ -604,10 +604,10 @@ sub OWX_Discover ($) {
           CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
         #-- Family 22 = Temperature sensor, assume DS1822 as default
         }elsif( $owx_f eq "22" ){
-          CommandDefine(undef,"$name OWTEMP DS1822 $owx_rnf");  
+          CommandDefine(undef,"$name OWTHERM DS1822 $owx_rnf");  
         #-- Family 28 = Temperature sensor, assume DS18B20 as default
         }elsif( $owx_f eq "28" ){
-          CommandDefine(undef,"$name OWTEMP DS18B20 $owx_rnf");   
+          CommandDefine(undef,"$name OWTHERM DS18B20 $owx_rnf");   
             #-- Family 3A = Switch, assume DS2413 as default
         }elsif( $owx_f eq "3A" ){
           CommandDefine(undef,"$name OWSWITCH DS2413 $owx_rnf");   
