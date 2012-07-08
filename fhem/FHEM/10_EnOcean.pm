@@ -320,7 +320,7 @@ EnOcean_Parse($$)
       $fspeed = 1      if($db_3 >= 165);
       $fspeed = 0      if($db_3 >= 190);
       $fspeed = "Auto" if($db_3 >= 210);
-      $temp   = sprintf("%0.1f", $db_1/6.375);      # 40..0
+      $temp   = sprintf("%0.1f", 40-$db_1/6.375);      # 40..0
       $present= $db_0&0x1 ? "no" : "yes";
 
       push @event, "3:state:temperature $temp";
