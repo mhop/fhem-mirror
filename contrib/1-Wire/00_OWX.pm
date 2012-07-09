@@ -9,7 +9,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.1 - July, 2012
+# Version 2.11 - July, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #

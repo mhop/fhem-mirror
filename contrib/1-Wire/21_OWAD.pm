@@ -2,10 +2,6 @@
 #
 # OWAD.pm
 #
-#
-#  TODO: Alarm limits ergeben "invalid page write attempt"
-#
-#
 # FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
 # Attention: This module may communicate with the OWX module,
@@ -18,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.1 - July, 2012
+# Version 2.11 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -971,7 +967,7 @@ sub OWXAD_SetPage($$) {
   my ($i,$j,$k);
   
   #=============== set the alarm values ===============================
-  if ( $page eq "test" ) {
+  if ( $page eq "alarm" ) {
     #-- issue the match ROM command \x55 and the set alarm page command 
     #   \x55\x10\x00 reading 8 data bytes and 2 CRC bytes
     $select="\x55\x10\x00";
