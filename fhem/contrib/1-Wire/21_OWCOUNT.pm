@@ -7,10 +7,6 @@
 # Attention: This module may communicate with the OWX module,
 #            but currently not with the 1-Wire File System OWFS
 #
-#
-#  SO FAR ONLY external counter inputs A,B are available ! Neither memory content, nor internal counters are questioned. 
-#
-#
 # Prefixes for subroutines of this module:
 # OW   = General 1-Wire routines  Peter Henning)
 # OWX  = 1-Wire bus master interface (Peter Henning)
@@ -18,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.1 - July, 2012
+# Version 2.11 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -354,7 +350,7 @@ sub OWCOUNT_FormatValues($) {
       my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
       if( $day!=$dayo ){
         my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
-        $midnight = $oldval*(1-$dt)+$vval*$dt;
+        $midnight += $oldval*(1-$dt)+$vval*$dt;
         OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
       }
     } 

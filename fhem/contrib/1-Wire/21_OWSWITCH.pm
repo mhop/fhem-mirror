@@ -7,6 +7,7 @@
 # Attention: This module may communicate with the OWX module,
 #            but currently not with the 1-Wire File System OWFS
 #
+# TODO: Kanalattribute ändern zur Laufzeit.
 #
 #
 # Prefixes for subroutines of this module:
@@ -16,7 +17,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.1 - July, 2012
+# Version 2.11 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -177,12 +178,12 @@ sub OWSWITCH_Define ($$) {
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
   #   determine CRC Code - only if this is a direct interface
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC("1D.".$id."00")) : "00";
+  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC("3A.".$id."00")) : "00";
   
   #-- Define device internals
-  $hash->{ROM_ID}     = "1D.".$id.$crc;
+  $hash->{ROM_ID}     = "3A.".$id.$crc;
   $hash->{OW_ID}      = $id;
-  $hash->{OW_FAMILY}  = "1D";
+  $hash->{OW_FAMILY}  = "3A";
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   
