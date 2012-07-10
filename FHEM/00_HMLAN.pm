@@ -11,6 +11,7 @@ sub HMLAN_Read($);
 sub HMLAN_Write($$$);
 sub HMLAN_ReadAnswer($$$);
 sub HMLAN_uptime($);
+sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
@@ -352,7 +353,7 @@ HMLAN_DoInit($)
   my $id  = AttrVal($name, "hmId", undef);
   my $key = AttrVal($name, "hmKey", "");        # 36(!) hex digits
 
-  my $s2000 = sprintf("%02X", secSince2000());
+  my $s2000 = sprintf("%02X", HMLAN_secSince2000());
 
   HMLAN_SimpleWrite($hash, "A$id") if($id);
   HMLAN_SimpleWrite($hash, "C");
@@ -374,6 +375,18 @@ HMLAN_KeepAlive($)
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", $hash, 1);
+}
+
+sub
+HMLAN_secSince2000()
+{
+  # Calculate the local time in seconds from 2000.
+  my $t = time();
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
+  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
+  $t -= 7200;   # HM Special
+  $t += fhemTzOffset($t);
+  return $t;
 }
 
 1;
