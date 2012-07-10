@@ -289,6 +289,7 @@ CommandCreateLog($$)
 
 ##########################
 # Table for automatically creating IO devices
+# PARAM in define will be replaced with the $1 from matchList
 my @usbtable = (
     { NAME      => "CUL",
       matchList => ["cu.usbmodem(.*)", "ttyACM(.*)"],
@@ -297,6 +298,14 @@ my @usbtable = (
       request   => "V\n",
       response  => "^V .* CU.*",
       define    => "CUL_PARAM CUL DEVICE\@9600 1PARAM34", },
+
+    { NAME      => "CUL",
+      matchList => ["ttySP(.*)"],
+      DeviceName=> "DEVICE\@38400",
+      flush     => "\n",
+      request   => "V\n",
+      response  => "^V .* CSM.*",
+      define    => "CUL_PARAM CUL DEVICE\@38400 1PARAM34", },
 
     { NAME      => "TCM310",
       matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)", "ttyACM(.*)"],
