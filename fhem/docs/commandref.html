@@ -3319,11 +3319,30 @@ A line ending with \ will be concatenated with the next one, so long lines
        </ul></li>
      <br>
 
-     <li>remotes
+      <li>remotes, pushButton
        <ul>
-         devicepair <btnNumber> hmDevice<br>
-         Pair a remote directly with a switch. The command for the switch is
-         sent out directly, the remote must be set into learning mode first.
+        * devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual]<br>
+         Pair a sender device directly with a actuator. After pairing 
+		 commands sent by the remote are processed directly by the actuator. 
+
+
+		 Remote must be set into learning mode first. <br>
+		 &lt;hmDevice&gt; is the actuator's channel to be paired.<br>
+		 &lt;btn_no&gt; is the button on the remote to be paired. If 'single' 
+		 is choosen buttons are counted from 1. For 'dual' btn_no is the number
+		 of the Button-pair to be used. I.e. '3' 
+		 in dual is the 3rd button pair correcponding to button 5 and 6 in 
+		 single mode.<br>
+		 [single|dual]: this mode impacts the default behavior of the 
+		 Actuator upon using this button. E.g. a dimmer can be learned to a 
+		 single button or to a button pair. <br>
+		 'dual' (default) Button pairs two buttons to one actuator. With a 
+		 dimmer this means one button for dim-up and one for dim-down. <br>
+		 'single' uses only one button of the sender. It is useful for e.g. for
+		 simple switch actuator to toggle on/off. Nevertheless 
+		 also dimmer can be learned to only one button. <br>
+		 example: set myRemote devicepair 2 mySwitchActuator single
+
        </ul>
      <br>
 

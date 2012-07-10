@@ -120,6 +120,8 @@ my %culHmModel=(
   "0062" => "HM-LC-SW2-DR",
   "0066" => "HM_LC_Sw4-WM",      # Tested by peterp
   "0067" => "HM-LC_Dim1PWM-CV",  # Tested by peterp
+  "0068" => "HM-LC_Dim1TPBU-FM", # Tested by martinp (2012-07-10)
+  "006A" => "HM-LC_Bl1PBU-FM",   # Tested by martinp (2012-07-10)
   "006C" => "HM-LC-SW1-BA-PCB",  # Tested by MartiMcFly
 );
 
@@ -906,7 +908,10 @@ my %culHmSubTypeSets = (
         { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"", stop=>"" },
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>",
-          devicepair => "<btnNumber> device", },
+          devicepair => "<btnNumber> device [single|dual]", },
+  pushButton =>										
+        { text => "<btn> [on|off] <txt1> <txt2>",
+          devicepair => "<btnNumber> device [single|dual]", },
   smokeDetector =>
         { test => "", "alarmOn"=>"", "alarmOff"=>"" },
   winMatic =>
@@ -1402,14 +1407,26 @@ CUL_HM_Set($@)
         $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"), 1, 0);
 
   } elsif($cmd eq "devicepair") { #####################################
-    return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
-    my $b1 = sprintf("%02X", $a[2]*2-1);
-    my $b2 = sprintf("%02X", $a[2]*2);
+    return "$a[2] is not a button number" if($a[2] < 1);
     
     my $dhash = $defs{$a[3]};
     return "$a[3] is not a known fhem device" if(!$dhash);
     return "$a[3] is not a CUL_HM device" if($dhash->{TYPE} ne "CUL_HM");
+    return "$a[4] must be single or dual" 
+	         if(defined($a[4]) && (($a[4] ne"single") &&($a[4] ne"dual")));
 
+	my $b1;
+    my $b2;
+	my $nrCh2Pair;
+	if ($a[4] ne"single"){ #default to dual
+	    $b1 = sprintf("%02X", $a[2]*2-1);
+	    $b2 = sprintf("%02X", $a[2]*2);
+	    $nrCh2Pair = 2;
+	}else{
+	    $b1 = sprintf("%02X",$a[2]);
+        $b2 = $b1;
+	    $nrCh2Pair = 1;
+	}
     my $dst2 = $dhash->{DEF};
     my $chn2 = "01";
     if(length($dst2) == 8) {     # shadow switch device for multi-channel switch
@@ -1419,23 +1436,18 @@ CUL_HM_Set($@)
     }
 
     # First the remote (one loop for on, one for off)
-    for(my $i = 1; $i <= 2; $i++) {
+    for(my $i = 1; $i <= $nrCh2Pair; $i++) {
       my $b = ($i==1 ? $b1 : $b2);
 
       # PEER_ADD, START, WRITE_INDEX, END
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}01${dst2}${chn2}00");
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}05${dst2}${chn2}04");
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}080100");
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}06");
+      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}01${dst2}${chn2}00");	  
+	  CUL_HM_pushConfig($hash,$id, $dst,hex($b),$dst2,hex($chn2),4,"0100");
     }
 
-    # Now the switch: PEER_ADD, PARAM_REQ:on, PARAM_REQ:off
+    # Now the switch: PEER_ADD
     CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}01${dst}${b2}${b1}");
-    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b1}03");
-    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}04${dst}${b2}03");
     $hash = $dhash; # Exchange the hash, as the switch is always alive.
     $isSender=0;    # the other device is a switch. ahem.
-
   }
 
   $hash->{STATE} = $state if($state);
