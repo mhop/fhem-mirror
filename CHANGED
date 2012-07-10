@@ -1,4 +1,5 @@
 - SVN
+  - feature: devicepair for single Button in 10_CUL_HM.pm (by MartinP)
   - feature: new Modules 75_MSG.pm, 76_MSGFile.pm and 76_MSGMail.pm (by Rüdiger)
   - feature: new Module 59_Twilight.pm to calculate current daylight
   - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
