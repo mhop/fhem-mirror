@@ -18,6 +18,7 @@ sub CUL_HM_Set($@);
 sub CUL_HM_DumpProtocol($$@);
 sub CUL_HM_convTemp($);
 sub CUL_HM_pushConfig($$$$$$$$);
+sub CUL_HM_secSince2000();
 
 my %culHmDevProps=(
   "01" => { st => "AlarmControl",    cl => "controller" }, # by peterp
@@ -489,7 +490,7 @@ CUL_HM_Parse($$)
 
     if($id eq $dst) {
       if($cmd eq "A03F") {                 # Timestamp request
-        my $s2000 = sprintf("%02X", secSince2000());
+        my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
         CUL_HM_SendCmd($shash, "++803F$id${src}0204$s2000",1,0);
         push @event, "time-request";
 
@@ -1897,5 +1898,18 @@ CUL_HM_maticFn($$$$$)
   $sndcmd = sprintf("++A001%s%s0106", $id, $dst);
   return $sndcmd;
 }
+
+sub
+CUL_HM_secSince2000()
+{
+  # Calculate the local time in seconds from 2000.
+  my $t = time();
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
+  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
+  $t -= 7200;   # HM Special
+  $t += fhemTzOffset($t);
+  return $t;
+}
+
 
 1;
