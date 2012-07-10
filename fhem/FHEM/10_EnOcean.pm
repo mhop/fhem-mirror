@@ -185,7 +185,7 @@ EnOcean_Set($@)
 
     }
 
-    select(undef, undef, undef, 0.1) if($i < int(@a)-1);
+    select(undef, undef, undef, 0.1);
   }
 
   my $cmd = join(" ", @a);
