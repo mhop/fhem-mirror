@@ -81,6 +81,7 @@ sub devspec2array($);
 sub doGlobalDef($);
 sub fhem($);
 sub fhz($);
+sub getAllSets($);
 sub IsDummy($);
 sub IsIgnored($);
 sub setGlobalAttrBeforeFork($);
@@ -1578,8 +1579,8 @@ getAllSets($)
 
   my $em = AttrVal($d, "eventMap", undef);
   if($em) {
-    $em = join(" ", map { $_ =~ s/.*://s; $_ } 
-                    grep { !/ / }
+    $em = join(" ", grep { !/ / }
+                    map { $_ =~ s/.*://s; $_ } 
                     EventMapAsList($em));
     $a2 = "$em $a2";
   }
@@ -2163,7 +2164,7 @@ DoTrigger($$)
         my $re = $inform{$c}{regexp};
         for(my $i = 0; $i < $max; $i++) {
           my $state = $defs{$dev}{CHANGED}[$i];
-          next if($re && $state !~ m/$re/);
+          next if($re && !($dev =~ m/$re/ || "$dev:$state" =~ m/$re/));
           syswrite($defs{$c}{CD},
             ($inform{$c}{type} eq "timer" ? "$tn " : "") .
             "$defs{$dev}{TYPE} $dev $state\n");
@@ -2947,17 +2948,6 @@ sub
 fhemTimeLocal($$$$$$) {
     my $t= fhemTimeGm($_[0],$_[1],$_[2],$_[3],$_[4],$_[5]);
     return $t-fhemTzOffset($t);
-}
-
-sub
-secSince2000()
-{
-  # Calculate the local time in seconds from 2000.
-  my $t = time();
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
-  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
-  $t -= fhemTzOffset($t);
-  return $t;
 }
 
 1;
