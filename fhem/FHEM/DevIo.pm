@@ -159,11 +159,19 @@ DevIo_OpenDev($$$)
 
 
     if ($^O=~/Win/) {
-     require Win32::SerialPort;
-     $po = new Win32::SerialPort ($dev);
+     eval {
+       require Win32::SerialPort;
+       $po = new Win32::SerialPort ($dev);
+     }
     } else  {
-     require Device::SerialPort;
-     $po = new Device::SerialPort ($dev);
+     eval {
+       require Device::SerialPort;
+       $po = new Device::SerialPort ($dev);
+     }
+    }
+    if($@) {
+      Log 1, $@;
+      return $@;
     }
 
     if(!$po) {
