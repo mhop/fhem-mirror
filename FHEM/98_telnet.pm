@@ -162,7 +162,11 @@ telnet_Read($)
           if($gotCmd && $hash->{prompt} && !$hash->{rcvdQuit});
   if($ret) {
     $ret =~ s/\n/\r\n/g if($pw);  # only for DOS telnet 
-    syswrite($hash->{CD}, $ret);
+    for(;;) {
+      my $l = syswrite($hash->{CD}, $ret);
+      last if(!$l || $l == length($ret));
+      $ret = substr($ret, $l);
+    }
   }
   CommandDelete(undef, $name) if($hash->{rcvdQuit});
 }
