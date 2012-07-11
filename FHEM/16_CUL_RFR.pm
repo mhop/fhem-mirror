@@ -87,16 +87,18 @@ CUL_RFR_Parse($$)
   my $name = $hash->{NAME};
   return "" if(IsIgnored($name));
 
-     if($smsg =~ m/^T/) { $hash->{NR_TMSG}++ }
-  elsif($smsg =~ m/^F/) { $hash->{NR_FMSG}++ }
-  elsif($smsg =~ m/^E/) { $hash->{NR_EMSG}++ }
-  elsif($smsg =~ m/^K/) { $hash->{NR_KMSG}++ }
-  else                  { $hash->{NR_RMSG}++ }
-
   $hash->{Clients}   = $iohash->{Clients};
   $hash->{MatchList} = $iohash->{MatchList};
-  foreach my $m (split(";", $smsg)) {
+
+  my @m = split(";", $smsg, -1);  # process only messages terminated with ;
+  for(my $i = 0; $i < $#m; $i++) {
+    my $m = $m[$i];
     CUL_Parse($hash, $iohash, $hash->{NAME}, $m, "X21");
+       if($m =~ m/^T/) { $hash->{NR_TMSG}++ }
+    elsif($m =~ m/^F/) { $hash->{NR_FMSG}++ }
+    elsif($m =~ m/^E/) { $hash->{NR_EMSG}++ }
+    elsif($m =~ m/^K/) { $hash->{NR_KMSG}++ }
+    else               { $hash->{NR_RMSG}++ }
   }
   return "";
 }
