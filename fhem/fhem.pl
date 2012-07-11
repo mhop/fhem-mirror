@@ -441,7 +441,6 @@ while (1) {
   # reported by select, but is used by unix too, to check if the device is
   # attached again.
   foreach my $p (keys %selectlist) {
-    next if(!$selectlist{$p});
     next if(!$selectlist{$p} || !$selectlist{$p}{NAME}); # due to rereadcfg/del
 
     CallFn($selectlist{$p}{NAME}, "ReadFn", $selectlist{$p})
