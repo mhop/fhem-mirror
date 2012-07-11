@@ -88,7 +88,6 @@ CUL_Initialize($)
   $hash->{UndefFn} = "CUL_Undef";
   $hash->{GetFn}   = "CUL_Get";
   $hash->{SetFn}   = "CUL_Set";
-  $hash->{StateFn} = "CUL_SetState";
   $hash->{AttrFn}  = "CUL_Attr";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
@@ -468,14 +467,6 @@ READEND:
   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
 
   return "$a[0] $a[1] => $msg";
-}
-
-#####################################
-sub
-CUL_SetState($$$$)
-{
-  my ($hash, $tim, $vt, $val) = @_;
-  return undef;
 }
 
 sub
