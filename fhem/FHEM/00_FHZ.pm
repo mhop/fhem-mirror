@@ -103,7 +103,6 @@ FHZ_Initialize($)
   $hash->{UndefFn} = "FHZ_Undef";
   $hash->{GetFn}   = "FHZ_Get";
   $hash->{SetFn}   = "FHZ_Set";
-  $hash->{StateFn} = "FHZ_SetState";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                    "showtime:1,0 model:fhz1000,fhz1300 loglevel:0,1,2,3,4,5,6 ".
                    "fhtsoftbuffer:1,0 addvaltrigger";
@@ -256,17 +255,6 @@ FHZ_Get($@)
 
   return "$a[0] $a[1] => $v";
 }
-
-#####################################
-sub
-FHZ_SetState($$$$)
-{
-  my ($hash, $tim, $vt, $val) = @_;
-
-  return "Undefined value $vt" if(!defined($gets{$vt}));
-  return undef;
-}
-
 
 #####################################
 sub
