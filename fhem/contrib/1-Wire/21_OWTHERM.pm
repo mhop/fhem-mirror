@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.1 - July, 2012
+# Version 2.12 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -214,7 +214,7 @@ sub OWTHERM_Define ($$) {
   Log 3, "OWTHERM: Device $name defined."; 
   
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+1, "OWTHERM_InitializeDevice", $hash, 0);
+  InternalTimer(time()+10, "OWTHERM_InitializeDevice", $hash, 0);
    
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
@@ -234,6 +234,7 @@ sub OWTHERM_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
+  my @args;
   
   $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "<span style=\"color:red\">&#x25BE;</span>";
   $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "<span style=\"color:red\">&#x25B4;</span>";
@@ -244,11 +245,16 @@ sub OWTHERM_InitializeDevice($) {
   
   #-- Initial readings temperature sensor
   $owg_temp  =  0.0;
-  $owg_tl    = -15.0;
-  $owg_th    =  70.0;
- 
+  $owg_tl = defined($attr{$name}{"tempLow"})   ? $attr{$name}{"tempLow"}   : 0.0;
+  $owg_th = defined($attr{$name}{"tempHigh"})  ? $attr{$name}{"tempHigh"}  : 100.0;
   #-- Initialize all the display stuff  
   OWTHERM_FormatValues($hash);
+  #-- alarm
+  @args   = ($name,"tempLow",$owg_tl);
+  OWTHERM_Set($hash,@args);
+  @args   = ($name,"tempHigh",$owg_th);
+  OWTHERM_Set($hash,@args);
+  
 }
 
 ########################################################################################
