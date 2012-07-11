@@ -122,7 +122,6 @@ FS20_Initialize($)
 
   $hash->{Match}     = "^81..(04|0c)..0101a001";
   $hash->{SetFn}     = "FS20_Set";
-  $hash->{StateFn}   = "FS20_SetState";
   $hash->{DefFn}     = "FS20_Define";
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
@@ -131,20 +130,6 @@ FS20_Initialize($)
                        "ignore:1,0 dummy:1,0 showtime:1,0 ".
                        "loglevel:0,1,2,3,4,5,6 " .
                        "model:".join(",", sort keys %models);
-}
-
-#####################################
-sub
-FS20_SetState($$$$)
-{
-  my ($hash, $tim, $vt, $val) = @_;
-
-  $val = $1 if($val =~ m/^(.*) \d+$/);
-  my $name = $hash->{NAME};
-  (undef, $val) = ReplaceEventMap($name, [$name, $val], 0)
-        if($attr{$name}{eventMap});
-  return "setstate $name: undefined value $val" if(!defined($fs20_c2b{$val}));
-  return undef;
 }
 
 #############################
