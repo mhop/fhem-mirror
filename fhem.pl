@@ -1746,7 +1746,6 @@ CommandSetstate($$)
   my @a = split(" ", $param, 2);
   return "Usage: setstate <name> <state>\n$namedef" if(@a != 2);
 
-
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
     if(!defined($defs{$sdev})) {
@@ -1760,7 +1759,8 @@ CommandSetstate($$)
     if($a[1] =~ m/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) +([^ ].*)$/) {
       my ($tim, $nameval) =  ($1, $2);
       my ($sname, $sval) = split(" ", $nameval, 2);
-      (undef, $sval) = ReplaceEventMap($d, [$d, $sval], 0) if($attr{$d}{eventMap});
+      (undef, $sval) = ReplaceEventMap($sdev, [$sdev, $sval], 0)
+                                if($attr{$sdev}{eventMap});
       my $ret = CallFn($sdev, "StateFn", $d, $tim, $sname, $sval);
       if($ret) {
         push @rets, $ret;
@@ -1779,8 +1779,15 @@ CommandSetstate($$)
 
       # This time is not the correct one, but we do not store a timestamp for
       # this reading.
-      $oldvalue{$sdev}{TIME} = TimeNow();
+      my $tn = TimeNow();
+      $oldvalue{$sdev}{TIME} = $tn;
       $oldvalue{$sdev}{VAL} = $d->{STATE};
+
+      my $ret = CallFn($sdev, "StateFn", $d, $tn, "STATE", $a[1]);
+      if($ret) {
+        push @rets, $ret;
+        next;
+      }
 
     }
   }

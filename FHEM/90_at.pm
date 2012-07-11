@@ -15,6 +15,7 @@ at_Initialize($)
   $hash->{DefFn}    = "at_Define";
   $hash->{UndefFn}  = "at_Undef";
   $hash->{AttrFn}   = "at_Attr";
+  $hash->{StateFn}  = "at_State";
   $hash->{AttrList} = "disable:0,1 skip_next:0,1 loglevel:0,1,2,3,4,5,6 ".
                       "alignTime";
 }
@@ -173,6 +174,33 @@ at_Attr(@)
         "disabled" :
         "Next: " . FmtTime($defs{$name}{TRIGGERTIME}));
 
+  return undef;
+}
+
+#############
+# Adjust one-time relative at's after reboot, the execution time is stored as
+# state
+sub
+at_State($$$$)
+{
+  my ($hash, $tim, $vt, $val) = @_;
+
+  return undef if($hash->{DEF} !~ m/^\+\d/ ||
+                  $val !~ m/Next: (\d\d):(\d\d):(\d\d)/);
+
+  my ($h, $m, $s) = ($1, $2, $3);
+  my $then = ($h*60+$m)*60+$s;
+  my $now = time();
+  my @lt = localtime($now);
+  my $ntime = ($lt[2]*60+$lt[1])*60+$lt[0];
+  return undef if($ntime > $then); 
+
+  my $name = $hash->{NAME};
+  RemoveInternalTimer($name);
+  InternalTimer($now+$then-$ntime, "at_Exec", $name, 0);
+  $hash->{NTM} = "$h:$m:$s";
+  $hash->{STATE} = $val;
+  
   return undef;
 }
 
