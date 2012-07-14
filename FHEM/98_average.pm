@@ -60,6 +60,7 @@ average_Notify($$)
     # Filtering
     next if(!defined($s));
     my ($evName, $val) = split(" ", $s, 2); # resets $1
+# Log 1,"mytestavg pre-filter: ".$devName.$evName." s=".$s; 
     next if($devName !~ m/^$re$/ && "$devName:$s" !~ m/^$re$/ || $s =~ m/_avg_/);
     if(defined($1)) {
       my $reArg = $1;
@@ -67,6 +68,8 @@ average_Notify($$)
     }
     next if(!defined($val) || $val !~ m/^(-?\d+\.?\d*)/);
     $val = $1;
+
+# Log 1,"mytestavg pst-filter: ".$devName.$evName." val=".$val; 
 
     ################
     # Avg computing
@@ -83,12 +86,27 @@ average_Notify($$)
 
       my $cumName = "${evName}_cum_" . ($idx ? "month" : "day");
       my $avgName = "${evName}_avg_" . ($idx ? "month" : "day");
+      my $minName = "${evName}_min_" . ($idx ? "month" : "day"); ##MH
+      my $maxName = "${evName}_max_" . ($idx ? "month" : "day"); ##MH
 
       if(!$r->{$cumName}) {
         $r->{$cumName}{VAL} = $secNow*$val;
         $r->{$avgName}{VAL} = $val;
+        $r->{$maxName}{VAL} = $val; ##MH
+        $r->{$minName}{VAL} = $val; ##MH
         $r->{$cumName}{TIME} = $r->{$avgName}{TIME} = $tn;
         next;
+      }
+
+      ##MH take care of existing average definitions - just add this one..
+      if(!$r->{$maxName}) {
+        $r->{$maxName}{VAL} = $val;
+        $r->{$maxName}{TIME} = $tn; 
+      }
+      ##MH take care of existing average definitions - just add this one..
+      if(!$r->{$minName}) {
+        $r->{$minName}{VAL} = $val;
+        $r->{$minName}{TIME} = $tn; 
       }
 
       my @dLast = split("[ :-]", $r->{$cumName}{TIME});
@@ -100,11 +118,29 @@ average_Notify($$)
         my $cum = $r->{$cumName}{VAL} + ($secNow-$secLast) * $val;
         $r->{$cumName}{VAL} = $cum;
         $r->{$avgName}{VAL} = sprintf("%0.1f", $cum/$secNow);
+        ##MH change only if current value bigger than maxvalue
+        if($r->{$maxName}{VAL} < $val) {
+          $r->{$maxName}{VAL} = sprintf("%0.1f", $val); ##MH
+          $r->{$maxName}{TIME} = $tn; ##MH
+        }
+
+        ##MH change only if current value smaller than minvalue
+        if($r->{$minName}{VAL} > $val) {
+          $r->{$minName}{VAL} = sprintf("%0.1f", $val); ##MH
+          $r->{$minName}{TIME} = $tn; ##MH
+        }
       } else {
         $dev->{CHANGED}[$myIdx++] = "$avgName: ".$r->{$avgName}{VAL};
+        $dev->{CHANGED}[$myIdx++] = "$maxName: ".$r->{$maxName}{VAL}; ##MH
+        $dev->{CHANGED}[$myIdx++] = "$minName: ".$r->{$minName}{VAL}; ##MH
         $r->{$cumName}{VAL} = $secNow*$val;
         $r->{$avgName}{VAL} = $val;
 
+        ##MH set to current value
+        $r->{$maxName}{VAL} = sprintf("%0.1f", $val); ##MH
+        $r->{$maxName}{TIME} = $tn; ##MH
+        $r->{$minName}{VAL} = sprintf("%0.1f", $val); ##MH
+        $r->{$minName}{TIME} = $tn; ##MH
       }
       $r->{$cumName}{TIME} = $r->{$avgName}{TIME} = $tn;
     }
@@ -113,3 +149,4 @@ average_Notify($$)
 }
 
 1;
+
