@@ -218,6 +218,7 @@ CUL_HM_Parse($$)
       delete($dhash->{ackCmdSent});
       delete($dhash->{ackWaiting});
       delete($dhash->{cmdStack});
+	  delete($attr{$dhash->{NAME}}{CmdPend});
       $dhash->{STATE} = "MISSING ACK";
       DoTrigger($dname, "MISSING ACK");
     }
@@ -266,6 +267,7 @@ CUL_HM_Parse($$)
 
     if($p =~ m/^8/) {
       delete($shash->{cmdStack});
+	  delete($attr{$dhash->{NAME}}{CmdPend});
       push @event, "state:NACK";
 
     } else {
@@ -908,10 +910,10 @@ my %culHmSubTypeSets = (
         { "on-for-timer"=>"sec", on =>"", off=>"", toggle=>"", pct=>"", stop=>"" },
   remote =>
         { text => "<btn> [on|off] <txt1> <txt2>",
-          devicepair => "<btnNumber> device [single|dual]", },
+          devicepair => "<btnNumber> device [single|dual] [set|unset]", },
   pushButton =>										
         { text => "<btn> [on|off] <txt1> <txt2>",
-          devicepair => "<btnNumber> device [single|dual]", },
+          devicepair => "<btnNumber> device [single|dual] [set|unset]", },
   smokeDetector =>
         { test => "", "alarmOn"=>"", "alarmOff"=>"" },
   winMatic =>
@@ -1408,12 +1410,14 @@ CUL_HM_Set($@)
 
   } elsif($cmd eq "devicepair") { #####################################
     return "$a[2] is not a button number" if($a[2] < 1);
-    
+			 
     my $dhash = $defs{$a[3]};
     return "$a[3] is not a known fhem device" if(!$dhash);
     return "$a[3] is not a CUL_HM device" if($dhash->{TYPE} ne "CUL_HM");
     return "$a[4] must be single or dual" 
-	         if(defined($a[4]) && (($a[4] ne"single") &&($a[4] ne"dual")));
+	         if(defined($a[4]) && (($a[4] ne"single") &&($a[4] ne"dual")));  
+    return "$a[5] must be set or unset" 
+	         if(defined($a[5]) && (($a[5] ne"set") &&($a[5] ne"unset")));  
 
 	my $b1;
     my $b2;
@@ -1427,6 +1431,8 @@ CUL_HM_Set($@)
         $b2 = $b1;
 	    $nrCh2Pair = 1;
 	}
+	my $cmd = ($a[5] ne "unset")?"01":"02";# do we set or remove?
+
     my $dst2 = $dhash->{DEF};
     my $chn2 = "01";
     if(length($dst2) == 8) {     # shadow switch device for multi-channel switch
@@ -1440,12 +1446,11 @@ CUL_HM_Set($@)
       my $b = ($i==1 ? $b1 : $b2);
 
       # PEER_ADD, START, WRITE_INDEX, END
-      CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}01${dst2}${chn2}00");	  
+	  CUL_HM_PushCmdStack($hash, "++A001${id}${dst}${b}$cmd${dst2}${chn2}00");
 	  CUL_HM_pushConfig($hash,$id, $dst,hex($b),$dst2,hex($chn2),4,"0100");
     }
 
-    # Now the switch: PEER_ADD
-    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}01${dst}${b2}${b1}");
+    CUL_HM_PushCmdStack($dhash, "++A001${id}${dst2}${chn2}$cmd${dst}${b2}${b1}");
     $hash = $dhash; # Exchange the hash, as the switch is always alive.
     $isSender=0;    # the other device is a switch. ahem.
   }
@@ -1549,7 +1554,6 @@ CUL_HM_Pair(@)
   CUL_HM_pushConfig($hash, $id, $src, $chn,0,0,0, "0201$idstr");
   CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
 
-
   return "";
 }
     
@@ -1600,6 +1604,9 @@ CUL_HM_PushCmdStack($$)
 
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
   push(@{$hash->{cmdStack}}, $cmd);
+  my $entries = scalar @{$hash->{cmdStack}};
+  $attr{$hash->{NAME}}{CmdPend} = $entries ." CMDs pending. Please activate learning" 
+                                  if("sender" eq $attr{$hash->{NAME}}{hmClass});
 }
 
 ###################################
@@ -1613,9 +1620,11 @@ CUL_HM_ProcessCmdStack($)
     if(@{$hash->{cmdStack}}) {
       CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
       $sent = 1;
+      $attr{$hash->{NAME}}{CmdPend} = scalar @{$hash->{cmdStack}} ."CMDs pending";
     }
     if(!@{$hash->{cmdStack}}) {
       delete($hash->{cmdStack});
+      delete($attr{$hash->{NAME}}{CmdPend});
     }
   }
   return $sent;
@@ -1632,6 +1641,7 @@ CUL_HM_Resend($)
     delete($hash->{ackCmdSent});
     delete($hash->{ackWaiting});
     delete($hash->{cmdStack});
+    delete($attr{$hash->{NAME}}{CmdPend});
     $hash->{STATE} = "MISSING ACK";
     DoTrigger($name, "MISSING ACK");
     return;
@@ -1649,6 +1659,29 @@ CUL_HM_Id($)
   my ($io) = @_;
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
   return AttrVal($io->{NAME}, "hmId", "F1$fhtid");
+}
+
+###################################
+sub
+CUL_HM_id2Name($)
+{ # get name for a HMid or a HMid channel combination
+  my ($p) = @_;
+  my $devId= substr($p, 0, 6);
+  my $chn;
+  my $chnId;
+  if (length($p) == 8){
+	$chn = substr($p, 6, 2);;
+	$chnId = $p;
+  }
+  my $name;
+  $name = "broadcast" if($devId eq "000000"); 
+  $name = $modules{CUL_HM}{defptr}{$chnId}->{NAME} if(!$name && $chnId); 
+  if (!$name){
+    $name = $modules{CUL_HM}{defptr}{$devId}->{NAME};
+    $name = $devId if(!$name);
+    $name .= ($chn ? (" chn:".$chn):"");
+  }
+  return $name;
 }
 
 #############################
@@ -1677,6 +1710,11 @@ my %culHmBits = (
                        PEER_ADDRESS   => "04,6",
                        PEER_CHANNEL_A => "10,2",
                        PEER_CHANNEL_B => "12,2", } },
+  "A001;p11=02"   => { txt => "CONFIG_PEER_REMOVE", params => {
+                       CHANNEL        => "00,2",
+                       PEER_ADDRESS   => '04,6,$val=CUL_HM_id2Name($val)',
+                       PEER_CHANNEL_A => "10,2",
+                       PEER_CHANNEL_B => "12,2", } },
   "A001;p11=03"   => { txt => "CONFIG_PEER_LIST_REQ", params => {
                        CHANNEL => "0,2", } },
   "A001;p11=04"   => { txt => "CONFIG_PARAM_REQ", params => {
@@ -1701,10 +1739,10 @@ my %culHmBits = (
   "A003"          => { txt => "AES reply",   params => {
                        DATA =>  "0," } },
   "A010;p01=01"   => { txt => "INFO_PEER_LIST", params => {
-                       PEER_ADDR1 => "02,6", PEER_CH1 => "08,2",
-                       PEER_ADDR2 => "10,6", PEER_CH2 => "16,2",
-                       PEER_ADDR3 => "18,6", PEER_CH3 => "24,2",
-                       PEER_ADDR4 => "26,6", PEER_CH4 => "32,2", } },
+                       PEER1 => '02,8,$val=CUL_HM_id2Name($val)',
+                       PEER2 => '10,8,$val=CUL_HM_id2Name($val)',
+                       PEER3 => '18,8,$val=CUL_HM_id2Name($val)',
+                       PEER4 => '26,8,$val=CUL_HM_id2Name($val)',} },
   "A010;p01=02"   => { txt => "INFO_PARAM_RESPONSE_PAIRS", params => {
                        DATA => "2,", } },
   "A010;p01=03"   => { txt => "INFO_PARAM_RESPONSE_SEQ", params => {
@@ -1794,6 +1832,8 @@ CUL_HM_DumpProtocol($$@)
     }
     $txt = " ($txt)" if($txt);
   }
+  $src=CUL_HM_id2Name($src);
+  $dst=CUL_HM_id2Name($dst);
   my $msg ="$prefix L:$len N:$cnt CMD:$cmd SRC:$src DST:$dst $p$txt ($cmdBits)";
   Log $l4, $msg;
   DoTrigger($iname, $msg) if($ev);
