@@ -19,6 +19,7 @@ sub FW_fileList($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeTable($$@);
+sub FW_ReadIconsFrom($$);
 sub FW_ReadIcons();
 sub FW_roomOverview($);
 sub FW_select($$$$@);
@@ -36,7 +37,12 @@ sub FW_pH(@);
 sub FW_pHPlain(@);
 sub FW_pO(@);
 
-use vars qw($FW_dir);  # moddir (./FHEM in old structure, www/pgm2 in new structure), needed by SVG
+use vars qw($FW_dir);  # base directory for web server: the first available from $modpath/www, $modpath/FHEM
+use vars qw($FW_icondir);  # icon base directory for web server: the first available from $FW_dir/icons, $FW_dir
+use vars qw($FW_docdir);  # doc directory for web server: the first available from $FW_dir/docs, $modpath/docs, $FW_dir
+use vars qw($FW_cssdir);  # css directory for web server: the first available from $FW_dir/css, $FW_dir
+use vars qw($FW_gplotdir);  # gplot directory for web server: the first available from $FW_dir/gplot,$FW_dir
+use vars qw($FW_jsdir);  # js directory for web server: the first available from $FW_dir/javascript, $FW_dir
 use vars qw($MW_dir);  # moddir (./FHEM), needed by edit Files in new structure
 use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
 use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
@@ -66,7 +72,7 @@ my %FW_icons;      # List of icons
 my $FW_iconsread;  # Timestamp of last icondir check
 my $FW_plotmode;   # Global plot mode (WEB attribute)
 my $FW_plotsize;   # Global plot size (WEB attribute)
-my $FW_reldoc;     # $FW_ME/commandref.html;
+my $FW_commandref;     # $FW_docdir/commandref.html;
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
@@ -97,7 +103,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress:0,1 ".
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheetPrefix hiddenroom HTTPS longpoll:1,0 ".
+                     "stylesheetPrefix iconpath hiddenroom HTTPS longpoll:1,0 ".
                      "redirectCmds:0,1 allowfrom ";
 
   ###############
@@ -269,6 +275,80 @@ FW_Read($)
 
 ###########################
 sub
+FW_ServeSpecial($$$) {
+
+  my ($file,$ext,$dir)= @_;
+  $file =~ s,\.\./,,g; # little bit of security
+
+  #Debug "We serve $dir/$file.$ext";
+  open(FH, "$dir/$file.$ext") || return 0;
+  binmode(FH) if($ext =~ m/gif|png|jpg/); # necessary for Windows
+  FW_pO join("", <FH>);
+  close(FH);
+  $FW_RETTYPE = "text/plain"             if($ext eq "txt");
+  $FW_RETTYPE = "text/html"              if($ext eq "html");
+  $FW_RETTYPE = "application/pdf"        if($ext eq "pdf");
+  $FW_RETTYPE = "text/css"               if($ext eq "css");
+  $FW_RETTYPE = "image/jpeg"             if($ext eq "jpg");
+  $FW_RETTYPE = "image/png"              if($ext eq "png");
+  $FW_RETTYPE = "image/gif"              if($ext eq "gif");
+  return 1;
+}
+  
+sub
+FW_SetDirs() {
+
+  # web server root
+  if(-d "$attr{global}{modpath}/www") {
+    $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/www");
+  } else {
+    $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
+  }
+  # icon dir
+  if(-d "$FW_dir/images") {
+    $FW_icondir = "$FW_dir/images";
+  } else {
+    $FW_icondir = $FW_dir;
+  }
+  # doc dir
+  if(-d "$FW_dir/docs") {
+    $FW_docdir = "$FW_dir/docs";
+  } elsif(-d "$attr{global}{modpath}/docs") {
+    $FW_docdir = "$attr{global}{modpath}/docs";
+  }
+  else {
+    $FW_docdir = $FW_dir;
+  }
+  # css dir
+  if(-d "$FW_dir/pgm2") {
+    $FW_cssdir = "$FW_dir/pgm2";
+  } else {
+    $FW_cssdir = $FW_dir;
+  }
+  # gplot dir
+  if(-d "$FW_dir/gplot") {
+    $FW_gplotdir = "$FW_dir/gplot";
+  } else {
+    $FW_gplotdir = $FW_dir;
+  }
+  # javascript dir
+  if(-d "$FW_dir/pgm2") {
+    $FW_jsdir = "$FW_dir/pgm2";
+  } else {
+    $FW_jsdir = $FW_dir;
+  }
+
+#   Debug "web server root: $FW_dir";
+#   Debug "icon directory: $FW_icondir";
+#   Debug "doc directory: $FW_docdir";
+#   Debug "css directory: $FW_cssdir";
+#   Debug "gplot directory: $FW_gplotdir";
+#   Debug "javascript directory: $FW_jsdir";
+  
+}
+
+
+sub
 FW_AnswerCall($)
 {
   my ($arg) = @_;
@@ -277,50 +357,52 @@ FW_AnswerCall($)
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
-  if(-d "$attr{global}{modpath}/www/pgm2") {
-    $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/www/pgm2");
-  } else {
-    $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
-  }
+
+  FW_SetDirs;
+
+  $FW_commandref = "$FW_docdir/commandref.html";
+  #Debug "commandref.html is at $FW_commandref";
+  
+
+  
   $MW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
   my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
 
   # Lets go:
-  if($arg =~ m,^${FW_ME}/(.*)\.(css|html|js)$,) {
-    my ($file, $ext) = ($1, $2);
-    $file =~ s,\.\./,,g;    # little bit of security
-    open(FH, "$FW_dir/$file.$ext") || return 0;
-    FW_pO join("", <FH>);
-    close(FH);
-    $FW_RETTYPE = "text/css"               if($ext eq "css");
-    $FW_RETTYPE = "application/javascript" if($ext eq "js");
-    return 1;
+  if($arg =~ m,^$FW_ME/docs/(.*)\.(html|txt|pdf)$,) {
+    return FW_ServeSpecial($1,$2,$FW_docdir);
 
-  } elsif($arg =~ m,^$FW_ME/icons/(.*)$, ||
-          $arg =~ m,^$FW_ME/(.*.png)$,i  ||
-          $arg =~ m,^/(favicon.ico)$,) {
-    my ($img, $cachable) = ($1, 1);
-    $img =~ s,\.\./,,g;
+  } elsif($arg =~ m,^${FW_ME}/css/(.*)\.css$,) {
+    return FW_ServeSpecial($1,"css",$FW_cssdir);
 
-    my $fnd;
-    $fnd = open(FH, "$FW_dir/$prf/$img") if($prf); 
-    $fnd = open(FH, "$FW_dir/$img") if(!$fnd); 
-    if(!$fnd && $arg =~ m,/icons/,) { # Hack: convert device state to icon name
-      FW_ReadIcons();
-      $img = FW_dev2image($img);
+  } elsif($arg =~ m,^${FW_ME}/js/(.*)\.js$,) {
+    return FW_ServeSpecial($1,"js",$FW_jsdir);
+
+  } elsif($arg =~ m,^/(favicon.ico)$,) {
+    return 0; # TODO!
+  }
+  
+  elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
+    my ($icon,$cachable) = ($1, 1);
+    FW_ReadIcons();
+
+    #Debug "You want $icon which is " . $FW_icons{$icon};
+    # if we do not have the icon, we convert the device state to the icon name
+    if(!$FW_icons{$icon}) {
+      $icon = FW_dev2image($icon);
+      #Debug "We do not have it and thus use $icon which is " . $FW_icons{$icon};
       $cachable = 0;
-      $fnd = open(FH, "$FW_dir/$prf/$img") if($img); 
-      $fnd = open(FH, "$FW_dir/$img") if(!$fnd && $img); 
     }
-    return 0 if(!$fnd);
-    binmode (FH); # necessary for Windows
-    FW_pO join("", <FH>);
-    close(FH);
-    my @f_ext = split(/\./,$img); #kpb
-    $FW_RETTYPE = "image/$f_ext[-1]";
-    return $cachable;
+    $FW_icons{$icon} =~ m/(.*)\.(gif|jpg|png)/;
+    my ($file,$ext)= ($1,$2);
+    
+    if(FW_ServeSpecial($file,$ext,$FW_icondir)) {
+      return $cachable;
+    } else {
+      return 0;
+    }
 
   } elsif($arg !~ m/^$FW_ME(.*)/) {
     my $c = $me->{CD};
@@ -331,7 +413,7 @@ FW_AnswerCall($)
     return -1;
 
   }
-
+  
   $arg = $1; # The stuff behind FW_ME
 
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
@@ -359,7 +441,6 @@ FW_AnswerCall($)
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
-  $FW_reldoc = "$FW_ME/commandref.html";
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
   if($FW_inform) {      # Longpoll header
@@ -428,7 +509,7 @@ FW_AnswerCall($)
 
   # Enable WebApp
   if($FW_tp || $FW_ss) {
-    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/fhemicon.png"/>';
+    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/icons/fhemicon.png"/>';
     FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     if($FW_ss) {
       FW_pO '<meta name="viewport" content="width=320"/>';
@@ -442,10 +523,10 @@ FW_AnswerCall($)
   
   $prf = "smallscreen" if(!$prf && $FW_ss);
   $prf = "touchpad"    if(!$prf && $FW_tp);
-  FW_pO "<link href=\"$FW_ME/".$prf."style.css\" rel=\"stylesheet\"/>";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
+  FW_pO "<link href=\"$FW_ME/css/".$prf."style.css\" rel=\"stylesheet\"/>";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/css/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/fhemweb.js\"></script>";
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
   my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
   FW_pO "</head>\n<body name=\"$t\" $onload>";
 
@@ -688,7 +769,7 @@ FW_doDetail($)
   }
 
   FW_pH "cmd=style iconFor $d", "Select icon";
-  FW_pH "$FW_reldoc#${t}", "Device specific help";
+  FW_pH "$FW_ME/docs/commandref.html#${t}", "Device specific help";
   FW_pO "<br><br>";
   FW_pO "</div>";
   FW_pO "</form>";
@@ -715,7 +796,7 @@ FW_roomOverview($)
     $FW_room = $1 if($FW_room && $FW_room =~ m/^([^,]*),/);
     $FW_room = "" if(!$FW_room);
     FW_pHPlain "room=$FW_room",
-        "<div id=\"back\"><img src=\"$FW_ME/back.png\"></div>";
+        "<div id=\"back\"><img src=\"$FW_ME/icons/back.png\"></div>";
     FW_pO "<div id=\"menu\">$FW_detail details</div>";
     return;
 
@@ -771,9 +852,9 @@ FW_roomOverview($)
   my @list = (
      "Everything",    "$FW_ME?room=all",
      "",              "",
-     "Howto",         "$FW_ME/HOWTO.html",
+     "Howto",         "$FW_ME/docs/HOWTO.html",
      "Wiki",          "http://fhemwiki.de",
-     "Details",       "$FW_ME/commandref.html",
+     "Details",       "$FW_ME/docs/commandref.html",
      "Definition...", "$FW_ME?cmd=style%20addDef",
      "Edit files",    "$FW_ME?cmd=style%20list",
      "Select style",  "$FW_ME?cmd=style%20select",
@@ -818,7 +899,7 @@ FW_roomOverview($)
       } else {
         pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
         my $icon = "";
-        $icon = "<img src=\"$FW_ME/icons/".$FW_icons{"ico$l1"}."\">&nbsp;"
+        $icon = "<img src=\"$FW_ME/icons/ico$l1\">&nbsp;"
                 if($FW_icons{"ico$l1"});
 
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
@@ -1001,6 +1082,25 @@ FW_fileList($)
   return sort @ret;
 }
 
+# return a hash name -> path of actual files for a given regexp
+sub
+FW_fileHash($)
+{
+  my ($fname) = @_;
+  $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
+  my ($dir,$re) = ($1, $2);
+  return if(!$re);
+  $re =~ s/%./[A-Za-z0-9]*/g;
+  my %ret;
+  return %ret if(!opendir(DH, $dir));
+  while(my $f = readdir(DH)) {
+    next if($f !~ m,^$re$,);
+    $ret{$f}= "${dir}/${f}";
+  }
+  closedir(DH);
+  return %ret;
+}
+
 ######################
 # Show the content of the log (plain text), or an image and offer a link
 # to convert it to a weblink
@@ -1160,7 +1260,7 @@ FW_showLog($)
 
   my $pm = AttrVal($wl,"plotmode",$FW_plotmode);
 
-  my $gplot_pgm = "$FW_dir/$type.gplot";
+  my $gplot_pgm = "$FW_gplotdir/$type.gplot";
 
   if(!-r $gplot_pgm) {
     my $msg = "Cannot read $gplot_pgm";
@@ -1268,7 +1368,7 @@ FW_showLog($)
     Log 5, "plotcommand: get $d $file INT $f $t " . join(" ", @{$flog});
     $ret = FW_fC("get $d $file INT $f $t " . join(" ", @{$flog}));
     ($cfg, $plot) = FW_substcfg(1, $wl, $cfg, $plot, $file, "<OuT>");
-    FW_pO SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_wname, $FW_dir);
+    FW_pO SVG_render($wl, $f, $t, $cfg, $internal_data, $plot, $FW_wname, $FW_cssdir);
     $FW_RETTYPE = "image/svg+xml";
 
   }
@@ -1476,6 +1576,26 @@ FW_calcWeblink($$)
 }
 
 ##################
+#
+sub
+FW_pFileHash($%) {
+
+    my ($heading,%files)= @_;
+    FW_pO "$heading<br>";
+    FW_pO "<table class=\"block\" id=\"at\">";
+    my $row = 0;
+    my @filenames= sort keys %files;
+    foreach my $filename (@filenames) {
+      FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
+      FW_pH "cmd=style edit $files{$filename}", $filename, 1;
+      FW_pO "</tr>";
+      $row = ($row+1)%2;
+    }
+    FW_pO "</table>";
+    FW_pO "<br>";
+ } 
+
+##################
 # List/Edit/Save css and gnuplot files
 sub
 FW_style($$)
@@ -1485,35 +1605,35 @@ FW_style($$)
 
   my $start = "<div id=\"content\"><table><tr><td>";
   my $end   = "</td></tr></table></div>";
+  
   if($a[1] eq "list") {
 
-    my @fl = ("fhem.cfg");
-    push(@fl, "");
-    push(@fl, FW_fileList("$MW_dir/.*(sh|[0-9].*Util.*|cfg|holiday)"));
-    push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/.*.(css|svg)"));
-    push(@fl, "");
-    push(@fl, FW_fileList("$FW_dir/.*.gplot"));
+    #
+    # list files for editing
+    #
+    my %files;
 
     FW_pO $start;
     FW_pO "$msg<br><br>" if($msg);
-    FW_pO "<table class=\"block\" id=\"at\">";
-    my $row = 0;
-    foreach my $file (@fl) {
-      FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      if($file eq "") {
-        FW_pO "<td><br></td>";
-      } else {
-        FW_pH "cmd=style edit $file", $file, 1;
-      }
-      FW_pO "</tr>";
-      $row = ($row+1)%2;
-    }
-    FW_pO "</table>$end";
+
+    %files= ("global configuration" => $attr{global}{configfile} );
+    FW_pFileHash("configuration", %files);
+
+    %files= FW_fileHash("$MW_dir/.*(sh|Util.*|cfg|holiday)");
+    FW_pFileHash("modules and other files", %files);
+
+    %files= FW_fileHash("$FW_cssdir/.*.(css|svg)");
+    FW_pFileHash("styles", %files);
+
+    %files= FW_fileHash("$FW_gplotdir/.*.gplot");
+    FW_pFileHash("gplot files", %files);
+
+    FW_pO $end;
+
 
   } elsif($a[1] eq "select") {
 
-    my @fl = FW_fileList("$FW_dir/.*style.css");
+    my @fl = FW_fileList("$FW_cssdir/.*style.css");
 
     FW_pO "$start<table class=\"block\" id=\"at\">";
     my $row = 0;
@@ -1538,17 +1658,21 @@ FW_style($$)
 
   } elsif($a[1] eq "edit") {
 
-    $a[2] =~ s,/,,g;    # little bit of security
+    #
+    # edit a file
+    #
+    #$a[2] =~ s,/,,g;    # little bit of security
     #my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
     #                               "$FW_dir/$a[2]");
-    my $f;
-    if($a[2] eq "fhem.cfg") {
-      $f = $attr{global}{configfile};
-    } elsif ($a[2] =~ m/.*(sh|Util.*|cfg|holiday)/ && $a[2] ne "fhem.cfg") {
-      $f = "$MW_dir/$a[2]";
-    } else {
-      $f = "$FW_dir/$a[2]";
-    }
+#     my $f;
+#     if($a[2] eq "fhem.cfg") {
+#       $f = $attr{global}{configfile};
+#     } elsif ($a[2] =~ m/.*(sh|Util.*|cfg|holiday)/ && $a[2] ne "fhem.cfg") {
+#       $f = "$MW_dir/$a[2]";
+#     } else {
+#       $f = "$FW_dir/$a[2]";
+#     }
+    my $f= $a[2];
     if(!open(FH, $f)) {
       FW_pO "$f: $!";
       return;
@@ -1604,15 +1728,15 @@ FW_style($$)
     FW_pO "<div id=\"content\"><table class=\"iconFor\">";
     foreach my $i (sort grep {/^ico/} keys %FW_icons) {
       FW_pO "<tr><td>";
-      FW_pO "<a href=\"$FW_ME?cmd=attr $a[2] icon $FW_icons{$i}\">$i</a>";
+      FW_pO "<a href=\"$FW_ME?cmd=attr $a[2] icon $i\">$i</a>";
       FW_pO "</td><td>";
-      FW_pO "<img src=\"$FW_ME/icons/$FW_icons{$i}\">";
+      FW_pO "<img src=\"$FW_ME/icons/$i\">";
       FW_pO "</td></tr>";
     }
     FW_pO "</table></div>";
 
   } elsif($a[1] eq "eventMonitor") {
-    FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/console.js\"></script>";
+    FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/console.js\"></script>";
     FW_pO "<div id=\"content\">";
     FW_pO "<div id=\"console\">";
     FW_pO "Events:<br>\n";
@@ -1661,7 +1785,7 @@ FW_style($$)
     FW_pO "</table></div><br>";
 
     if($a[2]) {
-      if(!open(FH, "$FW_dir/commandref.html")) {
+      if(!open(FH, "$FW_commandref")) {
         FW_pO "<h3>comandref.html is missing</h3>";
       } else {
         my $inDef;
@@ -1673,7 +1797,7 @@ FW_style($$)
             last if($l =~ m/<h3>/);
           }
           chomp($l);
-          $l =~ s/href="#/href="$FW_reldoc#/g;
+          $l =~ s/href="#/href="$FW_commandref#/g;
           FW_pO $l;
         }
         close(FH);
@@ -1844,6 +1968,45 @@ FW_Attr(@)
   return undef;
 }
 
+
+sub
+FW_ReadIconsFrom($$) {
+  # recursively reads .gif .jpg .png files and returns filenames as array
+  # recursion starts at $FW_icondir/$dir
+  # filenames are relative to $FW_icondir
+
+  my ($prepend,$dir)= @_;
+
+  #Debug "read icons from \"$dir\", prepend \"$prepend\"";
+  
+  my (@entries, @filenames);
+  if(opendir(DH, "${FW_icondir}/${dir}")) {
+    @entries= sort readdir(DH); # assures order: .gif  .jpg  .png
+    closedir(DH);
+  }
+  #Debug "$#entries entries found.";
+  foreach my $entry (@entries) {
+    my $filename= "$dir/$entry";
+    my $iconname= "${prepend}${entry}";
+    #Debug " entry: \"$entry\", filename= \"$filename\", iconname= \"$iconname\"";
+    if( -d "${FW_icondir}/${filename}" ) {
+      # entry is a directory
+      FW_ReadIconsFrom("${iconname}/", $filename) unless($entry eq "." || $entry eq "..");
+    } elsif( -f "${FW_icondir}/${filename}") {
+      # entry is a regular file
+      if($entry =~ m/\.(png|gif|jpg)$/i) {
+        # extension is .gif  .jpg  .png
+        #my $basename= $entry;
+        #$basename =~ s/\.[^.]+$//; # cut extension
+        # priority due to sort: .png (highest) to .gif (lowest)
+        #$FW_icons{"${prepend}${basename}"}= $filenamerel;
+        # store icon with extension
+        $FW_icons{"${prepend}${entry}"}= $filename;
+      }
+    }
+  }
+}
+
 sub
 FW_ReadIcons()
 {
@@ -1851,49 +2014,51 @@ FW_ReadIcons()
   return if($FW_iconsread && ($now - $FW_iconsread) <= 5);
 
   %FW_icons = ();
-  my @files;
-  if(opendir(DH, $FW_dir)) {
-    @files = readdir(DH);
-    closedir(DH);
-  }
-  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
-  if($prf && opendir(DH, "$FW_dir/$prf")) {
-    push @files, readdir(DH);
-    closedir(DH);
-  }
-
-  foreach my $l (sort @files) {     # Order: .gif,.jpg,.png
-    next if($l !~ m/\.(png|gif|jpg)$/i);
-    my $x = $l;
-    $x =~ s/\.[^.]+$//;	# Cut .gif/.jpg
-    $FW_icons{$x} = $l;
-  }
+  # read icons from default directory
+  FW_ReadIconsFrom("", "default");
+  # read icons from stylesheet specific directory, icons found here supersede default icons with same name
+  my $prefix= AttrVal($FW_wname, "stylesheetPrefix", "");
+  FW_ReadIconsFrom("", "$prefix") unless($prefix eq "");
+  # read icons from explicit directory, icons found here supersede all other icons with same name
+  my $iconpath= AttrVal($FW_wname, "iconpath", "");
+  FW_ReadIconsFrom("", "$iconpath") unless($iconpath eq "");
+  # if now icons were found so far, read icons from icondir itself
+  FW_ReadIconsFrom("", "") unless(%FW_icons);
 
   $FW_iconsread = $now;
+
+  #foreach my $k (keys %FW_icons) {
+  #  Debug " icon: $k    =>   " . $FW_icons{$k};
+  #}
+  
 }
+
+sub
+FW_IconOrOld($$) {
+  my ($old,$new)= @_;
+  my $icon= "${new}.png";
+  return $FW_icons{$icon} ? $icon : $old;
+}
+
 
 sub
 FW_dev2image($)
 {
   my ($name) = @_;
-  my $d = $defs{$name};
-  return "" if(!$name || !$d);
+  my $icon = "";
+  return $icon if(!$name || !$defs{$name});
 
-  my ($type, $state) = ($d->{TYPE}, $d->{STATE});
-  return "" if(!$type || !$state);
+  my ($type, $state) = ($defs{$name}{TYPE}, $defs{$name}{STATE});
+  return $icon if(!$type || !defined($state));
 
-  my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
+  #Debug "Looking for an icon for $name $type $state";
+
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-
-  my $icon;
-  $icon = $FW_icons{"$name.$state"}   if(!$icon);   # lamp.Aus.png
-  $icon = $FW_icons{"$name.$rstate"}  if(!$icon);   # lamp.on.png
-  $icon = $FW_icons{$name}            if(!$icon);   # lamp.png
-  $icon = $FW_icons{"$type.$state"}   if(!$icon);   # FS20.Aus.png
-  $icon = $FW_icons{"$type.$rstate"}  if(!$icon);   # FS20.on.png
-  $icon = $FW_icons{$type}            if(!$icon);   # FS20.png
-  $icon = $FW_icons{$state}           if(!$icon);   # Aus.png
-  $icon = $FW_icons{$rstate}          if(!$icon);   # on.png
+  $icon= FW_IconOrOld($icon,$state);            # on
+  $icon= FW_IconOrOld($icon,$type);             # FS20
+  $icon= FW_IconOrOld($icon,"$type.$state");    # FS20.on
+  $icon= FW_IconOrOld($icon,$name);             # MyLamp
+  $icon= FW_IconOrOld($icon,"$name.$state");    # MyLamp.on
   return $icon;
 }
 
@@ -2060,6 +2225,7 @@ FW_devState($$)
   } else {
     my $icon;
     $icon = FW_dev2image($d);
+    #Debug "Dev2Image returned $icon for $d";
     $txt = "<img src=\"$FW_ME/icons/$icon\" alt=\"$txt\"/>"
                     if($icon);
   }
@@ -2104,34 +2270,7 @@ FW_devState($$)
 }
 
 #####################################
-# This has to be modularized in the future.
-sub
-WeatherAsHtml($)
-{
-  my ($d) = @_;
-  $d = "<none>" if(!$d);
-  return "$d is not a Weather instance<br>"
-        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
-  my $imgHome="http://www.google.com";
 
-  my $ret = "<table>";
-  $ret .= sprintf('<tr><td><img src="%s%s"></td><td>%s<br>temp %s, hum %s, %s</td></tr>',
-        $imgHome, ReadingsVal($d, "icon", ""),
-        ReadingsVal($d, "condition", ""),
-        ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
-        ReadingsVal($d, "wind_condition", ""));
-
-  for(my $i=1; $i<=4; $i++) {
-    $ret .= sprintf('<tr><td><img src="%s%s"></td><td>%s: %s<br>min %s max %s</td></tr>',
-        $imgHome, ReadingsVal($d, "fc${i}_icon", ""),
-        ReadingsVal($d, "fc${i}_day_of_week", ""),
-        ReadingsVal($d, "fc${i}_condition", ""),
-        ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
-  }
-
-  $ret .= "</table>";
-  return $ret;
-}
 
 
 1;

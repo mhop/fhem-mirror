@@ -15,7 +15,7 @@ use warnings;
 use Time::HiRes qw(gettimeofday);
 
 my $UseWeatherGoogle= 0; # if you want Weather:Google back please set this to 1 and uncomment below.
-#  use Weather::Google;
+##  use Weather::Google;
 
 # taken from Daniel "Possum" LeWarne's Google::Weather module
 # http://cpansearch.perl.org/src/POSSUM/Weather-Google-0.05/lib/Weather/Google.pm
@@ -293,6 +293,78 @@ sub Weather_Undef($$) {
 
   RemoveInternalTimer($hash);
   return undef;
+}
+
+#####################################
+
+
+sub
+WeatherIconIMGTag($$$) {
+
+  use constant GOOGLEURL => "http://www.google.de";
+  use constant SIZE => "50%";
+
+  my ($icon,$uselocal,$isday)= @_;
+
+  my $url;
+  my $style;
+  
+  if($uselocal) {
+    # strip off path and extension
+    $icon =~ s,^/ig/images/weather/(.*)\.gif$,$1,;
+
+    if($isday) {
+      $icon= "weather/${icon}.png"
+    } else {
+      $icon= "weather/${icon}_night.png"
+    }
+
+    $url= "fhem/icons/$icon";
+    $style= " height=".SIZE." width=".SIZE;
+  } else {
+    $url= GOOGLEURL . $icon;
+  }
+
+  return "<img src=\"$url\"$style>";
+
+}
+
+#####################################
+# This has to be modularized in the future.
+sub
+WeatherAsHtml($)
+{
+  my $uselocal= 0;
+
+  my ($d) = @_;
+  $d = "<none>" if(!$d);
+  return "$d is not a Weather instance<br>"
+        if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
+
+  my $isday;
+  if(exists &isday) {
+                $isday = isday();
+        } else {
+                $isday = 1; #($hour>6 && $hour<19);
+  }
+        
+  my $ret = "<table>";
+  $ret .= sprintf('<tr><td>%s</td><td>%s<br>temp %s, hum %s, %s</td></tr>',
+        WeatherIconIMGTag(ReadingsVal($d, "icon", ""),$uselocal,$isday),
+        ReadingsVal($d, "condition", ""),
+        ReadingsVal($d, "temp_c", ""), ReadingsVal($d, "humidity", ""),
+        ReadingsVal($d, "wind_condition", ""));
+
+  for(my $i=1; $i<=4; $i++) {
+    $ret .= sprintf('<tr><td>%s</td><td>%s: %s<br>min %s max %s</td></tr>',
+        WeatherIconIMGTag(ReadingsVal($d, "fc${i}_icon", ""),$uselocal,$isday),
+        ReadingsVal($d, "fc${i}_day_of_week", ""),
+        ReadingsVal($d, "fc${i}_condition", ""),
+        ReadingsVal($d, "fc${i}_low_c", ""), ReadingsVal($d, "fc${i}_high_c", ""));
+  }
+
+  $ret .= "</table>";
+  return $ret;
 }
 
 #####################################
