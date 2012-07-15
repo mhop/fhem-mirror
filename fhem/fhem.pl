@@ -1203,7 +1203,9 @@ CommandDefine($$)
     }
   }
 
-  $m = LoadModule($m);
+  my $newm = LoadModule($m);
+  return "Cannot load module $m" if($newm eq "UNDEFINED");
+  $m = $newm;
 
   if(!$modules{$m} || !$modules{$m}{DefFn}) {
     my @m = grep { $modules{$_}{DefFn} || !$modules{$_}{LOADED} }
@@ -2533,13 +2535,14 @@ EventMapAsList($)
   return split($sc, $em);
 }
 
+#######################
 # $dir: 0 = User to Fhem (i.e. set), 1 = Fhem to User (i.e trigger)
 sub
 ReplaceEventMap($$$)
 {
   my ($dev, $str, $dir) = @_;
   my $em = $attr{$dev}{eventMap};
-  return $str if(!$em);
+  return $str if(!$em || (!$dir && $str->[1] eq "?"));
   my $dname = shift @{$str} if(!$dir);
 
   my $nstr = join(" ", @{$str}) if(!$dir);
