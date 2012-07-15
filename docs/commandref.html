@@ -4226,13 +4226,17 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>ww_soll &lt;temp&gt;<br>
           sets the hot water temperature<br>
           1.0 celsius resolution - temperature between 30 and 60 celsius</li>
-      <li>ww_betriebsart [automatik|nacht|tag]</li>
+      <li>ww_betriebsart [automatik|nacht|tag]<br>
           sets the working mode for hot water<br>
           <ul>
             <li>automatik: hot water production according to the working modes of both heating circuits</li>
             <li>nacht: no hot water at all</li>
             <li>tag: manual permanent hot water</li>
           </ul></li>
+      <li>ww_on-for-timer [period]<br>
+          start hot water production for the given period<br>
+          period must have the format HH:MM<br>
+          ww_betriebsart is set according to the attribut ww_timermode. For switching-off hot water a single one-time at command is automatically generated which will set ww_betriebsart back to nacht</li>
       <li>hk1_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
           sets the timer program for heating circuit 1<br>
           <ul>
@@ -4293,6 +4297,11 @@ A line ending with \ will be concatenated with the next one, so long lines
         These events account for ca. 92% of all events.<br>
         All UNKNOWN events are ignored too, most of them were only seen
         directly after setting the device into logmode.
+        </li>
+    <a name="ww_timermode"></a>
+    <li>ww_timermode [automatik|tag]<br>
+        Defines the working mode for the ww_on-for-timer command (default is tag).<br>
+        ww_on-for-timer will set the ww_betriebsart of the heater according to this attribute. 
         </li>
 
   </ul>
