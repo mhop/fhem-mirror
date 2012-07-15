@@ -653,8 +653,7 @@ FW_doDetail($)
       FW_pO "<table>";
       foreach my $cmd (split(":", $webCmd)) {
         FW_pO "<tr>";
-        FW_pH "cmd.$d=set $d $cmd&detail=$d",
-                ReplaceEventMap($d,$cmd,1), 1, "col1";
+        FW_pH "cmd.$d=set $d $cmd&detail=$d", $cmd, 1, "col1";
         FW_pO "</tr>";
       }
       FW_pO "</table>";
@@ -903,7 +902,6 @@ FW_showRoom()
         FW_pO "</td>";
         if($cmdlist) {
           my @cList = split(":", $cmdlist);
-          my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
 
           # Special handling (slider, dropdown)
@@ -952,8 +950,7 @@ FW_showRoom()
           }
 
           for(my $idx=$firstIdx; $idx < @cList; $idx++) {
-            FW_pH "cmd.$d=set $d $cList[$idx]$rf",
-                ReplaceEventMap($d,$cList[$idx],1),1,"col3";
+            FW_pH "cmd.$d=set $d $cList[$idx]$rf", $cList[$idx], 1,"col3";
           }
 
 
@@ -1879,18 +1876,24 @@ sub
 FW_dev2image($)
 {
   my ($name) = @_;
-  my $icon = "";
-  return $icon if(!$name || !$defs{$name});
+  my $d = $defs{$name};
+  return "" if(!$name || !$d);
 
-  my ($type, $state) = ($defs{$name}{TYPE}, $defs{$name}{STATE});
-  return $icon if(!$type || !defined($state));
+  my ($type, $state) = ($d->{TYPE}, $d->{STATE});
+  return "" if(!$type || !$state);
 
+  my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-  $icon = $FW_icons{$state}         if(defined($FW_icons{$state}));# on.png
-  $icon = $FW_icons{$type}          if($FW_icons{$type});          # FS20.png
-  $icon = $FW_icons{"$type.$state"} if($FW_icons{"$type.$state"}); # FS20.on.png
-  $icon = $FW_icons{$name}          if($FW_icons{$name});          # lamp.png
-  $icon = $FW_icons{"$name.$state"} if($FW_icons{"$name.$state"}); # lamp.on.png
+
+  my $icon;
+  $icon = $FW_icons{"$name.$state"}   if(!$icon);   # lamp.Aus.png
+  $icon = $FW_icons{"$name.$rstate"}  if(!$icon);   # lamp.on.png
+  $icon = $FW_icons{$name}            if(!$icon);   # lamp.png
+  $icon = $FW_icons{"$type.$state"}   if(!$icon);   # FS20.Aus.png
+  $icon = $FW_icons{"$type.$rstate"}  if(!$icon);   # FS20.on.png
+  $icon = $FW_icons{$type}            if(!$icon);   # FS20.png
+  $icon = $FW_icons{$state}           if(!$icon);   # Aus.png
+  $icon = $FW_icons{$rstate}          if(!$icon);   # on.png
   return $icon;
 }
 
@@ -2068,10 +2071,11 @@ FW_devState($$)
     $cmdlist = $webCmd;
 
   } elsif($hasOnOff && !$cmdlist) {
-    my (undef, $nstate) = ReplaceEventMap($d, [$d, $state], 0);
-    $nstate = $state if(!defined($nstate));
-    $link = "cmd.$d=set $d " . ($nstate eq "on" ? "off" : "on");
-    $cmdlist = "on:off";
+    # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
+    my $on  = ReplaceEventMap($d, "on", 1);
+    my $off = ReplaceEventMap($d, "off", 1);
+    $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on);
+    $cmdlist = "$on:$off";
 
   }
 
