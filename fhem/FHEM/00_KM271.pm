@@ -19,15 +19,16 @@ sub KM271_setbits($$);
 sub KM271_SetReading($$$$$);
 
 my %km271_sets = (
-  "hk1_nachtsoll"   => "07006565%02x656565", # 0.5 celsius
-  "hk1_tagsoll"     => "0700656565%02x6565", # 0.5 celsius
-  "hk1_betriebsart" => "070065656565%02x65",
-  "hk2_nachtsoll"   => "08006565%02x656565", # 0.5 celsius
-  "hk2_tagsoll"     => "0800656565%02x6565", # 0.5 celsius
-  "hk2_betriebsart" => "080065656565%02x65",
+  "hk1_nachtsoll"   => "07006565%02x656565:0700%02x", # 0.5 celsius
+  "hk1_tagsoll"     => "0700656565%02x6565:0701%02x", # 0.5 celsius
+  "hk1_betriebsart" => "070065656565%02x65:0702%02x",
+  "hk2_nachtsoll"   => "08006565%02x656565:0800%02x", # 0.5 celsius
+  "hk2_tagsoll"     => "0800656565%02x6565:0801%02x", # 0.5 celsius
+  "hk2_betriebsart" => "080065656565%02x65:0802%02x",
 
-  "ww_soll"         => "0C07656565%02x6565", # 1.0 celsius
-  "ww_betriebsart"  => "0C0E%02x6565656565", 
+  "ww_soll"         => "0C07656565%02x6565:0c07%02x", # 1.0 celsius
+  "ww_betriebsart"  => "0C0E%02x6565656565:0c0e%02x",
+  "ww_on-for-timer" => "0C0E%02x6565656565:0c0e%02x",
 
   "hk1_programm"    => "1100%02x6565656565",
   "hk1_timer"       => "11%s",
@@ -45,8 +46,11 @@ my %km271_sets = (
 my %km271_tr = (
   "CFG_Sommer_ab"                   => "0000:1,p:-9,a:8",
   "CFG_HK1_Nachttemperatur"         => "0000:2,d:2",
+  "cFG_HK1_Nachttemperatur"         => "0700:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Tagtemperatur"           => "0000:3,d:2",
+  "cFG_HK1_Tagtemperatur"           => "0701:0,d:2",  # fake reading for internal notify
   "CFG_HK1_Betriebsart"             => "0000:4,a:4",
+  "cFG_HK1_Betriebsart"             => "0702:0,a:4",  # fake reading for internal notify
   "CFG_HK1_Max_Temperatur"          => "000e:2",
   "CFG_HK1_Auslegung"               => "000e:4",
   "CFG_HK1_Aufschalttemperatur"     => "0015:0,a:9",
@@ -56,8 +60,11 @@ my %km271_tr = (
   "CFG_HK1_Temperatur_Offset"       => "0031:3,s,d:2",
   "CFG_HK1_Fernbedienung"           => "0031:4,a:0",
   "CFG_HK2_Nachttemperatur"         => "0038:2,d:2",
+  "cFG_HK2_Nachttemperatur"         => "0800:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Tagtemperatur"           => "0038:3,d:2",
+  "cFG_HK2_Tagtemperatur"           => "0801:0,d:2",  # fake reading for internal notify
   "CFG_HK2_Betriebsart"             => "0038:4,a:4",
+  "cFG_HK2_Betriebsart"             => "0802:0,a:4",  # fake reading for internal notify
   "CFG_HK2_Max_Temperatur"          => "0046:2",
   "CFG_HK2_Auslegung"               => "0046:4",
   "CFG_HK2_Aufschalttemperatur"     => "004d:0,a:9",
@@ -68,7 +75,9 @@ my %km271_tr = (
   "CFG_HK2_Fernbedienung"           => "0069:4,a:0",
   "CFG_Gebaeudeart"                 => "0070:2,p:1",
   "CFG_WW_Temperatur"               => "007e:3",
+  "cFG_WW_Temperatur"               => "0c07:0",      # fake reading for internal notify
   "CFG_WW_Betriebsart"              => "0085:0,a:4",
+  "cFG_WW_Betriebsart"              => "0c0e:0,a:4",  # fake reading for internal notify
   "CFG_WW_Aufbereitung"             => "0085:3,a:0",
   "CFG_WW_Zirkulation"              => "0085:5,a:9",
   "CFG_Sprache"                     => "0093:0,a:3",
@@ -157,7 +166,7 @@ my %km271_tr = (
   "Kessel_Betrieb"                  => "8831:0,bf:4",
   "Brenner_Ansteuerung"             => "8832:0,a:10",
   "Abgastemperatur"                 => "8833:0",
-  "Mod_Brenner_Stellglied"          => "8834:0",
+  "Brenner_Mod_Stellglied"          => "8834:0",
   "Brenner_Laufzeit1_Minuten2"      => "8836:0",
   "Brenner_Laufzeit1_Minuten1"      => "8837:0",
   "Brenner_Laufzeit1_Minuten"       => "8838:0,mb:3",
@@ -170,7 +179,7 @@ my %km271_tr = (
   "Versionsnummer_NK"               => "893f:0",
   "Modulkennung"                    => "8940:0",
 
-  "Letzter_Fehlerstatus"            => "aa:0,em",
+  "ERR_Letzter_Fehlerstatus"        => "aa:0,em",
 );
 
 my %km271_rev;
@@ -290,7 +299,7 @@ KM271_Initialize($)
   $hash->{DefFn}   = "KM271_Define";
   $hash->{UndefFn} = "KM271_Undef";
   $hash->{SetFn}   = "KM271_Set";
-  $hash->{AttrList}= "do_not_notify:1,0 all_km271_events loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 all_km271_events loglevel:0,1,2,3,4,5,6 ww_timermode:automatik,tag";
   my @a = ();
   $hash->{SENDBUFFER} = \@a;
 
@@ -340,6 +349,7 @@ sub
 KM271_Set($@)
 {
   my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
 
   return "\"set KM271\" needs at least an argument" if(@a < 2);
 
@@ -371,7 +381,28 @@ KM271_Set($@)
     return "Unknown arg, use one of " .
       join(" ", sort keys %km271_set_programm) if(!defined($val));
   }
-  elsif($a[1] =~ m/_timer$/) {  # Timer calculation
+  elsif($a[1] =~ m/^ww.*for-timer$/) {	# WW on-for-timer command
+    my @time = split(":", $val);
+    return "Duration must have the format HH:MM" if(@time < 2);
+    $val = $time[0];
+    $numeric_val = ($val =~ m/^[.0-9]+$/);
+    return "Duration must have the format HH:MM" if(!$numeric_val || $val < 0 || $val > 23);
+    my $val2 = $time[1];
+    $numeric_val = ($val2 =~ m/^[.0-9]+$/);
+    return "Duration must have the format HH:MM" if(!$numeric_val || $val2 < 0 || $val2 > 59);
+    return "Duration must be greater than 00:00" if($val + $val2 == 0);
+
+    if($modules{KM271}{ldata}{$name}) {
+      CommandDelete(undef, $name . "_ww_autoOff");
+      delete $modules{KM271}{ldata}{$name};
+    }
+    my $to = sprintf("%02d:%02d", $val, $val2);
+    CommandDefine(undef, $name . "_ww_autoOff at +$to set $name ww_betriebsart nacht");
+    $modules{KM271}{ldata}{$name} = $to;
+    
+    $val = $km271_set_betriebsart{AttrVal($name, "ww_timermode", "tag")};
+  }
+  elsif($a[1] =~ m/^hk.*timer$/) {  # Timer calculation
     return "\"set KM271 $a[1]\" needs typically 5 parameters (position on-day on-time off-day off-time)" if(@a < 4);
     $val = $a[2];
     $numeric_val = ($val =~ m/^[.0-9]+$/);
@@ -458,10 +489,12 @@ KM271_Set($@)
     $val = sprintf("%02x%s:%s%s", $offset, $val, $key, $val);
   }
 
-  my $data = sprintf($fmt, $val);
+  my $data = sprintf($fmt, $val, $val);
   push @{$hash->{SENDBUFFER}}, $data;
-  DevIo_SimpleWrite($hash, "02", 1) if(!exists($hash->{WAITING}));
-
+  if(!exists($hash->{WAITING}) && !exists($hash->{DATASENT})) {
+    DevIo_DoSimpleRead($hash);
+    DevIo_SimpleWrite($hash, "02", 1);
+  }
   return undef;
 }
 
@@ -488,6 +521,8 @@ KM271_Read($)
       if($buf eq "10") {
         if($hash->{DATASENT}) {
           delete($hash->{DATASENT});
+          # Delete the command from the list
+          shift @{$hash->{SENDBUFFER}};
           if ($hash->{NOTIFY}) {
             $data = $hash->{NOTIFY};
             delete($hash->{NOTIFY});
@@ -496,9 +531,11 @@ KM271_Read($)
           DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}});
           return;
         }
+        # Delete the command only after receiving ACK
+        $data = shift @{$hash->{SENDBUFFER}};
+        unshift @{$hash->{SENDBUFFER}}, $data;
         # Dirty trick: separate notify message after the colon
-        # Preserve the correct send order (shift)
-        my @dataList = split(":", shift @{ $hash->{SENDBUFFER} });
+        my @dataList = split(":", $data);
         $data = $dataList[0];
         $data = KM271_encode($data);
         $data .= "1003";
@@ -530,7 +567,7 @@ KM271_Read($)
           }
           return;
         }
-        DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}});
+        DevIo_SimpleWrite($hash, "02", 1);
       }
       
     }
@@ -613,6 +650,7 @@ KM271_Read($)
                             $km271_timer{$fn}{2} = substr($arg, 8, 4); }
         elsif($f eq "eh") { $val = KM271_seterror($arg); }
       }
+      $key = ucfirst($key);   # Hack to match the original and the fake reading
       KM271_SetReading($hash, $tn, $key, $val, $ntfy);
     }
 
@@ -646,6 +684,7 @@ KM271_DoInit($)
 {
   my ($hash) = @_;
   push @{$hash->{SENDBUFFER}}, $km271_sets{"logmode"};
+  DevIo_DoSimpleRead($hash);
   DevIo_SimpleWrite($hash, "02", 1);      # STX
   return undef;
 }
@@ -760,6 +799,5 @@ KM271_SetReading($$$$$)
   setReadingsVal($hash, $key, $val, $tn);
   DoTrigger($name, "$key: $val") if($ntfy);
 }
-
 
 1;
