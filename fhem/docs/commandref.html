@@ -3321,14 +3321,19 @@ A line ending with \ will be concatenated with the next one, so long lines
 
       <li>remotes, pushButton
        <ul>
-        * devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual]<br>
-         Pair a sender device directly with a actuator. After pairing 
-		 commands sent by the remote are processed directly by the actuator. 
+        * devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual] [set|remove]<br>
+         Pair/unpair a sender-channel device directly with a actuator-channel. 
+		 Trigger from the sender-channel, e.g. button press, will be processed by the 
+		 actuator-channel without CCU interaction.
 
-
-		 Remote must be set into learning mode first. <br>
-		 &lt;hmDevice&gt; is the actuator's channel to be paired.<br>
-		 &lt;btn_no&gt; is the button on the remote to be paired. If 'single' 
+		 Sender (remote or pushButton) must be set into learning after command execution.
+		 Processing in the sender will be postponed until then.<br>
+		 devicepair can be executed multiple times with the same settings - it will 
+		 cause the pairing specific parameter to be set to HM defaults. <br>
+		 It is possible to devicepair one actuator-channel to multiple sender-channel 
+		 as well as one sender-channel to multiple Actuator-channel. <br>
+		 &lt;hmDevice&gt; is the actuator-channel to be paired.<br>
+		 &lt;btn_no&gt; is the sender-channel (button) to be paired. If 'single' 
 		 is choosen buttons are counted from 1. For 'dual' btn_no is the number
 		 of the Button-pair to be used. I.e. '3' 
 		 in dual is the 3rd button pair correcponding to button 5 and 6 in 
@@ -3341,7 +3346,9 @@ A line ending with \ will be concatenated with the next one, so long lines
 		 'single' uses only one button of the sender. It is useful for e.g. for
 		 simple switch actuator to toggle on/off. Nevertheless 
 		 also dimmer can be learned to only one button. <br>
-		 example: set myRemote devicepair 2 mySwitchActuator single
+		 'set'   will setup pairing for the channels<br>
+		 'unset' will remove the pairing for the channels<br>
+		 example: set myRemote devicepair 2 mySwitchActuator single set
 
        </ul>
      <br>

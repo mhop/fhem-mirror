@@ -1,4 +1,6 @@
 - SVN
+  - feature: Status and length on cmdStack in webinterface for 10_CUL_HM
+  - feature: devicepair in 10_CUL_HM.pm supports unset
   - feature: devicepair for single Button in 10_CUL_HM.pm (by MartinP)
   - feature: new Modules 75_MSG.pm, 76_MSGFile.pm and 76_MSGMail.pm (by Rüdiger)
   - feature: new Module 59_Twilight.pm to calculate current daylight
