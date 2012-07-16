@@ -1692,7 +1692,7 @@ FW_style($$)
     FW_pO     FW_submit("saveAs", "Save as");
     FW_pO     FW_textfield("saveName", 30, "saveName");
     FW_pO     "<br><br>";
-    FW_pO     FW_hidden("cmd", "style save $a[2]");
+    FW_pO     FW_hidden("cmd", "style save $f");
     FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     FW_pO   "</form>";
