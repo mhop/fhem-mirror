@@ -307,6 +307,8 @@ FW_SetDirs() {
   # icon dir
   if(-d "$FW_dir/images") {
     $FW_icondir = "$FW_dir/images";
+  } elsif( -d "$FW_dir/pgm2") {
+    $FW_icondir = "$FW_dir/pgm2";
   } else {
     $FW_icondir = $FW_dir;
   }
@@ -315,8 +317,7 @@ FW_SetDirs() {
     $FW_docdir = "$FW_dir/docs";
   } elsif(-d "$attr{global}{modpath}/docs") {
     $FW_docdir = "$attr{global}{modpath}/docs";
-  }
-  else {
+  } else {
     $FW_docdir = $FW_dir;
   }
   # css dir
@@ -328,6 +329,8 @@ FW_SetDirs() {
   # gplot dir
   if(-d "$FW_dir/gplot") {
     $FW_gplotdir = "$FW_dir/gplot";
+  } elsif(-d "$FW_dir/pgm2") {
+    $FW_gplotdir = "$FW_dir/pgm2";
   } else {
     $FW_gplotdir = $FW_dir;
   }
