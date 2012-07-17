@@ -2379,7 +2379,8 @@ Dispatch($$$)
           my ($order, $mname) = split(":", $m);
 
           if($attr{global}{autoload_undefined_devices}) {
-            $mname = LoadModule($mname);
+            my $newm = LoadModule($mname);
+            $mname = $newm if($newm ne "UNDEFINED");
             if($modules{$mname} && $modules{$mname}{ParseFn}) {
               no strict "refs";
               @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
