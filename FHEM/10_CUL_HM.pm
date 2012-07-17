@@ -1675,9 +1675,10 @@ CUL_HM_id2Name($)
   }
   my $name;
   $name = "broadcast" if($devId eq "000000"); 
-  $name = $modules{CUL_HM}{defptr}{$chnId}->{NAME} if(!$name && $chnId); 
+  my $defPtr = $modules{CUL_HM}{defptr};
+  $name = $defPtr->{$chnId}{NAME} if(!$name && $chnId && $defPtr->{$chnId}); 
   if (!$name){
-    $name = $modules{CUL_HM}{defptr}{$devId}->{NAME};
+    $name = $defPtr->{$devId}{NAME} if($defPtr->{$devId});
     $name = $devId if(!$name);
     $name .= ($chn ? (" chn:".$chn):"");
   }
