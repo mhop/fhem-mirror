@@ -29,6 +29,7 @@ sub FW_showWeblink($$$$);
 sub FW_style($$);
 sub FW_submit($$@);
 sub FW_substcfg($$$$$$);
+sub FW_textfieldv($$$$);
 sub FW_textfield($$$);
 sub FW_updateHashes();
 sub FW_zoomLink($$$);
@@ -902,8 +903,8 @@ FW_roomOverview($)
       } else {
         pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
         my $icon = "";
-        $icon = "<img src=\"$FW_ME/icons/ico$l1\">&nbsp;"
-                if($FW_icons{"ico$l1"});
+        $icon = "<img src=\"$FW_ME/icons/ico${l1}.png\">&nbsp;"
+                if($FW_icons{"ico${l1}.png"});
 
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "<td><a href=\"$l2\">$icon$l1</a></td>";
@@ -1416,12 +1417,20 @@ FW_select($$$$@)
 
 ##################
 sub
+FW_textfieldv($$$$)
+{
+  my ($n, $z, $class, $value) = @_;
+  my $v;
+  $v=" value=\"$value\"" if($value);
+  return if($FW_hiddenroom{input});
+  my $s = "<input type=\"text\" name=\"$n\" class=\"$class\" size=\"$z\"$v/>";
+  return $s;
+}
+
+sub
 FW_textfield($$$)
 {
-  my ($n, $z, $class) = @_;
-  return if($FW_hiddenroom{input});
-  my $s = "<input type=\"text\" name=\"$n\" class=\"$class\" size=\"$z\"/>";
-  return $s;
+  return FW_textfieldv($_[0], $_[1], $_[2], "");
 }
 
 ##################
@@ -1675,9 +1684,9 @@ FW_style($$)
 #     } else {
 #       $f = "$FW_dir/$a[2]";
 #     }
-    my $f= $a[2];
-    if(!open(FH, $f)) {
-      FW_pO "$f: $!";
+    my $fullname= $a[2];
+    if(!open(FH, $fullname)) {
+      FW_pO "$fullname: $!";
       return;
     }
     my $data = join("", <FH>);
@@ -1686,13 +1695,14 @@ FW_style($$)
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form>";
-    $f =~ s,^.*/,,;
-    FW_pO     FW_submit("save", "Save $f");
+    my $basename= $fullname;
+    $basename =~ s,^.*/,,;
+    FW_pO     FW_submit("save", "Save $basename");
     FW_pO     "&nbsp;&nbsp;";
     FW_pO     FW_submit("saveAs", "Save as");
-    FW_pO     FW_textfield("saveName", 30, "saveName");
+    FW_pO     FW_textfieldv("saveName", 30, "saveName", $fullname);
     FW_pO     "<br><br>";
-    FW_pO     FW_hidden("cmd", "style save $f");
+    FW_pO     FW_hidden("cmd", "style save $fullname");
     FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     FW_pO   "</form>";
@@ -1700,18 +1710,24 @@ FW_style($$)
 
   } elsif($a[1] eq "save") {
     my $fName = $a[2];
+    # I removed all that special treatment since $fName now contains the full original filename
+    # this means that one can in principle overwrite any file in the file system if fhem
+    # runs with too many rights, e.g. if run as root!
+
     $fName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
-    $fName =~ s,/,,g;    # little bit of security
+
+    #$fName =~ s,/,,g;    # little bit of security
     #$fName = ($fName eq "fhem.cfg" ? $attr{global}{configfile} :
     #                               "$FW_dir/$fName");
-    if($fName eq "fhem.cfg") {
-      $fName = $attr{global}{configfile};
-    } elsif ($fName =~ m/.*(sh|Util.*|cfg|holiday)/ && $fName ne "fhem.cfg") {
-      $fName = "$MW_dir/$fName";
-    } else {
-      $fName = "$FW_dir/$fName";
-    }
+    #if($fName eq "fhem.cfg") {
+    #  $fName = $attr{global}{configfile};
+    #} elsif ($fName =~ m/.*(sh|Util.*|cfg|holiday)/ && $fName ne "fhem.cfg") {
+    #  $fName = "$MW_dir/$fName";
+    #} else {
+    #  $fName = "$FW_dir/$fName";
+    #}
+
     if(!open(FH, ">$fName")) {
       FW_pO "$fName: $!";
       return;
