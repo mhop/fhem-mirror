@@ -104,7 +104,7 @@ energy_Update($)
  my $timeout = $hash->{Timeout};
  my $counts = 0 ;
  my $summary = 0 ;
- my $url =  "/InstantView/request/getPowerProfile.html?n=$interval\&param=Wirkleistung\&format=1";
+ my $url =  "/InstantView/request/getPowerProfile.html?ts=0\&n=$interval\&param=Wirkleistung\&format=1";
  my $socket ;
  my $buf ;
  my $message ;
