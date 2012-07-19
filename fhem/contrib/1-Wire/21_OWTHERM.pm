@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.12 - July, 2012
+# Version 2.13 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -25,7 +25,7 @@
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
 #              DS1820 temperature sensor 
-#              Currently allowed values are DS1820, DS1822
+#              Currently allowed values are DS1820, DS18B20, DS1822
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
