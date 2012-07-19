@@ -8615,9 +8615,14 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     </code>
   <br>
   <br>
-  Connect to the <i>remote</i> fhem on host. portnr is the global port
-  attribute of the remote fhem, or 7072 if not defined. The optional :SSL
-  suffix is needed, if the remote fhem configured SSL for this port.<br>
+  Connect to the <i>remote</i> fhem on &lt;host&gt;. &lt;portnr&gt; is a telnet
+  port on the remote fhem, defaults to 7072. The optional :SSL suffix is
+  needed, if the remote fhem configured SSL for this telnet port. In this case
+  the IO::Socket::SSL perl module must be installed for the local host too.<br>
+
+  Note: if the remote fhem is on a separate host, the telnet port on the remote
+  fhem musst be specified with the global option.<br>
+
   The next parameter specifies the connection
   type:
   <ul>
