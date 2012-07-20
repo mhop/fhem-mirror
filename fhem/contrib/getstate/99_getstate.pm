@@ -73,6 +73,7 @@ CommandGetState($)
         $val =~ s/\s+$//g;
         $val = stringToNumber($val);
         $val = stripNumber($val);
+        $val =~ s/\s+$//g;
         $v = $val if (isNumber($val) && !$v);
         $v = $val if (isInteger($val) && !$v);
         $v = $val if (isFloat($val) && !$v);
