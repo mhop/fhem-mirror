@@ -21,6 +21,7 @@ sub FW_makeEdit($$$);
 sub FW_makeTable($$@);
 sub FW_ReadIconsFrom($$);
 sub FW_ReadIcons();
+sub FW_IconURL($);
 sub FW_roomOverview($);
 sub FW_select($$$$@);
 sub FW_showLog($);
@@ -2060,11 +2061,25 @@ FW_ReadIcons()
   #}
 }
 
+# returns the physical path relative to $FW_icondir for the logical path 
+# examples:
+#       FS20.on         ->      dark/FS20.on.png
+#       weather/sunny   ->      default/weather/sunny.gif
 sub
 FW_getIcon($) {
   my ($name)= @_;
   my $icon= "$name.png";        # FIXME
   return $FW_icons{$icon} ? $icon : undef;
+}
+
+# returns the URL for the logical path 
+# examples:
+#       FS20.on         ->      /icons/FS20.on
+#       weather/sunny   ->      /icons/sunny
+sub FW_IconURL($) {
+  my ($name)= @_;
+  $name =~ s/\.(png)$//;                           # FIXME
+  return "$FW_ME/icons/${name}.png";        # FIXME
 }
 
 
@@ -2257,8 +2272,7 @@ FW_devState($$)
     my $icon;
     $icon = FW_dev2image($d);
     #Debug "Dev2Image returned $icon for $d";
-    $txt = "<img src=\"$FW_ME/icons/$icon\" alt=\"$txt\"/>"
-                    if($icon);
+    $txt = "<img src=\"" . FW_IconURL($icon) . "\" alt=\"$txt\"/>" if($icon);
   }
 
   $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
