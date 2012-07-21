@@ -407,6 +407,7 @@ FW_AnswerCall($)
       $icon = FW_dev2image($icon);
       #Debug "We do not have it and thus use $icon which is " . $FW_icons{$icon};
       $cachable = 0;
+      return 0 if(!$icon);
     }
     $FW_icons{$icon} =~ m/(.*)\.(gif|jpg|png)/;
     my ($file,$ext)= ($1,$2);
