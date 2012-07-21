@@ -316,6 +316,8 @@ FW_SetDirs() {
   # doc dir
   if(-d "$FW_dir/docs") {
     $FW_docdir = "$FW_dir/docs";
+  } elsif(-f "$FW_dir/pgm2/commandref.html") {
+    $FW_docdir = "$FW_dir/pgm2";
   } elsif(-d "$attr{global}{modpath}/docs") {
     $FW_docdir = "$attr{global}{modpath}/docs";
   } else {
