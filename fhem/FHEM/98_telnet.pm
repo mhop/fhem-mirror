@@ -56,7 +56,15 @@ telnet_Define($$$)
   return "Usage: define <name> telnet [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
-  return TcpServer_Open($hash, $port, $global);
+  my $ret = TcpServer_Open($hash, $port, $global);
+
+  # Make sure that fhem only runs once
+  if($ret && !$init_done) {
+    Log 1, "$ret. Exiting.";
+    exit(1);
+  }
+  return $ret;
+
 }
 
 sub
@@ -94,7 +102,7 @@ telnet_Read($)
   }
   if(ord($buf) == 4) {	# EOT / ^D
     CommandQuit($hash, "");
-    next;
+    return;
   }
 
   $buf =~ s/\r//g;
