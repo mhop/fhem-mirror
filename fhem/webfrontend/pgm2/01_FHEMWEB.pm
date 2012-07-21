@@ -2060,10 +2060,10 @@ FW_ReadIcons()
 }
 
 sub
-FW_IconOrOld($$) {
-  my ($old,$new)= @_;
-  my $icon= "${new}.png";
-  return $FW_icons{$icon} ? $icon : $old;
+FW_getIcon($) {
+  my ($name)= @_;
+  my $icon= "$name.png";        # FIXME
+  return $FW_icons{$icon} ? $icon : undef;
 }
 
 
@@ -2071,20 +2071,24 @@ sub
 FW_dev2image($)
 {
   my ($name) = @_;
-  my $icon = "";
-  return $icon if(!$name || !$defs{$name});
+  my $d = $defs{$name};
+  return "" if(!$name || !$d);
 
-  my ($type, $state) = ($defs{$name}{TYPE}, $defs{$name}{STATE});
-  return $icon if(!$type || !defined($state));
+  my ($type, $state) = ($d->{TYPE}, $d->{STATE});
+  return "" if(!$type || !$state);
 
-  #Debug "Looking for an icon for $name $type $state";
-
+  my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
-  $icon= FW_IconOrOld($icon,$state);            # on
-  $icon= FW_IconOrOld($icon,$type);             # FS20
-  $icon= FW_IconOrOld($icon,"$type.$state");    # FS20.on
-  $icon= FW_IconOrOld($icon,$name);             # MyLamp
-  $icon= FW_IconOrOld($icon,"$name.$state");    # MyLamp.on
+
+  my $icon;
+  $icon = FW_getIcon("$name.$state")   if(!$icon);   # lamp.Aus.png
+  $icon = FW_getIcon("$name.$rstate")  if(!$icon);   # lamp.on.png
+  $icon = FW_getIcon($name)            if(!$icon);   # lamp.png
+  $icon = FW_getIcon("$type.$state")   if(!$icon);   # FS20.Aus.png
+  $icon = FW_getIcon("$type.$rstate")  if(!$icon);   # FS20.on.png
+  $icon = FW_getIcon($type)            if(!$icon);   # FS20.png
+  $icon = FW_getIcon($state)           if(!$icon);   # Aus.png
+  $icon = FW_getIcon($rstate)          if(!$icon);   # on.png
   return $icon;
 }
 
