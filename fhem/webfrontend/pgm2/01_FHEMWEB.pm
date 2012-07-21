@@ -145,7 +145,14 @@ FW_Define($$)
   return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
-  return TcpServer_Open($hash, $port, $global);
+  my $ret = TcpServer_Open($hash, $port, $global);
+
+  # Make sure that fhem only runs once
+  if($ret && !$init_done) {
+    Log 1, "$ret. Exiting.";
+    exit(1);
+  }
+  return $ret;
 }
 
 #####################################
@@ -753,8 +760,7 @@ FW_doDetail($)
   FW_makeTable($d, $defs{$d}{READINGS});
 
   my $attrList = getAllAttr($d);
-  my $roomList = join(",", sort keys %FW_rooms);
-  $roomList=~s/ /\&nbsp;/g;
+  my $roomList = join(",", sort grep !/ /, keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
 
   FW_makeSelect($d, "attr", $attrList,"attr");
@@ -2051,7 +2057,6 @@ FW_ReadIcons()
   #foreach my $k (keys %FW_icons) {
   #  Debug " icon: $k    =>   " . $FW_icons{$k};
   #}
-  
 }
 
 sub
