@@ -307,7 +307,7 @@ WeatherIconIMGTag($$$) {
   my ($icon,$uselocal,$isday)= @_;
 
   my $url;
-  my $style;
+  my $style= "";
   
   if($uselocal) {
     # strip off path and extension
