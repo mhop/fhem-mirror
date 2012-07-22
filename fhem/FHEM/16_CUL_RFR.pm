@@ -93,6 +93,16 @@ CUL_RFR_Parse($$)
   my @m = split(";", $smsg, -1);  # process only messages terminated with ;
   for(my $i = 0; $i < $#m; $i++) {
     my $m = $m[$i];
+
+    # Compressed FHT messages
+    while($m =~ m/^T(....)(..)(..)(..)(..)(..)(.*)(..)$/) {
+      my ($fhtid, $cmd, $source, $val, $cmd2, $val2, $rest, $rssi) =
+         ($1, $2, $3, $4, $5, $6, $7, $8);
+      my $firstmsg = "T$fhtid$cmd$source$val$rssi";
+      $m = "T$fhtid$cmd2$source$val2$rest$rssi";
+      CUL_Parse($hash, $iohash, $hash->{NAME}, $firstmsg, "X21");
+    }
+
     CUL_Parse($hash, $iohash, $hash->{NAME}, $m, "X21");
        if($m =~ m/^T/) { $hash->{NR_TMSG}++ }
     elsif($m =~ m/^F/) { $hash->{NR_FMSG}++ }
