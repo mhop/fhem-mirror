@@ -227,6 +227,29 @@ RSS_itemTime {
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
   RSS_itemText($S,$x,$y,sprintf("%02d:%02d", $hour, $min),%params);
 }
+sub
+RSS_itemSeconds {
+   my ($S,$x,$y,$format,%params)= @_;
+   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+  if ($format eq "colon")
+  {
+    RSS_itemText($S,$x,$y,sprintf(":%02d", $sec),%params);
+  }
+  else
+  {
+     RSS_itemText($S,$x,$y,sprintf("%02d", $sec),%params);
+  }
+}
+sub
+RSS_itemDate {
+  my ($S,$x,$y,%params)= @_;
+  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+ RSS_itemText($S,$x,$y,sprintf("%02d.%02d.%04d", $mday, $mon+1, $year+1900),%params);
+
+}
+
+
+
 
 sub
 RSS_itemGif {
@@ -255,7 +278,7 @@ RSS_evalLayout($$@) {
   $params{pt}= 12;
   $params{rgb}= "ffffff";
 
-  my ($x,$y,$text,$host,$filename);
+  my ($x,$y,$text,$host,$filename,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -286,7 +309,13 @@ RSS_evalLayout($$@) {
           } elsif($cmd eq "time") {
             ($x,$y)= split("[ \t]+", $def, 2);
             RSS_itemTime($S,$x,$y,%params);
-          } elsif($cmd eq "gif") {
+          } elsif($cmd eq "seconds") {
+            ($x,$y,$format) = split("[ \+]", $def,3);
+            RSS_itemSeconds($S,$x,$y,$format,%params);
+          } elsif($cmd eq "date") {
+            ($x,$y)= split("[ \t]+", $def, 2);
+            RSS_itemDate($S,$x,$y,%params);
+          }  elsif($cmd eq "gif") {
             ($x,$y,$host,$filename)= split("[ \t]+", $def,4);
             my $fn= AnalyzePerlCommand(undef, $filename);
             RSS_itemGif($S,$x,$y,$host,$fn,%params);
@@ -420,5 +449,6 @@ RSS_CGI(){
 #
 
 1;
+
 
 
