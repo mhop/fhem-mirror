@@ -185,7 +185,7 @@ EnOcean_Set($@)
 
     }
 
-    select(undef, undef, undef, 0.1);
+    select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
   }
 
   my $cmd = join(" ", @a);
