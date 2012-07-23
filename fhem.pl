@@ -844,9 +844,9 @@ OpenLogfile($)
 
   } else {
 
-    $defs{global}{logfile} = $attr{global}{logfile};
+    HandleArchiving($defs{global}) if($defs{global}{currentlogfile});
     $defs{global}{currentlogfile} = $param;
-    HandleArchiving($defs{global});
+    $defs{global}{logfile} = $attr{global}{logfile};
 
     open(LOG, ">>$currlogfile") || return("Can't open $currlogfile: $!");
     redirectStdinStdErr() if($init_done);
