@@ -20,15 +20,17 @@
 #
 # get <name> <key>
 #
-# where <key> is one of currentPower, intervalPower
+# where <key> is one of minPower, maxPower, lastPower, avgPower
 ##############################################################################
 
 
 package main;
 use IO::Socket::INET;
 
-my @gets = ('currentPower',             # value now
-      'intervalPower');        		# value in the interval
+my @gets = ('minPower',  # min value
+      'maxPower',        # max value
+      'lastPower',       # last value
+      'avgPower');       # avagare value in interval
 
 sub
 SML_Initialize($)
@@ -66,6 +68,10 @@ energy_Define($$)
  $hash->{UseSVTime}  = '';    # use the SV time as timestamp (else: TimeNow())
 
  $hash->{STATE} = 'Initializing';
+# $hash->{DAYPOWER} = '0';
+# $hash->{WEEKPOWER} = '0';
+# $hash->{MONTHPOWER} = '0';
+# $hash->{YEARPOWER} = '0';
 
  my $timenow = TimeNow();
 
@@ -108,8 +114,11 @@ energy_Update($)
  my $socket ;
  my $buf ;
  my $message ;
- my $tmp;
  my @array;
+ my $last;
+ my $avg;
+ my $min = 20000;
+ my $max = 0;
 
 Log 4, "$url";
 
@@ -140,9 +149,11 @@ if (defined ($socket) and $socket and $socket->connected())
  	    if ( $_ =~ /<v>(.*)<\/v>/ )
   	    {
   		Log 5, "$hash->{NAME} got fresh values from $ip ($1)";
-      		$tmp = $1;
+      		$last = $1;
       		$counts++ ;
       		$summary += $1;
+		if ($last < $min) {$min = $last};
+                if ($last > $max) {$max = $last};
             }
  	    if ( $_ =~ /<error>(.*)<\/error>/ )
   	    {
@@ -160,19 +171,22 @@ if (defined ($socket) and $socket and $socket->connected())
 }
 
 Log 5, "reading done.";
-if ( $success == 0 and $summary >= 0)
+if ( $success == 0 and $summary > 0 and $counts > 0)
 {
-	$hash->{READINGS}{$gets[0]}{VAL}  = $tmp;
+	$avg = $summary/$counts;
+  	$avg =sprintf("%.2f",$avg);
+	$hash->{READINGS}{$gets[0]}{VAL}  = $min;
 	$hash->{READINGS}{$gets[0]}{TIME}  = $timenow;
-	push @{$hash->{CHANGED}}, "currentPower: $tmp W";
-	$tmp = $summary/$counts;
-  	$tmp =sprintf("%.2f",$tmp);
-  	$hash->{READINGS}{$gets[1]}{VAL}  = $tmp;
-  	$hash->{READINGS}{$gets[1]}{TIME}  = $timenow;
-  	push @{$hash->{CHANGED}}, "intervalPower: $tmp W";
-
+	$hash->{READINGS}{$gets[1]}{VAL}  = $max;
+	$hash->{READINGS}{$gets[1]}{TIME}  = $timenow;
+	$hash->{READINGS}{$gets[2]}{VAL}  = $last;
+	$hash->{READINGS}{$gets[2]}{TIME}  = $timenow;
+  	$hash->{READINGS}{$gets[3]}{VAL}  = $avg;
+  	$hash->{READINGS}{$gets[3]}{TIME}  = $timenow;
+	push @{$hash->{CHANGED}}, "min: $min max: $max last: $last avg: $avg";
   	DoTrigger($hash->{NAME}, undef) if ($init_done);
-  	$hash->{STATE} = $hash->{READINGS}{currentPower}{VAL}.' W, '.$hash->{READINGS}{intervalPower}{VAL}.' W';
+  	$hash->{STATE} = $hash->{READINGS}{minPower}{VAL}.' W, '.$hash->{READINGS}{maxPower}{VAL}.' W ' .$hash->{READINGS}{lastPower}{VAL}.' W '.$hash->{READINGS}{avgPower}{VAL}.' W';
+
 }else{
   	Log 3, "$hash->{NAME} can't update - device send a error";
 }
