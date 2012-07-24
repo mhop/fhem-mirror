@@ -98,6 +98,7 @@ FHEMWEB_Initialize($)
   my ($hash) = @_;
 
   $hash->{ReadFn}  = "FW_Read";
+  $hash->{GetFn}   = "FW_Get";
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
@@ -2061,15 +2062,26 @@ FW_ReadIcons()
   #}
 }
 
-# returns the physical path relative to $FW_icondir for the logical path 
-# examples:
-#       FS20.on         ->      dark/FS20.on.png
-#       weather/sunny   ->      default/weather/sunny.gif
 sub
 FW_getIcon($) {
   my ($name)= @_;
   my $icon= "$name.png";        # FIXME
   return $FW_icons{$icon} ? $icon : undef;
+}
+
+# returns the physical absolute path relative for the logical path
+# examples:
+#       FS20.on         ->      $FW_icondir/dark/FS20.on.png
+#       weather/sunny   ->      $FW_icondir/default/weather/sunny.gif
+sub
+FW_IconPath($) {
+
+  my ($name)= @_;
+  $name =~ s/\.(png)$//;           # FIXME
+  $name= "${name}.png";           # FIXME
+  FW_ReadIcons() unless($FW_iconsread);
+  my $path= $FW_icons{$name};
+  return $path ? $FW_icondir. $path : undef;
 }
 
 # returns the URL for the logical path 
@@ -2315,7 +2327,23 @@ FW_devState($$)
 }
 
 #####################################
+sub FW_Get($@) {
 
+  my ($hash, @a) = @_;
+
+  return "syntax error" if(int(@a) != 3);
+
+  return "Unknown argument $a[1], choose one of " . "icon"
+        unless($a[1] eq "icon");
+
+  my $icon= FW_IconPath($a[2]);
+  return defined($icon) ? $icon : "no such icon";
+
+}  
+
+
+
+#####################################
 
 
 1;
