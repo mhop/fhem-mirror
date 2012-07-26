@@ -1,6 +1,8 @@
 ##############################################
 # $Id: 00_ZWDongle.pm 1721 2012-07-11 14:48:24Z rudolfkoenig $
 # Handling a ZWave (USB) Dongle
+# TODO: 
+# - get list of command classes for a device.
 package main;
 
 use strict;
@@ -19,23 +21,28 @@ sub ZWDongle_Write($$$);
 # http://open-zwave.googlecode.com/svn-history/r426/trunk/cpp/src/Driver.cpp
 # http://buzzdavidson.com/?p=68
 my %sets = (
-  "learnMode" => "50%02x",     # ZW_SET_LEARN_MODE
-  "sendData"  => "13%02x%s",   # ZW_SEND_DATA
-  # 032001000500/032001FF0500 (off/on) 
+  "addNode"   => { cmd   => "4a%02x@",     # ZW_ADD_NODE_TO_NETWORK',
+                   param => {on=>0x81, off=>0x05 } },
+  "removeNode"=> { cmd   => "4b%02x@",     # ZW_REMOVE_NODE_FROM_NETWORK',
+                   param => {on=>0x81, off=>0x05 } },
+  "createNode"=> { cmd   => "60%02x"  },  # ZW_REQUEST_NODE_INFO',
 );
 
 my %gets = (
   "caps"      => "07",     # SERIAL_API_GET_CAPABILITIES
   "ctrlCaps"  => "05",     # ZW_GET_CONTROLLER_CAPS
-  "devInfo"   => "41%02x", # ZW_GET_NODE_PROTOCOL_INFO
-  "devList"   => "02",     # SERIAL_API_GET_INIT_DATA
+  "nodeInfo"  => "41%02x", # ZW_GET_NODE_PROTOCOL_INFO
+  "nodeList"  => "02",     # SERIAL_API_GET_INIT_DATA
   "homeId"    => "20",     # MEMORY_GET_ID
   "version"   => "15",     # ZW_GET_VERSION
+  "raw"       => "%s",
 );
 
 # Known controller function. 
 # Note: Known != implemented, see %sets & %gets for the implemented ones.
-my %func_id= (
+use vars qw(%zw_func_id);
+use vars qw(%zw_type6);
+%zw_func_id= (
   '02'  => 'SERIAL_API_GET_INIT_DATA',
   '03'  => 'SERIAL_API_APPL_NODE_INFORMATION',
   '04'  => 'APPLICATION_COMMAND_HANDLER',
@@ -114,6 +121,20 @@ my %func_id= (
   'd0'  => 'ZW_SET_PROMISCUOUS_MODE',
 );
 
+%zw_type6 = (
+  '01' => 'GENERIC_CONTROLLER',    '12' => 'SWITCH_REMOTE',
+  '02' => 'STATIC_CONTROLLER',     '13' => 'SWITCH_TOGGLE',
+  '03' => 'AV_CONTROL_POINT',      '20' => 'SENSOR_BINARY',
+  '06' => 'DISPLAY',               '21' => 'SENSOR_MULTILEVEL',
+  '07' => 'GARAGE_DOOR',           '22' => 'WATER_CONTROL',
+  '08' => 'THERMOSTAT',            '30' => 'METER_PULSE',
+  '09' => 'WINDOW_COVERING',       '40' => 'ENTRY_CONTROL',
+  '0F' => 'REPEATER_SLAVE',        '50' => 'SEMI_INTEROPERABLE',
+  '10' => 'SWITCH_BINARY',         'ff' => 'NON_INTEROPERABLE',
+  '11' => 'SWITCH_MULTILEVEL',
+);
+
+
 
 sub
 ZWDongle_Initialize($)
@@ -126,6 +147,7 @@ ZWDongle_Initialize($)
   $hash->{ReadFn}  = "ZWDongle_Read";
   $hash->{WriteFn} = "ZWDongle_Write";
   $hash->{ReadyFn} = "ZWDongle_Ready";
+  $hash->{ReadAnswerFn} = "ZWDongle_ReadAnswer";
 
 # Normal devices
   $hash->{DefFn}   = "ZWDongle_Define";
@@ -156,7 +178,7 @@ ZWDongle_Define($$)
   my $dev = $a[2];
 
   $hash->{Clients} = ":ZWave:";
-  my %matchList = ( "1:ZWave" => "^........ ...*" );
+  my %matchList = ( "1:ZWave" => ".*" );
   $hash->{MatchList} = \%matchList;
 
   if($dev eq "none") {
@@ -170,6 +192,7 @@ ZWDongle_Define($$)
   }
 
   $hash->{DeviceName} = $dev;
+  $hash->{CallbackNr} = 0;
   my $ret = DevIo_OpenDev($hash, 0, "ZWDongle_DoInit");
   return $ret;
 }
@@ -185,12 +208,32 @@ ZWDongle_Set($@)
   return "\"set ZWDongle\" needs at least one parameter" if(@a < 1);
   my $type = shift @a;
 
-  return "Unknown argument $type, choose one of " . join(" ", sort keys %sets)
-  	if(!defined($sets{$type}));
-  my $nargs = int(split("%", $sets{$type}, -1))-1;
+  if(!defined($sets{$type})) {
+    my @r;
+    map { my $p = $sets{$_}{param};
+          push @r,($p ? "$_:".join(",",sort keys %{$p}) : $_)} sort keys %sets;
+    return "Unknown argument $type, choose one of " . join(" ",@r);
+  }
+  my $cmd = $sets{$type}{cmd};
+  my $par = $sets{$type}{param};
+  if($par) {
+    return "Unknown argument for $type, choose one of ".join(" ",keys %{$par})
+      if(!defined($par->{$a[0]}));
+    $a[0] = $par->{$a[0]};
+  }
+
+  if($cmd =~ m/\@/) {
+    my $c = $hash->{CallbackNr}+1;
+    $c = 1 if($c > 255);
+    $hash->{CallbackNr} = $c;
+    $c = sprintf("%02x", $c);
+    $cmd =~ s/\@/$c/g;
+  }
+
+  my $nargs = int(split("%", $cmd, -1))-1;
   return "set $name $type needs $nargs arguments" if($nargs != int(@a));
 
-  ZWDongle_Write($hash,  "00", sprintf($sets{$type}, @a));
+  ZWDongle_Write($hash,  "00", sprintf($cmd, @a));
   return undef;
 }
 
@@ -215,13 +258,14 @@ ZWDongle_Get($@)
 
   ZWDongle_Write($hash,  "00", sprintf($gets{$type}, @a));
   my $re = "^01".substr($gets{$type},0,2);  # Start with <01><len><01><CMD>
-  my $ret = ZWDongle_ReadAnswer($hash, "get $name $type", $re);
+  my ($err, $ret) = ZWDongle_ReadAnswer($hash, "get $name $type", $re);
+  return $err if($err);
 
   my $msg="";
   $msg = $ret if($ret);
   my @r = map { ord($_) } split("", pack('H*', $ret)) if(defined($ret));
 
-  if($type eq "devList") {                     ############################
+  if($type eq "nodeList") {                     ############################
     return "$name: Bogus data received" if(int(@r) != 36);
     my @list;
     for my $byte (0..28) {
@@ -241,7 +285,7 @@ ZWDongle_Get($@)
     for my $byte (0..31) {
       my $bits = $r[10+$byte];
       for my $bit (0..7) {
-        my $fn = $func_id{sprintf("%02x", $byte*8+$bit)};
+        my $fn = $zw_func_id{sprintf("%02x", $byte*8+$bit)};
         push @list, $fn if(($bits & (1<<$bit)) && $fn);
       }
     }
@@ -250,7 +294,7 @@ ZWDongle_Get($@)
   } elsif($type eq "homeId") {                  ############################
     $msg = sprintf("HomeId:%s CtrlNodeId:%s", 
                 substr($ret,4,8), substr($ret,12,2));
-    $hash->{HomeId} = substr($ret,4,8);
+    $hash->{homeId} = substr($ret,4,8);
 
   } elsif($type eq "version") {                 ############################
     $msg = join("",  map { chr($_) } @r[2..13]);
@@ -267,28 +311,15 @@ ZWDongle_Get($@)
     }
     $msg = join(" ", @list);
 
-  } elsif($type eq "devInfo") {                 ############################
+  } elsif($type eq "nodeInfo") {                 ############################
     my $id = sprintf("%02x", $r[6]);
     if($id eq "00") {
       $msg = "node $a[0] is not present";
     } else {
       my @list;
       my @type5 = qw( CONTROLLER STATIC_CONTROLLER SLAVE ROUTING_SLAVE);
-      my %type6 = (
-        '01' => 'GENERIC_CONTROLLER',    '12' => 'SWITCH_REMOTE',
-        '02' => 'STATIC_CONTROLLER',     '13' => 'SWITCH_TOGGLE',
-        '03' => 'AV_CONTROL_POINT',      '20' => 'SENSOR_BINARY',
-        '06' => 'DISPLAY',               '21' => 'SENSOR_MULTILEVEL',
-        '07' => 'GARAGE_DOOR',           '22' => 'WATER_CONTROL',
-        '08' => 'THERMOSTAT',            '30' => 'METER_PULSE',
-        '09' => 'WINDOW_COVERING',       '40' => 'ENTRY_CONTROL',
-        '0F' => 'REPEATER_SLAVE',        '50' => 'SEMI_INTEROPERABLE',
-        '10' => 'SWITCH_BINARY',         'ff' => 'NON_INTEROPERABLE',
-        '11' => 'SWITCH_MULTILEVEL',
-      );
-
       push @list, $type5[$r[5]-1] if($r[5]>0 && $r[5] <= @type5);
-      push @list, $type6{$id} if($type6{$id});
+      push @list, $zw_type6{$id} if($zw_type6{$id});
       push @list, ($r[2] & 0x80) ? "listening" : "sleeping";
       push @list, "routing"   if($r[2] & 0x40);
       push @list, "40kBaud"   if(($r[2] & 0x38) == 0x10);
@@ -374,8 +405,8 @@ ZWDongle_Read($@)
 
   $buf = unpack('H*', $buf);
 
-  # The dongle looses data over USB(?), and dropping the old buffer after a
-  # timeout is my only idea of solving this problem.
+  # The dongle looses data over USB for some commands(?), and dropping the old
+  # buffer after a timeout is my only idea of solving this problem.
   my $ts   = gettimeofday();
   my $data = ($hash->{READ_TS} && $ts-$hash->{READ_TS} > 1) ?
                         "" : $hash->{PARTIAL};
@@ -420,6 +451,7 @@ ZWDongle_Read($@)
     Log $ll5, "ZWDongle_Read $name: $msg";
     last if(defined($local) && (!defined($regexp) || ($msg =~ m/$regexp/)));
     ZWDongle_Parse($hash, $name, $msg);
+    $msg = undef;
   }
   $hash->{PARTIAL} = $data;
   return $msg if(defined($local));
@@ -432,9 +464,8 @@ sub
 ZWDongle_ReadAnswer($$$)
 {
   my ($hash, $arg, $regexp) = @_;
-  return ("No FD", undef)
+  return ("No FD (dummy device?)", undef)
         if(!$hash || ($^O !~ /Win/ && !defined($hash->{FD})));
-
   my $to = ($hash->{RA_Timeout} ? $hash->{RA_Timeout} : 3);
 
   for(;;) {
@@ -467,7 +498,7 @@ ZWDongle_ReadAnswer($$$)
     }
 
     my $ret = ZWDongle_Read($hash, $buf, $regexp);
-    return $ret if(defined($ret));
+    return (undef, $ret) if(defined($ret));
   }
 
 }
@@ -482,13 +513,7 @@ ZWDongle_Parse($$$)
   $hash->{RAWMSG} = $rmsg;
 
   my %addvals = (RAWMSG => $rmsg);
-  my $homeId = $hash->{HomeId};
-  if(!$homeId) {
-    Log 1, "ERROR: $name HomeId is not set!" if(!$hash->{errReported});
-    $hash->{errReported} = 1;
-    return;
-  }
-  Dispatch($hash, "$homeId $rmsg", \%addvals);
+  Dispatch($hash, $rmsg, \%addvals);
 }
 
 
