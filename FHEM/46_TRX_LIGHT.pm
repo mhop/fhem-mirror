@@ -54,6 +54,8 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1003 => [ "WAVEMAN", "light" ],
 	0x1004 => [ "EMW200", "light"],
 	0x1005 => [ "IMPULS", "light"],
+	0x1006 => [ "RISINGSUN", "light"],
+	0x1007 => [ "PHILIPS_SBC", "light"],
 	# 0x11: Lighting2
 	0x1100 => [ "AC", "light"],
 	0x1101 => [ "HOMEEASY", "light"],
@@ -70,6 +72,8 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1003 => [ "off", "on"], # WAVEMAN
 	0x1004 => [ "off", "on"], # EMW200
 	0x1005 => [ "off", "on"], # IMPULS
+	0x1006 => [ "off", "on"], # RisingSun
+	0x1007 => [ "off", "on", "", "", "", "all_off", "all_on"], # Philips SBC
 	# 0x11: Lighting2
 	0x1100 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # AC
 	0x1101 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # HOMEEASY
@@ -182,7 +186,7 @@ TRX_LIGHT_Set($@)
   	$hex_prefix = sprintf "0710";
   	$hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num & 0xff, $seqnr, $house, $unit, $cmnd; 
   	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command" if ($TRX_LIGHT_debug == 1);
-  	Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
   } elsif ($protocol_type == 0x11) {
 	# lightning2
   	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
@@ -197,7 +201,7 @@ TRX_LIGHT_Set($@)
 		$command .= sprintf " %d", $level;
 	} 
   	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
-  	Log 1,"TRX_LIGHT_Set hexline=$hex_command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
@@ -238,7 +242,7 @@ TRX_LIGHT_Define($$)
 
   $type = uc($type);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA") {
   	Log 1,"TRX_LIGHT define: wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
