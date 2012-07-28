@@ -1626,11 +1626,12 @@ GlobalAttr($$)
     eval { 
       use vars qw($DISTRIB_DESCRIPTION);
       # start of fix
-      # "Use of uninitialized value" after a fresh 5.2 installation and first time "updatefhem"
-      # release.pm does not reside in FhemUtils (what it should), so we load it from $modpath
+      # "Use of uninitialized value" after a fresh 5.2 installation and first
+      # time "updatefhem" release.pm does not reside in FhemUtils (what it
+      # should), so we load it from $modpath
       if(-e "$modpath/FhemUtils/release.pm") {
         require "FhemUtils/release.pm";
-      } elsif(-e:"$modpath/release.pm") {
+      } elsif(-e "$modpath/release.pm") {
         require "release.pm";
       } else {
         $DISTRIB_DESCRIPTION = "unknown";
