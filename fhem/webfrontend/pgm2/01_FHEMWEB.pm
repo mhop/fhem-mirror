@@ -2,6 +2,11 @@
 # $Id$
 package main;
 
+#
+# #Todo:
+#       3) logical icons should contain no extension, initial icon search uses any graphics type of png, gif, jpg
+
+
 use strict;
 use warnings;
 use TcpServerUtils;
@@ -19,8 +24,11 @@ sub FW_fileList($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeTable($$@);
+sub FW_makeImage($);
+sub FW_SetDirs();
 sub FW_ReadIconsFrom($$);
-sub FW_ReadIcons();
+sub FW_ReadIcons($);
+sub FW_GetIcons();
 sub FW_IconURL($);
 sub FW_roomOverview($);
 sub FW_select($$$$@);
@@ -71,7 +79,6 @@ my $FW_data;       # Filecontent from browser when editing a file
 my $FW_detail;     # currently selected device for detail view
 my %FW_devs;       # hash of from/to entries per device
 my %FW_icons;      # List of icons
-my $FW_iconsread;  # Timestamp of last icondir check
 my $FW_plotmode;   # Global plot mode (WEB attribute)
 my $FW_plotsize;   # Global plot size (WEB attribute)
 my $FW_commandref;     # $FW_docdir/commandref.html;
@@ -99,6 +106,7 @@ FHEMWEB_Initialize($)
 
   $hash->{ReadFn}  = "FW_Read";
   $hash->{GetFn}   = "FW_Get";
+  $hash->{SetFn}   = "FW_Set";
   $hash->{AttrFn}  = "FW_Attr";
   $hash->{DefFn}   = "FW_Define";
   $hash->{UndefFn} = "FW_Undef";
@@ -147,6 +155,11 @@ FW_Define($$)
   return "Usage: define <name> FHEMWEB [IPV6:]<tcp-portnr> [global]"
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
+
+  FW_SetDirs;
+  FW_ReadIcons($hash); # we do it only once at startup to save ressources at runtime
+
+        
   my $ret = TcpServer_Open($hash, $port, $global);
 
   # Make sure that fhem only runs once
@@ -154,6 +167,7 @@ FW_Define($$)
     Log 1, "$ret. Exiting.";
     exit(1);
   }
+
   return $ret;
 }
 
@@ -373,12 +387,10 @@ FW_AnswerCall($)
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
 
-  FW_SetDirs;
-
   $FW_commandref = "$FW_docdir/commandref.html";
   #Debug "commandref.html is at $FW_commandref";
   
-
+  FW_GetIcons(); # get the icon set for the current instance
   
   $MW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
@@ -401,7 +413,6 @@ FW_AnswerCall($)
   
   elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
     my ($icon,$cachable) = ($1, 1);
-    FW_ReadIcons();
 
     #Debug "You want $icon which is " . $FW_icons{$icon};
     # if we do not have the icon, we convert the device state to the icon name
@@ -731,6 +742,19 @@ FW_makeSelect($$$$)
   FW_pO "</form>";
 }
 
+##############################
+sub
+FW_makeImage($) {
+
+my ($name)= @_;
+  my $iconpath= FW_IconPath($name);
+  if(defined($iconpath)) {
+    my $iconurl= FW_IconURL($name);
+    return "<img src=\"$iconurl\"><!-- $iconpath -->";
+  } else {
+    return "<b>Image <i>$name</i> not found in $FW_icondir</b>";
+  }
+}
 
 ##############################
 sub
@@ -811,7 +835,7 @@ FW_roomOverview($)
     $FW_room = $1 if($FW_room && $FW_room =~ m/^([^,]*),/);
     $FW_room = "" if(!$FW_room);
     FW_pHPlain "room=$FW_room",
-        "<div id=\"back\"><img src=\"$FW_ME/icons/back.png\"></div>";
+        "<div id=\"back\">" . FW_makeImage("back") . "</div>";
     FW_pO "<div id=\"menu\">$FW_detail details</div>";
     return;
 
@@ -904,7 +928,7 @@ FW_roomOverview($)
 
   } else {
 
-    FW_ReadIcons();
+    FW_GetIcons(); # get the icon set for the current instance
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
@@ -940,9 +964,8 @@ FW_showRoom()
 {
   return if(!$FW_room);
 
-  # (re-) list the icons
-  FW_ReadIcons();
-
+  FW_GetIcons(); # get the icon set for the current instance
+  
   FW_pO "<form method=\"get\" action=\"$FW_ME\">";
   FW_pO "<div id=\"content\">";
   FW_pO "<table>";  # Need for equal width of subtables
@@ -982,7 +1005,7 @@ FW_showRoom()
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
       my $devName = AttrVal($d, "alias", $d);
       my $icon = AttrVal($d, "icon", "");
-      $icon = "<img src=\"$FW_ME/icons/$icon\">&nbsp;" if($icon);
+      $icon = FW_makeImage($icon) . "&nbsp;" if($icon);
 
       if($FW_hiddenroom{detail}) {
         FW_pO "<td><div class=\"col1\">$icon$devName</div></td>";
@@ -1728,17 +1751,6 @@ FW_style($$)
     $fName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
 
-    #$fName =~ s,/,,g;    # little bit of security
-    #$fName = ($fName eq "fhem.cfg" ? $attr{global}{configfile} :
-    #                               "$FW_dir/$fName");
-    #if($fName eq "fhem.cfg") {
-    #  $fName = $attr{global}{configfile};
-    #} elsif ($fName =~ m/.*(sh|Util.*|cfg|holiday)/ && $fName ne "fhem.cfg") {
-    #  $fName = "$MW_dir/$fName";
-    #} else {
-    #  $fName = "$FW_dir/$fName";
-    #}
-
     if(!open(FH, ">$fName")) {
       FW_pO "$fName: $!";
       return;
@@ -1754,13 +1766,13 @@ FW_style($$)
     $ret = "";
 
   } elsif($a[1] eq "iconFor") {
-    FW_ReadIcons();
+    FW_GetIcons(); # get the icon set for the current instance
     FW_pO "<div id=\"content\"><table class=\"iconFor\">";
     foreach my $i (sort grep {/^ico/} keys %FW_icons) {
       FW_pO "<tr><td>";
       FW_pO "<a href=\"$FW_ME?cmd=attr $a[2] icon $i\">$i</a>";
       FW_pO "</td><td>";
-      FW_pO "<img src=\"$FW_ME/icons/$i\">";
+      FW_pO FW_makeImage($i);
       FW_pO "</td></tr>";
     }
     FW_pO "</table></div>";
@@ -2007,7 +2019,7 @@ FW_ReadIconsFrom($$) {
 
   my ($prepend,$dir)= @_;
 
-  #Debug "read icons from \"$dir\", prepend \"$prepend\"";
+  #Debug "read icons from \"${FW_icondir}/${dir}\", prepend \"$prepend\"";
   
   my (@entries, @filenames);
   if(opendir(DH, "${FW_icondir}/${dir}")) {
@@ -2038,28 +2050,38 @@ FW_ReadIconsFrom($$) {
 }
 
 sub
-FW_ReadIcons()
+FW_ReadIcons($)
 {
-  my $now = time();
-  return if($FW_iconsread && ($now - $FW_iconsread) <= 5);
-
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  
   %FW_icons = ();
   # read icons from default directory
   FW_ReadIconsFrom("", "default");
   # read icons from stylesheet specific directory, icons found here supersede default icons with same name
-  my $prefix= AttrVal($FW_wname, "stylesheetPrefix", "");
+  my $prefix= AttrVal($name, "stylesheetPrefix", "");
   FW_ReadIconsFrom("", "$prefix") unless($prefix eq "");
   # read icons from explicit directory, icons found here supersede all other icons with same name
-  my $iconpath= AttrVal($FW_wname, "iconpath", "");
+  my $iconpath= AttrVal($name, "iconpath", "");
   FW_ReadIconsFrom("", "$iconpath") unless($iconpath eq "");
   # if now icons were found so far, read icons from icondir itself
   FW_ReadIconsFrom("", "") unless(%FW_icons);
 
-  $FW_iconsread = $now;
+  $hash->{fhem}{icons}= join(":", %FW_icons);
 
-  #foreach my $k (keys %FW_icons) {
-  #  Debug " icon: $k    =>   " . $FW_icons{$k};
-  #}
+  Log 4, "$name: Icon dictionary for $FW_icondir follows...";
+  foreach my $k (keys %FW_icons) {
+    Log 4, "  $k => " . $FW_icons{$k};
+  }
+
+}
+
+# get the icon set from the device
+sub
+FW_GetIcons() {
+  #Debug "Getting icons for $FW_wname.";
+  my $hash= $defs{$FW_wname};
+  %FW_icons= split(":", $hash->{fhem}{icons});
 }
 
 sub
@@ -2079,7 +2101,7 @@ FW_IconPath($) {
   my ($name)= @_;
   $name =~ s/\.(png)$//;           # FIXME
   $name= "${name}.png";           # FIXME
-  FW_ReadIcons() unless($FW_iconsread);
+  FW_GetIcons(); # get the icon set for the current instance
   my $path= $FW_icons{$name};
   return $path ? $FW_icondir. $path : undef;
 }
@@ -2202,7 +2224,7 @@ FW_Notify($$)
 
   my $rn = AttrVal($dn, "room", "");
   if($filter eq "all" || $rn =~ m/\b$filter\b/) {
-    FW_ReadIcons();
+    FW_GetIcons(); # get the icon set for the current instance
 
     my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
@@ -2327,6 +2349,7 @@ FW_devState($$)
 }
 
 #####################################
+
 sub FW_Get($@) {
 
   my ($hash, @a) = @_;
@@ -2336,14 +2359,29 @@ sub FW_Get($@) {
   return "Unknown argument $a[1], choose one of " . "icon"
         unless($a[1] eq "icon");
 
+  $FW_wname= $hash->{NAME};
   my $icon= FW_IconPath($a[2]);
   return defined($icon) ? $icon : "no such icon";
 
 }  
 
 
-
 #####################################
 
+sub FW_Set($@) {
+
+  my ($hash, @a) = @_;
+
+  return "syntax error" if(int(@a) != 2);
+
+  return "Unknown argument $a[1], choose one of " . "rereadicons"
+        unless($a[1] eq "rereadicons");
+
+  FW_ReadIcons($hash);
+  return undef;
+
+}
+
+#####################################
 
 1;
