@@ -1,0 +1,26 @@
+############################
+# Display brightness sensor log (BS) of the form
+2012-07-29_16:54:47 e.ext.bs brightness: 39.45  lux: 138267  flags: 0
+
+set terminal png transparent size <SIZE> crop
+set output '<OUT>.png'
+
+set title '<TL>'
+
+set xdata time
+set timefmt "%Y-%m-%d_%H:%M:%S"
+set xlabel " "
+set grid xtics y2tics
+
+set ytics nomirror
+set ylabel "brightness / units"
+#set yrange [0:100]
+
+set y2tics
+set y2label "brightness / units"
+#set y2range [0:100]
+
+#FileLog 4:::
+
+plot "<IN>" x1y1 title 'Volume' with lines
+
