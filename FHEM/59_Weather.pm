@@ -52,7 +52,7 @@ sub Weather_Initialize($) {
   $hash->{DefFn}   = "Weather_Define";
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 localicons event-on-update-reading event-on-change-reading";
 
 }
 
@@ -334,13 +334,13 @@ WeatherIconIMGTag($$$) {
 sub
 WeatherAsHtml($)
 {
-  my $uselocal= 0;
 
   my ($d) = @_;
   $d = "<none>" if(!$d);
   return "$d is not a Weather instance<br>"
         if(!$defs{$d} || $defs{$d}{TYPE} ne "Weather");
 
+  my $uselocal= AttrVal($d,"localicons",0);
   my $isday;
   if(exists &isday) {
                 $isday = isday();
