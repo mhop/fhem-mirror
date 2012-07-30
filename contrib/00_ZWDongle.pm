@@ -1,8 +1,10 @@
 ##############################################
 # $Id: 00_ZWDongle.pm 1721 2012-07-11 14:48:24Z rudolfkoenig $
-# Handling a ZWave (USB) Dongle
-# TODO: 
-# - get list of command classes for a device.
+# TODO:
+# - one command to create a fhem device for all nodeList entries
+# - inclusion mode active only for a given time (pairForSec)
+# - use central readings functions
+# - add usbscan
 package main;
 
 use strict;
@@ -154,7 +156,7 @@ ZWDongle_Initialize($)
   $hash->{SetFn}   = "ZWDongle_Set";
   $hash->{GetFn}   = "ZWDongle_Get";
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
-                     "showtime:1,0 model:ZWDongle loglevel:0,1,2,3,4,5,6 ";
+                     "model:ZWDongle loglevel:0,1,2,3,4,5,6 ";
 }
 
 #####################################
