@@ -98,12 +98,13 @@ FileLog_Log($$)
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
+  my $tn = TimeNow();
+  my $ct = $dev->{CHANGETIME};
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
-    if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
-      my $t = TimeNow();
-      $t = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
+    my $t = (($ct && $ct->[$i]) ? $ct->[$i] : $tn);
+    if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/ || "$t:$n:$s" =~ m/^$re$/) {
       $t =~ s/ /_/; # Makes it easier to parse with gnuplot
 
       FileLog_Switch($log);
