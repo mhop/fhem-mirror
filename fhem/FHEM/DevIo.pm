@@ -8,6 +8,7 @@ sub DevIo_SimpleWrite($$$);
 sub DevIo_OpenDev($$$);
 sub DevIo_CloseDev($);
 sub DevIo_Disconnected($);
+sub DevIo_SetHwHandshake($);
 
 ########################
 sub
@@ -134,7 +135,7 @@ DevIo_OpenDev($$$)
     delete($readyfnlist{"$name.$dev"});
     $selectlist{"$name.$dev"} = $hash;
 
-  } elsif($baudrate && lc($baudrate) eq "directio") {   # Without Device::SerialPort
+  } elsif($baudrate && lc($baudrate) eq "directio") { # w/o Device::SerialPort
 
     if(!open($po, "+<$dev")) {
       return undef if($reopen);
@@ -156,7 +157,6 @@ DevIo_OpenDev($$$)
 
 
   } else {                              # USB/Serial device
-
 
     if ($^O=~/Win/) {
      eval {
@@ -200,8 +200,9 @@ DevIo_OpenDev($$$)
       $po->handshake('none');
 
       # This part is for some Linux kernel versions whih has strange default
-      # settings.  Device::SerialPort is nice: if the flag is not defined for your
-      # OS then it will be ignored.
+      # settings.  Device::SerialPort is nice: if the flag is not defined for
+      # your OS then it will be ignored.
+
       $po->stty_icanon(0);
       #$po->stty_parmrk(0); # The debian standard install does not have it
       $po->stty_icrnl(0);
@@ -241,6 +242,14 @@ DevIo_OpenDev($$$)
 
   DoTrigger($name, "CONNECTED") if($reopen);
   return $ret;
+}
+
+sub
+DevIo_SetHwHandshake($)
+{
+  my ($hash) = @_;
+  $hash->{USBDev}->can_dtrdsr();
+  $hash->{USBDev}->can_rtscts();
 }
 
 ########################
