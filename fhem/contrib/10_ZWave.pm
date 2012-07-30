@@ -1,5 +1,12 @@
 ##############################################
 # See ZWDongle.pm for inspiration
+# TODO
+# - use central readings functions
+# - Generate MISSING ACK
+# - implement (global?) on-for-timer
+# - better autocreate integration
+# - get support in FHEMWEB
+# - class meter: get 
 package main;
 
 use strict;
@@ -372,7 +379,8 @@ ZWave_Parse($$@)
     if($evt eq "slave" &&
        $arg =~ m/(..)....(..)..(.*)$/) {
       my ($id,$type6,$classes) = ($1, $2, $3);
-      return ZWave_SetClasses($homeId, $id, $type6, $classes);
+      return ZWave_SetClasses($homeId, $id, $type6, $classes)
+        if($cmd eq 'ZW_ADD_NODE_TO_NETWORK');
     }
 
   } elsif($cmd eq "ZW_APPLICATION_UPDATE" && $arg =~ m/....(..)..(.*)$/) {
@@ -413,14 +421,11 @@ ZWave_Parse($$@)
   }
 
   my @event;
-  my $wakeup;
   foreach my $k (keys %{$ptr}) {
     if($arg =~ m/$k/) {
       my $val = $ptr->{$k};
       $val = eval $val if(index($val, '$') >= 0);
       push @event, $val;
-Log 1, ">$val<";
-#      $wakeup = 1 if($val eq "wakeup:notification" && !$wakeup);
     }
   }
 
@@ -428,7 +433,6 @@ Log 1, ">$val<";
   return join(" ", @event) if($local);
 
   if($hash->{WakeUp} && @{$hash->{WakeUp}}) {
-Log 1, "WU...";
     IOWrite($hash, "00", shift @{$hash->{WakeUp}});
   }
 
@@ -443,7 +447,7 @@ Log 1, "WU...";
         $hash->{STATE} = $vv;
         push @changed, $vv;
       }
-      push @changed, "deviceState:$vv";
+      push @changed, "reportedState:$vv";
 
     } else {
       push @changed, "$vn: $vv";
@@ -468,3 +472,13 @@ ZWave_Undef($$)
 }
 
 1;
+
+=begin html
+
+<a name="CUL"></a>
+<h3>CUL</h3>
+<ul>
+text
+</ul>
+
+=end html
