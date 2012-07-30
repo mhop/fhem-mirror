@@ -23,6 +23,7 @@
 # 0015: implemented Tobias' icon subfolder solution, fp_arrange detail always (fp_arrange detail deprecated, fp_arrange 1 shows all detail),
 #       changed backimg-size to 99% to avoid scrollbars , adopted slider & new FHT representation (May 1, 2012)
 # 0016: Minor repair of html-output, allowed devices with dot in name (May 2, 2012)
+# 0017: updating for changes in fhemweb: css-path, bgimg-path, deactivating rereadicons (July 30, 2012)
 #
 ################################################################
 #
@@ -315,10 +316,10 @@ FP_htmlHeader($) {
   # stylesheet
   if ($FP_name) {
 	my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
-  	FW_pO  ("<link href=\"$FW_ME/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix
+  	FW_pO  ("<link href=\"$FW_ME/css/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix  #20120730 0017
   } else {  
 	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
-    FW_pO  "<link href=\"$FW_ME/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen
+    FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen  #20120730 0017
   }
   #set sripts
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
@@ -368,14 +369,14 @@ FP_show(){
   ## body
   FW_pO "<body id=\"$FP_name-body\">\n";
   FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
-  FW_pO "<img src=\"$FW_ME/fp_$FP_name.png\">";            								  # alternative: jpg - how?
+  FW_pO "<img src=\"$FW_ME/icons/fp_$FP_name.png\">";            								  # alternative: jpg - how?  #20120730 0017
   FW_pO "</div>\n";
 
   ## menus
   FP_menu();
   FP_menuArrange() if ($FP_arrange && ($FP_arrange eq "1" || ($FP_arrange eq $FW_wname) || $FP_arrange eq "detail"));   #shows the arrange-menu
   # (re-) list the icons
-  FW_ReadIcons();
+# FW_ReadIcons(); #20120730 00017
   ## start floorplan  
   FW_pO "<div class=\"screen\" id=\"floorplan\">";
   FW_pO "<div id=\"logo\"></div>";
