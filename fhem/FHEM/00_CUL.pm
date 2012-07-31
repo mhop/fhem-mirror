@@ -24,7 +24,7 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "version"  => ["V", '^V .*'],
   "raw"      => ["", '.*'],
   "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
-  "fhtbuf"   => ["T03", '^..[\r\n]*$' ],
+  "fhtbuf"   => ["T03", '^[0-9A-F]+[\r\n]*$' ],
 );
 
 my %sets = (
