@@ -8,7 +8,7 @@
 #
 # $Id$
 #
-# Version = 1.0
+# Version = 2.0
 #
 ##############################################################################
 #
@@ -53,24 +53,24 @@ sub
 energy_State($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-#	Log 4, "time: $tim";
-#	Log 4, "name: $vt";
-#	Log 4, "value: $val";
+	Log 4, "time: $tim";
+	Log 4, "name: $vt";
+	Log 4, "value: $val";
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-#	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
   return undef;
 }
 sub
 energy_Set($$$$)
 {
   my ($hash, $tim, $vt, $val) = @_;
-#	Log 4, "time: $tim";
-#	Log 4, "name: $vt";
-#	Log 4, "value: $val";
+	Log 4, "time: $tim";
+	Log 4, "name: $vt";
+	Log 4, "value: $val";
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
-#	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
   return undef;
 }
 
@@ -211,11 +211,10 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
   	$hash->{READINGS}{avgPower}{VAL}  = $avg;
   	$hash->{READINGS}{avgPower}{TIME}  = $timenow;
 	$log = "min: $min max: $max last: $last avg: $avg";
-  	DoTrigger($hash->{NAME}, undef) if ($init_done);
-	$hash->{STATE} = "min: $min max: $max last: $last avg: $avg";
-    	my $newpower = $avg/(3600/$interval);
-	$newpower = $newpower/1000;
-    	$newpower =sprintf("%.6f",$newpower);
+    $hash->{STATE} = "min: $min max: $max last: $last avg: $avg";
+    my $newpower = $avg/(3600/$interval);
+    $newpower = $newpower/1000;
+    $newpower =sprintf("%.6f",$newpower);
     my ($date, $month, $day, $hour, $min, $sec) = $timenow =~ /^(\d\d\d\d)-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/;
 #    ######### DAYPOWER
     if ( $hash->{READINGS}{DAYPOWER}{VAL} eq "-1" ){
@@ -233,6 +232,7 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
     	}else{					# es ist eine Tag vergangen
     		$hash->{READINGS}{DAYPOWER}{VAL} = $newpower;
     		Log 4, "$hash->{NAME} new day timenow: $timenow newpower $newpower powlast $powLast";
+    		$log .= " day: $newpower";
     	}
       }
 #    ######### MONTH
@@ -251,6 +251,7 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
     	}else{					# es ist eine Monat vergangen
     		$hash->{READINGS}{MONTHPOWER}{VAL} = $newpower;
     		Log 4, "$hash->{NAME} Neuer Monat timenow: $timenow newpower $newpower powlast $powLast";
+    		$log .= " month: $newpower";
     	}
       }    
 #	######### YEARPOWER
@@ -269,6 +270,7 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
     	}else{					# es ist eine Jahr vergangen
     		$hash->{READINGS}{YEARPOWER}{VAL} = $newpower;
     		Log 4, "$hash->{NAME} Neues Jahr timenow: $timenow newpower $newpower powlast $powLast";
+    		$log .= " year: $newpower";
     	}
       }    
 #	######### TOTALPOWER
@@ -283,9 +285,11 @@ if ( $success == 0 and $summary > 0 and $counts > 0)
     	$hash->{READINGS}{TOTALPOWER}{VAL} = $powLast;
     	$log .= " total: $powLast";
      }
-    push @{$hash->{CHANGED}}, $log;
+     push @{$hash->{CHANGED}}, $log;
+     DoTrigger($hash->{NAME}, undef) if ($init_done);
+     Log 3, "$hash->{NAME} write log file: $log";
 }else{
-  	Log 3, "$hash->{NAME} can't update - device send a error";
+     Log 3, "$hash->{NAME} can't update - device send a error";
 }
 
 return undef;
