@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.13 - July, 2012
+# Version 2.14 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -45,15 +45,20 @@
 #
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
-# attr <name> <channel>Offset <float> = offset added to the reading in this channel 
-# attr <name> <channel>Factor <float> = factor multiplied to (reading+offset) in this channel 
-# attr <name> <channel>Mode <string>  = normal (default) or daily
+# attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
+# attr <name> <channel>Factor <float>  = factor multiplied to (reading+offset) in this channel 
+# attr <name> <channel>Mode <string>   = counting mode normal(default) or daily
+# attr <name> <channel>Period <string> = period for rate calculation hour (default), minute or second
 #
 # In normal counting mode each returned counting value will be factor*(reading+offset)
 # In daily  counting mode each returned counting value will be factor*(reading+offset)-midnight
 #           where midnight is stored as string in the 32 byte memory associated with the counter
-#           if this midnight string 
 #
+# Log Lines
+#    after each interval <date> <name> <channel>: <value> <unit> <value> <unit>/<period> <channel>: <value> <unit> <value> <unit>/<period> 
+#          example: 2012-07-30_00:07:55 OWX_C Taste:  17.03 p 28.1 p/h B:  7.0 cts 0.0 cts/min
+#    after midnight <new date> <name> <old day> <old date> <channel>: <value> <unit> <channel>: <value> <unit>   
+#          example: 2012-07-30_00:00:57 OWX_C D_29: 2012-7-29_23:59:59 Taste: 110.0 p, B:   7.0 cts
 ########################################################################################
 #
 #  This programm is free software; you can redistribute it and/or modify
@@ -83,6 +88,7 @@ sub Log($$);
 #-- channel name - fixed is the first array, variable the second 
 my @owg_fixed = ("A","B");
 my @owg_channel;
+my @owg_rate;
 #-- channel values - always the raw values from the device
 my @owg_val;
 my @owg_midnight;
@@ -143,6 +149,7 @@ sub OWCOUNT_Initialize ($) {
     $attlist .= " ".$owg_fixed[$i]."Factor";
     $attlist .= " ".$owg_fixed[$i]."Unit";
     $attlist .= " ".$owg_fixed[$i]."Mode:normal,daily";
+    $attlist .= " ".$owg_fixed[$i]."Period:hour,minute,second";
   }
   $hash->{AttrList} = $attlist; 
 }
@@ -255,18 +262,34 @@ sub OWCOUNT_InitializeDevice($) {
       Log 1, "OWCOUNT: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>";
       push(@unarr,"");  
     }
+    
+    #-- rate unit
+    my $period =  defined($attr{$name}{$owg_fixed[$i]."Period"})  ? $attr{$name}{$owg_fixed[$i]."Period"} : "hour";
 
     #-- offset and scale factor 
     my $offset  = defined($attr{$name}{$owg_fixed[$i]."Offset"}) ? $attr{$name}{$owg_fixed[$i]."Offset"} : 0;
     my $factor  = defined($attr{$name}{$owg_fixed[$i]."Factor"}) ? $attr{$name}{$owg_fixed[$i]."Factor"} : 1; 
-    my $mode    = defined($attr{$name}{$owg_fixed[$i]."Mode"}) ? $attr{$name}{$owg_fixed[$i]."Mode"} : "normal"; 
     #-- put into readings
     $owg_channel[$i] = $cnama[0];  
     $hash->{READINGS}{"$owg_channel[$i]"}{TYPE}     = $cnama[1];  
     $hash->{READINGS}{"$owg_channel[$i]"}{UNIT}     = $unarr[0];
     $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = $unarr[1];
+    $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD}   = $period; 
     $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET}   = $offset;  
     $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR}   = $factor;  
+
+    $owg_rate[$i] = $cnama[0]."_rate";  
+    if(  $period eq "hour" ){
+      $unit = "/h";
+    }elsif( $period eq "minute" ){
+      $unit = "/min";
+    } else {
+      $unit = "/s";
+    }       
+    $hash->{READINGS}{"$owg_rate[$i]"}{TYPE}     = $cnama[1]."_rate";  
+    $hash->{READINGS}{"$owg_rate[$i]"}{UNIT}     = $unarr[0].$unit;
+    $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = $unarr[1].$unit;
+    Log 1,"OWCOUNT InitializeDevice with period $period and UNITABBR = ".$hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
   }
   
   #-- set status according to interface type
@@ -299,11 +322,15 @@ sub OWCOUNT_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($offset,$factor,$midnight,$vval);
-  my ($value1,$value2,$value3)   = ("","","");
+  my ($offset,$factor,$period,$unit,$runit,$midnight,$vval,$vrate);
+  my ($value1,$value2,$value3,$value4,$value5)   = ("","","","","");
   my $galarm = 0;
 
   my $tn = TimeNow();
+  my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
+  my ($seco,$mino,$houro,$dayo,$montho,$yearo,$dayrest);
+  my $daybreak = 0;
+  my $monthbreak = 0;
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
@@ -312,62 +339,114 @@ sub OWCOUNT_FormatValues($) {
     $owg_channel[$i]=$cnama[0]; 
     $offset   = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
     $factor   = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
+    $unit     = $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR};
     #-- only if attribute value Mode=daily, take the midnight value from memory
     if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
       if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
-         $midnight = $owg_midnight[$i];
-         #-- parse float from midnight
-         $midnight =~ /([\d\.]+)/;
-         $midnight = 0.0 if(!(defined($midnight)));
+        $midnight = $owg_midnight[$i];
+        #-- parse float from midnight
+        $midnight =~ /([\d\.]+)/;
+        $midnight = 0.0 if(!(defined($midnight)));
+      } else {
+        $midnight = 0.0;
       }
     } else { 
       $midnight = 0.0;
     }
-    #Log 1, "OWCOUNT: midnight = $midnight";
     #-- correct values for proper offset, factor 
-    #-- integer values + 1 decimal
+    #-- 1 decimal
     if( $factor == 1.0 ){
       $vval    = int(($owg_val[$i] + $offset - $midnight)*10)/10;
       #-- string buildup for return value and STATE
-      $value1 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-      $value2 .= sprintf( "%s: %5.1f %s ", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-    #-- floating point values
+      $value1 .= sprintf( "%s: %5.1f %s",  $owg_channel[$i], $vval,$unit);
+      $value2 .= sprintf( "%s: %5.1f %s ", $owg_channel[$i], $vval,$unit);
+    #-- 3 decimals
     } else {
       $vval    = int((($owg_val[$i] + $offset)*$factor - $midnight)*1000)/1000;
       #-- string buildup for return value and STATE
-      $value1 .= sprintf( "%s: %5.3f %s", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
-      $value2 .= sprintf( "%s: %5.2f %s ", $owg_channel[$i], $vval,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
+      $value1 .= sprintf( "%s: %5.3f %s",  $owg_channel[$i], $vval,$unit);
+      $value2 .= sprintf( "%s: %5.2f %s ", $owg_channel[$i], $vval,$unit);
     }
     $value3 .= sprintf( "%s: " , $owg_channel[$i]);
     
-    #-- if daily mode and midnight has passed, store the interpolated value in the midnight store
+    #-- get the old values
     my $oldval = $hash->{READINGS}{"$owg_channel[$i]"}{VAL};
     my $oldtim = $hash->{READINGS}{"$owg_channel[$i]"}{TIME};
+    
+    #-- safeguard against the case where no previous measurement
     if( $oldtim ){    
-      my ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
-      my $dayo = substr($dayrest,0,2);
-      my ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
-      my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
+      ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
+      $dayo = substr($dayrest,0,2);
+      ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
+      my $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
+      $delt+=86400 
+        if( $delt<0 );
+      #-- rate, t.b. corrected in case of midnight
+      $vrate  = ($vval-$oldval)/$delt;
+      $vrate  = ($vval + $midnight-$oldval)/$delt
+        if( $vrate<0 );
+      
+      $period = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
+      if(  $period eq "hour" ){
+        $vrate*=3600;
+      }elsif( $period eq "minute" ){
+        $vrate*=60;
+      }       
+      $runit   = $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
+      #-- string buildup for return value and STATE
+      $value1 .= sprintf( " %5.3f %s", $vrate,$runit);
+      $value2 .= sprintf( " %5.2f %s ",$vrate,$runit);
+    
       if( $day!=$dayo ){
+        #-- we need to check this !
+        Log 1,"OWCOUNT: Daily change routine called with oldtim=$oldtim and day=$day and present=".$hash->{PRESENT};  
+        $daybreak = 1;
+        #--  linear interpolation
         my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
-        $midnight += $oldval*(1-$dt)+$vval*$dt;
+        my $dv = $oldval*(1-$dt)+$vval*$dt;
+        $midnight += $dv;
+        #-- in any mode, when midnight has passed, store the interpolated value in the midnight store
         OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
+        Log 1, "OWCOUNT: Interpolated additional value for channel ".$owg_channel[$i]." is ".$dv." at time ".$tn;
+        #-- string buildup for monthly logging
+        $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
+        if( $day<$dayo ){
+          $monthbreak = 1;
+          Log 1, "OWCOUNT: Change of month";
+          #-- string buildup for yearly logging
+          $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
+        }
       }
     } 
     #-- put into READINGS
     $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $vval;
     $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
+    $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = $vrate;
+    $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = $tn;
     
     #-- insert comma
     if( $i<int(@owg_fixed)-1 ){
       $value1 .= " ";
       $value2 .= ", ";
       $value3 .= ", ";
+      $value4 .= ", ";
+      $value5 .= ", ";
     }
   }
   #-- STATE
   $hash->{STATE} = $value2;
- 
+  if( $daybreak == 1 ){
+    $value4 = sprintf("D_%d: %d-%d-%d_23:59:59 %s",$dayo,$yearo,$montho,$dayo,$value4);
+    #-- needs to be higher array elements, 
+    $hash->{CHANGED}[1] = $value4;
+    Log 1,$name." ".$value4;
+    if( $monthbreak == 1){
+      $value5 = sprintf("M_%d: %d-%d-%d_23:59:59 %s",$montho,$yearo,$montho,$dayo,$value4);
+      #-- needs to be higher array elements, 
+      $hash->{CHANGED}[2] = $value5;
+      Log 1,$name." ".$value5;
+    }  
+  }
   return $value1;
 }
 

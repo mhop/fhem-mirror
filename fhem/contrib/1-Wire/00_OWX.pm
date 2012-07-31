@@ -9,7 +9,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.13 - July, 2012
+# Version 2.14 - July, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -199,8 +199,12 @@ sub OWX_Complex ($$$$) {
   $owx_interface = $hash->{INTERFACE};
   $owx_hwdevice  = $hash->{HWDEVICE};
   
+  #-- interface error
+  if( !(defined($owx_interface))){
+    Log 3,"OWX: Complex called with unknown interface";
+    return 0;
   #-- here we treat the directly connected serial interfaces
-  if( ($owx_interface eq "DS2480") || ($owx_interface eq "DS9097") ){
+  }elsif( ($owx_interface eq "DS2480") || ($owx_interface eq "DS9097") ){
     return OWX_Complex_SER($hash,$owx_dev,$data,$numread);
     
   #-- here we treat the network-connected CUNO
@@ -209,7 +213,7 @@ sub OWX_Complex ($$$$) {
 
   #-- interface error
   }else{
-    Log 1,"OWX: Complex called with unknown interface";
+    Log 3,"OWX: Complex called with unknown interface";
     return 0;
   }
 }
@@ -732,14 +736,18 @@ sub OWX_Reset ($) {
   $owx_interface = $hash->{INTERFACE};
   $owx_hwdevice  = $hash->{HWDEVICE};
   
-  if( $owx_interface eq "DS2480" ){
+   #-- interface error
+  if( !(defined($owx_interface))){
+    Log 3,"OWX: Reset called with unknown interface";
+    return 0;
+  }elsif( $owx_interface eq "DS2480" ){
     return OWX_Reset_2480($hash);
   }elsif( $owx_interface eq "DS9097" ){
     return OWX_Reset_9097($hash);
   }elsif( $owx_interface eq "CUNO" ){
     return OWX_Reset_CUNO($hash);
   }else{
-    Log 1,"OWX: Reset called with unknown interface";
+    Log 3,"OWX: Reset called with unknown interface";
     return 0;
   }
 }
