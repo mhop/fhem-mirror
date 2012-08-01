@@ -117,6 +117,9 @@ at_Exec($)
 
   # Avoid drift when the timespec is relative
   $data{AT_TRIGGERTIME} = $defs{$name}{TRIGGERTIME} if($def =~ m/^\+/);
+
+  my $oldCfgfn = $defs{$name}{CFGFN};
+  my $oldNr    = $defs{$name}{NR};
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
@@ -127,6 +130,8 @@ at_Exec($)
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
     delete($data{AT_RECOMPUTE});
     $attr{$name} = $oldattr;
+    $defs{$name}{CFGFN} = $oldCfgfn if($oldCfgfn);
+    $defs{$name}{NR} = $oldNr;
     $oldattr = undef;
   }
   delete($data{AT_TRIGGERTIME});
