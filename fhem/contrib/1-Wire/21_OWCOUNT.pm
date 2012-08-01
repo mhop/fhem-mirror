@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.14 - July, 2012
+# Version 2.15 - July, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -39,16 +39,18 @@
 # set <name> interval            => set query interval for measurement
 # set <name> memory <page>       => 32 byte string into page 0..13
 # set <name> midnight  <channel> => todays starting value for counter
+# set <name> init                => re-initialize device
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
 #
+# attr <name> UnitInReading = whether the physical unit is written into the reading = 1 (default) or 0
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
 # attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
 # attr <name> <channel>Factor <float>  = factor multiplied to (reading+offset) in this channel 
-# attr <name> <channel>Mode <string>   = counting mode normal(default) or daily
-# attr <name> <channel>Period <string> = period for rate calculation hour (default), minute or second
+# attr <name> <channel>Mode <string>   = counting mode = normal(default) or daily
+# attr <name> <channel>Period <string> = period for rate calculation  = hour (default), minute or second
 #
 # In normal counting mode each returned counting value will be factor*(reading+offset)
 # In daily  counting mode each returned counting value will be factor*(reading+offset)-midnight
@@ -107,7 +109,8 @@ my %gets = (
 my %sets = (
   "interval"    => "",
   "memory"      => "",
-  "midnight"    => ""
+  "midnight"    => "",
+  "init"       => ""
 );
 
 my %updates = (
@@ -137,12 +140,9 @@ sub OWCOUNT_Initialize ($) {
   $hash->{UndefFn} = "OWCOUNT_Undef";
   $hash->{GetFn}   = "OWCOUNT_Get";
   $hash->{SetFn}   = "OWCOUNT_Set";
-  #Name        = channel name
-  #Offset      = an offset added to the reading
-  #Factor      = a factor multiplied with (reading+offset)  
-  #Unit        = a unit of measure
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 ";
- 
+  
+  #-- see header for attributes
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 UnitInReading:0,1";
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Offset";
@@ -165,10 +165,7 @@ sub OWCOUNT_Initialize ($) {
 sub OWCOUNT_Define ($$) {
   my ($hash, $def) = @_;
   
-  # define <name> OWCOUNT [<model>] <id> [interval]
-  # e.g.: define flow OWCOUNT 525715020000 300
   my @a = split("[ \t][ \t]*", $def);
-  
   my ($name,$model,$fam,$id,$crc,$interval,$scale,$ret);
   
   #-- default
@@ -241,6 +238,7 @@ sub OWCOUNT_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
+  $hash->{PRESENT}    = 0;
     
   #-- Set channel names, channel units and alarm values
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
@@ -279,17 +277,26 @@ sub OWCOUNT_InitializeDevice($) {
     $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR}   = $factor;  
 
     $owg_rate[$i] = $cnama[0]."_rate";  
+    my $runit = "";
     if(  $period eq "hour" ){
-      $unit = "/h";
+      $runit = "/h";
     }elsif( $period eq "minute" ){
-      $unit = "/min";
+      $runit = "/min";
     } else {
-      $unit = "/s";
+      $runit = "/s";
     }       
     $hash->{READINGS}{"$owg_rate[$i]"}{TYPE}     = $cnama[1]."_rate";  
-    $hash->{READINGS}{"$owg_rate[$i]"}{UNIT}     = $unarr[0].$unit;
-    $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = $unarr[1].$unit;
-    Log 1,"OWCOUNT InitializeDevice with period $period and UNITABBR = ".$hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
+    $hash->{READINGS}{"$owg_rate[$i]"}{UNIT}     = $unarr[0].$runit;
+    $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = $unarr[1].$runit;
+    #Log 1,"OWCOUNT InitializeDevice with period $period and UNITABBR = ".$hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
+    
+    #-- remove units if they are unwanted
+    if( defined($attr{$name}{"UnitInReading"})){
+      if( $attr{$name}{"UnitInReading"} == 0){
+        $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = "";
+        $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR}    = "";
+      }
+    }
   }
   
   #-- set status according to interface type
@@ -322,7 +329,7 @@ sub OWCOUNT_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($offset,$factor,$period,$unit,$runit,$midnight,$vval,$vrate);
+  my ($offset,$factor,$present,$period,$unit,$runit,$midnight,$vval,$vrate);
   my ($value1,$value2,$value3,$value4,$value5)   = ("","","","","");
   my $galarm = 0;
 
@@ -340,6 +347,8 @@ sub OWCOUNT_FormatValues($) {
     $offset   = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
     $factor   = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
     $unit     = $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR};
+    $present  = $hash->{PRESENT};
+    
     #-- only if attribute value Mode=daily, take the midnight value from memory
     if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
       if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
@@ -374,18 +383,34 @@ sub OWCOUNT_FormatValues($) {
     my $oldtim = $hash->{READINGS}{"$owg_channel[$i]"}{TIME};
     
     #-- safeguard against the case where no previous measurement
-    if( $oldtim ){    
+    if( length($oldtim) > 0 ){    
+      #-- time difference in seconds
       ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
       $dayo = substr($dayrest,0,2);
       ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
       my $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
-      $delt+=86400 
-        if( $delt<0 );
-      #-- rate, t.b. corrected in case of midnight
-      $vrate  = ($vval-$oldval)/$delt;
-      $vrate  = ($vval + $midnight-$oldval)/$delt
-        if( $vrate<0 );
-      
+      #-- correct time for wraparound at midnight
+      if( ($delt<0) && ($present==1)){
+        $daybreak = 1;
+        $delt    += 86400;
+      }  
+      #-- correct $vval for wraparound of 32 bit counter 
+      if( ($vval < $oldval) && ($daybreak==0) && ($present==1) ){
+        Log 1,"OWCOUNT TODO: Counter wraparound";
+      }
+      #-- rate
+      if( $delt > 0 ){
+        $vrate  = ($vval-$oldval)/$delt;
+      } else {
+        Log 1, "OWCOUNT: Invalid time interval $delt for rate calculation";
+        $vrate = 0.0;
+      }
+      #-- correct rate for wraparound at midnight
+      if( ($vrate < 0)  && ($hash->{PRESENT}==1) ){
+        Log 1,"OWCOUNT: correcting raw rate directly after midnight from $vrate to ".($vrate+$midnight/$delt)." vval=$vval, oldval=$oldval, delt=$delt"; 
+        $vrate  += $midnight/$delt;
+      }
+      #-- correct rate for peroid setting
       $period = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
       if(  $period eq "hour" ){
         $vrate*=3600;
@@ -397,10 +422,9 @@ sub OWCOUNT_FormatValues($) {
       $value1 .= sprintf( " %5.3f %s", $vrate,$runit);
       $value2 .= sprintf( " %5.2f %s ",$vrate,$runit);
     
-      if( $day!=$dayo ){
+      if( $daybreak==1 ){
         #-- we need to check this !
-        Log 1,"OWCOUNT: Daily change routine called with oldtim=$oldtim and day=$day and present=".$hash->{PRESENT};  
-        $daybreak = 1;
+        Log 1,"OWCOUNT: Daybreak routine called with oldtim=$oldtim and day=$day and present=".$present;  
         #--  linear interpolation
         my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
         my $dv = $oldval*(1-$dt)+$vval*$dt;
@@ -409,21 +433,27 @@ sub OWCOUNT_FormatValues($) {
         OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
         Log 1, "OWCOUNT: Interpolated additional value for channel ".$owg_channel[$i]." is ".$dv." at time ".$tn;
         #-- string buildup for monthly logging
-        $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
+        $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
         if( $day<$dayo ){
           $monthbreak = 1;
           Log 1, "OWCOUNT: Change of month";
           #-- string buildup for yearly logging
-          $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR});
+          $value5 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
         }
       }
     } 
     #-- put into READINGS
     $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $vval;
-    $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
-    $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = $vrate;
-    $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = $tn;
-    
+    #-- but times and rate only when valid
+    if(  $hash->{PRESENT}==1 ){
+      $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
+      $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = $vrate;
+      $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = $tn;
+    } else {
+      $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = "";
+      $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = "";
+      $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = "";
+    }
     #-- insert comma
     if( $i<int(@owg_fixed)-1 ){
       $value1 .= " ";
@@ -441,7 +471,7 @@ sub OWCOUNT_FormatValues($) {
     $hash->{CHANGED}[1] = $value4;
     Log 1,$name." ".$value4;
     if( $monthbreak == 1){
-      $value5 = sprintf("M_%d: %d-%d-%d_23:59:59 %s",$montho,$yearo,$montho,$dayo,$value4);
+      $value5 = sprintf("M_%d: %d-%d-%d_23:59:59 %s",$montho,$yearo,$montho,$dayo,$value5);
       #-- needs to be higher array elements, 
       $hash->{CHANGED}[2] = $value5;
       Log 1,$name." ".$value5;
@@ -546,7 +576,6 @@ sub OWCOUNT_Get($@) {
   }
   
   #-- check syntax for getting counter
-  # TODO: WAS passiert, wenn channel name noch falsch ist ?
   if( $reading eq "counter" ){
     return "OWCOUNT: get needs parameter when reading counter: <channel>"
       if( int(@a)<2 );
@@ -618,7 +647,7 @@ sub OWCOUNT_GetValues($) {
   RemoveInternalTimer($hash);
   InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 1);
   
-  #-- reset presence
+  #-- reset presence - maybe this is too strong 
   $hash->{PRESENT}  = 0;
   
   #-- Get readings according to interface type
@@ -664,14 +693,13 @@ sub OWCOUNT_Set($@) {
   
   #-- for the selector: which values are possible
   if (@a == 2){
-    my $newkeys = join(" ", sort keys %sets);
+    my $newkeys = join(" ", keys %sets);
     return $newkeys ;    
   }
   
   #-- check syntax
-  return "OWCOUNT: Set needs one parameter when setting this value"
-    if( int(@a)<3 );
-  
+  return "OWCOUNT: Set needs one parameter"
+    if( int(@a)!=3 );
   #-- check argument
   if( !defined($sets{$a[1]}) ){
         return "OWCOUNT: Set with unknown argument $a[1]";
@@ -685,6 +713,12 @@ sub OWCOUNT_Set($@) {
   my $channel;
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
+  
+  #-- reset the device
+  if($key eq "init") {
+    OWCOUNT_InitializeDevice($hash);
+    return "OWCOUNT: Re-initialized device";
+  }
  
   #-- set new timer interval
   if($key eq "interval") {
