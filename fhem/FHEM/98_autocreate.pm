@@ -91,6 +91,7 @@ autocreate_Initialize($)
   my ($hash) = @_;
   $hash->{DefFn} = "autocreate_Define";
   $hash->{NotifyFn} = "autocreate_Notify";
+  $hash->{AttrFn}   = "autocreate_Attr";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 " . 
                      "autosave filelog device_room weblink weblink_room " .
                      "disable ignoreTypes";
@@ -453,5 +454,24 @@ NEXTDEVICE:
   }
   return ($scan ? $ret : undef);
 }
+
+###################################
+sub
+autocreate_Attr(@)
+{
+  my @a = @_;
+  my $do = 0;
+
+  if($a[0] eq "set" && $a[2] eq "disable") {
+    $do = (!defined($a[3]) || $a[3]) ? 1 : 2;
+  }
+  $do = 2 if($a[0] eq "del" && (!$a[2] || $a[2] eq "disable"));
+  return if(!$do);
+
+  $defs{$a[1]}{STATE} = ($do == 1 ? "disabled" : "active");
+
+  return undef;
+}
+
 
 1;
