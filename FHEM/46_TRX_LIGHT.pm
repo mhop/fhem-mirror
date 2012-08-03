@@ -179,7 +179,7 @@ TRX_LIGHT_Set($@)
 		$unit = $2;
   	} else {
 		Log 4,"TRX_LIGHT_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
-		return "error set name=$name  deviveid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
   	}
 
 	# lightning1
@@ -193,7 +193,7 @@ TRX_LIGHT_Set($@)
 		;
   	} else {
 		Log 4,"TRX_LIGHT_Set lightning2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
-		return "error set name=$name  deviveid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
   	}
   	$hex_prefix = sprintf "0B11";
   	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
