@@ -417,6 +417,7 @@ sub endTime {
 # returns 1 if time is before alarm time and before start time, else 0
 sub isUpcoming {
   my ($self,$t) = @_;
+  return 0 if($self->isDeleted());
   if($self->{alarm}) {
     return $t< $self->{alarm} ? 1 : 0;
   } else {
@@ -427,6 +428,7 @@ sub isUpcoming {
 # returns 1 if time is between alarm time and start time, else 0
 sub isAlarmed {
   my ($self,$t) = @_;
+  return 0 if($self->isDeleted());
   return $self->{alarm} ?
     (($self->{alarm}<= $t && $t<= $self->{start}) ? 1 : 0) : 0;
 }
@@ -434,11 +436,13 @@ sub isAlarmed {
 # return 1 if time is between start time and end time, else 0
 sub isStarted {
   my ($self,$t) = @_;
+  return 0 if($self->isDeleted());
   return $self->{start}<= $t && $t<= $self->{end} ? 1 : 0;
 }
 
 sub isEnded {
   my ($self,$t) = @_;
+  return 0 if($self->isDeleted());
   return $self->{end}< $t ? 1 : 0;
 }
 
@@ -446,7 +450,16 @@ sub nextTime {
   my ($self,$t) = @_;
   my @times= ( $self->{start}, $self->{end} );
   unshift @times, $self->{alarm} if($self->{alarm});
-  @times= sort grep { $_ >= $t } @times;
+  @times= sort grep { $_ > $t } @times;
+
+#   main::debug "Calendar: " . $self->asFull();
+#   main::debug "Calendar: Start " . main::FmtDateTime($self->{start});
+#   main::debug "Calendar: End   " . main::FmtDateTime($self->{end});
+#   main::debug "Calendar: Alarm " . main::FmtDateTime($self->{alarm}) if($self->{alarm});
+#   main::debug "Calendar: times[0] " . main::FmtDateTime($times[0]);
+#   main::debug "Calendar: times[1] " . main::FmtDateTime($times[1]);
+#   main::debug "Calendar: times[2] " . main::FmtDateTime($times[2]);
+  
   if(@times) {
     return $times[0];
   } else {
@@ -578,6 +591,7 @@ sub Calendar_Wakeup($) {
   my ($hash) = @_;
 
   my $t= time();
+  Log 4, "Calendar " . $hash->{NAME} . ": Wakeup";
 
   Calendar_GetUpdate($hash) if($t>= $hash->{fhem}{nxtUpdtTs});
 
@@ -588,6 +602,7 @@ sub Calendar_Wakeup($) {
   # find next event
   my $nt= $hash->{fhem}{nxtUpdtTs};
   foreach my $event ($hash->{fhem}{events}->events()) {
+    next if $event->isDeleted();
     my $et= $event->nextTime($t);
     # we only consider times in the future to avoid multiple
     # invocations for calendar events with the event time
@@ -607,6 +622,7 @@ sub Calendar_CheckTimes($) {
 
   my $eventsObj= $hash->{fhem}{events};
   my $t= time();
+  Log 4, "Calendar " . $hash->{NAME} . ": Checking times...";
 
   # we now run over all events and update the readings 
   my @allevents= $eventsObj->events();
@@ -658,7 +674,7 @@ sub Calendar_GetUpdate($) {
   $hash->{fhem}{lstUpdtTs}= $t;
   $hash->{fhem}{lastUpdate}= FmtDateTime($t);
   
-  #main::debug "Updating...";
+  Log 4, "Calendar " . $hash->{NAME} . ": Updating...";
   my $url= $hash->{fhem}{url};
   
   my $ics= GetFileFromURL($url);
