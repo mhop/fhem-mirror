@@ -192,14 +192,16 @@ TCM_Read($)
 
   #############################
   if($hash->{MODEL} == 120) {
-    if($data =~ m/^A55A(.B.{20})(..)/) {
+
+    while($data =~ m/^A55A(.B.{20})(..)/) {
       my ($net, $crc) = ($1, $2);
       my $mycrc = TCM_CSUM($net);
-      $hash->{PARTIAL} = substr($data, 28);
+      my $rest = substr($data, 28);
 
       if($crc ne $mycrc) {
         Log $ll2, "$name: wrong checksum: got $crc, computed $mycrc" ;
-        return;
+        $data = $rest;
+        next;
       }
 
       # Receive Radio Telegram (RRT)
@@ -219,28 +221,24 @@ TCM_Read($)
         TCM_Parse120($hash, $net, 0);
 
       }
+      $data = $rest;
+    }
 
-
-    } else {
-      if(length($data) >= 4) {
-        $data =~ s/.*A55A/A55A/ if($data !~ m/^A55A/);
-        $data = "" if($data !~ m/^A55A/);
-      }
-      $hash->{PARTIAL} = $data;
-
+    if(length($data) >= 4) {
+      $data =~ s/.*A55A/A55A/ if($data !~ m/^A55A/);
+      $data = "" if($data !~ m/^A55A/);
     }
 
   #############################
   } else {                              # TCM310 / ESP3
-    if($data =~ m/^55(....)(..)(..)(..)/) {
+
+    while($data =~ m/^55(....)(..)(..)(..)/) {
       my ($l1, $l2, $t, $crc) = (hex($1), hex($2), $3, $4);
 
       my $tlen = 2*(7+$l1+$l2);
-      if(length($data) < $tlen) {
-        $hash->{PARTIAL} = $data;
-        return;
-      }
-      $hash->{PARTIAL} = substr($data, $tlen);
+      last if(length($data) < $tlen);
+
+      my $rest = substr($data, $tlen);
       $data = substr($data, 0, $tlen);
 
       my $hdr = substr($data, 2, 8);
@@ -250,13 +248,15 @@ TCM_Read($)
       my $mycrc = TCM_CRC8($hdr);
       if($mycrc ne $crc) {
         Log $ll2, "$name: wrong header checksum: got $crc, computed $mycrc" ;
-        return;
+        $data = $rest;
+        next;
       }
       $mycrc = TCM_CRC8($mdata . $odata);
       $crc  = substr($data, -2);
       if($mycrc ne $crc) {
         Log $ll2, "$name: wrong data checksum: got $crc, computed $mycrc" ;
-        return;
+        $data = $rest;
+        next;
       }
 
       if($t eq "01") { # Radio
@@ -287,17 +287,16 @@ TCM_Read($)
 
       }
 
-    } else {
-      if(length($data) >= 4) {
-        $data =~ s/.*55/55/ if($data !~ m/^55/);
-        $data = "" if($data !~ m/^55/);
-      }
-      $hash->{PARTIAL} = $data;
-
+      $data = $rest;
     }
 
+    if(length($data) >= 4) {
+      $data =~ s/.*55/55/ if($data !~ m/^55/);
+      $data = "" if($data !~ m/^55/);
+    }
 
   }
+  $hash->{PARTIAL} = $data;
 }
 
 #####################################
