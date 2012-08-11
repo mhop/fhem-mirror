@@ -516,3 +516,6 @@
 
 - Sun Jun 17 2012 (M. Fischer)
   - CULflash routine from updatefhem removed. CULflash is a standalone module from now.
+
+- Sat Aug 11 2012 (M. Fischer)
+  - Added new module IPCAM

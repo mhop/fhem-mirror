@@ -57,6 +57,7 @@
   - feature: FhemUtils/release.pm for the new update process added. (M. Fischer)
   - bugfix:  correct one-time relative at commands after reboot
   - feature: ZWave added
+  - feature: module IPCAM added. (M. Fischer)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
