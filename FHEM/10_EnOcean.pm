@@ -67,7 +67,7 @@ EnOcean_Initialize($)
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
                        "subType:switch,contact,sensor,windowHandle,SR04,MD15,PM101,".
-                       "dimmer,dimmCtrl actualTemp";
+                       "dimmer,dimmCtrl,FSB61 actualTemp";
 
   for(my $i=0; $i<@ptm200btn;$i++) {
     $ptm200btn{$ptm200btn[$i]} = "$i:30";
@@ -273,9 +273,10 @@ EnOcean_Parse($$)
     }
 
     # released events are disturbing when using a remote, since it overwrites
-    # the "real" state immediately
+    # the "real" state immediately.
+    # In the case of an ElTako FSB61 the state should remain released (by Thomas)
     my $event = "state";
-    $event = "buttons" if($msg =~ m/released$/);
+    $event = "buttons" if($msg =~ m/released$/ && $st ne "FSB61");
 
     push @event, "3:$event:$msg";
 
