@@ -7915,14 +7915,14 @@ Terminating
       <code>attr ipcam storage /srv/share/surveillance/snapshots</code><br>
     </ul><br>
 
-    A notify on a motiondetection of a specified device:<br>
+    A notify on a motion detection of a specified device:<br>
     <ul>
       <code>define MOTION.not.01 notify GH.ga.SEC.MD.01:.*on.* get ipcam image</code><br>
     </ul><br>
 
     Send an eMail after snapshots are taken:<br>
     <ul>
-      <code>define MOTION.not.02 notify ipcam:.*snapshots.* { myEmailFuntion("ipcam") }</code><br>
+      <code>define MOTION.not.02 notify ipcam:.*snapshots.* { myEmailFunction("%NAME") }</code><br>
     </ul><br>
 
     A public web-cam takes only 1 snapshot per call:<br>
