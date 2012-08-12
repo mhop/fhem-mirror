@@ -3906,7 +3906,7 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li>buttons:<BtnX> released<br>
      </ul>
 
-     <li>FSB61 (set subType to FSB61 manually)<br>
+     <li>FSB61 (set model to FSB61 manually)<br>
      <ul>
         <li>released<br>
           The status of the device my become "released", this is not the case
@@ -3931,8 +3931,10 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li>open
          <li>learnBtn: on
      </ul>
-     <li>SR04* (Temp sensor + Presence button and desired temp dial). Set the
-          subType attr to SR04:
+     <li>SR04* (Temp sensor + Presence button and desired temp dial).<br>
+          Set the
+          model attribute to one of SR04 SR04P SR04PT SR04PST SR04PMS or the
+          subType attribute to SR04.
      <ul>
          <li>temperature: XY.Z
          <li>set_point: [0..255]
@@ -3942,7 +3944,7 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]
      </ul>
      <li>MD15-FtL-HE (Heating/Valve-regulator)<br>
-         subType must be MD15. This is done if the device was created by
+         The subType attibute must be MD15. This is done if the device was created by
          autocreate.<br>
      <ul>
        <li>$actuator %
@@ -3957,12 +3959,36 @@ A line ending with \ will be concatenated with the next one, so long lines
        <li>actuator: [ok|obstructed]
        <li>temperature: $tmp
      </ul>
-     <li>Ratio Presence Sensor Eagle PM101 (set subType to PM101)<br>
+
+     <li>Ratio Presence Sensor Eagle PM101.<br>
+         Set the model attribute to PM101<br>
      <ul>
        <li>brightness: $lux
        <li>channel1: [on|off]
        <li>channel2: [on|off]
      </ul>
+
+     <li>FAH60,FAH63,FIH63 brigthness senor.<br>
+         Set subType to FAH or model to FAH60/FAH63/FIH63 manually.<br>
+     <ul>
+       <li>brightness: $lux
+       <li>state: $lux
+     </ul>
+     
+     <li>FABH63,FBH55,FBH63,FIBH63 Motion/brightness sensor.<br>
+         Set subType to FBH or model to FABH63/FBH55/FBH63/FIBH63 manually.<br>
+     <ul>
+       <li>brightness: $lux
+       <li>motion:[yes|no]
+       <li>state: [motion: yes|no]
+     </ul>
+     <li>FTF55 Temperature sensor.<br>
+         Set subType to FTF or model to FTF55 manually.<br>
+     <ul>
+       <li>temperature: $temp
+       <li>state: $temp
+     </ul> 
+
   </ul>
 </ul>
 

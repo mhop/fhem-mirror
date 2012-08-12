@@ -11,16 +11,16 @@ sub EnOcean_Parse($$);
 sub EnOcean_Set($@);
 sub EnOcean_MD15Cmd($$$);
 
-my %rorgname = ("F6"=>"switch",     # RPS
+my %EnO_rorgname = ("F6"=>"switch",     # RPS
                 "D5"=>"contact",    # 1BS
                 "A5"=>"sensor",     # 4BS
                );
-my @ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
-my %ptm200btn;
+my @EnO_ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
+my %EnO_ptm200btn;
 
 # Some Manufacturers (e.g. Jaeger Direkt) also sell EnOcean products without an
 # intry in the table below. This table is only needed for A5 category devices
-my %manuf = (
+my %EnO_manuf = (
   "001" => "Peha",
   "002" => "Thermokon",
   "003" => "Servodan",
@@ -51,8 +51,28 @@ my %manuf = (
   "01C" => "CAN2GO",
 );
 
-my %subTypes = (
+my %EnO_subType = (
   "A5.20.01" => "MD15",
+  1          => "switch",
+  2          => "contact",
+  3          => "sensor",
+  4          => "windowHandle",
+  5          => "dimmer",
+  6          => "dimmCtrl",
+  7          => "FAH",
+  8          => "FBH",
+  9          => "FTF",
+);
+
+my @EnO_models = qw (
+  other
+  MD15-FtL-HE 
+  SR04 SR04P SR04PT SR04PST SR04PMS
+  FAH60 FAH63 FIH63
+  FABH63 FBH63 FIBH63
+  PM101
+  FTF55
+  FSB61
 );
 
 sub
@@ -65,14 +85,15 @@ EnOcean_Initialize($)
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 model " .
-                       "subType:switch,contact,sensor,windowHandle,SR04,MD15,PM101,".
-                       "dimmer,dimmCtrl,FSB61 actualTemp";
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+                       "model:".join(",",@EnO_models)." ".
+                       "subType:".join(",",values %EnO_subType)." ".
+                       "actualTemp";
 
-  for(my $i=0; $i<@ptm200btn;$i++) {
-    $ptm200btn{$ptm200btn[$i]} = "$i:30";
+  for(my $i=0; $i<@EnO_ptm200btn;$i++) {
+    $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
   }
-  $ptm200btn{released} = "0:20";
+  $EnO_ptm200btn{released} = "0:20";
   return undef;
 }
 
@@ -169,15 +190,15 @@ EnOcean_Set($@)
     } else {                                          # Simulate a PTM
       my ($c1,$c2) = split(",", $cmd, 2);
       return "Unknown argument $cmd, choose one of " .
-                                  join(" ", sort keys %ptm200btn)
-            if(!defined($ptm200btn{$c1}) || ($c2 && !defined($ptm200btn{$c2})));
+                                  join(" ", sort keys %EnO_ptm200btn)
+            if(!defined($EnO_ptm200btn{$c1}) || ($c2 && !defined($EnO_ptm200btn{$c2})));
       Log $ll2, "EnOcean: set $name $cmd";
 
-      my ($db_3, $status) = split(":", $ptm200btn{$c1}, 2);
+      my ($db_3, $status) = split(":", $EnO_ptm200btn{$c1}, 2);
       $db_3 <<= 5;
       $db_3 |= 0x10 if($c1 ne "released"); # set the pressed flag
       if($c2) {
-        my ($d2, undef) = split(":", $ptm200btn{$c2}, 2);
+        my ($d2, undef) = split(":", $EnO_ptm200btn{$c2}, 2);
         $db_3 |= ($d2<<1) | 0x01;
       }
       IOWrite($hash, "",
@@ -203,7 +224,7 @@ EnOcean_Parse($$)
   my ($iohash, $msg) = @_;
   my (undef,$rorg,$data,$id,$status,$odata) = split(":", $msg);
 
-  my $rorgname = $rorgname{$rorg};
+  my $rorgname = $EnO_rorgname{$rorg};
   if(!$rorgname) {
     Log 2, "Unknown EnOcean RORG ($rorg) received from $id";
     return "";
@@ -228,6 +249,7 @@ EnOcean_Parse($$)
   my $db_1 = hex substr($data,4,2) if($dl > 4);
   my $db_0 = hex substr($data,6,2) if($dl > 6);
   my $st = AttrVal($name, "subType", "");
+  my $model = AttrVal($name, "model", "");
 
   #################################
   # RPS: PTM200 based switch/remote or a windowHandle
@@ -242,14 +264,13 @@ EnOcean_Parse($$)
 
       # Theoretically there can be a released event with some of the A0,BI
       # pins set, but with the plastic cover on this wont happen.
-      $msg  = $ptm200btn[($db_3&0xe0)>>5];
-      $msg .= ",".$ptm200btn[($db_3&0x0e)>>1] if($db_3 & 1);
+      $msg  = $EnO_ptm200btn[($db_3&0xe0)>>5];
+      $msg .= ",".$EnO_ptm200btn[($db_3&0x0e)>>1] if($db_3 & 1);
       $msg .= " released" if(!($db_3 & 0x10));
 
     } else {
 
-      # Couldnt test
-      if($db_3 == 112) { # KeyCard
+      if($db_3 == 112) { # KeyCard, not tested
         $msg = "keycard inserted";
 
       # Only the windowHandle is setting these bits when nu=0
@@ -276,7 +297,7 @@ EnOcean_Parse($$)
     # the "real" state immediately.
     # In the case of an ElTako FSB61 the state should remain released (by Thomas)
     my $event = "state";
-    $event = "buttons" if($msg =~ m/released$/ && $st ne "FSB61");
+    $event = "buttons" if($msg =~ m/released$/ && $model ne "FSB61");
 
     push @event, "3:$event:$msg";
 
@@ -288,18 +309,17 @@ EnOcean_Parse($$)
 
   #################################
   } elsif($rorg eq "A5") {
-
     if(($db_0 & 0x08) == 0) {
       if($db_0 & 0x80) {
         my $fn = sprintf "%02x", ($db_3>>2);
         my $tp = sprintf "%02X", ((($db_3&3) << 5) | ($db_2 >> 3));
         my $mf = sprintf "%03X", ((($db_2&7) << 8) | $db_1);
-        $mf = $manuf{$mf} if($manuf{$mf});
+        $mf = $EnO_manuf{$mf} if($EnO_manuf{$mf});
         my $m = "teach-in:class A5.$fn.$tp (manufacturer: $mf)";
         Log 1, $m;
         push @event, "3:$m";
         my $st = "A5.$fn.$tp";
-        $st = $subTypes{$st} if($subTypes{$st});
+        $st = $EnO_subType{$model} if($EnO_subType{$st});
         $attr{$name}{subType} = $st;
 
         if("$fn.$tp" eq "20.01" && $iohash->{pair}) {      # MD15
@@ -314,7 +334,7 @@ EnOcean_Parse($$)
 
       }
 
-    } elsif($st eq "SR04") {
+    } elsif($model =~ m/^SR04/) {
       my ($fspeed, $temp, $present, $solltemp);
       $fspeed = 3;
       $fspeed = 2      if($db_3 >= 145);
@@ -346,7 +366,7 @@ EnOcean_Parse($$)
       push @event, "3:measured-temp:". sprintf "%.1f", ($db_1*40/255);
       EnOcean_MD15Cmd($hash, $name, $db_1);
       
-    } elsif($st eq "PM101") {
+    } elsif($model eq "PM101") {
       ####################################
       # Ratio Presence Sensor Eagle PM101, code by aicgazi
       ####################################
@@ -356,6 +376,61 @@ EnOcean_Parse($$)
       push @event, "3:brightness:$lux";
       push @event, "3:channel1:" . ($db_0 & 0x01 ? "off" : "on");
       push @event, "3:channel2:" . ($db_0 & 0x02 ? "off" : "on");
+
+    } elsif($st eq "FAH" || $model =~ /^(FAH60|FAH63|FIH63)$/) {
+      ####################################
+      # Eltako FAH60+FAH63+FIH63
+      # (EEP: 07-06-01 plus Data_byte3)
+      ####################################
+      # $db_3 is the illuminance where min 0x00 = 0 lx, max 0xFF = 100 lx;
+      # $db_2 must be 0x00
+
+      if($db_2 eq 0x00) {
+        my $luxlow = sprintf "%3d", $db_3;
+        $luxlow = sprintf "%d", ( $luxlow * 100 / 255 ) ;
+        push @event, "3:brightness:$luxlow";
+        push @event, "3:state:$luxlow";
+      } else {
+        # $db_2 is the illuminance where min 0x00 = 300 lx, max 0xFF = 30000 lx
+        my $lux = sprintf "%3d", $db_2;
+        $lux = sprintf "%d", (( $lux * 116.48) + 300 ) ;
+        push @event, "3:brightness:$lux";
+        push @event, "3:state:$lux";
+      }
+
+    } elsif($st eq "FBH" || $model =~ /^(FABH63|FBH55|FBH63|FIBH63)$/) {
+      ####################################
+      # Eltako FABH63+FBH55+FBH63+FIBH63
+      # (EEP: similar 07-08-01)
+      ####################################
+      # $db_0 motion detection where 0x0D = motion and 0x0F = no motion
+      # (DB0_Bit1 = 1 or 0)
+
+      if($db_0 eq 0x0D) {
+        push @event, "3:motion:yes";
+        push @event, "3:state:yes";
+      }
+      if($db_0 eq 0x0F) {
+        push @event, "3:motion:no";
+        push @event, "3:state:no";
+      }
+      # $db_2 is the illuminance where min 0x00 = 0 lx, max 0xFF = 2048 lx
+      my $lux = sprintf "%3d", $db_2;
+      $lux = sprintf "%d", ( $lux * 2048 / 255 ) ;
+      push @event, "3:brightness:$lux";
+      # $db_3 is voltage in EEP 07-08-01 but not used by Eltako !?
+      # push @event, "3:voltage:$db_3";
+
+    } elsif($st eq "FTF" || $model eq "FTF55") {
+      ####################################
+      # Eltako FTF55
+      # (EEP: 07-02-05)
+      ####################################
+      # $db_1 is the temperature where 0x00 = 40°C and 0xFF 0°C
+      my $temp = sprintf "%3d", $db_1;
+      $temp = sprintf "%f.1", ( 40 - $temp * 40 / 255 ) ;
+      push @event, "3:temperature:$temp";
+      push @event, "3:state:$temp";
 
     } elsif($st eq "dimmer") {
       # todo: create a more general solution for the central-command responses
