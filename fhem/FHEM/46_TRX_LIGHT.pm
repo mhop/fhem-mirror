@@ -157,7 +157,12 @@ TRX_LIGHT_Set($@)
   for ($i=0; $i <= $#$rec && ($rec->[$i] ne $command); $i++) { ;}
 
   if($i > $#$rec) {
-	my $error = "Unknown command $command, choose one of " . join(" ", sort @$rec);
+	my $l = join(" ", sort @$rec); 
+	if ($device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT") {
+  		$l =~ s/ level / level:slider,0,1,15 /; 
+	}
+  	my $error = "Unknown command $command, choose one of $l"; 
+
 	Log 4, $error;
 	return $error;
   }
