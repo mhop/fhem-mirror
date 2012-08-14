@@ -1,5 +1,5 @@
 ##############################################
-# $Id: HttpUtils.pm 1148 2011-12-28 19:21:19Z rudolfkoenig $
+# $Id$
 package main;
 
 use strict;
