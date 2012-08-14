@@ -319,7 +319,7 @@ EnOcean_Parse($$)
         Log 1, $m;
         push @event, "3:$m";
         my $st = "A5.$fn.$tp";
-        $st = $EnO_subType{$model} if($EnO_subType{$st});
+        $st = $EnO_subType{$st} if($EnO_subType{$st});
         $attr{$name}{subType} = $st;
 
         if("$fn.$tp" eq "20.01" && $iohash->{pair}) {      # MD15
