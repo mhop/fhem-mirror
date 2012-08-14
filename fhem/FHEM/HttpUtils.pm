@@ -14,18 +14,18 @@ urlEncode($) {
   return $_;
 }
 
-
 ##################
 # - if data (which is urlEncoded) is set, then a POST is performed, else a GET.
 # - noshutdown must be set for e.g the Fritz!Box
 sub
-GetFileFromURL($@)
+CustomGetFileFromURL($$@)
 {
-  my ($url, $timeout, $data, $noshutdown) = @_;
+  my ($quiet, $url, $timeout, $data, $noshutdown) = @_;
   $timeout = 4.0 if(!defined($timeout));
 
+  my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log 1, "GetFileFromURL $url: malformed or unsupported URL";
+    Log 1, "GetFileFromURL $displayurl: malformed or unsupported URL";
     return undef;
   }
   
@@ -82,18 +82,35 @@ GetFileFromURL($@)
   }
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
-  Log 4, "GetFileFromURL: Got http://$host$path, length: ".length($ret);
+  my $hostpath= $quiet ? "<hidden>" : $host . $path;
+  Log 4, "GetFileFromURL: Got http://$hostpath, length: ".length($ret);
   undef $conn;
   return $ret;
 }
 
 ##################
 # Compatibility mode
+
+sub
+GetFileFromURL($@)
+{
+  my ($url, @a)= @_;
+  return CustomGetFileFromURL(0, $url, @a);
+}
+
+sub
+GetFileFromURLQuiet($@)
+{
+  my ($url, @a)= @_;
+  return CustomGetFileFromURL(1, $url, @a);
+}
+
 sub
 GetHttpFile($$)
 {
   my ($host,$file) = @_;
   return GetFileFromURL("http://$host$file");
 }
+
 
 1;
