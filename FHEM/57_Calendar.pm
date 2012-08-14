@@ -677,9 +677,9 @@ sub Calendar_GetUpdate($) {
   Log 4, "Calendar " . $hash->{NAME} . ": Updating...";
   my $url= $hash->{fhem}{url};
   
-  my $ics= GetFileFromURL($url);
+  my $ics= GetFileFromURLQuiet($url);
   if(!defined($ics)) {
-    Log 1, "Calendar " . $hash->{NAME} . ": Could not retrieve $url";
+    Log 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
     return 0;
   }
 
@@ -691,7 +691,7 @@ sub Calendar_GetUpdate($) {
 
   my @entries= @{$ical->{entries}};
   if($#entries<0) {
-    Log 1, "Calendar " . $hash->{NAME} . ": Not an ical file at $url";
+    Log 1, "Calendar " . $hash->{NAME} . ": Not an ical file at URL";
     $hash->{STATE}= "Not an ical file at URL";
     return 0;
   };
