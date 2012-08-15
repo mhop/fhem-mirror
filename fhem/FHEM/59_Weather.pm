@@ -52,6 +52,7 @@ sub Weather_Initialize($) {
   $hash->{DefFn}   = "Weather_Define";
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
+  $hash->{SetFn}   = "Weather_Set";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5 localicons event-on-update-reading event-on-change-reading";
 
 }
@@ -215,7 +216,7 @@ sub Weather_GetUpdate($)
   my $val= "T: $temperature  H: $humidity  W: $wind";
   Log GetLogLevel($hash->{NAME},4), "Weather ". $hash->{NAME} . ": $val";
   $hash->{STATE}= $val;
-  
+  addEvent($hash, $val);
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
       
   return 1;
@@ -245,6 +246,23 @@ sub Weather_Get($@) {
   }
 
   return "$a[0] $reading => $value";
+}
+
+###################################
+
+sub Weather_Set($@) {
+  my ($hash, @a) = @_;
+
+  my $cmd= $a[1];
+
+  # usage check
+  if((@a == 2) && ($a[1] eq "update")) {
+    RemoveInternalTimer($hash);
+    Weather_GetUpdate($hash);
+    return undef;
+  } else {
+    return "Unknown argument $cmd, choose one of update";
+  }
 }
 
 
@@ -330,7 +348,6 @@ WeatherIconIMGTag($$$) {
 }
 
 #####################################
-# This has to be modularized in the future.
 sub
 WeatherAsHtml($)
 {
