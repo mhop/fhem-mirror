@@ -428,7 +428,7 @@ EnOcean_Parse($$)
       ####################################
       # $db_1 is the temperature where 0x00 = 40°C and 0xFF 0°C
       my $temp = sprintf "%3d", $db_1;
-      $temp = sprintf "%f.1", ( 40 - $temp * 40 / 255 ) ;
+      $temp = sprintf "%0.1f", ( 40 - $temp * 40 / 255 ) ;
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
 
