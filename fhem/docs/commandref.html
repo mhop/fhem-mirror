@@ -10020,7 +10020,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
         <li>
 	Generate event "fan: on" if dewpoint of &lt;devicename-outside&gt; is lower 
 	than dewpoint of &lt;devicename&gt; and temperature of &lt;devicename-outside&gt; is &gt;= min-temp
-	and reading "fan" was not already "on".</li>
+	and reading "fan" was not already "on". The event will be generated for &lt;devicename&gt;.</li>
 	<li>Generate event "fan: off": else and if reading "fan" was not already "off".</li>
 	</ul>
     </ul>
@@ -10028,9 +10028,12 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 
     Example:<PRE>
     # Generate event "fan: on" when dewpoint of Aussen_1 is first 
-    # time lower than Keller_Raum1 and outside temperature is &gt;= 0
+    # time lower than basement_tempsensor and outside temperature is &gt;= 0
     # and change it to "fan: off" is this condition changes.
-    define dew_fan1 dewpoint fan Keller_Raum1 Aussen_1 0
+    # Set a switch on/off (fan_switch) depending on the state.
+    define dew_fan1 dewpoint fan basement_tempsensor Aussen_1 0
+    define dew_fan1_on notify basement_tempsensor.*fan:.*on set fan_switch on
+    define dew_fan1_off notify basement_tempsensor.*fan:.*off set fan_switch off
   
     </PRE>
   </ul>
@@ -10043,7 +10046,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	<ul>
         <li>
 	Generate reading/event "alarm: on" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is lower 
-	than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "on".</li>
+	than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "on". The event will be generated for &lt;devicename&gt;.</li>
 	<li>Generate reading/event "alarm: off" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is 		higher than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "off".</li>
 	</ul>
     </ul>
@@ -10054,7 +10057,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     # (roomsensor) to alarm if the temperature of the wall is lower than 
     # the dewpoint of the air. In this case the water of the air will 
     # condense on the wall because the wall is cold.
+    # Set a switch on (alarm_siren) if alarm is on using notify.
     define dew_alarm1 dewpoint alarm roomsensor wallsensor 0
+    define roomsensor_alarm_on notify roomsensor.*fan:.*on set alarm_siren on
+    define roomsensor_alarm_off notify roomsensor.*fan:.*off set alarm_siren off
 
     # If you do not have a temperature sensor in/on the wall, you may also
     # compare the rooms dewpoint to the temperature of the same or another 
