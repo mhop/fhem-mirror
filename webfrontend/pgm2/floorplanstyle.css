@@ -1,16 +1,16 @@
 body     { background-color: #F0F0F0;
            font-family:Arial, sans-serif; 
-           font-size:9px; background-image:url(Grundriss.bak.png); 
+           font-size:9px; background-image:url(../icons/Grundriss.bak);
            background-repeat:no-repeat;  }
 
 body[id~=Media]     { background-color: #A5A5A5;
                         font-family:Arial, sans-serif; 
                         font-size:9px;  
-                        background-image:url(Media.bak.png); 
+                        background-image:url(../icons/Media.bak);
                         background-repeat:no-repeat;  }
 
 #logo    { position:absolute; top: 10px; left: 10px; 
-           width:64px;  height:67px; background-image:url(fhem_smallscreen.png); }
+           width:64px;  height:67px; background-image:url(../icons/fhem_smallscreen); }
 #backimg {position:absolute; top:15px; left:190px;}
 #menu    { position:absolute; top:120px; left:20px; min-width:60px; }
 #menu.floorplan   { position:absolute; top:120px; left:20px; min-width:80px; font-size:14px; line-height:22px; }
