@@ -1,5 +1,6 @@
 ﻿################################################################################
 # 95 FLOORPLAN
+# $Id $
 # Feedback: http://groups.google.com/group/fhem-users
 # Define Custom Floorplans
 # Released : 26.02.2012
@@ -302,7 +303,7 @@ FP_htmlHeader($) {
   FW_pO  "<title>".$title."</title>";
   # Enable WebApp
   if($FW_tp || $FW_ss) { 
-    FW_pO "<link rel=\"apple-touch-icon-precomposed\" href=\"$FW_ME/fhemicon.png\"/>";
+    FW_pO "<link rel=\"apple-touch-icon-precomposed\" href=\"" . FW_IconURL("fhemicon") . "\"/>";
     FW_pO "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"/>";
     if($FW_ss) {
       FW_pO "<meta name=\"viewport\" content=\"width=320\"/>";
@@ -314,13 +315,17 @@ FP_htmlHeader($) {
   my $rf = AttrVal($FW_wname, "refresh", "");
   FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);					# use refresh-value from Web-Instance
   # stylesheet
-  if ($FP_name) {
-	my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
-  	FW_pO  ("<link href=\"$FW_ME/css/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix  #20120730 0017
-  } else {  
-	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
-    FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen  #20120730 0017
-  }
+  # removed the option to have different styles for FHEMWEB and FLOORPLAN
+  #   if ($FP_name) {
+  # 	my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
+  #   	FW_pO  ("<link href=\"$FW_ME/css/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix  #20120730 0017
+  #   } else {
+  # 	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
+  #     FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen  #20120730 0017
+  #   }
+  my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
+  FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";
+
   #set sripts
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
@@ -354,7 +359,7 @@ FP_showStart() {
     FW_pO '<div id="startcontent">';
 	FW_pO "<br><br><br><br>No floorplans have been defined yet. For definition, use<br>";
 	FW_pO "<ul><code>define &lt;name&gt; FLOORPLAN</code></ul>";
-	FW_pO 'Also check the <a href="/fhem/commandref.html#FLOORPLAN">commandref</a><br>';
+	FW_pO 'Also check the <a href="$FW_ME/docs/commandref.html#FLOORPLAN">commandref</a><br>';
 	FW_pO "</div>";
   }
   FW_pO "</body>";
@@ -369,7 +374,7 @@ FP_show(){
   ## body
   FW_pO "<body id=\"$FP_name-body\">\n";
   FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
-  FW_pO "<img src=\"$FW_ME/icons/fp_$FP_name.png\">";            								  # alternative: jpg - how?  #20120730 0017
+  FW_pO FW_makeImage("fp_$FP_name");
   FW_pO "</div>\n";
 
   ## menus
@@ -392,7 +397,7 @@ FP_show(){
    foreach my $d (sort keys %defs) {                                                          # loop all devices
 		my $type = $defs{$d}{TYPE};
 		my $attr = AttrVal("$d","fp_$FP_name", undef);
-		next if(!$attr || $type eq "weblink");                                                 # skip if device-attribute not set for current floorplan-name
+		next if(!$attr || $type eq "weblink");                         # skip if device-attribute not set for current floorplan-name
 		
 		my ($top, $left, $style, $text, $text2) = split(/,/ , $attr);
 		# $top   = position in px, top
@@ -407,6 +412,7 @@ FP_show(){
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"$d\" align=\"center\">";               # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
+		#Debug "txt is \"$txt\"";
 		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3);   # Style3 = DeviceReading given in $text
 		my $cols = ($cmdlist ? (split(":", $cmdlist)) : 0);                                    # Need command-count for colspan of devicename+state
 		
@@ -430,20 +436,20 @@ FP_show(){
 
     ########################
     # Device-state per device
-		FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
+	FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
         $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                               # format FHT-temperature
-		### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
-		my $fp_image = AttrVal("$d", "fp_image", undef);                                  # floorplan-independent icon
+	### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
+	my $fp_image = AttrVal("$d", "fp_image", undef);                                  # floorplan-independent icon
         my $fp_fpimage = AttrVal("$d","fp_$FP_name".".image", undef);                     # floorplan-dependent icon
         if ($fp_image) {
             my $state = ReadingsVal($d, "state", undef);
-		    $fp_image =~ s/\{state\}/$state/;                                             # replace {state} by actual device-status
-            $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;     # replace icon-link in html          
+	    $fp_image =~ s/\{state\}/$state/;                                             # replace {state} by actual device-status
+            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;     # replace icon-link in html          
         }
         if ($fp_fpimage) {
             my $state = ReadingsVal($d, "state", undef);
             $fp_fpimage =~ s/\{state\}/$state/;                                           # replace {state} by actual device-status
-            $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;   # replace icon-link in html           
+            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;   # replace icon-link in html           
         }
 		FW_pO "<td colspan=\"$cols\">$txt";
 		FW_pO "</td></tr>";

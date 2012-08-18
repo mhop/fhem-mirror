@@ -2,11 +2,6 @@
 # $Id$
 package main;
 
-#
-# #Todo:
-#       3) logical icons should contain no extension, initial icon search uses any graphics type of png, gif, jpg
-
-
 use strict;
 use warnings;
 use TcpServerUtils;
@@ -97,6 +92,12 @@ my $FW_chash;      # client fhem hash
 #my $FW_encoding="ISO-8859-1";
 my $FW_encoding="UTF-8";
 
+
+my $ICONEXTENSION = "gif|ico|png|jpg"; # don't forget to amend FW_ServeSpecial if you change this!
+
+# FIXME 
+#       use constant FOO => BAR
+# is better but then I cannot use FOO in a regexp. Any ideas how to fix it?
 
 #####################################
 sub
@@ -306,7 +307,7 @@ FW_ServeSpecial($$$) {
 
   #Debug "We serve $dir/$file.$ext";
   open(FH, "$dir/$file.$ext") || return 0;
-  binmode(FH) if($ext =~ m/gif|png|jpg/); # necessary for Windows
+  binmode(FH) if($ext =~ m/$ICONEXTENSION/); # necessary for Windows
   FW_pO join("", <FH>);
   close(FH);
   $FW_RETTYPE = "text/plain"             if($ext eq "txt");
@@ -316,6 +317,7 @@ FW_ServeSpecial($$$) {
   $FW_RETTYPE = "image/jpeg"             if($ext eq "jpg");
   $FW_RETTYPE = "image/png"              if($ext eq "png");
   $FW_RETTYPE = "image/gif"              if($ext eq "gif");
+  $FW_RETTYPE = "image/x-icon"           if($ext eq "ico");
   return 1;
 }
   
@@ -422,7 +424,7 @@ FW_AnswerCall($)
       $cachable = 0;
       return 0 if(!$icon);
     }
-    $FW_icons{$icon} =~ m/(.*)\.(gif|jpg|png)/;
+    $FW_icons{$icon} =~ m/(.*)\.($ICONEXTENSION)/;
     my ($file,$ext)= ($1,$2);
     
     if(FW_ServeSpecial($file,$ext,$FW_icondir)) {
@@ -536,7 +538,7 @@ FW_AnswerCall($)
 
   # Enable WebApp
   if($FW_tp || $FW_ss) {
-    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/icons/fhemicon.png"/>';
+    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/icons/fhemicon"/>';
     FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     if($FW_ss) {
       FW_pO '<meta name="viewport" content="width=320"/>';
@@ -937,9 +939,8 @@ FW_roomOverview($)
           if($idx<int(@list1)-1);
       } else {
         pF "<tr%s>", $l1 eq $FW_room ? " class=\"sel\"" : "";
-        my $icon = "";
-        $icon = "<img src=\"$FW_ME/icons/ico${l1}.png\">&nbsp;"
-                if($FW_icons{"ico${l1}.png"});
+        # image tag if we have an icon, else empty
+        my $icon= $FW_icons{"ico${l1}"} ? FW_makeImage("ico${l1}") . "&nbsp;" : "";
 
         if($l2 =~ m/.html$/ || $l2 =~ m/^http/) {
            FW_pO "<td><a href=\"$l2\">$icon$l1</a></td>";
@@ -1005,6 +1006,9 @@ FW_showRoom()
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
       my $devName = AttrVal($d, "alias", $d);
       my $icon = AttrVal($d, "icon", "");
+      if($icon =~ m/^(.*)\.($ICONEXTENSION)$/) {
+        $icon= $1; # silently remove the extension
+      }
       $icon = FW_makeImage($icon) . "&nbsp;" if($icon);
 
       if($FW_hiddenroom{detail}) {
@@ -1172,10 +1176,10 @@ FW_logWrapper($)
   } else {
     FW_pO "<div id=\"content\">";
     FW_pO "<br>";
-    FW_zoomLink("cmd=$cmd;zoom=-1", "Zoom-in.png", "zoom in");
-    FW_zoomLink("cmd=$cmd;zoom=1",  "Zoom-out.png","zoom out");
-    FW_zoomLink("cmd=$cmd;off=-1",  "Prev.png",    "prev");
-    FW_zoomLink("cmd=$cmd;off=1",   "Next.png",    "next");
+    FW_zoomLink("cmd=$cmd;zoom=-1", "Zoom-in", "zoom in");
+    FW_zoomLink("cmd=$cmd;zoom=1",  "Zoom-out","zoom out");
+    FW_zoomLink("cmd=$cmd;off=-1",  "Prev",    "prev");
+    FW_zoomLink("cmd=$cmd;off=1",   "Next",    "next");
     FW_pO "<table><tr><td>";
     FW_pO "<td>";
     my $logtype = $defs{$d}{TYPE};
@@ -1954,10 +1958,10 @@ FW_showWeblink($$$$)
        ($defs{$d}{WLTYPE} eq "fileplot" || $defs{$d}{WLTYPE} eq "dbplot")&&
        !AttrVal($d, "fixedrange", undef)) {
 
-      FW_zoomLink("zoom=-1", "Zoom-in.png", "zoom in");
-      FW_zoomLink("zoom=1",  "Zoom-out.png","zoom out");
-      FW_zoomLink("off=-1",  "Prev.png",    "prev");
-      FW_zoomLink("off=1",   "Next.png",    "next");
+      FW_zoomLink("zoom=-1", "Zoom-in", "zoom in");
+      FW_zoomLink("zoom=1",  "Zoom-out","zoom out");
+      FW_zoomLink("off=-1",  "Prev",    "prev");
+      FW_zoomLink("off=1",   "Next",    "next");
       $buttons = 0;
       FW_pO "<br>";
     }
@@ -2013,7 +2017,7 @@ FW_Attr(@)
 
 sub
 FW_ReadIconsFrom($$) {
-  # recursively reads .gif .jpg .png files and returns filenames as array
+  # recursively reads .gif .ico .jpg .png files and returns filenames as array
   # recursion starts at $FW_icondir/$dir
   # filenames are relative to $FW_icondir
 
@@ -2023,27 +2027,23 @@ FW_ReadIconsFrom($$) {
   
   my (@entries, @filenames);
   if(opendir(DH, "${FW_icondir}/${dir}")) {
-    @entries= sort readdir(DH); # assures order: .gif  .jpg  .png
+    @entries= sort readdir(DH); # assures order: .gif  .ico  .jpg  .png
     closedir(DH);
   }
   #Debug "$#entries entries found.";
   foreach my $entry (@entries) {
     my $filename= "$dir/$entry";
-    my $iconname= "${prepend}${entry}";
-    #Debug " entry: \"$entry\", filename= \"$filename\", iconname= \"$iconname\"";
+    #Debug " entry: \"$entry\", filename= \"$filename\"";
     if( -d "${FW_icondir}/${filename}" ) {
       # entry is a directory
-      FW_ReadIconsFrom("${iconname}/", $filename) unless($entry eq "." || $entry eq "..");
+      FW_ReadIconsFrom("${prepend}${entry}/", $filename) unless($entry eq "." || $entry eq "..");
     } elsif( -f "${FW_icondir}/${filename}") {
       # entry is a regular file
-      if($entry =~ m/\.(png|gif|jpg)$/i) {
-        # extension is .gif  .jpg  .png
-        #my $basename= $entry;
-        #$basename =~ s/\.[^.]+$//; # cut extension
-        # priority due to sort: .png (highest) to .gif (lowest)
-        #$FW_icons{"${prepend}${basename}"}= $filenamerel;
-        # store icon with extension
-        $FW_icons{"${prepend}${entry}"}= $filename;
+      if($entry =~ m/^(.*)\.($ICONEXTENSION)$/i) {
+        my $logicalname= $1;
+        my $iconname= "${prepend}${logicalname}";
+        #Debug "    icon: \"$iconname\"";
+        $FW_icons{$iconname}= $filename;
       }
     }
   }
@@ -2085,10 +2085,20 @@ FW_GetIcons() {
 }
 
 sub
+FW_canonicalizeIcon($) {
+  my ($name)= @_;
+  if($name =~ m/^(.*)\.($ICONEXTENSION)$/) {
+    Log 1, "WARNING: argument of FW_canonicalizeIcon($name) has extension - inform the developers!";
+    $name= $1;
+  }
+  return $name;
+}
+
+sub
 FW_getIcon($) {
   my ($name)= @_;
-  my $icon= "$name.png";        # FIXME
-  return $FW_icons{$icon} ? $icon : undef;
+  $name= FW_canonicalizeIcon($name);
+  return $FW_icons{$name} ? $name : undef;
 }
 
 # returns the physical absolute path relative for the logical path
@@ -2097,10 +2107,8 @@ FW_getIcon($) {
 #       weather/sunny   ->      $FW_icondir/default/weather/sunny.gif
 sub
 FW_IconPath($) {
-
   my ($name)= @_;
-  $name =~ s/\.(png)$//;           # FIXME
-  $name= "${name}.png";           # FIXME
+  $name= FW_canonicalizeIcon($name);
   FW_GetIcons(); # get the icon set for the current instance
   my $path= $FW_icons{$name};
   return $path ? $FW_icondir. $path : undef;
@@ -2112,8 +2120,8 @@ FW_IconPath($) {
 #       weather/sunny   ->      /icons/sunny
 sub FW_IconURL($) {
   my ($name)= @_;
-  $name =~ s/\.(png)$//;                           # FIXME
-  return "$FW_ME/icons/${name}.png";        # FIXME
+  $name= FW_canonicalizeIcon($name);
+  return "$FW_ME/icons/${name}";
 }
 
 
