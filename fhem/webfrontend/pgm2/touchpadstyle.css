@@ -5,7 +5,7 @@ textarea { font-family:Arial, sans-serif; font-size:16px}
 input    { font-family:Arial, sans-serif; font-size:16px}
 select   { font-family:Arial, sans-serif; font-size:16px}
 #logo    { position:absolute; top:10px; left:10px;
-            width:100px;  height:105px; background-image:url(fhem.png); }
+            width:100px;  height:105px; background-image:url(fhem); }
 #menu    { position:absolute; top:120px;left:10px; width:100px; }
 #hdr     { position:absolute; top:10px; left:140px; }
 #content { position:absolute; top:50px; left:140px; bottom:20px; right:10px; }
