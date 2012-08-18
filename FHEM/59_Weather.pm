@@ -332,9 +332,9 @@ WeatherIconIMGTag($$$) {
     $icon =~ s,^/ig/images/weather/(.*)\.gif$,$1,;
 
     if($isday) {
-      $icon= "weather/${icon}.png"
+      $icon= "weather/${icon}"
     } else {
-      $icon= "weather/${icon}_night.png"
+      $icon= "weather/${icon}_night"
     }
 
     $url= "fhem/icons/$icon";
