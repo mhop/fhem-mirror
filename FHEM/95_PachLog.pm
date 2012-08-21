@@ -71,7 +71,7 @@ sub PachLog_Define($@)
   # X-API-Key steht im DEF %defs{<NAME>}{DEF}
   # Alternativ nach $defs{<NAME>}{XAPIKEY}
   my($package, $filename, $line, $subroutine) = caller(3);
-  Log 0 , "PachLog_Define => $package: $filename LINE: $line SUB: $subroutine \n";
+  # Log 0 , "PachLog_Define => $package: $filename LINE: $line SUB: $subroutine \n";
   Log 5, Dumper(@_) . "\n";
   return "Unknown argument count " . int(@a) . " , usage set <name> dataset value or set <name> delete dataset"  if(int(@a) != 1);
   return undef;
@@ -183,7 +183,7 @@ sub PachLog_Notify ($$)
     $feed{$feednr}{$r}{VAL} = &ReadingToNumber($i,$ll) ;
 
   }
-#  Log $ll, "PACHLOG => dumper(FEED) => " .Dumper(%feed);
+  #  Log $ll, "PACHLOG => dumper(FEED) => " .Dumper(%feed);
 
   # CVS-Data
   my @cvs = ();
@@ -224,7 +224,7 @@ sub PachLog_Notify ($$)
     # Ueberpruefen wir, ob alles okay war:
     if ($res->is_success())
     {
-        Log 0,("PACHLOG => Update[" . $t ."]: " . $cvs_data . " >> SUCCESS\n");
+        Log 5,("PACHLOG => Update[" . $t ."]: " . $cvs_data . " >> SUCCESS\n");
         # Time setzten
         $defs{$d}{READINGS}{$t}{TIME} = TimeNow();
     }
