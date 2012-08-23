@@ -406,7 +406,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     of the standardized readings updating mechanism in fhem.pl. Check the modules
     Attributes list if you want to know if it is supporting it.
     <br><br>
-    
+
     <a name="event-on-update-reading"></a>
     <li>event-on-update-reading<br>
     If not set, every update of any reading creates an event, which e.g. is handled
@@ -1308,7 +1308,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="motd"></a>
     <li>motd<br>
         Message Of The Day. Displayed on the homescreen of the FHEMWEB package,
-        or directly after the telnet logon, before displaying the fhem> prompt. 
+        or directly after the telnet logon, before displaying the fhem> prompt.
         SecurityCheck is setting motd if it is not defined upon startup, to
         avoid this set the motd value to none
     </li><br>
@@ -1436,7 +1436,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     Returns, line by line, the UIDs of all calendar events whose summary matches the regular expression
     &lt;regexp&gt;.<br><br>
-    
+
   </ul>
   <br>
 
@@ -1450,7 +1450,7 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Description</b>
   <ul>
-  
+
   A calendar is a set of calendar events. A calendar event has a summary (usually the title shown in a visual
   representation of the source calendar), a start time, an end time, and zero, one or more alarm times. The calendar events are
   fetched from the source calendar at the given URL. In case of multiple alarm times for a calendar event, only the
@@ -1558,10 +1558,10 @@ A line ending with \ will be concatenated with the next one, so long lines
     </code><br><br>
     </ul>
 
-    
+
   </ul>
 
-  
+
 </ul>
 
 
@@ -1895,7 +1895,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>follow-on-for-timer<br>
     schedule a "setstate off;trigger off" for the time specified as argument to
     the on-for-timer command. Or the same with on, if the command is
-    off-for-timer. 
+    off-for-timer.
     </li><br>
 
     <a name="follow-on-timer"></a>
@@ -3325,29 +3325,29 @@ A line ending with \ will be concatenated with the next one, so long lines
       <li>remotes, pushButton
        <ul>
         * devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual] [set|remove]<br>
-         Pair/unpair a sender-channel device directly with a actuator-channel. 
-		 Trigger from the sender-channel, e.g. button press, will be processed by the 
+         Pair/unpair a sender-channel device directly with a actuator-channel.
+		 Trigger from the sender-channel, e.g. button press, will be processed by the
 		 actuator-channel without CCU interaction.
 
 		 Sender (remote or pushButton) must be set into learning after command execution.
 		 Processing in the sender will be postponed until then.<br>
-		 devicepair can be executed multiple times with the same settings - it will 
+		 devicepair can be executed multiple times with the same settings - it will
 		 cause the pairing specific parameter to be set to HM defaults. <br>
-		 It is possible to devicepair one actuator-channel to multiple sender-channel 
+		 It is possible to devicepair one actuator-channel to multiple sender-channel
 		 as well as one sender-channel to multiple Actuator-channel. <br>
 		 &lt;hmDevice&gt; is the actuator-channel to be paired.<br>
-		 &lt;btn_no&gt; is the sender-channel (button) to be paired. If 'single' 
+		 &lt;btn_no&gt; is the sender-channel (button) to be paired. If 'single'
 		 is choosen buttons are counted from 1. For 'dual' btn_no is the number
-		 of the Button-pair to be used. I.e. '3' 
-		 in dual is the 3rd button pair correcponding to button 5 and 6 in 
+		 of the Button-pair to be used. I.e. '3'
+		 in dual is the 3rd button pair correcponding to button 5 and 6 in
 		 single mode.<br>
-		 [single|dual]: this mode impacts the default behavior of the 
-		 Actuator upon using this button. E.g. a dimmer can be learned to a 
+		 [single|dual]: this mode impacts the default behavior of the
+		 Actuator upon using this button. E.g. a dimmer can be learned to a
 		 single button or to a button pair. <br>
-		 'dual' (default) Button pairs two buttons to one actuator. With a 
+		 'dual' (default) Button pairs two buttons to one actuator. With a
 		 dimmer this means one button for dim-up and one for dim-down. <br>
 		 'single' uses only one button of the sender. It is useful for e.g. for
-		 simple switch actuator to toggle on/off. Nevertheless 
+		 simple switch actuator to toggle on/off. Nevertheless
 		 also dimmer can be learned to only one button. <br>
 		 'set'   will setup pairing for the channels<br>
 		 'unset' will remove the pairing for the channels<br>
@@ -3402,7 +3402,7 @@ A line ending with \ will be concatenated with the next one, so long lines
              specified for each week day, the resolution is 10 Minutes. The
              last time spec must always be 24:00.<br>
              Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
-             Meaning: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
+             Meaning: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be
              22.5, thereafter until midnight, 19 degrees celsius is desired.</li>
          <li>displayMode [temp-only|temp-hum]<br>
              displayTemp [actual|setpoint]<br>
@@ -3496,6 +3496,10 @@ A line ending with \ will be concatenated with the next one, so long lines
   <li>switch/dimmer/blindActuator:<br>
       deviceMsg [on|off|$val %]<br>
       poweron [on|off|$val]<br>
+  <li>HM-LC-SW1-BA-PCB:<br>
+      deviceMsg [on|off]<br>
+      poweron [on|off]<br>
+      battery: [low|ok]<br>
   <li>dimmer:<br>
       dim: [up|down|stop]<br>
   <li>HM-LC-BL1-PB-FM:<br>
@@ -3733,14 +3737,14 @@ A line ending with \ will be concatenated with the next one, so long lines
     </code></ul>
     </li>
 
-	When as last argument a g&lt;groupnr&gt; is present, the command will be sent 
+	When as last argument a g&lt;groupnr&gt; is present, the command will be sent
 	to the EIB group indexed by the groupnr (starting by 1, in the order as given in Define).
 	<br>Example:
 	<ul><code>
 	   define lamp1 EIB 0/10/01 0/10/02<br>
 	   set lamp1 on g2 (will send "on" to 0/10/02)
 	</code></ul>
-   
+
   </ul>
   <br>
 
@@ -3910,7 +3914,7 @@ A line ending with \ will be concatenated with the next one, so long lines
      <ul>
         <li>released<br>
           The status of the device my become "released", this is not the case
-          for a normal switch. 
+          for a normal switch.
      </ul>
 
      <li>windowHandle (HOPPE SecuSignal). Set the subType attr to windowHandle.
@@ -3974,7 +3978,7 @@ A line ending with \ will be concatenated with the next one, so long lines
        <li>brightness: $lux
        <li>state: $lux
      </ul>
-     
+
      <li>FABH63,FBH55,FBH63,FIBH63 Motion/brightness sensor.<br>
          Set subType to FBH or model to FABH63/FBH55/FBH63/FIBH63 manually.<br>
      <ul>
@@ -3987,7 +3991,7 @@ A line ending with \ will be concatenated with the next one, so long lines
      <ul>
        <li>temperature: $temp
        <li>state: $temp
-     </ul> 
+     </ul>
 
   </ul>
 </ul>
@@ -4346,7 +4350,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="ww_timermode"></a>
     <li>ww_timermode [automatik|tag]<br>
         Defines the working mode for the ww_on-for-timer command (default is tag).<br>
-        ww_on-for-timer will set the ww_betriebsart of the heater according to this attribute. 
+        ww_on-for-timer will set the ww_betriebsart of the heater according to this attribute.
         </li>
 
   </ul>
@@ -4397,7 +4401,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>HK2_Raumisttemperatur
     <li>HK2_Raumsolltemperatur
     <li>HK2_Vorlaufisttemperatur
-    <li>HK2_Vorlaufsolltemperatur    
+    <li>HK2_Vorlaufsolltemperatur
     <li>Kessel_Betrieb
     <li>Kessel_Fehler
     <li>Kessel_Integral
@@ -4561,7 +4565,7 @@ To send the data, both send or write could be used.<br>
 </ul>
 <br><br>
 <a name="MSGFile"></a>
-<h3>MSGFile</h3>	
+<h3>MSGFile</h3>
 <ul>
 		The MSGFile device is a frontend device for message handling.
 		With a MSGFile device data is written to disk (or other media).
@@ -4570,7 +4574,7 @@ To send the data, both send or write could be used.<br>
 		A MSGFile device needs the operating systems rights to write to the filesystem.
 		To set the rights for a directory, please use OS related commands.
 <br><br>
-	<a name="#MSGFileDefine"></a> 
+	<a name="#MSGFileDefine"></a>
 	<b>Define</b>
 	<ul><br>
 		<code>define &lt;name&gt; MSGFile &lt;filename&gt;</code><br><br>
@@ -4629,9 +4633,9 @@ To send the data, both send or write could be used.<br>
     <li><a href="#loglevel">loglevel</a></li>
   </ul>
 </ul>
-		
+
 <a name="MSGMail"></a>
-<h3>MSGMail</h3>	
+<h3>MSGMail</h3>
 <ul>
 		The MSGMail device is a frontend device for mail message handling.
 		With a MSGMaildevice data is fowarded to a mail provider and send to a recipent.
@@ -4685,7 +4689,7 @@ To send the data, both send or write could be used.<br>
 			<code>set myMsg send myMail</code><br>
 			<code>set myMail clear</code><br>
 		</ul><br>
-</ul>		
+</ul>
 
 <a name="MSGMailattr"></a>
 <b>Attributes</b>
@@ -4725,13 +4729,13 @@ To send the data, both send or write could be used.<br>
 		Per default this attribute is enabled</li>
     <li><a href="#loglevel">loglevel</a></li>
   </ul>
-</ul>		
+</ul>
 
 
 <a name="LUXTRONIK2"></a>
 <h3>LUXTRONIK2</h3>
 <ul>
-  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan Heatpumps. 
+  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan Heatpumps.
   It can be directly integrated into a local area network (Ethernet port).<br>
   <br>
 
@@ -5241,7 +5245,7 @@ To send the data, both send or write could be used.<br>
     The parameters <code>latitude</code> and <code>longitude</code> are decimal numbers which give the position on earth for which the twilight states shall be calculated.<br>
 	The parameter indoor_horizon gives a virtual horizon higher than 0, that shall be used for calculation of indoor twilight (typical values are between 0 and 6)<br>
 	The parameter Weather_Position is the yahoo weather id used for getting the weather condition. Go to http://weather.yahoo.com/ and enter a city or zip code. In the upcoming webpage, the id is a the end of the URL. Example: Munich, Germany -> 676757<br>
-    
+
 	Example:
     <pre>
       define myTwilight Twilight 49.962529  10.324845 3 676757
@@ -5260,7 +5264,7 @@ To send the data, both send or write could be used.<br>
   <a name="Twilightget"></a>
   <b>Get</b>
   <ul>
-  
+
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
     <table>
     <tr><td>light</td><td>the current virtual daylight value</td></tr>
@@ -5277,7 +5281,7 @@ To send the data, both send or write could be used.<br>
     <tr><td>ss</td><td>time of sunset</td></tr>
     <tr><td>ss_civil</td><td>time of civil sunset</td></tr>
     <tr><td>ss_nautic</td><td>time of nautic sunset</td></tr>
-    <tr><td>ss_astro</td><td>time of astro sunset</td></tr>	
+    <tr><td>ss_astro</td><td>time of astro sunset</td></tr>
     </table>
 
   </ul>
@@ -5487,7 +5491,7 @@ To send the data, both send or write could be used.<br>
     </ul> <br>
 
   <a name="POKEYS_set"></a>
-  <b>Set</b> 
+  <b>Set</b>
   <ul>
 	<code>set &lt;name&gt; &lt;state&gt; [&lt;time in ms&gt;]</code> <br>
 	<br>
@@ -5502,7 +5506,7 @@ To send the data, both send or write could be used.<br>
   </ul><br>
 
   <a name="POKEYS_get"></a>
-  <b>Get</b> 
+  <b>Get</b>
   <ul>
 	<code>get &lt;name&gt; &lt;type&gt; </code> <br>
 	<br>
@@ -5515,7 +5519,7 @@ To send the data, both send or write could be used.<br>
       # gets the version of the POKEYS device<br>
     </ul>
   </ul><br>
-  
+
   <a name="POKEYS_attr"></a>
   <b>Attributes</b>
   <ul>
@@ -5821,7 +5825,7 @@ Attributes:<br>
     </ul>
   </ul>
   <br>
-  
+
   <a name="ITset"></a>
   <b>Set </b>
   <ul>
@@ -6003,7 +6007,7 @@ Attributes:<br>
 
   Currently a media RSS feed delivering status pictures in JPEG format is supported. This media
   RSS feed can be used to feed a status display to a network-enabled photo frame.<p>
-  
+
   You need to have the perl module <code>GD</code> installed. This module is most likely not
   available for small systems like Fritz!Box.<p>
 
@@ -6026,7 +6030,7 @@ Attributes:<br>
     </ul>
     <br>
   </ul>
-    
+
   <a name="RSSset"></a>
   <b>Set</b>
   <ul>
@@ -6074,10 +6078,10 @@ Attributes:<br>
   in <code>size</code>. The background is black if no usable JPEG picture can be found. Next the
   script in the <a href="RSSlayout">layout definition</a> is used to superimpose items on
   the background.<p>
-  
+
   You can directly access the URL of the JPEG picture in your browser. Reload the page to see
   how it works.<p>
-  
+
   The media RSS feed advertises to refresh after 1 minute (ttl). Some photo frames ignore it and
   use their preset refresh rate. Go for a photo frame with an adjustable refresh rate (e.g
   every 5 seconds) if you have the choice!<p>
@@ -6091,7 +6095,7 @@ Attributes:<br>
   attr FrameRSS bg /usr/share/pictures<br>
   attr FrameRSS tmin 10<br>
   </code>
- 
+
   </ul>
 
   <a name="RSSlayout"></a>
@@ -6149,16 +6153,16 @@ Attributes:<br>
     text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "°C" }<br>
     gif 20 530 www.google.com:80 { ReadingsVal("e.ext.Weather","icon","") }<br>
     </code>
-    
+
   </ul>
 
 
 
 
-  
 
 
-  
+
+
 </ul>
 
 
@@ -6412,7 +6416,7 @@ Attributes:<br>
   </ul>
   <br><br>
 
-  
+
   <b>Example 1</b>
   <br><br>
   <ul>
@@ -6478,7 +6482,7 @@ Attributes:<br>
 
    </ul>
 
-   
+
 </ul>
 
 
@@ -7139,7 +7143,7 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
     <ul>
     <li> 41_OREGON.pm (see device <a href="#OREGON">OREGON</a>): Process messages Oregon Scientific weather sensors.
   See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> of
-  Oregon Scientific weather sensors that could be received by the RFXCOM receivers. 
+  Oregon Scientific weather sensors that could be received by the RFXCOM receivers.
   Until now the following Oregon Scientific weather sensors have been tested successfully: BTHR918, BTHR918N, PCR800, RGR918, THGR228N, THGR810, THR128, THWR288A, WTGR800, WGR918. It will probably work with many other Oregon sensors supported by RFXCOM receivers. Please give feedback if you use other sensors.<br>
     </li>
     <li> 42_RFXMETER.pm (see device <a href="#RFXMETER">RFXMETER</a>): Process RFXCOM RFXMeter devices. See <a href="http://www.rfxcom.com/sensors.htm">http://www.rfxcom.com/sensors.htm</a>.</li>
@@ -7186,17 +7190,17 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
     <li><a href="#attrdummy">dummy</a></li><br>
     <li>longids<br>
         Comma separated list of device-types for RFXCOM that should be handled using long IDs. This additional ID is a one byte hex string and is generated by the Oregon sensor when is it powered on. The value seems to be randomly generated. This has the advantage that you may use more than one Oregon sensor of the same type even if it has no switch to set a sensor id. For example the author uses two BTHR918N sensors at the same time. All have different deviceids. The drawback is that the deviceid changes after changing batteries. All devices listed as longids will get an additional one byte hex string appended to the device name.<br>
-Default is to use long IDs for all devices. 
+Default is to use long IDs for all devices.
       <br><br>
       Examples:<PRE>
-# Do not use any long IDs for any devices: 
+# Do not use any long IDs for any devices:
 attr RFXCOMUSB longids 0
-# Use any long IDs for all devices (this is default): 
+# Use any long IDs for all devices (this is default):
 attr RFXCOMUSB longids 1
-# Use longids for BTHR918N devices. 
+# Use longids for BTHR918N devices.
 # Will generate devices names like BTHR918N_f3.
 attr RFXCOMUSB longids BTHR918N
-# Use longids for TX3_T and TX3_H devices. 
+# Use longids for TX3_T and TX3_H devices.
 # Will generate devices names like TX3_T_07, TX3_T_01 ,TX3_H_07.
 attr RFXCOMUSB longids TX3_T,TX3_H</PRE>
     </li><br>
@@ -8009,13 +8013,13 @@ Terminating
       <pre>
       #
       # Webcam credentials
-      # 
+      #
       $credentials{&lt;name_cam1&gt;}{username} = "&lt;your_username&gt;";
       $credentials{&lt;name_cam1&gt;}{password} = "&lt;your_password&gt;";
       $credentials{&lt;name_cam2&gt;}{username} = "&lt;your_username&gt;";
       $credentials{&lt;name_cam2&gt;}{password} = "&lt;your_password&gt;";
       ...
-      </pre> 
+      </pre>
       Replace <code>&lt;name_cam1&gt;</code> respectively <code>&lt;name_cam2&gt;</code>
       with the names of your defined ip-cams and <code>&lt;your_username&gt;</code> respectively
       <code>&lt;your_password&gt;</code> with your credentials (all without the brackets
@@ -8322,14 +8326,14 @@ href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">U
 <ul>
   <table>
   <tr><td>
-  This module is for the <a href="http://www.rfxcom.com">RFXCOM</a> RFXtrx433 USB based 433 Mhz RF transmitters. 
+  This module is for the <a href="http://www.rfxcom.com">RFXCOM</a> RFXtrx433 USB based 433 Mhz RF transmitters.
 This USB based transmitter is able to receive and transmit many protocols like Oregon Scientific weather sensors, X10 security and lighting devices, ARC ((address code wheels) HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO,
 AB600, Duewi, DomiaLite, COCO) and others. <br>
   Currently the following parser modules are implemented: <br>
     <ul>
     <li> 46_TRX_WEATHER.pm (see device <a href="#TRX">TRX</a>): Process messages Oregon Scientific weather sensors.
   See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> for a list of
-  Oregon Scientific weather sensors that could be received by the RFXtrx433 tranmitter. 
+  Oregon Scientific weather sensors that could be received by the RFXtrx433 tranmitter.
   Until now the following Oregon Scientific weather sensors have been tested successfully: BTHR918, BTHR918N, PCR800, RGR918, THGR228N, THGR810, THR128, THWR288A, WTGR800, WGR918. It will also work with many other Oregon sensors supported by RFXtrx433. Please give feedback if you use other sensors.<br>
     </li>
     <li> 46_TRX_SECURITY.pm (see device <a href="#TRX_SECURITY">TRX_SECURITY</a>): Receive X10, KD101 and Visonic security sensors.</li>
@@ -8383,14 +8387,14 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
 Default is to use no long IDs.
       <br><br>
       Examples:<PRE>
-# Do not use any long IDs for any devices (this is default): 
+# Do not use any long IDs for any devices (this is default):
 attr RFXCOMUSB longids 0
 # Use long IDs for all devices:
 attr RFXCOMUSB longids 1
-# Use longids for BTHR918N devices. 
+# Use longids for BTHR918N devices.
 # Will generate devices names like BTHR918N_f3.
 attr RFXTRXUSB longids BTHR918N
-# Use longids for TX3_T and TX3_H devices. 
+# Use longids for TX3_T and TX3_H devices.
 # Will generate devices names like TX3_T_07, TX3_T_01 ,TX3_H_07.
 attr RFXTRXUSB longids TX3_T,TX3_H</PRE>
     </li><br>
@@ -8436,7 +8440,7 @@ attr RFXTRXUSB longids TX3_T,TX3_H</PRE>
     <br>
     <code>&lt;deviceid2&gt;</code>
     <ul>
-    is optional and specifies the second device id of the device if it exists. For example sd90 smoke sensors can be configured to report two device ids. 
+    is optional and specifies the second device id of the device if it exists. For example sd90 smoke sensors can be configured to report two device ids.
     </ul>
     <br>
     <code>&lt;devicelog2&gt;</code>
@@ -8544,7 +8548,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     where <code>value</code> is one of:<br>
     <pre>
     off
-    on                 
+    on
     dim                # only for X10, KOPPLA
     bright             # only for X10, KOPPLA
     all_off            # only for X10, ARC, EMW200, AC, HOMEEASY, ANSLUT
@@ -8573,7 +8577,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 <h3>TRX_WEATHER</h3>
 <ul>
   The TRX_WEATHER module interprets weather sensor messages received by a RTXtrx receiver. See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> for a list of
-  Oregon Scientific weather sensors that could be received by the RFXtrx433 tranmitter. You need to define a RFXtrx433 receiver first. See 
+  Oregon Scientific weather sensors that could be received by the RFXtrx433 tranmitter. You need to define a RFXtrx433 receiver first. See
   See <a href="#TRX">TRX</a>.
 
   <br><br>
@@ -8593,7 +8597,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	"THGR810",<br>
 	"RTGR328",<br>
 	"THGR328",<br>
-	"WTGR800_T" (for temperature of WTGR800),<br> 
+	"WTGR800_T" (for temperature of WTGR800),<br>
 	"THGR918" (for THGR918, THGRN228, THGN500),<br>
 	"TFATS34C" (for TFA TS34C),<br>
 	"BTHR918",<br>
@@ -8831,7 +8835,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   classes is a hex-list of ZWave device classes. This argument is usually
   specified by autocreate when creating a device. If you wish to manually
   create a device, use the classes attribute instead, see below for details.
-  Defining a ZWave device the first time is usually done by autocreate. 
+  Defining a ZWave device the first time is usually done by autocreate.
   <br>
   Example:
   <ul>
@@ -9037,7 +9041,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
           can group these weblinks by putting them into rooms.  If you convert
           the current logfile to a weblink, it will always refer to the current
           file, even if its name changes regularly (and not the one you
-          originally specified).</li> 
+          originally specified).</li>
 	</ul>
   </ul>
 
@@ -9208,7 +9212,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <br>
 
   <a name="FHEMWEBset"></a>
-  <b>Set</b> 
+  <b>Set</b>
   <ul>
     <code>set &lt;name&gt; rereadicons</code>
     <br><br>
@@ -9228,7 +9232,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     /data/Homeautomation/fhem/FHEM/FS20.on.png
     </code>
     <br><br>
-    
+
   </ul>
 
 
@@ -9477,12 +9481,12 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 <a name="FLOORPLAN"></a>
 <h3>FLOORPLAN</h3>
 <ul>
-  Implements an additional entry "Floorplans" to your fhem menu, leading to a userinterface without fhem-menu, rooms or devicelists. 
-  Devices can be displayed at a defined coordinate on the screen, usually with a clickable icon allowing to switch 
+  Implements an additional entry "Floorplans" to your fhem menu, leading to a userinterface without fhem-menu, rooms or devicelists.
+  Devices can be displayed at a defined coordinate on the screen, usually with a clickable icon allowing to switch
   the device on or off by clicking on it. A background-picture can be used - use e.g. a floorplan of your house, or any picture.
   Use floorplanstyle.css to adapt the representation.<br>
-  Step-by-step setup guides are available in 
-  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">english</a> and 
+  Step-by-step setup guides are available in
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">english</a> and
   <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf">german</a>. <br>
   <br>
 
@@ -9499,7 +9503,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  define Groundfloor FLOORPLAN<br>
 	  fp_Groundfloor.png
 	  </code><br>
-    </ul>  
+    </ul>
   </ul>
   <br>
 
@@ -9525,7 +9529,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	<ul>
       <li>top   = screen-position, pixels from top of screen
       <li>left  = screen-position, pixels from left of screen
-      <li>style = 
+      <li>style =
 		<ul>
 			<li>0  icon/state only
 			<li>1  devicename and icon/state
@@ -9545,10 +9549,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 		</table>
 	</ul>
 	<b>Hint:</b> no blanks between parameters<br><br>
-	
-	
+
+
     <li><a name="fp_arrange">fp_arrange</a><br>
-  	  Activates the "arrange mode" which shows an additional menu on the screen, 
+  	  Activates the "arrange mode" which shows an additional menu on the screen,
 	  allowing to place devices easily on the screen.<br>
 	  Example:
 	<ul>
@@ -9581,7 +9585,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	<ul>
       <code>attr Groundfloor fp_noMenu 1</code><br><br>
     </ul>
-	
+
     <li><a name="commandfield">commandfield</a><br>
 	Adds a fhem-commandfield to the floorplan screen.
 	</li>
@@ -9590,16 +9594,16 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
       <code>attr Groundfloor commandfield 1</code><br><br>
     </ul>
 
-    <li><a name="fp_inherited">Inherited from FHEMWEB</a><br>	
+    <li><a name="fp_inherited">Inherited from FHEMWEB</a><br>
 	The following attributes are inherited from the underlying <a href="#FHEMWEB">FHEMWEB</a> instance:<br>
     <ul>
 		<a href="#smallscreen">smallscreen</a><br>
 		<a href="#touchpad">touchpad</a><br>
 		<a href="#refresh">refresh</a><br>
-		<a href="#plotmode">plotmode</a><br>	
+		<a href="#plotmode">plotmode</a><br>
 		<a href="#plotsize">plotsize</a><br>
-		<a href="#webname">webname</a><br>	
-		<a href="#redirectCmds">redirectCmds</a><br>	
+		<a href="#webname">webname</a><br>
+		<a href="#redirectCmds">redirectCmds</a><br>
     </ul>
     </li><br>
   </ul>
@@ -9975,8 +9979,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <code>define &lt;name&gt; dewpoint dewpoint &lt;devicename-regex&gt; [&lt;temp_name&gt; &lt;hum_name&gt; &lt;new_name&gt;]</code><br>
     <br>
     <ul>
-      	Calculates dewpoint for device &lt;devicename-regex&gt; from temperature and humidity 
-	and write it to a new reading named dewpoint. 
+      	Calculates dewpoint for device &lt;devicename-regex&gt; from temperature and humidity
+	and write it to a new reading named dewpoint.
 	If optional &lt;temp_name&gt;, &lt;hum_name&gt; and &lt;new_name&gt; is specified
 	then read temperature from reading &lt;temp_name&gt;, humidity from reading &lt;hum_name&gt;
 	and write the calculated dewpoint to reading &lt;new_name&gt;.<br>
@@ -9985,23 +9989,23 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br>
 
     Example:<PRE>
-    # Compute the dewpoint for the temperature/humidity 
+    # Compute the dewpoint for the temperature/humidity
     # events of the temp1 device and generate reading dewpoint.
     define dew_temp1 dewpoint dewpoint temp1
     define dew_temp1 dewpoint dewpoint temp1 temperature humidity dewpoint
 
-    # Compute the dewpoint for the temperature/humidity 
+    # Compute the dewpoint for the temperature/humidity
     # events of all devices offering temperature and humidity
     # and generate reading dewpoint.
     define dew_all dewpoint dewpoint .*
     define dew_all dewpoint dewpoint .* temperature humidity dewpoint
 
-    # Compute the dewpoint for the temperature/humidity 
+    # Compute the dewpoint for the temperature/humidity
     # events of the device Aussen_1 offering temperature and humidity
     # and insert is into STATE.
     define dew_state dewpoint dewpoint Aussen_1 T H D
 
-    # Compute the dewpoint for the temperature/humidity 
+    # Compute the dewpoint for the temperature/humidity
     # events of all devices offering temperature and humidity
     # and insert the result into the STATE.
     # Example STATE: "T: 10 H: 62.5" will change to
@@ -10015,10 +10019,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <code>define &lt;name&gt; dewpoint fan &lt;devicename-regex&gt; &lt;devicename-outside&gt; &lt;min-temp&gt;</code><br>
     <br>
     <ul>
-      	May be used to turn an fan on or off if the outside air has less water. 
+      	May be used to turn an fan on or off if the outside air has less water.
 	<ul>
         <li>
-	Generate event "fan: on" if dewpoint of &lt;devicename-outside&gt; is lower 
+	Generate event "fan: on" if dewpoint of &lt;devicename-outside&gt; is lower
 	than dewpoint of &lt;devicename&gt; and temperature of &lt;devicename-outside&gt; is &gt;= min-temp
 	and reading "fan" was not already "on". The event will be generated for &lt;devicename&gt;.</li>
 	<li>Generate event "fan: off": else and if reading "fan" was not already "off".</li>
@@ -10027,14 +10031,14 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br>
 
     Example:<PRE>
-    # Generate event "fan: on" when dewpoint of Aussen_1 is first 
+    # Generate event "fan: on" when dewpoint of Aussen_1 is first
     # time lower than basement_tempsensor and outside temperature is &gt;= 0
     # and change it to "fan: off" is this condition changes.
     # Set a switch on/off (fan_switch) depending on the state.
     define dew_fan1 dewpoint fan basement_tempsensor Aussen_1 0
     define dew_fan1_on notify basement_tempsensor.*fan:.*on set fan_switch on
     define dew_fan1_off notify basement_tempsensor.*fan:.*off set fan_switch off
-  
+
     </PRE>
   </ul>
 
@@ -10042,10 +10046,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <code>define &lt;name&gt; dewpoint alarm &lt;devicename-regex&gt; &lt;devicename-reference&gt; &lt;diff-temp&gt;</code><br>
     <br>
     <ul>
-        Generate a mold alarm if a reference temperature is lower that the current dewpoint. 
+        Generate a mold alarm if a reference temperature is lower that the current dewpoint.
 	<ul>
         <li>
-	Generate reading/event "alarm: on" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is lower 
+	Generate reading/event "alarm: on" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is lower
 	than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "on". The event will be generated for &lt;devicename&gt;.</li>
 	<li>Generate reading/event "alarm: off" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is 		higher than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "off".</li>
 	</ul>
@@ -10053,9 +10057,9 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br>
 
     Example:<PRE>
-    # Using a wall temperature sensor (wallsensor) and a temp/hum sensor 
-    # (roomsensor) to alarm if the temperature of the wall is lower than 
-    # the dewpoint of the air. In this case the water of the air will 
+    # Using a wall temperature sensor (wallsensor) and a temp/hum sensor
+    # (roomsensor) to alarm if the temperature of the wall is lower than
+    # the dewpoint of the air. In this case the water of the air will
     # condense on the wall because the wall is cold.
     # Set a switch on (alarm_siren) if alarm is on using notify.
     define dew_alarm1 dewpoint alarm roomsensor wallsensor 0
@@ -10063,11 +10067,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     define roomsensor_alarm_off notify roomsensor.*fan:.*off set alarm_siren off
 
     # If you do not have a temperature sensor in/on the wall, you may also
-    # compare the rooms dewpoint to the temperature of the same or another 
-    # inside sensor. Alarm is temperature is 5 degrees colder than the 
-    # inside dewpointinside. 
+    # compare the rooms dewpoint to the temperature of the same or another
+    # inside sensor. Alarm is temperature is 5 degrees colder than the
+    # inside dewpointinside.
     define dev_alarm2 dewpoint alarm roomsensor roomsensor 5
-  
+
     </PRE>
   </ul>
 
@@ -10534,7 +10538,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 
     <a name="SSL"></a>
     <li>SSL<br>
-        Enable SSL encryption of the connection, see the description <a 
+        Enable SSL encryption of the connection, see the description <a
         href="#HTTPS">here</a> on generating the needed SSL certificates. To
         connect to such a port use one of the following commands:
         <ul>
@@ -10640,11 +10644,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <pre>
       YYYY:MM:DD_HH:MM:SS &lt;device&gt; &lt;event&gt;</pre>
     The regexp will be checked against the device name
-    devicename:event or timestamp:devicename:event combination. 
+    devicename:event or timestamp:devicename:event combination.
     The regexp must match the complete string, not just a part of it.
     <br>
-    <code>&lt;filename&gt;</code> may contain %-wildcards of the 
-    POSIX strftime function of the underlying OS (see your strftime manual). 
+    <code>&lt;filename&gt;</code> may contain %-wildcards of the
+    POSIX strftime function of the underlying OS (see your strftime manual).
     Common used wildcards are:
     <ul>
     <li><code>%d</code> day of month (01..31)</li>
@@ -10656,11 +10660,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <li><code>%W</code> week number of year with Monday as first day of week (00..53)
     </ul>
     FHEM also replaces <code>%L</code> by the value of the global logdir attribute.<br>
-    Before using <code>%V</code> for ISO 8601 week numbers check if it is 
-    correctly supported by your system (%V may not be replaced, replaced by an 
-    empty string or by an incorrect ISO-8601 week number, especially 
+    Before using <code>%V</code> for ISO 8601 week numbers check if it is
+    correctly supported by your system (%V may not be replaced, replaced by an
+    empty string or by an incorrect ISO-8601 week number, especially
     at the beginning of the year)
-    If you use <code>%V</code> you will also have to use %G 
+    If you use <code>%V</code> you will also have to use %G
     instead of %Y for the year!<br>
     Examples:
     <ul>
@@ -11401,6 +11405,6 @@ The .gnuplot file consists of 3 parts:
 
 </body>
 <!--
-vim: ts=2:et 
+vim: ts=2:et
 //-->
 </html>
