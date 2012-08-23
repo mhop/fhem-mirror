@@ -608,6 +608,8 @@ CUL_HM_Parse($$)
         push @event, "dim:down" if(hex($add)&0x20);
         push @event, "dim:stop" if(hex($add)&0x40);
 
+	  } elsif($model eq "HM-LC-SW1-BA-PCB") {
+		  push @event, "battery:" . ((hex($add)&0x80) ? "low" : "ok");
       }
 
       if($id eq $dst && $cmd ne "8002") {  # Send Ack
