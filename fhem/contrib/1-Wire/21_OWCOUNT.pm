@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.15 - July, 2012
+# Version 2.17 - August, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -290,13 +290,6 @@ sub OWCOUNT_InitializeDevice($) {
     $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = $unarr[1].$runit;
     #Log 1,"OWCOUNT InitializeDevice with period $period and UNITABBR = ".$hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
     
-    #-- remove units if they are unwanted
-    if( defined($attr{$name}{"UnitInReading"})){
-      if( $attr{$name}{"UnitInReading"} == 0){
-        $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR} = "";
-        $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR}    = "";
-      }
-    }
   }
   
   #-- set status according to interface type
@@ -319,9 +312,9 @@ sub OWCOUNT_InitializeDevice($) {
 
 ########################################################################################
 #
-# OWCOUNT_FormatValues - put together various format strings 
+# OWCOUNT_FormatValues - put together various format strings and assemble STATE variable
 #
-#  Parameter hash = hash of device addressed, fs = format string
+#  Parameter hash = hash of device addressed
 #
 ########################################################################################
 
@@ -329,7 +322,7 @@ sub OWCOUNT_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($offset,$factor,$present,$period,$unit,$runit,$midnight,$vval,$vrate);
+  my ($offset,$factor,$period,$unit,$runit,$midnight,$vval,$vrate);
   my ($value1,$value2,$value3,$value4,$value5)   = ("","","","","");
   my $galarm = 0;
 
@@ -339,6 +332,10 @@ sub OWCOUNT_FormatValues($) {
   my $daybreak = 0;
   my $monthbreak = 0;
   
+  my $present  = $hash->{PRESENT};
+  #-- remove units if they are unwanted
+  my $unir = defined($attr{$name}{"UnitInReading"}) ? $attr{$name}{"UnitInReading"} : 1;
+  
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
@@ -347,7 +344,8 @@ sub OWCOUNT_FormatValues($) {
     $offset   = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
     $factor   = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
     $unit     = $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR};
-    $present  = $hash->{PRESENT};
+    $period   = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
+    $runit    = $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
     
     #-- only if attribute value Mode=daily, take the midnight value from memory
     if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
@@ -362,21 +360,16 @@ sub OWCOUNT_FormatValues($) {
     } else { 
       $midnight = 0.0;
     }
+    
     #-- correct values for proper offset, factor 
+    #   careful: midnight value has not been corrected so far !
     #-- 1 decimal
     if( $factor == 1.0 ){
       $vval    = int(($owg_val[$i] + $offset - $midnight)*10)/10;
-      #-- string buildup for return value and STATE
-      $value1 .= sprintf( "%s: %5.1f %s",  $owg_channel[$i], $vval,$unit);
-      $value2 .= sprintf( "%s: %5.1f %s ", $owg_channel[$i], $vval,$unit);
     #-- 3 decimals
     } else {
       $vval    = int((($owg_val[$i] + $offset)*$factor - $midnight)*1000)/1000;
-      #-- string buildup for return value and STATE
-      $value1 .= sprintf( "%s: %5.3f %s",  $owg_channel[$i], $vval,$unit);
-      $value2 .= sprintf( "%s: %5.2f %s ", $owg_channel[$i], $vval,$unit);
     }
-    $value3 .= sprintf( "%s: " , $owg_channel[$i]);
     
     #-- get the old values
     my $oldval = $hash->{READINGS}{"$owg_channel[$i]"}{VAL};
@@ -398,40 +391,20 @@ sub OWCOUNT_FormatValues($) {
       if( ($vval < $oldval) && ($daybreak==0) && ($present==1) ){
         Log 1,"OWCOUNT TODO: Counter wraparound";
       }
-      #-- rate
-      if( $delt > 0 ){
-        $vrate  = ($vval-$oldval)/$delt;
-      } else {
-        Log 1, "OWCOUNT: Invalid time interval $delt for rate calculation";
-        $vrate = 0.0;
-      }
-      #-- correct rate for wraparound at midnight
-      if( ($vrate < 0)  && ($hash->{PRESENT}==1) ){
-        Log 1,"OWCOUNT: correcting raw rate directly after midnight from $vrate to ".($vrate+$midnight/$delt)." vval=$vval, oldval=$oldval, delt=$delt"; 
-        $vrate  += $midnight/$delt;
-      }
-      #-- correct rate for peroid setting
-      $period = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
-      if(  $period eq "hour" ){
-        $vrate*=3600;
-      }elsif( $period eq "minute" ){
-        $vrate*=60;
-      }       
-      $runit   = $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
-      #-- string buildup for return value and STATE
-      $value1 .= sprintf( " %5.3f %s", $vrate,$runit);
-      $value2 .= sprintf( " %5.2f %s ",$vrate,$runit);
-    
+     
       if( $daybreak==1 ){
-        #-- we need to check this !
-        Log 1,"OWCOUNT: Daybreak routine called with oldtim=$oldtim and day=$day and present=".$present;  
         #--  linear interpolation
         my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
         my $dv = $oldval*(1-$dt)+$vval*$dt;
+        #-- correct reading in daily mode
+        if( $midnight > 0.0 ){          
+          $vval  -= $dv;
+          $delt  *= (1-$dt);
+          $oldval = 0.0;
+        }
+        #-- in any mode store the interpolated value in the midnight store
         $midnight += $dv;
-        #-- in any mode, when midnight has passed, store the interpolated value in the midnight store
         OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
-        Log 1, "OWCOUNT: Interpolated additional value for channel ".$owg_channel[$i]." is ".$dv." at time ".$tn;
         #-- string buildup for monthly logging
         $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
         if( $day<$dayo ){
@@ -440,12 +413,53 @@ sub OWCOUNT_FormatValues($) {
           #-- string buildup for yearly logging
           $value5 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
         }
+      } 
+      #-- rate
+      if( ($delt > 0.0) && $present ){
+        $vrate  = ($vval-$oldval)/$delt;
+      } else {
+        $vrate = 0.0;
       }
+      #-- correct rate for period setting
+      if(  $period eq "hour" ){
+        $vrate*=3600;
+      }elsif( $period eq "minute" ){
+        $vrate*=60;
+      }       
+     
+      if( !defined($runit) ){
+        Log 1,"OWCOUNT: Error in rate unit definition. i=$i, owg_rate[i]=".$owg_rate[$i];
+        $runit = "ERR";
+      }
+      
+      #-- string buildup for return value and STATE
+      if( $unir ){
+        #-- 1 decimal
+        if( $factor == 1.0 ){
+          $value1 .= sprintf( "%s: %5.1f %s %5.2f %s",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
+          $value2 .= sprintf( "%s: %5.1f %s %5.2f %s", $owg_channel[$i], $vval,$unit,$vrate,$runit);
+        #-- 3 decimals
+        } else {
+          $value1 .= sprintf( "%s: %5.3f %s %5.2f %s",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
+          $value2 .= sprintf( "%s: %5.2f %s %5.2f %s", $owg_channel[$i], $vval,$unit,$vrate,$runit);
+        }  
+      }else {
+        #-- 1 decimal
+        if( $factor == 1.0 ){
+          $value1 .= sprintf( "%s: %5.1f %5.2f",  $owg_channel[$i], $vval,$vrate);
+          $value2 .= sprintf( "%s: %5.1f %5.2f", $owg_channel[$i], $vval,$vrate);
+        #-- 3 decimals
+        } else {
+          $value1 .= sprintf( "%s: %5.3f %5.2f",  $owg_channel[$i], $vval,$vrate);
+          $value2 .= sprintf( "%s: %5.2f %5.2f", $owg_channel[$i], $vval,$vrate);
+        }
+      }
+      $value3 .= sprintf( "%s: " , $owg_channel[$i]);
     } 
     #-- put into READINGS
     $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $vval;
     #-- but times and rate only when valid
-    if(  $hash->{PRESENT}==1 ){
+    if(  $present ){
       $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
       $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = $vrate;
       $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = $tn;
@@ -465,6 +479,12 @@ sub OWCOUNT_FormatValues($) {
   }
   #-- STATE
   $hash->{STATE} = $value2;
+  
+  #-- write units as header if they are unwanted in lines
+  if( $unir == 0 ){
+      #TODO: the entry into CHANGED must be into the lowest array position
+  }
+  
   if( $daybreak == 1 ){
     $value4 = sprintf("D_%d: %d-%d-%d_23:59:59 %s",$dayo,$yearo,$montho,$dayo,$value4);
     #-- needs to be higher array elements, 
@@ -896,8 +916,8 @@ sub OWXCOUNT_GetPage($$) {
       return "OWXCOUNT: Device $owx_dev returns invalid data";
     }
   
-    #-- first ignore memory and only use counter
-    my $value = ord($data[3])*4096 + ord($data[2])*256 +ord($data[1])*16 + ord($data[0]);
+    #-- first ignore memory and only use counter (Fehler gefunden von jamesgo)
+    my $value = (ord($data[3])<<32) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
    
     if( $page == 14) {
       $owg_val[0] = $value;

@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.13 - July, 2012
+# Version 2.17 - August, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -457,7 +457,12 @@ sub OWTHERM_GetValues($@) {
   #-- Get values according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    $ret = OWXTHERM_GetValues($hash);
+    #-- max 3 tries
+    for(my $try=0; $try<3; $try++){
+      $ret = OWXTHERM_GetValues($hash);
+      last
+        if( !defined($ret) );
+    } 
   }elsif( $interface eq "OWFS" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{
@@ -466,7 +471,7 @@ sub OWTHERM_GetValues($@) {
 
   #-- process results
   if( defined($ret)  ){
-    return "OWTHERM: Could not get values from device $name";
+    return "OWTHERM: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
   $value=OWTHERM_FormatValues($hash);
@@ -652,7 +657,6 @@ sub OWXTHERM_GetValues($) {
   my $owx_dev = $hash->{ROM_ID};
   #-- hash of the busmaster
   my $master = $hash->{IODev};
-
   
   #-- check, if the conversion has been called before - only on devices with real power
   if( defined($attr{$hash->{IODev}->{NAME}}{buspower}) && ( $attr{$hash->{IODev}->{NAME}}{buspower} eq "real") ){
@@ -691,58 +695,62 @@ sub OWXTHERM_GetValues($) {
      
   #-- process results
   my  @data=split(//,$res);
+  return "invalid data length"
+    if (@data != 19); 
+  return "invalid data"
+    if (ord($data[17])<=0); 
+  return "invalid CRC"
+    if (OWX_CRC8(substr($res,10,8),$data[18])==0);
+  
   #-- this must be different for the different device types
   #   family = 10 => DS1820, DS18S20
-  if( $hash->{OW_FAMILY} eq "10" ) {
-    if ( (@data == 19) && (ord($data[17])>0) ){
-      my $count_remain = ord($data[16]);
-      my $count_perc   = ord($data[17]);
-      my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
+  if( $hash->{OW_FAMILY} eq "10" ) {    
   
-      my $lsb  = ord($data[10]);
-      my $msb  = 0;
-      my $sign = ord($data[11]) & 255;
-      
-      #-- test with -25 degrees
-      #$lsb   =  12*16+14;
-      #$sign  = 1;
-      #$delta = 0;
-      
-      #-- 2's complement form = signed bytes
-      $owg_temp = int($lsb/2) + $delta;
-      if( $sign !=0 ){
-        $owg_temp = -128+$owg_temp;
-      }
-
-      $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
-      $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
-      return undef;
-    } else {
-      return "OWXTHERM: Device $owx_dev returns invalid data";
-    }
-  } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
-    if ( (@data == 19) && (ord($data[17])>0) ){
+    my $count_remain = ord($data[16]);
+    my $count_perc   = ord($data[17]);
+    my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
    
-      my $lsb  = ord($data[10]);
-      my $msb  = ord($data[11]) & 7;
-      my $sign = ord($data[11]) & 248;
+    my $lsb  = ord($data[10]);
+    my $msb  = 0;
+    my $sign = ord($data[11]) & 255;
       
-      #-- test with -55 degrees
-      #$lsb   = 9*16;
-      #$sign  = 1;
-      #$msb   = 7;
+    #-- test with -25 degrees
+    #$lsb   =  12*16+14;
+    #$sign  = 1;
+    #$delta = 0;
       
-      #-- 2's complement form = signed bytes
-      $owg_temp = $msb*16+ $lsb/16;   
-      if( $sign !=0 ){
-        $owg_temp = -128+$owg_temp;
-      }
-      $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
-      $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
-      return undef;
-    } else {
-      return "OWXTHERM: Device $owx_dev returns invalid data";
+    #-- 2's complement form = signed bytes
+    $owg_temp = int($lsb/2) + $delta;
+    if( $sign !=0 ){
+      $owg_temp = -128+$owg_temp;
     }
+
+    $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
+    $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+ 
+    return undef;
+
+  } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
+     
+    my $lsb  = ord($data[10]);
+    my $msb  = ord($data[11]) & 7;
+    my $sign = ord($data[11]) & 248;
+      
+    #-- test with -55 degrees
+    #$lsb   = 9*16;
+    #$sign  = 1;
+    #$msb   = 7;
+      
+    #-- 2's complement form = signed bytes
+    $owg_temp = $msb*16+ $lsb/16;   
+    if( $sign !=0 ){
+      $owg_temp = -128+$owg_temp;
+    }
+    $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
+    $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+    
+    return undef;
+    
   } else {
     return "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
   }
