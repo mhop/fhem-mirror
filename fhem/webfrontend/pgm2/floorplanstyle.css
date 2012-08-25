@@ -1,6 +1,6 @@
 body     { background-color: #F0F0F0;
            font-family:Arial, sans-serif; 
-           font-size:9px; background-image:url(../icons/Grundriss.bak);
+           font-size:9px; background-image:url(../icons/fhemicon);
            background-repeat:no-repeat;  }
 
 body[id~=Media]     { background-color: #A5A5A5;
