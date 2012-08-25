@@ -9,7 +9,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.15 - July, 2012
+# Version 2.17 - August, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -57,9 +57,10 @@ package main;
 use strict;
 use warnings;
 use Device::SerialPort;
-
-# Prototypes to make komodo happy
 use vars qw{%attr %defs};
+
+require "$attr{global}{modpath}/FHEM/DevIo.pm";
+
 sub Log($$);
 
 # Line counter 
@@ -131,6 +132,105 @@ sub OWX_Initialize ($) {
 
 ########################################################################################
 #
+# OWX_Define - Implements DefFn function
+# 
+# Parameter hash = hash of device addressed, def = definition string
+#
+########################################################################################
+
+sub OWX_Define ($$) {
+  my ($hash, $def) = @_;
+  my @a = split("[ \t][ \t]*", $def);
+  
+  #-- check syntax
+  if(int(@a) < 3){
+    return "OWX: Syntax error - must be define <name> OWX"
+  }
+  
+  #-- check syntax
+  Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno-device>"
+     if(int(@a) > 3);
+  #-- If this line contains 3 parameters, it is the bus master definition
+  my $dev = $a[2];
+  
+  #-- TODO: what should we do when the specified device name contains @ already ?
+  $hash->{DeviceName} = $dev."\@9600";
+  #-- Dummy 1-Wire ROM identifier
+  $hash->{ROM_ID} = "FF";
+
+  #-- First step: check if we have a directly connected serial interface or a CUNO attached
+  #   (mod suggested by T.Faust)
+  if ( $dev =~ m/\/dev\/.*/ ){
+    #-- Second step in case of serial device: open the serial device to test it
+    my $msg = "OWX: Serial device $dev";
+    my $ret = DevIo_OpenDev($hash,0,undef);
+    $owx_hwdevice = $hash->{USBDev};
+    if($ret){
+      Log 1, $msg." not defined";
+      return "OWX: Can't open serial device $dev: $!"
+    } else {
+      Log 1,$msg." defined";
+    }
+    $owx_hwdevice->reset_error();
+    $owx_hwdevice->baudrate(9600);
+    $owx_hwdevice->databits(8);
+    $owx_hwdevice->parity('none');
+    $owx_hwdevice->stopbits(1);
+    $owx_hwdevice->handshake('none');
+    $owx_hwdevice->write_settings;
+    #-- store with OWX device
+    $hash->{INTERFACE} = "serial";
+    $hash->{HWDEVICE}   = $owx_hwdevice;
+
+    #-- sleeping for some time
+    select(undef,undef,undef,0.1); 
+      
+  } else {
+    #-- Second step in case of CUNO: See if we can open it
+    my $msg = "OWX: CUNO device $dev";
+    $owx_hwdevice = $main::defs{$dev};
+    if($owx_hwdevice){
+      Log 1,$msg." defined";
+      #-- store with OWX device
+      $hash->{INTERFACE} = "CUNO";
+      $hash->{HWDEVICE}    = $owx_hwdevice;
+      #-- reset the 1-Wire system in CUNO
+      CUL_SimpleWrite($owx_hwdevice, "Oi");
+    }else{
+      Log 1, $msg." not defined";
+      return "OWX: Can't open cuno device $dev: $!"
+    }
+  }
+  #-- Third step: see, if a bus interface is detected
+  if (!OWX_Detect($hash)){
+    $hash->{STATE} = "Failed";
+    $hash->{PRESENT} = 0;
+    $init_done = 1; 
+    return undef;
+  }
+    
+  #-- In 10 seconds discover all devices on the 1-Wire bus
+  InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
+    
+  #-- Default settings
+  $hash->{interval}     = 300;          # kick every minute
+  $hash->{followAlarms} = "off";
+  $hash->{ALARMED}      = "no";
+  
+  #-- InternalTimer blocks if init_done is not true
+  my $oid = $init_done;
+  $hash->{PRESENT} = 1;
+  $hash->{STATE}      = "Initialized";
+  $init_done = 1;
+  #-- Intiate first alarm detection and eventually conversion in a minute or so
+  InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
+  $init_done     = $oid;
+  $hash->{STATE} = "Active";
+  return undef;
+}
+
+########################################################################################
+#
 # OWX_Alarms - Find devices on the 1-Wire bus, 
 #              which have the alarm flag set
 #
@@ -143,6 +243,7 @@ sub OWX_Initialize ($) {
 
 sub OWX_Alarms ($) {
   my ($hash) = @_;
+  my $name   = $hash->{NAME};
   my @owx_alarm_names=();
   
   #-- Discover all alarmed devices on the 1-Wire bus
@@ -152,13 +253,13 @@ sub OWX_Alarms ($) {
     $res = $res & OWX_Next_SER($hash,"alarm");
   }
   if( @owx_alarm_devs == 0){
-     return "OWX: No alarmed 1-Wire devices found ";
+     return "OWX: No alarmed 1-Wire devices found on bus $name";
   }
 
   #-- walk through all the devices to get their proper fhem names
   foreach my $fhem_dev (sort keys %main::defs) {
     #-- skip if busmaster
-    next if( $hash->{NAME} eq $main::defs{$fhem_dev}{NAME} );
+    next if( $name eq $main::defs{$fhem_dev}{NAME} );
     #-- all OW types start with OW
     next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
     foreach my $owx_dev  (@owx_alarm_devs) {
@@ -175,7 +276,7 @@ sub OWX_Alarms ($) {
     }
   }
   #-- so far, so good - what do we want to do with this ?
-  return "OWX: Alarmed 1-Wire devices found (".join(",",@owx_alarm_names).")";
+  return "OWX: Alarmed 1-Wire devices found on bus $name (".join(",",@owx_alarm_names).")";
 }  
 
 ########################################################################################
@@ -194,14 +295,15 @@ sub OWX_Alarms ($) {
 
 sub OWX_Complex ($$$$) {
   my ($hash,$owx_dev,$data,$numread) =@_;
-  
+  my $name   = $hash->{NAME};
+    
   #-- get the interface
   $owx_interface = $hash->{INTERFACE};
   $owx_hwdevice  = $hash->{HWDEVICE};
   
   #-- interface error
   if( !(defined($owx_interface))){
-    Log 3,"OWX: Complex called with unknown interface";
+    Log 3,"OWX: Complex called with unknown interface on bus $name";
     return 0;
   #-- here we treat the directly connected serial interfaces
   }elsif( ($owx_interface eq "DS2480") || ($owx_interface eq "DS9097") ){
@@ -213,7 +315,7 @@ sub OWX_Complex ($$$$) {
 
   #-- interface error
   }else{
-    Log 3,"OWX: Complex called with unknown interface";
+    Log 3,"OWX: Complex called with unknown interface $owx_interface on bus $name";
     return 0;
   }
 }
@@ -226,10 +328,7 @@ sub OWX_Complex ($$$$) {
 #
 ########################################################################################
 
-sub OWX_CRC ($) {
-  my ($romid) = @_;
-  
-  my @crc8_table = (
+my @crc8_table = (
     0, 94,188,226, 97, 63,221,131,194,156,126, 32,163,253, 31, 65,
     157,195, 33,127,252,162, 64, 30, 95, 1,227,189, 62, 96,130,220,
     35,125,159,193, 66, 28,254,160,225,191, 93, 3,128,222, 60, 98,
@@ -247,6 +346,9 @@ sub OWX_CRC ($) {
     233,183, 85, 11,136,214, 52,106, 43,117,151,201, 74, 20,246,168,
     116, 42,200,150, 21, 75,169,247,182,232, 10, 84,215,137,107, 53);
 
+
+sub OWX_CRC ($) {
+  my ($romid) = @_;
   my $crc8=0;  
 
   if( $romid eq "0" ){  
@@ -263,6 +365,36 @@ sub OWX_CRC ($) {
     for(my $i=0; $i<7; $i++){
       $crc8 = $crc8_table[ $crc8 ^ $owx_ROM_ID[$i] ];
     }  
+    return $crc8;
+  }
+}  
+
+########################################################################################
+#
+# OWX_CRC - Check the CRC8 code of an a byte string
+#
+# Parameter string, crc. 
+# If crc is defined, make a comparison, otherwise output crc8
+#
+########################################################################################
+
+sub OWX_CRC8 ($$) {
+  my ($string,$crc) = @_;
+  my $crc8=0;  
+  my @strhex;
+
+  for(my $i=0; $i<8; $i++){
+    $strhex[$i]=ord(substr($string,$i,1));
+    $crc8 = $crc8_table[ $crc8 ^ $strhex[$i] ];
+  }
+    
+  if( defined($crc) ){
+    if ( $crc = $crc8 ){
+      return 1;
+    }else{
+      return 0;
+    }
+  }else{
     return $crc8;
   }
 }  
@@ -318,103 +450,6 @@ sub OWX_DOCRC16($$) {
 #//...
 #}
 
-
-
-########################################################################################
-#
-# OWX_Define - Implements DefFn function
-# 
-# Parameter hash = hash of device addressed, def = definition string
-#
-########################################################################################
-
-sub OWX_Define ($$) {
-  my ($hash, $def) = @_;
-  my @a = split("[ \t][ \t]*", $def);
-  
-  if(int(@a) >= 3){
-   #-- check syntax
-    Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno-device>"
-       if(int(@a) > 3);
-    #-- If this line contains 3 parameters, it is the bus master definition
-    my $dev = $a[2];
-    $hash->{DeviceName} = $dev;
-    #-- Dummy 1-Wire ROM identifier
-    $hash->{ROM_ID} = "FF";
-
-    #-- First step: check if we have a directly connected serial interface or a CUNO attached
-    if ( $dev =~ m/.*USB.*/){
-      #-- Second step in case of serial device: open the serial device to test it
-      my $msg = "OWX: Serial device $dev";
-      $owx_hwdevice = new Device::SerialPort ($dev);
-      if($owx_hwdevice){
-        Log 1,$msg." defined";
-      }else{
-        Log 1, $msg." not defined";
-        return "OWX: Can't open serial device $dev: $!"
-      }
-      $owx_hwdevice->reset_error();
-      $owx_hwdevice->baudrate(9600);
-      $owx_hwdevice->databits(8);
-      $owx_hwdevice->parity('none');
-      $owx_hwdevice->stopbits(1);
-      $owx_hwdevice->handshake('none');
-      $owx_hwdevice->write_settings;
-      #-- store with OWX device
-      $hash->{INTERFACE} = "serial";
-      $hash->{HWDEVICE}   = $owx_hwdevice;
-      #-- sleeping for some time
-      select(undef,undef,undef,0.1); 
-    } else {
-      #-- Second step in case of CUNO: See if we can open it
-      my $msg = "OWX: CUNO device $dev";
-      $owx_hwdevice = $main::defs{$dev};
-      if($owx_hwdevice){
-        Log 1,$msg." defined";
-        #-- store with OWX device
-        $hash->{INTERFACE} = "CUNO";
-        $hash->{HWDEVICE}    = $owx_hwdevice;
-        #-- reset the 1-Wire system in CUNO
-        CUL_SimpleWrite($owx_hwdevice, "Oi");
-      }else{
-        Log 1, $msg." not defined";
-        return "OWX: Can't open cuno device $dev: $!"
-      }
-    }
- 
-    #-- Third step: see, if a bus interface is detected
-    if (!OWX_Detect($hash)){
-      $hash->{STATE} = "Failed";
-      $hash->{PRESENT} = 0;
-      $init_done = 1; 
-      return undef;
-    }
-    
-    #-- In 10 seconds discover all devices on the 1-Wire bus
-    InternalTimer(gettimeofday()+10, "OWX_Discover", $hash,0);
-    
-    #-- Default settings
-    $hash->{interval}     = 300;          # kick every minute
-    $hash->{followAlarms} = "off";
-    $hash->{ALARMED}      = "no";
-    
-    #-- InternalTimer blocks if init_done is not true
-    my $oid = $init_done;
-    $hash->{PRESENT} = 1;
-    $hash->{STATE}      = "Initialized";
-    $init_done = 1;
-
-    #-- Intiate first alarm detection and eventually conversion in a minute or so
-    InternalTimer(gettimeofday() + $hash->{interval}, "OWX_Kick", $hash,1);
-    $init_done     = $oid;
-    $hash->{STATE} = "Active";
-    return undef;
-  } else {
-   #-- check syntax
-    return "OWX: Syntax error - must be define <name> OWX"
-  }
-}
-
 ########################################################################################
 # 
 # OWX_Detect - Detect 1-Wire interface 
@@ -433,7 +468,10 @@ sub OWX_Detect ($) {
   my ($hash) = @_;
   
   my ($i,$j,$k,$l,$res,$ret,$ress);
-  
+  my $name = $hash->{NAME};
+  my $ress0 = "OWX: 1-Wire bus $name: interface ";
+  $ress     = $ress0;
+
   #-- get the interface
   $owx_interface = $hash->{INTERFACE};
   $owx_hwdevice  = $hash->{HWDEVICE};
@@ -449,16 +487,19 @@ sub OWX_Detect ($) {
       $res = OWX_Query_2480($hash,"\x17\x45\x5B\x0F\x91");
     
       #-- process 4/5-byte string for detection
-      if( ($res eq "\x16\x44\x5A\x00\x90") || ($res eq "\x16\x44\x5A\x00\x93")){
-        Log 1, "OWX: 1-Wire bus master DS2480 detected for the first time";
+      if( !defined($res)){
+        $res="";
+        $ret=0;
+      }elsif( ($res eq "\x16\x44\x5A\x00\x90") || ($res eq "\x16\x44\x5A\x00\x93")){
+        $ress .= "master DS2480 detected for the first time";
         $owx_interface="DS2480";
         $ret=1;
       } elsif( $res eq "\x17\x45\x5B\x0F\x91"){
-        Log 1, "OWX: 1-Wire bus master DS2480 re-detected";
+        $ress .= "master DS2480 re-detected";
         $owx_interface="DS2480";
         $ret=1;
-      } elsif( ($res eq "\x17\x0A\x5B\x0F\x02") || ($res eq "\x00\x17\x0A\x5B\x0F\x02") ){
-        Log 1, "OWX: Passive 1-Wire bus interface DS9097 detected";
+      } elsif( ($res eq "\x17\x0A\x5B\x0F\x02") || ($res eq "\x00\x17\x0A\x5B\x0F\x02") || ($res eq "\x30\xf8\x00") ){
+        $ress .= "passive DS9097 detected";
         $owx_interface="DS9097";
         $ret=1;
       } else {
@@ -466,19 +507,20 @@ sub OWX_Detect ($) {
       }
       last 
         if( $ret==1 );
-      $ress = "OWX: Trying again to detect an interface, answer was ";
+      $ress .= "not found, answer was ";
       for($i=0;$i<length($res);$i++){
         $j=int(ord(substr($res,$i,1))/16);
         $k=ord(substr($res,$i,1))%16;
         $ress.=sprintf "0x%1x%1x ",$j,$k;
       }
       Log 1, $ress;
+      $ress = $ress0;
       #-- sleeping for some time
       select(undef,undef,undef,0.5);
     }
     if( $ret == 0 ){
       $owx_interface=undef;
-      $ress = "OWX: No 1-Wire bus interface detected, answer was ";
+      $ress .= "not detected, answer was ";
       for($i=0;$i<length($res);$i++){
         $j=int(ord(substr($res,$i,1))/16);
         $k=ord(substr($res,$i,1))%16;
@@ -491,11 +533,11 @@ sub OWX_Detect ($) {
     my $ob = DevIo_SimpleRead($owx_hwdevice);
     if( $ob =~ m/OK.*/){
       $owx_interface="CUNO";
-      $ress="OWX: 1-Wire bus interface DS2482 detected in $owx_hwdevice->{NAME}";
+      $ress .= "DS2482 detected in $owx_hwdevice->{NAME}";
       $ret=1;
     } else {
       $owx_interface=undef;
-      $ress="OWX: 1-Wire bus interface in $owx_hwdevice->{NAME} could not be addressed";
+      $ress .= "in $owx_hwdevice->{NAME} could not be addressed";
       $ret=0;
     }
   }
@@ -520,6 +562,7 @@ sub OWX_Detect ($) {
 sub OWX_Discover ($) {
   my ($hash) = @_;
   my $res;
+  my $name = $hash->{NAME};
   
   #-- get the interface
   $owx_interface = $hash->{INTERFACE};
@@ -649,8 +692,8 @@ sub OWX_Discover ($) {
     Log 1, "OWX: Deleting unused 1-Wire device $main::defs{$fhem_dev}{NAME} of type $main::defs{$fhem_dev}{TYPE}";
     CommandDelete(undef,$main::defs{$fhem_dev}{NAME});
   }
-  Log 1, "OWX: 1-Wire devices found (".join(",",@owx_names).")";
-  return "OWX: 1-Wire devices found (".join(",",@owx_names).")";
+  Log 1, "OWX: 1-Wire devices found on bus $name: (".join(",",@owx_names).")";
+  return "OWX: 1-Wire devices found on bus $name: (".join(",",@owx_names).")";
 }   
 
 ########################################################################################
@@ -738,7 +781,7 @@ sub OWX_Reset ($) {
   
    #-- interface error
   if( !(defined($owx_interface))){
-    Log 3,"OWX: Reset called with unknown interface";
+    Log 3,"OWX: Reset called with undefined interface";
     return 0;
   }elsif( $owx_interface eq "DS2480" ){
     return OWX_Reset_2480($hash);
@@ -747,7 +790,7 @@ sub OWX_Reset ($) {
   }elsif( $owx_interface eq "CUNO" ){
     return OWX_Reset_CUNO($hash);
   }else{
-    Log 3,"OWX: Reset called with unknown interface";
+    Log 3,"OWX: Reset called with unknown interface $owx_interface";
     return 0;
   }
 }
@@ -815,6 +858,7 @@ sub OWX_Set($@) {
 sub OWX_Undef ($$) {
   my ($hash, $name) = @_;
   RemoveInternalTimer($hash);
+  DevIo_CloseDev($hash);
   return undef;
 }
 
@@ -1221,8 +1265,8 @@ sub OWX_Query_2480 ($$) {
 
   my ($hash,$cmd) = @_;
   my ($i,$j,$k);
-  my $dev = $hash->{DeviceName};
-
+  
+  $owx_hwdevice = $hash->{HWDEVICE};
   $owx_hwdevice->baudrate($owx_baud);
   $owx_hwdevice->write_settings;
 
@@ -1235,7 +1279,7 @@ sub OWX_Query_2480 ($$) {
     }
     Log 3, $res;
   }
-	
+  
   my $count_out = $owx_hwdevice->write($cmd);
 
   Log 1, "OWX: Write incomplete $count_out ne ".(length($cmd))."" if ( $count_out != length($cmd) );
@@ -1257,8 +1301,6 @@ sub OWX_Query_2480 ($$) {
 	
   #-- sleeping for some time
   select(undef,undef,undef,0.04);
-   
-  #$owx_hwdevice->close();
   return($string_in);
 }
 
@@ -1280,7 +1322,7 @@ sub OWX_Reset_2480 ($) {
  
   my ($res,$r1,$r2);
   #-- if necessary, prepend \xE3 character for command mode
-  if( $owx_mode ne "command" ) {
+  if( $owx_mode ne "command" ){
     $cmd = "\xE3";
   }
   #-- Reset command \xC5
@@ -1504,11 +1546,10 @@ sub OWX_Query_9097 ($$) {
 
   my ($hash,$cmd) = @_;
   my ($i,$j,$k);
-  my $dev = $hash->{DeviceName};
-
+  $owx_hwdevice = $hash->{HWDEVICE};
   $owx_hwdevice->baudrate($owx_baud);
   $owx_hwdevice->write_settings;
-
+  
   if( $owx_debug > 2){
     my $res = "OWX: Sending out ";
     for($i=0;$i<length($cmd);$i++){  
@@ -1528,7 +1569,7 @@ sub OWX_Query_9097 ($$) {
   #-- read the data
   my ($count_in, $string_in) = $owx_hwdevice->read(48);
     
-   if( $owx_debug > 2){
+  if( $owx_debug > 2){
     my $res = "OWX: Receiving ";
     for($i=0;$i<$count_in;$i++){  
       $j=int(ord(substr($string_in,$i,1))/16);
@@ -1540,8 +1581,7 @@ sub OWX_Query_9097 ($$) {
 	
   #-- sleeping for some time
   select(undef,undef,undef,0.01);
-  
-  #$owx_hwdevice->close();
+ 
   return($string_in);
 }
 
