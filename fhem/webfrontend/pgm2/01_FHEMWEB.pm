@@ -88,6 +88,7 @@ my $FW_longpoll;   # Set if longpoll (i.e. server notification) is active
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
+my $FW_cors;       # Cross-origin resource sharing
 my $FW_chash;      # client fhem hash
 #my $FW_encoding="ISO-8859-1";
 my $FW_encoding="UTF-8";
@@ -275,6 +276,8 @@ FW_Read($)
   my $cacheable = FW_AnswerCall($arg);
   return if($cacheable == -1); # Longpoll / inform request;
 
+  my $headercors = ($FW_cors ? "Access-Control-Allow-Origin: *\r\n" : "");
+
   my $compressed = "";
   if(($FW_RETTYPE =~ m/text/i ||
       $FW_RETTYPE =~ m/svg/i ||
@@ -292,7 +295,7 @@ FW_Read($)
   Log $ll, "$arg / RL: $length / $FW_RETTYPE / $compressed / $expires";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
-           $expires, $compressed,
+           $expires, $compressed, $headercors,
            "Content-Type: $FW_RETTYPE\r\n\r\n",
            $FW_RET;
   exit if(defined($pid));
@@ -605,6 +608,7 @@ FW_digestCgi($)
   $FW_XHR = undef;
   $FW_jsonp = undef;
   $FW_inform = undef;
+  $FW_cors = undef;
 
   %FW_webArgs = ();
   $arg =~ s,^[?/],,;
@@ -629,6 +633,7 @@ FW_digestCgi($)
     if($p eq "XHR")          { $FW_XHR = 1; }
     if($p eq "jsonp")        { $FW_jsonp = $v; }
     if($p eq "inform")       { $FW_inform = $v; }
+    if($p eq "CORS")         { $FW_cors = 1; }
 
   }
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
