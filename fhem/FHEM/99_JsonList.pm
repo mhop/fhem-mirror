@@ -75,13 +75,12 @@ PrintHashJson($$)
 {
   my ($h, $lev) = @_;
 
-  my ($str,$sstr) = ("","");
 
   my $hc = keys %{$h};
-  my $cc = 1;
-
+  my @str;
   foreach my $c (sort keys %{$h}) {
 
+    my $str = "";
     if(ref($h->{$c})) {
       if(ref($h->{$c}) eq "HASH" && $c ne "PortObj") {
         if($c eq "IODev" || $c eq "HASH") {
@@ -89,7 +88,7 @@ PrintHashJson($$)
         } else {
           $str .= sprintf("%*s\"%s\": {\n", $lev, " ", $c);
           if(keys(%{$h->{$c}}) != 0) {
-          $str .= PrintHashJson($h->{$c}, $lev+2);
+            $str .= PrintHashJson($h->{$c}, $lev+2);
           } else {
             $str .= sprintf("%*s\"null\": \"null\"\n", $lev+4, " ");
           }
@@ -103,12 +102,10 @@ PrintHashJson($$)
     } else {
       $str .= sprintf("%*s\"%s\": \"%s\"", $lev," ",$c, JsonEscape($h->{$c}));
     }
-    $str .= ",\n" if($cc != $hc);
-    $str .= "\n" if($cc == $hc);
-    $cc++;
+    push @str, $str if($str);
   }
 
-  return $str;
+  return join(",\n", @str) . "\n";
 }
 
 #####################################
@@ -157,17 +154,6 @@ CommandJsonList($$)
       #$str .= sprintf("%*s},\n", $lev+6, " ") if($t eq $lt);
 
       my $a1 = JsonEscape($p->{STATE});
-      my $a2 = JsonEscape(getAllSets($d));
-      my @sets;
-      foreach my $k2 (split(" ", $a2)) {
-        push @sets, $k2;
-      }
-      my $a3 = JsonEscape(getAllAttr($d));
-      my @attrs;
-      foreach my $k3 (split(" ", $a3)) {
-        push @attrs, $k3;
-      }
-
       # close device object
       $str .= sprintf("%*s},\n", $lev+6, " ") if($t eq $lt);
 
@@ -260,44 +246,39 @@ CommandJsonList($$)
           $str .= sprintf("%*s},\n", $lev+10, " ") if($cc != $ac);
           $str .= sprintf("%*s}\n", $lev+10, " ") if($cc == $ac);
         }
-        $str .= sprintf("%*s]\n", $lev+8, " ");
+        $str .= sprintf("%*s],\n", $lev+8, " ");
       } else {
-        $str .= sprintf("%*s\"READINGS\": []\n", $lev+8, " ");
+        $str .= sprintf("%*s\"READINGS\": [],\n", $lev+8, " ");
       }
 
-if($cc gt $ac) {
+
       # corresponding set parameters
       $str .= sprintf("%*s\"sets\": [\n", $lev+6, " ");
-
-      $ac = @sets;
-      $cc = 0;
-      foreach my $set (@sets) {
-        $str .= sprintf("%*s\"%s\"", $lev+8, " ", $set);
-        $cc++;
-        #$str .= ",\n" if($cc != $ac);
-        $str .= ",\n" if($cc != $ac);
-        #$str .= "\n" if($cc == $ac);
-      } 
+      my $sets = getAllSets($d);
+      if($sets) {
+        my @pSets;
+        foreach my $set (split(" ", JsonEscape($sets))) {
+          push @pSets, sprintf("%*s\"%s\"", $lev+8, " ", $set);
+        } 
+        $str .= join(",\n", @pSets);
+      }
       $str .= sprintf("\n%*s],\n", $lev+6, " ");
 
       # corresponding attributes
       $str .= sprintf("%*s\"attrs\": [\n", $lev+6, " ");
-      $ac = @attrs;
-      $cc = 0;
-      foreach my $attr (@attrs) {
-        $str .= sprintf("%*s\"%s\"", $lev+8, " ", $attr);
-        $cc++;
-        #$str .= ",\n" if($cc != $ac);
-        $str .= ",\n" if($cc != $ac);
-        $str .= "\n" if($cc == $ac);
-      } 
-}
+      my $attrs = getAllAttr($d);
+      if($attrs) {
+        my @aSets;
+        foreach my $attr (split(" ", JsonEscape($attrs))) {
+          push @aSets, sprintf("%*s\"%s\"", $lev+8, " ", $attr);
+        }
+        $str .= join(",\n", @aSets);
+      }
+      $str .= sprintf("\n%*s]\n", $lev+6, " ");
 
       $tc++;
       $tr = $tc if($q eq "");
       $tr++ if($q ne "" && $p->{TYPE} eq $t);
-      #$str .= sprintf("} ") if(($tc == $dc) || (!$lt));
-      #$str .= sprintf("+++}\n") if(($tc == $dc) || (!$lt));
       $str .= sprintf("%*s}\n", $lev+6, " ") if(($tc == $dc) || (!$lt));
     }
     $str .= sprintf("%*s]\n", $lev+4, " ") if($lt);
@@ -314,14 +295,12 @@ if($cc gt $ac) {
 
   } else {
     if($param eq "ROOMS") {
-      my @rooms;
-      foreach my $d (sort keys %defs) {
-        if($attr{$d}{"room"}) {
-          push(@rooms, $attr{$d}{"room"}) unless(grep($_ eq $attr{$d}{"room"}, @rooms));
-          next;
-        }
+      my %rooms;
+      foreach my $d (keys %attr) {
+        my $r = $attr{$d}{room};
+        map { $rooms{$_} = 1 } split(",", $r) if($r && $r ne "hidden");
       }
-      @rooms = sort(@rooms);
+      my @rooms = sort keys %rooms;
 
       # Result counter
       my $c = 0;
@@ -349,18 +328,9 @@ if($cc gt $ac) {
 
     } else {
       # Search for given device-type
-      my $listDev = "";
-      foreach my $d (sort { my $x = $defs{$a}{TYPE} cmp
-                                    $defs{$b}{TYPE};
-                               $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
-        if($param eq $defs{$d}{TYPE}) {
-          $listDev = $defs{$d}{TYPE};
-          next;
-        }
-      }
+      my @devs = grep { $param eq $defs{$_}{TYPE} } keys %defs;
 
-      # List devices by type
-      if($listDev ne "") {
+      if(@devs) {
         my $lt = "";
         my $ld = "";
         # Result counter
@@ -368,7 +338,7 @@ if($cc gt $ac) {
 
         # Open JSON object
         $str .= "{\n";
-        $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev, " ", "ResultSet", "devices#$listDev");
+        $str .= sprintf("%*s\"%s\": \"%s\",\n", $lev, " ", "ResultSet", "devices#$param");
         # Open JSON array
         $str .= sprintf("%*s\"%s\": [", $lev, " ", "Results");
 
