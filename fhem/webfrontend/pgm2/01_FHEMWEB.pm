@@ -76,7 +76,7 @@ my %FW_devs;       # hash of from/to entries per device
 my %FW_icons;      # List of icons
 my $FW_plotmode;   # Global plot mode (WEB attribute)
 my $FW_plotsize;   # Global plot size (WEB attribute)
-my $FW_commandref;     # $FW_docdir/commandref.html;
+my $FW_commandref; # $FW_docdir/commandref.html;
 my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
@@ -1219,7 +1219,7 @@ FW_readgplotfile($$$)
   my (@filelog, @data, $plot);
 
   my $wltype = "";
-  $wltype = $defs{$wl}{WLTYPE} if (defined($defs{$wl}{WLTYPE}));
+  $wltype = $defs{$wl}{WLTYPE} if($defs{$wl} && $defs{$wl}{WLTYPE});
 
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
   while(my $l = <FH>) {
