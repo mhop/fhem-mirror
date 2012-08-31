@@ -664,7 +664,7 @@ FW_updateHashes()
     next if(IsIgnored($d));
     my $t = AttrVal($d, "subType", $defs{$d}{TYPE});
     $t = AttrVal($d, "model", $t) if($t eq "unknown");
-    $FW_types{$t}{$d} = 1;
+    $FW_types{$d} = $t;
   }
 
   $FW_room = AttrVal($FW_detail, "room", "Unsorted") if($FW_detail);
@@ -985,7 +985,7 @@ FW_showRoom()
   my %group;
   foreach my $dev (@devs) {
     next if($defs{$dev}{TYPE} eq "weblink");
-    foreach my $grp (split(",", AttrVal($dev, "group", $defs{$dev}{TYPE}))) {
+    foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       $group{$grp}{$dev} = 1;
     }
   }
@@ -1224,10 +1224,11 @@ FW_readgplotfile($$$)
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
   while(my $l = <FH>) {
     $l =~ s/\r//g;
-#    if($l =~ m/^#FileLog (.*)$/) {
-    if($l =~ m/^#FileLog (.*)$/ && ($wltype eq "fileplot" || $wl eq "FileLog")) {
+    if($l =~ m/^#FileLog (.*)$/ &&
+       ($wltype eq "fileplot" || $wl eq "FileLog")) {
       push(@filelog, $1);
-    } elsif ($l =~ m/^#DbLog (.*)$/ && ($wltype eq "dbplot" || $wl eq "DbLog")) {
+    } elsif ($l =~ m/^#DbLog (.*)$/ && 
+       ($wltype eq "dbplot" || $wl eq "DbLog")) {
       push(@filelog, $1);
     } elsif($l =~ "^plot" || $plot) {
       $plot .= $l;
