@@ -6,6 +6,34 @@ use strict;
 use warnings;
 use IO::Socket::INET;
 
+my %ext2MIMEType= qw{
+  txt   text/plain
+  html  text/html
+  pdf   application/pdf
+  css   text/css
+  jpg   image/jpeg
+  png   image/png
+  gif   image/gif
+  ico   image/x-icon
+};
+
+my $KNOWNEXTENSIONS= 'txt|html|pdf|css|jpg|png|gif|ico';
+
+sub
+ext2MIMEType($) {
+  my ($ext)= @_;
+  my $MIMEType= $ext ? $ext2MIMEType{$ext} : "";
+  return $MIMEType ? $MIMEType : "";
+}
+
+sub
+filename2MIMEType($) {
+  my ($filename)= @_;
+  $filename =~ m/^(.*)\.($KNOWNEXTENSIONS)$/;
+  return ext2MIMEType($2);
+}
+  
+
 ##################
 sub
 urlEncode($) {

@@ -11,7 +11,7 @@ package main;
 use strict;
 use warnings;
 use vars qw(%data);
-
+use HttpUtils;
 
 #########################
 sub
@@ -71,11 +71,13 @@ HTTPSRV_CGI(){
   if($request !~ m,^/.+/.*,) {
     $request= "$request/index.html";
   }
-  if($request =~ m,^\/(.*)/(.*)$,) {
+  if($request =~ m,^/([^/]+)/(.*)$,) {
     my $name= $1;
     my $filename= $2;
+    my $MIMEtype= filename2MIMEType($filename);
+    #return("text/plain; charset=utf-8", "HTTPSRV device: $name, filename: $filename, MIME type: $MIMEtype");
     if(!defined($defs{$name})) {
-      return("text/plain; charset=utf-8", "Unknown HTTPSRV device: $name");
+      return("$MIMEtype; charset=utf-8", "Unknown HTTPSRV device: $name");
     }
       my $directory= $defs{$name}{fhem}{directory};
       $filename= "$directory/$filename";
