@@ -313,14 +313,7 @@ FW_ServeSpecial($$$) {
   binmode(FH) if($ext =~ m/$ICONEXTENSION/); # necessary for Windows
   FW_pO join("", <FH>);
   close(FH);
-  $FW_RETTYPE = "text/plain"             if($ext eq "txt");
-  $FW_RETTYPE = "text/html"              if($ext eq "html");
-  $FW_RETTYPE = "application/pdf"        if($ext eq "pdf");
-  $FW_RETTYPE = "text/css"               if($ext eq "css");
-  $FW_RETTYPE = "image/jpeg"             if($ext eq "jpg");
-  $FW_RETTYPE = "image/png"              if($ext eq "png");
-  $FW_RETTYPE = "image/gif"              if($ext eq "gif");
-  $FW_RETTYPE = "image/x-icon"           if($ext eq "ico");
+  $FW_RETTYPE = ext2MIMEType($ext);
   return 1;
 }
   
