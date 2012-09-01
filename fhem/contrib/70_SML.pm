@@ -8,7 +8,7 @@
 #
 # $Id$
 #
-# Version = 2.0
+# Version = 2.1
 #
 ##############################################################################
 #
@@ -71,6 +71,9 @@ energy_Set($$$$)
 	$hash->{READINGS}{$vt}{VAL} = $val;
 	$hash->{READINGS}{$vt}{TIME} = TimeNow();
 	Log 4, "$hash->{NAME} VAL: $hash->{READINGS}{$vt}{VAL}";
+ if ( $vt eq "?"){
+ 	return "Unknown argument ?, choose one of DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
+ }
   return undef;
 }
 
@@ -311,11 +314,11 @@ energy_Update($hash) unless $hash->{Interval};
  if (defined($hash->{READINGS}{$get})) {
   $val = $hash->{READINGS}{$get}{VAL};
  } else {
-  #return "energy_Get: no such reading: $get";
-#minPower, maxPower, lastPower, avgPower, DAYPOWER, MONTHPOWER, YEARPOWER, TOTALPOWER  
-return "energy_Get: no such reading: $get";
+ return "energy_Get: no such reading: $get";
  }
-
+ if ( $get eq "?"){
+ return "Unknown argument ?, choose one of minPower maxPower lastPower avgPower DAYPOWER MONTHPOWER YEARPOWER TOTALPOWER";
+ }
  Log 3, "$args[0] $get => $val";
 
  return $val;
