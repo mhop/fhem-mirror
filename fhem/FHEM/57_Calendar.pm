@@ -639,6 +639,7 @@ sub Calendar_CheckTimes($) {
   foreach $event (@endedevents) { $event->setMode("end"); }
 
   my @changedevents= grep { $_->modeChanged() } @allevents;
+
   
   my @upcoming= sort map { $_->uid() } @upcomingevents;
   my @alarm= sort map { $_->uid() } @alarmedevents;
@@ -649,7 +650,9 @@ sub Calendar_CheckTimes($) {
   my @ended= sort map { $_->uid() } grep { $_->modeChanged() } @endedevents;
   my @changed= sort map { $_->uid() } @changedevents;
   
-  readingsBeginUpdate($hash);
+  readingsBeginUpdate($hash); # clears all events in CHANGED, thus must be called first
+  # we create one fhem event for one changed calendar event
+  map { addEvent($hash, "changed: " . $_->uid() . " " . $_->mode() ); } @changedevents;
   readingsUpdate($hash, "lastCheck", $hash->{fhem}{lastCheck});
   readingsUpdate($hash, "modeUpcoming", join(";", @upcoming));
   readingsUpdate($hash, "modeAlarm", join(";", @alarm));
