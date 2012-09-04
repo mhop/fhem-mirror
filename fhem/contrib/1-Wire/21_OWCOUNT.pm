@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.17 - August, 2012
+# Version 2.18 - September, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -39,7 +39,7 @@
 # set <name> interval            => set query interval for measurement
 # set <name> memory <page>       => 32 byte string into page 0..13
 # set <name> midnight  <channel> => todays starting value for counter
-# set <name> init                => re-initialize device
+# set <name> init yes            => re-initialize device
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
@@ -219,7 +219,7 @@ sub OWCOUNT_Define ($$) {
  
   #-- Start timer for initialization in a few seconds
   InternalTimer(time()+1, "OWCOUNT_InitializeDevice", $hash, 0);
-  
+ 
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
 
@@ -288,6 +288,12 @@ sub OWCOUNT_InitializeDevice($) {
     $hash->{READINGS}{"$owg_rate[$i]"}{TYPE}     = $cnama[1]."_rate";  
     $hash->{READINGS}{"$owg_rate[$i]"}{UNIT}     = $unarr[0].$runit;
     $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = $unarr[1].$runit;
+    #-- some special cases
+    #   Energy/Power
+    $hash->{READINGS}{"$owg_rate[$i]"}{UNIT} = "kW"
+      if ($unarr[0].$runit eq "kWh/h" );
+    $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = "kW"
+      if ($unarr[1].$runit eq "kWh/h" );
     #Log 1,"OWCOUNT InitializeDevice with period $period and UNITABBR = ".$hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
     
   }
@@ -340,7 +346,9 @@ sub OWCOUNT_FormatValues($) {
   for (my $i=0;$i<int(@owg_fixed);$i++){
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
     my @cnama = split(/\|/,$cname);
-    $owg_channel[$i]=$cnama[0]; 
+    $owg_channel[$i]= $cnama[0]; 
+    $owg_rate[$i]   = $cnama[0]."_rate";  
+
     $offset   = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
     $factor   = $hash->{READINGS}{"$owg_channel[$i]"}{FACTOR};
     $unit     = $hash->{READINGS}{"$owg_channel[$i]"}{UNITABBR};
@@ -736,6 +744,8 @@ sub OWCOUNT_Set($@) {
   
   #-- reset the device
   if($key eq "init") {
+    return "OWCOUNT: init needs parameter 'yes'"
+      if($value ne "yes");
     OWCOUNT_InitializeDevice($hash);
     return "OWCOUNT: Re-initialized device";
   }
