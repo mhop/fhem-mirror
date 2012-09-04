@@ -17,7 +17,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.13 - July, 2012
+# Version 2.18 - September, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -45,9 +45,12 @@
 # set <name> output <channel-name>  ON|OFF => set value for channel (name A, B or defined channel name)
 #            note: 1 = OFF, 0 = ON in normal usage. See also th enote above
 # set <name> gpio  value => set values for channels (3 = both OFF, 1 = B ON 2 = A ON 0 = both ON)
+# set <name> init yes => re-initialize device
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
+#
+# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit <string>|<string> = values to display in state variable for on|off condition
@@ -97,7 +100,8 @@ my %gets = (
 my %sets = (
   "interval"    => "",
   "output"      => "",
-  "gpio"        => ""
+  "gpio"        => "",
+  "init"        => ""
 );
 
 my %updates = (
@@ -131,7 +135,8 @@ sub OWSWITCH_Initialize ($) {
   #Offset      = an offset added to the reading
   #Factor      = a factor multiplied with (reading+offset)  
   #Unit        = a unit of measure
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406 loglevel:0,1,2,3,4,5 ";
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406 loglevel:0,1,2,3,4,5 ".
+    "event:on-update,on-change";
  
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
@@ -491,12 +496,17 @@ sub OWSWITCH_GetValues($) {
     return "OWSWITCH: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
+  #-- old state, new state
+  my $oldval = $hash->{STATE};
   $value=OWSWITCH_FormatValues($hash);
-  #--logging
+  my $newval =  $hash->{STATE};
+  #--logging depends on setting of the event-attribute
   Log 5, $value;
-  $hash->{CHANGED}[0] = $value;
-  
-  DoTrigger($name, undef);
+  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
+  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
+     $hash->{CHANGED}[0] = $value;
+     DoTrigger($name, undef);
+  } 
   
   return undef;
 }
@@ -534,6 +544,14 @@ sub OWSWITCH_Set($@) {
   my $condx;
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
+  
+  #-- reset the device
+  if($key eq "init") {
+    return "OWCOUNT: init needs parameter 'yes'"
+      if($value ne "yes");
+    OWSWITCH_InitializeDevice($hash);
+    return "OWCOUNT: Re-initialized device";
+  }
  
   #-- set new timer interval
   if($key eq "interval") {
@@ -608,9 +626,9 @@ sub OWSWITCH_Set($@) {
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
   OWSWITCH_GetValues($hash);  
-  OWSWITCH_FormatValues($hash);  
+  #OWSWITCH_FormatValues($hash);  
   Log 4, "OWSWITCH: Set $hash->{NAME} $key $value";
-  $hash->{CHANGED}[0] = $value;
+  #$hash->{CHANGED}[0] = $value;
   return undef;
 }
 
