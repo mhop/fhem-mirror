@@ -77,7 +77,7 @@ HTTPSRV_CGI(){
     my $MIMEtype= filename2MIMEType($filename);
     #return("text/plain; charset=utf-8", "HTTPSRV device: $name, filename: $filename, MIME type: $MIMEtype");
     if(!defined($defs{$name})) {
-      return("$MIMEtype; charset=utf-8", "Unknown HTTPSRV device: $name");
+      return("text/plain; charset=utf-8", "Unknown HTTPSRV device: $name");
     }
       my $directory= $defs{$name}{fhem}{directory};
       $filename= "$directory/$filename";
@@ -86,7 +86,7 @@ HTTPSRV_CGI(){
         binmode(INPUTFILE);
         @contents= <INPUTFILE>;
         close(INPUTFILE);
-        return("", join("", @contents));
+        return("$MIMEtype; charset=utf-8", join("", @contents));
       } else {
         return("text/plain; charset=utf-8", "File not found: $filename");
     }
