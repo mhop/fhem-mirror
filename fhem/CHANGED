@@ -21,7 +21,7 @@
   - feature: webCmd in smallScreen added
   - feature: TRX modules by Willi
   - feature: FHEMWEB icons (by Joerg)
-  - feature: FHEMWEB console (== inform timer)
+  - feature: FHEMWEB console (same as inform timer)
   - feature: remove dependency on Google::Weather, major rewrite (Boris)
   - feature: started experimental interface implementation (fhem API v2) (Boris)
   - feature: sleep issued in at/notify/etc is not blocking fhem anymore
