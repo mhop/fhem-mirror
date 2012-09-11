@@ -13,6 +13,7 @@ HOL_Initialize($$) {
 
   $hash->{SetFn} = "HOL_Set";
   $hash->{DefFn} = "HOL_Define";
+  $hash->{UndefFn} = "HOL_Undef";
 }
 
 sub 
@@ -24,17 +25,21 @@ HOL_Set {
   my $currentState = $hash->{STATE};
   return "state is already $v" if $currentState eq $v;
   
-  if ($v eq "on" || $v eq "off") {
+  if ($v eq "on" || $v eq "off" || $v eq "switch") {
     if($v eq "on") {
       $hash->{STATE} = "on";
-      HOL_switch($hash->{NAME});
+      HOL_switch($hash);
     } elsif ($v eq "off") {
       $hash->{STATE} = "off";
       HOL_turnOffCurrentDevice($hash);
+    } elsif ($v eq "switch") {
+      my $state = "$hash->{STATE}";
+      return "can only switch if state is on" if ($state ne "on");
+      HOL_switch($hash);
     }
     return $v;
   } else {
-    return "unknown set value, choose one of on off";
+    return "unknown set value, choose one of on off switch";
   }
 }
 
@@ -56,8 +61,7 @@ HOL_turnOffCurrentDevice {
 
 sub
 HOL_switch {
-  my ($deviceName) = @_;
-  my $hash = $defs{$deviceName};
+  my ($hash) = @_;
   
   HOL_turnOffCurrentDevice($hash);
   
@@ -95,9 +99,18 @@ HOL_switch {
   $hash->{nextTrigger} = FmtDateTime($nextTrigger);
   
   fhem "set $deviceName on-for-timer $switchTime";
-  InternalTimer($nextTrigger, "HOL_switch", $deviceName, 0);
+  InternalTimer($nextTrigger, "HOL_switch", $hash, 0);
   
   return 1;
+}
+
+sub
+HOL_Undef($$)
+{
+  my ($hash, $arg) = @_;
+
+  RemoveInternalTimer($hash);
+  return undef;
 }
 
 sub
