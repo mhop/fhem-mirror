@@ -359,7 +359,8 @@ createInterfaceDefinitions();
 my $gp = $attr{global}{port};
 if($gp) {
   Log 3, "Converting 'attr global port $gp' to 'define telnetPort telnet $gp'";
-  CommandDefine(undef, "telnetPort telnet $gp");
+  my $ret = CommandDefine(undef, "telnetPort telnet $gp");
+  Log 1, "$ret" if($ret);
   delete($attr{global}{port});
 }
 
@@ -1583,7 +1584,7 @@ getAllSets($)
   my $em = AttrVal($d, "eventMap", undef);
   if($em) {
     $em = join(" ", grep { !/ / }
-                    map { $_ =~ s/.*://s; $_ } 
+                    map { $_ =~ s/.*=//s; $_ } 
                     EventMapAsList($em));
     $a2 = "$em $a2";
   }
