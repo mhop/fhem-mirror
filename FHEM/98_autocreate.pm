@@ -300,7 +300,7 @@ my @usbtable = (
       response  => "^V .* CU.*",
       define    => "CUL_PARAM CUL DEVICE\@9600 1PARAM34", },
 
-    { NAME      => "CUL",
+    { NAME      => "CUL",       # TuxRadio / CSM special
       matchList => ["ttySP(.*)"],
       DeviceName=> "DEVICE\@38400",
       flush     => "\n",
@@ -309,7 +309,8 @@ my @usbtable = (
       define    => "CUL_PARAM CUL DEVICE\@38400 1PARAM34", },
 
     { NAME      => "TCM310",
-      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)", "ttyUSB(.*)", "ttyACM(.*)"],
+      matchList => ["cu.usbserial(.*)", "cu.usbmodem(.*)",
+                    "ttyUSB(.*)", "ttyACM(.*)"],
       DeviceName=> "DEVICE\@57600",
       request   => pack("H*", "5500010005700838"),   # get idbase
       response  => "^\x55\x00\x05\x01",
@@ -337,6 +338,13 @@ my @usbtable = (
       response  => "^\x0d\x01\x00...........",
       define    => "TRX_PARAM TRX DEVICE\@38400", },
 
+    { NAME      => "ZWDongle",
+      matchList => ["cu.PL2303-0000(.*)", "ttyUSB(.*)"],
+      DeviceName=> "DEVICE\@115200",
+      request   => pack("H*", "01030020dc"),   # GetStatus 
+      response  => "^\x06.*",
+      define    => "ZWDongle_PARAM ZWDongle DEVICE\@115200", },
+
 );
 
 
@@ -357,6 +365,7 @@ CommandUsb($$)
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
+  Log 1, "usb $n starting";
   ################
   # First try to flash unflashed CULs
   if($^O eq "linux") {
@@ -452,6 +461,7 @@ CommandUsb($$)
     }
 NEXTDEVICE:
   }
+  Log 1, "usb $n end";
   return ($scan ? $ret : undef);
 }
 
