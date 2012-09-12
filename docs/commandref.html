@@ -1144,10 +1144,10 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="xmllist"></a>
 <h3>xmllist</h3>
 <ul>
-  <code>xmllist</code>
+  <code>xmllist [devspec]</code>
   <br><br>
-  Returns an XML tree of all definitions, all notify settings and all at
-  entries. It is not intended for human consumption.
+  Returns an XML tree of device definitions. <a href="#devspec">devspec</a> is
+  optional, and restricts the list of devices if specified. 
   <br><br>
   Example:
   <pre>  fhem> xmllist
