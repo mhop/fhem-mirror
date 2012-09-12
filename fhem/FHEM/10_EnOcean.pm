@@ -363,7 +363,7 @@ EnOcean_Parse($$)
       push @event, "3:tempSensor:"   . (($db_2 & 0x04) ? "failed" : "ok");
       push @event, "3:window:"       . (($db_2 & 0x02) ? "open" : "closed");
       push @event, "3:actuatorStatus:".(($db_2 & 0x01) ? "obstructed" : "ok");
-      push @event, "3:measured-temp:". sprintf "%.1f", ($db_1*40/255);
+      push @event, "3:measured-temp:". sprintf "%0.1f", ($db_1*40/255);
       EnOcean_MD15Cmd($hash, $name, $db_1);
       
     } elsif($model eq "PM101") {
