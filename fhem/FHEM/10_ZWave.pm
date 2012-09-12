@@ -1,12 +1,14 @@
 ##############################################
 # See ZWDongle.pm for inspiration
 # TODO
+# - versioned commands
 # - use central readings functions
 # - Generate MISSING ACK
 # - implement (global?) on-for-timer
 # - better autocreate integration
 # - get support in FHEMWEB
 # - class meter: get 
+# - class SWITCH_ALL
 package main;
 
 use strict;
