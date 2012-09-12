@@ -1,10 +1,10 @@
 ##############################################
 # $Id: 00_ZWDongle.pm 1721 2012-07-11 14:48:24Z rudolfkoenig $
 # TODO:
+# - routing commands
 # - one command to create a fhem device for all nodeList entries
 # - inclusion mode active only for a given time (pairForSec)
 # - use central readings functions
-# - add usbscan
 package main;
 
 use strict;
@@ -406,7 +406,6 @@ ZWDongle_Read($@)
   my $ll5 = GetLogLevel($name,5);
 
   $buf = unpack('H*', $buf);
-
   # The dongle looses data over USB for some commands(?), and dropping the old
   # buffer after a timeout is my only idea of solving this problem.
   my $ts   = gettimeofday();

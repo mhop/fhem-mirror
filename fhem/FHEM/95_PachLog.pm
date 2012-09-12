@@ -73,6 +73,7 @@ sub PachLog_Define($@)
   my($package, $filename, $line, $subroutine) = caller(3);
   # Log 0 , "PachLog_Define => $package: $filename LINE: $line SUB: $subroutine \n";
   Log 5, Dumper(@_) . "\n";
+  Log 1, "Got: ". join(",", @a);
   return "Unknown argument count " . int(@a) . " , usage set <name> dataset value or set <name> delete dataset"  if(int(@a) != 1);
   return undef;
 

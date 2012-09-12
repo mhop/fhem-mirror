@@ -45,13 +45,19 @@ CommandXmlList($$)
   my ($cl, $param) = @_;
   my $str = "<FHZINFO>\n";
   my $lt = "";
+  my %filter;
 
-  delete($modules{""}) if(defined($modules{""}));
+  if($param) {
+   my @arr = devspec2array($param);
+   map { $filter{$_} = 1 } @arr;
+  }
+  delete($modules{""}) if(defined($modules{""})); # ???
+
   for my $d (sort { my $x = $modules{$defs{$a}{TYPE}}{ORDER}.$defs{$a}{TYPE} cmp
     		            $modules{$defs{$b}{TYPE}}{ORDER}.$defs{$b}{TYPE};
     		    $x = ($a cmp $b) if($x == 0); $x; } keys %defs) {
 
-      next if(IsIgnored($d));
+      next if(IsIgnored($d) || (%filter && !$filter{$d}));
       my $p = $defs{$d};
       my $t = $p->{TYPE};
       if($t ne $lt) {

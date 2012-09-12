@@ -933,7 +933,8 @@ CUL_SimpleWrite(@)
   syswrite($hash->{TCPDev}, $msg) if($hash->{TCPDev});
   syswrite($hash->{DIODev}, $msg) if($hash->{DIODev});
 
-  select(undef, undef, undef, 0.001);
+  # Some linux installations are broken with 0.001, T01 returns no answer
+  select(undef, undef, undef, 0.01);
 }
 
 sub
