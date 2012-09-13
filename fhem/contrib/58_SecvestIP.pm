@@ -2,6 +2,7 @@
 #                                                                   #
 # SecvestIP.pm written by Peter J. Flathmann                        #
 # Version 0.1, 2012-09-07                                           #
+# Version 0.2, 2012-09-13                                           #
 # SecvestIP firmware version 2.3.4                                  #
 #                                                                   #
 #                                                                   #
@@ -11,13 +12,7 @@
 # Example:                                                          #
 #                                                                   #
 # define EMA SecvestIP secvestip admin geheimesKennwort             #
-#                                                                   #
-# define Alarmanlage dummy                                          #
-# attr Alarmanlage alias SecvestIP                                  #
-# attr Alarmanlage eventMap on:on off:off                           #
-#                                                                   #
-# define AlarmanlageScharf    notify Alarmanlage:on set EMA Set     #
-# define AlarmanlageUnscharf  notify Alarmanlage:off set EMA Unset  #
+# attr EMA webCmd state                                             #
 #                                                                   #
 #####################################################################
 
@@ -28,19 +23,20 @@ use POSIX;
 use LWP::UserAgent;
 use HTTP::Cookies;
 
-sub
-SecvestIP_Initialize($)
-{
+sub SecvestIP_Initialize($) {
+
   my ($hash) = @_;
 
   $hash->{DefFn}     = "SecvestIP_Define";
   $hash->{SetFn}     = "SecvestIP_Set";
   $hash->{GetFn}     = "SecvestIP_Get";
+
+  return undef;
 }
 
-sub SecvestIP_Get($@) {
+sub SecvestIP_Get($) {
 
-  my ($hash,@a) = @_;
+  my ($hash) = @_;
 
   my $url = 'http://'.$hash->{HOST}.'/';
 
@@ -71,7 +67,11 @@ sub SecvestIP_Set($$$) {
   my ($hash, $name ,$cmd) = @_;
 
   Log 1, "SecvestIP: Set $name $cmd";
-  return "Unknown argument $cmd, choose one of Set Unset PartSet" if ("?" eq $cmd); 
+
+  if ("?" eq $cmd) {
+    SecvestIP_Get($hash);
+    return "Unknown argument $cmd, choose one of state:Set,Unset,PartSet";
+  }   
 
   my $url = 'http://'.$hash->{HOST}.'/';
 
@@ -88,6 +88,10 @@ sub SecvestIP_Set($$$) {
   );
 
   $response = $agent->get ($url.'setMode.cgi?Mode='.$cmd.'&Source=Webpage&ts='.time() );
+
+  readingsBeginUpdate($hash);
+  readingsUpdate($hash, 'state', $cmd);
+  readingsEndUpdate($hash, 1);
   $hash->{STATE} = $cmd;
 
   return undef;
