@@ -1,18 +1,29 @@
 #####################################################################
 #                                                                   #
 # SecvestIP.pm written by Peter J. Flathmann                        #
-# Version 0.1, 2012-09-07                                           #
-# Version 0.2, 2012-09-13                                           #
+# Version 0.3, 2012-09-15                                           #
 # SecvestIP firmware version 2.3.4                                  #
 #                                                                   #
+# ----------------------------------------------------------------- #
 #                                                                   #
-# Usage: define <name> SecvestIP <hostname> <user> <password>       #
+# Usage:                                                            #
 #                                                                   #
+# define <name> SecvestIP <hostname> <user> <password>              #
+# set <name> <Set|PartSet|Unset>                                    #
 #                                                                   #
 # Example:                                                          #
 #                                                                   #
 # define EMA SecvestIP secvestip admin geheimesKennwort             #
 # attr EMA webCmd state                                             #
+# set EMA Set                                                       #
+#                                                                   #
+# ----------------------------------------------------------------- #
+#                                                                   #
+# Possible states:                                                  #
+#                                                                   #
+# Set:     activated                                                #
+# PartSet: internally activated                                     #
+# Unset:   deactivated                                              #
 #                                                                   #
 #####################################################################
 
@@ -52,11 +63,11 @@ sub SecvestIP_Get($) {
     Password => $hash->{PASSWORD}} 
   );
 
+  # Get SecvestIP state
   $response = $agent->get ($url.'getMode.cgi?ts='.time().'&Action=AudioAlarm&Source=Webpage');
 
   my @pairs = split(/\s+/,$response->content);
   my @state = split('=',$pairs[0]);
-
   $hash->{STATE} = $state[1];
   
   return undef;
@@ -65,13 +76,13 @@ sub SecvestIP_Get($) {
 sub SecvestIP_Set($$$) {
 
   my ($hash, $name ,$cmd) = @_;
+  
+  return "Unknown argument $cmd, choose one of state:Set,Unset,PartSet" if ($cmd eq "?");
 
   Log 1, "SecvestIP: Set $name $cmd";
 
-  if ("?" eq $cmd) {
-    SecvestIP_Get($hash);
-    return "Unknown argument $cmd, choose one of state:Set,Unset,PartSet";
-  }   
+  # Get current SecvestIP state
+  SecvestIP_Get($hash);
 
   my $url = 'http://'.$hash->{HOST}.'/';
 
@@ -86,13 +97,16 @@ sub SecvestIP_Set($$$) {
     UserName => $hash->{USER},
     Password => $hash->{PASSWORD}}
   );
-
+  
+  # switching between internal and full activation or vice versa requires Unset first
+  if ($cmd eq "Set" and $hash->{STATE} eq "PartSet" or $cmd eq "PartSet" and $hash->{STATE} eq "Set")  {
+    Log 1, "SecvestIP: switching from $hash->{STATE} to $cmd";
+    $response = $agent->get ($url.'setMode.cgi?Mode=Unset&Source=Webpage&ts='.time() );
+    sleep(2); # wait a moment to avoid confusing SecvestIP's web interface
+  }
+  
   $response = $agent->get ($url.'setMode.cgi?Mode='.$cmd.'&Source=Webpage&ts='.time() );
-
-  readingsBeginUpdate($hash);
-  readingsUpdate($hash, 'state', $cmd);
-  readingsEndUpdate($hash, 1);
-  $hash->{STATE} = $cmd;
+  SecvestIP_Get($hash);
 
   return undef;
 }
