@@ -6228,9 +6228,13 @@ Attributes:<br>
     <li>time &lt;x&gt; &lt;y&gt;<br>Renders the current time in HH:MM format.</li><br>
     <li>seconds &lt;x&gt; &lt;y&gt; &lt;format&gt<br>Renders the curent seconds. Maybe usefull for a RSS Clock. With option colon a : </li><br>
     <li>date &lt;x&gt; &lt;y&gt;<br>Renders the current date in DD:MM:YYY format.</li><br>
-    <li>gif &lt;x&gt; &lt;y&gt; &lt;hostname&gt; &lt;filename&gt; <br>Renders the GIF picture
-    that is downloaded from the given host. You can use
-    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;filename&gt. See below for example.</li><br>
+    <li>img &lt;x&gt; &lt;y&gt; &lt;s&gt; &lt;imgtype&gt; &lt;srctype&gt; &lt;arg&gt; <br>Renders a picture at the
+    position (&lt;x&gt;, &lt;y&gt;). The &lt;imgtype&gt; is one of <code>gif</code>, <code>jpeg</code>, <code>png</code>.
+    The picture is scaled by the factor &lt;s&gt; (a decimal value). If &lt;srctype&gt; is <code>file</code>, the picture
+    is loaded from the filename &lt;arg&gt;, if &lt;srctype&gt; is <code>url</code>, the picture
+    is loaded from the URL &lt;arg&gt;. You can use
+    <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
+    Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
     </li><br>
     </ul>
 
@@ -6241,8 +6245,8 @@ Attributes:<br>
     pt 48 # font size in points<br>
     time 0.10 0.90<br>
     pt 24<br>
-    text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "Â°C" }<br>
-    gif 20 530 www.google.com:80 { ReadingsVal("e.ext.Weather","icon","") }<br>
+    text 0.10 0.95 { ReadingsVal("MyWeather","temperature","?"). "°C" }<br>
+    img 20 530 0.5 png file { "/usr/share/fhem/www/images/weather/" . ReadingsVal("MyWeather","icon","") . ".png" }<br>
     </code>
 
   </ul>
