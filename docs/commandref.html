@@ -5163,23 +5163,18 @@ To send the data, both send or write could be used.<br>
   <ul>
     <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
     <br>
-    Defines a virtual device for weather forecasts. <!--You need to have the perl
-    module Weather::Google installed to use this device. If you do not have it,
-    use <i>cpan -i Weather::Google</i> to install it.--><br><br>
+    Defines a virtual device for weather forecasts.<br><br>
 
     A Weather device periodically gathers current and forecast weather conditions
-    from the Google Weather API.<br><br>
+    from the Yahoo Weather API.<br><br>
 
-    The parameter <code>location</code> is any string that is recognized as a
-    location, either a town name or a zip code or latitude/longitude (in decimal notation,
-    multiplied by one million). Browse to the URL
-    <code>http://www.google.de/ig/api?weather=location&hl=en</code>
-    to see the raw output for your location.<br><br>
+    The parameter <code>location</code> is the WOEID (WHERE-ON-EARTH-ID), go to
+    <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> to find it out for your location.<br><br>
 
     The optional parameter <code>interval</code> is the time between subsequent updates
     in seconds. It defaults to 3600 (1 hour).<br><br>
 
-    The optional language parameter may be one of
+    The optional language parameter is currently ignored.<!--may be one of
     <code>da</code>,
     <code>de</code>,
     <code>en</code>,
@@ -5198,15 +5193,13 @@ To send the data, both send or write could be used.<br>
     <code>zv-TW</code>.
 
     It determines the natural language in which the forecast information appears.
-    It defaults to <code>en</code>. If you want to set the language you also have to set the interval.<br><br>
+    It defaults to <code>en</code>. If you want to set the language you also have to set the interval.--><br><br>
 
     Examples:
     <pre>
-      define MyWeather Weather Frankfurt,HE
-      define Forecast Weather Amsterdam,NL 1800
-      define weather Weather 30000,France 3600 fr
-      define W Weather ,,,50500000,30500000 600 es
-      </pre>
+      define MyWeather Weather 673513
+      define Forecast Weather 673513 1800
+     </pre>
   </ul>
   <br>
 
@@ -5225,25 +5218,31 @@ To send the data, both send or write could be used.<br>
   <ul>
     <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
 
-    Valid readings and their meaning (? can be one of 0, 1, 2, 3, 4 and stands
-    for today, tomorrow, ...):<br>
+    Valid readings and their meaning (? can be one of 1, 2 and stands
+    for today, tomorrow):<br>
     <table>
     <tr><td>city</td><td>name of town returned for location</td></tr>
-    <tr><td>condition</td><td>current condition, one of Sunny, Clear, Partly Cloudy, Mostly Cloudy, Overcast, Chance of Rain</td></tr>
+    <tr><td>code</td><td>current condition code</td></tr>
+    <tr><td>condition</td><td>current condition</td></tr>
     <tr><td>current_date_time</td><td>last update of forecast on server</td></tr>
+    <tr><td>fc?_code</td><td>forecast condition code</td></tr>
     <tr><td>fc?_condition</td><td>forecast condition</td></tr>
     <tr><td>fc?_day_of_week</td><td>day of week for day +?</td></tr>
     <tr><td>fc?_high_c</td><td>forecasted daily high in degrees centigrade</td></tr>
-    <tr><td>fc?_icon</td><td>relative path for forecast icon, prefix with <code>http://www.google.com</code> to form a valid URL for display in web interfaces</td></tr>
+    <tr><td>fc?_icon</td><td>forecast icon</td></tr>
     <tr><td>fc?_low_c</td><td>forecasted daily low in degrees centigrade</td></tr>
     <tr><td>humidity</td><td>current humidity in %</td></tr>
     <tr><td>icon</td><td>relative path for current icon</td></tr>
-    <tr><td>postal_code</td><td>location sent to server</td></tr>
+    <tr><td>pressure</td><td>air pressure in hPa</td></tr>
+    <tr><td>pressure_trend</td><td>air pressure trend (unit?)</td></tr>
     <tr><td>temperature</td><td>current temperature in degrees centigrade</td></tr>
     <tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
     <tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
     <tr><td>wind</td><td>wind speed in km/h</td></tr>
+    <tr><td>wind_chill</td><td>?</td></tr>
     <tr><td>wind_condition</td><td>wind direction and speed</td></tr>
+    <tr><td>wind_direction</td><td>direction wind comes from in degrees (0 = north wind)</td></tr>
+    <tr><td>wind_speed</td><td>same as wind</td></tr>
     </table>
 
   </ul>
