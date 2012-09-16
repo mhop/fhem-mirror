@@ -101,9 +101,9 @@ sub HTTPSRV_CGI() {
     # get device name
     $name= $data{FWEXT}{$link}{deviceName} if($data{FWEXT}{$link});
 
-    Debug "link= $link";
-    Debug "filename= $filename";
-    Debug "name= $name";
+    #Debug "link= $link";
+    #Debug "filename= $filename";
+    #Debug "name= $name";
 
     # return error if no such device
     return("text/plain; charset=utf-8", "No HTTPSRV device for $link") unless($name);
