@@ -251,7 +251,7 @@ sub Weather_RetrieveData($)
             my $vis = (($2 eq "") ? " " : $2);   # clear visibility field
             readingsUpdate($hash, "visibility", $vis);
             if ($3) { readingsUpdate($hash, "pressure", $3); } 
-            if ($4) { readingsUpdate($hash, "pressure-trend", $4); }     
+            if ($4) { readingsUpdate($hash, "pressure_trend", $4); }
           }
 
           ### wind
@@ -271,54 +271,6 @@ sub Weather_RetrieveData($)
 }  #end sub
 
 
-###################################
-sub Weather_RetrieveDataViaWeatherGoogle($)
-{
-  my ($hash)= @_;
-
-  # get weather information from Google weather API
-  # see http://search.cpan.org/~possum/Weather-Google-0.03/lib/Weather/Google.pm
-
-  my $location= $hash->{LOCATION};
-  my $lang= $hash->{LANG};
-  my $name = $hash->{NAME};
-  my $WeatherObj;
-
-  Log 4, "$name: Updating weather information for $location, language $lang.";
-  eval {
-        $WeatherObj= new Weather::Google($location, {language => $lang});
-  };
-
-  if($@) {
-        Log 1, "$name: Could not retrieve weather information.";
-        return 0;
-  }
-
-  # the current conditions contain temp_c and temp_f
-  my $current = $WeatherObj->current_conditions;
-  foreach my $condition ( keys ( %$current ) ) {
-        my $value= $current->{$condition};
-        Weather_UpdateReading($hash,"",$condition,$value);
-  }
-
-  my $fci= $WeatherObj->forecast_information;
-  foreach my $i ( keys ( %$fci ) ) {
-        my $reading= $i;
-        my $value= $fci->{$i};
-        Weather_UpdateReading($hash,"",$i,$value);
-  }
-
-  # the forecast conditions contain high and low (temperature)
-  for(my $t= 0; $t<= 3; $t++) {
-        my $fcc= $WeatherObj->forecast_conditions($t);
-        my $prefix= sprintf("fc%d_", $t);
-        foreach my $condition ( keys ( %$fcc ) ) {
-                my $value= $fcc->{$condition};
-                Weather_UpdateReading($hash,$prefix,$condition,$value);
-        }
-  }
-
-}
 
 ###################################
 sub Weather_GetUpdate($)
