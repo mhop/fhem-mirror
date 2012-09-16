@@ -5,7 +5,7 @@
 # e-mail: omega at online dot de
 #
 ##############################################
-# $Id:  $
+# $Id  $
 
 package main;
 use strict;
@@ -248,21 +248,41 @@ RSS_itemDate {
 
 }
 
-
-
-
 sub
-RSS_itemGif {
-  my ($S,$x,$y,$host,$filename,%params)= @_;
-  return if($host eq "");
-  return if($filename eq "");
+RSS_itemImg {
+  my ($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params)= @_;
+  return if($arg eq "");
+  my $I;
+  if($srctype eq "url") {
+    my $data = GetFileFromURL($arg,3,undef,1);
+    if($imgtype eq "gif") {
+      $I= GD::Image->newFromGifData($data);
+    } elsif($imgtype eq "png") {
+      $I= GD::Image->newFromPngData($data);
+    } elsif($imgtype eq "jpeg") {
+      $I= GD::Image->newFromJpegData($data);
+    } else {
+      return;
+    }
+  } elsif($srctype eq "file") {
+    if($imgtype eq "gif") {
+      $I= GD::Image->newFromGif($arg);
+    } elsif($imgtype eq "png") {
+      $I= GD::Image->newFromPng($arg);
+    } elsif($imgtype eq "jpeg") {
+      $I= GD::Image->newFromJpeg($arg);
+    } else {
+      return;
+    }
+  } else {
+    return;
+  }
   ($x,$y)= RSS_xy($S,$x,$y);
-  my $data = GetFileFromURL("http://$host$filename");
-  return unless(defined($data));
-  my $I= GD::Image->newFromGifData($data);
   my ($width,$height)= $I->getBounds();
-  Log 5, "RSS placing $host$filename ($width x $height) at ($x,$y)";
-  $S->copy($I,$x,$y,0,0,$width,$height);
+  my ($swidth,$sheight)= (int($scale*$width), int($scale*$height));
+  #Debug "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
+  Log 5, "RSS placing $arg ($swidth x $sheight) at ($x,$y)";
+  $S->copyResampled($I,$x,$y,0,0,$swidth,$sheight,$width,$height);
 }  
 
 
@@ -278,7 +298,7 @@ RSS_evalLayout($$@) {
   $params{pt}= 12;
   $params{rgb}= "ffffff";
 
-  my ($x,$y,$text,$host,$filename,$format);
+  my ($x,$y,$scale,$text,$imgtype,$srctype,$arg,$format);
   
   my $cont= "";
   foreach my $line (@layout) {
@@ -315,10 +335,10 @@ RSS_evalLayout($$@) {
           } elsif($cmd eq "date") {
             ($x,$y)= split("[ \t]+", $def, 2);
             RSS_itemDate($S,$x,$y,%params);
-          }  elsif($cmd eq "gif") {
-            ($x,$y,$host,$filename)= split("[ \t]+", $def,4);
-            my $fn= AnalyzePerlCommand(undef, $filename);
-            RSS_itemGif($S,$x,$y,$host,$fn,%params);
+          }  elsif($cmd eq "img") {
+            ($x,$y,$scale,$imgtype,$srctype,$arg)= split("[ \t]+", $def,6);
+            my $arg= AnalyzePerlCommand(undef, $arg);
+            RSS_itemImg($S,$x,$y,$scale,$imgtype,$srctype,$arg,%params);
           } else {
             Log 1, "$name: Illegal command $cmd in layout definition.";
           }  
