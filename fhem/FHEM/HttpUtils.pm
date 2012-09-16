@@ -99,7 +99,7 @@ CustomGetFileFromURL($$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log 1, "GetFileFromURL: Select timeout/error: $!";
+      Log 1, "GetFileFromURL $displayurl: Select timeout/error: $!";
       undef $conn;
       return undef;
     }
