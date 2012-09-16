@@ -5371,7 +5371,7 @@ To send the data, both send or write could be used.<br>
   <b>Attributes</b>
   <br><br>
   <ul>
-    n/a
+    <li>directoryindex: if the request is sent with no filename, i.e. the infix (with or without trailing slash) only, the file given in this attribute is loaded. Defaults to <code>index.html</code>.</li>
   </ul>
   <br><br>
 
@@ -5381,7 +5381,7 @@ To send the data, both send or write could be used.<br>
 
   The above example on <code>http://hostname:8083/fhem</code> will return the file
   <code>/usr/share/jsfrontend/foo.html</code> for <code>http://hostname:8083/fhem/jsf/foo.html</code>.
-  If no filename is given, <code>index.html</code> is returned.<p>
+  If no filename is given, the filename prescribed by the <code>directoryindex</code> attribute is returned.<p>
 
   Notice: All links are relative to <code>http://hostname:8083/fhem</code>.
   </ul>
