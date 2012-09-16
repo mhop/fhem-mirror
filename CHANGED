@@ -58,6 +58,7 @@
   - bugfix:  correct one-time relative at commands after reboot
   - feature: ZWave added
   - feature: module IPCAM added. (M. Fischer)
+  - feature: module HTTPSRV added (Boris)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
