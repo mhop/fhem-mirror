@@ -24,10 +24,11 @@ sub SUNRISE_Initialize($);
 my $long;
 my $lat;
 my $tz     = ""; # will be overwritten
-my $altit  = "-6";        # Civil twilight
+my $defaultaltit  = "-6";        # Civil twilight
 my $RADEG  = ( 180 / 3.1415926 );
 my $DEGRAD = ( 3.1415926 / 180 );
 my $INV360 = ( 1.0 / 360.0 );
+my %alti = (REAL => 0, CIVIL => -6, NAUTIC => -12, ASTRONOMIC => -16); # or HORIZON <number>
 
 
 sub
@@ -47,6 +48,26 @@ sub
 sr($$$$$$)
 {
   my ($rise, $seconds, $isrel, $daycheck, $min, $max) = @_;
+  sr_alt($rise, $isrel, $daycheck, $defaultaltit, $seconds, $min, $max);
+}
+
+sub
+sr_alt($$$$$$$)
+{
+  my $rise=shift;
+  my $isrel=shift;
+  my $daycheck=shift;
+  my $altit=$_[0];
+  if(exists $alti{uc($altit)}) {
+      $altit=$alti{uc($altit)};
+      shift;
+  } elsif($altit =~ /HORIZON.*?([\-\+]*[0-9\.]+)/i) {
+      $altit=$1;
+      shift;
+  } else {
+      $altit=-6; #default
+  }
+  my($seconds, $min, $max)=@_;
   my $needrise = ($rise || $daycheck) ? 1 : 0;
   my $needset = (!$rise || $daycheck) ? 1 : 0;
   $seconds = 0 if(!$seconds);
@@ -64,7 +85,7 @@ sr($$$$$$)
   my @lt = localtime($nt);
   my $gmtoff = _calctz($nt,@lt); # in hour
 
-  my ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
+  my ($rt,$st) = _sr_alt($altit,$needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $gmtoff);
   my $sst = ($rise ? $rt : $st) + ($seconds/3600);
 
   my $nh = $lt[2] + $lt[1]/60 + $lt[0]/3600;    # Current hour since midnight
@@ -81,7 +102,7 @@ sr($$$$$$)
     my $ngmtoff = _calctz($nt,@lt); # in hour
     $diff = 24+$gmtoff-$ngmtoff;
 
-    ($rt,$st) = _sr($needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
+    ($rt,$st) = _sr_alt($altit,$needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
     $sst = ($rise ? $rt : $st) + ($seconds/3600);
   }
 
@@ -94,11 +115,16 @@ sr($$$$$$)
   return h2hms_fmt($sst);
 }
 
-
 sub
 _sr($$$$$$)
 {
-  my ($needrise, $needset, $y, $m, $dy, $offset) = @_;
+    _sr_alt($defaultaltit,@_);
+}
+
+sub
+_sr_alt($$$$$$$)
+{
+  my ($altit,$needrise, $needset, $y, $m, $dy, $offset) = @_;
 
   my $d = _days_since_2000_Jan_0($y,$m,$dy) + 0.5 - $long / 360.0;
   my ( $tmp_rise_1, $tmp_set_1 ) =
@@ -342,13 +368,13 @@ h2hms_fmt($)
 }
 
 
-sub sunrise_rel(@) { return sr(1, shift, 1, 0, shift, shift) }
-sub sunset_rel(@)  { return sr(0, shift, 1, 0, shift, shift) }
-sub sunrise_abs(@) { return sr(1, shift, 0, 0, shift, shift) }
-sub sunset_abs(@)  { return sr(0, shift, 0, 0, shift, shift) }
-sub sunrise(@)     { return sr(1, shift, 2, 0, shift, shift) }
-sub sunset(@)      { return sr(0, shift, 2, 0, shift, shift) }
-sub isday()        { return sr(1,     0, 0, 1, undef, undef) }
+sub sunrise_rel(@) { return sr_alt(1, 1, 0, shift, shift, shift, shift) }
+sub sunset_rel(@)  { return sr_alt(0, 1, 0, shift, shift, shift, shift) }
+sub sunrise_abs(@) { return sr_alt(1, 0, 0, shift, shift, shift, shift) }
+sub sunset_abs(@)  { return sr_alt(0, 0, 0, shift, shift, shift, shift) }
+sub sunrise(@)     { return sr_alt(1, 2, 0, shift, shift, shift, shift) }
+sub sunset(@)      { return sr_alt(0, 2, 0, shift, shift, shift, shift) }
+sub isday(@)       { return sr_alt(1, 0, 1, shift,     0, undef, undef) }
 sub sunrise_coord($$$) { ($long, $lat, $tz) = @_; return undef; }
 
 1;
