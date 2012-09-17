@@ -61,7 +61,7 @@ sr_alt($$$$$$$)
   if(exists $alti{uc($altit)}) {
       $altit=$alti{uc($altit)};
       shift;
-  } elsif($altit =~ /HORIZON.*?([\-\+]*[0-9\.]+)/i) {
+  } elsif($altit =~ /HORIZON=([\-\+]*[0-9\.]+)/i) {
       $altit=$1;
       shift;
   } else {
