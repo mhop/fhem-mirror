@@ -8,8 +8,8 @@
 #
 # (1) - define the IP, user and password directly in fhem's fhem.cfg (or UI).
 #
-#		define NetIO1 <IP address> <socket number> [<user> <password>];
-#		e.g. define NetIO1 192.168.178.2 1 admin admin;
+#		define NetIO1 <IP address:port number> <socket number> [<user> <password>];
+#		e.g. define NetIO1 192.168.178.2:80 1 admin admin;
 #
 #		if you omit the user credentials, the module will look for a configuration file,
 #		if no configuration file is found, it tries with 'admin', 'admin'
@@ -17,8 +17,8 @@
 #
 # (2) - define your credentials using a config file.
 #
-#		define NetIO1 <IP address> <socket number> [<path_to_configuration_file>];
-#		define NetIO1 192.168.178.2 1 /var/log/fhem/netio.conf);
+#		define NetIO1 <IP address:port number> <socket number> [<path_to_configuration_file>];
+#		define NetIO1 192.168.178.2:80 1 /var/log/fhem/netio.conf);
 #
 #		if you omit the configuration parameter, the module will look for a configuration
 #		file at: /var/log/fhem/netio.conf
@@ -26,7 +26,7 @@
 #  NetIO230B Configuration file format:
 #
 #		%config= (
-#			host => "192.168.xx.xx",
+#			host => "192.168.xx.xx:80",
 #			user => "anyusername_without_spaces",
 #			password => "anypassword_without_spaces"
 #		);
@@ -38,6 +38,8 @@
 #---------
 # 2012-02-03	0.1		initial realease
 # 2012-02-25	0.2		removed dependencies for LWP::UserAgent and HTTP::Request;
+# 2012-09-15	0.3		fixed missing param-list;
+#						added slight checking of passed device-address (now explicitely requires setting a port)
 
 ################################################################
 package main;
@@ -120,8 +122,12 @@ NetIO230B_Request($@)
 	my ($hash, $cmd, $list) = @_;
 	my $URL='';
 	my $log='';
+	my $parm='l';
+	if($cmd eq "set") {
+	  $parm = $list;
+	}
 
-	my $response = GetFileFromURL("http://".$hash->{HOST}."/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=l");
+	my $response = GetFileFromURL("http://"."$hash->{HOST}/tgi/control.tgi?l=p:". $hash->{USER}.":".$hash->{PASS}."&p=".$parm);
 	if(!$response or length($response)==0)
 	{
 		Log 3, "NetIO230B_Request failed: ".$log;
@@ -178,7 +184,7 @@ NetIO230B_Define($$)
 	my @a = split("[ \t][ \t]*", $def);
 	my $paramCount = int(@a);
 
-	Log 3, "Wrong syntax: use 'define <name> NetIO230B <ip-address> [<socket_number> <username> <password>]' or 'define <name> NetIO230B <ip-address> [<socket_number> <configfilename>]'" if(int(@a) < 4);  #5 = mit user/pass #4 = mit config
+	Log 3, "Wrong syntax: use 'define <name> NetIO230B <ip-address>:<portnumber> [<socket_number> <username> <password>]' or 'define <name> NetIO230B <ip-address>:<portnumber> [<socket_number> <configfilename>]'" if(int(@a) < 4);  #5 = mit user/pass #4 = mit config
 
 	#provide some default settings
 	$hash->{CONFIGFILEPATH} = "/var/log/fhem/netio.conf"; #default file path is /var/log/fhem/netio.conf
@@ -231,6 +237,8 @@ NetIO230B_Define($$)
 		$hash->{USER} = $a[PARAM_USER] if defined($a[PARAM_USER]);
 		$hash->{PASS} = $a[PARAM_PASS] if defined($a[PARAM_PASS]);
 	}
+	
+	Log 1,"NetIO230B: Invalid device-address! Please use an address in the format: <ip-address>:<portnumber>" unless ($hash->{HOST} =~ m/^(.+):([0-9]+)$/);
 
 	Log 3, "NetIO230B: device opened at host: $hash->{HOST} => @a\n";
 
