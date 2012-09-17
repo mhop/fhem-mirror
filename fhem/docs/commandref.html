@@ -11077,7 +11077,7 @@ isday</pre>
   Optionally, for all functions you can set first argument which defines a horizon value
   which then is used instead of the $defaultaltit in SUNRISE_EL.pm.<br>
   Possible values are: "REAL", "CIVIL", "NAUTIC", "ASTRONOMIC" or a 
-  positive or negative number preceded by "HORIZON"<br>
+  positive or negative number preceded by "HORIZON="<br>
   REAL is 0, CIVIL is -6, NATUIC is -12, ASTRONOMIC is -18 degrees above horizon.<br><br>
   Example:<br>
   <ul>
@@ -11086,10 +11086,10 @@ isday</pre>
     sunrise("CIVIL");
 
     # When sun is 3 degrees below (-3 above) horizon (Between real and civil sunset)
-    sunset("HORIZON -3");
+    sunset("HORIZON=-3");
 
     # When sun is 1 degree above horizon
-    sunset("HORIZON 1");
+    sunset("HORIZON=1");
 
     # Switch lamp1 on at real sunset, not before 18:00 and not after 21:00
     define a15 at *{sunset("REAL",0,"18:00","21:00")} set lamp1 on
