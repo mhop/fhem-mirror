@@ -15,7 +15,7 @@ sub sunrise_rel(@);
 sub sunset_rel(@);
 sub sunrise_abs(@);
 sub sunset_abs(@);
-sub isday();
+sub isday(@);
 sub sunrise_coord($$$);
 
 sub SUNRISE_Initialize($);
