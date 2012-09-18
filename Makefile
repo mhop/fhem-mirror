@@ -4,13 +4,6 @@ VARDIR=/var/log/fhem
 MANDIR=/usr/share/man/man1
 ETCDIR=/etc
 
-BINDIR=/tmp/fhem/usr/bin
-MODDIR=/tmp/fhem/usr/share/fhem
-VARDIR=/tmp/fhem/var/log/fhem
-MANDIR=/tmp/fhem/usr/share/man/man1
-ETCDIR=/tmp/fhem/etc
-
-
 # Used for .deb package creation
 RBINDIR=$(ROOT)$(BINDIR)
 RMODDIR=$(ROOT)$(MODDIR)
@@ -83,8 +76,9 @@ uninstall:backup
 
 dist:
 	mkdir .f
-	cp -r CHANGED FHEM HISTORY Makefile README.SVN\
-		contrib docs examples fhem.pl webfrontend .f
+	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
+		FHEM contrib docs www webfrontend .f
+	mkdir .f/log
 	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
@@ -120,7 +114,7 @@ deb:
 	rm -rf $(DESTDIR)
 
 fb7390:
-	cd contrib/FB7390 && ./makeimage $(DESTDIR)
+	cd contrib/FB7390 && sh ./makeimage $(DESTDIR)
 
 fb7270:
 	cd contrib/FB7270 && ./makeimage $(DESTDIR)
