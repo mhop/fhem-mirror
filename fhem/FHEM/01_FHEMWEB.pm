@@ -42,24 +42,31 @@ sub FW_pH(@);
 sub FW_pHPlain(@);
 sub FW_pO(@);
 
-use vars qw($FW_dir);  # base directory for web server: the first available from $modpath/www, $modpath/FHEM
-use vars qw($FW_icondir);  # icon base directory for web server: the first available from $FW_dir/icons, $FW_dir
-use vars qw($FW_docdir);  # doc directory for web server: the first available from $FW_dir/docs, $modpath/docs, $FW_dir
-use vars qw($FW_cssdir);  # css directory for web server: the first available from $FW_dir/css, $FW_dir
-use vars qw($FW_gplotdir);  # gplot directory for web server: the first available from $FW_dir/gplot,$FW_dir
-use vars qw($FW_jsdir);  # js directory for web server: the first available from $FW_dir/javascript, $FW_dir
-use vars qw($MW_dir);  # moddir (./FHEM), needed by edit Files in new structure
-use vars qw($FW_ME);   # webname (default is fhem), needed by 97_GROUP
-use vars qw($FW_ss);   # is smallscreen, needed by 97_GROUP/95_VIEW
-use vars qw($FW_tp);   # is touchpad (iPad / etc)
+use vars qw($FW_dir);     # base directory for web server: the first available
+                          # from $modpath/www, $modpath/FHEM
+use vars qw($FW_icondir); # icon base directory for web server: the first
+                          # available from $FW_dir/icons, $FW_dir
+use vars qw($FW_docdir);  # doc directory for web server: the first available
+                          # from $FW_dir/docs, $modpath/docs, $FW_dir
+use vars qw($FW_cssdir);  # css directory for web server: the first available
+                          # from $FW_dir/css, $FW_dir
+use vars qw($FW_gplotdir);# gplot directory for web server: the first
+                          # available from $FW_dir/gplot,$FW_dir
+use vars qw($FW_jsdir);   # js directory for web server: the first available
+                          # from $FW_dir/javascript, $FW_dir
+use vars qw($MW_dir);     # moddir (./FHEM), needed by edit Files in new
+                          # structure
+use vars qw($FW_ME);      # webname (default is fhem), needed by 97_GROUP
+use vars qw($FW_ss);      # is smallscreen, needed by 97_GROUP/95_VIEW
+use vars qw($FW_tp);      # is touchpad (iPad / etc)
 
 # global variables, also used by 97_GROUP/95_VIEW/95_FLOORPLAN
-use vars qw(%FW_types);  # device types,
-use vars qw($FW_RET);    # Returned data (html)
-use vars qw($FW_wname);  # Web instance
-use vars qw($FW_subdir); # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
-use vars qw(%FW_pos);    # scroll position
-use vars qw($FW_cname);  # Current connection name
+use vars qw(%FW_types);   # device types,
+use vars qw($FW_RET);     # Returned data (html)
+use vars qw($FW_wname);   # Web instance
+use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
+use vars qw(%FW_pos);     # scroll position
+use vars qw($FW_cname);   # Current connection name
 
 my $zlib_loaded;
 my $try_zlib = 1;
@@ -94,11 +101,9 @@ my $FW_chash;      # client fhem hash
 my $FW_encoding="UTF-8";
 
 
-my $ICONEXTENSION = "gif|ico|png|jpg"; # don't forget to amend FW_ServeSpecial if you change this!
+# don't forget to amend FW_ServeSpecial if you change this!
+my $ICONEXTENSION = "gif|ico|png|jpg";
 
-# FIXME 
-#       use constant FOO => BAR
-# is better but then I cannot use FOO in a regexp. Any ideas how to fix it?
 
 #####################################
 sub
@@ -159,8 +164,8 @@ FW_Define($$)
 
 
   FW_SetDirs;
-  FW_ReadIcons($hash); # we do it only once at startup to save ressources at runtime
-
+  # we do it only once at startup to save ressources at runtime
+  FW_ReadIcons($hash);
         
   my $ret = TcpServer_Open($hash, $port, $global);
 
@@ -337,8 +342,6 @@ FW_SetDirs() {
   # doc dir
   if(-d "$FW_dir/docs") {
     $FW_docdir = "$FW_dir/docs";
-  } elsif(-f "$FW_dir/pgm2/commandref.html") {
-    $FW_docdir = "$FW_dir/pgm2";
   } elsif(-d "$attr{global}{modpath}/docs") {
     $FW_docdir = "$attr{global}{modpath}/docs";
   } else {
@@ -411,12 +414,11 @@ FW_AnswerCall($)
   
   elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
     my ($icon,$cachable) = ($1, 1);
-
     #Debug "You want $icon which is " . $FW_icons{$icon};
     # if we do not have the icon, we convert the device state to the icon name
     if(!$FW_icons{$icon}) {
       $icon = FW_dev2image($icon);
-      #Debug "We do not have it and thus use $icon which is " . $FW_icons{$icon};
+      #Debug "We do not have it and thus use $icon which is ".$FW_icons{$icon};
       $cachable = 0;
       return 0 if(!$icon);
     }
@@ -2006,10 +2008,25 @@ FW_Attr(@)
 {
   my @a = @_;
   my $hash = $defs{$a[1]};
+  my $name = $hash->{NAME};
 
   if($a[0] eq "set" && $a[2] eq "HTTPS") {
     TcpServer_SetSSL($hash);
   }
+
+  if($a[2] eq "stylesheetPrefix" ||
+     $a[2] eq "smallscreen") {
+
+    # AttrFn is called too early, we have to set/del the attr here
+    if($a[0] eq "set") {
+      $attr{$name}{$a[2]} = (defined($a[3]) ? $a[3] : 1);
+    } else {
+      delete $attr{$name}{$a[2]};
+    }
+    FW_ReadIcons($hash);
+
+  }
+
   return undef;
 }
 
@@ -2021,6 +2038,7 @@ FW_ReadIconsFrom($$) {
   # filenames are relative to $FW_icondir
 
   my ($prepend,$dir)= @_;
+  return if($dir =~ m,/\.svn,);
 
   #Debug "read icons from \"${FW_icondir}/${dir}\", prepend \"$prepend\"";
   
@@ -2033,11 +2051,12 @@ FW_ReadIconsFrom($$) {
   foreach my $entry (@entries) {
     my $filename= "$dir/$entry";
     #Debug " entry: \"$entry\", filename= \"$filename\"";
-    if( -d "${FW_icondir}/${filename}" ) {
-      # entry is a directory
-      FW_ReadIconsFrom("${prepend}${entry}/", $filename) unless($entry eq "." || $entry eq "..");
-    } elsif( -f "${FW_icondir}/${filename}") {
-      # entry is a regular file
+
+    if( -d "${FW_icondir}/${filename}" ) {      # entry is a directory
+      FW_ReadIconsFrom("${prepend}${entry}/", $filename)
+        unless($entry eq "." || $entry eq "..");
+
+    } elsif( -f "${FW_icondir}/${filename}") {  # entry is a regular file
       if($entry =~ m/^(.*)\.($ICONEXTENSION)$/i) {
         my $logicalname= $1;
         my $iconname= "${prepend}${logicalname}";
@@ -2055,22 +2074,32 @@ FW_ReadIcons($)
   my $name = $hash->{NAME};
   
   %FW_icons = ();
+
   # read icons from default directory
   FW_ReadIconsFrom("", "default");
-  # read icons from stylesheet specific directory, icons found here supersede default icons with same name
-  my $prefix= AttrVal($name, "stylesheetPrefix", "");
+
+  # read icons from stylesheet specific directory, icons found here supersede
+  # default icons with same name. Smallscreen a special "stylesheet"
+  my $prefix = AttrVal($name, "smallscreen", "") ? "smallscreen" : "";
+  $prefix = AttrVal($name, "stylesheetPrefix", $prefix);
   FW_ReadIconsFrom("", "$prefix") unless($prefix eq "");
-  # read icons from explicit directory, icons found here supersede all other icons with same name
+
+  # read icons from explicit directory, icons found here supersede all other
+  # icons with same name
   my $iconpath= AttrVal($name, "iconpath", "");
   FW_ReadIconsFrom("", "$iconpath") unless($iconpath eq "");
+
   # if now icons were found so far, read icons from icondir itself
   FW_ReadIconsFrom("", "") unless(%FW_icons);
 
-  $hash->{fhem}{icons}= join(":", %FW_icons);
+  $hash->{fhemIcons} = \%FW_icons;
 
-  Log 4, "$name: Icon dictionary for $FW_icondir follows...";
-  foreach my $k (keys %FW_icons) {
-    Log 4, "  $k => " . $FW_icons{$k};
+  my $dumpLevel = 4;
+  if($attr{global}{verbose} >= $dumpLevel) {
+    Log $dumpLevel, "$name: Icon dictionary for $FW_icondir follows...";
+    foreach my $k (sort keys %FW_icons) {
+      Log $dumpLevel, "  $k => " . $FW_icons{$k};
+    }
   }
 
 }
@@ -2080,7 +2109,7 @@ sub
 FW_GetIcons() {
   #Debug "Getting icons for $FW_wname.";
   my $hash= $defs{$FW_wname};
-  %FW_icons= split(":", $hash->{fhem}{icons});
+  %FW_icons= %{$hash->{fhemIcons}};
 }
 
 sub
@@ -2357,8 +2386,9 @@ FW_devState($$)
 
 #####################################
 
-sub FW_Get($@) {
-
+sub
+FW_Get($@)
+{
   my ($hash, @a) = @_;
 
   return "syntax error" if(int(@a) != 3);
@@ -2369,14 +2399,14 @@ sub FW_Get($@) {
   $FW_wname= $hash->{NAME};
   my $icon= FW_IconPath($a[2]);
   return defined($icon) ? $icon : "no such icon";
-
 }  
 
 
 #####################################
 
-sub FW_Set($@) {
-
+sub
+FW_Set($@)
+{
   my ($hash, @a) = @_;
 
   return "syntax error" if(int(@a) != 2);
@@ -2386,7 +2416,6 @@ sub FW_Set($@) {
 
   FW_ReadIcons($hash);
   return undef;
-
 }
 
 #####################################
