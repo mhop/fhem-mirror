@@ -8,48 +8,30 @@ if test ! -f ../../$fw.tar.gz; then
 fi
 
 rm -rf var
-echo Extracting the fritzbox template
 tar xf ../../priv/fritzbox7390_template.tar
+
 cd var
 tar zxf fhem.tar.gz
-rm -rf fhem/FHEM
-mkdir fhem/FHEM
+rm -rf fhem/{FHEM,www,docs}
 cd ..
 
+rm -rf $fw
+tar zxf ../../$fw.tar.gz
+
+cd $fw
+cp -rp fhem.pl fhem.cfg FHEM docs www ../var/fhem
+cd ..
+
+rm -rf $fw
+rm -rf var/fhem/docs/*.{odg,pdf,man,txt}
 cp install var
 cp startfhem var/fhem
 cp fhemcmd.sh var/fhem/FHEM
 
-
-echo Extracting $fw
-rm -rf $fw
-tar zxf ../../$fw.tar.gz
-cd $fw
-cp fhem.pl ../var/fhem
-cp FHEM/*\
-        webfrontend/pgm2/*\
-        docs/*.html\
-        docs/fhem.png\
-        docs/*.jpg\
-        ../var/fhem/FHEM
-
-cd examples
-for i in *; do
-   cp -r $i ../../var/fhem/FHEM/example.$i
-done
-cd ../..
-rm -rf $fw
-
-
-echo Packing again
-cd var/fhem
-cp FHEM/example.sample_pgm2 fhem.cfg
-perl -pi -e 's,/tmp,./log,g' fhem.cfg
-
-cd ..
+cd var
 tar zcf fhem.tar.gz fhem
 rm -rf fhem
-
 cd ..
+
 tar cf $fw-fb7390.image var
 rm -rf var
