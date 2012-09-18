@@ -62,6 +62,7 @@ my %EnO_subType = (
   7          => "FAH",
   8          => "FBH",
   9          => "FTF",
+ 10          => "SR04",
 );
 
 my @EnO_models = qw (
@@ -334,7 +335,7 @@ EnOcean_Parse($$)
 
       }
 
-    } elsif($model =~ m/^SR04/) {
+    } elsif($model =~ m/^SR04/ || $st eq "SR04") {
       my ($fspeed, $temp, $present, $solltemp);
       $fspeed = 3;
       $fspeed = 2      if($db_3 >= 145);
