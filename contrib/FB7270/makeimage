@@ -10,35 +10,21 @@ fi
 rm -rf var
 echo Extracting the fritzbox template
 unzip -qo ../../priv/fritzbox7270_template.zip
+rm -rf fhem/{FHEM,www,docs}
 
+echo Merging
+rm -rf $fw
+tar zxf ../../$fw.tar.gz
+
+cd $fw
+cp -rp fhem.pl fhem.cfg FHEM docs www ../fhem
+cd ..
+rm -rf $fw
+
+rm -rf fhem/docs/*.{odg,pdf,man,txt}
 cp fhemcmd.sh fhem/FHEM
 cp startfhem fhem
 
-echo Extracting $fw
-rm -rf $fw
-tar zxf ../../$fw.tar.gz
-cd $fw
-cp fhem.pl ../fhem
-cp FHEM/*\
-        webfrontend/pgm2/*\
-        docs/*.html\
-        docs/fhem.png\
-        docs/*.jpg\
-        ../fhem/FHEM
-
-cd examples
-for i in *; do
-   cp -r $i ../../fhem/FHEM/example.$i
-done
-cd ../..
-rm -rf $fw
-
-
 echo Packing again
-cd fhem
-cp FHEM/example.sample_pgm2 fhem.cfg
-perl -pi -e 's,/tmp,./log,g' fhem.cfg
-
-cd ..
 zip -qr $fw-fb7270.zip fhem
 rm -rf fhem
