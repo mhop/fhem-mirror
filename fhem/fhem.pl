@@ -889,8 +889,10 @@ CommandRereadCfg($$)
   $init_done = 0;
 
   foreach my $d (keys %defs) {
-    my $ret = CallFn($d, "UndefFn", $defs{$d}, $d) if($name && $name ne $d);
-    return $ret if($ret);
+    my $ret = CallFn($d, "UndefFn", $defs{$d}, $d)
+        if($name && $name ne $d);
+    Log 1, "$d is against deletion ($ret), continuing with rereadcfg anyway"
+        if($ret);
   }
 
   my $cfgfile = $attr{global}{configfile};
