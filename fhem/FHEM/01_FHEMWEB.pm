@@ -237,28 +237,46 @@ FW_Read($)
 
   @FW_httpheader = split("[\r\n]", $hash->{BUF});
 
+  my @origin = grep /Origin/, @FW_httpheader;
+  my $headercors = ($FW_cors ? "Access-Control-Allow-".$origin[0]."\r\n".
+                             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n".
+                             "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
+                             "Access-Control-Allow-Credentials: true\r\n".
+                             "Access-Control-Max-Age:86400\r\n" : "");
+
+
   #############################
   # BASIC HTTP AUTH
   my $basicAuth = AttrVal($FW_wname, "basicAuth", undef);
+  my @headerOptions = grep /OPTIONS/, @FW_httpheader;
   if($basicAuth) {
     $hash->{BUF} =~ m/Authorization: Basic ([^\r\n]*)/s;
     my $secret = $1;
     my $pwok = ($secret && $secret eq $basicAuth);
-    if($secret && $basicAuth =~ m/^{.*}$/) {
+    if($secret && $basicAuth =~ m/^{.*}$/ || $headerOptions[0]) {
       eval "use MIME::Base64";
       if($@) {
         Log 1, $@;
 
-      } else {
+     } else {
         my ($user, $password) = split(":", decode_base64($secret));
         $pwok = eval $basicAuth;
         Log 1, "basicAuth expression: $@" if($@);
       }
     }
+    if($headerOptions[0]) {
+      print $c "HTTP/1.1 200 OK\r\n",
+             $headercors,
+             "Content-Length: 0\r\n\r\n";
+      $hash->{BUF}="";
+      return;
+      exit(1);
+    };
     if(!$pwok) {
       my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
       print $c "HTTP/1.1 401 Authorization Required\r\n",
              "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
+             $headercors,
              "Content-Length: 0\r\n\r\n";
       $hash->{BUF}="";
       return;
@@ -280,8 +298,6 @@ FW_Read($)
 
   my $cacheable = FW_AnswerCall($arg);
   return if($cacheable == -1); # Longpoll / inform request;
-
-  my $headercors = ($FW_cors ? "Access-Control-Allow-Origin: *\r\n" : "");
 
   my $compressed = "";
   if(($FW_RETTYPE =~ m/text/i ||
@@ -470,12 +486,20 @@ FW_AnswerCall($)
 
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
+  my @origin = grep /Origin/, @FW_httpheader;
+  my $headercors = ($FW_cors ? "Access-Control-Allow-".$origin[0]."\r\n".
+                             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n".
+                             "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
+                             "Access-Control-Allow-Credentials: true\r\n".
+                             "Access-Control-Max-Age:86400\r\n" : "");
+
   if($FW_inform) {      # Longpoll header
     $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
+             $headercors,
              "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
     return -1;
   }
