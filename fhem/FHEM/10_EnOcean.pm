@@ -74,6 +74,7 @@ my @EnO_models = qw (
   PM101
   FTF55
   FSB61
+  FSM61
 );
 
 sub
@@ -298,7 +299,9 @@ EnOcean_Parse($$)
     # the "real" state immediately.
     # In the case of an ElTako FSB61 the state should remain released (by Thomas)
     my $event = "state";
-    $event = "buttons" if($msg =~ m/released$/ && $model ne "FSB61");
+    $event = "buttons" if($msg =~ m/released$/ &&
+                          $model ne "FSB61" &&
+                          $model ne "FSM61");
 
     push @event, "3:$event:$msg";
 
