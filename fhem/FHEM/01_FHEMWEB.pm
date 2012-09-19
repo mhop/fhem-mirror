@@ -306,6 +306,7 @@ FW_Read($)
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
      $try_zlib &&
      AttrVal($FW_wname, "fwcompress", 1)) {
+Log $ll, "OLEN:".length($FW_RET);
     $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
   }
@@ -428,12 +429,12 @@ FW_AnswerCall($)
 
   } elsif($arg =~ m,^/(favicon.ico)$,) {
     return 0; # TODO!
-  }
-  
-  elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
+
+  } elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
     my ($icon,$cachable) = ($1, 1);
     #Debug "You want $icon which is " . $FW_icons{$icon};
     # if we do not have the icon, we convert the device state to the icon name
+    $icon =~ s/\.($ICONEXTENSION)$//;
     if(!$FW_icons{$icon}) {
       $icon = FW_dev2image($icon);
       #Debug "We do not have it and thus use $icon which is ".$FW_icons{$icon};
@@ -489,11 +490,12 @@ FW_AnswerCall($)
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
   my @origin = grep /Origin/, @FW_httpheader;
-  my $headercors = ($FW_cors ? "Access-Control-Allow-".$origin[0]."\r\n".
-                             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n".
-                             "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
-                             "Access-Control-Allow-Credentials: true\r\n".
-                             "Access-Control-Max-Age:86400\r\n" : "");
+  my $headercors = ($FW_cors ? 
+             "Access-Control-Allow-".$origin[0]."\r\n".
+             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n".
+             "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
+             "Access-Control-Allow-Credentials: true\r\n".
+             "Access-Control-Max-Age:86400\r\n" : "");
 
   if($FW_inform) {      # Longpoll header
     $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
@@ -577,7 +579,7 @@ FW_AnswerCall($)
   $prf = "smallscreen" if(!$prf && $FW_ss);
   $prf = "touchpad"    if(!$prf && $FW_tp);
   FW_pO "<link href=\"$FW_ME/css/".$prf."style.css\" rel=\"stylesheet\"/>";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/css/svg.js\"></script>"
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
   my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
