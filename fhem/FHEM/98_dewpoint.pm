@@ -73,15 +73,20 @@ dewpoint_Define($$)
 	}
   } elsif ($cmd_type eq "fan") {
 	# define <name> dewpoint fan devicename-regex devicename-outside min_temp
-  	if(@a == 6) {
+  	if (@a == 6 || @a == 7) {
   		$hash->{DEVNAME_OUT} = $a[4];
   		$hash->{MIN_TEMP} = $a[5];
+		if (@a == 6) { 		
+			$hash->{DIFF_TEMP} = 0;
+		} else {
+			$hash->{DIFF_TEMP} = $a[6];
+		}
 	} else {
-		return "wrong syntax: define <name> dewpoint fan devicename-regex devicename-outside min_temp"
+		return "wrong syntax: define <name> dewpoint fan devicename-regex devicename-outside min_temp [diff_temp]"
 	}
   } elsif ($cmd_type eq "alarm") {
 	# define <name> dewpoint alarm devicename-regex devicename-reference diff_temp
-  	if(@a == 6) {
+  	if (@a == 6) {
   		$hash->{DEVNAME_REF} = $a[4];
   		$hash->{DIFF_TEMP} = $a[5];
 	} else {
@@ -147,7 +152,8 @@ dewpoint_Notify($$)
   	}
 	$devname_out = $hash->{DEVNAME_OUT};
 	$min_temp = $hash->{MIN_TEMP};
-  	Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re, devname_out=$devname_out, min_temp=$min_temp" if ($dewpoint_debug == 1);
+	$diff_temp = $hash->{DIFF_TEMP};
+  	Log 1, "dewpoint_notify: cmd_type=$cmd_type devname=$devName dewname=$hashName, dev=$devName, dev_regex=$re, devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
 
   } elsif ($cmd_type eq "alarm") {
   	if (!defined($hash->{DEVNAME_REF}) || !defined($hash->{DIFF_TEMP})) {
@@ -251,16 +257,16 @@ dewpoint_Notify($$)
 
     	Log 1, "dewpoint_notify: current=$current" if ($dewpoint_debug == 1);
   } elsif ($cmd_type eq "fan") {
-	# >define <name> dewpoint fan devicename devicename-outside min-temp
+	# >define <name> dewpoint fan devicename devicename-outside min-temp [diff-temp]
 	#
 	#  This define may be used to turn an fan on or off if the outside air has less
 	#  water 
 	#
-	# - Generate reading/event "fan: on" if dewpoint of <devicename-outside> is lower 
+	# - Generate reading/event "fan: on" if (dewpoint of <devicename-outside>) + diff_temp is lower 
 	#   than dewpoint of <devicename> and temperature of <devicename-outside> is >= min-temp
 	#   and reading "fan" was not already "on".
 	# - Generate reading/event "fan: off": else and if reading "fan" was not already "off".
-	Log 1, "dewpoint_notify: fan devname_out=$devname_out, min_temp=$min_temp" if ($dewpoint_debug == 1);
+	Log 1, "dewpoint_notify: fan devname_out=$devname_out, min_temp=$min_temp, diff_temp=$diff_temp" if ($dewpoint_debug == 1);
 	my $sensor;
 	my $current;
 	if (exists $defs{$devname_out}{READINGS}{temperature}{VAL} && exists $defs{$devname_out}{READINGS}{humidity}{VAL}) {
@@ -268,7 +274,7 @@ dewpoint_Notify($$)
 		my $humidity_out = $defs{$devname_out}{READINGS}{humidity}{VAL};
 		my $dewpoint_out = sprintf("%.1f", dewpoint_dewpoint($temperature_out,$humidity_out));;
 		Log 1, "dewpoint_notify: fan dewpoint_out=$dewpoint_out" if ($dewpoint_debug == 1);
-		if ($dewpoint_out < $dewpoint && $temperature_out >= $min_temp) {
+		if (($dewpoint_out + $diff_temp) < $dewpoint && $temperature_out >= $min_temp) {
 			$current = "on";
 			Log 1, "dewpoint_notify: fan ON" if ($dewpoint_debug == 1);
 		} else {
