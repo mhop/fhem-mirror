@@ -244,6 +244,7 @@ CommandUpdatefhem($$)
     return "File size for $f ($l1) does not correspond to ".
                 "filetimes.txt entry ($l2)" if($l1 ne $l2);
     open(FH,">$localfile") || return "Can't write $localfile";
+    binmode(FH);
     print FH $content;
     close(FH);
     $ret .= "updated $f\n";
