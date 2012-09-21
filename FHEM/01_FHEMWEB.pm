@@ -573,9 +573,12 @@ FW_AnswerCall($)
     }
   }
 
-  my $rf = AttrVal($FW_wname, "refresh", "");
-  FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
-  
+  # meta refresh in rooms only
+  if ($FW_room) {
+    my $rf = AttrVal($FW_wname, "refresh", "");
+    FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
+  }
+
   $prf = "smallscreen" if(!$prf && $FW_ss);
   $prf = "touchpad"    if(!$prf && $FW_tp);
   FW_pO "<link href=\"$FW_ME/css/".$prf."style.css\" rel=\"stylesheet\"/>";
