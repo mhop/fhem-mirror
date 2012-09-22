@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use TcpServerUtils;
+use HttpUtils;
 
 #########################
 # Forward declaration
