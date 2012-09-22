@@ -521,6 +521,7 @@ KM271_Read($)
       if($buf eq "10") {
         if($hash->{DATASENT}) {
           delete($hash->{DATASENT});
+          delete($hash->{RETRYCOUNT});
           # Delete the command from the list
           shift @{$hash->{SENDBUFFER}};
           if ($hash->{NOTIFY}) {
@@ -529,59 +530,71 @@ KM271_Read($)
             goto INTERNAL_NOTIFY;                             # Timer changes are not reflected by the heater
           }
           DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}});
-          return;
-        }
-        # Delete the command only after receiving ACK
-        $data = shift @{$hash->{SENDBUFFER}};
-        unshift @{$hash->{SENDBUFFER}}, $data;
-        # Dirty trick: separate notify message after the colon
-        my @dataList = split(":", $data);
-        $data = $dataList[0];
-        $data = KM271_encode($data);
-        $data .= "1003";
-        $crc = KM271_crc($data);
-        $data .= $crc;
-        $hash->{DATASENT} = $data;
-        $hash->{ERROR} = 0;
-        if (@dataList > 1) {
-          # Set notify message
-          $hash->{NOTIFY} = $dataList[1];
         } else {
-          delete($hash->{NOTIFY});
+          # Delete the command only after receiving ACK
+          $data = shift @{$hash->{SENDBUFFER}};
+          unshift @{$hash->{SENDBUFFER}}, $data;
+          # Dirty trick: separate notify message after the colon
+          my @dataList = split(":", $data);
+          $data = $dataList[0];
+          $data = KM271_encode($data);
+          $data .= "1003";
+          $crc = KM271_crc($data);
+          $data .= $crc;
+          $hash->{DATASENT} = $data;
+          $hash->{ERROR} = 0;
+          $hash->{RETRYCOUNT} = 0;
+          if (@dataList > 1) {
+            # Set notify message
+            $hash->{NOTIFY} = $dataList[1];
+          } else {
+            delete($hash->{NOTIFY});
+          }
+          DevIo_SimpleWrite($hash, $data, 1);  # Send the data
         }
-        DevIo_SimpleWrite($hash, $data, 1);  # Send the data
       } else {
         if($hash->{DATASENT}) {
+          my $newStart = 0;
           if ($buf eq "15") {
             Log 1, "$name: NAK!";            # NACK from the KM271
+            if(++$hash->{ERROR} > 5) {
+              $newStart = 1;
+            } else {
+              DevIo_SimpleWrite($hash, $hash->{DATASENT}, 1);
+            }
           } else {
             Log 1, "$name: Bogus data after sending packet ($buf)";  # Strange response from the KM271
+            $newStart = 1;
           }
-          if($hash->{ERROR}++ > 5) {
-            Log 1, "$name: Sending ($hash->{DATASENT}) aborted!";
+          if ($newStart) {
+            # Start all over again
+            Log 1, "$name: Sending attempt for ($hash->{DATASENT}) failed!";
+            if(++$hash->{RETRYCOUNT} > 3) {
+              # Abort sending the actual command
+              Log 1, "$name: Sending ($hash->{DATASENT}) not successful!";
+              shift @{$hash->{SENDBUFFER}};
+              delete($hash->{RETRYCOUNT});
+            }
             delete($hash->{DATASENT});
             delete($hash->{NOTIFY});
             DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}});
-          } else {
-            DevIo_SimpleWrite($hash, $hash->{DATASENT}, 1);
           }
-          return;
+        } else {
+          DevIo_SimpleWrite($hash, "02", 1);
         }
-        DevIo_SimpleWrite($hash, "02", 1);
       }
-      
-    }
-    elsif ($buf eq "02") {                    # KM271 Wants to send
-      DevIo_SimpleWrite($hash, "10", 1);      # We are ready
-      $hash->{PARTIAL} = "";
-      $hash->{WAITING} = Time::HiRes::time;
-      $hash->{ERROR} = 0;
+    } else {
+      if ($buf eq "02") {                       # KM271 Wants to send
+        DevIo_SimpleWrite($hash, "10", 1);      # We are ready
+        $hash->{PARTIAL} = "";
+        $hash->{WAITING} = time;
+        $hash->{ERROR} = 0;
+      }
     }
     return;
-    
   } else {
     # After timeout get out of waiting mode
-    delete($hash->{WAITING}) if(Time::HiRes::time - $hash->{WAITING} > 2);
+    delete($hash->{WAITING}) if(time - $hash->{WAITING} > 2.5);
   }
   
   $hash->{PARTIAL} .= $buf;
@@ -592,7 +605,7 @@ KM271_Read($)
   if(KM271_crc($data . "1003") ne $crc) {
     Log 1, "Wrong CRC in $name: $crc";
     DevIo_SimpleWrite($hash, "15", 1); # NAK
-    if($hash->{ERROR}++ > 5) {
+    if(++$hash->{ERROR} > 5) {
       delete($hash->{WAITING});
       DevIo_SimpleWrite($hash, "02", 1) if(@{$hash->{SENDBUFFER}}); # Want to send
     }
