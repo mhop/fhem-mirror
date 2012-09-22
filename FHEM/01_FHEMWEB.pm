@@ -123,7 +123,7 @@ FHEMWEB_Initialize($)
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
                      "stylesheetPrefix iconpath hiddenroom HTTPS longpoll:1,0 ".
-                     "redirectCmds:0,1 allowfrom ";
+                     "redirectCmds:0,1 reverseLogs:0,1 allowfrom ";
 
   ###############
   # Initialize internal structures
@@ -1193,8 +1193,10 @@ FW_logWrapper($)
       FW_pO "<div id=\"content\">$path: $!</div>";
       return;
     }
+
+    my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
     binmode (FH); # necessary for Windows
-    my $cnt = join("", <FH>);
+    my $cnt = join("", $reverseLogs ? reverse <FH> : <FH>);
     close(FH);
     $cnt =~ s/</&lt;/g;
     $cnt =~ s/>/&gt;/g;
