@@ -77,12 +77,12 @@ sub SecvestIP_Set($$$) {
 
   my ($hash, $name ,$cmd) = @_;
   
+  # Get current SecvestIP state
+  SecvestIP_Get($hash);
+ 
   return "Unknown argument $cmd, choose one of state:Set,Unset,PartSet" if ($cmd eq "?");
 
   Log 1, "SecvestIP: Set $name $cmd";
-
-  # Get current SecvestIP state
-  SecvestIP_Get($hash);
 
   my $url = 'http://'.$hash->{HOST}.'/';
 
