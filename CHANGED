@@ -32,6 +32,7 @@
   - feature: new attribute group for FHEMWEB (Boris)
   - change:  11_FHT.pm, 50_WS300.pm, 59_Weather.pm migrated to readingsUpdate
              mechanism (Boris)
+  - change:  59_Weather.pm migrated from Google to Yahoo Weather API (Boris)             
   - change:  updatefhem modifications to support a clean install of fhem and
              pgm2 installation, see commandref.html (M. Fischer)
   - change:  FHEMWEB support for the new www/pgm2 directroy added (M. Fischer)
