@@ -19,29 +19,8 @@ use Time::HiRes qw(gettimeofday);
 #
 
 
-# Mapping of current supported encodings
-my %DEFAULT_ENCODINGS = (
-    en      => 'latin1',
-    da      => 'latin1',
-    de      => 'latin1',
-    es      => 'latin1',
-    fi      => 'latin1',
-    fr      => 'latin1',
-    it      => 'latin1',
-    ja      => 'utf-8',
-    ko      => 'utf-8',
-    nl      => 'latin1',
-    no      => 'latin1',
-    'pt-BR' => 'latin1',
-    ru      => 'utf-8',
-    sv      => 'latin1',
-    'zh-CN' => 'utf-8',
-    'zh-TW' => 'utf-8',
-);
-
-
 # Mapping / translation of current weather codes 0-47
-my @YahooCodes_us = (
+my @YahooCodes_en = (
        'tornado', 'tropical storm', 'hurricane', 'severe thunderstorms', 'thunderstorms', 'mixed rain and snow',
        'mixed rain and sleet', 'mixed snow and sleet', 'freezing drizzle', 'drizzle', 'freezing rain' ,'showers',
        'showers', 'snow flurries', 'light snow showers', 'blowing snow', 'snow', 'hail',
@@ -61,9 +40,9 @@ my @YahooCodes_us = (
 
 my @YahooCodes_de = (
        'Tornado', 'schwerer Sturm', 'Sturm', 'schwere Gewitter', 'Gewitter', 'Regen und Schnee',
-       'Regen und Schnee', 'Schnee und Regen', 'Eisregen', 'Graupelschauer', 'gefrierender Regen' ,'Regen',
-       'Regen', 'Schneegest&ouml;ber', 'leichter Schneeschauer', 'Schneeverwehungen', 'Schnee', 'Hagel',
-       'Schnee und Regen', 'Dunst', 'neblig', 'Staub oder Rauch', 'Smog', 'blustery',
+       'Regen und Graupel', 'Schnee und Graupel', 'Eisregen', 'Nieselregen', 'gefrierender Regen' ,'Schauer',
+       'Schauer', 'Schneetreiben', 'leichter Schneeschauer', 'Schneeverwehungen', 'Schnee', 'Hagel',
+       'Graupel', 'Staub', 'Nebel', 'Dunst', 'Smog', 'Sturm',
        'windig', 'kalt', 'wolkig',
        'überwiegend wolkig', # night
        'überwiegend wolkig', # day
@@ -74,12 +53,45 @@ my @YahooCodes_de = (
        'bewölkt', # night
        'bewölkt', # day
        'Regen und Hagel',
-       'heiss', 'einzelne Gewitter', 'vereinzelt Gewitter', 'vereinzelt Gewitter', 'vereinzelt Regen', 'heftiger Schneefall',
-       'vereinzelt Schneeschauer', 'heftiger Schneefall', 'teilweise wolkig', 'Gewitterregen', 'Schneeschauer', 'vereinzelt Gewitter');
+       'heiß', 'einzelne Gewitter', 'vereinzelt Gewitter', 'vereinzelt Gewitter', 'vereinzelt Schauer', 'starker Schneefall',
+       'vereinzelt Schneeschauer', 'starker Schneefall', 'teilweise wolkig', 'Gewitterregen', 'Schneeschauer', 'vereinzelt Gewitter');
 
-my @directions_de = ('N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW');
+my @YahooCodes_nl = (
+       'tornado', 'zware storm', 'orkaan', 'hevig onweer', 'onweer',
+       'regen en sneeuw',
+       'regen en ijzel', 'sneeuw en ijzel', 'aanvriezende motregen',
+       'motregen', 'aanvriezende regen' ,'regenbuien',
+       'buien', 'sneeuw windstoten', 'lichte sneeuwbuien',
+       'stuifsneeuw', 'sneeuw', 'hagel',
+       'ijzel', 'stof', 'mist', 'waas', 'smog', 'heftig',
+       'winderig', 'koud', 'bewolkt',
+       'overwegend bewolkt', # night
+       'overwegend bewolkt', # day
+       'gedeeltelijk bewolkt', # night
+       'gedeeltelijk bewolkt', # day
+       'helder', #night
+       'zonnig',
+       'bewolkt', #night
+       'bewolkt', #day
+       'regen en hagel',
+       'heet', 'plaatselijk onweer', 'af en toe onweer', 'af en toe onweer', 'af en toe regenbuien', 'hevige sneeuwval',
+       'af en toe sneeuwbuien', 'hevige sneeuwval', 'deels bewolkt',
+       'onweersbuien', 'sneeuwbuien', 'af en toe onweersbuien');
+
+
+my %pressure_trend_txt_en = ( 0 => "steady", 1 => "rising", 2 => "falling" );
+my %pressure_trend_txt_de = ( 0 => "gleichbleibend", 1 => "steigend", 2 => "fallend" );
+my %pressure_trend_txt_nl = ( 0 => "steady", 1 => "rising", 2 => "falling" );
+my %pressure_trend_sym = ( 0 => "=", 1 => "+", 2 => "-" );
+
        
-my %wdayXlate = ('Mon' => 'Mo.', 'Tue' => 'Di.', 'Wed'=> 'Mi.', 'Thu' => 'Do.', 'Fri' => 'Fr.', 'Sat' => 'Sa.', 'Sun' => 'So.');
+my @directions_txt_en = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW');
+my @directions_txt_de = ('N', 'NNO', 'NO', 'ONO', 'O', 'OSO', 'SO', 'SSO', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW');
+my @directions_txt_nl = ('N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW');
+
+my %wdays_txt_en = ('Mon' => 'Mon', 'Tue' => 'Tue', 'Wed'=> 'Wed', 'Thu' => 'Thu', 'Fri' => 'Fri', 'Sat' => 'Sat', 'Sun' => 'Sun');
+my %wdays_txt_de = ('Mon' => 'Mo', 'Tue' => 'Di', 'Wed'=> 'Mi', 'Thu' => 'Do', 'Fri' => 'Fr', 'Sat' => 'Sa', 'Sun' => 'So');
+my %wdays_txt_nl = ('Mon' => 'Mo.', 'Tue' => 'Di.', 'Wed'=> 'Mi.', 'Thu' => 'Do.', 'Fri' => 'Fr.', 'Sat' => 'Sa.', 'Sun' => 'So.');
 
 my @iconlist = (
        'storm', 'storm', 'storm', 'thunderstorm', 'thunderstorm', 'rainsnow',
@@ -125,10 +137,10 @@ sub wind_in_km_per_h($$) {
   return $unitsystem ne "SI" ? int(1.609344*$wind+0.5) : $wind;
 }
 
-sub degrees_to_direction($) {
-   my ($degrees) = @_;
+sub degrees_to_direction($@) {
+   my ($degrees,@directions_txt_i18n) = @_;
    my $mod = int((($degrees + 11.25) % 360) / 22.5);
-   return $directions_de[$mod];
+   return $directions_txt_i18n[$mod];
 }
 
 ###################################
@@ -178,6 +190,30 @@ sub Weather_RetrieveData($)
   my $xml = GetFileFromURL("http://weather.yahooapis.com/forecastrss?w=" . $location . "&u=" . $units, 3, undef, 1);
   return 0 if( ! defined $xml || $xml eq "");
 
+  my $lang= $hash->{LANG};
+  my @YahooCodes_i18n;
+  my %wdays_txt_i18n;
+  my @directions_txt_i18n;
+  my %pressure_trend_txt_i18n;
+
+  if($lang eq "de") {
+    @YahooCodes_i18n= @YahooCodes_de;
+    %wdays_txt_i18n= %wdays_txt_de;
+    @directions_txt_i18n= @directions_txt_de;
+    %pressure_trend_txt_i18n= %pressure_trend_txt_de;
+  } elsif($lang eq "nl") {
+    @YahooCodes_i18n= @YahooCodes_nl;
+    %wdays_txt_i18n= %wdays_txt_nl;
+    @directions_txt_i18n= @directions_txt_nl;
+    %pressure_trend_txt_i18n= %pressure_trend_txt_nl;
+  } else {
+    @YahooCodes_i18n= @YahooCodes_en;
+    %wdays_txt_i18n= %wdays_txt_en;
+    @directions_txt_i18n= @directions_txt_en;
+    %pressure_trend_txt_i18n= %pressure_trend_txt_en;
+  }
+
+
   foreach my $l (split("<",$xml)) {
           #Log 1, "DEBUG WEATHER: line=\"$l\"";
           next if($l eq "");                   # skip empty lines
@@ -202,7 +238,7 @@ sub Weather_RetrieveData($)
              my $code = (($value =~/code="([0-9]*?)".*/) ? $1 : undef);
              if (defined($code)) { 
                readingsUpdate($hash, $prefix . "code", $code); 
-               my $text = $YahooCodes_de[$code];  
+               my $text = $YahooCodes_i18n[$code];
                if ($text) { readingsUpdate($hash, $prefix . "condition", $text); } 
                #### add icon logic here - generate from code
                $text = $iconlist[$code];
@@ -216,7 +252,7 @@ sub Weather_RetrieveData($)
              if ($temp) { 
                 readingsUpdate($hash, "temperature", $temp); 
                 readingsUpdate($hash, "temp_c", $temp); # compatibility
-                $temp = ( $temp * 9  / 5 ) + 32;  # Celsius to Fahrenheit
+                $temp = int(( $temp * 9  / 5 ) + 32.5);  # Celsius to Fahrenheit
                 readingsUpdate($hash, "temp_f", $temp); # compatibility
              }  
 
@@ -225,8 +261,7 @@ sub Weather_RetrieveData($)
 
              my $day = (($value =~/date="(.*?), .*/) ? $1 : undef);  
              if ($day) {  
-                my $day_de = $wdayXlate{$day};             
-                readingsUpdate($hash, "day_of_week", $day_de); 
+                readingsUpdate($hash, "day_of_week", $wdays_txt_i18n{$day}); 
              }          
           }
 
@@ -238,8 +273,7 @@ sub Weather_RetrieveData($)
              if ($high_c) { readingsUpdate($hash, $prefix . "high_c", $high_c); }  
              my $day1 = (($value =~/day="(.*?)" .*/) ? $1 : undef); # forecast
              if ($day1) { 
-                my $day1_de = $wdayXlate{$day1};             
-                readingsUpdate($hash, $prefix . "day_of_week", $day1_de); 
+                readingsUpdate($hash, $prefix . "day_of_week", $wdays_txt_i18n{$day1}); 
              }   
           }
 
@@ -248,10 +282,14 @@ sub Weather_RetrieveData($)
             $value =~/humidity="([0-9.]*?)" .*visibility="([0-9.]*?|\s*?)" .*pressure="([0-9.]*?)"  .*rising="([0-9.]*?)" .*/;
 
             if ($1) { readingsUpdate($hash, "humidity", $1); }
-            my $vis = (($2 eq "") ? " " : $2);   # clear visibility field
+            my $vis = (($2 eq "") ? " " : int($2+0.5));   # clear visibility field
             readingsUpdate($hash, "visibility", $vis);
-            if ($3) { readingsUpdate($hash, "pressure", $3); } 
-            if ($4) { readingsUpdate($hash, "pressure_trend", $4); }
+            if ($3) { readingsUpdate($hash, "pressure", int($3+0.5)); } 
+            if ($4) {
+              readingsUpdate($hash, "pressure_trend", $4);
+              readingsUpdate($hash, "pressure_trend_txt", $pressure_trend_txt_i18n{$4});
+              readingsUpdate($hash, "pressure_trend_sym", $pressure_trend_sym{$4});
+            }
           }
 
           ### wind
@@ -259,12 +297,12 @@ sub Weather_RetrieveData($)
             $value =~/chill="([0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
             readingsUpdate($hash, "wind_chill", $1) if (defined($1)); 
             readingsUpdate($hash, "wind_direction", $2) if (defined($2));
-            my $windspeed= defined($3) ? int($3) : "";
+            my $windspeed= defined($3) ? int($3+0.5) : "";
             readingsUpdate($hash, "wind_speed", $windspeed);
             readingsUpdate($hash, "wind", $windspeed); # duplicate for compatibility
             if (defined($2) & defined($3)) {
-              my $wdir = degrees_to_direction($2);
-              readingsUpdate($hash, "wind_condition", "Wind: $wdir mit $windspeed km/h"); # compatibility
+              my $wdir = degrees_to_direction($2,@directions_txt_i18n);
+              readingsUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h"); # compatibility
             }
           }   
   }
@@ -351,7 +389,7 @@ sub Weather_Define($$) {
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "syntax: define <name> Weather <location> [interval [en|de|fr|es]]" 
+  return "syntax: define <name> Weather <location> [interval [en|de|nl]]"
     if(int(@a) < 3 && int(@a) > 5); 
 
   $hash->{STATE} = "Initialized";
