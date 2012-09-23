@@ -124,7 +124,7 @@ FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn} = "FP_define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 fp_stylesheetPrefix fp_noMenu:1,0";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0";
   # fp_arrange			: show addtl. menu for  attr fp_<name> ....
   # commandfield		: shows an fhem-commandline inputfield on floorplan
   # fp_default			: set for ONE floorplan. If set, floorplan-startscreen is skipped.
@@ -313,17 +313,10 @@ FP_htmlHeader($) {
   }
   # refresh-value
   my $rf = AttrVal($FW_wname, "refresh", "");
-  FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);					# use refresh-value from Web-Instance
+  FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf); # use refresh-value from Web-Instance
   # stylesheet
-  # removed the option to have different styles for FHEMWEB and FLOORPLAN
-  #   if ($FP_name) {
-  # 	my $prf = AttrVal($FP_name, "fp_stylesheetPrefix", "");
-  #   	FW_pO  ("<link href=\"$FW_ME/css/$prf"."floorplanstyle.css\" rel=\"stylesheet\"/>"); #use floorplanstyle.css for floorplans, evtl. with fp_stylesheetPrefix  #20120730 0017
-  #   } else {
-  # 	my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
-  #     FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";              			#use floorplanstyle.css (incl. FW-stylesheetPrefix) for fp-start-screen  #20120730 0017
-  #   }
-  my $css = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
+  my $defaultcss = AttrVal($FW_wname, "stylesheetPrefix", "") . "floorplanstyle.css";
+  my $css= AttrVal($FP_name, "stylesheet", $defaultcss);
   FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";
 
   #set sripts

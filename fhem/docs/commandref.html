@@ -5235,12 +5235,15 @@ To send the data, both send or write could be used.<br>
     <tr><td>humidity</td><td>current humidity in %</td></tr>
     <tr><td>icon</td><td>relative path for current icon</td></tr>
     <tr><td>pressure</td><td>air pressure in hPa</td></tr>
-    <tr><td>pressure_trend</td><td>air pressure trend (unit?)</td></tr>
+    <tr><td>pressure_trend</td><td>air pressure trend (0= steady, 1= rising, 2= falling)</td></tr>
+    <tr><td>pressure_trend_txt</td><td>textual representation of air pressure trend</td></tr>
+    <tr><td>pressure_trend_sym</td><td>symbolic representation of air pressure trend</td></tr>
     <tr><td>temperature</td><td>current temperature in degrees centigrade</td></tr>
     <tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
     <tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
+    <tr><td>visibility</td><td>visibility in km</td></tr>
     <tr><td>wind</td><td>wind speed in km/h</td></tr>
-    <tr><td>wind_chill</td><td>?</td></tr>
+    <tr><td>wind_chill</td><td>wind chill in degrees centigrade</td></tr>
     <tr><td>wind_condition</td><td>wind direction and speed</td></tr>
     <tr><td>wind_direction</td><td>direction wind comes from in degrees (0 = north wind)</td></tr>
     <tr><td>wind_speed</td><td>same as wind</td></tr>
@@ -9734,19 +9737,22 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 	  allowing to place devices easily on the screen.<br>
 	  Example:
 	<ul>
-      <code>attr Groundfloor fp_arrange 1</code><br>
+        <code>attr Groundfloor fp_arrange 1</code><br>
 	  <code>attr Groundfloor fp_arrange detail  #displays the devices with infos room, type, alias</code><br>
 	  <code>attr Groundfloor fp_arrange WEB     #activates arrange mode for frontend-device WEB only</code><br><br>
-    </ul>
-	</li>
-	<li><a name="fp_stylesheetPrefix">fp_stylesheetPrefix</a><br>
-	Allows the usage of a separate stylesheet like <a href="#stylesheetPrefix">stylesheetPrefix</a>.<br>
-	The prefix is prepended the standard stylesheet floorplanstyle.css .<br>
-		  Example:
+        </ul>
+    </li>
+    <li><a name="stylesheet">stylesheet</a><br>
+	Explicitely sets your personal stylesheet for the floorplan. This overrides the standard stylesheet.
+	The standard stylesheet for floorplans is <code>floorplanstyle.css</code>. If the <a href="#stylesheetPrefix">stylesheetPrefix</a> is set for the corresponding FHEMWEB instance, this same
+	<code>stylesheetPrefix</code> is also prepended to the stylesheet for floorplans.<br>
+	All stylesheets must be stored in the stylesheet subfolder of the fhem filesystem hierarchy. Store your personal
+	stylesheet along with <code>floorplanstyle.css</code> in the same folder.<br>
+	Example:
 	<ul>
-      <code>attr Groundfloor fp_stylesheetPrefix dark       # use darkfloorplanstyle.css</code><br><br>
-    </ul>
-	</li>
+          <code>attr Groundfloor stylesheet myfloorplanstyle.css</code><br><br>
+        </ul>
+    </li>
 
 	<li><a name="fp_default">fp_default</a><br>
 	The floorplan startscreen is skipped if this attribute is assigned to one of the floorplans in your installation.
