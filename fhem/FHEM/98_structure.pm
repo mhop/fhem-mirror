@@ -166,12 +166,12 @@ sub structure_Notify($$)
           #Bsp: A --> nur Reading A gehuert zur Struktur
           #Bsp: A B --> Reading A und B gehuert zur Struktur
           $devstate = ReadingsVal($d, $value[0], undef);
-          push(@clientstate, $devstate);
+          push(@clientstate, $devstate) if(defined($devstate));
         } elsif(@value == 2) {
           # zustand wenn der Status auf dem in der Struktur definierten
           # umdefiniert werden muss
           # bsp: on:An
-          if($devstate eq $value[0]){
+          if(defined($devstate) && $devstate eq $value[0]){
             $devstate = $value[1];
             push(@clientstate, $devstate);
             $i=99999;
@@ -181,7 +181,7 @@ sub structure_Notify($$)
           # Reading:OriginalStatus:NeuerStatus wenn zb. ein Device mehrere
           # Readings abbildet, zb. 1wire DS2406, DS2450 Bsp: A:Zu.:Geschlossen
           $devstate = ReadingsVal($d, $value[0], undef);
-          if($devstate eq $value[1]){
+          if(defined($devstate) && $devstate eq $value[1]){
             $devstate = $value[2];
             push(@clientstate, $devstate);
             # $i=99999; entfernt, wenn Device mehrere Ports/Readings abbildet
@@ -191,7 +191,7 @@ sub structure_Notify($$)
         # Log 1, "Dev: ".$d." Anzahl: ".@value." Value:".$value[0]." devstate:
         # ".$devstate;
         $minprio = $priority{$devstate}
-                if($devstate &&
+                if(defined($devstate) &&
                    $priority{$devstate} &&
                    $priority{$devstate} < $minprio);
       }
@@ -199,10 +199,10 @@ sub structure_Notify($$)
       # falls kein mapping im Device angegeben wurde
       $devstate = ReadingsVal($d, "state", undef);
       $minprio = $priority{$devstate}
-               if($devstate &&
+               if(defined($devstate) &&
                   $priority{$devstate} &&
                   $priority{$devstate} < $minprio);
-      push(@clientstate, $devstate);
+      push(@clientstate, $devstate) if(defined($devstate));
     }
 
     #besser als 1 kann minprio nicht werden
@@ -212,12 +212,12 @@ sub structure_Notify($$)
   @clientstate = uniq(@clientstate);# eleminiere alle Dubletten
 
   #ermittle Endstatus
-  my $newState;
+  my $newState = "";
   if($behavior eq "absolute"){
     # wenn absolute, dann gebe undefinierten Status aus falls die Clients
     # unterschiedliche Status' haben  
     if(@clientstate > 1) { $newState = "undefined";}
-    else { $newState = $clientstate[0];}
+    elsif(@clientstate > 0) { $newState = $clientstate[0];}
   } elsif($behavior eq "relative" && $minprio < 99999) {
     $newState = $priority[$minprio];
   } else {
@@ -226,7 +226,7 @@ sub structure_Notify($$)
 
 
   #eigenen Status jetzt setzen, nur wenn abweichend
-  if($hash->{STATE} ne $newState) {
+  if(!defined($hash->{STATE}) || ($hash->{STATE} ne $newState)) {
     Log 3, "Update structure '" .$me . "' to " . $newState .
                 " because device '" .$dev->{NAME}. "' has changed";
     $hash->{STATE} = $newState;
