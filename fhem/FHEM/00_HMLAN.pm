@@ -217,7 +217,7 @@ HMLAN_Write($$$)
 
   # Avoid problems with structure set
   # TODO: rewrite it to use a queue+internaltimer like the CUL
-  select(undef, undef, undef, 0.03);
+  select(undef, undef, undef, 0.3); # needed for structure set by meesus. 
 }
 
 #####################################
