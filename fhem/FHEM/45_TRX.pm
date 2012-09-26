@@ -68,7 +68,7 @@ TRX_Initialize($)
   $hash->{GetFn}   = "TRX_Get";
   $hash->{SetFn}   = "TRX_Set";
   $hash->{StateFn} = "TRX_SetState";
-  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 addvaltrigger:1:0 longids loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 do_not_init:1:0 addvaltrigger:1:0 longids loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "TRX_Shutdown";
 }
 
