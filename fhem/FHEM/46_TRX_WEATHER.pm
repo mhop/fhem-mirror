@@ -176,6 +176,24 @@ sub TRX_WEATHER_temperature {
 
 }
 
+sub TRX_WEATHER_chill_temperature {
+  my ($bytes, $dev, $res, $off) = @_;
+
+  my $temp =
+    (
+    (($bytes->[$off] & 0x80) ? -1 : 1) *
+        (($bytes->[$off] & 0x7f)*256 + $bytes->[$off+1]) 
+    )/10;
+
+  push @$res, {
+       		device => $dev,
+       		type => 'chilltemp',
+       		current => $temp,
+		units => 'Grad Celsius'
+  	}
+
+}
+
 sub TRX_WEATHER_humidity {
   my ($bytes, $dev, $res, $off) = @_;
   my $hum = $bytes->[$off];
@@ -316,6 +334,11 @@ sub TRX_WEATHER_common_anemometer {
 
   my $avspeed = $bytes->[7]*256 + $bytes->[8];
   my $speed = $bytes->[9]*256 + $bytes->[10];
+
+  if ($dev_type eq "TFA_WIND") {
+  	TRX_WEATHER_temperature($bytes, $dev_str, \@res, 11); 
+  	TRX_WEATHER_chill_temperature($bytes, $dev_str, \@res, 13); 
+  }
 
   push @res, {
 	device => $dev_str,
@@ -770,6 +793,15 @@ TRX_WEATHER_Parse($$)
 			$val .= "T: ".$i->{current}." ";
 
 			$sensor = "temperature";			
+			$def->{READINGS}{$sensor}{TIME} = $tm;
+			$def->{READINGS}{$sensor}{VAL} = $i->{current};
+			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
+  	} 
+	elsif ($i->{type} eq "chilltemp") { 
+			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
+			$val .= "CT: ".$i->{current}." ";
+
+			$sensor = "windchill";			
 			$def->{READINGS}{$sensor}{TIME} = $tm;
 			$def->{READINGS}{$sensor}{VAL} = $i->{current};
 			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
