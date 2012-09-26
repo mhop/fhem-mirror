@@ -144,6 +144,14 @@ TRX_LIGHT_Set($@)
 	return "No set implemented for $device_type";	
   }
 
+  if (	lc($hash->{TRX_LIGHT_devicelog}) eq "window" || lc($hash->{TRX_LIGHT_devicelog}) eq "door" || 
+   	lc($hash->{TRX_LIGHT_devicelog}) eq "motion" ||
+	lc($hash->{TRX_LIGHT_devicelog}) eq "lightsensor" || lc($hash->{TRX_LIGHT_devicelog}) eq "photosensor"
+      ) {
+	return "No set implemented for $device_type";	
+  }
+
+
   my $device_type_num = $light_device_c2b{$device_type};
   if(!defined($device_type_num)) {
 	return "Unknown device_type, choose one of " .
@@ -429,6 +437,14 @@ sub TRX_LIGHT_parse_X10 {
 	} else {	
 		$command = ($command eq "on") ? "off" : "on" ;	
 	}
+  }
+
+  if (lc($def->{TRX_LIGHT_devicelog}) eq "window" || lc($def->{TRX_LIGHT_devicelog}) eq "door") {
+		$command = ($command eq "on") ? "Open" : "Closed" ;
+  } elsif (lc($def->{TRX_LIGHT_devicelog}) eq "motion") {
+		$command = ($command eq "on") ? "alert" : "normal" ;
+  } elsif (lc($def->{TRX_LIGHT_devicelog}) eq "lightsensor" || lc($def->{TRX_LIGHT_devicelog}) eq "photosensor") {
+		$command = ($command eq "on") ? "dark" : "bright" ;
   }
 
   if ($type == 0x10 || $type == 0x11) {
