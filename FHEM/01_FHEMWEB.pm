@@ -307,7 +307,6 @@ FW_Read($)
      (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
      $try_zlib &&
      AttrVal($FW_wname, "fwcompress", 1)) {
-Log $ll, "OLEN:".length($FW_RET);
     $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
   }
@@ -427,9 +426,6 @@ FW_AnswerCall($)
 
   } elsif($arg =~ m,^${FW_ME}/js/(.*)\.js$,) {
     return FW_ServeSpecial($1,"js",$FW_jsdir);
-
-  } elsif($arg =~ m,^/(favicon.ico)$,) {
-    return 0; # TODO!
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
     my ($icon,$cachable) = ($1, 1);
@@ -562,6 +558,7 @@ FW_AnswerCall($)
   FW_pO '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">';
   FW_pO '<html xmlns="http://www.w3.org/1999/xhtml">';
   FW_pO "<head>\n<title>$t</title>";
+  FW_pO "<link rel=\"shortcut icon\" href=\"$FW_ME/icons/favicon.ico\" />";
 
   # Enable WebApp
   if($FW_tp || $FW_ss) {
