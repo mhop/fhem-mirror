@@ -6,6 +6,7 @@
 <title>Home of FHEM</title>
   <link rel="stylesheet" type="text/css" href="../css/style.css" />
   <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+  <link rel="shortcut icon" href="favicon.ico"/>
 </head>
 
 
@@ -13,19 +14,29 @@
 
   <div id="logo"></div>
   <div id="menu">
-    <div id="block">
-      <b>Content:</b>
-      <div id="dist"></div>
-      <div id="dist"><a href="#Description">Description</a></div>
-      <div id="dist"><a href="#Download">Download</a></div>
-      <div id="dist"><a href="#Screenshots">Screenshots</a></div>
-      <div id="dist"><a href="#Features">Features</a></div>
-      <div id="dist"><a href="#Hardware">Hardware</a></div>
-      <div id="dist"><a href="#Documentation">Documentation</a></div>
-      <div id="dist"><a href="#Links">Links</a></div>
-      <div id="dist"><a href="#Installation">Installation</a></div>
-      <div id="dist"><a href="#License">License</a></div>
-    </div>
+    <table id="room">
+      <tr><td></td></tr>
+      <tr><td><b>Content:</b></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Description">Description</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Download">Download</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Screenshots">Screenshots</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Features">Features</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Hardware">Hardware</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Documentation">Documentation</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Links">Links</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#Installation">Installation</a></td></tr>
+      <tr><td></td></tr>
+      <tr><td><a href="#License">License</a></td></tr>
+      <tr><td></td></tr>
+    </table>
   </div>
 
 
@@ -39,14 +50,13 @@
       heating / etc.  and to log events like temperature / humidity / power
       consumption.<br><br>
 
-      The program runs as a server, you can control it via web-frontends,
-      telnet, command line program or TCP/IP directly.<br><br>
+      The program runs as a server, you can control it via web or smartphone
+      frontends, telnet or TCP/IP directly.<br><br>
 
-      In order to use fhem you'll need a 24/7 server (PC, MacMini, Fritz!Box,
-      NAS, etc) with a perl interpreter and some attached hardware like the
+      In order to use fhem you'll need a 24/7 server (Fritz!Box, NAS, RPi, PC,
+      MacMini, etc) with a perl interpreter and some attached hardware like the
       CUL, FHZ1300PC, etc. to access the actors and sensors. See the "Supported
-      hardware" section below.
-    </ul>
+      hardware" section below.</ul>
 
 
     <a name="Download"></a>
@@ -76,12 +86,17 @@
     <h3>Frontend screenshots</h3>
     <ul>
 
-      Builtin pgm2 / external pgm5 web frontend:
+      Builtin (default) pgm2 / external pgm5 web frontend:
       <a href="pgm2-1.png">overview</a>,
       the same rendered for <a href="pgm2-4.png">smartphones</a>,
       <a href="pgm2-2.png">detail</a>,
       <a href="pgm2-3.png">SVG-plots</a>,
       <a href="pgm2-5.png">dark style</a>.
+      <br><br>
+
+      The FHEM FLOORPLAN module: 
+        <a href="tirreG.jpg">Example1</a>,
+        <a href="Benji.png">Example2</a>.
       <br><br>
 
       pgm3 web frontend: <a
@@ -118,12 +133,12 @@
     <h3>Features</h3>
     <ul>
       <li>support for a lot of protocols used in house automation like FS20,
-          OneWire, X10, HomeMatic, KNX, EnOcean. See the <a
+          HomeMatic, OneWire, X10, ZWave, EnOcean, KNX. See the <a
           href="#Hardware">Hardware</a> section for more.
           </li>
       <li>autocreating devices/logs when receiving data from a new device:
-      start fhem and watch how the plots of your sensors are appearing
-      automatically.</li>
+          start fhem and watch how the plots of your sensors are appearing
+          automatically.</li>
       <li>logging events to files or databases, with regexp filters</li>
       <li>notifying external programs or scripts when receiving certain
           events</li>
@@ -131,8 +146,10 @@
           </li>
       <li>watchdog (e.g. trigger if the HMS100-FIT is inactive for HH:MM:SS)
           </li>
+      <li>lot of interfaces: simple text, JSON, XML, each of them over plain
+          TCP/IP, SSL or HTTP.
       <li>modular architecture, easy to add your special device</li>
-      <li>different web frontends, choose your favorite</li>
+      <li>lot of frontends, choose your favorite</li>
     </ul>
 
     <a name="Hardware"></a>
@@ -207,7 +224,9 @@
          X10 security and X10 lighting devices.</li>
         <div id="dist"></div>
 
-      <li>Via the ELV USB-WDE1 access to ELV sensors KS200/KS300, S300IA, S300TH, ASH2200, PS 50 and Conrad sensors KS555, S555TH and ASH555.</li>
+      <li>Via the ELV USB-WDE1 access to ELV sensors KS200/KS300, S300IA,
+          S300TH, ASH2200, PS 50 and Conrad sensors KS555, S555TH and
+          ASH555.</li>
         <div id="dist"></div>
 
       <li>Via an eQ-3 HomeMatic Lan Configurator access to selected HomeMatic
@@ -345,29 +364,38 @@
 
     <a name="Installation"></a>
     <h3>Installation</h3>
+
     <ul>
     <h4>Fritz!Box</h4>
     <ul>
-      <li>See the detailed documentation <a href="fritzbox.html">here</a>, and
-          after installation connect to http://fritz.box:8083/fhem. Follow the <a
-          href="HOWTO.html">HOWTO</a> for adding devices.
+      <li>On the FB7390 install <a
+          href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> image. Note: it
+          is needed <i>additionally</i> to the OS image from AVM.<br>
+      <li>On the FB7270 unpack <a
+          href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> zip file to a USB-Disk,
+          attach the disk to the FritzBox, log in, and strt fhem from there.
+      <li>See also the detailed documentation <a href="fritzbox.html">here</a>.
      </ul>
 
     <h4>Debian/Ubuntu</h4>
     <ul>
-      <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">
-          this</a> package, and connect to http://localhost:8083/fhem. Follow
-          the <a href="HOWTO.html">HOWTO</a> for adding devices.
-     </ul>
+      <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">this</a> package.
+    </ul>
 
     <h4>Unix / OSX</h4>
     <ul>
-      <li>Make sure you have perl. Install the module Device::SerialPort with
-        "sudo cpan Device::SerialPort" (OSX user can skip this part).</li>
-      <li>Check the Makefile for the installation path, then type make
-        install-pgm2.</li>
-      <li>Check the installed configuration file and start fhem as advised.
-      <li>Follow the <a href="HOWTO.html">HOWTO</a> for adding devices.
+      <li>Make sure you have perl. Most certainly you will need the
+          Device::SerialPort fhem module, install it with "sudo cpan
+          Device::SerialPort" or "apt-get install libdevice-serialport-perl".
+          </li>
+      <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
+          .tar.gz</a> package, unpack it, and change to the unpacked directory.
+      <ul>
+        <li>Option 1: start fhem directly from this directory (perl fhem.pl fhem.cfg).
+        <li>Option 2: Install it by checking the Makefile first then typing
+            make install.<br>
+            Check the installed fhem.cfg and start fhem as advised.
+      </ul>
     </ul>
 
     <h4>Windows</h4>
@@ -376,135 +404,27 @@
       follow the guidelines for Unix.<br><br>
 
       <li>Be sure you have perl.exe in your path (%PATH%), and the module
-        Win32::SerialPort is installed.</li>
-      <li>Make sure that you can access the serial USB device via virtual
-        COM-Port or via socket(e.g. <code>COMX or xport:10001</code>).</li>
-      <li>Create a configuration file (see the examples directory and
-        docs/commandref.html)</li>
-      <li>Start the server with <code>fhem.pl &lt;configfile&gt;</code></li>
+          Win32::SerialPort is installed.</li>
+      <li>Make sure that you can access your device (CUL/FHZ/etc) via virtual
+          COM-Port or via socket (e.g. <code>COMX or xport:10001</code>).</li>
+      <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
+          .tar.gz</a> package, unpack it, and change to the unpacked directory.
+      <li>Start the server with <code>perl fhem.pl fhem.cfg</code></li>
     </ul>
 
     <br><br>
-    <div id="block">
-      <b>General notes for webfrontends:</b><br>
-      You don't have to install all of them, one is probably more than
-      enough :-).<br>
-      The numbering has historical reasons: not actively maintained versions
-      are not described here.<br>
-      <b>Important:</b> Make sure you add some protection (.htaccess, etc)
-      else everybody will be able to set your devices.<br>
-    </div>
-
-    <h3>Web frontend 2 (webfrontend/pgm2)</h3>
-      <ul>
-      This frontend is a FHEM module implementing a HTTP server, no further
-      programs are needed. It has support for grouping devices into rooms,
-      manipulating devices, direct fhem commands, displaying logfiles as text
-      or plot (SVG builtin or PNG by gnuplot), navigating/zooming in the
-      plots, HTTP basicAuth, HTTPS and IPV6 (with the IO::Socket::SSL and
-      IO::Socket:INET6 perl modules)
-      <br>
-
-      Screenshots: <a href="pgm2-1.png">overview</a>, <a
-      href="pgm2-2.png">detail</a>, <a href="pgm2-3.png">SVG-plots</a>.
-      <br><br>
-      It installed by default, but it can be deconfigured.<br>
+    After installation follow the <a href="HOWTO.html">HOWTO</a> for adding devices.
     </ul>
 
-    <h3>Web frontend 3 (webfrontend/pgm3)</h3>
-    <ul>
-      This frontend is PHP based and was contributed by Martin Haas.
-      Look at the webfrontends/pgm3/docs for more documentation.
-      A lot more details <a
-      href="http://www.martin-haas.de/fhz/screenshots.html">and screenshots</a>
-      can be found on Martins page: <a href="http://www.martin-haas.de/fhz">
-      http://www.martin-haas.de/fhz</a><br>
-      pgm3 may run on an other machine than fhem.<br> The Devices of 95% of the
-      users are detected and configured automatically.  Further 4% are
-      adaptable by the function UserDef. See config.php for explanation.
-      <br><br>
-
-      Installation:
-      <ul>
-        <li>Install PHP5, the php5-Apache-Modules, gnuplot  and php5-gd. Every
-          current distribution should do all the needed configuration without
-          your input.</li>
-
-        <li>Create a directory in the Apache2 DocumentRoot 
-          (e.g.: /var/www/pgm3) and copy all the files from the
-          webfrontend/pgm3 to this directory.<br>Make sure that this directory
-          is writeable by the webserver (e.g. User www-data.www-data)!</li>
-
-        <li>Call &lt;your-site&gt;/pgm3/index.php and follow the instructions
-          on screen</li>
-        <li>The official WIKI of pgm3 is now <a
-          href="http://fhemwiki.de">http://fhemwiki.de</a></li>
-
-        <li>Troubleshooting: right-click on the graphic then "show
-          graphic".</li>
-      </ul>
-     </ul>
-    
-    <h3>Web frontend 5 (webfrontend/pgm5)</h3>
-    <ul>
-      This frontend is CGI/CSS based. It has support for rooms, and  FHT/KS300
-      logs.  This webfrontend is an update of the former pgm2 (up to 4.2): It
-      resides in YOUR HTTP server, and doesn't provide an own, like the FHEMWEB
-      module does.<br><br>
-
-      Why to use this:<br>
-      1) If you want to stick with your Web-Servers (due to restrictions, 
-         ports or any other reason)<br>
-      2) If you have a NAS (Network attached storage) and limited CPU-Power. 
-         This frontend can render the graphics in the background (in 
-         intervals) and sends only the rendered graphics to the HTML-Page.<br>
-      3) If you need the FHEMRENDERER to render the images for other/own   
-         pages.<br>
-         <br>
-     A lot more details can be found on <a
-     href="http://www.dhs-computertechnik.de/support.html">http://www.dhs-computertechnik.de/support.html</a>
-     <br><br>
-
-    Installation:
-    <ul>
-       <li>Copy the file fhemweb.pl and *.css to your cgi-bin directory
-         (/home/httpd/cgi-bin), the icons (*.gif) to your httpd icons
-         (/home/httpd/icons), and commandref.html to the html directory
-         (/home/httpd/html) (or also to cgi-bin directory).<br>
-
-         Note: The program looks for icons in the following order: <br>
-         'device-name.state', 'device-name', 'device-type.state',
-         'device-type'</li>
-
-        <li>The *.gplot files should be reused from the built-in FHEMWEB and
-          should reside in the installed FHEM directory. Here we don't provide
-          specific *.gplot files as the mechanisms are exactly the same.</li>
-
-        <li>If you want to have access to plotted logs, then make sure that
-          gnuplot is installed and set the logtype for the FileLog device (see
-          commandref.html and example/04_log).  Copy the file
-          contrib/99_weblink.pm to the installed FHEM directory.</li>
-
-        <li>Copy the file pgm5/02_FHEMRENDERER.pm to the installed FHEM
-          directory.  This gives you a graphic rendering engine (gnuplot &
-          gnuplot-scroll at the moment), which can be configured to renderer
-          images in intervals.</li>
-
-        <li>Call 'your-site'/cgi-bin/fhemweb.pl </li>
-
-    </ul>
-    </ul>  
-    </ul>  
-    
     <a name="License"></a>
     <h3>License:</h3>
     <ul>
       Copyright:<br>
       <ul>
         <li>Rudolf Koenig (r dot koenig at koeniglich dot de)</li>
-        <li>Raoul Matthiessen (webfrontends/pgm1)</li>
         <li>Martin Haas (webfrontends/pgm3)</li>
-            <li>Olaf Droegehorn (webfrontends/pgm5)</li>
+        <li>Olaf Droegehorn (webfrontends/pgm5)</li>
+        <li>Numerous other people with their fhem modules</li>
       </ul>
       License: GPL (v2)<br>
       Thanks to TOSTi for inspiration and numerous other people for help. <br>
