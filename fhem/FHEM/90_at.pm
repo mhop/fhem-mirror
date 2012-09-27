@@ -32,7 +32,7 @@ at_Define($$)
 
   if(!$command) {
     if($hash->{OLDDEF}) { # Called from modify, where command is optional
-      RemoveInternalTimer($name);
+      RemoveInternalTimer($hash);
       (undef, $command) = split("[ \t]+", $hash->{OLDDEF}, 2);
       $hash->{DEF} = "$tm $command";
     } else {
@@ -72,8 +72,8 @@ at_Define($$)
   }
   $hash->{NTM} = $ntm if($rel eq "+" || $fn);
   $hash->{TRIGGERTIME} = $nt;
-  RemoveInternalTimer($name);
-  InternalTimer($nt, "at_Exec", $name, 0);
+  RemoveInternalTimer($hash);
+  InternalTimer($nt, "at_Exec", $hash, 0);
 
   $hash->{STATE} = ($oldattr && $oldattr->{disable} ? "disabled" : ("Next: ".FmtTime($nt)));
   
@@ -84,18 +84,21 @@ sub
 at_Undef($$)
 {
   my ($hash, $name) = @_;
-  RemoveInternalTimer($name);
+  $hash->{DELETED} = 1;
+  RemoveInternalTimer($hash);
   return undef;
 }
 
 sub
 at_Exec($)
 {
-  my ($name) = @_;
+  my ($hash) = @_;
   my ($skip, $disable) = ("","");
 
-  return if(!$defs{$name});           # Just deleted
-  Log GetLogLevel($name,5), "exec at command $name";
+  return if($hash->{DELETED});           # Just deleted
+  my $name = $hash->{NAME};
+  my $ll5 = GetLogLevel($name,5);
+  Log $ll5, "exec at command $name";
 
   if(defined($attr{$name})) {
     $skip    = 1 if($attr{$name} && $attr{$name}{skip_next});
@@ -103,35 +106,35 @@ at_Exec($)
   }
 
   delete $attr{$name}{skip_next} if($skip);
-  my (undef, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
+  my (undef, $command) = split("[ \t]+", $hash->{DEF}, 2);
   $command = SemicolonEscape($command);
   my $ret = AnalyzeCommandChain(undef, $command) if(!$skip && !$disable);
   Log GetLogLevel($name,3), $ret if($ret);
 
-  return if(!$defs{$name});           # Deleted in the Command
+  return if($hash->{DELETED});           # Deleted in the Command
 
-  my $count = $defs{$name}{REP};
-  my $def = $defs{$name}{DEF};
+  my $count = $hash->{REP};
+  my $def = $hash->{DEF};
 
   $oldattr = $attr{$name};           # delete removes the attributes too
 
   # Avoid drift when the timespec is relative
-  $data{AT_TRIGGERTIME} = $defs{$name}{TRIGGERTIME} if($def =~ m/^\+/);
+  $data{AT_TRIGGERTIME} = $hash->{TRIGGERTIME} if($def =~ m/^\+/);
 
-  my $oldCfgfn = $defs{$name}{CFGFN};
-  my $oldNr    = $defs{$name}{NR};
+  my $oldCfgfn = $hash->{CFGFN};
+  my $oldNr    = $hash->{NR};
   CommandDelete(undef, $name);          # Recreate ourselves
 
   if($count) {
     $def =~ s/{\d+}/{$count}/ if($def =~ m/^\+?\*{\d+}/);  # Replace the count
-    Log GetLogLevel($name,5), "redefine at command $name as $def";
+    Log $ll5, "redefine at command $name as $def";
 
     $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
     delete($data{AT_RECOMPUTE});
     $attr{$name} = $oldattr;
-    $defs{$name}{CFGFN} = $oldCfgfn if($oldCfgfn);
-    $defs{$name}{NR} = $oldNr;
+    $hash->{CFGFN} = $oldCfgfn if($oldCfgfn);
+    $hash->{NR} = $oldNr;
     $oldattr = undef;
   }
   delete($data{AT_TRIGGERTIME});
@@ -143,12 +146,14 @@ at_Attr(@)
   my ($cmd, $name, $attrName, $attrVal) = @_;
   my $do = 0;
 
+  my $hash = $defs{$name};
+
   if($cmd eq "set" && $attrName eq "alignTime") {
     return "alignTime needs a list of timespec parameters" if(!$attrVal);
     my ($alErr, $alHr, $alMin, $alSec, undef) = GetTimeSpec($attrVal);
     return "$name alignTime: $alErr" if($alErr);
 
-    my ($tm, $command) = split("[ \t]+", $defs{$name}{DEF}, 2);
+    my ($tm, $command) = split("[ \t]+", $hash->{DEF}, 2);
     $tm =~ m/^(\+)?(\*({\d+})?)?(.*)$/;
     my ($rel, $rep, $cnt, $tspec) = ($1, $2, $3, $4);
     return "startTimes: $name is not relative" if(!$rel);
@@ -156,7 +161,7 @@ at_Attr(@)
 
     my $alTime = ($alHr*60+$alMin)*60+$alSec;
     my $step = ($hr*60+$min)*60+$sec;
-    my $ttime = int($defs{$name}{TRIGGERTIME});
+    my $ttime = int($hash->{TRIGGERTIME});
     my $off = ($ttime % 86400) - 86400;
     while($off < $alTime) {
       $off += $step;
@@ -164,10 +169,10 @@ at_Attr(@)
     $ttime += ($alTime-$off);
     $ttime += $step if($ttime < time());
 
-    RemoveInternalTimer($name);
-    InternalTimer($ttime, "at_Exec", $name, 0);
-    $defs{$name}{TRIGGERTIME} = $ttime;
-    $defs{$name}{STATE} = "Next: " . FmtTime($ttime);
+    RemoveInternalTimer($hash);
+    InternalTimer($ttime, "at_Exec", $hash, 0);
+    $hash->{TRIGGERTIME} = $ttime;
+    $hash->{STATE} = "Next: " . FmtTime($ttime);
   }
 
   if($cmd eq "set" && $attrName eq "disable") {
@@ -175,9 +180,9 @@ at_Attr(@)
   }
   $do = 2 if($cmd eq "del" && (!$attrName || $attrName eq "disable"));
   return if(!$do);
-  $defs{$name}{STATE} = ($do == 1 ?
+  $hash->{STATE} = ($do == 1 ?
         "disabled" :
-        "Next: " . FmtTime($defs{$name}{TRIGGERTIME}));
+        "Next: " . FmtTime($hash->{TRIGGERTIME}));
 
   return undef;
 }
@@ -201,8 +206,8 @@ at_State($$$$)
   return undef if($ntime > $then); 
 
   my $name = $hash->{NAME};
-  RemoveInternalTimer($name);
-  InternalTimer($now+$then-$ntime, "at_Exec", $name, 0);
+  RemoveInternalTimer($hash);
+  InternalTimer($now+$then-$ntime, "at_Exec", $hash, 0);
   $hash->{NTM} = "$h:$m:$s";
   $hash->{STATE} = $val;
   
