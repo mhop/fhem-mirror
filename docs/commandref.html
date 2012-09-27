@@ -378,7 +378,10 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="comment"></a>
     <li>comment<br>
         Add an arbitrary comment.
-
+    <a name="alias"></a>
+    <li>alias<br>
+        Used by FHEMWEB to display a device with another name e.g. when using
+        special characters/spaces not accepted by device definition.
     <a name="room"></a>
     <li>room<br>
         Filter/group devices. Recognized by web-pgm2 and web-pgm3.  A device
@@ -1182,6 +1185,10 @@ A line ending with \ will be concatenated with the next one, so long lines
 
   <b>Attributes</b>
   <ul>
+    <li><a href="#archivedir">archivedir</a></li>
+    <li><a href="#archivecmd">archivecmd</a></li>
+    <li><a href="#nrarchive">nrarchive</a></li><br>
+
     <a name="autoload_undefined_devices"></a>
     <li>autoload_undefined_devices<br>
         If set, automatically load the corresponding module when a message
