@@ -60,6 +60,7 @@
   - feature: ZWave added
   - feature: module IPCAM added. (M. Fischer)
   - feature: module HTTPSRV added (Boris)
+  - feature: module FLOORPLAN added (Uli Maass)
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
