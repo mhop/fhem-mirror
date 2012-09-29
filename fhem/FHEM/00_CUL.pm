@@ -49,6 +49,8 @@ my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS: " .
 
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:";  # OneWire emulated as HMS on a CUNO
 
+my $clientsMAX = ":CUL_MAX:";  # as a starter - not available, yet
+
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
     "2:BS"        => "^81..(04|0c)..0101a001a5cf",
@@ -69,6 +71,10 @@ my %matchListHomeMatic = (
     "1:CUL_HM" => "^A....................",
     "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
     "D:CUL_IR"    => "^I............",
+);
+
+my %matchListMAX = (
+    "F:CUL_MAX" => "^Z........................",
 );
 
 sub
@@ -92,7 +98,7 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "sendpool addvaltrigger " .
-                     "rfmode:SlowRF,HomeMatic hmId hmProtocolEvents";
+                     "rfmode:SlowRF,HomeMatic,MAX hmId hmProtocolEvents";
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
 }
@@ -683,7 +689,7 @@ CUL_Write($$$)
 
   if($fn eq "F" ||                      # FS20 message
      $bstring =~ m/^u....F/ ||          # FS20 messages sent over an RFR
-     ($fn eq "" && $bstring =~ m/^A/)) { # AskSin/BidCos/HomeMatic
+     ($fn eq "" && ($bstring =~ m/^A/ || $bstring =~ m/^Z/ ))) { # AskSin/BidCos/HomeMatic/MAX
 
     CUL_AddFS20Queue($hash, $bstring);
 
@@ -702,6 +708,7 @@ CUL_SendFromQueue($$)
   my $name = $hash->{NAME};
 
   my $hm = ($bstring =~ m/^A/);
+  my $mz = ($bstring =~ m/^Z/);
   my $to = ($hm ? 0.15 : 0.3);
 
   if($bstring ne "") {
@@ -800,7 +807,7 @@ CUL_Parse($$$$$)
   my $rssi;
 
   my $dmsg = $rmsg;
-  if($dmsg =~ m/^[AFTKEHRSt]([A-F0-9][A-F0-9])+$/) { # RSSI
+  if($dmsg =~ m/^[AFTKEHRStZ]([A-F0-9][A-F0-9])+$/) { # RSSI
     my $l = length($dmsg);
     $rssi = hex(substr($dmsg, $l-2, 2));
     $dmsg = substr($dmsg, 0, $l-2);
@@ -877,6 +884,8 @@ CUL_Parse($$$$$)
     ;
   } elsif($fn eq "A" && $len >= 21) {              # AskSin/BidCos/HomeMatic
     ;
+  } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
+    ;
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } else {
@@ -946,14 +955,24 @@ CUL_Attr(@)
 
     my $name = $a[1];
     my $hash = $defs{$name};
+    my $numv = substr($hash->{VERSION},2,4);
 
-    $a[3] = "SlowRF" if(!$a[3] || $a[3] ne "HomeMatic");
+    $a[3] = "SlowRF" if(!$a[3] || ($a[3] ne "HomeMatic" && $a[3] ne "MAX"));
 
     if($a[3] eq "HomeMatic") {
       return if($hash->{initString} =~ m/Ar/);
       $hash->{Clients} = $clientsHomeMatic;
       $hash->{MatchList} = \%matchListHomeMatic;
       $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
+      CUL_SimpleWrite($hash, "Zx") if($numv > 1.46);  # reset MAX, if available
+      CUL_SimpleWrite($hash, $hash->{initString});
+
+    } elsif(($a[3] eq "MAX") && ($numv > 1.46)) {
+      return if($hash->{initString} =~ m/Zr/);
+      $hash->{Clients} = $clientsMAX;
+      $hash->{MatchList} = \%matchListMAX;
+      $hash->{initString} = "X21\nZr";  # X21 is needed for RSSI reporting
+      CUL_SimpleWrite($hash, "Ax");     # reset AskSin
       CUL_SimpleWrite($hash, $hash->{initString});
 
     } else {
@@ -962,6 +981,7 @@ CUL_Attr(@)
       $hash->{MatchList} = \%matchListSlowRF;
       $hash->{initString} = "X21";
       CUL_SimpleWrite($hash, "Ax");     # reset AskSin
+      CUL_SimpleWrite($hash, "Zx") if($numv > 1.46); # reset MAX if available
       CUL_SimpleWrite($hash, $hash->{initString});
 
     }
