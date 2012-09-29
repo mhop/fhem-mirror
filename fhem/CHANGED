@@ -1,5 +1,5 @@
 - SVN
-  - feature: rfmode supports to listen to MAX if fw>1.46 in 00_CUL.pm (Jens)
+  - feature: rfmode supports to listen to MAX if fw>1.46, 00_CUL.pm (Jens)
   - feature: Status and length on cmdStack in webinterface for 10_CUL_HM
   - feature: devicepair in 10_CUL_HM.pm supports unset
   - feature: devicepair for single Button in 10_CUL_HM.pm (by MartinP)
