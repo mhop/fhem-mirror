@@ -1089,24 +1089,29 @@ FW_showRoom()
               $firstIdx=1;
 
             } else {    ##### Dropdown
-              $firstIdx=1;
+
               my @tv = split(",", $values);
-              if($cmd eq "desired-temp") {
-                $txt = ReadingsVal($d, "desired-temp", 20);
-                $txt =~ s/ .*//;        # Cut off Celsius
-                $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-              } else {
-                $txt = Value($d);
-                $txt =~ s/$cmd //;
+              # Hack: eventmap (translation only) should not result in a dropdown.
+              # eventMap/webCmd/etc handling must be cleaned up.
+              if(@tv > 1) {
+                $firstIdx=1;
+                if($cmd eq "desired-temp") {
+                  $txt = ReadingsVal($d, "desired-temp", 20);
+                  $txt =~ s/ .*//;        # Cut off Celsius
+                  $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
+                } else {
+                  $txt = Value($d);
+                  $txt =~ s/$cmd //;
+                }
+                FW_pO "<td>".
+                  FW_hidden("arg.$d", $cmd) .
+                  FW_hidden("dev.$d", $d) .
+                  ($FW_room ? FW_hidden("room", $FW_room) : "") .
+                  FW_select("val.$d", \@tv, $txt, "dropdown").
+                  "</td><td>".
+                  FW_submit("cmd.$d", "set").
+                  "</td>";
               }
-              FW_pO "<td>".
-                FW_hidden("arg.$d", $cmd) .
-                FW_hidden("dev.$d", $d) .
-                ($FW_room ? FW_hidden("room", $FW_room) : "") .
-                FW_select("val.$d", \@tv, $txt, "dropdown").
-                "</td><td>".
-                FW_submit("cmd.$d", "set").
-                "</td>";
             }
           }
 
