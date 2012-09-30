@@ -1008,7 +1008,7 @@ FW_showRoom()
 
   my %group;
   foreach my $dev (@devs) {
-    next if($defs{$dev}{TYPE} eq "weblink");
+    next if($defs{$dev}{TYPE} eq "weblink" && !AttrVal($dev, "group", undef));
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       $group{$grp}{$dev} = 1;
     }
@@ -1047,9 +1047,18 @@ FW_showRoom()
       }
       $row++;
 
+      if($type eq "weblink") {
+        FW_pO "<td>";
+        FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, undef);
+        FW_pO "</td>";
+        next;
+      }
+
       my ($allSets, $cmdlist, $txt) = FW_devState($d, $rf);
       FW_pO "<td id=\"$d\">$txt";
 
+      ######
+      # Commands, slider, dropdown
       if(!$FW_ss) {
         FW_pO "</td>";
         if($cmdlist) {
@@ -1125,7 +1134,7 @@ FW_showRoom()
   foreach my $d (sort @list) {
     next if(IsIgnored($d));
     my $type = $defs{$d}{TYPE};
-    next if(!$type || $type ne "weblink");
+    next if(!$type || $type ne "weblink" || AttrVal($d, "group", undef));
 
     $buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
   }
