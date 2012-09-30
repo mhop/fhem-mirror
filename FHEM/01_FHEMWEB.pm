@@ -387,12 +387,14 @@ FW_SetDirs() {
     $FW_jsdir = $FW_dir;
   }
 
-#   Debug "web server root: $FW_dir";
-#   Debug "icon directory: $FW_icondir";
-#   Debug "doc directory: $FW_docdir";
-#   Debug "css directory: $FW_cssdir";
-#   Debug "gplot directory: $FW_gplotdir";
-#   Debug "javascript directory: $FW_jsdir";
+  Log 4, "FHEMWEB directories:";
+  Log 4, "  web server root: $FW_dir";
+  Log 4, "  icon directory: $FW_icondir";
+  Log 4, "    Notice: if style-specific subdirectories ${FW_icondir}/default etc. exist, icons are only read from there and not from ${FW_icondir}!";
+  Log 4, "  doc directory: $FW_docdir";
+  Log 4, "  css directory: $FW_cssdir";
+  Log 4, "  gplot directory: $FW_gplotdir";
+  Log 4, "  javascript directory: $FW_jsdir";
   
 }
 
