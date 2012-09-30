@@ -49,7 +49,7 @@ my $clientsSlowRF = ":FS20:FHT:FHT8V:KS300:USF1000:BS:HMS: " .
 
 my $clientsHomeMatic = ":CUL_HM:HMS:CUL_IR:";  # OneWire emulated as HMS on a CUNO
 
-my $clientsMAX = ":CUL_MAX:";  # as a starter - not available, yet
+my $clientsMAX = ":CUL_MAX:HMS:CUL_IR";  # CUL_MAX is not available, yet
 
 my %matchListSlowRF = (
     "1:USF1000"   => "^81..(04|0c)..0101a001a5ceaa00....",
@@ -74,7 +74,9 @@ my %matchListHomeMatic = (
 );
 
 my %matchListMAX = (
-    "F:CUL_MAX" => "^Z........................",
+    "1:CUL_MAX" => "^Z........................",
+    "8:HMS"       => "^810e04....(1|5|9).a001", # CUNO OneWire HMS Emulation
+    "D:CUL_IR"    => "^I............",
 );
 
 sub
@@ -955,7 +957,6 @@ CUL_Attr(@)
 
     my $name = $a[1];
     my $hash = $defs{$name};
-    my $numv = substr($hash->{VERSION},2,4);
 
     $a[3] = "SlowRF" if(!$a[3] || ($a[3] ne "HomeMatic" && $a[3] ne "MAX"));
 
@@ -964,15 +965,13 @@ CUL_Attr(@)
       $hash->{Clients} = $clientsHomeMatic;
       $hash->{MatchList} = \%matchListHomeMatic;
       $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
-      CUL_SimpleWrite($hash, "Zx") if($numv > 1.46);  # reset MAX, if available
       CUL_SimpleWrite($hash, $hash->{initString});
 
-    } elsif(($a[3] eq "MAX") && ($numv > 1.46)) {
+    } elsif($a[3] eq "MAX") {
       return if($hash->{initString} =~ m/Zr/);
       $hash->{Clients} = $clientsMAX;
       $hash->{MatchList} = \%matchListMAX;
       $hash->{initString} = "X21\nZr";  # X21 is needed for RSSI reporting
-      CUL_SimpleWrite($hash, "Ax");     # reset AskSin
       CUL_SimpleWrite($hash, $hash->{initString});
 
     } else {
@@ -981,7 +980,6 @@ CUL_Attr(@)
       $hash->{MatchList} = \%matchListSlowRF;
       $hash->{initString} = "X21";
       CUL_SimpleWrite($hash, "Ax");     # reset AskSin
-      CUL_SimpleWrite($hash, "Zx") if($numv > 1.46); # reset MAX if available
       CUL_SimpleWrite($hash, $hash->{initString});
 
     }
