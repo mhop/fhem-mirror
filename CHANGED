@@ -1,4 +1,6 @@
 - SVN
+  - rework:  CUL_HM reworks with respect to protocol. 
+             additions for several devices and commands
   - feature: rfmode supports to listen to MAX if fw>1.46, 00_CUL.pm (Jens)
   - feature: Status and length on cmdStack in webinterface for 10_CUL_HM
   - feature: devicepair in 10_CUL_HM.pm supports unset
