@@ -2415,6 +2415,7 @@ Dispatch($$$)
       }
     }
     if(!int(@found)) {
+      DoTrigger($name, "UNKNOWNCODE $dmsg");
       Log GetLogLevel($name,3), "$name: Unknown code $dmsg, help me!";
       return undef;
     }
