@@ -8,26 +8,150 @@ sub collectSubmitted($$@);
 sub printChapter($$@);
 
 my @hw = qw(
-  CM11 CUL FHZ HMLAN KM271 LIRC TCM TUL BS CUL_FHTTK USF1000 CUL_HM EIB EnOcean
-  FS20 FHT FHT8V HMS KS300 CUL_TX CUL_WS CUL_EM CUL_RFR SIS_PMS CUL_HOERMANN
-  OWFS X10 OWTEMP ALL3076 ALL4027 WEBIO WEBIO_12DIGITAL WEBTHERM RFXCOM OREGON
-  RFXMETER RFXX10REC RFXELSE WS300 Weather EM EMWZ EMEM EMGZ ESA2000 ECMD
-  ECMDDevice SCIVT SISPM USBWX WS3600 M232 xxLG7000 M232Counter LGTV
-  M232Voltage WS2000 ALL4000T IPWE VantagePro2 WOL NetIO230B IT CUL_IR
-  );
+  ALL3076 
+  ALL4000T 
+  ALL4027 
+  BS 
+  CM11 
+  CUL 
+  CUL_EM 
+  CUL_FHTTK 
+  CUL_HM 
+  CUL_HOERMANN
+  CUL_IR 
+  CUL_RFR 
+  CUL_TX 
+  CUL_WS 
+  ECMD
+  ECMDDevice 
+  EIB 
+  EM 
+  EMEM 
+  EMGZ 
+  EMWZ 
+  ESA2000 
+  EnOcean
+  FHT 
+  FHT8V 
+  FHZ 
+  FS20 
+  HMLAN 
+  HMS 
+  IPCAM
+  IPWE 
+  IT 
+  Itach_Relay
+  KM271 
+  KS300 
+  LGTV
+  LIRC 
+  M232 
+  M232Counter 
+  M232Voltage 
+  NetIO230B 
+  OREGON
+  OWFS 
+  OWTEMP 
+  POKEYS
+  RFXCOM 
+  RFXMETER 
+  RFXX10REC 
+  SCIVT 
+  SISPM 
+  SIS_PMS 
+  SML
+  STV
+  TCM 
+  TRX
+  TRX_ELSE
+  TRX_LIGHT
+  TRX_SECURITY
+  TRX_WEATHER
+  TUL 
+  TellStick
+  USBWX 
+  USF1000 
+  VantagePro2 
+  WEBCOUNT
+  WEBIO 
+  WEBIO_12DIGITAL 
+  WEBTHERM 
+  WOL 
+  WS2000 
+  WS300 
+  WS3600 
+  X10 
+  ZWDongle
+  ZWave
+  xxLG7000 
+
+);
+
 my @help = qw(
-  at average notify sequence watchdog FileLog FHEM2FHEM PachLog holiday PID
-  autocreate dummy structure JsonList SUNRISE_EL Utils XmlList updatefhem
-  );
+  CULflash
+  Calendar
+  FHEM2FHEM
+  FileLog
+  HTTPSRV
+  JsonList
+  MSG
+  MSGFile
+  MSGMail
+  PID
+  PachLog
+  RSS
+  SUNRISE_EL
+  Weather
+  Twilight
+  XmlList
+  at
+  autocreate
+  average
+  backup
+  dewpoint
+  dummy
+  holiday
+  notify
+  sequence
+  structure
+  telnet
+  updatefhem
+  watchdog
+
+);
+
 my @fe = (
-  "FHEMRENDERER", "fheME", "iPhone: dhs-computertechnik", "iPhone: fhemgw",
-  "iPhone: fhemobile", "iPhone: phyfhem", "myHCE", "pgm2/FHEMWEB with SVG",
-  "pgm2/FHEMWEB with gnuplot", "pgm3", "pgm5", "HomeMini", "android: andFHEM",
-  );
+  "FHEMRENDERER",
+  "HomeMini",
+  "android: andFHEM",
+  "fheME",
+  "iPhone: dhs-computertechnik",
+  "iPhone: fhemgw",
+  "iPhone: fhemobile",
+  "iPhone: phyfhem",
+  "myHCE",
+  "pgm2/FHEMWEB with SVG",
+  "pgm2/FHEMWEB with gnuplot",
+  "pgm3",
+  "pgm5",
+
+);
+
 my @platform = (
-  "PC: Linux", "OSX", "PC: Windows", "PC: BSD", "Fritz!Box 7390", "Fritz!Box 7270",
-  "Fritz!Box 7170", "Synology", "NSLU2", "TuxRadio", "Plug Computer",
-  );
+  "Fritz!Box 7170",
+  "Fritz!Box 7270",
+  "Fritz!Box 7390",
+  "NSLU2",
+  "OSX",
+  "PC: BSD",
+  "PC: Linux",
+  "PC: Windows",
+  "Plug Computer",
+  "Raspberry PI",
+  "Synology",
+  "TuxRadio",
+
+);
 
 
 my $title = "Used FHEM Modules & Components";
