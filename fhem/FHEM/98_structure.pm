@@ -171,6 +171,7 @@ sub structure_Notify($$)
           # zustand wenn der Status auf dem in der Struktur definierten
           # umdefiniert werden muss
           # bsp: on:An
+          $devstate = ReadingsVal($d, "state", undef);
           if(defined($devstate) && $devstate eq $value[0]){
             $devstate = $value[1];
             push(@clientstate, $devstate);
