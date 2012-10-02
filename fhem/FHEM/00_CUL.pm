@@ -891,6 +891,7 @@ CUL_Parse($$$$$)
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
     $dmsg = "TX".substr($dmsg,1);                  # t.* is occupied by FHTTK
   } else {
+    DoTrigger($name, "UNKNOWNCODE $dmsg");
     Log GetLogLevel($name,2), "$name: unknown message $dmsg";
     return;
   }
