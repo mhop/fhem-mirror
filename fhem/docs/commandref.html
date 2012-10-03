@@ -9505,12 +9505,15 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <a name="FHEMWEBget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; icon &lt;logical icon&gt;</code>
-    <br><br>
-    returns the absolute path to the logical icon. Example:<br><br>
-    <code>get myFHEMWEB icon FS20.on<br>
-    /data/Homeautomation/fhem/FHEM/FS20.on.png
-    </code>
+    <li>icon &lt;logical icon&gt;<br>
+        returns the absolute path to the logical icon. Example:
+        <ul>
+          <code>get myFHEMWEB icon FS20.on<br>
+          /data/Homeautomation/fhem/FHEM/FS20.on.png
+          </code>
+        </ul>
+    <li>pathlist<br>
+        return FHEMWEB specific directories, where files for given types are located
     <br><br>
 
   </ul>
