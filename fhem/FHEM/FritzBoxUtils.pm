@@ -61,7 +61,7 @@ FB_mail($$$)
   system("/bin/echo \'$text\' > \'$tmpfile\' ");
   system("/sbin/mailer send -i \"$tmpfile\" -s \"$subject\" -t \"$rcpt\"");
   system("rm \"$tmpfile\"");
-  Log 3, "Mail sent."
+  Log 3, "Mail sent to $rcpt";
 }
 
 
