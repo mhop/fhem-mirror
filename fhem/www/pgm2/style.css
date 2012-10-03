@@ -4,8 +4,8 @@ input    { font-family:Arial, sans-serif; font-size:16px; }
 select   { font-family:Arial, sans-serif; font-size:16px; }
 
 #logo    { position:fixed; top:10px; left:20px;
-            width:100px;  height:105px; background-image:url(../icons/fhemicon.png); }
-#menu    { position:fixed; top:120px;left:20px; width:140px; }
+            width:120px;  height:132px; background-image:url(../icons/fhemicon.png); }
+#menu    { position:fixed; top:152px;left:20px; width:140px; }
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
 
