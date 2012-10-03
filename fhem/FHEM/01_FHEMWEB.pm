@@ -39,6 +39,7 @@ sub FW_textfield($$$);
 sub FW_updateHashes();
 sub FW_zoomLink($$$);
 sub pF($@);
+sub FW_PathList();
 sub FW_pH(@);
 sub FW_pHPlain(@);
 sub FW_pO(@);
@@ -2432,21 +2433,38 @@ FW_devState($$)
 }
 
 #####################################
+sub
+FW_PathList()
+{
+   return "web server root:      $FW_dir\n".
+          "icon directory:       $FW_icondir\n".
+          "doc directory:        $FW_docdir\n".
+          "css directory:        $FW_cssdir\n".
+          "gplot directory:      $FW_gplotdir\n".
+          "javascript directory: $FW_jsdir";
+}
+
 
 sub
 FW_Get($@)
 {
   my ($hash, @a) = @_;
-
-  return "syntax error" if(int(@a) != 3);
-
-  return "Unknown argument $a[1], choose one of " . "icon"
-        unless($a[1] eq "icon");
-
   $FW_wname= $hash->{NAME};
-  my $icon= FW_IconPath($a[2]);
-  return defined($icon) ? $icon : "no such icon";
-}  
+
+
+  if($a[1] eq "icon") {
+    return "need one icon as argument" if(int(@a) != 3);
+    my $icon= FW_IconPath($a[2]);
+    return defined($icon) ? $icon : "no such icon";
+
+  } elsif($a[1] eq "pathlist") {
+    return FW_PathList();
+
+  } else {
+    return "Unknown argument $a[1], choose one of icon pathlist";
+
+  }
+}
 
 
 #####################################
@@ -2456,8 +2474,7 @@ FW_Set($@)
 {
   my ($hash, @a) = @_;
 
-  return "syntax error" if(int(@a) != 2);
-
+  return "no set value specified" if(@a < 2);
   return "Unknown argument $a[1], choose one of " . "rereadicons"
         unless($a[1] eq "rereadicons");
 
