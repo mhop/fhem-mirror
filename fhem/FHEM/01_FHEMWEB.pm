@@ -2187,7 +2187,7 @@ FW_IconPath($) {
   $name= FW_canonicalizeIcon($name);
   FW_GetIcons(); # get the icon set for the current instance
   my $path= $FW_icons{$name};
-  return $path ? $FW_icondir. $path : undef;
+  return $path ? $FW_icondir . "/" . $path : undef;
 }
 
 # returns the URL for the logical path 
