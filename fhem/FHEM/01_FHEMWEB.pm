@@ -2209,7 +2209,7 @@ FW_dev2image($)
   return "" if(!$name || !$d);
 
   my ($type, $state) = ($d->{TYPE}, $d->{STATE});
-  return "" if(!$type || !$state);
+  return "" if(!$type || !defined($state));
 
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
