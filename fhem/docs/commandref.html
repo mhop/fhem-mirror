@@ -3570,6 +3570,29 @@ A line ending with \ will be concatenated with the next one, so long lines
 			# "1234,5" in display with unit 'W'. Symbols scene,phone,bell and clock are active. Backlight flashing fast, Beep is second tone<br>
             set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock  </ul></code>  
 			</li>
+       </ul><br></li>
+     <li>keyMatic<br><br>
+       <ul>The Keymatic uses the AES signed communication. Therefore the control of the Keymatic is only together with the HM-LAN adapter possible. But the CUL can read and react on the status information of the Keymatic.</ul><br>
+       <ul>
+	     <li><B>lock</B><br>
+			The lock bolt moves to the locking position<br></li>
+	     <li><B>unlock [sec]</B><br>
+			The lock bolt moves to the unlocking position.<br>
+			[sec]: Sets the delay in seconds after the lock automatically locked again.<br>0 - 65535 seconds</li>
+	     <li><B>open [sec]</B><br>
+			Unlocked the door so that the door can be opened.<br>
+			[sec]: Sets the delay in seconds after the lock automatically locked again.<br>0 - 65535 seconds</li>
+		 <li><B>inhibit-set</B><br>
+			Blocked all directly paired remotes and the hardware buttons of the keyMatic. Now the door lock drive can be controlled only by FHEM.<br></li>
+		 <li><B>inhibit-clear</B><br>
+			Deletes the previously set inhibit-flag again.<br><br>
+			Example:
+			<ul><code>
+			# Lock the lock<br>
+			set keymatic lock<br><br>
+			# open the door and relock the lock after 60 seconds<br>
+            set keymatic unlock 60</ul></code>  
+			</li>
        </ul></li>
      </ul>
      <br>
