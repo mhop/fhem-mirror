@@ -69,98 +69,123 @@ my %culHmDevProps=(
 # <dev>_disp as channel 4
 # <dev>_aux1,<dev>_aux2,<dev>_aux7 as channel 5 to 7
 # autocreate for single channel devices is possible not recommended
+#rxt - receivetype of the device------
+# c: receive on config
+# w: receive in wakeup
+# b: receive on burst
 my %culHmModel=(
-  "0001" => {name=>"HM-LC-SW1-PL-OM54",     chn=>"",},
-  "0002" => {name=>"HM-LC-SW1-SM",          chn=>"",},
-  "0003" => {name=>"HM-LC-SW4-SM",          chn=>"Sw:1:4",},
-  "0004" => {name=>"HM-LC-SW1-FM",          chn=>"",},
-  "0005" => {name=>"HM-LC-BL1-FM",          chn=>"",},
-  "0006" => {name=>"HM-LC-BL1-SM",          chn=>"",},
-  "0007" => {name=>"KS550",                 chn=>"",},
-  "0008" => {name=>"HM-RC-4",               chn=>"Btn:1:4",},
-  "0009" => {name=>"HM-LC-SW2-FM",          chn=>"Sw:1:2",},
-  "000A" => {name=>"HM-LC-SW2-SM",          chn=>"Sw:1:2",},
-  "000B" => {name=>"HM-WDC7000",            chn=>"",},
-  "000D" => {name=>"ASH550",                chn=>"",},
-  "000E" => {name=>"ASH550I",               chn=>"",},
-  "000F" => {name=>"S550IA",                chn=>"",},
-  "0011" => {name=>"HM-LC-SW1-PL",          chn=>"",},
-  "0012" => {name=>"HM-LC-DIM1L-CV",        chn=>"",},
-  "0013" => {name=>"HM-LC-DIM1L-PL",        chn=>"",},
-  "0014" => {name=>"HM-LC-SW1-SM-ATMEGA168",chn=>"",},
-  "0015" => {name=>"HM-LC-SW4-SM-ATMEGA168",chn=>"Sw:1:4",},
-  "0016" => {name=>"HM-LC-DIM2L-CV",        chn=>"",},
-  "0018" => {name=>"CMM",                   chn=>"",},
-  "0019" => {name=>"HM-SEC-KEY",            chn=>"",},
-  "001A" => {name=>"HM-RC-P1",              chn=>"",},
-  "001B" => {name=>"HM-RC-SEC3",            chn=>"",},
-  "001C" => {name=>"HM-RC-SEC3-B",          chn=>"",},
-  "001D" => {name=>"HM-RC-KEY3",            chn=>"",},
-  "001E" => {name=>"HM-RC-KEY3-B",          chn=>"",},
-  "0022" => {name=>"WS888",                 chn=>"",},
-  "0026" => {name=>"HM-SEC-KEY-S",          chn=>"",},
-  "0027" => {name=>"HM-SEC-KEY-O",          chn=>"",},
-  "0028" => {name=>"HM-SEC-WIN",            chn=>"",},
-  "0029" => {name=>"HM-RC-12",              chn=>"Btn:1:12",},
-  "002A" => {name=>"HM-RC-12-B",            chn=>"Btn:1:12",},
-  "002D" => {name=>"HM-LC-SW4-PCB",         chn=>"Sw:1:4",},
-  "002E" => {name=>"HM-LC-DIM2L-SM",        chn=>"",},
-  "002F" => {name=>"HM-SEC-SC",             chn=>"",},
-  "0030" => {name=>"HM-SEC-RHS",            chn=>"",},
-  "0034" => {name=>"HM-PBI-4-FM",           chn=>"Btn:1:4",},
-  "0035" => {name=>"HM-PB-4-WM",            chn=>"Btn:1:4",},
-  "0036" => {name=>"HM-PB-2-WM",            chn=>"Btn:1:2",},
-  "0037" => {name=>"HM-RC-19",              chn=>"Btn:1:17,Disp:18",},
-  "0038" => {name=>"HM-RC-19-B",            chn=>"Btn:1:17,Disp:18",},
-  "0039" => {name=>"HM-CC-TC",              chn=>"",},
-  "003A" => {name=>"HM-CC-VD",              chn=>"",},
-  "003B" => {name=>"HM-RC-4-B",             chn=>"Btn:1:4",},
-  "003C" => {name=>"HM-WDS20-TH-O",         chn=>"",},
-  "003D" => {name=>"HM-WDS10-TH-O",         chn=>"",},
-  "003E" => {name=>"HM-WDS30-T-O",          chn=>"",},
-  "003F" => {name=>"HM-WDS40-TH-I",         chn=>"",},
-  "0040" => {name=>"HM-WDS100-C6-O",        chn=>"",},
-  "0041" => {name=>"HM-WDC7000",            chn=>"",},
-  "0042" => {name=>"HM-SEC-SD",             chn=>"",},
-  "0043" => {name=>"HM-SEC-TIS",            chn=>"",},
-  "0044" => {name=>"HM-SEN-EP",             chn=>"",},
-  "0045" => {name=>"HM-SEC-WDS",            chn=>"",},
-  "0047" => {name=>"KFM-Sensor",            chn=>"",},
-  "0046" => {name=>"HM-SWI-3-FM",           chn=>"Sw:1:3",},
-  "0048" => {name=>"IS-WDS-TH-OD-S-R3",     chn=>"",},
-  "0049" => {name=>"KFM-Display",           chn=>"",},
-  "004A" => {name=>"HM-SEC-MDIR",           chn=>"",},
-  "004B" => {name=>"HM-Sec-Cen",            chn=>"",},
-  "004C" => {name=>"HM-RC-12-SW",           chn=>"Btn:1:12",},
-  "004D" => {name=>"HM-RC-19-SW",           chn=>"Btn:1:17,Disp:18",},
-  "004E" => {name=>"HM-LC-DDC1-PCB",        chn=>"",},
-  "004F" => {name=>"HM-SEN-MDIR-SM",        chn=>"",},
-  "0050" => {name=>"HM-SEC-SFA-SM",         chn=>"",},
-  "0051" => {name=>"HM-LC-SW1-PB-FM",       chn=>"",},
-  "0052" => {name=>"HM-LC-SW2-PB-FM",       chn=>"Sw:1:2",},
-  "0053" => {name=>"HM-LC-BL1-PB-FM",       chn=>"",},
-  "0056" => {name=>"HM-CC-SCD",	            chn=>"",},
-  "0057" => {name=>"HM-LC-DIM1T-PL",        chn=>"",},
-  "0058" => {name=>"HM-LC-DIM1T-CV",        chn=>"",},
-  "0059" => {name=>"HM-LC-DIM1T-FM",        chn=>"",},
-  "005A" => {name=>"HM-LC-DIM2T-SM",        chn=>"",},
-  "005C" => {name=>"HM-OU-CF-PL",           chn=>"",},
-  "005D" => {name=>"HM-Sen-MDIR-O",         chn=>"",},
-  "005F" => {name=>"HM-SCI-3-FM",           chn=>"",},
-  "0060" => {name=>"HM-PB-4DIS-WM",         chn=>"",},
-  "0061" => {name=>"HM-LC-SW4-DR",          chn=>"Sw:1:4",},
-  "0062" => {name=>"HM-LC-SW2-DR",          chn=>"Sw:1:2",},
-  "0066" => {name=>"HM_LC_Sw4-WM",          chn=>"Sw:1:4",},
-  "0067" => {name=>"HM-LC_Dim1PWM-CV",      chn=>"",},
-  "0068" => {name=>"HM-LC_Dim1TPBU-FM",     chn=>"",},
-  "0069" => {name=>"HM-LC_Sw1PBU-FM",       chn=>"",},
-  "006A" => {name=>"HM-LC_Bl1PBU-FM",       chn=>"",},
-  "006C" => {name=>"HM-LC-SW1-BA-PCB",      chn=>"",},
-  "006D" => {name=>"HM-OU-LED16",           chn=>"Led:1:16",},
-  "0075" => {name=>"HM-OU-CFM-PL",          chn=>"Led:1:1,Mp3:2:2",},
-  "0x7A" => {name=>"ZEL-STG-RM-FSA",        chn=>"",},
-  "007B" => {name=>"ZEL-STG-RM-FEP-230V",   chn=>"",},
-  "0086" => {name=>"263-146",               chn=>"",},
+  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,rxt=>''       ,chn=>"",},
+  "0002" => {name=>"HM-LC-SW1-SM"            ,rxt=>''       ,chn=>"",},
+  "0003" => {name=>"HM-LC-SW4-SM"            ,rxt=>''       ,chn=>"Sw:1:4",},
+  "0004" => {name=>"HM-LC-SW1-FM"            ,rxt=>''       ,chn=>"",},
+  "0005" => {name=>"HM-LC-BL1-FM"            ,rxt=>''       ,chn=>"",},
+  "0006" => {name=>"HM-LC-BL1-SM"            ,rxt=>''       ,chn=>"",},
+  "0007" => {name=>"KS550"                   ,rxt=>''       ,chn=>"",},
+  "0008" => {name=>"HM-RC-4"                 ,rxt=>'c'      ,chn=>"Btn:1:4",},
+  "0009" => {name=>"HM-LC-SW2-FM"            ,rxt=>''       ,chn=>"Sw:1:2",},
+  "000A" => {name=>"HM-LC-SW2-SM"            ,rxt=>''       ,chn=>"Sw:1:2",},
+  "000B" => {name=>"HM-WDC7000"              ,rxt=>''       ,chn=>"",},
+  "000D" => {name=>"ASH550"                  ,rxt=>'c:w'    ,chn=>"",},
+  "000E" => {name=>"ASH550I"                 ,rxt=>'c:w'    ,chn=>"",},
+  "000F" => {name=>"S550IA"                  ,rxt=>'c:w'    ,chn=>"",},
+  "0011" => {name=>"HM-LC-SW1-PL"            ,rxt=>''       ,chn=>"",},
+  "0012" => {name=>"HM-LC-DIM1L-CV"          ,rxt=>''       ,chn=>"",},
+  "0013" => {name=>"HM-LC-DIM1L-PL"          ,rxt=>''       ,chn=>"",},
+  "0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,rxt=>''       ,chn=>"",},
+  "0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,rxt=>''       ,chn=>"Sw:1:4",},
+  "0016" => {name=>"HM-LC-DIM2L-CV"          ,rxt=>''       ,chn=>"Sw:1:2",},
+  "0018" => {name=>"CMM"                     ,rxt=>''       ,chn=>"",},
+  "0019" => {name=>"HM-SEC-KEY"              ,rxt=>''       ,chn=>"",},
+  "001A" => {name=>"HM-RC-P1"                ,rxt=>'c'      ,chn=>"",},
+  "001B" => {name=>"HM-RC-SEC3"              ,rxt=>'c'      ,chn=>"Btn:1:3",},
+  "001C" => {name=>"HM-RC-SEC3-B"            ,rxt=>'c'      ,chn=>"Btn:1:3",},
+  "001D" => {name=>"HM-RC-KEY3"              ,rxt=>'c'      ,chn=>"Btn:1:3",},
+  "001E" => {name=>"HM-RC-KEY3-B"            ,rxt=>'c'      ,chn=>"Btn:1:3",},
+  "0022" => {name=>"WS888"                   ,rxt=>''       ,chn=>"",},
+  "0026" => {name=>"HM-SEC-KEY-S"            ,rxt=>''       ,chn=>"",},
+  "0027" => {name=>"HM-SEC-KEY-O"            ,rxt=>''       ,chn=>"",},
+  "0028" => {name=>"HM-SEC-WIN"              ,rxt=>'b'      ,chn=>"",},
+  "0029" => {name=>"HM-RC-12"                ,rxt=>'c'      ,chn=>"Btn:1:12",},
+  "002A" => {name=>"HM-RC-12-B"              ,rxt=>'c'      ,chn=>"Btn:1:12",},
+  "002D" => {name=>"HM-LC-SW4-PCB"           ,rxt=>''       ,chn=>"Sw:1:4",},
+  "002E" => {name=>"HM-LC-DIM2L-SM"          ,rxt=>''       ,chn=>"Sw:1:2",},
+  "002F" => {name=>"HM-SEC-SC"               ,rxt=>'c:w'    ,chn=>"",},
+  "0030" => {name=>"HM-SEC-RHS"              ,rxt=>'c:w'    ,chn=>"",},
+  "0034" => {name=>"HM-PBI-4-FM"             ,rxt=>'c'      ,chn=>"Btn:1:4",},
+  "0035" => {name=>"HM-PB-4-WM"              ,rxt=>'c'      ,chn=>"Btn:1:4",},
+  "0036" => {name=>"HM-PB-2-WM"              ,rxt=>'c'      ,chn=>"Btn:1:2",},
+  "0037" => {name=>"HM-RC-19"                ,rxt=>'c:b'    ,chn=>"Btn:1:17,Disp:18",},
+  "0038" => {name=>"HM-RC-19-B"              ,rxt=>'c:b'    ,chn=>"Btn:1:17,Disp:18",},
+  "0039" => {name=>"HM-CC-TC"                ,rxt=>'c:w'    ,chn=>"",},
+  "003A" => {name=>"HM-CC-VD"                ,rxt=>'c:w'    ,chn=>"",},
+  "003B" => {name=>"HM-RC-4-B"               ,rxt=>'c'      ,chn=>"Btn:1:4",},
+  "003C" => {name=>"HM-WDS20-TH-O"           ,rxt=>'c:w'    ,chn=>"",},
+  "003D" => {name=>"HM-WDS10-TH-O"           ,rxt=>'c:w'    ,chn=>"",},
+  "003E" => {name=>"HM-WDS30-T-O"            ,rxt=>'c:w'    ,chn=>"",},
+  "003F" => {name=>"HM-WDS40-TH-I"           ,rxt=>'c:w'    ,chn=>"",},
+  "0040" => {name=>"HM-WDS100-C6-O"          ,rxt=>'c:w'    ,chn=>"",},
+  "0041" => {name=>"HM-WDC7000"              ,rxt=>''       ,chn=>"",},
+  "0042" => {name=>"HM-SEC-SD"               ,rxt=>''       ,chn=>"",},
+  "0043" => {name=>"HM-SEC-TIS"              ,rxt=>'c:w'    ,chn=>"",},
+  "0044" => {name=>"HM-SEN-EP"               ,rxt=>'c:w'    ,chn=>"",},
+  "0045" => {name=>"HM-SEC-WDS"              ,rxt=>'c:w'    ,chn=>"",},
+  "0047" => {name=>"KFM-Sensor"              ,rxt=>''       ,chn=>"",},
+  "0046" => {name=>"HM-SWI-3-FM"             ,rxt=>'c'      ,chn=>"Sw:1:3",},
+  "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,rxt=>'c:w'    ,chn=>"",},
+  "0049" => {name=>"KFM-Display"             ,rxt=>''       ,chn=>"",},
+  "004A" => {name=>"HM-SEC-MDIR"             ,rxt=>'c:w'    ,chn=>"",},
+  "004B" => {name=>"HM-Sec-Cen"              ,rxt=>''       ,chn=>"",},
+  "004C" => {name=>"HM-RC-12-SW"             ,rxt=>'c'      ,chn=>"Btn:1:12",},
+  "004D" => {name=>"HM-RC-19-SW"             ,rxt=>'c:b'    ,chn=>"Btn:1:17,Disp:18",},
+  "004E" => {name=>"HM-LC-DDC1-PCB"          ,rxt=>''       ,chn=>"",},
+  "004F" => {name=>"HM-SEN-MDIR-SM"          ,rxt=>'c:w'    ,chn=>"",},
+  "0050" => {name=>"HM-SEC-SFA-SM"           ,rxt=>''       ,chn=>"",},
+  "0051" => {name=>"HM-LC-SW1-PB-FM"         ,rxt=>''       ,chn=>"",},
+  "0052" => {name=>"HM-LC-SW2-PB-FM"         ,rxt=>''       ,chn=>"Sw:1:2",},
+  "0053" => {name=>"HM-LC-BL1-PB-FM"         ,rxt=>''       ,chn=>"",},
+  "0054" => {name=>"DORMA_RC-H"              ,rxt=>'c'      ,chn=>"",},
+  "0056" => {name=>"HM-CC-SCD"	             ,rxt=>'c:w'    ,chn=>"",},
+  "0057" => {name=>"HM-LC-DIM1T-PL"          ,rxt=>''       ,chn=>"",},
+  "0058" => {name=>"HM-LC-DIM1T-CV"          ,rxt=>''       ,chn=>"",},
+  "0059" => {name=>"HM-LC-DIM1T-FM"          ,rxt=>''       ,chn=>"",},
+  "005A" => {name=>"HM-LC-DIM2T-SM"          ,rxt=>''       ,chn=>"Sw:1:2",},
+  "005C" => {name=>"HM-OU-CF-PL"             ,rxt=>''       ,chn=>"",},
+  "005D" => {name=>"HM-Sen-MDIR-O"           ,rxt=>'c:w'    ,chn=>"",},
+  "005F" => {name=>"HM-SCI-3-FM"             ,rxt=>'c:w'    ,chn=>"",},
+  "0060" => {name=>"HM-PB-4DIS-WM"           ,rxt=>'c'      ,chn=>"",},
+  "0061" => {name=>"HM-LC-SW4-DR"            ,rxt=>''       ,chn=>"Sw:1:4",},
+  "0062" => {name=>"HM-LC-SW2-DR"            ,rxt=>''       ,chn=>"Sw:1:2",},
+  "0064" => {name=>"DORMA_atent"             ,rxt=>'c'      ,chn=>"",},
+  "0065" => {name=>"DORMA_BRC-H"             ,rxt=>'c'      ,chn=>"",},
+  "0066" => {name=>"HM_LC_Sw4-WM"            ,rxt=>'b'      ,chn=>"Sw:1:4",},
+  "0067" => {name=>"HM-LC_Dim1PWM-CV"        ,rxt=>''       ,chn=>"",},
+  "0068" => {name=>"HM-LC_Dim1TPBU-FM"       ,rxt=>''       ,chn=>"",},
+  "0069" => {name=>"HM-LC_Sw1PBU-FM"         ,rxt=>''       ,chn=>"",},
+  "006A" => {name=>"HM-LC_Bl1PBU-FM"         ,rxt=>''       ,chn=>"",},
+  "006B" => {name=>"HM-PB-2-WM55"            ,rxt=>'c:w'    ,chn=>"",},
+  "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,rxt=>'b'      ,chn=>"",},
+  "006D" => {name=>"HM-OU-LED16"             ,rxt=>''       ,chn=>"Led:1:16",},
+  "0075" => {name=>"HM-OU-CFM-PL"            ,rxt=>''       ,chn=>"Led:1:1,Mp3:2:2",},
+  "0078" => {name=>"HM-Dis-TD-T"             ,rxt=>'b'      ,chn=>"",},
+  "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,rxt=>'c:w'    ,chn=>"",},
+  "0x7A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,rxt=>''       ,chn=>"",},
+  "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",rxt=>''       ,chn=>"",},
+  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,rxt=>'c:w'    ,chn=>"",},
+  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,rxt=>'c'      ,chn=>"",},
+  "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,rxt=>'c'      ,chn=>"",},
+  "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,rxt=>'c'      ,chn=>"",},
+  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,rxt=>'c:w'    ,chn=>"",},
+  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,rxt=>'c:w'    ,chn=>"",},  
+  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,rxt=>'c'      ,chn=>"",},  
+  "0084" => {name=>"Schueco_263-160"         ,rxt=>'c:w'    ,chn=>"",},  
+  "0086" => {name=>"263-146"                 ,rxt=>''       ,chn=>"",},
+  "008D" => {name=>"Schueco_263-1350"        ,rxt=>'c:w'    ,chn=>"",},
+  "008E" => {name=>"263-155"                 ,rxt=>'c'      ,chn=>"",},
+  "008F" => {name=>"263-145"                 ,rxt=>'c'      ,chn=>"",},
+  "0090" => {name=>"Schueco_263-162"         ,rxt=>'c:w'    ,chn=>"",},  
+  "0092" => {name=>"Schueco_263-144"         ,rxt=>'c'      ,chn=>"",},  
+  "0093" => {name=>"263-158"                 ,rxt=>'c:w'    ,chn=>"",},
+  "0094" => {name=>"263-157"                 ,rxt=>'c:w'    ,chn=>"",},
 );
 sub
 CUL_HM_Initialize($)
@@ -178,7 +203,7 @@ CUL_HM_Initialize($)
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
 					   "chanNo device ".
-					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast ".
+					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast rxType ".
 					   "channel_01 channel_02 channel_03 channel_04 channel_05 channel_06 ".
 					   "channel_07 channel_08 channel_09 channel_0A channel_0B channel_0C ". 
 					   "channel_0D channel_0E channel_0F channel_10 channel_11 channel_12 ".
@@ -344,10 +369,11 @@ CUL_HM_Parse($$)
   elsif($msgType eq "00" ){      #### DEVICE_INFO,  Pairing-Request 
     CUL_HM_infoUpdtDevData($name, $shash,$p);#update data
 
-    if($shash->{cmdStack}) {
+    if($shash->{cmdStack} && ($attr{$name}{rxType} =~ m/config/)) {
       CUL_HM_ProcessCmdStack($shash);# sender devices may have msgs stacked
-
-    } else {
+	  push @event,"";
+    } 
+	else {
       push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
     }
     $sendAck = ""; #todo why is this special?
@@ -523,6 +549,7 @@ CUL_HM_Parse($$)
         CUL_HM_SendCmd($shash, $msgcnt."8002$id${src}00",1,0)  # Send Ack
     }
 	$sendAck = ""; #todo why is this special?
+	CUL_HM_ProcessCmdStack($shash);
   } 
   elsif($model eq "HM-CC-VD") { ###################
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
@@ -596,7 +623,7 @@ CUL_HM_Parse($$)
     if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($msgType eq "10" && $p =~ m/^06/))	{ #    or Info_Status message here
 
-      my ($subType,$chn,$level,$add) = ($1,$2,$3,$4) 
+      my ($subType,$chn,$level,$addVal) = ($1,$2,$3,hex($4)) 
 	                     if($p =~ m/^(..)(..)(..)(..)/);
       # Multi-channel device: Use channel if defined
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
@@ -617,7 +644,6 @@ CUL_HM_Parse($$)
       $eventName = "motor"   if($st eq "blindActuator");
 	  $eventName = "dim"     if($st eq "dimmer");
 	  my $action; #determine action
-	  my $addVal = hex($add);
       push @event, "$eventName:up:$val"   if($addVal&0x10);# see HM-CC-VDstates
       push @event, "$eventName:down:$val" if($addVal&0x20);#       align names
       push @event, "$eventName:stop:$val" if($addVal&0x40 || (($addVal == 0) &&
@@ -629,7 +655,6 @@ CUL_HM_Parse($$)
     }
   } 
   elsif($st eq "remote" || $st eq "pushButton" || $st eq "swi") { #############
-
     if($msgType =~ m/^4./ && $p =~ m/^(..)(..)$/) {
       my ($buttonField, $bno) = (hex($1), hex($2));# button number/event count
 	  my $buttonID = $buttonField&0x3f;# only 6 bit are valid
@@ -670,8 +695,13 @@ CUL_HM_Parse($$)
       }
       $sendAck = ""; #todo why is this special?
     }
-
-  } 
+  }
+  elsif($st eq "virtual"){#####################################################
+    # possibly add code to count all acks that are paired. 
+    if($msgType eq "02") {
+      push @event, "ackFrom ".$name;
+	}
+  }
   elsif($st eq "outputUnit"){##################################################
     if($msgType eq "40" && $p =~ m/^(..)(..)$/){
       my ($button, $bno) = (hex($1), hex($2));
@@ -684,7 +714,6 @@ CUL_HM_Parse($$)
       }
       my $btn = int($button&0x3f);
       push @event, "state:Btn$btn on$target";
-      push @event, "Btn$btn:on$target";
     }
 	elsif(($msgType eq "02" && $p =~ m/^01/) ||   # handle Ack_Status
 	       ($msgType eq "10" && $p =~ m/^06/)){    #    or Info_Status message
@@ -692,22 +721,28 @@ CUL_HM_Parse($$)
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$msgChn};
 	  if ($model eq "HM-OU-LED16") {
 	    #special: all LEDs map to device state
-        my $devState = $shash->{READINGS}{state}{VAL};
+        my $devState = $shash->{READINGS}{color}{VAL};
 	    $devState = "00000000" if (!$devState);
-	    my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
-	    my $mask = 3<<$bitLoc;
-	    my $value = (hex($devState) &~$mask)|($msgState<<$bitLoc);
-        $shash->{READINGS}{state}{TIME} = $tn;
-        $shash->{READINGS}{state}{VAL} = sprintf("%08X",$value);	 
-	    if ($chnHash){
-	    $shash = $chnHash;
-	      my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
-	      my $actColor = $colorTable{$msgState};
-	      $actColor = "unknown" if(!$actColor);
-          $chnHash->{READINGS}{state}{TIME} = $tn;
-          $chnHash->{READINGS}{state}{VAL} = $actColor;
-          push @event, "state:$actColor";			
-	    }
+		if($parse eq "powerOn"){# reset LEDs after power on
+		  CUL_HM_PushCmdStack($shash,sprintf("++A011%s%s8100%s",$id,$src,$devState));
+		  CUL_HM_ProcessCmdStack($shash);
+		}
+		else {# just update datafields in storage
+ 	      my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
+ 	      my $mask = 3<<$bitLoc;
+ 	      my $value = (hex($devState) &~$mask)|($msgState<<$bitLoc);
+          $shash->{READINGS}{color}{TIME} = $tn;
+          $shash->{READINGS}{color}{VAL} = sprintf("%08X",$value);	 
+ 	      if ($chnHash){
+ 	      $shash = $chnHash;
+ 	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
+ 	        my $actColor = $colorTable{$msgState};
+ 	        $actColor = "unknown" if(!$actColor);
+            $chnHash->{READINGS}{color}{TIME} = $tn;
+            $chnHash->{READINGS}{color}{VAL} = $actColor;
+            push @event, "state:$actColor";			
+ 	      }
+		}
 	  }
 	  elsif ($model eq "HM-OU-CFM-PL"){
 	    if ($chnHash){
@@ -725,12 +760,12 @@ CUL_HM_Parse($$)
     # Code with help of Bassem
     my $state;
     if($msgType eq "10" && $p =~ m/^06..(..)(..)/) {#InfoLevel
-	  my $addInfo;
-      ($state, $addInfo) = ($1, $2);
+	  my $addVal;
+      ($state, $addVal) = ($1, hex($2));
       push @event, "brightness:".hex($state);
       push @event, "state:alive";
-      push @event, "cover:closed" if($addInfo eq "00");         # By peterp
-      push @event, "cover:open"   if($addInfo eq "0E");
+      push @event, "cover:".   (($addVal&0x0E eq "00")?"closed":"open");        
+	  push @event, "battery:". (($addVal&0x80)        ?"low"   :"ok"  );
     }
     elsif($msgType eq "41" && $p =~ m/^..(......)/) {
       $state = $1;
@@ -788,11 +823,8 @@ CUL_HM_Parse($$)
 		push @event, "alive:yes";
         if($err) {
           push @event, "battery:". ((hex($err) & 0x80) ? "low" : "ok");
-		  if ($model eq "HM-SEC-WDS"){
-			$addState =" cover: ".(($err =~ m/^.E/) ? "open" : "closed");
-		  }
-		  else{
-			$addState =" sabotage: ".(($err =~ m/^.E/) ? "yes" : "no");		  
+		  if (!$model eq "HM-SEC-WDS"){
+			$addState =" cover: ".(($err =~ m/^.E/) ? "open" : "closed");		  
 		  }
         }
 	  }
@@ -1038,7 +1070,6 @@ my %culHmRegSupported = (
 			DecalHr      =>1,DecalMin     =>1, 
             BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1,
 			},	
-
   outputUnit=>{
 			OnDlySh   =>1,OnTimeSh  =>1,OffDlySh  =>1,OffTimeSh =>1,
 			OnDlyLg   =>1,OnTimeLg  =>1,OffDlyLg  =>1,OffTimeLg =>1,
@@ -1149,7 +1180,7 @@ CUL_HM_Get($@)
 	    if (ref($entityHash->{$entAttr}) eq "HASH"){
 	      foreach my $entAttr2 (keys %{$entityHash->{$entAttr}}){ 
             if ($entAttr eq "READINGS" && $entAttr2 eq $a[2]){
-			  return "4:".$entityHash->{$entAttr}{$entAttr2}{VAL};# if ($entAttr2{VAL});
+			  return $entityHash->{$entAttr}{$entAttr2}{VAL};# if ($entAttr2{VAL});
             }
 			if (ref($entityHash->{$entAttr}{$entAttr2}) eq "HASH"){
 	          foreach my $entAttr3 (keys %{$entityHash->{$entAttr}{$entAttr2}}){ 	
@@ -1194,7 +1225,8 @@ CUL_HM_Get($@)
   $hash->{STATE} = $state if($state);
   Log GetLogLevel($name,2), "CUL_HM set $name " . join(" ", @a[1..$#a]);
 
-  CUL_HM_ProcessCmdStack($devHash) if(!$isSender);
+  CUL_HM_ProcessCmdStack($devHash) 
+           if(!$attr{$name}{rxType}||$attr{$name}{rxType}=~ m/burst/);
   return "";
 }
 ###################################
@@ -1211,20 +1243,27 @@ my %culHmGlobalSets = (
   getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... <PeerChannel>",
   getConfig     => "",
   regSet        =>"<regName> <value> ... <peerChannel>",
+  virtual       =>"<noButtons>",
 );
 my %culHmSubTypeSets = (
   switch =>
-        { "on-for-timer"=>"sec", on=>"", off=>"", toggle=>"" },
+        { "on-for-timer"=>"sec", "on-till"=>"time",
+		  on=>"", off=>"", toggle=>"" },
   dimmer =>
-        { "on-for-timer"=>"sec", on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
+        { "on-for-timer"=>"sec", , "on-till"=>"time",
+		  on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
   blindActuator=>
         { on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
   remote =>
         { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
   pushButton =>										
         { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  virtual => 
+        { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+		  press => "[long|short]...",
+		  virtual       =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
-        { test => "", "alarmOn"=>"", "alarmOff"=>"" },
+        { test => "", "alarmOn"=>"", "alarmOff"=>"", },
   winMatic =>
         { matic  => "<btn>",
           read   => "<btn>",
@@ -1292,20 +1331,20 @@ CUL_HM_Set($@)
 
   my $chash = CUL_HM_getDeviceHash($hash);
 
-  my $h = $culHmGlobalSets{$cmd};
+  my $h = $culHmGlobalSets{$cmd} if($st ne "virtual");
   $h = $culHmSubTypeSets{$st}{$cmd} if(!defined($h) && $culHmSubTypeSets{$st});
   $h = $culHmModelSets{$md}{$cmd}   if(!defined($h) && $culHmModelSets{$md});
   my @h;
   @h = split(" ", $h) if($h);
 
-  my $isSender = ($class eq "sender" || $md eq "HM-CC-TC");
+  my $isSender = ($class eq "sender");
 
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
     $cmd = "pct";
 
   } 
   elsif(!defined($h)) {
-    my @arr = keys %culHmGlobalSets;
+    my @arr = keys %culHmGlobalSets if($st ne "virtual");
     push @arr, keys %{$culHmSubTypeSets{$st}} if($culHmSubTypeSets{$st});
     push @arr, keys %{$culHmModelSets{$md}} if($culHmModelSets{$md});
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
@@ -1394,6 +1433,7 @@ CUL_HM_Set($@)
 
   } 
   elsif($cmd eq "getConfig") { ################################################
+    CUL_HM_PushCmdStack($hash, "++A112$id$dst") if($attr{$name}{rxType} =~ m/wakeup/);     # Wakeup...
     CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s00040000000000",$id,$dst))
 	    if (length($dst) == 6);
 	my $chnFound;
@@ -1556,11 +1596,21 @@ CUL_HM_Set($@)
         sprintf("++%s11%s%s02%s000000", $headerbytes, $id,$dst,$chn));
 
   } 
-  elsif($cmd eq "on-for-timer") { #############################################
-    $tval = CUL_HM_encodeTime16((@a > 2)?$a[2]:0  );# onTime   0.0..85825945.6, 0=forever
+  elsif($cmd eq "on-for-timer"||$cmd eq "on-till") { ##########################
+    my (undef,undef,$duration,$edate) = @a; #date prepared extention to entdate
+    if ($cmd eq "on-till"){
+	  # to be extended to handle end date as well
+	  my ($eH,$eM,$eSec)  = split(':',$duration); 
+	  $eSec += $eH*3600 + $eM*60;
+	  my @lt = localtime;	  
+	  my $ltSec = $lt[2]*3600+$lt[1]*60+$lt[0];# actually strip of date
+	  $eSec += 3600*24 if ($ltSec > $eSec); # go for the next day
+	  $duration = $eSec - $ltSec;	  
+    }
+	return "please enter the duration in seconds" if (!defined ($duration));
+    $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     CUL_HM_PushCmdStack($hash,
         sprintf("++A011%s%s02%sC80000%s",$id,$dst,$chn,$tval));
-
   } 
   elsif($cmd eq "toggle") { ###################################################
     $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
@@ -1842,7 +1892,45 @@ CUL_HM_Set($@)
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     CUL_HM_SendCmd($hash, sprintf("++9441%s%s01%s",
         $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"), 1, 0);
-
+  } 
+  elsif($cmd eq "virtual") { ##################################################
+    my (undef,undef,$maxBtnNo) = @a;
+	return "please give a number between 1 and 255"
+	   if ($maxBtnNo < 1 ||$maxBtnNo > 255);# arbitrary - 255 should be max
+    return $name." already defines as ".$attr{$name}{subType}
+	   if ($attr{$name}{subType} && $attr{$name}{subType} ne "virtual");
+    $attr{$name}{subType} = "virtual";
+    $attr{$name}{hmClass} = "sender";
+    $attr{$name}{model}   = "virtual_".$maxBtnNo;
+    my $devId = $hash->{DEF};
+    for (my $btn=1;$btn < $maxBtnNo;$btn++){
+	  my $chnName = $name."_Btn".$btn;
+	  my $chnId = $devId.sprintf("%02X",$btn);
+	  DoTrigger("global",  "UNDEFINED $chnName CUL_HM $chnId")
+		  if (!$modules{CUL_HM}{defptr}{$chnId});
+	}
+  }
+  elsif($cmd eq "press") { ####################################################
+    my (undef,undef,$mode) = @a;
+    my ($srcId,$srcChn) = ($1,$2) if ($hash->{DEF} =~ m/(......)(..)/);
+	return "invalid channel:".$srcId.$srcChn if (!$srcChn);
+    my $rcvId = "000000"; #may have to change
+	my $btn = sprintf("%02X",$srcChn+(($mode && $mode eq "long")?64:0));
+	my $pressCnt = (!$hash->{helper}{count})?1:$hash->{helper}{count}+1;
+	$pressCnt %= 256;
+	my @peerList;
+	foreach my $peer (sort(split(',',$attr{$name}{peerList}))) {
+	  $peer =~ s/ .*//;
+	  push (@peerList,substr(CUL_HM_Name2Id($peer),0,6));
+	}
+	my $oldPeer; # only once to device, not channel!
+	foreach my $peer (sort @peerList){
+	  next if ($oldPeer eq $peer);
+      CUL_HM_SendCmd($hash, sprintf("++8440%s%s%s%s%02X",
+	                    $srcId,$peer,$srcChn,$btn,$pressCnt),1,0);
+	  $oldPeer = $peer;
+	}
+	$hash->{helper}{count}=$pressCnt;
   } 
   elsif($cmd eq "devicepair") { ###############################################
     #devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]"
@@ -1867,17 +1955,18 @@ CUL_HM_Set($@)
 	if ($single){ 
         $b2 = $b1;
 	    $nrCh2Pair = 1;
-	}else{
+	}
+	else{
 	    $b2 = $b1 + 1;
 	    $nrCh2Pair = 2;
 	}
 	my $cmd = ($set)?"01":"02";# do we set or remove?
 
     my $peerDst = $peerHash->{DEF};
+
     my $peerChn = "01";
     if(length($peerDst) == 8) { # shadow switch device for multi-channel switch
-      $peerChn = substr($peerDst, 6, 2);
-      $peerDst = substr($peerDst, 0, 6);
+      ($peerDst,$peerChn) = ($1,$2) if($peerDst =~ m/(......)(..)/);
       $peerHash = $modules{CUL_HM}{defptr}{$peerDst};
     }
 
@@ -1885,11 +1974,28 @@ CUL_HM_Set($@)
 	if (!$target || $target eq "remote" || $target eq "both"){
       for(my $i = 1; $i <= $nrCh2Pair; $i++) {
         my $b = ($i==1 ? $b1 : $b2);
-      
-	    CUL_HM_PushCmdStack($hash, 
-	               "++A001${id}${dst}${b}$cmd${peerDst}${peerChn}00");
-	    CUL_HM_pushConfig($hash,$id, $dst,hex($b),
-	               $peerDst,hex($peerChn),4,"0100");
+		
+		my $devhash = CUL_HM_getDeviceHash($hash);
+		my $devName = $devhash->{NAME};
+		
+  	    if ($attr{$devName}{subType} eq "virtual"){
+		  my $btnName = CUL_HM_id2Name($dst.sprintf("%02X",$b));
+		  return "button ".$b." not defined for virtual remote ".$name
+		      if (!defined $attr{$btnName});
+		  my $peerlist = $attr{$btnName}{peerList};
+		  $peerlist = "" if (!$peerlist);
+		  my $repl = CUL_HM_id2Name($peerDst.$peerChn).",";
+  	      $peerlist =~ s/$repl//;#avoid duplicate
+  	      $peerlist.= $repl if($set == 1);
+		  $attr{$btnName}{peerList} = $peerlist;
+	    }
+		else{
+		  my $bStr = sprintf("%02X",$b);
+  	      CUL_HM_PushCmdStack($hash, 
+  	               "++A001${id}${dst}${bStr}$cmd${peerDst}${peerChn}00");
+  	      CUL_HM_pushConfig($hash,$id, $dst,$b,
+  	               $peerDst,hex($peerChn),4,"0100");
+	    }
       }
 	}
 	if (!$target || $target eq "actor" || $target eq "both"){
@@ -1897,13 +2003,14 @@ CUL_HM_Set($@)
 	                              $id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
 	}
     $chash = $peerHash; # Exchange the hash, as the switch is always alive.
-    $isSender=0;    # the other device is a switch. ahem.
   }
 
   $hash->{STATE} = $state if($state); #todo: this is not the device state
   Log GetLogLevel($name,2), "CUL_HM set $name " . join(" ", @a[1..$#a]);
 
-  CUL_HM_ProcessCmdStack($chash) if(!$isSender);
+  CUL_HM_ProcessCmdStack($chash) 
+     if(!$attr{$chash->{NAME}}{rxType}||
+	     $attr{$chash->{NAME}}{rxType}=~ m/burst/);
   return "";
 }
 
@@ -1923,7 +2030,17 @@ CUL_HM_infoUpdtDevData($$$){
   $attr{$name}{firmware} = 
         sprintf("%d.%d", hex(substr($p,0,1)),hex(substr($p,1,1)));
   $attr{$name}{devInfo}  = $devInfo;
-
+  
+  delete $attr{$name}{rxType};
+  if ($culHmModel{$mId}{rxt}){
+	foreach my $rxt (split(':',$culHmModel{$mId}{rxt})){
+	  $attr{$name}{rxType} .= "config," if ($rxt eq "c");
+	  $attr{$name}{rxType} .= "wakeup," if ($rxt eq "w");
+	  $attr{$name}{rxType} .= "burst,"  if ($rxt eq "b");
+	}
+  }
+  #set rxType
+  
   # autocreate undefined channels  
   my @chanTypesList = split(',',$culHmModel{$mId}{chn});
   foreach my $chantype (@chanTypesList){
@@ -2010,7 +2127,6 @@ CUL_HM_SendCmd($$$$)
     $mn = hex($mn);
 
   }
-
   $io->{HM_CMDNR} = $mn;
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
@@ -2159,8 +2275,7 @@ CUL_HM_PushCmdStack($$)
   $hash->{cmdStack} = \@arr if(!$hash->{cmdStack});
   push(@{$hash->{cmdStack}}, $cmd);
   my $entries = scalar @{$hash->{cmdStack}};
-  $attr{$hash->{NAME}}{protCmdPend} = $entries ." CMDs pending. Please activate learning" 
-                                  if("sender" eq $attr{$hash->{NAME}}{hmClass});
+  $attr{$hash->{NAME}}{protCmdPend} = $entries." CMDs pending";
 }
 
 ###################################
@@ -2174,7 +2289,7 @@ CUL_HM_ProcessCmdStack($)
     if(@{$hash->{cmdStack}}) {
       CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
       $sent = 1;
-      $attr{$hash->{NAME}}{protCmdPend} = scalar @{$hash->{cmdStack}} ."CMDs pending";
+      $attr{$hash->{NAME}}{protCmdPend} = scalar @{$hash->{cmdStack}} ." CMDs pending";
 	  CUL_HM_eventP($hash,"Snd");	  
     }
     if(!@{$hash->{cmdStack}}) {
@@ -2456,8 +2571,7 @@ CUL_HM_parseCommon(@){
                            $shash->{helper}{respWait}{Pending}:"";
   if ($msgType eq "02"){# Ack/Nack #######################################
 	if ($shash->{helper}{respWait}{msgId}             && 
-	    $shash->{helper}{respWait}{msgId}   eq $msgId ){#&&
-#		$pendType eq "Ack"    ){
+	    $shash->{helper}{respWait}{msgId}   eq $msgId ){
 	  #ack we waited for - stop Waiting
 	  CUL_HM_respPendRm($shash);
 	} 
@@ -2480,12 +2594,9 @@ CUL_HM_parseCommon(@){
 	  delete($attr{$shash->{NAME}}{protCmdPend});
 	  CUL_HM_respPendRm($shash);
 	  $reply = "NACK"; 
-	}else{	  #ACK
-	  if ($subType eq "01"){ #AckStatus
-	    $reply = "ACKStatus"; # will be passed on to module
-	  }else{
-	    $reply = "ACK"; 
-	  }
+	}
+	else{	  #ACK
+	  $reply = ($subType eq "01")?"ACKStatus":"ACK"; 
 	  $success = "yes";
 	}
     $chnhash->{READINGS}{CommandAccepted}{TIME} = TimeNow();
@@ -2605,6 +2716,10 @@ CUL_HM_parseCommon(@){
 	  my ($chn) = ($1) if($p =~ m/^..(..)/);
 	  return "powerOn" if ($chn eq "00");# check dst eq "000000" as well?
 	}
+  }
+  elsif($msgType eq "70"){ #wakeup #######################################
+	CUL_HM_ProcessCmdStack($shash) 
+	       if ($attr{$shash->{NAME}}{rxType} =~ m/wakeup/);
   }
   return "";
 }

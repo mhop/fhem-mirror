@@ -3383,6 +3383,18 @@ A line ending with \ will be concatenated with the next one, so long lines
          </li>
      <li><B>unpair</B><a name="CUL_HMunpair"></a><br>
          "Unpair" the device, i.e. make it available to pair with other master devices. See <a href="#CUL_HMpair">pair</a> for description.</li>
+     <li><B>virtual &lt;number of buttons&gt;</B><a name="CUL_HMvirtual"></a><br>
+         configures a defined curcuit as virtual remote controll.  Then number of button being added is 1 to 255. If the command is issued a second time for the same entity additional buttons will be added. <br>
+		 Example for usage:
+		 <ul><code>
+			define vRemote CUL_HM 100000  # the selected HMid must not be in use<br>
+			set vRemote virtual 20        # define 20 button remote controll<br>
+			set vRemote_Btn4 devicepair 0 &lt;actorchannel&gt;  # pairs Button 4 and 5 to the given channel<br>
+			set vRemote_Btn4 press<br>
+			set vRemote_Btn5 press long<br>
+		</code></ul>
+
+		 see also <a href="#CUL_HMpress">press</a></li>
      </ul>
      <br>
      subType (i.e family) dependent commands:
@@ -3390,10 +3402,13 @@ A line ending with \ will be concatenated with the next one, so long lines
      <br>
      <li>switch
        <ul>
-          <li><B>on</B> - set the switch on</li>
+          <li><B>on</B>  - set the switch on</li>
           <li><B>off</B> - set the switch off</li>
-          <li><B>on-for-timer sec</B> - set the switch on for the given seconds. Note:
-          the protocol does not support an off-for-timer like FS20.</li>
+          <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> - set the switch on for the given seconds [0-85825945].<br>
+		  Note: off-for-timer like FS20 is not supported. It needs to be programmed on link level.</li>
+          <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - set the switch on for the given end time.<br>
+		  <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
+		  Currently a max of 24h is supported with endtime.<br></li>
           <li><B>toggle</B> - toggle the switch.</li>
        </ul>
      <br></li>
@@ -3402,17 +3417,16 @@ A line ending with \ will be concatenated with the next one, so long lines
          <li><B>0 - 100 [on-time] [ramp-time]</B><br>
              set the actuator to the given value (in percent)
              with a resolution of 0.5.<br>
-             Optional for dimmer you can give on-time and ramp time, both in seconds with 0.1s granularity.<br>
-             On-time is analog "on-for-timer", 0 means infinite.<br>
+             Optional for dimmer on-time and ramp time can be choosen, both in seconds with 0.1s granularity.<br>
+             On-time is analog "on-for-timer".<br>
              Ramp-time default is 2.5s, 0 means instantanous<br>
              </li>
-         <li><B>on / off</B><br>
-             this corresponds to 100 or 0 %.
-             </li>
+         <li><B>on</B> set level to 100%<br>
+         <li><B>off</B> set level to 0%<br></li>
          <li><B>toggle</B> - toggle between off and the last on-value
              </li>
-         <li><B>on-for-timer sec</B> - Dimmer only. Set on for given seconds.
-             Redundant with 0-100 and on/off for compatability purposes</li>
+         <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br>
+         <li><B><a href="#CUL_HMonForTimer">on-till &lt;time&gt;</a></B> - Dimmer only! <br>
          <li><B>stop</B> - stop motion or dim ramp</li>
        </ul>
      <br></li>
@@ -3454,6 +3468,13 @@ A line ending with \ will be concatenated with the next one, so long lines
         </li>
        </ul>
      <br></li>
+	 <li>virtual<a name="CUL_HMvirtual"></a><br>
+	   <ul>
+	   <li><B><a href="#CUL_HMdevicepair">devicepair</a></B> see remote</li>
+	   <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
+	   simulates a button press short (default) or long. Note that the current implementation will not specify the duration for long. Only one trigger will be sent of type "long".
+	   </ul>
+	 </li>
      <li>smokeDetector<br>
          Note: All these commands work right now only if you have more then one
          smoekDetector, and you paired them to form a group. For issuing the
@@ -3507,17 +3528,19 @@ A line ending with \ will be concatenated with the next one, so long lines
        </ul></li><br>
      <li>OutputUnit (HM-OU-LED16)
        <ul>
-         <li><B>led [off|red|green|yellow]</B><br>
-             switches the LED of the channel to the color. If the command is executed on a device it will set all LEDs to the specified color<br></li>
-         <li><B>ilum [0-15] [0-127]</B><br>
-             set the backlight ilumination of the device to a level between 0 and 15 an on-duration to up to 127 sec<br></li>
+        <li><B>led [off|red|green|yellow]</B><br>
+            switches the LED of the channel to the color. If the command is executed on a device it will set all LEDs to the specified color<br></li>
+        <li><B>ilum &lt;brightness&gt;&lt;duration&gt; </B><br>
+            &lt;brightness&gt; [0-15] of backlight.<br>
+		    &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br>
+		</li>
        </ul><br></li>
      <li>OutputUnit (HM-OU-CFM-PL)
        <ul>
          <li><B>led &lt;color&gt;[,&lt;color&gt;..]</B><br>
-		     Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A sequence of colors can be given separating the color entries by ','. White spaces must not be used in the list. 'S' indicates short and 'L' long ilumination. <br></li>
+		    Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A sequence of colors can be given separating the color entries by ','. White spaces must not be used in the list. 'S' indicates short and 'L' long ilumination. <br></li>
          <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..]</B><br>
-             Play a series of tones. List is to be entered separated by ','. White spaces must not be used in the list. <br></li>
+            Play a series of tones. List is to be entered separated by ','. White spaces must not be used in the list.<br></li>
        </ul><br></li>
      <li>HM-RC-19xxx
        <ul>
@@ -3548,7 +3571,6 @@ A line ending with \ will be concatenated with the next one, so long lines
             set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock  </ul></code>  
 			</li>
        </ul></li>
-
      </ul>
      <br>
 
@@ -9493,6 +9515,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <b>Get</b>
   <ul>
     <li>icon &lt;logical icon&gt;<br>
+
         returns the absolute path to the logical icon. Example:
         <ul>
           <code>get myFHEMWEB icon FS20.on<br>
@@ -9504,7 +9527,6 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <br><br>
 
   </ul>
-
 
   <a name="FHEMWEBattr"></a>
   <b>Attributes</b>
