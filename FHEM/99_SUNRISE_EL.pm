@@ -57,7 +57,7 @@ sr_alt($$$$$$$)
   my $rise=shift;
   my $isrel=shift;
   my $daycheck=shift;
-  my $altit=$_[0];
+  my $altit = defined($_[0]) ? $_[0] : "";
   if(exists $alti{uc($altit)}) {
       $altit=$alti{uc($altit)};
       shift;
