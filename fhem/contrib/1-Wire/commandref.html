@@ -1,660 +1,647 @@
 <html>
-<head>
-<title></title>
-</head>
-<body>
-	<a name="OWX"></a>
-	<h3>OWX</h3>
-	<ul>
-		FHEM module to commmunicate with 1-Wire bus devices
-		<ul>
-			<li>via an active DS2480/DS2482/DS2490/DS9097U bus master
-				interface attached to an USB port or</li>
-			<li>via a passive DS9097 interface attached to an USB port or</li>
-			<li>via a network-attached CUNO</li>
-		</ul>
-		Internally these interfaces are vastly different, read the
-		corresponding
-		<a href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki
-			pages </a>
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define OWio OWX /dev/ttyUSB1</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWXdefine"> <b>Define</b></a>
-		<ul>
-			<code>define &lt;name&gt; OWX &lt;serial-device&gt;</code>
-			or
-			<br />
-			<code>define &lt;name&gt; OWX &lt;cuno-device&gt;</code>
-			<br />
-			<br /> Define a 1-Wire interface to communicate with a 1-Wire bus.
-			<br />
-			<br />
-			<li><code>&lt;serial-device&gt;</code> The serial device (e.g.
-				USB port) to which the 1-Wire bus is attached.</li>
-			<li><code>&lt;cuno-device&gt;</code> The previously defined CUNO
-				to which the 1-Wire bus is attached.</li>
-		</ul>
-		<br />
-		<a name="OWXset"> <b>Set</b></a>
-		<ul>
-			<li><a name="owx_interval"> <code>set &lt;name&gt;
-						interval &lt;value&gt;</code>
-			</a> <br />
-			<br /> sets the time period in seconds for "kicking" the 1-Wire bus
-				(default is 300 seconds). This means:
-				<ul>
-					<li>With 1-Wire bus interfaces that do not supply power to the
-						1-Wire bus (attr buspower parasitic), the 1-Wire bus is reset at
-						these intervals.</li>
-					<li>With 1-Wire bus interfaces that supply power to the 1-Wire
-						bus (attr buspower = real), all temperature measurement devices on
-						the bus receive the command to start a temperature conversion
-						(saves a lot of time when reading)</li>
-					<li>With 1-Wire bus interfaces that contain a busmaster chip,
-						the response to a reset pulse contains information about alarms.</li>
-				</ul>
-				<br /></li>
-			<li><a name="owx_followAlarms"> <code>set
-						&lt;name&gt; followAlarms on|off</code>
-			</a> <br />
-			<br /> instructs the module to start an alarm search in case a reset
-				pulse discovers any 1-Wire device which has the alarm flag set.</li>
-		</ul>
-		<br />
-		<a name="OWXget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owx_alarms"></a> <code>get &lt;name&gt;
-					alarms</code> <br />
-			<br /> performs an "alarm search" for devices on the 1-Wire bus and,
-				if found, generates an event in the log (not with CUNO).</li>
-			<br />
-			<li><a name="owx_devices"></a> <code>get &lt;name&gt;
-					devices</code> <br />
-			<br /> redicovers all devices on the 1-Wire bus. If a device found
-				has a previous definition, this is automatically used. If a device
-				is found but has no definition, it is autocreated. If a defined
-				device is not on the 1-Wire bus, it is autodeleted.</li>
-			<br />
-			<br />
-		</ul>
-		<a name="OWXattr"> <b>Attributes</b></a>
-		<ul>
-			<li><a name="OWXbuspower"><code>attr &lt;name&gt;
-						buspower real|parasitic</code></a> <br />tells FHEM whether power is
-				supplied to the 1-Wire bus or not.</li>
-			<li>Standard attributes alias, comment, eventMap, logLevel,
-				webCmd</li>
-		</ul>
-	</ul>
-	<!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
-	<a name="OWAD"></a>
-	<h3>OWAD</h3>
-	<ul>
-		FHEM module to commmunicate with 1-Wire A/D converters
-		<br />
-		<br /> Note:
-		<br /> This 1-Wire module so far works only with the OWX interface
-		module. Please define an
-		<a href="#OWX">OWX</a> device first.
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define OWX_AD OWAD 724610000000 45</code>
-			<br />
-			<code>attr OWX_AD DAlarm high</code>
-			<br />
-			<code>attr OWX_AD DFactor 31.907097</code>
-			<br />
-			<code>attr OWX_AD DHigh 50.0</code>
-			<br />
-			<code>attr OWX_AD DName RelHumidity|humidity</code>
-			<br />
-			<code>attr OWX_AD DOffset -0.8088</code>
-			<br />
-			<code>attr OWX_AD DUnit percent|%</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWADdefine"></a>
-		<b>Define</b>
-		<ul>
-			<code>define &lt;name&gt; OWAD [&lt;model&gt;] &lt;id&gt;
-				[&lt;interval&gt;]</code>
-			<br />
-			<br /> Define a 1-Wire A/D converter.
-			<br />
-			<br />
-			<li><code>[&lt;model&gt;]</code><br /> Defines the A/D
-				converter model (and thus 1-Wire family id), currently the following
-				values are permitted:
-				<ul>
-					<li>model DS2450 with family id 20 (default if the model
-						parameter is omitted)</li>
-				</ul></li>
-			<li><code>&lt;id&gt;</code> <br />12-character unique ROM id of
-				the converter device without family id and CRC code</li>
-			<li><code>&lt;interval&gt;</code> <br />Measurement interval in
-				seconds. The default is 300 seconds.</li>
-			<br />
-		</ul>
-		<br />
-		<a name="OWADset"> <b>Set</b></a>
-		<ul>
-			<li><a name="owad_interval"> <code>set &lt;name&gt;
-						interval &lt;int&gt;</code></a><br /> Measurement interval in seconds. The
-				default is 300 seconds.</li>
-		</ul>
-		<br />
-		<a name="OWADget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owad_id"> <code>get &lt;name&gt; id</code></a> <br />
-				Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC</li>
-			<li><a name="owad_present"> <code>get &lt;name&gt;
-						present</code>
-			</a> <br /> Returns 1 if this 1-Wire device is present, otherwise 0.</li>
-			<li><a name="owad_interval2"> <code>get &lt;name&gt;
-						interval</code></a><br />Returns measurement interval in seconds.</li>
-			<li><a name="owad_reading"> <code>get &lt;name&gt;
-						reading</code></a><br />Obtain the measuement values.</li>
-			<li><a name="owad_alarm"> <code>get &lt;name&gt;
-						alarm</code></a><br />Obtain the alarm values.</li>
-			<li><a name="owad_status"> <code>get &lt;name&gt;
-						status</code></a><br />Obtain the i/o status values.</li>
-		</ul>
-		<br />
-		<a name="OWADattr"> <b>Attributes</b></a>
-		<ul>
-			<li><a name="owad_stateAL0"><code>attr &lt;name&gt;
-						stateAL0 &lt;string&gt;</code></a> <br />character string for denoting low
-				normal condition, default is green down triangle, e.g. the code
-				&lt;span style="color:green"&gt;&amp;#x25BE;&lt;/span&gt; leading to
-				the sign <span style="color: green">&#x25BE;</span></li>
-			<li><a name="owad_stateAH0"><code>attr &lt;name&gt;
-						stateAH0 &lt;string&gt;</code></a> <br />character string for denoting high
-				alarm condition, default is green upward triangle, e.g. the code
-				&lt;span style="color:green"&gt;&amp;#x25B4;&lt;/span&gt; leading to
-				the sign <span style="color: green">&#x25B4;</span></li>
-			<li><a name="owad_stateAL1"><code>attr &lt;name&gt;
-						stateAL1 &lt;string&gt;</code></a> <br />character string for denoting low
-				alarm condition, default is red down triangle, e.g. the code
-				&lt;span style="color:red"&gt;&amp;#x25BE;&lt;/span&gt; leading to
-				the sign <span style="color: red">&#x25BE;</span></li>
-			<li><a name="owad_stateAH1"><code>attr &lt;name&gt;
-						stateAH1 &lt;string&gt;</code></a> <br />character string for denoting high
-				alarm condition, default is red upward triangle, e.g. the code
-				&lt;span style="color:red"&gt;&amp;#x25B4;&lt;/span&gt; leading to
-				the sign <span style="color: red">&#x25B4;</span></li>
-		</ul>
-		For each of the following attributes, the channel identification
-		A,B,C,D may be used.
-		<ul>
-			<li><a name="owad_cname"><code>attr &lt;name&gt;
-						&lt;channel&gt;Name &lt;string&gt;|&lt;string&gt;</code></a> <br />name for
-				the channel | a type description for the measured value.</li>
-			<li><a name="owad_cunit"><code>attr &lt;name&gt;
-						&lt;channel&gt;Unit &lt;string&gt;|&lt;string&gt;</code></a> <br />unit of
-				measurement for this channel | its abbreviation.</li>
-			<li><a name="owad_coffset"><code>attr &lt;name&gt;
-						&lt;channel&gt;Offset &lt;float&gt;</code></a> <br />offset added to the
-				reading in this channel.</li>
-			<li><a name="owad_cfactor"><code>attr &lt;name&gt;
-						&lt;channel&gt;Factor &lt;float&gt;</code></a> <br />factor multiplied to
-				(reading+offset) in this channel.</li>
-			<li><a name="owad_calarm"><code>attr &lt;name&gt;
-						&lt;channel&gt;Alarm &lt;string&gt;</code></a> <br />alarm setting in this
-				channel, either both, low, high or none (default).</li>
-			<li><a name="owad_clow"><code>attr &lt;name&gt;
-						&lt;channel&gt;Low &lt;float&gt;</code></a> <br />measurement value (on the
-				scale determined by offset and factor) for low alarm.</li>
-			<li><a name="owad_chigh"><code>attr &lt;name&gt;
-						&lt;channel&gt;High &lt;float&gt;</code></a> <br />measurement value (on the
-				scale determined by offset and factor) for high alarm.</li>
-			<li>Standard attributes alias, comment, eventMap, logLevel,
-				webCmd</li>
-		</ul>
-	</ul>
-	<!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
-	<a name="OWCOUNT"></a>
-	<h3>OWCOUNT</h3>
-	<ul>
-		FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #
-		<br />
-		<br /> Note:
-		<br /> This 1-Wire module so far works only with the OWX interface
-		module. Please define an
-		<a href="#OWX">OWX</a> device first.
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define OWX_C OWCOUNT DS2423 CE780F000000 300</code>
-			<br />
-			<code>attr OWX_C AName Water|volume</code>
-			<br />
-			<code>attr OWX_C AUnit liters|l</code>
-			<br />
-			<code>attr OWX_CAMode daily</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWCOUNTdefine"></a>
-		<b>Define</b>
-		<ul>
-			<code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt;
-				[&lt;interval&gt;]</code>
-			<br />
-			<br /> Define a 1-Wire counter.
-			<br />
-			<br />
-			<li><code>[&lt;model&gt;]</code><br /> Defines the counter
-				model (and thus 1-Wire family id), currently the following values
-				are permitted:
-				<ul>
-					<li>model DS2423 with family id 1D (default if the model
-						parameter is omitted)</li>
-				</ul></li>
-			<li><code>&lt;id&gt;</code> <br />12-character unique ROM id of
-				the converter device without family id and CRC code</li>
-			<li><code>&lt;interval&gt;</code> <br />Measurement interval in
-				seconds. The default is 300 seconds.</li>
-		</ul>
-		<br />
-		<a name="OWCOUNTset"> <b>Set</b></a>
-		<ul>
-			<li><a name="owcount_interval"> <code>set
-						&lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement interval in
-				seconds. The default is 300 seconds.</li>
-			<li><a name="owcount_memory"> <code>set &lt;name&gt;
-						memory &lt;page&gt;</code></a><br />Write 32 bytes to memory page 0..13</li>
-			<li><a name="owcount_midnight"> <code>set
-						&lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Write the day's
-				starting value for counter &lt;channel&gt; (A, B or named channel,
-				see below)</li>
-		</ul>
-		<br />
-		<a name="OWCOUNTget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owcount_id"> <code>get &lt;name&gt; id</code></a> <br />
-				Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC</li>
-			<li><a name="owcount_present"> <code>get &lt;name&gt;
-						present</code>
-			</a> <br /> Returns 1 if this 1-Wire device is present, otherwise 0.</li>
-			<li><a name="owcount_interval2"> <code>get
-						&lt;name&gt; interval</code></a><br />Returns measurement interval in
-				seconds.</li>
-			<li><a name="owcount_memory2"> <code>get &lt;name&gt;
-						memory &lt;page&gt;</code></a><br />Obtain 32 bytes from memory page 0..13</li>
-			<li><a name="owcount_midnight2"> <code>get
-						&lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain the day's
-				starting value for counter &lt;channel&gt; (A, B or named channel,
-				see below)</li>
-			<li><a name="owcount_counter"> <code>get &lt;name&gt;
-						counter &lt;channel-name&gt;</code></a><br />Obtain the current value for
-				counter &lt;channel&gt; (A, B or named channel, see below)</li>
-			<li><a name="owcount_counters"> <code>get
-						&lt;name&gt; counters</code></a><br />Obtain the current value both counters</li>
-		</ul>
-		<br />
-		<a name="OWCOUNTattr"> <b>Attributes</b></a>
-		<ul>
-			For each of the following attributes, the channel identification A,B
-			may be used.
-			<li><a name="owcount_cname"><code>attr &lt;name&gt;
-						&lt;channel&gt;Name &lt;string&gt;|&lt;string&gt;</code></a> <br />name for
-				the channel | a type description for the measured value.</li>
-			<li><a name="owcount_cunit"><code>attr &lt;name&gt;
-						&lt;channel&gt;Unit &lt;string&gt;|&lt;string&gt;</code></a> <br />unit of
-				measurement for this channel | its abbreviation.</li>
-			<li><a name="owcount_coffset"><code>attr &lt;name&gt;
-						&lt;channel&gt;Offset &lt;float&gt;</code></a> <br />offset added to the
-				reading in this channel.</li>
-			<li><a name="owcount_cfactor"><code>attr &lt;name&gt;
-						&lt;channel&gt;Factor &lt;float&gt;</code></a> <br />factor multiplied to
-				(reading+offset) in this channel.</li>
-			<li><a name="owcount_cmode"><code>attr &lt;name&gt;
-						&lt;channel&gt;Mode daily | normal</code></a> <br />factor multiplied to
-				(reading+offset) in this channel.</li>
-			<li>Standard attributes alias, comment, eventMap, logLevel,
-				webCmd</li>
-		</ul>
-	</ul>
-	<!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
-	<a name="OWID"></a>
-	<h3>OWID</h3>
-	<ul>
-		FHEM module for 1-Wire devices that know only their unique ROM ID
-		<br />
-		<br />Note:
-		<br /> This 1-Wire module so far works only with the OWX interface
-		module. Please define an
-		<a href="#OWX">OWX</a> device first.
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define ROM1 OWX_ID OWCOUNT CE780F000000</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWIDdefine"></a>
-		<b>Define</b>
-		<ul>
-			<code>define &lt;name&gt; OWID &lt;id&gt; </code>
-			<br />
-			<br /> Define a 1-Wire device.
-			<br />
-			<br />
-			<li><code>&lt;id&gt;</code> <br />12-character unique ROM id of
-				the converter device without family id and CRC code</li>
-		</ul>
-		<br />
-		<a name="OWIDget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owid_id"> <code>get &lt;name&gt; id</code></a> <br />
-				Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC</li>
-			<li><a name="owid_present"> <code>get &lt;name&gt;
-						present</code>
-			</a> <br /> Returns 1 if this 1-Wire device is present, otherwise 0.</li>
-		</ul>
-		<br />
-	</ul>
-	<!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
-	<a name="OWLCD"></a>
-	<h3>OWLCD</h3>
-	<ul>
-		FHEM module to commmunicate with the
-		<a href="http://www.louisswart.co.za/1-Wire_Overview.html">1-Wire
-			LCD controller</a> from Louis Swart (1-Wire family id FF). See also the
-		corresponding
-		<a href="http://fhemwiki.de/wiki/1-Wire_Textdisplay">Wiki page.</a>
-		<br />
-		<br /> Note:
-		<br /> This 1-Wire module so far works only with the OWX interface
-		module. Please define an
-		<a href="#OWX">OWX</a> device first.
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define OWX_LCD OWLCD 9F0700000100</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWLCDdefine"></a>
-		<b>Define</b>
-		<ul>
-			<code>define &lt;name&gt; OWLCD &lt;id&gt;</code>
-			<br />
-			<br /> Define a 1-Wire LCD device.
-			<br />
-			<br />
-			<li><code>&lt;id&gt;</code> <br />12-character unique ROM id of
-				the converter device without family id and CRC code</li>
-		</ul>
-		<br />
-		<a name="OWLCDset"> <b>Set</b></a>
-		<ul>
-			<li><a name="owlcd_icon"> <code>set &lt;name&gt; icon
-						&lt;int&gt; on|off|blink</code></a><br /> Set one of the icons 0..14 on, off
-				or blinking</li>
-			<li><a name="owlcd_icon2"> <code>set &lt;name&gt;
-						icon 15 0..6</code></a><br /> Set icon 15 to one of its values</li>
-			<li><a name="owlcd_icon3"> <code>set &lt;name&gt;
-						icon none</code></a><br /> Set all icons off</li>
-			<li><a name="owlcd_line"> <code>set &lt;name&gt; line
-						&lt;int&gt; &lt;string&gt;</code></a><br /> Write LCD line 0..3 with some
-				content</li>
-			<li><a name="owlcd_memory"> <code>set &lt;name&gt;
-						memory &lt;page&gt; &lt;string&gt;</code></a><br />Write memory page 0..6</li>
-			<li><a name="owlcd_gpio"> <code>set &lt;name&gt; gpio
-						&lt;value&gt;</code></a><br />Write state for all three gpio pins (value =
-				0..7, for each bit 0=ON, 1=OFF)</li>
-			<li><a name="owlcd_bl"> <code>set &lt;name&gt;
-						backlight ON|OFF</code></a><br />Switch backlight on or off</li>
-			<li><a name="owlcd_lcd"> <code>set &lt;name&gt; lcd
-						ON|OFF</code></a><br />Switch LCD power on or off</li>
-			<li><a name="owlcd_gpio"> <code>set &lt;name&gt;
-						reset</code></a><br />Reset the display</li>
-			<li><a name="owlcd_gpio"> <code>set &lt;name&gt; test</code></a><br />Test
-				the display</li>
-		</ul>
-		<br />
-		<a name="owlcdget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owlcd_id"> <code>get &lt;name&gt; id</code></a> <br />
-				Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC</li>
-			<li><a name="owlcd_present"> <code>get &lt;name&gt;
-						present</code>
-			</a> <br /> Returns 1 if this 1-Wire device is present, otherwise 0.</li>
-			<li><a name="owlcd_memory2"> <code>get &lt;name&gt;
-						memory &lt;page&gt;</code></a><br />Read memory page 0..6</li>
-			<li><a name="owlcd_gpio"> <code>get &lt;name&gt; gpio</code></a><br />Obtain
-				state of all four input channels (15 = all off, 0 = all on)</li>
-			<li><a name="owlcd_counter"> <code>get &lt;name&gt;
-						gpio</code></a><br />Obtain state of all four input counters (4 x 16 Bit)</li>
-			<li><a name="owlcd_version"> <code>get &lt;name&gt;
-						version</code></a><br />Obtain firmware version of the controller</li>
-		</ul>
-		<br />
-		<a name="owlcdattr"> <b>Attributes</b></a>
-		<ul>
-			<li>Standard attributes alias, comment, eventMap, logLevel,
-				webCmd</li>
-		</ul>
-	</ul>
-	<!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
-	<a name="OWSWITCH"></a>
-	<h3>OWSWITCH</h3>
-	<ul>
-		FHEM module to commmunicate with 1-Wire Programmable Switches
-		<br />
-		<br /> Note:
-		<br /> This 1-Wire module so far works only with the OWX interface
-		module. Please define an
-		<a href="#OWX">OWX</a> device first.
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define OWX_S OWSWITCH DS2413 B5D502000000 60</code>
-			<br />
-			<code>attr OWX_S AName Lampe|light</code>
-			<br />
-			<code>attr OWX_S AUnit AN|AUS</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWSWITCHdefine"></a>
-		<b>Define</b>
-		<ul>
-			<code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt;
-				[&lt;interval&gt;]</code>
-			<br />
-			<br /> Define a 1-Wire switch.
-			<br />
-			<br />
-			<li><code>[&lt;model&gt;]</code><br /> Defines the switch model
-				(and thus 1-Wire family id), currently the following values are
-				permitted:
-				<ul>
-					<li>model DS2413 with family id 3A (default if the model
-						parameter is omitted)</li>
-				</ul></li>
-			<li><code>&lt;id&gt;</code> <br />12-character unique ROM id of
-				the converter device without family id and CRC code</li>
-			<li><code>&lt;interval&gt;</code> <br />Measurement interval in
-				seconds. The default is 300 seconds.</li>
-		</ul>
-		<br />
-		<a name="OWSWITCHset"> <b>Set</b></a>
-		<ul>
-			<li><a name="owswitch_interval"> <code>set
-						&lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement interval in
-				seconds. The default is 300 seconds.</li>
-			<li><a name="owswitch_output"> <code>set &lt;name&gt;
-						output &lt;channel-name&gt; ON | OFF</code></a><br />Switch channel on/off
-				(A, B or named channel, see below)</li>
-			<li><a name="owswitch_gpio"> <code>set &lt;name&gt;
-						gpio &lt;value&gt;</code></a><br />Write state for all channels (for each
-				bit 0=ON, 1=OFF)</li>
-		</ul>
-		<br />
-		<a name="OWSWITCHget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owswitch_id"> <code>get &lt;name&gt; id</code></a>
-				<br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC</li>
-			<li><a name="owswitch_present"> <code>get
-						&lt;name&gt; present</code>
-			</a> <br /> Returns 1 if this 1-Wire device is present, otherwise 0.</li>
-			<li><a name="owswitch_interval2"> <code>get
-						&lt;name&gt; interval</code></a><br />Returns measurement interval in
-				seconds.</li>
-			<li><a name="owswitch_input"> <code>get &lt;name&gt;
-						INPUT &lt;channel-name&gt;</code></a><br />Obtain state of channel (A, B or
-				named channel, see below)</li>
-			<li><a name="owswitch_gpio"> <code>get &lt;name&gt;
-						gpio</code></a><br />Obtain state of all channels</li>
-		</ul>
-		<br />
-		<a name="OWSWITCHattr"> <b>Attributes</b></a> For each of the
-		following attributes, the channel identification A,B may be used.
-		<ul>
-			<li><a name="owswitch_cname"><code>attr &lt;name&gt;
-						&lt;channel&gt;Name &lt;string&gt;|&lt;string&gt;</code></a> <br />name for
-				the channel | a type description for the measured value.</li>
-			<li><a name="owswitch_cunit"><code>attr &lt;name&gt;
-						&lt;channel&gt;Unit &lt;string&gt;|&lt;string&gt;</code></a> <br />display
-				for on | off condition</li>
-			<li>Standard attributes alias, comment, eventMap, logLevel,
-				webCmd</li>
-		</ul>
-	</ul>
-	<!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
-	<a name="OWTHERM"></a>
-	<h3>OWTHERM</h3>
-	<ul>
-		FHEM module to commmunicate with 1-Wire bus digital thermometer
-		devices
-		<br />
-		<br /> Note:
-		<br /> This is the only 1-Wire module which so far works with both
-		the OWFS and the OWX interface module. Please define an
-		<a href="#OWFS">OWFS</a> device or an
-		<a href="#OWX">OWX</a> device first.
-		<br />
-		<br />
-		<b>Example</b>
-		<br />
-		<ul>
-			<code>define OWX_T OWTHERM DS18B20 E8D09B030000 300</code>
-			<br />
-			<code>attr OWX_T tempUnit Kelvin</code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWTHERMdefine"></a>
-		<b>Define</b>
-		<ul>
-			<code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt;
-				[&lt;interval&gt;]</code>
-			<br />
-			<br /> Define a 1-Wire digital thermometer device.
-			<br />
-			<br />
-			<li><code>[&lt;model&gt;]</code><br /> Defines the thermometer
-				model (and thus 1-Wire family id) currently the following values are
-				permitted:
-				<ul>
-					<li>model DS1820 with family id 10 (default if the model
-						parameter is omitted)</li>
-					<li>model DS1822 with family id 22</li>
-					<li>model DS18B20 with family id 28</li>
-				</ul></li>
-			<li><code>&lt;id&gt;</code> <br />12-character unique ROM id of
-				the thermometer device without family id and CRC code</li>
-			<li><code>&lt;interval&gt;</code> <br /> Temperature
-				measurement interval in seconds. The default is 300 seconds.</li>
-			<br /> Example:
-			<br />
-			<code>define Temp1 OWTHERM 14B598010800 300 </code>
-			<br />
-		</ul>
-		<br />
-		<a name="OWTHERMset"> <b>Set</b></a>
-		<ul>
-			<li><a name="owtherm_interval"> <code>set
-						&lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature measurement
-				intervall in seconds. The default is 300 seconds.</li>
-			<li><a name="owtherm_tempHigh"> <code>set
-						&lt;name&gt; tempHigh &lt;float&gt;</code></a> <br /> The high alarm
-				temperature (on the temperature scale chosen by the attribute value)
-			</li>
-			<li><a name="owtherm_tempLow"> <code>set &lt;name&gt;
-						tempLow &lt;float&gt;</code></a> <br /> The low alarm temperature (on the
-				temperature scale chosen by the attribute value)</li>
-		</ul>
-		<br />
-		<a name="OWTHERMget"> <b>Get</b></a>
-		<ul>
-			<li><a name="owtherm_id"> <code>get &lt;name&gt; id</code></a> <br />
-				Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC</li>
-			<li><a name="owtherm_present"> <code>get &lt;name&gt;
-						present</code></a> <br /> Returns 1 if this 1-Wire device is present,
-				otherwise 0.</li>
-			<li><a name="owtherm_interval2"> <code>get
-						&lt;name&gt; interval</code></a><br />Returns temperature measurement
-				interval in seconds.</li>
-			<li><a name="owtherm_temperature"> <code>get
-						&lt;name&gt; temperature</code></a><br />Obtain the temperature.</li>
-			<li><a name="owtherm_alarm"> <code>get &lt;name&gt;
-						alarm</code></a><br />Obtain the alarm temperature values.</li>
-		</ul>
-		<br />
-		<a name="OWTHERMattr"> <b>Attributes</b></a>
-		<ul>
-			<li><a name="owtherm_stateAL"><code>attr &lt;name&gt;
-						stateAL &lt;string&gt;</code> </a> <br />character string for denoting low
-				alarm condition, default is red down triangle, e.g. the code
-				&lt;span style="color:red"&gt;&amp;#x25BE;&lt;/span&gt; leading to
-				the sign <span style="color: red">&#x25BE;</span></li>
-			<li><a name="owtherm_stateAH"><code>attr &lt;name&gt;
-						stateAH &lt;string&gt;</code> </a> <br />character string for denoting high
-				alarm condition, default is red upward triangle, e.g. the code
-				&lt;span style="color:red"&gt;&amp;#x25B4;&lt;/span&gt; leading to
-				the sign <span style="color: red">&#x25B4;</span></li>
-			<li><a name="owtherm_tempOffset"><code>attr
-						&lt;name&gt; tempOffset &lt;float&gt;</code> </a> <br />temperature offset
-				in &deg;C added to the raw temperature reading.</li>
-			<li><a name="owtherm_tempUnit"><code>attr
-						&lt;name&gt; tempUnit Celsius|Kelvin|Fahrenheit|C|K|F</code> </a> <br />unit
-				of measurement (temperature scale), default is Celsius = &deg;C</li>
-			<li><a name="owtherm_tempHigh2"> <code>attr
-						&lt;name&gt; tempHigh &lt;float&gt;</code>
-			</a> <br /> high alarm temperature (on the temperature scale chosen by
-				the attribute value).</li>
-			<li><a name="owtherm_tempLow2"> <code>attr
-						&lt;name&gt; tempLow &lt;float&gt;</code>
-			</a> <br /> low alarm temperature (on the temperature scale chosen by
-				the attribute value).</li>
-			<li>Standard attributes alias, comment, eventMap, logLevel,
-				webCmd</li>
-		</ul>
-	</ul>
+    <head>
+        <title></title>
+    </head>
+    <body>
+        <a name="OWX"></a>
+        <h3>OWX</h3>
+        <ul> FHEM module to commmunicate with 1-Wire bus devices <ul>
+                <li>via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an
+                    USB port or </li>
+                <li>via a passive DS9097 interface attached to an USB port or</li>
+                <li>via a network-attached CUNO</li>
+            </ul> Internally these interfaces are vastly different, read the corresponding <a
+                href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a>
+            <br />
+            <br />
+            <b>Example</b><br />
+            <ul>
+                <code>define OWio OWX /dev/ttyUSB1</code>
+                <br />
+            </ul>
+            <br />
+            <a name="OWXdefine">
+                <b>Define</b></a>
+            <ul>
+                <code>define &lt;name&gt; OWX &lt;serial-device&gt;</code> or <br />
+                <code>define &lt;name&gt; OWX &lt;cuno-device&gt;</code>
+                <br /><br /> Define a 1-Wire interface to communicate with a 1-Wire bus.<br />
+                <br />
+                <li>
+                    <code>&lt;serial-device&gt;</code> The serial device (e.g. USB port) to which
+                    the 1-Wire bus is attached.</li>
+                <li>
+                    <code>&lt;cuno-device&gt;</code> The previously defined CUNO to which the 1-Wire
+                    bus is attached. </li>
+            </ul>
+            <br />
+            <a name="OWXset">
+                <b>Set</b></a>
+            <ul>
+                <li><a name="owx_interval">
+                        <code>set &lt;name&gt; interval &lt;value&gt;</code>
+                    </a>
+                    <br /><br /> sets the time period in seconds for "kicking" the 1-Wire bus
+                    (default is 300 seconds). This means: <ul>
+                        <li>With 1-Wire bus interfaces that do not supply power to the 1-Wire bus
+                            (attr buspower parasitic), the 1-Wire bus is reset at these intervals. </li>
+                        <li>With 1-Wire bus interfaces that supply power to the 1-Wire bus (attr
+                            buspower = real), all temperature measurement devices on the bus receive
+                            the command to start a temperature conversion (saves a lot of time when
+                            reading) </li>
+                        <li>With 1-Wire bus interfaces that contain a busmaster chip, the response
+                            to a reset pulse contains information about alarms.</li>
+                    </ul><br />
+                </li>
+                <li><a name="owx_followAlarms">
+                        <code>set &lt;name&gt; followAlarms on|off</code>
+                    </a>
+                    <br /><br /> instructs the module to start an alarm search in case a reset pulse
+                    discovers any 1-Wire device which has the alarm flag set. </li>
+            </ul>
+            <br />
+            <a name="OWXget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owx_alarms"></a>
+                    <code>get &lt;name&gt; alarms</code>
+                    <br /><br /> performs an "alarm search" for devices on the 1-Wire bus and, if
+                    found, generates an event in the log (not with CUNO). </li>
+                <br />
+                <li><a name="owx_devices"></a>
+                    <code>get &lt;name&gt; devices</code>
+                    <br /><br /> redicovers all devices on the 1-Wire bus. If a device found has a
+                    previous definition, this is automatically used. If a device is found but has no
+                    definition, it is autocreated. If a defined device is not on the 1-Wire bus, it
+                    is autodeleted. </li>
+                <br />
+                <br />
+            </ul>
+            <a name="OWXattr">
+                <b>Attributes</b></a>
+            <ul>
+                <li><a name="OWXbuspower"><code>attr &lt;name&gt; buspower real|parasitic</code></a>
+                    <br />tells FHEM whether power is supplied to the 1-Wire bus or not.</li>
+                <li>Standard attributes alias, comment, eventMap, logLevel, webCmd</li>
+            </ul>
+        </ul>
+        <!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
+        <a name="OWAD"></a>
+        <h3>OWAD</h3>
+        <ul>FHEM module to commmunicate with 1-Wire A/D converters<br /><br /> Note:<br /> This
+            1-Wire module so far works only with the OWX interface module. Please define an <a
+                href="#OWX">OWX</a> device first. <br />
+            <br /><b>Example</b><br />
+            <ul>
+                <code>define OWX_AD OWAD 724610000000 45</code>
+                <br />
+                <code>attr OWX_AD DAlarm high</code>
+                <br />
+                <code>attr OWX_AD DFactor 31.907097</code>
+                <br />
+                <code>attr OWX_AD DHigh 50.0</code>
+                <br />
+                <code>attr OWX_AD DName RelHumidity|humidity</code>
+                <br />
+                <code>attr OWX_AD DOffset -0.8088</code>
+                <br />
+                <code>attr OWX_AD DUnit percent|%</code>
+                <br />
+            </ul><br />
+            <a name="OWADdefine"></a>
+            <b>Define</b>
+            <ul>
+                <code>define &lt;name&gt; OWAD [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+                <br /><br /> Define a 1-Wire A/D converter.<br /><br />
+                <li>
+                    <code>[&lt;model&gt;]</code><br /> Defines the A/D converter model (and thus
+                    1-Wire family id), currently the following values are permitted: <ul>
+                        <li>model DS2450 with family id 20 (default if the model parameter is
+                            omitted)</li>
+                    </ul>
+                </li>
+                <li>
+                    <code>&lt;id&gt;</code>
+                    <br />12-character unique ROM id of the converter device without family id and
+                    CRC code </li>
+                <li>
+                    <code>&lt;interval&gt;</code>
+                    <br />Measurement interval in seconds. The default is 300 seconds. </li>
+                <br />
+            </ul>
+            <br />
+            <a name="OWADset">
+                <b>Set</b></a>
+            <ul>
+                <li><a name="owad_interval">
+                        <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                    interval in seconds. The default is 300 seconds. </li>
+            </ul>
+            <br />
+            <a name="OWADget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owad_id">
+                        <code>get &lt;name&gt; id</code></a>
+                    <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+                <li><a name="owad_present">
+                        <code>get &lt;name&gt; present</code>
+                    </a>
+                    <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+                <li><a name="owad_interval2">
+                        <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
+                    in seconds. </li>
+                <li><a name="owad_reading">
+                        <code>get &lt;name&gt; reading</code></a><br />Obtain the measuement values. </li>
+                <li><a name="owad_alarm">
+                        <code>get &lt;name&gt; alarm</code></a><br />Obtain the alarm values. </li>
+                <li><a name="owad_status">
+                        <code>get &lt;name&gt; status</code></a><br />Obtain the i/o status values.
+                </li>
+            </ul>
+            <br />
+            <a name="OWADattr">
+                <b>Attributes</b></a>
+            <ul>
+                <li><a name="owad_stateAL0"><code>attr &lt;name&gt; stateAL0
+                        &lt;string&gt;</code></a>
+                    <br />character string for denoting low normal condition, default is green down
+                    triangle, e.g. the code &lt;span
+                    style="color:green"&gt;&amp;#x25BE;&lt;/span&gt; leading to the sign <span
+                        style="color:green">&#x25BE;</span>
+                </li>
+                <li><a name="owad_stateAH0"><code>attr &lt;name&gt; stateAH0
+                        &lt;string&gt;</code></a>
+                    <br />character string for denoting high alarm condition, default is green
+                    upward triangle, e.g. the code &lt;span
+                    style="color:green"&gt;&amp;#x25B4;&lt;/span&gt; leading to the sign <span
+                        style="color:green">&#x25B4;</span>
+                </li>
+                <li><a name="owad_stateAL1"><code>attr &lt;name&gt; stateAL1
+                        &lt;string&gt;</code></a>
+                    <br />character string for denoting low alarm condition, default is red down
+                    triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25BE;&lt;/span&gt;
+                    leading to the sign <span style="color:red">&#x25BE;</span></li>
+                <li><a name="owad_stateAH1"><code>attr &lt;name&gt; stateAH1
+                        &lt;string&gt;</code></a>
+                    <br />character string for denoting high alarm condition, default is red upward
+                    triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25B4;&lt;/span&gt;
+                    leading to the sign <span style="color:red">&#x25B4;</span>
+                </li>
+            </ul> For each of the following attributes, the channel identification A,B,C,D may be
+            used. <ul>
+                <li><a name="owad_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
+                            &lt;string&gt;|&lt;string&gt;</code></a>
+                    <br />name for the channel | a type description for the measured value. </li>
+                <li><a name="owad_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
+                            &lt;string&gt;|&lt;string&gt;</code></a>
+                    <br />unit of measurement for this channel | its abbreviation. </li>
+                <li><a name="owad_coffset"><code>attr &lt;name&gt; &lt;channel&gt;Offset
+                            &lt;float&gt;</code></a>
+                    <br />offset added to the reading in this channel. </li>
+                <li><a name="owad_cfactor"><code>attr &lt;name&gt; &lt;channel&gt;Factor
+                            &lt;float&gt;</code></a>
+                    <br />factor multiplied to (reading+offset) in this channel. </li>
+                <li><a name="owad_calarm"><code>attr &lt;name&gt; &lt;channel&gt;Alarm
+                            &lt;string&gt;</code></a>
+                    <br />alarm setting in this channel, either both, low, high or none (default). </li>
+                <li><a name="owad_clow"><code>attr &lt;name&gt; &lt;channel&gt;Low
+                            &lt;float&gt;</code></a>
+                    <br />measurement value (on the scale determined by offset and factor) for low
+                    alarm. </li>
+                <li><a name="owad_chigh"><code>attr &lt;name&gt; &lt;channel&gt;High
+                            &lt;float&gt;</code></a>
+                    <br />measurement value (on the scale determined by offset and factor) for high
+                    alarm. </li>
+                <li>Standard attributes alias, comment, eventMap, logLevel, webCmd</li>
+            </ul>
+        </ul>
+        <!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
+        <a name="OWCOUNT"></a>
+        <h3>OWCOUNT</h3>
+        <ul>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #<br /><br /> Note:<br />
+            This 1-Wire module so far works only with the OWX interface module. Please define an <a
+                href="#OWX">OWX</a> device first. <br />
+            <br /><b>Example</b><br />
+            <ul>
+                <code>define OWX_C OWCOUNT DS2423 CE780F000000 300</code>
+                <br />
+                <code>attr OWX_C AName Water|volume</code>
+                <br />
+                <code>attr OWX_C AUnit liters|l</code>
+                <br />
+                <code>attr OWX_CAMode daily</code>
+                <br />
+            </ul><br />
+            <a name="OWCOUNTdefine"></a>
+            <b>Define</b>
+            <ul>
+                <code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt;
+                    [&lt;interval&gt;]</code>
+                <br /><br /> Define a 1-Wire counter.<br /><br />
+                <li>
+                    <code>[&lt;model&gt;]</code><br /> Defines the counter model (and thus 1-Wire
+                    family id), currently the following values are permitted: <ul>
+                        <li>model DS2423 with family id 1D (default if the model parameter is
+                            omitted)</li>
+                    </ul>
+                </li>
+                <li>
+                    <code>&lt;id&gt;</code>
+                    <br />12-character unique ROM id of the converter device without family id and
+                    CRC code </li>
+                <li>
+                    <code>&lt;interval&gt;</code>
+                    <br />Measurement interval in seconds. The default is 300 seconds. </li>
+            </ul>
+            <br />
+            <a name="OWCOUNTset">
+                <b>Set</b></a>
+            <ul>
+                <li><a name="owcount_interval">
+                        <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                    interval in seconds. The default is 300 seconds. </li>
+                <li><a name="owcount_memory">
+                        <code>set &lt;name&gt; memory &lt;page&gt;</code></a><br />Write 32 bytes to
+                    memory page 0..13 </li>
+                <li><a name="owcount_midnight">
+                        <code>set &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Write
+                    the day's starting value for counter &lt;channel&gt; (A, B or named channel, see
+                    below)</li>
+            </ul>
+            <br />
+            <a name="OWCOUNTget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owcount_id">
+                        <code>get &lt;name&gt; id</code></a>
+                    <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+                <li><a name="owcount_present">
+                        <code>get &lt;name&gt; present</code>
+                    </a>
+                    <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+                <li><a name="owcount_interval2">
+                        <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
+                    in seconds. </li>
+                <li><a name="owcount_memory2">
+                        <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Obtain 32 bytes
+                    from memory page 0..13 </li>
+                <li><a name="owcount_midnight2">
+                        <code>get &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain
+                    the day's starting value for counter &lt;channel&gt; (A, B or named channel, see
+                    below)</li>
+                <li><a name="owcount_counter">
+                        <code>get &lt;name&gt; counter &lt;channel-name&gt;</code></a><br />Obtain
+                    the current value for counter &lt;channel&gt; (A, B or named channel, see
+                    below)</li>
+                <li><a name="owcount_counters">
+                        <code>get &lt;name&gt; counters</code></a><br />Obtain the current value
+                    both counters</li>
+            </ul>
+            <br />
+            <a name="OWCOUNTattr">
+                <b>Attributes</b></a>
+            <ul>For each of the following attributes, the channel identification A,B may be used.
+                        <li><a name="owcount_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
+                            &lt;string&gt;|&lt;string&gt;</code></a>
+                    <br />name for the channel | a type description for the measured value. </li>
+                <li><a name="owcount_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
+                            &lt;string&gt;|&lt;string&gt;</code></a>
+                    <br />unit of measurement for this channel | its abbreviation. </li>
+                <li><a name="owcount_coffset"><code>attr &lt;name&gt; &lt;channel&gt;Offset
+                            &lt;float&gt;</code></a>
+                    <br />offset added to the reading in this channel. </li>
+                <li><a name="owcount_cfactor"><code>attr &lt;name&gt; &lt;channel&gt;Factor
+                            &lt;float&gt;</code></a>
+                    <br />factor multiplied to (reading+offset) in this channel. </li>
+                <li><a name="owcount_cmode"><code>attr &lt;name&gt; &lt;channel&gt;Mode daily |
+                            normal</code></a>
+                    <br />factor multiplied to (reading+offset) in this channel. </li>
+                <li>Standard attributes alias, comment, eventMap, logLevel, webCmd</li>
+            </ul>
+        </ul>
+        <!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
+        <a name="OWID"></a>
+        <h3>OWID</h3>
+        <ul>FHEM module for 1-Wire devices that know only their unique ROM ID<br />
+            <br />Note:<br /> This 1-Wire module so far works only with the OWX interface module.
+            Please define an <a href="#OWX">OWX</a> device first. <br />
+            <br /><b>Example</b><br />
+            <ul>
+                <code>define ROM1 OWX_ID OWCOUNT CE780F000000</code>
+                <br />
+            </ul><br />
+            <a name="OWIDdefine"></a>
+            <b>Define</b>
+            <ul>
+                <code>define &lt;name&gt; OWID &lt;id&gt; </code>
+                <br /><br /> Define a 1-Wire device.<br /><br />
+                <li>
+                    <code>&lt;id&gt;</code>
+                    <br />12-character unique ROM id of the converter device without family id and
+                    CRC code </li>
+            </ul>
+            <br />
+            <a name="OWIDget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owid_id">
+                        <code>get &lt;name&gt; id</code></a>
+                    <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+                <li><a name="owid_present">
+                        <code>get &lt;name&gt; present</code>
+                    </a>
+                    <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+            </ul>
+            <br />
+        </ul>
+        <!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
+        <a name="OWLCD"></a>
+        <h3>OWLCD</h3>
+        <ul>FHEM module to commmunicate with the <a
+                href="http://www.louisswart.co.za/1-Wire_Overview.html">1-Wire LCD controller</a>
+            from Louis Swart (1-Wire family id FF). See also the corresponding <a
+                href="http://fhemwiki.de/wiki/1-Wire_Textdisplay">Wiki page.</a><br /><br />
+            Note:<br /> This 1-Wire module so far works only with the OWX interface module. Please
+            define an <a href="#OWX">OWX</a> device first. <br />
+            <br /><b>Example</b><br />
+            <ul>
+                <code>define OWX_LCD OWLCD 9F0700000100</code>
+                <br />
+            </ul>
+            <br />
+            <a name="OWLCDdefine"></a>
+            <b>Define</b>
+            <ul>
+                <code>define &lt;name&gt; OWLCD &lt;id&gt;</code>
+                <br /><br /> Define a 1-Wire LCD device.<br /><br />
+                <li>
+                    <code>&lt;id&gt;</code>
+                    <br />12-character unique ROM id of the converter device without family id and
+                    CRC code </li>
+            </ul>
+            <br />
+            <a name="OWLCDset">
+                <b>Set</b></a>
+            <ul>
+                <li><a name="owlcd_icon">
+                        <code>set &lt;name&gt; icon &lt;int&gt; on|off|blink</code></a><br /> Set
+                    one of the icons 0..14 on, off or blinking</li>
+                <li><a name="owlcd_icon2">
+                        <code>set &lt;name&gt; icon 15 0..6</code></a><br /> Set icon 15 to one of
+                    its values</li>
+                <li><a name="owlcd_icon3">
+                        <code>set &lt;name&gt; icon none</code></a><br /> Set all icons off</li>
+                <li><a name="owlcd_line">
+                        <code>set &lt;name&gt; line &lt;int&gt; &lt;string&gt;</code></a><br />
+                    Write LCD line 0..3 with some content </li>
+                <li><a name="owlcd_memory">
+                        <code>set &lt;name&gt; memory &lt;page&gt;
+                    &lt;string&gt;</code></a><br />Write memory page 0..6</li>
+                <li><a name="owlcd_gpio">
+                        <code>set &lt;name&gt; gpio &lt;value&gt;</code></a><br />Write state for
+                    all three gpio pins (value = 0..7, for each bit 0=ON, 1=OFF)</li>
+                <li><a name="owlcd_bl">
+                        <code>set &lt;name&gt; backlight ON|OFF</code></a><br />Switch backlight on
+                    or off</li>
+                <li><a name="owlcd_lcd">
+                        <code>set &lt;name&gt; lcd ON|OFF</code></a><br />Switch LCD power on or
+                    off</li>
+                <li><a name="owlcd_gpio">
+                        <code>set &lt;name&gt; reset</code></a><br />Reset the display</li>
+                <li><a name="owlcd_gpio">
+                        <code>set &lt;name&gt; test</code></a><br />Test the display</li>
+            </ul>
+            <br />
+            <a name="owlcdget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owlcd_id">
+                        <code>get &lt;name&gt; id</code></a>
+                    <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+                <li><a name="owlcd_present">
+                        <code>get &lt;name&gt; present</code>
+                    </a>
+                    <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+                <li><a name="owlcd_memory2">
+                        <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Read memory page
+                    0..6 </li>
+                <li><a name="owlcd_gpio">
+                        <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all four input
+                    channels (15 = all off, 0 = all on)</li>
+                <li><a name="owlcd_counter">
+                        <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all four input
+                    counters (4 x 16 Bit)</li>
+                <li><a name="owlcd_version">
+                        <code>get &lt;name&gt; version</code></a><br />Obtain firmware version of
+                    the controller</li>
+            </ul>
+            <br />
+            <a name="owlcdattr">
+                <b>Attributes</b></a>
+            <ul>
+                <li>Standard attributes alias, comment, eventMap, logLevel, webCmd</li>
+            </ul>
+        </ul>
+        <!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
+        <a name="OWSWITCH"></a>
+        <h3>OWSWITCH</h3>
+        <ul>FHEM module to commmunicate with 1-Wire Programmable Switches <br /><br /> Note:<br />
+            This 1-Wire module so far works only with the OWX interface module. Please define an <a
+                href="#OWX">OWX</a> device first. <br />
+            <br /><b>Example</b><br />
+            <ul>
+                <code>define OWX_S OWSWITCH DS2413 B5D502000000 60</code>
+                <br />
+                <code>attr OWX_S AName Lampe|light</code>
+                <br />
+                <code>attr OWX_S AUnit AN|AUS</code>
+                <br />
+            </ul>
+            <br />
+            <a name="OWSWITCHdefine"></a>
+            <b>Define</b>
+            <ul>
+                <code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt;
+                    [&lt;interval&gt;]</code>
+                <br /><br /> Define a 1-Wire switch.<br /><br />
+                <li>
+                    <code>[&lt;model&gt;]</code><br /> Defines the switch model (and thus 1-Wire
+                    family id), currently the following values are permitted: <ul>
+                        <li>model DS2413 with family id 3A (default if the model parameter is
+                            omitted)</li>
+                    </ul>
+                </li>
+                <li>
+                    <code>&lt;id&gt;</code>
+                    <br />12-character unique ROM id of the converter device without family id and
+                    CRC code </li>
+                <li>
+                    <code>&lt;interval&gt;</code>
+                    <br />Measurement interval in seconds. The default is 300 seconds. </li>
+            </ul>
+            <br />
+            <a name="OWSWITCHset">
+                <b>Set</b></a>
+            <ul>
+                <li><a name="owswitch_interval">
+                        <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                    interval in seconds. The default is 300 seconds. </li>
+                <li><a name="owswitch_output">
+                        <code>set &lt;name&gt; output &lt;channel-name&gt; ON |
+                    OFF</code></a><br />Switch channel on/off (A, B or named channel, see
+                    below)</li>
+                <li><a name="owswitch_gpio">
+                        <code>set &lt;name&gt; gpio &lt;value&gt;</code></a><br />Write state for
+                    all channels (for each bit 0=ON, 1=OFF)</li>
+            </ul>
+            <br />
+            <a name="OWSWITCHget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owswitch_id">
+                        <code>get &lt;name&gt; id</code></a>
+                    <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+                <li><a name="owswitch_present">
+                        <code>get &lt;name&gt; present</code>
+                    </a>
+                    <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+                <li><a name="owswitch_interval2">
+                        <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
+                    in seconds. </li>
+                <li><a name="owswitch_input">
+                        <code>get &lt;name&gt; INPUT &lt;channel-name&gt;</code></a><br />Obtain
+                    state of channel (A, B or named channel, see below)</li>
+                <li><a name="owswitch_gpio">
+                        <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all
+                    channels</li>
+            </ul>
+            <br />
+            <a name="OWSWITCHattr">
+                <b>Attributes</b></a> For each of the following attributes, the channel
+            identification A,B may be used. <ul>
+                <li><a name="owswitch_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
+                            &lt;string&gt;|&lt;string&gt;</code></a>
+                    <br />name for the channel | a type description for the measured value. </li>
+                <li><a name="owswitch_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
+                            &lt;string&gt;|&lt;string&gt;</code></a>
+                    <br />display for on | off condition </li>
+                <li>Standard attributes alias, comment, eventMap, logLevel, webCmd</li>
+            </ul>
+        </ul>
+        <!--+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-->
+        <a name="OWTHERM"></a>
+        <h3>OWTHERM</h3>
+        <ul>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br /><br />
+            Note:<br /> This is the only 1-Wire module which so far works with both the OWFS and the
+            OWX interface module. Please define an <a href="#OWFS">OWFS</a> device or an <a
+                href="#OWX">OWX</a> device first. <br />
+            <br /><b>Example</b><br />
+            <ul>
+                <code>define OWX_T OWTHERM DS18B20 E8D09B030000 300</code>
+                <br />
+                <code>attr OWX_T tempUnit Kelvin</code>
+                <br />
+            </ul><br />
+            <a name="OWTHERMdefine"></a>
+            <b>Define</b>
+            <ul>
+                <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt;
+                    [&lt;interval&gt;]</code>
+                <br /><br /> Define a 1-Wire digital thermometer device.<br /><br />
+                <li>
+                    <code>[&lt;model&gt;]</code><br /> Defines the thermometer model (and thus
+                    1-Wire family id) currently the following values are permitted: <ul>
+                        <li>model DS1820 with family id 10 (default if the model parameter is
+                            omitted)</li>
+                        <li>model DS1822 with family id 22</li>
+                        <li>model DS18B20 with family id 28</li>
+                    </ul>
+                </li>
+                <li>
+                    <code>&lt;id&gt;</code>
+                    <br />12-character unique ROM id of the thermometer device without family id and
+                    CRC code </li>
+                <li>
+                    <code>&lt;interval&gt;</code>
+                    <br /> Temperature measurement interval in seconds. The default is 300 seconds. </li>
+                <br /> Example: <br />
+                <code>define Temp1 OWTHERM 14B598010800 300 </code><br />
+            </ul>
+            <br />
+            <a name="OWTHERMset">
+                <b>Set</b></a>
+            <ul>
+                <li><a name="owtherm_interval">
+                        <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
+                    measurement intervall in seconds. The default is 300 seconds.</li>
+                <li><a name="owtherm_tempHigh">
+                        <code>set &lt;name&gt; tempHigh &lt;float&gt;</code></a>
+                    <br /> The high alarm temperature (on the temperature scale chosen by the
+                    attribute value) </li>
+                <li><a name="owtherm_tempLow">
+                        <code>set &lt;name&gt; tempLow &lt;float&gt;</code></a>
+                    <br /> The low alarm temperature (on the temperature scale chosen by the
+                    attribute value) </li>
+            </ul>
+            <br />
+            <a name="OWTHERMget">
+                <b>Get</b></a>
+            <ul>
+                <li><a name="owtherm_id">
+                        <code>get &lt;name&gt; id</code></a>
+                    <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+                <li><a name="owtherm_present">
+                        <code>get &lt;name&gt; present</code></a>
+                    <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+                <li><a name="owtherm_interval2">
+                        <code>get &lt;name&gt; interval</code></a><br />Returns temperature
+                    measurement interval in seconds.</li>
+                <li><a name="owtherm_temperature">
+                        <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature. </li>
+                <li><a name="owtherm_alarm">
+                        <code>get &lt;name&gt; alarm</code></a><br />Obtain the alarm temperature
+                    values. </li>
+            </ul>
+            <br />
+            <a name="OWTHERMattr">
+                <b>Attributes</b></a>
+            <ul>
+                <li><a name="owtherm_stateAL"><code>attr &lt;name&gt; stateAL &lt;string&gt;</code>
+                    </a>
+                    <br />character string for denoting low alarm condition, default is red down
+                    triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25BE;&lt;/span&gt;
+                    leading to the sign <span style="color:red">&#x25BE;</span>
+                </li>
+                <li><a name="owtherm_stateAH"><code>attr &lt;name&gt; stateAH &lt;string&gt;</code>
+                    </a>
+                    <br />character string for denoting high alarm condition, default is red upward
+                    triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25B4;&lt;/span&gt;
+                    leading to the sign <span style="color:red">&#x25B4;</span>
+                </li>
+                <li><a name="owtherm_tempOffset"><code>attr &lt;name&gt; tempOffset
+                            &lt;float&gt;</code>
+                    </a>
+                    <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+                <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
+                            Celsius|Kelvin|Fahrenheit|C|K|F</code>
+                    </a>
+                    <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+                <li><a name="owtherm_tempHigh2">
+                        <code>attr &lt;name&gt; tempHigh &lt;float&gt;</code>
+                    </a>
+                    <br /> high alarm temperature (on the temperature scale chosen by the attribute
+                    value). </li>
+                <li><a name="owtherm_tempLow2">
+                        <code>attr &lt;name&gt; tempLow &lt;float&gt;</code>
+                    </a>
+                    <br /> low alarm temperature (on the temperature scale chosen by the attribute
+                    value). </li>
+                <li>Standard attributes alias, comment, eventMap, logLevel, webCmd</li>
+            </ul>
+        </ul>
 
 
-	<br />
-</body>
+        <br />
+    </body>
 </html>
