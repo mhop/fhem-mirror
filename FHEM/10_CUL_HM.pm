@@ -58,7 +58,7 @@ my %culHmDevProps=(
   "70" => { st => "THSensor",        cl => "sender"   }, # Parse,unfinished
   "80" => { st => "threeStateSensor",cl => "sender"   }, # e.g.HM-SEC-RHS
   "81" => { st => "motionDetector",  cl => "sender"   },
-  "C0" => { st => "keyMatic",        cl => "sender"   },
+  "C0" => { st => "keyMatic",        cl => "receiver" },
   "C1" => { st => "winMatic",        cl => "receiver" },
   "CD" => { st => "smokeDetector",   cl => "receiver" }, # Parse,set unfinished
 );
@@ -379,7 +379,7 @@ CUL_HM_Parse($$)
     $sendAck = ""; #todo why is this special?
 	
   } 
-  elsif($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) {#### Pairing-Request-Convers.
+  elsif(($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) && $st ne "keyMatic") {#### Pairing-Request-Convers.
     push @event, "";    #todo why end here?
 
   } 
@@ -897,6 +897,24 @@ CUL_HM_Parse($$)
     } 
 
   }
+  elsif($st eq "keyMatic") {  ####################################
+    if($msgType eq "10" && $p =~ m/^(..)(..)(..)(..)(.*)/) {#subtype+chn+value+err
+      my ($val, $err) = (hex($3), hex($4));
+
+      my $error = 'none';
+      $error = 'motor aborted' if ($err & 0x04);
+      $error = 'clutch failure' if ($err & 0x02);	# Todo: check this value
+      $error = 'unknown' if ($err & 0x40);			# Todo: unknown error?
+      push @event, "error: " . $error;
+
+      push @event, "battery: ".	(($err & 0x80) ? "low" : "ok");
+      push @event, "lock: "	.	(($val == 1) ? "unlocked" : "locked");
+
+      push @event, "uncertain: " . (($err & 0x30) ? "yes" : "no");
+      my $state = ($err & 0x30) ? " (uncertain)" : "";
+      push @event, "state: "	.	(($val == 1) ? "unlocked" : "locked") . $state;
+    }
+  }  
   else{#####################################
     ; # no one wants the message
   }
@@ -1091,13 +1109,13 @@ CUL_HM_fltCvT($) #float config time
 	last if ($inValue < $fltCvT{$div});
 	$exp++;
   }
-  return ($exp<<5)+int($inValue/$div2);
+  return ($exp << 5)+int($inValue/$div2);
 }
 sub 
 CUL_HM_CvTflt($) # config time -> float
 {
   my ($inValue) = @_;
-  return ($inValue & 0x1f)*((sort {$a <=> $b} keys(%fltCvT))[$inValue>>5]);
+  return ($inValue & 0x1f)*((sort {$a <=> $b} keys(%fltCvT))[$inValue >> 5]);
 }
 
 
@@ -1269,6 +1287,15 @@ my %culHmSubTypeSets = (
           read   => "<btn>",
           keydef => "<btn> <txt1> <txt2>",
           create => "<txt>" },
+
+  keyMatic => {
+  	"lock"=>"",
+  	"unlock"=>"[sec] ...",
+  	"open"=>"[sec] ...",
+  	"inhibit-set"=>"",
+  	"inhibit-clear"=>"",
+  },
+
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>{ 
@@ -1407,7 +1434,11 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash, $id, $dst, $chn,0,0,$chn,
                     "08" . ($a[2] eq "on" ? "01":"02"));
 
-  } 
+  }
+  elsif($cmd eq "statusRequest" && $st eq "keyMatic") { ########################
+    CUL_HM_PushCmdStack($hash, sprintf("++B001%s%s010E",$id,$dst));				# LEVEL_GET
+
+  }
   elsif($cmd eq "statusRequest") { ############################################
 	my $chnFound;
     foreach my $channel (keys %{$attr{$name}}){
@@ -1617,8 +1648,34 @@ CUL_HM_Set($@)
     $hash->{toggleIndex} = (($hash->{toggleIndex}+1) % 128);
     CUL_HM_PushCmdStack($hash, sprintf("++A03E%s%s%s40%s%02X", $id, $dst,
                                       $dst, $chn, $hash->{toggleIndex}));
+                                      
+  }
+  elsif($cmd eq "lock") { ###################################################
+    CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s800100FF",$id,$dst));			# LEVEL_SET
 
-  } 
+  }
+  elsif($cmd eq "unlock") { ###################################################
+  	$tval = (@a > 2) ? int($a[2]) : 0;
+  	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";					# RELOCK_DELAY (255=never)
+    CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s800101%s",$id,$dst,$delay));	# LEVEL_SET
+    
+  }
+  elsif($cmd eq "open") { ###################################################
+  	$tval = (@a > 2) ? int($a[2]) : 0;
+  	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";					# RELOCK_DELAY (255=never)
+    CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s8001C8%s",$id,$dst,$delay));	# OPEN
+
+  }
+  elsif($cmd eq "inhibit-set") { ###############################################
+    CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s0101",$id,$dst));				# SET_LOCK
+
+  }
+
+  elsif($cmd eq "inhibit-clear") { #############################################
+    CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s0001",$id,$dst));				# SET_LOCK
+
+  }
+  
   elsif($cmd eq "pct") { ######################################################
     $a[1] = 100 if ($a[1] > 100);
     $tval = CUL_HM_encodeTime16((@a > 2)?$a[2]:85825945);# onTime   0.0..85825945.6, 0=forever
