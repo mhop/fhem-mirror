@@ -25,6 +25,7 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "raw"      => ["", '.*'],
   "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
   "fhtbuf"   => ["T03", '^[0-9A-F]+[\r\n]*$' ],
+  "cmds"     => ["?", '.*Use one of[ 0-9A-Za-z]+[\r\n]*$' ],
 );
 
 my %sets = (
@@ -142,6 +143,7 @@ CUL_Define($$)
   }
   $hash->{FHTID} = uc($a[3]);
   $hash->{initString} = "X21";
+  $hash->{CMDS} = "";
   $hash->{Clients} = $clientsSlowRF;
   $hash->{MatchList} = \%matchListSlowRF;
 
@@ -460,6 +462,9 @@ READEND:
       DevIo_Disconnected($hash);
       $msg = "No answer";
 
+    } elsif($a[1] eq "cmds") {       # nice it up
+      $msg =~ s/.*Use one of//g;
+
     } elsif($a[1] eq "uptime") {     # decode it
       $msg =~ s/[\r\n]//g;
       $msg = hex($msg)/125;
@@ -524,6 +529,14 @@ CUL_DoInit($)
                 ($a[5]+1900)%100,$a[4]+1,$a[3],$a[2],$a[1],$a[0]);
     CUL_SimpleWrite($hash, $msg);
   }
+
+  # Cmd-String feststellen
+
+  my $cmds = CUL_Get($hash, $name, "cmds", 0);
+  $cmds =~ s/$name cmds =>//g;
+  $cmds =~ s/ //g;
+  $hash->{CMDS} = $cmds;
+  Log 3, "$name: Possible commands: " . $hash->{CMDS};
 
   CUL_SimpleWrite($hash, $hash->{initString});
 
@@ -960,27 +973,41 @@ CUL_Attr(@)
     my $hash = $defs{$name};
 
     $a[3] = "SlowRF" if(!$a[3] || ($a[3] ne "HomeMatic" && $a[3] ne "MAX"));
+    my $msg = $hash->{NAME} . ": Mode $a[3] not supported";
 
     if($a[3] eq "HomeMatic") {
       return if($hash->{initString} =~ m/Ar/);
-      $hash->{Clients} = $clientsHomeMatic;
-      $hash->{MatchList} = \%matchListHomeMatic;
-      $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
-      CUL_SimpleWrite($hash, $hash->{initString});
+      if(($hash->{CMDS} =~ m/A/) || IsDummy($hash->{NAME})) {
+        $hash->{Clients} = $clientsHomeMatic;
+        $hash->{MatchList} = \%matchListHomeMatic;
+        CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
+        $hash->{initString} = "X21\nAr";  # X21 is needed for RSSI reporting
+        CUL_SimpleWrite($hash, $hash->{initString});
+      } else {
+	Log 2, $msg;
+        return $msg;
+      }
 
     } elsif($a[3] eq "MAX") {
       return if($hash->{initString} =~ m/Zr/);
-      $hash->{Clients} = $clientsMAX;
-      $hash->{MatchList} = \%matchListMAX;
-      $hash->{initString} = "X21\nZr";  # X21 is needed for RSSI reporting
-      CUL_SimpleWrite($hash, $hash->{initString});
+      if(($hash->{CMDS} =~ m/Z/) || IsDummy($hash->{NAME})) {
+        $hash->{Clients} = $clientsMAX;
+        $hash->{MatchList} = \%matchListMAX;
+        CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
+        $hash->{initString} = "X21\nZr";  # X21 is needed for RSSI reporting
+        CUL_SimpleWrite($hash, $hash->{initString});
+      } else {
+        Log 2, $msg;
+        return $msg;
+      }
 
     } else {
       return if($hash->{initString} eq "X21");
       $hash->{Clients} = $clientsSlowRF;
       $hash->{MatchList} = \%matchListSlowRF;
       $hash->{initString} = "X21";
-      CUL_SimpleWrite($hash, "Ax");     # reset AskSin
+      CUL_SimpleWrite($hash, "Ax") if ($hash->{CMDS} =~ m/A/); # reset AskSin
+      CUL_SimpleWrite($hash, "Zx") if ($hash->{CMDS} =~ m/Z/); # reset Moritz
       CUL_SimpleWrite($hash, $hash->{initString});
 
     }
