@@ -16,7 +16,7 @@ sub
 ShowRpiValues ()
 {
 
-my @uptime = explode(" ", qx(cat /proc/uptime));
+my @uptime = split(/ /, qx(cat /proc/uptime));
 my $seconds = @uptime[0];
 my $y = floor($seconds / 60/60/24/365);
 my $d = floor($seconds/60/60/24) % 365;
@@ -73,18 +73,32 @@ my $totalRxTx = $rx + $tx;
 
 my $network = "Received: " . $rx . " MB" . "<br>" . "Sent: " . $tx . " MB" . "<br>" . "Total: " . $totalRxTx . " MB";
 
-my @speicher = qx(free -mo);
+my @speicher = qx(free);
 shift @speicher;
-my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, @speicher[0]);
+my ($fs_desc, $total, $used, $free, $shared, $buffers, $cached) = split(/\s+/, trim(@speicher[0]));
 
 shift @speicher;
-my ($fs_desc, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, @speicher[0]);
+my ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim(@speicher[0]));
+if($fs_desc2 ne "Swap:"){
+   shift @speicher;
+   ($fs_desc2, $total2, $used2, $free2, $shared2, $buffers2, $cached2) = split(/\s+/, trim(@speicher[0]));
+}
+
+$used = $used / 1000;
+$buffers = $buffers / 1000;
+$cached = $cached / 1000;
+$total = $total / 1000;
+$free = $free / 1000;
+
+$used2 = $used2 / 1000;
+$total2 = $total2 / 1000;
+$free2 = $free2 / 1000;
 
 my $percentage = sprintf ("%.2f", (($used - $buffers - $cached) / $total * 100), 0);
-my $ram = "RAM: " . $percentage . "%" . "<br>" . "Free: " . ($free + $buffers + $cached) . " MB" . "<br>" . "Used: " . ($total - $buffers - $cached) . " MB" . "<br>" . "Total: " . $total . " MB";
+my $ram = "RAM: " . $percentage . "%" . "<br>" . "Free: " . ($free + $buffers + $cached) . " MB" . "<br>" . "Used: " . ($used - $buffers - $cached) . " MB" . "<br>" . "Total: " . $total . " MB";
+ 
 $percentage = sprintf ("%.2f", ($used2 / $total2 * 100), 0);
 my $swap = "Swap: " . $percentage . "%" . "<br>" . "Free: " . $free2 . " MB" . "<br>" . "Used: " . $used2 . " MB" . "<br>" . "Total: " . $total2 . " MB";
-
 
 my $Temperatur=sprintf ("%.2f", qx(cat /sys/class/thermal/thermal_zone0/temp) / 1000);
 
