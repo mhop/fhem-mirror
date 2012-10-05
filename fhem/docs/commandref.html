@@ -3748,13 +3748,11 @@ A line ending with \ will be concatenated with the next one, so long lines
          Unlocked the door so that the door can be opened.<br>
          [sec]: Sets the delay in seconds after the lock automatically locked
          again.<br>0 - 65535 seconds</li>
-      <li><B>inhibit-set</B><br>
-         Blocked all directly paired remotes and the hardware buttons of the
-         keyMatic. Now the door lock drive can be controlled only by
-         FHEM.<br></li>
-      <li><B>inhibit-clear</B><br>
-         Deletes the previously set inhibit-flag again.<br><br>
-         Example:
+      <li><B>inhibit [on|off]</B><br>
+         Block / unblock all directly paired remotes and the hardware buttons of the
+         keyMatic. If inhibit set on, the door lock drive can be controlled only by
+         FHEM.<br><br>
+         Examples:
          <ul><code>
            # Lock the lock<br>
            set keymatic lock<br><br>
