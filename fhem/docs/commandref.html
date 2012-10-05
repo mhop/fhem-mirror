@@ -3227,40 +3227,70 @@ A line ending with \ will be concatenated with the next one, so long lines
   <b>Define</b>
   <ul>
     <code><B>define &lt;name&gt; CUL_HM &lt;6-digit-hex-code|8-digit-hex-code&gt;</B></code>
+
+    <br><br>
+    Correct device definition is the key for HM environment simple maintenance.
     <br>
-	Correct device definition is the key for HM environment simple maintenance. <br>
-	Background to define entities:<br>
-	HM devices has a 3 byte (6 digit hex value) HMid - which is key for addressing. Each device hosts one or more channels. HMid for a channel is the device's HMid plus the channel number (1 byte, 2 digit) in hex. Channels should be defined for all multi-channel devices. Channel entities cannot be defined if the hosting device does not exist<br>
-	Note: FHEM mappes channel 1 to the device if it is no defined explicitely. Therefore do not need to be defined for single channel devices.<br>
-	Note: if a device is deleted all assotiated channels will be removed as well. <br>
-	An example for a full definition of a 2 channel switch is given below:<br>
+
+    Background to define entities:<br>
+    HM devices has a 3 byte (6 digit hex value) HMid - which is key for
+    addressing. Each device hosts one or more channels. HMid for a channel is
+    the device's HMid plus the channel number (1 byte, 2 digit) in hex.
+    Channels should be defined for all multi-channel devices. Channel entities
+    cannot be defined if the hosting device does not exist<br> Note: FHEM
+    mappes channel 1 to the device if it is not defined explicitely. Therefore
+    it does not need to be defined for single channel devices.<br>
+
+    Note: if a device is deleted all assotiated channels will be removed as
+    well. <br> An example for a full definition of a 2 channel switch is given
+    below:<br>
+
 	<ul><code>
 	define livingRoomSwitch CUL_HM 123456<br>
 	define LivingroomMainLight CUL_HM 12345601<br> 
-	define LivingroomBackLight CUL_HM 12345602<br><br></code></ul>
-	livingRoomSwitch is the device managing communication. Device is defined prior to channels to be able to setup references. <br>
-	LivingroomMainLight is channel 01 dealing with status of light, channel peers and channel assotiated register. If not defined channel 01 is covered b y the device entity.<br>
-	LivingRoomBackLight is the second 'channel', channel 02. Its definition is mendatory to operate this function.<br> 
-	
-	<ul>Sender specials: HM threats each button of remotes, push buttons and similar as channels. It is possible (not necessary) to define a channel per button. If all channels are defined access to pairing informatin is possible as well as access to channel related register. Furthermore names make the traces better readable.<br>
-	
-	define may also be invoked by the <a href="#autocreate">autocreate</a> module, together with the necessary hmClass and subType attributes. Usually you issue a <a href="#CULset">hmPairForSec</a> and press the corresponding button on the device to be paired, or issue a <a href="#CULset">hmPairSerial</a> sset command if the device is a receiver and you know its serial number. Autocreate will then create a fhem device and set all necessary attributes. Without pairing the device will not accept messages from fhem. fhem may create the device even if the pairing is not successful. Upon a successful pairing you'll see a CommandAccepted entry in the details section of the CUL_HM device.<br>
-    <br><br>
+	define LivingroomBackLight CUL_HM 12345602<br><br></code>
+        </ul>
+
+    livingRoomSwitch is the device managing communication. This device is
+    defined prior to channels to be able to setup references. <br>
+    LivingroomMainLight is channel 01 dealing with status of light, channel
+    peers and channel assotiated register. If not defined channel 01 is covered
+    by the device entity.<br> LivingRoomBackLight is the second 'channel',
+    channel 02. Its definition is mandatory to operate this function.<br><br>
+
+    Sender specials: HM threats each button of remotes, push buttons and
+    similar as channels. It is possible (not necessary) to define a channel per
+    button. If all channels are defined access to pairing informatin is
+    possible as well as access to channel related register. Furthermore names
+    make the traces better readable.<br><br>
+
+    define may also be invoked by the <a href="#autocreate">autocreate</a>
+    module, together with the necessary hmClass and subType attributes.
+    Usually you issue a <a href="#CULset">hmPairForSec</a> and press the
+    corresponding button on the device to be paired, or issue a <a
+    href="#CULset">hmPairSerial</a> set command if the device is a receiver
+    and you know its serial number. Autocreate will then create a fhem
+    device and set all necessary attributes. Without pairing the device
+    will not accept messages from fhem. fhem may create the device even if
+    the pairing is not successful. Upon a successful pairing you'll see a
+    CommandAccepted entry in the details section of the CUL_HM device.<br><br>
+
     If you cannot use autocreate, then you have to specify:<br>
     <ul>
       <li>the &lt;6-digit-hex-code&gt;or HMid+ch &lt;8-digit-hex-code&gt;<br>
-          It is the unique, hardcoded device-address and cannot be changed (no, you cannot choose it arbitrarily like for FS20 devices). You may detect it by inspecting the fhem log.</li>
+          It is the unique, hardcoded device-address and cannot be changed (no,
+          you cannot choose it arbitrarily like for FS20 devices). You may
+          detect it by inspecting the fhem log.</li>
       <li>the hmClass attribute<br>
           which is either sender or receiver</li>
       <li>the subType attribute<br>
           which is one of switch dimmer blindActuator remote sensor  swi
           pushButton threeStateSensor motionDetector  keyMatic winMatic
-          smokeDetector</li><br>
-          Without these attributes fhem won't be able to decode device messages
-          appropriately.
-
+          smokeDetector</li>
     </ul>
-    <br>
+    Without these attributes fhem won't be able to decode device messages
+    appropriately. <br><br>
+
     <b>Notes</b>
     <ul>
     <li>If the interface is a CUL device, the <a href="#rfmode">rfmode </a>
@@ -3270,8 +3300,8 @@ A line ending with \ will be concatenated with the next one, so long lines
         etc devices must be assigned to a different input device (CUL/FHZ/etc).
         </li>
     <li>Currently supported device families: remote, switch, dimmer,
-        blindActuator, motionDetector, smokeDetector, threeStateSensor, THSensor,
-        winmatic. Special devices: KS550, HM-CC-TC and the KFM100.
+        blindActuator, motionDetector, smokeDetector, threeStateSensor,
+        THSensor, winmatic. Special devices: KS550, HM-CC-TC and the KFM100.
         </li>
     <li>Device messages can only be interpreted correctly if the device type is
         known. fhem will extract the device type from a "pairing request"
@@ -3295,16 +3325,14 @@ A line ending with \ will be concatenated with the next one, so long lines
             least by some switches (HM-LC-Sw1-Pl and HM-LC-SW2-PB-FM).</li>
         <li>The <a href="#HMLAN">HMLAN</a> configurator will answer signing
             requests by itself, and if it is configured with the 3-byte address
-            of a foreign CCU (the address is part of the signing request), it is
-            able to answer signing requests correctly. In the reality this will
-            only work reliably if the foreign CCU is switched off, else it
-            will also answer to the signing request in parallel, and the actor
-            will not receive a clear confirmation.</li>
-        <li>AES-Encryption is not useable with a CUL device as the interface, but
-            it is supported with a HMLAN. Due to the issues above I do not
+            of a foreign CCU which is still configurerd with the default
+            password, it is able to answer signing requests correctly.</li>
+        <li>AES-Encryption is not useable with a CUL device as the interface,
+            but it is supported with a HMLAN. Due to the issues above I do not
             recommend using Homematic encryption at all.</li>
         </ul>
-    </li></ul>
+      </ul>
+    </li>
 
   </ul><br>
 
@@ -3319,55 +3347,114 @@ A line ending with \ will be concatenated with the next one, so long lines
      General commands (available to most hm devices):
      <ul>
 	 <li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
-	 Will read major configuration items stored in the HM device. Executed on a channel it will read pair Inforamtion, List0, List1 and List3 of the 1st internal peer. Furthermore teh peerlist will be retrieved for teh given channel. If executed on a device the command will get the above info or all assotated channels. Not included will be the configuration for additional peers.  <br>
-	 The command is a shortcut for a selection of other commands. 
+         Will read major configuration items stored in the HM device. Executed
+         on a channel it will read pair Inforamtion, List0, List1 and List3 of
+         the 1st internal peer. Furthermore the peerlist will be retrieved for
+         teh given channel. If executed on a device the command will get the
+         above info or all assotated channels. Not included will be the
+         configuration for additional peers.  <br> The command is a shortcut
+         for a selection of other commands. 
 	 </li>
 	 <li><B>getdevicepair</B><a name="CUL_HMgetdevicepair"></a><br>
-	 will read the peers (see devicepair) that are assigned to a channel. This command needs to be executed per channel. Information will be stored in the field Peers of the channel (see devicepair for specials about single-channel deivces). <br>
-	 For sender the same procedure as described in devicepair is necessary to get a reading. Also note that a proper diaplay will only be possible if define per channel (button) was done - see define. 
-	 </li>
+         will read the peers (see devicepair) that are assigned to a channel.
+         This command needs to be executed per channel. Information will be
+         stored in the field Peers of the channel (see devicepair for specials
+         about single-channel deivces). <br> For sender the same procedure as
+         described in devicepair is necessary to get a reading. Also note that
+         a proper diaplay will only be possible if define per channel (button)
+         was done - see define.  </li>
+
      <li><B>getpair</B><a name="CUL_HMgetpair"></a><br>
-         read pair information of the device. See also <a href="#CUL_HMpair">pair</a></li>
-	 <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6] &lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
-	 Read registerset in raw format. Meaning of the register cannot be displayed here in detail. <br>
-	 Register are structured in so called lists each containing a set of register.<br>
-	 List0 device-level settings e.g. CUL-pairing or dimmer thermal limit settings.<br>
-	 List1 per channel settings e.g. time to drive the blind up and down.<br>
-	 List3 per 'link' settings - means per peer-channel. This is a lot of data!. It controlls actions taken upon receive of a trigger from the peer.<br>
-	 List4 settings for channel (button) of a remote<br><br>
-	 &lt;PeerChannel&gt; paired HMid+ch, i.e. 4 byte (8 digit) value like '12345601'. It is mendatory for List 3 and 4 and can be left out for List 0 and 1. <br>
+         read pair information of the device. See also <a
+         href="#CUL_HMpair">pair</a></li>
+
+     <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]
+         &lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
+
+         Read registerset in raw format. Description of the registers is beyond
+         the scope of this documentation.<br>
+
+         Registers are structured in so called lists each containing a set of
+         registers.<br>
+
+         List0: device-level settings e.g. CUL-pairing or dimmer thermal limit
+         settings.<br>
+
+         List1: per channel settings e.g. time to drive the blind up and
+         down.<br>
+
+         List3: per 'link' settings - means per peer-channel. This is a lot of
+         data!. It controlls actions taken upon receive of a trigger from the
+         peer.<br>
+
+	 List4: settings for channel (button) of a remote<br><br>
+
+         &lt;PeerChannel&gt; paired HMid+ch, i.e. 4 byte (8 digit) value like
+         '12345601'. It is mendatory for List 3 and 4 and can be left out for
+         List 0 and 1. <br>
+
 	 'all' can be used to get data of each paired link of the channel. <br>
-	 'selfxx' can be used to address data for internal channels (assotiated with the build-in switches if any). xx is the number of the channel in decimal.<br>
-	 Note1: execution depends on the entity. If List1 is requested on a device rather then a channel the command will retrieve List1 for all channels assotiated. List3 with peerChannel = all will get all link for all channel if executed on a device.<br>
-	 Note2: for 'sender' see <a href="#CUL_HMremote">remote</a> <br>
-	 Note3: some retrieve may take a while - especially for devices with a lot of channel and links. It may be necessary to refresh the web interface manually to view the results <br>
-	 Note4: the direkt buttons on a HM device are hidden by default. Nevertheless those are implemented as links as well. To get access to the 'internal links' it is necessary to issue 'set &lt;name&gt; setReg intKeyVisib 81' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it by replace '81' with '01'<br>
-	 example:<br>
+
+         'selfxx' can be used to address data for internal channels (associated
+         with the build-in switches if any). xx is the number of the channel in
+         decimal.<br>
+
+         Note1: execution depends on the entity. If List1 is requested on a
+         device rather then a channel the command will retrieve List1 for all
+         channels assotiated. List3 with peerChannel = all will get all link
+         for all channel if executed on a device.<br>
+
+         Note2: for 'sender' see <a href="#CUL_HMremote">remote</a> <br>
+
+         Note3: the information retrieval may take a while - especially for
+         devices with a lot of channels and links. It may be necessary to
+         refresh the web interface manually to view the results <br>
+
+         Note4: the direct buttons on a HM device are hidden by default.
+         Nevertheless those are implemented as links as well. To get access to
+         the 'internal links' it is necessary to issue 'set &lt;name&gt; setReg
+         intKeyVisib 81' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
+         by replacing '81' with '01'<br> example:<br>
+
 	 <ul><code>
 	 set mydimmer getRegRaw List1<br>
 	 set mydimmer getRegRaw List3 all <br>
 	 </code></ul>
 	 </li>
      <li><B>pair</B><a name="CUL_HMpair"></a><br>
-         Pair the device again with its known serialNumber (e.g. after a device reset) to the CUL. If paired devices will report status information to the CUL. If not paired some requests may not be responded to. Additional some status may be send to broadcast not even to be sent at all, depending on the device. pair is on device level and is common for all channels. See also <a href="#CUL_HMgetpair">getPair</a>  and <a href="#CUL_HMunpair">unpair</a>. </li>
-	 <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt; &lt;peerChannel&gt; </B><a name="CUL_HMregRaw"></a><br>
-	 Will set register for device or channel. See also <a href="#CUL_HMgetRegRaw">getRegRaw</a>.<br>
-	 &lt;addr&gt; and &lt;data&gt; are 1 byte values that need to be given in hex.<br><br>
-	 example:<br>
+         Pair the device again with its known serialNumber (e.g. after a device
+         reset) to the CUL. If paired, devices will report status information to
+         the CUL. If not paired, the device wont respond to requests, and
+         certain status information is also not reported.  Paring is on device
+         level and is common for all channels. See also <a
+         href="#CUL_HMgetpair">getPair</a>  and <a
+         href="#CUL_HMunpair">unpair</a>.</li>
+     <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;
+         &lt;peerChannel&gt; </B><a name="CUL_HMregRaw"></a><br>
+         Will set register for device or channel. See also <a
+         href="#CUL_HMgetRegRaw">getRegRaw</a>.<br> &lt;addr&gt; and
+         &lt;data&gt; are 1 byte values that need to be given in hex.<br>
+	 Example:<br>
 	 <ul><code>
 	 set mydimmer regRaw List1 0B 10 00000000 <br>
 	 set mydimmer regRaw List1 0C 00 00000000 <br>
 	 </code></ul>
 	 will set the max drive time up for a blind actor to 25,6sec</li>
-	 <li><B>regSet &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
-	For some major register a readable version is implemented supporting register names &lt;regName&gt; and value conversionsing. Only a subset of register can be supproted.<br>
-	&lt;value&gt; is the data in human readable manner that will be written to the register.  <br>
-	&lt;peerChannel&gt; is required if this register is defined on a per 'devicepair' base. It can be set to '0' other wise.See <a href="CUL_HMgetRegRaw">getRegRaw</a>  for full description<br>
-	Supported register for a device can be explored using<br>
-	   <ul><code>set regSet ? 0 0</code></ul>
-	Condensed register description will be printed using<br>
-	   <ul><code>set regSet &lt;regname&gt; ? 0</code></ul>
-     </li>
+     <li><B>regSet &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
+        For some major register a readable version is implemented supporting
+        register names &lt;regName&gt; and value conversionsing. Only a subset
+        of register can be supproted.<br>
+        &lt;value&gt; is the data in human readable manner that will be written
+        to the register.<br>
+        &lt;peerChannel&gt; is required if this register is defined on a per
+        'devicepair' base. It can be set to '0' other wise.See <a
+        href="CUL_HMgetRegRaw">getRegRaw</a>  for full description<br>
+        Supported register for a device can be explored using<br>
+          <ul><code>set regSet ? 0 0</code></ul>
+        Condensed register description will be printed
+        using<br>
+          <ul><code>set regSet &lt;regname&gt; ? 0</code></ul>
+          </li>
      <li><B>reset</B><a name="CUL_HMreset"></a><br>
          Factory reset the device. You need to pair it again to use it with
          fhem.
@@ -3379,23 +3466,27 @@ A line ending with \ will be concatenated with the next one, so long lines
          fhem before you reset the device directly.
          </li> 
      <li><B>statusRequest</B><a name="CUL_HMstatusRequest"></a><br>
-         Update device status. For multichannel devices it should be issued on an per channel base
+         Update device status. For multichannel devices it should be issued on
+         an per channel base
          </li>
      <li><B>unpair</B><a name="CUL_HMunpair"></a><br>
-         "Unpair" the device, i.e. make it available to pair with other master devices. See <a href="#CUL_HMpair">pair</a> for description.</li>
+         "Unpair" the device, i.e. make it available to pair with other master
+         devices. See <a href="#CUL_HMpair">pair</a> for description.</li>
      <li><B>virtual &lt;number of buttons&gt;</B><a name="CUL_HMvirtual"></a><br>
-         configures a defined curcuit as virtual remote controll.  Then number of button being added is 1 to 255. If the command is issued a second time for the same entity additional buttons will be added. <br>
-		 Example for usage:
-		 <ul><code>
-			define vRemote CUL_HM 100000  # the selected HMid must not be in use<br>
-			set vRemote virtual 20        # define 20 button remote controll<br>
-			set vRemote_Btn4 devicepair 0 &lt;actorchannel&gt;  # pairs Button 4 and 5 to the given channel<br>
-			set vRemote_Btn4 press<br>
-			set vRemote_Btn5 press long<br>
-		</code></ul>
-
-		 see also <a href="#CUL_HMpress">press</a></li>
+         configures a defined curcuit as virtual remote controll.  Then number
+         of button being added is 1 to 255. If the command is issued a second
+         time for the same entity additional buttons will be added. <br>
+         Example for usage:
+         <ul><code>
+            define vRemote CUL_HM 100000  # the selected HMid must not be in use<br>
+            set vRemote virtual 20        # define 20 button remote controll<br>
+            set vRemote_Btn4 devicepair 0 &lt;actorchannel&gt;  # pairs Button 4 and 5 to the given channel<br>
+            set vRemote_Btn4 press<br>
+            set vRemote_Btn5 press long<br>
+        </code></ul>
+         see also <a href="#CUL_HMpress">press</a></li>
      </ul>
+
      <br>
      subType (i.e family) dependent commands:
      <ul>
@@ -3404,11 +3495,13 @@ A line ending with \ will be concatenated with the next one, so long lines
        <ul>
           <li><B>on</B>  - set the switch on</li>
           <li><B>off</B> - set the switch off</li>
-          <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> - set the switch on for the given seconds [0-85825945].<br>
-		  Note: off-for-timer like FS20 is not supported. It needs to be programmed on link level.</li>
+          <li><B>on-for-timer &lt;sec&gt;</B><a name="CUL_HMonForTimer"></a> -
+              set the switch on for the given seconds [0-85825945].<br> Note:
+              off-for-timer like FS20 is not supported. It needs to be programmed
+              on link level.</li>
           <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - set the switch on for the given end time.<br>
-		  <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
-		  Currently a max of 24h is supported with endtime.<br></li>
+	      <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
+	      Currently a max of 24h is supported with endtime.<br></li>
           <li><B>toggle</B> - toggle the switch.</li>
        </ul>
      <br></li>
@@ -3431,172 +3524,240 @@ A line ending with \ will be concatenated with the next one, so long lines
        </ul>
      <br></li>
      <li>remotes, pushButton<a name="CUL_HMremote"></a><br>
-	 This class of devices does not react on requests unless they are put to learn mode. FHEM obeys this behavior by stacking all requests until learn mode is detected. Manual interaction of the user is necessary to activate learn mode. Whether commands are pending is reported on device level with parameter 'protCmdPend'.
+         This class of devices does not react on requests unless they are put
+         to learn mode. FHEM obeys this behavior by stacking all requests until
+         learn mode is detected. Manual interaction of the user is necessary to
+         activate learn mode. Whether commands are pending is reported on
+         device level with parameter 'protCmdPend'.
        <ul>
-        <li><B>devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual] [set|unset] [actor|remote]</B><a name="CUL_HMdevicepair"></a><br>
-         Pair/unpair will establish a connection between a sender-channel and an actuator-channel called link in HM nomenclatur. Trigger from sender-channel, e.g. button press, will be processed by the actuator-channel without CCU interaction. Sender-channel waits for an acknowledge of each actuator paired to it. Positive indication will be given once all actuator responded. <br>
-		 Sender must be set into learning mode after command execution. FHEM postpones the commands until then.<br>
-		 devicepair can be repeated for an existing devicepair. This will cause parameter reset to HM defaults for this link.<br>
-		 Even though the command is execute on a remote or push-button it will as well take effect on the actuator directly. Both sides' pairing is virtually independant and has different impact on sender and receiver side.<br>
-		 Devicepairing of one actuator-channel to multiple sender-channel as well as one sender-channel to multiple Actuator-channel is possible.<br>
-		 &lt;hmDevice&gt; is the actuator-channel to be paired.<br>
-		 &lt;btn_no&gt; is the sender-channel (button) to be paired. If 'single' 
-		 is choosen buttons are counted from 1. For 'dual' btn_no is the number
-		 of the Button-pair to be used. I.e. '3' 
-		 in dual is the 3rd button pair correcponding to button 5 and 6 in 
-		 single mode.<br>
-		 if the command is executed on a channel the btn_no is ignored.<br>
-		 [single|dual]: this mode impacts the default behavior of the 
-		 Actuator upon using this button. E.g. a dimmer can be learned to a 
-		 single button or to a button pair. <br>
-		 'dual' (default) Button pairs two buttons to one actuator. With a 
-		 dimmer this means one button for dim-up and one for dim-down. <br>
-		 'single' uses only one button of the sender. It is useful for e.g. for
-		 simple switch actuator to toggle on/off. Nevertheless 
-		 also dimmer can be learned to only one button. <br>
-		 'set'   will setup pairing for the channels<br>
-		 'unset' will remove the pairing for the channels<br>
-		 [actor|remote|both] limits the execution to only actor or only remote. This gives the user the option to redo the pairing on the remote channel while the settings in the actor will not be removed.<br>
-		 example:<ul> <code>
-		    set myRemote devicepair 2 mySwActChn single set       # pair second button to an actuator channel<br>
-		    set myRmtBtn devicepair 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
-		    set myRemote devicepair 2 mySwActChn dual set         #pair button 3 and 4<br>
-		    set myRemote devicepair 3 mySwActChn dual unset       #remove pairing for button 5 and 6<br>
-		    set myRemote devicepair 3 mySwActChn dual unset aktor #remove pairing for button 5 and 6 in actor only<br>
-		    set myRemote devicepair 3 mySwActChn dual set remote  #pair button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
-			</code></ul>
-        </li>
-       </ul>
-     <br></li>
-	 <li>virtual<a name="CUL_HMvirtual"></a><br>
-	   <ul>
-	   <li><B><a href="#CUL_HMdevicepair">devicepair</a></B> see remote</li>
-	   <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
-	   simulates a button press short (default) or long. Note that the current implementation will not specify the duration for long. Only one trigger will be sent of type "long".
-	   </ul>
-	 </li>
-     <li>smokeDetector<br>
-         Note: All these commands work right now only if you have more then one
-         smoekDetector, and you paired them to form a group. For issuing the
-         commands you have to use the master of this group, and currently you
-         have to guess which of the detectors is the master.
-       <ul>
-         <li><B>test</B> - execute a network test</li>
-         <li><B>alarmOn</B> - initiate an alarm</li>
-         <li><B>alarmOff</B> - switch off the alarm</li>
-       </ul>
-     <br></li>
-     <li>4Dis (HM-PB-4DIS-WM)
-       <ul>
-         <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
-             Set the text on the display of the device. To this purpose issue
-             this set command first (or a number of them), and then choose from
-             the teach-in menu of the 4Dis the "Central" to transmit the data.
-             Example:
-             <ul><code>
-             set 4Dis text 1 on On Lamp<br>
-             set 4Dis text 1 off Kitchen Off<br>
-             </code></ul>
-       </ul></li>
-     <br></li>
-     <li>Climate-Control (HM-CC-TC)
-       <ul>
-         <li>day-temp &lt;tmp&gt;<br>
-             night-temp &lt;tmp&gt;<br>
-             party-temp &lt;tmp&gt;<br>
-             desired-temp &lt;tmp&gt;<br>
-             Set different temperatures. Temp must be between 6 and 30
-             Celsius, and precision is half a degree.</li>
-         <li>tempListSat HH:MM temp ... 24:00 temp<br>
-             tempListSun HH:MM temp ... 24:00 temp<br>
-             tempListMon HH:MM temp ... 24:00 temp<br>
-             tempListTue HH:MM temp ... 24:00 temp<br>
-             tempListThu HH:MM temp ... 24:00 temp<br>
-             tempListWed HH:MM temp ... 24:00 temp<br>
-             tempListFri HH:MM temp ... 24:00 temp<br>
-             Specify a list of temperature intervals. Up to 24 intervals can be
-             specified for each week day, the resolution is 10 Minutes. The
-             last time spec must always be 24:00.<br>
-             Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
-             Meaning: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
-             22.5, thereafter until midnight, 19 degrees celsius is desired.</li>
-         <li>displayMode [temp-only|temp-hum]<br>
-             displayTemp [actual|setpoint]<br>
-             displayTempUnit [celsius|fahrenheit]<br>
-             controlMode [manual|auto|central|party]<br>
-             decalcDay &lt;day&gt;</li>
-       </ul></li><br>
-     <li>OutputUnit (HM-OU-LED16)
-       <ul>
-        <li><B>led [off|red|green|yellow]</B><br>
-            switches the LED of the channel to the color. If the command is executed on a device it will set all LEDs to the specified color<br></li>
-        <li><B>ilum &lt;brightness&gt;&lt;duration&gt; </B><br>
-            &lt;brightness&gt; [0-15] of backlight.<br>
-		    &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br>
-		</li>
-       </ul><br></li>
-     <li>OutputUnit (HM-OU-CFM-PL)
-       <ul>
-         <li><B>led &lt;color&gt;[,&lt;color&gt;..]</B><br>
-		    Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A sequence of colors can be given separating the color entries by ','. White spaces must not be used in the list. 'S' indicates short and 'L' long ilumination. <br></li>
-         <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..]</B><br>
-            Play a series of tones. List is to be entered separated by ','. White spaces must not be used in the list.<br></li>
-       </ul><br></li>
-     <li>HM-RC-19xxx
-       <ul>
-	     <li><B>alarm &lt;count&gt;</B><br>
-			issue an alarm message to the remote<br></li>
-	     <li><B>service &lt;count&gt;</B><br>
-			issue an service message to the remote<br></li>
-	     <li><B>symbol &lt;symbol&gt; [set|unset]</B><br>
-			activate a symbol as available on the remote.<br></li>
-		 <li><B>beep [off|1|2|3]</B><br>
-			activate tone<br></li>
-		 <li><B>backlight [off|on|slow|fast]</B><br> 
-		    activate backlight<br></li>
-		 <li><B>display &lt;text&gt; comma unit tone backlight &lt;symbol(s)&gt; </B><br>
-		    control display of the remote<br>
-		    &lt;text&gt; : up to 5 chars <br>
-		    comma : 'comma' activates the comma, 'no' leaves it off <br>
-		    [unit] : set the unit symbols. [off|Proz|Watt|x3|C|x5|x6|x7|F|x9|x10|x11|x12|x13|x14|x15]. Currently the x3..x15 display is not tested. <br>
-			tone : activate one of the 3 tones [off|1|2|3]<br>
-			backlight: activate backlight flash mode [off|on|slow|fast]<br>
-			&lt;symbol(s)&gt; activate symbol display. Multople symbols can be acticated at the same time, concatinating them comma separated. Don't use spaces here. Possiblesymbols are			
-			[bulb|switch|window|door|blind|scene|phone|bell|clock|arrowUp|arrowDown]<br><br>
-			Example:
-			<ul><code>
-			# "hello" in display, symb bulb on, backlight, beep<br>
-			set FB1 display Hello no off 1 on bulb<br>
-			# "1234,5" in display with unit 'W'. Symbols scene,phone,bell and clock are active. Backlight flashing fast, Beep is second tone<br>
-            set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock  </ul></code>  
-			</li>
-       </ul><br></li>
-     <li>keyMatic<br><br>
-       <ul>The Keymatic uses the AES signed communication. Therefore the control of the Keymatic is only together with the HM-LAN adapter possible. But the CUL can read and react on the status information of the Keymatic.</ul><br>
-       <ul>
-	     <li><B>lock</B><br>
-			The lock bolt moves to the locking position<br></li>
-	     <li><B>unlock [sec]</B><br>
-			The lock bolt moves to the unlocking position.<br>
-			[sec]: Sets the delay in seconds after the lock automatically locked again.<br>0 - 65535 seconds</li>
-	     <li><B>open [sec]</B><br>
-			Unlocked the door so that the door can be opened.<br>
-			[sec]: Sets the delay in seconds after the lock automatically locked again.<br>0 - 65535 seconds</li>
-		 <li><B>inhibit-set</B><br>
-			Blocked all directly paired remotes and the hardware buttons of the keyMatic. Now the door lock drive can be controlled only by FHEM.<br></li>
-		 <li><B>inhibit-clear</B><br>
-			Deletes the previously set inhibit-flag again.<br><br>
-			Example:
-			<ul><code>
-			# Lock the lock<br>
-			set keymatic lock<br><br>
-			# open the door and relock the lock after 60 seconds<br>
-            set keymatic unlock 60</ul></code>  
-			</li>
-       </ul></li>
-     </ul>
-     <br>
+        <li><B>devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual]
+        [set|unset] [actor|remote]</B><a name="CUL_HMdevicepair"></a><br>
 
+         Pair/unpair will establish a connection between a sender-channel and
+         an actuator-channel called link in HM nomenclatur. Trigger from
+         sender-channel, e.g. button press, will be processed by the
+         actuator-channel without CCU interaction. Sender-channel waits for an
+         acknowledge of each actuator paired to it. Positive indication will be
+         given once all actuator responded. <br>
+
+         Sender must be set into learning mode after command execution. FHEM
+         postpones the commands until then.<br>
+
+         devicepair can be repeated for an existing devicepair. This will cause
+         parameter reset to HM defaults for this link.<br>
+
+         Even though the command is executed on a remote or push-button it will
+         as well take effect on the actuator directly. Both sides' pairing is
+         virtually independant and has different impact on sender and receiver
+         side.<br>
+
+         Devicepairing of one actuator-channel to multiple sender-channel as
+         well as one sender-channel to multiple Actuator-channel is
+         possible.<br>
+
+         &lt;hmDevice&gt; is the actuator-channel to be paired.<br>
+
+         &lt;btn_no&gt; is the sender-channel (button) to be paired. If
+         'single' is choosen buttons are counted from 1. For 'dual' btn_no is
+         the number of the Button-pair to be used. I.e. '3' in dual is the
+         3rd button pair correcponding to button 5 and 6 in single mode.<br>
+
+         If the command is executed on a channel the btn_no is ignored.<br>
+
+         [single|dual]: this mode impacts the default behavior of the 
+         Actuator upon using this button. E.g. a dimmer can be learned to a 
+         single button or to a button pair. <br>
+
+         'dual' (default) Button pairs two buttons to one actuator. With a 
+         dimmer this means one button for dim-up and one for dim-down. <br>
+
+         'single' uses only one button of the sender. It is useful for e.g. for
+         simple switch actuator to toggle on/off. Nevertheless also dimmer can
+         be learned to only one button. <br>
+
+         'set'   will setup pairing for the channels<br>
+
+         'unset' will remove the pairing for the channels<br>
+
+         [actor|remote|both] limits the execution to only actor or only remote.
+         This gives the user the option to redo the pairing on the remote
+         channel while the settings in the actor will not be removed.<br>
+
+         Example:<ul> <code>
+           set myRemote devicepair 2 mySwActChn single set       # pair second button to an actuator channel<br>
+           set myRmtBtn devicepair 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
+           set myRemote devicepair 2 mySwActChn dual set         #pair button 3 and 4<br>
+           set myRemote devicepair 3 mySwActChn dual unset       #remove pairing for button 5 and 6<br>
+           set myRemote devicepair 3 mySwActChn dual unset aktor #remove pairing for button 5 and 6 in actor only<br>
+           set myRemote devicepair 3 mySwActChn dual set remote  #pair button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
+         </code></ul>
+    </li>
+    </ul>
+    <br>
+
+    </li>
+     <li>virtual<a name="CUL_HMvirtual"></a><br>
+       <ul>
+       <li><B><a href="#CUL_HMdevicepair">devicepair</a></B> see remote</li>
+       <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
+         simulates a button press short (default) or long. Note that the current
+         implementation will not specify the duration for long. Only one trigger
+         will be sent of type "long".
+       </ul>
+     </li>
+
+    <li>smokeDetector<br>
+       Note: All these commands work right now only if you have more then one
+       smoekDetector, and you paired them to form a group. For issuing the
+       commands you have to use the master of this group, and currently you
+       have to guess which of the detectors is the master.
+     <ul>
+       <li><B>test</B> - execute a network test</li>
+       <li><B>alarmOn</B> - initiate an alarm</li>
+       <li><B>alarmOff</B> - switch off the alarm</li>
+     </ul>
+    </li>
+
+    <li>4Dis (HM-PB-4DIS-WM)
+    <ul>
+      <li><B>text &lt;btn_no&gt; [on|off] &lt;text1&gt; &lt;text2&gt;</B><br>
+          Set the text on the display of the device. To this purpose issue
+          this set command first (or a number of them), and then choose from
+          the teach-in menu of the 4Dis the "Central" to transmit the data.
+          Example:
+          <ul><code>
+          set 4Dis text 1 on On Lamp<br>
+          set 4Dis text 1 off Kitchen Off<br>
+          </code></ul>
+    </ul></li>
+    <br></li>
+
+    <li>Climate-Control (HM-CC-TC)
+    <ul>
+      <li>day-temp &lt;tmp&gt;<br>
+          night-temp &lt;tmp&gt;<br>
+          party-temp &lt;tmp&gt;<br>
+          desired-temp &lt;tmp&gt;<br>
+          Set different temperatures. Temp must be between 6 and 30
+          Celsius, and precision is half a degree.</li>
+      <li>tempListSat HH:MM temp ... 24:00 temp<br>
+          tempListSun HH:MM temp ... 24:00 temp<br>
+          tempListMon HH:MM temp ... 24:00 temp<br>
+          tempListTue HH:MM temp ... 24:00 temp<br>
+          tempListThu HH:MM temp ... 24:00 temp<br>
+          tempListWed HH:MM temp ... 24:00 temp<br>
+          tempListFri HH:MM temp ... 24:00 temp<br>
+          Specify a list of temperature intervals. Up to 24 intervals can be
+          specified for each week day, the resolution is 10 Minutes. The
+          last time spec must always be 24:00.<br>
+          Example: set th tempListSat 06:00 19 23:00 22.5 24:00 19<br>
+          Meaning: until 6:00 temperature shall be 19, from then until 23:00 temperature shall be 
+          22.5, thereafter until midnight, 19 degrees celsius is desired.</li>
+      <li>displayMode [temp-only|temp-hum]<br>
+          displayTemp [actual|setpoint]<br>
+          displayTempUnit [celsius|fahrenheit]<br>
+          controlMode [manual|auto|central|party]<br>
+          decalcDay &lt;day&gt;</li>
+    </ul></li><br>
+
+    <li>OutputUnit (HM-OU-LED16)
+    <ul>
+    <li><B>led [off|red|green|yellow]</B><br>
+        switches the LED of the channel to the color. If the command is
+        executed on a device it will set all LEDs to the specified
+        color<br></li>
+    <li><B>ilum &lt;brightness&gt;&lt;duration&gt; </B><br>
+        &lt;brightness&gt; [0-15] of backlight.<br>
+        &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br>
+    </li>
+    </ul><br></li>
+
+    <li>OutputUnit (HM-OU-CFM-PL)
+    <ul>
+      <li><B>led &lt;color&gt;[,&lt;color&gt;..]</B><br>
+          Possible colors are [redL|greenL|yellowL|redS|greenS|yellowS]. A
+          sequence of colors can be given separating the color entries by ','.
+          White spaces must not be used in the list. 'S' indicates short and
+          'L' long ilumination. <br></li>
+      <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..]</B><br>
+         Play a series of tones. List is to be entered separated by ','. White
+         spaces must not be used in the list.<br></li>
+    </ul><br></li>
+
+    <li>HM-RC-19xxx
+      <ul>
+      <li><B>alarm &lt;count&gt;</B><br>
+          issue an alarm message to the remote<br></li>
+      <li><B>service &lt;count&gt;</B><br>
+          issue an service message to the remote<br></li>
+      <li><B>symbol &lt;symbol&gt; [set|unset]</B><br>
+          activate a symbol as available on the remote.<br></li>
+      <li><B>beep [off|1|2|3]</B><br>
+          activate tone<br></li>
+      <li><B>backlight [off|on|slow|fast]</B><br> 
+          activate backlight<br></li>
+      <li><B>display &lt;text&gt; comma unit tone backlight &lt;symbol(s)&gt;
+         </B><br>
+         control display of the remote<br>
+         &lt;text&gt; : up to 5 chars <br>
+         comma : 'comma' activates the comma, 'no' leaves it off <br>
+         [unit] : set the unit symbols.
+         [off|Proz|Watt|x3|C|x5|x6|x7|F|x9|x10|x11|x12|x13|x14|x15]. Currently
+         the x3..x15 display is not tested. <br>
+
+         tone : activate one of the 3 tones [off|1|2|3]<br>
+
+         backlight: activate backlight flash mode [off|on|slow|fast]<br>
+
+         &lt;symbol(s)&gt; activate symbol display. Multople symbols can be
+         acticated at the same time, concatinating them comma separated. Don't
+         use spaces here. Possiblesymbols are			
+
+         [bulb|switch|window|door|blind|scene|phone|bell|clock|arrowUp|arrowDown]<br><br>
+         Example:
+           <ul><code>
+           # "hello" in display, symb bulb on, backlight, beep<br>
+           set FB1 display Hello no off 1 on bulb<br>
+           # "1234,5" in display with unit 'W'. Symbols scene,phone,bell and
+           # clock are active. Backlight flashing fast, Beep is second tone<br>
+           set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock
+           </ul></code>  
+         </li>
+      </ul><br></li>
+
+    <li>keyMatic<br><br>
+      <ul>The Keymatic uses the AES signed communication. Therefore the control
+      of the Keymatic is only together with the HM-LAN adapter possible. But
+      the CUL can read and react on the status information of the
+      Keymatic.</ul><br>
+      <ul>
+      <li><B>lock</B><br>
+         The lock bolt moves to the locking position<br></li>
+      <li><B>unlock [sec]</B><br>
+         The lock bolt moves to the unlocking position.<br> [sec]: Sets the
+         delay in seconds after the lock automatically locked again.<br>0 -
+         65535 seconds</li>
+      <li><B>open [sec]</B><br>
+         Unlocked the door so that the door can be opened.<br>
+         [sec]: Sets the delay in seconds after the lock automatically locked
+         again.<br>0 - 65535 seconds</li>
+      <li><B>inhibit-set</B><br>
+         Blocked all directly paired remotes and the hardware buttons of the
+         keyMatic. Now the door lock drive can be controlled only by
+         FHEM.<br></li>
+      <li><B>inhibit-clear</B><br>
+         Deletes the previously set inhibit-flag again.<br><br>
+         Example:
+         <ul><code>
+           # Lock the lock<br>
+           set keymatic lock<br><br>
+           # open the door and relock the lock after 60 seconds<br>
+          set keymatic unlock 60
+        </ul></code>  
+        </li>
+      </ul></li>
+   </ul>
+   <br>
      Debugging:
        <ul>
          <li><B>raw &lt;data&gt; ...</B><br>
@@ -3619,13 +3780,17 @@ A line ending with \ will be concatenated with the next one, so long lines
      <ul>
      <li><B>param &lt;paramName&gt;</B><br>
          returns the content of the relevant parameter for the entity. <br>
-		 Note: if this command is executed on a channel and 'model' is requested the content hosting device's 'model' will be returned.
+         Note: if this command is executed on a channel and 'model' is
+         requested the content hosting device's 'model' will be returned.
          </li>
      <li><B>reg &lt;addr&gt; &lt;list&gt; &lt;peerID&gt;</B><br>
-         returns the value of a register. The data is taken from the storage in FHEM. It is not read again. If registercontent is not present at this point in time please use getReg in advance.<br>
-		 &lt;addr&gt; address in hex of the register. Registername can be used alternaly if available in FHEM.<br>
-		 &lt;list&gt; list from which the register is taken. If rgistername is used list is ignored and can be set to 0.<br>
-		 &lt;peerID&gt; identifies the registerbank in case of list3 and list4. It an be set to dummy if not used.<br>
+         returns the value of a register. The data is taken from the storage in
+         FHEM. It is not read again. If registercontent is not present at this
+         point in time please use getReg in advance.<br>
+
+         &lt;addr&gt; address in hex of the register. Registername can be used alternaly if available in FHEM.<br>
+         &lt;list&gt; list from which the register is taken. If rgistername is used list is ignored and can be set to 0.<br>
+         &lt;peerID&gt; identifies the registerbank in case of list3 and list4. It an be set to dummy if not used.<br>
          </li>
      <li><B>regList</B><br>
          returns a list of register that are implemented in FHEM for this device.<br>
