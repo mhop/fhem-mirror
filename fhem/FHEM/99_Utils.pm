@@ -90,5 +90,59 @@ sub rtrim($)
    return $string;
 }
 
+######## UntoggleDirect ###########################################
+# What  : For devices paired directly, converts state 'toggle' into 'on' or 'off'
+# Call  : { UntoggleDirect("myDevice") }
+#         define untoggle_myDevice notify myDevice { UntoggleDirect("myDevice") }
+# Source: http://www.fhemwiki.de/wiki/FS20_Toggle_Events_auf_On/Off_umsetzen
+sub UntoggleDirect($) 
+{
+ my ($obj) = shift;
+ Log 3, "UntoggleDirect($obj)";
+ if (Value($obj) eq "toggle"){
+   if (OldValue($obj) eq "off") {
+     {fhem ("setstate ".$obj." on")}
+   }
+   else {
+     {fhem ("setstate ".$obj." off")}
+   }
+ }
+ else {
+   {fhem "setstate ".$obj." ".Value($obj)}
+ }  
+}
+
+
+######## UntoggleIndirect #########################################
+# What  : For devices paired indirectly, switches the target device 'on' or 'off' also when a 'toggle' was sent from the source device
+# Call  : { UntoggleIndirect("mySensorDevice","myActorDevice","50%") }
+#         define untoggle_mySensorDevice_myActorDevice notify mySensorDevice { UntoggleIndirect("mySensorDevice","myActorDevice","50%%") }
+# Source: http://www.fhemwiki.de/wiki/FS20_Toggle_Events_auf_On/Off_umsetzen
+sub UntoggleIndirect($$$)
+{
+  my ($sender, $actor, $dimvalue) = @_;
+  Log 4, "UntoggleDirect($sender, $actor, $dimvalue)";
+  if (Value($sender) eq "toggle")
+  {
+    if (Value($actor) eq "off") {fhem ("set ".$actor." on")}
+    else {fhem ("set ".$actor." off")}
+  }
+  ## workaround for dimming currently not working with indirect pairing
+  ## (http://culfw.de/commandref.html: "TODO/Known BUGS - FS20 dim commands should not repeat.")
+  elsif (Value($sender) eq "dimup") {fhem ("set ".$actor." dim100%")}
+  elsif (Value($sender) eq "dimdown") {fhem ("set ".$actor." ".$dimvalue)}
+  elsif (Value($sender) eq "dimupdown")
+  {
+    if (Value($actor) eq $dimvalue) {fhem ("set ".$actor." dim100%")}
+       ## Heuristic above doesn't work if lamp was dimmed, then switched off, then switched on, because state is "on", but the lamp is actually dimmed.
+    else {fhem ("set ".$actor." ".$dimvalue)}
+    sleep 1;
+  }
+  ## end of workaround
+  else {fhem ("set ".$actor." ".Value($sender))}
+
+  return;
+}
+
 
 1;
