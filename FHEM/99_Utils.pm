@@ -52,4 +52,43 @@ abstime2rel($)
   return sprintf("%02d:%02d:%02d", $diff/3600, ($diff/60)%60, $diff%60);
 }
 
+
+######## trim #####################################################
+# What  : cuts blankspaces from the beginning and end of a string
+# Call  : { trim(" Hello ") }
+# Source: http://www.somacon.com/p114.php , 
+#         http://www.fhemwiki.de/wiki/TRIM-Funktion-Anfangs/EndLeerzeichen_aus_Strings_entfernen
+sub trim($)
+{ 
+   my $string = shift;
+   $string =~ s/^\s+//;
+   $string =~ s/\s+$//;
+   return $string;
+} 
+
+######## ltrim ####################################################
+# What  : cuts blankspaces from the beginning of a string
+# Call  : { ltrim(" Hello") }
+# Source: http://www.somacon.com/p114.php , 
+#         http://www.fhemwiki.de/wiki/TRIM-Funktion-Anfangs/EndLeerzeichen_aus_Strings_entfernensub ltrim($)
+sub ltrim($)
+{
+   my $string = shift;
+   $string =~ s/^\s+//;
+   return $string;
+}
+
+######## rtrim ####################################################
+# What  : cuts blankspaces from the end of a string
+# Call  : { rtrim("Hello ") }
+# Source: http://www.somacon.com/p114.php , 
+#         http://www.fhemwiki.de/wiki/TRIM-Funktion-Anfangs/EndLeerzeichen_aus_Strings_entfernensub ltrim($)
+sub rtrim($)
+{
+   my $string = shift;
+   $string =~ s/\s+$//;
+   return $string;
+}
+
+
 1;
