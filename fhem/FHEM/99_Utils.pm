@@ -98,7 +98,7 @@ sub rtrim($)
 sub UntoggleDirect($) 
 {
  my ($obj) = shift;
- Log 3, "UntoggleDirect($obj)";
+ Log 4, "UntoggleDirect($obj)";
  if (Value($obj) eq "toggle"){
    if (OldValue($obj) eq "off") {
      {fhem ("setstate ".$obj." on")}
