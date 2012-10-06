@@ -3420,7 +3420,7 @@ A line ending with \ will be concatenated with the next one, so long lines
          Note4: the direct buttons on a HM device are hidden by default.
          Nevertheless those are implemented as links as well. To get access to
          the 'internal links' it is necessary to issue 'set &lt;name&gt; setReg
-         intKeyVisib 81' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
+         intKeyVisib 1' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
          by replacing '81' with '01'<br> example:<br>
 
 	 <ul><code>
@@ -3672,7 +3672,8 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li><B>led [off|red|green|yellow]</B><br>
         switches the LED of the channel to the color. If the command is
         executed on a device it will set all LEDs to the specified
-        color<br></li>
+        color.<br>
+		For Expert all LEDs can be set individual by providing a 8-digit hex number to the device.<br></li>
     <li><B>ilum &lt;brightness&gt;&lt;duration&gt; </B><br>
         &lt;brightness&gt; [0-15] of backlight.<br>
         &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br>
