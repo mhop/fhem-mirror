@@ -2004,14 +2004,20 @@ CUL_HM_Set($@)
 	  push (@peerList,substr(CUL_HM_Name2Id($peer),0,6));
 	}
 	my $oldPeer; # only once to device, not channel!
+	 
 	foreach my $peer (sort @peerList){
 	  next if ($oldPeer eq $peer);
-      CUL_HM_SendCmd($hash, sprintf("++A440%s%s%s%02X",
-	                    $srcId,$peer,$btn,$pressCnt),1,0);
+
+	  my $peerHash = $modules{CUL_HM}{defptr}{$peer};
+	  my $peerSt = AttrVal($peerHash->{NAME}, "subType", "");
+	  my $peerFlag = ($peerSt ne "keyMatic") ? "A4" : "B4"; 
+      CUL_HM_SendCmd($hash, sprintf("++%s40%s%s%s%02X",
+	                 $peerFlag,$srcId,$peer,$btn,$pressCnt),1,0);
 	  $oldPeer = $peer;
 	}
-	CUL_HM_SendCmd($hash, sprintf("++A440%s000000%s%02X",
-	                    $srcId,$btn,$pressCnt),1,0)if (!@peerList);
+
+	CUL_HM_SendCmd($hash, sprintf("++%40%s000000%s%02X",
+	               $flag,$srcId,$btn,$pressCnt),1,0)if (!@peerList);
 	$hash->{helper}{count}=$pressCnt;
   } 
   elsif($cmd eq "devicepair") { ###############################################
@@ -2030,7 +2036,7 @@ CUL_HM_Set($@)
 	      if(defined($target) && (($target ne"actor") &&
 		     ($target ne"remote")&&($target ne"both")));  
 	$single = ($single eq "single")?1:"";#default to dual
-	$set = ($set eq "unset")?"":1;
+	$set = ($set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
 	$b1 = ($isChannel) ? hex($chn):sprintf("%02X",$bNo);
@@ -2083,8 +2089,10 @@ CUL_HM_Set($@)
       }
 	}
 	if (!$target || $target eq "actor" || $target eq "both"){
+	  my $peerSt = AttrVal($peerHash->{NAME}, "subType", "");
+	  my $peerFlag = ($peerSt ne "keyMatic") ? "A0" : "B0"; 
       CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
-            $flag,$id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
+            $peerFlag,$id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
 	}
     $chash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
