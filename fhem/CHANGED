@@ -1,4 +1,6 @@
 - SVN
+  - feature: added functions trim, ltrim, rtrim, UntoggleDirect, UntoggleIndirect
+  - feature: added functions FB_mail, FB_WLANswitch
   - rework:  CUL_HM reworks with respect to protocol. 
              additions for several devices and commands
   - feature: rfmode supports to listen to MAX if fw>1.46, 00_CUL.pm (Jens)
@@ -65,6 +67,7 @@
   - feature: module HTTPSRV added (Boris)
   - feature: module FLOORPLAN added (Uli Maass)
   - bugfix:  FHEMWEB: weblink with group attribute is shown together with other elements
+
 
 - 2011-12-31 (5.2)
   - bugfix:  applying smallscreen attributes to firefox/opera
