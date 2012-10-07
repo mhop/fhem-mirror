@@ -202,7 +202,7 @@ CUL_HM_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
-					   "chanNo device peerList".
+					   "chanNo device peerList ".
 					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast rxType ".
 					   "channel_01 channel_02 channel_03 channel_04 channel_05 channel_06 ".
 					   "channel_07 channel_08 channel_09 channel_0A channel_0B channel_0C ". 
@@ -1389,7 +1389,8 @@ CUL_HM_Set($@)
 
   } 
   elsif(!defined($h)) {
-    my @arr = keys %culHmGlobalSets if($st ne "virtual");
+    my @arr;
+    @arr = keys %culHmGlobalSets if($st ne "virtual");
     push @arr, keys %{$culHmSubTypeSets{$st}} if($culHmSubTypeSets{$st});
     push @arr, keys %{$culHmModelSets{$md}} if($culHmModelSets{$md});
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
@@ -2031,7 +2032,7 @@ CUL_HM_Set($@)
 
 	my ($b1,$b2,$nrCh2Pair);
 	$b1 = ($isChannel) ? hex($chn):sprintf("%02X",$bNo);
-	$b1 = $b1*2 - 1 if($single && !$chn);
+	$b1 = $b1*2 - 1 if(!$single && !$isChannel);
 	if ($single){ 
         $b2 = $b1;
 	    $nrCh2Pair = 1;
@@ -2068,6 +2069,7 @@ CUL_HM_Set($@)
   	      $peerlist =~ s/$repl//;#avoid duplicate
   	      $peerlist.= $repl if($set == 1);
 		  $attr{$btnName}{peerList} = $peerlist;
+		  delete $attr{$btnName}{peerList} if (!$peerlist);
 	    }
 		else{
 		  my $bStr = sprintf("%02X",$b);
