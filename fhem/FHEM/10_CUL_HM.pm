@@ -1376,6 +1376,7 @@ CUL_HM_Set($@)
   my $chn = (length($dst) == 8)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
 
+  my $flag = ($st ne "keyMatic") ? "A0" : "B0"; 
   my $chash = CUL_HM_getDeviceHash($hash);
 
   my $h = $culHmGlobalSets{$cmd} if($st ne "virtual");
@@ -1429,7 +1430,7 @@ CUL_HM_Set($@)
   } 
   elsif($cmd eq "reset") { ############################################
 	CUL_HM_PushCmdStack($hash,
-        sprintf("++A011%s%s0400", $id,$dst));
+        sprintf("++%s11%s%s0400",$flag,$id,$dst));
   } 
   elsif($cmd eq "pair") { #############################################
     return "pair is not enabled for this type of device, ".
@@ -1453,7 +1454,6 @@ CUL_HM_Set($@)
   }
   elsif($cmd eq "statusRequest") { ############################################
 	my $chnFound;
-	my $flag = ($st eq "keyMatic")?"B0":"A0";
     foreach my $channel (keys %{$attr{$name}}){
 	  next if ($channel !~ m/^channel_/);
 	  my $chnHash = CUL_HM_name2hash($attr{$name}{$channel});
@@ -1462,7 +1462,7 @@ CUL_HM_Set($@)
 		$chnNo = substr($chnNo,6,2);
 	    $chnFound = 1 if ($chnNo eq "01");
 		CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s0E",
-		                    $flag, $id,$dst,$chnNo));
+		                    $flag,$id,$dst,$chnNo));
 	  }
     }
 	# if channel or single channel device
@@ -1471,18 +1471,19 @@ CUL_HM_Set($@)
 		$state = "";
   } 
   elsif($cmd eq "getpair") { ##################################################
-    CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s00040000000000", $id,$dst));
+    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s00040000000000",
+                        $flag,$id,$dst));
 	$state = "";	
   } 
   elsif($cmd eq "getdevicepair") { ############################################
-    CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s03", $id,$dst, $chn));
+    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03", $flag,$id,$dst, $chn));
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
     CUL_HM_PushCmdStack($hash, "++A112$id$dst") 
 	    if(AttrVal($name, "rxType", "0") =~ m/wakeup/);     # Wakeup...
-    CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s00040000000000",$id,$dst))
-	    if (length($dst) == 6);
+    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s00040000000000",
+                        $flag,$id,$dst)) if (length($dst) == 6);
 	my $chnFound;
     foreach my $channel (keys %{$attr{$name}}){
 	  next if ($channel !~ m/^channel_/);
@@ -1524,8 +1525,8 @@ CUL_HM_Set($@)
 
 	if($cmd eq "getRegRaw"){
 	  if ($list eq "00"){
-	    CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s00040000000000",
-		                        $id,$dst));
+	    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s00040000000000",
+                            $flag,$id,$dst));
 	  }
 	  else{# for all channels assotiated
 	    my $chnFound;
@@ -1537,24 +1538,25 @@ CUL_HM_Set($@)
 	        my $chnNo = $chnHash->{DEF};
 		    $chnNo = substr($chnNo,6,2);
 			if ($list =~m /0[34]/){#getPeers to see if list3 is available 
-			  CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s03", 
-			                          $id,$dst,$chnNo));
+			  CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03", 
+                                  $flag,$id,$dst,$chnNo));
 		      $chnHash->{helper}{getCfgList3} = $peerID.$peerChn;#list3 regs 
 			}
 			else{
-			  CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s04%s%s%s", 
-	                                  $id,$dst,$chnNo,$peerID,$peerChn,$list));
+			  CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s04%s%s%s", 
+                                  $flag,$id,$dst,$chnNo,$peerID,$peerChn,$list));
 			}
 	      }
         }
 		if (!$chnFound){
 		  if ($list =~m /0[34]/){#getPeers to see if list3 is available 
-		    CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s03",$id,$dst,$chn));
+		    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",
+		                        $flag,$id,$dst,$chn));
 		    $hash->{helper}{getCfgList3} = $peerID.$peerChn;#list3 regs
 		  }
 		  else{
-		    CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s0400000000%s", 
-	                                 $id,$dst,$chn,$list));
+		    CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s0400000000%s", 
+                                $flag,$id,$dst,$chn,$list));
 		  }
 		}
 	  }
@@ -2074,15 +2076,15 @@ CUL_HM_Set($@)
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
-  	               "++A001${id}${dst}${bStr}$cmd${peerDst}${peerChn}00");
+  	               "++".$flag."01${id}${dst}${bStr}$cmd${peerDst}${peerChn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,
   	               $peerDst,hex($peerChn),4,"0100");
 	    }
       }
 	}
 	if (!$target || $target eq "actor" || $target eq "both"){
-      CUL_HM_PushCmdStack($peerHash, sprintf("++A001%s%s%s%s%s%02X%02X",
-	                              $id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
+      CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
+            $flag,$id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
 	}
     $chash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
@@ -2182,11 +2184,14 @@ CUL_HM_Pair(@)
 sub
 CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
+  my $st = AttrVal($hash->{NAME}, "subType", "");
+  my $flag = ($st ne "keyMatic") ? "A0" : "B0"; 
+
   #getList1
-  CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s040000000001",$id,$dst,$chn));
+  CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s040000000001",$flag,$id,$dst,$chn));
   
   #getPeers and config what List3 shall be retrieved
-  CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%s03", $id,$dst,$chn));	       
+  CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03", $flag,$id,$dst,$chn));	       
   $chnhash->{helper}{getCfgList3} = "all";#get list3 regs of first peer in list
  }
 ###################################
@@ -2713,6 +2718,10 @@ CUL_HM_parseCommon(@){
  		# check for request to get List3 data
  		my $reqPeer = $chnhash->{helper}{getCfgList3};
  	    if ($reqPeer){
+ 
+          my $st = AttrVal($shash->{NAME}, "subType", "");
+          my $flag = ($st ne "keyMatic") ? "A0" : "B0";
+           
  	      my $id = CUL_HM_Id($shash->{IODev});
  		  @peerID = split(",", $chnhash->{helper}{peerList});
  		  my $class = AttrVal(CUL_HM_id2Name($src), "hmClass", "");
@@ -2721,8 +2730,8 @@ CUL_HM_parseCommon(@){
  		  foreach my $peer (@peerID){
  			$peer .="01" if (length($peer) == 6); # add the default
  			if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
- 			  CUL_HM_PushCmdStack($shash,sprintf("++A001%s%s%s04%s%s",$id,
- 			              $src,$chn,$peer,$listNo));# List3 or 4 
+ 			  CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",$id,
+                    $flag,$src,$chn,$peer,$listNo));# List3 or 4 
  			}
  		  }
  		  CUL_HM_ProcessCmdStack($shash) if($listNo ne "04");
@@ -2845,7 +2854,7 @@ CUL_HM_getRegFromStore($$$$){
       }
 	  else{
 	    $size2go -=8;
-		$d = ($d+hex($dRead))<<8;
+		$d = ($d+hex($dRead)) << 8;
 		$addr++;
 	  }
 	}
@@ -2940,17 +2949,23 @@ CUL_HM_pushConfig($$$$$$$$)
 {
   my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content) = @_;
 
+  my $st = AttrVal($hash->{NAME}, "subType", "");
+  my $flag = ($st ne "keyMatic") ? "A0" : "B0"; 
+
   $peerAddr = "000000" if(!$peerAddr);
-  CUL_HM_PushCmdStack($hash, sprintf("++A001%s%s%02X05%s%02X%02X",
-        $src, $dst, $chn, $peerAddr, $peerChn, $list));
+  CUL_HM_PushCmdStack($hash, sprintf("++%s01%s%s%02X05%s%02X%02X",
+        $flag, $src, $dst, $chn, $peerAddr, $peerChn, $list));
+
   my $tl = length($content);
   for(my $l = 0; $l < $tl; $l+=28) {
     my $ml = $tl-$l < 28 ? $tl-$l : 28;
-    CUL_HM_PushCmdStack($hash,
-      sprintf("++A001%s%s%02X08%s", $src,$dst,$chn, substr($content,$l,$ml)));
+
+    CUL_HM_PushCmdStack($hash, sprintf("++%s01%s%s%02X08%s",
+          $flag, $src,$dst,$chn, substr($content,$l,$ml)));
   }
+
   CUL_HM_PushCmdStack($hash,
-        sprintf("++A001%s%s%02X06",$src,$dst,$chn));
+        sprintf("++%s01%s%s%02X06", $flag, $src, $dst, $chn));
 }
 
 sub
