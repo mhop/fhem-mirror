@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.17 - August, 2012
+# Version 2.20 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -42,6 +42,8 @@
 #
 # Additional attributes are defined in fhem.cfg
 # Note: attributes "tempXXXX" are read during every update operation.
+#
+# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is red down triangle
 # attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is red up triangle
@@ -129,6 +131,7 @@ sub OWTHERM_Initialize ($) {
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
+                     "event:on-update,on-change ".
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "tempLow tempHigh";
@@ -278,7 +281,7 @@ sub OWTHERM_FormatValues($) {
   $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "<span style=\"color:red\">&#x25BE;</span>";
   $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "<span style=\"color:red\">&#x25B4;</span>";
   $unit   = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
-  $offset = defined($attr{$name}{"tempoffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $offset = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
   $factor = 1.0;
   
   if( $unit eq "Celsius" ){
@@ -474,12 +477,18 @@ sub OWTHERM_GetValues($@) {
     return "OWTHERM: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
+
+  #-- old state, new state
+  my $oldval = $hash->{STATE};
   $value=OWTHERM_FormatValues($hash);
-  #--logging
+  my $newval =  $hash->{STATE};
+   #--logging depends on setting of the event-attribute
   Log 5, $value;
-  $hash->{CHANGED}[0] = $value;
-  
-  DoTrigger($name, undef);
+  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
+  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
+     $hash->{CHANGED}[0] = $value;
+     DoTrigger($name, undef);
+  } 
   
   return undef;
 }
@@ -685,21 +694,25 @@ sub OWXTHERM_GetValues($) {
     return "OWXTHERM: Device $owx_dev not accessible in 2nd step"; 
   }
   
-  #my $res2 = "====> OWXTHERM Received ";
-  #for(my $i=0;$i<19;$i++){  
-  #  my $j=int(ord(substr($res,$i,1))/16);
-  #  my $k=ord(substr($res,$i,1))%16;
-  #  $res2.=sprintf "0x%1x%1x ",$j,$k;
+  #if (length($res) == 10){
+  #  my $res2 = "====> OWXTHERM Received ";
+  #  for(my $i=0;$i<19;$i++){  
+  #    my $j=int(ord(substr($res,$i,1))/16);
+  #    my $k=ord(substr($res,$i,1))%16;
+  #    $res2.=sprintf "0x%1x%1x ",$j,$k;
+  #  }
+  #  Log 1, $res2;
   #}
-  #Log 1, $res2;
      
   #-- process results
+  #$res="000000000".$res
+  #  if(length($res)==10);
   my  @data=split(//,$res);
-  return "invalid data length"
+  return "OWTHERM: invalid data length, ".int(@data)." bytes"
     if (@data != 19); 
-  return "invalid data"
+  return "OWXTHERM: invalid data"
     if (ord($data[17])<=0); 
-  return "invalid CRC"
+  return "OWXTHERM: invalid CRC"
     if (OWX_CRC8(substr($res,10,8),$data[18])==0);
   
   #-- this must be different for the different device types
