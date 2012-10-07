@@ -2,6 +2,9 @@
 #
 # OWX.pm
 #
+# TODO: Abfangen, wenn das Serial Device nach Öffnung nicht existiert ???
+# set init als rediscover ausführen.
+#
 # FHEM module to commmunicate with 1-Wire bus devices
 # * via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB port
 # * via a passive DS9097 interface attached to an USB port
@@ -9,16 +12,16 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.17 - August, 2012
+# Version 2.20 - October, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
 # define <name> OWX <serial-device> for USB interfaces or
-# define <name> OWX <cuno-device>   for a CUNO interface
+# define <name> OWX <cuno/coc-device> for a CUNO or COC interface
 #    
 # where <name> may be replaced by any name string 
 #       <serial-device> is a serial (USB) device
-#       <cuno-device>   is a CUNO device
+#       <cuno/coc-device>   is a CUNO or COC device
 #
 # get <name> alarms                 => find alarmed 1-Wire devices (not with CUNO)
 # get <name> devices                => find all 1-Wire devices 
@@ -161,6 +164,8 @@ sub OWX_Define ($$) {
   #-- First step: check if we have a directly connected serial interface or a CUNO attached
   #   (mod suggested by T.Faust)
   if ( $dev =~ m/\/dev\/.*/ ){
+    #-- TODO: what should we do when the specified device name contains @ already ?
+    $hash->{DeviceName} = $dev."\@9600";
     #-- Second step in case of serial device: open the serial device to test it
     my $msg = "OWX: Serial device $dev";
     my $ret = DevIo_OpenDev($hash,0,undef);
@@ -186,8 +191,9 @@ sub OWX_Define ($$) {
     select(undef,undef,undef,0.1); 
       
   } else {
+    $hash->{DeviceName} = $dev;
     #-- Second step in case of CUNO: See if we can open it
-    my $msg = "OWX: CUNO device $dev";
+    my $msg = "OWX: CUNO/COC device $dev";
     $owx_hwdevice = $main::defs{$dev};
     if($owx_hwdevice){
       Log 1,$msg." defined";
@@ -198,7 +204,7 @@ sub OWX_Define ($$) {
       CUL_SimpleWrite($owx_hwdevice, "Oi");
     }else{
       Log 1, $msg." not defined";
-      return "OWX: Can't open cuno device $dev: $!"
+      return "OWX: Can't open CUNO/COC device $dev: $!"
     }
   }
   #-- Third step: see, if a bus interface is detected
@@ -529,16 +535,37 @@ sub OWX_Detect ($) {
     }
     #-- here we treat the network-connected CUNO
   } else {
-    CUL_SimpleWrite($owx_hwdevice, "ORm");
-    my $ob = DevIo_SimpleRead($owx_hwdevice);
-    if( $ob =~ m/OK.*/){
-      $owx_interface="CUNO";
-      $ress .= "DS2482 detected in $owx_hwdevice->{NAME}";
-      $ret=1;
-    } else {
+    #-- sleeping for some time
+    select(undef,undef,undef,0.5);
+    #-- Max 4 tries to detect an interface
+    for($l=0;$l<4;$l++) {
+      #-- write 1-Wire bus       
+      CUL_SimpleWrite($owx_hwdevice, "ORm");
+      my $ob = OWX_SimpleRead($owx_hwdevice);
+      
+      #-- process result for detection
+      #Log 1,"ERGEBNIS ORm =>".$ob."<=";
+      if( !defined($ob)){
+        $ob="";
+        $ret=0;
+      }elsif( $ob =~ m/OK.*/){
+        $owx_interface="CUNO";
+        $ress .= "DS2482 detected in $owx_hwdevice->{NAME}";
+        $ret=1;
+      } else {
+        $ret=0;
+      }
+      last 
+        if( $ret==1 );  
+      $ress .= "not found, answer was ".$ob;
+      Log 1, $ress;
+      $ress = $ress0;
+      #-- sleeping for some time
+      select(undef,undef,undef,0.5);
+    }
+    if( $ret == 0 ){
       $owx_interface=undef;
       $ress .= "in $owx_hwdevice->{NAME} could not be addressed";
-      $ret=0;
     }
   }
   #-- store with OWX device
@@ -583,7 +610,7 @@ sub OWX_Discover ($) {
     #-- sleeping for some time
     select(undef,undef,undef,3);
     CUL_SimpleWrite($owx_hwdevice, "Oc");
-    my $ob = DevIo_SimpleRead($owx_hwdevice);
+    my $ob = OWX_SimpleRead($owx_hwdevice);
     if( $ob ){
       foreach my $dx (split(/\n/,$ob)){
         $dx =~ s/\d+\://;
@@ -1879,7 +1906,7 @@ sub OWX_Complex_CUNO ($$$$) {
     Log 3,"OWX: Sending match ROM to CUNO ".$select
        if( $owx_debug > 1);
     CUL_SimpleWrite($owx_hwdevice, $select);
-    my $ob = DevIo_SimpleRead($owx_hwdevice);
+    my $ob = OWX_SimpleRead($owx_hwdevice);
     #-- padding first 9 bytes into result string, since we have this 
     #   in the serial interfaces as well
     $res .= "000000000";
@@ -1894,12 +1921,14 @@ sub OWX_Complex_CUNO ($$$$) {
     #$numread += length($data);
     $res.=OWX_Receive_CUNO($hash,$numread);
   }
+  Log 3,"OWX: returned from CUNO $res"
+    if( $owx_debug > 1);
   return $res;
 }
 
 ########################################################################################
 #
-# OWX_receive_CUNO - Read from the CUNO
+# OWX_Receive_CUNO - Read from the CUNO
 # 
 # Parameter: hash = hash of bus master, numread = number of bytes to read
 #
@@ -1915,7 +1944,7 @@ sub OWX_Receive_CUNO ($$) {
   for( 
   my $i=0;$i<$numread;$i++){
     CUL_SimpleWrite($owx_hwdevice, "OrB");
-    my $ob = DevIo_SimpleRead($owx_hwdevice);
+    my $ob = OWX_SimpleRead($owx_hwdevice);
     #-- process results  
     if( !(defined($ob)) ){
       return "";
@@ -1949,7 +1978,7 @@ sub OWX_Receive_CUNO ($$) {
 
 sub OWX_Reset_CUNO ($) { 
   CUL_SimpleWrite($owx_hwdevice, "ORb");
-  my $ob = DevIo_SimpleRead($owx_hwdevice);
+  my $ob = OWX_SimpleRead($owx_hwdevice);
   if( substr($ob,0,4) eq "OK:1" ){
     return 1;
   }else{
@@ -1985,6 +2014,36 @@ sub OWX_Send_CUNO ($$) {
      if( $owx_debug > 1);
 }
 
+#########################################################################################
+# 
+# OWX_SimpleRead - Reading with retry. 
+# Suggested in this way by Dirk Tostmann
+#
+# Parameter hash = hash of device
+#
+# Return response, if OK
+#        0 if not OK
+#
+########################################################################################
+
+sub OWX_SimpleRead($)
+{
+  my ($hash) = @_;
+  my $buf = DevIo_DoSimpleRead($owx_hwdevice);
+
+  # Lets' try again: Some drivers return len(0) on the first read...
+  if(defined($buf) && length($buf) == 0) {
+    #-- allow some time
+    select(undef,undef,undef,0.5); 
+    $buf = DevIo_DoSimpleRead($owx_hwdevice);
+  }
+
+  if(!defined($buf) || length($buf) == 0) {
+    DevIo_Disconnected($hash);
+    return undef;
+  }
+  return $buf;
+}
 ########################################################################################
 #
 # OWX_Verify_CUNO - Verify a particular device on the 1-Wire bus
@@ -2005,7 +2064,7 @@ sub OWX_Verify_CUNO ($$) {
   #-- sleeping for some time
   select(undef,undef,undef,3);
   CUL_SimpleWrite($owx_hwdevice, "Oc");
-  my $ob = DevIo_SimpleRead($owx_hwdevice);
+  my $ob = OWX_SimpleRead($owx_hwdevice);
   if( $ob ){
     foreach my $dx (split(/\n/,$ob)){
       $dx =~ s/\d+\://;
