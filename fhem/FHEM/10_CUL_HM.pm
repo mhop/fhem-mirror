@@ -202,7 +202,7 @@ CUL_HM_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
-					   "chanNo device ".
+					   "chanNo device peerList".
 					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast rxType ".
 					   "channel_01 channel_02 channel_03 channel_04 channel_05 channel_06 ".
 					   "channel_07 channel_08 channel_09 channel_0A channel_0B channel_0C ". 
@@ -1774,7 +1774,7 @@ CUL_HM_Set($@)
 	      $col4all = $col4all.$col4all.$col4all.$col4all;#and now for 16
 		}
 		elsif ($a[2] =~ m/^[A-Fa-f0-9]{1,8}$/i){
-		  $col4all = sprintf("Color:%08X",hex($a[2]));
+		  $col4all = sprintf("%08X",hex($a[2]));
 		}
         else{
   	      return "$a[2] unknown. use hex or: ".join(" ",sort keys(%color));
@@ -2003,10 +2003,12 @@ CUL_HM_Set($@)
 	my $oldPeer; # only once to device, not channel!
 	foreach my $peer (sort @peerList){
 	  next if ($oldPeer eq $peer);
-      CUL_HM_SendCmd($hash, sprintf("++8440%s%s%s%s%02X",
-	                    $srcId,$peer,$srcChn,$btn,$pressCnt),1,0);
+      CUL_HM_SendCmd($hash, sprintf("++A440%s%s%s%02X",
+	                    $srcId,$peer,$btn,$pressCnt),1,0);
 	  $oldPeer = $peer;
 	}
+	CUL_HM_SendCmd($hash, sprintf("++A440%s000000%s%02X",
+	                    $srcId,$btn,$pressCnt),1,0)if (!@peerList);
 	$hash->{helper}{count}=$pressCnt;
   } 
   elsif($cmd eq "devicepair") { ###############################################
@@ -2026,7 +2028,7 @@ CUL_HM_Set($@)
 		     ($target ne"remote")&&($target ne"both")));  
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set eq "unset")?"":1;
-    Log 1,"General :".$isChannel." chn:".$chn;
+
 	my ($b1,$b2,$nrCh2Pair);
 	$b1 = ($isChannel) ? hex($chn):sprintf("%02X",$bNo);
 	$b1 = $b1*2 - 1 if($single && !$chn);
