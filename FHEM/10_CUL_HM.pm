@@ -898,8 +898,13 @@ CUL_HM_Parse($$)
 
   }
   elsif($st eq "keyMatic") {  ####################################
-    if($msgType eq "10" && $p =~ m/^(..)(..)(..)(..)(.*)/) {#subtype+chn+value+err
-      my ($val, $err) = (hex($3), hex($4));
+	#Info Level: msgType=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
+	#AckStatus:  msgType=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
+
+    if(($msgType eq "10" && $p =~ m/^06/) ||
+	   ($msgType eq "02" && $p =~ m/^01/)) {
+	  $p =~ m/^....(..)(..)/; 
+      my ($val, $err) = (hex($1), hex($2));
 
       my $error = 'none';
       my $stErr = ($err >>1) & 0x7;      
@@ -1052,7 +1057,18 @@ my %culHmRegDefine = (
   ActTypeLg     =>{a=>164 ,s=>1  ,l=>3,min=>0  ,max=>255   ,c=>""                    ,uc=>""                    ,u=>""    ,t=>"Long:Action type(LED or Tone)"},
   ActNumLg      =>{a=>165 ,s=>1  ,l=>3,min=>1  ,max=>255   ,c=>""                    ,uc=>""                    ,u=>""    ,t=>"Long:Action Number"},
   IntenseLg     =>{a=>175 ,s=>1  ,l=>3,min=>10 ,max=>255   ,c=>""                    ,uc=>""                    ,u=>""    ,t=>"Long:Volume - Tone channel only!"},
-
+# keymatic secific register
+  signal        =>{a=>3.4 ,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>""                    ,uc=>""                    ,u=>"bool",t=>"Confirmation beep 0=OFF, 1=On"},
+  signalTone    =>{a=>3.6 ,s=>0.2,l=>0,min=>0  ,max=>3     ,c=>""                    ,uc=>""                    ,u=>"%"   ,t=>"0=low 1=mid 2=high 3=very high"},
+  keypressSignal=>{a=>3.0 ,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>""                    ,uc=>""                    ,u=>"bool",t=>"Keypress beep 0=OFF, 1=On"},
+  holdTime      =>{a=>20  ,s=>1,  l=>1,min=>0  ,max=>8.16  ,c=>'d=$d*31.25'          ,uc=>'d=$d/31.25'          ,u=>"s",   t=>"Holdtime for door opening"},
+  setupDir      =>{a=>22  ,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>""                    ,uc=>""                    ,u=>"bool",t=>"Rotation direction for locking. ,0=right, 1=left"},
+  setupPosition =>{a=>23  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'$d=$d*15'            ,uc=>'$d=$d/15'            ,u=>"%"   ,t=>"Rotation angle neutral position"},
+  angelOpen     =>{a=>24  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'$d=$d*15'            ,uc=>'$d=$d/15'            ,u=>"%"   ,t=>"Door opening angle"},
+  angelMax      =>{a=>25  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'$d=$d*15'            ,uc=>'$d=$d/15'            ,u=>"%"   ,t=>"Angle locked"},
+  angelLocked   =>{a=>26  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'$d=$d*15'            ,uc=>'$d=$d/15'            ,u=>"%"   ,t=>"Angle Locked position"},
+  ledFlashUnlocked=>{a=>31.3,s=>0.1,l=>1,min=>0,max=>1     ,c=>""                    ,uc=>""                    ,u=>"bool",t=>"1=LED blinks when not locked"},
+  ledFlashLocked=>{a=>31.6,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>""                    ,uc=>""                    ,u=>"bool",t=>"1=LED blinks when locked"},
   );
 my %culHmRegGeneral = (
   intKeyVisib=>1,
@@ -1093,6 +1109,12 @@ my %culHmRegSupported = (
 			OnDlyLg   =>1,OnTimeLg  =>1,OffDlyLg  =>1,OffTimeLg =>1,
 			ActTypeSh =>1,ActNumSh  =>1,IntenseSh =>1,
 			ActTypeLg =>1,ActNumLg  =>1,IntenseLg =>1,
+			},
+  keyMatic=>{
+			signal    =>1,signalTone=>1,keypressSignal=>1,
+			holdTime  =>1,setupDir  =>1,setupPosition =>1,
+			angelOpen =>1,angelMax  =>1,angelLocked   =>1,
+			ledFlashUnlocked=>1,ledFlashLocked=>1,
 			},
 );
 ##--------------- Conversion routines for register settings
@@ -1350,6 +1372,7 @@ CUL_HM_Set($@)
   my $class = AttrVal($devName, "hmClass", "");#relevant is the device
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
+  my $isChannel = (length($dst) == 8)?"true":"";
   my $chn = (length($dst) == 8)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
 
@@ -1654,13 +1677,13 @@ CUL_HM_Set($@)
   	$tval = (@a > 2) ? int($a[2]) : 0;
   	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";	# RELOCK_DELAY (FF=never)
     CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s8001C8%s",$id,$dst,$delay));	# OPEN
-
+	$state = "";
   }
   elsif($cmd eq "inhibit") { ###############################################
   	return "$a[2] is not on or off" if($a[2] !~ m/^(on|off)$/);
  	my $val = ($a[2] eq "on") ? "01" : "00";
     CUL_HM_PushCmdStack($hash, sprintf("++B011%s%s%s01",$id,$dst,$val));	# SET_LOCK
-
+	$state = "";
   }
   elsif($cmd eq "pct") { ######################################################
     $a[1] = 100 if ($a[1] > 100);
@@ -1951,12 +1974,18 @@ CUL_HM_Set($@)
     $attr{$name}{hmClass} = "sender";
     $attr{$name}{model}   = "virtual_".$maxBtnNo;
     my $devId = $hash->{DEF};
-    for (my $btn=1;$btn < $maxBtnNo;$btn++){
+    for (my $btn=1;$btn <= $maxBtnNo;$btn++){
 	  my $chnName = $name."_Btn".$btn;
 	  my $chnId = $devId.sprintf("%02X",$btn);
 	  DoTrigger("global",  "UNDEFINED $chnName CUL_HM $chnId")
 		  if (!$modules{CUL_HM}{defptr}{$chnId});
 	}
+	foreach my $channel (keys %{$attr{$name}}){# remove higher numbers
+	  my $chNo = $1 if($channel =~ m/^channel_(.*)/);
+	  CommandDelete(undef,$attr{$name}{$channel})
+	        if (hex($chNo) > $maxBtnNo);
+	}
+	
   }
   elsif($cmd eq "press") { ####################################################
     my (undef,undef,$mode) = @a;
@@ -1996,10 +2025,10 @@ CUL_HM_Set($@)
 	      if(defined($target) && (($target ne"actor") &&
 		     ($target ne"remote")&&($target ne"both")));  
 	$single = ($single eq "single")?1:"";#default to dual
-	$set = ($set eq "set")?1:"";
-
+	$set = ($set eq "unset")?"":1;
+    Log 1,"General :".$isChannel." chn:".$chn;
 	my ($b1,$b2,$nrCh2Pair);
-	$b1 = $chn ? hex($chn):sprintf("%02X",$bNo);
+	$b1 = ($isChannel) ? hex($chn):sprintf("%02X",$bNo);
 	$b1 = $b1*2 - 1 if($single && !$chn);
 	if ($single){ 
         $b2 = $b1;
