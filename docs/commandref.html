@@ -1012,13 +1012,14 @@ A line ending with \ will be concatenated with the next one, so long lines
 <a name="rereadcfg"></a>
 <h3>rereadcfg</h3>
 <ul>
-  <code>rereadcfg</code>
+  <code>rereadcfg [fhem-config-file]</code>
   <br><br>
-  Re-read the configuration file.
-  Note: The statefile will be saved first, then the config file will be read
+  Re-read the configuration file, or the optionally specified file.
+  The sequence: the statefile will be saved first, then all devices will be
+  deleted, then the original config file (or the specified file) will be read
   (all devices will be initialized again), and at last the statefile will be
-  reloaded. It triggers upon completion the global:REREADCFG event.
-  All existing connections up to the one issuing the rereadcfg will be closed.
+  reloaded. It triggers upon completion the global:REREADCFG event.  All
+  existing connections up to the one issuing the rereadcfg will be closed.
   <br><br>
   Example:
   <ul>

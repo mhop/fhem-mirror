@@ -235,7 +235,7 @@ $modules{Global}{AttrFn} = "GlobalAttr";
   "rename"  => { Fn=>"CommandRename",
 	    Hlp=>"<old> <new>,rename a definition" },
   "rereadcfg"  => { Fn=>"CommandRereadCfg",
-	    Hlp=>",reread the config file" },
+	    Hlp=>"[configfile],read in the config after deleting everything" },
   "save"    => { Fn=>"CommandSave",
 	    Hlp=>"[configfile],write the configfile and the statefile" },
   "set"     => { Fn=>"CommandSet",
@@ -882,7 +882,10 @@ CommandRereadCfg($$)
 {
   my ($cl, $param) = @_;
   my $name = $cl->{NAME} if($cl);
+  my $cfgfile = ($param ? $param : $attr{global}{configfile});
+  return "Cannon open $cfgfile: $!" if(! -f $cfgfile);
 
+  $attr{global}{configfile} = $cfgfile;
   WriteStatefile();
 
   $reread_active=1;
@@ -896,7 +899,6 @@ CommandRereadCfg($$)
     delete $defs{$d};
   }
 
-  my $cfgfile = $attr{global}{configfile};
   %comments = ();
   %defs = ();
   %attr = ();
