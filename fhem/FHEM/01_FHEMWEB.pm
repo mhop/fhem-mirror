@@ -24,7 +24,6 @@ sub FW_makeImage($);
 sub FW_SetDirs();
 sub FW_ReadIconsFrom($$);
 sub FW_ReadIcons($);
-sub FW_GetIcons();
 sub FW_IconURL($);
 sub FW_roomOverview($);
 sub FW_select($$$$@);
@@ -341,7 +340,8 @@ FW_ServeSpecial($$$) {
 }
   
 sub
-FW_SetDirs() {
+FW_SetDirs()
+{
 
   # web server root
   if(-d "$attr{global}{modpath}/www") {
@@ -413,12 +413,11 @@ FW_AnswerCall($)
   $FW_commandref = "$FW_docdir/commandref.html";
   #Debug "commandref.html is at $FW_commandref";
   
-  FW_GetIcons(); # get the icon set for the current instance
   
   $MW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
   $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
-  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
+  %FW_icons= %{$defs{$FW_wname}{fhemIcons}};
 
   # Lets go:
   if($arg =~ m,^$FW_ME/docs/(.*)\.(html|txt|pdf)$,) {
@@ -580,6 +579,7 @@ FW_AnswerCall($)
     FW_pO "<meta http-equiv=\"refresh\" content=\"$rf\">" if($rf);
   }
 
+  my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
   $prf = "smallscreen" if(!$prf && $FW_ss);
   $prf = "touchpad"    if(!$prf && $FW_tp);
   FW_pO "<link href=\"$FW_ME/css/".$prf."style.css\" rel=\"stylesheet\"/>";
@@ -778,9 +778,9 @@ FW_makeSelect($$$$)
 
 ##############################
 sub
-FW_makeImage($) {
-
-my ($name)= @_;
+FW_makeImage($)
+{
+  my ($name)= @_;
   my $iconpath= FW_IconPath($name);
   if(defined($iconpath)) {
     my $iconurl= FW_IconURL($name);
@@ -962,7 +962,6 @@ FW_roomOverview($)
 
   } else {
 
-    FW_GetIcons(); # get the icon set for the current instance
     foreach(my $idx = 0; $idx < @list1; $idx++) {
       my ($l1, $l2) = ($list1[$idx], $list2[$idx]);
       if(!$l1) {
@@ -997,7 +996,6 @@ FW_showRoom()
 {
   return if(!$FW_room);
 
-  FW_GetIcons(); # get the icon set for the current instance
   
   FW_pO "<form method=\"get\" action=\"$FW_ME\">";
   FW_pO "<div id=\"content\">";
@@ -1076,26 +1074,39 @@ FW_showRoom()
             if($values =~ m/^slider,(.*),(.*),(.*)/) { ##### Slider
               my ($min,$stp, $max) = ($1, $2, $3);
               my $srf = $FW_room ? "&room=$FW_room" : "";
-              my $curr = ReadingsVal($d, $cmd, Value($d));
+              my $cv = ReadingsVal($d, $cmd, Value($d));
               $cmd = "" if($cmd eq "state");
-              $curr=~s/[^\d\.]//g;
+              $cv =~ s/[^\d\.]//g;
               FW_pO "<td colspan='2'>".
                       "<div class='slider' id='slider.$d'>".
                         "<div class='handle'>$min</div></div>".
                       "</div>".
                       "<script type=\"text/javascript\">" .
                         "Slider(document.getElementById('slider.$d'),".
-                              "'$min','$stp','$max','$curr',".
+                              "'$min','$stp','$max','$cv',".
                               "'$FW_ME?cmd=set $d $cmd %$srf')".
                       "</script>".
+                    "</td>";
+              $firstIdx=1;
+
+            } elsif($values =~ m/^time$/) { ##### Time picker
+              my $srf = $FW_room ? "&room=$FW_room" : "";
+              my $cv = ReadingsVal($d, $cmd, Value($d));
+              $cmd = "" if($cmd eq "state");
+              my $c = "\"$FW_ME?cmd=set $d $cmd %$srf\"";
+              FW_pO "<td colspan='2'>".
+                      "<input name='time.$d' value='$cv' type='text'".
+                                                " readonly size='5'>".
+                      "<input type='button' value='+'".
+                                                " onclick='addTime(this,$c)'>".
                     "</td>";
               $firstIdx=1;
 
             } else {    ##### Dropdown
 
               my @tv = split(",", $values);
-              # Hack: eventmap (translation only) should not result in a dropdown.
-              # eventMap/webCmd/etc handling must be cleaned up.
+              # Hack: eventmap (translation only) should not result in a
+              # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
               if(@tv > 1) {
                 $firstIdx=1;
                 if($cmd eq "desired-temp") {
@@ -1819,7 +1830,6 @@ FW_style($$)
     $ret = "";
 
   } elsif($a[1] eq "iconFor") {
-    FW_GetIcons(); # get the icon set for the current instance
     FW_pO "<div id=\"content\"><table class=\"iconFor\">";
     foreach my $i (sort grep {/^ico/} keys %FW_icons) {
       FW_pO "<tr><td>";
@@ -2079,12 +2089,12 @@ FW_Attr(@)
 }
 
 
+# recursively reads .gif .ico .jpg .png files and returns filenames as array
+# recursion starts at $FW_icondir/$dir
+# filenames are relative to $FW_icondir
 sub
-FW_ReadIconsFrom($$) {
-  # recursively reads .gif .ico .jpg .png files and returns filenames as array
-  # recursion starts at $FW_icondir/$dir
-  # filenames are relative to $FW_icondir
-
+FW_ReadIconsFrom($$)
+{
   my ($prepend,$dir)= @_;
   return if($dir =~ m,/\.svn,);
 
@@ -2108,7 +2118,7 @@ FW_ReadIconsFrom($$) {
       if($entry =~ m/^(.*)\.($ICONEXTENSION)$/i) {
         my $logicalname= $1;
         my $iconname= "${prepend}${logicalname}";
-        #Debug "    icon: \"$iconname\"";
+        #Debug "    icon: $iconname / $filename";
         $FW_icons{$iconname}= $filename;
       }
     }
@@ -2140,7 +2150,8 @@ FW_ReadIcons($)
   # if now icons were found so far, read icons from icondir itself
   FW_ReadIconsFrom("", "") unless(%FW_icons);
 
-  $hash->{fhemIcons} = \%FW_icons;
+  my %icons = %FW_icons;
+  $hash->{fhemIcons} = \%icons;
 
   my $dumpLevel = 4;
   if($attr{global}{verbose} >= $dumpLevel) {
@@ -2149,15 +2160,6 @@ FW_ReadIcons($)
       Log $dumpLevel, "  $k => " . $FW_icons{$k};
     }
   }
-
-}
-
-# get the icon set from the device
-sub
-FW_GetIcons() {
-  #Debug "Getting icons for $FW_wname.";
-  my $hash= $defs{$FW_wname};
-  %FW_icons= %{$hash->{fhemIcons}};
 }
 
 sub
@@ -2165,13 +2167,15 @@ FW_canonicalizeIcon($) {
   my ($name)= @_;
   if($name =~ m/^(.*)\.($ICONEXTENSION)$/) {
     Log 1, "WARNING: argument of FW_canonicalizeIcon($name) has extension - inform the developers!";
+
     $name= $1;
   }
   return $name;
 }
 
 sub
-FW_getIcon($) {
+FW_getIcon($)
+{
   my ($name)= @_;
   $name= FW_canonicalizeIcon($name);
   return $FW_icons{$name} ? $name : undef;
@@ -2182,10 +2186,10 @@ FW_getIcon($) {
 #       FS20.on         ->      $FW_icondir/dark/FS20.on.png
 #       weather/sunny   ->      $FW_icondir/default/weather/sunny.gif
 sub
-FW_IconPath($) {
+FW_IconPath($)
+{
   my ($name)= @_;
   $name= FW_canonicalizeIcon($name);
-  FW_GetIcons(); # get the icon set for the current instance
   my $path= $FW_icons{$name};
   return $path ? $FW_icondir . "/" . $path : undef;
 }
@@ -2194,7 +2198,9 @@ FW_IconPath($) {
 # examples:
 #       FS20.on         ->      /icons/FS20.on
 #       weather/sunny   ->      /icons/sunny
-sub FW_IconURL($) {
+sub
+FW_IconURL($)
+{
   my ($name)= @_;
   $name= FW_canonicalizeIcon($name);
   return "$FW_ME/icons/${name}";
@@ -2308,8 +2314,6 @@ FW_Notify($$)
 
   my $rn = AttrVal($dn, "room", "");
   if($filter eq "all" || $rn =~ m/\b$filter\b/) {
-    FW_GetIcons(); # get the icon set for the current instance
-
     my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
@@ -2450,7 +2454,7 @@ FW_Get($@)
 {
   my ($hash, @a) = @_;
   $FW_wname= $hash->{NAME};
-
+  %FW_icons= %{$hash->{fhemIcons}};
 
   if($a[1] eq "icon") {
     return "need one icon as argument" if(int(@a) != 3);
