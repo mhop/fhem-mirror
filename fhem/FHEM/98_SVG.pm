@@ -113,10 +113,16 @@ SVG_render($$$$$$$$)
         "onclick=\"parent.svg_copy(evt)\" " .
         "class=\"copy\" text-anchor=\"end\"> </text>";
 
-
   ######################
-  # Left and right labels
-  my $t = ($conf{ylabel} ? $conf{ylabel} : "");
+  # Digest grid
+  my $t = ($conf{grid} ? $conf{grid} : "");
+  my $hasxgrid = ( $t =~ /.*xtics.*/ ? 1 : 0);
+  my $hasygrid = ( $t =~ /.*ytics.*/ ? 1 : 0);
+  my $hasy2grid = ( $t =~ /.*y2tics.*/ ? 1 : 0);
+  
+  ######################
+  # Left label = ylabel and right label = y2label
+  $t = ($conf{ylabel} ? $conf{ylabel} : "");
   $t =~ s/"//g;
   if(!$SVG_ss) {
     ($off1,$off2) = (3*$th/4, $oh/2);
@@ -252,6 +258,8 @@ SVG_render($$$$$$$$)
     $aligntext = 2; $aligntics = 2;
   }
 
+  my $barwidth = $tstep;
+
   ######################
   # First the tics
   $off2 = $y+4;
@@ -285,23 +293,30 @@ SVG_render($$$$$$$$)
 
   ######################
   # Left and right axis tics / text / grid
+  #-- just in case we have only one data line, but want to draw both axes
   $hmin{x1y1}=$hmin{x1y2}, $hmax{x1y1}=$hmax{x1y2} if(!defined($hmin{x1y1}));
   $hmin{x1y2}=$hmin{x1y1}, $hmax{x1y2}=$hmax{x1y1} if(!defined($hmin{x1y2}));
 
-
-  for my $axis ("x1y1", "x1y2") {
-
-    # Round values, compute a nice step
-    next if(!defined($hmax{$axis}));
-
-    # yrange handling
-    my $yr = ($axis eq "x1y1" ? "yrange" : "y2range");
-    if($conf{$yr} && $conf{$yr} =~ /\[(.*):(.*)\]/) {
-      $hmin{$axis} = $1 if($1 ne "");
-      $hmax{$axis} = $2 if($2 ne "");
+  my (%hstep,%htics,%axdrawn);
+  
+  #-- yrange handling for axes x1y1..x1y8
+  for my $idx (0..7)  {
+    my $a = "x1y".($idx+1);
+    next if( !defined($hmax{$a}) || !defined($hmin{$a}) );
+    my $yra="y".($idx+1)."range";
+    $yra="yrange" if ($yra eq "y1range");  
+    #-- yrange is specified in plotfile
+    if($conf{$yra} && $conf{$yra} =~ /\[(.*):(.*)\]/) {
+      $hmin{$a} = $1 if($1 ne "");
+      $hmax{$a} = $2 if($2 ne "");
     }
-
-    my $dh = $hmax{$axis} - $hmin{$axis};
+    #-- tics handling
+    my $yt="y".($idx+1)."tics";
+    $yt="ytics" if ($yt eq"y1tics");
+    $htics{$a} = defined($conf{$yt}) ? $conf{$yt} : "";
+    
+    #-- Round values, compute a nice step  
+    my $dh = $hmax{$a} - $hmin{$a};
     my ($step, $mi, $ma) = (1, 1, 1);
     my @limit = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100,
                  200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000,
@@ -309,77 +324,145 @@ SVG_render($$$$$$$$)
     for my $li (0..int(@limit)-1) {
       my $l = $limit[$li];
       next if($dh > $l);
-      $ma = SVG_doround($hmax{$axis}, $l/10, 1);
-      $mi = SVG_doround($hmin{$axis}, $l/10, 0);
+      $ma = SVG_doround($hmax{$a}, $l/10, 1);
+      $mi = SVG_doround($hmin{$a}, $l/10, 0);
 
       if(($ma-$mi)/($l/10) >= 7) {    # If more then 7 steps, then choose next
         $l = $limit[$li+1];
-        $ma = SVG_doround($hmax{$axis}, $l/10, 1);
-        $mi = SVG_doround($hmin{$axis}, $l/10, 0);
+        $ma = SVG_doround($hmax{$a}, $l/10, 1);
+        $mi = SVG_doround($hmin{$a}, $l/10, 0);
       }
       $step = $l/10;
       last;
     }
-    $hmax{$axis} = $ma;
-    $hmin{$axis} = $mi;
+    $hmax{$a}    = $ma;
+    $hmin{$a}    = $mi;
+    $hstep{$a}   = $step;
+    $axdrawn{$a} = 0;
+    
+    #Log 2, "Axis $a has interval [$hmin{$a},$hmax{$a}], step $hstep{$a}, tics $htics{$a}\n";
+  }
 
-    # Draw the horizontal values and grid
-    my $hmul = $h/($ma-$mi);
-    $off1 = ($axis eq "x1y1" ? $x-$th*0.3 : $x+$w+$th*0.3);
-    $off3 = ($axis eq "x1y1" ? $x : $x+$w-5);
-    $off4 = $off3+5;
+  #-- run through all axes for drawing (each only once !) 
+  foreach my $a (sort keys %hmin) {
+    next if( $axdrawn{$a} );
+    $axdrawn{$a}=1;
+   
+    #-- safeguarding against pathological data
+    if( !$hstep{$a} ){
+        $hmax{$a} = $hmin{$a}+1;
+        $hstep{$a} = 1;
+    }
 
-    $yr = ($axis eq "x1y1" ? "ytics" : "y2tics");
-    my $tic = $conf{$yr};
-    if($tic && $tic !~ m/mirror/) {     # Tics specified in the configfile
+    #-- Draw the y-axis values and grid
+    my $dh = $hmax{$a} - $hmin{$a};
+    my $hmul = $dh>0 ? $h/$dh : $h;
+   
+    # offsets
+    my ($align,$display,$cll);
+    if( $a eq "x1y1" ){
+      # first axis = left
+      $off1 = $x-4-$th*0.3;
+      $off3 = $x-4;
+      $off4 = $off3+5;
+      $align = " text-anchor=\"end\"";
+      $display = "";
+      $cll = "";
+    } elsif ( $a eq "x1y2" ){
+      # second axis = right
+      $off1 = $x+4+$w+$th*0.3;
+      $off3 = $x+4+$w-5;
+      $off4 = $off3+5;
+      $align = "";
+      $display = "";
+      $cll = "";
+    } else {
+      # other axes in between
+      $off1 = $x-$th*0.3+30;
+      $off3 = $x+30;
+      $off4 = $off3+5;
+      $align = " text-anchor=\"end\"";
+      $display = " display=\"none\" id=\"hline_$idx\"";
+      $cll = " class=\"l$idx\"";
+    };
+    
+    #-- grouping
+    SVG_pO "<g$display>";
+    my $yp = $y + $h;
+    
+    #-- axis if not left or right axis
+    SVG_pO "<polyline points=\"$off3,$y $off3,$yp\" $cll/>" if( ($a ne "x1y1") && ($a ne "x1y2") );
+
+    #-- tics handling
+    my $tic = $htics{$a};
+    #-- tics as in the config-file
+    if($tic && $tic !~ m/mirror/) {     
       $tic =~ s/^\((.*)\)$/$1/;   # Strip ()
       foreach my $onetic (split(",", $tic)) {
         $onetic =~ s/^ *(.*) *$/$1/;
         my ($tlabel, $tvalue) = split(" ", $onetic);
         $tlabel =~ s/^"(.*)"$/$1/;
+        $tvalue = 0 if( !$tvalue );
 
-        $off2 = int($y+($ma-$tvalue)*$hmul);
-        SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\"/>";
-        $off2 += $th/4;
-        my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
-        SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>
-                $tlabel</text>";
-      }
-
-    } else {                             # Auto-tic
-
-      for(my $i = $mi; $i <= $ma; $i += $step) {
-        $off2 = int($y+($ma-$i)*$hmul);
-        SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\"/>";
-        if($axis eq "x1y2")  {
-          my $o6 = $x+$w;
-          SVG_pO "  <polyline points=\"$x,$off2 $o6,$off2\" class=\"vgrid\"/>"
-            if($i > $mi && $i < $ma);
+        $off2 = int($y+($hmax{$a}-$tvalue)*$hmul);
+        #-- tics
+        SVG_pO "<polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
+        #--grids
+        my $off6 = $x+$w;
+        if( ($a eq "x1y1") && $hasygrid )  {
+          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
+            if($i > $hmin{$a} && $i < $hmax{$a});
+        }elsif( ($a eq "x1y2") && $hasy2grid )  {
+          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
+            if($i > $hmin{$a} && $i < $hmax{$a});
         }
         $off2 += $th/4;
-        my $align = ($axis eq "x1y1" ? " text-anchor=\"end\"" : "");
+        #--  text
+        SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$tlabel</text>";
+      }
+    #-- tics automatically 
+    } elsif( $hstep{$a}>0 ) {            
+      for(my $i = $hmin{$a}; $i <= $hmax{$a}; $i += $hstep{$a}) {
+        $off2 = int($y+($hmax{$a}-$i)*$hmul);
+        #-- tics
+        SVG_pO "  <polyline points=\"$off3,$off2 $off4,$off2\" $cll/>";
+        #--grids
+        my $off6 = $x+$w;
+        if( ($a eq "x1y1") && $hasygrid )  {
+          my $off6 = $x+$w;
+          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
+            if($i > $hmin{$a} && $i < $hmax{$a});
+        }elsif(  ($a eq "x1y2") && $hasy2grid )  {
+          SVG_pO "  <polyline points=\"$x,$off2 $off6,$off2\" class=\"vgrid\"/>"
+            if($i > $hmin{$a} && $i < $hmax{$a});
+        }
+        $off2 += $th/4;
+        #--  text   
         my $txt = sprintf("%g", $i);
         SVG_pO "<text x=\"$off1\" y=\"$off2\" class=\"ylabel\"$align>$txt</text>";
       }
     }
+    SVG_pO "</g>";
 
   }
-
 
   ######################
   # Second loop over the data: draw the measured points
   for(my $idx=$#hdx; $idx >= 0; $idx--) {
     my $a = $lAxis[$idx];
 
+    SVG_pO "<!-- Warning: No axis for data item $idx defined -->" if(!defined($a));
     next if(!defined($a));
     $min = $hmin{$a};
     $hmax{$a} += 1 if($min == $hmax{$a});  # Else division by 0 in the next line
     my $hmul = $h/($hmax{$a}-$min);
     my $ret = "";
     my ($dxp, $dyp) = ($hdx[$idx], $hdy[$idx]);
+    SVG_pO "<!-- Warning: No data item $idx defined -->" if(!defined($dxp));
     next if(!defined($dxp));
 
     my $yh = $y+$h;
+    #-- Title attributes
     my $tl = $lTitle[$idx] ? $lTitle[$idx]  : "";
     #my $dec = int(log($hmul*3)/log(10)); # perl can be compiled without log() !
     my $dec = length(sprintf("%d",$hmul*3))-1;
@@ -391,8 +474,8 @@ SVG_render($$$$$$$$)
     my $isFill = ($lStyle[$idx] =~ m/fill/);
 
     my ($lx, $ly) = (-1,-1);
-    if($lType[$idx] eq "points" ) {
 
+    if($lType[$idx] eq "points" ) {
       foreach my $i (0..int(@{$dxp})-1) {
         my ($x1, $y1) = (int($x+$dxp->[$i]),
                          int($y+$h-($dyp->[$i]-$min)*$hmul));
@@ -446,6 +529,23 @@ SVG_render($$$$$$$$)
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
       SVG_pO "<polyline $attributes points=\"$ret\"/>";
 
+    } elsif( $lType[$idx] eq "bars" ) {
+       if(@{$dxp} == 1) {
+          my $y1 = $y+$h-($dyp->[0]-$min)*$hmul;
+          $ret .=  sprintf(" %d,%d %d,%d %d,%d %d,%d",
+                $x,$y+$h, $x,$y1, $x+$w,$y1, $x+$w,$y+$h);
+       } else {
+          $barwidth = $barwidth*$tmul;
+          # bars are all of equal width (see far above !), 
+          # position rounded to integer multiples of bar width
+          foreach my $i (0..int(@{$dxp})-1) {
+            my ($x1, $y1) = ( $x +4 + $dxp->[$i] - $barwidth,
+                               $y +$h-($dyp->[$i]-$min)*$hmul);
+            my ($x2, $y2) = ($barwidth, ($dyp->[$i]-$min)*$hmul);    
+            SVG_pO "<rect $attributes x=\"$x1\" y=\"$y1\" width=\"$x2\" height=\"$y2\"/>";
+         }
+       }
+
     } else {                            # lines and everything else
       foreach my $i (0..int(@{$dxp})-1) {
         my ($x1, $y1) = (int($x+$dxp->[$i]),
@@ -455,6 +555,7 @@ SVG_render($$$$$$$$)
         $lx = $x1; $ly = $y1;
         $ret .=  sprintf(" %d,%d", $x1, $y1);
       }
+      #-- insert last point for filled line
       $ret .=  sprintf(" %d,%d", $lx, $y+$h) if($isFill && $lx > -1);
 
       SVG_pO "<polyline $attributes points=\"$ret\"/>";
