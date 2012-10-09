@@ -212,7 +212,8 @@ FHT_Set($@)
       my @list = map { ($_.".0", $_+0.5) } (6..30);
       pop @list;
       my $tmpList="on,off,".join(",",@list);
-      $cmdList =~ s/-temp/-temp:$tmpList/g;
+      $cmdList =~ s/-temp/-temp:$tmpList/g;     # FHEMWEB sugar
+      $cmdList =~ s/(-from.|-to.)/$1:time/g;
       return "Unknown argument $cmd, choose one of $cmdList";
     }
 

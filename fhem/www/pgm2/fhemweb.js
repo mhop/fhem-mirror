@@ -100,6 +100,9 @@ Slider(slider, min, stp, max, curr, cmd)
       val = Math.floor(Math.floor(val/stp)*stp);
       sh.innerHTML = val;
       sh.setAttribute('style', 'left:'+offX+'px;');
+      if(cmd && cmd.substring(0,3) == "js:") {
+        eval(cmd.substring(3).replace('%',val));
+      }
     }
     document.onmousemove = mouseMove;
     document.ontouchmove = function(e) { touchFn(e, mouseMove); }
@@ -109,7 +112,9 @@ Slider(slider, min, stp, max, curr, cmd)
       document.onmousemove = oldFn1; document.onmouseup  = oldFn2;
       document.ontouchmove = oldFn3; document.ontouchend = oldFn4;
       if(cmd) {
-        document.location = cmd.replace('%',val);
+        if(cmd.substring(0,3) != "js:") {
+          document.location = cmd.replace('%',val);
+        }
       } else {
         slider.nextSibling.setAttribute('value', val);
       }
@@ -119,9 +124,53 @@ Slider(slider, min, stp, max, curr, cmd)
   sh.onselectstart = function() { return false; }
   sh.onmousedown = mouseDown;
   sh.ontouchstart = function(e) { touchFn(e, mouseDown); }
-
 }
 
+
+function
+setTime(el,name,val)
+{
+  var el = el.parentNode.parentNode.firstChild;
+  var v = el.value.split(":");
+  v[name == "H" ? 0 : 1] = ''+val;
+  if(v[0].length < 2) v[0] = '0'+v[0];
+  if(v[1].length < 2) v[1] = '0'+v[1];
+  el.value = v[0]+":"+v[1];
+  el.setAttribute('value', el.value);
+}
+
+function
+addTime(el,cmd)
+{
+  var par = el.parentNode;
+  var v = par.firstChild.value;
+  var brOff = par.innerHTML.indexOf("<br>");
+
+  if(brOff > 0) {
+    par.innerHTML = par.innerHTML.substring(0, brOff).replace('"-"','"+"');
+    if(cmd)
+      document.location = cmd.replace('%',v);
+    return;
+  }
+
+  el.setAttribute('value', '-');
+  if(v.indexOf(":") < 0)
+    par.firstChild.value = v = "12:00";
+  var val = v.split(":");
+
+  for(var i = 0; i < 2; i++) {
+    par.appendChild(document.createElement('br'));
+
+    var sl = document.createElement('div');
+    sl.innerHTML = '<div class="slider"><div class="handle">'+val[i]+
+                   '</div></div>';
+    par.appendChild(sl);
+    sl.setAttribute('class', par.getAttribute('class'));
+
+    Slider(sl.firstChild, 0, (i==0 ? 1 : 5), (i==0 ? 23 : 55), val[i],
+          'js:setTime(slider,"'+(i==0? "H":"M")+'",%)');
+  }
+}
 
 /*************** Select **************/
 /** Change attr/set argument type to input:text or select **/
@@ -156,6 +205,11 @@ FW_selChange(sel, list, elName)
         '<input type="hidden" name="'+name+'" value="'+min+'">';
       Slider(newEl.firstChild, min, stp, max, undefined, undefined);
 
+    } else if(vArr.length == 1 && vArr[0] == "time") {
+      newEl = document.createElement('div');
+      newEl.innerHTML='<input name="'+name+'" type="text" size="5">'+
+              '<input type="button" value="+" onclick="addTime(this)">';
+
     } else {
       newEl = document.createElement('select');
       for(var j=0; j < vArr.length; j++) {
@@ -164,7 +218,7 @@ FW_selChange(sel, list, elName)
     }
   }
 
-  newEl.setAttribute('class', el.getAttribute('class')); //changed from el.class
+  newEl.setAttribute('class', el.getAttribute('class'));
   newEl.setAttribute('name', el.getAttribute('name'));
   el.parentNode.replaceChild(newEl, el);
 
