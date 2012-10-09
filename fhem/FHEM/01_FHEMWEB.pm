@@ -451,7 +451,7 @@ FW_AnswerCall($)
 
   } elsif($arg !~ m/^$FW_ME(.*)/) {
     my $c = $me->{CD};
-    Log 2, "$FW_wname: redirecting $arg to $FW_ME";
+    Log 4, "$FW_wname: redirecting $arg to $FW_ME";
     print $c "HTTP/1.1 302 Found\r\n",
              "Content-Length: 0\r\n",
              "Location: $FW_ME\r\n\r\n";
