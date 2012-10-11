@@ -2902,7 +2902,7 @@ readingsUpdate($$$) {
   
   # sanity check
   defined($hash->{helper}{updating}) || 
-    die "fhem.pl: readingsUpdateReading: you must call readingsBeginUpdate first.";
+    die "fhem.pl: readingsUpdate($name,$reading,$value): you must call readingsBeginUpdate first.";
   
   # shorthand
   my $readings= $hash->{READINGS};
