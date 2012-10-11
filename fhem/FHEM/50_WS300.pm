@@ -397,11 +397,11 @@ WS300_Parse($$)
   }
   else
   {
-    readingsBeginUpdate($def);
-
     $def = $modules{WS300}{defptr}{9};
     $def->{READINGS}{$txt[0]}{VAL} = 0 if(!$def->{READINGS});
     $ref = $def->{READINGS};
+
+    readingsBeginUpdate($def);
 
     $t = hex($a[62+$offs].$a[63+$offs].$a[64+$offs].$a[65+$offs]);
     $t -= 65535 if( $t > 32767 );
