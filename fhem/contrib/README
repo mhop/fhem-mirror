@@ -36,6 +36,8 @@
   Support for a full-featured database log by Boris. See the README.
 - em1010.pl / em1010.gnuplot
   Standalone EM1010PC reader program and a gnuplot file to plot em1010 data
+- fhem2fht-bulkupdate.sh
+  Bulkupdate for FHTs
 - four2hex
   Convert housecode from  ELV notation (4) to fhem.pl notation (hex)
   Not needed any more, as current fhem versions understand both.
