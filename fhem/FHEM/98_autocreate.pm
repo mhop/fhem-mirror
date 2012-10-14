@@ -300,8 +300,8 @@ my @usbtable = (
       response  => "^V .* CU.*",
       define    => "CUL_PARAM CUL DEVICE\@9600 1PARAM34", },
 
-    { NAME      => "CUL",       # TuxRadio / CSM special
-      matchList => ["ttySP(.*)"],
+    { NAME      => "CUL",       # TuxRadio/RPi: CSM
+      matchList => ["ttySP(.*)", "ttyAMA(.*)", ],
       DeviceName=> "DEVICE\@38400",
       flush     => "\n",
       request   => "V\n",
