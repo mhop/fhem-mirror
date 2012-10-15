@@ -16,7 +16,7 @@ $DISTRIB_BRANCH="DEVELOPMENT";
 $DISTRIB_DESCRIPTION="$DISTRIB_ID $DISTRIB_RELEASE ($DISTRIB_BRANCH)";
 
 $UPDATE{server}   = "http://fhem.de";
-$UPDATE{path}     = "fhemupdate3";
+$UPDATE{path}     = "fhemupdate4";
 $UPDATE{packages} = "FHEM";
 
 1;
