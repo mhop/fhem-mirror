@@ -25,6 +25,8 @@
 #       changed backimg-size to 99% to avoid scrollbars , adopted slider & new FHT representation (May 1, 2012)
 # 0016: Minor repair of html-output, allowed devices with dot in name (May 2, 2012)
 # 0017: updating for changes in fhemweb: css-path, bgimg-path, deactivating rereadicons (July 30, 2012)
+# 0018: Changes by Boris (icon-paths, fp_stylesheetPrefix -> stylesheet
+# 0019: added fp_backgroundimg (October 15, 2012)
 #
 ################################################################
 #
@@ -124,7 +126,7 @@ FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn} = "FP_define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0 fp_backgroundimg";
   # fp_arrange			: show addtl. menu for  attr fp_<name> ....
   # commandfield		: shows an fhem-commandline inputfield on floorplan
   # fp_default			: set for ONE floorplan. If set, floorplan-startscreen is skipped.
@@ -367,7 +369,7 @@ FP_show(){
   ## body
   FW_pO "<body id=\"$FP_name-body\">\n";
   FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
-  FW_pO FW_makeImage("fp_$FP_name");
+  FW_pO FW_makeImage(AttrVal($FP_name, "fp_backgroundimg", "fp_$FP_name"));
   FW_pO "</div>\n";
 
   ## menus
