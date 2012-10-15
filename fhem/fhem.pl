@@ -883,7 +883,7 @@ CommandRereadCfg($$)
   my ($cl, $param) = @_;
   my $name = $cl->{NAME} if($cl);
   my $cfgfile = ($param ? $param : $attr{global}{configfile});
-  return "Cannon open $cfgfile: $!" if(! -f $cfgfile);
+  return "Cannot open $cfgfile: $!" if(! -f $cfgfile);
 
   $attr{global}{configfile} = $cfgfile;
   WriteStatefile();
