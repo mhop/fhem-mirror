@@ -1,9 +1,11 @@
+MOV FHEM/release.pm FHEM/FhemUtils
 MOV FHEM/*.jpg www/images/default
 MOV FHEM/*.png www/images/default
 MOV FHEM/*.gplot www/gplot
 MOV FHEM/*.js www/pgm2
 MOV FHEM/*.svg www/pgm2
 MOV FHEM/*.css www/pgm2
+MOV FHEM/*.html docs
 MOV www/pgm2/*.gplot www/gplot
 MOV www/pgm2/*.jpg www/images/default
 MOV www/pgm2/*.png www/images/default
