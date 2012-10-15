@@ -10,3 +10,4 @@ MOV www/pgm2/*.gplot www/gplot
 MOV www/pgm2/*.jpg www/images/default
 MOV www/pgm2/*.png www/images/default
 MOV www/pgm2/*.html docs
+DEL FHEM/99_updatefhem.pm
