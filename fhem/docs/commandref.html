@@ -1739,7 +1739,12 @@ A line ending with \ will be concatenated with the next one, so long lines
     given device to appear in the global logfile (FHZ/FS20/FHT).  E.g. to
     set the FHT time, you should schedule "set FHZ time" every minute, but
     this in turn makes your logfile unreadable.  These messages will not be
-    generated if the FHZ attribute loglevel is set to 6.</li><br>
+    generated if the FHZ attribute loglevel is set to 6.<br>
+    On the other hand, if you have to debug a given device, setting its
+    loglevel to a smaller value than the value of the global verbose attribute,
+    it will output its messages normally seen only with higher global verbose
+    levels.
+    </li> <br>
 
     <li><a href="#model">model</a> (fhz1000,fhz1300)</li><br>
 
