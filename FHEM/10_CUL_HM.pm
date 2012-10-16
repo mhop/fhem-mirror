@@ -1238,11 +1238,11 @@ CUL_HM_Get($@)
   if($cmd eq "param") {  ######################################################
 	my $val;
 	$val = AttrVal($name, $a[2], "");
-	$val = $hash->{READINGS}{$a[2]}{VAL}    if (!defined($val) && $hash->{READINGS}{$a[2]});
-	$val = AttrVal($devName, $a[2], "")     if (!defined($val));
-	$val = $devHash->{READINGS}{$a[2]}{VAL} if (!defined($val) && $devHash->{READINGS}{$a[2]});
-	$val = $hash->{helper}{$a[2]}           if (!defined($val));
-	$val = $devHash->{helper}{$a[2]}        if (!defined($val));
+	$val = $hash->{READINGS}{$a[2]}{VAL}    if (!$val && $hash->{READINGS}{$a[2]});
+	$val = AttrVal($devName, $a[2], "")     if (!$val);
+	$val = $devHash->{READINGS}{$a[2]}{VAL} if (!$val && $devHash->{READINGS}{$a[2]});
+	$val = $hash->{helper}{$a[2]}           if (!$val);
+	$val = $devHash->{helper}{$a[2]}        if (!$val);
 
 	return (defined ($val))?$val:"undefined";
   }
