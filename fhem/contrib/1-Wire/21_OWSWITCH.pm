@@ -17,7 +17,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.18 - September, 2012
+# Version 2.22 - September, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -719,6 +719,12 @@ sub OWXSWITCH_GetState($) {
   
   #-- process results
   @data=split(//,substr($res,10));
+  #return "invalid data length"
+  #  if (@data != 22); 
+  #return "invalid data"
+  #  if (ord($data[17])<=0); 
+  #return "invalid CRC"
+  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);  
   
   #-- reset the bus
   OWX_Reset($master);

@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.20 - October, 2012
+# Version 2.22 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -469,12 +469,14 @@ sub OWTHERM_GetValues($@) {
   }elsif( $interface eq "OWFS" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{
-    return "OWTHERM: GetValues with wrong IODev type $interface";
+    Log 3, "OWTHERM: GetValues with wrong IODev type $interface";
+    return 1;
   }
 
   #-- process results
   if( defined($ret)  ){
-    return "OWTHERM: Could not get values from device $name, reason $ret";
+    Log 3, "OWTHERM: Could not get values from device $name, reason $ret";
+    return 1;
   }
   $hash->{PRESENT} = 1; 
 
@@ -677,7 +679,7 @@ sub OWXTHERM_GetValues($) {
     OWX_Reset($master);
     #-- issue the match ROM command \x55 and the start conversion command
     if( OWX_Complex($master,$owx_dev,"\x44",0) eq 0 ){
-      return "OWXTHERM: Device $owx_dev not accessible";
+      return "$owx_dev not accessible";
     } 
     #-- conversion needs some 950 ms - but we may also do it in shorter time !
     select(undef,undef,undef,1.0);
@@ -691,7 +693,7 @@ sub OWXTHERM_GetValues($) {
   #Log 1,"OWXTHERM: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
-    return "OWXTHERM: Device $owx_dev not accessible in 2nd step"; 
+    return "$owx_dev not accessible in 2nd step"; 
   }
   
   #if (length($res) == 10){
@@ -708,11 +710,11 @@ sub OWXTHERM_GetValues($) {
   #$res="000000000".$res
   #  if(length($res)==10);
   my  @data=split(//,$res);
-  return "OWTHERM: invalid data length, ".int(@data)." bytes"
+  return "invalid data length, ".int(@data)." bytes"
     if (@data != 19); 
-  return "OWXTHERM: invalid data"
+  return "invalid data"
     if (ord($data[17])<=0); 
-  return "OWXTHERM: invalid CRC"
+  return "invalid CRC"
     if (OWX_CRC8(substr($res,10,8),$data[18])==0);
   
   #-- this must be different for the different device types
