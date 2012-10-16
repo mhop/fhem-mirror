@@ -1868,13 +1868,13 @@ CUL_HM_Set($@)
 		($cmd eq "controlMode")||($cmd eq "decalcDay")  ||
 		($cmd eq "displayTempUnit") ){ ########################################
     my %regs = (displayTemp     =>{actual=>0,setpoint=>2},
-                displayMode     =>{"temp-hum"=>1,"temp-only"=>1},
-                displayTempUnit =>{celsius=>1,fahrenheit=>4},
+                displayMode     =>{"temp-only"=>0,"temp-hum"=>1},
+                displayTempUnit =>{celsius=>0,fahrenheit=>4},
                 controlMode     =>{manual=>0,auto=>8,central=>16,party=>24},
-  			    decalcDay       =>{"Sat"=>0  ,"Sun"=>32 ,"Mon"=>64,"Tue"=>96, 
-				                   "Wed"=>128,"Thu"=>160,"Fri"=>192});
+  			    decalcDay       =>{Sat=>0  ,Sun=>32 ,Mon=>64,Tue=>96, 
+				                   Wed=>128,Thu=>160,Fri=>192});
 	return $a[2]."invalid for ".$cmd." select one of ". 
-	               join (" ",sort keys %{$regs{$cmd}}) if(!defined($regs{$cmd}{$a[2]}));
+	      join (" ",sort keys %{$regs{$cmd}}) if(!defined($regs{$cmd}{$a[2]}));
     $hash->{READINGS}{$cmd}{TIME} = TimeNow(); # update new value
     $hash->{READINGS}{$cmd}{VAL} = $a[2];
     my $tcnf = 0;
