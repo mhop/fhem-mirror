@@ -45,6 +45,7 @@ urlEncode($) {
 ##################
 # - if data (which is urlEncoded) is set, then a POST is performed, else a GET.
 # - noshutdown must be set for e.g the Fritz!Box
+# 4.0 is needed for some clients trying to reach fhem.de, 2.0 was not enough
 sub
 CustomGetFileFromURL($$@)
 {
@@ -70,10 +71,13 @@ CustomGetFileFromURL($$@)
   my $conn;
   if($protocol eq "https") {
     eval "use IO::Socket::SSL";
-    Log 1, $@ if($@);
-    $conn = IO::Socket::SSL->new(PeerAddr => "$host:$port") if(!$@);
+    if($@) {
+      Log 1, $@;
+    } else {
+      $conn = IO::Socket::SSL->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
+    }
   } else {
-    $conn = IO::Socket::INET->new(PeerAddr => "$host:$port");
+    $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
     Log 1, "GetFileFromURL: Can't connect to $protocol://$host:$port\n";
