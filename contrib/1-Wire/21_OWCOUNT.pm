@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.18 - September, 2012
+# Version 2.22 - September, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -43,6 +43,8 @@
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
+#
+# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> UnitInReading = whether the physical unit is written into the reading = 1 (default) or 0
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
@@ -142,7 +144,8 @@ sub OWCOUNT_Initialize ($) {
   $hash->{SetFn}   = "OWCOUNT_Set";
   
   #-- see header for attributes
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 UnitInReading:0,1";
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 UnitInReading:0,1 ".
+    "event:on-update,on-change";
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Offset";
@@ -257,7 +260,7 @@ sub OWCOUNT_InitializeDevice($) {
     my $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "counts|cts";
     my @unarr= split(/\|/,$unit);
     if( int(@unarr)!=2 ){
-      Log 1, "OWCOUNT: Incomplete channel unit specification $unit. Better use $unit|<abbreviation>";
+      Log 1, "OWCOUNT: Incomplete channel unit specification $unit. Better use <long unit desc>|$unit";
       push(@unarr,"");  
     }
     
@@ -694,12 +697,18 @@ sub OWCOUNT_GetValues($) {
     return "OWCOUNT: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
-  $value=OWCOUNT_FormatValues($hash);
-  #--logging
-  Log 5, $value;
-  $hash->{CHANGED}[0] = $value;
   
-  DoTrigger($name, undef);
+   #-- old state, new state
+  my $oldval = $hash->{STATE};
+  $value=OWCOUNT_FormatValues($hash);
+  my $newval =  $hash->{STATE};
+   #--logging depends on setting of the event-attribute
+  Log 5, $value;
+  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
+  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
+     $hash->{CHANGED}[0] = $value;
+     DoTrigger($name, undef);
+  } 
   
   return undef;
 }
@@ -909,11 +918,13 @@ sub OWXCOUNT_GetPage($$) {
   OWX_Reset($master);
 
   #-- process results
-  if( length($res) < 54){
-    Log 1, "OWXCOUNT: warning, have received ".length($res)." bytes in three steps";
-    #return "OWXCOUNT: warning, have received ".length($res)." bytes in three steps";
-  }
-  #Log 1, "OWXCOUNT: warning, have received ".length($res)." bytes in three steps";
+  @data=split(//,$res);
+  return "OWXCOUNT: invalid data length, ".length($res)." bytes in three steps"
+     if( length($res) < 54);
+  #return "invalid data"
+  #  if (ord($data[17])<=0); 
+  #return "invalid CRC"
+  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);  
   
   #-- first 12 byte are 9 ROM ID +3 command, next 32 are memory
   #-- memory part, treated as string
@@ -927,7 +938,7 @@ sub OWXCOUNT_GetPage($$) {
     }
   
     #-- first ignore memory and only use counter (Fehler gefunden von jamesgo)
-    my $value = (ord($data[3])<<32) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
+    my $value = (ord($data[3])<<24) + (ord($data[2])<<16) +(ord($data[1])<<8) + ord($data[0]);       
    
     if( $page == 14) {
       $owg_val[0] = $value;

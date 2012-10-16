@@ -12,7 +12,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.20 - October, 2012
+# Version 2.22 - October, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -151,7 +151,7 @@ sub OWX_Define ($$) {
   }
   
   #-- check syntax
-  Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno-device>"
+  Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno/coc-device>"
      if(int(@a) > 3);
   #-- If this line contains 3 parameters, it is the bus master definition
   my $dev = $a[2];
@@ -161,7 +161,7 @@ sub OWX_Define ($$) {
   #-- Dummy 1-Wire ROM identifier
   $hash->{ROM_ID} = "FF";
 
-  #-- First step: check if we have a directly connected serial interface or a CUNO attached
+  #-- First step: check if we have a directly connected serial interface or a CUNO/COC attached
   #   (mod suggested by T.Faust)
   if ( $dev =~ m/\/dev\/.*/ ){
     #-- TODO: what should we do when the specified device name contains @ already ?
@@ -386,6 +386,7 @@ sub OWX_CRC ($) {
 
 sub OWX_CRC8 ($$) {
   my ($string,$crc) = @_;
+  my $crc0=ord($crc);
   my $crc8=0;  
   my @strhex;
 
@@ -393,9 +394,9 @@ sub OWX_CRC8 ($$) {
     $strhex[$i]=ord(substr($string,$i,1));
     $crc8 = $crc8_table[ $crc8 ^ $strhex[$i] ];
   }
-    
+   
   if( defined($crc) ){
-    if ( $crc = $crc8 ){
+    if ( $crc0 == $crc8 ){
       return 1;
     }else{
       return 0;
@@ -444,17 +445,6 @@ sub OWX_DOCRC16($$) {
   }
   return ($crc);
 }
-
-#//-------------------------------------------------------------------#
-
-#Aufruf der Funktion im Programm:
-
-#{
-#//...
-#  unsigned int DEVICE_CRC16=0;
-#  DEVICE_CRC16 = calcCRC16r (DEVICE_CRC16,chr,0xA001);
-#//...
-#}
 
 ########################################################################################
 # 
@@ -610,6 +600,7 @@ sub OWX_Discover ($) {
     #-- sleeping for some time
     select(undef,undef,undef,3);
     CUL_SimpleWrite($owx_hwdevice, "Oc");
+     select(undef,undef,undef,0.5);
     my $ob = OWX_SimpleRead($owx_hwdevice);
     if( $ob ){
       foreach my $dx (split(/\n/,$ob)){
@@ -1956,10 +1947,10 @@ sub OWX_Receive_CUNO ($$) {
     }elsif( length($ob) == 20 ){
       $numread++;
     }else{
-      Log 1,"OWX: Received unexpected number of ".length($ob)." bytes from CUNO";
+      Log 1,"OWX: Received unexpected number of ".length($ob)." bytes from CUNO/COC";
     } 
   }
-  Log 3, "OWX: Receive from CUNO $numread bytes = $res2"
+  Log 3, "OWX: Receive from CUNO/COC $numread bytes = $res2"
      if( $owx_debug > 1);
   
   return($res);
@@ -2010,7 +2001,7 @@ sub OWX_Send_CUNO ($$) {
     $res2.=sprintf "0x%1x%1x ",$j,$k;
     CUL_SimpleWrite($owx_hwdevice, $res);
   } 
-  Log 3,"OWX: Send to CUNO $res2"
+  Log 3,"OWX: Send to CUNO/COC $res2"
      if( $owx_debug > 1);
 }
 
