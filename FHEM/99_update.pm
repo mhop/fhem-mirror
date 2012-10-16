@@ -227,13 +227,14 @@ update_DoHousekeeping($)
   foreach my $f (sort keys %{$lControl{$pack}}) {
     my $lCtrl = $lControl{$pack}{$f}{ctrl};
     my $str;
-    next if ($f =~ m/.hex$/);  # skip firmware files
     next if ($lCtrl ne "DIR");
 
     if ($lCtrl eq "DIR") {
       $str = update_CleanUpLocalFiles($lCtrl,"$f","");
-      $cleanup .= "==> $str\n";
-      Log 1, "update $str";
+      if($str) {
+        $cleanup .= "==> $str\n" ;
+        Log 1, "update $str";
+      }
     }
   }
 
@@ -241,7 +242,6 @@ update_DoHousekeeping($)
   foreach my $f (sort keys %{$lControl{$pack}}) {
     my $lCtrl = $lControl{$pack}{$f}{ctrl};
     my $str;
-    next if ($f =~ m/.hex$/);  # skip firmware files
     next if ($lCtrl ne "MOV");
 
     if ($lCtrl eq "MOV" && $f !~ /\*/) {
@@ -255,7 +255,6 @@ update_DoHousekeeping($)
   foreach my $f (sort keys %{$lControl{$pack}}) {
     my $lCtrl = $lControl{$pack}{$f}{ctrl};
     my $str;
-    next if ($f =~ m/.hex$/);  # skip firmware files
     next if ($lCtrl ne "MOV");
 
     if ($lCtrl eq "MOV" && $f =~ /\*/) {
@@ -275,7 +274,6 @@ update_DoHousekeeping($)
   foreach my $f (sort keys %{$lControl{$pack}}) {
     my $lCtrl = $lControl{$pack}{$f}{ctrl};
     my $str;
-    next if ($f =~ m/.hex$/);  # skip firmware files
     next if ($lCtrl ne "DEL");
 
     if ($f =~ /\*/) {
@@ -341,8 +339,6 @@ update_CheckUpdates($$$$)
   my %rControl = %$rControl_ref;
   my %lControl = %$lControl_ref;
   foreach my $f (sort keys %{$rControl{$pack}}) {
-    # skip firmware files
-    next if ($f =~ m/.hex$/);
     # skip housekeeping
     next if ($rControl{$pack}{$f}{ctrl} eq "DEL" ||
              $rControl{$pack}{$f}{ctrl} eq "DIR" ||
@@ -607,7 +603,6 @@ update_ListChanges($)
   my %rControl = %$rControl_ref;
   my %lControl = %$lControl_ref;
   foreach my $f (sort keys %{$rControl{$pack}}) {
-    next if ($f =~ m/.hex$/);  # skip firmware files
     next if ($rControl{$pack}{$f}{ctrl} eq "DEL" ||
              $rControl{$pack}{$f}{ctrl} eq "DIR" ||
              $rControl{$pack}{$f}{ctrl} eq "MOV");
@@ -817,9 +812,7 @@ update_CleanUpLocalFiles($$$)
   # make dir
   if ($ctrl eq "DIR") {
     my $mret = update_MakeDirectory($file);
-    if (!$mret) {
-      $ret = "create directory $modpath/$file";
-    } else {
+    if ($mret) {
       $ret = "create directory $modpath/$file failed: $mret";
     }
   }
