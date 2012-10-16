@@ -101,7 +101,9 @@ CUL_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "showtime:1,0 model:CUL,CUN,CUR loglevel:0,1,2,3,4,5,6 " . 
                      "sendpool addvaltrigger " .
-                     "rfmode:SlowRF,HomeMatic,MAX hmId hmProtocolEvents";
+					 "rfmode:SlowRF,HomeMatic,MAX hmId ".
+					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+
   $hash->{ShutdownFn} = "CUL_Shutdown";
 
 }
