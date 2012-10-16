@@ -24,7 +24,7 @@ watchdog_Initialize($)
 sub
 watchdog_Define($$)
 {
-  my ($ntfy, $def) = @_;
+  my ($watchdog, $def) = @_;
   my ($name, $type, $re1, $to, $re2, $command) = split("[ \t]+", $def, 6);
   
   return "Usage: define <name> watchdog <re1> <timeout> <re2> <command>"
@@ -41,17 +41,17 @@ watchdog_Define($$)
         if($to !~ m/^(\d\d):(\d\d)(:\d\d)?$/);
   $to = $1*3600+$2*60+($3 ? substr($3,1) : 0);
 
-  $ntfy->{RE1} = $re1;
-  $ntfy->{RE2} = $re2;
-  $ntfy->{TO}  = $to;
-  $ntfy->{CMD} = $command;
+  $watchdog->{RE1} = $re1;
+  $watchdog->{RE2} = $re2;
+  $watchdog->{TO}  = $to;
+  $watchdog->{CMD} = $command;
 
 
   if($re1 eq ".") {
-    watchdog_Activate($ntfy)
+    watchdog_Activate($watchdog)
 
   } else {
-    $ntfy->{STATE} = "defined";
+    $watchdog->{STATE} = "defined";
 
   }
 
@@ -62,49 +62,49 @@ watchdog_Define($$)
 sub
 watchdog_Notify($$)
 {
-  my ($ntfy, $dev) = @_;
+  my ($watchdog, $dev) = @_;
 
-  my $ln = $ntfy->{NAME};
+  my $ln = $watchdog->{NAME};
   return "" if($attr{$ln} && $attr{$ln}{disable});
+  my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
 
   my $n   = $dev->{NAME};
-  my $re1 = $ntfy->{RE1};
-  my $re2 = $ntfy->{RE2};
+  my $re1 = $watchdog->{RE1};
+  my $re2 = $watchdog->{RE2};
   my $max = int(@{$dev->{CHANGED}});
 
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
     my $dotTrigger = ($ln eq $n && $s eq "."); # trigger w .
-    my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
 
-    if($ntfy->{STATE} =~ m/Next:/) {
+    if($watchdog->{STATE} =~ m/Next:/) {
 
       if($n =~ m/^$re2$/ || "$n:$s" =~ m/^$re2$/) {
-        RemoveInternalTimer($ntfy);
+        RemoveInternalTimer($watchdog);
 
         if(($re1 eq $re2 || $re1 eq ".") && !$dontReAct) {
-          watchdog_Activate($ntfy);
+          watchdog_Activate($watchdog);
           return "";
 
         } else {
-          $ntfy->{STATE} = "defined";
+          $watchdog->{STATE} = "defined";
 
         }
 
       } elsif($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/) {
-        watchdog_Activate($ntfy) if(!$dontReAct);
+        watchdog_Activate($watchdog) if(!$dontReAct);
 
       }
 
-    } elsif($ntfy->{STATE} eq "defined") {
+    } elsif($watchdog->{STATE} eq "defined") {
       if($dotTrigger ||      # trigger w .
          ($n =~ m/^$re1$/ || "$n:$s" =~ m/^$re1$/)) {
-        watchdog_Activate($ntfy)
+        watchdog_Activate($watchdog)
       }
 
     } elsif($dotTrigger) {
-      $ntfy->{STATE} = "defined";       # trigger w . 
+      $watchdog->{STATE} = "defined";       # trigger w . 
 
     }
 
@@ -115,13 +115,13 @@ watchdog_Notify($$)
 sub
 watchdog_Trigger($)
 {
-  my ($ntfy) = @_;
-  Log(3, "Watchdog $ntfy->{NAME} triggered");
-  my $exec = SemicolonEscape($ntfy->{CMD});;
-  $ntfy->{STATE} = "triggered";
+  my ($watchdog) = @_;
+  Log(3, "Watchdog $watchdog->{NAME} triggered");
+  my $exec = SemicolonEscape($watchdog->{CMD});;
+  $watchdog->{STATE} = "triggered";
   
-  $ntfy->{READINGS}{Triggered}{TIME} = TimeNow();
-  $ntfy->{READINGS}{Triggered}{VAL} = $ntfy->{STATE};
+  $watchdog->{READINGS}{Triggered}{TIME} = TimeNow();
+  $watchdog->{READINGS}{Triggered}{VAL} = $watchdog->{STATE};
   
   my $ret = AnalyzeCommandChain(undef, $exec);
   Log 3, $ret if($ret);
@@ -130,11 +130,11 @@ watchdog_Trigger($)
 sub
 watchdog_Activate($)
 {
-  my ($ntfy) = @_;
-  my $nt = gettimeofday() + $ntfy->{TO};
-  $ntfy->{STATE} = "Next: " . FmtTime($nt);
-  RemoveInternalTimer($ntfy);
-  InternalTimer($nt, "watchdog_Trigger", $ntfy, 0)
+  my ($watchdog) = @_;
+  my $nt = gettimeofday() + $watchdog->{TO};
+  $watchdog->{STATE} = "Next: " . FmtTime($nt);
+  RemoveInternalTimer($watchdog);
+  InternalTimer($nt, "watchdog_Trigger", $watchdog, 0)
 }
 
 sub
