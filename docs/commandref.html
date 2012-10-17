@@ -27,7 +27,7 @@
   <a href="#devspec">Device specification</a><br>
 
   <br>
-  <b>fhem commands</b>
+  <b>Fhem commands</b>
   <ul>
       <a href="#attr">attr</a> &nbsp;
       <a href="#backup">backup</a> &nbsp;
@@ -1014,12 +1014,14 @@ A line ending with \ will be concatenated with the next one, so long lines
 <ul>
   <code>rereadcfg [fhem-config-file]</code>
   <br><br>
-  Re-read the configuration file, or the optionally specified file.
-  The sequence: the statefile will be saved first, then all devices will be
-  deleted, then the original config file (or the specified file) will be read
-  (all devices will be initialized again), and at last the statefile will be
-  reloaded. It triggers upon completion the global:REREADCFG event.  All
-  existing connections up to the one issuing the rereadcfg will be closed.
+  Re-read the active configuration file, or the optionally specified file.<br>
+  The sequence: the <a href="#statefile">statefile</a> will be saved first,
+  then all devices will be deleted, then the currently active config file (or
+  the specified file) will be read and at last the statefile will be
+  reloaded.<br>
+  Upon completion it triggers the global:REREADCFG event.  All existing
+  connections up to the one issuing the rereadcfg will be closed.
+
   <br><br>
   Example:
   <ul>
@@ -10960,10 +10962,16 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
 
     Examples:
     <pre>
-    # Talk to the FHT80 if we do not receive any message for 15 Minutes
-    define w watchdog FHT80 00:15:00 SAME set FHT80 time
+    # Request data from the FHT80 _once_ if we do not receive any message for
+    # 15 Minutes.
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date
 
-    # Shout if the HMS100-FIT is not alive
+    # Request data from the FHT80 _each_ time we do not receive any message for
+    # 15 Minutes, i.e. reactivate the watchdog after it triggered.  Might be
+    # dangerous, as it can trigger in a loop.
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .
+
+    # Shout once if the HMS100-FIT is not alive
     define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"
 
     # Send mail if the window is left open
@@ -10976,17 +10984,18 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
       <li>if &lt;regexp1&gt; is . (dot), then activate the watchdog at
           definition time. Else it will be activated when the first matching
           event is received.</li>
-      <li>&lt;regexp1&gt; reactivates a running watchdog, to avoid it use the
-          regexp1WontReactivate attribute.
+      <li>&lt;regexp1&gt; resets the timer of a running watchdog, to avoid it
+          use the regexp1WontReactivate attribute.
       <li>if &lt;regexp2&gt; is SAME, then it will be the same as the first
-          regexp, and it will be reactivated, when it is received. This is
-          probably the normal operation.</li>
+          regexp, and it will be reactivated, when it is received.
+          </li>
       <li>trigger &lt;watchdogname&gt; . will activate the trigger if its state
           is defined, and set it into state defined if its state is
-          triggered</li>
-      </ul>
+          triggered. You always have to reactivate the watchdog with this
+          command once it has triggered (unless you restart fhem)</li>
       <li>a generic watchdog (one watchdog responsible for more devices) is
           currently not possible.</li>
+    </ul>
     </ul>
 
     <br>
