@@ -51,7 +51,7 @@ TRX_SECURITY_Initialize($)
   $hash->{DefFn}     = "TRX_SECURITY_Define";
   $hash->{UndefFn}   = "TRX_SECURITY_Undef";
   $hash->{ParseFn}   = "TRX_SECURITY_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 event-on-update-reading event-on-change-reading do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -160,15 +160,13 @@ sub TRX_SECURITY_parse_X10Sec {
     } else {
 	$error = "TRX_SECURITY: x10_devtype wrong for subtype=$subtype";
 	Log 1, $error;
-  	return $error;
+  	return "";
     }
   } else {
  	$error = "TRX_SECURITY: error undefined subtype=$subtype";
 	Log 1, $error;
-  	return $error;
+  	return "";
   }
-
-  #Log 4, "device_type=$device_type";
 
   #--------------
   my $device_name = "TRX".$DOT.$dev_type.$DOT.$device;
@@ -182,7 +180,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	if (!$def) {
 	Log 1, "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
         	Log 3, "TRX_SECURITY: TRX_SECURITY Unknown device $device_name, please define it";
-       		return "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
+       		return "";
 	}
   }
 
@@ -242,8 +240,8 @@ sub TRX_SECURITY_parse_X10Sec {
       $command = $rec;
     }
   } else {
-    Log 1, "TRX_SECURITY undefined command cmd=$data device-nr=$device, hex=$hexdata";
-    return "TRX_SECURITY undefined command";
+    Log 1, "TRX_SECURITY: undefined command cmd=$data device-nr=$device, hex=$hexdata";
+    return "";
   }
 
   my $battery_level = $bytes->[7] & 0x0f;
@@ -251,7 +249,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	if ($battery_level == 0x9) { $battery = 'batt_ok'}
 	elsif ($battery_level == 0x0) { $battery = 'batt_low'}
 	else {
-		Log 1,"TRX-X10: X10Sec unkown battery_level=$battery_level";
+		Log 1,"TRX_SECURITY: X10Sec unkown battery_level=$battery_level";
 	}
   }
 
@@ -280,19 +278,17 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "Closed" if ($command eq "normal");
   }
 
+  readingsBeginUpdate($def);
+
   if (($dev_type ne "kr18") || ($dev_type ne "VISONIC_REMOTE")) {  
   	if ($firstdevice == 1) {
 		$val .= $current;
   	}
-  	$def->{READINGS}{$sensor}{TIME} = $tm;
-  	$def->{READINGS}{$sensor}{VAL} = $current;
-  	$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+	readingsUpdate($def, $sensor, $current);
 
   	if (($def->{STATE} ne $val)) {
 		$sensor = "statechange";
-		$def->{READINGS}{$sensor}{TIME} = $tm;
-		$def->{READINGS}{$sensor}{VAL} = $current;
-		$def->{CHANGED}[$n++] = $sensor . ": " . $current;		
+		readingsUpdate($def, $sensor, $current);
   	}
   } else {
 	# kr18 remote control or VISONIC_REMOTE
@@ -300,16 +296,12 @@ sub TRX_SECURITY_parse_X10Sec {
 
 	#$sensor = $def->{TRX_SECURITY_devicelog};
 	$val = $current;
-  	#$def->{READINGS}{$sensor}{TIME} = $tm;
-  	#$def->{READINGS}{$sensor}{VAL} = $current;
-  	#$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+	readingsUpdate($def, $sensor, $current);
 
 	my @cmd_split = split(/-/, $command);
 	$sensor = $cmd_split[0];
 	$current = $cmd_split[1];
-  	$def->{READINGS}{$sensor}{TIME} = $tm;
-  	$def->{READINGS}{$sensor}{VAL} = $current;
-  	$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+	readingsUpdate($def, $sensor, $current);
   }
 
   if ($battery ne "") {
@@ -317,9 +309,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "Error";
 	$current = "ok" if ($battery eq "batt_ok");
 	$current = "low" if ($battery eq "batt_low");
-	$def->{READINGS}{$sensor}{TIME} = $tm;
-	$def->{READINGS}{$sensor}{VAL} = $current;
-	$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+	readingsUpdate($def, $sensor, $current);
   }
 
   if ($delay ne '') {
@@ -327,20 +317,17 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "Error";
 	$current = "min" if ($delay eq "min_delay");
 	$current = "max" if ($delay eq "max_delay");
-	$def->{READINGS}{$sensor}{TIME} = $tm;
-	$def->{READINGS}{$sensor}{VAL} = $current;
-	$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+	readingsUpdate($def, $sensor, $current);
   }
 
   if (($firstdevice == 1) && $val) {
   	$def->{STATE} = $val;
-  	$def->{TIME} = $tm;
-  	$def->{CHANGED}[$n++] = $val;
+	readingsUpdate($def, "state", $val);
   }
 
-  DoTrigger($name, undef);
+  readingsEndUpdate($def, 1);
 
-  return "";
+  return $name;
 }
 
 
@@ -369,7 +356,7 @@ TRX_SECURITY_Parse($$)
   my $num_bytes = ord($msg);
 
   if ($num_bytes < 3) {
-    return;
+    return "";
   }
 
   my $type = $rfxcom_data_array[0];
@@ -379,7 +366,7 @@ TRX_SECURITY_Parse($$)
   if ($type == 0x20) {
 	Log 1, "TRX_SECURITY: X10Sec num_bytes=$num_bytes hex=$hexline" if ($TRX_SECURITY_debug == 1);
         $res = TRX_SECURITY_parse_X10Sec(\@rfxcom_data_array);
-  	Log 1, "TRX_SECURITY: unsupported hex=$hexline" if ($res ne "" && $res !~ /^UNDEFINED.*/);
+  	Log 1, "TRX_SECURITY: unsupported hex=$hexline" if ($res eq "");
 	return $res;
   } else {
 	Log 0, "TRX_SECURITY: not implemented num_bytes=$num_bytes hex=$hexline";

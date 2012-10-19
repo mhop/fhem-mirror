@@ -99,7 +99,7 @@ TRX_LIGHT_Initialize($)
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
   $hash->{ParseFn}   = "TRX_LIGHT_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 event-on-update-reading event-on-change-reading do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -447,6 +447,8 @@ sub TRX_LIGHT_parse_X10 {
 		$command = ($command eq "on") ? "dark" : "bright" ;
   }
 
+  readingsBeginUpdate($def);
+
   if ($type == 0x10 || $type == 0x11) {
 	# try to use it for all types:
 	$current = $command;
@@ -458,9 +460,7 @@ sub TRX_LIGHT_parse_X10 {
 
 	$sensor = $firstdevice == 1 ? $def->{TRX_LIGHT_devicelog} : $def->{TRX_LIGHT_devicelog2};
 	$val .= $current;
-  	$def->{READINGS}{$sensor}{TIME} = $tm;
-  	$def->{READINGS}{$sensor}{VAL} = $current;
-  	$def->{CHANGED}[$n++] = $sensor . ": " . $current;
+	readingsUpdate($def, $sensor, $current);
   } else {
 	$error = sprintf "TRX_LIGHT: error unknown sensor type=%x device_type=%s devn=%s first=%d command=%s", $type, $device_type, $device_name, $firstdevice, $command;
 	Log 1, $error;
@@ -469,13 +469,12 @@ sub TRX_LIGHT_parse_X10 {
 
   if (($firstdevice == 1) && $val) {
   	$def->{STATE} = $val;
-  	$def->{TIME} = $tm;
-  	$def->{CHANGED}[$n++] = $val;
+	readingsUpdate($def, "state", $val);
   }
 
-  DoTrigger($name, undef);
+  readingsEndUpdate($def, 1);
 
-  return "";
+  return $name;
 }
 
 #####################################
@@ -504,7 +503,7 @@ TRX_LIGHT_Parse($$)
   my $num_bytes = ord($msg);
 
   if ($num_bytes < 3) {
-    return;
+    return "";
   }
 
   my $type = $rfxcom_data_array[0];
@@ -514,7 +513,7 @@ TRX_LIGHT_Parse($$)
   if ($type == 0x10 || $type == 0x11 || $type == 0x12) {
 	Log 1, "TRX_LIGHT: X10 num_bytes=$num_bytes hex=$hexline" if ($TRX_LIGHT_debug == 1);
         $res = TRX_LIGHT_parse_X10(\@rfxcom_data_array);
-  	Log 1, "TRX_LIGHT: unsupported hex=$hexline" if ($res ne "" && $res !~ /^UNDEFINED.*/);
+  	Log 1, "TRX_LIGHT: unsupported hex=$hexline" if ($res eq "");
 	return $res;
   } else {
 	Log 0, "TRX_LIGHT: not implemented num_bytes=$num_bytes hex=$hexline";
