@@ -90,7 +90,7 @@ TRX_WEATHER_Initialize($)
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 event-on-update-reading event-on-change-reading do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
 }
 
@@ -785,6 +785,8 @@ TRX_WEATHER_Parse($$)
   my $i;
   my $val = "";
   my $sensor = "";
+
+  readingsBeginUpdate($def);
   foreach $i (@res){
  	#print "!> i=".$i."\n";
 	#printf "%s\t",$i->{device};
@@ -793,27 +795,21 @@ TRX_WEATHER_Parse($$)
 			$val .= "T: ".$i->{current}." ";
 
 			$sensor = "temperature";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
+			readingsUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "chilltemp") { 
 			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
 			$val .= "CT: ".$i->{current}." ";
 
 			$sensor = "windchill";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};
+			readingsUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "humidity") { 
 			#printf "Luftfeuchtigkeit %d%s, %s ;",$i->{current},$i->{units},$i->{string};
 			$val .= "H: ".$i->{current}." ";
 
 			$sensor = "humidity";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "battery") { 
 			#printf "Batterie %d%s; ",$i->{current},$i->{units};
@@ -822,9 +818,7 @@ TRX_WEATHER_Parse($$)
 			$val .= "BAT: ".$words[0]." "; #use only first word
 
 			$sensor = "battery";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "pressure") { 
 			#printf "Luftdruck %d %s, Vorhersage=%s ; ",$i->{current},$i->{units},$i->{forecast};
@@ -832,89 +826,65 @@ TRX_WEATHER_Parse($$)
 			$val .= "P: ".$i->{current}." ";
 
 			$sensor = "pressure";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 
 			$sensor = "forecast";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{forecast};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{forecast};;
+			readingsUpdate($def, $sensor, $i->{forecast});
 	}
 	elsif ($i->{type} eq "speed") { 
 			$val .= "W: ".$i->{current}." ";
 			$val .= "WA: ".$i->{average}." ";
 
 			$sensor = "wind_speed";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 
 			$sensor = "wind_avspeed";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{average};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{average};;
+			readingsUpdate($def, $sensor, $i->{average});
 	}
 	elsif ($i->{type} eq "direction") { 
 			$val .= "WD: ".$i->{current}." ";
 			$val .= "WDN: ".$i->{string}." ";
 
-			$sensor = "wind_dir";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current} . " " . $i->{string};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current} . " " . $i->{string};;
+			$sensor = "wind_dir";
+			readingsUpdate($def, $sensor, $i->{current} . " " . $i->{string});
 	}
 	elsif ($i->{type} eq "rain") { 
 			$val .= "RR: ".$i->{current}." ";
 
 			$sensor = "rain_rate";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "train") { 
 			$val .= "TR: ".$i->{current}." ";
 
 			$sensor = "rain_total";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "flip") { 
 			$val .= "F: ".$i->{current}." ";
 
 			$sensor = "rain_flip";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "uv") { 
 			$val .= "UV: ".$i->{current}." ";
 			$val .= "UVR: ".$i->{risk}." ";
 
 			$sensor = "uv_val";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 
 			$sensor = "uv_risk";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{risk};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{risk};;
+			readingsUpdate($def, $sensor, $i->{risk});
 	}
 	elsif ($i->{type} eq "weight") { 
 			$val .= "W: ".$i->{current}." ";
 
 			$sensor = "weight";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "hexline") { 
 			$sensor = "hexline";			
-			$def->{READINGS}{$sensor}{TIME} = $tm;
-			$def->{READINGS}{$sensor}{VAL} = $i->{current};
-			$def->{CHANGED}[$n++] = $sensor . ": " . $i->{current};;
+			readingsUpdate($def, $sensor, $i->{current});
 	}
 	else { 
 			print "\nTRX_WEATHER: Unknown: "; 
@@ -928,13 +898,14 @@ TRX_WEATHER_Parse($$)
     $val =~ s/^\s+|\s+$//g;
 
     $def->{STATE} = $val;
-    $def->{TIME} = $tm;
-    $def->{CHANGED}[$n++] = $val;
+    readingsUpdate($def, "state", $val);
   }
 
-  DoTrigger($name, undef);
+  $def->{"${name}_TIME"} = TimeNow();
 
-  return $val;
+  readingsEndUpdate($def, 1);
+
+  return $name;
 }
 
 1;
