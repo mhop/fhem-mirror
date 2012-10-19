@@ -2688,6 +2688,9 @@ setReadingsVal($$$$)
   my ($hash,$rname,$val,$ts) = @_;
   $hash->{READINGS}{$rname}{VAL} = $val;
   $hash->{READINGS}{$rname}{TIME} = $ts;
+  if($rname eq "state") {
+    $hash->{STATE} = $val;
+  }
 }
 
 sub
@@ -2927,6 +2930,7 @@ readingsUpdate($$$) {
   # add to CHANGED hash
   #Log 1, "changed!" if($changed); # DEBUG
   my $rv= "$reading: $value";
+  $rv = "$value" if($changed && ($reading eq "state")); 
   addEvent($hash, $rv) if($changed);
   
   return $rv;
