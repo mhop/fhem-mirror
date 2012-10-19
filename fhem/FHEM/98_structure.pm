@@ -225,6 +225,7 @@ sub structure_Notify($$)
     $newState = "undefined";
   }
 
+  delete($hash->{INSET});
 
   #eigenen Status jetzt setzen, nur wenn abweichend
   if(!defined($hash->{STATE}) || ($hash->{STATE} ne $newState)) {
@@ -235,10 +236,6 @@ sub structure_Notify($$)
     readingsUpdate($hash, "state", $newState);
     readingsEndUpdate($hash, 1);
   }
-  #Log 1, "devstate: ".$devstate." - minprio final: " . $minprio . "\n";
-  #Log 1, Dumper(%priority);
-  delete($hash->{INSET});
-
   undef;
 }
 
