@@ -740,7 +740,7 @@ TRX_WEATHER_Parse($$)
   unless ($rec) {
     Log 4, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
     Log 1, "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id message='$hexline'";
-    return "TRX_WEATHER: ERROR: Unknown sensor_id=$sensor_id \n";
+    return "";
   }
   
   my $method = $rec->{method};
@@ -755,7 +755,7 @@ TRX_WEATHER_Parse($$)
   if (! defined(&$method)) {
     Log 4, "TRX_WEATHER: Error: Unknown function=$method. Please define it in file $0";
     Log 4, "TRX_WEATHER: sensor_id=$sensor_id\n";
-    return "TRX_WEATHER: Error: Unknown function=$method. Please define it in file $0";
+    return "";
   } else {
     #Log 1, "TRX_WEATHER: parsing sensor_id=$sensor_id message='$hexline'";
     @res = $method->($rec->{part}, $longids, \@rfxcom_data_array);
@@ -767,7 +767,7 @@ TRX_WEATHER_Parse($$)
 
   if (! defined($device_name)) {
     Log 4, "TRX_WEATHER: error device_name undefined\n";
-    return "TRX_WEATHER: Error: Unknown devicename.";
+    return "";
   }
 
   my $def = $modules{TRX_WEATHER}{defptr}{"$device_name"};
