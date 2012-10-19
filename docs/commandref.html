@@ -452,6 +452,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>attr lamp loglevel 6</code><br>
     <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
     <code>attr weatherstation event-on-change-reading israining</code><br>
+    <code>attr weatherstation event-on-change-reading israining,state</code><br>
   </ul>
   <br>
 
@@ -8958,8 +8959,8 @@ attr RFXTRXUSB longids TX3_T,TX3_H</PRE>
   <a name="TRX_SECURITYattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#ignore">ignore</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
   </ul>
 </ul>
 
@@ -9058,8 +9059,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <a name="TRX_LIGHTattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#ignore">ignore</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
   </ul>
 
 </ul>
@@ -9119,8 +9120,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <a name="TRX_WEATHERattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#ignore">ignore</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
   </ul>
   <br>
 </ul>
