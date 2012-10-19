@@ -901,8 +901,6 @@ TRX_WEATHER_Parse($$)
     readingsUpdate($def, "state", $val);
   }
 
-  $def->{"${name}_TIME"} = TimeNow();
-
   readingsEndUpdate($def, 1);
 
   return $name;
