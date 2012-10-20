@@ -1537,6 +1537,8 @@ CommandRename($$)
   my ($cl, $param) = @_;
   my ($old, $new) = split(" ", $param);
 
+  $old = "''" if(!defined($old));
+
   return "Please define $old first" if(!defined($defs{$old}));
   return "Invalid characters in name (not A-Za-z0-9.:_): $new"
                         if($new !~ m/^[a-z0-9.:_]*$/i);
