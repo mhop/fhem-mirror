@@ -293,7 +293,7 @@ CommandCreateLog($$)
 # PARAM in define will be replaced with the $1 from matchList
 my @usbtable = (
     { NAME      => "CUL",
-      matchList => ["cu.usbmodem(.*)", "ttyACM(.*)"],
+      matchList => ['cu.usbmodem.*(.)$', 'ttyACM.*(.)$'],
       DeviceName=> "DEVICE\@9600",
       flush     => "\n",
       request   => "V\n",
