@@ -33,7 +33,7 @@ my %zwave_class = (
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x", },
     get   => { basicStatus => "02",     }, 
-    parse => { "..2003(.*)"  => '"basicReport:$1"',}, },
+    parse => { "..200.(.*)"  => '"basicReport:$1"',}, },
   CONTROLLER_REPLICATION   => { id => '21', },
   APPLICATION_STATUS       => { id => '22', },
   ZIP_SERVICES             => { id => '23', },
