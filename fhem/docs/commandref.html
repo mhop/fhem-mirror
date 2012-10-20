@@ -55,6 +55,7 @@
       <a href="#shutdown">shutdown</a> &nbsp;
       <a href="#sleep">sleep</a> &nbsp;
       <a href="#trigger">trigger</a> &nbsp;
+      <a href="#update">update</a> &nbsp;
       <a href="#updatefhem">updatefhem</a> &nbsp;
       <a href="#usb">usb</a> &nbsp;
       <a href="#xmllist">xmllist</a> &nbsp;
@@ -788,10 +789,57 @@ A line ending with \ will be concatenated with the next one, so long lines
   </code></pre>
 </ul>
 
+<a name="update"></a>
+<h3>update</h3>
+<ul>
+  <code>update [development|stable] [&lt;file&gt;|check|fhem|full] [force]</code><br>
+  <br>
+    The installed fhem distribution and its installed extensions (just like the
+    webGUI PGM2) are updated via this command from the online repository. The
+    locally installed files will be checked against the online repository and
+    will be updated in case the files online are in a newer version. Modules
+    which are used while the update is in progress will be restarted in the new
+    version after the update has finished.
+    <br>
+    <br>
+    Notice: The former used command "updatefhem" will be replaced by the new
+    command "update" in the 5.3 distribution.
+    <br>
+    <br>
+    The new update function will process more advanced distribution information
+    as well as control commands for updating, removing or renaming existing files.
+    New file structures can also be set up by the new control command files.
+    The new update process will exclusively work with the file path which is
+    given by the global attribute "modpath" except for the fhem.pl file. The user
+    decides whether to use a stable, a developer- or a experimental-rated version
+    of fhem (experimental is not yet implemented).
+    <br>
+    <br>
+    Furthermore, the use of packages is supported just like in a manual installation
+    of fhem. On the moment this only refers to FHEM including PGM2 (FHEMWEB), others
+    may follow up. By using the update in this way, only files which are acutally
+    used will be updated.
+    <br>
+    <br>
+
+    <a name="updateattr"></a>
+    <b>Attributes</b>
+    <ul>
+      <li><a href="#backup_before_update">backup_before_update</a></li><br>
+
+      <li><a href="#exclude_from_update">exclude_from_update</a></li><br>
+
+      <li><a href="#updatebranch">updatebranch</a></li><br>
+  </ul>
+</ul>
+
 <a name="updatefhem"></a>
 <h3>updatefhem</h3>
 <ul>
   <code>updatefhem [&lt;changed&gt;|&lt;filename&gt;|&lt;housekeeping&gt; [&lt;clean&gt;] [&lt;yes&gt;]|&lt;preserve&gt; [&lt;filename&gt;]]</code> <br>
+  <br>
+    <b>This command is deprecated as of Fhem 5.3</b>
+  <br>
   <br>
     Update the fhem modules and documentation from a nightly SVN checkout. For
     this purpose Fhem contacts http://fhem.de/fhemupdate, compares the stored
@@ -1204,11 +1252,11 @@ A line ending with \ will be concatenated with the next one, so long lines
 
     <a name="backup_before_update"></a>
     <li>backup_before_update<br>
-        If this attribute is set to 0, updatefhem skip always backing up your
+        If this attribute is set to 0, an update skip always backing up your
         installation via the <a href="#backup">backup</a> command. The default
         is to backup always before updates.<br>
         Note: Set this attribute only if you know what you do!<br>
-        This Attribute is used by the <a href="#updatefhem">updatefhem</a> command.<br>
+        This Attribute is used by the <a href="#update">update</a> command.<br>
         Example:<br>
         <ul>
           attr global backup_before_update 0
@@ -1268,7 +1316,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="exclude_from_update"></a>
     <li>exclude_from_update<br>
         Contains a space separated list of file which will be excluded by an update.
-        This Attribute is used by the <a href="#updatefhem">updatefhem</a> command.<br>
+        This Attribute is used by the <a href="#update">update</a> command.<br>
         Example:<br>
         <ul>
           attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot FS20.on.png FS20.off.png
@@ -1359,6 +1407,25 @@ A line ending with \ will be concatenated with the next one, so long lines
     <a name="title"></a>
     <li>title<br>
         Used by the web frontend fhemweb.pl (webpgm2) as a Page title.
+    </li><br>
+
+    <a name="updatebranch"></a>
+    <li>updatebranch<br>
+        The update branch will be set by the file FhemUtils/release.pm contained
+        in the modpath. For example, if a stable version (version 5.3 upwards) of
+        fhem is installed via a direct download connection of the archieve on the
+        fhem-website, then the branch of the update is automatically on "stable".
+        In this branch, only updates fixing confirmed errors, relevant security
+        fixes or new stable versions are provided.<br>
+        By using the command "update development &lt;filename&gt;", particular files
+        or packages can always be installed directly from the development branch
+        (e.g. "update development &lt;package&gt;").<br>
+        If you want to update from the development branch in stable verion in
+        general, you can force this behaviour by using the attribute "updatebranch DEVELOPMENT".
+        In case the installation of fhem should generally using the development
+        branch, this attribute would not have to be set. Instead, use "update development force"
+        to update all files including release.pm (containing the release-information)
+        to the newest version.
     </li><br>
 
     <a name="userattr"></a>
