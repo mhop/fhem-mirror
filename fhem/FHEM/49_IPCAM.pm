@@ -197,7 +197,7 @@ IPCAM_getSnapshot($) {
 
   $dateTime = TimeNow();
 
-  $snapshot = GetFileFromURL($camURI);
+  $snapshot = GetFileFromURLQuiet($camURI);
 
   $imageFormat = IPCAM_guessFileFormat(\$snapshot);
 
