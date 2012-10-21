@@ -27,7 +27,7 @@ sub CUL_HM_ProcessCmdStack($);
 sub CUL_HM_Resend($);
 sub CUL_HM_Id($);
 sub CUL_HM_name2hash($);
-sub CUL_HM_Name2Id($);
+sub CUL_HM_Name2Id(@);
 sub CUL_HM_id2Name($);
 sub CUL_HM_getDeviceHash($);
 sub CUL_HM_DumpProtocol($$@);
@@ -85,14 +85,14 @@ my %culHmModel=(
   "0004" => {name=>"HM-LC-SW1-FM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0005" => {name=>"HM-LC-BL1-FM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0006" => {name=>"HM-LC-BL1-SM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0007" => {name=>"KS550"                   ,cyc=>''      ,rxt=>''    ,lst=>'1'            ,chn=>"",},
+  "0007" => {name=>"KS550"                   ,cyc=>'00:10' ,rxt=>''    ,lst=>'1'            ,chn=>"",},
   "0008" => {name=>"HM-RC-4"                 ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "0009" => {name=>"HM-LC-SW2-FM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "000A" => {name=>"HM-LC-SW2-SM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "000B" => {name=>"HM-WDC7000"              ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"",},
   "000D" => {name=>"ASH550"                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "000E" => {name=>"ASH550I"                 ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "000F" => {name=>"S550IA"                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "000F" => {name=>"S550IA"                  ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0011" => {name=>"HM-LC-SW1-PL"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
   "0012" => {name=>"HM-LC-DIM1L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
   "0013" => {name=>"HM-LC-DIM1L-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -114,8 +114,8 @@ my %culHmModel=(
   "002A" => {name=>"HM-RC-12-B"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002D" => {name=>"HM-LC-SW4-PCB"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
   "002E" => {name=>"HM-LC-DIM2L-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Vtr:3:6",},
-  "002F" => {name=>"HM-SEC-SC"               ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0030" => {name=>"HM-SEC-RHS"              ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "002F" => {name=>"HM-SEC-SC"               ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0030" => {name=>"HM-SEC-RHS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0034" => {name=>"HM-PBI-4-FM"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "0035" => {name=>"HM-PB-4-WM"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "0036" => {name=>"HM-PB-2-WM"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:2",},
@@ -126,19 +126,19 @@ my %culHmModel=(
   "003B" => {name=>"HM-RC-4-B"               ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "003C" => {name=>"HM-WDS20-TH-O"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "003D" => {name=>"HM-WDS10-TH-O"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "003E" => {name=>"HM-WDS30-T-O"            ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003E" => {name=>"HM-WDS30-T-O"            ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "003F" => {name=>"HM-WDS40-TH-I"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "0040" => {name=>"HM-WDS100-C6-O"          ,cyc=>''      ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
+  "0040" => {name=>"HM-WDS100-C6-O"          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
   "0041" => {name=>"HM-WDC7000"              ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",},
-  "0042" => {name=>"HM-SEC-SD"               ,cyc=>''      ,rxt=>'b'    ,lst=>''             ,chn=>"",},
-  "0043" => {name=>"HM-SEC-TIS"              ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0042" => {name=>"HM-SEC-SD"               ,cyc=>'28:00' ,rxt=>'b'    ,lst=>''             ,chn=>"",},
+  "0043" => {name=>"HM-SEC-TIS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0044" => {name=>"HM-SEN-EP"               ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0045" => {name=>"HM-SEC-WDS"              ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0045" => {name=>"HM-SEC-WDS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0047" => {name=>"KFM-Sensor"              ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0046" => {name=>"HM-SWI-3-FM"             ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"Sw:1:3",},
   "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
   "0049" => {name=>"KFM-Display"             ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "004A" => {name=>"HM-SEC-MDIR"             ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "004A" => {name=>"HM-SEC-MDIR"             ,cyc=>'00:20' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "004B" => {name=>"HM-Sec-Cen"              ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004C" => {name=>"HM-RC-12-SW"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "004D" => {name=>"HM-RC-19-SW"             ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18",},
@@ -149,15 +149,15 @@ my %culHmModel=(
   "0052" => {name=>"HM-LC-SW2-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:2",},
   "0053" => {name=>"HM-LC-BL1-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0054" => {name=>"DORMA_RC-H"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
-  "0056" => {name=>"HM-CC-SCD"	             ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0056" => {name=>"HM-CC-SCD"	             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0057" => {name=>"HM-LC-DIM1T-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
   "0058" => {name=>"HM-LC-DIM1T-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
   "0059" => {name=>"HM-LC-DIM1T-FM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
   "005A" => {name=>"HM-LC-DIM2T-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Vtr:3:6",},
   "005C" => {name=>"HM-OU-CF-PL"             ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Sound:2:2",},
   "005D" => {name=>"HM-Sen-MDIR-O"           ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "005F" => {name=>"HM-SCI-3-FM"             ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0060" => {name=>"HM-PB-4DIS-WM"           ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
+  "005F" => {name=>"HM-SCI-3-FM"             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0060" => {name=>"HM-PB-4DIS-WM"           ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
   "0061" => {name=>"HM-LC-SW4-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
   "0062" => {name=>"HM-LC-SW2-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "0064" => {name=>"DORMA_atent"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
@@ -176,18 +176,18 @@ my %culHmModel=(
   "0x7A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
+  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
   "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
   "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
-  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},  
+  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
+  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},  
   "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",},  
   "0084" => {name=>"Schueco_263-160"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},  
   "0086" => {name=>"Schueco_263-146"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "008D" => {name=>"Schueco_263-1350"        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
   "008E" => {name=>"Schueco_263-155"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
   "008F" => {name=>"Schueco_263-145"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "0090" => {name=>"Schueco_263-162"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},  
+  "0090" => {name=>"Schueco_263-162"         ,cyc=>'00:30' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},  
   "0092" => {name=>"Schueco_263-144"         ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",},  
   "0093" => {name=>"Schueco_263-158"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0094" => {name=>"Schueco_263-157"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
@@ -1011,10 +1011,11 @@ CUL_HM_Parse($$)
 my %culHmRegDefine = (
 
   intKeyVisib  =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>""         ,f=>""      ,u=>"bool",t=>"visibility of internal keys"},
+  pairCentral  =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>''       ,f=>""      ,u=>'dec' ,t=>'pairing to central'},
   #blindActuator mainly   
   driveUp      =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
   driveDown    =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
-  driveTurn    =>{a=> 15.0,s=>2.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"fliptime up <=>down"},
+  driveTurn    =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"fliptime up <=>down"},
   maxTimeFSh   =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"Short:max time first direction"},
   maxTimeFLg   =>{a=>157.0,s=>1.0,l=>3,min=>0  ,max=>25.4  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"Long:max time first direction"},
   #remote mainly                                                                       
@@ -1101,7 +1102,7 @@ my %culHmRegDefine = (
   ledFlashLocked=>{a=>31.6,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when locked"},
   );
 my %culHmRegGeneral = (
-  intKeyVisib=>1,
+  intKeyVisib=>1,pairCentral=>1,
 	);
 my %culHmRegSupported = (
   remote=> {backOnTime=>1,backAtEvnt=>1,longPress=>1,msgShowTime=>1,},
@@ -1126,7 +1127,7 @@ my %culHmRegSupported = (
   switch=> {OnTimeSh   =>1,OnTimeLg    =>1,OffTimeSh    =>1,OffTimeLg  =>1,
             OnDlySh    =>1,OnDlyLg     =>1,OffDlySh     =>1,OffDlyLg   =>1,
 			},
-  ClimateControl=>{	
+  thermostat=>{	
 			DispTempHum  =>1,DispTempInfo =>1,DispTempUnit =>1,MdTempReg   =>1,
 			MdTempValve  =>1,TempComfort  =>1,TempLower    =>1,PartyEndDay =>1,
 			PartyEndMin  =>1,PartyEndHr   =>1,TempParty    =>1,DecalDay    =>1,
@@ -1241,16 +1242,51 @@ CUL_HM_Get($@)
 	$val = $hash->{READINGS}{$a[2]}{VAL}    if (!$val && $hash->{READINGS}{$a[2]});
 	$val = AttrVal($devName, $a[2], "")     if (!$val);
 	$val = $devHash->{READINGS}{$a[2]}{VAL} if (!$val && $devHash->{READINGS}{$a[2]});
-	$val = $hash->{helper}{$a[2]}           if (!$val);
+	$val = $hash->{$a[2]}                   if (!$val && $hash->{$a[2]});
+	$val = $devHash->{$a[2]}                if (!$val && $devHash->{$a[2]});
+	$val = $hash->{helper}{$a[2]}           if((!$val)&& (ref($hash->{helper}{$a[2]}) ne "HASH"));
 	$val = $devHash->{helper}{$a[2]}        if (!$val);
 
 	return (defined ($val))?$val:"undefined";
   }
   elsif($cmd eq "reg") {  #####################################################
-    my (undef,undef,$addr,$list,$peerId) = @a;
-    my $regVal = CUL_HM_getRegFromStore($name,$addr,$list,$peerId);
-	return ($regVal eq "invalid")? "Value not captured" 
+    my (undef,undef,$regReq,$list,$peerId) = @a;
+	if ($regReq eq 'all'){
+	  my @regArr = keys %culHmRegGeneral;
+	  push @regArr, keys %{$culHmRegSupported{$st}} if($culHmRegSupported{$st}); 
+	  
+	  my @peers; # get all peers we have a reglist 
+	  my @listWp; # list that require peers
+	  foreach my $readEntry (keys %{$hash->{READINGS}}){
+        my $regs = $hash->{READINGS}{$readEntry}{VAL};
+	    if ($readEntry =~m /^RegL_/){ #this is a reg Reading "RegL_<list>:peerN
+		  my $peer = substr($readEntry,8);
+		  my $listP = substr($readEntry,6,1);
+		  push(@peers,$peer)   if ($peer);
+		  push(@listWp,$listP) if ($peer);
+		}
+	  }
+	  
+	  my @regValList; #storage of results
+	  foreach my $regName (@regArr){
+	    my $regL  = $culHmRegDefine{$regName}->{l};
+		my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
+		foreach my $peer(@peerExe){
+		  next if($peer eq "");
+	      my $regVal = CUL_HM_getRegFromStore($name,$regName,0,$peer); #determine peerID
+	      push @regValList,"List:".$regL.
+		         " Peer:".$peer.
+		         "\t".$regName.
+				 ":\tvalue:". $regVal."\n" if ($regVal ne 'unknown') ; 
+		}
+	  }
+	  return $name." type:".$st." - \n".join("",sort(@regValList));
+	}
+	else{
+      my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
+	  return ($regVal eq "invalid")? "Value not captured" 
 	                             : "0x".sprintf("%X",$regVal)." dec:".$regVal;
+	}
   }
   elsif($cmd eq "regList") {  #################################################
     my @arr = keys %culHmRegGeneral ;
@@ -1258,9 +1294,9 @@ CUL_HM_Get($@)
     my $info = $st." - \n";	
 	foreach my $regName (@arr){
 	  my $reg  = $culHmRegDefine{$regName};	  
-	  $info .= $regName." range:". $reg->{min}." to ".$reg->{max}.$reg->{u}.
-	          ((($reg->{l} == 3)||($reg->{l} == 4))?" peer required":"")
-			  ." : ".$reg->{t}."\n";
+	  $info .= $regName."\trange:". $reg->{min}." to ".$reg->{max}.$reg->{u}.
+	          ((($reg->{l} == 3)||($reg->{l} == 4))?"\tpeer required":"")
+			  ."\t: ".$reg->{t}."\n";
 	}
 	return $info;
   }
@@ -1502,20 +1538,11 @@ CUL_HM_Set($@)
 	$state = "";
   }
   elsif($cmd eq "statusRequest") { ############################################
-	my $chnFound;
-    foreach my $channel (keys %{$attr{$name}}){
-	  next if ($channel !~ m/^channel_/);
-	  my $chnHash = CUL_HM_name2hash($attr{$name}{$channel});
-	  if ($chnHash){
-	    my $chnNo = $chnHash->{DEF};
-		$chnNo = substr($chnNo,6,2);
-	    $chnFound = 1 if ($chnNo eq "01");
-		CUL_HM_PushCmdStack($hash,"++".$flag.'01'.$id.$dst.$chnNo.'0E');
-	  }
+    my @chnIdList = CUL_HM_getAssChnId($name);
+    foreach my $channel (@chnIdList){
+	  my $chnNo = substr($channel,6,2);
+	  CUL_HM_PushCmdStack($hash,"++".$flag.'01'.$id.$dst.$chnNo.'0E');
     }
-	# if channel or single channel device
-	CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'0E')
-	    if (!$chnFound);
 	$state = "";
   } 
   elsif($cmd eq "getpair") { ##################################################
@@ -1528,20 +1555,13 @@ CUL_HM_Set($@)
   } 
   elsif($cmd eq "getConfig") { ################################################
 	my $chFound = 0;
-	if (!$isChannel){# get device with all defined channels
-      CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000');
-      foreach my $channel (keys %{$attr{$name}}){
-	    next if ($channel !~ m/^channel_/);
-	    my $chnHash = CUL_HM_name2hash($attr{$name}{$channel});
-	    if ($chnHash){# 01 will be collected  below
-	      my $chnNo = $chnHash->{DEF};
-	  	  $chnNo = substr($chnNo,6,2);
-	  	  CUL_HM_getConfig($hash,$chnHash,$id,$dst,$chnNo);
-		  $chFound = 1;
-	    }
-	  }
-    }
-    CUL_HM_getConfig($hash,$hash,$id,$dst,$chn)if (!$chFound);#get default channel
+	CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
+	       if (!$isChannel);
+	my @chnIdList = CUL_HM_getAssChnId($name);
+	foreach my $channel (@chnIdList){
+	  my $chnHash = CUL_HM_id2hash($channel);
+	  CUL_HM_getConfig($hash,$chnHash,$id,$dst,substr($channel,6,2));
+	}
 	$state = "";
   } 
   elsif($cmd eq "regRaw" ||$cmd eq "getRegRaw") { #############################
@@ -1554,11 +1574,10 @@ CUL_HM_Set($@)
 	# as of now only hex value allowed check range and convert
 
 	$chn = "00" if ($list eq "00");
-	my $tmpPeerID = ($peerID eq "all")?"all": CUL_HM_Name2Id($peerID); 
-	$peerID =~ m/^self(.*)/;
-	$tmpPeerID = $dst.(($1)?sprintf("%02X",$1):"");
-	$peerID = $tmpPeerID.((length($tmpPeerID) == 6)?"01":"");
-	$peerID = "00000000" if (length($peerID) != 8);# no valid ID - use 0
+	
+	$peerID = ($peerID eq 'all')?'all': CUL_HM_Name2Id($peerID,$hash); #todo add self
+	$peerID = $peerID.((length($peerID) == 6)?"01":"");# default chn 1, if none
+	$peerID = "00000000" if (length($peerID) != 8 && $peerID ne 'all');# none?
 
 	my $peerChn = substr($peerID,6,2);# have to split chan and id
 	$peerID = substr($peerID,0,6);
@@ -1568,31 +1587,18 @@ CUL_HM_Set($@)
 	    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000');
 	  }
 	  else{# other lists are per channel
-	    my $chnFound;
-		foreach my $channel (keys %{$attr{$name}}){#all device channels 
-		  next if ($channel !~ m/^channel_/);
-	      $chnFound = 1;
-	      my $chnHash = CUL_HM_name2hash($attr{$name}{$channel});
-	      if ($chnHash){
-	        my $chnNo = substr($chnHash->{DEF},6,2);
-			if ($list =~m /0[34]/){#getPeers to see if list3 is available 
-			  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'03');
-		      $chnHash->{helper}{getCfgList} = $peerID.$peerChn;#list3 regs 
-		      $chnHash->{helper}{getCfgListNo} = int($list);
-			}
-			else{
-			  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'04'.$peerID.$peerChn.$list);
-			}
-	      }
-        }
-		if (!$chnFound){
+	    my @chnIdList = CUL_HM_getAssChnId($name);
+        foreach my $channel (@chnIdList){
+		  my $chnNo = substr($channel,6,2);
 		  if ($list =~m /0[34]/){#getPeers to see if list3 is available 
-		    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'03');
-		    $hash->{helper}{getCfgList} = $peerID.$peerChn;#list3 regs
-		    $hash->{helper}{getCfgListNo} = int($list);
+			CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'03');
+			my $chnHash = CUL_HM_id2hash($channel);
+		    $chnHash->{helper}{getCfgList} = $peerID.$peerChn;#list3 regs 
+		    $chnHash->{helper}{getCfgListNo} = int($list);
 		  }
 		  else{
-		    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'0400000000'.$list);
+			CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'04'
+			                              .$peerID.$peerChn.$list);
 		  }
 		}
 	  }
@@ -1624,18 +1630,10 @@ CUL_HM_Set($@)
 
 	my $conversion = $reg->{c};
 	if (!$conversion){;# do nothing
-	}
-	elsif($conversion eq "factor"){# use factor
-	  $data *= $reg->{f};
-	}
-	elsif ($conversion eq "fltCvT"){
-	  $data = CUL_HM_fltCvT($data);
-	}
-	elsif($conversion eq "m10s3"){
-	  $data=$data*10-3;
-	}
-	else{
-	  return " conversion undefined - please contact admin";
+	}elsif($conversion eq "factor"){$data *= $reg->{f};# use factor
+	}elsif($conversion eq "fltCvT"){$data = CUL_HM_fltCvT($data);
+	}elsif($conversion eq "m10s3") {$data = $data*10-3;
+	}else{return " conversion undefined - please contact admin";
 	}
 	
 	my $addr = int($reg->{a});        # bit location later
@@ -1650,12 +1648,8 @@ CUL_HM_Set($@)
 	my $mask = (0xffffffff>>(32-$dLen));
 	my $dataStr = substr(sprintf("%08X",($data & $mask) << $bit),
 	                                       8-int($reg->{s}+0.99)*2,);
-    my $addrData;
-	for (my $cnt = 0;$cnt<int($reg->{s}+0.99);$cnt++){
-	  $addrData.=sprintf("%02X",$addr+$cnt).substr($dataStr,$cnt*2,2);
-	}
-    my ($lChn,$peerID,$peerChn) = ($chn,"000000","00");
 	
+    my ($lChn,$peerID,$peerChn) = ($chn,"000000","00");
 	if (($list == 3) ||($list == 4)){ # peer is necessary for list 3/4
 	  return "Peer not specified" if (!$peerChnIn);
 	  $peerID = ($peerChnIn =~ m/^self(.*)/)?$dst:CUL_HM_Name2Id($peerChnIn);
@@ -1670,13 +1664,21 @@ CUL_HM_Set($@)
 	else{  #if($list == 1/5/6){
       $lChn = "01" if ($chn eq "00"); #by default select chan 01 for device
 	}
+	
+    my $addrData;
 	if ($dLen < 8){# fractional byte see whether we have stored the register
 	  #read full 8 bit!!!
 	  my $curVal = CUL_HM_getRegFromStore(CUL_HM_id2Name($dst.$lChn),
 	                                      $addr,$list,$peerID.$peerChn);
 	  return "cannot read current value for Bitfield - retrieve Data first" 
 	             if (!$curVal);
-	  $data = ($curVal & (~($mask<<$bit)))||hex($data);
+	  $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
+	  $addrData.=sprintf("%02X%02X",$addr,$data);
+	}
+	else{
+	  for (my $cnt = 0;$cnt<int($reg->{s}+0.99);$cnt++){
+	    $addrData.=sprintf("%02X",$addr+$cnt).substr($dataStr,$cnt*2,2);
+	  }
 	}
     CUL_HM_pushConfig($hash,$id,$dst,$lChn,$peerID,$peerChn,$list,$addrData);
   } 
@@ -1997,7 +1999,6 @@ CUL_HM_Set($@)
 	  CommandDelete(undef,$attr{$name}{$channel})
 	        if (hex($chNo) > $maxBtnNo);
 	}
-	
   }
   elsif($cmd eq "actiondetect"){
     $state = "";
@@ -2195,12 +2196,17 @@ CUL_HM_Pair(@)
 sub
 CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
-  
   my $flag = CUL_HM_getFlag($hash);
+  
+  foreach my $readEntry (keys %{$chnhash->{READINGS}}){
+	if ($readEntry =~ m/^RegL_/){
+	  delete $chnhash->{READINGS}{$readEntry};
+	}
+  }
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
   my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2:3.p ,6:2"
-  foreach my$listEntry (@list){
-    my ($peerReq,$chnValid,)= (0,0);
+  foreach my$listEntry (@list){# each list that is define for this channel
+    my ($peerReq,$chnValid)= (0,0);
     my ($listNo,$chnLst1) = split(":",$listEntry); 
 	if (!$chnLst1){
 	  $chnValid = 1; #if no entry channel is valid
@@ -2229,7 +2235,7 @@ CUL_HM_getConfig($$$$$){
 	}	
   }
  }
-###################################
+###################-------send related --------################
 sub
 CUL_HM_SendCmd($$$$)
 {
@@ -2262,7 +2268,7 @@ CUL_HM_responseSetup($$$)
   my ($msgId, $msgType,$dst,$p) = ($2,$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-    
+  my $rTo = 1.5; #default rsponse timeout
   if ($msgType eq "01" && $subType){ 
     if ($subType eq "03"){ #PeerList-------------
   	  #--- remember request params in device level
@@ -2270,7 +2276,7 @@ CUL_HM_responseSetup($$$)
   	  $hash->{helper}{respWait}{forChn} = substr($p,0,2);#channel info we await
       
       # define timeout - holdup cmdStack until response complete or timeout
-  	  InternalTimer(gettimeofday()+1.5, "CUL_HM_respPendTout", "respPend:$dst", 0);
+  	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
   		  
   	  #--- remove readings in channel
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
@@ -2280,8 +2286,8 @@ CUL_HM_responseSetup($$$)
     }
     elsif($subType eq "04"){ #RegisterRead-------
       my ($peerID, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
-	  $peerID = CUL_HM_id2Name($peerID);
-	  $peerID =~ s/ /_/g;#remote blanks
+	  $peerID = ($peerID ne "00000000")?CUL_HM_id2Name($peerID):"";
+	  $peerID =~ s/ /_/g;#subs blanks
 	  #--- set messaging items
 	  $hash->{helper}{respWait}{Pending} = "RegisterRead";
 	  $hash->{helper}{respWait}{forChn} = $chn;
@@ -2289,7 +2295,7 @@ CUL_HM_responseSetup($$$)
 	  $hash->{helper}{respWait}{forPeer}= $peerID;# this is the HMid + channel
       
       # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+1.5,"CUL_HM_respPendTout","respPend:$dst", 0);
+	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);#todo General change timer to 1.5
 	  #--- remove channel entries that will be replaced
       my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
       $chnhash = $hash if(!$chnhash);   
@@ -2306,7 +2312,7 @@ CUL_HM_responseSetup($$$)
 	  $hash->{helper}{respWait}{forChn} = $chn;
       
       # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+1.5, "CUL_HM_respPendTout", "respPend:$dst", 0);
+	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
 	  return;
     }
   }
@@ -2352,6 +2358,7 @@ CUL_HM_respPendRm($)
   delete ($hash->{helper}{respWait});
   RemoveInternalTimer($hash);          # remove resend-timer
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
+
   CUL_HM_ProcessCmdStack($hash); # continue processing commands
 }
 ###################################
@@ -2365,12 +2372,13 @@ CUL_HM_respPendTout($)
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
+	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");#Generel - keep it?
   }
 }
 ###################################
 sub
-CUL_HM_respPendToutProlong($) #used when device sends part responses
-{
+CUL_HM_respPendToutProlong($) 
+{#used when device sends part responses
   my ($hash) =  @_;  
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer?
   InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
@@ -2408,7 +2416,6 @@ CUL_HM_ProcessCmdStack($)
   }
   return $sent;
 }
-
 ###################################
 sub
 CUL_HM_Resend($)
@@ -2416,7 +2423,7 @@ CUL_HM_Resend($)
   my $hash = shift;
   my $name = $hash->{NAME};
   return if(!$hash->{helper}{respWait}{reSent});      # Double timer?
-  if($hash->{helper}{respWait}{reSent} >= 1) {
+  if($hash->{helper}{respWait}{reSent} >= 3) {
   	CUL_HM_eventP($hash,"ResndFail");
     delete($hash->{cmdStack});
     delete($attr{$hash->{NAME}}{protCmdPend});
@@ -2432,7 +2439,25 @@ CUL_HM_Resend($)
     InternalTimer(gettimeofday()+1, "CUL_HM_Resend", $hash, 0);
   }
 }
+###################-----------helper and shortcuts--------################
+sub
+CUL_HM_getAssChnId($)
+{ # will return the list of assotiated channel of a device
+  # if it is a channel only return itself
+  # if device and no channel 
+  my ($name) = @_;
+  my @chnIdList;
+  foreach my $channel (keys %{$attr{$name}}){
+	next if ($channel !~ m/^channel_/);
+	my $chnHash = CUL_HM_name2hash($attr{$name}{$channel});
+	push @chnIdList,$chnHash->{DEF} if ($chnHash);
+  }
+  my $dId = CUL_HM_Name2Id($name);
 
+  push @chnIdList,$dId."01" if (length($dId) == 6 && !$attr{$name}{channel_01});
+  push @chnIdList,$dId if (length($dId) == 8);
+  return sort(@chnIdList);
+}
 ###################################
 sub
 CUL_HM_Id($)
@@ -2443,6 +2468,14 @@ CUL_HM_Id($)
 }
 ###################################
 sub
+CUL_HM_id2hash($)
+{# in: id, out:hash
+  my ($id) = @_;
+  return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
+  return $modules{CUL_HM}{defptr}{substr($id,0,6)}; # could be chn 01 of dev
+}
+###################################
+sub
 CUL_HM_name2hash($)
 {# in: name, out:hash
   my ($name) = @_;
@@ -2450,38 +2483,36 @@ CUL_HM_name2hash($)
 }
 ###################################
 sub
-CUL_HM_Name2Id($)
+CUL_HM_Name2Id(@)
 { # in: name or HMid out: HMid, undef if no match
-  my ($idName) = @_;
+  my ($idName,$idHash) = @_;
   my $hash = $defs{$idName};
-  my $hmId;
-  $hmId = $hash->{DEF} if ($hash);
-  $hmId =$idName if(!$hmId &&($idName =~ m/^[A-F0-9]{6,8}$/i));
-  return $hmId;
+  return $hash->{DEF} if ($hash);                           #idName is entity
+  return "000000"     if($idName eq "broadcast");           #broadcast
+
+  return $defs{$1}.$2 if($idName =~ m/(.*)_chn:(.*)/);      #<devname> chn:xx
+  return $idName      if($idName =~ m/^[A-F0-9]{6,8}$/i);   #was already HMid
+  return $idHash->{DEF}.sprintf("%02X",$1) 
+                      if($idHash && $idName =~ m/self(.*)/);
+  return;
 }
 ###################################
 sub
 CUL_HM_id2Name($)
 { # in: name or HMid out: name
   my ($p) = @_;
+  return $p                      if($attr{$p}); # is already name
   my $devId= substr($p, 0, 6);
-  my $chn;
-  my $chnId;
-  return $p if($attr{$p}); # is already name
+  return "broadcast"             if($devId eq "000000"); 
+  my ($chn,$chnId);
   if (length($p) == 8){
 	$chn = substr($p, 6, 2);;
 	$chnId = $p;
   }
-  return "broadcast" if($devId eq "000000"); 
-  my $name;
   my $defPtr = $modules{CUL_HM}{defptr};
-  $name = $defPtr->{$chnId}{NAME} if($chnId && $defPtr->{$chnId});
-  if (!$name){
-    $name = $defPtr->{$devId}{NAME} if($defPtr->{$devId});
-    $name = $devId if(!$name);
-    $name .= ($chn ? (" chn:".$chn):"");
-  }
-  return $name;
+  return $defPtr->{$chnId}{NAME} if($chnId && $defPtr->{$chnId});
+  return $defPtr->{$devId}{NAME} if($defPtr->{$devId});
+  return $devId. ($chn ? ("_chn:".$chn):"");
 }
 ###################################
 sub
@@ -2732,6 +2763,7 @@ CUL_HM_parseCommon(@){
 		
 		if ($p =~ m/00000000$/) {# last entry, peerList is complete
 		  CUL_HM_respPendRm($shash);
+
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
 		  if ($reqPeer){
@@ -2775,16 +2807,20 @@ CUL_HM_parseCommon(@){
 		  my $addr;
 		  my @dataList;
 		  ($addr,$data) = (hex($1),$2) if ($data =~ m/(..)(.*)/);
-		  $data =~s/(..)/$1:/g;
-		  foreach my $d1 (split(":",$data)){
-			push (@dataList,sprintf("%02X:%s",$addr++,$d1));
+		  if ($addr == 0){
+		   $data = "00:00";
 		  }
-		  $data = join(" ",@dataList);		
+		  else{
+		    $data =~s/(..)/$1:/g;
+		    foreach my $d1 (split(":",$data)){
+			  push (@dataList,sprintf("%02X:%s",$addr++,$d1));
+		    }
+		    $data = join(" ",@dataList);		
+		  }
 		}
-		my $peerN  =($list =~ m/^0[34]$/)?$shash->{helper}{respWait}{forPeer}:"";
-        $chnhash->{READINGS}{"RegL_".$list.":".$peerN}{VAL}.= " ".$data if($data);
-        $chnhash->{READINGS}{"RegL_".$list.":".$peerN}{TIME}= TimeNow();
-	
+		my $regLN = "RegL_".$list.":".$shash->{helper}{respWait}{forPeer};
+        $chnhash->{READINGS}{$regLN}{VAL}.= " ".$data if($data);
+        $chnhash->{READINGS}{$regLN}{TIME}= TimeNow();
 		if ($data =~m/00:00$/){ # this was the last message in the block
 		  if($list eq "00"){
 			my $name = CUL_HM_id2Name($src);
@@ -2795,6 +2831,7 @@ CUL_HM_parseCommon(@){
 		    $shash->{READINGS}{PairedTo}{TIME} = TimeNow();
 		  }
 		  CUL_HM_respPendRm($shash);
+		  delete $chnhash->{helper}{shadowReg}{$regLN};#remove shadowhash
 		}
 		else{
 		  CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
@@ -2813,6 +2850,9 @@ CUL_HM_parseCommon(@){
 	  $data =~ s/(..)(..)/ $1:$2/g;
 	  $chnHash->{READINGS}{$listName}{VAL}.= " ".$data;
 	  $chnHash->{READINGS}{$listName}{TIME}= TimeNow();
+	  # todo: this is likely a set of messages. Postpone command stack processing
+	  # until end of transmission. Verify whether there is a conflict with a 
+	  # current operation and use timer supervision to abort
 	}  
 	elsif($subtype eq "06"){ #reply to status request#######
 	  #todo = what is the answer to a status request
@@ -2842,13 +2882,13 @@ CUL_HM_parseCommon(@){
 
 #############################
 sub
-CUL_HM_getRegFromStore($$$$){
-  my($name,$addr,$list,$peerId)=@_;
+CUL_HM_getRegFromStore($$$$)
+{#read a register from backup data
+  my($name,$regName,$list,$peerId)=@_;
   my $hash = CUL_HM_name2hash($name);
-  my ($size,$pos,$conversion,$factor,$unit) = (8,0,"",1,""); # default 8bit, pos=0, no convertion
-
-  if ($culHmRegDefine{$addr}) {
-    my $regName = $addr;
+  my ($size,$pos,$conversion,$factor,$unit) = (8,0,"",1,""); # default
+  my $addr = $regName;
+  if ($culHmRegDefine{$regName}) { # get the register's information
     $addr = $culHmRegDefine{$regName}{a};
 	$pos = ($addr*10)%10;
 	$addr = int($addr);
@@ -2859,47 +2899,38 @@ CUL_HM_getRegFromStore($$$$){
 	$factor = $culHmRegDefine{$regName}{f};
 	$unit = $culHmRegDefine{$regName}{u};
   }
-  $peerId = substr(CUL_HM_Name2Id($name),0,6).                 #deviceID
-            sprintf("%02X",$1) if($peerId =~ m/^self(.*)/);    # plus channel
+  $peerId = substr(CUL_HM_Name2Id($name),0,6).sprintf("%02X",$1) 
+                     if($peerId =~ m/^self(.*)/);    # plus channel
 
-  my $listName = "RegL_".sprintf("%02X",$list).":".
-                 (($list<3)?"":CUL_HM_id2Name($peerId)); 
-  $listName =~ s/ /_/g;
-  my $listRegs = $hash->{READINGS}{$listName}{VAL} if ($listName);
-  return "unknown" if (!$listRegs);
-  my $data = 0;
-  my $size2go = $size;
-  foreach my $AD(split(" ",$listRegs)){
-    my ($a,$dRead) = split(":",$AD);
-	if(hex($a) == $addr){
-	  if ($size2go<9){
-	    $data += hex($dRead);
-		$data = ($data>>$pos) & (0xffffffff>>(32-$size));
-		
-	    if (!$conversion){;# do nothing
-	    }
-	    elsif($conversion eq "factor"){# use factor
-	      $data /= $factor;
-	    }
-	    elsif ($conversion eq "fltCvT"){
-	      $data = CUL_HM_CvTflt($data);
-	    }
-	    elsif($conversion eq "m10s3"){
-	      $data=($data+3)/10;
-	    }
-	    else{
-	      return " conversion undefined - please contact admin";
-	    }
-	    return $data.$unit;
-      }
-	  else{
-	    $size2go -=8;
-		$data = ($data+hex($dRead)) << 8;
-		$addr++;
-	  }
-	}
+  my $regLN = "RegL_".sprintf("%02X",$list).":".CUL_HM_id2Name($peerId); 
+  $regLN =~ s/broadcast//;
+  $regLN =~ s/ /_/g;
+  
+  my $data=0;
+  for (my $size2go = $size;$size2go>0;$size2go -=8){
+    my $addrS = sprintf("%02X",$addr);
+	my $dRead;
+    if ($hash->{helper}{shadowReg}&&$hash->{helper}{shadowReg}{$regLN}){
+      $dRead = $1 if($hash->{helper}{shadowReg}{$regLN} =~ m/$addrS:(..)/);
+    }
+    if (!$dRead && $hash->{READINGS}{$regLN}) {
+      $dRead = $1 if($hash->{READINGS}{$regLN}{VAL} =~ m/$addrS:(..)/);
+    }
+	return "unknown" if (!$dRead);
+	$data = ($data<< 8)+hex($dRead);
+
+	$addr++;
   }
-  return "invalid";
+
+  $data = ($data>>$pos) & (0xffffffff>>(32-$size));
+   if (!$conversion){                ;# do nothing
+   } elsif($conversion eq "factor"){ $data /= $factor;
+   } elsif($conversion eq "fltCvT"){ $data = CUL_HM_CvTflt($data);
+   } elsif($conversion eq "m10s3") { $data = ($data+3)/10;
+   } else { return " conversion undefined - please contact admin";
+   } 
+   return $data.$unit;
+
 }
 #############################
 my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
@@ -2980,21 +3011,47 @@ CUL_HM_decodeTime16($)
 #############################
 sub
 CUL_HM_pushConfig($$$$$$$$)
-{
+{#routine will generate messages to write cnfig data to register
   my ($hash,$src,$dst,$chn,$peerAddr,$peerChn,$list,$content) = @_;
   my $flag = CUL_HM_getFlag($hash);
-
   $peerAddr = "000000" if(!$peerAddr);
-  CUL_HM_PushCmdStack($hash, sprintf("++%s01%s%s%02X05%s%02X%02X",
-        $flag, $src, $dst, $chn, $peerAddr, $peerChn, $list));
-
   my $tl = length($content);
+  ($chn,$peerChn,$list) = split(':',sprintf("%02X:%02X:%02X",$chn,$peerChn,$list));
+
+  # --store pending changes in shadow to handle bit manipulations cululativ--
+  my $peerN = ($peerAddr eq "000000")?CUL_HM_id2Name($peerAddr.$peerChn):"";
+  $peerN =~ s/broadcast//;
+  $peerN =~ s/ /_/g;#remote blanks
+  my $regLN = "RegL_".$list.":".$peerN;
+  #--- copy data from readings to shadow
+  my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
+  $chnhash = $hash if (!$chnhash);
+  if (!$chnhash->{helper}{shadowReg} ||
+      !$chnhash->{helper}{shadowReg}{$regLN}){
+    if ($chnhash->{READINGS}{$regLN}){#readings are present
+    $chnhash->{helper}{shadowReg}{$regLN} = ($chnhash->{READINGS}{$regLN})?
+	                $chnhash->{READINGS}{$regLN}{VAL}:"";
+    }
+  }
+  #--- update with ne value
+  my $regs = $chnhash->{helper}{shadowReg}{$regLN};
+  for(my $l = 0; $l < $tl; $l+=4) { #substitute changed bytes in shadow
+    my $addr = substr($content,$l,2);
+    my $data = substr($content,$l+2,2);
+    if(!($regs =~ s/$addr:../$addr:$data/)){
+      $regs .= " ".$addr.":".$data;
+    }
+  }
+  $chnhash->{helper}{shadowReg}{$regLN} = $regs;
+  
+  CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
+                                        $peerAddr.$peerChn.$list);
   for(my $l = 0; $l < $tl; $l+=28) {
     my $ml = $tl-$l < 28 ? $tl-$l : 28;
-    CUL_HM_PushCmdStack($hash, sprintf("++A001%s%s%02X08%s",
-          $src,$dst,$chn, substr($content,$l,$ml)));
+    CUL_HM_PushCmdStack($hash, "++A001".$src.$dst.$chn."08".
+	                                 substr($content,$l,$ml));
   }
-  CUL_HM_PushCmdStack($hash,sprintf("++A001%s%s%02X06",$src,$dst,$chn));
+  CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
 }
 sub
 CUL_HM_secSince2000()
@@ -3016,12 +3073,12 @@ CUL_HM_secSince2000()
 sub
 CUL_HM_ActGetCreateHash()
 {# return hash of ActionDetector - create one if not existant
-  if (!$modules{CUL_HM}{defptr}{"100100"}){
-    DoTrigger("global",  "UNDEFINED ActionDetector CUL_HM 100100");
+  if (!$modules{CUL_HM}{defptr}{"000000"}){
+    DoTrigger("global",  "UNDEFINED ActionDetector CUL_HM 000000");
 	$attr{ActionDetector}{actCycle} = 600;
   }
-  my $actName = CUL_HM_id2Name("100100");
-  my $actHash = $modules{CUL_HM}{defptr}{"100100"};
+  my $actName = CUL_HM_id2Name("000000");
+  my $actHash = $modules{CUL_HM}{defptr}{"000000"};
   
   if (!$actHash->{helper}{actCycle} ||
       $actHash->{helper}{actCycle} != $attr{$actName}{actCycle}){
@@ -3029,12 +3086,12 @@ CUL_HM_ActGetCreateHash()
 	                                   $attr{$actName}{actCycle}<30);
 	$actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
 	RemoveInternalTimer("ActionDetector");
+	$actHash->{STATE} = "active";
 	InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
 									   "CUL_HM_ActCheck", "ActionDetector", 0);
   }
   return $actHash;
 }
-
 sub
 CUL_HM_time2sec($)
 {
@@ -3070,7 +3127,6 @@ CUL_HM_ActAdd($$)
   Log GetLogLevel($actName,3),"Device ".$devName." added to ActionDetector with "
       .$cycleString." time";
 }
-
 sub
 CUL_HM_ActDel($)
 {# delete HMid for activity supervision
@@ -3134,6 +3190,7 @@ CUL_HM_ActCheck()
       Log GetLogLevel($actName,5),"Device ".$devName." is alive";
 	}
   }
+
   $attr{$actName}{actCycle} = 600 if($attr{$actName}{actCycle}<30); 
   $actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
   InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
