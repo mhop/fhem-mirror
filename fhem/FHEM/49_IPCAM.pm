@@ -214,6 +214,7 @@ IPCAM_getSnapshot($) {
   readingsBeginUpdate($hash);
   if($seq < $seqImages) {
     $seq++;
+    $imageFormat = "JPG" if($imageFormat eq "JPEG");
     $lastSnapshot = $name."_snapshot.".lc($imageFormat);
     $imageFile = $name."_snapshot".$seq.".".lc($imageFormat);
     if(!open(FH, ">$storage/$lastSnapshot")) {
