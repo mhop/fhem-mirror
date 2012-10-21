@@ -45,6 +45,7 @@ HMLAN_Initialize($)
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
                      "hmId hmKey " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+
 }
 
 #####################################
@@ -191,6 +192,8 @@ HMLAN_ReadAnswer($$$)
   }
 }
 
+my %lhash;
+
 #####################################
 sub
 HMLAN_Write($$$)
@@ -198,7 +201,7 @@ HMLAN_Write($$$)
   my ($hash,$fn,$msg) = @_;
 
   my $dst = substr($msg, 16, 6);
-  if(hex(substr($msg, 6, 2))&0x01) {   # wakeup flag set, shake actor awake
+  {   # occationally necessary. Works fine if we do it always
     HMLAN_SimpleWrite($hash, "+$dst,00,00,");
     HMLAN_SimpleWrite($hash, "+$dst,00,00,");
     HMLAN_SimpleWrite($hash, "+$dst,00,00,");
@@ -207,16 +210,15 @@ HMLAN_Write($$$)
     HMLAN_SimpleWrite($hash, "+$dst,00,00,");
     HMLAN_SimpleWrite($hash, "+$dst,00,00,");
     HMLAN_SimpleWrite($hash, "+$dst,00,00,");
+    $lhash{$dst} = 1;
   }
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
-  $msg = sprintf("S%08X,00,00000000,01,%08X,%s",
-                $tm, $tm, substr($msg, 4));
+  $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
 
   # Avoid problems with structure set
   # TODO: rewrite it to use a queue+internaltimer like the CUL
   select(undef, undef, undef, 0.01); # needed for structure set by meesus. 
-  # may not be needed at all if acks are handled properly
 }
 
 #####################################

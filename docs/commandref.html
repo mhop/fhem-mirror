@@ -3429,6 +3429,19 @@ A line ending with \ will be concatenated with the next one, so long lines
 
      General commands (available to most hm devices):
      <ul>
+	 <li><B>actiondetect &lt;[hhh:mm]|off&gt;</B><a name="CUL_HMactiondetect"></a><br>
+         Supports 'alive' or better 'not alive' detection for devices. [hhh:mm] is the maxumin silent time for the device. Upon no message received in this period an event will be raised "&lt;device&gt; is dead". If the device sends again another notification is posted "&lt;device&gt; is alive". <br>
+		 This actiondetect will be autocreated for each device with build in cyclic status report. <br>
+		 Controlling entity is a pseudo device "ActionDetector" with HMId "000000". <br>
+		 Due to performance considerations the report latency is set to 600sec (10min). It can be controlled by the attribute "actCycle" of "ActionDetector".<br>
+		 Once entered to the supervision the HM device has 2 attributes:<br>
+		 <ul>
+		 actStatus: activity status of the device<br>
+		 actCycle:  detection period [hhh.mm]<br>
+		 </ul>
+		 Furthermore the overall function can be viewed checking out the "ActionDetector" entity. Here the status of all entities is present in the READING section. <br>
+		 Note: This function can be enabled for devices with non-cyclic messages as well. It is up to the user to enter a reasonable cycletime.
+	 </li>
 	 <li><B>getConfig</B><a name="CUL_HMgetConfig"></a><br>
          Will read major configuration items stored in the HM device. Executed
          on a channel it will read pair Inforamtion, List0, List1 and List3 of
