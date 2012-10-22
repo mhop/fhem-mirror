@@ -43,7 +43,7 @@ IPCAM_Initialize($$)
   $hash->{DefFn}    = "IPCAM_Define";
   $hash->{UndefFn}  = "IPCAM_Undef";
   $hash->{GetFn}    = "IPCAM_Get";
-  $hash->{AttrList} = "delay credentials path query snapshots storage ".
+  $hash->{AttrList} = "delay credentials path query snapshots storage timestamp:0,1 ".
                       "do_not_notify:1,0 showtime:1,0 ".
                       "loglevel:0,1,2,3,4,5,6 disable:0,1";
 }
@@ -86,11 +86,12 @@ IPCAM_Undef($$) {
 sub
 IPCAM_Get($@) {
   my ($hash, @a) = @_;
+  my $modpath = $attr{global}{modpath};
   my $name = $hash->{NAME};
   my $seqImages;
   my $seqDelay;
   my $seqWait;
-  my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "");
+  my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "$modpath/www/snapshots");
 
   # check syntax
   return "argument is missing @a"
@@ -106,13 +107,24 @@ IPCAM_Get($@) {
   return "Attribute 'query' is defined but empty."
     if(defined($attr{$name}{query}) && $attr{$name}{query} eq "");
 
+  # define default storage
+  if(!defined($attr{$name}{storage}) || $attr{$name}{storage} eq "") {
+    $attr{$name}{storage} = $storage;
+  }
+
+  if(! -d $storage) {
+    my $ret = mkdir "$storage";
+    if($ret == 0) {
+      Log 1, "ipcam Error while creating: $storage: $!";
+      return "Error while creating storagepath $storage: $!";
+    }
+  }
+ 
+  # get argument
   my $arg = $a[1];
 
   if($arg eq "image") {
 
-    return "Attribute 'storage' is missing. Please add this attribute first!"
-      if(!$storage);
-      
     $seqImages = int(defined($attr{$name}{snapshots}) ? $attr{$name}{snapshots} : 1);
     $seqDelay  = int(defined($attr{$name}{delay}) ? $attr{$name}{delay} : 0);
     $seqWait   = 0;
@@ -162,14 +174,18 @@ IPCAM_getSnapshot($) {
   my $lastSnapshot;
   my $snapshot;
   my $dateTime;
-  my $seqImages = int(defined($attr{$name}{snapshots}) ? $attr{$name}{snapshots} : 1);
+  my $modpath = $attr{global}{modpath};
   my $seq = int(defined($hash->{SEQ}) ? $hash->{SEQ} : 0);
-  my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "");
+  my $seqImages = int(defined($attr{$name}{snapshots}) ? $attr{$name}{snapshots} : 1);
+  my $seqF;
+  my $seqL = length($seqImages);
+  my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "$modpath/www/snapshots");
+  my $timestamp;
 
-  if(!$storage) {
-    RemoveInternalTimer($hash);
-    return "Attribute 'storage' is missing. Please add this attribute first!";
-  }
+  #if(!$storage) {
+  #  RemoveInternalTimer($hash);
+  #  return "Attribute 'storage' is missing. Please add this attribute first!";
+  #}
 
   $camPath  = $attr{$name}{path};
   $camQuery = $attr{$name}{query}
@@ -196,6 +212,9 @@ IPCAM_getSnapshot($) {
   }
 
   $dateTime = TimeNow();
+  $timestamp = $dateTime;
+  $timestamp =~ s/ /_/g;
+  $timestamp =~ s/(:|-)//g;
 
   $snapshot = GetFileFromURLQuiet($camURI);
 
@@ -214,9 +233,15 @@ IPCAM_getSnapshot($) {
   readingsBeginUpdate($hash);
   if($seq < $seqImages) {
     $seq++;
+    $seqF = sprintf("%0${seqL}d",$seq);
     $imageFormat = "JPG" if($imageFormat eq "JPEG");
+    
     $lastSnapshot = $name."_snapshot.".lc($imageFormat);
-    $imageFile = $name."_snapshot".$seq.".".lc($imageFormat);
+    if(defined($attr{$name}{timestamp}) && $attr{$name}{timestamp} == 1) {
+      $imageFile = $name."_".$timestamp.".".lc($imageFormat);
+    } else {
+      $imageFile = $name."_snapshot_".$seqF.".".lc($imageFormat);
+    }
     if(!open(FH, ">$storage/$lastSnapshot")) {
       Log 1, "IPCAM $name Can't write $storage/$lastSnapshot: $!";
       RemoveInternalTimer($hash);
@@ -237,8 +262,8 @@ IPCAM_getSnapshot($) {
     Log 5, "IPCAM $name snapshot $storage/$imageFile written.";
     readingsUpdate($hash,"last",$lastSnapshot);
     $hash->{STATE} = "last: $dateTime";
-    $hash->{READINGS}{"snapshot$seq"}{TIME} = $dateTime;
-    $hash->{READINGS}{"snapshot$seq"}{VAL}  = $imageFile;
+    $hash->{READINGS}{"snapshot$seqF"}{TIME} = $dateTime;
+    $hash->{READINGS}{"snapshot$seqF"}{VAL}  = $imageFile;
   }
 
   Log GetLogLevel($name,4), "IPCAM $name image: $imageFile";

@@ -8626,17 +8626,26 @@ This module supports Samsung TV devices with few commands. It's developed and te
       Defines the total number of snapshots to be taken with the <code>get &lt;name&gt; image</code> command.
       If this attribute is not defined, then the default value is 1.<br>
       The snapshots are stored in the given path of the attribute <code>storage</code> and are
-      numbered sequentially (starts with 1) like <code>snapshot1</code>, <code>snapshot2</code>, etc.
+      numbered sequentially (starts with 1) like <code>snapshot_01</code>, <code>snapshot_02</code>, etc.
       Furthermore, an additional file <code>last</code> will be saved, which is identical with
       the last snapshot-image. The module checks the imagetype and stores all these files with
-      the correct extension, e.g. <code>snapshot1.jpeg</code>.<br>
-      All files are overwritten on every <code>get &lt;name&gt; image</code> command.<br>
+      the devicename and a correct extension, e.g. <code>&lt;devicename&gt;_snapshot_01.jpg</code>.<br>
+      If you like a timestamp instead a sequentially number, take a look at the attribute <code>timestamp</code>.<br>
+      All files are overwritten on every <code>get &lt;name&gt; image</code> command (except: snapshots
+      with a timestamp. So, keep an eye on your diskspace if you use a timestamp extension!).<br>
       Example: <code>attr ipcam3 snapshots 5</code>
     </li>
     <li>
       storage<br>
-      Defines the location for the file storage of the snapshots.<br>
+      Defines the location for the file storage of the snapshots. Default: <code>$modpath/www/snapshots</code><br>
       Example: <code>attr ipcam3 storage /srv/share/surveillance/snapshots</code>
+    </li>
+    <li>
+      timestamp<br>
+      If this attribute is unset or set to 0, snapshots are stored with a sequentially number
+      like <code>&lt;devicename&gt;_snapshot_01.jpg</code>, <code>&lt;devicename&gt;_snapshot_02.jpg</code>, etc.<br>
+      If you like filenames with a timestamp postfix, e.g. <code>&lt;devicename&gt;_20121023_002602.jpg</code>,
+      set this attribute to 1.
     </li>
   </ul>
   <br>
