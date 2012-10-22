@@ -10,7 +10,7 @@ function
 compressPoints(pointList)
 {
   var i, x, y, lx = -1, ly, ret = "";
-  var pl_arr = pointList.split(/[, ]/);
+  var pl_arr = pointList.replace(/^  */,'').split(/[, ]/);
   for(i = 0; i < pl_arr.length; i +=2) {
     x = parseInt(pl_arr[i]);
     y = parseInt(pl_arr[i+1]);
@@ -48,12 +48,14 @@ get_cookie()
   if(c == null)
     return "";
   var results = c.match('fhemweb=(.*?)(;|$)' );
+console.info("getcookie:"+results);
   return (results ? unescape(results[1]) : "");
 }
 
 function
 set_cookie(value)
 {
+console.info("setcookie:"+value);
   parent.document.cookie="fhemweb="+escape(value);
 }
 
