@@ -2210,18 +2210,22 @@ FW_dev2image($)
   my ($type, $state) = ($d->{TYPE}, $d->{STATE});
   return "" if(!$type || !defined($state));
 
+  my $model = $attr{$name}{model} if(defined($attr{$name}{model}));
+
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
 
   my $icon;
-  $icon = FW_getIcon("$name.$state")   if(!$icon);   # lamp.Aus.png
-  $icon = FW_getIcon("$name.$rstate")  if(!$icon);   # lamp.on.png
-  $icon = FW_getIcon($name)            if(!$icon);   # lamp.png
-  $icon = FW_getIcon("$type.$state")   if(!$icon);   # FS20.Aus.png
-  $icon = FW_getIcon("$type.$rstate")  if(!$icon);   # FS20.on.png
-  $icon = FW_getIcon($type)            if(!$icon);   # FS20.png
-  $icon = FW_getIcon($state)           if(!$icon);   # Aus.png
-  $icon = FW_getIcon($rstate)          if(!$icon);   # on.png
+  $icon = FW_getIcon("$name.$state")   if(!$icon);           # lamp.Aus.png
+  $icon = FW_getIcon("$name.$rstate")  if(!$icon);           # lamp.on.png
+  $icon = FW_getIcon($name)            if(!$icon);           # lamp.png
+  $icon = FW_getIcon("$model.$state")  if(!$icon && $model); # HM-OU-LED16.off.png
+  $icon = FW_getIcon($model)           if(!$icon && $model); # HM-OU-LED16.png
+  $icon = FW_getIcon("$type.$state")   if(!$icon);           # FS20.Aus.png
+  $icon = FW_getIcon("$type.$rstate")  if(!$icon);           # FS20.on.png
+  $icon = FW_getIcon($type)            if(!$icon);           # FS20.png
+  $icon = FW_getIcon($state)           if(!$icon);           # Aus.png
+  $icon = FW_getIcon($rstate)          if(!$icon);           # on.png
   return $icon;
 }
 
