@@ -56,7 +56,7 @@ Slider(slider, min, stp, max, curr, cmd)
 {
   var sh = slider.firstChild;
   var lastX=-1, offX=0, maxX=0, val=-1;
-  min = parseInt(min); max = parseInt(max); stp = parseInt(stp);
+  min = parseFloat(min); max = parseFloat(max); stp = parseFloat(stp);
 
   function
   init()
