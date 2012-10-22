@@ -48,14 +48,12 @@ get_cookie()
   if(c == null)
     return "";
   var results = c.match('fhemweb=(.*?)(;|$)' );
-console.info("getcookie:"+results);
   return (results ? unescape(results[1]) : "");
 }
 
 function
 set_cookie(value)
 {
-console.info("setcookie:"+value);
   parent.document.cookie="fhemweb="+escape(value);
 }
 
