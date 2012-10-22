@@ -27,6 +27,8 @@
 # 0017: updating for changes in fhemweb: css-path, bgimg-path, deactivating rereadicons (July 30, 2012)
 # 0018: Changes by Boris (icon-paths, fp_stylesheetPrefix -> stylesheet
 # 0019: added fp_backgroundimg (October 15, 2012)
+# 0020: moved creation of userattr to define, added slider and timepicker and setList, added style5 icon+commands, added style 6 readingstimestamp, 
+#       added style-descriptions in fp-arrange (October 22, 2012)
 #
 ################################################################
 #
@@ -154,6 +156,9 @@ sub
 FP_define(){
   my ($hash, $def) = @_;
   $hash->{STATE} = $hash->{NAME};
+  my $name = $hash->{NAME};
+  addToAttrList("fp_$name");                                                  # create userattr fp_<name> if it doesn't exist yet
+  Log 3, "Floorplan - added userattr fp_$name";
   return undef;
   }
 #-------------------------------------------------------------------------------
@@ -192,7 +197,6 @@ FP_CGI(){
   $FP_name = $htmlpart[0] if (!$FP_name);
   
   if ($FP_name) {																   # a floorplan-name is part of URL
-	addToAttrList("fp_$FP_name");                                                  # create userattr fp_<name> if it doesn't exist yet
 	$FP_arrange = AttrVal($FP_name, "fp_arrange", 0) if ($FP_name);				   # set arrange mode
 	if(!defined($defs{$FP_name})){
 		$FW_RET = "ERROR: Floorplan $FP_name not defined \n";					   # check for typo in URL
@@ -268,19 +272,20 @@ FP_digestCgi($) {
     if($p eq "add.dev")        { $v =~ m,^([\.\w]*)\s\(,; $v = $1 if ($1); $cmd = "attr $v fp_$FP_name 50,100"; }
     if($p eq "cmd")            { $cmd = $v; }
     if($p =~ m/^cmd\.(.*)$/)   { $cmd = $v; $c = $1; }
-    if($p =~ m/^dev\.(.*)$/)   { $dev{$1} = $v; }
-    if($p =~ m/^arg\.(.*)$/)   { $arg{$1} = $v; }
-    if($p =~ m/^val\.(.*)$/)   { $val{$1} = $v; }
-    if($p =~ m/^deva\.(.*)$/)  { $deva{$1} = $v; $FP_arrange_selected = undef;}
-    if($p =~ m/^attr\.(.*)$/)  { $attr{$1} = $v; }
-    if($p =~ m/^top\.(.*)$/)   { $top{$1} = $v; }
-    if($p =~ m/^left\.(.*)$/)  { $left{$1} = $v; }
-    if($p =~ m/^style\.(.*)$/) { $style{$1} = $v; }
-    if($p =~ m/^text\.(.*)$/)  { $text{$1} = $v; }
+    if($p =~ m/^dev\.(.*)$/)   { $dev{$1}   = $v; }
+    if($p =~ m/^arg\.(.*)$/)   { $arg{$1}   = $v; }
+    if($p =~ m/^val\.(.*)$/)   { $val{$1}   = $v; }
+    if($p =~ m/^deva\.(.*)$/)  { $deva{$1}  = $v; $FP_arrange_selected = undef;}
+    if($p =~ m/^attr\.(.*)$/)  { $attr{$1}  = $v; }
+    if($p =~ m/^top\.(.*)$/)   { $top{$1}   = $v; }
+    if($p =~ m/^left\.(.*)$/)  { $left{$1}  = $v; }
+    if($p =~ m/^style\.(.*)$/) { $style{$1} = int($v); }
+    if($p =~ m/^text\.(.*)$/)  { $text{$1}  = $v; }
 	if($p eq "pos")            { %FW_pos =  split(/[=;]/, $v); }
   }
   $cmd.=" $dev{$c}"   if(defined($dev{$c}));     #FHT device
-  $cmd.=" $arg{$c}"   if(defined($arg{$c}));     #FHT argument (e.g. desired-temp)
+  $cmd.=" $arg{$c}"   if(defined($arg{$c})&&
+                       ($arg{$c} ne "state" || $cmd !~ m/^set/));     #FHT argument (e.g. desired-temp)
   $cmd.=" $val{$c}"   if(defined($val{$c}));     #FHT value
   $cmd.=" $deva{$c}"  if(defined($deva{$c}));    #arrange device
   $cmd.=" $attr{$c}"  if(defined($attr{$c}));    #arrange attr
@@ -324,6 +329,7 @@ FP_htmlHeader($) {
   #set sripts
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
 #  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
 #                        if($FW_longpoll);											 # longpoll not yet implemented for floorplans
   FW_pO "</head>\n";
@@ -375,8 +381,6 @@ FP_show(){
   ## menus
   FP_menu();
   FP_menuArrange() if ($FP_arrange && ($FP_arrange eq "1" || ($FP_arrange eq $FW_wname) || $FP_arrange eq "detail"));   #shows the arrange-menu
-  # (re-) list the icons
-# FW_ReadIcons(); #20120730 00017
   ## start floorplan  
   FW_pO "<div class=\"screen\" id=\"floorplan\">";
   FW_pO "<div id=\"logo\"></div>";
@@ -397,9 +401,9 @@ FP_show(){
 		my ($top, $left, $style, $text, $text2) = split(/,/ , $attr);
 		# $top   = position in px, top
 		# $left  = position in px, left
-		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands, 3=device-Reading + name from $text2)
+		# $style = style (0=icon only, 1=name+icon, 2=name+icon+commands, 3=device-Reading + name from $text2, 4=S300TH, 5=icon+commands, 6 device-Reading+timestamp)
 		# $text  = alternativeCaption
-		# $text2 = special for style3: $text = ReadingID, $text2=alternativeCaption
+		# $text2 = special for style3+6: $text = ReadingID, $text2=alternativeCaption
 		$left = 0 if (!$left);
 		$style = 0 if (!$style);
 
@@ -408,15 +412,15 @@ FP_show(){
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"$d\" align=\"center\">";               # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
 		#Debug "txt is \"$txt\"";
-		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3);   # Style3 = DeviceReading given in $text
+		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
 		my $cols = ($cmdlist ? (split(":", $cmdlist)) : 0);                                    # Need command-count for colspan of devicename+state
 		
     ########################
     # Device-name per device
-		if ($style gt 0) {
+		if ($style gt 0 && $style ne 5) {
 			FW_pO "   <tr class=\"devicename fp_$FP_name\" id=\"$d\">";                        # For css: class=devicename, id=devicename
 			my $devName = "";
-			if ($style == 3) {
+			if ($style == 3 || $style == 6) {
 				$devName = $text2 ? $text2 : "";											   # Style 3 = Reading - use last part of comma-separated description
 				} else {
 				$devName = ($text ? $text : AttrVal($d, "alias", $d));	 
@@ -431,74 +435,105 @@ FP_show(){
 
     ########################
     # Device-state per device
-	FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                         # For css: class=devicestate, id=devicename
+	FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                             # For css: class=devicestate, id=devicename
         $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                               # format FHT-temperature
 	### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
-	my $fp_image = AttrVal("$d", "fp_image", undef);                                  # floorplan-independent icon
+	my $fp_image = AttrVal("$d", "fp_image", undef);                                      # floorplan-independent icon
         my $fp_fpimage = AttrVal("$d","fp_$FP_name".".image", undef);                     # floorplan-dependent icon
         if ($fp_image) {
             my $state = ReadingsVal($d, "state", undef);
-	    $fp_image =~ s/\{state\}/$state/;                                             # replace {state} by actual device-status
-            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;     # replace icon-link in html          
+	    $fp_image =~ s/\{state\}/$state/;                                                 # replace {state} by actual device-status
+            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;    # replace icon-link in html - deactivated by Boris        
         }
         if ($fp_fpimage) {
             my $state = ReadingsVal($d, "state", undef);
             $fp_fpimage =~ s/\{state\}/$state/;                                           # replace {state} by actual device-status
-            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;   # replace icon-link in html           
+            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;  # replace icon-link in html - deactivated by Boris
         }
-		FW_pO "<td colspan=\"$cols\">$txt";
-		FW_pO "</td></tr>";
+	FW_pO "<td colspan=\"$cols\">$txt";
+	FW_pO "</td></tr>";
+	
+	if ($style == 6) {                                                                    # add ReadingsTimeStamp for style 6
+		$txt="";
+    	FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d\">";                     # For css: class=devicetimestamp, id=devicename
+		$txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
+	    FW_pO "<td colspan=\"$cols\">$txt";
+	    FW_pO "</td></tr>";
+	}
+	
+	
 
     ########################
     # Commands per device		  
-        if($cmdlist && $style == 2) {
+        if($cmdlist && ( $style == 2 || $style == 5) ) {
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
 		  FW_pO "  <tr class=\"devicecommands\" id=\"$d\">";
           # Special handling (slider, dropdown)
+		  my $FW_room = undef;  ##needed to be able to reuse code from FHEMWEB
           my $cmd = $cList[0];
           if($allSets && $allSets =~ m/$cmd:([^ ]*)/) {
             my $values = $1;
 
             if($values =~ m/^slider,(.*),(.*),(.*)/) { ##### Slider
               my ($min,$stp, $max) = ($1, $2, $3);
-              my $srf = "";
-              my $curr = ReadingsVal($d, $cmd, Value($d));
+              my $srf = $FW_room ? "&room=$FW_room" : "";
+              my $cv = ReadingsVal($d, $cmd, Value($d));
               $cmd = "" if($cmd eq "state");
-              $curr=~s/[^\d\.]//g;
+              $cv =~ s/[^\d\.]//g;
               FW_pO "<td colspan='2'>".
                       "<div class='slider' id='slider.$d'>".
                         "<div class='handle'>$min</div></div>".
                       "</div>".
                       "<script type=\"text/javascript\">" .
                         "Slider(document.getElementById('slider.$d'),".
-                              "'$min','$stp','$max','$curr',".
-                              "'$FW_ME?cmd=set $d $cmd %$srf')".
+                              "'$min','$stp','$max','$cv',".
+                              "'$FW_ME/floorplan/$FP_name?cmd=set $d $cmd %$srf')".
                       "</script>".
+                    "</td>";
+              $firstIdx=1;
+            } elsif($values =~ m/^time$/) { ##### Time picker
+              my $srf = $FW_room ? "&room=$FW_room" : "";
+              my $cv = ReadingsVal($d, $cmd, Value($d));
+              $cmd = "" if($cmd eq "state");
+              my $c = "\"$FW_ME/floorplan/$FP_name?cmd=set $d $cmd %$srf\"";
+              FW_pO "<td colspan='2'>".
+                      "<input name='time.$d' value='$cv' type='text'".
+                                                " readonly size='5'>".
+                      "<input type='button' value='+'".
+                                                " onclick='addTime(this,$c)'>".
                     "</td>";
               $firstIdx=1;
 
             } else {    ##### Dropdown
-              $firstIdx=1;
+
               my @tv = split(",", $values);
-              if($cmd eq "desired-temp") {
-                $txt = ReadingsVal($d, "measured-temp", "");
-                $txt =~ s/ .*//;        # Cut off Celsius
-                $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
-                $txt = int($txt*20)/$txt if($txt =~ m/^[0-9].$/); # ???
-              } else {
-                $txt = Value($d);
-                $txt =~ s/$cmd //;
+              # Hack: eventmap (translation only) should not result in a
+              # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
+              if(@tv > 1) {
+                $firstIdx=1;
+                if($cmd eq "desired-temp") {
+                  $txt = ReadingsVal($d, "desired-temp", 20);
+                  $txt =~ s/ .*//;        # Cut off Celsius
+                  $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
+                } else {
+                  $txt = Value($d);
+                  $txt =~ s/$cmd //;
+                }
+                FW_pO "<td>".
+                  FW_hidden("arg.$d", $cmd) .
+                  FW_hidden("dev.$d", $d) .
+                  ($FW_room ? FW_hidden("room", $FW_room) : "") .
+                  FW_select("val.$d", \@tv, $txt, "dropdown").
+                  FW_submit("cmd.$d", "set").
+                  "</td>";
               }
-			 FW_pO "<td>\n".
-             FP_input("dev.$d", $d, "hidden") .
-             FP_input("arg.$d", "desired-temp", "hidden") .
-             FW_select("val.$d", \@tv, ReadingsVal($d, "desired-temp", $txt),"devicecommands") .
-             FW_submit("cmd.$d", "set").
-             "</td>";
-			 }
+            }
           }
+		  # END # Special handling (slider, dropdown)
+		  
+		  
           for(my $idx=$firstIdx; $idx < @cList; $idx++) {
             FW_pH "cmd.$d=set $d $cList[$idx]",
                 ReplaceEventMap($d,$cList[$idx],1),1,"devicecommands";
@@ -628,7 +663,8 @@ FP_menuArrange() {
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form3
 		my ($top, $left, $style, $text, $text2) = split(",", $attrd);
 		$text .= ','.$text2 if ($text2);														# re-append Description after reading-ID for style3
-		my @styles = ("0","1","2","3","4");
+		my @styles = ("0 (Icon only)","1 (Name+Icon)","2 (Name+Icon+Commands)","3 (Device-Reading)","4 (S300TH-specific)","5 (Icon+Commands)","6 (Reading+Timestamp)");
+		$style = $styles[$style];
 		FW_pO "<div class=\"menu-arrange\" id=\"fpmenu\">\n" .
 			FP_input("deva.$d", $d, "hidden") . "\n" .
 			FP_input("dscr.$d", $disp, "text", "Selected device", 45, "", "disabled") . "\n<br>\n" . 
