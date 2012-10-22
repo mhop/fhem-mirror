@@ -325,10 +325,17 @@ FW_Read($)
 
 ###########################
 sub
-FW_ServeSpecial($$$) {
-
+FW_ServeSpecial($$$)
+{
   my ($file,$ext,$dir)= @_;
   $file =~ s,\.\./,,g; # little bit of security
+
+  if($ext eq "css") {
+    my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
+    $prf = "smallscreen" if(!$prf && $FW_ss);
+    $prf = "touchpad"    if(!$prf && $FW_tp);
+    $file = "$prf$file" if(-f "$dir/$prf$file.$ext");
+  }
 
   #Debug "We serve $dir/$file.$ext";
   open(FH, "$dir/$file.$ext") || return 0;
@@ -580,9 +587,7 @@ FW_AnswerCall($)
   }
 
   my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
-  $prf = "smallscreen" if(!$prf && $FW_ss);
-  $prf = "touchpad"    if(!$prf && $FW_tp);
-  FW_pO "<link href=\"$FW_ME/css/".$prf."style.css\" rel=\"stylesheet\"/>";
+  FW_pO "<link href=\"$FW_ME/css/style.css\" rel=\"stylesheet\"/>";
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
@@ -1764,6 +1769,7 @@ FW_style($$)
     } else {
       $attr{$FW_wname}{stylesheetPrefix} = $a[2];
     }
+    FW_ReadIcons($defs{$FW_wname});
     FW_pO "${start}Reload the page in the browser.$end";
 
   } elsif($a[1] eq "edit") {
@@ -2162,22 +2168,11 @@ FW_ReadIcons($)
   }
 }
 
-sub
-FW_canonicalizeIcon($) {
-  my ($name)= @_;
-  if($name =~ m/^(.*)\.($ICONEXTENSION)$/) {
-    Log 1, "WARNING: argument of FW_canonicalizeIcon($name) has extension - inform the developers!";
-
-    $name= $1;
-  }
-  return $name;
-}
 
 sub
 FW_getIcon($)
 {
   my ($name)= @_;
-  $name= FW_canonicalizeIcon($name);
   return $FW_icons{$name} ? $name : undef;
 }
 
@@ -2189,7 +2184,6 @@ sub
 FW_IconPath($)
 {
   my ($name)= @_;
-  $name= FW_canonicalizeIcon($name);
   my $path= $FW_icons{$name};
   return $path ? $FW_icondir . "/" . $path : undef;
 }
@@ -2202,7 +2196,6 @@ sub
 FW_IconURL($)
 {
   my ($name)= @_;
-  $name= FW_canonicalizeIcon($name);
   return "$FW_ME/icons/${name}";
 }
 
