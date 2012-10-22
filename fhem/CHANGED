@@ -69,6 +69,7 @@
   - bugfix:  FHEMWEB: weblink with group attribute is shown together with other
              elements
   - feature: FHEMWEB: timepicker added
+  - feature: FHEMWEB: support for modul specific icons added (M. Fischer)
 
 
 - 2011-12-31 (5.2)
