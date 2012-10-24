@@ -2,6 +2,8 @@
 #
 # OWAD.pm
 #
+# WIESO UNINITIALIZED in 623FF
+#
 # FHEM module to commmunicate with 1-Wire A/D converters DS2450
 #
 # Attention: This module may communicate with the OWX module,
@@ -14,7 +16,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.13 - July, 2012
+# Version 2.24 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -39,6 +41,8 @@
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B,C,D
 # Note: attributes are read only during initialization procedure - later changes are not used.
+#
+# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> stateAL0  "<string>"     = character string for denoting low normal condition, default is green down triangle
 # attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is green up triangle
@@ -148,7 +152,7 @@ sub OWAD_Initialize ($) {
   #Factor      = a v(oltage) factor multiplied with (reading+offset)  
   #Unit        = a unit of measure
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2450 loglevel:0,1,2,3,4,5 ".
-                "stateAL0 stateAL1 stateAH0 stateAH1 ";
+                "stateAL0 stateAL1 stateAH0 stateAH1 event:on-update,on-change ";
  
   for( my $i=0;$i<4;$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
@@ -344,7 +348,7 @@ sub OWAD_FormatValues($) {
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
-    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
+    my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|voltage";
     my @cnama = split(/\|/,$cname);
     $owg_channel[$i]=$cnama[0];
     $offset = $hash->{READINGS}{"$owg_channel[$i]"}{OFFSET};  
@@ -450,7 +454,7 @@ sub OWAD_Get($@) {
   #-- get id
   if($a[1] eq "id") {
     $value = $hash->{ROM_ID};
-     return "$a[0] $reading => $value";
+     return "$name.id => $value";
   } 
   
   #-- get present
@@ -459,13 +463,13 @@ sub OWAD_Get($@) {
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
     $hash->{PRESENT} = $value;
-    return "$a[0] $reading => $value";
+    return "$name.present => $value";
   } 
 
   #-- get interval
   if($a[1] eq "interval") {
     $value = $hash->{INTERVAL};
-     return "$a[0] $reading => $value";
+     return "$name.interval => $value";
   } 
   
   #-- reset presence
@@ -592,12 +596,18 @@ sub OWAD_GetValues($) {
     return "OWAD: Could not get values from device $name";
   }
   $hash->{PRESENT} = 1; 
-  $value=OWAD_FormatValues($hash);
-  #--logging
-  Log 5, $value;
-  $hash->{CHANGED}[0] = $value;
   
-  DoTrigger($name, undef);
+  #-- old state, new state
+  my $oldval = $hash->{STATE};
+  $value=OWAD_FormatValues($hash);
+  my $newval =  $hash->{STATE};
+   #--logging depends on setting of the event-attribute
+  Log 5, $value;
+  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
+  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
+     $hash->{CHANGED}[0] = $value;
+     DoTrigger($name, undef);
+  } 
   
   return undef;
 }
@@ -805,9 +815,6 @@ sub OWXAD_GetPage($$) {
 
   my ($hash,$page) = @_;
   
-  #-- For now, switch on conversion command
-  my $con=1;
-  
   my ($select, $res, $res2, $res3, @data);
   
   #-- ID of the device, hash of the busmaster
@@ -817,18 +824,16 @@ sub OWXAD_GetPage($$) {
   my ($i,$j,$k);
 
   #=============== get the voltage reading ===============================
-  if( $page eq "reading"){
-    #-- if the conversion has not been called before 
-    if( $con==1 ){
-      OWX_Reset($master);
-      #-- issue the match ROM command \x55 and the start conversion command
-      $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
-      if( $res eq 0 ){
-        return "OWXAD: Device $owx_dev not accessible for conversion";
-      } 
-      #-- conversion needs some 5 ms per channel
-      select(undef,undef,undef,0.02);
-    }
+  if( $page eq "reading") {
+    OWX_Reset($master);
+    #-- issue the match ROM command \x55 and the start conversion command
+    $res= OWX_Complex($master,$owx_dev,"\x3C\x0F\x00\xFF\xFF",0);
+    if( $res eq 0 ){
+      return "OWXAD: Device $owx_dev not accessible for conversion";
+    } 
+    #-- conversion needs some 5 ms per channel
+    select(undef,undef,undef,0.02);
+    
     #-- issue the match ROM command \x55 and the read conversion page command
     #   \xAA\x00\x00 
     $select="\xAA\x00\x00";
@@ -856,16 +861,18 @@ sub OWXAD_GetPage($$) {
     return "OWXAD: Device $owx_dev not accessible in reading $page page"; 
   }
   
-   #-- reset the bus
+  #-- reset the bus
   OWX_Reset($master);
   
   #-- process results
   @data=split(//,$res);
-  if ( (@data != 22) ){
-   Log 1, "OWXAD: Device $owx_dev returns invalid data of length ".int(@data);
-   return "OWXAD: Device $owx_dev returns invalid data of length ".int(@data);
-  }
-  
+  return "OWXAD: invalid data length, ".int(@data)." bytes"
+    if (@data != 22); 
+  #return "invalid data"
+  #  if (ord($data[17])<=0); 
+  #return "invalid CRC"
+  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);  
+    
   #=============== get the voltage reading ===============================
   if( $page eq "reading"){
     for( $i=0;$i<int(@owg_fixed);$i++){

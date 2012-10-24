@@ -12,7 +12,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.13 - July, 2012
+# Version 2.24 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -228,7 +228,7 @@ sub OWLCD_Get($@) {
   #-- get id
   if($a[1] eq "id") {
     $value = $hash->{ROM_ID};
-     return "$a[0] $reading => $value";
+     return "$name.id => $value";
   } 
   
   #-- get present
@@ -237,25 +237,25 @@ sub OWLCD_Get($@) {
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
     $hash->{PRESENT} = $value;
-    return "$a[0] $reading => $value";
+    return "$name.present => $value";
   } 
   
   #-- get gpio states
   if($a[1] eq "gpio") {
     $value = OWXLCD_Get($hash,"gpio");
-    return "$a[0] $reading => $value";
+    return "$name.gpio => $value";
   } 
   
   #-- get gpio counters
   if($a[1] eq "counter") {
     $value = OWXLCD_Get($hash,"counter");
-    return "$a[0] $reading => $value";
+    return "$name.counter => $value";
   } 
   
   #-- get version
   if($a[1] eq "version") {
     $value = OWXLCD_Get($hash,"version");
-    return "$a[0] $reading => $value";
+    return "$name.version => $value";
   }
   
   #-- get EEPROM content
@@ -263,7 +263,7 @@ sub OWLCD_Get($@) {
    my $page  = ($a[2] =~ m/\d/) ? int($a[2]) : 0;
    Log 1,"Calling GetMemory with page $page";
     $value = OWXLCD_GetMemory($hash,$page);
-    return "$a[0] $reading $page => $value";
+    return "$name $reading $page => $value";
   }  
 }
 

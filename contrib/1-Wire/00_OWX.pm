@@ -4,6 +4,7 @@
 #
 # TODO: Abfangen, wenn das Serial Device nach Öffnung nicht existiert ???
 # set init als rediscover ausführen.
+# ungültige ID's von ungültigen devices => rauswerfen.
 #
 # FHEM module to commmunicate with 1-Wire bus devices
 # * via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB port
@@ -12,7 +13,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.22 - October, 2012
+# Version 2.24 - October, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -123,7 +124,7 @@ my $owx_LastDeviceFlag = 0;
 sub OWX_Initialize ($) {
   my ($hash) = @_;
   #-- Provider
-  $hash->{Clients}     = ":OWAD:OWCOUNT:OWID:OWLCD:OWSWITCH:OWTHERM:";
+  $hash->{Clients}     = ":OWAD:OWCOUNT:OWID:OWLCD:OWMULTI:OWSWITCH:OWTHERM:";
 
   #-- Normal Devices
   $hash->{DefFn}   = "OWX_Define";
@@ -170,7 +171,7 @@ sub OWX_Define ($$) {
     my $msg = "OWX: Serial device $dev";
     my $ret = DevIo_OpenDev($hash,0,undef);
     $owx_hwdevice = $hash->{USBDev};
-    if($ret){
+    if(!defined($owx_hwdevice)){
       Log 1, $msg." not defined";
       return "OWX: Can't open serial device $dev: $!"
     } else {
@@ -673,16 +674,22 @@ sub OWX_Discover ($) {
         #-- Family 22 = Temperature sensor, assume DS1822 as default
         }elsif( $owx_f eq "22" ){
           CommandDefine(undef,"$name OWTHERM DS1822 $owx_rnf");  
+        #-- Family 26 = Multisensor, assume DS2438 as default
+        }elsif( $owx_f eq "26" ){
+          CommandDefine(undef,"$name OWMULTI DS2438 $owx_rnf");  
         #-- Family 28 = Temperature sensor, assume DS18B20 as default
         }elsif( $owx_f eq "28" ){
           CommandDefine(undef,"$name OWTHERM DS18B20 $owx_rnf");   
+        #-- Family 29 = Switch, assume DS2408 as default
+        }elsif( $owx_f eq "29" ){
+          CommandDefine(undef,"$name OWSWITCH DS2408 $owx_rnf");   
         #-- Family 3A = Switch, assume DS2413 as default
         }elsif( $owx_f eq "3A" ){
           CommandDefine(undef,"$name OWSWITCH DS2413 $owx_rnf");   
         #-- Family FF = LCD display    
         }elsif( $owx_f eq "FF" ){
           CommandDefine(undef,"$name OWLCD $owx_rnf");       
-        #-- All unknown families are ID only
+        #-- All unknown families are ID only (ID-Chips have family id 09)
         } else {
           CommandDefine(undef,"$name OWID $owx_f $owx_rnf");   
         }
