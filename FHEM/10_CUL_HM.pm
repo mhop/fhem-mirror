@@ -247,6 +247,7 @@ CUL_HM_Define($$)
       my $devName = $devHash->{NAME};
       $attr{$name}{device} = $devName; 
       $attr{$name}{chanNo} = $chn; 
+      $attr{$name}{model} = $attr{$devName}{model} if ($attr{$devName}{model});
 	  $attr{$devName}{"channel_$chn"} = $name; 
     }
 	else{
@@ -789,7 +790,6 @@ CUL_HM_Parse($$)
 	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
 	  $shash->{helper}{addVal} = $err;#store to handle changes
       push @event, "brightness:".hex($state);
-      push @event, "state:alive";
       push @event, "cover:".   (($err&0x0E)?"open" :"closed") if ($cmpVal&0x0E);        
 	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  )   if ($cmpVal&0x80);
     }
@@ -1010,7 +1010,7 @@ CUL_HM_Parse($$)
 	#              if  less then a byte                    !!!!!!!!!!!
 my %culHmRegDefine = (
 
-  intKeyVisib  =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>""         ,f=>""      ,u=>"bool",t=>"visibility of internal keys"},
+  intKeyVisib  =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>""         ,f=>""      ,u=>'bool',t=>'visibility of internal keys'},
   pairCentral  =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>''       ,f=>""      ,u=>'dec' ,t=>'pairing to central'},
   #blindActuator mainly   
   driveUp      =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
@@ -1062,7 +1062,7 @@ my %culHmRegDefine = (
   dimMaxLvlLg  =>{a=>150.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimMaxLevel"},
   dimStepLg    =>{a=>151.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimStep"},
   #tc
-  BacklOnTime  =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25    ,c=>""         ,f=>''      ,u=>'s'  ,t=>"Backlight ontime"},
+  BacklOnTime  =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25    ,c=>""         ,f=>''      ,u=>'s'   ,t=>"Backlight ontime"},
   BacklOnMode  =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1     ,c=>'factor'   ,f=>2       ,u=>'bool',t=>"Backlight mode 0=OFF, 1=AUTO"},
   BtnLock      =>{a=>15   ,s=>1  ,l=>0,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"Button Lock 0=OFF, 1=Lock"},
   DispTempHum  =>{a=>1.0  ,s=>0.1,l=>5,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"0=temp ,1=temp-humidity"},
@@ -1100,6 +1100,14 @@ my %culHmRegDefine = (
   angelLocked   =>{a=>26  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Angle Locked position"},
   ledFlashUnlocked=>{a=>31.3,s=>0.1,l=>1,min=>0,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when not locked"},
   ledFlashLocked=>{a=>31.6,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when locked"},
+# sec_mdir
+  evtFltrPeriod =>{a=>1.0 ,s=>0.4,l=>1,min=>0.5,max=>7.5   ,c=>'factor'   ,f=>2       ,u=>'s'   ,t=>"event filter period"},
+  evtFltrNum    =>{a=>1.4 ,s=>0.4,l=>1,min=>1  ,max=>15    ,c=>''         ,f=>''      ,u=>''    ,t=>"sensitivity - read sach n-th puls"},
+  minInterval   =>{a=>2.0 ,s=>0.3,l=>1,min=>0  ,max=>4     ,c=>''         ,f=>''      ,u=>''    ,t=>"minimum interval 0,15,20,60,120s"},
+  captInInterval=>{a=>2.3 ,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"capture within interval"},
+  brightFilter  =>{a=>2.4 ,s=>0.4,l=>1,min=>0  ,max=>7     ,c=>''         ,f=>''      ,u=>''    ,t=>"brightness filter"},
+  ledOnTime     =>{a=>34  ,s=>1  ,l=>1,min=>0  ,max=>1.275 ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"LED ontime"},
+  
   );
 my %culHmRegGeneral = (
   intKeyVisib=>1,pairCentral=>1,
@@ -1147,9 +1155,11 @@ my %culHmRegSupported = (
 			angelOpen =>1,angelMax  =>1,angelLocked   =>1,
 			ledFlashUnlocked=>1,ledFlashLocked=>1,
 			},
-   dis4=> 	{language => 1,stbyTime => 1, #todo insert correct name
-            },
-			
+  dis4=> 	{language => 1,stbyTime => 1, #todo insert correct name
+            },	
+  motionDetector=>{
+             evtFltrPeriod =>1,evtFltrNum    =>1,minInterval   =>1,
+			 captInInterval=>1,brightFilter  =>1,ledOnTime     =>1},
 );
 ##--------------- Conversion routines for register settings
 my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
@@ -2141,11 +2151,13 @@ CUL_HM_infoUpdtDevData($$$){
     my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
 	my $chnNoTyp = 1;
 	for (my $chnNoAbs = $chnStart; $chnNoAbs <= $chnEnd;$chnNoAbs++){
-	  my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?"":"_".sprintf("%02d",$chnNoTyp));
 	  my $chnId = $hash->{DEF}.sprintf("%02X",$chnNoAbs);
 	  if (!$modules{CUL_HM}{defptr}{$chnId}){
-	    DoTrigger("global",  "UNDEFINED $chnName CUL_HM $chnId");
+        my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?
+	                            '':'_'.sprintf("%02d",$chnNoTyp));
+	    DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
       }
+	  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 	  $chnNoTyp++;
 	}
   }
@@ -2295,7 +2307,7 @@ CUL_HM_responseSetup($$$)
 	  $hash->{helper}{respWait}{forPeer}= $peerID;# this is the HMid + channel
       
       # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);#todo General change timer to 1.5
+	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);
 	  #--- remove channel entries that will be replaced
       my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
       $chnhash = $hash if(!$chnhash);   
@@ -2511,7 +2523,7 @@ CUL_HM_id2Name($)
   }
   my $defPtr = $modules{CUL_HM}{defptr};
   return $defPtr->{$chnId}{NAME} if($chnId && $defPtr->{$chnId});
-  return $defPtr->{$devId}{NAME} if($defPtr->{$devId});
+  return $defPtr->{$devId}{NAME}.(defined($chn)?'_chn:'.$chn:'') if($defPtr->{$devId});
   return $devId. ($chn ? ("_chn:".$chn):"");
 }
 ###################################
