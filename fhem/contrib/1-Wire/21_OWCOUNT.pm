@@ -14,7 +14,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.22 - September, 2012
+# Version 2.24 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -385,6 +385,7 @@ sub OWCOUNT_FormatValues($) {
     #-- get the old values
     my $oldval = $hash->{READINGS}{"$owg_channel[$i]"}{VAL};
     my $oldtim = $hash->{READINGS}{"$owg_channel[$i]"}{TIME};
+    $oldtim = "" if(!defined($oldtim));
     
     #-- safeguard against the case where no previous measurement
     if( length($oldtim) > 0 ){    
@@ -542,7 +543,7 @@ sub OWCOUNT_Get($@) {
   #-- get id
   if($a[1] eq "id") {
     $value = $hash->{ROM_ID};
-     return "$a[0] $reading => $value";
+     return "$name.id => $value";
   } 
   
   #-- get present
@@ -551,13 +552,13 @@ sub OWCOUNT_Get($@) {
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
     $hash->{PRESENT} = $value;
-    return "$a[0] $reading => $value";
+    return "$name.present => $value";
   } 
 
   #-- get interval
   if($a[1] eq "interval") {
     $value = $hash->{INTERVAL};
-     return "$a[0] $reading => $value";
+     return "$name.interval => $value";
   } 
   
   #-- reset presence

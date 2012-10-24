@@ -2,7 +2,7 @@
 #
 # OWSWITCH.pm
 #
-# FHEM module to commmunicate with 1-Wire adressable switches DS2413, DS206
+# FHEM module to commmunicate with 1-Wire adressable switches DS2413, DS206, DS2408
 #
 # Attention: This module may communicate with the OWX module,
 #            but currently not with the 1-Wire File System OWFS
@@ -17,7 +17,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.22 - September, 2012
+# Version 2.24 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -38,12 +38,12 @@
 #            note: this value reflects the measured value, not necessarily the one set as
 #            output state, because the output transistors are open collector switches. A measured
 #            state of 1 = OFF therefore corresponds to an output state of 1 = OFF, but a measured
-#            state of 0 = ON can also be due to an external shortening of th eoutput.
+#            state of 0 = ON can also be due to an external shortening of the output.
 # get <name> gpio  => values for channels
 #
 # set <name> interval => set period for measurement
 # set <name> output <channel-name>  ON|OFF => set value for channel (name A, B or defined channel name)
-#            note: 1 = OFF, 0 = ON in normal usage. See also th enote above
+#            note: 1 = OFF, 0 = ON in normal usage. See also the note above
 # set <name> gpio  value => set values for channels (3 = both OFF, 1 = B ON 2 = A ON 0 = both ON)
 # set <name> init yes => re-initialize device
 #
@@ -83,7 +83,7 @@ use warnings;
 sub Log($$);
 
 #-- channel name - fixed is the first array, variable the second 
-my @owg_fixed = ("A","B");
+my @owg_fixed = ("A","B","C","D","E","F","G","H");
 my @owg_channel;
 #-- channel values - always the raw input resp. output values from the device
 my @owg_val;
@@ -106,9 +106,14 @@ my %sets = (
 
 my %updates = (
   "present"     => "",
-  "gpio"     => ""
+  "gpio"        => ""
 );
 
+my %cnumber = (
+  "DS2413" => 2,
+  "DS2406" => 2,
+  "DS2408" => 8
+  );
 
 ########################################################################################
 #
@@ -131,14 +136,13 @@ sub OWSWITCH_Initialize ($) {
   $hash->{UndefFn} = "OWSWITCH_Undef";
   $hash->{GetFn}   = "OWSWITCH_Get";
   $hash->{SetFn}   = "OWSWITCH_Set";
-  #Name        = channel name
-  #Offset      = an offset added to the reading
-  #Factor      = a factor multiplied with (reading+offset)  
-  #Unit        = a unit of measure
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406 loglevel:0,1,2,3,4,5 ".
+
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406,DS2408 loglevel:0,1,2,3,4,5 ".
     "event:on-update,on-change";
  
-  for( my $i=0;$i<int(@owg_fixed);$i++ ){
+ #TODO: correct number of channels
+ 
+  for( my $i=0;$i<8;$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Unit";
     $attlist .= " ".$owg_fixed[$i]."stateS";
@@ -192,8 +196,13 @@ sub OWSWITCH_Define ($$) {
   #   YY must be determined from id
   if( $model eq "DS2413" ){
     $fam = "3A";
+    CommandAttr (undef,"$name model DS2413"); 
   }elsif( $model eq "DS2406" ){
     $fam = "12";
+    CommandAttr (undef,"$name model DS2406"); 
+  }elsif( $model eq "DS2408" ){
+    $fam = "29";
+    CommandAttr (undef,"$name model DS2408"); 
   }else{
     return "OWSWITCH: Wrong 1-Wire device model $model";
   }
@@ -243,7 +252,7 @@ sub OWSWITCH_InitializeDevice($) {
   my $name   = $hash->{NAME};
    
   #-- Set channel names, channel units 
-  for( my $i=0;$i<int(@owg_fixed);$i++) { 
+  for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
     #-- Initial readings OFF
     $owg_val[$i]   = 1;
     $owg_vax[$i]   = 1;
@@ -307,7 +316,7 @@ sub OWSWITCH_FormatValues($) {
   my $tn = TimeNow();
   
   #-- formats for output
-  for (my $i=0;$i<int(@owg_fixed);$i++){
+  for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
     $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
     @cnama = split(/\|/,$cname);
     $owg_channel[$i]=$cnama[0];
@@ -333,7 +342,7 @@ sub OWSWITCH_FormatValues($) {
     $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
     
     #-- insert comma
-    if( $i<int(@owg_fixed)-1 ){
+    if( $i<$cnumber{$attr{$name}{"model"}}-1 ){
       $value1 .= " ";
       $value2 .= ", ";
       $value3 .= ", ";
@@ -376,7 +385,7 @@ sub OWSWITCH_Get($@) {
   #-- get id
   if($a[1] eq "id") {
     $value = $hash->{ROM_ID};
-     return "$a[0] $reading => $value";
+     return "$name.id => $value";
   } 
   
   #-- get present
@@ -385,13 +394,13 @@ sub OWSWITCH_Get($@) {
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
     $hash->{PRESENT} = $value;
-    return "$a[0] $reading => $value";
+    return "$name.present => $value";
   } 
 
   #-- get interval
   if($a[1] eq "interval") {
     $value = $hash->{INTERVAL};
-     return "$a[0] $reading => $value";
+     return "$name.interval => $value";
   } 
   
   #-- reset presence
@@ -405,19 +414,22 @@ sub OWSWITCH_Get($@) {
   if( $reading eq "input" ){
     return "OWSWITCH: get needs parameter when reading input: <channel>"
       if( int(@a)<2 );
-    #-- find out which channel we have
-    if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
-    }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
-    } else {
-      return "OWSWITCH: invalid input address, must be A, B or defined channel name"
+    my $fnd=undef;
+    for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+      if( ($a[2] eq $owg_channel[$i]) || ($a[2] eq $owg_fixed[$i]) ){
+        $fnd=$i;
+        last;
+      }
     }
+    return "OWSWITCH: invalid output address, must be A,B,... or defined channel name"
+      if( !defined($fnd) );
 
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
     #-- OWFS interface
     #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetPage($hash,"reading");
+    #  $ret = OWFSSWITCH_GetPage($hash,"reading");
     #-- Unknown interface
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
@@ -426,13 +438,7 @@ sub OWSWITCH_Get($@) {
     OWSWITCH_FormatValues($hash);  
     my @states = split(/,/,$hash->{STATE});
     
-    if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
-      return $a[2]." = ".$states[0]; 
-    }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
-      return $a[2]." = ".$states[1]; 
-    } else {
-      return "OWSWITCH: invalid input address, must be A, B or defined channel name"
-    }
+    return $a[2]." = ".$states[$fnd]; 
     
   #-- get all states
   }elsif( $reading eq "gpio" ){
@@ -575,12 +581,15 @@ sub OWSWITCH_Set($@) {
     return "OWSWITCH: get needs parameter when writing output: <channel>"
       if( int(@a)<2 );
     #-- find out which channel we have
-    if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
-    }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
-    } else {
-      return "OWSWITCH: invalid output address, must be A, B or defined channel name"
+    my $fnd=undef;
+    for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+      if( ($a[2] eq $owg_channel[$i]) || ($a[2] eq $owg_fixed[$i]) ){
+        $fnd=$i;
+        last;
+      }
     }
-    
+    return "OWSWITCH: invalid output address, must be A,B,... or defined channel name"
+      if( !defined($fnd) );
     #-- prepare gpio value
     my $nval;
     if( lc($a[3]) eq "on" ){
@@ -593,11 +602,14 @@ sub OWSWITCH_Set($@) {
 
     #-- OWX interface
     if( $interface eq "OWX" ){
-      $ret = OWXSWITCH_GetState($hash);
-      if( ($a[2] eq $owg_channel[0]) || ($a[2] eq "A") ){
-         $value = $owg_val[1]*2+$nval;
-      }elsif( ($a[2] eq $owg_channel[1]) || ($a[2] eq "B") ){    
-         $value = 2*$nval+$owg_val[0];
+      $ret   = OWXSWITCH_GetState($hash);
+      $value = 0;
+      #-- vax or val ?
+      for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+        $value += ($owg_vax[$i]<<$i) 
+          if( $i != $fnd );
+        $value += ($nval<<$i) 
+          if( $i == $fnd );  
       }
       $ret = OWXSWITCH_SetState($hash,$value);
     #-- OWFS interface
@@ -611,13 +623,13 @@ sub OWSWITCH_Set($@) {
   #-- set state
   }elsif( $key eq "gpio" ){
     #-- check value and write to device
-    return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= 3"
-      if( ! ((int($value) >= 0) && (int($value) <= 3)) );
+    return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= ".(1 << $cnumber{$attr{$name}{"model"}} - 1)
+      if( ! ((int($value) >= 0) && (int($value) <= (1 << $cnumber{$attr{$name}{"model"}} -1 ))) );
      
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_SetState($hash,int($value));
     #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetValues($hash);
+    #  $ret = OWFSSWITCH_GetValues($hash);
     }else{
       return "OWSWITCH: GetValues with wrong IODev type $interface";
     }
@@ -702,7 +714,7 @@ sub OWXSWITCH_GetState($) {
     }
   #-- family = 12 => DS2406
   }elsif( $hash->{OW_FAMILY} eq "12" ) {
-    #=============== set gpio values ===============================
+    #=============== get gpio values ===============================
     #-- issue the match ROM command \x55 and the access channel command
     #   \xF5 plus the two byte channel control and the value
     $select=sprintf("\xF5\xDC\xFF");   
@@ -710,6 +722,20 @@ sub OWXSWITCH_GetState($) {
     OWX_Reset($master);
     #-- read the data
     $res=OWX_Complex($master,$owx_dev,$select,1);
+    if( $res eq 0 ){
+      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
+    }
+  #-- family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== get gpio values ===============================
+    #-- issue the match ROM command \x55 and the read PIO rtegisters command
+    #   \xF5 plus the two byte channel target address
+    #-- reading 9 + 3 + 10 data bytes = 22 bytes
+    $select=sprintf("\xF0\x88\x00");   
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- read the data
+    $res=OWX_Complex($master,$owx_dev,$select,10);
     if( $res eq 0 ){
       return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
     }
@@ -729,16 +755,16 @@ sub OWXSWITCH_GetState($) {
   #-- reset the bus
   OWX_Reset($master);
   
-  #my $ress = "OWXSWITCH_Get: three data bytes ";
-  #  for($i=0;$i<int(@data);$i++){
-  #  my $j=int(ord($data[$i])/16);
-  #  my $k=ord($data[$i])%16;
-  #  $ress.=sprintf "0x%1x%1x ",$j,$k;
-  #  }
-  #Log 1, $ress;
+  my $ress = "OWXSWITCH_Get: ";
+    for($i=0;$i<int(@data);$i++){
+    my $j=int(ord($data[$i])/16);
+    my $k=ord($data[$i])%16;
+    $ress.=sprintf "0x%1x%1x ",$j,$k;
+    }
+  Log 1, $ress;
   
   #   note: value 1 corresponds to OFF, 0 to ON normally
-  #   note: we display the sensed output level, not the flipflop setting
+  #   note: val = input value, vax = output value
   #-- family = 3A => DS2413
   if( $hash->{OW_FAMILY} eq "3A" ) {
     $owg_val[0] = ord($data[0])      & 1;
@@ -752,6 +778,12 @@ sub OWXSWITCH_GetState($) {
     $owg_vax[0] =  ord($data[2])     & 1;
     $owg_val[1] = (ord($data[2])>>3) & 1;
     $owg_vax[1] = (ord($data[2])>>1) & 1;
+   #-- family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    for(my $i=0;$i<8;$i++){
+      $owg_val[$i] = (ord($data[2])>>$i) & 1;
+      $owg_vax[$i] = (ord($data[3])>>$i) & 1;
+    }
   }
   return undef
 }
@@ -798,7 +830,7 @@ sub OWXSWITCH_SetState($$) {
   #--  family = 12 => DS2406
   }elsif( $hash->{OW_FAMILY} eq "12" ) {
     #=============== set gpio values ===============================
-    # Wrriting the output state via the access channel command does
+    # Writing the output state via the access channel command does
     # not work contrary to documentation. Using the write status command 
     #-- issue the match ROM command \x55 and the read status command
     #   \xAA at address TA1 = \x07 TA2 = \x00   
@@ -819,7 +851,24 @@ sub OWXSWITCH_SetState($$) {
     if( $res eq 0 ){
       return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
     }
-    
+    $owg_val[0] = $value % 2;
+    $owg_vax[0] = $owg_val[0];
+    $owg_val[1] = int($value / 2);
+    $owg_vax[1] = $owg_val[1];
+  #--  family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== set gpio values ===============================
+    #-- issue the match ROM command \x55 and  the write gpio command
+    #   \x5A plus the value byte and its complement
+    $select=sprintf("\x5A%c%c",$value,255-$value);  
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- read the data
+    $res=OWX_Complex($master,$owx_dev,$select,1);
+    if( $res eq 0 ){
+      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
+    }
+        
   } else {
     return "OWXSWITCH: Unknown device family $hash->{OW_FAMILY}\n";
   }
@@ -829,35 +878,32 @@ sub OWXSWITCH_SetState($$) {
   #-- process results
   @data=split(//,substr($res,10));
   
-  #my $ress = "OWXSWITCH_Set: three data bytes ";
-  #  for($i=0;$i<int(@data);$i++){
-  #  my $j=int(ord($data[$i])/16);
-  #  my $k=ord($data[$i])%16;
-  #  $ress.=sprintf "0x%1x%1x ",$j,$k;
-  #  }
-  #Log 1, $ress;
+  my $ress = "OWXSWITCH_Set: ";
+    for($i=0;$i<int(@data);$i++){
+    my $j=int(ord($data[$i])/16);
+    my $k=ord($data[$i])%16;
+    $ress.=sprintf "0x%1x%1x ",$j,$k;
+    }
+  Log 1, $ress;
 
   #-- family = 3A => DS2413
   if( $hash->{OW_FAMILY} eq "3A" ) {
     if( $data[2] ne "\xAA"){
       return "OWXSWITCH: State could not be set for device $owx_dev";
     } 
-   #--  family = 12 => DS2406
+  #--  family = 12 => DS2406
   }elsif( $hash->{OW_FAMILY} eq "12" ) {
     #-- very crude check - should be CRC
     if( int(@data) != 5){
       return "OWXSWITCH: State could not be set for device $owx_dev";
     } 
-  }
-  
-  #-- Put the new values in the system variables
-  #-- This holds only for DS2413 
-  
-  $owg_val[0] = $value % 2;
-  $owg_vax[0] = $owg_val[0];
-  $owg_val[1] = int($value / 2);
-  $owg_vax[1] = $owg_val[1];
+  #--  family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    if( $data[2] ne "\xAA"){
+      return "OWXSWITCH: State could not be set for device $owx_dev";
+    } 
   return undef
+
 }
 
 1;

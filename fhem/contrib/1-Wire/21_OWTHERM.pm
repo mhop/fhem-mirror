@@ -15,7 +15,7 @@
 # Prof. Dr. Peter A. Henning, 2012
 # Martin Fischer, 2011
 # 
-# Version 2.22 - October, 2012
+# Version 2.24 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -376,7 +376,7 @@ sub OWTHERM_Get($@) {
   #-- get id
   if($a[1] eq "id") {
     $value = $hash->{ROM_ID};
-     return "$a[0] $reading => $value";
+     return "$name.id => $value";
   } 
   
   #-- Get other values according to interface type
@@ -390,7 +390,7 @@ sub OWTHERM_Get($@) {
       my $master       = $hash->{IODev};
       $value           = OWX_Verify($master,$hash->{ROM_ID});
       $hash->{PRESENT} = $value;
-      return "$a[0] $reading => $value";
+      return "$name.present => $value";
     } else {
       return "OWTHERM: Verification not yet implemented for interface $interface";
     }
@@ -399,7 +399,7 @@ sub OWTHERM_Get($@) {
   #-- get interval
   if($reading eq "interval") {
     $value = $hash->{INTERVAL};
-     return "$a[0] $reading => $value";
+     return "$name.interval => $value";
   } 
   
   #-- reset presence
@@ -696,19 +696,7 @@ sub OWXTHERM_GetValues($) {
     return "$owx_dev not accessible in 2nd step"; 
   }
   
-  #if (length($res) == 10){
-  #  my $res2 = "====> OWXTHERM Received ";
-  #  for(my $i=0;$i<19;$i++){  
-  #    my $j=int(ord(substr($res,$i,1))/16);
-  #    my $k=ord(substr($res,$i,1))%16;
-  #    $res2.=sprintf "0x%1x%1x ",$j,$k;
-  #  }
-  #  Log 1, $res2;
-  #}
-     
   #-- process results
-  #$res="000000000".$res
-  #  if(length($res)==10);
   my  @data=split(//,$res);
   return "invalid data length, ".int(@data)." bytes"
     if (@data != 19); 
