@@ -45,7 +45,6 @@ HMLAN_Initialize($)
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
                      "hmId hmKey " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
-
 }
 
 #####################################
@@ -199,18 +198,27 @@ sub
 HMLAN_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
-
   my $dst = substr($msg, 16, 6);
-  {   # occationally necessary. Works fine if we do it always
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    HMLAN_SimpleWrite($hash, "-$dst");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    HMLAN_SimpleWrite($hash, "+$dst,00,00,");
-    $lhash{$dst} = 1;
+
+#  my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
+  my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
+  my $IDsub = '-'.$dst;               # guess: ID remove?
+#  my $IDact = '+'.$dst;               # guess: ID recover? Different to IDadd?
+#  my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
+    
+  HMLAN_SimpleWrite($hash, $IDadd) if (!$lhash{$dst});
+  $lhash{$dst} = 1;
+   
+  if(hex(substr($msg, 6, 2))&0x01){   # wakeup sequence for TC... hmmm
+    HMLAN_SimpleWrite($hash, $IDadd);
+    HMLAN_SimpleWrite($hash, $IDadd);
+    HMLAN_SimpleWrite($hash, $IDadd);
+    HMLAN_SimpleWrite($hash, $IDsub);
+    HMLAN_SimpleWrite($hash, $IDadd);
+    HMLAN_SimpleWrite($hash, $IDadd);
+    HMLAN_SimpleWrite($hash, $IDadd);
+    HMLAN_SimpleWrite($hash, $IDadd);
+    #HMLAN_SimpleWrite($hash, "+$dst,01,00,F1EF\x0d\x0a");
   }
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
@@ -218,7 +226,6 @@ HMLAN_Write($$$)
 
   # Avoid problems with structure set
   # TODO: rewrite it to use a queue+internaltimer like the CUL
-  select(undef, undef, undef, 0.01); # needed for structure set by meesus. 
 }
 
 #####################################
@@ -233,7 +240,7 @@ HMLAN_Read($)
   my $name = $hash->{NAME};
 
   my $hmdata = $hash->{PARTIAL};
-  Log 5, "HMLAN/RAW: $hmdata/$buf";
+#  Log 5, "HMLAN/RAW: $hmdata/$buf";
   $hmdata .= $buf;
 
   while($hmdata =~ m/\n/) {
@@ -263,61 +270,65 @@ HMLAN_Parse($$)
   my ($hash, $rmsg) = @_;
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
-  my ($src, $status, $msec, $d2, $rssi, $msg);
-
-  my $dmsg = $rmsg;
-
-  Log $ll5, "HMLAN_Parse: $name $rmsg";
-  if($rmsg =~ m/^E(......),(....),(........),(..),(....),(.*)/) {
-    ($src, $status, $msec, $d2, $rssi, $msg) =
-    ($1,   $2,      $3,    $4,  $5,    $6);
-    $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
-    $hash->{uptime} = HMLAN_uptime($msec);
-
-  } elsif($rmsg =~ m/^R(........),(....),(........),(..),(....),(.*)/) {
-    ($src, $status, $msec, $d2, $rssi, $msg) =
-    ($1,   $2,      $3,    $4,  $5,    $6);
-
-    $dmsg = sprintf("A%02X%s", length($msg)/2, uc($msg));
-    $dmsg .= "NACK" if($status !~ m/00(01|02|21)/);	
+  my @mFld = split(',', $rmsg);
+  my $letter = substr($mFld[0],0,1); # get leading char
+  
+  if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
+    Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
+#	                               .(if($mFld[0] =~ m/^E/)?'  ':'')
+	                               .' stat:'.$mFld[1]
+	                               .' t:'.$mFld[2].' d:'.$mFld[3]
+								   .' r:'.$mFld[4]. 
+ 								  'm:'.$mFld[5];
+#                                  '     m:'.substr($mFld[5],0,2). 
+#                                  ' '.substr($mFld[5],2,4).
+#                                  ' '.substr($mFld[5],6,6).
+#                                  ' '.substr($mFld[5],12,6). 
+#                                  ' '.substr($mFld[5],18);
+								  
+    my $dmsg = sprintf("A%02X%s", length($mFld[5])/2, uc($mFld[5]));
 	
-    $hash->{uptime} = HMLAN_uptime($msec);
+	my $src = substr($mFld[5],6,6);
+	my $dst = substr($mFld[5],12,6);
+	my $flg = hex(substr($mFld[5],2,2));
+    # handle status. 1-ack,8=nack,21=?,02=? 81=open
 
-  } elsif($rmsg =~
-       m/^HHM-LAN-IF,(....),(..........),(......),(......),(........),(....)/) {
-    my ($vers,    $serno, $d1, $owner, $msec, $d2) =
-       (hex($1), $2,     $3,  $4,     $5,    $6);
-    $hash->{serialNr} = $serno;
-    $hash->{firmware} = sprintf("%d.%d", ($vers>>12)&0xf, $vers & 0xffff);
-    $hash->{owner} = $owner;
-    $hash->{uptime} = HMLAN_uptime($msec);
-    my $myId = AttrVal($name, "hmId", $owner);
-    if(lc($owner) ne lc($myId) && !AttrVal($name, "dummy", 0)) {
-      Log 1, "HMLAN setting owner to $myId from $owner";
+    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R'));          #ok
+
+    if (!($flg & 0x25)){#rule out other messages 
+	  HMLAN_SimpleWrite($hash, '-'.$src);
+	  HMLAN_SimpleWrite($hash, '+'.$src);
+	}
+    $dmsg .= "NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
+
+    $hash->{uptime} = HMLAN_uptime($mFld[2]);
+	$hash->{RSSI}   = hex($mFld[4]);
+    $hash->{RAWMSG} = $rmsg;
+    $hash->{"${name}_MSGCNT"}++;
+    $hash->{"${name}_TIME"} = TimeNow();
+    my %addvals = (RAWMSG => $rmsg, RSSI => hex($mFld[4]));
+    Dispatch($hash, $dmsg, \%addvals);
+  }
+  elsif($mFld[0] eq 'HHM-LAN-IF'){#@mFld=(undef,$vers,$serno,$d1,$owner,$msec,$d2)
+    $hash->{serialNr} = $mFld[2];
+    $hash->{firmware} = sprintf("%d.%d", (hex($mFld[1])>>12)&0xf, hex($mFld[1]) & 0xffff);
+    $hash->{owner} = $mFld[4];
+    $hash->{uptime} = HMLAN_uptime($mFld[5]);
+    Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
+	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
+								   .' O:'  .$mFld[4].' m:'.$mFld[5].' d2:'.$mFld[6];
+    my $myId = AttrVal($name, "hmId", $mFld[4]);
+    if(lc($mFld[4]) ne lc($myId) && !AttrVal($name, "dummy", 0)) {
+      Log 1, 'HMLAN setting owner to '.$myId.' from '.$mFld[4];
       HMLAN_SimpleWrite($hash, "A$myId");
     }
-    return;
-
-  } elsif($rmsg =~ m/^I00.*/) {
+  }
+  elsif($rmsg =~ m/^I00.*/) {;
     # Ack from the HMLAN
-    return;
-
-  } else {
+  } 
+  else {
     Log $ll5, "$name Unknown msg >$rmsg<";
-    return;
-
   }
-
-  $hash->{"${name}_MSGCNT"}++;
-  $hash->{"${name}_TIME"} = TimeNow();
-  $hash->{RAWMSG} = $rmsg;
-  my %addvals = (RAWMSG => $rmsg);
-  if(defined($rssi)) {
-    $rssi = hex($rssi)-65536;
-    $hash->{RSSI} = $rssi;
-    $addvals{RSSI} = $rssi;
-  }
-  Dispatch($hash, $dmsg, \%addvals);
 }
 
 
@@ -338,8 +349,25 @@ HMLAN_SimpleWrite(@)
   my $name = $hash->{NAME};
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
 
-  select(undef, undef, undef, 0.01);
-  Log GetLogLevel($name,5), "SW: $msg";
+  select(undef, undef, undef, 0.01); #  todo check necessity
+#---------- confort trace--------------
+#  Log GetLogLevel($name,5), 'HMLAN_Send:         S:'.
+#                                        substr($msg,0,9).
+#                            ' stat:  '.substr($msg,10,2).
+#                            ' t:'      .substr($msg,13,8).
+#                            ' d:'      .substr($msg,22,2).
+#                            ' r:'      .substr($msg,25,8).
+# 							 ' m:'      .substr($msg,34)
+
+#                            ' m:'      .substr($msg,34,2).
+#                            ' '        .substr($msg,36,4). 
+#                            ' '        .substr($msg,40,6).
+#                            ' '        .substr($msg,46,6). 
+#                            ' '        .substr($msg,52)     
+#							if (length($msg )>19);
+#  Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg     if (length($msg) <=19); 
+#----------- normal trace,better speed-----------
+  Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg; #normal trace
   
   $msg .= "\r\n" unless($nonl);
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
