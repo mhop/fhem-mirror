@@ -877,14 +877,6 @@ sub OWXSWITCH_SetState($$) {
 
   #-- process results
   @data=split(//,substr($res,10));
-  
-  my $ress = "OWXSWITCH_Set: ";
-    for($i=0;$i<int(@data);$i++){
-    my $j=int(ord($data[$i])/16);
-    my $k=ord($data[$i])%16;
-    $ress.=sprintf "0x%1x%1x ",$j,$k;
-    }
-  Log 1, $ress;
 
   #-- family = 3A => DS2413
   if( $hash->{OW_FAMILY} eq "3A" ) {
@@ -901,7 +893,8 @@ sub OWXSWITCH_SetState($$) {
   }elsif( $hash->{OW_FAMILY} eq "29" ) {
     if( $data[2] ne "\xAA"){
       return "OWXSWITCH: State could not be set for device $owx_dev";
-    } 
+    }
+  } 
   return undef
 
 }
