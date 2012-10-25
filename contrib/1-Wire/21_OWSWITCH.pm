@@ -754,15 +754,7 @@ sub OWXSWITCH_GetState($) {
   
   #-- reset the bus
   OWX_Reset($master);
-  
-  my $ress = "OWXSWITCH_Get: ";
-    for($i=0;$i<int(@data);$i++){
-    my $j=int(ord($data[$i])/16);
-    my $k=ord($data[$i])%16;
-    $ress.=sprintf "0x%1x%1x ",$j,$k;
-    }
-  Log 1, $ress;
-  
+
   #   note: value 1 corresponds to OFF, 0 to ON normally
   #   note: val = input value, vax = output value
   #-- family = 3A => DS2413
