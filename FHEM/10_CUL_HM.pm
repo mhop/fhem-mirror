@@ -130,7 +130,7 @@ my %culHmModel=(
   "003F" => {name=>"HM-WDS40-TH-I"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0040" => {name=>"HM-WDS100-C6-O"          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
   "0041" => {name=>"HM-WDC7000"              ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",},
-  "0042" => {name=>"HM-SEC-SD"               ,cyc=>'28:00' ,rxt=>'b'    ,lst=>''             ,chn=>"",},
+  "0042" => {name=>"HM-SEC-SD"               ,cyc=>'90:00' ,rxt=>'b'   ,lst=>''             ,chn=>"",},
   "0043" => {name=>"HM-SEC-TIS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0044" => {name=>"HM-SEN-EP"               ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0045" => {name=>"HM-SEC-WDS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
@@ -529,8 +529,12 @@ CUL_HM_Parse($$)
 	  # channel is in sType for this message
       my (   $of,     $vep) = 
          (hex($1), hex($2));
-      push @event, "ValveErrorPosition $dname: $vep %";
-      push @event, "ValveOffset $dname: $of %";
+      push @event, "ValveErrorPosition for $dname: $vep %";
+      push @event, "ValveOffset for $dname: $of %";
+	  #set the condition in destination
+	  DoTrigger($dname,'ValveErrorPosition: changeTo '.$vep.'%');
+	  DoTrigger($dname,'ValveOffset: changeTo '.$of.'%');
+	  push @event,""; # nothing to report for TC
     }
 #          ($cmd eq "A112" && $p =~ m/^0202(..)$/)) {    # Set desired temp
     elsif(($msgType eq '02' &&$sType eq '01')|| # ackStatus
@@ -589,8 +593,8 @@ CUL_HM_Parse($$)
 	#        => Link discriminator (00000000) is fixed
     elsif($msgType eq "10" && $p =~ m/^0401000000000509(..)0A(..)/) {
       my (    $of,     $vep) = (hex($1), hex($2));
-      push @event, "valve error position:$vep %";
-      push @event, "ValveOffset $dname: $of %";
+      push @event, "ValveErrorPosition: $vep%";
+      push @event, "ValveOffset: $of%";
     }
   
   } 
@@ -741,7 +745,7 @@ CUL_HM_Parse($$)
       push @event, "state:Btn$btn on$target";
     }
 	elsif(($msgType eq "02" && $p =~ m/^01/) ||   # handle Ack_Status
-	       ($msgType eq "10" && $p =~ m/^06/)){    #    or Info_Status message
+	      ($msgType eq "10" && $p =~ m/^06/)){    #    or Info_Status message
 	  my ($msgChn,$msgState) = ($1,$2) if ($p =~ m/..(..)(..)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$msgChn};
 	  if ($model eq "HM-OU-LED16") {
@@ -854,7 +858,7 @@ CUL_HM_Parse($$)
 
 		push @event, "alive:yes";
 	    push @event, "battery:". (($err&0x80)?"low"  :"ok"  )  if($cmpVal&0x80);
-		if (!$model eq "HM-SEC-WDS"){	  
+		if ($model ne "HM-SEC-WDS"){	  
 		  push @event, "cover:". (($err&0x0E)?"open" :"closed")if($cmpVal&0x0E);
 		}
 	  }
@@ -892,34 +896,31 @@ CUL_HM_Parse($$)
   } 
   elsif($st eq "winMatic") {  ####################################
     
-    if($msgType eq "10" && $p =~ m/^0601(..)(..)/) {
-      my ($lst, $flg) = ($1, $2);
-           if($lst eq "C8" && $flg eq "00") { push @event, "contact:tilted";
-      } elsif($lst eq "FF" && $flg eq "00") { push @event, "contact:closed";
-      } elsif($lst eq "FF" && $flg eq "10") { push @event, "contact:lock_on";
-      } elsif($lst eq "00" && $flg eq "10") { push @event, "contact:movement_tilted";
-      } elsif($lst eq "00" && $flg eq "20") { push @event, "contact:movement_closed";
-      } elsif($lst eq "00" && $flg eq "30") { push @event, "contact:open";
-      }
-      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".$lst."00",1,0)  
-        if($id eq $dst);# Send AckStatus
-	  $sendAck = "";
-    }
-
-    if($msgType eq "10" && $p =~ m/^0287(..)89(..)8B(..)/) {
-      my ($air, undef, $course) = ($1, $2, $3);
-      push @event, "airing:".
-      ($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air));
-      push @event, "course:".($course eq "FF" ? "tilt" : "close");
-    }
-
-    if($msgType eq "10" &&
-       $p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
-
-      my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
-         ($1, $2, $3, $4, $5, $6, $7, $8);
-      push @event, "airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5));
-      push @event, "contact:tesed";
+    if($msgType eq "10"){
+      if ($p =~ m/^0601(..)(..)/) {
+        my ($lst, $flg) = ($1, $2);
+             if($lst eq "C8" && $flg eq "00") { push @event, "contact:tilted";
+        } elsif($lst eq "FF" && $flg eq "00") { push @event, "contact:closed";
+        } elsif($lst eq "FF" && $flg eq "10") { push @event, "contact:lock_on";
+        } elsif($lst eq "00" && $flg eq "10") { push @event, "contact:movement_tilted";
+        } elsif($lst eq "00" && $flg eq "20") { push @event, "contact:movement_closed";
+        } elsif($lst eq "00" && $flg eq "30") { push @event, "contact:open";
+        }
+        CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".$lst."00",1,0)  
+          if($id eq $dst);# Send AckStatus
+	    $sendAck = "";
+	  }
+	  elsif ($p =~ m/^0287(..)89(..)8B(..)/) {
+	    my ($air, undef, $course) = ($1, $2, $3);
+        push @event, "airing:".($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air));
+        push @event, "course:".($course eq "FF" ? "tilt" : "close");
+	  }
+	  elsif($p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
+        my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
+           ($1, $2, $3, $4, $5, $6, $7, $8);
+        push @event, "airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5));
+        push @event, "contact:tesed";
+	  }
     } 
 
   }
@@ -1039,6 +1040,11 @@ my %culHmRegDefine = (
   OnMinLevelSh =>{a=> 16.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:minimum PowerLevel"},
   OnLevelSh    =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:PowerLevel on"},
 
+  OffLevelKmSh =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:OnLevel 127.5=locked"},
+  OnLevelKmSh  =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:OnLevel 127.5=locked"},
+  OnRampOnSpSh =>{a=> 34.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Short:Ramp On speed"},
+  OnRampOffSpSh=>{a=> 35.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Short:Ramp Off speed"},
+
   rampSstepSh  =>{a=> 18.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:rampStartStep"},
   rampOnTimeSh =>{a=> 19.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:rampOnTime"},
   rampOffTimeSh=>{a=> 20.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:rampOffTime"},
@@ -1061,6 +1067,11 @@ my %culHmRegDefine = (
   dimMinLvlLg  =>{a=>149.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimMinLevel"},
   dimMaxLvlLg  =>{a=>150.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimMaxLevel"},
   dimStepLg    =>{a=>151.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimStep"},
+
+  OffLevelKmLg =>{a=>143.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:OnLevel 127.5=locked"},
+  OnLevelKmLg  =>{a=>145.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:OnLevel 127.5=locked"},
+  OnRampOnSpLg =>{a=>162.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Long:Ramp On speed"},
+  OnRampOffSpLg=>{a=>163.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Long:Ramp Off speed"},
   #tc
   BacklOnTime  =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25    ,c=>""         ,f=>''      ,u=>'s'   ,t=>"Backlight ontime"},
   BacklOnMode  =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1     ,c=>'factor'   ,f=>2       ,u=>'bool',t=>"Backlight mode 0=OFF, 1=AUTO"},
@@ -1149,6 +1160,12 @@ my %culHmRegSupported = (
 			ActTypeSh =>1,ActNumSh  =>1,IntenseSh =>1,
 			ActTypeLg =>1,ActNumLg  =>1,IntenseLg =>1,
 			},
+  winMatic=>{			 
+            OnTimeSh      =>1,OffTimeSh     =>1,OffLevelKmSh  =>1,
+            OnLevelKmSh   =>1,OnRampOnSpSh  =>1,OnRampOffSpSh =>1,
+            OnTimeLg      =>1,OffTimeLg     =>1,OffLevelKmLg  =>1,
+            OnLevelKmLg   =>1,OnRampOnSpLg  =>1,OnRampOffSpLg =>1,
+			},
   keyMatic=>{
 			signal    =>1,signalTone=>1,keypressSignal=>1,
 			holdTime  =>1,setupDir  =>1,setupPosition =>1,
@@ -1158,8 +1175,9 @@ my %culHmRegSupported = (
   dis4=> 	{language => 1,stbyTime => 1, #todo insert correct name
             },	
   motionDetector=>{
-             evtFltrPeriod =>1,evtFltrNum    =>1,minInterval   =>1,
-			 captInInterval=>1,brightFilter  =>1,ledOnTime     =>1},
+            evtFltrPeriod =>1,evtFltrNum    =>1,minInterval   =>1,
+			captInInterval=>1,brightFilter  =>1,ledOnTime     =>1,
+			},
 );
 ##--------------- Conversion routines for register settings
 my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
@@ -1584,8 +1602,12 @@ CUL_HM_Set($@)
 	# as of now only hex value allowed check range and convert
 
 	$chn = "00" if ($list eq "00");
-	
-	$peerID = ($peerID eq 'all')?'all': CUL_HM_Name2Id($peerID,$hash); #todo add self
+	my $pSc = substr($peerID,0,4); #helper for shortcut spread
+    if     ($pSc eq 'self'){$peerID=$dst.sprintf("%02X",'0'.substr($peerID,4));
+	}elsif ($pSc eq 'fhem'){$peerID=$id .sprintf("%02X",'0'.substr($peerID,4));
+	}elsif($peerID eq 'all'){;# keep all
+	}else                  {$peerID = CUL_HM_Name2Id($peerID);
+	}
 	$peerID = $peerID.((length($peerID) == 6)?"01":"");# default chn 1, if none
 	$peerID = "00000000" if (length($peerID) != 8 && $peerID ne 'all');# none?
 
@@ -1662,9 +1684,14 @@ CUL_HM_Set($@)
     my ($lChn,$peerID,$peerChn) = ($chn,"000000","00");
 	if (($list == 3) ||($list == 4)){ # peer is necessary for list 3/4
 	  return "Peer not specified" if (!$peerChnIn);
-	  $peerID = ($peerChnIn =~ m/^self(.*)/)?$dst:CUL_HM_Name2Id($peerChnIn);
-	  $peerChn = ($1)?sprintf("%02X",$1):"";
- 	  $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01") if (!$peerChn);
+	  
+	  my $pSc = substr($peerID,0,4); #helper for shortcut spread
+      if     ($pSc eq 'self'){$peerID=$dst.sprintf("%02X",'0'.substr($peerID,4));
+	  }elsif ($pSc eq 'fhem'){$peerID=$id .sprintf("%02X",'0'.substr($peerID,4));
+	  }else                  {$peerID = CUL_HM_Name2Id($peerID);
+	  }
+
+ 	  $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");
       $peerID = substr($peerID,0,6);	
       return "Peer not specified" if (!$peerID);	  
 	}
@@ -1960,22 +1987,22 @@ CUL_HM_Set($@)
         sprintf("++%s01%s%s0101%s%02X%s",$flag,$id, $dst, $id, $a[2], $chn));
     CUL_HM_PushCmdStack($hash,
         sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn));
-
   } 
   elsif($cmd eq "read") { ###################################
-    CUL_HM_PushCmdStack($hash,
-        sprintf("++%s01%s%s0104%s%02X03",$flag,$id, $dst, $id, $a[2]));
+    return "read is discontinued since duplicate.\n".
+	       "please use getRegRaw instead. Syntax getRegRaw List3 fhem<btn> \n".
+		   "or getConfig for a complete configuratin list";
   } 
   elsif($cmd eq "keydef") { #####################################
-    if (     $a[3] eq "tilt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B220D838B228D83");
-    } elsif ($a[3] eq "close")     {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B550D838B558D83");
-    } elsif ($a[3] eq "closed")    {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0F008F00");
-    } elsif ($a[3] eq "bolt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0FFF8FFF");
-    } elsif ($a[3] eq "speedclose"){CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,sprintf("23%02XA3%02X",  $a[4]*2,  $a[4]*2));
-    } elsif ($a[3] eq "speedtilt") {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,sprintf("22%02XA2%02X",  $a[4]*2,  $a[4]*2));
-    } elsif ($a[3] eq "delete")    {CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s0102%s%02X%s",$flag,$id, $dst, $id, $a[2], $chn));
+    if (     $a[3] eq "tilt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B220D838B228D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
+    } elsif ($a[3] eq "close")     {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B550D838B558D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
+    } elsif ($a[3] eq "closed")    {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0F008F00");        #offLevel (also thru register)
+    } elsif ($a[3] eq "bolt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0FFF8FFF");        #offLevel (also thru register)
+    } elsif ($a[3] eq "speedclose"){CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,sprintf("23%02XA3%02X",$a[4]*2,$a[4]*2));#RAMPOFFspeed (also in reg)
+    } elsif ($a[3] eq "speedtilt") {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,sprintf("22%02XA2%02X",$a[4]*2,$a[4]*2));#RAMPOFFspeed (also in reg)
+    } elsif ($a[3] eq "delete")    {CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s0102%s%02X%s",$flag,$id, $dst, $id, $a[2], $chn));#unlearn key
     } else {
-      return "unknown argument $a[3]";
+      return 'unknown argument '.$a[3];
     }
   } 
   elsif($cmd eq "test") { #####################################################
@@ -2307,7 +2334,7 @@ CUL_HM_responseSetup($$$)
 	  $hash->{helper}{respWait}{forPeer}= $peerID;# this is the HMid + channel
       
       # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);
+	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);#todo General change timer to 1.5
 	  #--- remove channel entries that will be replaced
       my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
       $chnhash = $hash if(!$chnhash);   
@@ -2523,7 +2550,7 @@ CUL_HM_id2Name($)
   }
   my $defPtr = $modules{CUL_HM}{defptr};
   return $defPtr->{$chnId}{NAME} if($chnId && $defPtr->{$chnId});
-  return $defPtr->{$devId}{NAME}.(defined($chn)?'_chn:'.$chn:'') if($defPtr->{$devId});
+  return $defPtr->{$devId}{NAME} if($defPtr->{$devId});
   return $devId. ($chn ? ("_chn:".$chn):"");
 }
 ###################################
