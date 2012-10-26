@@ -157,8 +157,10 @@ FP_define(){
   my ($hash, $def) = @_;
   $hash->{STATE} = $hash->{NAME};
   my $name = $hash->{NAME};
-  addToAttrList("fp_$name");                                                  # create userattr fp_<name> if it doesn't exist yet
-  Log 3, "Floorplan - added userattr fp_$name";
+  if (AttrVal("global","userattr","") !~ m/fp_$name/) {
+	addToAttrList("fp_$name");                                                  # create userattr fp_<name> if it doesn't exist yet
+	Log 3, "Floorplan - added global userattr fp_$name";
+  }
   return undef;
   }
 #-------------------------------------------------------------------------------
