@@ -17,20 +17,15 @@ export PATH
 export LD_LIBRARY_PATH=$home/lib
 export PERL5LIB=$home/lib/perl5/site_perl/5.12.2/mips-linux:$home/lib/perl5/site_perl/5.12.2:$home/lib/perl5/5.12.2/mips-linux:$home/lib/perl5/5.12.2
 
-########### START fhem-user
-# let FHEM run as user boxusr80 by adding user fhem with uid of boxusr80
-# Using this feature the following will not work: ping,WOL,lcd4linux
-#id fhem > /dev/null 2>&1
-#if [ "$?" -ne "0" ]; then
-#  echo "user fhem does not exist. Adding it."
-#  echo "fhem:any:1080:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
-#fi 
-#chown root ${home}/dfu-programmer
-#chmod 4755 ${home}/dfu-programmer
-########### END fhem-user
-
-# set file ownership, so that the webinterface can read it.
-chown -R boxusr80 ${home}/log
-chown -R boxusr80 ${home}/FHEM
+# let FHEM run as user boxusr80
+# add user fhem with uid of boxusr80
+id fhem > /dev/null 2>&1
+if [ "$?" -ne "0" ]; then
+  echo "user fhem does not exist. Adding it."
+  echo "fhem:any:1080:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
+  # set files ownership
+  chown -R boxusr80 ${home}/log
+  chown -R boxusr80 ${home}/FHEM
+fi 
 
 perl fhem.pl fhem.cfg

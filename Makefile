@@ -1,8 +1,19 @@
-BINDIR=/usr/bin
-MODDIR=/usr/share/fhem
-VARDIR=/var/log/fhem
-MANDIR=/usr/share/man/man1
-ETCDIR=/etc
+VERS=5.3
+DATE=2012-10-28
+
+RELATIVE_PATH=YES
+BINDIR=/opt/fhem
+MODDIR=$(BINDIR)
+VARDIR=$(BINDIR)/log
+MANDIR=$(BINDIR)/docs
+ETCDIR=$(BINDIR)
+
+# Old variant
+#BINDIR=/usr/bin
+#MODDIR=/usr/share/fhem
+#VARDIR=/var/log/fhem
+#MANDIR=/usr/share/man/man1
+#ETCDIR=/etc
 
 # Used for .deb package creation
 RBINDIR=$(ROOT)$(BINDIR)
@@ -14,8 +25,6 @@ RETCDIR=$(ROOT)$(ETCDIR)
 # Destination Directories
 DEST=$(RETCDIR) $(RBINDIR) $(RMODDIR) $(RMANDIR) $(RVARDIR)
 
-VERS=5.2
-DATE=2011-12-31
 DESTDIR=fhem-$(VERS)
 
 all:
@@ -32,11 +41,13 @@ all:
 install:
 	@echo "- creating directories"
 	@-$(foreach DIR,$(DEST), if [ ! -e $(DIR) ]; then mkdir -p $(DIR); fi; )
-	@echo "- fixing permissions / path in fhem.cfg"
+	@echo "- fixing permissions in fhem.cfg"
 	@find FHEM docs www contrib -type f -print | xargs chmod 644
 	@cp fhem.cfg fhem.cfg.install
-	@perl -pi -e 's,modpath \.,modpath $(MODDIR),' fhem.cfg.install
-	@perl -pi -e 's,([^h]) \./log,$$1 $(VARDIR),' fhem.cfg.install
+	@-if [ "$(RELATIVE_PATH)" != YES ]; then\
+		perl -pi -e 's,modpath \.,modpath $(MODDIR),' fhem.cfg.install; \
+		perl -pi -e 's,([^h]) \./log,$$1 $(VARDIR),' fhem.cfg.install; \
+		fi;
 	@-if [ -e $(RETCDIR)/fhem.cfg ]; then \
 		echo "- move existing configuration to fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`"; \
 		mv $(RETCDIR)/fhem.cfg $(RETCDIR)/fhem.cfg.`date "+%Y-%m-%d_%H:%M:%S"`; fi;

@@ -12,20 +12,18 @@
 ### END INIT INFO
 
 set -e
-
-fhz=/usr/bin/fhem.pl
-conf=/etc/fhem.cfg
+cd /opt/fhem
 port=7072
 
 case "$1" in
 'start')
         echo "Starting fhem..."
-        $fhz $conf
+        perl fhem.pl fhem.cfg
         RETVAL=$?
         ;;
 'stop')
         echo "Stopping fhem..."
-        $fhz $port "shutdown"
+        perl fhem.pl $port "shutdown"
         RETVAL=$?
         ;;
 'status')
