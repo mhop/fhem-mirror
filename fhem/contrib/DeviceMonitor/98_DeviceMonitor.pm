@@ -40,7 +40,7 @@ sub DeviceMonitor_Notify($$)
 # Purpose: Checks for timeout - Notify reacts on triggers fired from the Device
 # Author : Dennis Gnoyke
 # Date   : 21.10.2012
-# Changes: 27.10.2012 GN Code optimized
+# Changes: 27.10.2012 GN Code optimized, Events reduced
 # Remarks: EXPERIMENTAL VERSION !!!!!!!
 # 
 #**************************** Begin of Code *************************************	
@@ -49,7 +49,8 @@ sub DeviceMonitor_Notify($$)
 	my $ownName = $ownhash->{NAME}   ; #Name of DeviceMonitor
 	my $enabled = $ownhash->{ENABLED}; #DeviceMonitor enabled ?
 	my $timeoutinterval = 0;
-
+	my $devState = "unknown";
+	
 	$timeoutinterval = AttrVal($devName, "device_timeout", "undef"); #Timeout configured ?
 	return "" if ($timeoutinterval eq "undef");
 	
@@ -66,9 +67,19 @@ sub DeviceMonitor_Notify($$)
 			$ownhash->{STATE} = "ENABLED";
 		}
 			
+	# Get current HealthState		
+	if (!defined($devhash->{HEALTH_STATE}))
+		{
+			$devState = "unknown";
+		}
+	else
+		{
+			$devState = $devhash->{HEALTH_STATE};
+		}
+		
 	if ($timeoutinterval < 1) #device_timeout set to 0
 		{
-			if (ReadingsVal($devName,"health_state","unknown") ne "unknown"){DoTrigger($devName,"health_state: unknown")};
+			if ($devState ne "unknown"){DoTrigger($devName,"health_state: unknown")};
 			$devhash->{HEALTH_STATE} = "unknown";
 			$devhash->{HEALTH_TIME} = TimeNow();
 			$ownhash->{READINGS}{$devName}{VAL} = "unknown";
@@ -76,7 +87,7 @@ sub DeviceMonitor_Notify($$)
 		}
 	else 
 		{
-			if (ReadingsVal($devName,"health_state","unknown") ne "alive"){DoTrigger($devName,"health_state: alive")};
+			if ($devState ne "alive"){DoTrigger($devName,"health_state: alive")};
 			RemoveInternalTimer($devhash);
 			$devhash->{HEALTH_STATE} = "alive";
 			$devhash->{HEALTH_TIME} = TimeNow();
