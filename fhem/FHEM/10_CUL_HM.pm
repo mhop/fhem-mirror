@@ -422,7 +422,7 @@ CUL_HM_Parse($$)
   } 
   elsif($model eq "HM-CC-TC") {  ####################################
     my ($sType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/);
-    if($cmd eq "8670" && $p =~ m/^(....)(..)/) {# weather event
+    if($msgType eq "70" && $p =~ m/^(....)(..)/) {# weather event
 	  $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
       $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
@@ -430,22 +430,23 @@ CUL_HM_Parse($$)
       push @event, "measured-temp:$t";
       push @event, "humidity:$h";
     }
-    elsif($cmd eq "A258" && $p =~ m/^(..)(..)/) {#climate event
+    elsif($msgType eq "58" && $p =~ m/^(..)(..)/) {#climate event
 	  $chn = '02'; # fix definition
       my (   $d1,     $vp) = # adjust_command[0..4] adj_data[0..250]
          (    $1, hex($2));
       $vp = int($vp/2.56+0.5);   # valve position in %
-      push @event, "actuator:$vp %";
+      #push @event, "actuator:$vp %";remove from TC
 
       # Set the valve state too, without an extra trigger
       if($dhash) {
+	    DoTrigger($dname,'ValvePosition: changeTo '.$vp.'%');
         $dhash->{STATE} = "$vp %";
         $dhash->{READINGS}{state}{TIME} = $tn;
         $dhash->{READINGS}{state}{VAL} = "$vp %";
       }
     }
     # 0403 167DE9 01 05 05 16 0000 windowopen-temp chan 03, dev 167DE9 on slot 01
-    elsif($cmd eq "A410" && $p =~ m/^0403(......)(..)0505(..)0000/) {
+    elsif($msgType eq "10" && $p =~ m/^0403(......)(..)0505(..)0000/) {
 	  # change of chn 3(window) list 5 register 5 - a peer window changed!
       my ( $tdev,   $tchan,     $v1) = (($1), hex($2), hex($3));
 	  push @event, sprintf("windowopen-temp-%d: %.1f (sensor:%s)"
@@ -453,7 +454,7 @@ CUL_HM_Parse($$)
     }
     # idea: remember  all possible 24 value-pairs per day and reconstruct list
     # everytime new values are set or received.
-    elsif($cmd eq "A410" &&
+    elsif($msgType eq "10" &&
        $p =~ m/^0402000000000(.)(..)(..)(..)(..)(..)(..)(..)(..)/) {
       # param list 5 or 6, 4 value pairs.
       my ($plist, $o1,    $v1,    $o2,    $v2,    $o3,    $v3,    $o4,    $v4) =
@@ -504,7 +505,7 @@ CUL_HM_Parse($$)
         push @event, $msg; # generate one event per day entry
       }
     } 
-	elsif($cmd eq "A410" && $p =~ m/^04020000000005(..)(..)/) {
+	elsif($msgType eq "10" && $p =~ m/^04020000000005(..)(..)/) {
       my ( $o1,    $v1) = (hex($1),hex($2));# only parse list 5 for chn 2
       my $msg;
       my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
@@ -525,16 +526,16 @@ CUL_HM_Parse($$)
 	    push @event,'param-change: offset='.$o1.', value='.$v1;
 	  }
     }
-    elsif($cmd eq "A001" && $p =~ m/^01080900(..)(..)/) {
-	  # channel is in sType for this message
-      my (   $of,     $vep) = 
-         (hex($1), hex($2));
-      push @event, "ValveErrorPosition for $dname: $vep %";
-      push @event, "ValveOffset for $dname: $of %";
-	  #set the condition in destination
-	  DoTrigger($dname,'ValveErrorPosition: changeTo '.$vep.'%');
-	  DoTrigger($dname,'ValveOffset: changeTo '.$of.'%');
-	  push @event,""; # nothing to report for TC
+    elsif($msgType eq "01"){
+      if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
+        my (   $of,     $vep) = (hex($1), hex($2));
+	    DoTrigger($dname,'ValveErrorPosition: changeTo '.$vep.'%');
+	    DoTrigger($dname,'ValveOffset: changeTo '.$of.'%');
+	    push @event,""; # nothing to report for TC
+	  }
+	  elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
+	  	push @event,""; # 
+	  }
     }
 #          ($cmd eq "A112" && $p =~ m/^0202(..)$/)) {    # Set desired temp
     elsif(($msgType eq '02' &&$sType eq '01')|| # ackStatus
@@ -753,7 +754,7 @@ CUL_HM_Parse($$)
         my $devState = $shash->{READINGS}{color}{VAL};
 	    $devState = "00000000" if (!$devState);
 		if($parse eq "powerOn"){# reset LEDs after power on
-		  CUL_HM_PushCmdStack($shash,'++A011'.$id.$src.'%s%s8100'.$devState);
+		  CUL_HM_PushCmdStack($shash,'++A011'.$id.$src."8100".$devState);
 		  CUL_HM_ProcessCmdStack($shash);
 		}
 		else {# just update datafields in storage
