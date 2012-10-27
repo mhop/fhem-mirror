@@ -8460,7 +8460,9 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
     192.168.1.5:10001
     </ul>
     <ul>
-    noninit is optional and issues that the RFXCOM device should not be initialized. This is useful if you share a RFXCOM device. It is also useful for testing to simulate a RFXCOM receiver via netcat or via FHEM2FHEM.
+    noninit is optional and issues that the RFXCOM device should not be
+    initialized. This is useful if you share a RFXCOM device. It is also useful
+    for testing to simulate a RFXCOM receiver via netcat or via FHEM2FHEM.
       <br>
       <br>
       Example: <br>
@@ -9732,7 +9734,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
     192.168.1.5:10001
     </ul>
     <ul>
-    noninit is optional and issues that the RFXtrx433 device should not be initialized. This is useful if you share a RFXtrx433 device via LAN. It is also useful for testing to simulate a RFXtrx433 receiver via netcat or via FHEM2FHEM.
+    noninit is optional and issues that the RFXtrx433 device should not be
+    initialized. This is useful if you share a RFXtrx433 device via LAN. It is
+    also useful for testing to simulate a RFXtrx433 receiver via netcat or via
+    FHEM2FHEM.
+
       <br>
       <br>
       Example: <br>
@@ -10524,12 +10530,15 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     fhem device <i>devicename</i>, just like if it would be attached to the
     local fhem.
     Drawback: only devices using the Dispatch function (CUL, FHZ, CM11,
-    SISPM, RFXCOM, TCM, TRX, TUL) generate raw messages.<br>
+    SISPM, RFXCOM, TCM, TRX, TUL) generate raw messages, and you must create a
+    FHEM2FHEM instance for each remote device.<br>
     <i>devicename</i> must exist on the local
     fhem server too with the same name and same type as the remote device, but
-    usually with the device-node "none", so it is only a dummy device.  All
-    necessary attributes (e.g. <a href="#rfmode">rfmode</a> if the remote CUL
-    is in HomeMatic mode) must also be set for the local device.
+    with the device-node "none", so it is only a dummy device. 
+    All necessary attributes (e.g. <a href="#rfmode">rfmode</a> if the remote
+    CUL is in HomeMatic mode) must also be set for the local device.
+    Do not reuse a real local device, else duplicate filtering (see dupTimeout)
+    won't work correctly.
     </li>
   </ul>
   The last parameter specifies an optional portpassword, if the remote server
@@ -10537,8 +10546,12 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <br>
   Examples:
   <ul>
-    <code>define ds1 FHEM2FHEM 192.168.0.1:7072 LOG:.*</code><br>
-    <code>define ds2 FHEM2FHEM 192.168.0.1:7072 RAW:CUL</code><br>
+    <code>define ds1 FHEM2FHEM 192.168.178.22:7072 LOG:.*</code><br>
+    <br>
+    <code>define RpiCUL CUL none 0000</code><br>
+    <code>define ds2 FHEM2FHEM 192.168.178.22:7072 RAW:RpiCUL</code><br>
+    and on the RPi (192.168.178.22):<br>
+    <code>rename CUL_0 RpiCUL</code><br>
   </ul>
   </ul>
   <br>

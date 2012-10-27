@@ -14,6 +14,7 @@
 
   <div id="logo"></div>
   <div id="menu">
+    <table><tr><td> <!-- Playing with the width -->
     <table id="room">
       <tr><td></td></tr>
       <tr><td><b>Content:</b></td></tr>
@@ -37,6 +38,7 @@
       <tr><td><a href="#License">License</a></td></tr>
       <tr><td></td></tr>
     </table>
+    </td></tr></table>
   </div>
 
 
@@ -125,7 +127,7 @@
       
       <br><br>
       Android frontends:
-      <a href="http://andFHEM.klass.li">AndFHEM</a> (native app)
+      <a href="http://andFHEM.klass.li">andFHEM</a> (native app)
     </ul>
 
 
@@ -280,9 +282,6 @@
       <div id="dist"><a href="README.contrib">contrib/README</a> describes
       some loosely coupled useful modules / scripts which can be used with
       fhem.</div>
-     
-      <div id="dist">Protocol descriptions and other useful stuff: <a
-      href="http://fhz4linux.info/">http://fhz4linux.info/</a></div>
 
     </ul>
 
@@ -294,25 +293,6 @@
       Development source at SVN@sourceforge: <a
         href="http://fhem.svn.sourceforge.net">
         http://fhem.svn.sourceforge.net</a><br>
-      <br>
-
-      Frontends:<br>
-      <ul>
-      <li>webpgm3 - A Web frontend from Martin Haas:
-        <a href="http://www.martin-haas.de/fhz">http://www.martin-haas.de/fhz</a><br>
-      <li>myHCE - A Web frontend from Martin Fischer:
-        <a href="http://www.fischer-net.de/hausautomation/myhce.html">
-        http://www.fischer-net.de/hausautomation/myhce.html</a><br>
-      <li>Frontend for the iPhone:
-        <a href="http://www.gschaden.com/wp/2009/01/18/fhem-iphone-gateway/">
-        http://www.gschaden.com/wp/2009/01/18/fhem-iphone-gateway/</a> or
-        <a href="http://www.dhs-computertechnik.de/support-iphone.html">
-        http://www.dhs-computertechnik.de/support-iphone.html</a>
-        <br>
-      <li>LinViex (home automation frontend):
-        <a href="http://sourceforge.net/projects/linviex">
-        http://sourceforge.net/projects/linviex</a><br>
-      </ul>
       <br>
 
       Device/OS Specific installation guides:<br>
@@ -373,13 +353,16 @@
           is needed <i>additionally</i> to the OS image from AVM.<br>
       <li>On the FB7270 unpack <a
           href="http://fhem.de/fhem-=VERS=-fb7390.image">this</a> zip file to a USB-Disk,
-          attach the disk to the FritzBox, log in, and strt fhem from there.
+          attach the disk to the FritzBox, log in, and start fhem from there.
       <li>See also the detailed documentation <a href="fritzbox.html">here</a>.
      </ul>
 
     <h4>Debian/Ubuntu</h4>
     <ul>
       <li>Install <a href="http://fhem.de/fhem-=VERS=.deb">this</a> package.
+      <b>Note:</b> For upgrading it is necessary to purge the old package (dpkg
+      -P fhem), as the directory structure has changed to be the same as with
+      .tar.gz or fritzbox.
     </ul>
 
     <h4>Unix / OSX</h4>
@@ -390,12 +373,7 @@
           </li>
       <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
           .tar.gz</a> package, unpack it, and change to the unpacked directory.
-      <ul>
-        <li>Option 1: start fhem directly from this directory (perl fhem.pl fhem.cfg).
-        <li>Option 2: Install it by checking the Makefile first then typing
-            make install.<br>
-            Check the installed fhem.cfg and start fhem as advised.
-      </ul>
+      <li>start fhem directly from this directory (perl fhem.pl fhem.cfg).
     </ul>
 
     <h4>Windows</h4>
@@ -421,7 +399,9 @@
     <ul>
       Copyright:<br>
       <ul>
-        <li>Rudolf Koenig (r dot koenig at koeniglich dot de)</li>
+        <li>Rudolf Koenig (r dot koenig at koeniglich dot de. Note: I <b>do
+        not</b> provide fhem-support via private mail, use the google
+        fhem-users group instead)</li>
         <li>Martin Haas (webfrontends/pgm3)</li>
         <li>Olaf Droegehorn (webfrontends/pgm5)</li>
         <li>Numerous other people with their fhem modules</li>

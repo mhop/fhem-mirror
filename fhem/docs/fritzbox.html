@@ -25,34 +25,22 @@
     <ul>
     After the CeBIT 2011 AVM released an image for the Fritz!Box7390 containing
     fhem, see <a href="http://www.avm.de/de/Service/Service-Portale/Labor/index.php"
-    >this</a> link. This image is to be installed in <i>addition</i> to the
-    normal firmware.
-    Version 19798 of this fhem-image (not the Lab firmware) configures 2 CUL
-    devices, the first one talking FS20 ("SlowRF"), the second preconfigured for
-    HomeMatic. Autoconfigure is not enabled by default, so you'll either have
-    to enable it or to enter the devices by hand.
-    <br><br>
+    >this</a> link. This image is to be installed in <b>addition</b> to the
+    normal firmware. You can upgrade/replace the normal firmware any time
+    without hurting the fhem installation and vice versa.  This fhem
+    installation configures 2 CUL devices, the first one talking FS20
+    ("SlowRF"), the second preconfigured for HomeMatic.  <br><br>
 
-    The bad news with this fhem-image is, that it will start fhem in a chroot
-    environment, i.e. you will not be able to trigger arbitrary FritzBox
-    functions out of fhem, e.g. sending mail, enabling WLAN, etc., it relies
-    only on the commands provided by a busybox copied to the chroot
-    environment.  <br><br>
+    The AVM installation will start fhem in a chroot environment, in order to
+    minimize security concerns, but this also prevents fhem to trigger
+    arbitrary FritzBox functions, e.g. sending mail, enabling WLAN, etc. wont
+    be possible from fhem.<br><br>
 
-    <a href="fhem-=VERS=-fb7390.image">This</a> image from fhem.de contains a
-    stripped down version of the perl package from the AVM fhem-image, the fhem
-    package, a dfu-programmer for flashing the CUL, and a modified installation
-    script.
-
-    The main difference is starting fhem in a normal (non-chroot) environment,
-    and enabling autocreate.  When installing it, you have to confirm with an
-    extra click that it does not have a valid AVM signature. It will reuse your
-    old logfiles and configuration, unlike the "original" AVM firmware.
-    Autocreate is on, and there are <b>no</b> CUL devices defined in the initial
-    configuration, you'll have to do this manually, e.g. by following the HOWTO
-    or the command reference. 
-
-    </ul>
+    <a href="fhem-=VERS=-fb7390.image">This</a> image from fhem.de contains
+    perl from the AVM fhem-image and of course fhem, the main difference is,
+    that fhem will be started in a normal (non-chroot) environment. 
+    When installing it, you have to confirm with an extra click that it does
+    not have a valid AVM signature.  </ul>
 
 <h3>Fritz!Box 7170/7270 (as of 2011-09-03)</h3>
     <ul>
@@ -70,103 +58,10 @@
           echo "&lt;path-of-the-stick&gt;/fhem/startfhem" > /var/flash/debug.cfg
       <li>Start fhem manually with "&lt;path-of-the-stick&gt;/fhem/startfhem"
     </ul>
+    Since these devices have less memory than the FB7390, fhem may suffer from
+    memory-shortage, esp. inspecting large logs directly in the browser my lead
+    to a reboot.
     </ul>
-
-<h3>Fritz!Box 7170 in <a href="http://fhemwiki.de/index.php/AVM_Fritz!Box">fhemwiki</a></h3>
-
-<h3>Fritz!Box 7170 (from Achim, as of 2009-10-19)</h3>
-<ul>
-    <li>Flash the FritzBox with the Freetz firmware using the Fritz!Box
-    web-frontend.  As we are not allowed to offer a FritzBox binary image for
-    download, here is a mini HOWTO:<br>
-    <ul>
-    <li>Download <a
-        href="http://trac.freetz.org/downloads/freetz-1.0.3.tar.bz2">
-        http://trac.freetz.org/downloads/freetz-1.0.3.tar.bz2</a></li>
-    <li>Bunzip2 and untar the package</li>
-    <li>Copy <a href="fb7170/dotconfig">dotconfig</a> into the untarred
-        directory as .config
-    <li>Call make
-    </ul><br>
-    <li>Copy the tgz packages <a href="fb7170/apache-1.3.41.tgz">apache</a>
-      (1MB), <a href="fb7170/fhem-4.6.tgz">fhem</a> (1MB) and 
-      <a href="fb7170/perl-5.6.2.tgz">perl</a> (10MB) to the USB stick
-      and attach it to the box.<br><br>
-
-    <li>Restart the box and connect to the box using telnet, e.g. with<pre>
-        telnet 192.168.178.1</pre>
-
-    <li>Untar the packages into a new directory on the USB stick, e.g.<pre>
-      cd /var/media/ftp/uStor01/
-      mkdir fritzext
-      cd fritzext
-      tar -xvzf ../fhem-4.6.tgz
-      tar -xvzf ../perl-5.6.2.tgz
-      tar -xvzf ../apache-1.3.41.tgz</pre>
-      For the following ascii file modifications the editor nano can be used
-      which is contained in the Freetz firmware.<br><br>
-
-    <li>Adapt /var/flash/debug.cfg, and change the path to fhem:<pre>
-      /var/flash # more debug.cfg
-      export dTSB=1212687845
-      /bin/sleep 120
-      cd /var/media/ftp/uStor01/fritzext/fhem-4.5 && ./rc.fhem</pre>
-
-    <li>Adapt fhem/rc.fhem, and change the path to perl, fhem, apache:<pre>
-      #!/bin/sh
-      # "RC" script for a fhem running on the Fritz!Box from
-      # an attached usb-stick.
-
-      cd /var
-      ln -s /var/media/ftp/uStor01/fritzext/perl .
-      ln -s /var/media/ftp/uStor01/fritzext/apache-1.3.41 .
-      ln -s /var/media/ftp/uStor01/fritzext/fhem  .
-
-      export LD_LIBRARY_PATH=/var/perl/lib
-      export PATH=/var/perl/bin:$PATH
-      export PERL5LIB=/var/perl/lib/:/var/perl/perl5/:/var/perl/lib/perl5/5.6.2/
-
-      mount -o remount,rw /var/media/ftp/uStor01
-
-      swapon /var/perl/swapfile
-
-      # For CUL:
-      insmod /lib/modules/2.6.13.1-ohio/kernel/drivers/usb/serial/usbserial.ko
-      vendor=0x03eb product=0x204b
-
-      # For FHZ:
-      insmod /lib/modules/2.6.13.1-ohio/kernel/drivers/usb/serial/ftdi_sio.ko
-
-      cd /var/media/ftp/uStor01/fritzext/fhem
-      perl fhem.pl fhem.cfg
-      cd /var/
-      apache-1.3.41/apache apache-1.3.41/conf/apache.conf</pre>
-
-    <li>Adapt your fhem.cfg.  CUL can be used on /dev/ttyUSB0.<br><br>
-    <li>Restart the box
-</ul>
-
-<h3>Fritz!Box 7270 (from Volker, as of 2009-10-19)</h3>
-<ul>
-  <li>Unpack <a href="fb7270/fhem45-on-fritzbox.tgz">fhem45-on-fritzbox.tgz</a>
-    to the USB-stick.<br><br>
-  <li>Attach the USB storage (stick) to the Fritz!Box. The Fritz!Box should
-    recognize it. Now we have to modify usr/fhem/rc.fhem.<br><br>
-  <li>Login (via telnet) to the Fritz!Box with the WEB-Password<pre>
-    telnet fritz.box</pre>
-  <li>Change to the folder /var/media/ftp/*partition*/usr/fhem <br><br>
-  <li>Edit rc-cp.fhem with nvi<br>
-    (i starts editing, ESC leaves edit mode, X deletes a character, :q! quits
-    nvi without change, ; :wq saves and quits nvi)<br>
-    and adapt the mount point. This is often MassStorageDevice-Partition-0-1.
-    This script will generate some links, makes a copy of .../usr/fhem to
-    /var/usr/ and starts "perl fhem-celica.pl fhem.volker.conf" in the
-    background.<br><br>
-  <li>Run ./rc-cp.fhem in the directory usr/fhem<br>
-    <b>Note:</b>After rebooting the Fritz!Box you will have run this script
-    again.<br><br>
-
-</ul>
 
 </div>
 </body>
