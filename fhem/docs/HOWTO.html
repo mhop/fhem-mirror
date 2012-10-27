@@ -42,30 +42,45 @@
       7170/7270 <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">zip file</a>.
       <br><br>
 
-      As most fhem installations access the "outer world" via a USB device
-      connected to the fhem computer (CUL, FHZ1x00, etc), we most probably need
-      the perl serial module. See the commandref section of your USB device, if
-      this module is needed.<br><br>
+      Many fhem installations access the "outer world" via a USB device
+      connected to the fhem computer (CUL, FHZ1x00, TUL, EUL, etc), these
+      installations most probably need the perl serial module. See the
+      commandref section of your USB device, if this module is needed. You can
+      avoid this module by using a device which connects via Ethernet, e.g. a
+      HMLAN or a CUNO.  <br><br>
 
-      If yes, you can install it e.g. with <code>"sudo cpan
+      If you need this module, you can install it e.g. with <code>"sudo cpan
       Device::SerialPort"</code>. There are also precompiled debian packages
       (libdevice-serialport-perl), and this module is already installed on OSX
       10.6. If you cannot install it, you then take a look at the @directio
       option in the commandref.html as a last resort.<br><br>
 
-      The default configuration will install fhem into /usr/bin,
-      /usr/share/fhem and /var/log/fhem and /etc/fhem.cfg, according to the
-      debian/ubuntu requirments. Edit the Makefile to change this. 
+      The default configuration will install fhem into /opt/fhem, edit the
+      Makefile to change this. You can also start fhem directly from where you
+      unpacked it, installation is optional.
 
       To install & start fhem type:<pre>
-      make install-pgm2
-      perl /usr/bin/fhem.pl /etc/fhem.cfg</pre>
+      make
+      cd /opt/fhem
+      perl fhem.pl fhem.cfg</pre>
 
-      After starting, the logfile should look like:<pre>
-      2008.06.15 16:17:03 2: FHEMWEB port 8083 opened
-      2008.06.15 16:17:03 2: FHEMWEB port 8084 opened
-      2008.06.15 16:17:03 2: FHEMWEB port 8085 opened
-      2008.06.15 16:17:03 0: Server started (version ...)</pre>
+      After starting, the fhem logfile in the log directory should look like:<pre>
+      2012.10.27 17:14:28 1: Including fhem.cfg
+      2012.10.27 17:14:28 3: WEB: port 8083 opened
+      2012.10.27 17:14:28 3: WEBphone: port 8084 opened
+      2012.10.27 17:14:28 3: WEBtablet: port 8085 opened
+      2012.10.27 17:14:28 1: Including /tmp/fhem.save
+      2012.10.27 17:14:28 3: telnetPort: port 7072 opened
+      2012.10.27 17:14:28 1: usb create starting
+      2012.10.27 17:14:28 1: usb create end
+      2012.10.27 17:14:28 2: SecurityCheck:  ...
+      2012.10.27 17:14:28 0: Server started (version Fhem 5.3 ...</pre>
+
+      The SecurityCheck warning tells you, that some of the fhem interfaces are
+      opened without a passwort. You should either set a password for each
+      device (see below), or set a global attribute to disable this message if
+      you are sure passwords are not needed.
+
       </ul>
 
     <a name="attaching"></a>
@@ -79,26 +94,30 @@
       <a href="http://localhost:8084/fhem">http://fhem-host:8085/fhem</a> if
       you are using a tablet like the iPad.<br><br>
 
-      In the default configuration, fhem will look for USB attached FHZ, CUL
-      and TCM devices on startup (unix/OSX only) and will create
-      appropriate fhem devices.<br><br>
+      <b>Note:</b> On the FritzBox the default configuration enables password
+      checking on all interfaces: The username is ignored, and the passwort is
+      checked against the FritzBox password.<br><br>
 
-      On linux (esp. FB7390) it will even try to
-      flash the unflashed CUL, if it is attached at startup. See the <a
-      href="commandref.html#usb">usb</a> and <a
+      In the default configuration, fhem will look for USB attached FHZ, CUL,
+      COC, ZWave and TCM devices on startup (unix/OSX only) and will create
+      appropriate fhem devices. Make your life easier by attaching the device
+      before starting fhem.<br><br>
+
+      On linux (esp. FB7390) fhem will try to flash an unflashed CUL, if it is
+      attached at startup. See the <a href="commandref.html#usb">usb</a> and <a
       href="commandref.html#CULflash">CULflash</a> commands for details, and
-      check the "unsorted" room in FHEMWEB for the newly created
-      devices. Note that switching a CUL to HomeMatic mode is still has to be
-      done manually. Only one device is flashed per fhem-startup.<br><br>
+      check the "unsorted" room in FHEMWEB for the newly created devices. Note
+      that switching a CUL to HomeMatic mode is still has to be done manually.
+      <br><br>
 
-      For doing it manually (or if fhem failed to discover your device):
-      Attach the USB device (CUL, FHZ1000PC/FHZ1300, TUL, EUL, etc) to your
-      computer, and look for the corresponding device in the /dev
+      For defining USB Input devices manually (or if fhem failed to discover
+      your device): Attach the USB device (CUL, FHZ1000PC/FHZ1300, TUL, EUL,
+      etc) to your computer, and look for the corresponding device in the /dev
       directory. For <a href="commandref.html#CUL">CUL</a> a file named
-      /dev/ttyACM* will be created under
-      Linux and /dev/cu.usbmodem* under OS X. Note the exact name of the device.
-      Define it for fhem (by typing it in the "Fhem cmd" input field in the
-      browser):<pre>
+      /dev/ttyACM* will be created under Linux and /dev/cu.usbmodem* under OS
+      X. Note the exact name of the device.  Define it for fhem (by typing it
+      in the "Fhem cmd" input field in the browser):<pre>
+
       define CUL1 CUL /dev/ttyACM0@9600 1234</pre>
 
       You can find details about CUL define parameters <a
@@ -107,17 +126,13 @@
       The same is to be done for the <a href="commandref.html#FHZ">FHZ</a> with
       slightly different parameters:<pre>
       define FHZ1 FHZ /dev/ttyUSB0</pre>
-      For the FHZ on OSX you need to install the ftdi driver first from <a
-      href="http://www.ftdichip.com/Drivers/VCP.htm">
-      http://www.ftdichip.com/Drivers/VCP.htm</a>, the device name will be
-      /dev/cu.usbserial-xxxxxxxx.
-
-      <br><br>
       <b>Notes:</b>
       <ul>
         <li>Don't forget to type "save" in the "Fhem cmd" input field of the
         browser after defining a device or setting its attribute.  Otherwise
         the changes will disappear after the next start.
+        <li>Execute commands by typing enter in the FHEMWEB input line.
+        Clicking on the save button won't execute your command.
         <li>The CUL is arriving without a firmware. You can flash it via the
         <a href="commandref.html#CULflash">CULflash</a> command, if the
         dfu-programmer is installed. dfu-programmer is part of the FB7390 image.
@@ -127,11 +142,11 @@
     <a name="sensors"></a>
     <h3>Configuring transmitter devices (i.e. sensors)</h3>
       <ul>
-      The sample configuration file installed via "make install-pgm2" has
-      configured an <a href="commandref.html#autocreate">autocreate</a>
-      instance. This will automatically create fhem devices upon reception
-      of a message from this device (typically a sensor like S300 or FHT).
-      Just wait for a while, watch the log and re-check your browser for newly
+      Many Radio devices will be created automatically in the default
+      configuration, due to the enabled <a href="commandref.html#autocreate">
+      autocreate</a> instance. This will automatically create fhem devices upon
+      reception of a message from this device (typically a sensor like S300 or
+      FHT). Just wait for a while, watch the log and re-check your browser for newly
       appeared devices. You can use <a href="commandref.html#rename">
       rename</a> to rename the automatically created device, e.g. type in the
       input field of the web frontend:
@@ -140,10 +155,9 @@
       rename FHT_1234 fht.kitchen</pre> 
       </code></ul>
       <br>
-
-      <b>Note</b>: if you rename the device itself, the attached FileLog
-      and weblink will be renamed automatically. The other way round (renaming
-      the FileLog or weblink) will not rename the associated devices
+      <b>Note</b>: if you rename the device itself, the attached FileLog and
+      weblink will be renamed automatically. The other way round (renaming the
+      FileLog or weblink) will not rename the associated devices
       automatically.<br><br>
 
       If you want to do the same manually:<br>
@@ -172,7 +186,7 @@
       HomeMatic sensors do not need to be paired with fhem, on the other side
       fhem will only autocreate such a device, when it receives a pairing
       request. You still need to "set CUL hmPairForSec 600" to respond
-      to this request.
+      to this request. The same is valid vor ZWave devices.
       </ul>
 
     <a name="actors"></a>
@@ -191,9 +205,9 @@
 
       to get only the commands available for this device.<br><br>
 
-      Other systems (EnOcean/HomeMatic) require a more elaborate procedure, and
-      the corresponding USB device is to be set into a pairing mode first. See
-      the commandref entry for your device.
+      Other systems (EnOcean/HomeMatic/ZWave) require a more elaborate
+      procedure, and the corresponding USB device is to be set into a pairing
+      mode first. See the commandref entry for your device.
       <br><br>
 
       Creating a fhem FHT / HomeMatic / EnOcean device automatically or
@@ -353,37 +367,39 @@
     <a name="security"></a>
     <h3>Security</h3>
       <ul>
-      <li>The telnet port cannot be secured with a password. Usually this is
-          not a problem, since this port is only accessible from the secure
-          home network. Deleting the last "global" attribute from the "attr
-          global port 7073 global" (changing it to "attr global port 7073")
-          will accept only local connections (i.e.  telnet only from the fhem
-          server itself).  <br><br></li>
+      <li>Both default TCP/IP interfaces in fhem (telnet and FHEMWEB) can be
+          secured by a password and additionally with encryption (HTTPS/SSL):
+          <ul>
+            <li>for <a href="commandref.html#FHEMWEB">FHEMWEB</a> see the 
+                <a href="commandref.html#basicAuth">basicAuth</a> and 
+                <a href="commandref.html#HTTPS">HTTPS</a> attributes
+            <li>for <a href="commandref.html#telnet">telnet</a> (which is more
+                or less a TCP/IP port) see the 
+                <a href="commandref.html#password">password</a> and 
+                <a href="commandref.html#SSL">SSL</a> attributes
+          </ul>
+          This is however not the default for most default configurations, and
+          this is the reason why you receive a SecurityCheck warning after
+          installation.
+          <br><br></li>
 
-      <li>One way of secure access from the outside is to use a VPN connection.
+      <li>Another way of secure access from the outside is to use a VPN connection.
           Connecting e.g. to a FritzBox by VPN works both for iOS and Android
-          devices.
+          devices, although the latter is more complicated to set up.
           <br><br></li>
 
-      <li>Securing FHEMWEB (method 1) by using the builtin features of FHEMWEB
-          for <a href="commandref.html#basicAuth">basic</a> html authentication
-          and <a href="commandref.html#HTTPS">HTTPS</a>. The perl modules
-          needed for HTTPS are missing from the FritzBox distribution, so this
-          is not an option here.
-          <br><br></li>
-
-      <li>Securing FHEMWEB (method 2) by using apache to implement this
-        features, and redirect a certain prefix to each FHEMWEB instance.
-        Add the following lines to your httpd.conf:<pre>
-        &lt;Proxy *&gt;
-          AuthType Basic
-          AuthName "Password Required"
-          AuthUserFile /home/httpd/etc/passwd
-          Require valid-user
-          Allow from 127.0.0.1
-        &lt;/Proxy&gt;
-        ProxyPass        /fhem  http://localhost:8083/fhem
-        ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
+      <li>You can secure FHEMWEB also by using apache to implement basicAuth /
+          HTTPS by redirect a certain prefix to your FHEMWEB instance.
+          Add the following lines to your httpd.conf:<pre>
+      &lt;Proxy *&gt;
+        AuthType Basic
+        AuthName "Password Required"
+        AuthUserFile /home/httpd/etc/passwd
+        Require valid-user
+        Allow from 127.0.0.1
+      &lt;/Proxy&gt;
+      ProxyPass        /fhem  http://localhost:8083/fhem
+      ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
 
         and then restart httpd with apachectl graceful. To create the password
         file, execute<br>
@@ -407,13 +423,14 @@
     <a name="fhemweb"></a>
     <h3>FHEMWEB (pgm2) look and feel</h3>
       <ul>
-      It makes sense to group your devices into rooms by setting the room
-      attribute. FHEMWEB puts devices without a room attribute into the
+      It makes sense to group your devices into rooms by setting the room or
+      group attribute. FHEMWEB puts devices without a room attribute into the
       "Unsorted" room. Devices in the room "hidden" will not be shown.
       <br><br>
+
       You can also define a stripped down FHEMWEB instance, by defining the
-      Menu entries to be hidden in the 
-      <a href="commandref.html#hiddenroom">hiddenroom</a> FHEMWEB attribute.
+      Menu entries to be hidden in the <a
+      href="commandref.html#hiddenroom">hiddenroom</a> FHEMWEB attribute.
       <br><br>
 
       Edit the colors / fonts by changing the style.css ("Edit files" ->

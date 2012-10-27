@@ -1,10 +1,12 @@
 #!/bin/sh
 # by Matthias Bauer
 
+cd /opt/fhem
+
 case "$1" in
   start)
     echo "Starting $0"
-    fhem.pl /etc/fhem/fhem.conf
+    perl fhem.pl fhem.cfg
     ;;
   stop)
     echo "Stopping $0"

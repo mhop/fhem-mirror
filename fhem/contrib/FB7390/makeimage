@@ -8,30 +8,45 @@ if test ! -f ../../$fw.tar.gz; then
 fi
 
 rm -rf var
+echo Extracting the fritzbox template
 tar xf ../../priv/fritzbox7390_template.tar
-
 cd var
 tar zxf fhem.tar.gz
-rm -rf fhem/{FHEM,www,docs}
+rm -rf fhem/FHEM www docs
+mkdir fhem/FHEM fhem/docs
 cd ..
 
-rm -rf $fw
-tar zxf ../../$fw.tar.gz
-
-cd $fw
-cp -rp fhem.pl fhem.cfg FHEM docs www ../var/fhem
-cd ..
-
-rm -rf $fw
-rm -rf var/fhem/docs/*.{odg,pdf,man,txt}
 cp install var
 cp startfhem var/fhem
 cp fhemcmd.sh var/fhem/FHEM
 
-cd var
+
+echo Extracting $fw
+rm -rf $fw
+tar zxf ../../$fw.tar.gz
+cd $fw
+cp fhem.cfg fhem.pl ../var/fhem
+cp -rp FHEM/* ../var/fhem/FHEM
+cp docs/fhem.png docs/*.html docs/*.jpg ../var/fhem/docs
+cp -rp www ../var/fhem
+
+cd ..
+rm -rf $fw
+
+
+echo Packing again
+cd var/fhem
+cat >> fhem.cfg << 'EOF'
+attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+attr WEBphone basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+attr WEBtablet basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+attr telnetPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+EOF
+
+cd ..
 tar zcf fhem.tar.gz fhem
 rm -rf fhem
-cd ..
 
+cd ..
 tar cf $fw-fb7390.image var
 rm -rf var

@@ -11,4 +11,5 @@ stop on runlevel [016]
 expect fork
 respawn
 
-exec /usr/bin/fhem.pl /etc/fhem.cfg
+chdir /opt/fhem
+exec perl fhem.pl fhem.cfg
