@@ -27,7 +27,7 @@ tar zxf ../../$fw.tar.gz
 cd $fw
 cp fhem.cfg fhem.pl ../var/fhem
 cp -rp FHEM/* ../var/fhem/FHEM
-cp docs/fhem.png docs/*.html docs/*.jpg ../var/fhem/docs
+cp docs/*.html docs/*.jpg ../var/fhem/docs
 cp -rp www ../var/fhem
 
 cd ..

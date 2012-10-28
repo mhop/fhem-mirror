@@ -1,4 +1,4 @@
-- SVN
+- 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect, UntoggleIndirect
   - feature: added functions FB_mail, FB_WLANswitch
   - rework:  CUL_HM reworks with respect to protocol. 
