@@ -242,8 +242,10 @@ sub OWTHERM_InitializeDevice($) {
   my @args;
   
   #-- more colorful alarm signatures
-  CommandAttr (undef,"$name stateAL <span style=\"color:red\">&#x25BE;</span>");
-  CommandAttr (undef,"$name stateAH <span style=\"color:red\">&#x25B4;</span>");
+  CommandAttr (undef,"$name stateAL <span style=\"color:red\">&#x25BE;</span>")
+     if( !defined($attr{$name}{"stateAL"} ));
+  CommandAttr (undef,"$name stateAH <span style=\"color:red\">&#x25B4;</span>")
+     if( !defined($attr{$name}{"stateAH"} ));
   
   #-- unit attribute defined ?
   $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
