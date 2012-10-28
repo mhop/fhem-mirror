@@ -257,10 +257,14 @@ sub OWAD_InitializeDevice($) {
   my $name   = $hash->{NAME};
   
   #-- more colorful alarm signatures
-  CommandAttr (undef,"$name stateAL1 <span style=\"color:red\">&#x25BE;</span>");
-  CommandAttr (undef,"$name stateAH1 <span style=\"color:red\">&#x25B4;</span>");
-  CommandAttr (undef,"$name stateAL0 <span style=\"color:green\">&#x25BE;</span>");
-  CommandAttr (undef,"$name stateAH0 <span style=\"color:green\">&#x25B4;</span>");
+  CommandAttr (undef,"$name stateAL1 <span style=\"color:red\">&#x25BE;</span>")
+     if( !defined($attr{$name}{"stateAL1"} ));
+  CommandAttr (undef,"$name stateAH1 <span style=\"color:red\">&#x25B4;</span>")
+     if( !defined($attr{$name}{"stateAH1"} ));
+  CommandAttr (undef,"$name stateAL0 <span style=\"color:green\">&#x25BE;</span>")
+     if( !defined($attr{$name}{"stateAL0"} ));
+  CommandAttr (undef,"$name stateAH0 <span style=\"color:green\">&#x25B4;</span>")
+     if( !defined($attr{$name}{"stateAH0"} ));
   
   #-- Initial readings 
   @owg_val   = (0.0,0.0,0.0,0.0);

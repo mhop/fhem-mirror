@@ -253,7 +253,8 @@ sub OWSWITCH_InitializeDevice($) {
   my $name   = $hash->{NAME};
    
   #-- more colorful shortening signature
-  CommandAttr (undef,"$name stateS <span style=\"color:red\">&#x2607;</span>");   
+  CommandAttr (undef,"$name stateS <span style=\"color:red\">&#x2607;</span>")
+   if( !defined($attr{$name}{"stateS"} ));
    
   #-- Set channel names, channel units 
   for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
