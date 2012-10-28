@@ -203,6 +203,7 @@ CUL_HM_Initialize($)
   $hash->{ParseFn}   = "CUL_HM_Parse";
   $hash->{SetFn}     = "CUL_HM_Set";
   $hash->{GetFn}     = "CUL_HM_Get";
+  $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 ".
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
@@ -285,6 +286,26 @@ CUL_HM_Undef($$)
   }
   delete($modules{CUL_HM}{defptr}{$HMid});
   return undef;
+}
+#############################
+sub
+CUL_HM_Rename($$$)
+{
+  #my ($hash, $name,$newName) = @_;
+  my ($name, $oldName) = @_;
+  my $HMid = CUL_HM_Name2Id($name);
+  if (length($HMid) == 8){# we are channel, inform the device
+    $attr{$name}{chanNo} = substr($HMid,6,2);
+	my $device = AttrVal($name, "device", "");
+	$attr{$device}{"channel_".$attr{$name}{chanNo}} = $name if ($device);
+  }
+  else{# we are a device - inform channels if exist
+    for (my$chn = 1; $chn <25;$chn++){
+	  my $chnName = AttrVal($name, sprintf("channel_%02X",$chn), "");
+	  $attr{$chnName}{device} = $name if ($chnName);
+	}
+  }
+  return;
 }
 
 #############################
@@ -435,14 +456,14 @@ CUL_HM_Parse($$)
       my (   $d1,     $vp) = # adjust_command[0..4] adj_data[0..250]
          (    $1, hex($2));
       $vp = int($vp/2.56+0.5);   # valve position in %
-      #push @event, "actuator:$vp %";remove from TC
+      push @event, "actuator:$vp %";
 
       # Set the valve state too, without an extra trigger
       if($dhash) {
-	    DoTrigger($dname,'ValvePosition: changeTo '.$vp.'%');
+	    DoTrigger($dname,'ValvePosition:set_'.$vp.'%');
         $dhash->{STATE} = "$vp %";
         $dhash->{READINGS}{state}{TIME} = $tn;
-        $dhash->{READINGS}{state}{VAL} = "$vp %";
+        $dhash->{READINGS}{state}{VAL} = "set_$vp %";
       }
     }
     # 0403 167DE9 01 05 05 16 0000 windowopen-temp chan 03, dev 167DE9 on slot 01
@@ -529,8 +550,10 @@ CUL_HM_Parse($$)
     elsif($msgType eq "01"){
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
-	    DoTrigger($dname,'ValveErrorPosition: changeTo '.$vep.'%');
-	    DoTrigger($dname,'ValveOffset: changeTo '.$of.'%');
+      push @event, "ValveErrorPosition for $dname: $vep %";
+      push @event, "ValveOffset for $dname: $of %";
+	    DoTrigger($dname,'ValveErrorPosition:set_'.$vep.'%');
+	    DoTrigger($dname,'ValveOffset:set_'.$of.'%');
 	    push @event,""; # nothing to report for TC
 	  }
 	  elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
@@ -560,7 +583,7 @@ CUL_HM_Parse($$)
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = ($2,hex($3), hex($4));
       $vp = int($vp)/2;   # valve position in %
-      push @event, "actuator:$vp %";
+      push @event, "ValvePosition:$vp%";
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
@@ -594,8 +617,8 @@ CUL_HM_Parse($$)
 	#        => Link discriminator (00000000) is fixed
     elsif($msgType eq "10" && $p =~ m/^0401000000000509(..)0A(..)/) {
       my (    $of,     $vep) = (hex($1), hex($2));
-      push @event, "ValveErrorPosition: $vep%";
-      push @event, "ValveOffset: $of%";
+      push @event, "ValveErrorPosition:$vep%";
+      push @event, "ValveOffset:$of%";
     }
   
   } 
@@ -719,9 +742,7 @@ CUL_HM_Parse($$)
 
       if($id eq $dst) {  # Send Ack
         CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".
-                ($state =~ m/on/?"C8":"00")."00", 1, 0);#todo why that???
-				                         # did someone simulate an actor?
-										 # a normal ack should do - or?
+                ($state =~ m/on/?"C8":"00")."00", 1, 0);#Actor simulation
       }
       $sendAck = ""; #todo why is this special?
     }
@@ -2052,7 +2073,7 @@ CUL_HM_Set($@)
 	my $pressCnt = (!$hash->{helper}{count})?1:$hash->{helper}{count}+1;
 	$pressCnt %= 256;
 	my @peerList;
-	foreach my $peer (sort(split(',',$attr{$name}{peerList}))) {
+	foreach my $peer (sort(split(',',AttrVal($name,"peerList","")))) {
 	  $peer =~ s/ .*//;
 	  push (@peerList,substr(CUL_HM_Name2Id($peer),0,6));
 	}
@@ -2287,7 +2308,12 @@ CUL_HM_SendCmd($$$$)
 
   if($mn eq "++") {
     $mn = $io->{HM_CMDNR} ? (($io->{HM_CMDNR} +1)&0xff) : 1;
-  } else {
+  } 
+  elsif($cmd =~ m/^[+-]/){; #continue pure
+    IOWrite($hash, "", $cmd);
+	return;
+  }
+  else {
     $mn = hex($mn);
   }
   $io->{HM_CMDNR} = $mn;
@@ -2335,7 +2361,7 @@ CUL_HM_responseSetup($$$)
 	  $hash->{helper}{respWait}{forPeer}= $peerID;# this is the HMid + channel
       
       # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);#todo General change timer to 1.5
+	  InternalTimer(gettimeofday()+$rTo,"CUL_HM_respPendTout","respPend:$dst", 0);
 	  #--- remove channel entries that will be replaced
       my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"};
       $chnhash = $hash if(!$chnhash);   
@@ -2412,7 +2438,7 @@ CUL_HM_respPendTout($)
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
-	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");#Generel - keep it?
+	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");
   }
 }
 ###################################
