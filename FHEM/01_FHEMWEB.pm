@@ -1186,25 +1186,6 @@ FW_fileList($)
   return sort @ret;
 }
 
-# return a hash name -> path of actual files for a given regexp
-sub
-FW_fileHash($)
-{
-  my ($fname) = @_;
-  $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
-  my ($dir,$re) = ($1, $2);
-  return if(!$re);
-  $re =~ s/%./[A-Za-z0-9]*/g;
-  my %ret;
-  return %ret if(!opendir(DH, $dir));
-  while(my $f = readdir(DH)) {
-    next if($f !~ m,^$re$,);
-    $ret{$f}= "${dir}/${f}";
-  }
-  closedir(DH);
-  return %ret;
-}
-
 ######################
 # Show the content of the log (plain text), or an image and offer a link
 # to convert it to a weblink
@@ -1691,24 +1672,41 @@ FW_calcWeblink($$)
 }
 
 ##################
-#
 sub
-FW_pFileHash($%) {
+FW_displayFileList($@)
+{
+  my ($heading,@files)= @_;
+  FW_pO "$heading<br>";
+  FW_pO "<table class=\"block\" id=\"at\">";
+  my $row = 0;
+  foreach my $f (@files) {
+    FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
+    FW_pH "cmd=style edit $f", $f, 1;
+    FW_pO "</tr>";
+    $row = ($row+1)%2;
+  }
+  FW_pO "</table>";
+  FW_pO "<br>";
+} 
 
-    my ($heading,%files)= @_;
-    FW_pO "$heading<br>";
-    FW_pO "<table class=\"block\" id=\"at\">";
-    my $row = 0;
-    my @filenames= sort keys %files;
-    foreach my $filename (@filenames) {
-      FW_pO "<tr class=\"" . ($row?"odd":"even") . "\">";
-      FW_pH "cmd=style edit $files{$filename}", $filename, 1;
-      FW_pO "</tr>";
-      $row = ($row+1)%2;
-    }
-    FW_pO "</table>";
-    FW_pO "<br>";
- } 
+##################
+sub
+FW_fileNameToPath($)
+{
+  my $name = shift;
+
+  $attr{global}{configfile} =~ m,([^/]*)$,;
+  my $cfgFileName = $1;
+  if($name eq $cfgFileName) {
+    return $attr{global}{configfile};
+  } elsif($name =~ m/.*(css|svg)$/) {
+    return "$FW_cssdir/$name";
+  } elsif($name =~ m/.*gplot$/) {
+    return "$FW_gplotdir/$name";
+  } else {
+    return "$MW_dir/$name";
+  }
+}
 
 ##################
 # List/Edit/Save css and gnuplot files
@@ -1722,27 +1720,18 @@ FW_style($$)
   my $end   = "</td></tr></table></div>";
   
   if($a[1] eq "list") {
-
-    #
-    # list files for editing
-    #
-    my %files;
-
     FW_pO $start;
     FW_pO "$msg<br><br>" if($msg);
 
-    %files= ("global configuration" => $attr{global}{configfile} );
-    FW_pFileHash("configuration", %files);
-
-    %files= FW_fileHash("$MW_dir/.*(sh|Util.*|cfg|holiday)");
-    FW_pFileHash("modules and other files", %files);
-
-    %files= FW_fileHash("$FW_cssdir/.*.(css|svg)");
-    FW_pFileHash("styles", %files);
-
-    %files= FW_fileHash("$FW_gplotdir/.*.gplot");
-    FW_pFileHash("gplot files", %files);
-
+    $attr{global}{configfile} =~ m,([^/]*)$,;
+    my $cfgFileName = $1;
+    FW_displayFileList("config file", $cfgFileName);
+    FW_displayFileList("Own modules and helper files",
+        FW_fileList("$MW_dir/^(.*sh|[0-9][0-9].*Util.*pm|.*cfg|.*holiday)\$"));
+    FW_displayFileList("styles",
+        FW_fileList("$FW_cssdir/^.*(css|svg)\$"));
+    FW_displayFileList("gplot files",
+        FW_fileList("$FW_gplotdir/^.*gplot\$"));
     FW_pO $end;
 
 
@@ -1774,23 +1763,11 @@ FW_style($$)
 
   } elsif($a[1] eq "edit") {
 
-    #
-    # edit a file
-    #
-    #$a[2] =~ s,/,,g;    # little bit of security
-    #my $f = ($a[2] eq "fhem.cfg" ? $attr{global}{configfile} :
-    #                               "$FW_dir/$a[2]");
-#     my $f;
-#     if($a[2] eq "fhem.cfg") {
-#       $f = $attr{global}{configfile};
-#     } elsif ($a[2] =~ m/.*(sh|Util.*|cfg|holiday)/ && $a[2] ne "fhem.cfg") {
-#       $f = "$MW_dir/$a[2]";
-#     } else {
-#       $f = "$FW_dir/$a[2]";
-#     }
-    my $fullname= $a[2];
-    if(!open(FH, $fullname)) {
-      FW_pO "$fullname: $!";
+    my $fileName = $a[2]; 
+    $fileName =~ s,.*/,,g;        # Little bit of security
+    my $filePath = FW_fileNameToPath($fileName);
+    if(!open(FH, $filePath)) {
+      FW_pO "<div id=\"content\">$filePath: $!</div>";
       return;
     }
     my $data = join("", <FH>);
@@ -1799,39 +1776,36 @@ FW_style($$)
     my $ncols = $FW_ss ? 40 : 80;
     FW_pO "<div id=\"content\">";
     FW_pO "<form>";
-    my $basename= $fullname;
-    $basename =~ s,^.*/,,;
-    FW_pO     FW_submit("save", "Save $basename");
+    FW_pO     FW_submit("save", "Save $fileName");
     FW_pO     "&nbsp;&nbsp;";
     FW_pO     FW_submit("saveAs", "Save as");
-    FW_pO     FW_textfieldv("saveName", 30, "saveName", $fullname);
+    FW_pO     FW_textfieldv("saveName", 30, "saveName", $fileName);
     FW_pO     "<br><br>";
-    FW_pO     FW_hidden("cmd", "style save $fullname");
+    FW_pO     FW_hidden("cmd", "style save $fileName");
     FW_pO     "<textarea name=\"data\" cols=\"$ncols\" rows=\"30\">" .
                 "$data</textarea>";
     FW_pO   "</form>";
     FW_pO "</div>";
 
   } elsif($a[1] eq "save") {
-    my $fName = $a[2];
-    # I removed all that special treatment since $fName now contains the full original filename
-    # this means that one can in principle overwrite any file in the file system if fhem
-    # runs with too many rights, e.g. if run as root!
-
-    $fName = $FW_webArgs{saveName}
+    my $fileName = $a[2];
+    $fileName = $FW_webArgs{saveName}
         if($FW_webArgs{saveAs} && $FW_webArgs{saveName});
+    $fileName =~ s,.*/,,g;        # Little bit of security
+    my $filePath = FW_fileNameToPath($fileName);
 
-    if(!open(FH, ">$fName")) {
-      FW_pO "$fName: $!";
+    if(!open(FH, ">$filePath")) {
+      FW_pO "<div id=\"content\">$filePath: $!</div>";
       return;
     }
     $FW_data =~ s/\r//g if($^O !~ m/Win/);
     binmode (FH);
     print FH $FW_data;
     close(FH);
-    my $ret = FW_fC("rereadcfg") if($fName eq $attr{global}{configfile});
-    $ret = FW_fC("reload $1") if($fName =~ m,.*/([^/]*).pm,);
-    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fName");
+
+    my $ret = FW_fC("rereadcfg") if($filePath eq $attr{global}{configfile});
+    $ret = FW_fC("reload $fileName") if($fileName =~ m,\.pm$,);
+    $ret = ($ret ? "<h3>ERROR:</h3><b>$ret</b>" : "Saved the file $fileName");
     FW_style("style list", $ret);
     $ret = "";
 
