@@ -17,7 +17,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.24 - October, 2012
+# Version 2.25 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -52,9 +52,11 @@
 #
 # attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
+# attr <name> stateS <string> = character string denoting external shortening condition, default is (ext)
+#                                        overwritten by an attribute setting "red angled arrow downwward"
+#
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit <string>|<string> = values to display in state variable for on|off condition
-# attr <name> <channel>stateS <string> = character string denoting external shortening condition
 #
 ########################################################################################
 #
@@ -138,14 +140,13 @@ sub OWSWITCH_Initialize ($) {
   $hash->{SetFn}   = "OWSWITCH_Set";
 
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406,DS2408 loglevel:0,1,2,3,4,5 ".
-    "event:on-update,on-change";
+    "event:on-update,on-change stateS ";
  
  #TODO: correct number of channels
  
   for( my $i=0;$i<8;$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Unit";
-    $attlist .= " ".$owg_fixed[$i]."stateS";
   }
   $hash->{AttrList} = $attlist; 
 }
@@ -251,6 +252,9 @@ sub OWSWITCH_InitializeDevice($) {
   
   my $name   = $hash->{NAME};
    
+  #-- more colorful shortening signature
+  CommandAttr (undef,"$name stateS <span style=\"color:red\">&#x2607;</span>");   
+   
   #-- Set channel names, channel units 
   for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
     #-- Initial readings OFF
@@ -312,9 +316,12 @@ sub OWSWITCH_FormatValues($) {
   my $name    = $hash->{NAME}; 
   my ($offset,$factor,$vval,$vvax,$vstr,$cname,@cnama,@unarr);
   my ($value1,$value2,$value3)   = ("","","");
-
+  
   my $tn = TimeNow();
   
+  #-- external shortening signature
+  my $sname = defined($attr{$name}{"stateS"})  ? $attr{$name}{"stateS"} : "(ext)";  
+
   #-- formats for output
   for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
     $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i];  
@@ -328,9 +335,9 @@ sub OWSWITCH_FormatValues($) {
  
     #-- string buildup for return value and STATE
     @unarr= split(/\|/,$hash->{READINGS}{"$owg_channel[$i]"}{UNIT});
-    $cname = defined($attr{$name}{$owg_fixed[$i]."stateS"})  ? $attr{$name}{$owg_fixed[$i]."stateS"} : "<span style=\"color:red\">&#x2607;</span>";  
+   
     $vstr    = $unarr[$vval];
-    $vstr   .= $cname if( ($vval == 0) && ($vvax == 1) );
+    $vstr   .= $sname if( ($vval == 0) && ($vvax == 1) );
     $vstr    = "ERR"  if( ($vval == 1) && ($vvax == 0) );
     
     $value1 .= sprintf( "%s: %s", $owg_channel[$i], $vstr);
@@ -623,8 +630,8 @@ sub OWSWITCH_Set($@) {
   #-- set state
   }elsif( $key eq "gpio" ){
     #-- check value and write to device
-    return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= ".(1 << $cnumber{$attr{$name}{"model"}} - 1)
-      if( ! ((int($value) >= 0) && (int($value) <= (1 << $cnumber{$attr{$name}{"model"}} -1 ))) );
+    return "OWSWITCH: Set with wrong value for gpio port, must be 0 <= gpio <= ".((1 << $cnumber{$attr{$name}{"model"}})-1)
+      if( ! ((int($value) >= 0) && (int($value) <= ((1 << $cnumber{$attr{$name}{"model"}})-1 ))) );
      
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_SetState($hash,int($value));

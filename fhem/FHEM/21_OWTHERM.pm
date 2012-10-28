@@ -45,8 +45,10 @@
 #
 # attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
-# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is red down triangle
-# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is red up triangle
+# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is (-),
+#             overwritten by attribute setting red down triangle
+# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is (+), 
+#             overwritten by attribute setting red up triangle
 # attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
 # attr <name> tempLow   <float>    = value for low alarm 
@@ -239,8 +241,9 @@ sub OWTHERM_InitializeDevice($) {
   my $name   = $hash->{NAME};
   my @args;
   
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "<span style=\"color:red\">&#x25BE;</span>";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "<span style=\"color:red\">&#x25B4;</span>";
+  #-- more colorful alarm signatures
+  CommandAttr (undef,"$name stateAL <span style=\"color:red\">&#x25BE;</span>");
+  CommandAttr (undef,"$name stateAH <span style=\"color:red\">&#x25B4;</span>");
   
   #-- unit attribute defined ?
   $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
@@ -278,8 +281,8 @@ sub OWTHERM_FormatValues($) {
   my $tn = TimeNow();
   
   #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "<span style=\"color:red\">&#x25BE;</span>";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "<span style=\"color:red\">&#x25B4;</span>";
+  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "(-)";
+  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "(+)";
   $unit   = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
   $offset = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
   $factor = 1.0;

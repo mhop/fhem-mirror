@@ -16,7 +16,7 @@
 #
 # Prof. Dr. Peter A. Henning, 2012
 # 
-# Version 2.24 - October, 2012
+# Version 2.25 - October, 2012
 #   
 # Setup bus device in fhem.cfg as
 #
@@ -44,10 +44,14 @@
 #
 # attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
-# attr <name> stateAL0  "<string>"     = character string for denoting low normal condition, default is green down triangle
-# attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is green up triangle
-# attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is red down triangle
-# attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is red up triangle
+# attr <name> stateAL0  "<string>"     = character string for denoting low normal condition, default is empty, 
+#             overwritten by attribute setting green down triangle
+# attr <name> stateAH0  "<string>"     = character string for denoting high normal condition, default is empty, 
+#             overwritten by attribute setting green up triangle
+# attr <name> stateAL1  "<string>"     = character string for denoting low alarm condition, default is l, 
+#             overwritten by attributre setting red down triangle
+# attr <name> stateAH1  "<string>"     = character string for denoting high alarm condition, default is h, 
+#             overwritten by attributre setting red up triangle
 # attr <name> <channel>Name   <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit   <string>|<string> = unit of measurement for this channel | its abbreviation 
 # attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
@@ -102,8 +106,6 @@ my @owg_shigh;
 #-- alarm values - always the raw values committed to the device
 my @owg_vlow;
 my @owg_vhigh;
-#-- variables for display strings
-my ($stateal1,$stateah1,$stateal0,$stateah0);
 
 my %gets = (
   "id"          => "",
@@ -254,10 +256,11 @@ sub OWAD_InitializeDevice($) {
   
   my $name   = $hash->{NAME};
   
-  $stateal1 = defined($attr{$name}{stateAL1}) ? $attr{$name}{stateAL1} : "<span style=\"color:red\">&#x25BE;</span>";
-  $stateah1 = defined($attr{$name}{stateAH1}) ? $attr{$name}{stateAH1} : "<span style=\"color:red\">&#x25B4;</span>";
-  $stateal0 = defined($attr{$name}{stateAL0}) ? $attr{$name}{stateAL0} : "<span style=\"color:green\">&#x25BE;</span>";
-  $stateah0 = defined($attr{$name}{stateAH0}) ? $attr{$name}{stateAH0} : "<span style=\"color:green\">&#x25B4;</span>";
+  #-- more colorful alarm signatures
+  CommandAttr (undef,"$name stateAL1 <span style=\"color:red\">&#x25BE;</span>");
+  CommandAttr (undef,"$name stateAH1 <span style=\"color:red\">&#x25B4;</span>");
+  CommandAttr (undef,"$name stateAL0 <span style=\"color:green\">&#x25BE;</span>");
+  CommandAttr (undef,"$name stateAH0 <span style=\"color:green\">&#x25B4;</span>");
   
   #-- Initial readings 
   @owg_val   = (0.0,0.0,0.0,0.0);
@@ -345,6 +348,12 @@ sub OWAD_FormatValues($) {
   my $galarm = 0;
 
   my $tn = TimeNow();
+  
+  #-- alarm signatures
+  my $stateal1 = defined($attr{$name}{stateAL1}) ? $attr{$name}{stateAL1} : "l";
+  my $stateah1 = defined($attr{$name}{stateAH1}) ? $attr{$name}{stateAH1} : "h";
+  my $stateal0 = defined($attr{$name}{stateAL0}) ? $attr{$name}{stateAL0} : "";
+  my $stateah0 = defined($attr{$name}{stateAH0}) ? $attr{$name}{stateAH0} : "";
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
