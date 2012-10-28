@@ -126,8 +126,9 @@ sub CommandTrigger($$);
 # GetFn    - get some data from this device
 # StateFn  - set local info for this device, do not activate anything
 # NotifyFn - call this if some device changed its properties
-# ReadyFn - check for available data, if no FD
-# ReadFn - Reading from a Device (see FHZ/WS300)
+# RenameFn - inform the device about its renameing
+# ReadyFn  - check for available data, if no FD
+# ReadFn   - Reading from a Device (see FHZ/WS300)
 
 #Special values in %defs:
 # TYPE    - The name of the module it belongs to
@@ -1553,6 +1554,8 @@ CommandRename($$)
 
   $oldvalue{$new} = $oldvalue{$old} if(defined($oldvalue{$old}));
   delete($oldvalue{$old});
+
+  CallFn($new, "RenameFn", $new,$old);# ignore replies
 
   DoTrigger("global", "RENAMED $old $new");
   return undef;
