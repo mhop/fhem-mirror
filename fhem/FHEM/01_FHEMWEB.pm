@@ -2427,16 +2427,17 @@ FW_Get($@)
   $FW_wname= $hash->{NAME};
   %FW_icons= %{$hash->{fhemIcons}};
 
-  if($a[1] eq "icon") {
+  my $arg = (defined($a[1]) ? $a[1] : "");
+  if($arg eq "icon") {
     return "need one icon as argument" if(int(@a) != 3);
     my $icon= FW_IconPath($a[2]);
     return defined($icon) ? $icon : "no such icon";
 
-  } elsif($a[1] eq "pathlist") {
+  } elsif($arg eq "pathlist") {
     return FW_PathList();
 
   } else {
-    return "Unknown argument $a[1], choose one of icon pathlist";
+    return "Unknown argument $arg choose one of icon pathlist";
 
   }
 }
