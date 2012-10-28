@@ -13,7 +13,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.24 - October, 2012
+# Version 2.25 - October, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -616,93 +616,100 @@ sub OWX_Discover ($) {
       }
     }
   }
+  
   #-- Go through all devices found on this bus
-    foreach my $owx_dev  (@owx_devs) {
-      #-- three pieces of the ROM ID found on the bus
-      my $owx_rnf = substr($owx_dev,3,12);
-      my $owx_f   = substr($owx_dev,0,2);
-      my $owx_crc = substr($owx_dev,15,3);
-      my $id_owx  = $owx_f.".".$owx_rnf;
-      
-      my $match = 0;
-    
-      #-- Check against all existing devices  
-      foreach my $fhem_dev (sort keys %main::defs) { 
-        #-- skip if busmaster
-        # next if( $hash->{NAME} eq $main::defs{$fhem_dev}{NAME} );
-        #-- all OW types start with OW
-        next if(      substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
-        my $id_fhem = substr($main::defs{$fhem_dev}{ROM_ID},0,15);
-        #-- skip interface device
-        next if( length($id_fhem) != 15 );
-        #-- testing if equal to the one found here  
-        #   even with improper family
-        #   Log 1, " FHEM-Device = ".substr($id_fhem,3,12)." OWX discovered device ".substr($id_owx,3,12);
-        if( substr($id_fhem,3,12) eq substr($id_owx,3,12) ) {
-          #-- warn if improper family id
-          if( substr($id_fhem,0,2) ne substr($id_owx,0,2) ){
-            Log 1, "OWX: Warning, $fhem_dev is defined with improper family id ".substr($id_fhem,0,2). 
-             ", correcting to ".substr($id_owx,0,2);
-             $main::defs{$fhem_dev}{OW_FAMILY} = substr($id_owx,0,2);
-          }
-          push(@owx_names,$main::defs{$fhem_dev}{NAME});
-          #-- replace the ROM ID by the proper value including CRC
-          $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
-          $main::defs{$fhem_dev}{PRESENT}=1;    
-          $match = 1;
-          last;
-        }
-        #
-      }
-    
-      #-- autocreate the device
-      if( $match==0 ){
-        #-- Default name OWX_FF_XXXXXXXXXXXX, default type = OWX_FF
-        my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
-        #-- Family 10 = Temperature sensor, assume DS1820 as default
-        if( $owx_f eq "10" ){
-          CommandDefine(undef,"$name OWTHERM DS1820 $owx_rnf");  
-        #-- Family 12 = Switch, assume DS2406 as default
-        }elsif( $owx_f eq "12" ){
-          CommandDefine(undef,"$name OWSWITCH DS2406 $owx_rnf");     
-        #-- Family 1D = Counter/RAM, assume DS2423 as default
-        }elsif( $owx_f eq "1D" ){
-          CommandDefine(undef,"$name OWCOUNT DS2423 $owx_rnf");            
-        #-- Family 20 = A/D converter, assume DS2450 as default
-        } elsif( $owx_f eq "20" ){
-          CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
-        #-- Family 22 = Temperature sensor, assume DS1822 as default
-        }elsif( $owx_f eq "22" ){
-          CommandDefine(undef,"$name OWTHERM DS1822 $owx_rnf");  
-        #-- Family 26 = Multisensor, assume DS2438 as default
-        }elsif( $owx_f eq "26" ){
-          CommandDefine(undef,"$name OWMULTI DS2438 $owx_rnf");  
-        #-- Family 28 = Temperature sensor, assume DS18B20 as default
-        }elsif( $owx_f eq "28" ){
-          CommandDefine(undef,"$name OWTHERM DS18B20 $owx_rnf");   
-        #-- Family 29 = Switch, assume DS2408 as default
-        }elsif( $owx_f eq "29" ){
-          CommandDefine(undef,"$name OWSWITCH DS2408 $owx_rnf");   
-        #-- Family 3A = Switch, assume DS2413 as default
-        }elsif( $owx_f eq "3A" ){
-          CommandDefine(undef,"$name OWSWITCH DS2413 $owx_rnf");   
-        #-- Family FF = LCD display    
-        }elsif( $owx_f eq "FF" ){
-          CommandDefine(undef,"$name OWLCD $owx_rnf");       
-        #-- All unknown families are ID only (ID-Chips have family id 09)
-        } else {
-          CommandDefine(undef,"$name OWID $owx_f $owx_rnf");   
-        }
-        #-- yes, it is on the bus and therefore present
-        push(@owx_names,$name);
-        $main::defs{$name}{PRESENT}=1;
-        #-- THIS IODev, default room
-        CommandAttr (undef,"$name IODev $hash->{NAME}"); 
-        CommandAttr (undef,"$name room OWX"); 
-        #-- replace the ROM ID by the proper value 
-        $main::defs{$name}{ROM_ID}=$owx_dev;
-      }
+  foreach my $owx_dev  (@owx_devs) {
+    #-- ignore those which do not have the proper pattern
+    if( !($owx_dev =~ m/[0-9A-F]{2}\.[0-9A-F]{12}\.[0-9A-F]{2}/) ){
+      Log 3,"OWX: Invalid 1-Wire device ID $owx_dev, ignoring it";
+      next;
     }
+    
+    #-- three pieces of the ROM ID found on the bus
+    my $owx_rnf = substr($owx_dev,3,12);
+    my $owx_f   = substr($owx_dev,0,2);
+    my $owx_crc = substr($owx_dev,15,3);
+    my $id_owx  = $owx_f.".".$owx_rnf;
+      
+    my $match = 0;
+    
+    #-- Check against all existing devices  
+    foreach my $fhem_dev (sort keys %main::defs) { 
+      #-- skip if busmaster
+      # next if( $hash->{NAME} eq $main::defs{$fhem_dev}{NAME} );
+      #-- all OW types start with OW
+      next if(      substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
+      my $id_fhem = substr($main::defs{$fhem_dev}{ROM_ID},0,15);
+      #-- skip interface device
+      next if( length($id_fhem) != 15 );
+      #-- testing if equal to the one found here  
+      #   even with improper family
+      #   Log 1, " FHEM-Device = ".substr($id_fhem,3,12)." OWX discovered device ".substr($id_owx,3,12);
+      if( substr($id_fhem,3,12) eq substr($id_owx,3,12) ) {
+        #-- warn if improper family id
+        if( substr($id_fhem,0,2) ne substr($id_owx,0,2) ){
+          Log 1, "OWX: Warning, $fhem_dev is defined with improper family id ".substr($id_fhem,0,2). 
+           ", correcting to ".substr($id_owx,0,2);
+           $main::defs{$fhem_dev}{OW_FAMILY} = substr($id_owx,0,2);
+        }
+        push(@owx_names,$main::defs{$fhem_dev}{NAME});
+        #-- replace the ROM ID by the proper value including CRC
+        $main::defs{$fhem_dev}{ROM_ID}=$owx_dev;
+        $main::defs{$fhem_dev}{PRESENT}=1;    
+        $match = 1;
+        last;
+      }
+      #
+    }
+    
+    #-- autocreate the device
+    if( $match==0 ){
+      #-- Default name OWX_FF_XXXXXXXXXXXX, default type = OWX_FF
+      my $name = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
+      #-- Family 10 = Temperature sensor, assume DS1820 as default
+      if( $owx_f eq "10" ){
+        CommandDefine(undef,"$name OWTHERM DS1820 $owx_rnf");  
+      #-- Family 12 = Switch, assume DS2406 as default
+      }elsif( $owx_f eq "12" ){
+        CommandDefine(undef,"$name OWSWITCH DS2406 $owx_rnf");     
+      #-- Family 1D = Counter/RAM, assume DS2423 as default
+      }elsif( $owx_f eq "1D" ){
+        CommandDefine(undef,"$name OWCOUNT DS2423 $owx_rnf");            
+      #-- Family 20 = A/D converter, assume DS2450 as default
+      } elsif( $owx_f eq "20" ){
+        CommandDefine(undef,"$name OWAD DS2450 $owx_rnf"); 
+      #-- Family 22 = Temperature sensor, assume DS1822 as default
+      }elsif( $owx_f eq "22" ){
+        CommandDefine(undef,"$name OWTHERM DS1822 $owx_rnf");  
+      #-- Family 26 = Multisensor, assume DS2438 as default
+      }elsif( $owx_f eq "26" ){
+        CommandDefine(undef,"$name OWMULTI DS2438 $owx_rnf");  
+      #-- Family 28 = Temperature sensor, assume DS18B20 as default
+      }elsif( $owx_f eq "28" ){
+        CommandDefine(undef,"$name OWTHERM DS18B20 $owx_rnf");   
+      #-- Family 29 = Switch, assume DS2408 as default
+      }elsif( $owx_f eq "29" ){
+        CommandDefine(undef,"$name OWSWITCH DS2408 $owx_rnf");   
+      #-- Family 3A = Switch, assume DS2413 as default
+      }elsif( $owx_f eq "3A" ){
+        CommandDefine(undef,"$name OWSWITCH DS2413 $owx_rnf");   
+      #-- Family FF = LCD display    
+      }elsif( $owx_f eq "FF" ){
+        CommandDefine(undef,"$name OWLCD $owx_rnf");       
+      #-- All unknown families are ID only (ID-Chips have family id 09)
+      } else {
+        CommandDefine(undef,"$name OWID $owx_f $owx_rnf");   
+      }
+      #-- yes, it is on the bus and therefore present
+      push(@owx_names,$name);
+      $main::defs{$name}{PRESENT}=1;
+      #-- THIS IODev, default room
+      CommandAttr (undef,"$name IODev $hash->{NAME}"); 
+      CommandAttr (undef,"$name room OWX"); 
+      #-- replace the ROM ID by the proper value 
+      $main::defs{$name}{ROM_ID}=$owx_dev;
+    }
+  }
 
   #-- final step: Undefine all 1-Wire devices which are not on this bus but have this IODev
   foreach my $fhem_dev (sort keys %main::defs) {
