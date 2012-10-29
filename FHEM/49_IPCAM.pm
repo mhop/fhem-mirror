@@ -97,7 +97,7 @@ IPCAM_Get($@) {
   return "argument is missing @a"
     if(int(@a) != 2);
   # check argument
-  return "Unknown argument $a[1], choose on of ".join(" ", sort keys %gets)
+  return "Unknown argument $a[1], choose one of ".join(" ", sort keys %gets)
     if(!defined($gets{$a[1]}));
   # check attributes
   return "Attribute 'path' is missing. Please add this attribute first!"
