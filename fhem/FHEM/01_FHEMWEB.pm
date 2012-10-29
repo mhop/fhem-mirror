@@ -2133,11 +2133,11 @@ FW_ReadIcons($)
   my %icons = %FW_icons;
   $hash->{fhemIcons} = \%icons;
 
-  my $dumpLevel = 4;
+  my $dumpLevel = 5;
   if($attr{global}{verbose} >= $dumpLevel) {
-    Log $dumpLevel, "$name: Icon dictionary for $FW_icondir follows...";
+    Log $dumpLevel, "$name Icon dictionary for $FW_icondir follows...";
     foreach my $k (sort keys %FW_icons) {
-      Log $dumpLevel, "  $k => " . $FW_icons{$k};
+      Log $dumpLevel, "$name $k => " . $FW_icons{$k};
     }
   }
 }
