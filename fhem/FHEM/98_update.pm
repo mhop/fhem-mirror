@@ -171,7 +171,7 @@ update_DoUpdate(@)
   my $doBackup = (!defined($attr{global}{backup_before_update}) ? 1 : $attr{global}{backup_before_update});
 
   if ($doBackup) {
-    my $cmdret = AnalyzeCommandChain(undef, "backup");
+    my $cmdret = AnalyzeCommand(undef, "backup");
     if ($cmdret !~ m/backup done.*/) {
       Log 1, "update Backup: The operation was canceled. Please check manually!";
       $ret .= "Something went wrong during backup:\n$cmdret\n";

@@ -1,4 +1,14 @@
-MOV FHEM/release.pm FHEM/FhemUtils
+DIR unused
+DIR www/images/default
+DIR www/gplot
+DIR www/pgm2
+DIR docs
+MOV FHEM/release.* unused
+MOV FHEM/99_updatefhem.* unused
+MOV FHEM/99_CULflash.* unused
+MOV FHEM/99_JsonList.* unused
+MOV FHEM/99_backup.* unused
+MOV FHEM/99_update.* unused
 MOV FHEM/*.jpg www/images/default
 MOV FHEM/*.png www/images/default
 MOV FHEM/*.gplot www/gplot
@@ -10,4 +20,3 @@ MOV www/pgm2/*.gplot www/gplot
 MOV www/pgm2/*.jpg www/images/default
 MOV www/pgm2/*.png www/images/default
 MOV www/pgm2/*.html docs
-MOV FHEM/99_updatefhem.pm UNUSED
