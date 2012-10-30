@@ -12684,6 +12684,10 @@ isday</pre>
       { fhem "set light on" }<br>
       define n1 notify piri:on { fhem "set light on" }
     </ul>
+    Note: if this function returns a value, it will also be logged into the
+    global fhem log. Use 1 as a second argument to disable this logging, this
+    makes sense when obtainig some values via fhem "get...".
+    <br>
     <br>
 
   <li>Notify can be used to store macros for manual execution. Use the <a
