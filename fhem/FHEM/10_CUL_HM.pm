@@ -1445,22 +1445,23 @@ my %culHmSubTypeSets = (
 );
 my %culHmModelSets = (
   "HM-CC-TC"=>{ 
+          devicepair    => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
           "day-temp"     => "temp",
           "night-temp"   => "temp",
           "party-temp"   => "temp",
           "desired-temp" => "temp", # does not work - only in manual mode??
-          "tempListSat"  => "HH:MM temp ...",
-          "tempListSun"  => "HH:MM temp ...",
-          "tempListMon"  => "HH:MM temp ...",
-          "tempListTue"  => "HH:MM temp ...",
-          "tempListThu"  => "HH:MM temp ...",
-          "tempListWed"  => "HH:MM temp ...",
-          "tempListFri"  => "HH:MM temp ...",
-          "displayMode"  => "[temp-only|temp-hum]",
-          "displayTemp"  => "[actual|setpoint]",
-          "displayTempUnit" => "[celsius|fahrenheit]",
-          "controlMode"  => "[manual|auto|central|party]",
-          "decalcDay"    => "day",        },
+          tempListSat    => "HH:MM temp ...",
+          tempListSun    => "HH:MM temp ...",
+          tempListMon    => "HH:MM temp ...",
+          tempListTue    => "HH:MM temp ...",
+          tempListThu    => "HH:MM temp ...",
+          tempListWed    => "HH:MM temp ...",
+          tempListFri    => "HH:MM temp ...",
+          displayMode    => "[temp-only|temp-hum]",
+          displayTemp    => "[actual|setpoint]",
+          displayTempUnit => "[celsius|fahrenheit]",
+          controlMode    => "[manual|auto|central|party]",
+          decalcDay      => "day",        },
   "HM-CC-VD"=>{ 
           valvePos     => "position",},
   "HM-RC-19"=>    {	
@@ -2157,6 +2158,7 @@ CUL_HM_Set($@)
     return "$target must be [actor|remote|both]" 
 	      if(defined($target) && (($target ne"actor") &&
 		     ($target ne"remote")&&($target ne"both")));  
+	return "use climate chan to pair TC" if($md eq "HM-CC-TC" &&$chn ne "02");
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set eq "unset")?0:1;
 
@@ -2200,9 +2202,9 @@ CUL_HM_Set($@)
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
-  	               "++".$flag."01${id}${dst}${bStr}$cmd${peerDst}${peerChn}00");
-  	      CUL_HM_pushConfig($hash,$id, $dst,$b,
-  	               $peerDst,hex($peerChn),4,"0100");
+  	              "++".$flag."01${id}${dst}${bStr}$cmd${peerDst}${peerChn}00");
+  	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,"0100")
+				   if($md ne "HM-CC-TC");
 	    }
       }
 	}
@@ -3205,6 +3207,7 @@ CUL_HM_ActGetCreateHash()
   if (!$modules{CUL_HM}{defptr}{"000000"}){
     DoTrigger("global",  "UNDEFINED ActionDetector CUL_HM 000000");
 	$attr{ActionDetector}{actCycle} = 600;
+  
   }
   my $defPtr = $modules{CUL_HM}{defptr};
   my $actName = $defPtr->{"000000"}{NAME} if($defPtr->{"000000"});
