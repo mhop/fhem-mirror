@@ -383,7 +383,7 @@ CommandUsb($$)
         $msg = "$culType: flash it with: CULflash none $culType";
         Log 4, $msg; $ret .= $msg . "\n";
         if(!$scan) {
-          CommandCULflash(undef, "none $culType");
+          AnalyzeCommand(undef, "culflash none $culType"); # Enable autoload
           sleep(4);      # Leave time for linux to load th drivers
         }
       }

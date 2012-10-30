@@ -79,7 +79,7 @@ sub WriteStatefile();
 sub XmlEscape($);
 sub devspec2array($);
 sub doGlobalDef($);
-sub fhem($);
+sub fhem($@);
 sub fhz($);
 sub getAllSets($);
 sub IsDummy($);
@@ -693,7 +693,14 @@ AnalyzeCommand($$)
     }
   }
 
-  return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
+  #############
+  # autoload commands.
+  if(!defined($cmds{$fn})) {
+    map { $fn = $_ if(uc($fn) eq uc($_)); } keys %modules;
+    $fn = lc(LoadModule($fn));
+    return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
+  }
+
   $param = "" if(!defined($param));
   no strict "refs";
   my $ret = &{$cmds{$fn}{Fn} }($cl, $param);
@@ -2248,11 +2255,11 @@ CallFn(@)
 #####################################
 # Used from perl oneliners inside of scripts
 sub
-fhem($)
+fhem($@)
 {
-  my $param = shift;
+  my ($param, $silent) = @_;
   my $ret = AnalyzeCommandChain(undef, $param);
-  Log 3, "$param : $ret" if($ret);
+  Log 3, "$param : $ret" if($ret && !$silent);
   return $ret;
 }
 
