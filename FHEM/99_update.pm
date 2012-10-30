@@ -1,5 +1,5 @@
 ################################################################
-# $Id:$
+# $Id$
 # 
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved

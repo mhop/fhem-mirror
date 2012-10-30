@@ -1,5 +1,5 @@
 ##############################################
-# $Id: $
+# $Id$
 # modified by M. Fischer
 package main;
 use strict;
