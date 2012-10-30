@@ -208,7 +208,7 @@ CUL_HM_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
-					   "chanNo device peerList ".
+					   "chanNo device peerList peerIDs ".
 					   "actCycle actStatus ".
 					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast ".
 					   "protResndFailLast protResndLast protResndFailCnt protResndCnt protToutRespLast protToutRespCnt ".
@@ -259,7 +259,7 @@ CUL_HM_Define($$)
     $modules{CUL_HM}{defptr}{$HMid} = $hash;
     AssignIoPort($hash);
   }
-
+  CUL_HM_ActGetCreateHash() if($HMid eq '000000');#startTimer
   if(int(@a) == 4) {
     $hash->{DEF} = $a[2];
     CUL_HM_Parse($hash, $a[3]);
@@ -809,20 +809,30 @@ CUL_HM_Parse($$)
   elsif($st eq "motionDetector") { #####################################
     # Code with help of Bassem
     my $state;
-    if($msgType eq "10" && $p =~ m/^06..(..)(..)/) {#InfoLevel
+    if(($msgType eq "10" ||$msgType eq "02") && $p =~ m/^0601(..)(..)/) {
 	  my $err;
       ($state, $err) = ($1, hex($2));
-	  my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
+	  my $cmpVal = defined($shash->{helper}{addVal})?
+	                      $shash->{helper}{addVal}:0xff;
 	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
 	  $shash->{helper}{addVal} = $err;#store to handle changes
-      push @event, "brightness:".hex($state);
+	  my $bright = hex($state);
+      push @event, "brightness:".$bright    
+	       if (ReadingsVal($name,"brightness","") != $bright);# post if changed
       push @event, "cover:".   (($err&0x0E)?"open" :"closed") if ($cmpVal&0x0E);        
 	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  )   if ($cmpVal&0x80);
     }
-    elsif($msgType eq "41" && $p =~ m/^..(......)/) {
-      $state = $1;
+    elsif($msgType eq "41" && $p =~ m/^..(..)(..)(..)/) {
+	  my($cnt, $bright,$nextTr) = (hex($1), hex($2),(hex($3)>>4));
       push @event, "state:motion";
       push @event, "motion:on$target"; #added peterp
+      push @event, "motionCount:".$cnt."_next:".$nextTr;
+      push @event, "brightness:".$bright    
+	       if (ReadingsVal($name,"brightness","") != $bright);# post if changed
+    }
+    elsif($msgType eq "70" && $p =~ m/^7F(..)(.*)/) {
+	  my($d1, $d2) = ($1, $2);
+      push @event, 'devState_raw'.$d1.':'.$d2;
     }
 
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101${state}00",1,0)
@@ -867,7 +877,9 @@ CUL_HM_Parse($$)
 	#AckStatus:  msgType=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
 
     if($p =~ m/^(..)(..)(..)(..)?$/) {
-      my ($b12, $b34, $state, $err) = ($1, $2, $3, hex($4));
+      my ($b12, $b34, $state) = ($1, $2, $3);
+	  my $err;
+	  $err = hex($4) if(defined($4));
       my $chn = ($msgType eq "41")?$b12:$b34;
       # Multi-channel device: Switch to channel hash
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
@@ -875,7 +887,7 @@ CUL_HM_Parse($$)
       
 	  if ($msgType eq "02"||$msgType eq "10"){
 	  	my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	    $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
+	    $cmpVal = (defined($err))?(($cmpVal ^ $err)|$err):0; # all error,one normal
 	    $shash->{helper}{addVal} = $err;#store to handle changes
 
 		push @event, "alive:yes";
@@ -901,9 +913,9 @@ CUL_HM_Parse($$)
     push @event, "3SSunknownMsg:$p" if(!@event);
   } 
   elsif($model eq "HM-WDC7000" ||$st eq "THSensor") { ####################
-
-	my $t =  hex(substr($p,0,4))/10;
-    $t -= 3276.8 if($t > 1638.4);
+	my $t =  hex(substr($p,0,4));
+    $t -= 32768 if($t > 1638.4);
+	$t = sprintf("%0.1f", $t/10);
 	my $h =  hex(substr($p,4,2));
 	my $ap = hex(substr($p,6,4));
 	my $statemsg = "state:T: $t";
@@ -979,6 +991,30 @@ CUL_HM_Parse($$)
   else{#####################################
     ; # no one wants the message
   }
+  #------------ parse for virtual destination     ------------------
+  if (AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
+    if($msgType =~ m/^4./ && $p =~ m/^(..)/) {
+      my ($recChn) = ($1);# button number/event count
+	  my $recId = $src.$recChn;
+	  for (my $cnt=1;$cnt<25;$cnt++)  {#need to check each channel
+	    my $dChNo = sprintf("%02X",$cnt);
+	    my $dChName = AttrVal($dname,"channel_".$dChNo,"");
+		if (!$dChName){next;} # not channel provisioned
+	    my @peerIDs = split(',',AttrVal($dChName,"peerIDs",""));
+	    foreach my $pId (@peerIDs){
+	      if ($pId eq $recId){ #match: we have to ack 
+		    my $dChHash = CUL_HM_name2hash($dChName);
+		    my $state = ReadingsVal($dChName,"virtActState","C8");
+		    $state = ($state eq "00")?"C8":"00";
+		    setReadingsVal($dChHash,"virtActState",$state,$tn);
+		    setReadingsVal($dChHash,"virtActTrigger",$name,$tn);
+            CUL_HM_SendCmd($dChHash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
+                  $state."00", 1, 0);
+	      }
+        }
+	  }
+	}
+  }
   #------------ send default ACK if not applicable------------------
   #    ack if we are destination, anyone did accept the message (@event)
   #        parser did not supress 
@@ -1006,7 +1042,7 @@ CUL_HM_Parse($$)
       }
     } 
 	else {
-      push @changed, "$vn: $vv";
+      push @changed, "$vn: ".($vv)?$vv:"-";
     }
     $shash->{READINGS}{$vn}{TIME} = $tn;
     $shash->{READINGS}{$vn}{VAL} = $vv;
@@ -1113,7 +1149,10 @@ my %culHmRegDefine = (
   DecalDay     =>{a=>1.5  ,s=>0.3,l=>5,min=>0  ,max=>7     ,c=>''         ,f=>''      ,u=>'d'   ,t=>"Decalc weekday 0=Sat...6=Fri"},
   DecalHr      =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23    ,c=>''         ,f=>''      ,u=>'h'   ,t=>"Decalc hour"},
   DecalMin     =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50    ,c=>'factor'   ,f=>0.1     ,u=>'min' ,t=>"Decalc min"},
-  #output Unit
+#Thermal-cc-VD
+  ValveOffset  =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25    ,c=>''         ,f=>''      ,u=>'%'   ,t=>"Valve offset"},             # size actually 0.5
+  ValveError   =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99    ,c=>''         ,f=>''      ,u=>'%'   ,t=>"Valve position when error"},# size actually 0.7
+#output Unit
   ActTypeSh     =>{a=>36  ,s=>1  ,l=>3,min=>0  ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Action type(LED or Tone)"},
   ActNumSh      =>{a=>37  ,s=>1  ,l=>3,min=>1  ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Action Number"},
   IntenseSh     =>{a=>47  ,s=>1  ,l=>3,min=>10 ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Volume - Tone channel only!"},
@@ -1175,6 +1214,7 @@ my %culHmRegSupported = (
 			TempWinOpen  =>1,
 			DecalHr      =>1,DecalMin     =>1, 
             BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1,
+            ValveOffset  =>1,ValveError   =>1,
 			},	
   outputUnit=>{
 			OnDlySh   =>1,OnTimeSh  =>1,OffDlySh  =>1,OffTimeSh =>1,
@@ -1421,24 +1461,26 @@ my %culHmModelSets = (
           "displayTempUnit" => "[celsius|fahrenheit]",
           "controlMode"  => "[manual|auto|central|party]",
           "decalcDay"    => "day",        },
-	"HM-RC-19"=>  {	
+  "HM-CC-VD"=>{ 
+          valvePos     => "position",},
+  "HM-RC-19"=>    {	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
 		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>",},
-	"HM-RC-19-B"=>  {	
+  "HM-RC-19-B"=>  {	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
 		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>",},
-	"HM-RC-19-SW"=>  {	
+  "HM-RC-19-SW"=> {	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
 		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>",},
-    "HM-PB-4DIS-WM"=> {
+  "HM-PB-4DIS-WM"=>{
 	      text      => "<btn> [on|off] <txt1> <txt2>",},
-	"HM-OU-LED16" =>{
+  "HM-OU-LED16" =>{
 		  led    =>"[off|red|green|orange]" ,
 		  ilum   =>"[0-15] [0-127]" },
-    "HM-OU-CFM-PL"=>{
+  "HM-OU-CFM-PL"=>{
 	      led       => "<color>[,<color>..]",
 		  playTone  => "<MP3No>[,<MP3No>..]",},
 );
@@ -1468,7 +1510,7 @@ CUL_HM_getRxType($)
  # Will store result in device helper
   my ($hash) = @_;
   $hash = CUL_HM_getDeviceHash($hash);
-  no warnings; #cnvert regardless of content
+  no warnings; #convert regardless of content
   my $rxtEntity = int($hash->{helper}{rxType});
   use warnings;
   if (!$rxtEntity){ #at least one bit must be set
@@ -1698,8 +1740,9 @@ CUL_HM_Set($@)
 	$dLen = int($dLen)*8+(($dLen*10)%10);
 	# only allow it level if length less then one byte!!
 	return "partial Word error: ".$dLen if($dLen != 8*int($dLen/8) && $dLen>7);
-	
+	no warnings qw(overflow portable);
 	my $mask = (0xffffffff>>(32-$dLen));
+	use warnings qw(overflow portable);
 	my $dataStr = substr(sprintf("%08X",($data & $mask) << $bit),
 	                                       8-int($reg->{s}+0.99)*2,);
 	
@@ -1998,6 +2041,11 @@ CUL_HM_Set($@)
     $hash->{READINGS}{$vn}{TIME} = TimeNow();
     $hash->{READINGS}{$vn}{VAL} = $msg;
   } 
+  elsif($cmd eq "valvePos") { ##################
+    my $vp = ($a[2]+0.5)*2.56;
+    my $d1 = 0;
+    CUL_HM_PushCmdStack($hash,sprintf("++A258%s%s%02X%02X",$id,$dst,$d1,$vp));
+  } 
   elsif($cmd eq "matic") { ##################################### 
     # Trigger pre-programmed action in the winmatic. These actions must be
     # programmed via the original software.
@@ -2096,11 +2144,11 @@ CUL_HM_Set($@)
   } 
   elsif($cmd eq "devicepair") { ###############################################
     #devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]"
-	my ($bNo,$dev,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
+	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
 	return "$bNo is not a button number" if(($bNo < 1) && !$chn);
-    my $peerHash = $defs{$dev} if ($dev);
-    return "$dev not a CUL_HM device" 
+    my $peerHash = $defs{$peerN} if ($peerN);
+    return "$peerN not a CUL_HM device" 
 	      if(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM");
     return "$single must be single or dual" 
 	      if(defined($single) && (($single ne"single") &&($single ne"dual")));  
@@ -2159,9 +2207,22 @@ CUL_HM_Set($@)
       }
 	}
 	if (!$target || $target eq "actor" || $target eq "both"){
-	  my $peerFlag = CUL_HM_getFlag($peerHash);
-      CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
+	  if (AttrVal( CUL_HM_id2Name($peerDst), "subType", "") eq "virtual"){
+		my $peerIDs = AttrVal($peerN,"peerIDs","");
+	    my $pId = $dst.sprintf("%02X",$b1);
+		$peerIDs .= $pId."," if($peerIDs !~ m/$pId,/);
+        $attr{$peerN}{peerIDs} = $peerIDs; 
+		my $peerList = "";
+		foreach my$tmpId (split(",",$peerIDs)){
+		  $peerList .= CUL_HM_id2Name($tmpId);
+		}
+		$attr{$peerN}{peerList} = $peerList;
+	  }
+	  else{
+	    my $peerFlag = CUL_HM_getFlag($peerHash);
+        CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
             $peerFlag,$id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
+	  }
 	}
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
@@ -2260,10 +2321,12 @@ CUL_HM_getConfig($$$$$){
   my $flag = CUL_HM_getFlag($hash);
   
   foreach my $readEntry (keys %{$chnhash->{READINGS}}){
-	if ($readEntry =~ m/^RegL_/){
+	if ($readEntry =~ m/^RegL_/){#remove old lists, no longer valid
 	  delete $chnhash->{READINGS}{$readEntry};
 	}
   }
+  #get Peer-list in any case - it is part of the config
+  CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
   my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2:3.p ,6:2"
   foreach my$listEntry (@list){# each list that is define for this channel
@@ -2286,7 +2349,7 @@ CUL_HM_getConfig($$$$$){
 	#$listNo,$chnValid $peerReq  
 	if ($chnValid){# yes, we will go for a list
 	  if ($peerReq){# need to get the peers first
-        CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
+#        CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
         $chnhash->{helper}{getCfgList} = "all";# peers first
         $chnhash->{helper}{getCfgListNo} = $listNo;
 	  }
@@ -3135,7 +3198,7 @@ CUL_HM_secSince2000()
 # verify that devices are seen in a certain period of time
 # It will generate events if no message is seen sourced by the device during 
 # that period.
-# ActionDetector will use the fixed HMid 100100
+# ActionDetector will use the fixed HMid 000000
 sub
 CUL_HM_ActGetCreateHash()
 {# return hash of ActionDetector - create one if not existant
@@ -3143,9 +3206,27 @@ CUL_HM_ActGetCreateHash()
     DoTrigger("global",  "UNDEFINED ActionDetector CUL_HM 000000");
 	$attr{ActionDetector}{actCycle} = 600;
   }
-  my $actName = CUL_HM_id2Name("000000");
+  my $defPtr = $modules{CUL_HM}{defptr};
+  my $actName = $defPtr->{"000000"}{NAME} if($defPtr->{"000000"});
   my $actHash = $modules{CUL_HM}{defptr}{"000000"};
-  
+  if (!$actHash->{helper}{first}){ # if called first time arrributes are no yet
+                                   #recovered
+  	InternalTimer(gettimeofday()+3, "CUL_HM_ActGetCreateHash", "ActionDetector", 0);
+	$actHash->{helper}{first} = 1;
+	return;
+  }
+  if (!$actHash->{helper}{actCycle} ){ #This is the first call
+    my $peerList = $attr{$actName}{peerList};
+	$peerList = "" if (!$peerList);
+    my $tn = TimeNow();
+	foreach my $devId (split(",",$peerList)){
+	  $actHash->{helper}{$devId}{start} = $tn;
+	   my $devName = CUL_HM_id2Name($devId);
+	  setReadingsVal($actHash,"status_".$devName,"unknown",$tn);	
+	  $attr{$devName}{actStatus}=""; # force trigger
+      CUL_HM_setAttrIfCh($devName,"actStatus","unknown","Activity");	  
+	}
+  }
   if (!$actHash->{helper}{actCycle} ||
       $actHash->{helper}{actCycle} != $attr{$actName}{actCycle}){
 	$attr{$actName}{actCycle} = 30 if(!$attr{$actName}{actCycle} ||
@@ -3153,6 +3234,7 @@ CUL_HM_ActGetCreateHash()
 	$actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
 	RemoveInternalTimer("ActionDetector");
 	$actHash->{STATE} = "active";
+
 	InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
 									   "CUL_HM_ActCheck", "ActionDetector", 0);
   }
@@ -3176,20 +3258,21 @@ CUL_HM_ActAdd($$)
 
   return $devId." is not an HM device - action detection cannot be added"
        if (length($devId) != 6);
-
   my ($cycleString,undef)=CUL_HM_time2sec($timeout);
   my $devName = CUL_HM_id2Name($devId);
   $attr{$devName}{actCycle} = $cycleString; 
-  $attr{$devName}{actStatus} = "unknown";
+  $attr{$devName}{actStatus}=""; # force trigger
+  CUL_HM_setAttrIfCh($devName,"actStatus","unknown","Activity");
   
-  my $acthash = CUL_HM_ActGetCreateHash();
-  my $actName = $acthash->{NAME}; # could have been renamed
+  my $actHash = CUL_HM_ActGetCreateHash();
+  my $actName = $actHash->{NAME}; # could have been renamed
 
   my $peerList = (!defined($attr{$actName}{peerList}))?"":$attr{$actName}{peerList};
   $peerList .= $devId."," if($peerList !~ m/$devId,/);#add if not in
-  $attr{$actName}{peerList} = $peerList;  
-  $acthash->{READINGS}{"status_".$devName}{TIME} = TimeNow(); # update new value
-  $acthash->{READINGS}{"status_".$devName}{VAL} = "unknown";
+  $attr{$actName}{peerList} = $peerList; 
+  my $tn = TimeNow();  
+  $actHash->{helper}{$devId}{start} = $tn;
+  setReadingsVal($actHash,"status_".$devName,"unknown",$tn);	  
   Log GetLogLevel($actName,3),"Device ".$devName." added to ActionDetector with "
       .$cycleString." time";
 }
@@ -3203,16 +3286,18 @@ CUL_HM_ActDel($)
 	   
   my $devName = CUL_HM_id2Name($devId);
   delete ($attr{$devName}{actCycle});
+  CUL_HM_setAttrIfCh($devName,"actStatus","deleted","Activity");#post trigger
   delete ($attr{$devName}{actStatus});
 
   my $acthash = CUL_HM_ActGetCreateHash();
   my $actName = $acthash->{NAME};
 
+  delete ($acthash->{helper}{$devId});
+
   $attr{$actName}{peerList} = "" if (!defined($attr{$actName}{peerList}));
   $attr{$actName}{peerList} =~ s/$devId,//g; 
   Log GetLogLevel($actName,3),"Device ".$devName." removed from ActionDetector";
 }
-
 sub
 CUL_HM_ActCheck()
 {# perform supervision
@@ -3229,30 +3314,29 @@ CUL_HM_ActCheck()
 	  CUL_HM_ActDel($devId); 
 	  next;
 	}
-	
-    $actHash->{READINGS}{"status_".$devName}{TIME} = $tn;
+	my $rdName = "status_".$devName;
+
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
 	if ($tSec == 0){# detection switched off
-	  $attr{$devName}{actStatus} = "switchedOff";
-  	  $actHash->{READINGS}{"status_".$devName}{VAL} = "switchedOff";
+	  CUL_HM_setRdIfCh($actHash,$rdName,"switchedOff",$tn);
+	  CUL_HM_setAttrIfCh($devName,"actStatus","switchedOff","Activity");
 	  next;
 	}
 	my $tLast = $attr{$devName}{"protLastRcv"};
     my @t = localtime($tod - $tSec); #time since when a trigger is expected
 	my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
-                           $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);				   
-	if (!$tLast || $tSince gt $tLast){#no message received in timeframe					   
-	  $actHash->{READINGS}{"status_".$devName}{VAL}="timedOut - last: ".$tLast;
-	  DoTrigger($devName,"Activity: dead")
-	             if($attr{$devName}{actStatus} ne "dead");
-      $attr{$devName}{actStatus} = "dead";
-      Log GetLogLevel($actName,2),"Device ".$devName." is dead";
+                           $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);					   
+	if ((!$tLast || $tSince gt $tLast)){      #no message received in timeframe
+	  if ($tSince gt $actHash->{helper}{$devId}{start}){
+	    CUL_HM_setRdIfCh($actHash,$rdName,"timedOut - last: ".$tLast,$tn);
+        CUL_HM_setAttrIfCh($devName,"actStatus","dead","Activity");
+        Log GetLogLevel($actName,2),"Device ".$devName." is dead";
+	  }
+	  # no action otherwise
  	}
-	else{					   
-	  $actHash->{READINGS}{"status_".$devName}{VAL} = "alive";
-	  DoTrigger($devName,"Activity: alive") 
-	             if($attr{$devName}{actStatus} ne "alive");
-	  $attr{$devName}{actStatus} = "alive";
+	else{
+      CUL_HM_setRdIfCh($actHash,$rdName,"alive",$tn);	
+      CUL_HM_setAttrIfCh($devName,"actStatus","alive","Activity");
       Log GetLogLevel($actName,5),"Device ".$devName." is alive";
 	}
   }
@@ -3262,6 +3346,22 @@ CUL_HM_ActCheck()
   InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
   								   "CUL_HM_ActCheck", "ActionDetector", 0);
 }
-
+sub
+CUL_HM_setRdIfCh($$$$)
+{
+  my ($hash,$rd,$val,$ts) = @_; 
+  $ts = TimeNow() if (!$ts);
+  setReadingsVal($hash,$rd,$val,$ts) 
+              if(ReadingsVal($hash->{NAME},$rd,"") ne $val);
+}
+sub
+CUL_HM_setAttrIfCh($$$$)
+{
+  my ($name,$att,$val,$trig) = @_; 
+  if($attr{$name}{$att} ne $val){
+    DoTrigger($name,$trig.":".$val) if($trig);
+	$attr{$name}{$att} = $val;
+  }
+}
 
 1;
