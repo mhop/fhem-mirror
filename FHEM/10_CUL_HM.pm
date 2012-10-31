@@ -462,91 +462,89 @@ CUL_HM_Parse($$)
       if($dhash) {
 	    DoTrigger($dname,'ValvePosition:set_'.$vp.'%');
         $dhash->{STATE} = "$vp %";
-        $dhash->{READINGS}{state}{TIME} = $tn;
-        $dhash->{READINGS}{state}{VAL} = "set_$vp %";
+		CUL_HM_setRd($dhash,"state","set_$vp %",$tn);
       }
     }
-    # 0403 167DE9 01 05 05 16 0000 windowopen-temp chan 03, dev 167DE9 on slot 01
-    elsif($msgType eq "10" && $p =~ m/^0403(......)(..)0505(..)0000/) {
-	  # change of chn 3(window) list 5 register 5 - a peer window changed!
-      my ( $tdev,   $tchan,     $v1) = (($1), hex($2), hex($3));
-	  push @event, sprintf("windowopen-temp-%d: %.1f (sensor:%s)"
+    elsif($msgType eq "10"){
+      if(   $p =~ m/^0403(......)(..)0505(..)0000/) {
+	    # change of chn 3(window) list 5 register 5 - a peer window changed!
+        my ( $tdev,   $tchan,     $v1) = (($1), hex($2), hex($3));
+	    push @event, sprintf("windowopen-temp-%d: %.1f (sensor:%s)"
 	                        ,$tchan, $v1/2, $tdev);
-    }
-    # idea: remember  all possible 24 value-pairs per day and reconstruct list
-    # everytime new values are set or received.
-    elsif($msgType eq "10" &&
-       $p =~ m/^0402000000000(.)(..)(..)(..)(..)(..)(..)(..)(..)/) {
-      # param list 5 or 6, 4 value pairs.
-      my ($plist, $o1,    $v1,    $o2,    $v2,    $o3,    $v3,    $o4,    $v4) =
-         (hex($1),hex($2),hex($3),hex($4),hex($5),hex($6),hex($7),hex($8),hex($9));
-
-      my ($dayoff, $maxdays, $basevalue);
-      my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-
-      if($plist == 5 || $plist == 6) {
-        if($plist == 5) {
-          $dayoff = 0; $maxdays = 5; $basevalue = hex("0B");
-        } 
-		else {
-          $dayoff = 5; $maxdays = 2; $basevalue = hex("01");
-        }
-        my $idx = ($o1-$basevalue);
-        my $dayidx = int($idx/48);
-        if($idx % 4 == 0 && $dayidx < $maxdays) {
-          $idx -= 48*$dayidx;
-          $idx /= 2;
-          my $ptr = $shash->{TEMPLIST}{$days[$dayidx+$dayoff]};
-          $ptr->{$idx}{HOUR} = int($v1/6);
-          $ptr->{$idx}{MINUTE} = ($v1%6)*10;
-          $ptr->{$idx}{TEMP} = $v2/2;
-          $ptr->{$idx+1}{HOUR} = int($v3/6);
-          $ptr->{$idx+1}{MINUTE} = ($v3%6)*10;
-          $ptr->{$idx+1}{TEMP} = $v4/2;
-        }
       }
+	  elsif($p =~ m/^0402000000000(.)(..)(..)(..)(..)(..)(..)(..)(..)/) {
+        # param list 5 or 6, 4 value pairs.
+        my ($plist, $o1,    $v1,    $o2,    $v2,    $o3,    $v3,    $o4,    $v4) =
+           (hex($1),hex($2),hex($3),hex($4),hex($5),hex($6),hex($7),hex($8),hex($9));
 
-      foreach my $wd (@days) {
-        my $twentyfour = 0;
-        my $msg = 'tempList'.$wd.':';
-        foreach(my $idx=0; $idx<24; $idx++) {
-          my $ptr = $shash->{TEMPLIST}{$wd}{$idx};
-          if(defined ($ptr->{TEMP}) && $ptr->{TEMP} ne "") {
-            if($twentyfour == 0) {
-              $msg .= sprintf(" %02d:%02d %.1f",
+        my ($dayoff, $maxdays, $basevalue);
+        my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+
+        if($plist == 5 || $plist == 6) {
+          if($plist == 5) {
+            $dayoff = 0; $maxdays = 5; $basevalue = hex("0B");
+          } 
+		  else {
+            $dayoff = 5; $maxdays = 2; $basevalue = hex("01");
+          }
+          my $idx = ($o1-$basevalue);
+          my $dayidx = int($idx/48);
+          if($idx % 4 == 0 && $dayidx < $maxdays) {
+            $idx -= 48*$dayidx;
+            $idx /= 2;
+            my $ptr = $shash->{TEMPLIST}{$days[$dayidx+$dayoff]};
+            $ptr->{$idx}{HOUR} = int($v1/6);
+            $ptr->{$idx}{MINUTE} = ($v1%6)*10;
+            $ptr->{$idx}{TEMP} = $v2/2;
+            $ptr->{$idx+1}{HOUR} = int($v3/6);
+            $ptr->{$idx+1}{MINUTE} = ($v3%6)*10;
+            $ptr->{$idx+1}{TEMP} = $v4/2;
+          }
+        }
+        foreach my $wd (@days) {
+          my $twentyfour = 0;
+          my $msg = 'tempList'.$wd.':';
+          foreach(my $idx=0; $idx<24; $idx++) {
+            my $ptr = $shash->{TEMPLIST}{$wd}{$idx};
+            if(defined ($ptr->{TEMP}) && $ptr->{TEMP} ne "") {
+              if($twentyfour == 0) {
+                $msg .= sprintf(" %02d:%02d %.1f",
                                 $ptr->{HOUR}, $ptr->{MINUTE}, $ptr->{TEMP});
-            } else {
-              $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
+              } else {
+                $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
+              }
             }
-          }
-          if(defined ($ptr->{HOUR}) && 0+$ptr->{HOUR} == 24) {
-            $twentyfour = 1;  # next value uninteresting, only first counts.
-          }
-      	}
-        push @event, $msg; # generate one event per day entry
+            if(defined ($ptr->{HOUR}) && 0+$ptr->{HOUR} == 24) {
+              $twentyfour = 1;  # next value uninteresting, only first counts.
+            }
+      	  }
+          push @event, $msg; # generate one event per day entry
+        }
+      } 
+	  elsif($p =~ m/^04020000000005(..)(..)/) {
+        my ( $o1,    $v1) = (hex($1),hex($2));# only parse list 5 for chn 2
+        my $msg;
+        my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
+        if($o1 == 1) { ### bitfield containing multiple values...
+	      my %mode = (0 => "manual",1 => "auto",2 => "central",3 => "party");
+          push @event,'displayMode:temperature '.(($v1 & 1)?" and humidity":" only");
+          push @event,'displayTemp:'            .(($v1 & 2)?"setpoint"     :"actual");
+          push @event,'displayTempUnit:'        .(($v1 & 4)?"fahrenheit"   :"celsius");
+          push @event,'controlMode:'            .($mode{(($v1 & 0x18)>>3)});
+          push @event,'decalcDay:'              .$days[($v1 & 0xE0)>>5];
+        } 
+	    elsif($o1 == 2) {
+	      my %pos = (0=>"Auto",1=>"Closed",2=>"Open",3=>"unknown");		  
+          push @event,"tempValveMode:".$pos{(($v1 & 0xC0)>>6)};
+        } 
+	    else{
+	      push @event,'param-change: offset='.$o1.', value='.$v1;
+	    }
       }
-    } 
-	elsif($msgType eq "10" && $p =~ m/^04020000000005(..)(..)/) {
-      my ( $o1,    $v1) = (hex($1),hex($2));# only parse list 5 for chn 2
-      my $msg;
-      my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-      if($o1 == 1) { ### bitfield containing multiple values...
-	    my %mode = (0 => "manual",1 => "auto",2 => "central",3 => "party");
-        push @event,'displayMode:temperature '.(($v1 & 1)?" and humidity":" only");
-        push @event,'displayTemp:'            .(($v1 & 2)?"setpoint"     :"actual");
-        push @event,'displayTempUnit:'        .(($v1 & 4)?"fahrenheit"   :"celsius");
-        push @event,'controlMode:'            .($mode{(($v1 & 0x18)>>3)});
-        push @event,'decalcDay:'              .$days[($v1 & 0xE0)>>5];
-
-      } 
-	  elsif($o1 == 2) {
-	    my %pos = (0=>"Auto",1=>"Closed",2=>"Open",3=>"unknown");		  
-        push @event,"tempValveMode:".$pos{(($v1 & 0xC0)>>6)};
-      } 
-	  else{
-	    push @event,'param-change: offset='.$o1.', value='.$v1;
+	  elsif($p =~ m/^0[23]/){#param response
+	    push @event,'';#cannot be handled here as request missing
 	  }
-    }
+	}
     elsif($msgType eq "01"){
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
@@ -615,7 +613,7 @@ CUL_HM_Parse($$)
 	#read List5 reg 09 (offset) and 0A (err-pos)
 	#list 5 is channel-dependant not link dependant
 	#        => Link discriminator (00000000) is fixed
-    elsif($msgType eq "10" && $p =~ m/^0401000000000509(..)0A(..)/) {
+    elsif($msgType eq "10" && $p =~ m/^04..........0509(..)0A(..)/) {
       my (    $of,     $vep) = (hex($1), hex($2));
       push @event, "ValveErrorPosition:$vep%";
       push @event, "ValveOffset:$of%";
@@ -772,8 +770,7 @@ CUL_HM_Parse($$)
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$msgChn};
 	  if ($model eq "HM-OU-LED16") {
 	    #special: all LEDs map to device state
-        my $devState = $shash->{READINGS}{color}{VAL};
-	    $devState = "00000000" if (!$devState);
+        my $devState = ReadingsVal($name,"color","00000000");
 		if($parse eq "powerOn"){# reset LEDs after power on
 		  CUL_HM_PushCmdStack($shash,'++A011'.$id.$src."8100".$devState);
 		  CUL_HM_ProcessCmdStack($shash);
@@ -782,15 +779,13 @@ CUL_HM_Parse($$)
  	      my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
  	      my $mask = 3<<$bitLoc;
  	      my $value = (hex($devState) &~$mask)|($msgState<<$bitLoc);
-          $shash->{READINGS}{color}{TIME} = $tn;
-          $shash->{READINGS}{color}{VAL} = sprintf("%08X",$value);	 
+		  push @event,"color:".sprintf("%08X",$value);
  	      if ($chnHash){
- 	      $shash = $chnHash;
+ 	        $shash = $chnHash;
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
  	        my $actColor = $colorTable{$msgState};
  	        $actColor = "unknown" if(!$actColor);
-            $chnHash->{READINGS}{color}{TIME} = $tn;
-            $chnHash->{READINGS}{color}{VAL} = $actColor;
+		    CUL_HM_setRd($chnHash,"color",$actColor,$tn);
             push @event, "state:$actColor";			
  	      }
 		}
@@ -1042,10 +1037,9 @@ CUL_HM_Parse($$)
       }
     } 
 	else {
-      push @changed, "$vn: ".($vv)?$vv:"-";
+      push @changed, ($vn.": ".(($vv)?$vv:"-"));
     }
-    $shash->{READINGS}{$vn}{TIME} = $tn;
-    $shash->{READINGS}{$vn}{VAL} = $vv;
+	CUL_HM_setRd($shash,$vn,$vv,$tn);
   }
   $shash->{CHANGED} = \@changed;
   return $shash->{NAME} ;# shash could have changed to support channel
@@ -1348,7 +1342,7 @@ CUL_HM_Get($@)
 	  my @peers; # get all peers we have a reglist 
 	  my @listWp; # list that require peers
 	  foreach my $readEntry (keys %{$hash->{READINGS}}){
-        my $regs = $hash->{READINGS}{$readEntry}{VAL};
+        my $regs = ReadingsVal($hash->{NAME},$readEntry,"");
 	    if ($readEntry =~m /^RegL_/){ #this is a reg Reading "RegL_<list>:peerN
 		  my $peer = substr($readEntry,8);
 		  my $listP = substr($readEntry,6,1);
@@ -1980,8 +1974,7 @@ CUL_HM_Set($@)
 				                   Wed=>128,Thu=>160,Fri=>192});
 	return $a[2]."invalid for ".$cmd." select one of ". 
 	      join (" ",sort keys %{$regs{$cmd}}) if(!defined($regs{$cmd}{$a[2]}));
-    $hash->{READINGS}{$cmd}{TIME} = TimeNow(); # update new value
-    $hash->{READINGS}{$cmd}{VAL} = $a[2];
+    CUL_HM_setRd($hash,$cmd,$a[2],"");
     my $tcnf = 0;
     my $missingEntries; 
     foreach my $entry (keys %regs){
@@ -2039,8 +2032,7 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
 
     my $vn = "tempList$wd";
-    $hash->{READINGS}{$vn}{TIME} = TimeNow();
-    $hash->{READINGS}{$vn}{VAL} = $msg;
+	CUL_HM_setRd($hash,$vn,$msg,'');
   } 
   elsif($cmd eq "valvePos") { ##################
     my $vp = ($a[2]+0.5)*2.56;
@@ -2864,8 +2856,7 @@ CUL_HM_parseCommon(@){
 	  $reply = ($subType eq "01")?"ACKStatus":"ACK"; 
 	  $success = "yes";
 	}
-    $chnhash->{READINGS}{CommandAccepted}{TIME} = TimeNow();
-    $chnhash->{READINGS}{CommandAccepted}{VAL} = $success;
+	CUL_HM_setRd($chnhash,"CommandAccepted",$success,"");
     CUL_HM_ProcessCmdStack($shash); # see if there is something left
 	return $reply;
   }
@@ -2885,8 +2876,8 @@ CUL_HM_parseCommon(@){
 		}
 		my $peerFound = join (',',@peerList);
 		$peerFound =~ s/broadcast//;  # remove end indication, not a peer
- 	    $chnhash->{READINGS}{peerList}{VAL}.= ",".$peerFound;
- 	    $chnhash->{READINGS}{peerList}{TIME} = TimeNow();
+		my $pl = ReadingsVal($chnhash->{NAME},"peerList","").",".$peerFound;
+		CUL_HM_setRd($chnhash,"peerList",$pl,'');
 		
 		$peerFound = join (',',@peerID);
 		$peerFound =~ s/00000000//;
@@ -2950,16 +2941,16 @@ CUL_HM_parseCommon(@){
 		  }
 		}
 		my $regLN = "RegL_".$list.":".$shash->{helper}{respWait}{forPeer};
-        $chnhash->{READINGS}{$regLN}{VAL}.= " ".$data if($data);
-        $chnhash->{READINGS}{$regLN}{TIME}= TimeNow();
+		CUL_HM_setRd($chnhash,$regLN,
+		             ReadingsVal($chnName,$regLN,"")." ".$data,'');
 		if ($data =~m/00:00$/){ # this was the last message in the block
 		  if($list eq "00"){
 			my $name = CUL_HM_id2Name($src);
-		    $shash->{READINGS}{PairedTo}{VAL} = sprintf("%02X%02X%02X",
-		                        CUL_HM_getRegFromStore($name,10,0,"00000000"),
-		                        CUL_HM_getRegFromStore($name,11,0,"00000000"),
-		                        CUL_HM_getRegFromStore($name,12,0,"00000000"));
-		    $shash->{READINGS}{PairedTo}{TIME} = TimeNow();
+			CUL_HM_setRd($shash,"PairedTo",
+		                 sprintf("%02X%02X%02X",
+		                    CUL_HM_getRegFromStore($name,10,0,"00000000"),
+		                    CUL_HM_getRegFromStore($name,11,0,"00000000"),
+		                    CUL_HM_getRegFromStore($name,12,0,"00000000")),"");
 		  }
 		  CUL_HM_respPendRm($shash);
 		  delete $chnhash->{helper}{shadowReg}{$regLN};#remove shadowhash
@@ -2976,11 +2967,13 @@ CUL_HM_parseCommon(@){
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
 	  my $listName = "RegL_".$list.":".CUL_HM_id2Name($peerID);
 	  $listName =~ s/ /_/g; #remove blanks
-	  $chnHash->{READINGS}{$listName}{VAL} = "" 
-	  		if ($chnHash->{READINGS}{$listName}{VAL} =~m/00:00$/);
-	  $data =~ s/(..)(..)/ $1:$2/g;
-	  $chnHash->{READINGS}{$listName}{VAL}.= " ".$data;
-	  $chnHash->{READINGS}{$listName}{TIME}= TimeNow();
+	  $data =~ s/(..)(..)/ $1:$2/g;	  
+	  
+	  my $lN = ReadingsVal($chnHash->{NAME},$listName,"");
+	  $lN = "" if($lN =~m/00:00$/);#clear data if it was finished before
+	  $lN .= " ".$data;
+	  CUL_HM_setRdIfCh($chnHash,$listName,$lN,"");
+
 	  # todo: this is likely a set of messages. Postpone command stack processing
 	  # until end of transmission. Verify whether there is a conflict with a 
 	  # current operation and use timer supervision to abort
@@ -3159,17 +3152,15 @@ CUL_HM_pushConfig($$$$$$$$)
   $chnhash = $hash if (!$chnhash);
   if (!$chnhash->{helper}{shadowReg} ||
       !$chnhash->{helper}{shadowReg}{$regLN}){
-    if ($chnhash->{READINGS}{$regLN}){#readings are present
-    $chnhash->{helper}{shadowReg}{$regLN} = ($chnhash->{READINGS}{$regLN})?
-	                $chnhash->{READINGS}{$regLN}{VAL}:"";
-    }
+	$chnhash->{helper}{shadowReg}{$regLN} = 
+	           ReadingsVal($chnhash->{NAME},$regLN,"");
   }
   #--- update with ne value
   my $regs = $chnhash->{helper}{shadowReg}{$regLN};
   for(my $l = 0; $l < $tl; $l+=4) { #substitute changed bytes in shadow
     my $addr = substr($content,$l,2);
     my $data = substr($content,$l+2,2);
-    if(!($regs =~ s/$addr:../$addr:$data/)){
+    if(!$regs || !($regs =~ s/$addr:../$addr:$data/)){
       $regs .= " ".$addr.":".$data;
     }
   }
@@ -3309,8 +3300,7 @@ CUL_HM_ActCheck()
   my $tod = int(gettimeofday());
   my $actName = $actHash->{NAME};
   delete ($actHash->{READINGS}); #cleansweep
-  $actHash->{READINGS}{status}{VAL} = "check performed";
-  $actHash->{READINGS}{status}{TIME} = $tn;
+  CUL_HM_setRd($actHash,"status","check performed",$tn);
   foreach my $devId (split(",",$attr{$actName}{peerList})){
     my $devName = CUL_HM_id2Name($devId);
 	if(!$devName || !defined($attr{$devName}{actCycle})){
@@ -3348,6 +3338,13 @@ CUL_HM_ActCheck()
   $actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
   InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
   								   "CUL_HM_ActCheck", "ActionDetector", 0);
+}
+sub
+CUL_HM_setRd($$$$) #$hash,$rd,$val,$ts
+{#change all readings from here - till fhem.pl provides solution
+  my ($hash,$rd,$val,$ts) = @_; 
+  $ts = TimeNow() if (!$ts);
+  setReadingsVal($hash,$rd,$val,$ts);
 }
 sub
 CUL_HM_setRdIfCh($$$$)
