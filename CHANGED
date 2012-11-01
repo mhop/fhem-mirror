@@ -1,6 +1,7 @@
 - SVN
   - feature: optional second parameter to fhem() to make it silent
   - feature: autoloading commands, XmlList/etc renamed from 99 to 98.
+  - feature: FHEMWEB returns external files in chunks to save memory
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect, UntoggleIndirect

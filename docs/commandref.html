@@ -10866,8 +10866,10 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <a name="reverseLogs"></a>
     <li>reverseLogs<br>
         Display the lines from the logfile in a reversed order, newest on the
-        top, so that you don.t have to scroll down. Default is disabled / 0, as
-        it consumes less (half?) memory.
+        top, so that you dont have to scroll down to look at the latest entries.
+        Note: enabling this attribute will prevent FHEMWEB from streaming
+        logfiles, resulting in a considerably increased memory consumption
+        (about 6 times the size of the file on the disk).
         </li>
         <br>
 

@@ -9,7 +9,8 @@ use HttpUtils;
 
 #########################
 # Forward declaration
-sub FW_AnswerCall($);
+sub FW_IconURL($);
+sub FW_answerCall($);
 sub FW_calcWeblink($$);
 sub FW_dev2image($);
 sub FW_digestCgi($);
@@ -19,29 +20,30 @@ sub FW_fatal($);
 sub FW_fileList($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
-sub FW_makeTable($$@);
 sub FW_makeImage($);
-sub FW_SetDirs();
-sub FW_ReadIconsFrom($$);
-sub FW_ReadIcons($);
-sub FW_IconURL($);
+sub FW_makeTable($$@);
+sub FW_pH(@);
+sub FW_pHPlain(@);
+sub FW_pO(@);
+sub FW_pathList();
+sub FW_readIcons($);
+sub FW_readIconsFrom($$);
+sub FW_returnFileAsStream($$$$$);
 sub FW_roomOverview($);
 sub FW_select($$$$@);
+sub FW_serveSpecial($$$$);
+sub FW_setDirs();
 sub FW_showLog($);
 sub FW_showRoom();
 sub FW_showWeblink($$$$);
 sub FW_style($$);
 sub FW_submit($$@);
 sub FW_substcfg($$$$$$);
-sub FW_textfieldv($$$$);
 sub FW_textfield($$$);
+sub FW_textfieldv($$$$);
 sub FW_updateHashes();
 sub FW_zoomLink($$$);
 sub pF($@);
-sub FW_PathList();
-sub FW_pH(@);
-sub FW_pHPlain(@);
-sub FW_pO(@);
 
 use vars qw($FW_dir);     # base directory for web server: the first available
                           # from $modpath/www, $modpath/FHEM
@@ -69,13 +71,14 @@ use vars qw($FW_subdir);  # Sub-path in URL for extensions, e.g. 95_FLOORPLAN
 use vars qw(%FW_pos);     # scroll position
 use vars qw($FW_cname);   # Current connection name
 
-my $zlib_loaded;
-my $try_zlib = 1;
+my $FW_zlib_checked;
+my $FW_use_zlib = 1;
 
 #########################
 # As we are _not_ multithreaded, it is safe to use global variables.
 # Note: for delivering SVG plots we fork
 my @FW_httpheader; # HTTP header, line by line
+my @FW_enc;        # Accepted encodings (browser header)
 my %FW_webArgs;    # all arguments specified in the GET
 my $FW_cmdret;     # Returned data by the fhem call
 my $FW_data;       # Filecontent from browser when editing a file
@@ -97,13 +100,14 @@ my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
 my $FW_cors;       # Cross-origin resource sharing
+my $FW_headercors; # 
 my $FW_chash;      # client fhem hash
 #my $FW_encoding="ISO-8859-1";
 my $FW_encoding="UTF-8";
 
 
-# don't forget to amend FW_ServeSpecial if you change this!
-my $ICONEXTENSION = "gif|ico|png|jpg";
+# don't forget to amend FW_serveSpecial if you change this!
+my $ICONEXTENSION = "gif|ico|png|jpg|jpeg";
 
 
 #####################################
@@ -164,9 +168,9 @@ FW_Define($$)
         if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
 
-  FW_SetDirs;
+  FW_setDirs();
   # we do it only once at startup to save ressources at runtime
-  FW_ReadIcons($hash);
+  FW_readIcons($hash);
         
   my $ret = TcpServer_Open($hash, $port, $global);
 
@@ -206,14 +210,17 @@ FW_Read($)
 
   my $ll = GetLogLevel($FW_wname,4);
   my $c = $hash->{CD};
-  if(!$zlib_loaded && $try_zlib && AttrVal($FW_wname, "fwcompress", 1)) {
-    $zlib_loaded = 1;
-    eval { require Compress::Zlib; };
-    if($@) {
-      $try_zlib = 0;
-      Log 1, $@;
-      Log 1, "$FW_wname: Can't load Compress::Zlib, deactivating compression";
-      $attr{$FW_wname}{fwcompress} = 0;
+  if(!$FW_zlib_checked) {
+    $FW_zlib_checked = 1;
+    $FW_use_zlib = AttrVal($FW_wname, "fwcompress", 1);
+    if($FW_use_zlib) {
+      eval { require Compress::Zlib; };
+      if($@) {
+        $FW_use_zlib = 0;
+        Log 1, $@;
+        Log 1, "$FW_wname: Can't load Compress::Zlib, deactivating compression";
+        $attr{$FW_wname}{fwcompress} = 0;
+      }
     }
   }
 
@@ -239,11 +246,12 @@ FW_Read($)
   @FW_httpheader = split("[\r\n]", $hash->{BUF});
 
   my @origin = grep /Origin/, @FW_httpheader;
-  my $headercors = ($FW_cors ? "Access-Control-Allow-".$origin[0]."\r\n".
-                             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n".
-                             "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
-                             "Access-Control-Allow-Credentials: true\r\n".
-                             "Access-Control-Max-Age:86400\r\n" : "");
+  $FW_headercors = ($FW_cors ?
+              "Access-Control-Allow-".$origin[0]."\r\n".
+              "Access-Control-Allow-Methods: GET\r\n".
+              "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
+              "Access-Control-Allow-Credentials: true\r\n".
+              "Access-Control-Max-Age:86400\r\n" : "");
 
 
   #############################
@@ -259,7 +267,7 @@ FW_Read($)
       if($@) {
         Log 1, $@;
 
-     } else {
+      } else {
         my ($user, $password) = split(":", decode_base64($secret));
         $pwok = eval $basicAuth;
         Log 1, "basicAuth expression: $@" if($@);
@@ -267,7 +275,7 @@ FW_Read($)
     }
     if($headerOptions[0]) {
       print $c "HTTP/1.1 200 OK\r\n",
-             $headercors,
+             $FW_headercors,
              "Content-Length: 0\r\n\r\n";
       $hash->{BUF}="";
       return;
@@ -277,7 +285,7 @@ FW_Read($)
       my $msg = AttrVal($FW_wname, "basicAuthMsg", "Fhem: login required");
       print $c "HTTP/1.1 401 Authorization Required\r\n",
              "WWW-Authenticate: Basic realm=\"$msg\"\r\n",
-             $headercors,
+             $FW_headercors,
              "Content-Length: 0\r\n\r\n";
       $hash->{BUF}="";
       return;
@@ -285,7 +293,7 @@ FW_Read($)
   }
   #############################
   
-  my @enc = grep /Accept-Encoding/, @FW_httpheader;
+  @FW_enc = grep /Accept-Encoding/, @FW_httpheader;
   my ($mode, $arg, $method) = split(" ", $FW_httpheader[0]);
   $hash->{BUF} = "";
 
@@ -297,16 +305,15 @@ FW_Read($)
     return if(($arg =~ m/cmd=showlog/) && ($pid = fork));
   }
 
-  my $cacheable = FW_AnswerCall($arg);
+  my $cacheable = FW_answerCall($arg);
   return if($cacheable == -1); # Longpoll / inform request;
 
   my $compressed = "";
   if(($FW_RETTYPE =~ m/text/i ||
       $FW_RETTYPE =~ m/svg/i ||
       $FW_RETTYPE =~ m/script/i) &&
-     (int(@enc) == 1 && $enc[0] =~ m/gzip/) &&
-     $try_zlib &&
-     AttrVal($FW_wname, "fwcompress", 1)) {
+     (int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) &&
+     $FW_use_zlib) {
     $FW_RET = Compress::Zlib::memGzip($FW_RET);
     $compressed = "Content-Encoding: gzip\r\n";
   }
@@ -317,7 +324,7 @@ FW_Read($)
   Log $ll, "$arg / RL: $length / $FW_RETTYPE / $compressed / $expires";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
-           $expires, $compressed, $headercors,
+           $expires, $compressed, $FW_headercors,
            "Content-Type: $FW_RETTYPE\r\n\r\n",
            $FW_RET;
   exit if(defined($pid));
@@ -325,9 +332,9 @@ FW_Read($)
 
 ###########################
 sub
-FW_ServeSpecial($$$)
+FW_serveSpecial($$$$)
 {
-  my ($file,$ext,$dir)= @_;
+  my ($file,$ext,$dir,$cacheable)= @_;
   $file =~ s,\.\./,,g; # little bit of security
 
   if($ext eq "css") {
@@ -337,17 +344,14 @@ FW_ServeSpecial($$$)
     $file = "$prf$file" if(-f "$dir/$prf$file.$ext");
   }
 
-  #Debug "We serve $dir/$file.$ext";
-  open(FH, "$dir/$file.$ext") || return 0;
-  binmode(FH) if($ext =~ m/$ICONEXTENSION/); # necessary for Windows
-  FW_pO join("", <FH>);
-  close(FH);
   $FW_RETTYPE = ext2MIMEType($ext);
-  return 1;
+  #Log 1, "We serve $dir/$file.$ext, $FW_RETTYPE";
+  return FW_returnFileAsStream("$dir/$file.$ext", "",
+                                        $FW_RETTYPE, 0, $cacheable);
 }
   
 sub
-FW_SetDirs()
+FW_setDirs()
 {
 
   # web server root
@@ -408,7 +412,7 @@ FW_SetDirs()
 
 
 sub
-FW_AnswerCall($)
+FW_answerCall($)
 {
   my ($arg) = @_;
   my $me=$defs{$FW_cname};      # cache, else rereadcfg will delete us
@@ -428,39 +432,33 @@ FW_AnswerCall($)
 
   # Lets go:
   if($arg =~ m,^$FW_ME/docs/(.*)\.(html|txt|pdf)$,) {
-    return FW_ServeSpecial($1,$2,$FW_docdir);
+    return FW_serveSpecial($1, $2, $FW_docdir, 1);
 
   } elsif($arg =~ m,^${FW_ME}/css/(.*)\.css$,) {
-    return FW_ServeSpecial($1,"css",$FW_cssdir);
+    return FW_serveSpecial($1, "css", $FW_cssdir, 1);
 
   } elsif($arg =~ m,^${FW_ME}/js/(.*)\.js$,) {
-    return FW_ServeSpecial($1,"js",$FW_jsdir);
+    return FW_serveSpecial($1, "js", $FW_jsdir, 1);
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
-    my ($icon,$cachable) = ($1, 1);
+    my ($icon,$cacheable) = ($1, 1);
     #Debug "You want $icon which is " . $FW_icons{$icon};
     # if we do not have the icon, we convert the device state to the icon name
     $icon =~ s/\.($ICONEXTENSION)$//;
     if(!$FW_icons{$icon}) {
       $icon = FW_dev2image($icon);
       #Debug "We do not have it and thus use $icon which is ".$FW_icons{$icon};
-      $cachable = 0;
+      $cacheable = 0;
       return 0 if(!$icon);
     }
     $FW_icons{$icon} =~ m/(.*)\.($ICONEXTENSION)/;
-    my ($file,$ext)= ($1,$2);
-    
-    if(FW_ServeSpecial($file,$ext,$FW_icondir)) {
-      return $cachable;
-    } else {
-      return 0;
-    }
+    return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
   } elsif($arg !~ m/^$FW_ME(.*)/) {
     my $c = $me->{CD};
     Log 4, "$FW_wname: redirecting $arg to $FW_ME";
     print $c "HTTP/1.1 302 Found\r\n",
-             "Content-Length: 0\r\n",
+             "Content-Length: 0\r\n", $FW_headercors,
              "Location: $FW_ME\r\n\r\n";
     return -1;
 
@@ -495,21 +493,13 @@ FW_AnswerCall($)
 
   $FW_cmdret = $docmd ? FW_fC($cmd) : "";
 
-  my @origin = grep /Origin/, @FW_httpheader;
-  my $headercors = ($FW_cors ? 
-             "Access-Control-Allow-".$origin[0]."\r\n".
-             "Access-Control-Allow-Methods: GET, POST, OPTIONS\r\n".
-             "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
-             "Access-Control-Allow-Credentials: true\r\n".
-             "Access-Control-Max-Age:86400\r\n" : "");
-
   if($FW_inform) {      # Longpoll header
     $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
     # NTFY_ORDER is larger than the normal order (50-)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
-             $headercors,
+             $FW_headercors,
              "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
     return -1;
   }
@@ -532,7 +522,7 @@ FW_AnswerCall($)
     elsif($FW_room)   { $tgt .= "?room=$FW_room" }
     my $c = $me->{CD};
     print $c "HTTP/1.1 302 Found\r\n",
-             "Content-Length: 0\r\n",
+             "Content-Length: 0\r\n", $FW_headercors,
              "Location: $tgt\r\n",
              "\r\n";
     return -1;
@@ -614,7 +604,7 @@ FW_AnswerCall($)
      if($cmd =~ m/^style /)    { FW_style($cmd,undef);    }
   elsif($FW_detail)            { FW_doDetail($FW_detail); }
   elsif($FW_room)              { FW_showRoom();           }
-  elsif($cmd =~ /^logwrapper/) { FW_logWrapper($cmd);     }
+  elsif($cmd =~ /^logwrapper/) { return FW_logWrapper($cmd); }
   elsif(!$FW_cmdret && AttrVal("global", "motd", "none") ne "none") {
     my $motd = AttrVal("global","motd",undef);
     $motd =~ s/\n/<br>/g;
@@ -939,6 +929,14 @@ FW_roomOverview($)
      "Event monitor", "$FW_ME?cmd=style%20eventMonitor",
      "",           "");
   my $lastname = ","; # Avoid double "".
+
+  my $lfn = "Logfile";
+  if($defs{$lfn}) { # Add the current Logfile to the list if defined
+    my @l = FW_fileList($defs{$lfn}{logfile});
+    my $fn = pop @l;
+    splice @list, 4,0, ("Logfile","$FW_ME?cmd=logwrapper%20$lfn%20text%20$fn");
+  }
+
   for(my $idx = 0; $idx < @list; $idx+= 2) {
     next if($FW_hiddenroom{$list[$idx]} || $list[$idx] eq $lastname);
     push @list1, $list[$idx];
@@ -1186,37 +1184,93 @@ FW_fileList($)
   return sort @ret;
 }
 
+
+###################################
+# Stream big files in chunks, to avoid bloating ourselves.
+# This is a "terminal" function, no data can be appended after it is called.
+sub
+FW_outputChunk($$$)
+{
+  my ($c, $buf, $d) = @_;
+  $buf = $d->deflate($buf) if($d);
+  print $c sprintf("%x\r\n", length($buf)), $buf, "\r\n" if(length($buf));
+}
+
+sub
+FW_returnFileAsStream($$$$$)
+{
+  my ($path, $suffix, $type, $doEsc, $cacheable) = @_;
+  if(!open(FH, $path)) {
+    FW_pO "<div id=\"content\">$path: $!</div>";
+    return 0;
+  }
+  binmode(FH) if($type !~ m/text/); # necessary for Windows
+
+  my $c = $FW_chash->{CD};
+  my $expires = $cacheable ? ("Expires: ".localtime(time()+900)." GMT\r\n"): "";
+  my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
+                "Content-Encoding: gzip\r\n" : "";
+  print $c "HTTP/1.1 200 OK\r\n",
+           $compr, $expires, $FW_headercors,
+           "Transfer-Encoding: chunked\r\n",
+           "Content-Type: $type; charset=$FW_encoding\r\n\r\n";
+
+  my $d = Compress::Zlib::deflateInit(-WindowBits=>31) if($compr);
+  FW_outputChunk($c, $FW_RET, $d);
+  my $buf;
+  while(sysread(FH, $buf, 2048)) {
+    if($doEsc) { # FileLog special
+      $buf =~ s/</&lt;/g;
+      $buf =~ s/>/&gt;/g;
+    }
+    FW_outputChunk($c, $buf, $d);
+  }
+  close(FH);
+  FW_outputChunk($c, $suffix, $d);
+
+  if($compr) {
+    $buf = $d->flush();
+    print $c sprintf("%x\r\n", length($buf)), $buf, "\r\n" if($buf);
+  }
+  print $c "0\r\n\r\n";
+  return -1;
+}
+
 ######################
 # Show the content of the log (plain text), or an image and offer a link
 # to convert it to a weblink
+# If text and no reverse required, try to return the data as a stream;
 sub
 FW_logWrapper($)
 {
   my ($cmd) = @_;
   my (undef, $d, $type, $file) = split(" ", $cmd, 4);
-
-  if($type eq "text") {
+  if(defined($type) && $type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
     $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
 
-    if(!open(FH, $path)) {
-      FW_pO "<div id=\"content\">$path: $!</div>";
-      return;
-    }
+    FW_pO "<div id=\"content\">";
+    FW_pO "<div class=\"tiny\">" if($FW_ss);
+    FW_pO "<pre>";
+    my $suffix = "</pre>".($FW_ss ? "</div>" : "")."</div>";
 
     my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
-    binmode (FH); # necessary for Windows
-    my $cnt = join("", $reverseLogs ? reverse <FH> : <FH>);
+    if(!$reverseLogs) {
+      $suffix .= "</body></html>";
+      return FW_returnFileAsStream($path, $suffix, "text/html", 1, 0);
+    }
+
+    if(!open(FH, $path)) {
+      FW_pO "<div id=\"content\">$path: $!</div></body></html>";
+      return 0;
+    }
+    my $cnt = join("", reverse <FH>);
     close(FH);
     $cnt =~ s/</&lt;/g;
     $cnt =~ s/>/&gt;/g;
-
-    FW_pO "<div id=\"content\">";
-    FW_pO "<div class=\"tiny\">" if($FW_ss);
-    FW_pO "<pre>$cnt</pre>";
-    FW_pO "</div>" if($FW_ss);
-    FW_pO "</div>";
+    FW_pO $cnt;
+    FW_pO $suffix;
 
   } else {
     FW_pO "<div id=\"content\">";
@@ -1246,6 +1300,8 @@ FW_logWrapper($)
     FW_pO "</div>";
 
   }
+  FW_pO "</body></html>";
+  return 0;
 }
 
 sub
@@ -1758,7 +1814,7 @@ FW_style($$)
     } else {
       $attr{$FW_wname}{stylesheetPrefix} = $a[2];
     }
-    FW_ReadIcons($defs{$FW_wname});
+    FW_readIcons($defs{$FW_wname});
     FW_pO "${start}Reload the page in the browser.$end";
 
   } elsif($a[1] eq "edit") {
@@ -2061,7 +2117,7 @@ FW_Attr(@)
     } else {
       delete $attr{$name}{$a[2]};
     }
-    FW_ReadIcons($hash);
+    FW_readIcons($hash);
 
   }
 
@@ -2073,7 +2129,7 @@ FW_Attr(@)
 # recursion starts at $FW_icondir/$dir
 # filenames are relative to $FW_icondir
 sub
-FW_ReadIconsFrom($$)
+FW_readIconsFrom($$)
 {
   my ($prepend,$dir)= @_;
   return if($dir =~ m,/\.svn,);
@@ -2091,7 +2147,7 @@ FW_ReadIconsFrom($$)
     #Debug " entry: \"$entry\", filename= \"$filename\"";
 
     if( -d "${FW_icondir}/${filename}" ) {      # entry is a directory
-      FW_ReadIconsFrom("${prepend}${entry}/", $filename)
+      FW_readIconsFrom("${prepend}${entry}/", $filename)
         unless($entry eq "." || $entry eq "..");
 
     } elsif( -f "${FW_icondir}/${filename}") {  # entry is a regular file
@@ -2106,7 +2162,7 @@ FW_ReadIconsFrom($$)
 }
 
 sub
-FW_ReadIcons($)
+FW_readIcons($)
 {
   my ($hash)= @_;
   my $name = $hash->{NAME};
@@ -2114,21 +2170,21 @@ FW_ReadIcons($)
   %FW_icons = ();
 
   # read icons from default directory
-  FW_ReadIconsFrom("", "default");
+  FW_readIconsFrom("", "default");
 
   # read icons from stylesheet specific directory, icons found here supersede
   # default icons with same name. Smallscreen a special "stylesheet"
   my $prefix = AttrVal($name, "smallscreen", "") ? "smallscreen" : "";
   $prefix = AttrVal($name, "stylesheetPrefix", $prefix);
-  FW_ReadIconsFrom("", "$prefix") unless($prefix eq "");
+  FW_readIconsFrom("", "$prefix") unless($prefix eq "");
 
   # read icons from explicit directory, icons found here supersede all other
   # icons with same name
   my $iconpath= AttrVal($name, "iconpath", "");
-  FW_ReadIconsFrom("", "$iconpath") unless($iconpath eq "");
+  FW_readIconsFrom("", "$iconpath") unless($iconpath eq "");
 
   # if now icons were found so far, read icons from icondir itself
-  FW_ReadIconsFrom("", "") unless(%FW_icons);
+  FW_readIconsFrom("", "") unless(%FW_icons);
 
   my %icons = %FW_icons;
   $hash->{fhemIcons} = \%icons;
@@ -2409,7 +2465,7 @@ FW_devState($$)
 
 #####################################
 sub
-FW_PathList()
+FW_pathList()
 {
    return "web server root:      $FW_dir\n".
           "icon directory:       $FW_icondir\n".
@@ -2434,7 +2490,7 @@ FW_Get($@)
     return defined($icon) ? $icon : "no such icon";
 
   } elsif($arg eq "pathlist") {
-    return FW_PathList();
+    return FW_pathList();
 
   } else {
     return "Unknown argument $arg choose one of icon pathlist";
@@ -2454,7 +2510,7 @@ FW_Set($@)
   return "Unknown argument $a[1], choose one of " . "rereadicons"
         unless($a[1] eq "rereadicons");
 
-  FW_ReadIcons($hash);
+  FW_readIcons($hash);
   return undef;
 }
 
