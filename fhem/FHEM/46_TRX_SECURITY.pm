@@ -180,7 +180,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	if (!$def) {
 	Log 1, "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
         	Log 3, "TRX_SECURITY: TRX_SECURITY Unknown device $device_name, please define it";
-       		return "";
+       		return "UNDEFINED $device_name TRX_SECURITY $dev_type $device $dev_reading";
 	}
   }
 
@@ -245,7 +245,7 @@ sub TRX_SECURITY_parse_X10Sec {
   }
 
   my $battery_level = $bytes->[7] & 0x0f;
-  if (($battery eq "") && ($dev_type ne "kd101")) {
+  if (($battery eq "") && ($dev_type ne "KD101")) {
 	if ($battery_level == 0x9) { $battery = 'batt_ok'}
 	elsif ($battery_level == 0x0) { $battery = 'batt_low'}
 	else {
@@ -261,11 +261,11 @@ sub TRX_SECURITY_parse_X10Sec {
   my $tm = TimeNow();
   my $val = "";
 
-  my $device_type = $def->{TRX_SECURITY_type};
+  my $device_type = uc($def->{TRX_SECURITY_type});
 
   my $sensor = "";
 
-  if ($device_type eq "sd90") {
+  if ($device_type eq "SD90") {
 	$sensor = $firstdevice == 1 ? $def->{TRX_SECURITY_devicelog} : $def->{TRX_SECURITY_devicelog2};
   } else {
   	$sensor = $def->{TRX_SECURITY_devicelog};
@@ -280,13 +280,14 @@ sub TRX_SECURITY_parse_X10Sec {
 
   readingsBeginUpdate($def);
 
-  if (($dev_type ne "kr18") || ($dev_type ne "VISONIC_REMOTE")) {  
+  if (($device_type ne "KR18") || ($device_type ne "VISONIC_REMOTE")) {  
   	if ($firstdevice == 1) {
 		$val .= $current;
   	}
 	readingsUpdate($def, $sensor, $current);
 
-  	if (($def->{STATE} ne $val)) {
+	# KD101 does not show normal, so statechange does not make sense
+  	if (($def->{STATE} ne $val) && ($device_type ne "KD101")) { 
 		$sensor = "statechange";
 		readingsUpdate($def, $sensor, $current);
   	}
