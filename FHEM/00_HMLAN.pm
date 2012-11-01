@@ -302,11 +302,11 @@ HMLAN_Parse($$)
     $dmsg .= "NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
 
     $hash->{uptime} = HMLAN_uptime($mFld[2]);
-	$hash->{RSSI}   = hex($mFld[4]);
+	$hash->{RSSI}   = hex($mFld[4])-65536;
     $hash->{RAWMSG} = $rmsg;
     $hash->{"${name}_MSGCNT"}++;
     $hash->{"${name}_TIME"} = TimeNow();
-    my %addvals = (RAWMSG => $rmsg, RSSI => hex($mFld[4]));
+    my %addvals = (RAWMSG => $rmsg, RSSI => hex($mFld[4])-65536);
     Dispatch($hash, $dmsg, \%addvals);
   }
   elsif($mFld[0] eq 'HHM-LAN-IF'){#@mFld=(undef,$vers,$serno,$d1,$owner,$msec,$d2)
