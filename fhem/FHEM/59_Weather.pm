@@ -248,7 +248,7 @@ sub Weather_RetrieveData($)
 
           ### current condition 
           if ($tag eq "yweather:condition" ) {
-             my $temp = (($value =~/temp="([0-9.]*?)".*/) ? $1 : undef);
+             my $temp = (($value =~/temp="(-?[0-9.]*?)".*/) ? $1 : undef);
              if ($temp) { 
                 readingsUpdate($hash, "temperature", $temp); 
                 readingsUpdate($hash, "temp_c", $temp); # compatibility
@@ -267,9 +267,9 @@ sub Weather_RetrieveData($)
 
           ### forecast 
           if ($tag eq "yweather:forecast" ) {
-             my $low_c = (($value =~/low="([0-9.]*?)".*/) ? $1 : undef);
+             my $low_c = (($value =~/low="(-?[0-9.]*?)".*/) ? $1 : undef);
              if ($low_c) { readingsUpdate($hash, $prefix . "low_c", $low_c); }  
-             my $high_c = (($value =~/high="([0-9.]*?)".*/) ? $1 : undef);
+             my $high_c = (($value =~/high="(-?[0-9.]*?)".*/) ? $1 : undef);
              if ($high_c) { readingsUpdate($hash, $prefix . "high_c", $high_c); }  
              my $day1 = (($value =~/day="(.*?)" .*/) ? $1 : undef); # forecast
              if ($day1) { 
@@ -294,7 +294,7 @@ sub Weather_RetrieveData($)
 
           ### wind
           if ($tag eq "yweather:wind" ) {
-            $value =~/chill="([0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
+            $value =~/chill="(-?[0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
             readingsUpdate($hash, "wind_chill", $1) if (defined($1)); 
             readingsUpdate($hash, "wind_direction", $2) if (defined($2));
             my $windspeed= defined($3) ? int($3+0.5) : "";
