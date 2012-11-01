@@ -6,6 +6,7 @@ package main;
 
 use strict;
 use warnings;
+#use Time::HiRes qw(gettimeofday);
 
 sub CUL_HM_Initialize($);
 sub CUL_HM_Define($$);
@@ -465,6 +466,10 @@ CUL_HM_Parse($$)
 		CUL_HM_setRd($dhash,"state","set_$vp %",$tn);
       }
     }
+    elsif(($msgType eq '02' &&$sType eq '01')|| # ackStatus
+	      ($msgType eq '10' &&$sType eq '06')){  #infoStatus
+      push @event, "desired-temp:" .sprintf("%0.1f", hex(substr($p,4,2))/2);
+    }
     elsif($msgType eq "10"){
       if(   $p =~ m/^0403(......)(..)0505(..)0000/) {
 	    # change of chn 3(window) list 5 register 5 - a peer window changed!
@@ -559,10 +564,6 @@ CUL_HM_Parse($$)
 	  }
     }
 #          ($cmd eq "A112" && $p =~ m/^0202(..)$/)) {    # Set desired temp
-    elsif(($msgType eq '02' &&$sType eq '01')|| # ackStatus
-	      ($msgType eq '10' &&$sType eq '06')){  #infoStatus
-      push @event, "desired-temp:" .sprintf("%0.1f", hex(substr($p,4,2))/2);
-    }
     elsif($cmd eq "A03F" && $id eq $dst) {              # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
       CUL_HM_SendCmd($shash, "++803F$id${src}0204$s2000",1,0);
@@ -2220,11 +2221,11 @@ CUL_HM_Set($@)
 	  }
 	}
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
+	$rxType = CUL_HM_getRxType($devHash);
   }
 
   $hash->{STATE} = $state if($state); 
   Log GetLogLevel($name,3), "CUL_HM set $name " . join(" ", @a[1..$#a]);
-
   CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
   return "";
 }
@@ -2392,7 +2393,7 @@ CUL_HM_responseSetup($$$)
   my ($msgId, $msgType,$dst,$p) = ($2,$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-  my $rTo = 1.5; #default rsponse timeout
+  my $rTo = 2; #default rsponse timeout
   if ($msgType eq "01" && $subType){ 
     if ($subType eq "03"){ #PeerList-------------
   	  #--- remember request params in device level
@@ -2495,6 +2496,7 @@ CUL_HM_respPendTout($)
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
+
 	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");
   }
 }
@@ -2504,7 +2506,7 @@ CUL_HM_respPendToutProlong($)
 {#used when device sends part responses
   my ($hash) =  @_;  
 
-  #RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer?
+  RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer?
   InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
 ###################################
@@ -2884,7 +2886,7 @@ CUL_HM_parseCommon(@){
 		$peerFound =~ s/00000000//;
 		$chnhash->{helper}{peerList}.= ",".$peerFound;
 		
-		if ($p =~ m/00000000$/) {# last entry, peerList is complete
+		if ($p =~ m/000000..$/) {# last entry, peerList is complete
 		  CUL_HM_respPendRm($shash);
 
 		  # check for request to get List3 data
