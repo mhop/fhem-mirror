@@ -1421,7 +1421,8 @@ my %culHmSubTypeSets = (
   pushButton =>										
         { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
   virtual => 
-        { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+        { raw      => "data ...",
+		  devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
 		  press      => "[long|short]...",
 		  virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
@@ -1714,7 +1715,7 @@ CUL_HM_Set($@)
     my $reg  = $culHmRegDefine{$regName};
 	return $st." - ".$regName            # give some help
 	       ." range:". $reg->{min}." to ".$reg->{max}.$reg->{u}
-		   .($reg->{l} == 3)?" peer required":""." : ".$reg->{t}."\n" 
+		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		        if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
 	        if ($data < $reg->{min} ||$data > $reg->{max});
@@ -1828,7 +1829,7 @@ CUL_HM_Set($@)
   }
   elsif($cmd eq "pct") { ######################################################
     $a[1] = 100 if ($a[1] > 100);
-    $tval = CUL_HM_encodeTime16((@a > 2)?$a[2]:85825945);# onTime   0.0..85825945.6, 0=forever
+    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[2]!=0)?$a[2]:85825945);# onTime   0.0..85825945.6, 0=forever
     $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..85825945.6, 0=immediate
     CUL_HM_PushCmdStack($hash, 
 	    sprintf("++%s11%s%s02%s%02X%s%s",$flag,$id,$dst,$chn,$a[1]*2,$rval,$tval));
@@ -2400,7 +2401,6 @@ CUL_HM_responseSetup($$$)
       
       # define timeout - holdup cmdStack until response complete or timeout
   	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
-  		  
   	  #--- remove readings in channel
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
   	  $chnhash = $hash if (!$chnhash);
@@ -2503,7 +2503,8 @@ sub
 CUL_HM_respPendToutProlong($) 
 {#used when device sends part responses
   my ($hash) =  @_;  
-  RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer?
+
+  #RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer?
   InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
 ###################################
@@ -3301,7 +3302,7 @@ CUL_HM_ActCheck()
   my $actName = $actHash->{NAME};
   delete ($actHash->{READINGS}); #cleansweep
   CUL_HM_setRd($actHash,"status","check performed",$tn);
-  foreach my $devId (split(",",$attr{$actName}{peerList})){
+  foreach my $devId (split(",",AttrVal($actName,"peerList","none"))){
     my $devName = CUL_HM_id2Name($devId);
 	if(!$devName || !defined($attr{$devName}{actCycle})){
 	  CUL_HM_ActDel($devId); 
