@@ -10101,7 +10101,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <br>
 </ul>
 
-<a name="YAMAHA_AVR"></a>
+<a name="
+YAMAHA_AVR"></a>
 <h3>YAMAHA_AVR</h3>
 <ul>
 
@@ -10174,7 +10175,17 @@ volume</pre>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
-
+    <li><a name="volume-smooth-change">volume-smooth-change</a><li><br>
+	Optional attribute to activate a smooth volume change.
+	<br><br>
+	Possible values: 0 => off , 1 => on
+    <li><a name="volume-smooth-steps">volume-smooth-steps</a></li><br>
+	Optional attribute to define the number of volume changes between the
+        current and the desired volume. Default value is 5 steps
+    <li><a name="volume-smooth-time">volume-smooth-time</a></li><br>
+       Optional attribute to define the time window for the volume smoothing in seconds.
+       For example the value 2 means the smooth process in general should take 2 seconds.
+       The value 0 means "as fast as possible". Default value is 0.
   </ul>
 <br>
   <b>Implementator's note</b>
