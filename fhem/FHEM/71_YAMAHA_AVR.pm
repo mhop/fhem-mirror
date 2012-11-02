@@ -14,11 +14,7 @@
 # Of course there are more possibilities than these 4 commands.
 # But in my oppinion these are the most relevant usecases within FHEM.
 #
-# For more commands, please email me.
-#
-# Written by Notausstieg (Notausstieg0309[at]googlemail[dot]com)
-#
-# 29.10.2012
+# $Id$
 #
 ###################################
 
