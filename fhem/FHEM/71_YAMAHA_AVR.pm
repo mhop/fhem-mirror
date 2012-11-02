@@ -22,12 +22,13 @@ package main;
 
 use strict;
 use warnings;
-#use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday sleep);
 
 
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
 sub YAMAHA_AVR_GetStatus($);
+sub YAMAHA_AVR_Undefine($$);
 
 
 
@@ -43,16 +44,17 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5 subType event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5 volume-smooth-change:0,1 volume-smooth-time:0,1,2,3,4,5 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 event-on-update-reading event-on-change-reading";
 }
 
 ###################################
 sub
-YAMAHA_AVR_GetStatus($)
+YAMAHA_AVR_GetStatus($$)
 {
-    my ($hash) = @_;
+    my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
+    $local = 0 if(!defined($local));
     
     return "" if(!defined($hash->{ADDRESS}) or !defined($hash->{INTERVAL}));
     
@@ -89,7 +91,7 @@ YAMAHA_AVR_GetStatus($)
     
     readingsEndUpdate($hash, 1);
     
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless $local == 0;
     
     Log GetLogLevel($name,4), "YAMAHA_AVR $name: $hash->{STATE}";
     
@@ -109,7 +111,7 @@ YAMAHA_AVR_Get($@)
     
     if($what =~ /^(power|input|volume|mute)$/)
     {
-        YAMAHA_AVR_GetStatus($hash);
+        YAMAHA_AVR_GetStatus($hash, 1);
         if(defined($hash->{READINGS}{$what}))
         {
     	    return $a[0]." ".$what." => ".$hash->{READINGS}{$what}{VAL};
@@ -229,7 +231,44 @@ YAMAHA_AVR_Set($@)
 	{
 	    if($hash->{STATE} eq "on")
 	    {
-		SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+		if(AttrVal($name, "volume-smooth-change", "0") eq "1")
+		{
+		    my $diff = int(($a[2] - $hash->{READINGS}{volume_level}{VAL}) / AttrVal($hash->{NAME}, "volume-smooth-steps", 5) / 0.5) * 0.5;
+		    my $steps = AttrVal($name, "volume-smooth-steps", 5);
+		    my $current_volume = $hash->{READINGS}{volume_level}{VAL};
+		    my $time = AttrVal($name, "volume-smooth-time", 0);
+		    my $sleep = $time / $steps;
+
+		    if($diff > 0)
+		    {
+		        Log GetLogLevel($name, 4), "YAMAHA_AV: use smooth volume change (with $steps steps of +$diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
+		    }
+		    else
+		    {
+			Log GetLogLevel($name, 4), "YAMAHA_AV: use smooth volume change (with $steps steps of $diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
+		    }
+	
+		    # Only if smoohing is really needed (step difference is not zero)
+		    if($diff != 0)
+		    {
+			for(my $step = 1; $step <= $steps; $step++)
+			{
+			    Log GetLogLevel($name, 4), "YAMAHA_AV: set volume to ".($current_volume + ($diff * $step))." dB";
+			
+			    SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+			
+				sleep $sleep unless ($time == 0);
+			}
+		    }
+		    
+		    # After complete smoothing, set the real wanted volume
+		    Log GetLogLevel($name, 4), "YAMAHA_AV set volume to ".$a[2]." dB";
+		    SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+		}
+		else
+		{
+		    SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+		}
 	    }
 	    else
 	    {
@@ -247,7 +286,7 @@ YAMAHA_AVR_Set($@)
     }
     readingsEndUpdate($hash, 1);
     
-    YAMAHA_AVR_GetStatus($hash);
+    YAMAHA_AVR_GetStatus($hash, 1);
     return undef;
     
 }
@@ -312,7 +351,8 @@ YAMAHA_AVR_Define($$)
     {
 	$hash->{INTERVAL}=30;
     }
-
+    $attr{$name}{"volume-smooth-change"} = "1";
+    
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
   
   return undef;
