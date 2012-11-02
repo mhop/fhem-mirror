@@ -49,7 +49,7 @@ YAMAHA_AVR_Initialize($)
 
 ###################################
 sub
-YAMAHA_AVR_GetStatus($$)
+YAMAHA_AVR_GetStatus($;$)
 {
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
