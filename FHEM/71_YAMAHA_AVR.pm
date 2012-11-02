@@ -86,7 +86,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
-	readingsUpdate($hash, "input", lc($1));
+	readingsUpdate($hash, "input", InputParamToFhemInput(lc($1), 0));
     }
     
     readingsEndUpdate($hash, 1);
