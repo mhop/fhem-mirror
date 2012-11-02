@@ -136,12 +136,17 @@ YAMAHA_AVR_Set($@)
     my $name = $hash->{NAME};
     my $address = $hash->{ADDRESS};
     my $result = "";
-    my $inputs_piped = $hash->{INPUTS};
-    
+    my $command;
+    my $inputs_piped = InputParamToFhemInput(lc($hash->{INPUTS}), 0);
+    my $inputs_comma = InputParamToFhemInput(lc($hash->{INPUTS}), 1);
+   
     return "No Argument given" if(!defined($a[1]));
-    
+     Log 2, "inputs_piped: $inputs_piped";
+     Log 2, "inputs_comma: $inputs_comma";
+     
+ 
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$hash->{INPUTS}." mute:on,off statusRequest";
+    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off statusRequest";
 
     readingsBeginUpdate($hash);
     if($what eq "on")
@@ -169,17 +174,14 @@ YAMAHA_AVR_Set($@)
 	        
 		if($a[2] =~ /^($inputs_piped)$/)
 		{
-		    if($a[2] eq "netradio")
+		    $command = getCommandParam($hash, $a[2]);
+		    if(defined($command) and length($command) > 0)
 		    {
-			$result = SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>NET RADIO</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
-		    }
-		    elsif($a[2] eq "airplay")
-		    {
-			$result = SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>AirPlay</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
+			$result = SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>".$command."</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
 		    }
 		    else
 		    {
-			$result = SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>".uc($a[2])."</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
+			return "invalid input: ".$a[2];
 		    }
 
 		    if(not $result =~ /RC="0"/)
@@ -325,20 +327,15 @@ YAMAHA_AVR_Define($$)
     
     foreach (sort @inputs)
     {
-	if($_ =~ /<Param>(.+?)<\/Param>/ and not $1 =~ /iPod/)
+	if($_ =~ /<Param>(.+?)<\/Param>/)
 	{
 	    if(defined($hash->{INPUTS}) and length($hash->{INPUTS}) > 0)
 	    {
-	      $hash->{INPUTS} .= ",";
+	      $hash->{INPUTS} .= "|";
 	    }
-	    if($1 eq "NET RADIO")
-	    {
-		$hash->{INPUTS} .= "netradio";
-	    }
-	    else
-	    {
-		$hash->{INPUTS} .= lc($1);
-	    }
+	  
+	      $hash->{INPUTS} .= $1;
+	    
 	}
     }
     
@@ -376,5 +373,44 @@ YAMAHA_AVR_Undefine($$)
   RemoveInternalTimer($hash);
   return undef;
 }
+
+
+#############################
+# Converts all Inputs to FHEM usable command lists
+sub InputParamToFhemInput($$)
+{
+    my ($inputs, $replace_pipes) = @_;
+
+   
+    $inputs =~ s/\s+//g;
+    $inputs =~ s/,//g;
+    $inputs =~ s/\(.+?\)//g;
+    $inputs =~ s/\|/,/g if($replace_pipes == 1);
+
+    return $inputs;
+}
+
+#############################
+# Returns the Yamaha Parameter Name for the FHEM like input channel
+sub getCommandParam($$)
+{
+   my ($hash, $command) = @_;
+   my $item;
+   my @commands = split("\\|", $hash->{INPUTS});
+
+    foreach $item (@commands)
+    {
+	if(lc(InputParamToFhemInput($item, 0)) eq $command)
+	{
+	    return $item;
+	}
+    
+    }
+    
+    return undef;
+    
+}
+
+
 
 1;
