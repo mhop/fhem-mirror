@@ -1,4 +1,6 @@
 - SVN
+  - feature: new Module 71_YAMAHA_AVR.pm for controlling Yamaha AV receivers
+             over network (by Markus)
   - feature: optional second parameter to fhem() to make it silent
   - feature: autoloading commands, XmlList/etc renamed from 99 to 98.
   - feature: FHEMWEB returns external files in chunks to save memory
