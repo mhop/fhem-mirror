@@ -140,10 +140,7 @@ YAMAHA_AVR_Set($@)
     my $inputs_piped = InputParamToFhemInput(lc($hash->{INPUTS}), 0);
     my $inputs_comma = InputParamToFhemInput(lc($hash->{INPUTS}), 1);
    
-    return "No Argument given" if(!defined($a[1]));
-     Log 2, "inputs_piped: $inputs_piped";
-     Log 2, "inputs_comma: $inputs_comma";
-     
+    return "No Argument given" if(!defined($a[1]));     
  
     my $what = $a[1];
     my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off statusRequest";
