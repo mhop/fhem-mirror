@@ -54,7 +54,7 @@ YAMAHA_AVR_GetStatus($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
-    $local = 0 if(!defined($local));
+    $local = 0 unless(defined($local));
     
     return "" if(!defined($hash->{ADDRESS}) or !defined($hash->{INTERVAL}));
     
@@ -91,7 +91,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     readingsEndUpdate($hash, 1);
     
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless $local == 0;
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
     
     Log GetLogLevel($name,4), "YAMAHA_AVR $name: $hash->{STATE}";
     
@@ -353,7 +353,7 @@ YAMAHA_AVR_Define($$)
     }
     $attr{$name}{"volume-smooth-change"} = "1";
     
-    InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
+    InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", ($hash, 0), 0);
   
   return undef;
 }
