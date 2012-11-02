@@ -92,6 +92,7 @@
       <a href="#EMGZ">EMGZ</a> &nbsp;
       <a href="#EMWZ">EMWZ</a> &nbsp;
       <a href="#ESA2000">ESA2000</a> &nbsp;
+      <a href="#FB_CALLMONITOR">FB_CALLMONITOR</a> &nbsp;
       <a href="#FHT">FHT</a> &nbsp;
       <a href="#FHT8V">FHT8V</a> &nbsp;
       <a href="#FHZ">FHZ</a> &nbsp;
@@ -2071,6 +2072,63 @@ A line ending with \ will be concatenated with the next one, so long lines
      the device.
   </ul>
 </ul>
+
+<a name="FB_CALLMONITOR"></a>
+<h3>FB_CALLMONITOR</h3>
+<ul>
+  <tr><td>
+  The FB_CALLMONITOR module connects to a AVM FritzBox Fon and listens for telephone
+  events (Receiving incoming call, Making a call)
+  <br><br>
+  In order to use this module with fhem you <b>must</b> enable the CallMonitor feature via 
+  telephone shortcode.<br><br>
+  <ul>
+      <code>#96*5* - for activating<br>#96*4* - for deactivating</code>
+  </ul>
+  
+  <br>
+  Just dial the shortcode for activating on one of your phones, after 3 seconds just hang up. The feature is now activated.
+  <br>
+  After activating the CallMonitor-Support in your FritzBox, this module is able to 
+  generate an event for each call.
+  <br><br>
+  This module work with any FritzBox Fon model.
+  <br><br>
+  
+  <a name="FB_CALLMONITORdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FB_CALLMONITOR &lt;ip-address&gt;[:port]</code><br>
+    <br>
+    port is 1012 by default.
+    <br>
+  </ul>
+  <br>
+
+  <a name="FB_CALLMONITORset"></a>
+  <b>Set</b>
+  <ul>
+  N/A 
+  </ul>
+  <br>
+
+  <a name="FB_CALLMONITORget"></a>
+  <b>Get</b>
+  <ul>
+  N/A
+  </ul>
+  <br>
+  <br>
+
+  <a name="FB_CALLMONITORattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+</ul>
+
 
 <a name="FHT"></a>
 <h3>FHT</h3>
