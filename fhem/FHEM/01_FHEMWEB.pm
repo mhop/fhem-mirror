@@ -1252,7 +1252,7 @@ FW_logWrapper($)
 
     FW_pO "<div id=\"content\">";
     FW_pO "<div class=\"tiny\">" if($FW_ss);
-    FW_pO "<pre>";
+    FW_pO "<pre class=\"log\">";
     my $suffix = "</pre>".($FW_ss ? "</div>" : "")."</div>";
 
     my $reverseLogs = AttrVal($FW_wname, "reverseLogs", 0);
