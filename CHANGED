@@ -1,4 +1,5 @@
 - SVN
+  - feature: new Module 72_FB_CALLMONITOR for receiving telephone call events (Markus)
   - feature: new Module 71_YAMAHA_AVR.pm for controlling Yamaha AV receivers
              over network (by Markus)
   - feature: optional second parameter to fhem() to make it silent
