@@ -97,6 +97,7 @@
       <a href="#FHT8V">FHT8V</a> &nbsp;
       <a href="#FHZ">FHZ</a> &nbsp;
       <a href="#FS20">FS20</a> &nbsp;
+      <a href="#HCS">HCS</a> &nbsp;
       <a href="#HMS">HMS</a> &nbsp;
       <a href="#HMLAN">HMLAN</a> &nbsp;
       <a href="#HOL">HOL</a> &nbsp;
@@ -2637,6 +2638,138 @@ A line ending with \ will be concatenated with the next one, so long lines
 
 </ul>
 
+<a name="HCS"></a>
+<h3>HCS</h3>
+<ul>
+  Defines a virtual device for monitoring heating valves (FHT, HM-CC-VD) to control
+  a central heating unit.<br><br>
+
+  <a name="HCSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HCE &lt;device&gt; &lt;interval&gt; &lt;valveThresholdOn&gt; &lt;valveThresholdOff&gt;</code>
+    <br><br>
+
+    <ul>
+      <li><code>&lt;device&gt;</code> the name of a predefined device to switch.</li>
+      <li><code>&lt;interval&gt;</code> is a digit number. The unit is minutes.</li>
+      <li><code>&lt;valveThresholdOn&gt;</code> is a digit number. Threshold upon which device is switched on (heating required).</li>
+      <li><code>&lt;valveThresholdOff&gt;</code> is a digit number. Threshold upon which device is switched off (idle).</li>
+    </ul>
+    <br>
+
+    The HCS (heating control system) device monitors the state of all detected
+    valves in a free definable interval (by default: 10 min). 
+    <br><br>
+
+    Regulation for heating requirement or suppression of the request can be controlled by 
+    valve position using also free definable thresholds.
+    <br><br>
+
+    In doing so, the HCS device also includes the hysteresis between two states.
+    <br><br>
+
+    Example:<br>
+    Threshold valve position for heating requirement: 40% (default)
+    Threshold valve position for idle: 35% (default)
+    <br><br>
+
+    Heating is required when the "open" position of a valve is more than 40%. HCS
+    then activates the defined device until the "open" position of the valve has
+    lowered to 35% or less (threshold for idle).
+    <br><br>
+
+    In addition, the HCS device supports an optional temp-sensor. The valve-position oriented 
+    regulation can be overriden by the reading of the temp-sensor.
+    <br><br>
+
+    Example:<br>
+    Threshold temperature reading for heating requirement: 10&deg; Celsius
+    Threshold temperature reading for idle: 18&deg; Celsius
+    <br><br>
+
+    Is a valve reaching or exceeding the threshold for heating requirement (&gt;=40%), but the 
+    temperature reading is more than 18&deg; Celcius, the selected device will stay deactivated. 
+    The valve-position oriented regulation has been overridden by the temperature reading in this example.
+    <br><br>
+
+    The HCS device automatically detects devices which are ignored. Furthermore, certain
+    devices can also be excluded of the monitoring manually.
+    <br><br>
+
+  <a name="HCSget"></a>
+  <b>Get </b>
+    <ul>
+      <li>valves<br>
+          returns the actual valve positions
+      </li><br>
+    </ul>
+  <br>
+
+  <a name="HCSset"></a>
+  <b>Set</b>
+   <ul>
+      <li>interval<br>
+          modifies the interval of reading the actual valve positions. The unit is minutes.
+      </li><br>
+      <li>on<br>
+          restarts the monitoring after shutdown by <code>off</code> switch.<br>
+          HCS device starts up automatically upon FHEM start or after new device implementation!
+      </li><br>
+      <li>off<br>
+          shutdown of monitoring, can be restarted by using the <code>on</code> command.
+      </li><br>
+      <li>valveThresholdOn<br>
+          defines threshold upon which device is switched on (heating required).
+      </li><br>
+      <li>valveThresholdOff<br>
+          defines threshold upon which device is switched off (idle).
+      </li><br>
+   </ul>
+  <br>
+
+  <a name="HCSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>device<br>
+        optional; used to change the device. This is normally done in the <code>define</code> tag.
+    </li><br>
+    <li>deviceCmdOn<br>
+        command to activate the device, e.g. <code>on</code>.
+    </li><br>
+    <li>deviceCmdOff<br>
+        command to deactivate the device, e.g. <code>off</code>.
+    </li><br>
+    <li>sensor<br>
+        device name of the temp-sensor (optional).
+    </li><br>
+    <li>sensorThresholdOn<br>
+        threshold for temperature reading activating the defined device
+        Must be set if <code>sensor</code> has been defined
+    </li><br>
+    <li>sensorThresholdOff<br>
+        threshold for temperature reading deactivating the defined device.
+        Must be set if <code>sensor</code> has been defined
+    </li><br>
+    <li>sensorReading<br>
+         name which is used for saving the "reading" of the defined temp-sensor.
+    </li><br>
+    <li>valveThresholdOn<br>
+         see Set
+    </li><br>
+    <li>valveThresholdOff<br>
+    </li>see Set<br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li><br>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+  </ul>
+  <br>
+
+  </ul>
+  <br>
+
+</ul>
 
 <a name="HMS"></a>
 <h3>HMS</h3>
