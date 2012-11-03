@@ -27,7 +27,7 @@ use Time::HiRes qw(gettimeofday sleep);
 
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
-sub YAMAHA_AVR_GetStatus($);
+sub YAMAHA_AVR_GetStatus($;$);
 sub YAMAHA_AVR_Undefine($$);
 
 
@@ -347,7 +347,7 @@ YAMAHA_AVR_Define($$)
     }
     $attr{$name}{"volume-smooth-change"} = "1";
     
-    InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", ($hash, 0), 0);
+    InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
   
   return undef;
 }
