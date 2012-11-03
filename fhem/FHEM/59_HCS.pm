@@ -7,7 +7,7 @@
 #  This script free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 2 of the License, or
-#  (at your option) any later version.
+#  any later version.
 #
 #  The GNU General Public License can be found at
 #  http://www.gnu.org/copyleft/gpl.html.
@@ -56,7 +56,7 @@ HCS_Initialize($$)
   $hash->{UndefFn}  = "HCS_Undef";
   $hash->{GetFn}    = "HCS_Get";
   $hash->{SetFn}    = "HCS_Set";
-  $hash->{AttrList} = "device deviceCmdOn deviceCmdOff ".
+  $hash->{AttrList} = "device deviceCmdOn deviceCmdOff interval ".
                       "sensor sensorThresholdOn sensorThresholdOff sensorReading ".
                       "valvesExcluded valveThresholdOn valveThresholdOff ".
                       "do_not_notify:1,0 event-on-update-reading event-on-change-reading ".
@@ -311,7 +311,9 @@ HCS_getValves($$) {
   foreach my $d (sort keys %defs) {
     # skipping unneeded devices
     next if($defs{$d}{TYPE} ne "FHT" && $defs{$d}{TYPE} ne "CUL_HM");
-    next if($defs{$d}{TYPE} eq "CUL_HM" && $attr{$d}{model} ne "HM-CC-TC");
+    next if($defs{$d}{TYPE} eq "CUL_HM" && !$attr{$d}{model});
+    next if($defs{$d}{TYPE} eq "CUL_HM" && $attr{$d}{model}  ne "HM-CC-TC");
+    next if($defs{$d}{TYPE} eq "CUL_HM" && $attr{$d}{model} eq "HM-CC-TC" && ($attr{$d}{device} || $attr{$d}{chanNo}));
 
     # get current actuator state from each device
     $valveState = $defs{$d}{READINGS}{"actuator"}{VAL};
