@@ -76,7 +76,7 @@ RFXCOM_Initialize($)
   $hash->{ReadFn}  = "RFXCOM_Read";
   $hash->{WriteFn} = "RFXCOM_Write";
   $hash->{Clients} =
-        ":RFXMETER:OREGON:RFXX10REC:RFXELSE:";
+        ":RFXMETER:OREGON:RFXX10REC:";
   my %mc = (
     "1:RFXMETER"   => "^30.*",
     "2:OREGON"   => "^(3[8-9A-F]|[4-6][0-9A-F]|7[0-8]).*", #38-78
