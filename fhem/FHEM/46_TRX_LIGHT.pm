@@ -62,6 +62,9 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1102 => [ "ANSLUT", "light"],
 	# 0x12: Lighting3
 	0x1200 => [ "KOPPLA", "light"], # IKEA Koppla
+	0x1400 => [ "LIGHTWAVERF", "light"], # LightwaveRF
+	0x1401 => [ "EMW100", "light"], # EMW100
+	0x1402 => [ "BBSB", "light"], # BBSB
 );
 
 my %light_device_commands = (	# HEXSTRING => commands
@@ -81,6 +84,9 @@ my %light_device_commands = (	# HEXSTRING => commands
 	# 0x12: Lighting3
 	0x1200 => [ "bright", "", "", "", "", "", "", "dim", "", "", "", "", "", "", "", "", "",
 		    "on", "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "off", "", "program", "", "", "", "",], # Koppla
+	0x1400 => [ "off", "on", "all_off", "mood1", "mood2", "mood3", "mood4", "mood5", "reserved1", "reserved2", "unlock", "lock", "all_lock", "close", "stop", "open", "level"], # LightwaveRF, Siemens
+	0x1401 => [ "off", "on", "learn"], # EMW100 GAO/Everflourish
+	0x1402 => [ "off", "on", "all_off", "all_on"], # BBSB new types
 );
 
 my %light_device_c2b;        # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -94,7 +100,7 @@ TRX_LIGHT_Initialize($)
     $light_device_c2b{$light_device_codes{$k}->[0]} = $k;
   }
 
-  $hash->{Match}     = "^..(10|11|12).*";
+  $hash->{Match}     = "^..(10|11|12|14).*";
   $hash->{SetFn}     = "TRX_LIGHT_Set";
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
@@ -213,8 +219,23 @@ TRX_LIGHT_Set($@)
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
 	} 
-  	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
-  	Log 1,"TRX_LIGHT_Set hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lightning2 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lightning2 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
+  } elsif ($protocol_type == 0x14) {
+	# lightning4
+  	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
+		;
+  	} else {
+		Log 4,"TRX_LIGHT_Set lightning2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
+  	}
+  	$hex_prefix = sprintf "0A14";
+  	$hex_command = sprintf "%02x%02x%s%02x%02x00", $device_type_num & 0xff, $seqnr, $deviceid, $cmnd, $level; 
+	if ($command eq "level") {
+		$command .= sprintf " %d", $level;
+	} 
+  	Log 1,"TRX_LIGHT_Set lightning4 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lightning4 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
@@ -255,7 +276,7 @@ TRX_LIGHT_Define($$)
 
   $type = uc($type);
 
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB") {
   	Log 1,"TRX_LIGHT define: wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
@@ -371,6 +392,9 @@ sub TRX_LIGHT_parse_X10 {
   } elsif ($type == 0x11) {
   	$device = sprintf '%02x%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6], $bytes->[7];
   	$data = $bytes->[8];
+  } elsif ($type == 0x14) {
+  	$device = sprintf '%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
+  	$data = $bytes->[7];
   } else {
 	$error = sprintf "TRX_LIGHT: wrong type=%02x", $type;
 	Log 1, $error;
@@ -449,12 +473,16 @@ sub TRX_LIGHT_parse_X10 {
 
   readingsBeginUpdate($def);
 
-  if ($type == 0x10 || $type == 0x11) {
+  if ($type == 0x10 || $type == 0x11 || $type == 0x14) {
 	# try to use it for all types:
 	$current = $command;
 	if ($type == 0x11 && $command eq "level") {
 		# append level number
 		my $level = $bytes->[9];
+		$current .= sprintf " %d", $level;
+	} elsif ($type == 0x14 && $command eq "level") {
+		# append level number
+		my $level = $bytes->[8];
 		$current .= sprintf " %d", $level;
 	}
 
@@ -510,7 +538,7 @@ TRX_LIGHT_Parse($$)
 
   #Log 1, "TRX_LIGHT: num_bytes=$num_bytes hex=$hexline type=$type" if ($TRX_LIGHT_debug == 1);
   my $res = "";
-  if ($type == 0x10 || $type == 0x11 || $type == 0x12) {
+  if ($type == 0x10 || $type == 0x11 || $type == 0x12 || $type == 0x14) {
 	Log 1, "TRX_LIGHT: X10 num_bytes=$num_bytes hex=$hexline" if ($TRX_LIGHT_debug == 1);
         $res = TRX_LIGHT_parse_X10(\@rfxcom_data_array);
   	Log 1, "TRX_LIGHT: unsupported hex=$hexline" if ($res eq "");
