@@ -2,9 +2,7 @@
 #
 # OWX.pm
 #
-# TODO: Abfangen, wenn das Serial Device nach Öffnung nicht existiert ???
-# set init als rediscover ausführen.
-# ungültige ID's von ungültigen devices => rauswerfen.
+# $Id: 00_OWX.pm $
 #
 # FHEM module to commmunicate with 1-Wire bus devices
 # * via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB port
@@ -13,7 +11,7 @@
 # Internally these interfaces are vastly different, read the corresponding Wiki pages 
 # http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire
 #
-# Version 2.25 - October, 2012
+# Version 2.26 - November, 2012
 #
 # Prof. Dr. Peter A. Henning, 2012
 #
@@ -719,8 +717,10 @@ sub OWX_Discover ($) {
     next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
     #-- skip if the device is present.
     next if( $main::defs{$fhem_dev}{PRESENT} == 1);
-    #-- skip if different IODev
-    next if( $main::defs{$fhem_dev}{IODev}{NAME} ne $hash->{NAME} );
+    #-- skip if different IODev, but only if IODev exists
+    if ( $main::defs{$fhem_dev}{IODev} ){
+      next if( $main::defs{$fhem_dev}{IODev}{NAME} ne $hash->{NAME} );
+    }
     Log 1, "OWX: Deleting unused 1-Wire device $main::defs{$fhem_dev}{NAME} of type $main::defs{$fhem_dev}{TYPE}";
     CommandDelete(undef,$main::defs{$fhem_dev}{NAME});
   }
