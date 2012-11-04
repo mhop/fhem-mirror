@@ -28,6 +28,7 @@ FB_CALLMONITOR_Initialize($)
 # Provider
   $hash->{SetFn}   = "FB_CALLMONITOR_Set";
   $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
+  $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
   $hash->{AttrList}= "event-on-update-reading event-on-change-reading";
@@ -130,6 +131,16 @@ FB_CALLMONITOR_DoInit($)
 
 # No Initialization needed
 return undef;
+
+}
+
+
+sub
+FB_CALLMONITOR_Ready($)
+{
+   my ($hash) = @_;
+   
+   return DevIo_OpenDev($hash, 1, "FB_CALLMONITOR_DoInit");
 
 }
 
