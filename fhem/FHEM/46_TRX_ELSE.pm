@@ -134,3 +134,16 @@ TRX_ELSE_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="TRX_ELSE"></a>
+<h3>TRX_ELSE</h3>
+<ul>
+  The TRX_ELSE module is invoked by TRX if a code is received by RFXCOM RFXtrx433 RF receiver that is currently not handled by a TRX_-Module. There is nothing to be defined for this module. You need to define an RFXtrx433 receiver first. See <a href="#TRX">TRX</a>.
+  <a name="TRX_SECURITYdefine"></a>
+</ul>
+
+=end html
+=cut
