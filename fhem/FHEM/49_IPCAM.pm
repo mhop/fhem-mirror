@@ -309,3 +309,183 @@ IPCAM_guessFileFormat($) {
 # vim: ts=2:et
 
 1;
+
+=pod
+=begin html
+
+<a name="IPCAM"></a>
+<h3>IPCAM</h3>
+<ul>
+  <br>
+
+  <a name"IPCAMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; IPCAM &lt;ip[:port]&gt;</code>
+    <br><br>
+
+    Defines a network camera device to trigger snapshots on events.<br><br>
+
+    Network cameras (IP cameras) usually have a build-in function to create
+    snapshot images. This module enables the event- or time-controlled
+    recording of these images.<br>
+    In addition, this module allows the recording of many image formats like
+    JPEG, PNG, GIF, TIFF, BMP, ICO, PPM, XPM, XBM and SVG. The only requirement
+    is that the recorded image must be accessible via a URL.<br>
+    So it is also possible to record images of e.g. a public Weather Camera
+    from the internet or any picture of a website.<br><br>
+
+    Examples:<br><br>
+    A local ip-cam takes 5 snapshots with 10 seconds delay per call:<br>
+    <ul>
+      <code>define ipcam IPCAM 192.168.1.205</code><br>
+      <code>attr ipcam delay 10</code><br>
+      <code>attr ipcam path snapshot.cgi?user=foo&amp;pwd=bar</code><br>
+      <code>attr ipcam snapshots 5</code><br>
+      <code>attr ipcam storage /srv/share/surveillance/snapshots</code><br>
+    </ul><br>
+
+    A notify on a motion detection of a specified device:<br>
+    <ul>
+      <code>define MOTION.not.01 notify GH.ga.SEC.MD.01:.*on.* get ipcam image</code><br>
+    </ul><br>
+
+    Send an eMail after snapshots are taken:<br>
+    <ul>
+      <code>define MOTION.not.02 notify ipcam:.*snapshots.* { myEmailFunction("%NAME") }</code><br>
+    </ul><br>
+
+    A public web-cam takes only 1 snapshot per call:<br>
+    <ul>
+      <code>define schloss IPCAM http://www2.braunschweig.de</code><br>
+      <code>attr schloss path webcam/schloss.jpg</code><br>
+      <code>attr schloss storage /srv/share/surveillance/snapshots</code><br>
+    </ul><br>
+
+    An at-Job takes every hour a snapshot:<br>
+    <ul>
+      <code>define snapshot_schloss at +*00:01:00 get schloss image</code><br>
+    </ul><br>
+
+  </ul>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="IPCAMget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <ul>
+      <li>
+        <code>image</code><br>
+        Get one or more images of the defined IP-Cam. The number of images<br>
+        and the time interval between images can be specified using the<br>
+        attributes <code>snapshots</code> and <code>delay</code>.
+      </li>
+      <li>
+        <code>last</code><br>
+        Show the name of the last snapshot.
+      </li>
+      <li>
+        <code>snapshots</code><br>
+        Show the total number of a image sequence.
+      </li>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="IPCAMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>
+      credentials<br>
+      Defines the location of the credentials file.<br>
+      If you prefer to store your cam credentials in a file instead be a part of the
+      URI (see attributes <code>path</code> and <code>query</code>), set the full path
+      with filename on this attribute.<br>
+      Example: <code>attr ipcam3 credentials /etc/fhem/ipcam.conf</code><br><br>
+
+      The credentials file has the following structure:<br>
+      <pre>
+      #
+      # Webcam credentials
+      #
+      $credentials{&lt;name_cam1&gt;}{username} = "&lt;your_username&gt;";
+      $credentials{&lt;name_cam1&gt;}{password} = "&lt;your_password&gt;";
+      $credentials{&lt;name_cam2&gt;}{username} = "&lt;your_username&gt;";
+      $credentials{&lt;name_cam2&gt;}{password} = "&lt;your_password&gt;";
+      ...
+      </pre>
+      Replace <code>&lt;name_cam1&gt;</code> respectively <code>&lt;name_cam2&gt;</code>
+      with the names of your defined ip-cams and <code>&lt;your_username&gt;</code> respectively
+      <code>&lt;your_password&gt;</code> with your credentials (all without the brackets
+      <code>&lt;</code> and <code>&gt;</code>!).
+    </li>
+    <li>
+      delay<br>
+      Defines the time interval between snapshots in seconds.<br>
+      If more then one snapshot is taken, then it makes sense to define a short delay
+      between the snapshots. On the one hand, the camera is not addressed in short intervals
+      and the second may be better represented movements between images.<br>
+      Example: <code>attr ipcam3 delay 10</code>
+    </li>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li>
+      path<br>
+      Defines the path and query component of the complete <a href="http://de.wikipedia.org/wiki/Uniform_Resource_Identifier" target="_blank">URI</a> to get a snapshot of the
+      camera. Is the full URI of your ip-cam for example <code>http://CAMERA_IP/snapshot.cgi?user=admin&amp;pwd=password</code>,
+      then only the path and query part is specified here (without the leading slash (/).<br>
+      Example: <code>attr ipcam3 path snapshot.cgi?user=admin&amp;pwd=password</code><br><br>
+
+      If you prefer to store the credentials in a file (take a look at the attribute <code>credentials</code>)
+      you have to set the placeholder <code>USERNAME</code> and <code>PASSWORD</code> in the path string. These placeholders
+      will be replaced with the values from the credentials file.<br>
+      Example: <code>attr ipcam3 path snapshot.cgi?user=USERNAME&amp;pwd=PASSWORD</code>
+    </li>
+    <li><a href="#showtime">showtime</a></li>
+    <li>
+      snapshots<br>
+      Defines the total number of snapshots to be taken with the <code>get &lt;name&gt; image</code> command.
+      If this attribute is not defined, then the default value is 1.<br>
+      The snapshots are stored in the given path of the attribute <code>storage</code> and are
+      numbered sequentially (starts with 1) like <code>snapshot_01</code>, <code>snapshot_02</code>, etc.
+      Furthermore, an additional file <code>last</code> will be saved, which is identical with
+      the last snapshot-image. The module checks the imagetype and stores all these files with
+      the devicename and a correct extension, e.g. <code>&lt;devicename&gt;_snapshot_01.jpg</code>.<br>
+      If you like a timestamp instead a sequentially number, take a look at the attribute <code>timestamp</code>.<br>
+      All files are overwritten on every <code>get &lt;name&gt; image</code> command (except: snapshots
+      with a timestamp. So, keep an eye on your diskspace if you use a timestamp extension!).<br>
+      Example: <code>attr ipcam3 snapshots 5</code>
+    </li>
+    <li>
+      storage<br>
+      Defines the location for the file storage of the snapshots. Default: <code>$modpath/www/snapshots</code><br>
+      Example: <code>attr ipcam3 storage /srv/share/surveillance/snapshots</code>
+    </li>
+    <li>
+      timestamp<br>
+      If this attribute is unset or set to 0, snapshots are stored with a sequentially number
+      like <code>&lt;devicename&gt;_snapshot_01.jpg</code>, <code>&lt;devicename&gt;_snapshot_02.jpg</code>, etc.<br>
+      If you like filenames with a timestamp postfix, e.g. <code>&lt;devicename&gt;_20121023_002602.jpg</code>,
+      set this attribute to 1.
+    </li>
+  </ul>
+  <br>
+
+  <a name="IPCAMevents"></a>
+  <b>Generated events</b>
+  <ul>
+    <li>last: &lt;name_of_device&gt;_snapshot.&lt;image_extension&gt;</li>
+    <li>snapshots: &lt;total_number_of_taken_snapshots_at_end&gt;</li>
+  </ul>
+  <br>
+
+</ul>
+
+
+=end html
+=cut

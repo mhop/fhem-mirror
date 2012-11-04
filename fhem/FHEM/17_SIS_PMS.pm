@@ -266,3 +266,97 @@ SIS_PMS_Set($@)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="SIS_PMS"></a>
+
+<h3>SIS_PMS</h3>
+<ul>
+  This module is responsible for handling the actual sockets (power on,
+  power off, toggle) on a "Silver Shield Power Manager", see <a href="#SISPM">SISPM</a>
+  for how to define access to one (SIS_PMS stands for "Silver Shield Power Manager Socket").
+  <br><br>
+
+  <a name="SIS_PMSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SIS_PMS &lt;serial&gt; &lt;socket&gt;</code>
+    <br><br>
+
+   To securely distinguish multiple attached Power Manager devices, the
+   serial number of those is used. You get these with "sispmctl -s"&nbsp;- or
+   just let autocreate define the sockets attached for you.<br>
+
+   <ul>
+   <li><code>&lt;serial&gt;</code> is the serial number of the Power Manager device, see above.</li>
+   <li><code>&lt;socket&gt;</code> is a number between 1 and 4 (for a 4 socket model)</li>
+   </ul>
+   <br>
+
+    Examples:
+    <ul>
+      <code>define lamp SIS_PMS 01:02:03:04:05 1</code><br>
+      <code>define otherlamp SIS_PMS 01:02:03:04:05 3</code><br>
+      <code>define tv SIS_PMS 01:01:38:44:55 1</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="SIS_PMSset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt;]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    off
+    on
+    toggle
+    on-till           # Special, see the note
+    off-till          # Special, see the note
+    </pre>
+    Examples:
+    <ul>
+      <code>set lamp on</code><br>
+      <code>set lamp1,lamp2,lamp3 on</code><br>
+      <code>set lamp1-lamp3 on</code><br>
+      <code>set hql_lamp on-till 18:45</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>As an external program is used, a noticeable delay may occur.</li>
+      <li>*-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
+      or { &lt;perl code&gt; }, where the perl-code returns a time
+          specification).
+      If the current time is greater than the specified time, then the
+      command is ignored, else an "on" or "off" command, respectively, is
+          generated, and for the given time an "off"/"on" command is
+      scheduleld via the at command.</li>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="SIS_PMSattributes"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <a name="attrdummy"></a>
+    <li>dummy<br>
+    Set the device attribute dummy to define devices which should not
+    output any signals. Associated notifys will be executed if the signal
+    is received. Used e.g. to react to a code from a sender, but it will
+    not actually switch if triggered in the web frontend.
+    </li><br>
+
+    <li><a href="#loglevel">loglevel</a></li><br>
+  </ul>
+</ul>
+
+
+=end html
+=cut

@@ -343,3 +343,142 @@ CUL_IR_Attr(@)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="CUL_IR"></a>
+<h3>CUL_IR</h3>
+<ul>
+
+  The CUL_IR module interprets Infrared messages received by the CUN/CUNO/CUNOv2/TuxRadio.
+  Those devices can receive Infrared Signals from basically any Remote controller and will transform
+  that information in a so called Button-Code  <br><br>
+
+
+  <a name="CUL_IRdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_IR &lt;<a href="#IODev">IODev</a>&gt;</code> <br>
+    <br>
+    &lt;<a href="#IODev">IODev</a>&gt; is the devicename of the IR-receivung device, e.g. CUNO1.<br><br>
+
+    Your definition should look like E.g.:
+    <pre>
+    define IR-Dev CUL_IR CUNO1</pre>
+  </ul>
+
+  <a name="CUL_IRset"></a>
+  <b>Set</b>
+  <ul>
+    <a name="irLearnForSec"></a>
+    <li>irLearnForSec<br>
+       Sets the CUL_IR device in an IR-Code Learning mode for the given seconds. Any received IR-Code will
+       be stored as a Button attribute for this devices. The name of these attributes is dependent on the two
+       attributes <a href="#CUL_IRattr">learncount</a> and <a href="#CUL_IRattr">learnprefix</a>.<br>
+       Attention: Before learning IR-Codes the CUL_IR device needs to be set in IR-Receiving mode
+       by modifying the <a href="#irReceive">irReceive</a> attribute.
+     </li>
+    <a name="irSend"></a>
+    <li>irSend<br>
+       Sends out IR-commands via the connected IODev. The IR-command can be specified as buttonname according
+	   to <a href="#Button.*">Button.*</a> or as IR-Code directly. If a buttonname is specified, the
+	   corresponding IR-Code will be sent out.<br>
+	   Example: <br>
+   	   <pre>set IR-Dev irSend ButtonA001 </pre>
+	   If defining an IR-Code directly the following Code-Syntax needs to be followed:<br>
+	   <pre>IRCode: &lt;PP&gt;&lt;AAAA&gt;&lt;CCCC&gt;&lt;FF&gt; </pre>
+	   with P = Protocol; A = Address; C = Command; F = Flags<br>
+	   With the Flags you can modify IR-Repetition. Flags between 00-0E will produce
+	   0-15 IR-Repetitions.
+	   You can type the IR-Code as plain as above, or with a heading "I" as learnt for the buttons.<br>
+	   Example: <br>
+   	   <code>set IR-Dev irSend 0A07070F0F02<br>
+	   set IR-Dev irSend I0A07070F0F00 </code>
+
+     </li>
+  </ul>
+
+  <a name="CUL_IRget"></a>
+  <b>Get</b>
+  <ul>N/A</ul>
+
+  <a name="CUL_IRattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#irReceive">irReceive</a><br>
+        Configure the IR Transceiver of the &lt;<a href="#IODev">IODev</a>&gt; (the CUNO1). Available
+        arguments are:
+        <ul>
+        <li>OFF<br>
+            Switching off the reception of IR signals. This is the default.
+
+        <li>ON<br>
+            Switching on the reception of IR signals. This is WITHOUT filtering repetitions. This is
+            not recommended as many remote controls do repeat their signals.
+
+        <li>ON_NR<br>
+            Switching on the reception of IR signals with filtering of repetitions. This is
+            the recommended modus operandi.
+        </ul>
+    </li><br>
+
+	<li><a name="Button.*"></a>Button.*<br>
+        Button.* is the wildcard for all learnt IR-Codes. IR-Codes are learnt as Button-Attributes.
+        The name for a learnt Button - IR-Code is compiled out of three elements:<br>
+        <pre>
+        Button&lt;learnprefix&gt;&lt;learncount&gt;
+        </pre>
+        When the CUL_IR device is set into <a href="#irLearnForSec">learning mode</a> it will generate a
+        new button-attribute for each new IR-Code received.This is done according to the following syntax:<br>
+        <pre>
+        &lt;Button-Attribute-Name&gt; &lt;IR-Code&gt;</pre>
+        Examples of learnt button-attributes with EMPTY &lt;learnprefix&gt; and &lt;learncount&gt; starting from 1:<br>
+        <pre>
+        Button001   I02029A000000
+        Button002   I02029A000001</pre>
+        To make sure that something happens when this IR-code is received later on one has to modify the attribute
+        and to add commands as attribute values.
+        Examples:
+        <pre>
+        Button001   I02029A000000   set WZ_Lamp on
+        Button002   I02029A000001   set Switch on</pre>
+        The syntax for this is:
+        <pre>
+        attr &lt;device-name&gt; &lt;attribute-name&gt; &lt;IR-Code&gt; &lt;command&gt;
+        </pre>
+    </li>
+    <li><a name="Group.*"></a>Group.*<br>
+        Group.* is the wildcard for IR-Code groups. With these attributes one can define
+        IR-Code parts, which may match to several Button-IR-Codes.<br>
+        This is done by defining group-attributes that contain only parts of the IR-Code.
+        The syntax is:
+        <pre>
+        &lt;Group-Attribute-Name&gt; &lt;IR-Code&gt;</pre>
+        Examples of a group-attribute is:<br>
+        <pre>
+        Group001   I02029A</pre>
+        With this all IR-Codes starting with I02029A will match the Group001.
+    </li><br>
+    <li><a name="learncount"></a>learncount<br>
+        learncount is used to store the next button-code-number that needs to be learned.
+        By manually modifying this attribute new button sequences can be arranged.
+    </li><br>
+    <li><a name="learnprefix"></a>learnprefix<br>
+        learnprefix is a string which will be added to the button-attribute-name. <br>
+        A button-attribute-name is constructed by:
+        <pre>
+        Button&lt;learnprefix&gt;&lt;learncount&gt;    </pre>
+        If learnprefix is empty the button-attribute-name only contains the term
+        "Button" and the actual number of <a href="#learncount">learncount</a>.
+    </li><br>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

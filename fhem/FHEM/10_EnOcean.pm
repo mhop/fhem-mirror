@@ -540,3 +540,218 @@ EnOcean_A5Cmd($$$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="EnOcean"></a>
+<h3>EnOcean</h3>
+<ul>
+  Devices sold by numerous hardware verndors (e.g. Eltako, Peha, etc), using
+  the RF Protocol provided by the EnOcean Alliance.
+  <br><br>
+  <a name="EnOceandefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EnOcean &lt;ID&gt;</code>
+    <br><br>
+
+    Define an EnOcean device, connected via a <a href="#TCM">TCM</a>. The
+    &lt;ID&gt; parameter is an 8 digit hex number. For remotes and sensors the
+    <a href="#autocreate">autocreate</a> module may help you.<br>
+
+    Example:
+    <ul>
+      <code>define switch1 EnOcean ffc54500</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EnOceanset"></a>
+  <b>Set</b>
+  <ul>
+    <li>MD15 commands. Note: The command is not sent until the MD15
+    wakes up and sends a mesage, usually every 10 minutes.
+    <ul>
+      <li>actuator &lt;value&gt;<br>
+         Set the actuator to the specifed percent value (0-100)</li>
+      <li>desired-temp &lt;value&gt;<br>
+         Use the builtin PI regulator, and set the desired temperature to the
+         specified degree. The actual value will be taken from the temperature
+         reported by the MD15 or from the attribute actualTemp if it is set</li>
+      <li>unattended<br>
+         Do not regulate the MD15.</li>
+    </ul></li>
+
+    <li>subType dimmCtrl, tested with ElTako Dimmer only
+    <ul>
+      <li>teach<br>
+        initiate teach-in mode
+      <li>dimm percent [time 01-FF FF:slowest] [on/off]<br>
+        issue dim command.
+    </ul>
+    </li>
+
+    <li>all other:
+    <ul>
+    <code>set switch1 &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of A0,AI,B0,BI,C0,CI,D0,DI, combinations of
+    these and released, in fact we are trying to emulate a PTM100 type remote.
+    <br>
+
+    If you define an <a href="#eventMap">eventMap</a> attribute with on/off,
+    then you'll be able to easily set the device from the <a
+    href="#FHEMWEB">WEB</a> frontend.<br><br>
+    In order to control devices, you cannot reuse the ID's of other devices
+    (like remotes), instead you have to create your own, which must be in the
+    allowed ID-Range of the underlying IO device. For this first query the
+    TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
+    up to 128 ID's starting with the base shown there. If you are using an
+    ID outside of the allowed range, you'll see an ERR_ID_RANGE message in the
+    fhem log.<br>
+
+    Example:
+    <ul><code>
+      set switch1 BI<br>
+      set switch1 B0,CI<br>
+      attr eventMap BI:on B0:off<br>
+      set switch1 on<br>
+    </code></ul>
+    </li>
+
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EnOceanget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="EnOceanattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a></li>
+    <li><a href="#subType">subType</a></li>
+    <li><a name="actualTemp">actualTemp</a><br>
+      The value of the actual temperature, used when controlling MD15 devices.
+      Should by filled via a notify from a distinct temperature sensor. If
+      absent, the reported temperature from the MD15 is used.
+      </li>
+  </ul>
+  <br>
+
+  <a name="EnOceanevents"></a>
+  <b>Generated events:</b>
+  <ul>
+     <li>switch. Switches (remotes) with more than one (pair) of buttons
+         are separate devices with separate address.
+     <ul>
+         <li>A0
+         <li>AI
+         <li>B0
+         <li>BI
+         <li>C0
+         <li>CI
+         <li>D0
+         <li>DI
+         <li>A0,BI
+         <li>&lt;BtnX,BtnY&gt; where BtnX and BtnY is one of the above, e.g.
+             A0,BI or D0,CI
+         <li>buttons:released
+         <li>buttons:<BtnX> released<br>
+     </ul>
+
+     <li>FSB61/FSM61 (set model to FSB61 or FSM61 manually)<br>
+     <ul>
+        <li>released<br>
+          The status of the device my become "released", this is not the case
+          for a normal switch.
+     </ul>
+
+     <li>windowHandle (HOPPE SecuSignal). Set the subType attr to windowHandle.
+     <ul>
+         <li>closed
+         <li>open
+         <li>tilted
+         <li>open from tilted
+     </ul>
+     <li>keycard. Set the subType attr to keycard. (untested)
+     <ul>
+         <li>keycard inserted
+         <li>keycard removed
+     </ul>
+     <li>STM-250 Door and window contact.
+     <ul>
+         <li>closed
+         <li>open
+         <li>learnBtn: on
+     </ul>
+     <li>SR04* (Temp sensor + Presence button and desired temp dial).<br>
+          Set the
+          model attribute to one of SR04 SR04P SR04PT SR04PST SR04PMS or the
+          subType attribute to SR04.
+     <ul>
+         <li>temperature: XY.Z
+         <li>set_point: [0..255]
+         <li>fan: [0|1|2|3|Auto]
+         <li>present: yes
+         <li>learnBtn: on
+         <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]
+     </ul>
+     <li>MD15-FtL-HE (Heating/Valve-regulator)<br>
+         The subType attibute must be MD15. This is done if the device was created by
+         autocreate.<br>
+     <ul>
+       <li>$actuator %
+       <li>currentValue: $actuator
+       <li>serviceOn: [yes|no]
+       <li>energyInput: [enabled|disabled]
+       <li>energyStorage: [charged|empty]
+       <li>battery: [ok|empty]
+       <li>cover: [open|closed]
+       <li>tempSensor: [failed|ok]
+       <li>window: [open|closed]
+       <li>actuator: [ok|obstructed]
+       <li>temperature: $tmp
+     </ul>
+
+     <li>Ratio Presence Sensor Eagle PM101.<br>
+         Set the model attribute to PM101<br>
+     <ul>
+       <li>brightness: $lux
+       <li>channel1: [on|off]
+       <li>channel2: [on|off]
+     </ul>
+
+     <li>FAH60,FAH63,FIH63 brigthness senor.<br>
+         Set subType to FAH or model to FAH60/FAH63/FIH63 manually.<br>
+     <ul>
+       <li>brightness: $lux
+       <li>state: $lux
+     </ul>
+
+     <li>FABH63,FBH55,FBH63,FIBH63 Motion/brightness sensor.<br>
+         Set subType to FBH or model to FABH63/FBH55/FBH63/FIBH63 manually.<br>
+     <ul>
+       <li>brightness: $lux
+       <li>motion:[yes|no]
+       <li>state: [motion: yes|no]
+     </ul>
+     <li>FTF55 Temperature sensor.<br>
+         Set subType to FTF or model to FTF55 manually.<br>
+     <ul>
+       <li>temperature: $temp
+       <li>state: $temp
+     </ul>
+
+  </ul>
+</ul>
+
+=end html
+=cut

@@ -152,3 +152,82 @@ MSGFile_Undef($$)
 	return undef;
 }
 1;
+
+=pod
+=begin html
+
+<a name="MSGFile"></a>
+<h3>MSGFile</h3>
+<ul>
+    The MSGFile device is a frontend device for message handling.
+    With a MSGFile device data is written to disk (or other media).
+    Multiple MSGFile devices could be defined.
+    To write the data to disk, a MSG device is necessary.
+    A MSGFile device needs the operating systems rights to write to the filesystem.
+    To set the rights for a directory, please use OS related commands.
+    <br><br>
+
+  <a name="MSGFileDefine"></a>
+    <b>Define</b>
+    <ul><br>
+            <code>define &lt;name&gt; MSGFile &lt;filename&gt;</code><br><br>
+            Specifies the MSGFile device. At definition the message counter is set to 0.
+            A filename must be specified at definition.
+    </ul>
+    <br>
+    Examples:
+    <ul>
+      <code>define myFile MSGFile</code>
+    </ul><br>
+  <a name="MSGFileSet"></a>
+
+  <b>Set</b><br>
+  <ul><code>set &lt;name&gt; add|clear|list [text]</code><br>
+	Set is used to manipulate the message buffer of the device. The message
+	buffer is an array of lines of data, stored serial based on the incoming
+	time into the buffer. Lines of data inside the buffer could not be deleted
+	anymore, except of flashing the whole buffer.<br>
+	<ul><b>add</b><br> to add lines of data to the message buffer. All data behind
+	"add" will be interpreted as text message. To add a carriage return to the data,
+	please use the CR attribute.
+	</ul>
+	<ul><b>clear</b><br> to flash the message buffer and set the line counter to 0.
+		All the lines of data are deleted and the buffer is flushed.</ul>
+	<ul><b>list</b><br> to list the message buffer.</ul><br>
+		</ul><br>
+		Examples:
+		<ul>
+			<code>set myFile add Dies ist Textzeile 1</code><br>
+			<code>set myFile add Dies ist Textzeile 2</code><br>
+			<code>set myFile clear</code><br><br>
+			Full working example to write two lines of data to a file:<br>
+			<code>define myMsg MSG</code><br>
+			<code>define myFile MSGFile /tmp/fhemtest.txt</code><br>
+			<code>attr myFile filemode append</code><br>
+			<code>set myFile add Textzeile 1</code><br>
+			<code>set myFile add Textzeile 2</code><br>
+			<code>set myMsg write myFile</code><br>
+			<code>set myFile clear</code><br>
+		</ul><br>
+
+  <a name="MSGFileVattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="MSGFilefilename">filename</a><br>
+		sets the filename, must be a fully qualified filename.
+		FHEM must have the rights to write this file to the directory</li>
+    <li><a href="MSGFilefilemode">filemode</a><br>
+		sets the filemode, valid are "new" or "append"<br>
+			new creates a new, empty file and writes the data to this file. Existing files are cleared, the data is lost!<br>
+			append uses, if available, an existing file and writes the
+			buffer data to the end of the file. If the file do not exist, it will
+			be created</li>
+    <li><a href="MSGFilenameCR">CR</a><br>
+		set the option to write a carriage return at the end of the line.
+		CR could be set to 0 or 1, 1 enables this feature</li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+</ul>
+
+=end html
+=cut

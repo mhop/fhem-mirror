@@ -785,3 +785,186 @@ FHZ_Read($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="FHZ"></a>
+<h3>FHZ</h3>
+<ul>
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the devices is connected via USB or a serial port.
+  <br><br>
+
+  <a name="FHZdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHZ &lt;serial-device&gt;</code> <br>
+    <br>
+    Specifies the serial port to communicate with the FHZ1000PC or FHZ1300PC.
+    The name(s) of the serial-device(s) depends on your distribution. <br>
+
+    If the serial-device is called none, then no device will be opened, so you
+    can experiment without hardware attached.<br>
+
+    The program can service multiple devices, FS20 and FHT device commands will
+    be sent out through the last FHZ device defined before the definition of
+    the FS20/FHT device. To change the association, use the IODev attribute.<br>
+    <br>
+
+    For GNU/Linux you may want to read our <a href="linux.html">hints for
+    GNU/Linux</a> about <a href="linux.html#multipledevices">multiple USB
+    devices</a>.<br>
+
+    <b>Note:</b>The firmware of the FHZ1x00 will drop commands if the airtime
+    for the last hour would exceed 1% (which corresponds roughly to 163
+    commands). For this purpose there is a command counter for the last hour
+    (see list FHZDEVICE), which triggers with "TRANSMIT LIMIT EXCEEDED" if
+    there were more than 163 commands in the last hour.<br><br>
+
+    If you experience problems (for verbose 4 you get a lot of "Bad CRC
+    message" in the log), then try to define your device as <br> <code>define
+    &lt;name&gt; FHZ &lt;serial-device&gt; strangetty</code><br>
+  </ul>
+  <br>
+
+  <a name="FHZset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set FHZ &lt;variable&gt; [&lt;value&gt;]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <ul>
+      FHTcode<br>
+      initFS20<br>
+      initHMS<br>
+      stopHMS<br>
+      initfull<br>
+      raw<br>
+      open<br>
+      reopen<br>
+      close<br>
+      time<br>
+    </ul>
+    Notes:
+    <ul>
+      <li>raw is used to send out "raw" FS20/FHT messages (&quot;setters&quot; only - no query messages!).
+          See message byte streams in FHEM/00_FHZ.pm and the doc directory for some examples.</li>
+      <li>In order to set the time of your FHT's, schedule this command every
+      minute:<br>
+      <code>define fhz_timer at +*00:01:00 set FHZ time</code><br>
+      See the <a href="#loglevel">loglevel</a> to prevent logging of
+          this command.
+      </li>
+      <li>FHTcode is a two digit hex number (from 00 to 63?) and sets the
+          central FHT code, which is used by the FHT devices. After changing
+          it, you <b>must</b> reprogram each FHT80b with: PROG (until Sond
+          appears), then select CEnt, Prog, Select nA.</li>
+      <li>If the FHT ceases to work for FHT devices whereas other devices
+          (e.g. HMS, KS300) continue to work, a<ul>
+          <code>set FHZ initfull</code></ul> command could help. Try<ul>
+          <code>set FHZ reopen</code></ul> if the FHZ
+          ceases to work completely. If all else fails, shutdown fhem, unplug
+          and replug the FHZ device. Problems with FHZ may also be related to
+          long USB cables or insufficient power on the USB - use a powered hub
+          to improve this particular part of such issues.
+          See <a href="http://www.fhem.de/USB.html">our USB page</a>
+          for detailed USB / electromag. interference troubleshooting.</li>
+      <li><code>initfull</code> issues the initialization sequence for the FHZ
+          device:<br>
+          <pre>
+            get FHZ init2
+            get FHZ serial
+            set FHZ initHMS
+            set FHZ initFS20
+            set FHZ time
+            set FHZ raw 04 01010100010000</pre></li>
+      <li><code>reopen</code> closes and reopens the serial device port. This
+          implicitly initializes the FHZ and issues the
+          <code>initfull</code> command sequence.</li>
+      <li><code>stopHMS</code> probably is the inverse of <code>initHMS</code>
+          (I don't have authoritative info on what exactly it does).</li>
+      <li><code>close</code> closes and frees the serial device port until you open
+          it again with <code>open</code>, e.g. useful if you need to temporarily
+          unload the ftdi_sio kernel module to use the <a href="http://www.ftdichip.com/Support/Documents/AppNotes/AN232B-01_BitBang.pdf" target="_blank">bit-bang mode</a>.</li>
+
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FHZget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get FHZ &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <ul>
+      init1<br>
+      init2<br>
+      init3<br>
+      serial<br>
+      fhtbuf<br>
+    </ul>
+    Notes:
+    <ul>
+      <li>The mentioned codes are needed for initializing the FHZ1X00</li>
+      <li>The answer for a command is also displayed by <code>list FHZ</code>
+      </li>
+      <li>
+          The FHZ1x00PC has a message buffer for the FHT (see the FHT entry in
+          the <a href="#set">set</a> section). If the buffer is full, then newly
+          issued commands will be dropped, if the attribute <a
+          href="#fhtsoftbuffer">fhtsoftbuffer</a> is not set.
+          <code>fhtbuf</code> returns the free memory in this buffer (in hex),
+          an empty buffer in the FHZ1000 is 2c (42 bytes), in the FHZ1300 is 4a
+          (74 bytes). A message occupies 3 + 2x(number of FHT commands) bytes,
+          this is the second reason why sending multiple FHT commands with one
+          <a href="#set"> set</a> is a good idea. The first reason is, that
+          these FHT commands are sent at once to the FHT.
+          </li>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FHZattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="do_not_notify"></a>
+    <li>do_not_notify<br>
+    Disable FileLog/notify/inform notification for a device. This affects
+    the received signal, the set and trigger commands.</li><br>
+
+    <li><a href="#attrdummy">dummy</a></li><br>
+
+    <li><a href="#showtime">showtime</a></li><br>
+
+    <a name="loglevel"></a>
+    <li>loglevel<br>
+    Set the device loglevel to e.g. 6 if you do not wish messages from a
+    given device to appear in the global logfile (FHZ/FS20/FHT).  E.g. to
+    set the FHT time, you should schedule "set FHZ time" every minute, but
+    this in turn makes your logfile unreadable.  These messages will not be
+    generated if the FHZ attribute loglevel is set to 6.<br>
+    On the other hand, if you have to debug a given device, setting its
+    loglevel to a smaller value than the value of the global verbose attribute,
+    it will output its messages normally seen only with higher global verbose
+    levels.
+    </li> <br>
+
+    <li><a href="#model">model</a> (fhz1000,fhz1300)</li><br>
+
+    <a name="fhtsoftbuffer"></a>
+    <li>fhtsoftbuffer<br>
+        As the FHZ command buffer for FHT devices is limited (see fhtbuf),
+        and commands are only sent to the FHT device every 120 seconds,
+        the hardware buffer may overflow and FHT commands get lost.
+        Setting this attribute implements an "unlimited" software buffer.<br>
+        Default is disabled (i.e. not set or set to 0).</li><br>
+  </ul>
+  <br>
+</ul>
+
+
+
+=end html
+=cut

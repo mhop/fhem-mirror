@@ -2088,3 +2088,94 @@ sub OWX_Verify_CUNO ($$) {
 } 
 
 1;
+
+=pod
+=begin html
+
+<a name="OWX"></a>
+<h3>OWX</h3>
+<ul> FHEM module to commmunicate with 1-Wire bus devices <ul>
+        <li>via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an
+            USB port or </li>
+        <li>via a passive DS9097 interface attached to an USB port or</li>
+        <li>via a network-attached CUNO or through a COC on the RaspBerry Pi</li>
+    </ul> Internally these interfaces are vastly different, read the corresponding <a
+        href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a>
+    <br />
+    <br />
+    <b>Example</b><br />
+    <ul>
+        <code>define OWio1 OWX /dev/ttyUSB1</code>
+        <br />
+        <code>define OWio2 OWX COC</code>
+        <br />
+    </ul>
+    <br />
+    <a name="OWXdefine">
+        <b>Define</b></a>
+    <ul>
+        <code>define &lt;name&gt; OWX &lt;serial-device&gt;</code> or <br />
+        <code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code>
+        <br /><br /> Define a 1-Wire interface to communicate with a 1-Wire bus.<br />
+        <br />
+        <li>
+            <code>&lt;serial-device&gt;</code> The serial device (e.g. USB port) to which
+            the 1-Wire bus is attached.</li>
+        <li>
+            <code>&lt;cuno-device&gt;</code> The previously defined CUNO to which the 1-Wire
+            bus is attached. </li>
+    </ul>
+    <br />
+    <a name="OWXset">
+        <b>Set</b></a>
+    <ul>
+        <li><a name="owx_interval">
+                <code>set &lt;name&gt; interval &lt;value&gt;</code>
+            </a>
+            <br /><br /> sets the time period in seconds for "kicking" the 1-Wire bus
+            (default is 300 seconds). This means: <ul>
+                <li>With 1-Wire bus interfaces that do not supply power to the 1-Wire bus
+                    (attr buspower parasitic), the 1-Wire bus is reset at these intervals. </li>
+                <li>With 1-Wire bus interfaces that supply power to the 1-Wire bus (attr
+                    buspower = real), all temperature measurement devices on the bus receive
+                    the command to start a temperature conversion (saves a lot of time when
+                    reading) </li>
+                <li>With 1-Wire bus interfaces that contain a busmaster chip, the response
+                    to a reset pulse contains information about alarms.</li>
+            </ul><br />
+        </li>
+        <li><a name="owx_followAlarms">
+                <code>set &lt;name&gt; followAlarms on|off</code>
+            </a>
+            <br /><br /> instructs the module to start an alarm search in case a reset pulse
+            discovers any 1-Wire device which has the alarm flag set. </li>
+    </ul>
+    <br />
+    <a name="OWXget">
+        <b>Get</b></a>
+    <ul>
+        <li><a name="owx_alarms"></a>
+            <code>get &lt;name&gt; alarms</code>
+            <br /><br /> performs an "alarm search" for devices on the 1-Wire bus and, if
+            found, generates an event in the log (not with CUNO). </li>
+        <br />
+        <li><a name="owx_devices"></a>
+            <code>get &lt;name&gt; devices</code>
+            <br /><br /> redicovers all devices on the 1-Wire bus. If a device found has a
+            previous definition, this is automatically used. If a device is found but has no
+            definition, it is autocreated. If a defined device is not on the 1-Wire bus, it
+            is autodeleted. </li>
+        <br />
+        <br />
+    </ul>
+    <a name="OWXattr">
+        <b>Attributes</b></a>
+    <ul>
+        <li><a name="OWXbuspower"><code>attr &lt;name&gt; buspower real|parasitic</code></a>
+            <br />tells FHEM whether power is supplied to the 1-Wire bus or not.</li>
+        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
+    </ul>
+</ul>
+
+=end html
+=cut

@@ -47,3 +47,56 @@ dummy_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="dummy"></a>
+<h3>dummy</h3>
+<ul>
+
+  Define a dummy. A dummy can take via <a href="#set">set</a> any values.
+  Used for programming.
+  <br><br>
+
+  <a name="dummydefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; dummy</code>
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define myvar dummy</code><br>
+      <code>set myvar 7</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="dummyset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt</code><br>
+    Set any value.
+  </ul>
+  <br>
+
+  <a name="dummyget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="dummyattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a name="setList">setList</a><br>
+        Space separated list of commands, which will be returned upon "set name ?",
+        so the FHEMWEB frontend can construct a dropdown and offer on/off
+        switches. Example: attr dummyName setList on off
+        </li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

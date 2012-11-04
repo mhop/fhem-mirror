@@ -156,3 +156,109 @@ MSGMail_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="MSGMail"></a>
+<h3>MSGMail</h3>
+<ul>
+  The MSGMail device is a frontend device for mail message handling.
+  With a MSGMaildevice data is fowarded to a mail provider and send to a recipent.
+  Multiple MSGMail devices could be defined.
+  MSGMail supports by the moment only mail provider, which uses SSL secured connection
+  like Googlemail, GMX, Yahoo or 1und1 for example.
+  To send an email, a MSG device is necessary.<br>
+  <b>MAIL::Lite</b> and <b>Net::SMTP::SSL</b> from CPAN is needed to use MSGMail!!
+  <br><br>
+
+  <a name="MSGMailDefine"></a>
+  <b>Define</b>
+  <ul><br>
+          <code>define &lt;name&gt; MSGMail &lt;from&gt; &lt;to&gt; &lt;smtphost&gt; &lt;authfile&gt;</code><br><br>
+          Specifies the MSGMail device. At definition the message counter is set to 0.
+          From, To, SMTPHost and the authfile (see attributes below) need to be defined
+          at definition time.
+  </ul>
+                  <br>
+          Examples:
+          <ul>
+                  <code>define myMail MSGMail from@address.com to@address.com smtp.provider.host /etc/msgauthfile</code>
+          </ul><br>
+
+  <a name="MSGMailSet"></a>
+  <b>Set</b><br>
+  <ul><code>set &lt;name&gt; add|clear|list [text]</code><br>
+	Set is used to manipulate the message buffer of the device. The message
+	buffer is an array of lines of data, stored serial based on the incoming
+	time into the buffer. Lines of data inside the buffer could not be deleted
+	anymore, except of flashing the whole buffer.<br>
+	<ul><b>add</b><br> to add lines of data to the message buffer. All data behind
+	"add" will be interpreted as text message. To add a carriage return to the data,
+	please use the CR attribute.
+	</ul>
+	<ul><b>clear</b><br> to flash the message buffer and set the line counter to 0.
+		All the lines of data are deleted and the buffer is flushed.</ul>
+	<ul><b>list</b><br> to list the message buffer.<br></ul><br>
+		<br>
+		Examples:
+		<ul>
+			<code>set myMail add Dies ist Textzeile 1</code><br>
+			<code>set myMail add Dies ist Textzeile 2</code><br>
+			<code>set myMail clear</code><br><br>
+			Full working example to send two lines of data to a recipent:<br>
+			<code>define myMsg MSG</code><br>
+			<code>define myMail MSGMail donald.duck@entenhausen.com dagobert.duck@duck-banking.com smtp.entenhausen.net /etc/fhem/msgmailauth</code><br>
+			<code>attr myMail smtpport 9999</code><br>
+			<code>attr myMail subject i need more money</code><br>
+			<code>attr myMail CR 0</code><br>
+			<code>set myMail add Please send me </code><br>
+			<code>set myMail add 1.000.000 Taler</code><br>
+			<code>set myMsg send myMail</code><br>
+			<code>set myMail clear</code><br>
+		</ul><br>
+  </ul>
+
+  <a name="MSGMailattr"></a>
+  <b>Attributes</b>
+  <ul>
+    Almost all of these attributes are not optional, most of them could set at definition.<br>
+    <li><a href="MSGMailFrom">from</a><br>
+		sets the mail address of the sender</li>
+    <li><a href="MSGMailTo">to</a><br>
+		sets the mail address of the recipent</li>
+    <li><a href="MSGMailsmtphost">smtphost</a><br>
+		sets the name of the smtphost, for example for GMX
+		you could use mail.gmx.net or for Googlemail the smtphost is
+		smtp.googlemail.com</li>
+    <li><a href="MSGMailsmtphost">smtpport</a> (optional)<br>
+		sets the port of the smtphost, for example for GMX
+		or for Googlemail the smtport is 465, which is also
+		the default and do not need to be set</li>
+    <li><a href="MSGMailsubject">subject</a> (optional)<br>
+		sets the subject of this email. Per default the subject is set to "FHEM"<br>
+		</li>
+    <li><a href="MSGMailauthfile">authfile</a><br>
+		sets the authfile for the SSL connection to the SMTP host<br>
+		the authfile is a simple textfile with the userid in line 1 and
+		the password in line 2.<br>
+		Example:<br>
+		<code>123user45</code><br>
+		<code>strenggeheim</code><br>
+		It is a good behaviour to protect this data and put the file, for
+		example into the /etc directory and set the rights to 440
+		(chmod 440 /etc/msgmailauthfile), so that not everyone could see the contents
+		of the file. FHEM must have access to this file to read the userid and password.
+		<br>
+		</li>
+    <li><a href="MSGFilenameCR">CR</a><br>
+		set the option to write a carriage return at the end of the line.
+		CR could be set to 0 or 1, 1 enables this feature.
+		Per default this attribute is enabled</li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+</ul>
+
+
+=end html
+=cut

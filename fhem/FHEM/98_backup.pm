@@ -190,3 +190,34 @@ createArchiv($)
 # vim: ts=2:et
 
 1;
+
+=pod
+=begin html
+
+<a name="backup"></a>
+<h3>backup</h3>
+<ul>
+  <code>backup</code><br>
+  <br>
+  The complete FHEM directory (containing the modules), the WebInterface
+  pgm2 (if installed) and the config-file will be saved into a .tar.gz
+  file by default. The file is stored with a timestamp in the
+  <a href="#modpath">modpath</a>/backup directory or to a directory
+  specified by the global attribute <a href="#backupdir">backupdir</a>.<br>
+  Note: tar and gzip must be installed to use this feature.
+  <br>
+  <br>
+  If you need to call tar with support for symlinks, you could set the
+  global attribute <a href="#backupsymlink">backupsymlink</a> to everything
+  else as "no".
+  <br>
+  <br>
+  You could pass the backup to your own command / script by using the
+  global attribute <a href="#backupcmd">backupcmd</a>.
+  <br>
+  <br>
+</ul>
+
+
+=end html
+=cut

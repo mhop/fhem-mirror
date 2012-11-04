@@ -370,3 +370,101 @@ structure_Attr($@)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="structure"></a>
+<h3>structure</h3>
+<ul>
+  <br>
+  <a name="structuredefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; structure &lt;struct_type&gt; &lt;dev1&gt; &lt;dev2&gt; ...</code>
+    <br><br>
+    The structure device is used to organize/structure devices in order to
+    set groups of them at once (e.g. switching everything off in a house).<br>
+
+    The list of attached devices can be modified through the addstruct /
+    delstruct commands. Each attached device will get the attribute
+    &lt;struct_type&gt;=&lt;name&gt;<br> when it is added to the list, and the
+    attribute will be deleted if the device is deleted from the structure.
+    <br>
+    The structure devices can also be added to a structure, e.g. you can have
+    a building consisting of levels which consists of rooms of devices.
+    <br>
+
+    Example:<br>
+    <ul>
+      <li>define kitchen structure room lamp1 lamp2</li>
+      <li>addstruct kitchen TYPE=FS20</li>
+      <li>delstruct kitchen lamp1</li>
+      <li>define house structure building kitchen living</li>
+      <li>set house off</li>
+    </ul>
+    <br>
+
+    The backward propagated status change from the devices to this structure
+    works in two different ways.
+    <br>Attribute clientstate_behavior<br>
+    <li>absolute</li>
+    <ul>
+      The structure status will changed to the common device status of all defined devices 
+      to this structure if all devices are identical. Otherwise the structure status is "undefined".
+    </ul>
+    <li>relative</li>
+    <ul>
+      You have to set the attribute "clientstate_priority" with all states of
+      the defined devices to this structure in descending order. Each group are
+      delemited by space. Each entry of one group are delimited by "pipe"
+    </ul>
+    <br>Example:<br>
+    <ul>
+      <li>attr kittchen clientstate_behavior relative</li>
+      <li>attr kittchen clientstate_priority An|On|on Aus|Off|off</li>
+      <li>attr house clientstate_priority Any_On|An All_Off|Aus</li>
+    </ul>
+    <br>
+    To group more devices from different types of devices you can define 
+    a clientstate redefining on each device. For example the Reading "A" of device door
+    is "open" or "closed" and the state of device lamp1 should redefine from 
+    "on" to "An" and "off" to "Aus"
+    <br>Example:<br> 
+    <ul>
+      <li>define door OWSWITCH &lt;ROMID&gt</li>
+      <li>define lamp1 dummy</li>
+      <li>attr lamp1 cmdlist on off</li>
+      <li>define kitchen structure struct_kitchen lamp1 door</li>
+      <li>attr kittchen clientstate_priority An|on OK|Aus|off</li>
+      <li>attr lamp1 struct_kitchen on:An off:Aus</li>
+      <li>attr door struct_kitchen A:open:on A:closed:off</li>
+    </ul>
+
+  <br>
+  <a name="structureset"></a>
+  <b>Set</b>
+  <ul>
+    Every set command is propagated to the attached devices. Exception: if an
+    attached devices has an attribute structexcluse, and the attribute value
+    matches (as a regexp) the name of the current structure.
+  </ul>
+  <br>
+  <a name="structureget"></a>
+  <b>Get</b>
+  <ul>
+    get is not supported through a structure device.
+  </ul>
+  <br>
+  <a name="structureattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>structexclude<br>
+        exclude the device from set operations, see the set command above.</li>
+  </ul>
+  <br>
+</ul>
+</ul>
+
+=end html
+=cut

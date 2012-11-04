@@ -170,3 +170,63 @@ EMGZ_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="EMGZ"></a>
+<h3>EMGZ</h3>
+<ul>
+  <a name="EMGZdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EMGZ &lt;device-number&gt;</code>
+    <br><br>
+
+    Define up to 4 EM1000GZ attached to the EM1010PC. The device number must
+    be between 9 and 12.
+    Defining an EMGZ will schedule an internal task, which reads the
+    status of the device every 5 minutes, and triggers notify/filelog commands.
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define emgz EMGZ 9</code><br>
+    </ul>
+  </ul>
+
+  <a name="EMGZset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set EMGZdevice  &lt;param&gt; &lt;value&gt;</code><br><br>
+    where param is:
+    <ul>
+      <li>price<br>
+          The price of one KW in EURO (use e.g. 0.20 for 20 Cents). It is used
+          only on the EM1010PC display, it is of no interest for FHEM.
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EMGZget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get EMGZ status</code>
+    <br><br>
+    This is the same command which is scheduled every 5 minutes internally.
+  </ul>
+  <br>
+
+  <a name="EMGZattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (EM1000GZ)</li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

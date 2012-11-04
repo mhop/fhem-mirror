@@ -539,3 +539,80 @@ WS2000_List($$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="WS2000"></a>
+<h3>WS2000</h3>
+<ul>
+  <br>
+
+  <a name="WS2000define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WS2000 &lt;device_to_connect&gt;</code>
+    <br><br>
+
+    Define a WS2000 series raw receiver device sold by ELV. Details see <a
+    href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=6724">here</a>.
+    Unlike 86_FS10.pm it will handle the complete device communication itself
+    and doesnt require an external program.  For this reason you can now use
+    this also on windows.
+    <br>
+      This Device will be usually connect to a serial port, but you can also
+      define a raw network redirector like lantronix XPORT(TM).
+    <br>Note: Currently this device does not support a "set" function
+    <br><br>
+
+    Attributes:
+    <ul>
+      <li><code>rain</code>: factor for calculating amount of rain in ml/count</li>
+      <li><code>altitude</code>: height in meters to calculate pressure for NN (not used yet)</li>
+    </ul>
+    <br>
+    Example:
+    <ul>
+      <code>define WS2000 WS2000 /dev/ttyS0</code><br>
+    </ul>
+      <ul>
+      <code>define WS2000 WS2000 xport:10001</code><br>
+    </ul>
+      <ul>
+      <code>attr WS2000 rain 366</code> : use factor 366 ml/count for rain sensor S2000R<br>
+    </ul>
+    <br>
+  </ul>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="WS2000get"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; list</code>
+    <br>
+    Gets the last reading of all received sensord
+    <br><br>
+    <code>get &lt;name&gt; [TH0..TH7, T0..T7, I0..I7, R0..R7, W0..W7, L0..L7, P0..P7,LAST,RAW]</code><br>
+    get the last reading for the name sensor, <br>
+    <code>LAST</code>: Last received Sensor
+    <br><br>
+    <code>RAW</code>: original Data from interface
+    <br><br>
+  </ul>
+
+
+  <a name="WS2000attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (ws2000)</li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li>rain</li>
+    <li>altitude</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

@@ -235,3 +235,83 @@ HMS_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="HMS"></a>
+<h3>HMS</h3>
+<ul>
+  <a name="HMSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HMS &lt;housecode&gt;</code>
+    <br><br>
+
+    <code>&lt;housecode&gt;</code> is a four digit hex number,
+    corresponding to the address of the HMS device.
+    <br>
+
+    Examples:
+    <ul>
+      <code>define temp HMS 1234</code><br>
+    </ul>
+    Notes:<br>
+    <ul>
+      <li>There is _NO_ guarantee that the code will work as expected in all
+      circumstances, the authors are not liable for any damage occuring as a
+      result of incomplete or buggy code</li>
+
+      <li>Currently supported devices are the HMS100-T HMS100-TF HMS100-WD
+          HMS100-MG HMS100-TFK HMS100-CO HMS100-FIT RM100-2 RM100-3</li>
+
+      <li>The housecode of the HMS devices may change if the battery is renewed.
+      In order to make life easier, you can define a "wildcard" device for each
+      type of HMS device. First the real device-id will be checked, then the
+      wildcard device id. The wildcards are:
+      <ul>
+    <li>1000 for the HMS100-TF</li>
+    <li>1001 for the HMS100-T</li>
+    <li>1002 for the HMS100-WD</li>
+    <li>1003 for the RM100-2</li>
+    <li>1004 for the HMS100-TFK/li>
+    <li>1006 for the HMS100-MG</li>
+    <li>1008 for the HMS100-CO</li>
+    <li>100e for the HMS100-FIT</li>
+      </ul>
+      </li>
+
+      <li>Some battery low notifications are not yet implemented (RM100,
+      HMS100WD).</li>
+      <li>Please test your installation before relying on the
+      functionality.</li>
+
+    </ul>
+    <br>
+  </ul>
+  <br>
+
+  <a name="HMSset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="HMSget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="HMSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#model">model</a> (hms100-t hms100-tf hms100-wd hms100-mg
+        hms100-co hms100-tfk hms100-fit rm100-2)</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

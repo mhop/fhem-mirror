@@ -337,3 +337,57 @@ VantagePro2_GetStatus($)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="VantagePro2"></a>
+<h3>VantagePro2</h3>
+<ul>
+  Note: this module needs the Net::Telnet perl module.
+  <br><br>
+  <a name="VantagePro2define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt;  &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines a Davis VantagePro2 weatherstation attached on transparent ethernet/usb|serial server accessable by telnet.<br><br>
+
+    Examples:
+    <ul>
+      <code>define AUSSEN.wetterstation VantagePro2 192.168.8.127 4999 60</code><br>
+      <code>
+    fhem> list AUSSEN.wetterstation<br>
+    Internals:<br>
+   DEF        192.168.8.127 4999 60<br>
+   Host       192.168.8.127<br>
+   NAME       AUSSEN.wetterstation<br>
+   NR         5<br>
+   Port       4999<br>
+   STATE      T-OUT: 22.78 T-IN: 26.50 H-OUT: 55 H-IN: 45 W: 1.61 W-AV: 1.61 WS 257 R: 0.00 S: 770 UV: 4.1 RD: 0 RM: 41 RY: 241 BM: 76.27 BT: Steady<br>
+   TYPE       VantagePro2<br>
+   Readings:<br>
+     2010-08-04 10:15:17   10 min. average windspeed 1.61 (km/h)<br>
+     2010-08-04 10:15:17   UV              4.1 (UV/Index)<br>
+     2010-08-04 10:15:17   barometer       76.27 (Millimeters)<br>
+     2010-08-04 10:15:17   barometer trend Steady<br>
+     2010-08-04 10:15:17   day rain        0 (mm/day)<br>
+     2010-08-04 10:15:17   humidity inside 45 (%)<br>
+     2010-08-04 10:15:17   humidity outside 55 (%)<br>
+     2010-08-04 10:15:17   month rain      41 (mm/month)<br>
+     2010-08-04 10:15:17   rainrate        0.00 (mm/h)<br>
+     2010-08-04 10:15:17   solar           770 (Watt/m^2)<br>
+     2010-08-04 10:15:17   temperature-inside 26.50 (Celsius)<br>
+     2010-08-04 10:15:17   temperature-outside 22.78 (Celsius)<br>
+     2010-08-04 10:15:17   wind direction  257 (Degrees)<br>
+     2010-08-04 10:15:17   windspeed       1.61 (km/h)<br>
+     2010-08-04 10:15:17   year rain       241 (mm/year)<br>
+Attributes:<br>
+   delay      60<br>
+      </code><br>
+    </ul>
+  </ul>
+</ul>
+
+=end html
+=cut

@@ -285,3 +285,69 @@ sub ReadingToNumber($$)
 	return $in
 }
 1;
+
+=pod
+=begin html
+
+<a name="PachLog"></a>
+<h3>PachLog</h3>
+<ul>
+  The PachLog-Module Logs SensorData like (temperature and humidity) to <a href=http://www.pachube.com>www.pachube.com</a>.
+  <br><br>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
+  <a name="PachLogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <br><code>define &lt;name&gt; PachLog &lt;Pachube-API-Key&gt;</code> <br>
+    <br>
+    &lt;Pachube-API-Key&gt;:<br>
+    The Pachube-API-Key however is what you need in your code to authenticate your application's access the Pachube service.<br>
+    Don't share this with anyone: it's just like any other password.<br>
+    <a href=http://www.pachube.com>www.pachube.com</a><br>
+
+  </ul>
+  <br>
+
+  <a name="PachLogset"></a>
+  <b>Set</b>
+    <ul>
+        <br>
+        Add a new Device for Logging to www.pachube.com<br><br>
+        <code>set &lt;NAME&gt; ADD &lt;FHEM-DEVICENAME&gt; FEED-NR:ID:READING:ID:READING</code><br><br>
+        Example: KS300-Weather-Data<br><br>
+        READINGS: temperature humidity wind rain<br><br>
+        1. Generate Input-Feed on www.pachube.com => Yout get your FEED-NR: 1234<br>
+        2. Add Datastreams to the Feed:<br>
+        <ul>
+        <table>
+        <tr><td>ID</td><td>0</td><td>temperature</td></tr>
+        <tr><td>ID</td><td>1</td><td>humidity</td></tr>
+        <tr><td>ID</td><td>2</td><td>wind</td></tr>
+        <tr><td>ID</td><td>3</td><td>rain</td></tr></table><br>
+        </ul>
+        3. Add the KS300 to your PachLog-Device<br><br>
+        <code>set &lt;NAME&gt; ADD &lt;My-KS300&gt; 1234:0temperature:1:humidity:2:wind:3:rain</code><br><br>
+        Delete a Device form Logging to www.pachube.com<br><br>
+        <code>set &lt;NAME&gt; DEL &lt;FHEM-DEVICENAME&gt;</code><br><br>
+    </ul>
+    <br>
+
+  <a name="PachLogget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="PachLogattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li>disable<br>
+        Disables PachLog.
+        Nor more Logging to www.pachube.com
+   </ul><br>
+
+
+</ul>
+
+=end html
+=cut

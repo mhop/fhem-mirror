@@ -371,3 +371,54 @@ LUXTRONIK2_GetStatus($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="LUXTRONIK2"></a>
+<h3>LUXTRONIK2</h3>
+<ul>
+  Luxtronik 2.0 is a heating controller used in Alpha Innotec and Siemens Novelan Heatpumps.
+  It can be directly integrated into a local area network (Ethernet port).<br>
+  <br>
+
+  <a name="LUXTRONIK2define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; LUXTRONIK2 &lt;IP-address&gt; [&lt;poll-interval&gt;]</code>
+    <br><br>
+	If the pool interval is omitted, it is set to 300 (seconds).
+	<br><br>
+    Example:
+    <ul>
+      <code>define Heizung LUXTRONIK2 192.168.0.12 600</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="LUXTRONIK2set"></a>
+  <b>Set </b>
+	<ul>
+    Nothing to set here yet...
+    </ul>
+  <br>
+
+  <a name="LUXTRONIK2get"></a>
+  <b>Get</b>
+  <ul>
+   No get implemented yet ...
+  </ul>
+  <br>
+
+  <a name="LUXTRONIK2attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+
+  </ul>
+
+=end html
+=cut

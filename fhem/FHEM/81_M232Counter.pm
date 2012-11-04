@@ -252,3 +252,91 @@ M232Counter_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="M232Counter"></a>
+<h3>M232Counter</h3>
+<ul>
+
+  <a name="M232Counterdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; M232Counter [unit [factor [deltaunit [deltafactor]]]]</code>
+    <br><br>
+
+    Define at most one M232Counter for a M232 device. Defining a M232Counter
+    will schedule an internal task, which periodically reads the status of the
+    counter, and triggers notify/filelog commands. <code>unit</code> is the unit
+    name, <code>factor</code> is used to calculate the reading of the counter
+    from the number of ticks. <code>deltaunit</code> is the unit name of the counter
+    differential per second, <code>deltafactor</code> is used to calculate the
+    counter differential per second from the number of ticks per second.<br><br>
+    Default values:
+    <ul>
+      <li>unit: ticks</li>
+      <li>factor: 1.0</li>
+      <li>deltaunit: ticks per second</li>
+      <li>deltafactor: 1.0</li>
+    </ul>
+    <br>Note: the parameters in square brackets are optional. If you wish to
+    specify an optional parameter, all preceding parameters must be specified
+    as well.
+    <br><br>Examples:
+    <ul>
+      <code>define counter M232Counter turns</code><br>
+      <code>define counter M232Counter kWh 0.0008 kW 2.88</code>
+       (one tick equals 1/1250th kWh)<br>
+    </ul>
+    <br>
+    Do not forget to start the counter (with <code>set .. start</code> for
+    M232) or to start the counter and set the reading to a specified value
+    (with <code>set ... value</code> for M232Counter).<br><br>
+    To avoid issues with the tick count reaching the end point, the device's
+    internal counter is automatically reset to 0 when the tick count is 64,000
+    or above and the reading <i>basis</i> is adjusted accordingly.
+    <br><br>
+  </ul>
+
+  <a name="M232Counterset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; value &lt;value&gt;</code>
+    <br><br>
+    Sets the reading of the counter to the given value. The counter is reset
+    and started and the offset is adjusted to value/unit.
+    <br><br>
+    <code>set &lt;name&gt; interval &lt;interval&gt;</code>
+    <br><br>
+    Sets the status polling interval in seconds to the given value. The default
+    is 60 seconds.
+    <br><br>
+  </ul>
+
+
+  <a name="M232Counterget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; status</code>
+    <br><br>
+    Gets the reading of the counter multiplied by the factor from the
+    <code>define</code> statement. Wraparounds of the counter are accounted for
+    by an offset (see  reading <code>basis</code> in the output of the
+    <code>list</code> statement for the device).
+    <br><br>
+  </ul>
+
+  <a name="M232Counterattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (M232Counter)</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

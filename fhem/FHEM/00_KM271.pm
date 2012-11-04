@@ -814,3 +814,238 @@ KM271_SetReading($$$$$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="KM271"></a>
+<h3>KM271</h3>
+<ul>
+  KM271 is the name of the communication device for the Buderus Logamatic 2105
+  or 2107 heating controller. It is connected via a serial line to the fhem
+  computer. The fhem module sets the communication device into log-mode, which
+  then will generate an event on change of the inner parameters. There are
+  about 20.000 events a day, the FHEM module ignores about 90% of them, if the
+  <a href="#all_km271_events">all_km271_events</a> attribute is not set.<br>
+  <br><br>
+
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module.
+  <br><br>
+
+  <a name="KM271define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; KM271 &lt;serial-device-name&gt;</code>
+    <br><br>
+    Example:
+    <ul>
+      <code>define KM271 KM271 /dev/ttyS0@2400</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="KM271set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set KM271  &lt;param&gt; [&lt;value&gt; [&lt;values&gt;]]</code><br><br>
+    where param is one of:
+    <ul>
+      <li>hk1_tagsoll &lt;temp&gt;<br>
+          sets the by day temperature for heating circuit 1<br>
+          0.5 celsius resolution - temperature between 10 and 30 celsius</li>
+      <li>hk2_tagsoll &lt;temp&gt;<br>
+          sets the by day temperature for heating circuit 2<br>
+          (see above)</li>
+      <li>hk1_nachtsoll &lt;temp&gt;<br>
+          sets the by night temperature for heating circuit 1<br>
+          (see above)</li>
+      <li>hk2_nachtsoll &lt;temp&gt;<br>
+          sets the by night temperature for heating circuit 2<br>
+          (see above)</li>
+      <li>hk1_betriebsart [automatik|nacht|tag]<br>
+          sets the working mode for heating circuit 1<br>
+          <ul>
+            <li>automatik: the timer program is active and the summer configuration is in effect</li>
+            <li>nacht: manual by night working mode, no timer program is in effect</li>
+            <li>tag: manual by day working mode, no timer program is in effect</li>
+          </ul></li>
+      </li>
+      <li>hk2_betriebsart [automatik|nacht|tag]<br>
+          sets the working mode for heating circuit 2<br>
+          (see above)</li>
+      <li>ww_soll &lt;temp&gt;<br>
+          sets the hot water temperature<br>
+          1.0 celsius resolution - temperature between 30 and 60 celsius</li>
+      <li>ww_betriebsart [automatik|nacht|tag]<br>
+          sets the working mode for hot water<br>
+          <ul>
+            <li>automatik: hot water production according to the working modes of both heating circuits</li>
+            <li>nacht: no hot water at all</li>
+            <li>tag: manual permanent hot water</li>
+          </ul></li>
+      <li>ww_on-for-timer [period]<br>
+          start hot water production for the given period<br>
+          period must have the format HH:MM<br>
+          ww_betriebsart is set according to the attribut ww_timermode. For switching-off hot water a single one-time at command is automatically generated which will set ww_betriebsart back to nacht</li>
+      <li>hk1_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
+          sets the timer program for heating circuit 1<br>
+          <ul>
+            <li>eigen: the custom program defined by the user (see below) is used</li>
+            <li>all others: predefined programs from Buderus for various situations (see Buderus manual for details)</li>
+          </ul></li>
+      <li>hk2_programm [eigen|familie|frueh|spaet|vormittag|nachmittag|mittag|single|senior]<br>
+          sets the timer program for heating circuit 2<br>
+          (see above)</li>
+      <li>hk1_timer [&lt;position&gt; delete|&lt;position&gt; &lt;on-day&gt; &lt;on-time&gt; &lt;off-day&gt; &lt;off-time&gt;]<br>
+          sets (or deactivates) a by day working mode time interval for the custom program of heating circuit 1<br>
+          <ul>
+            <li>position: addresses a slot of the custom timer program and must be between 1 and 21<br>
+                The slot will be set to the interval specified by the following on- and off-timepoints or is deactivated when the next argument is <b>delete</b>.</li>
+            <li>on-day: first part of the on-timepoint<br>
+                valid arguments are [mo|di|mi|do|fr|sa|so]</li>
+            <li>on-time: second part of the on-timepoint<br>
+                valid arguments have the format HH:MM (supported resolution: 10 min)</li>
+            <li>off-day: first part of the off-timepoint<br>
+                (see above)</li>
+            <li>off-time: second part of the off-timepoint<br>
+                valid arguments have the format HH:MM (supported resolution: 10 min)</li>
+          </ul>
+          As the on-timepoint is reached, the heating circuit is switched to by day working mode and when the off-timepoint is attained, the circuit falls back to by night working mode.
+          A program can be build up by chaining up to 21 of these intervals. They are ordered by the position argument. There's no behind the scene magic that will automatically consolidate the list.
+          The consistency of the program is in the responsibility of the user.
+          <br><br>
+          Example:
+          <ul>
+            <code>set KM271 hk1_timer 1 mo 06:30 mo 08:20</code><br>
+          </ul><br>
+          This will toogle the by day working mode every Monday at 6:30 and will fall back to by night working mode at 8:20 the same day.</li>
+      <li>hk2_timer [&lt;position&gt; delete|&lt;position&gt; &lt;on-day&gt; &lt;on-time&gt; &lt;off-day&gt; &lt;off-time&gt;]<br>
+          sets (or deactivates) a by day working mode time interval for the custom program of heating circuit 2<br>
+          (see above)</li>
+      <li>logmode<br>set to logmode / request all readings again</li>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="KM271get"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="KM271attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <a name="all_km271_events"></a>
+    <li>all_km271_events<br>
+        If this attribute is set to 1, do not ignore following events:<br>
+        HK1_Vorlaufisttemperatur, HK2_Vorlaufisttemperatur, Kessel_Vorlaufisttemperatur,
+        Kessel_Integral, Kessel_Integral1<br>
+        These events account for ca. 92% of all events.<br>
+        All UNKNOWN events are ignored too, most of them were only seen
+        directly after setting the device into logmode.
+        </li>
+    <a name="ww_timermode"></a>
+    <li>ww_timermode [automatik|tag]<br>
+        Defines the working mode for the ww_on-for-timer command (default is tag).<br>
+        ww_on-for-timer will set the ww_betriebsart of the heater according to this attribute.
+        </li>
+
+  </ul>
+  <br>
+
+
+  <a name="KM271events"></a>
+  <b>Generated events:</b>
+  <ul>
+    <li>Abgastemperatur
+    <li>Aussentemperatur
+    <li>Aussentemperatur_gedaempft
+    <li>Brenner_Ansteuerung
+    <li>Brenner_Ausschalttemperatur
+    <li>Brenner_Einschalttemperatur
+    <li>Brenner_Laufzeit1_Minuten2
+    <li>Brenner_Laufzeit1_Minuten1
+    <li>Brenner_Laufzeit1_Minuten
+    <li>Brenner_Laufzeit2_Minuten2
+    <li>Brenner_Laufzeit2_Minuten1
+    <li>Brenner_Laufzeit2_Minuten
+    <li>Brenner_Mod_Stellglied
+    <li>ERR_Fehlerspeicher1
+    <li>ERR_Fehlerspeicher2
+    <li>ERR_Fehlerspeicher3
+    <li>ERR_Fehlerspeicher4
+    <li>ERR_Letzter_Fehlerstatus
+    <li>HK1_Ausschaltoptimierung
+    <li>HK1_Betriebswerte1
+    <li>HK1_Betriebswerte2
+    <li>HK1_Einschaltoptimierung
+    <li>HK1_Heizkennlinie_+10_Grad
+    <li>HK1_Heizkennlinie_-10_Grad
+    <li>HK1_Heizkennlinie_0_Grad
+    <li>HK1_Mischerstellung
+    <li>HK1_Pumpe
+    <li>HK1_Raumisttemperatur
+    <li>HK1_Raumsolltemperatur
+    <li>HK1_Vorlaufisttemperatur
+    <li>HK1_Vorlaufsolltemperatur
+    <li>HK2_Ausschaltoptimierung
+    <li>HK2_Betriebswerte1
+    <li>HK2_Betriebswerte2
+    <li>HK2_Einschaltoptimierung
+    <li>HK2_Heizkennlinie_+10_Grad
+    <li>HK2_Heizkennlinie_-10_Grad
+    <li>HK2_Heizkennlinie_0_Grad
+    <li>HK2_Mischerstellung
+    <li>HK2_Pumpe
+    <li>HK2_Raumisttemperatur
+    <li>HK2_Raumsolltemperatur
+    <li>HK2_Vorlaufisttemperatur
+    <li>HK2_Vorlaufsolltemperatur
+    <li>Kessel_Betrieb
+    <li>Kessel_Fehler
+    <li>Kessel_Integral
+    <li>Kessel_Integral1
+    <li>Kessel_Vorlaufisttemperatur
+    <li>Kessel_Vorlaufsolltemperatur
+    <li>Modulkennung
+    <li>NoData
+    <li>Versionsnummer_NK
+    <li>Versionsnummer_VK
+    <li>WW_Betriebswerte1
+    <li>WW_Betriebswerte2
+    <li>WW_Einschaltoptimierung
+    <li>WW_Isttemperatur
+    <li>WW_Pumpentyp
+    <li>WW_Solltemperatur
+  </ul>
+  <br>
+  As I cannot explain all the values, I logged data for a period and plotted
+  each received value in the following logs:
+    <ul>
+      <li><a href="km271/km271_Aussentemperatur.png">Aussentemperatur</a></li>
+      <li><a href="km271/km271_Betriebswerte.png">Betriebswerte</a></li>
+      <li><a href="km271/km271_Brenneransteuerung.png">Brenneransteuerung</a></li>
+      <li><a href="km271/km271_Brennerlaufzeit.png">Brennerlaufzeit</a></li>
+      <li><a href="km271/km271_Brennerschalttemperatur.png">Brennerschalttemperatur</a></li>
+      <li><a href="km271/km271_Heizkennlinie.png">Heizkennlinie</a></li>
+      <li><a href="km271/km271_Kesselbetrieb.png">Kesselbetrieb</a></li>
+      <li><a href="km271/km271_Kesselintegral.png">Kesselintegral</a></li>
+      <li><a href="km271/km271_Ladepumpe.png">Ladepumpe</a></li>
+      <li><a href="km271/km271_Raumsolltemperatur_HK1.png">Raumsolltemperatur_HK1</a></li>
+      <li><a href="km271/km271_Vorlauftemperatur.png">Vorlauftemperatur</a></li>
+      <li><a href="km271/km271_Warmwasser.png">Warmwasser</a></li>
+    </ul>
+  All of these events are reported directly after initialization (or after
+  requesting logmode), along with some 60 configuration records (6byte long
+  each). Most parameters from these records are reverse engeneered, they
+  all start with CFG_ for configuration and PRG_ for timer program information.
+  </ul>
+
+
+
+=end html
+=cut

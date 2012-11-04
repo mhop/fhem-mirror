@@ -525,3 +525,119 @@ sub nonblockGetLinesSISPM {
 
 
 1;
+
+=pod
+=begin html
+
+<a name="SISPM"></a>
+<h3>SISPM</h3>
+<ul>
+  <br>
+
+  <a name="SISPMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SISPM &lt;/path/to/sispmctl&gt;</code>
+    <br><br>
+
+    <!--<div style="background-color: #ffaaaa;"> -->
+    <div>
+    When <i>using multiple SIS PMs on one host</i>, sispmctl up to and including V 2.7 has a bug:
+<pre>plug-2:# sispmctl -v -s -d 1 -g all -d 2 -g all
+
+SiS PM Control for Linux 2.7
+
+(C) 2004, 2005, 2006, 2007, 2008 by Mondrian Nuessle, (C) 2005, 2006 by Andreas Neuper.
+This program is free software.
+[...]
+
+Gembird #0 is USB device 013.This device is a 4-socket SiS-PM.
+[...]
+
+Gembird #1 is USB device 015.This device is a 4-socket SiS-PM.
+[...]
+
+Accessing Gembird #1 USB device 015
+Status of outlet 1:     on
+Status of outlet 2:     on
+Status of outlet 3:     on
+Status of outlet 4:     on
+Error performing requested action
+Libusb error string: error sending control message: Invalid argument
+Terminating
+*** glibc detected *** sispmctl: double free or corruption (fasttop): 0x000251e0 ***
+[...]</pre>
+    Well, the fix is simple and will be sent upstream, but in case it's not incorporated
+    at the time you need it, here it is; it's easy to apply even by hand ;-)
+<pre>
+--- src/main.c-old      2010-01-19 16:56:15.000000000 +0100
++++ src/main.c  2010-01-19 16:54:56.000000000 +0100
+@@ -441,7 +441,7 @@
+            }
+            break;
+        case 'd': // replace previous (first is default) device by selected one
+-           if(udev!=NULL) usb_close (udev);
++           if(udev!=NULL) { usb_close (udev); udev=NULL; }
+            devnum = atoi(optarg);
+            if(devnum>=count) devnum=count-1;
+            break;
+</pre></div><br>
+
+    Defines a path to the program "sispmctl", which is used to control (locally attached)
+    "Silver Shield Power Manager" devices. Usually these are connected to the local computer
+    via USB, more than one "sispm" device per computer is supported. (Please note that, due
+    to neglections in their USB driver, AVM's Fritz!Box 7170 (and derivates, like Deutsche
+    Telekom's Speedport W901V) <b>is not</b> able to talk to these devices ... The Fritz!Box
+    72xx and 73xx should be fine.)
+
+    The communication between FHEM and the Power Manager device is done by using the open
+    source <a href="http://sispmctl.sourceforge.net/">sispmctl</a> program. Thus, for the
+    time being, THIS functionality is only available running FHEM on Linux (or any other platform
+    where you can get the sispmctl program compiled and running). On the bright side: by
+    interfacing via commandline, it is possible to define multiple SISPM devices, e. g. with
+    a wrapper that does execute sispmctl on a remote (Linux) system. And: sispmctl runs happily
+    on Marvells SheevaPlug ;) <i>Please note:</i> if you're not running FHEM as root, you most likely
+    have to make sispmctl setuid root (<code>chmod 4755 /path/to/sispmctl</code>) or fiddle with
+    udev so that the devices of the Power Manager are owned by the user running FHEM.
+
+    After defining a SISPM device, a first test is done, identifying attached PMs. If this
+    succeeds, an internal task is scheduled to read the status every 30 seconds. (Reason
+    being that someone else could have switched sockets externally to FHEM.)
+
+    To actually control any power sockets, you need to define a <a href="#SIS_PMS">SIS_PMS</a>
+    device ;) If autocreate is enabled, those should be autocreated for your convenience as
+    soon as the first scan took place (30 seconds after the define).
+
+    Implementation of SISPM.pm tries to be nice, that is it reads from the pipe only
+    non-blocking (== if there is data), so it should be safe even to use it via ssh or
+    a netcat-pipe over the Internet, but this, as well, has not been tested extensively yet.
+    <br><br>
+
+    Attributes:
+    <ul>
+      <li><code>model</code>: <code>SISPM</code> (ignored for now)</li>
+    </ul>
+    <br>
+    Example:
+    <ul>
+      <code>define PMS_Terrarium SISPM /usr/bin/sispmctl</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="SISPMset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="SISPMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="SISPMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (SISPM)</li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

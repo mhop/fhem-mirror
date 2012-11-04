@@ -335,3 +335,51 @@ energy_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="SML"></a>
+
+<h3>SML</h3>
+<ul><p>
+This module supports "Intelligenter Strom Zhler"(ENBW) and "Sparzhler" (Yellow Strom).<br>
+The electricity meter will be polled in a defined interval for new values.
+</p>
+ <b>Define</b><br>
+  <code>define &lt;name&gt; SML &lt;host&gt; &lt;port&gt; [&lt;interval&gt; &lt;timeout&gt;]</code><br>
+  <p>
+  Example:<br>
+  define StromZ1 SML 192.168.178.20 <br>
+  define StromZ2 SML 192.168.10.25 300 60 <br>
+  </p>
+
+  <b>Set</b><br>
+  set &lt;name&gt; &lt;value&gt; &lt;nummber&gt;<br>where value is one of:<br><br>
+  <ul>
+  <li><code>TOTALPOWER</code> </li>
+  <li><code>YEARPOWER </code> </li>
+  <li><code>MONTHPOWER</code> </li>
+  <li><code>DAYPOWER  </code> </li>
+  <li><code>Interval </code> </li>
+   </ul>
+   <br>Example:<br>
+  set &lt;name&gt; TOTALPOWER 12345 <br><br>
+
+ <b>Get</b><br>
+ get &lt;name&gt; &lt;value&gt; <br>where value is one of:<br>
+  <ul>
+  <li><code>TOTALPOWER</code></li>
+  <li><code>YEARPOWER </code></li>
+  <li><code>MONTHPOWER</code></li>
+  <li><code>DAYPOWER  </code></li>
+  <li><code>Interval </code> </li>
+   </ul>
+ <br>Example:<br>
+  get &lt;name&gt; DAYPOWER<br>
+  get &lt;name&gt; YEARPOWER<br><br>
+  
+</ul>
+
+=end html
+=cut

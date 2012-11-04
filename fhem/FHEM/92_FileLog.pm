@@ -485,3 +485,203 @@ seekTo($$$$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="FileLog"></a>
+<h3>FileLog</h3>
+<ul>
+  <br>
+
+  <a name="FileLogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FileLog &lt;filename&gt; &lt;regexp&gt;</code>
+    <br><br>
+
+    Log events to <code>&lt;filename&gt;</code>. The log format is
+    <pre>
+      YYYY:MM:DD_HH:MM:SS &lt;device&gt; &lt;event&gt;</pre>
+    The regexp will be checked against the device name
+    devicename:event or timestamp:devicename:event combination.
+    The regexp must match the complete string, not just a part of it.
+    <br>
+    <code>&lt;filename&gt;</code> may contain %-wildcards of the
+    POSIX strftime function of the underlying OS (see your strftime manual).
+    Common used wildcards are:
+    <ul>
+    <li><code>%d</code> day of month (01..31)</li>
+    <li><code>%m</code> month (01..12)</li>
+    <li><code>%Y</code> year (1970...)
+    <li><code>%w</code> day of week (0..6);  0 represents Sunday
+    <li><code>%j</code> day of year (001..366)
+    <li><code>%U</code> week number of year with Sunday as first day of week (00..53)
+    <li><code>%W</code> week number of year with Monday as first day of week (00..53)
+    </ul>
+    FHEM also replaces <code>%L</code> by the value of the global logdir attribute.<br>
+    Before using <code>%V</code> for ISO 8601 week numbers check if it is
+    correctly supported by your system (%V may not be replaced, replaced by an
+    empty string or by an incorrect ISO-8601 week number, especially
+    at the beginning of the year)
+    If you use <code>%V</code> you will also have to use %G
+    instead of %Y for the year!<br>
+    Examples:
+    <ul>
+      <code>define lamplog FileLog %L/lamp.log lamp</code><br>
+      <code>define wzlog FileLog /var/tmp/wz-%Y-%U.log
+              wz:(measured-temp|actuator).*</code><br>
+      With ISO 8601 week numbers, if supported:<br>
+      <code>define wzlog FileLog /var/tmp/wz-%G-%V.log
+              wz:(measured-temp|actuator).*</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="FileLogset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; reopen</code><br>
+
+    Used to reopen a FileLog after making some manual changes to the logfile.
+    <br>
+  </ul>
+  <br>
+
+
+  <a name="FileLogget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+          &lt;to&gt; &lt;column_spec&gt; </code>
+    <br><br>
+    Read data from the logfile, used by frontends to plot data without direct
+    access to the file.<br>
+
+    <ul>
+      <li>&lt;infile&gt;<br>
+        Name of the logfile to grep. "-" is the current logfile, or you can
+        specify an older file (or a file from the archive).</li>
+      <li>&lt;outfile&gt;<br>
+        If it is "-", you get the data back on the current connection, else it
+        is the prefix for the output file. If more than one file is specified,
+        the data is separated by a comment line for "-", else it is written in
+        separate files, numerated from 0.
+        </li>
+      <li>&lt;from&gt; &lt;to&gt;<br>
+        Used to grep the data. The elements should correspond to the
+        timeformat or be an initial substring of it.</li>
+      <li>&lt;column_spec&gt;<br>
+        For each column_spec return a set of data in a separate file or
+        separated by a comment line on the current connection.<br>
+        Syntax: &lt;col&gt;:&lt;regexp&gt;:&lt;default&gt;:&lt;fn&gt;<br>
+        <ul>
+          <li>&lt;col&gt;
+            The column number to return, starting at 1 with the date.
+            If the column is enclosed in double quotes, then it is a fix text,
+            not a column nuber.</li>
+          <li>&lt;regexp&gt;
+            If present, return only lines containing the regexp. Case sensitive.
+            </li>
+          <li>&lt;default&gt;<br>
+            If no values were found and the default value is set, then return
+            one line containing the from value and this default. We need this
+            feature as gnuplot aborts if a dataset has no value at all.
+            </li>
+          <li>&lt;fn&gt;
+            One of the following:
+            <ul>
+              <li>int<br>
+                Extract the  integer at the beginning og the string. Used e.g.
+                for constructs like 10%</li>
+              <li>delta-h or delta-d<br>
+                Return the delta of the values for a given hour or a given day.
+                Used if the column contains a counter, as is the case for the
+                KS300 rain column.</li>
+              <li>everything else<br>
+                The string is evaluated as a perl expression. @fld is the
+                current line splitted by spaces. Note: The string/perl
+                expression cannot contain spaces, as the part after the space
+                will be considered as the next column_spec.</li>
+            </ul></li>
+        </ul></li>
+      </ul>
+    <br><br>
+    Example:
+      <pre>get outlog out-2008.log - 2008-01-01 2008-01-08 4:IR:int: 9:IR::</pre>
+    <br><br>
+  </ul>
+
+  <a name="FileLogattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="archivedir"></a>
+    <a name="archivecmd"></a>
+    <a name="nrarchive"></a>
+    <li>archivecmd / archivedir / nrarchive<br>
+    When a new FileLog file is opened, the FileLog archiver wil be called.
+        This happens only, if the name of the logfile has changed (due to
+        time-specific wildcards, see the <a href="#FileLog">FileLog</a>
+        section), and there is a new entry to be written into the file.
+        <br>
+
+        If the attribute archivecmd is specified, then it will be started as a
+        shell command (no enclosing " is needed), and each % in the command
+        will be replaced with the name of the old logfile.<br>
+
+        If this attribute is not set, but nrarchive and/or archivecmd are set,
+        then nrarchive old logfiles are kept along the current one while older
+        ones are moved to archivedir (or deleted if archivedir is not set).
+        </li><br>
+
+    <li><a href="#disable">disable</a></li>
+
+    <a name="logtype"></a>
+    <li>logtype<br>
+        Used by the pgm2 webfrontend to offer gnuplot/SVG images made from the
+        logs.  The string is made up of tokens separated by comma (,), each
+        token specifies a different gnuplot program. The token may contain a
+        colon (:), the part before the colon defines the name of the program,
+        the part after is the string displayed in the web frontend. Currently
+        following types of gnuplot programs are implemented:<br>
+        <ul>
+           <li>fs20<br>
+               Plots on as 1 and off as 0. The corresponding filelog definition
+               for the device fs20dev is:<br>
+               define fslog FileLog log/fs20dev-%Y-%U.log fs20dev
+          </li>
+           <li>fht<br>
+               Plots the measured-temp/desired-temp/actuator lines. The
+               corresponding filelog definitions (for the FHT device named
+               fht1) looks like:<br>
+               <code>define fhtlog1 FileLog log/fht1-%Y-%U.log fht1:.*(temp|actuator).*</code>
+
+          </li>
+           <li>temp4rain10<br>
+               Plots the temperature and rain (per hour and per day) of a
+               ks300. The corresponding filelog definitions (for the KS300
+               device named ks300) looks like:<br>
+               define ks300log FileLog log/fht1-%Y-%U.log ks300:.*H:.*
+          </li>
+           <li>hum6wind8<br>
+               Plots the humidity and wind values of a
+               ks300. The corresponding filelog definition is the same as
+               above, both programs evaluate the same log.
+          </li>
+           <li>text<br>
+               Shows the logfile as it is (plain text). Not gnuplot definition
+               is needed.
+          </li>
+        </ul>
+        Example:<br>
+           attr ks300log1 logtype temp4rain10:Temp/Rain,hum6wind8:Hum/Wind,text:Raw-data
+    </li><br>
+
+
+
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

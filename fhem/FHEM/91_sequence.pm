@@ -116,3 +116,50 @@ sequence_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="sequence"></a>
+<h3>sequence</h3>
+<ul>
+  <br>
+
+  <a name="sequencedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; sequence &lt;re1&gt; &lt;timeout1&gt; &lt;re2&gt; [&lt;timeout2&gt; &lt;re3&gt; ...]</code>
+    <br><br>
+
+    A sequence is used to allow to trigger events for a certain combination of
+    button presses on a remote. E.g. to switch on a lamp when pressing the
+    Btn1:on, then Btn2:off and at last Btn1:on one after the other you could
+    define the following:<br>
+    <br>
+    <ul>
+      <code>
+      define lampseq sequence Btn1:on 0.5 Btn2:off 0.5 Btn1:on<br>
+      define lampon  notify lampseq:trigger set lamp on
+      </code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="sequenceset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="sequenceget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="sequenceattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

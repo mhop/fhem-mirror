@@ -146,3 +146,87 @@ watchdog_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="watchdog"></a>
+<h3>watchdog</h3>
+<ul>
+  <br>
+
+  <a name="watchdogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; watchdog &lt;regexp1&gt; &lt;timespec&gt; &lt;regexp2&gt; &lt;command&gt;</code><br>
+    <br>
+    Start an arbitrary fhem.pl command if after &lt;timespec&gt; receiving an
+    event matching &lt;regexp1&gt; no event matching &lt;regexp2&gt; is
+    received.<br>
+    The syntax for &lt;regexp1&gt; and &lt;regexp2&gt; is the same as the
+    regexp for <a href="#notify">notify</a>.<br>
+    &lt;timespec&gt; is HH:MM[:SS]<br>
+    &lt;command&gt; is a usual fhem command like used int the <a
+    href="#at">at</a> or <a href="#notify">notify</a>
+    <br><br>
+
+    Examples:
+    <pre>
+    # Request data from the FHT80 _once_ if we do not receive any message for
+    # 15 Minutes.
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date
+
+    # Request data from the FHT80 _each_ time we do not receive any message for
+    # 15 Minutes, i.e. reactivate the watchdog after it triggered.  Might be
+    # dangerous, as it can trigger in a loop.
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .
+
+    # Shout once if the HMS100-FIT is not alive
+    define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"
+
+    # Send mail if the window is left open
+    define w watchdog contact1:open 00:15 contact1:closed "mail_me close window1"
+    attr w regexp1WontReactivate
+    </pre>
+
+    Notes:<br>
+    <ul>
+      <li>if &lt;regexp1&gt; is . (dot), then activate the watchdog at
+          definition time. Else it will be activated when the first matching
+          event is received.</li>
+      <li>&lt;regexp1&gt; resets the timer of a running watchdog, to avoid it
+          use the regexp1WontReactivate attribute.
+      <li>if &lt;regexp2&gt; is SAME, then it will be the same as the first
+          regexp, and it will be reactivated, when it is received.
+          </li>
+      <li>trigger &lt;watchdogname&gt; . will activate the trigger if its state
+          is defined, and set it into state defined if its state is
+          triggered. You always have to reactivate the watchdog with this
+          command once it has triggered (unless you restart fhem)</li>
+      <li>a generic watchdog (one watchdog responsible for more devices) is
+          currently not possible.</li>
+    </ul>
+
+    <br>
+  </ul>
+
+  <a name="watchdogset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="watchdogget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="watchdogattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a name="regexp1WontReactivate">regexp1WontReactivate</a><br>
+        When a watchdog is active, a second event matching regexp1 will
+        normally reset the timeout. Set this attribute to prevents this.
+    </li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

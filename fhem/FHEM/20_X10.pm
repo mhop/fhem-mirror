@@ -532,3 +532,123 @@ X10_Parse($$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="X10"></a>
+<h3>X10</h3>
+<ul>
+  <a name="X10define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; X10 &lt;model&gt; &lt;housecode&gt;
+          &lt;unitcode&gt;</code>
+    <br><br>
+
+   Defines an X10 device via its model, housecode and unitcode.<br><br>
+
+   Notes:
+   <ul>
+   <li><code>&lt;model&gt;</code> is one of
+      <ul>
+        <li><code>lm12</code>: lamp module, dimmable</li>
+        <li><code>lm15</code>: lamp module, not dimmable</li>
+        <li><code>am12</code>: appliance module, not dimmable</li>
+        <li><code>tm12</code>: tranceiver module, not dimmable. Its
+            unitcode is 1.</li>
+      </ul>
+      Model determines whether a dim command is reasonable to be sent
+      or not.</li>
+   <li><code>&lt;housecode&gt;</code> ranges from A to P.</li>
+   <li><code>&lt;unitcode&gt;</code> ranges from 1 to 16.</li>
+   </ul>
+   <br>
+
+    Examples:
+    <ul>
+      <code>define lamp1 X10 lm12 N 10</code><br>
+      <code>define pump X10 am12 B 7</code><br>
+      <code>define lamp2 X10 lm15 N 11</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="X10set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;argument&gt]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    dimdown           # requires argument, see the note
+    dimup             # requires argument, see the note
+    off
+    on
+    on-till           # Special, see the note
+    on-for-timer      # Special, see the note
+    </pre>
+    Examples:
+    <ul>
+      <code>set lamp1 dimup 10</code><br>
+      <code>set lamp1,lamp2 off</code><br>
+      <code>set pump off</code><br>
+      <code>set lamp2 on-till 19:59</code><br>
+      <code>set lamp2 on-for-timer 00:02:30</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>Only switching and dimming are supported by now.</li>
+      <li>Dimming is valid only for a dimmable device as specified by
+          the <code>model</code> argument in its <code>define</code>
+          statement.
+      <li>An X10 device has 210 discrete brightness levels. If you use a
+          X10 sender, e.g. a remote control or a wall switch to dim, a
+          brightness step is 100%/210.</li>
+      <li><code>dimdown</code> and <code>dimup</code> take a number in the
+          range from 0 to 22 as argument. It is assumed that argument 1 is
+          a 1% brightness change (microdim) and arguments 2 to 22 are
+          10%..100% brightness changes. The meaning of argument 0 is
+          unclear.</li>
+      <li>This currently leads to some confusion in the logs as the
+          <code>dimdown</code> and <code>dimup</code> codes are logged with
+          different meaning of the arguments depending on whether the commands
+          were sent from the PC or from a remote control or a wall switch.</li>
+      <li><code>dimdown</code> and <code>dimup</code> from on and off states may
+          have unexpected results. This seems to be a feature of the X10
+          devices.</li>
+      <li><code>on-till</code> requires an absolute time in the "at" format
+          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          returns a time specification).
+          If the current time is greater than the specified time, then the
+          command is ignored, else an "on" command is generated, and for the
+          given "till-time" an off command is scheduleld via the at command.
+          </li>
+      <li><code>on-for-timer</code> requires a relative time in the "at" format
+          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          returns a time specification).
+          </li>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="X10get"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="X10attr"></a>
+  <b>Attributes</b>
+  <ul>
+  <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a> (lm12,lm15,am12,tm13)</li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

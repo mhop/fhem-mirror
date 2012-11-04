@@ -907,3 +907,74 @@ TRX_WEATHER_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="TRX_WEATHER"></a>
+<h3>TRX_WEATHER</h3>
+<ul>
+  The TRX_WEATHER module interprets weather sensor messages received by a RTXtrx receiver. See <a href="http://www.rfxcom.com/oregon.htm">http://www.rfxcom.com/oregon.htm</a> for a list of
+  Oregon Scientific weather sensors that could be received by the RFXtrx433 tranmitter. You need to define a RFXtrx433 receiver first. See
+  See <a href="#TRX">TRX</a>.
+
+  <br><br>
+
+  <a name="TRX_WEATHERdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; OREGON &lt;deviceid&gt;</code> <br>
+    <br>
+    &lt;deviceid&gt; is the device identifier of the Oregon sensor. It consists of the sensors name and (only if the attribute longids is set of the RFXtrx433) an a one byte hex string (00-ff) that identifies the sensor. If an sensor uses an switch to set an additional is then this is also added. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used: <br>
+	"THR128" (for THR128/138, THC138),<br>
+	"THGR132N" (for THC238/268,THN132,THWR288,THRN122,THN122,AW129/131),<br>
+	"THWR800", <br>
+	"RTHN318", <br>
+	"TX3_T" (for LaCrosse TX3, TX4, TX17),<br>
+	"THGR228N" (for THGN122/123, THGN132, THGR122/228/238/268),<br>
+	"THGR810",<br>
+	"RTGR328",<br>
+	"THGR328",<br>
+	"WTGR800_T" (for temperature of WTGR800),<br>
+	"THGR918" (for THGR918, THGRN228, THGN500),<br>
+	"TFATS34C" (for TFA TS34C),<br>
+	"BTHR918",<br>
+	"BTHR918N (for BTHR918N, BTHR968),<br>
+	"RGR918" (for RGR126/682/918),<br>
+	"PCR800",<br>
+	"TFA_RAIN" (for TFA rain sensor),<br>
+	"WTGR800_A" (for wind sensor of WTGR800),<br>
+	"WGR800" (for wind sensor of WGR800),<br>
+	"WGR918" (for wind sensor of STR918 and WGR918),<br>
+	"TFA_WIND" (for TFA wind sensor)
+    <br>
+    <br><br>
+      Example: <br>
+    <code>define Tempsensor TRX_WEATHER TX3_T</code><br>
+    <code>define Tempsensor3 TRX_WEATHER THR128_3</code><br>
+    <code>define Windsensor TRX_WEATHER WGR918_A</code><br>
+    <code>define Regensensor TRX_WEATHER RGR918</code><br>
+  </ul>
+  <br>
+
+  <a name="TRX_WEATHERset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="TRX_WEATHERget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="TRX_WEATHERattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br>
+</ul>
+
+
+
+=end html
+=cut

@@ -112,3 +112,52 @@ LIRC_Ready($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="LIRC"></a>
+<h3>LIRC</h3>
+<ul>
+  Use infrared signals received by an lirc device as toggle events.
+  <br><br>
+  Note: this module needs the Lirc::Client perl module.
+  <br><br>
+
+  <a name="LIRCdefine"></a>
+  <b>Define</b>
+  <ul>
+    define &lt;name&gt; LIRC &lt;lircrc_file&gt;<br>
+    Example:<br>
+    <ul>
+     define Lirc LIRC /etc/lirc/lircrc
+    </ul>
+    Note: In the lirc configuration file you have to define each possible event.
+    If you have this configuration
+    <pre>
+    begin
+      prog = fhem
+      button = pwr
+      config = IrPower
+    end</pre>
+    and you press the pwr button the IrPower toggle event occures at fhem.
+    <pre>
+    define IrPower01 notify IrPower set lamp toggle</pre>
+    turns the lamp on and off.
+    If you want a faster reaction to keypresses you have to change the
+    defaultvalue of readytimeout from 5 seconds to e.g. 1 second in fhem.pl
+  </ul>
+  <br>
+
+  <a name="LIRCset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="LIRCget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="LIRCattr"></a>
+  <b>Attributes</b> <ul>N/A</ul><br>
+</ul>
+
+=end html
+=cut

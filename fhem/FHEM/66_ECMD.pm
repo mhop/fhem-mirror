@@ -631,3 +631,190 @@ ECMD_Write($$)
 #####################################
 
 1;
+
+=pod
+=begin html
+
+<a name="ECMD"></a>
+<h3>ECMD</h3>
+<ul>
+  Any physical device with request/response-like communication capabilities
+  over a TCP connection can be defined as ECMD device. A practical example
+  of such a device is the AVR microcontroller board AVR-NET-IO from
+  <a href="http://www.pollin.de">Pollin</a> with
+  <a href="http://www.ethersex.de/index.php/ECMD">ECMD</a>-enabled
+  <a href="http://www.ethersex.de">Ethersex</a> firmware.<p>
+
+  A physical ECMD device can host any number of logical ECMD devices. Logical
+  devices are defined as <a href="#ECMDDevice">ECMDDevice</a>s in fhem.
+  ADC 0 to 3 and I/O port 0 to 3 of the above mentioned board
+  are examples of such logical devices. ADC 0 to 3 all belong to the same
+  device class ADC (analog/digital converter). I/O port 0 to 3 belong to the device
+  class I/O port. By means of extension boards you can make your physical
+  device drive as many logical devices as you can imagine, e.g. IR receivers,
+  LC displays, RF receivers/transmitters, 1-wire devices, etc.<p>
+
+  Defining one fhem module for any device class would create an unmanageable
+  number of modules. Thus, an abstraction layer is used. You create a device class
+  on the fly and assign it to a logical ECMD device. The
+  <a href="#ECMDClassdef">class definition</a>
+  names the parameters of the logical device, e.g. a placeholder for the number
+  of the ADC or port, as well as the get and set capabilities. Worked examples
+  are to be found in the documentation of the <a href="#ECMDDevice">ECMDDevice</a> device.
+  <br><br>
+
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the module is connected via serial Port or USB.
+  <br><br>
+
+  <a name="ECMDdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ECMD telnet &lt;IPAddress:Port&gt;</code><br><br>
+    or<br><br>
+    <code>define &lt;name&gt; ECMD serial &lt;SerialDevice&gt;[&lt;@BaudRate&gt;]</code>
+    <br><br>
+
+    Defines a physical ECMD device. The keywords <code>telnet</code> or
+    <code>serial</code> are fixed.<br><br>
+
+    Examples:
+    <ul>
+      <code>define AVRNETIO ECMD telnet 192.168.0.91:2701</code><br>
+      <code>define AVRNETIO ECMD serial /dev/ttyS0</code><br>
+      <code>define AVRNETIO ECMD serial /sev/ttyUSB0@38400</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="ECMDset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; classdef &lt;classname&gt; &lt;filename&gt;</code>
+    <br><br>
+    Creates a new device class <code>&lt;classname&gt;</code> for logical devices.
+    The class definition is in the file <code>&lt;filename&gt;</code>. You must
+    create the device class before you create a logical device that adheres to
+    that definition.
+    <br><br>
+    Example:
+    <ul>
+      <code>define AVRNETIO classdef /etc/fhem/ADC.classdef</code><br>
+    </ul>
+    <br>
+    <code>set &lt;name&gt; reopen</code>
+    <br><br>
+    Closes and reopens the device. Could be handy if connection is lost and cannot be
+    reestablished automatically.
+    <br><br>
+  </ul>
+
+
+  <a name="ECMDget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; raw &lt;command&gt;</code>
+    <br><br>
+    Sends the command <code>&lt;command&gt;</code> to the physical ECMD device
+    <code>&lt;name&gt;</code> and reads the response.
+  </ul>
+  <br><br>
+
+  <a name="ECMDattr"></a>
+  <b>Attributes</b>
+  <br><br>
+  <ul>
+    <li>classdefs<br>A colon-separated list of &lt;classname&gt;=&lt;filename&gt;.
+    The list is automatically updated if a class definition is added. You can
+    directly set the attribute.</li>
+  </ul>
+  <br><br>
+
+
+  <a name="ECMDClassdef"></a>
+  <b>Class definition</b>
+  <br><br>
+  <ul>
+
+        The class definition for a logical ECMD device class is contained in a text file.
+        The text file is made up of single lines. Empty lines and text beginning with #
+        (hash) are ignored. Therefore make sure not to use hashes in commands.<br>
+
+        The following commands are recognized in the device class definition:<br><br>
+        <ul>
+                <li><code>params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br><br>
+                Declares the names of the named parameters that must be present in the
+                <a href="#ECMDDevicedefine">definition of the logical ECMD device</a>.
+                <br><br>
+                </li>
+
+                <li><code>set &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
+                <br><br>
+                Declares a new set command <code>&lt;commandname&gt;</code>.
+                <br><br>
+                </li>
+
+                <li><code>get &lt;commandname&gt; cmd { <a href="#perl">&lt;perl special&gt;</a> }</code>
+                <br><br>
+                Declares a new get command <code>&lt;commandname&gt;</code>.
+                <br><br>
+                </li>
+
+                <li>
+		<code>set &lt;commandname&gt; postproc { &lt;perl command&gt }</code><br>
+		<code>get &lt;commandname&gt; postproc { &lt;perl command&gt }</code>
+                <br><br>
+                Declares a postprocessor for the command <code>&lt;commandname&gt;</code>.
+                <br><br>
+                </li>
+
+
+                <li>
+                <code>set &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code><br>
+                <code>get &lt;commandname&gt; params &lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]</code>
+                <br><br>
+                Declares the names of the named parameters that must be present in the
+                set or get command <code>&lt;commandname&gt;</code></a>. Be careful not to use a parameter name that
+                is already used in the device definition (see <code>params</code> above).
+                <br><br>
+                </li>
+
+        </ul>
+
+        The perl specials in the definitions of the set and get commands can
+        contain macros. Apart from the rules outlined in the <a
+        href="#perl">documentation of perl specials</a> in fhem, the following
+        rules apply:<br><br>
+        <ul>
+          <li>The character @ will be replaced with the device
+          name. To use @ in the text itself, use the double mode (@@).</li>
+
+          <li>The macro <code>%NAME</code> will expand to the device name (same
+          as <code>@</code>).</li>
+
+          <li>The macro <code>%&lt;parameter&gt;</code> will expand to the
+          current value of the named parameter. This can be either a parameter
+          from the device definition or a parameter from the set or get
+          command.</li>
+
+          <li>The macro substitution occurs before perl evaluates the
+          expression. It is a plain text substitution.</li>
+
+          <li>If in doubt what happens, run the commands with loglevel 5 and
+          observe the log file.</li>
+      </ul><br><br>
+
+      <!--Neither apply the rules outlined in the <a href="#perl">documentation of perl specials</a>
+      for the <code>&lt;perl command&gt</code> in the postprocessor definitions nor can it contain macros.
+      This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>-->
+      The rules outlined in the <a href="#perl">documentation of perl specials</a>
+      for the <code>&lt;perl command&gt</code> in the postprocessor definitions apply.
+      <b>Note:</b> Beware of undesired side effects from e.g. doubling of semicolon!
+
+      The <code>perl command</code> acts on <code>$_</code>. The result of the perl command is the
+      final result of the get or set command.
+    </ul>
+</ul>
+
+=end html
+=cut

@@ -677,3 +677,315 @@ getFhtBuffer($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="FHT"></a>
+<h3>FHT</h3>
+<ul>
+  Fhem can receive FHT radio (868.35 MHz) messages either through an <a
+  href="#FHZ">FHZ</a> or an <a href="#CUL">CUL</a> device, so this must be
+  defined first.<br><br>
+
+  <a name="FHTdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHT &lt;housecode&gt;</code>
+    <br><br>
+
+    <code>&lt;housecode&gt;</code> is a four digit hex number,
+    corresponding to the address of the FHT80b device.
+    <br>
+
+    Examples:
+    <ul>
+      <code>define wz FHT 3232</code><br>
+    </ul>
+    <br>
+    See the FHT section in <a href="#set">set</a> for more.
+  </ul>
+  <br>
+
+  <a name="FHTset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;valuetype&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+      desired-temp
+      day-temp night-temp
+      report1 report2
+      refreshvalues
+      mode
+      holiday1 holiday2      # see mode holiday_short or holiday
+      manu-temp              # No clue what it does.
+      year month day hour minute
+      time date
+      lowtemp-offset         # Alarm-Temp.-Differenz
+      windowopen-temp
+      mon-from1 mon-to1 mon-from2 mon-to2
+      tue-from1 tue-to1 tue-from2 tue-to2
+      wed-from1 wed-to1 wed-from2 wed-to2
+      thu-from1 thu-to1 thu-from2 thu-to2
+      fri-from1 fri-to1 fri-from2 fri-to2
+      sat-from1 sat-to1 sat-from2 sat-to2
+      sun-from1 sun-to1 sun-from2 sun-to2
+</pre>
+
+    Examples:
+    <ul>
+      <code>set wz desired-temp 22.5</code><br>
+      <code>set fl desired-temp 20.5 day-temp 19.0 night-temp 16.0</code><br>
+    </ul>
+    <br>
+
+    Notes:
+    <ul>
+      <li>Following events are reported (more or less regularly) by each FHT
+          device: <code>measured-temp actuator actuator1...actuator8
+          warnings</code><br>
+          You can use these strings for <a href="#notify">notify</a> or
+          <a href="#FileLog">FileLog</a> definitions.
+          <ul>
+            <li>warnings can contain following strings:
+                none, Battery low,Temperature too low, Window open,
+                Fault on window sensor
+                </li>
+            <li>actuator (without a suffix) stands for all actuators.
+            <li>actuator or actuator1..8 can take following values:
+                <ul>
+                  <li>&lt;value&gt;%<br>
+                     This is the normal case, the actuator is instructed to
+                     open to this value.
+                  <li>offset &lt;value&gt;%<br>
+                     The actuator is running with this offset.
+                  <li>lime-protection<br>
+                     The actuator was instructed to execute the lime-protection
+                     procedure.
+                  <li>synctime<br>
+                     If you select Sond/Sync on the FHT80B, you'll see a count
+                     down.
+                  <li>test<br>
+                     The actuator was instructed by the FHT80b to emit a beep.
+                  <li>pair<br>
+                     The the FHT80b sent a "you-belong-to-me" to this actuator.
+                </ul>
+          </ul>
+          <br>
+
+      <li>The FHT is very economical (or lazy), it accepts one message from the
+          FHZ1x00 every 115+x seconds, where x depends on the housecode. Don't
+          be surprised if your command is only accepted 10 minutes later by the
+          device. FHT commands are buffered in the FHZ1x00/CUL till they are
+          sent to the FHT, see the related <code>fhtbuf</code> entry in the
+          <code><a href="#get">get</a></code> section.<br> You can send up to 8
+          commands in one message at once to the FHT if you specify them all as
+          arguments to the same set command, see the example above.<br><br>
+
+      <li>time sets hour and minute to local time</li><br>
+
+      <li>date sets year, month and date to local time</li><br>
+
+      <li>refreshvalues is an alias for report1 255 report2 255</li><br>
+
+      <li>All <code>*-temp</code> values need a temperature
+          as argument, which will be rounded to 0.5 Celsius.<br>
+          Temperature values must  between 5.5 and 30.5 Celsius. Value 5.5 sets
+          the actuator to OFF, value 30.5 set the actuator to ON</li><br>
+
+      <li><code>mode</code> is one of <code>auto, manual, holiday or
+          holiday_short.</code><br>
+          If the mode is holiday, then the mode switches back to either auto or
+          manual at 00:00 of the day specified by the following:
+            <ul>
+              <li>holiday1 sets the end-day of the holiday</li>
+              <li>holiday2 sets the end-month of the holiday</li>
+            </ul>
+          For holiday_short (party mode)
+          <ul>
+              <li> holiday1 sets the absolute hour to switch back from this
+              mode (in 10-minute steps, max 144)
+              <li> holiday2 sets the day of month to switch back from this mode
+              (can only be today or tomorrow, since holiday1 accepts only 24 hours).
+              Example:
+              <ul>
+                  <li> current date is 29 Jan, time is 18:05
+                  <li> you want to switch to party mode until tomorrow 1:00
+                  <li> set holiday1 to 6 (6 x 10min = 1hour) and holiday2 to 30
+              </ul>
+          </ul>
+          The temperature for the holiday period is set by the desired-temperature
+          parameter. <br> Note that you cannot set holiday mode for days earlier than the
+          day after tomorrow, for this you must use holiday_short.<br>
+          Note also, you cannot set parameters seperately, you must set them in one command.
+          Example:
+          <br>
+	  <code>set FHT1 mode holiday holiday1 24 holiday2 12 desired-temp 14</code>
+          </li>
+          <br>
+
+      <li>The <code>*-from1/*-from2/*-to1/*-to2</code> valuetypes need a time
+      spec as argument in the HH:MM format. They define the periods, where
+      the day-temp is valid. The minute (MM) will be rounded to 10, and
+      24:00 means off.
+          <br><br></li>
+
+      <li>To synchronize the FHT time and to "wake" muted FHTs it is adviseable
+          to schedule following command:<br>
+      <code>define fht_sync at  +*3:30 set TYPE=FHT time</code>
+          <br><br>
+
+      <li><code>report1</code> with parameter 255 requests all settings for
+          monday till sunday to be sent. The argument is a bitfield, to request
+          unique values add up the following:
+          <ul>
+            <li> 1: monday</li>
+            <li> 2: tuesday</li>
+            <li> 4: thursday</li>
+            <li> 8: wednesday</li>
+            <li>16: friday</li>
+            <li>32: saturday</li>
+            <li>64: sunday</li>
+          </ul>
+          measured-temp and actuator is sent along if it is considered
+          appropriate
+          by the FHT.
+          <br><br>
+          <b>Note:</b> This command generates a lot of RF traffic, which can
+          lead to further problems, especially if the reception is not clear.
+          <br><br></li>
+
+      <li><code>report2</code> with parameter 255 requests the following
+          settings to be reported: day-temp night-temp windowopen-temp
+          lowtemp-offset desired-temp measured-temp mode warnings.
+          The argument is (more or less) a bitfield, to request unique values
+          add up the following:
+          <ul>
+          <li> 1: warnings
+          <li> 2: mode
+          <li> 4: day-temp, night-temp, windowopen-temp
+          <li>64: lowtemp-offset
+          </ul>
+          measured-temp and actuator is sent along if it is considered
+          appropriate
+
+          by the FHT.
+          <br><br>
+
+      <li><code>lowtemp-offset</code> needs a temperature as argument, valid
+          values must be between 1.0 and 5.0 Celsius.<br> It will trigger a
+          warning if <code>desired-temp - measured-temp &gt;
+          lowtemp-offset</code> in a room for at least 1.5 hours after the last
+          desired-temp change.  <br><br>
+
+      <li>FHEM optionally has an internal software buffer for FHT devices.
+          This buffer should prevent transmission errors. If there is no
+          confirmation for a given period, FHEM resends the command. You can
+          see the queued commands with <a href="#list">list</a>
+          &lt;fht-device&gt;.
+          See the <a href="#fhtsoftbuffer">fhtsoftbuffer</a>,
+          <a href="#retrycount">retrycount</a> and
+          <a href="#minfhtbuffer">minfhtbuffer</a> attributes for details.
+          <br><br>
+
+      <li>If a buffer is still in the softbuffer, it will be sent in the
+          following order:<br> <code>desired-temp,mode,report1,report2,
+          holiday1,holiday2,day-temp,night-temp, [all other commands]</code>
+          <br><br>
+
+    </ul>
+  </ul>
+  <br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="FHTattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a><br>
+      <b>Note:</b>It makes sense to define an FHT device even for an FHT8b,
+      else you will receive "unknown FHT device, please define one" message
+      for each FHT8b as the CUL is reporting the 8b valve messages.  But you
+      should set the dummy attribute for these devices, else the internal FHT
+      buffer of the CUL will be filled with data for the 8b's which is never
+      consumed. If the buffer is full, you'll get "EOB" messages from the CUL,
+      and you cannot transmit any data to the 80b's</li><br>
+
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (fht80b)</li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+
+    <a name="retrycount"></a>
+    <li>retrycount<br>
+        If the <a href="#fhtsoftbuffer">fhtsoftbuffer</a> attribute is set, then
+        resend commands <code>retrycount</code> times if after 240 seconds
+        no confirmation message is received from the corresponding FHT
+        device.<br>
+        Default is 3.</li><br>
+
+    <a name="minfhtbuffer"></a>
+    <li>minfhtbuffer<br>
+        FHEM won't send commands to the FHZ if its fhtbuffer is below
+        this value, default is 0. If this value is low, then the ordering of
+        fht commands (see the note in the FHT section of <a href="#set">set</a>)
+        has little effect, as only commands in the softbuffer can be
+        prioritized. The maximum value should be 7 below the hardware maximum
+        (see fhtbuf).
+        </li><br>
+
+    <a name="lazy"></a>
+    <li>lazy<br>
+        If the lazy attribute is set, FHEM won't send commands to the FHT if
+        the current reading and the value to be set are already identical. This
+        may help avoiding conflicts with the max-1%-time-on-air rule in large
+        installations. Not set per default.
+        </li><br>
+
+    <a name="tmpcorr"></a>
+    <li>tmpcorr<br>
+        Correct the temperature reported by the FHT by the value specified.
+        Note: only the measured-temp value reported by fhem (used for logging)
+        will be modified.
+        </li>
+  </ul>
+  <br>
+
+  <a name="FHTevents"></a>
+  <b>Generated events:</b>
+  <ul>
+     <li>actuator
+     <li>actuator1 actuator2 actuator3 actuator4<br>
+         actuator5 actuator6 actuator7 actuator8<br>
+         (sent if you configured an offset for the associated valve)
+     <li>mon-from1 mon-to1 mon-from2 mon-to2
+     <li>tue-from1 tue-to1 tue-from2 tue-to2
+     <li>wed-from1 wed-to1 wed-from2 wed-to2
+     <li>thu-from1 thu-to1 thu-from2 thu-to2
+     <li>fri-from1 fri-to1 fri-from2 fri-to2
+     <li>sat-from1 sat-to1 sat-from2 sat-to2
+     <li>sun-from1 sun-to1 sun-from2 sun-to2
+     <li>mode
+     <li>holiday1 holiday2
+     <li>desired-temp
+     <li>measured-temp measured-low measured-high
+     <li>warnings
+     <li>manu-temp
+     <li>year month day hour minute
+     <li>day-temp night-temp lowtemp-offset windowopen-temp
+     <li>ack can-xmit can-rcv ack2 start-xmit end-xmit
+         (only if the CUL is configured to transmit FHT protocol data)
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

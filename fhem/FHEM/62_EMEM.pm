@@ -137,3 +137,57 @@ EMEM_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="EMEM"></a>
+<h3>EMEM</h3>
+<ul>
+  <br>
+
+  <a name="EMEMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EMEM &lt;device-number&gt;</code>
+    <br><br>
+
+    Define up to 4 EM1000EM attached to the EM1010PC. The device number must
+    be between 5 and 8.
+    Defining an EMEM will schedule an internal task, which reads the
+    status of the device every 5 minutes, and triggers notify/filelog commands.
+    <br>Note: Currently this device does not support a "set" function.
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define emem EMEM 5</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+
+  <a name="EMEMget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get EMEM status</code>
+    <br><br>
+    This is the same command which is scheduled every 5 minutes internally.
+  </ul>
+  <br>
+
+  <a name="EMEMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (EM1000EM)</li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

@@ -93,3 +93,49 @@ sub Commanddumpdef($)
   return $r;
 }
 1;
+
+=pod
+=begin html
+
+<a name="dumpdef"></a>
+<h3>dumpdef</h3>
+<ul>
+  <code>dumpdef &lt;options&gt;</code>
+  <br><br>
+    Data::Dumper for FHEM-Devices/Hashes<br><br>
+    Dumps the content of &lt;options&gt; to FHEMWEB<br><br>
+    Options:<br><br>
+    <ul>
+    <table>
+    <tr><td><code>FHEM-DEVICENAME</code></td><td>=></td><td><code>%defs{FHEM-DEVICENAME}+%attr{FHEM-DEVICENAME}</code></td></tr>
+    <tr><td><code>MOD</code></td><td>=></td><td><code>%modules</code></td></tr>
+    <tr><td><code>SEL</code></td><td>=></td><td><code>%selectlist</code></td></tr>
+    <tr><td><code>DAT</code></td><td>=></td><td><code>%data</code></td></tr>
+    <tr><td><code>CMD</code></td><td>=></td><td><code>%cmd</code></td></tr>
+    </table>
+    </ul>
+  <br><br>
+  Example:
+  <ul><br>
+    <pre>dumpdef TEST
+
+    CALLER => main: /opt/fhz/FHEM/01_FHEMWEB.pm LINE: 194 SUB: main::FW_AnswerCall
+    SUB-NAME: main::Commanddumpdef
+    DUMP-DEVICE: TEST
+    $VAR1 = {
+        'IODev' => {},
+        'NAME' => 'TEST',
+        'NR' => 64,
+        'STATE' => '???',
+        'TYPE' => 'dummy'
+        };
+    DUMP-DEVICE-ATTR
+    $VAR1 = {
+        'room' => 'DEF_DUMMY,GRP.TEST'
+        };
+    </pre>
+  </ul>
+</ul>
+
+=end html
+=cut

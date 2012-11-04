@@ -243,3 +243,94 @@ LGTV_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="LGTV"></a>
+<h3>LGTV</h3>
+<ul>
+
+  <a name="LGTVdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; LGTV</code>
+    <br><br>
+
+    This module is expected to work with <a href="#xxLG7000">xxLG7000</a> as it's
+    IODev. With LGTV and a compatible hardware module (currently, there's only
+    xxLG7000), you are able to power your TV set on and off, query it's power state,
+    select the input (AV, RGB, Composites, analogue TV, DVB-T, HDMI) or mute/unmute
+    the volume.<br>
+    Defining a LGTV device will schedule an internal task, which periodically reads
+    the status of the TV set (power state; if power is on, query the selected input)
+    and triggers notify/filelog commands.<br><br>
+
+    Example:
+    <ul>
+      <code>define 47LG7000 LGTV</code><br>
+      <code>attr 47LG7000 IODev <a href="#xxLG7000">myLG7k</a></code>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="LGTVset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;what&gt; &lt;value&gt;</code>
+    <br><br>
+    Currently, the following commands are defined; not all may be available on a
+    given TV set. An error messages should be recorded if e. g. the input in question
+    is not usable.
+
+<pre>power on
+power off
+input AV1
+input AV2
+input AV3
+input AV3
+input Component
+input RGB
+input HDMI1
+input HDMI2
+input HDMI3
+input HDMI4
+input DVBT
+input PAL
+audio mute
+audio normal</pre>
+  </ul>
+
+  <a name="LGTVget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;what&gt;</code>
+    <br><br>
+    Currently, the following commands are defined; not all may be available on a
+    given TV set. An error messages should be recorded if e. g. the input in question
+    is not usable.
+<pre>power
+input
+audio</pre>
+  </ul>
+
+  <a name="LGTVattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li>
+<!--    <li><a href="#model">model</a> (M232Counter)</li> -->
+  </ul>
+<br>
+  <b>Implementator's note</b>
+  <ul>
+    The commands listed above are send 1:1 to the underlying IODev (e. g. xxLG7000); that IODev
+    is responsible for translation into <i>whatever means</i> to invoke the function on the TV.
+    It is my hope that other's will adopt this idea and write compatible low level drivers for other
+    TV sets, to make this module (even ;)) more useful.
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

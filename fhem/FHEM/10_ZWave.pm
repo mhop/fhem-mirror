@@ -475,3 +475,202 @@ ZWave_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="ZWave"></a>
+<h3>ZWave</h3>
+<ul>
+  This module is used to control ZWave devices via FHEM, see <a
+  href="http://www.z-wave.com">www.z-wave.com</a> on details for this device family.
+  This module is a client of the <a href="#ZWDongle">ZWDongle</a> module, which
+  is directly attached to the controller via USB or TCP/IP.
+  <br><br>
+  <a name="ZWavedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ZWave &lt;homeId&gt; &lt;id&gt; [classes]</code>
+  <br>
+  <br>
+  &lt;homeId&gt; is the homeId of the controller node, and id is the id of the
+  slave node in the network of this controller.<br>
+  classes is a hex-list of ZWave device classes. This argument is usually
+  specified by autocreate when creating a device. If you wish to manually
+  create a device, use the classes attribute instead, see below for details.
+  Defining a ZWave device the first time is usually done by autocreate.
+  <br>
+  Example:
+  <ul>
+    <code>define lamp ZWave 00ce2074 9</code><br>
+    <code>attr lamp classes SWITCH_BINARY BASIC MANUFACTURER_SPECIFIC VERSION SWITCH_ALL ASSOCIATION METER CONFIGURATION ALARM</code><br>
+  </ul>
+  </ul>
+  <br>
+
+  Note: the sets/gets/generated events of a gven node depend on the classes
+  supported by this node. If a node supports 3 classes, then the union of
+  these sets/gets/events will be available for this node.<br>
+  Commands for battery operated nodes will be queues internally, and sent when
+  the node sends a message. Answer to get commands appear then as events, the
+  corresponding readings will be updated.
+  <br><br>
+
+  <a name="ZWaveset"></a>
+  <b>Set</b>
+  <ul>
+
+  <br><b>Class BASIC</b>
+  <li>basicValue value<br>
+    Send value (0-255) to this device. The interpretation is device dependent,
+    e.g. for a SWITCH_BINARY device 0 is off and anything else is on.
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>on<br>
+    switch the device on
+  <li>off<br>
+    switch the device off
+  <li>reportOn,reportOff<br>
+    activate/deactivate the reporting of device state changes to the association group.
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>configByte cfgAddress 8bitValue<br>
+      configWord cfgAddress 16bitValue<br>
+      configLong cfgAddress 32bitValue<br>
+    Send a configuration value for the parameter cfgAddress. cfgAddress and
+    value is node specific.
+  <li>configDefault cfgAddress<br>
+    Reset the configuration parameter for the cfgAddress parameter to its default value.
+    See the device documentation to determine this value.
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeupInterval value<br>
+  Set the wakeup interval of battery operated devices to the given value in
+  seconds. Upon wakeup the device sends a wakeup notification.
+
+  <br><br><b>Class ASSOCIATION</b>
+  <li>associationAdd groupId nodeId ...<br>
+  Add the specified list of nodeIds to the assotion group groupId.<br>
+  Note: upon creating a fhem-device for the first time fhem will automatically
+  add the controller to the first association group of the node corresponding
+  to the fhem device, i.e it issues a "set name associationAdd 1 controllerNodeId"
+
+  <li>associationDel groupId nodeId ...<br>
+  Remove the specified list of nodeIds from the assotion group groupId.
+
+  </ul>
+  <br>
+
+  <a name="ZWaveget"></a>
+  <b>Get</b>
+  <ul>
+
+  <br><b>Class BASIC</b>
+  <li>basicStatus<br>
+    return the status of the node as basicReport:XY. The value (XY) depends on
+    the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>swbStatus<br>
+    return the status of the node, as state:on or state:off.
+
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>sbStatus<br>
+    return the status of the node, as state:open or state:closed.
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config cfgAddress<br>
+    return the value of the configuration parameter cfgAddress. The value is
+    device specific.
+
+  <br><br><b>Class ALARM</b>
+  <li>alarm alarmId<br>
+    return the value for alarmId. The value is device specific.
+
+  <br><br><b>Class BATTERY</b>
+  <li>battery<br>
+    return the charge of the battery in %, as battery:value %
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeupInterval<br>
+    return the wakeup interval in seconds, in the form<br>
+    wakeupReport:interval:seconds target:id
+
+  <br><br><b>Class ASSOCIATION</b>
+  <li>association groupId<br>
+    return the list of nodeIds in the association group groupId in the form:<br>
+    assocGroup_X:Max:Y Nodes:id,id...
+
+  <br><br><b>Class VERSION</b>
+  <li>version<br>
+    return the version information of this node in the form:<br>
+    Lib:A Prot:x.y App:a.b
+
+  </ul>
+  <br>
+
+  <a name="ZWaveattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a></li>
+    <li><a href="#classes">classes</a>
+      This attribute is needed by the ZWave module, as the list of the possible
+      set/get commands depends on it. It contains a space separated list of
+      class names (capital letters).
+      </li>
+  </ul>
+  <br>
+
+  <a name="ZWaveevents"></a>
+  <b>Generated events:</b>
+  <ul>
+
+  <br><b>Class BASIC</b>
+  <li>basicReport:XY
+
+  <br><br><b>Class SWITCH_BINARY</b>
+  <li>state:on
+  <li>state:off
+
+  <br><br><b>Class SENSOR_BINARY</b>
+  <li>state:open
+  <li>state:closed
+
+  <br><br><b>Class METER</b>
+  <li>power:val [kWh|kVAh|W|pulseCount]
+  <li>gas:val [m3|feet3|pulseCount]
+  <li>water:val [m3|feet3|USgallons|pulseCount]
+
+  <br><br><b>Class CONFIGURATION</b>
+  <li>config_X:Y
+
+  <br><br><b>Class ALARM</b>
+  <li>alarm_type_X:level Y
+
+  <br><br><b>Class BATTERY</b>
+  <li>battery:chargelevel %
+
+  <br><br><b>Class WAKE_UP</b>
+  <li>wakeup:notification
+  <li>wakeupReport:interval:X target:Y
+
+  <br><br><b>Class ASSOCIATION</b>
+  <li>assocGroup_X:Max:Y Nodes:A,B,...
+
+  <br><br><b>Class VERSION</b>
+  <li>Lib:A Prot:x.y App:a.b
+
+  </ul>
+</ul>
+
+
+
+
+=end html
+=cut

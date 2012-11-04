@@ -331,3 +331,72 @@ sub nonblockGetLinesTellStick {
 
 
 1;
+
+=pod
+=begin html
+
+<a name="TellStick"></a>
+<h3>TellStick</h3>
+<ul>
+  <br>
+
+  <a name="TellStickdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TellStick &lt;/path/to/tdtool&gt;</code>
+    <br><br>
+
+    <!--<div style="background-color: #ffaaaa;"> -->
+    <div>
+    Defines a path to the program "tdtool", which is used to control a (locally attached)
+    "Telldus TellStick [Duo]" USB device. A TellStick controls a wide range of 433 MHz
+    devices, like the widely available switchable power outlets from InterTechno.<br><br>
+    To keep things simple, FHEM interfaces with the telldus-core suite (available
+    for Linux, Windows, Mac OSX) via the supplied tool, "tdtool". This FHEM module
+    will initially use "tdtool --list" to receive a list of configured devices, then let
+    autocreate (if enabled) create them as <a href="#SIS_PMS">SIS_PMS</a> devices.<br></br>
+    <i>Please make sure</i> that the user running FHEM under ("fhem" in a standard setup on
+    Linux) has the <i>r/w-right to access the stick's device</i> ("/dev/tellstick"
+    in telldus-core version 2.0) &mdash; if the state of your devices do not change when
+    modified im FHEM, access rights problems are the most probable cause
+    (<code>chmod o+rw /dev/tellstick</code> should fix that; you may want to automate it
+    via udev or adding the fhem user to the proper group ;))<br></br>
+    This module has only been tested with the 2.0 branch of teldus-core because of a known bug
+    in 2.1, <a href="http://www.telldus.com/forum/viewtopic.php?f=15&t=1645"> preventing
+    version 2.1 working properly with some TellSticks</a> and/or "tdtool" application; FTR, the
+    "Batch: 8" version a was granted usage of for writing this module was impacted by it ...
+
+    To actually control any power sockets, you need to define a <a href="#SIS_PMS">SIS_PMS</a>
+    device &mdash; TellStick.pm uses SIS_PMS devices ("socket" is te:ll:st:ck:01, "socketnr"
+    is the ID of the device in "tdtool"), as as of now only on/off switching is supported and
+    this was the easiest implementation path. SIS_PMS is supported by <a href="http://sites.google.com/site/andfhem/">andFHEM</a>, the Android
+    frontend, so this make some sense. (Furthermore, I don't own dimmable devices and they are
+    actually not really cheap; >15 EUR/socket compared to the 15 EUR for 5 switch-only, non-self
+    learning socket adapters from Intertechno at your local home improvement store.)
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define TStick TellStick /usr/bin/tdtool</code><br>
+      <code>define Deckenfluter SIS_PMS te:ll:st:ck:01 2</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="TellStickset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="TellStickget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="TellStickattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li>none <!--<a href="#model">model</a> (TellStick)--></li>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

@@ -161,3 +161,46 @@ WEBIO_GetStatus($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="WEBIO"></a>
+<h3>WEBIO</h3>
+<ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
+  <a name="WEBIOdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WEBIO &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines an Web-IO device (Box with 2 Analog-In/Out 0..10V, www.wut.de) via ip address. The status of the device is also pooled (delay interval).<br><br>
+
+
+    Examples:
+    <ul>
+      <code>define pumpspeed WEBIO 192.168.8.200 1 60</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="WEBIOset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    0.00 - 10.00
+    </pre>
+    Examples:
+    <ul>
+      <code>set pumpspeed 6.75</code><br>
+    </ul>
+    <br>
+  </ul>
+</ul>
+
+=end html
+=cut

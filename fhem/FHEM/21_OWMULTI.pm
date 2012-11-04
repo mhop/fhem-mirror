@@ -848,3 +848,115 @@ sub OWXMULTI_SetValues($@) {
 
 
 1;
+
+=pod
+=begin html
+
+<a name="OWMULTI"></a>
+<h3>OWMULTI</h3>
+<ul>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery monitor<br /><br /> Note:<br /> This
+    1-Wire module so far works only with the OWX interface module. Please define an <a
+        href="#OWX">OWX</a> device first. <br />
+    <br /><b>Example</b><br />
+    <ul>
+        <code>define OWX_M OWMULTI 7C5034010000 45</code>
+        <br />
+        <code>attr OWX_M VName relHumidity|humidity</code>
+        <br />
+        <code>attr OWX_M VUnit percent|%</code>
+        <br />
+        <code>attr OWX_M VFunction (161.29 * V / VDD - 25.8065)/(1.0546 - 0.00216 * T)</code>
+        <br />
+    </ul><br />
+    <a name="OWMULTIdefine"></a>
+    <b>Define</b>
+    <ul>
+        <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+        <br /><br /> Define a 1-Wire multi-sensor<br /><br />
+        <li>
+            <code>[&lt;model&gt;]</code><br /> Defines the sensor model (and thus
+            1-Wire family id), currently the following values are permitted: <ul>
+                <li>model DS2438 with family id 26 (default if the model parameter is
+                    omitted). Measured is a temperature value, an external voltage and the current supply voltage</li>
+            </ul>
+        </li>
+        <li>
+            <code>&lt;id&gt;</code>
+            <br />12-character unique ROM id of the converter device without family id and
+            CRC code </li>
+        <li>
+            <code>&lt;interval&gt;</code>
+            <br />Measurement interval in seconds. The default is 300 seconds. </li>
+        <br />
+    </ul>
+    <br />
+    <a name="OWMULTIset">
+        <b>Set</b></a>
+    <ul>
+        <li><a name="owmulti_interval">
+            <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+            interval in seconds. The default is 300 seconds. </li>
+    </ul>
+    <br />
+    <a name="OWMULTIget">
+        <b>Get</b></a>
+    <ul>
+        <li><a name="owmulti_id">
+            <code>get &lt;name&gt; id</code></a>
+            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+        <li><a name="owmulti_present">
+            <code>get &lt;name&gt; present</code>
+        </a>
+            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+        <li><a name="owmulti_interval2">
+            <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
+            in seconds. </li>
+        <li><a name="owmulti_reading">
+            <code>get &lt;name&gt; reading</code></a><br />Obtain the measurement value from VFunction. </li>
+        <li><a name="owmulti_temperature">
+            <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature value. </li>
+        <li><a name="owmulti_vdd">
+            <code>get &lt;name&gt; VDD</code></a><br />Obtain the current supply voltage.
+        </li>
+        <li><a name="owmulti_raw">
+            <code>get &lt;name&gt; V</code> or <code>get &lt;name&gt; raw</code></a><br />Obtain the raw external voltage measurement.
+        </li>
+    </ul>
+    <br />
+    <a name="OWMULTIattr">
+        <b>Attributes</b></a>
+    <ul>
+        <li><a name="owmulti_vname"><code>attr &lt;name&gt; VName
+            &lt;string&gt;|&lt;string&gt;</code></a>
+            <br />name for the channel | a type description for the measured value. </li>
+        <li><a name="owmulti_vunit"><code>attr &lt;name&gt; VUnit
+            &lt;string&gt;|&lt;string&gt;</code></a>
+            <br />unit of measurement for this channel | its abbreviation. </li>
+        <li><a name="owmulti_vfunction"><code>attr &lt;name&gt; VFunction
+            &lt;string&gt;</code></a>
+            <br />arbitrary functional expression involving the values VDD, V, T. Example see above.
+            <ul>
+            <li>VDD is replaced by the measured supply voltage in Volt,</li>
+            <li> V by the measured external voltage,</li>
+            <li>T by the measured and corrected temperature in its unit</li>
+        </ul></li>
+        <li><a name="owmulti_tempOffset"><code>attr &lt;name&gt; tempOffset
+            &lt;float&gt;</code>
+        </a>
+            <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+        <li><a name="owmulti_tempUnit"><code>attr &lt;name&gt; tempUnit
+            Celsius|Kelvin|Fahrenheit|C|K|F</code>
+        </a>
+            <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+        <li><a name="owmulti_event"><code>attr &lt;name&gt; event on-change|on-update
+        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
+            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
+                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
+            </ul>
+        </li>
+        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
+  </ul>
+</ul>
+
+=end html
+=cut

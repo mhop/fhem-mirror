@@ -863,3 +863,205 @@ sub Calendar_Undef($$) {
 
 
 1;
+
+=pod
+=begin html
+
+<a name="Calendar"></a>
+<h3>Calendar</h3>
+<ul>
+  <br>
+
+  <a name="Calendardefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Calendar ical url &lt;URL&gt; [&lt;interval&gt;]</code><br>
+    <br>
+    Defines a calendar device.<br><br>
+
+    A calendar device periodically gathers calendar events from the source calendar at the given URL. The file at the given URL
+    must be in ICal format.<br><br>
+
+    If the URL
+    starts with <code>https://</code>, the perl module IO::Socket::SSL must be installed
+    (use <code>cpan -i IO::Socket::SSL</code>).<br><br>
+
+    Note for users of Google Calendar: You can literally use the private ICal URL from your Google Calendar.
+    Google App accounts do not work since requests to the URL
+    get redirected first and the fhem mechanism for retrieving data via http/https cannot handle this. If your Google Calendar
+    URL starts with <code>https://</code> and the perl module IO::Socket::SSL is not installed on your system, you can
+    replace it by <code>http://</code>.<br><br>
+
+    The optional parameter <code>interval</code> is the time between subsequent updates
+    in seconds. It defaults to 3600 (1 hour).<br><br>
+
+    Examples:
+    <pre>
+      define MyCalendar Calendar ical url https://www.google.com/calendar/ical/john.doe%40example.com/private-foo4711/basic.ics
+      define YourCalendar Calendar ical url http://www.google.com/calendar/ical/jane.doe%40example.com/private-bar0815/basic.ics 86400
+      </pre>
+  </ul>
+  <br>
+
+  <a name="Calendarset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; update</code><br><br>
+
+    Forces the retrieval of the calendar from the URL. The next automatic retrieval is scheduled to occur
+    <code>interval</code> seconds later.<br><br>
+  </ul>
+  <br>
+
+
+  <a name="Calendarget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; full|text|summary|location|alarm|start|end &lt;reading&gt|&lt;uid&gt;</code><br><br>
+
+    Returns, line by line, the full state or a textual representation or the summary (subject, title) or the
+    location or the alarm time or the start time or the end time
+    of the calendar event(s) listed in the
+    reading &lt;reading&gt or identified by the UID &lt;uid&gt.<br><br>
+
+    <code>get &lt;name&gt; find &lt;regexp&gt;</code><br><br>
+
+    Returns, line by line, the UIDs of all calendar events whose summary matches the regular expression
+    &lt;regexp&gt;.<br><br>
+
+  </ul>
+
+  <br>
+
+  <a name="Calendarattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br>
+
+  <b>Description</b>
+  <ul>
+
+  A calendar is a set of calendar events. A calendar event has a summary (usually the title shown in a visual
+  representation of the source calendar), a start time, an end time, and zero, one or more alarm times. The calendar events are
+  fetched from the source calendar at the given URL. In case of multiple alarm times for a calendar event, only the
+  earliest alarm time is kept. Recurring calendar events are currently not supported.<p>
+
+  A calendar event is identified by its UID. The UID is taken from the source calendar. All non-alphanumerical characters
+  are stripped off the UID to make your life easier.<p>
+
+  A calendar event can be in one of the following states:
+  <table border="1">
+  <tr><td>new</td><td>The calendar event was first seen at the most recent update. Either this was your first retrieval of
+  the calendar or you newly added the calendar event to the source calendar.</td></tr>
+  <tr><td>known</td><td>The calendar event was already there before the most recent update.</td></tr>
+  <tr><td>updated</td><td>The calendar event was already there before the most recent update but it has changed since it
+  was last retrieved.</td></tr>
+  <tr><td>deleted</td><td>The calendar event was there before the most recent update but is no longer. You removed it from the source calendar. The calendar event will be removed from all lists at the next update.</td></tr>
+  </table><br>
+  Calendar events that lie completely in the past (current time on wall clock is later than the calendar event's end time)
+  are not retrieved and are thus not accessible through the calendar.
+  <p>
+
+  A calendar event can be in one of the following modes:
+  <table border="1">
+  <tr><td>upcoming</td><td>Neither the alarm time nor the start time of the calendar event is reached.</td></tr>
+  <tr><td>alarm</td><td>The alarm time has passed but the start time of the calendar event is not yet reached.</td></tr>
+  <tr><td>start</td><td>The start time has passed but the end time of the calendar event is not yet reached.</td></tr>
+  <tr><td>end</td><td>The end time of the calendar event has passed.</td></tr>
+  </table><br>
+  A calendar event transitions from one mode to another immediately when the time for the change has come. This is done by waiting
+  for the earliest future time among all alarm, start or end times of all calendar events.
+  <p>
+
+  A calendar device has several readings. Except for <code>calname</code>, each reading is a semicolon-separated list of UIDs of
+  calendar events that satisfy certain conditions:
+  <table border="1">
+  <tr><td>calname</td><td>name of the calendar</td></tr>
+  <tr><td>all</td><td>all events</td></tr>
+  <tr><td>modeAlarm</td><td>events in alarm mode</td></tr>
+  <tr><td>modeAlarmOrStart</td><td>events in alarm or start mode</td></tr>
+  <tr><td>modeAlarmed</td><td>events that have just transitioned from upcoming to alarm mode</td></tr>
+  <tr><td>modeChanged</td><td>events that have just changed their mode somehow</td></tr>
+  <tr><td>modeEnd</td><td>events in end mode</td></tr>
+  <tr><td>modeEnded</td><td>events that have just transitioned from start to end mode</td></tr>
+  <tr><td>modeStart</td><td>events in start mode</td></tr>
+  <tr><td>modeStarted</td><td>events that have just transitioned to start mode</td></tr>
+  <tr><td>modeUpcoming</td><td>events in upcoming mode</td></tr>
+  <tr><td>stateChanged</td><td>events that have just changed their state somehow</td></tr>
+  <tr><td>stateDeleted</td><td>events in state deleted</td></tr>
+  <tr><td>stateNew</td><td>events in state new</td></tr>
+  <tr><td>stateUpdated</td><td>events in state updated</td></tr>
+  </table>
+  </ul>
+  <p>
+  
+  When a calendar event has changed, an event is created in the form
+  <code>changed: UID mode</code> with mode being the current mode the calendar event is in after the change.
+  
+  <p>
+
+  <b>Usage scenarios</b>
+  <ul>
+    <i>Show all calendar events with details</i><br><br>
+    <ul>
+    <code>
+    get MyCalendar full all<br>
+    2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom   known    alarm 31.05.2012 17:00:00 07.06.2012 16:30:00-07.06.2012 18:00:00 Erna for coffee<br>
+    992hydf4y44awer5466lhfdsrgl7tin6b6mckf8glmhui4googlecom   known upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
+    </code><br><br>
+    </ul>
+
+    <i>Show calendar events in your photo frame</i><br><br>
+    <ul>
+    Put a line in the <a href="#RSSlayout">layout description</a> to show calendar events in alarm or start mode:<br><br>
+    <code>text 20 60 { fhem("get MyCalendar text modeAlarmOrStart") }</code><br><br>
+    This may look like:<br><br>
+    <code>
+    07.06.12 16:30 Erna for coffee<br>
+    08.06.12 00:00 Vacation
+    </code><br><br>
+    </ul>
+
+    <i>Switch the light on when Erna comes</i><br><br>
+    <ul>
+    First find the UID of the calendar event:<br><br>
+    <code>
+    get MyCalendar find .*Erna.*<br>
+    2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom
+    </code><br><br>
+    Then define a notify:<br><br>
+    <code>
+    define ErnaComes notify MyCalendar:modeStarted.*2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom.* set MyLight on
+    </code><br><br>
+    You can also do some logging:<br><br>
+    <code>
+    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom.* { Log 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    </code><br><br>
+    </ul>
+
+    <i>Switch actors on and off</i><br><br>
+    <ul>
+    Think about a calendar with calendar events whose summaries (subjects, titles) are the names of devices in your fhem installation.
+    You want the respective devices to switch on when the calendar event starts and to switch off when the calendar event ends.<br><br>
+    <code>
+    define SwitchActorOn notify MyCalendar:modeStarted.* { my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; fhem("set $actor on") }<br><br>
+    define SwitchActorOff notify MyCalendar:modeEnded.* { my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; fhem("set $actor off") }
+    </code><br><br>
+    You can also do some logging:<br><br>
+    <code>
+    define LogActors notify MyCalendar:mode(Started|Ended).* { my $reading= "%EVTPART0";; my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; Log 1, "Actor: $actor, Reading $reading" }
+    </code><br><br>
+    </ul>
+
+
+  </ul>
+
+
+</ul>
+
+
+=end html
+=cut

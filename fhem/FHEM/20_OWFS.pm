@@ -218,3 +218,149 @@ OWFS_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="OWFS"></a>
+<h3>OWFS</h3>
+<ul>
+  OWFS is a suite of programs that designed to make the 1-wire bus and its
+  devices easily accessible. The underlying priciple is to create a virtual
+  filesystem, with the unique ID being the directory, and the individual
+  properties of the device are represented as simple files that can be read
+  and written.<br><br>
+
+  Note: You need the owperl module from
+  <a href="http://owfs.org/index.php?page=owperl">http://owfs.org/</a>.
+  <br><br>
+
+  <a name="OWFSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; OWFS &lt;owserver-ip:port&gt; &lt;model&gt; [&lt;id&gt;]</code>
+    <br><br>
+
+    Define a 1-wire device to communicate with an OWFS-Server.<br><br>
+
+    <code>&lt;owserver-ip:port&gt;</code>
+    <ul>
+      IP-address:port from OW-Server.
+    </ul>
+    <code>&lt;model&gt;</code>
+    <ul>
+      Define the <a href="#owfs_type">type</a> of the input device.
+      Currently supportet: <code>DS1420, DS9097 (for passive Adapter)</code>
+    </ul>
+    <code>&lt;id&gt;</code>
+    <ul>
+      Corresponding to the <a href="#owfs_id">id</a> of the input device. Only for active Adapter.
+      <br><br>
+    </ul>
+
+    Note:<br>
+    If the <code>owserver-ip:port</code> is called <code>none</code>, then
+    no device will be opened, so you can experiment without hardware attached.<br><br>
+
+    Example:
+    <ul>
+      <code>#define an active Adapter:<br>
+      define DS9490R OWFS 127.0.0.1:4304 DS1420 93302D000000</code><br>
+    </ul>
+    <br>
+    <ul>
+      <code>#define a passive Adapter:<br>
+      define DS9097 OWFS 127.0.0.1:4304 DS9097</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="OWFSget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of (not supported by passive Devices e.g. DS9097):<br>
+    <ul>
+      <li><a name="owfs_address"></a>
+        <code>address</code> (read-only)<br>
+        The entire 64-bit unique ID. address starts with the family code.<br>
+        Given as upper case hexidecimal digits (0-9A-F).
+      </li>
+      <li><a name="owfs_crc8"></a>
+        <code>crc8</code> (read-only)<br>
+        The 8-bit error correction portion. Uses cyclic redundancy check. Computed
+        from the preceeding 56 bits of the unique ID number.<br>
+        Given as upper case hexidecimal digits (0-9A-F).
+      </li>
+      <li><a name="owfs_family"></a>
+        <code>family</code> (read-only)<br>
+        The 8-bit family code. Unique to each type of device.<br>
+        Given as upper case hexidecimal digits (0-9A-F).
+      </li>
+      <li><a name="owfs_id"></a>
+        <code>id</code> (read-only)<br>
+        The 48-bit middle portion of the unique ID number. Does not include the
+        family code or CRC.<br>
+        Given as upper case hexidecimal digits (0-9A-F).
+      </li>
+      <li><a name="owfs_locator"></a>
+        <code>locator</code> (read-only)<br>
+        Uses an extension of the 1-wire design from iButtonLink company that
+        associated 1-wire physical connections with a unique 1-wire code. If
+        the connection is behind a Link Locator the locator will show a unique
+        8-byte number (16 character hexidecimal) starting with family code FE.<br>
+        If no Link Locator is between the device and the master, the locator
+        field will be all FF.
+      </li>
+      <li><a name="owfs_present"></a>
+        <code>present</code> (read-only)<br>
+        Is the device currently present on the 1-wire bus?
+      </li>
+      <li><a name="owfs_type"></a>
+        <code>type</code> (read-only)<br>
+        Part name assigned by Dallas Semi. E.g. DS2401 Alternative packaging
+       (iButton vs chip) will not be distiguished.
+      </li>
+      <br>
+    </ul>
+    Examples:
+    <ul>
+      <code>get DS9490R type</code><br>
+      <code>DS9490R type => DS1420</code><br><br>
+      <code>get DS9490R address</code><br>
+      <code>DS9490R address => 8193302D0000002B</code>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="OWFSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a name="owfs_temp-scale"></a>
+      temp-scale<br>
+      Specifies the temperature-scale unit:
+      <ul>
+        <li><code>C</code><br>
+          Celsius. This is the default.</li>
+        <li><code>F</code><br>
+          Fahrenheit</li>
+        <li><code>K</code><br>
+          Kelvin</li>
+        <li><code>R</code><br>
+          Rankine</li>
+      </ul>
+    </li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut
