@@ -397,8 +397,8 @@ CommandJsonList($$)
 =pod
 =begin html
 
-<a name="jsonlist"></a>
-<h3>jsonlist</h3>
+<a name="JsonList"></a>
+<h3>JsonList</h3>
 <ul>
   <code>jsonlist [&lt;devspec&gt;|&lt;typespec&gt;|ROOMS]</code>
   <br><br>
