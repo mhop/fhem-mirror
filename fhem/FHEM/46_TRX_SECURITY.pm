@@ -377,3 +377,81 @@ TRX_SECURITY_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="TRX_SECURITY"></a>
+<h3>TRX_SECURITY</h3>
+<ul>
+  The TRX_SECURITY module interprets X10, KD101 and Visonic security sensors received by a RFXCOM RFXtrx433 RF receiver. You need to define an RFXtrx433 receiver first. See <a href="#TRX">TRX</a>.
+
+  <br><br>
+
+  <a name="TRX_SECURITYdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TRX_SECURITY &lt;type&gt; &lt;deviceid&gt; &lt;devicelog&gt; [&lt;deviceid2&gt; &lt;devicelog2&gt;] </code> <br>
+    <br>
+    <code>&lt;type&gt;</code>
+    <ul>
+      specifies one of the following security devices:
+        <ul>
+          <li> <code>DS10A</code> (X10 security ds10a Door/Window Sensor or compatible devices. This device type reports the status of the switch [Open/Closed], status of the delay switch [min|max]], and battery status [ok|low].)</li>
+          <li> <code>MS10A</code> (X10 security ms10a motion sensor. This device type reports the status of motion sensor  [normal|alert] and battery status [ok|low].))</li>
+          <li> <code>SD90</code> (Marmitek sd90 smoke detector. This device type reports the status of the smoke detector [normal|alert] and battery status [ok|low].)</li>
+          <li> <code>KR18</code> (X10 security remote control. Report the Reading "Security" with values [Arm|Disarm], "ButtonA" and "ButtonB" with values [on|off] )</li>
+          <li> <code>KD101</code> (KD101 smoke sensor. Report the Reading "smoke" with values [normal|alert])</li>
+          <li> <code>VISONIC_WINDOW</code> (VISONIC security Door/Window Sensor or compatible devices. This device type reports the status of the switch [Open/Closed] and battery status [ok|low].)</li>
+          <li> <code>VISONIC_MOTION</code> (VISONIC security motion sensor. This device type reports the status of motion sensor  [normal|alert] and battery status [ok|low].))</li>
+        </ul>
+    </ul>
+    <br>
+    <code>&lt;deviceid&gt;</code>
+    <ul>
+    specifies the first device id of the device. X10 security (DS10A, MS10A) and SD90 have a a 16 bit device id which has to be written as a hex-string (example "5a54"). All other devices have a 24 bit device id.
+    </ul>
+    <br>
+    <code>&lt;devicelog&gt;</code>
+    <ul>
+    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "smoke" for sd90.
+    </ul>
+    <br>
+    <code>&lt;deviceid2&gt;</code>
+    <ul>
+    is optional and specifies the second device id of the device if it exists. For example sd90 smoke sensors can be configured to report two device ids.
+    </ul>
+    <br>
+    <code>&lt;devicelog2&gt;</code>
+    <ul>
+    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    </ul>
+    <br>
+      Example: <br>
+    <code>define livingroom_window TRX_SECURITY ds10a 72cd Window</code>
+      <br>
+    <code>define motion_sensor1 TRX_SECURITY ms10a 55c6 motion</code>
+      <br>
+    <code>define smoke_sensor1 TRX_SECURITY sd90 54d3 Smoke 54d3 Smoketest</code>
+      <br>
+  </ul>
+  <br>
+
+  <a name="TRX_SECURITYset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="TRX_SECURITYget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="TRX_SECURITYattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+</ul>
+
+=end html
+=cut

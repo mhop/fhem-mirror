@@ -183,3 +183,74 @@ EMWZ_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="EMWZ"></a>
+<h3>EMWZ</h3>
+<ul>
+  <a name="EMWZdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EMWZ &lt;device-number&gt;</code>
+    <br><br>
+
+    Define up to 4 EM1000WZ attached to the EM1010PC. The device number must
+    be between 1 and 4. Defining an EMWZ will schedule an internal task, which
+    reads the status of the device every 5 minutes, and triggers notify/filelog
+    commands.  <br><br>
+
+    Example:
+    <ul>
+      <code>define emwz EMWZ 1</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EMWZset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set EMWZdevice  &lt;param&gt; &lt;value&gt;</code><br><br>
+    where param is one of:
+    <ul>
+      <li>rperkw<br>
+          Number of rotations for a KiloWatt of the EM1000WZ device (actually
+          of the device where the EM1000WZ is attached to). Without setting
+          this correctly, all other readings will be incorrect.
+      <li>alarm<br>
+          Alarm in WATT. if you forget to set it, the default value is
+          rediculously low (random), and if a value above this threshold is
+          received, the EM1010PC will start beeping once every minute. It can
+          be very annoying.
+      <li>price<br>
+          The price of one KW in EURO (use e.g. 0.20 for 20 Cents). It is used
+          only on the EM1010PC display, it is of no interest for FHEM.
+    </ul>
+  </ul>
+  <br>
+
+
+  <a name="EMWZget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get EMWZ status</code>
+    <br><br>
+    This is the same command which is scheduled every 5 minutes internally.
+  </ul>
+  <br>
+
+  <a name="EMWZattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (EM1000WZ)</li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#IODev">IODev</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

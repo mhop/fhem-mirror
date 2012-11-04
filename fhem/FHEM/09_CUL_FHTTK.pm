@@ -254,3 +254,63 @@ CUL_FHTTK_Parse($$)
 #############################
 
 1;
+
+=pod
+=begin html
+
+<a name="CUL_FHTTK"></a>
+<h3>CUL_FHTTK</h3>
+<ul>
+  This module handles messages from the FHT80 TF "Fenster-T&uuml;r-Kontakt" (Window-Door-Contact)
+  which are normally only acted upon by the <a href="#FHT">FHT80B</a>. With this module,
+  FHT80 TFs are in a limited way (see <a href="http://fhz4linux.info/tiki-index.php?page=FHT+protocol">Wiki</a>
+  for detailed explanation of TF's mode of operation) usable similar to HMS100 TFK. The name
+  of the module was chosen as a) only CUL will spill out the datagrams and b) "TF" designates
+  usually temperature+humidity sensors (no clue, why ELV didn't label this one "TFK" like with
+  FS20 and HMS).<br><br>
+  As said before, FHEM can receive FHT80 TF radio (868.35 MHz) messages only through an
+  <a href="#CUL">CUL</a> device, so this must be defined first.<br><br>
+
+  <a name="CUL_FHTTKdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_FHTTK &lt;devicecode&gt;</code>
+    <br><br>
+
+    <code>&lt;devicecode&gt;</code> is a six digit hex number, given to the FHT80 TF during
+    production, i. e. it is not changeable. (Yes, it keeps this code after changing batteries
+    as well.)<br>
+
+    Examples:
+    <ul>
+      <code>define TK_TEST CUL_FHTTK 965AB0</code>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="CUL_FHTTKset"></a>
+  <b>Set </b>
+    <ul> Nothing to set here yet ... </ul>
+  <br>
+
+  <b>Get</b>
+   <ul> No get implemented yet ...
+   </ul><br>
+
+  <a name="CUL_FHTTKattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (FHT80TF)</li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

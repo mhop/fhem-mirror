@@ -317,3 +317,88 @@ Twilight_getWeatherHorizon($)
 }
 1;
 
+
+=pod
+=begin html
+
+<a name="Twilight"></a>
+<h3>Twilight</h3>
+<ul>
+  <br>
+
+  <a name="Twilightdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Twilight &lt;latitude&gt; &lt;longitude&gt; [&lt;indoor_horizon&gt; [&lt;Weather_Position&gt;]]</code><br>
+    <br>
+    Defines a virtual device for Twilight calculations <br><br>
+
+    A Twilight device periodically calculates the times of different twilight phases throughout the day.
+	It calculates a virtual "light" element, that gives an indicator about the amount of the current daylight.
+	Besides the location on earth it is influenced by a so called "indoor horizon" (e.g. if there are high buildings, mountains) as well as by weather conditions. Very bad weather conditions lead to a reduced daylight for nearly the whole day.
+	The light calculated spans between 0 and 6, where the values mean the following:<br><br>
+	<code>0 - total night, sun is at least -18 degree below horizon</code><br>
+	<code>1 - astronomical twilight, sun is between -12 and -18 degree below horizon</code><br>
+	<code>2 - nautical twilight, sun is between -6 and -12 degree below horizon</code><br>
+	<code>3 - civil twilight, sun is between 0 and -6 degree below horizon</code><br>
+	<code>4 - indoor twilight, sun is between the indoor_horizon and 0 degree below horizon (not used if indoor_horizon=0)</code><br>
+	<code>5 - weather twilight, sun is between indoor_horizon and a virtual weather horizon (the weather horizon depends on weather conditions (optional)</code><br>
+	<code>6 - maximum daylight</code><br>
+	<br>
+
+    The parameters <code>latitude</code> and <code>longitude</code> are decimal numbers which give the position on earth for which the twilight states shall be calculated.<br>
+	The parameter indoor_horizon gives a virtual horizon higher than 0, that shall be used for calculation of indoor twilight (typical values are between 0 and 6)<br>
+	The parameter Weather_Position is the yahoo weather id used for getting the weather condition. Go to http://weather.yahoo.com/ and enter a city or zip code. In the upcoming webpage, the id is a the end of the URL. Example: Munich, Germany -> 676757<br>
+
+	Example:
+    <pre>
+      define myTwilight Twilight 49.962529  10.324845 3 676757
+    </pre>
+  </ul>
+  <br>
+
+  <a name="Twilightset"></a>
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+
+  <a name="Twilightget"></a>
+  <b>Get</b>
+  <ul>
+
+    <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
+    <table>
+    <tr><td>light</td><td>the current virtual daylight value</td></tr>
+    <tr><td>nextEvent</td><td>the name of the next event</td></tr>
+    <tr><td>nextEventTime</td><td>the time when the next event will probably happen (durint light phase 5 and 6 this is updated when weather conditions change</td></tr>
+    <tr><td>sr_astro</td><td>time of astronomical sunrise</td></tr>
+    <tr><td>sr_naut</td><td>time of nautical sunrise</td></tr>
+    <tr><td>sr_civil</td><td>time of civil sunrise</td></tr>
+    <tr><td>sr</td><td>time of sunrise</td></tr>
+    <tr><td>sr_indoor</td><td>time of indoor sunrise</td></tr>
+    <tr><td>sr_weather</td><td>time of weather sunrise</td></tr>
+    <tr><td>ss_weather</td><td>time of weather sunset</td></tr>
+    <tr><td>ss_indoor</td><td>time of indoor sunset</td></tr>
+    <tr><td>ss</td><td>time of sunset</td></tr>
+    <tr><td>ss_civil</td><td>time of civil sunset</td></tr>
+    <tr><td>ss_nautic</td><td>time of nautic sunset</td></tr>
+    <tr><td>ss_astro</td><td>time of astro sunset</td></tr>
+    </table>
+
+  </ul>
+  <br>
+
+  <a name="Twilightattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

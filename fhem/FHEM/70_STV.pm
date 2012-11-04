@@ -346,3 +346,39 @@ if ( $kind ne 0 ){
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="STV"></a>
+
+<h3>STV</h3>
+<ul><p>
+This module supports Samsung TV devices with few commands. It's developed and tested with Samsung LE39B650.<br>
+</p>
+ <b>Define</b><br>
+  <code>define &lt;name&gt; STV &lt;host&gt;]</code><br>
+  <p>
+  Example:<br>
+  define Television1 STV 192.168.178.20 <br>
+  </p>
+ <b>Set</b><br>
+  set &lt;name&gt; &lt;value&gt; &lt;nummber&gt;<br>where value is one of:<br><br>
+  <ul>
+  <li><code>mute</code> </li>
+  <li><code>volume </code> </li>
+  <li><code>call</code> </li>
+  <li><code>sms  </code> </li>
+  <li><code>date </code> </li>
+  </ul>
+   <br>Example:<br>
+  set &lt;name&gt; mute <br>
+  set &lt;name&gt; volume 20 <br>
+  set &lt;name&gt; call Peter 012345678 Phone 87654321 <br><br>
+  
+ <b>Get</b><br>
+   <ul>N/A</ul><br>
+</ul>
+   
+=end html
+=cut

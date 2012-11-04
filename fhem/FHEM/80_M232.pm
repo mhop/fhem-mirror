@@ -345,3 +345,91 @@ DONE:
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="M232"></a>
+<h3>M232</h3>
+<ul>
+  <br>
+
+  <a name="M232define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; M232 &lt;m232-device&gt;</code>
+    <br><br>
+
+    Define a M232 device. You can attach as many M232 devices as you like. A
+    M232 device provides 6 analog inputs (voltage 0..5V with 10 bit resolution)
+    and 8 bidirectional digital ports. The eighth digital port can be used as a
+    16 bit counter (maximum frequency 3kHz). The M232 device needs to be
+    connected to a 25pin sub-d RS232 serial port. A USB-to-serial converter
+    works fine if no serial port is available.<br><br>
+
+    Examples:
+    <ul>
+      <code>define m232 M232 /dev/ttyUSB2</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="M232set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; stop</code>
+    <br><br>
+    Stops the counter.
+    <br><br>
+    <code>set &lt;name&gt; start</code>
+    <br><br>
+    Resets the counter to zero and starts it.
+    <br><br>
+    <code>set &lt;name&gt; octet <value></code>
+    <br><br>
+    Sets the state of all digital ports at once, value is 0..255.
+    <br><br>
+    <code>set &lt;name&gt; io0..io7 0|1</code>
+    <br><br>
+    Turns digital port 0..7 off or on.
+    <br><br>
+  </ul>
+
+
+  <a name="M232get"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; [an0..an5]</code>
+    <br><br>
+    Gets the reading of analog input 0..5 in volts.
+    <br><br>
+    <code>get &lt;name&gt; [io0..io7]</code>
+    <br><br>
+    Gets the state of digital ports 0..7, result is 0 or 1.
+    <br><br>
+    <code>get &lt;name&gt; octet</code>
+    <br><br>
+    Gets the state of all digital ports at once, result is 0..255.
+    <br><br>
+    <code>get &lt;name&gt; counter</code>
+    <br><br>
+    Gets the number of ticks of the counter since the last reset. The counter
+    wraps around from 65,535 to 0 and <i>then stops</i>.
+    See <a href="#M232Counter">M232Counter</a> for how we care about this.
+    <br><br>
+  </ul>
+
+
+  <a name="M232attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (m232)</li>
+  </ul>
+  <br>
+
+</ul>
+
+
+=end html
+=cut

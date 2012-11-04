@@ -551,3 +551,112 @@ TRX_LIGHT_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="TRX_LIGHT"></a>
+<h3>TRX_LIGHT</h3>
+<ul>
+  The TRX_LIGHT module receives and sends X10, ARC, ELRO AB400D, Waveman, Chacon EMW200, IMPULS, RisingSun, AC, HomeEasy EU and ANSLUT lighting devices (switches and remote control). Allows to send Philips SBC (receive not possible). ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. AC is the protocol used by different brands with units having a learning mode button:
+KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 transceiver receiver first.
+  See <a href="#TRX">TRX</a>.
+
+  <br><br>
+
+  <a name="TRX_LIGHTdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TRX_LIGHT &lt;type&gt; &lt;deviceid&gt; &lt;devicelog&gt; [&lt;deviceid2&gt; &lt;devicelog2&gt;] </code> <br>
+    <br>
+    <code>&lt;type&gt;</code>
+    <ul>
+      specifies the type of the device: <br>
+    X10 lighting devices:
+        <ul>
+          <li> <code>MS14A</code> (X10 motion sensor. Reports [normal|alert] on the first deviceid (motion sensor) and [on|off] for the second deviceid (light sensor)) </li>
+          <li> <code>X10</code> (All other x10 devices. Report [off|on|dim|bright|all_off|all_on] on both deviceids.)</li>
+          <li> <code>ARC</code> (ARC devices. ARC is a protocol used by devices from HomeEasy, KlikAanKlikUit, ByeByeStandBy, Intertechno, ELRO, AB600, Duewi, DomiaLite and COCO with address code wheels. Report [off|on|all_off|all_on|chime].)</li>
+          <li> <code>AB400D</code> (ELRO AB400D devices. Report [off|on].)</li>
+          <li> <code>WAVEMAN</code> (Waveman devices. Report [off|on].)</li>
+          <li> <code>EMW200</code> (Chacon EMW200 devices. Report [off|on|all_off|all_on].)</li>
+          <li> <code>IMPULS</code> (IMPULS devices. Report [off|on].)</li>
+          <li> <code>RISINGSUN</code> (RisingSun devices. Report [off|on].)</li>
+          <li> <code>PHILIPS_SBC</code> (Philips SBC devices. Send [off|on|all_off|all_on].)</li>
+          <li> <code>AC</code> (AC devices. AC is the protocol used by different brands with units having a learning mode button: KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. Report [off|on|level &lt;NUM&gt;|all_off|all_on|all_level &lt;NUM&gt;].)</li>
+          <li> <code>HOMEEASY</code> (HomeEasy EU devices. Report [off|on|level|all_off|all_on|all_level].)</li>
+          <li> <code>ANSLUT</code> (Anslut devices. Report [off|on|level|all_off|all_on|all_level].)</li>
+        </ul>
+    </ul>
+    <br>
+    <code>&lt;deviceid&gt;</code>
+    <ul>
+    specifies the first device id of the device. <br>
+    A lighting device normally has a house code A..P followed by a unitcode 1..16 (example "B1").<br>
+    For AC, HomeEasy EU and ANSLUT it is a 10 Character-Hex-String for the deviceid, consisting of <br>
+	- unid-id: 8-Char-Hex: 00000001 to 03FFFFFF<br>
+	- unit-code: 2-Char-Hex: 01 to 10  <br>
+    </ul>
+    <br>
+    <code>&lt;devicelog&gt;</code>
+    <ul>
+    is the name of the Reading used to report. Suggested: "motion" for motion sensors.
+    </ul>
+    <br>
+    <code>&lt;deviceid2&gt;</code>
+    <ul>
+    is optional and specifies the second device id of the device if it exists. For example ms14a motion sensors report motion status on the first deviceid and the status of the light sensor on the second deviceid.
+    </ul>
+    <br>
+    <code>&lt;devicelog2&gt;</code>
+    <ul>
+    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    </ul>
+    <br>
+      Example: <br>
+    	<code>define motion_sensor2 TRX_LIGHT MS14A A1 motion A2 light</code>
+	<br>
+    	<code>define Steckdose TRX_LIGHT ARC G2 light</code>
+	<br>
+    	<code>define light TRX_LIGHT AC 0101010101 light</code>
+      <br>
+  </ul>
+  <br>
+
+  <a name="TRX_LIGHTset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;levelnum&gt;]</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    off
+    on
+    dim                # only for X10, KOPPLA
+    bright             # only for X10, KOPPLA
+    all_off            # only for X10, ARC, EMW200, AC, HOMEEASY, ANSLUT
+    all_on             # only for X10, ARC, EMW200, AC, HOMEEASY, ANSLUT
+    chime              # only for ARC
+    level &lt;levelnum&gt;    # only AC, HOMEEASY, ANSLUT: set level to &lt;levelnum&gt; (range: 0=0% to 15=100%)
+    </pre>
+      Example: <br>
+    	<code>set Steckdose on</code>
+      <br>
+  </ul><br>
+
+  <a name="TRX_LIGHTget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="TRX_LIGHTattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+
+</ul>
+
+=end html
+=cut

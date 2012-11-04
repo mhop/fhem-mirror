@@ -411,3 +411,105 @@ sub getCommandParam($$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="YAMAHA_AVR"></a>
+<h3>YAMAHA_AVR</h3>
+<ul>
+
+  <a name="YAMAHA_AVRdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;status_interval&gt;]</code>
+    <br><br>
+
+    This module controls AV receiver from Yamaha via network connection. You are able
+    to power your AV reveiver on and off, query it's power state,
+    select the input (HDMI, AV, AirPlay, internet radio, Tuner, ...), select the volume
+    or mute/unmute the volume.<br><br>
+    Defining a YAMAHA_AVR device will schedule an internal task (interval can be set
+    with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 60 seconds), which periodically reads
+    the status of the AV receiver (power state, selected input, volume and mute status)
+    and triggers notify/filelog commands.<br><br>
+
+    Example:
+    <ul>
+      <code>define AV_Receiver YAMAHA_AVR 192.168.0.10</code><br>
+    </ul>
+  <a name="YAMAHA_AVRset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;command&gt; [&lt;parameter&gt;]</code>
+    <br><br>
+    Currently, the following commands are defined; the available inputs are depending on the used receiver.
+    The module only offers the real available inputs. The following input commands are just an example and can differ.
+
+<pre>on
+off
+input hdmi1
+input hdmi2
+input hdmi3
+input hdmi4
+input av1
+input av2
+input av3
+input av3
+input av4
+input av5
+input av6
+input usb
+input airplay
+input tuner
+input v-aux
+input audio
+input server
+volume -80..16	(volume between -80 and +16 dB)
+mute on
+mute off</pre>
+  </ul>
+
+  <a name="YAMAHA_AVRget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;what&gt;</code>
+    <br><br>
+    Currently, the following commands are defined and return the current state of the receiver.
+<pre>power
+input 
+mute 
+volume</pre>
+  </ul>
+  <a name="YAMAHA_AVRattr"></a>
+  <b>Attributes</b>
+  <ul>
+  
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a name="volume-smooth-change">volume-smooth-change</a></li>
+	Optional attribute to activate a smooth volume change.
+	<br><br>
+	Possible values: 0 => off , 1 => on<br><br>
+    <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
+	Optional attribute to define the number of volume changes between the
+        current and the desired volume. Default value is 5 steps<br><br>
+    <li><a name="volume-smooth-time">volume-smooth-time</a></li>
+       Optional attribute to define the time window for the volume smoothing in seconds.
+       For example the value 2 means the smooth process in general should take 2 seconds.
+       The value 0 means "as fast as possible". Default value is 0.
+  </ul>
+<br>
+  <b>Implementator's note</b>
+  <ul>
+    The module is only usable if you activate "Network Standby" on your receiver.<br><br>
+    Technically there are many more commands and readings possible, but I think
+    these are the main usecases within FHEM.
+  </ul>
+  <br>
+</ul>
+</ul>
+
+=end html
+=cut

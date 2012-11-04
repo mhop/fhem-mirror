@@ -176,3 +176,79 @@ USF1000_Parse($$)
 #############################
 
 1;
+
+=pod
+=begin html
+
+<a name="USF1000"></a>
+<h3>USF1000</h3>
+<ul>
+  Fhem can receive your tank's fill level from the USF1000S device
+  through a <a href="#FHZ">FHZ</a> device, so one must be defined first.
+  The state contains the fill level in % (lower case v in the device state)
+  and the current volume in liters (upper case V in the device state).
+  Measured distance to the liquid's surface, fill level, volume and warnings
+  (Test mode, Battery low) are available. Due to the design of the USF1000S
+  protocol, you can have only one USF1000S in range of your FHZ as these
+  devices cannot be distinguished.<br>
+  <br>
+
+  <a name="USF1000Define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; USF1000 &lt;geometry&gt;</code>
+    <br><br>
+
+    <code>&lt;geometry&gt;</code> determines the form of the tank and the
+    position of the sensor. The following geometries are currently
+    supported:<br><br>
+    <ul>
+        <li><code>cub &lt;length&gt; &lt;width&gt; &lt;height&gt; &lt;offset&gt;</code></li>
+        <li><code>cylv &lt;diameter&gt; &lt;height&gt; &lt;offset&gt;</code></li>
+    </ul>
+    <br>
+    <code>cub</code> stands for a cuboid whose base is &lt;length&gt; &times; &lt;width&gt;.
+    <code>cylv</code> stands for a vertical cylinder whose diameter is &lt;diameter&gt;.
+    &lt;height&gt; is the distance of the surface of the liquid from the ground
+    if the tank is full. &lt;offset&gt; is the distance of the sensor relative to
+    the surface of the liquid. All quantities are expressed in meters.<br>
+    <br>
+
+    Example:<br>
+    <ul>
+      <code>define MyTank USF1000 cylv 2 1 0.3</code>: a cylindrical water tank with
+      2 meters diameter. The water stands 1 meter high if the tank is full. The
+      sensor is fixed 1,3 meters above ground.<br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="USF1000set"></a>
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="USF1000get"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="USF1000attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (usf1000s)</li>
+    <li><a href="#ignore">ignore</a></li>
+  </ul>
+  <br>
+
+</ul>
+=end html
+=cut

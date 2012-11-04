@@ -375,3 +375,139 @@ dewpoint_dewpoint($$)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="dewpoint"></a>
+<h3>dewpoint</h3>
+<ul>
+  Dewpoint calculations. Offers three different ways to use dewpoint: <br>
+  <ul>
+    <li><b>dewpoint</b><br>
+        Compute additional event dewpoint from a sensor offering temperature and humidity.</li>
+    <li><b>fan</b><br>
+        Generate a event to turn a fan on if the outside air has less water than the inside.</li>
+    <li><b>alarm</b><br>
+        Generate a mold alarm if a reference temperature is lower that the current dewpoint.</li>
+  <br>
+  </ul>
+
+  <a name="dewpointdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; dewpoint dewpoint &lt;devicename-regex&gt; [&lt;temp_name&gt; &lt;hum_name&gt; &lt;new_name&gt;]</code><br>
+    <br>
+    <ul>
+      	Calculates dewpoint for device &lt;devicename-regex&gt; from temperature and humidity
+	and write it to a new reading named dewpoint.
+	If optional &lt;temp_name&gt;, &lt;hum_name&gt; and &lt;new_name&gt; is specified
+	then read temperature from reading &lt;temp_name&gt;, humidity from reading &lt;hum_name&gt;
+	and write the calculated dewpoint to reading &lt;new_name&gt;.<br>
+	If &lt;temp_name&gt; is T then use temperature from state T: H:, add &lt;new_name&gt; to the state.
+    </ul>
+    <br>
+
+    Example:<PRE>
+    # Compute the dewpoint for the temperature/humidity
+    # events of the temp1 device and generate reading dewpoint.
+    define dew_temp1 dewpoint dewpoint temp1
+    define dew_temp1 dewpoint dewpoint temp1 temperature humidity dewpoint
+
+    # Compute the dewpoint for the temperature/humidity
+    # events of all devices offering temperature and humidity
+    # and generate reading dewpoint.
+    define dew_all dewpoint dewpoint .*
+    define dew_all dewpoint dewpoint .* temperature humidity dewpoint
+
+    # Compute the dewpoint for the temperature/humidity
+    # events of the device Aussen_1 offering temperature and humidity
+    # and insert is into STATE.
+    define dew_state dewpoint dewpoint Aussen_1 T H D
+
+    # Compute the dewpoint for the temperature/humidity
+    # events of all devices offering temperature and humidity
+    # and insert the result into the STATE.
+    # Example STATE: "T: 10 H: 62.5" will change to
+    # "T: 10 H: 62.5 D: 3.2"
+    define dew_state dewpoint dewpoint .* T H D
+
+    </PRE>
+  </ul>
+
+  <ul>
+    <code>define &lt;name&gt; dewpoint fan &lt;devicename-regex&gt; &lt;devicename-outside&gt; &lt;min-temp&gt; [&lt;diff_temp&gt;]</code><br>
+    <br>
+    <ul>
+      	May be used to turn an fan on or off if the outside air has less water.
+	<ul>
+        <li>
+	Generate event "fan: on" if (dewpoint of &lt;devicename-outside&gt;) + &lt;diff_temp&gt; is lower
+	than dewpoint of &lt;devicename&gt; and temperature of &lt;devicename-outside&gt; is &gt;= min-temp
+	and reading "fan" was not already "on". The event will be generated for &lt;devicename&gt;. Parameter &lt;diff-temp&gt; is optional</li>
+	<li>Generate event "fan: off": else and if reading "fan" was not already "off".</li>
+	</ul>
+    </ul>
+    <br>
+
+    Example:<PRE>
+    # Generate event "fan: on" when dewpoint of Aussen_1 is first
+    # time lower than basement_tempsensor and outside temperature is &gt;= 0
+    # and change it to "fan: off" is this condition changes.
+    # Set a switch on/off (fan_switch) depending on the state.
+    define dew_fan1 dewpoint fan basement_tempsensor Aussen_1 0
+    define dew_fan1_on notify basement_tempsensor.*fan:.*on set fan_switch on
+    define dew_fan1_off notify basement_tempsensor.*fan:.*off set fan_switch off
+
+    </PRE>
+  </ul>
+
+  <ul>
+    <code>define &lt;name&gt; dewpoint alarm &lt;devicename-regex&gt; &lt;devicename-reference&gt; &lt;diff-temp&gt;</code><br>
+    <br>
+    <ul>
+        Generate a mold alarm if a reference temperature is lower that the current dewpoint.
+	<ul>
+        <li>
+	Generate reading/event "alarm: on" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is lower
+	than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "on". The event will be generated for &lt;devicename&gt;.</li>
+	<li>Generate reading/event "alarm: off" if temperature of &lt;devicename-reference&gt; - &lt;diff-temp&gt; is 		higher than dewpoint of &lt;devicename&gt; and reading "alarm" was not already "off".</li>
+	</ul>
+    </ul>
+    <br>
+
+    Example:<PRE>
+    # Using a wall temperature sensor (wallsensor) and a temp/hum sensor
+    # (roomsensor) to alarm if the temperature of the wall is lower than
+    # the dewpoint of the air. In this case the water of the air will
+    # condense on the wall because the wall is cold.
+    # Set a switch on (alarm_siren) if alarm is on using notify.
+    define dew_alarm1 dewpoint alarm roomsensor wallsensor 0
+    define roomsensor_alarm_on notify roomsensor.*fan:.*on set alarm_siren on
+    define roomsensor_alarm_off notify roomsensor.*fan:.*off set alarm_siren off
+
+    # If you do not have a temperature sensor in/on the wall, you may also
+    # compare the rooms dewpoint to the temperature of the same or another
+    # inside sensor. Alarm is temperature is 5 degrees colder than the
+    # inside dewpointinside.
+    define dev_alarm2 dewpoint alarm roomsensor roomsensor 5
+
+    </PRE>
+  </ul>
+
+  <a name="dewpointset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="dewpointget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="dewpointattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+  </ul>
+</ul>
+
+
+=end html
+=cut

@@ -138,3 +138,80 @@ CUL_RFR_AddPrefix($$)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="CUL_RFR"></a>
+<h3>CUL_RFR</h3>
+<ul>
+  <table>
+  <tr><td>
+  The CUL_RFR  module is used to "attach" a second CUL to your base CUL, and
+  use it as a repeater / range extender. RFR is shorthand for RF_ROUTER.
+  Transmission of the data uses the CC1101 packet capabilities with GFSK
+  modulation at 250kBaud after pinging the base CUL at the usual 1kBaud. When
+  configured, the RFR device can be used like another CUL connected directly to
+  fhem.
+
+
+  <br><br>
+  Before you can use this feature in fhem, you have to enable/configure RF
+  ROUTING in both CUL's:
+  <ul>
+    <li>First give your base CUL (which remains connected to the PC) an RFR ID
+    by issuing the fhem command "set MyCUL raw ui0100". With this command
+    the base CUL will get the ID 01, and it will not relay messages to other
+    CUL's (as the second number is 00).
+    <li>Now replace the base CUL with the RFR CUL, and set its id by issuing
+    the fhem command "set MyCUL raw ui0201". Now remove this CUL and attach the
+    original, base CUL again. The RFR CUL got the id 02, and will relay every
+    message to the base CUL with id 01.
+    <li>Take the RFR CUL, and attach it to an USB power supply, as seen on
+    the image. As the configured base id is not 00, it will activate RF
+    reception on boot, and will start sending messages to the base CUL.
+    <li>Now you have to define this RFR cul as a fhem device:
+  </ul>
+
+  </td><td>
+  <img src="cul_rfr.jpg"/>
+  </td></tr>
+  </table>
+  <br>
+
+  <a name="CUL_RFRdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_RFR &lt;own-id&gt; &lt;base-id&gt;</code> <br>
+    <br>
+    &lt;own-id&gt; is the id of the RFR CUL <b>not</b> connected to the PC,
+    &lt;base-id&gt; is the id of the CUL connected to the PC. Both parameters
+    have two characters, each representing a one byte hex number.<br>
+    Example:
+    <ul>
+      <code>set MyCUL raw ui0100</code><br>
+      # Now replace the base CUL with the RFR CUL<br>
+      <code>set MyCUL raw ui0201</code><br>
+      # Reattach the base CUL to the PC and attach the RFR CUL to a
+      USB power supply<br>
+      <code>define MyRFR CUL_RFR 02 01</code><br>
+    </ul>
+    </ul> <br>
+
+  <a name="CUL_RFRset"></a>
+  <b>Set</b> <ul>Same as for the <a href="#CULset">CUL</a>.</ul><br>
+
+  <a name="CUL_RFRget"></a>
+  <b>Get</b> <ul>Same as for the <a href="#CULget">CUL</a>.</ul><br>
+
+  <a name="CUL_RFRattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    The rest of the attributes is the same as for the <a href="#CUL">CUL</a>.</ul><br>
+  </ul>
+  <br>
+
+=end html
+=cut

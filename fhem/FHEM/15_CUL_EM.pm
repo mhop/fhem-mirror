@@ -250,3 +250,77 @@ CUL_EM_Parse($$)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="CUL_EM"></a>
+<h3>CUL_EM</h3>
+<ul>
+  The CUL_EM module interprets EM type of messages received by the CUL, notably
+  from EMEM, EMWZ or EMGZ devices.
+  <br><br>
+
+  <a name="CUL_EMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_EM &lt;code&gt; [corr1 corr2
+                CostPerUnit BasicFeePerMonth]</code> <br>
+    <br>
+    &lt;code&gt; is the code which must be set on the EM device. Valid values
+    are 1 through 12. 1-4 denotes EMWZ, 5-8 EMEM and 9-12 EMGZ devices.<br><br>
+
+    <b>corr1</b> is used to correct the current number, <b>corr2</b>
+    for the total number.
+    <ul>
+      <li>for EMWZ devices you should specify the rotation speed (R/kW)
+          of your watt-meter (e.g. 150) for corr1 and 12 times this value for
+          corr2</li>
+      <li>for EMEM devices the corr1 value is 0.01, and the corr2 value is
+          0.001 </li>
+    </ul>
+    <br>
+
+    <b>CostPerUnit</b> and <b>BasicFeePerMonth</b> are used to compute your
+    daily and mothly fees. Your COST will appear in the log, generated once
+    daiy (without the basic fee) or month (with the bassic fee included). Your
+    definition should look like E.g.:
+    <pre>
+    define emwz 1 75 900 0.15 12.50</pre>
+    and the Log looks like:
+    <pre>
+    CUM_DAY: 6.849 CUM: 60123.4 COST: 1.02
+    CUM_MONTH: 212.319 CUM: 60123.4 COST: 44.34</pre>
+
+    Tipp: You can configure your EMWZ device to show in the CUM column of the
+    STATE reading the current reading of your meter. For this purpose: multiply
+    the current reading (from the real device) with the corr1 value (RperKW),
+    and substract the RAW CUM value from it. Now set the basis reading of your
+    EMWZ device (named emwz) to this value.<br>
+
+  </ul>
+  <br>
+
+  <a name="CUL_EMset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_EMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_EMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

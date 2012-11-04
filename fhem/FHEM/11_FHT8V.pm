@@ -106,3 +106,81 @@ FHT8V_Get($@)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="FHT8V"></a>
+<h3>FHT8V</h3>
+<ul>
+  Fhem can directly control FHT8V type valves via a <a href="#CUL">CUL</a>
+  device without an intermediate FHT. This paragraph documents one of the
+  building blocks, the other is the <a href="#PID">PID</a> device.
+  <br>
+  <br>
+
+  <a name="FHT8Vdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHT &lt;housecode&gt; [IODev]</code>
+    <br><br>
+
+    <code>&lt;housecode&gt;</code> is a four digit hex number,
+    and must have the following relation to the housecode of the corresponding CUL
+    device:
+    <ul>given the CUL housecode as AABB, then this housecode must be
+    of the form CCBB, where CC is greater or equal to AA, but less then AA+8.
+    </ul>
+    This form is chosen so that the CUL can update all FHT8V valve states
+    within 2 minutes.
+    <br>
+    <br>
+    <code>&lt;IODev&gt;</code> must be specified if the last defined CUL device
+    is not the one to use. Usually this is done voa the <a
+    href="#IODev">IODev</a> attribute, but as the address checked is performed
+    at the definition, we must use an exception here.
+    <br>
+
+    Examples:
+    <ul>
+      <code>define wz FHT8V 3232</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FHT8Vset"></a>
+  <b>Set </b>
+  <ul>
+      <li>set &lt;name&gt; valve &lt;value;&gt;<br>
+      Set the valve to the given value (in percent, from 0 to 100).
+      </li>
+      <li>set &lt;name&gt; pair<br>
+      Pair the valve with the CUL.
+      </li>
+  </ul>
+  <br>
+
+  <a name="FHT8Vget"></a>
+  <b>Get </b>
+  <ul>
+      <li>get &lt;name&gt; valve<br>
+      Read back the valve position from the CUL FHT buffer, and convert it to percent (from 0 to 100).
+      </li>
+  </ul>
+  <br>
+
+  <a name="FHT8Vattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#eventMap">eventMap</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

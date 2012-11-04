@@ -102,3 +102,31 @@ CULflash_SplitNewFiletimes($)
 
 # vim: ts=2:et
 1;
+
+=pod
+=begin html
+
+<a name="CULflash"></a>
+<h3>CULflash</h3>
+<ul>
+  <code>CULflash &lt;CUL-Name&gt; &lt;CUL-Version&gt;</code> <br>
+  <br>
+    Download the CUL firmware from a nightly SVN chekout and flash the
+    hardware. Currently only the CUL is supported with its versions:
+    CUL_V2, CUL_V2_HM, CUL_V3, CUL_V4.<br>
+    <b>Note:</b> dfu-programmer has to be installed in the path, this is
+    already the case with the Fritz!Box 7390 image from fhem.de<br>
+
+    If the CUL is not yet flashed, then specify "none" as CUL-Name.
+    Example:
+    <ul>
+    <code>CULflash CUL CUL_V3<br>
+          CULflash none CUL_V3</code>
+    </ul>
+    Note: the message "dfu-programmer: failed to release interface 0." is
+    normal on the FB7390.
+</ul>
+
+
+=end html
+=cut

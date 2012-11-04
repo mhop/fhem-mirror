@@ -196,3 +196,61 @@ MSG_Define($$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="MSG"></a>
+<h3>MSG</h3>
+<ul>
+  The MSG device is the backend device for all the message handling (I/O-engine).
+  Under normal conditions only one MSG device is needed to serve multiple frontend
+  message devices like file or email.
+  <br><br>
+  <a name="MSGdefine"></a>
+  <b>Define</b>
+  <ul>
+  <code>define &lt;name&gt; MSG </code><br><br>
+  Specifies the MSG device. A single MSG device could serve multiple MSG frontends.
+  But, for special conditions there could be defined more than one MSG device.
+  </ul>
+  <br>
+  <a name="MSGset"></a>
+  <b>Set</b>
+  <ul>
+  <code>set &lt;name&gt; send|write &lt;devicename&gt;</code><br><br>
+  </ul>
+  Notes:
+  <ul>
+  To send the data, both send or write could be used.<br>
+  The devicename is the name of a frontenddevice previously
+  defined. Based on the type of the frontend device, the MSG device
+  will send out the lines of data.
+  <br>
+  Frontend devices are available for:<br>
+  	<ul><li><a href="#MSGFile">File</a></li>
+  	<li><a href="#MSGMail">EMail with SSL Authentification</a></li></ul>
+  For details about this devices, please review the device-definitions.<br>
+  After sending/writing the data, the data stills exists with the
+  frontend device, MSG do not delete/purge any data, this must be done
+  by the frontend device.
+  <br><br>
+  	Examples:
+  	<ul>
+  		<code>define myMsg MSG</code>
+  	</ul>
+  </ul>
+  <a name="MSGVattr"></a>
+  <b>Attributes</b>
+  <ul>
+      <li><a href="#IODev">IODev</a></li>
+      <li><a href="#dummy">dummy</a></li>
+      <li><a href="#ignore">ignore</a></li>
+      <li><a href="#loglevel">loglevel</a></li>
+      <li><a href="#eventMap">eventMap</a></li><br>
+    </ul>
+  </ul>
+<br><br>
+
+=end html
+=cut

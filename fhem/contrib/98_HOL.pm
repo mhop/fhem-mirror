@@ -134,3 +134,42 @@ sub HOL_getHolidaySwitchDeviceNames() {
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="HOL"></a>
+<h3>HOL</h3>
+<ul>
+  <tr>The HOL module attempts to simulate your presence using your FHEM devices.<br/>
+  Device support: All devices that are able to handle on-for-timer and on commands.<br />
+  Currently the device can be found within the <i>contrib/</i> folder.<td>
+
+  <br /><br />
+  <a name="HOLdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HOL</code><br>
+    <br>
+    To make the module find the devices you want to switch in holiday mode, 
+    you have to specify a global user attribute (attr global userattr holidaySwitchTime).
+    The attribute tells the HOL module how long each device should be switched on.
+    If you want to switch a device in your FHEM configuration, just add this attribute as device attribute
+    with your defined duration.
+    When being switched to on, the module chooses a random defined device
+    having the <i>holidaySwitchTime</i> attribute and trigger it to on-for-timer.
+    After the on-timespan, this device is switched to off and another random one triggered to on-for-timer.
+  </ul>
+  <br>
+
+  <a name="HOLset"></a>
+  <b>Set</b>
+  <ul>
+    <li>on</li>
+    <li>off</li>
+  </ul>
+</ul>
+
+
+=end html
+=cut

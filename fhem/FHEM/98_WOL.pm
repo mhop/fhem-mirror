@@ -148,3 +148,56 @@ sub wol_by_udp {
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="WOL"></a>
+<h3>WOL</h3>
+<ul>
+  <a name="WOLdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WOL &lt;MAC&gt; &lt;IP&gt;
+          &lt;unitcode&gt;</code>
+    <br><br>
+
+    Defines a WOL device via its MAC and IP address.<br><br>
+
+    Example:
+    <ul>
+      <code>define computer1 WOL 72:11:AC:4D:37:13 192.168.0.24</code><br>
+    </ul>
+    Notes:
+    <ul>
+      <li>Module uses <code>ether-wake</code> on FritzBoxes.</li>
+      <li>For other computers the WOL implementation of <a href="http://search.cpan.org/~clintdw/Net-Wake-0.02/lib/Net/Wake.pm">Net::Wake</a> is used</li>
+    </ul>
+  </ul>
+
+  <a name="WOLset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    refresh           # checks whether the computer is currently running
+    on                # sends a magic packet to the defined MAC address
+    </pre>
+
+    Examples:
+    <ul>
+      <code>set computer1 on</code><br>
+      <code>set computer1 refresh</code><br>
+    </ul>
+  </ul>
+  <a name="WOLget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="WOLattr"></a>
+  <b>Attributes</b> <ul>N/A</ul><br>
+</ul>
+
+=end html
+=cut

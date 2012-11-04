@@ -643,3 +643,65 @@ USBWX_Disconnected($)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="USBWX"></a>
+<h3>USBWX</h3>
+<ul>
+  The USBWX module interprets the messages received by the ELV <a
+href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=29870">USB-WDE1</a>
+  weather receiver. This receiver is compaptible with the following ELV sensors:
+  KS200/KS300, S300IA, S300TH, ASH2200, PS50. It also known to work with Conrad
+  weather sensors KS555, S555TH and ASH555.<br> This module was tested with ELV
+  S300TH, ELV ASH2200, ELV KS300, Conrad S555TH and Conrad KS555. <br> Readings
+  and STATE of temperature/humidity sensors are compatible with the CUL_WS
+  module. For KS300/KS555 sensors STATE is compatible with the KS300 module. The
+  module is integrated into autocreate to generate the appropriate filelogs and
+  weblinks automatically.
+  <br><br>
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module
+  if the devices is connected via USB or a serial port.
+  <br><br>
+
+  <a name="USBWXdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; USBWX &lt;serial device&gt;</code>
+    <br>
+    <br>Defines USB-WDE1 attached via usb.<br>
+    <br>
+    <code>define &lt;name&gt; USBWX &lt;code&gt; [corr1...corr4]</code> <br>
+    <br>
+    &lt;code&gt; is the code which must be set on the sensor. Valid values
+    are 1 through 8. <br> 9 is used as the sensor id of the ks300 sensor.<br>
+    corr1..corr4 are up to 4 numerical correction factors, which will be added
+    to the respective value to calibrate the device. Note: rain-values will be
+    multiplied and not added to the correction factor.
+    <br>
+    <br>
+    Example:<pre>
+    define USBWDE1 USBWX /dev/ttyUSB0
+    define USBWX_1 USBWX 1
+    define USBWX_livingroom USBWX 2
+    define USBWX_ks300 USBWX 9
+    </pre>
+  </ul>
+
+  <a name="USBWXset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+  <a name="USBWXget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="USBWXattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

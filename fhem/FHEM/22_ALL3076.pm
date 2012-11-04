@@ -158,3 +158,66 @@ ALL3076_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="ALL3076"></a>
+<h3>ALL3076</h3>
+<ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
+  <a name="ALL3076define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ALL3076 &lt;ip-address&gt; </code>
+    <br><br>
+    Defines an Allnet 3076 device (Dimmable lightswitch) via its ip address or dns name<br><br>
+
+    Examples:
+    <ul>
+      <code>define lamp1 ALL3076 192.168.1.200</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="ALL3076set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    dimdown
+    dim10%
+    dim20%
+    dim30%
+    dim40%
+    dim50%
+    dim60%
+    dim70%
+    dim80%
+    dim90%
+    dim100%
+    dim[0-100]%
+    dimup
+    off
+    on
+    toggle
+    </pre>
+    Examples:
+    <ul>
+      <code>set lamp1 on</code><br>
+      <code>set lamp1 dim11%</code><br>
+      <code>set lamp2 toggle</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>Toggle is special implemented. List name returns "on" or "off" even after a toggle command</li>
+    </ul>
+  </ul>
+</ul>
+
+=end html
+=cut

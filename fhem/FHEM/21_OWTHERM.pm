@@ -818,3 +818,126 @@ sub OWXTHERM_SetValues($@) {
 
 
 1;
+
+=pod
+=begin html
+
+<a name="OWTHERM"></a>
+<h3>OWTHERM</h3>
+<ul>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br /><br />
+    Note:<br /> This is the only 1-Wire module which so far works with both the OWFS and the
+    OWX interface module. Please define an <a href="#OWFS">OWFS</a> device or an <a
+        href="#OWX">OWX</a> device first. <br />
+    <br /><b>Example</b><br />
+    <ul>
+        <code>define OWX_T OWTHERM DS18B20 E8D09B030000 300</code>
+        <br />
+        <code>attr OWX_T tempUnit Kelvin</code>
+        <br />
+    </ul><br />
+    <a name="OWTHERMdefine"></a>
+    <b>Define</b>
+    <ul>
+        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt;
+            [&lt;interval&gt;]</code>
+        <br /><br /> Define a 1-Wire digital thermometer device.<br /><br />
+        <li>
+            <code>[&lt;model&gt;]</code><br /> Defines the thermometer model (and thus
+            1-Wire family id) currently the following values are permitted: <ul>
+                <li>model DS1820 with family id 10 (default if the model parameter is
+                    omitted)</li>
+                <li>model DS1822 with family id 22</li>
+                <li>model DS18B20 with family id 28</li>
+            </ul>
+        </li>
+        <li>
+            <code>&lt;id&gt;</code>
+            <br />12-character unique ROM id of the thermometer device without family id and
+            CRC code </li>
+        <li>
+            <code>&lt;interval&gt;</code>
+            <br /> Temperature measurement interval in seconds. The default is 300 seconds. </li>
+        <br /> Example: <br />
+        <code>define Temp1 OWTHERM 14B598010800 300 </code><br />
+    </ul>
+    <br />
+    <a name="OWTHERMset">
+        <b>Set</b></a>
+    <ul>
+        <li><a name="owtherm_interval">
+                <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
+            measurement intervall in seconds. The default is 300 seconds.</li>
+        <li><a name="owtherm_tempHigh">
+                <code>set &lt;name&gt; tempHigh &lt;float&gt;</code></a>
+            <br /> The high alarm temperature (on the temperature scale chosen by the
+            attribute value) </li>
+        <li><a name="owtherm_tempLow">
+                <code>set &lt;name&gt; tempLow &lt;float&gt;</code></a>
+            <br /> The low alarm temperature (on the temperature scale chosen by the
+            attribute value) </li>
+    </ul>
+    <br />
+    <a name="OWTHERMget">
+        <b>Get</b></a>
+    <ul>
+        <li><a name="owtherm_id">
+                <code>get &lt;name&gt; id</code></a>
+            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+        <li><a name="owtherm_present">
+                <code>get &lt;name&gt; present</code></a>
+            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+        <li><a name="owtherm_interval2">
+                <code>get &lt;name&gt; interval</code></a><br />Returns temperature
+            measurement interval in seconds.</li>
+        <li><a name="owtherm_temperature">
+                <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature. </li>
+        <li><a name="owtherm_alarm">
+                <code>get &lt;name&gt; alarm</code></a><br />Obtain the alarm temperature
+            values. </li>
+    </ul>
+    <br />
+    <a name="OWTHERMattr">
+        <b>Attributes</b></a>
+    <ul>
+        <li><a name="owtherm_stateAL"><code>attr &lt;name&gt; stateAL &lt;string&gt;</code>
+            </a>
+            <br />character string for denoting low alarm condition, default is red down
+            triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25BE;&lt;/span&gt;
+            leading to the sign <span style="color:red">&#x25BE;</span>
+        </li>
+        <li><a name="owtherm_stateAH"><code>attr &lt;name&gt; stateAH &lt;string&gt;</code>
+            </a>
+            <br />character string for denoting high alarm condition, default is red upward
+            triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25B4;&lt;/span&gt;
+            leading to the sign <span style="color:red">&#x25B4;</span>
+        </li>
+        <li><a name="owtherm_tempOffset"><code>attr &lt;name&gt; tempOffset
+                    &lt;float&gt;</code>
+            </a>
+            <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+        <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
+                    Celsius|Kelvin|Fahrenheit|C|K|F</code>
+            </a>
+            <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+        <li><a name="owtherm_tempHigh2">
+                <code>attr &lt;name&gt; tempHigh &lt;float&gt;</code>
+            </a>
+            <br /> high alarm temperature (on the temperature scale chosen by the attribute
+            value). </li>
+        <li><a name="owtherm_tempLow2">
+                <code>attr &lt;name&gt; tempLow &lt;float&gt;</code>
+            </a>
+            <br /> low alarm temperature (on the temperature scale chosen by the attribute
+            value). </li>
+        <li><a name="owtherm_event"><code>attr &lt;name&gt; event on-change|on-update
+        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
+            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
+                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
+            </ul>
+        </li>
+        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
+    </ul>
+</ul>
+
+=end html
+=cut

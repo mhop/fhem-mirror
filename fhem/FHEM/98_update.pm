@@ -870,3 +870,49 @@ update_MakeDirectory($)
 
 # vim: ts=2:et
 1;
+
+=pod
+=begin html
+
+<a name="update"></a>
+<h3>update</h3>
+<ul>
+  <code>update [development|stable] [&lt;file&gt;|check|fhem|full] [force]</code><br>
+  <br>
+    The installed fhem distribution and its installed extensions (just like the
+    webGUI PGM2) are updated via this command from the online repository. The
+    locally installed files will be checked against the online repository and
+    will be updated in case the files online are in a newer version. Modules
+    which are used while the update is in progress will be restarted in the new
+    version after the update has finished.
+    <br>
+    <br>
+    The new update function will process more advanced distribution information
+    as well as control commands for updating, removing or renaming existing files.
+    New file structures can also be set up by the new control command files.
+    The new update process will exclusively work with the file path which is
+    given by the global attribute "modpath" except for the fhem.pl file. The user
+    decides whether to use a stable, a developer- or a experimental-rated version
+    of fhem (experimental is not yet implemented).
+    <br>
+    <br>
+    Furthermore, the use of packages is supported just like in a manual installation
+    of fhem. On the moment this only refers to FHEM including PGM2 (FHEMWEB), others
+    may follow up. By using the update in this way, only files which are acutally
+    used will be updated.
+    <br>
+    <br>
+
+    <a name="updateattr"></a>
+    <b>Attributes</b>
+    <ul>
+      <li><a href="#backup_before_update">backup_before_update</a></li><br>
+
+      <li><a href="#exclude_from_update">exclude_from_update</a></li><br>
+
+      <li><a href="#updatebranch">updatebranch</a></li><br>
+  </ul>
+</ul>
+
+=end html
+=cut

@@ -332,3 +332,75 @@ KS300_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="KS300"></a>
+<h3>KS300</h3>
+<ul>
+  Fhem can receive the KS300 radio (868.35 MHz) messages through <a
+  href="#FHZ">FHZ</a>, <a href="WS300">WS300</a> or an <a href="#CUL">CUL</a>
+  device, so one of them must be defined first.<br>
+  This module services messages received by the FHZ device, if you use one of
+  the other alternetives, see the <a href="#WS300">WS300</a> or <a
+  href="#CUL_WS">CUL_WS</a> entries.<br>
+  Note: The KS555 is also reported to work.<br>
+  <br>
+
+  <a name="KS300define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; KS300 &lt;housecode&gt; [ml/raincounter [wind-factor]]</code>
+    <br><br>
+
+    <code>&lt;housecode&gt;</code> is a four digit hex number,
+    corresponding to the address of the KS300 device, right now it is ignored.
+    The ml/raincounter defaults to 255 ml, but it must be specified if you wish
+    to set the wind factor, which defaults to 1.0.
+    <br>
+
+    Examples:
+    <ul>
+      <code>define ks1 KS300 1234</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="KS300set"></a>
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="KS300get"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="KS300attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (ks300)</li>
+    <li>rainadjustment<br>
+        If this attribute is set, fhem automatically accounts for rain counter
+        resets after a battery change and random counter switches as experienced
+        by some users. The raw rain counter values are adjusted by an offset
+        in order to flatten out the sudden large increases and decreases in
+        the received rain counter values. Default is off.</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

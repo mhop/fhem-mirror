@@ -130,3 +130,75 @@ BS_Parse($$)
 #############################
 
 1;
+
+=pod
+=begin html
+
+<a name="BS"></a>
+<h3>BS</h3>
+<ul>
+  The module BS allows to collect data from a brightness sensor through a
+  <a href="#FHZ">FHZ</a> device. For details on the brightness sensor see
+  <a href="http://www.busware.de/tiki-index.php?page=CPM-BS">busware wiki</a>.
+  You can have at most nine different brightness sensors in range of your
+  FHZ.<br>
+  <br>
+
+  The state contains the brightness in % (reading <code>brightness</code>) and
+  the brightness in lux (reading <code>lux</code>). The <code>flags</code>
+  reading is always zero. The meaning of these readings is explained in more
+  detail on the above mentioned wiki page.<br>
+  <br>
+
+  <a name="BSDefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; BS &lt;sensor#&gt; [&lt;RExt&gt;]</code>
+    <br><br>
+
+    <code>&lt;sensor#&gt;</code> is the number of sensor in the brightness
+    sensor address system that runs from 1 to 9.<br>
+    <br>
+    <code>&lt;RExt&gt;</code> is the value of the resistor on your brightness
+    sensor in &Omega; (Ohm). The brightness reading in % is proportional to the resistance, the
+    lux reading is proportional to the resistance squared. The value is
+    optional. The default resistance is RExt= 50.000&Omega;.<br>
+    <br>
+
+    Example:<br>
+    <ul>
+      <code>define bs1 BS 1 40000</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="BSset"></a>
+  <b>Set </b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="BSget"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="BSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (bs)</li>
+    <li><a href="#ignore">ignore</a></li>
+  </ul>
+  <br>
+
+</ul>
+
+
+=end html
+=cut

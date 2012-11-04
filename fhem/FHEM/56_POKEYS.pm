@@ -489,3 +489,78 @@ POKEYS_Disconnect($)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="POKEYS"></a>
+<h3>POKEYS</h3>
+<ul>
+  The POKEYS module is used to control the LAN POKEYS device (<a href="http://www.poscope.com/pokeys56e">POKEYS56e</a>) which supports
+  up to 56 digital input, analog inputs, counter inputs and digital outputs.
+  Each port/pin has to be configured before it can be used.
+
+  <br>
+  <br>
+  <a name="POKEYSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; POKEYS &lt;ip-address&gt; &lt;pin&gt; &lt;io-state&gt; [&lt;time in ms&gt;]</code> <br>
+    <br>
+    <code>&lt;ip-address&gt;</code> the IP address where the POKEYS device can be accessed<br>
+    <code>&lt;pin&gt;</code> the pin number which should be configured<br>
+    <code>&lt;io-state&gt;</code> the new io state of the pin <code>Obsolete(=undef) DigIn DigOut AdcIn DigInCtRise DigInCtFall ExtDigOut GetBasic </code> <br>
+    <code>&lt;time in ms&gt;</code> optional else 1000ms: cyclic update time for Input pin <br>
+
+	<br>
+    Example:
+    <ul>
+	  <code>define PoInfo   POKEYS 192.168.178.34  0 GetBasic</code><br>
+      # creates a virtual pin for getting infos about the device with the <code>get</code> command<br>
+      <code>define Pin44in  POKEYS 192.168.178.34 44 DigIn 200</code><br>
+      # creates a digitial input port on pin 44<br>
+      <code>define Pin25out POKEYS 192.168.178.34 25 DigOut</code><br>
+	  # creates a digial output port on pin 25<br>
+    </ul>
+    </ul> <br>
+
+  <a name="POKEYSset"></a>
+  <b>Set</b>
+  <ul>
+	<code>set &lt;name&gt; &lt;state&gt; [&lt;time in ms&gt;]</code> <br>
+	<br>
+	<code>&lt;state&gt;</code> can be <code>OFF ON OFF_PULSE ON_PULSE </code><br>
+    <code>&lt;time in ms&gt;</code> optional else 1000ms hold time for the <code>ON_PULSE OFF_PULSE</code> state<br>
+	<br>
+    Example:
+    <ul>
+	  <code>set Pin25out ON</code><br>
+      # sets Pin25out to ON (0V)<br>
+    </ul>
+  </ul><br>
+
+  <a name="POKEYSget"></a>
+  <b>Get</b>
+  <ul>
+	<code>get &lt;name&gt; &lt;type&gt; </code> <br>
+	<br>
+	only supported for pins of type <code>GetBasic</code><br>
+	<code>&lt;type&gt;</code> can be <code>Version DevName Serial User CPUload</code><br>
+  	<br>
+    Example:
+    <ul>
+	  <code>get PoInfo Version</code><br>
+      # gets the version of the POKEYS device<br>
+    </ul>
+  </ul><br>
+
+  <a name="POKEYSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    todo <br>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

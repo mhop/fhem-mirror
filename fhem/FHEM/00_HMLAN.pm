@@ -420,3 +420,71 @@ HMLAN_secSince2000()
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="HMLAN"></a>
+<h3>HMLAN</h3>
+<ul>
+  <tr><td>
+  The HMLAN is the fhem module for the eQ-3 HomeMatic LAN Configurator.
+  <br><br>
+  The fhem module will emulate a CUL device, so the <a href="#CUL_HM">CUL_HM</a>
+  module can be used to define HomeMatic devices.<br><br>
+
+  In order to use it with fhem you <b>must</b> disable the encryption first
+  with the "HomeMatic Lan Interface Configurator" (which is part of the
+  supplied Windows software), by selecting the device, "Change IP Settings",
+  and deselect "AES Encrypt Lan Communication".<br><br>
+  This device can be used in parallel with a CCU and (readonly) with fhem. To do this:
+  <ul>
+    <li>start the fhem/contrib/tcptee.pl program
+    <li>redirect the CCU to the local host
+    <li>disable the LAN-Encryption on the CCU for the Lan configurator
+    <li>set the dummy attribute for the HMLAN device in fhem
+  </ul>
+  <br><br>
+
+
+  <a name="HMLANdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; HMLAN &lt;ip-address&gt;[:port]</code><br>
+    <br>
+    port is 1000 by default.
+    If the ip-address is called none, then no device will be opened, so you
+    can experiment without hardware attached.<br>
+  </ul>
+  <br>
+
+  <a name="HMLANset"></a>
+  <b>Set</b>
+  <ul>
+    <li><a href="#hmPairForSec">hmPairForSec</a>
+    <li><a href="#hmPairSerial">hmPairSerial</a>
+  </ul>
+  <br>
+
+  <a name="HMLANget"></a>
+  <b>Get</b>
+  <ul>
+  N/A
+  </ul>
+  <br>
+  <br>
+
+  <a name="HMLANattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+    <li><a href="#hmId">hmId</a></li><br>
+    <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
+  </ul>
+</ul>
+
+=end html
+=cut

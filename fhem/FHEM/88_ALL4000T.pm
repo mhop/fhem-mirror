@@ -139,3 +139,29 @@ ALL4000T_GetStatus($)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="ALL4000T"></a>
+<h3>ALL4000T</h3>
+<ul>
+  Note: this module requires the following perl modules: XML::Simple LWP::UserAgent
+  HTTP::Request.
+  <br><br>
+  <a name="ALL4000Tdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ALL4000T &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines a temperature sensor connected on an Allnet 4000 device via its ip address and port. Use the delay argument to define the delay between polls.<br><br>
+
+    Examples:
+    <ul>
+      <code>define AUSSEN.POOL.TEMP.vorlauf ALL4000T 192.168.68.20 t2 120</code><br>
+    </ul>
+  </ul>
+  <br>
+</ul>
+=end html
+=cut

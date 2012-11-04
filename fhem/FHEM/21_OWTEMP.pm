@@ -489,3 +489,123 @@ OWTEMP_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="OWTEMP"></a>
+<h3>OWTEMP</h3>
+<ul>
+  High-Precision 1-Wire Digital Thermometer.
+  <br><br>
+
+  Note:<br>
+  Please define an <a href="#OWFS">OWFS</a> device first.
+  <br><br>
+
+  <a name="OWTEMPdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; OWTEMP &lt;id&gt; [&lt;interval&gt;] [&lt;alarminterval&gt;]</code>
+    <br><br>
+
+    Define a 1-wire Digital Thermometer device.<br><br>
+
+    <code>&lt;id&gt;</code>
+    <ul>
+      Corresponding to the <a href="#owfs_id">id</a> of the input device.<br>
+      Set &lt;id&gt; to <code>none</code>for demo mode.
+    </ul>
+    <code>&lt;interval&gt;</code>
+    <ul>
+      Sets the status polling intervall in seconds to the given value. The default is 300 seconds.
+    </ul>
+    <code>&lt;alarminterval&gt;</code>
+    <ul>
+      Sets the alarm polling intervall in seconds to the given value. The default is 300 seconds.
+      <br><br>
+    </ul>
+
+    Note:<br>
+    Currently supported <a href="#owfs_type">type</a>: <code>DS18S20</code>.<br><br>
+
+    Example:
+    <ul>
+      <code>define KG.hz.TF.01 OWTEMP 14B598010800 300 60</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="OWTEMPset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <ul>
+      <li><a name="owtemp_templow"></a>
+        <code>templow</code> (read-write)<br>
+        The upper limit for the low temperature alarm state.
+      </li>
+      <li><a name="owtemp_temphigh"></a>
+        <code>temphigh</code> (read-write)<br>
+        The lower limit for the high temperature alarm state.
+      </li>
+      <li><a name="owtemp_ALARMINT"></a>
+        <code>ALARMINT</code> (write-only)<br>
+        Sets the alarm polling intervall in seconds to the given value.
+      </li>
+      <li><a name="owtemp_INTERVAL"></a>
+        <code>INTERVAL</code> (write-only)<br>
+        Sets the status polling intervall in seconds to the given value.
+      </li>
+    </ul>
+  </ul><br>
+
+  <a name="OWTEMPget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <ul>
+      <li><a href="#owfs_address">address</a> (read-only)</li>
+      <li><a href="#owfs_crc8">crc8</a> (read-only)</li>
+      <li><a href="#owfs_family">family</a> (read-only)</li>
+      <li><a href="#owfs_id">id</a> (read-only)</li>
+      <li><a href="#owfs_locator">locator</a> (read-only)</li>
+      <li><a href="#owfs_present">present</a> (read-only)</li>
+      <li><a name="owtemp_temperature"></a>
+        <code>temperature</code> (read-only)<br>
+        Read by the chip at high resolution (~12 bits). Units are selected from
+        the defined OWFS Device. See <a href="#owfs_temp-scale">temp-scale</a> for choices.
+      </li>
+      <li><a href="#owtemp_templow">templow</a> (read-write)</li>
+      <li><a href="#owtemp_temphigh">temphigh</a> (read-write)</li>
+      <li><a href="#owfs_type">type</a> (read-only)</li>
+      <br>
+    </ul>
+    Examples:
+    <ul>
+      <code>get KG.hz.TF.01 type</code><br>
+      <code>KG.hz.TF.01 type => DS18S20</code><br><br>
+      <code>get KG.hz.TF.01 temperature</code><br>
+      <code>KG.hz.TF.01 temperature => 38.2500 (Celsius)</code>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="OWTEMPattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#IODev">IODev</a></li>
+  </ul>
+  <br>
+
+</ul>
+  
+=end html
+=cut

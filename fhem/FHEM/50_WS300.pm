@@ -604,3 +604,69 @@ NEXTPOLL:
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="WS300"></a>
+<h3>WS300</h3>
+<ul>
+  <br>
+
+  <a name="WS300define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define WS300Device WS300 &lt;serial device&gt;</code><br>
+    or<br>
+    <code>define &lt;devname&gt WS300 [0-9]</code><br>
+    <br>
+    The first line is mandatory if you have a WS300 device: it defines the
+    input device with its USB port. The name of this device is fixed and must
+    be WS300Device. It must be the first defined WS300 device.<br>
+
+    For each additional device (with number 0 to 9) you have to define another
+    WS300 device, with an arbitrary name. The WS300 device which reports the
+    readings will be defined with the port number 9, an optional KS300 with the
+    port number 8.<br><br>
+
+    Examples:
+    <pre>
+      define WS300Device  WS300   /dev/ttyUSB1
+      define ash2200.1    WS300   0
+      define ks300        WS300   8
+      define ws300        WS300   9
+    </pre>
+  </ul>
+  <br>
+
+  <a name="WS300set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set WS300Device  &lt;interval(min.)&gt; &lt;height(m)&gt; &lt;rainvalume(ml)&gt;</code>
+    <br><br>
+    Set some WS300 configuration parameters.
+  </ul>
+
+
+  <a name="WS300get"></a>
+  <b>Get</b>
+  <ul>
+    N/A
+  </ul>
+  <br>
+
+  <a name="WS300attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (ws300)</li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+</ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

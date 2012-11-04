@@ -2517,3 +2517,317 @@ FW_Set($@)
 #####################################
 
 1;
+
+=pod
+=begin html
+
+<a name="FHEMWEB"></a>
+<h3>FHEMWEB</h3>
+<ul>
+  FHEMWEB is the builtin web-frontend (webpgm2). It implements a simple web
+  server (optionally with Basic-Auth and HTTPS), so no additional program is
+  needed.
+  <br> <br>
+
+  <a name="FHEMWEBdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FHEMWEB &lt;tcp-portnr&gt; [global]</code>
+    <br><br>
+    Enable the webfrontend on port &lt;tcp-portnr&gt;. If global is specified,
+    then requests from all interfaces (not only localhost / 127.0.0.1) are
+    serviced.<br>
+    To enable listening on IPV6 see the comments <a href="#port">here</a>.
+    <br><br>
+    Feature: http://host:port/fhem/icons/&lt;devicename&gt; will return
+    the icon associated with the current status of &lt;devicename&gt;.
+
+  </ul>
+  <br>
+
+  <a name="FHEMWEBset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; rereadicons</code>
+    <br><br>
+    Rereads the icons in the icon path and updates the mapping from logical icons to physical files.
+    Use after adding, deleting or changing icons.
+    <br><br>
+
+  </ul>
+
+  <a name="FHEMWEBget"></a>
+  <b>Get</b>
+  <ul>
+    <li>icon &lt;logical icon&gt;<br>
+
+        returns the absolute path to the logical icon. Example:
+        <ul>
+          <code>get myFHEMWEB icon FS20.on<br>
+          /data/Homeautomation/fhem/FHEM/FS20.on.png
+          </code>
+        </ul>
+    <li>pathlist<br>
+        return FHEMWEB specific directories, where files for given types are located
+    <br><br>
+
+  </ul>
+
+  <a name="FHEMWEBattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="webname"></a>
+    <li>webname<br>
+        Path after the http://hostname:port/ specification. Defaults to fhem,
+        i.e the default http address is http://localhost:8083/fhem
+        </li><br>
+
+    <a name="refresh"></a>
+    <li>refresh<br>
+        If set, a http-equiv="refresh" entry will be genererated with the given
+        argument (i.e. the browser will reload the page after the given
+        seconds).
+        </li><br>
+
+    <a name="plotmode"></a>
+    <li>plotmode<br>
+        Specifies how to generate the plots:
+        <ul>
+          <li>gnuplot<br>
+              Call the gnuplot script with each logfile. The filename
+              specification of the <a href="#FileLog">FileLog</a> device will
+              determine what is in the plot.  The data is converted into an
+              image on the backend with gnuplot.</li>
+          <li>gnuplot-scroll<br>
+              Fhemweb will offer zoom and scroll buttons in order to navigate
+              in the current logfile, i.e. you can select just a part of the
+              data to be displayed. The more data is contained in a single
+              logfile, the easier you can navigate. The recommendation is to
+              store the data for a whole year in one logfile.  The data is
+              converted into an image on the backend with gnuplot.</li>
+          <li>SVG<br>
+              The same scrolling as with gnuplot scroll, but the data is sent
+              as an SVG script to the frontend, which will compute
+              the image: no need for gnuplot on the backend.
+              This is the default. Note: SVG is supported on the Android
+              platform by Opera/Firefox and the Internet Explorer before 9
+              needs a plugin.
+              </li>
+        </ul>
+        See also the attribute fixedrange.
+        Note: for gnuplot & gnuplot-scroll mode the gnuplot output is
+        redirected to the file gnuplot.err in the /tmp directory
+        </li><br>
+
+    <a name="plotsize"></a>
+    <li>plotsize<br>
+        the default size of the plot, in pixels, separated by comma:
+        width,height. You can set individual sizes by setting the plotsize of
+        the weblink. Default is 800,160 for desktop, and 480,160 for
+        smallscreen.
+        </li><br>
+
+    <a name="fixedrange"></a>
+    <li>fixedrange<br>
+        Can be applied to weblink devices (FHEMWEB).<br>
+        Contains two time specs in the form YYYY-MM-DD separated by a space.
+        In plotmode gnuplot-scroll or SVG the given time-range will be used,
+        and no scrolling for this weblinks will be possible. Needed e.g. for
+        looking at last-years data without scrolling.<br><br>
+        If the value is one of day, week, month, year than set the zoom level
+        for this weblink independently of the user specified zoom-level.
+        This is useful for pages with multiple plots: one of the plots is best
+        viewed in with the default (day) zoom, the other one with a week zoom.
+        </li><br>
+
+    <a name="smallscreen"></a>
+    <a name="touchpad"></a>
+    <li>smallscreen, touchpad<br>
+        Optimize for small screen size (i.e. smartphones) or for touchpad
+        devices (i.e. tablets)<br>
+        Note: The default configuration installed with make install-pgm2
+        installs 2 FHEMWEB instances: port 8083 for desktop browsers and
+        port 8084 for smallscreen browsers, both using SVG rendering.
+        On Android SVG is supported by Opera/Firefox.<br>
+
+        WebApp suppport if specifying one of the above options: After viewing
+        the site on the iPhone or iPad in Safari, add it to the home-screen to
+        get full-screen support.
+        </li><br>
+
+    <a name="plotfork"></a>
+    <li>plotfork<br>
+        If set, generate the logs in a parallel process. Note: do not use it
+        on Windows and on systems with small memory foorprint.
+    </li><br>
+
+    <a name="basicAuth"></a>
+    <li>basicAuth, basicAuthMsg<br>
+        request a username/password authentication for access. You have to set
+        the basicAuth attribute to the Base64 encoded value of
+        &lt;user&gt;:&lt;password&gt;, e.g.:<ul>
+        # Calculate first the encoded string with the commandline program<br>
+        $ echo -n fhemuser:secret | base64<br>
+        ZmhlbXVzZXI6c2VjcmV0<br>
+        fhem.cfg:<br>
+        attr WEB basicAuth ZmhlbXVzZXI6c2VjcmV0
+        </ul>
+        You can of course use other means of base64 encoding, e.g. online
+        Base64 encoders. If basicAuthMsg is set, it will be displayed in the
+        popup window when requesting the username/password.<br>
+        <br>
+        If the argument of basicAuth is enclosed in {}, then it will be
+        evaluated, and the $user and $password variable will be set to the
+        values entered. If the return value is true, then the password will be
+        accepted.
+        Example:<br>
+        <code>
+        attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
+        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        </code>
+
+
+    </li><br>
+
+    <a name="HTTPS"></a>
+    <li>HTTPS<br>
+        Enable HTTPS connections. This feature requires the perl module
+        IO::Socket::SSL, to be installed with cpan -i IO::Socket::SSL or
+        apt-get install libio-socket-ssl-perl; OSX and the FritzBox-7390
+        already have this module.<br>
+
+        A local certificate has to be generated into a directory called certs,
+        this directory <b>must</b> be in the <a href="#modpath">modpath</a>
+        directory, at the same level as the FHEM directory.
+        <ul>
+        mkdir certs<br>
+        cd certs<br>
+        openssl req -new -x509 -nodes -out server-cert.pem -days 3650 -keyout server-key.pem
+        </ul>
+      <br><br>
+    </li>
+
+    <li><a href="#allowfrom">allowfrom</a></li>
+    </li><br>
+    <li><a href="#loglevel">loglevel</a></li>
+    </li><br>
+
+    <a name="stylesheetPrefix"></a>
+    <li>stylesheetPrefix<br>
+      prefix for the files style.css, svg_style.css and svg_defs.svg. If the file
+      with the prefix is missing, the default file (without prefix) will be used.
+      These files have to be placed into the FHEM directory, and can be selected
+      directly from the "Select style" FHEMWEB menu entry. Example:
+      <ul>
+        attr WEB stylesheetPrefix dark<br>
+        <br>
+        Referenced files:<br>
+        <ul>
+        darksvg_defs.svg<br>
+        darksvg_style.css<br>
+        darkstyle.css<br>
+        </ul>
+        <br>
+      </ul>
+      </li>
+
+    <a name="hiddenroom"></a>
+    <li>hiddenroom<br>
+        Komma separated list of rooms to "hide", i.e. not to show. Special
+        values are input, detail and save, in which case the input areas, link
+        to the detailed views or save button is hidden (although each aspect
+        still can be addressed through url manipulation).<br>
+        The list can also contain values from the additional "Howto/Wiki/FAQ"
+        block.
+        </li>
+        <br>
+
+    <a name="longpoll"></a>
+    <li>longpoll<br>
+        Affects devices states in the room overview only.<br>
+        In this mode status update is refreshed more or less instantaneously,
+        and state change (on/off only) is done without requesting a complete
+        refresh from the server.
+        </li>
+        <br>
+
+    <a name="redirectCmds"></a>
+    <li>redirectCmds<br>
+        Clear the browser URL window after issuing the command by redirecting
+        the browser, as a reload for the same site might have unintended
+        side-effects. Default is 1 (enabled). Disable it by setting this
+        attribute to 0 if you want to study the command syntax, in order to
+        communicate with FHEMWEB.
+        </li>
+        <br>
+
+    <a name="webCmd"></a>
+    <li>webCmd<br>
+        Colon separated list of commands to be shown in the room overview for a
+        certain device.  On smallscreen devices only the first value is
+        accessible.<br>
+        If the first value references a command, for which "set
+        device ?" lists a number possible choices (e.g. desired-temp for FHT
+        devices), then a select widget will be displayed. If the values are
+        "slider,min,step,max", then a javascript driven slider is displayed.
+        if the value is "time", then a javascript timepicker is displayed.
+        If the command is state, then the value will be used as a command.<br>
+        Examples:
+        <ul>
+          attr lamp webCmd on:off:on-for-timer 10<br>
+          define d1 dummy<br>
+          attr d1 webCmd state<br>
+          attr d1 set setList state:on,off<br>
+          define d2 dummy<br>
+          attr d2 webCmd state<br>
+          attr d2 set setList state:slider,0,1,10<br>
+          define d3 dummy<br>
+          attr d3 webCmd state<br>
+          attr d3 set setList state:time<br>
+        </ul>
+        Note: this is an attribute for the displayed device, not for the FHEMWEB
+        instance.
+        </li>
+        <br>
+
+    <a name="fwmodpath"></a>
+    <li>fwmodpath<br>
+        Set the "modpath" for this intance of FHEMWEB. Used to search .gplot
+        files, pictures, etc. Default is the <a href="#modpath">modpath</a>/FHEM directory.
+        </li>
+        <br>
+
+    <a name="fwcompress"></a>
+    <li>fwcompress<br>
+        Enable compressing the HTML data (default is 1, i.e. yes, use 0 to switch it off).
+        </li>
+        <br>
+
+    <a name="icon"></a>
+    <li>icon<br>
+        Set the icon for a device in the room overview. There is an
+        icon-chooser in FHEMWEB to ease this task.  Setting icons for the room
+        itself is indirect: there must exist an icon with the name
+        ico<ROOMNAME>.png in the modpath/fwmodpath directory.
+        </li>
+        <br>
+
+    <a name="reverseLogs"></a>
+    <li>reverseLogs<br>
+        Display the lines from the logfile in a reversed order, newest on the
+        top, so that you dont have to scroll down to look at the latest entries.
+        Note: enabling this attribute will prevent FHEMWEB from streaming
+        logfiles, resulting in a considerably increased memory consumption
+        (about 6 times the size of the file on the disk).
+        </li>
+        <br>
+
+    </ul>
+
+    See also <a href="#room">room</a> and <a href="#group">group</a> attributes.
+  </ul>
+
+
+
+=end html
+=cut

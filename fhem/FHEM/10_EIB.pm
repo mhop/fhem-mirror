@@ -445,3 +445,122 @@ eib_name2hex($)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="EIB"></a>
+<h3>EIB / KNX</h3>
+<ul>
+  EIB/KNX is a standard for building automation / home automation.
+  It is mainly based on a twisted pair wiring, but also other mediums (ip, wireless) are specified.
+
+  While the module <a href="#TUL">TUL</a> represents the connection to the EIB network,
+  the EIB modules represent individual EIB devices. This module provides a basic set of operations (on, off, on-till, etc.)
+  to switch on/off EIB devices. Sophisticated setups can be achieved by combining a number of
+  EIB module instances or by sending raw hex values to the network (set <devname> raw <hexval>).
+
+  EIB/KNX defines a series of Datapoint Type as standard data types used
+  to allow general interpretation of values of devices manufactured by diferent companies.
+  This datatypes are used to interpret the status of a device, so the state in FHEM will then
+  show the correct value.
+
+  <br><br>
+  <a name="EIBdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EIB &lt;main group&gt; [&lt;additional group&gt; ..]</code>
+    <br><br>
+
+    Define an EIB device, connected via a <a href="#TUL">TUL</a>. The
+    &lt;group&gt; parameters are either a group name notation (0-15/0-15/0-255) or the hex representation of the value (0-f0-f0-ff).
+    The &lt;main group&gt;  is used for sending of commands to the EIB network.
+    The state of the instance will be updated when a new state is received from the network for any of the given groups.
+    This is usefull for example for toggle switches where a on command is send to one group and the real state (on or off) is
+    responded back on a second group.
+
+    For actors and sensors the
+    <a href="#autocreate">autocreate</a> module may help.<br>
+
+    Example:
+    <ul>
+      <code>define lamp1 EIB 0/10/12</code><br>
+      <code>define lamp1 EIB 0/10/12 0/0/5</code><br>
+      <code>define lamp1 EIB 0A0C</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EIBset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt; g&lt;groupnr&gt;]</code><br>
+    where value one of:
+	<li><b>on</b> switch on device
+	<li><b>off</b> switch off device
+	<li><b>on-for-timer</b> <secs> switch on the device for the given time. After the specified seconds a switch off command is sent.
+	<li><b>on-till</b> <time spec> switches the device on. The device will be switched off at the given time.
+    <li><b>value</b> <hexvalue> sends the given value as raw data to the device.
+
+    <br>Example:
+    <ul><code>
+      set lamp1 on<br>
+      set lamp1 off<br>
+      set lamp1 on-for-timer 10<br>
+      set lamp1 on-till 13:15:00<br>
+      set lamp1 value 234578<br>
+    </code></ul>
+    </li>
+
+	When as last argument a g&lt;groupnr&gt; is present, the command will be sent
+	to the EIB group indexed by the groupnr (starting by 1, in the order as given in Define).
+	<br>Example:
+	<ul><code>
+	   define lamp1 EIB 0/10/01 0/10/02<br>
+	   set lamp1 on g2 (will send "on" to 0/10/02)
+	</code></ul>
+
+  </ul>
+  <br>
+
+  <a name="EIBattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#webCmd">webCmd</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#dummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#model">model</a>
+      set the model according to the datapoint types defined by the (<a href="http://www.sti.uniurb.it/romanell/110504-Lez10a-KNX-Datapoint%20Types%20v1.5.00%20AS.pdf" target="_blank">EIB / KNX specifications</a>).<br>
+      The device state in FHEM is interpreted and shown according to the specification.
+      <ul>
+      	<li>dpt5</li>
+      	<li>percent</li>
+      	<li>dpt7</li>
+      	<li>length-mm</li>
+      	<li>current-mA</li>
+      	<li>brightness</li>
+      	<li>timeperiod-ms</li>
+      	<li>timeperiod-min</li>
+      	<li>timeperiod-h</li>
+      	<li>dpt9</li>
+      	<li>tempsensor</li>
+      	<li>lightsensor</li>
+      	<li>dpt10</li>
+      	<li>time</li>
+      	<li>dpt11</li>
+      	<li>date</li>
+      	<li>dpt12</li>
+      </ul>
+    </li>
+  </ul>
+  </ul>
+  <br>
+
+
+=end html
+=cut

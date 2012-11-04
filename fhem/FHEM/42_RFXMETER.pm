@@ -247,3 +247,52 @@ RFXMETER_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="RFXMETER"></a>
+<h3>RFXMETER</h3>
+<ul>
+  The RFXMETER module interprets RFXCOM RFXMeter messages received by a RFXCOM receiver. You need to define an RFXCOM receiver first.
+  See the <a href="#RFXCOM">RFXCOM</a>.
+
+  <br><br>
+
+  <a name="RFXMETERdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; RFXMETER &lt;deviceid&gt; [&lt;scalefactor&gt;] [&lt;unitname&gt;]</code> <br>
+    <br>
+    &lt;deviceid&gt; is the device identifier of the RFXMeter sensor and is a one byte hexstring (00-ff).
+    <br>
+    &lt;scalefactor&gt; is an optional scaling factor. It is multiplied to the value that is received from the RFXmeter sensor.
+    <br>
+    &lt;unitname&gt; is an optional string that describes the value units. It is added to the Reading generated to describe the values.
+    <br><br>
+      Example: <br>
+    <code>define RFXWater RFXMETER 00 0.5 ltr</code>
+      <br>
+    <code>define RFXPower RFXMETER 01 0.001 kwh</code>
+      <br>
+    <code>define RFXGas RFXMETER 02 0.01 cu_m</code>
+      <br>
+  </ul>
+  <br>
+
+  <a name="RFXMETERset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="RFXMETERget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="RFXMETERattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+  </ul>
+</ul>
+
+=end html
+=cut

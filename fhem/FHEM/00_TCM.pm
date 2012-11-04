@@ -668,3 +668,84 @@ TCM_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="TCM"></a>
+<h3>TCM</h3>
+<ul>
+  The TCM module serves an USB or TCP/IP connected TCM120 or TCM310 EnOcean
+  Transceiver module. These are mostly packaged together with a serial to USB
+  chip and an antenna, e.g. the BSC BOR contains the TCM120, the EUL from
+  busware contains a TCM310.  See also the datasheet available from <a
+  href="http://www.enocean.com">www.enocean.com</a>.
+  <br>
+  As the TCM120 and the TCM310 speak completely different protocols, this
+  module implements 2 drivers in one. It is the "physical" part for the <a
+  href="#EnOcean">EnOcean</a> module.<br><br>
+
+  <a name="TCMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TCM [120|310] &lt;device&gt;</code> <br>
+    <br>
+    First you have to specify the type of the EnOcean Transceiver Chip , i.e
+    either 120 for the TCM120 or 310 for the TCM310.<br><br>
+    <code>device</code> can take the same parameters (@baudrate, @directio,
+    TCP/IP, none) like the <a href="#CULdefine">CUL</a>, but you probably have
+    to specify the baudrate: the TCM120 should be opened with 9600 Baud, the
+    TCM310 with 57600 baud.
+    Example:
+    <ul><code>
+      define BscBor TCM 120 /dev/ttyACM0@9600<br>
+      define TCM310 TCM 310 /dev/ttyACM0@57600<br>
+    </code></ul>
+
+  </ul>
+  <br>
+
+  <a name="TCMset"></a>
+  <b>Set </b>
+  <ul>
+    <li>idbase<br>
+        Set the ID base. Note: The firmware executes this command only up to
+        then times to prevent misuse.<br><br>
+    <li>modem_off<br>
+    <li>modem_on<br>
+    <li>reset<br>
+    <li>sensitivity<br>
+    <li>sleep<br>
+    <li>wake<br>
+        For details see the datasheet available from
+        www.enocean.com.  If you do not understand it, than you probably don't
+        need it :)
+        </li><br>
+  </ul>
+
+  <a name="TCMget"></a>
+  <b>Get</b>
+  <ul>
+    <li>idbase<br>
+        Get the ID base. You need this command in order to control EnOcean
+        devices, see the <a href="#EnOceandefine">EnOcean</a>
+        paragraph.<br><br>
+    <li>modem_status<br>
+    <li>sensitivity<br>
+    <li>sw_ver<br>
+        for details see the datasheet available from www.enocean.com
+        </li><br>
+  </ul>
+
+  <a name="TCMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

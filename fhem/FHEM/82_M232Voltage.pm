@@ -115,3 +115,57 @@ M232Voltage_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="M232Voltage"></a>
+<h3>M232Voltage</h3>
+<ul>
+  <br>
+
+  <a name="M232Voltagedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; M232Voltage [an0..an5] [unit [factor]]</code>
+    <br><br>
+
+    Define as many M232Voltages as you like for a M232 device. Defining a
+    M232Voltage will schedule an internal task, which reads the status of the
+    analog input every minute, and triggers notify/filelog commands.
+    <code>unit</code> is the unit name, <code>factor</code> is used to
+    calibrate the reading of the analog input.<br><br>
+
+    Note: the unit defaults to the string "volts", but it must be specified
+    if you wish to set the factor, which defaults to 1.0. <br><br>
+
+    Example:
+    <ul>
+      <code>define volt M232Voltage an0</code><br>
+      <code>define brightness M232Voltage an5 lx 200.0</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="M232Voltageget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; status</code>
+    <br><br>
+  </ul>
+
+  <a name="M232Voltageattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (M232Voltage)</li>
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

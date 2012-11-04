@@ -272,3 +272,59 @@ DONE:
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="SCIVT"></a>
+<h3>SCIVT</h3>
+<ul>
+  <br>
+
+  <a name="SCIVTdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; SCIVT &lt;SCD-device&gt;</code>
+    <br><br>
+
+    Define a SCD series solar controler device. Details see <a
+    href="http://english.ivt-hirschau.de/content.php?parent_id=CAT_64&doc_id=DOC_118">here</a>.
+    You probably need a Serial to USB controller like the PL2303.
+    <br>
+    Defining an SCIVT device will schedule an internal task, which reads the
+    status of the device every 5 minutes, and triggers notify/filelog commands.
+    <br>Note: Currently this device does not support a "set" function, only
+    a single get function which reads the device status immediately.
+    <br><br>
+
+    Example:
+    <ul>
+      <code>define scd  SCIVT /dev/ttyUSB2</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="SVICTset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="SVICTget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get SCVIT data</code>
+    <br>
+  </ul>
+  <br>
+
+  <a name="SVICTattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (SCD)</li>
+  </ul>
+  <br>
+
+</ul>
+
+
+=end html
+=cut
