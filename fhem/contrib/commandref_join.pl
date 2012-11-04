@@ -3,9 +3,12 @@
 use strict;
 use warnings;
 
+# $Id: 
+
 my $docIn  = "docs/commandref_frame.html";
 my $docOut = "docs/commandref.html";
 my @modDir = ("FHEM");
+use constant TAGS => qw{ul li code};
 
 open(IN, "$docIn")    || die "Cant open $docIn: $!\n";
 open(OUT, ">$docOut") || die "Cant open $docOut: $!\n";
@@ -52,6 +55,8 @@ while(my $l = <IN>) {
 
 # Copy the doc part from the module
 foreach my $mod (sort keys %mods) {
+  my $tag;
+  my %tagcount= ();
   open(MOD, $mods{$mod}) || die("Cant open $mods{$mod}:$!\n");
   my $skip = 1;
   while(my $l = <MOD>) {
@@ -60,10 +65,18 @@ foreach my $mod (sort keys %mods) {
     } elsif($l =~ m/^=end html/) {
       $skip = 1;
     } elsif(!$skip) {
+      # here we copy line by line from the module
       print OUT $l;
+      foreach $tag (TAGS) {
+        $tagcount{$tag}+= ($l =~ /<$tag>/i);
+        $tagcount{$tag}-= ($l =~ /<\/$tag>/i);
+      }
     }
   }
   close(MOD);
+  foreach $tag (TAGS) {
+    print("$mods{$mod}: Unbalanced $tag\n") if($tagcount{$tag});
+  }
 }
 
 # Copy the tail
