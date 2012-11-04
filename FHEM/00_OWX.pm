@@ -2,7 +2,7 @@
 #
 # OWX.pm
 #
-# $Id: 00_OWX.pm $
+# $Id$
 #
 # FHEM module to commmunicate with 1-Wire bus devices
 # * via an active DS2480/DS2482/DS2490/DS9097U bus master interface attached to an USB port
