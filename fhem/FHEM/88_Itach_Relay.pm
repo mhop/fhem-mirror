@@ -139,7 +139,7 @@ ITACH_RELAY_Define($$)
 =pod
 =begin html
 
-<a name="ITACH_RELAY"></a>
+<a name="Itach_Relay"></a>
 <h3>ITACH_RELAY</h3>
 <ul>
   Note: this module needs the Net::Telnet module.
