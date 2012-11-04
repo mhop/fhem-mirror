@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-# $Id: 
+# $Id$
 
 my $docIn  = "docs/commandref_frame.html";
 my $docOut = "docs/commandref.html";
