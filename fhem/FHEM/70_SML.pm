@@ -333,3 +333,5 @@ energy_Undef($$)
 
  return undef;
 }
+
+1;
