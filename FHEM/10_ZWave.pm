@@ -475,13 +475,3 @@ ZWave_Undef($$)
 }
 
 1;
-
-=begin html
-
-<a name="CUL"></a>
-<h3>CUL</h3>
-<ul>
-text
-</ul>
-
-=end html
