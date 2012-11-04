@@ -104,3 +104,31 @@ CommandXmlList($$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="xmllist"></a>
+<h3>xmllist</h3>
+<ul>
+  <code>xmllist [devspec]</code>
+  <br><br>
+  Returns an XML tree of device definitions. <a href="#devspec">devspec</a> is
+  optional, and restricts the list of devices if specified. 
+  <br><br>
+  Example:
+  <pre>  fhem> xmllist
+  &lt;FHZINFO&gt;
+          &lt;internal_LIST&gt;
+                  &lt;internal name="global" state="internal" sets=""
+                            attrs="room configfile logfile ..."&gt;
+                          &lt;INT key="DEF" value="&lt;no definition&gt;"/&gt;
+                          &lt;INT key="NR" value="0"/&gt;
+                          &lt;INT key="STATE" value="internal"/&gt;
+      [...]
+
+  </pre>
+</ul>
+
+=end html
+=cut

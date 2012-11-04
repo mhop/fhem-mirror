@@ -232,3 +232,84 @@ PID_setValue($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="PID"></a>
+<h3>PID</h3>
+<ul>
+  The PID device is a loop controller, used to set the value e.g of a heating
+  valve dependent of the current and desired temperature.
+  <br>
+  <br>
+
+  <a name="PIDdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; PID sensor[:reading:regexp] actor[:cmd:min:max] [p i d]</code>
+    <br><br>
+
+    <code>sensor[:reading:regexp]</code> specifies the sensor, which is an
+    already defined fhem device, e.g. a S300TH temperature sensor. The reading
+    and regexp fields are necessary only for unknown devices (currently <a
+    href="#CUL_WS">CUL_WS</a> and <a href="#HMS">HMS</a> devices are "known").
+    Reading specifies the READINGS field of the sensor, and the regexp extracts
+    the number from this field. E.g. for the complete definition for a CUL_WS
+    device is: <code>s300th_dev:temperature:([\d\.]*)</code>
+    <br><br>
+
+    <code>actor[:cmd:min:max]</code> specifies the actor, which is an
+    already defined fhem device, e.g. an FHT8V valve. The cmd, min and max
+    fields are necessary only for unknown devices (currently <a
+    href="#FHT8V">FHT8V</a> is "known"). cmd specifies the command name for the
+    actor, min the minimum value and max the maximum value. The complete
+    definition for an FHT8V device is:<code>fht8v_dev:valve:0:100</code>
+    <br><br>
+
+    p, i and d are the parameters use to controlling, see also the <a
+    href="http://de.wikipedia.org/wiki/Regler">this</a> wikipedia entry.
+    The default values are around 25.5, 3 and 5.88, you probably need to tune
+    these values. They can be also changed later.
+    <br><br>
+
+    Examples:
+    <ul>
+      <code>define wz_pid PID wz_th wz_fht8v</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="PIDset"></a>
+  <b>Set </b>
+  <ul>
+      <li>set &lt;name&gt; factors p i d<br>
+      Set the p, i and d factors, as described above.
+      </li>
+      <li>set &lt;name&gt; desired &lt;value&gt;<br>
+      Set the desired value (e.g. temperature). Note: until this value is not
+      set, no command is issued.
+      </li>
+  </ul>
+  <br>
+
+  <a name="PIDget"></a>
+  <b>Get </b>
+  <ul>
+      N/A
+  </ul>
+  <br>
+
+  <a name="PIDattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+
+
+=end html
+=cut

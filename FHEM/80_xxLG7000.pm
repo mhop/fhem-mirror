@@ -303,3 +303,64 @@ xxLG7000GetData($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="xxLG7000"></a>
+<h3>xxLG7000</h3>
+<ul>
+  <br>
+
+  <a name="xxLG7000define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; xxLG7000 &lt;serial-device&gt;</code>
+    <br><br>
+
+    Defines a serial link to a TV set of LG's xxLG70yy (e. g. 47LG7000) series
+    and similar TV sets from <a href="http://www.lge.com/">LG</a>. As of January 2010, the following TV sets should
+    be compatible:<br><br>
+    <ul>
+    <li><code>xxLG7000</code>, e. g. 47LG7000 (tested)</li>
+    <li><code>xxPG7000</code>, e. g. 50PG7000 (same Manual as 47LG7000 ;))</li>
+    <li><code>PS3000/6000/7000/8000 series</code> (according to <a href="http://www.lge.com/uk/products/documents/LGSV09-LR.pdf">LG brochure</a>; no liabilities assumed)</li>
+    <li><code>PQ3000/6000 series</code> (see PS3000)</li>
+    <li><code>LU4000/5000 series</code> (<i>not LU7000</i>; see PS3000)</li>
+    <li><code>LH2000/3000/4000/5000 series</code> (see PS3000)</li>
+    <li><code>SL9500/9000/8000 series</code> (see PS3000)</li>
+    </ul><br>
+    These TV sets feature a serial connector which can officially be used to control
+    the TV set (see your Onwer's Manual, there's an Appendix labelled "External Control
+    Device setup", referening to cabling and command set). The xxLG7000 module is
+    the FHEM module to actually utilize this. (BTW, those TVs run Linux internally ;))<br><br>
+    To exercise control over your TV set, use the <a href="#LGTV">LGTV</a> module and
+    bind it ("attr &lt;LGTV-name&gt; IODev &lt;xxLG7000-name&gt;") to xxLG7000.<br><br>
+
+    Examples:
+    <ul>
+      <code>define myLG7k xxLG7000 /dev/ttyUSB1</code><br>
+    </ul>
+    <br>
+    </ul>
+
+  <a name="xxLG7000set"></a>
+  <b>Set </b>
+  <ul> Not used, nothing to set directly. </ul>
+
+  <a name="xxLG7000get"></a>
+  <b>Get</b>
+  <ul> Not used, nothing to get directly. </ul>
+
+  <a name="xxLG7000attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li>SetID (1, 2, ...; see your TV's Owner's Manual how to set it. Defaults to 1 if unset.)</li>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

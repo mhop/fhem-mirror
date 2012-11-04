@@ -198,3 +198,45 @@ WEBIO_12DIGITAL_GetStatus($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="WEBIO_12DIGITAL"></a>
+<h3>WEBIO_12DIGITAL</h3>
+<ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
+  <a name="WEBIO_12DIGITALdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WEBIO_12DIGITAL &lt;ip-address&gt; &lt;outputport&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines an Web-IO-Digital device (Box with up to 12 digital in/outputs, www.wut.de) via ip address. The status of the device is also pooled (delay interval).<br><br>
+
+    Examples:
+    <ul>
+      <code>define motor1 WEBIO_12DIGITAL 192.168.8.200 1 60</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="WEBIO_12DIGITALset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+       on off
+    </pre>
+    Examples:
+    <ul>
+      <code>set motor1 on</code><br>
+    </ul>
+    <br>
+  </ul>
+</ul>
+
+=end html
+=cut

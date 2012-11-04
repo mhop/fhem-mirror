@@ -565,3 +565,86 @@ RFXX10REC_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="RFXX10REC"></a>
+<h3>RFXX10REC</h3>
+<ul>
+  The RFXX10REC module interprets X10 security and X10 lighting messages received by a RFXCOM RF receiver. Reported also to work with KlikAanKlikUit. You need to define an RFXCOM receiver first.
+  See <a href="#RFXCOM">RFXCOM</a>.
+
+  <br><br>
+
+  <a name="RFXX10RECdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; RFXX10REC &lt;type&gt; &lt;deviceid&gt; &lt;devicelog&gt; [&lt;deviceid&gt; &lt;devicelog&gt;] </code> <br>
+    <br>
+    <code>&lt;type&gt;</code>
+    <ul>
+      specifies the type of the X10 device: <br>
+    X10 security devices:
+        <ul>
+          <li> <code>ds10a</code> (X10 security ds10a Door/Window Sensor or compatible devices. This device type reports the status of the switch [Open/Closed], status of the delay switch [min|max]], and battery status [ok|low].)</li>
+          <li> <code>ms10a</code> (X10 security ms10a motion sensor. This device type reports the status of motion sensor  [normal|alert] and battery status [ok|low].))</li>
+          <li> <code>sd90</code> (Marmitek sd90 smoke detector. This device type reports the status of the smoke detector [normal|alert] and battery status [ok|low].)</li>
+          <li> <code>kr18</code> (X10 security remote control. Report the Reading "Security" with values [Arm|Disarm], "ButtonA" and "ButtonB" with values [on|off] )</li>
+        </ul>
+    X10 lighting devices:
+        <ul>
+          <li> <code>ms14a</code> (X10 motion sensor. Reports [normal|alert] on the first deviceid (motion sensor) and [on|off] for the second deviceid (light sensor)) </li>
+          <li> <code>x10</code> (All other x10 devices. Report [on|off] on both deviceids.)</li>
+        </ul>
+    </ul>
+    <br>
+    <code>&lt;deviceid&gt;</code>
+    <ul>
+    specifies the first device id of the device. X10 security have a a 16-Bit device id which has to be written as a hex-string (example "5a54").
+    A X10 lighting device has a house code A..P followed by a unitcode 1..16 (example "B1").
+    </ul>
+    <br>
+    <code>&lt;devicelog&gt;</code>
+    <ul>
+    is the name of the Reading used to report. Suggested: "Window" or "Door" for ds10a, "motion" for motion sensors, "Smoke" for sd90.
+    </ul>
+    <br>
+    <code>&lt;deviceid2&gt;</code>
+    <ul>
+    is optional and specifies the second device id of the device if it exists. For example sd90 smoke sensors can be configured to report two device ids. ms14a motion sensors report motion status on the first deviceid and the status of the light sensor on the second deviceid.
+    </ul>
+    <br>
+    <code>&lt;devicelog2&gt;</code>
+    <ul>
+    is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    </ul>
+    <br>
+      Example: <br>
+    <code>define livingroom_window RFXX10REC ds10a 72cd Window</code>
+      <br>
+    <code>define motion_sensor1 RFXX10REC ms10a 55c6 motion</code>
+      <br>
+    <code>define smoke_sensor1 RFXX10REC sd90 54d3 Smoke 54d3 Smoketest</code>
+      <br>
+    <code>define motion_sensor2 RFXX10REC ms14a A1 motion A2 light</code>
+      <br>
+  </ul>
+  <br>
+
+  <a name="RFXX10RECset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="RFXX10RECget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="RFXX10RECattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+  </ul>
+</ul>
+
+=end html
+=cut

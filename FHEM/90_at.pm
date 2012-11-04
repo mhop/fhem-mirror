@@ -215,3 +215,132 @@ at_State($$$$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="at"></a>
+<h3>at</h3>
+<ul>
+
+  Start an arbitrary fhem.pl command at a later time.<br>
+  <br>
+
+  <a name="atdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; at &lt;timespec&gt; &lt;command&gt;</code><br>
+    <br>
+    <code>&lt;timespec&gt;</code> format: [+][*{N}]&lt;timedet&gt;<br>
+    <ul>
+      The optional <code>+</code> indicates that the specification is
+      <i>relative</i>(i.e. it will be added to the current time).<br>
+      The optional <code>*</code> indicates that the command should be
+      executed <i>repeatedly</i>.<br>
+      The optional <code>{N}</code> after the * indicates,that the command
+      should be repeated <i>N-times</i> only.<br>
+      &lt;timedet&gt; is either HH:MM, HH:MM:SS or {perlfunc()}, where perlfunc
+      must return a HH:MM or HH:MM:SS date.
+    </ul>
+    <br>
+
+    Examples:
+    <PRE>
+    # absolute ones:
+    define a1 at 17:00:00 set lamp on                            # fhem command
+    define a2 at 17:00:00 { Log 1, "Teatime" }                   # Perl command
+    define a3 at 17:00:00 "/bin/echo "Teatime" > /dev/console"   # shell command
+    define a4 at *17:00:00 set lamp on                           # every day
+
+    # relative ones
+    define a5 at +00:00:10 set lamp on                  # switch on in 10 seconds
+    define a6 at +00:00:02 set lamp on-for-timer 1      # Blink once in 2 seconds
+    define a7 at +*{3}00:00:02 set lamp on-for-timer 1  # Blink 3 times
+
+    # Blink 3 times if the piri sends a command
+    define n1 notify piri:on.* define a8 at +*{3}00:00:02 set lamp on-for-timer 1
+
+    # Switch the lamp on from sunset to 11 PM
+    define a9 at +*{sunset_rel()} set lamp on
+    define a10 at *23:00:00 set lamp off
+
+    # More elegant version, works for sunset > 23:00 too
+    define a11 at +*{sunset_rel()} set lamp on-till 23:00
+
+    # Only do this on weekend
+    define a12 at +*{sunset_rel()} { fhem("set lamp on-till 23:00") if($we) }
+
+    # Switch lamp1 and lamp2 on from 7:00 till 10 minutes after sunrise
+    define a13 at *07:00 set lamp1,lamp2 on-till {sunrise(+600)}
+
+    # Switch the lamp off 2 minutes after sunrise each day
+    define a14 at +{sunrise(+120)} set lamp on
+
+    # Switch lamp1 on at sunset, not before 18:00 and not after 21:00
+    define a15 at *{sunset(0,"18:00","21:00")} set lamp1 on
+
+    </PRE>
+
+    Notes:<br>
+    <ul>
+      <li>if no <code>*</code> is specified, then a command will be executed
+          only once, and then the <code>at</code> entry will be deleted.  In
+          this case the command will be saved to the statefile (as it
+          considered volatile, i.e. entered by cronjob) and not to the
+          configfile (see the <a href="#save">save</a> command.)
+      </li>
+
+      <li>if the current time is greater than the time specified, then the
+          command will be executed tomorrow.</li>
+
+      <li>For even more complex date handling you either have to call fhem from
+          cron or filter the date in a perl expression, see the last example and
+          the section <a href="#perl">Perl special</a>.
+      </li>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="atset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="atget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="atattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <a name="disable"></a>
+    <li>disable<br>
+        Can be applied to at/watchdog/notify/FileLog devices.<br>
+        Disables the corresponding at/notify or FileLog device. Note:
+        If applied to an <a href="#at">at</a>, the command will not be executed,
+        but the next time will be computed.</li><br>
+
+    <a name="skip_next"></a>
+    <li>skip_next<br>
+        Used for at commands: skip the execution of the command the next
+        time.</li><br>
+
+    <a name="alignTime"></a>
+    <li>alignTime<br>
+        Applies only to relative at definitions: adjust the time of the next
+        command execution so, that it will also be executed at the desired
+        alignTime. The argument is a timespec, see above for the
+        definition.<br>
+        Example:<br>
+        <ul>
+        # Make sure that it chimes when the new hour begins<br>
+        define at2 at +*01:00 set Chime on-for-timer 1<br>
+        attr atr2 alignTime 00:00<br>
+        </ul>
+        </li><br>
+
+  </ul>
+  <br>
+
+</ul>
+
+=end html
+=cut

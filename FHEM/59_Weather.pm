@@ -488,3 +488,103 @@ WeatherAsHtml($)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="Weather"></a>
+<h3>Weather</h3>
+<ul>
+  <br>
+
+  <a name="Weatherdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; Weather &lt;location&gt; [&lt;interval&gt; [&lt;language&gt;]]</code><br>
+    <br>
+    Defines a virtual device for weather forecasts.<br><br>
+
+    A Weather device periodically gathers current and forecast weather conditions
+    from the Yahoo Weather API.<br><br>
+
+    The parameter <code>location</code> is the WOEID (WHERE-ON-EARTH-ID), go to
+    <a href="http://weather.yahoo.com">http://weather.yahoo.com</a> to find it out for your location.<br><br>
+
+    The optional parameter <code>interval</code> is the time between subsequent updates
+    in seconds. It defaults to 3600 (1 hour).<br><br>
+
+    The optional language parameter may be one of
+    <code>de</code>,
+    <code>en</code>,
+    <code>nl</code>,
+
+    It determines the natural language in which the forecast information appears.
+    It defaults to <code>en</code>. If you want to set the language you also have to set the interval.<br><br>
+
+    Examples:
+    <pre>
+      define MyWeather Weather 673513
+      define Forecast Weather 673513 1800
+     </pre>
+  </ul>
+  <br>
+
+  <a name="Weatherset"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; update</code><br><br>
+
+    Forces the retrieval of the weather data. The next automatic retrieval is scheduled to occur
+    <code>interval</code> seconds later.<br><br>
+  </ul>
+  <br>
+
+  <a name="Weatherget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;reading&gt;</code><br><br>
+
+    Valid readings and their meaning (? can be one of 1, 2 and stands
+    for today, tomorrow):<br>
+    <table>
+    <tr><td>city</td><td>name of town returned for location</td></tr>
+    <tr><td>code</td><td>current condition code</td></tr>
+    <tr><td>condition</td><td>current condition</td></tr>
+    <tr><td>current_date_time</td><td>last update of forecast on server</td></tr>
+    <tr><td>fc?_code</td><td>forecast condition code</td></tr>
+    <tr><td>fc?_condition</td><td>forecast condition</td></tr>
+    <tr><td>fc?_day_of_week</td><td>day of week for day +?</td></tr>
+    <tr><td>fc?_high_c</td><td>forecasted daily high in degrees centigrade</td></tr>
+    <tr><td>fc?_icon</td><td>forecast icon</td></tr>
+    <tr><td>fc?_low_c</td><td>forecasted daily low in degrees centigrade</td></tr>
+    <tr><td>humidity</td><td>current humidity in %</td></tr>
+    <tr><td>icon</td><td>relative path for current icon</td></tr>
+    <tr><td>pressure</td><td>air pressure in hPa</td></tr>
+    <tr><td>pressure_trend</td><td>air pressure trend (0= steady, 1= rising, 2= falling)</td></tr>
+    <tr><td>pressure_trend_txt</td><td>textual representation of air pressure trend</td></tr>
+    <tr><td>pressure_trend_sym</td><td>symbolic representation of air pressure trend</td></tr>
+    <tr><td>temperature</td><td>current temperature in degrees centigrade</td></tr>
+    <tr><td>temp_c</td><td>current temperature in degrees centigrade</td></tr>
+    <tr><td>temp_f</td><td>current temperature in degrees Fahrenheit</td></tr>
+    <tr><td>visibility</td><td>visibility in km</td></tr>
+    <tr><td>wind</td><td>wind speed in km/h</td></tr>
+    <tr><td>wind_chill</td><td>wind chill in degrees centigrade</td></tr>
+    <tr><td>wind_condition</td><td>wind direction and speed</td></tr>
+    <tr><td>wind_direction</td><td>direction wind comes from in degrees (0 = north wind)</td></tr>
+    <tr><td>wind_speed</td><td>same as wind</td></tr>
+    </table>
+
+  </ul>
+  <br>
+
+  <a name="Weatherattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

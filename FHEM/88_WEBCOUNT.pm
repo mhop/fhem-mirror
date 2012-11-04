@@ -141,3 +141,29 @@ WEBCOUNT_GetStatus($)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="WEBCOUNT"></a>
+<h3>WEBCOUNT</h3>
+<ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
+  <a name="WEBCOUNTdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; WEBCOUNT &lt;ip-address&gt; &lt;port&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines an WEBCOUNT device (Box with 6 count pulses, www.wut.de) via ip address. The device is pooled (delay interval).<br><br>
+
+
+    Examples:
+    <ul>
+      <code>define pump WEBCOUNT 192.168.8.200 1 60</code><br>
+    </ul>
+  </ul>
+  <br>
+</ul>
+=end html
+=cut

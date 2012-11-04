@@ -255,3 +255,104 @@ western_easter($)
   return $month, $day;
 }
 1;
+
+=pod
+=begin html
+
+<a name="holiday"></a>
+<h3>holiday</h3>
+<ul>
+  <a name="holidaydefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; holiday</code>
+    <br><br>
+    Define a set of holidays. The module will try to open the file
+    &lt;name&gt;.holiday in the <a href="#modpath">modpath</a>/FHEM directory.
+    If entries in the holiday file match the current day, then the STATE of
+    this holiday instance displayed in the <a href="#list">list</a> command
+    will be set to the corresponding values, else the state is set to the text
+    none. Most probably you'll want to query this value in some perl script:
+    see Value() in the <a href="#perl">perl</a> section or the global attribute
+    <a href="#holiday2we"> holiday2we</a>.<br> The file will be reread once
+    every night, to compute the value for the current day, and by each get
+    command (see below).<br>
+    <br>
+
+    Holiday file definition:<br>
+    The file may contain comments (beginning with #) or empty lines.
+    Significant lines begin with a number (type) and contain some space
+    separated words, depending on the type. The different types are:<br>
+    <ul>
+      <li>1<br>
+          Exact date. Arguments: &lt;MM-DD&gt; &lt;holiday-name&gt;<br>
+          Exampe: 1 12-24 Christmas
+          </li>
+      <li>2<br>
+          Easter-dependent date. Arguments: &lt;day-offset&gt;
+          &lt;holiday-name&gt;.
+          The offset is counted from Easter-Sunday.
+          <br>
+          Exampe: 2 1 Easter-Monday<br>
+          Sidenote: You can check the easter date with:
+          fhem> { join("-", western_easter(2011)) }
+          </li>
+      <li>3<br>
+          Month dependent date. Arguments: &lt;nth&gt; &lt;weekday&gt;
+          &lt;month &lt;holiday-name&gt;.<br>
+          Examples:<br>
+          <ul>
+            3  1 Mon 05 First Monday In May<br>
+            3  2 Mon 05 Second Monday In May<br>
+            3 -1 Mon 05 Last Monday In May<br>
+            3  0 Mon 05 Each Monday In May<br>
+          </ul>
+          </li>
+      <li>4<br>
+          Interval. Arguments: &lt;MM-DD&gt; &lt;MM-DD&gt; &lt;holiday-name&gt;
+          .<br>
+          Example:<br>
+          <ul>
+            4 06-01 06-30 Summer holiday<br>
+          </ul>
+          </li>
+      <li>5<br>
+          Date relative, weekday fixed holiday. Arguments: &lt;nth&gt;
+          &lt;weekday&gt; &lt;month&gt; &lt;day&gt; &lt; holiday-name&gt;<br>
+          Note that while +0 or -0 as offsets are not forbidden, their behaviour
+          is undefined in the sense that it might change without notice.<br>
+          Examples:<br>
+          <ul>
+            5 -1 Wed 11 23 Buss und Bettag (first Wednesday before Nov, 23rd)<br>
+            5 1 Mon 01 31 First Monday after Jan, 31st (1st Monday in February)<br>
+          </ul>
+          </li>
+    </ul>
+    See also he.holiday in the contrib directory for official holidays in the
+    german country of Hessen, and by.holiday for the Bavarian definition.
+  </ul>
+  <br>
+
+  <a name="holidayset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="holidayget"></a>
+  <b>Get</b>
+    <ul>
+      <code>get &lt;name&gt; &lt;MM-DD&gt;</code><br>
+      <code>get &lt;name&gt; yesterday</code><br>
+      <code>get &lt;name&gt; today</code><br>
+      <code>get &lt;name&gt; tomorrow</code><br>
+      <br><br>
+      Return the holiday name of the specified date or the text none.
+      <br><br>
+    </ul>
+    <br>
+
+  <a name="holidayattr"></a>
+  <b>Attributes</b><ul>N/A</ul><br>
+
+</ul>
+
+=end html
+=cut

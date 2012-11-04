@@ -743,3 +743,80 @@ CM11_Ready($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="CM11"></a>
+<h3>CM11</h3>
+<ul>
+  Note: this module requires the Device::SerialPort or Win32::SerialPort module.
+  <br><br>
+  <a name="CM11define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CM11 &lt;serial-device&gt;</code>
+    <br><br>
+    CM11 is the X10 module to interface X10 devices with the PC.<br><br>
+
+    The current implementation can evaluate incoming data on the powerline of
+    any kind. It can send on, off, dimdown and dimup commands.
+    <br><br>
+    The name of the serial-device depends on your distribution. If
+    serial-device is none, then no device will be opened, so you can experiment
+    without hardware attached.<br>
+
+    If you experience problems (for verbose 4 you get a lot of "Bad CRC message"
+    in the log), then try to define your device as <br>
+    <code>define &lt;name&gt; FHZ &lt;serial-device&gt; strangetty</code><br>
+    <br>
+
+    Example:
+    <ul>
+      <code>define x10if CM11 /dev/ttyUSB3</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="CM11set"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; reopen</code>
+    <br><br>
+    Reopens the serial port.
+  </ul>
+  <br>
+
+  <a name="CM11get"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; fwrev</code>
+    <br><br>
+    Reads the firmware revision of the CM11 device. Returns <code>error</code>
+    if the serial connection to the device times out. Can be used for error
+    detection.
+    <br><br>
+
+    <code>get &lt;name&gt; time</code>
+    <br><br>
+    Reads the internal time of the device which is the total uptime (modulo one
+    year), since fhem sets the time to 0.00:00:00 if the device requests the time
+    to be set after being powered on. Returns <code>error</code>
+    if the serial connection to the device times out. Can be used for error
+    detection.
+  </ul>
+  <br>
+
+  <a name="CM11attr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (CM11)</li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

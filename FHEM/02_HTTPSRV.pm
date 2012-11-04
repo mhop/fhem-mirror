@@ -140,3 +140,60 @@ sub HTTPSRV_CGI() {
 
 
 
+
+=pod
+=begin html
+
+<a name="HTTPSRV"></a>
+<h3>HTTPSRV</h3>
+<ul>
+  Provides a mini HTTP server plugin for FHEMWEB. It serves files from a given directory.<p>
+
+  HTTPSRV is an extension to <a href="HTTPSRV">FHEMWEB</a>. You must install FHEMWEB to use HTTPSRV.</p>
+
+  <a name="HTTPSRVdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; &lt;infix&gt; &lt;directory&gt; &lt;friendlyname&gt;</code><br><br>
+
+    Defines the HTTP server. <code>&lt;infix&gt;</code> is the portion behind the FHEMWEB base URL (usually
+    <code>http://hostname:8083/fhem</code>), <code>&lt;directory&gt;</code> is the absolute path the
+    files are served from, and <code>&lt;friendlyname&gt;</code> is the name displayed in the side menu of FHEMWEB.<p><p>
+
+    Example:
+    <ul>
+      <code>define myJSFrontend HTTPSRV jsf /usr/share/jsfrontend My little frontend</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="HTTPSRVset"></a>
+  <b>Set</b>
+  <ul>
+    n/a
+  </ul>
+  <br><br>
+
+  <a name="HTTPSRVattr"></a>
+  <b>Attributes</b>
+  <br><br>
+  <ul>
+    <li>directoryindex: if the request is sent with no filename, i.e. the infix (with or without trailing slash) only, the file given in this attribute is loaded. Defaults to <code>index.html</code>.</li>
+  </ul>
+  <br><br>
+
+  <b>Usage information</b>
+  <br><br>
+  <ul>
+
+  The above example on <code>http://hostname:8083/fhem</code> will return the file
+  <code>/usr/share/jsfrontend/foo.html</code> for <code>http://hostname:8083/fhem/jsf/foo.html</code>.
+  If no filename is given, the filename prescribed by the <code>directoryindex</code> attribute is returned.<p>
+
+  Notice: All links are relative to <code>http://hostname:8083/fhem</code>.
+  </ul>
+  <br><br>
+</ul>
+
+=end html
+=cut

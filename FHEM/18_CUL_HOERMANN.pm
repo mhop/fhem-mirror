@@ -60,3 +60,43 @@ CUL_HOERMANN_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="CUL_HOERMANN"></a>
+<h3>CUL_HOERMANN</h3>
+<ul>
+  The CUL_HOERMANN module registers the 868MHz Hoermann Garage-Door-Opener
+  signals received by the CUL. <b>Note</b>: As the structure of this signal is
+  not understood, no checksum is verified, so it is likely to receive bogus
+  messages.
+  <br><br>
+
+  <a name="CUL_HOERMANNdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_HOERMANNEM &lt;10-digit-hex-code&gt;</code>
+    <br>
+  </ul>
+  <br>
+
+  <a name="CUL_HOERMANNset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_HOERMANNget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_HOERMANNattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

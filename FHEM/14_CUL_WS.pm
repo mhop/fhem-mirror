@@ -358,3 +358,48 @@ CUL_WS_Attr(@)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="CUL_WS"></a>
+<h3>CUL_WS</h3>
+<ul>
+  The CUL_WS module interprets S300 type of messages received by the CUL.
+  <br><br>
+
+  <a name="CUL_WSdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; CUL_WS &lt;code&gt; [corr1...corr4]</code> <br>
+    <br>
+    &lt;code&gt; is the code which must be set on the S300 device. Valid values
+    are 1 through 8.<br>
+    corr1..corr4 are up to 4 numerical correction factors, which will be added
+    to the respective value to calibrate the device. Note: rain-values will be
+    multiplied and not added to the correction factor.
+  </ul>
+  <br>
+
+  <a name="CUL_WSset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_WSget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_WSattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (S300,KS300,WS7000)</li><br>
+    <li><a href="#IODev">IODev (!)</a></li><br>
+    <li><a href="#eventMap">eventMap</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

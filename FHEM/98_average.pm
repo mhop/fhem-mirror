@@ -150,3 +150,101 @@ average_Notify($$)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="average"></a>
+<h3>average</h3>
+<ul>
+
+  Compute additional average, minimum and maximum values for current day and
+  month.
+
+  <br>
+
+  <a name="averagedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; average &lt;regexp&gt;</code><br>
+    <br>
+    <ul>
+      The syntax for &lt;regexp&gt; is the same as the
+      regexp for <a href="#notify">notify</a>.<br>
+      If it matches, and the event is of the form "eventname number", then this
+      module computes the daily and monthly average, maximum and minimum values
+      and generates events of the form
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_avg_day: &lt;computed_average&gt;
+      </ul>
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_min_day: &lt;minimum day value&gt;
+      </ul>
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_max_day: &lt;maximum day value&gt;
+      </ul>
+      and
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_avg_month: &lt;computed_average&gt;
+      </ul>
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_min_month: &lt;minimum month value&gt;
+      </ul>
+      <ul>
+        &lt;device&gt; &lt;eventname&gt;_max_month: &lt;maximum month value&gt;
+      </ul>
+
+      at the beginning of the next day or month respectively.<br>
+      The current average, minimum, maximum and the cumulated values are stored
+      in the device readings.
+    </ul>
+    <br>
+
+    Example:<PRE>
+    # Compute the average, minimum and maximum for the temperature events of
+    # the ws1 device
+    define avg_temp_ws1 average ws1:temperature.*
+
+    # Compute the average, minimum and maximum for each temperature event
+    define avg_temp_ws1 average .*:temperature.*
+
+    # Compute the average, minimum and maximum for all temperature and humidity events
+    # Events:
+    # ws1 temperature: 22.3
+    # ws1 humidity: 67.4
+    define avg_temp_ws1 average .*:(temperature|humidity).*
+
+    # Hunt only for the humidity: take the value from the first
+    # parenthesis ($1 in perl regexp) if it is a number
+    # Event: ws1 T: 52.3  H: 67.4
+    define avg_temp_ws1 average ws1:.*H:.([-\d\.]+)
+    </PRE>
+  </ul>
+
+  <a name="averageset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="averageget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="averageattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#disable">disable</a></li>
+  </ul>
+
+  <a name="averageevents"></a>
+  <b>Generated events:</b>
+  <ul>
+    <li>&lt;eventname&gt;_avg_day: $avg_day
+    <li>&lt;eventname&gt;_avg_month: $avg_month
+    <li>&lt;eventname&gt;_min_day: $min_day
+    <li>&lt;eventname&gt;_min_month: $min_month
+    <li>&lt;eventname&gt;_max_day: $max_day
+    <li>&lt;eventname&gt;_max_month: $max_month
+  </ul>
+</ul>
+
+
+=end html
+=cut

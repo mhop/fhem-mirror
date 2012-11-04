@@ -1018,3 +1018,119 @@ sub OWXCOUNT_SetPage($$$) {
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="OWCOUNT"></a>
+<h3>OWCOUNT</h3>
+<ul>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #<br /><br /> Note:<br />
+    This 1-Wire module so far works only with the OWX interface module. Please define an <a
+        href="#OWX">OWX</a> device first. <br />
+    <br /><b>Example</b><br />
+    <ul>
+        <code>define OWX_C OWCOUNT DS2423 CE780F000000 300</code>
+        <br />
+        <code>attr OWX_C AName Water|volume</code>
+        <br />
+        <code>attr OWX_C AUnit liters|l</code>
+        <br />
+        <code>attr OWX_CAMode daily</code>
+        <br />
+    </ul><br />
+    <a name="OWCOUNTdefine"></a>
+    <b>Define</b>
+    <ul>
+        <code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt;
+            [&lt;interval&gt;]</code>
+        <br /><br /> Define a 1-Wire counter.<br /><br />
+        <li>
+            <code>[&lt;model&gt;]</code><br /> Defines the counter model (and thus 1-Wire
+            family id), currently the following values are permitted: <ul>
+                <li>model DS2423 with family id 1D (default if the model parameter is
+                    omitted)</li>
+            </ul>
+        </li>
+        <li>
+            <code>&lt;id&gt;</code>
+            <br />12-character unique ROM id of the converter device without family id and
+            CRC code </li>
+        <li>
+            <code>&lt;interval&gt;</code>
+            <br />Measurement interval in seconds. The default is 300 seconds. </li>
+    </ul>
+    <br />
+    <a name="OWCOUNTset">
+        <b>Set</b></a>
+    <ul>
+        <li><a name="owcount_interval">
+                <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+            interval in seconds. The default is 300 seconds. </li>
+        <li><a name="owcount_memory">
+                <code>set &lt;name&gt; memory &lt;page&gt;</code></a><br />Write 32 bytes to
+            memory page 0..13 </li>
+        <li><a name="owcount_midnight">
+                <code>set &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Write
+            the day's starting value for counter &lt;channel&gt; (A, B or named channel, see
+            below)</li>
+    </ul>
+    <br />
+    <a name="OWCOUNTget">
+        <b>Get</b></a>
+    <ul>
+        <li><a name="owcount_id">
+                <code>get &lt;name&gt; id</code></a>
+            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+        <li><a name="owcount_present">
+                <code>get &lt;name&gt; present</code>
+            </a>
+            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+        <li><a name="owcount_interval2">
+                <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
+            in seconds. </li>
+        <li><a name="owcount_memory2">
+                <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Obtain 32 bytes
+            from memory page 0..13 </li>
+        <li><a name="owcount_midnight2">
+                <code>get &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain
+            the day's starting value for counter &lt;channel&gt; (A, B or named channel, see
+            below)</li>
+        <li><a name="owcount_counter">
+                <code>get &lt;name&gt; counter &lt;channel-name&gt;</code></a><br />Obtain
+            the current value for counter &lt;channel&gt; (A, B or named channel, see
+            below)</li>
+        <li><a name="owcount_counters">
+                <code>get &lt;name&gt; counters</code></a><br />Obtain the current value
+            both counters</li>
+    </ul>
+    <br />
+    <a name="OWCOUNTattr">
+        <b>Attributes</b></a>
+    <ul>For each of the following attributes, the channel identification A,B may be used.
+                <li><a name="owcount_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
+                    &lt;string&gt;|&lt;string&gt;</code></a>
+            <br />name for the channel | a type description for the measured value. </li>
+        <li><a name="owcount_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
+                    &lt;string&gt;|&lt;string&gt;</code></a>
+            <br />unit of measurement for this channel | its abbreviation. </li>
+        <li><a name="owcount_coffset"><code>attr &lt;name&gt; &lt;channel&gt;Offset
+                    &lt;float&gt;</code></a>
+            <br />offset added to the reading in this channel. </li>
+        <li><a name="owcount_cfactor"><code>attr &lt;name&gt; &lt;channel&gt;Factor
+                    &lt;float&gt;</code></a>
+            <br />factor multiplied to (reading+offset) in this channel. </li>
+        <li><a name="owcount_cmode"><code>attr &lt;name&gt; &lt;channel&gt;Mode daily |
+                    normal</code></a>
+            <br />factor multiplied to (reading+offset) in this channel. </li>
+        <li><a name="owcount_event"><code>attr &lt;name&gt; event on-change|on-update
+        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
+            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
+                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
+            </ul>
+        </li>
+        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
+    </ul>
+</ul>
+
+=end html
+=cut

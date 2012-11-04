@@ -200,3 +200,101 @@ telnet_Undef($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="telnet"></a>
+<h3>telnet</h3>
+<ul>
+  <br>
+  <a name="telnetdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code>
+    <br><br>
+
+    Listen on the TCP/IP port <code>&lt;portNumber&gt;</code> for incoming
+    connections. If the second parameter global is <b>not</b> specified,
+    the server will only listen to localhost connections.
+    <br><br>
+
+    To use IPV6, specify the portNumber as IPV6:&lt;number&gt;, in this
+    case the perl module IO::Socket:INET6 will be requested.
+    On Linux you may have to install it with cpan -i IO::Socket::INET6 or
+    apt-get libio-socket-inet6-perl; OSX and the FritzBox-7390 perl already has
+    this module.
+    <br><br>
+    Examples:
+    <ul>
+        <code>define tPort telnet 7072 global</code><br>
+        <code>attr tPort globalpassword mySecret</code><br>
+        <code>attr tPort SSL</code><br>
+    </ul>
+    <br>
+    Note: The old global attribute port is automatically converted to a
+    telnet instance with the name telnetPort. The global allowfrom attibute is
+    lost in this conversion.
+  </ul>
+  <br>
+
+
+  <a name="telnetset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="telnetget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="telnetattr"></a>
+  <b>Attributes:</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <br>
+
+    <a name="password"></a>
+    <li>password<br>
+        Specify a password, which has to be entered as the very first string
+        after the connection is established. If the argument is enclosed in {},
+        then it will be evaluated, and the $password variable will be set to
+        the password entered. If the return value is true, then the password
+        will be accepted. If thies parameter is specified, fhem sends telnet
+        IAC requests to supress echo while entering the password.
+        Also all returned lines are terminated with \r\n.
+        Example:<br>
+        <code>
+        attr tPort password secret<br>
+        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        </code>
+        <br><br>
+
+    <a name="globalpassword"></a>
+    <li>globalpassword<br>
+        Just like the attribute password, but a password will only required for
+        non-local connections.
+        <br><br>
+
+    <a name="SSL"></a>
+    <li>SSL<br>
+        Enable SSL encryption of the connection, see the description <a
+        href="#HTTPS">here</a> on generating the needed SSL certificates. To
+        connect to such a port use one of the following commands:
+        <ul>
+          socat openssl:fhemhost:fhemport,verify=0 readline<br>
+          ncat --ssl fhemhost fhemport<br>
+          openssl s_client -connect fhemhost:fhemport<br>
+        </ul>
+        <br><br>
+
+    <a name="allowfrom"></a>
+    <li>allowfrom<br>
+        Regexp of allowed ip-addresses or hostnames. If set,
+        only connections from these addresses are allowed.
+        <br><br>
+
+  </ul>
+
+</ul>
+
+
+=end html
+=cut

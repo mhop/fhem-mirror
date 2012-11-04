@@ -259,3 +259,150 @@ ECMDDevice_Define($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="ECMDDevice"></a>
+<h3>ECMDDevice</h3>
+<ul>
+  <br>
+  <a name="ECMDDevicedefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ECMDDevice &lt;classname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <br><br>
+
+    Defines a logical ECMD device. The number of given parameters must match those given in
+    the <a href="#ECMDClassdef">class definition</a> of the device class <code>&lt;classname&gt;</code>.
+    <br><br>
+
+    Examples:
+    <ul>
+      <code>define myADC ECMDDevice ADC</code><br>
+      <code>define myRelais1 ECMDDevice relais 8</code><br>
+    </ul>
+    <br>
+  </ul>
+
+  <a name="ECMDDeviceset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set &lt;name&gt; &lt;commandname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <br><br>
+    The number of given parameters must match those given for the set command <code>&lt;commandname&gt;</code> definition in
+    the <a href="#ECMDClassdef">class definition</a>.<br><br>
+    If <code>set &lt;commandname&gt;</code> is invoked the perl special in curly brackets from the command definition
+    is evaluated and the result is sent to the physical ECMD device.
+    <br><br>
+    Example:
+    <ul>
+      <code>set myRelais1 on</code><br>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="ECMDDeviceget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;commandname&gt; [&lt;parameter1&gt; [&lt;parameter2&gt; [&lt;parameter3&gt; ... ]]]</code>
+    <br><br>
+    The number of given parameters must match those given for the get command <code>&lt;commandname&gt;</code> definition in
+    the <a href="#ECMDClassdef">class definition</a>.<br><br>
+    If <code>get &lt;commandname&gt;</code> is invoked the perl special in curly brackets from the command definition
+    is evaluated and the result is sent to the physical ECMD device. The response from the physical ECMD device is returned
+    and the state of the logical ECMD device is updated accordingly.
+    <br><br>
+    Example:
+    <ul>
+      <code>get myADC value 3</code><br>
+    </ul>
+    <br>
+  </ul>
+
+
+  <a name="ECMDDeviceattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br><br>
+
+
+  <b>Example 1</b>
+  <br><br>
+  <ul>
+        The following example shows how to access the ADC of the AVR-NET-IO board from
+        <a href="http://www.pollin.de">Pollin</a> with
+        <a href="http://www.ethersex.de/index.php/ECMD">ECMD</a>-enabled
+        <a href="http://www.ethersex.de">Ethersex</a> firmware.<br><br>
+
+        The class definition file <code>/etc/fhem/ADC.classdef</code> looks as follows:<br><br>
+        <code>
+                get value cmd {"adc get %channel"}  <br>
+                get value params channel<br>
+        </code>
+        <br>
+        In the fhem configuration file or on the fhem command line we do the following:<br><br>
+        <code>
+                define AVRNETIO ECMD telnet 192.168.0.91:2701        # define the physical device<br>
+                set AVRNETIO classdef ADC /etc/fhem/ADC.classdef       # define the device class ADC<br>
+                define myADC ECDMDevice ADC # define the logical device myADC with device class ADC<br>
+                get myADC value 1 # retrieve the value of analog/digital converter number 1<br>
+        </code>
+        <br>
+        The get command is evaluated as follows: <code>get value</code> has one named parameter
+        <code>channel</code>. In the example the literal <code>1</code> is given and thus <code>%channel</code>
+        is replaced by <code>1</code> to yield <code>"adc get 1"</code> after macro substitution. Perl
+        evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO. The
+        board returns something like <code>024</code> for the current value of  analog/digital converter number 1.
+        <br><br>
+
+   </ul>
+
+
+  <b>Example 2</b>
+  <br><br>
+    <ul>
+        The following example shows how to switch a relais driven by pin 3 (bit mask 0x08) of I/O port 2 on for
+        one second and then off again.<br><br>
+
+        The class definition file <code>/etc/fhem/relais.classdef</code> looks as follows:<br><br>
+        <code>
+                params pinmask<br>
+                set on cmd {"io set ddr 2 ff\nioset port 2 0%pinmask\nwait 1000\nio set port 2 00"}<br>
+		set on postproc {s/^OK\nOK\nOK\nOK$/success/; "$_" eq "success" ? "ok" : "error"; }<br>
+        </code>
+        <br>
+        In the fhem configuration file or on the fhem command line we do the following:<br><br>
+        <code>
+                define AVRNETIO ECMD telnet 192.168.0.91:2701        # define the physical device<br>
+                set AVRNETIO classdef relais /etc/fhem/relais.classdef       # define the device class relais<br>
+                define myRelais ECMDDevice 8 # define the logical device myRelais with pin mask 8<br>
+                set myRelais on # execute the "on" command<br>
+        </code>
+        <br>
+        The set command is evaluated as follows: <code>%pinmask</code>
+        is replaced by <code>8</code> to yield
+        <code>"io set ddr 2 ff\nioset port 2 08\nwait 1000\nio set port 2 00"</code> after macro substitution. Perl
+        evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO line by line.
+        <br>
+	For any of the four plain ethersex commands, the AVR-NET-IO returns the string <code>OK</code>. They are
+	concatenated and separated by line breaks (\n). The postprocessor takes the result from <code>$_</code>,
+	substitutes it by the string <code>success</code> if it is <code>OK\nOK\nOK\nOK</code>, and then either
+	returns the string <code>ok</code> or the string <code>error</code>.
+
+   </ul>
+
+
+</ul>
+
+
+
+
+=end html
+=cut

@@ -148,3 +148,75 @@ IPWE_GetStatus($)
 
 1;
 
+
+=pod
+=begin html
+
+<a name="IPWE"></a>
+<h3>IPWE</h3>
+<ul>
+  <br>
+
+  <a name="IPWEdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; IPWE &lt;hostname&gt; [&lt;delay&gt;]</code>
+    <br><br>
+
+    Define a IPWE network attached weather data receiver device sold by ELV. Details see <a
+    href="http://www.elv.de/output/controller.aspx?cid=74&detail=10&detail2=21508">here</a>.
+    It's intended to receive the same sensors as WS300 (8 T/H-Sensors and one kombi sensor),
+    but can be accessed via http and telnet.
+    <br>
+     For unknown reason, my try to use the telnet interface   was not working neither with raw sockets
+      nor with Net::Telnet module. Therefore i choosed here the "easy" way
+    to simple readout the http page and extract all data from the offered table. For this reason this module doesnt
+    contain any option to configure this device.
+    <br><br><b>Note:</b> You should give your sensors a name within the web interface, once they a received the first time.
+    <br>To extract a single sensor simply match for this name or sensor id<br>
+    <br>
+
+    Attributes:
+    <ul>
+      <li><code>delay</code>: seconds between read accesses(default 300s)</li>
+
+    </ul>
+    <br>
+    Example:
+    <ul>
+      <code>define ipwe IPWE ipwe1 120</code><br>
+    </ul>
+      <ul>
+      <code>attr ipwe delay 600</code> : 10min between readouts<br>
+    </ul>
+    <br>
+  </ul>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="IPWEget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; status</code>
+    <br><br>
+    Gets actual data from device for sensors with data
+    <br><br>
+    <code>get &lt;name&gt; &lt;sensorname&gt; </code>
+    <br><br>
+    will grep output from device for this sensorname
+    <br><br>
+  </ul>
+
+
+  <a name="IPWEattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (ipwe)</li>
+    <li>delay</li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+
+</ul>
+=end html
+=cut

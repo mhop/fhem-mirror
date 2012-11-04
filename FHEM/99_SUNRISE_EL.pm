@@ -378,3 +378,98 @@ sub isday(@)       { return sr_alt(1, 0, 1, shift,     0, undef, undef) }
 sub sunrise_coord($$$) { ($long, $lat, $tz) = @_; return undef; }
 
 1;
+
+=pod
+=begin html
+
+<a name="SUNRISE_EL"></a>
+<h3>SUNRISE_EL</h3>
+<ul>
+  This module is used to define the functions<pre>
+sunrise, sunset,
+sunrise_rel, sunset_rel
+sunrise_abs, sunset_abs
+isday</pre>
+  perl functions, to be used in <a href="#at">at</a> or FS20 on-till commands.<br>
+  First you should set the longitude and latitude global attributes to the
+  exact longitude and latitude values (see e.g. maps.google.com for the exact
+  values, which should be in the form of a floating point value).  The default
+  value is Frankfurt am Main, Germany.
+  <br><br>
+  The default altitude ($defaultaltit in SUNRISE_EL.pm) defines the sunrise/sunset
+  for Civil twilight (i.e. one can no longer read outside without artificial
+  illumination), which differs from sunrise/sunset times found on different
+  websites.  See perldoc "DateTime::Event::Sunrise" for alternatives.
+  <br><br>
+
+  sunrise()/sunset() returns the absolute time of the next sunrise/sunset,
+  adding 24 hours if the next event is tomorrow, to use it in the timespec of
+  an at device or for the on-till command for FS20 devices.<br>
+
+  sunrise_rel()/sunset_rel() returns the relative time to the next
+  sunrise/sunset. <br>
+  sunrise_abs()/sunset_abs() return the absolute time of the corresponding
+  event today (no 24 hours added).<br>
+  All functions take up to three arguments:<br>
+  <ul>
+    <li>The first specifies an offset (in seconds), which will be added to the
+    event.
+    <li>The second and third specify min and max values (format: "HH:MM").
+  </ul>
+  <br>
+  isday() can be used in some notify or at commands to check if the sun is up or
+  down.<br><br>
+
+  Optionally, for all functions you can set first argument which defines a horizon value
+  which then is used instead of the $defaultaltit in SUNRISE_EL.pm.<br>
+  Possible values are: "REAL", "CIVIL", "NAUTIC", "ASTRONOMIC" or a 
+  positive or negative number preceded by "HORIZON="<br>
+  REAL is 0, CIVIL is -6, NATUIC is -12, ASTRONOMIC is -18 degrees above horizon.<br><br>
+  Example:<br>
+  <ul>
+  <PRE>
+    # When sun is 6 degrees below horizon - same as sunrise();
+    sunrise("CIVIL");
+
+    # When sun is 3 degrees below (-3 above) horizon (Between real and civil sunset)
+    sunset("HORIZON=-3");
+
+    # When sun is 1 degree above horizon
+    sunset("HORIZON=1");
+
+    # Switch lamp1 on at real sunset, not before 18:00 and not after 21:00
+    define a15 at *{sunset("REAL",0,"18:00","21:00")} set lamp1 on
+  </PRE>
+  </ul>
+  
+  <b>Define</b> <ul>N/A</ul><br>
+
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <b>Attributes</b> <ul>
+    <a name="latitude"></a>
+    <li>latitude<br>
+      If set, this latitude is used to calculate sunset/sunrise<br>
+      Notation need to be in decimal format (for example Berlin = 52.666)
+      As default Frankfurt/Main, Germany (50.112) is used.
+    </li><br>
+    <a name="longitude"></a>
+    <li>longitude<br>
+        If set, this longitude is used to calculate sunset/sunrise<br>
+        Notation need to be in decimal format (for example Berlin = 13.400)
+        As default Frankfurt/Main, Germany (8.686) is used.
+    </li><br>
+    Note: these are global attributes, e.g.<br>
+    <ul>
+      attr global latitude 50.112<br>
+      attr global longitude 8.686<br>
+    </ul>
+  </ul><br>
+
+
+</ul>
+
+=end html
+=cut

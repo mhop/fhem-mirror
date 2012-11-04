@@ -230,3 +230,53 @@ ALL4027_GetStatus($)
   }
 }
 1;
+
+=pod
+=begin html
+
+<a name="ALL4027"></a>
+<h3>ALL4027</h3>
+<ul>
+  Note: this module needs the HTTP::Request and LWP::UserAgent perl modules.
+  <br><br>
+  <a name="ALL4027define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ALL4027 &lt;ip-address&gt; &lt;port&gt; &lt;relay_nr&gt; &lt;delay&gt;</code>
+    <br><br>
+    Defines an Allnet 4027 device (Box with 8 relays) connected to an ALL4000 via its ip address. The status of the device is also pooled (delay interval), because someone else is able  to change the state via the webinterface of the device.<br><br>
+
+
+    Examples:
+    <ul>
+      <code>define lamp1 ALL4027 192.168.8.200 0 7 60</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="ALL4027set"></a>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    off
+    on
+    on-for-timer &lt;Seconds&gt;
+    toggle
+    </pre>
+    Examples:
+    <ul>
+      <code>set poolpump on</code><br>
+    </ul>
+    <br>
+    Notes:
+    <ul>
+      <li>Toggle is special implemented. List name returns "on" or "off" even after a toggle command</li>
+    </ul>
+  </ul>
+</ul>
+
+=end html
+=cut

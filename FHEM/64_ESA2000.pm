@@ -281,3 +281,48 @@ ESA2000_Parse($$)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="ESA2000"></a>
+<h3>ESA2000</h3>
+<ul>
+  The ESA2000 module interprets ESA2000 type of messages received by the CUL,
+  currently only for ESA2000 LED devices.
+  <br><br>
+
+  <a name="ESA2000define"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; ESA2000 &lt;code&gt;
+        [base1 base2]</code> <br>
+    <br>
+    &lt;code&gt; is the 4 digit HEX code identifying the devices.<br><br>
+
+    <b>base1/2</b> is added to the total kwh as a base (Hoch- und Niedertarifz&auml;hlerstand).
+  </ul>
+  <br>
+
+  <a name="CUL_EMset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="CUL_EMget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="CUL_EMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#ignore">ignore</a></li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#model">model</a> (ESA2000_LED)</li><br>
+    <li><a href="#IODev">IODev</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+
+=end html
+=cut

@@ -210,3 +210,44 @@ sub OWID_Undef ($) {
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="OWID"></a>
+<h3>OWID</h3>
+<ul>FHEM module for 1-Wire devices that know only their unique ROM ID<br />
+    <br />Note:<br /> This 1-Wire module so far works only with the OWX interface module.
+    Please define an <a href="#OWX">OWX</a> device first. <br />
+    <br /><b>Example</b><br />
+    <ul>
+        <code>define ROM1 OWX_ID OWCOUNT CE780F000000</code>
+        <br />
+    </ul><br />
+    <a name="OWIDdefine"></a>
+    <b>Define</b>
+    <ul>
+        <code>define &lt;name&gt; OWID &lt;id&gt; </code>
+        <br /><br /> Define a 1-Wire device.<br /><br />
+        <li>
+            <code>&lt;id&gt;</code>
+            <br />12-character unique ROM id of the converter device without family id and
+            CRC code </li>
+    </ul>
+    <br />
+    <a name="OWIDget">
+        <b>Get</b></a>
+    <ul>
+        <li><a name="owid_id">
+                <code>get &lt;name&gt; id</code></a>
+            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+        <li><a name="owid_present">
+                <code>get &lt;name&gt; present</code>
+            </a>
+            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+    </ul>
+    <br />
+</ul>
+
+=end html
+=cut

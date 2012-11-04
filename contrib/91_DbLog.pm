@@ -95,3 +95,79 @@ DbDo($)
 }
 
 1;
+
+=pod
+=begin html
+
+<a name="DbLog"></a>
+<h3>DbLog</h3>
+<ul>
+  <br>
+
+  <a name="DbLogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
+    <br><br>
+
+    Log events to a database. The database connection is defined in
+    <code>&lt;configfilename&gt;</code> (see sample configuration file
+    <code>db.conf</code>). The configuration is stored in a separate file
+    to avoid storing the password in the main configuration file and to have it
+    visible in the output of the <a href="#list">list</a> command.
+    <br><br>
+
+    You must have <code>93_DbLog.pm</code> in the <code>FHEM</code> subdirectory
+    to make this work. Additionally, the modules <code>DBI</code> and
+    <code>DBD::&lt;dbtype&gt;</code> need to be installed (use
+    <code>cpan -i &lt;module&gt;</code> if your distribution does not have it).
+    <br><br>
+    <code>&lt;regexp&gt;</code> is the same as in <a href="#FileLog">FileLog</a>.
+    <br><br>
+    Sample code to create a MySQL database is in <code>fhemdb_create.sql</code>.
+    The database contains two tables: <code>current</code> and
+    <code>history</code>. The latter contains all events whereas the former only
+    contains the last event for any given reading and device.
+    The columns have the following meaning:
+    <ol>
+    <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
+    <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
+    <li>TYPE: device type, e.g. <code>KS300</code></li>
+    <li>EVENT: event specification as full string,
+                                        e.g. <code>humidity: 71 (%)</code></li>
+    <li>READING: name of reading extracted from event,
+                    e.g. <code>humidity</code></li>
+    <li>VALUE: actual reading extracted from event,
+                    e.g. <code>71</code></li>
+    <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
+    </ol>
+    The content of VALUE is optimized for automated post-processing, e.g.
+    <code>yes</code> is translated to <code>1</code>.
+    <br><br>
+    The current values can be retrieved by means of the perl script
+    <code>fhemdb_get.pl</code>. Its output is adapted to what a
+    <a href="www.cacti.net">Cacti</a> data input method expects.
+    Call <code>fhemdb_get.pl</code> without parameters to see the usage
+    information.
+    <br><br>
+    Examples:
+    <ul>
+        <code># log everything to database</code><br>
+        <code>define logdb DbLog /etc/fhem/db.conf .*:.*</code>
+    </ul>
+  </ul>
+
+
+  <a name="DbLogset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="DbLogget"></a>
+  <b>Get</b> <ul>N/A</ul><br>
+
+  <a name="DbLogattr"></a>
+  <b>Attributes</b> <ul>N/A</ul><br>
+
+</ul>
+
+=end html
+=cut

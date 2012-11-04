@@ -423,3 +423,63 @@ EmGetDevData($)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="EM"></a>
+<h3>EM</h3>
+<ul>
+  <a name="EMdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; EM &lt;em1010pc-device&gt;</code>
+    <br><br>
+
+    Define a EM1010PC USB device. As the EM1010PC was not designed to be used
+    with a PC attached to it all the time, it won't transmit received signals
+    automatically, fhem has to poll it every 5 minutes.<br>
+
+    Currently there is no way to read the internal log of the EM1010PC with
+    fhem, use the program em1010.pl in the contrib directory for this
+    purpose.<br><br>
+
+    Examples:
+    <ul>
+      <code>define em EM /dev/elv_em1010pc</code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="EMset"></a>
+  <b>Set</b>
+  <ul>
+    <code>set EM &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is either time or reset.<br>
+    If time has arguments of the form YYYY-MM-DD HH:MM:SS, then the specified
+    time will be set, else the time from the host.<br>
+    Note: after reset you should set the time.
+  </ul>
+  <br>
+
+  <a name="EMget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get EM &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is either version or time.
+  </ul>
+
+  <a name="EMattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#model">model</a> (em1010pc)</li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut

@@ -694,3 +694,156 @@ FP_input(@)
 	return "<input type=\"$type\"$title$size$maxlength $addition name=\"$n\" value=\"$v\"/>\n";
 }
 1;
+
+=pod
+=begin html
+
+<a name="FLOORPLAN"></a>
+<h3>FLOORPLAN</h3>
+<ul>
+  Implements an additional entry "Floorplans" to your fhem menu, leading to a userinterface without fhem-menu, rooms or devicelists.
+  Devices can be displayed at a defined coordinate on the screen, usually with a clickable icon allowing to switch
+  the device on or off by clicking on it. A background-picture can be used - use e.g. a floorplan of your house, or any picture.
+  Use floorplanstyle.css to adapt the representation.<br>
+  Step-by-step setup guides are available in
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">english</a> and
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf">german</a>. <br>
+  <br>
+
+  <a name="FLOORPLANdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FLOORPLAN </code>
+    <br><br>
+
+    <b>Hint:</b> Store fp_&lt;name&gt;.png in your image folder (www/images/default , www/pgm2 or FHEM) to use it as background picture.<br><br>
+    Example:
+    <ul>
+      <code>
+	  define Groundfloor FLOORPLAN<br>
+	  fp_Groundfloor.png
+	  </code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FLOORPLANset"></a>
+  <b>Set </b>
+  <ul>
+      <li>N/A</li>
+  </ul>
+  <br>
+
+  <a name="FLOORPLANget"></a>
+  <b>Get </b>
+  <ul>
+      <li>N/A</li>
+  </ul>
+  <br>
+
+  <a name="FLOORPLANattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a name="fp_fpname">userattr fp_&lt;name&gt; &lt;top&gt;,&lt;left&gt;[,&lt;style&gt;[,&lt;description&gt;]]</a><br><br>
+    A <a href="#userattr">userattr</a> fp_&lt;name&gt; will be created automatically if it does not exist yet.<br>
+	<ul>
+      <li>top   = screen-position, pixels from top of screen
+      <li>left  = screen-position, pixels from left of screen
+      <li>style =
+		<ul>
+			<li>0  icon/state only
+			<li>1  devicename and icon/state
+			<li>2  devicename, icon/state and commands
+			<li>3  device-reading and optional description
+			<li>4  S300TH-specific, displays temperature above humidity
+			<li>5  icon/state and commands
+			<li>6  device-reading, reading-timestamp and optional description
+		</ul>
+      <li>description will be displayed instead of the original devicename
+    </ul><br>
+    Examples:<br>
+    <ul>
+		<table>
+			<tr><td><code>attr lamp1 fp_Groundfloor 100,100</code></td><td><code>#display lamp1 with icon only at screenposition 100,100</code></td></tr>
+			<tr><td><code>attr lamp2 fp_Groundfloor 100,140,1,Art-Deco</code></td><td><code>#display lamp2 with description 'Art-Deco-Light' at 100,140</code></td></tr>
+			<tr><td><code>attr lamp2 fp_FirstFloor  130,100,1</code></td><td><code>#display the same device at different positions on other floorplans</code></td></tr>
+			<tr><td><code>attr myFHT fp_Groundfloor 300,20,10,Temperature</code></td><td><code>#display given Text + FHT-temperature</code></td></tr>
+		</table>
+	</ul>
+	<b>Hint:</b> no blanks between parameters<br><br>
+
+
+    <li><a name="fp_arrange">fp_arrange</a><br>
+  	  Activates the "arrange mode" which shows an additional menu on the screen,
+	  allowing to place devices easily on the screen.<br>
+	  Example:
+	<ul>
+        <code>attr Groundfloor fp_arrange 1</code><br>
+	  <code>attr Groundfloor fp_arrange detail  #displays the devices with infos room, type, alias</code><br>
+	  <code>attr Groundfloor fp_arrange WEB     #activates arrange mode for frontend-device WEB only</code><br><br>
+        </ul>
+    </li>
+    <li><a name="stylesheet">stylesheet</a><br>
+	Explicitely sets your personal stylesheet for the floorplan. This overrides the standard stylesheet.
+	The standard stylesheet for floorplans is <code>floorplanstyle.css</code>. If the <a href="#stylesheetPrefix">stylesheetPrefix</a> is set for the corresponding FHEMWEB instance, this same
+	<code>stylesheetPrefix</code> is also prepended to the stylesheet for floorplans.<br>
+	All stylesheets must be stored in the stylesheet subfolder of the fhem filesystem hierarchy. Store your personal
+	stylesheet along with <code>floorplanstyle.css</code> in the same folder.<br>
+	Example:
+	<ul>
+          <code>attr Groundfloor stylesheet myfloorplanstyle.css</code><br><br>
+        </ul>
+    </li>
+
+	<li><a name="fp_default">fp_default</a><br>
+	The floorplan startscreen is skipped if this attribute is assigned to one of the floorplans in your installation.
+	</li>
+    Example:
+	<ul>
+      <code>attr Groundfloor fp_default 1</code><br><br>
+    </ul>
+
+	<li><a name="fp_noMenu">fp_noMenu</a><br>
+	Suppresses the menu which usually shows the links to all your floorplans.
+	</li>
+    Example:
+	<ul>
+      <code>attr Groundfloor fp_noMenu 1</code><br><br>
+    </ul>
+
+    <li><a name="commandfield">commandfield</a><br>
+	Adds a fhem-commandfield to the floorplan screen.
+	</li>
+    Example:
+	<ul>
+      <code>attr Groundfloor commandfield 1</code><br><br>
+    </ul>
+	
+    <li><a name="fp_backgroundimg">fp_backgroundimg</a><br>
+	Allows to choose a background-picture independent of the floorplan-name.
+	</li>
+    Example:
+	<ul>
+      <code>attr Groundfloor fp_backgroundimg foobar.png</code><br><br>
+    </ul>
+
+    <li><a name="fp_inherited">Inherited from FHEMWEB</a><br>
+	The following attributes are inherited from the underlying <a href="#FHEMWEB">FHEMWEB</a> instance:<br>
+    <ul>
+		<a href="#smallscreen">smallscreen</a><br>
+		<a href="#touchpad">touchpad</a><br>
+		<a href="#refresh">refresh</a><br>
+		<a href="#plotmode">plotmode</a><br>
+		<a href="#plotsize">plotsize</a><br>
+		<a href="#webname">webname</a><br>
+		<a href="#redirectCmds">redirectCmds</a><br>
+    </ul>
+    </li><br>
+  </ul>
+  <br>
+</ul>
+
+
+
+=end html
+=cut

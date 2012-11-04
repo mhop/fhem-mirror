@@ -1084,3 +1084,95 @@ sub sendRequest($$)
 
 
 1;
+
+=pod
+=begin html
+
+<a name="TUL"></a>
+<h3>TUL</h3>
+<ul>
+
+  <table>
+  <tr><td>
+  The TUL module is the representation of a EIB / KNX connector in FHEM.
+  <a href="#EIB">EIB</a> instances represent the EIB / KNX devices and will need a TUL as IODev to communicate with the EIB / KNX network.<br>
+  The TUL module is designed to connect to EIB network either using EIBD or the <a href="http://busware.de/tiki-index.php?page=TUL" target="_blank">TUL usb stick</a> created by busware.de
+
+  Note: this module may require the Device::SerialPort or Win32::SerialPort
+  module if you attach the device via USB and the OS sets strange default
+  parameters for serial devices.
+
+  </td><td>
+  <img src="http://busware.de/show_image.php?id=269" width="100%" height="100%"/>
+  </td></tr>
+  </table>
+
+  <a name="TULdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TUL &lt;device&gt; &lt;physical address&gt;</code> <br>
+    <br>
+    TUL usb stick / TPUART serial devices:<br><ul>
+      &lt;device&gt; specifies the serial port to communicate with the TUL.
+      The name of the serial-device depends on your distribution, under
+      linux the cdc_acm kernel module is responsible, and usually a
+      /dev/ttyACM0 device will be created. If your distribution does not have a
+      cdc_acm module, you can force usbserial to handle the TUL by the
+      following command:<ul>modprobe usbserial vendor=0x03eb
+      product=0x204b</ul>In this case the device is most probably
+      /dev/ttyUSB0.<br><br>
+
+      You can also specify a baudrate if the device name contains the @
+      character, e.g.: /dev/ttyACM0@19200<br><br>
+	  Note: For TUL usb stick the baudrate 19200 is needed and this is the default
+	  when no baudrate is given.
+	  <br><br>
+
+	  Example:<br>
+	  <code>define tul TUL tul:/dev/ttyACM0 1.1.249</code>
+    </ul>
+    EIBD:<br><ul>
+    &lt;device&gt; specifies the host:port of the eibd device. E.g.
+    eibd:192.168.0.244:2323. When using the standard port, the port can be omitted.
+    <br><br>
+
+	  Example:<br>
+	  <code>define tul TUL eibd:localhost 1.1.249</code>
+    </ul>
+    <br>
+    If the device is called none, then no device will be opened, so you
+    can experiment without hardware attached.<br>
+
+    The physical address is used as the source address of telegrams sent to EIB network.
+  </ul>
+  <br>
+
+  <a name="TULset"></a>
+  <b>Set </b>
+  <ul>
+    <li>raw<br>
+        Issue a TUL raw telegram message
+        </li><br>
+  </ul>
+
+  <a name="TULget"></a>
+  <b>Get</b>
+  <ul>
+    <li>raw<br>
+        sends a read telegram
+        </li><br>
+  </ul>
+
+  <a name="TULattr"></a>
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#do_not_notify">do_not_notify</a></li><br>
+    <li><a href="#attrdummy">dummy</a></li><br>
+    <li><a href="#showtime">showtime</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html
+=cut
