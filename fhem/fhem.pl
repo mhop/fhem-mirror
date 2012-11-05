@@ -1110,9 +1110,9 @@ DoSet(@)
   return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
-  my $ret = CallFn($dev, "SetFn", $defs{$dev}, @a);
+  my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $defs{$dev}, @a);
   return $ret if($ret);
-
+  return undef if($skipTrigger);
   shift @a;
   my $arg = $defs{$dev}{CHANGED} ? undef : join(" ", @a);
   return DoTrigger($dev, $arg);
@@ -2246,10 +2246,17 @@ CallFn(@)
   }
   my $fn = $modules{$defs{$d}{TYPE}}{$n};
   return "" if(!$fn);
-  no strict "refs";
-  my $ret = &{$fn}(@_);
-  use strict "refs";
-  return $ret;
+  if(wantarray) {
+    no strict "refs";
+    my @ret = &{$fn}(@_);
+    use strict "refs";
+    return @ret;
+  } else {
+    no strict "refs";
+    my $ret = &{$fn}(@_);
+    use strict "refs";
+    return $ret;
+  }
 }
 
 #####################################
