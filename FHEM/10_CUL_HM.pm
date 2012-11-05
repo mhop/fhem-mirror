@@ -95,11 +95,11 @@ my %culHmModel=(
   "000E" => {name=>"ASH550I"                 ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "000F" => {name=>"S550IA"                  ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0011" => {name=>"HM-LC-SW1-PL"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0012" => {name=>"HM-LC-DIM1L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
+  "0012" => {name=>"HM-LC-DIM1L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0013" => {name=>"HM-LC-DIM1L-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
   "0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:4",},
-  "0016" => {name=>"HM-LC-DIM2L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Vtr:3:6",},
+  "0016" => {name=>"HM-LC-DIM2L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "0018" => {name=>"CMM"                     ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
   "0019" => {name=>"HM-SEC-KEY"              ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
   "001A" => {name=>"HM-RC-P1"                ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
@@ -114,7 +114,7 @@ my %culHmModel=(
   "0029" => {name=>"HM-RC-12"                ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002A" => {name=>"HM-RC-12-B"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002D" => {name=>"HM-LC-SW4-PCB"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "002E" => {name=>"HM-LC-DIM2L-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Vtr:3:6",},
+  "002E" => {name=>"HM-LC-DIM2L-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "002F" => {name=>"HM-SEC-SC"               ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0030" => {name=>"HM-SEC-RHS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0034" => {name=>"HM-PBI-4-FM"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
@@ -151,14 +151,14 @@ my %culHmModel=(
   "0053" => {name=>"HM-LC-BL1-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0054" => {name=>"DORMA_RC-H"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
   "0056" => {name=>"HM-CC-SCD"	             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0057" => {name=>"HM-LC-DIM1T-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
-  "0058" => {name=>"HM-LC-DIM1T-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
-  "0059" => {name=>"HM-LC-DIM1T-FM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Vtr:2:3",},
-  "005A" => {name=>"HM-LC-DIM2T-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Vtr:3:6",},
+  "0057" => {name=>"HM-LC-DIM1T-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0058" => {name=>"HM-LC-DIM1T-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0059" => {name=>"HM-LC-DIM1T-FM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "005A" => {name=>"HM-LC-DIM2T-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "005C" => {name=>"HM-OU-CF-PL"             ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Sound:2:2",},
   "005D" => {name=>"HM-Sen-MDIR-O"           ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "005F" => {name=>"HM-SCI-3-FM"             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0060" => {name=>"HM-PB-4DIS-WM"           ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
+  "0060" => {name=>"HM-PB-4DIS-WM"           ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
   "0061" => {name=>"HM-LC-SW4-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
   "0062" => {name=>"HM-LC-SW2-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "0064" => {name=>"DORMA_atent"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
@@ -327,7 +327,7 @@ CUL_HM_Parse($$)
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   my $dname = $dhash ? $dhash->{NAME} :
                        ($dst eq "000000" ? "broadcast" : 
-                       ($dst eq $id ? $iohash->{NAME} : $dst));
+                                ($dst eq $id ? $iohash->{NAME} : $dst));
   my $target = " (to $dname)";
 
   return "" if($p =~ m/NACK$/);#discard TCP errors from HMlan. Resend will cover it
@@ -359,7 +359,7 @@ CUL_HM_Parse($$)
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
   my $tn = TimeNow();
-
+  
   # return if duplicate
   my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst $p";
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) {
@@ -442,7 +442,7 @@ CUL_HM_Parse($$)
 	$sendAck = ""; #todo why is this special?
 
   } 
-  elsif($model eq "HM-CC-TC") {  ####################################
+  elsif($model eq "HM-CC-TC") { ####################################
     my ($sType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/);
     if($msgType eq "70" && $p =~ m/^(....)(..)/) {# weather event
 	  $chn = '01'; # fix definition
@@ -693,7 +693,6 @@ CUL_HM_Parse($$)
 	  push @event, "battery:" . (($err&0x80) ? "low" : "ok" )
 	           if(($model eq "HM-LC-SW1-BA-PCB")&&($cmpVal&0x80));
 	  push @event, "state:$val";
-
     }
   } 
   elsif($st eq "remote" || $st eq "pushButton" || $st eq "swi") { #############
@@ -775,12 +774,13 @@ CUL_HM_Parse($$)
 		if($parse eq "powerOn"){# reset LEDs after power on
 		  CUL_HM_PushCmdStack($shash,'++A011'.$id.$src."8100".$devState);
 		  CUL_HM_ProcessCmdStack($shash);
+		  # no event necessary, all the same as before
 		}
 		else {# just update datafields in storage
  	      my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
  	      my $mask = 3<<$bitLoc;
  	      my $value = (hex($devState) &~$mask)|($msgState<<$bitLoc);
-		  push @event,"color:".sprintf("%08X",$value);
+		  CUL_HM_setRd($shash,"color",sprintf("%08X",$value),$tn);# to device!
  	      if ($chnHash){
  	        $shash = $chnHash;
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
@@ -837,34 +837,61 @@ CUL_HM_Parse($$)
     
   } 
   elsif($st eq "smokeDetector") { #####################################
-    #todo: check for correct msgType, see below
-	#AckStatus : msgType=0x02 p(..)(..)(..) subtype=01, channel, state (1 byte)
 	#Info Level: msgType=0x10 p(..)(..)(..) subtype=06, channel, state (1 byte)
 	#Event:      msgType=0x41 p(..)(..)(..) channel   , unknown, state (1 byte)
 
-    my $level = $1 if($p =~ m/01..(..)/);# todo: fancy incomplete way to parse an AckStatus
-	if ($level) {
-	  if ($level eq "C8"){
-        push @event, "state:on";
-        push @event, "smoke_detect:on$target";
-      }elsif($level eq "01"){
-        push @event, "state:all-clear";
-	  }else{
-	    push @event, "state:$level";#todo - maybe calculate the level in %
-	  }
-	}
-    if ($msgType eq "10"){ #todo: why is the information in InfoLevel ignored?
+	if ($msgType eq "10" && $p =~ m/^06..(..)/) {
+	  my $state = hex($1);
+	  my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
+	  $cmpVal = ($cmpVal ^ $state)|$state; 
+      push @event, "battery:". (($state&0x04)?"low"  :"ok"  ) if($cmpVal&0x04);
       push @event, "state:alive";
     } 
-	if($p =~ m/^00(..)$/) {
-      push @event, "test:$1";
+    elsif ($msgType eq "40"){ #autonomous event
+	  my ($state,$trgCnt) = (hex(substr($p,0,2)),hex(substr($p,2,2)));
+	  if($dhash){ # the source is in dst
+	    my $cmpVal = defined($dhash->{helper}{addVal})?
+		                            $dhash->{helper}{addVal}:0xff;
+	    $cmpVal = ($cmpVal ^ $state)|$state; 
+	    if (!($state & 1)){
+		  DoTrigger($dname,'test:'.$state);       # blame device
+		  push @event, "test:from $dname:$state"; # team trigger as well
+		}
+		DoTrigger($dname,'battery:'.(($state & 0x04)?"low":"ok"))
+		        if($cmpVal&0x80);
+	  }
+      push @event, "";
     }
-    push @event, "SDunknownMsg:$p" if(!@event);
+    elsif ($msgType eq "41"){ #Alarm detected
+	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
+	  if($dhash){ # the source is in dst
+	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
+		  $dhash->{helper}{alarmNo} = $No;
+	      DoTrigger($dname,'state:'.(($state eq "01")?"all-clear":"on"));
+		}
+	  }
+      push @event,"state:".(($state eq "01")?"all-clear":"on").":from:".$dname;
+      push @event,"smoke_detect:on $dname";
+    } 
+    elsif ($msgType eq "01"){ #Configs
+	  my $sType = substr($p,0,2);
+	  if($sType eq "01"){#add peer to group
+		push @event,"SDteam:add_".$dname;
+	  }
+	  elsif($sType eq "02"){# remove from group
+		push @event,"SDteam:remove_".$dname;
+	  }
+	  elsif($sType eq "05"){# set param List 3 and 4
+		push @event,"";
+	  }
+	}
+	else{
+      push @event, "SDunknownMsg:$p" if(!@event);
+	}
 	
     CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src.($cmd eq "A001" ? "80":"00"),1,0)
-      if($id eq $dst && $cmd ne "8002");  # Send Ack/Nack
+          if($id eq $dst && $cmd ne "8002");  # Send Ack/Nack
 	$sendAck = ""; #todo why is this special?
-
   } 
   elsif($st eq "threeStateSensor") { #####################################
     #todo: check for correct msgType, see below
@@ -1427,7 +1454,8 @@ my %culHmSubTypeSets = (
 		  press      => "[long|short]...",
 		  virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
-        { test => "", "alarmOn"=>"", "alarmOff"=>"", },
+        { test => "", "alarmOn"=>"", "alarmOff"=>"", 
+		  devicepair => "<btnNumber> device ... single [set|unset] actor"},
   winMatic =>{matic  => "<btn>",
               read   => "<btn>",
               keydef => "<btn> <txt1> <txt2>",
@@ -2153,6 +2181,9 @@ CUL_HM_Set($@)
 	      if(defined($target) && (($target ne"actor") &&
 		     ($target ne"remote")&&($target ne"both")));  
 	return "use climate chan to pair TC" if($md eq "HM-CC-TC" &&$chn ne "02");
+	return "use - single [set|unset] actor - for smoke detector" 
+	      if($st eq "smokeDetector" && 
+		       ($single ne "single" || $target ne "actor"));
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set eq "unset")?0:1;
 
@@ -2170,7 +2201,6 @@ CUL_HM_Set($@)
 	my $cmd = ($set)?"01":"02";# do we set or remove?
 
     my $peerDst = $peerHash->{DEF};
-
     my $peerChn = "01";
     if(length($peerDst) == 8) { # shadow switch device for multi-channel switch
       ($peerDst,$peerChn) = ($1,$2) if($peerDst =~ m/(......)(..)/);
@@ -2221,13 +2251,15 @@ CUL_HM_Set($@)
 	  }
 	}
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
-	$rxType = CUL_HM_getRxType($devHash);
   }
-
-  $hash->{STATE} = $state if($state); 
+  
+  if($state){
+    $hash->{STATE} = $state; 
+	DoTrigger($name,'state:'.$state);
+  }
   Log GetLogLevel($name,3), "CUL_HM set $name " . join(" ", @a[1..$#a]);
   CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
-  return "";
+  return ("",1);# no not generate trigger outof command
 }
 
 ###################################
@@ -2321,7 +2353,7 @@ CUL_HM_getConfig($$$$$){
 	  delete $chnhash->{READINGS}{$readEntry};
 	}
   }
-  #get Peer-list in any case - it is part of the config
+  #get Peer-list in any case - it is part of config
   CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
   my $lstAr = $culHmModel{CUL_HM_getMId($hash)}{lst};
   my @list = split(",",$lstAr); #get valid lists e.g."1, 5:2:3.p ,6:2"
@@ -2336,7 +2368,7 @@ CUL_HM_getConfig($$$$$){
 	  my @chnLst = split('\.',$chnLst1);
 	  foreach my $lchn (@chnLst){
 	    $peerReq = 1 if ($lchn =~ m/p/);
-		no warnings;# know that lchan may be followed by a 'p' causing a warning
+		no warnings;#know that lchan may be followed by a 'p' causing a warning
 	    $chnValid = 1 if (int($lchn) == hex($chn));
 		use warnings;
 	    last if ($chnValid);
@@ -2361,6 +2393,7 @@ CUL_HM_SendCmd($$$$)
 {
   my ($hash, $cmd, $sleep, $waitforack) = @_;
   my $io = $hash->{IODev};
+
   select(undef, undef, undef, 0.1) if($io->{TYPE} ne 'HMLAN');
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
@@ -2379,10 +2412,9 @@ CUL_HM_SendCmd($$$$)
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
 
   IOWrite($hash, "", $cmd);
-	
   $cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
-  CUL_HM_responseSetup($hash,$cmd,$waitforack);
+  CUL_HM_responseSetup($hash,$cmd,$waitforack);	
 }
 ###################################
 sub
@@ -2496,7 +2528,6 @@ CUL_HM_respPendTout($)
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
-
 	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");
   }
 }
@@ -2506,7 +2537,7 @@ CUL_HM_respPendToutProlong($)
 {#used when device sends part responses
   my ($hash) =  @_;  
 
-  RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer?
+  RemoveInternalTimer("respPend:$hash->{DEF}");
   InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
 ###################################
