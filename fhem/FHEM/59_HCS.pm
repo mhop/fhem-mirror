@@ -452,7 +452,7 @@ HCS_getValves($$) {
   <a name="HCSdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HCE &lt;device&gt; &lt;interval&gt; &lt;valveThresholdOn&gt; &lt;valveThresholdOff&gt;</code>
+    <code>define &lt;name&gt; HCS &lt;device&gt; &lt;interval&gt; &lt;valveThresholdOn&gt; &lt;valveThresholdOff&gt;</code>
     <br><br>
 
     <ul>
