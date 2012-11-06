@@ -1,5 +1,6 @@
 ################################################################
 # $Id: $
+# vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved
@@ -56,7 +57,7 @@ HCS_Initialize($$)
   $hash->{UndefFn}  = "HCS_Undef";
   $hash->{GetFn}    = "HCS_Get";
   $hash->{SetFn}    = "HCS_Set";
-  $hash->{AttrList} = "device deviceCmdOn deviceCmdOff interval ".
+  $hash->{AttrList} = "device deviceCmdOn deviceCmdOff interval idleperiod ".
                       "sensor sensorThresholdOn sensorThresholdOff sensorReading ".
                       "valvesExcluded valveThresholdOn valveThresholdOff ".
                       "do_not_notify:1,0 event-on-update-reading event-on-change-reading ".
@@ -239,13 +240,19 @@ HCS_setState($$) {
   my ($hash,$heatDemand) = @_;
   my $name = $hash->{NAME};
   my $type = $hash->{TYPE};
+  my $ll = AttrVal($name,"loglevel",3);
   my $device       = AttrVal($name,"device","");
   my $deviceCmdOn  = AttrVal($name,"deviceCmdOn","on");
   my $deviceCmdOff = AttrVal($name,"deviceCmdOff","off");
+  my $idlePeriod   = AttrVal($name,"idleperiod",0);
+  my $lastPeriodTime = ($hash->{helper}{lastSend}) ? $hash->{helper}{lastSend} : 0;
+  my $newPeriodTime = gettimeofday();
+  my $diffPeriodTime = int((int($newPeriodTime)-int($lastPeriodTime))/60);
   my $sensor = AttrVal($name,"sensor",undef);
   my $cmd;
   my $overdrive = 0;
   my $state;
+  my $stateDevice;
 
   if($heatDemand == 1) {
     $state = "demand";
@@ -264,16 +271,29 @@ HCS_setState($$) {
   }
 
   $state = "error" if(!defined($defs{$device}));
+  $stateDevice = ReadingsVal($name,"device","");
 
   readingsBeginUpdate($hash);
+  readingsUpdate($hash, "device", $cmd);
   readingsUpdate($hash, "overdrive", $overdrive) if($sensor);
   readingsUpdate($hash, "state", $state);
   readingsEndUpdate($hash, 1);
 
   if($defs{$device}) {
-    my $cmdret = CommandSet(undef,"$device $cmd");
-    Log 1, "$type $name An error occurred while switching device '$device': $cmdret"
-      if($cmdret); 
+    my $eventOnChange = AttrVal($name,"event-on-change-reading","");
+    my $eventOnUpdate = AttrVal($name,"event-on-update-reading","");
+    if(!$eventOnChange ||
+      ($eventOnUpdate && $eventOnUpdate =~ m/device/) || 
+      ($eventOnChange && ($eventOnChange =~ m/device/ || $eventOnChange == 1) && $cmd ne $stateDevice)) {
+      if(!$idlePeriod || ($idlePeriod && $diffPeriodTime >= $idlePeriod)) {
+        my $cmdret = CommandSet(undef,"$device $cmd");
+        $hash->{helper}{lastSend} = $newPeriodTime;
+        Log 1, "$type $name An error occurred while switching device '$device': $cmdret"
+          if($cmdret);
+      } elsif($idlePeriod && $diffPeriodTime < $idlePeriod) {
+        Log $ll, "$type $name device $device blocked by idleperiod ($idlePeriod min.)";
+      }
+    }
   } else {
     Log 1, "$type $name device '$device' does not exists.";
   }
@@ -291,6 +311,7 @@ HCS_getValves($$) {
   my $heatDemand = 0;
   my $valveThresholdOn  = AttrVal($name,"valveThresholdOn",40);
   my $valveThresholdOff = AttrVal($name,"valveThresholdOff",35);
+  my $ll = AttrVal($name,"loglevel",3);
   my %valves = ();
   my $valvesIdle = 0;
   my $valveState;
@@ -324,7 +345,7 @@ HCS_getValves($$) {
       $valves{$defs{$d}{NAME}}{state} = $value;
       $valves{$defs{$d}{NAME}}{demand} = 0;
       $ret .= "$defs{$d}{NAME}: $value\n" if($list);
-      Log 4, "$type $name $defs{$d}{NAME}: $value";
+      Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
       $sumIgnored++;
       $sumValves++;
       $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
@@ -337,7 +358,7 @@ HCS_getValves($$) {
       $valves{$defs{$d}{NAME}}{state} = $value;
       $valves{$defs{$d}{NAME}}{demand} = 0;
       $ret .= "$defs{$d}{NAME}: $value\n" if($list);
-      Log 4, "$type $name $defs{$d}{NAME}: $value";
+      Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
       $sumExcluded++;
       $sumValves++;
       $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
@@ -348,7 +369,7 @@ HCS_getValves($$) {
     $value = "$valveState%";
     $valves{$defs{$d}{NAME}}{state} = $value;
     $ret .= "$defs{$d}{NAME}: $value" if($list);
-    Log 4, "$type $name $defs{$d}{NAME}: $value";
+    Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
 
     # get last readings
     $valveLastDemand = ReadingsVal($name,$d."_demand",0);
@@ -422,7 +443,7 @@ HCS_getValves($$) {
   }
 
   #my $sumDemand = $sumValves-$valvesIdle-$sumIgnored-$sumExcluded;
-  Log 3, "$type $name Found $sumValves Device(s): $sumFHT FHT, $sumHMCCTC HM-CC-TC. ".
+  Log $ll, "$type $name Found $sumValves Device(s): $sumFHT FHT, $sumHMCCTC HM-CC-TC. ".
          "demand: $sumDemand, idle: $valvesIdle, ignored: $sumIgnored, excluded: $sumExcluded, overdrive: $overdrive";
 
   readingsBeginUpdate($hash);
@@ -435,8 +456,6 @@ HCS_getValves($$) {
 
   return ($list) ? $ret : $heatDemand;
 }
-
-# vim: ts=2:et
 
 1;
 
@@ -502,6 +521,14 @@ HCS_getValves($$) {
     devices can also be excluded of the monitoring manually.
     <br><br>
 
+    To reduce the transmission load, use the attribute event-on-change-reading, e.g.
+    <code>attr &lt;name&gt; event-on-change-reading state,demand</code>
+    <br><br>
+
+    To avoid frequent switching "on" and "off" of the device, a timeout (in minutes) can be set
+    using the attribute <code>idleperiod</code>.
+    <br><br>
+
   <a name="HCSget"></a>
   <b>Get </b>
     <ul>
@@ -544,6 +571,9 @@ HCS_getValves($$) {
     </li><br>
     <li>deviceCmdOff<br>
         command to deactivate the device, e.g. <code>off</code>.
+    </li><br>
+    <li>idleperiod<br>
+        locks the device to be switched for the specified period. The unit is minutes.
     </li><br>
     <li>sensor<br>
         device name of the temp-sensor (optional).
