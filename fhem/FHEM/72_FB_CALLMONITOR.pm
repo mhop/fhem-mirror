@@ -26,7 +26,6 @@ FB_CALLMONITOR_Initialize($)
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
 
 # Provider
-  $hash->{SetFn}   = "FB_CALLMONITOR_Set";
   $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
@@ -71,18 +70,6 @@ FB_CALLMONITOR_Undef($$)
   return undef;
 }
 
-
-
-#####################################
-# Nothing can be set
-sub
-FB_CALLMONITOR_Set($@)
-{
-  my ($hash, @a) = @_;
-
-
-  return "Set command is not supported by this module";
-}
 
 
 #####################################
