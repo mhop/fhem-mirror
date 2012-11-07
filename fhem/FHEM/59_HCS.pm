@@ -284,7 +284,7 @@ HCS_setState($$) {
     my $eventOnUpdate = AttrVal($name,"event-on-update-reading","");
     if(!$eventOnChange ||
       ($eventOnUpdate && $eventOnUpdate =~ m/device/) || 
-      ($eventOnChange && ($eventOnChange =~ m/device/ || $eventOnChange == 1) && $cmd ne $stateDevice)) {
+      ($eventOnChange && $eventOnChange =~ m/device/  && $cmd ne $stateDevice)) {
       if(!$idlePeriod || ($idlePeriod && $diffPeriodTime >= $idlePeriod)) {
         my $cmdret = CommandSet(undef,"$device $cmd");
         $hash->{helper}{lastSend} = $newPeriodTime;
@@ -338,74 +338,76 @@ HCS_getValves($$) {
 
     # get current actuator state from each device
     $valveState = $defs{$d}{READINGS}{"actuator"}{VAL};
-    $valveState =~ s/[\s%]//g;
+    if($valveState) {
+      $valveState =~ s/[\s%]//g;
 
-    if($attr{$d}{ignore}) {
-      $value = "$valveState% (ignored)";
+      if($attr{$d}{ignore}) {
+        $value = "$valveState% (ignored)";
+        $valves{$defs{$d}{NAME}}{state} = $value;
+        $valves{$defs{$d}{NAME}}{demand} = 0;
+        $ret .= "$defs{$d}{NAME}: $value\n" if($list);
+        Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
+        $sumIgnored++;
+        $sumValves++;
+        $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
+        $sumHMCCTC++  if(defined($attr{$d}{model}) && $attr{$d}{model} eq "HM-CC-TC");
+        next;
+      }
+
+      if($excluded =~ m/$d/) {
+        $value = "$valveState% (excluded)";
+        $valves{$defs{$d}{NAME}}{state} = $value;
+        $valves{$defs{$d}{NAME}}{demand} = 0;
+        $ret .= "$defs{$d}{NAME}: $value\n" if($list);
+        Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
+        $sumExcluded++;
+        $sumValves++;
+        $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
+        $sumHMCCTC++  if(defined($attr{$d}{model}) && $attr{$d}{model} eq "HM-CC-TC");
+        next;
+      }
+
+      $value = "$valveState%";
       $valves{$defs{$d}{NAME}}{state} = $value;
-      $valves{$defs{$d}{NAME}}{demand} = 0;
-      $ret .= "$defs{$d}{NAME}: $value\n" if($list);
+      $ret .= "$defs{$d}{NAME}: $value" if($list);
       Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
-      $sumIgnored++;
-      $sumValves++;
-      $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
-      $sumHMCCTC++  if(defined($attr{$d}{model}) && $attr{$d}{model} eq "HM-CC-TC");
-      next;
-    }
 
-    if($excluded =~ m/$d/) {
-      $value = "$valveState% (excluded)";
-      $valves{$defs{$d}{NAME}}{state} = $value;
-      $valves{$defs{$d}{NAME}}{demand} = 0;
-      $ret .= "$defs{$d}{NAME}: $value\n" if($list);
-      Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
-      $sumExcluded++;
-      $sumValves++;
-      $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
-      $sumHMCCTC++  if(defined($attr{$d}{model}) && $attr{$d}{model} eq "HM-CC-TC");
-      next;
-    }
+      # get last readings
+      $valveLastDemand = ReadingsVal($name,$d."_demand",0);
 
-    $value = "$valveState%";
-    $valves{$defs{$d}{NAME}}{state} = $value;
-    $ret .= "$defs{$d}{NAME}: $value" if($list);
-    Log $ll+1, "$type $name $defs{$d}{NAME}: $value";
+      # check heat demand from each valve
+      if($valveState >= $valveThresholdOn) {
+        $heatDemand = 1;
+        $valveNewDemand = $heatDemand;
+        $ret .= " (demand)\n" if($list);
+        $sumDemand++;
+      } else {
 
-    # get last readings
-    $valveLastDemand = ReadingsVal($name,$d."_demand",0);
-
-    # check heat demand from each valve
-    if($valveState >= $valveThresholdOn) {
-      $heatDemand = 1;
-      $valveNewDemand = $heatDemand;
-      $ret .= " (demand)\n" if($list);
-      $sumDemand++;
-    } else {
-
-      if($valveLastDemand == 1) {
-        if($valveState > $valveThresholdOff) {
-          $heatDemand = 1;
-          $valveNewDemand = $heatDemand;
-          $ret .= " (demand)\n" if($list);
-          $sumDemand++;
+        if($valveLastDemand == 1) {
+          if($valveState > $valveThresholdOff) {
+            $heatDemand = 1;
+            $valveNewDemand = $heatDemand;
+            $ret .= " (demand)\n" if($list);
+            $sumDemand++;
+         } else {
+            $valveNewDemand = 0;
+            $ret .= " (idle)\n" if($list);
+            $valvesIdle++;
+          }
         } else {
           $valveNewDemand = 0;
           $ret .= " (idle)\n" if($list);
           $valvesIdle++;
         }
-      } else {
-        $valveNewDemand = 0;
-        $ret .= " (idle)\n" if($list);
-        $valvesIdle++;
       }
+
+      $valves{$defs{$d}{NAME}}{demand} = $valveNewDemand;
+
+      # count devices
+      $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
+      $sumHMCCTC++  if(defined($attr{$d}{model}) && $attr{$d}{model} eq "HM-CC-TC");
+      $sumValves++;
     }
-
-    $valves{$defs{$d}{NAME}}{demand} = $valveNewDemand;
-
-    # count devices
-    $sumFHT++     if($defs{$d}{TYPE} eq "FHT");
-    $sumHMCCTC++  if($attr{$d}{model} eq "HM-CC-TC");
-    $sumValves++;
   }
 
   # overdrive mode
@@ -591,6 +593,7 @@ HCS_getValves($$) {
     </li><br>
     <li>valvesExcluded<br>
         space separated list of devices (FHT or HM-CC-TC) for excluding
+    </li><br>
     <li>valveThresholdOn<br>
          see Set
     </li><br>
