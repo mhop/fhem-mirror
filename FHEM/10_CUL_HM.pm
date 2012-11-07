@@ -317,8 +317,7 @@ CUL_HM_Parse($$)
   my $id = CUL_HM_Id($iohash);
   # Msg format: Allnnffttssssssddddddpp...
   $msg =~ m/A(..)(..)(..)(..)(......)(......)(.*)/;
-  my @msgarr = ($1,$2,$3,$4,$5,$6,$7);
-  my ($len,$msgcnt,$msgFlag,$msgType,$src,$dst,$p) = @msgarr;
+  my ($len,$msgcnt,$msgFlag,$msgType,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
   $p = "" if(!defined($p));
   my $cmd = "$msgFlag$msgType"; #still necessary to maintain old style
   my $lcm = "$len$cmd";
@@ -376,7 +375,6 @@ CUL_HM_Parse($$)
   push @event, "powerOn"   if($parse eq "powerOn");
   
   my $sendAck = "yes";# if yes Ack will be determined automatically
-  $sendAck = "" if ($parse eq "STATresp");
 
   if ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
@@ -386,7 +384,6 @@ CUL_HM_Parse($$)
   }
   elsif($parse eq "done"){
     push @event, "";
-	$sendAck = ""; 
   } 
   elsif($lcm eq "09A112") {      #### Another fhem wants to talk (HAVE_DATA)
     ;
@@ -401,7 +398,6 @@ CUL_HM_Parse($$)
 	else {
       push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
     }
-    $sendAck = ""; #todo why is this special?
 	
   } 
   elsif(($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) && $st ne "keyMatic") {#### Pairing-Request-Convers.
@@ -439,7 +435,6 @@ CUL_HM_Parse($$)
       push @event, "unknown:$p";
 
     }
-	$sendAck = ""; #todo why is this special?
 
   } 
   elsif($model eq "HM-CC-TC") { ####################################
@@ -448,6 +443,11 @@ CUL_HM_Parse($$)
 	  $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
       $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
+	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+      $chnHash = $shash if (!$chnHash);
+	  CUL_HM_setRd($chnHash,"state"        ,"T: $t H: $h",$tn); 
+	  CUL_HM_setRd($chnHash,"measured-temp",$t           ,$tn); 
+	  CUL_HM_setRd($chnHash,"humidity"     ,$h           ,$tn); 
       push @event, "state:T: $t H: $h";
       push @event, "measured-temp:$t";
       push @event, "humidity:$h";
@@ -457,6 +457,8 @@ CUL_HM_Parse($$)
       my (   $d1,     $vp) = # adjust_command[0..4] adj_data[0..250]
          (    $1, hex($2));
       $vp = int($vp/2.56+0.5);   # valve position in %
+	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+	  CUL_HM_setRd($chnHash,"state","$vp %",$tn)if (!$chnHash);
       push @event, "actuator:$vp %";
 
       # Set the valve state too, without an extra trigger
@@ -468,14 +470,20 @@ CUL_HM_Parse($$)
     }
     elsif(($msgType eq '02' &&$sType eq '01')|| # ackStatus
 	      ($msgType eq '10' &&$sType eq '06')){  #infoStatus
-      push @event, "desired-temp:" .sprintf("%0.1f", hex(substr($p,4,2))/2);
+	  $chn = substr($p,2,2); 
+	  my $dTemp = sprintf("%0.1f", hex(substr($p,4,2))/2);
+	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+	  CUL_HM_setRd($chnHash,"desired-temp",$dTemp,$tn)if (!$chnHash);
+      push @event, "desired-temp:" .$dTemp;
     }
     elsif($msgType eq "10"){
+	  $chn = substr($p,2,2);
       if(   $p =~ m/^0403(......)(..)0505(..)0000/) {
 	    # change of chn 3(window) list 5 register 5 - a peer window changed!
         my ( $tdev,   $tchan,     $v1) = (($1), hex($2), hex($3));
 	    push @event, sprintf("windowopen-temp-%d: %.1f (sensor:%s)"
 	                        ,$tchan, $v1/2, $tdev);
+							#todo: This will never cleanup if a peer is deleted
       }
 	  elsif($p =~ m/^0402000000000(.)(..)(..)(..)(..)(..)(..)(..)(..)/) {
         # param list 5 or 6, 4 value pairs.
@@ -582,7 +590,8 @@ CUL_HM_Parse($$)
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = ($2,hex($3), hex($4));
       $vp = int($vp)/2;   # valve position in %
-      push @event, "ValvePosition:$vp%";
+      push @event, "ValvePosition:$vp%";#todo should be removed
+      push @event, "state:$vp%";
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
@@ -650,7 +659,6 @@ CUL_HM_Parse($$)
       } else {
         push @event, "state:$v";
       }
-	  $sendAck = ""; #todo why no ack?
     }
     
   } 
@@ -741,8 +749,9 @@ CUL_HM_Parse($$)
       if($id eq $dst) {  # Send Ack
         CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".
                 ($state =~ m/on/?"C8":"00")."00", 1, 0);#Actor simulation
+		$sendAck = "";
       }
-      $sendAck = ""; #todo why is this special?
+      
     }
   }
   elsif($st eq "virtual"){#####################################################
@@ -779,8 +788,9 @@ CUL_HM_Parse($$)
 		else {# just update datafields in storage
  	      my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
  	      my $mask = 3<<$bitLoc;
- 	      my $value = (hex($devState) &~$mask)|($msgState<<$bitLoc);
-		  CUL_HM_setRd($shash,"color",sprintf("%08X",$value),$tn);# to device!
+ 	      my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
+		  CUL_HM_setRd($shash,"color",$value,$tn);# to device!
+		  CUL_HM_setRd($shash,"state",$value,$tn);# to device!
  	      if ($chnHash){
  	        $shash = $chnHash;
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
@@ -798,7 +808,6 @@ CUL_HM_Parse($$)
           $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
           push @event, "state:$val";			
 	    }
-	    $sendAck = ""; ##no ack for those messages!
 	  }
 	}  
   } 
@@ -811,30 +820,32 @@ CUL_HM_Parse($$)
 	  my $cmpVal = defined($shash->{helper}{addVal})?
 	                      $shash->{helper}{addVal}:0xff;
 	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
-	  $shash->{helper}{addVal} = $err;#store to handle changes
+	  $shash->{helper}{addVal} = $err;   #store to handle changes
 	  my $bright = hex($state);
       push @event, "brightness:".$bright    
-	       if (ReadingsVal($name,"brightness","") != $bright);# post if changed
+	       if (ReadingsVal($name,"brightness","") ne $bright);# post if changed
       push @event, "cover:".   (($err&0x0E)?"open" :"closed") if ($cmpVal&0x0E);        
 	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  )   if ($cmpVal&0x80);
     }
-    elsif($msgType eq "41" && $p =~ m/^..(..)(..)(..)/) {
-	  my($cnt, $bright,$nextTr) = (hex($1), hex($2),(hex($3)>>4));
+    elsif($msgType eq "41" && $p =~ m/^01(..)(..)(..)/) {#01 is "motion"
+	  my($cnt,$nextTr) = (hex($1),(hex($3)>>4));
+	  $state = $2;
+	  my $bright = hex($state);
       push @event, "state:motion";
       push @event, "motion:on$target"; #added peterp
       push @event, "motionCount:".$cnt."_next:".$nextTr;
       push @event, "brightness:".$bright    
-	       if (ReadingsVal($name,"brightness","") != $bright);# post if changed
+	       if (ReadingsVal($name,"brightness","") ne $bright);# post if changed
     }
     elsif($msgType eq "70" && $p =~ m/^7F(..)(.*)/) {
 	  my($d1, $d2) = ($1, $2);
       push @event, 'devState_raw'.$d1.':'.$d2;
     }
-
-    CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101${state}00",1,0)
-      if($id eq $dst && $cmd ne "8002");  # Send AckStatus
-	$sendAck = ""; #todo why is this special?
-    
+	
+	if($id eq $dst && $cmd ne "8002" && $state){
+      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101${state}00",1,0);
+	  $sendAck = ""; #todo why is this special?
+	}
   } 
   elsif($st eq "smokeDetector") { #####################################
 	#Info Level: msgType=0x10 p(..)(..)(..) subtype=06, channel, state (1 byte)
@@ -889,9 +900,10 @@ CUL_HM_Parse($$)
       push @event, "SDunknownMsg:$p" if(!@event);
 	}
 	
-    CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src.($cmd eq "A001" ? "80":"00"),1,0)
-          if($id eq $dst && $cmd ne "8002");  # Send Ack/Nack
-	$sendAck = ""; #todo why is this special?
+	if($id eq $dst && $cmd ne "8002"){  # Send Ack/Nack
+      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src.($cmd eq "A001" ? "80":"00"),1,0);
+      $sendAck = ""; #todo why is this special?
+	}
   } 
   elsif($st eq "threeStateSensor") { #####################################
     #todo: check for correct msgType, see below
@@ -928,10 +940,11 @@ CUL_HM_Parse($$)
       $txt = "unknown:$state" if(!$txt);
       push @event, "state:$txt";
 	  push @event, "contact:$txt$target";
-
-      CUL_HM_SendCmd($shash, $msgcnt."8002$id$src${chn}00",1,0)  # Send Ack
-                             if($id eq $dst);
-      $sendAck = ""; #todo why is this special?
+	  
+      if($id eq $dst){
+        CUL_HM_SendCmd($shash, $msgcnt."8002$id$src${chn}00",1,0);  # Send Ack
+        $sendAck = ""; #todo why is this special?
+	  }
     }
     push @event, "3SSunknownMsg:$p" if(!@event);
   } 
@@ -948,8 +961,6 @@ CUL_HM_Parse($$)
     push @event, "temperature:$t";#temp is always there
     push @event, "humidity:$h"      if ($h);
     push @event, "airpress:$ap"     if ($ap);
-    $sendAck = "";
-
   } 
   elsif($st eq "winMatic") {  ####################################
     
@@ -1043,10 +1054,11 @@ CUL_HM_Parse($$)
   #        parser did not supress 
   CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00",1,0)  # Send Ack
       if(   ($id eq $dst) 			#are we adressee 
-	     && ($msgType ne "02") 		#no ack for ack
+#	     && ($msgType ne "02") 		#no ack for ack
+	     && (hex($msgFlag)&0x20) 	#response required Flag
 		 && @event  				#only ack of we identified it
-		 && ($sendAck eq "yes"));  	#sender requested ACK
-	  
+		 && ($sendAck eq "yes")		#sender requested ACK
+		 );  	
   #------------ process events ------------------
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
 
@@ -1065,7 +1077,7 @@ CUL_HM_Parse($$)
       }
     } 
 	else {
-      push @changed, ($vn.": ".(($vv)?$vv:"-"));
+      push @changed, ($vn.": ".((defined($vv)&&$vv ne "")?$vv:"-"));
     }
 	CUL_HM_setRd($shash,$vn,$vv,$tn);
   }
@@ -2800,7 +2812,7 @@ my %culHmBits = (
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
                      "BURST", "BIDI", "RPTED", "RPTEN");
-
+                     #BIDI: response is expected
 
 sub
 CUL_HM_DumpProtocol($$@)
