@@ -747,20 +747,21 @@ FP_input(@)
     <li><a name="fp_fpname">userattr fp_&lt;name&gt; &lt;top&gt;,&lt;left&gt;[,&lt;style&gt;[,&lt;description&gt;]]</a><br><br>
     A <a href="#userattr">userattr</a> fp_&lt;name&gt; will be created automatically if it does not exist yet.<br>
 	<ul>
-      <li>top   = screen-position, pixels from top of screen
-      <li>left  = screen-position, pixels from left of screen
+      <li>top   = screen-position, pixels from top of screen</li>
+      <li>left  = screen-position, pixels from left of screen</li>
       <li>style =
 		<ul>
-			<li>0  icon/state only
-			<li>1  devicename and icon/state
-			<li>2  devicename, icon/state and commands
-			<li>3  device-reading and optional description
-			<li>4  S300TH-specific, displays temperature above humidity
-			<li>5  icon/state and commands
-			<li>6  device-reading, reading-timestamp and optional description
+			<li>0  icon/state only</li>
+			<li>1  devicename and icon/state</li>
+			<li>2  devicename, icon/state and commands</li>
+			<li>3  device-reading and optional description</li>
+			<li>4  S300TH-specific, displays temperature above humidity</li>
+			<li>5  icon/state and commands</li>
+			<li>6  device-reading, reading-timestamp and optional description</li>
 		</ul>
-      <li>description will be displayed instead of the original devicename
-    </ul><br>
+	  </li>
+      <li>description will be displayed instead of the original devicename</li>
+    </ul></li><br>
     Examples:<br>
     <ul>
 		<table>
@@ -778,10 +779,10 @@ FP_input(@)
 	  allowing to place devices easily on the screen.<br>
 	  Example:
 	<ul>
-        <code>attr Groundfloor fp_arrange 1</code><br>
+      <code>attr Groundfloor fp_arrange 1</code><br>
 	  <code>attr Groundfloor fp_arrange detail  #displays the devices with infos room, type, alias</code><br>
 	  <code>attr Groundfloor fp_arrange WEB     #activates arrange mode for frontend-device WEB only</code><br><br>
-        </ul>
+    </ul>
     </li>
     <li><a name="stylesheet">stylesheet</a><br>
 	Explicitely sets your personal stylesheet for the floorplan. This overrides the standard stylesheet.
@@ -791,8 +792,8 @@ FP_input(@)
 	stylesheet along with <code>floorplanstyle.css</code> in the same folder.<br>
 	Example:
 	<ul>
-          <code>attr Groundfloor stylesheet myfloorplanstyle.css</code><br><br>
-        </ul>
+       <code>attr Groundfloor stylesheet myfloorplanstyle.css</code><br><br>
+    </ul>
     </li>
 
 	<li><a name="fp_default">fp_default</a><br>
