@@ -352,6 +352,7 @@ sub TRX_LIGHT_parse_X10 {
   	return $error;
   }
 
+  if ($dev_type eq "BBSB") { return " "; } # ignore BBSB messages temporarily because of receiving problems  
 
   my $device;
   my $data;
