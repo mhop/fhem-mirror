@@ -11,6 +11,10 @@
 # * "RTHN318"	is RTHN318
 # * "TX3_T" 	is LaCrosse TX3, TX4, TX17
 # * "TS15C" 	is TS15C
+# * "VIKING_02811" is Viking 02811
+# * "WS2300"    is La Crosse WS2300
+# * "RUBICSON"  is RUBiCSON
+# * "TFA_303133" is TFA 30.3133
 #
 # temperature/humidity sensors (TEMPHYDRO):
 # * "THGR228N"	is THGN122/123, THGN132, THGR122/228/238/268
@@ -378,6 +382,10 @@ sub TRX_WEATHER_common_temp {
 	0x04 => "RTHN318",
 	0x05 => "TX3", # LaCrosse TX3
 	0x06 => "TS15C", 
+	0x07 => "VIKING_02811", # Viking 02811
+	0x08 => "WS2300", # La Crosse WS2300
+	0x09 => "RUBICSON", # RUBiCSON
+	0x0a => "TFA_303133", # TFA 30.3133
   );
 
   if (exists $devname{$bytes->[1]}) {
