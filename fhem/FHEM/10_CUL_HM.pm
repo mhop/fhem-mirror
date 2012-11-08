@@ -2348,7 +2348,9 @@ CUL_HM_infoUpdtDevData($$$){
   $mId = CUL_HM_getMId($hash);# set helper valiable and use result 
   
   # autocreate undefined channels  
+  Log 1,"General start timer";
   my @chanTypesList = split(',',$culHmModel{$mId}{chn});
+  my $startime = gettimeofday()+1;
   foreach my $chantype (@chanTypesList){
     my ($chnTpName,$chnStart,$chnEnd) = split(':',$chantype);
 	my $chnNoTyp = 1;
@@ -2357,7 +2359,10 @@ CUL_HM_infoUpdtDevData($$$){
 	  if (!$modules{CUL_HM}{defptr}{$chnId}){
         my $chnName = $name."_".$chnTpName.(($chnStart == $chnEnd)?
 	                            '':'_'.sprintf("%02d",$chnNoTyp));
-	    DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
+		InternalTimer($startime++,"CUL_HM_infoUpdtChanData",
+		"$chnName,$chnId,$model",0);
+		Log 1,"General timer:$chnName,$chnId,$model";
+	    #DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
       }
 	  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 	  $chnNoTyp++;
@@ -2367,6 +2372,15 @@ CUL_HM_infoUpdtDevData($$$){
     CUL_HM_ActAdd($hash->{DEF},$culHmModel{$mId}{cyc});
   }
 
+}
+sub
+CUL_HM_infoUpdtChanData(@)
+{# delay this to ensure the device is already available
+  my($in ) = @_;
+  my($chnName,$chnId,$model ) = split(',',$in);
+  Log 1,"General updateChannel:".$chnName;
+  DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
+  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 }
 ###################################
 sub
