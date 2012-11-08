@@ -1,5 +1,5 @@
 ################################################################
-# $Id: $
+# $Id$
 # vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
@@ -125,7 +125,7 @@ sub
 HCS_checkState($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
-  my $interval = $attr{$name}{interval};
+  my $interval = AttrVal($name,"interval",10);
   my $timer;
   my $ret;
 
@@ -242,6 +242,7 @@ HCS_setState($$) {
   my $type = $hash->{TYPE};
   my $ll = AttrVal($name,"loglevel",3);
   my $device       = AttrVal($name,"device","");
+  my $deviceState  = Value($device);
   my $deviceCmdOn  = AttrVal($name,"deviceCmdOn","on");
   my $deviceCmdOff = AttrVal($name,"deviceCmdOff","off");
   my $idlePeriod   = AttrVal($name,"idleperiod",0);
@@ -282,9 +283,12 @@ HCS_setState($$) {
   if($defs{$device}) {
     my $eventOnChange = AttrVal($name,"event-on-change-reading","");
     my $eventOnUpdate = AttrVal($name,"event-on-update-reading","");
+
     if(!$eventOnChange ||
       ($eventOnUpdate && $eventOnUpdate =~ m/device/) || 
-      ($eventOnChange && $eventOnChange =~ m/device/  && $cmd ne $stateDevice)) {
+      ($eventOnChange && $eventOnChange =~ m/device/  && 
+      ($cmd ne $stateDevice || $deviceState ne $stateDevice))) {
+
       if(!$idlePeriod || ($idlePeriod && $diffPeriodTime >= $idlePeriod)) {
         my $cmdret = CommandSet(undef,"$device $cmd");
         $hash->{helper}{lastSend} = $newPeriodTime;
@@ -293,6 +297,7 @@ HCS_setState($$) {
       } elsif($idlePeriod && $diffPeriodTime < $idlePeriod) {
         Log $ll, "$type $name device $device blocked by idleperiod ($idlePeriod min.)";
       }
+
     }
   } else {
     Log 1, "$type $name device '$device' does not exists.";
@@ -338,7 +343,7 @@ HCS_getValves($$) {
 
     # get current actuator state from each device
     $valveState = $defs{$d}{READINGS}{"actuator"}{VAL};
-    if($valveState) {
+    if($valveState || $valveState eq "0") {
       $valveState =~ s/[\s%]//g;
 
       if($attr{$d}{ignore}) {
