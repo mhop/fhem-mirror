@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 99_WOL.pm 1116 2012-01-21 15:01:34Z matthiasklass $
+# $Id$
 package main;
 
 use strict;

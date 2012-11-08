@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 98_telnet.pm 1098 2011-11-12 07:51:08Z rudolfkoenig $
+# $Id$
 
 # Note: this is not really a telnet server, but a TCP server with slight telnet
 # features (disable echo on password)

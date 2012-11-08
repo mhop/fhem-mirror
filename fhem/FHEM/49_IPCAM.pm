@@ -1,5 +1,5 @@
-################################################################
 # $Id$
+################################################################
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved
@@ -260,7 +260,7 @@ IPCAM_getSnapshot($) {
     print FH $snapshot;
     close(FH);
     Log 5, "IPCAM $name snapshot $storage/$imageFile written.";
-    readingsUpdate($hash,"last",$lastSnapshot);
+    readingsBulkUpdate($hash,"last",$lastSnapshot);
     $hash->{STATE} = "last: $dateTime";
     $hash->{READINGS}{"snapshot$seqF"}{TIME} = $dateTime;
     $hash->{READINGS}{"snapshot$seqF"}{VAL}  = $imageFile;
@@ -269,7 +269,7 @@ IPCAM_getSnapshot($) {
   Log GetLogLevel($name,4), "IPCAM $name image: $imageFile";
 
   if($seq == $seqImages) {
-    readingsUpdate($hash,"snapshots",$seq);
+    readingsBulkUpdate($hash,"snapshots",$seq);
     $seq = 0;
   }
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1));

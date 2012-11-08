@@ -8,6 +8,8 @@
   - feature: autoloading commands, XmlList/etc renamed from 99 to 98.
   - feature: FHEMWEB returns external files in chunks to save memory
   - feature: commandref.html splitted: documentation is now appended to the modules.
+  - change: introduced readingsBulkUpdate, readingsSingleUpdate
+  - change: added GPLv2 licensing information
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect, UntoggleIndirect

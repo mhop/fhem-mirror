@@ -1,14 +1,30 @@
-##############################################
-#
-# Modul: FB_CALLMONITOR
-#
-# Connects to a FritzBox Fon via network.
-#
-# When a call is received or takes place it creates an event with further call informations.
-#
-# This module has no sets or gets as it is only used for event triggering.
-#
 # $Id$
+##############################################################################
+#
+#     72_FB_CALLMONITOR.pm
+#     Connects to a FritzBox Fon via network.
+#     When a call is received or takes place it creates an event with further call informations.
+#     This module has no sets or gets as it is only used for event triggering.
+#
+#     Copyright by Markus Bloch
+#     e-mail:
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
 
 package main;
 
@@ -99,13 +115,13 @@ FB_CALLMONITOR_Read($)
  
    @array = split(";", $data);
    readingsBeginUpdate($hash);
-   readingsUpdate($hash, "event", lc($array[1]));
-   readingsUpdate($hash, "external_number", $array[3]) if(not $array[3] eq "0" and $array[1] eq "RING");
-   readingsUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING");
-   readingsUpdate($hash, "external_number" , $array[5]) if($array[1] eq "CALL");
-   readingsUpdate($hash, "internal_number", $array[4]) if($array[1] eq "CALL");
-   readingsUpdate($hash, "used_connection", $array[5]) if($array[1] eq "RING");
-   readingsUpdate($hash, "used_connection", $array[6]) if($array[1] eq "CALL");
+   readingsBulkUpdate($hash, "event", lc($array[1]));
+   readingsBulkUpdate($hash, "external_number", $array[3]) if(not $array[3] eq "0" and $array[1] eq "RING");
+   readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING");
+   readingsBulkUpdate($hash, "external_number" , $array[5]) if($array[1] eq "CALL");
+   readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "CALL");
+   readingsBulkUpdate($hash, "used_connection", $array[5]) if($array[1] eq "RING");
+   readingsBulkUpdate($hash, "used_connection", $array[6]) if($array[1] eq "CALL");
 
  
    readingsEndUpdate($hash, 1);

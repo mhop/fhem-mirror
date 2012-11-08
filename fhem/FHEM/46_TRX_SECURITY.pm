@@ -1,27 +1,29 @@
-#################################################################################
-# 46_TRX_SECURITY.pm
+# $Id$
+##############################################################################
 #
-# FHEM module for X10, KD101, Visonic
+#     46_TRX_LIGHT.pm
+#     FHEM module for X10, KD101, Visonic
+#     Copyright by Willi Herzig
+#     e-mail:
 #
-# Copyright (C) 2012 Willi Herzig
+#     This file is part of fhem.
 #
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# as published by the Free Software Foundation; either version 2
-# of the License, or (at your option) any later version.
-# 
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
 #
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
 #
-# The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
-##################################
+##############################################################################
+
+#
 #
 # values for "set global verbose"
 # 4: log unknown protocols
@@ -284,12 +286,12 @@ sub TRX_SECURITY_parse_X10Sec {
   	if ($firstdevice == 1) {
 		$val .= $current;
   	}
-	readingsUpdate($def, $sensor, $current);
+	readingsBulkUpdate($def, $sensor, $current);
 
 	# KD101 does not show normal, so statechange does not make sense
   	if (($def->{STATE} ne $val) && ($device_type ne "KD101")) { 
 		$sensor = "statechange";
-		readingsUpdate($def, $sensor, $current);
+		readingsBulkUpdate($def, $sensor, $current);
   	}
   } else {
 	# kr18 remote control or VISONIC_REMOTE
@@ -297,12 +299,12 @@ sub TRX_SECURITY_parse_X10Sec {
 
 	#$sensor = $def->{TRX_SECURITY_devicelog};
 	$val = $current;
-	readingsUpdate($def, $sensor, $current);
+	readingsBulkUpdate($def, $sensor, $current);
 
 	my @cmd_split = split(/-/, $command);
 	$sensor = $cmd_split[0];
 	$current = $cmd_split[1];
-	readingsUpdate($def, $sensor, $current);
+	readingsBulkUpdate($def, $sensor, $current);
   }
 
   if ($battery ne "") {
@@ -310,7 +312,7 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "Error";
 	$current = "ok" if ($battery eq "batt_ok");
 	$current = "low" if ($battery eq "batt_low");
-	readingsUpdate($def, $sensor, $current);
+	readingsBulkUpdate($def, $sensor, $current);
   }
 
   if ($delay ne '') {
@@ -318,12 +320,12 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "Error";
 	$current = "min" if ($delay eq "min_delay");
 	$current = "max" if ($delay eq "max_delay");
-	readingsUpdate($def, $sensor, $current);
+	readingsBulkUpdate($def, $sensor, $current);
   }
 
   if (($firstdevice == 1) && $val) {
   	$def->{STATE} = $val;
-	readingsUpdate($def, "state", $val);
+	readingsBulkUpdate($def, "state", $val);
   }
 
   readingsEndUpdate($def, 1);

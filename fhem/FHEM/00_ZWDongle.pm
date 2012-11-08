@@ -1,5 +1,5 @@
 ##############################################
-# $Id: 00_ZWDongle.pm 1721 2012-07-11 14:48:24Z rudolfkoenig $
+# $Id$
 # TODO:
 # - routing commands
 # - one command to create a fhem device for all nodeList entries
