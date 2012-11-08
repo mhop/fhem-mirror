@@ -59,10 +59,32 @@ YAMAHA_AVR_GetStatus($;$)
     return "" if(!defined($hash->{ADDRESS}) or !defined($hash->{INTERVAL}));
     
     my $device = $hash->{ADDRESS};
+    
+    
+    
+    if(not defined($hash->{MODEL}))
+    {
+      getModel($hash, $device);
+    }
+    
+    if(not defined($hash->{INPUTS}) or length($hash->{INPUTS}) == 0)
+    {
+	getInputs($hash, $device);
+    }
+    
+    
+    
     my $return = SendCommand($device,"<YAMAHA_AV cmd=\"GET\"><Main_Zone><Basic_Status>GetParam</Basic_Status></Main_Zone></YAMAHA_AV>");
 
-
-    return "Can't submit command. please see fhem logfile for further information" if(not defined($return) or length($return) == 0);
+    Log GetLogLevel($name, 4), "YANMAHA_AVR: GetStatus-Request returned:\n$return";
+    
+    if($return eq "")
+    {
+    
+	$hash->{STATE} = "unknown";
+	return;
+    }
+    
     
     readingsBeginUpdate($hash);
     
@@ -137,8 +159,10 @@ YAMAHA_AVR_Set($@)
     my $address = $hash->{ADDRESS};
     my $result = "";
     my $command;
-    my $inputs_piped = InputParamToFhemInput(lc($hash->{INPUTS}), 0);
-    my $inputs_comma = InputParamToFhemInput(lc($hash->{INPUTS}), 1);
+    
+    
+    my $inputs_piped = defined($hash->{INPUTS}) ? InputParamToFhemInput(lc($hash->{INPUTS}), 0) : "" ;
+    my $inputs_comma = defined($hash->{INPUTS}) ? InputParamToFhemInput(lc($hash->{INPUTS}), 1) : "" ;
    
     return "No Argument given" if(!defined($a[1]));     
  
@@ -168,7 +192,8 @@ YAMAHA_AVR_Set($@)
 	    if($hash->{STATE} eq "on")
 	    {
 	        $inputs_piped =~ s/,/|/g;
-	        
+	     if(not $inputs_piped eq "")
+	     {    
 		if($a[2] =~ /^($inputs_piped)$/)
 		{
 		    $command = getCommandParam($hash, $a[2]);
@@ -191,12 +216,23 @@ YAMAHA_AVR_Set($@)
 		{
 		    return $usage;
 		}
+	      }
+	      else
+	      {
+	        return "No inputs are avaible. Please try an statusUpdate.";
+	      }
+	     
 	    }
 	    else
 	    {
 		return "input can only be used when device is powered on";
 	    }
 	}
+	else
+	{
+	    return $inputs_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
+	}
+	
     }
     elsif($what eq "mute")
     {
@@ -298,7 +334,6 @@ YAMAHA_AVR_Define($$)
     my ($hash, $def) = @_;
     my @a = split("[ \t][ \t]*", $def);
     my $name = $hash->{NAME};
-    my @inputs;
     
     if(! @a >= 3)
     {
@@ -310,31 +345,7 @@ YAMAHA_AVR_Define($$)
 
     my $address = $a[2];
   
-    my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
-    if($response =~ /<Unit_Description.* Unit_Name="(.+?)">/)
-    {
-        $hash->{MODEL} = $1;
-    }
-
     $hash->{ADDRESS} = $address;
-  
-    $response = SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></Main_Zone></YAMAHA_AV>");
-    $response =~ s/></>\n</g;
-    @inputs = split("\n", $response);
-    
-    foreach (sort @inputs)
-    {
-	if($_ =~ /<Param>(.+?)<\/Param>/)
-	{
-	    if(defined($hash->{INPUTS}) and length($hash->{INPUTS}) > 0)
-	    {
-	      $hash->{INPUTS} .= "|";
-	    }
-	  
-	      $hash->{INPUTS} .= $1;
-	    
-	}
-    }
     
     
     if(defined($a[3]) and $a[3] > 0)
@@ -406,6 +417,41 @@ sub getCommandParam($$)
     
     return undef;
     
+}
+
+
+sub getModel($$)
+{
+    my ($hash, $address) = @_;
+    my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
+    if($response =~ /<Unit_Description.* Unit_Name="(.+?)">/)
+    {
+        $hash->{MODEL} = $1;
+    }
+}
+
+sub getInputs($$)
+{
+
+    my ($hash, $address) = @_;  
+    my $response = SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></Main_Zone></YAMAHA_AV>");
+    $response =~ s/></>\n</g;
+    my @inputs = split("\n", $response);
+    
+    foreach (sort @inputs)
+    {
+	if($_ =~ /<Param>(.+?)<\/Param>/)
+	{
+	    if(defined($hash->{INPUTS}) and length($hash->{INPUTS}) > 0)
+	    {
+	      $hash->{INPUTS} .= "|";
+	    }
+	  
+	      $hash->{INPUTS} .= $1;
+	    
+	}
+    }
+
 }
 
 
