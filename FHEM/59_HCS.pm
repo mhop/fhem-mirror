@@ -1,5 +1,5 @@
-################################################################
 # $Id$
+################################################################
 # vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
@@ -227,7 +227,7 @@ HCS_Set($@) {
     #$hash->{STATE} = "off";
     $hash->{NEXTCHECK} = "offline";
     readingsBeginUpdate($hash);
-    readingsUpdate($hash, "state", "off");
+    readingsBulkUpdate($hash, "state", "off");
     readingsEndUpdate($hash, 1);
     Log 1, "$type $name monitoring of valves interrupted";
   }
@@ -275,9 +275,9 @@ HCS_setState($$) {
   $stateDevice = ReadingsVal($name,"device","");
 
   readingsBeginUpdate($hash);
-  readingsUpdate($hash, "device", $cmd);
-  readingsUpdate($hash, "overdrive", $overdrive) if($sensor);
-  readingsUpdate($hash, "state", $state);
+  readingsBulkUpdate($hash, "device", $cmd);
+  readingsBulkUpdate($hash, "overdrive", $overdrive) if($sensor);
+  readingsBulkUpdate($hash, "state", $state);
   readingsEndUpdate($hash, 1);
 
   if($defs{$device}) {
@@ -455,10 +455,10 @@ HCS_getValves($$) {
 
   readingsBeginUpdate($hash);
   for my $d (sort keys %valves) {
-    readingsUpdate($hash, $d."_state", $valves{$d}{state});
-    readingsUpdate($hash, $d."_demand", $valves{$d}{demand});
+    readingsBulkUpdate($hash, $d."_state", $valves{$d}{state});
+    readingsBulkUpdate($hash, $d."_demand", $valves{$d}{demand});
   }
-  readingsUpdate($hash, "sensor", $tempValue) if(defined($tempValue) && $tempValue ne "");
+  readingsBulkUpdate($hash, "sensor", $tempValue) if(defined($tempValue) && $tempValue ne "");
   readingsEndUpdate($hash, 1);
 
   return ($list) ? $ret : $heatDemand;

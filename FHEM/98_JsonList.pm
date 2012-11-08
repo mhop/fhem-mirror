@@ -431,7 +431,7 @@ CommandJsonList($$)
               "room": "Server",
               "statefile": "/var/cache/fhem/fhem.save",
               "verbose": "4",
-              "version": "=VERS= from =DATE= ($Id: fhem.pl,v $)"
+              "version": "=VERS= from =DATE= ($Id$)"
             },
             "READINGS": []
           }

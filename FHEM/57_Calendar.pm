@@ -1,12 +1,26 @@
-#
-#
-#
-# 57_Calendar.pm
-# written by Dr. Boris Neubert 2012-06-01
-# e-mail: omega at online dot de
-#
-##############################################
 # $Id$
+##############################################################################
+#
+#     57_Calendar.pm
+#     Copyright by Dr. Boris Neubert
+#     e-mail: omega at online dot de
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
 
 # Todos:
 #  Support recurring events
@@ -653,16 +667,16 @@ sub Calendar_CheckTimes($) {
   readingsBeginUpdate($hash); # clears all events in CHANGED, thus must be called first
   # we create one fhem event for one changed calendar event
   map { addEvent($hash, "changed: " . $_->uid() . " " . $_->mode() ); } @changedevents;
-  readingsUpdate($hash, "lastCheck", $hash->{fhem}{lastCheck});
-  readingsUpdate($hash, "modeUpcoming", join(";", @upcoming));
-  readingsUpdate($hash, "modeAlarm", join(";", @alarm));
-  readingsUpdate($hash, "modeAlarmed", join(";", @alarmed));
-  readingsUpdate($hash, "modeAlarmOrStart", join(";", @alarm,@start));
-  readingsUpdate($hash, "modeChanged", join(";", @changed));
-  readingsUpdate($hash, "modeStart", join(";", @start));
-  readingsUpdate($hash, "modeStarted", join(";", @started));
-  readingsUpdate($hash, "modeEnd", join(";", @end));
-  readingsUpdate($hash, "modeEnded", join(";", @ended));
+  readingsBulkUpdate($hash, "lastCheck", $hash->{fhem}{lastCheck});
+  readingsBulkUpdate($hash, "modeUpcoming", join(";", @upcoming));
+  readingsBulkUpdate($hash, "modeAlarm", join(";", @alarm));
+  readingsBulkUpdate($hash, "modeAlarmed", join(";", @alarmed));
+  readingsBulkUpdate($hash, "modeAlarmOrStart", join(";", @alarm,@start));
+  readingsBulkUpdate($hash, "modeChanged", join(";", @changed));
+  readingsBulkUpdate($hash, "modeStart", join(";", @start));
+  readingsBulkUpdate($hash, "modeStarted", join(";", @started));
+  readingsBulkUpdate($hash, "modeEnd", join(";", @end));
+  readingsBulkUpdate($hash, "modeEnded", join(";", @ended));
   readingsEndUpdate($hash, 1); # DoTrigger, because sub is called by a timer instead of dispatch
   
 }  
@@ -729,13 +743,13 @@ sub Calendar_GetUpdate($) {
 
   #$hash->{STATE}= $val;
   readingsBeginUpdate($hash);
-  readingsUpdate($hash, "calname", $calname);
-  readingsUpdate($hash, "lastUpdate", $hash->{fhem}{lastUpdate});
-  readingsUpdate($hash, "all", join(";", @all));
-  readingsUpdate($hash, "stateNew", join(";", @new));
-  readingsUpdate($hash, "stateUpdated", join(";", @updated));
-  readingsUpdate($hash, "stateDeleted", join(";", @deleted));
-  readingsUpdate($hash, "stateChanged", join(";", @changed));
+  readingsBulkUpdate($hash, "calname", $calname);
+  readingsBulkUpdate($hash, "lastUpdate", $hash->{fhem}{lastUpdate});
+  readingsBulkUpdate($hash, "all", join(";", @all));
+  readingsBulkUpdate($hash, "stateNew", join(";", @new));
+  readingsBulkUpdate($hash, "stateUpdated", join(";", @updated));
+  readingsBulkUpdate($hash, "stateDeleted", join(";", @deleted));
+  readingsBulkUpdate($hash, "stateChanged", join(";", @changed));
   readingsEndUpdate($hash, 1); # DoTrigger, because sub is called by a timer instead of dispatch
 
   $t+= $hash->{fhem}{interval};

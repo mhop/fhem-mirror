@@ -1,4 +1,6 @@
-#################################################################################
+# $Id$
+##############################################################################
+#
 # 46_TRX_WEATHER.pm
 # FHEM module to decode weather sensor messages for RFXtrx
 #
@@ -803,21 +805,21 @@ TRX_WEATHER_Parse($$)
 			$val .= "T: ".$i->{current}." ";
 
 			$sensor = "temperature";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "chilltemp") { 
 			#printf "Temperatur %2.1f %s ; ",$i->{current},$i->{units};
 			$val .= "CT: ".$i->{current}." ";
 
 			$sensor = "windchill";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
   	} 
 	elsif ($i->{type} eq "humidity") { 
 			#printf "Luftfeuchtigkeit %d%s, %s ;",$i->{current},$i->{units},$i->{string};
 			$val .= "H: ".$i->{current}." ";
 
 			$sensor = "humidity";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "battery") { 
 			#printf "Batterie %d%s; ",$i->{current},$i->{units};
@@ -826,7 +828,7 @@ TRX_WEATHER_Parse($$)
 			$val .= "BAT: ".$words[0]." "; #use only first word
 
 			$sensor = "battery";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "pressure") { 
 			#printf "Luftdruck %d %s, Vorhersage=%s ; ",$i->{current},$i->{units},$i->{forecast};
@@ -834,65 +836,65 @@ TRX_WEATHER_Parse($$)
 			$val .= "P: ".$i->{current}." ";
 
 			$sensor = "pressure";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 
 			$sensor = "forecast";			
-			readingsUpdate($def, $sensor, $i->{forecast});
+			readingsBulkUpdate($def, $sensor, $i->{forecast});
 	}
 	elsif ($i->{type} eq "speed") { 
 			$val .= "W: ".$i->{current}." ";
 			$val .= "WA: ".$i->{average}." ";
 
 			$sensor = "wind_speed";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 
 			$sensor = "wind_avspeed";			
-			readingsUpdate($def, $sensor, $i->{average});
+			readingsBulkUpdate($def, $sensor, $i->{average});
 	}
 	elsif ($i->{type} eq "direction") { 
 			$val .= "WD: ".$i->{current}." ";
 			$val .= "WDN: ".$i->{string}." ";
 
 			$sensor = "wind_dir";
-			readingsUpdate($def, $sensor, $i->{current} . " " . $i->{string});
+			readingsBulkUpdate($def, $sensor, $i->{current} . " " . $i->{string});
 	}
 	elsif ($i->{type} eq "rain") { 
 			$val .= "RR: ".$i->{current}." ";
 
 			$sensor = "rain_rate";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "train") { 
 			$val .= "TR: ".$i->{current}." ";
 
 			$sensor = "rain_total";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "flip") { 
 			$val .= "F: ".$i->{current}." ";
 
 			$sensor = "rain_flip";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "uv") { 
 			$val .= "UV: ".$i->{current}." ";
 			$val .= "UVR: ".$i->{risk}." ";
 
 			$sensor = "uv_val";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 
 			$sensor = "uv_risk";			
-			readingsUpdate($def, $sensor, $i->{risk});
+			readingsBulkUpdate($def, $sensor, $i->{risk});
 	}
 	elsif ($i->{type} eq "weight") { 
 			$val .= "W: ".$i->{current}." ";
 
 			$sensor = "weight";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	elsif ($i->{type} eq "hexline") { 
 			$sensor = "hexline";			
-			readingsUpdate($def, $sensor, $i->{current});
+			readingsBulkUpdate($def, $sensor, $i->{current});
 	}
 	else { 
 			print "\nTRX_WEATHER: Unknown: "; 
@@ -906,7 +908,7 @@ TRX_WEATHER_Parse($$)
     $val =~ s/^\s+|\s+$//g;
 
     $def->{STATE} = $val;
-    readingsUpdate($def, "state", $val);
+    readingsBulkUpdate($def, "state", $val);
   }
 
   readingsEndUpdate($def, 1);

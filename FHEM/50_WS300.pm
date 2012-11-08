@@ -1,3 +1,4 @@
+# $Id$
 ################################################################
 #
 #  Copyright notice
@@ -33,7 +34,7 @@
 # define ws300		WS300	9		(always 9)
 # set WS300Device <interval(5-60 min.)> <height(0-2000 m)> <rainvalume(ml)>
 ################################################################
-# $Id$
+
 
 package main;
 
@@ -287,15 +288,15 @@ WS300_Parse($$)
           # state
 	  $val = "T: $t  H: $h  Bat: $b  LR: $l";
 	  $def->{STATE} = $val;
-          readingsUpdate($def, 'state', $val);
+          readingsBulkUpdate($def, 'state', $val);
           # temperature
-          readingsUpdate($def, $txt[0], $t);
+          readingsBulkUpdate($def, $txt[0], $t);
           # humidity
-          readingsUpdate($def, $txt[1], $h);
+          readingsBulkUpdate($def, $txt[1], $h);
           # battery
-          readingsUpdate($def, $txt[5], $b);
+          readingsBulkUpdate($def, $txt[5], $b);
           # lost receives
-          readingsUpdate($def, $txt[6], $l);
+          readingsBulkUpdate($def, $txt[6], $l);
           
           Log $ll, "WS300 $def->{NAME}: $val";
 
@@ -307,26 +308,26 @@ WS300_Parse($$)
           # state
           $val = "T: $t  H: $h  W: $wind  R: $rain  IR: $ir  Bat: $b  LR: $l";
 	  $def->{STATE} = $val;
-          readingsUpdate($def, 'state', $val);
+          readingsBulkUpdate($def, 'state', $val);
 
           $def->{CHANGED}[0] = $val;
           $def->{CHANGETIME}[0] = $tm;
           # temperature
-          readingsUpdate($def, $txt[0], $t);
+          readingsBulkUpdate($def, $txt[0], $t);
           # humidity
-          readingsUpdate($def, $txt[1], $h);
+          readingsBulkUpdate($def, $txt[1], $h);
           # wind
-          readingsUpdate($def, $txt[2], $wind);
+          readingsBulkUpdate($def, $txt[2], $wind);
           # rain counter
-          readingsUpdate($def, $txt[3], $rainc);
+          readingsBulkUpdate($def, $txt[3], $rainc);
           # is raining
-          readingsUpdate($def, $txt[4], $ir);
+          readingsBulkUpdate($def, $txt[4], $ir);
           # battery
-          readingsUpdate($def, $txt[5], $b);
+          readingsBulkUpdate($def, $txt[5], $b);
           # lost receives
-          readingsUpdate($def, $txt[6], $l);
+          readingsBulkUpdate($def, $txt[6], $l);
           # rain cumulative
-          readingsUpdate($def, $txt[8], $rain);
+          readingsBulkUpdate($def, $txt[8], $rain);
           # statistics
           if($actday == 99)
           {
@@ -346,9 +347,9 @@ WS300_Parse($$)
             $rain_month = sprintf("%.1f",$rain_month);
             $ref->{acthour}{TIME} = $tm;
             $ref->{acthour}{VAL} = "$acthour";
-            readingsUpdate($def, $txt[9], $rain_hour);
-            readingsUpdate($def, $txt[10], $rain_day);
-            readingsUpdate($def, $txt[11], $rain_month);
+            readingsBulkUpdate($def, $txt[9], $rain_hour);
+            readingsBulkUpdate($def, $txt[10], $rain_day);
+            readingsBulkUpdate($def, $txt[11], $rain_month);
             $rain_hour=0;
           }
           if($actday != $lt[3])
@@ -376,9 +377,9 @@ WS300_Parse($$)
             $oldrain = $rain;
             $ref->{acthour}{TIME} = $tm;
             $ref->{acthour}{VAL} = "$acthour";
-            readingsUpdate($def, $txt[9], $rain_hour);
-            readingsUpdate($def, $txt[10], $rain_day);
-            readingsUpdate($def, $txt[11], $rain_month);
+            readingsBulkUpdate($def, $txt[9], $rain_hour);
+            readingsBulkUpdate($def, $txt[10], $rain_day);
+            readingsBulkUpdate($def, $txt[11], $rain_month);
           }
           Log $ll,"WS300 $def->{NAME}: $val";
 
@@ -410,15 +411,15 @@ WS300_Parse($$)
     # state
     $val = "T: $t  H: $h  P: $press  Willi: $willi";
     $def->{STATE} = $val;
-    readingsUpdate($def, 'state', $val);
+    readingsBulkUpdate($def, 'state', $val);
     # temperature
-    readingsUpdate($def, $txt[0], $t);
+    readingsBulkUpdate($def, $txt[0], $t);
     # humidity
-    readingsUpdate($def, $txt[1], $h);
+    readingsBulkUpdate($def, $txt[1], $h);
     # pressure
-    readingsUpdate($def, $txt[7], $press);
+    readingsBulkUpdate($def, $txt[7], $press);
     # willi
-    readingsUpdate($def, 'willi', $willi);
+    readingsBulkUpdate($def, 'willi', $willi);
     
     Log $ll,"WS300 $def->{NAME}: $val";
 

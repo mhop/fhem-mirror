@@ -1,22 +1,39 @@
-#
-#  Module: YAMAHA_AVR
-#
-# An FHEM Perl module for controlling Yamaha AV-Receivers
-# via network connection. As the interface is standardized
-# within all Yamaha AV-Receivers, this module should work
-# with any receiver which has an ethernet or wlan connection.
-# 
-# Currently supported are:  power (on|off)
-#                           input (hdmi1|hdmi2|...)
-#                           volume (-50 ... 10)
-#                           mute (on|off)
-#
-# Of course there are more possibilities than these 4 commands.
-# But in my oppinion these are the most relevant usecases within FHEM.
-#
 # $Id$
+##############################################################################
 #
-###################################
+#     71_YAMAHA_AVR.pm
+#     An FHEM Perl module for controlling Yamaha AV-Receivers
+#     via network connection. As the interface is standardized
+#     within all Yamaha AV-Receivers, this module should work
+#     with any receiver which has an ethernet or wlan connection.
+#
+#     Currently supported are:  power (on|off)
+#                               input (hdmi1|hdmi2|...)
+#                               volume (-50 ... 10)
+#                               mute (on|off)
+#
+#     Of course there are more possibilities than these 4 commands.
+#     But in my oppinion these are the most relevant usecases within fhem.
+#
+#     Copyright by Markus Bloch
+#     e-mail:
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
 
 package main;
 
@@ -91,7 +108,7 @@ YAMAHA_AVR_GetStatus($;$)
     if($return =~ /<Power>(.+)<\/Power>/)
     {
        $power = $1;
-       readingsUpdate($hash, "power", lc($power));
+       readingsBulkUpdate($hash, "power", lc($power));
        if($power eq "Standby")
        {
 	    $power = "Off";
@@ -102,13 +119,13 @@ YAMAHA_AVR_GetStatus($;$)
     }
     if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute><\/Volume>/)
     {
-	readingsUpdate($hash, "volume_level", ($1 / 10 ** $2));
-	readingsUpdate($hash, "mute", lc($3));
+	readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
+	readingsBulkUpdate($hash, "mute", lc($3));
     }
     
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
-	readingsUpdate($hash, "input", InputParamToFhemInput(lc($1), 0));
+	readingsBulkUpdate($hash, "input", InputParamToFhemInput(lc($1), 0));
     }
     
     readingsEndUpdate($hash, 1);
@@ -176,7 +193,7 @@ YAMAHA_AVR_Set($@)
 	if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)
 	{
 	    # As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
-	    readingsUpdate($hash, "power", "on");
+	    readingsBulkUpdate($hash, "power", "on");
 	    $hash->{STATE} = "on";
 	    return undef;
 	}   

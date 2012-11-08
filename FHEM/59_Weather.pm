@@ -1,13 +1,28 @@
-#
-#
-# 59_Weather.pm
-# maintainer: Dr. Boris Neubert 2009-06-01
-# e-mail: omega at online dot de
-# Port to Yahoo by Erwin Menschhorn 2012-08-30
-# e-mail emenschhorn at gmail dot com
-#
-##############################################
 # $Id$
+##############################################################################
+#
+#     59_Weather.pm
+#     Copyright by Dr. Boris Neubert
+#     e-mail: omega at online dot de
+#
+#     This file is part of fhem.
+# 
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+# 
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+# 
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+
 package main;
 
 use strict;
@@ -165,13 +180,13 @@ sub Weather_UpdateReading($$$$) {
 
   my $reading= $prefix . $key;
 
-  readingsUpdate($hash,$reading,$value);
+  readingsBulkUpdate($hash,$reading,$value);
   if($reading eq "temp_c") {
-    readingsUpdate($hash,"temperature",$value); # additional entry for compatibility
+    readingsBulkUpdate($hash,"temperature",$value); # additional entry for compatibility
   }
   if($reading eq "wind_condition") {
     $value=~ s/.*?(\d+).*/$1/; # extract numeric
-    readingsUpdate($hash,"wind",wind_in_km_per_h($value,$unitsystem)); # additional entry for compatibility
+    readingsBulkUpdate($hash,"wind",wind_in_km_per_h($value,$unitsystem)); # additional entry for compatibility
   }
 
   return 1;
@@ -230,19 +245,19 @@ sub Weather_RetrieveData($)
             my $loc = "";
             $loc = $1 if (defined($1)); 
             $loc .= ", $2" if (defined($2)); 
-            readingsUpdate($hash, "city", $loc);
+            readingsBulkUpdate($hash, "city", $loc);
           }
         
           ### current condition and forecast
           if (($tag eq "yweather:condition" ) || ($tag eq "yweather:forecast" )) {
              my $code = (($value =~/code="([0-9]*?)".*/) ? $1 : undef);
              if (defined($code)) { 
-               readingsUpdate($hash, $prefix . "code", $code); 
+               readingsBulkUpdate($hash, $prefix . "code", $code);
                my $text = $YahooCodes_i18n[$code];
-               if ($text) { readingsUpdate($hash, $prefix . "condition", $text); } 
+               if ($text) { readingsBulkUpdate($hash, $prefix . "condition", $text); }
                #### add icon logic here - generate from code
                $text = $iconlist[$code];
-               readingsUpdate($hash, $prefix . "icon", $text) if ($text); 
+               readingsBulkUpdate($hash, $prefix . "icon", $text) if ($text);
              }  
           }
 
@@ -250,30 +265,30 @@ sub Weather_RetrieveData($)
           if ($tag eq "yweather:condition" ) {
              my $temp = (($value =~/temp="(-?[0-9.]*?)".*/) ? $1 : undef);
              if ($temp) { 
-                readingsUpdate($hash, "temperature", $temp); 
-                readingsUpdate($hash, "temp_c", $temp); # compatibility
+                readingsBulkUpdate($hash, "temperature", $temp);
+                readingsBulkUpdate($hash, "temp_c", $temp); # compatibility
                 $temp = int(( $temp * 9  / 5 ) + 32.5);  # Celsius to Fahrenheit
-                readingsUpdate($hash, "temp_f", $temp); # compatibility
+                readingsBulkUpdate($hash, "temp_f", $temp); # compatibility
              }  
 
              my $datum = (($value =~/date=".*? ([0-9].*)".*/) ? $1 : undef);  
-             readingsUpdate($hash, "current_date_time", $datum) if (defined($1)); 
+             readingsBulkUpdate($hash, "current_date_time", $datum) if (defined($1));
 
              my $day = (($value =~/date="(.*?), .*/) ? $1 : undef);  
              if ($day) {  
-                readingsUpdate($hash, "day_of_week", $wdays_txt_i18n{$day}); 
+                readingsBulkUpdate($hash, "day_of_week", $wdays_txt_i18n{$day});
              }          
           }
 
           ### forecast 
           if ($tag eq "yweather:forecast" ) {
              my $low_c = (($value =~/low="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if ($low_c) { readingsUpdate($hash, $prefix . "low_c", $low_c); }  
+             if ($low_c) { readingsBulkUpdate($hash, $prefix . "low_c", $low_c); }
              my $high_c = (($value =~/high="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if ($high_c) { readingsUpdate($hash, $prefix . "high_c", $high_c); }  
+             if ($high_c) { readingsBulkUpdate($hash, $prefix . "high_c", $high_c); }
              my $day1 = (($value =~/day="(.*?)" .*/) ? $1 : undef); # forecast
              if ($day1) { 
-                readingsUpdate($hash, $prefix . "day_of_week", $wdays_txt_i18n{$day1}); 
+                readingsBulkUpdate($hash, $prefix . "day_of_week", $wdays_txt_i18n{$day1});
              }   
           }
 
@@ -281,28 +296,28 @@ sub Weather_RetrieveData($)
           if ($tag eq "yweather:atmosphere" ) {
             $value =~/humidity="([0-9.]*?)" .*visibility="([0-9.]*?|\s*?)" .*pressure="([0-9.]*?)"  .*rising="([0-9.]*?)" .*/;
 
-            if ($1) { readingsUpdate($hash, "humidity", $1); }
+            if ($1) { readingsBulkUpdate($hash, "humidity", $1); }
             my $vis = (($2 eq "") ? " " : int($2+0.5));   # clear visibility field
-            readingsUpdate($hash, "visibility", $vis);
-            if ($3) { readingsUpdate($hash, "pressure", int($3+0.5)); } 
+            readingsBulkUpdate($hash, "visibility", $vis);
+            if ($3) { readingsBulkUpdate($hash, "pressure", int($3+0.5)); }
             if ($4) {
-              readingsUpdate($hash, "pressure_trend", $4);
-              readingsUpdate($hash, "pressure_trend_txt", $pressure_trend_txt_i18n{$4});
-              readingsUpdate($hash, "pressure_trend_sym", $pressure_trend_sym{$4});
+              readingsBulkUpdate($hash, "pressure_trend", $4);
+              readingsBulkUpdate($hash, "pressure_trend_txt", $pressure_trend_txt_i18n{$4});
+              readingsBulkUpdate($hash, "pressure_trend_sym", $pressure_trend_sym{$4});
             }
           }
 
           ### wind
           if ($tag eq "yweather:wind" ) {
             $value =~/chill="(-?[0-9.]*?)" .*direction="([0-9.]*?)" .*speed="([0-9.]*?)" .*/;
-            readingsUpdate($hash, "wind_chill", $1) if (defined($1)); 
-            readingsUpdate($hash, "wind_direction", $2) if (defined($2));
+            readingsBulkUpdate($hash, "wind_chill", $1) if (defined($1));
+            readingsBulkUpdate($hash, "wind_direction", $2) if (defined($2));
             my $windspeed= defined($3) ? int($3+0.5) : "";
-            readingsUpdate($hash, "wind_speed", $windspeed);
-            readingsUpdate($hash, "wind", $windspeed); # duplicate for compatibility
+            readingsBulkUpdate($hash, "wind_speed", $windspeed);
+            readingsBulkUpdate($hash, "wind", $windspeed); # duplicate for compatibility
             if (defined($2) & defined($3)) {
               my $wdir = degrees_to_direction($2,@directions_txt_i18n);
-              readingsUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h"); # compatibility
+              readingsBulkUpdate($hash, "wind_condition", "Wind: $wdir $windspeed km/h"); # compatibility
             }
           }   
   }

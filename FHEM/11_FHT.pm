@@ -1,5 +1,26 @@
-#############################################
 # $Id$
+##############################################################################
+#
+#     11_FHT.pm
+#     Copyright by 
+#     e-mail: 
+#
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Foobar is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
 package main;
 
 use strict;
@@ -522,16 +543,16 @@ FHT_Parse($$)
     $val = $nVal? $nVal : "none";
 
     # set additional warnings and trigger notify
-    readingsUpdate($def, "battery", $valBattery);
+    readingsBulkUpdate($def, "battery", $valBattery);
     Log $ll4, "FHT $name battery: $valBattery";
 
-    readingsUpdate($def, "lowtemp", $valLowTemp);
+    readingsBulkUpdate($def, "lowtemp", $valLowTemp);
     Log $ll4, "FHT $name lowtemp: $valLowTemp";
 
-    readingsUpdate($def, "window", $valWindow);
+    readingsBulkUpdate($def, "window", $valWindow);
     Log $ll4, "FHT $name window: $valWindow";
 
-    readingsUpdate($def, "windowsensor", $valSensor);
+    readingsBulkUpdate($def, "windowsensor", $valSensor);
     Log $ll4, "FHT $name windowsensor: $valSensor";
   }
 
@@ -539,10 +560,10 @@ FHT_Parse($$)
     $cmd = "FHZ:$cmd";
 
   } else {
-    readingsUpdate($def, $cmd, $val);
+    readingsBulkUpdate($def, $cmd, $val);
     if($cmd eq "measured-temp") {
         $def->{STATE} = "$cmd: $val";
-        readingsUpdate($def, "temperature", $val);
+        readingsBulkUpdate($def, "temperature", $val);
     }    
   }
 
