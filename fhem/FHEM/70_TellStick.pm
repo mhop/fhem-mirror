@@ -29,7 +29,7 @@
 #
 # Contributed by Kai 'wusel' Siering <wusel+fhem@uu.org> in 2012
 # Based in part on work for FHEM by other authors ...
-# $Id: 70_TellStick.pm 1 2011-11-12 07:51:08Z real-wusel $
+# $Id$
 ###########################
 
 package main;

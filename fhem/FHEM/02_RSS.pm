@@ -5,7 +5,7 @@
 # e-mail: omega at online dot de
 #
 ##############################################
-# $Id  $
+# $Id$
 
 package main;
 use strict;
@@ -619,7 +619,7 @@ RSS_CGI(){
     is loaded from the URL &lt;arg&gt;. You can use
     <code>{ <a href="#perl">&lt;perl special&gt;</a> }</code> for &lt;arg&gt. See below for example.
     Notice: do not load the image from URL that is served by fhem as it leads to a deadlock.<br></li>
-    </li><br>
+    <br>
     </ul>
 
     This is how a layout definition might look like:<p>

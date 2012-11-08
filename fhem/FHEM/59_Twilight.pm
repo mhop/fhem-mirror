@@ -1,8 +1,27 @@
+# $Id$
+##############################################################################
 #
-# 59_Twilight.pm
-# written by Sebastian Stuecker based on Twilight.tcl http://www.homematic-wiki.info/mw/index.php/TCLScript:twilight
+#     59_Twilight.pm
+#     Copyright by Sebastian Stuecker
+#     based on Twilight.tcl http://www.homematic-wiki.info/mw/index.php/TCLScript:twilight
+#     e-mail: omega at online dot de
 #
-##############################################
+#     This file is part of fhem.
+#
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
 
 package main;
 use strict;
@@ -183,7 +202,7 @@ Twilight_GetUpdate($)
   }
   
   Twilight_getWeatherHorizon($hash);
-  readingsUpdate($hash,"condition",$hash->{CONDITION});
+  readingsBulkUpdate($hash,"condition",$hash->{CONDITION});
   if($hash->{WEATHER_HORIZON} > (89-$hash->{LATITUDE}+$declination) ){
     $hash->{WEATHER_HORIZON} = 89-$hash->{LATITUDE}+$declination;
   }
@@ -203,10 +222,10 @@ Twilight_GetUpdate($)
     ($sunrise_set[$i]{RISE}, $sunrise_set[$i]{SET})=
        Twilight_calc($latitude, $longitude, $sunrise_set[$i]{DEGREE},
                      $declination, $timezone, $midseconds, $timediff);
-    readingsUpdate($hash, $sunrise_set[$i]{SR_NAME},
+    readingsBulkUpdate($hash, $sunrise_set[$i]{SR_NAME},
         $sunrise_set[$i]{RISE} eq "nan" ? "undefined" : 
         strftime("%H:%M:%S",localtime($sunrise_set[$i]{RISE})));
-    readingsUpdate($hash, $sunrise_set[$i]{SS_NAME},
+    readingsBulkUpdate($hash, $sunrise_set[$i]{SS_NAME},
         $sunrise_set[$i]{SET} eq "nan" ? "undefined" : 
         strftime("%H:%M:%S",localtime($sunrise_set[$i]{SET})));
   }
@@ -218,10 +237,10 @@ Twilight_GetUpdate($)
   for(my $i=0; $i < 12; $i++) {
     my $nexttime=$sunrise_set[6-abs($i-6)-$k]{$half};
     if($nexttime ne "nan" && $nexttime > $now) {
-      readingsUpdate($hash, "light", 6-abs($i-6));
-      readingsUpdate($hash, "nextEvent",
+      readingsBulkUpdate($hash, "light", 6-abs($i-6));
+      readingsBulkUpdate($hash, "nextEvent",
                             $sunrise_set[6-abs($i-6)-$k]{$sname});
-      readingsUpdate($hash, "nextEventTime",
+      readingsBulkUpdate($hash, "nextEventTime",
                             strftime("%H:%M:%S",localtime($nexttime)));
 
       if($i==5 || $i==6) { # Weather
@@ -247,12 +266,12 @@ Twilight_GetUpdate($)
 
   if(!$alarmOffset) {
     $alarmOffset = 900;
-    readingsUpdate($hash,"light", 0);
+    readingsBulkUpdate($hash,"light", 0);
     $hash->{STATE}=0;
   }
   if(!$hash->{LOCAL}) {
     InternalTimer($now+$alarmOffset, "Twilight_GetUpdate", $hash, 0);
-    readingsUpdate($hash,"nextUpdate",
+    readingsBulkUpdate($hash,"nextUpdate",
                    strftime("%H:%M:%S",localtime($now+$alarmOffset)));
   }
   

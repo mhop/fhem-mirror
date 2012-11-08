@@ -1,11 +1,27 @@
+# $Id$##############################################################################
 #
+#     67_ECMDDevice.pm
+#     Copyright by Dr. Boris Neubert
+#     e-mail: omega at online dot de
 #
-# 66_ECMDDevice.pm
-# written by Dr. Boris Neubert 2011-01-15
-# e-mail: omega at online dot de
+#     This file is part of fhem.
 #
-##############################################
-# $Id$
+#     Fhem is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 2 of the License, or
+#     (at your option) any later version.
+#
+#     Fhem is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU General Public License
+#     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
+#
+##############################################################################
+
+
 package main;
 
 use strict;
@@ -79,10 +95,7 @@ ECMDDevice_Changed($$$)
 {
         my ($hash, $cmd, $value)= @_;
 
-
-        readingsBeginUpdate($hash);
-        readingsUpdate($hash, $cmd, $value);
-        readingsEndUpdate($hash, 1);
+        readingsSingleUpdate($hash, $cmd, $value, 1);
 
         $hash->{STATE} = "$cmd $value";
 

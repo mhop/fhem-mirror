@@ -2913,11 +2913,11 @@ readingsEndUpdate($$) {
 }
 
 #
-# Call readingsUpdate to update the reading.
+# Call readingsBulkUpdate to update the reading.
 # Example: readingsUpdate($hash,"temperature",$value);
 #
 sub
-readingsUpdate($$$) {
+readingsBulkUpdate($$$) {
 
   my ($hash,$reading,$value)= @_;
   my $name= $hash->{NAME};
@@ -2952,6 +2952,19 @@ readingsUpdate($$$) {
   $rv = "$value" if($changed && ($reading eq "state")); 
   addEvent($hash, $rv) if($changed);
   
+  return $rv;
+}
+
+#
+# this is a shorthand call
+#
+sub
+readingsSingleUpdate($$$$) {
+
+  my ($hash,$reading,$value,$dotrigger)= @_;
+  readingsBeginUpdate($hash);
+  my $rv= readingsBulkUpdate($hash,$reading,$value);
+  readingsEndUpdate($hash,$dotrigger);
   return $rv;
 }
 
