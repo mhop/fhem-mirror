@@ -442,6 +442,7 @@ sub getModel($$)
 {
     my ($hash, $address) = @_;
     my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
+    return undef unless(defined($response));
     if($response =~ /<Unit_Description.* Unit_Name="(.+?)">/)
     {
         $hash->{MODEL} = $1;
@@ -453,6 +454,7 @@ sub getInputs($$)
 
     my ($hash, $address) = @_;  
     my $response = SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></Main_Zone></YAMAHA_AV>");
+    return undef unless (defined($response));
     $response =~ s/></>\n</g;
     my @inputs = split("\n", $response);
     
