@@ -16,7 +16,7 @@
 #     But in my oppinion these are the most relevant usecases within fhem.
 #
 #     Copyright by Markus Bloch
-#     e-mail:
+#     e-mail: Notausstieg0309@googlemail.com
 #
 #     This file is part of fhem.
 #
@@ -41,6 +41,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday sleep);
 
+require "$attr{global}{modpath}/FHEM/HttpUtils.pm";
 
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);
