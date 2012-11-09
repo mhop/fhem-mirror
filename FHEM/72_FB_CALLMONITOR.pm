@@ -7,7 +7,7 @@
 #     This module has no sets or gets as it is only used for event triggering.
 #
 #     Copyright by Markus Bloch
-#     e-mail:
+#     e-mail: Notausstieg0309@googlemail.com
 #
 #     This file is part of fhem.
 #
