@@ -73,18 +73,18 @@ YAMAHA_AVR_GetStatus($;$)
     my $name = $hash->{NAME};
     my $power;
     $local = 0 unless(defined($local));
-    
+
     return "" if(!defined($hash->{ADDRESS}) or !defined($hash->{INTERVAL}));
-    
+
     my $device = $hash->{ADDRESS};
-    
-    
-    
+
+
+
     if(not defined($hash->{MODEL}))
     {
-      getModel($hash, $device);
+	getModel($hash, $device);
     }
-    
+
     if(not defined($hash->{INPUTS}) or length($hash->{INPUTS}) == 0)
     {
 	getInputs($hash, $device);
@@ -99,7 +99,7 @@ YAMAHA_AVR_GetStatus($;$)
     if($return eq "")
     {
     
-	$hash->{STATE} = "unknown";
+	InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
 	return;
     }
     
