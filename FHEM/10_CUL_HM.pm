@@ -27,8 +27,8 @@ sub CUL_HM_PushCmdStack($$);
 sub CUL_HM_ProcessCmdStack($);
 sub CUL_HM_Resend($);
 sub CUL_HM_Id($);
-sub CUL_HM_name2hash($);
-sub CUL_HM_Name2Id(@);
+sub CUL_HM_name2Hash($);
+sub CUL_HM_name2Id(@);
 sub CUL_HM_id2Name($);
 sub CUL_HM_getDeviceHash($);
 sub CUL_HM_DumpProtocol($$@);
@@ -293,7 +293,7 @@ CUL_HM_Rename($$$)
 {
   #my ($hash, $name,$newName) = @_;
   my ($name, $oldName) = @_;
-  my $HMid = CUL_HM_Name2Id($name);
+  my $HMid = CUL_HM_name2Id($name);
   if (length($HMid) == 8){# we are channel, inform the device
     $attr{$name}{chanNo} = substr($HMid,6,2);
 	my $device = AttrVal($name, "device", "");
@@ -438,7 +438,7 @@ CUL_HM_Parse($$)
   } 
   elsif($model eq "HM-CC-TC") { ####################################
     my ($sType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/);
-    if($msgType eq "70" && $p =~ m/^(....)(..)/) {# weather event
+    if($msgType eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
       $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
@@ -451,7 +451,7 @@ CUL_HM_Parse($$)
       push @event, "measured-temp:$t";
       push @event, "humidity:$h";
     }
-    elsif($msgType eq "58" && $p =~ m/^(..)(..)/) {#climate event
+    elsif($msgType eq "58" && $p =~ m/^(..)(..)/) {# climate event
 	  $chn = '02'; # fix definition
       my (   $d1,     $vp) = # adjust_command[0..4] adj_data[0..250]
          (    $1, hex($2));
@@ -467,17 +467,17 @@ CUL_HM_Parse($$)
 		CUL_HM_setRd($dhash,"state","set_$vp %",$tn);
       }
     }
-    elsif(($msgType eq '02' &&$sType eq '01')|| # ackStatus
-	      ($msgType eq '10' &&$sType eq '06')){  #infoStatus
+    elsif(($msgType eq '02' &&$sType eq '01')||    # ackStatus
+	      ($msgType eq '10' &&$sType eq '06')){    # infoStatus
 	  $chn = substr($p,2,2); 
 	  my $dTemp = sprintf("%0.1f", hex(substr($p,4,2))/2);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  CUL_HM_setRd($chnHash,"desired-temp",$dTemp,$tn)if (!$chnHash);
       push @event, "desired-temp:" .$dTemp;
     }
-    elsif($msgType eq "10"){
+    elsif($msgType eq "10"){                       # Config change report
 	  $chn = substr($p,2,2);
-      if(   $p =~ m/^0403(......)(..)0505(..)0000/) {
+      if(   $p =~ m/^0403(......)(..)0505(..)0000/) {# param change
 	    # change of chn 3(window) list 5 register 5 - a peer window changed!
         my ( $tdev,   $tchan,     $v1) = (($1), hex($2), hex($3));
 	    push @event, sprintf("windowopen-temp-%d: %.1f (sensor:%s)"
@@ -533,7 +533,7 @@ CUL_HM_Parse($$)
           push @event, $msg; # generate one event per day entry
         }
       } 
-	  elsif($p =~ m/^04020000000005(..)(..)/) {
+	  elsif($p =~ m/^04020000000005(..)(..)/) {   # paramchanged L5
         my ( $o1,    $v1) = (hex($1),hex($2));# only parse list 5 for chn 2
         my $msg;
         my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
@@ -553,11 +553,11 @@ CUL_HM_Parse($$)
 	      push @event,'param-change: offset='.$o1.', value='.$v1;
 	    }
       }
-	  elsif($p =~ m/^0[23]/){#param response
+	  elsif($p =~ m/^0[23]/){                     # param response
 	    push @event,'';#cannot be handled here as request missing
 	  }
 	}
-    elsif($msgType eq "01"){
+    elsif($msgType eq "01"){                       # status reports
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
       push @event, "ValveErrorPosition for $dname: $vep %";
@@ -570,8 +570,7 @@ CUL_HM_Parse($$)
 	  	push @event,""; # 
 	  }
     }
-#          ($cmd eq "A112" && $p =~ m/^0202(..)$/)) {    # Set desired temp
-    elsif($cmd eq "A03F" && $id eq $dst) {              # Timestamp request
+    elsif($cmd eq "A03F" && $id eq $dst) {         # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
       CUL_HM_SendCmd($shash, "++803F$id${src}0204$s2000",1,0);
       push @event, "time-request";
@@ -1039,7 +1038,7 @@ CUL_HM_Parse($$)
 	    my @peerIDs = split(',',AttrVal($dChName,"peerIDs",""));
 	    foreach my $pId (@peerIDs){
 	      if ($pId eq $recId){ #match: we have to ack 
-		    my $dChHash = CUL_HM_name2hash($dChName);
+		    my $dChHash = CUL_HM_name2Hash($dChName);
 		    my $state = ReadingsVal($dChName,"virtActState","C8");
 		    $state = ($state eq "00")?"C8":"00";
 		    setReadingsVal($dChHash,"virtActState",$state,$tn);
@@ -1433,7 +1432,7 @@ CUL_HM_Get($@)
         my $regs = ReadingsVal($hash->{NAME},$readEntry,"");
 	    if ($readEntry =~m /^RegL_/){ #this is a reg Reading "RegL_<list>:peerN
 		  my $peer = substr($readEntry,8);
-		  my $listP = substr($readEntry,6,1);
+		  my $listP = substr($readEntry,6,1);  
 		  push(@peers,$peer)   if ($peer);
 		  push(@listWp,$listP) if ($peer);
 		}
@@ -1447,7 +1446,7 @@ CUL_HM_Get($@)
 		  next if($peer eq "");
 	      my $regVal = CUL_HM_getRegFromStore($name,$regName,0,$peer); #determine peerID
 	      push @regValList,"List:".$regL.
-		         " Peer:".$peer.
+		         " Peer:".CUL_HM_id2Name($peer). 
 		         "\t".$regName.
 				 ":\tvalue:". $regVal."\n" if ($regVal ne 'unknown') ; 
 		}
@@ -1458,7 +1457,7 @@ CUL_HM_Get($@)
 	        if ($md eq "HM-CC-TC" && $chn eq "02");
 	  return $name." type:".$st." - \n".join("",sort(@regValList)).$addInfo;
 	}
-	else{
+	else{	  
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
 	  return ($regVal eq "invalid")? "Value not captured" 
 	                             : "0x".sprintf("%X",$regVal)." dec:".$regVal;
@@ -1726,7 +1725,7 @@ CUL_HM_Set($@)
 	$state = "";
   }
   elsif($cmd eq "statusRequest") { ############################################
-    my @chnIdList = CUL_HM_getAssChnId($name);
+    my @chnIdList = CUL_HM_getAssChnIds($name);
     foreach my $channel (@chnIdList){
 	  my $chnNo = substr($channel,6,2);
 	  CUL_HM_PushCmdStack($hash,"++".$flag.'01'.$id.$dst.$chnNo.'0E');
@@ -1745,9 +1744,9 @@ CUL_HM_Set($@)
 	my $chFound = 0;
 	CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000')
 	       if (!$isChannel);
-	my @chnIdList = CUL_HM_getAssChnId($name);
+	my @chnIdList = CUL_HM_getAssChnIds($name);
 	foreach my $channel (@chnIdList){
-	  my $chnHash = CUL_HM_id2hash($channel);
+	  my $chnHash = CUL_HM_id2Hash($channel);
 	  CUL_HM_getConfig($hash,$chnHash,$id,$dst,substr($channel,6,2));
 	}
 	$state = "";
@@ -1760,18 +1759,9 @@ CUL_HM_Set($@)
 	($list,$peerID) = ($a[2],$a[3])if ($cmd eq "getRegRaw");
 	$list =~ s/List/0/;# convert Listy to 0y
 	# as of now only hex value allowed check range and convert
-
-	$chn = "00" if ($list eq "00");
-	my $pSc = substr($peerID,0,4); #helper for shortcut spread
-    if     ($pSc eq 'self'){$peerID=$dst.sprintf("%02X",'0'.substr($peerID,4));
-	}elsif ($pSc eq 'fhem'){$peerID=$id .sprintf("%02X",'0'.substr($peerID,4));
-	}elsif($peerID eq 'all'){;# keep all
-	}else                  {$peerID = CUL_HM_Name2Id($peerID);
-	}
-	$peerID = $peerID.((length($peerID) == 6)?"01":"");# default chn 1, if none
-	$peerID = "00000000" if (length($peerID) != 8 && $peerID ne 'all');# none?
-
-	my $peerChn = substr($peerID,6,2);# have to split chan and id
+	
+    $peerID  = CUL_HM_peerChId(($peerID?$peerID:"00000000"),$dst,$id);	  
+	my $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");# have to split chan and id
 	$peerID = substr($peerID,0,6);
 
 	if($cmd eq "getRegRaw"){
@@ -1779,12 +1769,12 @@ CUL_HM_Set($@)
 	    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000');
 	  }
 	  else{# other lists are per channel
-	    my @chnIdList = CUL_HM_getAssChnId($name);
+	    my @chnIdList = CUL_HM_getAssChnIds($name);
         foreach my $channel (@chnIdList){
 		  my $chnNo = substr($channel,6,2);
 		  if ($list =~m /0[34]/){#getPeers to see if list3 is available 
 			CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chnNo.'03');
-			my $chnHash = CUL_HM_id2hash($channel);
+			my $chnHash = CUL_HM_id2Hash($channel);
 		    $chnHash->{helper}{getCfgList} = $peerID.$peerChn;#list3 regs 
 		    $chnHash->{helper}{getCfgListNo} = int($list);
 		  }
@@ -1796,6 +1786,7 @@ CUL_HM_Set($@)
 	  }
 	}
 	else{
+	  $chn = "00" if ($list eq "00");
 	  # as of now only hex value allowed check range and convert
 	  return "invalid address or data" if ($addr > 255 || $data > 255);
 	  my $addrData = uc(sprintf("%02x%02x",$addr,$data));
@@ -1850,15 +1841,9 @@ CUL_HM_Set($@)
     my ($lChn,$peerID,$peerChn) = ($chn,"000000","00");
 	if (($list == 3) ||($list == 4)){ # peer is necessary for list 3/4
 	  return "Peer not specified" if (!$peerChnIn);
-	  
-	  my $pSc = substr($peerID,0,4); #helper for shortcut spread
-      if     ($pSc eq 'self'){$peerID=$dst.sprintf("%02X",'0'.substr($peerID,4));
-	  }elsif ($pSc eq 'fhem'){$peerID=$id .sprintf("%02X",'0'.substr($peerID,4));
-	  }else                  {$peerID = CUL_HM_Name2Id($peerID);
-	  }
-
+	  $peerID  = CUL_HM_peerChId($peerChnIn,$dst,$id);	  
  	  $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");
-      $peerID = substr($peerID,0,6);	
+      $peerID  = substr($peerID,0,6);	
       return "Peer not specified" if (!$peerID);	  
 	}
 	elsif($list == 0){
@@ -2098,8 +2083,7 @@ CUL_HM_Set($@)
   elsif($cmd eq "desired-temp") { ##################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
-    CUL_HM_PushCmdStack($hash,
-                sprintf("++%s11%s%s0202%s",$flag,$id,$dst,$temp));
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
   } 
   elsif($cmd =~ m/^(day|night|party)-temp$/) { ##################
     my %tt = (day=>"03", night=>"04", party=>"06");
@@ -2322,7 +2306,8 @@ CUL_HM_Set($@)
     $hash->{STATE} = $state; 
 	DoTrigger($name,'state:'.$state);
   }
-  Log GetLogLevel($name,3), "CUL_HM set $name " . join(" ", @a[1..$#a]);
+  $rxType = CUL_HM_getRxType($devHash);
+  Log GetLogLevel($name,3), "CUL_HM set $name " . join(" ", @a[1..$#a])." rxt:".$rxType;
   CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
   return ("",1);# no not generate trigger outof command
 }
@@ -2348,7 +2333,6 @@ CUL_HM_infoUpdtDevData($$$){
   $mId = CUL_HM_getMId($hash);# set helper valiable and use result 
   
   # autocreate undefined channels  
-  Log 1,"General start timer";
   my @chanTypesList = split(',',$culHmModel{$mId}{chn});
   my $startime = gettimeofday()+1;
   foreach my $chantype (@chanTypesList){
@@ -2361,7 +2345,6 @@ CUL_HM_infoUpdtDevData($$$){
 	                            '':'_'.sprintf("%02d",$chnNoTyp));
 		InternalTimer($startime++,"CUL_HM_infoUpdtChanData",
 		"$chnName,$chnId,$model",0);
-		Log 1,"General timer:$chnName,$chnId,$model";
 	    #DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
       }
 	  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
@@ -2378,7 +2361,6 @@ CUL_HM_infoUpdtChanData(@)
 {# delay this to ensure the device is already available
   my($in ) = @_;
   my($chnName,$chnId,$model ) = split(',',$in);
-  Log 1,"General updateChannel:".$chnName;
   DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
   $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 }
@@ -2472,7 +2454,6 @@ CUL_HM_SendCmd($$$$)
   my ($hash, $cmd, $sleep, $waitforack) = @_;
   my $io = $hash->{IODev};
 
-  select(undef, undef, undef, 0.1) if($io->{TYPE} ne 'HMLAN');
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
 
@@ -2516,12 +2497,13 @@ CUL_HM_responseSetup($$$)
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
   	  $chnhash = $hash if (!$chnhash);
   	  $chnhash->{READINGS}{peerList}{VAL}="";#empty old list
+	  $attr{$hash->{NAME}}{peerIDs} = '';
 	  return;
     }
     elsif($subType eq "04"){ #RegisterRead-------
       my ($peerID, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
-	  $peerID = ($peerID ne "00000000")?CUL_HM_id2Name($peerID):"";
-	  $peerID =~ s/ /_/g;#subs blanks
+	  $peerID = ($peerID ne "00000000")?CUL_HM_peerChName($peerID,$dst,""):"";
+
 	  #--- set messaging items
 	  $hash->{helper}{respWait}{Pending} = "RegisterRead";
 	  $hash->{helper}{respWait}{forChn} = $chn;
@@ -2710,14 +2692,18 @@ CUL_HM_ID2PeerList ($$$)
   else{# update the human readable list
     $attr{$name}{peerIds} = $peerIds;
     $attr{$name}{peerList} = "";
+	my $dId = substr(CUL_HM_name2Id($name),0,6);
     foreach my $pId (split(",",$peerIds)){
-	  $attr{$name}{peerList} .= CUL_HM_id2Name($pId)."," if ($pId);
+	  next if (!$pId);
+	  $attr{$name}{peerList} .= (($dId eq substr($pId,0,6))?
+	                                    ("self".substr($pId,6,2).","):
+	                                    (CUL_HM_id2Name($pId).","));
     }
   }
 }
 ###################  Conversions  ################
 sub
-CUL_HM_getAssChnId($)
+CUL_HM_getAssChnIds($)
 { # will return the list of assotiated channel of a device
   # if it is a channel only return itself
   # if device and no channel 
@@ -2725,10 +2711,10 @@ CUL_HM_getAssChnId($)
   my @chnIdList;
   foreach my $channel (keys %{$attr{$name}}){
 	next if ($channel !~ m/^channel_/);
-	my $chnHash = CUL_HM_name2hash($attr{$name}{$channel});
+	my $chnHash = CUL_HM_name2Hash($attr{$name}{$channel});
 	push @chnIdList,$chnHash->{DEF} if ($chnHash);
   }
-  my $dId = CUL_HM_Name2Id($name);
+  my $dId = CUL_HM_name2Id($name);
 
   push @chnIdList,$dId."01" if (length($dId) == 6 && !$attr{$name}{channel_01});
   push @chnIdList,$dId if (length($dId) == 8);
@@ -2744,7 +2730,7 @@ CUL_HM_Id($)
 }
 ###################################
 sub
-CUL_HM_id2hash($)
+CUL_HM_id2Hash($)
 {# in: id, out:hash
   my ($id) = @_;
   return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
@@ -2752,14 +2738,14 @@ CUL_HM_id2hash($)
 }
 ###################################
 sub
-CUL_HM_name2hash($)
+CUL_HM_name2Hash($)
 {# in: name, out:hash
   my ($name) = @_;
   return $defs{$name};
 }
 ###################################
 sub
-CUL_HM_Name2Id(@)
+CUL_HM_name2Id(@)
 { # in: name or HMid out: HMid, undef if no match
   my ($idName,$idHash) = @_;
   my $hash = $defs{$idName};
@@ -2771,6 +2757,29 @@ CUL_HM_Name2Id(@)
   return $idHash->{DEF}.sprintf("%02X",$1) 
                       if($idHash && $idName =~ m/self(.*)/);
   return;
+}
+###################################
+sub
+CUL_HM_peerChId($$$)
+{# peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
+  my($pId,$dId,$iId)=@_;
+  my $pSc = substr($pId,0,4); #helper for shortcut spread
+  return $dId.sprintf("%02X",'0'.substr($pId,4)) if ($pSc eq 'self');
+  return $iId.sprintf("%02X",'0'.substr($pId,4)) if ($pSc eq 'fhem');
+  return "all"                                   if ($pId eq 'all');#used by getRegList
+  my ($dev,$chn) = ($1,$2) if ($pId =~ m/(.*)_chn:(.*)/); #obey device with undef channels
+  return CUL_HM_name2Id($dev).$chn               if ($chn); 
+  return substr(CUL_HM_name2Id($pId).'01',0,8);                  
+}
+###################################
+sub
+CUL_HM_peerChName($$$)
+{# peer Channel ID to user entry. <peerChId> <deviceID> <ioID>
+  my($pId,$dId,$iId)=@_;
+  my($pDev,$pChn) = ($1,$2) if ($pId =~ m/(......)(..)/);
+  return 'self'.$pChn if ($pDev eq $dId);
+  return 'fhem'.$pChn if ($pDev eq $iId);
+  return CUL_HM_id2Name($pId);                
 }
 ###################################
 sub
@@ -2786,9 +2795,11 @@ CUL_HM_id2Name($)
 	$chnId = $p;
   }
   my $defPtr = $modules{CUL_HM}{defptr};
-  return $defPtr->{$chnId}{NAME} if($chnId && $defPtr->{$chnId});
-  return $defPtr->{$devId}{NAME} if($defPtr->{$devId});
-  return $devId. ($chn ? ("_chn:".$chn):"");
+  return $defPtr->{$chnId}{NAME} if( $chnId && $defPtr->{$chnId});#channel 
+  return $defPtr->{$devId}{NAME} if(!$chnId && $defPtr->{$devId});#device only
+  return $defPtr->{$devId}{NAME}."_chn:".$chn 
+                                 if( $chnId && $defPtr->{$devId});#device, add chn
+  return $devId. ($chn ? ("_chn:".$chn):"");                      #not defined, return ID only
 }
 ###################################
 sub
@@ -3151,9 +3162,12 @@ sub
 CUL_HM_getRegFromStore($$$$)
 {#read a register from backup data
   my($name,$regName,$list,$peerId)=@_;
-  my $hash = CUL_HM_name2hash($name);
+  my $hash = CUL_HM_name2Hash($name);
   my ($size,$pos,$conversion,$factor,$unit) = (8,0,"",1,""); # default
   my $addr = $regName;
+  my $dId = substr(CUL_HM_name2Id($name),0,6);#id of device
+  my $iId = CUL_HM_Id($hash->{IODev});        #id of IO device
+  
   if ($culHmRegDefine{$regName}) { # get the register's information
     $addr = $culHmRegDefine{$regName}{a};
 	$pos = ($addr*10)%10;
@@ -3165,12 +3179,11 @@ CUL_HM_getRegFromStore($$$$)
 	$factor = $culHmRegDefine{$regName}{f};
 	$unit = $culHmRegDefine{$regName}{u};
   }
-  $peerId = substr(CUL_HM_Name2Id($name),0,6).sprintf("%02X",$1) 
-                     if($peerId =~ m/^self(.*)/);    # plus channel
-
-  my $regLN = "RegL_".sprintf("%02X",$list).":".CUL_HM_id2Name($peerId); 
+  
+  $peerId  = CUL_HM_peerChId(($peerId?$peerId:"00000000"),$dId,$iId);
+							    
+  my $regLN = "RegL_".sprintf("%02X",$list).":".CUL_HM_peerChName($peerId,$dId,$iId);
   $regLN =~ s/broadcast//;
-  $regLN =~ s/ /_/g;
   
   my $data=0;
   for (my $size2go = $size;$size2go>0;$size2go -=8){

@@ -72,6 +72,7 @@ HMLAN_Define($$)
     return undef;
   }
   $hash->{DeviceName} = $dev;
+  $hash->{helper}{nextSend}=gettimeofday();
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -349,7 +350,7 @@ HMLAN_SimpleWrite(@)
   my $name = $hash->{NAME};
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
 
-  select(undef, undef, undef, 0.01); #  todo check necessity
+#  select(undef, undef, undef, 0.01); #  todo check necessity
 #---------- confort trace--------------
 #  Log GetLogLevel($name,5), 'HMLAN_Send:         S:'.
 #                                        substr($msg,0,9).
@@ -370,6 +371,13 @@ HMLAN_SimpleWrite(@)
   Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg; #normal trace
   
   $msg .= "\r\n" unless($nonl);
+  
+  # Currently it does  not seem to be necessary to wait Thus this code is inhibit for now
+  #my $ct = gettimeofday();
+  #select(undef, undef, undef, 0.01) if($hash->{helper}{nextSend} >$ct);
+  #$hash->{helper}{nextSend} = $ct + 0.01; # experimental value. 
+  select(undef, undef, undef, 0.01);
+ 
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 }
 
