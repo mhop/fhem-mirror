@@ -158,9 +158,9 @@ CUL_Define($$)
   
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "CUL_DoInit");
+  $hash->{helper}{HMnextTR}=gettimeofday();
   return $ret;
 }
-
 
 #####################################
 sub
@@ -214,7 +214,6 @@ CUL_RemoveMAXPair($)
   my $hash = shift;
   delete($hash->{maxPair});
 }
-
 
 #####################################
 sub
@@ -672,6 +671,16 @@ CUL_XmitLimitCheck($$)
   $hash->{XMIT_TIME} = \@b;
   $hash->{NR_CMD_LAST_H} = int(@b);
 }
+sub
+CUL_XmitLimitCheckHM($$)
+{# add a delay to  last received. Thisis dynamic to obey System performance
+ # was wrking with 700ms - added buffer to 900ms
+  my ($hash,$fn) = @_;
+  for (my $cnt=0;$cnt<10;$cnt++){
+    last if (gettimeofday()>($hash->{helper}{HMnextTR}+0.09));
+    select(undef, undef, undef, 0.02);
+  }
+}
 
 #####################################
 # Translate data prepared for an FHZ to CUL syntax, so we can reuse
@@ -736,7 +745,6 @@ CUL_SendFromQueue($$)
 {
   my ($hash, $bstring) = @_;
   my $name = $hash->{NAME};
-
   my $hm = ($bstring =~ m/^A/);
   my $mz = ($bstring =~ m/^Z/);
   my $to = ($hm ? 0.15 : 0.3);
@@ -757,7 +765,9 @@ CUL_SendFromQueue($$)
           }
       }
     }
-    CUL_XmitLimitCheck($hash,$bstring) if(!$hm);
+	if($hm) {CUL_XmitLimitCheckHM($hash,$bstring)
+	}else{CUL_XmitLimitCheck($hash,$bstring)
+	}
     CUL_SimpleWrite($hash, $bstring);
   }
 
@@ -772,7 +782,6 @@ sub
 CUL_AddFS20Queue($$)
 {
   my ($hash, $bstring) = @_;
-
   if(!$hash->{QUEUE}) {
     $hash->{QUEUE} = [ $bstring ];
     CUL_SendFromQueue($hash, $bstring);
@@ -782,14 +791,12 @@ CUL_AddFS20Queue($$)
   }
 }
 
-
 #####################################
 sub
 CUL_HandleWriteQueue($)
 {
   my $hash = shift;
   my $arr = $hash->{QUEUE};
-
   if(defined($arr) && @{$arr} > 0) {
     shift(@{$arr});
     if(@{$arr} == 0) {
@@ -817,7 +824,7 @@ CUL_Read($)
   my $name = $hash->{NAME};
 
   my $culdata = $hash->{PARTIAL};
-  Log 5, "CUL/RAW: $culdata/$buf";
+  Log 5, "CUL/RAW: $culdata/$buf"; 
   $culdata .= $buf;
 
   while($culdata =~ m/\n/) {
@@ -932,6 +939,7 @@ CUL_Parse($$$$$)
     $hash->{RSSI} = $rssi;
     $addvals{RSSI} = $rssi;
   }
+  $hash->{helper}{HMnextTR}=gettimeofday();
   Dispatch($hash, $dmsg, \%addvals);
 }
 
@@ -957,7 +965,6 @@ CUL_SimpleWrite(@)
 {
   my ($hash, $msg, $nonl) = @_;
   return if(!$hash);
-
   if($hash->{TYPE} eq "CUL_RFR") {
     # Prefix $msg with RRBBU and return the corresponding CUL hash.
     ($hash, $msg) = CUL_RFR_AddPrefix($hash, $msg); 
