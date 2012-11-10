@@ -136,7 +136,7 @@ SolarView_Define($$)
 
     for my $get (@gets)
     {
-      readingsUpdate($hash, SolarView_WR($hash, $get, $wr), $hash->{Invalid});
+      readingsBulkUpdate($hash, SolarView_WR($hash, $get, $wr), $hash->{Invalid});
     }
   }
 
@@ -237,7 +237,7 @@ SolarView_Update($)
           # update Readings
           for my $get (@gets)
           {
-            readingsUpdate($hash, SolarView_WR($hash, $get, $wr), $readings{$get});
+            readingsBulkUpdate($hash, SolarView_WR($hash, $get, $wr), $readings{$get});
           }
           
           readingsEndUpdate($hash, $init_done);
@@ -312,21 +312,21 @@ SolarView_IsNight($)
 
     for my $wr (@{$hash->{Inverters}})
     {
-      readingsUpdate($hash, SolarView_WR($hash, 'totalEnergyDay', $wr), 0);
+      readingsBulkUpdate($hash, SolarView_WR($hash, 'totalEnergyDay', $wr), 0);
     }
     
     if ($mday == 1)
     {
       for my $wr (@{$hash->{Inverters}})
       {
-        readingsUpdate($hash, SolarView_WR($hash, 'totalEnergyMonth', $wr), 0);
+        readingsBulkUpdate($hash, SolarView_WR($hash, 'totalEnergyMonth', $wr), 0);
       }
       
       if ($mon == 0)
       {
         for my $wr (@{$hash->{Inverters}})
         {
-          readingsUpdate($hash, SolarView_WR($hash, 'totalEnergyYear', $wr), 0);
+          readingsBulkUpdate($hash, SolarView_WR($hash, 'totalEnergyYear', $wr), 0);
         }
       }
     }
