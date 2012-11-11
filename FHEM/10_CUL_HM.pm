@@ -41,6 +41,9 @@ sub CUL_HM_decodeTime16($);
 sub CUL_HM_pushConfig($$$$$$$$);
 sub CUL_HM_maticFn($$$$$);
 sub CUL_HM_secSince2000();
+# ----------------modul globals-----------------------
+my $respRemoved; # used to control trigger of stach processing
+                 # need to take care that ACK is first
 
 my %culHmDevProps=(
   "01" => { st => "AlarmControl",    cl => "controller" }, # by peterp
@@ -330,7 +333,8 @@ CUL_HM_Parse($$)
 
   return "" if($p =~ m/NACK$/);#discard TCP errors from HMlan. Resend will cover it
   return "" if($src eq $id);#discard mirrored messages
-  
+
+  $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
     if($msgType eq "00") {
@@ -747,6 +751,7 @@ CUL_HM_Parse($$)
       if($id eq $dst) {  # Send Ack
         CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".
                 ($state =~ m/on/?"C8":"00")."00", 1, 0);#Actor simulation
+
 		$sendAck = "";
       }
       
@@ -1055,11 +1060,12 @@ CUL_HM_Parse($$)
   #        parser did not supress 
   CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00",1,0)  # Send Ack
       if(   ($id eq $dst) 			#are we adressee 
-#	     && ($msgType ne "02") 		#no ack for ack
 	     && (hex($msgFlag)&0x20) 	#response required Flag
 		 && @event  				#only ack of we identified it
 		 && ($sendAck eq "yes")		#sender requested ACK
 		 );  	
+		 
+  CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont stack if a response is complete
   #------------ process events ------------------
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
 
@@ -2437,8 +2443,7 @@ CUL_HM_getConfig($$$$$){
 	#$listNo,$chnValid $peerReq  
 	if ($chnValid){# yes, we will go for a list
 	  if ($peerReq){# need to get the peers first
-#        CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
-        $chnhash->{helper}{getCfgList} = "all";# peers first
+        $chnhash->{helper}{getCfgList} = "all";      # peers first
         $chnhash->{helper}{getCfgListNo} = $listNo;
 	  }
 	  else{
@@ -2493,6 +2498,7 @@ CUL_HM_responseSetup($$$)
       
       # define timeout - holdup cmdStack until response complete or timeout
   	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
+	  
   	  #--- remove readings in channel
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
   	  $chnhash = $hash if (!$chnhash);
@@ -2579,8 +2585,7 @@ CUL_HM_respPendRm($)
   delete ($hash->{helper}{respWait});
   RemoveInternalTimer($hash);          # remove resend-timer
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
-
-  CUL_HM_ProcessCmdStack($hash); # continue processing commands
+  $respRemoved = 1;
 }
 ###################################
 sub
@@ -2593,6 +2598,7 @@ CUL_HM_respPendTout($)
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
+	CUL_HM_ProcessCmdStack($hash); # continue processing commands
 	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");
   }
 }
@@ -3055,7 +3061,6 @@ CUL_HM_parseCommon(@){
 						$flag,$id,$src,$chn,$peer,$listNo));# List3 or 4 
 			  }
 			}
-			CUL_HM_ProcessCmdStack($shash);
 		  }
 		  delete $chnhash->{helper}{getCfgList};
 		  delete $chnhash->{helper}{getCfgListNo};
@@ -3105,6 +3110,7 @@ CUL_HM_parseCommon(@){
 		                    CUL_HM_getRegFromStore($name,11,0,"00000000"),
 		                    CUL_HM_getRegFromStore($name,12,0,"00000000")),"");
 		  }
+		  
 		  CUL_HM_respPendRm($shash);
 		  delete $chnhash->{helper}{shadowReg}{$regLN};#remove shadowhash
 		}
