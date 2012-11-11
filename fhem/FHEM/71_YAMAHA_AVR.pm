@@ -67,7 +67,7 @@ YAMAHA_AVR_Initialize($)
 
 ###################################
 sub
-YAMAHA_AVR_GetStatus($;$)
+YAMAHA_AVR_GetStatus($;$$)
 {
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
@@ -82,23 +82,22 @@ YAMAHA_AVR_GetStatus($;$)
 
     if(not defined($hash->{MODEL}))
     {
-	getModel($hash, $device);
+	YAMAHA_AVR_getModel($hash, $device);
     }
 
     if(not defined($hash->{INPUTS}) or length($hash->{INPUTS}) == 0)
     {
-	getInputs($hash, $device);
+	YAMAHA_AVR_getInputs($hash, $device);
     }
     
     
     
-    my $return = SendCommand($device,"<YAMAHA_AV cmd=\"GET\"><Main_Zone><Basic_Status>GetParam</Basic_Status></Main_Zone></YAMAHA_AV>");
+    my $return = YAMAHA_AVR_SendCommand($device,"<YAMAHA_AV cmd=\"GET\"><Main_Zone><Basic_Status>GetParam</Basic_Status></Main_Zone></YAMAHA_AV>");
 
     Log GetLogLevel($name, 4), "YANMAHA_AVR: GetStatus-Request returned:\n$return";
     
     if($return eq "")
     {
-    
 	InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
 	return;
     }
@@ -118,15 +117,18 @@ YAMAHA_AVR_GetStatus($;$)
        $hash->{STATE} = lc($power);
        
     }
+    
+    
     if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute><\/Volume>/)
     {
 	readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
 	readingsBulkUpdate($hash, "mute", lc($3));
     }
     
+    
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
-	readingsBulkUpdate($hash, "input", InputParamToFhemInput(lc($1), 0));
+	readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
     }
     
     readingsEndUpdate($hash, 1);
@@ -152,9 +154,10 @@ YAMAHA_AVR_Get($@)
     if($what =~ /^(power|input|volume|mute)$/)
     {
         YAMAHA_AVR_GetStatus($hash, 1);
+
         if(defined($hash->{READINGS}{$what}))
         {
-    	    return $a[0]." ".$what." => ".$hash->{READINGS}{$what}{VAL};
+	    return $a[0]." ".$what." => ".$hash->{READINGS}{$what}{VAL};
 	}
 	else
 	{
@@ -179,8 +182,8 @@ YAMAHA_AVR_Set($@)
     my $command;
     
     
-    my $inputs_piped = defined($hash->{INPUTS}) ? InputParamToFhemInput(lc($hash->{INPUTS}), 0) : "" ;
-    my $inputs_comma = defined($hash->{INPUTS}) ? InputParamToFhemInput(lc($hash->{INPUTS}), 1) : "" ;
+    my $inputs_piped = defined($hash->{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{INPUTS}), 0) : "" ;
+    my $inputs_comma = defined($hash->{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{INPUTS}), 1) : "" ;
    
     return "No Argument given" if(!defined($a[1]));     
  
@@ -188,9 +191,11 @@ YAMAHA_AVR_Set($@)
     my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off statusRequest";
 
     readingsBeginUpdate($hash);
+
     if($what eq "on")
     {
-	$result = SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>On</Power></Power_Control></Main_Zone></YAMAHA_AV>");
+	$result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>On</Power></Power_Control></Main_Zone></YAMAHA_AV>");
+
 	if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)
 	{
 	    # As the receiver startup takes about 5 seconds, the status will be already set, if the return code of the command is 0.
@@ -198,10 +203,11 @@ YAMAHA_AVR_Set($@)
 	    $hash->{STATE} = "on";
 	    return undef;
 	}   
+
     }
     elsif($what eq "off")
     {
-	SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>Standby</Power></Power_Control></Main_Zone></YAMAHA_AV>");
+	YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>Standby</Power></Power_Control></Main_Zone></YAMAHA_AV>");
     }
     elsif($what eq "input")
     {
@@ -209,15 +215,15 @@ YAMAHA_AVR_Set($@)
 	{
 	    if($hash->{STATE} eq "on")
 	    {
-	        $inputs_piped =~ s/,/|/g;
-	     if(not $inputs_piped eq "")
-	     {    
+		$inputs_piped =~ s/,/|/g;
+	    if(not $inputs_piped eq "")
+	    {
 		if($a[2] =~ /^($inputs_piped)$/)
 		{
-		    $command = getCommandParam($hash, $a[2]);
+		    $command = YAMAHA_AVR_getCommandParam($hash, $a[2]);
 		    if(defined($command) and length($command) > 0)
 		    {
-			$result = SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>".$command."</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
+			$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>".$command."</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
 		    }
 		    else
 		    {
@@ -227,7 +233,7 @@ YAMAHA_AVR_Set($@)
 		    if(not $result =~ /RC="0"/)
 		    {
 			# if the returncode isn't 0, than the command was not successful
-			return "Could not set input to ".$a[2].". Please use only available inputs on your specific receiver";
+			return "Could not set input to ".$a[2].".";
 		    }
 		}
 		else
@@ -250,7 +256,7 @@ YAMAHA_AVR_Set($@)
 	{
 	    return $inputs_piped eq "" ? "No inputs are available. Please try an statusUpdate." : "No input parameter was given";
 	}
-	
+
     }
     elsif($what eq "mute")
     {
@@ -260,12 +266,11 @@ YAMAHA_AVR_Set($@)
 	    {
 		if( $a[2] eq "on")
 		{
-		    SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Mute>On</Mute></Volume></Main_Zone></YAMAHA_AV>");
+		    YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Mute>On</Mute></Volume></Main_Zone></YAMAHA_AV>");
 		}
 		elsif($a[2] eq "off")
 		{
-		    SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Mute>Off</Mute></Volume></Main_Zone></YAMAHA_AV>"); 
-		
+		    YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Mute>Off</Mute></Volume></Main_Zone></YAMAHA_AV>"); 
 		}
 		else
 		{
@@ -308,20 +313,15 @@ YAMAHA_AVR_Set($@)
 			{
 			    Log GetLogLevel($name, 4), "YAMAHA_AV: set volume to ".($current_volume + ($diff * $step))." dB";
 			
-			    SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
 			
-				sleep $sleep unless ($time == 0);
+			    sleep $sleep unless ($time == 0);
 			}
 		    }
-		    
-		    # After complete smoothing, set the real wanted volume
-		    Log GetLogLevel($name, 4), "YAMAHA_AV set volume to ".$a[2]." dB";
-		    SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
 		}
-		else
-		{
-		    SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
-		}
+		
+		Log GetLogLevel($name, 4), "YAMAHA_AV set volume to ".$a[2]." dB";
+		YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
 	    }
 	    else
 	    {
@@ -383,7 +383,7 @@ YAMAHA_AVR_Define($$)
 
 #############################
 sub
-SendCommand($$)
+YAMAHA_AVR_SendCommand($$)
 {
    my($address, $command) = @_;
    
@@ -403,7 +403,7 @@ YAMAHA_AVR_Undefine($$)
 
 #############################
 # Converts all Inputs to FHEM usable command lists
-sub InputParamToFhemInput($$)
+sub YAMAHA_AVR_InputParam2Fhem($$)
 {
     my ($inputs, $replace_pipes) = @_;
 
@@ -418,7 +418,7 @@ sub InputParamToFhemInput($$)
 
 #############################
 # Returns the Yamaha Parameter Name for the FHEM like input channel
-sub getCommandParam($$)
+sub YAMAHA_AVR_getCommandParam($$)
 {
    my ($hash, $command) = @_;
    my $item;
@@ -426,7 +426,7 @@ sub getCommandParam($$)
 
     foreach $item (@commands)
     {
-	if(lc(InputParamToFhemInput($item, 0)) eq $command)
+	if(lc(YAMAHA_AVR_InputParam2Fhem($item, 0)) eq $command)
 	{
 	    return $item;
 	}
@@ -438,7 +438,7 @@ sub getCommandParam($$)
 }
 
 
-sub getModel($$)
+sub YAMAHA_AVR_getModel($$)
 {
     my ($hash, $address) = @_;
     my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
@@ -449,11 +449,11 @@ sub getModel($$)
     }
 }
 
-sub getInputs($$)
+sub YAMAHA_AVR_getInputs($$)
 {
 
     my ($hash, $address) = @_;  
-    my $response = SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></Main_Zone></YAMAHA_AV>");
+    my $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></Main_Zone></YAMAHA_AV>");
     return undef unless (defined($response));
     $response =~ s/></>\n</g;
     my @inputs = split("\n", $response);
