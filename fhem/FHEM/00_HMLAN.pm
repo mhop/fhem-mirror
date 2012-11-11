@@ -199,8 +199,17 @@ sub
 HMLAN_Write($$$)
 {
   my ($hash,$fn,$msg) = @_;
-  my $dst = substr($msg, 16, 6);
+  my ($mtype,$src,$dst) = (substr($msg, 8, 2),
+                           substr($msg, 10, 6),
+						   substr($msg, 16, 6));
 
+	if ($mtype eq "02" && $src eq $hash->{owner}){
+                                  # Acks are generally send by HMLAN
+                                  # So far there is no need to send own
+    Log 5, "HMLAN: Skip ACK";
+	return;
+  }
+  
 #  my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
   my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
   my $IDsub = '-'.$dst;               # guess: ID remove?
@@ -276,25 +285,29 @@ HMLAN_Parse($$)
   
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
     Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
-#	                               .(if($mFld[0] =~ m/^E/)?'  ':'')
+	                               .(($mFld[0] =~ m/^E/)?'  ':'')
 	                               .' stat:'.$mFld[1]
 	                               .' t:'.$mFld[2].' d:'.$mFld[3]
-								   .' r:'.$mFld[4]. 
- 								  'm:'.$mFld[5];
-#                                  '     m:'.substr($mFld[5],0,2). 
-#                                  ' '.substr($mFld[5],2,4).
-#                                  ' '.substr($mFld[5],6,6).
-#                                  ' '.substr($mFld[5],12,6). 
-#                                  ' '.substr($mFld[5],18);
+								   .' r:'.$mFld[4] 
+ 								   .'m:'.$mFld[5];
+#                                   .'     m:'.substr($mFld[5],0,2)
+#                                   .' '.substr($mFld[5],2,4)
+#                                   .' '.substr($mFld[5],6,6)
+#                                   .' '.substr($mFld[5],12,6)
+#                                   .' '.substr($mFld[5],18);
 								  
     my $dmsg = sprintf("A%02X%s", length($mFld[5])/2, uc($mFld[5]));
 	
 	my $src = substr($mFld[5],6,6);
 	my $dst = substr($mFld[5],12,6);
 	my $flg = hex(substr($mFld[5],2,2));
-    # handle status. 1-ack,8=nack,21=?,02=? 81=open
-
-    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R'));          #ok
+	
+    # handle status. 01=ack:seems to announce the new message counter
+	#                02=our send message returned it was likely not sent
+	#                08=nack,
+	#                21=?,
+	#                81=open
+    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R'));
 
     if (!($flg & 0x25)){#rule out other messages 
 	  HMLAN_SimpleWrite($hash, '-'.$src);
@@ -352,33 +365,36 @@ HMLAN_SimpleWrite(@)
 
 #  select(undef, undef, undef, 0.01); #  todo check necessity
 #---------- confort trace--------------
-#  Log GetLogLevel($name,5), 'HMLAN_Send:         S:'.
-#                                        substr($msg,0,9).
-#                            ' stat:  '.substr($msg,10,2).
-#                            ' t:'      .substr($msg,13,8).
-#                            ' d:'      .substr($msg,22,2).
-#                            ' r:'      .substr($msg,25,8).
+# Log GetLogLevel($name,5), 'HMLAN_Send:         S:'.
+#                                       substr($msg,0,9).
+#
+#                           ' stat:  '.substr($msg,10,2).
+#                           ' t:'      .substr($msg,13,8).
+#                           ' d:'      .substr($msg,22,2).
+#                           ' r:'      .substr($msg,25,8).
 # 							 ' m:'      .substr($msg,34)
-
-#                            ' m:'      .substr($msg,34,2).
-#                            ' '        .substr($msg,36,4). 
-#                            ' '        .substr($msg,40,6).
-#                            ' '        .substr($msg,46,6). 
-#                            ' '        .substr($msg,52)     
+#
+#                           ' m:'      .substr($msg,34,2).
+#                           ' '        .substr($msg,36,4). 
+#                           ' '        .substr($msg,40,6).
+#                           ' '        .substr($msg,46,6). 
+#                           ' '        .substr($msg,52)     
+#
 #							if (length($msg )>19);
-#  Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg     if (length($msg) <=19); 
+# Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg     if (length($msg) <=19); 
 #----------- normal trace,better speed-----------
   Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg; #normal trace
   
   $msg .= "\r\n" unless($nonl);
   
   # Currently it does  not seem to be necessary to wait Thus this code is inhibit for now
-  #my $ct = gettimeofday();
-  #select(undef, undef, undef, 0.01) if($hash->{helper}{nextSend} >$ct);
-  #$hash->{helper}{nextSend} = $ct + 0.01; # experimental value. 
-  select(undef, undef, undef, 0.01);
- 
+  for (my$cnt=0;$cnt<10;$cnt++){ #  no more then 10 itterations!!! fault save
+    last if ($hash->{helper}{nextSend} <gettimeofday());
+	select(undef, undef, undef, 0.01);
+  }
+  
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
+  $hash->{helper}{nextSend} = gettimeofday() + 0.01; # experimental value. 
 }
 
 ########################
