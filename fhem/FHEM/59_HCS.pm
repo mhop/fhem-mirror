@@ -469,15 +469,18 @@ HCS_getValues($$) {
     my $delta;
     my $str;
 
-    foreach my $d (sort keys %devs) {
+    foreach my $d (sort keys %{$hash->{helper}{device}}) {
       my $info = "";
-      my $act = ($devs{$d}{actuator} eq "n/a")     ? " n/a" : sprintf("%${lv}d",$devs{$d}{actuator});
-      my $td  = ($devs{$d}{tempDesired} eq "n/a")  ? " n/a" : sprintf("%4.1f",$devs{$d}{tempDesired});
-      my $tm  = ($devs{$d}{tempMeasured} eq "n/a") ? " n/a" : sprintf("%4.1f",$devs{$d}{tempMeasured});
-      $info   = "idle"       if($devs{$d}{ignored} == 0);
-      $info   = "demand"     if($devs{$d}{ignored} == 1);
-      $info   = "(excluded)" if($devs{$d}{excluded} == 1);
-      $info   = "(ignored)"  if($devs{$d}{ignored} == 1);
+      my $act = ($hash->{helper}{device}{$d}{actuator} eq "n/a")     ? " n/a" :
+                  sprintf("%${lv}d",$hash->{helper}{device}{$d}{actuator});
+      my $td  = ($hash->{helper}{device}{$d}{tempDesired} eq "n/a")  ? " n/a" :
+                  sprintf("%4.1f",$hash->{helper}{device}{$d}{tempDesired});
+      my $tm  = ($hash->{helper}{device}{$d}{tempMeasured} eq "n/a") ? " n/a" :
+                  sprintf("%4.1f",$hash->{helper}{device}{$d}{tempMeasured});
+      $info   = "idle"       if($hash->{helper}{device}{$d}{demand} == 0);
+      $info   = "demand"     if($hash->{helper}{device}{$d}{demand} == 1);
+      $info   = "(excluded)" if($hash->{helper}{device}{$d}{excluded} == 1);
+      $info   = "(ignored)"  if($hash->{helper}{device}{$d}{ignored} == 1);
 
       if($td eq " n/a" || $tm eq " n/a") {
         $delta = " n/a";
