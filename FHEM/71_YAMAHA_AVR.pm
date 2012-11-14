@@ -74,9 +74,9 @@ YAMAHA_AVR_GetStatus($;$)
     my $power;
     $local = 0 unless(defined($local));
 
-    return "" if(!defined($hash->{ADDRESS}) or !defined($hash->{INTERVAL}));
+    return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{INTERVAL}));
 
-    my $device = $hash->{ADDRESS};
+    my $device = $hash->{helper}{ADDRESS};
 
 
 
@@ -85,7 +85,7 @@ YAMAHA_AVR_GetStatus($;$)
 	YAMAHA_AVR_getModel($hash, $device);
     }
 
-    if(not defined($hash->{INPUTS}) or length($hash->{INPUTS}) == 0)
+    if(not defined($hash->{helper}{INPUTS}) or length($hash->{helper}{INPUTS}) == 0)
     {
 	YAMAHA_AVR_getInputs($hash, $device);
     }
@@ -98,7 +98,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if($return eq "")
     {
-	InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
+	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
 	return;
     }
     
@@ -133,7 +133,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     readingsEndUpdate($hash, 1);
     
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
+    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
     
     Log GetLogLevel($name,4), "YAMAHA_AVR $name: $hash->{STATE}";
     
@@ -177,13 +177,13 @@ YAMAHA_AVR_Set($@)
 {
     my ($hash, @a) = @_;
     my $name = $hash->{NAME};
-    my $address = $hash->{ADDRESS};
+    my $address = $hash->{helper}{ADDRESS};
     my $result = "";
     my $command;
     
     
-    my $inputs_piped = defined($hash->{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{INPUTS}), 0) : "" ;
-    my $inputs_comma = defined($hash->{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{INPUTS}), 1) : "" ;
+    my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
+    my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
    
     return "No Argument given" if(!defined($a[1]));     
  
@@ -363,16 +363,16 @@ YAMAHA_AVR_Define($$)
 
     my $address = $a[2];
   
-    $hash->{ADDRESS} = $address;
+    $hash->{helper}{ADDRESS} = $address;
     
     
     if(defined($a[3]) and $a[3] > 0)
     {
-	$hash->{INTERVAL}=$a[3];
+	$hash->{helper}{INTERVAL}=$a[3];
     }
     else
     {
-	$hash->{INTERVAL}=30;
+	$hash->{helper}{INTERVAL}=30;
     }
     $attr{$name}{"volume-smooth-change"} = "1";
     
@@ -422,7 +422,7 @@ sub YAMAHA_AVR_getCommandParam($$)
 {
    my ($hash, $command) = @_;
    my $item;
-   my @commands = split("\\|", $hash->{INPUTS});
+   my @commands = split("\\|", $hash->{helper}{INPUTS});
 
     foreach $item (@commands)
     {
@@ -443,9 +443,10 @@ sub YAMAHA_AVR_getModel($$)
     my ($hash, $address) = @_;
     my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
     return undef unless(defined($response));
-    if($response =~ /<Unit_Description.* Unit_Name="(.+?)">/)
+    if($response =~ /<Unit_Description\s+Version="(.+?)"\s+Unit_Name="(.+?)">/)
     {
-        $hash->{MODEL} = $1;
+	$hash->{FIRMWARE} = $1;
+        $hash->{MODEL} = $2;
     }
 }
 
@@ -462,12 +463,12 @@ sub YAMAHA_AVR_getInputs($$)
     {
 	if($_ =~ /<Param>(.+?)<\/Param>/)
 	{
-	    if(defined($hash->{INPUTS}) and length($hash->{INPUTS}) > 0)
+	    if(defined($hash->{helper}{INPUTS}) and length($hash->{helper}{INPUTS}) > 0)
 	    {
-	      $hash->{INPUTS} .= "|";
+	      $hash->{helper}{INPUTS} .= "|";
 	    }
 	  
-	      $hash->{INPUTS} .= $1;
+	      $hash->{helper}{INPUTS} .= $1;
 	    
 	}
     }
@@ -496,7 +497,7 @@ sub YAMAHA_AVR_getInputs($$)
     select the input (HDMI, AV, AirPlay, internet radio, Tuner, ...), select the volume
     or mute/unmute the volume.<br><br>
     Defining a YAMAHA_AVR device will schedule an internal task (interval can be set
-    with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 60 seconds), which periodically reads
+    with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 30 seconds), which periodically reads
     the status of the AV receiver (power state, selected input, volume and mute status)
     and triggers notify/filelog commands.<br><br>
 
