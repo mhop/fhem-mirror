@@ -24,8 +24,9 @@ if [ "$?" -ne "0" ]; then
   echo "user fhem does not exist. Adding it."
   echo "fhem:any:1080:0:fhem:/home-not-used:/bin/sh" >>/var/tmp/passwd
   # set files ownership
-  chown -R boxusr80 ${home}/log
-  chown -R boxusr80 ${home}/FHEM
+  chown -R boxusr80 FHEM docs fhem.pl log fhem.cfg www
+  chown root dfu-programmer     
+  chmod u+s dfu-programmer
 fi 
 
 perl fhem.pl fhem.cfg
