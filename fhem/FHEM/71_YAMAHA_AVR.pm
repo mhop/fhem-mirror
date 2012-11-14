@@ -151,13 +151,13 @@ YAMAHA_AVR_Get($@)
     $what = $a[1];
     
     
-    if($what =~ /^(power|input|volume|mute)$/)
+    if($what =~ /^(power|input|volume_level|mute)$/)
     {
         YAMAHA_AVR_GetStatus($hash, 1);
 
         if(defined($hash->{READINGS}{$what}))
         {
-	    return $a[0]." ".$what." => ".$hash->{READINGS}{$what}{VAL};
+	    return $hash->{READINGS}{$what}{VAL};
 	}
 	else
 	{
@@ -166,7 +166,7 @@ YAMAHA_AVR_Get($@)
     }
     else
     {
-	return "Unknown argument $what, choose one of param power input volume mute get";
+	return "Unknown argument $what, choose one of param power input volume_level mute get";
     }
 }
 
@@ -545,7 +545,7 @@ mute off</pre>
 <pre>power
 input 
 mute 
-volume</pre>
+volume_level</pre>
   </ul>
   <a name="YAMAHA_AVRattr"></a>
   <b>Attributes</b>
