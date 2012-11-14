@@ -2014,7 +2014,7 @@ sub
 FW_fC($)
 {
   my ($cmd) = @_;
-  my $ret = AnalyzeCommand($FW_chash, $cmd);
+  my $ret = AnalyzeCommandChain($FW_chash, $cmd);
   return $ret;
 }
 
