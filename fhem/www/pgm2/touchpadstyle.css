@@ -5,10 +5,10 @@ textarea { font-family:Arial, sans-serif; font-size:16px}
 input    { font-family:Arial, sans-serif; font-size:16px}
 select   { font-family:Arial, sans-serif; font-size:16px}
 #logo    { position:absolute; top:10px; left:10px;
-            width:100px;  height:105px; background-image:url(fhem); }
-#menu    { position:absolute; top:120px;left:10px; width:100px; }
-#hdr     { position:absolute; top:10px; left:140px; }
-#content { position:absolute; top:50px; left:140px; bottom:20px; right:10px; }
+            width:120px;  height:132px; background-image:url(../icons/fhemicon.png); }
+#menu    { position:absolute; top:152px;left:10px; width:140px; }
+#hdr     { position:absolute; top:10px; left:160px; }
+#content { position:absolute; top:50px; left:160px; bottom:20px; right:10px; }
 
 .devType { padding-top:20px; }
 a {  color: #278727; }
