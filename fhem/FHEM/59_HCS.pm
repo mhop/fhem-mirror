@@ -448,7 +448,11 @@ HCS_getValues($$) {
     next if($t eq "CUL_HM" && $attr{$d}{model} eq "HM-CC-TC" && ($attr{$d}{device} || $attr{$d}{chanNo}));
 
     $devs{$d}{actuator}     = ReadingsVal($d,"actuator","n/a");
-    $devs{$d}{actuator}     =~ s/(\s+|%)//g;
+    if ($devs{$d}{actuator} =~ m/^\d+\s*%$/) {
+      $devs{$d}{actuator} =~ s/(\s+|%)//g;
+    } else {
+      $devs{$d}{actuator} = 0;
+    }
     $devs{$d}{excluded}     = ($exclude =~ m/$d/) ? 1 : 0;
     $devs{$d}{ignored}      = ($attr{$d}{ignore} && $attr{$d}{ignore} == 1) ? 1 : 0;
     $devs{$d}{tempDesired}  = ReadingsVal($d,"desired-temp","n/a");
@@ -874,6 +878,7 @@ HCS_getValues($$) {
     <li><code>exclude</code> (optional)<br>
         space or comma separated list of devices (FHT or HM-CC-TC) for excluding from
         monitoring
+    </li>
     <li><code>idleperiod</code> (mandatory)<br>
         locks the device to be switched for the specified period. The unit is minutes.
         Default value: <code>10</code>
@@ -920,7 +925,7 @@ HCS_getValues($$) {
     </li>
     <li><a href="#disable"><code>disable</code></a></li>
     <li><a href="#do_not_notify"><code>do_not_notify</code></a></li>
-    <li><a href="#event-on-change-reading"><code>event-on-change-reading</a><br>
+    <li><a href="#event-on-change-reading"><code>event-on-change-reading</code></a><br>
         default value: <code>state,devicestate,eco,overdrive</code>
     </li>
     <li><a href="#event-on-update-reading"><code>event-on-update-reading</code></a></li>
