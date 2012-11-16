@@ -18,8 +18,8 @@ sub CUL_HM_Set($@);
 sub CUL_HM_infoUpdtDevData($$$);
 sub CUL_HM_Pair(@);
 sub CUL_HM_getConfig($$$$$);
-sub CUL_HM_SendCmd($$$$);
-sub CUL_HM_responseSetup($$$);
+sub CUL_HM_SendCmd($$);
+sub CUL_HM_responseSetup($$);
 sub CUL_HM_eventP($$);
 sub CUL_HM_respPendRm($);
 sub CUL_HM_respPendTout($);
@@ -214,12 +214,12 @@ CUL_HM_Initialize($)
                        "rawToReadable unit ".
 					   "chanNo device peerList peerIDs ".
 					   "actCycle actStatus ".
-					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast ".
+					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast protState ".
 					   "protResndFailLast protResndLast protResndFailCnt protResndCnt protToutRespLast protToutRespCnt ".
 					   "channel_01 channel_02 channel_03 channel_04 channel_05 channel_06 ".
 					   "channel_07 channel_08 channel_09 channel_0A channel_0B channel_0C ". 
 					   "channel_0D channel_0E channel_0F channel_10 channel_11 channel_12 ".
-					   "channel_13 channel_14 channel_15 channel_16 channel_17 channel_18 ";
+					   "channel_13 channel_14 channel_15 channel_16 channel_17 channel_18";
   my @modellist;
   foreach my $model (keys %culHmModel){
     push @modellist,$culHmModel{$model}{name};
@@ -227,6 +227,7 @@ CUL_HM_Initialize($)
   $hash->{AttrList}  .= " model:"  .join(",", sort @modellist);
   $hash->{AttrList}  .= " subType:".join(",", sort 
                 map { $culHmDevProps{$_}{st} } keys %culHmDevProps);
+  CUL_HM_initRegHash();
 }
 #############################
 sub
@@ -374,7 +375,7 @@ CUL_HM_Parse($$)
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$msgcnt,$msgFlag,$msgType,$src,$dst,$p);
 
   #----------start valid messages parsing ---------
-  my $parse = CUL_HM_parseCommon($msgcnt,$msgType,$src,$dst,$p);
+  my $parse = CUL_HM_parseCommon($msgcnt,$msgFlag,$msgType,$src,$dst,$p);
   push @event, "powerOn"   if($parse eq "powerOn");
   
   my $sendAck = "yes";# if yes Ack will be determined automatically
@@ -392,16 +393,15 @@ CUL_HM_Parse($$)
     ;
   } 
   elsif($msgType eq "00" ){      #### DEVICE_INFO,  Pairing-Request 
+ 	CUL_HM_ProcessCmdStack($shash) if(CUL_HM_getRxType($shash) & 0x04);#config
     CUL_HM_infoUpdtDevData($name, $shash,$p);#update data
 
     if($shash->{cmdStack} && (CUL_HM_getRxType($shash) & 0x04)) {
-      CUL_HM_ProcessCmdStack($shash);# sender devices may have msgs stacked
 	  push @event,"";
     } 
 	else {
       push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
     }
-	
   } 
   elsif(($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) && $st ne "keyMatic") {#### Pairing-Request-Convers.
     push @event, "";    #todo why end here?
@@ -409,7 +409,7 @@ CUL_HM_Parse($$)
   } 
   elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
 
-    if($cmd eq "8670" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
+    if($msgType eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
 
       my (    $t,      $h,      $r,      $w,     $wd,      $s,      $b ) =
          (hex($1), hex($2), hex($3), hex($4), hex($5), hex($6), hex($7));
@@ -433,12 +433,10 @@ CUL_HM_Parse($$)
       push @event, "isRaining:$ir";
       push @event, "sunshine:$s";
       push @event, "brightness:$b";
-
-    } else {
+    } 
+	else {
       push @event, "unknown:$p";
-
     }
-
   } 
   elsif($model eq "HM-CC-TC") { ####################################
     my ($sType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/);
@@ -447,10 +445,10 @@ CUL_HM_Parse($$)
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
       $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-      $chnHash = $shash if (!$chnHash);
-	  CUL_HM_setRd($chnHash,"state"        ,"T: $t H: $h",$tn); 
-	  CUL_HM_setRd($chnHash,"measured-temp",$t           ,$tn); 
-	  CUL_HM_setRd($chnHash,"humidity"     ,$h           ,$tn); 
+	  CUL_HM_UpdtReadBulk($chnHash,1,"state:T: $t H: $h",  # update weather channel
+	                                 "measured-temp:$t",
+	                                 "humidity:$h")
+				  if (!$chnHash);
       push @event, "state:T: $t H: $h";
       push @event, "measured-temp:$t";
       push @event, "humidity:$h";
@@ -461,22 +459,18 @@ CUL_HM_Parse($$)
          (    $1, hex($2));
       $vp = int($vp/2.56+0.5);   # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-	  CUL_HM_setRd($chnHash,"state","$vp %",$tn)if (!$chnHash);
+	  readingsSingleUpdate($chnHash,"state","$vp %",1) if($chnHash);
       push @event, "actuator:$vp %";
 
       # Set the valve state too, without an extra trigger
-      if($dhash) {
-	    DoTrigger($dname,'ValvePosition:set_'.$vp.'%');
-        $dhash->{STATE} = "$vp %";
-		CUL_HM_setRd($dhash,"state","set_$vp %",$tn);
-      }
+      readingsSingleUpdate($dhash,"state","set_$vp %",1) if($dhash);
     }
     elsif(($msgType eq '02' &&$sType eq '01')||    # ackStatus
 	      ($msgType eq '10' &&$sType eq '06')){    # infoStatus
 	  $chn = substr($p,2,2); 
 	  my $dTemp = sprintf("%0.1f", hex(substr($p,4,2))/2);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-	  CUL_HM_setRd($chnHash,"desired-temp",$dTemp,$tn)if (!$chnHash);
+	  readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1) if($chnHash);
       push @event, "desired-temp:" .$dTemp;
     }
     elsif($msgType eq "10"){                       # Config change report
@@ -564,11 +558,10 @@ CUL_HM_Parse($$)
     elsif($msgType eq "01"){                       # status reports
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
-      push @event, "ValveErrorPosition for $dname: $vep %";
-      push @event, "ValveOffset for $dname: $of %";
-	    DoTrigger($dname,'ValveErrorPosition:set_'.$vep.'%');
-	    DoTrigger($dname,'ValveOffset:set_'.$of.'%');
-	    push @event,""; # nothing to report for TC
+        push @event, "ValveErrorPosition_for_$dname: $vep %";
+        push @event, "ValveOffset_for_$dname: $of %";
+		CUL_HM_UpdtReadBulk($dhash,1,'ValveErrorPosition:set_'.$vep.' %',
+		                             'ValveOffset:set_'.$of.' %');
 	  }
 	  elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
 	  	push @event,""; # 
@@ -576,15 +569,10 @@ CUL_HM_Parse($$)
     }
     elsif($cmd eq "A03F" && $id eq $dst) {         # Timestamp request
       my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
-      CUL_HM_SendCmd($shash, "++803F$id${src}0204$s2000",1,0);
+      CUL_HM_SendCmd($shash, "++803F$id${src}0204$s2000");
       push @event, "time-request";
 	  $sendAck = ""; 
     } 
-	
-	if($cmd ne "8002" && $cmd ne "A03F" && $id eq $dst) {
-        CUL_HM_SendCmd($shash, $msgcnt."8002$id${src}00",1,0)  # Send Ack
-    }
-	$sendAck = ""; #todo why is this special?
   } 
   elsif($model eq "HM-CC-VD") { ###################
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
@@ -592,7 +580,6 @@ CUL_HM_Parse($$)
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = ($2,hex($3), hex($4));
       $vp = int($vp)/2;   # valve position in %
-      push @event, "ValvePosition:$vp%";#todo should be removed
       push @event, "state:$vp%";
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
@@ -740,21 +727,11 @@ CUL_HM_Parse($$)
         $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
       }
       my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	  $cmpVal = (($cmpVal ^ $buttonField)|$buttonField); # all error,only one goto normal
+	  $cmpVal = (($cmpVal ^ $buttonField)|$buttonField); # each err, one goto normal
 	  $shash->{helper}{addVal} = $buttonField;   #store to handle changes
+	  readingsSingleUpdate($chnHash,"state",$target,1);#trigger chan evt also 
       push @event,"battery:". (($buttonField&0x80)?"low":"ok")if($cmpVal&0x80);
-      push @event, "state:$btnName $state$target";
-	  
-	  $chnHash->{STATE} = $state.$target;   #handle channel manually, others to device
-	  DoTrigger($btnName,"$state$target");
-
-      if($id eq $dst) {  # Send Ack
-        CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".
-                ($state =~ m/on/?"C8":"00")."00", 1, 0);#Actor simulation
-
-		$sendAck = "";
-      }
-      
+      push @event,"state:$btnName $state$target";
     }
   }
   elsif($st eq "virtual"){#####################################################
@@ -792,14 +769,14 @@ CUL_HM_Parse($$)
  	      my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
  	      my $mask = 3<<$bitLoc;
  	      my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
-		  CUL_HM_setRd($shash,"color",$value,$tn);# to device!
-		  CUL_HM_setRd($shash,"state",$value,$tn);# to device!
+		  CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
+		                               "state".$value);
  	      if ($chnHash){
  	        $shash = $chnHash;
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
  	        my $actColor = $colorTable{$msgState};
  	        $actColor = "unknown" if(!$actColor);
-		    CUL_HM_setRd($chnHash,"color",$actColor,$tn);
+		    push @event, "color:$actColor";           #todo duplicate
             push @event, "state:$actColor";			
  	      }
 		}
@@ -846,7 +823,7 @@ CUL_HM_Parse($$)
     }
 	
 	if($id eq $dst && $cmd ne "8002" && $state){
-      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101${state}00",1,0);
+      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101${state}00");
 	  $sendAck = ""; #todo why is this special?
 	}
   } 
@@ -856,7 +833,8 @@ CUL_HM_Parse($$)
 
 	if ($msgType eq "10" && $p =~ m/^06..(..)/) {
 	  my $state = hex($1);
-	  my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
+	  my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:
+	                                                 0xff;
 	  $cmpVal = ($cmpVal ^ $state)|$state; 
       push @event, "battery:". (($state&0x04)?"low"  :"ok"  ) if($cmpVal&0x04);
       push @event, "state:alive";
@@ -867,12 +845,10 @@ CUL_HM_Parse($$)
 	    my $cmpVal = defined($dhash->{helper}{addVal})?
 		                            $dhash->{helper}{addVal}:0xff;
 	    $cmpVal = ($cmpVal ^ $state)|$state; 
-	    if (!($state & 1)){
-		  DoTrigger($dname,'test:'.$state);       # blame device
-		  push @event, "test:from $dname:$state"; # team trigger as well
-		}
-		DoTrigger($dname,'battery:'.(($state & 0x04)?"low":"ok"))
-		        if($cmpVal&0x80);
+		readingsSingleUpdate($dhash,'test',"from $dname:$state",1)
+		      if (!($state & 1));
+		readingsSingleUpdate($dhash,'battery',(($state & 0x04)?"low":"ok"),1)
+		      if($cmpVal&0x80);
 	  }
       push @event, "";
     }
@@ -881,7 +857,8 @@ CUL_HM_Parse($$)
 	  if($dhash){ # the source is in dst
 	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
 		  $dhash->{helper}{alarmNo} = $No;
-	      DoTrigger($dname,'state:'.(($state eq "01")?"all-clear":"on"));
+		  readingsSingleUpdate($dhash,'state',
+		                              (($state eq "01")?"all-clear":"on"),1);
 		}
 	  }
       push @event,"state:".(($state eq "01")?"all-clear":"on").":from:".$dname;
@@ -904,7 +881,7 @@ CUL_HM_Parse($$)
 	}
 	
 	if($id eq $dst && $cmd ne "8002"){  # Send Ack/Nack
-      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src.($cmd eq "A001" ? "80":"00"),1,0);
+      CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src.($cmd eq "A001" ? "80":"00"));
       $sendAck = ""; #todo why is this special?
 	}
   } 
@@ -948,7 +925,7 @@ CUL_HM_Parse($$)
 	  push @event, "contact:$txt$target";
 	  
 	  if($id eq $dst && hex($msgFlag)&0x20){
-		CUL_HM_SendCmd($shash, $msgcnt."8002$id$src${chn}00",1,0);  #Send Ack
+		CUL_HM_SendCmd($shash, $msgcnt."8002$id$src${chn}00");  #Send Ack
 		$sendAck = ""; 
 	  }
     }
@@ -980,7 +957,7 @@ CUL_HM_Parse($$)
         } elsif($lst eq "00" && $flg eq "20") { push @event, "contact:movement_closed";
         } elsif($lst eq "00" && $flg eq "30") { push @event, "contact:open";
         }
-        CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".$lst."00",1,0)  
+        CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."0101".$lst."00")  
           if($id eq $dst);# Send AckStatus
 	    $sendAck = "";
 	  }
@@ -1031,34 +1008,42 @@ CUL_HM_Parse($$)
   else{#####################################
     ; # no one wants the message
   }
-  #------------ parse for virtual destination     ------------------
-  if (AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
-    if($msgType =~ m/^4./ && $p =~ m/^(..)/) {
-      my ($recChn) = ($1);# button number/event count
+
+  #------------ parse if FHEM is destination or virtual actor  ----------------
+  if($msgType =~ m/^4./ && $p =~ m/^(..)/) { #Push Button event
+    my ($recChn) = ($1);# button number/event count
+    if (AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
 	  my $recId = $src.$recChn;
 	  for (my $cnt=1;$cnt<25;$cnt++)  {#need to check each channel
 	    my $dChNo = sprintf("%02X",$cnt);
 	    my $dChName = AttrVal($dname,"channel_".$dChNo,"");
-		if (!$dChName){next;} # not channel provisioned
+		next if (!$dChName);                            # not channel provisioned
 	    my @peerIDs = split(',',AttrVal($dChName,"peerIDs",""));
 	    foreach my $pId (@peerIDs){
 	      if ($pId eq $recId){ #match: we have to ack 
 		    my $dChHash = CUL_HM_name2Hash($dChName);
 		    my $state = ReadingsVal($dChName,"virtActState","C8");
 		    $state = ($state eq "00")?"C8":"00";
-		    setReadingsVal($dChHash,"virtActState",$state,$tn);
-		    setReadingsVal($dChHash,"virtActTrigger",$name,$tn);
+			CUL_HM_UpdtReadBulk($dChHash,1,"virtActState:".$state,
+			                    "virtActTrigger:".CUL_HM_id2Name($recId));
             CUL_HM_SendCmd($dChHash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
-                  $state."00", 1, 0);
+                  $state."00");
 	      }
         }
 	  }
 	}
+	elsif($id eq $dst){# hist: send an ack - should not be used in reality
+	                   # fhem CUL shall ack a button press
+      CUL_HM_SendCmd($shash, $msgcnt."8002".$dst.$src."0101".
+                ((hex($recChn)&1)?"C8":"00")."00");#Actor simulation
+      $sendAck = "";
+	}
   }
+  
   #------------ send default ACK if not applicable------------------
   #    ack if we are destination, anyone did accept the message (@event)
   #        parser did not supress 
-  CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00",1,0)  # Send Ack
+  CUL_HM_SendCmd($shash, $msgcnt."8002".$id.$src."00")  # Send Ack
       if(   ($id eq $dst) 			#are we adressee 
 	     && (hex($msgFlag)&0x20) 	#response required Flag
 		 && @event  				#only ack of we identified it
@@ -1067,30 +1052,46 @@ CUL_HM_Parse($$)
 		 
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont stack if a response is complete
   #------------ process events ------------------
+
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
-
-  my @changed;
-  for(my $i = 0; $i < int(@event); $i++) {
-    next if($event[$i] eq "");
-
-    my ($vn, $vv) = split(":", $event[$i], 2);
-    if($vn eq "state") {
-      if($shash->{cmdSent} && $shash->{cmdSent} eq $vv) {
-        delete($shash->{cmdSent}); # Skip second "on/off" after our own command
-      } 
-	  else {
-        $shash->{STATE} = $vv;
-        push @changed, $vv;
-      }
-    } 
-	else {
-      push @changed, ($vn.": ".((defined($vv)&&$vv ne "")?$vv:"-"));
-    }
-	CUL_HM_setRd($shash,$vn,$vv,$tn);
-  }
-  $shash->{CHANGED} = \@changed;
+  CUL_HM_UpdtReadBulk($shash,1,@event);
   return $shash->{NAME} ;# shash could have changed to support channel
 }
+
+my %culHmRegDefShLg = (# register that are available for short AND long button press. Will be merged to rgister list at init
+#blindActuator mainly   
+  maxTimeF      =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"Short:max time first direction"},
+  driveMode     =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"0=direct,1=viaUpperEnd,2=viaLowerEnd,3=viaNextEnd"},
+  maxTimeF      =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"Short:max time first direction"},
+  actionType    =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"0=off,1=JmpToTarget,2=toggleToCnt,3=toggleToCntInv"},
+  OnTimeMode    =>{a=> 10.0,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,t=>"on time mode: 0=absolut,1=minimal"},
+  OffTimeMode   =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,t=>"off time mode: 0=absolut,1=minimal"},
+#dimmer  mainly                                                                        
+  OnDly         =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:on delay "},
+  OnTime        =>{a=>  7.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:on time"},
+  OffDly        =>{a=>  8.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:off delay"},
+  OffTime       =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:off time"},
+                                                                
+  OffLevel      =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:PowerLevel Off"},
+  OnMinLevel    =>{a=> 16.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:minimum PowerLevel"},
+  OnLevel       =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:PowerLevel on"},
+                                                                
+  OffLevelKm    =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>127.5   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:OnLevel 127.5=locked"},
+  OnLevelKm     =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>127.5   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:OnLevel 127.5=locked"},
+  OnRampOnSp    =>{a=> 34.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Short:Ramp On speed"},
+  OnRampOffSp   =>{a=> 35.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Short:Ramp Off speed"},
+                  
+  rampSstep     =>{a=> 18.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:rampStartStep"},
+  rampOnTime    =>{a=> 19.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:rampOnTime"},
+  rampOffTime   =>{a=> 20.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:rampOffTime"},
+  dimMinLvl     =>{a=> 21.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:dimMinLevel"},
+  dimMaxLvl     =>{a=> 22.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:dimMaxLevel"},
+  dimStep       =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:dimStep"},
+#output Unit                                                    
+  ActType       =>{a=>36   ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Action type(LED or Tone)"},
+  ActNum        =>{a=>37   ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Action Number"},
+  Intense       =>{a=>47   ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Volume - Tone channel only!"},
+);
 
 
 ##----------definitions for register settings-----------------	
@@ -1109,132 +1110,86 @@ CUL_HM_Parse($$)
 	# caution: !!! bitfield setting will zero the rest of the register
 	#              if  less then a byte                    !!!!!!!!!!!
 my %culHmRegDefine = (
-  intKeyVisib  =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>""         ,f=>""      ,u=>'bool',t=>'visibility of internal keys'},
-  pairCentral  =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>''       ,f=>""      ,u=>'dec' ,t=>'pairing to central'},
-  #blindActuator mainly   
-  driveUp      =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
-  driveDown    =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
-  driveTurn    =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"fliptime up <=>down"},
-  maxTimeFSh   =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"Short:max time first direction"},
-  maxTimeFLg   =>{a=>157.0,s=>1.0,l=>3,min=>0  ,max=>25.4  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"Long:max time first direction"},
-  driveModeSh  =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3     ,c=>''         ,f=>""      ,u=>''    ,t=>"0=direct,1=viaUpperEnd,2=viaLowerEnd,3=viaNextEnd"},
-  actionTypeSh =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3     ,c=>''         ,f=>""      ,u=>''    ,t=>"0=off,1=JmpToTarget,2=toggleToCnt,3=toggleToCntInv"},
-  OnTimeModeSh =>{a=> 10.0,s=>0.1,l=>3,min=>0  ,max=>1     ,c=>''         ,f=>""      ,u=>''    ,t=>"on time mode: 0=absolut,1=minimal"},
-  OffTimeModeSh=>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1     ,c=>''         ,f=>""      ,u=>''    ,t=>"off time mode: 0=absolut,1=minimal"},
-  driveModeLg  =>{a=>159.0,s=>1.0,l=>3,min=>0  ,max=>3     ,c=>''         ,f=>""      ,u=>''    ,t=>"0=direct,1=viaUpperEnd,2=viaLowerEnd,3=viaNextEnd"},
-  actionTypeLg =>{a=>138.0,s=>0.2,l=>3,min=>0  ,max=>3     ,c=>''         ,f=>""      ,u=>''    ,t=>"0=off,1=JmpToTarget,2=toggleToCnt,3=toggleToCntInv"},
-  OffTimeModeLg=>{a=>138.6,s=>0.1,l=>3,min=>0  ,max=>1     ,c=>''         ,f=>""      ,u=>''    ,t=>"off time mode: 0=absolut,1=minimal"},
-  OnTimeModeLg =>{a=>138.0,s=>0.1,l=>3,min=>0  ,max=>1     ,c=>''         ,f=>""      ,u=>''    ,t=>"on time mode: 0=absolut,1=minimal"},
-  #remote mainly                                                                       
-  language     =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1     ,c=>""         ,f=>""      ,u=>''    ,t=>"Language 0:English, 1:German"},
-  stbyTime     =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99    ,c=>""         ,f=>""      ,u=>'s'   ,t=>"Standby Time"},
-  backOnTime   =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255   ,c=>""         ,f=>""      ,u=>'s'   ,t=>"Backlight On Time"},
-  backAtEvnt   =>{a=> 13.5,s=>0.3,l=>0,min=>0  ,max=>8     ,c=>""         ,f=>""      ,u=>''    ,t=>"Backlight at key=4,motion=2,charge=1"},
-  longPress    =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8   ,c=>'m10s3'    ,f=>""      ,u=>'s'   ,t=>"time to detect key long press"},
-  msgShowTime  =>{a=> 45.0,s=>1.0,l=>1,min=>0.0,max=>120   ,c=>'factor'   ,f=>2       ,u=>'s'   ,t=>"Message show time(RC19). 0=always on"},
-  #dimmer  mainly                                                                      
-  ovrTempLvl   =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100   ,c=>""         ,f=>""      ,u=>"C"   ,t=>"overtemperatur level"},
-  redTempLvl   =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100   ,c=>""         ,f=>""      ,u=>"C"   ,t=>"reduced temperatur recover"},
-  redLvl       =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>"%"   ,t=>"reduced power level"},
-
-  OnDlySh      =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:on delay "},
-  OnTimeSh     =>{a=>  7.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:on time"},
-  OffDlySh     =>{a=>  8.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:off delay"},
-  OffTimeSh    =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:off time"},
-
-  OffLevelSh   =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:PowerLevel Off"},
-  OnMinLevelSh =>{a=> 16.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:minimum PowerLevel"},
-  OnLevelSh    =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:PowerLevel on"},
-
-  OffLevelKmSh =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:OnLevel 127.5=locked"},
-  OnLevelKmSh  =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:OnLevel 127.5=locked"},
-  OnRampOnSpSh =>{a=> 34.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Short:Ramp On speed"},
-  OnRampOffSpSh=>{a=> 35.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Short:Ramp Off speed"},
-
-  rampSstepSh  =>{a=> 18.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:rampStartStep"},
-  rampOnTimeSh =>{a=> 19.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:rampOnTime"},
-  rampOffTimeSh=>{a=> 20.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Short:rampOffTime"},
-  dimMinLvlSh  =>{a=> 21.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:dimMinLevel"},
-  dimMaxLvlSh  =>{a=> 22.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:dimMaxLevel"},
-  dimStepSh    =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Short:dimStep"},
-
-  OnDlyLg      =>{a=>134.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Long:on delay"},
-  OnTimeLg     =>{a=>135.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Long:on time"},
-  OffDlyLg     =>{a=>136.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Long:off delay"},
-  OffTimeLg    =>{a=>137.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Long:off time"},
-
-  OffLevelLg   =>{a=>143.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:PowerLevel Off"},
-  OnMinLevelLg =>{a=>144.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:minimum PowerLevel"},
-  OnLevelLg    =>{a=>145.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:PowerLevel on"},
-
-  rampSstepLg  =>{a=>146.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:rampStartStep"},
-  rampOnTimeLg =>{a=>147.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Long:off delay"},
-  rampOffTimeLg=>{a=>148.0,s=>1.0,l=>3,min=>0  ,max=>111600,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,t=>"Long:off delay"},
-  dimMinLvlLg  =>{a=>149.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimMinLevel"},
-  dimMaxLvlLg  =>{a=>150.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimMaxLevel"},
-  dimStepLg    =>{a=>151.0,s=>1.0,l=>3,min=>0  ,max=>100   ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:dimStep"},
-
-  OffLevelKmLg =>{a=>143.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:OnLevel 127.5=locked"},
-  OnLevelKmLg  =>{a=>145.0,s=>1.0,l=>3,min=>0  ,max=>127.5 ,c=>'factor'   ,f=>2       ,u=>'%'   ,t=>"Long:OnLevel 127.5=locked"},
-  OnRampOnSpLg =>{a=>162.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Long:Ramp On speed"},
-  OnRampOffSpLg=>{a=>163.0,s=>1.0,l=>3,min=>0  ,max=>1     ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"Long:Ramp Off speed"},
-#CC-TC
-  BacklOnTime  =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25    ,c=>""         ,f=>''      ,u=>'s'   ,t=>"Backlight ontime"},
-  BacklOnMode  =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1     ,c=>'factor'   ,f=>2       ,u=>'bool',t=>"Backlight mode 0=OFF, 1=AUTO"},
-  BtnLock      =>{a=>15   ,s=>1  ,l=>0,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"Button Lock 0=OFF, 1=Lock"},
-  DispTempHum  =>{a=>1.0  ,s=>0.1,l=>5,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"0=temp ,1=temp-humidity"},
-  DispTempInfo =>{a=>1.1  ,s=>0.1,l=>5,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"0=actual ,1=setPoint"},
-  DispTempUnit =>{a=>1.2  ,s=>0.1,l=>5,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"0=Celsius ,1=Fahrenheit"},
-  MdTempReg    =>{a=>1.3  ,s=>0.2,l=>5,min=>0  ,max=>3     ,c=>''         ,f=>''      ,u=>''    ,t=>"0=MANUAL ,1=AUTO ,2=CENTRAL ,3=PARTY"},
-  MdTempValve  =>{a=>2.6  ,s=>0.2,l=>5,min=>0  ,max=>2     ,c=>''         ,f=>''      ,u=>''    ,t=>"0=auto ,1=close ,2=open"},
-
-  TempComfort  =>{a=>3    ,s=>0.6,l=>5,min=>6  ,max=>30    ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"confort temp value"},
-  TempLower    =>{a=>4    ,s=>0.6,l=>5,min=>6  ,max=>30    ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"confort temp value"},
-  PartyEndDay  =>{a=>98   ,s=>1  ,l=>6,min=>0  ,max=>200   ,c=>''         ,f=>''      ,u=>'d'   ,t=>"Party end Day"},
-  PartyEndMin  =>{a=>97.7 ,s=>1  ,l=>6,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'min' ,t=>"Party end 0=:00, 1=:30"},
-  PartyEndHr   =>{a=>97   ,s=>0.6,l=>6,min=>0  ,max=>23    ,c=>''         ,f=>''      ,u=>'h'   ,t=>"Party end Hour"},
-  TempParty    =>{a=>6    ,s=>0.6,l=>5,min=>6  ,max=>30    ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"Temperature for Party"},
-  TempWinOpen  =>{a=>5    ,s=>0.6,l=>5,min=>6  ,max=>30    ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"Temperature for Win open !chan 3 only!"},
-  DecalDay     =>{a=>1.5  ,s=>0.3,l=>5,min=>0  ,max=>7     ,c=>''         ,f=>''      ,u=>'d'   ,t=>"Decalc weekday 0=Sat...6=Fri"},
-  DecalHr      =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23    ,c=>''         ,f=>''      ,u=>'h'   ,t=>"Decalc hour"},
-  DecalMin     =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50    ,c=>'factor'   ,f=>0.1     ,u=>'min' ,t=>"Decalc min"},
-#Thermal-cc-VD
-  ValveOffset  =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25    ,c=>''         ,f=>''      ,u=>'%'   ,t=>"Valve offset"},             # size actually 0.5
-  ValveError   =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99    ,c=>''         ,f=>''      ,u=>'%'   ,t=>"Valve position when error"},# size actually 0.7
-#output Unit
-  ActTypeSh     =>{a=>36  ,s=>1  ,l=>3,min=>0  ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Action type(LED or Tone)"},
-  ActNumSh      =>{a=>37  ,s=>1  ,l=>3,min=>1  ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Action Number"},
-  IntenseSh     =>{a=>47  ,s=>1  ,l=>3,min=>10 ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Short:Volume - Tone channel only!"},
-  
-  ActTypeLg     =>{a=>164 ,s=>1  ,l=>3,min=>0  ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Long:Action type(LED or Tone)"},
-  ActNumLg      =>{a=>165 ,s=>1  ,l=>3,min=>1  ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Long:Action Number"},
-  IntenseLg     =>{a=>175 ,s=>1  ,l=>3,min=>10 ,max=>255   ,c=>''         ,f=>''      ,u=>''    ,t=>"Long:Volume - Tone channel only!"},
-# keymatic secific register
-  signal        =>{a=>3.4 ,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"Confirmation beep 0=OFF, 1=On"},
-  signalTone    =>{a=>3.6 ,s=>0.2,l=>0,min=>0  ,max=>3     ,c=>''         ,f=>''      ,u=>'%'   ,t=>"0=low 1=mid 2=high 3=very high"},
-  keypressSignal=>{a=>3.0 ,s=>0.1,l=>0,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"Keypress beep 0=OFF, 1=On"},
-  holdTime      =>{a=>20  ,s=>1,  l=>1,min=>0  ,max=>8.16  ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,t=>"Holdtime for door opening"},
-  setupDir      =>{a=>22  ,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"Rotation direction for locking. ,0=right, 1=left"},
-  setupPosition =>{a=>23  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Rotation angle neutral position"},
-  angelOpen     =>{a=>24  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Door opening angle"},
-  angelMax      =>{a=>25  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Angle locked"},
-  angelLocked   =>{a=>26  ,s=>1  ,l=>1,min=>0  ,max=>3000  ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Angle Locked position"},
-  ledFlashUnlocked=>{a=>31.3,s=>0.1,l=>1,min=>0,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when not locked"},
-  ledFlashLocked=>{a=>31.6,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when locked"},
-# sec_mdir
-  evtFltrPeriod =>{a=>1.0 ,s=>0.4,l=>1,min=>0.5,max=>7.5   ,c=>'factor'   ,f=>2       ,u=>'s'   ,t=>"event filter period"},
-  evtFltrNum    =>{a=>1.4 ,s=>0.4,l=>1,min=>1  ,max=>15    ,c=>''         ,f=>''      ,u=>''    ,t=>"sensitivity - read sach n-th puls"},
-  minInterval   =>{a=>2.0 ,s=>0.3,l=>1,min=>0  ,max=>4     ,c=>''         ,f=>''      ,u=>''    ,t=>"minimum interval 0,15,20,60,120s"},
-  captInInterval=>{a=>2.3 ,s=>0.1,l=>1,min=>0  ,max=>1     ,c=>''         ,f=>''      ,u=>'bool',t=>"capture within interval"},
-  brightFilter  =>{a=>2.4 ,s=>0.4,l=>1,min=>0  ,max=>7     ,c=>''         ,f=>''      ,u=>''    ,t=>"brightness filter"},
-  ledOnTime     =>{a=>34  ,s=>1  ,l=>1,min=>0  ,max=>1.275 ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"LED ontime"},
+  intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>'visibility of internal keys'},
+  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>''         ,f=>''      ,u=>'dec' ,t=>'pairing to central'},
+#blindActuator mainly   
+  driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
+  driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
+  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"fliptime up <=>down"},
+#remote mainly                                                                         
+  language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,t=>"Language 0:English, 1:German"},
+  stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,t=>"Standby Time"},
+  backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"Backlight at keystroke"},
+  backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"Backlight at motion"},
+  backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,t=>"Backlight On Time"},
+  longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8     ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,t=>"time to detect key long press"},
+  dblPress        =>{a=>  9.0,s=>0.4,l=>1,min=>0  ,max=>1.5     ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"time to detect double press"},
+  peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"peer expects burst"},
+  expectAES       =>{a=>  1.7,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"expect AES"},
+  msgShowTime     =>{a=> 45.0,s=>1.0,l=>1,min=>0.0,max=>120     ,c=>'factor'   ,f=>2       ,u=>'s'   ,t=>"Message show time(RC19). 0=always on"},
+  beepAtAlarm     =>{a=> 46.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"Beep 0=none, 1=Tone1, 2=Tone2, 3=Tone3"},
+  beepAtService   =>{a=> 46.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"Beep 0=none, 1=Tone1, 2=Tone2, 3=Tone3"},
+  beepAtInfo      =>{a=> 46.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"Beep 0=none, 1=Tone1, 2=Tone2, 3=Tone3"},
+  backlAtAlarm    =>{a=> 47.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"Backlight 0=off, 1=on, 2=blink slow, 3=blink fast"},
+  backlAtService  =>{a=> 47.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"Backlight 0=off, 1=on, 2=blink slow, 3=blink fast"},
+  backlAtInfo     =>{a=> 47.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"Backlight 0=off, 1=on, 2=blink slow, 3=blink fast"},
+#dimmer  mainly                                                                        
+  ovrTempLvl      =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,t=>"overtemperatur level"},
+  redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,t=>"reduced temperatur recover"},
+  redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,t=>"reduced power level"},
+                                                                
+#CC-TC                                                          
+  BacklOnTime     =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,t=>"Backlight ontime"},
+  BacklOnMode     =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'factor'   ,f=>2       ,u=>'bool',t=>"Backlight mode 0=OFF, 1=AUTO"},
+  BtnLock         =>{a=>15   ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"Button Lock 0=OFF, 1=Lock"},
+  DispTempHum     =>{a=>1.0  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"0=temp ,1=temp-humidity"},
+  DispTempInfo    =>{a=>1.1  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"0=actual ,1=setPoint"},
+  DispTempUnit    =>{a=>1.2  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"0=Celsius ,1=Fahrenheit"},
+  MdTempReg       =>{a=>1.3  ,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>''    ,t=>"0=MANUAL ,1=AUTO ,2=CENTRAL ,3=PARTY"},
+  MdTempValve     =>{a=>2.6  ,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>''         ,f=>''      ,u=>''    ,t=>"0=auto ,1=close ,2=open"},
+                                                                
+  TempComfort     =>{a=>3    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"confort temp value"},
+  TempLower       =>{a=>4    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"confort temp value"},
+  PartyEndDay     =>{a=>98   ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,t=>"Party end Day"},
+  PartyEndMin     =>{a=>97.7 ,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,t=>"Party end 0=:00, 1=:30"},
+  PartyEndHr      =>{a=>97   ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,t=>"Party end Hour"},
+  TempParty       =>{a=>6    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"Temperature for Party"},
+  TempWinOpen     =>{a=>5    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,t=>"Temperature for Win open !chan 3 only!"},
+  DecalDay        =>{a=>1.5  ,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>'d'   ,t=>"Decalc weekday 0=Sat...6=Fri"},
+  DecalHr         =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,t=>"Decalc hour"},
+  DecalMin        =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,t=>"Decalc min"},
+#Thermal-cc-VD                                                  
+  ValveOffset     =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,t=>"Valve offset"},             # size actually 0.5
+  ValveError      =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,t=>"Valve position when error"},# size actually 0.7
+# keymatic secific register                                     
+  signal          =>{a=>3.4  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"Confirmation beep 0=OFF, 1=On"},
+  signalTone      =>{a=>3.6  ,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>''         ,f=>''      ,u=>'%'   ,t=>"0=low 1=mid 2=high 3=very high"},
+  keypressSignal  =>{a=>3.0  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"Keypress beep 0=OFF, 1=On"},
+  holdTime        =>{a=>20   ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,t=>"Holdtime for door opening"},
+  setupDir        =>{a=>22   ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"Rotation direction for locking. ,0=right, 1=left"},
+  setupPosition   =>{a=>23   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Rotation angle neutral position"},
+  angelOpen       =>{a=>24   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Door opening angle"},
+  angelMax        =>{a=>25   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Angle locked"},
+  angelLocked     =>{a=>26   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,t=>"Angle Locked position"},
+  ledFlashUnlocked=>{a=>31.3 ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when not locked"},
+  ledFlashLocked  =>{a=>31.6 ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"1=LED blinks when locked"},
+# sec_mdir                                                      
+  evtFltrPeriod   =>{a=>1.0  ,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,t=>"event filter period"},
+  evtFltrNum      =>{a=>1.4  ,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,t=>"sensitivity - read sach n-th puls"},
+  minInterval     =>{a=>2.0  ,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>''         ,f=>''      ,u=>''    ,t=>"minimum interval 0,15,20,60,120s"},
+  captInInterval  =>{a=>2.3  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'bool',t=>"capture within interval"},
+  brightFilter    =>{a=>2.4  ,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,t=>"brightness filter"},
+  ledOnTime       =>{a=>34   ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,t=>"LED ontime"},
+# weather units                                                 
+  stormUpThresh   =>{a=>6    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,t=>"Storm upper threshold"},
+  stormLowThresh  =>{a=>7    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,t=>"Storm lower threshold"},
   
   );
 my %culHmRegGeneral = (
   intKeyVisib=>1,pairCentral=>1,
 	);
 my %culHmRegType = (
-  remote=> {backOnTime=>1,backAtEvnt=>1,longPress=>1,msgShowTime=>1,},
+  remote=> {expectAES=>1,peerNeedsBurst=>1,dblPress=>1,longPress=>1},
   blindActuator=> {driveUp=>1, driveDown=>1 , driveTurn=>1,
                    maxTimeFSh =>1,
                    maxTimeFLg =>1,
@@ -1276,32 +1231,82 @@ my %culHmRegType = (
 			angelOpen =>1,angelMax  =>1,angelLocked   =>1,
 			ledFlashUnlocked=>1,ledFlashLocked=>1,
 			},
-  dis4=> 	{language => 1,stbyTime => 1, #todo insert correct name
-            },	
   motionDetector=>{
             evtFltrPeriod =>1,evtFltrNum    =>1,minInterval   =>1,
 			captInInterval=>1,brightFilter  =>1,ledOnTime     =>1,
 			},
 );
 my %culHmRegModel = (
- "HM-CC-VD"=> { ValveOffset  =>1,ValveError   =>1,},
+  "HM-RC-12"   => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
+  "HM-RC-12-B" => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
+  "HM-RC-12-SW"=> {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
+       
+  "HM-RC-19"   => { language =>1,},
+  "HM-RC-19-B" => { language =>1,},
+  "HM-RC-19-SW"=> { language =>1,},
+ 
+  "HM-CC-VD"      => {ValveOffset     =>1,ValveError      =>1},
+  "HM-PB-4DIS-WM" => {language        =>1,stbyTime        =>1},
+  "HM-WDS100-C6-O"=> {stormUpThresh   =>1,stormLowThresh  =>1},
+  "KS550"         => {stormUpThresh   =>1,stormLowThresh  =>1},
 );
 my %culHmRegChan = (# if only for some channel then enter it here 
- "HM-CC-TC02"=> {
+  "HM-CC-TC02"=> {
 			DispTempHum  =>1,DispTempInfo =>1,DispTempUnit =>1,MdTempReg   =>1,
 			MdTempValve  =>1,TempComfort  =>1,TempLower    =>1,PartyEndDay =>1,
 			PartyEndMin  =>1,PartyEndHr   =>1,TempParty    =>1,DecalDay    =>1,
 			DecalHr      =>1,DecalMin     =>1, 
             BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1,
               },
- "HM-CC-TC03"=> {  #window channel
+  "HM-CC-TC03"=> {  #window channel
 			TempWinOpen  =>1,
               },
+  "HM-RC-1912"   => {msgShowTime=>1, beepAtAlarm =>1,beepAtService =>1,beepAtInfo  =>1,backlAtAlarm =>1,backlAtService =>1,backlAtInfo =>1},
+  "HM-RC-19-B12" => {msgShowTime=>1, beepAtAlarm =>1,beepAtService =>1,beepAtInfo  =>1,backlAtAlarm =>1,backlAtService =>1,backlAtInfo =>1},
+  "HM-RC-19-SW12"=> {msgShowTime=>1, beepAtAlarm =>1,beepAtService =>1,beepAtInfo  =>1,backlAtAlarm =>1,backlAtService =>1,backlAtInfo =>1}, 
  );
 
 ##--------------- Conversion routines for register settings
 my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
               600=>18600,3600=>111600);
+			  
+sub
+CUL_HM_initRegHash()
+{ #duplicate short and long press register 
+  foreach my $rn (keys %culHmRegDefShLg){ #update register list
+    %{$culHmRegDefine{$rn."Sh"}} = %{$culHmRegDefShLg{$rn}};
+    %{$culHmRegDefine{$rn."Lg"}} = %{$culHmRegDefShLg{$rn}};
+	$culHmRegDefine{$rn."Lg"}{a} +=0x80;
+  }
+  foreach my $type(sort(keys %culHmRegType)){ #update references to Register
+    foreach my $reg (sort(keys %{$culHmRegType{$type}})){
+      if ($culHmRegDefShLg{$reg}){
+	    delete $culHmRegType{$type}{$reg};
+	    $culHmRegType{$type}{$reg."Sh"} = 1;
+	    $culHmRegType{$type}{$reg."Lg"} = 1;
+	  }
+    }
+  }
+  foreach my $type(sort(keys %culHmRegModel)){ #update references to Register
+    foreach my $reg (sort(keys %{$culHmRegModel{$type}})){
+      if ($culHmRegDefShLg{$reg}){
+	    delete $culHmRegModel{$type}{$reg};
+	    $culHmRegModel{$type}{$reg."Sh"} = 1;
+	    $culHmRegModel{$type}{$reg."Lg"} = 1;
+	  }
+    }
+  }
+  foreach my $type(sort(keys %culHmRegChan)){ #update references to Register
+    foreach my $reg (sort(keys %{$culHmRegChan{$type}})){
+      if ($culHmRegDefShLg{$reg}){
+	    delete $culHmRegChan{$type}{$reg};
+	    $culHmRegChan{$type}{$reg."Sh"} = 1;
+	    $culHmRegChan{$type}{$reg."Lg"} = 1;
+	  }
+    }
+  }
+}
+
 sub 
 CUL_HM_fltCvT($) # float -> config time
 {  
@@ -1445,23 +1450,28 @@ CUL_HM_Get($@)
 	  }
 	  
 	  my @regValList; #storage of results
+	  my $regHeader = "list:peer\tregister         :value\n";
 	  foreach my $regName (@regArr){
 	    my $regL  = $culHmRegDefine{$regName}->{l};
 		my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
 		foreach my $peer(@peerExe){
 		  next if($peer eq "");
-	      my $regVal = CUL_HM_getRegFromStore($name,$regName,0,$peer); #determine peerID
-	      push @regValList,"List:".$regL.
-		         " Peer:".CUL_HM_id2Name($peer). 
-		         "\t".$regName.
-				 ":\tvalue:". $regVal."\n" if ($regVal ne 'unknown') ; 
+	      my $regVal = CUL_HM_getRegFromStore($name,$regName,0,$peer); #determine
+		  my $peerN = CUL_HM_id2Name($peer);
+		  $peerN = "      " if ($peer  eq "00000000");
+		  push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
+		          $regL,$peerN,$regName,$regVal)
+		        if ($regVal ne 'unknown');
 		}
 	  }
-	  my $addInfo = "";
+	  my $addInfo = ""; #todo - find a generic way to handle special devices
 	  $addInfo = CUL_HM_TCtempReadings(ReadingsVal($name,"RegL_05:",""),
 	                                   ReadingsVal($name,"RegL_06:",""))
 	        if ($md eq "HM-CC-TC" && $chn eq "02");
-	  return $name." type:".$st." - \n".join("",sort(@regValList)).$addInfo;
+			
+	  return $name." type:".$st." - \n".
+	         $regHeader.join("",sort(@regValList)).
+			 $addInfo;
 	}
 	else{	  
       my $regVal = CUL_HM_getRegFromStore($name,$regReq,$list,$peerId);
@@ -1473,15 +1483,30 @@ CUL_HM_Get($@)
     my @regArr = keys %culHmRegGeneral ;
 	push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st});  
     push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
-    push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn}); 
+     
+	if ($isChannel){
+	  push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
+	}
+	else{# add all ugly channel register to device view
+	  for (my $chn=0;$chn<25;$chn++){
+	    my $chnN = sprintf("%02X",$chn);
+	    push @regArr, keys %{$culHmRegChan{$md.$chnN}} 
+		      if($culHmRegChan{$md.$chnN}); 
+	  }
+	}
 
-    my $info = $st." - \n";	
+	my @rI;
 	foreach my $regName (@regArr){
 	  my $reg  = $culHmRegDefine{$regName};	  
-	  $info .= $regName."\trange:". $reg->{min}." to ".$reg->{max}.$reg->{u}.
-	          ((($reg->{l} == 3)||($reg->{l} == 4))?"\tpeer required":"")
-			  ."\t: ".$reg->{t}."\n";
+	  push @rI,sprintf("%4d: %13s | %3d to %-11s | %8s | %s\n",
+			  $reg->{l},$regName,$reg->{min},$reg->{max}.$reg->{u},
+              ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),$reg->{t})
+	        if (!($isChannel && $reg->{l} == 0));
 	}
+	
+    my $info = sprintf("list: %13s | %-18s | %-8s | %s\n",
+	                 "register","range","peer","description");
+	foreach(sort(@rI)){$info .= $_;}
 	return $info;
   }
 
@@ -2071,7 +2096,7 @@ CUL_HM_Set($@)
 				                   Wed=>128,Thu=>160,Fri=>192});
 	return $a[2]."invalid for ".$cmd." select one of ". 
 	      join (" ",sort keys %{$regs{$cmd}}) if(!defined($regs{$cmd}{$a[2]}));
-    CUL_HM_setRd($hash,$cmd,$a[2],"");
+    readingsSingleUpdate($hash,$cmd,$a[2],1);
     my $tcnf = 0;
     my $missingEntries; 
     foreach my $entry (keys %regs){
@@ -2128,7 +2153,7 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
 
     my $vn = "tempList$wd";
-	CUL_HM_setRd($hash,$vn,$msg,'');
+	readingsSingleUpdate($hash,$vn,$msg,1);
   } 
   elsif($cmd eq "valvePos") { ##################
     my $vp = ($a[2]+0.5)*2.56;
@@ -2167,11 +2192,11 @@ CUL_HM_Set($@)
   elsif($cmd eq "test") { #####################################################
     my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
     $hash->{TESTNR} = $testnr;
-    CUL_HM_SendCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr), 1, 0);
+    CUL_HM_SendCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr));
   } 
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     CUL_HM_SendCmd($hash, sprintf("++9441%s%s01%s",
-        $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"), 1, 0);
+        $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"));
   } 
   elsif($cmd eq "virtual") { ##################################################
   	$state = "";
@@ -2308,10 +2333,8 @@ CUL_HM_Set($@)
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
   
-  if($state){
-    $hash->{STATE} = $state; 
-	DoTrigger($name,'state:'.$state);
-  }
+  readingsSingleUpdate($hash,"state",$state,1) if($state);
+
   $rxType = CUL_HM_getRxType($devHash);
   Log GetLogLevel($name,3), "CUL_HM set $name " . join(" ", @a[1..$#a])." rxt:".$rxType;
   CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
@@ -2362,7 +2385,7 @@ CUL_HM_infoUpdtDevData($$$){
   }
 
 }
-sub
+sub    #---------------------------------
 CUL_HM_infoUpdtChanData(@)
 {# delay this to ensure the device is already available
   my($in ) = @_;
@@ -2370,8 +2393,7 @@ CUL_HM_infoUpdtChanData(@)
   DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
   $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_Pair(@)
 {
   my ($name, $hash,$cmd,$src,$dst,$p) = @_;
@@ -2390,26 +2412,25 @@ CUL_HM_Pair(@)
         $iohash->{NAME}. " pairing (hmPairForSec) not enabled";
       return "";
     }
-
-  } elsif($dst ne $id) {
+  } 
+  elsif($dst ne $id) {
     return "" ;
-	
-  } elsif($cmd eq "0400") {     # WDC7000
+  } 
+  elsif($cmd eq "0400") {     # WDC7000
     return "" ;
-
-  } elsif($iohash->{hmPairSerial}) {
+  } 
+  elsif($iohash->{hmPairSerial}) {
     delete($iohash->{hmPairSerial});
   }
   
   my ($idstr, $s) = ($id, 0xA);
   $idstr =~ s/(..)/sprintf("%02X%s",$s++,$1)/ge;
   CUL_HM_pushConfig($hash, $id, $src,0,0,0,0, "0201$idstr");
-  CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
+  CUL_HM_ProcessCmdStack($hash); # start processing immediately
 
   return "";
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
@@ -2453,10 +2474,10 @@ CUL_HM_getConfig($$$$$){
   }
  }
 ###################-------send related --------################
-sub
-CUL_HM_SendCmd($$$$)
+sub    #---------------------------------
+CUL_HM_SendCmd($$)
 {
-  my ($hash, $cmd, $sleep, $waitforack) = @_;
+  my ($hash, $cmd) = @_;
   my $io = $hash->{IODev};
 
   $cmd =~ m/^(..)(.*)$/;
@@ -2478,15 +2499,14 @@ CUL_HM_SendCmd($$$$)
   IOWrite($hash, "", $cmd);
   $cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
-  CUL_HM_responseSetup($hash,$cmd,$waitforack);	
+  CUL_HM_responseSetup($hash,$cmd);	
 }
-###################################
-sub
-CUL_HM_responseSetup($$$)
+sub    #---------------------------------
+CUL_HM_responseSetup($$)
 {#store all we need to handle the response
  #setup repeatTimer and cmdStackControll
-  my ($hash,$cmd,$waitForAck) =  @_;
-  my ($msgId, $msgType,$dst,$p) = ($2,$4,$6,$7)
+  my ($hash,$cmd) =  @_;
+  my ($msgId, $msgFlag,$msgType,$dst,$p) = ($2,hex($3),$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
   my $rTo = 2; #default response timeout
@@ -2538,7 +2558,8 @@ CUL_HM_responseSetup($$$)
 	  return;
     }
   }
-  if ($waitForAck){
+  
+  if ($msgFlag & 0x20){
     my $iohash = $hash->{IODev};
     $hash->{helper}{respWait}{cmd}    = $cmd;
     $hash->{helper}{respWait}{msgId}  = $msgId; #msgId we wait to ack
@@ -2549,8 +2570,7 @@ CUL_HM_responseSetup($$$)
     InternalTimer(gettimeofday()+$off, "CUL_HM_Resend", $hash, 0);
   }
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_eventP($$)
 { # handle protocol events
   #todo: add severity, counter, history and acknowledge
@@ -2577,8 +2597,7 @@ CUL_HM_eventP($$)
     $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} if ($hash->{cmdStack});
   }
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_respPendRm($)
 {  # delete all response related entries in messageing entity
   my ($hash) =  @_;  
@@ -2587,8 +2606,7 @@ CUL_HM_respPendRm($)
   RemoveInternalTimer("respPend:$hash->{DEF}");# remove responsePending timer
   $respRemoved = 1;
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_respPendTout($)
 {
   my ($HMid) =  @_;  
@@ -2599,11 +2617,10 @@ CUL_HM_respPendTout($)
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
 	CUL_HM_ProcessCmdStack($hash); # continue processing commands
-	DoTrigger($hash->{NAME}, "RESPONSE TIMEOUT");
+	readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT",1);
   }
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_respPendToutProlong($) 
 {#used when device sends part responses
   my ($hash) =  @_;  
@@ -2611,8 +2628,7 @@ CUL_HM_respPendToutProlong($)
   RemoveInternalTimer("respPend:$hash->{DEF}");
   InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_PushCmdStack($$)
 {
   my ($chnhash, $cmd) = @_;
@@ -2628,20 +2644,21 @@ CUL_HM_PushCmdStack($$)
   $attr{$name}{protCmdPend} = $entries." CMDs_pending";
   $attr{$name}{protState} = "CMDs_pending" if(!$hash->{helper}{respWait});
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_ProcessCmdStack($)
 {
   my ($chnhash) = @_;
   my $hash = CUL_HM_getDeviceHash($chnhash);
   my $name = $hash->{NAME};
   my $sent;
-  if($hash->{cmdStack} && !$hash->{helper}{respWait}{cmd} && !$hash->{helper}{respWait}{Pending}){
+  if($hash->{cmdStack} && !$hash->{helper}{respWait}{cmd} && 
+                          !$hash->{helper}{respWait}{Pending}){
     if(@{$hash->{cmdStack}}) {
+
       $attr{$name}{protState} = "CMDs_processing...";
-      CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}}, 1, 1);
+      CUL_HM_SendCmd($hash, shift @{$hash->{cmdStack}});
       $sent = 1;
-      $attr{$hash->{NAME}}{protCmdPend} = scalar @{$hash->{cmdStack}} ." CMDs pending";
+      $attr{$hash->{NAME}}{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
 	  CUL_HM_eventP($hash,"Snd");	  
     }
     if(!@{$hash->{cmdStack}}) {
@@ -2656,8 +2673,7 @@ CUL_HM_ProcessCmdStack($)
   }
   return $sent;
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_Resend($)
 {#resend a message if there is no answer
   my $hash = shift;
@@ -2668,8 +2684,7 @@ CUL_HM_Resend($)
     delete($hash->{cmdStack});
     delete($attr{$hash->{NAME}}{protCmdPend});
 	CUL_HM_respPendRm($hash);
-    $hash->{STATE} = "MISSING ACK";
-    DoTrigger($name, "MISSING ACK");
+	readingsSingleUpdate($hash,"state","MISSING ACK",1);
   }
   else {
   	CUL_HM_eventP($hash,"Resnd");
@@ -2685,21 +2700,21 @@ sub
 CUL_HM_ID2PeerList ($$$)
 {
   my($name,$peerID,$set) = @_;
-  my $peerIds = AttrVal($name,"peerIds",""); 
+  my $peerIDs = AttrVal($name,"peerIDs",""); 
   if (length($peerID) == 8){# wont add if not a channel - still update names
     $peerID = $peerID.",";
-    $peerIds =~ s/$peerID//;#avoid duplicate
-    $peerIds.= $peerID if($set);
+    $peerIDs =~ s/$peerID//;#avoid duplicate
+    $peerIDs.= $peerID if($set);
   }
-  if (!$peerIds){ #list now empty
-	delete $attr{$name}{peerIds};
+  if (!$peerIDs){ #list now empty
+	delete $attr{$name}{peerIDs};
 	delete $attr{$name}{peerList};
   }
   else{# update the human readable list
-    $attr{$name}{peerIds} = $peerIds;
+    $attr{$name}{peerIDs} = $peerIDs;
     $attr{$name}{peerList} = "";
 	my $dId = substr(CUL_HM_name2Id($name),0,6);
-    foreach my $pId (split(",",$peerIds)){
+    foreach my $pId (split(",",$peerIDs)){
 	  next if (!$pId);
 	  $attr{$name}{peerList} .= (($dId eq substr($pId,0,6))?
 	                                    ("self".substr($pId,6,2).","):
@@ -2708,7 +2723,7 @@ CUL_HM_ID2PeerList ($$$)
   }
 }
 ###################  Conversions  ################
-sub
+sub    #---------------------------------
 CUL_HM_getAssChnIds($)
 { # will return the list of assotiated channel of a device
   # if it is a channel only return itself
@@ -2726,31 +2741,27 @@ CUL_HM_getAssChnIds($)
   push @chnIdList,$dId if (length($dId) == 8);
   return sort(@chnIdList);
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_Id($)
 {#in ioHash out ioHMid 
   my ($io) = @_;
   my $fhtid = defined($io->{FHTID}) ? $io->{FHTID} : "0000";
   return AttrVal($io->{NAME}, "hmId", "F1$fhtid");
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_id2Hash($)
 {# in: id, out:hash
   my ($id) = @_;
   return $modules{CUL_HM}{defptr}{$id} if ($modules{CUL_HM}{defptr}{$id});
   return $modules{CUL_HM}{defptr}{substr($id,0,6)}; # could be chn 01 of dev
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_name2Hash($)
 {# in: name, out:hash
   my ($name) = @_;
   return $defs{$name};
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_name2Id(@)
 { # in: name or HMid out: HMid, undef if no match
   my ($idName,$idHash) = @_;
@@ -2764,8 +2775,7 @@ CUL_HM_name2Id(@)
                       if($idHash && $idName =~ m/self(.*)/);
   return;
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_peerChId($$$)
 {# peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
   my($pId,$dId,$iId)=@_;
@@ -2777,8 +2787,7 @@ CUL_HM_peerChId($$$)
   return CUL_HM_name2Id($dev).$chn               if ($chn); 
   return substr(CUL_HM_name2Id($pId).'01',0,8);                  
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_peerChName($$$)
 {# peer Channel ID to user entry. <peerChId> <deviceID> <ioID>
   my($pId,$dId,$iId)=@_;
@@ -2787,8 +2796,7 @@ CUL_HM_peerChName($$$)
   return 'fhem'.$pChn if ($pDev eq $iId);
   return CUL_HM_id2Name($pId);                
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_id2Name($)
 { # in: name or HMid out: name
   my ($p) = @_;
@@ -2807,8 +2815,7 @@ CUL_HM_id2Name($)
                                  if( $chnId && $defPtr->{$devId});#device, add chn
   return $devId. ($chn ? ("_chn:".$chn):"");                      #not defined, return ID only
 }
-###################################
-sub
+sub    #---------------------------------
 CUL_HM_getDeviceHash($)
 {#in: hash (chn or dev) out: hash of the device (used e.g. for send messages)
   my ($hash) = @_;
@@ -2934,11 +2941,19 @@ my %culHmBits = (
 
 );
 # RC send BCAST to specific address. Is the meaning understood?
-my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
+my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
                      "BURST", "BIDI", "RPTED", "RPTEN");
-                     #BIDI: response is expected
+					 #RPTEN    0x80: set in every message. Meaning?
+					 #RPTED    0x40: ???
+                     #BIDI     0x20: response is expected
+					 #Burst    0x10: set if burst is required by device
+					 #Bit3     0x08:
+					 #CFG      0x04: Device in Config mode 
+					 #               - check it msg is pending
+					 #WAKEMEUP 0x02: awake - hurry up to send messages
+					 #WAKEUP   0x01: send initially to keep the device awake
 
-sub
+sub #------------------------
 CUL_HM_DumpProtocol($$@)
 {
   my ($prefix, $iohash, $len,$cnt,$msgFlags,$msgType,$src,$dst,$p) = @_;
@@ -2989,16 +3004,23 @@ CUL_HM_DumpProtocol($$@)
 sub
 CUL_HM_parseCommon(@){
   # parsing commands that are device independant
-  my ($msgId,$msgType,$src,$dst,$p) = @_;
+  my ($msgId,$msgFlag,$msgType,$src,$dst,$p) = @_;
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   return "" if(!$shash->{DEF});# this should be from ourself 
   
   my $pendType = $shash->{helper}{respWait}{Pending}? 
                            $shash->{helper}{respWait}{Pending}:"";
+  #------------ parse message flag for start processing command Stack
+  if($shash->{cmdStack} && 
+      hex($msgFlag) & 0x02 && (CUL_HM_getRxType($shash) & 0x08)){ #wakeup #####
+	#send wakeup and process command stack
+  	CUL_HM_SendCmd($shash, '++A112'.CUL_HM_Id($shash->{IODev}).$src);
+	CUL_HM_ProcessCmdStack($shash);
+  }
   if ($msgType eq "02"){# Ack/Nack #######################################
 	if ($shash->{helper}{respWait}{msgId}             && 
-	    $shash->{helper}{respWait}{msgId}   eq $msgId ){
+	    $shash->{helper}{respWait}{msgId} eq $msgId ){
 	  #ack we waited for - stop Waiting
 	  CUL_HM_respPendRm($shash);
 	} 
@@ -3026,8 +3048,9 @@ CUL_HM_parseCommon(@){
 	  $reply = ($subType eq "01")?"ACKStatus":"ACK"; 
 	  $success = "yes";
 	}
-	CUL_HM_setRd($chnhash,"CommandAccepted",$success,"");
-    CUL_HM_ProcessCmdStack($shash); # see if there is something left
+	readingsSingleUpdate($chnhash,"CommandAccepted",$success,1);
+    CUL_HM_ProcessCmdStack($shash) 
+	      if(CUL_HM_Id($shash->{IODev}) eq $dhash->{DEF}); # Continue
 	return $reply;
   }
   elsif($msgType eq "10"){
@@ -3045,7 +3068,8 @@ CUL_HM_parseCommon(@){
 		
 		if ($p =~ m/000000..$/) {# last entry, peerList is complete
           CUL_HM_respPendRm($shash);
-		  CUL_HM_setRd($chnhash,"peerList",AttrVal($chnNname,"peerList",""),"");
+		  readingsSingleUpdate($chnhash,"peerList",
+		                       AttrVal($chnNname,"peerList",""),0);
 		  
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
@@ -3053,7 +3077,7 @@ CUL_HM_parseCommon(@){
 		    my $flag = CUL_HM_getFlag($shash);
 		    my $id = CUL_HM_Id($shash->{IODev});
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
-		    my @peerID = split(",", AttrVal($chnNname,"peerIds",""));
+		    my @peerID = split(",", AttrVal($chnNname,"peerIDs",""));
 		    foreach my $peer (@peerID){
 			  $peer .="01" if (length($peer) == 6); # add the default
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
@@ -3099,16 +3123,16 @@ CUL_HM_parseCommon(@){
 		  }
 		}
 		my $regLN = "RegL_".$list.":".$shash->{helper}{respWait}{forPeer};
-		CUL_HM_setRd($chnhash,$regLN,
-		             ReadingsVal($chnName,$regLN,"")." ".$data,'');
+		readingsSingleUpdate($chnhash,$regLN,
+		             ReadingsVal($chnName,$regLN,"")." ".$data,0);
 		if ($data =~m/00:00$/){ # this was the last message in the block
 		  if($list eq "00"){
 			my $name = CUL_HM_id2Name($src);
-			CUL_HM_setRd($shash,"PairedTo",
+			readingsSingleUpdate($shash,"PairedTo",
 		                 sprintf("%02X%02X%02X",
 		                    CUL_HM_getRegFromStore($name,10,0,"00000000"),
 		                    CUL_HM_getRegFromStore($name,11,0,"00000000"),
-		                    CUL_HM_getRegFromStore($name,12,0,"00000000")),"");
+		                    CUL_HM_getRegFromStore($name,12,0,"00000000")),0);
 		  }
 		  
 		  CUL_HM_respPendRm($shash);
@@ -3131,7 +3155,7 @@ CUL_HM_parseCommon(@){
 	  my $lN = ReadingsVal($chnHash->{NAME},$listName,"");
 	  $lN = "" if($lN =~m/00:00$/);#clear data if it was finished before
 	  $lN .= " ".$data;
-	  CUL_HM_setRdIfCh($chnHash,$listName,$lN,"");
+      readingsSingleUpdate($chnHash,$listName,$lN,1);
 
 	  # todo: this is likely a set of messages. Postpone command stack processing
 	  # until end of transmission. Verify whether there is a conflict with a 
@@ -3152,17 +3176,13 @@ CUL_HM_parseCommon(@){
 	  }
 	}
   }
-  elsif($msgType eq "70"){ #wakeup #######################################
-  #CUL_HM_Id($hash->{IODev})
-    if((CUL_HM_getRxType($shash) & 0x08) && $shash->{cmdStack}){
-	  #send wakeup and process command stack if applicable
-   	  CUL_HM_SendCmd($shash, '++A112'.CUL_HM_Id($shash->{IODev}).$src, 1, 1);
-	  CUL_HM_ProcessCmdStack($shash);
-	}
+  elsif($msgType eq "70"){ #Time to trigger TC##################
+    #send wakeup and process command stack
+#  	CUL_HM_SendCmd($shash, '++A112'.CUL_HM_Id($shash->{IODev}).$src);
+#	CUL_HM_ProcessCmdStack($shash);
   }
   return "";
 }
-
 #############################
 sub
 CUL_HM_getRegFromStore($$$$)
@@ -3341,10 +3361,12 @@ CUL_HM_secSince2000()
 {
   # Calculate the local time in seconds from 2000.
   my $t = time();
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
-  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
-  $t -= 7200;   # HM Special
-  $t += fhemTzOffset($t);
+  my @l = localtime($t);
+  my @g = gmtime($t);
+  $t += 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24 + $l[8]) * 60 + $l[1]-$g[1]) 
+                           # timezone and daylight saving...
+        - 946684800        # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
+        - 7200;            # HM Special
   return $t;
 }
 
@@ -3376,7 +3398,7 @@ CUL_HM_ActGetCreateHash()
 	foreach my $devId (split(",",$peerList)){
 	  $actHash->{helper}{$devId}{start} = $tn;
 	  my $devName = CUL_HM_id2Name($devId);
-	  setReadingsVal($actHash,"status_".$devName,"unknown",$tn);	
+	  readingsSingleUpdate($actHash,"status_".$devName,"unknown",1);	
 	  $attr{$devName}{actStatus}=""; # force trigger
       CUL_HM_setAttrIfCh($devName,"actStatus","unknown","Activity");	  
 	}
@@ -3426,7 +3448,7 @@ CUL_HM_ActAdd($$)
   $attr{$actName}{peerList} = $peerList; 
   my $tn = TimeNow();  
   $actHash->{helper}{$devId}{start} = $tn;
-  setReadingsVal($actHash,"status_".$devName,"unknown",$tn);	  
+  readingsSingleUpdate($actHash,"status_".$devName,"unknown",1);	  
   Log GetLogLevel($actName,3),"Device ".$devName." added to ActionDetector with "
       .$cycleString." time";
 }
@@ -3456,41 +3478,38 @@ sub
 CUL_HM_ActCheck()
 {# perform supervision
   my $actHash = CUL_HM_ActGetCreateHash();
-  my $tn = TimeNow();
   my $tod = int(gettimeofday());
   my $actName = $actHash->{NAME};
+  my $peerList = AttrVal($actName,"peerList","none");
   delete ($actHash->{READINGS}); #cleansweep
-  CUL_HM_setRd($actHash,"status","check performed",$tn);
-  foreach my $devId (split(",",AttrVal($actName,"peerList","none"))){
+  readingsSingleUpdate($actHash,"state","check_performed",0);
+  foreach my $devId (split(",",$peerList)){
     my $devName = CUL_HM_id2Name($devId);
 	if(!$devName || !defined($attr{$devName}{actCycle})){
 	  CUL_HM_ActDel($devId); 
 	  next;
 	}
 	my $rdName = "status_".$devName;
-
+	my $state;
     my (undef,$tSec)=CUL_HM_time2sec($attr{$devName}{actCycle});
 	if ($tSec == 0){# detection switched off
-	  CUL_HM_setRdIfCh($actHash,$rdName,"switchedOff",$tn);
-	  CUL_HM_setAttrIfCh($devName,"actStatus","switchedOff","Activity");
-	  next;
+	  $state = "switchedOff";
 	}
-	my $tLast = $attr{$devName}{"protLastRcv"};
-    my @t = localtime($tod - $tSec); #time since when a trigger is expected
-	my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
-                           $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);					   
-	if ((!$tLast || $tSince gt $tLast)){      #no message received in timeframe
-	  if ($tSince gt $actHash->{helper}{$devId}{start}){
-	    CUL_HM_setRdIfCh($actHash,$rdName,"timedOut - last: ".$tLast,$tn);
-        CUL_HM_setAttrIfCh($devName,"actStatus","dead","Activity");
-        Log GetLogLevel($actName,2),"Device ".$devName." is dead";
-	  }
-	  # no action otherwise
- 	}
 	else{
-      CUL_HM_setRdIfCh($actHash,$rdName,"alive",$tn);	
-      CUL_HM_setAttrIfCh($devName,"actStatus","alive","Activity");
-      Log GetLogLevel($actName,5),"Device ".$devName." is alive";
+	  my $tLast = $attr{$devName}{"protLastRcv"};
+      my @t = localtime($tod - $tSec); #time since when a trigger is expected
+	  my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
+                             $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+      
+	  if ((!$tLast || $tSince gt $tLast)){      #no message received in timeframe
+            $state = "dead" if ($tSince gt $actHash->{helper}{$devId}{start});
+ 	  }else{$state = "alive";}
+	}  
+	if ($state && $attr{$devName}{actStatus} ne $state){
+	  DoTrigger($devName,"Activity:".$state);
+	  $attr{$devName}{actStatus} = $state;
+	  readingsSingleUpdate($actHash,$rdName,$state,1);
+	  Log GetLogLevel($actName,2),"Device ".$devName." is ".$state;
 	}
   }
 
@@ -3500,19 +3519,18 @@ CUL_HM_ActCheck()
   								   "CUL_HM_ActCheck", "ActionDetector", 0);
 }
 sub
-CUL_HM_setRd($$$$) #$hash,$rd,$val,$ts
-{#change all readings from here - till fhem.pl provides solution
-  my ($hash,$rd,$val,$ts) = @_; 
-  $ts = TimeNow() if (!$ts);
-  setReadingsVal($hash,$rd,$val,$ts);
-}
-sub
-CUL_HM_setRdIfCh($$$$)
-{
-  my ($hash,$rd,$val,$ts) = @_; 
-  $ts = TimeNow() if (!$ts);
-  setReadingsVal($hash,$rd,$val,$ts) 
-              if(ReadingsVal($hash->{NAME},$rd,"") ne $val);
+CUL_HM_UpdtReadBulk(@)
+{ # update a bunch of readings and trigger the events
+  my ($hash,$doTrg,@readings) = @_; 
+  return if (!@readings);
+  readingsBeginUpdate($hash);
+  foreach my $rd (@readings){
+    next if (!$rd);
+    my ($rdName, $rdVal) = split(":",$rd, 2);
+	readingsBulkUpdate($hash,$rdName, 
+	                         ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
+  }
+  readingsEndUpdate($hash,$doTrg);
 }
 sub
 CUL_HM_setAttrIfCh($$$$)
