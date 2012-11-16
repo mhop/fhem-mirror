@@ -15,6 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
+my $debug = 0; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
@@ -72,7 +73,6 @@ HMLAN_Define($$)
     return undef;
   }
   $hash->{DeviceName} = $dev;
-  $hash->{helper}{nextSend}=gettimeofday();
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -202,40 +202,28 @@ HMLAN_Write($$$)
   my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                            substr($msg, 10, 6),
 						   substr($msg, 16, 6));
+  my $ll5 = GetLogLevel($hash->{NAME},5);						   
 
-	if ($mtype eq "02" && $src eq $hash->{owner}){
-                                  # Acks are generally send by HMLAN
-                                  # So far there is no need to send own
-    Log 5, "HMLAN: Skip ACK";
+  if ($mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24){
+    # Acks are generally send by HMLAN autonomously
+    # Special 
+    Log $ll5, "HMLAN: Skip ACK";
 	return;
   }
-  
-#  my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
-  my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
-  my $IDsub = '-'.$dst;               # guess: ID remove?
 #  my $IDact = '+'.$dst;               # guess: ID recover? Different to IDadd?
 #  my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
+#  my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
+
+
+  my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
+  my $IDsub = '-'.$dst;               # guess: ID remove?
     
   HMLAN_SimpleWrite($hash, $IDadd) if (!$lhash{$dst});
   $lhash{$dst} = 1;
-   
-  if(hex(substr($msg, 6, 2))&0x01){   # wakeup sequence for TC... hmmm
-    HMLAN_SimpleWrite($hash, $IDadd);
-    HMLAN_SimpleWrite($hash, $IDadd);
-    HMLAN_SimpleWrite($hash, $IDadd);
-    HMLAN_SimpleWrite($hash, $IDsub);
-    HMLAN_SimpleWrite($hash, $IDadd);
-    HMLAN_SimpleWrite($hash, $IDadd);
-    HMLAN_SimpleWrite($hash, $IDadd);
-    HMLAN_SimpleWrite($hash, $IDadd);
-    #HMLAN_SimpleWrite($hash, "+$dst,01,00,F1EF\x0d\x0a");
-  }
+
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
-
-  # Avoid problems with structure set
-  # TODO: rewrite it to use a queue+internaltimer like the CUL
 }
 
 #####################################
@@ -248,9 +236,10 @@ HMLAN_Read($)
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
-
+  my $ll5 = GetLogLevel($name,5);
+  
   my $hmdata = $hash->{PARTIAL};
-#  Log 5, "HMLAN/RAW: $hmdata/$buf";
+  Log $ll5, "HMLAN/RAW: $hmdata/$buf" if (!$debug);
   $hmdata .= $buf;
 
   while($hmdata =~ m/\n/) {
@@ -284,17 +273,30 @@ HMLAN_Parse($$)
   my $letter = substr($mFld[0],0,1); # get leading char
   
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
-    Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
+    # max speed for devices is 100ms after receive - example:TC
+	# will prepare the delay here
+    my $srcId = (length($mFld[5])>11)?substr($mFld[5],6,6):"lastRec";
+    $hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
+    if ($debug){
+      Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
 	                               .(($mFld[0] =~ m/^E/)?'  ':'')
 	                               .' stat:'.$mFld[1]
 	                               .' t:'.$mFld[2].' d:'.$mFld[3]
 								   .' r:'.$mFld[4] 
- 								   .'m:'.$mFld[5];
-#                                   .'     m:'.substr($mFld[5],0,2)
-#                                   .' '.substr($mFld[5],2,4)
-#                                   .' '.substr($mFld[5],6,6)
-#                                   .' '.substr($mFld[5],12,6)
-#                                   .' '.substr($mFld[5],18);
+                                   .'     m:'.substr($mFld[5],0,2)
+                                   .' '.substr($mFld[5],2,4)
+                                   .' '.$srcId
+                                   .' '.substr($mFld[5],12,6)
+                                   .' '.substr($mFld[5],18);
+	}
+	else{
+      Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
+	                               .(($mFld[0] =~ m/^E/)?'  ':'')
+	                               .' stat:'.$mFld[1]
+	                               .' t:'.$mFld[2].' d:'.$mFld[3]
+								   .' r:'.$mFld[4] 
+ 								   .' m:'.$mFld[5];
+    }
 								  
     my $dmsg = sprintf("A%02X%s", length($mFld[5])/2, uc($mFld[5]));
 	
@@ -304,7 +306,7 @@ HMLAN_Parse($$)
 	
     # handle status. 01=ack:seems to announce the new message counter
 	#                02=our send message returned it was likely not sent
-	#                08=nack,
+	#                08=nack - HMLAN did not receive an ACK,
 	#                21=?,
 	#                81=open
     HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R'));
@@ -360,41 +362,44 @@ sub
 HMLAN_SimpleWrite(@)
 {
   my ($hash, $msg, $nonl) = @_;
-  my $name = $hash->{NAME};
-  return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
 
-#  select(undef, undef, undef, 0.01); #  todo check necessity
-#---------- confort trace--------------
-# Log GetLogLevel($name,5), 'HMLAN_Send:         S:'.
-#                                       substr($msg,0,9).
-#
-#                           ' stat:  '.substr($msg,10,2).
-#                           ' t:'      .substr($msg,13,8).
-#                           ' d:'      .substr($msg,22,2).
-#                           ' r:'      .substr($msg,25,8).
-# 							 ' m:'      .substr($msg,34)
-#
-#                           ' m:'      .substr($msg,34,2).
-#                           ' '        .substr($msg,36,4). 
-#                           ' '        .substr($msg,40,6).
-#                           ' '        .substr($msg,46,6). 
-#                           ' '        .substr($msg,52)     
-#
-#							if (length($msg )>19);
-# Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg     if (length($msg) <=19); 
-#----------- normal trace,better speed-----------
-  Log GetLogLevel($name,5), 'HMLAN_Send:  '.$msg; #normal trace
+  return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
+  my $name = $hash->{NAME};
+  my $ll5 = GetLogLevel($name,5);
+  
+  if ($debug){
+    Log $ll5, 'HMLAN_Send:         S:'.
+                                          substr($msg,0,9).
+   
+                              ' stat:  '.substr($msg,10,2).
+                              ' t:'      .substr($msg,13,8).
+                              ' d:'      .substr($msg,22,2).
+                              ' r:'      .substr($msg,25,8).  
+                              ' m:'      .substr($msg,34,2).
+                              ' '        .substr($msg,36,4). 
+                              ' '        .substr($msg,40,6).
+                              ' '        .substr($msg,46,6). 
+                              ' '        .substr($msg,52)      
+   							if (length($msg )>51);
+    Log $ll5, 'HMLAN_Send:  '.$msg     if (length($msg) <=51); 
+  }
+  else{
+    Log $ll5, 'HMLAN_Send:  '.$msg; #normal trace
+  }
   
   $msg .= "\r\n" unless($nonl);
   
   # Currently it does  not seem to be necessary to wait Thus this code is inhibit for now
-  for (my$cnt=0;$cnt<10;$cnt++){ #  no more then 10 itterations!!! fault save
-    last if ($hash->{helper}{nextSend} <gettimeofday());
-	select(undef, undef, undef, 0.01);
+  my $id = (length($msg)>51)?substr($msg,46,6):"";
+  if ($id){
+    my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
+    if ($DevDelay > 0.01){# wait less then 10 ms will not work
+      $DevDelay = ((int($DevDelay*100))%100)/100;# security - wait no more then 1 sec
+	  select(undef, undef, undef, $DevDelay);
+    }
   }
   
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
-  $hash->{helper}{nextSend} = gettimeofday() + 0.01; # experimental value. 
 }
 
 ########################
@@ -430,16 +435,17 @@ HMLAN_KeepAlive($)
   HMLAN_SimpleWrite($hash, "K");
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", $hash, 1);
 }
-
 sub
 HMLAN_secSince2000()
 {
   # Calculate the local time in seconds from 2000.
   my $t = time();
-  my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($t);
-  $t -= 946684800; # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
-  $t -= 7200;   # HM Special
-  $t += fhemTzOffset($t);
+  my @l = localtime($t);
+  my @g = gmtime($t);
+  $t += 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24 + $l[8]) * 60 + $l[1]-$g[1]) 
+                           # timezone and daylight saving...
+        - 946684800        # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
+        - 7200;            # HM Special
   return $t;
 }
 
