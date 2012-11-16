@@ -72,17 +72,13 @@ YAMAHA_AVR_GetStatus($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
-    #my $zone = YAMAHA_AVR_getZoneName($hash, AttrVal($name, "used-zone", "main"));
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
-    
     
     $local = 0 unless(defined($local));
 
     return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{INTERVAL}));
 
     my $device = $hash->{helper}{ADDRESS};
-
-
 
     if(not defined($hash->{MODEL}))
     {
@@ -107,7 +103,6 @@ YAMAHA_AVR_GetStatus($;$)
 	return;
     }
     
-    
     readingsBeginUpdate($hash);
     
     if($return =~ /<Power>(.+)<\/Power>/)
@@ -122,7 +117,6 @@ YAMAHA_AVR_GetStatus($;$)
        $hash->{STATE} = lc($power);
        
     }
-    
     
     if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Volume>/)
     {
@@ -157,8 +151,8 @@ YAMAHA_AVR_Get($@)
     my $what;
 
     return "argument is missing" if(int(@a) != 2);
-    $what = $a[1];
     
+    $what = $a[1];
     
     if($what =~ /^(power|input|volume_level|mute)$/)
     {
@@ -189,7 +183,6 @@ YAMAHA_AVR_Set($@)
     my $address = $hash->{helper}{ADDRESS};
     my $result = "";
     my $command;
-    #my $zone = YAMAHA_AVR_getZoneName($hash, AttrVal($name, "used-zone", "main"));
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
@@ -333,7 +326,7 @@ YAMAHA_AVR_Set($@)
 			Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
 		    }
 	
-		    # Only if smoohing is really needed (step difference is not zero)
+		    # Only if a volume reading exists and smoohing is really needed (step difference is not zero)
 		    if(defined($hash->{READINGS}{volume_level}{VAL}) and $diff != 0)
 		    {
 			for(my $step = 1; $step <= $steps; $step++)
@@ -347,6 +340,7 @@ YAMAHA_AVR_Set($@)
 		    }
 		}
 		
+		# Set the desired volume
 		Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$a[2]." dB";
 		$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
 		if(not $result =~ /RC="0"/)
@@ -372,7 +366,9 @@ YAMAHA_AVR_Set($@)
     }
     readingsEndUpdate($hash, 1);
     
+    # Call the GetStatus() Function to retrieve the new values after setting something (with local flag, so the internal timer is not getting interupted)
     YAMAHA_AVR_GetStatus($hash, 1);
+    
     return undef;
     
 }
@@ -409,6 +405,7 @@ YAMAHA_AVR_Define($$)
 	$hash->{helper}{SELECTED_ZONE} = "mainzone";
     }
     
+    
     if(defined($a[4]) and $a[4] > 0)
     {
 	$hash->{helper}{INTERVAL}=$a[4];
@@ -437,8 +434,7 @@ YAMAHA_AVR_Define($$)
 	}
     }
     
-    
-    
+    # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
     $attr{$name}{"volume-smooth-change"} = "1" unless(defined($attr{$name}{"volume-smooth-change"}));
     
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
@@ -461,6 +457,8 @@ sub
 YAMAHA_AVR_Undefine($$)
 {
   my($hash, $name) = @_;
+  
+  # Stop the internal GetStatus-Loop and exist
   RemoveInternalTimer($hash);
   return undef;
 }
