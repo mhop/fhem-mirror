@@ -439,9 +439,9 @@ These receivers supports many protocols like Oregon Scientific weather sensors, 
       <br>
       <br>
       Example: <br>
-    <code>define RFXCOMTCP RFXCOM 192.168.1.5:10001
+    <code>define RFXCOMTCP RFXCOM 192.168.1.5:10001</code>
     <br>
-    <code>define RFXCOMTCP2 RFXCOM 192.168.1.121:10001 noinit
+    <code>define RFXCOMTCP2 RFXCOM 192.168.1.121:10001 noinit</code>
       <br>
     </ul>
     <br>
