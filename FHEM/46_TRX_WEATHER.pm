@@ -45,9 +45,13 @@
 # * "TFA_WIND"	is TFA
 # * "WDS500" is UPM WDS500
 #
+# Energy Sensors:
+# * "CM160"	is OWL CM119, CM160
+# * "CM180"	is OWL CM180
+#
 # Weighing scales (WEIGHT): 
-# "BWR101" is Oregon Scientific BWR101
-# "GR101" is Oregon Scientific GR101
+# * "BWR101" is Oregon Scientific BWR101
+# * "GR101" is Oregon Scientific GR101
 #
 # Copyright (C) 2012 Willi Herzig
 #
@@ -69,14 +73,12 @@
 # This library is free software; you can redistribute it and/or modify
 # it under the same terms as Perl itself, either Perl version 5.8.7 or,
 # at your option, any later version of Perl 5 you may have available.
-
 ##################################
 #
 # values for "set global verbose"
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id$
 package main;
 
 use strict;
@@ -92,7 +94,7 @@ TRX_WEATHER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^..(50|51|52|54|55|56|5d).*";
+  $hash->{Match}     = "^..(50|51|52|54|55|56|5a|5d).*";
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
@@ -107,12 +109,23 @@ TRX_WEATHER_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-	my $a = int(@a);
-	#print "a0 = $a[0]";
-  return "wrong syntax: define <name> TRX_WEATHER code" if(int(@a) != 3);
+  #my $a = int(@a);
+  #print "a0 = $a[0]";
+
+  return "wrong syntax: define <name> TRX_WEATHER code" if (int(@a) < 3);
 
   my $name = $a[0];
   my $code = $a[2];
+
+  if (($code =~ /^CM160/) || ($code =~ /^CM180/)) {
+  	return "wrong syntax: define <name> TRX_WEATHER code [scale_current scale_total add_total]" if (int(@a) != 3 && int(@a) != 6);
+  	$hash->{scale_current} = ((int(@a) == 6) ? $a[3] : 1);
+  	$hash->{scale_total} = ((int(@a) == 6) ? $a[4] : 1);
+  	$hash->{add_total} = ((int(@a) == 6) ? $a[5] : 1);
+  } else {
+	return "wrong syntax: define <name> TRX_WEATHER code" if(int(@a) > 3);
+  }
+
 
   $hash->{CODE} = $code;
   $modules{TRX_WEATHER}{defptr}{$code} = $hash;
@@ -147,7 +160,9 @@ my %types =
    0x550b => { part => 'RAIN', method => \&TRX_WEATHER_common_rain, },
    # WIND
    0x5610 => { part => 'WIND', method => \&TRX_WEATHER_common_anemometer, },
-   # WEIGHT
+   # Energy usage sensors
+   0x5A11 => { part => 'ENERGY', method => \&TRX_WEATHER_common_energy, },
+    # WEIGHT
    0x5D08 => { part => 'WEIGHT', method => \&TRX_WEATHER_common_weight, },
   );
 
@@ -643,6 +658,83 @@ sub TRX_WEATHER_common_rain {
 
 # ------------------------------------------------------------
 #
+sub TRX_WEATHER_common_energy {
+    	my $type = shift;
+	my $longids = shift;
+    	my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  #Log 1,"subtype=$subtype";
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "CM160", # CM119, CM160
+	0x02 => "CM180", # CM180
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log 1,"TRX_WEATHER: common_energy error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  #my $seqnbr = sprintf "%02x", $bytes->[2];
+  #Log 1,"seqnbr=$seqnbr";
+
+  my $dev_str = $dev_type;
+  $dev_str .= $DOT.sprintf("%02x%02x", $bytes->[3],$bytes->[4]);
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  my $energy_current = (
+	$bytes->[6] * 256*256*256 + 
+	$bytes->[7] * 256*256 +
+	$bytes->[8] * 256 +
+	$bytes->[9]
+	);
+
+  push @res, {
+	device => $dev_str,
+	type => 'energy_current',
+	current => $energy_current,
+	units => 'W',
+  };
+
+  my $energy_total = (
+	$bytes->[10] * 256*256*256*256*256 + 
+	$bytes->[11] * 256*256*256*256 +
+	$bytes->[12] * 256*256*256 + 
+	$bytes->[13] * 256*256 +
+	$bytes->[14] * 256 +
+	$bytes->[15]
+	) / 223.666;
+  $energy_total = sprintf("%.3f", $energy_total/1000);
+
+  push @res, {
+	device => $dev_str,
+	type => 'energy_total',
+	current => $energy_total,
+	units => 'kWh',
+  };
+
+  my $count = $bytes->[5];
+  #  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 16) if ($count==0 || $count==1 || $count==2 || $count==3 || $count==8 || $count==9);
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 16); 
+
+  return @res;
+}
+
+# ------------------------------------------------------------
+#
 sub TRX_WEATHER_common_weight {
     	my $type = shift;
 	my $longids = shift;
@@ -886,6 +978,28 @@ TRX_WEATHER_Parse($$)
 			$sensor = "uv_risk";			
 			readingsBulkUpdate($def, $sensor, $i->{risk});
 	}
+	elsif ($i->{type} eq "energy_current") { 
+			my $energy_current = $i->{current};
+			if (defined($def->{scale_current})) {
+				$energy_current = $energy_current * $def->{scale_current};
+				#Log 1,"scale_current=".$def->{scale_current};			
+			}
+			$val .= "ECUR: ".$energy_current." ";
+
+			$sensor = "energy_current";
+			readingsBulkUpdate($def, $sensor, $energy_current." ".$i->{units});
+	}
+	elsif ($i->{type} eq "energy_total") { 
+			my $energy_total = $i->{current};
+			if (defined($def->{scale_total}) && defined($def->{add_total})) {
+				$energy_total = $energy_total * $def->{scale_total} + $def->{add_total};
+				#Log 1,"scale_total=".$def->{scale_total};			
+			}
+			$val .= "ESUM: ".$energy_total." ";
+
+			$sensor = "energy_total";
+			readingsBulkUpdate($def, $sensor, $energy_total." ".$i->{units});
+	}
 	elsif ($i->{type} eq "weight") { 
 			$val .= "W: ".$i->{current}." ";
 
@@ -933,9 +1047,11 @@ TRX_WEATHER_Parse($$)
   <a name="TRX_WEATHERdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; OREGON &lt;deviceid&gt;</code> <br>
+    <code>define &lt;name&gt; TRX_WEATHER &lt;deviceid&gt;</code> <br>
     <br>
-    &lt;deviceid&gt; is the device identifier of the Oregon sensor. It consists of the sensors name and (only if the attribute longids is set of the RFXtrx433) an a one byte hex string (00-ff) that identifies the sensor. If an sensor uses an switch to set an additional is then this is also added. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used: <br>
+    <code>&lt;deviceid&gt;</code> 
+    <ul>
+	is the device identifier of the sensor. It consists of the sensors name and (only if the attribute longids is set of the RFXtrx433) an a one byte hex string (00-ff) that identifies the sensor. If an sensor uses an switch to set an additional is then this is also added. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used: <br>
 	"THR128" (for THR128/138, THC138),<br>
 	"THGR132N" (for THC238/268,THN132,THWR288,THRN122,THN122,AW129/131),<br>
 	"THWR800", <br>
@@ -956,14 +1072,48 @@ TRX_WEATHER_Parse($$)
 	"WTGR800_A" (for wind sensor of WTGR800),<br>
 	"WGR800" (for wind sensor of WGR800),<br>
 	"WGR918" (for wind sensor of STR918 and WGR918),<br>
-	"TFA_WIND" (for TFA wind sensor)
+	"TFA_WIND" (for TFA wind sensor),<br>
+	"BWR101" (for Oregon Scientific BWR101),<br>
+	"GR101" (for Oregon Scientific GR101)
+    </ul>
     <br>
-    <br><br>
-      Example: <br>
+    Example: <br>
+    <ul>
     <code>define Tempsensor TRX_WEATHER TX3_T</code><br>
     <code>define Tempsensor3 TRX_WEATHER THR128_3</code><br>
     <code>define Windsensor TRX_WEATHER WGR918_A</code><br>
     <code>define Regensensor TRX_WEATHER RGR918</code><br>
+    </ul>
+  </ul>
+  <br><br>
+  <ul>
+    <code>define &lt;name&gt; TRX_WEATHER &lt;deviceid&gt; [&lt;scale_current&gt; &lt;scale_total&gt; &lt;add_total&gt;]</code> <br>
+    <br>
+    <code>&lt;deviceid&gt;</code> 
+    <ul>
+  is the device identifier of the energy sensor. It consists of the sensors name and (only if the attribute longids is set of the RFXtrx433) an a two byte hex string (0000-ffff) that identifies the sensor. The define statement with the deviceid is generated automatically by autocreate. The following sensor names are used: <br>
+	"CM160"	(for OWL CM119 or CM160),<br>
+	"CM180"	(for OWL CM180),<br><br>
+    </ul>
+    The following Readings are generated:<br>
+    <ul>
+      <code>"energy_current:"</code>: 
+        <ul>
+	current usage in Watt. If &lt;scale_current&gt is defined the result is: <code>energy_current * &lt;scale_current&gt;</code>.
+        </ul>
+      <code>"energy_total:"</code>: 
+        <ul>
+	current usage in kWh. If scale_total and add_total is defined the result is: <code>energy_total * &lt;scale_total&gt; + &lt;add_total&gt;</code>.
+        </ul>
+    <br>
+    <br><br>
+    </ul>
+    Example: <br>
+    <ul>
+    <code>define Tempsensor TRX_WEATHER CM160_1401</code><br>
+    <code>define Tempsensor TRX_WEATHER CM180_1401 1 1 0</code><br>
+    <code>define Tempsensor TRX_WEATHER CM180_1401 0.9 0.9 -1000</code><br>
+    </ul>
   </ul>
   <br>
 
