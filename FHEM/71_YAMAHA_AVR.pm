@@ -72,6 +72,10 @@ YAMAHA_AVR_GetStatus($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
+    #my $zone = YAMAHA_AVR_getZoneName($hash, AttrVal($name, "used-zone", "main"));
+    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
+    
+    
     $local = 0 unless(defined($local));
 
     return "" if(!defined($hash->{helper}{ADDRESS}) or !defined($hash->{helper}{INTERVAL}));
@@ -90,9 +94,10 @@ YAMAHA_AVR_GetStatus($;$)
 	YAMAHA_AVR_getInputs($hash, $device);
     }
     
+    return "No Zone available" if(not defined($zone));
     
     
-    my $return = YAMAHA_AVR_SendCommand($device,"<YAMAHA_AV cmd=\"GET\"><Main_Zone><Basic_Status>GetParam</Basic_Status></Main_Zone></YAMAHA_AV>");
+    my $return = YAMAHA_AVR_SendCommand($device,"<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
 
     Log GetLogLevel($name, 4), "YANMAHA_AVR: GetStatus-Request returned:\n$return";
     
@@ -119,12 +124,16 @@ YAMAHA_AVR_GetStatus($;$)
     }
     
     
-    if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute><\/Volume>/)
+    if($return =~ /<Volume><Lvl><Val>(.+)<\/Val><Exp>(.+)<\/Exp><Unit>.+<\/Unit><\/Lvl><Mute>(.+)<\/Mute>.*<\/Volume>/)
     {
 	readingsBulkUpdate($hash, "volume_level", ($1 / 10 ** $2));
 	readingsBulkUpdate($hash, "mute", lc($3));
     }
     
+    if($return =~ /<Volume>.*?<Output>(.+?)<\/Output>.*?<\/Volume>/)
+    {
+	readingsBulkUpdate($hash, "output", lc($1));
+    }
     
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
     {
@@ -180,7 +189,8 @@ YAMAHA_AVR_Set($@)
     my $address = $hash->{helper}{ADDRESS};
     my $result = "";
     my $command;
-    
+    #my $zone = YAMAHA_AVR_getZoneName($hash, AttrVal($name, "used-zone", "main"));
+    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     my $inputs_piped = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 0) : "" ;
     my $inputs_comma = defined($hash->{helper}{INPUTS}) ? YAMAHA_AVR_InputParam2Fhem(lc($hash->{helper}{INPUTS}), 1) : "" ;
@@ -194,7 +204,7 @@ YAMAHA_AVR_Set($@)
 
     if($what eq "on")
     {
-	$result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>On</Power></Power_Control></Main_Zone></YAMAHA_AV>");
+	$result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>");
 
 	if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)
 	{
@@ -202,12 +212,23 @@ YAMAHA_AVR_Set($@)
 	    readingsBulkUpdate($hash, "power", "on");
 	    $hash->{STATE} = "on";
 	    return undef;
-	}   
+	}
+	else
+	{
+	    return "Could not set power to on";
+	}
 
     }
     elsif($what eq "off")
     {
-	YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Power_Control><Power>Standby</Power></Power_Control></Main_Zone></YAMAHA_AV>");
+	$result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>");
+	
+	if(not $result =~ /RC="0"/)
+	{
+		# if the returncode isn't 0, than the command was not successful
+		return "Could not set power to off";
+	}
+
     }
     elsif($what eq "input")
     {
@@ -223,7 +244,7 @@ YAMAHA_AVR_Set($@)
 		    $command = YAMAHA_AVR_getCommandParam($hash, $a[2]);
 		    if(defined($command) and length($command) > 0)
 		    {
-			$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Input><Input_Sel>".$command."</Input_Sel></Input></Main_Zone></YAMAHA_AV>");
+			$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
 		    }
 		    else
 		    {
@@ -266,16 +287,22 @@ YAMAHA_AVR_Set($@)
 	    {
 		if( $a[2] eq "on")
 		{
-		    YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Mute>On</Mute></Volume></Main_Zone></YAMAHA_AV>");
+		    $result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>On</Mute></Volume></$zone></YAMAHA_AV>");
 		}
 		elsif($a[2] eq "off")
 		{
-		    YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Mute>Off</Mute></Volume></Main_Zone></YAMAHA_AV>"); 
+		    $result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>Off</Mute></Volume></$zone></YAMAHA_AV>"); 
 		}
 		else
 		{
 		    return $usage;
 		}
+		
+		if(not $result =~ /RC="0"/)
+		{
+			# if the returncode isn't 0, than the command was not successful
+			return "Could not set mute to ".$a[2].".";
+		}    
 	    }
 	    else
 	    {
@@ -299,29 +326,35 @@ YAMAHA_AVR_Set($@)
 
 		    if($diff > 0)
 		    {
-		        Log GetLogLevel($name, 4), "YAMAHA_AV: use smooth volume change (with $steps steps of +$diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
+		        Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of +$diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
 		    }
 		    else
 		    {
-			Log GetLogLevel($name, 4), "YAMAHA_AV: use smooth volume change (with $steps steps of $diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
+			Log GetLogLevel($name, 4), "YAMAHA_AVR: use smooth volume change (with $steps steps of $diff volume change each ".sprintf("%.3f", $sleep)." seconds)";
 		    }
 	
 		    # Only if smoohing is really needed (step difference is not zero)
-		    if($diff != 0)
+		    if(defined($hash->{READINGS}{volume_level}{VAL}) and $diff != 0)
 		    {
 			for(my $step = 1; $step <= $steps; $step++)
 			{
-			    Log GetLogLevel($name, 4), "YAMAHA_AV: set volume to ".($current_volume + ($diff * $step))." dB";
+			    Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
 			
-			    YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
 			
 			    sleep $sleep unless ($time == 0);
 			}
 		    }
 		}
 		
-		Log GetLogLevel($name, 4), "YAMAHA_AV set volume to ".$a[2]." dB";
-		YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><Main_Zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></Main_Zone></YAMAHA_AV>");
+		Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$a[2]." dB";
+		$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
+		if(not $result =~ /RC="0"/)
+		{
+			# if the returncode isn't 0, than the command was not successful
+			return "Could not set volume to ".$a[2].".";
+		}    
+	    
 	    }
 	    else
 	    {
@@ -353,9 +386,9 @@ YAMAHA_AVR_Define($$)
     my @a = split("[ \t][ \t]*", $def);
     my $name = $hash->{NAME};
     
-    if(! @a >= 3)
+    if(! @a >= 4)
     {
-	my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<statusinterval>]";
+	my $msg = "wrong syntax: define <name> YAMAHA_AVR <ip-or-hostname> [<zone>] [<statusinterval>]";
 	Log 2, $msg;
 	return $msg;
     }
@@ -366,15 +399,47 @@ YAMAHA_AVR_Define($$)
     $hash->{helper}{ADDRESS} = $address;
     
     
-    if(defined($a[3]) and $a[3] > 0)
+    
+    if(defined($a[3]))
     {
-	$hash->{helper}{INTERVAL}=$a[3];
+        $hash->{helper}{SELECTED_ZONE} = $a[3];
+    }
+    else
+    {
+	$hash->{helper}{SELECTED_ZONE} = "mainzone";
+    }
+    
+    if(defined($a[4]) and $a[4] > 0)
+    {
+	$hash->{helper}{INTERVAL}=$a[4];
     }
     else
     {
 	$hash->{helper}{INTERVAL}=30;
     }
-    $attr{$name}{"volume-smooth-change"} = "1";
+    
+    
+    # In case of a redefine, check the zone parameter if the specified zone exist, otherwise use the main zone
+    if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
+    {
+	if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
+	{
+    
+	    $hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
+	    YAMAHA_AVR_getInputs($hash, $address);
+	    
+	}
+	else
+	{
+	    Log GetLogLevel($name, 2), "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device ".$hash->{NAME}.". Using Main Zone instead";
+	    $hash->{ACTIVE_ZONE} = "mainzone";
+	    YAMAHA_AVR_getInputs($hash, $address);
+	}
+    }
+    
+    
+    
+    $attr{$name}{"volume-smooth-change"} = "1" unless(defined($attr{$name}{"volume-smooth-change"}));
     
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
   
@@ -410,10 +475,50 @@ sub YAMAHA_AVR_InputParam2Fhem($$)
    
     $inputs =~ s/\s+//g;
     $inputs =~ s/,//g;
-    $inputs =~ s/\(.+?\)//g;
+    $inputs =~ s/\(/_/g;
+    $inputs =~ s/\)//g;
     $inputs =~ s/\|/,/g if($replace_pipes == 1);
 
     return $inputs;
+}
+
+#############################
+# Converts all Zones to FHEM usable command lists
+sub YAMAHA_AVR_Zone2Fhem($$)
+{
+    my ($zones, $replace_pipes) = @_;
+
+   
+    $zones =~ s/\s+//g;
+    $zones =~ s/_//g;
+    $zones =~ s/\|/,/g if($replace_pipes == 1);
+
+    return lc $zones;
+
+}
+
+#############################
+# Returns the Yamaha Zone Name for the FHEM like zone attribute
+sub YAMAHA_AVR_getZoneName($$)
+{
+   my ($hash, $zone) = @_;
+   my $item;
+   
+   return undef if(not defined($hash->{helper}{ZONES}));
+   
+   my @commands = split("\\|", $hash->{helper}{ZONES});
+
+    foreach $item (@commands)
+    {
+	if(YAMAHA_AVR_Zone2Fhem($item, 0) eq $zone)
+	{
+	    return $item;
+	}
+    
+    }
+    
+    return undef;
+    
 }
 
 #############################
@@ -441,6 +546,7 @@ sub YAMAHA_AVR_getCommandParam($$)
 sub YAMAHA_AVR_getModel($$)
 {
     my ($hash, $address) = @_;
+    my $name = $hash->{NAME};
     my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
     return undef unless(defined($response));
     if($response =~ /<Unit_Description\s+Version="(.+?)"\s+Unit_Name="(.+?)">/)
@@ -448,20 +554,55 @@ sub YAMAHA_AVR_getModel($$)
 	$hash->{FIRMWARE} = $1;
         $hash->{MODEL} = $2;
     }
+
+
+    while($response =~ /<Menu Func="Subunit" Title_1="(.+?)" YNC_Tag="(.+?)">/gc)
+    {
+        if(defined($hash->{helper}{ZONES}) and length($hash->{helper}{ZONES}) > 0)
+        {
+            $hash->{helper}{ZONES} .= "|";
+        }
+
+        $hash->{helper}{ZONES} .= $2;
+
+    }
+    
+    # uncommented line for zone detection testing
+    #
+    # $hash->{helper}{ZONES} .= "|Zone_2";
+    
+    $hash->{ZONES_AVAILABLE} = YAMAHA_AVR_Zone2Fhem($hash->{helper}{ZONES}, 1);
+    
+    
+    if(defined(YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE})))
+    {
+    
+	Log GetLogLevel($name, 4), "YAMAHA_AVR: using zone ".YAMAHA_AVR_getZoneName($hash, lc $hash->{helper}{SELECTED_ZONE});
+	$hash->{ACTIVE_ZONE} = lc $hash->{helper}{SELECTED_ZONE};
+    
+    }
+    else
+    {
+	Log GetLogLevel($name, 2), "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device $name. Using Main Zone instead";
+	$hash->{ACTIVE_ZONE} = "mainzone";
+    }
 }
 
 sub YAMAHA_AVR_getInputs($$)
 {
 
     my ($hash, $address) = @_;  
-    my $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><Main_Zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></Main_Zone></YAMAHA_AV>");
+    my $name = $hash->{NAME};
+    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
+    my $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
     return undef unless (defined($response));
-    $response =~ s/></>\n</g;
-    my @inputs = split("\n", $response);
+
     
-    foreach (sort @inputs)
-    {
-	if($_ =~ /<Param>(.+?)<\/Param>/)
+    undef($hash->{helper}{INPUTS}) if(defined($hash->{helper}{INPUTS}));
+
+    
+    
+	while($response =~ /<Param>(.+?)<\/Param>/gc)
 	{
 	    if(defined($hash->{helper}{INPUTS}) and length($hash->{helper}{INPUTS}) > 0)
 	    {
@@ -471,7 +612,10 @@ sub YAMAHA_AVR_getInputs($$)
 	      $hash->{helper}{INPUTS} .= $1;
 	    
 	}
-    }
+	
+	$hash->{helper}{INPUTS} = join("|", sort split("\\|", $hash->{helper}{INPUTS}));
+	
+    
 
 }
 
@@ -489,7 +633,7 @@ sub YAMAHA_AVR_getInputs($$)
   <a name="YAMAHA_AVRdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;status_interval&gt;]</code>
+    <code>define &lt;name&gt; YAMAHA_AVR &lt;ip-address&gt; [&lt;zone&gt;] [&lt;status_interval&gt;]</code>
     <br><br>
 
     This module controls AV receiver from Yamaha via network connection. You are able
@@ -497,14 +641,48 @@ sub YAMAHA_AVR_getInputs($$)
     select the input (HDMI, AV, AirPlay, internet radio, Tuner, ...), select the volume
     or mute/unmute the volume.<br><br>
     Defining a YAMAHA_AVR device will schedule an internal task (interval can be set
-    with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 30 seconds), which periodically reads
-    the status of the AV receiver (power state, selected input, volume and mute status)
-    and triggers notify/filelog commands.<br><br>
+    with optional parameter &lt;status_interval&gt; in seconds, if not set, the value is 30
+    seconds), which periodically reads the status of the AV receiver (power state, selected
+    input, volume and mute status) and triggers notify/filelog commands.<br><br>
 
     Example:
+    <PRE>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10
+       
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60   # With custom interval of 60 seconds
+    </PRE>
+  </ul>
+  <b>Zone Selection</b><br>
+  <ul>
+    If your receiver supports Zone Selection (e.g. RX-V671, RX_V673,... and the AVANTAGE series) 
+    you can select the zone which should be controlled. The RX_4xx and RX_3xx series for example 
+    just have a "Main Zone" (which is the whole receiver itself). In general you have the following
+    possibilities for the parameter &lt;zone&gt; (depending on your receiver model).<br><br>
     <ul>
-      <code>define AV_Receiver YAMAHA_AVR 192.168.0.10</code><br>
+    <li><b>mainzone</b> - this is the main zone (standard)</li>
+    <li><b>zone2</b> - The second zone (Zone 2)</li>
+    <li><b>zone3</b> - The third zone (Zone 3)</li>
+    <li><b>zone4</b> - The fourth zone (Zone 4)</li>
     </ul>
+    <br>
+    Depending on your receiver model you have not all inputs available on these different zones.
+    The module just offers the real available inputs.
+    <br><br>
+    Example:
+    
+     <PRE>
+        define AV_Receiver YAMAHA_AVR 192.168.0.10           # If no zone is specified, the "Main Zone" will be used.
+        attr AV_Receiver YAMAHA_AVR room Livingroom
+        
+        # Define the second zone
+        define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2
+        attr AV_Receiver_Zone2 room Bedroom
+     </PRE>
+     Each Zone needs an own device and can be assigned to the different rooms, as each zone
+     can be separatly controlled from the other zones.
+     <br><br>
+  </ul>
+  
   <a name="YAMAHA_AVRset"></a>
   <b>Set </b>
   <ul>
@@ -576,7 +754,7 @@ volume_level</pre>
   </ul>
   <br>
 </ul>
-</ul>
+
 
 =end html
 =cut
