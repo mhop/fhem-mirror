@@ -53,7 +53,7 @@ TRX_Initialize($)
   $hash->{Clients} =
         ":TRX_WEATHER:TRX_SECURITY:TRX_LIGHT:";
   my %mc = (
-    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|5d).*",
+    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|5a|5d).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
     "3:TRX_LIGHT"	=> "^..(10|11|12).*", 
     "4:TRX_ELSE"   	=> "^...*",
@@ -462,9 +462,9 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK.</li>
       <br>
       <br>
       Example: <br>
-    <code>define RFXTRXTCP TRX 192.168.1.5:10001
+    <code>define RFXTRXTCP TRX 192.168.1.5:10001</code>
     <br>
-    <code>define RFXTRXTCP2 TRX 192.168.1.121:10001 noinit
+    <code>define RFXTRXTCP2 TRX 192.168.1.121:10001 noinit</code>
       <br>
     </ul>
     <br>
