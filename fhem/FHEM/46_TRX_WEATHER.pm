@@ -1106,7 +1106,6 @@ TRX_WEATHER_Parse($$)
 	current usage in kWh. If scale_total and add_total is defined the result is: <code>energy_total * &lt;scale_total&gt; + &lt;add_total&gt;</code>.
         </ul>
     <br>
-    <br><br>
     </ul>
     Example: <br>
     <ul>
