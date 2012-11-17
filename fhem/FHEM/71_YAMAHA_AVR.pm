@@ -131,7 +131,7 @@ YAMAHA_AVR_GetStatus($;$)
     }
     else
     {
-       undef($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
+       delete($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
     
     }
     
@@ -602,7 +602,7 @@ sub YAMAHA_AVR_getInputs($$)
     return undef unless (defined($response));
 
     
-    undef($hash->{helper}{INPUTS}) if(defined($hash->{helper}{INPUTS}));
+    delete($hash->{helper}{INPUTS}) if(defined($hash->{helper}{INPUTS}));
 
     
     
