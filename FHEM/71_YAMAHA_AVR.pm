@@ -551,14 +551,36 @@ sub YAMAHA_AVR_getModel($$)
 {
     my ($hash, $address) = @_;
     my $name = $hash->{NAME};
-    my $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/desc.xml");
-    return undef unless(defined($response));
-    if($response =~ /<Unit_Description\s+Version="(.+?)"\s+Unit_Name="(.+?)">/)
-    {
-	$hash->{FIRMWARE} = $1;
-        $hash->{MODEL} = $2;
+    my $response;
+    my $desc_url;
+    
+    $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
+    
+    
+    if(defined($response) and $response =~ /<URL>(.+?)<\/URL>/)
+    { 
+       $desc_url = $1;
     }
-
+    else
+    {
+       $desc_url = "/YamahaRemoteControl/desc.xml";
+    }
+    
+    $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
+    
+    if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
+    {
+        $hash->{MODEL} = $1;
+        $hash->{SYSTEM_ID} = $2;
+        $hash->{FIRMWARE} = $3;
+    }
+    else
+    {
+	return undef;
+    }
+    
+    $response = GetFileFromURL("http://".$address.$desc_url);
+    return undef unless(defined($response));
 
     while($response =~ /<Menu Func="Subunit" Title_1="(.+?)" YNC_Tag="(.+?)">/gc)
     {
