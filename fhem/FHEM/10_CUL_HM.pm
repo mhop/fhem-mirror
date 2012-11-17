@@ -1417,29 +1417,17 @@ CUL_HM_Get($@)
 
   #----------- now start processing --------------
   if($cmd eq "param") {  ######################################################
-	my ($chnCnt,$pre,@chnName);
+	my $val;
+	$val = AttrVal($name, $a[2], "");
+	$val = $hash->{READINGS}{$a[2]}{VAL}    if (!$val && $hash->{READINGS}{$a[2]});
+	$val = AttrVal($devName, $a[2], "")     if (!$val);
+	$val = $devHash->{READINGS}{$a[2]}{VAL} if (!$val && $devHash->{READINGS}{$a[2]});
+	$val = $hash->{$a[2]}                   if (!$val && $hash->{$a[2]});
+	$val = $devHash->{$a[2]}                if (!$val && $devHash->{$a[2]});
+	$val = $hash->{helper}{$a[2]}           if((!$val)&& (ref($hash->{helper}{$a[2]}) ne "HASH"));
+	$val = $devHash->{helper}{$a[2]}        if (!$val);
 
-    if (!$isChannel){ 
-	  ($chnCnt,@chnName) = CUL_HM_getChannelNames($hash);
-	  $pre = "name: ";
-	}
-	push @chnName,$name;
-	
-	my @founds;
-	foreach my $cn (@chnName){
-	  my $ch = CUL_HM_name2Hash($cn);
-	  my $val;
-	  $val = AttrVal($cn, $a[2], "");
-	  $val = $ch->{READINGS}{$a[2]}{VAL}      if (!$val &&               $ch->{READINGS}{$a[2]});
-	  $val = AttrVal($devName, $a[2], "")     if (!$val && $isChannel );
-	  $val = $devHash->{READINGS}{$a[2]}{VAL} if (!$val && $isChannel && $devHash->{READINGS}{$a[2]} );
-	  $val = $ch->{$a[2]}                     if (!$val &&               $ch->{$a[2]});
-	  $val = $devHash->{$a[2]}                if (!$val && $isChannel && $devHash->{$a[2]});
-	  $val = $ch->{helper}{$a[2]}             if((!$val)&&               (ref($ch->{helper}{$a[2]}) ne "HASH"));
-	  $val = $devHash->{helper}{$a[2]}        if (!$val && $isChannel);
-	  push @founds, $pre.$cn."\t ".$a[2].":".$val if ($val);
-	}
-	return join("\n",sort(@founds));
+	return (defined ($val))?$val:"undefined";
   }
   elsif($cmd eq "reg") {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
