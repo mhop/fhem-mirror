@@ -448,7 +448,7 @@ CUL_HM_Parse($$)
 	  CUL_HM_UpdtReadBulk($chnHash,1,"state:T: $t H: $h",  # update weather channel
 	                                 "measured-temp:$t",
 	                                 "humidity:$h")
-				  if (!$chnHash);
+				  if ($chnHash);
       push @event, "state:T: $t H: $h";
       push @event, "measured-temp:$t";
       push @event, "humidity:$h";
@@ -1111,7 +1111,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 	#              if  less then a byte                    !!!!!!!!!!!
 my %culHmRegDefine = (
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,t=>'visibility of internal keys',lit=>{invisib=>0,visib=>1}},
-  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>''         ,f=>''      ,u=>'dec' ,t=>'pairing to central'},
+  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>''         ,f=>''      ,u=>'dec' ,t=>'pairing to central'},# todo General invent hex
 #blindActuator mainly                                                                                
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,t=>"drive time up"},
@@ -1443,7 +1443,7 @@ CUL_HM_Get($@)
   }
   elsif($cmd eq "reg") {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
-	if ($regReq eq 'all'){
+	if ($regReq eq 'all'){# todo General correct retrieve of channel information if device is used
 	  my @regArr = keys %culHmRegGeneral;
 	  push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st}); 
 	  push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
@@ -1500,8 +1500,8 @@ CUL_HM_Get($@)
 	  push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
 	}
 	else{# add all ugly channel register to device view
-	  for (my $chn=0;$chn<25;$chn++){
-	    my $chnN = sprintf("%02X",$chn);
+	  for my $chnId (CUL_HM_getAssChnIds($name)){
+	    my $chnN = substr($chnId,6,2);
 	    push @regArr, keys %{$culHmRegChan{$md.$chnN}} 
 		      if($culHmRegChan{$md.$chnN}); 
 	  }
@@ -1514,7 +1514,6 @@ CUL_HM_Get($@)
 	  if ($reg->{c} eq 'lit'){
 	    $help .= " options:".join(",",keys%{$reg->{lit}});
 	  }
-	  
 	  push @rI,sprintf("%4d: %13s | %3d to %-11s | %8s | %s\n",
 			  $reg->{l},$regName,$reg->{min},$reg->{max}.$reg->{u},
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),$help)
