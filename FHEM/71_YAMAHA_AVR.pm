@@ -72,7 +72,6 @@ YAMAHA_AVR_GetStatus($;$)
     my ($hash, $local) = @_;
     my $name = $hash->{NAME};
     my $power;
-    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     $local = 0 unless(defined($local));
 
@@ -89,6 +88,8 @@ YAMAHA_AVR_GetStatus($;$)
     {
 	YAMAHA_AVR_getInputs($hash, $device);
     }
+    
+    my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
     return "No Zone available" if(not defined($zone));
     
@@ -127,6 +128,11 @@ YAMAHA_AVR_GetStatus($;$)
     if($return =~ /<Volume>.*?<Output>(.+?)<\/Output>.*?<\/Volume>/)
     {
 	readingsBulkUpdate($hash, "output", lc($1));
+    }
+    else
+    {
+       undef($hash->{READINGS}{output}) if(defined($hash->{READINGS}{output}));
+    
     }
     
     if($return =~ /<Input_Sel>(.+)<\/Input_Sel>/)
