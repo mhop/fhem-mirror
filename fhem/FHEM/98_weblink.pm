@@ -12,7 +12,7 @@ weblink_Initialize($)
   my ($hash) = @_;
 
   $hash->{DefFn} = "weblink_Define";
-  $hash->{AttrList}= "fixedrange plotmode plotsize label title htmlattr";
+  $hash->{AttrList}= "fixedrange plotmode plotsize label title htmlattr plotfunction";
 }
 
 
@@ -45,7 +45,7 @@ weblink_Define($$)
   <a name="weblinkdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; weblink [link|fileplot|image|iframe|htmlCode]
+    <code>define &lt;name&gt; weblink [link|fileplot|dbplot|image|iframe|htmlCode]
                 &lt;argument&gt;</code>
     <br><br>
     This is a placeholder used with webpgm2 to be able to integrate links
@@ -60,6 +60,7 @@ weblink_Define($$)
       <code>define hr weblink htmlCode &lt;hr&gt</code><br>
       <code>define w_Frlink weblink htmlCode { WeatherAsHtml("w_Frankfurt") }</code><br>
       <code>define MyPlot weblink fileplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;:&lt;logfile&gt;</code><br>
+      <code>define MyPlot weblink dbplot &lt;logdevice&gt;:&lt;gnuplot-file&gt;</code><br>
     </ul>
     <br>
 
@@ -133,7 +134,28 @@ weblink_Define($$)
     <li>title<br>
       A special form of label (see above), which replaces the string &lt;TL&gt;
       in the .gplot file. It defaults to the filename of the logfile.
-      </li>
+    </li>
+
+    <a name="plotfunction"></a>
+    <li>plotfunction<br>
+      Space value separated list of values. The value will be used to replace
+      &lt;SPEC#&gt; type of strings in the .gplot file, with # beginning at 1
+      (&lt;SPEC1&gt;, &lt;SPEC2&gt;, etc.) in the #FileLog or #DbLog directive.
+      With this attribute you can use the same .gplot file for multiple devices
+      with the same logdevice.
+      <ul><b>Example:</b><br>
+        <li>#FileLog <SPEC1><br>
+            with: attr <weblinkdevice> plotfunction "4:IR\x3a:0:"<br>
+            instead of<br>  
+            #FileLog 4:IR\x3a:0:
+        </li>
+        <li>#DbLog <SPEC1><br>
+            with: attr <weblinkdevice> plotfunction "Garage_Raumtemp:temperature::"<br>
+            instead of<br>
+            #DbLog Garage_Raumtemp:temperature::
+        </li>
+      </ul>
+    </li>
 
   </ul>
   <br>
