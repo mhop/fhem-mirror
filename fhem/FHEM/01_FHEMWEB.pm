@@ -10,6 +10,7 @@ use HttpUtils;
 #########################
 # Forward declaration
 sub FW_IconURL($);
+sub FW_fC($@);
 sub FW_answerCall($);
 sub FW_calcWeblink($$);
 sub FW_dev2image($);
@@ -482,7 +483,7 @@ FW_answerCall($)
     }
   }
 
-  my $cmd = FW_digestCgi($arg);
+  my ($cmd, $cmddev) = FW_digestCgi($arg);
   my $docmd = 0;
   $docmd = 1 if($cmd && 
                 $cmd !~ /^showlog/ &&
@@ -491,7 +492,7 @@ FW_answerCall($)
                 $cmd !~ /^style / &&
                 $cmd !~ /^edit/);
 
-  $FW_cmdret = $docmd ? FW_fC($cmd) : "";
+  $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
 
   if($FW_inform) {      # Longpoll header
     $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
@@ -662,7 +663,7 @@ FW_digestCgi($)
   $cmd.=" $arg{$c}" if(defined($arg{$c}) &&
                        ($arg{$c} ne "state" || $cmd !~ m/^set/));
   $cmd.=" $val{$c}" if(defined($val{$c}));
-  return $cmd;
+  return ($cmd, $c);
 }
 
 #####################
@@ -1921,10 +1922,11 @@ FW_style($$)
     foreach my $mn (sort keys %modules) {
       my $mp = $modules{$mn};
       next if($isHelper{$mn});
-      # If it is not loaded, read it through to check if it has a Define Function
+      # If it is not loaded, read it through to check if it has a Define
+      # Function
       if(!$mp->{LOADED} && !$mp->{defChecked}) {
         $mp->{defChecked} = 1;
-        if(open(FH, "$attr{global}{modpath}/FHEM/$modules{$mn}{ORDER}_$mn.pm")) {
+        if(open(FH,"$attr{global}{modpath}/FHEM/$modules{$mn}{ORDER}_$mn.pm")) {
           while(my $l = <FH>) {
             $mp->{DefFn} = 1 if(index($l, "{DefFn}")   > 0);
           }
@@ -2025,10 +2027,15 @@ pF($@)
 ##################
 # fhem command
 sub
-FW_fC($)
+FW_fC($@)
 {
-  my ($cmd) = @_;
-  my $ret = AnalyzeCommandChain($FW_chash, $cmd);
+  my ($cmd, $unique) = @_;
+  my $ret;
+  if($unique) {
+    $ret = AnalyzeCommand($FW_chash, $cmd);
+  } else {
+    $ret = AnalyzeCommandChain($FW_chash, $cmd);
+  }
   return $ret;
 }
 
