@@ -524,7 +524,7 @@ CUL_HM_Parse($$)
                 $ptr->{HOUR} = $ptr->{MINUTE} = $ptr->{TEMP} = "";
               }
             }
-            if(defined ($ptr->{HOUR}) && 0+$ptr->{HOUR} == 24) {
+            if($ptr->{HOUR} && 0+$ptr->{HOUR} == 24) {
               $twentyfour = 1;  # next value uninteresting, only first counts.
             }
       	  }
@@ -580,6 +580,7 @@ CUL_HM_Parse($$)
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = ($2,hex($3), hex($4));
       $vp = int($vp)/2;   # valve position in %
+	  push @event, "ValvePosition:$vp%";
       push @event, "state:$vp%";
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
@@ -1349,10 +1350,10 @@ CUL_HM_TCtempReadings($$)
   my ($reg5,$reg6)=@_;
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   my $tempRegs = substr($reg5,12*5-1).$reg6;
+  $tempRegs =~ s/ 00:00/ /g;
   $tempRegs =~ s/ ..:/,/g;
   $tempRegs =~ s/^,//;
   $tempRegs =~ s/ $//;
-  print $tempRegs."\n";
   my @Tregs = split(",",$tempRegs);
   my @time  = @Tregs[grep !($_ % 2), 0..$#Tregs];    # even-index elements
   my @temp  = @Tregs[grep $_ % 2, 0..$#Tregs];       # odd-index  elements
@@ -1361,11 +1362,12 @@ CUL_HM_TCtempReadings($$)
   foreach  (@temp){$_=hex($_)/2};
   my $setting;
   for (my $day = 0;$day<7;$day++){
+    my $tSpan  = 0;
     for (my $entry = 0;$entry<24;$entry++){
       my $reg = $day *24 + $entry; 
-  	  my $tSpan = $time[$reg];
       last if ($tSpan > 1430);
   	  $setting .= sprintf("Temp set: %s %02d:%02d - %3.01f C\n",$days[$day],($tSpan/60),($tSpan%60),$temp[$reg]);
+	  $tSpan = $time[$reg];
     }
   }
   return $setting;
@@ -1957,8 +1959,8 @@ CUL_HM_Set($@)
   }
   elsif($cmd eq "pct") { ######################################################
     $a[1] = 100 if ($a[1] > 100);
-    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[2]!=0)?$a[2]:85825945);# onTime   0.0..85825945.6, 0=forever
-    $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..85825945.6, 0=immediate
+    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[2]!=0)?$a[2]:6709248);# onTime   0.0..6709248, 0=forever
+    $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..6709248, 0=immediate
     CUL_HM_PushCmdStack($hash, 
 	    sprintf("++%s11%s%s02%s%02X%s%s",$flag,$id,$dst,$chn,$a[1]*2,$rval,$tval));
   } 
@@ -2692,6 +2694,11 @@ CUL_HM_Resend($)
     delete($hash->{cmdStack});
     delete($attr{$hash->{NAME}}{protCmdPend});
 	CUL_HM_respPendRm($hash);
+	my $burstEvt = ($hash->{helper}{burstEvtCnt})? 
+	                  $hash->{helper}{burstEvtCnt}:0;
+	$attr{$name}{protState} = "CMDs_done".
+	                          (($burstEvt)?("_events:".$burstEvt):"");
+							  
 	readingsSingleUpdate($hash,"state","MISSING ACK",1);
   }
   else {
@@ -3171,21 +3178,26 @@ CUL_HM_parseCommon(@){
 	  }
 	}  
 	elsif($subtype eq "04"){ #ParamChange###################
-	  my($chn,$peerID,$list,$data) = @_ if($p =~ m/^04(..)(........)(..)(.*)/);
+	  my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
 	  my $listName = "RegL_".$list.":".CUL_HM_id2Name($peerID);
+      $listName =~ s/broadcast//;
 	  $listName =~ s/ /_/g; #remove blanks
+
 	  $data =~ s/(..)(..)/ $1:$2/g;	  
 	  
 	  my $lN = ReadingsVal($chnHash->{NAME},$listName,"");
-	  $lN = "" if($lN =~m/00:00$/);#clear data if it was finished before
-	  $lN .= " ".$data;
-      readingsSingleUpdate($chnHash,$listName,$lN,1);
+	  foreach my $entry(split(' ',$data)){
+	    my ($a,$d) = split(":",$entry);	
+        last if ($a eq "00");		
+		if ($lN =~m/$a:/){$lN =~ s/$a:../$a:$d/;
+		}else{  		  $lN .= " ".$entry;}
+	  }
+	  $lN = join(' ',sort(split(' ',$lN)));# reorder
+	  if ($lN =~ s/00:00//){$lN .= " 00:00"};
 
-	  # todo: this is likely a set of messages. Postpone command stack processing
-	  # until end of transmission. Verify whether there is a conflict with a 
-	  # current operation and use timer supervision to abort
+      readingsSingleUpdate($chnHash,$listName,$lN,1);
 	}  
 	elsif($subtype eq "06"){ #reply to status request#######
 	  #todo = what is the answer to a status request
