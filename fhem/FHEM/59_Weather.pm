@@ -28,6 +28,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use HttpUtils;
 
 #
 # uses the Yahoo! Weather API: http://developer.yahoo.com/weather/
