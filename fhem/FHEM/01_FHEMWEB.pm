@@ -1320,16 +1320,30 @@ FW_readgplotfile($$$)
   open(FH, $gplot_pgm) || return (FW_fatal("$gplot_pgm: $!"), undef);
   while(my $l = <FH>) {
     $l =~ s/\r//g;
+    my $plotfn = undef;
     if($l =~ m/^#FileLog (.*)$/ &&
        ($wltype eq "fileplot" || $wl eq "FileLog")) {
-      push(@filelog, $1);
+      $plotfn = $1;
     } elsif ($l =~ m/^#DbLog (.*)$/ && 
        ($wltype eq "dbplot" || $wl eq "DbLog")) {
-      push(@filelog, $1);
+      $plotfn = $1;
     } elsif($l =~ "^plot" || $plot) {
       $plot .= $l;
     } else {
       push(@data, $l);
+    }
+    
+    if($plotfn) {
+      my $specval = AttrVal($wl, "plotfunction", undef);
+      if ($specval) {
+        my @spec = split(" ",$specval);
+        my $spec_count=1;
+        foreach (@spec) {
+          $plotfn =~ s/<SPEC$spec_count>/$_/g;
+          $spec_count++;
+        }
+      }
+      push(@filelog, $plotfn);
     }
   }
   close(FH);
