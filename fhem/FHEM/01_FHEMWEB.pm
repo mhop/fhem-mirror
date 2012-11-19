@@ -509,6 +509,8 @@ FW_answerCall($)
     $FW_RETTYPE = "text/plain; charset=$FW_encoding";
     if($FW_jsonp) {
       $FW_cmdret =~ s/'/\\'/g;
+      # Escape newlines in JavaScript string
+      $FW_cmdret =~ s/\n/\\\n/g;
       FW_pO "$FW_jsonp('$FW_cmdret');";
     } else {
       FW_pO $FW_cmdret;
