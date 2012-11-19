@@ -674,11 +674,15 @@ CUL_XmitLimitCheck($$)
 sub
 CUL_XmitLimitCheckHM($$)
 {# add a delay to  last received. Thisis dynamic to obey System performance
- # was wrking with 700ms - added buffer to 900ms
+ # was working with 700ms - added buffer to 900ms
   my ($hash,$fn) = @_;
-  for (my $cnt=0;$cnt<10;$cnt++){
-    last if (gettimeofday()>($hash->{helper}{HMnextTR}+0.09));
-    select(undef, undef, undef, 0.02);
+  my $id = (length($fn)>19)?substr($fn,16,6):"";#get HMID destination
+  if ($id){
+    my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
+    if ($DevDelay > 0.01){# wait less then 10 ms will not work
+      $DevDelay = ((int($DevDelay*100))%100)/100;# security: no more then 1 sec
+	  select(undef, undef, undef, $DevDelay);
+    }
   }
 }
 
@@ -919,8 +923,9 @@ CUL_Parse($$$$$)
     ;
   } elsif($fn eq "I" && $len >= 12) {              # IR-CUL/CUN/CUNO
     ;
-  } elsif($fn eq "A" && $len >= 21) {              # AskSin/BidCos/HomeMatic
-    ;
+  } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
+    my $srcId = substr($dmsg,9,6);
+	$hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
     ;
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
