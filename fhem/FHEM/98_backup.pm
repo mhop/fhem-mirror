@@ -1,5 +1,6 @@
 ################################################################
 # $Id$
+# vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved
@@ -145,7 +146,7 @@ readModpath($$)
       push @pathname, $file;
     }
   }
-  return $ret;;
+  return $ret;
 }
 
 sub
@@ -186,8 +187,6 @@ createArchiv($)
   }
   return $ret;
 }
-
-# vim: ts=2:et
 
 1;
 
