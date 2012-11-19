@@ -1116,8 +1116,8 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 	# caution: !!! bitfield setting will zero the rest of the register
 	#              if  less then a byte                    !!!!!!!!!!!
 my %culHmRegDefine = (
-  intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal keys',lit=>{invisib=>0,visib=>1}},
-  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>'pairing to central'},# todo General invent hex
+  intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
+  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>'pairing to central'},
 #blindActuator mainly                                                                             
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
@@ -3069,7 +3069,7 @@ CUL_HM_parseCommon(@){
 	}
 	readingsSingleUpdate($chnhash,"CommandAccepted",$success,1);
     CUL_HM_ProcessCmdStack($shash) 
-	      if(CUL_HM_Id($shash->{IODev}) eq $dhash->{DEF}); # Continue #General - uninit?
+	      if($dhash->{DEF} && (CUL_HM_Id($shash->{IODev}) eq $dhash->{DEF}));
 	return $reply;
   }
   elsif($msgType eq "10"){
