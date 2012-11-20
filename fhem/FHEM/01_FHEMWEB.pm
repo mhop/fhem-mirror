@@ -10,7 +10,6 @@ use HttpUtils;
 #########################
 # Forward declaration
 sub FW_IconURL($);
-sub FW_fC($@);
 sub FW_answerCall($);
 sub FW_calcWeblink($$);
 sub FW_dev2image($);
@@ -100,7 +99,6 @@ my $FW_longpoll;   # Set if longpoll (i.e. server notification) is active
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
-my $FW_cors;       # Cross-origin resource sharing
 my $FW_headercors; # 
 my $FW_chash;      # client fhem hash
 #my $FW_encoding="ISO-8859-1";
@@ -128,7 +126,7 @@ FHEMWEB_Initialize($)
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
                      "stylesheetPrefix iconpath hiddenroom HTTPS longpoll:1,0 ".
-                     "redirectCmds:0,1 reverseLogs:0,1 allowfrom ";
+                     "redirectCmds:0,1 reverseLogs:0,1 allowfrom CORS:0,1";
 
   ###############
   # Initialize internal structures
@@ -247,9 +245,9 @@ FW_Read($)
   @FW_httpheader = split("[\r\n]", $hash->{BUF});
 
   my @origin = grep /Origin/, @FW_httpheader;
-  $FW_headercors = ($FW_cors ?
+  $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
               "Access-Control-Allow-".$origin[0]."\r\n".
-              "Access-Control-Allow-Methods: GET\r\n".
+              "Access-Control-Allow-Methods: GET OPTIONS\r\n".
               "Access-Control-Allow-Headers: Origin, Authorization, Accept\r\n".
               "Access-Control-Allow-Credentials: true\r\n".
               "Access-Control-Max-Age:86400\r\n" : "");
@@ -633,7 +631,6 @@ FW_digestCgi($)
   $FW_XHR = undef;
   $FW_jsonp = undef;
   $FW_inform = undef;
-  $FW_cors = undef;
 
   %FW_webArgs = ();
   $arg =~ s,^[?/],,;
@@ -658,7 +655,6 @@ FW_digestCgi($)
     if($p eq "XHR")          { $FW_XHR = 1; }
     if($p eq "jsonp")        { $FW_jsonp = $v; }
     if($p eq "inform")       { $FW_inform = $v; }
-    if($p eq "CORS")         { $FW_cors = 1; }
 
   }
   $cmd.=" $dev{$c}" if(defined($dev{$c}));
@@ -2842,6 +2838,13 @@ FW_Set($@)
         Note: enabling this attribute will prevent FHEMWEB from streaming
         logfiles, resulting in a considerably increased memory consumption
         (about 6 times the size of the file on the disk).
+        </li>
+        <br>
+
+    <a name="CORS"></a>
+    <li>CORS<br>
+        If set to 1, FHEMWEB will supply a "Cross origin resource sharing"
+        header, see the wikipedia for details.
         </li>
         <br>
 

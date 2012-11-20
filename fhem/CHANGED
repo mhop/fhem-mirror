@@ -1,26 +1,33 @@
 - SVN
   - feature: new Module 59_HCS.pm for monitoring heating valves (FHT, HM-CC-VD)
-             to contral a central heating unit. I thank Benjamin for his support! (M. Fischer)
-  - feature: new Module 72_FB_CALLMONITOR for receiving telephone call events (Markus)
+    to contral a central heating unit. I thank Benjamin for his support! (M.
+    Fischer)
+  - feature: new Module 72_FB_CALLMONITOR for receiving telephone call events
+    (Markus)
   - feature: new Module 71_YAMAHA_AVR.pm for controlling Yamaha AV receivers
-             over network (by Markus)
+    over network (by Markus)
   - feature: optional second parameter to fhem() to make it silent
   - feature: autoloading commands, XmlList/etc renamed from 99 to 98.
   - feature: FHEMWEB returns external files in chunks to save memory
-  - feature: commandref.html splitted: documentation is now appended to the modules.
+  - feature: commandref.html splitted: documentation is now appended to the
+    modules.
   - change: introduced readingsBulkUpdate, readingsSingleUpdate
   - change: added GPLv2 licensing information
+  - bugfix: FHEMWEB slider with min > 0
+  - change: FHEMWEB CORS moved to options
 
 - 2012-10-28 (5.3)
-  - feature: added functions trim, ltrim, rtrim, UntoggleDirect, UntoggleIndirect
+  - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
+    UntoggleIndirect
   - feature: added functions FB_mail, FB_WLANswitch
-  - rework:  CUL_HM reworks with respect to protocol. 
-             additions for several devices and commands
+  - rework:  CUL_HM reworks with respect to protocol.  additions for several
+    devices and commands
   - feature: rfmode supports to listen to MAX if fw>1.46, 00_CUL.pm (Jens)
   - feature: Status and length on cmdStack in webinterface for 10_CUL_HM
   - feature: devicepair in 10_CUL_HM.pm supports unset
   - feature: devicepair for single Button in 10_CUL_HM.pm (by MartinP)
-  - feature: new Modules 75_MSG.pm, 76_MSGFile.pm and 76_MSGMail.pm (by Rüdiger)
+  - feature: new Modules 75_MSG.pm, 76_MSGFile.pm and 76_MSGMail.pm (by
+    Rüdiger)
   - feature: new Module 59_Twilight.pm to calculate current daylight
   - feature: internal NotifyOrderPrefix: 98_average.pm is more straightforward
   - feature: the usb command tries to flash unflashed CULs on linux
@@ -30,7 +37,7 @@
   - feature: additional groups from /etc/groups are applied (Christopher)
   - feature: updatefhem backup is using tar+gzip now
   - feature: EIB: introduce Get, interpret received values upon defined model
-             (by datapoint types) (Maz)
+    (by datapoint types) (Maz)
   - feature: NetIO230B module by Andy
   - feature: Retaining configfile comments (not within a define statement)
   - feature: EnOcean PM101 by Ignaz
@@ -41,7 +48,8 @@
   - feature: FHEMWEB icons (by Joerg)
   - feature: FHEMWEB console (same as inform timer)
   - feature: remove dependency on Google::Weather, major rewrite (Boris)
-  - feature: started experimental interface implementation (fhem API v2) (Boris)
+  - feature: started experimental interface implementation (fhem API v2)
+    (Boris)
   - feature: sleep issued in at/notify/etc is not blocking fhem anymore
   - feature: dummy got a setList attribute
   - feature: new module 02_RSS.pm 
@@ -49,38 +57,38 @@
   - feature: FHEMWEB attribute values via dropdown, slider for dimmer
   - feature: new attribute group for FHEMWEB (Boris)
   - change:  11_FHT.pm, 50_WS300.pm, 59_Weather.pm migrated to readingsUpdate
-             mechanism (Boris)
-  - change:  59_Weather.pm migrated from Google to Yahoo Weather API (Boris)             
+    mechanism (Boris)
+  - change:  59_Weather.pm migrated from Google to Yahoo Weather API (Boris)
   - change:  updatefhem modifications to support a clean install of fhem and
-             pgm2 installation, see commandref.html (M. Fischer)
+    pgm2 installation, see commandref.html (M. Fischer)
   - change:  FHEMWEB support for the new www/pgm2 directroy added (M. Fischer)
-  - change:  Makefile support for for the new www/pgm2 directroy and new targets
-             backup and uninstall added. More verbose output. (M. Fischer)
+  - change:  Makefile support for for the new www/pgm2 directroy and new
+    targets backup and uninstall added. More verbose output. (M. Fischer)
   - change:  backup separated from updatefhem to a new command (M. Fischer)
-  - feature: new command backup added (M. Fischer)
-             new global attribute <backupsymlink> added
-             new global attribute <backupcmd> added
-             new global attribute <backup_before_update> added
+  - feature: new command backup added (M. Fischer) new global attribute
+    <backupsymlink> added new global attribute <backupcmd> added new global
+    attribute <backup_before_update> added
   - feature: new module 57_Calendar.pm (Boris)
-  - feature: new parameter <changed> for updatefhem added (M. Fischer)
-             new global attribute <exclude_from_update> added (M. Fischer)
+  - feature: new parameter <changed> for updatefhem added (M. Fischer) new
+    global attribute <exclude_from_update> added (M. Fischer)
   - feature: optional telnet password added / telnet port is optional
   - feature: holiday returns all matches, not only the first.
   - change:  CULflash separated from updatefhem to a new module (M. Fischer)
   - feature: time and internet helper routines added to fhem.pl (Boris)
   - change:  separating common functions used by the FHEM modules into
-             *Utils.pm files from fhem.pl
+    *Utils.pm files from fhem.pl
   - feature: portpassword and basicAuth may use evaluated functions
   - feature: motd with SecurityCheck added
   - feature: telnet module added, attr global port moved. allowfrom changed.
-  - feature: FhemUtils/release.pm for the new update process added. (M. Fischer)
+  - feature: FhemUtils/release.pm for the new update process added. (M.
+    Fischer)
   - bugfix:  correct one-time relative at commands after reboot
   - feature: ZWave added
   - feature: module IPCAM added. (M. Fischer)
   - feature: module HTTPSRV added (Boris)
   - feature: module FLOORPLAN added (Uli Maass)
   - bugfix:  FHEMWEB: weblink with group attribute is shown together with other
-             elements
+    elements
   - feature: FHEMWEB: timepicker added
   - feature: FHEMWEB: support for modul specific icons added (M. Fischer)
 
