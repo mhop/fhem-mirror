@@ -63,7 +63,7 @@ Slider(slider, min, stp, max, curr, cmd)
   {
     maxX = slider.offsetWidth-sh.offsetWidth;
     if(curr) {
-      offX += curr*maxX/(max-min);
+      offX += (curr-min)*maxX/(max-min);
       sh.innerHTML = curr;
       sh.setAttribute('style', 'left:'+offX+'px;');
     }
