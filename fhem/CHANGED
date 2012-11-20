@@ -15,6 +15,7 @@
   - change: added GPLv2 licensing information
   - bugfix: FHEMWEB slider with min > 0
   - change: FHEMWEB CORS moved to options
+  - change: FHEMWEB closing old TCP connections
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
