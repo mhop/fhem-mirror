@@ -136,6 +136,7 @@ FHEMWEB_Initialize($)
 
   addToAttrList("webCmd");
   addToAttrList("icon");
+  InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
 }
 
 #####################################
@@ -244,6 +245,7 @@ FW_Read($)
 
   @FW_httpheader = split("[\r\n]", $hash->{BUF});
 
+
   my @origin = grep /Origin/, @FW_httpheader;
   $FW_headercors = (AttrVal($FW_wname, "CORS", 0) ?
               "Access-Control-Allow-".$origin[0]."\r\n".
@@ -292,9 +294,11 @@ FW_Read($)
   }
   #############################
   
+  my $now = time();
   @FW_enc = grep /Accept-Encoding/, @FW_httpheader;
   my ($mode, $arg, $method) = split(" ", $FW_httpheader[0]);
   $hash->{BUF} = "";
+  $hash->{LASTACCESS} = $now;
 
   $arg = "" if(!defined($arg));
   Log $ll, "HTTP $name GET $arg";
@@ -319,7 +323,7 @@ FW_Read($)
 
   my $length = length($FW_RET);
   my $expires = ($cacheable?
-                        ("Expires: ".localtime(time()+900)." GMT\r\n") : "");
+                        ("Expires: ".localtime($now+900)." GMT\r\n") : "");
   Log $ll, "$arg / RL: $length / $FW_RETTYPE / $compressed / $expires";
   print $c "HTTP/1.1 200 OK\r\n",
            "Content-Length: $length\r\n",
@@ -2519,7 +2523,6 @@ FW_Get($@)
 
 
 #####################################
-
 sub
 FW_Set($@)
 {
@@ -2534,6 +2537,20 @@ FW_Set($@)
 }
 
 #####################################
+sub
+FW_closeOldClients()
+{
+  my $now = time();
+  foreach my $dev (keys %defs) {
+    next if(!$defs{$dev}{TYPE} || $defs{$dev}{TYPE} ne "FHEMWEB" ||
+            !$defs{$dev}{LASTACCESS} || $defs{$dev}{inform} ||
+            ($now - $defs{$dev}{LASTACCESS}) < 60);
+    Log 4, "Closing connection $dev";
+    FW_Undef($defs{$dev}, "");
+    delete $defs{$dev};
+  }
+  InternalTimer($now+60, "FW_closeOldClients", 0, 0);
+}
 
 1;
 
