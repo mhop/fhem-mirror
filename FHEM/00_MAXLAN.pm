@@ -428,11 +428,16 @@ MAXLAN_Parse($$)
   }elsif($cmd eq "C"){#Configuration
     return if(@args < 2);
     my $bindata = decode_base64($args[1]);
+
+    return "Invalid C: response, not enough data" if(length($bindata) < 18);
+
+    #Parse the first 18 bytes, those are send for every device
     my ($len,$addr,$devicetype,$groupid,$firmware,$testresult,$serial) = unpack("CH6CCCCa[10]", $bindata);
+    $len = $len+1; #The len field itself was not counted
 
     Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid", {RAWMSG => $rmsg});
 
-    return "Invalid C: response, len does not match" if($len != length($bindata)-1);
+    return "Invalid C: response, len does not match" if($len != length($bindata));
     #devicetype: Cube = 0, HeatingThermostat = 1, HeatingThermostatPlus = 2, WallMountedThermostat = 3, ShutterContact = 4, PushButton = 5
     #Seems that ShutterContact does not have any configdata
     if($devicetype == 0){#Cube
@@ -453,6 +458,7 @@ MAXLAN_Parse($$)
       Log $ll5, "len $len, addr $addr, devicetype $devicetype, groupid $groupid, serial $serial, comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
       Dispatch($hash, "MAX,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
     }elsif($devicetype == 4){#ShutterContact TODO
+      Log 2, "ShutterContact send some configuration, but none was expected" if($len > 18);
       Log $ll5, "len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
     }else{ #TODO
       Log $ll5, "Got configdata for unimplemented devicetype $devicetype: len $len, addr $addr, devicetype $devicetype, groupid $groupid, serial $serial";
