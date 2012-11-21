@@ -22,6 +22,7 @@ sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeImage($);
 sub FW_makeTable($$@);
+sub FW_makeTableFromArray($@);
 sub FW_pH(@);
 sub FW_pHPlain(@);
 sub FW_pO(@);
@@ -797,7 +798,8 @@ FW_doDetail($)
   FW_pO "<form method=\"get\" action=\"$FW_ME\">";
   FW_pO FW_hidden("detail", $d);
 
-  my $t = $defs{$d}{TYPE};
+  my $h = $defs{$d};
+  my $t = $h->{TYPE};
   FW_pO "<div id=\"content\">";
 
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
@@ -814,9 +816,9 @@ FW_doDetail($)
   }
   FW_pO "<table><tr><td>";
   FW_makeSelect($d, "set", getAllSets($d), "set");
-  FW_makeTable($d, $defs{$d});
-  FW_pO "Readings" if($defs{$d}{READINGS});
-  FW_makeTable($d, $defs{$d}{READINGS});
+  FW_makeTable($d, $h);
+  FW_pO "Readings" if($h->{READINGS});
+  FW_makeTable($d, $h->{READINGS});
 
   my $attrList = getAllAttr($d);
   my $roomList = join(",", sort grep !/ /, keys %FW_rooms);
@@ -832,6 +834,18 @@ FW_doDetail($)
     FW_pO "</table>";
   }
 
+  ## dependent objects
+  my @dob;  # dependent objects - triggered by current device
+  foreach my $dn (sort keys %defs) { 
+    next if($dn eq $d);
+    my $dh = $defs{$dn};
+    if(($dh->{DEF} && $dh->{DEF} =~ m/\b$d\b/) ||
+       ($h->{DEF}  && $h->{DEF}  =~ m/\b$dn\b/)) {
+      push(@dob, $dn);
+    }
+  }
+  FW_makeTableFromArray("Probably associated with", @dob);
+
   FW_pO "</td></tr></table>";
 
   if($t eq "weblink") {
@@ -845,7 +859,26 @@ FW_doDetail($)
   FW_pO "</div>";
   FW_pO "</form>";
 
+}
 
+##############################
+sub
+FW_makeTableFromArray($@) {
+  my ($txt,@obj) = @_;
+  if (@obj>0) {
+    my $row=1;
+    FW_pO "<br>" if($FW_RET !~ m/<br>$/);
+    FW_pO "$txt";
+    FW_pO '<table class="block wide">';
+    foreach (sort @obj) {
+      pF "<tr class=\"%s\"><td>", ($row&1)?"odd":"even";
+      $row++;
+      FW_pH "detail=$_", $_;
+      FW_pO "</td><td>$defs{$_}{TYPE}</td><td> </td>";
+      FW_pO "</tr>";
+    }
+    FW_pO "</table><br>";
+  }
 }
 
 ##############
