@@ -18,6 +18,7 @@ sub MAXLAN_SimpleWrite(@);
 sub MAXLAN_Poll($);
 sub MAXLAN_SendDeviceCmd($$);
 sub MAXLAN_RequestConfiguration($$);
+sub MAXLAN_RemoveDevice($$);
 
 my %device_types = (
   0 => "Cube",
@@ -90,6 +91,7 @@ MAXLAN_Define($$)
   $hash->{INTERVAL} = @a > 3 ? $a[3] : $defaultPollInterval;
   #This interface is shared with 14_CUL_MAX.pm
   $hash->{SendDeviceCmd} = \&MAXLAN_SendDeviceCmd;
+  $hash->{RemoveDevice} = \&MAXLAN_RemoveDevice;
 
 
   MAXLAN_Connect($hash);
@@ -429,6 +431,8 @@ MAXLAN_Parse($$)
     my ($len,$addr,$devicetype,$groupid,$firmware,$testresult,$serial) = unpack("CH6CCCCa[10]", $bindata);
 
     Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid", {RAWMSG => $rmsg});
+
+    return "Invalid C: response, len does not match" if($len != length($bindata)-1);
     #devicetype: Cube = 0, HeatingThermostat = 1, HeatingThermostatPlus = 2, WallMountedThermostat = 3, ShutterContact = 4, PushButton = 5
     #Seems that ShutterContact does not have any configdata
     if($devicetype == 0){#Cube
@@ -635,12 +639,21 @@ MAXLAN_SendDeviceCmd($$)
   return MAXLAN_ExpectAnswer($hash, "S:");
 }
 
-#Resets the cube (what does that acutally do? Factory reset?)
+#Resets the cube, i.e. does a factory reset. All pairings will be lost.
 sub
 MAXLAN_RequestReset($)
 {
   my $hash = shift;
   MAXLAN_Write($hash,"a:");
+  MAXLAN_ExpectAnswer($hash, "A:");
+}
+
+#Remove the device from the cube, i.e. deletes the pairing
+sub
+MAXLAN_RemoveDevice($$)
+{
+  my ($hash,$addr) = @_;
+  MAXLAN_Write($hash,"t:1,1,".encode_base64(pack("H6",$addr),""));
   MAXLAN_ExpectAnswer($hash, "A:");
 }
 
