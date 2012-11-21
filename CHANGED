@@ -16,7 +16,8 @@
   - bugfix: FHEMWEB slider with min > 0
   - change: FHEMWEB CORS moved to options
   - change: FHEMWEB closing old TCP connections
-  - change: FHEMWEB added "Associated with" to detail-screen
+  - change: FHEMWEB added "Associated with" to detail-screen (Uli)
+  - change: FHEMWEB added ETag headers (Matthias)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
