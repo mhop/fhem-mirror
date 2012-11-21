@@ -159,7 +159,7 @@ MAX_Set($@)
   }else{
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
-      my $templist = join(",",map { $_/2 }  (9..61));
+      my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
       return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,$templist ecoTemperature comfortTemperature temperatureOffset maximumTemperature minimumTemperature windowOpenTemperature windowOpenDuration groupid removeDevice";
     } else {
       return "Unknown argument $setting, choose one of groupid removeDevice";
