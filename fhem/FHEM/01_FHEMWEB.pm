@@ -1236,18 +1236,36 @@ sub
 FW_returnFileAsStream($$$$$)
 {
   my ($path, $suffix, $type, $doEsc, $cacheable) = @_;
+
+  #Check for If-None-Match header (ETag)
+  my @if_none_match_lines = grep /If-None-Match/, @FW_httpheader;
+  my $if_none_match = undef;
+  if(@if_none_match_lines) {
+    $if_none_match = $if_none_match_lines[0];
+    $if_none_match =~ s/If-None-Match: \"(.*)\"/$1/;
+  }
+
+  my $c = $FW_chash->{CD};
+  my $etag = (stat($path))[9]; #mtime
+
+  if(defined($etag) and defined($if_none_match) and $etag eq $if_none_match) {
+    print $c "HTTP/1.1 304 Not Modified\r\n",
+      $FW_headercors, "\r\n";
+    return -1;
+  }
+
   if(!open(FH, $path)) {
     FW_pO "<div id=\"content\">$path: $!</div>";
     return 0;
   }
   binmode(FH) if($type !~ m/text/); # necessary for Windows
 
-  my $c = $FW_chash->{CD};
+  $etag = defined($etag) ? "ETag: \"$etag\"\r\n" : "";
   my $expires = $cacheable ? ("Expires: ".localtime(time()+900)." GMT\r\n"): "";
   my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
   print $c "HTTP/1.1 200 OK\r\n",
-           $compr, $expires, $FW_headercors,
+           $compr, $expires, $FW_headercors, $etag,
            "Transfer-Encoding: chunked\r\n",
            "Content-Type: $type; charset=$FW_encoding\r\n\r\n";
 
