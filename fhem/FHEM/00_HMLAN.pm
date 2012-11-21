@@ -367,11 +367,18 @@ HMLAN_SimpleWrite(@)
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
   
+  # Currently it does  not seem to be necessary to wait Thus this code is inhibit for now
+  my $id = (length($msg)>51)?substr($msg,46,6):"";
+  if ($id){
+    my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
+    if ($DevDelay > 0.01){# wait less then 10 ms will not work
+      $DevDelay = ((int($DevDelay*100))%100)/100;# security - wait no more then 1 sec
+	  select(undef, undef, undef, $DevDelay);
+    }
+  }
   if ($debug){
-    Log $ll5, 'HMLAN_Send:         S:'.
-                                          substr($msg,0,9).
-   
-                              ' stat:  '.substr($msg,10,2).
+    Log $ll5, 'HMLAN_Send:         S:'   .substr($msg,0,9).
+                              ' stat:  ' .substr($msg,10,2).
                               ' t:'      .substr($msg,13,8).
                               ' d:'      .substr($msg,22,2).
                               ' r:'      .substr($msg,25,8).  
@@ -388,17 +395,6 @@ HMLAN_SimpleWrite(@)
   }
   
   $msg .= "\r\n" unless($nonl);
-  
-  # Currently it does  not seem to be necessary to wait Thus this code is inhibit for now
-  my $id = (length($msg)>51)?substr($msg,46,6):"";
-  if ($id){
-    my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
-    if ($DevDelay > 0.01){# wait less then 10 ms will not work
-      $DevDelay = ((int($DevDelay*100))%100)/100;# security - wait no more then 1 sec
-	  select(undef, undef, undef, $DevDelay);
-    }
-  }
-  
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 }
 
