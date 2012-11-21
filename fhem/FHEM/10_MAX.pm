@@ -95,8 +95,10 @@ MAX_Set($@)
       $ctrlmode = 0; #auto
       #TODO: auto mode with temperature is also possible
     } elsif($args[0] eq "eco") {
+      return "No ecoTemperature defined" if(!exists($hash->{ecoTemperature}));
       $temperature = $hash->{ecoTemperature};
     } elsif($args[0] eq "comfort") {
+      return "No comfortTemperature defined" if(!exists($hash->{comfortTemperature}));
       $temperature = $hash->{comfortTemperature};
     } elsif($args[0] eq "on") {
       $temperature = 30.5;
@@ -152,13 +154,15 @@ MAX_Set($@)
     my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,17,0x00,0x00,0x00,$hash->{addr},0x00,
                                               $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+  }elsif($setting eq "removeDevice") {
+    return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
   }else{
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templist = join(",",map { $_/2 }  (9..61));
-      return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,$templist ecoTemperature comfortTemperature temperatureOffset maximumTemperature minimumTemperature windowOpenTemperature windowOpenDuration groupid";
+      return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,$templist ecoTemperature comfortTemperature temperatureOffset maximumTemperature minimumTemperature windowOpenTemperature windowOpenDuration groupid removeDevice";
     } else {
-      return "Unknown argument $setting";
+      return "Unknown argument $setting, choose one of groupid removeDevice";
     }
   }
 }
@@ -326,6 +330,8 @@ MAX_Parse($$)
     <li>groupid &lt;id&gt;<br>
       For devices of type HeatingThermostat only.
       Writes the given group id the device's memory. It is usually not necessary to change this.</li>
+    <li>removeDevice<br>
+      Removes the device from the cube, i.e. deletes the pairing.</li>
     <li>ecoTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given eco temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
     <li>comfortTemperature &lt;value&gt;<br>
