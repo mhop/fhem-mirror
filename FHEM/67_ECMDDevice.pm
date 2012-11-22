@@ -402,8 +402,19 @@ ECMDDevice_Define($$)
         The set command is evaluated as follows: <code>%pinmask</code>
         is replaced by <code>8</code> to yield
         <code>"io set ddr 2 ff\nioset port 2 08\nwait 1000\nio set port 2 00"</code> after macro substitution. Perl
-        evaluates this to a literal string which is send as a plain ethersex command to the AVR-NET-IO line by line.
-        <br>
+        evaluates this to a literal string. This string is split into lines (without trailing newline characters)
+        <code>
+        <ul>
+        <li>io set ddr 2 ff</li>
+        <li>ioset port 2 08</li>
+        <li>wait 1000</li>
+        <li>io set port 2 00</li>
+        </ul>
+        </code>
+        These lines are sent as a plain ethersex commands to the AVR-NET-IO one by one. Each line is terminated with
+        a newline character unless <a href="#ECMDattr">the <code>nonl</code> attribute of the ECMDDevice</a> is set. After
+        each line the answer from the ECMDDevice is read back. They are concatenated with newlines and returned
+        for further processing, e.g. by the <code>postproc</code> command.      
 	For any of the four plain ethersex commands, the AVR-NET-IO returns the string <code>OK</code>. They are
 	concatenated and separated by line breaks (\n). The postprocessor takes the result from <code>$_</code>,
 	substitutes it by the string <code>success</code> if it is <code>OK\nOK\nOK\nOK</code>, and then either
