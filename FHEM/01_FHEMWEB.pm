@@ -1037,7 +1037,7 @@ FW_showRoom()
   return if(!$FW_room);
 
   
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO "<form method=\"get\" action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\">";
   FW_pO "<table>";  # Need for equal width of subtables
 
