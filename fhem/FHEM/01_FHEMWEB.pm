@@ -479,9 +479,10 @@ FW_answerCall($)
     foreach my $k (sort keys %{$data{FWEXT}}) {
       if($arg =~ m/^$k/) {
         no strict "refs";
+        #Returns undef if it already sent a HTTP header
         ($FW_RETTYPE, $FW_RET) = &{$data{FWEXT}{$k}{FUNC}}($arg);
         use strict "refs";
-        return 0;
+        return defined($FW_RETTYPE) ? 0 : -1;
       }
     }
   }
