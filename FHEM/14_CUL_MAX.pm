@@ -1,5 +1,6 @@
 ##############################################
-#Written by Matthias Gehre, M.Gehre@gmx.de, 2012
+# $Id$
+# Written by Matthias Gehre, M.Gehre@gmx.de, 2012
 package main;
 
 use strict;
