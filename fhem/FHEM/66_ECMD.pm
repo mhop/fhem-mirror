@@ -46,7 +46,7 @@ ECMD_Initialize($)
   $hash->{GetFn}   = "ECMD_Get";
   $hash->{SetFn}   = "ECMD_Set";
   $hash->{AttrFn}  = "ECMD_Attr";
-  $hash->{AttrList}= "classdefs loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "classdefs nonl loglevel:0,1,2,3,4,5";
 }
 
 #####################################
@@ -422,9 +422,10 @@ ECMD_Get($@)
 
   if($cmd eq "raw") {
         return "get raw needs an argument" if(@a< 3);
+        my $nonl= AttrVal($name, "nonl", 0);
         my $ecmd= join " ", @args;
         Log 5, $ecmd;
-        ECMD_SimpleWrite($hash, $ecmd);
+        ECMD_SimpleWrite($hash, $ecmd, $nonl);
         ($err, $msg) = ECMD_ReadAnswer($hash, "raw");
         return $err if($err);
   }  else {
@@ -496,7 +497,11 @@ ECMD_EvalClassDef($$$)
                 Log 5, "$name: evaluating >$line<";
                 # split line into command and definition
                 my ($cmd, $def)= split("[ \t]+", $line, 2);
-                if($cmd eq "params") {
+                if($cmd eq "nonl") {
+                        Log 5, "$name: no newline";
+                        $hash->{fhem}{classDefs}{$classname}{nonl}= 1;
+                }
+                elsif($cmd eq "params") {
                         Log 5, "$name: parameters are $def";
                         $hash->{fhem}{classDefs}{$classname}{params}= $def;
                 } elsif($cmd eq "set" || $cmd eq "get") {
@@ -618,9 +623,10 @@ ECMD_Write($$)
   my $answer;
   my @r;
   my @ecmds= split "\n", $msg;
+  my $nonl= AttrVal($hash->{NAME}, "nonl", 0);
   foreach my $ecmd (@ecmds) {
         Log 5, "$hash->{NAME} sending $ecmd";
-        ECMD_SimpleWrite($hash, $ecmd);
+        ECMD_SimpleWrite($hash, $ecmd, $nonl);
         $answer= ECMD_ReadAnswer($hash, "$ecmd");
         push @r, $answer;
         Log 5, $answer;
@@ -727,6 +733,9 @@ ECMD_Write($$)
     <li>classdefs<br>A colon-separated list of &lt;classname&gt;=&lt;filename&gt;.
     The list is automatically updated if a class definition is added. You can
     directly set the attribute.</li>
+    <li>nonl<br>A newline (\n) is automatically appended to every command string sent to the device
+    unless this attribute is set. Please note that newlines (\n) in a command string are interpreted
+    as separators to split the command string into several commands and are never literally sent.</li>
   </ul>
   <br><br>
 
@@ -809,7 +818,7 @@ ECMD_Write($$)
       This is to avoid undesired side effects from e.g. doubling of semicolons.<br><br>-->
       The rules outlined in the <a href="#perl">documentation of perl specials</a>
       for the <code>&lt;perl command&gt</code> in the postprocessor definitions apply.
-      <b>Note:</b> Beware of undesired side effects from e.g. doubling of semicolon!
+      <b>Note:</b> Beware of undesired side effects from e.g. doubling of semicolons!
 
       The <code>perl command</code> acts on <code>$_</code>. The result of the perl command is the
       final result of the get or set command.
