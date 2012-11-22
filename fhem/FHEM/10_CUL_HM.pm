@@ -602,7 +602,7 @@ CUL_HM_Parse($$)
       push @event, "motor:opening" if(($err&0x30) == 0x10);
       push @event, "motor:closing" if(($err&0x30) == 0x20);
       push @event, "motor:stop"    if(($err&0x30) == 0x00);
-	  push @event, ""; # just in case - mark message as passed
+	  push @event, ""; # just in case - mark message as confirmed
     }
 
     # CMD:A010 SRC:13F251 DST:5D24C9 0401 00000000 05 09:00 0A:07 00:00
@@ -1008,10 +1008,11 @@ CUL_HM_Parse($$)
     ; # no one wants the message
   }
 
-  #------------ parse if FHEM is destination or virtual actor  ----------------
-  if($msgType =~ m/^4./ && $p =~ m/^(..)/) { #Push Button event
-    my ($recChn) = ($1);# button number/event count
-    if (AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
+  #------------ parse if FHEM or virtual actor is destination   ---------------
+
+  if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
+    if($msgType =~ m/^4./ && $p =~ m/^(..)/) { #Push Button event
+      my ($recChn) = ($1);# button number/event count
 	  my $recId = $src.$recChn;
 	  foreach my $dChId (CUL_HM_getAssChnIds($dname)){
 	    next if (!$modules{CUL_HM}{defptr}{$dChId});
@@ -1026,13 +1027,26 @@ CUL_HM_Parse($$)
 			CUL_HM_UpdtReadBulk($dChHash,1,"virtActState:".$state,
 			                    "virtActTrigger:".CUL_HM_id2Name($recId));
             CUL_HM_SndCmd($dChHash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
-                  $state."00");
+                  (($state eq "ON")?"C8":"00")."00");
 	      }
         }
 	  }
 	}
-	elsif($id eq $dst){# hist: send an ack - should not be used in reality
-	                   # fhem CUL shall ack a button press
+	elsif($msgType eq "58" && $p =~ m/^(..)(..)/) {# climate event
+      my ($d1,$vp) =($1,hex($2)); # adjust_command[0..4] adj_data[0..250]
+      $vp = int($vp/2.56+0.5);    # valve position in %
+	  my $chnHash = $modules{CUL_HM}{defptr}{$dst."01"};
+ 	  CUL_HM_UpdtReadBulk($chnHash,1,"ValvePosition:$vp%",
+	                               "ValveAdjCmd:".$d1);
+      CUL_HM_SndCmd($chnHash,$msgcnt."8002".$dst.$src.'0101'.
+	                       sprintf("%02X",$vp*2)."0000");#$vp, $err,$??
+	}
+  }
+  elsif($id eq $dst){# if fhem is destination check if we need to react
+    if($msgType =~ m/^4./ && $p =~ m/^(..)/ &&  #Push Button event
+	   (hex($msgFlag)&0x20)){ 	#response required Flag
+      my ($recChn) = ($1);# button number/event count
+	            # fhem CUL shall ack a button press
       CUL_HM_SndCmd($shash, $msgcnt."8002".$dst.$src."0101".
                 ((hex($recChn)&1)?"C8":"00")."00");#Actor simulation
       $sendAck = "";
@@ -1333,7 +1347,8 @@ CUL_HM_TCtempReadings($$)
 {
   my ($reg5,$reg6)=@_;
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-  my $tempRegs = substr($reg5,12*5-1).$reg6;
+  $reg5 =~ s/.* 0B:/ 0B:/;
+  my $tempRegs = $reg5.$reg6;
   $tempRegs =~ s/ 00:00/ /g;
   $tempRegs =~ s/ ..:/,/g;
   $tempRegs =~ s/^,//;
@@ -1447,7 +1462,7 @@ CUL_HM_Get($@)
 		  $peerN = "      " if ($peer  eq "00000000");
 		  push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
 		          $regL,$peerN,$regName,$regVal)
-		        if ($regVal ne 'unknown');
+		        if ($regVal ne 'invalid');
 		}
 	  }
 	  my $addInfo = ""; #todo - find a generic way to handle special devices
@@ -1535,9 +1550,10 @@ my %culHmSubTypeSets = (
   pushButton =>										
         { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
   virtual => 
-        { raw      => "data ...",
+        { raw        => "data ...",
 		  devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
 		  press      => "[long|short]...",
+ #         valvePos   => "position",#acting as TC
 		  virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
         { test => "", "alarmOn"=>"", "alarmOff"=>"", 
@@ -2169,9 +2185,18 @@ CUL_HM_Set($@)
 	readingsSingleUpdate($hash,$vn,$msg,1);
   } 
   elsif($cmd eq "valvePos") { ##################
-    my $vp = ($a[2]+0.5)*2.56;
-    my $d1 = 0;
-    CUL_HM_PushCmdStack($hash,sprintf("++A258%s%s%02X%02X",$id,$dst,$d1,$vp));
+	return "only number <= 100  or 'off' allowed" 
+	   if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <100 ));
+	RemoveInternalTimer("valvePos:$dst");# remove responsePending timer
+    if ($a[2] eq "off"){
+	  $state = "ValveAdjust:stopped";
+	}
+	else {
+	  my $vp = $a[2];
+	  readingsSingleUpdate($hash,"valvePosTC","$vp%",0);
+	  CUL_HM_valvePosUpdt("valvePos:$dst$chn");
+	  $state = "ValveAdjust:$vp%";
+	}
   } 
   elsif($cmd eq "matic") { ##################################### 
     # Trigger pre-programmed action in the winmatic. These actions must be
@@ -2356,6 +2381,25 @@ CUL_HM_Set($@)
 
 ###################################
 sub
+CUL_HM_valvePosUpdt(@)
+{# update valve position periodically to please valve
+  my($in ) = @_;
+  my(undef,$vId) = split(':',$in);
+  my $hash = CUL_HM_id2Hash($vId);
+  my $name = $hash->{NAME};
+  my $ioId = CUL_HM_Id($hash->{IODev});
+  my $vDevId = substr($vId,0,6);
+  my $vp = ReadingsVal($name,"valvePosTC","15 %");
+  $vp =~ s/%//;
+  $vp *=2;
+  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
+    next if (length($peer) != 8);
+    $peer = substr($peer,0,6);	
+    CUL_HM_PushCmdStack($hash,sprintf("++A258%s%s00%02X",$vDevId,$peer,$vp));
+  }
+  InternalTimer(gettimeofday()+150,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+}
+sub
 CUL_HM_infoUpdtDevData($$$){
   my($name,$hash,$p) = @_;
   my($fw,$mId,$serNo,$stc,$devInfo) = ($1,$2,$3,$4,$5) 
@@ -2535,7 +2579,8 @@ CUL_HM_responseSetup($$)
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
   	  $chnhash = $hash if (!$chnhash);
   	  $chnhash->{READINGS}{peerList}{VAL}="";#empty old list
-	  $attr{$hash->{NAME}}{peerIDs} = '';
+	  $attr{$chnhash->{NAME}}{peerIDs} = '';
+	  $attr{$chnhash->{NAME}}{peerList} = 'cleared';
 	  return;
     }
     elsif($subType eq "04"){ #RegisterRead-------
@@ -3091,7 +3136,7 @@ CUL_HM_parseCommon(@){
 		$chnhash = $shash if (!$chnhash);
 	    my $chnNname = $chnhash->{NAME};
 		my @peers = substr($p,2,) =~ /(.{8})/g;
-		foreach my $peer(@peers){		  
+		foreach my $peer(@peers){	
     	  CUL_HM_ID2PeerList ($chnNname,$peer,1) if ($peer !~ m/^000000../);
 		}
 		
@@ -3264,7 +3309,7 @@ CUL_HM_getRegFromStore($$$$)
     if (!$dRead && $hash->{READINGS}{$regLN}) {
       $dRead = $1 if($hash->{READINGS}{$regLN}{VAL} =~ m/$addrS:(..)/);
     }
-	return "invalid" if (!$dRead);
+	return "invalid" if (!defined($dRead));
 
 	$data = ($data<< 8)+hex($dRead);
 	$addr++;
