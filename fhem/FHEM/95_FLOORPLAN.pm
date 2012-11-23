@@ -331,7 +331,7 @@ FP_htmlHeader($) {
   FW_pO  "<link href=\"$FW_ME/css/$css\" rel=\"stylesheet\"/>";
 
   #set sripts
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/svg.js\"></script>"
+  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
 #  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
