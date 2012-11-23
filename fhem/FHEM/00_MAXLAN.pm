@@ -499,41 +499,43 @@ MAXLAN_Parse($$)
       Log 5, "bindata: ".unpack("H*",substr($bindata,0,$len+1)); #+1 because the len field is not counted
       Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, rferror $rferror1, errframetype $errframetype, unkbit ($unkbit1,$unkbit2,$unkbit3,$unkbit4)";
 
-      my $shash = $modules{MAX}{defptr}{$addr};
+      if($valid) {
+        my $shash = $modules{MAX}{defptr}{$addr};
 
-      if(!$shash) {
-        Log 2, "Got List response for undefined device with addr $addr";
-      }elsif($shash->{type} eq "HeatingThermostat"){
-        my ($bits2,$valveposition,$temperaturesetpoint,$until1,$until2,$until3) = unpack("aCCCCC",substr($bindata,6));
-        my $ctrlmode = vec($bits2, 0, 2);
-        my $dstsetting = vec($bits2, 3, 1);
-        my $rferror = vec($bits2, 6, 1);
-        my $battery = vec($bits2, 7, 1);
+        if(!$shash) {
+          Log 2, "Got List response for undefined device with addr $addr";
+        }elsif($shash->{type} eq "HeatingThermostat"){
+          my ($bits2,$valveposition,$temperaturesetpoint,$until1,$until2,$until3) = unpack("aCCCCC",substr($bindata,6));
+          my $ctrlmode = vec($bits2, 0, 2);
+          my $dstsetting = vec($bits2, 3, 1);
+          my $rferror = vec($bits2, 6, 1);
+          my $battery = vec($bits2, 7, 1);
 
-        my $untilStr = MAXLAN_ParseDateTime($until1,$until2,$until3)->{str};
-        my $curTemp = $until2/10;
-        #If the control mode is not "temporary", the cube sends the current (measured) temperature
-        $curTemp = "" if($ctrlmode == 2 || $curTemp == 0);
-        $untilStr = "" if($ctrlmode != 2);
+          my $untilStr = MAXLAN_ParseDateTime($until1,$until2,$until3)->{str};
+          my $curTemp = $until2/10;
+          #If the control mode is not "temporary", the cube sends the current (measured) temperature
+          $curTemp = "" if($ctrlmode == 2 || $curTemp == 0);
+          $untilStr = "" if($ctrlmode != 2);
 
-        $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
-        Log 5, "battery $battery, rferror $rferror, dstsetting $dstsetting, ctrlmode $ctrlmode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $curTemp";
+          $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
+          Log 5, "battery $battery, rferror $rferror, dstsetting $dstsetting, ctrlmode $ctrlmode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $curTemp";
       
-        Dispatch($hash, "MAX,HeatingThermostatState,$addr,$temperaturesetpoint,$ctrlmode,$untilStr,$battery,$rferror,$dstsetting,$valveposition,$curTemp", {RAWMSG => $rmsg});
-      }elsif($shash->{type} eq "ShutterContact"){
-        my $bits2 = substr($bindata,6,1);
-        my $isopen = vec($bits2,0,2) == 0 ? 0 : 1;
-        my $unkbit5 = vec($bits2,2,4);
-        my $rferror = vec($bits2,6,1);
-        my $battery = vec($bits2,7,1);
-        Log 5, "ShutterContact isopen $isopen, rferror $rferror, battery $battery, unkbits $unkbit5";
-      
-        Dispatch($hash, "MAX,ShutterContactState,$addr,$isopen,$battery,$rferror", {RAWMSG => $rmsg});
-      }else{
-        Log 2, "Got status for unimplemented device type $shash->{type}";
-      }
+          Dispatch($hash, "MAX,HeatingThermostatState,$addr,$temperaturesetpoint,$ctrlmode,$untilStr,$battery,$rferror,$dstsetting,$valveposition,$curTemp", {RAWMSG => $rmsg});
+        }elsif($shash->{type} eq "ShutterContact"){
+          my $bits2 = substr($bindata,6,1);
+          my $isopen = vec($bits2,0,2) == 0 ? 0 : 1;
+          my $unkbit5 = vec($bits2,2,4);
+          my $rferror = vec($bits2,6,1);
+          my $battery = vec($bits2,7,1);
+          Log 5, "ShutterContact isopen $isopen, rferror $rferror, battery $battery, unkbits $unkbit5";
+
+          Dispatch($hash, "MAX,ShutterContactState,$addr,$isopen,$battery,$rferror", {RAWMSG => $rmsg});
+        }else{
+          Log 2, "Got status for unimplemented device type $shash->{type}";
+        }
+      } # if($valid)
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
-    }
+    } # while(length($bindata))
 
     if(!$hash->{gothello}) {
       # "L:..." is the last response after connection before the cube starts to idle
