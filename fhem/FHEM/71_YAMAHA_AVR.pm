@@ -94,7 +94,7 @@ YAMAHA_AVR_GetStatus($;$)
     return "No Zone available" if(not defined($zone));
     
     
-    my $return = YAMAHA_AVR_SendCommand($device,"<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
+    my $return = YAMAHA_AVR_SendCommand($hash, $device,"<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
 
     Log GetLogLevel($name, 4), "YANMAHA_AVR: GetStatus-Request returned:\n$return";
     
@@ -203,7 +203,7 @@ YAMAHA_AVR_Set($@)
 
     if($what eq "on")
     {
-	$result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>");
+	$result = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>On</Power></Power_Control></$zone></YAMAHA_AV>");
 
 	if($result =~ /RC="0"/ and $result =~ /<Power><\/Power>/)
 	{
@@ -220,7 +220,7 @@ YAMAHA_AVR_Set($@)
     }
     elsif($what eq "off")
     {
-	$result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>");
+	$result = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Power_Control><Power>Standby</Power></Power_Control></$zone></YAMAHA_AV>");
 	
 	if(not $result =~ /RC="0"/)
 	{
@@ -243,7 +243,7 @@ YAMAHA_AVR_Set($@)
 		    $command = YAMAHA_AVR_getCommandParam($hash, $a[2]);
 		    if(defined($command) and length($command) > 0)
 		    {
-			$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
+			$result = YAMAHA_AVR_SendCommand($hash, $address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
 		    }
 		    else
 		    {
@@ -286,11 +286,11 @@ YAMAHA_AVR_Set($@)
 	    {
 		if( $a[2] eq "on")
 		{
-		    $result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>On</Mute></Volume></$zone></YAMAHA_AV>");
+		    $result = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>On</Mute></Volume></$zone></YAMAHA_AV>");
 		}
 		elsif($a[2] eq "off")
 		{
-		    $result = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>Off</Mute></Volume></$zone></YAMAHA_AV>"); 
+		    $result = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Mute>Off</Mute></Volume></$zone></YAMAHA_AV>"); 
 		}
 		else
 		{
@@ -339,7 +339,7 @@ YAMAHA_AVR_Set($@)
 			{
 			    Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".($current_volume + ($diff * $step))." dB";
 			
-			    YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
+			    YAMAHA_AVR_SendCommand($hash, $address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".(($current_volume + ($diff * $step))*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
 			
 			    sleep $sleep unless ($time == 0);
 			}
@@ -348,7 +348,7 @@ YAMAHA_AVR_Set($@)
 		
 		# Set the desired volume
 		Log GetLogLevel($name, 4), "YAMAHA_AVR: set volume to ".$a[2]." dB";
-		$result = YAMAHA_AVR_SendCommand($address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
+		$result = YAMAHA_AVR_SendCommand($hash, $address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Volume><Lvl><Val>".($a[2]*10)."</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></$zone></YAMAHA_AV>");
 		if(not $result =~ /RC="0"/)
 		{
 			# if the returncode isn't 0, than the command was not successful
@@ -450,12 +450,21 @@ YAMAHA_AVR_Define($$)
 
 #############################
 sub
-YAMAHA_AVR_SendCommand($$)
+YAMAHA_AVR_SendCommand($$$)
 {
-   my($address, $command) = @_;
+   my($hash, $address, $command) = @_;
+   my $name = $hash->{NAME};
+   my $response;
    
+     
+   Log GetLogLevel($name, 5), "YAMAHA_AVR: execute on $name: $command";
+    
    # In case any URL changes must be made, this part is separated in this function".
-   return GetFileFromURL("http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command);
+   $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command);
+   Log GetLogLevel($name, 3), "YAMAHA_AVR: could not execute command on device $name" unless (defined($response));
+    
+   return $response;
+
 }
 
 #############################
@@ -554,7 +563,9 @@ sub YAMAHA_AVR_getModel($$)
     my $response;
     my $desc_url;
     
-    $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
+    $response = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
+
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description url from device $name" unless (defined($response));
     
     
     if(defined($response) and $response =~ /<URL>(.+?)<\/URL>/)
@@ -566,7 +577,9 @@ sub YAMAHA_AVR_getModel($$)
        $desc_url = "/YamahaRemoteControl/desc.xml";
     }
     
-    $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
+    $response = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
+    
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get system configuration from device $name" unless (defined($response));
     
     if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
     {
@@ -580,6 +593,9 @@ sub YAMAHA_AVR_getModel($$)
     }
     
     $response = GetFileFromURL("http://".$address.$desc_url);
+    
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description from device $name" unless (defined($response));
+    
     return undef unless(defined($response));
 
     while($response =~ /<Menu Func="Subunit" Title_1="(.+?)" YNC_Tag="(.+?)">/gc)
@@ -620,7 +636,14 @@ sub YAMAHA_AVR_getInputs($$)
     my ($hash, $address) = @_;  
     my $name = $hash->{NAME};
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
-    my $response = YAMAHA_AVR_SendCommand($address, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
+    
+    return undef if (not defined($zone) or $zone eq "");
+    
+    my $response = YAMAHA_AVR_SendCommand($hash, $address, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
+    
+    
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available inputs from device $name" unless (defined($response));
+    
     return undef unless (defined($response));
 
     
@@ -680,8 +703,8 @@ sub YAMAHA_AVR_getInputs($$)
   </ul>
   <b>Zone Selection</b><br>
   <ul>
-    If your receiver supports Zone Selection (e.g. RX-V671, RX_V673,... and the AVANTAGE series) 
-    you can select the zone which should be controlled. The RX_4xx and RX_3xx series for example 
+    If your receiver supports zone selection (e.g. RX-V671, RX-V673,... and the AVANTAGE series) 
+    you can select the zone which should be controlled. The RX-V4xx and RX-V3xx series for example 
     just have a "Main Zone" (which is the whole receiver itself). In general you have the following
     possibilities for the parameter &lt;zone&gt; (depending on your receiver model).<br><br>
     <ul>
@@ -704,8 +727,8 @@ sub YAMAHA_AVR_getInputs($$)
         define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2
         attr AV_Receiver_Zone2 room Bedroom
      </PRE>
-     Each Zone needs an own device and can be assigned to the different rooms, as each zone
-     can be separatly controlled from the other zones.
+     For each Zone you will need  an own YAMAHA_AVr device, which can be assigned to a different room.
+     Each zone can be controlled separatly from all other available zones. 
      <br><br>
   </ul>
   
