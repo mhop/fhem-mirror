@@ -434,7 +434,7 @@ MAXLAN_Parse($$)
     Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid", {RAWMSG => $rmsg});
 
     if($len != length($bindata)) {
-      Log 1, "Invalid C: response, len does not match";
+      Dispatch($hash, "MAX,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
       return "Invalid C: response, len does not match";
     }
 
