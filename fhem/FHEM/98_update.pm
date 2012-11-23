@@ -1,5 +1,6 @@
 ################################################################
 # $Id$
+# vim: ts=2:et
 # 
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved
@@ -539,16 +540,17 @@ update_GetRemoteFiles($$$)
     }
 
     if (!$newFhem && @reloadModules) {
-      $ret .= "\nModule(s) reloaded:\n";
-      foreach my $modFile (@reloadModules) {
-        my $cmdret = CommandReload($cl,$modFile);
-        if (!$cmdret) {
-          Log 1, "update reloaded module: $modFile";
-          $ret .= "==> $modFile\n";
-        } else {
-          $ret .= "==> $modFile:\n$cmdret\n";
-        }
-      }
+      $ret .= "A new version of one ore more module(s) was installed, 'shutdown restart' is required!";
+      #$ret .= "\nModule(s) reloaded:\n";
+      #foreach my $modFile (@reloadModules) {
+      #  my $cmdret = CommandReload($cl,$modFile);
+      #  if (!$cmdret) {
+      #    Log 1, "update reloaded module: $modFile";
+      #    $ret .= "==> $modFile\n";
+      #  } else {
+      #    $ret .= "==> $modFile:\n$cmdret\n";
+      #  }
+      #}
     }
 
     if ($newFhem) {
@@ -868,7 +870,6 @@ update_MakeDirectory($)
   return $ret;
 }
 
-# vim: ts=2:et
 1;
 
 =pod
