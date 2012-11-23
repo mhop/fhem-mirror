@@ -704,7 +704,7 @@ sub YAMAHA_AVR_getInputs($$)
   <b>Zone Selection</b><br>
   <ul>
     If your receiver supports zone selection (e.g. RX-V671, RX-V673,... and the AVANTAGE series) 
-    you can select the zone which should be controlled. The RX-V4xx and RX-V3xx series for example 
+    you can select the zone which should be controlled. The RX-V3xx and RX-V4xx series for example 
     just have a "Main Zone" (which is the whole receiver itself). In general you have the following
     possibilities for the parameter &lt;zone&gt; (depending on your receiver model).<br><br>
     <ul>
@@ -727,8 +727,8 @@ sub YAMAHA_AVR_getInputs($$)
         define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2
         attr AV_Receiver_Zone2 room Bedroom
      </PRE>
-     For each Zone you will need  an own YAMAHA_AVr device, which can be assigned to a different room.
-     Each zone can be controlled separatly from all other available zones. 
+     For each Zone you will need an own YAMAHA_AVR device, which can be assigned to a different room.
+     Each zone can be controlled separatly from all other available zones.
      <br><br>
   </ul>
   
