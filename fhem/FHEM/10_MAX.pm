@@ -289,8 +289,8 @@ MAX_Parse($$)
     my $connected = $args[0];
 
     readingsSingleUpdate($shash,"connection",$connected,0);
-  } elsif($msgtype eq "HeatingThermostatConfig") {
 
+  } elsif($msgtype eq "HeatingThermostatConfig") {
     $shash->{ecoTemperature} = $args[0];
     $shash->{comfortTemperature} = $args[1];
     $shash->{boostValveposition} = $args[2];
@@ -300,6 +300,12 @@ MAX_Parse($$)
     $shash->{minimumTemperature} = $args[6];
     $shash->{windowOpenTemperature} = $args[7];
     $shash->{windowOpenDuration} = $args[8];
+
+  } elsif($msgtype eq "Error") {
+    $shash->{ERROR} = join(",",$args[0]);
+
+  } else {
+    Log 1, "MAX_Parse: Unknown message $msgtype";
   }
 
   #Build $shash->{STATE}
