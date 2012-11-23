@@ -10,7 +10,6 @@ use Data::Dumper;
 use POSIX;
 
 sub MAXLAN_Parse($$);
-sub MAXLAN_ParseDateTime($$$);
 sub MAXLAN_Read($);
 sub MAXLAN_Write($$);
 sub MAXLAN_ReadAnswer($);
@@ -256,22 +255,6 @@ MAXLAN_Read($)
 }
 
 sub
-MAXLAN_ParseDateTime($$$)
-{
-  my ($byte1,$byte2,$byte3) = @_;
-  my $day = $byte1 & 0x1F;
-  my $month = (($byte1 & 0xE0) >> 4) | ($byte2 >> 7);
-  my $year = $byte2 & 0x3F;
-  my $time = ($byte3 & 0x3F);
-  if($time%2){
-    $time = int($time/2).":30";
-  }else{
-    $time = int($time/2).":00";
-  }
-  return { "day" => $day, "month" => $month, "year" => $year, "time" => $time, "str" => "$day.$month.$year $time" };
-}
-
-sub
 MAXLAN_SendMetadata($)
 {
   my $hash = shift;
@@ -432,20 +415,28 @@ MAXLAN_Parse($$)
     return if(@args < 2);
     my $bindata = decode_base64($args[1]);
 
-    return "Invalid C: response, not enough data" if(length($bindata) < 18);
+    if(length($bindata) < 18) {
+      Log 1, "Invalid C: response, not enough data";
+      return "Invalid C: response, not enough data";
+    }
 
     #Parse the first 18 bytes, those are send for every device
     my ($len,$addr,$devicetype,$groupid,$firmware,$testresult,$serial) = unpack("CH6CCCCa[10]", $bindata);
+    Log $ll5, "len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
+
     $len = $len+1; #The len field itself was not counted
 
     Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid", {RAWMSG => $rmsg});
 
-    return "Invalid C: response, len does not match" if($len != length($bindata));
+    if($len != length($bindata)) {
+      Log 1, "Invalid C: response, len does not match";
+      return "Invalid C: response, len does not match";
+    }
+
     #devicetype: Cube = 0, HeatingThermostat = 1, HeatingThermostatPlus = 2, WallMountedThermostat = 3, ShutterContact = 4, PushButton = 5
     #Seems that ShutterContact does not have any configdata
     if($devicetype == 0){#Cube
       #TODO: there is a lot of data left to interpret
-      Log $ll5, "len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
     }elsif($devicetype == 1){#HeatingThermostat
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset) = unpack("CCCCCCCCCCC",substr($bindata,18));
       my $boostValve = ($boost & 0x1F) * 5;
@@ -458,13 +449,12 @@ MAXLAN_Parse($$)
       $minsetpointtemp=$minsetpointtemp/2.0;
       $windowopentemp=$windowopentemp/2.0;
       $windowopendur=$windowopendur*5;
-      Log $ll5, "len $len, addr $addr, devicetype $devicetype, groupid $groupid, serial $serial, comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
+      Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
       Dispatch($hash, "MAX,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
     }elsif($devicetype == 4){#ShutterContact TODO
       Log 2, "ShutterContact send some configuration, but none was expected" if($len > 18);
-      Log $ll5, "len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
     }else{ #TODO
-      Log $ll5, "Got configdata for unimplemented devicetype $devicetype: len $len, addr $addr, devicetype $devicetype, groupid $groupid, serial $serial";
+      Log 2, "Got configdata for unimplemented devicetype $devicetype";
     }
 
     #Check if it is already recorded in devices
@@ -489,47 +479,25 @@ MAXLAN_Parse($$)
     while(length($bindata)){
       my ($len,$addr,$errframetype,$bits1) = unpack("CH6Ca",$bindata);
       my $unkbit1 = vec($bits1,0,1);
-      my $unkbit2 = vec($bits1,2,1);
-      my $initialized = vec($bits1,1,1);
-      my $rferror1 = vec($bits1,3,1);
-      my $valid = vec($bits1,4,1);
-      my $unkbit3 = vec($bits1,5,1);
-      my $unkbit4 = vec($bits1,6,2);
+      my $initialized = vec($bits1,1,1); #I never saw this beeing 0
+      my $answer = vec($bits1,2,1); #answer to what?
+      my $rferror1 = vec($bits1,3,1); # if 1 then see errframetype
+      my $valid = vec($bits1,4,1); #is the status following the common header valid
+      my $unkbit2 = vec($bits1,5,1);
+      my $unkbit3 = vec($bits1,6,2);
   
-      Log 5, "bindata: ".unpack("H*",substr($bindata,0,$len+1)); #+1 because the len field is not counted
-      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, rferror $rferror1, errframetype $errframetype, unkbit ($unkbit1,$unkbit2,$unkbit3,$unkbit4)";
+      Log 5, "len $len, addr $addr, initialized $initialized, valid $valid, rferror $rferror1, errframetype $errframetype, answer $answer, unkbit ($unkbit1,$unkbit2,$unkbit3)";
 
+      my $payload = unpack("H*",substr($bindata,6,$len-6+1)); #+1 because the len field is not counted
       if($valid) {
         my $shash = $modules{MAX}{defptr}{$addr};
 
         if(!$shash) {
           Log 2, "Got List response for undefined device with addr $addr";
         }elsif($shash->{type} eq "HeatingThermostat"){
-          my ($bits2,$valveposition,$temperaturesetpoint,$until1,$until2,$until3) = unpack("aCCCCC",substr($bindata,6));
-          my $ctrlmode = vec($bits2, 0, 2);
-          my $dstsetting = vec($bits2, 3, 1);
-          my $rferror = vec($bits2, 6, 1);
-          my $battery = vec($bits2, 7, 1);
-
-          my $untilStr = MAXLAN_ParseDateTime($until1,$until2,$until3)->{str};
-          my $curTemp = $until2/10;
-          #If the control mode is not "temporary", the cube sends the current (measured) temperature
-          $curTemp = "" if($ctrlmode == 2 || $curTemp == 0);
-          $untilStr = "" if($ctrlmode != 2);
-
-          $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
-          Log 5, "battery $battery, rferror $rferror, dstsetting $dstsetting, ctrlmode $ctrlmode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $curTemp";
-      
-          Dispatch($hash, "MAX,HeatingThermostatState,$addr,$temperaturesetpoint,$ctrlmode,$untilStr,$battery,$rferror,$dstsetting,$valveposition,$curTemp", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,HeatingThermostatState,$addr,$payload", {RAWMSG => $rmsg});
         }elsif($shash->{type} eq "ShutterContact"){
-          my $bits2 = substr($bindata,6,1);
-          my $isopen = vec($bits2,0,2) == 0 ? 0 : 1;
-          my $unkbit5 = vec($bits2,2,4);
-          my $rferror = vec($bits2,6,1);
-          my $battery = vec($bits2,7,1);
-          Log 5, "ShutterContact isopen $isopen, rferror $rferror, battery $battery, unkbits $unkbit5";
-
-          Dispatch($hash, "MAX,ShutterContactState,$addr,$isopen,$battery,$rferror", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
         }else{
           Log 2, "Got status for unimplemented device type $shash->{type}";
         }
