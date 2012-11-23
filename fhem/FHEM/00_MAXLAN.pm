@@ -40,7 +40,7 @@ my $roundtriptime = 3; #seconds
 my $metadata_magic = 0x56;
 my $metadata_version = 2;
 
-my $defaultPollInterval = 10;
+my $defaultPollInterval = 60;
 
 sub
 MAXLAN_Initialize($)
