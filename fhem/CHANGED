@@ -18,6 +18,7 @@
   - change: FHEMWEB closing old TCP connections
   - change: FHEMWEB added "Associated with" to detail-screen (Uli)
   - change: FHEMWEB added ETag headers (Matthias)
+  - change: FHEMWEB devStateIcon added
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
