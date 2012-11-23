@@ -171,8 +171,13 @@ MAXLAN_Set($@)
 
   }elsif($setting eq "factoryReset") {
     MAXLAN_RequestReset($hash);
+
+  }elsif($setting eq "reconnect") {
+    DevIo_CloseDev($hash);
+    RemoveInternalTimer($hash);
+    MAXLAN_Connect($hash);
   }else{
-    return "Unknown argument $setting, choose one of pairmode raw clock factoryReset";
+    return "Unknown argument $setting, choose one of pairmode raw clock factoryReset reconnect";
   }
   return undef;
 }
