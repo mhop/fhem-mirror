@@ -137,6 +137,7 @@ FHEMWEB_Initialize($)
 
   addToAttrList("webCmd");
   addToAttrList("icon");
+  addToAttrList("devStateIcon");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
 }
 
@@ -2321,6 +2322,17 @@ FW_dev2image($)
   $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
 
   my $icon;
+  my $devStateIcon = AttrVal($name, "devStateIcon", undef);
+  if(defined($devStateIcon)) {
+    my @list = split(" ", $devStateIcon);
+    foreach my $l (@list) {
+      my ($re,$iconName) = split(":", $l);
+      if($re && $state =~ m/^$re$/) {
+        return FW_getIcon($iconName);   # Can be used to preserve text
+      }
+    }
+  }
+
   $icon = FW_getIcon("$name.$state")   if(!$icon);           # lamp.Aus.png
   $icon = FW_getIcon("$name.$rstate")  if(!$icon);           # lamp.on.png
   $icon = FW_getIcon($name)            if(!$icon);           # lamp.png
@@ -2914,6 +2926,21 @@ FW_closeOldClients()
     <li>CORS<br>
         If set to 1, FHEMWEB will supply a "Cross origin resource sharing"
         header, see the wikipedia for details.
+        </li>
+        <br>
+
+    <a name="devStateIcon"></a>
+    <li>devStateIcon<br>
+        Space separated list of regexp/icon-name pairs. If the state of the
+        device matches regexp, then the corresponding icon-name will be
+        displayed. If icon-name does not exist in the fhem/www/images
+        directory, then the status text will be displayed. Note: the icon-name
+        must be specified without the trailing .png/.jpg suffix.<br>
+        Example:<br>
+        <ul>
+        attr lamp devStateIcon on:closed off:open<br>
+        attr lamp devStateIcon .*:noIcon<br>
+        </ul>
         </li>
         <br>
 
