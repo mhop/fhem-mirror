@@ -34,6 +34,9 @@ my @boost_durations = (0, 5, 10, 15, 20, 25, 30, 60);
 #Time after which we reconnect after a failed connection attempt
 my $reconnect_interval = 5; #seconds
 
+#the time it takes after sending one command till we see its effect in the L: response
+my $roundtriptime = 3; #seconds
+
 my $metadata_magic = 0x56;
 my $metadata_version = 2;
 
@@ -642,6 +645,8 @@ MAXLAN_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
   MAXLAN_Write($hash,"s:".encode_base64($payload,""));
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+$roundtriptime, "MAXLAN_Poll", $hash, 0);
   return MAXLAN_ExpectAnswer($hash, "S:");
 }
 
