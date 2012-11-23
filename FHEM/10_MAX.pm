@@ -15,7 +15,7 @@ sub MAX_Set($@);
 sub MAX_MD15Cmd($$$);
 sub MAX_DateTime2Internal($);
 
-my @ctrl_modes = ( "auto", "manual", "temporary" );
+my @ctrl_modes = ( "auto", "manual", "temporary", "boost" );
 
 my %interfaces = (
   "Cube" => undef,
@@ -169,6 +169,23 @@ MAX_Set($@)
 
 #############################
 sub
+MAX_ParseDateTime($$$)
+{
+  my ($byte1,$byte2,$byte3) = @_;
+  my $day = $byte1 & 0x1F;
+  my $month = (($byte1 & 0xE0) >> 4) | ($byte2 >> 7);
+  my $year = $byte2 & 0x3F;
+  my $time = ($byte3 & 0x3F);
+  if($time%2){
+    $time = int($time/2).":30";
+  }else{
+    $time = int($time/2).":00";
+  }
+  return { "day" => $day, "month" => $month, "year" => $year, "time" => $time, "str" => "$day.$month.$year $time" };
+}
+
+#############################
+sub
 MAX_Parse($$)
 {
   my ($hash, $msg) = @_;
@@ -201,28 +218,48 @@ MAX_Parse($$)
     }
 
   } elsif($msgtype eq "HeatingThermostatState") {
-    my $settemp = $args[0];
-    my $mode = $ctrl_modes[$args[1]];
-    my $until = $args[2];
-    my $batterylow = $args[3];
-    my $rferror = $args[4];
-    my $dstsetting = $args[5];
-    my $valveposition = $args[6];
-    my $measuredTemperature = "";
-    $measuredTemperature = $args[7] if(@args > 7);
+
+    my ($bits2,$valveposition,$temperaturesetpoint,$until1,$until2,$until3) = unpack("aCCCCC",pack("H*",$args[0]));
+    my $mode = vec($bits2, 0, 2); #
+    my $dstsetting = vec($bits2, 3, 1); #is automatically switching to DST activated
+    my $langateway = vec($bits2, 4, 1); #??
+    my $panel = vec($bits2, 5, 1); #1 if the heating thermostat is locked for manually setting the temperature at the device
+    my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
+    my $batterylow = vec($bits2, 7, 1); #1 if battery is low
+
+    my $untilStr = MAX_ParseDateTime($until1,$until2,$until3)->{str};
+    my $measuredTemperature = $until2/10;
+    #If the control mode is not "temporary", the cube sends the current (measured) temperature
+    $measuredTemperature = "" if($mode == 2 || $measuredTemperature == 0);
+    $untilStr = "" if($mode != 2);
+
+    $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
+    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $measuredTemperature";
+    #my $settemp = $args[0];
+    #my $mode = $ctrl_modes[$args[1]];
+    #my $until = $args[2];
+    #my $batterylow = $args[3];
+    #my $rferror = $args[4];
+    #my $dstsetting = $args[5];
+    #my $valveposition = $args[6];
+    #my $measuredTemperature = "";
+
+    #The HeatingThermostat uses the temperatureOffset during control
+    #but does not apply it to measuredTemperature before sending it to us
+    $measuredTemperature += $shash->{temperatureOffset} if($measuredTemperature ne "" and exists($shash->{temperatureOffset}));
 
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
     $shash->{dstsetting} = $dstsetting;
     if($mode eq "temporary"){
-      $shash->{until} = "$until";
+      $shash->{until} = "$untilStr";
     }else{
       delete($shash->{until});
     }
 
     readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
-    readingsBulkUpdate($shash, "desiredTemperature", $settemp);
+    readingsBulkUpdate($shash, "desiredTemperature", $temperaturesetpoint);
     readingsBulkUpdate($shash, "valveposition", $valveposition);
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", $measuredTemperature);
@@ -230,9 +267,12 @@ MAX_Parse($$)
     readingsEndUpdate($shash, 0);
 
   }elsif($msgtype eq "ShutterContactState"){
-    my $isopen = $args[0];
-    my $batterylow = $args[1];
-    my $rferror = $args[2];
+    my $bits = pack("H2",$args[0]);
+    my $isopen = vec($bits,0,2) == 0 ? 0 : 1;
+    my $unkbits = vec($bits,2,4);
+    my $rferror = vec($bits,6,1);
+    my $batterylow = vec($bits,7,1);
+    Log 5, "ShutterContact isopen $isopen, rferror $rferror, battery $batterylow, unkbits $unkbits";
 
     $shash->{rferror} = $rferror;
 
