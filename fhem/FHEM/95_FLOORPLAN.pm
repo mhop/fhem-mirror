@@ -1,6 +1,6 @@
 ﻿################################################################################
 # 95 FLOORPLAN
-# $Id $
+# $Id$
 # Feedback: http://groups.google.com/group/fhem-users
 # Define Custom Floorplans
 # Released : 26.02.2012
@@ -29,6 +29,7 @@
 # 0019: added fp_backgroundimg (October 15, 2012)
 # 0020: moved creation of userattr to define, added slider and timepicker and setList, added style5 icon+commands, added style 6 readingstimestamp, 
 #       added style-descriptions in fp-arrange (October 22, 2012)
+# 0021: fixed http-header, unsetting FF-autocomplete, added attribute fp_setbutton (fixes by Matthias) (November 23, 2012)
 #
 ################################################################
 #
@@ -128,7 +129,7 @@ FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn} = "FP_define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0 fp_backgroundimg";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0";
   # fp_arrange			: show addtl. menu for  attr fp_<name> ....
   # commandfield		: shows an fhem-commandline inputfield on floorplan
   # fp_default			: set for ONE floorplan. If set, floorplan-startscreen is skipped.
@@ -235,6 +236,7 @@ FP_CGI(){
             "Content-Length: 0\r\n",
             "Location: $tgt\r\n",
             "\r\n";
+	return;
   }
 
   ######################################
@@ -410,7 +412,7 @@ FP_show(){
 		$style = 0 if (!$style);
 
 		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">";
-		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\">";
+		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
 		FW_pO " <table class=\"$type fp_$FP_name\" id=\"$d\" align=\"center\">";               # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
 		#Debug "txt is \"$txt\"";
@@ -527,8 +529,8 @@ FP_show(){
                   FW_hidden("arg.$d", $cmd) .
                   FW_hidden("dev.$d", $d) .
                   ($FW_room ? FW_hidden("room", $FW_room) : "") .
-                  FW_select("val.$d", \@tv, $txt, "dropdown").
-                  FW_submit("cmd.$d", "set").
+                  (AttrVal($FP_name,'fp_setbutton',1) ? FW_select("val.$d", \@tv, $txt, "dropdown") : FW_select("val.$d", \@tv, $txt, "dropdown", "submit()")).
+                  (AttrVal($FP_name,'fp_setbutton',1) ? FW_submit("cmd.$d", "set") : FW_hidden("cmd.$d", "set")).
                   "</td>";
               }
             }
