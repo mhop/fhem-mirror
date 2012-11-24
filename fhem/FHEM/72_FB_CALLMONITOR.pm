@@ -32,7 +32,46 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 
-sub FB_CALLMONITOR_Read($);
+my %connection_type = (
+0 => "0",
+1 => "FON1",
+2 => "FON2",
+3 => "FON3",
+4 => "ISDN",
+5 => "FAX",
+6 => "not_defined",
+7 => "not_defined",
+8 => "not_defined",
+9 => "not_defined",
+10 => "DECT_1",
+11 => "DECT_2",
+12 => "DECT_3",
+13 => "DECT_4",
+14 => "DECT_5",
+15 => "DECT_6",
+16 => "FRITZMini_1",
+17 => "FRITZMini_2",
+18 => "FRITZMini_3",
+19 => "FRITZMini_4",
+20 => "VoIP_1",
+21 => "VoIP_2",
+22 => "VoIP_3",
+23 => "VoIP_4",
+24 => "VoIP_5",
+25 => "VoIP_6",
+26 => "VoIP_7",
+27 => "VoIP_8",
+28 => "VoIP_9",
+29 => "VoIP_10",
+40 => "Answering_Machine_1",
+41 => "Answering_Machine_2",
+42 => "Answering_Machine_3",
+43 => "Answering_Machine_4",
+44 => "Answering_Machine_5"
+);
+
+
+
 
 sub
 FB_CALLMONITOR_Initialize($)
@@ -69,8 +108,11 @@ FB_CALLMONITOR_Define($$)
   $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
 
+
+
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+
   return $ret;
 }
 
@@ -81,6 +123,8 @@ FB_CALLMONITOR_Undef($$)
 {
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
+
+
 
   DevIo_CloseDev($hash); 
   return undef;
@@ -120,12 +164,12 @@ FB_CALLMONITOR_Read($)
    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING");
    readingsBulkUpdate($hash, "external_number" , $array[5]) if($array[1] eq "CALL");
    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "CALL");
-   readingsBulkUpdate($hash, "used_connection", $array[5]) if($array[1] eq "RING");
-   readingsBulkUpdate($hash, "used_connection", $array[6]) if($array[1] eq "CALL");
-
- 
+   readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
+   readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
+   readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
+   readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
    readingsEndUpdate($hash, 1);
-
+  
 }
 
 sub
@@ -157,7 +201,7 @@ FB_CALLMONITOR_Ready($)
 <ul>
   <tr><td>
   The FB_CALLMONITOR module connects to a AVM FritzBox Fon and listens for telephone
-  events (Receiving incoming call, Making a call)
+  <a href="#FB_CALLMONITORevents">events</a> (Receiving incoming call, Making a call)
   <br><br>
   In order to use this module with fhem you <b>must</b> enable the CallMonitor feature via 
   telephone shortcode.<br><br>
@@ -183,7 +227,6 @@ FB_CALLMONITOR_Ready($)
     <br>
   </ul>
   <br>
-
   <a name="FB_CALLMONITORset"></a>
   <b>Set</b>
   <ul>
@@ -197,14 +240,25 @@ FB_CALLMONITOR_Ready($)
   N/A
   </ul>
   <br>
-  <br>
 
   <a name="FB_CALLMONITORattr"></a>
-  <b>Attributes</b>
+  <b>Attributes</b><br><br>
   <ul>
-    <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br>
+ 
+  <a name="FB_CALLMONITORevents"></a>
+  <b>Generated Events:</b><br><br>
+  <ul>
+  <li><b>event</b>: (call|ring|connect|disconnect) - which event in detail was triggerd</li>
+  <li><b>external_number</b>: $number - The participants number which is calling (event: ring) or beeing called (event: call)</li>
+  <li><b>internal_number</b>: $number - The internal number (fixed line, VoIP number, ...) on which the participant is calling (event: ring) or is used for calling (event: call)</li>
+  <li><b>internal_connection</b>: $connection - The internal connection (FON1, FON2, ISDN, DECT, ...) which is used to take the call</li>
+  <li><b>external_connection</b>: $connection - The external connection (fixed line, VoIP account) which is used to take the call</li>
+  <li><b>call_duration</b>: $seconds - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
   </ul>
 </ul>
 
