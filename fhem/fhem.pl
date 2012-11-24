@@ -2928,21 +2928,25 @@ readingsBulkUpdate($$$) {
   
   # shorthand
   my $readings= $hash->{READINGS};
+
+  my $changed= 1;
+  # check for changes only if reading already exists
+  if(defined($readings->{$reading})) {
   
-  # these flags determine if any of the "event-on" attributes are set;
-  my $attreocr= AttrVal($name, "event-on-change-reading", "");
-  my $attreour= AttrVal($name, "event-on-update-reading", "");
+    # these flags determine if any of the "event-on" attributes are set;
+    my $attreocr= AttrVal($name, "event-on-change-reading", "");
+    my $attreour= AttrVal($name, "event-on-update-reading", "");
 
-  # these flags determine whether the reading is listed in any of the attributes
-  my $eocr= $attreocr && grep($_ eq $reading, split /,/,$attreocr);
-  my $eour= $attreour && grep($_ eq $reading, split /,/,$attreour);
+    # these flags determine whether the reading is listed in any of the attributes
+    my $eocr= $attreocr && grep($_ eq $reading, split /,/,$attreocr);
+    my $eour= $attreour && grep($_ eq $reading, split /,/,$attreour);
 
-  # determine if an event should be created
-  my $changed= !($attreocr || $attreour)  # always create event if no attribute is set
-                || $eour                  # or if the reading is listed in event-on-update-reading
-                || ($eocr &&              # or if the reading is listed in event-on-change-reading...
-                ($value ne $readings->{$reading}{VAL})); # ...and its value has changed.
-                
+    # determine if an event should be created
+    my $changed= !($attreocr || $attreour)  # always create event if no attribute is set
+                  || $eour                  # or if the reading is listed in event-on-update-reading
+                  || ($eocr &&              # or if the reading is listed in event-on-change-reading...
+                  ($value ne $readings->{$reading}{VAL})); # ...and its value has changed.
+  }
  
   setReadingsVal($hash, $reading, $value, $hash->{helper}{updating}{latestUpdate}); 
   
