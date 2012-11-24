@@ -517,8 +517,9 @@ FP_show(){
               # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
               if(@tv > 1) {
                 $firstIdx=1;
-                if($cmd eq "desired-temp") {
-                  $txt = ReadingsVal($d, "desired-temp", 20);
+                my @array = qw/desired-temp desiredTemperature/;
+                if(/$cmd/i ~~ @array) {
+                  $txt = ReadingsVal($d, $cmd, 20);
                   $txt =~ s/ .*//;        # Cut off Celsius
                   $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
                 } else {
