@@ -451,13 +451,13 @@ sub isAlarmed {
 sub isStarted {
   my ($self,$t) = @_;
   return 0 if($self->isDeleted());
-  return $self->{start}<= $t && $t<= $self->{end} ? 1 : 0;
+  return $self->{start}<= $t && $t< $self->{end} ? 1 : 0;
 }
 
 sub isEnded {
   my ($self,$t) = @_;
   return 0 if($self->isDeleted());
-  return $self->{end}< $t ? 1 : 0;
+  return $self->{end}<= $t ? 1 : 0;
 }
 
 sub nextTime {
