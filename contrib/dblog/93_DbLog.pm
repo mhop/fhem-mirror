@@ -1,8 +1,12 @@
+
 ##############################################
 #
 # 93_DbLog.pm
 # written by Dr. Boris Neubert 2007-12-30
 # e-mail: omega at online dot de
+#
+# modified by Tobias Faust 2012-06-26
+# e-mail: tobias dot faust at online dot de
 #
 ##############################################
 
@@ -10,6 +14,7 @@ package main;
 use strict;
 use warnings;
 use DBI;
+use Data::Dumper;
 
 sub DbLog($$$);
 
@@ -20,14 +25,15 @@ DbLog_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{DefFn} = "DbLog_Define";
-  $hash->{UndefFn} = "DbLog_Undef";
+  $hash->{DefFn}    = "DbLog_Define";
+  $hash->{UndefFn}  = "DbLog_Undef";
   $hash->{NotifyFn} = "DbLog_Log";
+  $hash->{GetFn}    = "DbLog_Get";
   $hash->{AttrFn}   = "DbLog_Attr";
   $hash->{AttrList} = "disable:0,1";
 }
 
-#####################################
+###############################################################
 sub
 DbLog_Define($@)
 {
@@ -43,7 +49,7 @@ DbLog_Define($@)
   return "Bad regexp: $@" if($@);
   $hash->{REGEXP} = $regexp;
 
-  $hash->{configuration}= $a[2];
+  $hash->{CONFIGURATION}= $a[2];
 
   return "Can't connect to database." if(!DbLog_Connect($hash));
 
@@ -63,6 +69,11 @@ DbLog_Undef($$)
 }
 
 ################################################################
+#
+# Wird bei jeder ?nderung eines Attributes dieser
+# DbLog-Instanz aufgerufen
+#
+################################################################
 sub
 DbLog_Attr(@)
 {
@@ -80,6 +91,10 @@ DbLog_Attr(@)
   return undef;
 }
 
+################################################################
+#
+# Parsefunktion, abh?ngig vom Devicetyp
+#
 ################################################################
 sub
 DbLog_ParseEvent($$)
@@ -130,8 +145,8 @@ DbLog_ParseEvent($$)
 	$value= $parts[1];
 	$unit= "";
      }
-     if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+     if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
+     if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
      if($reading =~ m(^actuator[0-9]*)) {
 		if($value eq "lime-protection") {
 			$reading= "actuator-lime-protection";
@@ -175,7 +190,7 @@ DbLog_ParseEvent($$)
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
      if($event =~ m(avg_day)) { $reading= "data"; $value= $event; }
      if($event =~ m(avg_month)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
      if($reading eq "wind") { $value=~ s/ \(km\/h\)//; $unit= "km/h"; }
      if($reading eq "rain") { $value=~ s/ \(l\/m2\)//; $unit= "l/m2"; }
      if($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
@@ -189,7 +204,7 @@ DbLog_ParseEvent($$)
   # HMS
   elsif($type eq "HMS") {
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
      if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
      if($reading eq "battery") {
         $value=~ s/ok/1/;
@@ -201,18 +216,24 @@ DbLog_ParseEvent($$)
   # CUL_WS
   elsif($type eq "CUL_WS") {
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $unit= "°C"; }
+     if($reading eq "temperature") { $unit= "?C"; }
      if($reading eq "humidity") { $unit= "%"; }
   }
 
   # BS
   elsif($type eq "BS") {
-	 if($event =~ m(brightness:.*)) { 
-		@parts= split(/ /,$event);
-		$reading= "lux";
-		$value= $parts[4]*1.;
-		$unit= "lux";
-     }
+	  if($event =~ m(brightness:.*)) {
+		  @parts= split(/ /,$event);
+		  $reading= "lux";
+		  $value= $parts[4]*1.;
+		  $unit= "lux";
+    }
+  }
+
+  # Default
+  else {
+    $reading= "data";
+    $value= $event;
   }
 
   @result= ($reading,$value,$unit);
@@ -221,15 +242,22 @@ DbLog_ParseEvent($$)
 
 
 ################################################################
+#
+# Hauptroutine zum Loggen. Wird bei jedem Eventchange
+# aufgerufen
+#
+################################################################
 sub
 DbLog_Log($$)
 {
   # Log is my entry, Dev is the entry of the changed device
   my ($log, $dev) = @_;
 
+  return undef if($log->{STATE} eq "disabled");
+
   # name and type required for parsing
   my $n= $dev->{NAME};
-  my $t= $dev->{TYPE};
+  my $t= uc($dev->{TYPE});
 
   # timestamp in SQL format YYYY-MM-DD hh:mm:ss
   #my ($sec,$min,$hr,$day,$mon,$yr,$wday,$yday,$isdst)= localtime(time);
@@ -251,8 +279,9 @@ DbLog_Log($$)
       my $unit= $r[2];
       if(!defined $reading) { $reading= ""; }
       if(!defined $value) { $value= ""; }
-      if(!defined $unit) { $unit= ""; }
-
+      if(!defined $unit || $unit eq "") {
+         $unit = AttrVal("$n", "unit", "");
+      }
 
       my $is= "(TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES " .
          "('$ts', '$n', '$t', '$s', '$reading', '$value', '$unit')";
@@ -261,20 +290,59 @@ DbLog_Log($$)
       DbLog_ExecSQL($log, "INSERT INTO current" . $is);
 
 
+
     }
   }
 
   return "";
 }
 
+################################################################
+#
+# zerlegt ?bergebenes FHEM-Datum in die einzelnen Bestandteile
+# und f?gt noch Defaultwerte ein
+#
+################################################################
+sub
+DbLog_explode_datetime($%) {
+  my ($t, %def) = @_;
+  my %retv;
 
+  my (@datetime, @date, @time);
+  @datetime = split("_", $t); #Datum und Zeit auftrennen
+  @date = split("-", $datetime[0]);
+  @time = split(":", $datetime[1]) if ($datetime[1]);
+  if ($date[0]) {$retv{year}  = $date[0];} else {$retv{year}  = $def{year};}
+  if ($date[1]) {$retv{month} = $date[1];} else {$retv{month} = $def{month};}
+  if ($date[2]) {$retv{day}   = $date[2];} else {$retv{day}   = $def{day};}
+  if ($time[0]) {$retv{hour}  = $time[0];} else {$retv{hour}  = $def{hour};}
+  if ($time[1]) {$retv{minute}= $time[1];} else {$retv{minute}= $def{minute};}
+  if ($time[2]) {$retv{second}= $time[2];} else {$retv{second}= $def{second};}
+
+  $retv{datetime}=DbLog_implode_datetime($retv{year}, $retv{month}, $retv{day}, $retv{hour}, $retv{minute}, $retv{second});
+
+  #Log 1, Dumper(%retv);
+  return %retv
+}
+
+sub
+DbLog_implode_datetime($$$$$$) {
+  my ($year, $month, $day, $hour, $minute, $second) = @_;
+  my $retv = $year."-".$month."-".$day."_".$hour.":".$minute.":".$second;
+
+  return $retv;
+}
+################################################################
+#
+# Verbindung zur DB aufbauen
+#
 ################################################################
 sub
 DbLog_Connect($)
 {
   my ($hash)= @_;
 
-  my $configfilename= $hash->{configuration};
+  my $configfilename= $hash->{CONFIGURATION};
   if(!open(CONFIG, $configfilename)) {
 	Log 1, "Cannot open database configuration file $configfilename.";
 	return 0; }
@@ -288,17 +356,38 @@ DbLog_Connect($)
   my $dbuser= $dbconfig{user};
   my $dbpassword= $dbconfig{password};
 
+  #check the database model
+  if($dbconn =~ m/pg:/i) {
+    $hash->{DBMODEL}="POSTGRESQL";
+  } elsif ($dbconn =~ m/mysql:/i) {
+    $hash->{DBMODEL}="MYSQL";
+  } elsif ($dbconn =~ m/oracle:/i) {
+    $hash->{DBMODEL}="ORACLE";
+  } else {
+    $hash->{DBMODEL}="unknown";
+    Log 3, "Unknown dbmodel type in configuration file $configfilename.";
+    Log 3, "Only Mysql, Postgresql, Oracle is currently supported.";
+    Log 3, "Otherwise please check the connectstring: $dbconn";
+    return 0;
+  }
+
+
   Log 3, "Connecting to database $dbconn with user $dbuser";
   my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
   if(!$dbh) {
-    Log 1, "Can't connect to $dbconn: $DBI::errstr";
+    Log 3, "Can't connect to $dbconn: $DBI::errstr";
     return 0;
   }
   Log 3, "Connection to db $dbconn established";
   $hash->{DBH}= $dbh;
+
   return 1;
 }
 
+################################################################
+#
+# Prozeduren zum Ausf?hren des SQL?s
+#
 ################################################################
 sub
 DbLog_ExecSQL1($$)
@@ -310,7 +399,7 @@ DbLog_ExecSQL1($$)
     Log 2, "DBLog error: " . $DBI::errstr;
     return 0;
   }
-  return 1;
+  return $sth;
 }
 
 sub
@@ -320,7 +409,8 @@ DbLog_ExecSQL($$)
 
   Log 5, "Executing $sql";
   my $dbh= $hash->{DBH};
-  if(!DbLog_ExecSQL1($dbh,$sql)) {
+  my $sth = DbLog_ExecSQL1($dbh,$sql);
+  if(!$sth) {
     #retry
     $dbh->disconnect();
     if(!DbLog_Connect($hash)) {
@@ -328,14 +418,383 @@ DbLog_ExecSQL($$)
       return 0;
     }
     $dbh= $hash->{DBH};
-    if(!DbLog_ExecSQL1($dbh,$sql)) {
+    $sth = DbLog_ExecSQL1($dbh,$sql);
+    if(!$sth) {
       Log 2, "DBLog retry failed.";
       return 0;
     }
     Log 2, "DBLog retry ok.";
   }
-  return 1;
+  return $sth;
 }
 
 ################################################################
+#
+# GET Funktion
+# wird zb. zur Generierung der Plots implizit aufgerufen
+#
+################################################################
+sub
+DbLog_Get($@)
+{
+  my ($hash, @a) = @_;
+
+  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec>...\n".
+     "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
+     "  see the #DbLog entries in the .gplot files\n" .
+     "  <infile> is not used, only for compatibility for FileLog, please use - \n" .
+     "  <outfile> is a prefix, - means stdout\n"
+    if(int(@a) < 5);
+  shift @a;
+  my $inf  = shift @a;
+  my $outf = shift @a;
+  my $from = shift @a;
+  my $to   = shift @a; # Now @a contains the list of column_specs
+  my ($internal, @fld);
+
+  if($outf eq "INT") {
+    $outf = "-";
+    $internal = 1;
+  }
+
+  my @readings = ();
+  my (%sqlspec, %from_datetime, %to_datetime);
+
+  #uebergebenen Timestamp anpassen
+  #m?gliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
+  %from_datetime = DbLog_explode_datetime($from, DbLog_explode_datetime("2000-01-01_00:00:00", undef));
+  %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-31-12_23:59:59", undef));
+  $from = $from_datetime{datetime};
+  $to = $to_datetime{datetime};
+
+
+  my ($retval,$sql_timestamp,$sql_dev,$sql_reading,$sql_value) = "";
+  my $writeout = 0;
+  my (@min, @max, @sum, @cnt, @lastv, @lastd);
+  my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval); #fuer delta-h/d Berechnung
+
+  #extract the Device:Reading arguments into @readings array
+  for(my $i = 0; $i < int(@a); $i++) {
+    @fld = split(":", $a[$i], 4);
+    $readings[$i][0] = $fld[0];
+    $readings[$i][1] = $fld[1];
+    $readings[$i][2] = $fld[2];
+    $readings[$i][3] = $fld[3];
+  }
+
+  my $dbh= $hash->{DBH};
+
+  #vorbereiten der DB-Abfrage, DB-Modell-abh?ngig
+  if ($hash->{DBMODEL} eq "POSTGRESQL") {
+    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD_HH24:MI:SS')";
+    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD_HH24:MI:SS')";
+    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD_HH24:MI:SS')";
+  } elsif ($hash->{DBMODEL} eq "ORACLE") {
+    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD_HH24:MI:SS')";
+    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD_HH24:MI:SS')";
+    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD_HH24:MI:SS')";
+  } elsif ($hash->{DBMODEL} eq "MYSQL") {
+    $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d_%H:%i:%s')";
+    $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d_%H:%i:%s')";
+    $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d_%H:%i:%s')";
+  }
+
+   for(my $i=0; $i<int(@readings); $i++) {
+   # ueber alle Readings
+   # Variablen initialisieren
+   $min[$i]   =  999999;
+   $max[$i]   = -999999;
+   $sum[$i]   = 0;
+   $cnt[$i]   = 0;
+   $lastv[$i] = 0;
+   $lastd[$i] = "undef";
+   $minval    =  999999;
+   $maxval    = -999999;
+
+  my $stm= "SELECT
+        $sqlspec{get_timestamp},
+        DEVICE,
+        READING,
+        VALUE
+       FROM history
+       WHERE 1=1
+        AND (DEVICE || '|' || READING) = ('".@readings[$i]->[0]."|".@readings[$i]->[1]."')
+        AND TIMESTAMP > $sqlspec{from_timestamp}
+        AND TIMESTAMP < $sqlspec{to_timestamp}
+       ORDER BY TIMESTAMP";
+  Log 4, "DbLog: Execute Statement to Database:";
+  Log 4, $stm;
+
+  my $sth= $dbh->prepare($stm) ||
+    return "Cannot prepare statement $stm: $DBI::errstr";
+  my $rc= $sth->execute() ||
+    return "Cannot execute statement $stm: $DBI::errstr";
+
+  while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value)= $sth->fetchrow_array) {
+    $writeout   = 0;
+    $out_value  = "";
+    $out_tstamp = "";
+    ############ Auswerten des 4. Parameters: function ###################
+    if(@readings[$i]->[3] eq "int") {
+      #nur den integerwert ?bernehmen falls zb value=15?C
+      $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
+      $out_tstamp = $sql_timestamp;
+      $writeout=1;
+
+    } elsif (@readings[$i]->[3] =~ m/^int(\d+).*/o) {
+      #?bernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+      $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
+      $out_tstamp = $sql_timestamp;
+      $writeout=1;
+
+    } elsif (@readings[$i]->[3] eq "delta-h") {
+      #Berechnung eines Stundenwertes
+      %tstamp = DbLog_explode_datetime($sql_timestamp, undef);
+      if($lastd[$i] eq "undef") {
+        %lasttstamp = DbLog_explode_datetime($sql_timestamp, undef);
+      } else {
+        %lasttstamp = DbLog_explode_datetime($lastd[$i], undef);
+      }
+      if("$tstamp{hour}" ne "$lasttstamp{hour}") {
+        # Aenderung der stunde, Berechne Delta
+        $out_value = sprintf("%0.1f", $maxval - $minval);
+        $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
+        $minval =  999999;
+        $maxval = -999999;
+        $writeout=1;
+      }
+    } elsif (@readings[$i]->[3] eq "delta-d") {
+      #Berechnung eines Tageswertes
+      %tstamp = DbLog_explode_datetime($sql_timestamp, undef);
+      if($lastd[$i] eq "undef") {
+        %lasttstamp = DbLog_explode_datetime($sql_timestamp, undef);
+      } else {
+        %lasttstamp = DbLog_explode_datetime($lastd[$i], undef);
+      }
+      if("$tstamp{day}" ne "$lasttstamp{day}") {
+        # Aenderung des Tages, Berechne Delta
+        $out_value = sprintf("%0.1f", $maxval - $minval);
+        $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00");
+        $minval =  999999;
+        $maxval = -999999;
+        $writeout=1;
+      }
+    } elsif(@readings[$i]->[3]) {
+      #evaluate
+      my $value = $sql_value;
+      $out_value = eval("@readings[$i]->[3]");
+      if($@) {Log 3, "DbLog: Fehler in der ?bergebenen Funktion: <".@readings[$i]->[3].">, Fehler: $@";}
+      $out_tstamp = $sql_timestamp;
+      $writeout=1;
+    } else {
+      $out_value = $sql_value;
+      $out_tstamp = $sql_timestamp;
+      $writeout=1;
+    }
+
+    ###################### Ausgabe ###########################
+    $retval .= "$out_tstamp $out_value\n" if($writeout);
+
+    if(defined($sql_value) || $sql_value =~ m/^[-\.\d]+$/o){
+      #nur setzen wenn nummerisch
+      $min[$i] = $sql_value if($sql_value < $min[$i]);
+      $max[$i] = $sql_value if($sql_value > $max[$i]);;
+      $sum[$i] += $sql_value;
+      $minval = $sql_value if($sql_value < $minval);
+      $maxval = $sql_value if($sql_value > $maxval);
+    } else {
+      $min[$i] = 0;
+      $max[$i] = 0;
+      $sum[$i] = 0;
+      $minval  = 0;
+      $maxval  = 0;
+    }
+    $cnt[$i]++;
+    $lastv[$i] = $sql_value;
+    $lastd[$i] = $sql_timestamp;
+
+  } #while fetchrow
+
+  ######## den letzten Abschlusssatz rausschreiben ##########
+  if(@readings[$i]->[3] eq "delta-h" || @readings[$i]->[3] eq "delta-d") {
+    $out_value = sprintf("%0.1f", $maxval - $minval);
+    $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if(@readings[$i]->[3] eq "delta-h");
+    $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if(@readings[$i]->[3] eq "delta-d");
+    $retval .= "$out_tstamp $out_value\n";
+  }
+  # DatenTrenner setzen
+  $retval .= "#@readings[$i]->[0]:@readings[$i]->[1]:@readings[$i]->[2]:@readings[$i]->[3]\n";
+  } #for @readings
+
+  #Ueberfuehren der gesammelten Werte in die globale Variable %data
+  for(my $j=0; $j<int(@readings); $j++) {
+   my $k = $j+1;
+   $data{"min$k"} = $min[$j] == 999999 ? "undef" : $min[$j];
+   $data{"max$k"} = $max[$j] == -999999 ? "undef" : $max[$j];
+   $data{"avg$k"} = $cnt[$j] ? sprintf("%0.1f", $sum[$j]/$cnt[$j]) : "undef";
+   $data{"sum$k"} = $sum[$j];
+   $data{"cnt$k"} = $cnt[$j] ? $cnt[$j] : "undef";
+   $data{"currval$k"} = $lastv[$j];
+   $data{"currdate$k"} = $lastd[$j];
+  }
+
+  if($internal) {
+  $internal_data = \$retval;
+  return undef;
+  }
+  return $retval;
+}
+################################################################
+
+
+# reload 93_DbLog.pm
+# get DbLog_Bewaesserung - - 2012-06-22 2012-06-23 KS300:temperature:: KS300:humidity::
+# get DbLog - - 2012-11-10_10 2012-11-10_20 KS300:rain:0:delta-h
+# http://tulpemd.dyndns.org/fhem?cmd=showlog weblink_Bodenfeuchte_1 DbLog_Bodenfeuchte myDbLogtest null
+#
+# FileLog
+# get FileLog_KS300 KS300-2012-11.log - 2012-11-10 2012-11-22 10:IR\x3a:0:delta-d
+
 1;
+
+=pod
+=begin html
+<a name="DbLog"></a>
+<h3>DbLog</h3>
+<ul>
+  <br>
+
+  <a name="DbLogdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; DbLog &lt;configfilename&gt; &lt;regexp&gt;</code>
+    <br><br>
+
+    Log events to a database. The database connection is defined in
+    <code>&lt;configfilename&gt;</code> (see sample configuration file
+    <code>db.conf</code>). The configuration is stored in a separate file
+    to avoid storing the password in the main configuration file and to have it
+    visible in the output of the <a href="../docs/commandref.html#list">list</a> command.
+    <br><br>
+
+    You must have <code>93_DbLog.pm</code> in the <code>FHEM</code> subdirectory
+    to make this work. Additionally, the modules <code>DBI</code> and
+    <code>DBD::&lt;dbtype&gt;</code> need to be installed (use
+    <code>cpan -i &lt;module&gt;</code> if your distribution does not have it).
+    <br><br>
+
+    <code>&lt;regexp&gt;</code> is the same as in <a href="../docs/commandref.html#FileLog">FileLog</a>.
+    <br><br>
+    Sample code to create a MySQL database is in <code>fhemdb_create.sql</code>.
+    The database contains two tables: <code>current</code> and
+    <code>history</code>. The latter contains all events whereas the former only
+    contains the last event for any given reading and device.
+    The columns have the following meaning:
+    <ol>
+
+    <li>TIMESTAMP: timestamp of event, e.g. <code>2007-12-30 21:45:22</code></li>
+    <li>DEVICE: device name, e.g. <code>Wetterstation</code></li>
+    <li>TYPE: device type, e.g. <code>KS300</code></li>
+    <li>EVENT: event specification as full string,
+                                        e.g. <code>humidity: 71 (%)</code></li>
+    <li>READING: name of reading extracted from event,
+                    e.g. <code>humidity</code></li>
+
+    <li>VALUE: actual reading extracted from event,
+                    e.g. <code>71</code></li>
+    <li>UNIT: unit extracted from event, e.g. <code>%</code></li>
+    </ol>
+    The content of VALUE is optimized for automated post-processing, e.g.
+    <code>yes</code> is translated to <code>1</code>
+    <br><br>
+    The current values can be retrieved by the following code like FileLog:<br>
+    <ul>
+      <code>get myDbLog - - 2012-11-10 2012-11-10 KS300:temperature::</code>
+    </ul>
+    <br><br>
+    <b>Examples:</b>
+    <ul>
+        <code># log everything to database</code><br>
+
+        <code>define myDbLog DbLog /etc/fhem/db.conf .*:.*</code>
+    </ul>
+  </ul>
+
+
+  <a name="DbLogset"></a>
+  <b>Set</b> <ul>N/A</ul><br>
+
+  <a name="DbLogget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+          &lt;to&gt; &lt;column_spec&gt; </code>
+    <br><br>
+    Read data from the Database, used by frontends to plot data without direct
+    access to the Database.<br>
+
+    <ul>
+      <li>&lt;infile&gt;<br>
+        A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+      <li>&lt;outfile&gt;<br>
+        A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+      <li>&lt;from&gt; / &lt;to&gt;<br>
+        Used to select the data. Please use the following timeformat or
+        an initial substring of it:<br>
+        <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+      <li>&lt;column_spec&gt;<br>
+        For each column_spec return a set of data separated by
+        a comment line on the current connection.<br>
+        Syntax: &lt;device&gt;:&lt;reading&gt;:&lt;default&gt;:&lt;fn&gt;<br>
+        <ul>
+          <li>&lt;device&gt;<br>
+            The name of the device. Case sensitive</li>
+          <li>&lt;reading&gt;<br>
+            The reading of the given device to select. Case sensitive.
+            </li>
+          <li>&lt;default&gt;<br>
+            no implemented yet
+            </li>
+          <li>&lt;fn&gt;
+            One of the following:
+            <ul>
+              <li>int<br>
+                Extract the integer at the beginning of the string. Used e.g.
+                for constructs like 10%</li>
+              <li>int&lt;digit&gt;<br>
+                Extract the decimal digits including negative character and
+                decimal point at the beginning og the string. Used e.g.
+                for constructs like 15.7&deg;C</li>
+              <li>delta-h or delta-d<br>
+                Return the delta of the values for a given hour or a given day.
+                Used if the column contains a counter, as is the case for the
+                KS300 rain column.</li>
+              <li>everything else<br>
+                The string is evaluated as a perl expression. $value is the
+                current value returned from the Database. Note: The string/perl
+                expression cannot contain spaces, as the part after the space
+                will be considered as the next column_spec.</li>
+            </ul></li>
+        </ul></li>
+      </ul>
+    <br><br>
+    Example:
+      <ul>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature::</code></li>
+        <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
+           like from 10am until 20pm at 10.11.2012</li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature::</code></li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature:: KS300:rain::delta-h KS300:rain::delta-d</code></li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyDummy:data::$value=~"on"?1:0</code></li>
+      </ul>
+    <br><br>
+  </ul>
+
+  <a name="DbLogattr"></a>
+  <b>Attributes</b> <ul>N/A</ul><br>
+
+</ul>
+
+
+=end html
+=cut
