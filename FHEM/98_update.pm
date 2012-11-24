@@ -168,6 +168,17 @@ update_DoUpdate(@)
     $ret = $checkUpdates;
   }
 
+  # save statefile
+  $ret .= "\nSaving statefile: ";
+  my $cmdret = WriteStatefile();
+  if (!$cmdret) {
+    Log 1, "update saving statefile";
+    $ret .= "done\n\n";
+  } else {
+    Log 1, "update statefile: $cmdret";
+    $ret .= "Something went wrong with statefile:\n$cmdret\n\n";
+  }
+
   # do a backup first
   my $doBackup = (!defined($attr{global}{backup_before_update}) ? 1 : $attr{global}{backup_before_update});
 
