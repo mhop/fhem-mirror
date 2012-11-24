@@ -19,6 +19,9 @@
   - change: FHEMWEB added "Associated with" to detail-screen (Uli)
   - change: FHEMWEB added ETag headers (Matthias)
   - change: FHEMWEB devStateIcon added
+  - change: 98_update.pm due a (probable) bug in perl, modules are no longer
+            loading automatically. A restart is required now! (M. Fischer)
+  - feature: 98_update.pm saves the statefile before an update (M. Fischer)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
