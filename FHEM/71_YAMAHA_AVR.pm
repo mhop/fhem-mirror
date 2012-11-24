@@ -95,10 +95,10 @@ YAMAHA_AVR_GetStatus($;$)
     
     
     my $return = YAMAHA_AVR_SendCommand($hash, $device,"<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
-
-    Log GetLogLevel($name, 4), "YANMAHA_AVR: GetStatus-Request returned:\n$return";
     
-    if($return eq "")
+    Log GetLogLevel($name, 4), "YANMAHA_AVR: GetStatus-Request returned:\n$return" if(defined($return));
+    
+    if(not defined($return) or $return eq "")
     {
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
 	return;
