@@ -498,7 +498,7 @@ sub TRX_LIGHT_parse_X10 {
   }
 
   if (($firstdevice == 1) && $val) {
-  	$def->{STATE} = $val;
+  	#$def->{STATE} = $val;
 	readingsBulkUpdate($def, "state", $val);
   }
 

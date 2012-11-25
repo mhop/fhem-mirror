@@ -1021,7 +1021,7 @@ TRX_WEATHER_Parse($$)
     # remove heading and trailing space chars from $val
     $val =~ s/^\s+|\s+$//g;
 
-    $def->{STATE} = $val;
+    #$def->{STATE} = $val;
     readingsBulkUpdate($def, "state", $val);
   }
 
