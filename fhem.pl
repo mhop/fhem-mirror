@@ -2942,7 +2942,7 @@ readingsBulkUpdate($$$) {
     my $eour= $attreour && grep($_ eq $reading, split /,/,$attreour);
 
     # determine if an event should be created
-    my $changed= !($attreocr || $attreour)  # always create event if no attribute is set
+    $changed= !($attreocr || $attreour)  # always create event if no attribute is set
                   || $eour                  # or if the reading is listed in event-on-update-reading
                   || ($eocr &&              # or if the reading is listed in event-on-change-reading...
                   ($value ne $readings->{$reading}{VAL})); # ...and its value has changed.
