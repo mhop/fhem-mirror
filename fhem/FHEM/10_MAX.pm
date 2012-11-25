@@ -302,7 +302,11 @@ MAX_Parse($$)
     $shash->{windowOpenDuration} = $args[8];
 
   } elsif($msgtype eq "Error") {
-    $shash->{ERROR} = join(",",$args[0]);
+    if(@args == 0) {
+      delete $shash->{ERROR} if(exists($shash->{ERROR}));
+    } else {
+      $shash->{ERROR} = join(",",$args[0]);
+    }
 
   } else {
     Log 1, "MAX_Parse: Unknown message $msgtype";

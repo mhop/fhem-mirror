@@ -462,6 +462,9 @@ MAXLAN_Parse($$)
       Log 2, "Got configdata for unimplemented devicetype $devicetype";
     }
 
+    #Clear Error
+    Dispatch($hash, "MAX,Error,$addr", {RAWMSG => $rmsg});
+
     #Check if it is already recorded in devices
     my $found = 0;
     foreach (@{$hash->{devices}}) {
