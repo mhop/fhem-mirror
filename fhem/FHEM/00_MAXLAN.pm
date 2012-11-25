@@ -104,7 +104,15 @@ MAXLAN_Connect($)
 {
   my $hash = shift;
 
+  #Close connection (if there is a previous one)
+  DevIo_CloseDev($hash);
+
+  RemoveInternalTimer($hash);
+
+  $hash->{gothello} = 0;
+
   delete($hash->{NEXT_OPEN}); #work around the connection rate limiter in DevIo
+
   my $ret = DevIo_OpenDev($hash, 0, "MAXLAN_DoInit");
   if($hash->{STATE} ne "opened"){
     Log 3, "Scheduling reconnect attempt in $reconnect_interval seconds";
@@ -173,8 +181,6 @@ MAXLAN_Set($@)
     MAXLAN_RequestReset($hash);
 
   }elsif($setting eq "reconnect") {
-    DevIo_CloseDev($hash);
-    RemoveInternalTimer($hash);
     MAXLAN_Connect($hash);
   }else{
     return "Unknown argument $setting, choose one of pairmode raw clock factoryReset reconnect";
@@ -316,6 +322,19 @@ MAXLAN_SendMetadata($)
       return;
     }
   }
+}
+
+sub
+MAXLAN_FinishConnect($)
+{
+  my ($hash) = @_;
+  #Handle deferred setting of time (L: is the last response after connection before the cube starts to idle)
+  if(defined($hash->{setTimeOnHello})) {
+    MAXLAN_Set($hash,$hash->{NAME},"clock");
+    delete $hash->{setTimeOnHello};
+  }
+  #Enable polling timer
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MAXLAN_Poll", $hash, 0)
 }
 
 sub
@@ -516,13 +535,7 @@ MAXLAN_Parse($$)
     if(!$hash->{gothello}) {
       # "L:..." is the last response after connection before the cube starts to idle
       $hash->{gothello} = 1;
-      #Handle deferred setting of time (L: is the last response after connection before the cube starts to idle)
-      if(defined($hash->{setTimeOnHello})) {
-        MAXLAN_Set($hash,$hash->{NAME},"clock");
-        delete $hash->{setTimeOnHello};
-      }
-      #Enable polling timer
-      InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MAXLAN_Poll", $hash, 0)
+      MAXLAN_FinishConnect($hash);
     }
   }elsif($cmd eq "N"){#New device paired
     if(@args==0){
@@ -571,8 +584,6 @@ MAXLAN_SimpleWrite(@)
   #TODO: none of those conditions detect if the connection is actually lost!
   if(!$hash->{TCPDev} || !defined($ret) || !$hash->{TCPDev}->connected) {
       Log GetLogLevel($name,1), 'MAXLAN_SimpleWrite failed';
-      DevIo_CloseDev($hash);
-      RemoveInternalTimer($hash);
       MAXLAN_Connect($hash);
     }
 }
