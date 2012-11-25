@@ -1,0 +1,1267 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html><head>
+  <title>fhem reference</title>
+  <link rel="stylesheet" type="text/css" href="commandref-Dateien/style.css">
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <link rel="shortcut icon" href="http://fhem.de/favicon.ico">
+
+</head>
+
+
+<body>
+
+  <div id="logo"></div>
+  <div id="menu">
+    <h3>fhem.pl Referenz</h3>
+  </div>
+
+  <div id="right">
+
+<h3>Inhalt</h3>
+<ul>
+  <a href="#intro">Einleitung</a><br>
+  <a href="#command">FHEM Befehls-Typen</a><br>
+  <a href="#devspec">Geräte-Spezifikation</a><br>
+
+  <br>
+  <b>FHEM-Befehle</b>
+  <ul>
+      <a href="#attr">attr</a> &nbsp;
+      <a href="#backup">backup</a> &nbsp;
+      <a href="#CULflash">CULflash</a> &nbsp;
+      <a href="#createlog">createlog</a> &nbsp;
+      <a href="#define">define</a> &nbsp;
+      <a href="#delete">delete</a> &nbsp;
+      <a href="#deleteattr">deleteattr</a> &nbsp;
+      <a href="#get">get</a> &nbsp;
+      <a href="#getstate">getstate</a> &nbsp;
+      <a href="#help">?,help</a> &nbsp;
+      <a href="#include">include</a> &nbsp;
+      <a href="#inform">inform</a> &nbsp;
+      <a href="#jsonlist">jsonlist</a> &nbsp;
+      <a href="#list">list</a> &nbsp;
+      <a href="#modify">modify</a> &nbsp;
+      <a href="#quit">quit</a> &nbsp;
+      <a href="#reload">reload</a> &nbsp;
+      <a href="#rename">rename</a> &nbsp;
+      <a href="#rereadcfg">rereadcfg</a> &nbsp;
+      <a href="#save">save</a> &nbsp;
+      <a href="#set">set</a> &nbsp;
+      <a href="#setdefaultattr">setdefaultattr</a> &nbsp;
+      <a href="#setstate">setstate</a> &nbsp;
+      <a href="#shutdown">shutdown</a> &nbsp;
+      <a href="#sleep">sleep</a> &nbsp;
+      <a href="#trigger">trigger</a> &nbsp;
+      <a href="#update">update</a> &nbsp;
+      <a href="#usb">usb</a> &nbsp;
+      <a href="#xmllist">xmllist</a> &nbsp;
+
+  </ul>
+
+  <br>
+  <b>Geräte</b>
+  <ul>
+      <a href="#global">global</a><br>
+
+  </ul>
+
+  <br>
+  <b>Hilfs (Erweiterungs-) Module</b>
+  <ul>
+    <a href="#FHEM2FHEM">FHEM2FHEM</a> &nbsp;
+    <a href="#FHEMWEB">FHEMWEB</a> &nbsp;
+    <a href="#FileLog">FileLog</a> &nbsp;
+    <a href="#PachLog">PachLog</a> &nbsp;
+    <a href="#PID">PID</a> &nbsp;
+    <a href="#SUNRISE_EL">SUNRISE_EL</a> &nbsp;
+    <a href="#at">at</a> &nbsp;
+    <a href="#autocreate">autocreate</a> &nbsp;
+    <a href="#average">average</a> &nbsp;
+    <a href="#dewpoint">dewpoint</a> &nbsp;
+    <a href="#dummy">dummy</a> &nbsp;
+    <a href="#holiday">holiday</a> &nbsp;
+    <a href="#notify">notify</a> &nbsp;
+    <a href="#sequence">sequence</a> &nbsp;
+    <a href="#structure">structure</a> &nbsp;
+    <a href="#telnet">telnet</a> &nbsp;
+    <a href="#watchdog">watchdog</a> &nbsp;
+    <a href="#weblink">weblink</a> &nbsp;
+
+  </ul>
+
+  <br>
+  <a href="#perl">PERL Besonderheiten</a><br>
+  <a href="#gnuplot-syntax">gnuplot file Syntax</a><br>
+</ul>
+
+
+<a name="intro"></a>
+<h3>Einleitung</h3>
+<ul>
+<p>FHEM wird hauptsächlich zur Heimautomatisierung benutzt, 
+ist aber ebenso für andere Aufgaben einsetzbar wo Benachrichtigungen, 
+Zeitschaltungen und Datensammlungen eine wichtige Rolle spielen.</p>
+<p>FHEM unterstützt verschiedene Hardwaregeräte die eine 
+Verbindung mittels unterschiedlicher Protokolle (z.B. FHZ1000 mit Interfaces vom 
+Typ FS20 und HMS, CM11 um mit X10 zu arbeiten) sowie logischer Geräte wie FS20 
+oder FHT die einen Nachrichtenaustausch mit verschiedensten Geräten die diese 
+Protokolle verwenden ermöglichen.</p>
+<p>
+FHEM ist modular. Abhängig von den unterschiedlichen Geräten werden in den 
+Modulen verschiedene Funktionen (z.B. define, get, set) realisiert. FHEM enthält 
+weitere Funktionen wie Trigger (<a href="#notify">notify</a>), 
+Zeitabhängige Funktionen (<a href="#at">at</a>) 
+die die Funktionalität erweitern.</p>
+<p>
+FHEM wird entweder über einfache ASCII-Kommandozeilen gesteuert die in Dateien 
+wie z.B. der Konfigurationsdatei fhem.cfg gespeichert sind oder über eine TCP/IP 
+Verbindung, entweder direkt in einer „telnet“-Sitzung, oder per fhem.pl im 
+Client-Modus oder über eines der Webfrontends.<br> &nbsp;</p>
+<p class="MsoNormal">Wenn Sie den FHEM-Server starten, müssen Sie eine 
+Konfigurationsdatei auswählen:</p>
+<p>&nbsp;</p>
+<ul>
+  <code>fhem.pl ~/.fhem</code>
+</ul>
+&nbsp;<p>Nachstehend eine Minimal-Konfiguration Datei: </p>
+<pre>    attr global <a href="#logfile">logfile</a> /tmp/fhem.log
+    attr global <a href="#statefile">statefile</a> /tmp/fhem.save
+    attr global <a href="#verbose">verbose</a> 3
+    attr global <a href="#port">port</a> 7072
+    attr global <a href="#modpath">modpath</a> /usr/share/fhem
+    <a href="#define">define</a> FHZ FHZ /dev/tts/USB0
+
+    <a href="#define">define</a> lamp FS20 8765 01</pre>
+
+    <p>Beispiele für andere Konfigurationsdateien finden Sie 
+    im “examples“-Verzeichnis</p>
+<p>
+Die Kommunikation mit FHEM kann entweder in einer “session” (über telnet) oder 
+über einzelne Klient-Kommandos (über fhem.pl) erfolgen. Beispiel:</p>
+<ul>
+    <code>telnet localhost 7072<br>
+    &lt;NL&gt; </code>(Die Betätigung der &quot;Enter&quot;-Taste schaltet in den&nbsp; "prompt" 
+    Modus)<code><br>
+    &lt;command&gt;...<br>
+    quit</code><br>
+</ul>
+    oder
+<ul>
+    <code>fhem.pl 7072 "set lamp off"</code>
+</ul>
+</ul>
+
+
+<a name="command"></a>
+<h3>FHEM Befehlstypen</h3>
+<ul>
+Es gibt drei Arten von Befehlen: „fhem“ Befehle (werden in diesem Dokument 
+beschrieben), SHELL-Befehle (diese müssen von doppelten Anführungszeichen „“ 
+eingeschlossen werden) und PERL-Ausdrücken (von geschwungenen Klammern {} 
+eingeschlossen). SHELL-Befehle oder PERL-Ausdrücke werden für komplexe <a href="#at">at</a> 
+oder <a href="#notify">notify</a> Ausdrücke benötigt, können aber auch als „normale“ Befehle angewendet werden.&nbsp;
+  <p class="MsoNormal">Die folgenden drei Befehle bewirken z.B. dasselbe 
+  Ergebnis, wenn sie am “telnet”-Prompt eingegeben werden:</p>
+  <p>&nbsp;</p>
+  <ul>
+  set lamp off<br>
+  "fhem.pl 7072 "set lamp off""<br>
+  {fhem("set lamp off")}<br>
+  </ul>
+&nbsp;<p>SHELL-Kommandos werden im Hintergrund ausgeführt, 
+PERL-Ausdrücke und FHEM-Kommandos werden im Haupt-“thread” ausgeführt. Um 
+PERL-Ausdrücke leichter eingeben zu können, sind einige Spezialfunktionen und 
+Variablen verfügbar. Lesen Sie sich bitte die Abschnitte
+<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#perl" style="color: #278727; text-decoration: underline; text-underline: single">
+Perl special</a> zum besseren Verständnis durch.</p>
+<p>Um FHEM-Befehle in einen SHELL-Script zu triggern (dies ist 
+eine „andere“ Möglichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
+der fhem.pl.</p>
+<p>&nbsp;</p>
+<p">Mehrere FHEM-Kommandos hintereinander werden mittels 
+Semikolon (;) getrennt. Weil Semikola auch in PERL-Code oder SHELL-Programmen 
+benutzt werden, müssen sie mittels doppelten Semikola geschützt werden. Lesen 
+Sie sich bitte die <b>Bermerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.</p>
+<p>Z.B. schaltet die erste der folgenden Befehlszeilen die 
+Lampe 1 nur/erst zur Uhrzeit 07:00 Uhr aus, die Lampe 2 aber sofort und die 
+zweite Befehlszeile schaltet Lampe 1 und 2 um 7:00 Uhr gleichzeitig aus. </p>
+<p>&nbsp;</p>
+  <ul>
+  define lampoff at 07:00 set Lamp1 off; set Lamp2 off<br>
+  define lampoff at 07:00 set Lamp1 off;; set Lamp2 off<br>
+  </ul>
+&nbsp;<p">Befehle können entweder direkt eingegeben oder aus 
+seiner Datei (z.B. am Start von FHEM aus der Konfugurationsdatei eingelesen 
+werden. Die Befehle werden entweder direkt ausgeführt oder später wenn sie als 
+Argumente eines <a href="#at">at</a> oder <a href="#notify">notify</a>-Befehles verwendet werden. </p>
+<p>&nbsp;</p>
+<p>Eine mit einem \ abgeschlossene Zeile wird mit der 
+nachfolgenden Zeile verbunden. Somit können lange Befehlszeilen (die z.B. aus 
+mehreren PERL-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige 
+Web-Frontends (z.B. webpgm2) erleichtern die Eingabe von sich über mehrere 
+Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
+<p>&nbsp;</p>
+</ul>
+
+
+<a name="devspec"></a>
+<h3>Geräte-Spezifikation (devspec)</h3>
+<ul>
+  <p>Die Befehle
+    <a href="#attr">attr</a>,
+    <a href="#deleteattr">deleteattr</a>,<a href="#delete">delete</a>,
+    <a href="#get">get</a>,
+    <a href="#list">list</a>,
+    <a href="#set">set</a>,
+    <a href="#setstate">setstate</a>,<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#setstate"><span style="text-decoration: underline">
+  </span></a>können eine komplexere 
+  Gerätespezifikation als Argumente enthalten, die auch eine Anzahl von Geräten 
+  betreffen kann. Eine Gerätespezifikation (Kurzfassung) kann z.B. so aussehen:</p>
+  <ul>
+  <li>ein einzelner Gerätename. Dies ist der 
+  meist vorkommende Fall.</li>
+  <li>
+  eine Liste von Gerätenamen, durch Kommata (,) getrennt</li>
+  <li>
+  ein Bereich, durch ein Minuszeichen getrennt (-)</li>
+  <li>ein regulärer Ausdruck der eines der 
+  folgenden Zeichen enthält: ^*[]$</li>
+  <li>
+  ein Geräteattribut, gefolgt von einem Gleichheitszeichen (=) und einem 
+  regulären Ausdruck für dieses Attribut.
+  Als Attribut können Sie entweder Attribute die mittels “attr”-Befehl oder 
+  eines der “internen” Attribute wie DEF, STATE oder TYPE angeben.</li>
+  </ul>
+  &nbsp;<p>
+  Beispiele: </p>
+  <ul>
+    <code>set lamp1 on</code><br>
+    <code>set lamp1,lamp2,lamp3 on</code><br>
+    <code>set lamp[1-3] on</code><br>
+    <code>set lamp.* on</code><br>
+    <code>set lamp1-lamp3 on</code><br>
+    <code>set lamp1-lamp3,lamp3 on</code><br>
+    <code>set room=kitchen off</code><br>
+    <code>list disabled=</code><br>
+    <code>list TYPE=FS20</code><br>
+  </ul>
+  Bemerkungen: <br>
+&nbsp;<ul>
+  <li>zuerst wird die durch Kommata getrennte 
+  Spezifikation abgearbeitet, dann folgen die Bereichsspezifikationen und die 
+  regulären Ausdrücke</li>
+  <li>
+  wenn für ein Gerät eine Spezifikation exakt zutrifft, werden keine weiteren 
+  Vergleiche vorgenommen.</li>
+  <li>
+  die Befehlszeile kann die selbe Gerätebezeichnung mehrfach enthalten z.B.: &quot;set 
+  lamp1-lamp3, lamp3 on&quot;.
+  Lamp3 wird hier zwei Mal eingeschalten.</span></li>
+  <li>um Strukturen mit komplexeren Anforderungen zu realisieren lesen Sie bitte 
+  den Abschnitt zu <a href="#structure">
+      structure</a>.
+  </li></ul>
+</ul>
+
+<a name="help"></a>
+<h3>?, help</h3>
+<ul>
+  <code>?</code><br>
+  <code>help</code><br>
+  <br>
+  Sie erhalten eine Liste aller Befehle mit einer Kurzbeschreibung jedes 
+  Befehls.
+</ul>
+
+<a name="attr"></a>
+<h3>attr</h3>
+<ul>
+  <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
+
+  <br>
+   Dieser Befehl setzt ein Attribut für ein Gerät welches mit <a href="#define">define</a> definiert wurde. Sie können auch 
+  Ihre eigenen Attribute definieren, um sie in anderen Applikationen anzuwenden. 
+  Geben Sie „&lt;attr &lt;name&gt; ?“ ein, um eine Liste verfügbarer Attribute 
+  anzuzeigen. Bitte lesen Sie das Kapitel <a href="#devspec">Device specification</a>&nbsp; 
+  um Detail-Informationen zu &lt;devspec&gt; zu erhalten.
+  <p>Attribute, die für 
+  alle Geräte anwendbar sind: </p>
+  <ul>
+    <a name="comment"></a>
+    <li>comment<br>
+        Fügt einen beliebigen Kommentar hinzu.
+    <a name="alias"></a>
+    </li><li>alias<br>
+     Wird in FHEMWEB benutzt, um ein en anderen Namen für ein Gerät anzuzeigen 
+    z.B. wenn Sonderzeichen/Leerzeichen nicht in der Gerätedefinition verwendet 
+    werden können.
+    <a name="room"></a>
+    </li><li>room<br>
+     Filtert/gruppiert Geräte. Verwendbar unter web-pgm2 und web-pgm3.
+     Ein Geräte kann zu mehr als einem Raum zugeordnet werden. In diesem Fall 
+    müssen die Raumzuordnungen&nbsp; durch Kommata getrennt angegeben werden.<br>
+        Geräte, die dem Raum mit der Bezeichnung “hidden” zugeordnet werden, 
+    erscheinen nicht auf der Webseite, es sei denn Sie berücksichtigen <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
+        rooms for certain FHEMWEB instances.
+        </a></li><a href="#hiddenroom">
+
+    </a><a name="group"></a>
+    <li>group<br>
+        Gerätegruppen, anwendbar unter web-pgm2 (Modul
+    <a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#FHEMWEB" style="color: #278727; text-decoration: underline; text-underline: single">
+    FHEMWEB</a>) zeigt Geräte die in die gleiche Gruppe gehören auch in einer 
+    gemeinsamen Box an. Das benutzt man, um später Geräte zu gruppieren. Ein 
+    Gerät kann zu mehr als einer Gruppe gehören. In diesem Fall müssen die 
+    entsprechenden Gruppen, durch Kommata getrennt, eingetragen werden<p>
+    Wenn dieses Attribut nicht gesetzt ist, wird der in der Gerätegruppe 
+    gesetzte Gerätetyp verwendet.&nbsp;</li><a name="showtime"></a></p>
+    <li>showtime<br>
+    Wird im Webfrontend pgm2 verwendet, um die Zeit der letzten Aktivität 
+    anstelle des Status in der Gesamtansicht anzuzeigen. Nützlich z.B. für FS20 
+    PIRI Geräte.</span>
+    </li>
+
+    <br><br>
+    <br>
+    Die folgenden Attribute werden bei Modulen verwendet, die standardisierte „readings“ 
+    Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der Liste der 
+    Modulattribute wenn Sie wissen möchten ob dies unterstützt wird.<br><br>
+
+    <a name="event-on-update-reading"></a>
+    <li>event-on-update-reading<br>
+    Wenn nicht gesetzt, erzeugt jede Veränderung eines “readings” ein Ereignis, 
+    welches z.B. von
+    <a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#notify" style="color: #278727; text-decoration: underline; text-underline: single">
+    notify</a> oder
+    <a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#FileLog" style="color: #278727; text-decoration: underline; text-underline: single">
+    FileLog</a> berücksichtigt wird. Wenn gesetzt erzeugen nur Aktualisierungen 
+    der eingetragenen „readings“ ein Ereignis.
+    </li>
+
+    <a name="event-on-change-reading"></a>
+    <li>event-on-change-reading<br>
+    Dieses Attribut enthält eine durch Kommata getrennte Liste von “readings”. 
+    Wenn gesetzt, erzeugen nur Veränderungen der gelisteten „readings“ ein 
+    Ereignis. Wenn die aktualiserten Werte der gelisteten „readings“ identisch 
+    sind, wird kein Ereignis generiert.</li><p>
+    Die unterschiedlichen Bedeutungen von
+    event-on-update-reading und event-on-change-reading sind folgende</span>:
+    <ol>
+    <li>
+    <p>Wenn 
+    beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung eines jeden „readings“ 
+    eines Gerätes ein Ereignis.</li>
+    <li>
+    Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder Änderungen 
+    von „readings“ die nicht in einem der Attribute gesetzt sind ein Ereignis.</li>
+    <li>
+    Wenn ein „reading“ in event-on-update-reading aufgeführt ist, erzeugt eine 
+    Aktualisierung ein Ereignis unabhängig ob das „reading“ auch in 
+    event-on-change-reading aufgelistet ist.</li>
+    </ol>
+
+  </ul>
+  <br>
+
+  Gerätespezifische Attribute sind in der Beschreibung zum jeweiligen Gerät 
+  aufgeführt.
+  <br>
+
+  Beispiele:
+  <ul>
+    <code>attr global verbose 3</code><br>
+    <code>attr lamp room kitchen</code><br>
+    <code>attr lamp group lights</code><br>
+    <code>attr lamp loglevel 6</code><br>
+    <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
+    <code>attr weatherstation event-on-change-reading israining</code><br>
+    <code>attr weatherstation event-on-change-reading israining,state</code><br>
+  </ul>
+  <br>
+
+  Bemerkungen:<br>
+  <ul>
+    <li>Lesen Sie unter <a href="#deleteattr">deleteattr</a> nach um Attribute 
+    zu löschen.</li>
+  </ul>
+</ul>
+
+<a name="setdefaultattr"></a>
+<h3>setdefaultattr</h3>
+<ul>
+  <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
+
+  <br>Add a default attribute. Each device defined from now on will receive
+  this attribute.<br> If no attrname is specified, then the default attribute
+  list will be deleted.
+  <br><br>
+
+  Example to set the attribute "room kitchen" and "loglevel 4" to
+  each of the lamps:
+  <ul>
+    <code>setdefaultattr room kitchen</code><br>
+    <code>setdefaultattr loglevel 4</code><br>
+    <code>define lamp1 FS20 1234 11</code><br>
+    <code>define lamp2 FS20 1234 12</code><br>
+    <code>define lamp3 FS20 1234 13</code><br>
+    <code>setdefaultattr</code><br>
+  </ul>
+  <br>
+
+  Notes:<br>
+  <ul>
+    <li>There is no way to delete a single default-attribute from the list</li>
+  </ul>
+</ul>
+
+
+<a name="define"></a>
+<h3>define</h3>
+<ul>
+  <code>define &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
+  <br>
+  Define a device. You need devices if you want to manipulate them (e.g.
+  set on/off), and the logfile is also more readable if it contains e.g.
+  "lamp off" instead of "Device 5673, Button 00, Code 00 (off)". <br>
+  Use "define &lt;name&gt; ?" to get a list of possible types.<br>
+  After definition, the global event "DEFINED" will be generated, see the
+  notify section for details.<br>
+  <br><br>
+
+  Each device takes different additional arguments at definition, see the
+  corresponding device section for details.<br>
+  <br>
+</ul>
+
+
+<a name="deleteattr"></a>
+<h3>deleteattr</h3>
+<ul>
+  <code>deleteattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
+  <br>
+  Delete either a single attribute (see the <a href="#attr">attr</a> command)
+  or all attributes for a device (if no &lt;attrname&gt; is defined).
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  <br>
+
+  Examples:
+  <ul>
+    <code>deleteattr lamp follow-on-for-timer</code><br>
+    <code>deleteattr lamp</code><br>
+  </ul>
+  <br>
+</ul>
+
+<a name="delete"></a>
+<h3>delete</h3>
+<ul>
+  <code>delete &lt;devspec&gt;</code> <br>
+  <br>
+  Delete something created with the <a href="#define">define</a> command.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  After deletion, the global event "DELETED" will be generated, see the notify
+  section for details.<br>
+  Examples:
+  <ul>
+    <code>delete lamp</code><br>
+  </ul>
+  <br>
+</ul>
+
+<a name="get"></a>
+<h3>get</h3>
+<ul>
+  <code>get &lt;devspec&gt; &lt;type-specific&gt;</code>
+  <br><br>
+  Ask a value directly from the device, and wait for an answer. In general, you
+  can get a list of possible parameters by
+  <ul>
+    <code>get &lt;device&gt; ?</code>
+  </ul>
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  <br>
+  Each device has different get parameters, see the corresponding device
+  section for details.<br>
+  <br>
+
+</ul>
+
+
+<a name="getstate"></a>
+<h3>getstate</h3>
+<ul>
+  <code>getstate &lt;devspec&gt;</code>
+  <br><br>
+  Output a short space seperated status for &lt;devspec&gt;. It is useful for
+  monitoring the device in e.g. Cacti.<br>
+  Examples:
+  <ul><code>
+  getstate lamp<br>
+  state:1<br>
+  <br>
+  getstate fl<br>
+  ack:0 actuator:2 day-temp:21.5 desired-temp:22.5 [...] measured-temp:22.9 [...]
+  </code></ul>
+  Note: to use this command copy the file contrib/getstate/99_getstate.pm into
+  your FHEM directory.
+  <br>
+
+</ul>
+
+
+<a name="include"></a>
+<h3>include</h3>
+<ul>
+  <code>include &lt;filename&gt;</code> <br>
+  <br>
+  Read in the file, and process every line as a fhem command. Makes
+  configuration files more modular and enables to reread them.
+  <br>
+</ul>
+
+<a name="inform"></a>
+<h3>inform</h3>
+<ul>
+  <code>inform {on|off|timer|raw} [regexp]</code> <br>
+  <br>
+  If set to on, and a device state changes, send a notification to the current
+  client. This command can be used by other programs/modules to receive a
+  notification.<br>
+  The option timer prepends a timerstamp to the line. Note: this command is
+  a nice way to check which events are generated, to help you when creating
+  <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a> entries.
+
+  <br>
+</ul>
+
+<a name="list"></a>
+<h3>list</h3>
+<ul>
+  <code>list [devspec] [value]</code>
+  <br><br>
+  Output a list of all definitions, all notify settings and all at
+  entries. This is one of the few commands which return a string in a
+  normal case.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
+  <br>
+  If value is specified, then output this property (like DEF, TYPE, etc) or
+  reading (actuator, measured-temp) for all devices from the devspec.
+  <br><br>
+  Example:
+  <pre><code>  fhem&gt; list
+
+  Type list <name> for detailed info.
+
+  Internal:
+    global               (Internal)
+
+  FHZ:
+    FHZ                  (fhtbuf: 23)
+
+  FS20:
+    Btn4                 (on-old-for-timer)
+    Roll1                (on)
+    Stehlampe            (off)
+
+  FHT:
+    fl                   (measured-temp: 21.1 (Celsius))
+
+  KS300:
+    out1                 (T: 2.9  H: 74  W: 2.2  R: 8.2  IR: no)
+
+  at:
+    at_rollup            (Next: 07:00:00)
+
+  notify:
+    ntfy_btn4            (active)
+
+  FileLog:
+    avglog               (active)
+
+  </name></code></pre>
+  If specifying <code>name</code>, then a detailed status for <code>name</code>
+  will be displayed, e.g.:
+  <pre><code>  fhem&gt; list fl
+
+  Internals:
+    CODE       5102
+    DEF        5102
+    NAME       fl
+    NR         15
+    STATE      measured-temp: 21.1 (Celsius)
+    TYPE       FHT
+    IODev      FHZ
+  Attributes:
+    room       Heizung
+  Readings:
+    2006-11-02 09:45:56   actuator        19%
+    [...]
+  </code></pre>
+</ul>
+
+
+<a name="modify"></a>
+<h3>modify</h3>
+<ul>
+  <code>modify &lt;name&gt; &lt;type-dependent-options&gt;</code>
+  <br><br>
+
+  Used to modify some definitions. Useful for changing some <a href="#at">at</a> or <a href="#notify">notify</a> definitions.  If specifying
+  one argument to an at type definition, only the time part will be changed. In
+  case of a notify type definition, only the regex part will be changed.  All
+  other values (state, attributes, etc) will remain intact.
+  <br><br>
+  Example:
+  <ul>
+    <code>define lampon at 19:00 set lamp on</code><br>
+    <code>modify lampon *19:00</code><br>
+    <code>modify lampon 19:00 set lamp on-for-timer 16</code><br>
+  </ul>
+</ul>
+
+<a name="quit"></a>
+<h3>quit</h3>
+<ul>
+  <code>quit</code>
+  <br><br>
+  If used in a TCP/IP session, terminate the client session.<br>
+  If used in a script, terminate the parsing of the current script.
+  <br><br>
+  Example:
+  <ul>
+    <code>quit</code>
+  </ul>
+</ul>
+
+
+<a name="reload"></a>
+<h3>reload</h3>
+<ul>
+  <code>reload &lt;module&gt;</code>
+  <br><br>
+  Reload the given module from the module directory. It is a convenient way to
+  test modules whithout restarting the program.
+  <br><br>
+  Example:
+  <ul>
+    <code>reload 99_PRIV</code>
+  </ul>
+</ul>
+
+<a name="rename"></a>
+<h3>rename</h3>
+<ul>
+  <code>rename &lt;oldname&gt; &lt;newname&gt;</code>
+  <br><br>
+  Rename a device from the &lt;oldname&gt; to &lt;newname&gt;, together with
+  its attributes. The global event RENAMED will be generated, see the notify
+  section for details.
+  <br><br>
+  Example:
+  <ul>
+    <code>rename FHT_1234 fht.kitchen</code>
+  </ul>
+</ul>
+
+
+<a name="rereadcfg"></a>
+<h3>rereadcfg</h3>
+<ul>
+  <code>rereadcfg [fhem-config-file]</code>
+  <br><br>
+  Re-read the active configuration file, or the optionally specified file.<br>
+  The sequence: the <a href="#statefile">statefile</a> will be saved first,
+  then all devices will be deleted, then the currently active config file (or
+  the specified file) will be read and at last the statefile will be
+  reloaded.<br>
+  Upon completion it triggers the global:REREADCFG event.  All existing
+  connections up to the one issuing the rereadcfg will be closed.
+
+  <br><br>
+  Example:
+  <ul>
+    <code>rereadcfg</code>
+  </ul>
+</ul>
+
+<a name="save"></a>
+<h3>save</h3>
+<ul>
+  <code>save [&lt;configfile&gt;]</code>
+  <br><br>
+  Save first the <a href="#statefile">statefile</a>, then the
+  <a href="#configfile">configfile</a> information. If a parameter is specified,
+  it will be used instead the global configfile attribute.<br><br>
+  Notes:
+  <ul>
+    <li>save only writes out definitions and attributes, but no (set/get)
+    commands which were previously part of the config file. If you need such
+    commands after the initialization (e.g.  <a href="http://fhem.de/FHZset">FHTcode</a>), you
+    should trigger them via <a href="#notify">notify</a>, when receiving the
+    INITIALIZED event.</li>
+
+    <li>save tries to preserve comments (lines starting with #) and include
+    structures, but it won't work correctly if some of these files are not
+    writeable.</li>
+
+  </ul>
+</ul>
+
+
+<a name="set"></a>
+<h3>set</h3>
+<ul>
+  <code>set &lt;devspec&gt; &lt;type-specific&gt;</code>
+  <br><br>
+  Set parameters of a device / send signals to a device. You can
+  get a list of possible parameters by
+  <ul>
+    <code>set &lt;name&gt; ?</code>
+  </ul>
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;. The set command returns only a value on error.<br>
+  <br>
+  Each device has different set parameters, see the corresponding device
+  section for details.<br>
+  <br>
+
+</ul>
+
+
+<a name="setstate"></a>
+<h3>setstate</h3>
+<ul>
+  <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
+  <br><br>
+  Set the "STATE" for <code>&lt;name&gt;</code> as shown in paranthesis in the
+  <a href="#list">list</a> command
+  to <code>&lt;value&gt;</code> without sending any signals to the device
+  itself. This command is also used in the <a href="#statefile">statefile</a>.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
+  <br><br>
+  Examples:
+  <ul>
+    setstate lamp on
+  </ul>
+  Note:
+  <ul>
+    <li>The statefile uses another version of this command, don't be surprised.
+    </li>
+  </ul>
+</ul>
+
+
+<a name="shutdown"></a>
+<h3>shutdown</h3>
+<ul>
+  <code>shutdown [restart]</code>
+  <br><br>
+  Shut down the server (after saving the <a href="#statefile">state information
+  </a>). It triggers the global:SHUTDOWN event.  If the optional restart
+  parameter is specified, fhem tries to restart itself.
+  <br><br>
+  Example:
+  <ul>
+    <code>shutdown</code><br>
+    <code>shutdown restart</code>
+  </ul>
+</ul>
+
+
+<a name="trigger"></a>
+<h3>trigger</h3>
+<ul>
+  <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
+  <br><br>
+  Trigger a <a href="#notify">notify</a> definition.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.
+
+  <br><br>
+  Example:
+  <ul>
+    <code>trigger btn3 on</code>
+  </ul>
+</ul>
+
+<a name="sleep"></a>
+<h3>sleep</h3>
+<ul>
+  <code>sleep &lt;sec&gt;</code>
+  <br><br>
+  Sleep for a given amount, millisecond accuracy.
+  <br><br>
+  Example:
+  <ul>
+    <code>sleep 0.5</code><br>
+    <code>define n3 notify btn3.* set lamp toggle;;sleep 0.5;;set lamp toggle</code>
+  </ul>
+  <br>
+  Note: sleep followed by another command and issued in at/notify/etc is not
+  blocking fhem.<br>
+</ul>
+
+
+<a name="global"></a>
+<h3>global</h3>
+<ul>
+  The global device is used to set different global attributes. It will be
+  automatically defined, it cannot be deleted or renamed and has no set or get
+  parameters<br>
+  <br>
+
+  <b>Define</b><ul>N/A</ul><br>
+
+  <b>Set </b><ul>N/A</ul><br>
+
+  <b>Get</b><ul>N/A</ul><br>
+
+  <b>Attributes</b>
+  <ul>
+    <li><a href="#archivedir">archivedir</a></li>
+    <li><a href="#archivecmd">archivecmd</a></li>
+    <li><a href="#nrarchive">nrarchive</a></li><br>
+
+    <a name="autoload_undefined_devices"></a>
+    <li>autoload_undefined_devices<br>
+        If set, automatically load the corresponding module when a message
+        of this type is received. This is used by the <a href="#autocreate">
+        autocreate</a> device, to automatically create a fhem device upon
+        receiving a corresponding message.
+    </li><br>
+
+
+    <a name="backup_before_update"></a>
+    <li>backup_before_update<br>
+        If this attribute is set to 0, an update skip always backing up your
+        installation via the <a href="#backup">backup</a> command. The default
+        is to backup always before updates.<br>
+        Note: Set this attribute only if you know what you do!<br>
+        This Attribute is used by the <a href="#update">update</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global backup_before_update 0
+        </ul>
+    </li><br>
+
+    <a name="backupcmd"></a>
+    <li>backupcmd<br>
+        You could pass the backup to your own command / script by using this attribute.
+        If this attribute is specified, then it will be started as a shell command and
+        passes a space separated list of files / directories as <strong>one</strong>
+        argument to the command, like e.g.:
+        <br>
+        <ul>
+          <code>"/etc/fhem.cfg /var/log/fhem/fhem.save /usr/share/fhem/contrib
+                /usr/share/fhem/FHEM /usr/share/fhem/foo /usr/share/fhem/foobar
+                /usr/share/fhem/www"</code>
+        </ul>
+        Note: Your command / script has to return the string "backup done" or
+        everything else to report errors, to work properly with updatefhem!<br>
+        This Attribute is used by the <a href="#backup">backup</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global backupcmd /usr/local/bin/myBackupScript.sh
+        </ul>
+    </li><br>
+
+    <a name="backupdir"></a>
+    <li>backupdir<br>
+        A folder to store the compressed backup file.
+        This Attribute is used by the <a href="#backup">backup</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global backupdir /Volumes/BigHD
+        </ul>
+    </li><br>
+
+    <a name="backupsymlink"></a>
+    <li>backupsymlink<br>
+        If this attribute is set to everything else as "no", the archive command tar
+        will support symlinks in your backup. Otherwise, if this attribute is set to
+        "no" symlinks are ignored by tar.
+        This Attribute is used by the <a href="#backup">backup</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global backupsymlinks yes
+        </ul>
+    </li><br>
+
+    <a name="configfile"></a>
+    <li>configfile<br>
+        Contains the name of the fhem configuration file. If <a href="#save">save</a> is called without argument, then the output will
+        be written to this file.
+    </li><br>
+
+    <a name="exclude_from_update"></a>
+    <li>exclude_from_update<br>
+        Contains a space separated list of file which will be excluded by an update.
+        This Attribute is used by the <a href="#update">update</a> command.<br>
+        Example:<br>
+        <ul>
+          attr global exclude_from_update 21_OWTEMP.pm temp4hum4.gplot FS20.on.png FS20.off.png
+        </ul>
+    </li><br>
+
+    <a name="holiday2we"></a>
+    <li>holiday2we<br>
+        If this attribute is set, then the <a href="#perl">$we</a> variable
+        will be true, if the value of the <a href="#holiday">holiday</a>
+        variable referenced by this attribute is not none.<br>
+        Example:<br>
+        <ul>
+          attr global holiday2we hessen
+        </ul>
+    </li><br>
+
+    <a name="lastinclude"></a>
+    <li>lastinclude<br>
+        If this attribute is set, then the last command of the generated
+        configfile (see the <a href="#save">save</a> command) will be<br>
+        include &lt;lastinclude-value&gt;<br>
+        This attribute is DEPRECATED, use <a href="#notify">notify</a>, with
+        the INITIALIZED event to execute commands after initialization.
+    </li><br>
+
+    <a name="logfile"></a>
+    <li>logfile<br>
+        Specify the logfile to write.  You can use "-" for
+        stdout, in this case the server won't background itself.<br>
+        The logfile name can also take wildcards for easier logfile rotation,
+        see the <a href="#FileLog">FileLog</a> section. Just apply the
+        <code>archivecmd / archivedir / nrarchive</code> attributes to the
+        <code>global</code> device as you would do for a FileLog device.<br>
+        You can access the current name of the logfile with
+        <code>{ $currlogfile }</code>.
+    </li><br>
+
+    <a name="modpath"></a>
+    <li>modpath<br>
+        Specify the path to the modules directory <code>FHEM</code>. The path
+        does <b>not</b> contain the directory FHEM. Upon setting the
+        attribute, the directory will be scanned for filenames of the form
+        NN_&lt;NAME&gt;.pm, and make them available for device definition under
+        &lt;NAME&gt;. If the first device of type &lt;NAME&gt; is defined, the
+        module will be loaded, and its function with the name
+        &lt;NAME&gt;_Initialize will be called. Exception to this rule are
+        modules with NN=99, these are considered to be utility modules
+        containing only perl helper functions, they are loaded at startup (i.e.
+        modpath attribute definition time).
+    </li><br>
+
+    <a name="motd"></a>
+    <li>motd<br>
+        Message Of The Day. Displayed on the homescreen of the FHEMWEB package,
+        or directly after the telnet logon, before displaying the fhem&gt; prompt.
+        SecurityCheck is setting motd if it is not defined upon startup, to
+        avoid this set the motd value to none
+    </li><br>
+
+    <a name="mseclog"></a>
+    <li>mseclog<br>
+        If set, the timestamp in the logfile will contain a millisecond part.
+    </li><br>
+
+    <a name="nofork"></a>
+    <li>nofork<br>
+        If set and the logfile is not "-", do not try to background. Needed
+        on some Fritzbox installations.
+    </li><br>
+
+    <a name="pidfilename="></a>
+    <li>pidfilename<br>
+        Write the process id of the perl process to the specified file. The
+        server runs as a daemon, and some distributions would like to check by
+        the pid if we are still running. The file will be deleted upon
+        shutdown.
+    </li><br>
+
+    <a name="statefile"></a>
+    <a name="statefile"></a>
+    <li>statefile<br>
+        Set the filename where the state and certain <a href="#at">at</a>
+        information will be saved before shutdown. If it is not specified, then
+        no information will be saved.
+    </li><br>
+
+    <a name="title"></a>
+    <li>title<br>
+        Used by the web frontend fhemweb.pl (webpgm2) as a Page title.
+    </li><br>
+
+    <a name="updatebranch"></a>
+    <li>updatebranch<br>
+        The update branch will be set by the file FhemUtils/release.pm contained
+        in the modpath. For example, if a stable version (version 5.3 upwards) of
+        fhem is installed via a direct download connection of the archieve on the
+        fhem-website, then the branch of the update is automatically on "stable".
+        In this branch, only updates fixing confirmed errors, relevant security
+        fixes or new stable versions are provided.<br>
+        By using the command "update development &lt;filename&gt;", particular files
+        or packages can always be installed directly from the development branch
+        (e.g. "update development &lt;package&gt;").<br>
+        If you want to update from the development branch in stable verion in
+        general, you can force this behaviour by using the attribute "updatebranch DEVELOPMENT".
+        In case the installation of fhem should generally using the development
+        branch, this attribute would not have to be set. Instead, use "update development force"
+        to update all files including release.pm (containing the release-information)
+        to the newest version.
+    </li><br>
+
+    <a name="userattr"></a>
+    <li>userattr<br>
+        A space separated list which contains the names of additional
+        attributes. Without specifying them you will not be able to set them
+        (in order to prevent typos).
+    </li><br>
+
+    <a name="verbose"></a>
+    <li>verbose<br>
+        Set the verbosity level. Possible values:
+        <ul>
+          <li>0 - server start/stop
+          </li><li>1 - error messages or unknown packets
+          </li><li>2 - major events/alarms.
+          </li><li>3 - commands sent out will be logged.
+          </li><li>4 - you'll see whats received by the different devices.
+          </li><li>5 - debugging.</li>
+        </ul>
+        Recommended level is 3 for normal use.
+    </li><br>
+
+    <a name="dupTimeout"></a>
+    <li>dupTimeout<br>
+        Define the timeout for which 2 identical events from two different
+        receiver are considered a duplicate. Default is 0.5 seconds.
+    </li><br>
+
+  </ul>
+</ul>
+
+<a name="perl"></a>
+<h3>Perl specials</h3>
+  If you want to automate some tasks via fhem, then you'll probably use <a href="#at">at</a> or <a href="#notify">notify</a>. For more complex tasks
+  you'll use either a shell-script or a perl "oneliner" as the at/notify
+  argument. This chapter gives some tips in using the perl oneliners.<br><br>
+
+  <li>To test perl oneliners, type them on the telnet prompt (or FHEMWEB text
+    input) by enclosing it in {}, one line at once.  The last line will only
+    write something in the logfile, the output of the other lines is directly
+    visible.
+    <ul>
+      { "Hello" }<br>
+      { 1+3*4 }<br>
+      { `ls /etc` }<br>
+      { Log 1, "Hello" }<br>
+    </ul>
+    <br>
+
+  </li><li>
+    Perl expressions are separated by ;, in fhem oneliners they have to
+    escaped with ;;<br>
+    <ul>
+      { my $a = 1+1;; Log 1, "Hello $a" }
+    </ul>
+    <br>
+
+  </li><li>To use fhem commands from the perl expression, use the function fhem(),
+    which takes a string argument, this string will be evaluated as a fhem
+    command:<br>
+    <ul>
+      { fhem "set light on" }<br>
+      define n1 notify piri:on { fhem "set light on" }
+    </ul>
+    Note: if this function returns a value, it will also be logged into the
+    global fhem log. Use 1 as a second argument to disable this logging, this
+    makes sense when obtainig some values via fhem "get...".
+    <br>
+    <br>
+
+  </li><li>Notify can be used to store macros for manual execution. Use the <a href="#trigger">trigger</a> command to execute the macro:<br>
+    <ul>
+      define MyMacro notify MyMacro { Log 1, "Hello"}<br>
+      trigger MyMacro<br>
+      define MacroWithArg notify MyMacro { Log 1, "Hello %"}<br>
+      trigger MyMacro MyArg<br>
+    </ul>
+    <br>
+
+
+  </li><li>To make date and time handling easier, the variables $sec, $min, $hour,
+    $mday, $month, $year, $wday, $yday, $isdst are available in the perl
+    oneliners (see also perldoc -f localtime). Exceptions: $month is in the
+    range of 1 to 12, and $year is corrected by 1900 (as I would expect).<br>
+    Additionally the variabe $we is 1 if it is weekend (i.e $wday == 0 or
+    $wday == 6), and 0 otherwise. If the <a href="#holiday2we">holida2we</a>
+    global attribute is set, $we is 1 for holidays too.<br>
+    <ul>
+      define n2 notify piri:on { if($hour &gt; 18 || $hour &lt; 5) {
+        fhem "set light on" } }<br>
+      define roll_en *07:45:00 { fhem "trigger SwitchAllRoll on" if(!$we) }<br>
+      define roll_en *08:30:00 { fhem "trigger SwitchAllRoll on" if($we) }<br>
+
+    </ul>
+    <br>
+
+  </li><li>
+    The following helper functions are defined in 99_Util.pm (which will
+    be loaded automatically, as every module with prefix 99):
+    <ul>
+      <li>min(a,b), max(a,b)</li>
+      <li>time_str2num("YYYY-MM-DD HH:MM:SS") returns a numerical value,
+          which makes computation of time differences easier</li>
+      <li>abstime2rel("HH:MM:SS") converts an absolute time to a relative one
+          </li>
+    </ul>
+    </li>
+
+  <li>
+    To access the device states/attributes, use the following functions:
+    <br>
+    <ul>
+      <li>Value(&lt;devicename&gt;)<br>
+        returns the state of the device (the string you see in paranthesis in
+        the output of the list command).
+        <br><br>
+      </li><li>OldValue(&lt;devicename&gt;)
+      </li><li>OldTimestamp(&lt;devicename&gt;)<br>
+        returns the old value/timestamp of the device.
+        <br><br>
+      </li><li>
+        ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
+        Return the reading (the value in the Readings section of "list device")
+        <br><br>
+      </li><li>
+        AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
+        Return the attribute of the device
+        <br><br>
+        { Value("wz") }<br>
+        { OldValue("wz") }<br>
+        { time_str2num(OldTimestamp("wz")) }<br>
+        { ReadingsVal("wz", "measured-temp", "20")+0 }<br>
+        { ReadingsTimestamp("wz", "measured-temp", 0)}<br>
+        { AttrVal("wz", "room", "none") }<br>
+      </li></ul>
+
+
+  </li><li>
+    By using the 99_SUNRISE_EL.pm module, you have access to the following
+    functions: <br>
+    <ul>
+    sunset($offset, $min, $max)<br>
+    sunrise($offset, $min, $max)<br>
+    isday()<br>
+    </ul>
+    offset is in seconds, and the format of min/max is "HH:MM" or "HH:MM:SS".
+    isday returns 1 if the sun is visible, and 0 else.
+    </li>
+
+  <br>
+  <br>
+
+<a name="gnuplot-syntax"></a>
+<h3>gnuplot file syntax</h3>
+
+The .gplot files are also used by the <a href="#FHEMWEB">FHEMWEB</a>/SVG module
+when the <a href="#plotmode">plotmode</a> attribute is set to SVG. In this case
+only a subset of the .gnuplot attributes are used, and some lines have special
+meanings: the difference will be explained in this chapter. See also <a href="http://fhemwiki.de/wiki/Creating_Plots">this</a> fhemwiki entry on
+creating logs.<br>
+Following is a minimal .gplot definition (valid only for plotmode SVG):<br>
+<pre>  set terminal size &lt;SIZE&gt;
+  #FileLog 4:::
+  plot title 'Temperature' with lines
+</pre>
+The .gnuplot file consists of 3 parts:
+<ul>
+  <li>set commands<br>
+    Following sets are recognized:
+    <ul>
+    <li>terminal, only the size parameter.<br>
+        This is usually set to &lt;SIZE&gt;, which is replaced by the <a href="#plotsize">plotsize</a> attribute of the FHEMWEB or weblink
+        instance.</li>
+
+    <li>title<br>
+        Usually set to &lt;TL&gt; which is replace by the weblink <a href="#title">title</a> attribute, or to &lt;Lx&gt;, which is replaced
+        by the weblink <a href="#label">label</a> attribute.</li>
+
+    <li>ylabel,y2label<br>
+        Left and right labels, printed vertically. Are also subject to label
+        replacement.</li>
+
+    <li>yrange,y2range<br>
+        Specify the range of the left and right axis. Examples:<br>
+        <ul>
+          set yrange [-0.1:1.1]<br>
+          set y2range [0:]<br>
+        </ul>
+        </li>
+    <li>ytics,y2tics<br>
+        the label for the left/right axis tics.  Examples:<br>
+        <ul>
+          set ytics ("on" 0, "off" 1)<br>
+          set y2tics<br>
+        </ul>
+        </li>
+    </ul>
+    </li>
+    <br>
+
+  <li>#FileLog entries<br>
+      Each line from the plot section must have one corresponding #FileLog
+      line. For the syntax see the column_spec paragraph of the <a href="#FileLogget">Filelog get</a> description.
+      Note that for SVG plots the first column of the input file always has to
+      be in the standard fhem timestamp format (YYYY-MM-DD_HH:MM:SS)
+      </li>
+      <br>
+
+  <li>plot entries<br>
+      There is always one plot command with comma separated argument-blocks.
+      Each argument-block represents one line, and has its own parameters.
+      Following parameters are recognized:
+      <ul>
+      <li>axes x1y1 / x1y2<br>
+        tells the program to assign the current line to one of the two axes
+        (left or right).
+        </li>
+      <li>title<br>
+        Caption of the line. Whan clicking on  this title, a small javascript
+        program will change the title to the min/max and last values of the plot,
+        will enable copying this line or pasting an already copied one (the
+        existing scale of the plot wont'be changed, only the pasted line will
+        be scaled), and other lines of the plot will temporarily be hidden.
+        </li>
+      <li>with &lt;linetype&gt;<br>
+        Specify the line type. Following types are recognized: points,
+        steps, fsteps, histeps and lines. Everything unknown will be mapped to
+        the type lines.
+        </li>
+      <li>ls &lt;linestyle&gt;<br>
+        The linestyle defaults to l0 for the first line, l1 for the second, and
+        so on. It is defined in the svg_style.css file. There are two sets
+        defined here: l0-l8 and l0fill-l6fill. The second set must be specified
+        explicitly. If the name of the linestyle contains the word fill, then
+        plots of the lineytype "lines" will have an additional starting and
+        ending segment, so that filling is done correctly.<br>
+        See the SVG spec for details of this CSS file.
+        Note: if you plan to use this attribute, you have to specify it for all
+        the lines (attribute-blocks) in the plot command.
+        </li>
+      <li>lw &lt;linewidth&gt;<br>
+        Sets the stroke-width style of the line. This attribute is deprecated,
+        the corresponding feature of the CSS file / (attribute ls) should be
+        used instead.
+
+        </li>
+      </ul>
+</li></ul>
+
+
+
+
+</div></body></html>
