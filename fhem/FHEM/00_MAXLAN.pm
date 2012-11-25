@@ -686,6 +686,9 @@ Setting pairmode to "cancel" puts the cube out of pairing mode.</li>
     to your fhem.cfg to do this automatically on startup.</li>
     <li>factorReset<br>
       Reset the cube to factory defaults.</li>
+    <li>reconnect<br>
+      FHEM will terminate the current connection to the cube and then reconnect. This allows
+      re-reading the configuration data from the cube, as it is only send after establishing a new connection.</li>
   </ul>
   <br>
 
