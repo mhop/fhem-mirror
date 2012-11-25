@@ -88,11 +88,6 @@ MAXLAN_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
-
-  #Sometimes (race condition in the cube?) the cube sends invalid
-  #configuration. Doing a reconnect usually remedies that.
-  $hash->{InvalidConfigurationReconnectCount} = 10;
-
   $hash->{PARTIAL} = "";
   $hash->{DeviceName} = $dev;
   $hash->{INTERVAL} = @a > 3 ? $a[3] : $defaultPollInterval;
@@ -115,7 +110,6 @@ MAXLAN_Connect($)
   RemoveInternalTimer($hash);
 
   $hash->{gothello} = 0;
-  $hash->{gotInvalidConfiguration} = 0;
 
   delete($hash->{NEXT_OPEN}); #work around the connection rate limiter in DevIo
 
@@ -329,18 +323,6 @@ sub
 MAXLAN_FinishConnect($)
 {
   my ($hash) = @_;
-
-  if($hash->{gotInvalidConfiguration} and $hash->{InvalidConfigurationReconnectCount} > 0) {
-    #Workaround a cube bug by reconnecting
-    Log 3, "Reconnecting to workaround a cube bug, $hash->{InvalidConfigurationReconnectCount} attempts left";
-    $hash->{InvalidConfigurationReconnectCount} -= 1;
-    MAXLAN_Connect($hash); #reconnect
-    return;
-  }
-
-  #Reset reconnect count if we finally got a good configuration
-  $hash->{InvalidConfigurationReconnectCount} = 10 if(!$hash->{gotInvalidConfiguration});
-
   #Handle deferred setting of time (L: is the last response after connection before the cube starts to idle)
   if(defined($hash->{setTimeOnHello})) {
     MAXLAN_Set($hash,$hash->{NAME},"clock");
@@ -467,7 +449,6 @@ MAXLAN_Parse($$)
 
     if($len != length($bindata)) {
       Dispatch($hash, "MAX,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
-      $hash->{gotInvalidConfiguration} = 1;
       return "Invalid C: response, len does not match";
     }
 
