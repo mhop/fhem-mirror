@@ -217,23 +217,19 @@ MAXLAN_ReadAnswer($)
 {
   my ($hash) = @_;
 
-  my $data = $hash->{PARTIAL};
-
   #Read until we have a complete line
-  until($data =~ m/\n/) {
+  until($hash->{PARTIAL} =~ m/\n/) {
     my $buf = DevIo_SimpleRead($hash);
     if(!defined($buf)){
       Log 1, "MAXLAN_ReadAnswer: error during read";
       return undef; #error occured
     }
-    $data .= $buf;
+    $hash->{PARTIAL} .= $buf;
   }
 
   my $rmsg;
-  ($rmsg,$data) = split("\n", $data, 2);
+  ($rmsg,$hash->{PARTIAL}) = split("\n", $hash->{PARTIAL}, 2);
   $rmsg =~ s/\r//; #remove \r
-  #save partial data for next read
-  $hash->{PARTIAL} = $data;
   return $rmsg;
 }
 
@@ -259,14 +255,13 @@ MAXLAN_Read($)
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
 
-  my $data = $hash->{PARTIAL};
-  $data .= $buf;
+  $hash->{PARTIAL} .= $buf;
 
-  while($data =~ m/\n/) {
+  #while we have a complete line
+  while($hash->{PARTIAL} =~ m/\n/) {
     my $rmsg;
-    ($rmsg,$data) = split("\n", $data, 2);
-    $hash->{PARTIAL} = $data;
-    $rmsg =~ s/\r//;
+    ($rmsg,$hash->{PARTIAL}) = split("\n", $hash->{PARTIAL}, 2);
+    $rmsg =~ s/\r//;#remove \r
     MAXLAN_Parse($hash, $rmsg) if($rmsg);
   }
 }
