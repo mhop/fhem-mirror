@@ -456,7 +456,7 @@ CUL_HM_Parse($$)
       $vp = int($vp/2.56+0.5);   # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  readingsSingleUpdate($chnHash,"state","$vp %",1) if($chnHash);
-      push @event, "actuator:$vp %";
+      push @event, "actuator:$vp%";
 
       # Set the valve state too, without an extra trigger
       readingsSingleUpdate($dhash,"state","set_$vp %",1) if($dhash);
@@ -554,10 +554,10 @@ CUL_HM_Parse($$)
     elsif($msgType eq "01"){                       # status reports
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
-        push @event, "ValveErrorPosition_for_$dname: $vep %";
-        push @event, "ValveOffset_for_$dname: $of %";
-		CUL_HM_UpdtReadBulk($dhash,1,'ValveErrorPosition:set_'.$vep.' %',
-		                             'ValveOffset:set_'.$of.' %');
+        push @event, "ValveErrorPosition_for_$dname: $vep%";
+        push @event, "ValveOffset_for_$dname: $of%";
+		CUL_HM_UpdtReadBulk($dhash,1,'ValveErrorPosition:set_'.$vep.'%',
+		                             'ValveOffset:set_'.$of.'%');
 	  }
 	  elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
 	  	push @event,""; # 
@@ -735,7 +735,7 @@ CUL_HM_Parse($$)
   elsif($st eq "virtual"){#####################################################
     # possibly add code to count all acks that are paired. 
     if($msgType eq "02") {
-      push @event, "ackFrom ".$name;
+      push @event, "";
 	}
   }
   elsif($st eq "outputUnit"){##################################################
@@ -1040,6 +1040,16 @@ CUL_HM_Parse($$)
 	                               "ValveAdjCmd:".$d1);
       CUL_HM_SndCmd($chnHash,$msgcnt."8002".$dst.$src.'0101'.
 	                       sprintf("%02X",$vp*2)."0000");#$vp, $err,$??
+	}
+	elsif($msgType eq "02"){
+	  if ($dhash->{helper}{respWait}{msgId}             && 
+	      $dhash->{helper}{respWait}{msgId} eq $msgcnt ){
+	    #ack we waited for - stop Waiting
+	    CUL_HM_respPendRm($dhash);
+	  } 
+	}
+	if (hex($msgFlag)&0x20){
+	  CUL_HM_SndCmd($dhash, $msgcnt."8002".$dst.$src."00");#virtual must ack
 	}
   }
   elsif($id eq $dst){# if fhem is destination check if we need to react
@@ -1553,7 +1563,7 @@ my %culHmSubTypeSets = (
         { raw        => "data ...",
 		  devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
 		  press      => "[long|short]...",
- #         valvePos   => "position",#acting as TC
+          valvePos   => "position",#acting as TC
 		  virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
         { test => "", "alarmOn"=>"", "alarmOff"=>"", 
@@ -2187,14 +2197,16 @@ CUL_HM_Set($@)
   elsif($cmd eq "valvePos") { ##################
 	return "only number <= 100  or 'off' allowed" 
 	   if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <100 ));
-	RemoveInternalTimer("valvePos:$dst");# remove responsePending timer
     if ($a[2] eq "off"){
 	  $state = "ValveAdjust:stopped";
+	  RemoveInternalTimer("valvePos:$dst$chn");# remove responsePending timer
+	  delete($hash->{helper}{virtTC});
 	}
 	else {
 	  my $vp = $a[2];
 	  readingsSingleUpdate($hash,"valvePosTC","$vp%",0);
-	  CUL_HM_valvePosUpdt("valvePos:$dst$chn");
+	  CUL_HM_valvePosUpdt("valvePos:$dst$chn") if (!$hash->{helper}{virtTC});
+	  $hash->{helper}{virtTC} = "03";
 	  $state = "ValveAdjust:$vp%";
 	}
   } 
@@ -2380,24 +2392,35 @@ CUL_HM_Set($@)
 }
 
 ###################################
+my $updtValveCnt = 0;
+
 sub
 CUL_HM_valvePosUpdt(@)
 {# update valve position periodically to please valve
   my($in ) = @_;
   my(undef,$vId) = split(':',$in);
   my $hash = CUL_HM_id2Hash($vId);
-  my $name = $hash->{NAME};
-  my $ioId = CUL_HM_Id($hash->{IODev});
   my $vDevId = substr($vId,0,6);
-  my $vp = ReadingsVal($name,"valvePosTC","15 %");
-  $vp =~ s/%//;
-  $vp *=2;
-  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
-    next if (length($peer) != 8);
-    $peer = substr($peer,0,6);	
-    CUL_HM_PushCmdStack($hash,sprintf("++A258%s%s00%02X",$vDevId,$peer,$vp));
-  }
-  InternalTimer(gettimeofday()+150,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
+  my $nextTimer = 150;
+
+#  if ($updtValveCnt++ %2){
+#    $nextTimer = 20;
+#    CUL_HM_PushCmdStack($hash,"++8670".$vDevId."00000000D036");# some weather event - 
+#  }
+#  else{
+    my $name = $hash->{NAME};
+    my $vp = ReadingsVal($name,"valvePosTC","15 %");
+    $vp =~ s/%//;
+    $vp *=2.56;
+	foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
+	  next if (length($peer) != 8);
+	  $peer = substr($peer,0,6);	
+	  CUL_HM_PushCmdStack($hash,sprintf("++A258%s%s%s%02X",$vDevId,$peer,$hash->{helper}{virtTC},$vp));
+	}
+#  }
+  $hash->{helper}{virtTC} = "00";
+  CUL_HM_ProcessCmdStack($hash);
+  InternalTimer(gettimeofday()+$nextTimer,"CUL_HM_valvePosUpdt","valvePos:$vId",0);
 }
 sub
 CUL_HM_infoUpdtDevData($$$){
@@ -3204,15 +3227,14 @@ CUL_HM_parseCommon(@){
 		  if($list eq "00"){
 			my $name = CUL_HM_id2Name($src);
 			readingsSingleUpdate($shash,"PairedTo",
-		                 sprintf("%02X%02X%02X",
-		                    CUL_HM_getRegFromStore($name,10,0,"00000000"),
-		                    CUL_HM_getRegFromStore($name,11,0,"00000000"),
-		                    CUL_HM_getRegFromStore($name,12,0,"00000000")),0);
-		  }
-		  
+		                    CUL_HM_getRegFromStore($name,"pairCentral",0,"00000000"),0);
+		  }		  
 		  CUL_HM_respPendRm($shash);
 		  delete $chnHash->{helper}{shadowReg}{$regLN};#remove shadowhash
-		  CUL_HM_updtRegDisp($chnHash,$list,CUL_HM_name2Id($peerName));
+		  # peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
+		  CUL_HM_updtRegDisp($chnHash,$list,
+		        CUL_HM_peerChId($peerName,
+						substr(CUL_HM_hash2Id($chnHash),0,6),"000000"));
 		}
 		else{
 		  CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
@@ -3290,7 +3312,7 @@ CUL_HM_getRegFromStore($$$$)
 	$unit = $reg->{u};
   }
   else{
-   # return "invalid";
+	;# use address instead of 
   }
   $peerId  = CUL_HM_peerChId(($peerId?$peerId:"00000000"),$dId,$iId);
 							    
@@ -3334,9 +3356,11 @@ CUL_HM_getRegFromStore($$$$)
 sub
 CUL_HM_updtRegDisp($$$)
 {
+  my $starttime = gettimeofday();
   my($hash,$list,$peerId)=@_;
+  my $listNo = $list+0;
   my $name = $hash->{NAME};
-  my $peer = ($peerId)?CUL_HM_id2Name($peerId)."-":"";
+  my $peer = ($peerId)?CUL_HM_peerChName($peerId,substr($hash->{DEF},0,6),"")."-":"";
   $peer=~s/:/-/;
   my $devName =CUL_HM_getDeviceHash($hash)->{NAME};# devName as protocol entity
   my $st = AttrVal($devName, "subType", "");
@@ -3349,9 +3373,10 @@ CUL_HM_updtRegDisp($$$)
   push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn}); 
   my @changedRead;
   foreach my $regName (@regArr){
-    next if (!$culHmRegDefine{$regName}->{d});
+    next if (!$culHmRegDefine{$regName}->{d}            ||
+	         ($culHmRegDefine{$regName}->{l} != $listNo));
     my $rgVal = CUL_HM_getRegFromStore($name,$regName,$list,$peerId);
-	next if (!$rgVal || $rgVal eq "unknown");#todo General -delete this reading?
+	next if (!$rgVal || $rgVal eq "invalid");
 	my $readName = "R-".$peer.$regName;
 	push (@changedRead,$readName.":".$rgVal)
 	      if (ReadingsVal($name,$readName,"") ne $rgVal);
@@ -3392,19 +3417,18 @@ sub
 CUL_HM_encodeTime16($)
 {
   my $v = shift;
-  my $ret = "FFFF";
-  my $mul = 20;
-
   return "0000" if($v < 0.05);
-  for(my $i = 0; $i < 16; $i++) {
-    if($v*$mul < 0xfff) {
-     $ret=sprintf("%03X%X", $v*$mul, $i);
+  
+  my $ret = "FFFF";
+  my $mul = 10;
+  for(my $i = 0; $i < 32; $i++) {
+    if($v*$mul < 0x7ff) {
+     $ret=sprintf("%04X", ((($v*$mul)<<5)+$i));
      last;
     }
     $mul /= 2;
   }
   my $v2 = CUL_HM_decodeTime16($ret);
-  Log 2, "Timeout $v rounded to $v2" if($v != $v2);
   return ($ret);
 }
 sub
@@ -3427,13 +3451,10 @@ sub
 CUL_HM_decodeTime16($)
 {
   my $v = hex(shift);
-  my $m = int($v/16);
-  my $e = $v % 16;
-  my $mul = 0.05;
-  while($e--) {
-    $mul *= 2;
-  }
-  return $mul*$m;
+  my $m = int($v>>5);
+  my $e = $v & 0x1f;
+  my $mul = 0.1;
+  return 2^$e*$m*0.1;
 }
 #############################
 sub
@@ -4303,19 +4324,19 @@ CUL_HM_setAttrIfCh($$$$)
       T: $t H: $h<br>
       temperature $t<br>
       humidity $h<br>
-      actuator $vp %<br>
+      actuator $vp%<br>
       desired-temp $t<br>
       desired-temp-ack $t<br>
       tempList$wd  hh:mm $t hh:mm $t ...<br>
-      ValveErrorPosition $dname $vep %<br>
-      ValveOffset $dname $of %<br>
+      ValveErrorPosition $dname $vep%<br>
+      ValveOffset $dname $of%<br>
       windowopentemp-$tchan $t (sensor:$tdev)<br>
   <li>HM-CC-VD:<br>
-      actuator $vp %<br>
+      actuator $vp%<br>
       motor [opening|closing|blocked|loose|adjusting range too small|ok]<br>
       battery [low|ok]<br>
-      ValveErrorPosition $vep %<br>
-      ValveOffset $dname $of %<br>
+      ValveErrorPosition $vep%<br>
+      ValveOffset $dname $of%<br>
   <li>KFM100:<br>
       rawValue $v<br>
       Sequence $s<br>
