@@ -11,20 +11,24 @@
   <div id="logo"></div>
   <div id="menu">
     <h3>FHEM Howto</h3>
-    <div id="block">
-      <b>Inhalt:</b>
-      <div id="dist"></div>
-      <div id="dist"><a href="#starting">Start</a></div>
-      <div id="dist"><a href="#attaching">USB Geräte</a></div>
-      <div id="dist"><a href="#sensors">Sensoren</a></div>
-      <div id="dist"><a href="#actors">Aktoren</a></div>
-      <div id="dist"><a href="#at">At/Notify</a></div>
-      <div id="dist"><a href="#logging">Daten loggen</a></div>
-      <div id="dist"><a href="#plotting">Plotten</a></div>
-      <div id="dist"><a href="#security">Sicherhei</a></div>
-      <div id="dist"><a href="#fhemweb">Anpassungen</a></div>
-      <div id="dist"><a href="#structure">Strukturen</a></div>
-    </div>
+    Version: <a href="HOWTO.html">EN</a>&nbsp;<b>DE</b>
+    <br>
+    <br>
+    <table id="room">
+      <tr><td></td></tr>
+      <tr><td><b>Inhalt:</b></td></tr>
+      <tr><td><a href="#starting">Start</a></td></tr>
+      <tr><td><a href="#attaching">USB Geräte</a></td></tr>
+      <tr><td><a href="#sensors">Sensoren</a></td></tr>
+      <tr><td><a href="#actors">Aktoren</a></td></tr>
+      <tr><td><a href="#at">At/Notify</a></td></tr>
+      <tr><td><a href="#logging">Daten loggen</a></td></tr>
+      <tr><td><a href="#plotting">Plotten</a></td></tr>
+      <tr><td><a href="#security">Sicherhei</a></td></tr>
+      <tr><td><a href="#fhemweb">Anpassungen</a></td></tr>
+      <tr><td><a href="#structure">Strukturen</a></td></tr>
+      <tr><td>
+    </table>
   </div>
 
 
@@ -36,11 +40,11 @@
       Diesen Abschnitt können Sie überspringen wenn Sie FHEM entweder mittels eines Debian-<a href="http://fhem.de/fhem-5.3.deb">Paketes</a> oder mittels 
       einer <a href="http://fhem.de/fhem-5.3-fb7390.image">Imagedatei</a> auf der FRITZ!Box oder mittels des <a href="http://fhem.de/fhem-5.3-fb7270.zip">Zip-Files</a> für die FRITZ!Box 7170/7270 
       installiert haben.
-      <p>Viele FHEM-Installationen verbinden die “Außenwelt” über ein USB-Gerät welches mit dem FHEM-Rechner verbunden ist (diese 
-      Geräte sind z.B. CUL, FHZ1x00, TUL, EUL etc). Diese Installationen benötigen die PERL „serial“ Module. In dem „commandref“-Abschnitt des jeweiligen USB-Gerätes sehen 
+      <p>Viele FHEM-Installationen verbinden die "Außenwelt" über ein USB-Gerät welches mit dem FHEM-Rechner verbunden ist (diese 
+      Geräte sind z.B. CUL, FHZ1x00, TUL, EUL etc). Diese Installationen benötigen die PERL "serial" Module. In dem "commandref"-Abschnitt des jeweiligen USB-Gerätes sehen 
       Sie, ob das entsprechende Modul benötigt wird.
       Sie benötigen dieses Modul nicht, wenn das Gerät über Ethernet angeschlossen wird (z.B. HM-LAN oder CUNO).</p>
-      <p>Wenn Sie dieses Modul benötigen, können Sie es mit dem Kommando “sudo cpan Device::SerialPort” nachträglich installieren. Es 
+      <p>Wenn Sie dieses Modul benötigen, können Sie es mit dem Kommando "sudo cpan Device::SerialPort" nachträglich installieren. Es 
       gibt aber auch schon bereits vorkompilierte Debian-Pakete (libdevice-serialport-perl) und im OSX 10.5 ist das Paket auch bereits enthalten. Wenn Sie das Paket 
       nicht installieren können, dann schauen Sie sich die @directio-Option auf der commandref.html-Seite als mögliche Informationsquelle an.</p>
       <p>Die Standard-Installation installiert FHEM in das Verzeichnis /opt/fhem. Wenn Sie jedoch lieber in ein anderes Verzeichnis 
@@ -76,9 +80,9 @@
       <h3>Anschließen des USB-Gerätes an den PC/die FRITZ!Box(CUL/FHZ1x00PC etc.)</h3>
       <ul>
       <p>Verbinden Sie sich mit FHEM indem Sie im Internet-Browser bei Verwendung eines normalen Desktop-Rechners
-      <a href="http://fhem-host:8083/fhem" style="color: blue; text-decoration: underline; text-underline: single">
-      http://fhem-host:8083/fhem</a> oder bei Verwendung eines Smartphones <a href="http://fhem-host:8084/fhem" style="color: blue; text-decoration: underline; text-underline: single">
-      http://fhem-host:8084/fhem</a> oder bei Verwendung eines Tablets wie dem iPad <a href="http://fhem-host:8085/fhem" style="color: blue; text-decoration: underline; text-underline: single">
+      <a href="http://fhem-host:8083/fhem">
+      http://fhem-host:8083/fhem</a> oder bei Verwendung eines Smartphones <a href="http://fhem-host:8084/fhem">
+      http://fhem-host:8084/fhem</a> oder bei Verwendung eines Tablets wie dem iPad <a href="http://fhem-host:8085/fhem">
       http://fhem-host:8085/fhem</a> eingeben.</p>
       <p><br>
 
@@ -88,10 +92,13 @@
       In der Standard-Konfiguration sucht FHEM beim Start nach über USB verbundenen Geräten wie FHZ, CUL, COC, ZWave oder TCM und erstellt 
       automatisch die entsprechenden Einträge in der fhem.cfg. Schließen Sie also diese Geräte vor dem Start von FHEM an.</p>
       <p>
-      Unter dem Betriebssystem LINUX (speziell bei der FRITZ!Box 7390) wird FHEM versuchen einen bereits angesteckten aber noch unprogrammierten CUL zu 
-      programmieren. Details dazu entnehmen Sie bitte den Beschreibungen der Befehle „usb“ und „CUL flash“ in der commandref.html. Die neu angelegten 
-      Geräte werden im Raum/Menüpunkt „Unsorted“ angezeigt. Achtung: Die Umschaltung eines CUL in den „HomeMatic Modus“ erfolgt nicht automatisch, 
-      sondern muss manuell erfolgen.<br><br>
+      Unter dem Betriebssystem LINUX (speziell bei der FRITZ!Box 7390) wird
+      FHEM versuchen einen bereits angesteckten aber noch unprogrammierten CUL
+      zu programmieren. Details dazu entnehmen Sie bitte den Beschreibungen der
+      Befehle "usb" und "CUL flash" in der commandref.html. Die neu
+      angelegten Geräte werden im Raum/Menüpunkt "Unsorted" angezeigt.
+      Achtung: Die Umschaltung eines CUL in den "HomeMatic Modus" erfolgt
+      nicht automatisch, sondern muss manuell erfolgen.<br><br>
 
       Um Geräte mit USB-Anschluss manuell zu definieren (oder falls FHEM diese nicht automatisch erkennt), schließen Sie das USB-Gerät (CUL, 
       FHZ1000PC/FHZ1300, TUL, EUL, etc) zuerst an Ihren Computer an. Dann sehen Sie im Verzeichnis /dev nach der dort entsprechend eingetragenen 
@@ -109,26 +116,26 @@
       <b>Achtung/Bemerkungen:</b> </p>
       <ul>
         <li>
-        Vergessen Sie nicht, den “save”-Button neben der FHEM-Befehlseingabezeile nach der Eingabe einer Gerätedefinition oder 
+        Vergessen Sie nicht, den "save"-Button neben der FHEM-Befehlseingabezeile nach der Eingabe einer Gerätedefinition oder 
         eines Geräteattributes zu drücken. In diesem Fall werden die erfolgten Eingaben nicht in der Konfigurationsdatei gespeichert und bei einem 
         Neustart von FHEM nicht mehr berücksichtigt.</p>
 		</li>
 		<li>
-        Zur Ausführung von in der FHEM Befehlszeile eingegebenen Anweisungen drücken Sie „Enter“ auf der Tastatur. Betätigen des „save“-Buttons 
+        Zur Ausführung von in der FHEM Befehlszeile eingegebenen Anweisungen drücken Sie "Enter" auf der Tastatur. Betätigen des "save"-Buttons 
         führt diese eingegebenen Anweisungen nicht aus.</p>
 		</li>
 		<li>
-        Sie erhalten den CUL vom Hersteller ohne Firmware. Sie können ihn mittels des „CULflash“ Kommandos programmieren wenn das Programm „dfu-programmer“ 
-        im Verzeichnis fhem vorhanden ist. Das Programm „dfu-programmer“ ist Bestandteil des Images für die FRITZ!Box 7390.</span></li></ul>
+        Sie erhalten den CUL vom Hersteller ohne Firmware. Sie können ihn mittels des "CULflash" Kommandos programmieren wenn das Programm "dfu-programmer" 
+        im Verzeichnis fhem vorhanden ist. Das Programm "dfu-programmer" ist Bestandteil des Images für die FRITZ!Box 7390.</span></li></ul>
       </ul>
 
     <h3>
       Konfiguration der Sender (Sensoren)</h3>
       <ul>
-      <p>Viele funkgesteuerte Geräte werden in der “default”-Konfiguration wegen der voreingestellten „autocreate“-Funktion automatisch erstellt.</p>
+      <p>Viele funkgesteuerte Geräte werden in der "default"-Konfiguration wegen der voreingestellten "autocreate"-Funktion automatisch erstellt.</p>
       <p>Diese Funktion erstellt automatisch diese Geräteeintragungen bei Empfang einer Nachricht von diesen Geräten (z.B. 
       eines Sensors wie dem S300 oder FHT). Bitte warten Sie eine gewisse Zeit, beobachten Sie die Logeinträge und aktualisieren Sie Ihren Browser um neu 
-      erreichte Geräte angezeigt zu bekommen. Sie können den Befehl „rename“ benutzen, um automatisch erstellte Geräteeinträge umzubenennen. Geben Sie 
+      erreichte Geräte angezeigt zu bekommen. Sie können den Befehl "rename" benutzen, um automatisch erstellte Geräteeinträge umzubenennen. Geben Sie 
       den Befehl mit den entsprechenden Parametern in der Befehlszeile der Webseite ein. Z.B.:</p>
       <br>
       <ul>
@@ -140,7 +147,7 @@
       oder Logfiles selbst umbenennen, werden die zugehörigen Geräte nicht mit umbenannt!<br><br>
 
       Wenn Sie das Gerät manuell umbenennen wollen, dann gehen Sie folgendermaßen vor:<br>
-      <p>Warten Sie eine Weile bis Daten übertragen werden. Im Logfile (zu erreichen unter Webseite Menüpunkt „Unsorted“-&gt; FileLog -&gt; Logfile -&gt; 
+      <p>Warten Sie eine Weile bis Daten übertragen werden. Im Logfile (zu erreichen unter Webseite Menüpunkt "Unsorted"-&gt; FileLog -&gt; Logfile -&gt; 
       text) erscheint z.B folgende Textzeile:</p>
       <ul><code>
       FS20 Unknown device &lt;HOUSECODE&gt;, Button &lt;BTN&gt; Code
@@ -162,9 +169,9 @@
       komplette Liste der FS20 Modelle.<br> 
       Bei einem anderen neuen Geräten sollte eine ähnliche Nachricht im Logfile 
       erscheinen.</p>
-      <p>HomeMatic Geräte müssen nicht mit FHEM “gepairt” werden, andererseits wird FHM solche Geräte nur automatisch eintragen wenn 
-      es eine „pairing“-Anfrage erhält. Dazu müssen Sie FHEM mit dem Befehl „set CUL hmPairForSec 600“ in Empfangsbereitschaft versetzen.
-      Gleiches Vorgehen gilt für das „pairing“ von ZWave-Geräten</p>
+      <p>HomeMatic Geräte müssen nicht mit FHEM "gepairt" werden, andererseits wird FHM solche Geräte nur automatisch eintragen wenn 
+      es eine "pairing"-Anfrage erhält. Dazu müssen Sie FHEM mit dem Befehl "set CUL hmPairForSec 600" in Empfangsbereitschaft versetzen.
+      Gleiches Vorgehen gilt für das "pairing" von ZWave-Geräten</p>
       </ul>
 
     <a name="actors"></a>
@@ -173,7 +180,7 @@
       Definieren Sie das <a href="http://fhem.de/commandref.html#FS20">FS20</a> Gerät mit z.B folgendem Eintrag in die fhem.cfg:</p>
       <pre>      define lamp1 FS20 1234 56</pre>
 
-      <p>Dann drücken Sie den Anmeldeknopf an dem Gerät solange, bis die LED blinkt. Anschließend klicken sie auf den “on“ Link 
+      <p>Dann drücken Sie den Anmeldeknopf an dem Gerät solange, bis die LED blinkt. Anschließend klicken sie auf den "on" Link 
       auf der FHEM Webseite um das Kommando zu senden. Die LED sollte aufhören zu blinken. Das Gerät ist nun auf den Hauscode 1234 Gerätecode 56 
       programmiert. Sire können alternativ die 4-base ELV Notation benutzen. 
       Anschließend können Sie modellspezifische Attribute für das Gerät setzen.
@@ -182,9 +189,9 @@
 
       <p>Mit diesem Eintrag bekommen Sie nunmehr nur die für dieses Gerät relevanten Kommandos angezeigt</p>
       <p>Andere Systeme (EnOcean/HomeMatic/ZWave) brauchen eine umfangreichere Prozedur und das entsprechende Gerät muss zuerst in 
-      den “pairing mode” versetzt werden. Bitte sehen Sie sich den entsprechenden Eintrag auf der commandref.html-Seite für Ihr Gerät zur 
+      den "pairing mode" versetzt werden. Bitte sehen Sie sich den entsprechenden Eintrag auf der commandref.html-Seite für Ihr Gerät zur 
       Information an. </p>
-      <p>Das automatische oder manuelle eintragen von FHT/HomeMatic/EnOcean-Geräten in FHEM bedeutet nicht automatisch, dass der CUL oder die FHZ mit FHEM „gepairt“ 
+      <p>Das automatische oder manuelle eintragen von FHT/HomeMatic/EnOcean-Geräten in FHEM bedeutet nicht automatisch, dass der CUL oder die FHZ mit FHEM "gepairt" 
       ist.</p>
       <ul>
       <li>FHT:<br>
@@ -194,10 +201,10 @@
       bitte den entsprechenden Eintrag in den FAQ durch.<br>
 	  </li>
       <li>HomeMatic:<br>
-        Versetzen Sie den CUL/HMLAN inden “pairing”-Modus mit dem Befehl:<ul><code>
+        Versetzen Sie den CUL/HMLAN inden "pairing"-Modus mit dem Befehl:<ul><code>
         set CUL hmPairForSec 600
         </code></ul>
-        <p>Dann drücken Sie den Anmeldeknopf am HomeMatic-Gerät. Wenn das “pairing” erfolgreich war sehen Sie &quot;CommandAccepted: 
+        <p>Dann drücken Sie den Anmeldeknopf am HomeMatic-Gerät. Wenn das "pairing" erfolgreich war sehen Sie &quot;CommandAccepted: 
         yes&quot; im Detailfenster des Gerätes auf der FHEM Webseite.</li></ul>
     </ul>
 
@@ -205,8 +212,8 @@
     <a name="at"></a>
     <h3>Zeitabhängige Kommandos (at)/Notifikationen (notify, watchdog)</h3>
       <ul>
-      Um “at”-Kommandos zu einer bestimmten Zeit/periodisch 
-      auszuführen müssen Sie Geräte vom Typ “at” definieren. Entsprechende Beispiele und Definitionen finden Sie <a href="http://fhem.de/commandref.html#at">hier</a>.</p>
+      Um "at"-Kommandos zu einer bestimmten Zeit/periodisch 
+      auszuführen müssen Sie Geräte vom Typ "at" definieren. Entsprechende Beispiele und Definitionen finden Sie <a href="http://fhem.de/commandref.html#at">hier</a>.</p>
       <br><br>
 
       Um Kommandos ausführen zu lassen wenn ein Gerät eine Nachricht aussendet, müssen Sie Geräte vom Typ <a href="http://fhem.de/commandref.html#notify">notify</a> oder
@@ -233,50 +240,50 @@
       <ul><code>
         define lampNotify notify myPiri:on.* set myLamp on
       </code></ul><br>
-      Um dieses “notify” zu testen können Sie die Ereignisse unter Verwendung 
-      des “trigger”-Kommandos simulieren. <span lang="EN-US">Z.B.:</span><p>&nbsp;</p>
+      Um dieses "notify" zu testen können Sie die Ereignisse unter Verwendung 
+      des "trigger"-Kommandos simulieren. <span lang="EN-US">Z.B.:</span><p>&nbsp;</p>
       <ul><code>
         trigger myPiri on-for-timer 120
       </code></ul><br>
 
-      &nbsp;<p>“at”, “notify” und “watchdog” verwenden entweder vordefinierte FHEM-Kommandos, SHELL-Scripte oder “PERL-oneliners” 
-      als Argumente. Für Details und Tipps für „perl onliners“ lesen Sie bitte die <a href="http://fhem.de/commandref.html#perl">PERL-specials</a> Abschnitte in der commandref.html.</p>
+      &nbsp;<p>"at", "notify" und "watchdog" verwenden entweder vordefinierte FHEM-Kommandos, SHELL-Scripte oder "PERL-oneliners" 
+      als Argumente. Für Details und Tipps für "perl onliners" lesen Sie bitte die <a href="http://fhem.de/commandref.html#perl">PERL-specials</a> Abschnitte in der commandref.html.</p>
       
     </ul>
 
     <a name="logging"></a>
     <h3>Daten loggen</h3>
       <ul>
-      Um Daten/Nachrichten/Ereignisse in einer Datei zu speichern müssen Sie ein Gerät vom Typ <a href="http://fhem.de/commandref.html#FileLog">FileLog</a> anlegen. Die Funktion „autocreate“ erstellt 
-      für neu erkannte Geräte automatisch eine Logdatei. Sie können jedoch die Funktion <a href="http://fhem.de/commandref.html#createlog">„createlog“</a> nutzen, um später eine weitere Logdatei 
+      Um Daten/Nachrichten/Ereignisse in einer Datei zu speichern müssen Sie ein Gerät vom Typ <a href="http://fhem.de/commandref.html#FileLog">FileLog</a> anlegen. Die Funktion "autocreate" erstellt 
+      für neu erkannte Geräte automatisch eine Logdatei. Sie können jedoch die Funktion <a href="http://fhem.de/commandref.html#createlog">"createlog"</a> nutzen, um später eine weitere Logdatei 
       hinzuzufügen.
       <p>Um Daten/Nachrichten/Ereignisse in einer Datenbank zu speichern informieren Sie sich im Verzeichnis contrib/dblog der FHEM Distribution.</p>
       <p><br>
 
       FHEMWEB hat eine vordefinierte Funktionen Anzeige von Dateien des Typs FileLog. 
-      Weitere Informationen im folgenden Abschnitt <a href="#plot">„plot“</a>.
+      Weitere Informationen im folgenden Abschnitt <a href="#plot">"plot"</a>.
       </p>
       <p>
       Die Größe einer jeden Logdatei (<a href="http://fhem.de/commandref.html#FileLog">FileLog</a>)wird durch die eingegebenen Logkriterien (z.B. Jahr/Monat/Woche/Tag) 
-      bestimmt. Sie können das Archivieren mit den Attributen „<a href="http://fhem.de/commandref.html#nrarchive">nrarchive</a></span><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">“ 
-      oder „<a href="http://fhem.de/commandref.html#archivedir">archivecmd</a>"erlauben.
+      bestimmt. Sie können das Archivieren mit den Attributen "<a href="http://fhem.de/commandref.html#nrarchive">nrarchive</a></span><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">" 
+      oder "<a href="http://fhem.de/commandref.html#archivedir">archivecmd</a>"erlauben.
       </p>
       </ul>
 
     <a name="plotting"></a>
     <h3>Inhalte von Logdateien plotten (zeichnen)</h3>
       <ul>
-      <p>Die Funktion “autocreate” erstellt Weblinks (d.h. Plots) für neu erkannte Geräte. Der folgende Abschnitt beschreibt wie man 
+      <p>Die Funktion "autocreate" erstellt Weblinks (d.h. Plots) für neu erkannte Geräte. Der folgende Abschnitt beschreibt wie man 
       z.B. Plots von unterschiedlichen Sensoren gemeinsam ausgibt.</p>
       <p>Die Daten für einen Plot stammen jeweils aus seiner FileLog-Datei. 
       Ändern Sie ggf. die Filterkriterien (regexp) wenn noch andere Daten geplottet werden sollen. Als nächsten Schritt setzen Sie das <a href="http://fhem.de/commandref.html#logtype">logtype</a> 
       Attribut des FileLog. Damit bestimmen Sie, welche Plotvorlagedatei (.gplot) benutzt werden soll. Die Übersicht über die vorhandenen gnuplot-Dateien 
-      finden Sie unter dem Menüpunkt „Edit files“. Die gnuplot-Dateien enthalten die zugehörigen FileLog Beispiele.</p>
+      finden Sie unter dem Menüpunkt "Edit files". Die gnuplot-Dateien enthalten die zugehörigen FileLog Beispiele.</p>
       <p>Beachten Sie bitte, dass die .gnuplot-Dateien ebenfalls bei der Darstellung von SVG anstelle des Gnuplot Backends benutzt werden. </span>
       </p>
       <p>
       Die gnuplot-Dateien müssen #Filelog-Einträge haben, damit sie mit gnuplot scroll oder SVG benutzt werden können (Diese Zeilen werden von gnuplot, 
-      aber nichrt von FHEM, als Kommentare behandelt). Wenn die Auswahl mittels der FileLog „get“ Funktion erfolgen soll, dann lesen Sie sich für die 
+      aber nichrt von FHEM, als Kommentare behandelt). Wenn die Auswahl mittels der FileLog "get" Funktion erfolgen soll, dann lesen Sie sich für die 
       Syntax die mitgelieferten gnuplot-Dateien oder den column_spec Abschnitt hier durch.</p>
       <p> 
       Beispiele:</p>
@@ -288,18 +295,18 @@
       <p>Lassen Sie sich das Diagramm (/denPlot) anzeigen, indem Sie darauf klicken und erstellen Sie einen <a href="http://fhem.de/commandref.html#weblink">Weblink</a> der seine eigenen 
       Attribute hat. Wenn der Weblink zur aktuellen Logdatei gehört, dann wird er als aktueller Weblink gespeichert und angezeigt (Sie müssen ihn nicht 
       erneut definieren, wenn sich in seinem Dateinamen die Bezeichnungen für Jahr/Monat/Datum ändern).</p>
-      <p>Die Logs können entweder mit “gnuplot” (welches im aktuellen Pfad installiert sein muss), oder mittels des im Programm 
+      <p>Die Logs können entweder mit "gnuplot" (welches im aktuellen Pfad installiert sein muss), oder mittels des im Programm 
       enthaltenen SVG-Moduls erstellt werden. In diesem Fall muss Ihr Browser SVG unterstützen. Alle Browser unterstützen SVG, ausser dem Internet 
       Explorer vor der Version 9 und Android vor der Version 3.0. Wenn Sie ein Gerät mit diesen Android-Versionen benutzen, dann versuchen Sie bitte als 
       Browser Opera oder Firefox.</p>
-      <p><br>Der voreingestellte Modus ist SVG. Um das zu ändern, setzen Sie die „ <a href="http://fhem.de/commandref.html#plotmode">plotmode</a>“ 
-      Attribute auf „gnuplot“ oder „gnuplot scroll“.<br><br>
+      <p><br>Der voreingestellte Modus ist SVG. Um das zu ändern, setzen Sie die " <a href="http://fhem.de/commandref.html#plotmode">plotmode</a>" 
+      Attribute auf "gnuplot" oder "gnuplot scroll".<br><br>
 
-      Um ältere Daten anzeigen zu lassen, erstellen Sie bitte einen anderen Weblink und setzen das “fixedrange”-Attribut auf z.B.:</p>
+      Um ältere Daten anzeigen zu lassen, erstellen Sie bitte einen anderen Weblink und setzen das "fixedrange"-Attribut auf z.B.:</p>
       <ul><code>
         attr weblink_1 fixedrange 2006-01-01 2007-01-01
       </code></ul>
-      <p>Um fremde (nicht unter FHEM erfasste) Daten als Plot oder als normalen Text anzuzeigen, erstellen Sie bitte ein “fake” Logfile 
+      <p>Um fremde (nicht unter FHEM erfasste) Daten als Plot oder als normalen Text anzuzeigen, erstellen Sie bitte ein "fake" Logfile 
       mit dem korrekten Dateinamen und einer unbenutzten regexp, z.B.: </p>
       <pre>      define messages FileLog /var/log/messages fakelog</pre>
       </ul>
@@ -348,8 +355,8 @@
       ProxyPass        /fhem  http://localhost:8083/fhem
       ProxyPassReverse /fhem  http://localhost:8083/fhem</pre>
 
-      Dann starten Sie den Apache-Server erneut mit dem Kommando “apachectl 
-      graceful”.
+      Dann starten Sie den Apache-Server erneut mit dem Kommando "apachectl 
+      graceful".
       <p>
       Um die Passwortdatei zu erzeugen geben Sie bitte folgende Befehlszeile ein:</p>
       <p>htpasswd -c /home/httpd/etc/passwd &lt;username&gt;
@@ -379,20 +386,20 @@ Include /etc/httpd/conf/ssl.conf</pre></li>
     <h3>FHEMWEB (pgm2) anpassen</h3>
       <ul>
       <p>Es macht Sinn, Ihre Geräte in Räumen zu 
-      gruppieren, indem Sie das „group“-Attribut setzen. FHEMWEB zeigt Geräte 
-      ohne Raum-Attribut im Raum (Menüpunkt) „Unsorted“. Fügen Sie Geräten das 
-      „hidden“ Raumattribut zu, so werden diese Geräte nicht auf der Webseite 
+      gruppieren, indem Sie das "group"-Attribut setzen. FHEMWEB zeigt Geräte 
+      ohne Raum-Attribut im Raum (Menüpunkt) "Unsorted". Fügen Sie Geräten das 
+      "hidden" Raumattribut zu, so werden diese Geräte nicht auf der Webseite 
       angezeigt.</p>
       <br>
 
       Sie können ein kürzeres Menü auf der Webseite erzeugen, indem Sie 
-      Menüpunkte die nicht angezeigt werden sollen mit dem Attribut „<a href="http://fhem.de/commandref.html#hiddenroom">hiddenroom</a>“ 
+      Menüpunkte die nicht angezeigt werden sollen mit dem Attribut "<a href="http://fhem.de/commandref.html#hiddenroom">hiddenroom</a>" 
       versehen.<p><br>
 
-      Farben und Schriften können Sie durch Anpassung der Datei „style.css“ 
-      ändern („Edit files“ -&gt; style.css) oder Sie erstellen Ihren eigenen Stil (siehe 
-      auch „<a href="http://fhem.de/commandref.html#stylesheetPrefix">stylesheetPrefix</a>“) 
-      dann wird Ihr neuer Stil auch nicht beim nächsten Ausführen des „<a href="http://fhem.de/commandref.html#updatefhem">update</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">“-Kommandos 
+      Farben und Schriften können Sie durch Anpassung der Datei "style.css" 
+      ändern ("Edit files" -&gt; style.css) oder Sie erstellen Ihren eigenen Stil (siehe 
+      auch "<a href="http://fhem.de/commandref.html#stylesheetPrefix">stylesheetPrefix</a>") 
+      dann wird Ihr neuer Stil auch nicht beim nächsten Ausführen des "<a href="http://fhem.de/commandref.html#updatefhem">update</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">"-Kommandos 
       überschrieben.
       <br><br>
       </p>
@@ -403,10 +410,10 @@ Include /etc/httpd/conf/ssl.conf</pre></li>
     <h3>Komplexe Strukturen</h3>
       <ul>
       <p>
-      Definieren Sie Ihre Geräte in verschiedenen Räumen. Dann können Sie die „room=&lt;roomname&gt;“ Spezifikation verwenden um gleichzeitig verschiedene 
-      Geräte auf einmal anzusprechen. Details entnehmen sie bitten dem „<a href="http://fhem.de/commandref.html#devspec">devspec</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">“ 
+      Definieren Sie Ihre Geräte in verschiedenen Räumen. Dann können Sie die "room=&lt;roomname&gt;" Spezifikation verwenden um gleichzeitig verschiedene 
+      Geräte auf einmal anzusprechen. Details entnehmen sie bitten dem "<a href="http://fhem.de/commandref.html#devspec">devspec</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">" 
       Abschnitt.</p>
-      <p>Für noch komplexere Szenarien informieren sie sich bitte über das “<a href="http://fhem.de/commandref.html#structure">structure</a>”-Modul. 
+      <p>Für noch komplexere Szenarien informieren sie sich bitte über das "<a href="http://fhem.de/commandref.html#structure">structure</a>"-Modul. 
       Sie können verschiedene Ebenen wie Flure, Gebäude usw. definieren und alle 
       Geräte einer definierten Struktur auf einmal ansprechen.</p>
       </ul>
