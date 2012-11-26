@@ -4,6 +4,7 @@ body     { background-color: #444444; background-image:url(../icons/darklogo); b
 #menu    { position:absolute; top:170px;left:20px; width:140px; }
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
+#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 
 a { color: #CCCCCC; text-decoration: none;}
 a:hover { color: #ffffff; }

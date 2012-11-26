@@ -1,27 +1,29 @@
 - SVN
   - feature: new Module 59_HCS.pm for monitoring heating valves (FHT, HM-CC-VD)
-    to contral a central heating unit. I thank Benjamin for his support! (M.
-    Fischer)
+             to contral a central heating unit. I thank Benjamin for his
+             support! (M.  Fischer)
   - feature: new Module 72_FB_CALLMONITOR for receiving telephone call events
-    (Markus)
+             (Markus)
   - feature: new Module 71_YAMAHA_AVR.pm for controlling Yamaha AV receivers
-    over network (by Markus)
+             over network (by Markus)
   - feature: optional second parameter to fhem() to make it silent
   - feature: autoloading commands, XmlList/etc renamed from 99 to 98.
   - feature: FHEMWEB returns external files in chunks to save memory
   - feature: commandref.html splitted: documentation is now appended to the
-    modules.
-  - change: introduced readingsBulkUpdate, readingsSingleUpdate
-  - change: added GPLv2 licensing information
-  - bugfix: FHEMWEB slider with min > 0
-  - change: FHEMWEB CORS moved to options
-  - change: FHEMWEB closing old TCP connections
-  - change: FHEMWEB added "Associated with" to detail-screen (Uli)
-  - change: FHEMWEB added ETag headers (Matthias)
-  - change: FHEMWEB devStateIcon added
-  - change: 98_update.pm due a (probable) bug in perl, modules are no longer
-            loading automatically. A restart is required now! (M. Fischer)
+             modules.
+  - change:  introduced readingsBulkUpdate, readingsSingleUpdate
+  - change:  added GPLv2 licensing information
+  - bugfix:  FHEMWEB slider with min > 0
+  - change:  FHEMWEB CORS moved to options
+  - change:  FHEMWEB closing old TCP connections
+  - change:  FHEMWEB added "Associated with" to detail-screen (Uli)
+  - change:  FHEMWEB added ETag headers (Matthias)
+  - change:  FHEMWEB devStateIcon added
+  - change:  HOWTO auf deutsch (ilmtuelp0815)
+  - change:  98_update.pm due a (probable) bug in perl, modules are no longer
+             loading automatically. A restart is required now! (M. Fischer)
   - feature: 98_update.pm saves the statefile before an update (M. Fischer)
+  - feature: FHEMWEB longpoll reconnect (Matthias)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
