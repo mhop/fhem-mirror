@@ -93,6 +93,9 @@ MAX_Set($@)
       #This enables the automatic/schedule mode where the thermostat follows the weekly program
       $temperature = 0;
       $ctrlmode = 0; #auto
+    } elsif($args[0] eq "boost") {
+      $temperature = 0;
+      $ctrlmode = 3;
       #TODO: auto mode with temperature is also possible
     } elsif($args[0] eq "eco") {
       return "No ecoTemperature defined" if(!exists($hash->{ecoTemperature}));
@@ -108,7 +111,7 @@ MAX_Set($@)
       $temperature = $args[0];
     }
 
-    if(@args > 1 and $args[1] eq "until" and $ctrlmode == 1) {
+    if(@args > 1 and ($args[1] eq "until") and ($ctrlmode == 1)) {
       $ctrlmode = 2; #temporary
       $until = sprintf("%06x",MAX_DateTime2Internal($args[2]." ".$args[3]));
     }
@@ -160,7 +163,9 @@ MAX_Set($@)
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
-      return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,$templist ecoTemperature comfortTemperature temperatureOffset maximumTemperature minimumTemperature windowOpenTemperature windowOpenDuration groupid removeDevice";
+      my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
+
+      return "Unknown argument $setting, choose one of desiredTemperature:eco,boost,comfort,$templist ecoTemperature:$templist comfortTemperature:$templist temperatureOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid removeDevice";
     } else {
       return "Unknown argument $setting, choose one of groupid removeDevice";
     }
@@ -374,6 +379,7 @@ MAX_Parse($$)
           <li>"on" or "off" correspondig to 30.5 and 4.5 degree celcius</li>
           <li>"eco" or "comfort" using the eco/comfort temperature set on the device (just as the right-most physical button on the device itself does)</li>
           <li>"auto", where the weekly program saved on the thermostat is processed</li>
+          <li>"boost", activates the boost mode, where for boostDuration minutes the valve is opened up boostValveposition percent.</li>
         </ul>
         All values but "auto" maybe accompanied by the "until" clause, with &lt;data&gt; in format "dd.mm.yyyy HH:MM" (minutes may only be "30" or "00"!)
         to set a temporary temperature until that date/time. Make sure that the cube has valid system time!</li>
