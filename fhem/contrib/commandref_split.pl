@@ -3,12 +3,8 @@
 use strict;
 use warnings;
 
-my $docIn  = "docs/commandref.html";
-my $docOut = "docs/commandref_frame.html";
-my @modDir = ("FHEM", "contrib", "webfrontend/pgm5");
-
-open(IN, "$docIn")    || die "Cant open $docIn: $!\n";
-open(OUT, ">$docOut") || die "Cant open $docOut: $!\n";
+my @lang = ("EN", "DE");
+my @modDir = ("FHEM");
 
 my %mods;
 foreach my $modDir (@modDir) {
@@ -22,42 +18,79 @@ foreach my $modDir (@modDir) {
   }
 }
 
+
+my %doc;
 my %fnd;
 my $modFileName;
-while(my $l = <IN>) {
-  $l =~ s/[\r\n]//g;
-  if($l =~ m,^<a name="(.*)"></a>$,) {
-    if($modFileName) {
-      print MODOUT "=end html\n=cut\n";
-      close(MODOUT);
-      rename "$modFileName.NEW", $modFileName;
-    }
-    my $mod = lc($1);
-    if($mods{$mod}) {
-      print "Double-Fnd: $mod\n" if($fnd{$mod});
-      $fnd{$mod} = 1;
-      $modFileName = $mods{$mod};
-      open(MODIN, "$modFileName") || die("Cant open $modFileName: $!\n");
-      open(MODOUT, ">$modFileName.NEW") || die("Cant open $modFileName.NEW: $!\n");
-      my $seen1;
-      while(my $l = <MODIN>) {
-        $seen1 = 1 if($l =~ m/^1;[\r\n]*/);
-        last if($l =~ m/=pod/ && $seen1);
-        print MODOUT $l;
+foreach my $lang (@lang) {
+  my $suffix = ($lang eq "EN" ? "" : "_$lang");
+
+  my $docIn  = "docs/commandref$suffix.html";
+  my $docOut = "docs/commandref_frame$suffix.html";
+  #my @modDir = ("FHEM", "contrib", "webfrontend/pgm5");
+
+  open(IN, "$docIn")    || die "Cant open $docIn: $!\n";
+  open(OUT, ">$docOut") || die "Cant open $docOut: $!\n";
+
+  my $content = "";
+  my $skipping;
+
+  while(my $l = <IN>) {
+    $l =~ s/[\r\n]//g;
+    if($l =~ m,^<a name="(.*)"></a>$,) {
+      if($modFileName) {
+        $doc{$modFileName}{$lang} = $content;
+        $content = "";
       }
-      print MODOUT "\n\=pod\n=begin html\n\n";
-    } else {
-      print "Not a module: $mod\n";
-      $modFileName = "";
+      my $mod = lc($1);
+      if($mods{$mod}) {
+        print "Double-Fnd: $mod\n" if($fnd{$mod});
+        $fnd{$mod} = 1;
+        $modFileName = $mods{$mod};
+      } else {
+        print "Not a module: $mod\n" if($lang eq "EN");
+        $modFileName = "";
+      }
     }
-  }
-  if($modFileName){
-    print MODOUT "$l\n";
-  } else {
-    print OUT "$l\n";
+    if($l =~ m,href="#global",) {
+      print OUT "$l\n";
+      $skipping = 1;
+      next;
+    }
+    $skipping = 0 if($skipping && $l =~ m,</ul>,);
+    next if($skipping);
+
+    if($modFileName){
+      $content .= "$l\n";
+    } else {
+      print OUT "$l\n";
+    }
   }
 }
 
 foreach my $mod (sort {$mods{$a} cmp $mods{$b}} keys %mods) {
   print "Missing doc for $mods{$mod}\n" if(!$fnd{$mod});
+  $modFileName = $mods{$mod};
+  open(IN, "$modFileName") || die("$modFileName: $!\n");
+  open(OUT, ">$modFileName.NEW") || die("$modFileName.NEW: $!\n");
+  while(my $l = <IN>) {
+    print OUT $l;
+    if($l =~ m/^1;/) {
+      if($doc{$modFileName}) {
+        print OUT "\n=pod\n\n";
+        foreach my $lang (@lang) {
+          next if(!$doc{$modFileName}{$lang});
+          my $suffix = ($lang eq "EN" ? "" : "_$lang");
+          print OUT "=begin html$suffix\n\n";
+          print OUT $doc{$modFileName}{$lang};
+          print OUT "=end html$suffix\n\n";
+        }
+        print OUT "=cut\n";
+      }
+      last;
+    }
+  }
+  close(IN);
+  close(OUT);
+  rename("$modFileName.NEW", $modFileName);
 }
