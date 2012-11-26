@@ -1,5 +1,7 @@
 /*************** LONGPOLL START **************/
 var FW_pollConn;
+//The number of the next line in FW_pollConn.responseText to parse
+var FW_curLine;
 
 function
 FW_cmd(arg)     /* see also FW_devState */
@@ -12,10 +14,22 @@ FW_cmd(arg)     /* see also FW_devState */
 function
 FW_doUpdate()
 {
-  if(FW_pollConn.readyState != 4 || FW_pollConn.status != 200)
+  if(FW_pollConn.readyState == 4) {
+    var errdiv = document.createElement('div');
+    errdiv.innerHTML = "Connection lost, reconnecting in 5 seconds...";
+    errdiv.setAttribute("id","connect_err");
+    document.body.appendChild(errdiv);
+    setTimeout("FW_longpoll()", 5000);
+    return; // some problem connecting
+  }
+
+  if(FW_pollConn.readyState != 3)
     return;
   var lines = FW_pollConn.responseText.split("\n");
-  for(var i=0; i < lines.length; i++) {
+  //Pop the last (maybe empty) line after the last "\n"
+  //We wait until it is complete, i.e. terminated by "\n"
+  lines.pop();
+  for(var i=FW_curLine; i < lines.length; i++) {
     var d = lines[i].split(";", 3);    // Complete arg
     if(d.length != 3)
       continue;
@@ -23,13 +37,19 @@ FW_doUpdate()
     if(el)
       el.innerHTML=d[2];
   }
-  FW_pollConn.abort();
-  FW_longpoll();
+  //Next time, we continue at the next line
+  FW_curLine = lines.length;
 }
 
 function
 FW_longpoll()
 {
+  var errdiv = document.getElementById("connect_err");
+  if(errdiv)
+    document.body.removeChild(errdiv);
+
+  FW_curLine = 0;
+
   FW_pollConn = new XMLHttpRequest();
   var room="room=all";
   var sa = document.location.search.substring(1).split("&");

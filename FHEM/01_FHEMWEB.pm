@@ -2474,8 +2474,6 @@ FW_FlushInform($)
   my $c = $hash->{CD};
   print $c $hash->{INFORMBUF};
   $hash->{INFORMBUF}="";
-
-  CommandDelete(undef, $name);
 }
 
 ###################

@@ -9,6 +9,7 @@ select   { font-family:Arial, sans-serif; font-size:16px}
 #menu    { position:absolute; top:152px;left:10px; width:140px; }
 #hdr     { position:absolute; top:10px; left:160px; }
 #content { position:absolute; top:50px; left:160px; bottom:20px; right:10px; }
+#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
 
 .devType { padding-top:20px; }
 a {  color: #278727; }
