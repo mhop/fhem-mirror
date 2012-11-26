@@ -52,7 +52,7 @@ MAX_Define($$)
         if(int(@a)!=4 || $a[3] !~ m/^[A-F0-9]{6}$/i);
 
   my $type = $a[2];
-  my $addr = $a[3];
+  my $addr = lc($a[3]); #all addr should be lowercase
   Log 5, "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
@@ -195,17 +195,24 @@ MAX_Parse($$)
 {
   my ($hash, $msg) = @_;
   my ($MAX,$msgtype,$addr,@args) = split(",",$msg);
+  return if($MAX ne "MAX");
 
+  Log 5, "MAX_Parse $msg";
   #Find the device with the given addr
   my $shash = $modules{MAX}{defptr}{$addr};
 
   if(!$shash)
   {
-    if($msgtype eq "define"){
-      my $devicetype = $args[0];
+    my $devicetype = undef;
+    $devicetype = $args[0] if($msgtype eq "define");
+    $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
+    $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState");
+    $devicetype = "HeatingThermostat" if($msgtype eq "HeatingThermostatConfig" or $msgtype eq "HeatingThermostatState");
+    if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
-    }else{
-      return;
+    } else {
+      Log 2, "Got message for undefined device, and failed to guess type from msg '$msgtype' - ignoring";
+      return $hash->{NAME};
     }
   }
 
