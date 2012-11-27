@@ -79,7 +79,7 @@ YAMAHA_AVR_GetStatus($;$)
 
     my $device = $hash->{helper}{ADDRESS};
 
-    if(not defined($hash->{ACTIVE_ZONE}))
+    if(not defined($hash->{ACTIVE_ZONE}) or not defined($hash->{MODEL}) or not defined($hash->{FIRMWARE}))
     {
 	YAMAHA_AVR_getModel($hash, $device);
     }
@@ -91,8 +91,11 @@ YAMAHA_AVR_GetStatus($;$)
     
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
-    return "No Zone available" if(not defined($zone));
-    
+    if(not defined($zone));
+    {
+	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
+	return "No Zone available";
+    }
     
     my $return = YAMAHA_AVR_SendCommand($hash, $device,"<YAMAHA_AV cmd=\"GET\"><$zone><Basic_Status>GetParam</Basic_Status></$zone></YAMAHA_AV>");
     
@@ -628,6 +631,7 @@ sub YAMAHA_AVR_getModel($$)
 	Log GetLogLevel($name, 2), "YAMAHA_AVR: selected zone >>".$hash->{helper}{SELECTED_ZONE}."<< is not available on device $name. Using Main Zone instead";
 	$hash->{ACTIVE_ZONE} = "mainzone";
     }
+    return 0;
 }
 
 sub YAMAHA_AVR_getInputs($$)
