@@ -85,7 +85,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -245,6 +245,7 @@ FB_CALLMONITOR_Ready($)
   <b>Attributes</b><br><br>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notiy">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
   </ul>
