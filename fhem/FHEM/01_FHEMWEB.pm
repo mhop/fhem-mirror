@@ -474,6 +474,43 @@ FW_answerCall($)
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
                                                 $FW_tp ? "640,160" : "800,160");
+  my ($cmd, $cmddev) = FW_digestCgi($arg);
+
+
+  if($FW_inform) {      # Longpoll header
+    $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
+    # NTFY_ORDER is larger than the normal order (50-)
+    $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
+    my $c = $me->{CD};
+    print $c "HTTP/1.1 200 OK\r\n",
+             $FW_headercors,
+             "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
+    return -1;
+  }
+
+  my $docmd = 0;
+  $docmd = 1 if($cmd &&
+                $cmd !~ /^showlog/ &&
+                $cmd !~ /^logwrapper/ &&
+                $cmd !~ /^toweblink/ &&
+                $cmd !~ /^style / &&
+                $cmd !~ /^edit/);
+
+  #If we are in XHR or json mode, execute the command directly
+  if($FW_XHR || $FW_jsonp) {
+    $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
+    $FW_RETTYPE = "text/plain; charset=$FW_encoding";
+    if($FW_jsonp) {
+      $FW_cmdret =~ s/'/\\'/g;
+      # Escape newlines in JavaScript string
+      $FW_cmdret =~ s/\n/\\\n/g;
+      FW_pO "$FW_jsonp('$FW_cmdret');";
+    } else {
+      FW_pO $FW_cmdret;
+    }
+    return 0;
+  }
+
   ##############################
   # Axels FHEMWEB modules...
   if(defined($data{FWEXT})) {
@@ -488,40 +525,8 @@ FW_answerCall($)
     }
   }
 
-  my ($cmd, $cmddev) = FW_digestCgi($arg);
-  my $docmd = 0;
-  $docmd = 1 if($cmd && 
-                $cmd !~ /^showlog/ &&
-                $cmd !~ /^logwrapper/ &&
-                $cmd !~ /^toweblink/ &&
-                $cmd !~ /^style / &&
-                $cmd !~ /^edit/);
-
+  #Now execute the command
   $FW_cmdret = $docmd ? FW_fC($cmd, $cmddev) : "";
-
-  if($FW_inform) {      # Longpoll header
-    $me->{inform} = ($FW_room ? $FW_room : $FW_inform);
-    # NTFY_ORDER is larger than the normal order (50-)
-    $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
-    my $c = $me->{CD};
-    print $c "HTTP/1.1 200 OK\r\n",
-             $FW_headercors,
-             "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
-    return -1;
-  }
-
-  if($FW_XHR || $FW_jsonp) {
-    $FW_RETTYPE = "text/plain; charset=$FW_encoding";
-    if($FW_jsonp) {
-      $FW_cmdret =~ s/'/\\'/g;
-      # Escape newlines in JavaScript string
-      $FW_cmdret =~ s/\n/\\\n/g;
-      FW_pO "$FW_jsonp('$FW_cmdret');";
-    } else {
-      FW_pO $FW_cmdret;
-    }
-    return 0;
-  }
 
   # Redirect after a command, to clean the browser URL window
   if($docmd && !$FW_cmdret && AttrVal($FW_wname, "redirectCmds", 1)) {
@@ -640,7 +645,8 @@ FW_digestCgi($)
   $FW_inform = undef;
 
   %FW_webArgs = ();
-  $arg =~ s,^[?/],,;
+  #Remove (nongreedy) everything including the first '?'
+  $arg =~ s,^.*?[?],,;
   foreach my $pv (split("&", $arg)) {
     $pv =~ s/\+/ /g;
     $pv =~ s/%(..)/chr(hex($1))/ge;
