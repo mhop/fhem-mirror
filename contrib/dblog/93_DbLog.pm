@@ -18,7 +18,6 @@ use Data::Dumper;
 
 sub DbLog($$$);
 
-
 ################################################################
 sub
 DbLog_Initialize($)
@@ -30,7 +29,8 @@ DbLog_Initialize($)
   $hash->{NotifyFn} = "DbLog_Log";
   $hash->{GetFn}    = "DbLog_Get";
   $hash->{AttrFn}   = "DbLog_Attr";
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} = "disable:0,1 loglevel:0,5";
+
 }
 
 ###############################################################
@@ -70,7 +70,7 @@ DbLog_Undef($$)
 
 ################################################################
 #
-# Wird bei jeder ?nderung eines Attributes dieser
+# Wird bei jeder Aenderung eines Attributes dieser
 # DbLog-Instanz aufgerufen
 #
 ################################################################
@@ -93,50 +93,56 @@ DbLog_Attr(@)
 
 ################################################################
 #
-# Parsefunktion, abh?ngig vom Devicetyp
+# Parsefunktion, abhaengig vom Devicetyp
 #
 ################################################################
 sub
 DbLog_ParseEvent($$)
 {
-  my ($type, $event)= @_;
-  my @result;
+	my ($type, $event)= @_;
+	my @result;
 
-  # split the event into reading and argument
-  # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-  my @parts= split(/: /,$event);
-  my $reading= $parts[0]; if(!defined($reading)) { $reading= ""; }
-  my $arg= $parts[1];
+	# split the event into reading and argument
+	# "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
+	my @parts   = split(/: /,$event);
+	my $reading = shift @parts;
+	my $value   = join(": ", @parts);
+	my $unit    = "";
 
-  # the interpretation of the argument depends on the device type
+	#default
+	if(!defined($reading)) { $reading = ""; }
+	if(!defined($value))   { $value   = ""; }
 
-  #default
-  my $value= $arg; if(!defined($value)) { $value= ""; }
-  my $unit= "";
+	# the interpretation of the argument depends on the device type
+	# EMEM, M232Counter, M232Voltage return plain numbers
+	if(($type eq "M232Voltage") ||
+	   ($type eq "M232Counter") ||
+	   ($type eq "EMEM")) {
+    }
 
+	# Onewire
 
-  # EMEM, M232Counter, M232Voltage return plain numbers
-  if(($type eq "M232Voltage") ||
-     ($type eq "M232Counter") ||
-     ($type eq "EMEM")) {
-  }
-  # FS20
-  elsif(($type eq "FS20") ||
-        ($type eq "X10")) {
-     @parts= split(/ /,$value);
-     my $reading= $parts[0]; if(!defined($reading)) { $reading= ""; }
-     if($#parts>=1) {
-     	$value= join(" ", shift @parts);
-	     if($reading =~ m(^dim*%$)) {
-		$value= substr($reading,3,length($reading)-4);
-     		$reading= "dim";
-		$unit= "%";
+	elsif(($type eq "OWAD") ||
+	      ($type eq "OWSWITCH") ||
+		  ($type eq "OWMULTI")) {
+		$reading = "data";
+		$value = $event;
 	}
-      else {
-      	$value= "";
-      }
-     }
-  }
+
+	# FS20
+	elsif(($type eq "FS20") ||
+          ($type eq "X10")) {
+		#@parts = split(/ /,$event);
+		#$reading = shift @parts;
+		#$value   = join(" ", shift @parts);
+
+		if($reading =~ m/^dim(\d+).*/o) {
+			$value = $1;
+			$reading= "dim";
+			$unit= "%";
+		}
+		if(!defined($value) || $value eq "") {$value=$reading; $reading="data";}
+	}
   # FHT
   elsif($type eq "FHT") {
      if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
@@ -145,8 +151,8 @@ DbLog_ParseEvent($$)
 	$value= $parts[1];
 	$unit= "";
      }
-     if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
-     if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
+     if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+     if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(^actuator[0-9]*)) {
 		if($value eq "lime-protection") {
 			$reading= "actuator-lime-protection";
@@ -190,7 +196,7 @@ DbLog_ParseEvent($$)
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
      if($event =~ m(avg_day)) { $reading= "data"; $value= $event; }
      if($event =~ m(avg_month)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
+     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading eq "wind") { $value=~ s/ \(km\/h\)//; $unit= "km/h"; }
      if($reading eq "rain") { $value=~ s/ \(l\/m2\)//; $unit= "l/m2"; }
      if($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
@@ -202,9 +208,13 @@ DbLog_ParseEvent($$)
       }
   }
   # HMS
-  elsif($type eq "HMS") {
+  elsif($type eq "HMS" ||
+        $type eq "CUL_WS" ||
+		$type eq "OWTHERM") {
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "?C"; }
+     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+	 if($reading eq "temperature") { $value=~ s/([-\.\d]+).*/$1/; $unit= "°C"; } #OWTHERM
+
      if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
      if($reading eq "battery") {
         $value=~ s/ok/1/;
@@ -213,12 +223,6 @@ DbLog_ParseEvent($$)
      }
   }
 
-  # CUL_WS
-  elsif($type eq "CUL_WS") {
-     if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $unit= "?C"; }
-     if($reading eq "humidity") { $unit= "%"; }
-  }
 
   # BS
   elsif($type eq "BS") {
@@ -230,14 +234,8 @@ DbLog_ParseEvent($$)
     }
   }
 
-  # Default
-  else {
-    $reading= "data";
-    $value= $event;
-  }
-
-  @result= ($reading,$value,$unit);
-  return @result;
+	@result= ($reading,$value,$unit);
+	return @result;
 }
 
 
@@ -299,8 +297,9 @@ DbLog_Log($$)
 
 ################################################################
 #
-# zerlegt ?bergebenes FHEM-Datum in die einzelnen Bestandteile
-# und f?gt noch Defaultwerte ein
+# zerlegt uebergebenes FHEM-Datum in die einzelnen Bestandteile
+# und fuegt noch Defaultwerte ein
+# uebergebenes SQL-Format: YYYY-MM-DD HH24:MI:SS
 #
 ################################################################
 sub
@@ -309,7 +308,7 @@ DbLog_explode_datetime($%) {
   my %retv;
 
   my (@datetime, @date, @time);
-  @datetime = split("_", $t); #Datum und Zeit auftrennen
+  @datetime = split(" ", $t); #Datum und Zeit auftrennen
   @date = split("-", $datetime[0]);
   @time = split(":", $datetime[1]) if ($datetime[1]);
   if ($date[0]) {$retv{year}  = $date[0];} else {$retv{year}  = $def{year};}
@@ -328,7 +327,7 @@ DbLog_explode_datetime($%) {
 sub
 DbLog_implode_datetime($$$$$$) {
   my ($year, $month, $day, $hour, $minute, $second) = @_;
-  my $retv = $year."-".$month."-".$day."_".$hour.":".$minute.":".$second;
+  my $retv = $year."-".$month."-".$day." ".$hour.":".$minute.":".$second;
 
   return $retv;
 }
@@ -363,19 +362,19 @@ DbLog_Connect($)
     $hash->{DBMODEL}="MYSQL";
   } elsif ($dbconn =~ m/oracle:/i) {
     $hash->{DBMODEL}="ORACLE";
+  } elsif ($dbconn =~ m/sqlite:/i) {
+    $hash->{DBMODEL}="SQLITE";
   } else {
     $hash->{DBMODEL}="unknown";
     Log 3, "Unknown dbmodel type in configuration file $configfilename.";
-    Log 3, "Only Mysql, Postgresql, Oracle is currently supported.";
-    Log 3, "Otherwise please check the connectstring: $dbconn";
-    return 0;
+    Log 3, "Only Mysql, Postgresql, Oracle, SQLite are fully supported.";
+    Log 3, "It may cause SQL-Erros during generating plots.";
   }
-
 
   Log 3, "Connecting to database $dbconn with user $dbuser";
   my $dbh = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
   if(!$dbh) {
-    Log 3, "Can't connect to $dbconn: $DBI::errstr";
+    Log 2, "Can't connect to $dbconn: $DBI::errstr";
     return 0;
   }
   Log 3, "Connection to db $dbconn established";
@@ -386,7 +385,7 @@ DbLog_Connect($)
 
 ################################################################
 #
-# Prozeduren zum Ausf?hren des SQL?s
+# Prozeduren zum Ausfuehren des SQLs
 #
 ################################################################
 sub
@@ -406,8 +405,7 @@ sub
 DbLog_ExecSQL($$)
 {
   my ($hash,$sql)= @_;
-
-  Log 5, "Executing $sql";
+  Log GetLogLevel($hash->{NAME},5), "Executing $sql";
   my $dbh= $hash->{DBH};
   my $sth = DbLog_ExecSQL1($dbh,$sql);
   if(!$sth) {
@@ -439,11 +437,11 @@ DbLog_Get($@)
 {
   my ($hash, @a) = @_;
 
-  return "Usage: get $a[0] <infile> <outfile> <from> <to> <column_spec>...\n".
+  return "Usage: get $a[0] <in> <out> <from> <to> <column_spec>...\n".
      "  where column_spec is <device>:<reading>:<default>:<fn>\n" .
      "  see the #DbLog entries in the .gplot files\n" .
-     "  <infile> is not used, only for compatibility for FileLog, please use - \n" .
-     "  <outfile> is a prefix, - means stdout\n"
+     "  <in> is not used, only for compatibility for FileLog, please use - \n" .
+     "  <out> is a prefix, - means stdout\n"
     if(int(@a) < 5);
   shift @a;
   my $inf  = shift @a;
@@ -461,14 +459,16 @@ DbLog_Get($@)
   my (%sqlspec, %from_datetime, %to_datetime);
 
   #uebergebenen Timestamp anpassen
-  #m?gliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
-  %from_datetime = DbLog_explode_datetime($from, DbLog_explode_datetime("2000-01-01_00:00:00", undef));
-  %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-31-12_23:59:59", undef));
+  #moegliche Formate: YYYY | YYYY-MM | YYYY-MM-DD | YYYY-MM-DD_HH24
+  $from =~ s/_/\ /g;
+  $to   =~ s/_/\ /g;
+  %from_datetime = DbLog_explode_datetime($from, DbLog_explode_datetime("2000-01-01 00:00:00", undef));
+  %to_datetime   = DbLog_explode_datetime($to, DbLog_explode_datetime("2099-01-01 00:00:00", undef));
   $from = $from_datetime{datetime};
   $to = $to_datetime{datetime};
 
 
-  my ($retval,$sql_timestamp,$sql_dev,$sql_reading,$sql_value) = "";
+  my ($retval,$sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit) = "";
   my $writeout = 0;
   my (@min, @max, @sum, @cnt, @lastv, @lastd);
   my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval); #fuer delta-h/d Berechnung
@@ -484,19 +484,31 @@ DbLog_Get($@)
 
   my $dbh= $hash->{DBH};
 
-  #vorbereiten der DB-Abfrage, DB-Modell-abh?ngig
+  #vorbereiten der DB-Abfrage, DB-Modell-abhaengig
   if ($hash->{DBMODEL} eq "POSTGRESQL") {
-    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD_HH24:MI:SS')";
-    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD_HH24:MI:SS')";
-    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD_HH24:MI:SS')";
+    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
+    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
+    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
   } elsif ($hash->{DBMODEL} eq "ORACLE") {
-    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD_HH24:MI:SS')";
-    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD_HH24:MI:SS')";
-    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD_HH24:MI:SS')";
+    $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
+    $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
+    $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
   } elsif ($hash->{DBMODEL} eq "MYSQL") {
-    $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d_%H:%i:%s')";
-    $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d_%H:%i:%s')";
-    $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d_%H:%i:%s')";
+    $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
+    $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
+    $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
+  } elsif ($hash->{DBMODEL} eq "SQLITE") {
+    $sqlspec{get_timestamp}  = "TIMESTAMP";
+    $sqlspec{from_timestamp} = "'$from'";
+    $sqlspec{to_timestamp}   = "'$to'";
+  } else {
+    $sqlspec{get_timestamp}  = "TIMESTAMP";
+    $sqlspec{from_timestamp} = "'$from'";
+    $sqlspec{to_timestamp}   = "'$to'";
+  }
+
+  if(uc($outf) eq "ALL") {
+    $sqlspec{all}  = ",TYPE,EVENT,UNIT";
   }
 
    for(my $i=0; $i<int(@readings); $i++) {
@@ -516,33 +528,38 @@ DbLog_Get($@)
         DEVICE,
         READING,
         VALUE
+		".$sqlspec{all}."
        FROM history
        WHERE 1=1
         AND (DEVICE || '|' || READING) = ('".@readings[$i]->[0]."|".@readings[$i]->[1]."')
         AND TIMESTAMP > $sqlspec{from_timestamp}
         AND TIMESTAMP < $sqlspec{to_timestamp}
        ORDER BY TIMESTAMP";
-  Log 4, "DbLog: Execute Statement to Database:";
-  Log 4, $stm;
+
+  Log GetLogLevel($hash->{NAME},5), "Executing $stm";
 
   my $sth= $dbh->prepare($stm) ||
     return "Cannot prepare statement $stm: $DBI::errstr";
   my $rc= $sth->execute() ||
     return "Cannot execute statement $stm: $DBI::errstr";
 
-  while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value)= $sth->fetchrow_array) {
+  if(uc($outf) eq "ALL") {
+	$retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
+	$retval .= "=====================================================\n";
+  }
+  while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit)= $sth->fetchrow_array) {
     $writeout   = 0;
     $out_value  = "";
     $out_tstamp = "";
     ############ Auswerten des 4. Parameters: function ###################
     if(@readings[$i]->[3] eq "int") {
-      #nur den integerwert ?bernehmen falls zb value=15?C
+      #nur den integerwert uebernehmen falls zb value=15°C
       $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
       $out_tstamp = $sql_timestamp;
       $writeout=1;
 
     } elsif (@readings[$i]->[3] =~ m/^int(\d+).*/o) {
-      #?bernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+      #übernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
       $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
       $out_tstamp = $sql_timestamp;
       $writeout=1;
@@ -581,9 +598,11 @@ DbLog_Get($@)
       }
     } elsif(@readings[$i]->[3]) {
       #evaluate
-      my $value = $sql_value;
-      $out_value = eval("@readings[$i]->[3]");
-      if($@) {Log 3, "DbLog: Fehler in der ?bergebenen Funktion: <".@readings[$i]->[3].">, Fehler: $@";}
+      my $val = $sql_value;
+      eval("@readings[$i]->[3]");
+	  $out_value = $val;
+
+      if($@) {Log 3, "DbLog: Fehler in der übergebenen Funktion: <".@readings[$i]->[3].">, Fehler: $@";}
       $out_tstamp = $sql_timestamp;
       $writeout=1;
     } else {
@@ -593,7 +612,14 @@ DbLog_Get($@)
     }
 
     ###################### Ausgabe ###########################
-    $retval .= "$out_tstamp $out_value\n" if($writeout);
+    if($writeout) {
+	  if(uc($outf) eq "ALL") {
+	    $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+	  } else {
+	    $out_tstamp =~ s/\ /_/g; #needed by generating plots
+	    $retval .= "$out_tstamp $out_value\n";
+	  }
+	}
 
     if(defined($sql_value) || $sql_value =~ m/^[-\.\d]+$/o){
       #nur setzen wenn nummerisch
@@ -620,7 +646,12 @@ DbLog_Get($@)
     $out_value = sprintf("%0.1f", $maxval - $minval);
     $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if(@readings[$i]->[3] eq "delta-h");
     $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if(@readings[$i]->[3] eq "delta-d");
-    $retval .= "$out_tstamp $out_value\n";
+    if(uc($outf) eq "ALL") {
+	  $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+	} else {
+	  $out_tstamp =~ s/\ /_/g; #needed by generating plots
+	  $retval .= "$out_tstamp $out_value\n";
+	}
   }
   # DatenTrenner setzen
   $retval .= "#@readings[$i]->[0]:@readings[$i]->[1]:@readings[$i]->[2]:@readings[$i]->[3]\n";
@@ -656,6 +687,7 @@ DbLog_Get($@)
 # get FileLog_KS300 KS300-2012-11.log - 2012-11-10 2012-11-22 10:IR\x3a:0:delta-d
 
 1;
+
 
 =pod
 =begin html
@@ -734,10 +766,12 @@ DbLog_Get($@)
     access to the Database.<br>
 
     <ul>
-      <li>&lt;infile&gt;<br>
+      <li>&lt;in&gt;<br>
         A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
-      <li>&lt;outfile&gt;<br>
-        A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+      <li>&lt;out&gt;<br>
+        A dummy parameter for FileLog compatibility. Set it to <code>-</code>
+		to check the output for plot-computing.<br>Set it to the special keyword
+		<code>all</code> to get all columns from Database.</li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Used to select the data. Please use the following timeformat or
         an initial substring of it:<br>
@@ -765,36 +799,40 @@ DbLog_Get($@)
                 Extract the decimal digits including negative character and
                 decimal point at the beginning og the string. Used e.g.
                 for constructs like 15.7&deg;C</li>
-              <li>delta-h or delta-d<br>
+              <li>delta-h / delta-d<br>
                 Return the delta of the values for a given hour or a given day.
                 Used if the column contains a counter, as is the case for the
                 KS300 rain column.</li>
               <li>everything else<br>
-                The string is evaluated as a perl expression. $value is the
-                current value returned from the Database. Note: The string/perl
+                The string is evaluated as a perl expression. $val is the
+                current value returned from the Database.<br>Note: The string/perl
                 expression cannot contain spaces, as the part after the space
                 will be considered as the next column_spec.</li>
             </ul></li>
         </ul></li>
       </ul>
     <br><br>
-    Example:
+    Examples:
       <ul>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature::</code></li>
         <li><code>get myDbLog - - 2012-11-10_10 2012-11-10_20 KS300:temperature::int1</code><br>
            like from 10am until 20pm at 10.11.2012</li>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature::</code></li>
+        <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature::</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature:: KS300:rain::delta-h KS300:rain::delta-d</code></li>
-        <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyDummy:data::$value=~"on"?1:0</code></li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
+		   return 1 for all occurance of on* (on|on-for-timer etc) and 0 for all off*</li>
+		<li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
+		   Example of OWAD: value like this: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
+		   and output for port B is like this: <code>2012-11-20_10:23:54 66.647</code></li>
       </ul>
     <br><br>
   </ul>
-
   <a name="DbLogattr"></a>
   <b>Attributes</b> <ul>N/A</ul><br>
-
 </ul>
-
-
 =end html
+
+=begin html_DE
+
+=end html_DE
 =cut
