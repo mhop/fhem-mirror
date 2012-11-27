@@ -265,4 +265,75 @@ FB_CALLMONITOR_Ready($)
 
 
 =end html
+=begin html_DE
+
+<a name="FB_CALLMONITOR"></a>
+<h3>FB_CALLMONITOR</h3>
+<ul>
+  <tr><td>
+  Das Modul FB_CALLMONITOR verbindet sich zu einer AVM FritzBox Fon und verarbeitet
+  Telefonie-<a href="#FB_CALLMONITORevents">Ereignisse</a>.(eingehende & ausgehende Telefonate)
+  <br><br>
+  Um dieses Modul nutzen zu k&ouml;nnen, muss der CallMonitor via Kurzwahl mit einem Telefon aktiviert werden.
+ .<br><br>
+  <ul>
+      <code>#96*5* - CallMonitor aktivieren<br>#96*4* - CallMonitor deaktivieren</code>
+  </ul>
+  <br>
+  Einfach die entsprechende Kurzwahl auf irgend einem Telefon eingeben, welches an die Fritz!Box angeschlossen ist. 
+  Nach ca. 3 Sekunden kann man einfach wieder auflegen. Nun ist der CallMonitor aktiviert.
+  <br>
+  Sobald der CallMonitor auf der Fritz!Box aktiviert wurde erzeugt das Modul entsprechende Events (s.u.)
+  <br><br>
+  Dieses Modul funktioniert mit allen Fritz!Box Modellen, welche Telefonie unterst&uuml;tzen (Namenszusatz: Fon).
+  <br><br>
+  
+  <a name="FB_CALLMONITORdefine"></a>
+  <b>Definition</b>
+  <ul>
+    <code>define &lt;name&gt; FB_CALLMONITOR &lt;IP-Addresse&gt;[:Port]</code><br>
+    <br>
+    Port 1012 ist der Standardport und muss daher nicht explizit angegeben werden.
+    <br>
+  </ul>
+  <br>
+  <a name="FB_CALLMONITORset"></a>
+  <b>Set-Kommandos</b>
+  <ul>
+  N/A 
+  </ul>
+  <br>
+
+  <a name="FB_CALLMONITORget"></a>
+  <b>Get-Kommandos</b>
+  <ul>
+  N/A
+  </ul>
+  <br>
+
+  <a name="FB_CALLMONITORattr"></a>
+  <b>Attribute</b><br><br>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notiy">do_not_notify</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+  </ul>
+  <br>
+ 
+  <a name="FB_CALLMONITORevents"></a>
+  <b>Generierte Events:</b><br><br>
+  <ul>
+  <li><b>event</b>: (call|ring|connect|disconnect) - Welches Event wurde genau ausgel&ouml;st.</li>
+  <li><b>external_number</b>: $number - Die Rufnummer des Gegen&uuml;bers, welcher anruft (event: ring) oder angerufen wird (event: call)</li>
+  <li><b>internal_number</b>: $number - Die interne Rufnummer (Festnetz, VoIP-Nummer, ...) auf welcher man angerufen wird (event: ring) oder die man gerade nutzt um jemanden anzurufen (event: call)</li>
+  <li><b>internal_connection</b>: $connection - Der interne Anschluss an der Fritz!Box welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren (FON1, FON2, ISDN, DECT, ...)</li>
+  <li><b>external_connection</b>: $connection - Der externe Anschluss welcher genutzt wird um das Gespräch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
+  <li><b>call_duration</b>: $seconds - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
+  </ul>
+</ul>
+
+
+=end html_DE
+
 =cut
