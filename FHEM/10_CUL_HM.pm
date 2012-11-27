@@ -734,7 +734,7 @@ CUL_HM_Parse($$)
   }
   elsif($st eq "virtual"){#####################################################
     # possibly add code to count all acks that are paired. 
-    if($msgType eq "02") {
+    if($msgType eq "02") {# this must be a reflection from what we sent, ignore
       push @event, "";
 	}
   }
@@ -1011,25 +1011,37 @@ CUL_HM_Parse($$)
   #------------ parse if FHEM or virtual actor is destination   ---------------
 
   if(AttrVal($dname, "subType", "none") eq "virtual"){# see if need for answer
-    if($msgType =~ m/^4./ && $p =~ m/^(..)/) { #Push Button event
-      my ($recChn) = ($1);# button number/event count
-	  my $recId = $src.$recChn;
-	  foreach my $dChId (CUL_HM_getAssChnIds($dname)){
+    if($msgType =~ m/^4./ && $p =~ m/^(..)(..)/) { #Push Button event
+      my ($recChn,$trigNo) = (hex($1),hex($2));# button number/event count
+	  my $longPress = ($recChn & 0x40)?"long":"short";
+	  my $recId = $src.sprintf("%02X",($recChn&0x3f));
+	  foreach my $dChId (CUL_HM_getAssChnIds($dname)){# need to check all chan
 	    next if (!$modules{CUL_HM}{defptr}{$dChId});
 		my $dChNo = substr($dChId,6,2);
 		my $dChName = CUL_HM_id2Name($dChId);
 	    my @peerIDs = split(',',AttrVal($dChName,"peerIDs",""));
-	    foreach my $pId (@peerIDs){
-	      if ($pId eq $recId){ #match: we have to ack 
-		    my $dChHash = CUL_HM_name2Hash($dChName);
-		    my $state = ReadingsVal($dChName,"virtActState","ON");
-		    $state = ($state eq "OFF")?"ON":"OFF";
-			CUL_HM_UpdtReadBulk($dChHash,1,"virtActState:".$state,
-			                    "virtActTrigger:".CUL_HM_id2Name($recId));
-            CUL_HM_SndCmd($dChHash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
+
+		if (AttrVal($dChName,"peerIDs","") =~m/$recId/){# is in peerlist?
+		  my $dChHash = CUL_HM_name2Hash($dChName);
+		  $dChHash->{helper}{trgLgRpt} = 0 if (!defined($dChHash->{helper}{trgLgRpt}));
+		  $dChHash->{helper}{trgLgRpt} +=1;
+		  
+		  my $state = ReadingsVal($dChName,"virtActState","ON");
+		  $state = ($state eq "OFF")?"ON":"OFF" 
+		        if ($dChHash->{helper}{trgLgRpt} == 1);# toggle first
+		  if (hex($msgFlag)&0x20){
+		    $longPress .= "_Release";
+			$dhash->{helper}{trgLgRpt}=0;
+		    CUL_HM_SndCmd($dChHash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
                   (($state eq "ON")?"C8":"00")."00");
-	      }
-        }
+			$sendAck = "";
+		  }
+		  CUL_HM_UpdtReadBulk($dChHash,1,"virtActState:".$state,
+			                       "virtActTrigger:".CUL_HM_id2Name($recId),
+						           "virtActTrigType:".$longPress,
+						           "virtActTrigRpt:".$dChHash->{helper}{trgLgRpt},
+						           "virtActTrigNo:".$trigNo	);
+        }	
 	  }
 	}
 	elsif($msgType eq "58" && $p =~ m/^(..)(..)/) {# climate event
@@ -1048,7 +1060,7 @@ CUL_HM_Parse($$)
 	    CUL_HM_respPendRm($dhash);
 	  } 
 	}
-	if (hex($msgFlag)&0x20){
+	if (hex($msgFlag)&0x20 && ($sendAck eq "yes")){
 	  CUL_HM_SndCmd($dhash, $msgcnt."8002".$dst.$src."00");#virtual must ack
 	}
   }
@@ -1085,7 +1097,6 @@ my %culHmRegDefShSh = (# register that are available for short AND long button p
 #blindActuator mainly   
   maxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
   driveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
-  maxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
   actionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,JmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OnTimeMode      =>{a=> 10.0,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
@@ -1142,26 +1153,28 @@ my %culHmRegDefine = (
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"fliptime up <=>down"},
 #remote mainly                                                                                      
-  language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Language 0:English, 1:German"},
-  stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Standby Time"},
-  backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight at keystroke",lit=>{off=>0,on=>1}},
-  backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight at motion"   ,lit=>{off=>0,on=>1}},
-  backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight On Time"},
+  language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Language 0:English, 1:German"},
+  stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
+  backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke",lit=>{off=>0,on=>1}},
+  backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at motion"   ,lit=>{off=>0,on=>1}},
+  backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
   longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8     ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,d=>0,t=>"time to detect key long press"},
   dblPress        =>{a=>  9.0,s=>0.4,l=>1,min=>0  ,max=>1.5     ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"time to detect double press"},
   peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"peer expects burst",lit=>{off=>0,on=>1}},
   expectAES       =>{a=>  1.7,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"expect AES"        ,lit=>{off=>0,on=>1}},
+  lcdSymb         =>{a=>  2.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask which symbol to display on message"},
+  lcdLvlInterp    =>{a=>  3.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask fro symbols"},
   msgShowTime     =>{a=> 45.0,s=>1.0,l=>1,min=>0.0,max=>120     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"Message show time(RC19). 0=always on"},
   beepAtAlarm     =>{a=> 46.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Alarm"        ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
-  beepAtService   =>{a=> 46.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Beep Service"      ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
-  beepAtInfo      =>{a=> 46.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Beep Info"         ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
-  backlAtAlarm    =>{a=> 47.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight Alarm"   ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
-  backlAtService  =>{a=> 47.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight Service" ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
-  backlAtInfo     =>{a=> 47.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight Info"    ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
+  beepAtService   =>{a=> 46.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Service"      ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
+  beepAtInfo      =>{a=> 46.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Info"         ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
+  backlAtAlarm    =>{a=> 47.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Alarm"   ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
+  backlAtService  =>{a=> 47.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Service" ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
+  backlAtInfo     =>{a=> 47.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Info"    ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
 #dimmer  mainly                                                                                  
-  ovrTempLvl      =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>0,t=>"overtemperatur level"},
-  redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>0,t=>"reduced temperatur recover"},
-  redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>0,t=>"reduced power level"},
+  ovrTempLvl      =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"overtemperatur level"},
+  redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"reduced temperatur recover"},
+  redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>1,t=>"reduced power level"},
 #CC-TC                                                                                        
   BacklOnTime     =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
   BacklOnMode     =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
@@ -1198,12 +1211,12 @@ my %culHmRegDefine = (
   ledFlashUnlocked=>{a=>31.3 ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
   ledFlashLocked  =>{a=>31.6 ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
 # sec_mdir                                                                                   
-  evtFltrPeriod   =>{a=>1.0  ,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>0,t=>"event filter period"},
-  evtFltrNum      =>{a=>1.4  ,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"sensitivity - read sach n-th puls"},
-  minInterval     =>{a=>2.0  ,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"minimum interval in sec",lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
-  captInInterval  =>{a=>2.3  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"capture within interval",lit=>{off=>0,on=>1}},
-  brightFilter    =>{a=>2.4  ,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"brightness filter"},
-  ledOnTime       =>{a=>34   ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
+  evtFltrPeriod   =>{a=>1.0  ,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
+  evtFltrNum      =>{a=>1.4  ,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
+  minInterval     =>{a=>2.0  ,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec",lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
+  captInInterval  =>{a=>2.3  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval",lit=>{off=>0,on=>1}},
+  brightFilter    =>{a=>2.4  ,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
+  ledOnTime       =>{a=>34   ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
 # weather units                                                                                  
   stormUpThresh   =>{a=>6    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Storm upper threshold"},
   stormLowThresh  =>{a=>7    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Storm lower threshold"},
@@ -1270,9 +1283,15 @@ my %culHmRegChan = (# if channelspecific then enter them here
             BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1,
               },
   "HM-CC-TC03"   => {TempWinOpen  =>1, }, #window channel
-  "HM-RC-1912"   => {msgShowTime=>1, beepAtAlarm =>1,beepAtService =>1,beepAtInfo  =>1,backlAtAlarm =>1,backlAtService =>1,backlAtInfo =>1},
-  "HM-RC-19-B12" => {msgShowTime=>1, beepAtAlarm =>1,beepAtService =>1,beepAtInfo  =>1,backlAtAlarm =>1,backlAtService =>1,backlAtInfo =>1},
-  "HM-RC-19-SW12"=> {msgShowTime=>1, beepAtAlarm =>1,beepAtService =>1,beepAtInfo  =>1,backlAtAlarm =>1,backlAtService =>1,backlAtInfo =>1}, 
+  "HM-RC-1912"   => {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
+                     backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
+                     lcdSymb      =>1, lcdLvlInterp   =>1},
+  "HM-RC-19-B12" => {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
+                     backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
+                     lcdSymb      =>1, lcdLvlInterp   =>1},
+  "HM-RC-19-SW12"=> {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
+                     backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
+                     lcdSymb      =>1, lcdLvlInterp   =>1},
  );
 
 ##--------------- Conversion routines for register settings
@@ -2309,24 +2328,25 @@ CUL_HM_Set($@)
     #devicepair <btnN> device ... [single|dual] [set|unset] [actor|remote|both]
 	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
-	return "$bNo is not a button number" if(($bNo < 1) && !$chn);
-    my $peerHash = $defs{$peerN} if ($peerN);
-    return "$peerN not a CUL_HM device" 
-	      if(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM");
-    return "$single must be single or dual" 
-	      if(defined($single) && (($single ne"single") &&($single ne"dual")));
-    return "$set must be set or unset" 
-	      if(defined($set) && (($set ne"set") &&($set ne"unset")));  
-    return "$target must be [actor|remote|both]" 
-	      if(defined($target) && (($target ne"actor") &&
-		     ($target ne"remote")&&($target ne"both")));  
-	return "use climate chan to pair TC" if($md eq "HM-CC-TC" &&$chn ne "02");
-	return "use - single [set|unset] actor - for smoke detector" 
-	      if($st eq "smokeDetector" && 
-		       (!$single || $single ne "single" || $target ne "actor"));
-	return "use - single - for this sensor" 
-	      if(($md eq "ROTO_ZEL-STG-RM-FDK" || $md eq "HM-SEC-RHS") &&
-		       (!$single || $single ne "single"));
+	return "$bNo is not a button number"                          if(($bNo < 1) && !$chn);
+	my $peerDst = CUL_HM_name2Id($peerN);
+	$peerDst .= "01" if( length($peerDst)==6);
+    return "please enter peer"                                    if(!$peerDst);
+	my $peerChn = substr($peerDst,6,2);
+	$peerDst = substr($peerDst,0,6);
+    my $peerHash;
+	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn} 
+	      if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
+    return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
+    return "$single must be single or dual"                       if(defined($single) && (($single ne"single") &&($single ne"dual")));
+    return "$set must be set or unset"                            if(defined($set) && (($set ne"set") &&($set ne"unset")));  
+    return "$target must be [actor|remote|both]"                  if(defined($target) && (($target ne"actor") &&
+		                                                             ($target ne"remote")&&($target ne"both")));  
+	return "use climate chan to pair TC"                          if($md eq "HM-CC-TC" &&$chn ne "02");
+	return "use - single [set|unset] actor - for smoke detector"  if($st eq "smokeDetector" && 
+		                                                             (!$single || $single ne "single" || $target ne "actor"));
+	return "use - single - for this sensor"                       if(($md eq "ROTO_ZEL-STG-RM-FDK" || $md eq "HM-SEC-RHS") &&
+		                                                             (!$single || $single ne "single"));
 			   
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set eq "unset")?0:1;
@@ -2343,13 +2363,6 @@ CUL_HM_Set($@)
 	    $nrCh2Pair = 2;
 	}
 	my $cmd = ($set)?"01":"02";# do we set or remove?
-
-    my $peerDst = $peerHash->{DEF};
-    my $peerChn = "01";
-    if(length($peerDst) == 8) { # shadow switch device for multi-channel switch
-      ($peerDst,$peerChn) = ($1,$2) if($peerDst =~ m/(......)(..)/);
-      $peerHash = $modules{CUL_HM}{defptr}{$peerDst};
-    }
 
     # First the remote (one loop for on, one for off)
 	if (!$target || $target eq "remote" || $target eq "both"){
@@ -2380,13 +2393,14 @@ CUL_HM_Set($@)
             $peerFlag,$id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
 	  }
 	}
+	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
     $devHash = $peerHash; # Exchange the hash, as the switch is always alive.
   }
   
   readingsSingleUpdate($hash,"state",$state,1) if($state);
 
   $rxType = CUL_HM_getRxType($devHash);
-  Log GetLogLevel($name,3), "CUL_HM set $name " . join(" ", @a[1..$#a])." rxt:".$rxType;
+  Log GetLogLevel($name,2), "CUL_HM set $name " . join(" ", @a[1..$#a])." rxt:".$rxType;
   CUL_HM_ProcessCmdStack($devHash) if($rxType & 0x03);#all/burst
   return ("",1);# no not generate trigger outof command
 }
@@ -2864,7 +2878,7 @@ CUL_HM_name2Id(@)
   return $defs{$1}->{DEF}.$2 if($name =~ m/(.*)_chn:(..)/);   #<devname> chn:xx
   return $name               if($name =~ m/^[A-F0-9]{6,8}$/i);#was already HMid
   return $idHash->{DEF}.sprintf("%02X",$1) 
-                             if($idHash && $name =~ m/self(.*)/);
+                             if($idHash && ($name =~ m/self(.*)/));
   return "";
 }
 sub    #---------------------------------
@@ -3654,7 +3668,7 @@ CUL_HM_ActCheck()
 	  DoTrigger($devName,"Activity:".$state);
 	  $attr{$devName}{actStatus} = $state;
 	  readingsSingleUpdate($actHash,$rdName,$state,1);
-	  Log GetLogLevel($actName,2),"Device ".$devName." is ".$state;
+	  Log GetLogLevel($actName,4),"Device ".$devName." is ".$state;
 	}
   }
 
