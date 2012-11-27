@@ -79,7 +79,7 @@ YAMAHA_AVR_GetStatus($;$)
 
     my $device = $hash->{helper}{ADDRESS};
 
-    if(not defined($hash->{MODEL}))
+    if(not defined($hash->{ACTIVE_ZONE}))
     {
 	YAMAHA_AVR_getModel($hash, $device);
     }
