@@ -4,7 +4,7 @@
 # Feedback: http://groups.google.com/group/fhem-users
 # Define Custom Floorplans
 # Released : 26.02.2012
-# Version  : 1.01
+# Version  : 2.0
 # Revisions:
 # 0001: Released to testers
 # 0002: use local FP_select and FP_submit after clash with FHEMWEB update
@@ -30,26 +30,28 @@
 # 0020: moved creation of userattr to define, added slider and timepicker and setList, added style5 icon+commands, added style 6 readingstimestamp, 
 #       added style-descriptions in fp-arrange (October 22, 2012)
 # 0021: fixed http-header, unsetting FF-autocomplete, added attribute fp_setbutton (fixes by Matthias) (November 23, 2012)
+# 0022: longpoll by Matthias Gehre (November 27, 2012)
 #
 ################################################################
 #
 #  Copyright notice
 #
 #  (c) 2012 Copyright: Ulrich Maass
-#  All rights reserved
 #
-#  This script is free software; you can redistribute it and/or modify
+#  This file is part of fhem.
+# 
+#  Fhem is free software: you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
+#  the Free Software Foundation, either version 2 of the License, or
 #  (at your option) any later version.
-#
-#  The GNU General Public License can be found at
-#  http://www.gnu.org/copyleft/gpl.html.
-#
-#  This script is distributed in the hope that it will be useful,
+# 
+#  Fhem is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
+# 
+#  You should have received a copy of the GNU General Public License
+#  along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ################################################################################
 # Usage
@@ -71,7 +73,7 @@
 # To make objects display, they will thereby get assigned
 # attr <device> fp_<name> <top>,<left>,<style>,<text>
 # displays device <device> on floorplan <name> at position top:<top>,left:<left> with style <style> and description <text>
-# styles: 0: icon/state only, 1: name+icon, 2: name+icon+commands 3:Device-Readings(+name) 3:S300TH
+# styles: 0: icon/state only, 1: name+icon, 2: name+icon+commands 3:Device-Readings(+name) 4:S300TH
 # Example: attr lamp fp_Groundfloor 100,100,1,TableLamp #displays lamp at position 100px,100px
 #
 # Repeat step 3 to add further devices. Delete attr fp_<name> when all devices are arranged on your screen. Enjoy.
@@ -175,7 +177,7 @@ FP_CGI(){
   $FP_name = undef;
   my ($p,$v) = ("","");       #parameter and value of analyzed URL
   $FW_RET = "";               # blank out any html-code written so far by fhemweb
-#  $FW_longpoll = (AttrVal($FW_wname, "longpoll", undef));							# longpoll doesn't work (yet) for floorplans
+  $FW_longpoll = (AttrVal($FW_wname, "longpoll", undef));							# longpoll
   $FW_detail = 0;
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
@@ -334,8 +336,6 @@ FP_htmlHeader($) {
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
-#  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/longpoll.js\"></script>"
-#                        if($FW_longpoll);											 # longpoll not yet implemented for floorplans
   FW_pO "</head>\n";
 }
 #-------------------------------------------------------------------------------
@@ -377,7 +377,8 @@ FP_show(){
   ### Page start
   FP_htmlHeader("$FP_name");
   ## body
-  FW_pO "<body id=\"$FP_name-body\">\n";
+  my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
+  FW_pO "<body id=\"$FP_name-body\" $onload>\n";
   FW_pO "<div id=\"backimg\" style=\"width: 99%; height: 99%;\">";
   FW_pO FW_makeImage(AttrVal($FP_name, "fp_backgroundimg", "fp_$FP_name"));
   FW_pO "</div>\n";
@@ -413,7 +414,7 @@ FP_show(){
 
 		FW_pO "\n<div style=\"position:absolute; top:".$top."px; left:".$left."px;\" id=\"div-$d\">";
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name/$d\" autocomplete=\"off\">";
-		FW_pO " <table class=\"$type fp_$FP_name\" id=\"$d\" align=\"center\">";               # Main table per device
+		FW_pO " <table class=\"$type fp_$FP_name\" id=\"table-$d\" align=\"center\">";               # Main table per device
 		my ($allSets, $cmdlist, $txt) = FW_devState($d, "");
 		#Debug "txt is \"$txt\"";
 		$txt = ReadingsVal($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
@@ -422,7 +423,7 @@ FP_show(){
     ########################
     # Device-name per device
 		if ($style gt 0 && $style ne 5) {
-			FW_pO "   <tr class=\"devicename fp_$FP_name\" id=\"$d\">";                        # For css: class=devicename, id=devicename
+			FW_pO "   <tr class=\"devicename fp_$FP_name\" id=\"$d-devicename\">";                        # For css: class=devicename, id=<devicename>-devicename
 			my $devName = "";
 			if ($style == 3 || $style == 6) {
 				$devName = $text2 ? $text2 : "";											   # Style 3 = Reading - use last part of comma-separated description
@@ -459,7 +460,7 @@ FP_show(){
 	
 	if ($style == 6) {                                                                    # add ReadingsTimeStamp for style 6
 		$txt="";
-    	FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d\">";                     # For css: class=devicetimestamp, id=devicename
+    	FW_pO "<tr class=\"devicetimestamp fp_$FP_name\" id=\"$d-devicetimestamp\">";                     # For css: class=devicetimestamp, id=<devicename>-devicetimestamp
 		$txt = ReadingsTimestamp($d, $text, "Undefined Reading $d-<b>$text</b>") if ($style == 3 || $style == 6);   # Style3+6 = DeviceReading given in $text
 	    FW_pO "<td colspan=\"$cols\">$txt";
 	    FW_pO "</td></tr>";
@@ -473,7 +474,7 @@ FP_show(){
           my @cList = split(":", $cmdlist);
           my @rList = map { ReplaceEventMap($d,$_,1) } @cList;
           my $firstIdx = 0;
-		  FW_pO "  <tr class=\"devicecommands\" id=\"$d\">";
+		  FW_pO "  <tr class=\"devicecommands\" id=\"$d-devicecommands\">";
           # Special handling (slider, dropdown)
 		  my $FW_room = undef;  ##needed to be able to reuse code from FHEMWEB
           my $cmd = $cList[0];
