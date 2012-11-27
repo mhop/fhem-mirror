@@ -483,8 +483,8 @@ FW_answerCall($)
     $me->{NTFY_ORDER} = $FW_cname;   # else notifyfn won't be called
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
-             $FW_headercors,
-             "Content-Type: text/plain; charset=$FW_encoding\r\n\r\n";
+       $FW_headercors,
+       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n";
     return -1;
   }
 
