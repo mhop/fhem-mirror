@@ -24,6 +24,7 @@
              loading automatically. A restart is required now! (M. Fischer)
   - feature: 98_update.pm saves the statefile before an update (M. Fischer)
   - feature: FHEMWEB longpoll reconnect (Matthias)
+  - bugfix:  rename may overwrite other devices
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
