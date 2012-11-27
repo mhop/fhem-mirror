@@ -13,6 +13,7 @@
              modules.
   - change:  introduced readingsBulkUpdate, readingsSingleUpdate
   - change:  added GPLv2 licensing information
+  - feature: FLOORPLAN added fp_setbutton attribute
   - bugfix:  FHEMWEB slider with min > 0
   - change:  FHEMWEB CORS moved to options
   - change:  FHEMWEB closing old TCP connections
@@ -25,6 +26,7 @@
   - feature: 98_update.pm saves the statefile before an update (M. Fischer)
   - feature: FHEMWEB longpoll reconnect (Matthias)
   - bugfix:  rename may overwrite other devices
+  - feature: FLOORPLAN longpoll (Matthias)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
