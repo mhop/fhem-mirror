@@ -811,4 +811,140 @@ volume_level</pre>
 
 
 =end html
+=begin html_DE
+
+<a name="YAMAHA_AVR"></a>
+<h3>YAMAHA_AVR</h3>
+<ul>
+
+  <a name="YAMAHA_AVRdefine"></a>
+  <b>Definition</b>
+  <ul>
+    <code>define &lt;name&gt; YAMAHA_AVR &lt;IP-Addresse&gt; [&lt;Zone&gt;] [&lt;Status_Interval&gt;]</code>
+    <br><br>
+
+    Dieses Modul steuert AV-Receiver des Herstellers Yamaha &uuml;ber die Netzwerkschnittstelle.
+    Es bietet die M&ouml;glichkeit den Receiver an-/auszuschalten, den Eingangskanal zu w&auml;hlen,
+    die Lautst&auml;rke zu &auml;ndern, den Receiver "Stumm" zu schalten, sowie den aktuellen Status abzufragen.
+    <br><br>
+    Bei der Definition eines YAMAHA_AVR-Moduls wird eine interne Routine in Gang gesetzt, welche regelm&auml;&szlig;ig 
+    (einstellbar durch den optionalen Parameter &lt;Status_Interval&gt;; falls nicht gesetzt ist der Standardwert 30 Sekunden)
+    den Status des Receivers abfragt und entsprechende Notify-/FileLog-Ger&auml;te triggert..<br><br>
+
+    Beispiel:
+    <PRE>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10
+       
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60   # Mit modifiziertem Status Interval (60 Sekunden)
+    </PRE>
+  </ul>
+  <b>Zonenauswahl</b><br>
+  <ul>
+    Wenn der zu steuernde Receiver mehrere Zonen besitzt (z.B. RX-V671, RX-V673,... sowie die AVANTAGE Modellreihe) 
+    kann die zu steuernde Zone explizit angegeben werden. Die Modellreihen RX-V3xx und RX-V4xx als Beispiel
+    haben nur eine Zone (Main Zone). Je nach Receiver-Modell stehen folgende Zonen zur Verf&uuml;gung, welche mit
+    dem optionalen Parameter &lt;Zone&gt; angegeben werden k&ouml;nnen.<br><br>
+    <ul>
+    <li><b>mainzone</b> - Das ist die Hauptzone (Standard)</li>
+    <li><b>zone2</b> - Die zweite Zone (Zone 2)</li>
+    <li><b>zone3</b> - Die dritte Zone (Zone 3)</li>
+    <li><b>zone4</b> - Die vierte Zone (Zone 4)</li>
+    </ul>
+    <br>
+    Je nach Receiver-Modell stehen in den verschiedenen Zonen nicht immer alle Eing&auml;nge zur Verf&uuml;gung. 
+    Dieses Modul bietet nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge an.
+    <br><br>
+    Beispiel:
+    
+     <PRE>
+        define AV_Receiver YAMAHA_AVR 192.168.0.10           # Wenn keine Zone angegeben ist, wird 
+        attr AV_Receiver YAMAHA_AVR room Wohnzimmer          # standardm&auml;&szlig;ig "mainzone" verwendet
+        
+        # Definition der zweiten Zone
+        define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2
+        attr AV_Receiver_Zone2 room Schlafzimmer
+     </PRE>
+     F&uuml;r jede Zone muss eine eigene YAMAHA_AVR Definition erzeugt werden, welche dann unterschiedlichen R&auml;umen zugeordnet werden kann.
+     Jede Zone kann unabh&auml;ngig von allen anderen Zonen (inkl. der Main Zone) gesteuert werden.
+     <br><br>
+  </ul>
+  
+  <a name="YAMAHA_AVRset"></a>
+  <b>Set-Kommandos </b>
+  <ul>
+    <code>set &lt;Name&gt; &lt;Kommando&gt; [&lt;Parameter&gt;]</code>
+    <br><br>
+    Aktuell werden folgende Kommandos unterst&uuml;tzt. Die verf&uuml;gbaren Eing&auml;nge k&ouml;nnen je nach Receiver-Modell variieren.
+    Die folgenden Eing&auml;nge stehen beispielhaft an einem RX-V473 Receiver zur Verf&uuml;gung.
+    Aktuell stehen folgende Kommandos zur Verf&uuml;gung.
+
+<pre>on
+off
+input hdmi1
+input hdmi2
+input hdmi3
+input hdmi4
+input av1
+input av2
+input av3
+input av3
+input av4
+input av5
+input av6
+input usb
+input airplay
+input tuner
+input v-aux
+input audio
+input server
+volume -80..16	(Lautst&auml;rke zwischen -80 und +16 dB)
+mute on
+mute off</pre>
+  </ul>
+
+  <a name="YAMAHA_AVRget"></a>
+  <b>Get-Kommandos</b>
+  <ul>
+    <code>get &lt;Name&gt; &lt;Parameter&gt;</code>
+    <br><br>
+    Aktuell stehen folgende Parameter zur Verf&uuml;gung welche den aktuellen Status des Receivers zur&uuml;ck geben.<br><br>
+     <ul>
+     <li><code>power</code> - Betriebszustand des Receiveres/Zone (on oder off)</li>
+     <li><code>input</code> - Gew&auml;hlter Eingang</li>
+     <li><code>mute</code> - Lautlos an oder aus (on oder off)</li>
+     <li><code>volume_level</code> - Lautst&auml;rkepegel in dB</li>
+     </ul>
+  </ul>
+  <br>
+  <a name="YAMAHA_AVRattr"></a>
+  <b>Attribute</b>
+  <ul>
+  
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a name="volume-smooth-change">volume-smooth-change</a></li>
+	Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
+	<br><br>
+	M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br><br>
+    <li><a name="volume-smooth-steps">volume-smooth-steps</a></li>
+	Optionales Attribut, welches angibt, wieviele Schritte zur weichen Lautst&auml;rkeanpassung
+	 durchgef&uuml;hrt werden sollen. Standartwert ist 5 Anpassungschritte<br><br>
+    <li><a name="volume-smooth-time">volume-smooth-time</a></li>
+	Optionales Attrribut welches das Zeitfenster in Sekunden f&uuml;r die Anpassung angibt.
+       Als Beispiel bedeutet der Wert 2 dass innerhalb von 2 Sekunden die Lautst&auml;rkeanpassung durchgef&uuml;hrt werden soll.
+       Der Wert 0 bedeutet, dass die Anpassung so schnell wie m&ouml;glich geschehen soll. Der Standardwert ist 0.
+  </ul>
+<br>
+  <b>Hinweise des Autors</b>
+  <ul>
+    Dieses Modul ist nur nutzbar, wenn die Option "Network Standby" am Receiver aktiviert ist.<br><br>
+    Technisch gesehen sind viel mehr Kommandos und R&uuml;ckgabewerte m&ouml;glich, aber dies sind meiner
+    Meinung nach die wichtigsten innerhalb von FHEM.
+  </ul>
+  <br>
+</ul>
+=end html_DE
+
 =cut
