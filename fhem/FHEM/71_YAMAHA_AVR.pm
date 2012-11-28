@@ -91,7 +91,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     my $zone = YAMAHA_AVR_getZoneName($hash, $hash->{ACTIVE_ZONE});
     
-    if(not defined($zone));
+    if(not defined($zone))
     {
 	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
 	return "No Zone available";
