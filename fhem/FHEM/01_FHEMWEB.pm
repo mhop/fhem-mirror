@@ -1245,21 +1245,25 @@ FW_returnFileAsStream($$$$$)
 {
   my ($path, $suffix, $type, $doEsc, $cacheable) = @_;
 
-  #Check for If-None-Match header (ETag)
-  my @if_none_match_lines = grep /If-None-Match/, @FW_httpheader;
-  my $if_none_match = undef;
-  if(@if_none_match_lines) {
-    $if_none_match = $if_none_match_lines[0];
-    $if_none_match =~ s/If-None-Match: \"(.*)\"/$1/;
-  }
-
+  my $etag;
   my $c = $FW_chash->{CD};
-  my $etag = (stat($path))[9]; #mtime
 
-  if(defined($etag) and defined($if_none_match) and $etag eq $if_none_match) {
-    print $c "HTTP/1.1 304 Not Modified\r\n",
-      $FW_headercors, "\r\n";
-    return -1;
+  if($cacheable) {
+    #Check for If-None-Match header (ETag)
+    my @if_none_match_lines = grep /If-None-Match/, @FW_httpheader;
+    my $if_none_match = undef;
+    if(@if_none_match_lines) {
+      $if_none_match = $if_none_match_lines[0];
+      $if_none_match =~ s/If-None-Match: \"(.*)\"/$1/;
+    }
+
+    $etag = (stat($path))[9]; #mtime
+
+    if(defined($etag) && defined($if_none_match) && $etag eq $if_none_match) {
+      print $c "HTTP/1.1 304 Not Modified\r\n",
+        $FW_headercors, "\r\n";
+      return -1;
+    }
   }
 
   if(!open(FH, $path)) {
