@@ -8,6 +8,15 @@ use warnings;
 use Data::Dumper;
 
 sub CUL_MAX_SendDeviceCmd($$);
+sub CUL_MAX_Send(@);
+
+# Todo for full MAXLAN replacement:
+# - Implement msgcnt
+# - Broadcast TimeInformation every 6 hours
+# - Pairing
+# - Send Ack on ShutterContactState (but never else)
+
+my $pairmodeDuration = 30; #seconds
 
 sub
 CUL_MAX_Initialize($)
@@ -23,6 +32,7 @@ CUL_MAX_Initialize($)
   $hash->{MatchList} = \%mc;
   $hash->{UndefFn}   = "CUL_MAX_Undef";
   $hash->{ParseFn}   = "CUL_MAX_Parse";
+  $hash->{SetFn}     = "CUL_MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
                         "showtime:1,0 loglevel:0,1,2,3,4,5,6";
 }
@@ -45,6 +55,7 @@ CUL_MAX_Define($$)
   $hash->{addr} = $a[2];
   $hash->{STATE} = "Defined";
   $hash->{cnt} = 0;
+  $hash->{pairmode} = 0;
   AssignIoPort($hash);
 
   #This interface is shared with 00_MAXLAN.pm
@@ -61,13 +72,45 @@ CUL_MAX_Undef($$)
   return undef;
 }
 
+sub
+CUL_MAX_DisablePairmode($)
+{
+  my $hash = shift;
+  $hash->{pairmode} = 0;
+}
+
+sub
+CUL_MAX_Set($@)
+{
+  my ($hash, $device, @a) = @_;
+  return "\"set MAXLAN\" needs at least one parameter" if(@a < 1);
+  my ($setting, @args) = @a;
+
+  if($setting eq "pairmode") {
+    $hash->{pairmode} = 1;
+    InternalTimer(gettimeofday()+$pairmodeDuration, "CUL_MAXLAN_DisablePairmode", $hash, 0);
+  } else {
+    return "Unknown argument $setting, choose one of pairmode";
+  }
+  return undef;
+}
+
 ###################################
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
                      "BURST", "BIDI", "RPTED", "RPTEN");
 
-my %msgTypes = ( "02" => "Ack",
+my %msgTypes = ( #Receiving:
+                 "00" => "PairPing",
+                 "02" => "Ack",
+                 "03" => "TimeInformation",
                  "30" => "ShutterContactState",
-                 "60" => "HeatingThermostatState",
+                 "60" => "HeatingThermostatState"
+               );
+my %sendTypes = (#Sending:
+                 "PairPong" => "01",
+                 #"40" => "SetTemperature",
+                 #"11" => "SetConfiguration",
+                 #"F1" => "WakeUp",
                );
 
 sub
@@ -99,7 +142,32 @@ CUL_MAX_Parse($$)
   if(exists($msgTypes{$msgTypeRaw})) {
     my $msgType = $msgTypes{$msgTypeRaw};
     if($msgType eq "Ack") {
+      #The Ack payload for HeatingThermostats is 01HHHHHH where HHHHHH are the first 3 bytes of the HeatingThermostatState payload
       Log 5, "Got Ack";
+
+    } elsif($msgType eq "TimeInformation") {
+      my ($f1,$f2,$f3,$f4,$f5) = unpack("CCCCC",pack("H*",$payload));
+      #For all fields but the month I'm quite sure
+      my $year = $f1 + 2000;
+      my $day  = $f2;
+      my $hour = ($f3 & 0x1F)+1;
+      my $min = $f4 & 0x3F;
+      my $sec = $f5 & 0x3F;
+      my $month = (($f4 >> 6) << 2) | ($f5 >> 6); #this is just guessed
+      my $unk1 = $f3 >> 5;
+      my $unk2 = $f4 >> 6;
+      my $unk3 = $f5 >> 6;
+      Log 5, "Got TimeInformation: year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
+
+    } elsif($msgType eq "PairPing") {
+      my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
+      Log 5, "Got PairPing, unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+      if($hash->{pairmode}) {
+        CUL_MAX_Send($hash, "PairPong", $src, "00");
+        #TODO: wait for Ack
+        #TODO: send TimeInformation
+      }
+
     } else {
       Dispatch($shash, "MAX,$msgType,$src,$payload", {RAWMSG => $rmsg});
     }
@@ -110,16 +178,28 @@ CUL_MAX_Parse($$)
 }
 
 sub
+CUL_MAX_Send(@)
+{
+  my ($hash, $cmd, $dst, $payload) = @_;
+  return CUL_MAX_SendDeviceCmd($hash, pack("H*","0000".$sendTypes{$cmd}.$hash->{addr}.$dst."00".$payload));
+}
+
+sub
 CUL_MAX_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
 
-  $hash->{cnt} += 1;
+  #If cnt is not right, we don't get a Ack (At least if count is too low - have to test more)
+  #TODO: cnt is per device, not global
+  $hash->{cnt} = ($hash->{cnt}+1) & 0xff;
   substr($payload,3,3) = pack("H6",$hash->{addr});
-  substr($payload,1,0) = pack("C",$hash->{cnt});
+  substr($payload,0,1) = pack("C",$hash->{cnt});
   $payload = pack("C",length($payload)) . $payload;
+  #Convert to hex
+  $payload = unpack("H*",$payload);
 
-  Log 5, "CUL_MAX_SendDeviceCmd: ". unpack("H*",$payload);
+  Log 5, "CUL_MAX_SendDeviceCmd: ". $payload;
+  IOWrite($hash, "", "Zs". $payload);
 }
 
 1;
