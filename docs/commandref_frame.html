@@ -328,13 +328,13 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>event-on-update-reading<br>
     If not set, every update of any reading creates an event, which e.g. is handled
     by <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a>. The attribute takes
-    a comma-separated list of readings. If set, only updates of the listed readings create
+    a comma-separated list of readings. You may use regular expressions in that list. If set, only updates of the listed readings create
     events.
     </li>
 
     <a name="event-on-change-reading"></a>
     <li>event-on-change-reading<br>
-    The attribute takes a comma-separated list of readings. If set, only changes of the listed readings create events. In other words, if a reading listed here is updated with the new value
+    The attribute takes a comma-separated list of readings. You may use regular expressions in that list. If set, only changes of the listed readings create events. In other words, if a reading listed here is updated with the new value
     identical to the old value, no event is created.
     </li><br>
 

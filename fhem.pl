@@ -2939,8 +2939,8 @@ readingsBulkUpdate($$$) {
     my $attreour= AttrVal($name, "event-on-update-reading", "");
 
     # these flags determine whether the reading is listed in any of the attributes
-    my $eocr= $attreocr && grep($_ eq $reading, split /,/,$attreocr);
-    my $eour= $attreour && grep($_ eq $reading, split /,/,$attreour);
+    my $eocr= $attreocr && grep($reading =~ m/^$_$/, split /,/,$attreocr);
+    my $eour= $attreour && grep($reading =~ m/^$_$/, split /,/,$attreour);
 
     # determine if an event should be created
     $changed= !($attreocr || $attreour)  # always create event if no attribute is set
