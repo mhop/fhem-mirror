@@ -98,11 +98,11 @@ MAX_Set($@)
       $ctrlmode = 3;
       #TODO: auto mode with temperature is also possible
     } elsif($args[0] eq "eco") {
-      return "No ecoTemperature defined" if(!exists($hash->{ecoTemperature}));
-      $temperature = $hash->{ecoTemperature};
+      $temperature = ReadingsVal($hash->{NAME},"ecoTemperature","");
+      return "No ecoTemperature defined" if(!$temperature);
     } elsif($args[0] eq "comfort") {
-      return "No comfortTemperature defined" if(!exists($hash->{comfortTemperature}));
-      $temperature = $hash->{comfortTemperature};
+      $temperature = ReadingsVal($hash->{NAME},"comfortTemperature","");
+      return "No comfortTemperature defined" if(!$temperature);
     } elsif($args[0] eq "on") {
       $temperature = 30.5;
     } elsif($args[0] eq "off") {
@@ -136,23 +136,32 @@ MAX_Set($@)
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "temperatureOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ]) {
 
     return "can only set configuration for HeatingThermostat" if($hash->{type} ne "HeatingThermostat");
-    return "Invalid comfortTemperature" if(!exists($hash->{comfortTemperature}) or $hash->{comfortTemperature} < 4.5 or $hash->{comfortTemperature} > 30.5);
-    return "Invalid ecoTemperature" if(!exists($hash->{ecoTemperature}) or $hash->{ecoTemperature} < 4.5 or $hash->{ecoTemperature} > 30.5);
-    return "Invalid maximumTemperature" if(!exists($hash->{maximumTemperature}) or $hash->{maximumTemperature} < 4.5 or $hash->{maximumTemperature} > 30.5);
-    return "Invalid minimumTemperature" if(!exists($hash->{minimumTemperature}) or $hash->{minimumTemperature} < 4.5 or $hash->{minimumTemperature} > 30.5);
-    return "Invalid windowOpenTemperature" if(!exists($hash->{windowOpenTemperature}) or $hash->{windowOpenTemperature} < 4.5 or $hash->{windowOpenTemperature} > 30.5);
-    return "Invalid temperatureOffset" if(!exists($hash->{temperatureOffset}) or $hash->{temperatureOffset} < -3.5 or $hash->{temperatureOffset} > 3.5);
-    return "Invalid windowOpenDuration" if(!exists($hash->{windowOpenDuration}) or $hash->{windowOpenDuration} < 0 or $hash->{windowOpenDuration} > 60);
 
-    $hash->{$setting} = $args[0];
+    readingsSingleUpdate($hash, $setting, $args[0], 0);
 
-    my $comfort = int($hash->{comfortTemperature}*2);
-    my $eco = int($hash->{ecoTemperature}*2);
-    my $max = int($hash->{maximumTemperature}*2);
-    my $min = int($hash->{minimumTemperature}*2);
-    my $offset = int(($hash->{temperatureOffset} + 3.5)*2);
-    my $windowOpenTemp = int($hash->{windowOpenTemperature}*2);
-    my $windowOpenTime = int($hash->{windowOpenDuration}/5);
+    my $comfortTemperature = ReadingsVal($hash->{NAME},"comfortTemperature","");
+    my $ecoTemperature = ReadingsVal($hash->{NAME},"ecoTemperature","");
+    my $maximumTemperature = ReadingsVal($hash->{NAME},"maximumTemperature","");
+    my $minimumTemperature = ReadingsVal($hash->{NAME},"minimumTemperature","");
+    my $windowOpenTemperature = ReadingsVal($hash->{NAME},"windowOpenTemperature","");
+    my $windowOpenDuration = ReadingsVal($hash->{NAME},"windowOpenDuration","");
+    my $temperatureOffset = ReadingsVal($hash->{NAME},"temperatureOffset","");
+
+    return "Invalid comfortTemperature"    if($comfortTemperature eq "" or $comfortTemperature < 4.5 or $comfortTemperature > 30.5);
+    return "Invalid ecoTemperature"        if($ecoTemperature eq "" or $ecoTemperature < 4.5 or $ecoTemperature > 30.5);
+    return "Invalid maximumTemperature"    if($maximumTemperature eq "" or $maximumTemperature < 4.5 or $maximumTemperature > 30.5);
+    return "Invalid minimumTemperature"    if($minimumTemperature eq "" or $minimumTemperature < 4.5 or $minimumTemperature > 30.5);
+    return "Invalid windowOpenTemperature" if($windowOpenTemperature eq "" or $windowOpenTemperature < 4.5 or $windowOpenTemperature > 30.5);
+    return "Invalid windowOpenDuration"    if($windowOpenDuration eq "" or $windowOpenDuration < 0 or $windowOpenDuration > 60);
+    return "Invalid temperatureOffset"     if($temperatureOffset eq "" or $temperatureOffset < -3.5 or $temperatureOffset > 3.5);
+
+    my $comfort = int($comfortTemperature*2);
+    my $eco = int($ecoTemperature*2);
+    my $max = int($maximumTemperature*2);
+    my $min = int($minimumTemperature*2);
+    my $offset = int(($temperatureOffset + 3.5)*2);
+    my $windowOpenTemp = int($windowOpenTemperature*2);
+    my $windowOpenTime = int($windowOpenDuration/5);
 
     my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,17,0x00,0x00,0x00,$hash->{addr},0x00,
                                               $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
@@ -301,18 +310,20 @@ MAX_Parse($$)
   }elsif($msgtype eq "CubeConnectionState"){
     my $connected = $args[0];
 
-    readingsSingleUpdate($shash,"connection",$connected,0);
+    readingsSingleUpdate($shash,"connection",$connected, 0);
 
   } elsif($msgtype eq "HeatingThermostatConfig") {
-    $shash->{ecoTemperature} = $args[0];
-    $shash->{comfortTemperature} = $args[1];
-    $shash->{boostValveposition} = $args[2];
-    $shash->{boostDuration} = $args[3];
-    $shash->{temperatureOffset} = $args[4];
-    $shash->{maximumTemperature} = $args[5];
-    $shash->{minimumTemperature} = $args[6];
-    $shash->{windowOpenTemperature} = $args[7];
-    $shash->{windowOpenDuration} = $args[8];
+    readingsBeginUpdate($shash);
+    readingsBulkUpdate($shash, "ecoTemperature", $args[0]);
+    readingsBulkUpdate($shash, "comfortTemperature", $args[1]);
+    readingsBulkUpdate($shash, "boostValveposition", $args[2]);
+    readingsBulkUpdate($shash, "boostDuration", $args[3]);
+    readingsBulkUpdate($shash, "temperatureOffset", $args[4]);
+    readingsBulkUpdate($shash, "maximumTemperature", $args[5]);
+    readingsBulkUpdate($shash, "minimumTemperature", $args[6]);
+    readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
+    readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
+    readingsEndUpdate($shash, 0);
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {
