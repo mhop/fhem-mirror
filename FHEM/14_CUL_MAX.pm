@@ -48,7 +48,7 @@ CUL_MAX_Define($$)
   AssignIoPort($hash);
 
   #This interface is shared with 00_MAXLAN.pm
-  $hash->{SendDeviceCmd} = \&MAXLAN_SendDeviceCmd;
+  $hash->{SendDeviceCmd} = \&CUL_MAX_SendDeviceCmd;
 
   return undef;
 }
@@ -64,6 +64,12 @@ CUL_MAX_Undef($$)
 ###################################
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
                      "BURST", "BIDI", "RPTED", "RPTEN");
+
+my %msgTypes = ( "02" => "Ack",
+                 "30" => "ShutterContactState",
+                 "60" => "HeatingThermostatState",
+               );
+
 sub
 CUL_MAX_Parse($$)
 {
@@ -76,7 +82,7 @@ CUL_MAX_Parse($$)
   my $shash = $modules{CUL_MAX}{defptr};
 
   $rmsg =~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/;
-  my ($len,$msgcnt,$msgFlag,$msgType,$src,$dst,$zero,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
+  my ($len,$msgcnt,$msgFlag,$msgTypeRaw,$src,$dst,$zero,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
   Log 1, "CUL_MAX_Parse: len mismatch" if(2*hex($len)+3 != length($rmsg)); #+3 = +1 for 'Z' and +2 for len field in hex
   Log 1, "CUL_MAX_Parse zero = $zero" if($zero != 0);
 
@@ -89,20 +95,22 @@ CUL_MAX_Parse($$)
   $src = lc($src);
   $dst = lc($dst);
 
-  Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlLong, msgType $msgType, src $src, dst $dst, payload $payload";
-  if($msgType eq "30") {
-    Dispatch($shash, "MAX,ShutterContactState,$src,$payload", {RAWMSG => $rmsg});
-  } elsif($msgType eq "60") {
-    Dispatch($shash, "MAX,HeatingThermostatState,$src,$payload", {RAWMSG => $rmsg});
-  } elsif($msgType eq "02") { #Ack
-    Log 5, "Got Ack";
+  Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlLong, msgTypeRaw $msgTypeRaw, src $src, dst $dst, payload $payload";
+  if(exists($msgTypes{$msgTypeRaw})) {
+    my $msgType = $msgTypes{$msgTypeRaw};
+    if($msgType eq "Ack") {
+      Log 5, "Got Ack";
+    } else {
+      Dispatch($shash, "MAX,$msgType,$src,$payload", {RAWMSG => $rmsg});
+    }
   } else {
-    Log 2, "Got unhandled message type $msgType";
+    Log 2, "Got unhandled message type $msgTypeRaw";
   }
   return undef;
 }
 
-sub CUL_MAX_SendDeviceCmd($$)
+sub
+CUL_MAX_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
 
