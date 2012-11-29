@@ -107,9 +107,9 @@
       FHEM Kommandozeile der Webseite eingeben:</p>
       <pre>      define CUL1 CUL /dev/ttyACM0@9600 1234</pre>
 
-      <p>Details über die Parameter zur Definition eines CUL finden Sie <a href="http://fhem.de/commandref.html#CUL">hier</a></p>
+      <p>Details über die Parameter zur Definition eines CUL finden Sie <a href="commandref.html#CUL">hier</a></p>
     
-      <p>Ein <a href="http://fhem.de/commandref.html#FHZ">FHZ-Gerät</a> wird ebenso, aber mit anderen Parametern, angelegt </p>
+      <p>Ein <a href="commandref.html#FHZ">FHZ-Gerät</a> wird ebenso, aber mit anderen Parametern, angelegt </p>
       </p>
       <pre>      define FHZ1 FHZ /dev/ttyUSB0</pre>
       <p>
@@ -165,7 +165,7 @@
       </code></ul>
 
       &nbsp;<p>um nur die für dieses Gerät verfügbaren Attribbute angezeigt zu bekommen.
-      <a href="http://fhem.de/commandref.html#model">Hier</a> sehen Sie eine 
+      <a href="commandref.html#model">Hier</a> sehen Sie eine 
       komplette Liste der FS20 Modelle.<br> 
       Bei einem anderen neuen Geräten sollte eine ähnliche Nachricht im Logfile 
       erscheinen.</p>
@@ -177,7 +177,7 @@
     <a name="actors"></a>
     <h3>Konfiguration von Empfängern (Aktoren)</h3>
       <ul>
-      Definieren Sie das <a href="http://fhem.de/commandref.html#FS20">FS20</a> Gerät mit z.B folgendem Eintrag in die fhem.cfg:</p>
+      Definieren Sie das <a href="commandref.html#FS20">FS20</a> Gerät mit z.B folgendem Eintrag in die fhem.cfg:</p>
       <pre>      define lamp1 FS20 1234 56</pre>
 
       <p>Dann drücken Sie den Anmeldeknopf an dem Gerät solange, bis die LED blinkt. Anschließend klicken sie auf den "on" Link 
@@ -213,11 +213,11 @@
     <h3>Zeitabhängige Kommandos (at)/Notifikationen (notify, watchdog)</h3>
       <ul>
       Um "at"-Kommandos zu einer bestimmten Zeit/periodisch 
-      auszuführen müssen Sie Geräte vom Typ "at" definieren. Entsprechende Beispiele und Definitionen finden Sie <a href="http://fhem.de/commandref.html#at">hier</a>.</p>
+      auszuführen müssen Sie Geräte vom Typ "at" definieren. Entsprechende Beispiele und Definitionen finden Sie <a href="commandref.html#at">hier</a>.</p>
       <br><br>
 
-      Um Kommandos ausführen zu lassen wenn ein Gerät eine Nachricht aussendet, müssen Sie Geräte vom Typ <a href="http://fhem.de/commandref.html#notify">notify</a> oder
-      <a href="http://fhem.de/commandref.html#watchdog">watchdog</a> definieren.
+      Um Kommandos ausführen zu lassen wenn ein Gerät eine Nachricht aussendet, müssen Sie Geräte vom Typ <a href="commandref.html#notify">notify</a> oder
+      <a href="commandref.html#watchdog">watchdog</a> definieren.
       Um die in FHEM auftretenden Ereignisse besser zu verstehen/erkennen sollten Sie eine Telnet-Verbindung zu Ihrem FHEM aufbauen. </span>
       Geben Sie z.B. in der Eingabeaufforderung folgendes ein:<ul>&nbsp;<p>
       <code>
@@ -247,15 +247,15 @@
       </code></ul><br>
 
       &nbsp;<p>"at", "notify" und "watchdog" verwenden entweder vordefinierte FHEM-Kommandos, SHELL-Scripte oder "PERL-oneliners" 
-      als Argumente. Für Details und Tipps für "perl onliners" lesen Sie bitte die <a href="http://fhem.de/commandref.html#perl">PERL-specials</a> Abschnitte in der commandref.html.</p>
+      als Argumente. Für Details und Tipps für "perl onliners" lesen Sie bitte die <a href="commandref.html#perl">PERL-specials</a> Abschnitte in der commandref.html.</p>
       
     </ul>
 
     <a name="logging"></a>
     <h3>Daten loggen</h3>
       <ul>
-      Um Daten/Nachrichten/Ereignisse in einer Datei zu speichern müssen Sie ein Gerät vom Typ <a href="http://fhem.de/commandref.html#FileLog">FileLog</a> anlegen. Die Funktion "autocreate" erstellt 
-      für neu erkannte Geräte automatisch eine Logdatei. Sie können jedoch die Funktion <a href="http://fhem.de/commandref.html#createlog">"createlog"</a> nutzen, um später eine weitere Logdatei 
+      Um Daten/Nachrichten/Ereignisse in einer Datei zu speichern müssen Sie ein Gerät vom Typ <a href="commandref.html#FileLog">FileLog</a> anlegen. Die Funktion "autocreate" erstellt 
+      für neu erkannte Geräte automatisch eine Logdatei. Sie können jedoch die Funktion <a href="commandref.html#createlog">"createlog"</a> nutzen, um später eine weitere Logdatei 
       hinzuzufügen.
       <p>Um Daten/Nachrichten/Ereignisse in einer Datenbank zu speichern informieren Sie sich im Verzeichnis contrib/dblog der FHEM Distribution.</p>
       <p><br>
@@ -264,9 +264,9 @@
       Weitere Informationen im folgenden Abschnitt <a href="#plot">"plot"</a>.
       </p>
       <p>
-      Die Größe einer jeden Logdatei (<a href="http://fhem.de/commandref.html#FileLog">FileLog</a>)wird durch die eingegebenen Logkriterien (z.B. Jahr/Monat/Woche/Tag) 
-      bestimmt. Sie können das Archivieren mit den Attributen "<a href="http://fhem.de/commandref.html#nrarchive">nrarchive</a></span><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">" 
-      oder "<a href="http://fhem.de/commandref.html#archivedir">archivecmd</a>"erlauben.
+      Die Größe einer jeden Logdatei (<a href="commandref.html#FileLog">FileLog</a>)wird durch die eingegebenen Logkriterien (z.B. Jahr/Monat/Woche/Tag) 
+      bestimmt. Sie können das Archivieren mit den Attributen "<a href="commandref.html#nrarchive">nrarchive</a></span><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">" 
+      oder "<a href="commandref.html#archivedir">archivecmd</a>"erlauben.
       </p>
       </ul>
 
@@ -276,7 +276,7 @@
       <p>Die Funktion "autocreate" erstellt Weblinks (d.h. Plots) für neu erkannte Geräte. Der folgende Abschnitt beschreibt wie man 
       z.B. Plots von unterschiedlichen Sensoren gemeinsam ausgibt.</p>
       <p>Die Daten für einen Plot stammen jeweils aus seiner FileLog-Datei. 
-      Ändern Sie ggf. die Filterkriterien (regexp) wenn noch andere Daten geplottet werden sollen. Als nächsten Schritt setzen Sie das <a href="http://fhem.de/commandref.html#logtype">logtype</a> 
+      Ändern Sie ggf. die Filterkriterien (regexp) wenn noch andere Daten geplottet werden sollen. Als nächsten Schritt setzen Sie das <a href="commandref.html#logtype">logtype</a> 
       Attribut des FileLog. Damit bestimmen Sie, welche Plotvorlagedatei (.gplot) benutzt werden soll. Die Übersicht über die vorhandenen gnuplot-Dateien 
       finden Sie unter dem Menüpunkt "Edit files". Die gnuplot-Dateien enthalten die zugehörigen FileLog Beispiele.</p>
       <p>Beachten Sie bitte, dass die .gnuplot-Dateien ebenfalls bei der Darstellung von SVG anstelle des Gnuplot Backends benutzt werden. </span>
@@ -292,14 +292,14 @@
         attr hms100th_log logtype temp4hum6:Plot,text
       </pre>
 
-      <p>Lassen Sie sich das Diagramm (/denPlot) anzeigen, indem Sie darauf klicken und erstellen Sie einen <a href="http://fhem.de/commandref.html#weblink">Weblink</a> der seine eigenen 
+      <p>Lassen Sie sich das Diagramm (/denPlot) anzeigen, indem Sie darauf klicken und erstellen Sie einen <a href="commandref.html#weblink">Weblink</a> der seine eigenen 
       Attribute hat. Wenn der Weblink zur aktuellen Logdatei gehört, dann wird er als aktueller Weblink gespeichert und angezeigt (Sie müssen ihn nicht 
       erneut definieren, wenn sich in seinem Dateinamen die Bezeichnungen für Jahr/Monat/Datum ändern).</p>
       <p>Die Logs können entweder mit "gnuplot" (welches im aktuellen Pfad installiert sein muss), oder mittels des im Programm 
       enthaltenen SVG-Moduls erstellt werden. In diesem Fall muss Ihr Browser SVG unterstützen. Alle Browser unterstützen SVG, ausser dem Internet 
       Explorer vor der Version 9 und Android vor der Version 3.0. Wenn Sie ein Gerät mit diesen Android-Versionen benutzen, dann versuchen Sie bitte als 
       Browser Opera oder Firefox.</p>
-      <p><br>Der voreingestellte Modus ist SVG. Um das zu ändern, setzen Sie die " <a href="http://fhem.de/commandref.html#plotmode">plotmode</a>" 
+      <p><br>Der voreingestellte Modus ist SVG. Um das zu ändern, setzen Sie die " <a href="commandref.html#plotmode">plotmode</a>" 
       Attribute auf "gnuplot" oder "gnuplot scroll".<br><br>
 
       Um ältere Daten anzeigen zu lassen, erstellen Sie bitte einen anderen Weblink und setzen das "fixedrange"-Attribut auf z.B.:</p>
@@ -321,16 +321,16 @@
       <p>Beide Standard TCP/IP Weboberflächen in FHEM (telnet und FHEMWEB) können mit einem Passwort und zusätzlich mit 
       Verschlüsselung (HTTPS/SSL) gesichert werden.</p>
 &nbsp;<ul>
-            <li>für <a href="http://fhem.de/commandref.html#FHEMWEB">FHEMWEB</a> 
+            <li>für <a href="commandref.html#FHEMWEB">FHEMWEB</a> 
             benutzen Sie die 
-                <a href="http://fhem.de/commandref.html#basicAuth">basicAuth</a> 
+                <a href="commandref.html#basicAuth">basicAuth</a> 
             und 
-                <a href="http://fhem.de/commandref.html#HTTPS">HTTPS</a> 
+                <a href="commandref.html#HTTPS">HTTPS</a> 
             Attribute
-            </li><li>für <a href="http://fhem.de/commandref.html#telnet">telnet</a> (welches 
+            </li><li>für <a href="commandref.html#telnet">telnet</a> (welches 
             mehr oder weniger ein TCP/IP Port ist) benutzen Sie die 
-                <a href="http://fhem.de/commandref.html#password">password</a> und 
-                <a href="http://fhem.de/commandref.html#SSL">SSL</a> Attribute
+                <a href="commandref.html#password">password</a> und 
+                <a href="commandref.html#SSL">SSL</a> Attribute
           </li></ul>
           <p>Das ist jedoch nicht der Standard für die meisten Konfigurationen und es ist der Grund weshalb Sie eine 
           Sicherheitswarnung nach der Installation erhalten.</p>
@@ -393,13 +393,13 @@ Include /etc/httpd/conf/ssl.conf</pre></li>
       <br>
 
       Sie können ein kürzeres Menü auf der Webseite erzeugen, indem Sie 
-      Menüpunkte die nicht angezeigt werden sollen mit dem Attribut "<a href="http://fhem.de/commandref.html#hiddenroom">hiddenroom</a>" 
+      Menüpunkte die nicht angezeigt werden sollen mit dem Attribut "<a href="commandref.html#hiddenroom">hiddenroom</a>" 
       versehen.<p><br>
 
       Farben und Schriften können Sie durch Anpassung der Datei "style.css" 
       ändern ("Edit files" -&gt; style.css) oder Sie erstellen Ihren eigenen Stil (siehe 
-      auch "<a href="http://fhem.de/commandref.html#stylesheetPrefix">stylesheetPrefix</a>") 
-      dann wird Ihr neuer Stil auch nicht beim nächsten Ausführen des "<a href="http://fhem.de/commandref.html#updatefhem">update</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">"-Kommandos 
+      auch "<a href="commandref.html#stylesheetPrefix">stylesheetPrefix</a>") 
+      dann wird Ihr neuer Stil auch nicht beim nächsten Ausführen des "<a href="commandref.html#updatefhem">update</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">"-Kommandos 
       überschrieben.
       <br><br>
       </p>
@@ -411,9 +411,9 @@ Include /etc/httpd/conf/ssl.conf</pre></li>
       <ul>
       <p>
       Definieren Sie Ihre Geräte in verschiedenen Räumen. Dann können Sie die "room=&lt;roomname&gt;" Spezifikation verwenden um gleichzeitig verschiedene 
-      Geräte auf einmal anzusprechen. Details entnehmen sie bitten dem "<a href="http://fhem.de/commandref.html#devspec">devspec</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">" 
+      Geräte auf einmal anzusprechen. Details entnehmen sie bitten dem "<a href="commandref.html#devspec">devspec</a><span style="font-size: 11.0pt; line-height: 115%; font-family: Arial,sans-serif">" 
       Abschnitt.</p>
-      <p>Für noch komplexere Szenarien informieren sie sich bitte über das "<a href="http://fhem.de/commandref.html#structure">structure</a>"-Modul. 
+      <p>Für noch komplexere Szenarien informieren sie sich bitte über das "<a href="commandref.html#structure">structure</a>"-Modul. 
       Sie können verschiedene Ebenen wie Flure, Gebäude usw. definieren und alle 
       Geräte einer definierten Struktur auf einmal ansprechen.</p>
       </ul>
