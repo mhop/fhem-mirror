@@ -6,7 +6,6 @@ package main;
 use strict;
 use warnings;
 use MIME::Base64;
-use Data::Dumper;
 use POSIX;
 
 sub MAXLAN_Parse($$);
@@ -428,7 +427,7 @@ MAXLAN_Parse($$)
       Dispatch($hash, "MAX,define,$hash->{devices}[-1]->{addr},$device_types{$hash->{devices}[-1]->{type}},$hash->{devices}[-1]->{serial},$hash->{devices}[-1]->{groupid}", {RAWMSG => $rmsg});
     }
 
-    Log $ll5, "Got Metadata, hash: ".Dumper($hash);
+    #Log $ll5, "Got Metadata, hash: ".Dumper($hash);
 
   }elsif($cmd eq "C"){#Configuration
     return if(@args < 2);
