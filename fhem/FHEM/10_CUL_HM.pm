@@ -456,7 +456,7 @@ CUL_HM_Parse($$)
       $vp = int($vp/2.56+0.5);   # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  readingsSingleUpdate($chnHash,"state","$vp %",1) if($chnHash);
-      push @event, "actuator:$vp%";
+      push @event, "actuator:$vp %";
 
       # Set the valve state too, without an extra trigger
       readingsSingleUpdate($dhash,"state","set_$vp %",1) if($dhash);
@@ -554,10 +554,10 @@ CUL_HM_Parse($$)
     elsif($msgType eq "01"){                       # status reports
       if($p =~ m/^010809(..)0A(..)/) { # TC set valve  for VD => post events to VD
         my (   $of,     $vep) = (hex($1), hex($2));
-        push @event, "ValveErrorPosition_for_$dname: $vep%";
-        push @event, "ValveOffset_for_$dname: $of%";
-		CUL_HM_UpdtReadBulk($dhash,1,'ValveErrorPosition:set_'.$vep.'%',
-		                             'ValveOffset:set_'.$of.'%');
+        push @event, "ValveErrorPosition_for_$dname: $vep %";
+        push @event, "ValveOffset_for_$dname: $of %";
+		CUL_HM_UpdtReadBulk($dhash,1,'ValveErrorPosition:set_'.$vep.' %',
+		                             'ValveOffset:set_'.$of.' %');
 	  }
 	  elsif($p =~ m/^010[56]/){ # 'prepare to set' or 'end set'
 	  	push @event,""; # 
@@ -576,8 +576,8 @@ CUL_HM_Parse($$)
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
       my ($chn,$vp, $err) = ($2,hex($3), hex($4));
       $vp = int($vp)/2;   # valve position in %
-	  push @event, "ValvePosition:$vp%";
-      push @event, "state:$vp%";
+	  push @event, "ValvePosition:$vp %";
+      push @event, "state:$vp %";
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
@@ -612,8 +612,8 @@ CUL_HM_Parse($$)
 	#        => Link discriminator (00000000) is fixed
     elsif($msgType eq "10" && $p =~ m/^04..........0509(..)0A(..)/) {
       my (    $of,     $vep) = (hex($1), hex($2));
-      push @event, "ValveErrorPosition:$vep%";
-      push @event, "ValveOffset:$of%";
+      push @event, "ValveErrorPosition:$vep %";
+      push @event, "ValveOffset:$of %";
     }
   
   } 
@@ -768,7 +768,7 @@ CUL_HM_Parse($$)
  	      my $mask = 3<<$bitLoc;
  	      my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
 		  CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
-		                               "state".$value);
+		                               "state:".$value);
  	      if ($chnHash){
  	        $shash = $chnHash;
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
@@ -923,10 +923,10 @@ CUL_HM_Parse($$)
 	  push @event, "state:$txt";
 	  push @event, "contact:$txt$target";
 	  
-	  if($id eq $dst && hex($msgFlag)&0x20){
-		CUL_HM_SndCmd($shash, $msgcnt."8002$id$src${chn}00");  #Send Ack
-		$sendAck = ""; 
-	  }
+#	  if($id eq $dst && hex($msgFlag)&0x20){ General remove if Peter agrees
+#		CUL_HM_SndCmd($shash, $msgcnt."8002$id$src${chn}00");  #Send Ack
+#		$sendAck = ""; 
+#	  }
     }
     else{push @event, "3SSunknownMsg:$p" if(!@event);}
   } 
@@ -1048,7 +1048,7 @@ CUL_HM_Parse($$)
       my ($d1,$vp) =($1,hex($2)); # adjust_command[0..4] adj_data[0..250]
       $vp = int($vp/2.56+0.5);    # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$dst."01"};
- 	  CUL_HM_UpdtReadBulk($chnHash,1,"ValvePosition:$vp%",
+ 	  CUL_HM_UpdtReadBulk($chnHash,1,"ValvePosition:$vp %",
 	                               "ValveAdjCmd:".$d1);
       CUL_HM_SndCmd($chnHash,$msgcnt."8002".$dst.$src.'0101'.
 	                       sprintf("%02X",$vp*2)."0000");#$vp, $err,$??
@@ -2098,8 +2098,9 @@ CUL_HM_Set($@)
         else{
   	      return "$a[2] unknown. use hex or: ".join(" ",sort keys(%color));
 		}
-        CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s8100%s",
-		                                   $flag,$id,$dst,$col4all));
+		CUL_HM_UpdtReadBulk($hash,1,"color:".$col4all,
+		                            "state:set_".$col4all);
+        CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."8100".$col4all);
 	  }else{# operating on a channel
   	    return "$a[2] unknown. use: ".join(" ",sort keys(%color))
 	       if (!defined($color{$a[2]}) );
@@ -2223,10 +2224,10 @@ CUL_HM_Set($@)
 	}
 	else {
 	  my $vp = $a[2];
-	  readingsSingleUpdate($hash,"valvePosTC","$vp%",0);
+	  readingsSingleUpdate($hash,"valvePosTC","$vp %",0);
 	  CUL_HM_valvePosUpdt("valvePos:$dst$chn") if (!$hash->{helper}{virtTC});
 	  $hash->{helper}{virtTC} = "03";
-	  $state = "ValveAdjust:$vp%";
+	  $state = "ValveAdjust:$vp %";
 	}
   } 
   elsif($cmd eq "matic") { ##################################### 
@@ -2424,7 +2425,7 @@ CUL_HM_valvePosUpdt(@)
 #  else{
     my $name = $hash->{NAME};
     my $vp = ReadingsVal($name,"valvePosTC","15 %");
-    $vp =~ s/%//;
+    $vp =~ s/ %//;
     $vp *=2.56;
 	foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
 	  next if (length($peer) != 8);
@@ -3363,7 +3364,7 @@ CUL_HM_getRegFromStore($$$$)
 	 }   
    } else { return " conversion undefined - please contact admin";
    } 
-   return $convFlg.$data.$unit;
+   return $convFlg.$data.' '.$unit;
 
 }
 #----------------------

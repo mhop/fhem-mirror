@@ -46,6 +46,9 @@ HMLAN_Initialize($)
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
                      "hmId hmKey " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
+  $hash->{helper}{dPend} = 0;# data pending in HMLAN
+  $hash->{helper}{lastSend} = 0;
+
 }
 
 #####################################
@@ -311,10 +314,10 @@ HMLAN_Parse($$)
 	#                81=open
     HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R'));
 
-    if (!($flg & 0x25)){#rule out other messages 
-	  HMLAN_SimpleWrite($hash, '-'.$src);
-	  HMLAN_SimpleWrite($hash, '+'.$src);
-	}
+#    if (!($flg & 0x25)){#rule out other messages 
+#	  HMLAN_SimpleWrite($hash, '-'.$src);
+#	  HMLAN_SimpleWrite($hash, '+'.$src);
+#	}
     $dmsg .= "NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
 
     $hash->{uptime} = HMLAN_uptime($mFld[2]);
@@ -366,16 +369,32 @@ HMLAN_SimpleWrite(@)
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
-  
-  # Currently it does  not seem to be necessary to wait Thus this code is inhibit for now
+
+  my $tn = gettimeofday();
+  # calculate maximum data speed for HMLAN. 
+  #  Theorie 2,5kByte/s
+  #  tested allowes no more then 2 byte/ms incl overhead
+  #  It is even slower if HMLAN waits for acks, acks are missing,...
+  my $bytPend = $hash->{helper}{dPend} - 
+                int(($tn - $hash->{helper}{lastSend})*2000);
+  $bytPend = 0 if ($bytPend < 0);
+  $hash->{helper}{dPend} = $bytPend + length($msg);
+  $hash->{helper}{lastSend} = $tn;
+  my $wait = $bytPend/2000; # HMLAN 
+  #  => wait time to protect HMLAN overload
+#  my $wait = $bytPend>>11; # fast divide by 2048 
+
+  # It is not possible to answer befor 100ms
   my $id = (length($msg)>51)?substr($msg,46,6):"";
-  if ($id){
-    my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
-    if ($DevDelay > 0.01){# wait less then 10 ms will not work
-      $DevDelay = ((int($DevDelay*100))%100)/100;# security - wait no more then 1 sec
-	  select(undef, undef, undef, $DevDelay);
-    }
+  my $DevDelay=0;
+  if ($id && $hash->{helper}{nextSend}{$id}){
+    $DevDelay = $hash->{helper}{nextSend}{$id} - $tn; # calculate time passed
+	$DevDelay = ($DevDelay > 0.01)?( $DevDelay -= int($DevDelay)):0;
   }
+  $wait = ($DevDelay >$wait)?$DevDelay:$wait; # select the longer waittime
+  select(undef, undef, undef, $wait)if ($wait>0.01);
+  
+  
   if ($debug){
     Log $ll5, 'HMLAN_Send:         S:'   .substr($msg,0,9).
                               ' stat:  ' .substr($msg,10,2).
@@ -417,7 +436,8 @@ HMLAN_DoInit($)
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
-
+  
+  RemoveInternalTimer( $hash);# avoid duplicate timer
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", $hash, 0);
   return undef;
 }
@@ -429,6 +449,7 @@ HMLAN_KeepAlive($)
   my $hash = shift;
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
+  RemoveInternalTimer( $hash);# avoid duplicate timer
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", $hash, 1);
 }
 sub
