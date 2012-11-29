@@ -5,7 +5,6 @@ package main;
 
 use strict;
 use warnings;
-use Data::Dumper;
 
 sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
