@@ -6,7 +6,6 @@ package main;
 use strict;
 use warnings;
 use MIME::Base64;
-use Data::Dumper;
 
 sub MAX_Define($$);
 sub MAX_Initialize($);
