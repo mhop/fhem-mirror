@@ -40,8 +40,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday sleep);
-
-require "$attr{global}{modpath}/FHEM/HttpUtils.pm";
+use HttpUtils;
 
 sub YAMAHA_AVR_Get($@);
 sub YAMAHA_AVR_Define($$);

@@ -31,6 +31,7 @@ package main;
 use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
+use DevIo;
 
 my %connection_type = (
 0 => "0",
