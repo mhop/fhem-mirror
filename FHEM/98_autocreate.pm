@@ -22,7 +22,7 @@ my %flogpar = (
       => { GPLOT => "fht:Temp/Act,", FILTER => "%NAME" },
   "HMS100TFK_.*"
       => { GPLOT => "fht80tf:Contact,", FILTER => "%NAME" },
-  "HMS100T_.*"
+  "HMS100T[F]?_.*"
       => { GPLOT => "temp4hum6:Temp/Hum,", FILTER => "%NAME:T:.*" },
   "KS300.*"
       => { GPLOT => "temp4rain10:Temp/Rain,hum6wind8:Wind/Hum,",
