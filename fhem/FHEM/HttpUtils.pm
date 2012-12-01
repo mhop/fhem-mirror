@@ -54,7 +54,7 @@ CustomGetFileFromURL($$@)
 
   my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log 1, "GetFileFromURL $displayurl: malformed or unsupported URL";
+    Log 1, "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
     return undef;
   }
   
@@ -80,7 +80,7 @@ CustomGetFileFromURL($$@)
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
-    Log 1, "GetFileFromURL: Can't connect to $protocol://$host:$port\n";
+    Log 1, "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
     undef $conn;
     return undef;
   }
@@ -103,7 +103,7 @@ CustomGetFileFromURL($$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log 1, "GetFileFromURL $displayurl: Select timeout/error: $!";
+      Log 1, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
       undef $conn;
       return undef;
     }
@@ -114,8 +114,15 @@ CustomGetFileFromURL($$@)
   }
 
   $ret=~ s/(.*?)\r\n\r\n//s; # Not greedy: switch off the header.
+  my @header= split("\r\n", $1);
   my $hostpath= $quiet ? "<hidden>" : $host . $path;
-  Log 4, "GetFileFromURL: Got http://$hostpath, length: ".length($ret);
+  Log 4, "CustomGetFileFromURL $displayurl: Got data, length: ".length($ret);
+  if(!length($ret)) {
+    Log 4, "CustomGetFileFromURL $displayurl: Zero length data, header follows...";
+    for (@header) {
+        Log 4, "CustomGetFileFromURL $displayurl: $_";
+    }
+  }
   undef $conn;
   return $ret;
 }
