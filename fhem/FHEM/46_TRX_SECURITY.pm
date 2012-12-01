@@ -1,10 +1,10 @@
 # $Id$
 ##############################################################################
 #
-#     46_TRX_LIGHT.pm
+#     46_TRX_SECURITY.pm
 #     FHEM module for X10, KD101, Visonic
-#     Copyright by Willi Herzig
-#     e-mail:
+#
+#     Copyright (C) 2012 Willi Herzig
 #
 #     This file is part of fhem.
 #
@@ -22,14 +22,12 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-
 #
 #
 # values for "set global verbose"
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id$
 package main;
 
 use strict;
@@ -44,17 +42,137 @@ my $TRX_SECURITY_type_default = "ds10a";
 
 my $DOT = q{_};
 
+my %security_device_codes = (	# HEXSTRING => "NAME", "name of reading", 
+	# 0x20: X10, KD101, Visonic, Meiantech
+	0x2000 => [ "DS10A", "Window" ],
+	0x2001 => [ "MS10A", "motion" ],
+	0x2002 => [ "KR18", "key" ],
+	0x2003 => [ "KD101", "smoke" ],
+	0x2004 => [ "VISONIC_WINDOW", "window" ],
+	0x2005 => [ "VISONIC_REMOTE", "key" ],
+	0x2006 => [ "VISONIC_WINDOW", "window" ],
+	0x2007 => [ "Meiantech", "alarm" ],
+);
+
+my %security_device_commands = (	# HEXSTRING => commands
+	# 0x20: X10, KD101, Visonic, Meiantech
+	0x2000 => [ "", "", "", "", "", "", ""], # DS10A
+	0x2003 => [ "", "", "", "", "", "", "alert", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "pair",], # KD101
+);
+
+my %security_device_c2b;        # DEVICE_TYPE->hash (reverse of security_device_codes)
+
+#####################################
 sub
 TRX_SECURITY_Initialize($)
 {
   my ($hash) = @_;
 
+  foreach my $k (keys %security_device_codes) {
+    $security_device_c2b{$security_device_codes{$k}->[0]} = $k;
+  }
+
   $hash->{Match}     = "^..(20).*";
+  $hash->{SetFn}     = "TRX_SECURITY_Set";
   $hash->{DefFn}     = "TRX_SECURITY_Define";
   $hash->{UndefFn}   = "TRX_SECURITY_Undef";
   $hash->{ParseFn}   = "TRX_SECURITY_Parse";
   $hash->{AttrList}  = "IODev ignore:1,0 event-on-update-reading event-on-change-reading do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
 
+}
+
+###################################
+sub
+TRX_SECURITY_Set($@)
+{
+  my ($hash, @a) = @_;
+  my $ret = undef;
+  my $na = int(@a);
+
+  return "no set value specified" if($na < 2 || $na > 3);
+
+  # look for device_type
+
+  my $name = $a[0];
+  my $command = $a[1];
+  my $level;
+
+  if ($na == 3) {
+  	$level = $a[2];
+  } else {
+	$level = 0;
+  }
+
+  my $device_type = $hash->{TRX_SECURITY_type};
+  my $deviceid = $hash->{TRX_SECURITY_deviceid};
+
+  if ($device_type ne "KD101") {
+	return "No set implemented for $device_type";	
+  }
+
+  my $device_type_num = $security_device_c2b{$device_type};
+  if(!defined($device_type_num)) {
+	return "Unknown device_type, choose one of " .
+                                join(" ", sort keys %security_device_c2b);
+  }
+  my $protocol_type = $device_type_num >> 8; # high bytes
+
+  # Now check if the command is valid and retrieve the command id:
+  my $rec = $security_device_commands{$device_type_num};
+  my $i;
+  for ($i=0; $i <= $#$rec && ($rec->[$i] ne $command); $i++) { ;}
+
+  if($i > $#$rec) {
+	my $l = join(" ", sort @$rec); 
+	if ($device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT") {
+  		$l =~ s/ level / level:slider,0,1,15 /; 
+	}
+  	my $error = "Unknown command $command, choose one of $l"; 
+
+	Log 4, $error;
+	return $error;
+  }
+
+  if ($na == 4 && $command ne "level") {
+	my $error = "Error: level not possible for command $command";
+  }
+
+  my $seqnr = 0;
+  my $cmnd = $i;
+
+  my $hex_prefix;
+  my $hex_command;
+  if ($protocol_type == 0x20) {
+  	my $id1;
+  	my $id2;
+  	my $id3;
+  	if ($deviceid =~ /(..)(..)(..)/ ) {
+		$id1 = $1;
+		$id2 = $2;
+		$id3 = $3;
+  	} else {
+		Log 4,"TRX_SECURITY_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		return "error set name=$name  deviceid=$deviceid";
+  	}
+
+	# lightning1
+  	$hex_prefix = sprintf "0820";
+  	$hex_command = sprintf "%02x%02x%02s%02s%02s%02x00", $device_type_num & 0xff, $seqnr, $id1, $id2, $id3, $cmnd; 
+  	Log 1,"TRX_SECURITY_Set name=$name device_type=$device_type, deviceid=$deviceid id1=$id1, id1=$id2, id1=$id3, command=$command" if ($TRX_SECURITY_debug == 1);
+  	Log 1,"TRX_SECURITY_Set hexline=$hex_prefix$hex_command" if ($TRX_SECURITY_debug == 1);
+  } else {
+	return "No set implemented for $device_type . Unknown protocol type";	
+  }
+
+  IOWrite($hash, $hex_prefix, $hex_command);
+
+  my $tn = TimeNow();
+  $hash->{CHANGED}[0] = $command;
+  $hash->{STATE} = $command;
+  $hash->{READINGS}{state}{TIME} = $tn;
+  $hash->{READINGS}{state}{VAL} = $command;
+
+  return $ret;
 }
 
 #####################################
@@ -440,7 +558,19 @@ TRX_SECURITY_Parse($$)
   <br>
 
   <a name="TRX_SECURITYset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set </b>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; </code>
+    <br><br>
+    where <code>value</code> is one of:<br>
+    <pre>
+    alert              # only for KD101
+    pair               # only for KD101
+    </pre>
+      Example: <br>
+    	<code>set TRX_KD101_a5ca00 alert</code>
+      <br>
+  </ul><br>
 
   <a name="TRX_SECURITYget"></a>
   <b>Get</b> <ul>N/A</ul><br>
