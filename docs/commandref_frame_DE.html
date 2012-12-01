@@ -22,7 +22,7 @@
 <ul>
   <a href="#intro">Einleitung</a><br>
   <a href="#command">FHEM Befehls-Typen</a><br>
-  <a href="#devspec">Geräte-Spezifikation</a><br>
+  <a href="#devspec">Ger&auml;te-Spezifikation</a><br>
 
   <br>
   <b>FHEM-Befehle</b>
@@ -60,7 +60,7 @@
   </ul>
 
   <br>
-  <b>Geräte</b>
+  <b>Ger&auml;te</b>
   <ul>
       <a href="#global">global</a><br>
 
@@ -99,27 +99,27 @@
 <a name="intro"></a>
 <h3>Einleitung</h3>
 <ul>
-<p>FHEM wird hauptsächlich zur Heimautomatisierung benutzt, 
-ist aber ebenso für andere Aufgaben einsetzbar wo Benachrichtigungen, 
+<p>FHEM wird haupts&auml;chlich zur Heimautomatisierung benutzt, 
+ist aber ebenso f&uuml;r andere Aufgaben einsetzbar wo Benachrichtigungen, 
 Zeitschaltungen und Datensammlungen eine wichtige Rolle spielen.</p>
-<p>FHEM unterstützt verschiedene Hardwaregeräte die eine 
+<p>FHEM unterst&uuml;tzt verschiedene Hardwareger&auml;te die eine 
 Verbindung mittels unterschiedlicher Protokolle (z.B. FHZ1000 mit Interfaces vom 
-Typ FS20 und HMS, CM11 um mit X10 zu arbeiten) sowie logischer Geräte wie FS20 
-oder FHT die einen Nachrichtenaustausch mit verschiedensten Geräten die diese 
-Protokolle verwenden ermöglichen.</p>
+Typ FS20 und HMS, CM11 um mit X10 zu arbeiten) sowie logischer Ger&auml;te wie FS20 
+oder FHT die einen Nachrichtenaustausch mit verschiedensten Ger&auml;ten die diese 
+Protokolle verwenden erm&ouml;glichen.</p>
 <p>
-FHEM ist modular. Abhängig von den unterschiedlichen Geräten werden in den 
-Modulen verschiedene Funktionen (z.B. define, get, set) realisiert. FHEM enthält 
+FHEM ist modular. Abh&auml;ngig von den unterschiedlichen Ger&auml;ten werden in den 
+Modulen verschiedene Funktionen (z.B. define, get, set) realisiert. FHEM enth&auml;lt 
 weitere Funktionen wie Trigger (<a href="#notify">notify</a>), 
-Zeitabhängige Funktionen (<a href="#at">at</a>) 
-die die Funktionalität erweitern.</p>
+Zeitabh&auml;ngige Funktionen (<a href="#at">at</a>) 
+die die Funktionalit&auml;t erweitern.</p>
 <p>
-FHEM wird entweder über einfache ASCII-Kommandozeilen gesteuert die in Dateien 
-wie z.B. der Konfigurationsdatei fhem.cfg gespeichert sind oder über eine TCP/IP 
-Verbindung, entweder direkt in einer „telnet“-Sitzung, oder per fhem.pl im 
-Client-Modus oder über eines der Webfrontends.<br> &nbsp;</p>
-<p class="MsoNormal">Wenn Sie den FHEM-Server starten, müssen Sie eine 
-Konfigurationsdatei auswählen:</p>
+FHEM wird entweder &uuml;ber einfache ASCII-Kommandozeilen gesteuert die in Dateien 
+wie z.B. der Konfigurationsdatei fhem.cfg gespeichert sind oder &uuml;ber eine TCP/IP 
+Verbindung, entweder direkt in einer "telnet"-Sitzung, oder per fhem.pl im 
+Client-Modus oder &uuml;ber eines der Webfrontends.<br> &nbsp;</p>
+<p class="MsoNormal">Wenn Sie den FHEM-Server starten, m&uuml;ssen Sie eine 
+Konfigurationsdatei ausw&auml;hlen:</p>
 <p>&nbsp;</p>
 <ul>
   <code>fhem.pl ~/.fhem</code>
@@ -134,14 +134,14 @@ Konfigurationsdatei auswählen:</p>
 
     <a href="#define">define</a> lamp FS20 8765 01</pre>
 
-    <p>Beispiele für andere Konfigurationsdateien finden Sie 
-    im “examples“-Verzeichnis</p>
+    <p>Beispiele f&uuml;r andere Konfigurationsdateien finden Sie 
+    im "examples"-Verzeichnis</p>
 <p>
-Die Kommunikation mit FHEM kann entweder in einer “session” (über telnet) oder 
-über einzelne Klient-Kommandos (über fhem.pl) erfolgen. Beispiel:</p>
+Die Kommunikation mit FHEM kann entweder in einer "session" (&uuml;ber telnet) oder 
+&uuml;ber einzelne Klient-Kommandos (&uuml;ber fhem.pl) erfolgen. Beispiel:</p>
 <ul>
     <code>telnet localhost 7072<br>
-    &lt;NL&gt; </code>(Die Betätigung der &quot;Enter&quot;-Taste schaltet in den&nbsp; "prompt" 
+    &lt;NL&gt; </code>(Die Bet&auml;tigung der &quot;Enter&quot;-Taste schaltet in den&nbsp; "prompt" 
     Modus)<code><br>
     &lt;command&gt;...<br>
     quit</code><br>
@@ -156,32 +156,32 @@ Die Kommunikation mit FHEM kann entweder in einer “session” (über telnet) o
 <a name="command"></a>
 <h3>FHEM Befehlstypen</h3>
 <ul>
-Es gibt drei Arten von Befehlen: „fhem“ Befehle (werden in diesem Dokument 
-beschrieben), SHELL-Befehle (diese müssen von doppelten Anführungszeichen „“ 
-eingeschlossen werden) und PERL-Ausdrücken (von geschwungenen Klammern {} 
-eingeschlossen). SHELL-Befehle oder PERL-Ausdrücke werden für komplexe <a href="#at">at</a> 
-oder <a href="#notify">notify</a> Ausdrücke benötigt, können aber auch als „normale“ Befehle angewendet werden.&nbsp;
+Es gibt drei Arten von Befehlen: "fhem" Befehle (werden in diesem Dokument 
+beschrieben), SHELL-Befehle (diese m&uuml;ssen von doppelten Anf&uuml;hrungszeichen "" 
+eingeschlossen werden) und PERL-Ausdr&uuml;cken (von geschwungenen Klammern {} 
+eingeschlossen). SHELL-Befehle oder PERL-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> 
+oder <a href="#notify">notify</a> Ausdr&uuml;cke ben&ouml;tigt, k&ouml;nnen aber auch als "normale" Befehle angewendet werden.&nbsp;
   <p class="MsoNormal">Die folgenden drei Befehle bewirken z.B. dasselbe 
-  Ergebnis, wenn sie am “telnet”-Prompt eingegeben werden:</p>
+  Ergebnis, wenn sie am "telnet"-Prompt eingegeben werden:</p>
   <p>&nbsp;</p>
   <ul>
   set lamp off<br>
   "fhem.pl 7072 "set lamp off""<br>
   {fhem("set lamp off")}<br>
   </ul>
-&nbsp;<p>SHELL-Kommandos werden im Hintergrund ausgeführt, 
-PERL-Ausdrücke und FHEM-Kommandos werden im Haupt-“thread” ausgeführt. Um 
-PERL-Ausdrücke leichter eingeben zu können, sind einige Spezialfunktionen und 
-Variablen verfügbar. Lesen Sie sich bitte die Abschnitte
-<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#perl" style="color: #278727; text-decoration: underline; text-underline: single">
-Perl special</a> zum besseren Verständnis durch.</p>
+&nbsp;<p>SHELL-Kommandos werden im Hintergrund ausgef&uuml;hrt, 
+PERL-Ausdr&uuml;cke und FHEM-Kommandos werden im Haupt-"thread" ausgef&uuml;hrt. Um 
+PERL-Ausdr&uuml;cke leichter eingeben zu k&ouml;nnen, sind einige Spezialfunktionen und 
+Variablen verf&uuml;gbar. Lesen Sie sich bitte die Abschnitte
+<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_frame_DE.html#perl" style="color: #278727; text-decoration: underline; text-underline: single">
+Perl special</a> zum besseren Verst&auml;ndnis durch.</p>
 <p>Um FHEM-Befehle in einen SHELL-Script zu triggern (dies ist 
-eine „andere“ Möglichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
+eine "andere" M&ouml;glichkeit), benutzen Sie bitte die oben beschriebene Client-Form 
 der fhem.pl.</p>
 <p>&nbsp;</p>
 <p">Mehrere FHEM-Kommandos hintereinander werden mittels 
 Semikolon (;) getrennt. Weil Semikola auch in PERL-Code oder SHELL-Programmen 
-benutzt werden, müssen sie mittels doppelten Semikola geschützt werden. Lesen 
+benutzt werden, m&uuml;ssen sie mittels doppelten Semikola gesch&uuml;tzt werden. Lesen 
 Sie sich bitte die <b>Bermerkungen </b>des <a href="#notify">notify</a>-Abschnittes zu Kommandoparametern und Regeln durch.</p>
 <p>Z.B. schaltet die erste der folgenden Befehlszeilen die 
 Lampe 1 nur/erst zur Uhrzeit 07:00 Uhr aus, die Lampe 2 aber sofort und die 
@@ -191,22 +191,22 @@ zweite Befehlszeile schaltet Lampe 1 und 2 um 7:00 Uhr gleichzeitig aus. </p>
   define lampoff at 07:00 set Lamp1 off; set Lamp2 off<br>
   define lampoff at 07:00 set Lamp1 off;; set Lamp2 off<br>
   </ul>
-&nbsp;<p">Befehle können entweder direkt eingegeben oder aus 
+&nbsp;<p">Befehle k&ouml;nnen entweder direkt eingegeben oder aus 
 seiner Datei (z.B. am Start von FHEM aus der Konfugurationsdatei eingelesen 
-werden. Die Befehle werden entweder direkt ausgeführt oder später wenn sie als 
+werden. Die Befehle werden entweder direkt ausgef&uuml;hrt oder sp&auml;ter wenn sie als 
 Argumente eines <a href="#at">at</a> oder <a href="#notify">notify</a>-Befehles verwendet werden. </p>
 <p>&nbsp;</p>
 <p>Eine mit einem \ abgeschlossene Zeile wird mit der 
-nachfolgenden Zeile verbunden. Somit können lange Befehlszeilen (die z.B. aus 
+nachfolgenden Zeile verbunden. Somit k&ouml;nnen lange Befehlszeilen (die z.B. aus 
 mehreren PERL-Befehlen bestehen) auf mehrere Zeilen aufgteilt werden. Einige 
-Web-Frontends (z.B. webpgm2) erleichtern die Eingabe von sich über mehrere 
+Web-Frontends (z.B. webpgm2) erleichtern die Eingabe von sich &uuml;ber mehrere 
 Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <p>&nbsp;</p>
 </ul>
 
 
 <a name="devspec"></a>
-<h3>Geräte-Spezifikation (devspec)</h3>
+<h3>Ger&auml;te-Spezifikation (devspec)</h3>
 <ul>
   <p>Die Befehle
     <a href="#attr">attr</a>,
@@ -214,24 +214,24 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <a href="#get">get</a>,
     <a href="#list">list</a>,
     <a href="#set">set</a>,
-    <a href="#setstate">setstate</a>,<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_ger.html#setstate"><span style="text-decoration: underline">
-  </span></a>können eine komplexere 
-  Gerätespezifikation als Argumente enthalten, die auch eine Anzahl von Geräten 
-  betreffen kann. Eine Gerätespezifikation (Kurzfassung) kann z.B. so aussehen:</p>
+    <a href="#setstate">setstate</a>,<a href="file:///C:/Inetpub/wwwroot/www.fhem.de/commandref_frame_DE.html#setstate"><span style="text-decoration: underline">
+  </span></a>k&ouml;nnen eine komplexere 
+  Ger&auml;tespezifikation als Argumente enthalten, die auch eine Anzahl von Ger&auml;ten 
+  betreffen kann. Eine Ger&auml;tespezifikation (Kurzfassung) kann z.B. so aussehen:</p>
   <ul>
-  <li>ein einzelner Gerätename. Dies ist der 
+  <li>ein einzelner Ger&auml;tename. Dies ist der 
   meist vorkommende Fall.</li>
   <li>
-  eine Liste von Gerätenamen, durch Kommata (,) getrennt</li>
+  eine Liste von Ger&auml;tenamen, durch Kommata (,) getrennt</li>
   <li>
   ein Bereich, durch ein Minuszeichen getrennt (-)</li>
-  <li>ein regulärer Ausdruck der eines der 
-  folgenden Zeichen enthält: ^*[]$</li>
+  <li>ein regul&auml;rer Ausdruck der eines der 
+  folgenden Zeichen enth&auml;lt: ^*[]$</li>
   <li>
-  ein Geräteattribut, gefolgt von einem Gleichheitszeichen (=) und einem 
-  regulären Ausdruck für dieses Attribut.
-  Als Attribut können Sie entweder Attribute die mittels “attr”-Befehl oder 
-  eines der “internen” Attribute wie DEF, STATE oder TYPE angeben.</li>
+  ein Ger&auml;teattribut, gefolgt von einem Gleichheitszeichen (=) und einem 
+  regul&auml;ren Ausdruck f&uuml;r dieses Attribut.
+  Als Attribut k&ouml;nnen Sie entweder Attribute die mittels "attr"-Befehl oder 
+  eines der "internen" Attribute wie DEF, STATE oder TYPE angeben.</li>
   </ul>
   &nbsp;<p>
   Beispiele: </p>
@@ -250,12 +250,12 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 &nbsp;<ul>
   <li>zuerst wird die durch Kommata getrennte 
   Spezifikation abgearbeitet, dann folgen die Bereichsspezifikationen und die 
-  regulären Ausdrücke</li>
+  regul&auml;ren Ausdr&uuml;cke</li>
   <li>
-  wenn für ein Gerät eine Spezifikation exakt zutrifft, werden keine weiteren 
+  wenn f&uuml;r ein Ger&auml;t eine Spezifikation exakt zutrifft, werden keine weiteren 
   Vergleiche vorgenommen.</li>
   <li>
-  die Befehlszeile kann die selbe Gerätebezeichnung mehrfach enthalten z.B.: &quot;set 
+  die Befehlszeile kann die selbe Ger&auml;tebezeichnung mehrfach enthalten z.B.: &quot;set 
   lamp1-lamp3, lamp3 on&quot;.
   Lamp3 wird hier zwei Mal eingeschalten.</span></li>
   <li>um Strukturen mit komplexeren Anforderungen zu realisieren lesen Sie bitte 
@@ -280,90 +280,90 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>attr &lt;devspec&gt; &lt;attrname&gt; [&lt;value&gt;] </code><br>
 
   <br>
-   Dieser Befehl setzt ein Attribut für ein Gerät welches mit <a href="#define">define</a> definiert wurde. Sie können auch 
+   Dieser Befehl setzt ein Attribut f&uuml;r ein Ger&auml;t welches mit <a href="#define">define</a> definiert wurde. Sie k&ouml;nnen auch 
   Ihre eigenen Attribute definieren, um sie in anderen Applikationen anzuwenden. 
-  Geben Sie „&lt;attr &lt;name&gt; ?“ ein, um eine Liste verfügbarer Attribute 
+  Geben Sie "&lt;attr &lt;name&gt; ?" ein, um eine Liste verf&uuml;gbarer Attribute 
   anzuzeigen. Bitte lesen Sie das Kapitel <a href="#devspec">Device specification</a>&nbsp; 
   um Detail-Informationen zu &lt;devspec&gt; zu erhalten.
-  <p>Attribute, die für 
-  alle Geräte anwendbar sind: </p>
+  <p>Attribute, die f&uuml;r 
+  alle Ger&auml;te anwendbar sind: </p>
   <ul>
     <a name="comment"></a>
     <li>comment<br>
-        Fügt einen beliebigen Kommentar hinzu.
+        F&uuml;gt einen beliebigen Kommentar hinzu.
     <a name="alias"></a>
     </li><li>alias<br>
-     Wird in FHEMWEB benutzt, um ein en anderen Namen für ein Gerät anzuzeigen 
-    z.B. wenn Sonderzeichen/Leerzeichen nicht in der Gerätedefinition verwendet 
-    werden können.
+     Wird in FHEMWEB benutzt, um ein en anderen Namen f&uuml;r ein Ger&auml;t anzuzeigen 
+    z.B. wenn Sonderzeichen/Leerzeichen nicht in der Ger&auml;tedefinition verwendet 
+    werden k&ouml;nnen.
     <a name="room"></a>
     </li><li>room<br>
-     Filtert/gruppiert Geräte. Verwendbar unter web-pgm2 und web-pgm3.
-     Ein Geräte kann zu mehr als einem Raum zugeordnet werden. In diesem Fall 
-    müssen die Raumzuordnungen&nbsp; durch Kommata getrennt angegeben werden.<br>
-        Geräte, die dem Raum mit der Bezeichnung “hidden” zugeordnet werden, 
-    erscheinen nicht auf der Webseite, es sei denn Sie berücksichtigen <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
+     Filtert/gruppiert Ger&auml;te. Verwendbar unter web-pgm2 und web-pgm3.
+     Ein Ger&auml;te kann zu mehr als einem Raum zugeordnet werden. In diesem Fall 
+    m&uuml;ssen die Raumzuordnungen&nbsp; durch Kommata getrennt angegeben werden.<br>
+        Ger&auml;te, die dem Raum mit der Bezeichnung "hidden" zugeordnet werden, 
+    erscheinen nicht auf der Webseite, es sei denn Sie ber&uuml;cksichtigen <a href="#hiddenroom"> FHEMWEB attribute to selectively disable
         rooms for certain FHEMWEB instances.
         </a></li><a href="#hiddenroom">
 
     </a><a name="group"></a>
     <li>group<br>
-        Gerätegruppen, anwendbar unter web-pgm2 (Modul <a href="#FHEMWEB">FHEMWEB</a>) zeigt Geräte die in die gleiche Gruppe gehören auch in einer 
-    gemeinsamen Box an. Das benutzt man, um später Geräte zu gruppieren. Ein 
-    Gerät kann zu mehr als einer Gruppe gehören. In diesem Fall müssen die 
+        Ger&auml;tegruppen, anwendbar unter web-pgm2 (Modul <a href="#FHEMWEB">FHEMWEB</a>) zeigt Ger&auml;te die in die gleiche Gruppe geh&ouml;ren auch in einer 
+    gemeinsamen Box an. Das benutzt man, um sp&auml;ter Ger&auml;te zu gruppieren. Ein 
+    Ger&auml;t kann zu mehr als einer Gruppe geh&ouml;ren. In diesem Fall m&uuml;ssen die 
     entsprechenden Gruppen, durch Kommata getrennt, eingetragen werden<p>
-    Wenn dieses Attribut nicht gesetzt ist, wird der in der Gerätegruppe 
-    gesetzte Gerätetyp verwendet.&nbsp;</li><a name="showtime"></a></p>
+    Wenn dieses Attribut nicht gesetzt ist, wird der in der Ger&auml;tegruppe 
+    gesetzte Ger&auml;tetyp verwendet.&nbsp;</li><a name="showtime"></a></p>
     <li>showtime<br>
-    Wird im Webfrontend pgm2 verwendet, um die Zeit der letzten Aktivität 
-    anstelle des Status in der Gesamtansicht anzuzeigen. Nützlich z.B. für FS20 
-    PIRI Geräte.</span>
+    Wird im Webfrontend pgm2 verwendet, um die Zeit der letzten Aktivit&auml;t 
+    anstelle des Status in der Gesamtansicht anzuzeigen. N&uuml;tzlich z.B. f&uuml;r FS20 
+    PIRI Ger&auml;te.</span>
     </li>
 
     <br><br>
     <br>
-    Die folgenden Attribute werden bei Modulen verwendet, die standardisierte „readings“ 
+    Die folgenden Attribute werden bei Modulen verwendet, die standardisierte "readings" 
     Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der Liste der 
-    Modulattribute wenn Sie wissen möchten ob dies unterstützt wird.<br><br>
+    Modulattribute wenn Sie wissen m&ouml;chten ob dies unterst&uuml;tzt wird.<br><br>
 
     <a name="event-on-update-reading"></a>
     <li>event-on-update-reading<br>
-    Wenn nicht gesetzt, erzeugt jede Veränderung eines “readings” ein Ereignis, 
+    Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines "readings" ein Ereignis, 
     welches z.B. von
     <a href="#notify">
     notify</a> oder
     <a href="FileLog">
-    FileLog</a> berücksichtigt wird. Wenn gesetzt erzeugen nur Aktualisierungen 
-    der eingetragenen „readings“ ein Ereignis.
+    FileLog</a> ber&uuml;cksichtigt wird. Wenn gesetzt erzeugen nur Aktualisierungen 
+    der eingetragenen "readings" ein Ereignis.
     </li>
 
     <a name="event-on-change-reading"></a>
     <li>event-on-change-reading<br>
-    Dieses Attribut enthält eine durch Kommata getrennte Liste von “readings”. 
-    Wenn gesetzt, erzeugen nur Veränderungen der gelisteten „readings“ ein 
-    Ereignis. Wenn die aktualiserten Werte der gelisteten „readings“ identisch 
+    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von "readings". 
+    Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten "readings" ein 
+    Ereignis. Wenn die aktualiserten Werte der gelisteten "readings" identisch 
     sind, wird kein Ereignis generiert.</li><p>
     Die unterschiedlichen Bedeutungen von
     event-on-update-reading und event-on-change-reading sind folgende</span>:
     <ol>
     <li>
     <p>Wenn 
-    beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung eines jeden „readings“ 
-    eines Gerätes ein Ereignis.</li>
+    beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung eines jeden "readings" 
+    eines Ger&auml;tes ein Ereignis.</li>
     <li>
-    Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder Änderungen 
-    von „readings“ die nicht in einem der Attribute gesetzt sind ein Ereignis.</li>
+    Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder &auml;nderungen 
+    von "readings" die nicht in einem der Attribute gesetzt sind ein Ereignis.</li>
     <li>
-    Wenn ein „reading“ in event-on-update-reading aufgeführt ist, erzeugt eine 
-    Aktualisierung ein Ereignis unabhängig ob das „reading“ auch in 
+    Wenn ein "reading" in event-on-update-reading aufgef&uuml;hrt ist, erzeugt eine 
+    Aktualisierung ein Ereignis unabh&auml;ngig ob das "reading" auch in 
     event-on-change-reading aufgelistet ist.</li>
     </ol>
 
   </ul>
   <br>
 
-  Gerätespezifische Attribute sind in der Beschreibung zum jeweiligen Gerät 
-  aufgeführt.
+  Ger&auml;tespezifische Attribute sind in der Beschreibung zum jeweiligen Ger&auml;t 
+  aufgef&uuml;hrt.
   <br>
 
   Beispiele:
@@ -381,7 +381,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   Bemerkungen:<br>
   <ul>
     <li>Lesen Sie unter <a href="#deleteattr">deleteattr</a> nach um Attribute 
-    zu löschen.</li>
+    zu l&ouml;schen.</li>
   </ul>
 </ul>
 
@@ -391,9 +391,9 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>setdefaultattr [&lt;attrname&gt; [&lt;value&gt;]] </code><br>
 
   <br>
-  Fügt Sie ein Standardattribut hinzu. Jedem nach dieser Zuweisung definierte 
-  Gerät wird dieses Attribut zugewiesen. Wenn kein „attrname“ angegenben wird, 
-  dann wird die Liste der Standardattribute gelöscht.
+  F&uuml;gt Sie ein Standardattribut hinzu. Jedem nach dieser Zuweisung definierte 
+  Ger&auml;t wird dieses Attribut zugewiesen. Wenn kein "attrname" angegeben wird, 
+  dann wird die Liste der Standardattribute gel&ouml;scht.
   <br><br>
 
   Beispiel, um das Attribut "room kitchen" und "loglevel 4" allen Lampen 
@@ -410,8 +410,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
   Anmerkungen:<br>
   <ul>
-    <li>es gibt keine Möglichkeit, ein einzelnes Standardattribut aus der Liste 
-    tu löschen.</li>
+    <li>es gibt keine M&ouml;glichkeit, ein einzelnes Standardattribut aus der Liste 
+    tu l&ouml;schen.</li>
   </ul>
 </ul>
 
@@ -421,18 +421,18 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>define &lt;name&gt; &lt;type&gt; &lt;type-specific&gt;</code><br>
   <br>
-  Definiert ein Gerät. Sie müssen Geräte einrichten um sie zu beeinflussen (z.B. 
-  das Kommando set on/off auszuführen). Gleichfalls ist das Logfile besser 
+  Definiert ein Ger&auml;t. Sie m&uuml;ssen Ger&auml;te einrichten um sie zu beeinflussen (z.B. 
+  das Kommando set on/off auszuf&uuml;hren). Gleichfalls ist das Logfile besser 
   lesbar wenn es z.B.
-  "lamp off" anstatt "Device 5673, Button 00, Code 00 (off)" als Text enthält. <br>
+  "lamp off" anstatt "Device 5673, Button 00, Code 00 (off)" als Text enth&auml;lt. <br>
   Geben Sie an der Befehlszeile "define &lt;name&gt; ?" ein, um eine Liste der 
-  verfügbaren &quot;types&quot; zu erhalten.<br>
+  verf&uuml;gbaren &quot;types&quot; zu erhalten.<br>
   Nach der Definition, wird das globale Ereignis "DEFINED" genriert. Genauere 
   Beschreibung erhalten Sie im Abschnitt &quot;notify&quot;.<br>
   <br><br>
 
-  Jedes Gerät besitzt unterschiedliche hinzufügbare Argumente per Definition, 
-  lesen Sie sich bitte die zu dem jeweiligen Gerät gehörenden Abschnitte durch.<br>
+  Jedes Ger&auml;t besitzt unterschiedliche hinzuf&uuml;gbare Argumente per Definition, 
+  lesen Sie sich bitte die zu dem jeweiligen Ger&auml;t geh&ouml;renden Abschnitte durch.<br>
   <br>
 </ul>
 
@@ -442,11 +442,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>deleteattr &lt;devspec&gt; [&lt;attrname&gt;]</code> <br>
   <br>
-  Löscht entweder ein einzelnes Attribut (siehe Abschnitt <a href="#attr">attr</a> )
-  oder alle Attribute eines Gerätes (falls kein&nbsp; &lt;attrname&gt; angegeben 
+  L&ouml;scht entweder ein einzelnes Attribut (siehe Abschnitt <a href="#attr">attr</a> )
+  oder alle Attribute eines Ger&auml;tes (falls kein&nbsp; &lt;attrname&gt; angegeben 
   wird).
   Lesen Sie bitte den&nbsp; <a href="#devspec">Device specification</a> 
-  Abschnitt für
+  Abschnitt f&uuml;r
   &lt;devspec&gt; durch.<br>
   <br>
 
@@ -463,13 +463,13 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>delete &lt;devspec&gt;</code> <br>
   <br>
-  Löscht etwas was mit dem <a href="#define">define</a> Befehl erstellt worden 
+  L&ouml;scht etwas was mit dem <a href="#define">define</a> Befehl erstellt worden 
   ist.
-  Lesen Sie sich bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; für 
+  Lesen Sie sich bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r 
   Details von
   &lt;devspec&gt; durch.<br>
-  Nach dem löschen, wird das globale Ereignis "DELETED" erzeugt. Lesen Sie bitte 
-  den Abschnitt zu &quot;notify&quot; für genauere Informationen durch.<br>
+  Nach dem l&ouml;schen, wird das globale Ereignis "DELETED" erzeugt. Lesen Sie bitte 
+  den Abschnitt zu &quot;notify&quot; f&uuml;r genauere Informationen durch.<br>
   Beispiel:
   <ul>
     <code>delete lamp</code><br>
@@ -482,16 +482,16 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>get &lt;devspec&gt; &lt;type-specific&gt;</code>
   <br><br>
-  Fragt einen Wert direkt&nbsp; (aktuell) vom Gerät ab und wartet auf eine 
-  Antwort. Eine allgemeine Liste möglicher Paramter erhalten Sie mit<ul>
+  Fragt einen Wert direkt&nbsp; (aktuell) vom Ger&auml;t ab und wartet auf eine 
+  Antwort. Eine allgemeine Liste m&ouml;glicher Paramter erhalten Sie mit<ul>
     <code>get &lt;device&gt; ?</code>
   </ul>
-  Lesen Sie den Abschnitt <a href="#devspec">Device specification</a> für 
+  Lesen Sie den Abschnitt <a href="#devspec">Device specification</a> f&uuml;r 
   Details zu
   &lt;devspec&gt; durch.<br>
   <br>
-  Jedes Gerät hat unterschiedliche &quot;get&quot;-Parameter. Lesen Sie Details bitte im 
-  zugehörigen Abschnitt nach.<br>
+  Jedes Ger&auml;t hat unterschiedliche &quot;get&quot;-Parameter. Lesen Sie Details bitte im 
+  zugeh&ouml;rigen Abschnitt nach.<br>
   <br>
 
 </ul>
@@ -502,8 +502,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>getstate &lt;devspec&gt;</code>
   <br><br>
-  Gibt einen kurzen, durch Leerzeichen getrennte Statusliste für &lt;devspec&gt; 
-  aus . Dies ist nützlich, um das Gerät in z.B. Cacti zu beobachten.<br>
+  Gibt einen kurzen, durch Leerzeichen getrennte Statusliste f&uuml;r &lt;devspec&gt; 
+  aus . Dies ist n&uuml;tzlich, um das Ger&auml;t in z.B. Cacti zu beobachten.<br>
   Beispiel:
   <ul><code>
   getstate lamp<br>
@@ -512,7 +512,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   getstate fl<br>
   ack:0 actuator:2 day-temp:21.5 desired-temp:22.5 [...] measured-temp:22.9 [...]
   </code></ul>
-  Bemerkung: Um diesen Befehl nutzen zu können, kopieren Sie bitte&nbsp; die 
+  Bemerkung: Um diesen Befehl nutzen zu k&ouml;nnen, kopieren Sie bitte&nbsp; die 
   Datei 99_getstate.pm aus dem Verzeichnis contrib/getstate/ in Ihr FHEM 
   Verzeichnis.
   <br>
@@ -528,7 +528,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   Liest (z.B. als Befehlszeile in der fhem.cfg) die in &lt;filename&gt; angegebene 
   Datei in FHEM ein und interpretiert jede Dateizeile als FHEM Befehl. Mit 
   dieser Hilfe werden Konfigurationsdateien modularer und erlaubt es sie z.B. 
-  nach Räumen geordnet auftzuteilen.
+  nach R&auml;umen geordnet auftzuteilen.
   <br>
 </ul>
 
@@ -537,10 +537,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>inform {on|off|timer|raw} [regexp]</code> <br>
   <br>
-  Wenn auf &quot;on&quot; gesetzt und der Status eines Gerätes ändert sich, dann wird eine 
+  Wenn auf &quot;on&quot; gesetzt und der Status eines Ger&auml;tes &auml;ndert sich, dann wird eine 
   Nachricht an den Client gesendet. Dieser Befehl kann von anderen 
   Programmen/Modulen dazu benutzt werden, eine Hinweisnachricht zu erhalten. <br>
-  Die Option &quot;timer&quot; fügt&nbsp; der Nachricht einen Zeitstempel hinzu. Hinweis: 
+  Die Option &quot;timer&quot; f&uuml;gt&nbsp; der Nachricht einen Zeitstempel hinzu. Hinweis: 
   Dieser Befehl erleichtert Ihnen die bessere Kontrolle in
   <a href="#notify">notify</a> oder <a href="#FileLog">FileLog</a> , wann welche 
   Ereignisse erzeugt wurden.
@@ -555,11 +555,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <br><br>
   Auflistung aller &quot;definitions&quot;, &quot;notify&quot; und &quot;at&quot;-Definitionen. Dies ist eines 
   der wenigen Befehle, die im Normalfall eine Zeichenkette ausgeben. Bitte lesen 
-  Sie den Abschnitt <a href="#devspec">Device specification</a> für Details zu
+  Sie den Abschnitt <a href="#devspec">Device specification</a> f&uuml;r Details zu
   &lt;devspec&gt;.
   <br>
   Wenn value angegeben ist, der von ( DEF, TYPE, usw) oder
-  reading (actuator, measured-temp) für alle Geräte die in devspec angegeben 
+  reading (actuator, measured-temp) f&uuml;r alle Ger&auml;te die in devspec angegeben 
   sind.
   <br><br>
   Beispiel:
@@ -594,8 +594,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     avglog               (active)
 
   </name></code></pre>
-  Wenn Sie für <code>name</code> einen Gerätenamen eingeben, dann erhalten Sie 
-  einen genauen Status für das in<code> name</code> angegebene Gerät angezeigt, 
+  Wenn Sie f&uuml;r <code>name</code> einen Ger&auml;tenamen eingeben, dann erhalten Sie 
+  einen genauen Status f&uuml;r das in<code> name</code> angegebene Ger&auml;t angezeigt, 
   z.B.:
   <pre><code>  fhem&gt; list fl
 
@@ -622,11 +622,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>modify &lt;name&gt; &lt;type-dependent-options&gt;</code>
   <br><br>
 
-  Dieser Befehl wird benutzt, um Definitionen zu verändern. Er ist nützlich, um <a href="#at">at</a> oder <a href="#notify">notify</a> 
-  Definitionen zu verändern.  Wenn Sie einen Wert einer an Definition verändern, 
-  dann wird nur der für die Zeit zuständige Teil geändert. Im Falle der 
-  Veränderung einer Definition vom Typ &quot;notify&quot; wird nur der&nbsp; regex Teil 
-  geändert. Alle anderen Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.
+  Dieser Befehl wird benutzt, um Definitionen zu ver&auml;ndern. Er ist n&uuml;tzlich, um <a href="#at">at</a> oder <a href="#notify">notify</a> 
+  Definitionen zu ver&auml;ndern.  Wenn Sie einen Wert einer an Definition ver&auml;ndern, 
+  dann wird nur der f&uuml;r die Zeit zust&auml;ndige Teil ge&auml;ndert. Im Falle der 
+  Ver&auml;nderung einer Definition vom Typ &quot;notify&quot; wird nur der&nbsp; regex Teil 
+  ge&auml;ndert. Alle anderen Werte (Stati, Attribute,&nbsp; etc) bleiben erhalten.
   <br><br>
   Beispiel:
   <ul>
@@ -672,7 +672,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>rename &lt;oldname&gt; &lt;newname&gt;</code>
   <br><br>
-  Benennt ein Gerät von &lt;oldname&gt; in &lt;newname&gt;, einschliesslich der 
+  Benennt ein Ger&auml;t von &lt;oldname&gt; in &lt;newname&gt;, einschliesslich der 
   Attribute, um. Das globale Ereignis &quot;RENAMED&quot; wird erstellt, Lesen Sie bitte 
   den Abschnitt &quot;notify&quot; durch um Details zu erfahren.
   <br><br>
@@ -690,11 +690,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <br><br>
   Liest entweder die aktuelle Konfigurationsdatei oder die angegebene Datei ein.<br>
   Der Ablauf ist dabei wie folgt:&nbsp; Zuerst wird das <a href="#statefile">statefile</a> 
-  gesichert. Dann werden alle Geräte gelöscht. Dann wird die aktuelle 
+  gesichert. Dann werden alle Ger&auml;te gel&ouml;scht. Dann wird die aktuelle 
   Konfigurationsdatei (oder die angegebene Datei) eingelesen zuletzt wird das statefile 
   neu eingelesen.<br>
   Wenn dieser Ablauf abgeschlossen ist, wird das globale REREADCFG Ereignis 
-  ausgelöst.  Alle existierenden Verbindungenwerden bis zum &quot;rereadcfg&quot; Ereignis 
+  ausgel&ouml;st.  Alle existierenden Verbindungenwerden bis zum &quot;rereadcfg&quot; Ereignis 
   getrennt.
 
   <br><br>
@@ -717,13 +717,13 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <li>Der Befehl speichert nur &quot;definitions&quot; und &quot;attributes&quot; aber keine (set/get)
     Befehle die vorher Teil der Konfigurationsdatei waren. Wenn Sie solche 
     Befehle nach der Initialisierung (z.B.  <a href="http://fhem.de/FHZset">FHTcode</a>) 
-    benötigen,dann müssen Sie sie mit <a href="#notify">notify</a> triggern wenn 
+    ben&ouml;tigen,dann m&uuml;ssen Sie sie mit <a href="#notify">notify</a> triggern wenn 
     das
     INITIALIZED Ereignis eintritt.</li>
 
     <li>Der Befehl &quot;save&quot; versucht Kommentarzeilen&nbsp; (Zeilen die mit # 
     beginnen) und &quot;include&quot;-Zeilen zu erhalten, aber arbeitet nicht korrekt wenn 
-    FHEM für diese Dateien keine Schreibrechte besitzt.</li>
+    FHEM f&uuml;r diese Dateien keine Schreibrechte besitzt.</li>
 
   </ul>
 </ul>
@@ -734,17 +734,17 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>set &lt;devspec&gt; &lt;type-specific&gt;</code>
   <br><br>
-  Der Befehl setzt Geräteparameter/sendet Signale an ein Gerät. Sie erhalten 
-  eine Liste verfügbarer Parameter wenn Sie folgendes eingeben:
+  Der Befehl setzt Ger&auml;teparameter/sendet Signale an ein Ger&auml;t. Sie erhalten 
+  eine Liste verf&uuml;gbarer Parameter wenn Sie folgendes eingeben:
   <ul>
     <code>set &lt;name&gt; ?</code>
   </ul>
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a> für 
+  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a> f&uuml;r 
   Details zu
-  &lt;devspec&gt;. Der &quot;set&quot;-Befehl gibt nur bei Fehler einen Wert zurück.<br>
+  &lt;devspec&gt;. Der &quot;set&quot;-Befehl gibt nur bei Fehler einen Wert zur&uuml;ck.<br>
   <br>
-  Jedes Gerät hat verschiedene Parameter die mit &quot;set&quot; gesetzt werden können. 
-  Lesen Sie bitte den entsprechenden Abschnitt für das Gerät für Details durch.<br>
+  Jedes Ger&auml;t hat verschiedene Parameter die mit &quot;set&quot; gesetzt werden k&ouml;nnen. 
+  Lesen Sie bitte den entsprechenden Abschnitt f&uuml;r das Ger&auml;t f&uuml;r Details durch.<br>
   <br>
 
 </ul>
@@ -755,11 +755,11 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>setstate &lt;devspec&gt; &lt;value&gt;</code>
   <br><br>
-  Der Befehl setzt den "STATUS&quot; für <code>&lt;name&gt;</code> , wie im Befehl
+  Der Befehl setzt den "STATUS&quot; f&uuml;r <code>&lt;name&gt;</code> , wie im Befehl
   <a href="#list">list</a> beschrieben, auf den Wert <code>&lt;value&gt;</code> 
-  ohne an das Gerät ein Signal zu senden. Dieser Befehl wird auch im <a href="#statefile">statefile</a> 
+  ohne an das Ger&auml;t ein Signal zu senden. Dieser Befehl wird auch im <a href="#statefile">statefile</a> 
   benutzt.
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; für 
+  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r 
   Details zu
   &lt;devspec&gt;.
   <br><br>
@@ -780,7 +780,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>shutdown [restart]</code>
   <br><br>
-  Der Befehl fährt den Server herunter (nach dem sichern der <a href="#statefile">state information
+  Der Befehl f&auml;hrt den Server herunter (nach dem sichern der <a href="#statefile">state information
   </a>). Er triggert das global:SHUTDOWN Ereignis.  Wenn der optionale 
   Parameterv restart angegeben, versucht FHEM von selbst wieder zu starten.
   <br><br>
@@ -798,7 +798,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <code>trigger &lt;devspec&gt; &lt;state&gt;</code>
   <br><br>
   Triggert eine <a href="#notify">notify</a> Definition.
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; für 
+  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r 
   Details zu
   &lt;devspec&gt;.
 
@@ -814,7 +814,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>sleep &lt;sec&gt;</code>
   <br><br>
-  Stoppt die Befehlsabarbeitung für die angegebene Anzahl von Millisekunden.
+  Stoppt die Befehlsabarbeitung f&uuml;r die angegebene Anzahl von Millisekunden.
   <br><br>
   Beispiel:
   <ul>
@@ -830,8 +830,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <a name="global"></a>
 <h3>global</h3>
 <ul>
-  Das &quot;global&quot; Gerät wird benutzt, um allgemeingültige Attribute zu setzen. Es 
-  wird automatisch erstellt und kann nicht gelöscht oder umbenannt werden. Es 
+  Das &quot;global&quot; Ger&auml;t wird benutzt, um allgemeing&uuml;ltige Attribute zu setzen. Es 
+  wird automatisch erstellt und kann nicht gel&ouml;scht oder umbenannt werden. Es 
   hat keine &quot;set&quot; oder &quot;get&quot; Parameter.<br>
   <br>
 
@@ -850,8 +850,8 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <a name="autoload_undefined_devices"></a>
     <li>autoload_undefined_devices<br>
         wenn dieses Attribut gesetzt ist, werden die zu einer neu empfangenen 
-    Nachricht zugehörigen Module automatisch geladen.&nbsp; Dies erfolgt vom <a href="#autocreate">
-        autocreate</a> Gerät, um so automatisch ein FHEM-Gerät bei erreichen 
+    Nachricht zugeh&ouml;rigen Module automatisch geladen.&nbsp; Dies erfolgt vom <a href="#autocreate">
+        autocreate</a> Ger&auml;t, um so automatisch ein FHEM-Ger&auml;t bei erreichen 
     einer entsprechenden Nachricht zu erstellen.
     </li><br>
 
@@ -872,7 +872,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="backupcmd"></a>
     <li>backupcmd<br>
-        Sie können das Update durch Ihre eigenen Befehle/Skripts durchführen 
+        Sie k&ouml;nnen das Update durch Ihre eigenen Befehle/Skripts durchf&uuml;hren 
     indem Sie dieses Attribut setzen.
         Wenn dieses Attribut gesetzt ist, dann startet es als ein SHELL-Befehl 
     und erstellt eine durch Leerzeichen getrennte Liste von 
@@ -884,7 +884,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
                 /usr/share/fhem/www"</code>
         </ul>
         Bemerkung: Ihr Befehl/Skript muss die Zeichenkette "backup done" 
-    zurückgeben oder eine entsprechende Zeichenkette um Fehlermeldungen 
+    zur&uuml;ckgeben oder eine entsprechende Zeichenkette um Fehlermeldungen 
     auszugeben, damit die Zusammenarbeit mit updatefhem funktioniert!<br>
         Dieses Attribut wird vom <a href="#backup">backup</a> Befehl benutzt.<br>
         Beispiel:<br>
@@ -905,7 +905,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="backupsymlink"></a>
     <li>backupsymlink<br>
-        Wenn dieses Attribut auf etwas anderes als "no", dann unterstützt der 
+        Wenn dieses Attribut auf etwas anderes als "no", dann unterst&uuml;tzt der 
     Archviierungsbefehl &quot;tar&quot; symbolische Links in Ihrem Backup. Andererseits, 
     wenn dieses Attribut auf
         "no" gesetzt ist werden symbolische Links vom Befehl &quot;tar&quot; ignoriert. 
@@ -918,15 +918,15 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="configfile"></a>
     <li>configfile<br>
-        Enthält den Namen der FHEM Konfigurationsdatei. Wenn <a href="#save">save</a> 
+        Enth&auml;lt den Namen der FHEM Konfigurationsdatei. Wenn <a href="#save">save</a> 
     ohne Argumente aufgerufen wird dann wird die Ausgabedatei unter diesem 
     Dateinamen gespeichert.
     </li><br>
 
     <a name="exclude_from_update"></a>
     <li>exclude_from_update<br>
-        Enthält eine Liste durch Leerzeichen getrennter Dateien welche nicht im 
-    Update berücksichtigt werden. Dieses Attribut wird vom <a href="#update">update</a> 
+        Enth&auml;lt eine Liste durch Leerzeichen getrennter Dateien welche nicht im 
+    Update ber&uuml;cksichtigt werden. Dieses Attribut wird vom <a href="#update">update</a> 
     Befehl benutzt.<br>
         Beispiel:<br>
         <ul>
@@ -949,33 +949,33 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <a name="lastinclude"></a>
     <li>lastinclude<br>
         Wurde dieses Attribut gesetzt, dann wird der letzte Befehl der generierten 
-    Konfigurationsdatei (siehe <a href="#save">save</a> Befehl) berücksichtigt &lt;lastinclude-value&gt;<br>
+    Konfigurationsdatei (siehe <a href="#save">save</a> Befehl) ber&uuml;cksichtigt &lt;lastinclude-value&gt;<br>
         Dieses Attribut ist DEPRECATED, bitte benutzen Sie <a href="#notify">notify</a>, 
     mit dem&nbsp; INITIALIZED Ereignis um Befehle nach der Intialisierung 
-    auszuführen.
+    auszuf&uuml;hren.
     </li><br>
 
     <a name="logfile"></a>
     <li>logfile<br>
         Gibt das Logfile an, in welches gespeichert werden soll.&nbsp; Sie 
-    können "-" für die Ausgabe in das stdout-Gerät. In diesem Fall the server won't background itself.<br>
+    k&ouml;nnen "-" f&uuml;r die Ausgabe in das stdout-Ger&auml;t. In diesem Fall the server won't background itself.<br>
         Der Name der Logdatei kann auch &quot;wildcards&quot; enthalten, um eine 
-    einfachere Abfolge für die Dateien zu erreichen. Lesen Sie bitte den 
-    Abschnitt <a href="#FileLog">FileLog</a>. Fügen Sie die Attribute
+    einfachere Abfolge f&uuml;r die Dateien zu erreichen. Lesen Sie bitte den 
+    Abschnitt <a href="#FileLog">FileLog</a>. F&uuml;gen Sie die Attribute
         <code>archivecmd / archivedir / nrarchive</code> zum
-        <code>global</code> Gerät hinzu wie Sie es auch bei einem FileLog device 
-    tun könnten.<br>
-        Sie können den Namen der Logdatei mit&nbsp;
+        <code>global</code> Ger&auml;t hinzu wie Sie es auch bei einem FileLog device 
+    tun k&ouml;nnten.<br>
+        Sie k&ouml;nnen den Namen der Logdatei mit&nbsp;
         <code>{ $currlogfile }festlegen</code>.
     </li><br>
 
     <a name="modpath"></a>
     <li>modpath<br>
         Mit modpath geben Sie den Pfad zu dem Verzeichnis der <code>FHEM</code> 
-    Module an. Der Pfad enhält <b>nicht</b> das Verzeichnis FHEM. Durch das 
+    Module an. Der Pfad enh&auml;lt <b>nicht</b> das Verzeichnis FHEM. Durch das 
     setzen der Attribute, wird das Verzeichnis nach Dateinamen in der Form NN_&lt;NAME&gt;.pm, 
-    und sie werden für die Definition von Geräten unter dem Namen
-        &lt;NAME&gt; verfügbar gemacht. Wenn das erste Gerät&nbsp; des Typs &lt;NAME&gt; definiert 
+    und sie werden f&uuml;r die Definition von Ger&auml;ten unter dem Namen
+        &lt;NAME&gt; verf&uuml;gbar gemacht. Wenn das erste Ger&auml;t&nbsp; des Typs &lt;NAME&gt; definiert 
     wird, werden die entsprechenden Module geladen und in dem Modul die 
     entsprechende Function mit dem Namen
         &lt;NAME&gt;_Initialize wird aufgerufen. Eine Ausnahme bilden Module die 
@@ -986,15 +986,15 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="motd"></a>
     <li>motd<br>
-        Nachricht des Tages. Wird im Begrüßungsbildschirm von FHEM angezeigt,
+        Nachricht des Tages. Wird im Begr&uuml;ßungsbildschirm von FHEM angezeigt,
         oder direkt beim Start einer &quot;telnet&quot; Sitzung, bevor der fhem&gt; Prompt 
     erscheint. Der SecurityCheck setzt motd wenn es bisher nicht gesetzt ist. Um 
-    das zu verhindern, können sie den Wert von motd auf &quot;none&quot; setzen
+    das zu verhindern, k&ouml;nnen sie den Wert von motd auf &quot;none&quot; setzen
     </li><br>
 
     <a name="mseclog"></a>
     <li>mseclog<br>
-        Wenn dieses Attribut gesetzt ist, enthalten Datums/Zeiteinträge (timestamp) 
+        Wenn dieses Attribut gesetzt ist, enthalten Datums/Zeiteintr&auml;ge (timestamp) 
     in der Logdatei einen Millisekunden-Eintrag.
     </li><br>
 
@@ -1007,10 +1007,10 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="pidfilename="></a>
     <li>pidfilename<br>
-        Schreibt die PERL Prozess-ID in die angegebene Datei. Der Server läuft 
+        Schreibt die PERL Prozess-ID in die angegebene Datei. Der Server l&auml;uft 
     als Daemon und einige Distributionen wollen anhand der PID testen, ob der 
-    FHEM Prozess läuft. Die Datei wird bei Ausführung des &quot;shutdown&quot;-Kommandos 
-    gelöscht.
+    FHEM Prozess l&auml;uft. Die Datei wird bei Ausf&uuml;hrung des &quot;shutdown&quot;-Kommandos 
+    gel&ouml;scht.
     </li><br>
 
     <a name="statefile"></a>
@@ -1032,60 +1032,61 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <li>updatebranch<br>
         Dieses Attribut wird mittels der Datei FhemUtils/release.pm gesetzt die 
     im &quot;modpath&quot;-Verzeichnis enthalten ist. Z.B, wenn eine stabile Version von 
-    FHEM (ab Version 5.3 aufwärts) über eine direkte Download-Verbindung vom 
+    FHEM (ab Version 5.3 aufw&auml;rts) &uuml;ber eine direkte Download-Verbindung vom 
     Archiv der FHEM-Webseite installiert wurde, then wird automatisch der Zweig 
     der Aktualisierung auf "stable"eingestellt.
         In dieser Form der Aktualisierung werden nur behobene Fehler, relevante 
-    Sicherheitslücken oder neue stabile Versionen aktualisiert.<br>
+    Sicherheitsl&uuml;cken oder neue stabile Versionen aktualisiert.<br>
         Mittels dem Befehl "update development &lt;filename&gt;" benutzen, 
-    können Dateien oder Pakete jederzei direkt aus dem Entwicklungszweig
+    k&ouml;nnen Dateien oder Pakete jederzei direkt aus dem Entwicklungszweig
         (z.B. mittels "update development &lt;package&gt;") installiert werden.<br>
         Wenn Sie anstelle von Entwicklungsversionen eine stabile Version 
-    installieren wollen, so können Sie dies durch Angabe des Attributes "updatebranch DEVELOPMENT" 
+    installieren wollen, so k&ouml;nnen Sie dies durch Angabe des Attributes "updatebranch DEVELOPMENT" 
     erzwingen.
         Bei der Installation von FHEM sollten Sie generell die 
     Entwicklungsversion installieren. Dieses Attribut muss nicht gesetzt werden. 
     Benutzen Sie dagegen "update development force"
-        um alle Dateien, einschliesslich der Datei release.pm (enthält die 
+        um alle Dateien, einschliesslich der Datei release.pm (enth&auml;lt die 
     aktuellen Informationen)
         zu aktualisieren.
     </li><br>
 
     <a name="userattr"></a>
     <li>userattr<br>
-        Enthält eine durch Leerzeichen getrennte Liste in welcher die Namen 
-    zusätzlicher Attribute aufgeführt sind. Diese müssen zuerst in dieser Liste 
-    definiert werden, bevor sie angewendet werden können.
+        Enth&auml;lt eine durch Leerzeichen getrennte Liste in welcher die Namen 
+    zus&auml;tzlicher Attribute aufgef&uuml;hrt sind. Diese m&uuml;ssen zuerst in dieser Liste 
+    definiert werden, bevor sie angewendet werden k&ouml;nnen.
     </li><br>
 
     <a name="verbose"></a>
     <li>verbose<br>
-        Setzt den Wert für die Häufigkeit/Intensität von Nachrichten. Mögliche 
+        Setzt den Wert f&uuml;r die H&auml;ufigkeit/Intensit&auml;t von Nachrichten. M&ouml;gliche 
     Werte sind:
         <ul>
           <li>0 - Server start/stop
           </li><li>1 - Fehlermeldungen oder unbekannte Pakete 
           </li><li>2 - bedeutende Ereigbisse/Alarme.
           </li><li>3 - ausgesendete Kommandos werden gelogged.
-          </li><li>4 - Sie sehen was von den einzelnen Geräten empfangen wird.
+          </li><li>4 - Sie sehen was von den einzelnen Ger&auml;ten empfangen wird.
           </li><li>5 - Fehlersuche.</li>
         </ul>
-        Es wird der Wert 3 für den Normalgebrauch empfohlen.
+        Es wird der Wert 3 f&uuml;r den Normalgebrauch empfohlen.
     </li><br>
 
     <a name="dupTimeout"></a>
     <li>dupTimeout<br>
         Definert die Wartezeit, nach der 2 identische Ereignisse zweier 
-    Empfänger als Duplikat angesehen werden. Voreingestellt sind 0,5 Sekunden.&nbsp;
+    Empf&auml;nger als Duplikat angesehen werden. Voreingestellt sind 0,5 Sekunden.&nbsp;
     </li><br>
 
   </ul>
 </ul>
 
+
 <a name="perl"></a>
 <h3>Perl specials</h3>
   Wenn Sie einige Aufgaben automatisieren wollen, dann sollten Sie die Befehle <a href="#at">at</a> oder <a href="#notify">notify</a> 
-nutzen. Für komplexere Aufgaben sollten Sie lieber ein SHELLl-Skiipt oder einen 
+nutzen. F&uuml;r komplexere Aufgaben sollten Sie lieber ein SHELLl-Skiipt oder einen 
 PERL "oneliner" als das at/notify
   argument anwenden. Dieser Abschnitt gibt Ihnen einige Tipps zur Anwendung der 
 PERL-oneliner.<br><br>
@@ -1093,7 +1094,7 @@ PERL-oneliner.<br><br>
   <li>Um PERL-&quot;oneliner&quot; zu testen, geben Sie diese am &quot;telnet&quot; Prompt (oder in 
   der FHEMWEB Text-Eingabezeile) eingeschlossen von geschweiften Klammern {} in 
   einer Zeile ein.  Die letzte Beispielzeile schreibt nur etwas in die Logdatei, 
-  während das Ergebnis der anderen Zeilen direkt auf der Webseite sichtbar ist.<ul>
+  w&auml;hrend das Ergebnis der anderen Zeilen direkt auf der Webseite sichtbar ist.<ul>
       Beispiele:<p>{ "Hello" }<br>
       { 1+3*4 }<br>
       { `ls /etc` }<br>
@@ -1103,14 +1104,14 @@ PERL-oneliner.<br><br>
     <br>
 
   </li><li>
-    PERL Ausdrücke werden durch ein Semikolon (;) getrennt. In FHEM &quot;oneliners&quot; 
-    müssen sie durch ein weiteres Semikolon (;;) &quot;escaped&quot; (maskiert) werden<br>
+    PERL Ausdr&uuml;cke werden durch ein Semikolon (;) getrennt. In FHEM &quot;oneliners&quot; 
+    m&uuml;ssen sie durch ein weiteres Semikolon (;;) &quot;escaped&quot; (maskiert) werden<br>
     &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Beispiel:<ul>
       { my $a = 1+1;; Log 1, "Hello $a" }
     </ul>
     <br>
 
-  </li><li>Um FHEM-Kommandos in den PERL-Ausdrücken zu verwenden, benutzen Sie 
+  </li><li>Um FHEM-Kommandos in den PERL-Ausdr&uuml;cken zu verwenden, benutzen Sie 
 bitte die Funktion fhem(),
     mit einem Textargument. Dieser Text wird als FHEM-Kommando interpretiert.<br>
     <p>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Beispiel<ul>
@@ -1118,14 +1119,14 @@ bitte die Funktion fhem(),
       define n1 notify piri:on { fhem "set light on" }
       <p>&nbsp;</p>
     </ul>
-    Bemerkung: Wenn diese Funktion einen wert zurück liefert, wird dieser in der 
+    Bemerkung: Wenn diese Funktion einen wert zur&uuml;ck liefert, wird dieser in der 
 allgemeinen Logdatei gespeichert.. Benutzen sie &quot;1&quot; als zweites Argument um 
 dieses speichern zu verhindern. Sinnvoll ist dieses Argument bei der Abfrage von 
 Werten mittels "get...".
     <br>
     <br>
 
-  </li><li>Notify kann auch dazu verwendet werden, um Macros manuell auszuführen. 
+  </li><li>Notify kann auch dazu verwendet werden, um Macros manuell auszuf&uuml;hren. 
 Verwenden Sie den <a href="#trigger">trigger</a>-Befehl um das Makro zu starten:<br>
     <ul>
       define MyMacro notify MyMacro { Log 1, "Hello"}<br>
@@ -1138,12 +1139,12 @@ Verwenden Sie den <a href="#trigger">trigger</a>-Befehl um das Makro zu starten:
 
   </li><li>Um die Verwendung von Datum und Zeitangaben zu vereinfachen, wurden 
 die Variablen $sec, $min, $hour,
-    $mday, $month, $year, $wday, $yday, $isdst für die Verwendung in PERL-&quot;oneliners&quot; 
-eingeführt (s. unter perldoc -f localtime). Ausnahmen: $month hat einen 
+    $mday, $month, $year, $wday, $yday, $isdst f&uuml;r die Verwendung in PERL-&quot;oneliners&quot; 
+eingef&uuml;hrt (s. unter perldoc -f localtime). Ausnahmen: $month hat einen 
 Wertebereich von 1 to 12 und $year ist korrigiert von 1900.<br>
     Die weitere Variabe $we hat den Wert 1 wenn der abgefragte Tag auf ein 
-Wochenende fällt (Z.B. $wday == 0 [Sonntag] oder
-    $wday == 6 [Samstag]), und 0 für die anderen Wochentage. Wenn man das 
+Wochenende f&auml;llt (Z.B. $wday == 0 [Sonntag] oder
+    $wday == 6 [Samstag]), und 0 f&uuml;r die anderen Wochentage. Wenn man das 
 allgemeine <a href="#holiday2we">holida2we</a> Attribut setzt, dann ist $we 
 ebenfalls 1 bei Urlaubstagen.<br>
     <ul>
@@ -1160,7 +1161,7 @@ ebenfalls 1 bei Urlaubstagen.<br>
     wie jede mit 99 beginnende Datei automatisch geladen):
     <ul>
       <li>min(a,b), max(a,b)</li>
-      <li>time_str2num("YYYY-MM-DD HH:MM:SS") gibt einen numerischen Wert zurück,
+      <li>time_str2num("YYYY-MM-DD HH:MM:SS") gibt einen numerischen Wert zur&uuml;ck,
           der die Berechnung von Zeitdifferenzen vereinfacht</li>
       <li>abstime2rel("HH:MM:SS") wandelt absolute in relative Zeitangaben um
           </li>
@@ -1168,26 +1169,26 @@ ebenfalls 1 bei Urlaubstagen.<br>
     </li>
 
   <li>
-    Um auf die Gerätestati/Attribute zuzugreifen benutzen Sie bitte die 
+    Um auf die Ger&auml;testati/Attribute zuzugreifen benutzen Sie bitte die 
     folgenden Funktionen:
     <br>
     <ul>
       <li>Value(&lt;devicename&gt;)<br>
-        gibt den Status eines Gerätes zurück (entsprechend dem Ausdruck in 
+        gibt den Status eines Ger&auml;tes zur&uuml;ck (entsprechend dem Ausdruck in 
       Klammern, den Sie beim List-Befehl sehen).
         <br><br>
       </li><li>OldValue(&lt;devicename&gt;)
       </li><li>OldTimestamp(&lt;devicename&gt;)<br>
-        gibt den vorherigen Wert/Zeitstempel des Gerätes zurück.
+        gibt den vorherigen Wert/Zeitstempel des Ger&auml;tes zur&uuml;ck.
         <br><br>
       </li><li>
         ReadingsVal(&lt;devicename&gt;,&lt;reading&gt;,&lt;defaultvalue&gt;)<br>
-        Gibt den Inhalt der &quot;readings&quot; zurück (den Inhalt der in dem &quot;Readings&quot;-Abschnitt 
+        Gibt den Inhalt der &quot;readings&quot; zur&uuml;ck (den Inhalt der in dem &quot;Readings&quot;-Abschnitt 
         von "list device" angezeigt wird)
         <br><br>
       </li><li>
         AttrVal(&lt;devicename&gt;,&lt;attribute&gt;,&lt;defaultvalue&gt;)<br>
-        Gibt die gesetzteb Attribute des Gerätes zurück
+        Gibt die gesetzteb Attribute des Ger&auml;tes zur&uuml;ck
         <br><br>
         { Value("wz") }<br>
         { OldValue("wz") }<br>
@@ -1206,8 +1207,8 @@ ebenfalls 1 bei Urlaubstagen.<br>
     sunrise($offset, $min, $max)<br>
     isday()<br>
     </ul>
-    Der Wert von &quot;offset&quot; wird in Sekunden angegeben und das Format für min/max ist "HH:MM" oderr "HH:MM:SS".
-    isday gibt 1 zurück, wenn die Sonne sichtbar ist und ansonsten den Wert 0.
+    Der Wert von &quot;offset&quot; wird in Sekunden angegeben und das Format f&uuml;r min/max ist "HH:MM" oderr "HH:MM:SS".
+    isday gibt 1 zur&uuml;ck, wenn die Sonne sichtbar ist und ansonsten den Wert 0.
     </li>
 
   <br>
@@ -1220,9 +1221,9 @@ ebenfalls 1 bei Urlaubstagen.<br>
     Modulen falls das <a href="#plotmode">plotmode</a>-Attribut auf SVG gesetzt 
     ist. In diesem Fall wird nur eine geringere Anzahl der .gnuplot Attribute 
     benutzt, und einige Linien haben eine besondere Bedeutung: Die Unterschiede 
-    werden in diesem Kapitel erklärt. Lesen Sie bitte auch <a href="http://fhemwiki.de/wiki/Creating_Plots">
+    werden in diesem Kapitel erkl&auml;rt. Lesen Sie bitte auch <a href="http://fhemwiki.de/wiki/Creating_Plots">
     diesen</a> fhemwiki Eintrag zur Erstellung von Logdateien.<br>
-    Im folgenden ist eine minimale .gplot Definition (gültig nur bei Plotmode SVG):<br>
+    Im folgenden ist eine minimale .gplot Definition (g&uuml;ltig nur bei Plotmode SVG):<br>
 <pre>  set terminal size &lt;SIZE&gt;
   #FileLog 4:::
   plot title 'Temperature' with lines
@@ -1232,7 +1233,7 @@ ebenfalls 1 bei Urlaubstagen.<br>
   <li>set Befehle<br>
     Folgende &quot;sets&quot; werden erkannt:
     <ul>
-    <li>terminal, nur die Größenparameter.<br>
+    <li>terminal, nur die Gr&ouml;ßenparameter.<br>
         Dieser ist in der Regel auf &lt;SIZE&gt; gesetzt, welcher ersetzt wird 
     durch das <a href="#plotsize">plotsize</a> Attribut von FHEMWEB oder einer 
     Weblink-Instanz.</li>
@@ -1255,7 +1256,7 @@ ebenfalls 1 bei Urlaubstagen.<br>
         </ul>
         </li>
     <li>ytics,y2tics<br>
-        Beschriftung für die Werte der rechten/linken y-Achse.  Beispiele:<br>
+        Beschriftung f&uuml;r die Werte der rechten/linken y-Achse.  Beispiele:<br>
         <ul>
           set ytics ("on" 0, "off" 1)<br>
           set y2tics<br>
@@ -1265,8 +1266,8 @@ ebenfalls 1 bei Urlaubstagen.<br>
     </li>
     <br>
 
-  <li>#FileLog Einträge<br>
-      Jede Line des Plots muss eine dazugehörige #FileLog
+  <li>#FileLog Eintr&auml;ge<br>
+      Jede Line des Plots muss eine dazugeh&ouml;rige #FileLog
       Zeile haben. Zur Syntax lesen Sie bitte den Abschnitt &quot;column_spec paragraph&quot; 
   von der <a href="#FileLogget">Filelog get</a> Beschreibung.
       Beachten sie bitte, das bei SVG-Plots die erste Spalte der Datei unbedingt 
@@ -1274,9 +1275,9 @@ ebenfalls 1 bei Urlaubstagen.<br>
       </li>
       <br>
 
-  <li>Plot Einträge<br>
+  <li>Plot Eintr&auml;ge<br>
       bestehen immer aus einem Plotbefehl und aus durch Kommata getrenne 
-  Argumentblöcke. Jeder Argumentblock repräsentiert eine darzustellende Linie 
+  Argumentbl&ouml;cke. Jeder Argumentblock repr&auml;sentiert eine darzustellende Linie 
   und hat seine eigenen Paramter.
       Folgende Parameter werden are anerkannt:
       <ul>
@@ -1285,15 +1286,15 @@ ebenfalls 1 bei Urlaubstagen.<br>
       oder rechts) zuzuweisen.&nbsp; 
         </li>
       <li>title<br>
-        Beschriftung der Linie. Wenn man auf diesen Titel klickt, dann ändert 
+        Beschriftung der Linie. Wenn man auf diesen Titel klickt, dann &auml;ndert 
       ein kleines Javascript-Programm den Titel auf die min/max und last-Werte 
       des Plots,
         Weiterhin erlaubt das Programm diese Linie zu kopieren oder eine bereits 
-      kopierte Linie einzufügen (die existierende Skalierung des Plots wird 
-      dabei nicht verändert, nur die eingefügte Linie wird skaliert/angepasst. 
+      kopierte Linie einzuf&uuml;gen (die existierende Skalierung des Plots wird 
+      dabei nicht ver&auml;ndert, nur die eingef&uuml;gte Linie wird skaliert/angepasst. 
       Andere Linien des Plots werden zeitweise nicht angezeigt.</li>
       <li>with &lt;linetype&gt;<br>
-        spezifiziert die Art der Linie. Folgende Linienarten können verwendet 
+        spezifiziert die Art der Linie. Folgende Linienarten k&ouml;nnen verwendet 
       werden: points,
         steps, fsteps, histeps and lines. Nicht bekannte Linienarten werden als 
       Typ &quot;lines&quot; dargestellt.
@@ -1303,11 +1304,11 @@ ebenfalls 1 bei Urlaubstagen.<br>
       als l1 und so weiter. Definiert ist dies in der svg_style.css Datei. Darin 
       sind zwei Sets definiert: l0-l8 and l0fill-l6fill. Das zweite Set muss 
       aber explizit angegeben werden. Wenn der Name des Linienstils das Wort &quot;fill&quot; 
-      enthält, dann haben Plots des Linientyps "lines" ein zusätzliches Start- und
-        Endsegment für eine korrekte Darstellung.<br>
-        Bitte lesen sie die SVG Spezifikationen, um Details über diese css-Datei 
+      enth&auml;lt, dann haben Plots des Linientyps "lines" ein zus&auml;tzliches Start- und
+        Endsegment f&uuml;r eine korrekte Darstellung.<br>
+        Bitte lesen sie die SVG Spezifikationen, um Details &uuml;ber diese css-Datei 
       zu erfahren.
-        Notiz: Wenn Sie dieses Attribut einsetzen möchten, müssen Sie es für 
+        Notiz: Wenn Sie dieses Attribut einsetzen m&ouml;chten, m&uuml;ssen Sie es f&uuml;r 
       alle Linien (Attributblocks) im Plotbefehl spezifizieren.
         </li>
       <li>lw &lt;linewidth&gt;<br>
