@@ -27,6 +27,7 @@
   - feature: FHEMWEB longpoll reconnect (Matthias)
   - bugfix:  rename may overwrite other devices
   - feature: FLOORPLAN longpoll (Matthias)
+  - feature: support for recurring events added in 57_Calendar.pm (Boris)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
