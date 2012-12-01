@@ -677,7 +677,10 @@ CUL_XmitLimitCheckHM($$)
  # was working with 700ms - added buffer to 900ms
   my ($hash,$fn) = @_;
   my $id = (length($fn)>19)?substr($fn,16,6):"";#get HMID destination
-  if ($id){
+  if($id &&
+     $hash->{helper} && 
+     $hash->{helper}{nextSend} &&
+     $hash->{helper}{nextSend}{$id}) {
     my $DevDelay = $hash->{helper}{nextSend}{$id} - gettimeofday();
     if ($DevDelay > 0.01){# wait less then 10 ms will not work
       $DevDelay = ((int($DevDelay*100))%100)/100;# security: no more then 1 sec
