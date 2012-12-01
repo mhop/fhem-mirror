@@ -2706,7 +2706,9 @@ sub
 setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
-  if($rname eq "state" && $hash->{READINGS}{$rname}{VAL} ne $val) {
+  if($rname eq "state" && 
+     $hash->{READINGS}{$rname} &&
+     $hash->{READINGS}{$rname}{VAL} ne $val) {
     $hash->{STATE} = $val;
   }
   $hash->{READINGS}{$rname}{VAL} = $val;
