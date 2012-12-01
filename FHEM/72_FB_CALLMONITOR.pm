@@ -32,6 +32,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use DevIo;
+use HttpUtils;
 
 my %connection_type = (
 0 => "0",
@@ -86,7 +87,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 reverse-search:all,klicktel,dasoertliche,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -154,16 +155,23 @@ FB_CALLMONITOR_Read($)
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
   my @array;
-  my $data = "";
-  $data .= $buf;
-
- 
+  my $reverse_search = undef;
+  my $data = $buf;
+  
    @array = split(";", $data);
+  
+   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $array[3]) if(not $array[3] eq "0" and $array[1] eq "RING" and AttrVal($name, "reverse-search", "none") ne "none");
+   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $array[5]) if($array[1] eq "CALL" and AttrVal($name, "reverse-search", "none") ne "none");
+  
+   
+  
    readingsBeginUpdate($hash);
    readingsBulkUpdate($hash, "event", lc($array[1]));
    readingsBulkUpdate($hash, "external_number", $array[3]) if(not $array[3] eq "0" and $array[1] eq "RING");
+   readingsBulkUpdate($hash, "external_name", $reverse_search) if(defined($reverse_search)); 
    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING");
    readingsBulkUpdate($hash, "external_number" , $array[5]) if($array[1] eq "CALL");
+   
    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "CALL");
    readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
@@ -191,6 +199,86 @@ FB_CALLMONITOR_Ready($)
    return DevIo_OpenDev($hash, 1, "FB_CALLMONITOR_DoInit");
 
 }
+
+sub
+FB_CALLMONITOR_reverseSearch($$)
+{
+my ($hash, $number) = @_;
+my $name = $hash->{NAME};
+my $result;
+my $invert_match = undef;
+
+
+# Using Cache if enabled
+if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+{
+   if(defined($hash->{helper}{CACHE}{$number}))
+   {
+      Log GetLogLevel($name, 4), "FB_CALLMONITOR $name using cache for reverse search of $number";
+      if($hash->{helper}{CACHE}{$number} ne "timeout")
+      {
+         return ($hash->{helper}{CACHE}{$number} ne "unknown" ? $hash->{helper}{CACHE}{$number} : undef) ;
+      }
+   }
+}
+
+# Ask klicktel.de
+if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "klicktel")
+{
+  $result = GetFileFromURL("http://www.klicktel.de/inverssuche/index/search?_dvform_posted=1&phoneNumber=".$number, 5);
+  if(not defined($result))
+  {
+     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+     {
+       $hash->{helper}{CACHE}{$number} = "timeout";
+       return undef;
+     }
+  }
+  else
+  {
+    #Log 2, $result;
+   if($result =~ /<a class="namelink" href=".+?">.*?<span class="fn">(.+?)<\/span>.*?<\/a>/)
+   {
+     $invert_match = $1;
+     # char replacing todo;
+     $hash->{helper}{CACHE}{$number} = $invert_match if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     return $invert_match;
+   }
+  }
+}
+
+# Ask dasoertliche.de
+if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "dasoertliche")
+{
+  $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5);
+  if(not defined($result))
+  {
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+    {
+       $hash->{helper}{CACHE}{$number} = "timeout";
+       return undef;
+    }
+    
+  }
+  else
+  {
+   #Log 2, $result;
+   if($result =~ /getItemData\('.*?', '.*?', '.*?', '.*?', '.*?', '(.*?)', '.*?', '.*?', '.*?'\);/)
+   {
+     $invert_match = $1;
+     # char replacing todo
+     $hash->{helper}{CACHE}{$number} = $invert_match if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     return $invert_match;
+   }
+  }
+}
+
+ 
+# If no result is available set cache result and return undefined 
+$hash->{helper}{CACHE}{$number} = "unknown";
+return undef 
+} 
+
 
 1;
 
@@ -248,7 +336,17 @@ FB_CALLMONITOR_Ready($)
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notiy">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a name="reverse-search">reverse-search</a> (all|klicktel|dasoertliche|none)</li>
+    Activate the reverse searching of the external number (at dial and call receiving).
+    It is possible to select a specific web service, which should be used for reverse searching.
+    If the attribute is set to "all", the reverse search will reverse search on all websites until a valid answer is found on of them 
+    If is set to "none", then no reverse searching will be used.<br><br>Default value is "none".<br><br>
+    <li><a name="reverse-search-cache">reverse-search-cache</a></li>
+    If this attribute is activated each reverse-search result is saved in an internal cache
+    and will be used instead of reverse searching again the same number.<br><br>
+    Possible values: 0 => off , 1 => on<br>
+    Default Value is 0 (off)
   </ul>
   <br>
  
