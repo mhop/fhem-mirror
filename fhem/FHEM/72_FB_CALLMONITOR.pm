@@ -87,7 +87,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 reverse-search:all,klicktel,dasoertliche,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -97,7 +97,7 @@ FB_CALLMONITOR_Define($$)
 {
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-
+  
   if(@a != 3) {
     my $msg = "wrong syntax: define <name> FB_CALLMONITOR ip[:port]";
     Log 2, $msg;
@@ -109,7 +109,10 @@ FB_CALLMONITOR_Define($$)
   my $dev = $a[2];
   $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
+  InternalTimer(gettimeofday()+3, "FB_CALLMONITOR_loadCacheFile", $hash, 0);
 
+  
+  
 
 
   $hash->{DeviceName} = $dev;
@@ -217,14 +220,16 @@ if(AttrVal($name, "reverse-search-cache", "0") eq "1")
       Log GetLogLevel($name, 4), "FB_CALLMONITOR $name using cache for reverse search of $number";
       if($hash->{helper}{CACHE}{$number} ne "timeout")
       {
-         return ($hash->{helper}{CACHE}{$number} ne "unknown" ? $hash->{helper}{CACHE}{$number} : undef) ;
+         return $hash->{helper}{CACHE}{$number};
       }
    }
 }
 
 # Ask klicktel.de
-if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "klicktel")
-{
+if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "klicktel.de")
+{ 
+  Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name using klicktel.de for reverse search of $number";
+   
   $result = GetFileFromURL("http://www.klicktel.de/inverssuche/index/search?_dvform_posted=1&phoneNumber=".$number, 5);
   if(not defined($result))
   {
@@ -236,21 +241,23 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
   }
   else
   {
-    #Log 2, $result;
-   if($result =~ /<a class="namelink" href=".+?">.*?<span class="fn">(.+?)<\/span>.*?<\/a>/)
+   
+   if($result =~ /<a class="namelink" href=".+?">(.+?)<\/a>/)
    {
      $invert_match = $1;
-     # char replacing todo;
-     $hash->{helper}{CACHE}{$number} = $invert_match if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
      return $invert_match;
    }
   }
 }
 
 # Ask dasoertliche.de
-if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "dasoertliche")
+if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "dasoertliche.de")
 {
-  $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5);
+  Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name using dasoertliche.de for reverse search of $number";
+  
+  $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 7);
   if(not defined($result))
   {
     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -266,8 +273,8 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
    if($result =~ /getItemData\('.*?', '.*?', '.*?', '.*?', '.*?', '(.*?)', '.*?', '.*?', '.*?'\);/)
    {
      $invert_match = $1;
-     # char replacing todo
-     $hash->{helper}{CACHE}{$number} = $invert_match if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
      return $invert_match;
    }
   }
@@ -279,6 +286,93 @@ $hash->{helper}{CACHE}{$number} = "unknown";
 return "unknown";
 } 
 
+sub FB_CALLMONITOR_html2txt($)
+{
+
+my ($string) = @_;
+
+$string =~ s/&nbsp;/ /g;
+$string =~ s/(\xe4|&auml;)/ä/g;
+$string =~ s/(\xc4|&Auml;)/Ä/g;
+$string =~ s/(\xf6|&ouml;)/ö/g;
+$string =~ s/(\xd6|&Ouml;)/Ö/g;
+$string =~ s/(\xfc|&uuml;)/ü/g;
+$string =~ s/(\xdc|&Uuml;)/Ü/g;
+$string =~ s/(\xdf|&szlig;)/ß/g;
+$string =~ s/<.+?>//g;
+$string =~ s/(^\s+|\s+$)//g;
+
+return $string;
+
+}
+
+
+sub FB_CALLMONITOR_writeToCache($$$)
+{
+  my ($hash, $number, $txt) = @_;
+  my $name = $hash->{NAME};
+  my $file = AttrVal($name, "reverse-search-cache-file", "");
+
+  
+  $file =~ s/(^\s+|\s+$)//g;
+  
+  $hash->{helper}{CACHE}{$number} = $txt;
+  
+  if($file ne "")
+  {
+    Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name opening cache file $file";
+    if(open(CACHEFILE, ">>$file"))
+    {
+       print CACHEFILE "$number|$txt\n";
+       close(CACHEFILE); 
+    }
+    else
+    {
+       Log 2, "FB_CALLMONITOR: $name could not open cache file";
+    }
+  }
+
+
+}
+
+sub FB_CALLMONITOR_loadCacheFile($)
+{
+  my ($hash) = @_;
+  my $file = AttrVal($hash->{NAME}, "reverse-search-cache-file", "");
+  my @cachefile;
+  my @tmpline;
+  
+  $file =~ s/(^\s+|\s+$)//g;
+  
+  if($file ne "")
+  {
+    Log 2, "FB_CALLMONITOR: loading cache file $file";
+    if(open(CACHEFILE, "$file"))
+    {
+       @cachefile = <CACHEFILE>;
+       close(CACHEFILE);
+       
+       foreach my $line (@cachefile)
+       {
+        if(not $line =~ /^\s*$/)
+        {
+          $line =~ s/\n//g;
+          
+	  @tmpline = split("\\|", $line);
+	
+	  if(@tmpline == 2)
+	  {
+	    $hash->{helper}{CACHE}{$tmpline[0]} = $tmpline[1];
+	  }
+         }
+       } 
+    }
+    else
+    {
+       Log 2, "FB_CALLMONITOR: could not open cache file";
+    }
+  }
+}
 
 1;
 
@@ -337,7 +431,7 @@ return "unknown";
     <li><a href="#do_not_notiy">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
-    <li><a name="reverse-search">reverse-search</a> (all|klicktel|dasoertliche|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
     If the attribute is set to "all", the reverse search will reverse search on all websites until a valid answer is found on of them 
@@ -347,6 +441,9 @@ return "unknown";
     and will be used instead of reverse searching again the same number.<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)
+    <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
+    Write the internal reverse-search-cache to the given file and use it next time FHEM starts.
+    So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.
   </ul>
   <br>
  
@@ -355,6 +452,7 @@ return "unknown";
   <ul>
   <li><b>event</b>: (call|ring|connect|disconnect) - which event in detail was triggerd</li>
   <li><b>external_number</b>: $number - The participants number which is calling (event: ring) or beeing called (event: call)</li>
+  <li><b>external_name</b>: $name - The result of the reverse lookup of the external_number via internet. Is only available if reverse-search is activated.</li>
   <li><b>internal_number</b>: $number - The internal number (fixed line, VoIP number, ...) on which the participant is calling (event: ring) or is used for calling (event: call)</li>
   <li><b>internal_connection</b>: $connection - The internal connection (FON1, FON2, ISDN, DECT, ...) which is used to take the call</li>
   <li><b>external_connection</b>: $connection - The external connection (fixed line, VoIP account) which is used to take the call</li>
