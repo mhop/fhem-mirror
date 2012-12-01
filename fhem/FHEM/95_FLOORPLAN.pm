@@ -213,13 +213,11 @@ FP_CGI(){
 	$FP_arrange_default = undef;
 	$FP_arrange_selected = undef;
 	my $dev = undef;
-	my @devs = devspec2array("*");
-	foreach my $fp (@devs) {
+	foreach my $fp (keys %defs) {
 	   if (AttrVal($fp, "fp_default", undef)) {									   # use floorplan with attr fp_default
 			$FP_name = $fp;
 			$FW_subdir = "/floorplan/$fp";
 			$FP_arrange = AttrVal($fp, "fp_arrange", undef);
-
 	   }
 	}
   }  
@@ -448,12 +446,12 @@ FP_show(){
         if ($fp_image) {
             my $state = ReadingsVal($d, "state", undef);
 	    $fp_image =~ s/\{state\}/$state/;                                                 # replace {state} by actual device-status
-            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;    # replace icon-link in html - deactivated by Boris        
+            $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_image\"/;    # replace icon-link in html
         }
         if ($fp_fpimage) {
             my $state = ReadingsVal($d, "state", undef);
             $fp_fpimage =~ s/\{state\}/$state/;                                           # replace {state} by actual device-status
-            #$txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;  # replace icon-link in html - deactivated by Boris
+            $txt =~ s/\<img\ src\=\"(.*)\"/\<img\ src\=\"\/fhem\/icons\/$fp_fpimage\"/;  # replace icon-link in html
         }
 	FW_pO "<td colspan=\"$cols\">$txt";
 	FW_pO "</td></tr>";
