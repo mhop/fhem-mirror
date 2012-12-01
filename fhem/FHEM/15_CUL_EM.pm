@@ -136,8 +136,9 @@ CUL_EM_Parse($$)
     }
 
     # correct counter wraparound
-    if($total_cnt< $total_cnt_last) {
-      $basis_cnt += 65536;
+    if($total_cnt < $total_cnt_last) {
+      # check: real wraparound or reset only
+      $basis_cnt += ($total_cnt_last > 65000 ? 65536 : $total_cnt_last);
       $readings{basis} = $basis_cnt;
     }
 
