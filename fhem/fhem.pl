@@ -3003,8 +3003,9 @@ fhemTimeGm($$$$$$) {
     
     $year+= 1900;
     my $isleapyear= $year % 4 ? 0 : $year % 100 ? 1 : $year % 400 ? 0 : 1;
-    my $leapyears= int((($year-1)-1968)/4 - (($year-1)-1900)/100 + (($year-1)-1600)/400);
-    #Debug sprintf("%02d.%02d.%04d %02d:%02d:%02d", $mday,$month+1,$year,$hour,$min,$sec);
+    # here the Wikipedia as at 2012-12-01 is wrong and that code line is right
+    my $leapyears= int(($year-1968)/4 - ($year-1900)/100 + ($year-1600)/400);
+    #Debug sprintf("%02d.%02d.%04d %02d:%02d:%02d %d leap years, is leap year: %d", $mday,$month+1,$year,$hour,$min,$sec,$leapyears,$isleapyear);
 
     if ( $^O eq 'MacOS' ) {
       $year-= 1904;
