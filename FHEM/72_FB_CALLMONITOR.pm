@@ -231,7 +231,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      if(AttrVal($name, "reverse-search-cache", "0") eq "1")
      {
        $hash->{helper}{CACHE}{$number} = "timeout";
-       return undef;
+       return "timeout";
      }
   }
   else
@@ -256,7 +256,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
     {
        $hash->{helper}{CACHE}{$number} = "timeout";
-       return undef;
+       return "timeout";
     }
     
   }
@@ -276,7 +276,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
  
 # If no result is available set cache result and return undefined 
 $hash->{helper}{CACHE}{$number} = "unknown";
-return undef 
+return "unknown";
 } 
 
 
