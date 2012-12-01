@@ -22,10 +22,6 @@
 #
 ##############################################################################
 
-# Todos:
-#  Support recurring events
-
-
 use strict;
 use warnings;
 use HttpUtils;
@@ -246,16 +242,25 @@ sub modeChanged {
 
 # converts a date/time string to the number of non-leap seconds since the epoch
 # 20120520T185202Z: date/time string in ISO8601 format, time zone GMT
+# 20121129T222200: date/time string in ISO8601 format, time zone local
 # 20120520:         a date string has no time zone associated
 sub tm {
   my ($t)= @_;
-  #main::debug "convert $t";
+  return undef if(!$t);
+  #main::debug "convert >$t<";
   my ($year,$month,$day)= (substr($t,0,4), substr($t,4,2),substr($t,6,2));
   if(length($t)>8) {
       my ($hour,$minute,$second)= (substr($t,9,2), substr($t,11,2),substr($t,13,2));
-      return main::fhemTimeGm($second,$minute,$hour,$day,$month-1,$year-1900);
+      my $z;
+      $z= substr($t,15,1) if(length($t) == 16);
+      #main::debug "$day.$month.$year $hour:$minute:$second $z";
+      if($z) {
+        return main::fhemTimeGm($second,$minute,$hour,$day,$month-1,$year-1900);
+      } else {
+        return main::fhemTimeLocal($second,$minute,$hour,$day,$month-1,$year-1900);
+      }
   } else {
-      #main::debug "$day $month $year";
+      #main::debug "$day.$month.$year";
       return main::fhemTimeLocal(0,0,0,$day,$month-1,$year-1900);
   }
 }
@@ -322,6 +327,17 @@ sub ts0 {
   return sprintf("%02d.%02d.%2d %02d:%02d", $day,$month+1,$year-100,$hour,$minute);
 }
 
+sub plusNMonths($$) {
+  my ($tm, $n)= @_;
+  my ($second,$minute,$hour,$day,$month,$year,$wday,$yday,$isdst)= localtime($tm);
+  #main::debug "Adding $n months to $day.$month.$year $hour:$minute:$second= " . ts($tm);
+  $month+= $n;
+  $year+= int($month / 12);
+  $month %= 12;
+  #main::debug " gives $day.$month.$year $hour:$minute:$second= " . ts(main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year));
+  return main::fhemTimeLocal($second,$minute,$hour,$day,$month,$year);
+}
+
 sub fromVEvent {
   my ($self,$vevent)= @_;
 
@@ -332,6 +348,13 @@ sub fromVEvent {
   $self->{lastModified}= tm($vevent->value("LAST-MODIFIED"));
   $self->{summary}= $vevent->value("SUMMARY");
   $self->{location}= $vevent->value("LOCATION");
+
+  #Dates to exclude in reoccuring rule
+  my @exdate;
+  @exdate= split(",", $vevent->value("EXDATE")) if($vevent->value("EXDATE"));
+  @exdate = map { tm($_) } @exdate;
+  $self->{exdate} = \@exdate;
+
   #$self->{summary}=~ s/;/,/g;
 
   #
@@ -343,16 +366,24 @@ sub fromVEvent {
   if($rrule) {
     my @rrparts= split(";", $rrule);
     my %r= map { split("=", $_); } @rrparts;
-    #foreach my $k (keys %r) {
-    #  main::debug "Rule part $k is $r{$k}";
-    #}
-    my $freq= $r{"FREQ"};
-    #
-    # weekly
-    #
-    if($freq eq "WEEKLY") {
-      # my @weekdays= split(",",$r{"BYDAY"});# BYDAY is not always set
+
+    foreach my $k (keys %r) {
+      if( $k ne "FREQ" and $k ne "INTERVAL" and $k ne "UNTIL" and $k ne "COUNT" and $k ne "BYMONTHDAY") {
+        main::Log 2, "Calendar: RRULE $rrule is not supported";
+      }
     }
+
+    $self->{freq} =  $r{"FREQ"};
+    #According to RFC, interval defaults to 1
+    $self->{interval} = exists($r{"INTERVAL"}) ? $r{"INTERVAL"} : 1;
+    $self->{until} = tm($r{"UNTIL"}) if(exists($r{"UNTIL"}));
+    $self->{count} = $r{"COUNT"} if(exists($r{"COUNT"}));
+    $self->{bymonthday} = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"}));
+    
+
+    # advanceToNextOccurance until we are in the future
+    my $t = time();
+    while($self->{end} < $t and $self->advanceToNextOccurance()) { ; }
   }
   
 
@@ -425,6 +456,53 @@ sub startTime {
 sub endTime {
   my ($self)= @_;
   return ts($self->{end});
+}
+
+sub advanceToNextOccurance {
+  my ($self) = @_;
+  # See RFC 2445 page 39 and following
+
+  return if(!exists($self->{freq})); #This event is not reoccuring
+  return if(exists($self->{count}) and $self->{count} == 0); #We are already at the last occurance
+
+  #There are no leap seconds in epoch time
+  #Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
+  my  $nextstart = $self->{start};
+  do
+  {
+    if($self->{freq} eq "SECONDLY") {
+      $nextstart += $self->{interval};
+    } elsif($self->{freq} eq "MINUTELY") {
+      $nextstart += 60*$self->{interval};
+    } elsif($self->{freq} eq "HOURLY") {
+      $nextstart += 60*60*$self->{interval};
+    } elsif($self->{freq} eq "DAILY") {
+      $nextstart += 60*60*24*$self->{interval};
+    } elsif($self->{freq} eq "WEEKLY") {
+      $nextstart += 7*60*60*24*$self->{interval};
+    } elsif($self->{freq} eq "MONTHLY") {
+      # here we ignore BYMONTHDAY as we consider the day of month of $self->{start}
+      # to be equal to BYMONTHDAY.
+      $nextstart= plusNMonths($nextstart, $self->{interval});
+    } elsif($self->{freq} eq "YEARLY") {
+      $nextstart= plusNMonths($nextstart, 12*$self->{interval});
+    } else {
+      main::Log 1, "Calendar: event frequency '" . $self->{freq} . "' not implemented";
+      return;
+    }
+
+  # Loop if nextstart is in the "dates to exclude"
+  } while(exists($self->{exdate}) and ($nextstart ~~ $self->{exdate}));
+
+  #the UNTIL clause is inclusive, so $newt == $self->{until} is okey
+  return if(exists($self->{until}) and $nextstart > $self->{until});
+  $self->{count} -= 1 if(exists($self->{count}));
+
+  my $duration = $self->{end} - $self->{start};
+  $self->{start} = $nextstart;
+  $self->{end} = $self->{start} + $duration;
+  main::Log 5, "Next time of $self->{summary} is: start " . ts($self->{"start"}) . ", end " . ts($self->{"end"});
+  return 1;
 }
 
 
@@ -640,10 +718,12 @@ sub Calendar_CheckTimes($) {
 
   # we now run over all events and update the readings 
   my @allevents= $eventsObj->events();
+  my @endedevents= grep { $_->isEnded($t) } @allevents;
+  foreach (@endedevents) { $_->advanceToNextOccurance(); }
+
   my @upcomingevents= grep { $_->isUpcoming($t) } @allevents;
   my @alarmedevents= grep { $_->isAlarmed($t) } @allevents;
   my @startedevents= grep { $_->isStarted($t) } @allevents;
-  my @endedevents= grep { $_->isEnded($t) } @allevents;
 
   my $event;
   #main::debug "Updating modes...";
@@ -695,11 +775,12 @@ sub Calendar_GetUpdate($) {
   my $url= $hash->{fhem}{url};
   
   my $ics= GetFileFromURLQuiet($url);
+  #my $ics= CustomGetFileFromURL(0, $url, undef, undef, 1);
   if(!defined($ics)) {
     Log 1, "Calendar " . $hash->{NAME} . ": Could not retrieve file at URL";
     return 0;
   }
-
+  
   # we parse the calendar into a recursive ICal::Entry structure
   my $ical= ICal::Entry->new("root");
   $ical->parse(split("\n",$ics));
