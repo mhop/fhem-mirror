@@ -10,8 +10,8 @@ use POSIX;
 
 sub MAXLAN_Parse($$);
 sub MAXLAN_Read($);
-sub MAXLAN_Write($$);
-sub MAXLAN_ReadAnswer($);
+sub MAXLAN_Write(@);
+sub MAXLAN_ReadSingleResponse($$);
 sub MAXLAN_SimpleWrite(@);
 sub MAXLAN_Poll($);
 sub MAXLAN_SendDeviceCmd($$);
@@ -29,8 +29,7 @@ my %device_types = (
 
 my @boost_durations = (0, 5, 10, 15, 20, 25, 30, 60);
 
-#Time after which we reconnect after a failed connection attempt
-my $reconnect_interval = 5; #seconds
+my $reconnect_interval = 2; #seconds
 
 #the time it takes after sending one command till we see its effect in the L: response
 my $roundtriptime = 3; #seconds
@@ -49,7 +48,6 @@ MAXLAN_Initialize($)
 
 # Provider
   $hash->{ReadFn}  = "MAXLAN_Read";
-  $hash->{WriteFn} = "MAXLAN_Write";
   $hash->{SetFn}   = "MAXLAN_Set";
   $hash->{Clients} = ":MAX:";
   my %mc = (
@@ -71,15 +69,15 @@ MAXLAN_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  if(@a < 3 or @a > 4) {
-    my $msg = "wrong syntax: define <name> MAXLAN ip[:port] [pollintervall]";
+  if(@a < 3) {
+    my $msg = "wrong syntax: define <name> MAXLAN ip[:port] [pollintervall [ondemand]]";
     Log 2, $msg;
     return $msg;
   }
-  DevIo_CloseDev($hash);
 
-  my $name = $a[0];
-  my $dev = $a[2];
+  my $name = shift @a;
+  shift @a;
+  my $dev = shift @a;
   $dev .= ":62910" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
   if($dev eq "none") {
@@ -87,37 +85,86 @@ MAXLAN_Define($$)
     $attr{$name}{dummy} = 1;
     return undef;
   }
+  $hash->{INTERVAL} = $defaultPollInterval;
+  $hash->{persistent} = 1;
+  if(@a) {
+    $hash->{INTERVAL} = shift @a;
+    while(@a) {
+      my $arg = shift @a;
+      if($arg eq "ondemand") {
+        $hash->{persistent} = 0;
+      } else {
+        my $msg = "unknown argument $arg";
+        Log 1, $msg;
+        return $msg;
+      }
+    }
+  }
+
+  $hash->{cubeTimeDifference} = 99999;
+  $hash->{pairmode} = 0;
   $hash->{PARTIAL} = "";
   $hash->{DeviceName} = $dev;
-  $hash->{INTERVAL} = @a > 3 ? $a[3] : $defaultPollInterval;
   #This interface is shared with 14_CUL_MAX.pm
   $hash->{SendDeviceCmd} = \&MAXLAN_SendDeviceCmd;
   $hash->{RemoveDevice} = \&MAXLAN_RemoveDevice;
 
-
-  MAXLAN_Connect($hash);
+  #Wait until all device definitions have been loaded
+  InternalTimer(gettimeofday()+1, "MAXLAN_Poll", $hash, 0);
 }
 
+sub
+MAXLAN_IsConnected($)
+{
+  return exists($_[0]->{FD});
+}
+
+
+#Disconnects from the Cube. It is safe to call this when already disconnected.
+sub
+MAXLAN_Disconnect($)
+{
+  my $hash = shift;
+  Log 5, "MAXLAN_Disconnect";
+  #All operations here are no-op if already disconnected
+  DevIo_CloseDev($hash);
+  RemoveInternalTimer($hash);
+}
+
+#Connects to the Cube. If already connected, disconnects first.
 sub
 MAXLAN_Connect($)
 {
   my $hash = shift;
 
-  #Close connection (if there is a previous one)
-  DevIo_CloseDev($hash);
-
-  RemoveInternalTimer($hash);
-
-  $hash->{gothello} = 0;
+  return if(MAXLAN_IsConnected($hash));
 
   delete($hash->{NEXT_OPEN}); #work around the connection rate limiter in DevIo
-
-  my $ret = DevIo_OpenDev($hash, 0, "MAXLAN_DoInit");
-  if($hash->{STATE} ne "opened"){
-    Log 3, "Scheduling reconnect attempt in $reconnect_interval seconds";
-    InternalTimer(gettimeofday()+$reconnect_interval, "MAXLAN_Connect", $hash, 0);
+  my $ret = DevIo_OpenDev($hash, 0, "");
+  if(!MAXLAN_IsConnected($hash)) {
+    my $msg = "MAXLAN_Connect: Could not connect";
+    Log 2, $msg;
+    return $msg;
   }
-  return $ret;
+
+  #Read initial configuration data
+  MAXLAN_ExpectAnswer($hash,"H:");
+  MAXLAN_ExpectAnswer($hash,"M:");
+  my $rmsg;
+  do
+  {
+    #Receive one "C:" per device
+    $rmsg = MAXLAN_ReadSingleResponse($hash, 1);
+    MAXLAN_Parse($hash, $rmsg);
+  } until($rmsg =~ m/^L:/);
+  #At the end, the cube sends a "L:"
+  
+  #Handle deferred setting of time
+  if(AttrVal($hash->{NAME},"set-clock-on-init","1") && $hash->{cubeTimeDifference} > 1) {
+    MAXLAN_Set($hash,$hash->{NAME},"clock");
+  }
+
+  return undef; 
 }
 
 
@@ -126,9 +173,8 @@ sub
 MAXLAN_Undef($$)
 {
   my ($hash, $arg) = @_;
-  RemoveInternalTimer($hash);
-  MAXLAN_Write($hash,"q:");
-  DevIo_CloseDev($hash); 
+  #MAXLAN_Write($hash,"q:"); #unnecessary
+  MAXLAN_Disconnect($hash);
   return undef;
 }
 
@@ -142,11 +188,11 @@ MAXLAN_Set($@)
 
   if($setting eq "pairmode"){
     if(@args > 0 and $args[0] eq "cancel") {
-      MAXLAN_Write($hash,"x:");
-      return MAXLAN_ExpectAnswer($hash,"N:");
+      MAXLAN_Write($hash,"x:", "N:");
     } else {
       my $duration = 60;
       $duration = $args[0] if(@args > 0);
+      $hash->{pairmode} = 1;
       MAXLAN_Write($hash,"n:".sprintf("%04x",$duration));
       $hash->{STATE} = "pairing";
     }
@@ -154,13 +200,7 @@ MAXLAN_Set($@)
   }elsif($setting eq "raw"){
     MAXLAN_Write($hash,$args[0]);
 
-  }elsif($setting eq "clock"){
-    if(!exists($hash->{rfaddr})){
-      Log 5, "Defering the setting of time until after hello";
-      $hash->{setTimeOnHello} = 1;
-      return;
-    }
-
+  }elsif($setting eq "clock") {
     #This encodes the winter/summer timezones, its meaning is not entirely clear
     my $timezones = "Q0VUAAAKAAMAAA4QQ0VTVAADAAIAABwg";
 
@@ -168,19 +208,16 @@ MAXLAN_Set($@)
     #time format the cube uses. Something based on ntp I guess. Maybe this only works in GMT+1?
     my $time = time()-946684774;
     my $rmsg = "v:".$timezones.",".sprintf("%08x",$time);
-    MAXLAN_Write($hash,$rmsg);
-    my $answer = MAXLAN_ReadAnswer($hash);
-    if($answer ne "A:"){
-      Log 1, "Failed to set clock, answer was $answer, expected A:";
-    }else{
-      Dispatch($hash, "MAX,CubeClockState,$hash->{rfaddr},1", {RAWMSG => $rmsg});
-    }
+    my $ret = MAXLAN_Write($hash,$rmsg, "A:");
+    Dispatch($hash, "MAX,CubeClockState,$hash->{rfaddr},1", {RAWMSG => $rmsg}) if(!$ret);
+    return $ret;
 
   }elsif($setting eq "factoryReset") {
     MAXLAN_RequestReset($hash);
 
   }elsif($setting eq "reconnect") {
-    MAXLAN_Connect($hash);
+    MAXLAN_Disconnect($hash);
+    MAXLAN_Connect($hash) if($hash->{persistent});
   }else{
     return "Unknown argument $setting, choose one of pairmode raw clock factoryReset reconnect";
   }
@@ -191,8 +228,8 @@ sub
 MAXLAN_ExpectAnswer($$)
 {
   my ($hash,$expectedanswer) = @_;
-  my $rmsg = MAXLAN_ReadAnswer($hash);
-  return "Error while receiving" if(!defined($rmsg)); #error is already logged in MAXLAN_ReadAnswer
+  my $rmsg = MAXLAN_ReadSingleResponse($hash, 1);
+  return "Error while receiving" if(!defined($rmsg)); #error is already logged in MAXLAN_ReadSingleResponse
 
   my $ret = undef;
   if($rmsg !~ m/^$expectedanswer/) {
@@ -206,18 +243,19 @@ MAXLAN_ExpectAnswer($$)
 
 #####################################
 sub
-MAXLAN_ReadAnswer($)
+MAXLAN_ReadSingleResponse($$)
 {
-  my ($hash) = @_;
+  my ($hash,$waitForResponse) = @_;
 
   #Read until we have a complete line
   until($hash->{PARTIAL} =~ m/\n/) {
     my $buf = DevIo_SimpleRead($hash);
     if(!defined($buf)){
-      Log 1, "MAXLAN_ReadAnswer: error during read";
+      Log 1, "MAXLAN_ReadSingleResponse: error during read";
       return undef; #error occured
     }
     $hash->{PARTIAL} .= $buf;
+    last if(!$waitForResponse);
   }
 
   my $rmsg;
@@ -229,12 +267,18 @@ MAXLAN_ReadAnswer($)
 my %lhash;
 
 #####################################
+#Sends given msg and checks for/parses the answer
 sub
-MAXLAN_Write($$)
+MAXLAN_Write(@)
 {
-  my ($hash,$msg) = @_;
-  
+  my ($hash,$msg,$expectedAnswer) = @_;
+  my $ret = undef;
+
+  MAXLAN_Connect($hash); #It's a no-op if already connected
   MAXLAN_SimpleWrite($hash, $msg);
+  $ret = MAXLAN_ExpectAnswer($hash, $expectedAnswer) if($expectedAnswer);
+  MAXLAN_Disconnect($hash) if(!$hash->{persistent} && !$hash->{pairmode});
+  return $ret;
 }
 
 #####################################
@@ -244,18 +288,11 @@ MAXLAN_Read($)
 {
   my ($hash) = @_;
 
-  my $buf = DevIo_SimpleRead($hash);
-  return "" if(!defined($buf));
-  my $name = $hash->{NAME};
-
-  $hash->{PARTIAL} .= $buf;
-
-  #while we have a complete line
-  while($hash->{PARTIAL} =~ m/\n/) {
-    my $rmsg;
-    ($rmsg,$hash->{PARTIAL}) = split("\n", $hash->{PARTIAL}, 2);
-    $rmsg =~ s/\r//;#remove \r
-    MAXLAN_Parse($hash, $rmsg) if($rmsg);
+  while(1) {
+    my $rmsg = MAXLAN_ReadSingleResponse($hash, 0);
+    last if(!$rmsg);
+    Log 2, "Unsolicated response from Cube: $rmsg";
+    MAXLAN_Parse($hash, $rmsg);
   }
 }
 
@@ -309,26 +346,8 @@ MAXLAN_SendMetadata($)
   for(my $i=0;$i < $numpackages; $i++) {
     my $package = substr($metadata,$i*$blocksize,$blocksize);
 
-    MAXLAN_Write($hash,"m:".sprintf("%02d",$i).",".$package);
-    my $answer = MAXLAN_ReadAnswer($hash);
-    if($answer ne "A:"){
-      Log 1, "SendMetadata got response $answer, expected 'A:'";
-      return;
-    }
+    return MAXLAN_Write($hash,"m:".sprintf("%02d",$i).",".$package, "A:");
   }
-}
-
-sub
-MAXLAN_FinishConnect($)
-{
-  my ($hash) = @_;
-  #Handle deferred setting of time (L: is the last response after connection before the cube starts to idle)
-  if(defined($hash->{setTimeOnHello})) {
-    MAXLAN_Set($hash,$hash->{NAME},"clock");
-    delete $hash->{setTimeOnHello};
-  }
-  #Enable polling timer
-  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MAXLAN_Poll", $hash, 0)
 }
 
 sub
@@ -375,6 +394,7 @@ MAXLAN_Parse($$)
                           + $cubedatetime->{minute} - $min);
       Log 3, "Cube thinks it is $cubedatetime->{day}.$cubedatetime->{month}.$cubedatetime->{year} $cubedatetime->{hour}:$cubedatetime->{minute}";
       Log 3, "Time difference is $difference minutes";
+      $hash->{cubeTimeDifference} = $difference;
     }
 
     Dispatch($hash, "MAX,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
@@ -424,6 +444,7 @@ MAXLAN_Parse($$)
       $hash->{devices}[-1]->{serial} = $groupsdevices[$i+2];
       $hash->{devices}[-1]->{name} = $groupsdevices[$i+3];
       $hash->{devices}[-1]->{groupid} = $groupsdevices[$i+4];
+      #Dispatch($hash, "MAX,define,$hash->{devices}[-1]->{addr},$device_types{$hash->{devices}[-1]->{type}},$hash->{devices}[-1]->{serial},$hash->{devices}[-1]->{groupid},1", {RAWMSG => $rmsg});
     }
 
     #Log $ll5, "Got Metadata, hash: ".Dumper($hash);
@@ -525,11 +546,6 @@ MAXLAN_Parse($$)
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
     } # while(length($bindata))
 
-    if(!$hash->{gothello}) {
-      # "L:..." is the last response after connection before the cube starts to idle
-      $hash->{gothello} = 1;
-      MAXLAN_FinishConnect($hash);
-    }
   }elsif($cmd eq "N"){#New device paired
     if(@args==0){
       $hash->{STATE} = "initalized"; #pairing ended
@@ -539,20 +555,20 @@ MAXLAN_Parse($$)
     Log 2, "Paired new device, type $device_types{$type}, addr $addr, serial $serial";
     Dispatch($hash, "MAX,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
 
+    $hash->{pairmode} = 0;
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
     MAXLAN_RequestConfiguration($hash,$addr);
   } elsif($cmd eq "A"){#Acknowledged
-    Log 3, "Got stray Acknowledged from cube, this should be read by MAXLAN_ReadAnswer";
 
   } elsif($cmd eq "S"){#Response to s:
-    my $dutycycle = hex($args[0]); #number of command send over the air
+    $hash->{dutycycle} = hex($args[0]); #number of command send over the air
     my $discarded = $args[1];
-    my $freememoryslot = $args[2];
-    Log 5, "dutycyle $dutycycle, freememoryslot $freememoryslot";
+    $hash->{freememoryslot} = $args[2];
+    Log 5, "dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
 
-    Log 3, "1% rule: we sent too much, cmd is now in queue" if($dutycycle == 100 && $freememoryslot > 0);
-    Log 3, "1% rule: we sent too much, queue is full, cmd discarded" if($dutycycle == 100 && $freememoryslot == 0);
-    Log 3, "Command was discarded" if($discarded);
+    Log 3, "1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
+    Log 2, "1% rule: we sent too much, queue is full" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} == 0);
+    Log 2, "Command was discarded" if($discarded);
     return "Command was discarded" if($discarded);
   } else {
     Log $ll5, "$name Unknown command $cmd";
@@ -576,9 +592,9 @@ MAXLAN_SimpleWrite(@)
   my $ret = syswrite($hash->{TCPDev}, $msg);
   #TODO: none of those conditions detect if the connection is actually lost!
   if(!$hash->{TCPDev} || !defined($ret) || !$hash->{TCPDev}->connected) {
-      Log GetLogLevel($name,1), 'MAXLAN_SimpleWrite failed';
-      MAXLAN_Connect($hash);
-    }
+    Log GetLogLevel($name,1), 'MAXLAN_SimpleWrite failed';
+    MAXLAN_Disconnect($hash);
+  }
 }
 
 ########################
@@ -586,7 +602,6 @@ sub
 MAXLAN_DoInit($)
 {
   my ($hash) = @_;
-  $hash->{gothello} = 0;
   return undef;
 }
 
@@ -594,8 +609,7 @@ sub
 MAXLAN_RequestList($)
 {
   my $hash = shift;
-  MAXLAN_Write($hash, "l:");
-  return MAXLAN_ExpectAnswer($hash, "L:");
+  return MAXLAN_Write($hash, "l:", "L:");
 }
 
 #####################################
@@ -604,21 +618,32 @@ MAXLAN_Poll($)
 {
   my $hash = shift;
 
-  return if(!$hash->{FD});
-
-  if(!defined(MAXLAN_RequestList($hash))) {
-    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MAXLAN_Poll", $hash, 0);
+  if(MAXLAN_IsConnected($hash)) {
+    my $ret = MAXLAN_RequestList($hash);
+    Log 1, "MAXLAN_Poll: Did not get any answer" if($ret);
   } else {
-    Log 1, "MAXLAN_Poll: Did not get any answer";
+    #Connecting gives us a RequestList for free
+    my $ret = MAXLAN_Connect($hash);
+    if($ret) {
+      #Connecting failed
+      InternalTimer(gettimeofday()+$reconnect_interval, "MAXLAN_Poll", $hash, 0);
+      return;
+    }
   }
+
+  if(!$hash->{persistent} && !$hash->{pairmode}) {
+    MAXLAN_Disconnect($hash);
+  }
+
+  InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MAXLAN_Poll", $hash, 0);
 }
 
+#This only works for a device that got just paired
 sub
 MAXLAN_RequestConfiguration($$)
 {
   my ($hash,$addr) = @_;
-  MAXLAN_Write($hash,"c:$addr");
-  MAXLAN_ExpectAnswer($hash, "C:");
+  return MAXLAN_Write($hash,"c:$addr", "C:");
 }
 
 #Sends command to a device and waits for acknowledgment
@@ -626,19 +651,21 @@ sub
 MAXLAN_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
-  MAXLAN_Write($hash,"s:".encode_base64($payload,""));
+  my $ret = MAXLAN_Write($hash,"s:".encode_base64($payload,""), "S:");
+  #Reschedule a poll in the near future after the cube will
+  #have gotten an answer
   RemoveInternalTimer($hash);
   InternalTimer(gettimeofday()+$roundtriptime, "MAXLAN_Poll", $hash, 0);
-  return MAXLAN_ExpectAnswer($hash, "S:");
+  return $ret;
 }
 
-#Resets the cube, i.e. does a factory reset. All pairings will be lost.
+#Resets the cube, i.e. do a factory reset. All pairings will be lost from the cube
+#(but you will have to manually reset each individual device.
 sub
 MAXLAN_RequestReset($)
 {
   my $hash = shift;
-  MAXLAN_Write($hash,"a:");
-  MAXLAN_ExpectAnswer($hash, "A:");
+  return MAXLAN_Write($hash,"a:", "A:");
 }
 
 #Remove the device from the cube, i.e. deletes the pairing
@@ -646,8 +673,7 @@ sub
 MAXLAN_RemoveDevice($$)
 {
   my ($hash,$addr) = @_;
-  MAXLAN_Write($hash,"t:1,1,".encode_base64(pack("H6",$addr),""));
-  MAXLAN_ExpectAnswer($hash, "A:");
+  return MAXLAN_Write($hash,"t:1,1,".encode_base64(pack("H6",$addr),""), "A:");
 }
 
 1;
@@ -662,20 +688,22 @@ MAXLAN_RemoveDevice($$)
   The MAXLAN is the fhem module for the eQ-3 MAX! Cube LAN Gateway.
   <br><br>
   The fhem module makes the MAX! "bus" accessible to fhem, automatically detecting paired MAX! devices. (The devices themselves are handled by the <a href="#MAX">MAX</a> module).<br>
-  The MAXLAN module keeps a persistant connection to the cube. The cube only allows one connection at a time, so neither the Max! Software or the
+  The MAXLAN module keeps a persistent connection to the cube. The cube only allows one connection at a time, so neither the Max! Software or the
   Max! internet portal can be used at the same time.
   <br>
 
   <a name="MAXLANdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; MAXLAN &lt;ip-address&gt;[:port] [&lt;pollintervall&gt;]</code><br>
+    <code>define &lt;name&gt; MAXLAN &lt;ip-address&gt;[:port] [&lt;pollintervall&gt; [ondemand]]</code><br>
     <br>
     port is 62910 by default. (If your Cube listens on port 80, you have to update the firmware with
     the official MAX! software).
     If the ip-address is called none, then no device will be opened, so you
     can experiment without hardware attached.<br>
     The optional parameter &lt;pollintervall&gt; defines the time in seconds between each polling of data from the cube.<br>
+    You may provide the option <code>ondemand</code> forcing the MAXLAN module to tear-down the connection as often as possible
+    thus making the cube usable by other applications or the web portal.
   </ul>
   <br>
 
@@ -689,7 +717,7 @@ Setting pairmode to "cancel" puts the cube out of pairing mode.</li>
     Sends the raw &lt;data&gt; to the cube.</li>
     <li>clock<br>
     Sets the internal clock in the cube to the current system time of fhem's machine. You can add<br>
-    <code>set ml clock</code><br>
+    <code>attr ml set-clock-on-init</code><br>
     to your fhem.cfg to do this automatically on startup.</li>
     <li>factorReset<br>
       Reset the cube to factory defaults.</li>
@@ -710,6 +738,8 @@ Setting pairmode to "cancel" puts the cube out of pairing mode.</li>
   <a name="MAXLANattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>set-clock-on-init<br>
+      (Default: 1). Automatically call "set clock" after connecting to the cube.
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#attrdummy">dummy</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
