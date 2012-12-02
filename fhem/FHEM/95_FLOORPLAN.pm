@@ -840,6 +840,7 @@ FP_input(@)
 		<a href="#plotsize">plotsize</a><br>
 		<a href="#webname">webname</a><br>
 		<a href="#redirectCmds">redirectCmds</a><br>
+		<a href="#longpoll">longpoll</a><br>
     </ul>
     </li><br>
   </ul>
@@ -849,4 +850,155 @@ FP_input(@)
 
 
 =end html
+=begin html_DE
+
+<a name="FLOORPLAN"></a>
+<h3>FLOORPLAN</h3>
+<ul>
+  Fügt dem fhem-Menü einen zusätzlichen Menüpunkt "Floorplans" hinzu, dre zu einer Anzeige ohne fhem-Menü, Räume oder device-Listen führt.
+  Geräte können an einer festlegbaren Koordinate auf dem Bildschirm angezeigt werden, üblicherweise mit einem anklickbaren icon, das das Ein- oder Aus-Schalten
+  des Geräts durch klicken erlaubt. Ein Hintergrundbild kann verwendet werden - z.B. ein Grundriss oder jegliches andere Bild.
+  Mit floorplanstyle.css kann die Formatierung angepasst werden.<br>
+  Eine Schritt-für-Schritt-Anleitung zur Einrichtung ist verfügbar in
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide.pdf">Englisch</a> und
+  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/docs/fhem-floorplan-installation-guide_de.pdf">Deutsch</a>. <br>
+  <br>
+
+  <a name="FLOORPLANdefine"></a>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; FLOORPLAN </code>
+    <br><br>
+
+    <b>Hinweis:</b> Speichern Sie Ihr Hintergrundbild mit dem Dateinamen fp_&lt;name&gt;.png in Ihrem icon_ordner (www/images/default , www/pgm2 or FHEM) .<br><br>
+    Beispiel:
+    <ul>
+      <code>
+	  define Grundriss FLOORPLAN<br>
+	  fp_Grundriss.png
+	  </code><br>
+    </ul>
+  </ul>
+  <br>
+
+  <a name="FLOORPLANset"></a>
+  <b>Set</b>
+  <ul>
+      <li>N/A</li>
+  </ul>
+  <br>
+
+  <a name="FLOORPLANget"></a>
+  <b>Get </b>
+  <ul>
+      <li>N/A</li>
+  </ul>
+  <br>
+
+  <a name="FLOORPLANattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <li><a name="fp_fpname">userattr fp_&lt;name&gt; &lt;top&gt;,&lt;left&gt;[,&lt;style&gt;[,&lt;description&gt;]]</a><br><br>
+    A <a href="#userattr">userattr</a> fp_&lt;name&gt; wird automatisch angelegt, sofern es noch nicht existiert.<br>
+	<ul>
+      <li>top   = Bildschirmposition, pixel vom oberen Bildschirmrand</li>
+      <li>left  = Bildschirmposition, pixel vom linken Bildschirmrand</li>
+      <li>style =
+		<ul>
+			<li>0  nur icon/Status</li>
+			<li>1  Gerätename und icon/Status</li>
+			<li>2  Gerätename, icon/Status und Kommandos</li>
+			<li>3  Geräte-reading und optionale Beschreibung</li>
+			<li>4  S300TH-spezifisch, zeigt Temperatur und Luftfeuchtigkeit an</li>
+			<li>5  icon/Status und Kommandos (ohne Gerätename)</li>
+			<li>6  Geräte-reading, Zeitstempel und optionale Beschreibung</li>
+		</ul>
+	  </li>
+      <li>Eine ggf. angegebene Bschreibung wird anstelle des original-Gerätenamens angezeigt.</li>
+    </ul></li><br>
+    Beispiele:<br>
+    <ul>
+		<table>
+			<tr><td><code>attr lamp1 fp_Erdgeschoss 100,100</code></td><td><code>#display lamp1 with icon only at screenposition 100,100</code></td></tr>
+			<tr><td><code>attr lamp2 fp_Erdgeschoss 100,140,1,Art-Deco</code></td><td><code>#display lamp2 with description 'Art-Deco-Light' at 100,140</code></td></tr>
+			<tr><td><code>attr lamp2 fp_ErsteEtage  130,100,1</code></td><td><code>#display the same device at different positions on other floorplans</code></td></tr>
+			<tr><td><code>attr myFHT fp_Erdgeschoss 300,20,10,Temperature</code></td><td><code>#display given Text + FHT-temperature</code></td></tr>
+		</table>
+	</ul>
+	<b>Hinweis:</b> Die Parameter müssen ohne Leerstellen aneinandergereiht werden.<br><br>
+
+
+    <li><a name="fp_arrange">fp_arrange</a><br>
+  	  Aktiviert den "arrange-Modus" der ein zusätzliches Menü anzeigt,
+	  mit dem Geräte auf dem Bildschirm angeordnet werden können. Dabei können die Koordinaten auch durch Platzieren mit der Maus gesetzt werden.<br>
+	  Beispiel:
+	<ul>
+      <code>attr Erdgeschoss fp_arrange 1</code><br>
+	  <code>attr Erdgeschoss fp_arrange detail  #Zeigt die Geräte mit den Infos Raum, Typ und Alias</code><br>
+	  <code>attr Erdgeschoss fp_arrange WEB     #Aktiviert den arrange-Modus nur für die Webinstanz WEB</code><br><br>
+    </ul>
+    </li>
+    <li><a name="stylesheet">stylesheet</a><br>
+	Ermöglicht die Verwendung eines eigenen css-stylesheet für Ihren floorplan. Dieses Attribut hat Vorrang vor dem Standard-stylesheet.
+	Das Standard-stylesheet für floorplans ist <code>floorplanstyle.css</code>. Falls <a href="#stylesheetPrefix">stylesheetPrefix</a> in der korrespondierenden FHEMWEB-Instanz gesetzt ist, wird dieser
+	<code>stylesheetPrefix</code> auch dem stylesheet für floorplans vorangestellt (prepend).<br>
+	Alle stylesheets werden im stylesheet-Ordner des fhem-Dateisystems abgelegt. Legen Sie dort 
+	Ihr eigenes stylesheet neben  <code>floorplanstyle.css</code> in demselben Ordner ab.<br>
+	Beispiel:
+	<ul>
+       <code>attr Erdgeschoss stylesheet myfloorplanstyle.css</code><br><br>
+    </ul>
+    </li>
+
+	<li><a name="fp_default">fp_default</a><br>
+	Der floorplan-Startbildschirm wird übersprungen wenn dieses Attribut einem der von Ihnen definierten floorplans zugeordnet ist.
+	</li>
+    Beispiel:
+	<ul>
+      <code>attr Erdgeschoss fp_default 1</code><br><br>
+    </ul>
+
+	<li><a name="fp_noMenu">fp_noMenu</a><br>
+	Blendet das floorplans-Menü aus, das normalerweise am linken Bildschirmrand angezeigt wird.
+	</li>
+    Beispiel:
+	<ul>
+      <code>attr Erdgeschoss fp_noMenu 1</code><br><br>
+    </ul>
+
+    <li><a name="commandfield">commandfield</a><br>
+	Fügt Ihrem floorplan ein fhem-Kommandofeld hinzu.
+	</li>
+    Beispiel:
+	<ul>
+      <code>attr Erdgeschoss commandfield 1</code><br><br>
+    </ul>
+	
+    <li><a name="fp_backgroundimg">fp_backgroundimg</a><br>
+	Gestattet die Bennung eine Hintergundbilds unabhängig vom floorplan-Namen.<br>
+    <b>Hinweis:</b> Das Attribut kann mittels notify geändert werden, um z.B. unterschiedliche Hintergundbidlder am Tag oder in der Nacht anzuzeigen.<br>
+    Beispiel:
+	<ul>
+      <code>attr Erdgeschoss fp_backgroundimg foobar.png</code><br><br>
+    </ul>
+
+    <li><a name="fp_inherited">Vererbt von FHEMWEB</a><br>
+	Die folgenden Attribute werden von der zugrundliegenden <a href="#FHEMWEB">FHEMWEB</a>-Instanz vererbt:<br>
+    <ul>
+		<a href="#smallscreen">smallscreen</a><br>
+		<a href="#touchpad">touchpad</a><br>
+		<a href="#refresh">refresh</a><br>
+		<a href="#plotmode">plotmode</a><br>
+		<a href="#plotsize">plotsize</a><br>
+		<a href="#webname">webname</a><br>
+		<a href="#redirectCmds">redirectCmds</a><br>
+		<a href="#longpoll">longpoll</a><br>
+    </ul>
+    </li><br>
+  </ul>
+  <br>
+</ul>
+
+=end html_DE
+
 =cut
