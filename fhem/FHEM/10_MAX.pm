@@ -52,11 +52,16 @@ MAX_Define($$)
 
   my $type = $a[2];
   my $addr = lc($a[3]); #all addr should be lowercase
+  if(exists($modules{MAX}{defptr}{$addr})) {
+    my $msg = "MAX_Define: Device with addr $addr is already defined";
+    Log 1, $msg;
+    return $msg;
+  }
   Log 5, "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
   $hash->{STATE} = "waiting for data";
-  $hash->{isMAXLAN} = 0;
+  $hash->{usingCube} = 0;
   $modules{MAX}{defptr}{$addr} = $hash;
 
   $hash->{internals}{interfaces} = $interfaces{$type};
@@ -79,9 +84,8 @@ MAX_Set($@)
   my ($hash, $devname, @a) = @_;
   my ($setting, @args) = @a;
 
-  return "Cannot set without IODev" if(!exists($hash->{IODev}));
-
   if($setting eq "desiredTemperature"){
+    return "Cannot set without IODev" if(!defined($hash->{IODev}));
     return "can only set desiredTemperature for HeatingThermostat" if($hash->{type} ne "HeatingThermostat");
     return "missing a value" if(@args == 0);
 
@@ -129,12 +133,13 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   }elsif($setting eq "groupid"){
+    return "Cannot set without IODev" if(!defined($hash->{IODev}));
     return "argument needed" if(@args == 0);
 
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},pack("CCCCCCH6CC",0x00,0x00,34,0x00,0x00,0x00,$hash->{addr},0x00,$args[0]));
 
-  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "temperatureOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ]) {
-
+  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ]) {
+    return "Cannot set without IODev" if(!exists($hash->{IODev}));
     return "can only set configuration for HeatingThermostat" if($hash->{type} ne "HeatingThermostat");
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
@@ -145,7 +150,7 @@ MAX_Set($@)
     my $minimumTemperature = ReadingsVal($hash->{NAME},"minimumTemperature","");
     my $windowOpenTemperature = ReadingsVal($hash->{NAME},"windowOpenTemperature","");
     my $windowOpenDuration = ReadingsVal($hash->{NAME},"windowOpenDuration","");
-    my $temperatureOffset = ReadingsVal($hash->{NAME},"temperatureOffset","");
+    my $measurementOffset = ReadingsVal($hash->{NAME},"measurementOffset","");
 
     return "Invalid comfortTemperature"    if($comfortTemperature eq "" or $comfortTemperature < 4.5 or $comfortTemperature > 30.5);
     return "Invalid ecoTemperature"        if($ecoTemperature eq "" or $ecoTemperature < 4.5 or $ecoTemperature > 30.5);
@@ -153,34 +158,36 @@ MAX_Set($@)
     return "Invalid minimumTemperature"    if($minimumTemperature eq "" or $minimumTemperature < 4.5 or $minimumTemperature > 30.5);
     return "Invalid windowOpenTemperature" if($windowOpenTemperature eq "" or $windowOpenTemperature < 4.5 or $windowOpenTemperature > 30.5);
     return "Invalid windowOpenDuration"    if($windowOpenDuration eq "" or $windowOpenDuration < 0 or $windowOpenDuration > 60);
-    return "Invalid temperatureOffset"     if($temperatureOffset eq "" or $temperatureOffset < -3.5 or $temperatureOffset > 3.5);
+    return "Invalid measurementOffset"     if($measurementOffset eq "" or $measurementOffset < -3.5 or $measurementOffset > 3.5);
 
     my $comfort = int($comfortTemperature*2);
     my $eco = int($ecoTemperature*2);
     my $max = int($maximumTemperature*2);
     my $min = int($minimumTemperature*2);
-    my $offset = int(($temperatureOffset + 3.5)*2);
+    my $offset = int(($measurementOffset + 3.5)*2);
     my $windowOpenTemp = int($windowOpenTemperature*2);
     my $windowOpenTime = int($windowOpenDuration/5);
 
     my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,17,0x00,0x00,0x00,$hash->{addr},0x00,
                                               $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+
   }elsif($setting eq "removeDevice") {
+    return "Cannot set without IODev" if(!defined($hash->{IODev}));
     if(exists($hash->{IODev}{RemoveDevice})) {
       return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
     } else {
       return "IODev does not need removeDevice";
     }
+
   }else{
+    my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
 
-      my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
-
-      return "Unknown argument $setting, choose one of desiredTemperature:eco,boost,comfort,$templist ecoTemperature:$templist comfortTemperature:$templist temperatureOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid$removeDevice";
+      return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid$removeDevice";
     } else {
       return "Unknown argument $setting, choose one of groupid$removeDevice";
     }
@@ -240,7 +247,8 @@ MAX_Parse($$)
       $shash->{serial} = $serial;
     }
     $shash->{groupid} = $args[2];
-    $shash->{isMAXLAN} = $args[3];
+    $shash->{usingCube} = $args[3];
+    $shash->{IODev} = $hash;
 
   } elsif($msgtype eq "HeatingThermostatState") {
 
@@ -252,7 +260,7 @@ MAX_Parse($$)
     my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
-    my $untilStr = MAX_ParseDateTime($until1,$until2,$until3)->{str};
+    my $untilStr = defined($until3) ? MAX_ParseDateTime($until1,$until2,$until3)->{str} : "";
     my $measuredTemperature = $until2/10;
     #If the control mode is not "temporary", the cube sends the current (measured) temperature
     $measuredTemperature = "" if($mode == 2 || $measuredTemperature == 0);
@@ -269,9 +277,9 @@ MAX_Parse($$)
     #my $valveposition = $args[6];
     #my $measuredTemperature = "";
 
-    #The HeatingThermostat uses the temperatureOffset during control
+    #The HeatingThermostat uses the measurementOffset during control
     #but does not apply it to measuredTemperature before sending it to us
-    $measuredTemperature += $shash->{temperatureOffset} if($measuredTemperature ne "" and exists($shash->{temperatureOffset}));
+    $measuredTemperature += $shash->{measurementOffset} if($measuredTemperature ne "" and exists($shash->{measurementOffset}));
 
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
@@ -322,7 +330,7 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "comfortTemperature", $args[1]);
     readingsBulkUpdate($shash, "boostValveposition", $args[2]);
     readingsBulkUpdate($shash, "boostDuration", $args[3]);
-    readingsBulkUpdate($shash, "temperatureOffset", $args[4]);
+    readingsBulkUpdate($shash, "measurementOffset", $args[4]);
     readingsBulkUpdate($shash, "maximumTemperature", $args[5]);
     readingsBulkUpdate($shash, "minimumTemperature", $args[6]);
     readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
@@ -415,8 +423,8 @@ MAX_Parse($$)
       For devices of type HeatingThermostat only. Writes the given eco temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
     <li>comfortTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given comfort temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
-    <li>temperatureOffset &lt;value&gt;<br>
-      For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. The thermostat tries to match desiredTemperature to (measuredTemperature+temperatureOffset). Usually, the measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small negative offset. Must be between -3.5 and 3.5 degree.</li>
+    <li>measurementOffset &lt;value&gt;<br>
+      For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. The thermostat tries to match desiredTemperature to (measured temperature at sensor + measurementOffset). Usually, the measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small negative offset. Must be between -3.5 and 3.5 degree.</li>
     <li>minimumTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given minimum temperature to the device's memory. It confines the temperature that can be manually set on the device.</li>
     <li>maximumTemperature &lt;value&gt;<br>
