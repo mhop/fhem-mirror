@@ -8,14 +8,25 @@ use warnings;
 
 sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
+sub CUL_MAX_BroadcastTime($);
+sub CUL_MAX_Set($@);
 
 # Todo for full MAXLAN replacement:
-# - Implement msgcnt
-# - Broadcast TimeInformation every 6 hours
-# - Pairing
 # - Send Ack on ShutterContactState (but never else)
 
 my $pairmodeDuration = 30; #seconds
+
+my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
+
+#TODO: this is duplicated in MAXLAN
+my %device_types = (
+  0 => "Cube",
+  1 => "HeatingThermostat",
+  2 => "HeatingThermostatPlus",
+  3 => "WallMountedThermostat",
+  4 => "ShutterContact",
+  5 => "PushButton"
+);
 
 sub
 CUL_MAX_Initialize($)
@@ -46,8 +57,8 @@ CUL_MAX_Define($$)
   return "wrong syntax: define <name> CUL_MAX <srdAddr>" if(@a<3);
 
   if(exists($modules{CUL_MAX}{defptr})) {
-    Log 1, "There is already on CUL_MAX defined";
-    return "There is already on CUL_MAX defined";
+    Log 1, "There is already one CUL_MAX defined";
+    return "There is already one CUL_MAX defined";
   }
   $modules{CUL_MAX}{defptr} = $hash;
 
@@ -55,11 +66,13 @@ CUL_MAX_Define($$)
   $hash->{STATE} = "Defined";
   $hash->{cnt} = 0;
   $hash->{pairmode} = 0;
+  $hash->{devices} = ();
   AssignIoPort($hash);
 
   #This interface is shared with 00_MAXLAN.pm
   $hash->{SendDeviceCmd} = \&CUL_MAX_SendDeviceCmd;
 
+  CUL_MAX_BroadcastTime($hash);
   return undef;
 }
 
@@ -68,6 +81,7 @@ sub
 CUL_MAX_Undef($$)
 {
   my ($hash, $name) = @_;
+  RemoveInternalTimer($hash);
   return undef;
 }
 
@@ -87,7 +101,7 @@ CUL_MAX_Set($@)
 
   if($setting eq "pairmode") {
     $hash->{pairmode} = 1;
-    InternalTimer(gettimeofday()+$pairmodeDuration, "CUL_MAXLAN_DisablePairmode", $hash, 0);
+    InternalTimer(gettimeofday()+$pairmodeDuration, "CUL_MAX_DisablePairmode", $hash, 0);
   } else {
     return "Unknown argument $setting, choose one of pairmode";
   }
@@ -95,9 +109,6 @@ CUL_MAX_Set($@)
 }
 
 ###################################
-my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "BCAST", "Bit3",
-                     "BURST", "BIDI", "RPTED", "RPTEN");
-
 my %msgTypes = ( #Receiving:
                  "00" => "PairPing",
                  "02" => "Ack",
@@ -107,6 +118,7 @@ my %msgTypes = ( #Receiving:
                );
 my %sendTypes = (#Sending:
                  "PairPong" => "01",
+                 "TimeInformation" => "03",
                  #"40" => "SetTemperature",
                  #"11" => "SetConfiguration",
                  #"F1" => "WakeUp",
@@ -124,20 +136,18 @@ CUL_MAX_Parse($$)
   my $shash = $modules{CUL_MAX}{defptr};
 
   $rmsg =~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/;
-  my ($len,$msgcnt,$msgFlag,$msgTypeRaw,$src,$dst,$zero,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
-  Log 1, "CUL_MAX_Parse: len mismatch" if(2*hex($len)+3 != length($rmsg)); #+3 = +1 for 'Z' and +2 for len field in hex
+  my ($len,$msgcnt,$msgFlagRaw,$msgTypeRaw,$src,$dst,$zero,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
+  $len = hex($len);
+  Log 1, "CUL_MAX_Parse: len mismatch" if(2*$len+3 != length($rmsg)); #+3 = +1 for 'Z' and +2 for len field in hex
   Log 1, "CUL_MAX_Parse zero = $zero" if($zero != 0);
 
-  my $msgFlLong = "";
-  for(my $i = 0; $i < @culHmCmdFlags; $i++) {
-      $msgFlLong .= ",$culHmCmdFlags[$i]" if(hex($msgFlag) & (1<<$i));
-  }
+  my $msgFlag = sprintf("%b",hex($msgFlagRaw));
 
   #convert adresses to lower case
   $src = lc($src);
   $dst = lc($dst);
 
-  Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlLong, msgTypeRaw $msgTypeRaw, src $src, dst $dst, payload $payload";
+  Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgTypeRaw, src $src, dst $dst, payload $payload";
   if(exists($msgTypes{$msgTypeRaw})) {
     my $msgType = $msgTypes{$msgTypeRaw};
     if($msgType eq "Ack") {
@@ -145,25 +155,30 @@ CUL_MAX_Parse($$)
       Log 5, "Got Ack";
 
     } elsif($msgType eq "TimeInformation") {
-      my ($f1,$f2,$f3,$f4,$f5) = unpack("CCCCC",pack("H*",$payload));
-      #For all fields but the month I'm quite sure
-      my $year = $f1 + 2000;
-      my $day  = $f2;
-      my $hour = ($f3 & 0x1F)+1;
-      my $min = $f4 & 0x3F;
-      my $sec = $f5 & 0x3F;
-      my $month = (($f4 >> 6) << 2) | ($f5 >> 6); #this is just guessed
-      my $unk1 = $f3 >> 5;
-      my $unk2 = $f4 >> 6;
-      my $unk3 = $f5 >> 6;
-      Log 5, "Got TimeInformation: year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
-
+      if($len == 10) {
+        Log 5, "Want TimeInformation?";
+      } else {
+        my ($f1,$f2,$f3,$f4,$f5) = unpack("CCCCC",pack("H*",$payload));
+        #For all fields but the month I'm quite sure
+        my $year = $f1 + 2000;
+        my $day  = $f2;
+        my $hour = ($f3 & 0x1F);
+        my $min = $f4 & 0x3F;
+        my $sec = $f5 & 0x3F;
+        my $month = (($f4 >> 6) << 2) | ($f5 >> 6); #this is just guessed
+        my $unk1 = $f3 >> 5;
+        my $unk2 = $f4 >> 6;
+        my $unk3 = $f5 >> 6;
+        #I guess the unk1,2,3 encode if we are in DST?
+        Log 5, "Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
+      }
     } elsif($msgType eq "PairPing") {
       my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
-      Log 5, "Got PairPing, unk1 $unk1, type $type, unk2 $unk2, serial $serial";
-      if($hash->{pairmode}) {
-        CUL_MAX_Send($hash, "PairPong", $src, "00");
+      Log 5, "Got PairPing (pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+      if($shash->{pairmode}) {
+        CUL_MAX_Send($shash, "PairPong", $src, "00", "00000000");
         #TODO: wait for Ack
+        Dispatch($shash, "MAX,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
         #TODO: send TimeInformation
       }
 
@@ -179,8 +194,18 @@ CUL_MAX_Parse($$)
 sub
 CUL_MAX_Send(@)
 {
-  my ($hash, $cmd, $dst, $payload) = @_;
-  return CUL_MAX_SendDeviceCmd($hash, pack("H*","0000".$sendTypes{$cmd}.$hash->{addr}.$dst."00".$payload));
+  my ($hash, $cmd, $dst, $payload, $flags) = @_;
+
+  $flags = "0"x8 if(!$flags);
+
+  return CUL_MAX_SendDeviceCmd($hash, pack("H2B8H*","00",$flags,$sendTypes{$cmd}.$hash->{addr}.$dst."00".$payload));
+}
+
+sub
+CUL_MAX_DeviceHash($)
+{
+  my $addr = shift @_;
+  return $modules{MAX}{defptr}{$addr};
 }
 
 sub
@@ -188,17 +213,45 @@ CUL_MAX_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
 
-  #If cnt is not right, we don't get a Ack (At least if count is too low - have to test more)
-  #TODO: cnt is per device, not global
-  $hash->{cnt} = ($hash->{cnt}+1) & 0xff;
-  substr($payload,3,3) = pack("H6",$hash->{addr});
-  substr($payload,0,1) = pack("C",$hash->{cnt});
-  $payload = pack("C",length($payload)) . $payload;
-  #Convert to hex
-  $payload = unpack("H*",$payload);
+  my $dstaddr = substr($payload,6,3);
+  my $dhash = CUL_MAX_DeviceHash($dstaddr);
 
+  #If cnt is not right, we don't get an Ack (At least if count is too low - have to test more)
+  #TODO: cnt is per device, not global
+  #$dhash->{READINGS}{msgcnt}{VAL} = ($dhash->{READINGS}{msgcnt}{VAL} + 1) & 0xFF;
+  my $cnt = 1;
+  #replace source address
+  substr($payload,3,3) = pack("H6",$hash->{addr});
+  #replace message counter
+  substr($payload,0,1) = pack("C",$cnt);
+  #Prefix length byte
+  $payload = pack("C",length($payload)) . $payload;
+
+  $payload = unpack("H*",$payload); #convert to hex
   Log 5, "CUL_MAX_SendDeviceCmd: ". $payload;
   IOWrite($hash, "", "Zs". $payload);
+  return undef;
+}
+
+sub
+CUL_MAX_BroadcastTime($)
+{
+  my $hash = shift @_;
+  my ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst) = gmtime(time());
+  $mon += 1; #make month 1-based
+  #month encoding is just guessed
+  #also $hour-1 is not so clear, maybe there is some timezone involved (maybe we should send gmtime?)
+  #but where do we send the timezone? or is scheduled data/until in GMT?
+  #perls localtime gives years since 1900, and we need years since 2000
+  my $payload = unpack("H*",pack("CCCCC", $year - 100, $day, $hour, $min | (($mon & 0x0C) << 4), $sec | (($mon & 0x03) << 6)));
+  Log 5, "CUL_MAX_BroadcastTime: payload $payload";
+  while (my ($addr, $dhash) = each (%{$modules{MAX}{defptr}})) {
+    if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash) {
+      Log 5, "broadcast time to $addr";
+      CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "00000011");
+    }
+  }
+  InternalTimer(gettimeofday()+$timeBroadcastInterval, "CUL_MAX_BroadcastTime", $hash, 0);
 }
 
 1;
