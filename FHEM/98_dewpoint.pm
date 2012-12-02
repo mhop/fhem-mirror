@@ -1,3 +1,4 @@
+# $Id$
 ##############################################
 #
 # Dewpoint computing 
@@ -22,14 +23,14 @@
 #
 # The GNU General Public License may also be found at http://www.gnu.org/licenses/gpl-2.0.html .
 #
-# $Id$
-#
 package main;
 use strict;
 use warnings;
 
 # Debug this module? YES = 1, NO = 0
 my $dewpoint_debug = 0;
+# default maximum time_diff for dewpoint
+my $dewpoint_time_diff_default = 1; # 1 Second
 
 ##########################
 sub
@@ -39,7 +40,7 @@ dewpoint_Initialize($)
   $hash->{DefFn}   = "dewpoint_Define";
   $hash->{NotifyFn} = "dewpoint_Notify";
   $hash->{NotifyOrderPrefix} = "10-";   # Want to be called before the rest
-  $hash->{AttrList} = "disable:0,1";
+  $hash->{AttrList} = "max_timediff disable:0,1";
 }
 
 
@@ -179,6 +180,7 @@ dewpoint_Notify($$)
 
   my $temperature = "";
   my $humidity = "";
+  my $time_diff;
 
   for (my $i = 0; $i < $max; $i++) {
     	my $s = $dev->{CHANGED}[$i];
@@ -206,20 +208,61 @@ dewpoint_Notify($$)
     		Log 1, "dewpoint_notify T: H:, temp=$temperature hum=$humidity" if ($dewpoint_debug == 1);
 	} elsif ($evName eq $temp_name.":") {
 		$temperature = $val;
-    		Log 1, "dewpoint_notify temperature! temp=$temperature" if ($dewpoint_debug == 1);
+    		Log 1, "dewpoint_notify temperature! dev=$devName, temp_name=$temp_name, temp=$temperature" if ($dewpoint_debug == 1);
 	} elsif ($evName eq $hum_name.":") {
 		$humidity = $val;
-    		Log 1, "dewpoint_notify humidity! hum=$humidity" if ($dewpoint_debug == 1);
+    		Log 1, "dewpoint_notify humidity! dev=$devName, hum_name=$hum_name, hum=$humidity" if ($dewpoint_debug == 1);
 	}
  
   }
 
   if ($n == -1) { $n = $max; }
 
-  if (($temperature eq "") || ($humidity eq "")) { return undef; } # no way to calculate dewpoint!
+  #if (($temperature eq "") || ($humidity eq "")) { return undef; } # no way to calculate dewpoint!
+
+  $time_diff = -1;
+  if (($humidity eq "") && (($temperature eq ""))) {
+	return undef;  # no way to calculate dewpoint!
+  } elsif (($humidity eq "") && (($temperature ne ""))) { 
+	# temperature set, but humidity not. Try to use a valid value from the appropiate reading
+	if (defined($dev->{READINGS}{$hum_name}{VAL}) && defined($dev->{READINGS}{$temp_name}{TIME})) {
+		# calculate time difference
+		$time_diff = time() - time_str2num($dev->{READINGS}{$hum_name}{TIME});
+
+		$humidity = $dev->{READINGS}{$hum_name}{VAL};
+		Log 1,">dev=$devName, hum_name=$hum_name, reference humidity=$humidity ($time_diff), temp=$temperature" if ($dewpoint_debug == 1);
+	} else { return undef; }
+	# Check if Attribute timeout is set
+	my $timeout = AttrVal($hash->{NAME},"max_timediff", undef);
+	if (defined($timeout)) {
+		Log 1,"dewpoint timeout=$timeout" if ($dewpoint_debug == 1); 
+	} else { 
+		$timeout = $dewpoint_time_diff_default;
+	}
+	if ($time_diff > 0 && $time_diff > $timeout) { return undef; }  
+  } elsif (($temperature eq "") && ($humidity ne "")) { 
+	# humdidity set, but temperature not. Try to use a valid value from the appropiate reading
+	if (defined($dev->{READINGS}{$temp_name}{VAL}) && defined($dev->{READINGS}{$temp_name}{TIME})) {
+		# calculate time difference
+		$time_diff = time() - time_str2num($dev->{READINGS}{$temp_name}{TIME});
+
+		$temperature = $dev->{READINGS}{$temp_name}{VAL};
+		Log 1,">dev=$devName, temp_name=$temp_name, reference temperature=$temperature ($time_diff), hum=$humidity" if ($dewpoint_debug == 1);
+	} else { return undef; }
+	# Check if Attribute timeout is set
+	my $timeout = AttrVal($hash->{NAME},"max_timediff", undef);
+	if (defined($timeout)) {
+		Log 1,"dewpoint timeout=$timeout" if ($dewpoint_debug == 1);
+	} else { 
+		$timeout = $dewpoint_time_diff_default;
+	}
+	if ($time_diff > 0 && $time_diff > $timeout) { return undef; }  
+  } 
 
   # We found temperature and humidity. so we can calculate dewpoint first
   
+  if ($humidity == 0) { return undef; }  # humdidity is no valid value to calculate dewpoint
+
   my $dewpoint = sprintf("%.1f", dewpoint_dewpoint($temperature,$humidity));
   Log 1, "dewpoint_notify: dewpoint=$dewpoint" if ($dewpoint_debug == 1);
 
@@ -244,6 +287,7 @@ dewpoint_Notify($$)
 		$dev->{READINGS}{$sensor}{VAL} = $current;
 		$dev->{CHANGED}[$n++] = $sensor . ": " . $current;
 	} else {
+		#Log 1,">dev=$devName, lastval='$lastval' devSTATE='".$dev->{STATE}."' state=".$dev->{READINGS}{state}{VAL}."'";
 		# state begins with "T:". append dewpoint or insert before BAT
 		if ($lastval =~ /BAT:/) {	
 			$current = $lastval;
@@ -251,7 +295,7 @@ dewpoint_Notify($$)
 		} else {
 			$current = $lastval." ".$sensor.": ".$dewpoint;
 		}
-		$dev->{STATE} = $current;
+		$dev->{STATE} = $current; 
 		$dev->{CHANGED}[$n++] = $current;
 	}
 
@@ -483,8 +527,8 @@ dewpoint_dewpoint($$)
     # condense on the wall because the wall is cold.
     # Set a switch on (alarm_siren) if alarm is on using notify.
     define dew_alarm1 dewpoint alarm roomsensor wallsensor 0
-    define roomsensor_alarm_on notify roomsensor.*fan:.*on set alarm_siren on
-    define roomsensor_alarm_off notify roomsensor.*fan:.*off set alarm_siren off
+    define roomsensor_alarm_on notify roomsensor.*alarm:.*on set alarm_siren on
+    define roomsensor_alarm_off notify roomsensor.*alarm:.*off set alarm_siren off
 
     # If you do not have a temperature sensor in/on the wall, you may also
     # compare the rooms dewpoint to the temperature of the same or another
@@ -505,6 +549,15 @@ dewpoint_dewpoint($$)
   <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
+    <li>max_timediff<br>
+        Maximum time difference in seconds allowed between the temperature and humidity values for a device. dewpoint uses the Readings for temperature or humidity if they are not delivered in the event. This is necessary for using dewpoint with event-on-change-reading. Also needed for sensors that do deliver temperature and humidity in different events like for example technoline sensors TX3TH.<br>
+If not set default is 1 second.
+      <br><br>
+      Examples:<PRE>
+# allow maximum time difference of 60 seconds
+define dew_all dewpoint dewpoint .*
+attr dew_all max_timediff 60
+    </li><br>
   </ul>
 </ul>
 
