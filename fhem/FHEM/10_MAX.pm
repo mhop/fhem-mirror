@@ -56,6 +56,7 @@ MAX_Define($$)
   $hash->{type} = $type;
   $hash->{addr} = $addr;
   $hash->{STATE} = "waiting for data";
+  $hash->{isMAXLAN} = 0;
   $modules{MAX}{defptr}{$addr} = $hash;
 
   $hash->{internals}{interfaces} = $interfaces{$type};
@@ -232,10 +233,8 @@ MAX_Parse($$)
       Log 1, "Device changed serial from $shash->{serial} to $serial" if($shash->{serial} and ($shash->{serial} ne $serial));
       $shash->{serial} = $serial;
     }
-    if(@args > 2){
-      my $groupid = $args[2];
-      $shash->{groupid} = $groupid;
-    }
+    $shash->{groupid} = $args[2];
+    $shash->{isMAXLAN} = $args[3];
 
   } elsif($msgtype eq "HeatingThermostatState") {
 
