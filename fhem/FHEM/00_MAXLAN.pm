@@ -377,7 +377,7 @@ MAXLAN_Parse($$)
       Log 3, "Time difference is $difference minutes";
     }
 
-    Dispatch($hash, "MAX,define,$hash->{rfaddr},Cube,$hash->{serial}", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
     Dispatch($hash, "MAX,CubeConnectionState,$hash->{rfaddr},1", {RAWMSG => $rmsg});
     Dispatch($hash, "MAX,CubeClockState,$hash->{rfaddr},$clockset", {RAWMSG => $rmsg});
     Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $clockset";
@@ -424,7 +424,6 @@ MAXLAN_Parse($$)
       $hash->{devices}[-1]->{serial} = $groupsdevices[$i+2];
       $hash->{devices}[-1]->{name} = $groupsdevices[$i+3];
       $hash->{devices}[-1]->{groupid} = $groupsdevices[$i+4];
-      Dispatch($hash, "MAX,define,$hash->{devices}[-1]->{addr},$device_types{$hash->{devices}[-1]->{type}},$hash->{devices}[-1]->{serial},$hash->{devices}[-1]->{groupid}", {RAWMSG => $rmsg});
     }
 
     #Log $ll5, "Got Metadata, hash: ".Dumper($hash);
@@ -444,7 +443,7 @@ MAXLAN_Parse($$)
 
     $len = $len+1; #The len field itself was not counted
 
-    Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {RAWMSG => $rmsg});
 
     if($len != length($bindata)) {
       Dispatch($hash, "MAX,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
@@ -538,7 +537,7 @@ MAXLAN_Parse($$)
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
     Log 2, "Paired new device, type $device_types{$type}, addr $addr, serial $serial";
-    Dispatch($hash, "MAX,define,$addr,$device_types{$type},$serial", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
 
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
     MAXLAN_RequestConfiguration($hash,$addr);
