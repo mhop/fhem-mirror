@@ -167,16 +167,22 @@ MAX_Set($@)
                                               $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
   }elsif($setting eq "removeDevice") {
-    return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
+    if(exists($hash->{IODev}{RemoveDevice})) {
+      return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
+    } else {
+      return "IODev does not need removeDevice";
+    }
   }else{
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
 
-      return "Unknown argument $setting, choose one of desiredTemperature:eco,boost,comfort,$templist ecoTemperature:$templist comfortTemperature:$templist temperatureOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid removeDevice";
+      my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
+
+      return "Unknown argument $setting, choose one of desiredTemperature:eco,boost,comfort,$templist ecoTemperature:$templist comfortTemperature:$templist temperatureOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid$removeDevice";
     } else {
-      return "Unknown argument $setting, choose one of groupid removeDevice";
+      return "Unknown argument $setting, choose one of groupid$removeDevice";
     }
   }
 }
