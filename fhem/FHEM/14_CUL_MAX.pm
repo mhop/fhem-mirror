@@ -114,7 +114,8 @@ my %msgTypes = ( #Receiving:
                  "02" => "Ack",
                  "03" => "TimeInformation",
                  "30" => "ShutterContactState",
-                 "60" => "HeatingThermostatState"
+                 "42" => "WallThermostatState", #by WallMountedThermostat
+                 "60" => "ThermostatState", #by HeatingThermostat
                );
 my %sendTypes = (#Sending:
                  "PairPong" => "01",
@@ -151,7 +152,7 @@ CUL_MAX_Parse($$)
   if(exists($msgTypes{$msgTypeRaw})) {
     my $msgType = $msgTypes{$msgTypeRaw};
     if($msgType eq "Ack") {
-      #The Ack payload for HeatingThermostats is 01HHHHHH where HHHHHH are the first 3 bytes of the HeatingThermostatState payload
+      #TODO: The Ack payload for HeatingThermostats is 01HHHHHH where HHHHHH are the first 3 bytes of the HeatingThermostatState payload
       Log 5, "Got Ack";
 
     } elsif($msgType eq "TimeInformation") {
@@ -170,15 +171,20 @@ CUL_MAX_Parse($$)
         my $unk2 = $f4 >> 6;
         my $unk3 = $f5 >> 6;
         #I guess the unk1,2,3 encode if we are in DST?
-        Log 5, "Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
+        Log 5, "CUL_MAX_Parse: Got TimeInformation: (in GMT) year $year, mon $month, day $day, hour $hour, min $min, sec $sec, unk ($unk1, $unk2, $unk3)";
       }
     } elsif($msgType eq "PairPing") {
       my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
-      Log 5, "Got PairPing (pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+      Log 5, "CUL_MAX_Parse: Got PairPing (pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
       if($shash->{pairmode}) {
+        Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
         CUL_MAX_Send($shash, "PairPong", $src, "00", "00000000");
         #TODO: wait for Ack
         Dispatch($shash, "MAX,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
+        if($device_types{$type} eq "HeatingThermostat" or $device_types{$type} eq "WallMountedThermostat") {
+          #This are the default values that a device has after factory reset or pairing
+          Dispatch($hash, "MAX,ThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
+        }
         #TODO: send TimeInformation
       }
 
@@ -186,7 +192,7 @@ CUL_MAX_Parse($$)
       Dispatch($shash, "MAX,$msgType,$src,$payload", {RAWMSG => $rmsg});
     }
   } else {
-    Log 2, "Got unhandled message type $msgTypeRaw";
+    Log 2, "CUL_MAX_Parse: Got unhandled message type $msgTypeRaw";
   }
   return undef;
 }
