@@ -219,6 +219,10 @@ MAXLAN_Set($@)
   }elsif($setting eq "reconnect") {
     MAXLAN_Disconnect($hash);
     MAXLAN_Connect($hash) if($hash->{persistent});
+
+  }elsif($setting eq "inject") {
+    MAXLAN_Parse($hash,$args[0]);
+
   }else{
     return "Unknown argument $setting, choose one of pairmode raw clock factoryReset reconnect";
   }
@@ -476,8 +480,9 @@ MAXLAN_Parse($$)
     #Seems that ShutterContact does not have any configdata
     if($devicetype == 0){#Cube
       #TODO: there is a lot of data left to interpret
-    }elsif($devicetype == 1){#HeatingThermostat
-      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset) = unpack("CCCCCCCCCCC",substr($bindata,18));
+    }elsif($devicetype == 1 or $devicetype == 3){#HeatingThermostat or #WallMountedThermostat
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCa*",substr($bindata,18));
+      #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration =  $boost_durations[$boost >> 5]; #in minutes
       #There is some trailing data missing, which maps to the weekly program
@@ -489,8 +494,9 @@ MAXLAN_Parse($$)
       $windowopentemp=$windowopentemp/2.0;
       $windowopendur=$windowopendur*5;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
-      Dispatch($hash, "MAX,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
-    }elsif($devicetype == 4){#ShutterContact TODO
+      Dispatch($hash, "MAX,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
+
+    }elsif($devicetype == 4){#ShutterContact
       Log 2, "ShutterContact send some configuration, but none was expected" if($len > 18);
     }else{ #TODO
       Log 2, "Got configdata for unimplemented devicetype $devicetype";
@@ -536,8 +542,8 @@ MAXLAN_Parse($$)
 
         if(!$shash) {
           Log 2, "Got List response for undefined device with addr $addr";
-        }elsif($shash->{type} eq "HeatingThermostat"){
-          Dispatch($hash, "MAX,HeatingThermostatState,$addr,$payload", {RAWMSG => $rmsg});
+        }elsif($shash->{type} eq "HeatingThermostat" or $shash->{type} eq "WallMountedThermostat"){
+          Dispatch($hash, "MAX,ThermostatState,$addr,$payload", {RAWMSG => $rmsg});
         }elsif($shash->{type} eq "ShutterContact"){
           Dispatch($hash, "MAX,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
         }else{
