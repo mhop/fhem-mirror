@@ -111,6 +111,7 @@ MAXLAN_Define($$)
 
   #Wait until all device definitions have been loaded
   InternalTimer(gettimeofday()+1, "MAXLAN_Poll", $hash, 0);
+  return undef;
 }
 
 sub
