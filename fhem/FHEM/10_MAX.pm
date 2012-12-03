@@ -84,9 +84,8 @@ MAX_Set($@)
   my ($hash, $devname, @a) = @_;
   my ($setting, @args) = @a;
 
-  if($setting eq "desiredTemperature"){
+  if($setting eq "desiredTemperature" and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!defined($hash->{IODev}));
-    return "can only set desiredTemperature for HeatingThermostat" if($hash->{type} ne "HeatingThermostat");
     return "missing a value" if(@args == 0);
 
     my $temperature;
@@ -138,9 +137,8 @@ MAX_Set($@)
 
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},pack("CCCCCCH6CC",0x00,0x00,34,0x00,0x00,0x00,$hash->{addr},0x00,$args[0]));
 
-  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ]) {
+  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
-    return "can only set configuration for HeatingThermostat" if($hash->{type} ne "HeatingThermostat");
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
 
@@ -180,14 +178,25 @@ MAX_Set($@)
       return "IODev does not need removeDevice";
     }
 
+  } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
+    return "Cannot set without IODev" if(!exists($hash->{IODev}));
+    return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
+
+    readingsSingleUpdate($hash, $setting, $args[0], 0);
+    my $payload = pack("CCCCCCH6CC",0x00,0x00,0x82,0x00,0x00,0x00,$hash->{addr},0x00, $args[0] ? 4 : 0);
+    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+
   }else{
     my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
+    my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
-      my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
 
       return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid$removeDevice";
+
+    } elsif($hash->{type} eq "WallMountedThermostat") {
+      return "Unknown argument $setting, choose one of displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist groupid$removeDevice";
     } else {
       return "Unknown argument $setting, choose one of groupid$removeDevice";
     }
@@ -229,7 +238,6 @@ MAX_Parse($$)
     $devicetype = $args[0] if($msgtype eq "define");
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
     $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState");
-    $devicetype = "HeatingThermostat" if($msgtype eq "HeatingThermostatConfig" or $msgtype eq "HeatingThermostatState");
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
     } else {
@@ -250,7 +258,7 @@ MAX_Parse($$)
     $shash->{usingCube} = $args[3];
     $shash->{IODev} = $hash;
 
-  } elsif($msgtype eq "HeatingThermostatState") {
+  } elsif($msgtype eq "ThermostatState") {
 
     my ($bits2,$valveposition,$temperaturesetpoint,$until1,$until2,$until3) = unpack("aCCCCC",pack("H*",$args[0]));
     my $mode = vec($bits2, 0, 2); #
@@ -294,7 +302,12 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     #This formatting must match with in MAX_Set:$templist
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$temperaturesetpoint));
-    readingsBulkUpdate($shash, "valveposition", $valveposition);
+    if($shash->{type} eq "HeatingThermostat") {
+      readingsBulkUpdate($shash, "valveposition", $valveposition);
+    } else {
+      #This is a WallMountedThermostat
+      readingsBulkUpdate($shash, "displayActualTemperature", $valveposition ? 1 : 0);
+    }
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", $measuredTemperature);
     }
@@ -324,7 +337,7 @@ MAX_Parse($$)
 
     readingsSingleUpdate($shash,"connection",$connected, 0);
 
-  } elsif($msgtype eq "HeatingThermostatConfig") {
+  } elsif($msgtype eq "ThermostatConfig") {
     readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "ecoTemperature", $args[0]);
     readingsBulkUpdate($shash, "comfortTemperature", $args[1]);
@@ -334,7 +347,7 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "maximumTemperature", $args[5]);
     readingsBulkUpdate($shash, "minimumTemperature", $args[6]);
     readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
-    readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
+    readingsBulkUpdate($shash, "windowOpenDuration", $args[8]) if($shash->{type} eq "HeatingThermostat");
     readingsEndUpdate($shash, 0);
 
   } elsif($msgtype eq "Error") {
