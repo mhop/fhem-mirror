@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 ################################################################
-# $Id: $
+# $Id$
 # vim: ts=2:et
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
@@ -22,7 +22,6 @@
 #  GNU General Public License for more details.
 #
 ################################################################
-
 use CGI qw(:standard Vars);
 use CGI::Carp qw(warningsToBrowser fatalsToBrowser);
 use DBI; #requires libdbd-sqlite3-perl
@@ -83,13 +82,13 @@ if(index($ua,"Fhem") > -1) {
 
 sub viewStatistics() {
   my $visLib        = googleVisualizationLib("'corechart','geochart','table'");
-  my $cOS           = drawPieChart("nodes","os","Operating System",400,300,"chart_os");
-  my $cArch         = drawPieChart("nodes","arch","Architecture",400,300,"chart_arch");
-  my $cRelease      = drawPieChart("nodes","release","FHEM Release",400,300,"chart_release");
-  my $cPerl         = drawPieChart("nodes","perl","Perl Version",400,300,"chart_perl");
-  #my $cModulesTop10 = drawColumnChartTop10Modules("modules","modulestop10",,"Used",825,300,"chart_modulestop10");
-  #my $cModDefTop10  = drawColumnChartTop10ModDef("modules","definitions","Definitions",825,300,"chart_moddeftop10");
-  my $cModules      = drawBarChartModules("modules","modules","Used","Definitions",825,600,"chart_modules");
+  my $cOS           = drawPieChart("nodes","os","Operating System",390,300,"chart_os");
+  my $cArch         = drawPieChart("nodes","arch","Architecture",390,300,"chart_arch");
+  my $cRelease      = drawPieChart("nodes","release","FHEM Release",390,300,"chart_release");
+  my $cPerl         = drawPieChart("nodes","perl","Perl Version",390,300,"chart_perl");
+  my $cModulesTop10 = drawColumnChartTop10Modules("modules","modulestop10",,"Used",800,300,"chart_modulestop10");
+  my $cModDefTop10  = drawColumnChartTop10ModDef("modules","definitions","Definitions",800,300,"chart_moddeftop10");
+  #my $cModules      = drawBarChartModules("modules","modules","Used","Definitions",800,600,"chart_modules");
   my $mWorld        = drawRegionsMap("locations","countryname","world","map_world");
   my $mEU           = drawRegionsMap("locations","countryname","150","map_europe");
   my $mWesternEU    = drawMarkersMap("locations","city","155","map_germany");
@@ -112,8 +111,8 @@ sub viewStatistics() {
                       },
                       $visLib,
                       $cOS, $cArch, $cRelease, $cPerl,
-                      # $cModulesTop10, $cModDefTop10,
-                      $cModules,
+                      $cModulesTop10, $cModDefTop10,
+                      #$cModules,
                       $mWorld, $mEU, $mWesternEU,
                       $tModules, $tModels,
                    ],
@@ -146,44 +145,47 @@ sub viewStatistics() {
 
     <h3>Fhem Statistics ($nodes submissions since $since)</h3>
     <h4>Installed on...</h4>
-    <div id="chart_os" style="float:left; border: 1px solid black; margin-right:25px;"></div>
+    <div id="chart_os" style="float:left; border: 1px solid black; margin-right:18px;"></div>
     <div id="chart_arch" style="float:left; border: 1px solid black;"></div>
     <div style="clear:both;"></div>
 
     <h4>Versions...</h4>
-    <div id="chart_release" style="float:left; border: 1px solid black; margin-right:25px;"></div>
+    <div id="chart_release" style="float:left; border: 1px solid black; margin-right:18px;"></div>
     <div id="chart_perl" style="float:left; border: 1px solid black;"></div>
     <div style="clear:both;"></div>
 
-<!-- graphs disabled
-//    <h4>Top 10 of most commonly used modules<small><sup>1</sup></small>...</h4>
-//    <div id="chart_modulestop10" style="width: 825px; height: 300px; border: 1px solid black;"></div>
-//    <small><sup>1</sup> excluded from graph: $excludeFromTop10modules</small>
-//
-//    <h4>Top 10 of total definitions by module<small><sup>1</sup></small>...</h4>
-//    <div id="chart_moddeftop10" style="width: 825px; height: 300px; border: 1px solid black;"></div>
-//    <small><sup>1</sup> excluded from graph: $excludeFromTop10definitions</small>
+    <h4>Top 10 of most commonly used modules<small><sup>1</sup></small>...</h4>
+    <div id="chart_modulestop10" style="width: 800px; height: 300px; border: 1px solid black;"></div>
+    <small><sup>1</sup> excluded from graph: $excludeFromTop10modules</small>
+
+    <h4>Top 10 of total definitions by module<small><sup>1</sup></small>...</h4>
+    <div id="chart_moddeftop10" style="width: 800px; height: 300px; border: 1px solid black;"></div>
+    <small><sup>1</sup> excluded from graph: $excludeFromTop10definitions</small>
+
+<!--
+//    <h4>Top 20 of most commonly used modules (with total definitions by module)...</h4>
+//    <div id="chart_modules" style="width: 825px; height: 600px; border: 1px solid black;"></div>
 //-->
-    <h4>Top 20 of most commonly used modules (with total definitions by module)...</h4>
-    <div id="chart_modules" style="width: 825px; height: 600px; border: 1px solid black;"></div>
 
     <h4>Locations worldwide...</h4>
-    <div id="map_world" style="width: 825px; height: 500px; border: 1px solid black;"></div>
+    <div id="map_world" style="width: 800px; height: 500px; border: 1px solid black;"></div>
 
     <h4>Locations in Europe...</h4>
-    <div id="map_europe" style="width: 825px; height: 500px; border: 1px solid black;"></div>
+    <div id="map_europe" style="width: 800px; height: 500px; border: 1px solid black;"></div>
 
     <h4>Locations in Western Europe...</h4>
-    <div id="map_germany" style="width: 825px; height: 500px; border: 1px solid black;"></div>
+    <div id="map_germany" style="width: 800px; height: 500px; border: 1px solid black;"></div>
 
-    <div style="float:left; width: 400px; margin-right:25px;">
+    <div style="float:left; width: 390px; margin-right:20px;">
       <h4>List of total used modules (with definitions)...</h4>
-      <div id="table_modules" style="width: 400px; border: 1px solid black;"></div>
+      <div id="table_modules" style="width: 390px; border: 1px solid black;"></div>
+      <small><strong>Note:</strong> Click on a column header for sorting</small>
     </div>
 
-    <div style="float:left; width: 400px;">
+    <div style="float:left; width: 390px;">
       <h4>List of defined models...</h4>
-      <div id="table_models" style="width: 400px; border: 1px solid black;"></div>
+      <div id="table_models" style="width: 390px; border: 1px solid black;"></div>
+      <small><strong>Note:</strong> Click on a column header for sorting</small>
     </div>
     <div style="clear:both;"></div>
 
@@ -233,11 +235,12 @@ sub drawPieChart(@) {
     ]);
 
     var options = {
-      title  : '$title',
-      width  : $width,
-      height : $height,
-      is3D   : true,
-      tooltip : { showColorCode: true, },
+      title     : '$title',
+      width     : $width,
+      height    : $height,
+      is3D      : true,
+      tooltip   : { showColorCode: true, },
+      chartArea : { height:'80%',width:'95%', },
     };
 
     var chart = new google.visualization.PieChart(document.getElementById('$divID'));
@@ -258,7 +261,7 @@ sub drawColumnChartTop10Modules(@) {
   my %hash = ();
   foreach my $column (@$res) {
     #my ($sum) = $dbh->selectrow_array("SELECT sum($column) FROM $table");
-    my ($sum) = $dbh->selectrow_array("SELECT count('$column') FROM $table");
+    my ($sum) = $dbh->selectrow_array("SELECT count($column) FROM $table WHERE $column != 0");
     $hash{$column} = $sum;
   }
 
@@ -283,6 +286,10 @@ sub drawColumnChartTop10Modules(@) {
 
     var options = {
       // title  : 'title',
+      legend    : { position:'none' },
+      chartArea : { width:"90%" },
+      fontSize  : 12,
+      vAxis     : { minValue:0, },
     };
 
     var chart = new google.visualization.ColumnChart(document.getElementById('$divID'));
@@ -326,6 +333,10 @@ sub drawColumnChartTop10ModDef(@) {
 
     var options = {
       // title  : 'title',
+      legend    : { position:'none' },
+      chartArea : { width:"90%" },
+      fontSize  : 12,
+      vAxis     : { minValue:0, },
     };
 
     var chart = new google.visualization.ColumnChart(document.getElementById('$divID'));
@@ -344,7 +355,8 @@ sub drawBarChartModules(@) {
 
   my %hash = ();
   foreach my $column (@$res) {
-    my ($count) = $dbh->selectrow_array("SELECT count($column) FROM $table WHERE $column > 0");
+    next if($column eq "uniqueID");
+    my ($count) = $dbh->selectrow_array("SELECT count($column) FROM $table WHERE $column != 0");
     my ($sum)   = $dbh->selectrow_array("SELECT sum($column) FROM $table");
     $hash{$column}{count} = $count;
     $hash{$column}{sum}   = $sum;
@@ -352,8 +364,7 @@ sub drawBarChartModules(@) {
 
   my $data;
   my $i=0;
-  foreach my $column (sort {$hash{$b} <=> $hash{$a}} keys %hash) {
-    next if($column eq "uniqueID");
+  foreach my $column (sort {$hash{$b}{count} <=> $hash{$a}{count}} keys %hash) {
     $data .= "\t['$column',$hash{$column}{count},$hash{$column}{sum}],\n";
     $i++;
     last if($i == 20);
@@ -413,7 +424,8 @@ sub drawMarkersMap(@) {
     var options = {
       region: '$region',
       displayMode: 'markers',
-      colorAxis: {colors: ['green', 'blue']}
+      colorAxis: {colors: ['gold', 'darkgreen']},
+      backgroundColor : 'lightblue',
     };
 
     var chart = new google.visualization.GeoChart(document.getElementById('$divID'));
@@ -452,6 +464,8 @@ sub drawRegionsMap(@) {
 
     var options = {
       region: '$region',
+      // colorAxis: {colors: ['#FFFF80', 'darkgreen']},
+      backgroundColor : 'lightblue',
     };
 
     var chart = new google.visualization.GeoChart(document.getElementById('$divID'));
@@ -502,6 +516,7 @@ sub drawTable2cols(@) {
       showRowNumber : false,
       sortAscending : true,
       sortColumn    : 0,
+      height        : 400,
     };
 
     var table = new google.visualization.Table(document.getElementById('$divID'));
@@ -520,7 +535,7 @@ sub drawTable3cols(@) {
 
   my %hash = ();
   foreach my $column (@$res) {
-    my ($count) = $dbh->selectrow_array("SELECT count(\"$column\") FROM $table WHERE \"$column\" > 0");
+    my ($count) = $dbh->selectrow_array("SELECT count(\"$column\") FROM $table WHERE \"$column\" != 0");
     my ($sum)   = $dbh->selectrow_array("SELECT sum(\"$column\") FROM $table");
     $hash{$column}{count} = $count;
     $hash{$column}{sum}   = $sum;
@@ -546,8 +561,9 @@ sub drawTable3cols(@) {
 
     var options = {
       showRowNumber : false,
-      sortAscending : true,
-      sortColumn    : 0,
+      sortAscending : false,
+      sortColumn    : 1,
+      height        : 400,
     };
 
     var table = new google.visualization.Table(document.getElementById('$divID'));
