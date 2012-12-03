@@ -138,7 +138,7 @@ CommandFheminfo($$)
   $ret = $str;
 
   if(@args != 0 && $args[0] eq "send") {
-    my $uri = "http://192.168.1.5/cgi/statistics.cgi";
+    my $uri = "http://fhem.de/stats/statistics.cgi";
     my $req = HTTP::Request->new("POST",$uri);
     $req->content_type("application/x-www-form-urlencoded");
     my $contInfo;
