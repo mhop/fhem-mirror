@@ -1,0 +1,104 @@
+=head1 NAME
+
+  Geo::IP::Record - Contains city information for GeoIP City Edition
+
+=head1 SYNOPSIS
+
+  use Geo::IP;
+
+  my $gi = Geo::IP->open("/usr/local/share/GeoIP/GeoIPCity.dat", GEOIP_STANDARD);
+
+  my $record = $gi->record_by_addr('24.24.24.24');
+
+  print $record->country_code,
+	$record->country_code3,
+	$record->country_name,
+	$record->region,
+	$record->region_name,
+	$record->city,
+	$record->postal_code,
+	$record->latitude,
+	$record->longitude,
+	$record->time_zone,
+	$record->area_code,
+    $record->continent_code,
+	$record->metro_code;
+
+=head1 DESCRIPTION
+
+Geo::IP::Record represents objects containing location information
+returned by the GeoIP City database.  It works with both the
+commercial GeoIP City and free GeoLite City databases.
+
+=head1 OBJECT METHODS
+
+=over 4
+
+=item $code = $record->country_code;
+
+Returns the ISO 3166 country code from the location object.
+
+=item $code3 = $record->country_code3;
+
+Returns the ISO 3166 3 letter country code from the location object.
+
+=item $name = $record->country_name;
+
+Returns the country name from the location object.
+
+=item $region = $record->region;
+
+Returns the region code from the location object.
+
+=item $region = $record->region_name;
+
+Returns the region name from the location object.
+
+=item $city = $record->city;
+
+Returns the city from the location object.
+
+=item $postal_code = $record->postal_code;
+
+Returns the postal code from the location object.
+
+=item $lat = $record->latitude;
+
+Returns the latitude from the location object.
+
+=item $lon = $record->longitude;
+
+Returns the longitude from the location object.
+
+=item $time_zone = $record->time_zone;
+
+Returns the time zone from the location object.
+
+=item $area_code = $record->area_code;
+
+Returns the area code from the location object (for city-level US locations only)
+
+=item $metro_code = $record->metro_code;
+
+Returns the metro code from the location object (for city-level US locations only)
+
+
+=item $continent_code = $record->continent_code;
+
+ Returns the continent code from the location object.
+ Possible continent codes are AF, AS, EU, NA, OC, SA for Africa, Asia, Europe, North America, Oceania  and South America. 
+
+=back
+
+=head1 VERSION
+
+1.21
+
+=head1 AUTHOR
+
+Copyright (c) 2008, MaxMind LLC
+
+All rights reserved.  This package is free software; you can redistribute it
+and/or modify it under the same terms as Perl itself.
+
+=cut
