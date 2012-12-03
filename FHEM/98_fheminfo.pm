@@ -25,8 +25,6 @@ package main;
 use strict;
 use warnings;
 use Config;
-use HTTP::Request::Common qw(POST);
-use LWP::UserAgent;
 
 sub CommandFheminfo($$);
 
@@ -56,6 +54,21 @@ CommandFheminfo($$)
 
   my $name = "fheminfo";
   my %info;
+
+  my $module;
+  my $err = "Missing perl module '$module'. Please install this module first.";
+  my $err;
+  $module = "HTTP::Request::Common";
+  if(!checkModule($module)) {
+    Log 1, "$name $err";
+    return $err;
+  }
+
+  $module = "LWP::UserAgent";
+  if(!checkModule($module)) {
+    Log 1, "$name $err";
+    return $err;
+  }
 
   return "Unknown argument $args[0], usage: fheminfo [send]" if(@args && lc($args[0]) ne "send");
 
@@ -125,7 +138,7 @@ CommandFheminfo($$)
   $ret = $str;
 
   if(@args != 0 && $args[0] eq "send") {
-    my $uri = "http://fhem.de/stats/statistics.cgi";
+    my $uri = "http://192.168.1.5/cgi/statistics.cgi";
     my $req = HTTP::Request->new("POST",$uri);
     $req->content_type("application/x-www-form-urlencoded");
     my $contInfo;
@@ -198,6 +211,17 @@ sub checkConfigFile($) {
     }
   }
 
+}
+
+sub checkModule($) {
+  my $module = shift;
+  eval("use $module");
+
+  if($@) {
+    return(0);
+  } else {
+    return(1);
+  }
 }
 
 1;
