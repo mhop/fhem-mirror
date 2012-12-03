@@ -357,7 +357,7 @@ IPCAM_guessFileFormat($) {
 
     A public web-cam takes only 1 snapshot per call:<br>
     <ul>
-      <code>define schloss IPCAM http://www2.braunschweig.de</code><br>
+      <code>define schloss IPCAM www2.braunschweig.de</code><br>
       <code>attr schloss path webcam/schloss.jpg</code><br>
       <code>attr schloss storage /srv/share/surveillance/snapshots</code><br>
     </ul><br>
