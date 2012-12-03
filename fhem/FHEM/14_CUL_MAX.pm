@@ -18,6 +18,8 @@ my $pairmodeDuration = 30; #seconds
 
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
 
+my $resendRetries = 5; #how often resend before giving up?
+
 #TODO: this is duplicated in MAXLAN
 my %device_types = (
   0 => "Cube",
@@ -66,6 +68,7 @@ CUL_MAX_Define($$)
   $hash->{STATE} = "Defined";
   $hash->{cnt} = 0;
   $hash->{pairmode} = 0;
+  $hash->{retryCount} = 0;
   $hash->{devices} = ();
   AssignIoPort($hash);
 
@@ -125,6 +128,9 @@ my %sendTypes = (#Sending:
                  #"F1" => "WakeUp",
                );
 
+#Array of all packet that we wait to be ack'ed
+my @waitForAck = ();
+
 sub
 CUL_MAX_Parse($$)
 {
@@ -152,8 +158,19 @@ CUL_MAX_Parse($$)
   if(exists($msgTypes{$msgTypeRaw})) {
     my $msgType = $msgTypes{$msgTypeRaw};
     if($msgType eq "Ack") {
+      my $i = 0;
+      while ($i < @waitForAck) {
+        my $packet = $waitForAck[$i];
+        if($packet->{dest} eq $src and $packet->{cnt} == hex($msgcnt)) {
+          Log 5, "Got matching ack";
+          splice @waitForAck, $i, 1;
+          return undef;
+        } else {
+          $i++;
+        }
+      }
       #TODO: The Ack payload for HeatingThermostats is 01HHHHHH where HHHHHH are the first 3 bytes of the HeatingThermostatState payload
-      Log 5, "Got Ack";
+      Log 5, "Got Ack (but no match)";
 
     } elsif($msgType eq "TimeInformation") {
       if($len == 10) {
@@ -210,8 +227,39 @@ CUL_MAX_Send(@)
 sub
 CUL_MAX_DeviceHash($)
 {
-  my $addr = shift @_;
+  my $addr = shift;
   return $modules{MAX}{defptr}{$addr};
+}
+
+sub
+CUL_MAX_Resend($)
+{
+  my $hash = shift;
+
+  my $resendTime = gettimeofday()+60; #some large time
+  my $i = 0;
+  while ($i < @waitForAck ) {
+    my $packet = $waitForAck[$i];
+    if( $packet->{time} <= gettimeofday() ) {
+      Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{payload}";
+      if($packet->{resend}++ < $resendRetries) {
+        #First resend is one second after original send, second resend it two seconds after first resend, etc
+        $packet->{time} = gettimeofday()+$packet->{resend};
+        IOWrite($hash, "", "Zs". $packet->{payload});
+        readingsSingleUpdate($hash, "retryCount", ReadingsVal($hash->{NAME}, "retryCount", 0) + 1, 1);
+      } else {
+        Log 1, "CUL_MAX_Resend: Giving up on that packet";
+        splice @waitForAck, $i, 1; #Remove from array
+        readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
+        next
+      }
+    }
+    $resendTime = $packet->{time} if($packet->{time} < $resendTime);
+    $i++;
+  }
+
+  return if(!@waitForAck); #no need to recheck
+  InternalTimer($resendTime, "CUL_MAX_Resend", $hash, 0);
 }
 
 sub
@@ -219,13 +267,12 @@ CUL_MAX_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
 
-  my $dstaddr = substr($payload,6,3);
+  my $dstaddr = unpack("H6",substr($payload,6,3));
   my $dhash = CUL_MAX_DeviceHash($dstaddr);
 
   #If cnt is not right, we don't get an Ack (At least if count is too low - have to test more)
-  #TODO: cnt is per device, not global
-  #$dhash->{READINGS}{msgcnt}{VAL} = ($dhash->{READINGS}{msgcnt}{VAL} + 1) & 0xFF;
-  my $cnt = 1;
+  my $cnt = ($dhash->{READINGS}{msgcnt}{VAL} + 1) & 0xFF;
+  $dhash->{READINGS}{msgcnt}{VAL} = $cnt;
   #replace source address
   substr($payload,3,3) = pack("H6",$hash->{addr});
   #replace message counter
@@ -236,6 +283,13 @@ CUL_MAX_SendDeviceCmd($$)
   $payload = unpack("H*",$payload); #convert to hex
   Log 5, "CUL_MAX_SendDeviceCmd: ". $payload;
   IOWrite($hash, "", "Zs". $payload);
+  my $now = gettimeofday();
+  $waitForAck[@waitForAck] = { "payload" => $payload,
+                               "dest" => $dstaddr,
+                               "cnt" => $cnt,
+                               "time" => $now+1,
+                               "resend" => "0" };
+  InternalTimer($now+1, "CUL_MAX_Resend", $hash, 0);
   return undef;
 }
 
