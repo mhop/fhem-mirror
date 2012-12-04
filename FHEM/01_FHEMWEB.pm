@@ -2337,7 +2337,7 @@ FW_dev2image($)
     my @list = split(" ", $devStateIcon);
     foreach my $l (@list) {
       my ($re,$iconName) = split(":", $l);
-      if($re && $state =~ m/^$re$/) {
+      if(defined($re) && $state =~ m/^$re$/) {
         return FW_getIcon($iconName);   # Can be used to preserve text
       }
     }
