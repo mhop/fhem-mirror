@@ -16,6 +16,15 @@ sub MAX_DateTime2Internal($);
 
 my @ctrl_modes = ( "auto", "manual", "temporary", "boost" );
 
+my %device_types = (
+  0 => "Cube",
+  1 => "HeatingThermostat",
+  2 => "HeatingThermostatPlus",
+  3 => "WallMountedThermostat",
+  4 => "ShutterContact",
+  5 => "PushButton"
+);
+
 my %interfaces = (
   "Cube" => undef,
   "HeatingThermostat" => "thermostat;battery;temperature",
@@ -77,6 +86,15 @@ MAX_DateTime2Internal($)
   return (($month&0xE) << 20) | ($day << 16) | (($month&1) << 15) | (($year-2000) << 8) | ($hour*2 + int($min/30));
 }
 
+sub
+MAX_TypeToTypeId($)
+{
+  while (my ($typeId, $type) = each (%device_types)) {
+    return $typeId if($_[0] eq $type);
+  }
+  Log 1, "MAX_TypeToTypeId: Invalid type $_[0]";
+  return 0;
+}
 #############################
 sub
 MAX_Set($@)
@@ -135,7 +153,7 @@ MAX_Set($@)
     return "Cannot set without IODev" if(!defined($hash->{IODev}));
     return "argument needed" if(@args == 0);
 
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},pack("CCCCCCH6CC",0x00,0x00,34,0x00,0x00,0x00,$hash->{addr},0x00,$args[0]));
+    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},pack("CCCCCCH6CC",0x00,0x00,0x22,0x00,0x00,0x00,$hash->{addr},0x00,$args[0]));
 
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
@@ -166,7 +184,7 @@ MAX_Set($@)
     my $windowOpenTemp = int($windowOpenTemperature*2);
     my $windowOpenTime = int($windowOpenDuration/5);
 
-    my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,17,0x00,0x00,0x00,$hash->{addr},0x00,
+    my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,0x11,0x00,0x00,0x00,$hash->{addr},0x00,
                                               $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
@@ -186,19 +204,43 @@ MAX_Set($@)
     my $payload = pack("CCCCCCH6CC",0x00,0x00,0x82,0x00,0x00,0x00,$hash->{addr},0x00, $args[0] ? 4 : 0);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
+  } elsif($setting eq "associate") {
+    my $dest = $args[0];
+    if(exists($defs{$dest})) {
+      return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
+      #return "Destination is not a thermostat" if($defs{$dest}{type} ne "HeatingThermostat" and $defs{$dest}{type} ne "WallMountedThermostat");
+      $dest = $defs{$dest}{addr};
+    } else {
+      return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
+    }
+    my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
+    Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{groupid});
+    Log 5, "Using dest $dest, destType $destType";
+    my $payload = pack("CCCCCCH6CH6C",0x00,0x00,0x20,0x00,0x00,0x00,$hash->{addr}, $hash->{groupid}, $dest, $destType);
+    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+
+  } elsif($setting eq "factoryReset") {
+    my $payload = pack("CCCCCCH6CH6C",0x00,0x00,0x20,0x00,0x00,0x00,$hash->{addr}, 0);
+    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+
   }else{
     my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
     my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
+    my $ret = "Unknown argument $setting, choose one of factoryReset groupid$removeDevice";
+    my $assoclist = join(",", map { $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
 
-      return "Unknown argument $setting, choose one of desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration groupid$removeDevice";
+      return "$ret associate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration";
 
     } elsif($hash->{type} eq "WallMountedThermostat") {
-      return "Unknown argument $setting, choose one of displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist groupid$removeDevice";
+      return "$ret associate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist";
+    } elsif($hash->{type} eq "ShutterContact") {
+      return "$ret associate:$assoclist";
     } else {
-      return "Unknown argument $setting, choose one of groupid$removeDevice";
+      return $ret;
     }
   }
 }
@@ -446,6 +488,10 @@ MAX_Parse($$)
             For devices of type HeatingThermostat only. Writes the given window open temperature to the device's memory. That is the temperature the heater will temporarily set if an open window is detected.</li>
     <li>windowOpenDuration &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open duration to the device's memory. That is the duration the heater will temporarily set the window open temperature if an open window is detected by a rapid temperature decrease. (Not used if open window is detected by ShutterControl. Must be between 0 and 60 minutes in multiples of 5.</li>
+    <li>factoryReset<br>
+        Resets the device to factory values. It has to be paired again afterwards. (If you use MAXLAN, you have to use removeDevice, before you can re-pair.)</li>
+    <li>associate<br>
+        Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened.</li>
   </ul>
   <br>
 
