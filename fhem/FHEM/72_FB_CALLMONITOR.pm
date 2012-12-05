@@ -87,7 +87,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -160,22 +160,24 @@ FB_CALLMONITOR_Read($)
   my @array;
   my $reverse_search = undef;
   my $data = $buf;
+  my $external_number = undef;
+  
+  
   
    @array = split(";", $data);
   
-   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $array[3]) if(not $array[3] eq "0" and $array[1] eq "RING" and AttrVal($name, "reverse-search", "none") ne "none");
-   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $array[5]) if($array[1] eq "CALL" and AttrVal($name, "reverse-search", "none") ne "none");
+   $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING");
+   $external_number = $array[5] if($array[1] eq "CALL");
   
-   
+   $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1");
   
+   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(AttrVal($name, "reverse-search", "none") ne "none");
+ 
    readingsBeginUpdate($hash);
    readingsBulkUpdate($hash, "event", lc($array[1]));
-   readingsBulkUpdate($hash, "external_number", $array[3]) if(not $array[3] eq "0" and $array[1] eq "RING");
+   readingsBulkUpdate($hash, "external_number", $external_number) if(defined($external_number));
    readingsBulkUpdate($hash, "external_name", $reverse_search) if(defined($reverse_search)); 
-   readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING");
-   readingsBulkUpdate($hash, "external_number" , $array[5]) if($array[1] eq "CALL");
-   
-   readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "CALL");
+   readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING" or $array[1] eq "CALL");
    readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
    readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
@@ -440,10 +442,14 @@ sub FB_CALLMONITOR_loadCacheFile($)
     If this attribute is activated each reverse-search result is saved in an internal cache
     and will be used instead of reverse searching again the same number.<br><br>
     Possible values: 0 => off , 1 => on<br>
-    Default Value is 0 (off)
+    Default Value is 0 (off)<br><br>
     <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
     Write the internal reverse-search-cache to the given file and use it next time FHEM starts.
-    So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.
+    So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.<br><br>
+    <li><a name="remove-leading-zero">remove-leading-zero</a></li>
+    If this attribute is activated, a leading zero will be removed from the external_number (e.g. in telefon systems).<br><br>
+    Possible values: 0 => off , 1 => on<br>
+    Default Value is 0 (off)<br><br>
   </ul>
   <br>
  
@@ -452,7 +458,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <ul>
   <li><b>event</b>: (call|ring|connect|disconnect) - which event in detail was triggerd</li>
   <li><b>external_number</b>: $number - The participants number which is calling (event: ring) or beeing called (event: call)</li>
-  <li><b>external_name</b>: $name - The result of the reverse lookup of the external_number via internet. Is only available if reverse-search is activated.</li>
+  <li><b>external_name</b>: $name - The result of the reverse lookup of the external_number via internet. Is only available if reverse-search is activated. Special values are "unknown" (no search results found) and "timeout" (got timeout while search request). In case of an timeout and activated caching, the number will be searched again next time a call occurs with the same number</li>
   <li><b>internal_number</b>: $number - The internal number (fixed line, VoIP number, ...) on which the participant is calling (event: ring) or is used for calling (event: call)</li>
   <li><b>internal_connection</b>: $connection - The internal connection (FON1, FON2, ISDN, DECT, ...) which is used to take the call</li>
   <li><b>external_connection</b>: $connection - The external connection (fixed line, VoIP account) which is used to take the call</li>
@@ -515,6 +521,25 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#do_not_notiy">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|none)</li>
+    Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
+    Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher für die R&uuml;ckw&auml;rtssuche verwendet werden soll.
+    Wenn dieses Attribut auf dem Wert "all" steht, werden alle verf&uuml;gbaren Suchanbieter f&uuml;r die R&uuml;ckw&auml;rtssuche herangezogen, solange bis irgend ein Anbieter ein valides Ergebniss liefert.
+    Wenn der Wert "none" ist, wird keine R&uuml;ckw&auml;rtssuche durchgef&uuml;hrt.<br><br>Standardwert ist "none" (keine R&uuml;ckw&auml;rtssuche).<br><br>
+    <li><a name="reverse-search-cache">reverse-search-cache</a></li>
+    Wenn dieses Attribut gesetzt ist, werden alle Ergebisse der R&uuml;ckw&auml;rtssuche in einem modul-internen gespeichert
+    und von da an nur noch aus dem Cache genutzt anstatt eine erneute R&uuml;ckw&auml;rtssuche durchzuf&uuml;hren.<br><br>
+    M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
+    Standardwert ist 0 (deaktiviert)<br><br>
+    <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
+    Da der Cache nur im Arbeitsspeicher existiert, ist er nicht persisten und geht beim stoppen von FHEM verloren.
+    Mit diesem Parameter werden alle Cache-Ergebnisse in eine Textdatei geschrieben (z.B.  /usr/share/fhem/telefonbuch.txt) 
+    und beim n&auml;chsten Start von FHEM direkt wieder in den Cache geladen und genutzt.
+    <br><br>
+    <li><a name="remove-leading-zero">remove-leading-zero</a></li>
+    Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
+    M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
+    Standardwert ist 0 (deaktiviert)<br><br>
   </ul>
   <br>
  
@@ -523,6 +548,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <ul>
   <li><b>event</b>: (call|ring|connect|disconnect) - Welches Event wurde genau ausgel&ouml;st.</li>
   <li><b>external_number</b>: $number - Die Rufnummer des Gegen&uuml;bers, welcher anruft (event: ring) oder angerufen wird (event: call)</li>
+  <li><b>external_name</b>: $name - Das Ergebniss der R&uuml;ckw&auml;rtssuche (sofern aktiviert). Im Fehlerfall kann diese Reading auch den Inhalt "unknown" (keinen Eintrag gefunden) und "timeout" (Zeit&uuml;berschreitung bei der Abfrage) enthalten. Im Falle einer Zeit&uuml;berschreitung und aktiviertem Caching, wird die Rufnummer beim n&auml;chsten Mal erneut gesucht.</li>
   <li><b>internal_number</b>: $number - Die interne Rufnummer (Festnetz, VoIP-Nummer, ...) auf welcher man angerufen wird (event: ring) oder die man gerade nutzt um jemanden anzurufen (event: call)</li>
   <li><b>internal_connection</b>: $connection - Der interne Anschluss an der Fritz!Box welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren (FON1, FON2, ISDN, DECT, ...)</li>
   <li><b>external_connection</b>: $connection - Der externe Anschluss welcher genutzt wird um das Gespräch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
