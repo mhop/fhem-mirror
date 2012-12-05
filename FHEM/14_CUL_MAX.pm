@@ -18,7 +18,7 @@ my $pairmodeDuration = 30; #seconds
 
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
 
-my $resendRetries = 5; #how often resend before giving up?
+my $resendRetries = 10; #how often resend before giving up?
 
 #TODO: this is duplicated in MAXLAN
 my %device_types = (
@@ -114,11 +114,20 @@ CUL_MAX_Set($@)
 ###################################
 my %msgTypes = ( #Receiving:
                  "00" => "PairPing",
+                 "01" => "PairPong",
                  "02" => "Ack",
                  "03" => "TimeInformation",
+                 "11" => "ConfigTemperatures", #like boost/eco/comfort etc
                  "30" => "ShutterContactState",
                  "42" => "WallThermostatState", #by WallMountedThermostat
                  "60" => "ThermostatState", #by HeatingThermostat
+                 "40" => "SetTemperature", #to thermostat
+                 "20" => "AddLinkPartner",
+                 "21" => "RemoveLinkPartner",
+                 "22" => "SetGroupId",
+                 "23" => "RemoveGroupId",
+                 "F1" => "WakeUp",
+                 "F0" => "Reset",
                );
 my %sendTypes = (#Sending:
                  "PairPong" => "01",
@@ -143,20 +152,19 @@ CUL_MAX_Parse($$)
   my $shash = $modules{CUL_MAX}{defptr};
 
   $rmsg =~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/;
-  my ($len,$msgcnt,$msgFlagRaw,$msgTypeRaw,$src,$dst,$zero,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
+  my ($len,$msgcnt,$msgFlagRaw,$msgTypeRaw,$src,$dst,$groupid,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
   $len = hex($len);
   Log 1, "CUL_MAX_Parse: len mismatch" if(2*$len+3 != length($rmsg)); #+3 = +1 for 'Z' and +2 for len field in hex
-  Log 1, "CUL_MAX_Parse zero = $zero" if($zero != 0);
 
+  $groupid = hex($groupid);
   my $msgFlag = sprintf("%b",hex($msgFlagRaw));
 
   #convert adresses to lower case
   $src = lc($src);
   $dst = lc($dst);
-
-  Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgTypeRaw, src $src, dst $dst, payload $payload";
+  my $msgType = exists($msgTypes{$msgTypeRaw}) ? $msgTypes{$msgTypeRaw} : $msgTypeRaw;
+  Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
   if(exists($msgTypes{$msgTypeRaw})) {
-    my $msgType = $msgTypes{$msgTypeRaw};
     if($msgType eq "Ack") {
       my $i = 0;
       while ($i < @waitForAck) {
@@ -205,8 +213,10 @@ CUL_MAX_Parse($$)
         #TODO: send TimeInformation
       }
 
-    } else {
+    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState"])  {
       Dispatch($shash, "MAX,$msgType,$src,$payload", {RAWMSG => $rmsg});
+    } else {
+      Log 5, "Unhandled message $msgType";
     }
   } else {
     Log 2, "CUL_MAX_Parse: Got unhandled message type $msgTypeRaw";
