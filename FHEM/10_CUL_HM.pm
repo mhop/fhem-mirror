@@ -363,6 +363,14 @@ CUL_HM_Parse($$)
   my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst $p";
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) {
     Log GetLogLevel($name,4), "CUL_HM $name dup mesg";
+    if(($id eq $dst)&& (hex($msgFlag)&0x20)){
+	  CUL_HM_SndCmd($shash, $msgcnt."8002".$id.$src."0101C800");  # Send Ack
+      Log GetLogLevel($name,4), "CUL_HM $name dup mesg - ack and ignore";
+	}
+	else{
+      Log GetLogLevel($name,4), "CUL_HM $name dup mesg - ignore";
+	}
+
     return ""; #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
@@ -375,7 +383,7 @@ CUL_HM_Parse($$)
   push @event, "powerOn"   if($parse eq "powerOn");
   
   my $sendAck = "yes";# if yes Ack will be determined automatically
-
+	
   if ($parse eq "ACK"){# remember - ACKinfo will be passed on
     push @event, "";
   }
@@ -399,10 +407,9 @@ CUL_HM_Parse($$)
       push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
     }
   } 
-  elsif(($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) && $st ne "keyMatic") {#### Pairing-Request-Convers.
-    push @event, "";    #todo why end here?
-
-  } 
+#  elsif(($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) && $st ne "keyMatic") {#### Pairing-Request-Convers.
+#    push @event, "";    #todo why end here?
+#  } General check operation after removal
   elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
 
     if($msgType eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
@@ -923,10 +930,6 @@ CUL_HM_Parse($$)
 	  push @event, "state:$txt";
 	  push @event, "contact:$txt$target";
 	  
-#	  if($id eq $dst && hex($msgFlag)&0x20){ General remove if Peter agrees
-#		CUL_HM_SndCmd($shash, $msgcnt."8002$id$src${chn}00");  #Send Ack
-#		$sendAck = ""; 
-#	  }
     }
     else{push @event, "3SSunknownMsg:$p" if(!@event);}
   } 
@@ -1093,11 +1096,27 @@ CUL_HM_Parse($$)
   return $shash->{NAME} ;# shash could have changed to support channel
 }
 
-my %culHmRegDefShSh = (# register that are available for short AND long button press. Will be merged to rgister list at init
+##----------definitions for register settings-----------------	
+	# definition of Register for all devices
+	# a: address, incl bits 13.4 4th bit in reg 13
+	# s: size 2.0 = 2 byte, 0.5 = 5 bit. Max is 4.0!!
+	# l: list number. List0 will be for channel 0
+	#     List 1 will set peer to 00000000
+	#     list 3 will need the input of a peer!
+	# min: minimal input value
+	# max: maximal input value
+	# c: conversion, will point to a routine for calculation
+	# f: factor to be used if c = 'factor'
+	# u: unit for description
+	# t: txt description
+	# lit: if the command is a literal options will be entered here
+	# d: if '1' the register will appear in Readings
+	#
+my %culHmRegDefShLg = (# register that are available for short AND long button press. Will be merged to rgister list at init
 #blindActuator mainly   
   maxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
   driveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
-  actionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,JmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
+  actionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OnTimeMode      =>{a=> 10.0,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
 #dimmer  mainly                                                                                 
@@ -1125,26 +1144,38 @@ my %culHmRegDefShSh = (# register that are available for short AND long button p
   ActType         =>{a=>36   ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action type(LED or Tone)"},
   ActNum          =>{a=>37   ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
   Intense         =>{a=>47   ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Volume - Tone channel only!"},
+# statemachines
+  BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRampOn      =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRampOff     =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRefOn       =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOn"   ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRefOff      =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOff"  ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  
+  DimJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtDlyOn      =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtDlyOff     =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtRampOn     =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtRampOff    =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  
+  SwJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
+  
+  CtOn            =>{a=>  3.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from On"       ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
+  CtOff           =>{a=>  3.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from Off"      ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
+  CtDlyOn         =>{a=>  2.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOn"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
+  CtDlyOff        =>{a=>  2.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOff" ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
+  CtRampOn        =>{a=>  1.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOn"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
+  CtRampOff       =>{a=>  1.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOff"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
 );
 
 
-##----------definitions for register settings-----------------	
-	# definition of Register for all devices
-	# a: address, incl bits 13.4 4th bit in reg 13
-	# s: size 2.0 = 2 byte, 0.5 = 5 bit. Max is 4.0!!
-	# l: list number. List0 will be for channel 0
-	#     List 1 will set peer to 00000000
-	#     list 3 will need the input of a peer!
-	# min: minimal input value
-	# max: maximal input value
-	# c: conversion, will point to a routine for calculation
-	# f: factor to be used if c = 'factor'
-	# u: unit for description
-	# t: txt description
-	# lit: if the command is a literal options will be entered here
-	# d: if '1' the register will appear in Readings
-	# caution: !!! bitfield setting will zero the rest of the register
-	#              if  less then a byte                    !!!!!!!!!!!
+
 my %culHmRegDefine = (
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
   pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>'pairing to central'},
@@ -1165,9 +1196,9 @@ my %culHmRegDefine = (
   lcdSymb         =>{a=>  2.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask which symbol to display on message"},
   lcdLvlInterp    =>{a=>  3.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask fro symbols"},
   msgShowTime     =>{a=> 45.0,s=>1.0,l=>1,min=>0.0,max=>120     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"Message show time(RC19). 0=always on"},
-  beepAtAlarm     =>{a=> 46.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Alarm"        ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
-  beepAtService   =>{a=> 46.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Service"      ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
-  beepAtInfo      =>{a=> 46.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Info"         ,lit=>{none=>0,Tone1=>1,Tone2=>2,Tone3=>3}},
+  beepAtAlarm     =>{a=> 46.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Alarm"        ,lit=>{none=>0,tone1=>1,tone2=>2,tone3=>3}},
+  beepAtService   =>{a=> 46.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Service"      ,lit=>{none=>0,tone1=>1,tone2=>2,tone3=>3}},
+  beepAtInfo      =>{a=> 46.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Beep Info"         ,lit=>{none=>0,tone1=>1,tone2=>2,tone3=>3}},
   backlAtAlarm    =>{a=> 47.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Alarm"   ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
   backlAtService  =>{a=> 47.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Service" ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
   backlAtInfo     =>{a=> 47.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Info"    ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
@@ -1179,29 +1210,29 @@ my %culHmRegDefine = (
   BacklOnTime     =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
   BacklOnMode     =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
   BtnLock         =>{a=>15   ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"     ,lit=>{unlock=>0,lock=>1}},
-  DispTempHum     =>{a=>1.0  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                ,lit=>{temp=>0,tempHumidity=>1}},
-  DispTempInfo    =>{a=>1.1  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                ,lit=>{actual=>0,setPoint=>1}},
-  DispTempUnit    =>{a=>1.2  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                ,lit=>{Celsius=>0,Fahrenheit=>1}},
-  MdTempReg       =>{a=>1.3  ,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
-  MdTempValve     =>{a=>2.6  ,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
+  DispTempHum     =>{a=>1.0  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{temp=>0,tempHumidity=>1}},
+  DispTempInfo    =>{a=>1.1  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{actual=>0,setPoint=>1}},
+  DispTempUnit    =>{a=>1.2  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{Celsius=>0,Fahrenheit=>1}},
+  MdTempReg       =>{a=>1.3  ,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
+  MdTempValve     =>{a=>2.6  ,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
                                                                                                  
-  TempComfort     =>{a=>3    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>0,t=>"comfort temp value"},
-  TempLower       =>{a=>4    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>0,t=>"comfort temp value"},
-  PartyEndDay     =>{a=>98   ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>0,t=>"Party end Day"},
-  PartyEndMin     =>{a=>97.7 ,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,d=>0,t=>"Party end 0=:00, 1=:30"},
-  PartyEndHr      =>{a=>97   ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>0,t=>"Party end Hour"},
-  TempParty       =>{a=>6    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>0,t=>"Temperature for Party"},
-  TempWinOpen     =>{a=>5    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>0,t=>"Temperature for Win open !chan 3 only!"},
-  DecalDay        =>{a=>1.5  ,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Decalc weekday"  ,lit=>{sat=>0,sun=>1,mon=>2,tue=>3,wed=>4,thu=>5,fri=>6}},
-  DecalHr         =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>0,t=>"Decalc hour"},
-  DecalMin        =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>0,t=>"Decalc min"},
+  TempComfort     =>{a=>3    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  TempLower       =>{a=>4    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  PartyEndDay     =>{a=>98   ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
+  PartyEndMin     =>{a=>97.7 ,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,d=>1,t=>"Party end 0=:00, 1=:30"},
+  PartyEndHr      =>{a=>97   ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
+  TempParty       =>{a=>6    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
+  TempWinOpen     =>{a=>5    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
+  DecalDay        =>{a=>1.5  ,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"  ,lit=>{sat=>0,sun=>1,mon=>2,tue=>3,wed=>4,thu=>5,fri=>6}},
+  DecalHr         =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
+  DecalMin        =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
 #Thermal-cc-VD                                                                                  
   ValveOffset     =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>0,t=>"Valve offset"},             # size actually 0.5
   ValveError      =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>0,t=>"Valve position when error"},# size actually 0.7
 # keymatic secific register                                                                     
-  signal          =>{a=>3.4  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep",lit=>{off=>0,on=>1}},
-  signalTone      =>{a=>3.6  ,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                 ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
-  keypressSignal  =>{a=>3.0  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"    ,lit=>{off=>0,on=>1}},
+  signal          =>{a=>3.4  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
+  signalTone      =>{a=>3.6  ,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
+  keypressSignal  =>{a=>3.0  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                 ,lit=>{off=>0,on=>1}},
   holdTime        =>{a=>20   ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
   setupDir        =>{a=>22   ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
   setupPosition   =>{a=>23   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Rotation angle neutral position"},
@@ -1213,8 +1244,8 @@ my %culHmRegDefine = (
 # sec_mdir                                                                                   
   evtFltrPeriod   =>{a=>1.0  ,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>1.4  ,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
-  minInterval     =>{a=>2.0  ,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec",lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
-  captInInterval  =>{a=>2.3  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval",lit=>{off=>0,on=>1}},
+  minInterval     =>{a=>2.0  ,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
+  captInInterval  =>{a=>2.3  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>2.4  ,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
   ledOnTime       =>{a=>34   ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
 # weather units                                                                                  
@@ -1232,14 +1263,25 @@ my %culHmRegType = (
                    OnDly    =>1, OnTime     =>1,OffDly     =>1,  OffTime    =>1,
   	   		       OffLevel =>1, OnLevel    =>1,
                    driveMode=>1, actionType =>1,OnTimeMode =>1,  OffTimeMode=>1,
+				   BlJtOn          =>1,BlJtOff         =>1,BlJtDlyOn       =>1,BlJtDlyOff      =>1,
+                   BlJtRampOn      =>1,BlJtRampOff     =>1,BlJtRefOn       =>1,BlJtRefOff      =>1,
+                   CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
+				   CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
 				   },
-  dimmer=> {ovrTempLvl     =>1,redTempLvl      =>1,redLvl          =>1,
-            OnDly          =>1,OnTime          =>1,OffDly          =>1,OffTime        =>1,
-			OffLevel       =>1,OnMinLevel      =>1,OnLevel         =>1,               
-            rampSstep      =>1,rampOnTime      =>1,rampOffTime     =>1,dimMinLvl      =>1,
-            dimMaxLvl      =>1,dimStep         =>1,
+  dimmer=> {ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
+            OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+			OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1,               
+            rampSstep       =>1,rampOnTime      =>1,rampOffTime     =>1,dimMinLvl       =>1,
+            dimMaxLvl       =>1,dimStep         =>1,
+            DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,
+            DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1,
+            CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
+            CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
 			},
-  switch=> {OnTime   =>1,OffTime    =>1, OnDly    =>1,OffDly     =>1,
+  switch=> {OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
+            SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+            CtOn            =>1,CtDlyOn         =>1,
+            CtOff           =>1,CtDlyOff        =>1,
 			},
   outputUnit=>{
 			OnDly   =>1,OnTime  =>1,OffDly  =>1,OffTime =>1,
@@ -1301,14 +1343,14 @@ my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
 sub
 CUL_HM_initRegHash()
 { #duplicate short and long press register 
-  foreach my $reg (keys %culHmRegDefShSh){ #update register list
-    %{$culHmRegDefine{"Sh".$reg}} = %{$culHmRegDefShSh{$reg}};
-    %{$culHmRegDefine{"Lg".$reg}} = %{$culHmRegDefShSh{$reg}};
+  foreach my $reg (keys %culHmRegDefShLg){ #update register list
+    %{$culHmRegDefine{"Sh".$reg}} = %{$culHmRegDefShLg{$reg}};
+    %{$culHmRegDefine{"Lg".$reg}} = %{$culHmRegDefShLg{$reg}};
 	$culHmRegDefine{"Lg".$reg}{a} +=0x80;
   }
   foreach my $type(sort(keys %culHmRegType)){ #update references to register
     foreach my $reg (sort(keys %{$culHmRegType{$type}})){
-      if ($culHmRegDefShSh{$reg}){
+      if ($culHmRegDefShLg{$reg}){
 	    delete $culHmRegType{$type}{$reg};
 	    $culHmRegType{$type}{"Sh".$reg} = 1;
 	    $culHmRegType{$type}{"Lg".$reg} = 1;
@@ -1317,7 +1359,7 @@ CUL_HM_initRegHash()
   }
   foreach my $type(sort(keys %culHmRegModel)){ #update references to register
     foreach my $reg (sort(keys %{$culHmRegModel{$type}})){
-      if ($culHmRegDefShSh{$reg}){
+      if ($culHmRegDefShLg{$reg}){
 	    delete $culHmRegModel{$type}{$reg};
 	    $culHmRegModel{$type}{"Sh".$reg} = 1;
 	    $culHmRegModel{$type}{"Lg".$reg} = 1;
@@ -1326,7 +1368,7 @@ CUL_HM_initRegHash()
   }
   foreach my $type(sort(keys %culHmRegChan)){ #update references to register
     foreach my $reg (sort(keys %{$culHmRegChan{$type}})){
-      if ($culHmRegDefShSh{$reg}){
+      if ($culHmRegDefShLg{$reg}){
 	    delete $culHmRegChan{$type}{$reg};
 	    $culHmRegChan{$type}{"Sh".$reg} = 1;
 	    $culHmRegChan{$type}{"Lg".$reg} = 1;
@@ -1372,32 +1414,43 @@ my %culHmModelGets = (
         },
 );
 sub
-CUL_HM_TCtempReadings($$)
+CUL_HM_TCtempReadings($)
 {
-  my ($reg5,$reg6)=@_;
+  my ($hash)=@_;
+  
+  my $name = $hash->{NAME};
+  my $reg5 = ReadingsVal($name,"RegL_05:","");
+  my $reg6 = ReadingsVal($name,"RegL_06:","");
+
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
-  $reg5 =~ s/.* 0B:/ 0B:/;
-  my $tempRegs = $reg5.$reg6;
-  $tempRegs =~ s/ 00:00/ /g;
-  $tempRegs =~ s/ ..:/,/g;
-  $tempRegs =~ s/^,//;
-  $tempRegs =~ s/ $//;
+  $reg5 =~ s/.* 0B://;     #remove register up to addr 11 from list 5
+  my $tempRegs = $reg5.$reg6;  #one row
+  $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
+  $tempRegs =~ s/ ..:/,/g;     #remove addr Info
+  $tempRegs =~ s/ $//;         #remove trailing ' '
   my @Tregs = split(",",$tempRegs);
-  my @time  = @Tregs[grep !($_ % 2), 0..$#Tregs];    # even-index elements
-  my @temp  = @Tregs[grep $_ % 2, 0..$#Tregs];       # odd-index  elements
+  my @time  = @Tregs[grep !($_ % 2), 0..$#Tregs]; # even-index =time
+  my @temp  = @Tregs[grep $_ % 2, 0..$#Tregs];    # odd-index  =data
   return "reglist incomplete\n" if ((scalar @time )<168);
   foreach  (@time){$_=hex($_)*10};
   foreach  (@temp){$_=hex($_)/2};
   my $setting;
+  my @changedRead;
   for (my $day = 0;$day<7;$day++){
     my $tSpan  = 0;
+	my $dayRead = "";
     for (my $entry = 0;$entry<24;$entry++){
       my $reg = $day *24 + $entry; 
       last if ($tSpan > 1430);
-  	  $setting .= sprintf("Temp set: %s %02d:%02d - %3.01f C\n",$days[$day],($tSpan/60),($tSpan%60),$temp[$reg]);
+	  $tSpan = $time[$reg];
+	  my $entry = sprintf("%02d:%02d %3.01f",($tSpan/60),($tSpan%60),$temp[$reg]);
+  	  $setting .= "Temp set: ".$days[$day]." ".$entry." C\n";
+  	  $dayRead .= " ".$entry;
 	  $tSpan = $time[$reg];
     }
+	push (@changedRead,"tempList".$days[$day].":".$dayRead);
   }
+  CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
 
@@ -1495,8 +1548,7 @@ CUL_HM_Get($@)
 		}
 	  }
 	  my $addInfo = ""; #todo - find a generic way to handle special devices
-	  $addInfo = CUL_HM_TCtempReadings(ReadingsVal($name,"RegL_05:",""),
-	                                   ReadingsVal($name,"RegL_06:",""))
+	  $addInfo = CUL_HM_TCtempReadings($hash)
 	        if ($md eq "HM-CC-TC" && $chn eq "02");
 			
 	  return $name." type:".$st." - \n".
@@ -1599,24 +1651,6 @@ my %culHmSubTypeSets = (
 
 );
 my %culHmModelSets = (
-  "HM-CC-TC"=>{ 
-          devicepair    => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
-          "day-temp"     => "temp",
-          "night-temp"   => "temp",
-          "party-temp"   => "temp",
-          "desired-temp" => "temp", # does not work - only in manual mode??
-          tempListSat    => "HH:MM temp ...",
-          tempListSun    => "HH:MM temp ...",
-          tempListMon    => "HH:MM temp ...",
-          tempListTue    => "HH:MM temp ...",
-          tempListThu    => "HH:MM temp ...",
-          tempListWed    => "HH:MM temp ...",
-          tempListFri    => "HH:MM temp ...",
-          displayMode    => "[temp-only|temp-hum]",
-          displayTemp    => "[actual|setpoint]",
-          displayTempUnit => "[celsius|fahrenheit]",
-          controlMode    => "[manual|auto|central|party]",
-          decalcDay      => "day",        },
   "HM-CC-VD"=>{ 
           valvePos     => "position",},
   "HM-RC-19"=>    {	
@@ -1644,6 +1678,46 @@ my %culHmModelSets = (
   "HM-SEC-RHS"=>{
           devicepair    => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
 );
+
+my %culHmChanSets = (
+  "HM-CC-TC00"=>{ 
+          devicepair    => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+          "day-temp"     => "temp",
+          "night-temp"   => "temp",
+          "party-temp"   => "temp",
+          "desired-temp" => "temp", 
+          tempListSat    => "HH:MM temp ...",
+          tempListSun    => "HH:MM temp ...",
+          tempListMon    => "HH:MM temp ...",
+          tempListTue    => "HH:MM temp ...",
+          tempListThu    => "HH:MM temp ...",
+          tempListWed    => "HH:MM temp ...",
+          tempListFri    => "HH:MM temp ...",
+          displayMode    => "[temp-only|temp-hum]",
+          displayTemp    => "[actual|setpoint]",
+          displayTempUnit => "[celsius|fahrenheit]",
+          controlMode    => "[manual|auto|central|party]",
+          decalcDay      => "day",        },
+  "HM-CC-TC02"=>{ 
+          devicepair    => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+          "day-temp"     => "temp",
+          "night-temp"   => "temp",
+          "party-temp"   => "temp",
+          "desired-temp" => "temp", 
+          tempListSat    => "HH:MM temp ...",
+          tempListSun    => "HH:MM temp ...",
+          tempListMon    => "HH:MM temp ...",
+          tempListTue    => "HH:MM temp ...",
+          tempListThu    => "HH:MM temp ...",
+          tempListWed    => "HH:MM temp ...",
+          tempListFri    => "HH:MM temp ...",
+          displayMode    => "[temp-only|temp-hum]",
+          displayTemp    => "[actual|setpoint]",
+          displayTempUnit => "[celsius|fahrenheit]",
+          controlMode    => "[manual|auto|central|party]",
+          decalcDay      => "day",        },
+);
+
 ##############################################
 sub
 CUL_HM_getMId($)
@@ -1719,9 +1793,12 @@ CUL_HM_Set($@)
 
   my $devHash = CUL_HM_getDeviceHash($hash);
 
+  my $mdCh      = $md.($isChannel?$chn:"00"); # chan specific commands?
   my $h = $culHmGlobalSets{$cmd} if($st ne "virtual");
   $h = $culHmSubTypeSets{$st}{$cmd} if(!defined($h) && $culHmSubTypeSets{$st});
   $h = $culHmModelSets{$md}{$cmd}   if(!defined($h) && $culHmModelSets{$md});
+  $h = $culHmChanSets{$mdCh}{$cmd}  if(!defined($h) && $culHmChanSets{$mdCh});
+
   my @h;
   @h = split(" ", $h) if($h);
 
@@ -1732,7 +1809,8 @@ CUL_HM_Set($@)
     my @arr;
     @arr = keys %culHmGlobalSets if($st ne "virtual");
     push @arr, keys %{$culHmSubTypeSets{$st}} if($culHmSubTypeSets{$st});
-    push @arr, keys %{$culHmModelSets{$md}} if($culHmModelSets{$md});
+    push @arr, keys %{$culHmModelSets{$md}}   if($culHmModelSets{$md});
+    push @arr, keys %{$culHmChanSets{$mdCh}}  if($culHmChanSets{$mdCh});
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
 
     if($usg =~ m/ pct/) {
@@ -2210,9 +2288,7 @@ CUL_HM_Set($@)
       $msg .= sprintf(" %02d:%02d %.1f", $h, $m, $a[$idx+1]);
     }
     CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
-
-    my $vn = "tempList$wd";
-	readingsSingleUpdate($hash,$vn,$msg,1);
+	readingsSingleUpdate($hash,"tempList$wd",$msg,0);
   } 
   elsif($cmd eq "valvePos") { ##################
 	return "only number <= 100  or 'off' allowed" 
@@ -2338,6 +2414,7 @@ CUL_HM_Set($@)
     my $peerHash;
 	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn} 
 	      if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
+    $peerHash = $modules{CUL_HM}{defptr}{$peerDst} if (!$peerHash);
     return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
     return "$single must be single or dual"                       if(defined($single) && (($single ne"single") &&($single ne"dual")));
     return "$set must be set or unset"                            if(defined($set) && (($set ne"set") &&($set ne"unset")));  
@@ -3396,6 +3473,13 @@ CUL_HM_updtRegDisp($$$)
 	push (@changedRead,$readName.":".$rgVal)
 	      if (ReadingsVal($name,$readName,"") ne $rgVal);
   }
+
+  # ---  handle specifics -  no general approach so far.   
+  CUL_HM_TCtempReadings($hash) 
+        if (($listNo == 5 ||$listNo == 6)     && 
+             substr($hash->{DEF},6,2) eq "02" &&
+             CUL_HM_Get($hash,"param","model") eq "HM-CC-TC");
+
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 }
 

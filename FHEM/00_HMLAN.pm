@@ -15,7 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
-my $debug = 0; # set 1 for better log readability
+my $debug = 1; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
@@ -46,9 +46,6 @@ HMLAN_Initialize($)
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
                      "hmId hmKey " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
-  $hash->{helper}{dPend} = 0;# data pending in HMLAN
-  $hash->{helper}{lastSend} = 0;
-
 }
 
 #####################################
@@ -76,6 +73,8 @@ HMLAN_Define($$)
     return undef;
   }
   $hash->{DeviceName} = $dev;
+  $hash->{helper}{dPend} = 0;# data pending in HMLAN
+  $hash->{helper}{lastSend} = 0;
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
@@ -98,7 +97,6 @@ HMLAN_Undef($$)
         delete $defs{$d}{IODev};
       }
   }
-
   DevIo_CloseDev($hash); 
   return undef;
 }
@@ -107,7 +105,9 @@ HMLAN_Undef($$)
 sub
 HMLAN_RemoveHMPair($)
 {
-  my $hash = shift;
+  my($in ) = shift;
+  my(undef,$name) = split(':',$in);
+  my $hash = $defs{$name};
   delete($hash->{hmPair});
 }
 
@@ -126,12 +126,11 @@ HMLAN_Set($@)
   my $type = shift @a;
   my $arg = join("", @a);
   my $ll = GetLogLevel($name,3);
-
   if($type eq "hmPairForSec") { ####################################
     return "Usage: set $name hmPairForSec <seconds_active>"
         if(!$arg || $arg !~ m/^\d+$/);
     $hash->{hmPair} = 1;
-    InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", $hash, 1);
+    InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:".$hash, 1);
 
   } elsif($type eq "hmPairSerial") { ################################
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
@@ -235,7 +234,6 @@ sub
 HMLAN_Read($)
 {
   my ($hash) = @_;
-
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
   my $name = $hash->{NAME};
@@ -437,8 +435,8 @@ HMLAN_DoInit($)
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
   
-  RemoveInternalTimer( $hash);# avoid duplicate timer
-  InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", $hash, 0);
+  RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+  InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
   return undef;
 }
 
@@ -446,11 +444,14 @@ HMLAN_DoInit($)
 sub
 HMLAN_KeepAlive($)
 {
-  my $hash = shift;
+  my($in ) = shift;
+  my(undef,$name) = split(':',$in);
+  my $hash = $defs{$name};
+ 
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
-  RemoveInternalTimer( $hash);# avoid duplicate timer
-  InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", $hash, 1);
+  RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+  InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 1);
 }
 sub
 HMLAN_secSince2000()
