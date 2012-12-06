@@ -208,7 +208,7 @@ CUL_MAX_Parse($$)
         Dispatch($shash, "MAX,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
         if($device_types{$type} eq "HeatingThermostat" or $device_types{$type} eq "WallMountedThermostat") {
           #This are the default values that a device has after factory reset or pairing
-          Dispatch($hash, "MAX,ThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,ThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
         }
         #TODO: send TimeInformation
       }
