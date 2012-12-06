@@ -220,13 +220,17 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   } elsif($setting eq "factoryReset") {
-    my $payload = pack("CCCCCCH6CH6C",0x00,0x00,0x20,0x00,0x00,0x00,$hash->{addr}, 0);
+    my $payload = pack("CCCCCCH6C",0x00,0x00,0xF0,0x00,0x00,0x00,$hash->{addr}, 0);
+    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+
+  } elsif($setting eq "wakeUp") {
+    my $payload = pack("CCCCCCH6CC",0x00,0x00,0xF1,0x00,0x00,0x00,$hash->{addr}, 0, 0x3F);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   }else{
     my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
     my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
-    my $ret = "Unknown argument $setting, choose one of factoryReset groupid$removeDevice";
+    my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid$removeDevice";
     my $assoclist = join(",", map { $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
 
     if($hash->{type} eq "HeatingThermostat") {
