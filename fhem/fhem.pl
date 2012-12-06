@@ -1921,6 +1921,7 @@ HandleTimeout()
   my $now = gettimeofday();
   return ($nextat-$now) if($now < $nextat);
 
+  $now += 0.01;# need to cover min delay at least
   $nextat = 0;
   #############
   # Check the internal list.
@@ -1936,13 +1937,15 @@ HandleTimeout()
       &{$fn}($intAt{$i}{ARG});
       use strict "refs";
       delete($intAt{$i});
-    }
-    $nextat = $tim if(!$nextat || $nextat > $tim);
+    } else {
+      $nextat = $tim if(!$nextat || $nextat > $tim);
+	}
   }
 
   return undef if(!$nextat);
-  $now = gettimeofday();
-  return ($now < $nextat) ? ($nextat-$now) : 0;
+  $now = gettimeofday(); # possibly some tasks did timeout in the meantime
+                         # we will cover them 
+  return ($now+ 0.01 < $nextat) ? ($nextat-$now) : 0.01;
 }
 
 
