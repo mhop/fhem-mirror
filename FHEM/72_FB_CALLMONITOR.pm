@@ -197,9 +197,9 @@ FB_CALLMONITOR_Read($)
   
    if(defined($external_number) and not $external_number =~ /^0/ and $area_code ne "")
    {
-    if($area_code =~ /^0[1-9]+$/)
+    if($area_code =~ /^0[1-9]\d+$/)
     {
-      $external_number = AttrVal($name, "local-area-code", "").$external_number;
+      $external_number = $area_code.$external_number;
     }
     else
     {
