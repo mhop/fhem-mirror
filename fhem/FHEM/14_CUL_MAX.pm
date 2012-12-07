@@ -85,6 +85,7 @@ CUL_MAX_Undef($$)
 {
   my ($hash, $name) = @_;
   RemoveInternalTimer($hash);
+  delete($modules{CUL_MAX}{defptr});
   return undef;
 }
 
