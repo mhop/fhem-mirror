@@ -85,9 +85,10 @@ FB_CALLMONITOR_Initialize($)
 # Provider
   $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
+  $hash->{GetFn}   = "FB_CALLMONITOR_Get";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -140,10 +141,32 @@ FB_CALLMONITOR_Undef($$)
 #####################################
 # No get commands possible, as we just receive the events from the FritzBox.
 sub
-FB_CALLMONITOR_ReadAnswer($$$)
+FB_CALLMONITOR_Get($@)
 {
 
-return "Get command is not supported by this module";
+my ($hash, @arguments) = @_;
+
+
+return "argument missing" if(int(@arguments) < 2);
+
+if($arguments[1] eq "search")
+{
+    if($arguments[2] =~ /^\d+$/)
+    {
+        return FB_CALLMONITOR_reverseSearch($hash, $arguments[2]);
+    }
+    else
+    {
+    return "given argument is not a telephone number";
+    }
+}
+else
+{
+
+   return "unknown argument"; 
+
+
+}
 
 }
 
@@ -171,7 +194,7 @@ FB_CALLMONITOR_Read($)
   
    $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1");
   
-   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(AttrVal($name, "reverse-search", "none") ne "none");
+   $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
  
    readingsBeginUpdate($hash);
    readingsBulkUpdate($hash, "event", lc($array[1]));
