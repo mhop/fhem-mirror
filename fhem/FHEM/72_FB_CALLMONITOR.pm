@@ -88,7 +88,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{GetFn}   = "FB_CALLMONITOR_Get";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -183,6 +183,7 @@ FB_CALLMONITOR_Read($)
   my @array;
   my $reverse_search = undef;
   my $data = $buf;
+  my $area_code = AttrVal($name, "local-area-code", "");
   my $external_number = undef;
   
   
@@ -194,6 +195,19 @@ FB_CALLMONITOR_Read($)
   
    $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1");
   
+   if(defined($external_number) and not $external_number =~ /^0/ and $area_code ne "")
+   {
+    if($area_code =~ /^0[1-9]+$/)
+    {
+      $external_number = AttrVal($name, "local-area-code", "").$external_number;
+    }
+    else
+    {
+     Log 2, "FB_CALLMONITOR: given local area code '$area_code' is not an area code. therefore will be ignored";
+    }
+   
+   }
+   
    $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
  
    readingsBeginUpdate($hash);
@@ -473,6 +487,8 @@ sub FB_CALLMONITOR_loadCacheFile($)
     If this attribute is activated, a leading zero will be removed from the external_number (e.g. in telefon systems).<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)<br><br>
+    <li><a name="local-area-code">local-area-code</a></li>
+    Use the given local area code for reverse search in case of a local call (e.g. 0228 for Bonn, Germany)<br><br>
   </ul>
   <br>
  
@@ -563,6 +579,8 @@ sub FB_CALLMONITOR_loadCacheFile($)
     Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
+    <li><a name="local-area-code">local-area-code</a></li>
+    Verwendet die gesetze Vorwahlnummer bei R&uuml;ckw&auml;rtssuchen bei Ortsgespr&auml;chen (z.B. 0228 f&uuml;r Bonn)<br><br>
   </ul>
   <br>
  
