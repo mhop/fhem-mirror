@@ -8,6 +8,7 @@ use warnings;
 use MIME::Base64;
 
 sub MAX_Define($$);
+sub MAX_Undef($$);
 sub MAX_Initialize($);
 sub MAX_Parse($$);
 sub MAX_Set($@);
@@ -42,6 +43,7 @@ MAX_Initialize($)
   Log 5, "Calling MAX_Initialize";
   $hash->{Match}     = "^MAX";
   $hash->{DefFn}     = "MAX_Define";
+  $hash->{UndefFn}   = "MAX_Undef";
   $hash->{ParseFn}   = "MAX_Parse";
   $hash->{SetFn}     = "MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
@@ -77,6 +79,13 @@ MAX_Define($$)
 
   AssignIoPort($hash);
   return undef;
+}
+
+sub
+MAX_Undef($$)
+{
+  my ($hash,$name) = @_;
+  delete($modules{MAX}{defptr}{$hash->{addr}});
 }
 
 sub
