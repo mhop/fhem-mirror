@@ -88,7 +88,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{GetFn}   = "FB_CALLMONITOR_Get";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
 
 }
 
@@ -269,7 +269,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
 { 
   Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name using klicktel.de for reverse search of $number";
    
-  $result = GetFileFromURL("http://www.klicktel.de/inverssuche/index/search?_dvform_posted=1&phoneNumber=".$number, 5);
+  $result = GetFileFromURL("http://www.klicktel.de/inverssuche/index/search?_dvform_posted=1&phoneNumber=".$number, 5, undef, 1);
   if(not defined($result))
   {
      if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -296,7 +296,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
 {
   Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name using dasoertliche.de for reverse search of $number";
   
-  $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 7);
+  $result = GetFileFromURL("http://www1.dasoertliche.de/?form_name=search_inv&ph=".$number, 5, undef, 1);
   if(not defined($result))
   {
     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
@@ -318,6 +318,35 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
    }
   }
 }
+
+# SWITZERLAND ONLY!!! Ask search.ch
+if(AttrVal($name, "reverse-search", "none") eq "search.ch")
+{
+  Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name using search.ch for reverse search of $number";
+  
+  $result = GetFileFromURL("http://tel.search.ch/?tel=".$number, 5, undef, 1);
+  if(not defined($result))
+  {
+    if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+    {
+       $hash->{helper}{CACHE}{$number} = "timeout";
+       return "timeout";
+    }
+    
+  }
+  else
+  {
+   #Log 2, $result;
+   if($result =~ /<h5><a href=".*?" class="fn">(.+?)<\/a><\/h5>/)
+   {
+     $invert_match = $1;
+     $invert_match = FB_CALLMONITOR_html2txt($invert_match);
+     FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     return $invert_match;
+   }
+  }
+}
+
 
  
 # If no result is available set cache result and return undefined 
@@ -470,10 +499,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#do_not_notiy">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
-    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
-    If the attribute is set to "all", the reverse search will reverse search on all websites until a valid answer is found on of them 
+    If the attribute is set to "all", the reverse search will reverse search on all websites (execept search.ch) until a valid answer is found on of them 
     If is set to "none", then no reverse searching will be used.<br><br>Default value is "none".<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     If this attribute is activated each reverse-search result is saved in an internal cache
@@ -560,10 +589,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#do_not_notiy">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
-    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher für die R&uuml;ckw&auml;rtssuche verwendet werden soll.
-    Wenn dieses Attribut auf dem Wert "all" steht, werden alle verf&uuml;gbaren Suchanbieter f&uuml;r die R&uuml;ckw&auml;rtssuche herangezogen, solange bis irgend ein Anbieter ein valides Ergebniss liefert.
+    Wenn dieses Attribut auf dem Wert "all" steht, werden alle verf&uuml;gbaren Suchanbieter (ausser search.ch) f&uuml;r die R&uuml;ckw&auml;rtssuche herangezogen, solange bis irgend ein Anbieter ein valides Ergebniss liefert.
     Wenn der Wert "none" ist, wird keine R&uuml;ckw&auml;rtssuche durchgef&uuml;hrt.<br><br>Standardwert ist "none" (keine R&uuml;ckw&auml;rtssuche).<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     Wenn dieses Attribut gesetzt ist, werden alle Ergebisse der R&uuml;ckw&auml;rtssuche in einem modul-internen gespeichert
