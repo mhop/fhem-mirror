@@ -39,7 +39,7 @@ structure_Initialize($)
   $hash->{NotifyFn}  = "structure_Notify";
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
-  $hash->{AttrList}  = "clientstate_priority clientstate_behavior:relative,absolute";
+  $hash->{AttrList}  = "clientstate_priority clientstate_behavior:relative,absolute loglevel:0,5";
 
   addToAttrList("structexclude");
 
@@ -250,7 +250,7 @@ sub structure_Notify($$)
 
   #eigenen Status jetzt setzen, nur wenn abweichend
   if(!defined($hash->{STATE}) || ($hash->{STATE} ne $newState)) {
-    Log 3, "Update structure '" .$me . "' to " . $newState .
+    Log GetLogLevel($hash->{NAME},5), "Update structure '" .$me . "' to " . $newState .
                 " because device '" .$dev->{NAME}. "' has changed";
     $hash->{STATE} = $newState;
     readingsSingleUpdate($hash, "state", $newState, 1);
@@ -268,9 +268,9 @@ CommandAddStruct($)
   if(int(@a) != 2) {
     return "Usage: addstruct <structure_device> <devspec>";
   }
-
   my $name = shift(@a);
   my $hash = $defs{$name};
+
   if(!$hash || $hash->{TYPE} ne "structure") {
     return "$a is not a structure device";
   }
@@ -348,7 +348,7 @@ structure_Set($@)
     }
   }
   delete($hash->{INSET});
-  Log 5, "SET: $ret" if($ret);
+  Log GetLogLevel($hash->{NAME},5), "SET: $ret" if($ret);
   return $list[1] eq "?"
            ? "Unknown argument ?, choose one of " . join(" ", sort keys(%pars))
            : undef;
@@ -361,7 +361,9 @@ structure_Attr($@)
   my ($type, @list) = @_;
 
   return undef if($list[1] eq "alias" ||
-                  $list[1] eq "room");
+                  $list[1] eq "room" ||
+                  $list[1] =~ m/clientstate/ ||
+                  $list[1] eq "loglevel");
   my $hash = $defs{$list[0]};
   $hash->{INATTR} = 1;
   my $ret = "";
@@ -384,7 +386,7 @@ structure_Attr($@)
     }
   }
   delete($hash->{INATTR});
-  Log 5, "ATTR: $ret" if($ret);
+  Log GetLogLevel($hash->{NAME},5), "ATTR: $ret" if($ret);
   return undef;
 }
 
