@@ -238,12 +238,18 @@ MAX_Set($@)
     my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
     my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
     my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid$removeDevice";
-    my $assoclist = join(",", map { $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+
+    my $assoclist;
+    #Build list of devices which this device can be associated to
+    if($hash->{type} eq "HeatingThermostat") {
+      $assoclist = join(",", map { $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat", "ShutterContact"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+    } elsif($hash->{type} ~~ ["ShutterContact", "WallMountedThermostat"]) {
+      $assoclist = join(",", map { $_->{type} eq "HeatingThermostat" ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+    }
 
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
-
       return "$ret associate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration";
 
     } elsif($hash->{type} eq "WallMountedThermostat") {
