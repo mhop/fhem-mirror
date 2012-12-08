@@ -197,14 +197,6 @@ MAX_Set($@)
                                               $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
-  }elsif($setting eq "removeDevice") {
-    return "Cannot set without IODev" if(!defined($hash->{IODev}));
-    if(exists($hash->{IODev}{RemoveDevice})) {
-      return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
-    } else {
-      return "IODev does not need removeDevice";
-    }
-
   } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
     return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
@@ -229,8 +221,14 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   } elsif($setting eq "factoryReset") {
-    my $payload = pack("CCCCCCH6C",0x00,0x00,0xF0,0x00,0x00,0x00,$hash->{addr}, 0);
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    if(exists($hash->{IODev}{RemoveDevice})) {
+      #MAXLAN
+      return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
+    } else {
+      #CUL_MAXK
+      my $payload = pack("CCCCCCH6C",0x00,0x00,0xF0,0x00,0x00,0x00,$hash->{addr}, 0);
+      return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    }
 
   } elsif($setting eq "wakeUp") {
     my $payload = pack("CCCCCCH6CC",0x00,0x00,0xF1,0x00,0x00,0x00,$hash->{addr}, 0, 0x3F);
@@ -485,8 +483,6 @@ MAX_Parse($$)
     <li>groupid &lt;id&gt;<br>
       For devices of type HeatingThermostat only.
       Writes the given group id the device's memory. It is usually not necessary to change this.</li>
-    <li>removeDevice<br>
-      Removes the device from the cube, i.e. deletes the pairing.</li>
     <li>ecoTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given eco temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
     <li>comfortTemperature &lt;value&gt;<br>
