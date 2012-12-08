@@ -680,6 +680,7 @@ sub
 MAXLAN_RemoveDevice($$)
 {
   my ($hash,$addr) = @_;
+  #This does a factoryReset on the Device
   return MAXLAN_Write($hash,"t:1,1,".encode_base64(pack("H6",$addr),""), "A:");
 }
 
