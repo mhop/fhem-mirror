@@ -283,7 +283,7 @@ FP_digestCgi($) {
     if($p =~ m/^attr\.(.*)$/)  { $attr{$1}  = $v; }
     if($p =~ m/^top\.(.*)$/)   { $top{$1}   = $v; }
     if($p =~ m/^left\.(.*)$/)  { $left{$1}  = $v; }
-    if($p =~ m/^style\.(.*)$/) { $style{$1} = int($v); }
+    if($p =~ m/^style\.(.*)$/) { $style{$1} = int(substr($v,0,2)); }
     if($p =~ m/^text\.(.*)$/)  { $text{$1}  = $v; }
 	if($p eq "pos")            { %FW_pos =  split(/[=;]/, $v); }
   }
