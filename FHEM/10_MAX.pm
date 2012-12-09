@@ -258,9 +258,8 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   }else{
-    my $removeDevice = exists($hash->{IODev}{RemoveDevice}) ? " removeDevice" : "";
     my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
-    my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid$removeDevice";
+    my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid";
 
     my $assoclist;
     #Build list of devices which this device can be associated to
@@ -539,7 +538,7 @@ MAX_Parse($$)
     <li>windowOpenDuration &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open duration to the device's memory. That is the duration the heater will temporarily set the window open temperature if an open window is detected by a rapid temperature decrease. (Not used if open window is detected by ShutterControl. Must be between 0 and 60 minutes in multiples of 5.</li>
     <li>factoryReset<br>
-        Resets the device to factory values. It has to be paired again afterwards. (If you use MAXLAN, you have to use removeDevice, before you can re-pair.)</li>
+        Resets the device to factory values. It has to be paired again afterwards.</li>
     <li>associate<br>
         Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened.</li>
   </ul>
