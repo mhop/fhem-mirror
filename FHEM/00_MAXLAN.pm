@@ -8,6 +8,10 @@ use warnings;
 use MIME::Base64;
 use POSIX;
 
+require "10_MAX.pm";
+our %msgCmd2Id;
+our %device_types;
+
 sub MAXLAN_Parse($$);
 sub MAXLAN_Read($);
 sub MAXLAN_Write(@);
@@ -17,15 +21,6 @@ sub MAXLAN_Poll($);
 sub MAXLAN_SendDeviceCmd($$);
 sub MAXLAN_RequestConfiguration($$);
 sub MAXLAN_RemoveDevice($$);
-
-my %device_types = (
-  0 => "Cube",
-  1 => "HeatingThermostat",
-  2 => "HeatingThermostatPlus",
-  3 => "WallMountedThermostat",
-  4 => "ShutterContact",
-  5 => "PushButton"
-);
 
 my @boost_durations = (0, 5, 10, 15, 20, 25, 30, 60);
 
