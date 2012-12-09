@@ -15,11 +15,9 @@ sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime($);
 sub CUL_MAX_Set($@);
+sub CUL_MAX_SendAck($$$);
 sub CUL_MAX_SendTimeInformation(@);
 sub CUL_MAX_Send(@);
-
-# Todo for full MAXLAN replacement:
-# - Send Ack on ShutterContactState (but never else)
 
 my $pairmodeDuration = 30; #seconds
 
@@ -193,6 +191,10 @@ CUL_MAX_Parse($$)
 
     } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState"])  {
       Dispatch($shash, "MAX,$msgType,$src,$payload", {RAWMSG => $rmsg});
+      #Only ShutterContactState needs ack
+      if($msgType eq "ShutterContactState" and $dst eq $shash->{addr}) {
+        CUL_MAX_SendAck($shash,$msgcnt,$dst);
+      }
     } else {
       Log 5, "Unhandled message $msgType";
     }
@@ -202,7 +204,14 @@ CUL_MAX_Parse($$)
   return undef;
 }
 
-#All inputs are hex strings, $cmd is one from %msgCmd2Id
+sub
+CUL_MAX_SendAck($$$)
+{
+  my ($hash,$msgcnt,$dst) = @_;
+  return CUL_MAX_Send($hash, "Ack", $dst, "00", "", "00", $msgcnt);
+}
+
+#All inputs are hex strings, $flags is binary in string format, $cmd is one from %msgCmd2Id
 sub
 CUL_MAX_Send(@)
 {
