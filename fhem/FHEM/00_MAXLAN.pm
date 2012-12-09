@@ -327,7 +327,9 @@ MAXLAN_Read($)
   while(1) {
     my $rmsg = MAXLAN_ReadSingleResponse($hash, 0);
     last if(!$rmsg);
-    Log 2, "Unsolicated response from Cube: $rmsg";
+    # The Msg N: .... is the only one that may come spontanously from
+    # the cube while we are in pairmode
+    Log 2, "Unsolicated response from Cube: $rmsg" unless($hash->{pairmode} and substr($rmsg,0,2) eq "N:");
     MAXLAN_Parse($hash, $rmsg);
   }
 }
