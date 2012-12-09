@@ -498,8 +498,8 @@ MAX_Parse($$)
     The &lt;addr&gt; is a 6 digit hex number.
     You should never need to specify this by yourself, the <a href="#autocreate">autocreate</a> module will do it for you.<br>
     It's advisable to set event-on-change-reading, like
-    <code>attr Heater_0 event-on-change-reading battery,desiredTemperature,valveposition</code>
-    because the polling mechanism will otherwise create events every 10 seconds.
+    <code>attr MAX_123456 event-on-change-reading .*</code>
+    because the polling mechanism will otherwise create events every 10 seconds.<br>
 
     Example:
     <ul>
@@ -543,8 +543,11 @@ MAX_Parse($$)
         Resets the device to factory values. It has to be paired again afterwards.<br>
         ATTENTION: When using this on a ShutterContact using the MAXLAN backend, the ShutterContact has to be triggered once manually to complete
         the factoryReset.</li>
-    <li>associate<br>
-        Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened.</li>
+    <li>associate &lt;value&gt;<br>
+        Associated one device to another. &lt;value&gt; can be the name of MAX device or its 6-digit hex address.<br>
+        Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened. The thermostat must be associated to the ShutterContact, too, to accept those messages.
+        Associating HeatingThermostat and WallMountedThermostat makes them sync their desiredTemperature and uses the measured temperature of the
+ WallMountedThermostat for control.</li>
   </ul>
   <br>
 
