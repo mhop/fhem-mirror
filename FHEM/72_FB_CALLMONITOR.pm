@@ -496,7 +496,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <b>Attributes</b><br><br>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
-    <li><a href="#do_not_notiy">do_not_notify</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
     <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|search.ch|none)</li>
@@ -586,7 +586,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <b>Attribute</b><br><br>
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
-    <li><a href="#do_not_notiy">do_not_notify</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|search.ch|none)</li>
