@@ -155,7 +155,7 @@ MAXLAN_Connect($)
   #Parsing the "C:" responses later on will set IODev correctly again.
   #This effectively removes IODev from all devices that are not longer paired to our Cube.
   foreach (%{$modules{MAX}{defptr}}) {
-    $modules{MAX}{defptr}{$_}{IODev} = undef if($modules{MAX}{defptr}{$_}{IODev} == $hash);
+    $modules{MAX}{defptr}{$_}{IODev} = undef if(defined($modules{MAX}{defptr}{$_}{IODev}) and $modules{MAX}{defptr}{$_}{IODev} == $hash);
   }
 
   my $rmsg;
