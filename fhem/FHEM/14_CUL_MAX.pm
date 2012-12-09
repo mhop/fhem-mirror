@@ -25,7 +25,7 @@ my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube use
 
 my $resendRetries = 10; #how often resend before giving up?
 
-my $ackTimeout = 2.3; #seconds: The MAX devices wake up once every second. Making this a fraction increases our change to hit
+my $ackTimeout = 1.3; #seconds: The MAX devices wake up once every second. Making this a fraction increases our change to hit
 # the right moment the next time.
 
 sub
