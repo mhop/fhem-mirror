@@ -167,6 +167,7 @@ CUL_MAX_Parse($$)
   Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
   if(exists($msgTypes{$msgTypeRaw})) {
     if($msgType eq "Ack") {
+      Dispatch($shash, "MAX,Ack,$src,$payload", {RAWMSG => $rmsg});
       my $i = 0;
       while ($i < @waitForAck) {
         my $packet = $waitForAck[$i];
@@ -178,8 +179,6 @@ CUL_MAX_Parse($$)
           $i++;
         }
       }
-      #TODO: The Ack payload for HeatingThermostats is 01HHHHHH where HHHHHH are the first 3 bytes of the HeatingThermostatState payload
-      Log 5, "Got Ack (but no match)";
 
     } elsif($msgType eq "TimeInformation") {
       if($len == 10) {
