@@ -20,14 +20,17 @@ set ylabel "Temperature in C"
 #FileLog 4:flowTemperature:0:
 #FileLog 4:returnTemperatureTarget:0:
 #FileLog 4:returnTemperature:0:
-#FileLog 4:ambientTemperature:0:int
+#FileLog 4:ambientTemperature:0:
+#FileLog 4:averageAmbientTemperature:0:
 
 plot \
-  "< awk '/temperature/{print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Vorlauftemperatur' with lines,\
-  "< awk '/desired/{print $1, $4}' <IN>"\
-     using 1:2 axes x1y2 title 'Rücklauftemperatur SOLL' with lines,\
-  "< awk '/humidity/ {print $1, $4+0}' <IN>"\
-     using 1:2 axes x1y2 title 'Rücklauftemperatur' with lines,\
-  "< awk '/actuator/ {print $1, $4+0}' <IN>"\
-     using 1:2 axes x1y2 title 'Außentemperatur' with lines lw2\
+  "< awk '/flowTemperature/{print $1, $4}' <IN>"\
+     using 1:2 axes x1y1 title 'Vorlauftemperatur' with lines,\
+  "< awk '/returnTemperatureTarget/{print $1, $4}' <IN>"\
+     using 1:2 axes x1y1 title 'Rücklauftemperatur SOLL' with lines,\
+  "< awk '/returnTemperature/ {print $1, $4+0}' <IN>"\
+     using 1:2 axes x1y1 title 'Rücklauftemperatur' with lines,\
+  "< awk '/ambientTemperature/ {print $1, $4+0}' <IN>"\
+     using 1:2 axes x1y1 title 'Außentemperatur' with lines lw2,\
+  "< awk '/averageAmbient/ {print $1, $4+0}' <IN>"\
+     using 1:2 axes x1y1 title 'durchschnittliche Außentemperatur' with lines lw2\
