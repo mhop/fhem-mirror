@@ -119,6 +119,7 @@ my @waitForAck = ();
 sub
 CUL_MAX_Parse($$)
 {
+  #Attention: there is a limit in the culfw firmware: It only receives messages shorter than 30 bytes (see rf_moritz.h)
   my ($hash, $rmsg) = @_;
 
   if(!exists($modules{CUL_MAX}{defptr})) {
@@ -180,7 +181,7 @@ CUL_MAX_Parse($$)
       Log 5, "CUL_MAX_Parse: Got PairPing (pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
       if($shash->{pairmode}) {
         Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
-        CUL_MAX_Send($shash, "PairPong", $src, "00", "00000000");
+        CUL_MAX_Send($shash, "PairPong", $src, "00");
         #TODO: wait for Ack
         Dispatch($shash, "MAX,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
         if($device_types{$type} eq "HeatingThermostat" or $device_types{$type} eq "WallMountedThermostat") {
@@ -200,8 +201,6 @@ CUL_MAX_Parse($$)
   }
   return undef;
 }
-
-sub
 
 #All inputs are hex strings, $cmd is one from %msgCmd2Id
 sub
