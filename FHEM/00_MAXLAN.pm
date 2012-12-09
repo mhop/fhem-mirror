@@ -150,6 +150,14 @@ MAXLAN_Connect($)
   #Read initial configuration data
   MAXLAN_ExpectAnswer($hash,"H:");
   MAXLAN_ExpectAnswer($hash,"M:");
+
+  #We first reset the IODev for all MAX devices using this MAXLAN as a backend.
+  #Parsing the "C:" responses later on will set IODev correctly again.
+  #This effectively removes IODev from all devices that are not longer paired to our Cube.
+  foreach (%{$modules{MAX}{defptr}}) {
+    $modules{MAX}{defptr}{$_}{IODev} = undef if($modules{MAX}{defptr}{$_}{IODev} == $hash);
+  }
+
   my $rmsg;
   do
   {
@@ -209,7 +217,7 @@ MAXLAN_Set($@)
     my $time = time()-946684774;
     my $rmsg = "v:".$timezones.",".sprintf("%08x",$time);
     my $ret = MAXLAN_Write($hash,$rmsg, "A:");
-    Dispatch($hash, "MAX,CubeClockState,$hash->{rfaddr},1", {RAWMSG => $rmsg}) if(!$ret);
+    Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},1", {RAWMSG => $rmsg}) if(!$ret);
     return $ret;
 
   }elsif($setting eq "factoryReset") {
@@ -435,9 +443,9 @@ MAXLAN_Parse($$)
       $hash->{cubeTimeDifference} = $difference;
     }
 
-    Dispatch($hash, "MAX,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
-    Dispatch($hash, "MAX,CubeConnectionState,$hash->{rfaddr},1", {RAWMSG => $rmsg});
-    Dispatch($hash, "MAX,CubeClockState,$hash->{rfaddr},$clockset", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,CubeConnectionState,$hash->{rfaddr},1", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,CubeClockState,$hash->{rfaddr},$clockset", {RAWMSG => $rmsg});
     Log $ll5, "MAXLAN_Parse: Got hello, connection ip $args[4], duty cycle $dutycycle, freememory $freememory, clockset $clockset";
 
   } elsif($cmd eq 'M') {
@@ -482,7 +490,6 @@ MAXLAN_Parse($$)
       $hash->{devices}[-1]->{serial} = $groupsdevices[$i+2];
       $hash->{devices}[-1]->{name} = $groupsdevices[$i+3];
       $hash->{devices}[-1]->{groupid} = $groupsdevices[$i+4];
-      #Dispatch($hash, "MAX,define,$hash->{devices}[-1]->{addr},$device_types{$hash->{devices}[-1]->{type}},$hash->{devices}[-1]->{serial},$hash->{devices}[-1]->{groupid},1", {RAWMSG => $rmsg});
     }
 
     #Log $ll5, "Got Metadata, hash: ".Dumper($hash);
@@ -502,10 +509,10 @@ MAXLAN_Parse($$)
 
     $len = $len+1; #The len field itself was not counted
 
-    Dispatch($hash, "MAX,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$devicetype},$serial,$groupid,1", {RAWMSG => $rmsg});
 
     if($len != length($bindata)) {
-      Dispatch($hash, "MAX,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
+      Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
       return "Invalid C: response, len does not match";
     }
 
@@ -527,7 +534,7 @@ MAXLAN_Parse($$)
       $windowopentemp=$windowopentemp/2.0;
       $windowopendur=$windowopendur*5;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
-      Dispatch($hash, "MAX,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
+      Dispatch($hash, "MAX,1,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
 
     }elsif($devicetype == 4){#ShutterContact
       Log 2, "ShutterContact send some configuration, but none was expected" if($len > 18);
@@ -536,7 +543,7 @@ MAXLAN_Parse($$)
     }
 
     #Clear Error
-    Dispatch($hash, "MAX,Error,$addr", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,Error,$addr", {RAWMSG => $rmsg});
 
     #Check if it is already recorded in devices
     my $found = 0;
@@ -576,9 +583,9 @@ MAXLAN_Parse($$)
         if(!$shash) {
           Log 2, "Got List response for undefined device with addr $addr";
         }elsif($shash->{type} eq "HeatingThermostat" or $shash->{type} eq "WallMountedThermostat"){
-          Dispatch($hash, "MAX,ThermostatState,$addr,$payload", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,1,ThermostatState,$addr,$payload", {RAWMSG => $rmsg});
         }elsif($shash->{type} eq "ShutterContact"){
-          Dispatch($hash, "MAX,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
+          Dispatch($hash, "MAX,1,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
         }else{
           Log 2, "Got status for unimplemented device type $shash->{type}";
         }
@@ -594,7 +601,7 @@ MAXLAN_Parse($$)
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
     Log 2, "Paired new device, type $device_types{$type}, addr $addr, serial $serial";
-    Dispatch($hash, "MAX,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
+    Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
 
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
     MAXLAN_RequestConfiguration($hash,$addr);
@@ -726,7 +733,12 @@ MAXLAN_RemoveDevice($$)
 {
   my ($hash,$addr) = @_;
   #This does a factoryReset on the Device
-  return MAXLAN_Write($hash,"t:1,1,".encode_base64(pack("H6",$addr),""), "A:");
+  my $ret = MAXLAN_Write($hash,"t:1,1,".encode_base64(pack("H6",$addr),""), "A:");
+  if(!defined($ret)) { #success
+    #The device is not longer accessable by the Cube
+    $modules{MAX}{defptr}{$addr}{IODev} = undef;
+  }
+  return $ret;
 }
 
 1;
