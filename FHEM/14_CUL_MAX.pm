@@ -15,6 +15,7 @@ sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime($);
 sub CUL_MAX_Set($@);
+sub CUL_MAX_SendTimeInformation(@);
 sub CUL_MAX_Send(@);
 
 # Todo for full MAXLAN replacement:
@@ -155,8 +156,10 @@ CUL_MAX_Parse($$)
       }
 
     } elsif($msgType eq "TimeInformation") {
-      if($len == 10) {
-        Log 5, "Want TimeInformation?";
+      if($dst eq $shash->{addr}) {
+        #This is a request for TimeInformation send to us
+        Log 5, "Got request for TimeInformation, sending it";
+        CUL_MAX_SendTimeInformation($shash, $src);
       } else {
         my ($f1,$f2,$f3,$f4,$f5) = unpack("CCCCC",pack("H*",$payload));
         #For all fields but the month I'm quite sure
@@ -308,21 +311,36 @@ CUL_MAX_SendDeviceCmd($$)
 }
 
 sub
-CUL_MAX_BroadcastTime($)
+CUL_MAX_GetTimeInformationPayload()
 {
-  my $hash = shift @_;
   my ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst) = gmtime(time());
   $mon += 1; #make month 1-based
   #month encoding is just guessed
   #also $hour-1 is not so clear, maybe there is some timezone involved (maybe we should send gmtime?)
   #but where do we send the timezone? or is scheduled data/until in GMT?
   #perls localtime gives years since 1900, and we need years since 2000
-  my $payload = unpack("H*",pack("CCCCC", $year - 100, $day, $hour, $min | (($mon & 0x0C) << 4), $sec | (($mon & 0x03) << 6)));
+  return unpack("H*",pack("CCCCC", $year - 100, $day, $hour, $min | (($mon & 0x0C) << 4), $sec | (($mon & 0x03) << 6)));
+}
+
+sub
+CUL_MAX_SendTimeInformation(@)
+{
+  my ($hash,$addr,$payload) = @_;
+  $payload = CUL_MAX_GetTimeInformationPayload() if(!defined($payload));
+  Log 5, "broadcast time to $addr";
+  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "00000011");
+}
+
+sub
+CUL_MAX_BroadcastTime($)
+{
+  my $hash = shift;
+  my $payload = CUL_MAX_GetTimeInformationPayload();
   Log 5, "CUL_MAX_BroadcastTime: payload $payload";
-  while (my ($addr, $dhash) = each (%{$modules{MAX}{defptr}})) {
+  foreach my $addr (keys %{$modules{MAX}{defptr}}) {
+    my $dhash = $modules{MAX}{defptr}{$addr};
     if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash) {
-      Log 5, "broadcast time to $addr";
-      CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "00000011");
+      CUL_MAX_SendTimeInformation($hash, $addr, $payload);
     }
   }
   InternalTimer(gettimeofday()+$timeBroadcastInterval, "CUL_MAX_BroadcastTime", $hash, 0);
