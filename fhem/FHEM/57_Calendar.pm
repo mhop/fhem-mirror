@@ -1142,9 +1142,23 @@ sub Calendar_Undef($$) {
     <ul>
     Think about a calendar with calendar events whose summaries (subjects, titles) are the names of devices in your fhem installation.
     You want the respective devices to switch on when the calendar event starts and to switch off when the calendar event ends.<br><br>
-    <code>
-    define SwitchActorOn notify MyCalendar:modeStarted.* { my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; fhem("set $actor on") }<br><br>
-    define SwitchActorOff notify MyCalendar:modeEnded.* { my $uid= "%EVTPART1";; my $actor= fhem("get MyCalendar summary $uid");; fhem("set $actor off") }
+   <code>
+    define SwitchActorOn  notify MyCalendar:modeStarted.* { 
+                my $reading="%EVTPART0";; 
+                my $uid= "%EVTPART1";; 
+                my $actor= fhem("get MyCalendar summary $uid");; 
+                if(defined $actor) { 
+                   fhem("set $actor on") 
+                } 
+    }<br><br>
+    define SwitchActorOff  notify MyCalendar:modeEnded.* { 
+                my $reading="%EVTPART0";; 
+                my $uid= "%EVTPART1";; 
+                my $actor= fhem("get MyCalendar summary $uid");; 
+                if(defined $actor) { 
+                   fhem("set $actor off") 
+                } 
+    }
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
