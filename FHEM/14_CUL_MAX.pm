@@ -15,6 +15,7 @@ sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime($);
 sub CUL_MAX_Set($@);
+sub CUL_MAX_Send(@);
 
 # Todo for full MAXLAN replacement:
 # - Send Ack on ShutterContactState (but never else)
@@ -24,6 +25,9 @@ my $pairmodeDuration = 30; #seconds
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
 
 my $resendRetries = 10; #how often resend before giving up?
+
+my $ackTimeout = 2.3; #seconds: The MAX devices wake up once every second. Making this a fraction increases our change to hit
+# the right moment the next time.
 
 sub
 CUL_MAX_Initialize($)
@@ -69,6 +73,7 @@ CUL_MAX_Define($$)
 
   #This interface is shared with 00_MAXLAN.pm
   $hash->{SendDeviceCmd} = \&CUL_MAX_SendDeviceCmd;
+  $hash->{Send} = \&CUL_MAX_Send;
 
   CUL_MAX_BroadcastTime($hash);
   return undef;
@@ -194,13 +199,41 @@ CUL_MAX_Parse($$)
 }
 
 sub
+
+#All inputs are hex strings, $cmd is one from %msgCmd2Id
+sub
 CUL_MAX_Send(@)
 {
-  my ($hash, $cmd, $dst, $payload, $flags) = @_;
+  # $cmd is one of
+  my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt) = @_;
 
   $flags = "0"x8 if(!$flags);
+  $groupId = "00" if(!defined($groupId));
+  if(!defined($msgcnt)) {
+    my $dhash = CUL_MAX_DeviceHash($dst);
+    #replace message counter if not already set
+    $dhash->{READINGS}{msgcnt}{VAL} += 1;
+    $dhash->{READINGS}{msgcnt}{VAL} &= 0xFF;
+    $msgcnt = sprintf("%02x",$dhash->{READINGS}{msgcnt}{VAL});
+  }
 
-  return CUL_MAX_SendDeviceCmd($hash, pack("H2B8H*","00",$flags,$sendTypes{$cmd}.$hash->{addr}.$dst."00".$payload));
+  my $packet = $msgcnt . $flags . $msgCmd2Id{$cmd} . $hash->{addr} . $dst . $groupId . $payload;
+
+  #prefix length in bytes
+  $packet = sprintf("%02x",length($packet)/2) . $packet;
+
+  #Send to CUL
+  IOWrite($hash, "", "Zs". $packet);
+
+  #Schedule checking for Ack
+  my $timeout = gettimeofday()+$ackTimeout;
+  $waitForAck[@waitForAck] = { "packet" => $packet,
+                               "dest" => $dst,
+                               "cnt" => hex($msgcnt),
+                               "time" => $timeout,
+                               "resends" => "0" };
+  InternalTimer($timeout, "CUL_MAX_Resend", $hash, 0);
+  return undef;
 }
 
 sub
@@ -220,11 +253,11 @@ CUL_MAX_Resend($)
   while ($i < @waitForAck ) {
     my $packet = $waitForAck[$i];
     if( $packet->{time} <= gettimeofday() ) {
-      Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{payload}";
-      if($packet->{resend}++ < $resendRetries) {
+      Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
+      if($packet->{resends}++ < $resendRetries) {
         #First resend is one second after original send, second resend it two seconds after first resend, etc
-        $packet->{time} = gettimeofday()+$packet->{resend};
-        IOWrite($hash, "", "Zs". $packet->{payload});
+        $packet->{time} = gettimeofday()+$ackTimeout;
+        IOWrite($hash, "", "Zs". $packet->{packet});
         readingsSingleUpdate($hash, "retryCount", ReadingsVal($hash->{NAME}, "retryCount", 0) + 1, 1);
       } else {
         Log 1, "CUL_MAX_Resend: Giving up on that packet";
@@ -249,26 +282,28 @@ CUL_MAX_SendDeviceCmd($$)
   my $dstaddr = unpack("H6",substr($payload,6,3));
   my $dhash = CUL_MAX_DeviceHash($dstaddr);
 
-  #If cnt is not right, we don't get an Ack (At least if count is too low - have to test more)
-  my $cnt = ($dhash->{READINGS}{msgcnt}{VAL} + 1) & 0xFF;
-  $dhash->{READINGS}{msgcnt}{VAL} = $cnt;
+  my $cnt = unpack("C",substr($payload,0,1));
+  if($cnt == 0) {
+    #replace message counter if not already set
+    $cnt = ($dhash->{READINGS}{msgcnt}{VAL} + 1) & 0xFF;
+    $dhash->{READINGS}{msgcnt}{VAL} = $cnt;
+    substr($payload,0,1) = pack("C",$cnt);
+  }
   #replace source address
   substr($payload,3,3) = pack("H6",$hash->{addr});
-  #replace message counter
-  substr($payload,0,1) = pack("C",$cnt);
   #Prefix length byte
   $payload = pack("C",length($payload)) . $payload;
 
   $payload = unpack("H*",$payload); #convert to hex
   Log 5, "CUL_MAX_SendDeviceCmd: ". $payload;
   IOWrite($hash, "", "Zs". $payload);
-  my $now = gettimeofday();
-  $waitForAck[@waitForAck] = { "payload" => $payload,
+  my $timeout = gettimeofday()+$ackTimeout;
+  $waitForAck[@waitForAck] = { "packet" => $payload,
                                "dest" => $dstaddr,
                                "cnt" => $cnt,
-                               "time" => $now+1,
-                               "resend" => "0" };
-  InternalTimer($now+1, "CUL_MAX_Resend", $hash, 0);
+                               "time" => $timeout,
+                               "resends" => "0" };
+  InternalTimer($timeout, "CUL_MAX_Resend", $hash, 0);
   return undef;
 }
 
