@@ -127,12 +127,11 @@ CUL_MAX_Parse($$)
   my $shash = $modules{CUL_MAX}{defptr};
 
   $rmsg =~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/;
-  my ($len,$msgcnt,$msgFlagRaw,$msgTypeRaw,$src,$dst,$groupid,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
+  my ($len,$msgcnt,$msgFlag,$msgTypeRaw,$src,$dst,$groupid,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
   $len = hex($len);
   Log 1, "CUL_MAX_Parse: len mismatch" if(2*$len+3 != length($rmsg)); #+3 = +1 for 'Z' and +2 for len field in hex
 
   $groupid = hex($groupid);
-  my $msgFlag = sprintf("%b",hex($msgFlagRaw));
 
   #convert adresses to lower case
   $src = lc($src);
@@ -176,7 +175,15 @@ CUL_MAX_Parse($$)
       }
     } elsif($msgType eq "PairPing") {
       my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
-      Log 5, "CUL_MAX_Parse: Got PairPing (pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+      Log 5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
+
+      #There are two variants of PairPing: The first has a destination address of "000000" and can be paired
+      #to any device. The other is send after changing batteries (without factory reset) and has a destination address of the last paired device.
+      #It can still be paired to any device (doesn't have to be the last paired device).
+      if(($dst ne "000000") and ($dst ne $shash->{addr})) {
+        Log 2, "Device want's to be re-paired to $dst";
+      }
+
       if($shash->{pairmode}) {
         Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
         CUL_MAX_Send($shash, "PairPong", $src, "00");
@@ -211,14 +218,14 @@ CUL_MAX_SendAck($$$)
   return CUL_MAX_Send($hash, "Ack", $dst, "00", "", "00", $msgcnt);
 }
 
-#All inputs are hex strings, $flags is binary in string format, $cmd is one from %msgCmd2Id
+#All inputs are hex strings, $cmd is one from %msgCmd2Id
 sub
 CUL_MAX_Send(@)
 {
   # $cmd is one of
   my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt) = @_;
 
-  $flags = "0"x8 if(!$flags);
+  $flags = "00" if(!$flags);
   $groupId = "00" if(!defined($groupId));
   if(!defined($msgcnt)) {
     my $dhash = CUL_MAX_DeviceHash($dst);
@@ -336,7 +343,7 @@ CUL_MAX_SendTimeInformation(@)
   my ($hash,$addr,$payload) = @_;
   $payload = CUL_MAX_GetTimeInformationPayload() if(!defined($payload));
   Log 5, "broadcast time to $addr";
-  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "00000011");
+  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "03");
 }
 
 sub
