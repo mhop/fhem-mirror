@@ -138,9 +138,15 @@ CUL_MAX_Parse($$)
   $dst = lc($dst);
   my $msgType = exists($msgId2Cmd{$msgTypeRaw}) ? $msgId2Cmd{$msgTypeRaw} : $msgTypeRaw;
   Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
+  my $isToMe = ($dst eq $shash->{addr}) ? 1 : 0; # $isToMe is true if that packet was directed at us
+
   if(exists($msgId2Cmd{$msgTypeRaw})) {
+
     if($msgType eq "Ack") {
-      Dispatch($shash, "MAX,Ack,$src,$payload", {RAWMSG => $rmsg});
+      Dispatch($shash, "MAX,$isToMe,Ack,$src,$payload", {RAWMSG => $rmsg});
+
+      return undef if(!$isToMe);
+
       my $i = 0;
       while ($i < @waitForAck) {
         my $packet = $waitForAck[$i];
@@ -154,7 +160,7 @@ CUL_MAX_Parse($$)
       }
 
     } elsif($msgType eq "TimeInformation") {
-      if($dst eq $shash->{addr}) {
+      if($isToMe) {
         #This is a request for TimeInformation send to us
         Log 5, "Got request for TimeInformation, sending it";
         CUL_MAX_SendTimeInformation($shash, $src);
@@ -188,16 +194,16 @@ CUL_MAX_Parse($$)
         Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
         CUL_MAX_Send($shash, "PairPong", $src, "00");
         #TODO: wait for Ack
-        Dispatch($shash, "MAX,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
+        Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
         if($device_types{$type} eq "HeatingThermostat" or $device_types{$type} eq "WallMountedThermostat") {
           #This are the default values that a device has after factory reset or pairing
-          Dispatch($shash, "MAX,ThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,ThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
         }
         #TODO: send TimeInformation
       }
 
     } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState"])  {
-      Dispatch($shash, "MAX,$msgType,$src,$payload", {RAWMSG => $rmsg});
+      Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
       #Only ShutterContactState needs ack
       if($msgType eq "ShutterContactState" and $dst eq $shash->{addr}) {
         CUL_MAX_SendAck($shash,$msgcnt,$dst);
