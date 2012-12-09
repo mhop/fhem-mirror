@@ -18,6 +18,7 @@ sub MAXLAN_Write(@);
 sub MAXLAN_ReadSingleResponse($$);
 sub MAXLAN_SimpleWrite(@);
 sub MAXLAN_Poll($);
+sub MAXLAN_Send(@);
 sub MAXLAN_SendDeviceCmd($$);
 sub MAXLAN_RequestConfiguration($$);
 sub MAXLAN_RemoveDevice($$);
@@ -102,6 +103,7 @@ MAXLAN_Define($$)
   $hash->{DeviceName} = $dev;
   #This interface is shared with 14_CUL_MAX.pm
   $hash->{SendDeviceCmd} = \&MAXLAN_SendDeviceCmd;
+  $hash->{Send} = \&MAXLAN_Send;
   $hash->{RemoveDevice} = \&MAXLAN_RemoveDevice;
 
   #Wait until all device definitions have been loaded
@@ -646,6 +648,20 @@ MAXLAN_RequestConfiguration($$)
 {
   my ($hash,$addr) = @_;
   return MAXLAN_Write($hash,"c:$addr", "C:");
+}
+
+sub
+MAXLAN_Send(@)
+{
+  my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt) = @_;
+
+  $flags = "0"x8 if(!$flags);
+  $groupId = "00" if(!defined($groupId));
+
+  if(defined($msgcnt)) {
+    Log 2, "MAXLAN_Send: MAXLAN does not support msgcnt";
+  }
+  return MAXLAN_SendDeviceCmd($hash, pack("H2B8H*","00",$flags,$msgCmd2Id{$cmd}."000000".$dst.$groupId.$payload));
 }
 
 #Sends command to a device and waits for acknowledgment
