@@ -380,6 +380,7 @@ MAX_Parse($$)
     }
 
     readingsBeginUpdate($shash);
+    readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     #This formatting must match with in MAX_Set:$templist
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$temperaturesetpoint));
