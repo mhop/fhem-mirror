@@ -207,7 +207,7 @@ CUL_MAX_Parse($$)
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
       #Only ShutterContactState needs ack
       if($msgType eq "ShutterContactState" and $dst eq $shash->{addr}) {
-        CUL_MAX_SendAck($shash,$msgcnt,$dst);
+        CUL_MAX_SendAck($shash,$msgcnt,$src);
       }
     } else {
       Log 5, "Unhandled message $msgType";
@@ -222,7 +222,7 @@ sub
 CUL_MAX_SendAck($$$)
 {
   my ($hash,$msgcnt,$dst) = @_;
-  return CUL_MAX_Send($hash, "Ack", $dst, "00", "", "00", $msgcnt);
+  return CUL_MAX_Send($hash, "Ack", $dst, "00", "00", "00", $msgcnt);
 }
 
 #All inputs are hex strings, $cmd is one from %msgCmd2Id
@@ -251,6 +251,7 @@ CUL_MAX_Send(@)
   IOWrite($hash, "", "Zs". $packet);
 
   #Schedule checking for Ack
+  return undef if($cmd eq "Ack"); #we don't get an Ack for an Ack
   my $timeout = gettimeofday()+$ackTimeout;
   $waitForAck[@waitForAck] = { "packet" => $packet,
                                "dest" => $dst,
