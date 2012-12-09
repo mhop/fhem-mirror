@@ -142,7 +142,7 @@ LUXTRONIK2_GetStatus($)
       Log 1, "LUXTRONIK2_GetStatus status report length check: $name $host ".length($result)." should have been ". $count * 4;
       return "Value read mismatch Lux2 ( $!)\n";
   }
-  @heatpump_values = unpack("N$count", $result);
+  @heatpump_values = unpack("N!$count", $result);
   if(scalar(@heatpump_values) != $count) {
       Log 2, "LUXTRONIK2_GetStatus10: $name $host ".scalar(@heatpump_values)." -> ".$heatpump_values[10];
       return "Value unpacking problem";
@@ -165,17 +165,19 @@ LUXTRONIK2_GetStatus($)
  
   $socket->recv($result, $count*4+4);
   if(length($result) != $count*4) {
-      Log 3, "LUXTRONIK2_GetStatus parameter settings length check: $name $host "
-	  . length($result) . " should have been " . $count * 4;
       my $loop = 4; # safety net in case of communication problems
       while((length($result) < ($count * 4)) && ($loop-- > 0) ) {
 	  my $result2;
 	  my $newcnt = ($count * 4) - length($result);
 	  $socket->recv($result2, $newcnt);
 	  $result .= $result2;
-	  Log 3, "LUXTRONIK2_GetStatus read additional " . length($result2)
-	      . " bytes of expected " . $newcnt . " bytes, total should be "
-	      . $count * 4 . " buflen=" . length($result);
+#	  Log 3, "LUXTRONIK2_GetStatus read additional " . length($result2)
+#	      . " bytes of expected " . $newcnt . " bytes, total should be "
+#	      . $count * 4 . " buflen=" . length($result);
+      }
+      if($loop == 0) {
+        Log 3, "LUXTRONIK2_GetStatus parameter settings length check: $name $host "
+	  . length($result) . " should have been " . $count * 4;
       }
   }
   @heatpump_parameters = unpack("N$count", $result);
