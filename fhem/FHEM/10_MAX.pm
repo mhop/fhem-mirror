@@ -328,7 +328,7 @@ MAX_Parse($$)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
     my $untilStr = defined($until3) ? MAX_ParseDateTime($until1,$until2,$until3)->{str} : "";
-    my $measuredTemperature = $until2/10;
+    my $measuredTemperature = defined($until2) ? $until2/10 : "";
     #If the control mode is not "temporary", the cube sends the current (measured) temperature
     $measuredTemperature = "" if($mode == 2 || $measuredTemperature == 0);
     $untilStr = "" if($mode != 2);
@@ -414,6 +414,18 @@ MAX_Parse($$)
       delete $shash->{ERROR} if(exists($shash->{ERROR}));
     } else {
       $shash->{ERROR} = join(",",$args[0]);
+    }
+
+  } elsif($msgtype eq "Ack") {
+    #The payload of an Ack is a 2-digit hex number (I just saw it being "01")
+    #with unknown meaning plus the data of a State broadcast from the same device
+    #For HeatingThermostats, it does not contain the last three "until" bytes (or measured temperature)
+    if($shash->{type} ~~ ["HeatingThermostat", "WallMountedThermostat"] ) {
+      return MAX_Parse($hash, "MAX,ThermostatState,$addr,". substr($args[0],2));
+    } elsif($shash->{type} eq "ShutterContact") {
+      return MAX_Parse($hash, "MAX,ShutterContactState,$addr,". substr($args[0],2));
+    } else {
+      Log 2, "MAX_Parse: Don't know how to interpret Ack payload for $shash->{type}";
     }
 
   } else {
