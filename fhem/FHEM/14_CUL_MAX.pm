@@ -5,6 +5,11 @@ package main;
 
 use strict;
 use warnings;
+require "10_MAX.pm";
+
+our %msgId2Cmd;
+our %msgCmd2Id;
+our %device_types;
 
 sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
@@ -19,16 +24,6 @@ my $pairmodeDuration = 30; #seconds
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
 
 my $resendRetries = 10; #how often resend before giving up?
-
-#TODO: this is duplicated in MAXLAN
-my %device_types = (
-  0 => "Cube",
-  1 => "HeatingThermostat",
-  2 => "HeatingThermostatPlus",
-  3 => "WallMountedThermostat",
-  4 => "ShutterContact",
-  5 => "PushButton"
-);
 
 sub
 CUL_MAX_Initialize($)
@@ -112,32 +107,6 @@ CUL_MAX_Set($@)
   return undef;
 }
 
-###################################
-my %msgTypes = ( #Receiving:
-                 "00" => "PairPing",
-                 "01" => "PairPong",
-                 "02" => "Ack",
-                 "03" => "TimeInformation",
-                 "11" => "ConfigTemperatures", #like boost/eco/comfort etc
-                 "30" => "ShutterContactState",
-                 "42" => "WallThermostatState", #by WallMountedThermostat
-                 "60" => "ThermostatState", #by HeatingThermostat
-                 "40" => "SetTemperature", #to thermostat
-                 "20" => "AddLinkPartner",
-                 "21" => "RemoveLinkPartner",
-                 "22" => "SetGroupId",
-                 "23" => "RemoveGroupId",
-                 "F1" => "WakeUp",
-                 "F0" => "Reset",
-               );
-my %sendTypes = (#Sending:
-                 "PairPong" => "01",
-                 "TimeInformation" => "03",
-                 #"40" => "SetTemperature",
-                 #"11" => "SetConfiguration",
-                 #"F1" => "WakeUp",
-               );
-
 #Array of all packet that we wait to be ack'ed
 my @waitForAck = ();
 
@@ -163,9 +132,9 @@ CUL_MAX_Parse($$)
   #convert adresses to lower case
   $src = lc($src);
   $dst = lc($dst);
-  my $msgType = exists($msgTypes{$msgTypeRaw}) ? $msgTypes{$msgTypeRaw} : $msgTypeRaw;
+  my $msgType = exists($msgId2Cmd{$msgTypeRaw}) ? $msgId2Cmd{$msgTypeRaw} : $msgTypeRaw;
   Log 5, "CUL_MAX_Parse: len $len, msgcnt $msgcnt, msgflag $msgFlag, msgTypeRaw $msgType, src $src, dst $dst, groupid $groupid, payload $payload";
-  if(exists($msgTypes{$msgTypeRaw})) {
+  if(exists($msgId2Cmd{$msgTypeRaw})) {
     if($msgType eq "Ack") {
       Dispatch($shash, "MAX,Ack,$src,$payload", {RAWMSG => $rmsg});
       my $i = 0;
