@@ -30,7 +30,7 @@ my $reconnect_interval = 2; #seconds
 #the time it takes after sending one command till we see its effect in the L: response
 my $roundtriptime = 3; #seconds
 
-my $read_timeout = 1; #seconds. How long to wait for an answer from the Cube over TCP/IP
+my $read_timeout = 2; #seconds. How long to wait for an answer from the Cube over TCP/IP
 
 my $metadata_magic = 0x56;
 my $metadata_version = 2;
