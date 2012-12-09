@@ -350,7 +350,7 @@ MAX_Parse($$)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
     my $untilStr = defined($until3) ? MAX_ParseDateTime($until1,$until2,$until3)->{str} : "";
-    my $measuredTemperature = defined($until2) ? $until2/10 : "";
+    my $measuredTemperature = defined($until2) ? $until2/10 : 0;
     #If the control mode is not "temporary", the cube sends the current (measured) temperature
     $measuredTemperature = "" if($mode == 2 || $measuredTemperature == 0);
     $untilStr = "" if($mode != 2);
@@ -446,6 +446,8 @@ MAX_Parse($$)
       return MAX_Parse($hash, "MAX,ThermostatState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "ShutterContact") {
       return MAX_Parse($hash, "MAX,ShutterContactState,$addr,". substr($args[0],2));
+    } elsif($shash->{type} eq "Cube") {
+      ; #Payload is always "00"
     } else {
       Log 2, "MAX_Parse: Don't know how to interpret Ack payload for $shash->{type}";
     }
@@ -538,7 +540,9 @@ MAX_Parse($$)
     <li>windowOpenDuration &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open duration to the device's memory. That is the duration the heater will temporarily set the window open temperature if an open window is detected by a rapid temperature decrease. (Not used if open window is detected by ShutterControl. Must be between 0 and 60 minutes in multiples of 5.</li>
     <li>factoryReset<br>
-        Resets the device to factory values. It has to be paired again afterwards.</li>
+        Resets the device to factory values. It has to be paired again afterwards.<br>
+        ATTENTION: When using this on a ShutterContact using the MAXLAN backend, the ShutterContact has to be triggered once manually to complete
+        the factoryReset.</li>
     <li>associate<br>
         Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened.</li>
   </ul>
