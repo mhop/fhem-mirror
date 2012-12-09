@@ -183,11 +183,12 @@ CUL_MAX_Parse($$)
       my ($unk1,$type,$unk2,$serial) = unpack("CCCa*",pack("H*",$payload));
       Log 5, "CUL_MAX_Parse: Got PairPing (dst $dst, pairmode $shash->{pairmode}), unk1 $unk1, type $type, unk2 $unk2, serial $serial";
 
-      #There are two variants of PairPing: The first has a destination address of "000000" and can be paired
-      #to any device. The other is send after changing batteries (without factory reset) and has a destination address of the last paired device.
-      #It can still be paired to any device (doesn't have to be the last paired device).
-      if(($dst ne "000000") and ($dst ne $shash->{addr})) {
-        Log 2, "Device want's to be re-paired to $dst";
+      #There are two variants of PairPing:
+      #1. It has a destination address of "000000" and can be paired to any device.
+      #2. It is sent after changing batteries or repressing the pair button (without factory reset) and has a destination address of the last paired device. We can answer it with PairPong and even get an Ack, but it will still not be paired to us. A factory reset (originating from the last paired device) is needed first.
+      if(($dst ne "000000") and !$isToMe) {
+        Log 2, "Device want's to be re-paired to $dst, not to us";
+        return undef;
       }
 
       if($shash->{pairmode}) {
