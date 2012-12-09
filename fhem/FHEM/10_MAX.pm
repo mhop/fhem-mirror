@@ -329,7 +329,10 @@ MAX_Parse($$)
   }
 
   #if $isToMe is true, then the message was directed at device $hash, thus we can also use it for sending
-  $shash->{IODev} = $hash if($isToMe);
+  if($isToMe) {
+    $shash->{IODev} = $hash;
+    $shash->{backend} = $hash->{NAME}; #for user information
+  }
 
   if($msgtype eq "define"){
     my $devicetype = $args[0];
