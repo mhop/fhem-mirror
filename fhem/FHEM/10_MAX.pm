@@ -360,18 +360,11 @@ MAX_Parse($$)
 
     $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
     Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $measuredTemperature";
-    #my $settemp = $args[0];
-    #my $mode = $ctrl_modes[$args[1]];
-    #my $until = $args[2];
-    #my $batterylow = $args[3];
-    #my $rferror = $args[4];
-    #my $dstsetting = $args[5];
-    #my $valveposition = $args[6];
-    #my $measuredTemperature = "";
 
     #The HeatingThermostat uses the measurementOffset during control
     #but does not apply it to measuredTemperature before sending it to us
-    $measuredTemperature += $shash->{measurementOffset} if($measuredTemperature ne "" and exists($shash->{measurementOffset}));
+    my $measOffset = ReadingsVal($hash->{NAME},"measurementOffset","");
+    $measuredTemperature += $measOffset if($measuredTemperature ne "" and $measOffset ne "");
 
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
