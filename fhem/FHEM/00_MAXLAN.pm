@@ -553,13 +553,13 @@ MAXLAN_Parse($$)
   }elsif($cmd eq "N"){#New device paired
     if(@args==0){
       $hash->{STATE} = "initalized"; #pairing ended
-      return;
+      $hash->{pairmode} = 0;
+      return undef;
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
     Log 2, "Paired new device, type $device_types{$type}, addr $addr, serial $serial";
     Dispatch($hash, "MAX,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
 
-    $hash->{pairmode} = 0;
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
     MAXLAN_RequestConfiguration($hash,$addr);
   } elsif($cmd eq "A"){#Acknowledged
