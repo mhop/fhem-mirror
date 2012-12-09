@@ -95,7 +95,6 @@ MAX_Define($$)
   $hash->{type} = $type;
   $hash->{addr} = $addr;
   $hash->{STATE} = "waiting for data";
-  $hash->{usingCube} = 0;
   $modules{MAX}{defptr}{$addr} = $hash;
 
   $hash->{internals}{interfaces} = $interfaces{$type};
@@ -306,7 +305,9 @@ sub
 MAX_Parse($$)
 {
   my ($hash, $msg) = @_;
-  my ($MAX,$msgtype,$addr,@args) = split(",",$msg);
+  my ($MAX,$isToMe,$msgtype,$addr,@args) = split(",",$msg);
+  #$isToMe is 1 if the message was direct at the device $hash, and 0
+  #if we just snooped a message directed at a different device (by CUL_MAX).
   return if($MAX ne "MAX");
 
   Log 5, "MAX_Parse $msg";
@@ -327,6 +328,9 @@ MAX_Parse($$)
     }
   }
 
+  #if $isToMe is true, then the message was directed at device $hash, thus we can also use it for sending
+  $shash->{IODev} = $hash if($isToMe);
+
   if($msgtype eq "define"){
     my $devicetype = $args[0];
     Log 1, "Device changed type from $shash->{type} to $devicetype" if($shash->{type} ne $devicetype);
@@ -336,7 +340,6 @@ MAX_Parse($$)
       $shash->{serial} = $serial;
     }
     $shash->{groupid} = $args[2];
-    $shash->{usingCube} = $args[3];
     $shash->{IODev} = $hash;
 
   } elsif($msgtype eq "ThermostatState") {
@@ -444,9 +447,9 @@ MAX_Parse($$)
     #with unknown meaning plus the data of a State broadcast from the same device
     #For HeatingThermostats, it does not contain the last three "until" bytes (or measured temperature)
     if($shash->{type} ~~ ["HeatingThermostat", "WallMountedThermostat"] ) {
-      return MAX_Parse($hash, "MAX,ThermostatState,$addr,". substr($args[0],2));
+      return MAX_Parse($hash, "MAX,$isToMe,ThermostatState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "ShutterContact") {
-      return MAX_Parse($hash, "MAX,ShutterContactState,$addr,". substr($args[0],2));
+      return MAX_Parse($hash, "MAX,$isToMe,ShutterContactState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "Cube") {
       ; #Payload is always "00"
     } else {
