@@ -17,7 +17,11 @@ sub MAX_DateTime2Internal($);
 
 my @ctrl_modes = ( "auto", "manual", "temporary", "boost" );
 
-my %device_types = (
+use vars qw(%device_types);
+use vars qw(%msgId2Cmd);
+use vars qw(%msgCmd2Id);
+
+%device_types = (
   0 => "Cube",
   1 => "HeatingThermostat",
   2 => "HeatingThermostatPlus",
@@ -25,6 +29,25 @@ my %device_types = (
   4 => "ShutterContact",
   5 => "PushButton"
 );
+
+%msgId2Cmd = (
+                 "00" => "PairPing",
+                 "01" => "PairPong",
+                 "02" => "Ack",
+                 "03" => "TimeInformation",
+                 "11" => "ConfigTemperatures", #like boost/eco/comfort etc
+                 "30" => "ShutterContactState",
+                 "42" => "WallThermostatState", #by WallMountedThermostat
+                 "60" => "ThermostatState", #by HeatingThermostat
+                 "40" => "SetTemperature", #to thermostat
+                 "20" => "AddLinkPartner",
+                 "21" => "RemoveLinkPartner",
+                 "22" => "SetGroupId",
+                 "23" => "RemoveGroupId",
+                 "F1" => "WakeUp",
+                 "F0" => "Reset",
+               );
+%msgCmd2Id = reverse %msgId2Cmd;
 
 my %interfaces = (
   "Cube" => undef,
