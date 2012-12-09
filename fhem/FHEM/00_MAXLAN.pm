@@ -30,6 +30,8 @@ my $reconnect_interval = 2; #seconds
 #the time it takes after sending one command till we see its effect in the L: response
 my $roundtriptime = 3; #seconds
 
+my $read_timeout = 1; #seconds. How long to wait for an answer from the Cube over TCP/IP
+
 my $metadata_magic = 0x56;
 my $metadata_version = 2;
 
@@ -231,11 +233,16 @@ MAXLAN_ExpectAnswer($$)
 {
   my ($hash,$expectedanswer) = @_;
   my $rmsg = MAXLAN_ReadSingleResponse($hash, 1);
-  return "Error while receiving" if(!defined($rmsg)); #error is already logged in MAXLAN_ReadSingleResponse
+
+  if(!defined($rmsg)) {
+    my $msg = "MAXLAN_ExpectAnswer: Error while waiting for answer $expectedanswer";
+    Log 1, $msg;
+    return $msg;
+  }
 
   my $ret = undef;
   if($rmsg !~ m/^$expectedanswer/) {
-    Log 2, "MAXLAN_ParseAnswer: Got unexpected response, expected $expectedanswer";
+    Log 2, "MAXLAN_ExpectAnswer: Got unexpected response, expected $expectedanswer";
     MAXLAN_Parse($hash,$rmsg);
     return "Got unexpected response, expected $expectedanswer";
   }
@@ -249,15 +256,42 @@ MAXLAN_ReadSingleResponse($$)
 {
   my ($hash,$waitForResponse) = @_;
 
+
+  my ($rin, $win, $ein, $rout, $wout, $eout);
+  $rin = $win = $ein = '';
+  vec($rin,fileno($hash->{TCPDev}),1) = 1;
+  $ein = $rin;
+
+  my $maxTime = gettimeofday()+$read_timeout;
+
   #Read until we have a complete line
   until($hash->{PARTIAL} =~ m/\n/) {
-    my $buf = DevIo_SimpleRead($hash);
-    if(!defined($buf)){
+
+    #Check timeout
+    if(gettimeofday() > $maxTime) {
+      Log 1, "MAXLAN_ReadSingleResponse: timeout while reading from socket" if($waitForResponse);
+      return undef;;
+    }
+
+    #Wait for data
+    my $nfound = select($rout=$rin, $wout=$win, $eout=$ein, $read_timeout);
+    if($nfound == -1) {
+      Log 1, "MAXLAN_ReadSingleResponse: error during select, ret = $nfound";
+      return undef;
+    }
+    last if($nfound == 0 and !$waitForResponse);
+    next if($nfound == 0); #Sometimes select() returns early, just try again
+
+    #Blocking read
+    my $buf;
+    my $res = sysread($hash->{TCPDev}, $buf, 256);
+    if(!defined($res)){
       Log 1, "MAXLAN_ReadSingleResponse: error during read";
       return undef; #error occured
     }
+
+    #Append data to partial data we got before
     $hash->{PARTIAL} .= $buf;
-    last if(!$waitForResponse);
   }
 
   my $rmsg;
@@ -635,9 +669,7 @@ MAXLAN_Poll($)
     }
   }
 
-  if(!$hash->{persistent} && !$hash->{pairmode}) {
-    MAXLAN_Disconnect($hash);
-  }
+  MAXLAN_Disconnect($hash) if(!$hash->{persistent} && !$hash->{pairmode});
 
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "MAXLAN_Poll", $hash, 0);
 }
