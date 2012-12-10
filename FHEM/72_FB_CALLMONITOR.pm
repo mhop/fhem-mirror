@@ -190,8 +190,8 @@ FB_CALLMONITOR_Read($)
   
    @array = split(";", $data);
   
-   $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING");
-   $external_number = $array[5] if($array[1] eq "CALL");
+   $external_number = $array[3] if(not $array[3] eq "0" and $array[1] eq "RING" and $array[3] ne "");
+   $external_number = $array[5] if($array[1] eq "CALL" and $array[3] ne "");
   
    $external_number =~ s/^0// if(AttrVal($name, "remove-leading-zero", "0") eq "1");
   
@@ -209,11 +209,11 @@ FB_CALLMONITOR_Read($)
    }
    
    $reverse_search = FB_CALLMONITOR_reverseSearch($hash, $external_number) if(defined($external_number) and AttrVal($name, "reverse-search", "none") ne "none");
- 
+   
    readingsBeginUpdate($hash);
    readingsBulkUpdate($hash, "event", lc($array[1]));
-   readingsBulkUpdate($hash, "external_number", $external_number) if(defined($external_number));
-   readingsBulkUpdate($hash, "external_name", $reverse_search) if(defined($reverse_search)); 
+   readingsBulkUpdate($hash, "external_number", (defined($external_number) ? $external_number : "unknown"));
+   readingsBulkUpdate($hash, "external_name",(defined($reverse_search) ? $reverse_search : "unknown"));
    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING" or $array[1] eq "CALL");
    readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
