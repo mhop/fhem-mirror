@@ -1,4 +1,7 @@
 - SVN
+  - feature: new Module 93_DbLog.pm for logging events into Databases. 
+             Generating Plots with weblinks are supportet.
+             (by B. Neubert / T. Faust)
   - feature: new Module 59_HCS.pm for monitoring heating valves (FHT, HM-CC-VD)
              to contral a central heating unit. I thank Benjamin for his
              support! (M.  Fischer)
