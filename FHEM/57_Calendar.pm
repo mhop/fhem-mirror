@@ -367,7 +367,7 @@ sub fromVEvent {
     my @rrparts= split(";", $rrule);
     my %r= map { split("=", $_); } @rrparts;
 
-    my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY);
+    my @keywords= qw(FREQ INTERVAL UNTIL COUNT BYMONTHDAY BYDAY BYMONTH);
     foreach my $k (keys %r) {
       if(not($k ~~ @keywords)) {
         main::Log 2, "Calendar: RRULE $rrule is not supported";
@@ -381,6 +381,7 @@ sub fromVEvent {
     $self->{count} = $r{"COUNT"} if(exists($r{"COUNT"}));
     $self->{bymonthday} = $r{"BYMONTHDAY"} if(exists($r{"BYMONTHDAY"})); # stored but ignored
     $self->{byday} = $r{"BYDAY"} if(exists($r{"BYDAY"})); # stored but ignored
+    $self->{bymonth} = $r{"BYMONTH"} if(exists($r{"BYMONTH"})); # stored but ignored
 
     # advanceToNextOccurance until we are in the future
     my $t = time();
