@@ -314,36 +314,43 @@ sub TRX_SECURITY_parse_X10Sec {
 
   my %x10_security =
     (
-	0x00 => ['X10Sec', 'normal', 'min_delay', ''],
-	0x01 => ['X10Sec', 'normal', 'max_delay', ''],
+	0x00 => ['X10Sec', 'normal', 'min_delay', '', ''],
+	0x01 => ['X10Sec', 'normal', 'max_delay', '', ''],
 
-	0x02 => ['X10Sec', 'alert', 'min_delay', ''],
-	0x03 => ['X10Sec', 'alert', 'max_delay', ''],
+	0x02 => ['X10Sec', 'alert', 'min_delay', '', ''],
+	0x03 => ['X10Sec', 'alert', 'max_delay', '', ''],
 
-	0x04 => ['X10Sec', 'alert', '', ''],
-	0x05 => ['X10Sec', 'normal', '', ''],
+	0x04 => ['X10Sec', 'alert', '', '', ''],
+	0x05 => ['X10Sec', 'normal', '', '', ''],
 
-	0x06 => ['X10Sec', 'alert', '', ''],
-	0x07 => ['X10Sec', 'normal', '', ''],
+	0x06 => ['X10Sec', 'alert', '', '', ''],
+	0x07 => ['X10Sec', 'normal', '', '', ''],
 
-	0x08 => ['X10Sec', 'tamper', '', ''],
+	0x08 => ['X10Sec', 'IR', '', '', ''],
 
-	0x09 => ['X10Sec', 'Security-Arm_Away', 'min_delay', ''], # kr18
-	0x0a => ['X10Sec', 'Security-Arm_Away', 'max_delay', ''], # kr18
-	0x0b => ['X10Sec', 'Security-Arm_Home', 'min_delay', ''], # kr18
-	0x0c => ['X10Sec', 'Security-Arm_Home', 'max_delay', ''], # kr18
-	0x0d => ['X10Sec', 'Security-Disarm', 'min_delay', ''], # kr18
+	0x09 => ['X10Sec', 'Security-Arm_Away', 'min_delay', '', ''], # kr18
+	0x0a => ['X10Sec', 'Security-Arm_Away', 'max_delay', '', ''], # kr18
+	0x0b => ['X10Sec', 'Security-Arm_Home', 'min_delay', '', ''], # kr18
+	0x0c => ['X10Sec', 'Security-Arm_Home', 'max_delay', '', ''], # kr18
+	0x0d => ['X10Sec', 'Security-Disarm', 'min_delay', '', ''], # kr18
 
-	0x10 => ['X10Sec', 'ButtonA-on', '', ''], # kr18
-	0x11 => ['X10Sec', 'ButtonA-off', '', ''], # kr18
-	0x12 => ['X10Sec', 'ButtonB-on', '', ''], # kr18
-	0x13 => ['X10Sec', 'ButtonB-off', '', ''], # kr18
+	0x10 => ['X10Sec', 'ButtonA-off', '', '', ''], # kr18
+	0x11 => ['X10Sec', 'ButtonA-on', '', '', ''], # kr18
+	0x12 => ['X10Sec', 'ButtonB-off', '', '', ''], # kr18
+	0x13 => ['X10Sec', 'ButtonB-on', '', '', ''], # kr18
 
-	0x14 => ['X10Sec', 'dark', '', ''],
-	0x15 => ['X10Sec', 'light', '', ''],
-	0x16 => ['X10Sec', 'normal', '', 'batt_low'],
+	0x14 => ['X10Sec', 'dark', '', '', ''],
+	0x15 => ['X10Sec', 'light', '', '', ''],
+	0x16 => ['X10Sec', 'normal', '', 'batt_low', ''],
 
-	0x17 => ['X10Sec', 'pair KD101', '', ''],
+	0x17 => ['X10Sec', 'pair KD101', '', '', ''],
+
+	0x80 => ['X10Sec', 'normal', 'max_delay', '', 'tamper'],
+	0x81 => ['X10Sec', 'normal', 'min_delay', '', 'tamper'],
+	0x82 => ['X10Sec', 'alert', 'max_delay', '', 'tamper'],
+	0x83 => ['X10Sec', 'alert', 'min_delay', '', 'tamper'],
+	0x84 => ['X10Sec', 'alert', '', '', 'tamper'],
+	0x85 => ['X10Sec', 'normal', '', '', 'tamper'],
 
     );
 
@@ -351,11 +358,12 @@ sub TRX_SECURITY_parse_X10Sec {
   my $type = "";
   my $delay = "";
   my $battery = "";
+  my $option = "";
   my @res;
   if (exists $x10_security{$data}) {
     my $rec = $x10_security{$data};
     if (ref $rec) {
-      ($type, $command, $delay, $battery) = @$rec;
+      ($type, $command, $delay, $battery, $option) = @$rec;
     } else {
       $command = $rec;
     }
@@ -439,6 +447,9 @@ sub TRX_SECURITY_parse_X10Sec {
 	$current = "min" if ($delay eq "min_delay");
 	$current = "max" if ($delay eq "max_delay");
 	readingsBulkUpdate($def, $sensor, $current);
+  }
+  if ($option ne '') {
+	$val .= " ".$option;
   }
 
   if (($firstdevice == 1) && $val) {
