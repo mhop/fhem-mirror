@@ -35,6 +35,7 @@ use vars qw(%msgCmd2Id);
                  "01" => "PairPong",
                  "02" => "Ack",
                  "03" => "TimeInformation",
+                 "10" => "ConfigWeekProfile",
                  "11" => "ConfigTemperatures", #like boost/eco/comfort etc
                  "30" => "ShutterContactState",
                  "42" => "WallThermostatState", #by WallMountedThermostat
@@ -48,6 +49,8 @@ use vars qw(%msgCmd2Id);
                  "F0" => "Reset",
                );
 %msgCmd2Id = reverse %msgId2Cmd;
+
+my @decalcDays = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
 
 my %interfaces = (
   "Cube" => undef,
@@ -366,7 +369,7 @@ MAX_Parse($$)
 
     #The HeatingThermostat uses the measurementOffset during control
     #but does not apply it to measuredTemperature before sending it to us
-    my $measOffset = ReadingsVal($hash->{NAME},"measurementOffset","");
+    my $measOffset = ReadingsVal($shash->{NAME},"measurementOffset","");
     $measuredTemperature += $measOffset if($measuredTemperature ne "" and $measOffset ne "");
 
     $shash->{mode} = $mode;
@@ -429,6 +432,11 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "minimumTemperature", $args[6]);
     readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
     readingsBulkUpdate($shash, "windowOpenDuration", $args[8]) if($shash->{type} eq "HeatingThermostat");
+    readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
+    readingsBulkUpdate($shash, "valveOffset", $args[10]);
+    readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
+    #readingsBulkUpdate($shash, "weekProfile", "$args[13]");
+    $shash->{internal}{weekProfile} = $args[13];
     readingsEndUpdate($shash, 0);
 
   } elsif($msgtype eq "Error") {
