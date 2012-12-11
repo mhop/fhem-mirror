@@ -55,10 +55,8 @@ CommandFheminfo($$)
   my $name = "fheminfo";
   my %info;
 
-  my $module;
+  my $module = "HTTP::Request::Common";
   my $err = "Missing perl module '$module'. Please install this module first.";
-  my $err;
-  $module = "HTTP::Request::Common";
   if(!checkModule($module)) {
     Log 1, "$name $err";
     return $err;
