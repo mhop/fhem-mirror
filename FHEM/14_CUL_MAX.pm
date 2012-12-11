@@ -129,7 +129,11 @@ CUL_MAX_Parse($$)
   $rmsg =~ m/Z(..)(..)(..)(..)(......)(......)(..)(.*)/;
   my ($len,$msgcnt,$msgFlag,$msgTypeRaw,$src,$dst,$groupid,$payload) = ($1,$2,$3,$4,$5,$6,$7,$8);
   $len = hex($len);
-  Log 1, "CUL_MAX_Parse: len mismatch" if(2*$len+3 != length($rmsg)); #+3 = +1 for 'Z' and +2 for len field in hex
+  if(2*$len+3 != length($rmsg)) { #+3 = +1 for 'Z' and +2 for len field in hex
+    my $msg = "CUL_MAX_Parse: len mismatch";
+    Log 1, $msg;
+    return $msg;
+  }
 
   $groupid = hex($groupid);
 
