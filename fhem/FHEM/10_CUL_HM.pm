@@ -4,6 +4,8 @@
 
 package main;
 
+# update actiondetector is supported with lines marked as "#todo Updt1 remove"
+#        the lines can be removed after some soak time - around version 2600
 use strict;
 use warnings;
 #use Time::HiRes qw(gettimeofday);
@@ -213,14 +215,10 @@ CUL_HM_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
-					   "chanNo device peerList peerIDs ".
-					   "actCycle actStatus ".
-					   "protCmdPend protLastRcv protSndCnt protSndLast protCmdDel protNackCnt protNackLast protState ".
-					   "protResndFailLast protResndLast protResndFailCnt protResndCnt protToutRespLast protToutRespCnt ".
-					   "channel_01 channel_02 channel_03 channel_04 channel_05 channel_06 ".
-					   "channel_07 channel_08 channel_09 channel_0A channel_0B channel_0C ". 
-					   "channel_0D channel_0E channel_0F channel_10 channel_11 channel_12 ".
-					   "channel_13 channel_14 channel_15 channel_16 channel_17 channel_18";
+					   "peerList ". #todo Updt1 remove
+					   "peerIDs ".
+					   "actCycle actStatus autoReadReg:1,0 ".
+					   "";
   my @modellist;
   foreach my $model (keys %culHmModel){
     push @modellist,$culHmModel{$model}{name};
@@ -229,6 +227,21 @@ CUL_HM_Initialize($)
   $hash->{AttrList}  .= " subType:".join(",", sort 
                 map { $culHmDevProps{$_}{st} } keys %culHmDevProps);
   CUL_HM_initRegHash();
+  
+}
+sub
+CUL_HM_updateConfig($){
+  foreach (@{$modules{CUL_HM}{helper}{updtCfgLst}}){
+    my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
+    if (1 == AttrVal($name,"autoReadReg","0")){
+	  CUL_HM_Set(CUL_HM_name2Hash($name),$name,"getConfig");
+	  CUL_HM_Set(CUL_HM_name2Hash($name),$name,"statusRequest");
+	  InternalTimer(gettimeofday()+15,"CUL_HM_updateConfig", "updateConfig", 0);
+	  last;
+    }
+    else{
+    }
+  }
 }
 #############################
 sub
@@ -252,10 +265,10 @@ CUL_HM_Define($$)
     $modules{CUL_HM}{defptr}{$HMid} = $hash;
     AssignIoPort($hash);
     my $devName = $devHash->{NAME};
-    $attr{$name}{device} = $devName; 
-    $attr{$name}{chanNo} = $chn; 
+	$hash->{device} = $devName; 
+    $hash->{chanNo} = $chn; 
     $attr{$name}{model} = $attr{$devName}{model} if ($attr{$devName}{model});
-	$attr{$devName}{"channel_$chn"} = $name; 
+	$devHash->{"channel_$chn"} = $name;
   }
   else{# define a device
     $modules{CUL_HM}{defptr}{$HMid} = $hash;
@@ -266,6 +279,15 @@ CUL_HM_Define($$)
     $hash->{DEF} = $a[2];
     CUL_HM_Parse($hash, $a[3]);
   }
+  RemoveInternalTimer("updateConfig");
+  InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
+ 
+  my @arr;
+  if(!$modules{CUL_HM}{helper}{updtCfgLst}){
+    $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
+  }
+  push(@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name);
+
   return undef;
 }
 #############################
@@ -273,15 +295,16 @@ sub
 CUL_HM_Undef($$)
 {
   my ($hash, $name) = @_;
-  my $devName = $attr{$name}{device};
+  my $devName = $hash->{device};
   my $HMid = $hash->{DEF};
   my $chn = substr($HMid,6,2);
   if ($chn){# delete a channel
-    delete $attr{$devName}{"channel_$chn"} if ($devName);
+	my $devHash = CUL_HM_name2Hash($devName);
+    delete $devHash->{"channel_$chn"} if ($devName);
   }
   else{# delete a device
-    foreach my $channel (keys %{$attr{$name}}){
-	  CommandDelete(undef,$attr{$name}{$channel})
+    foreach my $channel (keys %{$hash}){
+	  CommandDelete(undef,$hash->{$channel})
 	        if ($channel =~ m/^channel_/);
     }
   }
@@ -295,15 +318,18 @@ CUL_HM_Rename($$$)
   #my ($hash, $name,$newName) = @_;
   my ($name, $oldName) = @_;
   my $HMid = CUL_HM_name2Id($name);
+  my $hash = CUL_HM_name2Hash($name);
   if (length($HMid) == 8){# we are channel, inform the device
-    $attr{$name}{chanNo} = substr($HMid,6,2);
-	my $device = AttrVal($name, "device", "");
-	$attr{$device}{"channel_".$attr{$name}{chanNo}} = $name if ($device);
+    $hash->{chanNo} = substr($HMid,6,2);
+	my $device = $hash->{device}?$hash->{device}:"";
+	my $devHash = CUL_HM_name2Hash($device);
+	$devHash->{"channel_".$hash->{chanNo}} = $name if ($device);
   }
   else{# we are a device - inform channels if exist
     for (my$chn = 1; $chn <25;$chn++){
-	  my $chnName = AttrVal($name, sprintf("channel_%02X",$chn), "");
-	  $attr{$chnName}{device} = $name if ($chnName);
+	  my $chnName =  $hash->{sprintf("channel_%02X",$chn)};
+	  my $chnHash = CUL_HM_name2Hash($chnName);
+	  $chnHash->{device} = $name if ($chnName);
 	}
   }
   return;
@@ -1119,7 +1145,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   actionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OnTimeMode      =>{a=> 10.0,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
-#dimmer  mainly                                                                                 
+#dimmer mainly                                                                                 
   OnDly           =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on delay "},
   OnTime          =>{a=>  7.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on time"},
   OffDly          =>{a=>  8.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off delay"},
@@ -1182,7 +1208,7 @@ my %culHmRegDefine = (
 #blindActuator mainly                                                                             
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
-  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"fliptime up <=>down"},
+  driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"fliptime up <=>down"},
 #remote mainly                                                                                      
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Language 0:English, 1:German"},
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
@@ -1191,8 +1217,8 @@ my %culHmRegDefine = (
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
   longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8     ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,d=>0,t=>"time to detect key long press"},
   dblPress        =>{a=>  9.0,s=>0.4,l=>1,min=>0  ,max=>1.5     ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"time to detect double press"},
-  peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"peer expects burst",lit=>{off=>0,on=>1}},
-  expectAES       =>{a=>  1.7,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"expect AES"        ,lit=>{off=>0,on=>1}},
+  peerNeedsBurst  =>{a=>  1.0,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"peer expects burst",lit=>{off=>0,on=>1}},
+  expectAES       =>{a=>  1.7,s=>0.1,l=>4,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"expect AES"        ,lit=>{off=>0,on=>1}},
   lcdSymb         =>{a=>  2.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask which symbol to display on message"},
   lcdLvlInterp    =>{a=>  3.0,s=>0.1,l=>4,min=>0  ,max=>255     ,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>"bitmask fro symbols"},
   msgShowTime     =>{a=> 45.0,s=>1.0,l=>1,min=>0.0,max=>120     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"Message show time(RC19). 0=always on"},
@@ -1227,8 +1253,8 @@ my %culHmRegDefine = (
   DecalHr         =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
   DecalMin        =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
 #Thermal-cc-VD                                                                                  
-  ValveOffset     =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>0,t=>"Valve offset"},             # size actually 0.5
-  ValveError      =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>0,t=>"Valve position when error"},# size actually 0.7
+  ValveOffset     =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
+  ValveError      =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
 # keymatic secific register                                                                     
   signal          =>{a=>3.4  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
   signalTone      =>{a=>3.6  ,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
@@ -1249,8 +1275,8 @@ my %culHmRegDefine = (
   brightFilter    =>{a=>2.4  ,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
   ledOnTime       =>{a=>34   ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
 # weather units                                                                                  
-  stormUpThresh   =>{a=>6    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Storm upper threshold"},
-  stormLowThresh  =>{a=>7    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Storm lower threshold"},
+  stormUpThresh   =>{a=>6    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
+  stormLowThresh  =>{a=>7    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
   
   );
 my %culHmRegGeneral = (
@@ -1417,11 +1443,9 @@ sub
 CUL_HM_TCtempReadings($)
 {
   my ($hash)=@_;
-  
   my $name = $hash->{NAME};
   my $reg5 = ReadingsVal($name,"RegL_05:","");
   my $reg6 = ReadingsVal($name,"RegL_06:","");
-
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   $reg5 =~ s/.* 0B://;     #remove register up to addr 11 from list 5
   my $tempRegs = $reg5.$reg6;  #one row
@@ -1436,6 +1460,8 @@ CUL_HM_TCtempReadings($)
   foreach  (@temp){$_=hex($_)/2};
   my $setting;
   my @changedRead;
+  push (@changedRead,"tempList_State:".
+                ($hash->{helper}{shadowReg}{"RegL_05:"}?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
     my $tSpan  = 0;
 	my $dayRead = "";
@@ -1462,14 +1488,14 @@ CUL_HM_Get($@)
   return "no get value specified" if(@a < 2);
 
   my $name = $hash->{NAME};
-  my $devName = $attr{$name}{device};# get devName as protocol entity
-  $devName = $name if (!$devName); # we control ourself if no chief available
+  my $devName = $hash->{device};# get devName as protocol entity
+  $devName = $name if (!$devName); # we control ourself if no device available
   my $st = AttrVal($devName, "subType", "");
   my $md = AttrVal($devName, "model", "");
   my $mId = CUL_HM_getMId($hash);
   my $rxType = CUL_HM_getRxType($hash);
 
-  my $class = AttrVal($devName, "hmClass", "");#relevant is the chief
+  my $class = AttrVal($devName, "hmClass", "");#relevant is the device
   my $cmd = $a[1];
   my $dst = $hash->{DEF};
   my $isChannel = (length($dst) == 8)?"true":"";
@@ -1582,13 +1608,13 @@ CUL_HM_Get($@)
 	  my $reg  = $culHmRegDefine{$regName};	  
 	  my $help = $reg->{t};
 	  $help .= " options:".join(",",keys%{$reg->{lit}})if (defined($reg->{lit}));
-	  push @rI,sprintf("%4d: %13s | %3d to %-11s | %8s | %s\n",
+	  push @rI,sprintf("%4d: %16s | %3d to %-11s | %8s | %s\n",
 			  $reg->{l},$regName,$reg->{min},$reg->{max}.$reg->{u},
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),$help)
 	        if (!($isChannel && $reg->{l} == 0));
 	}
 	
-    my $info = sprintf("list: %13s | %-18s | %-8s | %s\n",
+    my $info = sprintf("list: %16s | %-18s | %-8s | %s\n",
 	                 "register","range","peer","description");
 	foreach(sort(@rI)){$info .= $_;}
 	return $info;
@@ -1790,7 +1816,6 @@ CUL_HM_Set($@)
   my $isChannel = (length($dst) == 8)?"true":"";
   my $chn = ($isChannel)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
-
   my $devHash = CUL_HM_getDeviceHash($hash);
 
   my $mdCh      = $md.($isChannel?$chn:"00"); # chan specific commands?
@@ -1854,10 +1879,13 @@ CUL_HM_Set($@)
 	  CUL_HM_respPendRm($hash);
 	  delete ($hash->{helper}{burstEvtCnt});
 	  delete ($hash->{cmdStack});
-	  foreach my $var (keys %{$attr{$name}}){
+	  foreach my $var (keys %{$attr{$name}}){ # can be removed versions later
 	    delete ($attr{$name}{$var}) if ($var =~ m/^prot/);
       }
-	  $attr{$name}{protState} = "Info_Cleared" ;
+	  foreach my $var (keys %{$hash}){
+		delete ($hash->{$var}) if ($var =~ m/^prot/);
+      }
+	  $hash->{protState} = "Info_Cleared" ;
 	}
 	else{
 	  return "unknown section. User readings or msgEvents";
@@ -1868,10 +1896,10 @@ CUL_HM_Set($@)
 	CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
   } 
   elsif($cmd eq "pair") { #############################################
+	$state = "";
     return "pair is not enabled for this type of device, ".
                 "use set <IODev> hmPairForSec"
         if($class eq "sender");
-	$state = "";
     my $serialNr = AttrVal($name, "serialNr", undef);
     return "serialNr is not set" if(!$serialNr);
     CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".unpack("H*",$serialNr));
@@ -2361,9 +2389,9 @@ CUL_HM_Set($@)
 	  DoTrigger("global",  "UNDEFINED $chnName CUL_HM $chnId")
 		  if (!$modules{CUL_HM}{defptr}{$chnId});
 	}
-	foreach my $channel (keys %{$attr{$name}}){# remove higher numbers
+	foreach my $channel (keys %{$hash}){# remove higher numbers
 	  my $chNo = $1 if($channel =~ m/^channel_(.*)/);
-	  CommandDelete(undef,$attr{$name}{$channel})
+	  CommandDelete(undef,$hash->{$channel})
 	        if (hex($chNo) > $maxBtnNo);
 	}
   }
@@ -2608,9 +2636,7 @@ CUL_HM_getConfig($$$$$){
   my $flag = CUL_HM_getFlag($hash);
   
   foreach my $readEntry (keys %{$chnhash->{READINGS}}){
-	if ($readEntry =~ m/^RegL_/){#remove old lists, no longer valid
-	  delete $chnhash->{READINGS}{$readEntry};
-	}
+	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^RegL_/);
   }
   #get Peer-list in any case - it is part of config
   CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
@@ -2633,7 +2659,6 @@ CUL_HM_getConfig($$$$$){
 	    last if ($chnValid);
       }
 	}
-	#$listNo,$chnValid $peerReq  
 	if ($chnValid){# yes, we will go for a list
 	  if ($peerReq){# need to get the peers first
         $chnhash->{helper}{getCfgList} = "all";      # peers first
@@ -2695,7 +2720,6 @@ CUL_HM_responseSetup($$)
   	  $chnhash = $hash if (!$chnhash);
   	  $chnhash->{READINGS}{peerList}{VAL}="";#empty old list
 	  $attr{$chnhash->{NAME}}{peerIDs} = '';
-	  $attr{$chnhash->{NAME}}{peerList} = 'cleared';
 	  return;
     }
     elsif($subType eq "04"){ #RegisterRead-------
@@ -2719,6 +2743,15 @@ CUL_HM_responseSetup($$)
       delete ($chnhash->{READINGS}{"RegL_".$list.":".$peer}{TIME}); 
 	  return;
     }
+#    elsif($subType eq "0A"){ #Pair Serial----------
+#	  #--- set messaging items
+#	  $hash->{helper}{respWait}{Pending} = "PairSerial";
+#	  $hash->{helper}{respWait}{forChn} = substr($p,4,20);
+#      
+#      # define timeout - holdup cmdStack until response complete or timeout
+#	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
+#	  return;
+#    }
     elsif($subType eq "0E"){ #StatusReq----------
 	  #--- set messaging items
 	  $hash->{helper}{respWait}{Pending} = "StatusReq";
@@ -2730,7 +2763,7 @@ CUL_HM_responseSetup($$)
     }
   }
   
-  if ($msgFlag & 0x20){
+  if (($msgFlag & 0x20) && ($dst ne '000000')){
     my $iohash = $hash->{IODev};
     $hash->{helper}{respWait}{cmd}    = $cmd;
     $hash->{helper}{respWait}{msgId}  = $msgId; #msgId we wait to ack
@@ -2747,17 +2780,18 @@ CUL_HM_eventP($$)
   #todo: add severity, counter, history and acknowledge
   my ($hash, $evntType) = @_;
   my $name = $hash->{NAME};
-  my $nAttr = $attr{$name};
+  my $nAttr = $hash;
   return if (!$name);
   if ($evntType eq "Rcv"){
     $nAttr->{"protLastRcv"} = TimeNow();
 	return;
   }
-  $nAttr->{"prot".$evntType."Cnt"} = 0 
-          if (!$nAttr->{"prot".$evntType."Cnt"});
-  $nAttr->{"prot".$evntType."Cnt"}++;
-  $nAttr->{"prot".$evntType."Last"} = TimeNow();
-  if ($evntType ne "Rcv" && $evntType ne "Snd"){#count unusual events
+  
+  my $evnt = $nAttr->{"prot".$evntType}?$nAttr->{"prot".$evntType}:"0 > x";
+  my ($evntCnt,undef) = split(' last_at:',$evnt);
+  $nAttr->{"prot".$evntType} = ++$evntCnt." last_at:".TimeNow();
+  
+  if ($evntType ne "Snd"){#count unusual events
     if ($hash->{helper}{burstEvtCnt}){
 	       $hash->{helper}{burstEvtCnt}++;
 	}else {$hash->{helper}{burstEvtCnt}=1;};
@@ -2783,7 +2817,7 @@ CUL_HM_respPendTout($)
   my ($HMid) =  @_;  
   $HMid =~ s/.*://; #remove timer identifier
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
-  if ($hash){
+  if ($hash && $hash->{DEF} ne '000000'){
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
     CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
 	CUL_HM_respPendRm($hash);
@@ -2812,8 +2846,8 @@ CUL_HM_PushCmdStack($$)
   }
   push(@{$hash->{cmdStack}}, $cmd);
   my $entries = scalar @{$hash->{cmdStack}};
-  $attr{$name}{protCmdPend} = $entries." CMDs_pending";
-  $attr{$name}{protState} = "CMDs_pending" 
+  $hash->{protCmdPend} = $entries." CMDs_pending";
+  $hash->{protState} = "CMDs_pending"             
         if (!$hash->{helper}{respWait}{cmd} && 
             !$hash->{helper}{respWait}{Pending});
 }
@@ -2829,17 +2863,17 @@ CUL_HM_ProcessCmdStack($)
     if(@{$hash->{cmdStack}}) {
       CUL_HM_SndCmd($hash, shift @{$hash->{cmdStack}});
       $sent = 1;
-      $attr{$name}{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
-      $attr{$name}{protState} = "CMDs_processing...";
+      $hash->{protCmdPend} = scalar @{$hash->{cmdStack}}." CMDs pending";
+      $hash->{protState} = "CMDs_processing...";                         
 	  CUL_HM_eventP($hash,"Snd");	  
     }
     if(!@{$hash->{cmdStack}}) {
       delete($hash->{cmdStack});
-      delete($attr{$name}{protCmdPend});
+      delete($hash->{protCmdPend}); 
 	  #-- update info ---
 	  my $burstEvt = ($hash->{helper}{burstEvtCnt})? 
 	                  $hash->{helper}{burstEvtCnt}:0;
-      $attr{$name}{protState} = "CMDs_done".
+      $hash->{protState} = "CMDs_done".
 	      (($burstEvt)?("_events:".$burstEvt):"");
     }
   }
@@ -2854,11 +2888,11 @@ CUL_HM_Resend($)
   if($hash->{helper}{respWait}{reSent} >= 3) {
   	CUL_HM_eventP($hash,"ResndFail");
     delete($hash->{cmdStack});
-    delete($attr{$name}{protCmdPend});
+    delete($hash->{protCmdPend});
 	CUL_HM_respPendRm($hash);
 	my $burstEvt = ($hash->{helper}{burstEvtCnt})? 
 	                  $hash->{helper}{burstEvtCnt}:0;
-	$attr{$name}{protState} = "CMDs_done".
+	$hash->{protState} = "CMDs_done".
 	                          (($burstEvt)?("_events:".$burstEvt):"");
 	readingsSingleUpdate($hash,"state","MISSING ACK",1);
   }
@@ -2885,20 +2919,19 @@ CUL_HM_ID2PeerList ($$$)
   }
   if (!$peerIDs){ #list now empty
 	delete $attr{$name}{peerIDs};
-	delete $attr{$name}{peerList};
 	delete ($hash->{READINGS}{peerList}); 
   }
   else{# update the human readable list
     $attr{$name}{peerIDs} = $peerIDs;
-    $attr{$name}{peerList} = "";
 	my $dId = substr(CUL_HM_name2Id($name),0,6);
+	my $peerListTmp = "";
     foreach my $pId (split(",",$peerIDs)){
 	  next if (!$pId);
-	  $attr{$name}{peerList} .= (($dId eq substr($pId,0,6))?
+	  $peerListTmp .= (($dId eq substr($pId,0,6))?
 	                                    ("self".substr($pId,6,2).","):
 	                                    (CUL_HM_id2Name($pId).","));
     }
-	readingsSingleUpdate($hash,"peerList",$attr{$name}{peerList},0);
+	readingsSingleUpdate($hash,"peerList",$peerListTmp,0);
   }
 }
 ###################  Conversions  ################
@@ -2909,14 +2942,15 @@ CUL_HM_getAssChnIds($)
   # if device and no channel 
   my ($name) = @_;
   my @chnIdList;
-  foreach my $channel (keys %{$attr{$name}}){
+  my $hash = CUL_HM_name2Hash($name);
+  foreach my $channel (keys %{$hash}){
 	next if ($channel !~ m/^channel_/);
-	my $chnHash = CUL_HM_name2Hash($attr{$name}{$channel});
+	my $chnHash = CUL_HM_name2Hash($hash->{$channel});
 	push @chnIdList,$chnHash->{DEF} if ($chnHash);
   }
   my $dId = CUL_HM_name2Id($name);
 
-  push @chnIdList,$dId."01" if (length($dId) == 6 && !$attr{$name}{channel_01});
+  push @chnIdList,$dId."01" if (length($dId) == 6 && !$hash->{channel_01});
   push @chnIdList,$dId if (length($dId) == 8);
   return sort(@chnIdList);
 }
@@ -3229,7 +3263,7 @@ CUL_HM_parseCommon(@){
 	  $success = "no";
 	  CUL_HM_eventP($shash,"Nack");
       delete($shash->{cmdStack});
-	  delete($attr{$shash->{NAME}}{protCmdPend});
+	  delete($shash->{protCmdPend});
 	  CUL_HM_respPendRm($shash);
 	  $reply = "NACK"; 
 	}
@@ -3241,6 +3275,13 @@ CUL_HM_parseCommon(@){
     CUL_HM_ProcessCmdStack($shash) 
 	      if($dhash->{DEF} && (CUL_HM_Id($shash->{IODev}) eq $dhash->{DEF}));
 	return $reply;
+  }
+  elsif($msgType eq "00"){
+    if ($pendType eq "PairSerial"){
+	  if($shash->{helper}{respWait}{forChn} = substr($p,6,20)){
+	    CUL_HM_respPendRm($shash);
+	  }
+	} 
   }
   elsif($msgType eq "10"){
     my $subtype = substr($p,0,2);
@@ -3256,10 +3297,7 @@ CUL_HM_parseCommon(@){
 		}
 		
 		if ($p =~ m/000000..$/) {# last entry, peerList is complete
-          CUL_HM_respPendRm($shash);
-		  readingsSingleUpdate($chnhash,"peerList",
-		                       AttrVal($chnNname,"peerList",""),0);
-		  
+          CUL_HM_respPendRm($shash);		  
 		  # check for request to get List3 data
 		  my $reqPeer = $chnhash->{helper}{getCfgList};
 		  if ($reqPeer){
@@ -3326,7 +3364,7 @@ CUL_HM_parseCommon(@){
 		  # peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
 		  CUL_HM_updtRegDisp($chnHash,$list,
 		        CUL_HM_peerChId($peerName,
-						substr(CUL_HM_hash2Id($chnHash),0,6),"000000"));
+						substr(CUL_HM_hash2Id($chnHash),0,6),"00000000"));
 		}
 		else{
 		  CUL_HM_respPendToutProlong($shash);#wasn't last - reschedule timer
@@ -3415,14 +3453,17 @@ CUL_HM_getRegFromStore($$$$)
   my $convFlg = "";# confirmation flag - indicates data not confirmed by device
   for (my $size2go = $size;$size2go>0;$size2go -=8){
     my $addrS = sprintf("%02X",$addr);
-	my $dRead;
+    
+	my $dReadS;
     if ($hash->{helper}{shadowReg}&&$hash->{helper}{shadowReg}{$regLN}){
-	  $convFlg = "set_";
-      $dRead = $1 if($hash->{helper}{shadowReg}{$regLN} =~ m/$addrS:(..)/);
+      $dReadS = $1 if($hash->{helper}{shadowReg}{$regLN} =~ m/$addrS:(..)/);
     }
-    if (!$dRead && $hash->{READINGS}{$regLN}) {
-      $dRead = $1 if($hash->{READINGS}{$regLN}{VAL} =~ m/$addrS:(..)/);
+	my $dReadR;
+    if ($hash->{READINGS}{$regLN}) {
+      $dReadR = $1 if($hash->{READINGS}{$regLN}{VAL} =~ m/$addrS:(..)/);
     }
+	$convFlg = "set_" if ($dReadS && $dReadR ne $dReadS);
+    my $dRead = $dReadS?$dReadS:$dReadR;
 	return "invalid" if (!defined($dRead));
 
 	$data = ($data<< 8)+hex($dRead);
@@ -3452,7 +3493,8 @@ CUL_HM_updtRegDisp($$$)
   my($hash,$list,$peerId)=@_;
   my $listNo = $list+0;
   my $name = $hash->{NAME};
-  my $peer = ($peerId)?CUL_HM_peerChName($peerId,substr($hash->{DEF},0,6),"")."-":"";
+  my $peer = ($peerId && $peerId ne '00000000' )?
+     CUL_HM_peerChName($peerId,substr($hash->{DEF},0,6),"")."-":"";
   $peer=~s/:/-/;
   my $devName =CUL_HM_getDeviceHash($hash)->{NAME};# devName as protocol entity
   my $st = AttrVal($devName, "subType", "");
@@ -3474,11 +3516,11 @@ CUL_HM_updtRegDisp($$$)
 	      if (ReadingsVal($name,$readName,"") ne $rgVal);
   }
 
-  # ---  handle specifics -  no general approach so far.   
+  # ---  handle specifics -  no general approach so far.  
   CUL_HM_TCtempReadings($hash) 
-        if (($listNo == 5 ||$listNo == 6)     && 
+        if (($list == 5 ||$list == 6)     && 
              substr($hash->{DEF},6,2) eq "02" &&
-             CUL_HM_Get($hash,"param","model") eq "HM-CC-TC");
+             CUL_HM_Get($hash,$name,"param","model") eq "HM-CC-TC");
 
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 }
@@ -3590,6 +3632,7 @@ CUL_HM_pushConfig($$$$$$$$)
     }
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs;
+  CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
   
   CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
@@ -3625,21 +3668,24 @@ CUL_HM_ActGetCreateHash()
   if (!$modules{CUL_HM}{defptr}{"000000"}){
     DoTrigger("global",  "UNDEFINED ActionDetector CUL_HM 000000");
 	$attr{ActionDetector}{actCycle} = 600;
-  
   }
   my $defPtr = $modules{CUL_HM}{defptr};
   my $actName = $defPtr->{"000000"}{NAME} if($defPtr->{"000000"});
   my $actHash = $modules{CUL_HM}{defptr}{"000000"};
-  if (!$actHash->{helper}{first}){ # if called first time arrributes are no yet
+  if ($attr{$actName}{peerList} && !$attr{$actName}{peerIDs}){#todo Updt1 remove
+    $attr{$actName}{peerIDs} = $attr{$actName}{peerList};     #todo Updt1 remove
+	delete ($attr{$actName}{peerList});                       #todo Updt1 remove
+  }                                                           #todo Updt1 remove
+  if (!$actHash->{helper}{first}){ # if called first time attributes are no yet
                                    #recovered
   	InternalTimer(gettimeofday()+3, "CUL_HM_ActGetCreateHash", "ActionDetector", 0);
 	$actHash->{helper}{first} = 1;
 	return;
   }
   if (!$actHash->{helper}{actCycle} ){ #This is the first call
-    my $peerList = AttrVal($actName,"peerList","");
+    my $peerIDs = AttrVal($actName,"peerIDs","");
     my $tn = TimeNow();
-	foreach my $devId (split(",",$peerList)){
+	foreach my $devId (split(",",$peerIDs)){
 	  $actHash->{helper}{$devId}{start} = $tn;
 	  my $devName = CUL_HM_id2Name($devId);
 	  readingsSingleUpdate($actHash,"status_".$devName,"unknown",1);	
@@ -3683,13 +3729,12 @@ CUL_HM_ActAdd($$)
   $attr{$devName}{actCycle} = $cycleString; 
   $attr{$devName}{actStatus}=""; # force trigger
   CUL_HM_setAttrIfCh($devName,"actStatus","unknown","Activity");
-  
   my $actHash = CUL_HM_ActGetCreateHash();
   my $actName = $actHash->{NAME}; # could have been renamed
 
-  my $peerList = AttrVal($actName,"peerList","");
-  $peerList .= $devId."," if($peerList !~ m/$devId,/);#add if not in
-  $attr{$actName}{peerList} = $peerList; 
+  my $peerIDs = AttrVal($actName,"peerIDs","");
+  $peerIDs .= $devId."," if($peerIDs !~ m/$devId,/);#add if not in
+  $attr{$actName}{peerIDs} = $peerIDs; 
   my $tn = TimeNow();  
   $actHash->{helper}{$devId}{start} = $tn;
   readingsSingleUpdate($actHash,"status_".$devName,"unknown",1);	  
@@ -3708,14 +3753,13 @@ CUL_HM_ActDel($)
   delete ($attr{$devName}{actCycle});
   CUL_HM_setAttrIfCh($devName,"actStatus","deleted","Activity");#post trigger
   delete ($attr{$devName}{actStatus});
-
   my $acthash = CUL_HM_ActGetCreateHash();
   my $actName = $acthash->{NAME};
 
   delete ($acthash->{helper}{$devId});
 
-  $attr{$actName}{peerList} = "" if (!defined($attr{$actName}{peerList}));
-  $attr{$actName}{peerList} =~ s/$devId,//g; 
+  $attr{$actName}{peerIDs} = "" if (!defined($attr{$actName}{peerIDs}));
+  $attr{$actName}{peerIDs} =~ s/$devId,//g; 
   Log GetLogLevel($actName,3),"Device ".$devName." removed from ActionDetector";
 }
 sub
@@ -3724,10 +3768,10 @@ CUL_HM_ActCheck()
   my $actHash = CUL_HM_ActGetCreateHash();
   my $tod = int(gettimeofday());
   my $actName = $actHash->{NAME};
-  my $peerList = AttrVal($actName,"peerList","none");
+  my $peerIDs = AttrVal($actName,"peerIDs","none");
   delete ($actHash->{READINGS}); #cleansweep
   readingsSingleUpdate($actHash,"state","check_performed",0);
-  foreach my $devId (split(",",$peerList)){
+  foreach my $devId (split(",",$peerIDs)){
     my $devName = CUL_HM_id2Name($devId);
 	if(!$devName || !defined($attr{$devName}{actCycle})){
 	  CUL_HM_ActDel($devId); 
@@ -3740,7 +3784,8 @@ CUL_HM_ActCheck()
 	  $state = "switchedOff";
 	}
 	else{
-	  my $tLast = $attr{$devName}{"protLastRcv"};
+      my $devHash = CUL_HM_name2Hash($devName);
+	  my $tLast = $devHash->{"protLastRcv"};
       my @t = localtime($tod - $tSec); #time since when a trigger is expected
 	  my $tSince = sprintf("%04d-%02d-%02d %02d:%02d:%02d",
                              $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
@@ -4411,6 +4456,21 @@ CUL_HM_setAttrIfCh($$$$)
     <li><a name="unit">unit</a><br>
         set the reported unit by the KFM100 if rawToReadable is active. E.g.<br>
         attr KFM100 unit Liter
+        </li>
+    <li><a name="autoReadReg">autoReadReg</a><br>
+        set to '1' will execute a getConfig for the device automatically after each reboot of FHEM. 
+		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
+		of the readings and the display will be delayed depending on the sice of the database.<br>
+		Recommendations and constrains upon usage:<br>
+        <ul>
+          use this attribute on the device or channel 01. Do not use it separate on each channel 
+		  of a multi-channel device to avoid duplicate execution<br>
+          usage on devices which only react to 'config' mode is not recommended since executen will 
+		  not start until config is triggered by the user<br>
+          usage on devices which support wakeup-mode is usefull. But consider that execution is delayed 
+		  until the device "wakes up".<br>
+        </ul>
+		
         </li>
   </ul>
   <br>
