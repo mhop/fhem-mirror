@@ -15,7 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
-my $debug = 1; # set 1 for better log readability
+my $debug = 0; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
@@ -220,7 +220,7 @@ HMLAN_Write($$$)
   my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
   my $IDsub = '-'.$dst;               # guess: ID remove?
     
-  HMLAN_SimpleWrite($hash, $IDadd) if (!$lhash{$dst});
+  HMLAN_SimpleWrite($hash, $IDadd) if (!$lhash{$dst} && $dst ne "000000");
   $lhash{$dst} = 1;
 
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
