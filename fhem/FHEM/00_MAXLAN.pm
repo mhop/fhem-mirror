@@ -521,20 +521,24 @@ MAXLAN_Parse($$)
     if($devicetype == 0){#Cube
       #TODO: there is a lot of data left to interpret
     }elsif($devicetype == 1 or $devicetype == 3){#HeatingThermostat or #WallMountedThermostat
-      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCa*",substr($bindata,18));
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
       #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
       my $boostDuration =  $boost_durations[$boost >> 5]; #in minutes
       #There is some trailing data missing, which maps to the weekly program
-      $comforttemp=$comforttemp/2.0; #convert to degree celcius
-      $ecotemp=$ecotemp/2.0; #convert to degree celcius
+      $comforttemp /= 2.0; #convert to degree celcius
+      $ecotemp /= 2.0; #convert to degree celcius
       $tempoffset = $tempoffset/2.0-3.5; #convert to degree
-      $maxsetpointtemp=$maxsetpointtemp/2.0;
-      $minsetpointtemp=$minsetpointtemp/2.0;
-      $windowopentemp=$windowopentemp/2.0;
-      $windowopendur=$windowopendur*5;
+      $maxsetpointtemp /= 2.0;
+      $minsetpointtemp /= 2.0;
+      $windowopentemp  /= 2.0;
+      $windowopendur   *= 5;
+      $maxvalvesetting *= 100/255;
+      $valveoffset     *= 100/255;
+      my $decalcDay       = ($decalcifiction >> 5) & 0x07;
+      my $decalcTime      = $decalcifiction & 0x1F;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
-      Dispatch($hash, "MAX,1,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur", {RAWMSG => $rmsg});
+      Dispatch($hash, "MAX,1,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
 
     }elsif($devicetype == 4){#ShutterContact
       Log 2, "ShutterContact send some configuration, but none was expected" if($len > 18);
