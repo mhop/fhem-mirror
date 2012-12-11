@@ -212,13 +212,14 @@ FB_CALLMONITOR_Read($)
    
    readingsBeginUpdate($hash);
    readingsBulkUpdate($hash, "event", lc($array[1]));
-   readingsBulkUpdate($hash, "external_number", (defined($external_number) ? $external_number : "unknown"));
-   readingsBulkUpdate($hash, "external_name",(defined($reverse_search) ? $reverse_search : "unknown"));
+   readingsBulkUpdate($hash, "external_number", (defined($external_number) ? $external_number : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
+   readingsBulkUpdate($hash, "external_name",(defined($reverse_search) ? $reverse_search : "unknown")) if($array[1] eq "RING" or $array[1] eq "CALL");
    readingsBulkUpdate($hash, "internal_number", $array[4]) if($array[1] eq "RING" or $array[1] eq "CALL");
    readingsBulkUpdate($hash, "external_connection", $array[5]) if($array[1] eq "RING");
    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
    readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
    readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
+   readingsBulkUpdate($hash, "call_id", $array[2]);
    readingsEndUpdate($hash, 1);
   
 }
@@ -531,6 +532,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <li><b>internal_connection</b>: $connection - The internal connection (FON1, FON2, ISDN, DECT, ...) which is used to take the call</li>
   <li><b>external_connection</b>: $connection - The external connection (fixed line, VoIP account) which is used to take the call</li>
   <li><b>call_duration</b>: $seconds - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
+  <li><b>call_id</b>: §id - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
   </ul>
 </ul>
 
@@ -623,6 +625,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <li><b>internal_connection</b>: $connection - Der interne Anschluss an der Fritz!Box welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren (FON1, FON2, ISDN, DECT, ...)</li>
   <li><b>external_connection</b>: $connection - Der externe Anschluss welcher genutzt wird um das Gespräch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
   <li><b>call_duration</b>: $seconds - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
+  <li><b>call_id</b>: $id - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei 2 oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
   </ul>
 </ul>
 
