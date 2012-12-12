@@ -438,9 +438,13 @@ MAXLAN_Parse($$)
                           + $cubedatetime->{day} - $mday)*24
                           + $cubedatetime->{hour} - $hour)*60
                           + $cubedatetime->{minute} - $min);
-      Log 3, "Cube thinks it is $cubedatetime->{day}.$cubedatetime->{month}.$cubedatetime->{year} $cubedatetime->{hour}:$cubedatetime->{minute}";
-      Log 3, "Time difference is $difference minutes";
       $hash->{cubeTimeDifference} = $difference;
+      if($difference > 1) {
+        Log 2, "MAXLAN_Parse: Cube thinks it is $cubedatetime->{day}.$cubedatetime->{month}.$cubedatetime->{year} $cubedatetime->{hour}:$cubedatetime->{minute}";
+        Log 2, "MAXLAN_Parse: Time difference is $difference minutes";
+      }
+    } else {
+      Log 2, "MAXLAN_Parse: Cube has no time set";
     }
 
     Dispatch($hash, "MAX,1,define,$hash->{rfaddr},Cube,$hash->{serial},0,1", {RAWMSG => $rmsg});
