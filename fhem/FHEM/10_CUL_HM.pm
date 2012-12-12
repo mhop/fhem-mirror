@@ -1488,8 +1488,7 @@ CUL_HM_Get($@)
   return "no get value specified" if(@a < 2);
 
   my $name = $hash->{NAME};
-  my $devName = $hash->{device};# get devName as protocol entity
-  $devName = $name if (!$devName); # we control ourself if no device available
+  my $devName = $hash->{device}?$hash->{device}:$name;
   my $st = AttrVal($devName, "subType", "");
   my $md = AttrVal($devName, "model", "");
   my $mId = CUL_HM_getMId($hash);
@@ -1804,7 +1803,7 @@ CUL_HM_Set($@)
   return "no set value specified" if(@a < 2);
 
   my $name = $hash->{NAME};
-  my $devName = AttrVal($name,    "device" , $name);# devName as protocol entity
+  my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
   my $class   = AttrVal($devName, "hmClass", "");#relevant is the device
@@ -2819,10 +2818,11 @@ CUL_HM_respPendTout($)
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
   if ($hash && $hash->{DEF} ne '000000'){
     CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
-    CUL_HM_eventP($hash,"ToutResp") if ($hash->{helper}{respWait}{Pending});
+	my $pendCmd = $hash->{helper}{respWait}{Pending};# save before remove
+    CUL_HM_eventP($hash,"ToutResp") if ($pendCmd);
 	CUL_HM_respPendRm($hash);
 	CUL_HM_ProcessCmdStack($hash); # continue processing commands
-	readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT",1);
+	readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT:".$pendCmd,1);
   }
 }
 sub    #---------------------------------
@@ -3241,10 +3241,17 @@ CUL_HM_parseCommon(@){
   	CUL_HM_SndCmd($shash, '++A112'.CUL_HM_Id($shash->{IODev}).$src);
 	CUL_HM_ProcessCmdStack($shash);
   }
+  
   if ($msgType eq "02"){# Ack/Nack #######################################
 	if ($shash->{helper}{respWait}{msgId}             && 
 	    $shash->{helper}{respWait}{msgId} eq $msgId ){
 	  #ack we waited for - stop Waiting
+	  CUL_HM_respPendRm($shash);
+	}
+	if ($pendType eq "StatusReq"){#possible answer for status request
+	  my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
+	  my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc}; 
+	  $chnhash = $shash if (!$chnhash);
 	  CUL_HM_respPendRm($shash);
 	} 
 
@@ -3404,7 +3411,7 @@ CUL_HM_parseCommon(@){
 		my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc}; 
 		$chnhash = $shash if (!$chnhash);
 		CUL_HM_respPendRm($shash);
-		return "STATresp";# todo dont send ACK - check what others do
+		return "STATresp";
 	  }
 	  else{
 		my ($chn) = ($1) if($p =~ m/^..(..)/);
