@@ -532,7 +532,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <li><b>internal_connection</b>: $connection - The internal connection (FON1, FON2, ISDN, DECT, ...) which is used to take the call</li>
   <li><b>external_connection</b>: $connection - The external connection (fixed line, VoIP account) which is used to take the call</li>
   <li><b>call_duration</b>: $seconds - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
-  <li><b>call_id</b>: §id - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
+  <li><b>call_id</b>: $id - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
   </ul>
 </ul>
 
