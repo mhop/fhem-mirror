@@ -13,7 +13,7 @@ our %device_types;
 
 sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
-sub CUL_MAX_BroadcastTime($);
+sub CUL_MAX_BroadcastTime(@);
 sub CUL_MAX_Set($@);
 sub CUL_MAX_SendAck($$$);
 sub CUL_MAX_SendTimeInformation(@);
@@ -104,8 +104,12 @@ CUL_MAX_Set($@)
   if($setting eq "pairmode") {
     $hash->{pairmode} = 1;
     InternalTimer(gettimeofday()+$pairmodeDuration, "CUL_MAX_DisablePairmode", $hash, 0);
+
+  } elsif($setting eq "broadcastTime") {
+    CUL_MAX_BroadcastTime($hash, 1);
+
   } else {
-    return "Unknown argument $setting, choose one of pairmode";
+    return "Unknown argument $setting, choose one of pairmode broadcastTime";
   }
   return undef;
 }
@@ -356,18 +360,30 @@ CUL_MAX_SendTimeInformation(@)
 }
 
 sub
-CUL_MAX_BroadcastTime($)
+CUL_MAX_SendTimeInformationSender($)
 {
-  my $hash = shift;
+  my $args = shift;
+  my ($hash,$addr,$payload) = @{$args};
+  CUL_MAX_SendTimeInformation($hash, $addr, $payload);
+}
+
+sub
+CUL_MAX_BroadcastTime(@)
+{
+  my ($hash,$manual) = @_;
   my $payload = CUL_MAX_GetTimeInformationPayload();
   Log 5, "CUL_MAX_BroadcastTime: payload $payload";
+  my $i = 1;
   foreach my $addr (keys %{$modules{MAX}{defptr}}) {
     my $dhash = $modules{MAX}{defptr}{$addr};
     if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash) {
-      CUL_MAX_SendTimeInformation($hash, $addr, $payload);
+      #We queue it at different times and do not send directly, because
+      #sending them all in a row makes us not see the Acks
+      InternalTimer(gettimeofday()+3*$i++, "CUL_MAX_SendTimeInformationSender", [$hash, $addr, $payload], 0);
     }
   }
-  InternalTimer(gettimeofday()+$timeBroadcastInterval, "CUL_MAX_BroadcastTime", $hash, 0);
+
+  InternalTimer(gettimeofday()+$timeBroadcastInterval, "CUL_MAX_BroadcastTime", $hash, 0) unless(defined($manual));
 }
 
 1;
