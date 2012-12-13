@@ -23,10 +23,9 @@ my $pairmodeDuration = 30; #seconds
 
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
 
-my $resendRetries = 10; #how often resend before giving up?
+my $resendRetries = 0; #how often resend before giving up?
 
-my $ackTimeout = 1.3; #seconds: The MAX devices wake up once every second. Making this a fraction increases our change to hit
-# the right moment the next time.
+my $ackTimeout = 3; #seconds
 
 sub
 CUL_MAX_Initialize($)
@@ -343,8 +342,6 @@ CUL_MAX_GetTimeInformationPayload()
   my ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst) = gmtime(time());
   $mon += 1; #make month 1-based
   #month encoding is just guessed
-  #also $hour-1 is not so clear, maybe there is some timezone involved (maybe we should send gmtime?)
-  #but where do we send the timezone? or is scheduled data/until in GMT?
   #perls localtime gives years since 1900, and we need years since 2000
   return unpack("H*",pack("CCCCC", $year - 100, $day, $hour, $min | (($mon & 0x0C) << 4), $sec | (($mon & 0x03) << 6)));
 }
