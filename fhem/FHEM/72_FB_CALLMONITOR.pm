@@ -88,8 +88,14 @@ FB_CALLMONITOR_Initialize($)
   $hash->{GetFn}   = "FB_CALLMONITOR_Get";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
-
+  if(-r "/var/flash/phonebook")
+  {
+    $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
+  }
+  else
+  {
+    $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";  
+  }
 }
 
 #####################################
@@ -110,6 +116,9 @@ FB_CALLMONITOR_Define($$)
   my $dev = $a[2];
   $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
+
+  FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+  
   InternalTimer(gettimeofday()+3, "FB_CALLMONITOR_loadCacheFile", $hash, 0);
 
   
@@ -163,7 +172,7 @@ if($arguments[1] eq "search")
 else
 {
 
-   return "unknown argument"; 
+   return "unknown argument, choose on of search"; 
 
 
 }
@@ -252,6 +261,17 @@ my $result;
 my $invert_match = undef;
 
 
+# Using internal phonebook if available and enabled
+if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-search", "none") eq "internal" and defined($hash->{helper}{PHONEBOOK}))
+{
+   if(defined($hash->{helper}{PHONEBOOK}{$number}))
+   {
+      Log GetLogLevel($name, 4), "FB_CALLMONITOR $name using internal phonebook for reverse search of $number";
+         return $hash->{helper}{PHONEBOOK}{$number};
+
+   }
+}
+
 # Using Cache if enabled
 if(AttrVal($name, "reverse-search-cache", "0") eq "1")
 {
@@ -276,6 +296,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      if(AttrVal($name, "reverse-search-cache", "0") eq "1")
      {
        $hash->{helper}{CACHE}{$number} = "timeout";
+       undef($result);
        return "timeout";
      }
   }
@@ -287,6 +308,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      $invert_match = $1;
      $invert_match = FB_CALLMONITOR_html2txt($invert_match);
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     undef($result);
      return $invert_match;
    }
   }
@@ -303,6 +325,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
     {
        $hash->{helper}{CACHE}{$number} = "timeout";
+       undef($result);
        return "timeout";
     }
     
@@ -315,6 +338,7 @@ if(AttrVal($name, "reverse-search", "none") eq "all" or AttrVal($name, "reverse-
      $invert_match = $1;
      $invert_match = FB_CALLMONITOR_html2txt($invert_match);
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     undef($result);
      return $invert_match;
    }
   }
@@ -331,6 +355,7 @@ if(AttrVal($name, "reverse-search", "none") eq "search.ch")
     if(AttrVal($name, "reverse-search-cache", "0") eq "1")
     {
        $hash->{helper}{CACHE}{$number} = "timeout";
+       undef($result);
        return "timeout";
     }
     
@@ -343,6 +368,7 @@ if(AttrVal($name, "reverse-search", "none") eq "search.ch")
      $invert_match = $1;
      $invert_match = FB_CALLMONITOR_html2txt($invert_match);
      FB_CALLMONITOR_writeToCache($hash, $number, $invert_match) if(AttrVal($name, "reverse-search-cache", "0") eq "1");
+     undef($result);
      return $invert_match;
    }
   }
@@ -403,6 +429,66 @@ sub FB_CALLMONITOR_writeToCache($$$)
 
 
 }
+
+
+sub FB_CALLMONITOR_loadInternalPhonebookFile($)
+{
+
+  my ($hash) = @_;
+  my $phonebook = undef;
+  my $contact;
+  my $name;
+  my $number;
+  my $area_code = AttrVal($hash->{NAME}, "local-area-code", "");
+
+  delete $hash->{helper}{PHONEBOOK} if(defined($hash->{helper}{PHONEBOOK}));
+
+  if(-r "/var/flash/phonebook")
+  {
+
+
+    if(open(PHONEBOOK, "</var/flash/phonebook"))
+    {
+
+      $phonebook = join('', <PHONEBOOK>);
+
+
+
+      while($phonebook =~ m/<contact>(.+?)<\/contact>/gs)
+      {
+
+        $contact = $1;
+        if($contact =~ m/<realName>(.+?)<\/realName>/)
+        {
+          $name = $1; 
+          Log 2, "found $name";
+ 
+          while($contact =~ m/<number[a-z0-9="\n ]+?type="(\w+?)"[a-z0-9="\n ]+?>(.+?)<\/number>/gs)
+          {
+            if($1 ne "intern")
+            {
+            $number = $2;
+             if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "")
+              {
+               if($area_code =~ /^0[1-9]\d+$/)
+               {
+                $number = $area_code.$number;
+               }
+    
+             }
+            $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
+            undef $number;
+            }
+          }
+          undef $name;
+        }
+      }
+      undef $phonebook;
+    }
+  }
+}
+
+
 
 sub FB_CALLMONITOR_loadCacheFile($)
 {
@@ -500,10 +586,11 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
-    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|search.ch|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
-    If the attribute is set to "all", the reverse search will reverse search on all websites (execept search.ch) until a valid answer is found on of them 
+    The value "internal" is only available when running FHEM on a FritzBox (using the internal phonebook).
+    If the attribute is set to "all", the reverse search will use the internal phonebook (if running FHEM on a FritzBox) or reverse search on all websites (execept search.ch) until a valid answer is found on of them 
     If is set to "none", then no reverse searching will be used.<br><br>Default value is "none".<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     If this attribute is activated each reverse-search result is saved in an internal cache
@@ -591,10 +678,13 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
     <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
-    <li><a name="reverse-search">reverse-search</a> (all|klicktel.de|dasoertliche.de|search.ch|none)</li>
+    <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
-    Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher für die R&uuml;ckw&auml;rtssuche verwendet werden soll.
-    Wenn dieses Attribut auf dem Wert "all" steht, werden alle verf&uuml;gbaren Suchanbieter (ausser search.ch) f&uuml;r die R&uuml;ckw&auml;rtssuche herangezogen, solange bis irgend ein Anbieter ein valides Ergebniss liefert.
+    Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.
+    Falls FHEM auf einer FritzBox Fon l&auml;uft, kann mit dem Wert "internal" ausschlie&szlig;lich das interne Telefonbuch verwendet werden.
+    Wenn dieses Attribut auf dem Wert "all" steht, wird (sofern FHEM auf einer FritzBox Fon l&auml;uft) das interne Telefonbuch verwendet,
+    sowie alle verf&uuml;gbaren Suchanbieter (ausser search.ch)
+    f&uuml;r die R&uuml;ckw&auml;rtssuche herangezogen, solange bis irgend ein Anbieter ein valides Ergebniss liefert.
     Wenn der Wert "none" ist, wird keine R&uuml;ckw&auml;rtssuche durchgef&uuml;hrt.<br><br>Standardwert ist "none" (keine R&uuml;ckw&auml;rtssuche).<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
     Wenn dieses Attribut gesetzt ist, werden alle Ergebisse der R&uuml;ckw&auml;rtssuche in einem modul-internen gespeichert
@@ -623,7 +713,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <li><b>external_name</b>: $name - Das Ergebniss der R&uuml;ckw&auml;rtssuche (sofern aktiviert). Im Fehlerfall kann diese Reading auch den Inhalt "unknown" (keinen Eintrag gefunden) und "timeout" (Zeit&uuml;berschreitung bei der Abfrage) enthalten. Im Falle einer Zeit&uuml;berschreitung und aktiviertem Caching, wird die Rufnummer beim n&auml;chsten Mal erneut gesucht.</li>
   <li><b>internal_number</b>: $number - Die interne Rufnummer (Festnetz, VoIP-Nummer, ...) auf welcher man angerufen wird (event: ring) oder die man gerade nutzt um jemanden anzurufen (event: call)</li>
   <li><b>internal_connection</b>: $connection - Der interne Anschluss an der Fritz!Box welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren (FON1, FON2, ISDN, DECT, ...)</li>
-  <li><b>external_connection</b>: $connection - Der externe Anschluss welcher genutzt wird um das Gespräch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
+  <li><b>external_connection</b>: $connection - Der externe Anschluss welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
   <li><b>call_duration</b>: $seconds - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
   <li><b>call_id</b>: $id - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei 2 oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
   </ul>
