@@ -46,7 +46,7 @@ sub GPIO4_Define($$) {
 	}
 	else {
 		my ($family, $id) = split('-',$a[2]);
-		if ($family eq "28") {
+		if ($family eq "28" || $family eq "10") {
 			InternalTimer(gettimeofday()+10, "GPIO4_DeviceUpdateLoop", $hash, 0);
 		}
 		else {
@@ -74,15 +74,18 @@ sub GPIO_GetSlave($) {
 	my ($slave) = @_;
 	Log 2, "GPIO4: GPIO4_GetSlave($slave)";
 	my ($family, $id) = split("-", $slave);
+	foreach my $devicename (keys %defs) {
+		return undef if ($defs{$devicename}{DEF} eq $slave); 
+	}
+	Log 2, "GPIO4: create $slave";
+	CommandDefine(undef,"gpio4_$id GPIO4 $slave");	
 	if ($family eq "28") {
-		foreach my $devicename (keys %defs) {
-			return undef if ($defs{$devicename}{DEF} eq $slave); 
-		}
-		Log 2, "GPIO4: create $slave";
-		CommandDefine(undef,"gpio4_$id GPIO4 $slave");	
-		$attr{"gpio4_$id"}{room} = "GPIO4"; 
 		$attr{"gpio4_$id"}{model} = "DS18B20"; 
 	}
+	if ($family eq "10") {
+		$attr{"gpio4_$id"}{model} = "DS1820"; 
+	}
+	$attr{"gpio4_$id"}{room} = "GPIO4"; 
 	return undef;
 }
 
