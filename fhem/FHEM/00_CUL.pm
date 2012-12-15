@@ -31,7 +31,6 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
-  "maxPairForSec" => "MAX",
   "raw"       => "",
   "freq"      => "SlowRF",
   "bWidth"    => "SlowRF",
@@ -208,13 +207,6 @@ CUL_RemoveHMPair($)
   delete($hash->{hmPair});
 }
 
-sub
-CUL_RemoveMAXPair($)
-{
-  my $hash = shift;
-  delete($hash->{maxPair});
-}
-
 #####################################
 sub
 CUL_Set($@)
@@ -248,12 +240,6 @@ CUL_Set($@)
     CUL_SimpleWrite($hash, sprintf("As15%02x8401%s000000010A%s",
                     $hash->{HM_CMDNR}, $id, unpack('H*', $arg)));
     $hash->{hmPairSerial} = $arg;
-
-  } elsif($type eq "maxPairForSec") { ####################################
-    return "Usage: set $name maxPairForSec <seconds_active>"
-        if(!$arg || $arg !~ m/^\d+$/);
-    $hash->{maxPair} = 1;
-    InternalTimer(gettimeofday()+$arg, "CUL_RemoveMAXPair", $hash, 1);
 
   } elsif($type eq "freq") { ######################################## MHz
 
@@ -1176,11 +1162,6 @@ CUL_Attr(@)
        in learning mode if it is a receiver.
        </li><br>
     <a name="hmPairForSec"></a>
-    <li>maxPairForSec<br>
-       <a href="#rfmode">MAX</a> mode only.<br>
-       Set the CUL in Pairing-Mode for the given seconds. Any MAX device set into
-       pairing mode in this time will be paired with fhem.
-       </li><br>
     <li>led<br>
         Set the CUL led off (00), on (01) or blinking (02).
         </li><br>
