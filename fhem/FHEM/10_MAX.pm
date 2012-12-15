@@ -194,13 +194,13 @@ MAX_Set($@)
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
 
-    my $comfortTemperature = ReadingsVal($hash->{NAME},"comfortTemperature","");
-    my $ecoTemperature = ReadingsVal($hash->{NAME},"ecoTemperature","");
-    my $maximumTemperature = ReadingsVal($hash->{NAME},"maximumTemperature","");
-    my $minimumTemperature = ReadingsVal($hash->{NAME},"minimumTemperature","");
-    my $windowOpenTemperature = ReadingsVal($hash->{NAME},"windowOpenTemperature","");
-    my $windowOpenDuration = ReadingsVal($hash->{NAME},"windowOpenDuration","");
-    my $measurementOffset = ReadingsVal($hash->{NAME},"measurementOffset","");
+    my $comfortTemperature = ReadingsVal($hash->{NAME},"comfortTemperature","21");
+    my $ecoTemperature = ReadingsVal($hash->{NAME},"ecoTemperature","17");
+    my $maximumTemperature = ReadingsVal($hash->{NAME},"maximumTemperature","30.5");
+    my $minimumTemperature = ReadingsVal($hash->{NAME},"minimumTemperature","4.5");
+    my $windowOpenTemperature = ReadingsVal($hash->{NAME},"windowOpenTemperature","12");
+    my $windowOpenDuration = ReadingsVal($hash->{NAME},"windowOpenDuration","15");
+    my $measurementOffset = ReadingsVal($hash->{NAME},"measurementOffset","0");
 
     return "Invalid comfortTemperature"    if($comfortTemperature eq "" or $comfortTemperature < 4.5 or $comfortTemperature > 30.5);
     return "Invalid ecoTemperature"        if($ecoTemperature eq "" or $ecoTemperature < 4.5 or $ecoTemperature > 30.5);
@@ -277,7 +277,7 @@ MAX_Set($@)
       return "$ret associate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration";
 
     } elsif($hash->{type} eq "WallMountedThermostat") {
-      return "$ret associate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist";
+      return "$ret associate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist";
     } elsif($hash->{type} eq "ShutterContact") {
       return "$ret associate:$assoclist";
     } else {
