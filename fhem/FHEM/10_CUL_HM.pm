@@ -163,7 +163,7 @@ my %culHmModel=(
   "005A" => {name=>"HM-LC-DIM2T-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "005C" => {name=>"HM-OU-CF-PL"             ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Sound:2:2",},
   "005D" => {name=>"HM-Sen-MDIR-O"           ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "005F" => {name=>"HM-SCI-3-FM"             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "005F" => {name=>"HM-SCI-3-FM"             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Sw:1:3",},
   "0060" => {name=>"HM-PB-4DIS-WM"           ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
   "0061" => {name=>"HM-LC-SW4-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
   "0062" => {name=>"HM-LC-SW2-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
@@ -213,6 +213,7 @@ CUL_HM_Initialize($)
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 ".
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+					   "event-on-change-reading event-on-update-reading ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
 					   "peerList ". #todo Updt1 remove
@@ -614,23 +615,17 @@ CUL_HM_Parse($$)
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
-      my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
-	  $shash->{helper}{addVal} = $err;   #store to handle changes
-
       # Status-Byte Auswertung
 	  my $stErr = ($err >>1) & 0x7;      
-	  if ($cmpVal&0x0E){# report bad always, good only once
-	    if (!$stErr){#remove both conditions
-          push @event, "battery:ok";
-          push @event, "motorErr:ok";
-		}
-		else{
-          push @event, "motorErr:blocked"                   if($stErr == 1);
-          push @event, "motorErr:loose"                     if($stErr == 2);
-          push @event, "motorErr:adjusting range too small" if($stErr == 3);
-          push @event, "battery:low"                        if($stErr == 4);
-		}
+	  if (!$stErr){#remove both conditions
+        push @event, "battery:ok";
+        push @event, "motorErr:ok";
+	  }
+	  else{
+        push @event, "motorErr:blocked"                   if($stErr == 1);
+        push @event, "motorErr:loose"                     if($stErr == 2);
+        push @event, "motorErr:adjusting range too small" if($stErr == 3);
+        push @event, "battery:low"                        if($stErr == 4);
 	  }
       push @event, "motor:opening" if(($err&0x30) == 0x10);
       push @event, "motor:closing" if(($err&0x30) == 0x20);
@@ -648,7 +643,6 @@ CUL_HM_Parse($$)
       push @event, "ValveErrorPosition:$vep %";
       push @event, "ValveOffset:$of %";
     }
-  
   } 
   elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
 
@@ -694,10 +688,6 @@ CUL_HM_Parse($$)
       # Multi-channel device: Use channel if defined
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
-	  $shash->{helper}{addVal} = $err;   #store to handle changes
-
       my $val = hex($level)/2;
       $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
 
@@ -719,7 +709,7 @@ CUL_HM_Parse($$)
         push @event, "$eventName:stop:$val" if(($err&0x30) == 0x00);
 	  }
 	  push @event, "battery:" . (($err&0x80) ? "low" : "ok" )
-	           if(($model eq "HM-LC-SW1-BA-PCB")&&($cmpVal&0x80));
+	           if(($model eq "HM-LC-SW1-BA-PCB")&&($err&0x80));
 	  push @event, "state:$val";
     }
   } 
@@ -757,11 +747,9 @@ CUL_HM_Parse($$)
 	  else{
         $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
       }
-      my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	  $cmpVal = (($cmpVal ^ $buttonField)|$buttonField); # each err, one goto normal
 	  $shash->{helper}{addVal} = $buttonField;   #store to handle changes
 	  readingsSingleUpdate($chnHash,"state",$target,1);#trigger chan evt also 
-      push @event,"battery:". (($buttonField&0x80)?"low":"ok")if($cmpVal&0x80);
+      push @event,"battery:". (($buttonField&0x80)?"low":"ok");
       push @event,"state:$btnName $state$target";
     }
   }
@@ -828,16 +816,10 @@ CUL_HM_Parse($$)
     if(($msgType eq "10" ||$msgType eq "02") && $p =~ m/^0601(..)(..)/) {
 	  my $err;
       ($state, $err) = ($1, hex($2));
-	  my $cmpVal = defined($shash->{helper}{addVal})?
-	                      $shash->{helper}{addVal}:0xff;
-	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
-	  $shash->{helper}{addVal} = $err;   #store to handle changes
 	  my $bright = hex($state);
-      push @event,"brightness:".$bright    
-	       if (ReadingsVal($name,"brightness","") ne $bright);# post if changed
-      push @event, "cover:".   (($err&0x0E)?"open" :"closed") if ($cmpVal&0x0E);        
-	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  )   if ($cmpVal&0x80);
-	  push @event, ""; # just in case - mark message as passed
+      push @event, "brightness:".$bright;
+      push @event, "cover:".     (($err&0x0E)?"open" :"closed");        
+	  push @event, "battery:".   (($err&0x80)?"low"  :"ok"  );
     }
     elsif($msgType eq "41" && $p =~ m/^01(..)(..)(..)/) {#01 is "motion"
 	  my($cnt,$nextTr) = (hex($1),(hex($3)>>4));
@@ -846,8 +828,7 @@ CUL_HM_Parse($$)
       push @event, "state:motion";
       push @event, "motion:on$target"; #added peterp
       push @event, "motionCount:".$cnt."_next:".$nextTr;
-      push @event, "brightness:".$bright    
-	       if (ReadingsVal($name,"brightness","") ne $bright);# post if changed
+      push @event, "brightness:".$bright;
     }
     elsif($msgType eq "70" && $p =~ m/^7F(..)(.*)/) {
 	  my($d1, $d2) = ($1, $2);
@@ -865,22 +846,16 @@ CUL_HM_Parse($$)
 
 	if ($msgType eq "10" && $p =~ m/^06..(..)/) {
 	  my $state = hex($1);
-	  my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:
-	                                                 0xff;
-	  $cmpVal = ($cmpVal ^ $state)|$state; 
-      push @event, "battery:". (($state&0x04)?"low"  :"ok"  ) if($cmpVal&0x04);
+      push @event, "battery:". (($state&0x04)?"low"  :"ok"  );
       push @event, "state:alive";
     } 
     elsif ($msgType eq "40"){ #autonomous event
-	  my ($state,$trgCnt) = (hex(substr($p,0,2)),hex(substr($p,2,2)));
 	  if($dhash){ # the source is in dst
-	    my $cmpVal = defined($dhash->{helper}{addVal})?
-		                            $dhash->{helper}{addVal}:0xff;
-	    $cmpVal = ($cmpVal ^ $state)|$state; 
+	    my ($state,$trgCnt) = (hex(substr($p,0,2)),hex(substr($p,2,2)));
 		readingsSingleUpdate($dhash,'test',"from $dname:$state",1)
 		      if (!($state & 1));
 		readingsSingleUpdate($dhash,'battery',(($state & 0x04)?"low":"ok"),1)
-		      if($cmpVal&0x80);
+		      if($state&0x80);
 	  }
       push @event, "";
     }
@@ -930,13 +905,10 @@ CUL_HM_Parse($$)
         ($chn,$state,$err) = ($1, $2, hex($3));
 		$shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
-	  	my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	    $cmpVal = (defined($err))?(($cmpVal ^ $err)|$err):0; # all error,one normal
-	    $shash->{helper}{addVal} = $err;#store to handle changes
 		push @event, "alive:yes";
-	    push @event, "battery:". (($err&0x80)?"low"  :"ok"  )  if($cmpVal&0x80);
+	    push @event, "battery:". (($err&0x80)?"low"  :"ok"  );
 		if ($model ne "HM-SEC-WDS"){	  
-		  push @event, "cover:". (($err&0x0E)?"open" :"closed")if($cmpVal&0x0E);
+		  push @event, "cover:". (($err&0x0E)?"open" :"closed");
 	    }
 	  }
 	}
@@ -1014,20 +986,16 @@ CUL_HM_Parse($$)
  	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
-      my $cmpVal = defined($shash->{helper}{addVal})?$shash->{helper}{addVal}:0xff;
-	  $cmpVal = (($cmpVal ^ $err)|$err); # all error,only one goto normal
-	  $shash->{helper}{addVal} = $err;   #store to handle changes
-
       my $stErr = ($err >>1) & 0x7;      
       my $error = 'unknown_'.$stErr;
       $error = 'motor aborted'  if ($stErr == 2);
       $error = 'clutch failure' if ($stErr == 1);
       $error = 'none'           if ($stErr == 0);
 
-      push @event, "unknown:" .  (($err&0x40) ? "40" :"")   if($cmpVal&0x40);
-	  push @event, "battery:".   (($err&0x80) ? "low":"ok") if($cmpVal&0x80);
-      push @event, "uncertain:" .(($err&0x30) ? "yes":"no") if($cmpVal&0x30);
-      push @event, "error:" .    ($error)                   if($cmpVal&0x0E);
+      push @event, "unknown:40"   if($err&0x40);
+	  push @event, "battery:".   (($err&0x80) ? "low":"ok");
+      push @event, "uncertain:" .(($err&0x30) ? "yes":"no");
+      push @event, "error:" .    ($error);
       my $state = ($err & 0x30) ? " (uncertain)" : "";
       push @event, "lock:"	.	(($val == 1) ? "unlocked" : "locked");
       push @event, "state:"	.	(($val == 1) ? "unlocked" : "locked") . $state;
@@ -1451,11 +1419,11 @@ CUL_HM_TCtempReadings($)
   my $tempRegs = $reg5.$reg6;  #one row
   $tempRegs =~ s/ 00:00/ /g;   #remove regline termination
   $tempRegs =~ s/ ..:/,/g;     #remove addr Info
-  $tempRegs =~ s/ $//;         #remove trailing ' '
+  $tempRegs =~ s/ //g;         #blank
   my @Tregs = split(",",$tempRegs);
   my @time  = @Tregs[grep !($_ % 2), 0..$#Tregs]; # even-index =time
   my @temp  = @Tregs[grep $_ % 2, 0..$#Tregs];    # odd-index  =data
-  return "reglist incomplete\n" if ((scalar @time )<168);
+  return "reglist incomplete\n" if (scalar( @time )<168);
   foreach  (@time){$_=hex($_)*10};
   foreach  (@temp){$_=hex($_)/2};
   my $setting;
@@ -1539,7 +1507,7 @@ CUL_HM_Get($@)
   }
   elsif($cmd eq "reg") {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
-	if ($regReq eq 'all'){# todo General correct retrieve of channel information if device is used
+	if ($regReq eq 'all'){
 	  my @regArr = keys %culHmRegGeneral;
 	  push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st}); 
 	  push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
@@ -2065,10 +2033,10 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash,$id,$dst,$lChn,$peerID,$peerChn,$list,$addrData);
   } 
   elsif($cmd eq "on") { ###############################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000');
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C8');
   } 
   elsif($cmd eq "off") { ##############################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'000000');
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'00');
   } 
   elsif($cmd eq "on-for-timer"||$cmd eq "on-till") { ##########################
     my (undef,undef,$duration,$edate) = @a; #date prepared extention to entdate
@@ -2457,7 +2425,7 @@ CUL_HM_Set($@)
 	$set = ($set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
-	$b1 = ($isChannel) ? hex($chn):sprintf("%02X",$bNo);
+	$b1 = ($isChannel) ? hex($chn):(!$bNo?"01":sprintf("%02X",$bNo));
 	$b1 = $b1*2 - 1 if(!$single && !$isChannel);
 	if ($single){ 
         $b2 = $b1;
@@ -3776,8 +3744,10 @@ CUL_HM_ActCheck()
   my $tod = int(gettimeofday());
   my $actName = $actHash->{NAME};
   my $peerIDs = AttrVal($actName,"peerIDs","none");
-  delete ($actHash->{READINGS}); #cleansweep
-  readingsSingleUpdate($actHash,"state","check_performed",0);
+#  delete ($actHash->{READINGS}); #cleansweep
+  my @event;
+  push @event, "state:check_performed";
+
   foreach my $devId (split(",",$peerIDs)){
     my $devName = CUL_HM_id2Name($devId);
 	if(!$devName || !defined($attr{$devName}{actCycle})){
@@ -3802,13 +3772,15 @@ CUL_HM_ActCheck()
  	  }else{$state = "alive";}
 	}  
 	if ($state && $attr{$devName}{actStatus} ne $state){
+
 	  DoTrigger($devName,"Activity:".$state);
 	  $attr{$devName}{actStatus} = $state;
-	  readingsSingleUpdate($actHash,$rdName,$state,1);
+      push @event, $rdName.":".$state;
 	  Log GetLogLevel($actName,4),"Device ".$devName." is ".$state;
 	}
   }
-
+  CUL_HM_UpdtReadBulk($actHash,0,@event);
+  
   $attr{$actName}{actCycle} = 600 if($attr{$actName}{actCycle}<30); 
   $actHash->{helper}{actCycle} = $attr{$actName}{actCycle};
   InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
@@ -4541,11 +4513,11 @@ CUL_HM_setAttrIfCh($$$$)
       cover closed<br>
       cover open<br>
   <li>smokeDetector<br>
-      on<br>
-      smoke_detect on<br>
-      all-clear<br>
-      alive<br>
-      test $t<br>
+      state: [on|all-clear|alive]<br>
+      smoke_detect on from $src<br>
+      test:from $src<br>
+      battery: [low|ok]<br>
+	  SDteam:[add|remove]_$name<br>
   <li>threeStateSensor (all)<br>
       sabotage<br>
       alive<br>
