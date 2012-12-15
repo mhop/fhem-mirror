@@ -541,7 +541,7 @@ MAXLAN_Parse($$)
       $valveoffset     *= 100/255;
       my $decalcDay       = ($decalcifiction >> 5) & 0x07;
       my $decalcTime      = $decalcifiction & 0x1F;
-      Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, $minsetpointtemp minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
+      Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
       Dispatch($hash, "MAX,1,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
 
     }elsif($devicetype == 4){#ShutterContact
