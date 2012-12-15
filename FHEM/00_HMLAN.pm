@@ -209,7 +209,7 @@ HMLAN_Write($$$)
   if ($mtype eq "02" && $src eq $hash->{owner} && length($msg) == 24){
     # Acks are generally send by HMLAN autonomously
     # Special 
-    Log $ll5, "HMLAN: Skip ACK";
+    Log $ll5, "HMLAN: Skip ACK" if (!$debug);
 	return;
   }
 #  my $IDact = '+'.$dst;               # guess: ID recover? Different to IDadd?
@@ -217,7 +217,8 @@ HMLAN_Write($$$)
 #  my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
 
 
-  my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
+# my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
+  my $IDadd = '+'.$dst;     # guess: add ID?                                     
   my $IDsub = '-'.$dst;               # guess: ID remove?
     
   HMLAN_SimpleWrite($hash, $IDadd) if (!$lhash{$dst} && $dst ne "000000");
@@ -310,7 +311,7 @@ HMLAN_Parse($$)
 	#                08=nack - HMLAN did not receive an ACK,
 	#                21=?,
 	#                81=open
-    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R'));
+#    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R') && $src ne AttrVal($name, "hmId", $mFld[4]));
 
 #    if (!($flg & 0x25)){#rule out other messages 
 #	  HMLAN_SimpleWrite($hash, '-'.$src);
@@ -331,6 +332,7 @@ HMLAN_Parse($$)
     $hash->{firmware} = sprintf("%d.%d", (hex($mFld[1])>>12)&0xf, hex($mFld[1]) & 0xffff);
     $hash->{owner} = $mFld[4];
     $hash->{uptime} = HMLAN_uptime($mFld[5]);
+    $hash->{helper}{keepAliveRec} = 1;
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
 								   .' O:'  .$mFld[4].' m:'.$mFld[5].' d2:'.$mFld[6];
@@ -434,7 +436,8 @@ HMLAN_DoInit($)
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
-  
+
+  $hash->{helper}{keepAliveRec} = 1; # ok for first time
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
   return undef;
@@ -447,11 +450,24 @@ HMLAN_KeepAlive($)
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
- 
+  $hash->{helper}{keepAliveRec} = 0; # reset indicator
+
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
+  InternalTimer(gettimeofday()+1, "HMLAN_KeepAliveCheck", "keepAliveCk:".$name, 1);
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 1);
+}
+#####################################
+sub
+HMLAN_KeepAliveCheck($)
+{
+  my($in ) = shift;
+  my(undef,$name) = split(':',$in);
+  my $hash = $defs{$name};
+  if ($hash->{helper}{keepAliveRec} != 1){
+    DevIo_Disconnected($hash);
+  }
 }
 sub
 HMLAN_secSince2000()
