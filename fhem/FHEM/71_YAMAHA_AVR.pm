@@ -142,6 +142,11 @@ YAMAHA_AVR_GetStatus($;$)
 	readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
     }
     
+    if($return =~ /<Input>.*?<Title>\s*?(\S+?)\s*?<\/Title>.*<\/Input>/)
+    {
+	readingsBulkUpdate($hash, "input_name", $1);
+    }
+    
     readingsEndUpdate($hash, 1);
     
     InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
