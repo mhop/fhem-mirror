@@ -43,7 +43,12 @@
 # * "WGR800_A"	is WGR800
 # * "WGR918"	is STR918, WGR918
 # * "TFA_WIND"	is TFA
-# * "WDS500" is UPM WDS500
+# * "WDS500" is UPM WDS500u
+#
+# UV Sensors:
+# "UVN128"	is Oregon UVN128, UV138
+# "UVN800"	is Oregon UVN800
+# "TFA_UV"	is TFA_UV-Sensor
 #
 # Energy Sensors:
 # * "CM160"	is OWL CM119, CM160
@@ -94,7 +99,7 @@ TRX_WEATHER_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^..(50|51|52|54|55|56|5a|5d).*";
+  $hash->{Match}     = "^..(50|51|52|54|55|56|57|5a|5d).*";
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
@@ -160,6 +165,8 @@ my %types =
    0x550b => { part => 'RAIN', method => \&TRX_WEATHER_common_rain, },
    # WIND
    0x5610 => { part => 'WIND', method => \&TRX_WEATHER_common_anemometer, },
+   # UV
+   0x5709 => { part => 'UV', method => \&TRX_WEATHER_common_uv, },
    # Energy usage sensors
    0x5A11 => { part => 'ENERGY', method => \&TRX_WEATHER_common_energy, },
     # WEIGHT
@@ -653,6 +660,82 @@ sub TRX_WEATHER_common_rain {
   };
 
   TRX_WEATHER_battery($bytes, $dev_str, \@res, 10);
+  return @res;
+}
+
+my @uv_str =
+  (
+   qw/low low low/, # 0 - 2
+   qw/medium medium medium/, # 3 - 5
+   qw/high high/, # 6 - 7
+   'very high', 'very high', 'very high', # 8 - 10
+  );
+
+sub TRX_WEATHER_uv_string {
+  $uv_str[$_[0]] || 'dangerous';
+}
+
+# -----------------------------
+sub TRX_WEATHER_common_uv {
+  my $type = shift;
+  my $longids = shift;
+  my $bytes = shift;
+
+  my $subtype = sprintf "%02x", $bytes->[1];
+  #Log 1,"subtype=$subtype";
+  my $dev_type;
+
+  my %devname =
+    (	# HEXSTRING => "NAME"
+	0x01 => "UVN128", # Oregon UVN128, UV138
+	0x02 => "UVN800", # Oregon UVN800
+	0x03 => "TFA_UV", # TFA_UV-Sensor
+  );
+
+  if (exists $devname{$bytes->[1]}) {
+  	$dev_type = $devname{$bytes->[1]};
+  } else {
+  	Log 1,"RFX_WEATHER: common_uv error undefined subtype=$subtype";
+  	my @res = ();
+  	return @res;
+  }
+
+  #my $seqnbr = sprintf "%02x", $bytes->[2];
+  #Log 1,"seqnbr=$seqnbr";
+
+  my $dev_str = $dev_type;
+  if (TRX_WEATHER_use_longid($longids,$dev_type)) {
+  	$dev_str .= $DOT.sprintf("%02x", $bytes->[3]);
+  }
+  if ($bytes->[4] > 0) {
+  	$dev_str .= $DOT.sprintf("%d", $bytes->[4]);
+  }
+  #Log 1,"dev_str=$dev_str";
+
+  my @res = ();
+
+  # hexline debugging
+  if ($TRX_HEX_debug) {
+    my $hexline = ""; for (my $i=0;$i<@$bytes;$i++) { $hexline .= sprintf("%02x",$bytes->[$i]);} 
+    push @res, { device => $dev_str, type => 'hexline', current => $hexline, units => 'hex', };
+  }
+
+  my $uv = $bytes->[5]/10; # UV
+  my $risk = TRX_WEATHER_uv_string(int($uv));
+
+  push @res, {
+	device => $dev_str,
+	type => 'uv',
+	current => $uv,
+	risk => $risk,
+	units => '',
+  };
+
+
+  if ($dev_type eq "TFA_UV") {
+  	TRX_WEATHER_temperature($bytes, $dev_str, \@res, 6); 
+  }
+  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 8);
   return @res;
 }
 

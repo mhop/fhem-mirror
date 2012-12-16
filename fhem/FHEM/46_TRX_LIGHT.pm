@@ -31,7 +31,6 @@
 # 4: log unknown protocols
 # 5: log decoding hexlines for debugging
 #
-# $Id$
 package main;
 
 use strict;
@@ -122,6 +121,53 @@ TRX_LIGHT_SetState($$$$)
   return undef;
 }
 
+#############################
+sub
+TRX_LIGHT_Do_On_Till($@)
+{
+  my ($hash, @a) = @_;
+  return "Timespec (HH:MM[:SS]) needed for the on-till command" if(@a != 3);
+
+  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+  return $err if($err);
+
+  my @lt = localtime;
+  my $hms_till = sprintf("%02d:%02d:%02d", $hr, $min, $sec);
+  my $hms_now = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
+  if($hms_now ge $hms_till) {
+    Log 4, "on-till: won't switch as now ($hms_now) is later than $hms_till";
+    return "";
+  }
+
+  my $tname = $hash->{NAME} . "_timer";
+  CommandDelete(undef, $tname) if($defs{$tname});
+  my @b = ($a[0], "on");
+  TRX_LIGHT_Set($hash, @b);
+  CommandDefine(undef, "$tname at $hms_till set $a[0] off");
+
+}
+
+
+#############################
+sub
+TRX_LIGHT_Do_On_For_Timer($@)
+{
+  my ($hash, @a) = @_;
+  return "Timespec (HH:MM[:SS]) needed for the on-for-timer command" if(@a != 3);
+
+  my ($err, $hr, $min, $sec, $fn) = GetTimeSpec($a[2]);
+  return $err if($err);
+
+  my $hms_for_timer = sprintf("+%02d:%02d:%02d", $hr, $min, $sec);
+
+  my $tname = $hash->{NAME} . "_timer";
+  CommandDelete(undef, $tname) if($defs{$tname});
+  my @b = ($a[0], "on");
+  TRX_LIGHT_Set($hash, @b);
+  CommandDefine(undef, "$tname at $hms_for_timer set $a[0] off");
+
+}
+
 ###################################
 sub
 TRX_LIGHT_Set($@)
@@ -138,6 +184,12 @@ TRX_LIGHT_Set($@)
   my $command = $a[1];
   my $level;
 
+  # special for on-till
+  return TRX_LIGHT_Do_On_Till($hash, @a) if($command eq "on-till");
+
+  # special for on-for-timer
+  return TRX_LIGHT_Do_On_For_Timer($hash, @a) if($command eq "on-for-timer");
+
   if ($na == 3) {
   	$level = $a[2];
   } else {
@@ -153,7 +205,8 @@ TRX_LIGHT_Set($@)
 
   if (	lc($hash->{TRX_LIGHT_devicelog}) eq "window" || lc($hash->{TRX_LIGHT_devicelog}) eq "door" || 
    	lc($hash->{TRX_LIGHT_devicelog}) eq "motion" ||
-	lc($hash->{TRX_LIGHT_devicelog}) eq "lightsensor" || lc($hash->{TRX_LIGHT_devicelog}) eq "photosensor"
+	lc($hash->{TRX_LIGHT_devicelog}) eq "lightsensor" || lc($hash->{TRX_LIGHT_devicelog}) eq "photosensor" ||
+	lc($hash->{TRX_LIGHT_devicelog}) eq "lock"
       ) {
 	return "No set implemented for $device_type";	
   }
@@ -176,7 +229,8 @@ TRX_LIGHT_Set($@)
 	if ($device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT") {
   		$l =~ s/ level / level:slider,0,1,15 /; 
 	}
-  	my $error = "Unknown command $command, choose one of $l"; 
+  	#my $error = "Unknown command $command, choose one of $l"; 
+  	my $error = "Unknown command $command, choose one of $l "."on-till on-for-timer"; 
 
 	Log 4, $error;
 	return $error;
@@ -471,6 +525,8 @@ sub TRX_LIGHT_parse_X10 {
 		$command = ($command eq "on") ? "alert" : "normal" ;
   } elsif (lc($def->{TRX_LIGHT_devicelog}) eq "lightsensor" || lc($def->{TRX_LIGHT_devicelog}) eq "photosensor") {
 		$command = ($command eq "on") ? "dark" : "bright" ;
+  } elsif (lc($def->{TRX_LIGHT_devicelog}) eq "lock") {
+                $command = ($command eq "on") ? "Closed" : "Open" ;
   }
 
   readingsBeginUpdate($def);
@@ -640,10 +696,27 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     all_on             # only for X10, ARC, EMW200, AC, HOMEEASY, ANSLUT
     chime              # only for ARC
     level &lt;levelnum&gt;    # only AC, HOMEEASY, ANSLUT: set level to &lt;levelnum&gt; (range: 0=0% to 15=100%)
+    on-till           # Special, see the note
+    on-for-timer      # Special, see the note
     </pre>
       Example: <br>
     	<code>set Steckdose on</code>
       <br>
+    <br>
+    Notes:
+    <ul>
+      <li><code>on-till</code> requires an absolute time in the "at" format
+          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          returns a time specification).
+          If the current time is greater than the specified time, then the
+          command is ignored, else an "on" command is generated, and for the
+          given "till-time" an off command is scheduleld via the at command.
+          </li>
+      <li><code>on-for-timer</code> requires a relative time in the "at" format
+          (HH:MM:SS, HH:MM) or { &lt;perl code&gt; }, where the perl code
+          returns a time specification).
+          </li>
+    </ul>
   </ul><br>
 
   <a name="TRX_LIGHTget"></a>
