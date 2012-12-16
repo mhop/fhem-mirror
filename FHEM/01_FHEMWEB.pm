@@ -715,11 +715,14 @@ FW_makeTable($$@)
 
   my $row = 1;
   foreach my $n (sort keys %{$hash}) {
-    my $r = ref($hash->{$n});
+    my $val = $hash->{$n};
+    $val = $hash->{$n}{NAME} if($n eq "IODev" && ref($val) eq "HASH" && defined($hash->{$n}{NAME}));
+
+    my $r = ref($val);
     next if($r && ($r ne "HASH" || !defined($hash->{$n}{VAL})));
+
     pF "<tr class=\"%s\">", ($row&1)?"odd":"even";
     $row++;
-    my $val = $hash->{$n};
 
     if($n eq "DEF" && !$FW_hiddenroom{input}) {
       FW_makeEdit($name, $n, $val);
