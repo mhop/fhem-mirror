@@ -2033,10 +2033,10 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash,$id,$dst,$lChn,$peerID,$peerChn,$list,$addrData);
   } 
   elsif($cmd eq "on") { ###############################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C8');
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000');
   } 
   elsif($cmd eq "off") { ##############################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'00');
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'000000');
   } 
   elsif($cmd eq "on-for-timer"||$cmd eq "on-till") { ##########################
     my (undef,undef,$duration,$edate) = @a; #date prepared extention to entdate
