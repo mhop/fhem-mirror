@@ -53,7 +53,7 @@ TRX_Initialize($)
   $hash->{Clients} =
         ":TRX_WEATHER:TRX_SECURITY:TRX_LIGHT:";
   my %mc = (
-    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|5a|5d).*",
+    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|57|5a|5d).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
     "3:TRX_LIGHT"	=> "^..(10|11|12).*", 
     "4:TRX_ELSE"   	=> "^...*",

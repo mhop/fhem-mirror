@@ -35,6 +35,8 @@
   - feature: added support for KD101 smoke sensor (also set alert and pair) in TRX_SECURITY using RFXtrx433 (Willi Herzig)
   - change: changed dewpoint to work with event-on-change-reading and technoline TX3TH (Willi Herzig)
   - feature: new command fheminfo. Shows system informations. (M. Fischer)
+  - feature: added support for UV sensors in TRX_LIGHT using RFXtrx433 (Willi Herzig)
+  - feature: added on-till and on-timer for set in TRX_LIGHT using RFXtrx433 (Willi Herzig)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
