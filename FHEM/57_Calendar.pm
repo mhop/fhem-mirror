@@ -67,6 +67,9 @@ sub addproperty {
   #main::debug "key= $key parts= $parts";
   $parts= "" unless(defined($parts));
   $parameter= "" unless(defined($parameter));
+  if($key eq "EXDATE") {
+    push @{$self->{properties}{exdates}}, $parameter;
+  }
   $self->{properties}{$key}= {
       PARTS => "$parts",
       VALUE => "$parameter"
@@ -351,8 +354,16 @@ sub fromVEvent {
 
   #Dates to exclude in reoccuring rule
   my @exdate;
-  @exdate= split(",", $vevent->value("EXDATE")) if($vevent->value("EXDATE"));
-  @exdate = map { tm($_) } @exdate;
+  if(exists($vevent->{properties}{exdates})) {
+    foreach my $entry (@{$vevent->{properties}{exdates}}) {
+      my @ed = split(",", $entry);
+      @ed = map { tm($_) } @ed;
+      push @exdate, @ed;
+    }
+  }  
+
+  #@exdate= split(",", $vevent->value("EXDATE")) if($vevent->value("EXDATE"));
+  #@exdate = map { tm($_) } @exdate;
   $self->{exdate} = \@exdate;
 
   #$self->{summary}=~ s/;/,/g;
@@ -467,6 +478,7 @@ sub advanceToNextOccurance {
   return if(!exists($self->{freq})); #This event is not reoccuring
   return if(exists($self->{count}) and $self->{count} == 0); #We are already at the last occurance
 
+  my @weekdays = qw(SU MO TU WE TH FR SA);
   #There are no leap seconds in epoch time
   #Valid values for freq: SECONDLY, MINUTELY, HOURLY, DAILY, WEEKLY, MONTHLY, YEARLY
   my  $nextstart = $self->{start};
@@ -481,7 +493,20 @@ sub advanceToNextOccurance {
     } elsif($self->{freq} eq "DAILY") {
       $nextstart += 60*60*24*$self->{interval};
     } elsif($self->{freq} eq "WEEKLY") {
-      $nextstart += 7*60*60*24*$self->{interval};
+      # special handling for WEEKLY and BYDAY
+      if(exists($self->{byday})) {
+        my ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat);
+        my $preventloop = 0;        
+        do {
+          $nextstart += 60*60*24*$self->{interval};
+          ($msec, $mmin, $mhour, $mday, $mmon, $myear, $mwday, $yday, $isdat) = gmtime($nextstart);
+          $preventloop ++;        
+        } while(index($self->{byday}, $weekdays[$mwday]) == -1 and $preventloop < 10);
+      }
+      else {
+        # default WEEKLY handling
+        $nextstart += 7*60*60*24*$self->{interval};
+      }
     } elsif($self->{freq} eq "MONTHLY") {
       # here we ignore BYMONTHDAY as we consider the day of month of $self->{start}
       # to be equal to BYMONTHDAY.
