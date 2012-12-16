@@ -37,6 +37,8 @@ my $TRX_ELSE_debug = 0;
 
 my $time_old = 0;
 
+my $DOT = q{_};
+
 sub
 TRX_ELSE_Initialize($)
 {
@@ -65,9 +67,10 @@ TRX_ELSE_Define($$)
   my $name = $a[0];
   my $code = $a[2];
 
-  $hash->{CODE} = $code;
-  #$modules{TRX_ELSE}{defptr}{$name} = $hash;
-  $modules{TRX_ELSE}{defptr}{$code} = $hash;
+  my $device_name = "TRX_UNKNOWN".$DOT.$code;
+
+  $hash->{TRX_LIGHT_CODE} = $code;
+  $modules{TRX_ELSE}{defptr}{$device_name} = $hash;
   AssignIoPort($hash);
 
   return undef;
@@ -81,9 +84,6 @@ TRX_ELSE_Undef($$)
   delete($modules{TRX_ELSE}{defptr}{$name});
   return undef;
 }
-
-
-my $DOT = q{_};
 
 sub
 TRX_ELSE_Parse($$)
@@ -125,10 +125,30 @@ TRX_ELSE_Parse($$)
 	if (($msg != 0x00) && ($msg != 0x01)) {
   		Log 0, "TRX_ELSE: error transmit NACK=".sprintf("%02x",$msg);
 	} 
-  } else {
-  	Log 0, "TRX_ELSE: hex=$msg";
+  } 
+  #Log 0, "TRX_ELSE: hex=$msg";
+
+  my $type_hex = sprintf("%02x", $type);
+
+  my $device_name = "TRX".$DOT."UNKNOWN".$DOT.$type_hex;
+
+  my $def = $modules{TRX_ELSE}{defptr}{$device_name};
+  if (!$def) {
+	Log 1, "UNDEFINED $device_name TRX_ELSE $type_hex";
+        Log 3, "TRX_ELSE: TRX_ELSE Unknown device $device_name, please define it";
+       	return "UNDEFINED $device_name TRX_ELSE $type_hex";
   }
 
+  readingsBeginUpdate($def);
+
+  #my $sensor = "hexline";
+  my $current = $msg;
+  #readingsBulkUpdate($def, $sensor, $current);
+
+  readingsBulkUpdate($def, "state", $current);
+
+
+  readingsEndUpdate($def, 1);
 
   return "";
 }
@@ -141,8 +161,25 @@ TRX_ELSE_Parse($$)
 <a name="TRX_ELSE"></a>
 <h3>TRX_ELSE</h3>
 <ul>
-  The TRX_ELSE module is invoked by TRX if a code is received by RFXCOM RFXtrx433 RF receiver that is currently not handled by a TRX_-Module. There is nothing to be defined for this module. You need to define an RFXtrx433 receiver first. See <a href="#TRX">TRX</a>.
+  The TRX_ELSE module is invoked by TRX if a code is received by RFXCOM RFXtrx433 RF receiver that is currently not handled by a TRX_-Module. You need to define an RFXtrx433 receiver first. 
+See <a href="#TRX">TRX</a>.
+  <br>
   <a name="TRX_SECURITYdefine"></a>
+  <br>
+  <b>Define</b>
+  <ul>
+    <code>define &lt;name&gt; TRX_ELSE &lt;hextype&gt;</code> <br>
+    <br>
+    <code>&lt;hextype&gt;</code>
+    <ul>
+      specifies the hexvalue (00 - ff) of the type received by the RFXtrx433 transceiver. <br>
+    </ul>
+    <br>
+      Example: <br>
+    	<code>define TRX_UNKNOWN_9A TRX_ELSE 9A</code>
+      <br>
+  </ul>
+  <br>
 </ul>
 
 =end html
