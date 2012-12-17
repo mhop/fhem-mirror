@@ -129,6 +129,14 @@ MAX_TypeToTypeId($)
   Log 1, "MAX_TypeToTypeId: Invalid type $_[0]";
   return 0;
 }
+
+sub
+MAX_CheckIODev($)
+{
+  my $hash = shift;
+  return !defined($hash->{IODev}) || ($hash->{IODev}{TYPE} ne "MAXLAN" && $hash->{IODev}{TYPE} ne "CUL_MAX");
+}
+
 #############################
 sub
 MAX_Set($@)
@@ -136,8 +144,9 @@ MAX_Set($@)
   my ($hash, $devname, @a) = @_;
   my ($setting, @args) = @a;
 
+  return "Invalid IODev" if(MAX_CheckIODev($hash));
+
   if($setting eq "desiredTemperature" and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
-    return "Cannot set without IODev" if(!defined($hash->{IODev}));
     return "missing a value" if(@args == 0);
 
     my $temperature;
@@ -184,15 +193,12 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   }elsif($setting eq "groupid"){
-    return "Cannot set without IODev" if(!defined($hash->{IODev}));
     return "argument needed" if(@args == 0);
 
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},pack("CCCCCCH6CC",0x00,0x00,0x22,0x00,0x00,0x00,$hash->{addr},0x00,$args[0]));
 
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
-
-    readingsSingleUpdate($hash, $setting, $args[0], 0);
 
     my $comfortTemperature = ReadingsVal($hash->{NAME},"comfortTemperature","21");
     my $ecoTemperature = ReadingsVal($hash->{NAME},"ecoTemperature","17");
@@ -210,6 +216,8 @@ MAX_Set($@)
     return "Invalid windowOpenDuration"    if($windowOpenDuration eq "" or $windowOpenDuration < 0 or $windowOpenDuration > 60);
     return "Invalid measurementOffset"     if($measurementOffset eq "" or $measurementOffset < -3.5 or $measurementOffset > 3.5);
 
+    readingsSingleUpdate($hash, $setting, $args[0], 0);
+
     my $comfort = int($comfortTemperature*2);
     my $eco = int($ecoTemperature*2);
     my $max = int($maximumTemperature*2);
@@ -223,7 +231,6 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
-    return "Cannot set without IODev" if(!exists($hash->{IODev}));
     return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
@@ -246,11 +253,12 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   } elsif($setting eq "factoryReset") {
+
     if(exists($hash->{IODev}{RemoveDevice})) {
       #MAXLAN
       return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
     } else {
-      #CUL_MAXK
+      #CUL_MAX
       my $payload = pack("CCCCCCH6C",0x00,0x00,0xF0,0x00,0x00,0x00,$hash->{addr}, 0);
       return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
     }
@@ -266,9 +274,9 @@ MAX_Set($@)
     my $assoclist;
     #Build list of devices which this device can be associated to
     if($hash->{type} eq "HeatingThermostat") {
-      $assoclist = join(",", map { $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat", "ShutterContact"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat", "ShutterContact"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     } elsif($hash->{type} ~~ ["ShutterContact", "WallMountedThermostat"]) {
-      $assoclist = join(",", map { $_->{type} eq "HeatingThermostat" ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} eq "HeatingThermostat" ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     }
 
     if($hash->{type} eq "HeatingThermostat") {
@@ -366,6 +374,9 @@ MAX_Parse($$)
 
     $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
     Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $measuredTemperature";
+
+    #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
+    $measuredTemperature = "" if($measuredTemperature < 1);
 
     #The HeatingThermostat uses the measurementOffset during control
     #but does not apply it to measuredTemperature before sending it to us
@@ -578,10 +589,10 @@ MAX_Parse($$)
   <a name="MAXevents"></a>
   <b>Generated events:</b>
   <ul>
-    <li>desiredTemperature<br>Only for HeatingThermostat</li>
+    <li>desiredTemperature<br>Only for HeatingThermostat and WallMountedThermostat</li>
     <li>valveposition<br>Only for HeatingThermostat</li>
     <li>battery</li>
-    <li>temperature<br>The measured(!) temperature, only for HeatingThermostat</li>
+    <li>temperature<br>The measured(!) temperature, only for HeatingThermostat and WallMountedThermostat</li>
   </ul>
 </ul>
 
