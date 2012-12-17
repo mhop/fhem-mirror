@@ -969,7 +969,7 @@ FW_roomOverview($)
      "",              "",
      "Howto",         "$FW_ME/docs/HOWTO.html",
      "Wiki",          "http://fhemwiki.de",
-     "Details",       "$FW_ME/docs/commandref.html",
+     "Commandref",    "$FW_ME/docs/commandref.html",
      "Definition...", "$FW_ME?cmd=style%20addDef",
      "Edit files",    "$FW_ME?cmd=style%20list",
      "Select style",  "$FW_ME?cmd=style%20select",
