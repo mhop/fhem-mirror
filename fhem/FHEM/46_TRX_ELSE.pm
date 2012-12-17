@@ -125,6 +125,7 @@ TRX_ELSE_Parse($$)
 	if (($msg != 0x00) && ($msg != 0x01)) {
   		Log 0, "TRX_ELSE: error transmit NACK=".sprintf("%02x",$msg);
 	} 
+  	return "";
   } 
   #Log 0, "TRX_ELSE: hex=$msg";
 
