@@ -34,7 +34,7 @@ sub GPIO4_Initialize($) {
 sub GPIO4_Define($$) {
 
 	my ($hash, $def) = @_;
-	Log 2, "GPIO4: GPIO4_Define($hash->{NAME})";
+	Log 4, "GPIO4: GPIO4_Define($hash->{NAME})";
 	
 	my @a = split("[ \t][ \t]*", $def);
 	return "syntax: define <name> GPIO4 <id>|BUSMASTER" if (int(@a) != 3);
@@ -50,7 +50,7 @@ sub GPIO4_Define($$) {
 	else {
 		my ($family, $id) = split('-',$a[2]);
 		if ($family eq "28" || $family eq "10") {
-			
+			setReadingsVal($hash,'failures',0,TimeNow()); 
 			# start polling device after fhem.cfg completely loaded to ensure pollingInterval attribute is assigned (5s)
 			InternalTimer(gettimeofday()+5, "GPIO4_DeviceUpdateLoop", $hash, 0);
 		}
@@ -58,12 +58,12 @@ sub GPIO4_Define($$) {
 			return "GPIO4: device family $family not supported";
 		}
 	}
-	return undef;
+	return;
 }
 
 sub GPIO4_GetSlaves($) {
 	my ($hash) = @_;
-	Log 2, "GPIO4: GPIO4_GetSlaves()";
+	Log 4, "GPIO4: GPIO4_GetSlaves()";
 	open SLAVES, "/sys/bus/w1/devices/w1_bus_master1/w1_master_slaves";
 	my @slaves = <SLAVES>;
 	chomp(@slaves);
@@ -72,21 +72,21 @@ sub GPIO4_GetSlaves($) {
 	foreach my $slave (@slaves) {
 		GPIO_GetSlave($hash,$slave);
 	}
-	return undef;
+	return;
 }
 
 sub GPIO_GetSlave($$) {
 	my ($hash,$slave) = @_;
-	Log 2, "GPIO4: GPIO4_GetSlave($slave)";
+	Log 4, "GPIO4: GPIO4_GetSlave($slave)";
 	my ($family, $id) = split("-", $slave);
 	
 	# return if device exists
 	foreach my $devicename (keys %defs) {
-		return undef if (exists $defs{$devicename}{DEF} && $defs{$devicename}{DEF} eq $slave); 
+		return if (exists $defs{$devicename}{DEF} && $defs{$devicename}{DEF} eq $slave); 
 	}
 
 	# device does not exist, create it
-	Log 2, "GPIO4: create $slave";
+	Log 1, "GPIO4: create $slave";
 	CommandDefine(undef,"gpio4_$id GPIO4 $slave");	
 	if ($family eq "28") {
 		$attr{"gpio4_$id"}{model} = "DS18B20"; 
@@ -106,25 +106,27 @@ sub GPIO_GetSlave($$) {
 	$attr{"FileLog_gpio4_$id"}{logtype} = "temp4:Temp,text"; 
 
 	# create plot
-	CommandDefine(undef,"weblink_gpio4_$id weblink fileplot FileLog_gpio4_$id:temp4:CURRENT");
-	$attr{"weblink_gpio4_$id"}{label} = '"'."gpio4_$id: ".'Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
-	$attr{"weblink_gpio4_$id"}{room} = "GPIO4"; 
+	if ($attr{autocreate}{weblink}) {
+		CommandDefine(undef,"weblink_gpio4_$id weblink fileplot FileLog_gpio4_$id:temp4:CURRENT");
+		$attr{"weblink_gpio4_$id"}{label} = '"'."gpio4_$id: ".'Min $data{min1}, Max $data{max1}, Last $data{currval1}"';
+		$attr{"weblink_gpio4_$id"}{room} = $attr{autocreate}{weblink_room} || "GPIO4";
+	}
 
-	return undef;
+	return;
 }
 
 sub GPIO4_DeviceUpdateLoop($) {
 	my ($hash) = @_;
     my $pollingInterval = $attr{$hash->{NAME}}{pollingInterval} || 60; 
-	Log 2, "GPIO4: GPIO4_DeviceUpdateLoop($hash->{NAME}), pollingInterval:$pollingInterval";
+	Log 6, "GPIO4: GPIO4_DeviceUpdateLoop($hash->{NAME}), pollingInterval:$pollingInterval";
 	GPIO4_Get($hash);
 	InternalTimer(gettimeofday()+$pollingInterval, "GPIO4_DeviceUpdateLoop", $hash, 0);
-	return undef;
+	return;
 }
 
 sub GPIO4_Get($) {
 	my ($hash) = @_;
-	Log 2, "GPIO4: GPIO4_Get($hash->{NAME})";
+	Log 6, "GPIO4: GPIO4_Get($hash->{NAME})";
 	open DATA, "/sys/bus/w1/devices/$hash->{DEF}/w1_slave";
 	if (<DATA> =~ /YES/) {
 		<DATA> =~ /t=(\d+)/;
@@ -134,15 +136,18 @@ sub GPIO4_Get($) {
 		readingsBulkUpdate($hash,"temperature",$temp);
 		readingsEndUpdate($hash,1);
 	}
+	else {
+		readingsSingleUpdate($hash,'failures',ReadingsVal($hash->{NAME},"failures",0)+1,1); 
+	}
 	close(DATA);
-	return undef;
+	return;
 }
 
 sub GPIO4_Undef($) {
 	my ($hash) = @_;
-	Log 2, "GPIO4: GPIO4_Undef($hash->{NAME})";
+	Log 4, "GPIO4: GPIO4_Undef($hash->{NAME})";
 	RemoveInternalTimer($hash);
-	return undef;
+	return;
 }
 
 1;
