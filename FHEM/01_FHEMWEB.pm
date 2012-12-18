@@ -96,6 +96,7 @@ my %FW_types;      # device types, for sorting
 my @FW_zoom;       # "qday", "day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
 my %FW_hiddenroom; # hash of hidden rooms
+my %FW_hiddengroup;# hash of hidden groups
 my $FW_longpoll;   # Set if longpoll (i.e. server notification) is active
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
@@ -126,7 +127,7 @@ FHEMWEB_Initialize($)
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 webname fwmodpath fwcompress:0,1 ".
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
-                     "stylesheetPrefix iconpath hiddenroom HTTPS longpoll:1,0 ".
+                     "stylesheetPrefix iconpath hiddenroom hiddengroup HTTPS longpoll:1,0 ".
                      "redirectCmds:0,1 reverseLogs:0,1 allowfrom CORS:0,1";
 
   ###############
@@ -1045,7 +1046,11 @@ sub
 FW_showRoom()
 {
   return if(!$FW_room);
-
+  
+  %FW_hiddengroup = ();
+  foreach my $r (split(",",AttrVal($FW_wname, "hiddengroup", ""))) {
+    $FW_hiddengroup{$r} = 1;
+  }
   
   FW_pO "<form method=\"get\" action=\"$FW_ME\" autocomplete=\"off\">";
   FW_pO "<div id=\"content\">";
@@ -1061,6 +1066,7 @@ FW_showRoom()
   foreach my $dev (@devs) {
     next if($defs{$dev}{TYPE} eq "weblink" && !AttrVal($dev, "group", undef));
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
+      next if($FW_hiddengroup{$grp}); 
       $group{$grp}{$dev} = 1;
     }
   }
@@ -2844,7 +2850,7 @@ FW_closeOldClients()
 
     <a name="hiddenroom"></a>
     <li>hiddenroom<br>
-        Komma separated list of rooms to "hide", i.e. not to show. Special
+        Comma separated list of rooms to "hide", i.e. not to show. Special
         values are input, detail and save, in which case the input areas, link
         to the detailed views or save button is hidden (although each aspect
         still can be addressed through url manipulation).<br>
@@ -2852,6 +2858,15 @@ FW_closeOldClients()
         block.
         </li>
         <br>
+
+    <a name="hiddengroup"></a>
+    <li>hiddengroup<br>
+        Comma separated list of groups to "hide", i.e. not to show in any room
+        of this FHEMWEB instance.<br>
+        Example:  attr WEBtablet hiddengroup FileLog,dummy,at,notify
+        </li>
+        <br>
+
 
     <a name="longpoll"></a>
     <li>longpoll<br>
