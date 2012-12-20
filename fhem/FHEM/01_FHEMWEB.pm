@@ -128,7 +128,7 @@ FHEMWEB_Initialize($)
                      "plotmode:gnuplot,gnuplot-scroll,SVG plotsize refresh " .
                      "touchpad smallscreen plotfork basicAuth basicAuthMsg ".
                      "stylesheetPrefix iconpath hiddenroom hiddengroup HTTPS longpoll:1,0 ".
-                     "redirectCmds:0,1 reverseLogs:0,1 allowfrom CORS:0,1";
+                     "redirectCmds:0,1 reverseLogs:0,1 allowfrom CORS:0,1 endPlotToday:1,0";
 
   ###############
   # Initialize internal structures
@@ -1785,7 +1785,8 @@ FW_calcWeblink($$)
   } elsif($zoom eq "week") {
 
     my @l = localtime($now);
-    my $t = $now - ($l[6]*86400) + ($off*86400)*7;
+    my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 7 : $l[6]);
+    my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
     $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
 
@@ -1794,17 +1795,25 @@ FW_calcWeblink($$)
 
  } elsif($zoom eq "month") {
 
-    my @l = localtime($now);
-    while($off < -12) {
+    my ($endDay, @l);
+    if(AttrVal($FW_wname, "endPlotToday", undef)) {
+      @l = localtime($now+86400);
+      $endDay = $l[3];
+      $off--;
+    } else {
+      @l = localtime($now);
+      $endDay = 1;
+    }
+    while($off < -12) { # Correct the year
       $off += 12; $l[5]--;
     }
     $l[4] += $off;
     $l[4] += 12, $l[5]-- if($l[4] < 0);
-    $FW_devs{$d}{from} = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
+    $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d", $l[5]+1900, $l[4]+1,$endDay);
 
     $l[4]++;
     $l[4] = 0, $l[5]++ if($l[4] == 12);
-    $FW_devs{$d}{to}   = sprintf("%04d-%02d", $l[5]+1900, $l[4]+1);
+    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d", $l[5]+1900, $l[4]+1,$endDay);
 
   } elsif($zoom eq "year") {
 
@@ -2755,6 +2764,13 @@ FW_closeOldClients()
         for this weblink independently of the user specified zoom-level.
         This is useful for pages with multiple plots: one of the plots is best
         viewed in with the default (day) zoom, the other one with a week zoom.
+        </li><br>
+
+    <a name="endPlotToday"></a>
+    <li>endPlotToday<br>
+        If this FHEMWEB attribute ist set to 1, then week and month plots will
+        end today. Else the current week (starting at Sunday) or the current
+        month will be shown.<br>
         </li><br>
 
     <a name="smallscreen"></a>
