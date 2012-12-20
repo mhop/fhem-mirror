@@ -1785,7 +1785,7 @@ FW_calcWeblink($$)
   } elsif($zoom eq "week") {
 
     my @l = localtime($now);
-    my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 7 : $l[6]);
+    my $start = (AttrVal($FW_wname, "endPlotToday", undef) ? 6 : $l[6]);
     my $t = $now - ($start*86400) + ($off*86400)*7;
     @l = localtime($t);
     $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
