@@ -28,7 +28,7 @@ sub GPIO4_Initialize($) {
 	$hash->{DefFn}		 = "GPIO4_Define";
 	$hash->{UndefFn}	 = "GPIO4_Undef";
 	$hash->{GetFn}		 = "GPIO4_Get";
-	$hash->{AttrList}	 = "pollingInterval model loglevel:0,1,2,3,4,5,6";	
+	$hash->{AttrList}	 = "tempOffset pollingInterval model loglevel:0,1,2,3,4,5,6";	
 }
 
 sub GPIO4_Define($$) {
@@ -50,7 +50,10 @@ sub GPIO4_Define($$) {
 	else {
 		my ($family, $id) = split('-',$a[2]);
 		if ($family eq "28" || $family eq "10") {
+
+			# reset failures counter
 			setReadingsVal($hash,'failures',0,TimeNow()); 
+
 			# start polling device after fhem.cfg completely loaded to ensure pollingInterval attribute is assigned (5s)
 			InternalTimer(gettimeofday()+5, "GPIO4_DeviceUpdateLoop", $hash, 0);
 		}
@@ -112,6 +115,8 @@ sub GPIO_GetSlave($$) {
 		$attr{"weblink_gpio4_$id"}{room} = $attr{autocreate}{weblink_room} || "GPIO4";
 	}
 
+	# save fhem.cfg depending on autocreate autosave
+	CommandSave(undef, undef) if($attr{autocreate}{autosave});
 	return;
 }
 
@@ -130,10 +135,14 @@ sub GPIO4_Get($) {
 	open DATA, "/sys/bus/w1/devices/$hash->{DEF}/w1_slave";
 	if (<DATA> =~ /YES/) {
 		<DATA> =~ /t=(\d+)/;
-		my $temp = sprintf("%.1f", $1/1000.0);
+		my $temp = $1/1000.0;
+		if ($attr{$hash->{NAME}}{tempOffset}) {
+			$temp+=$attr{$hash->{NAME}}{tempOffset};
+		}
+		my $tempstr = sprintf("%.1f",$temp);
 		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash,"state","T: $temp");
-		readingsBulkUpdate($hash,"temperature",$temp);
+		readingsBulkUpdate($hash,"state","T: $tempstr");
+		readingsBulkUpdate($hash,"temperature",$tempstr);
 		readingsEndUpdate($hash,1);
 	}
 	else {
