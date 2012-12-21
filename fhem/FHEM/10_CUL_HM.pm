@@ -8,7 +8,6 @@ package main;
 #        the lines can be removed after some soak time - around version 2600
 use strict;
 use warnings;
-#use Time::HiRes qw(gettimeofday);
 
 sub CUL_HM_Initialize($);
 sub CUL_HM_Define($$);
@@ -354,8 +353,9 @@ CUL_HM_Parse($$)
                        ($dst eq "000000" ? "broadcast" : 
                                 ($dst eq $id ? $iohash->{NAME} : $dst));
   my $target = " (to $dname)";
-
-  return "" if($p =~ m/NACK$/);#discard TCP errors from HMlan. Resend will cover it
+  my $msgStat;
+  ($p,$msgStat) = split(":",$p,2);
+  return "" if($msgStat && $msgStat eq 'NACK');#discard TCP errors from HMlan. Resend will cover it
   return "" if($src eq $id);#discard mirrored messages
 
   $respRemoved = 0;  #set to 'no response in this message' at start
@@ -366,7 +366,7 @@ CUL_HM_Parse($$)
       # prefer subType over model to make autocreate easier
       # model names are quite cryptic anyway
       my $model = substr($p, 2, 4);
-      my $stc = substr($p, 26, 2);        # subTypeCode
+      my $stc   = substr($p, 26, 2);        # subTypeCode
       if($culHmDevProps{$stc}) {
         $sname = "CUL_HM_".$culHmDevProps{$stc}{st} . "_" . $src;
       } 
@@ -391,7 +391,7 @@ CUL_HM_Parse($$)
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) {
     Log GetLogLevel($name,4), "CUL_HM $name dup mesg";
     if(($id eq $dst)&& (hex($msgFlag)&0x20)){
-	  CUL_HM_SndCmd($shash, $msgcnt."8002".$id.$src."0101C800");  # Send Ack
+#	  CUL_HM_SndCmd($shash, $msgcnt."8002".$id.$src."00");  # Send Ack
       Log GetLogLevel($name,4), "CUL_HM $name dup mesg - ack and ignore";
 	}
 	else{
@@ -1623,6 +1623,8 @@ my %culHmSubTypeSets = (
         { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
   pushButton =>										
         { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  threeStateSensor =>										
+        { devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
   virtual => 
         { raw        => "data ...",
 		  devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
@@ -1639,37 +1641,32 @@ my %culHmSubTypeSets = (
   keyMatic =>{lock   =>"",
   	          unlock =>"[sec] ...",
   	          open   =>"[sec] ...",
-  	          inhibit=>"[on|off]",
-  },
+  	          inhibit=>"[on|off]"},
 
 );
 my %culHmModelSets = (
   "HM-CC-VD"=>{ 
-          valvePos     => "position",},
+          valvePos     => "position"},
   "HM-RC-19"=>    {	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
-		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>",},
+		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
   "HM-RC-19-B"=>  {	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
-		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>",},
+		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
   "HM-RC-19-SW"=> {	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
-		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>",},
+		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
   "HM-PB-4DIS-WM"=>{
-	      text      => "<btn> [on|off] <txt1> <txt2>",},
+	      text      => "<btn> [on|off] <txt1> <txt2>"},
   "HM-OU-LED16" =>{
 		  led    =>"[off|red|green|orange]" ,
 		  ilum   =>"[0-15] [0-127]" },
   "HM-OU-CFM-PL"=>{
 	      led       => "<color>[,<color>..]",
-		  playTone  => "<MP3No>[,<MP3No>..]",},
-  "ROTO_ZEL-STG-RM-FDK"=>{
-          devicepair    => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
-  "HM-SEC-RHS"=>{
-          devicepair    => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
+		  playTone  => "<MP3No>[,<MP3No>..]"},
 );
 
 my %culHmChanSets = (
@@ -2416,10 +2413,8 @@ CUL_HM_Set($@)
     return "$target must be [actor|remote|both]"                  if(defined($target) && (($target ne"actor") &&
 		                                                             ($target ne"remote")&&($target ne"both")));  
 	return "use climate chan to pair TC"                          if($md eq "HM-CC-TC" &&$chn ne "02");
-	return "use - single [set|unset] actor - for smoke detector"  if($st eq "smokeDetector" && 
-		                                                             (!$single || $single ne "single" || $target ne "actor"));
-	return "use - single - for this sensor"                       if(($md eq "ROTO_ZEL-STG-RM-FDK" || $md eq "HM-SEC-RHS") &&
-		                                                             (!$single || $single ne "single"));
+	return "use - single [set|unset] actor - for smoke detector"  if($st eq "smokeDetector"    && (!$single || $single ne "single" || $target ne "actor"));
+	return "use - single - for threeStateSensor"                  if($st eq "threeStateSensor" && (!$single || $single ne "single"));
 			   
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set eq "unset")?0:1;
@@ -2427,9 +2422,10 @@ CUL_HM_Set($@)
 	my ($b1,$b2,$nrCh2Pair);
 	$b1 = ($isChannel) ? hex($chn):(!$bNo?"01":sprintf("%02X",$bNo));
 	$b1 = $b1*2 - 1 if(!$single && !$isChannel);
-	if ($single){ 
-        $b2 = $b1;
-	    $nrCh2Pair = 1;
+	if ($single){
+	  $b2 = $b1;
+	  $b1 = 0 if ($st eq "smokeDetector");
+	  $nrCh2Pair = 1;
 	}
 	else{
 	    $b2 = $b1 + 1;
@@ -2458,7 +2454,8 @@ CUL_HM_Set($@)
 	}
 	if (!$target || $target eq "actor" || $target eq "both"){
 	  if (AttrVal( CUL_HM_id2Name($peerDst), "subType", "") eq "virtual"){
-		CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b1),$set); #update peerlist
+		CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b2),$set); #update peerlist
+		CUL_HM_ID2PeerList ($peerN,$dst.sprintf("%02X",$b1),$set) if ($b1 & !$single); #update peerlist
 	  }
 	  else{
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
