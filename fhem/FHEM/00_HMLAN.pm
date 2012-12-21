@@ -132,7 +132,8 @@ HMLAN_Set($@)
     $hash->{hmPair} = 1;
     InternalTimer(gettimeofday()+$arg, "HMLAN_RemoveHMPair", "hmPairForSec:".$hash, 1);
 
-  } elsif($type eq "hmPairSerial") { ################################
+  } 
+  elsif($type eq "hmPairSerial") { ################################
     return "Usage: set $name hmPairSerial <10-character-serialnumber>"
         if(!$arg || $arg !~ m/^.{10}$/);
 
@@ -194,7 +195,7 @@ HMLAN_ReadAnswer($$$)
   }
 }
 
-my %lhash;
+my %lhash = ""; # remember which ID is assigned to this HMLAN
 
 #####################################
 sub
@@ -221,8 +222,10 @@ HMLAN_Write($$$)
   my $IDadd = '+'.$dst;     # guess: add ID?                                     
   my $IDsub = '-'.$dst;               # guess: ID remove?
     
-  HMLAN_SimpleWrite($hash, $IDadd) if (!$lhash{$dst} && $dst ne "000000");
-  $lhash{$dst} = 1;
+  if (!$lhash{$dst} && $dst ne "000000"){
+    HMLAN_SimpleWrite($hash, $IDadd);
+    $lhash{$dst} = 1;
+  }
 
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
@@ -317,7 +320,7 @@ HMLAN_Parse($$)
 #	  HMLAN_SimpleWrite($hash, '-'.$src);
 #	  HMLAN_SimpleWrite($hash, '+'.$src);
 #	}
-    $dmsg .= "NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
+    $dmsg .= ":NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
 
     $hash->{uptime} = HMLAN_uptime($mFld[2]);
 	$hash->{RSSI}   = hex($mFld[4])-65536;
@@ -335,7 +338,7 @@ HMLAN_Parse($$)
     $hash->{helper}{keepAliveRec} = 1;
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
-								   .' O:'  .$mFld[4].' m:'.$mFld[5].' d2:'.$mFld[6];
+								   .' O:'  .$mFld[4].' m:'.$mFld[5].' IDcnt:'.$mFld[6];
     my $myId = AttrVal($name, "hmId", $mFld[4]);
     if(lc($mFld[4]) ne lc($myId) && !AttrVal($name, "dummy", 0)) {
       Log 1, 'HMLAN setting owner to '.$myId.' from '.$mFld[4];
@@ -436,7 +439,8 @@ HMLAN_DoInit($)
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
-
+  
+  %lhash = '';# clear IDs - HMLAN might have a reset 
   $hash->{helper}{keepAliveRec} = 1; # ok for first time
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
