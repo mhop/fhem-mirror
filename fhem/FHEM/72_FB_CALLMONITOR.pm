@@ -88,14 +88,9 @@ FB_CALLMONITOR_Initialize($)
   $hash->{GetFn}   = "FB_CALLMONITOR_Get";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
-  if(-r "/var/flash/phonebook")
-  {
-    $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";
-  }
-  else
-  {
-    $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 event-on-update-reading event-on-change-reading";  
-  }
+ 
+  
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file event-on-update-reading event-on-change-reading";
 }
 
 #####################################
@@ -116,13 +111,9 @@ FB_CALLMONITOR_Define($$)
   my $dev = $a[2];
   $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
-
-  FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+  InternalTimer(gettimeofday()+3, "FB_CALLMONITOR_loadInternalPhonebookFile", $hash, 0);
   
-  InternalTimer(gettimeofday()+3, "FB_CALLMONITOR_loadCacheFile", $hash, 0);
-
-  
-  
+  InternalTimer(gettimeofday()+2, "FB_CALLMONITOR_loadCacheFile", $hash, 0);
 
 
   $hash->{DeviceName} = $dev;
@@ -174,7 +165,6 @@ else
 
    return "unknown argument, choose on of search"; 
 
-
 }
 
 }
@@ -212,7 +202,7 @@ FB_CALLMONITOR_Read($)
     }
     else
     {
-     Log 2, "FB_CALLMONITOR: given local area code '$area_code' is not an area code. therefore will be ignored";
+     Log GetLogLevel($name, 2), "$name: given local area code '$area_code' is not an area code. therefore will be ignored";
     }
    
    }
@@ -423,7 +413,7 @@ sub FB_CALLMONITOR_writeToCache($$$)
     }
     else
     {
-       Log 2, "FB_CALLMONITOR: $name could not open cache file";
+       Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name could not open cache file";
     }
   }
 
@@ -435,60 +425,75 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
 {
 
   my ($hash) = @_;
+  my $name = $hash->{NAME};
   my $phonebook = undef;
   my $contact;
-  my $name;
+  my $contact_name;
   my $number;
-  my $area_code = AttrVal($hash->{NAME}, "local-area-code", "");
+  my $area_code = AttrVal($name, "local-area-code", "");
+  my $internal_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook");
 
   delete $hash->{helper}{PHONEBOOK} if(defined($hash->{helper}{PHONEBOOK}));
 
-  if(-r "/var/flash/phonebook")
+  if(-r $internal_file)
   {
-
-
-    if(open(PHONEBOOK, "</var/flash/phonebook"))
+    if(open(PHONEBOOK, "<$internal_file"))
     {
-
+     
       $phonebook = join('', <PHONEBOOK>);
-
-
-
-      while($phonebook =~ m/<contact>(.+?)<\/contact>/gs)
+      if($phonebook =~ /<contact>/ and $phonebook =~ /<realName>/ and $phonebook =~ /<phonebook>/ and $phonebook =~ /<\/phonebook>/)
       {
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name found FritzBox phonebook $internal_file";
 
-        $contact = $1;
-        if($contact =~ m/<realName>(.+?)<\/realName>/)
+
+        while($phonebook =~ m/<contact>(.+?)<\/contact>/gs)
         {
-          $name = $1; 
-          Log 2, "found $name";
- 
-          while($contact =~ m/<number[a-z0-9="\n ]+?type="(\w+?)"[a-z0-9="\n ]+?>(.+?)<\/number>/gs)
+
+          $contact = $1;
+          if($contact =~ m/<realName>(.+?)<\/realName>/)
           {
-            if($1 ne "intern")
+            $contact_name = $1; 
+            Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name found $contact_name";
+ 
+            while($contact =~ m/<number[a-z0-9="\n ]+?type="(\w+?)"[a-z0-9="\n ]+?>(.+?)<\/number>/gs)
             {
-            $number = $2;
-             if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "")
+              if($1 ne "intern")
               {
-               if($area_code =~ /^0[1-9]\d+$/)
-               {
-                $number = $area_code.$number;
-               }
+                $number = $2;
+                if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "")
+                {
+                  if($area_code =~ /^0[1-9]\d+$/)
+                  {
+                    $number = $area_code.$number;
+                  }
     
-             }
-            $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
-            undef $number;
+                }
+            
+                $hash->{helper}{PHONEBOOK}{$number} = FB_CALLMONITOR_html2txt($contact_name) if(not defined($hash->{helper}{PHONEBOOK}{$number}));
+                undef $number;
+              }
             }
+            undef $contact_name;
           }
-          undef $name;
         }
+        undef $phonebook;
+    
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name read " . ( scalar keys %{$hash->{helper}{PHONEBOOK}} ) . " contact(s) from FritzBox phonebook";
       }
-      undef $phonebook;
+      else
+      {
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: the file $internal_file is not a FritzBox phonebook";
+      }
+    
     }
-  }
+    else
+    {
+       Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name internal could not read FritzBox phonebook file: $internal_file";
+    }
+
 }
 
-
+}
 
 sub FB_CALLMONITOR_loadCacheFile($)
 {
@@ -589,7 +594,6 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
-    The value "internal" is only available when running FHEM on a FritzBox (using the internal phonebook).
     If the attribute is set to "all", the reverse search will use the internal phonebook (if running FHEM on a FritzBox) or reverse search on all websites (execept search.ch) until a valid answer is found on of them 
     If is set to "none", then no reverse searching will be used.<br><br>Default value is "none".<br><br>
     <li><a name="reverse-search-cache">reverse-search-cache</a></li>
@@ -600,6 +604,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
     Write the internal reverse-search-cache to the given file and use it next time FHEM starts.
     So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.<br><br>
+    <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;file&gt;</li>
+    This attribute can be used to specify the (full) path to a phonebook file in FritzBox format (XML structure). Using this option it is possible to use the phonebook of a FritzBox even without FHEM running on a Fritzbox.
+    The phonebook could for example be obtained by doing "cat /var/flash/phonebook" on a FritzBox with shell access.<br><br>
+    Default value is /var/flash/phonebook (phonebook filepath on FritzBox)
     <li><a name="remove-leading-zero">remove-leading-zero</a></li>
     If this attribute is activated, a leading zero will be removed from the external_number (e.g. in telefon systems).<br><br>
     Possible values: 0 => off , 1 => on<br>
@@ -677,7 +685,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.
@@ -691,11 +699,16 @@ sub FB_CALLMONITOR_loadCacheFile($)
     und von da an nur noch aus dem Cache genutzt anstatt eine erneute R&uuml;ckw&auml;rtssuche durchzuf&uuml;hren.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
-    <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;file&gt;</li>
+    <li><a name="reverse-search-cache-file">reverse-search-cache-file</a> &lt;Dateipfad&gt;</li>
     Da der Cache nur im Arbeitsspeicher existiert, ist er nicht persisten und geht beim stoppen von FHEM verloren.
     Mit diesem Parameter werden alle Cache-Ergebnisse in eine Textdatei geschrieben (z.B.  /usr/share/fhem/telefonbuch.txt) 
     und beim n&auml;chsten Start von FHEM direkt wieder in den Cache geladen und genutzt.
     <br><br>
+    <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;Dateipfad&gt</li>
+    Mit diesem Attribut kann man optional den Pfad zu einer Datei angeben, welche ein Telefonbuch im FritzBox-Format (XML-Struktur) enth&auml;lt.
+    Dadurch ist es m&ouml;glich ein FritzBox-Telefonbuch zu verwenden, ohne das FHEM auf einer FritzBox laufen muss.
+    Auf einer FritzBox kann eine solche Datei via Telnet-Verbindung durch den Befehl "cat /var/flash/phonebook" ausgelesen werden.<br><br>
+    Standartwert ist /var/flash/phonebook (entspricht dem Pfad auf einer FritzBox)<br><br>
     <li><a name="remove-leading-zero">remove-leading-zero</a></li>
     Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
