@@ -48,7 +48,7 @@ ECMDDevice_Initialize($)
   $hash->{SetFn}     = "ECMDDevice_Set";
   $hash->{DefFn}     = "ECMDDevice_Define";
 
-  $hash->{AttrList}  = "loglevel 0,1,2,3,4,5";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5";
 }
 
 ###################################
