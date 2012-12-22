@@ -430,20 +430,22 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
   my $contact;
   my $contact_name;
   my $number;
+  my $count_contacts;
+  
   my $area_code = AttrVal($name, "local-area-code", "");
-  my $internal_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook");
+  my $phonebook_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook");
 
   delete $hash->{helper}{PHONEBOOK} if(defined($hash->{helper}{PHONEBOOK}));
 
-  if(-r $internal_file)
+  if(-r $phonebook_file)
   {
-    if(open(PHONEBOOK, "<$internal_file"))
+    if(open(PHONEBOOK, "<$phonebook_file"))
     {
      
       $phonebook = join('', <PHONEBOOK>);
       if($phonebook =~ /<contact>/ and $phonebook =~ /<realName>/ and $phonebook =~ /<phonebook>/ and $phonebook =~ /<\/phonebook>/)
       {
-        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name found FritzBox phonebook $internal_file";
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name found FritzBox phonebook $phonebook_file";
 
 
         while($phonebook =~ m/<contact>(.+?)<\/contact>/gs)
@@ -477,18 +479,18 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
           }
         }
         undef $phonebook;
-    
-        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name read " . ( scalar keys %{$hash->{helper}{PHONEBOOK}} ) . " contact(s) from FritzBox phonebook";
+        $count_contacts = scalar keys %{$hash->{helper}{PHONEBOOK}};
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from FritzBox phonebook";
       }
       else
       {
-        Log GetLogLevel($name, 2), "FB_CALLMONITOR: the file $internal_file is not a FritzBox phonebook";
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: the file $phonebook_file is not a FritzBox phonebook";
       }
     
     }
     else
     {
-       Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name internal could not read FritzBox phonebook file: $internal_file";
+       Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name internal could not read FritzBox phonebook file: $phonebook_file";
     }
 
 }
