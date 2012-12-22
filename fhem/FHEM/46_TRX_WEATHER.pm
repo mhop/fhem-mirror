@@ -18,6 +18,10 @@
 # * "RUBICSON"  is RUBiCSON
 # * "TFA_303133" is TFA 30.3133
 #
+# humidity sensors (HYDRO):
+# * "TX3" 	is LaCrosse TX3
+# * "WS2300"	is # LaCrosse WS2300
+#
 # temperature/humidity sensors (TEMPHYDRO):
 # * "THGR228N"	is THGN122/123, THGN132, THGR122/228/238/268
 # * "THGR810"	is THGR810
@@ -25,8 +29,9 @@
 # * "THGR328"	is THGR328
 # * "WTGR800_T"	is WTGR800
 # * "THGR918"	is THGR918, THGRN228, THGN500
-# * "TFATS34C"	is TFA TS34C
-# * "WT450H"	is UPM WT450H
+# * "TFATS34C"	is TFA TS34C, Cresta
+# * "WT450H"	is WT260,WT260H,WT440H,WT450,WT450H
+# * "VIKING_02038" is Viking 02035,02038 (02035 has no humidity)
 #
 # temperature/humidity/pressure sensors (TEMPHYDROBARO):
 # * "BTHR918"	is BTHR918
@@ -37,6 +42,7 @@
 # * "PCR800"	is PCR800
 # * "TFA_RAIN"	is TFA
 # * "RG700"	is UPM RG700
+# * "WS2300_RAIN" is WS2300
 #
 # wind sensors (WIND):
 # * "WTGR800_A" is WTGR800
@@ -44,6 +50,7 @@
 # * "WGR918"	is STR918, WGR918
 # * "TFA_WIND"	is TFA
 # * "WDS500" is UPM WDS500u
+# * "WS2300_WIND" is WS2300
 #
 # UV Sensors:
 # "UVN128"	is Oregon UVN128, UV138
@@ -328,6 +335,7 @@ sub TRX_WEATHER_common_anemometer {
 	0x03 => "WGR918",
 	0x04 => "TFA_WIND",
 	0x05 => "WDS500", # UPM WDS500
+	0x06 => "WS2300_WIND", # WS2300
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -415,7 +423,7 @@ sub TRX_WEATHER_common_temp {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_temp error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_temp error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -458,12 +466,13 @@ sub TRX_WEATHER_common_hydro {
   my %devname =
     (	# HEXSTRING => "NAME"
 	0x01 => "TX3", # LaCrosse TX3
+	0x02 => "WS2300", # LaCrosse WS2300 Humidity
   );
 
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_hydro error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_hydro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -508,14 +517,15 @@ sub TRX_WEATHER_common_temphydro {
 	0x04 => "THGR328",
 	0x05 => "WTGR800_T",
 	0x06 => "THGR918",
-	0x07 => "TFATS34C",
-	0x08 => "WT450H",
+	0x07 => "TFATS34C", 
+	0x08 => "WT450H", # WT260,WT260H,WT440H,WT450,WT450H
+	0x09 => "VIKING_02038", # Viking 02035,02038 (02035 has no humidity)
   );
 
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_temphydro error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_temphydro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -561,7 +571,7 @@ sub TRX_WEATHER_common_temphydrobaro {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_temphydrobaro error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_temphydrobaro error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
@@ -607,6 +617,7 @@ sub TRX_WEATHER_common_rain {
 	0x02 => "PCR800",
 	0x03 => "TFA_RAIN",
 	0x04 => "RG700",
+	0x05 => "WS2300_RAIN", # WS2300
   );
 
   if (exists $devname{$bytes->[1]}) {
@@ -695,7 +706,7 @@ sub TRX_WEATHER_common_uv {
   if (exists $devname{$bytes->[1]}) {
   	$dev_type = $devname{$bytes->[1]};
   } else {
-  	Log 1,"RFX_WEATHER: common_uv error undefined subtype=$subtype";
+  	Log 1,"TRX_WEATHER: common_uv error undefined subtype=$subtype";
   	my @res = ();
   	return @res;
   }
