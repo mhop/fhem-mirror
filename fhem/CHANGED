@@ -38,6 +38,7 @@
   - feature: added support for UV sensors in TRX_LIGHT using RFXtrx433 (Willi Herzig)
   - feature: added on-till and on-timer for set in TRX_LIGHT using RFXtrx433 (Willi Herzig)
   - feature: generate devices with hexcodes as state for unknown types in TRX_ELSE using RFXtrx433 (Willi Herzig)
+  - feature: new modules 10_OWServer.pm and 11_OWDevice.pm to interface with OWFS
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
