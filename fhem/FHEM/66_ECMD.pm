@@ -600,7 +600,8 @@ ECMD_Set($@)
         my $name = $a[0];
 
         # usage check
-        my $usage= "Usage: set $name classdef <classname> <filename> OR set $name reopen";
+        #my $usage= "Usage: set $name classdef <classname> <filename> OR set $name reopen";
+        my $usage= "Unknown argument $a[1], choose one of reopen classdef";
         if((@a == 2) && ($a[1] eq "reopen")) {
                 return ECMD_Reopen($hash);
         }
