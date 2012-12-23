@@ -443,7 +443,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
     {
      
       $phonebook = join('', <PHONEBOOK>);
-      if($phonebook =~ /<contact>/ and $phonebook =~ /<realName>/ and $phonebook =~ /<phonebook>/ and $phonebook =~ /<\/phonebook>/)
+      if($phonebook =~ /<contact>/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/)
       {
         Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name found FritzBox phonebook $phonebook_file";
 
