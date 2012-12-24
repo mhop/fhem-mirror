@@ -19,7 +19,7 @@ sub CUL_MAX_SendAck($$$);
 sub CUL_MAX_SendTimeInformation(@);
 sub CUL_MAX_Send(@);
 
-my $pairmodeDuration = 30; #seconds
+my $pairmodeDuration = 60; #seconds
 
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
 
