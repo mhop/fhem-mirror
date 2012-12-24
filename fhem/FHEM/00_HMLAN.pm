@@ -213,18 +213,19 @@ HMLAN_Write($$$)
     Log $ll5, "HMLAN: Skip ACK" if (!$debug);
 	return;
   }
-#  my $IDact = '+'.$dst;               # guess: ID recover? Different to IDadd?
-#  my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
-#  my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
+# my $IDHM  = '+'.$dst.',01,00,F1EF'; #used by HMconfig - meanning??
+# my $IDadd = '+'.$dst;               # guess: add ID?                                     
+# my $IDack = '+'.$dst.',02,00,';     # guess: ID acknowledge
+# my $IDack = '+'.$dst.',FF,00,';     # guess: ID acknowledge General
+# my $IDsub = '-'.$dst;               # guess: ID remove?
+  my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
 
 
-# my $IDadd = '+'.$dst.',00,00,';     # guess: add ID?                                     
-  my $IDadd = '+'.$dst;     # guess: add ID?                                     
-  my $IDsub = '-'.$dst;               # guess: ID remove?
-    
   if (!$lhash{$dst} && $dst ne "000000"){
     HMLAN_SimpleWrite($hash, $IDadd);
     $lhash{$dst} = 1;
+   	$hash->{assignIDs}=join(',',keys %lhash);
+   	$hash->{assignIDsCnt}=scalar(keys %lhash)-1;
   }
 
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
@@ -335,6 +336,7 @@ HMLAN_Parse($$)
     $hash->{firmware} = sprintf("%d.%d", (hex($mFld[1])>>12)&0xf, hex($mFld[1]) & 0xffff);
     $hash->{owner} = $mFld[4];
     $hash->{uptime} = HMLAN_uptime($mFld[5]);
+   	$hash->{assignIDsReport}=$mFld[6];
     $hash->{helper}{keepAliveRec} = 1;
     Log $ll5, 'HMLAN_Parse: '.$name.                 ' V:'.$mFld[1]
 	                               .' sNo:'.$mFld[2].' d:'.$mFld[3]
