@@ -434,9 +434,6 @@ CUL_HM_Parse($$)
       push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
     }
   } 
-#  elsif(($cmd =~ m/^A0[01]{2}$/ && $dst eq $id) && $st ne "keyMatic") {#### Pairing-Request-Convers.
-#    push @event, "";    #todo why end here?
-#  } General check operation after removal
   elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
 
     if($msgType eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
@@ -861,15 +858,15 @@ CUL_HM_Parse($$)
     }
     elsif ($msgType eq "41"){ #Alarm detected
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
+	  my $stStr = ($state eq "01")?"all-clear":"on";
 	  if($dhash){ # the source is in dst
 	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
 		  $dhash->{helper}{alarmNo} = $No;
-		  readingsSingleUpdate($dhash,'state',
-		                              (($state eq "01")?"all-clear":"on"),1);
+		  readingsSingleUpdate($dhash,'state',$stStr,1);
 		}
 	  }
-      push @event,"state:".(($state eq "01")?"all-clear":"on").":from:".$dname;
-      push @event,"smoke_detect:on $dname";
+      push @event,"state:".$stStr.":from:".$dname;
+      push @event,"smoke_detect:$stStr $dname";
     } 
     elsif ($msgType eq "01"){ #Configs
 	  my $sType = substr($p,0,2);
@@ -1049,6 +1046,7 @@ CUL_HM_Parse($$)
 	                               "ValveAdjCmd:".$d1);
       CUL_HM_SndCmd($chnHash,$msgcnt."8002".$dst.$src.'0101'.
 	                       sprintf("%02X",$vp*2)."0000");#$vp, $err,$??
+	  $sendAck = "";
 	}
 	elsif($msgType eq "02"){
 	  if ($dhash->{helper}{respWait}{msgId}             && 
@@ -1135,9 +1133,9 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   dimMaxLvl       =>{a=> 22.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMaxLevel"},
   dimStep         =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimStep"},
 #output Unit                                                                                       
-  ActType         =>{a=>36   ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action type(LED or Tone)"},
-  ActNum          =>{a=>37   ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
-  Intense         =>{a=>47   ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Volume - Tone channel only!"},
+  ActType         =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action type(LED or Tone)"},
+  ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
+  Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_0=>255,vol_1=>250,vol_2=>246,vol_3=>240,vol_4=>234,vol_5=>227,vol_6=>218,vol_7=>207,vol_8=>190,vol_9=>162,vol_00=>10}},  
 # statemachines
   BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
@@ -1201,50 +1199,52 @@ my %culHmRegDefine = (
   redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"reduced temperatur recover"},
   redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>1,t=>"reduced power level"},
 #CC-TC                                                                                        
-  BacklOnTime     =>{a=>5.0  ,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
-  BacklOnMode     =>{a=>5.6  ,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
-  BtnLock         =>{a=>15   ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"     ,lit=>{unlock=>0,lock=>1}},
-  DispTempHum     =>{a=>1.0  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{temp=>0,tempHumidity=>1}},
-  DispTempInfo    =>{a=>1.1  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{actual=>0,setPoint=>1}},
-  DispTempUnit    =>{a=>1.2  ,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{Celsius=>0,Fahrenheit=>1}},
-  MdTempReg       =>{a=>1.3  ,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
-  MdTempValve     =>{a=>2.6  ,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
+  BacklOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
+  BacklOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
+  BtnLock         =>{a=> 15  ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"     ,lit=>{unlock=>0,lock=>1}},
+  DispTempHum     =>{a=>  1.0,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{temp=>0,tempHumidity=>1}},
+  DispTempInfo    =>{a=>  1.1,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{actual=>0,setPoint=>1}},
+  DispTempUnit    =>{a=>  1.2,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{Celsius=>0,Fahrenheit=>1}},
+  MdTempReg       =>{a=>  1.3,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
+  MdTempValve     =>{a=>  2.6,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
                                                                                                  
-  TempComfort     =>{a=>3    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
-  TempLower       =>{a=>4    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
-  PartyEndDay     =>{a=>98   ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
-  PartyEndMin     =>{a=>97.7 ,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,d=>1,t=>"Party end 0=:00, 1=:30"},
-  PartyEndHr      =>{a=>97   ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
-  TempParty       =>{a=>6    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
-  TempWinOpen     =>{a=>5    ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
-  DecalDay        =>{a=>1.5  ,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"  ,lit=>{sat=>0,sun=>1,mon=>2,tue=>3,wed=>4,thu=>5,fri=>6}},
-  DecalHr         =>{a=>8.3  ,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
-  DecalMin        =>{a=>8    ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
+  TempComfort     =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  TempLower       =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  PartyEndDay     =>{a=> 98  ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
+  PartyEndMin     =>{a=> 97.7,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,d=>1,t=>"Party end 0=:00, 1=:30"},
+  PartyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
+  TempParty       =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
+  TempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
+  DecalDay        =>{a=>  1.5,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"  ,lit=>{sat=>0,sun=>1,mon=>2,tue=>3,wed=>4,thu=>5,fri=>6}},
+  DecalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
+  DecalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
 #Thermal-cc-VD                                                                                  
-  ValveOffset     =>{a=>9    ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
-  ValveError      =>{a=>10   ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
+  ValveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
+  ValveError      =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
 # keymatic secific register                                                                     
-  signal          =>{a=>3.4  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
-  signalTone      =>{a=>3.6  ,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
-  keypressSignal  =>{a=>3.0  ,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                 ,lit=>{off=>0,on=>1}},
-  holdTime        =>{a=>20   ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
-  setupDir        =>{a=>22   ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
-  setupPosition   =>{a=>23   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Rotation angle neutral position"},
-  angelOpen       =>{a=>24   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Door opening angle"},
-  angelMax        =>{a=>25   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Angle locked"},
-  angelLocked     =>{a=>26   ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Angle Locked position"},
-  ledFlashUnlocked=>{a=>31.3 ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
-  ledFlashLocked  =>{a=>31.6 ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
+  signal          =>{a=>  3.4,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
+  signalTone      =>{a=>  3.6,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
+  keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                 ,lit=>{off=>0,on=>1}},
+  holdTime        =>{a=> 20  ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
+  setupDir        =>{a=> 22  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
+  setupPosition   =>{a=> 23  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Rotation angle neutral position"},
+  angelOpen       =>{a=> 24  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Door opening angle"},
+  angelMax        =>{a=> 25  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Angle locked"},
+  angelLocked     =>{a=> 26  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Angle Locked position"},
+  ledFlashUnlocked=>{a=> 31.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
+  ledFlashLocked  =>{a=> 31.6,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
 # sec_mdir                                                                                   
-  evtFltrPeriod   =>{a=>1.0  ,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
-  evtFltrNum      =>{a=>1.4  ,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
-  minInterval     =>{a=>2.0  ,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
-  captInInterval  =>{a=>2.3  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
-  brightFilter    =>{a=>2.4  ,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
-  ledOnTime       =>{a=>34   ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
+  evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
+  evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
+  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
+  captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
+  brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
+  ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
 # weather units                                                                                  
-  stormUpThresh   =>{a=>6    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
-  stormLowThresh  =>{a=>7    ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
+  stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
+  stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
+# others
+  localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable",lit=>{off=>0,on=>1}},
   
   );
 my %culHmRegGeneral = (
@@ -1272,14 +1272,9 @@ my %culHmRegType = (
             CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
             CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
 			},
-  switch=> {OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
+  switch=> {OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
             SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-            CtOn            =>1,CtDlyOn         =>1,
-            CtOff           =>1,CtDlyOff        =>1,
-			},
-  outputUnit=>{
-			OnDly   =>1,OnTime  =>1,OffDly  =>1,OffTime =>1,
-			ActType =>1,ActNum  =>1,Intense =>1,
+            CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 			},
   winMatic=>{	                                    		 
             OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,
@@ -1309,6 +1304,12 @@ my %culHmRegModel = (
   "HM-PB-4DIS-WM" => {language        =>1,stbyTime        =>1},
   "HM-WDS100-C6-O"=> {stormUpThresh   =>1,stormLowThresh  =>1},
   "KS550"         => {stormUpThresh   =>1,stormLowThresh  =>1},
+  "HM-OU-CFM-PL"  => {localResetDis   =>1,
+  			OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
+            SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+            CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
+			OnTimeMode      =>1,OffTimeMode     =>1, 
+			ActType         =>1,ActNum          =>1},
 );
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"=> {
@@ -1328,6 +1329,7 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "HM-RC-19-SW12"=> {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
                      backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
                      lcdSymb      =>1, lcdLvlInterp   =>1},
+  "HM-OU-CFM-PL02"=>{Intense=>1}
  );
 
 ##--------------- Conversion routines for register settings
@@ -2420,7 +2422,7 @@ CUL_HM_Set($@)
 	$set = ($set eq "unset")?0:1;
 
 	my ($b1,$b2,$nrCh2Pair);
-	$b1 = ($isChannel) ? hex($chn):(!$bNo?"01":sprintf("%02X",$bNo));
+	$b1 = ($isChannel) ? hex($chn):(!$bNo?"01":$bNo);
 	$b1 = $b1*2 - 1 if(!$single && !$isChannel);
 	if ($single){
 	  $b2 = $b1;
