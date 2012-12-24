@@ -448,7 +448,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
         Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name found FritzBox phonebook $phonebook_file";
 
 
-        while($phonebook =~ m/<contact>(.+?)<\/contact>/gs)
+        while($phonebook =~ m/<contact[a-z0-9="\n- ]*>(.+?)<\/contact>/gs)
         {
 
           $contact = $1;
@@ -457,7 +457,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
             $contact_name = $1; 
             Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name found $contact_name";
  
-            while($contact =~ m/<number[a-z0-9="\n ]+?type="(\w+?)"[a-z0-9="\n ]+?>(.+?)<\/number>/gs)
+            while($contact =~ m/<number[a-z0-9="\n- ]+?type="(\w+?)"[a-z0-9="\n- ]*?>(.+?)<\/number>/gs)
             {
               if($1 ne "intern")
               {
