@@ -142,7 +142,7 @@ YAMAHA_AVR_GetStatus($;$)
 	readingsBulkUpdate($hash, "input", YAMAHA_AVR_InputParam2Fhem(lc($1), 0));
     }
     
-    if($return =~ /<Input>.*?<Title>\s*?(\S+?)\s*?<\/Title>.*<\/Input>/)
+    if($return =~ /<Input>.*?<Title>\s*(.+?)\s*<\/Title>.*<\/Input>/)
     {
 	readingsBulkUpdate($hash, "input_name", $1);
     }
