@@ -32,6 +32,7 @@ use strict;
 use warnings;
 use Time::HiRes qw(gettimeofday);
 use DevIo;
+use Digest::MD5;
 use HttpUtils;
 
 my %connection_type = (
@@ -90,7 +91,7 @@ FB_CALLMONITOR_Initialize($)
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
  
   
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file event-on-update-reading event-on-change-reading";
 }
 
 #####################################
@@ -218,8 +219,27 @@ FB_CALLMONITOR_Read($)
    readingsBulkUpdate($hash, "external_connection", $array[6]) if($array[1] eq "CALL");
    readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
    readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
-   readingsBulkUpdate($hash, "call_id", $array[2]);
-   readingsEndUpdate($hash, 1);
+   
+    if(AttrVal($name, "unique-call-ids", "0") eq "1")
+    {
+	if($array[1] eq "RING" or $array[1] eq "CALL")
+	{
+	    $hash->{helper}{CALLID}{$array[2]} = Digest::MD5::md5_hex($data);
+	}
+	
+	readingsBulkUpdate($hash, "call_id", $hash->{helper}{CALLID}{$array[2]});
+	
+	if($array[1] eq "DISCONNECT")
+	{
+	    delete($hash->{helper}{CALLID}{$array[2]});
+	}
+    }
+    else
+    {
+	readingsBulkUpdate($hash, "call_id", $array[2]);
+    }
+    
+    readingsEndUpdate($hash, 1);
   
 }
 
@@ -614,6 +634,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
     If this attribute is activated, a leading zero will be removed from the external_number (e.g. in telefon systems).<br><br>
     Possible values: 0 => off , 1 => on<br>
     Default Value is 0 (off)<br><br>
+    <li><a name="unique-call-ids">unique-call-ids</a></li>
+    If this attribute is activated, each call will use a biunique call id. So each call can be separated from previous calls in the past.<br><br>
+    Possible values: 0 => off , 1 => on<br>
+    Default Value is 0 (off)<br><br>
     <li><a name="local-area-code">local-area-code</a></li>
     Use the given local area code for reverse search in case of a local call (e.g. 0228 for Bonn, Germany)<br><br>
   </ul>
@@ -713,6 +737,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
     Standartwert ist /var/flash/phonebook (entspricht dem Pfad auf einer FritzBox)<br><br>
     <li><a name="remove-leading-zero">remove-leading-zero</a></li>
     Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
+    M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
+    Standardwert ist 0 (deaktiviert)<br><br>
+<li><a name="unique-call-ids">unique-call-ids</a></li>
+    Wenn dieses Attribut aktiviert ist, wird f&uuml;r jedes Gespr&auml;ch eine eineindeutige Identifizierungsnummer verwendet. Dadurch lassen sich auch bereits beendete Gespr&auml;che voneinander unterscheiden. Dies ist zum Beispiel notwendig bei der Verarbeitung der Events durch eine Datenbank.<br><br>
     M&ouml;gliche Werte: 0 => deaktiviert , 1 => aktiviert<br>
     Standardwert ist 0 (deaktiviert)<br><br>
     <li><a name="local-area-code">local-area-code</a></li>
