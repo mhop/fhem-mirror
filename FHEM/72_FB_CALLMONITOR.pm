@@ -479,7 +479,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
  
             while($contact =~ m/<number[a-z0-9="\n- ]+?type="(\w+?)"[a-z0-9="\n- ]*?>(.+?)<\/number>/gs)
             {
-              if($1 ne "intern")
+              if($1 ne "intern" and $1 ne "memo")
               {
                 $number = $2;
                 if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "")
