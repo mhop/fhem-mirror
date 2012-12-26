@@ -497,7 +497,14 @@ CUL_HM_Parse($$)
 	  $chn = substr($p,2,2); 
 	  my $dTemp = sprintf("%0.1f", hex(substr($p,4,2))/2);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-	  readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1) if($chnHash);
+	  if($chnHash){
+	    my $chnName = $chnHash->{NAME};
+        my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
+	    readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1);
+	    readingsSingleUpdate($chnHash,"desired-temp-manu",$dTemp,1) if($mode eq 'manual '  && $msgType eq '10');
+	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode eq 'central ' && $msgType eq '02');
+        CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode eq 'central ' && $msgType eq '10');
+       }
       push @event, "desired-temp:" .$dTemp;
     }
     elsif($msgType eq "10"){                       # Config change report
@@ -569,6 +576,20 @@ CUL_HM_Parse($$)
           push @event,'displayTempUnit:'        .(($v1 & 4)?"fahrenheit"   :"celsius");
           push @event,'controlMode:'            .($mode{(($v1 & 0x18)>>3)});
           push @event,'decalcDay:'              .$days[($v1 & 0xE0)>>5];
+	      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+          my $dTemp;
+	      if($chnHash){
+	        my $chnName = $chnHash->{NAME};
+            my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
+            $dTemp = ReadingsVal($chnName,"desired-temp","21.0");
+		    if ($chnHash->{helper}{oldMode} ne $mode){
+		      $dTemp = ReadingsVal($chnName,"desired-temp-manu",$dTemp)if ($mode eq 'manual ');
+		      $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode eq 'central ');
+		      $chnHash->{helper}{oldMode} = $mode;
+		    }
+	        readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1);
+           }
+          push @event, "desired-temp:" .$dTemp;
         } 
 	    elsif($o1 == 2) {
 	      my %pos = (0=>"Auto",1=>"Closed",2=>"Open",3=>"unknown");		  
@@ -629,6 +650,7 @@ CUL_HM_Parse($$)
       push @event, "motor:stop"    if(($err&0x30) == 0x00);
 	  push @event, ""; # just in case - mark message as confirmed
     }
+
 
     # CMD:A010 SRC:13F251 DST:5D24C9 0401 00000000 05 09:00 0A:07 00:00
     # status change report to paired central unit
@@ -3064,6 +3086,11 @@ my %culHmBits = (
                      LOWBAT         => '06,02,$val=(hex($val)&0x80)?1:0',
                      RSSI           => '08,02,$val=(-1)*(hex($val))', }},
   "02;p01=02"   => { txt => "ACK2"}, # smokeDetector pairing only?
+  "02;p01=04"   => { txt => "ACK-proc",  params => {
+                     Para1          => "02,4",
+                     Para2          => "06,4",
+                     Para3          => "10,4",
+                     Para4          => "14,2",}}, # remote?
   "02;p01=80"   => { txt => "NACK"},
   "02;p01=84"   => { txt => "NACK_TARGET_INVALID"},
   "02"          => { txt => "ACK/NACK_UNKNOWN   "},

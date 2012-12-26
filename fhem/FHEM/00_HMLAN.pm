@@ -195,7 +195,7 @@ HMLAN_ReadAnswer($$$)
   }
 }
 
-my %lhash = ""; # remember which ID is assigned to this HMLAN
+my %lhash; # remember which ID is assigned to this HMLAN
 
 #####################################
 sub
@@ -310,11 +310,14 @@ HMLAN_Parse($$)
 	my $dst = substr($mFld[5],12,6);
 	my $flg = hex(substr($mFld[5],2,2));
 	
-    # handle status. 01=ack:seems to announce the new message counter
-	#                02=our send message returned it was likely not sent
-	#                08=nack - HMLAN did not receive an ACK,
-	#                21=?,
-	#                81=open
+    # handle status. 0001=ack:seems to announce the new message counter
+	#                0002=our send message returned it was likely not sent
+	#                0008=nack - HMLAN did not receive an ACK,
+	#                0021= 'R'
+	#                0081=open
+	#                0100=with 'E', not 'R'. 
+	#                0081=open
+	
 #    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R') && $src ne AttrVal($name, "hmId", $mFld[4]));
 
 #    if (!($flg & 0x25)){#rule out other messages 
@@ -442,7 +445,7 @@ HMLAN_DoInit($)
   HMLAN_SimpleWrite($hash, "Y03,00,");
   HMLAN_SimpleWrite($hash, "T$s2000,04,00,00000000");
   
-  %lhash = '';# clear IDs - HMLAN might have a reset 
+  foreach (keys %lhash){delete ($lhash{$_})};# clear IDs - HMLAN might have a reset 
   $hash->{helper}{keepAliveRec} = 1; # ok for first time
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
