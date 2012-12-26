@@ -502,8 +502,9 @@ CUL_HM_Parse($$)
         my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
 	    readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1);
 	    readingsSingleUpdate($chnHash,"desired-temp-manu",$dTemp,1) if($mode eq 'manual '  && $msgType eq '10');
-	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode eq 'central ' && $msgType eq '02');
-        CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode eq 'central ' && $msgType eq '10');
+#	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode eq 'central ' && $msgType eq '02');
+#		removed - shall not be changed automatically - change is  only temporary
+#       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode eq 'central ' && $msgType eq '10');
        }
       push @event, "desired-temp:" .$dTemp;
     }
@@ -1332,6 +1333,7 @@ my %culHmRegModel = (
             CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 			OnTimeMode      =>1,OffTimeMode     =>1, 
 			ActType         =>1,ActNum          =>1},
+  "HM-CC-TC"      => {BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1},
 );
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"=> {
@@ -1339,7 +1341,6 @@ my %culHmRegChan = (# if channelspecific then enter them here
 			MdTempValve  =>1,TempComfort  =>1,TempLower    =>1,PartyEndDay =>1,
 			PartyEndMin  =>1,PartyEndHr   =>1,TempParty    =>1,DecalDay    =>1,
 			DecalHr      =>1,DecalMin     =>1, 
-            BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1,
               },
   "HM-CC-TC03"   => {TempWinOpen  =>1, }, #window channel
   "HM-RC-1912"   => {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
@@ -1992,8 +1993,8 @@ CUL_HM_Set($@)
 		   .(($reg->{l} == 3)?" peer required":"")." : ".$reg->{t}."\n"
 		          if ($data eq "?");
 	return "value:".$data." out of range for Reg \"".$regName."\""
-	        if (($data < $reg->{min} ||$data > $reg->{max})&&
-			    !($reg->{c} eq 'lit'||$reg->{c} eq 'hex')); # none number
+	        if (!($reg->{c} eq 'lit'||$reg->{c} eq 'hex')&&
+			    ($data < $reg->{min} ||$data > $reg->{max})); # none number
     return"invalid value. use:". join(",",keys%{$reg->{lit}}) 
 	        if ($reg->{c} eq 'lit' && !defined($reg->{lit}{$data}));
 	
@@ -2268,6 +2269,10 @@ CUL_HM_Set($@)
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
+    my $chnHash = CUL_HM_id2Hash($dst."02");
+	my $mode = ReadingsVal($chnHash->{NAME},"R-MdTempReg","");
+	readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1) 
+	      if($mode eq 'central ');
   } 
   elsif($cmd =~ m/^(day|night|party)-temp$/) { ##################
     my %tt = (day=>"03", night=>"04", party=>"06");
