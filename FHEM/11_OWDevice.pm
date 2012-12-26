@@ -1,4 +1,4 @@
-# $Id: $
+# $Id$
 ##############################################################################
 #
 #     11_OWDevice.pm
@@ -116,7 +116,7 @@ OWDevice_ReadValue($$) {
         my @getters= @{$hash->{fhem}{getters}};
         Debug join(",", @getters);
         Debug $getters[0];
-        $hash->{STATE}= $value if($reading eq $getters[0]);
+        $hash->{STATE}= "$reading: $value" if($reading eq $getters[0]);
         
         return $value;
 }
