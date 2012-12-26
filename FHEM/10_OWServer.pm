@@ -177,7 +177,7 @@ OWServer_Get($@)
 
   if($cmd eq "devices") {
         my @dir= split(",", $owserver->dir());
-        my @devices= grep { m/^\/\d\d\.\d+$/ } @dir;
+        my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
         my $ret;
         for my $device (@devices) {
           $ret .= substr($device,1) . " " . $owserver->read($device . "/type") . "\n";
