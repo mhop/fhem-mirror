@@ -131,6 +131,7 @@ at_Exec($)
 
     $data{AT_RECOMPUTE} = 1;                 # Tell sunrise compute the next day
     CommandDefine(undef, "$name at $def");   # Recompute the next TRIGGERTIME
+    $hash = $defs{$name};
     delete($data{AT_RECOMPUTE});
     $attr{$name} = $oldattr;
     $hash->{CFGFN} = $oldCfgfn if($oldCfgfn);
