@@ -1,4 +1,4 @@
-# $Id: $
+# $Id$
 ################################################################
 #
 #  Copyright notice
@@ -47,7 +47,7 @@ OWServer_Initialize($)
   $hash->{DefFn}   = "OWServer_Define";
   $hash->{UndefFn} = "OWServer_Undef";
   $hash->{GetFn}   = "OWServer_Get";
-#  $hash->{SetFn}   = "OWServer_Set";
+  $hash->{SetFn}   = "OWServer_Set";
 # $hash->{AttrFn}  = "OWServer_Attr";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5";
 }
@@ -70,9 +70,9 @@ OWServer_Define($$)
   
   OWServer_CloseDev($hash);
 
-  $hash->{fhem}{Protocol}= $protocol;
+  $hash->{fhem}{protocol}= $protocol;
 
-  OWServer_OpenDev($hash, $protocol);
+  OWServer_OpenDev($hash);
   return undef;
 }
 
@@ -104,25 +104,32 @@ sub
 OWServer_CloseDev($)
 {
   my ($hash) = @_;
+  my $name = $hash->{NAME};
 
   return unless(defined($hash->{fhem}{owserver}));
+  DoTrigger($name, "DISCONNECTED");
   delete $hash->{fhem}{owserver};
 
 }
 
 ########################
 sub
-OWServer_OpenDev($$)
+OWServer_OpenDev($)
 {
-  my ($hash, $protocol) = @_;
+  my ($hash) = @_;
   my $name = $hash->{NAME};
 
+  OWServer_CloseDev($hash);
+  my $protocol= $hash->{fhem}{protocol};
   Log 4, "$name: Opening connection to OWServer $protocol...";
   my $owserver= OWNet->new($protocol);
   if($owserver) {
     Log 4, "$name: Successfully connected to $protocol.";
     $hash->{fhem}{owserver}= $owserver;
     DoTrigger($name, "CONNECTED") if($owserver);
+    $hash->{STATE}= "";       # Allow InitDev to set the state
+    my $ret  = OWServer_DoInit($hash);
+    
   }
   return $owserver
 }
@@ -190,6 +197,22 @@ OWServer_Get($@)
 }
 
 #####################################
+sub
+OWServer_Set($@)
+{
+        my ($hash, @a) = @_;
+        my $name = $a[0];
+
+        # usage check
+        #my $usage= "Usage: set $name classdef <classname> <filename> OR set $name reopen";
+        my $usage= "Unknown argument $a[1], choose one of reopen";
+        if((@a == 2) && ($a[1] eq "reopen")) {
+                return OWServer_OpenDev($hash);
+        }
+        return undef;
+
+}
+#####################################
 
 
 1;
@@ -233,7 +256,10 @@ OWServer_Get($@)
   <a name="OWServerset"></a>
   <b>Set</b>
   <ul>
-    none
+    <code>set &lt;name&gt; reopen</code>
+    <br><br>
+    Reopens the connection to the owserver.
+    <br><br>
   </ul>
   <br><br>
 
