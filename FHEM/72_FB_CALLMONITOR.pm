@@ -628,8 +628,8 @@ sub FB_CALLMONITOR_loadCacheFile($)
     So all reverse search results are persistent written to disk and will be used instantly after FHEM starts.<br><br>
     <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;file&gt;</li>
     This attribute can be used to specify the (full) path to a phonebook file in FritzBox format (XML structure). Using this option it is possible to use the phonebook of a FritzBox even without FHEM running on a Fritzbox.
-    The phonebook could for example be obtained by doing "cat /var/flash/phonebook" on a FritzBox with shell access.<br><br>
-    Default value is /var/flash/phonebook (phonebook filepath on FritzBox)
+    The phonebook file can be obtained by an export via FritzBox web UI<br><br>
+    Default value is /var/flash/phonebook (phonebook filepath on FritzBox)<br><br>
     <li><a name="remove-leading-zero">remove-leading-zero</a></li>
     If this attribute is activated, a leading zero will be removed from the external_number (e.g. in telefon systems).<br><br>
     Possible values: 0 => off , 1 => on<br>
@@ -733,7 +733,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
     <li><a name="reverse-search-phonebook-file">reverse-search-phonebook-file</a> &lt;Dateipfad&gt</li>
     Mit diesem Attribut kann man optional den Pfad zu einer Datei angeben, welche ein Telefonbuch im FritzBox-Format (XML-Struktur) enth&auml;lt.
     Dadurch ist es m&ouml;glich ein FritzBox-Telefonbuch zu verwenden, ohne das FHEM auf einer FritzBox laufen muss.
-    Auf einer FritzBox kann eine solche Datei via Telnet-Verbindung durch den Befehl "cat /var/flash/phonebook" ausgelesen werden.<br><br>
+    Sofern FHEM auf einer FritzBox l&auml;uft (und nichts abweichendes angegeben wurde), wird das interne File /var/flash/phonebook verwendet. Alternativ kann man das Telefonbuch in der FritzBox-Weboberfläche exportieren und dieses verwenden<br><br>
     Standartwert ist /var/flash/phonebook (entspricht dem Pfad auf einer FritzBox)<br><br>
     <li><a name="remove-leading-zero">remove-leading-zero</a></li>
     Wenn dieses Attribut aktiviert ist, wird die f&uuml;hrende Null aus der externen Rufnummer (bei eingehenden & abgehenden Anrufen) entfernt. Dies ist z.B. notwendig bei Telefonanlagen.<br><br>
