@@ -1835,7 +1835,7 @@ CommandTrigger($$)
 
   my ($dev, $state) = split(" ", $param, 2);
   return "Usage: trigger <name> <state>\n$namedef" if(!$dev);
-  $state = "" if(!$state);
+  $state = "" if(!defined($state));
 
   my @rets;
   foreach my $sdev (devspec2array($dev)) {
