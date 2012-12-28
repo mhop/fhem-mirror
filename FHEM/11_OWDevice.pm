@@ -71,8 +71,28 @@ OWDevice_GetDetails($) {
         unshift @setters, qw(templow temphigh);
         unshift @polls, qw(temperature);
         $interface= "temperature";
+      } elsif($family eq "28") {
+        # 18B20 programmable resolution digital thermometer
+        unshift @getters, qw(temperature templow temphigh);
+        unshift @setters, qw(templow temphigh);
+        unshift @polls, qw(temperature);
+        $interface= "temperature";
+      } elsif($family eq "1D") {
+        # 2423 4k RAM with counter
+        unshift @getters, qw(counters.A counters.B);
+        unshift @setters, qw();
+        unshift @polls, qw(counters.A counters.B);
+        #$interface= "count";
+      } elsif($family eq "3A") {
+        # 2413 1-Wire Dual Channel Addressable Switch
+        unshift @getters, qw(PIO.A PIO.B);
+        unshift @setters, qw(PIO.A PIO.B);
+        unshift @polls, qw(PIO.A PIO.B);
+        #$interface= "state";
       } elsif($family eq "reserved") {
         # reserved for other devices
+        # add other devices here and post your additions als patch in
+        # http://forum.fhem.de/index.php?t=thread&frm_id=26&rid=10
       };
       # http://perl-seiten.homepage.t-online.de/html/perl_array.html
       return ($interface, \@getters, \@setters, \@polls);
@@ -112,11 +132,13 @@ OWDevice_ReadValue($$) {
         
         my $address= $hash->{fhem}{address};
         my $value= OWDevice_ReadFromServer($hash, "/$address/$reading");
-        $value= trim($value) if(AttrVal($hash,"trimvalues",1));
-        my @getters= @{$hash->{fhem}{getters}};
-        Debug join(",", @getters);
-        Debug $getters[0];
-        $hash->{STATE}= "$reading: $value" if($reading eq $getters[0]);
+        if(defined($value)) {
+          $value= trim($value) if(AttrVal($hash,"trimvalues",1));
+          my @getters= @{$hash->{fhem}{getters}};
+          $hash->{STATE}= "$reading: $value" if($reading eq $getters[0]);
+        } else {
+          Log 3, $hash->{NAME} . ": reading $reading did not return a value";
+        }
         
         return $value;
 }
@@ -264,6 +286,16 @@ OWDevice_Define($$)
     regularly retrieved by polling can be seen when issuing the
     <code><a href="#list">list</a> &lt;name&gt;</code> command.
     <br><br>
+    The following devices are currently supported:
+    <ul>
+      <li>18S20 high precision digital thermometer</li>
+      <li>18B20 programmable resolution digital thermometer</li>
+      <li>2423 4k RAM with counter</li>
+      <li>2413 1-Wire Dual Channel Addressable Switch</li>
+    </ul>
+    <br><br>
+    Adding more devices is simple. Look at the code (subroutine <code>OWDevice_GetDetails</code>).
+    <br><br>
     This module is completely unrelated to the 1-wire modules with names all in uppercase.
     <br><br>
 
@@ -338,6 +370,7 @@ OWDevice_Define($$)
   <a name="OWDeviceattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
