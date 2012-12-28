@@ -577,7 +577,7 @@ DbLog_Get($@)
     $out_tstamp = "";
 
     ############ Auswerten des 5. Parameters: Regexp ###################
-    if($readings[$i]->[4]) {
+    if($readings[$i]->[4] && $readings[$i]->[4]) {
       #evaluate
       my $val = $sql_value;
       eval("$readings[$i]->[4]");
@@ -588,19 +588,19 @@ DbLog_Get($@)
     }
 
     ############ Auswerten des 4. Parameters: function ###################
-    if($readings[$i]->[3] eq "int") {
-      #nur den integerwert uebernehmen falls zb value=15?C
+    if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {
+      #nur den integerwert uebernehmen falls zb value=15°C
       $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
       $out_tstamp = $sql_timestamp;
       $writeout=1;
 
-    } elsif ($readings[$i]->[3] =~ m/^int(\d+).*/o) {
+    } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {
       #?bernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
       $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
       $out_tstamp = $sql_timestamp;
       $writeout=1;
 
-    } elsif ($readings[$i]->[3] eq "delta-h") {
+    } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {
       #Berechnung eines Stundenwertes
       %tstamp = DbLog_explode_datetime($sql_timestamp, ());
       if($lastd[$i] eq "undef") {
@@ -616,7 +616,7 @@ DbLog_Get($@)
         $maxval = -999999;
         $writeout=1;
       }
-    } elsif ($readings[$i]->[3] eq "delta-d") {
+    } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {
       #Berechnung eines Tageswertes
       %tstamp = DbLog_explode_datetime($sql_timestamp, ());
       if($lastd[$i] eq "undef") {
@@ -669,7 +669,7 @@ DbLog_Get($@)
   } #while fetchrow
 
   ######## den letzten Abschlusssatz rausschreiben ##########
-  if($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d") {
+  if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
     $out_value = sprintf("%0.1f", $maxval - $minval);
     $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
     $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
@@ -681,7 +681,16 @@ DbLog_Get($@)
 	}
   }
   # DatenTrenner setzen
-  $retval .= "#$readings[$i]->[0]:$readings[$i]->[1]:$readings[$i]->[2]:$readings[$i]->[3]:$readings[$i]->[4]\n";
+  $retval .= "#$readings[$i]->[0]";
+  $retval .= ":";
+  $retval .= "$readings[$i]->[1]" if($readings[$i]->[1]);
+  $retval .= ":";
+  $retval .= "$readings[$i]->[2]" if($readings[$i]->[2]);
+  $retval .= ":";
+  $retval .= "$readings[$i]->[3]" if($readings[$i]->[3]);
+  $retval .= ":";
+  $retval .= "$readings[$i]->[4]" if($readings[$i]->[4]);
+  $retval .= "\n";
   } #for @readings
 
   #Ueberfuehren der gesammelten Werte in die globale Variable %data
