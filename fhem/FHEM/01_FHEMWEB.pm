@@ -1084,9 +1084,8 @@ FW_showRoom()
     FW_pO "<tr><td>";
     FW_pO "<table class=\"block wide\" id=\"$g\">";
 
-    foreach my $d (sort @devs) {
-      next if(!$group{$g}{$d}); 
-      
+    foreach my $d (sort { lc(AttrVal($a,"alias",$a)) cmp 
+                          lc(AttrVal($b,"alias",$b)) } keys %{$group{$g}}) {
       my $type = $defs{$d}{TYPE};
 
       pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
@@ -1745,8 +1744,8 @@ FW_calcWeblink($$)
       #klaus fixed range day, week, month or year
       if($fr eq "day" || $fr eq "week" || $fr eq "month" || $fr eq "year" ) {
         $frx=$fr;
-      }
-      else {
+
+      } else {
         my @range = split(" ", $fr);
         my @t = localtime;
         $FW_devs{$d}{from} = ResolveDateWildcards($range[0], @t);
