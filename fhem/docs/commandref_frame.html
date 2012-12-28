@@ -108,7 +108,7 @@ too, where notification, timers and logging plays an important role.<br>
 <br>
 
 It supports different hardware devices to interface with certain protocols
-(e.g. FHZ1000 to interface FS20 and HMS, CM11 to access X10), and logical
+(e.g. FHZ1000PC to interface FS20 and HMS, CM11 to access X10), and logical
 devices like FS20 or FHT to digest the messages for a certain device type using
 this protocol.<br>
 <br>
@@ -126,34 +126,39 @@ web frontends.<br> <br>
 
 When starting the server you have to specify a configuration file:<br>
 <ul>
-  <code>fhem.pl ~/.fhem</code>
+  <code>perl fhem.pl fhem.cfg</code>
 </ul>
 <br>
 
-A minimal configuration file: <pre>
-    attr global <a href="#logfile">logfile</a> /tmp/fhem.log
-    attr global <a href="#statefile">statefile</a> /tmp/fhem.save
+A minimal configuration file looks like: <pre>
+    attr global <a href="#logfile">logfile</a> log/fhem.log
+    attr global <a href="#modpath">modpath</a> .
+    attr global <a href="#statefile">statefile</a> log/fhem.save
     attr global <a href="#verbose">verbose</a> 3
-    attr global <a href="#port">port</a> 7072
-    attr global <a href="#modpath">modpath</a> /usr/share/fhem
-    <a href="#define">define</a> FHZ FHZ /dev/tts/USB0
+    define telnetPort <a href="#telnet">telnet</a> 7072 global
+    define WEB <a href="#FHEMWEB">FHEMWEB</a> 8083 global</pre>
 
-    <a href="#define">define</a> lamp FS20 8765 01</pre>
+Note: the last two lines are optional and assume you wish to use the
+builtin telnet and WEB interface.<br>
+<br>
 
-    For other configuration files see the examples subdirectory.<br>
-    <br>
+The web interface can be reached at 
+<ul>
+  http://&lt;fhemhost&gt;:8083
+</ul>
+<br>
 
 TCP/IP communication with fhem can either happen in a "session" (via
 telnet) or single client command (via fhem.pl). Example:
 <ul>
-    <code>telnet localhost 7072<br>
+    <code>telnet &lt;fhemhost&gt; 7072<br>
     &lt;NL&gt; </code>(This newline switches into "prompt" mode)<code><br>
     &lt;command&gt;...<br>
     quit</code><br>
 </ul>
     or
 <ul>
-    <code>fhem.pl 7072 "set lamp off"</code>
+    <code>fhem.pl &lt;fhemhost&gt;:7072 "&lt;command&gt;..."</code>
 </ul>
 </ul>
 
