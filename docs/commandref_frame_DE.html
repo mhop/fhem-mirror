@@ -121,27 +121,31 @@ Verbindung, entweder direkt in einer "telnet"-Sitzung, oder per fhem.pl im
 Client-Modus oder &uuml;ber eines der Webfrontends.<br> &nbsp;</p>
 <p class="MsoNormal">Wenn Sie den FHEM-Server starten, m&uuml;ssen Sie eine 
 Konfigurationsdatei ausw&auml;hlen:</p>
-<p>&nbsp;</p>
 <ul>
-  <code>fhem.pl ~/.fhem</code>
+  <code>perl fhem.pl fhem.cfg</code>
 </ul>
-&nbsp;<p>Nachstehend eine Minimal-Konfiguration Datei: </p>
-<pre>    attr global <a href="#logfile">logfile</a> /tmp/fhem.log
-    attr global <a href="#statefile">statefile</a> /tmp/fhem.save
+&nbsp;<p>Nachstehend eine Minimal-Konfiguration Datei: </p><pre>
+    attr global <a href="#logfile">logfile</a> log/fhem.log
+    attr global <a href="#modpath">modpath</a> .
+    attr global <a href="#statefile">statefile</a> log/fhem.save
     attr global <a href="#verbose">verbose</a> 3
-    attr global <a href="#port">port</a> 7072
-    attr global <a href="#modpath">modpath</a> /usr/share/fhem
-    <a href="#define">define</a> FHZ FHZ /dev/tts/USB0
+    define telnetPort <a href="#telnet">telnet</a> 7072 global
+    define WEB <a href="#FHEMWEB">FHEMWEB</a> 8083 global</pre>
 
-    <a href="#define">define</a> lamp FS20 8765 01</pre>
+Die letzten zwei Zeilen definieren einen telnet und einen WEB Zugang, beide k&ouml;nnen aber
+bei Bedarf auch abgeschaltet werden.<br><br>
 
-    <p>Beispiele f&uuml;r andere Konfigurationsdateien finden Sie 
-    im "examples"-Verzeichnis</p>
-<p>
-Die Kommunikation mit FHEM kann entweder in einer "session" (&uuml;ber telnet) oder 
-&uuml;ber einzelne Klient-Kommandos (&uuml;ber fhem.pl) erfolgen. Beispiel:</p>
+Die WEB Schnittstelle kann &uuml;ber
 <ul>
-    <code>telnet localhost 7072<br>
+  http://&lt;fhemhost&gt;:8083
+</ul>
+erreicht werden.
+<br><br>
+
+Die Kommunikation mit FHEM kann entweder in einer "session" (&uuml;ber telnet) oder 
+&uuml;ber einzelne Klient-Kommandos (&uuml;ber fhem.pl) erfolgen. Beispiel:
+<ul>
+    <code>telnet &lt;fhemhost&gt; 7072<br>
     &lt;NL&gt; </code>(Die Bet&auml;tigung der &quot;Enter&quot;-Taste schaltet in den&nbsp; "prompt" 
     Modus)<code><br>
     &lt;command&gt;...<br>
@@ -149,9 +153,10 @@ Die Kommunikation mit FHEM kann entweder in einer "session" (&uuml;ber telnet) o
 </ul>
     oder
 <ul>
-    <code>fhem.pl 7072 "set lamp off"</code>
+    <code>fhem.pl &lt;fhemhost&gt;:7072 "&lt;command&gt;..."</code>
 </ul>
 </ul>
+<br>
 
 
 <a name="command"></a>
@@ -163,8 +168,7 @@ eingeschlossen werden) und PERL-Ausdr&uuml;cken (von geschwungenen Klammern {}
 eingeschlossen). SHELL-Befehle oder PERL-Ausdr&uuml;cke werden f&uuml;r komplexe <a href="#at">at</a> 
 oder <a href="#notify">notify</a> Ausdr&uuml;cke ben&ouml;tigt, k&ouml;nnen aber auch als "normale" Befehle angewendet werden.&nbsp;
   <p class="MsoNormal">Die folgenden drei Befehle bewirken z.B. dasselbe 
-  Ergebnis, wenn sie am "telnet"-Prompt eingegeben werden:</p>
-  <p>&nbsp;</p>
+  Ergebnis, wenn sie am "telnet"-Prompt eingegeben werden:
   <ul>
   set lamp off<br>
   "fhem.pl 7072 "set lamp off""<br>
