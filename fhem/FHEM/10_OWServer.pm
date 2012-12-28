@@ -250,7 +250,12 @@ OWServer_Set($@)
       <code>define myLocalOWServer OWServer localhost:4304</code><br>
       <code>define myRemoteOWServer OWServer raspi:4304</code><br>
     </ul>
-    <br>
+    <br><br>
+    Notice: if you get no devices add both <code>localhost</code> and the FQDN of your owserver as server directives
+    to the owserver configuration file
+    on the remote host.
+    <br><br>
+    
   </ul>
 
   <a name="OWServerset"></a>
