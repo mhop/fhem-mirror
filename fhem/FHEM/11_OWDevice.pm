@@ -83,11 +83,29 @@ OWDevice_GetDetails($) {
         unshift @setters, qw();
         unshift @polls, qw(counters.A counters.B);
         #$interface= "count";
+      } elsif($family eq "05") {
+        # 2405 - Addressable Switch
+        unshift @getters, qw(PIO);
+        unshift @setters, qw(PIO);
+        unshift @polls, qw(PIO);
+        #$interface= "state";
+      } elsif($family eq "12") {
+        # 2406, 2407 - Dual Addressable Switch with 1kbit Memory
+        unshift @getters, qw(PIO.A PIO.B);
+        unshift @setters, qw(PIO.A PIO.B);
+        unshift @polls, qw(PIO.A PIO.B);
+        #$interface= "state";
       } elsif($family eq "3A") {
         # 2413 1-Wire Dual Channel Addressable Switch
         unshift @getters, qw(PIO.A PIO.B);
         unshift @setters, qw(PIO.A PIO.B);
         unshift @polls, qw(PIO.A PIO.B);
+        #$interface= "state";
+      } elsif($family eq "29") {
+        # 2408 - 1-Wire 8 Channel Addressable Switch
+        unshift @getters, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
+        unshift @setters, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
+        unshift @polls, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
         #$interface= "state";
       } elsif($family eq "reserved") {
         # reserved for other devices
