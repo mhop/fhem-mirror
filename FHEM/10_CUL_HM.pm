@@ -387,7 +387,8 @@ CUL_HM_Parse($$)
   my $tn = TimeNow();
   
   # return if duplicate
-  my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst $p";
+  my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst ".($p?$p:"");
+
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) {
     Log GetLogLevel($name,4), "CUL_HM $name dup mesg";
     if(($id eq $dst)&& (hex($msgFlag)&0x20)){
@@ -466,7 +467,7 @@ CUL_HM_Parse($$)
     }
   } 
   elsif($model eq "HM-CC-TC") { ####################################
-    my ($sType,$chn) = ($1,$2) if($p =~ m/^(..)(..)/);
+    my ($sType,$chn) = ($1,$2) if($p && $p =~ m/^(..)(..)/);
     if($msgType eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
@@ -583,7 +584,7 @@ CUL_HM_Parse($$)
 	        my $chnName = $chnHash->{NAME};
             my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
             $dTemp = ReadingsVal($chnName,"desired-temp","21.0");
-		    if ($chnHash->{helper}{oldMode} ne $mode){
+		    if (!$chnHash->{helper}{oldMode} || $chnHash->{helper}{oldMode} ne $mode){
 		      $dTemp = ReadingsVal($chnName,"desired-temp-manu",$dTemp)if ($mode eq 'manual ');
 		      $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode eq 'central ');
 		      $chnHash->{helper}{oldMode} = $mode;
@@ -1053,7 +1054,8 @@ CUL_HM_Parse($$)
                   (($state eq "ON")?"C8":"00")."00");
 			$sendAck = "";
 		  }
-		  CUL_HM_UpdtReadBulk($dChHash,1,"virtActState:".$state,
+		  CUL_HM_UpdtReadBulk($dChHash,1,"state:".$state,
+		                           "virtActState:".$state,
 			                       "virtActTrigger:".CUL_HM_id2Name($recId),
 						           "virtActTrigType:".$longPress,
 						           "virtActTrigRpt:".$dChHash->{helper}{trgLgRpt},
@@ -2567,7 +2569,6 @@ CUL_HM_infoUpdtDevData($$$){
 	                            '':'_'.sprintf("%02d",$chnNoTyp));
 		InternalTimer($startime++,"CUL_HM_infoUpdtChanData",
 		"$chnName,$chnId,$model",0);
-	    #DoTrigger("global",  'UNDEFINED '.$chnName.' CUL_HM '.$chnId);
       }
 	  $attr{CUL_HM_id2Name($chnId)}{model} = $model;
 	  $chnNoTyp++;
