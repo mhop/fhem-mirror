@@ -2,24 +2,22 @@
 # $Id: $
 package main;
 
-use strict;
-use warnings;
-use IO::Socket::INET;
-
-sub BlockingCall($$$$);
-
-
 =pod
 ### Usage:
 sub TestBlocking() { BlockingCall("DoSleep", 5, "SleepDone", 8); }
 sub DoSleep($)     { sleep(shift); return "I'm done"; }
 sub SleepDone($)   { Log 1, "SleepDone: " . shift; }
-
 =cut
 
 
+use strict;
+use warnings;
+use IO::Socket::INET;
+
+sub BlockingCall($$@);
+
 sub
-BlockingCall($$$$)
+BlockingCall($$@)
 {
   my ($blockingFn, $arg, $finishFn, $timeout) = @_;
 
@@ -39,6 +37,8 @@ BlockingCall($$$$)
   no strict "refs";
   my $ret = &{$blockingFn}($arg);
   use strict "refs";
+
+  exit(0) if(!$finishFn);
 
   # Look for the telnetport
   my $tp;
