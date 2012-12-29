@@ -310,6 +310,10 @@ OWDevice_Define($$)
       <li>18B20 programmable resolution digital thermometer</li>
       <li>2423 4k RAM with counter</li>
       <li>2413 1-Wire Dual Channel Addressable Switch</li>
+      <li>2405 Addressable Switch</li>
+      <li>2406, 2407 - Dual Addressable Switch with 1kbit Memory</li>
+      <li>2413 1-Wire Dual Channel Addressable Switch</li>
+      <li>2408 1-Wire 8 Channel Addressable Switch</li>
     </ul>
     <br><br>
     Adding more devices is simple. Look at the code (subroutine <code>OWDevice_GetDetails</code>).
