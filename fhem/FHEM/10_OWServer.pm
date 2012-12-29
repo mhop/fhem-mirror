@@ -228,7 +228,7 @@ OWServer_Set($@)
   <a name="OWDevicedefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; OWDevice &lt;protocol&gt;</code>
+    <code>define &lt;name&gt; OWServer &lt;protocol&gt;</code>
     <br><br>
 
     Defines a logical OWServer device. OWServer is the server component of the
