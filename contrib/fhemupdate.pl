@@ -110,6 +110,7 @@ for(my $loop = 0; $loop < 2; $loop++) {
    "./CHANGED"                   => { type=>",fhem,", dir=>"." },
    "FHEM/.*.pm"                  => { type=>",fhem,", dir=>"FHEM" },
    "FHEM/FhemUtils/.*.pm"        => { type=>",fhem,", dir=>"FHEM/FhemUtils"},
+   "FHEM/lib/.*.pm"              => { type=>",fhem,", dir=>"FHEM/lib"},
    "../culfw/Devices/CUL/.*.hex" => { type=>",fhem,", dir=>"FHEM",
                                                       dir3=>"FHEM", },
    "www/pgm2/.*"                 => { type=>"fhem,",  dir=>"www/pgm2"},
