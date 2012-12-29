@@ -37,10 +37,11 @@ rm -rf $fw
 echo Packing again
 cd var/fhem
 cat >> fhem.cfg << 'EOF'
-attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-attr WEBphone basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-attr WEBtablet basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
-attr telnetPort globalpassword {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+#FB_checkPw does not for FB-OS > 5.22
+#attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+#attr WEBphone basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+#attr WEBtablet basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
+#attr telnetPort globalpassword {use FritzBoxUtils;;FB_checkPw("localhost","$password") } 
 EOF
 
 cd ..
