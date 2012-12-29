@@ -7,23 +7,37 @@ use warnings;
 use Digest::MD5 "md5_hex";
 use HttpUtils;
 
-my ($lastOkPw, $lastOkTime) =("", 0);
+my ($lastOkPw, $lastOkHost, $lastOkTime) =("", "", 0);
 
 sub
-FB_getPage($$$)
+FB_doCheckPW($$)
 {
-  my ($host, $pw, $page) = @_;
-  my $data = GetFileFromURL("http://$host".
-             "/cgi-bin/webcm?getpage=../html/login_sid.xml", undef, undef, 1);
+  my ($host, $pw) = @_;
+  my $data = GetFileFromURL("http://$host/login_sid.lua", undef, undef, 1);
   return undef if(!$data);
+
   my $chl;
   $chl = $1 if($data =~ /<Challenge>(\w+)<\/Challenge>/i);
   my $chlAnsw .= "$chl-$pw";
   $chlAnsw =~ s/(.)/$1.chr(0)/eg; # works probably only with ascii
   $chlAnsw = "$chl-".lc(md5_hex($chlAnsw));
-  my @d = ( "login:command/response=$chlAnsw", "getpage=$page" );
-  $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
-  return GetFileFromURL("http://$host/cgi-bin/webcm", undef, $data, 1);
+
+  if($data =~ m/iswriteaccess/) {      # Old version
+    my @d = ( "login:command/response=$chlAnsw",
+              "getpage=../html/de/internet/connect_status.txt" );
+    $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
+    $data = GetFileFromURL("http://$host/cgi-bin/webcm", undef, $data, 1);
+    my $isOk = ($data =~ m/checkStatus/);
+    return $isOk;
+
+  } else {                            # FritzOS >= 5.50
+    my @d = ( "response=$chlAnsw", "page=/login_sid.lua" );
+    $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
+    $data = GetFileFromURL("http://$host/login_sid.lua", undef, $data, 1);
+    my $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
+    $sid = undef if($sid =~ m/^0*$/);
+    return $sid;
+  }
 }
 
 sub
@@ -32,12 +46,13 @@ FB_checkPw($$)
   my ($host, $pw) = @_;
   my $now = time();
 
-  return 1 if($lastOkPw eq $pw && ($now - $lastOkTime) < 300); # 5min cache
+  return 1 if($lastOkPw eq $pw && $lastOkHost eq $host && 
+              ($now - $lastOkTime) < 300); # 5min cache
 
-  my $data = FB_getPage($host, $pw, "../html/de/internet/connect_status.txt");
-
-  if(defined($data) && $data =~ m/"checkStatus":/) {
-    $lastOkPw = $pw; $lastOkTime = $now;
+  if(FB_doCheckPW($host, $pw)) {
+    $lastOkPw = $pw;
+    $lastOkTime = $now;
+    $lastOkHost = $host;
     return 1;
 
   } else {
