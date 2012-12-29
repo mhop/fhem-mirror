@@ -25,8 +25,7 @@ system("mkdir -p fhemupdate");
 system("svn update .");
 die "SVN failed, exiting\n" if($?);
 
-`cp fhem.pl fhem.pl.txt`;
-
+`../copyfiles.sh`;
 
 #################################
 # Old style
@@ -40,9 +39,9 @@ my @filelist = (
  "www/images/default/.*.png",
  "www/images/smallscreen/.*.png",
  "www/pgm2/.*\.(js|css|svg)",
- "docs/commandref.html",
- "docs/faq.html",
- "docs/HOWTO.html",
+ "docs/commandref(_..)?.html",
+ "docs/faq(_..)?.html",
+ "docs/HOWTO(_..)?.html",
  "docs/fhem.*.png",
  "docs/.*.jpg",
  "../culfw/Devices/CUL/.*.hex",
@@ -95,7 +94,6 @@ foreach my $f (sort keys %filetime) {
   }
 }
 close FH;
-
 NEWSTYLE:
 
 for(my $loop = 0; $loop < 2; $loop++) {
@@ -118,9 +116,9 @@ for(my $loop = 0; $loop < 2; $loop++) {
    "www/images/dark/.*.png"      => { type=>"fhem,",  dir=>"www/pgm2"},
    "www/images/default/.*"       => { type=>"fhem,",  dir=>"www/pgm2"},
    "www/images/smallscreen/.*"   => { type=>"fhem,",  dir=>"www/pgm2"},
-   "docs/commandref.html"        => { type=>"fhem,",  dir=>"www/pgm2"},
-   "docs/faq.html"               => { type=>"fhem,",  dir=>"www/pgm2"},
-   "docs/HOWTO.html"             => { type=>"fhem,",  dir=>"www/pgm2"},
+   "docs/commandref(_..)?.html"      => { type=>"fhem,",  dir=>"www/pgm2"},
+   "docs/faq(_..)?.html"             => { type=>"fhem,",  dir=>"www/pgm2"},
+   "docs/HOWTO(_..)?.html"           => { type=>"fhem,",  dir=>"www/pgm2"},
    "docs/fhem.*.png"             => { type=>"fhem,",  dir=>"www/pgm2"},
    "docs/.*.jpg"                 => { type=>"fhem,",  dir=>"www/pgm2"},
   );
@@ -228,3 +226,5 @@ my $rsyncopts="-a --delete --compress --verbose";
 system("rsync $rsyncopts fhemupdate fhem.de:fhem");
 system("rsync $rsyncopts fhemupdate2 fhem.de:fhem");
 system("rsync $rsyncopts fhemupdate4/. fhem.de:fhem/fhemupdate4/svn");
+system("scp docs/commandref.html docs/commandref_DE.html fhem.de:fhem");
+system("scp CHANGED fhem.de:fhem");
