@@ -30,7 +30,7 @@ use warnings;
 # this must be the latest OWNet from
 #  http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm
 # the version at CPAN is outdated and malfunctioning as at 2012-12-19
-use OWNet;
+use lib::OWNet;
 
 #####################################
 sub
