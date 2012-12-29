@@ -9,4 +9,4 @@ Section: utils
 Priority: extra
 Architecture: all
 Homepage: http://www.fhem.de
-Depends: perl-base (>= 5.6.2), libdevice-serialport-perl (>= 1.0)
+Depends: perl-base (>= 5.6.2), libdevice-serialport-perl (>= 1.0), libwww-perl (>= 1.0)
