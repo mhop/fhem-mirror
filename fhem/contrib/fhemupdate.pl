@@ -34,6 +34,7 @@ my @filelist = (
  "./fhem.pl.txt",
  "FHEM/.*.pm",
  "FHEM/FhemUtils/.*.pm",
+ "FHEM/lib/.*.pm",
  "www/gplot/.*.gplot",
  "www/images/dark/.*.png",
  "www/images/default/.*.png",
