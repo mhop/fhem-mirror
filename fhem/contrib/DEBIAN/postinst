@@ -3,7 +3,7 @@
 set -e
 
 if ! getent passwd fhem >/dev/null; then
-    useradd --system --home /var/log/fhem --gid dialout --shell /bin/false fhem
+    useradd --system --home /opt/fhem --gid dialout --shell /bin/false fhem
 fi
 
 chown -R fhem /opt/fhem
