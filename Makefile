@@ -42,6 +42,7 @@ install:
 	@echo "- creating directories"
 	@-$(foreach DIR,$(DEST), if [ ! -e $(DIR) ]; then mkdir -p $(DIR); fi; )
 	@echo "- fixing permissions in fhem.cfg"
+	perl contrib/commandref_join.pl 
 	@find FHEM docs www contrib -type f -print | xargs chmod 644
 	@cp fhem.cfg fhem.cfg.install
 	@-if [ "$(RELATIVE_PATH)" != YES ]; then\
@@ -90,6 +91,7 @@ dist:
 	cp -r fhem.pl fhem.cfg CHANGED HISTORY Makefile README.SVN\
 		FHEM contrib docs www webfrontend .f
 	mkdir .f/log
+	(cd .f; perl contrib/commandref_join.pl)
 	find .f -name .svn -print | xargs rm -rf
 	find .f -name \*.orig -print | xargs rm -f
 	find .f -name .#\* -print | xargs rm -f
