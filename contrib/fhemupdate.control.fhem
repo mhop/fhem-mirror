@@ -3,6 +3,9 @@ DIR www/images/default
 DIR www/gplot
 DIR www/pgm2
 DIR docs
+DIR FHEM/lib
+DEL FHEM/OWNet.pm
+UPD FHEM/lib/OWNet.pm
 MOV FHEM/release.* unused
 MOV FHEM/99_updatefhem.* unused
 MOV FHEM/99_CULflash.* unused
