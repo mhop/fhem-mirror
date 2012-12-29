@@ -2153,8 +2153,8 @@ FW_showWeblink($$$$)
 
     # plots navigation buttons
     if($buttons &&
-       ($defs{$d}{WLTYPE} eq "fileplot" || $defs{$d}{WLTYPE} eq "dbplot")&&
-       !AttrVal($d, "fixedrange", undef)) {
+       ($defs{$d}{WLTYPE} eq "fileplot" || $defs{$d}{WLTYPE} eq "dbplot") &&
+       AttrVal($d, "fixedrange", "x") !~ m/^[ 0-9:-]*$/) {
 
       FW_zoomLink("zoom=-1", "Zoom-in", "zoom in");
       FW_zoomLink("zoom=1",  "Zoom-out","zoom out");
