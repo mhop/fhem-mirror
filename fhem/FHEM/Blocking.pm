@@ -9,12 +9,12 @@ use IO::Socket::INET;
 sub BlockingCall($$$$);
 
 
+=pod
 ### Usage:
 sub TestBlocking() { BlockingCall("DoSleep", 5, "SleepDone", 8); }
 sub DoSleep($)     { sleep(shift); return "I'm done"; }
 sub SleepDone($)   { Log 1, "SleepDone: " . shift; }
 
-=pod
 =cut
 
 
