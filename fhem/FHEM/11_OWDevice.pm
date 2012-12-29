@@ -85,12 +85,14 @@ OWDevice_GetDetails($) {
         #$interface= "count";
       } elsif($family eq "05") {
         # 2405 - Addressable Switch
+        # added by m. fischer
         unshift @getters, qw(PIO);
         unshift @setters, qw(PIO);
         unshift @polls, qw(PIO);
         #$interface= "state";
       } elsif($family eq "12") {
         # 2406, 2407 - Dual Addressable Switch with 1kbit Memory
+        # added by m. fischer
         unshift @getters, qw(PIO.A PIO.B);
         unshift @setters, qw(PIO.A PIO.B);
         unshift @polls, qw(PIO.A PIO.B);
@@ -103,10 +105,23 @@ OWDevice_GetDetails($) {
         #$interface= "state";
       } elsif($family eq "29") {
         # 2408 - 1-Wire 8 Channel Addressable Switch
+        # added by m. fischer
         unshift @getters, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
         unshift @setters, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
         unshift @polls, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
         #$interface= "state";
+      } elsif($family eq "FF") {
+        # LCD - LCD controller
+        # added by m. fischer
+        unshift @getters, qw(counters.0 counters.1 counters.2 counters.3);
+        unshift @getters, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3 version);
+        unshift @setters, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3);
+        unshift @setters, qw(line16.0 line16.1 line16.2 line16.3 screen16);
+        unshift @setters, qw(line20.0 line20.1 line20.2 line20.3 screen20);
+        unshift @setters, qw(line40.0 line40.1 line40.2 line40.3 screen40);
+        unshift @setters, qw(backlight LCDon);
+        unshift @polls, qw(counters.0 counters.1 counters.2 counters.3);
+        unshift @polls, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3);
       } elsif($family eq "reserved") {
         # reserved for other devices
         # add other devices here and post your additions als patch in
@@ -223,7 +238,17 @@ OWDevice_Set($@)
         my $value= $a[2];
         my @setters= @{$hash->{fhem}{setters}};
         if($cmdname ~~ @setters) {
-          return "set $name needs two arguments" if(int(@a) != 3);
+          # LCD Display need more than two arguments, to display text
+          # added by m.fischer
+          if($cmdname =~ /(line16.0|line16.1|line16.2|line16.3|screen16)/ ||
+             $cmdname =~ /(line20.0|line20.1|line20.2|line20.3|screen20)/ ||
+             $cmdname =~ /(line40.0|line40.1|line40.2|line40.3|screen40)/) {
+             shift @a;
+             shift @a;
+             $value= "@a";
+          } else {
+            return "set $name needs two arguments" if(int(@a) != 3);
+          }
           OWDevice_WriteValue($hash,$cmdname,$value);
           readingsSingleUpdate($hash,$cmdname,$value,1);
           return undef;
@@ -314,6 +339,7 @@ OWDevice_Define($$)
       <li>2406, 2407 - Dual Addressable Switch with 1kbit Memory</li>
       <li>2413 1-Wire Dual Channel Addressable Switch</li>
       <li>2408 1-Wire 8 Channel Addressable Switch</li>
+      <li>LCD 1-wire LCD controller by Louis Swart</li>
     </ul>
     <br><br>
     Adding more devices is simple. Look at the code (subroutine <code>OWDevice_GetDetails</code>).
