@@ -5,6 +5,7 @@
 package main;
 
 # update actiondetector is supported with lines marked as "#todo Updt1 remove"
+# update regRaw warnings                                  "#todo Updt2 remove"
 #        the lines can be removed after some soak time - around version 2600
 use strict;
 use warnings;
@@ -1424,6 +1425,7 @@ my %culHmGlobalGets = (
   param      => "<param>",
   reg        => "<addr> ... <list> <peer>",
   regList    => "",
+  saveConfig => "<filename>",
 );
 my %culHmSubTypeGets = (
   none4Type =>
@@ -1602,7 +1604,7 @@ CUL_HM_Get($@)
 	  my $reg  = $culHmRegDefine{$regName};	  
 	  my $help = $reg->{t};
 	  $help .= " options:".join(",",keys%{$reg->{lit}})if (defined($reg->{lit}));
-	  push @rI,sprintf("%4d: %16s | %3d to %-11s | %8s | %s\n",
+	  push @rI,sprintf("%4d: %-16s | %3d to %-11s | %8s | %s\n",
 			  $reg->{l},$regName,$reg->{min},$reg->{max}.$reg->{u},
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),$help)
 	        if (!($isChannel && $reg->{l} == 0));
@@ -1612,6 +1614,38 @@ CUL_HM_Get($@)
 	                 "register","range","peer","description");
 	foreach(sort(@rI)){$info .= $_;}
 	return $info;
+  }
+  elsif($cmd eq "saveConfig"){  ###############################################
+    my $fName = $a[2];
+	open(aSave, ">>$fName") || return("Can't open $fName: $!");
+    
+	print aSave "\n\n#======== store device data:".$devName." === from: ".TimeNow();
+	my @eNames;
+	push @eNames,$devName;
+	foreach my $e (CUL_HM_getAssChnIds($name)){
+	  my $eName = CUL_HM_id2Name($e);
+	  push @eNames, $eName if($eName !~ m/_chn:/);
+	}
+	
+	foreach my $eName (@eNames){
+	  print aSave "\n#---      entity:".$eName;
+	  my $pIds = AttrVal($eName, "peerIDs", "");
+	  my $timestamps = "\n#     timestamp of the readings for reference";
+	  if ($pIds){
+	    print aSave "\n# Peer Names:".ReadingsVal($eName,"peerList","");
+		$timestamps .= "\n#        ".ReadingsTimestamp($eName,"peerList","")." :peerList";
+	    print aSave "\nset ".$eName." peerBulk ".$pIds;
+	  }
+	  my $ehash = CUL_HM_name2Hash($eName);
+	  foreach my $read (sort keys %{$ehash->{READINGS}}){
+	    next if ($read !~ m/^RegL_/);
+	    print aSave "\nset ".$eName." regBulk ".$read." ".ReadingsVal($eName,$read,"");
+		$timestamps .= "\n#        ".ReadingsTimestamp($eName,$read,"")." :".$read;
+	  }
+	  print aSave $timestamps;
+	}
+	print aSave "\n======= finished ===\n";
+	close(aSave);
   }
 
   Log GetLogLevel($name,4), "CUL_HM get $name " . join(" ", @a[1..$#a]);
@@ -1626,7 +1660,9 @@ my %culHmGlobalSets = (
   pair     	    => "",
   unpair   	    => "",
   sign     	    => "[on|off]",
-  regRaw   	    =>"[List0|List1|List2|List3|List4|List5|List6] <addr> <data> ... <PeerChannel>",
+  regRaw   	    =>"[List0|List1|List2|List3|List4|List5|List6] <addr> <data> ... <PeerChannel>", #todo Updt2 remove
+  regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
+  peerBulk      => "<peer1,peer2,...>",
   statusRequest => "",
   getpair       => "", 
   getdevicepair => "",
@@ -1932,12 +1968,37 @@ CUL_HM_Set($@)
 	}
 	$state = "";
   } 
-  elsif($cmd eq "regRaw" ||$cmd eq "getRegRaw") { #############################
+  elsif($cmd eq "peerBulk") { #################################################
+	$state = "";
+	my $pL = $a[2];
+	foreach my $peer (split(',',$pL)){
+	  next if ($peer =~ m/^self/);
+	  my $pID = CUL_HM_peerChId($peer,$dst,$id);
+	  return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
+	  my $pCh1 = substr($pID,6,2);
+	  my $pCh2 = $pCh1;
+      if($culHmSubTypeSets{$st}{devicepair}||
+         $culHmModelSets{$md}{devicepair}||
+         $culHmChanSets{$mdCh}{devicepair}){
+	    $pCh2 = "00";
+      }
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'01'.
+	                      substr($pID,0,6).$pCh1.$pCh2);
+	}
+  } 
+  elsif($cmd eq "regRaw" ||$cmd eq "regBulk"||$cmd eq "getRegRaw") { ##########
     my ($list,$addr,$data,$peerID);
 	$state = "";
 	($list,$addr,$data,$peerID) = ($a[2],hex($a[3]),hex($a[4]),$a[5])
 	                               if ($cmd eq "regRaw");
-	($list,$peerID) = ($a[2],$a[3])if ($cmd eq "getRegRaw");
+	if ($cmd eq "regBulk"){
+	  ($list) = ($a[2]);
+	  $list =~ s/RegL_//;
+	  ($list,$peerID) = split(":",$list);
+	  return "unknown list Number:".$list if(hex($list)>6);
+	}
+
+	($list,$peerID) = ($a[2],$a[3])if ($cmd eq "getRegRaw");#todo Updt2 remove
 	$list =~ s/List/0/;# convert Listy to 0y
 	# as of now only hex value allowed check range and convert
 	
@@ -1966,13 +2027,20 @@ CUL_HM_Set($@)
 		}
 	  }
 	}
-	else{
-	  $chn = "00" if ($list eq "00");
-	  # as of now only hex value allowed check range and convert
-	  return "invalid address or data" if ($addr > 255 || $data > 255);
-	  my $addrData = uc(sprintf("%02x%02x",$addr,$data));
-      CUL_HM_pushConfig($hash,$id,$dst,$chn,$peerID,$peerChn,$list,$addrData);
+	if($cmd eq "regBulk"){;
+	  my @adIn = @a;
+	  shift @adIn;shift @adIn;shift @adIn;
+	  my $adList;
+	  foreach my $ad (sort @adIn){
+	    ($addr,$data) = split(":",$ad);
+		$adList .= sprintf("%02X%02X",hex($addr),hex($data)) if ($addr ne "00");
+		return "wrong addr or data:".$ad if (hex($addr)>255 || hex($data)>255);
+	  }
+      CUL_HM_pushConfig($hash,$id,$dst,$chn,$peerID,$peerChn,$list,$adList);
 	}
+	else{                                                    #todo Updt2 remove
+	  return "outdated - use regBulk with changed format";   #todo Updt2 remove
+	}                                                        #todo Updt2 remove
   } 
   elsif($cmd eq "regSet") { ###################################################
     #set <name> regSet <regName> <value> <peerChn> 
@@ -2462,7 +2530,7 @@ CUL_HM_Set($@)
 	    $b2 = $b1 + 1;
 	    $nrCh2Pair = 2;
 	}
-	my $cmd = ($set)?"01":"02";# do we set or remove?
+	my $cmdB = ($set)?"01":"02";# do we set or remove?
 
     # First the remote (one loop for on, one for off)
 	if (!$target || $target eq "remote" || $target eq "both"){
@@ -2477,7 +2545,7 @@ CUL_HM_Set($@)
 		else{
 		  my $bStr = sprintf("%02X",$b);
   	      CUL_HM_PushCmdStack($hash, 
-  	              "++".$flag."01${id}${dst}${bStr}$cmd${peerDst}${peerChn}00");
+  	              "++".$flag."01${id}${dst}${bStr}$cmdB${peerDst}${peerChn}00");
   	      CUL_HM_pushConfig($hash,$id, $dst,$b,$peerDst,hex($peerChn),4,"0100")
 				   if($md ne "HM-CC-TC");
 	    }
@@ -2491,7 +2559,7 @@ CUL_HM_Set($@)
 	  else{
 	    my $peerFlag = CUL_HM_getFlag($peerHash);
         CUL_HM_PushCmdStack($peerHash, sprintf("++%s01%s%s%s%s%s%02X%02X",
-            $peerFlag,$id,$peerDst,$peerChn,$cmd,$dst,$b2,$b1 ));
+            $peerFlag,$id,$peerDst,$peerChn,$cmdB,$dst,$b2,$b1 ));
 	  }
 	}
 	return ("",1) if ($target && $target eq "remote");#Nothing to transmit for actor
@@ -3640,7 +3708,6 @@ CUL_HM_pushConfig($$$$$$$$)
   }
   $chnhash->{helper}{shadowReg}{$regLN} = $regs;
   CUL_HM_updtRegDisp($hash,$list,$peerAddr.$peerChn);
-  
   CUL_HM_PushCmdStack($hash, "++".$flag.'01'.$src.$dst.$chn.'05'.
                                         $peerAddr.$peerChn.$list);
   for(my $l = 0; $l < $tl; $l+=28) {
@@ -4079,17 +4146,50 @@ CUL_HM_setAttrIfCh($$$$)
          level and is common for all channels. See also <a
          href="#CUL_HMgetpair">getPair</a>  and <a
          href="#CUL_HMunpair">unpair</a>.</li>
-     <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;
-         &lt;peerChannel&gt; </B><a name="CUL_HMregRaw"></a><br>
-         Will set register for device or channel. See also <a
-         href="#CUL_HMgetRegRaw">getRegRaw</a>.<br> &lt;addr&gt; and
-         &lt;data&gt; are 1 byte values that need to be given in hex.<br>
+     <li><B>peerBulk</B> <peerch1,peerch2,...<a name="CUL_HMpeerBulk"></a><br>
+	     peerBulk will add peer channels to the channel. All channels in the 
+		 list will be added. This includes that the parameter and behavior 
+		 defined for this 'link' will return to the defaults. peerBulk is only
+		 meant to add peers. More suffisticated funktionality as provided by
+		 <a href="#CUL_HMdevicepair">devicepair</a> is not supported. peerBulk
+		 will only add channels in 'single' button mode.<br>
+		 Also note that peerBulk will not delete any existing peers, just add
+		 and re-add given peers.<br>
+		 Main purpose of this command is the usage for re-store data to a 
+		 device. It is recommended to restore register configuration utilising
+		 <a href="#CUL_HMregBulk">regBulk</a>
 	 Example:<br>
 	 <ul><code>
-	 set mydimmer regRaw List1 0B 10 00000000 <br>
-	 set mydimmer regRaw List1 0C 00 00000000 <br>
+	 set myChannel peerBulk 12345601,<br>
+	 set myChannel peerBulk self01,self02,FB_Btn_04,FB_Btn_03,<br>
 	 </code></ul>
-	 will set the max drive time up for a blind actor to 25,6sec</li>
+	 </li>
+     <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;
+         replaced by regBulk</li>
+     <li><B>regBulk  &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...
+	     </B><a name="CUL_HMregBulk"></a><br>
+		 This command will replace the former regRaw. It allows to set register
+		 in raw format. Its main purpose is to restore a complete register list 
+		 to values secured before. <br>
+		 Values may be read by <a href="#CUL_HMgetConfig">getConfig</a>. The 
+		 resulting readings can be used directly for this command.<br>
+		 &lt;reg List&gt; is the list data should be written to. Format could be 
+		 '00', 'RegL_00', '01'...<br>
+		 &lt;peer&gt; is an optional adder in case the list requires a peer. 
+		 The peer can be given as channel name or the 4 byte (8 chars) HM 
+		 channel ID.<br>
+		 &lt;addr1:data1&gt; is the list of register to be written in hex 
+		 format.<br>
+	 Example:<br>
+	 <ul><code>
+	 set myChannel regBulk RegL_00:	02:01 0A:17 0B:43 0C:BF 15:FF 00:00<br>
+	 RegL_03:FB_Btn_07
+	01:00 02:00 03:00 04:32 05:64 06:00 07:FF 08:00 09:FF 0A:01 0B:44 0C:54 0D:93 0E:00 0F:00 11:C8 12:00 13:00 14:00 15:00 16:00 17:00 18:00 19:00 1A:00 1B:00 1C:00 1D:FF 1E:93 1F:00 81:00 82:00 83:00 84:32 85:64 86:00 87:FF 88:00 89:FF 8A:21 8B:44 8C:54 8D:93 8E:00 8F:00 91:C8 92:00 93:00 94:00 95:00 96:00 97:00 98:00 99:00 9A:00 9B:00 9C:00 9D:05 9E:93 9F:00 00:00<br>
+	 set myblind regBulk 01 0B:10<br>
+	 set myblind regBulk 01 0C:00<br>
+	 </code></ul>
+	 </li>
+	 myblind will set the max drive time up for a blind actor to 25,6sec</li>
      <li><B>regSet &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
         For some major register a readable version is implemented supporting
         register names &lt;regName&gt; and value conversionsing. Only a subset
@@ -4257,7 +4357,12 @@ CUL_HM_setAttrIfCh($$$$)
        Note: All these commands work right now only if you have more then one
        smoekDetector, and you paired them to form a group. For issuing the
        commands you have to use the master of this group, and currently you
-       have to guess which of the detectors is the master.
+       have to guess which of the detectors is the master.<br>
+	   smokeDetector can be setup to teams using 
+	   <a href="#CUL_HMdevicepair">devicepair</a>. You need to pair all 
+	   team-members to the master. Don't forget to also devicepair the master
+	   itself to the team - i.e. pair it to itself! doing that you have full 
+	   controll over the team and don't need to guess.<br>
      <ul>
        <li><B>test</B> - execute a network test</li>
        <li><B>alarmOn</B> - initiate an alarm</li>
@@ -4418,6 +4523,40 @@ CUL_HM_setAttrIfCh($$$$)
   <a name="CUL_HMget"></a>
   <b>Get</b><br>
      <ul>
+     <li><B>configSave &lt;filename&gt;</B><a name="CUL_HMconfigSave"></a><br>
+         Saves the configuration of an entity into a file. Data is stored in a
+		 format to be executed from fhem command prompt.<br>
+		 The file is located in the fhem home directory aside of fhem.cfg. Data 
+		 will be stored cumulative - i.e. new data will be appended to the 
+		 file. It is up to the user to avoid duplicate storage of the same 
+		 entity.<br>
+		 Target of the data is ONLY the HM-device information which is located
+		 IN the HM device. Explicitely this is the peer-list and the register.
+		 With the register also the pairing is included.<br>
+		 The file is readable and editable by the user. Additionaly timestamps 
+		 are stored to help user to validate.<br>
+		 Restrictions:<br>
+		 Even though all data of the entity will be secured to the file FHEM 
+		 stores the data that is avalilable to FHEM at time of save!. It is up 
+		 to the user to read the data from the HM-hardware prior to execution. 
+		 See recommended flow below.<br>
+		 This command will not store any FHEM attributes o device definitions.
+		 This continues to remain in fhem.cfg.<br>
+		 Furthermore the secured data will not automatically be reloaded to the 
+		 HM-hardware. It is up to the user to perform a restore.<br><br>
+		 As with other commands also 'configSave' is best executed on a device 
+		 rather then on a channel. If executed on a device also the assotiated 
+		 channel data will be secured. <br><br>
+		 <code>
+		 Recommended work-order for device 'HMdev':<br>
+		 set HMdev clear msgEvents  # clear old events to better check flow<br>
+		 set HMdev getConfig        # read device & channel inforamtion<br>
+		 # wait untill operation is complete<br>
+		 # protState should be CMDs_done<br>
+		 #           there shall be no warnings amongst prot... variables<br>
+		 get configSave myActorFile<br>
+		 </code>
+         </li>
      <li><B>param &lt;paramName&gt;</B><br>
          returns the content of the relevant parameter for the entity. <br>
          Note: if this command is executed on a channel and 'model' is
