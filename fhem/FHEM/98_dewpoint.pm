@@ -199,7 +199,7 @@ dewpoint_Notify($$)
    		#my ($evName1, $val1, $evName2, $val2, $rest) = split(" ", $s, 5); # resets $1
 		#$lastval = $evName1." ".$val1." ".$evName2." ".$val2;		
 		$lastval = $s;
-		if ($s =~ /T: [-+]?([0-9]*\.[0-9]+|[0-9]+)/) {	
+		if ($s =~ /T: ([-+]?[0-9]*\.[0-9]+|[0-9]+)/) {	
 			$temperature = $1;
 		}
 		if ($s =~ /H: [-+]?([0-9]*\.[0-9]+|[0-9]+)/) {	
