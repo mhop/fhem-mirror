@@ -225,7 +225,7 @@ HMLAN_Write($$$)
     HMLAN_SimpleWrite($hash, $IDadd);
     $lhash{$dst} = 1;
    	$hash->{assignIDs}=join(',',keys %lhash);
-   	$hash->{assignIDsCnt}=scalar(keys %lhash)-1;
+   	$hash->{assignIDsCnt}=scalar(keys %lhash);
   }
 
   my $tm = int(gettimeofday()*1000) % 0xffffffff;
