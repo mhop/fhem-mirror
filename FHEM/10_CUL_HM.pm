@@ -2110,10 +2110,13 @@ CUL_HM_Set($@)
     my $addrData;
 	if ($dLen < 8){# fractional byte see whether we have stored the register
 	  #read full 8 bit!!!
-	  my $curVal = CUL_HM_getRegFromStore(CUL_HM_id2Name($dst.$lChn),
+	  my $rName = CUL_HM_id2Name($dst.$lChn);
+	  $rName =~ s/_chn:.*//;
+	  my $curVal = CUL_HM_getRegFromStore($rName,
 	                                      $addr,$list,$peerID.$peerChn);
 	  return "cannot read current value for Bitfield - retrieve Data first" 
 	             if (!$curVal);
+	  $curVal =~ s/set_//; # set is not relevant, we take it as given
 	  $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
 	  $addrData.=sprintf("%02X%02X",$addr,$data);
 	}
