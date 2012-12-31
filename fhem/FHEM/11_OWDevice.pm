@@ -264,7 +264,7 @@ OWDevice_Define($$)
         my ($hash, $def) = @_;
         my @a = split("[ \t]+", $def);
 
-        return "Usage: define <name> OWDevice <address> [interval]"  if($#a < 3 || $#a > 4);
+        return "Usage: define <name> OWDevice <address> [interval]"  if($#a < 2|| $#a > 3);
         my $name= $a[0];
 
         AssignIoPort($hash);
