@@ -38,8 +38,9 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
+  $hash->{AttrFn}     = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "trimvalues loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "trimvalues polls interfaces loglevel:0,1,2,3,4,5";
 }
 
 ###################################
@@ -207,6 +208,31 @@ OWDevice_UpdateValues($) {
           if(defined($hash->{fhem}{interval}));
 
 }
+
+###################################
+sub
+OWDevice_Attr($@)
+{
+        my ($cmd, $name, $attrName, $attrVal) = @_;
+        my $hash = $defs{$name};
+
+        $attrVal= "" unless defined($attrVal);
+        $attrVal= "" if($cmd eq "del");
+        
+        if($attrName eq "polls") {
+            my @polls= split(",", $attrVal);
+            $hash->{fhem}{polls}= \@polls;
+            Log 5, "$name: polls: " . join(" ", @polls);
+        } elsif($attrName eq "interfaces") {
+            if($attrVal ne "") {
+              $hash->{fhem}{interfaces}= join(";",split(",",$attrVal));
+              Log 5, "$name: interfaces: " . $hash->{fhem}{interfaces};
+            } else {
+              delete $hash->{fhem}{interfaces} if(defined($hash->{fhem}{interfaces}));
+              Log 5, "$name: no interfaces";
+            }
+        }
+}        
 
 ###################################
 sub
@@ -419,6 +445,8 @@ OWDevice_Define($$)
   <b>Attributes</b>
   <ul>
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
+    <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
+    <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
