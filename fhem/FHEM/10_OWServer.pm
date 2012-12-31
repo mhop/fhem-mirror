@@ -280,8 +280,8 @@ OWServer_Set($@)
   <ul>
     <code>get &lt;name&gt; devices</code>
     <br><br>
-    Lists the addresses and types of all 1-wire devices provided by the owserver, Also shows
-    the corresponding <a href="#OWDevice">OWDevice</a> devices if defined.
+    Lists the addresses and types of all 1-wire devices provided by the owserver. Also shows
+    the corresponding <a href="#OWDevice">OWDevice</a> if one is defined for the respective 1-wire devices.
     <br><br>
   </ul>
   <br><br>
