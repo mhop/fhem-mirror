@@ -187,7 +187,13 @@ OWServer_Get($@)
         my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
         my $ret;
         for my $device (@devices) {
-          $ret .= substr($device,1) . " " . $owserver->read($device . "/type") . "\n";
+          my $name= "";
+          my $address= substr($device,1);
+          my $type= $owserver->read($device . "/type");
+          foreach my $p (keys %defs) {
+             $name= concatc(", ", $name, $p) if($defs{$p}{TYPE} eq "OWDevice" and $defs{$p}{fhem}{address} eq $address);
+          }
+          $ret .= sprintf("%s %10s %s\n", $address, $type, $name);
         }
         return $ret;
   }  else {
@@ -274,7 +280,8 @@ OWServer_Set($@)
   <ul>
     <code>get &lt;name&gt; devices</code>
     <br><br>
-    Lists the addresses and types of all 1-wire devices provided by the owserver.
+    Lists the addresses and types of all 1-wire devices provided by the owserver, Also shows
+    the corresponding <a href="#OWDevice">OWDevice</a> devices if defined.
     <br><br>
   </ul>
   <br><br>
