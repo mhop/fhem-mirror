@@ -4167,7 +4167,7 @@ CUL_HM_setAttrIfCh($$$$)
 	 set myChannel peerBulk self01,self02,FB_Btn_04,FB_Btn_03,<br>
 	 </code></ul>
 	 </li>
-     <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;
+     <li><B>regRaw [List0|List1|List2|List3|List4] &lt;addr&gt; &lt;data&gt;</B>
          replaced by regBulk</li>
      <li><B>regBulk  &lt;reg List&gt;:&lt;peer&gt; &lt;addr1:data1&gt; &lt;addr2:data2&gt;...
 	     </B><a name="CUL_HMregBulk"></a><br>
