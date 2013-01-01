@@ -126,8 +126,8 @@ my %culHmModel=(
   "0034" => {name=>"HM-PBI-4-FM"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "0035" => {name=>"HM-PB-4-WM"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
   "0036" => {name=>"HM-PB-2-WM"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:2",},
-  "0037" => {name=>"HM-RC-19"                ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18",},
-  "0038" => {name=>"HM-RC-19-B"              ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18",},
+  "0037" => {name=>"HM-RC-19"                ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
+  "0038" => {name=>"HM-RC-19-B"              ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
   "0039" => {name=>"HM-CC-TC"                ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'5:2.3p,6:2'   ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
   "003A" => {name=>"HM-CC-VD"                ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'5'            ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
@@ -148,7 +148,7 @@ my %culHmModel=(
   "004A" => {name=>"HM-SEC-MDIR"             ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "004B" => {name=>"HM-Sec-Cen"              ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004C" => {name=>"HM-RC-12-SW"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
-  "004D" => {name=>"HM-RC-19-SW"             ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18",},
+  "004D" => {name=>"HM-RC-19-SW"             ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
   "004E" => {name=>"HM-LC-DDC1-PCB"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004F" => {name=>"HM-SEN-MDIR-SM"          ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0050" => {name=>"HM-SEC-SFA-SM"           ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -1206,6 +1206,7 @@ my %culHmRegDefine = (
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
   backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke",lit=>{off=>0,on=>1}},
   backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at motion"   ,lit=>{off=>0,on=>1}},
+  backAtCharge    =>{a=> 13.5,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at Charge"   ,lit=>{off=>0,on=>1}},
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
   longPress       =>{a=>  4.4,s=>0.4,l=>1,min=>0.3,max=>1.8     ,c=>'m10s3'    ,f=>''      ,u=>'s'   ,d=>0,t=>"time to detect key long press"},
   dblPress        =>{a=>  9.0,s=>0.4,l=>1,min=>0  ,max=>1.5     ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"time to detect double press"},
@@ -1322,9 +1323,9 @@ my %culHmRegModel = (
   "HM-RC-12-B" => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
   "HM-RC-12-SW"=> {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
        
-  "HM-RC-19"   => { language =>1,},
-  "HM-RC-19-B" => { language =>1,},
-  "HM-RC-19-SW"=> { language =>1,},
+  "HM-RC-19"   => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1,backAtCharge =>1, language =>1,},
+  "HM-RC-19-B" => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1,backAtCharge =>1, language =>1,},
+  "HM-RC-19-SW"=> {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1,backAtCharge =>1, language =>1,},
  
   "HM-CC-VD"      => {ValveOffset     =>1,ValveError      =>1},
   "HM-PB-4DIS-WM" => {language        =>1,stbyTime        =>1},
@@ -2207,7 +2208,7 @@ CUL_HM_Set($@)
   elsif($cmd eq "display") { ################################################## 
 	my (undef,undef,undef,$t,$c,$u,$snd,$blk,$symb) = @_;
 	return "cmd only possible for device or its display channel"
-	       if (length($hash->{DEF}) ne 6 && $chn ne 18);
+	       if ($isChannel && $chn ne 18);
 	my %symbol=(off => 0x0000,
 	            bulb =>0x0100,switch =>0x0200,window   =>0x0400,door=>0x0800,
                 blind=>0x1000,scene  =>0x2000,phone    =>0x4000,bell=>0x8000,
