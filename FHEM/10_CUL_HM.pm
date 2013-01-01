@@ -1042,12 +1042,12 @@ CUL_HM_Parse($$)
 
 		if (AttrVal($dChName,"peerIDs","") =~m/$recId/){# is in peerlist?
 		  my $dChHash = CUL_HM_name2Hash($dChName);
-		  $dChHash->{helper}{trgLgRpt} = 0 if (!defined($dChHash->{helper}{trgLgRpt}));
+		  $dChHash->{helper}{trgLgRpt} = 0 
+		        if (!defined($dChHash->{helper}{trgLgRpt}));
 		  $dChHash->{helper}{trgLgRpt} +=1;
 		  
-		  my $state = ReadingsVal($dChName,"virtActState","ON");
-		  $state = ($state eq "OFF")?"ON":"OFF" 
-		        if ($dChHash->{helper}{trgLgRpt} == 1);# toggle first
+		  my $state = ReadingsVal($dChName,"virtActState","OFF");
+		  $state = ($state eq "OFF")?"ON":"OFF";
 		  if (hex($msgFlag)&0x20){
 		    $longPress .= "_Release";
 			$dhash->{helper}{trgLgRpt}=0;
