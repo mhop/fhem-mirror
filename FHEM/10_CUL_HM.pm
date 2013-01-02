@@ -174,7 +174,7 @@ my %culHmModel=(
   "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "006B" => {name=>"HM-PB-2-WM55"            ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "006B" => {name=>"HM-PB-2-WM55"            ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
   "006D" => {name=>"HM-OU-LED16"             ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"Led:1:16",},
   "0075" => {name=>"HM-OU-CFM-PL"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",},
