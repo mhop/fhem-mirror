@@ -195,7 +195,7 @@ watchdog_Undef($$)
           definition time. Else it will be activated when the first matching
           event is received.</li>
       <li>&lt;regexp1&gt; resets the timer of a running watchdog, to avoid it
-          use the regexp1WontReactivate attribute.
+          use the regexp1WontReactivate attribute.</li>
       <li>if &lt;regexp2&gt; is SAME, then it will be the same as the first
           regexp, and it will be reactivated, when it is received.
           </li>
