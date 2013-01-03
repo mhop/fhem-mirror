@@ -413,8 +413,8 @@ isday</pre>
   All functions take up to three arguments:<br>
   <ul>
     <li>The first specifies an offset (in seconds), which will be added to the
-    event.
-    <li>The second and third specify min and max values (format: "HH:MM").
+    event.</li>
+    <li>The second and third specify min and max values (format: "HH:MM").</li>
   </ul>
   <br>
   isday() can be used in some notify or at commands to check if the sun is up or
@@ -454,13 +454,13 @@ isday</pre>
       If set, this latitude is used to calculate sunset/sunrise<br>
       Notation need to be in decimal format (for example Berlin = 52.666)
       As default Frankfurt/Main, Germany (50.112) is used.
-    </li><br>
+      </li><br>
     <a name="longitude"></a>
     <li>longitude<br>
         If set, this longitude is used to calculate sunset/sunrise<br>
         Notation need to be in decimal format (for example Berlin = 13.400)
         As default Frankfurt/Main, Germany (8.686) is used.
-    </li><br>
+        </li><br>
     Note: these are global attributes, e.g.<br>
     <ul>
       attr global latitude 50.112<br>

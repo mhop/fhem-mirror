@@ -162,15 +162,15 @@ CUL_RFR_AddPrefix($$)
     <li>First give your base CUL (which remains connected to the PC) an RFR ID
     by issuing the fhem command "set MyCUL raw ui0100". With this command
     the base CUL will get the ID 01, and it will not relay messages to other
-    CUL's (as the second number is 00).
+    CUL's (as the second number is 00).</li>
     <li>Now replace the base CUL with the RFR CUL, and set its id by issuing
     the fhem command "set MyCUL raw ui0201". Now remove this CUL and attach the
     original, base CUL again. The RFR CUL got the id 02, and will relay every
-    message to the base CUL with id 01.
+    message to the base CUL with id 01.</li>
     <li>Take the RFR CUL, and attach it to an USB power supply, as seen on
     the image. As the configured base id is not 00, it will activate RF
-    reception on boot, and will start sending messages to the base CUL.
-    <li>Now you have to define this RFR cul as a fhem device:
+    reception on boot, and will start sending messages to the base CUL.</li>
+    <li>Now you have to define this RFR cul as a fhem device:</li>
   </ul>
 
   </td><td>

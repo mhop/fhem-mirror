@@ -710,17 +710,18 @@ TCM_Undef($$)
   <ul>
     <li>idbase<br>
         Set the ID base. Note: The firmware executes this command only up to
-        then times to prevent misuse.<br><br>
-    <li>modem_off<br>
-    <li>modem_on<br>
-    <li>reset<br>
-    <li>sensitivity<br>
-    <li>sleep<br>
-    <li>wake<br>
+        then times to prevent misuse.
+        </li>
+    <li>modem_off</li>
+    <li>modem_on</li>
+    <li>reset</li>
+    <li>sensitivity</li>
+    <li>sleep</li>
+    <li>wake
         For details see the datasheet available from
         www.enocean.com.  If you do not understand it, than you probably don't
         need it :)
-        </li><br>
+        </li><br><br>
   </ul>
 
   <a name="TCMget"></a>
@@ -729,9 +730,9 @@ TCM_Undef($$)
     <li>idbase<br>
         Get the ID base. You need this command in order to control EnOcean
         devices, see the <a href="#EnOceandefine">EnOcean</a>
-        paragraph.<br><br>
-    <li>modem_status<br>
-    <li>sensitivity<br>
+        paragraph.</li>><br>
+    <li>modem_status</li><br>
+    <li>sensitivity</li><br>
     <li>sw_ver<br>
         for details see the datasheet available from www.enocean.com
         </li><br>

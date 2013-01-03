@@ -171,20 +171,20 @@ notify_Attr(@)
 
       <li>Following special events will be generated for the device "global"
       <ul>
-          <li>INITIALIZED after initialization is finished.
-          <li>DEFINED &lt;devname&gt; after a device is defined.
-          <li>DELETED &lt;devname&gt; after a device was deleted.
-          <li>RENAMED &lt;old&gt; &lt;new&gt; after a device was renamed.
+          <li>INITIALIZED after initialization is finished.</li>
+          <li>DEFINED &lt;devname&gt; after a device is defined.</li>
+          <li>DELETED &lt;devname&gt; after a device was deleted.</li>
+          <li>RENAMED &lt;old&gt; &lt;new&gt; after a device was renamed.</li>
           <li>UNDEFINED &lt;defspec&gt; upon reception of a message for an
-          undefined device.
-      </ul>
+          undefined device.</li>
+      </ul></li>
 
       <li>Notify can be used to store macros for manual execution. Use the <a
           href="#trigger">trigger</a> command to execute the macro.
           E.g.<br>
           <code>fhem> define MyMacro notify MyMacro { Log 1, "Hello"}</code><br>
           <code>fhem> trigger MyMacro</code><br>
-
+          </li>
 
     </ul>
   </ul>

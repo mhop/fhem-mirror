@@ -125,7 +125,7 @@ weblink_Define($$)
             <li>Fhem config:<br>
                 attr wl_1 label "Max $data{max1}, Current $data{currval1}"</li>
             <li>.gplot file entry:<br>
-                set title &lt;L1&gt;<br>
+                set title &lt;L1&gt;<br></li>
           </ul></li>
       </ul>
       </li>
