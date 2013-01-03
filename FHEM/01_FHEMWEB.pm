@@ -713,11 +713,15 @@ FW_makeTable($$@)
 
   return if(!$hash || !int(keys %{$hash}));
   FW_pO "<table class=\"block wide\">";
+  my $si = AttrVal("global", "showInternalValues", 0);
 
   my $row = 1;
   foreach my $n (sort keys %{$hash}) {
+    next if(!$si && $n =~ m/^\./);      # Skip "hidden" Values
     my $val = $hash->{$n};
-    $val = $hash->{$n}{NAME} if($n eq "IODev" && ref($val) eq "HASH" && defined($hash->{$n}{NAME}));
+
+    $val = $hash->{$n}{NAME}    # Exception
+        if($n eq "IODev" && ref($val) eq "HASH" && defined($hash->{$n}{NAME}));
 
     my $r = ref($val);
     next if($r && ($r ne "HASH" || !defined($hash->{$n}{VAL})));
@@ -828,16 +832,16 @@ FW_doDetail($)
   }
   FW_pO "<table><tr><td>";
   FW_makeSelect($d, "set", getAllSets($d), "set");
-  FW_makeTable($d, $h);
+  FW_makeTable($d, $h);                         # Internal values
   FW_pO "Readings" if($h->{READINGS});
-  FW_makeTable($d, $h->{READINGS});
+  FW_makeTable($d, $h->{READINGS});             # Readings
 
   my $attrList = getAllAttr($d);
   my $roomList = join(",", sort grep !/ /, keys %FW_rooms);
   $attrList =~ s/room /room:$roomList /;
 
   FW_makeSelect($d, "attr", $attrList,"attr");
-  FW_makeTable($d, $attr{$d}, "deleteattr");
+  FW_makeTable($d, $attr{$d}, "deleteattr");    # Attributes
 
 
   if($t eq "FileLog" ) {
