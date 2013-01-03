@@ -118,7 +118,7 @@ YAMAHA_AVR_GetStatus($;$)
 	    $power = "Off";
        }
        
-       $hash->{STATE} = lc($power);
+	readingsBulkUpdate($hash, "state", lc($power));
        
     }
     
