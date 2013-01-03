@@ -392,8 +392,6 @@ FHT_Parse($$)
 {
   my ($hash, $msg) = @_;
 
-Log 1, "FHTVAL0: >$msg< ". length($msg);
-
   $msg = lc($msg);
   my $dev = substr($msg, 16, 4);
   my $cde = substr($msg, 20, 2);
