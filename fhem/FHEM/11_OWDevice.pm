@@ -40,7 +40,8 @@ OWDevice_Initialize($)
   $hash->{DefFn}     = "OWDevice_Define";
   $hash->{AttrFn}     = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "trimvalues polls interfaces loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "trimvalues polls interfaces loglevel:0,1,2,3,4,5 ".
+                       $readingFnAttributes;
 }
 
 ###################################
@@ -449,8 +450,7 @@ OWDevice_Define($$)
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>
 

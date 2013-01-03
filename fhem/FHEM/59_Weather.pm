@@ -128,7 +128,8 @@ sub Weather_Initialize($) {
   $hash->{UndefFn} = "Weather_Undef";
   $hash->{GetFn}   = "Weather_Get";
   $hash->{SetFn}   = "Weather_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 localicons event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 localicons ".
+                      $readingFnAttributes;
 
 }
 
@@ -596,8 +597,7 @@ WeatherAsHtml($)
   <a name="Weatherattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>

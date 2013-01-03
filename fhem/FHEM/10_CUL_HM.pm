@@ -213,13 +213,12 @@ CUL_HM_Initialize($)
   $hash->{RenameFn}  = "CUL_HM_Rename";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 ".
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
-					   "event-on-change-reading event-on-update-reading ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
-					   "peerList ". #todo Updt1 remove
-					   "peerIDs ".
-					   "actCycle actStatus autoReadReg:1,0 ".
-					   "";
+                       "peerList ". #todo Updt1 remove
+                       "peerIDs ".
+                       "actCycle actStatus autoReadReg:1,0 ".
+                       $readingFnAttributes;
   my @modellist;
   foreach my $model (keys %culHmModel){
     push @modellist,$culHmModel{$model}{name};
@@ -4588,6 +4587,7 @@ CUL_HM_setAttrIfCh($$$$)
     <li><a href="#dummy">dummy</a></li>
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="hmClass">hmClass</a>,
         <a name="model">model</a>,
         <a name="subType">subType</a><br>
