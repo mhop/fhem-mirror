@@ -484,6 +484,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
               {
                 $number = $2;
                 
+                $number =~ s/^+\d\d/0/g; # quick'n'dirty fix in case of international number format.
                 $number =~ s/\D//g unless($number =~ /@/);
                 $number =~ s/\s//g if($number =~ /@/);
                 
