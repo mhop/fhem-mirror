@@ -30,6 +30,16 @@ use vars qw(%msgCmd2Id);
   5 => "PushButton"
 );
 
+my %readingDef = ( #min/max/default
+  "maximumTemperature"    => [4.5, 30.5, 30.5],
+  "minimumTemperature"    => [4.5, 30.5, 4.5],
+  "comfortTemperature"    => [4.5, 30.5, 21],
+  "ecoTemperature"        => [4.5, 30.5, 17],
+  "windowOpenTemperature" => [4.5, 30.5, 12],
+  "windowOpenDuration"    => [0,   60,   15],
+  "measurementOffset"     => [-3.5, 3.5, 0]
+);
+
 %msgId2Cmd = (
                  "00" => "PairPing",
                  "01" => "PairPong",
@@ -139,6 +149,23 @@ MAX_CheckIODev($)
   return !defined($hash->{IODev}) || ($hash->{IODev}{TYPE} ne "MAXLAN" && $hash->{IODev}{TYPE} ne "CUL_MAX");
 }
 
+sub
+MAX_ReadingsVal(@)
+{
+  my ($hash,$name) = @_;
+
+  my $val = ReadingsVal($hash->{NAME},$name,"");
+  #$readingDef{$name} array is [min, max, default]
+  if(exists($readingDef{$name}) and
+    ($val eq "" or $val !~ /^-?(\d+\.?\d*|\.\d+)$/ or $val < $readingDef{$name}[0] or $val > $readingDef{$name}[1])) {
+    #Error: invalid value
+    Log 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[2]";
+    $val = $readingDef{$name}[2];
+    readingsSingleUpdate($hash,$name,$val,0);
+  }
+  return $val;
+}
+
 #############################
 sub
 MAX_Set($@)
@@ -164,10 +191,10 @@ MAX_Set($@)
       $ctrlmode = 3;
       #TODO: auto mode with temperature is also possible
     } elsif($args[0] eq "eco") {
-      $temperature = ReadingsVal($hash->{NAME},"ecoTemperature","");
+      $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
       return "No ecoTemperature defined" if(!$temperature);
     } elsif($args[0] eq "comfort") {
-      $temperature = ReadingsVal($hash->{NAME},"comfortTemperature","");
+      $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
       return "No comfortTemperature defined" if(!$temperature);
     } elsif($args[0] eq "on") {
       $temperature = 30.5;
@@ -202,21 +229,13 @@ MAX_Set($@)
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
 
-    my $comfortTemperature = ReadingsVal($hash->{NAME},"comfortTemperature","21");
-    my $ecoTemperature = ReadingsVal($hash->{NAME},"ecoTemperature","17");
-    my $maximumTemperature = ReadingsVal($hash->{NAME},"maximumTemperature","30.5");
-    my $minimumTemperature = ReadingsVal($hash->{NAME},"minimumTemperature","4.5");
-    my $windowOpenTemperature = ReadingsVal($hash->{NAME},"windowOpenTemperature","12");
-    my $windowOpenDuration = ReadingsVal($hash->{NAME},"windowOpenDuration","15");
-    my $measurementOffset = ReadingsVal($hash->{NAME},"measurementOffset","0");
-
-    return "Invalid comfortTemperature"    if($comfortTemperature eq "" or $comfortTemperature < 4.5 or $comfortTemperature > 30.5);
-    return "Invalid ecoTemperature"        if($ecoTemperature eq "" or $ecoTemperature < 4.5 or $ecoTemperature > 30.5);
-    return "Invalid maximumTemperature"    if($maximumTemperature eq "" or $maximumTemperature < 4.5 or $maximumTemperature > 30.5);
-    return "Invalid minimumTemperature"    if($minimumTemperature eq "" or $minimumTemperature < 4.5 or $minimumTemperature > 30.5);
-    return "Invalid windowOpenTemperature" if($windowOpenTemperature eq "" or $windowOpenTemperature < 4.5 or $windowOpenTemperature > 30.5);
-    return "Invalid windowOpenDuration"    if($windowOpenDuration eq "" or $windowOpenDuration < 0 or $windowOpenDuration > 60);
-    return "Invalid measurementOffset"     if($measurementOffset eq "" or $measurementOffset < -3.5 or $measurementOffset > 3.5);
+    my $comfortTemperature = MAX_ReadingsVal($hash,"comfortTemperature");
+    my $ecoTemperature = MAX_ReadingsVal($hash,"ecoTemperature");
+    my $maximumTemperature = MAX_ReadingsVal($hash,"maximumTemperature");
+    my $minimumTemperature = MAX_ReadingsVal($hash,"minimumTemperature");
+    my $windowOpenTemperature = MAX_ReadingsVal($hash,"windowOpenTemperature");
+    my $windowOpenDuration = MAX_ReadingsVal($hash,"windowOpenDuration");
+    my $measurementOffset = MAX_ReadingsVal($hash,"measurementOffset");
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
 
@@ -382,7 +401,7 @@ MAX_Parse($$)
 
     #The HeatingThermostat uses the measurementOffset during control
     #but does not apply it to measuredTemperature before sending it to us
-    my $measOffset = ReadingsVal($shash->{NAME},"measurementOffset","");
+    my $measOffset = MAX_ReadingsVal($shash,"measurementOffset");
     $measuredTemperature -= $measOffset if($measuredTemperature ne "" and $measOffset ne "");
 
     $shash->{mode} = $mode;
