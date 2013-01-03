@@ -100,6 +100,9 @@ FileLog_Log($$)
   my $max = int(@{$dev->{CHANGED}});
   my $tn = TimeNow();
   my $ct = $dev->{CHANGETIME};
+  my $wrotesome;
+  my $fh = $log->{FH};
+
   for (my $i = 0; $i < $max; $i++) {
     my $s = $dev->{CHANGED}[$i];
     $s = "" if(!defined($s));
@@ -109,11 +112,13 @@ FileLog_Log($$)
 
       FileLog_Switch($log);
 
-      my $fh = $log->{FH};
       print $fh "$t $n $s\n";
-      $fh->flush;
-      $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
+      $wrotesome = 1;
     }
+  }
+  if($wrotesome) {
+    $fh->flush;
+    $fh->sync if !($^O eq 'MSWin32'); #not implemented in Windows
   }
   return "";
 }
@@ -513,11 +518,11 @@ seekTo($$$$)
     <ul>
     <li><code>%d</code> day of month (01..31)</li>
     <li><code>%m</code> month (01..12)</li>
-    <li><code>%Y</code> year (1970...)
-    <li><code>%w</code> day of week (0..6);  0 represents Sunday
-    <li><code>%j</code> day of year (001..366)
-    <li><code>%U</code> week number of year with Sunday as first day of week (00..53)
-    <li><code>%W</code> week number of year with Monday as first day of week (00..53)
+    <li><code>%Y</code> year (1970...)</li>
+    <li><code>%w</code> day of week (0..6);  0 represents Sunday</li>
+    <li><code>%j</code> day of year (001..366)</li>
+    <li><code>%U</code> week number of year with Sunday as first day of week (00..53)</li>
+    <li><code>%W</code> week number of year with Monday as first day of week (00..53)</li>
     </ul>
     FHEM also replaces <code>%L</code> by the value of the global logdir attribute.<br>
     Before using <code>%V</code> for ISO 8601 week numbers check if it is
