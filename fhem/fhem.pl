@@ -44,16 +44,15 @@ use Time::HiRes qw(gettimeofday);
 sub AddDuplicate($$);
 sub AnalyzeCommand($$);
 sub AnalyzeCommandChain($$);
-sub AnalyzePerlCommand($$);
 sub AnalyzeInput($);
+sub AnalyzePerlCommand($$);
 sub AssignIoPort($);
 sub AttrVal($$$);
-sub addToAttrList($);
 sub CallFn(@);
-sub CommandChain($$);
 sub CheckDuplicate($$);
-sub DoTrigger($$);
+sub CommandChain($$);
 sub Dispatch($$$);
+sub DoTrigger($$@);
 sub EventMapAsList($);
 sub FmtDateTime($);
 sub FmtTime($);
@@ -63,54 +62,59 @@ sub HandleArchiving($);
 sub HandleTimeout();
 sub IOWrite($@);
 sub InternalTimer($$$$);
+sub IsDummy($);
+sub IsIgnored($);
 sub LoadModule($);
 sub Log($$);
 sub OpenLogfile($);
 sub PrintHash($$);
 sub ReadingsVal($$$);
+sub RemoveInternalTimer($);
 sub ReplaceEventMap($$$);
 sub ResolveDateWildcards($@);
-sub RemoveInternalTimer($);
 sub SecondsTillTomorrow($);
 sub SemicolonEscape($);
 sub SignalHandling();
 sub TimeNow();
 sub WriteStatefile();
 sub XmlEscape($);
+sub addEvent($$);
+sub addToAttrList($);
+sub createInterfaceDefinitions();
 sub devspec2array($);
 sub doGlobalDef($);
 sub fhem($@);
 sub fhz($);
 sub getAllSets($);
-sub IsDummy($);
-sub IsIgnored($);
-sub setGlobalAttrBeforeFork($);
+sub readingsBeginUpdate($);
+sub readingsBulkUpdate($$$@);
+sub readingsEndUpdate($$);
+sub readingsSingleUpdate($$$$);
 sub redirectStdinStdErr();
+sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
-sub addEvent($$);
-sub createInterfaceDefinitions();
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
 sub CommandDefine($$);
-sub CommandDeleteAttr($$);
 sub CommandDelete($$);
+sub CommandDeleteAttr($$);
 sub CommandGet($$);
 sub CommandHelp($$);
+sub CommandIOWrite($$);
 sub CommandInclude($$);
 sub CommandInform($$);
-sub CommandIOWrite($$);
 sub CommandList($$);
 sub CommandModify($$);
-sub CommandReload($$);
-sub CommandRereadCfg($$);
-sub CommandRename($$);
 sub CommandQuit($$);
+sub CommandReload($$);
+sub CommandRename($$);
+sub CommandRereadCfg($$);
 sub CommandSave($$);
 sub CommandSet($$);
 sub CommandSetstate($$);
-sub CommandSleep($$);
 sub CommandShutdown($$);
+sub CommandSleep($$);
 sub CommandTrigger($$);
 
 ##################################################
@@ -177,6 +181,7 @@ my $nextat;                     # Time when next timer will be triggered.
 my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
+my $readingsUpdateDelayTrigger; # needed internally
 my $cvsid = '$Id$';
 my $namedef =
   "where <name> is either:\n" .
@@ -195,12 +200,16 @@ $modules{Global}{LOADED} = 1;
 $modules{Global}{AttrList} =
   "archivecmd apiversion archivedir configfile lastinclude logfile " .
   "modpath nrarchive pidfilename port statefile title userattr " .
-  "verbose:1,2,3,4,5 mseclog version nofork logdir holiday2we " .
-  "autoload_undefined_devices dupTimeout latitude longitude " .
+  "verbose:1,2,3,4,5 mseclog:1,0 version nofork:1,0 logdir holiday2we " .
+  "autoload_undefined_devices:1,0 dupTimeout latitude longitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
-  "exclude_from_update motd updatebranch uniqueID sendStatistics ";
-
+  "exclude_from_update motd updatebranch uniqueID sendStatistics ".
+  "showInternalValues:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";
+
+use vars qw($readingFnAttributes);
+$readingFnAttributes = "event-on-change-reading:0,1 event-on-update-reading:0,1 stateFormat";
+
 
 %cmds = (
   "?"       => { Fn=>"CommandHelp",
@@ -670,7 +679,7 @@ AnalyzeCommand($$)
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
     my $out = "";
-    $out = ">> $currlogfile 2>&1" if($currlogfile ne "-");
+    $out = ">> $currlogfile 2>&1" if($currlogfile ne "-" && $^O ne "MSWin32");
     system("$1 $out &");
     return undef;
   }
@@ -1106,16 +1115,28 @@ DoSet(@)
   my @a = @_;
 
   my $dev = $a[0];
-  return "Please define $dev first" if(!$defs{$dev});
-  return "No set implemented for $dev" if(!$modules{$defs{$dev}{TYPE}}{SetFn});
+  my $hash = $defs{$dev};
+  return "Please define $dev first" if(!$hash);
+  return "No set implemented for $dev" if(!$modules{$hash->{TYPE}}{SetFn});
+
+  # No special handling needed fo the Usage check
+  return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
-  my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $defs{$dev}, @a);
+  $readingsUpdateDelayTrigger = 1;
+  my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
+  $readingsUpdateDelayTrigger = 0;
   return $ret if($ret);
   return undef if($skipTrigger);
   shift @a;
-  my $arg = $defs{$dev}{CHANGED} ? undef : join(" ", @a);
-  return DoTrigger($dev, $arg);
+
+  if($hash->{CHANGED}) {        # Backward compatibility
+    DoTrigger($dev, undef);
+  } else {
+    readingsSingleUpdate($hash, "state", join(" ", @a), 1);
+  }
+
+  return undef;
 }
 
 
@@ -1386,9 +1407,11 @@ sub
 PrintHash($$)
 {
   my ($h, $lev) = @_;
+  my $si = AttrVal("global", "showInternalValues", 0);
 
   my ($str,$sstr) = ("","");
   foreach my $c (sort keys %{$h}) {
+    next if(!$si && $c =~ m/^\./);
     if(ref($h->{$c})) {
       if(ref($h->{$c}) eq "HASH") {
         if(defined($h->{$c}{TIME}) && defined($h->{$c}{VAL})) {
@@ -1422,7 +1445,7 @@ CommandList($$)
   my ($cl, $param) = @_;
   my $str = "";
 
-  if(!$param) {
+  if(!$param) { # List of all devices
 
     $str = "\nType list <name> for detailed info.\n";
     my $lt = "";
@@ -1438,12 +1461,12 @@ CommandList($$)
       $lt = $t;
     }
 
-  } else {
+  } else { # devspecArray
 
     my @arg = split(" ", $param);
     my @list = devspec2array($arg[0]);
     if($arg[1]) {
-      foreach my $sdev (@list) {
+      foreach my $sdev (@list) { # Show a Hash-Entry or Reading for each device
 
         if($defs{$sdev} &&
            $defs{$sdev}{$arg[1]}) {
@@ -1459,7 +1482,7 @@ CommandList($$)
         }
       }
 
-    } elsif(@list == 1) {
+    } elsif(@list == 1) { # Details
       my $sdev = $list[0];
       if(!defined($defs{$sdev})) {
         $str .= "No device named $param found";
@@ -1471,7 +1494,7 @@ CommandList($$)
       }
 
     } else {
-      foreach my $sdev (@list) {
+      foreach my $sdev (@list) {         # List of devices
         $str .= "$sdev\n";
       }
 
@@ -1598,6 +1621,7 @@ getAllSets($)
   my $a2 = CommandSet(undef, "$d ?");
   $a2 =~ s/.*choose one of //;
   $a2 = "" if($a2 =~ /^No set implemented for/);
+  return "" if($a2 eq "");
 
   my $em = AttrVal($d, "eventMap", undef);
   if($em) {
@@ -2141,11 +2165,10 @@ GetTimeSpec($)
 #####################################
 # Do the notification
 sub
-DoTrigger($$)
+DoTrigger($$@)
 {
-  my ($dev, $ns) = @_;
+  my ($dev, $ns, $noreplace) = @_;
   my $ret = "";
-
   return "" if(!defined($defs{$dev}));
 
   if(defined($ns)) {
@@ -2158,17 +2181,15 @@ DoTrigger($$)
     return "";
   }
 
-  if($attr{$dev}{eventMap}) {
-    my $c = $defs{$dev}{CHANGED};
-    for(my $i = 0; $i < @{$c}; $i++) {
-      $c->[$i] = ReplaceEventMap($dev, $c->[$i], 1);
+  if(!$noreplace) {
+    if($attr{$dev}{eventMap}) {
+      my $c = $defs{$dev}{CHANGED};
+      for(my $i = 0; $i < @{$c}; $i++) {
+        $c->[$i] = ReplaceEventMap($dev, $c->[$i], 1);
+      }
+      $defs{$dev}{STATE} = ReplaceEventMap($dev, $defs{$dev}{STATE}, 1);
     }
-    $defs{$dev}{STATE} = ReplaceEventMap($dev, $defs{$dev}{STATE}, 1);
   }
-
-  # STATE && {READINGS}{state} should be the same
-  my $r = $defs{$dev}{READINGS};
-  $r->{state}{VAL} = $defs{$dev}{STATE} if($r && $r->{state});
 
   my $max = int(@{$defs{$dev}{CHANGED}});
   Log 5, "Triggering $dev ($max changes)";
@@ -2178,13 +2199,13 @@ DoTrigger($$)
   # Log/notify modules
   # If modifying a device in its own trigger, do not call the triggers from
   # the inner loop.
-  if(!defined($defs{$dev}{INTRIGGER})) {
+  if($max && !defined($defs{$dev}{INTRIGGER})) {
     $defs{$dev}{INTRIGGER}=1;
     my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
                    grep { $defs{$_}{NTFY_ORDER} } keys %defs;
+    Log 5, "Notify loop for $dev $defs{$dev}{CHANGED}->[0]";
     foreach my $n (@ntfyList) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
-      Log 5, "$dev trigger: Checking $n for notify";
       my $r = CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
       $ret .= $r if($r);
     }
@@ -2396,7 +2417,6 @@ Dispatch($$$)
 
   my $cl = $hash->{Clients};
   $cl = $iohash->{Clients} if(!$cl);
-
   foreach my $m (sort { $modules{$a}{ORDER} cmp $modules{$b}{ORDER} }
                   grep {defined($modules{$_}{ORDER})} keys %modules) {
 
@@ -2405,12 +2425,11 @@ Dispatch($$$)
     # Module is not loaded or the message is not for this module
     next if(!$modules{$m}{Match} || $dmsg !~ m/$modules{$m}{Match}/i);
 
-    no strict "refs";
+    no strict "refs"; $readingsUpdateDelayTrigger = 1;
     @found = &{$modules{$m}{ParseFn}}($hash,$dmsg);
-    use strict "refs";
+    use strict "refs"; $readingsUpdateDelayTrigger = 0;
     last if(int(@found));
   }
-
   if(!int(@found)) {
     my $h = $hash->{MatchList}; $h = $iohash->{MatchList} if(!$h);
     if(defined($h)) {
@@ -2422,9 +2441,9 @@ Dispatch($$$)
             my $newm = LoadModule($mname);
             $mname = $newm if($newm ne "UNDEFINED");
             if($modules{$mname} && $modules{$mname}{ParseFn}) {
-              no strict "refs";
+              no strict "refs"; $readingsUpdateDelayTrigger = 1;
               @found = &{$modules{$mname}{ParseFn}}($hash,$dmsg);
-              use strict "refs";
+              use strict "refs"; $readingsUpdateDelayTrigger = 0;
             } else {
               Log 0, "ERROR: Cannot autoload $mname";
             }
@@ -2602,7 +2621,11 @@ ReplaceEventMap($$$)
       }
 
     } else {    # GivenName -> set command
-      if($nstr =~ m/\b$val\b/) {
+      if($nstr eq $val) { # for special translations like <> and <<
+        $nstr = $re;
+        $changed = 1;
+        last;
+      } elsif($nstr =~ m/\b$val\b/) {
         $nstr =~ s/\b$val\b/$re/;
         $changed = 1;
         last;
@@ -2709,11 +2732,6 @@ sub
 setReadingsVal($$$$)
 {
   my ($hash,$rname,$val,$ts) = @_;
-  if($rname eq "state" && 
-     $hash->{READINGS}{$rname} &&
-     $hash->{READINGS}{$rname}{VAL} ne $val) {
-    $hash->{STATE} = $val;
-  }
   $hash->{READINGS}{$rname}{VAL} = $val;
   $hash->{READINGS}{$rname}{TIME} = $ts;
 }
@@ -2884,35 +2902,76 @@ EOD
 # which is the time when you called this subroutine.
 #
 sub 
-readingsBeginUpdate($) {
-
+readingsBeginUpdate($)
+{
   my ($hash)= @_;
+  my $name = $hash->{NAME};
   
   # get timestamp
-  $hash->{helper}{updating}{latestUpdate}= TimeNow();
-  $hash->{CHANGED}= ();
-  
-  return $hash->{helper}{updating}{latestUpdate};
+  my $now = TimeNow();
+  $hash->{".updateTimestamp"} = $now;
 
+  my $attreocr= AttrVal($name, "event-on-change-reading", undef);
+  if($attreocr) {
+    my @a = split(/,/,$attreocr);
+    $hash->{".attreocr"} = \@a;
+  }
+  
+  my $attreour= AttrVal($name, "event-on-update-reading", undef);
+  if($attreour) {
+    my @a = split(/,/,$attreour);
+    $hash->{".attreour"} = \@a;
+  }
+
+  $hash->{CHANGED}= ();
+  return $now;
 }
 
 #
 # Call readingsEndUpdate when you are done updating readings.
 # This optionally calls DoTrigger to propagate the changes.
-# Rule: DoTrigger should only be called when the sub that
-# changes the readings is not called by Dispatch.
 #
 sub
-readingsEndUpdate($$) {
-
+readingsEndUpdate($$)
+{
   my ($hash,$dotrigger)= @_;
+  my $name = $hash->{NAME};
   
   # turn off updating mode
-  delete $hash->{helper}{updating};
+  delete $hash->{".updateTimestamp"};
+  delete $hash->{".attreour"};
+  delete $hash->{".attreocr"};
+
+  
+  ###########################
+  # Set STATE
+  my $sr = AttrVal($name, "stateFormat", undef);
+  my $st = $hash->{READINGS}{state};
+  if(!$sr) {
+    $st = $st->{VAL} if(defined($st));
+
+  } elsif($sr =~ m/^{(.*)}$/) {
+    $st = eval $1;
+    if($@) {
+      $st = "Error evaluating $name stateFormat: $@";
+      Log 1, $st;
+    }
+
+  } else {
+    # Substitute reading names with their values, leave the rest untouched.
+    $st = $sr;
+    my $r = $hash->{READINGS};
+    $st =~ s/\b([A-Za-z_-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
+
+  }
+  $hash->{STATE} = ReplaceEventMap($name, $st, 1);
+
 
   # propagate changes
-  if($dotrigger)  {
-    DoTrigger($hash->{NAME}, undef) if($init_done);
+  if($dotrigger && $init_done) {
+    DoTrigger($name, undef, 1) if(!$readingsUpdateDelayTrigger);
+  } else {
+    delete($hash->{CHANGED});
   }
   
   return undef;
@@ -2923,45 +2982,53 @@ readingsEndUpdate($$) {
 # Example: readingsUpdate($hash,"temperature",$value);
 #
 sub
-readingsBulkUpdate($$$) {
-
-  my ($hash,$reading,$value)= @_;
+readingsBulkUpdate($$$@)
+{
+  my ($hash,$reading,$value,$changed)= @_;
   my $name= $hash->{NAME};
   
   # sanity check
-  defined($hash->{helper}{updating}) || 
-    die "fhem.pl: readingsUpdate($name,$reading,$value): you must call readingsBeginUpdate first.";
+  if(!defined($hash->{".updateTimestamp"})) {
+    Log 1, "readingsUpdate($name,$reading,$value) missed to call ".
+                "readingsBeginUpdate first.";
+    return;
+  }
   
   # shorthand
-  my $readings= $hash->{READINGS};
+  my $readings= $hash->{READINGS}{$reading};
 
-  my $changed= 1;
+  if(!defined($changed)) {
+    $changed = (substr($reading,0,1) ne "."); # Dont trigger dot-readings
+  }
   # check for changes only if reading already exists
-  if(defined($readings->{$reading})) {
+  if($changed && defined($readings)) {
   
-    # these flags determine if any of the "event-on" attributes are set;
-    my $attreocr= AttrVal($name, "event-on-change-reading", "");
-    my $attreour= AttrVal($name, "event-on-update-reading", "");
+    # these flags determine if any of the "event-on" attributes are set
+    my $attreocr= $hash->{".attreocr"};
+    my $attreour= $hash->{".attreour"};
 
-    # these flags determine whether the reading is listed in any of the attributes
-    my $eocr= $attreocr && grep($reading =~ m/^$_$/, split /,/,$attreocr);
-    my $eour= $attreour && grep($reading =~ m/^$_$/, split /,/,$attreour);
-
-    # determine if an event should be created
-    $changed= !($attreocr || $attreour)  # always create event if no attribute is set
-                  || $eour                  # or if the reading is listed in event-on-update-reading
-                  || ($eocr &&              # or if the reading is listed in event-on-change-reading...
-                  ($value ne $readings->{$reading}{VAL})); # ...and its value has changed.
+    # these flags determine whether the reading is listed in any of
+    # the attributes
+    my $eocr= $attreocr && grep($reading =~ m/^$_$/, @{$attreocr});
+    my $eour= $attreour && grep($reading =~ m/^$_$/, @{$attreour});
+    # determine if an event should be created:
+    # always create event if no attribute is set
+    # or if the reading is listed in event-on-update-reading
+    # or if the reading is listed in event-on-change-reading...
+    # ...and its value has changed.
+    $changed= !($attreocr || $attreour)
+              || $eour  
+              || ($eocr && ($value ne $readings->{VAL}));
+    #Log 1, "EOCR:$eocr EOUR:$eour CHANGED:$changed";
   }
  
-  setReadingsVal($hash, $reading, $value, $hash->{helper}{updating}{latestUpdate}); 
+  setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}); 
   
-  # add to CHANGED hash
-  #Log 1, "changed!" if($changed); # DEBUG
-  my $rv= "$reading: $value";
-  $rv = "$value" if($changed && ($reading eq "state")); 
-  addEvent($hash, $rv) if($changed);
-  
+  my $rv = "$reading: $value";
+  if($changed) {
+    $rv = "$value" if($reading eq "state");
+    addEvent($hash, $rv);
+  }
   return $rv;
 }
 
@@ -2969,16 +3036,16 @@ readingsBulkUpdate($$$) {
 # this is a shorthand call
 #
 sub
-readingsSingleUpdate($$$$) {
-
+readingsSingleUpdate($$$$)
+{
   my ($hash,$reading,$value,$dotrigger)= @_;
   readingsBeginUpdate($hash);
-  my $rv= readingsBulkUpdate($hash,$reading,$value);
+  my $rv = readingsBulkUpdate($hash,$reading,$value);
   readingsEndUpdate($hash,$dotrigger);
   return $rv;
 }
 
-###############################################################################
+##############################################################################
 #
 # date and time routines
 #
