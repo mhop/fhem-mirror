@@ -55,7 +55,7 @@ TRX_Initialize($)
   my %mc = (
     "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|57|5a|5d).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
-    "3:TRX_LIGHT"	=> "^..(10|11|12).*", 
+    "3:TRX_LIGHT"	=> "^..(10|11|12|13).*", 
     "4:TRX_ELSE"   	=> "^...*",
   );
   $hash->{MatchList} = \%mc;
