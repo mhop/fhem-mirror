@@ -31,14 +31,23 @@
   - bugfix:  rename may overwrite other devices
   - feature: FLOORPLAN longpoll (Matthias)
   - feature: support for recurring events added in 57_Calendar.pm (Boris)
-  - feature: added support for OWL CM119,CM160 and CM180, energy sensors in TRX_WEATHER using RFXtrx433 (Willi Herzig)
-  - feature: added support for KD101 smoke sensor (also set alert and pair) in TRX_SECURITY using RFXtrx433 (Willi Herzig)
-  - change: changed dewpoint to work with event-on-change-reading and technoline TX3TH (Willi Herzig)
+  - feature: added support for OWL CM119,CM160 and CM180, energy sensors in
+             TRX_WEATHER using RFXtrx433 (Willi Herzig)
+  - feature: added support for KD101 smoke sensor (also set alert and pair) in
+             TRX_SECURITY using RFXtrx433 (Willi Herzig)
+  - change:  changed dewpoint to work with event-on-change-reading and
+             technoline TX3TH (Willi Herzig)
   - feature: new command fheminfo. Shows system informations. (M. Fischer)
-  - feature: added support for UV sensors in TRX_LIGHT using RFXtrx433 (Willi Herzig)
-  - feature: added on-till and on-timer for set in TRX_LIGHT using RFXtrx433 (Willi Herzig)
-  - feature: generate devices with hexcodes as state for unknown types in TRX_ELSE using RFXtrx433 (Willi Herzig)
-  - feature: new modules 10_OWServer.pm and 11_OWDevice.pm to interface with OWFS
+  - feature: added support for UV sensors in TRX_LIGHT using RFXtrx433 (Willi
+             Herzig)
+  - feature: added on-till and on-timer for set in TRX_LIGHT using RFXtrx433
+             (Willi Herzig)
+  - feature: generate devices with hexcodes as state for unknown types in
+             TRX_ELSE using RFXtrx433 (Willi Herzig)
+  - feature: new modules 10_OWServer.pm and 11_OWDevice.pm to interface with
+             OWFS
+  - feature: stateFormat (readingsFn modules) and showInternalValues attributes
+  - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWave
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,

@@ -61,26 +61,34 @@ foreach my $lang (@lang) {
   foreach my $mod (sort keys %mods) {
     my $tag;
     my %tagcount= ();
+    my %llwct = (); # Last line with closed tag
     open(MOD, $mods{$mod}) || die("Cant open $mods{$mod}:$!\n");
     my $skip = 1;
+    my $line = 0;
     while(my $l = <MOD>) {
+      $line++;
       if($l =~ m/^=begin html$suffix$/) {
         $l = <MOD>;    # skip one line, to be able to repeat join+split
-        $skip = 0;
+        $skip = 0; $line++;
       } elsif($l =~ m/^=end html$suffix/) {
         $skip = 1;
       } elsif(!$skip) {
         # here we copy line by line from the module
         print OUT $l;
         foreach $tag (TAGS) {
-          $tagcount{$tag}+= ($l =~ /<$tag>/i);
-          $tagcount{$tag}-= ($l =~ /<\/$tag>/i);
+          my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
+          $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
+          $tagcount{$tag} -=()= ($l =~ /<\/$tag>/gi);
+          $llwct{$tag} = $line if(!$llwct{$tag} || ($ot && !$tagcount{$tag}));
+          #print "$mod $line $tag $tagcount{$tag}\n" if($tagcount{$tag} ne $ot);
         }
       }
     }
     close(MOD);
     foreach $tag (TAGS) {
-      print("$lang $mods{$mod}: Unbalanced $tag\n") if($tagcount{$tag});
+      print("$lang $mods{$mod}: Unbalanced $tag ".
+                "($tagcount{$tag}, last line ok: $llwct{$tag})\n")
+        if($tagcount{$tag});
     }
   }
 
