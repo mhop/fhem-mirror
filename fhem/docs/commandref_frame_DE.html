@@ -326,49 +326,67 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     </li>
 
     <br><br>
-    <br>
-    Die folgenden Attribute werden bei Modulen verwendet, die standardisierte "readings" 
-    Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der Liste der 
-    Modulattribute wenn Sie wissen m&ouml;chten ob dies unterst&uuml;tzt wird.<br><br>
+
+    <a name="readingFnAttributes"></a>
+    <b>readingFnAttribute</b><br>
+    Die folgenden Attribute werden bei Modulen verwendet, die standardisierte
+    "readings" Aktualisierung der fhem.pl benutzen. Informieren Sie sich in der
+    Liste der Modulattribute wenn Sie wissen m&ouml;chten ob dies
+    unterst&uuml;tzt wird.<br><br>
+
+    <a name="stateFormat"></a>
+    <li>stateFormat<br>
+    &Auml;ndert den Ger&auml;testatus, dies ist z.Bsp. in der Ausgabe des list
+    Kommandos zu sehen, oder in der Raum&uumlbersicht von FHEMWEB.  Falls
+    nicht gesetzt, dann wird das state Reading &uuml;bernommen. Sonst werden
+    alle W&ouml;rter im Wert des Attributes durch das entsprechende Reading des
+    Ger&auml;tes ersetzt (soweit vorhanden). Falls der Wert in {}
+    eingeschlossen ist, dann wird es als Perl Ausdruck ausgewertet. Die
+    Auswertung passiert bei jeder &Auml;nderung eines Readings.
+    </li>
 
     <a name="event-on-update-reading"></a>
     <li>event-on-update-reading<br>
-    Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines "readings" ein Ereignis, 
-    welches z.B. von
-    <a href="#notify">
-    notify</a> oder
-    <a href="FileLog">
-    FileLog</a> ber&uuml;cksichtigt wird. Wenn gesetzt erzeugen nur Aktualisierungen 
-    der eingetragenen "readings" ein Ereignis.
+    If not set, every update of any reading creates an event, which e.g. is
+    handled by <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a>.
+    The attribute takes a comma-separated list of readings. You may use regular
+    expressions in that list. If set, only updates of the listed readings
+    create events.
+    </li>
+
+    <a name="event-on-update-reading"></a>
+    <li>event-on-update-reading<br>
+    Wenn nicht gesetzt, erzeugt jede Ver&auml;nderung eines "readings" ein
+    Ereignis, welches z.B. von <a href="#notify">notify</a> oder<a
+    href="FileLog"> FileLog</a> ber&uuml;cksichtigt wird. Wenn gesetzt erzeugen
+    nur Aktualisierungen der eingetragenen "readings" ein Ereignis.
     </li>
 
     <a name="event-on-change-reading"></a>
     <li>event-on-change-reading<br>
-    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von "readings". 
-    Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten "readings" ein 
-    Ereignis. Wenn die aktualiserten Werte der gelisteten "readings" identisch 
-    sind, wird kein Ereignis generiert.</li><p>
-    Die unterschiedlichen Bedeutungen von
-    event-on-update-reading und event-on-change-reading sind folgende</span>:
-    <ol>
-    <li>
-    <p>Wenn 
-    beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung eines jeden "readings" 
-    eines Ger&auml;tes ein Ereignis.</li>
-    <li>
-    Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder &auml;nderungen 
-    von "readings" die nicht in einem der Attribute gesetzt sind ein Ereignis.</li>
-    <li>
-    Wenn ein "reading" in event-on-update-reading aufgef&uuml;hrt ist, erzeugt eine 
-    Aktualisierung ein Ereignis unabh&auml;ngig ob das "reading" auch in 
-    event-on-change-reading aufgelistet ist.</li>
-    </ol>
+
+    Dieses Attribut enth&auml;lt eine durch Kommata getrennte Liste von
+    "readings".  Wenn gesetzt, erzeugen nur Ver&auml;nderungen der gelisteten
+    "readings" ein Ereignis. Wenn die aktualiserten Werte der gelisteten
+    "readings" identisch sind, wird kein Ereignis generiert.</li><p> Die
+    unterschiedlichen Bedeutungen von event-on-update-reading und
+    event-on-change-reading sind folgende</span>:
+    <ul>
+    <li>Wenn beide Attribute nicht gesetzt sind erzeugt jede Aktualisierung
+        eines jeden "readings" eines Ger&auml;tes ein Ereignis.</li>
+    <li>Wenn eines der Attribute gesetzt ist, erzeugen nur Updates oder
+        &auml;nderungen von "readings" die nicht in einem der Attribute gesetzt
+        sind ein Ereignis.</li>
+    <li>Wenn ein "reading" in event-on-update-reading aufgef&uuml;hrt ist,
+        erzeugt eine Aktualisierung ein Ereignis unabh&auml;ngig ob das
+        "reading" auch in event-on-change-reading aufgelistet ist.</li>
+    </ul>
 
   </ul>
   <br>
 
-  Ger&auml;tespezifische Attribute sind in der Beschreibung zum jeweiligen Ger&auml;t 
-  aufgef&uuml;hrt.
+  Ger&auml;tespezifische Attribute sind in der Beschreibung zum jeweiligen
+  Ger&auml;t aufgef&uuml;hrt.
   <br>
 
   Beispiele:
@@ -380,6 +398,7 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
     <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
     <code>attr weatherstation event-on-change-reading israining</code><br>
     <code>attr weatherstation event-on-change-reading israining,state</code><br>
+    <code>attr heating stateFormat Temp:measured-temp, Valve:actuator</code><br>
   </ul>
   <br>
 
@@ -1068,24 +1087,33 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 
     <a name="verbose"></a>
     <li>verbose<br>
-        Setzt den Wert f&uuml;r die H&auml;ufigkeit/Intensit&auml;t von Nachrichten. M&ouml;gliche 
-    Werte sind:
-        <ul>
-          <li>0 - Server start/stop
-          </li><li>1 - Fehlermeldungen oder unbekannte Pakete 
-          </li><li>2 - bedeutende Ereigbisse/Alarme.
-          </li><li>3 - ausgesendete Kommandos werden gelogged.
-          </li><li>4 - Sie sehen was von den einzelnen Ger&auml;ten empfangen wird.
-          </li><li>5 - Fehlersuche.</li>
-        </ul>
-        Es wird der Wert 3 f&uuml;r den Normalgebrauch empfohlen.
+      Setzt den Wert f&uuml;r die H&auml;ufigkeit/Intensit&auml;t von
+      Nachrichten. M&ouml;gliche Werte sind:
+      <ul>
+        <li>0 - Server start/stop
+        </li><li>1 - Fehlermeldungen oder unbekannte Pakete 
+        </li><li>2 - bedeutende Ereigbisse/Alarme.
+        </li><li>3 - ausgesendete Kommandos werden gelogged.
+        </li><li>4 - Sie sehen was von den einzelnen Ger&auml;ten empfangen wird.
+        </li><li>5 - Fehlersuche.</li>
+      </ul>
+      Es wird der Wert 3 f&uuml;r den Normalgebrauch empfohlen.
     </li><br>
 
     <a name="dupTimeout"></a>
     <li>dupTimeout<br>
-        Definert die Wartezeit, nach der 2 identische Ereignisse zweier 
-    Empf&auml;nger als Duplikat angesehen werden. Voreingestellt sind 0,5 Sekunden.&nbsp;
+      Definert die Wartezeit, nach der 2 identische Ereignisse zweier
+      Empf&auml;nger als Duplikat angesehen werden. Voreingestellt sind 0,5
+      Sekunden.&nbsp;
     </li><br>
+
+    <a name="showInternalValues"></a>
+    <li>showInternalValues<br>
+      Attribute/Ger&auml;te-Eintraege/Readings die mit Punkt (.) anfangen
+      werden nicht angezeigt, es sei denn das globale Attribut
+      showInternalValues ist gesetzt. Diese Variable wird bei dem list und
+      xmllist Befehl, und bei der FHEMWEB Raumansicht gepr&uuml;ft.
+    </li>
 
   </ul>
 </ul>
