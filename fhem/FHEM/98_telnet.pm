@@ -265,13 +265,13 @@ telnet_Undef($$)
         attr tPort password secret<br>
         attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
         </code>
-        <br><br>
+        </li><br>
 
     <a name="globalpassword"></a>
     <li>globalpassword<br>
         Just like the attribute password, but a password will only required for
         non-local connections.
-        <br><br>
+        </li><br>
 
     <a name="SSL"></a>
     <li>SSL<br>
@@ -283,13 +283,13 @@ telnet_Undef($$)
           ncat --ssl fhemhost fhemport<br>
           openssl s_client -connect fhemhost:fhemport<br>
         </ul>
-        <br><br>
+        </li><br>
 
     <a name="allowfrom"></a>
     <li>allowfrom<br>
         Regexp of allowed ip-addresses or hostnames. If set,
         only connections from these addresses are allowed.
-        <br><br>
+        </li><br>
 
   </ul>
 

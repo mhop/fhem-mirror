@@ -236,12 +236,12 @@ average_Notify($$)
   <a name="averageevents"></a>
   <b>Generated events:</b>
   <ul>
-    <li>&lt;eventname&gt;_avg_day: $avg_day
-    <li>&lt;eventname&gt;_avg_month: $avg_month
-    <li>&lt;eventname&gt;_min_day: $min_day
-    <li>&lt;eventname&gt;_min_month: $min_month
-    <li>&lt;eventname&gt;_max_day: $max_day
-    <li>&lt;eventname&gt;_max_month: $max_month
+    <li>&lt;eventname&gt;_avg_day: $avg_day</li>
+    <li>&lt;eventname&gt;_avg_month: $avg_month</li>
+    <li>&lt;eventname&gt;_min_day: $min_day</li>
+    <li>&lt;eventname&gt;_min_month: $min_month</li>
+    <li>&lt;eventname&gt;_max_day: $max_day</li>
+    <li>&lt;eventname&gt;_max_month: $max_month</li>
   </ul>
 </ul>
 

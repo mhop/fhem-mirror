@@ -1122,8 +1122,8 @@ CUL_Attr(@)
         Issue a CUL firmware command.  See the <a
         href="http://culfw.de/commandref.html">this</a> document
         for details on CUL commands.
-
         </li><br>
+
     <li>freq / bWidth / rAmpl / sens<br>
         <a href="#rfmode">SlowRF</a> mode only.<br>
         Set the CUL frequency / bandwidth / receiver-amplitude / sensitivity<br>
@@ -1135,16 +1135,17 @@ CUL_Attr(@)
         <li>freq sets both the reception and transmission frequency. Note:
             although the CC1101 can be set to frequencies between 315 and 915
             MHz, the antenna interface and the antenna of the CUL is tuned for
-            exactly one frequency. Default is 868.3MHz (or 433MHz)
+            exactly one frequency. Default is 868.3MHz (or 433MHz)</li>
         <li>bWidth can be set to values between 58kHz and 812kHz. Large values
             are susceptible to interference, but make possible to receive
             inaccurate or multiple transmitters. It affects tranmission too.
-            Default is 325kHz.
+            Default is 325kHz.</li>
         <li>rAmpl is receiver amplification, with values between 24 and 42 dB.
             Bigger values allow reception of weak signals. Default is 42.
+            </li>
         <li>sens is the decision boundery between the on and off values, and it
             is 4, 8, 12 or 16 dB.  Smaller values allow reception of less clear
-            signals. Default is 4dB.
+            signals. Default is 4dB.</li>
         </ul>
         </li><br>
     <a name="hmPairForSec"></a>
@@ -1209,11 +1210,11 @@ CUL_Attr(@)
   <a name="CULattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#attrdummy">dummy</a></li><br>
-    <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (CUL,CUN,CUR)</li><br>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (CUL,CUN,CUR)</li>
     <li><a name="sendpool">sendpool</a><br>
         If using more than one CUL/CUN for covering a large area, sending
         different events by the different CUL's might disturb each other. This
@@ -1235,13 +1236,13 @@ CUL_Attr(@)
         <ul>
         <li>SlowRF<br>
             To communicate with FS20/FHT/HMS/EM1010/S300/Hoermann devices @1kHz
-            datarate. This is the default.
+            datarate. This is the default.</li>
 
         <li>HomeMatic<br>
-            To communicate with HomeMatic type of devices @20kHz datarate
+            To communicate with HomeMatic type of devices @20kHz datarate</li>
 
         <li>MAX<br>
-            To communicate with MAX! type of devices @20kHz datarate
+            To communicate with MAX! type of devices @20kHz datarate</li>
 
         </ul>
         </li><br>

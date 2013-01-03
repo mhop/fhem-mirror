@@ -167,7 +167,7 @@ ZWDongle_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   if(@a != 3) {
-    my $msg = "wrong syntax: define <name> ZWDongle {none | ".
+    my $msg = "wrong syntax: define <name> ZWDongle {none[:homeId] | ".
                         "devicename[\@baudrate] | ".
                         "devicename\@directio | ".
                         "hostname:port}";
@@ -183,8 +183,9 @@ ZWDongle_Define($$)
   my %matchList = ( "1:ZWave" => ".*" );
   $hash->{MatchList} = \%matchList;
 
-  if($dev eq "none") {
-    Log 1, "$name device is none, commands will be echoed only";
+  if($dev =~ m/none:(.*)/) {
+    $hash->{homeId} = $1;
+    Log 1, "$name device is none (homeId:$1), commands will be echoed only";
     $attr{$name}{dummy} = 1;
     return undef;
 
@@ -575,16 +576,16 @@ ZWDongle_Ready($)
     mode. After activating inclusion mode usually you have to press a switch
     three times within 1.5 seconds on the node to be included into the network
     of the controller. If autocreate is active, a fhem device will be created
-    after inclusion.
+    after inclusion.</li>
 
   <li>removeNode [on|off]<br>
     Activate (or deactivate) exclusion mode. Note: the corresponding fhem
-    device have to be deleted manually.
+    device have to be deleted manually.</li>
 
   <li>createNode id<br>
     Request the class information for the specified node, and create a fhem
     device upon reception of the answer. Used for previously included nodes,
-    see the nodeList get command below.
+    see the nodeList get command below.</li>
 
   </ul>
   <br>
@@ -594,20 +595,21 @@ ZWDongle_Ready($)
   <ul>
   <li>nodeList<br>
     return the list of included nodeIds. Can be used to recreate fhem-nodes
-    with the createNode command.
+    with the createNode command.</li>
 
   <li>homeId<br>
-    return the six hex-digit homeId of the controller.
+    return the six hex-digit homeId of the controller.</li>
 
   <li>caps, ctrlCaps, version<br>
-    return different controller specific information. Needed by developers only.
+    return different controller specific information. Needed by developers
+    only.  </li>
 
   <li>nodeInfo<br>
-    return node specific information. Needed by developers only.
+    return node specific information. Needed by developers only.</li>
 
 
   <li>raw<br>
-    Send raw data to the controller. Developer only.
+    Send raw data to the controller. Developer only.</li>
   </ul>
   <br>
 
@@ -625,8 +627,11 @@ ZWDongle_Ready($)
   <b>Generated events:</b>
   <ul>
   <li>ZW_ADD_NODE_TO_NETWORK [learnReady|nodeFound|controller|done|failed]
+    </li>
   <li>ZW_REMOVE_NODE_TO_NETWORK [learnReady|nodeFound|slave|controller|done|failed]
+    </li>
   <li>UNDEFINED ZWave_${type6}_$id ZWave $homeId $id $classes"
+    </li>
   </ul>
 
 </ul>

@@ -217,15 +217,15 @@ EMWZ_Define($$)
       <li>rperkw<br>
           Number of rotations for a KiloWatt of the EM1000WZ device (actually
           of the device where the EM1000WZ is attached to). Without setting
-          this correctly, all other readings will be incorrect.
+          this correctly, all other readings will be incorrect.</li>
       <li>alarm<br>
           Alarm in WATT. if you forget to set it, the default value is
           rediculously low (random), and if a value above this threshold is
           received, the EM1010PC will start beeping once every minute. It can
-          be very annoying.
+          be very annoying.</li>
       <li>price<br>
           The price of one KW in EURO (use e.g. 0.20 for 20 Cents). It is used
-          only on the EM1010PC display, it is of no interest for FHEM.
+          only on the EM1010PC display, it is of no interest for FHEM.</li>
     </ul>
   </ul>
   <br>

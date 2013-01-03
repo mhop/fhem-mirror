@@ -203,7 +203,7 @@ EMGZ_Define($$)
     <ul>
       <li>price<br>
           The price of one KW in EURO (use e.g. 0.20 for 20 Cents). It is used
-          only on the EM1010PC display, it is of no interest for FHEM.
+          only on the EM1010PC display, it is of no interest for FHEM.</li>
     </ul>
   </ul>
   <br>
