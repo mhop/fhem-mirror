@@ -25,7 +25,6 @@
 #     along with fhem.  If not, see <http://www.gnu.org/licenses/>.
 #
 ##############################################################################
-
 #
 # values for "set global verbose"
 # 4: log unknown protocols
@@ -62,6 +61,9 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	0x1102 => [ "ANSLUT", "light"],
 	# 0x12: Lighting3
 	0x1200 => [ "KOPPLA", "light"], # IKEA Koppla
+	# 0x13: Lighting4
+	0x1300 => [ "PT2262", ""], # PT2262 raw messages
+	# 0x13: Lighting5
 	0x1400 => [ "LIGHTWAVERF", "light"], # LightwaveRF
 	0x1401 => [ "EMW100", "light"], # EMW100
 	0x1402 => [ "BBSB", "light"], # BBSB
@@ -84,6 +86,7 @@ my %light_device_commands = (	# HEXSTRING => commands
 	# 0x12: Lighting3
 	0x1200 => [ "bright", "", "", "", "", "", "", "dim", "", "", "", "", "", "", "", "", "",
 		    "on", "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "off", "", "program", "", "", "", "",], # Koppla
+	0x1300 => [ "hex", "bin", "base-4"], # PT2262
 	0x1400 => [ "off", "on", "all_off", "mood1", "mood2", "mood3", "mood4", "mood5", "reserved1", "reserved2", "unlock", "lock", "all_lock", "close", "stop", "open", "level"], # LightwaveRF, Siemens
 	0x1401 => [ "off", "on", "learn"], # EMW100 GAO/Everflourish
 	0x1402 => [ "off", "on", "all_off", "all_on"], # BBSB new types
@@ -100,7 +103,7 @@ TRX_LIGHT_Initialize($)
     $light_device_c2b{$light_device_codes{$k}->[0]} = $k;
   }
 
-  $hash->{Match}     = "^..(10|11|12|14).*";
+  $hash->{Match}     = "^..(10|11|12|13|14).*";
   $hash->{SetFn}     = "TRX_LIGHT_Set";
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
@@ -317,23 +320,28 @@ TRX_LIGHT_Define($$)
   my @a = split("[ \t][ \t]*", $def);
 
   my $a = int(@a);
+  my $type = "";
+  my $deviceid = "";
+  my $devicelog = "";
+  my $commandcodes = "";
 
-  if(int(@a) != 5 && int(@a) != 7) {
+  if (int(@a) > 2 &&  uc($a[2]) eq "PT2262") {
+	if (int(@a) != 3 && int(@a) != 6) {
+		Log 1,"TRX_LIGHT wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_LIGHT PT2262 [<deviceid> <devicelog> <commandcodes>]'";
+		return "wrong syntax: define <name> TRX_LIGHT PT2262 [<deviceid> <devicelog> <commandcodes>]";
+	}
+  } elsif(int(@a) != 5 && int(@a) != 7) {
 	Log 1,"TRX_LIGHT wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_LIGHT <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]'";
 	return "wrong syntax: define <name> TRX_LIGHT <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]";
-  }
-	
+  } 
 
   my $name = $a[0];
+  $type = uc($a[2]) if (int(@a) > 2);
+  $deviceid = $a[3] if (int(@a) > 3);
+  $devicelog = $a[4] if (int(@a) > 4);
+  $commandcodes = $a[5] if ($type eq "PT2262" && int(@a) > 5);
 
-  my $type = lc($a[2]);
-  my $deviceid = $a[3];
-  my $devicelog = $a[4];
-
-
-  $type = uc($type);
-
-  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB") {
+  if ($type ne "X10" && $type ne "ARC" && $type ne "MS14A" && $type ne "AB400D" && $type ne "WAVEMAN" && $type ne "EMW200" && $type ne "IMPULS" && $type ne "RISINGSUN" && $type ne "PHILIPS_SBC" && $type ne "AC" && $type ne "HOMEEASY" && $type ne "ANSLUT" && $type ne "KOPPLA" && $type ne "LIGHTWAVERF" && $type ne "EMW100" && $type ne "BBSB" && $type ne "PT2262") {
   	Log 1,"TRX_LIGHT define: wrong type: $type";
   	return "TRX_LIGHT: wrong type: $type";
   }
@@ -345,10 +353,12 @@ TRX_LIGHT_Define($$)
 	$my_type = $type;
   }
 
-  my $device_name = "TRX".$DOT.$my_type.$DOT.$deviceid;
+  my $device_name = "TRX".$DOT.$my_type;
+  if ($deviceid ne "") { $device_name .= $DOT.$deviceid };
 
   $hash->{TRX_LIGHT_deviceid} = $deviceid;
   $hash->{TRX_LIGHT_devicelog} = $devicelog;
+  $hash->{TRX_LIGHT_commandcodes} = $commandcodes if ($type eq "PT2262");
   $hash->{TRX_LIGHT_type} = $type;
   #$hash->{TRX_LIGHT_CODE} = $deviceid;
   $modules{TRX_LIGHT}{defptr}{$device_name} = $hash;
@@ -383,7 +393,9 @@ TRX_LIGHT_Undef($$)
 }
 
 
-#####################################
+############################################
+# T R X _ L I G H T _ p a r s e _ X 1 0 ( )
+#-------------------------------------------
 sub TRX_LIGHT_parse_X10 {
   my $bytes = shift;
 
@@ -565,7 +577,134 @@ sub TRX_LIGHT_parse_X10 {
   return $name;
 }
 
-#####################################
+########################################################
+# T R X _ L I G H T _ p a r s e _ P T 2 2 6 2 ( )
+#-------------------------------------------------------
+sub TRX_LIGHT_parse_PT2262 {
+  my $bytes = shift;
+
+  my $error = "";
+
+
+  #my $device;
+
+  my $type = $bytes->[0];
+  my $subtype = $bytes->[1];
+  my $dev_type;
+  my $dev_reading;
+  my $rest;
+
+  my $type_subtype = ($type << 8) + $subtype;
+
+  if (exists $light_device_codes{$type_subtype}) {
+    my $rec = $light_device_codes{$type_subtype};
+    ($dev_type, $dev_reading) = @$rec;
+  } else {
+ 	$error = sprintf "TRX_LIGHT: PT2262 error undefined type=%02x, subtype=%02x", $type, $subtype;
+	Log 1, $error;
+  	return $error;
+  }
+
+  my $device;
+
+  $device = "";
+
+  my $command = "error";
+  my $current = "";
+
+  my $hexdata = sprintf '%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5];
+  my $hex_length = length($hexdata);
+  my $bin_length = $hex_length * 4;
+  my $bindata = unpack("B$bin_length", pack("H$hex_length", $hexdata));
+
+  #my @a = ($bindata =~ /[0-1]{2}/g);
+  my $base_4 = $bindata;
+  $base_4 =~ s/(.)(.)/$1*2+$2/eg;
+
+  my $codes = $base_4;
+  #$codes =~ tr/0123/UMED/; # Up,Middle,Error,Down
+  $codes =~ s/0/up /g; # 
+  $codes =~ s/1/middle /g; # 
+  $codes =~ s/2/err /g; # 
+  $codes =~ s/3/down /g; # 
+
+  my $device_name = "TRX".$DOT.$dev_type;
+  my $command_codes = "";
+  my $command_rest = "";
+
+  my $def;
+
+  # look for defined device with longest ID matching first:
+  for (my $i=11; $i>0;$i--){
+	if ($modules{TRX_LIGHT}{defptr}{$device_name.$DOT.substr($base_4,0,$i)}) {
+		$device = substr($base_4,0,$i);
+		$def = $modules{TRX_LIGHT}{defptr}{$device_name.$DOT.substr($base_4,0,$i)};
+		$command_codes = $def->{TRX_LIGHT_commandcodes};
+		$command_rest = substr($base_4,$i);
+  		Log 1, "TRX_LIGHT: PT2262 found device_name=$device_name i=$i code=$base_4 commandcodes='$command_codes' command_rest='$command_rest' " if ($TRX_LIGHT_debug == 1);
+  	}
+  }
+  
+  #--------------
+  if ($device ne "") { 
+	# found a device
+  	Log 1, "TRX_LIGHT: PT2262 found device_name=$device_name data=$hexdata" if ($TRX_LIGHT_debug == 1);
+	$device_name .= $DOT.$device 
+  } else {
+	# no specific device found. Using generic one:
+  	Log 1, "TRX_LIGHT: PT2262 device_name=$device_name data=$hexdata" if ($TRX_LIGHT_debug == 1);
+  	$def = $modules{TRX_LIGHT}{defptr}{$device_name};
+  	if(!$def) {
+		Log 1, "UNDEFINED $device_name TRX_LIGHT $dev_type $device $dev_reading" if ($TRX_LIGHT_debug == 1);
+       		Log 3, "TRX_LIGHT: TRX_LIGHT Unknown device $device_name, please define it";
+		return "UNDEFINED $device_name TRX_LIGHT $dev_type $device $dev_reading";
+  	}
+  }
+
+  # Use $def->{NAME}, because the device may be renamed:
+  my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
+
+  Log 1, "TRX_LIGHT: PT2262 $name devn=$device_name command=$command, cmd=$hexdata" if ($TRX_LIGHT_debug == 1);
+
+  my $n = 0;
+  my $val = "";
+
+  my $device_type = $def->{TRX_LIGHT_type};
+  my $sensor = $def->{TRX_LIGHT_devicelog};
+
+  readingsBeginUpdate($def);
+
+  $current = $command;
+
+  if ($device eq "") {
+  	readingsBulkUpdate($def, "hex", $hexdata);
+  	readingsBulkUpdate($def, "bin", $bindata);
+  	#readingsBulkUpdate($def, "base_4", $base_4);
+  	readingsBulkUpdate($def, "codes", $codes);
+	$val = $base_4;
+  } else {
+	# look for command code:
+	$command_codes .= ",";
+	#if ($command_codes =~ /$command_rest:(.*),/o ) {
+	if ($command_codes =~ /$command_rest:([a-z|A-Z]*),/ ) {
+		Log 1,"PT2262: found=$1" if ($TRX_LIGHT_debug == 1); 
+		$command = $1;
+	}
+	Log 1,"PT2622 readingsBulkUpdate($def, $sensor, $command)" if ($TRX_LIGHT_debug == 1);
+	$val = $command;
+  	readingsBulkUpdate($def, $sensor, $val);
+  }
+
+  readingsBulkUpdate($def, "state", $val);
+  readingsEndUpdate($def, 1);
+
+  return $name;
+}
+
+####################################
+# T R X _ L I G H T _ P a r s e ( )
+#-----------------------------------
 sub
 TRX_LIGHT_Parse($$)
 {
@@ -601,6 +740,12 @@ TRX_LIGHT_Parse($$)
   if ($type == 0x10 || $type == 0x11 || $type == 0x12 || $type == 0x14) {
 	Log 1, "TRX_LIGHT: X10 num_bytes=$num_bytes hex=$hexline" if ($TRX_LIGHT_debug == 1);
         $res = TRX_LIGHT_parse_X10(\@rfxcom_data_array);
+  	Log 1, "TRX_LIGHT: unsupported hex=$hexline" if ($res eq "");
+	return $res;
+  } elsif ($type == 0x13) {
+	#Log 1, "TRX_LIGHT: Lighting4/PT2262 num_bytes=$num_bytes hex=$hexline";
+	Log 1, "TRX_LIGHT: Lighting4/PT2262 num_bytes=$num_bytes hex=$hexline" if ($TRX_LIGHT_debug == 1);
+        $res = TRX_LIGHT_parse_PT2262(\@rfxcom_data_array);
   	Log 1, "TRX_LIGHT: unsupported hex=$hexline" if ($res eq "");
 	return $res;
   } else {
