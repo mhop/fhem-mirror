@@ -45,7 +45,8 @@ IPCAM_Initialize($$)
   $hash->{GetFn}    = "IPCAM_Get";
   $hash->{AttrList} = "delay credentials path query snapshots storage timestamp:0,1 ".
                       "do_not_notify:1,0 showtime:1,0 ".
-                      "loglevel:0,1,2,3,4,5,6 disable:0,1";
+                      "loglevel:0,1,2,3,4,5,6 disable:0,1 ".
+                      $readingFnAttributes;
 }
 
 #####################################
@@ -434,6 +435,7 @@ IPCAM_guessFileFormat($) {
     <li><a href="#disable">disable</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li>
       path<br>
       Defines the path and query component of the complete <a href="http://de.wikipedia.org/wiki/Uniform_Resource_Identifier" target="_blank">URI</a> to get a snapshot of the

@@ -91,7 +91,8 @@ FB_CALLMONITOR_Initialize($)
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
  
   
-  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
+                        $readingFnAttributes;
 }
 
 #####################################
@@ -611,8 +612,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Activate the reverse searching of the external number (at dial and call receiving).
     It is possible to select a specific web service, which should be used for reverse searching.
@@ -710,8 +710,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="reverse-search">reverse-search</a> (all|internal|klicktel.de|dasoertliche.de|search.ch|none)</li>
     Aktiviert die R&uuml;ckw&auml;rtssuche der externen Rufnummer der Gegenstelle (bei eingehenden/abgehenden Anrufen).
     Es ist m&ouml;glich einen bestimmten Suchanbieter zu verwenden, welcher f&uuml;r die R&uuml;ckw&auml;rtssuche verwendet werden soll.

@@ -43,7 +43,8 @@ CUL_MAX_Initialize($)
   $hash->{ParseFn}   = "CUL_MAX_Parse";
   $hash->{SetFn}     = "CUL_MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                        "showtime:1,0 loglevel:0,1,2,3,4,5,6";
+                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+                        $readingFnAttributes;
 }
 
 #############################
@@ -423,6 +424,7 @@ CUL_MAX_BroadcastTime(@)
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 

@@ -110,7 +110,9 @@ TRX_WEATHER_Initialize($)
   $hash->{DefFn}     = "TRX_WEATHER_Define";
   $hash->{UndefFn}   = "TRX_WEATHER_Undef";
   $hash->{ParseFn}   = "TRX_WEATHER_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 event-on-update-reading event-on-change-reading do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
+                       "loglevel:0,1,2,3,4,5,6 ".
+                       $readingFnAttributes;
 
 }
 
@@ -1221,8 +1223,7 @@ TRX_WEATHER_Parse($$)
   <ul>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>

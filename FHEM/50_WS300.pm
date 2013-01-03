@@ -65,7 +65,10 @@ WS300_Initialize($)
   my ($hash) = @_;
 
   # Provider
-  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 loglevel:0,1,2,3,4,5,6 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}  = "do_not_notify:0,1 showtime:0,1 model:ws300 ".
+                       "loglevel:0,1,2,3,4,5,6 ".
+                       $readingFnAttributes;
+
   $hash->{DefFn}     = "WS300_Define";
   $hash->{GetFn}     = "WS300_Get";
   $hash->{ParseFn}   = "WS300_Parse";
@@ -662,8 +665,7 @@ NEXTPOLL:
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (ws300)</li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
 </ul>
   <br>
 </ul>

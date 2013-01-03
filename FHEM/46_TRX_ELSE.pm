@@ -48,7 +48,8 @@ TRX_ELSE_Initialize($)
   $hash->{DefFn}     = "TRX_ELSE_Define";
   $hash->{UndefFn}   = "TRX_ELSE_Undef";
   $hash->{ParseFn}   = "TRX_ELSE_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 ".
+                       $readingFnAttributes;
 
   Log 1, "TRX_ELSE: Initialize" if ($TRX_ELSE_debug == 1);
 }

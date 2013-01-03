@@ -105,7 +105,9 @@ TRX_LIGHT_Initialize($)
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
   $hash->{ParseFn}   = "TRX_LIGHT_Parse";
-  $hash->{AttrList}  = "IODev ignore:1,0 event-on-update-reading event-on-change-reading do_not_notify:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 ".
+                        "loglevel:0,1,2,3,4,5,6 ".
+                        $readingFnAttributes;
 
 }
 
@@ -727,8 +729,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <ul>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
 
 </ul>
