@@ -69,6 +69,7 @@ CUL_MAX_Define($$)
   $hash->{retryCount} = 0;
   $hash->{devices} = ();
   AssignIoPort($hash);
+  CUL_MAX_Check($hash);
 
   #This interface is shared with 00_MAXLAN.pm
   $hash->{SendDeviceCmd} = \&CUL_MAX_SendDeviceCmd;
@@ -93,6 +94,24 @@ CUL_MAX_DisablePairmode($)
 {
   my $hash = shift;
   $hash->{pairmode} = 0;
+}
+
+sub
+CUL_MAX_Check($@)
+{
+  my ($hash) = @_;
+  return if(!defined($hash->{IODev}));
+  return if(!defined($hash->{IODev}{TYPE}));
+  return if($hash->{IODev}{TYPE} ne "CUL");
+  return if(!defined($hash->{IODev}{VERSION}));
+  my $version = $hash->{IODev}{VERSION};
+
+  #Looks like "V 1.49 CUL868"
+  $version =~ m/V (.*)\.(.*) CUL.*/;
+  my ($major_version,$minorversion) = ($1, $2);
+  if($major_version == 1 and $minorversion < 50) {
+    Log 2, "The current firmware of the CUL has known bugs with respect to MAX! support. Please update."
+  }
 }
 
 sub
@@ -234,11 +253,14 @@ CUL_MAX_SendAck($$$)
 }
 
 #All inputs are hex strings, $cmd is one from %msgCmd2Id
+#This is deprecated as part of the MAX backend interface
 sub
 CUL_MAX_Send(@)
 {
   # $cmd is one of
   my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt) = @_;
+
+  CUL_MAX_Check($hash);
 
   $flags = "00" if(!$flags);
   $groupId = "00" if(!defined($groupId));
@@ -312,6 +334,8 @@ sub
 CUL_MAX_SendDeviceCmd($$)
 {
   my ($hash,$payload) = @_;
+
+  CUL_MAX_Check($hash);
 
   my $dstaddr = unpack("H6",substr($payload,6,3));
   my $dhash = CUL_MAX_DeviceHash($dstaddr);
