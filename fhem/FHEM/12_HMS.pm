@@ -38,7 +38,7 @@ HMS_Initialize($)
   $hash->{DefFn}     = "HMS_Define";
   $hash->{UndefFn}   = "HMS_Undef";
   $hash->{ParseFn}   = "HMS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6 ignore:0,1";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:hms100-t,hms100-tf,hms100-wd,hms100-mg,hms100-tfk,rm100-2,hms100-co,hms100-fit loglevel:0,1,2,3,4,5,6 ignore:0,1 $readingFnAttributes";
 }
 
 #####################################
@@ -215,21 +215,17 @@ HMS_Parse($$)
 
   }
 
-  my $now = TimeNow();
   Log GetLogLevel($name,4), "HMS Device $dev ($type: $val)";
 
+  readingsBeginUpdate($def);
   my $max = int(@txt);
   for( my $i = 0; $i < $max; $i++) {
-    $def->{READINGS}{$txt[$i]}{TIME} = $now;
-    $def->{READINGS}{$txt[$i]}{VAL} = $v[$i];
-    $def->{CHANGED}[$i] = "$txt[$i]: $v[$i]";
+    readingsBulkUpdate($def, $txt[$i], $v[$i]);
   }
-  $def->{READINGS}{type}{TIME} = $now;
-  $def->{READINGS}{type}{VAL} = $type;
-
-  $def->{STATE} = $val;
-  $def->{CHANGED}[$max++] = $val;
-  $def->{CHANGED}[$max++] = "ExactId: $odev" if($odev ne $dev);
+  readingsBulkUpdate($def, "type", $type);
+  readingsBulkUpdate($def, "state", $val);
+  readingsBulkUpdate($def, "ExactId", $odev) if($odev ne $dev);
+  readingsEndUpdate($def, 1);
 
   return $name;
 }
@@ -274,7 +270,7 @@ HMS_Parse($$)
     <li>1001 for the HMS100-T</li>
     <li>1002 for the HMS100-WD</li>
     <li>1003 for the RM100-2</li>
-    <li>1004 for the HMS100-TFK/li>
+    <li>1004 for the HMS100-TFK</li>
     <li>1006 for the HMS100-MG</li>
     <li>1008 for the HMS100-CO</li>
     <li>100e for the HMS100-FIT</li>
@@ -300,14 +296,15 @@ HMS_Parse($$)
   <a name="HMSattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#ignore">ignore</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#IODev">IODev</a></li><br>
-    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#model">model</a> (hms100-t hms100-tf hms100-wd hms100-mg
         hms100-co hms100-tfk hms100-fit rm100-2)</li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 

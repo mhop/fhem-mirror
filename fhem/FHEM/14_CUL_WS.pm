@@ -25,7 +25,9 @@ CUL_WS_Initialize($)
   $hash->{UndefFn}   = "CUL_WS_Undef";
   $hash->{AttrFn}    = "CUL_WS_Attr";
   $hash->{ParseFn}   = "CUL_WS_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 model:S300TH,KS300 loglevel ignore:0,1";
+  $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 ".
+                       "model:S300TH,KS300 loglevel ignore:0,1 ".
+                       $readingFnAttributes;
 }
 
 
@@ -75,8 +77,8 @@ CUL_WS_Parse($$)
                "6"=>"pyro",
                "7"=>"temp/hum");
 
-  # -wusel, 2010-01-24: *sigh* No READINGS set, bad for other modules. Trying to add
-  #                     setting READINGS as well as STATE ...
+  # -wusel, 2010-01-24: *sigh* No READINGS set, bad for other modules. Trying
+  # to add setting READINGS as well as STATE ...
   my $NotifyType;
   my $NotifyHumidity;
   my $NotifyTemperature;
@@ -117,7 +119,6 @@ CUL_WS_Parse($$)
     return "UNDEFINED CUL_WS_$cde CUL_WS $cde";
   }
 
-  my $tm=TimeNow();
   $hash = $def;
   my $name = $hash->{NAME};
   return "" if(IsIgnored($name));
@@ -285,7 +286,9 @@ CUL_WS_Parse($$)
   Log GetLogLevel($name,4), "CUL_WS $devtype $name: $val";
 
   # Sanity checks
-  if($NotifyTemperature && $hash->{READINGS}{temperature}{VAL}) {
+  if($NotifyTemperature &&
+     $hash->{READINGS}{temperature} &&
+     $hash->{READINGS}{temperature}{VAL}) {
     my $tval = $hash->{READINGS}{strangetemp} ? 
                $hash->{READINGS}{strangetemp}{VAL} : 
                $hash->{READINGS}{temperature}{VAL};
@@ -293,7 +296,7 @@ CUL_WS_Parse($$)
     if($diff < -15.0 || $diff > 15.0) {
       Log 2, "$name: Temp difference ($diff) too large: $val, skipping it";
       $hash->{READINGS}{strangetemp}{VAL} = $NotifyTemperature;
-      $hash->{READINGS}{strangetemp}{TIME} = $tm;
+      $hash->{READINGS}{strangetemp}{TIME} = TimeNow();
       return "";
     }
   }
@@ -304,11 +307,8 @@ CUL_WS_Parse($$)
     return "";
   }
 
-
-  $hash->{STATE} = $val;                      # List overview
-  $hash->{READINGS}{state}{TIME} = $tm;       # For list
-  $hash->{READINGS}{state}{VAL} = $val;
-  $hash->{CHANGED}[0] = $val;                 # For notify
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash, "state", $val);
 
   my $i=1;
   my $j;
@@ -327,15 +327,13 @@ CUL_WS_Parse($$)
     } elsif($Notifies[$j] eq "P")  { $val = $NotifyPressure;
     }
     my $nm = $NotifyMappings{$Notifies[$j]};
-    $hash->{READINGS}{$nm}{TIME} = $tm;
-    $hash->{READINGS}{$nm}{VAL} = $val;
-    $hash->{CHANGED}[$i++] = "$nm: $val";
+
+    readingsBulkUpdate($hash, $nm, $val);
   }
 
-  $hash->{READINGS}{DEVTYPE}{VAL}=$devtype;
-  $hash->{READINGS}{DEVTYPE}{TIME}=$tm;
-  $hash->{READINGS}{DEVFAMILY}{VAL}=$family;
-  $hash->{READINGS}{DEVFAMILY}{TIME}=$tm;
+  readingsBulkUpdate($hash, "DEVTYPE", $devtype, 0);
+  readingsBulkUpdate($hash, "DEVFAMILY", $family, 0);
+  readingsEndUpdate($hash, 1); # Notify is done by Dispatch
 
   return $name;
 }
@@ -390,13 +388,14 @@ CUL_WS_Attr(@)
   <a name="CUL_WSattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#ignore">ignore</a></li><br>
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#showtime">showtime</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#model">model</a> (S300,KS300,WS7000)</li><br>
-    <li><a href="#IODev">IODev (!)</a></li><br>
-    <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#IODev">IODev (!)</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a> (S300,KS300,WS7000)</li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
