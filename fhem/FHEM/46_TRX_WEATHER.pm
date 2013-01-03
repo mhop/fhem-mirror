@@ -392,7 +392,7 @@ sub TRX_WEATHER_common_anemometer {
 	units => 'degrees',
   };
 
-  TRX_WEATHER_simple_battery($bytes, $dev_str, \@res, 15);
+  TRX_WEATHER_battery($bytes, $dev_str, \@res, 15);
 
   return @res;
 }
