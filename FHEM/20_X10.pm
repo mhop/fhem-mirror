@@ -602,7 +602,7 @@ X10_Parse($$)
       <li>Only switching and dimming are supported by now.</li>
       <li>Dimming is valid only for a dimmable device as specified by
           the <code>model</code> argument in its <code>define</code>
-          statement.
+          statement.</li>
       <li>An X10 device has 210 discrete brightness levels. If you use a
           X10 sender, e.g. a remote control or a wall switch to dim, a
           brightness step is 100%/210.</li>
