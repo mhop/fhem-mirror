@@ -377,7 +377,7 @@ MAX_Parse($$)
     Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $measuredTemperature";
 
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
-    $measuredTemperature = "" if($measuredTemperature < 1);
+    $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
 
     #The HeatingThermostat uses the measurementOffset during control
     #but does not apply it to measuredTemperature before sending it to us
