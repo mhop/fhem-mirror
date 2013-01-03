@@ -148,7 +148,7 @@ my %zwave_class = (
   );
 
 
-  sub
+sub
 ZWave_Initialize($)
 {
   my ($hash) = @_;
@@ -160,14 +160,14 @@ ZWave_Initialize($)
   $hash->{ParseFn}   = "ZWave_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ".
     "ignore:1,0 dummy:1,0 showtime:1,0 classes ".
-    "loglevel:0,1,2,3,4,5,6 " .
+    "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
     "model:".join(",", sort @zwave_models);
   map { $zwave_id2class{$zwave_class{$_}{id}} = $_ } keys %zwave_class;
 }
 
 
 #############################
-  sub
+sub
 ZWave_Define($$)
 {
   my ($hash, $def) = @_;
@@ -292,16 +292,14 @@ ZWave_Cmd($$@)
 
   my $tn = TimeNow();
   if($type eq "set") {
-    $hash->{CHANGED}[0] = $cmd;
-    $hash->{STATE} = $cmd;
-    $hash->{READINGS}{state}{TIME} = $tn;
-    $hash->{READINGS}{state}{VAL} = $cmd;
+    readingsSingleUpdate($hash, "state", $cmd, 1);
 
   } else {
     my $mval = $val;
     ($cmd, $mval) = split(":", $val) if($val);
-    $hash->{READINGS}{$cmd}{TIME} = $tn;
-    $hash->{READINGS}{$cmd}{VAL} = $mval;
+    if($cmd && $mval) {
+      readingsSingleUpdate($hash, $cmd, $mval, 1);
+    }
 
   }
   return $val;
@@ -353,6 +351,8 @@ ZWave_SetClasses($$$$)
   return "";
 }
 
+###################################
+# 0004000a03250300 (sensor binary off for id 11)
 sub
 ZWave_Parse($$@)
 {
@@ -440,26 +440,15 @@ ZWave_Parse($$@)
   }
 
 
-  my @changed;
-  my $tn = TimeNow();
+  readingsBeginUpdate($hash);
   for(my $i = 0; $i < int(@event); $i++) {
     next if($event[$i] eq "");
     my ($vn, $vv) = split(":", $event[$i], 2);
-    if($vn eq "state") {
-      if($hash->{STATE} ne $vv) {
-        $hash->{STATE} = $vv;
-        push @changed, $vv;
-      }
-      push @changed, "reportedState:$vv";
-
-    } else {
-      push @changed, "$vn: $vv";
-
-    }
-    $hash->{READINGS}{$vn}{TIME} = $tn;
-    $hash->{READINGS}{$vn}{VAL} = $vv;
+    readingsBulkUpdate($hash, $vn, $vv);
+    readingsBulkUpdate($hash, "reportedState", $vv)
+        if($vn eq "state");     # different from set
   }
-  $hash->{CHANGED} = \@changed;
+  readingsEndUpdate($hash, 1);
   return $hash->{NAME};
 }
 
@@ -523,40 +512,42 @@ ZWave_Undef($$)
   <br><b>Class BASIC</b>
   <li>basicValue value<br>
     Send value (0-255) to this device. The interpretation is device dependent,
-    e.g. for a SWITCH_BINARY device 0 is off and anything else is on.
+    e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>on<br>
-    switch the device on
+    switch the device on</li>
   <li>off<br>
-    switch the device off
+    switch the device off</li>
   <li>reportOn,reportOff<br>
-    activate/deactivate the reporting of device state changes to the association group.
+    activate/deactivate the reporting of device state changes to the
+    association group.</li>
 
   <br><br><b>Class CONFIGURATION</b>
   <li>configByte cfgAddress 8bitValue<br>
       configWord cfgAddress 16bitValue<br>
       configLong cfgAddress 32bitValue<br>
     Send a configuration value for the parameter cfgAddress. cfgAddress and
-    value is node specific.
+    value is node specific.</li>
   <li>configDefault cfgAddress<br>
-    Reset the configuration parameter for the cfgAddress parameter to its default value.
-    See the device documentation to determine this value.
+    Reset the configuration parameter for the cfgAddress parameter to its
+    default value.  See the device documentation to determine this value.</li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval value<br>
   Set the wakeup interval of battery operated devices to the given value in
-  seconds. Upon wakeup the device sends a wakeup notification.
+  seconds. Upon wakeup the device sends a wakeup notification.</li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>associationAdd groupId nodeId ...<br>
-  Add the specified list of nodeIds to the assotion group groupId.<br>
-  Note: upon creating a fhem-device for the first time fhem will automatically
-  add the controller to the first association group of the node corresponding
-  to the fhem device, i.e it issues a "set name associationAdd 1 controllerNodeId"
+  Add the specified list of nodeIds to the assotion group groupId.<br> Note:
+  upon creating a fhem-device for the first time fhem will automatically add
+  the controller to the first association group of the node corresponding to
+  the fhem device, i.e it issues a "set name associationAdd 1
+  controllerNodeId"</li>
 
   <li>associationDel groupId nodeId ...<br>
-  Remove the specified list of nodeIds from the assotion group groupId.
+  Remove the specified list of nodeIds from the assotion group groupId.</li>
 
   </ul>
   <br>
@@ -569,42 +560,51 @@ ZWave_Undef($$)
   <li>basicStatus<br>
     return the status of the node as basicReport:XY. The value (XY) depends on
     the node, e.g a SWITCH_BINARY device report 00 for off and FF (255) for on.
+    </li>
 
   <br><br><b>Class SWITCH_BINARY</b>
   <li>swbStatus<br>
     return the status of the node, as state:on or state:off.
+    </li>
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>sbStatus<br>
     return the status of the node, as state:open or state:closed.
+    </li>
 
   <br><br><b>Class CONFIGURATION</b>
   <li>config cfgAddress<br>
     return the value of the configuration parameter cfgAddress. The value is
     device specific.
+    </li>
 
   <br><br><b>Class ALARM</b>
   <li>alarm alarmId<br>
     return the value for alarmId. The value is device specific.
+    </li>
 
   <br><br><b>Class BATTERY</b>
   <li>battery<br>
     return the charge of the battery in %, as battery:value %
+    </li>
 
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval<br>
     return the wakeup interval in seconds, in the form<br>
     wakeupReport:interval:seconds target:id
+    </li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>association groupId<br>
     return the list of nodeIds in the association group groupId in the form:<br>
     assocGroup_X:Max:Y Nodes:id,id...
+    </li>
 
   <br><br><b>Class VERSION</b>
   <li>version<br>
     return the version information of this node in the form:<br>
     Lib:A Prot:x.y App:a.b
+    </li>
 
   </ul>
   <br>
@@ -619,6 +619,7 @@ ZWave_Undef($$)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a href="#classes">classes</a>
       This attribute is needed by the ZWave module, as the list of the possible
       set/get commands depends on it. It contains a space separated list of
@@ -632,39 +633,39 @@ ZWave_Undef($$)
   <ul>
 
   <br><b>Class BASIC</b>
-  <li>basicReport:XY
+  <li>basicReport:XY</li>
 
   <br><br><b>Class SWITCH_BINARY</b>
-  <li>state:on
-  <li>state:off
+  <li>state:on</li>
+  <li>state:off</li>
 
   <br><br><b>Class SENSOR_BINARY</b>
-  <li>state:open
-  <li>state:closed
+  <li>state:open</li>
+  <li>state:closed</li>
 
   <br><br><b>Class METER</b>
-  <li>power:val [kWh|kVAh|W|pulseCount]
-  <li>gas:val [m3|feet3|pulseCount]
-  <li>water:val [m3|feet3|USgallons|pulseCount]
+  <li>power:val [kWh|kVAh|W|pulseCount]</li>
+  <li>gas:val [m3|feet3|pulseCount]</li>
+  <li>water:val [m3|feet3|USgallons|pulseCount]</li>
 
   <br><br><b>Class CONFIGURATION</b>
-  <li>config_X:Y
+  <li>config_X:Y</li>
 
   <br><br><b>Class ALARM</b>
-  <li>alarm_type_X:level Y
+  <li>alarm_type_X:level Y</li>
 
   <br><br><b>Class BATTERY</b>
-  <li>battery:chargelevel %
+  <li>battery:chargelevel %</li>
 
   <br><br><b>Class WAKE_UP</b>
-  <li>wakeup:notification
-  <li>wakeupReport:interval:X target:Y
+  <li>wakeup:notification</li>
+  <li>wakeupReport:interval:X target:Y</li>
 
   <br><br><b>Class ASSOCIATION</b>
-  <li>assocGroup_X:Max:Y Nodes:A,B,...
+  <li>assocGroup_X:Max:Y Nodes:A,B,...</li>
 
   <br><br><b>Class VERSION</b>
-  <li>Lib:A Prot:x.y App:a.b
+  <li>Lib:A Prot:x.y App:a.b</li>
 
   </ul>
 </ul>

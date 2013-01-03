@@ -18,7 +18,8 @@ CUL_TX_Initialize($)
   $hash->{UndefFn}   = "CUL_TX_Undef";
   $hash->{ParseFn}   = "CUL_TX_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 " .
-                        "showtime:1,0 loglevel:0,1,2,3,4,5,6";
+                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 " .
+                        $readingFnAttributes;
 }
 
 #############################
@@ -83,7 +84,7 @@ CUL_TX_Parse($$)
   my $ll4 = GetLogLevel($name,4);
   Log $ll4, "CUL_TX $name $id3 ($msg)";
 
-  my ($msgtype, $val, $changedTxt);
+  my ($msgtype, $val);
   my $valraw = ($a[5].$a[6].".".$a[7]);
   my $type = $a[2];
   if($type eq "0") {
@@ -94,7 +95,6 @@ CUL_TX_Parse($$)
     $msgtype = "temperature";
     $val = sprintf("%2.1f", ($valraw - 50 + $def->{corr}) );
     Log $ll4, "CUL_TX $msgtype $name $id3 T: $val F: $id2";
-    $changedTxt = "temperature: $val";
 
   } elsif ($type eq "E") {
     if($now - $def->{lastH} < $def->{minsecs} ) {
@@ -104,7 +104,6 @@ CUL_TX_Parse($$)
     $msgtype = "humidity";
     $val = $valraw;
     Log $ll4, "CUL_TX $msgtype $name $id3 H: $val F: $id2";
-    $changedTxt = "humidity: $val";
 
   } else {
     my $ll2 = GetLogLevel($name,4);
@@ -128,16 +127,11 @@ CUL_TX_Parse($$)
 
   }
 
-  my $tn = TimeNow();
-  $def->{STATE} = $state;
-  $def->{READINGS}{state}{TIME} = $tn;
-  $def->{READINGS}{state}{VAL} = $state;
-  $def->{CHANGED}[0] = $changedTxt;
+  readingsBeginUpdate($def);
+  readingsBulkUpdate($def, "state", $state);
+  readingsBulkUpdate($def, $msgtype, $val);
+  readingsEndUpdate($def, 1);
 
-  $def->{READINGS}{$msgtype}{VAL} = $val;
-  $def->{READINGS}{$msgtype}{TIME} = $tn;
-
-  DoTrigger($name, undef) if($init_done);
   return $name;
 }
 
@@ -187,14 +181,15 @@ CUL_TX_Parse($$)
     <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <li><a href="#showtime">showtime</a></li><br>
     <li><a href="#loglevel">loglevel</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
   <a name="CUL_TXevents"></a>
   <b>Generated events:</b>
   <ul>
-     <li>temperature: $temp
-     <li>humidity: $hum
+     <li>temperature: $temp</li>
+     <li>humidity: $hum</li>
   </ul>
   <br>
 

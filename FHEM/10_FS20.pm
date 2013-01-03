@@ -127,9 +127,8 @@ FS20_Initialize($)
   $hash->{UndefFn}   = "FS20_Undef";
   $hash->{ParseFn}   = "FS20_Parse";
   $hash->{AttrList}  = "IODev follow-on-for-timer:1,0 follow-on-timer ".
-                       "do_not_notify:1,0 ".
-                       "ignore:1,0 dummy:1,0 showtime:1,0 ".
-                       "loglevel:0,1,2,3,4,5,6 " .
+                       "do_not_notify:1,0 ignore:1,0 dummy:1,0 showtime:1,0 ".
+                       "loglevel:0,1,2,3,4,5,6 $readingFnAttributes " .
                        "model:".join(",", sort keys %models);
 }
 
@@ -262,17 +261,9 @@ FS20_Set($@)
   # Look for all devices with the same code, and set state, timestamp
   my $code = "$hash->{XMIT} $hash->{BTN}";
   my $tn = TimeNow();
-  my $defptr = $modules{FS20}{defptr};
-  foreach my $n (keys %{ $defptr->{$code} }) {
-    my $lh = $defptr->{$code}{$n};
-    $lh->{CHANGED}[0] = $v;
-    $lh->{STATE} = $v;
-    $lh->{READINGS}{state}{TIME} = $tn;
-    $lh->{READINGS}{state}{VAL} = $v;
-    my $lhname = $lh->{NAME};
-    if($name ne $lhname) {
-      DoTrigger($lhname, undef)
-    }
+  my $defptr = $modules{FS20}{defptr}{$code};
+  foreach my $n (keys %{ $defptr }) {
+    readingsSingleUpdate($defptr->{$n}, "state", $v, 1);
   }
   return $ret;
 }
@@ -397,10 +388,7 @@ FS20_Parse($$)
 
       return "" if(IsIgnored($n));   # Little strange.
 
-      $lh->{CHANGED}[0] = $v;
-      $lh->{STATE} = $v;
-      $lh->{READINGS}{state}{TIME} = TimeNow();
-      $lh->{READINGS}{state}{VAL} = $v;
+      readingsSingleUpdate($lh, "state", $v, 1);
       Log GetLogLevel($n,2), "FS20 $n $v";
 
       if($modules{FS20}{ldata}{$n}) {
@@ -570,13 +558,12 @@ four2hex($$)
       <li>If the timer is set (i.e. it is not 0) then on, dim*,
           and *-for-timer will take it into account (at least by the FS20ST).
       </li>
-      <li>The <code>time</code> argument ranges from 0.25sec to 4 hours and
-          16 minutes.
-      As the time is encoded in one byte there are only 112 distinct
-      values, the resolution gets coarse with larger values. The program
-      will report the used timeout if the specified one cannot be set
-      exactly.  The resolution is 0.25 sec from 0 to 4 sec, 0.5 sec from 4
-      to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
+      <li>The <code>time</code> argument ranges from 0.25sec to 4 hours and 16
+          minutes.  As the time is encoded in one byte there are only 112
+          distinct values, the resolution gets coarse with larger values. The
+          program will report the used timeout if the specified one cannot be
+          set exactly.  The resolution is 0.25 sec from 0 to 4 sec, 0.5 sec
+          from 4 to 8 sec, 1 sec from 8 to 16 sec and so on. If you need better
           precision for large values, use <a href="#at">at</a> which has a 1
           sec resolution.</li>
       <li>on-till requires an absolute time in the "at" format (HH:MM:SS, HH:MM
@@ -619,7 +606,6 @@ four2hex($$)
         </code></ul>
         </li><br>
 
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
     <a name="attrdummy"></a>
     <li>dummy<br>
     Set the device attribute dummy to define devices which should not
@@ -644,10 +630,6 @@ four2hex($$)
     see your manual for details.
     </li><br>
 
-
-    <li><a href="#loglevel">loglevel</a></li><br>
-
-    <li><a href="#showtime">showtime</a></li><br>
 
     <a name="model"></a>
     <li>model<br>
@@ -687,6 +669,11 @@ four2hex($$)
         "ignored=1" special devspec.
         </li><br>
 
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+
   </ul>
   <br>
 
@@ -694,13 +681,13 @@ four2hex($$)
   <b>Generated events:</b>
   <ul>
      From an FS20 device you can receive one of the following events.
-     <li>on
-     <li>off
-     <li>toggle
-     <li>dimdown
-     <li>dimup
-     <li>dimupdown
-     <li>on-for-timer
+     <li>on</li>
+     <li>off</li>
+     <li>toggle</li>
+     <li>dimdown</li>
+     <li>dimup</li>
+     <li>dimupdown</li>
+     <li>on-for-timer</li>
      Which event is sent is device dependent and can sometimes configured on
      the device.
   </ul>

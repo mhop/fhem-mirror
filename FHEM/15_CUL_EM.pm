@@ -22,7 +22,8 @@ CUL_EM_Initialize($)
   $hash->{UndefFn}   = "CUL_EM_Undef";
   $hash->{ParseFn}   = "CUL_EM_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:0,1 showtime:0,1 " .
-                        "model:EMEM,EMWZ,EMGZ loglevel ignore:0,1";
+                        "model:EMEM,EMWZ,EMGZ loglevel ignore:0,1".
+                        $readingFnAttributes;
 }
 
 #####################################
@@ -160,8 +161,8 @@ CUL_EM_Parse($$)
 
     $val = sprintf("CNT: %d CUM: %0.3f  5MIN: %0.3f  TOP: %0.3f",
                          $seqno, $total, $current, $peak);
-    $hash->{STATE} = $val;
-    $hash->{CHANGED}[$c++] = "$val";
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash, "state", $val);
 
     $readings{total_cnt}   = $total_cnt;
     $readings{current_cnt} = $current_cnt;
@@ -234,10 +235,9 @@ CUL_EM_Parse($$)
 
 
     foreach my $k (keys %readings) {
-      $hash->{READINGS}{$k}{TIME}= $tn;
-      $hash->{READINGS}{$k}{VAL} = $readings{$k};
-      $hash->{CHANGED}[$c++] = "$k: $readings{$k}";
+      readingsBulkUpdate($hash, $k, $readings{$k});
     }
+    readingsEndUpdate($hash, 1);
     return $hash->{NAME};
 
   } else {
@@ -318,6 +318,7 @@ CUL_EM_Parse($$)
     <li><a href="#model">model</a> (EMEM,EMWZ,EMGZ)</li><br>
     <li><a href="#IODev">IODev</a></li><br>
     <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
