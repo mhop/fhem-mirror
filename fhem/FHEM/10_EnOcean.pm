@@ -12,9 +12,9 @@ sub EnOcean_Set($@);
 sub EnOcean_MD15Cmd($$$);
 
 my %EnO_rorgname = ("F6"=>"switch",     # RPS
-                "D5"=>"contact",    # 1BS
-                "A5"=>"sensor",     # 4BS
-               );
+                    "D5"=>"contact",    # 1BS
+                    "A5"=>"sensor",     # 4BS
+                   );
 my @EnO_ptm200btn = ("AI", "A0", "BI", "B0", "CI", "C0", "DI", "D0");
 my %EnO_ptm200btn;
 
@@ -57,8 +57,8 @@ my %EnO_subType = (
   2          => "contact",
   3          => "sensor",
   4          => "windowHandle",
-  5          => "dimmer",
-  6          => "dimmCtrl",
+  5          => "eltakoDimmer",
+  6          => "eltakoShutter",
   7          => "FAH",
   8          => "FBH",
   9          => "FTF",
@@ -90,7 +90,8 @@ EnOcean_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "model:".join(",",@EnO_models)." ".
                        "subType:".join(",",values %EnO_subType)." ".
-                       "actualTemp";
+                       "subDef actualTemp dimTime shutTime ".
+                       $readingFnAttributes;
 
   for(my $i=0; $i<@EnO_ptm200btn;$i++) {
     $EnO_ptm200btn{$EnO_ptm200btn[$i]} = "$i:30";
@@ -107,7 +108,7 @@ EnOcean_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   return "wrong syntax: define <name> EnOcean 8-digit-hex-code"
-        if(int(@a)!=3 || $a[2] !~ m/^[A-F0-9]{8}$/i);
+    if(int(@a)!=3 || $a[2] !~ m/^[A-F0-9]{8}$/i);
 
   $modules{EnOcean}{defptr}{uc($a[2])} = $hash;
   AssignIoPort($hash);
@@ -124,6 +125,7 @@ EnOcean_Set($@)
   my ($hash, @a) = @_;
   return "no set value specified" if(@a < 2);
 
+  my $updateState = 1;
   my $name = $hash->{NAME};
   my $st = AttrVal($name, "subType", "");
   my $ll2 = GetLogLevel($name, 2);
@@ -163,37 +165,135 @@ EnOcean_Set($@)
       $hash->{READINGS}{$cmd}{TIME} = $tn;
       $hash->{READINGS}{$cmd}{VAL} = $arg;
 
-    } elsif($st eq "dimmCtrl") { # Tested for Eltako-Dimmer
+	###########################
+    } elsif($st eq "eltakoDimmer") {
+
+      my $sendDimCmd=0;
+      my $dimTime=AttrVal($name, "dimTime", 0);
+      my $onoff=1;
+      my $subDef = AttrVal($name, "subDef", "");
+      my $dimVal=$hash->{READINGS}{dimValue}{VAL};
+
       if($cmd eq "teach") {
-        my $data=sprintf("A502000000%s00", $hash->{DEF});
-        Log $ll2, "dimmCtrl.Teach: " . $data;
-        IOWrite($hash, "000A0001", $data); # len:000a optlen:00 pakettype:1(radio)
-
-      } elsif($cmd eq "dimm") {
-        return "Usage: dimm percent [time 01-FF FF:slowest] [on/off]" if(@a<2);
-        my $time=0;
-        my $onoff=1;
-        # for eltako relative (0-100) (but not compliant to EEP because DB0.2 is 0)
-        my $dimVal=$a[1];
-        shift(@a);
-        if(defined($a[1])) { $time=$a[1]; shift(@a); }
-        if(defined($a[1])) { $onoff=($a[1] eq "off") ? 0 : 1; shift(@a); }
-        # EEP: A5/38/08 Central Command ->Typ 0x02: Dimming
-        my $data=sprintf("A502%02X%02X%02X%s00", $dimVal, $time, $onoff|0x08, $hash->{DEF});
+        my $data=sprintf("A502000000%s00", $subDef);
+        Log $ll2, $st . ".Teach: " . $data;
+        # len:000a optlen:00 pakettype:1(radio)
         IOWrite($hash, "000A0001", $data);
-        Log $ll2, "dimmCtrl.dimm: " . $data;
- 
-      } else {
-        return "Unknown argument $cmd, choose one of: teach, dimm:slider,0,1,100"
 
+      } elsif($cmd eq "dim") {
+        return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
+        # for eltako relative (0-100) (but not compliant to EEP because DB0.2
+        # is 0)
+        $dimVal=$a[1];
+        shift(@a);
+        if(defined($a[1])) { 
+          $dimTime=sprintf("%x",(($a[1]*2.55)-255)*-1); 
+          shift(@a); 
+        }
+        $sendDimCmd=1;
+
+      } elsif($cmd eq "dimup") {
+        return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
+        $dimVal+=$a[1];
+        Log $ll2, "$st.$cmd val:" . $hash->{VALUE} .
+                        " par:" . $a[1] . " val:" . $dimVal;
+        shift(@a);
+        if(defined($a[1])) {
+          $dimTime=$a[1];
+          shift(@a);
+        }
+        $sendDimCmd=1;
+
+      } elsif($cmd eq "dimdown") {
+        return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
+        $dimVal-=$a[1];
+        shift(@a);
+          if(defined($a[1])) { $dimTime=$a[1]; shift(@a); }
+        $sendDimCmd=1;
+
+      } elsif($cmd eq "on" || $cmd eq "B0") {
+        $dimTime=1;
+        $sendDimCmd=1;
+        $dimVal=100;
+
+      } elsif($cmd eq "off" || $cmd eq "BI") {
+        $dimTime=1;
+        $onoff=0;
+        $sendDimCmd=1;
+
+      } else {
+        return "Unknown argument $cmd, choose one of dim:slider,0,1,100 ".
+                "dimup:slider,0,1,100 dimdown:slider,0,1,100 on off teach"
       }
+	  
+      if($sendDimCmd) {
+        $updateState = 0;
+        $a[0]="on";
+          if($dimVal >  100) { $dimVal=100; }
+          if($dimVal <= 0)   { $dimVal=0; $onoff=0; $a[0]="off" }
+        ReadingsVal($name, "dimValue", $dimVal); 
+        my $data=sprintf("A502%02X%02X%02X%s00",
+                $dimVal, $dimTime, $onoff|0x08, $subDef);
+        IOWrite($hash, "000A0001", $data);
+        Log $ll2, $st." ".$cmd.": ".$data.$subDef;
+      }
+	  
+    ###########################
+    } elsif($st eq "eltakoShutter") {
+      my $shutTime=AttrVal($name, "shutTime", 0);
+      my $subDef = AttrVal($name, "subDef", "");
+      my $shutCmd = 0x00; 
+      if($cmd eq "teach") {
+        my $data=sprintf("A5FFF80D80%s00", $subDef);
+        Log $ll2, $st . ".Teach: " . $data;
+
+        # len:000a optlen:00 pakettype:1(radio)
+        IOWrite($hash, "000A0001", $data);
+
+      } elsif($cmd eq "stop") {
+        $shutCmd = 0x00;
+
+      } elsif($cmd eq "up" || $cmd eq "B0") {
+        my $position = 100;
+        if($a[1]) { 
+          $shutTime = $shutTime/100*$a[1]; 
+          $position = $hash->{READINGS}{position}{VAL}+$a[1];
+            if($position > 100) { $position = 100; };
+        }
+        $hash->{READINGS}{position}{TIME} = $tn;
+        $hash->{READINGS}{position}{VAL} = $position;
+        $shutCmd = 0x01;
+
+      } elsif($cmd eq "down" || $cmd eq "BI") {
+        my $position = 0;
+        if($a[1]) { 
+          $shutTime = $shutTime/100*$a[1]; 
+          $position = $hash->{READINGS}{position}{VAL}-$a[1];
+            if($position <= 0) { $position = 0; };
+        }
+        $hash->{READINGS}{position}{TIME} = $tn;
+        $hash->{READINGS}{position}{VAL} = $position;
+        $shutCmd = 0x02;
+      } else { 
+        return "Unknown argument " . $cmd . ", choose one of up down stop teach"
+      }
+      shift(@a);
+      if($shutCmd) {
+        $updateState = 0;
+        # EEP: A5/3F/7F Universal ???
+        my $data = sprintf("A5%02X%02X%02X%02X%s00",
+                        0x00, $shutTime, $shutCmd, 0x08, $subDef);
+        IOWrite($hash, "000A0001", $data);
+        Log $ll2, $st . ".$cmd" . $data;
+      }    
 
     ###########################
     } else {                                          # Simulate a PTM
       my ($c1,$c2) = split(",", $cmd, 2);
       return "Unknown argument $cmd, choose one of " .
-                                  join(" ", sort keys %EnO_ptm200btn)
-            if(!defined($EnO_ptm200btn{$c1}) || ($c2 && !defined($EnO_ptm200btn{$c2})));
+      join(" ", sort keys %EnO_ptm200btn)
+        if(!defined($EnO_ptm200btn{$c1}) ||
+           ($c2 && !defined($EnO_ptm200btn{$c2})));
       Log $ll2, "EnOcean: set $name $cmd";
 
       my ($db_3, $status) = split(":", $EnO_ptm200btn{$c1}, 2);
@@ -204,22 +304,21 @@ EnOcean_Set($@)
         $db_3 |= ($d2<<1) | 0x01;
       }
       IOWrite($hash, "",
-                sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
+              sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
 
     }
 
     select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
   }
 
-  my $cmd = join(" ", @a);
-  $hash->{CHANGED}[0] = $cmd;
-  $hash->{STATE} = $cmd;
-  $hash->{READINGS}{state}{TIME} = $tn;
-  $hash->{READINGS}{state}{VAL} = $cmd;
-  return undef;
+  if($updateState == 1) {
+    readingsSingleUpdate($hash, "state", join(" ", @a), 1);
+    return undef;
+  }
 }
 
 #############################
+# "EnOcean:F6:50000000:0011C8D4:FF" -> EnO_switch on (BI)
 sub
 EnOcean_Parse($$)
 {
@@ -430,31 +529,18 @@ EnOcean_Parse($$)
       # Eltako FTF55
       # (EEP: 07-02-05)
       ####################################
-      # $db_1 is the temperature where 0x00 = 40°C and 0xFF 0°C
+      # $db_1 is the temperature where 0x00 = 40?C and 0xFF 0?C
       my $temp = sprintf "%3d", $db_1;
       $temp = sprintf "%0.1f", ( 40 - $temp * 40 / 255 ) ;
       push @event, "3:temperature:$temp";
       push @event, "3:state:$temp";
-
-    } elsif($st eq "dimmer") {
+	  
+    } elsif($st eq "eltakoDimmer") {
       # todo: create a more general solution for the central-command responses
-
-      # response command from (Eltako-)Actor ( Central-Command:A5/38/08 )
-      if($db_3 eq 0x01) { # switch
-        push @event, "3:state:" . (($db_0 & 0x01) ? "on": "off");
-        push @event, "3:time:" . ($db_2<<8 + $db_1);
-        push @event, "3:timeType:" . (($db_0 & 0x02) ? "delay": "duration");
-
-      } elsif($db_3 eq 0x02) { # dimm
-        push @event, "3:state:" . (($db_0 & 0x01) ? "on": "off");
-        push @event, "3:dimmValue:$db_2";
-
-      } elsif($db_3 eq 0x03) { # setpoint-switch, todo
-      } elsif($db_3 eq 0x04) { # basic setpoint, todo
-      } elsif($db_3 eq 0x05) { # control-variable, todo
-      } elsif($db_3 eq 0x06) { # fan-stage, todo
+      if($db_3 eq 0x02) { # dimm
+        push @event, "3:state:" . ($db_0 & 0x01 ? "on" : "off");
+        push @event, "3:dimValue:" . $db_2;
       }
-
     } else {
       push @event, "3:state:$db_3";
       push @event, "3:sensor1:$db_3";
@@ -469,31 +555,13 @@ EnOcean_Parse($$)
 
   }
 
-  # Flag & 1: reading
-  # Flag & 2: changed
-
-  my $tn = TimeNow();
-  my @changed;
+  readingsBeginUpdate($hash);
   for(my $i = 0; $i < int(@event); $i++) {
+    # Flag & 1: reading, Flag & 2: changed. Currently ignored.
     my ($flag, $vn, $vv) = split(":", $event[$i], 3);
-
-    if($flag & 2) {
-      if($vn eq "state") {
-        $hash->{STATE} = $vv;
-        push @changed, $vv;
-
-      } else {
-        push @changed, "$vn: $vv";
-
-      }
-    }
-
-    if($flag & 1) {
-      $hash->{READINGS}{$vn}{TIME} = TimeNow();
-      $hash->{READINGS}{$vn}{VAL} = $vv;
-    }
+    readingsBulkUpdate($hash, $vn, $vv);
   }
-  $hash->{CHANGED} = \@changed;
+  readingsEndUpdate($hash, 1);
   
   return $name;
 }
@@ -583,12 +651,33 @@ EnOcean_A5Cmd($$$)
          Do not regulate the MD15.</li>
     </ul></li>
 
-    <li>subType dimmCtrl, tested with ElTako Dimmer only
+    <li>subType eltakoDimmer, tested with Eltako devices only
     <ul>
       <li>teach<br>
-        initiate teach-in mode
-      <li>dimm percent [time 01-FF FF:slowest] [on/off]<br>
-        issue dim command.
+        initiate teach-in mode</li>
+      <li>dimm percent [time 1-100]<br>
+        issue dim command.</li>
+      <li>dimmup percent [time 1-100]<br>
+        issue dim command.</li>
+      <li>dimmdown percent [time 1-100]<br>
+        issue dim command.</li>
+      <li>dimm on<br>
+        issue switch on command.</li>
+      <li>dimm off<br>
+        issue switch off command.</li>
+    </ul>
+    </li>
+	
+    <li>subType eltakoShutter, tested with Eltako devices only
+    <ul>
+      <li>teach<br>
+        initiate teach-in mode</li>
+      <li>up [percent]<br>
+        issue roll up command.</li>
+      <li>down [percent]<br>
+        issue roll down command.</li>
+      <li>stop<br>
+        issue stop command.</li>
     </ul>
     </li>
 
@@ -638,6 +727,7 @@ EnOcean_A5Cmd($$$)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#model">model</a></li>
     <li><a href="#subType">subType</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="actualTemp">actualTemp</a><br>
       The value of the actual temperature, used when controlling MD15 devices.
       Should by filled via a notify from a distinct temperature sensor. If
@@ -652,103 +742,126 @@ EnOcean_A5Cmd($$$)
      <li>switch. Switches (remotes) with more than one (pair) of buttons
          are separate devices with separate address.
      <ul>
-         <li>A0
-         <li>AI
-         <li>B0
-         <li>BI
-         <li>C0
-         <li>CI
-         <li>D0
-         <li>DI
-         <li>A0,BI
+         <li>A0</li>
+         <li>AI</li>
+         <li>B0</li>
+         <li>BI</li>
+         <li>C0</li>
+         <li>CI</li>
+         <li>D0</li>
+         <li>DI</li>
+         <li>A0,BI</li>
          <li>&lt;BtnX,BtnY&gt; where BtnX and BtnY is one of the above, e.g.
-             A0,BI or D0,CI
-         <li>buttons:released
-         <li>buttons:<BtnX> released<br>
-     </ul>
+             A0,BI or D0,CI</li>
+         <li>buttons:released</li>
+         <li>buttons:<BtnX> released</li>
+         <br>
+     </ul></li>
 
      <li>FSB61/FSM61 (set model to FSB61 or FSM61 manually)<br>
-     <ul>
+     <ul>di
         <li>released<br>
-          The status of the device my become "released", this is not the case
-          for a normal switch.
-     </ul>
+          The status of the device may become "released", this is not the case
+          for a normal switch.</li>
+     </ul></li>
 
      <li>windowHandle (HOPPE SecuSignal). Set the subType attr to windowHandle.
      <ul>
-         <li>closed
-         <li>open
-         <li>tilted
-         <li>open from tilted
-     </ul>
+         <li>closed</li>
+         <li>open</li>
+         <li>tilted</li>
+         <li>open from tilted</li>
+     </ul></li>
+
      <li>keycard. Set the subType attr to keycard. (untested)
      <ul>
-         <li>keycard inserted
-         <li>keycard removed
-     </ul>
+         <li>keycard inserted</li>
+         <li>keycard removed</li>
+     </ul></li>
+
      <li>STM-250 Door and window contact.
      <ul>
-         <li>closed
-         <li>open
-         <li>learnBtn: on
-     </ul>
+         <li>closed</li>
+         <li>open</li>
+         <li>learnBtn: on</li>
+     </ul></li>
+
      <li>SR04* (Temp sensor + Presence button and desired temp dial).<br>
           Set the
           model attribute to one of SR04 SR04P SR04PT SR04PST SR04PMS or the
           subType attribute to SR04.
      <ul>
-         <li>temperature: XY.Z
-         <li>set_point: [0..255]
-         <li>fan: [0|1|2|3|Auto]
-         <li>present: yes
-         <li>learnBtn: on
-         <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]
-     </ul>
+         <li>temperature: XY.Z</li>
+         <li>set_point: [0..255]</li>
+         <li>fan: [0|1|2|3|Auto]</li>
+         <li>present: yes</li>
+         <li>learnBtn: on</li>
+         <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]</li>
+     </ul></li>
+
      <li>MD15-FtL-HE (Heating/Valve-regulator)<br>
          The subType attibute must be MD15. This is done if the device was created by
          autocreate.<br>
      <ul>
-       <li>$actuator %
-       <li>currentValue: $actuator
-       <li>serviceOn: [yes|no]
-       <li>energyInput: [enabled|disabled]
-       <li>energyStorage: [charged|empty]
-       <li>battery: [ok|empty]
-       <li>cover: [open|closed]
-       <li>tempSensor: [failed|ok]
-       <li>window: [open|closed]
-       <li>actuator: [ok|obstructed]
-       <li>temperature: $tmp
-     </ul>
+       <li>$actuator %</li>
+       <li>currentValue: $actuator</li>
+       <li>serviceOn: [yes|no]</li>
+       <li>energyInput: [enabled|disabled]</li>
+       <li>energyStorage: [charged|empty]</li>
+       <li>battery: [ok|empty]</li>
+       <li>cover: [open|closed]</li>
+       <li>tempSensor: [failed|ok]</li>
+       <li>window: [open|closed]</li>
+       <li>actuator: [ok|obstructed]</li>
+       <li>temperature: $tmp</li>
+     </ul></li>
 
      <li>Ratio Presence Sensor Eagle PM101.<br>
          Set the model attribute to PM101<br>
      <ul>
-       <li>brightness: $lux
-       <li>channel1: [on|off]
-       <li>channel2: [on|off]
-     </ul>
+       <li>brightness: $lux</li>
+       <li>channel1: [on|off]</li>
+       <li>channel2: [on|off]</li>
+     </ul></li>
 
      <li>FAH60,FAH63,FIH63 brigthness senor.<br>
          Set subType to FAH or model to FAH60/FAH63/FIH63 manually.<br>
      <ul>
-       <li>brightness: $lux
-       <li>state: $lux
-     </ul>
+       <li>brightness: $lux</li>
+       <li>state: $lux</li>
+     </ul></li>
 
      <li>FABH63,FBH55,FBH63,FIBH63 Motion/brightness sensor.<br>
          Set subType to FBH or model to FABH63/FBH55/FBH63/FIBH63 manually.<br>
      <ul>
-       <li>brightness: $lux
-       <li>motion:[yes|no]
-       <li>state: [motion: yes|no]
-     </ul>
+       <li>brightness: $lux</li>
+       <li>motion:[yes|no]</li>
+       <li>state: [motion: yes|no]</li>
+     </ul></li>
+
      <li>FTF55 Temperature sensor.<br>
          Set subType to FTF or model to FTF55 manually.<br>
      <ul>
-       <li>temperature: $temp
-       <li>state: $temp
-     </ul>
+       <li>temperature: $temp</li>
+       <li>state: $temp</li>
+     </ul></li>
+
+     <li>eltakoDimmer<br>
+     <ul>
+     </ul></li>
+     
+     <li>eltakoShutter<br>
+     <ul>
+        <li>B0<br>
+          The status of the device will become B0 after the TOP endpoint is
+          reached, or it has finished an "up %%" command.</li>
+        <li>BI<br>
+          The status of the device will become BI if the BOTTOM endpoint is
+          reached</li>
+        <li>released<br>
+          The status of the device may become "released", this is not the case
+          for a normal switch.</li>
+     </ul></li>
 
   </ul>
 </ul>
