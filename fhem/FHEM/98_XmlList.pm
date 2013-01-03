@@ -71,9 +71,11 @@ CommandXmlList($$)
       my $a3 = XmlEscape(getAllAttr($d));
  
       $str .= "\t\t<$t name=\"$d\" state=\"$a1\" sets=\"$a2\" attrs=\"$a3\">\n";
+      my $si = AttrVal("global", "showInternalValues", 0);
  
       foreach my $c (sort keys %{$p}) {
         next if(ref($p->{$c}));
+        next if(!$si && $c =~ m/^\./);
         $str .= sprintf("\t\t\t<INT key=\"%s\" value=\"%s\"/>\n",
                         XmlEscape($c), XmlEscape($p->{$c}));
       }
@@ -81,6 +83,7 @@ CommandXmlList($$)
                                         $p->{IODev}{NAME}) if($p->{IODev});
  
       foreach my $c (sort keys %{$attr{$d}}) {
+        next if(!$si && $c =~ m/^\./);
         $str .= sprintf("\t\t\t<ATTR key=\"%s\" value=\"%s\"/>\n",
                         XmlEscape($c), XmlEscape($attr{$d}{$c}));
       }
@@ -88,6 +91,7 @@ CommandXmlList($$)
       my $r = $p->{READINGS};
       if($r) {
         foreach my $c (sort keys %{$r}) {
+          next if(!$si && $c =~ m/^\./);
           my $h = $r->{$c};
           next if(!defined($h->{VAL}) || !defined($h->{TIME}));
           $str .=
