@@ -211,7 +211,7 @@ CUL_MAX_Parse($$)
         #TODO: send TimeInformation
       }
 
-    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState"])  {
+    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState", "PushButtonState"])  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
       #Only ShutterContactState needs ack
       if($msgType eq "ShutterContactState" and $dst eq $shash->{addr}) {

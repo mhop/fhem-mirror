@@ -39,6 +39,7 @@ use vars qw(%msgCmd2Id);
                  "11" => "ConfigTemperatures", #like boost/eco/comfort etc
                  "30" => "ShutterContactState",
                  "42" => "WallThermostatState", #by WallMountedThermostat
+                 "50" => "PushButtonState",
                  "60" => "ThermostatState", #by HeatingThermostat
                  "40" => "SetTemperature", #to thermostat
                  "20" => "AddLinkPartner",
@@ -424,6 +425,17 @@ MAX_Parse($$)
     readingsBulkUpdate($shash,"onoff",$isopen);
     readingsEndUpdate($shash, 1);
 
+  }elsif($msgtype eq "PushButtonState") {
+    my ($bits2, $onoff) = unpack("CC",pack("H*",$args[0]));
+    #The meaning of $bits2 is completly guessed based on similarity to other devices, TODO: confirm
+    my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
+    my $batterylow = vec($bits2, 7, 1); #1 if battery is low
+
+    readingsBeginUpdate($shash);
+    readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+    readingsBulkUpdate($shash,"onoff",$onoff);
+    readingsEndUpdate($shash, 0);
+
   }elsif($msgtype eq "CubeClockState"){
     my $clockset = $args[0];
     $shash->{clocknotset} = !$clockset;
@@ -466,6 +478,8 @@ MAX_Parse($$)
       return MAX_Parse($hash, "MAX,$isToMe,ThermostatState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "ShutterContact") {
       return MAX_Parse($hash, "MAX,$isToMe,ShutterContactState,$addr,". substr($args[0],2));
+    } elsif($shash->{type} eq "PushButton") {
+      return MAX_Parse($hash, "MAX,$isToMe,PushButtonState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "Cube") {
       ; #Payload is always "00"
     } else {
