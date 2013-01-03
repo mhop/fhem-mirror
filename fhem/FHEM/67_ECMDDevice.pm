@@ -48,7 +48,8 @@ ECMDDevice_Initialize($)
   $hash->{SetFn}     = "ECMDDevice_Set";
   $hash->{DefFn}     = "ECMDDevice_Define";
 
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5 ".
+                        $readingFnAttributes;
 }
 
 ###################################
@@ -340,8 +341,7 @@ ECMDDevice_Define($$)
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br><br>
 

@@ -61,7 +61,8 @@ YAMAHA_AVR_Initialize($)
   $hash->{DefFn}     = "YAMAHA_AVR_Define";
   $hash->{UndefFn}   = "YAMAHA_AVR_Undefine";
 
-  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volume-smooth-change:0,1 volume-smooth-time:0,1,2,3,4,5 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 event-on-update-reading event-on-change-reading";
+  $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 volume-smooth-change:0,1 volume-smooth-time:0,1,2,3,4,5 volume-smooth-steps:1,2,3,4,5,6,7,8,9,10 ".
+                      $readingFnAttributes;
 }
 
 ###################################
@@ -789,8 +790,7 @@ volume_level</pre>
   
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optional attribute to activate a smooth volume change.
 	<br><br>

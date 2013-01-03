@@ -39,7 +39,9 @@ structure_Initialize($)
   $hash->{NotifyFn}  = "structure_Notify";
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
-  $hash->{AttrList}  = "clientstate_priority clientstate_behavior:relative,absolute loglevel:0,5";
+  $hash->{AttrList}  = "clientstate_priority ".
+                       "clientstate_behavior:relative,absolute loglevel:0,5 ".
+                       $readingFnAttributes;
 
   addToAttrList("structexclude");
 
@@ -487,6 +489,7 @@ structure_Attr($@)
   <a name="structureattr"></a>
   <b>Attributes</b>
   <ul>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li>structexclude<br>
         exclude the device from set operations, see the set command above.</li>
   </ul>

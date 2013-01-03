@@ -83,8 +83,8 @@ Twilight_Initialize($)
   $hash->{DefFn}   = "Twilight_Define";
   $hash->{UndefFn} = "Twilight_Undef";
   $hash->{GetFn}   = "Twilight_Get";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 event-on-update-reading ".
-                        "event-on-change-reading";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 ".
+                      $readingFnAttributes;
 }
 
 sub
@@ -413,8 +413,7 @@ Twilight_getWeatherHorizon($)
   <a name="Twilightattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>

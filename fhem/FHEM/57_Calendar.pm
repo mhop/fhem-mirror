@@ -700,8 +700,8 @@ sub Calendar_Initialize($) {
   $hash->{UndefFn} = "Calendar_Undef";
   $hash->{GetFn}   = "Calendar_Get";
   $hash->{SetFn}   = "Calendar_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 event-on-update-reading event-on-change-reading";
-
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 ".
+                     $readingFnAttributes;
 }
 
 ###################################
@@ -1058,8 +1058,7 @@ sub Calendar_Undef($$) {
   <a name="Calendarattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 

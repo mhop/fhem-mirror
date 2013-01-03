@@ -73,7 +73,8 @@ MAX_Initialize($)
   $hash->{ParseFn}   = "MAX_Parse";
   $hash->{SetFn}     = "MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 event-on-update-reading event-on-change-reading";
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+                       $readingFnAttributes;
   return undef;
 }
 
@@ -406,7 +407,7 @@ MAX_Parse($$)
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", $measuredTemperature);
     }
-    readingsEndUpdate($shash, 0);
+    readingsEndUpdate($shash, 1);
 
   }elsif($msgtype eq "ShutterContactState"){
     my $bits = pack("H2",$args[0]);
@@ -421,7 +422,7 @@ MAX_Parse($$)
     readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     readingsBulkUpdate($shash,"onoff",$isopen);
-    readingsEndUpdate($shash, 0);
+    readingsEndUpdate($shash, 1);
 
   }elsif($msgtype eq "CubeClockState"){
     my $clockset = $args[0];
@@ -448,7 +449,7 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
     #readingsBulkUpdate($shash, "weekProfile", "$args[13]");
     $shash->{internal}{weekProfile} = $args[13];
-    readingsEndUpdate($shash, 0);
+    readingsEndUpdate($shash, 1);
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {
@@ -576,13 +577,12 @@ MAX_Parse($$)
   <a name="MAXattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#IODev">IODev</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
