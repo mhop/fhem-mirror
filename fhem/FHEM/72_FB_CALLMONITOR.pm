@@ -478,7 +478,7 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
             $contact_name = $1; 
             Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name found $contact_name";
  
-            while($contact =~ m/<number[^>]+?type="(\w+?)"[^>]*?>(.+?)<\/number>/gs)
+            while($contact =~ m/<number[^>]*?type="([^<>"]+?)"[^<>]*?>([^<>"]+?)<\/number>/gs)
             {
               if($1 ne "intern" and $1 ne "memo")
               {
