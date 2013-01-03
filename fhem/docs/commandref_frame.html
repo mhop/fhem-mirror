@@ -326,32 +326,50 @@ A line ending with \ will be concatenated with the next one, so long lines
         devices.
     </li>
 
-    <br><br>The following attributes are honored by the modules that make use
-    of the standardized readings updating mechanism in fhem.pl. Check the modules
-    Attributes list if you want to know if it is supporting it.
-    <br><br>
+    <br>
+    <a name="readingFnAttributes"></a>
+    <b>readingFnAttributes</b><br>
+    The following attributes are honored by the modules that make use
+    of the standardized readings updating mechanism in fhem.pl. Check the
+    modules attribute list if you want to know if it is supporting it.
+
+    <a name="stateFormat"></a>
+    <li>stateFormat<br>
+    Modifies the STATE of the device, shown by the list command or in the room
+    overview in FHEMWEB. If not set, its value is taken from the state reading.
+    If set, then every word in the argument is replaced by the value of the
+    reading if such a reading for the current device exists. If the value of
+    this attribute is enclused in {}, then it is evaluated. This attribute is
+    evaluated each time a reading is updated.
+    </li>
 
     <a name="event-on-update-reading"></a>
     <li>event-on-update-reading<br>
-    If not set, every update of any reading creates an event, which e.g. is handled
-    by <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a>. The attribute takes
-    a comma-separated list of readings. You may use regular expressions in that list. If set, only updates of the listed readings create
-    events.
+    If not set, every update of any reading creates an event, which e.g. is
+    handled by <a href="#notify">notify</a> or <a href="#FileLog">FileLog</a>.
+    The attribute takes a comma-separated list of readings. You may use regular
+    expressions in that list. If set, only updates of the listed readings
+    create events.
     </li>
 
     <a name="event-on-change-reading"></a>
     <li>event-on-change-reading<br>
-    The attribute takes a comma-separated list of readings. You may use regular expressions in that list. If set, only changes of the listed readings create events. In other words, if a reading listed here is updated with the new value
-    identical to the old value, no event is created.
+    The attribute takes a comma-separated list of readings. You may use regular
+    expressions in that list. If set, only changes of the listed readings
+    create events. In other words, if a reading listed here is updated with the
+    new value identical to the old value, no event is created.
     </li><br>
 
-    The precedence of event-on-update-reading and event-on-change-reading is as follows:
+    The precedence of event-on-update-reading and event-on-change-reading is as
+    follows:
     <ol>
-    <li>If both attributes are not set, any update of any reading of the device creates an event.</li>
-    <li>If any of the attributes is set, no events occur for updates or changes of readings
-        not listed in any of the attributes.</li>
-    <li>If a reading is listed in event-on-update-reading, an update of the reading creates an
-        event no matter whether the reading is also listed in event-on-change-reading.</li>
+    <li>If both attributes are not set, any update of any reading of the device
+        creates an event.</li>
+    <li>If any of the attributes is set, no events occur for updates or changes
+        of readings not listed in any of the attributes.</li>
+    <li>If a reading is listed in event-on-update-reading, an update of the
+        reading creates an event no matter whether the reading is also listed
+        in event-on-change-reading.</li>
     </ol>
 
   </ul>
@@ -369,6 +387,7 @@ A line ending with \ will be concatenated with the next one, so long lines
     <code>attr weatherstation event-on-update-reading wind,temperature,humidity</code><br>
     <code>attr weatherstation event-on-change-reading israining</code><br>
     <code>attr weatherstation event-on-change-reading israining,state</code><br>
+    <code>attr heating stateFormat Temp:measured-temp, Valve:actuator</code><br>
   </ul>
   <br>
 
@@ -1037,6 +1056,14 @@ A line ending with \ will be concatenated with the next one, so long lines
         receiver are considered a duplicate. Default is 0.5 seconds.
     </li><br>
 
+    <a name="showInternalValues"></a>
+    <li>showInternalValues<br>
+        Show data used for internal computations. If the name of an internal
+        value, reading or attribute starts with dot (.), then it is normally
+        hidden, and will only be visible, if this attribute is set to 1.
+        The attribute is checked by the list command, by the FHEMWEB room
+        overview and by xmllist.
+    </li>
   </ul>
 </ul>
 
