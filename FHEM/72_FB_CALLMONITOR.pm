@@ -464,12 +464,12 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
     {
      
       $phonebook = join('', <PHONEBOOK>);
-      if($phonebook =~ /<contact>/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/)
+      if($phonebook =~ /<contact/ and $phonebook =~ /<realName>/ and $phonebook =~ /<number/ and $phonebook =~ /<phonebook/ and $phonebook =~ /<\/phonebook>/)
       {
         Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name found FritzBox phonebook $phonebook_file";
 
 
-        while($phonebook =~ m/<contact[a-z0-9="\n- ]*>(.+?)<\/contact>/gs)
+        while($phonebook =~ m/<contact[^>]*>(.+?)<\/contact>/gs)
         {
 
           $contact = $1;
@@ -478,11 +478,15 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
             $contact_name = $1; 
             Log GetLogLevel($name, 4), "FB_CALLMONITOR: $name found $contact_name";
  
-            while($contact =~ m/<number[a-z0-9="\n- ]+?type="(\w+?)"[a-z0-9="\n- ]*?>(.+?)<\/number>/gs)
+            while($contact =~ m/<number[^>]+?type="(\w+?)"[^>]*?>(.+?)<\/number>/gs)
             {
               if($1 ne "intern" and $1 ne "memo")
               {
                 $number = $2;
+                
+                $number =~ s/\D//g unless($number =~ /@/);
+                $number =~ s/\s//g if($number =~ /@/);
+                
                 if(not $number =~ /^0/ and not $number =~ /@/ and $area_code ne "")
                 {
                   if($area_code =~ /^0[1-9]\d+$/)
