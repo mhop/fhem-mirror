@@ -167,6 +167,7 @@ OWDevice_ReadValue($$) {
         
         my $address= $hash->{fhem}{address};
         my $value= OWDevice_ReadFromServer($hash, "/$address/$reading");
+        #Debug "/$address/$reading => $value";  
         if(defined($value)) {
           $value= trim($value) if(AttrVal($hash,"trimvalues",1));
           my @getters= @{$hash->{fhem}{getters}};
@@ -201,7 +202,7 @@ OWDevice_UpdateValues($) {
           readingsBeginUpdate($hash);
           foreach my $reading (@polls) {
             my $value= OWDevice_ReadValue($hash,$reading);
-            readingsBulkUpdate($hash,$reading,$value);
+            readingsBulkUpdate($hash,$reading,$value) if(defined($value));
           }
           readingsEndUpdate($hash,1);
         }
