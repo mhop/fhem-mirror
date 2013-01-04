@@ -2964,7 +2964,7 @@ readingsEndUpdate($$)
     $st =~ s/\b([A-Za-z_-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
 
   }
-  $hash->{STATE} = ReplaceEventMap($name, $st, 1);
+  $hash->{STATE} = ReplaceEventMap($name, $st, 1) if(defined($st));
 
 
   # propagate changes
