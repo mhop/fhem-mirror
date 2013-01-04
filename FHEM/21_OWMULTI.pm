@@ -4,15 +4,11 @@
 #
 # FHEM module to commmunicate with 1-Wire chip DS2438Z - Smart Battery Monitor
 #
-# Prefixes for subroutines of this module:
-# OW   = General 1-Wire routines (Martin Fischer, Peter Henning)
-# OWX  = 1-Wire bus master interface (Peter Henning)
+# Prof. Dr. Peter A. Henning
 #
-# Prof. Dr. Peter A. Henning, 2012
-# 
-# Version 2.24 - October, 2012
-#   
-# Setup bus device in fhem.cfg as
+# $Id$
+#
+########################################################################################
 #
 # define <name> OWMULTI [<model>] <ROM_ID> [interval]
 #
@@ -37,8 +33,6 @@
 #
 # Additional attributes are defined in fhem.cfg
 # Note: attributes "tempXXXX" are read during every update operation.
-#
-# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> tempOffset <float>        = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>        = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
@@ -69,7 +63,6 @@
 ########################################################################################
 package main;
 
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 use strict;
 use warnings;
@@ -125,7 +118,7 @@ sub OWMULTI_Initialize ($) {
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
-                     "event:on-update,on-change ".
+                     "event-on-update-reading event-on-change-reading ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "VName VUnit VFunction";
   }
@@ -198,10 +191,12 @@ sub OWMULTI_Define ($$) {
 
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWMULTI: Warning, no 1-Wire I/O device found for $name."
-    if(!defined($hash->{IODev}->{NAME}));
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+    return "OWMULTI: Warning, no 1-Wire I/O device found for $name.";
+  }
   $modules{OWMULTI}{defptr}{$id} = $hash;
-  $hash->{STATE} = "Defined";
+  #--
+  readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWMULTI: Device $name defined."; 
   
   #-- Start timer for initialization in a few seconds
@@ -231,10 +226,10 @@ sub OWMULTI_InitializeDevice($) {
   $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
   $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
   
-  #-- Initial readings temperature sensor
-  $owg_temp = 0.0;
-  $owg_volt = 0.0;
-  $owg_vdd  = 5.0;  
+  #-- Initial readings
+  $owg_temp = "";
+  $owg_volt = "";
+  $owg_vdd  = "";  
   #-- Set channel name, channel unit for voltage channel
   my $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage|voltage";
   my @cnama = split(/\|/,$cname);
@@ -275,9 +270,7 @@ sub OWMULTI_FormatValues($) {
   
   my $name    = $hash->{NAME}; 
   my ($tunit,$toffset,$tfactor,$tabbr,$tval,$vfunc,$vval);
-  my ($value1,$value2)   = ("","");
-
-  my $tn = TimeNow();
+  my $svalue  = "";
   
   #-- attributes defined ?
   $tunit  = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
@@ -297,24 +290,23 @@ sub OWMULTI_FormatValues($) {
     $tabbr="?";
     Log 1, "OWMULTI_FormatValues: unknown unit $tunit";
   }
-  #-- these values are rather coplex to obtain, therefore save them in the hash
+  #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{UNIT}     = $tunit;
   $hash->{READINGS}{"temperature"}{UNITABBR} = $tabbr;
   $hash->{tempf}{offset}                     = $toffset;
   $hash->{tempf}{factor}                     = $tfactor;
   
+  #-- no change in any value if invalid reading
+  return if( $owg_temp eq "");
+  
   #-- correct values for proper offset, factor 
   $tval  = ($owg_temp + $toffset)*$tfactor;
-
-  #-- put into READINGS
-  $hash->{READINGS}{"temperature"}{VAL}   = $tval;
-  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
    
   my $cname = defined($attr{$name}{"VName"})  ? $attr{$name}{"VName"} : "voltage|voltage";
   my @cnama = split(/\|/,$cname);
   $owg_channel=$cnama[0];
   
-   #-- attribute VFunction defined ?
+  #-- attribute VFunction defined ?
   $vfunc   = defined($attr{$name}{"VFunction"}) ? $attr{$name}{"VFunction"} : "V";
 
   #-- replace by proper values 
@@ -324,27 +316,30 @@ sub OWMULTI_FormatValues($) {
   
   #-- determine the measured value from the function
   $vfunc = "\$owg_vdd = $owg_vdd; \$owg_volt = $owg_volt; \$tval = $tval; ".$vfunc;
+  #Log 1, "vfunc= ".$vfunc;
   $vfunc = eval($vfunc);
-  if( $vfunc ne "" ){
+  if( !$vfunc ){
+    $vval = 0.0;
+  } elsif( $vfunc ne "" ){
     $vval = int( $vfunc*1000 )/1000;
   } else {
-    $vval = 0.0;
+    
   }
   
-  #-- put into READINGS
-  $hash->{READINGS}{"$owg_channel"}{VAL}   = $vval;
-  $hash->{READINGS}{"$owg_channel"}{TIME}  = $tn;
-  $hash->{READINGS}{"VDD"}{VAL}   = $owg_vdd;
-  $hash->{READINGS}{"VDD"}{TIME}  = $tn;
-         
   #-- string buildup for return value, STATE 
-  $value1 .= sprintf( "%s: %5.3f %s temperature %5.3f %s VDD %5.2f V", $owg_channel, $vval,$hash->{READINGS}{"$owg_channel"}{UNITABBR},$tval,$tabbr,$owg_vdd);
-  $value2 .= sprintf( "%s: %5.2f %s (T: %5.2f %s)", $owg_channel, $vval,$hash->{READINGS}{"$owg_channel"}{UNITABBR},$tval,$tabbr);
-   
+  $svalue .= sprintf( "%s: %5.2f %s (T: %5.2f %s)", $owg_channel, $vval,$hash->{READINGS}{"$owg_channel"}{UNITABBR},$tval,$tabbr);
+  
+  #-- put into READINGS
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"$owg_channel",$vval);
+  readingsBulkUpdate($hash,"VDD",$owg_vdd);
+  readingsBulkUpdate($hash,"temperature",$tval);
+  
   #-- STATE
-  $hash->{STATE} = $value2;
+  readingsBulkUpdate($hash,"state",$svalue);
+  readingsEndUpdate($hash,1); 
 
-  return $value1;
+  return $svalue;
 }
   
 ########################################################################################
@@ -418,7 +413,7 @@ sub OWMULTI_Get($@) {
   
   #-- process results
   if( defined($ret)  ){
-    return "OWMULTI: Could not get values from device $name, return was $ret";
+    return "OWMULTI: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
   OWMULTI_FormatValues($hash);
@@ -475,7 +470,7 @@ sub OWMULTI_GetValues($@) {
         if( !defined($ret) );
     } 
   #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSTHERM_GetValues($hash);
+  #  $ret = OWFSMULTI_GetValues($hash);
   }else{
     Log 3, "OWMULTI: GetValues with wrong IODev type $interface";
     return 1;
@@ -488,18 +483,9 @@ sub OWMULTI_GetValues($@) {
   }
   $hash->{PRESENT} = 1; 
 
-  #-- old state, new state
-  my $oldval = $hash->{STATE};
   $value=OWMULTI_FormatValues($hash);
-  my $newval =  $hash->{STATE};
-   #--logging depends on setting of the event-attribute
   Log 5, $value;
-  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
-  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
-     $hash->{CHANGED}[0] = $value;
-     DoTrigger($name, undef);
-  } 
-  
+
   return undef;
 }
 
@@ -562,7 +548,7 @@ sub OWMULTI_Set($@) {
     $ret = OWXMULTI_SetValues($hash,@a);
   #-- OWFS interface not yet implemented
   #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSTHERM_SetValues($hash,@a);
+  #  $ret = OWFSMULTI_SetValues($hash,@a);
   #  return $ret
   #    if(defined($ret));
   } else {
@@ -671,31 +657,23 @@ sub OWXMULTI_GetValues($) {
   if( $res eq 0 ){
     return "$owx_dev not accessible in 2nd step"; 
   }
-  
-  #  $res2 = "====> OWXMULTI Received ";
-  #  for(my $i=0;$i<length($res);$i++){  
-  #    my $j=int(ord(substr($res,$i,1))/16);
-  #    my $k=ord(substr($res,$i,1))%16;
-  #    $res2.=sprintf "0x%1x%1x ",$j,$k;
-  #  }
-  #  Log 1, $res2;
      
   #-- process results
-  my  @data=split(//,$res);
-  return "invalid data length, ".int(@data)." bytes"
-    if (@data != 20); 
+  my  @data=split(//,substr($res,9));
+  return "invalid data length, ".int(@data)." instead of 11 bytes"
+    if (@data != 11); 
   return "conversion not complete or data invalid"
-    if ((ord($data[11]) & 112)!=0); 
-  #return "invalid CRC"
-  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);
+    if ((ord($data[2]) & 112)!=0); 
+  return "invalid CRC"
+    if (OWX_CRC8(substr($res,11,8),$data[10])==0);
   
   #-- this must be different for the different device types
   #   family = 26 => DS2438
   
   #-- temperature
-  my $lsb  = ord($data[12]);
-  my $msb  = ord($data[13]) & 127;
-  my $sign = ord($data[13]) & 128;
+  my $lsb  = ord($data[3]);
+  my $msb  = ord($data[4]) & 127;
+  my $sign = ord($data[4]) & 128;
       
   #-- test with -55 degrees
   #$lsb   = 0;
@@ -709,8 +687,8 @@ sub OWXMULTI_GetValues($) {
   }
   
   #-- voltage
-  $lsb  = ord($data[14]);
-  $msb  = ord($data[15]) & 3;
+  $lsb  = ord($data[5]);
+  $msb  = ord($data[6]) & 3;
       
   #-- test with 5V
   #$lsb  = 244;
@@ -756,35 +734,25 @@ sub OWXMULTI_GetValues($) {
   #-- issue the match ROM command \x55 and the read scratchpad command \xBE
   #-- reading 9 + 2 + 9 data bytes = 20 bytes
   $res=OWX_Complex($master,$owx_dev,"\xBE\x00",9);
-  #Log 1,"OWXMULTI: data length from reading device is ".length($res)." bytes";
   #-- process results
   if( $res eq 0 ){
     return "$owx_dev not accessible in 2nd step"; 
   }
-  
-  #  $res2 = "====> OWXMULTI Received ";
-  #  for(my $i=0;$i<length($res);$i++){  
-  #    my $j=int(ord(substr($res,$i,1))/16);
-  #    my $k=ord(substr($res,$i,1))%16;
-  #    $res2.=sprintf "0x%1x%1x ",$j,$k;
-  #  }
-  #  Log 1, $res2;
-     
+    
   #-- process results
-  @data=split(//,$res);
-  return "invalid data length, ".int(@data)." bytes"
-    if (@data != 20); 
+  @data=split(//,substr($res,9));
+  return "invalid data length, ".int(@data)." instead of 11 bytes"
+    if (@data != 11); 
   return "conversion not complete or data invalid"
-    if ((ord($data[11]) & 112)!=0); 
-  #return "invalid CRC"
-  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);
+    if ((ord($data[2]) & 112)!=0); 
+  return "invalid CRC"
+    if (OWX_CRC8(substr($res,11,8),$data[10])==0);
   
   #-- this must be different for the different device types
   #   family = 26 => DS2438
-  
   #-- voltage
-  $lsb  = ord($data[14]);
-  $msb  = ord($data[15]) & 3;
+  $lsb  = ord($data[5]);
+  $msb  = ord($data[6]) & 3;
       
   #-- test with 7.2 V
   #$lsb  = 208;
@@ -845,118 +813,112 @@ sub OWXMULTI_SetValues($@) {
   return undef;
 }
 
-
-
 1;
 
 =pod
 =begin html
+ <a name="OWMULTI"></a>
+        <h3>OWMULTI</h3>
+        <p>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery
+            monitor<br /><br /> Note:<br /> This 1-Wire module so far works only with the OWX
+            interface module. Please define an <a href="#OWX">OWX</a> device first. <br /></p>
+        <br /><h4>Example</h4>
+        <p>
+            <code>define OWX_M OWMULTI 7C5034010000 45</code>
+            <br />
+            <code>attr OWX_M VName relHumidity|humidity</code>
+            <br />
+            <code>attr OWX_M VUnit percent|%</code>
+            <br />
+            <code>attr OWX_M VFunction (161.29 * V / VDD - 25.8065)/(1.0546 - 0.00216 * T)</code>
+            <br />
+        </p><br />
+        <a name="OWMULTIdefine"></a>
+        <h4>Define</h4>
+        <p>
+            <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+            <br /><br /> Define a 1-Wire multi-sensor<br /><br /></p>
+        <ul>
+            <li>
+                <code>[&lt;model&gt;]</code><br /> Defines the sensor model (and thus 1-Wire family
+                id), currently the following values are permitted: <ul>
+                    <li>model DS2438 with family id 26 (default if the model parameter is omitted).
+                        Measured is a temperature value, an external voltage and the current supply
+                        voltage</li>
+                </ul>
+            </li>
+            <li>
+                <code>&lt;id&gt;</code>
+                <br />12-character unique ROM id of the converter device without family id and CRC
+                code </li>
+            <li>
+                <code>&lt;interval&gt;</code>
+                <br />Measurement interval in seconds. The default is 300 seconds. </li>
+        </ul>
+        <br />
+        <a name="OWMULTIset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="owmulti_interval">
+                    <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                interval in seconds. The default is 300 seconds. </li>
+        </ul>
+        <br />
+        <a name="OWMULTIget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="owmulti_id">
+                    <code>get &lt;name&gt; id</code></a>
+                <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+            <li><a name="owmulti_present">
+                    <code>get &lt;name&gt; present</code>
+                </a>
+                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+            <li><a name="owmulti_interval2">
+                    <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval in
+                seconds. </li>
+            <li><a name="owmulti_reading">
+                    <code>get &lt;name&gt; reading</code></a><br />Obtain the measurement value from
+                VFunction. </li>
+            <li><a name="owmulti_temperature">
+                    <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature value. </li>
+            <li><a name="owmulti_vdd">
+                    <code>get &lt;name&gt; VDD</code></a><br />Obtain the current supply voltage. </li>
+            <li><a name="owmulti_raw">
+                    <code>get &lt;name&gt; V</code> or <code>get &lt;name&gt;
+                raw</code></a><br />Obtain the raw external voltage measurement. </li>
+        </ul>
+        <br />
+        <a name="OWMULTIattr"></a>
+        <h4>Attributes</h4>
+        <ul>
+            <li><a name="owmulti_vname"><code>attr &lt;name&gt; VName
+                        &lt;string&gt;|&lt;string&gt;</code></a>
+                <br />name for the channel | a type description for the measured value. </li>
+            <li><a name="owmulti_vunit"><code>attr &lt;name&gt; VUnit
+                        &lt;string&gt;|&lt;string&gt;</code></a>
+                <br />unit of measurement for this channel | its abbreviation. </li>
+            <li><a name="owmulti_vfunction"><code>attr &lt;name&gt; VFunction
+                    &lt;string&gt;</code></a>
+                <br />arbitrary functional expression involving the values VDD, V, T. Example see
+                above. <ul>
+                    <li>VDD is replaced by the measured supply voltage in Volt,</li>
+                    <li> V by the measured external voltage,</li>
+                    <li>T by the measured and corrected temperature in its unit</li>
+                </ul></li>
+            <li><a name="owmulti_tempOffset"><code>attr &lt;name&gt; tempOffset &lt;float&gt;</code>
+                </a>
+                <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+            <li><a name="owmulti_tempUnit"><code>attr &lt;name&gt; tempUnit
+                        Celsius|Kelvin|Fahrenheit|C|K|F</code>
+                </a>
+                <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#event-on-update-reading">event-on-update-reading</a>, <a
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    <a href="#webCmd">webCmd</a></li>
 
-<a name="OWMULTI"></a>
-<h3>OWMULTI</h3>
-<ul>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery monitor<br /><br /> Note:<br /> This
-    1-Wire module so far works only with the OWX interface module. Please define an <a
-        href="#OWX">OWX</a> device first. <br />
-    <br /><b>Example</b><br />
-    <ul>
-        <code>define OWX_M OWMULTI 7C5034010000 45</code>
-        <br />
-        <code>attr OWX_M VName relHumidity|humidity</code>
-        <br />
-        <code>attr OWX_M VUnit percent|%</code>
-        <br />
-        <code>attr OWX_M VFunction (161.29 * V / VDD - 25.8065)/(1.0546 - 0.00216 * T)</code>
-        <br />
-    </ul><br />
-    <a name="OWMULTIdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
-        <br /><br /> Define a 1-Wire multi-sensor<br /><br />
-        <li>
-            <code>[&lt;model&gt;]</code><br /> Defines the sensor model (and thus
-            1-Wire family id), currently the following values are permitted: <ul>
-                <li>model DS2438 with family id 26 (default if the model parameter is
-                    omitted). Measured is a temperature value, an external voltage and the current supply voltage</li>
-            </ul>
-        </li>
-        <li>
-            <code>&lt;id&gt;</code>
-            <br />12-character unique ROM id of the converter device without family id and
-            CRC code </li>
-        <li>
-            <code>&lt;interval&gt;</code>
-            <br />Measurement interval in seconds. The default is 300 seconds. </li>
-        <br />
-    </ul>
-    <br />
-    <a name="OWMULTIset">
-        <b>Set</b></a>
-    <ul>
-        <li><a name="owmulti_interval">
-            <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
-            interval in seconds. The default is 300 seconds. </li>
-    </ul>
-    <br />
-    <a name="OWMULTIget">
-        <b>Get</b></a>
-    <ul>
-        <li><a name="owmulti_id">
-            <code>get &lt;name&gt; id</code></a>
-            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-        <li><a name="owmulti_present">
-            <code>get &lt;name&gt; present</code>
-        </a>
-            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-        <li><a name="owmulti_interval2">
-            <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
-            in seconds. </li>
-        <li><a name="owmulti_reading">
-            <code>get &lt;name&gt; reading</code></a><br />Obtain the measurement value from VFunction. </li>
-        <li><a name="owmulti_temperature">
-            <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature value. </li>
-        <li><a name="owmulti_vdd">
-            <code>get &lt;name&gt; VDD</code></a><br />Obtain the current supply voltage.
-        </li>
-        <li><a name="owmulti_raw">
-            <code>get &lt;name&gt; V</code> or <code>get &lt;name&gt; raw</code></a><br />Obtain the raw external voltage measurement.
-        </li>
-    </ul>
-    <br />
-    <a name="OWMULTIattr">
-        <b>Attributes</b></a>
-    <ul>
-        <li><a name="owmulti_vname"><code>attr &lt;name&gt; VName
-            &lt;string&gt;|&lt;string&gt;</code></a>
-            <br />name for the channel | a type description for the measured value. </li>
-        <li><a name="owmulti_vunit"><code>attr &lt;name&gt; VUnit
-            &lt;string&gt;|&lt;string&gt;</code></a>
-            <br />unit of measurement for this channel | its abbreviation. </li>
-        <li><a name="owmulti_vfunction"><code>attr &lt;name&gt; VFunction
-            &lt;string&gt;</code></a>
-            <br />arbitrary functional expression involving the values VDD, V, T. Example see above.
-            <ul>
-            <li>VDD is replaced by the measured supply voltage in Volt,</li>
-            <li> V by the measured external voltage,</li>
-            <li>T by the measured and corrected temperature in its unit</li>
-        </ul></li>
-        <li><a name="owmulti_tempOffset"><code>attr &lt;name&gt; tempOffset
-            &lt;float&gt;</code>
-        </a>
-            <br />temperature offset in &deg;C added to the raw temperature reading. </li>
-        <li><a name="owmulti_tempUnit"><code>attr &lt;name&gt; tempUnit
-            Celsius|Kelvin|Fahrenheit|C|K|F</code>
-        </a>
-            <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
-        <li><a name="owmulti_event"><code>attr &lt;name&gt; event on-change|on-update
-        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
-            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
-                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
-            </ul>
-        </li>
-        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
-  </ul>
-</ul>
-
+        </ul>
 =end html
 =cut

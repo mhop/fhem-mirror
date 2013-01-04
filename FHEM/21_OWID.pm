@@ -4,17 +4,11 @@
 #
 # FHEM module to commmunicate with general 1-Wire ID-ROMS
 #
-# Attention: This module may communicate with the OWX module,
-#            but currently not with the 1-Wire File System OWFS
+# Prof. Dr. Peter A. Henning
 #
-# Prefixes for subroutines of this module:
-# OW   = General 1-Wire routines  Peter Henning)
+# $Id$
 #
-# Prof. Dr. Peter A. Henning, 2012
-# 
-# Version 2.24 - October, 2012
-#   
-# Setup bus device in fhem.cfg as
+########################################################################################
 #
 # define <name> OWID <FAM_ID> <ROM_ID>
 #
@@ -49,7 +43,6 @@
 ########################################################################################
 package main;
 
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 use strict;
 use warnings;
@@ -136,18 +129,18 @@ sub OWID_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWID: Warning, no 1-Wire I/O device found for $name."
-    if(!defined($hash->{IODev}->{NAME}));
-    
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+    return "OWID: Warning, no 1-Wire I/O device found for $name.";
+  }
   $modules{OWID}{defptr}{$id} = $hash;
-  
-  $hash->{STATE} = "Defined";
-  Log 3, "OWID:   Device $name defined."; 
+  #--
+  readingsSingleUpdate($hash,"state","Defined",1);
+  Log 3, "OWTHERM: Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
- 
-  $hash->{STATE} = "Initialized";
+  #--
+  readingsSingleUpdate($hash,"state","Initialized",1); 
   return undef; 
 }
 
@@ -213,41 +206,39 @@ sub OWID_Undef ($) {
 
 =pod
 =begin html
-
-<a name="OWID"></a>
-<h3>OWID</h3>
-<ul>FHEM module for 1-Wire devices that know only their unique ROM ID<br />
-    <br />Note:<br /> This 1-Wire module so far works only with the OWX interface module.
-    Please define an <a href="#OWX">OWX</a> device first. <br />
-    <br /><b>Example</b><br />
-    <ul>
-        <code>define ROM1 OWX_ID OWCOUNT CE780F000000</code>
+ <a name="OWID"></a>
+        <h3>OWID</h3>
+        <p>FHEM module for 1-Wire devices that know only their unique ROM ID<br />
+            <br />Note:<br /> This 1-Wire module so far works only with the OWX interface module.
+            Please define an <a href="#OWX">OWX</a> device first. <br /></p>
+        <br /><h4>Example</h4><br />
+        <p>
+            <code>define ROM1 OWX_ID OWCOUNT CE780F000000</code>
+            <br />
+        </p><br />
+        <a name="OWIDdefine"></a>
+        <h4>Define</h4>
+        <p>
+            <code>define &lt;name&gt; OWID &lt;id&gt; </code>
+            <br /><br /> Define a 1-Wire device.<br /><br />
+        </p>
+        <ul>
+            <li>
+                <code>&lt;id&gt;</code>
+                <br />12-character unique ROM id of the converter device without family id and CRC
+                code </li>
+        </ul>
         <br />
-    </ul><br />
-    <a name="OWIDdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; OWID &lt;id&gt; </code>
-        <br /><br /> Define a 1-Wire device.<br /><br />
-        <li>
-            <code>&lt;id&gt;</code>
-            <br />12-character unique ROM id of the converter device without family id and
-            CRC code </li>
-    </ul>
-    <br />
-    <a name="OWIDget">
-        <b>Get</b></a>
-    <ul>
-        <li><a name="owid_id">
-                <code>get &lt;name&gt; id</code></a>
-            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-        <li><a name="owid_present">
-                <code>get &lt;name&gt; present</code>
-            </a>
-            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-    </ul>
-    <br />
-</ul>
-
+        <a name="OWIDget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="owid_id">
+                    <code>get &lt;name&gt; id</code></a>
+                <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+            <li><a name="owid_present">
+                    <code>get &lt;name&gt; present</code>
+                </a>
+                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+        </ul>
 =end html
 =cut

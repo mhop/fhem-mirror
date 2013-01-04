@@ -4,20 +4,13 @@
 #
 # FHEM module to commmunicate with 1-Wire temperature sensors DS1820, DS18S20, DS18B20, DS1822
 #
-# Attention: This module may communicate with the OWX module,
-#            and also with the 1-Wire File System OWFS
+# Prof. Dr. Peter A. Henning 
 #
-# Prefixes for subroutines of this module:
-# OW   = General 1-Wire routines (Martin Fischer, Peter Henning)
-# OWFS = 1-Wire file system (Martin Fischer)
-# OWX  = 1-Wire bus master interface (Peter Henning)
+# $Id$
 #
-# Prof. Dr. Peter A. Henning, 2012
-# Martin Fischer, 2011
-# 
-# Version 2.24 - October, 2012
-#   
-# Setup bus device in fhem.cfg as
+# Disclaimer: No code of the former OWTEMP module is contained here
+#
+########################################################################################
 #
 # define <name> OWTHERM [<model>] <ROM_ID> [interval]
 #
@@ -43,12 +36,8 @@
 # Additional attributes are defined in fhem.cfg
 # Note: attributes "tempXXXX" are read during every update operation.
 #
-# attr <name> event on-change/on-update = when to write an event (default= on-update)
-#
-# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is (-),
-#             overwritten by attribute setting red down triangle
-# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is (+), 
-#             overwritten by attribute setting red up triangle
+# attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is down triangle
+# attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is up triangle
 # attr <name> tempOffset <float>   = temperature offset in degree Celsius added to the raw temperature reading 
 # attr <name> tempUnit  <string>   = unit of measurement, e.g. Celsius/Kelvin/Fahrenheit or C/K/F, default is Celsius
 # attr <name> tempLow   <float>    = value for low alarm 
@@ -74,7 +63,6 @@
 ########################################################################################
 package main;
 
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 use strict;
 use warnings;
@@ -133,10 +121,10 @@ sub OWTHERM_Initialize ($) {
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
-                     "event:on-update,on-change ".
+                     "event-on-update-reading event-on-change-reading ".
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
-                     "tempLow tempHigh";
+                     "tempLow tempHigh";                
   }
   
 ########################################################################################
@@ -210,12 +198,14 @@ sub OWTHERM_Define ($$) {
   $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{INTERVAL}   = $interval;
 
-  #-- Couple to I/O device
+  #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
-  Log 3, "OWTHERM: Warning, no 1-Wire I/O device found for $name."
-    if(!defined($hash->{IODev}->{NAME}));
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+    return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
+  }
   $modules{OWTHERM}{defptr}{$id} = $hash;
-  $hash->{STATE} = "Defined";
+  #--
+  readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWTHERM: Device $name defined."; 
   
   #-- Start timer for initialization in a few seconds
@@ -241,28 +231,25 @@ sub OWTHERM_InitializeDevice($) {
   my $name   = $hash->{NAME};
   my @args;
   
-  #-- more colorful alarm signatures
-  CommandAttr (undef,"$name stateAL <span style=\"color:red\">&#x25BE;</span>")
-     if( !defined($attr{$name}{"stateAL"} ));
-  CommandAttr (undef,"$name stateAH <span style=\"color:red\">&#x25B4;</span>")
-     if( !defined($attr{$name}{"stateAH"} ));
-  
   #-- unit attribute defined ?
-  $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
   $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
   
   #-- Initial readings temperature sensor
-  $owg_temp  =  0.0;
-  $owg_tl = defined($attr{$name}{"tempLow"})   ? $attr{$name}{"tempLow"}   : 0.0;
-  $owg_th = defined($attr{$name}{"tempHigh"})  ? $attr{$name}{"tempHigh"}  : 100.0;
-  #-- Initialize all the display stuff  
-  OWTHERM_FormatValues($hash);
-  #-- alarm
-  @args   = ($name,"tempLow",$owg_tl);
-  OWTHERM_Set($hash,@args);
-  @args   = ($name,"tempHigh",$owg_th);
-  OWTHERM_Set($hash,@args);
+  $owg_temp  =  "";
+  $owg_tl = defined($attr{$name}{"tempLow"})   ? $attr{$name}{"tempLow"}   : "";
+  $owg_th = defined($attr{$name}{"tempHigh"})  ? $attr{$name}{"tempHigh"}  : "";
   
+  #-- Output formatting because of reading attributes
+  OWTHERM_FormatValues($hash);
+  #-- set status
+  if ($owg_tl ne ""){
+    @args   = ($name,"tempLow",$owg_tl);
+    OWTHERM_Set($hash,@args);
+  }
+  if ($owg_th ne ""){
+    @args   = ($name,"tempHigh",$owg_th);
+    OWTHERM_Set($hash,@args);
+  }
 }
 
 ########################################################################################
@@ -278,16 +265,14 @@ sub OWTHERM_FormatValues($) {
   
   my $name    = $hash->{NAME}; 
   my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
-  my ($value1,$value2,$value3)   = ("","","");
-
-  my $tn = TimeNow();
+  my $svalue = "";
   
   #-- attributes defined ?
-  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "(-)";
-  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "(+)";
-  $unit   = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : $hash->{READINGS}{"temperature"}{UNIT};
-  $offset = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
-  $factor = 1.0;
+  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
+  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
+  $unit    =  $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
+  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $factor  = 1.0;
   
   if( $unit eq "Celsius" ){
     $abbr   = "&deg;C";
@@ -300,57 +285,51 @@ sub OWTHERM_FormatValues($) {
     $factor = 1.8;
   } else {
     $abbr="?";
-    Log 1, "OWTHERM_FormatValues: unknown unit $unit";
+    Log 3, "OWTHERM_FormatValues: unknown unit $unit";
   }
-  #-- these values are rather coplex to obtain, therefore save them in the hash
+  #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
   $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
   $hash->{tempf}{offset}                     = $offset;
   $hash->{tempf}{factor}                     = $factor;
   
+  #-- no change in any value if invalid reading
+  return if( $owg_temp eq "");
+  
   #-- correct values for proper offset, factor 
   $vval  = ($owg_temp + $offset)*$factor;
-  
-  #-- put into READINGS
-  $hash->{READINGS}{"temperature"}{VAL}   = $vval;
-  $hash->{READINGS}{"temperature"}{TIME}  = $tn;
     
   #-- correct alarm values for proper offset, factor 
   $vlow   = ($owg_tl + $offset)*$factor;
   $vhigh  = ($owg_th + $offset)*$factor;
-  
-  #-- put into READINGS
-  $hash->{READINGS}{"tempLow"}{VAL}     = $vlow;
-  $hash->{READINGS}{"tempLow"}{TIME}    = $tn;
-  $hash->{READINGS}{"tempHigh"}{VAL}    = $vhigh;
-  $hash->{READINGS}{"tempHigh"}{TIME}   = $tn;   
          
   #-- formats for output
   $statef  = "%5.2f ".$abbr;
-  $value1 = "temperature: ".sprintf($statef,$vval);
-  $value2 = sprintf($statef,$vval);
-  $hash->{ALARM} = 1;
+  $svalue = "temperature: ".sprintf($statef,$vval);
   
   #-- Test for alarm condition
+  $hash->{ALARM} = 1;
   if( ($vval <= $vlow) && ( $vval >= $vhigh ) ){
-    $value2 .= " ".$stateal.$stateah;
-    $value3 .= " ".$stateal.$stateah;
+    $svalue .= " ".$stateal.$stateah;
   }elsif( $vval <= $vlow ){
-    $value2 .= " ".$stateal;
-    $value3 .= " ".$stateal; 
+    $svalue .= " ".$stateal;
   }elsif( $vval >= $vhigh ){
-    $value2 .= " ".$stateah;
-    $value3 .= " ".$stateah;
+    $svalue .= " ".$stateah;
   } else {
     $hash->{ALARM} = 0;
   }
   
+  #-- put into READINGS
+  readingsBeginUpdate($hash);
+  readingsBulkUpdate($hash,"temperature",$vval);
+  readingsBulkUpdate($hash,"tempLow",$vlow);
+  readingsBulkUpdate($hash,"tempHigh",$vhigh);
+  
   #-- STATE
-  $hash->{STATE} = $value2;
-  #-- alarm
-  #$hash->{READINGS}{alarms}{VAL}  = $value3;
-  #$hash->{READINGS}{alarms}{TIME}   = $tn;
-  return $value1;
+  readingsBulkUpdate($hash,"state",$svalue);
+  readingsEndUpdate($hash,1); 
+  
+  return $svalue;
 }
   
 ########################################################################################
@@ -485,17 +464,8 @@ sub OWTHERM_GetValues($@) {
   }
   $hash->{PRESENT} = 1; 
 
-  #-- old state, new state
-  my $oldval = $hash->{STATE};
   $value=OWTHERM_FormatValues($hash);
-  my $newval =  $hash->{STATE};
-   #--logging depends on setting of the event-attribute
   Log 5, $value;
-  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
-  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
-     $hash->{CHANGED}[0] = $value;
-     DoTrigger($name, undef);
-  } 
   
   return undef;
 }
@@ -540,7 +510,7 @@ sub OWTHERM_Set($@) {
     return undef;
   }
 
-  #-- set other values depending on interface type
+  #-- set tempLow or tempHigh
   my $interface = $hash->{IODev}->{TYPE};
   my $offset    = $hash->{tempf}{offset};
   my $factor    = $hash->{tempf}{factor};
@@ -551,7 +521,7 @@ sub OWTHERM_Set($@) {
   return sprintf("OWTHERM: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
     if($value < $mmin || $value > $mmax);
     
-  #-- seems to be ok, put into the device
+  #-- seems to be ok, put into the device after correcting for offset and factor
   $a[2]  = int($value/$factor-$offset);
 
   #-- OWX interface
@@ -664,7 +634,7 @@ sub OWXTHERM_GetValues($) {
 
   my ($hash) = @_;
   
-  my ($i,$j,$k);
+  my ($i,$j,$k,@data);
   
   #-- For default, perform the conversion NOT now
   my $con=1;
@@ -702,25 +672,25 @@ sub OWXTHERM_GetValues($) {
   }
   
   #-- process results
-  my  @data=split(//,$res);
-  return "invalid data length, ".int(@data)." bytes"
-    if (@data != 19); 
+  @data=split(//,substr($res,9));
+  return "invalid data length, ".int(@data)." instead of 10 bytes"
+    if (@data != 10); 
   return "invalid data"
-    if (ord($data[17])<=0); 
+    if (ord($data[8])<=0); 
   return "invalid CRC"
-    if (OWX_CRC8(substr($res,10,8),$data[18])==0);
+    if (OWX_CRC8(substr($res,10,8),$data[9])==0);
   
   #-- this must be different for the different device types
   #   family = 10 => DS1820, DS18S20
   if( $hash->{OW_FAMILY} eq "10" ) {    
   
-    my $count_remain = ord($data[16]);
-    my $count_perc   = ord($data[17]);
+    my $count_remain = ord($data[7]);
+    my $count_perc   = ord($data[8]);
     my $delta        = -0.25 + ($count_perc - $count_remain)/$count_perc;
    
-    my $lsb  = ord($data[10]);
+    my $lsb  = ord($data[1]);
     my $msb  = 0;
-    my $sign = ord($data[11]) & 255;
+    my $sign = ord($data[2]) & 255;
       
     #-- test with -25 degrees
     #$lsb   =  12*16+14;
@@ -733,16 +703,16 @@ sub OWXTHERM_GetValues($) {
       $owg_temp = -128+$owg_temp;
     }
 
-    $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
-    $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+    $owg_th = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
+    $owg_tl = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
  
     return undef;
 
   } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
      
-    my $lsb  = ord($data[10]);
-    my $msb  = ord($data[11]) & 7;
-    my $sign = ord($data[11]) & 248;
+    my $lsb  = ord($data[1]);
+    my $msb  = ord($data[2]) & 7;
+    my $sign = ord($data[2]) & 248;
       
     #-- test with -55 degrees
     #$lsb   = 9*16;
@@ -754,8 +724,8 @@ sub OWXTHERM_GetValues($) {
     if( $sign !=0 ){
       $owg_temp = -128+$owg_temp;
     }
-    $owg_th = ord($data[12]) > 127 ? 128-ord($data[12]) : ord($data[12]);
-    $owg_tl = ord($data[13]) > 127 ? 128-ord($data[13]) : ord($data[13]);
+    $owg_th = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
+    $owg_tl = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
     
     return undef;
     
@@ -815,129 +785,114 @@ sub OWXTHERM_SetValues($@) {
   return undef;
 }
 
-
-
 1;
 
 =pod
 =begin html
-
-<a name="OWTHERM"></a>
-<h3>OWTHERM</h3>
-<ul>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br /><br />
-    Note:<br /> This is the only 1-Wire module which so far works with both the OWFS and the
-    OWX interface module. Please define an <a href="#OWFS">OWFS</a> device or an <a
-        href="#OWX">OWX</a> device first. <br />
-    <br /><b>Example</b><br />
-    <ul>
-        <code>define OWX_T OWTHERM DS18B20 E8D09B030000 300</code>
-        <br />
-        <code>attr OWX_T tempUnit Kelvin</code>
-        <br />
-    </ul><br />
-    <a name="OWTHERMdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt;
-            [&lt;interval&gt;]</code>
+     <a name="OWTHERM"></a>
+        <h3>OWTHERM</h3>
+        <p>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br /><br />
+            Note:<br /> This is the only 1-Wire module which so far works with both the OWFS and the
+            OWX interface module. Please define an <a href="#OWFS">OWFS</a> device or an <a
+                href="#OWX">OWX</a> device first. <br />
+        </p>
+        <h4>Example</h4>
+        <p>
+            <code>define OWX_T OWTHERM DS18B20 E8D09B030000 300</code>
+            <br />
+            <code>attr OWX_T tempUnit Kelvin</code>
+            <br />
+        </p><br />
+        <a name="OWTHERMdefine"></a>
+        <h4>Define</h4>
+        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
         <br /><br /> Define a 1-Wire digital thermometer device.<br /><br />
-        <li>
-            <code>[&lt;model&gt;]</code><br /> Defines the thermometer model (and thus
-            1-Wire family id) currently the following values are permitted: <ul>
-                <li>model DS1820 with family id 10 (default if the model parameter is
-                    omitted)</li>
-                <li>model DS1822 with family id 22</li>
-                <li>model DS18B20 with family id 28</li>
-            </ul>
-        </li>
-        <li>
+        <p>
+            <code>[&lt;model&gt;]</code><br /> Defines the thermometer model (and thus 1-Wire family
+            id) currently the following values are permitted: </p>
+        <ul>
+            <li>model DS1820 with family id 10 (default if the model parameter is omitted)</li>
+            <li>model DS1822 with family id 22</li>
+            <li>model DS18B20 with family id 28</li>
+        </ul>
+        <p>
             <code>&lt;id&gt;</code>
-            <br />12-character unique ROM id of the thermometer device without family id and
-            CRC code </li>
-        <li>
+            <br />12-character unique ROM id of the thermometer device without family id and CRC
+            code </p>
+        <p>
             <code>&lt;interval&gt;</code>
-            <br /> Temperature measurement interval in seconds. The default is 300 seconds. </li>
+            <br /> Temperature measurement interval in seconds. The default is 300 seconds. </p>
         <br /> Example: <br />
         <code>define Temp1 OWTHERM 14B598010800 300 </code><br />
-    </ul>
-    <br />
-    <a name="OWTHERMset">
-        <b>Set</b></a>
-    <ul>
-        <li><a name="owtherm_interval">
-                <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
-            measurement intervall in seconds. The default is 300 seconds.</li>
-        <li><a name="owtherm_tempHigh">
-                <code>set &lt;name&gt; tempHigh &lt;float&gt;</code></a>
-            <br /> The high alarm temperature (on the temperature scale chosen by the
-            attribute value) </li>
-        <li><a name="owtherm_tempLow">
-                <code>set &lt;name&gt; tempLow &lt;float&gt;</code></a>
-            <br /> The low alarm temperature (on the temperature scale chosen by the
-            attribute value) </li>
-    </ul>
-    <br />
-    <a name="OWTHERMget">
-        <b>Get</b></a>
-    <ul>
-        <li><a name="owtherm_id">
-                <code>get &lt;name&gt; id</code></a>
-            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-        <li><a name="owtherm_present">
-                <code>get &lt;name&gt; present</code></a>
-            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-        <li><a name="owtherm_interval2">
-                <code>get &lt;name&gt; interval</code></a><br />Returns temperature
-            measurement interval in seconds.</li>
-        <li><a name="owtherm_temperature">
-                <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature. </li>
-        <li><a name="owtherm_alarm">
-                <code>get &lt;name&gt; alarm</code></a><br />Obtain the alarm temperature
-            values. </li>
-    </ul>
-    <br />
-    <a name="OWTHERMattr">
-        <b>Attributes</b></a>
-    <ul>
-        <li><a name="owtherm_stateAL"><code>attr &lt;name&gt; stateAL &lt;string&gt;</code>
-            </a>
-            <br />character string for denoting low alarm condition, default is red down
-            triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25BE;&lt;/span&gt;
-            leading to the sign <span style="color:red">&#x25BE;</span>
-        </li>
-        <li><a name="owtherm_stateAH"><code>attr &lt;name&gt; stateAH &lt;string&gt;</code>
-            </a>
-            <br />character string for denoting high alarm condition, default is red upward
-            triangle, e.g. the code &lt;span style="color:red"&gt;&amp;#x25B4;&lt;/span&gt;
-            leading to the sign <span style="color:red">&#x25B4;</span>
-        </li>
-        <li><a name="owtherm_tempOffset"><code>attr &lt;name&gt; tempOffset
-                    &lt;float&gt;</code>
-            </a>
-            <br />temperature offset in &deg;C added to the raw temperature reading. </li>
-        <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
-                    Celsius|Kelvin|Fahrenheit|C|K|F</code>
-            </a>
-            <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
-        <li><a name="owtherm_tempHigh2">
-                <code>attr &lt;name&gt; tempHigh &lt;float&gt;</code>
-            </a>
-            <br /> high alarm temperature (on the temperature scale chosen by the attribute
-            value). </li>
-        <li><a name="owtherm_tempLow2">
-                <code>attr &lt;name&gt; tempLow &lt;float&gt;</code>
-            </a>
-            <br /> low alarm temperature (on the temperature scale chosen by the attribute
-            value). </li>
-        <li><a name="owtherm_event"><code>attr &lt;name&gt; event on-change|on-update
-        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
-            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
-                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
-            </ul>
-        </li>
-        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
-    </ul>
-</ul>
-
+        <br />
+        <a name="OWTHERMset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="owtherm_interval">
+                    <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Temperature
+                measurement intervall in seconds. The default is 300 seconds.</li>
+            <li><a name="owtherm_tempHigh">
+                    <code>set &lt;name&gt; tempHigh &lt;float&gt;</code></a>
+                <br /> The high alarm temperature (on the temperature scale chosen by the attribute
+                value) </li>
+            <li><a name="owtherm_tempLow">
+                    <code>set &lt;name&gt; tempLow &lt;float&gt;</code></a>
+                <br /> The low alarm temperature (on the temperature scale chosen by the attribute
+                value) </li>
+        </ul>
+        <br />
+        <a name="OWTHERMget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="owtherm_id">
+                    <code>get &lt;name&gt; id</code></a>
+                <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+            <li><a name="owtherm_present">
+                    <code>get &lt;name&gt; present</code></a>
+                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+            <li><a name="owtherm_interval2">
+                    <code>get &lt;name&gt; interval</code></a><br />Returns temperature measurement
+                interval in seconds.</li>
+            <li><a name="owtherm_temperature">
+                    <code>get &lt;name&gt; temperature</code></a><br />Obtain the temperature. </li>
+            <li><a name="owtherm_alarm">
+                    <code>get &lt;name&gt; alarm</code></a><br />Obtain the alarm temperature
+                values. </li>
+        </ul>
+        <br />
+        <a name="OWTHERMattr"></a>
+        <h4>Attributes</h4>
+        <ul>
+            <li><a name="owtherm_stateAL"><code>attr &lt;name&gt; stateAL &lt;string&gt;</code>
+                </a>
+                <br />character string for denoting low alarm condition, default is down triangle,
+                e.g. the code &amp;#x25BE; leading to the sign &#x25BE; </li>
+            <li><a name="owtherm_stateAH"><code>attr &lt;name&gt; stateAH &lt;string&gt;</code>
+                </a>
+                <br />character string for denoting high alarm condition, default is upward
+                triangle, e.g. the code &amp;#x25B4; leading to the sign &#x25B4; </li>
+            <li><a name="owtherm_tempOffset"><code>attr &lt;name&gt; tempOffset &lt;float&gt;</code>
+                </a>
+                <br />temperature offset in &deg;C added to the raw temperature reading. </li>
+            <li><a name="owtherm_tempUnit"><code>attr &lt;name&gt; tempUnit
+                        Celsius|Kelvin|Fahrenheit|C|K|F</code>
+                </a>
+                <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
+            <li><a name="owtherm_tempHigh2">
+                    <code>attr &lt;name&gt; tempHigh &lt;float&gt;</code>
+                </a>
+                <br /> high alarm temperature (on the temperature scale chosen by the attribute
+                value). </li>
+            <li><a name="owtherm_tempLow2">
+                    <code>attr &lt;name&gt; tempLow &lt;float&gt;</code>
+                </a>
+                <br /> low alarm temperature (on the temperature scale chosen by the attribute
+                value). </li>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#event-on-update-reading">event-on-update-reading</a>, <a
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    <a href="#webCmd">webCmd</a></li>
+        </ul>
 =end html
 =cut

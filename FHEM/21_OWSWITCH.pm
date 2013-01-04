@@ -4,22 +4,11 @@
 #
 # FHEM module to commmunicate with 1-Wire adressable switches DS2413, DS206, DS2408
 #
-# Attention: This module may communicate with the OWX module,
-#            but currently not with the 1-Wire File System OWFS
+# Prof. Dr. Peter A. Henning
 #
-# TODO: Kanalattribute ändern zur Laufzeit.
+# $Id$
 #
-#
-# Prefixes for subroutines of this module:
-# OW   = General 1-Wire routines  Peter Henning)
-# OWX  = 1-Wire bus master interface (Peter Henning)
-# OWFS = 1-Wire file system (??)
-#
-# Prof. Dr. Peter A. Henning, 2012
-# 
-# Version 2.25 - October, 2012
-#   
-# Setup bus device in fhem.cfg as
+########################################################################################
 #
 # define <name> OWSWITCH [<model>] <ROM_ID> [interval] 
 #
@@ -42,15 +31,16 @@
 # get <name> gpio  => values for channels
 #
 # set <name> interval => set period for measurement
-# set <name> output <channel-name>  ON|OFF => set value for channel (name A, B or defined channel name)
+# set <name> output <channel-name>  on|off|on-for-timer <int>|on-for-timer <int>
+#            => set value for channel (name A, B or defined channel name)
 #            note: 1 = OFF, 0 = ON in normal usage. See also the note above
+#            ON-for-timer/OFF-for-timer will set the desired value only for <int> seconds
+#            and then will return to the opposite value.
 # set <name> gpio  value => set values for channels (3 = both OFF, 1 = B ON 2 = A ON 0 = both ON)
 # set <name> init yes => re-initialize device
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
-#
-# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> stateS <string> = character string denoting external shortening condition, default is (ext)
 #                                        overwritten by an attribute setting "red angled arrow downwward"
@@ -78,7 +68,6 @@
 ########################################################################################
 package main;
 
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 use strict;
 use warnings;
@@ -140,7 +129,8 @@ sub OWSWITCH_Initialize ($) {
   $hash->{SetFn}   = "OWSWITCH_Set";
 
   my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2413,DS2406,DS2408 loglevel:0,1,2,3,4,5 ".
-    "event:on-update,on-change stateS ";
+    "event-on-update-reading event-on-change-reading ".
+    "stateS ";
  
  #TODO: correct number of channels
  
@@ -221,17 +211,19 @@ sub OWSWITCH_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWSWITCH: Warning, no 1-Wire I/O device found for $name."
-    if(!defined($hash->{IODev}->{NAME}));
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  }
   $modules{OWSWITCH}{defptr}{$id} = $hash;
-  $hash->{STATE} = "Defined";
-  Log 3, "OWSWITCH:   Device $name defined."; 
+  #--
+  readingsSingleUpdate($hash,"state","defined",1);
+  Log 3, "OWSWITCH: Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
  
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+1, "OWSWITCH_InitializeDevice", $hash, 0);
+  InternalTimer(time()+10, "OWSWITCH_InitializeDevice", $hash, 0);
   
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
@@ -251,16 +243,12 @@ sub OWSWITCH_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
-   
-  #-- more colorful shortening signature
-  CommandAttr (undef,"$name stateS <span style=\"color:red\">&#x2607;</span>")
-   if( !defined($attr{$name}{"stateS"} ));
-   
+    
   #-- Set channel names, channel units 
   for( my $i=0;$i<$cnumber{$attr{$name}{"model"}} ;$i++) { 
-    #-- Initial readings OFF
+    #-- Initial readings ERR
     $owg_val[$i]   = 1;
-    $owg_vax[$i]   = 1;
+    $owg_vax[$i]   = 0;
     #-- name
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|onoff";
     my @cnama = split(/\|/,$cname);
@@ -315,13 +303,14 @@ sub OWSWITCH_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($offset,$factor,$vval,$vvax,$vstr,$cname,@cnama,@unarr);
-  my ($value1,$value2,$value3)   = ("","","");
-  
-  my $tn = TimeNow();
+  my ($offset,$factor,$vval,$vvax,$vstr,$cname,@cnama,@unarr,$valid);
+  my $svalue  = ""; 
   
   #-- external shortening signature
-  my $sname = defined($attr{$name}{"stateS"})  ? $attr{$name}{"stateS"} : "(ext)";  
+  my $sname = defined($attr{$name}{"stateS"})  ? $attr{$name}{"stateS"} : "&#x2607;";  
+  
+  #-- put into READINGS
+  readingsBeginUpdate($hash);
 
   #-- formats for output
   for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
@@ -338,28 +327,28 @@ sub OWSWITCH_FormatValues($) {
     @unarr= split(/\|/,$hash->{READINGS}{"$owg_channel[$i]"}{UNIT});
    
     $vstr    = $unarr[$vval];
-    $vstr   .= $sname if( ($vval == 0) && ($vvax == 1) );
-    $vstr    = "ERR"  if( ($vval == 1) && ($vvax == 0) );
     
-    $value1 .= sprintf( "%s: %s", $owg_channel[$i], $vstr);
-    $value2 .= sprintf( "%s: %s ", $owg_channel[$i], $vstr);
-    $value3 .= sprintf( "%s: " , $owg_channel[$i]);
-    
-    #-- put into READINGS
-    $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $vstr;
-    $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
-    
-    #-- insert comma
-    if( $i<$cnumber{$attr{$name}{"model"}}-1 ){
-      $value1 .= " ";
-      $value2 .= ", ";
-      $value3 .= ", ";
+    #-- put into readings only when valid
+    if( ($vval == 1) && ($vvax == 0) ){
+      $vstr ="???"
+    }else{
+      $vstr.= $sname if( ($vval == 0) && ($vvax == 1) );
+      readingsBulkUpdate($hash,"$owg_channel[$i]",$vstr);
+    } 
+    $svalue .= sprintf( "%s: %s" , $owg_channel[$i], $vstr);
+
+    #-- insert space 
+    if( $i<($cnumber{$attr{$name}{"model"}}-1) ){
+      $svalue .= " ";
     }
+    
   }
+  
   #-- STATE
-  $hash->{STATE} = $value2;
+  readingsBulkUpdate($hash,"state",$svalue);
+  readingsEndUpdate($hash,1); 
  
-  return $value1;
+  return $svalue;
 }
 
 ########################################################################################
@@ -463,7 +452,7 @@ sub OWSWITCH_Get($@) {
   }
   #-- process results
   if( defined($ret)  ){
-    return "OWSWITCH: Could not get values from device $name";
+    return "OWSWITCH: Could not get values from device $name, reason $ret";
   }
   $hash->{PRESENT} = 1; 
   return "OWSWITCH: $name.$reading => ".OWSWITCH_FormatValues($hash);  
@@ -498,29 +487,32 @@ sub OWSWITCH_GetValues($) {
   #-- Get readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
   if( $interface eq "OWX" ){
-    $ret = OWXSWITCH_GetState($hash);
+    #-- max 3 tries
+    for(my $try=0; $try<3; $try++){
+      $ret = OWXSWITCH_GetState($hash);
+      last
+        if( !defined($ret) );
+      } 
   #}elsif( $interface eq "OWFS" ){
   #  $ret = OWFSSWITCH_GetValues($hash);
   }else{
-    return "OWSWITCH: GetValues with wrong IODev type $interface";
+    Log 3, "OWSWITCH: GetValues with wrong IODev type $interface";
+    return 1;
   }
   
   #-- process results
   if( defined($ret)  ){
-    return "OWSWITCH: Could not get values from device $name";
+    for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+      $owg_val[$i] = 1;
+      $owg_vax[$i] = 0;
+    }
+    Log 3, "OWSWITCH: Could not get values from device $name, reason $ret";
+    return 1;
   }
   $hash->{PRESENT} = 1; 
-  #-- old state, new state
-  my $oldval = $hash->{STATE};
-  $value=OWSWITCH_FormatValues($hash);
-  my $newval =  $hash->{STATE};
-  #--logging depends on setting of the event-attribute
+  
+  $value = OWSWITCH_FormatValues($hash);
   Log 5, $value;
-  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
-  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
-     $hash->{CHANGED}[0] = $value;
-     DoTrigger($name, undef);
-  } 
   
   return undef;
 }
@@ -578,7 +570,6 @@ sub OWSWITCH_Set($@) {
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 1);
     return undef;
   }
- 
    
   #-- Set readings according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -598,16 +589,40 @@ sub OWSWITCH_Set($@) {
     }
     return "OWSWITCH: invalid output address, must be A,B,... or defined channel name"
       if( !defined($fnd) );
+
     #-- prepare gpio value
     my $nval;
+    my $ntim;
+    my $nstr="";
     if( lc($a[3]) eq "on" ){
       $nval = 0;
     }elsif( lc($a[3]) eq "off" ){
       $nval = 1;
+    }elsif( lc($a[3]) =~ m/for-timer/ ){
+      if( !($a[4] =~ m/\d\d\:\d\d\:\d\d/) ){
+        if( !($a[4] =~ m/\d{1,4}/ )){
+          return "OWSWITCH: Wrong data value $a[4], must be time format xx:xx:zz or integer";
+        } else {
+          $ntim = sprintf("%02d:%02d:%02d",int($a[4]/3600),int( ($a[4] % 3600)/60 ),$a[4] %60);
+        }
+      } else {
+        $ntim= $a[4];
+      }   
+      if( lc($a[3]) eq "on-for-timer" ){
+        $nval = 0;
+        $nstr = "$a[0] $a[1] $a[2] off";
+      }elsif( lc($a[3]) eq "off-for-timer" ){  
+        $nval = 1;
+        $nstr = "$a[0] $a[1] $a[2] on";
+      }
     }else{
-      return "OWSWITCH: Wrong data value $a[3], must be ON or OFF";
+      return "OWSWITCH: Wrong data value $a[3], must be on, off, on-for-timer or off-for-timer";
     }
-
+    
+    if ($nstr ne ""){
+      fhem("define ".$a[0].".".$owg_fixed[$fnd]."Timer at +".$ntim." set ".$nstr);
+    }
+    
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret   = OWXSWITCH_GetState($hash);
@@ -708,8 +723,70 @@ sub OWXSWITCH_GetState($) {
   
   my ($i,$j,$k);
   
+  #-- family = 12 => DS2406
+  if( $hash->{OW_FAMILY} eq "12" ) {
+    #=============== get gpio values ===============================
+    #-- issue the match ROM command \x55 and the access channel command
+    #   \xF5 plus the two byte channel control and the value
+    #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
+    $select=sprintf("\xF5\xDD\xFF");   
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- read the data
+    $res=OWX_Complex($master,$owx_dev,$select,4);
+    if( $res eq 0 ){
+      return "not accessible in reading"; 
+    }
+    
+    #-- reset the bus
+    OWX_Reset($master);
+    
+    #-- process results
+    @data=split(//,substr($res,9));
+    return "invalid data length, ".int(@data)." instead of 7 bytes"
+      if (@data != 7); 
+    return "invalid CRC"
+      if ( OWX_CRC16(substr($res,9,5),$data[5],$data[6]) == 0);
+       
+    $owg_val[0] = (ord($data[3])>>2) & 1;
+    $owg_vax[0] =  ord($data[3])     & 1;
+    $owg_val[1] = (ord($data[3])>>3) & 1;
+    $owg_vax[1] = (ord($data[3])>>1) & 1;
+
+  #-- family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== get gpio values ===============================
+    #-- issue the match ROM command \x55 and the read PIO rtegisters command
+    #   \xF5 plus the two byte channel target address
+    #-- reading 9 + 3 + 8 data bytes + 2 CRC bytes = 22 bytes
+    $select=sprintf("\xF0\x88\x00");   
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- read the data
+    $res=OWX_Complex($master,$owx_dev,$select,10);
+    if( $res eq 0 ){
+      return "not accessible in reading"; 
+    }
+    
+    #-- reset the bus
+    OWX_Reset($master);
+  
+    #-- process results
+    @data=split(//,substr($res,9));
+    return "invalid data length, ".int(@data)." instead of 13 bytes"
+      if (@data != 13); 
+    return "invalid data"
+      if (ord($data[9])!=255); 
+    return "invalid CRC"
+      if( OWX_CRC16(substr($res,9,11),$data[11],$data[12]) == 0);  
+
+    for(my $i=0;$i<8;$i++){
+      $owg_val[$i] = (ord($data[2])>>$i) & 1;
+      $owg_vax[$i] = (ord($data[3])>>$i) & 1;
+    }
+    
   #-- family = 3A => DS2413
-  if( $hash->{OW_FAMILY} eq "3A" ) {
+  }elsif( $hash->{OW_FAMILY} eq "3A" ) {
     #=============== get gpio values ===============================
     #-- issue the match ROM command \x55 and the read gpio command
     #   \xF5 plus 2 empty bytes
@@ -718,79 +795,35 @@ sub OWXSWITCH_GetState($) {
     #-- read the data
     $res=OWX_Complex($master,$owx_dev,"\xF5",2);
     if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in reading"; 
+      return "not accessible in reading"; 
     }
-  #-- family = 12 => DS2406
-  }elsif( $hash->{OW_FAMILY} eq "12" ) {
-    #=============== get gpio values ===============================
-    #-- issue the match ROM command \x55 and the access channel command
-    #   \xF5 plus the two byte channel control and the value
-    $select=sprintf("\xF5\xDC\xFF");   
-    #-- reset the bus
-    OWX_Reset($master);
-    #-- read the data
-    $res=OWX_Complex($master,$owx_dev,$select,1);
-    if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
-    }
-  #-- family = 29 => DS2408
-  }elsif( $hash->{OW_FAMILY} eq "29" ) {
-    #=============== get gpio values ===============================
-    #-- issue the match ROM command \x55 and the read PIO rtegisters command
-    #   \xF5 plus the two byte channel target address
-    #-- reading 9 + 3 + 10 data bytes = 22 bytes
-    $select=sprintf("\xF0\x88\x00");   
-    #-- reset the bus
-    OWX_Reset($master);
-    #-- read the data
-    $res=OWX_Complex($master,$owx_dev,$select,10);
-    if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
-    }
-  } else {
-    return "OWXSWITCH: Unknown device family $hash->{OW_FAMILY}\n";
-  }
-  
-  #-- process results
-  @data=split(//,substr($res,10));
-  #return "invalid data length"
-  #  if (@data != 22); 
-  #return "invalid data"
-  #  if (ord($data[17])<=0); 
-  #return "invalid CRC"
-  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);  
-  
-  #-- reset the bus
-  OWX_Reset($master);
-
-  #   note: value 1 corresponds to OFF, 0 to ON normally
-  #   note: val = input value, vax = output value
-  #-- family = 3A => DS2413
-  if( $hash->{OW_FAMILY} eq "3A" ) {
-    $owg_val[0] = ord($data[0])      & 1;
-    $owg_vax[0] = (ord($data[0])>>1) & 1;
-    $owg_val[1] = (ord($data[0])>>2) & 1;
-    $owg_vax[1] = (ord($data[0])>>3) & 1;
     
-  #-- family = 12 => DS2406
-  }elsif( $hash->{OW_FAMILY} eq "12" ) {
-    $owg_val[0] = (ord($data[2])>>2) & 1;
-    $owg_vax[0] =  ord($data[2])     & 1;
-    $owg_val[1] = (ord($data[2])>>3) & 1;
-    $owg_vax[1] = (ord($data[2])>>1) & 1;
-   #-- family = 29 => DS2408
-  }elsif( $hash->{OW_FAMILY} eq "29" ) {
-    for(my $i=0;$i<8;$i++){
-      $owg_val[$i] = (ord($data[2])>>$i) & 1;
-      $owg_vax[$i] = (ord($data[3])>>$i) & 1;
-    }
+    #-- reset the bus
+    OWX_Reset($master);
+    
+    #-- process results
+    @data=split(//,substr($res,9));
+    return "invalid data length, ".int(@data)." instead of 3 bytes"
+      if (@data != 3); 
+    return "invalid data"
+      if ( (15- (ord($data[1])>>4)) != (ord($data[1]) & 15) );
+    
+    #   note: value 1 corresponds to OFF, 0 to ON normally
+    #   note: val = input value, vax = output value
+    $owg_val[0] = ord($data[1])      & 1;
+    $owg_vax[0] = (ord($data[1])>>1) & 1;
+    $owg_val[1] = (ord($data[1])>>2) & 1;
+    $owg_vax[1] = (ord($data[1])>>3) & 1;
+  
+  } else {
+    return "unknown device family $hash->{OW_FAMILY}\n";
   }
   return undef
 }
 
 ########################################################################################
 #
-# OWXSWITCH_SetPage - Set gpio ports of device
+# OWXSWITCH_SetState - Set gpio ports of device
 #
 # Parameter hash = hash of device addressed
 #           value = integer value for device outputs
@@ -814,31 +847,20 @@ sub OWXSWITCH_SetState($$) {
   
   my ($i,$j,$k);
   
-  #-- family = 3A => DS2413
-  if( $hash->{OW_FAMILY} eq "3A" ) {
-    #=============== set gpio values ===============================
-    #-- issue the match ROM command \x55 and the write gpio command
-    #   \x5A plus the value byte and its complement
-    $select=sprintf("\x5A%c%c",252+$value,3-$value);   
-    #-- reset the bus
-    OWX_Reset($master);
-    #-- read the data
-    $res=OWX_Complex($master,$owx_dev,$select,1);
-    if( $res eq 0 ){
-      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
-    }
+
   #--  family = 12 => DS2406
-  }elsif( $hash->{OW_FAMILY} eq "12" ) {
+  if( $hash->{OW_FAMILY} eq "12" ) {
     #=============== set gpio values ===============================
     # Writing the output state via the access channel command does
     # not work contrary to documentation. Using the write status command 
     #-- issue the match ROM command \x55 and the read status command
     #   \xAA at address TA1 = \x07 TA2 = \x00   
+    #-- reading 9 + 3 + 1 data bytes + 2 CRC bytes = 15 bytes
     #-- reset the bus
     OWX_Reset($master);
     #-- read the data
-    $res        = OWX_Complex($master,$owx_dev,"\xAA\x07\x00",1);
-    my $stat    = substr($res,10,1);
+    $res        = OWX_Complex($master,$owx_dev,"\xAA\x07\x00",3);
+    my $stat    = ord(substr($res,10,1));
     my $statneu = ( $stat & 159 ) | (($value<<5) & 96) ; 
     #-- issue the match ROM command \x55 and the write status command
     #   \x55 at address TA1 = \x07 TA2 = \x00
@@ -851,10 +873,23 @@ sub OWXSWITCH_SetState($$) {
     if( $res eq 0 ){
       return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
     }
+    #-- reset the bus
+    OWX_Reset($master);
+    
+    #-- process results
+    @data=split(//,substr($res,9));
+    
+    #-- very crude check - should be CRC
+    if( int(@data) != 6){
+      return "OWXSWITCH: State could not be set for device $owx_dev";
+    } 
+    
+    #-- put into local buffer
     $owg_val[0] = $value % 2;
     $owg_vax[0] = $owg_val[0];
     $owg_val[1] = int($value / 2);
     $owg_vax[1] = $owg_val[1];
+    
   #--  family = 29 => DS2408
   }elsif( $hash->{OW_FAMILY} eq "29" ) {
     #=============== set gpio values ===============================
@@ -868,34 +903,44 @@ sub OWXSWITCH_SetState($$) {
     if( $res eq 0 ){
       return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
     }
-        
-  } else {
-    return "OWXSWITCH: Unknown device family $hash->{OW_FAMILY}\n";
-  }
-  #-- reset the bus
-  OWX_Reset($master);
-
-  #-- process results
-  @data=split(//,substr($res,10));
-
-  #-- family = 3A => DS2413
-  if( $hash->{OW_FAMILY} eq "3A" ) {
-    if( $data[2] ne "\xAA"){
-      return "OWXSWITCH: State could not be set for device $owx_dev";
-    } 
-  #--  family = 12 => DS2406
-  }elsif( $hash->{OW_FAMILY} eq "12" ) {
-    #-- very crude check - should be CRC
-    if( int(@data) != 5){
-      return "OWXSWITCH: State could not be set for device $owx_dev";
-    } 
-  #--  family = 29 => DS2408
-  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    
+    #-- process results
+    @data=split(//,substr($res,10));
+    
     if( $data[2] ne "\xAA"){
       return "OWXSWITCH: State could not be set for device $owx_dev";
     }
-  } 
-  return undef
+    #-- reset the bus
+    OWX_Reset($master);
+    
+  #-- family = 3A => DS2413      
+  }elsif( $hash->{OW_FAMILY} eq "3A" ) {
+    #=============== set gpio values ===============================
+    #-- issue the match ROM command \x55 and the write gpio command
+    #   \x5A plus the value byte and its complement
+    $select=sprintf("\x5A%c%c",252+$value,3-$value);   
+    #-- reset the bus
+    OWX_Reset($master);
+    #-- read the data
+    $res=OWX_Complex($master,$owx_dev,$select,1);
+    if( $res eq 0 ){
+      return "OWXSWITCH: Device $owx_dev not accessible in writing"; 
+    }
+    #-- reset the bus
+    OWX_Reset($master);
+    
+    #-- process results
+    @data=split(//,substr($res,10));
+  
+    if( $data[2] ne "\xAA"){
+      return "OWXSWITCH: State could not be set for device $owx_dev";
+    }  
+  
+  }else {
+    return "OWXSWITCH: Unknown device family $hash->{OW_FAMILY}\n";
+  }
+
+  return undef;
 
 }
 
@@ -903,105 +948,103 @@ sub OWXSWITCH_SetState($$) {
 
 =pod
 =begin html
-
-<a name="OWSWITCH"></a>
-<h3>OWSWITCH</h3>
-<ul>FHEM module to commmunicate with 1-Wire Programmable Switches <br /><br /> Note:<br />
-    This 1-Wire module so far works only with the OWX interface module. Please define an <a
-        href="#OWX">OWX</a> device first. <br />
-    <br /><b>Example</b><br />
-    <ul>
-        <code>define OWX_S OWSWITCH DS2413 B5D502000000 60</code>
+<body>
+        <h3>OWSWITCH</h3>
+        <p>FHEM module to commmunicate with 1-Wire Programmable Switches <br /><br /> Note:<br />
+            This 1-Wire module so far works only with the OWX interface module. Please define an <a
+                href="#OWX">OWX</a> device first. <br /></p>
+        <br /><h4>Example</h4>
+        <p>
+            <code>define OWX_S OWSWITCH DS2413 B5D502000000 60</code>
+            <br />
+            <code>attr OWX_S AName Lampe|light</code>
+            <br />
+            <code>attr OWX_S AUnit AN|AUS</code>
+            <br />
+        </p>
         <br />
-        <code>attr OWX_S AName Lampe|light</code>
+        <a name="OWSWITCHdefine"></a>
+        <h4>Define</h4>
+        <p>
+            <code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+            <br /><br /> Define a 1-Wire switch.<br /><br /></p>
+        <ul>
+            <li>
+                <code>[&lt;model&gt;]</code><br /> Defines the switch model (and thus 1-Wire family
+                id), currently the following values are permitted: <ul>
+                    <li>model DS2413 with family id 3A (default if the model parameter is omitted).
+                        2 Channel switch with onboard memory</li>
+                    <li>model DS2406 with family id 12. 2 Channel switch </li>
+                    <li>model DS2408 with family id 29. 8 Channel switch</li>
+                </ul>
+            </li>
+            <li>
+                <code>&lt;id&gt;</code>
+                <br />12-character unique ROM id of the converter device without family id and CRC
+                code </li>
+            <li>
+                <code>&lt;interval&gt;</code>
+                <br />Measurement interval in seconds. The default is 300 seconds. </li>
+        </ul>
+        <a name="OWSWITCHset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="owswitch_interval">
+                    <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                interval in seconds. The default is 300 seconds. </li>
+            <li><a name="owswitch_output">
+                    <code>set &lt;name&gt; output &lt;channel-name&gt; on | off | on-for-timer &lt;time&gt; | off-for-timer &lt;time&gt;</code>
+                    </a><br />Set
+                value for channel (A,B,... or defined channel name). 1 = off, 0 = on in normal
+                usage. See also the note above.<br/>
+             on-for-timer/off-for-timer will set the desired value only for the given time, 
+             either given as hh:mm:ss or as integers seconds
+             and then will return to the opposite value.</li>
+            <li><a name="owswitch_gpio">
+                    <code>set &lt;name&gt; gpio &lt;value&gt;</code></a><br />Set values for
+                channels (For 2 channels: 3 = A and B off, 1 = B on 2 = A on 0 = both on)</li>
+            <li><a name="owswitch_init">
+                    <code>set &lt;name&gt; init yes</code></a><br /> Re-initialize the device</li>
+        </ul>
         <br />
-        <code>attr OWX_S AUnit AN|AUS</code>
+        <a name="OWSWITCHget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="owswitch_id">
+                    <code>get &lt;name&gt; id</code></a>
+                <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+            <li><a name="owswitch_present">
+                    <code>get &lt;name&gt; present</code>
+                </a>
+                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+            <li><a name="owswitch_interval2">
+                    <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval in
+                seconds. </li>
+            <li><a name="owswitch_input">
+                    <code>get &lt;name&gt; input &lt;channel-name&gt;</code></a><br /> state for
+                channel (A,B, ... or defined channel name) This value reflects the measured value,
+                not necessarily the one set as output state, because the output transistors are open
+                collector switches. A measured state of 1 = OFF therefore corresponds to an output
+                state of 1 = OFF, but a measured state of 0 = ON can also be due to an external
+                shortening of the output.</li>
+            <li><a name="owswitch_gpio">
+                    <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all channels</li>
+        </ul>
         <br />
-    </ul>
-    <br />
-    <a name="OWSWITCHdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt;
-            [&lt;interval&gt;]</code>
-        <br /><br /> Define a 1-Wire switch.<br /><br />
-        <li>
-            <code>[&lt;model&gt;]</code><br /> Defines the switch model (and thus 1-Wire
-            family id), currently the following values are permitted: <ul>
-                <li>model DS2413 with family id 3A (default if the model parameter is
-                    omitted). 2 Channel switch with onboard memory</li>
-                <li>model DS2406 with family id 12. 2 Channel switch </li>
-                <li>model DS2406 with family id 29. 8 Channel switch</li>
-            </ul>
-        </li>
-        <li>
-            <code>&lt;id&gt;</code>
-            <br />12-character unique ROM id of the converter device without family id and
-            CRC code </li>
-        <li>
-            <code>&lt;interval&gt;</code>
-            <br />Measurement interval in seconds. The default is 300 seconds. </li>
-    </ul>
-    <br />
-    <a name="OWSWITCHset">
-        <b>Set</b></a>
-    <ul>
-        <li><a name="owswitch_interval">
-                <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
-            interval in seconds. The default is 300 seconds. </li>
-        <li><a name="owswitch_output">
-                <code>set &lt;name&gt; output &lt;channel-name&gt; ON |
-                    OFF</code></a><br />Set value for channel (A,B,... or defined channel name). 1 = OFF, 0 = ON in normal usage. 
-                     See also the note above</li>
-        <li><a name="owswitch_gpio">
-            <code>set &lt;name&gt; gpio &lt;value&gt;</code></a><br />Set values for channels (For 2 channels: 3 = A and B OFF, 1 = B ON 2 = A ON 0 = both ON)</li>
-        <li><a name="owswitch_init">
-            <code>set &lt;name&gt; init yes</code></a><br /> Re-initialize the device</li>
-    </ul>
-    <br />
-    <a name="OWSWITCHget">
-        <b>Get</b></a>
-    <ul>
-        <li><a name="owswitch_id">
-                <code>get &lt;name&gt; id</code></a>
-            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-        <li><a name="owswitch_present">
-                <code>get &lt;name&gt; present</code>
-            </a>
-            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-        <li><a name="owswitch_interval2">
-                <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
-            in seconds. </li>
-        <li><a name="owswitch_input">
-                <code>get &lt;name&gt; input &lt;channel-name&gt;</code></a><br />
-                state for channel (A,B, ... or defined channel name)
-                This value reflects the measured value, not necessarily the one set as
-                output state, because the output transistors are open collector switches. A measured
-                state of 1 = OFF therefore corresponds to an output state of 1 = OFF, but a measured
-                state of 0 = ON can also be due to an external shortening of the output.</li>
-        <li><a name="owswitch_gpio">
-                <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all
-            channels</li>
-    </ul>
-    <br />
-    <a name="OWSWITCHattr">
-        <b>Attributes</b></a> For each of the following attributes, the channel
-    identification A,B,... may be used. <ul>
-        <li><a name="owswitch_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
-                    &lt;string&gt;|&lt;string&gt;</code></a>
-            <br />name for the channel | a type description for the measured value. </li>
-        <li><a name="owswitch_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
-                    &lt;string&gt;|&lt;string&gt;</code></a>
-            <br />display for on | off condition </li>
-        <li><a name="owswitch_event"><code>attr &lt;name&gt; event on-change|on-update
-        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
-            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
-                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
-            </ul>
-        </li>
-        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
-    </ul>
-</ul>
-
+        <a name="OWSWITCHattr"></a>
+        <h4>Attributes</h4> For each of the following attributes, the channel identification A,B,...
+        may be used. <ul>
+            <li><a name="owswitch_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
+                        &lt;string&gt;|&lt;string&gt;</code></a>
+                <br />name for the channel | a type description for the measured value. </li>
+            <li><a name="owswitch_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
+                        &lt;string&gt;|&lt;string&gt;</code></a>
+                <br />display for on | off condition </li>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#event-on-update-reading">event-on-update-reading</a>, <a
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    <a href="#webCmd">webCmd</a></li>
+        </ul>
 =end html
 =cut
