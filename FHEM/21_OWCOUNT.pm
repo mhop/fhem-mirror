@@ -4,19 +4,11 @@
 #
 # FHEM module to commmunicate with 1-Wire Counter/RAM DS2423
 #
-# Attention: This module may communicate with the OWX module,
-#            but currently not with the 1-Wire File System OWFS
+# Prof. Dr. Peter A. Henning
 #
-# Prefixes for subroutines of this module:
-# OW   = General 1-Wire routines  Peter Henning)
-# OWX  = 1-Wire bus master interface (Peter Henning)
-# OWFS = 1-Wire file system (??)
+# $Id$
 #
-# Prof. Dr. Peter A. Henning, 2012
-# 
-# Version 2.25 - October, 2012
-#   
-# Setup bus device in fhem.cfg as
+########################################################################################
 #
 # define <name> OWCOUNT [<model>] <ROM_ID> [interval] 
 #
@@ -39,12 +31,9 @@
 # set <name> interval            => set query interval for measurement
 # set <name> memory <page>       => 32 byte string into page 0..13
 # set <name> midnight  <channel> => todays starting value for counter
-# set <name> init yes            => re-initialize device
 #
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
-#
-# attr <name> event on-change/on-update = when to write an event (default= on-update)
 #
 # attr <name> UnitInReading = whether the physical unit is written into the reading = 1 (default) or 0
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
@@ -83,7 +72,6 @@
 ########################################################################################
 package main;
 
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 use strict;
 use warnings;
@@ -111,8 +99,7 @@ my %gets = (
 my %sets = (
   "interval"    => "",
   "memory"      => "",
-  "midnight"    => "",
-  "init"       => ""
+  "midnight"    => ""
 );
 
 my %updates = (
@@ -144,8 +131,8 @@ sub OWCOUNT_Initialize ($) {
   $hash->{SetFn}   = "OWCOUNT_Set";
   
   #-- see header for attributes
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 UnitInReading:0,1 ".
-    "event:on-update,on-change";
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 ".
+                "event-on-update-reading event-on-change-reading ";
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Offset";
@@ -211,17 +198,19 @@ sub OWCOUNT_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWCOUNT: Warning, no 1-Wire I/O device found for $name."
-    if(!defined($hash->{IODev}->{NAME}));
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+    return "OWCOUNT: Warning, no 1-Wire I/O device found for $name.";
+  }
   $modules{OWCOUNT}{defptr}{$id} = $hash;
-  $hash->{STATE} = "Defined";
-  Log 3, "OWCOUNT:   Device $name defined."; 
+  #--
+  readingsSingleUpdate($hash,"state","defined",1);
+  Log 3, "OWCOUNT: Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
  
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+1, "OWCOUNT_InitializeDevice", $hash, 0);
+  InternalTimer(time()+10, "OWCOUNT_InitializeDevice", $hash, 0);
  
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
@@ -246,7 +235,7 @@ sub OWCOUNT_InitializeDevice($) {
   #-- Set channel names, channel units and alarm values
   for( my $i=0;$i<int(@owg_fixed);$i++) { 
     #-- initial readings 
-    $owg_val[$i]      = 0.0;
+    $owg_val[$i]      = "";
     $owg_midnight[$i] = 0.0; 
     #-- name
     my $cname = defined($attr{$name}{$owg_fixed[$i]."Name"})  ? $attr{$name}{$owg_fixed[$i]."Name"} : $owg_fixed[$i]."|event";
@@ -332,7 +321,7 @@ sub OWCOUNT_FormatValues($) {
   
   my $name    = $hash->{NAME}; 
   my ($offset,$factor,$period,$unit,$runit,$midnight,$vval,$vrate);
-  my ($value1,$value2,$value3,$value4,$value5)   = ("","","","","");
+  my ($svalue,$dvalue,$mvalue) = ("","","");
   my $galarm = 0;
 
   my $tn = TimeNow();
@@ -342,8 +331,9 @@ sub OWCOUNT_FormatValues($) {
   my $monthbreak = 0;
   
   my $present  = $hash->{PRESENT};
-  #-- remove units if they are unwanted
-  my $unir = defined($attr{$name}{"UnitInReading"}) ? $attr{$name}{"UnitInReading"} : 1;
+  
+  #-- put into READINGS
+  readingsBeginUpdate($hash);
   
   #-- formats for output
   for (my $i=0;$i<int(@owg_fixed);$i++){
@@ -358,158 +348,134 @@ sub OWCOUNT_FormatValues($) {
     $period   = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
     $runit    = $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
     
-    #-- only if attribute value Mode=daily, take the midnight value from memory
-    if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
-      if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
-        $midnight = $owg_midnight[$i];
-        #-- parse float from midnight
-        $midnight =~ /([\d\.]+)/;
-        $midnight = 0.0 if(!(defined($midnight)));
-      } else {
+    #-- skip som thing if undefined
+    if( $owg_val[$i] eq ""){
+      $svalue .= $owg_channel[$i].": ???";
+    }else{     
+      #-- only if attribute value Mode=daily, take the midnight value from memory
+      if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
+        if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
+          $midnight = $owg_midnight[$i];
+          #-- parse float from midnight
+          $midnight =~ /([\d\.]+)/;
+          $midnight = 0.0 if(!(defined($midnight)));
+        } else {
+          $midnight = 0.0;
+        }
+      } else { 
         $midnight = 0.0;
       }
-    } else { 
-      $midnight = 0.0;
-    }
     
-    #-- correct values for proper offset, factor 
-    #   careful: midnight value has not been corrected so far !
-    #-- 1 decimal
-    if( $factor == 1.0 ){
-      $vval    = int(($owg_val[$i] + $offset - $midnight)*10)/10;
-    #-- 3 decimals
-    } else {
-      $vval    = int((($owg_val[$i] + $offset)*$factor - $midnight)*1000)/1000;
-    }
-    
-    #-- get the old values
-    my $oldval = $hash->{READINGS}{"$owg_channel[$i]"}{VAL};
-    my $oldtim = $hash->{READINGS}{"$owg_channel[$i]"}{TIME};
-    $oldtim = "" if(!defined($oldtim));
-    
-    #-- safeguard against the case where no previous measurement
-    if( length($oldtim) > 0 ){    
-      #-- time difference in seconds
-      ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
-      $dayo = substr($dayrest,0,2);
-      ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
-      my $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
-      #-- correct time for wraparound at midnight
-      if( ($delt<0) && ($present==1)){
-        $daybreak = 1;
-        $delt    += 86400;
-      }  
-      #-- correct $vval for wraparound of 32 bit counter 
-      if( ($vval < $oldval) && ($daybreak==0) && ($present==1) ){
-        Log 1,"OWCOUNT TODO: Counter wraparound";
-      }
-     
-      if( $daybreak==1 ){
-        #--  linear interpolation
-        my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
-        my $dv = $oldval*(1-$dt)+$vval*$dt;
-        #-- correct reading in daily mode
-        if( $midnight > 0.0 ){          
-          $vval  -= $dv;
-          $delt  *= (1-$dt);
-          $oldval = 0.0;
-        }
-        #-- in any mode store the interpolated value in the midnight store
-        $midnight += $dv;
-        OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
-        #-- string buildup for monthly logging
-        $value4 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
-        if( $day<$dayo ){
-          $monthbreak = 1;
-          Log 1, "OWCOUNT: Change of month";
-          #-- string buildup for yearly logging
-          $value5 .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
-        }
-      } 
-      #-- rate
-      if( ($delt > 0.0) && $present ){
-        $vrate  = ($vval-$oldval)/$delt;
+      #-- correct values for proper offset, factor 
+      #   careful: midnight value has not been corrected so far !
+      #-- 1 decimal
+      if( $factor == 1.0 ){
+        $vval    = int(($owg_val[$i] + $offset - $midnight)*10)/10; 
+      #-- 3 decimals
       } else {
-        $vrate = 0.0;
+        $vval    = int((($owg_val[$i] + $offset)*$factor - $midnight)*1000)/1000;
       }
-      #-- correct rate for period setting
-      if(  $period eq "hour" ){
-        $vrate*=3600;
-      }elsif( $period eq "minute" ){
-        $vrate*=60;
-      }       
-     
-      if( !defined($runit) ){
-        Log 1,"OWCOUNT: Error in rate unit definition. i=$i, owg_rate[i]=".$owg_rate[$i];
-        $runit = "ERR";
-      }
-      
-      #-- string buildup for return value and STATE
-      if( $unir ){
-        #-- 1 decimal
-        if( $factor == 1.0 ){
-          $value1 .= sprintf( "%s: %5.1f %s %5.2f %s",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
-          $value2 .= sprintf( "%s: %5.1f %s %5.2f %s", $owg_channel[$i], $vval,$unit,$vrate,$runit);
-        #-- 3 decimals
-        } else {
-          $value1 .= sprintf( "%s: %5.3f %s %5.2f %s",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
-          $value2 .= sprintf( "%s: %5.2f %s %5.2f %s", $owg_channel[$i], $vval,$unit,$vrate,$runit);
-        }  
-      }else {
-        #-- 1 decimal
-        if( $factor == 1.0 ){
-          $value1 .= sprintf( "%s: %5.1f %5.2f",  $owg_channel[$i], $vval,$vrate);
-          $value2 .= sprintf( "%s: %5.1f %5.2f", $owg_channel[$i], $vval,$vrate);
-        #-- 3 decimals
-        } else {
-          $value1 .= sprintf( "%s: %5.3f %5.2f",  $owg_channel[$i], $vval,$vrate);
-          $value2 .= sprintf( "%s: %5.2f %5.2f", $owg_channel[$i], $vval,$vrate);
+    
+      #-- get the old values
+      my $oldval = $hash->{READINGS}{"$owg_channel[$i]"}{VAL};
+      my $oldtim = $hash->{READINGS}{"$owg_channel[$i]"}{TIME};
+      $oldtim = "" if(!defined($oldtim));
+    
+      #-- safeguard against the case where no previous measurement
+      if( length($oldtim) > 0 ){    
+        #-- time difference in seconds
+        ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
+        $dayo = substr($dayrest,0,2);
+        ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
+        my $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
+        #-- debugging: changing the day every 10 minutes
+        #$delt = 
+        #-- correct time for wraparound at midnight
+        if( ($delt<0) && ($present==1)){
+          $daybreak = 1;
+          $delt    += 86400;
         }
+        #-- correct $vval for wraparound of 32 bit counter 
+        if( ($vval < $oldval) && ($daybreak==0) && ($present==1) ){
+          Log 1,"OWCOUNT TODO: Counter wraparound";
+        }
+     
+        if( $daybreak==1 ){
+          #--  linear interpolation
+          my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
+          my $dv = $oldval*(1-$dt)+$vval*$dt;
+          #-- correct reading in daily mode
+          if( $midnight > 0.0 ){          
+            $vval  -= $dv;
+            $delt  *= (1-$dt);
+            $oldval = 0.0;
+          }
+          #-- in any mode store the interpolated value in the midnight store
+          $midnight += $dv;
+          OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
+          #-- string buildup for monthly logging
+          $dvalue .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
+          if( $day<$dayo ){
+            $monthbreak = 1;
+            Log 1, "OWCOUNT: Change of month";
+            #-- string buildup for yearly logging
+            $mvalue .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
+          }
+        } 
+        #-- rate
+        if( ($delt > 0.0) && $present ){
+          $vrate  = int( ($vval-$oldval)/$delt*1000)/1000;
+        } else {
+          $vrate = 0.0;
+        }
+        #-- correct rate for period setting
+        if(  $period eq "hour" ){
+          $vrate*=3600;
+        }elsif( $period eq "minute" ){
+          $vrate*=60;
+        }       
+     
+        if( !defined($runit) ){
+          Log 1,"OWCOUNT: Error in rate unit definition. i=$i, owg_rate[i]=".$owg_rate[$i];
+          $runit = "ERR";
+        }
+      
+        #-- string buildup for return value and STATE
+        #-- 1 decimal
+        if( $factor == 1.0 ){
+          $svalue .= sprintf( "%s: %5.1f %s (%5.2f %s)",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
+        #-- 3 decimals
+        } else {
+          $svalue .= sprintf( "%s: %5.3f %s (%5.2f %s)", $owg_channel[$i], $vval,$unit,$vrate,$runit);
+        }  
       }
-      $value3 .= sprintf( "%s: " , $owg_channel[$i]);
-    } 
-    #-- put into READINGS
-    $hash->{READINGS}{"$owg_channel[$i]"}{VAL}   = $vval;
-    #-- but times and rate only when valid
-    if(  $present ){
-      $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = $tn;
-      $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = $vrate;
-      $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = $tn;
-    } else {
-      $hash->{READINGS}{"$owg_channel[$i]"}{TIME}  = "";
-      $hash->{READINGS}{"$owg_rate[$i]"}{VAL}      = "";
-      $hash->{READINGS}{"$owg_rate[$i]"}{TIME}     = "";
+      readingsBulkUpdate($hash,"$owg_channel[$i]",$vval);
+      readingsBulkUpdate($hash,"$owg_rate[$i]",$vrate);
     }
-    #-- insert comma
+    #-- insert space 
     if( $i<int(@owg_fixed)-1 ){
-      $value1 .= " ";
-      $value2 .= ", ";
-      $value3 .= ", ";
-      $value4 .= ", ";
-      $value5 .= ", ";
+      $svalue .= " ";
     }
   }
   #-- STATE
-  $hash->{STATE} = $value2;
-  
-  #-- write units as header if they are unwanted in lines
-  if( $unir == 0 ){
-      #TODO: the entry into CHANGED must be into the lowest array position
-  }
-  
+  readingsBulkUpdate($hash,"state",$svalue);
+ 
+  #-- Daily/monthly cumulated value
   if( $daybreak == 1 ){
-    $value4 = sprintf("D_%d: %d-%d-%d_23:59:59 %s",$dayo,$yearo,$montho,$dayo,$value4);
-    #-- needs to be higher array elements, 
-    $hash->{CHANGED}[1] = $value4;
-    Log 1,$name." ".$value4;
+    $svalue = sprintf("D_%d",$dayo);
+    $dvalue = sprintf("%d-%d-%d_23:59:59 %s",$yearo,$montho,$dayo,$dvalue);
+    readingsBulkUpdate($hash,$svalue,$dvalue);
+    Log 1,$name." ".$dvalue;
     if( $monthbreak == 1){
-      $value5 = sprintf("M_%d: %d-%d-%d_23:59:59 %s",$montho,$yearo,$montho,$dayo,$value5);
-      #-- needs to be higher array elements, 
-      $hash->{CHANGED}[2] = $value5;
-      Log 1,$name." ".$value5;
+      $svalue = sprintf("M_%d",$montho);
+      $mvalue = sprintf("%d-%d-%d_23:59:59 %s",$yearo,$montho,$dayo,$mvalue);
+      readingsBulkUpdate($hash,$svalue,$mvalue);
+      Log 1,$name." ".$mvalue;
     }  
   }
-  return $value1;
+  readingsEndUpdate($hash,1); 
+  
+  return $svalue;
 }
 
 ########################################################################################
@@ -699,18 +665,9 @@ sub OWCOUNT_GetValues($) {
   }
   $hash->{PRESENT} = 1; 
   
-   #-- old state, new state
-  my $oldval = $hash->{STATE};
   $value=OWCOUNT_FormatValues($hash);
-  my $newval =  $hash->{STATE};
-   #--logging depends on setting of the event-attribute
   Log 5, $value;
-  my $ev = defined($attr{$name}{"event"})  ? $attr{$name}{"event"} : "on-update";  
-  if( ($ev eq "on-update") || (($ev eq "on-change") && ($newval ne $oldval)) ){
-     $hash->{CHANGED}[0] = $value;
-     DoTrigger($name, undef);
-  } 
-  
+ 
   return undef;
 }
 
@@ -736,8 +693,8 @@ sub OWCOUNT_Set($@) {
   }
   
   #-- check syntax
-  return "OWCOUNT: Set needs one parameter"
-    if( int(@a)!=3 );
+  return "OWCOUNT: Set needs at least one parameter"
+    if( int(@a)<3 );
   #-- check argument
   if( !defined($sets{$a[1]}) ){
         return "OWCOUNT: Set with unknown argument $a[1]";
@@ -752,14 +709,6 @@ sub OWCOUNT_Set($@) {
   my $name    = $hash->{NAME};
   my $model   = $hash->{OW_MODEL};
   
-  #-- reset the device
-  if($key eq "init") {
-    return "OWCOUNT: init needs parameter 'yes'"
-      if($value ne "yes");
-    OWCOUNT_InitializeDevice($hash);
-    return "OWCOUNT: Re-initialized device";
-  }
- 
   #-- set new timer interval
   if($key eq "interval") {
     # check value
@@ -893,7 +842,6 @@ sub OWXCOUNT_GetPage($$) {
   #   \xA5 TA1 TA2 reading 40 data bytes and 2 CRC bytes
   my $ta2 = ($page*32) >> 8;
   my $ta1 = ($page*32) & 255;
-  #Log 1, "OWXCOUNT: getting page Nr. $ta2 $ta1";
   $select=sprintf("\xA5%c%c",$ta1,$ta2);   
   #-- reset the bus
   OWX_Reset($master);
@@ -919,15 +867,15 @@ sub OWXCOUNT_GetPage($$) {
   OWX_Reset($master);
 
   #-- process results
-  @data=split(//,$res);
-  return "OWXCOUNT: invalid data length, ".length($res)." bytes in three steps"
-     if( length($res) < 54);
+  @data=split(//,substr($res,9));
+  return "OWXCOUNT: invalid data length, ".int(@data)." instead of 45 bytes in three steps"
+     if( int(@data) < 45);
   #return "invalid data"
   #  if (ord($data[17])<=0); 
-  #return "invalid CRC"
-  #  if (OWX_CRC8(substr($res,10,8),$data[18])==0);  
+  return "invalid CRC"
+    if (OWX_CRC16(substr($res,9,43),$data[43],$data[44]) == 0);
   
-  #-- first 12 byte are 9 ROM ID +3 command, next 32 are memory
+  #-- first 3 command, next 32 are memory
   #-- memory part, treated as string
   $owg_str=substr($res,12,32);
   #-- counter part
@@ -1021,14 +969,12 @@ sub OWXCOUNT_SetPage($$$) {
 
 =pod
 =begin html
-
 <a name="OWCOUNT"></a>
-<h3>OWCOUNT</h3>
-<ul>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #<br /><br /> Note:<br />
-    This 1-Wire module so far works only with the OWX interface module. Please define an <a
-        href="#OWX">OWX</a> device first. <br />
-    <br /><b>Example</b><br />
-    <ul>
+        <h3>OWCOUNT</h3>
+        <p>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #<br /><br /> Note:<br /> This
+            1-Wire module so far works only with the OWX interface module. Please define an <a
+                href="#OWX">OWX</a> device first. </p>
+        <br /><h4>Example</h4><br />
         <code>define OWX_C OWCOUNT DS2423 CE780F000000 300</code>
         <br />
         <code>attr OWX_C AName Water|volume</code>
@@ -1037,100 +983,96 @@ sub OWXCOUNT_SetPage($$$) {
         <br />
         <code>attr OWX_CAMode daily</code>
         <br />
-    </ul><br />
-    <a name="OWCOUNTdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt;
-            [&lt;interval&gt;]</code>
-        <br /><br /> Define a 1-Wire counter.<br /><br />
-        <li>
-            <code>[&lt;model&gt;]</code><br /> Defines the counter model (and thus 1-Wire
-            family id), currently the following values are permitted: <ul>
-                <li>model DS2423 with family id 1D (default if the model parameter is
-                    omitted)</li>
-            </ul>
-        </li>
-        <li>
-            <code>&lt;id&gt;</code>
-            <br />12-character unique ROM id of the converter device without family id and
-            CRC code </li>
-        <li>
-            <code>&lt;interval&gt;</code>
-            <br />Measurement interval in seconds. The default is 300 seconds. </li>
-    </ul>
-    <br />
-    <a name="OWCOUNTset">
-        <b>Set</b></a>
-    <ul>
-        <li><a name="owcount_interval">
-                <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
-            interval in seconds. The default is 300 seconds. </li>
-        <li><a name="owcount_memory">
-                <code>set &lt;name&gt; memory &lt;page&gt;</code></a><br />Write 32 bytes to
-            memory page 0..13 </li>
-        <li><a name="owcount_midnight">
-                <code>set &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Write
-            the day's starting value for counter &lt;channel&gt; (A, B or named channel, see
-            below)</li>
-    </ul>
-    <br />
-    <a name="OWCOUNTget">
-        <b>Get</b></a>
-    <ul>
-        <li><a name="owcount_id">
-                <code>get &lt;name&gt; id</code></a>
-            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-        <li><a name="owcount_present">
-                <code>get &lt;name&gt; present</code>
-            </a>
-            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-        <li><a name="owcount_interval2">
-                <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval
-            in seconds. </li>
-        <li><a name="owcount_memory2">
-                <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Obtain 32 bytes
-            from memory page 0..13 </li>
-        <li><a name="owcount_midnight2">
-                <code>get &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain
-            the day's starting value for counter &lt;channel&gt; (A, B or named channel, see
-            below)</li>
-        <li><a name="owcount_counter">
-                <code>get &lt;name&gt; counter &lt;channel-name&gt;</code></a><br />Obtain
-            the current value for counter &lt;channel&gt; (A, B or named channel, see
-            below)</li>
-        <li><a name="owcount_counters">
-                <code>get &lt;name&gt; counters</code></a><br />Obtain the current value
-            both counters</li>
-    </ul>
-    <br />
-    <a name="OWCOUNTattr">
-        <b>Attributes</b></a>
-    <ul>For each of the following attributes, the channel identification A,B may be used.
-                <li><a name="owcount_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
-                    &lt;string&gt;|&lt;string&gt;</code></a>
-            <br />name for the channel | a type description for the measured value. </li>
-        <li><a name="owcount_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
-                    &lt;string&gt;|&lt;string&gt;</code></a>
-            <br />unit of measurement for this channel | its abbreviation. </li>
-        <li><a name="owcount_coffset"><code>attr &lt;name&gt; &lt;channel&gt;Offset
-                    &lt;float&gt;</code></a>
-            <br />offset added to the reading in this channel. </li>
-        <li><a name="owcount_cfactor"><code>attr &lt;name&gt; &lt;channel&gt;Factor
-                    &lt;float&gt;</code></a>
-            <br />factor multiplied to (reading+offset) in this channel. </li>
-        <li><a name="owcount_cmode"><code>attr &lt;name&gt; &lt;channel&gt;Mode daily |
-                    normal</code></a>
-            <br />factor multiplied to (reading+offset) in this channel. </li>
-        <li><a name="owcount_event"><code>attr &lt;name&gt; event on-change|on-update
-        </code></a>This attribte work similarly, but not identically to the standard event-on-update-change/event-on-update-reading attribute.
-            <ul><li><code>event on-update</code> (default) will write a notify/FileLog event any time a measurement is received.</li>
-                <li><code>event on-change</code> will write a notify/FileLog event only when a measurement is different from the previous one.</li>
-            </ul>
-        </li>
-        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
-    </ul>
-</ul>
-
+        <br />
+        <a name="OWCOUNTdefine"></a>
+        <h4>Define</h4>
+        <p>
+            <code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+            <br /><br /> Define a 1-Wire counter.<br /><br /></p>
+        <ul>
+            <li>
+                <code>[&lt;model&gt;]</code><br /> Defines the counter model (and thus 1-Wire family
+                id), currently the following values are permitted: <ul>
+                    <li>model DS2423 with family id 1D (default if the model parameter is
+                        omitted)</li>
+                </ul>
+            </li>
+            <li>
+                <code>&lt;id&gt;</code>
+                <br />12-character unique ROM id of the converter device without family id and CRC
+                code </li>
+            <li>
+                <code>&lt;interval&gt;</code>
+                <br />Measurement interval in seconds. The default is 300 seconds. </li>
+        </ul>
+        <br />
+        <a name="OWCOUNTset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="owcount_interval">
+                    <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br /> Measurement
+                interval in seconds. The default is 300 seconds. </li>
+            <li><a name="owcount_memory">
+                    <code>set &lt;name&gt; memory &lt;page&gt;</code></a><br />Write 32 bytes to
+                memory page 0..13 </li>
+            <li><a name="owcount_midnight">
+                    <code>set &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Write the
+                day's starting value for counter &lt;channel&gt; (A, B or named channel, see
+                below)</li>
+        </ul>
+        <br />
+        <a name="OWCOUNTget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="owcount_id">
+                    <code>get &lt;name&gt; id</code></a>
+                <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+            <li><a name="owcount_present">
+                    <code>get &lt;name&gt; present</code>
+                </a>
+                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+            <li><a name="owcount_interval2">
+                    <code>get &lt;name&gt; interval</code></a><br />Returns measurement interval in
+                seconds. </li>
+            <li><a name="owcount_memory2">
+                    <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Obtain 32 bytes from
+                memory page 0..13 </li>
+            <li><a name="owcount_midnight2">
+                    <code>get &lt;name&gt; midnight &lt;channel-name&gt;</code></a><br />Obtain the
+                day's starting value for counter &lt;channel&gt; (A, B or named channel, see
+                below)</li>
+            <li><a name="owcount_counter">
+                    <code>get &lt;name&gt; counter &lt;channel-name&gt;</code></a><br />Obtain the
+                current value for counter &lt;channel&gt; (A, B or named channel, see below)</li>
+            <li><a name="owcount_counters">
+                    <code>get &lt;name&gt; counters</code></a><br />Obtain the current value both
+                counters</li>
+        </ul>
+        <br />
+        <a name="OWCOUNTattr"></a>
+        <h4>Attributes</h4>
+        <p>For each of the following attributes, the channel identification A,B may be used.</p>
+        <ul>
+            <li><a name="owcount_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
+                        &lt;string&gt;|&lt;string&gt;</code></a>
+                <br />name for the channel | a type description for the measured value. </li>
+            <li><a name="owcount_cunit"><code>attr &lt;name&gt; &lt;channel&gt;Unit
+                        &lt;string&gt;|&lt;string&gt;</code></a>
+                <br />unit of measurement for this channel | its abbreviation. </li>
+            <li><a name="owcount_coffset"><code>attr &lt;name&gt; &lt;channel&gt;Offset
+                        &lt;float&gt;</code></a>
+                <br />offset added to the reading in this channel. </li>
+            <li><a name="owcount_cfactor"><code>attr &lt;name&gt; &lt;channel&gt;Factor
+                        &lt;float&gt;</code></a>
+                <br />factor multiplied to (reading+offset) in this channel. </li>
+            <li><a name="owcount_cmode"><code>attr &lt;name&gt; &lt;channel&gt;Mode daily |
+                        normal</code></a>
+                <br />factor multiplied to (reading+offset) in this channel. </li>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#event-on-update-reading">event-on-update-reading</a>, <a
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    <a href="#webCmd">webCmd</a></li>
+        </ul>
 =end html
 =cut
