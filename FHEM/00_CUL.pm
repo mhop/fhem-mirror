@@ -949,8 +949,11 @@ CUL_Ready($)
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
-  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-  return ($InBytes>0);
+  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+  if($po) {
+    ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  }
+  return ($InBytes && $InBytes>0);
 }
 
 ########################
