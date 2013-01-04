@@ -1134,8 +1134,9 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   maxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
   driveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
   actionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
-  OnTimeMode      =>{a=> 10.0,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
+  multiExec       =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"only Long press: multiple execution of command"    ,lit=>{off=>0,on=>1}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
+  OnTimeMode      =>{a=> 10.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
 #dimmer mainly                                                                                 
   OnDly           =>{a=>  6.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on delay "},
   OnTime          =>{a=>  7.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"on time"},
@@ -1301,6 +1302,7 @@ my %culHmRegType = (
   switch=> {OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
             SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
             CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
+			actionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
 			},
   winMatic=>{	                                    		 
             OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,
@@ -2207,7 +2209,7 @@ CUL_HM_Set($@)
   elsif($cmd eq "display") { ################################################## 
 	my (undef,undef,undef,$t,$c,$u,$snd,$blk,$symb) = @_;
 	return "cmd only possible for device or its display channel"
-	       if ($isChannel && $chn ne 18);
+	       if ($isChannel && $chn ne "12");
 	my %symbol=(off => 0x0000,
 	            bulb =>0x0100,switch =>0x0200,window   =>0x0400,door=>0x0800,
                 blind=>0x1000,scene  =>0x2000,phone    =>0x4000,bell=>0x8000,
@@ -2699,7 +2701,7 @@ sub    #---------------------------------
 CUL_HM_getConfig($$$$$){
   my ($hash,$chnhash,$id,$dst,$chn) = @_;
   my $flag = CUL_HM_getFlag($hash);
-  
+
   foreach my $readEntry (keys %{$chnhash->{READINGS}}){
 	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^RegL_/);
   }
