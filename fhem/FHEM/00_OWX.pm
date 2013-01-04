@@ -756,15 +756,19 @@ sub OWX_Discover ($) {
       $chip     = "unknown";
       $acstring = "OWID $owx_f";  
     }
+       
+    #Log 1,"###\nfor the following device match=$match, chip=$chip name=$name acstring=$acstring";
     #-- autocreate the device if necessary
     if( $match==1 ){
       $ret .= sprintf("%s %-10s %s\n", $owx_f.$owx_rnf, $chip, $exname);
     #
     }else{
       my $acname = sprintf "OWX_%s_%s",$owx_f,$owx_rnf;
-      CommandDefine(undef,"$name $acstring $owx_rnf"); 
+      #Log 1, "to define $acname $acstring $owx_rnf";
+      CommandDefine(undef,"$acname $acstring $owx_rnf");
+      select(undef,undef,undef,0.1);
       push(@owx_names,$acname);
-      $main::defs{$name}{PRESENT}=1;
+      $main::defs{$acname}{PRESENT}=1;
       #-- THIS IODev, default room
       #CommandAttr (undef,"$name IODev $hash->{NAME}"); 
       CommandAttr (undef,"$acname room OWX"); 
@@ -772,6 +776,7 @@ sub OWX_Discover ($) {
       $main::defs{$acname}{ROM_ID}=$owx_dev;
       $ret .= sprintf("%s %-10s %s\n", $owx_f.$owx_rnf, $chip, $acname);
     }
+
     
   }
 
@@ -780,7 +785,7 @@ sub OWX_Discover ($) {
     #-- skip if malformed device
     #next if( !defined($main::defs{$fhem_dev}{NAME}) );
     #-- all OW types start with OW, but safeguard against deletion of other devices
-    next if( !defined($main::defs{$fhem_dev}{TYPE}));
+    #next if( !defined($main::defs{$fhem_dev}{TYPE}));
     next if( substr($main::defs{$fhem_dev}{TYPE},0,2) ne "OW");
     next if( uc($main::defs{$fhem_dev}{TYPE}) eq "OWX");
     next if( uc($main::defs{$fhem_dev}{TYPE}) eq "OWFS");
@@ -794,6 +799,7 @@ sub OWX_Discover ($) {
     }
     Log 1, "OWX: Deleting unused 1-Wire device $main::defs{$fhem_dev}{NAME} of type $main::defs{$fhem_dev}{TYPE}";
     CommandDelete(undef,$main::defs{$fhem_dev}{NAME});
+    #Log 1, "present= ".$main::defs{$fhem_dev}{PRESENT}." iodev=".$main::defs{$fhem_dev}{IODev}{NAME};
   }
   #-- Log the discovered devices
   Log 1, "OWX: 1-Wire devices found on bus $name (".join(",",@owx_names).")";
@@ -2035,6 +2041,7 @@ sub OWX_Complex_CUNO ($$$$) {
   #-- has receive part
   if( $numread > 0 ){
     #$numread += length($data);
+    Log 1,"CUNO is expected to deliver $numread bytes";
     $res.=OWX_Receive_CUNO($hash,$numread);
   }
   Log 3,"OWX: returned from CUNO $res"
@@ -2063,9 +2070,9 @@ sub OWX_Discover_CUNO ($) {
   
   #-- zero the array
   @{$hash->{DEVS}}=();
-  OWX_ReInit_CUNO($hash,0);
-  CUL_SimpleWrite($owx_hwdevice, "Oc");
-  select(undef,undef,undef,0.5);
+  OWX_ReInit_CUNO($hash,1);
+  ##CUL_SimpleWrite($owx_hwdevice, "Oc");
+  select(undef,undef,undef,5);
   my ($err,$ob) = CUL_ReadAnswer($owx_hwdevice,"",0,undef);
   if( $ob ){
     #Log 1,"OWX: Answer to ".$owx_hwdevice->{NAME}." device search is ".$ob;
@@ -2123,6 +2130,18 @@ sub OWX_Receive_CUNO ($$) {
     }elsif( length($ob) == 11 ){
       $res  .= sprintf("%c",hex(substr($ob,9,2)));
       $res2 .= "0x".substr($ob,9,2)." ";
+    #-- 18 bytes received from CUNO 
+    }elsif( length($ob) == 18 ){
+    
+    my $res = "OWX: Receiving from CUNO: $ob\n";
+    for(my $i=0;$i<length($ob);$i++){  
+      my $j=int(ord(substr($ob,$i,1))/16);
+      my $k=ord(substr($ob,$i,1))%16;
+      $res.=sprintf "0x%1x%1x ",$j,$k;
+    }
+    Log 3, $res;
+    
+    #$numread++;
     #-- 20 bytes received = leftover from match
     }elsif( length($ob) == 20 ){
       $numread++;
@@ -2191,7 +2210,7 @@ sub OWX_ReInit_CUNO ($$) {
     }
   }elsif( $type eq "1" ){
    my $ob = CallFn($owx_hwdevice->{NAME}, "GetFn", $owx_hwdevice, (" ", "raw", "Oi"));
-   Log 1, "Answer of sending Oi to ".$owx_hwdevice->{NAME}." was $ob";
+   #Log 1, "Answer of sending Oi to ".$owx_hwdevice->{NAME}." was $ob";
    return 1;
   }
 }
