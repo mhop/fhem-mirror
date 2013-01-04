@@ -170,8 +170,6 @@ OWDevice_ReadValue($$) {
         #Debug "/$address/$reading => $value";  
         if(defined($value)) {
           $value= trim($value) if(AttrVal($hash,"trimvalues",1));
-          my @getters= @{$hash->{fhem}{getters}};
-          $hash->{STATE}= "$reading: $value" if($reading eq $getters[0]);
         } else {
           Log 3, $hash->{NAME} . ": reading $reading did not return a value";
         }
@@ -197,12 +195,16 @@ OWDevice_UpdateValues($) {
         my ($hash)= @_;
 
         my @polls= @{$hash->{fhem}{polls}};
+        my @getters= @{$hash->{fhem}{getters}};
         if($#polls>=0) {
           my $address= $hash->{fhem}{address};
           readingsBeginUpdate($hash);
           foreach my $reading (@polls) {
             my $value= OWDevice_ReadValue($hash,$reading);
-            readingsBulkUpdate($hash,$reading,$value) if(defined($value));
+            if(defined($value)) {
+              readingsBulkUpdate($hash,$reading,$value);
+              readingsBulkUpdate($hash,"state","$reading: $value") if($reading eq $getters[0]);
+            }
           }
           readingsEndUpdate($hash,1);
         }
