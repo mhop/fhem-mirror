@@ -4,17 +4,11 @@
 #
 # FHEM module to commmunicate with the 1-Wire LCD hardware
 #
-# Attention: This module may communicate with the OWX module,
-#            but currently not with the 1-Wire File System OWFS
+# Prof. Dr. Peter A. Henning
 #
-# Prefixes for subroutines of this module:
-# OW   = General 1-Wire routines  Peter Henning
+# $Id$
 #
-# Prof. Dr. Peter A. Henning, 2012
-# 
-# Version 2.24 - October, 2012
-#   
-# Setup bus device in fhem.cfg as
+########################################################################################
 #
 # define <name> OWLCD <ROM_ID>
 #
@@ -62,7 +56,6 @@
 ########################################################################################
 package main;
 
-#-- Prototypes to make komodo happy
 use vars qw{%attr %defs};
 use strict;
 use warnings;
@@ -171,13 +164,13 @@ sub OWLCD_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  Log 3, "OWLCD: Warning, no 1-Wire I/O device found for $name."
-    if(!defined($hash->{IODev}->{NAME}));
-    
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+    return "OWLCD: Warning, no 1-Wire I/O device found for $name.";
+  }
   $modules{OWLCD}{defptr}{$id} = $hash;
   
   $hash->{STATE} = "Defined";
-  Log 3, "OWLCD:  Device $name defined."; 
+  Log 3, "OWLCD:   Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -419,9 +412,10 @@ sub OWLCD_Set($@) {
   
   #-- set a single LCD line
   if($key eq "line") {
+    $value = OWXLCD_Trans($value);
     return "OWLCD: Wrong line number, choose 0..".$lcdlines 
       if( ( 0 > $line ) || ($line > ($lcdlines-1)) );
-    return "OWLCD: Wrong line length, must be < ".$lcdchars 
+    return "OWLCD: Wrong line length, must be <= ".$lcdchars 
       if( length($value) > $lcdchars );
     #-- check value and write to device   
      OWXLCD_SetLine($hash,$line,$value);
@@ -907,20 +901,9 @@ sub OWXLCD_SetLine($$$) {
   $res2 = "";
   $line = int($line);
   $msg =   defined($msg) ? $msg : "";
-  #-- replace umlaut chars for special codepage
-  $msg =~ s/ä/\x7B/g;
-  $msg =~ s/ö/\x7C/g;
-  $msg =~ s/ü/\x7E/g;
-  $msg =~ s/Ä/\x5B/g;
-  $msg =~ s/Ö/\x5C/g;
-  $msg =~ s/Ü/\x5E/g;
-  $msg =~ s/ß/\xBE/g;
   
-  #--take out degree sign
-  if( $msg =~ m/.*\&deg\;.*/ ) {
-    my @ma = split(/\&deg\;/,$msg);
-    $msg = $ma[0]."\x80".$ma[1];
-  }
+  $msg = OWXLCD_Trans($msg);
+ 
   #-- ID of the device, hash of the busmaster
   my $owx_dev = $hash->{ROM_ID};
   my $master  = $hash->{IODev};
@@ -988,6 +971,34 @@ sub OWXLCD_SetLine($$$) {
 
 ########################################################################################
 #
+# OWXLCD_Trans - String translation helper
+#
+# Parameter msg   = data string to be written
+#
+########################################################################################
+
+sub OWXLCD_Trans($) {
+
+  my ($msg) = @_;
+  
+  #-- replace umlaut chars for special codepage
+  $msg =~ s/ä/\x7B/g;
+  $msg =~ s/ö/\x7C/g;
+  $msg =~ s/ü/\x7E/g;
+  $msg =~ s/Ä/\x5B/g;
+  $msg =~ s/Ö/\x5C/g;
+  $msg =~ s/Ü/\x5E/g;
+  $msg =~ s/ß/\xBE/g;
+  #--take out degree sign
+  if( $msg =~ m/.*\&deg\;.*/ ) {
+    my @ma = split(/\&deg\;/,$msg);
+    $msg = $ma[0]."\x80".$ma[1];
+  }
+  return $msg;
+}
+
+########################################################################################
+#
 # OWXLCD_SetMemory - set internal nonvolatile memory
 #
 # Parameter hash  = hash of device addressed
@@ -1038,94 +1049,93 @@ sub OWXLCD_SetMemory($$$) {
 
 =pod
 =begin html
-
-<a name="OWLCD"></a>
-<h3>OWLCD</h3>
-<ul>FHEM module to commmunicate with the <a
-        href="http://www.louisswart.co.za/1-Wire_Overview.html">1-Wire LCD controller</a>
-    from Louis Swart (1-Wire family id FF). See also the corresponding <a
-        href="http://fhemwiki.de/wiki/1-Wire_Textdisplay">Wiki page.</a><br /><br />
-    Note:<br /> This 1-Wire module so far works only with the OWX interface module. Please
-    define an <a href="#OWX">OWX</a> device first. <br />
-    <br /><b>Example</b><br />
-    <ul>
-        <code>define OWX_LCD OWLCD 9F0700000100</code>
+  <a name="OWLCD"></a>
+        <h3>OWLCD</h3>
+        <p>FHEM module to commmunicate with the <a
+                href="http://www.louisswart.co.za/1-Wire_Overview.html">1-Wire LCD controller</a>
+            from Louis Swart (1-Wire family id FF). See also the corresponding <a
+                href="http://fhemwiki.de/wiki/1-Wire_Textdisplay">Wiki page.</a><br /><br />
+            Note:<br /> This 1-Wire module so far works only with the OWX interface module. Please
+            define an <a href="#OWX">OWX</a> device first. <br /></p>
+        <br /><h4>Example</h4>
+        <p>
+            <code>define OWX_LCD OWLCD 9F0700000100</code>
+            <br />
+        </p>
         <br />
-    </ul>
-    <br />
-    <a name="OWLCDdefine"></a>
-    <b>Define</b>
-    <ul>
-        <code>define &lt;name&gt; OWLCD &lt;id&gt;</code>
-        <br /><br /> Define a 1-Wire LCD device.<br /><br />
-        <li>
-            <code>&lt;id&gt;</code>
-            <br />12-character unique ROM id of the converter device without family id and
-            CRC code </li>
-    </ul>
-    <br />
-    <a name="OWLCDset">
-        <b>Set</b></a>
-    <ul>
-        <li><a name="owlcd_icon">
-                <code>set &lt;name&gt; icon &lt;int&gt; on|off|blink</code></a><br /> Set
-            one of the icons 0..14 on, off or blinking</li>
-        <li><a name="owlcd_icon2">
-                <code>set &lt;name&gt; icon 15 0..6</code></a><br /> Set icon 15 to one of
-            its values</li>
-        <li><a name="owlcd_icon3">
-                <code>set &lt;name&gt; icon none</code></a><br /> Set all icons off</li>
-        <li><a name="owlcd_line">
-                <code>set &lt;name&gt; line &lt;int&gt; &lt;string&gt;</code></a><br />
-            Write LCD line 0..3 with some content </li>
-        <li><a name="owlcd_memory">
-                <code>set &lt;name&gt; memory &lt;page&gt;
-            &lt;string&gt;</code></a><br />Write memory page 0..6</li>
-        <li><a name="owlcd_gpio">
-                <code>set &lt;name&gt; gpio &lt;value&gt;</code></a><br />Write state for
-            all three gpio pins (value = 0..7, for each bit 0=ON, 1=OFF)</li>
-        <li><a name="owlcd_bl">
-                <code>set &lt;name&gt; backlight ON|OFF</code></a><br />Switch backlight on
-            or off</li>
-        <li><a name="owlcd_lcd">
-                <code>set &lt;name&gt; lcd ON|OFF</code></a><br />Switch LCD power on or
-            off</li>
-        <li><a name="owlcd_gpio">
-                <code>set &lt;name&gt; reset</code></a><br />Reset the display</li>
-        <li><a name="owlcd_gpio">
-                <code>set &lt;name&gt; test</code></a><br />Test the display</li>
-    </ul>
-    <br />
-    <a name="owlcdget">
-        <b>Get</b></a>
-    <ul>
-        <li><a name="owlcd_id">
-                <code>get &lt;name&gt; id</code></a>
-            <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
-        <li><a name="owlcd_present">
-                <code>get &lt;name&gt; present</code>
-            </a>
-            <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
-        <li><a name="owlcd_memory2">
-                <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Read memory page
-            0..6 </li>
-        <li><a name="owlcd_gpio">
-                <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all four input
-            channels (15 = all off, 0 = all on)</li>
-        <li><a name="owlcd_counter">
-                <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all four input
-            counters (4 x 16 Bit)</li>
-        <li><a name="owlcd_version">
-                <code>get &lt;name&gt; version</code></a><br />Obtain firmware version of
-            the controller</li>
-    </ul>
-    <br />
-    <a name="owlcdattr">
-        <b>Attributes</b></a>
-    <ul>
-        <li>Standard attributes alias, comment, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>, <a href="#webCmd">webCmd</a></li>
-    </ul>
-</ul>
-
+        <a name="OWLCDdefine"></a>
+        <h4>Define</h4>
+        <p>
+            <code>define &lt;name&gt; OWLCD &lt;id&gt;</code>
+            <br /><br /> Define a 1-Wire LCD device.<br /><br /></p>
+        <ul>
+            <li>
+                <code>&lt;id&gt;</code>
+                <br />12-character unique ROM id of the converter device without family id and CRC
+                code </li>
+        </ul>
+        <br />
+        <a name="OWLCDset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="owlcd_icon">
+                    <code>set &lt;name&gt; icon &lt;int&gt; on|off|blink</code></a><br /> Set one of
+                the icons 0..14 on, off or blinking</li>
+            <li><a name="owlcd_icon2">
+                    <code>set &lt;name&gt; icon 15 0..6</code></a><br /> Set icon 15 to one of its
+                values</li>
+            <li><a name="owlcd_icon3">
+                    <code>set &lt;name&gt; icon none</code></a><br /> Set all icons off</li>
+            <li><a name="owlcd_line">
+                    <code>set &lt;name&gt; line &lt;int&gt; &lt;string&gt;</code></a><br /> Write
+                LCD line 0..3 with some content </li>
+            <li><a name="owlcd_memory">
+                    <code>set &lt;name&gt; memory &lt;page&gt; &lt;string&gt;</code></a><br />Write
+                memory page 0..6</li>
+            <li><a name="owlcd_gpio">
+                    <code>set &lt;name&gt; gpio &lt;value&gt;</code></a><br />Write state for all
+                three gpio pins (value = 0..7, for each bit 0=ON, 1=OFF)</li>
+            <li><a name="owlcd_bl">
+                    <code>set &lt;name&gt; backlight ON|OFF</code></a><br />Switch backlight on or
+                off</li>
+            <li><a name="owlcd_lcd">
+                    <code>set &lt;name&gt; lcd ON|OFF</code></a><br />Switch LCD power on or
+                off</li>
+            <li><a name="owlcd_gpio">
+                    <code>set &lt;name&gt; reset</code></a><br />Reset the display</li>
+            <li><a name="owlcd_gpio">
+                    <code>set &lt;name&gt; test</code></a><br />Test the display</li>
+        </ul>
+        <br />
+        <a name="owlcdget"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="owlcd_id">
+                    <code>get &lt;name&gt; id</code></a>
+                <br /> Returns the full 1-Wire device id OW_FAMILY.ROM_ID.CRC </li>
+            <li><a name="owlcd_present">
+                    <code>get &lt;name&gt; present</code>
+                </a>
+                <br /> Returns 1 if this 1-Wire device is present, otherwise 0. </li>
+            <li><a name="owlcd_memory2">
+                    <code>get &lt;name&gt; memory &lt;page&gt;</code></a><br />Read memory page 0..6 </li>
+            <li><a name="owlcd_gpio">
+                    <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all four input
+                channels (15 = all off, 0 = all on)</li>
+            <li><a name="owlcd_counter">
+                    <code>get &lt;name&gt; gpio</code></a><br />Obtain state of all four input
+                counters (4 x 16 Bit)</li>
+            <li><a name="owlcd_version">
+                    <code>get &lt;name&gt; version</code></a><br />Obtain firmware version of the
+                controller</li>
+        </ul>
+        <br />
+        <a name="owlcdattr"></a>
+        <h4>Attributes</h4>
+        <ul>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#room">room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel"
+                    >loglevel</a>, <a href="#webCmd">webCmd</a></li>
+        </ul>
 =end html
 =cut
