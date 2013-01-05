@@ -908,7 +908,7 @@ CUL_HM_Parse($$)
       push @event, "SDunknownMsg:$p" if(!@event);
 	}
 	
-	if($id eq $dst && $cmd ne "8002"){  # Send Ack/Nack
+	if($id eq $dst && (hex($msgFlag)&0x20)){  # Send Ack/Nack
       CUL_HM_SndCmd($shash, $msgcnt."8002".$id.$src.($cmd eq "A001" ? "80":"00"));
       $sendAck = ""; #todo why is this special?
 	}
@@ -1131,10 +1131,9 @@ CUL_HM_Parse($$)
 	#
 my %culHmRegDefShLg = (# register that are available for short AND long button press. Will be merged to rgister list at init
 #blindActuator mainly   
-  maxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
-  driveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
-  actionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
-  multiExec       =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"only Long press: multiple execution of command"    ,lit=>{off=>0,on=>1}},
+  MaxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
+  DriveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
+  ActionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
   OnTimeMode      =>{a=> 10.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
 #dimmer mainly                                                                                 
@@ -1143,6 +1142,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   OffDly          =>{a=>  8.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off delay"},
   OffTime         =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off time"},
 
+  ActionTypeDim   =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
   OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel Off"},
   OnMinLevel      =>{a=> 16.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"minimum PowerLevel"},
   OnLevel         =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel on"},
@@ -1152,12 +1152,12 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   OnRampOnSp      =>{a=> 34.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"Ramp On speed"},
   OnRampOffSp     =>{a=> 35.0,s=>1.0,l=>3,min=>0  ,max=>1       ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"Ramp Off speed"},
 
-  rampSstep       =>{a=> 18.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"rampStartStep"},
-  rampOnTime      =>{a=> 19.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"rampOnTime"},
-  rampOffTime     =>{a=> 20.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"rampOffTime"},
-  dimMinLvl       =>{a=> 21.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMinLevel"},
-  dimMaxLvl       =>{a=> 22.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMaxLevel"},
-  dimStep         =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimStep"},
+  RampSstep       =>{a=> 18.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"rampStartStep"},
+  RampOnTime      =>{a=> 19.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"rampOnTime"},
+  RampOffTime     =>{a=> 20.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"rampOffTime"},
+  DimMinLvl       =>{a=> 21.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMinLevel"},
+  DimMaxLvl       =>{a=> 22.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimMaxLevel"},
+  DimStep         =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimStep"},
 #output Unit                                                                                       
   ActType         =>{a=> 36  ,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action type(LED or Tone)"},
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
@@ -1184,12 +1184,12 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   SwJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
   SwJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
   
-  CtOn            =>{a=>  3.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from On"       ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
-  CtOff           =>{a=>  3.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from Off"      ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
-  CtDlyOn         =>{a=>  2.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOn"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
-  CtDlyOff        =>{a=>  2.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOff" ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
-  CtRampOn        =>{a=>  1.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOn"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
-  CtRampOff       =>{a=>  1.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOff"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,in=>4,out=>5}},
+  CtOn            =>{a=>  3.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from On"       ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtOff           =>{a=>  3.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from Off"      ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtDlyOn         =>{a=>  2.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOn"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtDlyOff        =>{a=>  2.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOff" ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtRampOn        =>{a=>  1.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOn"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtRampOff       =>{a=>  1.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOff"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 );
 
 
@@ -1201,6 +1201,7 @@ my %culHmRegDefine = (
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"fliptime up <=>down"},
+  lgMultiExec     =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
 #remote mainly                                                                                      
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Language 0:English, 1:German"},
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
@@ -1225,29 +1226,48 @@ my %culHmRegDefine = (
   ovrTempLvl      =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"overtemperatur level"},
   redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"reduced temperatur recover"},
   redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>1,t=>"reduced power level"},
+  loadErrCalib	  =>{a=> 18.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"Load Error Calibration"},
+  transmitTryMax  =>{a=> 48.0,s=>1.0,l=>1,min=>0  ,max=>10      ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"max message re-transmit"},
+  loadAppearBehav =>{a=> 49.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on load appearence at restart",lit=>{off=>0,last=>1,btnPress=>2,btnPressIfWasOn=>3}},
+  powerUpAction	  =>{a=> 86.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on power up"                  ,lit=>{off=>0,on=>1}},
+  statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0.5,max=>15.5    ,c=>'factor'   ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"},
+  statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
+  fuseDelay		  =>{a=> 51.0,s=>1.0,l=>1,min=>0  ,max=>2.55    ,c=>'factor'   ,f=>100     ,u=>"s"   ,d=>0,t=>"fuse delay"},
+  characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                      ,lit=>{linear=>0,square=>1}},
 #CC-TC                                                                                        
-  BacklOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
-  BacklOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
-  BtnLock         =>{a=> 15  ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"     ,lit=>{unlock=>0,lock=>1}},
-  DispTempHum     =>{a=>  1.0,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{temp=>0,tempHumidity=>1}},
-  DispTempInfo    =>{a=>  1.1,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{actual=>0,setPoint=>1}},
-  DispTempUnit    =>{a=>  1.2,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{Celsius=>0,Fahrenheit=>1}},
-  MdTempReg       =>{a=>  1.3,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
-  MdTempValve     =>{a=>  2.6,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
+  backlOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
+  backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
+  btnLock         =>{a=> 15  ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"     ,lit=>{unlock=>0,lock=>1}},
+  dispTempHum     =>{a=>  1.0,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{temp=>0,tempHumidity=>1}},
+  dispTempInfo    =>{a=>  1.1,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{actual=>0,setPoint=>1}},
+  dispTempUnit    =>{a=>  1.2,s=>0.1,l=>5,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{Celsius=>0,Fahrenheit=>1}},
+  mdTempReg       =>{a=>  1.3,s=>0.2,l=>5,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{manual=>0,auto=>1,central=>2,party=>3}},
+  mdTempValve     =>{a=>  2.6,s=>0.2,l=>5,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""                ,lit=>{auto=>0,close=>1,open=>2}},
                                                                                                  
-  TempComfort     =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
-  TempLower       =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
-  PartyEndDay     =>{a=> 98  ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
-  PartyEndMin     =>{a=> 97.7,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,d=>1,t=>"Party end 0=:00, 1=:30"},
-  PartyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
-  TempParty       =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
-  TempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
-  DecalDay        =>{a=>  1.5,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"  ,lit=>{sat=>0,sun=>1,mon=>2,tue=>3,wed=>4,thu=>5,fri=>6}},
-  DecalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
-  DecalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
+  tempComfort     =>{a=>  3  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  tempLower       =>{a=>  4  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"comfort temp value"},
+  partyEndDay     =>{a=> 98  ,s=>1  ,l=>6,min=>0  ,max=>200     ,c=>''         ,f=>''      ,u=>'d'   ,d=>1,t=>"Party end Day"},
+  partyEndMin     =>{a=> 97.7,s=>1  ,l=>6,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>'min' ,d=>1,t=>"Party end 0=:00, 1=:30"},
+  partyEndHr      =>{a=> 97  ,s=>0.6,l=>6,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Party end Hour"},
+  tempParty       =>{a=>  6  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Party"},
+  tempWinOpen     =>{a=>  5  ,s=>0.6,l=>5,min=>6  ,max=>30      ,c=>'factor'   ,f=>2       ,u=>'C'   ,d=>1,t=>"Temperature for Win open !chan 3 only!"},
+  decalDay        =>{a=>  1.5,s=>0.3,l=>5,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Decalc weekday"  ,lit=>{sat=>0,sun=>1,mon=>2,tue=>3,wed=>4,thu=>5,fri=>6}},
+  decalHr         =>{a=>  8.3,s=>0.5,l=>5,min=>0  ,max=>23      ,c=>''         ,f=>''      ,u=>'h'   ,d=>1,t=>"Decalc hour"},
+  decalMin        =>{a=>  8  ,s=>0.3,l=>5,min=>0  ,max=>50      ,c=>'factor'   ,f=>0.1     ,u=>'min' ,d=>1,t=>"Decalc min"},
 #Thermal-cc-VD                                                                                  
-  ValveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
-  ValveError      =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
+  valveOffset     =>{a=>  9  ,s=>0.5,l=>5,min=>0  ,max=>25      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve offset"},             # size actually 0.5
+  valveError      =>{a=> 10  ,s=>1  ,l=>5,min=>0  ,max=>99      ,c=>''         ,f=>''      ,u=>'%'   ,d=>1,t=>"Valve position when error"},# size actually 0.7
+#SCD                                                                                  
+  msgScdPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,lvlNormal=>1}},
+  msgScdPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
+  msgScdPosC      =>{a=> 32.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position C",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
+  msgScdPosD      =>{a=> 32.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position D",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
+  evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600,max=>1200    ,c=>''         ,f=>1.6     ,u=>'s'   ,d=>0,t=>"Event filter time",},#todo check calculation
+#rhs - different literals
+  msgRhsPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
+  msgRhsPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
+  msgRhsPosC      =>{a=> 32.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position C",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
+  evtDly          =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'factor'   ,f=>1.6     ,u=>'s'   ,d=>0,t=>"Event delay time",},#todo check calculation
 # keymatic secific register                                                                     
   signal          =>{a=>  3.4,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
   signalTone      =>{a=>  3.6,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
@@ -1279,30 +1299,34 @@ my %culHmRegGeneral = (
 	);
 my %culHmRegType = (
   remote=> {expectAES=>1,peerNeedsBurst=>1,dblPress=>1,longPress=>1},
-  blindActuator=> {driveUp  =>1, driveDown=>1 , driveTurn=>1,
-                   maxTimeF =>1,
-                   OnDly    =>1, OnTime     =>1,OffDly     =>1,  OffTime    =>1,
-  	   		       OffLevel =>1, OnLevel    =>1,
-                   driveMode=>1, actionType =>1,OnTimeMode =>1,  OffTimeMode=>1,
+  blindActuator=> {driveUp         =>1,driveDown       =>1,driveTurn       =>1,maxTimeF        =>1,                                    
+                   OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+  	   		       OffLevel        =>1,OnLevel         =>1,                                    
+                   ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,DriveMode       =>1,
 				   BlJtOn          =>1,BlJtOff         =>1,BlJtDlyOn       =>1,BlJtDlyOff      =>1,
                    BlJtRampOn      =>1,BlJtRampOff     =>1,BlJtRefOn       =>1,BlJtRefOff      =>1,
                    CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
 				   CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
+				   lgMultiExec     =>1,
 				   },
-  dimmer=> {ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
-            OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
+  dimmer=> {TransmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction	  =>1,
+            ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,fuseDelay		  =>1,#not dim.L
+            OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime           =>1,
+			ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1,
 			OffLevel        =>1,OnMinLevel      =>1,OnLevel         =>1,               
-            rampSstep       =>1,rampOnTime      =>1,rampOffTime     =>1,dimMinLvl       =>1,
-            dimMaxLvl       =>1,dimStep         =>1,
+            RampSstep       =>1,RampOnTime      =>1,RampOffTime     =>1,
+			DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1,
             DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,
             DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1,
             CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
             CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
+			lgMultiExec     =>1,
 			},
-  switch=> {OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
-            SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-            CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
-			actionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
+  switch=> {OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly            =>1,
+            SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff        =>1,
+            CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff          =>1,
+			ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
+ 		    lgMultiExec     =>1,
 			},
   winMatic=>{	                                    		 
             OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,
@@ -1319,6 +1343,8 @@ my %culHmRegType = (
 			captInInterval=>1,brightFilter    =>1,ledOnTime       =>1,
 			},
 );
+
+
 my %culHmRegModel = (
   "HM-RC-12"   => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
   "HM-RC-12-B" => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
@@ -1328,26 +1354,38 @@ my %culHmRegModel = (
   "HM-RC-19-B" => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1,backAtCharge =>1, language =>1,},
   "HM-RC-19-SW"=> {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1,backAtCharge =>1, language =>1,},
  
-  "HM-CC-VD"      => {ValveOffset     =>1,ValveError      =>1},
-  "HM-PB-4DIS-WM" => {language        =>1,stbyTime        =>1},
-  "HM-WDS100-C6-O"=> {stormUpThresh   =>1,stormLowThresh  =>1},
-  "KS550"         => {stormUpThresh   =>1,stormLowThresh  =>1},
-  "HM-OU-CFM-PL"  => {localResetDis   =>1,
+  "HM-LC-Dim1PWM-CV"=>{characteristic  =>1},
+  "HM-LC-Dim1L-P"   =>{loadAppearBehav =>1,loadErrCalib	  =>1},
+  "HM-LC-Dim1L-CV"  =>{loadAppearBehav =>1,loadErrCalib	  =>1},
+  "HM-LC-Dim2L-SM"  =>{loadAppearBehav =>1,loadErrCalib	  =>1},
+  
+  "HM-CC-VD"       =>{valveOffset     =>1,valveError      =>1},
+  "HM-PB-4DIS-WM"  =>{language        =>1,stbyTime        =>1},
+  "HM-WDS100-C6-O" =>{stormUpThresh   =>1,stormLowThresh  =>1},
+  "KS550"          =>{stormUpThresh   =>1,stormLowThresh  =>1},
+  "HM-OU-CFM-PL"   =>{localResetDis   =>1,
   			OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
             SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
             CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 			OnTimeMode      =>1,OffTimeMode     =>1, 
 			ActType         =>1,ActNum          =>1},
-  "HM-CC-TC"      => {BacklOnTime  =>1,BacklOnMode  =>1,BtnLock      =>1},
+  "HM-CC-TC"       =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
+  "HM-CC-SCD"      =>{peerNeedsBurst  =>1,expectAES       =>1,
+                      transmitTryMax  =>1,evtFltrTime     =>1,
+                      msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1,},
+  "HM-SEC-RHS"     =>{peerNeedsBurst  =>1,expectAES       =>1,
+                      msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
+                      evtDly          =>1,ledOnTime       =>1,transmitTryMax  =>1,},
+
 );
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"=> {
-			DispTempHum  =>1,DispTempInfo =>1,DispTempUnit =>1,MdTempReg   =>1,
-			MdTempValve  =>1,TempComfort  =>1,TempLower    =>1,PartyEndDay =>1,
-			PartyEndMin  =>1,PartyEndHr   =>1,TempParty    =>1,DecalDay    =>1,
-			DecalHr      =>1,DecalMin     =>1, 
+			dispTempHum  =>1,dispTempInfo =>1,dispTempUnit =>1,mdTempReg   =>1,
+			mdTempValve  =>1,tempComfort  =>1,tempLower    =>1,partyEndDay =>1,
+			partyEndMin  =>1,partyEndHr   =>1,tempParty    =>1,decalDay    =>1,
+			decalHr      =>1,decalMin     =>1, 
               },
-  "HM-CC-TC03"   => {TempWinOpen  =>1, }, #window channel
+  "HM-CC-TC03"   => {tempWinOpen  =>1, }, #window channel
   "HM-RC-1912"   => {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
                      backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
                      lcdSymb      =>1, lcdLvlInterp   =>1},
@@ -1368,16 +1406,16 @@ sub
 CUL_HM_initRegHash()
 { #duplicate short and long press register 
   foreach my $reg (keys %culHmRegDefShLg){ #update register list
-    %{$culHmRegDefine{"Sh".$reg}} = %{$culHmRegDefShLg{$reg}};
-    %{$culHmRegDefine{"Lg".$reg}} = %{$culHmRegDefShLg{$reg}};
-	$culHmRegDefine{"Lg".$reg}{a} +=0x80;
+    %{$culHmRegDefine{"sh".$reg}} = %{$culHmRegDefShLg{$reg}};
+    %{$culHmRegDefine{"lg".$reg}} = %{$culHmRegDefShLg{$reg}};
+	$culHmRegDefine{"lg".$reg}{a} +=0x80;
   }
   foreach my $type(sort(keys %culHmRegType)){ #update references to register
     foreach my $reg (sort(keys %{$culHmRegType{$type}})){
       if ($culHmRegDefShLg{$reg}){
 	    delete $culHmRegType{$type}{$reg};
-	    $culHmRegType{$type}{"Sh".$reg} = 1;
-	    $culHmRegType{$type}{"Lg".$reg} = 1;
+	    $culHmRegType{$type}{"sh".$reg} = 1;
+	    $culHmRegType{$type}{"lg".$reg} = 1;
 	  }
     }
   }
@@ -1385,8 +1423,8 @@ CUL_HM_initRegHash()
     foreach my $reg (sort(keys %{$culHmRegModel{$type}})){
       if ($culHmRegDefShLg{$reg}){
 	    delete $culHmRegModel{$type}{$reg};
-	    $culHmRegModel{$type}{"Sh".$reg} = 1;
-	    $culHmRegModel{$type}{"Lg".$reg} = 1;
+	    $culHmRegModel{$type}{"sh".$reg} = 1;
+	    $culHmRegModel{$type}{"lg".$reg} = 1;
 	  }
     }
   }
@@ -1394,8 +1432,8 @@ CUL_HM_initRegHash()
     foreach my $reg (sort(keys %{$culHmRegChan{$type}})){
       if ($culHmRegDefShLg{$reg}){
 	    delete $culHmRegChan{$type}{$reg};
-	    $culHmRegChan{$type}{"Sh".$reg} = 1;
-	    $culHmRegChan{$type}{"Lg".$reg} = 1;
+	    $culHmRegChan{$type}{"sh".$reg} = 1;
+	    $culHmRegChan{$type}{"lg".$reg} = 1;
 	  }
     }
   }
@@ -4134,7 +4172,7 @@ CUL_HM_setAttrIfCh($$$$)
 
          Note4: the direct buttons on a HM device are hidden by default.
          Nevertheless those are implemented as links as well. To get access to
-         the 'internal links' it is necessary to issue 'set &lt;name&gt; setReg
+         the 'internal links' it is necessary to issue 'set &lt;name&gt; regSet
          intKeyVisib 1' or 'set &lt;name&gt; setRegRaw List0 2 81'. Reset it
          by replacing '81' with '01'<br> example:<br>
 
