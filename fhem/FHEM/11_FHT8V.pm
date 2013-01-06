@@ -13,7 +13,8 @@ FHT8V_Initialize($)
   $hash->{DefFn}     = "FHT8V_Define";
   $hash->{SetFn}     = "FHT8V_Set";
   $hash->{GetFn}     = "FHT8V_Get";
-  $hash->{AttrList}  = "IODev dummy:1,0 ignore:1,0 loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev dummy:1,0 ignore:1,0 loglevel:0,1,2,3,4,5,6 ".
+                         $readingFnAttributes;
 }
 
 #############################
@@ -177,6 +178,7 @@ FHT8V_Get($@)
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
