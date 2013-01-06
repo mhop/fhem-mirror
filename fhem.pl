@@ -2986,6 +2986,8 @@ readingsBulkUpdate($$$@)
 {
   my ($hash,$reading,$value,$changed)= @_;
   my $name= $hash->{NAME};
+
+  return if(!defined($reading) || !defined($value));
   
   # sanity check
   if(!defined($hash->{".updateTimestamp"})) {
