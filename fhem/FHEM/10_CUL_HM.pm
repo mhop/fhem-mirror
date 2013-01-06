@@ -953,18 +953,29 @@ CUL_HM_Parse($$)
     else{push @event, "3SSunknownMsg:$p" if(!@event);}
   } 
   elsif($model eq "HM-WDC7000" ||$st eq "THSensor") { ####################
-	my $t =  hex(substr($p,0,4));
-    $t -= 32768 if($t > 1638.4);
-	$t = sprintf("%0.1f", $t/10);
-	my $h =  hex(substr($p,4,2));
-	my $ap = hex(substr($p,6,4));
-	my $statemsg = "state:T: $t";
-	$statemsg .= " H: $h"   if ($h);
-	$statemsg .= " AP: $ap" if ($ap);
-    push @event, $statemsg;
-    push @event, "temperature:$t";#temp is always there
-    push @event, "humidity:$h"      if ($h);
-    push @event, "airpress:$ap"     if ($ap);
+    if($model eq "HM-CC-SCD"){# co2 sensor
+      if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
+	      ($msgType eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
+	      ($msgType eq "41"))                { 
+		my $co2Lvl = hex(substr($p,4,2));
+		my %lvl=(0=>"normal",1=>"added",2=>"addedStrong");
+	    push @event, "state:".$lvl{$co2Lvl};
+	  }
+	}
+	else{
+      my $t =  hex(substr($p,0,4));
+      $t -= 32768 if($t > 1638.4);
+      $t = sprintf("%0.1f", $t/10);
+      my $h =  hex(substr($p,4,2));
+      my $ap = hex(substr($p,6,4));
+      my $statemsg = "state:T: $t";
+      $statemsg .= " H: $h"   if ($h);
+      $statemsg .= " AP: $ap" if ($ap);
+      push @event, $statemsg;
+      push @event, "temperature:$t";#temp is always there
+      push @event, "humidity:$h"      if ($h);
+      push @event, "airpress:$ap"     if ($ap);
+	}
   } 
   elsif($st eq "winMatic") {  ####################################
     
@@ -1281,6 +1292,7 @@ my %culHmRegDefine = (
   ledFlashUnlocked=>{a=> 31.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
   ledFlashLocked  =>{a=> 31.6,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
 # sec_mdir                                                                                   
+  sabotageMsg     =>{a=> 16.0,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message"   ,lit=>{off=>0,on=>1}},
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
   minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
@@ -1338,7 +1350,7 @@ my %culHmRegType = (
 			angelOpen       =>1,angelMax        =>1,angelLocked     =>1,
 			ledFlashUnlocked=>1,ledFlashLocked  =>1,
 			},
-  motionDetector=>{                               
+  motionDetector=>{
             evtFltrPeriod =>1,evtFltrNum      =>1,minInterval     =>1,
 			captInInterval=>1,brightFilter    =>1,ledOnTime       =>1,
 			},
@@ -1364,11 +1376,12 @@ my %culHmRegModel = (
   "HM-WDS100-C6-O" =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "KS550"          =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "HM-OU-CFM-PL"   =>{localResetDis   =>1,
-  			OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
-            SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
-            CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
-			OnTimeMode      =>1,OffTimeMode     =>1, 
-			ActType         =>1,ActNum          =>1},
+  			          OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
+                      SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+                      CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
+			          OnTimeMode      =>1,OffTimeMode     =>1, 
+			          ActType         =>1,ActNum          =>1},
+  "HM-SEC-MDIR"    =>{sabotageMsg     =>1,},
   "HM-CC-TC"       =>{backlOnTime     =>1,backlOnMode     =>1,btnLock         =>1},
   "HM-CC-SCD"      =>{peerNeedsBurst  =>1,expectAES       =>1,
                       transmitTryMax  =>1,evtFltrTime     =>1,
@@ -2189,10 +2202,16 @@ CUL_HM_Set($@)
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
   } 
   elsif($cmd eq "toggle") { ###################################################
-    $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
-    $hash->{toggleIndex} = (($hash->{toggleIndex}+1) % 128);
-    CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%s%02X",$flag,$id, $dst,
+    if($st eq "dimmer"){;
+	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
+	            (ReadingsVal($name,"state","on") eq "off" ?"C80000":"000000"));
+	}
+	else{
+      $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
+      $hash->{toggleIndex} = (($hash->{toggleIndex}+1) % 128);
+      CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%s%02X",$flag,$id, $dst,
                                       $dst, $chn, $hash->{toggleIndex}));                                     
+	}
   }
   elsif($cmd eq "lock") { ###################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF');	# LEVEL_SET
@@ -2475,7 +2494,8 @@ CUL_HM_Set($@)
     CUL_HM_SndCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr));
   } 
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
-    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%s",
+#    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%s",
+    CUL_HM_SndCmd($hash, sprintf("++B441%s%s01%s",
         $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"));
   } 
   elsif($cmd eq "virtual") { ##################################################
