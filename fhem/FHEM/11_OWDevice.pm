@@ -22,6 +22,8 @@
 #
 ##############################################################################
 
+# Todos:
+# - stateFormat via Interface
 
 package main;
 
@@ -40,7 +42,7 @@ OWDevice_Initialize($)
   $hash->{DefFn}     = "OWDevice_Define";
   $hash->{AttrFn}     = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "trimvalues polls interfaces loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}  = "trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
                        $readingFnAttributes;
 }
 
@@ -324,6 +326,7 @@ OWDevice_Define($$)
         $hash->{fhem}{polls}= $pollsref;
         Log 5, "$name: polls: " . join(" ", @polls);
 
+        $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
         OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
 
         return undef;
@@ -451,6 +454,7 @@ OWDevice_Define($$)
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
+    <li>model: preset with device type, e.g. DS18S20.</li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
