@@ -117,7 +117,7 @@ sub OWMULTI_Initialize ($) {
   $hash->{SetFn}   = "OWMULTI_Set";
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
-  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS2438 loglevel:0,1,2,3,4,5 ".
                      "event-on-update-reading event-on-change-reading ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
                      "VName VUnit VFunction";
@@ -176,10 +176,12 @@ sub OWMULTI_Define ($$) {
   #   YY must be determined from id
   if( $model eq "DS2438" ){
     $fam = "26";
+    CommandAttr (undef,"$name model DS2438"); 
   }else{
     return "OWMULTI: Wrong 1-Wire device model $model";
   }
-  # determine CRC Code - only if this is a direct interface
+ 
+  #-- determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- define device internals
@@ -191,8 +193,11 @@ sub OWMULTI_Define ($$) {
 
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
-    return "OWMULTI: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  }
+  if( $hash->{IODev}->{PRESENT} != 1 ){
+    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWMULTI}{defptr}{$id} = $hash;
   #--

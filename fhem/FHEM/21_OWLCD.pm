@@ -164,8 +164,11 @@ sub OWLCD_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
-    return "OWLCD: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  }
+  if( $hash->{IODev}->{PRESENT} != 1 ){
+    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWLCD}{defptr}{$id} = $hash;
   

@@ -336,7 +336,7 @@ sub OWX_Complex ($$$$) {
   }elsif( ($owx_interface eq "DS2480") || ($owx_interface eq "DS9097") ){
     return OWX_Complex_SER($hash,$owx_dev,$data,$numread);
     
-  #-- here we treat the network-connected CUNO
+  #-- here we treat the CUNO/COC devices
   }elsif( $owx_interface eq "CUNO" ){
     return OWX_Complex_CUNO($hash,$owx_dev,$data,$numread);
 
@@ -2041,7 +2041,8 @@ sub OWX_Complex_CUNO ($$$$) {
   #-- has receive part
   if( $numread > 0 ){
     #$numread += length($data);
-    Log 1,"CUNO is expected to deliver $numread bytes";
+    Log 3,"CUNO is expected to deliver $numread bytes"
+      if( $owx_debug > 1);
     $res.=OWX_Receive_CUNO($hash,$numread);
   }
   Log 3,"OWX: returned from CUNO $res"
@@ -2133,7 +2134,7 @@ sub OWX_Receive_CUNO ($$) {
     #-- 18 bytes received from CUNO 
     }elsif( length($ob) == 18 ){
     
-    my $res = "OWX: Receiving from CUNO: $ob\n";
+    my $res = "OWX: Receiving 18 bytes from CUNO: $ob\n";
     for(my $i=0;$i<length($ob);$i++){  
       my $j=int(ord(substr($ob,$i,1))/16);
       my $k=ord(substr($ob,$i,1))%16;
