@@ -182,7 +182,7 @@ sub OWSWITCH_Define ($$) {
   } else {    
     return "OWSWITCH: $a[0] ID $a[2] invalid, specify a 12 digit value";
   }
-    #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
+  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
   #   FF = family id follows from the model
   #   YY must be determined from id
   if( $model eq "DS2413" ){
@@ -197,9 +197,7 @@ sub OWSWITCH_Define ($$) {
   }else{
     return "OWSWITCH: Wrong 1-Wire device model $model";
   }
-  
-  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   determine CRC Code - only if this is a direct interface
+  #--   determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- Define device internals
@@ -211,8 +209,11 @@ sub OWSWITCH_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  }
+  if( $hash->{IODev}->{PRESENT} != 1 ){
+    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWSWITCH}{defptr}{$id} = $hash;
   #--

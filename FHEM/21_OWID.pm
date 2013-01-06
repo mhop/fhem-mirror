@@ -77,7 +77,7 @@ sub OWID_Initialize ($) {
   $hash->{UndefFn}  = "OWID_Undef";
   $hash->{GetFn}    = "OWID_Get";
   $hash->{SetFn}    = undef;
-  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 loglevel:0,1,2,3,4,5 ";
+  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ";
   $hash->{AttrList} = $attlist; 
 }
 
@@ -129,8 +129,11 @@ sub OWID_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
-    return "OWID: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  }
+  if( $hash->{IODev}->{PRESENT} != 1 ){
+    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWID}{defptr}{$id} = $hash;
   #--

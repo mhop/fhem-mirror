@@ -186,20 +186,32 @@ sub OWCOUNT_Define ($$) {
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
+  #   FF = family id follows from the model
+  #   YY must be determined from id
+  if( $model eq "DS2423" ){
+    $fam = "1D";
+    CommandAttr (undef,"$name model DS2423"); 
+  }else{
+    return "OWMULTI: Wrong 1-Wire device model $model";
+  }
+  
   #   determine CRC Code - only if this is a direct interface
-  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC("1D.".$id."00")) : "00";
+  $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- Define device internals
-  $hash->{ROM_ID}     = "1D.".$id.$crc;
+  $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{OW_ID}      = $id;
-  $hash->{OW_FAMILY}  = "1D";
+  $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
   $hash->{INTERVAL}   = $interval;
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | ($hash->{IODev}->{PRESENT} != 1) ){
-    return "OWCOUNT: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  }
+  if( $hash->{IODev}->{PRESENT} != 1 ){
+    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWCOUNT}{defptr}{$id} = $hash;
   #--
@@ -210,7 +222,7 @@ sub OWCOUNT_Define ($$) {
   my $interface= $hash->{IODev}->{TYPE};
  
   #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+10, "OWCOUNT_InitializeDevice", $hash, 0);
+  InternalTimer(time()+5, "OWCOUNT_InitializeDevice", $hash, 0);
  
   #-- Start timer for updates
   InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
@@ -286,8 +298,6 @@ sub OWCOUNT_InitializeDevice($) {
       if ($unarr[0].$runit eq "kWh/h" );
     $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR} = "kW"
       if ($unarr[1].$runit eq "kWh/h" );
-    #Log 1,"OWCOUNT InitializeDevice with period $period and UNITABBR = ".$hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
-    
   }
   
   #-- set status according to interface type
@@ -348,7 +358,7 @@ sub OWCOUNT_FormatValues($) {
     $period   = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
     $runit    = $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
     
-    #-- skip som thing if undefined
+    #-- skip some thing if undefined
     if( $owg_val[$i] eq ""){
       $svalue .= $owg_channel[$i].": ???";
     }else{     
@@ -443,10 +453,10 @@ sub OWCOUNT_FormatValues($) {
         #-- string buildup for return value and STATE
         #-- 1 decimal
         if( $factor == 1.0 ){
-          $svalue .= sprintf( "%s: %5.1f %s (%5.2f %s)",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
+          $svalue .= sprintf( "%s: %5.1f %s / %5.2f %s",  $owg_channel[$i], $vval,$unit,$vrate,$runit);
         #-- 3 decimals
         } else {
-          $svalue .= sprintf( "%s: %5.3f %s (%5.2f %s)", $owg_channel[$i], $vval,$unit,$vrate,$runit);
+          $svalue .= sprintf( "%s: %5.3f %s / %5.2f %s", $owg_channel[$i], $vval,$unit,$vrate,$runit);
         }  
       }
       readingsBulkUpdate($hash,"$owg_channel[$i]",$vval);
