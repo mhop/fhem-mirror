@@ -71,6 +71,7 @@ OWDevice_GetDetails($) {
       my $family= substr($hash->{fhem}{address}, 0, 2);
       if($family eq "10") {
         # 18S20 high precision digital thermometer
+        # 1920  iButton version of the thermometer
         unshift @getters, qw(temperature templow temphigh);
         unshift @setters, qw(templow temphigh);
         unshift @polls, qw(temperature);
@@ -87,6 +88,36 @@ OWDevice_GetDetails($) {
         unshift @setters, qw();
         unshift @polls, qw(counters.A counters.B);
         #$interface= "count";
+      } elsif($family eq "22") {
+        # 1822 - Econo 1-Wire Digital Thermometer
+        # added by m. fischer
+        unshift @getters, qw(temperature temperature9 temperature10 temperature11 temperature12 fasttemp);
+        unshift @setters, qw(temphigh templow);
+        unshift @polls, qw(temperature);
+        $interface= "temperature";
+      } elsif($family eq "3B") {
+        # 1825 - Programmable Resolution 1-Wire Digital Thermometer with ID
+        # added by m. fischer
+        unshift @getters, qw(prog_addr temperature temperature9 temperature10 temperature11 temperature12 fasttemp);
+        unshift @setters, qw(temphigh templow);
+        unshift @polls, qw(temperature);
+        $interface= "temperature";
+      } elsif($family eq "24") {
+        # 2415 - 1-Wire Time Chip
+        # 1904 - RTC iButton
+        # 2417 - 1-Wire Time Chip with Interrupt
+        # added by m. fischer
+        unshift @getters, qw(date enable interval itime flags running udate);
+        unshift @setters, qw(date enable itime flags running udate);
+        unshift @polls, qw(date enable running udate);
+        #$interface= "timer"; # to be discussed
+      } elsif($family eq "01") {
+        # 2401 - Silicon Serial Number
+        # 1990A - Serial Number iButton
+        # added by m. fischer
+        # this chip has no special properties to set, get or poll
+        # it has only a "unique serial number identifier"
+        #interface= "serial"; # to be discussed
       } elsif($family eq "05") {
         # 2405 - Addressable Switch
         # added by m. fischer
@@ -126,9 +157,79 @@ OWDevice_GetDetails($) {
         unshift @setters, qw(backlight LCDon);
         unshift @polls, qw(counters.0 counters.1 counters.2 counters.3);
         unshift @polls, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3);
+        #$interface= "display"; # to be discussed
+      } elsif($family eq "1B") {
+        # 2436 - Battery ID/Monitor Chip
+        # added by m. fischer
+        unshift @getters, qw(temperature volts counter/cycles);
+        unshift @setters, qw(counter/increment counter/reset);
+        unshift @polls, qw(temperature volts counter/cycles);
+        #interface= "state"; # to be discussed
+      } elsif($family eq "26") {
+        # 2438 - Smart Battery Monitor
+        # added by m. fischer
+        unshift @getters, qw(temperature VAD VDD vis CA EE IAD date disconnect/date disconnect/udate);
+        # configuration properties
+        unshift @getters, qw(CA EE IAD);
+        # date properties
+        unshift @getters, qw(date disconnect/date disconnect/udate endcharge/date endcharge/udate udate);
+        # humidity sensor
+        unshift @getters, qw(HIH4000/humidity HTM1735/humidity DATANAB/humidity humidity);
+        # barometer
+        unshift @getters, qw(B1-R1-A/pressure B1-R1-A/gain B1-R1-A/offset);
+        # solar sensor
+        unshift @getters, qw(S3-R1-A/current S3-R1-A/illumination S3-R1-A/gain);
+        # multisensor
+        unshift @getters, qw(MultiSensor/type offset);
+        # configuration properties
+        unshift @setters, qw(CA EE IAD);
+        # date properties
+        unshift @setters, qw(date disconnect/date disconnect/udate endcharge/date endcharge/udate udate);
+        # humidity sensor
+        unshift @setters, qw(DATANAB/reset);
+        # solar sensor
+        unshift @setters, qw(S3-R1-A/gain);
+        # multisensor
+        unshift @setters, qw(offset);
+        unshift @polls, qw(temperature VAD VDD);
+        #$interface= "multisensor"; # to be discussed
+      } elsif($family eq "20") {
+        # 2450 - Quad A/D Converter
+        # added by m. fischer
+        unshift @getters, qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D);
+        unshift @getters, qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D);
+        unshift @getters, qw(PIO.A PIO.B PIO.C PIO.D);
+        unshift @getters, qw(set_alarm/high.A set_alarm/high.B set_alarm/high.C set_alarm/high.D);
+        unshift @getters, qw(set_alarm/low.A set_alarm/low.B set_alarm/low.C set_alarm/low.D);
+        unshift @getters, qw(set_alarm/volthigh.A set_alarm/volthigh.B set_alarm/volthigh.C set_alarm/volthigh.D);
+        unshift @getters, qw(set_alarm/volt2high.A set_alarm/volt2high.B set_alarm/volt2high.C set_alarm/volt2high.D);
+        unshift @getters, qw(set_alarm/voltlow.A set_alarm/voltlow.B set_alarm/voltlow.C set_alarm/voltlow.D);
+        unshift @getters, qw(set_alarm/volt2low.A set_alarm/volt2low.B set_alarm/volt2low.C set_alarm/volt2low.D);
+        unshift @getters, qw(set_alarm/unset);
+        unshift @getters, qw(volt.A volt.B volt.C volt.D);
+        unshift @getters, qw(8bit/volt.A 8bit/volt.B 8bit/volt.C 8bit/volt.D);
+        unshift @getters, qw(volt2.A volt2.B volt2.C volt2.D);
+        unshift @getters, qw(8bit/volt2.A 8bit/volt2.B 8bit/volt2.C 8bit/volt2.D);
+        # co2 (carbon dioxide) sensor
+        unshift @getters, qw(CO2/power CO2/ppm CO2/status);
+        unshift @setters, qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D);
+        unshift @setters, qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D);
+        unshift @setters, qw(PIO.A PIO.B PIO.C PIO.D);
+        unshift @setters, qw(set_alarm/high.A set_alarm/high.B set_alarm/high.C set_alarm/high.D);
+        unshift @setters, qw(set_alarm/low.A set_alarm/low.B set_alarm/low.C set_alarm/low.D);
+        unshift @setters, qw(set_alarm/volthigh.A set_alarm/volthigh.B set_alarm/volthigh.C set_alarm/volthigh.D);
+        unshift @setters, qw(set_alarm/volt2high.A set_alarm/volt2high.B set_alarm/volt2high.C set_alarm/volt2high.D);
+        unshift @setters, qw(set_alarm/voltlow.A set_alarm/voltlow.B set_alarm/voltlow.C set_alarm/voltlow.D);
+        unshift @setters, qw(set_alarm/volt2low.A set_alarm/volt2low.B set_alarm/volt2low.C set_alarm/volt2low.D);
+        unshift @setters, qw(set_alarm/unset);
+        unshift @polls, qw(PIO.A PIO.B PIO.C PIO.D);
+        unshift @polls, qw(volt.A volt.B volt.C volt.D);
+        unshift @polls, qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D);
+        unshift @polls, qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D);
+        #$interface= "multisensor"; # to be discussed
       } elsif($family eq "reserved") {
         # reserved for other devices
-        # add other devices here and post your additions als patch in
+        # add other devices here and post your additions as patch in
         # http://forum.fhem.de/index.php?t=thread&frm_id=26&rid=10
       };
       # http://perl-seiten.homepage.t-online.de/html/perl_array.html
