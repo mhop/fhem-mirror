@@ -462,17 +462,18 @@ YAMAHA_AVR_Define($$)
 
 #############################
 sub
-YAMAHA_AVR_SendCommand($$$)
+YAMAHA_AVR_SendCommand($$@)
 {
-    my($hash, $address, $command) = @_;
+    my ($hash, $address, $command, $loglevel) = @_;
     my $name = $hash->{NAME};
     my $response;
    
+    $loglevel = GetLogLevel($hash->{NAME}, 3) unless(defined($loglevel));
      
     Log GetLogLevel($name, 5), "YAMAHA_AVR: execute on $name: $command";
     
     # In case any URL changes must be made, this part is separated in this function".
-    $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command);
+    $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 1, ($hash->{helper}{AVAILABLE} ? $loglevel : 5));
     
     unless(defined($response))
     {
