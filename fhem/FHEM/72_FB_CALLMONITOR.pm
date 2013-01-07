@@ -386,10 +386,14 @@ if(AttrVal($name, "reverse-search", "none") eq "search.ch")
 }
 
 
- 
-# If no result is available set cache result and return undefined 
-$hash->{helper}{CACHE}{$number} = "unknown";
-return "unknown";
+if(AttrVal($name, "reverse-search-cache", "0") eq "1")
+{ 
+    # If no result is available set cache result and return undefined 
+    $hash->{helper}{CACHE}{$number} = "unknown";
+}
+
+    return undef;
+
 } 
 
 sub FB_CALLMONITOR_html2txt($)
