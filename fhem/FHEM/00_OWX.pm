@@ -2071,12 +2071,12 @@ sub OWX_Discover_CUNO ($) {
   
   #-- zero the array
   @{$hash->{DEVS}}=();
-  OWX_ReInit_CUNO($hash,1);
-  ##CUL_SimpleWrite($owx_hwdevice, "Oc");
-  select(undef,undef,undef,5);
+  OWX_ReInit_CUNO($hash,0);
+  CUL_SimpleWrite($owx_hwdevice, "Oc");
+  select(undef,undef,undef,0.5);
   my ($err,$ob) = CUL_ReadAnswer($owx_hwdevice,"",0,undef);
   if( $ob ){
-    #Log 1,"OWX: Answer to ".$owx_hwdevice->{NAME}." device search is ".$ob;
+    Log 3,"OWX: Answer to ".$owx_hwdevice->{NAME}." device search is ".$ob;
     foreach my $dx (split(/\n/,$ob)){
       next if ($dx !~ /^\d\d?\:[0-9a-fA-F]{16}/);
       $dx =~ s/\d+\://;
