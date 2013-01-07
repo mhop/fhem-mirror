@@ -118,7 +118,7 @@ YAMAHA_AVR_GetStatus($;$)
 	    $power = "Off";
        }
        
-	readingsBulkUpdate($hash, "state", lc($power));
+	$hash->{STATE} = lc($power);
        
     }
     
@@ -451,6 +451,10 @@ YAMAHA_AVR_Define($$)
     # set the volume-smooth-change attribute only if it is not defined, so no user values will be overwritten
     $attr{$name}{"volume-smooth-change"} = "1" unless(defined($attr{$name}{"volume-smooth-change"}));
     
+    $hash->{helper}{AVAILABLE} = 1;
+
+     
+    
     InternalTimer(gettimeofday()+2, "YAMAHA_AVR_GetStatus", $hash, 0);
   
   return undef;
@@ -460,18 +464,28 @@ YAMAHA_AVR_Define($$)
 sub
 YAMAHA_AVR_SendCommand($$$)
 {
-   my($hash, $address, $command) = @_;
-   my $name = $hash->{NAME};
-   my $response;
+    my($hash, $address, $command) = @_;
+    my $name = $hash->{NAME};
+    my $response;
    
      
-   Log GetLogLevel($name, 5), "YAMAHA_AVR: execute on $name: $command";
+    Log GetLogLevel($name, 5), "YAMAHA_AVR: execute on $name: $command";
     
-   # In case any URL changes must be made, this part is separated in this function".
-   $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command);
-   Log GetLogLevel($name, 3), "YAMAHA_AVR: could not execute command on device $name" unless (defined($response));
+    # In case any URL changes must be made, this part is separated in this function".
+    $response = GetFileFromURL("http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command);
     
-   return $response;
+    unless(defined($response))
+    {
+	Log GetLogLevel($name, 3), "YAMAHA_AVR: could not execute command on device $name" if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 1);
+    }
+    else
+    {
+	Log GetLogLevel($name, 3), "YAMAHA_AVR: device $name reappeared" if (defined($hash->{helper}{AVAILABLE}) and $hash->{helper}{AVAILABLE} eq 0);
+    }
+    
+    $hash->{helper}{AVAILABLE} = (defined($response) ? 1 : 0);
+    
+    return $response;
 
 }
 
