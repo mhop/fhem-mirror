@@ -2604,7 +2604,7 @@ ReplaceEventMap($$$)
   my ($dev, $str, $dir) = @_;
   my $em = $attr{$dev}{eventMap};
   return $str    if($dir && !$em);
-  return @{$str} if(!$dir && (!$em || $str->[1] eq "?"));
+  return @{$str} if(!$dir && (!$em || int(@{$str}) < 2 || $str->[1] eq "?"));
   my $dname = shift @{$str} if(!$dir);
 
   my $nstr = join(" ", @{$str}) if(!$dir);
