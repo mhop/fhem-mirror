@@ -1432,7 +1432,8 @@ PrintHash($$)
          }
       }
     } else {
-      $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, $h->{$c});
+      my $v = $h->{$c};
+      $str .= sprintf("%*s %-10s %s\n", $lev," ",$c, defined($v) ? $v : "");
     }
   }
   return $str . $sstr;
