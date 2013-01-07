@@ -719,6 +719,7 @@ FW_makeTable($$@)
   foreach my $n (sort keys %{$hash}) {
     next if(!$si && $n =~ m/^\./);      # Skip "hidden" Values
     my $val = $hash->{$n};
+    $val = "" if(!defined($val));
 
     $val = $hash->{$n}{NAME}    # Exception
         if($n eq "IODev" && ref($val) eq "HASH" && defined($hash->{$n}{NAME}));
