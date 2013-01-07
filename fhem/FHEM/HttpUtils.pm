@@ -49,12 +49,13 @@ urlEncode($) {
 sub
 CustomGetFileFromURL($$@)
 {
-  my ($quiet, $url, $timeout, $data, $noshutdown) = @_;
+  my ($quiet, $url, $timeout, $data, $noshutdown, $loglevel) = @_;
   $timeout = 4.0 if(!defined($timeout));
+  $loglevel = 1 if(!$loglevel);
 
   my $displayurl= $quiet ? "<hidden>" : $url;
   if($url !~ /^(http|https):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
-    Log 1, "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
+    Log $loglevel, "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
     return undef;
   }
   
@@ -72,7 +73,7 @@ CustomGetFileFromURL($$@)
   if($protocol eq "https") {
     eval "use IO::Socket::SSL";
     if($@) {
-      Log 1, $@;
+      Log $loglevel, $@;
     } else {
       $conn = IO::Socket::SSL->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
     }
@@ -80,7 +81,7 @@ CustomGetFileFromURL($$@)
     $conn = IO::Socket::INET->new(PeerAddr=>"$host:$port", Timeout=>$timeout);
   }
   if(!$conn) {
-    Log 1, "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
+    Log $loglevel, "CustomGetFileFromURL $displayurl: Can't connect to $protocol://$host:$port\n";
     undef $conn;
     return undef;
   }
@@ -103,7 +104,7 @@ CustomGetFileFromURL($$@)
     vec($rin, $conn->fileno(), 1) = 1;
     my $nfound = select($rout=$rin, undef, undef, $timeout);
     if($nfound <= 0) {
-      Log 1, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
+      Log $loglevel, "CustomGetFileFromURL $displayurl: Select timeout/error: $!";
       undef $conn;
       return undef;
     }
