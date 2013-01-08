@@ -18,6 +18,7 @@ sub FW_doDetail($);
 sub FW_dumpFileLog($$$);
 sub FW_fatal($);
 sub FW_fileList($);
+sub FW_htmlEscape($);
 sub FW_logWrapper($);
 sub FW_makeEdit($$$);
 sub FW_makeImage($);
@@ -601,7 +602,7 @@ FW_answerCall($)
   if($FW_cmdret) {
     $FW_detail = "";
     $FW_room = "";
-    $FW_cmdret =~ s/</&lt;/g;
+    $FW_cmdret = FW_htmlEscape($FW_cmdret);
     $FW_cmdret =~ s/>/&gt;/g;
     FW_pO "<div id=\"content\">";
     $FW_cmdret = "<pre>$FW_cmdret</pre>" if($FW_cmdret =~ m/\n/);
@@ -738,6 +739,7 @@ FW_makeTable($$@)
       FW_pO "<td><div class=\"dname\">$n</div></td>";
       if(ref($val)) {
         my ($v, $t) = ($val->{VAL}, $val->{TIME});
+        $v = FW_htmlEscape($v);
         if($FW_ss) {
           $t = ($t ? "<br><div class=\"tiny\">$t</div>" : "");
           FW_pO "<td><div class=\"dval\">$v$t</div></td>";
@@ -749,6 +751,7 @@ FW_makeTable($$@)
         }
 
       } else {
+        $val = FW_htmlEscape($val);
         FW_pO "<td><div class=\"dval\">$val</div></td>";
 
       }
@@ -1346,8 +1349,7 @@ FW_logWrapper($)
     }
     my $cnt = join("", reverse <FH>);
     close(FH);
-    $cnt =~ s/</&lt;/g;
-    $cnt =~ s/>/&gt;/g;
+    $cnt = FW_htmlEscape($cnt);
     FW_pO $cnt;
     FW_pO $suffix;
 
@@ -2644,6 +2646,15 @@ FW_closeOldClients()
     delete $defs{$dev};
   }
   InternalTimer($now+60, "FW_closeOldClients", 0, 0);
+}
+
+sub
+FW_htmlEscape($)
+{
+  my ($txt) = @_;
+  $txt =~ s/</&lt;/g;
+  $txt =~ s/>/&gt;/g;
+  return $txt;
 }
 
 1;
