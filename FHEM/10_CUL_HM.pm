@@ -198,6 +198,7 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",},  
   "0093" => {name=>"Schueco_263-158"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0094" => {name=>"Schueco_263-157"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "00A1" => {name=>"HM-LC-SW1-PL2"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
 );
 sub
 CUL_HM_Initialize($)
@@ -1749,6 +1750,7 @@ my %culHmSubTypeSets = (
 		  virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
         { test => "", "alarmOn"=>"", "alarmOff"=>"", 
+#		  test1 => "", test2 => "", #General 
 		  devicepair => "<btnNumber> device ... single [set|unset] actor"},
   winMatic =>{matic  => "<btn>",
               read   => "<btn>",
@@ -2493,9 +2495,18 @@ CUL_HM_Set($@)
     $hash->{TESTNR} = $testnr;
     CUL_HM_SndCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr));
   } 
+  elsif($cmd eq "test1") { ##################################################### General remove after test
+    my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+    $hash->{TESTNR} = $testnr;
+    CUL_HM_SndCmd($hash, sprintf("++B440%s%s00%02X",$dst,$dst,$testnr));
+  } 
+  elsif($cmd eq "test2") { ##################################################### General remove after test
+    my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
+    $hash->{TESTNR} = $testnr;
+    CUL_HM_SndCmd($hash, sprintf("++9440%s%s00%02X",$id,$dst,$testnr));
+  } 
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
-#    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%s",
-    CUL_HM_SndCmd($hash, sprintf("++B441%s%s01%s",
+    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%s",
         $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"));
   } 
   elsif($cmd eq "virtual") { ##################################################
@@ -2818,9 +2829,9 @@ CUL_HM_SndCmd($$)
   $io->{HM_CMDNR} = $mn;
   $cmd = sprintf("As%02X%02X%s", length($cmd2)/2+1, $mn, $cmd2);
   IOWrite($hash, "", $cmd);
+  CUL_HM_responseSetup($hash,$cmd);	
   $cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/;
   CUL_HM_DumpProtocol("SND", $io, ($1,$2,$3,$4,$5,$6,$7));
-  CUL_HM_responseSetup($hash,$cmd);	
 }
 sub    #---------------------------------
 CUL_HM_responseSetup($$)
@@ -2830,11 +2841,12 @@ CUL_HM_responseSetup($$)
   my ($msgId, $msgFlag,$msgType,$dst,$p) = ($2,hex($3),$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-  my $rTo = 2; #default response timeout
+  my $rTo = rand(20)/10+2; #default response timeout
   if ($msgType eq "01" && $subType){ 
     if ($subType eq "03"){ #PeerList-------------
   	  #--- remember request params in device level
   	  $hash->{helper}{respWait}{Pending} = "PeerList";
+  	  $hash->{helper}{respWait}{PendCmd} = $cmd;
   	  $hash->{helper}{respWait}{forChn} = substr($p,0,2);#channel info we await
       
       # define timeout - holdup cmdStack until response complete or timeout
@@ -2851,7 +2863,8 @@ CUL_HM_responseSetup($$)
       my ($peer, $list) = ($1,$2) if ($p =~ m/..04(........)(..)/);
 	  $peer = ($peer ne "00000000")?CUL_HM_peerChName($peer,$dst,""):"";
 	  #--- set messaging items
-	  $hash->{helper}{respWait}{Pending} = "RegisterRead";
+	  $hash->{helper}{respWait}{Pending}= "RegisterRead";
+   	  $hash->{helper}{respWait}{PendCmd}= $cmd;
 	  $hash->{helper}{respWait}{forChn} = $chn;
 	  $hash->{helper}{respWait}{forList}= $list;
 	  $hash->{helper}{respWait}{forPeer}= $peer;
@@ -2871,6 +2884,7 @@ CUL_HM_responseSetup($$)
 #    elsif($subType eq "0A"){ #Pair Serial----------
 #	  #--- set messaging items
 #	  $hash->{helper}{respWait}{Pending} = "PairSerial";
+#  	  $hash->{helper}{respWait}{PendCmd} = $cmd;
 #	  $hash->{helper}{respWait}{forChn} = substr($p,4,20);
 #      
 #      # define timeout - holdup cmdStack until response complete or timeout
@@ -2879,7 +2893,8 @@ CUL_HM_responseSetup($$)
 #    }
     elsif($subType eq "0E"){ #StatusReq----------
 	  #--- set messaging items
-	  $hash->{helper}{respWait}{Pending} = "StatusReq";
+	  $hash->{helper}{respWait}{Pending}= "StatusReq";
+  	  $hash->{helper}{respWait}{PendCmd}= $cmd;
 	  $hash->{helper}{respWait}{forChn} = $chn;
       
       # define timeout - holdup cmdStack until response complete or timeout
@@ -2943,12 +2958,24 @@ CUL_HM_respPendTout($)
   $HMid =~ s/.*://; #remove timer identifier
   my $hash = $modules{CUL_HM}{defptr}{$HMid};
   if ($hash && $hash->{DEF} ne '000000'){
-    CUL_HM_eventP($hash,"Tout") if ($hash->{helper}{respWait}{cmd});
-	my $pendCmd = $hash->{helper}{respWait}{Pending};# save before remove
-    CUL_HM_eventP($hash,"ToutResp") if ($pendCmd);
-	CUL_HM_respPendRm($hash);
-	CUL_HM_ProcessCmdStack($hash); # continue processing commands
-	readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT:".$pendCmd,1);
+	my $pendCmd = $hash->{helper}{respWait}{Pending};# secure before remove
+
+    my $pendRsndCnt = $hash->{helper}{respWait}{PendingRsend};
+	$pendRsndCnt = 1 if (!$pendRsndCnt);
+	if ($pendRsndCnt <7 &&                     # some retries
+	    (CUL_HM_getRxType($hash) & 0x03) != 0){# to slow for wakeup and config
+      my $name = $hash->{NAME};
+      Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$pendRsndCnt;
+	  $hash->{helper}{respWait}{PendingRsend} = $pendRsndCnt + 1;
+      CUL_HM_SndCmd($hash,substr($hash->{helper}{respWait}{PendCmd},4));
+	  CUL_HM_eventP($hash,"Resnd") if ($pendCmd);
+	}
+	else{
+      CUL_HM_eventP($hash,"ResndFail") if ($pendCmd);
+	  CUL_HM_respPendRm($hash);
+	  CUL_HM_ProcessCmdStack($hash); # continue processing commands
+	  readingsSingleUpdate($hash,"state","RESPONSE TIMEOUT:".$pendCmd,1);
+	}
   }
 }
 sub    #---------------------------------
