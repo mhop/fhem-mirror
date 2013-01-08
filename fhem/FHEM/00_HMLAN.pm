@@ -317,6 +317,7 @@ HMLAN_Parse($$)
 	#                0081=open
 	#                0100=with 'E', not 'R'. 
 	#                0081=open
+	#                04xx=nothing will be sent anymore? try restart
 	
 #    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R') && $src ne AttrVal($name, "hmId", $mFld[4]));
 
@@ -324,6 +325,16 @@ HMLAN_Parse($$)
 #	  HMLAN_SimpleWrite($hash, '-'.$src);
 #	  HMLAN_SimpleWrite($hash, '+'.$src);
 #	}
+    if($mFld[1] =~ m/^04/){
+	  Log $ll5, 'HMLAN_Parse: problems detected - please restart HMLAN';
+      #foreach (keys %lhash){delete ($lhash{$_})};# does not help
+      #DevIo_Disconnected($hash) ;# does not help
+	}
+    if($mFld[1] =~ m/^02/){
+	  Log $ll5, 'HMLAN_Parse: restart HMLAN might be necessary';
+	  HMLAN_SimpleWrite($hash, '-'.$src);# todo not proven how to get out of this situation
+	  HMLAN_SimpleWrite($hash, '+'.$src);
+	}
     $dmsg .= ":NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
 
     $hash->{uptime} = HMLAN_uptime($mFld[2]);
@@ -364,7 +375,6 @@ sub
 HMLAN_Ready($)
 {
   my ($hash) = @_;
-
   return DevIo_OpenDev($hash, 1, "HMLAN_DoInit");
 }
 
@@ -384,11 +394,11 @@ HMLAN_SimpleWrite(@)
   #  tested allowes no more then 2 byte/ms incl overhead
   #  It is even slower if HMLAN waits for acks, acks are missing,...
   my $bytPend = $hash->{helper}{dPend} - 
-                int(($tn - $hash->{helper}{lastSend})*2000);
+                int(($tn - $hash->{helper}{lastSend})*4000);
   $bytPend = 0 if ($bytPend < 0);
   $hash->{helper}{dPend} = $bytPend + length($msg);
   $hash->{helper}{lastSend} = $tn;
-  my $wait = $bytPend/2000; # HMLAN 
+  my $wait = $bytPend/4000; # HMLAN 
   #  => wait time to protect HMLAN overload
 #  my $wait = $bytPend>>11; # fast divide by 2048 
 
