@@ -176,7 +176,7 @@ EnOcean_Set($@)
 
       if($cmd eq "teach") {
         my $data=sprintf("A502000000%s00", $subDef);
-        Log $ll2, $st . ".Teach: " . $data;
+        Log $ll2, "EnOcean: set $name $cmd SenderID: $subDef";
         # len:000a optlen:00 pakettype:1(radio)
         IOWrite($hash, "000A0001", $data);
 
@@ -195,8 +195,6 @@ EnOcean_Set($@)
       } elsif($cmd eq "dimup") {
         return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
         $dimVal+=$a[1];
-        Log $ll2, "$st.$cmd val:" . $hash->{VALUE} .
-                        " par:" . $a[1] . " val:" . $dimVal;
         shift(@a);
         if(defined($a[1])) {
           $dimTime=$a[1];
@@ -220,6 +218,7 @@ EnOcean_Set($@)
         $dimTime=1;
         $onoff=0;
         $sendDimCmd=1;
+        $dimVal=0;
 
       } else {
         return "Unknown argument $cmd, choose one of dim:slider,0,1,100 ".
@@ -235,7 +234,7 @@ EnOcean_Set($@)
         my $data=sprintf("A502%02X%02X%02X%s00",
                 $dimVal, $dimTime, $onoff|0x08, $subDef);
         IOWrite($hash, "000A0001", $data);
-        Log $ll2, $st." ".$cmd.": ".$data.$subDef;
+        Log $ll2, "EnOcean: set $name $cmd $dimVal";
       }
 	  
     ###########################
@@ -245,8 +244,7 @@ EnOcean_Set($@)
       my $shutCmd = 0x00; 
       if($cmd eq "teach") {
         my $data=sprintf("A5FFF80D80%s00", $subDef);
-        Log $ll2, $st . ".Teach: " . $data;
-
+        Log $ll2, "EnOcean: set $name $cmd SenderID: $subDef";
         # len:000a optlen:00 pakettype:1(radio)
         IOWrite($hash, "000A0001", $data);
 
@@ -278,13 +276,13 @@ EnOcean_Set($@)
         return "Unknown argument " . $cmd . ", choose one of up down stop teach"
       }
       shift(@a);
-      if($shutCmd) {
+      if($shutCmd || ($cmd eq "stop")) {
         $updateState = 0;
         # EEP: A5/3F/7F Universal ???
         my $data = sprintf("A5%02X%02X%02X%02X%s00",
                         0x00, $shutTime, $shutCmd, 0x08, $subDef);
         IOWrite($hash, "000A0001", $data);
-        Log $ll2, $st . ".$cmd" . $data;
+        Log $ll2, "EnOcean: set $name $cmd";
       }    
 
     ###########################
