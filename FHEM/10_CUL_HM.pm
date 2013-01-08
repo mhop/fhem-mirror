@@ -436,7 +436,7 @@ CUL_HM_Parse($$)
       push @event, CUL_HM_Pair($name, $shash,$cmd,$src,$dst,$p);
     }
   } 
-  elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ############
+  elsif($model eq "KS550" || $model eq "HM-WDS100-C6-O") { ####################
 
     if($msgType eq "70" && $p =~ m/^(....)(..)(....)(....)(..)(..)(..)/) {
 
@@ -467,7 +467,7 @@ CUL_HM_Parse($$)
       push @event, "unknown:$p";
     }
   } 
-  elsif($model eq "HM-CC-TC") { ####################################
+  elsif($model eq "HM-CC-TC") { ###############################################
     my ($sType,$chn) = ($1,$2) if($p && $p =~ m/^(..)(..)/);
     if($msgType eq "70" && $p =~ m/^(....)(..)/) { # weather event
 	  $chn = '01'; # fix definition
@@ -625,7 +625,7 @@ CUL_HM_Parse($$)
 	  $sendAck = ""; 
     } 
   } 
-  elsif($model eq "HM-CC-VD") { ###################
+  elsif($model eq "HM-CC-VD") { ###############################################
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
     # status ACK to controlling HM-CC-TC
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
@@ -666,7 +666,16 @@ CUL_HM_Parse($$)
       push @event, "ValveOffset:$of %";
     }
   } 
-  elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ###################
+  elsif($model eq "HM-CC-SCD"){ ###############################################
+    if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
+	    ($msgType eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
+	    ($msgType eq "41"))                { 
+	  my $co2Lvl = hex(substr($p,4,2));
+	  my %lvl=(0=>"normal",100=>"added",200=>"addedStrong");
+	  push @event, "state:".$lvl{$co2Lvl};
+	}
+  }
+  elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ##########################
 
     if($p =~ m/.14(.)0200(..)(..)(..)/) {# todo very risky - no start...
       my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
@@ -698,7 +707,7 @@ CUL_HM_Parse($$)
     }
     
   } 
-  elsif($st eq "switch" || ############################################
+  elsif($st eq "switch" || ####################################################
           $st eq "dimmer" ||
           $st eq "blindActuator") {
 
@@ -750,7 +759,8 @@ CUL_HM_Parse($$)
 	    $chnHash = $shash;
 	    if ($st eq "swi"){#maintain history for event naming
 			$btnName = "Btn$buttonField";
-		}else{
+		}
+		else{
 			my $btn = int((($buttonField&0x3f)+1)/2);
 			$btnName = "Btn$btn";
 			$state = ($buttonField&1 ? "off" : "on")
@@ -772,6 +782,7 @@ CUL_HM_Parse($$)
 	  $shash->{helper}{addVal} = $buttonField;   #store to handle changes
 	  readingsSingleUpdate($chnHash,"state",$target,1);#trigger chan evt also 
       push @event,"battery:". (($buttonField&0x80)?"low":"ok");
+	  Log 1,"General Button:"."state:$btnName $state$target :".$buttonField;
       push @event,"state:$btnName $state$target";
     }
   }
@@ -832,7 +843,7 @@ CUL_HM_Parse($$)
 	  }
 	}  
   } 
-  elsif($st eq "motionDetector") { #####################################
+  elsif($st eq "motionDetector") { ############################################
     # Code with help of Bassem
     my $state;
     if(($msgType eq "10" ||$msgType eq "02") && $p =~ m/^0601(..)(..)/) {
@@ -862,7 +873,7 @@ CUL_HM_Parse($$)
 	  $sendAck = ""; #todo why is this special?
 	}
   } 
-  elsif($st eq "smokeDetector") { #####################################
+  elsif($st eq "smokeDetector") { #############################################
 	#Info Level: msgType=0x10 p(..)(..)(..) subtype=06, channel, state (1 byte)
 	#Event:      msgType=0x41 p(..)(..)(..) channel   , unknown, state (1 byte)
 
@@ -914,7 +925,7 @@ CUL_HM_Parse($$)
       $sendAck = ""; #todo why is this special?
 	}
   } 
-  elsif($st eq "threeStateSensor") { #####################################
+  elsif($st eq "threeStateSensor") { ##########################################
     #todo: check for correct msgType, see below
 	#Event:      msgType=0x41 p(..)(..)(..)     channel   , unknown, state
 	#Info Level: msgType=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
@@ -953,32 +964,21 @@ CUL_HM_Parse($$)
     }
     else{push @event, "3SSunknownMsg:$p" if(!@event);}
   } 
-  elsif($model eq "HM-WDC7000" ||$st eq "THSensor") { ####################
-    if($model eq "HM-CC-SCD"){# co2 sensor
-      if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
-	      ($msgType eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
-	      ($msgType eq "41"))                { 
-		my $co2Lvl = hex(substr($p,4,2));
-		my %lvl=(0=>"normal",1=>"added",2=>"addedStrong");
-	    push @event, "state:".$lvl{$co2Lvl};
-	  }
-	}
-	else{
-      my $t =  hex(substr($p,0,4));
-      $t -= 32768 if($t > 1638.4);
-      $t = sprintf("%0.1f", $t/10);
-      my $h =  hex(substr($p,4,2));
-      my $ap = hex(substr($p,6,4));
-      my $statemsg = "state:T: $t";
-      $statemsg .= " H: $h"   if ($h);
-      $statemsg .= " AP: $ap" if ($ap);
-      push @event, $statemsg;
-      push @event, "temperature:$t";#temp is always there
-      push @event, "humidity:$h"      if ($h);
-      push @event, "airpress:$ap"     if ($ap);
-	}
+  elsif($model eq "HM-WDC7000" ||$st eq "THSensor") { #########################
+    my $t =  hex(substr($p,0,4));
+    $t -= 32768 if($t > 1638.4);
+    $t = sprintf("%0.1f", $t/10);
+    my $h =  hex(substr($p,4,2));
+    my $ap = hex(substr($p,6,4));
+    my $statemsg = "state:T: $t";
+    $statemsg .= " H: $h"   if ($h);
+    $statemsg .= " AP: $ap" if ($ap);
+    push @event, $statemsg;
+    push @event, "temperature:$t";#temp is always there
+    push @event, "humidity:$h"      if ($h);
+    push @event, "airpress:$ap"     if ($ap);
   } 
-  elsif($st eq "winMatic") {  ####################################
+  elsif($st eq "winMatic") {  #################################################
     
     if($msgType eq "10"){
       if ($p =~ m/^0601(..)(..)/) {
@@ -1008,7 +1008,7 @@ CUL_HM_Parse($$)
     } 
 
   }
-  elsif($st eq "keyMatic") {  ####################################
+  elsif($st eq "keyMatic") {  #################################################
 	#Info Level: msgType=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
 	#AckStatus:  msgType=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
 
@@ -1034,7 +1034,7 @@ CUL_HM_Parse($$)
       push @event, "state:"	.	(($val == 1) ? "unlocked" : "locked") . $state;
     }
   }  
-  else{#####################################
+  else{########################################################################
     ; # no one wants the message
   }
 
@@ -1175,26 +1175,26 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   ActNum          =>{a=> 37  ,s=>1  ,l=>3,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Action Number"},
   Intense         =>{a=> 43  ,s=>1  ,l=>3,min=>10 ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Volume",lit=>{vol_0=>255,vol_1=>250,vol_2=>246,vol_3=>240,vol_4=>234,vol_5=>227,vol_6=>218,vol_7=>207,vol_8=>190,vol_9=>162,vol_00=>10}},  
 # statemachines
-  BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtRampOn      =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtRampOff     =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtRefOn       =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOn"   ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
-  BlJtRefOff      =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOff"  ,lit=>{no=>0,onDly=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRampOn      =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRampOff     =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRefOn       =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOn"   ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
+  BlJtRefOff      =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from refOff"  ,lit=>{no=>0,dlyOn=>1,refOn=>2,on=>3,dlyOff=>4,refOff=>5,off=>6,rampOn=>8,rampOff=>9}},
   
-  DimJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
-  DimJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
-  DimJtDlyOn      =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
-  DimJtDlyOff     =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
-  DimJtRampOn     =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
-  DimJtRampOff    =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,onDly=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtDlyOn      =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtDlyOff     =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtRampOn     =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOn"  ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
+  DimJtRampOff    =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from rampOff" ,lit=>{no=>0,dlyOn=>1,rampOn=>2,on=>3,dlyOff=>4,rampOff=>5,Off=>6}},
   
-  SwJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
-  SwJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
-  SwJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
-  SwJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,onDly=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtOn          =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
+  SwJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
   
   CtOn            =>{a=>  3.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from On"       ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtOff           =>{a=>  3.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from Off"      ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
@@ -1750,8 +1750,8 @@ my %culHmSubTypeSets = (
 		  virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector =>
         { test => "", "alarmOn"=>"", "alarmOff"=>"", 
-#		  test1 => "", test2 => "", #General 
-		  devicepair => "<btnNumber> device ... single [set|unset] actor"},
+		  alarm1 => "",
+		  devicepair => "<btnNumber> device ... single [set|unset] actor",},
   winMatic =>{matic  => "<btn>",
               read   => "<btn>",
               keydef => "<btn> <txt1> <txt2>",
@@ -2082,7 +2082,7 @@ CUL_HM_Set($@)
 		}
 	  }
 	}
-	if($cmd eq "regBulk"){;
+	elsif($cmd eq "regBulk"){;
 	  my @adIn = @a;
 	  shift @adIn;shift @adIn;shift @adIn;
 	  my $adList;
@@ -2495,19 +2495,14 @@ CUL_HM_Set($@)
     $hash->{TESTNR} = $testnr;
     CUL_HM_SndCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr));
   } 
-  elsif($cmd eq "test1") { ##################################################### General remove after test
-    my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
-    $hash->{TESTNR} = $testnr;
-    CUL_HM_SndCmd($hash, sprintf("++B440%s%s00%02X",$dst,$dst,$testnr));
-  } 
-  elsif($cmd eq "test2") { ##################################################### General remove after test
-    my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
-    $hash->{TESTNR} = $testnr;
-    CUL_HM_SndCmd($hash, sprintf("++9440%s%s00%02X",$id,$dst,$testnr));
-  } 
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
     CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%s",
-        $dst,$dst, $1 eq "On" ? "0BC8" : "0C01"));
+        $dst,$dst, (($1 eq "On" )? "0BC8" : "0C01")));
+  } 
+  elsif($cmd eq "alarm1") { ############################################### General
+    my $testnr = $hash->{TESTNRa} ? ($hash->{TESTNRa} +1) : 1;
+    $hash->{TESTNRa} = $testnr;
+    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%02X",$dst,$dst, $testnr));
   } 
   elsif($cmd eq "virtual") { ##################################################
   	$state = "";
