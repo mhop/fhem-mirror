@@ -434,7 +434,7 @@ sub OWCOUNT_FormatValues($) {
         } 
         #-- rate
         if( ($delt > 0.0) && $present ){
-          $vrate  = int( ($vval-$oldval)/$delt*1000)/1000;
+          $vrate  = ($vval-$oldval)/$delt;
         } else {
           $vrate = 0.0;
         }
@@ -443,7 +443,8 @@ sub OWCOUNT_FormatValues($) {
           $vrate*=3600;
         }elsif( $period eq "minute" ){
           $vrate*=60;
-        }       
+        }     
+        $vrate = int($vrate * 1000)/1000;  
      
         if( !defined($runit) ){
           Log 1,"OWCOUNT: Error in rate unit definition. i=$i, owg_rate[i]=".$owg_rate[$i];
