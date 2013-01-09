@@ -898,7 +898,7 @@ sub
 CommandRereadCfg($$)
 {
   my ($cl, $param) = @_;
-  my $name = $cl->{NAME} if($cl);
+  my $name = ($cl ? $cl->{NAME} : "__anonymous__");
   my $cfgfile = ($param ? $param : $attr{global}{configfile});
   return "Cannot open $cfgfile: $!" if(! -f $cfgfile);
 
@@ -907,7 +907,6 @@ CommandRereadCfg($$)
 
   $reread_active=1;
   $init_done = 0;
-
   foreach my $d (sort { $defs{$b}{NR} <=> $defs{$a}{NR} } keys %defs) {
     my $ret = CallFn($d, "UndefFn", $defs{$d}, $d)
         if($name && $name ne $d);
@@ -932,7 +931,7 @@ CommandRereadCfg($$)
     $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
   }
   DoTrigger("global", "REREADCFG");
-  $defs{$name} = $selectlist{$name} = $cl if($name);
+  $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
 
   $init_done = 1;
   $reread_active=0;
