@@ -109,7 +109,6 @@ MAX_Define($$)
   Log 5, "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
-  $hash->{STATE} = "waiting for data";
   $modules{MAX}{defptr}{$addr} = $hash;
 
   $hash->{internals}{interfaces} = $interfaces{$type};
@@ -366,6 +365,7 @@ MAX_Parse($$)
     $shash->{backend} = $hash->{NAME}; #for user information
   }
 
+  readingsBeginUpdate($shash);
   if($msgtype eq "define"){
     my $devicetype = $args[0];
     Log 1, "Device changed type from $shash->{type} to $devicetype" if($shash->{type} ne $devicetype);
@@ -413,7 +413,6 @@ MAX_Parse($$)
       delete($shash->{until});
     }
 
-    readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     #This formatting must match with in MAX_Set:$templist
@@ -427,7 +426,6 @@ MAX_Parse($$)
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", $measuredTemperature);
     }
-    readingsEndUpdate($shash, 1);
 
   }elsif($msgtype eq "ShutterContactState"){
     my $bits = pack("H2",$args[0]);
@@ -439,10 +437,8 @@ MAX_Parse($$)
 
     $shash->{rferror} = $rferror;
 
-    readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     readingsBulkUpdate($shash,"onoff",$isopen);
-    readingsEndUpdate($shash, 1);
 
   }elsif($msgtype eq "PushButtonState") {
     my ($bits2, $onoff) = unpack("CC",pack("H*",$args[0]));
@@ -450,10 +446,8 @@ MAX_Parse($$)
     my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
-    readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     readingsBulkUpdate($shash,"onoff",$onoff);
-    readingsEndUpdate($shash, 0);
 
   }elsif($msgtype eq "CubeClockState"){
     my $clockset = $args[0];
@@ -462,10 +456,9 @@ MAX_Parse($$)
   }elsif($msgtype eq "CubeConnectionState"){
     my $connected = $args[0];
 
-    readingsSingleUpdate($shash,"connection",$connected, 0);
+    readingsBulkUpdate($shash, "connection", $connected);
 
   } elsif($msgtype eq "ThermostatConfig") {
-    readingsBeginUpdate($shash);
     readingsBulkUpdate($shash, "ecoTemperature", $args[0]);
     readingsBulkUpdate($shash, "comfortTemperature", $args[1]);
     readingsBulkUpdate($shash, "boostValveposition", $args[2]) if($shash->{type} eq "HeatingThermostat");
@@ -480,7 +473,6 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
     #readingsBulkUpdate($shash, "weekProfile", "$args[13]");
     $shash->{internal}{weekProfile} = $args[13];
-    readingsEndUpdate($shash, 1);
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {
@@ -509,22 +501,24 @@ MAX_Parse($$)
     Log 1, "MAX_Parse: Unknown message $msgtype";
   }
 
-  #Build $shash->{STATE}
-  $shash->{STATE} = "waiting for data";
+  #Build state READING
+  my $state = "waiting for data";
   if(exists($shash->{READINGS})) {
-    $shash->{STATE} = $shash->{READINGS}{connection}{VAL} ? "connected" : "not connected" if(exists($shash->{READINGS}{connection}));
-    $shash->{STATE} = "$shash->{READINGS}{desiredTemperature}{VAL} °C" if(exists($shash->{READINGS}{desiredTemperature}));
-    $shash->{STATE} = $shash->{READINGS}{onoff}{VAL} ? "opened" : "closed" if(exists($shash->{READINGS}{onoff}));
+    $state = $shash->{READINGS}{connection}{VAL} ? "connected" : "not connected" if(exists($shash->{READINGS}{connection}));
+    $state = "$shash->{READINGS}{desiredTemperature}{VAL} °C" if(exists($shash->{READINGS}{desiredTemperature}));
+    $state = $shash->{READINGS}{onoff}{VAL} ? "opened" : "closed" if(exists($shash->{READINGS}{onoff}));
   }
 
-  $shash->{STATE} .= " (clock not set)" if($shash->{clocknotset});
-  $shash->{STATE} .= " (auto)" if(exists($shash->{mode}) and $shash->{mode} eq "auto");
+  $state .= " (clock not set)" if($shash->{clocknotset});
+  $state .= " (auto)" if(exists($shash->{mode}) and $shash->{mode} eq "auto");
   #Don't print this: it's the standard mode
-  #$shash->{STATE} .= " (manual)" if(exists($shash->{mode}) and  $shash->{mode} eq "manual");
-  $shash->{STATE} .= " (until ".$shash->{until}.")" if(exists($shash->{mode}) and $shash->{mode} eq "temporary" );
-  $shash->{STATE} .= " (battery low)" if($shash->{batterylow});
-  $shash->{STATE} .= " (rf error)" if($shash->{rferror});
-  
+  #$state .= " (manual)" if(exists($shash->{mode}) and  $shash->{mode} eq "manual");
+  $state .= " (until ".$shash->{until}.")" if(exists($shash->{mode}) and $shash->{mode} eq "temporary" );
+  $state .= " (battery low)" if($shash->{batterylow});
+  $state .= " (rf error)" if($shash->{rferror});
+
+  readingsBulkUpdate($shash, "state", $state);
+  readingsEndUpdate($shash, 1);
   return $shash->{NAME}
 }
 
