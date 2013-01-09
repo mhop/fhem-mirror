@@ -467,7 +467,7 @@ MAXLAN_Parse($$)
       ($magic,$version,$numgroups,@groupsdevices) = unpack("CCCXC/(CC/aH6)C/(CH6a[10]C/aC)C",$bindata);
       1;
     } or do {
-      Log 1, "Metadata response is malformed!";
+      Log 1, "MAXLAN_Parse: Metadata response is malformed!";
       return;
     };
     
@@ -504,12 +504,12 @@ MAXLAN_Parse($$)
 
     if(length($bindata) < 18) {
       Log 1, "Invalid C: response, not enough data";
-      return "Invalid C: response, not enough data";
+      return "MAXLAN_Parse: Invalid C: response, not enough data";
     }
 
     #Parse the first 18 bytes, those are send for every device
     my ($len,$addr,$devicetype,$groupid,$firmware,$testresult,$serial) = unpack("CH6CCCCa[10]", $bindata);
-    Log $ll5, "len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
+    Log $ll5, "MAXLAN_Parse: len $len, addr $addr, devicetype $devicetype, firmware $firmware, testresult $testresult, groupid $groupid, serial $serial";
 
     $len = $len+1; #The len field itself was not counted
 
@@ -517,7 +517,7 @@ MAXLAN_Parse($$)
 
     if($len != length($bindata)) {
       Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
-      return "Invalid C: response, len does not match";
+      return "MAXLAN_Parse: Invalid C: response, len does not match";
     }
 
     #devicetype: Cube = 0, HeatingThermostat = 1, HeatingThermostatPlus = 2, WallMountedThermostat = 3, ShutterContact = 4, PushButton = 5
@@ -545,9 +545,9 @@ MAXLAN_Parse($$)
       Dispatch($hash, "MAX,1,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
 
     }elsif($devicetype == 4){#ShutterContact
-      Log 2, "ShutterContact send some configuration, but none was expected" if($len > 18);
+      Log 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
     }else{ #TODO
-      Log 2, "Got configdata for unimplemented devicetype $devicetype";
+      Log 2, "MAXLAN_Parse: Got configdata for unimplemented devicetype $devicetype";
     }
 
     #Clear Error
@@ -595,7 +595,7 @@ MAXLAN_Parse($$)
         }elsif($shash->{type} eq "ShutterContact"){
           Dispatch($hash, "MAX,1,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
         }else{
-          Log 2, "Got status for unimplemented device type $shash->{type}";
+          Log 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
         }
       } # if($valid)
       $bindata=substr($bindata,$len+1); #+1 because the len field is not counted
@@ -608,7 +608,7 @@ MAXLAN_Parse($$)
       return undef;
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
-    Log 2, "Paired new device, type $device_types{$type}, addr $addr, serial $serial";
+    Log 2, "MAXLAN_Parse: Paired new device, type $device_types{$type}, addr $addr, serial $serial";
     Dispatch($hash, "MAX,1,define,$addr,$device_types{$type},$serial,0,1", {RAWMSG => $rmsg});
 
     #After a device has been paired, it automatically appears in the "L" and "C" commands,
@@ -619,15 +619,15 @@ MAXLAN_Parse($$)
     $hash->{dutycycle} = hex($args[0]); #number of command send over the air
     my $discarded = $args[1];
     $hash->{freememoryslot} = $args[2];
-    Log 5, "dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
+    Log 5, "MAXLAN_Parse: dutycyle $hash->{dutycycle}, freememoryslot $hash->{freememoryslot}";
 
-    Log 3, "1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
-    Log 2, "1% rule: we sent too much, queue is full" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} == 0);
-    Log 2, "Command was discarded" if($discarded);
+    Log 3, "MAXLAN_Parse: 1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
+    Log 2, "MAXLAN_Parse: 1% rule: we sent too much, queue is full" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} == 0);
+    Log 2, "MAXLAN_Parse: Command was discarded" if($discarded);
     return "Command was discarded" if($discarded);
   } else {
     Log $ll5, "$name Unknown command $cmd";
-    return "Unknown command $cmd";
+    return "MAXLAN_Parse: Unknown command $cmd";
   }
   return undef;
 }
