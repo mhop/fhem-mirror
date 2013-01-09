@@ -253,7 +253,6 @@ CUL_MAX_SendAck($$$)
 }
 
 #All inputs are hex strings, $cmd is one from %msgCmd2Id
-#This is deprecated as part of the MAX backend interface
 sub
 CUL_MAX_Send(@)
 {
@@ -330,6 +329,7 @@ CUL_MAX_Resend($)
   InternalTimer($resendTime, "CUL_MAX_Resend", $hash, 0);
 }
 
+#This is deprecated as part of the MAX backend interface
 sub
 CUL_MAX_SendDeviceCmd($$)
 {
@@ -401,7 +401,11 @@ CUL_MAX_BroadcastTime(@)
   my $i = 1;
   foreach my $addr (keys %{$modules{MAX}{defptr}}) {
     my $dhash = $modules{MAX}{defptr}{$addr};
-    if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash) {
+    #Check that
+    #1. the MAX device dhash uses this MAX_CUL as IODev
+    #2. the MAX device is a Wall/HeatingThermostat
+    if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash
+    && $dhash->{type} ~~ [ "HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat"] ) {
       #We queue it at different times and do not send directly, because
       #sending them all in a row makes us not see the Acks
       InternalTimer(gettimeofday()+3*$i++, "CUL_MAX_SendTimeInformationSender", [$hash, $addr, $payload], 0);
