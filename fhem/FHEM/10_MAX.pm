@@ -458,21 +458,25 @@ MAX_Parse($$)
 
     readingsBulkUpdate($shash, "connection", $connected);
 
-  } elsif($msgtype eq "ThermostatConfig") {
+  } elsif($msgtype ~~ ["HeatingThermostatConfig", "WallThermostatConfig"]) {
     readingsBulkUpdate($shash, "ecoTemperature", $args[0]);
     readingsBulkUpdate($shash, "comfortTemperature", $args[1]);
-    readingsBulkUpdate($shash, "boostValveposition", $args[2]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "boostDuration", $args[3]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "measurementOffset", $args[4]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "maximumTemperature", $args[5]);
-    readingsBulkUpdate($shash, "minimumTemperature", $args[6]);
-    readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "windowOpenDuration", $args[8]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "maxValveSetting", $args[9]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "valveOffset", $args[10]) if($shash->{type} eq "HeatingThermostat");
-    readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
+    readingsBulkUpdate($shash, "maximumTemperature", $args[2]);
+    readingsBulkUpdate($shash, "minimumTemperature", $args[3]);
+    if($shash->{type} eq "HeatingThermostat") {
+      readingsBulkUpdate($shash, "boostValveposition", $args[4]);
+      readingsBulkUpdate($shash, "boostDuration", $args[5]);
+      readingsBulkUpdate($shash, "measurementOffset", $args[6]);
+      readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
+      readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
+      readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
+      readingsBulkUpdate($shash, "valveOffset", $args[10]);
+      readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
+      $shash->{internal}{weekProfile} = $args[13];
+    } else {
+      $shash->{internal}{weekProfile} = $args[4];
+    }
 
-    $shash->{internal}{weekProfile} = $args[13];
     #parse weekprofiles for each day
     for (my $i=0;$i<7;$i++) {
       my (@time_prof, @temp_prof);
@@ -502,8 +506,8 @@ MAX_Parse($$)
         }
      }
 
-     readingsBulkUpdate($shash, "weekprofile-$decalcDays[$i]-time", $time_prof_str );
-     readingsBulkUpdate($shash, "weekprofile-$decalcDays[$i]-temp", $temp_prof_str );
+     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays[$i]-time", $time_prof_str );
+     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays[$i]-temp", $temp_prof_str );
 
      } # Endparse weekprofiles for each day
 

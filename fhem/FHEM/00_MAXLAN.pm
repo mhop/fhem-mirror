@@ -522,9 +522,10 @@ MAXLAN_Parse($$)
 
     #devicetype: Cube = 0, HeatingThermostat = 1, HeatingThermostatPlus = 2, WallMountedThermostat = 3, ShutterContact = 4, PushButton = 5
     #Seems that ShutterContact does not have any configdata
-    if($devicetype == 0){#Cube
+    if($device_types{$devicetype} eq "Cube"){
       #TODO: there is a lot of data left to interpret
-    }elsif($devicetype == 1 or $devicetype == 3){#HeatingThermostat or #WallMountedThermostat
+
+    }elsif($device_types{$devicetype} eq "HeatingThermostat"){
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
       #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
@@ -542,9 +543,18 @@ MAXLAN_Parse($$)
       my $decalcDay       = ($decalcifiction >> 5) & 0x07;
       my $decalcTime      = $decalcifiction & 0x1F;
       Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, boostValve $boostValve, boostDuration $boostDuration, tempoffset $tempoffset, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp, windowopentemp $windowopentemp, windowopendur $windowopendur";
-      Dispatch($hash, "MAX,1,ThermostatConfig,$addr,$ecotemp,$comforttemp,$boostValve,$boostDuration,$tempoffset,$maxsetpointtemp,$minsetpointtemp,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
+      Dispatch($hash, "MAX,1,HeatingThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$boostValve,$boostDuration,$tempoffset,$windowopentemp,$windowopendur,$maxvalvesetting,$valveoffset,$decalcDay,$decalcTime,$weekprofile", {RAWMSG => $rmsg});
 
-    }elsif($devicetype == 4){#ShutterContact
+    }elsif($device_types{$devicetype} eq "WallMountedThermostat"){
+      my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile) = unpack("CCCCH*",substr($bindata,18));
+      $comforttemp /= 2.0; #convert to degree celcius
+      $ecotemp /= 2.0; #convert to degree celcius
+      $maxsetpointtemp /= 2.0;
+      $minsetpointtemp /= 2.0;
+      Log $ll5, "comfortemp $comforttemp, ecotemp $ecotemp, minsetpointtemp $minsetpointtemp, maxsetpointtemp $maxsetpointtemp";
+      Dispatch($hash, "MAX,1,WallThermostatConfig,$addr,$ecotemp,$comforttemp,$maxsetpointtemp,$minsetpointtemp,$weekprofile", {RAWMSG => $rmsg});
+
+    }elsif($device_types{$devicetype} eq "ShutterContact"){
       Log 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
     }else{ #TODO
       Log 2, "MAXLAN_Parse: Got configdata for unimplemented devicetype $devicetype";
