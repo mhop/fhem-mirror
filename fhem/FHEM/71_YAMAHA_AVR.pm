@@ -594,7 +594,7 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Unit_Desc>GetParam</Unit_Desc></System></YAMAHA_AV>");
 
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description url from device $name" unless (defined($response));
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description url from device $name. Please turn on the device or check for correct hostaddress!" unless (defined($response));
     
     
     if(defined($response) and $response =~ /<URL>(.+?)<\/URL>/)
@@ -608,7 +608,7 @@ sub YAMAHA_AVR_getModel($)
     
     $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>");
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get system configuration from device $name" unless (defined($response));
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get system configuration from device $name. Please turn on the device or check for correct hostaddress!" unless (defined($response));
     
     if(defined($response) and $response =~ /<Model_Name>(.+?)<\/Model_Name>.*<System_ID>(.+?)<\/System_ID>.*<Version>(.+?)<\/Version>/)
     {
@@ -623,7 +623,7 @@ sub YAMAHA_AVR_getModel($)
     
     $response = GetFileFromURL("http://".$address.$desc_url);
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description from device $name" unless (defined($response));
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get unit description from device $name. Please turn on the device or check for correct hostaddress!" unless (defined($response));
     
     return undef unless(defined($response));
 
@@ -674,7 +674,7 @@ sub YAMAHA_AVR_getInputs($)
     my $response = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"GET\"><$zone><Input><Input_Sel_Item>GetParam</Input_Sel_Item></Input></$zone></YAMAHA_AV>");
     
     
-    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available inputs from device $name" unless (defined($response));
+    Log GetLogLevel($name, 3), "YAMAHA_AVR: could not get the available inputs from device $name. Please turn on the device or check for correct hostaddress!!!" unless (defined($response));
     
     return undef unless (defined($response));
 
