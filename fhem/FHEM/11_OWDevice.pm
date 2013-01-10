@@ -2,8 +2,9 @@
 ##############################################################################
 #
 #     11_OWDevice.pm
-#     Copyright by Dr. Boris Neubert
+#     Copyright by Dr. Boris Neubert & Martin Fischer
 #     e-mail: omega at online dot de
+#     e-mail: m_fischer at gmx dot de
 #
 #     This file is part of fhem.
 #
@@ -24,13 +25,307 @@
 
 # Todos:
 # - stateFormat via Interface
-# - warum wird jeder Wert 2x geloggt?
 
 package main;
 
 use strict;
 use warnings;
 
+use vars qw(%owdevice);
+
+# 1-Wire devices (order by family code)
+# http://owfs.sourceforge.net/family.html
+
+$owdevice{"01"} = {
+    # DS2401 - Silicon Serial Number
+    # DS1990A - Serial Number iButton
+    "read"      => [],
+    "write"     => [],
+    "poll"      => [],
+    "state"     => [ qw(address) ],
+    "interface" => "serial",
+};
+$owdevice{"05"} = {
+    # DS2405 - Addressable Switch
+    "read"      => [ qw(PIO sensed) ],
+    "write"     => [ qw(PIO) ],
+    "poll"      => [ qw(sensed) ],
+    "state"     => [ qw(sensed) ],
+    "event"     => { qw(0 closed 1 opened) },
+    "interface" => "state",
+};
+$owdevice{"10"} = {
+    # DS18S20 - High-Precision 1-Wire Digital Thermometer
+    # DS1920 - iButton version of the thermometer
+    "read"      => [ qw(power),
+                     qw(temperature templow temphigh) ],
+    "write"     => [ qw(templow temphigh) ],
+    "poll"      => [ qw(temperature) ],
+    "state"     => [ qw(temperature) ],
+    "alarm"     => 1,
+    "interface" => "temperature",
+};
+$owdevice{"12"} = {
+    # DS2406, DS2407 - Dual Addressable Switch with 1kbit Memory
+    "read"      => [ qw(channels),
+                     qw(latch.A latch.B latch.ALL latch.BYTE),
+                     qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.ALL),
+                     qw(PIO.A PIO.B PIO.ALL PIO.BYTE),
+                     qw(power),
+                     qw(sensed.A sensed.B sensed.ALL sensed.BYTE),
+                     qw(set_alarm),
+                     qw(TAI8570/pressure TAI8570/sibling TAI8570/temperature),
+                     qw(T8A/volt.0 T8A/volt.1 T8A/volt.2 T8A/volt.3 T8A/volt.4 T8A/volt.5 T8A/volt.6),
+                     qw(T8A/volt.7 T8A/volt.ALL) ],
+    "write"     => [ qw(latch.A latch.B latch.ALL latch.BYTE),
+                     qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.ALL),
+                     qw(PIO.A PIO.B PIO.ALL PIO.BYTE),
+                     qw(sensed.A sensed.B sensed.ALL sensed.BYTE),
+                     qw(set_alarm), ],
+    "poll"      => [ qw(sensed.A sensed.B) ],
+    "state"     => [ qw(sensed.A sensed.B) ],
+    "alarm"     => 1,
+    "event"     => { qw(0 off 1 on) },
+    "interface" => "state",
+};
+$owdevice{"1B"} = {
+    # DS2436 - Battery ID/Monitor Chip
+    "read"      => [ qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4 pages/page.ALL),
+                     qw(temperature),
+                     qw(volts),
+                     qw(counter/cycles) ],
+    "write"     => [ qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4 pages/page.ALL),
+                     qw(counter/increment counter/reset) ],
+    "poll"      => [ qw(temperature volts counter/cycles) ],
+    "state"     => [ qw(temperature volts counter/cycles) ],
+    "interface" => "multisensor",
+};
+$owdevice{"1D"} = {
+    # DS2423 - 4kbit 1-Wire RAM with Counter
+    "read"      => [ qw(counters.A counters.B counters.ALL),
+                     qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4 pages/page.5),
+                     qw(pages/page.6 pages/page.7 pages/page.8 pages/page.9 pages/page.10 pages/page.11),
+                     qw(pages/page.12 pages/page.13 pages/page.14 pages/page.15),
+                     qw(pages/count.0 pages/count.1 pages/count.2 pages/count.3 pages/count.4 pages/count.5),
+                     qw(pages/count.6 pages/count.7 pages/count.8 pages/count.9 pages/count.10 pages/count.11),
+                     qw(pages/count.12 pages/count.13 pages/count.14 pages/count.15) ],
+    "write"     => [ qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4 pages/page.5),
+                     qw(pages/page.6 pages/page.7 pages/page.8 pages/page.9 pages/page.10 pages/page.11),
+                     qw(pages/page.12 pages/page.13 pages/page.14 pages/page.15) ],
+    "poll"      => [ qw(counters.A counters.B) ],
+    "state"     => [ qw(counters.A counters.B) ],
+    "offset"    => [ qw(counters.A counters.B) ],
+    "interface" => "counter",
+};
+$owdevice{"20"} = {
+    # DS2450 - Quad A/D Converter
+    "read"      => [ qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D alarm/high.ALL),
+                     qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D alarm/low.ALL),
+                     qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.ALL),
+                     qw(PIO.A PIO.B PIO.C PIO.D PIO.ALL),
+                     qw(power),
+                     qw(set_alarm/high.A set_alarm/high.B set_alarm/high.C set_alarm/high.D set_alarm/high.ALL),
+                     qw(set_alarm/low.A set_alarm/low.B set_alarm/low.C set_alarm/low.D set_alarm/low.ALL),
+                     qw(set_alarm/volthigh.A set_alarm/volthigh.B set_alarm/volthigh.C set_alarm/volthigh.D),
+                     qw(set_alarm/volthigh.ALL),
+                     qw(set_alarm/volt2high.A set_alarm/volt2high.B set_alarm/volt2high.C set_alarm/volt2high.D),
+                     qw(set_alarm/volt2high.ALL),
+                     qw(set_alarm/voltlow.A set_alarm/voltlow.B set_alarm/voltlow.C set_alarm/voltlow.D),
+                     qw(set_alarm/voltlow.ALL),
+                     qw(set_alarm/volt2low.A set_alarm/volt2low.B set_alarm/volt2low.C set_alarm/volt2low.D),
+                     qw(set_alarm/volt2low.ALL),
+                     qw(set_alarm/unset),
+                     qw(volt.A volt.B volt.C volt.D volt.ALL),
+                     qw(8bit/volt.A 8bit/volt.B 8bit/volt.C 8bit/volt.D 8bit/volt.ALL),
+                     qw(volt2.A volt2.B volt2.C volt2.D volt2.ALL),
+                     qw(8bit/volt2.A 8bit/volt2.B 8bit/volt2.C 8bit/volt2.D 8bit/volt2.ALL),
+                     qw(CO2/power CO2/ppm CO2/status) ],
+    "write"     => [ qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D alarm/high.ALL),
+                     qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D alarm/low.ALL),
+                     qw(memory),
+                     qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.ALL),
+                     qw(PIO.A PIO.B PIO.C PIO.D PIO.ALL),
+                     qw(power),
+                     qw(set_alarm/high.A set_alarm/high.B set_alarm/high.C set_alarm/high.D set_alarm/high.ALL),
+                     qw(set_alarm/low.A set_alarm/low.B set_alarm/low.C set_alarm/low.D set_alarm/low.ALL),
+                     qw(set_alarm/volthigh.A set_alarm/volthigh.B set_alarm/volthigh.C set_alarm/volthigh.D),
+                     qw(set_alarm/volthigh.ALL),
+                     qw(set_alarm/volt2high.A set_alarm/volt2high.B set_alarm/volt2high.C set_alarm/volt2high.D),
+                     qw(set_alarm/volt2high.ALL),
+                     qw(set_alarm/voltlow.A set_alarm/voltlow.B set_alarm/voltlow.C set_alarm/voltlow.D),
+                     qw(set_alarm/voltlow.ALL),
+                     qw(set_alarm/volt2low.A set_alarm/volt2low.B set_alarm/volt2low.C set_alarm/volt2low.D),
+                     qw(set_alarm/volt2low.ALL),
+                     qw(set_alarm/unset) ],
+    "poll"      => [ qw(PIO.A PIO.B PIO.C PIO.D),
+                     qw(volt.A volt.B volt.C volt.D),
+                     qw(volt2.A volt2.B volt2.C volt2.D) ],
+    "state"     => [ qw(PIO.A PIO.B PIO.C PIO.D),
+                     qw(volt.A volt.B volt.C volt.D),
+                     qw(volt2.A volt2.B volt2.C volt2.D) ],
+    "event"     => { qw(0 off 1 on) },
+    "interface" => "multisensor",
+};
+$owdevice{"22"} = {
+    # DS1822 - Econo 1-Wire Digital Thermometer
+    "read"      => [ qw(temperature temperature9 temperature10 temperature11 temperature12 fasttemp),
+                     qw(temphigh templow),
+		     qw(power) ],
+    "write"	=> [ qw(temphigh templow) ],
+    "poll"      => [ qw(temperature) ],
+    "state"     => [ qw(temperature) ],
+    "alarm"     => 1,
+    "interface" => "temperature",
+};
+$owdevice{"24"} = {
+    # DS2415 - 1-Wire Time Chip
+    # DS1904 - RTC iButton
+    "read"      => [ qw(date flags running udate) ],
+    "write"     => [ qw(date flags running udate) ],
+    "poll"      => [ qw(date running udate) ],
+    "state"     => [ qw(date running) ],
+    "interface" => "timer",
+};
+$owdevice{"26"} = {
+    # DS2438 - Smart Battery Monitor
+    "read"      => [ qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4),
+                     qw(pages/page.5 pages/page.6 pages/page.7 pages/page.ALL),
+                     qw(temperature),
+                     qw(VAD VDD),
+                     qw(vis),
+                     qw(CA),
+                     qw(EE),
+                     qw(IAD),
+                     qw(date),
+                     qw(disconnect/date disconnect/udate),
+                     qw(endcharge/date endcharge/udate),
+                     qw(udate),
+                     qw(HIH4000/humidity),
+                     qw(HTM1735/humidity),
+                     qw(DATANAB/humidity),
+                     qw(humidity),
+                     qw(B1-R1-A/pressure B1-R1-A/gain B1-R1-A/offset),
+                     qw(S3-R1-A/current S3-R1-A/illumination S3-R1-A/gain),
+                     qw(MultiSensor/type),
+                     qw(offset) ],
+    "write"     => [ qw(pages/page.0 pages/page.1 pages/page.2 pages/page.3 pages/page.4),
+                     qw(pages/page.5 pages/page.6 pages/page.7 pages/page.ALL),
+                     qw(CA),
+                     qw(EE),
+                     qw(IAD),
+                     qw(date),
+                     qw(disconnect/date disconnect/udate),
+                     qw(endcharge/date endcharge/udate),
+                     qw(udate),
+                     qw(DATANAB/reset),
+                     qw(B1-R1-A/gain B1-R1-A/offset),
+                     qw(S3-R1-A/gain),
+                     qw(offset) ],
+    "poll"      => [ qw(temperature VAD VDD) ],
+    "state"     => [ qw(temperature VAD VDD) ],
+    "interface" => "multisensor",
+};
+$owdevice{"27"} = {
+    # DS2417 - 1-Wire Time Chip with Interrupt
+    "read"      => [ qw(date enable interval itime running udate) ],
+    "write"     => [ qw(date enable interval itime running udate) ],
+    "poll"      => [ qw(date enable running udate) ],
+    "state"     => [ qw(date enable running) ],
+    "interface" => "timer",
+};
+$owdevice{"28"} = {
+    # DS18B20 - Programmable Resolution 1-Wire Digital Thermometer
+    "read"      => [ qw(temperature temperature9 temperature10 temperature11 temperature12 fasttemp),
+                     qw(temphigh templow) ],
+    "write"     => [ qw(temphigh templow) ],
+    "poll"      => [ qw(temperature) ],
+    "state"     => [ qw(temperature) ],
+    "alarm"     => 1,
+    "interface" => "temperature",
+};
+$owdevice{"29"} = {
+    # DS2408 - 1-Wire 8 Channel Addressable Switch
+    "read"      => [ qw(latch.0 latch.1 latch.2 latch.3 latch.4 latch.5 latch.6 latch.7 latch.ALL latch.BYTE),
+                     qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7 PIO.ALL PIO.BYTE),
+                     qw(power),
+                     qw(sensed.0 sensed.1 sensed.2 sensed.3 sensed.4 sensed.5 sensed.6 sensed.7 sensed.ALL),
+                     qw(strobe),
+                     qw(por),
+                     qw(set_alarm) ],
+    "write"     => [ qw(latch.0 latch.1 latch.2 latch.3 latch.4 latch.5 latch.6 latch.7 latch.ALL latch.BYTE),
+                     qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7 PIO.ALL PIO.BYTE),
+                     qw(strobe),
+                     qw(por),
+                     qw(set_alarm),
+                     qw(LCD_H/clear LCD_H/home LCD_H/screen LCD_H/screenyc LCD_H/onoff LCD_H/message),
+                     qw(LCD_M/clear LCD_M/home LCD_M/screen LCD_M/screenyc LCD_M/onoff LCD_M/message) ],
+    "poll"      => [ qw(sensed.0 sensed.1 sensed.2 sensed.3 sensed.4 sensed.5 sensed.6 sensed.7) ],
+    "state"     => [ qw(sensed.0 sensed.1 sensed.2 sensed.3 sensed.4 sensed.5 sensed.6 sensed.7) ],
+    "alarm"     => 1,
+    "event"     => { qw(0 off 1 on) },
+    "interface" => "state",
+};
+$owdevice{"3A"} = {
+    # DS2413 - Dual Channel Addressable Switch
+    "read"      => [ qw(PIO.A PIO.B PIO.ALL PIO.BYTE),
+                     qw(sensed.A sensed.B sensed.ALL sensed.BYTE) ],
+    "write"     => [ qw(PIO.A PIO.B PIO.ALL PIO.BYTE) ],
+    "poll"      => [ qw(sensed.A sensed.B) ],
+    "state"     => [ qw(sensed.A sensed.B) ],
+    "event"     => { qw(0 off 1 on) },
+    "interface" => "state",
+};
+$owdevice{"3B"} = {
+    # DS1825 - Programmable Resolution 1-Wire Digital Thermometer with ID
+    "read"      => [ qw(prog_addr temperature temperature9 temperature10 temperature11 temperature12 fasttemp) ],
+    "write"     => [ qw(temphigh templow) ],
+    "poll"      => [ qw(temperature) ],
+    "state"     => [ qw(temperature) ],
+    "alarm"     => 1,
+    "interface" => "temperature",
+};
+$owdevice{"FF"} = {
+    # LCD - LCD controller by Louis Swart
+    "read"      => [ qw(counters.0 counters.1 counters.2 counters.3 counters.ALL),
+                     qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3 cumulative.ALL),
+                     qw(data),
+                     qw(memory),
+                     qw(register),
+                     qw(version) ],
+    "write"     => [ qw(backlight),
+                     qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3 cumulative.ALL),
+                     qw(data),
+                     qw(LCDon),
+                     qw(line16.0 line16.1 line16.2 line16.3 line16.ALL),
+                     qw(line20.0 line20.1 line20.2 line20.3 line20.ALL),
+                     qw(line40.0 line40.1 line40.2 line40.3 line40.ALL),
+                     qw(memory),
+                     qw(register),
+                     qw(screen16 screen20 screen40) ],
+    "poll"      => [ qw(counters.0 counters.1 counters.2 counters.3) ],
+    "state"     => [ qw(counters.0 counters.1 counters.2 counters.3) ],
+    "interface" => "display",
+};
+
+# add default properties to each owdevice
+foreach my $f (sort keys %owdevice) {
+    push(@{$owdevice{$f}{"read"}},qw(address crc8 family id locator r_address r_id r_locator type));
+    @{$owdevice{$f}{"read"}}  = sort(@{$owdevice{$f}{"read"}});
+    if(defined($owdevice{$f}{"write"}) && @{$owdevice{$f}{"write"}}) {
+        @{$owdevice{$f}{"write"}} = sort(@{$owdevice{$f}{"write"}});
+    }
+    if(defined($owdevice{$f}{"poll"}) && @{$owdevice{$f}{"poll"}}) {
+    	@{$owdevice{$f}{"poll"}}  = sort(@{$owdevice{$f}{"poll"}});
+    }
+    if(defined($owdevice{$f}{"state"}) && @{$owdevice{$f}{"state"}}) {
+    	@{$owdevice{$f}{"state"}} = sort(@{$owdevice{$f}{"state"}});
+    }
+}
 
 ###################################
 sub
@@ -41,9 +336,9 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
-  $hash->{AttrFn}    = "OWDevice_Attr";
+  $hash->{AttrFn}     = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "IODev trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
+  $hash->{AttrList}  = "trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
                        $readingFnAttributes;
 }
 
@@ -53,188 +348,21 @@ OWDevice_Initialize($)
 # 2nd element: array of getters/readings
 # 3rd element: array of setters/readings
 # 4th element: array of readings to be periodically updated
-# the value of the first reading in getters is written to state
+# 5th element: array of readings to be written to state
 sub
 OWDevice_GetDetails($) {
 
-      my ($hash)= @_;
-      my $interface= "";
-      my @getters= qw(address alias family id power type);
-      my @setters= qw(alias);
-      my @polls;
+  my ($hash)= @_;
 
-      # below we use shift such that the potentially
-      # more important values get listed first and
-      # that the first reading in getters could be
-      # defined (it is shown in the STATE).
-            
-      # http://owfs.sourceforge.net/family.html
-      my $family= substr($hash->{fhem}{address}, 0, 2);
-      if($family eq "10") {
-        # 18S20 high precision digital thermometer
-        # 1920  iButton version of the thermometer
-        unshift @getters, qw(temperature templow temphigh);
-        unshift @setters, qw(templow temphigh);
-        unshift @polls, qw(temperature);
-        $interface= "temperature";
-      } elsif($family eq "28") {
-        # 18B20 programmable resolution digital thermometer
-        unshift @getters, qw(temperature templow temphigh);
-        unshift @setters, qw(templow temphigh);
-        unshift @polls, qw(temperature);
-        $interface= "temperature";
-      } elsif($family eq "1D") {
-        # 2423 4k RAM with counter
-        unshift @getters, qw(counters.A counters.B);
-        unshift @setters, qw();
-        unshift @polls, qw(counters.A counters.B);
-        #$interface= "count";
-      } elsif($family eq "22") {
-        # 1822 - Econo 1-Wire Digital Thermometer
-        # added by m. fischer
-        unshift @getters, qw(temperature temperature9 temperature10 temperature11 temperature12 fasttemp);
-        unshift @setters, qw(temphigh templow);
-        unshift @polls, qw(temperature);
-        $interface= "temperature";
-      } elsif($family eq "3B") {
-        # 1825 - Programmable Resolution 1-Wire Digital Thermometer with ID
-        # added by m. fischer
-        unshift @getters, qw(prog_addr temperature temperature9 temperature10 temperature11 temperature12 fasttemp);
-        unshift @setters, qw(temphigh templow);
-        unshift @polls, qw(temperature);
-        $interface= "temperature";
-      } elsif($family eq "24") {
-        # 2415 - 1-Wire Time Chip
-        # 1904 - RTC iButton
-        # 2417 - 1-Wire Time Chip with Interrupt
-        # added by m. fischer
-        unshift @getters, qw(date enable interval itime flags running udate);
-        unshift @setters, qw(date enable itime flags running udate);
-        unshift @polls, qw(date enable running udate);
-        #$interface= "timer"; # to be discussed
-      } elsif($family eq "01") {
-        # 2401 - Silicon Serial Number
-        # 1990A - Serial Number iButton
-        # added by m. fischer
-        # this chip has no special properties to set, get or poll
-        # it has only a "unique serial number identifier"
-        #interface= "serial"; # to be discussed
-      } elsif($family eq "05") {
-        # 2405 - Addressable Switch
-        # added by m. fischer
-        unshift @getters, qw(PIO);
-        unshift @setters, qw(PIO);
-        unshift @polls, qw(PIO);
-        #$interface= "state";
-      } elsif($family eq "12") {
-        # 2406, 2407 - Dual Addressable Switch with 1kbit Memory
-        # added by m. fischer
-        unshift @getters, qw(PIO.A PIO.B);
-        unshift @setters, qw(PIO.A PIO.B);
-        unshift @polls, qw(PIO.A PIO.B);
-        #$interface= "state";
-      } elsif($family eq "3A") {
-        # 2413 1-Wire Dual Channel Addressable Switch
-        unshift @getters, qw(PIO.A PIO.B);
-        unshift @setters, qw(PIO.A PIO.B);
-        unshift @polls, qw(PIO.A PIO.B);
-        #$interface= "state";
-      } elsif($family eq "29") {
-        # 2408 - 1-Wire 8 Channel Addressable Switch
-        # added by m. fischer
-        unshift @getters, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
-        unshift @setters, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
-        unshift @polls, qw(PIO.0 PIO.1 PIO.2 PIO.3 PIO.4 PIO.5 PIO.6 PIO.7);
-        #$interface= "state";
-      } elsif($family eq "FF") {
-        # LCD - LCD controller
-        # added by m. fischer
-        unshift @getters, qw(counters.0 counters.1 counters.2 counters.3);
-        unshift @getters, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3 version);
-        unshift @setters, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3);
-        unshift @setters, qw(line16.0 line16.1 line16.2 line16.3 screen16);
-        unshift @setters, qw(line20.0 line20.1 line20.2 line20.3 screen20);
-        unshift @setters, qw(line40.0 line40.1 line40.2 line40.3 screen40);
-        unshift @setters, qw(backlight LCDon);
-        unshift @polls, qw(counters.0 counters.1 counters.2 counters.3);
-        unshift @polls, qw(cumulative.0 cumulative.1 cumulative.2 cumulative.3);
-        #$interface= "display"; # to be discussed
-      } elsif($family eq "1B") {
-        # 2436 - Battery ID/Monitor Chip
-        # added by m. fischer
-        unshift @getters, qw(temperature volts counter/cycles);
-        unshift @setters, qw(counter/increment counter/reset);
-        unshift @polls, qw(temperature volts counter/cycles);
-        #interface= "state"; # to be discussed
-      } elsif($family eq "26") {
-        # 2438 - Smart Battery Monitor
-        # added by m. fischer
-        unshift @getters, qw(temperature VAD VDD vis CA EE IAD date disconnect/date disconnect/udate);
-        # configuration properties
-        unshift @getters, qw(CA EE IAD);
-        # date properties
-        unshift @getters, qw(date disconnect/date disconnect/udate endcharge/date endcharge/udate udate);
-        # humidity sensor
-        unshift @getters, qw(HIH4000/humidity HTM1735/humidity DATANAB/humidity humidity);
-        # barometer
-        unshift @getters, qw(B1-R1-A/pressure B1-R1-A/gain B1-R1-A/offset);
-        # solar sensor
-        unshift @getters, qw(S3-R1-A/current S3-R1-A/illumination S3-R1-A/gain);
-        # multisensor
-        unshift @getters, qw(MultiSensor/type offset);
-        # configuration properties
-        unshift @setters, qw(CA EE IAD);
-        # date properties
-        unshift @setters, qw(date disconnect/date disconnect/udate endcharge/date endcharge/udate udate);
-        # humidity sensor
-        unshift @setters, qw(DATANAB/reset);
-        # solar sensor
-        unshift @setters, qw(S3-R1-A/gain);
-        # multisensor
-        unshift @setters, qw(offset);
-        unshift @polls, qw(temperature VAD VDD);
-        #$interface= "multisensor"; # to be discussed
-      } elsif($family eq "20") {
-        # 2450 - Quad A/D Converter
-        # added by m. fischer
-        unshift @getters, qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D);
-        unshift @getters, qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D);
-        unshift @getters, qw(PIO.A PIO.B PIO.C PIO.D);
-        unshift @getters, qw(set_alarm/high.A set_alarm/high.B set_alarm/high.C set_alarm/high.D);
-        unshift @getters, qw(set_alarm/low.A set_alarm/low.B set_alarm/low.C set_alarm/low.D);
-        unshift @getters, qw(set_alarm/volthigh.A set_alarm/volthigh.B set_alarm/volthigh.C set_alarm/volthigh.D);
-        unshift @getters, qw(set_alarm/volt2high.A set_alarm/volt2high.B set_alarm/volt2high.C set_alarm/volt2high.D);
-        unshift @getters, qw(set_alarm/voltlow.A set_alarm/voltlow.B set_alarm/voltlow.C set_alarm/voltlow.D);
-        unshift @getters, qw(set_alarm/volt2low.A set_alarm/volt2low.B set_alarm/volt2low.C set_alarm/volt2low.D);
-        unshift @getters, qw(set_alarm/unset);
-        unshift @getters, qw(volt.A volt.B volt.C volt.D);
-        unshift @getters, qw(8bit/volt.A 8bit/volt.B 8bit/volt.C 8bit/volt.D);
-        unshift @getters, qw(volt2.A volt2.B volt2.C volt2.D);
-        unshift @getters, qw(8bit/volt2.A 8bit/volt2.B 8bit/volt2.C 8bit/volt2.D);
-        # co2 (carbon dioxide) sensor
-        unshift @getters, qw(CO2/power CO2/ppm CO2/status);
-        unshift @setters, qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D);
-        unshift @setters, qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D);
-        unshift @setters, qw(PIO.A PIO.B PIO.C PIO.D);
-        unshift @setters, qw(set_alarm/high.A set_alarm/high.B set_alarm/high.C set_alarm/high.D);
-        unshift @setters, qw(set_alarm/low.A set_alarm/low.B set_alarm/low.C set_alarm/low.D);
-        unshift @setters, qw(set_alarm/volthigh.A set_alarm/volthigh.B set_alarm/volthigh.C set_alarm/volthigh.D);
-        unshift @setters, qw(set_alarm/volt2high.A set_alarm/volt2high.B set_alarm/volt2high.C set_alarm/volt2high.D);
-        unshift @setters, qw(set_alarm/voltlow.A set_alarm/voltlow.B set_alarm/voltlow.C set_alarm/voltlow.D);
-        unshift @setters, qw(set_alarm/volt2low.A set_alarm/volt2low.B set_alarm/volt2low.C set_alarm/volt2low.D);
-        unshift @setters, qw(set_alarm/unset);
-        unshift @polls, qw(PIO.A PIO.B PIO.C PIO.D);
-        unshift @polls, qw(volt.A volt.B volt.C volt.D);
-        unshift @polls, qw(alarm/high.A alarm/high.B alarm/high.C alarm/high.D);
-        unshift @polls, qw(alarm/low.A alarm/low.B alarm/low.C alarm/low.D);
-        #$interface= "multisensor"; # to be discussed
-      } elsif($family eq "reserved") {
-        # reserved for other devices
-        # add other devices here and post your additions as patch in
-        # http://forum.fhem.de/index.php?t=thread&frm_id=26&rid=10
-      };
-      # http://perl-seiten.homepage.t-online.de/html/perl_array.html
-      return ($interface, \@getters, \@setters, \@polls);
+  my $family= substr($hash->{fhem}{address}, 0, 2);
+  my @getters= @{$owdevice{$family}{"read"}};
+  my @setters= @{$owdevice{$family}{"write"}};
+  my @polls= @{$owdevice{$family}{"poll"}};
+  my @state= @{$owdevice{$family}{"state"}};
+      
+  my $interface= $owdevice{$family}{"interface"};
+  # http://perl-seiten.homepage.t-online.de/html/perl_array.html
+  return ($interface, \@getters, \@setters, \@polls, \@state);
 }
 
 ###################################
@@ -300,6 +428,7 @@ OWDevice_UpdateValues($) {
 
         my @polls= @{$hash->{fhem}{polls}};
         my @getters= @{$hash->{fhem}{getters}};
+        my @state= @{$hash->{fhem}{currentstate}};
         if($#polls>=0) {
           my $address= $hash->{fhem}{address};
           readingsBeginUpdate($hash);
@@ -307,9 +436,19 @@ OWDevice_UpdateValues($) {
             my $value= OWDevice_ReadValue($hash,$reading);
             if(defined($value)) {
               readingsBulkUpdate($hash,$reading,$value);
-              readingsBulkUpdate($hash,"state","$reading: $value") if($reading eq $getters[0]);
             }
           }
+          my $state;
+          foreach my $reading (@state) {
+            my $value= OWDevice_ReadValue($hash,$reading);
+            if(defined($value)) {
+                $state .= "$reading: $value  ";
+            } else {
+                $state .= "$reading: n/a  ";
+            }
+          }
+          $state =~ s/\s+$//;
+          readingsBulkUpdate($hash,"state",$state);
           readingsEndUpdate($hash,1);
         }
         InternalTimer(gettimeofday()+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
@@ -413,10 +552,11 @@ OWDevice_Define($$)
           $hash->{fhem}{interval}= $a[3];
           Log 5, "$name: polling every $a[3] seconds";
         }
-        my ($interface, $gettersref, $settersref, $pollsref)= OWDevice_GetDetails($hash);
+        my ($interface, $gettersref, $settersref, $pollsref, $stateref)= OWDevice_GetDetails($hash);
         my @getters= @{$gettersref};
         my @setters= @{$settersref};
         my @polls= @{$pollsref};
+        my @state= @{$stateref};
         if($interface ne "") {
           $hash->{fhem}{interfaces}= $interface;
           Log 5, "$name: interfaces: $interface";
@@ -427,6 +567,8 @@ OWDevice_Define($$)
         Log 5, "$name: setters: " . join(" ", @setters);
         $hash->{fhem}{polls}= $pollsref;
         Log 5, "$name: polls: " . join(" ", @polls);
+        $hash->{fhem}{currentstate}= $stateref;
+        Log 5, "$name: state: " . join(" ", @state);
 
         $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
         OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
@@ -466,14 +608,25 @@ OWDevice_Define($$)
     <br><br>
     The following devices are currently supported:
     <ul>
-      <li>18S20 high precision digital thermometer</li>
-      <li>18B20 programmable resolution digital thermometer</li>
-      <li>2423 4k RAM with counter</li>
-      <li>2413 1-Wire Dual Channel Addressable Switch</li>
-      <li>2405 Addressable Switch</li>
-      <li>2406, 2407 - Dual Addressable Switch with 1kbit Memory</li>
-      <li>2408 1-Wire 8 Channel Addressable Switch</li>
-      <li>LCD 1-wire LCD controller by Louis Swart</li>
+      <li>DS2401 - Silicon Serial Number</li>
+      <li>DS1990A - Serial Number iButton</li>
+      <li>DS2405 - Addressable Switch</li>
+      <li>DS18S20 - High-Precision 1-Wire Digital Thermometer</li>
+      <li>DS1920 - iButton version of the thermometer</li>
+      <li>DS2406, DS2407 - Dual Addressable Switch with 1kbit Memory</li>
+      <li>DS2436 - Battery ID/Monitor Chip</li>
+      <li>DS2423 - 4kbit 1-Wire RAM with Counter</li>
+      <li>DS2450 - Quad A/D Converter</li>
+      <li>DS1822 - Econo 1-Wire Digital Thermometer</li>
+      <li>DS2415 - 1-Wire Time Chip</li>
+      <li>DS1904 - RTC iButton</li>
+      <li>DS2438 - Smart Battery Monitor</li>
+      <li>DS2417 - 1-Wire Time Chip with Interrupt</li>
+      <li>DS18B20 - Programmable Resolution 1-Wire Digital Thermometer</li>
+      <li>DS2408 - 1-Wire 8 Channel Addressable Switch</li>
+      <li>DS2413 - Dual Channel Addressable Switch</li>
+      <li>DS1825 - Programmable Resolution 1-Wire Digital Thermometer with ID</li>
+      <li>LCD - LCD controller by Louis Swart</li>
     </ul>
     <br><br>
     Adding more devices is simple. Look at the code (subroutine <code>OWDevice_GetDetails</code>).
@@ -497,7 +650,6 @@ OWDevice_Define($$)
           ...<br>
           getters:<br>
             address<br>
-            alias<br>
             family<br>
             id<br>
             power<br>
@@ -552,14 +704,6 @@ OWDevice_Define($$)
   <a name="OWDeviceattr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="IODev"></a>
-    <li>IODev: 
-        Set the OWServer device which should be used for sending and receiving data
-        for this OWDevice. Note: Upon startup fhem assigns each OWDevice
-        to the last previously defined OWServer. Thus it is best if you define OWServer
-        and OWDevices in blocks: first define the first OWServer and the OWDevices that
-        belong to it, then continue with the next OWServer and the attached OWDevices, and so on.
-    </li>
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
