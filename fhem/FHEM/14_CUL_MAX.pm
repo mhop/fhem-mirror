@@ -223,9 +223,9 @@ CUL_MAX_Parse($$)
         CUL_MAX_Send($shash, "PairPong", $src, "00");
         #TODO: wait for Ack
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
-        if($device_types{$type} eq "HeatingThermostat" or $device_types{$type} eq "WallMountedThermostat") {
+        if($device_types{$type} eq "HeatingThermostat") {
           #This are the default values that a device has after factory reset or pairing
-          Dispatch($shash, "MAX,$isToMe,ThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,80,5,0,30.5,4.5,12,15", {RAWMSG => $rmsg});
         }
         #TODO: send TimeInformation
       }
