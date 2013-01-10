@@ -379,7 +379,7 @@ MAX_Parse($$)
 
   } elsif($msgtype eq "ThermostatState") {
 
-    my ($bits2,$valveposition,$temperaturesetpoint,$until1,$until2,$until3) = unpack("aCCCCC",pack("H*",$args[0]));
+    my ($bits2,$valveposition,$desiredTemperature,$until1,$until2,$until3) = unpack("aCCCCC",pack("H*",$args[0]));
     my $mode = vec($bits2, 0, 2); #
     my $dstsetting = vec($bits2, 3, 1); #is automatically switching to DST activated
     my $langateway = vec($bits2, 4, 1); #??
@@ -393,14 +393,14 @@ MAX_Parse($$)
     $measuredTemperature = "" if($mode == 2 || $measuredTemperature == 0);
     $untilStr = "" if($mode != 2);
 
-    $temperaturesetpoint = $temperaturesetpoint/2.0; #convert to degree celcius
-    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, temperaturesetpoint $temperaturesetpoint, until $untilStr, curTemp $measuredTemperature";
+    $desiredTemperature = $desiredTemperature/2.0; #convert to degree celcius
+    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, until $untilStr, curTemp $measuredTemperature";
 
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
     $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
 
     #The HeatingThermostat uses the measurementOffset during control
-    #but does not apply it to measuredTemperature before sending it to us
+    #but does not apply it to measuredTemperature before sending it to us (guessed)
     my $measOffset = MAX_ReadingsVal($shash,"measurementOffset");
     $measuredTemperature -= $measOffset if($measuredTemperature ne "" and $measOffset ne "");
 
@@ -416,16 +416,33 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     #This formatting must match with in MAX_Set:$templist
-    readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$temperaturesetpoint));
-    if($shash->{type} eq "HeatingThermostat") {
-      readingsBulkUpdate($shash, "valveposition", $valveposition);
-    } else {
-      #This is a WallMountedThermostat
-      readingsBulkUpdate($shash, "displayActualTemperature", $valveposition ? 1 : 0);
-    }
+    readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature));
+    readingsBulkUpdate($shash, "valveposition", $valveposition);
     if($measuredTemperature ne "") {
       readingsBulkUpdate($shash, "temperature", $measuredTemperature);
     }
+
+  }elsif($msgtype eq "WallThermostatState"){
+    my ($bits2,$valveposition,$desiredTemperature,$null1,$unk,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+    my $mode = vec($bits2, 0, 2); #
+    my $dstsetting = vec($bits2, 3, 1); #is automatically switching to DST activated
+    my $langateway = vec($bits2, 4, 1); #??
+    my $panel = vec($bits2, 5, 1); #1 if the heating thermostat is locked for manually setting the temperature at the device
+    my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
+    my $batterylow = vec($bits2, 7, 1); #1 if battery is low
+
+    $desiredTemperature = $desiredTemperature/2.0; #convert to degree celcius
+    Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
+
+    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, unknown: $unk, temperature $temperature";
+
+    $shash->{rferror} = $rferror;
+    readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+    #This formatting must match with in MAX_Set:$templist
+    readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature));
+    readingsBulkUpdate($shash, "valveposition", $valveposition);
+    readingsBulkUpdate($shash, "temperature", $temperature);
+    readingsBulkUpdate($shash, "displayActualTemperature", ($valveposition & 0x0C) ? 1 : 0);
 
   }elsif($msgtype eq "ShutterContactState"){
     my $bits = pack("H2",$args[0]);
