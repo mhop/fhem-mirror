@@ -160,7 +160,11 @@ MAX_ReadingsVal(@)
     #Error: invalid value
     Log 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[2]";
     $val = $readingDef{$name}[2];
-    readingsSingleUpdate($hash,$name,$val,0);
+    if(exists($hash->{".updateTimestamp"})) {
+      readingsBulkUpdate($hash,$name,$val);
+    } else {
+      readingsSingleUpdate($hash,$name,$val,0);
+    }
   }
   return $val;
 }
