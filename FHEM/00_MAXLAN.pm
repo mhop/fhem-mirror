@@ -600,8 +600,10 @@ MAXLAN_Parse($$)
 
         if(!$shash) {
           Log 2, "Got List response for undefined device with addr $addr";
-        }elsif($shash->{type} eq "HeatingThermostat" or $shash->{type} eq "WallMountedThermostat"){
+        }elsif($shash->{type} eq "HeatingThermostat"){
           Dispatch($hash, "MAX,1,ThermostatState,$addr,$payload", {RAWMSG => $rmsg});
+        }elsif($shash->{type} eq "WallMountedThermostat"){
+          Dispatch($hash, "MAX,1,WallThermostatState,$addr,$payload", {RAWMSG => $rmsg});
         }elsif($shash->{type} eq "ShutterContact"){
           Dispatch($hash, "MAX,1,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
         }else{
