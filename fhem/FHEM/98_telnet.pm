@@ -21,7 +21,7 @@ telnet_Initialize($)
   $hash->{AttrFn}  = "telnet_Attr";
   $hash->{NotifyFn}= "telnet_SecurityCheck";
   $hash->{AttrList} = "loglevel:0,1,2,3,4,5,6 globalpassword password ".
-                        "allowfrom SSL";
+                        "allowfrom SSL connectTimeout connectInterval";
 }
 
 #####################################
@@ -47,24 +47,93 @@ telnet_SecurityCheck($$)
 
 ##########################
 sub
+telnet_ClientConnect($)
+{
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  $hash->{DEF} =~ m/^(IPV6:)?(.*):(\d+)$/;
+  my ($isIPv6, $server, $port) = ($1, $2, $3);
+
+  Log GetLogLevel($name,4), "$name: Connecting to $server:$port...";
+  my @opts = (
+        PeerAddr => "$server:$port",
+        Timeout => AttrVal($name, "connectTimeout", 2),
+  );
+
+  my $client;
+  if($hash->{SSL}) {
+    $client = IO::Socket::SSL->new(@opts);
+  } else {
+    $client = IO::Socket::INET->new(@opts);
+  }
+  if($client) {
+    $hash->{FD}    = $client->fileno();
+    $hash->{CD}    = $client;         # sysread / close won't work on fileno
+    $hash->{BUF}   = "";
+    $hash->{CONNECTS}++;
+    $selectlist{$name} = $hash;
+    $hash->{STATE} = "Connected";
+    RemoveInternalTimer($hash);
+    Log(GetLogLevel($name,3), "$name: connected to $server:$port");
+
+  } else {
+    telnet_ClientDisconnect($hash, 1);
+
+  }
+}
+
+##########################
+sub
+telnet_ClientDisconnect($$)
+{
+  my ($hash, $connect) = @_;
+  my $name   = $hash->{NAME};
+  close($hash->{CD}) if($hash->{CD});
+  delete($hash->{FD});
+  delete($hash->{CD});
+  delete($selectlist{$name});
+  $hash->{STATE} = "Disconnected";
+  InternalTimer(gettimeofday()+AttrVal($name, "connectInterval", 60),
+                "telnet_ClientConnect", $hash, 0);
+  if($connect) {
+    Log GetLogLevel($name,4), "$name: Connect failed.";
+  } else {
+    Log GetLogLevel($name,3), "$name: Disconnected";
+  }
+}
+
+##########################
+sub
 telnet_Define($$$)
 {
   my ($hash, $def) = @_;
 
   my @a = split("[ \t][ \t]*", $def);
   my ($name, $type, $port, $global) = split("[ \t]+", $def);
-  return "Usage: define <name> telnet [IPV6:]<tcp-portnr> [global]"
-        if($port !~ m/^(IPV6:)?\d+$/ || ($global && $global ne "global"));
 
-  my $ret = TcpServer_Open($hash, $port, $global);
+  my $isServer = 1 if($port && $port =~ m/^(IPV6:)?\d+$/);
+  my $isClient = 1 if($port && $port =~ m/^(IPV6:)?.*:\d+$/);
+
+  return "Usage: define <name> telnet { [IPV6:]<tcp-portnr> [global] | ".
+                                      " [IPV6:]serverName:port }"
+        if(!($isServer || $isClient) ||
+            ($isClient && $global) ||
+            ($global && $global ne "global"));
 
   # Make sure that fhem only runs once
-  if($ret && !$init_done) {
-    Log 1, "$ret. Exiting.";
-    exit(1);
+  if($isServer) {
+    my $ret = TcpServer_Open($hash, $port, $global);
+    if($ret && !$init_done) {
+      Log 1, "$ret. Exiting.";
+      exit(1);
+    }
+    return $ret;
   }
-  return $ret;
 
+  if($isClient) {
+    $hash->{isClient} = 1;
+    telnet_ClientConnect($hash);
+  }
 }
 
 sub
@@ -97,16 +166,22 @@ telnet_Read($)
   my $buf;
   my $ret = sysread($hash->{CD}, $buf, 256);
   if(!defined($ret) || $ret <= 0) {
-    CommandDelete(undef, $name);
+    if($hash->{isClient}) {
+      telnet_ClientDisconnect($hash, 0);
+    } else {
+      CommandDelete(undef, $name);
+    }
     return;
   }
+
   if(ord($buf) == 4) {	# EOT / ^D
     CommandQuit($hash, "");
     return;
   }
 
   $buf =~ s/\r//g;
-  my $pw = telnet_pw($hash->{SNAME}, $name);
+  my $sname = ($hash->{isClient} ? $name : $hash->{SNAME});
+  my $pw = telnet_pw($sname, $name);
   if($pw) {
     $buf =~ s/\xff..//g;              # Telnet IAC stuff
     $buf =~ s/\xfd(.)//;              # Telnet Do ?
@@ -136,7 +211,12 @@ telnet_Read($)
           $hash->{pwEntered} = 1;
           next;
         } else {
-          CommandDelete(undef, $name);
+          if($hash->{isClient}) {
+            telnet_ClientDisconnect($hash, 0);
+          } else {
+            delete($hash->{rcvdQuit});
+            CommandDelete(undef, $name);
+          }
           return;
         }
       }
@@ -175,8 +255,17 @@ telnet_Read($)
       last if(!$l || $l == length($ret));
       $ret = substr($ret, $l);
     }
+    $hash->{CD}->flush();
+
   }
-  CommandDelete(undef, $name) if($hash->{rcvdQuit});
+  if($hash->{rcvdQuit}) {
+    if($hash->{isClient}) {
+      delete($hash->{rcvdQuit});
+      telnet_ClientDisconnect($hash, 0);
+    } else {
+      CommandDelete(undef, $name);
+    }
+  }
 }
 
 ##########################
@@ -188,6 +277,10 @@ telnet_Attr(@)
 
   if($a[0] eq "set" && $a[2] eq "SSL") {
     TcpServer_SetSSL($hash);
+    if($hash->{CD}) {
+      my $ret = IO::Socket::SSL->start_SSL($hash->{CD});
+      Log 1, "$hash->{NAME} start_SSL: $ret" if($ret);
+    }
   }
   return undef;
 }
@@ -211,30 +304,48 @@ telnet_Undef($$)
   <a name="telnetdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code>
+    <code>define &lt;name&gt; telnet &lt;portNumber&gt; [global]</code><br>
+    or<br>
+    <code>define &lt;name&gt; telnet &lt;servername&gt:&lt;portNumber&gt;</code>
     <br><br>
 
+    First form, <b>server</b> mode:<br>
     Listen on the TCP/IP port <code>&lt;portNumber&gt;</code> for incoming
     connections. If the second parameter global is <b>not</b> specified,
     the server will only listen to localhost connections.
-    <br><br>
-
+    <br>
     To use IPV6, specify the portNumber as IPV6:&lt;number&gt;, in this
     case the perl module IO::Socket:INET6 will be requested.
     On Linux you may have to install it with cpan -i IO::Socket::INET6 or
     apt-get libio-socket-inet6-perl; OSX and the FritzBox-7390 perl already has
-    this module.
-    <br><br>
+    this module.<br>
     Examples:
     <ul>
         <code>define tPort telnet 7072 global</code><br>
         <code>attr tPort globalpassword mySecret</code><br>
         <code>attr tPort SSL</code><br>
     </ul>
-    <br>
     Note: The old global attribute port is automatically converted to a
     telnet instance with the name telnetPort. The global allowfrom attibute is
     lost in this conversion.
+
+    <br><br>
+    Second form, <b>client</b> mode:<br>
+    Connect to the specified server port, and execute commands received from
+    there just like in server mode. This can be used to connect to a fhem
+    instance sitting behind a firewall, when installing exceptions in the
+    firewall is not desired or possible. Note: this client mode supprts SSL,
+    but not IPV6.<br>
+    Example:
+    <ul>
+      Start tcptee first on publicly reachable host outside the firewall.<ul>
+        perl contrib/tcptee.pl --bidi 3000</ul>
+      Configure fhem inside the firewall:<ul>
+        define tClient telnet &lt;tcptee_host&gt;:3000</ul>
+      Connect to the fhem from outside of the firewall:<ul>
+        telnet &lt;tcptee_host&gt; 3000</ul>
+    </ul>
+
   </ul>
   <br>
 
@@ -290,6 +401,19 @@ telnet_Undef($$)
         Regexp of allowed ip-addresses or hostnames. If set,
         only connections from these addresses are allowed.
         </li><br>
+
+    <a name="connectTimeout"></a>
+    <li>connectTimeout<br>
+        Wait at maximum this many seconds for the connection to be established.
+        Default is 2.
+        </li><br>
+
+    <a name="connectInterval"></a>
+    <li>connectInterval<br>
+        After closing a connection, or if a connection cannot be estblished,
+        try to connect again after this many seconds. Default is 60.
+        </li><br>
+
 
   </ul>
 
