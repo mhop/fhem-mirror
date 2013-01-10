@@ -478,7 +478,7 @@ YAMAHA_AVR_SendCommand($$;$)
     
     $response = CustomGetFileFromURL(0, "http://".$address."/YamahaRemoteControl/ctrl", 10, "<?xml version=\"1.0\" encoding=\"utf-8\"?>".$command, 0, ($hash->{helper}{AVAILABLE} ? $loglevel : 5));
     
-    Log GetLogLevel($name, 5), "YAMAHA_AVR: got response for $name: $response";
+    Log GetLogLevel($name, 5), "YAMAHA_AVR: got response for $name: $response" if(defined($response));
     
     unless(defined($response))
     {
