@@ -10,10 +10,11 @@ my $bidi;
 my $loop;
 my $myIp;
 my $myPort;
+my $ssl;
 my $serverHost;
 my $serverPort;
-my $usage = "Usage: tcptee.pl [--bidi] [--loop] " .
-            "[myIp:]myPort:serverHost:serverPort\n";
+my $usage = "Usage: tcptee.pl [--bidi] [--loop] [--ssl] " .
+            "[myIp:]myPort[:serverHost:serverPort]\n";
 
 while(@ARGV) {
   my $opt = shift @ARGV;
@@ -24,13 +25,19 @@ while(@ARGV) {
   } elsif($opt =~ m/^--loop$/i) {
     $loop = 1
 
-  } elsif($opt =~ m/^(.*):(\d+):(.*):(\d+)/) {
+  } elsif($opt =~ m/^--ssl$/i) {
+    $ssl = 1
+
+  } elsif($opt =~ m/^(\d+)$/) {
+    $myPort = $opt;
+
+  } elsif($opt =~ m/^(.*):(\d+):(.*):(\d+)$/) {
     $myIp = $1;
     $myPort = $2;
     $serverHost = $3;
     $serverPort = $4;
 
-  } elsif($opt =~ m/^(\d+):(.*):(\d+)/) {
+  } elsif($opt =~ m/^(\d+):(.*):(\d+)$/) {
     $myPort = $1;
     $serverHost = $2;
     $serverPort = $3;
@@ -41,9 +48,9 @@ while(@ARGV) {
   }
 }
 
-die $usage if(!$serverHost);
-
 my ($sfd, $myfd, %clients, $discoMsg);
+
+die $usage if(!$myPort);
 
 sub
 tPrint($)
@@ -58,16 +65,18 @@ tPrint($)
 for(;;) {
 
   # Open the server first
-  $sfd = IO::Socket::INET->new(PeerAddr => "$serverHost:$serverPort");
-  if(!$sfd) {
-    tPrint "Cannot connect to $serverHost:$serverPort : $!" if(!$discoMsg);
+  if($serverHost) {
+    $sfd = IO::Socket::INET->new(PeerAddr => "$serverHost:$serverPort");
+    if(!$sfd) {
+      tPrint "Cannot connect to $serverHost:$serverPort : $!" if(!$discoMsg);
+      $discoMsg = 1;
+      last if(!$loop);
+      sleep(5);
+      next;
+    }
     $discoMsg = 1;
-    last if(!$loop);
-    sleep(5);
-    next;
+    tPrint "Connected to $serverHost:$serverPort";
   }
-  $discoMsg = 1;
-  tPrint "Connected to $serverHost:$serverPort";
 
 
   # Now open our listener
@@ -85,7 +94,7 @@ for(;;) {
   # Data loop
   for(;;) {
     my ($rin,$rout) = ('','');
-    vec($rin, $sfd->fileno(),  1) = 1;
+    vec($rin, $sfd->fileno(),  1) = 1 if($sfd);
     vec($rin, $myfd->fileno(), 1) = 1;
     foreach my $c (keys %clients) {
       vec($rin, fileno($clients{$c}{fd}), 1) = 1;
@@ -110,11 +119,29 @@ for(;;) {
       $clients{$fd}{addr} = inet_ntoa($iaddr) . ":$port";
       tPrint "Connection accepted from $clients{$fd}{addr}";
 
+      if($ssl) {
+        tPrint "Attaching SSL";
+        eval "require IO::Socket::SSL";
+        if($@) {
+          tPrint "Can't load IO::Socket::SSL, falling back to plain";
+        } else {
+          my $ret = IO::Socket::SSL->start_SSL($fd, {
+            SSL_server    => 1, 
+            SSL_key_file  => "certs/server-key.pem",
+            SSL_cert_file => "certs/server-cert.pem",
+          });
+          if(!$ret && $! ne "Socket is not connected") {
+            die "SSL/HTTPS error: $!";
+          }
+        }
+      }
+
+
       syswrite($fd, $firstmsg) if($firstmsg);
     }
 
     # Data from the server
-    if(vec($rout, $sfd->fileno(), 1)) {
+    if($sfd && vec($rout, $sfd->fileno(), 1)) {
       my $buf;
       my $ret = sysread($sfd, $buf, 256);
       if(!defined($ret) || $ret <= 0) {
@@ -123,33 +150,37 @@ for(;;) {
       }
       foreach my $c (keys %clients) {
         syswrite($clients{$c}{fd}, $buf);
+        $clients{$c}{fd}->flush();
       }
       $firstmsg = $buf if(!$firstmsg);
     }
 
     # Data from one of the clients
-    foreach my $c (keys %clients) {
+CLIENT:foreach my $c (keys %clients) {
       next if(!vec($rout, fileno($clients{$c}{fd}), 1));
-      my $buf;
-      my $ret = sysread($clients{$c}{fd}, $buf, 256);
-      if(!defined($ret) || $ret <= 0) {
-        close($clients{$c}{fd});
-        tPrint "Client $clients{$c}{addr} left us";
-        delete($clients{$c});
-        next;
-      }
-
-      syswrite($sfd, $buf);
-      if($bidi) {
-        foreach my $c2 (keys %clients) {
-          syswrite($clients{$c2}{fd}, $buf) if($c2 ne $c);
+      for(;;) {
+        my $buf;
+        my $ret = sysread($clients{$c}{fd}, $buf, 256);
+        if(!defined($ret) || $ret <= 0) {
+          close($clients{$c}{fd});
+          tPrint "Client $clients{$c}{addr} left us";
+          delete($clients{$c});
+          next CLIENT;
         }
+
+        syswrite($sfd, $buf) if($sfd);
+        if($bidi) {
+          foreach my $c2 (keys %clients) {
+            syswrite($clients{$c2}{fd}, $buf) if($c2 ne $c);
+          }
+        }
+        last if(!$ssl || !$clients{$c}{fd}->pending());
       }
     }
 
   }
 
-  close($sfd);
+  close($sfd) if($sfd);
   close($myfd);
   foreach my $c (keys %clients) {
     close($clients{$c}{fd});
