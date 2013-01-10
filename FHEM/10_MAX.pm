@@ -471,8 +471,41 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "maxValveSetting", $args[9]) if($shash->{type} eq "HeatingThermostat");
     readingsBulkUpdate($shash, "valveOffset", $args[10]) if($shash->{type} eq "HeatingThermostat");
     readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
-    #readingsBulkUpdate($shash, "weekProfile", "$args[13]");
+
     $shash->{internal}{weekProfile} = $args[13];
+    #parse weekprofiles for each day
+    for (my $i=0;$i<7;$i++) {
+      my (@time_prof, @temp_prof);
+      for(my $j=0;$j<13;$j++) {
+        @time_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))& 0x1FF) * 5;
+        @temp_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
+      }
+
+      my @hours;
+      my @minutes;
+      my $j;
+      for($j=0;$j<13;$j++) {
+        $hours[$j] = ($time_prof[$j] / 60 % 24);
+        $minutes[$j] = ($time_prof[$j]%60);
+        #if 00:00 reached, last point in profile was found
+        last if(int($hours[$j])==0 && int($minutes[$j])==0 );
+      }
+
+      my $time_prof_str = "00:00";
+      my $temp_prof_str;
+      for (my $k=0;$k<=$j;$k++) {
+        $time_prof_str .= sprintf("-%02d:%02d", $hours[$k], $minutes[$k]);
+        $temp_prof_str .= $temp_prof[$k];
+        if ($k < $j) {
+          $time_prof_str .= "  /  " . sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
+          $temp_prof_str .= "  /  ";
+        }
+     }
+
+     readingsBulkUpdate($shash, "weekprofile-$decalcDays[$i]-time", $time_prof_str );
+     readingsBulkUpdate($shash, "weekprofile-$decalcDays[$i]-temp", $temp_prof_str );
+
+     } # Endparse weekprofiles for each day
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {
