@@ -822,6 +822,7 @@ sub OWXMULTI_SetValues($@) {
 
 =pod
 =begin html
+
  <a name="OWMULTI"></a>
         <h3>OWMULTI</h3>
         <p>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery
@@ -923,7 +924,7 @@ sub OWXMULTI_SetValues($@) {
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
-
         </ul>
+        
 =end html
 =cut
