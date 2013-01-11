@@ -670,8 +670,8 @@ CUL_HM_Parse($$)
     if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($msgType eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
 	    ($msgType eq "41"))                { 
-	  my $co2Lvl = hex(substr($p,4,2));
-	  my %lvl=(0=>"normal",100=>"added",200=>"addedStrong");
+	  my $co2Lvl = substr($p,4,2);
+	  my %lvl=("00"=>"normal","64"=>"added","C8"=>"addedStrong");
 	  push @event, "state:".$lvl{$co2Lvl};
 	}
   }
@@ -738,6 +738,11 @@ CUL_HM_Parse($$)
         push @event, "$eventName:up:$val"   if(($err&0x30) == 0x10);
         push @event, "$eventName:down:$val" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$val" if(($err&0x30) == 0x00);
+	  }
+	  if ($st eq "dimmer"){
+        push @event, "overload:".(($err&0x02)?"on":"off");
+        push @event, "overheat:".(($err&0x04)?"on":"off");
+        push @event, "reduced:" .(($err&0x08)?"on":"off");
 	  }
 	  push @event, "battery:" . (($err&0x80) ? "low" : "ok" )
 	           if(($model eq "HM-LC-SW1-BA-PCB")&&($err&0x80));
@@ -1195,6 +1200,12 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   SwJtOff         =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
   SwJtDlyOn       =>{a=> 12.0,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOn" ,lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
   SwJtDlyOff      =>{a=> 12.4,s=>0.4,l=>3,min=>0  ,max=>6       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from delayOff",lit=>{no=>0,dlyOn=>1,on=>3,dlyOff=>4,off=>6}},
+
+  KeyJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,dlyUnlock=>1,rampUnlock=>2,lock=>3,dlyLock=>4,rampLock=>5,lock=>6,open=>8}},
+  KeyJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,dlyUnlock=>1,rampUnlock=>2,lock=>3,dlyLock=>4,rampLock=>5,lock=>6,open=>8}},
+  
+  CtValLo         =>{a=>  4.0,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Condition value low for CT table"  },
+  CtValHi         =>{a=>  5.0,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Condition value high for CT table" },
   
   CtOn            =>{a=>  3.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from On"       ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtOff           =>{a=>  3.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from Off"      ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
@@ -1202,9 +1213,9 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   CtDlyOff        =>{a=>  2.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from delayOff" ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtRampOn        =>{a=>  1.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOn"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
   CtRampOff       =>{a=>  1.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from rampOff"  ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtRefOn         =>{a=> 28.0,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOn"    ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
+  CtRefOff        =>{a=> 28.4,s=>0.4,l=>3,min=>0  ,max=>5       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jmp on condition from refOff"   ,lit=>{geLo=>0,geHi=>1,ltLo=>2,ltHi=>3,between=>4,outside=>5}},
 );
-
-
 
 my %culHmRegDefine = (
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
@@ -1213,6 +1224,8 @@ my %culHmRegDefine = (
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"fliptime up <=>down"},
+  refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"reference run counter"},
+  
   lgMultiExec     =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
 #remote mainly                                                                                      
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Language 0:English, 1:German"},
@@ -1285,11 +1298,12 @@ my %culHmRegDefine = (
   signalTone      =>{a=>  3.6,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                 ,lit=>{off=>0,on=>1}},
   holdTime        =>{a=> 20  ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
+  holdPWM         =>{a=> 21  ,s=>1,  l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Holdtime pulse wide modulation"},
   setupDir        =>{a=> 22  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
-  setupPosition   =>{a=> 23  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Rotation angle neutral position"},
-  angelOpen       =>{a=> 24  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Door opening angle"},
-  angelMax        =>{a=> 25  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Angle locked"},
-  angelLocked     =>{a=> 26  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>15      ,u=>'%'   ,d=>0,t=>"Angle Locked position"},
+  setupPosition   =>{a=> 23  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Rotation angle neutral position"},
+  angelOpen       =>{a=> 24  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Door opening angle"},
+  angelMax        =>{a=> 25  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Angle maximum"},
+  angelLocked     =>{a=> 26  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Angle Locked position"},
   ledFlashUnlocked=>{a=> 31.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
   ledFlashLocked  =>{a=> 31.6,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
 # sec_mdir                                                                                   
@@ -1312,14 +1326,17 @@ my %culHmRegGeneral = (
 	);
 my %culHmRegType = (
   remote=> {expectAES=>1,peerNeedsBurst=>1,dblPress=>1,longPress=>1},
-  blindActuator=> {driveUp         =>1,driveDown       =>1,driveTurn       =>1,maxTimeF        =>1,                                    
+  blindActuator=> {driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
+                   TransmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,
+                   maxTimeF        =>1,                                    
                    OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
   	   		       OffLevel        =>1,OnLevel         =>1,                                    
                    ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,DriveMode       =>1,
 				   BlJtOn          =>1,BlJtOff         =>1,BlJtDlyOn       =>1,BlJtDlyOff      =>1,
                    BlJtRampOn      =>1,BlJtRampOff     =>1,BlJtRefOn       =>1,BlJtRefOff      =>1,
-                   CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
-				   CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
+                   CtValLo         =>1,CtValHi         =>1,
+                   CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,CtRefOn         =>1,
+				   CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1,
 				   lgMultiExec     =>1,
 				   },
   dimmer=> {TransmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction	  =>1,
@@ -1331,12 +1348,14 @@ my %culHmRegType = (
 			DimMinLvl       =>1,DimMaxLvl       =>1,DimStep         =>1,
             DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,
             DimJtDlyOff     =>1,DimJtRampOn     =>1,DimJtRampOff    =>1,
+            CtValLo         =>1,CtValHi         =>1,
             CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
             CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
 			lgMultiExec     =>1,
 			},
   switch=> {OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly            =>1,
             SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff        =>1,
+            CtValLo         =>1,CtValHi         =>1,
             CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff          =>1,
 			ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
  		    lgMultiExec     =>1,
@@ -1347,9 +1366,12 @@ my %culHmRegType = (
 			},                                  
   keyMatic=>{                                   
 			signal          =>1,signalTone      =>1,keypressSignal  =>1,
-			holdTime        =>1,setupDir        =>1,setupPosition   =>1,
+			holdTime        =>1,holdPWM         =>1,setupDir        =>1,setupPosition   =>1,
 			angelOpen       =>1,angelMax        =>1,angelLocked     =>1,
 			ledFlashUnlocked=>1,ledFlashLocked  =>1,
+            CtValLo         =>1,CtValHi         =>1,
+            CtOn            =>1,CtOff           =>1,
+            KeyJtOn         =>1,KeyJtOff        =>1,
 			},
   motionDetector=>{
             evtFltrPeriod =>1,evtFltrNum      =>1,minInterval     =>1,
@@ -1379,6 +1401,7 @@ my %culHmRegModel = (
   "HM-OU-CFM-PL"   =>{localResetDis   =>1,
   			          OnTime          =>1,OffTime         =>1, OnDly          =>1,OffDly          =>1,
                       SwJtOn          =>1,SwJtOff         =>1,SwJtDlyOn       =>1,SwJtDlyOff      =>1,
+                      CtValLo         =>1,CtValHi         =>1,
                       CtOn            =>1,CtDlyOn         =>1,CtOff           =>1,CtDlyOff        =>1,
 			          OnTimeMode      =>1,OffTimeMode     =>1, 
 			          ActType         =>1,ActNum          =>1},
