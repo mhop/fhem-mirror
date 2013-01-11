@@ -149,11 +149,17 @@ MAX_CheckIODev($)
 }
 
 sub
+MAX_ParseTemperature($)
+{
+  return @_[0] eq "on" ? 30.5 : (@_[0] eq "off" ? 4.5 :@_[0]);
+}
+
+sub
 MAX_ReadingsVal(@)
 {
   my ($hash,$name) = @_;
 
-  my $val = ReadingsVal($hash->{NAME},$name,"");
+  my $val = MAX_ParseTemperature(ReadingsVal($hash->{NAME},$name,""));
   #$readingDef{$name} array is [min, max, default]
   if(exists($readingDef{$name}) and
     ($val eq "" or $val !~ /^-?(\d+\.?\d*|\.\d+)$/ or $val < $readingDef{$name}[0] or $val > $readingDef{$name}[1])) {
@@ -199,12 +205,8 @@ MAX_Set($@)
     } elsif($args[0] eq "comfort") {
       $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
       return "No comfortTemperature defined" if(!$temperature);
-    } elsif($args[0] eq "on") {
-      $temperature = 30.5;
-    } elsif($args[0] eq "off") {
-      $temperature = 4.5;
     }else{
-      $temperature = $args[0];
+      $temperature = MAX_ParseTemperature($args[0]);
     }
 
     if(@args > 1 and ($args[1] eq "until") and ($ctrlmode == 1)) {
@@ -242,12 +244,12 @@ MAX_Set($@)
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
 
-    my $comfort = int($comfortTemperature*2);
-    my $eco = int($ecoTemperature*2);
-    my $max = int($maximumTemperature*2);
-    my $min = int($minimumTemperature*2);
+    my $comfort = int(MAX_ParseTemperature($comfortTemperature)*2);
+    my $eco = int(MAX_ParseTemperature($ecoTemperature)*2);
+    my $max = int(MAX_ParseTemperature($maximumTemperature)*2);
+    my $min = int(MAX_ParseTemperature($minimumTemperature)*2);
     my $offset = int(($measurementOffset + 3.5)*2);
-    my $windowOpenTemp = int($windowOpenTemperature*2);
+    my $windowOpenTemp = int(MAX_ParseTemperature($windowOpenTemperature)*2);
     my $windowOpenTime = int($windowOpenDuration/5);
 
     my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,0x11,0x00,0x00,0x00,$hash->{addr},0x00,
@@ -292,7 +294,7 @@ MAX_Set($@)
     return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
 
   }else{
-    my $templist = join(",",map { sprintf("%2.1f",$_/2) }  (9..61));
+    my $templist = "off,".join(",",map { sprintf("%2.1f",$_/2) }  (10..60)) . ",on";
     my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid";
 
     my $assoclist;
@@ -642,7 +644,7 @@ MAX_Parse($$)
     <li>maximumTemperature &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given maximum temperature to the device's memory. It confines the temperature that can be manually set on the device.</li>
     <li>windowOpenTemperature &lt;value&gt;<br>
-            For devices of type HeatingThermostat only. Writes the given window open temperature to the device's memory. That is the temperature the heater will temporarily set if an open window is detected.</li>
+            For devices of type HeatingThermostat only. Writes the given window open temperature to the device's memory. That is the temperature the heater will temporarily set if an open window is detected. Setting it to 4.5 degree or "off" will turn off reacting on open windows.</li>
     <li>windowOpenDuration &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open duration to the device's memory. That is the duration the heater will temporarily set the window open temperature if an open window is detected by a rapid temperature decrease. (Not used if open window is detected by ShutterControl. Must be between 0 and 60 minutes in multiples of 5.</li>
     <li>factoryReset<br>
