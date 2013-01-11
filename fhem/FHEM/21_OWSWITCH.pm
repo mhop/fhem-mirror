@@ -74,7 +74,7 @@ use warnings;
 sub Log($$);
 
 #-- channel name - fixed is the first array, variable the second 
-my @owg_fixed = ("A","B","C","D","E","F","G","H");
+my @owg_fixed  = ("A","B","C","D","E","F","G","H");
 my @owg_channel;
 #-- channel values - always the raw input resp. output values from the device
 my @owg_val;
@@ -132,12 +132,12 @@ sub OWSWITCH_Initialize ($) {
     "event-on-update-reading event-on-change-reading ".
     "stateS ";
  
- #TODO: correct number of channels
- 
+  #-- correct list of attributes
   for( my $i=0;$i<8;$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Unit";
   }
+ 
   $hash->{AttrList} = $attlist; 
 }
 
@@ -187,16 +187,20 @@ sub OWSWITCH_Define ($$) {
   #   YY must be determined from id
   if( $model eq "DS2413" ){
     $fam = "3A";
+    @owg_fixed = ("A","B");
     CommandAttr (undef,"$name model DS2413"); 
   }elsif( $model eq "DS2406" ){
     $fam = "12";
+    @owg_fixed = ("A","B");
     CommandAttr (undef,"$name model DS2406"); 
   }elsif( $model eq "DS2408" ){
     $fam = "29";
+    @owg_fixed = ("A","B","C","D","E","F","G","H");
     CommandAttr (undef,"$name model DS2408"); 
   }else{
     return "OWSWITCH: Wrong 1-Wire device model $model";
   }
+  
   #--   determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
@@ -304,7 +308,7 @@ sub OWSWITCH_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
-  my ($offset,$factor,$vval,$vvax,$vstr,$cname,@cnama,@unarr,$valid);
+  my ($offset,$factor,$vval,$vvax,$vstr,$cname,$unit,@unarr,@cnama,$valid);
   my $svalue  = ""; 
   
   #-- external shortening signature
@@ -325,8 +329,8 @@ sub OWSWITCH_FormatValues($) {
     $vvax    = $owg_vax[$i];
  
     #-- string buildup for return value and STATE
-    @unarr= split(/\|/,$hash->{READINGS}{"$owg_channel[$i]"}{UNIT});
-   
+    $unit = defined($attr{$name}{$owg_fixed[$i]."Unit"})  ? $attr{$name}{$owg_fixed[$i]."Unit"} : "ON|OFF";
+    @unarr= split(/\|/,$unit);
     $vstr    = $unarr[$vval];
     
     #-- put into readings only when valid
@@ -419,7 +423,7 @@ sub OWSWITCH_Get($@) {
         last;
       }
     }
-    return "OWSWITCH: invalid output address, must be A,B,... or defined channel name"
+    return "OWSWITCH: invalid input address, must be A,B,... or defined channel name"
       if( !defined($fnd) );
 
     #-- OWX interface
@@ -780,10 +784,9 @@ sub OWXSWITCH_GetState($) {
       if (ord($data[9])!=255); 
     return "invalid CRC"
       if( OWX_CRC16(substr($res,9,11),$data[11],$data[12]) == 0);  
-
     for(my $i=0;$i<8;$i++){
-      $owg_val[$i] = (ord($data[2])>>$i) & 1;
-      $owg_vax[$i] = (ord($data[3])>>$i) & 1;
+      $owg_val[$i] = (ord($data[3])>>$i) & 1;
+      $owg_vax[$i] = (ord($data[4])>>$i) & 1;
     }
     
   #-- family = 3A => DS2413
@@ -949,6 +952,7 @@ sub OWXSWITCH_SetState($$) {
 
 =pod
 =begin html
+
 <body>
         <h3>OWSWITCH</h3>
         <p>FHEM module to commmunicate with 1-Wire Programmable Switches <br /><br /> Note:<br />
@@ -1047,5 +1051,6 @@ sub OWXSWITCH_SetState($$) {
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
+        
 =end html
 =cut
