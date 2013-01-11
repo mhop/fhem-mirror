@@ -25,6 +25,7 @@
 
 # Todos:
 # - stateFormat via Interface
+# - warum wird jeder Wert 2x geloggt?
 
 package main;
 
@@ -336,9 +337,9 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
-  $hash->{AttrFn}     = "OWDevice_Attr";
+  $hash->{AttrFn}    = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
+  $hash->{AttrList}  = "IODev trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
                        $readingFnAttributes;
 }
 
@@ -704,6 +705,14 @@ OWDevice_Define($$)
   <a name="OWDeviceattr"></a>
   <b>Attributes</b>
   <ul>
+    <a name="IODev"></a>
+    <li>IODev:
+        Set the OWServer device which should be used for sending and receiving data
+        for this OWDevice. Note: Upon startup fhem assigns each OWDevice
+        to the last previously defined OWServer. Thus it is best if you define OWServer
+        and OWDevices in blocks: first define the first OWServer and the OWDevices that
+        belong to it, then continue with the next OWServer and the attached OWDevices, and so on.
+    </li>
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>
