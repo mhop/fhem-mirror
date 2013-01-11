@@ -787,7 +787,7 @@ sub OWXTHERM_SetValues($@) {
     return "OWXTHERM: Device $owx_dev not accessible"; 
   } 
   
-  DoTrigger($name, undef) if($init_done);
+  #DoTrigger($name, undef) if($init_done);
   return undef;
 }
 
@@ -795,6 +795,7 @@ sub OWXTHERM_SetValues($@) {
 
 =pod
 =begin html
+
      <a name="OWTHERM"></a>
         <h3>OWTHERM</h3>
         <p>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br /><br />
@@ -811,26 +812,29 @@ sub OWXTHERM_SetValues($@) {
         </p><br />
         <a name="OWTHERMdefine"></a>
         <h4>Define</h4>
-        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
-        <br /><br /> Define a 1-Wire digital thermometer device.<br /><br />
         <p>
+        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+        <br /><br /> Define a 1-Wire digital thermometer device.</p>
+        <ul>
+          <li>
             <code>[&lt;model&gt;]</code><br /> Defines the thermometer model (and thus 1-Wire family
             id) currently the following values are permitted: </p>
-        <ul>
-            <li>model DS1820 with family id 10 (default if the model parameter is omitted)</li>
-            <li>model DS1822 with family id 22</li>
-            <li>model DS18B20 with family id 28</li>
-        </ul>
-        <p>
+            <ul>
+              <li>model DS1820 with family id 10 (default if the model parameter is omitted)</li>
+              <li>model DS1822 with family id 22</li>
+              <li>model DS18B20 with family id 28</li>
+          </ul>
+          </li>
+          <li>
             <code>&lt;id&gt;</code>
             <br />12-character unique ROM id of the thermometer device without family id and CRC
-            code </p>
-        <p>
+            code 
+         </li>
+          <li>
             <code>&lt;interval&gt;</code>
-            <br /> Temperature measurement interval in seconds. The default is 300 seconds. </p>
-        <br /> Example: <br />
-        <code>define Temp1 OWTHERM 14B598010800 300 </code><br />
-        <br />
+            <br /> Temperature measurement interval in seconds. The default is 300 seconds. 
+         </li>
+        </ul>
         <a name="OWTHERMset"></a>
         <h4>Set</h4>
         <ul>
@@ -900,5 +904,6 @@ sub OWXTHERM_SetValues($@) {
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
+        
 =end html
 =cut

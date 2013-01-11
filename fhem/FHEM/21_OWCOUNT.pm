@@ -48,7 +48,7 @@
 #           where midnight is stored as string in the 32 byte memory associated with the counter
 #
 # Log Lines
-#    after each interval <date> <name> <channel>: <value> <unit> <value> <unit>/<period> <channel>: <value> <unit> <value> <unit>/<period> 
+#    after each interval <date> <name> <channel>: <value> <unit> <value> / <unit>/<period> <channel>: <value> <unit> / <value> <unit>/<period> 
 #          example: 2012-07-30_00:07:55 OWX_C Taste:  17.03 p 28.1 p/h B:  7.0 cts 0.0 cts/min
 #    after midnight <new date> <name> <old day> <old date> <channel>: <value> <unit> <channel>: <value> <unit>   
 #          example: 2012-07-30_00:00:57 OWX_C D_29: 2012-7-29_23:59:59 Taste: 110.0 p, B:   7.0 cts
@@ -980,6 +980,7 @@ sub OWXCOUNT_SetPage($$$) {
 
 =pod
 =begin html
+
 <a name="OWCOUNT"></a>
         <h3>OWCOUNT</h3>
         <p>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #<br /><br /> Note:<br /> This
@@ -1085,5 +1086,6 @@ sub OWXCOUNT_SetPage($$$) {
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
+        
 =end html
 =cut
