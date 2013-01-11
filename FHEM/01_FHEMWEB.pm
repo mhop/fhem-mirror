@@ -486,7 +486,8 @@ FW_answerCall($)
     my $c = $me->{CD};
     print $c "HTTP/1.1 200 OK\r\n",
        $FW_headercors,
-       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n";
+       "Content-Type: application/octet-stream; charset=$FW_encoding\r\n\r\n",
+       FW_roomStatesForInform($FW_room);
     return -1;
   }
 
@@ -1090,7 +1091,7 @@ FW_showRoom()
 
     FW_pO "\n<tr><td><div class=\"devType\">$g</div></td></tr>";
     FW_pO "<tr><td>";
-    FW_pO "<table class=\"block wide\" id=\"$g\">";
+    FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
 
     foreach my $d (sort { lc(AttrVal($a,"alias",$a)) cmp 
                           lc(AttrVal($b,"alias",$b)) } keys %{$group{$g}}) {
@@ -2449,6 +2450,21 @@ FW_dumpFileLog($$$)
 }
 
 sub
+FW_roomStatesForInform($)
+{
+  my ($room) = @_;
+  return "" if(!$room);
+
+  my $data = "";
+  my @rl = devspec2array("room=$room");
+  foreach my $dn (@rl) {
+    my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
+    $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n";
+  }
+  return $data;
+}
+
+sub
 FW_Notify($$)
 {
   my ($ntfy, $dev) = @_;
@@ -2462,6 +2478,7 @@ FW_Notify($$)
 
   my $rn = AttrVal($dn, "room", "");
   if($filter eq "all" || $rn =~ m/\b$filter\b/) {
+    # Why is saving this stuff needed? FLOORPLAN?
     my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
@@ -2471,7 +2488,7 @@ FW_Notify($$)
     $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
     ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir) = @old;
-    $data = "$dn;$dev->{STATE};$txt\n";
+    $data = "$dn<<$dev->{STATE}<<$txt\n";
 
   } elsif($filter eq "console") {
     if($dev->{CHANGED}) {    # It gets deleted sometimes (?)

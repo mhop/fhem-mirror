@@ -30,7 +30,7 @@ FW_doUpdate()
   //We wait until it is complete, i.e. terminated by "\n"
   lines.pop();
   for(var i=FW_curLine; i < lines.length; i++) {
-    var d = lines[i].split(";", 3);    // Complete arg
+    var d = lines[i].split("<<", 3);    // Complete arg
     if(d.length != 3)
       continue;
     var el = document.getElementById(d[0]);
@@ -66,7 +66,7 @@ FW_longpoll()
 function
 FW_delayedStart()
 {
-  setTimeout("FW_longpoll()", 1000);
+  setTimeout("FW_longpoll()", 100);
 }
 /*************** LONGPOLL END **************/
 

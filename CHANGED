@@ -49,6 +49,7 @@
   - feature: stateFormat (readingsFn modules) and showInternalValues attributes
   - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWave
   - feature: telnet client mode
+  - bugfix:  FHEMWEB longpoll misses initial state change (HM: set_on vs. on)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
