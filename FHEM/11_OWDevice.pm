@@ -25,7 +25,6 @@
 
 # Todos:
 # - stateFormat via Interface
-# - warum wird jeder Wert 2x geloggt?
 
 package main;
 
@@ -42,9 +41,9 @@ $owdevice{"01"} = {
     # DS1990A - Serial Number iButton
     "read"      => [],
     "write"     => [],
-    "poll"      => [],
-    "state"     => [ qw(address) ],
-    "interface" => "serial",
+    "poll"      => [ qw(address) ],
+    "state"     => [],
+    "interface" => "id",
 };
 $owdevice{"05"} = {
     # DS2405 - Addressable Switch
@@ -290,6 +289,14 @@ $owdevice{"3B"} = {
     "alarm"     => 1,
     "interface" => "temperature",
 };
+$owdevice{"81"} = {
+    # USB id - ID found in DS2490R and DS2490B USB adapters 
+    "read"      => [],
+    "write"     => [],
+    "poll"      => [ qw(address) ],
+    "state"     => [],
+    "interface" => "id",
+};
 $owdevice{"FF"} = {
     # LCD - LCD controller by Louis Swart
     "read"      => [ qw(counters.0 counters.1 counters.2 counters.3 counters.ALL),
@@ -337,9 +344,10 @@ OWDevice_Initialize($)
   $hash->{GetFn}     = "OWDevice_Get";
   $hash->{SetFn}     = "OWDevice_Set";
   $hash->{DefFn}     = "OWDevice_Define";
+  $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "IODev trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
+  $hash->{AttrList}  = "trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
                        $readingFnAttributes;
 }
 
@@ -350,6 +358,7 @@ OWDevice_Initialize($)
 # 3rd element: array of setters/readings
 # 4th element: array of readings to be periodically updated
 # 5th element: array of readings to be written to state
+# 6th element: alerting device support
 sub
 OWDevice_GetDetails($) {
 
@@ -360,10 +369,11 @@ OWDevice_GetDetails($) {
   my @setters= @{$owdevice{$family}{"write"}};
   my @polls= @{$owdevice{$family}{"poll"}};
   my @state= @{$owdevice{$family}{"state"}};
+  my $alerting= ($owdevice{$family}{"alarm"}) ? 1 : 0;
       
   my $interface= $owdevice{$family}{"interface"};
   # http://perl-seiten.homepage.t-online.de/html/perl_array.html
-  return ($interface, \@getters, \@setters, \@polls, \@state);
+  return ($interface, \@getters, \@setters, \@polls, \@state, $alerting);
 }
 
 ###################################
@@ -371,9 +381,9 @@ OWDevice_GetDetails($) {
 # Read http://forum.fhem.de/index.php?t=tree&goto=54027&rid=10#msg_54027
 # to find out why.
 sub
-OWDevice_ReadFromServer($@)
+OWDevice_ReadFromServer($$@)
 {
-  my ($hash, @a) = @_;
+  my ($hash,$cmd,@a) = @_;
 
   my $dev = $hash->{NAME};
   return if(IsDummy($dev) || IsIgnored($dev));
@@ -387,7 +397,13 @@ OWDevice_ReadFromServer($@)
   }
 
   no strict "refs";
-  my $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
+  my $ret;
+  if($cmd eq "read") {
+    $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
+  }
+  if($cmd eq "dir") {
+    $ret = &{$modules{$iohash->{TYPE}}{DirFn}}($iohash, @a);
+  }
   use strict "refs";
   return $ret;
 }
@@ -399,12 +415,15 @@ OWDevice_ReadValue($$) {
         my ($hash,$reading)= @_;
         
         my $address= $hash->{fhem}{address};
-        my $value= OWDevice_ReadFromServer($hash, "/$address/$reading");
+        my $interface= $hash->{fhem}{interfaces};
+        my $value= OWDevice_ReadFromServer($hash,"read","/$address/$reading");
         #Debug "/$address/$reading => $value";  
-        if(defined($value)) {
-          $value= trim($value) if(AttrVal($hash,"trimvalues",1));
-        } else {
-          Log 3, $hash->{NAME} . ": reading $reading did not return a value";
+        if($interface ne "id") {
+          if(defined($value)) {
+            $value= trim($value) if(AttrVal($hash,"trimvalues",1));
+          } else {
+            Log 3, $hash->{NAME} . ": reading $reading did not return a value";
+          }
         }
         
         return $value;
@@ -429,7 +448,10 @@ OWDevice_UpdateValues($) {
 
         my @polls= @{$hash->{fhem}{polls}};
         my @getters= @{$hash->{fhem}{getters}};
-        my @state= @{$hash->{fhem}{currentstate}};
+        my @state= @{$hash->{fhem}{state}};
+        my $alerting= $hash->{fhem}{alerting};
+        my $interface= $hash->{fhem}{interfaces};
+        my $state;
         if($#polls>=0) {
           my $address= $hash->{fhem}{address};
           readingsBeginUpdate($hash);
@@ -439,14 +461,27 @@ OWDevice_UpdateValues($) {
               readingsBulkUpdate($hash,$reading,$value);
             }
           }
-          my $state;
-          foreach my $reading (@state) {
-            my $value= OWDevice_ReadValue($hash,$reading);
-            if(defined($value)) {
+          if(@state) {
+            foreach my $reading (@state) {
+              my $value= OWDevice_ReadValue($hash,$reading);
+              if(defined($value)) {
                 $state .= "$reading: $value  ";
-            } else {
+              } else {
                 $state .= "$reading: n/a  ";
+              }
             }
+          }
+          if($alerting) {
+            my $dir= OWDevice_ReadFromServer($hash,"dir","/alarm/");
+            my $alarm= ($dir =~ m/$address/) ? 1 :0;
+            readingsBulkUpdate($hash,"alarm",$alarm);
+            $state .= "alarm: $alarm";
+          }
+          if($interface eq "id") {
+            my $dir= OWDevice_ReadFromServer($hash,"dir","/");
+            my $present= ($dir =~ m/$address/) ? 1 :0;
+            readingsBulkUpdate($hash,"present",$present);
+            $state .= "present: $present";
           }
           $state =~ s/\s+$//;
           readingsBulkUpdate($hash,"state",$state);
@@ -533,6 +568,18 @@ OWDevice_Set($@)
 
 #############################
 sub
+OWDevice_Undef($$)
+{
+  my ($hash, $name) = @_;
+
+  delete($modules{OWDevice}{defptr}{$hash->{NAME}});
+  RemoveInternalTimer($hash);
+
+  return undef;
+}
+
+#############################
+sub
 OWDevice_Define($$)
 {
         my ($hash, $def) = @_;
@@ -553,7 +600,7 @@ OWDevice_Define($$)
           $hash->{fhem}{interval}= $a[3];
           Log 5, "$name: polling every $a[3] seconds";
         }
-        my ($interface, $gettersref, $settersref, $pollsref, $stateref)= OWDevice_GetDetails($hash);
+        my ($interface, $gettersref, $settersref, $pollsref, $stateref, $alerting)= OWDevice_GetDetails($hash);
         my @getters= @{$gettersref};
         my @setters= @{$settersref};
         my @polls= @{$pollsref};
@@ -568,10 +615,21 @@ OWDevice_Define($$)
         Log 5, "$name: setters: " . join(" ", @setters);
         $hash->{fhem}{polls}= $pollsref;
         Log 5, "$name: polls: " . join(" ", @polls);
-        $hash->{fhem}{currentstate}= $stateref;
+        $hash->{fhem}{state}= $stateref;
         Log 5, "$name: state: " . join(" ", @state);
+        $hash->{fhem}{alerting}= $alerting;
+        Log 5, "$name: alerting: $alerting";
 
         $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
+        if($interface eq "id" && !defined($hash->{fhem}{interval})) {
+          my $value= OWDevice_Get($hash, "address");
+          my $dir= OWDevice_ReadFromServer($hash,"dir","/");
+          my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
+          readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"present",$present);
+          readingsBulkUpdate($hash,"state","present: $present");
+          readingsEndUpdate($hash,1);
+        }
         OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
 
         return undef;
@@ -705,14 +763,6 @@ OWDevice_Define($$)
   <a name="OWDeviceattr"></a>
   <b>Attributes</b>
   <ul>
-    <a name="IODev"></a>
-    <li>IODev:
-        Set the OWServer device which should be used for sending and receiving data
-        for this OWDevice. Note: Upon startup fhem assigns each OWDevice
-        to the last previously defined OWServer. Thus it is best if you define OWServer
-        and OWDevices in blocks: first define the first OWServer and the OWDevices that
-        belong to it, then continue with the next OWServer and the attached OWDevices, and so on.
-    </li>
     <li>trimvalues: removes leading and trailing whitespace from readings. Default is 1 (on).</li>
     <li>polls: a comma-separated list of readings to poll. This supersedes the list of default readings to poll.</li>
     <li>interfaces: supersedes the interfaces exposed by that device.</li>

@@ -39,9 +39,10 @@ OWServer_Initialize($)
   my ($hash) = @_;
 
 # Provider
-  $hash->{WriteFn}= "OWServer_Write";
-  $hash->{ReadFn} = "OWServer_Read";
-  $hash->{Clients}= ":OWDevice:";
+  $hash->{WriteFn} = "OWServer_Write";
+  $hash->{ReadFn}  = "OWServer_Read";
+  $hash->{DirFn}   = "OWServer_Dir";
+  $hash->{Clients} = ":OWDevice:";
 
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
@@ -154,7 +155,7 @@ OWServer_Read($@)
   return undef unless(defined($hash->{fhem}{owserver}));
   return $hash->{fhem}{owserver}->read($path);
 }
-  
+
 #####################################
 sub
 OWServer_Write($@)
@@ -163,6 +164,16 @@ OWServer_Write($@)
 
   return undef unless(defined($hash->{fhem}{owserver}));
   return $hash->{fhem}{owserver}->write($path,$value);
+}
+
+#####################################
+sub
+OWServer_Dir($@)
+{
+  my ($hash,$path)= @_;
+
+  return undef unless(defined($hash->{fhem}{owserver}));
+  return $hash->{fhem}{owserver}->dir($path);
 }
 
 
