@@ -232,10 +232,6 @@ CUL_MAX_Parse($$)
 
     } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState", "PushButtonState"])  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
-      #Only ShutterContactState needs ack
-      if($msgType eq "ShutterContactState" and $dst eq $shash->{addr}) {
-        CUL_MAX_SendAck($shash,$msgcnt,$src);
-      }
     } else {
       Log 5, "Unhandled message $msgType";
     }
