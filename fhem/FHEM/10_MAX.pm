@@ -429,7 +429,9 @@ MAX_Parse($$)
     }
 
   }elsif($msgtype eq "WallThermostatState"){
-    my ($bits2,$valveposition,$desiredTemperature,$null1,$unk,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+    my ($bits2,$valveposition,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+    #$heaterTemperature/10 is the temperature measured by a paired HeatingThermostat
+    #we don't do anything with it here, because this value also appears as temperature in the HeatingThermostat's ThermostatState message
     my $mode = vec($bits2, 0, 2); #
     my $dstsetting = vec($bits2, 3, 1); #is automatically switching to DST activated
     my $langateway = vec($bits2, 4, 1); #??
@@ -441,7 +443,7 @@ MAX_Parse($$)
     $temperature /= 10.0; #convert to degree celcius
     Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
 
-    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, unknown: $unk, temperature $temperature";
+    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, heaterTemperature $heaterTemperature, temperature $temperature";
 
     $shash->{rferror} = $rferror;
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
