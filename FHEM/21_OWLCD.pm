@@ -1052,6 +1052,7 @@ sub OWXLCD_SetMemory($$$) {
 
 =pod
 =begin html
+
   <a name="OWLCD"></a>
         <h3>OWLCD</h3>
         <p>FHEM module to commmunicate with the <a
@@ -1140,5 +1141,6 @@ sub OWXLCD_SetMemory($$$) {
                     href="#room">room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel"
                     >loglevel</a>, <a href="#webCmd">webCmd</a></li>
         </ul>
+        
 =end html
 =cut
