@@ -435,7 +435,8 @@ MAX_Parse($$)
     my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
-    $desiredTemperature = $desiredTemperature/2.0; #convert to degree celcius
+    $desiredTemperature /= 2.0; #convert to degree celcius
+    $temperature /= 10.0; #convert to degree celcius
     Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
 
     Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, unknown: $unk, temperature $temperature";
@@ -502,8 +503,8 @@ MAX_Parse($$)
     for (my $i=0;$i<7;$i++) {
       my (@time_prof, @temp_prof);
       for(my $j=0;$j<13;$j++) {
-        @time_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))& 0x1FF) * 5;
-        @temp_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
+        $time_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))& 0x1FF) * 5;
+        $temp_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
       }
 
       my @hours;
