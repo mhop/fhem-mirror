@@ -311,7 +311,7 @@ HMLAN_Parse($$)
 	my $flg = hex(substr($mFld[5],2,2));
 	
     # handle status. 0001=ack:seems to announce the new message counter
-	#                0002=our send message returned it was likely not sent
+	#                0002=message send done, no ack was requested
 	#                0008=nack - HMLAN did not receive an ACK,
 	#                0021= 'R'
 	#                0081=open
@@ -325,16 +325,14 @@ HMLAN_Parse($$)
 #	  HMLAN_SimpleWrite($hash, '-'.$src);
 #	  HMLAN_SimpleWrite($hash, '+'.$src);
 #	}
-    if($mFld[1] =~ m/^04/){
-	  Log $ll5, 'HMLAN_Parse: problems detected - please restart HMLAN';
-      #foreach (keys %lhash){delete ($lhash{$_})};# does not help
-      #DevIo_Disconnected($hash) ;# does not help
+    my $stat = hex($mFld[1]);
+	if($stat & 0x060A){ # do not parse this message, no valid content
+	  Log $ll5, 'HMLAN_Parse: problems detected - please restart HMLAN'if($stat & 0x0400);
+	  Log $ll5, 'HMLAN_Parse: restart HMLAN might be necessary'        if($stat & 0x0200);
+	  Log $ll5, 'HMLAN_Parse: discard'                                 if($stat & 0x000A);  
+	  return ;# message with no ack is send - do not dispatch
 	}
-    if($mFld[1] =~ m/^02/){
-	  Log $ll5, 'HMLAN_Parse: restart HMLAN might be necessary';
-	  HMLAN_SimpleWrite($hash, '-'.$src);# todo not proven how to get out of this situation
-	  HMLAN_SimpleWrite($hash, '+'.$src);
-	}
+
     $dmsg .= ":NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	
 
     $hash->{uptime} = HMLAN_uptime($mFld[2]);
