@@ -30,14 +30,33 @@ use vars qw(%msgCmd2Id);
   5 => "PushButton"
 );
 
+my %boost_durations = (0 => 0, 1 => 5, 2 => 10, 3 => 15, 4 => 20, 5 => 25, 6 => 30, 7 => 60);
+my %boost_durationsInv = reverse %boost_durations;
+
+my %decalcDays = (0 => "Sat", 1 => "Sun", 2 => "Mon", 3 => "Tue", 4 => "Wed", 5 => "Thu", 6 => "Fri");
+my %decalcDaysInv = reverse %decalcDays;
+
+sub validTemperature { return $_[0] eq "on" || $_[0] eq "off" || ($_[0] ~~ /^\d+(\.[05])?$/ && $_[0] >= 5 && $_[0] <= 30); }
+sub validWindowOpenDuration { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 60; }
+sub validMeasurementOffset { return $_[0] ~~ /^-?\d+(\.[05])?$/ && $_[0] >= -3.5 && $_[0] <= 3.5; }
+sub validBoostDuration { return $_[0] ~~ /^\d+$/ && exists($boost_durationsInv{$_[0]}); }
+sub validValveposition { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 100; }
+sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(..), (\d{1,2}):00$/);
+  return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; }
+
 my %readingDef = ( #min/max/default
-  "maximumTemperature"    => [4.5, 30.5, 30.5],
-  "minimumTemperature"    => [4.5, 30.5, 4.5],
-  "comfortTemperature"    => [4.5, 30.5, 21],
-  "ecoTemperature"        => [4.5, 30.5, 17],
-  "windowOpenTemperature" => [4.5, 30.5, 12],
-  "windowOpenDuration"    => [0,   60,   15],
-  "measurementOffset"     => [-3.5, 3.5, 0]
+  "maximumTemperature"    => [ \&validTemperature, 30.5],
+  "minimumTemperature"    => [ \&validTemperature, 4.5],
+  "comfortTemperature"    => [ \&validTemperature, 21],
+  "ecoTemperature"        => [ \&validTemperature, 17],
+  "windowOpenTemperature" => [ \&validTemperature, 12],
+  "windowOpenDuration"    => [ \&validWindowOpenDuration,   15],
+  "measurementOffset"     => [ \&validMeasurementOffset, 0],
+  "boostDuration"         => [ \&validBoostDuration, 5 ],
+  "boostValveposition"    => [ \&validValveposition, 80 ],
+  "decalcification"       => [ \&validDecalcification, "Sat, 12:00" ],
+  "maxValveSetting"       => [ \&validValveposition, 100 ],
+  "valveOffset"           => [ \&validValveposition, 00 ],
 );
 
 %msgId2Cmd = (
@@ -46,7 +65,8 @@ my %readingDef = ( #min/max/default
                  "02" => "Ack",
                  "03" => "TimeInformation",
                  "10" => "ConfigWeekProfile",
-                 "11" => "ConfigTemperatures", #like boost/eco/comfort etc
+                 "11" => "ConfigTemperatures", #like eco/comfort etc
+                 "12" => "ConfigValve",
                  "30" => "ShutterContactState",
                  "42" => "WallThermostatState", #by WallMountedThermostat
                  "50" => "PushButtonState",
@@ -61,8 +81,6 @@ my %readingDef = ( #min/max/default
                  "F0" => "Reset",
                );
 %msgCmd2Id = reverse %msgId2Cmd;
-
-my @decalcDays = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
 
 my %interfaces = (
   "Cube" => undef,
@@ -156,17 +174,26 @@ MAX_ParseTemperature($)
 }
 
 sub
+MAX_Validate(@)
+{
+  my ($name,$val) = @_;
+  return 1 if(!exists($readingDef{$name}));
+  return $readingDef{$name}[0]->($val);
+}
+
+sub
 MAX_ReadingsVal(@)
 {
   my ($hash,$name) = @_;
 
   my $val = MAX_ParseTemperature(ReadingsVal($hash->{NAME},$name,""));
-  #$readingDef{$name} array is [min, max, default]
-  if(exists($readingDef{$name}) and
-    ($val eq "" or $val !~ /^-?(\d+\.?\d*|\.\d+)$/ or $val < $readingDef{$name}[0] or $val > $readingDef{$name}[1])) {
+  #$readingDef{$name} array is [validatingFunc, defaultValue]
+  if(exists($readingDef{$name}) and !$readingDef{$name}[0]->($val)) {
     #Error: invalid value
-    Log 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[2]";
-    $val = $readingDef{$name}[2];
+    Log 2, "MAX: Invalid value $val for READING $name. Forcing to $readingDef{$name}[1]";
+    $val = $readingDef{$name}[1];
+
+    #Save default value to READINGS
     if(exists($hash->{".updateTimestamp"})) {
       readingsBulkUpdate($hash,$name,$val);
     } else {
@@ -185,7 +212,7 @@ MAX_Set($@)
 
   return "Invalid IODev" if(MAX_CheckIODev($hash));
 
-  if($setting eq "desiredTemperature" and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
+  if($setting eq "desiredTemperature" and $hash->{type} ~~ ["HeatingThermostat","WallMountedThermostat"]) {
     return "missing a value" if(@args == 0);
 
     my $temperature;
@@ -219,6 +246,30 @@ MAX_Set($@)
     $payload .= $until if(defined($until));
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload);
 
+  }elsif($setting ~~ ["boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"]
+      and $hash->{type} ~~ ["HeatingThermostat","WallMountedThermostat"]){
+
+    if(!MAX_Validate($setting, $args[0])) {
+      my $msg = "Invalid value $args[0] for $setting";
+      Log 1, $msg;
+      return $msg;
+    }
+
+    readingsSingleUpdate($hash, $setting, $args[0], 0);
+
+    my $boostDuration = MAX_ReadingsVal($hash,"boostDuration");
+    my $boostValveposition = MAX_ReadingsVal($hash,"boostValveposition");
+    my $decalcification = MAX_ReadingsVal($hash,"decalcification");
+    my $maxValveSetting = MAX_ReadingsVal($hash,"maxValveSetting");
+    my $valveOffset = MAX_ReadingsVal($hash,"valveOffset");
+
+    my ($decalcDay, $decalcHour) = ($decalcification =~ /^(..), (\d{1,2}):00$/);
+    my $decalc = ($decalcDaysInv{$decalcDay} << 5) | $decalcHour;
+    my $boost = ($boost_durationsInv{$boostDuration} << 5) | int($boostValveposition/5);
+
+    my $payload = sprintf("%02x%02x%02x%02x", $boost, $decalc, int($maxValveSetting*255/100), int($valveOffset*255/100));
+    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigValve",$hash->{addr},$payload);
+
   }elsif($setting eq "groupid"){
     return "argument needed" if(@args == 0);
 
@@ -226,6 +277,14 @@ MAX_Set($@)
 
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
+
+    if(!MAX_Validate($setting, $args[0])) {
+      my $msg = "Invalid value $args[0] for $setting";
+      Log 1, $msg;
+      return $msg;
+    }
+
+    readingsSingleUpdate($hash, $setting, $args[0], 0);
 
     my $comfortTemperature = MAX_ReadingsVal($hash,"comfortTemperature");
     my $ecoTemperature = MAX_ReadingsVal($hash,"ecoTemperature");
@@ -483,7 +542,7 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
       readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
       readingsBulkUpdate($shash, "valveOffset", $args[10]);
-      readingsBulkUpdate($shash, "decalcification", "$decalcDays[$args[11]], $args[12]:00");
+      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]}, $args[12]:00");
       $shash->{internal}{weekProfile} = $args[13];
     } else {
       $shash->{internal}{weekProfile} = $args[4];
@@ -518,8 +577,8 @@ MAX_Parse($$)
         }
      }
 
-     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays[$i]-time", $time_prof_str );
-     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays[$i]-temp", $temp_prof_str );
+     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays{$i}-time", $time_prof_str );
+     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays{$i}-temp", $temp_prof_str );
 
      } # Endparse weekprofiles for each day
 
