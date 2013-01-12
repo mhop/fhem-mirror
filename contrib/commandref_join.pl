@@ -67,7 +67,7 @@ foreach my $lang (@lang) {
     my $line = 0;
     while(my $l = <MOD>) {
       $line++;
-      if($l =~ m/^=begin html$suffix$/) {
+      if($l =~ m/^=begin html$suffix/) {
         $l = <MOD>;    # skip one line, to be able to repeat join+split
         $skip = 0; $line++;
       } elsif($l =~ m/^=end html$suffix/) {
