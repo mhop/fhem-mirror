@@ -3,8 +3,9 @@
 #
 #  Copyright notice
 #
-#  (c) 2012 Copyright: Dr. Boris Neubert
-#  omega at online dot de
+#  (c) 2012 Copyright: Dr. Boris Neubert & Martin Fischer
+#  e-mail: omega at online dot de
+#  e-mail: m_fischer at gmx dot de
 #
 #  This file is part of fhem.
 #
@@ -32,6 +33,29 @@ use warnings;
 # the version at CPAN is outdated and malfunctioning as at 2012-12-19
 use lib::OWNet;
 
+use vars qw(%owfamily);
+# 1-Wire devices (order by family code)
+# http://owfs.sourceforge.net/family.html
+%owfamily = (
+  "01"  => qw(DS2401 DS1990A),
+  "05"  => qw(DS2405),
+  "10"  => qw(DS18S20 DS1920),
+  "12"  => qw(DS2406 DS2507),
+  "1B"  => qw(DS2436),
+  "1D"  => qw(DS2436),
+  "20"  => qw(DS2450),
+  "22"  => qw(DS1822),
+  "24"  => qw(DS2415 DS1904),
+  "26"  => qw(DS2438),
+  "27"  => qw(DS2417),
+  "28"  => qw(DS18B20),
+  "29"  => qw(DS2408),
+  "3A"  => qw(DS2413),
+  "3B"  => qw(DS1825),
+  "81"  => qw(DS1420),
+  "FF"  => qw(LCD),
+);
+
 #####################################
 sub
 OWServer_Initialize($)
@@ -46,6 +70,7 @@ OWServer_Initialize($)
 
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
+  $hash->{NotifyFn}= "OWServer_Notify";
   $hash->{UndefFn} = "OWServer_Undef";
   $hash->{GetFn}   = "OWServer_Get";
   $hash->{SetFn}   = "OWServer_Set";
@@ -137,12 +162,34 @@ OWServer_OpenDev($)
 
 #####################################
 sub
+OWServer_Notify($$)
+{
+  my ($hash,$dev) = @_;
+  my $name  = $hash->{NAME};
+  my $type  = $hash->{TYPE};
+
+  return if($dev->{NAME} ne "global" ||
+            !grep(m/^INITIALIZED$/, @{$dev->{CHANGED}}));
+
+  return if($attr{$name} && $attr{$name}{disable});
+
+  delete $modules{OWServer}{NotifyFn};
+  delete $hash->{NTFY_ORDER} if($hash->{NTFY_ORDER});
+
+  OWServer_DoInit($hash);
+
+  return undef;
+}
+
+#####################################
+sub
 OWServer_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
   $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
+  OWServer_Autodiscovery($hash) if($init_done);
   return undef;
 }
 
@@ -176,6 +223,54 @@ OWServer_Dir($@)
   return $hash->{fhem}{owserver}->dir($path);
 }
 
+#####################################
+sub
+OWServer_Autodiscovery($)
+{
+  my ($hash)= @_;
+  my $name = $hash->{NAME};
+  
+  my $owserver= $hash->{fhem}{owserver};
+
+  my @dir= split(",", $owserver->dir());
+  my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
+  for my $device (@devices) {
+    my $address= substr($device,1);
+    my $family= substr($address,0,2);
+    if(!defined($owfamily{$family})) {
+      next;
+    } else {
+      my $type= $owserver->read($device . "/type");
+      if($type !~ m/$owfamily{$family}/) {
+        Log 2, "$name: Autodiscovery: type '$type' unknown";
+        next;
+      } else {
+        foreach my $d (keys %defs) {
+          next if($defs{$d}{TYPE} eq "OWDevice" &&
+                  defined($defs{$d}{fhem}) && 
+                  defined($defs{$d}{fhem}{address}) && $defs{$d}{fhem}{address} eq $address);
+          my $id= substr($address,3);
+          my $devname= $type . "_" . $id;
+          if(defined($defs{$devname})) {
+            next;
+          } else {
+            my $interval= ($family eq "81") ? "" : " 60";
+            my $define= "$devname OWDevice $address" . $interval;
+            my $cmdret;
+            $cmdret= CommandDefine(undef,$define);
+            if($cmdret) {
+              Log 1, "$name: An error occurred while creating device for address '$address': $cmdret";
+            } else {
+              $cmdret= CommandAttr(undef,"$devname room OWDevice");
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return undef;
+}
 
 #####################################
 sub
