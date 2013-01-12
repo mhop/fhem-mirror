@@ -41,7 +41,7 @@ sub validWindowOpenDuration { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 
 sub validMeasurementOffset { return $_[0] ~~ /^-?\d+(\.[05])?$/ && $_[0] >= -3.5 && $_[0] <= 3.5; }
 sub validBoostDuration { return $_[0] ~~ /^\d+$/ && exists($boost_durationsInv{$_[0]}); }
 sub validValveposition { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 100; }
-sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(..), (\d{1,2}):00$/);
+sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{1,2}):00$/);
   return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; }
 
 my %readingDef = ( #min/max/default
@@ -170,7 +170,7 @@ MAX_CheckIODev($)
 sub
 MAX_ParseTemperature($)
 {
-  return @_[0] eq "on" ? 30.5 : (@_[0] eq "off" ? 4.5 :@_[0]);
+  return $_[0] eq "on" ? 30.5 : ($_[0] eq "off" ? 4.5 :$_[0]);
 }
 
 sub
@@ -247,15 +247,17 @@ MAX_Set($@)
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload);
 
   }elsif($setting ~~ ["boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"]
-      and $hash->{type} ~~ ["HeatingThermostat","WallMountedThermostat"]){
+      and $hash->{type} eq "HeatingThermostat"){
 
-    if(!MAX_Validate($setting, $args[0])) {
+    my $val = join(" ",@args); #decalcification contains a space
+
+    if(!MAX_Validate($setting, $val)) {
       my $msg = "Invalid value $args[0] for $setting";
       Log 1, $msg;
       return $msg;
     }
 
-    readingsSingleUpdate($hash, $setting, $args[0], 0);
+    readingsSingleUpdate($hash, $setting, $val, 0);
 
     my $boostDuration = MAX_ReadingsVal($hash,"boostDuration");
     my $boostValveposition = MAX_ReadingsVal($hash,"boostValveposition");
@@ -263,7 +265,7 @@ MAX_Set($@)
     my $maxValveSetting = MAX_ReadingsVal($hash,"maxValveSetting");
     my $valveOffset = MAX_ReadingsVal($hash,"valveOffset");
 
-    my ($decalcDay, $decalcHour) = ($decalcification =~ /^(..), (\d{1,2}):00$/);
+    my ($decalcDay, $decalcHour) = ($decalcification =~ /^(...) (\d{1,2}):00$/);
     my $decalc = ($decalcDaysInv{$decalcDay} << 5) | $decalcHour;
     my $boost = ($boost_durationsInv{$boostDuration} << 5) | int($boostValveposition/5);
 
@@ -353,7 +355,8 @@ MAX_Set($@)
     if($hash->{type} eq "HeatingThermostat") {
       #Create numbers from 4.5 to 30.5
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
-      return "$ret associate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration";
+      my $boostDurVal = join(",", values(%boost_durations));
+      return "$ret associate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
 
     } elsif($hash->{type} eq "WallMountedThermostat") {
       return "$ret associate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist";
@@ -546,13 +549,13 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "minimumTemperature", $args[3]);
     if($shash->{type} eq "HeatingThermostat") {
       readingsBulkUpdate($shash, "boostValveposition", $args[4]);
-      readingsBulkUpdate($shash, "boostDuration", $args[5]);
+      readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[5]});
       readingsBulkUpdate($shash, "measurementOffset", $args[6]);
       readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
       readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
       readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
       readingsBulkUpdate($shash, "valveOffset", $args[10]);
-      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]}, $args[12]:00");
+      readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]} $args[12]:00");
       $shash->{internal}{weekProfile} = $args[13];
     } else {
       $shash->{internal}{weekProfile} = $args[4];
@@ -706,6 +709,16 @@ MAX_Parse($$)
             For devices of type HeatingThermostat only. Writes the given window open temperature to the device's memory. That is the temperature the heater will temporarily set if an open window is detected. Setting it to 4.5 degree or "off" will turn off reacting on open windows.</li>
     <li>windowOpenDuration &lt;value&gt;<br>
             For devices of type HeatingThermostat only. Writes the given window open duration to the device's memory. That is the duration the heater will temporarily set the window open temperature if an open window is detected by a rapid temperature decrease. (Not used if open window is detected by ShutterControl. Must be between 0 and 60 minutes in multiples of 5.</li>
+    <li>decalcification &lt;value&gt;<br>
+        For devices of type HeatingThermostat only. Writes the given decalcification time to the device's memory. Value must be of format "Sat 12:00" with minutes being "00". Once per week during that time, the HeatingThermostat will open the valves shortly for decalcification.</li>
+    <li>boostDuration &lt;value&gt;<br>
+        For devices of type HeatingThermostat only. Writes the given boost duration to the device's memory. Value must be one of 5, 10, 15, 20, 25, 30, 60. It is the duration of the boost function in minutes.</li>
+    <li>boostValveposition &lt;value&gt;<br>
+        For devices of type HeatingThermostat only. Writes the given boost valveposition to the device's memory. It is the valve position in percent during the boost function.</li>
+    <li>maxValveSetting &lt;value&gt;<br>
+        For devices of type HeatingThermostat only. Writes the given maximum valveposition to the device's memory. The heating thermostat will not open the valve more than this value (in percent).</li>
+    <li>valveOffset &lt;value&gt;<br>
+        For devices of type HeatingThermostat only. Writes the given valve offset to the device's memory. The heating thermostat will add this to all computed valvepositions during control.</li>
     <li>factoryReset<br>
         Resets the device to factory values. It has to be paired again afterwards.<br>
         ATTENTION: When using this on a ShutterContact using the MAXLAN backend, the ShutterContact has to be triggered once manually to complete

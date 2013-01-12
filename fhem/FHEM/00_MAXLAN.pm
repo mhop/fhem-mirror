@@ -11,7 +11,6 @@ use POSIX;
 require "10_MAX.pm";
 our %msgCmd2Id;
 our %device_types;
-our %boost_durations;
 
 sub MAXLAN_Parse($$);
 sub MAXLAN_Read($);
@@ -526,7 +525,7 @@ MAXLAN_Parse($$)
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
       #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
-      my $boostDuration =  $boost_durations{$boost >> 5}; #in minutes
+      my $boostDuration = $boost >> 5;
       #There is some trailing data missing, which maps to the weekly program
       $comforttemp /= 2.0; #convert to degree celcius
       $ecotemp /= 2.0; #convert to degree celcius
@@ -719,7 +718,7 @@ MAXLAN_Send(@)
   if(defined($msgcnt)) {
     Log 2, "MAXLAN_Send: MAXLAN does not support msgcnt";
   }
-  my $payload = pack("H*","00".$flags.$msgCmd2Id{$cmd}."000000".$dst.$groupId.$payload);
+  $payload = pack("H*","00".$flags.$msgCmd2Id{$cmd}."000000".$dst.$groupId.$payload);
 
   my $ret = MAXLAN_Write($hash,"s:".encode_base64($payload,""), "S:");
   #Reschedule a poll in the near future after the cube will
