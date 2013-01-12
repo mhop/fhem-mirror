@@ -72,6 +72,8 @@ CUL_MAX_Define($$)
   if(CUL_MAX_Check($hash)) {
     #Doing this on older firmware disables MAX mode
     IOWrite($hash, "", "Za". $hash->{addr});
+    #Append to initString, so this is resend if cul disappears and then reappears
+    $hash->{IODev}{initString} .= "\nZa". $hash->{addr};
   }
 
   #This interface is shared with 00_MAXLAN.pm
