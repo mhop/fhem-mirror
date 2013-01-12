@@ -116,7 +116,7 @@ my %culHmModel=(
   "0022" => {name=>"WS888"                   ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0026" => {name=>"HM-SEC-KEY-S"            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
   "0027" => {name=>"HM-SEC-KEY-O"            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
-  "0028" => {name=>"HM-SEC-WIN"              ,cyc=>''      ,rxt=>'b'   ,lst=>'1,3'          ,chn=>"",},
+  "0028" => {name=>"HM-SEC-WIN"              ,cyc=>''      ,rxt=>'b'   ,lst=>'1,3'          ,chn=>"Win:1:1,Akku:2:2",},
   "0029" => {name=>"HM-RC-12"                ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002A" => {name=>"HM-RC-12-B"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
   "002D" => {name=>"HM-LC-SW4-PCB"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
@@ -984,34 +984,38 @@ CUL_HM_Parse($$)
     push @event, "airpress:$ap"     if ($ap);
   } 
   elsif($st eq "winMatic") {  #################################################
-    
-    if($msgType eq "10"){
-      if ($p =~ m/^0601(..)(..)/) {
-        my ($lst, $flg) = ($1, $2);
-             if($lst eq "C8" && $flg eq "00") { push @event, "contact:tilted";
-        } elsif($lst eq "FF" && $flg eq "00") { push @event, "contact:closed";
-        } elsif($lst eq "FF" && $flg eq "10") { push @event, "contact:lock_on";
-        } elsif($lst eq "00" && $flg eq "10") { push @event, "contact:movement_tilted";
-        } elsif($lst eq "00" && $flg eq "20") { push @event, "contact:movement_closed";
-        } elsif($lst eq "00" && $flg eq "30") { push @event, "contact:open";
-        }
-        CUL_HM_SndCmd($shash, $msgcnt."8002".$id.$src."0101".$lst."00")  
-          if($id eq $dst);# Send AckStatus
-	    $sendAck = "";
+    my($sType,$chn,$lvl,$stat) = ($1,$2,$3,$4) if ($p =~ m/^(..)(..)(..)(..)/);
+    if(($msgType eq "10" && $sType eq "06") ||
+	   ($msgType eq "02" && $sType eq "01")){
+	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
+	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
+	  # stateflag meaning unknown
+	  push @event, "state:".(($lvl eq "FF")?"locked":((hex($lvl)/2)." %"));
+	  if ($chn eq "01"){
+	    my %err = (0=>"no",1=>"TurnError",2=>"TiltError");
+	    my %dir = (0=>"no",1=>"up",2=>"down",3=>"undefined");
+	    push @event, "motorError:".$err{(hex($stat)>>1)&0x02};
+	    push @event, "direction:".$dir{(hex($stat)>>4)&0x02};
+#	  CUL_HM_SndCmd($shash, $msgcnt."8002".$id.$src."0101".$lst."00")  
+#          if($id eq $dst);# Send AckStatus
+#	  $sendAck = "";
 	  }
-	  elsif ($p =~ m/^0287(..)89(..)8B(..)/) {
-	    my ($air, undef, $course) = ($1, $2, $3);
-        push @event, "airing:".($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air));
-        push @event, "course:".($course eq "FF" ? "tilt" : "close");
+	  else{ #should be akku
+	    my %statF = (0=>"trickleCharge",1=>"charge",2=>"dischange",3=>"unknown");
+	    push @event, "charge:".$statF{(hex($stat)>>4)&0x02}; 
 	  }
-	  elsif($p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
-        my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
-           ($1, $2, $3, $4, $5, $6, $7, $8);
-        push @event, "airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5));
-        push @event, "contact:tesed";
-	  }
-    } 
-
+	}
+	if ($p =~ m/^0287(..)89(..)8B(..)/) {
+	  my ($air, undef, $course) = ($1, $2, $3);
+      push @event, "airing:".($air eq "FF" ? "inactiv" : CUL_HM_decodeTime8($air));
+      push @event, "course:".($course eq "FF" ? "tilt" : "close");
+	}
+	elsif($p =~ m/^0201(..)03(..)04(..)05(..)07(..)09(..)0B(..)0D(..)/) {
+      my ($flg1, $flg2, $flg3, $flg4, $flg5, $flg6, $flg7, $flg8) =
+         ($1, $2, $3, $4, $5, $6, $7, $8);
+      push @event, "airing:".($flg5 eq "FF" ? "inactiv" : CUL_HM_decodeTime8($flg5));
+      push @event, "contact:tesed";
+	}
   }
   elsif($st eq "keyMatic") {  #################################################
 	#Info Level: msgType=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
@@ -1203,7 +1207,12 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 
   KeyJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from On"      ,lit=>{no=>0,dlyUnlock=>1,rampUnlock=>2,lock=>3,dlyLock=>4,rampLock=>5,lock=>6,open=>8}},
   KeyJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>7       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,dlyUnlock=>1,rampUnlock=>2,lock=>3,dlyLock=>4,rampLock=>5,lock=>6,open=>8}},
-  
+
+  WinJtOn         =>{a=> 11.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,rampOnDly=>1,rampOn=>2,on=>3,ramoOffDly=>4,rampOff=>5,Off=>6,rampOnFast=>8,rampOffFast=>9}},
+  WinJtOff        =>{a=> 11.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,rampOnDly=>1,rampOn=>2,on=>3,ramoOffDly=>4,rampOff=>5,Off=>6,rampOnFast=>8,rampOffFast=>9}},
+  WinJtRampOn     =>{a=> 13.0,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,rampOnDly=>1,rampOn=>2,on=>3,ramoOffDly=>4,rampOff=>5,Off=>6,rampOnFast=>8,rampOffFast=>9}},
+  WinJtRampOff    =>{a=> 13.4,s=>0.4,l=>3,min=>0  ,max=>9       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Jump from Off"     ,lit=>{no=>0,rampOnDly=>1,rampOn=>2,on=>3,ramoOffDly=>4,rampOff=>5,Off=>6,rampOnFast=>8,rampOffFast=>9}},
+
   CtValLo         =>{a=>  4.0,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Condition value low for CT table"  },
   CtValHi         =>{a=>  5.0,s=>1  ,l=>3,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Condition value high for CT table" },
   
@@ -1252,7 +1261,7 @@ my %culHmRegDefine = (
   redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"reduced temperatur recover"},
   redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>1,t=>"reduced power level"},
   loadErrCalib	  =>{a=> 18.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"Load Error Calibration"},
-  transmitTryMax  =>{a=> 48.0,s=>1.0,l=>1,min=>0  ,max=>10      ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"max message re-transmit"},
+  transmitTryMax  =>{a=> 48.0,s=>1.0,l=>1,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"max message re-transmit"},
   loadAppearBehav =>{a=> 49.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on load appearence at restart",lit=>{off=>0,last=>1,btnPress=>2,btnPressIfWasOn=>3}},
   powerUpAction	  =>{a=> 86.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on power up"                  ,lit=>{off=>0,on=>1}},
   statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0.5,max=>15.5    ,c=>'factor'   ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"},
@@ -1293,7 +1302,7 @@ my %culHmRegDefine = (
   msgRhsPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
   msgRhsPosC      =>{a=> 32.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position C",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
   evtDly          =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'factor'   ,f=>1.6     ,u=>'s'   ,d=>0,t=>"Event delay time",},#todo check calculation
-# keymatic secific register                                                                     
+# keymatic/winmatic secific register                                                                     
   signal          =>{a=>  3.4,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
   signalTone      =>{a=>  3.6,s=>0.2,l=>0,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""                              ,lit=>{low=>0,mid=>1,high=>2,veryHigh=>3}},
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                 ,lit=>{off=>0,on=>1}},
@@ -1301,19 +1310,27 @@ my %culHmRegDefine = (
   holdPWM         =>{a=> 21  ,s=>1,  l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Holdtime pulse wide modulation"},
   setupDir        =>{a=> 22  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
   setupPosition   =>{a=> 23  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Rotation angle neutral position"},
-  angelOpen       =>{a=> 24  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Door opening angle"},
-  angelMax        =>{a=> 25  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Angle maximum"},
+  angelOpen       =>{a=> 24  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>1,t=>"Door opening angle"},
+  angelMax        =>{a=> 25  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>1,t=>"Angle maximum"},
   angelLocked     =>{a=> 26  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Angle Locked position"},
+  pullForce       =>{a=> 28  ,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"pull force level"},
+  pushForce       =>{a=> 29  ,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"push force level"},
+  tiltMax         =>{a=> 30  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"maximum tilt level"},
   ledFlashUnlocked=>{a=> 31.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when not locked",lit=>{off=>0,on=>1}},
   ledFlashLocked  =>{a=> 31.6,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED blinks when locked"    ,lit=>{off=>0,on=>1}},
 # sec_mdir                                                                                   
+  cyclicInfoMsg   =>{a=>  9  ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message",lit=>{off=>0,on=>1}},
   sabotageMsg     =>{a=> 16.0,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message"   ,lit=>{off=>0,on=>1}},
+  transmDevTryMax =>{a=> 20.0,s=>1.0,l=>1,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
   minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
   captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
+  msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
+  msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
+
 # weather units                                                                                  
   stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
   stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
@@ -1360,9 +1377,8 @@ my %culHmRegType = (
 			ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,
  		    lgMultiExec     =>1,
 			},
-  winMatic=>{	                                    		 
-            OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,
-            OnLevelKm       =>1,OnRampOnSp      =>1,OnRampOffSp     =>1,
+  winMatic=>{
+            signal          =>1,signalTone      =>1,keypressSignal  =>1,  
 			},                                  
   keyMatic=>{                                   
 			signal          =>1,signalTone      =>1,keypressSignal  =>1,
@@ -1378,7 +1394,6 @@ my %culHmRegType = (
 			captInInterval=>1,brightFilter    =>1,ledOnTime       =>1,
 			},
 );
-
 
 my %culHmRegModel = (
   "HM-RC-12"   => {backAtKey    =>1, backAtMotion =>1, backOnTime   =>1},
@@ -1413,26 +1428,36 @@ my %culHmRegModel = (
   "HM-SEC-RHS"     =>{peerNeedsBurst  =>1,expectAES       =>1,
                       msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
                       evtDly          =>1,ledOnTime       =>1,transmitTryMax  =>1,},
-
+  "HM-SEC-SC"      =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
+                      msgScPosA       =>1,msgScPosB       =>1,
+					                      ledOnTime       =>1,transmitTryMax  =>1,
+                      peerNeedsBurst  =>1,expectAES       =>1,},
 );
 my %culHmRegChan = (# if channelspecific then enter them here 
-  "HM-CC-TC02"=> {
+  "HM-CC-TC02"   => {
 			dispTempHum  =>1,dispTempInfo =>1,dispTempUnit =>1,mdTempReg   =>1,
 			mdTempValve  =>1,tempComfort  =>1,tempLower    =>1,partyEndDay =>1,
 			partyEndMin  =>1,partyEndHr   =>1,tempParty    =>1,decalDay    =>1,
 			decalHr      =>1,decalMin     =>1, 
               },
-  "HM-CC-TC03"   => {tempWinOpen  =>1, }, #window channel
-  "HM-RC-1912"   => {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
+  "HM-CC-TC03"    =>{tempWinOpen  =>1, }, #window channel
+  "HM-RC-1912"    =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
                      backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
                      lcdSymb      =>1, lcdLvlInterp   =>1},
-  "HM-RC-19-B12" => {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
+  "HM-RC-19-B12"  =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
                      backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
                      lcdSymb      =>1, lcdLvlInterp   =>1},
-  "HM-RC-19-SW12"=> {msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
+  "HM-RC-19-SW12" =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
                      backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
                      lcdSymb      =>1, lcdLvlInterp   =>1},
-  "HM-OU-CFM-PL02"=>{Intense=>1}
+  "HM-OU-CFM-PL02"=>{Intense=>1},
+  "HM-SEC-WIN01"  =>{setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1,
+                     CtValLo         =>1,CtValHi         =>1,
+                     CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
+			         WinJtOn         =>1,WinJtOff        =>1,WinJtRampOn     =>1,WinJtRampOff    =>1,
+                     OnTime          =>1,OffTime         =>1,OffLevelKm      =>1,
+                     OnLevelKm       =>1,OnRampOnSp      =>1,OnRampOffSp     =>1
+                    }
  );
 
 ##--------------- Conversion routines for register settings
@@ -1751,38 +1776,29 @@ my %culHmGlobalSets = (
   clear         =>"[readings|msgEvents]",
 );
 my %culHmSubTypeSets = (
-  switch =>
-        { "on-for-timer"=>"sec", "on-till"=>"time",
-		  on=>"", off=>"", toggle=>"" },
-  dimmer =>
-        { "on-for-timer"=>"sec", , "on-till"=>"time",
-		  on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
-  blindActuator=>
-        { on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
-  remote =>
-        { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  pushButton =>										
-        { devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  threeStateSensor =>										
-        { devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
-  virtual => 
-        { raw        => "data ...",
-		  devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
-		  press      => "[long|short]...",
-          valvePos   => "position",#acting as TC
-		  virtual    =>"<noButtons>",}, #redef necessary for virtual
-  smokeDetector =>
-        { test => "", "alarmOn"=>"", "alarmOff"=>"", 
-		  alarm1 => "",
-		  devicepair => "<btnNumber> device ... single [set|unset] actor",},
-  winMatic =>{matic  => "<btn>",
-              read   => "<btn>",
-              keydef => "<btn> <txt1> <txt2>",
-              create => "<txt>" },
-  keyMatic =>{lock   =>"",
-  	          unlock =>"[sec] ...",
-  	          open   =>"[sec] ...",
-  	          inhibit=>"[on|off]"},
+  switch           =>{ "on-for-timer"=>"sec", "on-till"=>"time",
+		                on=>"", off=>"", toggle=>"" },
+  dimmer           =>{ "on-for-timer"=>"sec", , "on-till"=>"time",
+		               on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
+  blindActuator    =>{ on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
+  remote           =>{ devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  pushButton       =>{ devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  threeStateSensor =>{ devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
+  motionDetector   =>{ devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
+  virtual          =>{ raw        => "data ...",
+		               devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+		               press      => "[long|short]...",
+                       valvePos   => "position",#acting as TC
+		               virtual    =>"<noButtons>",}, #redef necessary for virtual
+  smokeDetector    =>{ test       => "", "alarmOn"=>"", "alarmOff"=>"", 
+		               devicepair => "<btnNumber> device ... single [set|unset] actor",},
+  winMatic         =>{ matic      => "<btn>",
+                       keydef     => "<btn> <txt1> <txt2>",
+                       create     => "<txt>" },
+  keyMatic         =>{ lock       =>"",
+  	                   unlock     =>"[sec] ...",
+  	                   open       =>"[sec] ...",
+  	                   inhibit    =>"[on|off]"},
 
 );
 my %culHmModelSets = (
@@ -1847,6 +1863,8 @@ my %culHmChanSets = (
           displayTempUnit => "[celsius|fahrenheit]",
           controlMode    => "[manual|auto|central|party]",
           decalcDay      => "day",        },
+  "HM-SEC-WIN01"=>{  stop         =>"",
+                     level        =>"<level> <relockDly> <speed>..."},
 );
 
 ##############################################
@@ -2205,6 +2223,21 @@ CUL_HM_Set($@)
 	}
     CUL_HM_pushConfig($hash,$id,$dst,$lChn,$peerID,$peerChn,$list,$addrData);
   } 
+  elsif($cmd eq "level") { ###############################################
+	#level        =>"<level> <relockDly> <speed>..."
+    my (undef,undef,$lvl,$rLocDly,$speed) = @a; 
+	return "please enter level 0 to 100" if (!defined($lvl)    || $lvl>100);
+	return "reloclDelay range 0..65535 or ignore"
+	                                     if (defined($rLocDly) && 
+										     ($rLocDly > 65535 || 
+											  ($rLocDly < 0.1 && $rLocDly ne 'ignore' && $rLocDly ne '0' )));
+	return "select speed range 0 to 100" if (defined($speed)   && $speed>100);
+    $rLocDly = 111600 if (!defined($rLocDly)||$rLocDly eq "ignore");# defaults
+    $speed = 30 if (!defined($rLocDly));
+	$rLocDly = CUL_HM_encodeTime8($rLocDly);# calculate hex value
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
+	                    sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
+  } 
   elsif($cmd eq "on") { ###############################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000');
   } 
@@ -2496,11 +2529,6 @@ CUL_HM_Set($@)
     CUL_HM_PushCmdStack($hash,
         sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn));
   } 
-  elsif($cmd eq "read") { ###################################
-    return "read is discontinued since duplicate.\n".
-	       "please use getRegRaw instead. Syntax getRegRaw List3 fhem<btn> \n".
-		   "or getConfig for a complete configuratin list";
-  } 
   elsif($cmd eq "keydef") { #####################################
     if (     $a[3] eq "tilt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B220D838B228D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
     } elsif ($a[3] eq "close")     {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B550D838B558D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
@@ -2516,16 +2544,16 @@ CUL_HM_Set($@)
   elsif($cmd eq "test") { #####################################################
     my $testnr = $hash->{TESTNR} ? ($hash->{TESTNR} +1) : 1;
     $hash->{TESTNR} = $testnr;
-    CUL_HM_SndCmd($hash, sprintf("++9440%s%s00%02X",$dst,$dst,$testnr));
+	my $msg = sprintf("++9440%s%s00%02X",$dst,$dst,$testnr);
+    CUL_HM_SndCmd($hash, $msg);# repeat non-ack messages - delivery uncertain
+    CUL_HM_SndCmd($hash, $msg);
+    CUL_HM_SndCmd($hash, $msg);
   } 
   elsif($cmd =~ m/alarm(.*)/) { ###############################################
-    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%s",
-        $dst,$dst, (($1 eq "On" )? "0BC8" : "0C01")));
-  } 
-  elsif($cmd eq "alarm1") { ############################################### General
-    my $testnr = $hash->{TESTNRa} ? ($hash->{TESTNRa} +1) : 1;
-    $hash->{TESTNRa} = $testnr;
-    CUL_HM_SndCmd($hash, sprintf("++9441%s%s01%02X",$dst,$dst, $testnr));
+    my $msg = sprintf("++9441%s%s01%s",$dst,$dst,(($1 eq "On")?"0BC8":"0C01"));
+    CUL_HM_SndCmd($hash, $msg);# repeat non-ack messages - delivery uncertain
+    CUL_HM_SndCmd($hash, $msg);
+    CUL_HM_SndCmd($hash, $msg);
   } 
   elsif($cmd eq "virtual") { ##################################################
   	$state = "";
@@ -4609,6 +4637,21 @@ CUL_HM_setAttrIfCh($$$$)
         </ul></code>  
         </li>
       </ul></li>
+	  
+	<li>winMatic <br><br>
+      <ul>winMatic provides 2 channels, one for the window control and a second
+	  for the accumulator.</ul><br>
+      <ul>
+      <li><B>level &lt;level&gt; &lt;relockDelay&gt; &lt;speed&gt;</B><br>
+         set the level. <br>
+		 &lt;level&gt;:  range is 0 to 100%<br>
+		 &lt;relockDelay&gt;: range 0 to 65535 sec. 'ignore' can be used to igneore the value alternaly <br>
+		 &lt;speed&gt;: range is 0 to 100%<br>
+		 </li>
+      <li><B>stop</B><br>
+         stop movement<br>
+		 </li>
+      </ul></li>
    </ul>
    <br>
      Debugging:
@@ -4819,12 +4862,10 @@ CUL_HM_setAttrIfCh($$$$)
       humidity $h<br>
       airpress $ap<br>
   <li>winMatic<br>
-      contact closed<br>
-      contact open<br>
-      contact tilted<br>
-      contact movement_tilted<br>
-      contact movement_closed<br>
-      contact lock_on<br>
+      motorError: [no|TurnError|TiltError]<br>
+	  direction: [no|up|down|undefined]<br>	  
+	  * Akku Channel<br>
+	  charge: [trickleCharge|charge|dischange|unknown]<br>
       airing: $air<br>
       course: tilt<br>
       course: close<br>
