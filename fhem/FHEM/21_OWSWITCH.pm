@@ -165,42 +165,62 @@ sub OWSWITCH_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWSWITCH: Wrong syntax, must be define <name> OWSWITCH [<model>] <id> [interval]"
+  return "OWSWITCH: Wrong syntax, must be define <name> OWSWITCH [<model>] <id> [interval] or OWSWITCH <fam>.<id> [interval]"
        if(int(@a) < 2 || int(@a) > 5);
        
-  #-- check if this is an old style definition, e.g. <model> is missing
+  #-- different types of definition allowed
   my $a2 = $a[2];
   my $a3 = defined($a[3]) ? $a[3] : "";
+  #-- no model, 12 characters
   if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS2413";
+    $fam           = "3A";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
+  #-- no model, 2+12 characters
+   } elsif(  $a2 =~ m/^^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+    $fam           = substr($a[2],0,2);
+    $id            = substr($a[2],3);
+    if(int(@a)>=4) { $interval = $a[3]; }
+    if( $fam eq "3A" ){
+      $model = "DS2413";
+      @owg_fixed = ("A","B");
+      CommandAttr (undef,"$name model DS2413"); 
+    }elsif( $fam eq "12" ){
+      $model = "DS2406";
+      @owg_fixed = ("A","B");
+      CommandAttr (undef,"$name model DS2406"); 
+    }elsif( $fam eq "29" ){
+      $model = "DS2408";
+      @owg_fixed = ("A","B","C","D","E","F","G","H");
+      CommandAttr (undef,"$name model DS2408"); 
+    }else{
+      return "OWSWITCH: Wrong 1-Wire device family $fam";
+    }
+  #-- model, 12 characters
   } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
+    if( $model eq "DS2413" ){
+      $fam = "3A";
+      @owg_fixed = ("A","B");
+      CommandAttr (undef,"$name model DS2413"); 
+    }elsif( $model eq "DS2406" ){
+      $fam = "12";
+      @owg_fixed = ("A","B");
+      CommandAttr (undef,"$name model DS2406"); 
+    }elsif( $model eq "DS2408" ){
+      $fam = "29";
+      @owg_fixed = ("A","B","C","D","E","F","G","H");
+      CommandAttr (undef,"$name model DS2408"); 
+    }else{
+      return "OWSWITCH: Wrong 1-Wire device model $model";
+    }
   } else {    
-    return "OWSWITCH: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWSWITCH: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
-  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   FF = family id follows from the model
-  #   YY must be determined from id
-  if( $model eq "DS2413" ){
-    $fam = "3A";
-    @owg_fixed = ("A","B");
-    CommandAttr (undef,"$name model DS2413"); 
-  }elsif( $model eq "DS2406" ){
-    $fam = "12";
-    @owg_fixed = ("A","B");
-    CommandAttr (undef,"$name model DS2406"); 
-  }elsif( $model eq "DS2408" ){
-    $fam = "29";
-    @owg_fixed = ("A","B","C","D","E","F","G","H");
-    CommandAttr (undef,"$name model DS2408"); 
-  }else{
-    return "OWSWITCH: Wrong 1-Wire device model $model";
-  }
-  
+
   #--   determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
@@ -449,10 +469,10 @@ sub OWSWITCH_Get($@) {
 
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_GetState($hash);
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetValues($hash);
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSSWITCH_GetState($hash);
     }else{
-      return "OWSWITCH: GetValues with wrong IODev type $interface";
+      return "OWSWITCH: Get with wrong IODev type $interface";
     }
   }
   #-- process results
@@ -497,9 +517,9 @@ sub OWSWITCH_GetValues($) {
       $ret = OWXSWITCH_GetState($hash);
       last
         if( !defined($ret) );
-      } 
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSSWITCH_GetValues($hash);
+    } 
+  }elsif( $interface eq "OWServer" ){
+     $ret = OWFSSWITCH_GetState($hash);
   }else{
     Log 3, "OWSWITCH: GetValues with wrong IODev type $interface";
     return 1;
@@ -641,8 +661,17 @@ sub OWSWITCH_Set($@) {
       }
       $ret = OWXSWITCH_SetState($hash,$value);
     #-- OWFS interface
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetPage($hash,"reading");
+    }elsif( $interface eq "OWServer" ){
+      $ret   = OWFSSWITCH_GetState($hash);
+      $value = 0;
+      #-- vax or val ?
+      for (my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+        $value += ($owg_vax[$i]<<$i) 
+          if( $i != $fnd );
+        $value += ($nval<<$i) 
+          if( $i == $fnd );  
+      }
+      $ret = OWFSSWITCH_SetState($hash,$value);
     #-- Unknown interface
     }else{
       return "OWSWITCH: Get with wrong IODev type $interface";
@@ -656,8 +685,8 @@ sub OWSWITCH_Set($@) {
      
     if( $interface eq "OWX" ){
       $ret = OWXSWITCH_SetState($hash,int($value));
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSSWITCH_GetValues($hash);
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSSWITCH_SetState($hash,int($value));
     }else{
       return "OWSWITCH: GetValues with wrong IODev type $interface";
     }
@@ -690,13 +719,126 @@ sub OWSWITCH_Undef ($) {
 ########################################################################################
 #
 # The following subroutines in alphabetical order are only for a 1-Wire bus connected 
-# via OWFS
+# via OWServer
 #
 # Prefix = OWFSSWITCH
 #
 ########################################################################################
 
+########################################################################################
+#
+# OWFSSWITCH_GetState - Get gpio ports from device
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
 
+sub OWFSSWITCH_GetState($) {
+  my ($hash) = @_;
+ 
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  #-- get values 
+  my $rel = OWServer_Read($master,"/$owx_add/sensed.ALL");
+  my $rex = OWServer_Read($master,"/$owx_add/PIO.ALL");
+  
+  return "no return from OWServer"
+    if( ($rel eq "") || ($rex eq "") );
+        
+  my @ral = split(/,/,$rel);
+  my @rax = split(/,/,$rex);
+  
+  return "wrong data length from OWServer"
+    if( (int(@ral) != $cnumber{$attr{$name}{"model"}}) || (int(@rax) != $cnumber{$attr{$name}{"model"}}) );
+  
+  #-- All have the same code here !
+  #-- family = 12 => DS2406
+  if( $hash->{OW_FAMILY} eq "12" ) {
+    #=============== get gpio values ===============================
+    for(my $i=0;$i<2;$i++){
+      $owg_val[$i] = $ral[$i];
+      #-- reading a zero means it is off
+      $owg_vax[$i] = 1 - $rax[$i];
+    }
+  #-- family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== get gpio values ===============================
+    for(my $i=0;$i<8;$i++){
+      $owg_val[$i] = $ral[$i];
+      #-- reading a zero means it is off
+      $owg_vax[$i] = 1 - $rax[$i];
+    }
+  #-- family = 3A => DS2413
+  }elsif( $hash->{OW_FAMILY} eq "3A" ) {
+    #=============== get gpio values ===============================
+    for(my $i=0;$i<2;$i++){
+      $owg_val[$i] = $ral[$i];
+      #-- reading a zero means it is off
+      $owg_vax[$i] = 1 - $rax[$i];
+    }
+  } else {
+    return "unknown device family $hash->{OW_FAMILY}\n";
+  }
+  return undef
+}
+
+########################################################################################
+#
+# OWFSSWITCH_SetState - Set gpio ports in device
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWFSSWITCH_SetState($$) {
+  my ($hash,$value) = @_;
+  
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  #-- family = 12 => DS2406
+  if( $hash->{OW_FAMILY} eq "12" ) {
+    #=============== set gpio values ===============================
+    #-- put into local buffer
+    $owg_val[0] = $value % 2;
+    $owg_vax[0] = $owg_val[0];
+    $owg_val[1] = int($value / 2);
+    $owg_vax[1] = $owg_val[1];
+   
+  #-- family = 29 => DS2408
+  }elsif( $hash->{OW_FAMILY} eq "29" ) {
+    #=============== set gpio values ===============================
+    for(my $i=0;$i<8;$i++){
+      $owg_val[$i] = ($value>>$i) & 1;
+      $owg_vax[$i] = $owg_val[$i]
+    }    
+  #-- family = 3A => DS2413
+  }elsif( $hash->{OW_FAMILY} eq "3A" ) {
+    #=============== set gpio values ===============================
+    $owg_val[0] = $value % 2;
+    $owg_vax[0] = $owg_val[0];
+    $owg_val[1] = int($value / 2);
+    $owg_vax[1] = $owg_val[1];
+  } else {
+    return "unknown device family $hash->{OW_FAMILY}\n";
+  }
+  #-- writing a zero will switch output transistor off
+  my @res;
+  for(my $i=0;$i<$cnumber{$attr{$name}{"model"}};$i++){
+    $res[$i]=1-$owg_val[$i];
+  } 
+  OWServer_Write($master, "/$owx_add/PIO.ALL", join(',',@res));
+  return undef
+}
 
 ########################################################################################
 #
@@ -707,7 +849,7 @@ sub OWSWITCH_Undef ($) {
 #
 ########################################################################################
 #
-# OWXAD_GetState - Get gpio ports from device
+# OWXSWITCH_GetState - Get gpio ports from device
 #
 # Parameter hash = hash of device addressed
 #
