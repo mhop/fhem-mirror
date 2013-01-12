@@ -11,7 +11,6 @@ our %msgId2Cmd;
 our %msgCmd2Id;
 our %device_types;
 
-sub CUL_MAX_SendDeviceCmd($$);
 sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime(@);
 sub CUL_MAX_Set($@);
@@ -76,7 +75,6 @@ CUL_MAX_Define($$)
   }
 
   #This interface is shared with 00_MAXLAN.pm
-  $hash->{SendDeviceCmd} = \&CUL_MAX_SendDeviceCmd;
   $hash->{Send} = \&CUL_MAX_Send;
 
   CUL_MAX_BroadcastTime($hash);
@@ -330,42 +328,6 @@ CUL_MAX_Resend($)
 
   return if(!@waitForAck); #no need to recheck
   InternalTimer($resendTime, "CUL_MAX_Resend", $hash, 0);
-}
-
-#This is deprecated as part of the MAX backend interface
-sub
-CUL_MAX_SendDeviceCmd($$)
-{
-  my ($hash,$payload) = @_;
-
-  CUL_MAX_Check($hash);
-
-  my $dstaddr = unpack("H6",substr($payload,6,3));
-  my $dhash = CUL_MAX_DeviceHash($dstaddr);
-
-  my $cnt = unpack("C",substr($payload,0,1));
-  if($cnt == 0) {
-    #replace message counter if not already set
-    $cnt = ($dhash->{READINGS}{msgcnt}{VAL} + 1) & 0xFF;
-    $dhash->{READINGS}{msgcnt}{VAL} = $cnt;
-    substr($payload,0,1) = pack("C",$cnt);
-  }
-  #replace source address
-  substr($payload,3,3) = pack("H6",$hash->{addr});
-  #Prefix length byte
-  $payload = pack("C",length($payload)) . $payload;
-
-  $payload = unpack("H*",$payload); #convert to hex
-  Log 5, "CUL_MAX_SendDeviceCmd: ". $payload;
-  IOWrite($hash, "", "Zs". $payload);
-  my $timeout = gettimeofday()+$ackTimeout;
-  $waitForAck[@waitForAck] = { "packet" => $payload,
-                               "dest" => $dstaddr,
-                               "cnt" => $cnt,
-                               "time" => $timeout,
-                               "resends" => "0" };
-  InternalTimer($timeout, "CUL_MAX_Resend", $hash, 0);
-  return undef;
 }
 
 sub
