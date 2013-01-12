@@ -193,7 +193,7 @@ MAX_Set($@)
 
     if($args[0] eq "auto") {
       #This enables the automatic/schedule mode where the thermostat follows the weekly program
-      $temperature = 0;
+      $temperature = @args > 1 ? MAX_ParseTemperature($args[1]) : 0;
       $ctrlmode = 0; #auto
     } elsif($args[0] eq "boost") {
       $temperature = 0;
@@ -627,7 +627,7 @@ MAX_Parse($$)
           <li>degree celcius between 3.5 and 30.5 in 0.5 degree steps</li>
           <li>"on" or "off" correspondig to 30.5 and 4.5 degree celcius</li>
           <li>"eco" or "comfort" using the eco/comfort temperature set on the device (just as the right-most physical button on the device itself does)</li>
-          <li>"auto", where the weekly program saved on the thermostat is processed</li>
+          <li>"auto &lt;temperature&gt;". The weekly program saved on the thermostat is processed. If the optional &lt;temperature&gt; is given, it is set as desiredTemperature until the next switch point of the weekly program.</li>
           <li>"boost", activates the boost mode, where for boostDuration minutes the valve is opened up boostValveposition percent.</li>
         </ul>
         All values but "auto" maybe accompanied by the "until" clause, with &lt;data&gt; in format "dd.mm.yyyy HH:MM" (minutes may only be "30" or "00"!)
