@@ -224,12 +224,15 @@ OWServer_Dir($@)
 }
 
 #####################################
+# TODO: codereview - es war zu spät...
 sub
 OWServer_Autodiscovery($)
 {
   my ($hash)= @_;
   my $name = $hash->{NAME};
   
+  return undef;
+
   my $owserver= $hash->{fhem}{owserver};
 
   my @dir= split(",", $owserver->dir());
