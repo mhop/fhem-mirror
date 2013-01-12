@@ -480,7 +480,7 @@ MAX_Parse($$)
     my ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature);
     if( length($args[0]) == 4 ) {
       #This is the message that WallMountedThermostats send to paired HeatingThermostats
-      ($desiredTemperature,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+      ($desiredTemperature,$temperature) = unpack("CC",pack("H*",$args[0]));
     } elsif( length($args[0]) == 14 ) {
       #This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
       ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
