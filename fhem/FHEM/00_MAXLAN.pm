@@ -11,6 +11,7 @@ use POSIX;
 require "10_MAX.pm";
 our %msgCmd2Id;
 our %device_types;
+our %boost_durations;
 
 sub MAXLAN_Parse($$);
 sub MAXLAN_Read($);
@@ -21,8 +22,6 @@ sub MAXLAN_Poll($);
 sub MAXLAN_Send(@);
 sub MAXLAN_RequestConfiguration($$);
 sub MAXLAN_RemoveDevice($$);
-
-my @boost_durations = (0, 5, 10, 15, 20, 25, 30, 60);
 
 my $reconnect_interval = 2; #seconds
 
@@ -527,7 +526,7 @@ MAXLAN_Parse($$)
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
       #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
-      my $boostDuration =  $boost_durations[$boost >> 5]; #in minutes
+      my $boostDuration =  $boost_durations{$boost >> 5}; #in minutes
       #There is some trailing data missing, which maps to the weekly program
       $comforttemp /= 2.0; #convert to degree celcius
       $ecotemp /= 2.0; #convert to degree celcius
