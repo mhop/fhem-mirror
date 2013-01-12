@@ -56,6 +56,7 @@ my %readingDef = ( #min/max/default
                  "21" => "RemoveLinkPartner",
                  "22" => "SetGroupId",
                  "23" => "RemoveGroupId",
+                 "82" => "SetDisplayActualTemperature",
                  "F1" => "WakeUp",
                  "F0" => "Reset",
                );
@@ -214,22 +215,14 @@ MAX_Set($@)
       $until = sprintf("%06x",MAX_DateTime2Internal($args[2]." ".$args[3]));
     }
 
-    my $groupid = $hash->{groupid};
-    $groupid = 0; #comment this line to control the whole group, no only one device
-
-    $temperature = int($temperature*2.0) | ($ctrlmode << 6); #convert to internal representation
-    my $payload;
-    if(defined($until)) {
-      $payload = pack("CCCCCCH6CCH6",0x00,$groupid?0x04:0,0x40,0x00,0x00,0x00,$hash->{addr},$groupid,$temperature,$until);
-    }else{
-      $payload = pack("CCCCCCH6CC"  ,0x00,$groupid?0x04:0,0x40,0x00,0x00,0x00,$hash->{addr},$groupid,$temperature);
-    }
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    my $payload = sprintf("%02x",int($temperature*2.0) | ($ctrlmode << 6));
+    $payload .= $until if(defined($until));
+    return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload);
 
   }elsif($setting eq "groupid"){
     return "argument needed" if(@args == 0);
 
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},pack("CCCCCCH6CC",0x00,0x00,0x22,0x00,0x00,0x00,$hash->{addr},0x00,$args[0]));
+    return ($hash->{IODev}{Send})->($hash->{IODev},"SetGroupId",$hash->{addr}, sprintf("%02x",$args[0]) );
 
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
@@ -242,8 +235,6 @@ MAX_Set($@)
     my $windowOpenDuration = MAX_ReadingsVal($hash,"windowOpenDuration");
     my $measurementOffset = MAX_ReadingsVal($hash,"measurementOffset");
 
-    readingsSingleUpdate($hash, $setting, $args[0], 0);
-
     my $comfort = int(MAX_ParseTemperature($comfortTemperature)*2);
     my $eco = int(MAX_ParseTemperature($ecoTemperature)*2);
     my $max = int(MAX_ParseTemperature($maximumTemperature)*2);
@@ -252,16 +243,14 @@ MAX_Set($@)
     my $windowOpenTemp = int(MAX_ParseTemperature($windowOpenTemperature)*2);
     my $windowOpenTime = int($windowOpenDuration/5);
 
-    my $payload = pack("CCCCCCH6C"."CCCCCCC",0x00,0x00,0x11,0x00,0x00,0x00,$hash->{addr},0x00,
-                                              $comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    my $payload = sprintf("%02x%02x%02x%02x%02x%02x%02x",$comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
+    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload)
 
   } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
     return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
 
     readingsSingleUpdate($hash, $setting, $args[0], 0);
-    my $payload = pack("CCCCCCH6CC",0x00,0x00,0x82,0x00,0x00,0x00,$hash->{addr},0x00, $args[0] ? 4 : 0);
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    return ($hash->{IODev}{Send})->($hash->{IODev},"SetDisplayActualTemperature",$hash->{addr},sprintf("%02x",$args[0] ? 4 : 0));
 
   } elsif($setting eq "associate") {
     my $dest = $args[0];
@@ -275,8 +264,7 @@ MAX_Set($@)
     my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
     Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{groupid});
     Log 5, "Using dest $dest, destType $destType";
-    my $payload = pack("CCCCCCH6CH6C",0x00,0x00,0x20,0x00,0x00,0x00,$hash->{addr}, $hash->{groupid}, $dest, $destType);
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%02x%s%02x",$hash->{groupid}, $dest, $destType));
 
   } elsif($setting eq "factoryReset") {
 
@@ -285,13 +273,11 @@ MAX_Set($@)
       return ($hash->{IODev}{RemoveDevice})->($hash->{IODev},$hash->{addr});
     } else {
       #CUL_MAX
-      my $payload = pack("CCCCCCH6C",0x00,0x00,0xF0,0x00,0x00,0x00,$hash->{addr}, 0);
-      return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+      return ($hash->{IODev}{Send})->($hash->{IODev},"Reset",$hash->{addr});
     }
 
   } elsif($setting eq "wakeUp") {
-    my $payload = pack("CCCCCCH6CC",0x00,0x00,0xF1,0x00,0x00,0x00,$hash->{addr}, 0, 0x3F);
-    return ($hash->{IODev}{SendDeviceCmd})->($hash->{IODev},$payload);
+    return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, 0x3F);
 
   }else{
     my $templist = "off,".join(",",map { sprintf("%2.1f",$_/2) }  (10..60)) . ",on";
