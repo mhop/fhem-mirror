@@ -474,29 +474,39 @@ MAX_Parse($$)
     }
 
   }elsif($msgtype eq "WallThermostatState"){
-    my ($bits2,$valveposition,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
-    #$heaterTemperature/10 is the temperature measured by a paired HeatingThermostat
-    #we don't do anything with it here, because this value also appears as temperature in the HeatingThermostat's ThermostatState message
-    my $mode = vec($bits2, 0, 2); #
-    my $dstsetting = vec($bits2, 3, 1); #is automatically switching to DST activated
-    my $langateway = vec($bits2, 4, 1); #??
-    my $panel = vec($bits2, 5, 1); #1 if the heating thermostat is locked for manually setting the temperature at the device
-    my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
-    my $batterylow = vec($bits2, 7, 1); #1 if battery is low
+    my ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature);
+    if( length($args[0]) == 4 ) {
+      #This is the message that WallMountedThermostats send to paired HeatingThermostats
+      ($desiredTemperature,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+    } elsif( length($args[0]) == 14 ) {
+      #This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
+      ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+      #$heaterTemperature/10 is the temperature measured by a paired HeatingThermostat
+      #we don't do anything with it here, because this value also appears as temperature in the HeatingThermostat's ThermostatState message
+      my $mode = vec($bits2, 0, 2); #
+      my $dstsetting = vec($bits2, 3, 1); #is automatically switching to DST activated
+      my $langateway = vec($bits2, 4, 1); #??
+      my $panel = vec($bits2, 5, 1); #1 if the heating thermostat is locked for manually setting the temperature at the device
+      my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
+      my $batterylow = vec($bits2, 7, 1); #1 if battery is low
+      Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
+
+      Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature";
+      $shash->{rferror} = $rferror;
+      readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
+      readingsBulkUpdate($shash, "displayActualTemperature", ($displayActualTemperature) ? 1 : 0);
+    } else {
+      Log 2, "Invalid WallThermostatState packet"
+    }
 
     $desiredTemperature /= 2.0; #convert to degree celcius
     $temperature /= 10.0; #convert to degree celcius
-    Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
 
-    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, heaterTemperature $heaterTemperature, temperature $temperature";
+    Log 5, "desiredTemperature $desiredTemperature, temperature $temperature";
 
-    $shash->{rferror} = $rferror;
-    readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
     #This formatting must match with in MAX_Set:$templist
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature));
-    readingsBulkUpdate($shash, "valveposition", $valveposition);
     readingsBulkUpdate($shash, "temperature", $temperature);
-    readingsBulkUpdate($shash, "displayActualTemperature", ($valveposition & 0x0C) ? 1 : 0);
 
   }elsif($msgtype eq "ShutterContactState"){
     my $bits = pack("H2",$args[0]);
@@ -593,8 +603,10 @@ MAX_Parse($$)
     #The payload of an Ack is a 2-digit hex number (I just saw it being "01")
     #with unknown meaning plus the data of a State broadcast from the same device
     #For HeatingThermostats, it does not contain the last three "until" bytes (or measured temperature)
-    if($shash->{type} ~~ ["HeatingThermostat", "WallMountedThermostat"] ) {
+    if($shash->{type} ~~ "HeatingThermostat" ) {
       return MAX_Parse($hash, "MAX,$isToMe,ThermostatState,$addr,". substr($args[0],2));
+    } elsif($shash->{type} eq "WallMountedThermostat") {
+      return MAX_Parse($hash, "MAX,$isToMe,WallThermostatState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "ShutterContact") {
       return MAX_Parse($hash, "MAX,$isToMe,ShutterContactState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "PushButton") {
