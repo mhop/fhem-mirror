@@ -281,7 +281,11 @@ HMLAN_Parse($$)
   if ($letter =~ m/^[ER]/){#@mFld=($src, $status, $msec, $d2, $rssi, $msg)
     # max speed for devices is 100ms after receive - example:TC
 	# will prepare the delay here
-    my $srcId = (length($mFld[5])>11)?substr($mFld[5],6,6):"lastRec";
+	my $src = substr($mFld[5],6,6);
+	my $dst = substr($mFld[5],12,6);
+	my $flg = hex(substr($mFld[5],2,2));
+	my $mNo = substr($mFld[5],0,2);
+    my $srcId = (length($mFld[5])>11)?$src:"lastRec";
     $hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
     if ($debug){
       Log $ll5, 'HMLAN_Parse: '.$name.' S:'.$mFld[0]
@@ -289,10 +293,10 @@ HMLAN_Parse($$)
 	                               .' stat:'.$mFld[1]
 	                               .' t:'.$mFld[2].' d:'.$mFld[3]
 								   .' r:'.$mFld[4] 
-                                   .'     m:'.substr($mFld[5],0,2)
+                                   .'     m:'.$mNo
                                    .' '.substr($mFld[5],2,4)
                                    .' '.$srcId
-                                   .' '.substr($mFld[5],12,6)
+                                   .' '.$dst
                                    .' '.substr($mFld[5],18);
 	}
 	else{
@@ -306,9 +310,6 @@ HMLAN_Parse($$)
 								  
     my $dmsg = sprintf("A%02X%s", length($mFld[5])/2, uc($mFld[5]));
 	
-	my $src = substr($mFld[5],6,6);
-	my $dst = substr($mFld[5],12,6);
-	my $flg = hex(substr($mFld[5],2,2));
 	
     # handle status. 0001=ack:seems to announce the new message counter
 	#                0002=message send done, no ack was requested
@@ -326,11 +327,18 @@ HMLAN_Parse($$)
 #	  HMLAN_SimpleWrite($hash, '+'.$src);
 #	}
     my $stat = hex($mFld[1]);
-	if($stat & 0x060A){ # do not parse this message, no valid content
+	if($stat & 0x040A){ # do not parse this message, no valid content
 	  Log $ll5, 'HMLAN_Parse: problems detected - please restart HMLAN'if($stat & 0x0400);
-	  Log $ll5, 'HMLAN_Parse: restart HMLAN might be necessary'        if($stat & 0x0200);
 	  Log $ll5, 'HMLAN_Parse: discard'                                 if($stat & 0x000A);  
 	  return ;# message with no ack is send - do not dispatch
+	}
+    Log $ll5, 'HMLAN_Parse: special reply '.$mFld[1]        if($stat & 0x0200);
+
+	# HMLAN sends ACK for flag 'A0' but not for 'A4'. Background is unknown - 
+	# we ack ourself an long as logic is uncertain 
+	if ($flg == 0xA4 && $hash->{owner} eq $dst){
+	  Log $ll5, "HMLAN: manual ACK";
+	  HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
 	}
 
     $dmsg .= ":NACK" if($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R');	

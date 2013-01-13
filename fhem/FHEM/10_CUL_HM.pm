@@ -4,7 +4,6 @@
 
 package main;
 
-# update actiondetector is supported with lines marked as "#todo Updt1 remove"
 # update regRaw warnings                                  "#todo Updt2 remove"
 #        the lines can be removed after some soak time - around version 2600
 use strict;
@@ -49,7 +48,7 @@ my $respRemoved; # used to control trigger of stach processing
                  # need to take care that ACK is first
 
 my %culHmDevProps=(
-  "01" => { st => "AlarmControl",    cl => "controller" }, # by peterp
+  "01" => { st => "AlarmControl",    cl => " " }, # by peterp
   "12" => { st => "outputUnit",      cl => "receiver" }, # Test Pending
   "10" => { st => "switch",          cl => "receiver" }, # Parse,Set
   "20" => { st => "dimmer",          cl => "receiver" }, # Parse,Set
@@ -151,7 +150,7 @@ my %culHmModel=(
   "004D" => {name=>"HM-RC-19-SW"             ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
   "004E" => {name=>"HM-LC-DDC1-PCB"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004F" => {name=>"HM-SEN-MDIR-SM"          ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0050" => {name=>"HM-SEC-SFA-SM"           ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0050" => {name=>"HM-SEC-SFA-SM"           ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Flash:1:1,Siren:2:2",},
   "0051" => {name=>"HM-LC-SW1-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
   "0052" => {name=>"HM-LC-SW2-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:2",},
   "0053" => {name=>"HM-LC-BL1-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -216,7 +215,6 @@ CUL_HM_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
-                       "peerList ". #todo Updt1 remove
                        "peerIDs ".
                        "actCycle actStatus autoReadReg:1,0 ".
                        $readingFnAttributes;
@@ -724,7 +722,7 @@ CUL_HM_Parse($$)
 
       push @event, "deviceMsg:$val$target" if($chn ne "00");
 	     #hack for blind  - other then behaved devices blind does not send
-		 #        a status info fo rchan 0 at power on
+		 #        a status info for chan 0 at power on
 		 #        chn3 (virtual chan) and not used up to now
 		 #        info from it is likely a power on!
 	  push @event, "powerOn"   if($chn eq "03"&&$st eq "dimmer");
@@ -743,6 +741,11 @@ CUL_HM_Parse($$)
         push @event, "overload:".(($err&0x02)?"on":"off");
         push @event, "overheat:".(($err&0x04)?"on":"off");
         push @event, "reduced:" .(($err&0x08)?"on":"off");
+	  }
+	  if ($model eq "HM-SEC-SFA-SM" && $chn eq "00"){
+	    push @event, "powerError:"     .(($err&0x02) ? "on":"off");
+	    push @event, "sabotageError:"  .(($err&0x04) ? "on":"off");
+	    push @event, "batterieError:"  .(($err&0x08) ? "on":"off");
 	  }
 	  push @event, "battery:" . (($err&0x80) ? "low" : "ok" )
 	           if(($model eq "HM-LC-SW1-BA-PCB")&&($err&0x80));
@@ -787,7 +790,6 @@ CUL_HM_Parse($$)
 	  $shash->{helper}{addVal} = $buttonField;   #store to handle changes
 	  readingsSingleUpdate($chnHash,"state",$target,1);#trigger chan evt also 
       push @event,"battery:". (($buttonField&0x80)?"low":"ok");
-	  Log 1,"General Button:"."state:$btnName $state$target :".$buttonField;
       push @event,"state:$btnName $state$target";
     }
   }
@@ -1321,13 +1323,16 @@ my %culHmRegDefine = (
 # sec_mdir                                                                                   
   cyclicInfoMsg   =>{a=>  9  ,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message",lit=>{off=>0,on=>1}},
   sabotageMsg     =>{a=> 16.0,s=>1  ,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message"   ,lit=>{off=>0,on=>1}},
-  transmDevTryMax =>{a=> 20.0,s=>1.0,l=>1,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
+  lowBatLimit     =>{a=> 18.0,s=>1  ,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>'10'    ,u=>'V'   ,d=>1,t=>"low batterie limit"},
+  batDefectLimit  =>{a=> 19.0,s=>1  ,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>'100'   ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
+  transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
   minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
   captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
+  eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''     ,u=>'s'   ,d=>1,t=>"event delay time"},
   msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
   msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
 
@@ -1336,8 +1341,8 @@ my %culHmRegDefine = (
   stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
 # others
   localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable",lit=>{off=>0,on=>1}},
-  
   );
+  
 my %culHmRegGeneral = (
   intKeyVisib=>1,pairCentral=>1,
 	);
@@ -1430,8 +1435,12 @@ my %culHmRegModel = (
                       evtDly          =>1,ledOnTime       =>1,transmitTryMax  =>1,},
   "HM-SEC-SC"      =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                       msgScPosA       =>1,msgScPosB       =>1,
-					                      ledOnTime       =>1,transmitTryMax  =>1,
+					                      ledOnTime       =>1,transmitTryMax  =>1,eventDlyTime    =>1,
                       peerNeedsBurst  =>1,expectAES       =>1,},
+  "HM-SEC-SFA-SM"  =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
+                      lowBatLimit     =>1,batDefectLimit  =>1,
+                      transmitTryMax  =>1,},
+
 );
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"   => {
@@ -1986,14 +1995,14 @@ CUL_HM_Set($@)
   my $id = CUL_HM_Id($hash->{IODev});
   my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
 
-  if($cmd eq "raw") {  ##################################################
+  if($cmd eq "raw") {  ########################################################
     return "Usage: set $a[0] $cmd data [data ...]" if(@a < 3);
 	$state = "";
     for (my $i = 2; $i < @a; $i++) {
       CUL_HM_PushCmdStack($hash, $a[$i]);
     }
   } 
-  elsif($cmd eq "clear") { ############################################
+  elsif($cmd eq "clear") { ####################################################
     my (undef,undef,$sect) = @a;
 	if ($sect eq "readings"){
 	  delete $hash->{READINGS};
@@ -2015,10 +2024,10 @@ CUL_HM_Set($@)
 	}
 	$state = "";
   } 
-  elsif($cmd eq "reset") { ############################################
+  elsif($cmd eq "reset") { ####################################################
 	CUL_HM_PushCmdStack($hash,"++".$flag."11".$id.$dst."0400");
   } 
-  elsif($cmd eq "pair") { #############################################
+  elsif($cmd eq "pair") { #####################################################
 	$state = "";
     return "pair is not enabled for this type of device, ".
                 "use set <IODev> hmPairForSec"
@@ -2028,11 +2037,11 @@ CUL_HM_Set($@)
     CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".unpack("H*",$serialNr));
     $hash->{hmPairSerial} = $serialNr;
   } 
-  elsif($cmd eq "unpair") { ###########################################
+  elsif($cmd eq "unpair") { ###################################################
     CUL_HM_pushConfig($hash, $id, $dst, 0,0,0,0, "02010A000B000C00");
     $state = "";
   } 
-  elsif($cmd eq "sign") { ############################################
+  elsif($cmd eq "sign") { #####################################################
     CUL_HM_pushConfig($hash, $id, $dst, $chn,0,0,$chn,
                     "08" . ($a[2] eq "on" ? "01":"02"));
 	$state = "";
@@ -2223,7 +2232,7 @@ CUL_HM_Set($@)
 	}
     CUL_HM_pushConfig($hash,$id,$dst,$lChn,$peerID,$peerChn,$list,$addrData);
   } 
-  elsif($cmd eq "level") { ###############################################
+  elsif($cmd eq "level") { ####################################################
 	#level        =>"<level> <relockDly> <speed>..."
     my (undef,undef,$lvl,$rLocDly,$speed) = @a; 
 	return "please enter level 0 to 100" if (!defined($lvl)    || $lvl>100);
@@ -2238,10 +2247,10 @@ CUL_HM_Set($@)
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'81'.$chn.
 	                    sprintf("%02X%02s%02X",$lvl*2,$rLocDly,$speed*2));
   } 
-  elsif($cmd eq "on") { ###############################################
+  elsif($cmd eq "on") { #######################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000');
   } 
-  elsif($cmd eq "off") { ##############################################
+  elsif($cmd eq "off") { ######################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'000000');
   } 
   elsif($cmd eq "on-for-timer"||$cmd eq "on-till") { ##########################
@@ -2271,7 +2280,7 @@ CUL_HM_Set($@)
                                       $dst, $chn, $hash->{toggleIndex}));                                     
 	}
   }
-  elsif($cmd eq "lock") { ###################################################
+  elsif($cmd eq "lock") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF');	# LEVEL_SET
   }
   elsif($cmd eq "unlock") { ###################################################
@@ -2279,13 +2288,13 @@ CUL_HM_Set($@)
   	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";	# RELOCK_DELAY (FF=never)
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800101'.$delay);# LEVEL_SET
   }
-  elsif($cmd eq "open") { ###################################################
+  elsif($cmd eq "open") { #####################################################
   	$tval = (@a > 2) ? int($a[2]) : 0;
   	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";	# RELOCK_DELAY (FF=never)
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'8001C8'.$delay);# OPEN
 	$state = "";
   }
-  elsif($cmd eq "inhibit") { ###############################################
+  elsif($cmd eq "inhibit") { ##################################################
   	return "$a[2] is not on or off" if($a[2] !~ m/^(on|off)$/);
  	my $val = ($a[2] eq "on") ? "01" : "00";
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.'01');	# SET_LOCK
@@ -2298,10 +2307,10 @@ CUL_HM_Set($@)
     CUL_HM_PushCmdStack($hash, 
 	    sprintf("++%s11%s%s02%s%02X%s%s",$flag,$id,$dst,$chn,$a[1]*2,$rval,$tval));
   } 
-  elsif($cmd eq "stop") { #####################################
+  elsif($cmd eq "stop") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
   } 
-  elsif($cmd eq "text") { #############################################
+  elsif($cmd eq "text") { #####################################################
     $state = "";
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
     return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
@@ -2455,7 +2464,7 @@ CUL_HM_Set($@)
 
 	CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01".sprintf("%02X",$tcnf));
   } 
-  elsif($cmd eq "desired-temp") { ##################
+  elsif($cmd eq "desired-temp") { #############################################
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.$temp);
@@ -2464,14 +2473,14 @@ CUL_HM_Set($@)
 	readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1) 
 	      if($mode eq 'central ');
   } 
-  elsif($cmd =~ m/^(day|night|party)-temp$/) { ##################
+  elsif($cmd =~ m/^(day|night|party)-temp$/) { ################################
     my %tt = (day=>"03", night=>"04", party=>"06");
     my $tt = $tt{$1};
     my $temp = CUL_HM_convTemp($a[2]);
     return $temp if(length($temp) > 2);
     CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "$tt$temp");      # List 5
   } 
-  elsif($cmd =~ m/^tempList(...)/) { ##################################
+  elsif($cmd =~ m/^tempList(...)/) { ##########################################
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
                     "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
                     "Fri"=>"6 31");
@@ -2501,7 +2510,7 @@ CUL_HM_Set($@)
     CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
 	readingsSingleUpdate($hash,"tempList$wd",$msg,0);
   } 
-  elsif($cmd eq "valvePos") { ##################
+  elsif($cmd eq "valvePos") { #################################################
 	return "only number <= 100  or 'off' allowed" 
 	   if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <100 ));
     if ($a[2] eq "off"){
@@ -2517,19 +2526,19 @@ CUL_HM_Set($@)
 	  $state = "ValveAdjust:$vp %";
 	}
   } 
-  elsif($cmd eq "matic") { ##################################### 
+  elsif($cmd eq "matic") { ####################################################
     # Trigger pre-programmed action in the winmatic. These actions must be
     # programmed via the original software.
     CUL_HM_PushCmdStack($hash,
         sprintf("++%s3E%s%s%s40%02X%s", $flag,$id, $dst, $id, $a[2], $chn));
   } 
-  elsif($cmd eq "create") { ###################################
+  elsif($cmd eq "create") { ###################################################
     CUL_HM_PushCmdStack($hash, 
         sprintf("++%s01%s%s0101%s%02X%s",$flag,$id, $dst, $id, $a[2], $chn));
     CUL_HM_PushCmdStack($hash,
         sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn));
   } 
-  elsif($cmd eq "keydef") { #####################################
+  elsif($cmd eq "keydef") { ###################################################
     if (     $a[3] eq "tilt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B220D838B228D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
     } elsif ($a[3] eq "close")     {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B550D838B558D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
     } elsif ($a[3] eq "closed")    {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0F008F00");        #offLevel (also thru register)
@@ -2578,7 +2587,7 @@ CUL_HM_Set($@)
 	        if (hex($chNo) > $maxBtnNo);
 	}
   }
-  elsif($cmd eq "actiondetect"){
+  elsif($cmd eq "actiondetect"){###############################################
     $state = "";
     my (undef,undef,$cyctime) = @a;
     return ($cyctime eq 'off')?CUL_HM_ActDel($dst):CUL_HM_ActAdd($dst,$cyctime);
@@ -3882,10 +3891,6 @@ CUL_HM_ActGetCreateHash()
   my $defPtr = $modules{CUL_HM}{defptr};
   my $actName = $defPtr->{"000000"}{NAME} if($defPtr->{"000000"});
   my $actHash = $modules{CUL_HM}{defptr}{"000000"};
-  if ($attr{$actName}{peerList} && !$attr{$actName}{peerIDs}){#todo Updt1 remove
-    $attr{$actName}{peerIDs} = $attr{$actName}{peerList};     #todo Updt1 remove
-	delete ($attr{$actName}{peerList});                       #todo Updt1 remove
-  }                                                           #todo Updt1 remove
   if (!$actHash->{helper}{first}){ # if called first time attributes are no yet
                                    #recovered
   	InternalTimer(gettimeofday()+3, "CUL_HM_ActGetCreateHash", "ActionDetector", 0);
