@@ -166,7 +166,7 @@ use vars qw(%addNotifyCB);	# Used by event enhancers (e.g. avarage)
 
 use vars qw($reread_active);
 
-my $AttrList = "room group comment alias eventMap";
+my $AttrList = "room group comment alias eventMap userReadings";
 
 my %comments;			# Comments from the include files
 my $ipv6;			# Using IPV6
@@ -317,6 +317,17 @@ if(int(@ARGV) == 2) {
 }
 # End of client code
 ###################################################
+
+
+###################################################
+# for debugging
+sub
+Debug($) {
+  my $msg= shift;
+  Log 1, "DEBUG>" . $msg;
+}
+###################################################
+
 
 ###################################################
 # Server initialization
@@ -1385,6 +1396,12 @@ CommandDeleteAttr($$)
     }
 
     $a[0] = $sdev;
+    
+    if($a[1] eq "userReadings") {
+      Debug "Deleting userReadings for $sdev";
+      delete($defs{$sdev}{fhem}{userReadings});
+    }
+
     $ret = CallFn($sdev, "AttrFn", "del", @a);
     if($ret) {
       push @rets, $ret;
@@ -1747,6 +1764,27 @@ CommandAttr($$)
       }
     }
 
+    if($a[1] eq "userReadings") {
+
+      my %userReadings;
+
+      my $arg= $a[2]; # myReading1 { codecodecode1 }, myReading2 { codecodecode2 }, myReading3 { codecodecode3 }
+
+      my $regexi= '\s*(\w+)\s+({.*?})\s*';      # matches myReading1 { codecodecode1 }
+      my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
+
+      Debug "arg is $arg";
+
+      while($arg =~ /$regexo/) {
+        my $userReading= $2;
+        my $perlCode= $3;
+        #Debug sprintf("userReading %s has perlCode %s", $userReading, $perlCode);
+        $userReadings{$userReading}= $perlCode;
+        $arg= defined($5) ? $5 : "";
+      }
+      $defs{$sdev}{fhem}{userReadings}= \%userReadings;
+    }
+
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
       push @rets,"$sdev: unknown IODev specified";
       next;
@@ -1770,6 +1808,7 @@ CommandAttr($$)
       $defs{$sdev}{NR} = $devcount++
         if($defs{$ioname}{NR} > $defs{$sdev}{NR});
     }
+
   }
   Log 3, join(" ", @rets) if(!$cl && @rets);
   return join("\n", @rets);
@@ -2750,11 +2789,6 @@ addEvent($$)
 #
 ################################################################
 
-sub
-Debug($) {
-  my $msg= shift;
-  Log 1, "DEBUG>" . $msg;
-}
 
 # get the names of interfaces for the device represented by the $hash
 # empty list is returned if interfaces are not defined
@@ -2927,6 +2961,7 @@ readingsBeginUpdate($)
   return $now;
 }
 
+
 #
 # Call readingsEndUpdate when you are done updating readings.
 # This optionally calls DoTrigger to propagate the changes.
@@ -2937,6 +2972,20 @@ readingsEndUpdate($$)
   my ($hash,$dotrigger)= @_;
   my $name = $hash->{NAME};
   
+  # process user readings
+  if(defined($hash->{fhem}{userReadings})) {
+    my %userReadings= %{$hash->{fhem}{userReadings}};
+    foreach my $userReading (keys %userReadings) {
+      Debug "Evaluating " . $userReadings{$userReading};
+      my $value= eval $userReadings{$userReading};
+      if($@) {
+        $value = "Error evaluating $name userReading $userReading: $@";
+        Log 1, $value;
+      }
+      readingsBulkUpdate($hash,$userReading,$value,1);
+    }
+  }
+
   # turn off updating mode
   delete $hash->{".updateTimestamp"};
   delete $hash->{".attreour"};
@@ -2965,7 +3014,6 @@ readingsEndUpdate($$)
 
   }
   $hash->{STATE} = ReplaceEventMap($name, $st, 1) if(defined($st));
-
 
   # propagate changes
   if($dotrigger && $init_done) {
