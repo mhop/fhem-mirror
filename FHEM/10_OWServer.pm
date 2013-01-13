@@ -40,23 +40,23 @@ use vars qw(%owfamily);
 # 1-Wire devices (order by family code)
 # http://owfs.sourceforge.net/family.html
 %owfamily = (
-  "01"  => qw(DS2401 DS1990A),
-  "05"  => qw(DS2405),
-  "10"  => qw(DS18S20 DS1920),
-  "12"  => qw(DS2406 DS2507),
-  "1B"  => qw(DS2436),
-  "1D"  => qw(DS2436),
-  "20"  => qw(DS2450),
-  "22"  => qw(DS1822),
-  "24"  => qw(DS2415 DS1904),
-  "26"  => qw(DS2438),
-  "27"  => qw(DS2417),
-  "28"  => qw(DS18B20),
-  "29"  => qw(DS2408),
-  "3A"  => qw(DS2413),
-  "3B"  => qw(DS1825),
-  "81"  => qw(DS1420),
-  "FF"  => qw(LCD),
+  "01"  => "DS2401 DS1990A",
+  "05"  => "DS2405",
+  "10"  => "DS18S20 DS1920",
+  "12"  => "DS2406 DS2507",
+  "1B"  => "DS2436",
+  "1D"  => "DS2436",
+  "20"  => "DS2450",
+  "22"  => "DS1822",
+  "24"  => "DS2415 DS1904",
+  "26"  => "DS2438",
+  "27"  => "DS2417",
+  "28"  => "DS18B20",
+  "29"  => "DS2408",
+  "3A"  => "DS2413",
+  "3B"  => "DS1825",
+  "81"  => "DS1420",
+  "FF"  => "LCD",
 );
 
 use vars qw(%gets %sets);
@@ -104,6 +104,7 @@ OWServer_Initialize($)
   $hash->{WriteFn} = "OWServer_Write";
   $hash->{ReadFn}  = "OWServer_Read";
   $hash->{DirFn}   = "OWServer_Dir";
+  $hash->{FindFn}  = "OWServer_Find";
   $hash->{Clients} = ":OWDevice:";
 
 # Consumer
@@ -270,6 +271,25 @@ OWServer_Dir($@)
 
 #####################################
 sub
+OWServer_Find($@)
+{
+  my ($hash,$slave)= @_;
+  my $owserver= $hash->{fhem}{owserver};
+
+  my @dir= split(",",$owserver->dir("/"));
+  my $path= undef;
+  for my $entry (@dir) {
+    $entry = substr($entry,1);
+    next if($entry !~ m/^bus.\d+/m);
+    my @busdir= split(",",$owserver->dir("/$entry"));
+    $path= (grep { m/$slave/i } @busdir) ? $entry : undef;
+    last if($path)
+  }
+  return $path;
+}
+
+#####################################
+sub
 OWServer_Autocreate($)
 {
   my ($hash)= @_;
@@ -296,12 +316,13 @@ OWServer_Autocreate($)
   for my $device (@devices) {
     my $address= substr($device,1);
     my $family= substr($address,0,2);
-    if(!defined($owfamily{$family})) {
+    if(!exists $owfamily{$family}) {
       Log 2, "$name: Autocreate: unknown familycode '$family' found. Please report this!";
       next;
     } else {
       my $type= $owserver->read($device . "/type");
-      if($type !~ m/$owfamily{$family}/) {
+      my $owtype= $owfamily{$family};
+      if($owtype !~ m/$type/) {
         Log 2, "$name: Autocreate: type '$type' not defined in familycode '$family'. Please report this!";
         next;
       } else {
