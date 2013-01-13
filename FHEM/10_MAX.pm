@@ -313,7 +313,32 @@ MAX_Set($@)
     readingsSingleUpdate($hash, $setting, $args[0], 0);
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetDisplayActualTemperature",$hash->{addr},sprintf("%02x",$args[0] ? 4 : 0));
 
-  } elsif($setting eq "associate") {
+  } elsif($setting eq "fake") {
+    #Resolve first argument to address
+    return "Invalid number of arguments" if(@args == 0);
+    my $dest = $args[0];
+    if(exists($defs{$dest})) {
+      return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
+      $dest = $defs{$dest}{addr};
+    } else {
+      return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
+    }
+
+    if($hash->{type} eq "ShutterContact") {
+      return "Invalid number of arguments" if(@args != 2);
+      my $state = $args[1] ? "12" : "10";
+      return ($hash->{IODev}{Send})->($hash->{IODev},"ShutterContactState",$dest,$state,"06",undef,undef,$hash->{addr});
+    } elsif($hash->{type} eq "WallMountedThermostat") {
+      return "Invalid number of arguments" if(@args != 3);
+      my $desiredTemperature = $args[1];
+      my $measuredTemperature = $args[2];
+      return ($hash->{IODev}{Send})->($hash->{IODev},"WallThermostatState",$dest,
+        sprintf("%02x%02x",int($desiredTemperature*2),int($measuredTemperature*10)),"04",undef,undef,$hash->{addr});
+    } else {
+      return "fake does not work for device type $hash->{type}";
+    }
+
+  } elsif($setting ~~ ["associate", "deassociate"]) {
     my $dest = $args[0];
     if(exists($defs{$dest})) {
       return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
@@ -325,7 +350,12 @@ MAX_Set($@)
     my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
     Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{groupid});
     Log 5, "Using dest $dest, destType $destType";
-    return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%02x%s%02x",$hash->{groupid}, $dest, $destType));
+    if($setting eq "associate") {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%s%02x", $dest, $destType));
+    } else {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"RemoveLinkPartner",$hash->{addr},sprintf("%s%02x", $dest, $destType));
+    }
+
 
   } elsif($setting eq "factoryReset") {
 
@@ -356,12 +386,12 @@ MAX_Set($@)
       #Create numbers from 4.5 to 30.5
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
       my $boostDurVal = join(",", values(%boost_durations));
-      return "$ret associate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
+      return "$ret associate:$assoclist deassociate:$assoclist desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist measurementOffset:$templistOffset maximumTemperature:$templist minimumTemperature:$templist windowOpenTemperature:$templist windowOpenDuration boostDuration:$boostDurVal boostValveposition decalcification maxValveSetting valveOffset";
 
     } elsif($hash->{type} eq "WallMountedThermostat") {
-      return "$ret associate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist";
+      return "$ret associate:$assoclist deassociate:$assoclist displayActualTemperature:0,1 desiredTemperature:eco,comfort,boost,auto,$templist ecoTemperature:$templist comfortTemperature:$templist maximumTemperature:$templist";
     } elsif($hash->{type} eq "ShutterContact") {
-      return "$ret associate:$assoclist";
+      return "$ret associate:$assoclist deassociate:$assoclist";
     } else {
       return $ret;
     }
@@ -608,7 +638,12 @@ MAX_Parse($$)
     }
 
   } elsif($msgtype eq "Ack") {
-    #The payload of an Ack is a 2-digit hex number (I just saw it being "01")
+    #The payload of an Ack is a 2-digit hex number (being "01" for okey and "81" for "invalid command/argument"
+    if($isToMe and (unpack("C",pack("H*",$args[0])) & 0x80)) {
+      my $device = $addr;
+      $device = $modules{MAX}{defptr}{$device}{NAME} if(exists($modules{MAX}{defptr}{$device}));
+      Log 1, "Device $device answered with: Invalid command/argument";
+    }
     #with unknown meaning plus the data of a State broadcast from the same device
     #For HeatingThermostats, it does not contain the last three "until" bytes (or measured temperature)
     if($shash->{type} ~~ "HeatingThermostat" ) {
@@ -733,6 +768,12 @@ MAX_Parse($$)
         Associating a ShutterContact to a {Heating,WallMounted}Thermostat makes it send message to that device to automatically lower temperature to windowOpenTemperature while the shutter is opened. The thermostat must be associated to the ShutterContact, too, to accept those messages.
         Associating HeatingThermostat and WallMountedThermostat makes them sync their desiredTemperature and uses the measured temperature of the
  WallMountedThermostat for control.</li>
+    <li>deassociate &lt;value&gt;<br>
+        Removes the association set by associate.</li>
+    <li>fake &lt;device&gt; &lt;parameters...&gt;<br>
+      Sends a fake state message of this device over the air to &lt;device&gt;. Works only with CUL_MAX as IODev. For ShutterContacts, sends
+      a ShutterContactState message; &lt;parameters...&gt; must be 0 or 1 for "window closed" or "window opened". For WallMountedThermostats.
+      sends a WallThermostatState message; &lt;parameters...&gt; must be "$desiredTemperature $measuredTemperature" (both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with the source device beforehand.</li>
   </ul>
   <br>
 
