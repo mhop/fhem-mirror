@@ -43,7 +43,7 @@ $owdevice{"01"} = {
     # DS1990A - Serial Number iButton
     "read"      => [],
     "write"     => [],
-    "poll"      => [ qw(address) ],
+    "poll"      => [ qw(id) ],
     "state"     => [],
     "interface" => "id",
 };
@@ -295,7 +295,7 @@ $owdevice{"81"} = {
     # USB id - ID found in DS2490R and DS2490B USB adapters 
     "read"      => [],
     "write"     => [],
-    "poll"      => [ qw(address) ],
+    "poll"      => [ qw(id) ],
     "state"     => [],
     "interface" => "id",
 };
@@ -631,12 +631,13 @@ OWDevice_Define($$)
         $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
         $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
         if($interface eq "id" && !defined($hash->{fhem}{interval})) {
-          my $value= OWDevice_Get($hash, "address");
           my $dir= OWDevice_ReadFromServer($hash,"dir","/");
           my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
           my $bus= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
           my $location= (defined($bus)) ? $bus :"absent";
+          my $id= OWDevice_Get($hash, $name, "id");
           readingsBeginUpdate($hash);
+          readingsBulkUpdate($hash,"id",$id);
           readingsBulkUpdate($hash,"present",$present);
           readingsBulkUpdate($hash,"state","present: $present");
           readingsBulkUpdate($hash,"location",$location);
