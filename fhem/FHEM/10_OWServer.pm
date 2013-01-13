@@ -24,6 +24,9 @@
 #
 ################################################################################
 
+# TODO:
+# - doku für get / set nachziehen
+
 package main;
 
 use strict;
@@ -54,6 +57,41 @@ use vars qw(%owfamily);
   "3B"  => qw(DS1825),
   "81"  => qw(DS1420),
   "FF"  => qw(LCD),
+);
+
+use vars qw(%gets %sets);
+%gets = (
+  "/settings/timeout/directory"        => "",
+  "/settings/timeout/ftp"              => "",
+  "/settings/timeout/ha7"              => "",
+  "/settings/timeout/network"          => "",
+  "/settings/timeout/presence"         => "",
+  "/settings/timeout/serial"           => "",
+  "/settings/timeout/server"           => "",
+  "/settings/timeout/stable"           => "",
+  "/settings/timeout/uncached"         => "",
+  "/settings/timeout/usb"              => "",
+  "/settings/timeout/volatile"         => "",
+  "/settings/timeout/w1"               => "",
+  "/settings/units/pressure_scale"     => "",
+  "/settings/units/temperature_scale"  => "",
+);
+
+%sets = (
+  "timeout/directory"        => "",
+  "timeout/ftp"              => "",
+  "timeout/ha7"              => "",
+  "timeout/network"          => "",
+  "timeout/presence"         => "",
+  "timeout/serial"           => "",
+  "timeout/server"           => "",
+  "timeout/stable"           => "",
+  "timeout/uncached"         => "",
+  "timeout/usb"              => "",
+  "timeout/volatile"         => "",
+  "timeout/w1"               => "",
+  "units/pressure_scale"     => "",
+  "units/temperature_scale"  => "",
 );
 
 #####################################
@@ -189,6 +227,13 @@ OWServer_DoInit($)
   my $name = $hash->{NAME};
   $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
+  my $owserver= $hash->{fhem}{owserver};
+  foreach my $reading (sort keys %gets) {
+    readingsBeginUpdate($hash);
+    readingsBulkUpdate($hash,"$reading",$owserver->read("$reading"));
+    readingsEndUpdate($hash,1);
+  }
+
   OWServer_Autocreate($hash) if($init_done);
   return undef;
 }
@@ -322,8 +367,27 @@ OWServer_Get($@)
           $ret .= sprintf("%s %10s %s\n", $address, $type, $name);
         }
         return $ret;
-  }  else {
-        return "Unknown argument $cmd, choose one of devices"
+  } elsif($cmd eq "errors") {
+        my $path= "statistics/errors";
+        my @dir= split(",", $owserver->dir($path));
+        my $wide= (reverse sort { $a <=> $b } map { length($_) } @dir)[0];
+        $wide= $wide-length($path);
+        my $ret= "=> $path:\n";
+        for my $error (@dir) {
+          my $stat= $owserver->read("$path/$error");
+          my (undef, $str) = $error =~ m|^(.*[/\\])([^/\\]+?)$|;
+          $str =~ s/_/ /g;
+          $ret .= sprintf("%-*s %d\n",$wide,$str,($stat) ? $stat : 0);
+        }
+        return $ret;
+  } elsif(defined($gets{$cmd})) {
+        my $ret;
+        my $value= $owserver->read($cmd);
+        readingsSingleUpdate($hash,$cmd,$value,1);
+        return "$cmd => $value";
+
+  } else {
+        return "Unknown argument $cmd, choose one of devices ".join(" ", sort keys %gets);
   }
 
 }
@@ -337,9 +401,18 @@ OWServer_Set($@)
 
         # usage check
         #my $usage= "Usage: set $name classdef <classname> <filename> OR set $name reopen";
-        my $usage= "Unknown argument $a[1], choose one of reopen";
+        my $usage= "Unknown argument $a[1], choose one of reopen ".join(" ", sort keys %sets);
+        return $usage if($a[1] ne "reopen " && !defined($sets{$a[1]}));
+
         if((@a == 2) && ($a[1] eq "reopen")) {
                 return OWServer_OpenDev($hash);
+        } elsif(@a == 3) {
+          my $cmd= $a[1];
+          my $value= $a[2];
+          my $owserver= $hash->{fhem}{owserver};
+          my $ret= $owserver->write("/settings/$cmd",$value);
+          #return $ret if($ret);
+          readingsSingleUpdate($hash,"/settings/$cmd",$value,1);
         }
         return undef;
 
