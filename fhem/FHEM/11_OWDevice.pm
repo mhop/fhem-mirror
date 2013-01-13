@@ -634,9 +634,12 @@ OWDevice_Define($$)
           my $value= OWDevice_Get($hash, "address");
           my $dir= OWDevice_ReadFromServer($hash,"dir","/");
           my $present= ($dir =~ m/$hash->{fhem}{address}/) ? 1 :0;
+          my $bus= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
+          my $location= (defined($bus)) ? $bus :"absent";
           readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,"present",$present);
           readingsBulkUpdate($hash,"state","present: $present");
+          readingsBulkUpdate($hash,"location",$location);
           readingsEndUpdate($hash,1);
         }
         OWDevice_UpdateValues($hash) if(defined($hash->{fhem}{interval}));
