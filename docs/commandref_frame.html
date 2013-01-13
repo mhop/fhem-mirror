@@ -370,13 +370,27 @@ A line ending with \ will be concatenated with the next one, so long lines
     <li>If a reading is listed in event-on-update-reading, an update of the
         reading creates an event no matter whether the reading is also listed
         in event-on-change-reading.</li>
-    </ol>
+    </ol><br>
 
-  </ul>
+    <a name="userReadings"></a>
+    <li>userReadings<br>
+    A comma-separated list of user-defined readings. Each definition has the form
+    <code>&lt;reading&gt; { &lt;perl code&gt; }</code>. After a single or bulk
+    readings update, the user-defined readings are set by evaluating the <a href="#perl">
+    perl code</a>
+    <code>{ &lt;perl code&gt; }</code> for all definitions and setting the value of
+    the respective user-defined reading <code>&lt;reading&gt;</code> to the result.<br><br>
+    Examples:<br>
+    <code>attr myPowerMeter userReadings power { ReadingsVal("myPowerMeter","count.A",0)/1250.0;; }</code><br>
+    <code>attr myMultiMeter userReadings power1 { ReadingsVal("myMultiMeter","count.A",0)/1250.0;; },
+          power2 { ReadingsVal("myMultiMeter","count.B",0)/1250.0;; }</code>
+    </li><br>
+
+    </ul>
   <br>
 
   Device specific attributes are documented in the corresponding device section.
-  <br>
+  <br><br>
 
   Examples:
   <ul>
