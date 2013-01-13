@@ -564,7 +564,7 @@ FHT_Parse($$)
   } else {
     readingsBulkUpdate($def, $cmd, $val);
     if($cmd eq "measured-temp") {
-      readingsBulkUpdate($def, "state", "measured-temp: $val");
+      readingsBulkUpdate($def, "state", "measured-temp: $val", 0);
       readingsBulkUpdate($def, "temperature", $val); # For dewpoint
     }    
   }
