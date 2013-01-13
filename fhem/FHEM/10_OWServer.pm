@@ -189,7 +189,7 @@ OWServer_DoInit($)
   my $name = $hash->{NAME};
   $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
-  OWServer_Autodiscovery($hash) if($init_done);
+  OWServer_Autocreate($hash) if($init_done);
   return undef;
 }
 
@@ -224,47 +224,64 @@ OWServer_Dir($@)
 }
 
 #####################################
-# TODO: codereview - es war zu spät...
 sub
-OWServer_Autodiscovery($)
+OWServer_Autocreate($)
 {
   my ($hash)= @_;
   my $name = $hash->{NAME};
-  
-  return undef;
 
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "autocreate");
+    return undef if(AttrVal($defs{$d}{NAME},"disable",undef));
+  }
+  
   my $owserver= $hash->{fhem}{owserver};
 
   my @dir= split(",", $owserver->dir());
   my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
+
+  my @defined = ();
+  foreach my $d (keys %defs) {
+    next if($defs{$d}{TYPE} ne "OWDevice");
+    if(defined($defs{$d}{fhem}) && defined($defs{$d}{fhem}{address})) {
+      push(@defined,$defs{$d}{fhem}{address});
+    }
+  }
+
   for my $device (@devices) {
     my $address= substr($device,1);
     my $family= substr($address,0,2);
     if(!defined($owfamily{$family})) {
+      Log 2, "$name: Autocreate: unknown familycode '$family' found. Please report this!";
       next;
     } else {
       my $type= $owserver->read($device . "/type");
       if($type !~ m/$owfamily{$family}/) {
-        Log 2, "$name: Autodiscovery: type '$type' unknown";
+        Log 2, "$name: Autocreate: type '$type' not defined in familycode '$family'. Please report this!";
         next;
       } else {
         foreach my $d (keys %defs) {
-          next if($defs{$d}{TYPE} eq "OWDevice" &&
-                  defined($defs{$d}{fhem}) && 
-                  defined($defs{$d}{fhem}{address}) && $defs{$d}{fhem}{address} eq $address);
-          my $id= substr($address,3);
-          my $devname= $type . "_" . $id;
-          if(defined($defs{$devname})) {
+          next if($defs{$d}{TYPE} ne "OWDevice");
+          if(defined($defs{$d}{fhem}) &&
+             defined($defs{$d}{fhem}{address}) && $defs{$d}{fhem}{address} eq $address) {
+            Log 5, "$name address '$address' already defined as '$defs{$d}{NAME}'";
             next;
           } else {
-            my $interval= ($family eq "81") ? "" : " 60";
-            my $define= "$devname OWDevice $address" . $interval;
-            my $cmdret;
-            $cmdret= CommandDefine(undef,$define);
-            if($cmdret) {
-              Log 1, "$name: An error occurred while creating device for address '$address': $cmdret";
+            my $id= substr($address,3);
+            my $devname= $type . "_" . $id;
+            if(defined($defs{$devname}) || grep {$_ eq $address} @defined) {
+              next;
             } else {
-              $cmdret= CommandAttr(undef,"$devname room OWDevice");
+              Log 5, "$name create new device '$devname' for address '$address'";
+              my $interval= ($family eq "81") ? "" : " 60";
+              my $define= "$devname OWDevice $address" . $interval;
+              my $cmdret;
+              $cmdret= CommandDefine(undef,$define);
+              if($cmdret) {
+                Log 1, "$name: Autocreate: An error occurred while creating device for address '$address': $cmdret";
+              } else {
+                $cmdret= CommandAttr(undef,"$devname room OWDevice");
+              }
             }
           }
         }
@@ -352,11 +369,12 @@ OWServer_Set($@)
     format &lt;hostname&gt;:&lt;port&gt;. For details see
     <a href="http://owfs.org/index.php?page=owserver_protocol">owserver documentation</a>.
     <br><br>
-    You need <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm from owfs.org</a>. Just drop it into your <code>FHEM</code>
-    folder alongside the <code>10_OWServer.pm</code> module. As at 2012-12-23 the OWNet module
+    You need <a href="http://owfs.cvs.sourceforge.net/viewvc/owfs/owfs/module/ownet/perl5/OWNet/lib/OWNet.pm">OWNet.pm from owfs.org</a>, which is normally deployed with FHEM. As at 2012-12-23 the OWNet module
     on CPAN has an issue which renders it useless for remote connections.
     <br><br>
     The actual 1-wire devices are defined as <a href="#OWDevice">OWDevice</a> devices.
+    If <a href="#autocreate">autocreate</a> is enabled, all the devices found are created at
+    start of FHEM automatically.
     <br><br>
     This module is completely unrelated to the 1-wire modules with names all in uppercase.
     <br><br>
