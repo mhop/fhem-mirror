@@ -406,6 +406,9 @@ OWDevice_ReadFromServer($$@)
   if($cmd eq "dir") {
     $ret = &{$modules{$iohash->{TYPE}}{DirFn}}($iohash, @a);
   }
+  if($cmd eq "find") {
+    $ret = &{$modules{$iohash->{TYPE}}{FindFn}}($iohash, @a);
+  }
   use strict "refs";
   return $ret;
 }
@@ -475,15 +478,18 @@ OWDevice_UpdateValues($) {
           }
           if($alerting) {
             my $dir= OWDevice_ReadFromServer($hash,"dir","/alarm/");
-            my $alarm= ($dir =~ m/$address/) ? 1 :0;
+            my $alarm= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
             readingsBulkUpdate($hash,"alarm",$alarm);
             $state .= "alarm: $alarm";
           }
           if($interface eq "id") {
             my $dir= OWDevice_ReadFromServer($hash,"dir","/");
-            my $present= ($dir =~ m/$address/) ? 1 :0;
+            my $present= (defined($dir) && $dir =~ m/$address/) ? 1 :0;
             readingsBulkUpdate($hash,"present",$present);
             $state .= "present: $present";
+            my $bus= OWDevice_ReadFromServer($hash,"find",$address);
+            my $location= (defined($bus)) ? $bus :"absent";
+            readingsBulkUpdate($hash,"location",$location);
           }
           $state =~ s/\s+$//;
           readingsBulkUpdate($hash,"state",$state);
@@ -622,6 +628,7 @@ OWDevice_Define($$)
         $hash->{fhem}{alerting}= $alerting;
         Log 5, "$name: alerting: $alerting";
 
+        $hash->{fhem}{bus}= OWDevice_ReadFromServer($hash,"find",$hash->{fhem}{address});
         $attr{$name}{model}= OWDevice_ReadValue($hash, "type");
         if($interface eq "id" && !defined($hash->{fhem}{interval})) {
           my $value= OWDevice_Get($hash, "address");
