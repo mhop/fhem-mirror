@@ -481,8 +481,9 @@ MAX_Parse($$)
     if( length($args[0]) == 4 ) {
       #This is the message that WallMountedThermostats send to paired HeatingThermostats
       ($desiredTemperature,$temperature) = unpack("CC",pack("H*",$args[0]));
-    } elsif( length($args[0]) == 14 ) {
-      #This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
+    } elsif( length($args[0]) == 14 or length($args[0]) == 13) {
+      #len=14: This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
+      #len=13: Payload of the Ack message, last field "temperature" is missing
       ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
       #$heaterTemperature/10 is the temperature measured by a paired HeatingThermostat
       #we don't do anything with it here, because this value also appears as temperature in the HeatingThermostat's ThermostatState message
@@ -503,13 +504,16 @@ MAX_Parse($$)
     }
 
     $desiredTemperature /= 2.0; #convert to degree celcius
-    $temperature /= 10.0; #convert to degree celcius
-
-    Log 5, "desiredTemperature $desiredTemperature, temperature $temperature";
+    if(defined($temperature)) {
+      $temperature /= 10.0; #convert to degree celcius
+      Log 5, "desiredTemperature $desiredTemperature, temperature $temperature";
+      readingsBulkUpdate($shash, "temperature", $temperature);
+    } else {
+      Log 5, "desiredTemperature $desiredTemperature"
+    }
 
     #This formatting must match with in MAX_Set:$templist
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature));
-    readingsBulkUpdate($shash, "temperature", $temperature);
 
   }elsif($msgtype eq "ShutterContactState"){
     my $bits = pack("H2",$args[0]);
