@@ -260,12 +260,14 @@ sub
 CUL_MAX_Send(@)
 {
   # $cmd is one of
-  my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt) = @_;
+  my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt, $src) = @_;
 
   CUL_MAX_Check($hash);
 
   $flags = "00" if(!$flags);
   $groupId = "00" if(!defined($groupId));
+  $src = $hash->{addr} if(!defined($src));
+
   if(!defined($msgcnt)) {
     my $dhash = CUL_MAX_DeviceHash($dst);
     #replace message counter if not already set
@@ -274,7 +276,7 @@ CUL_MAX_Send(@)
     $msgcnt = sprintf("%02x",$dhash->{READINGS}{msgcnt}{VAL});
   }
 
-  my $packet = $msgcnt . $flags . $msgCmd2Id{$cmd} . $hash->{addr} . $dst . $groupId . $payload;
+  my $packet = $msgcnt . $flags . $msgCmd2Id{$cmd} . $src . $dst . $groupId . $payload;
 
   #prefix length in bytes
   $packet = sprintf("%02x",length($packet)/2) . $packet;
@@ -284,6 +286,7 @@ CUL_MAX_Send(@)
 
   #Schedule checking for Ack
   return undef if($cmd eq "Ack"); #we don't get an Ack for an Ack
+  return undef if($src ne $hash->{addr}); #we don't handle Ack's for fake messages
   my $timeout = gettimeofday()+$ackTimeout;
   $waitForAck[@waitForAck] = { "packet" => $packet,
                                "dest" => $dst,
