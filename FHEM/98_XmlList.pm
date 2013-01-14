@@ -112,7 +112,7 @@ CommandXmlList($$)
 =pod
 =begin html
 
-<a name="xmllist"></a>
+<a name="XmlList"></a>
 <h3>xmllist</h3>
 <ul>
   <code>xmllist [devspec]</code>

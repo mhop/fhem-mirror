@@ -1068,6 +1068,7 @@ sub OWXAD_SetPage($$) {
 =pod
 =begin html
 
+<a name="OWAD"></a>
 <h3>OWAD</h3>
         <p>FHEM module to commmunicate with 1-Wire A/D converters<br /><br /> Note:<br /> This
             1-Wire module so far works only with the OWX interface module. Please define an <a
