@@ -266,6 +266,7 @@ OWServer_Dir($@)
   my ($hash,$path)= @_;
 
   return undef unless(defined($hash->{fhem}{owserver}));
+  $path= ($path) ? $path : "/";
   return $hash->{fhem}{owserver}->dir($path);
 }
 
@@ -302,7 +303,7 @@ OWServer_Autocreate($)
   
   my $owserver= $hash->{fhem}{owserver};
 
-  my @dir= split(",", $owserver->dir());
+  my @dir= split(",", $owserver->dir("/"));
   my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
 
   my @defined = ();
@@ -375,7 +376,7 @@ OWServer_Get($@)
   my $owserver= $hash->{fhem}{owserver};
 
   if($cmd eq "devices") {
-        my @dir= split(",", $owserver->dir());
+        my @dir= split(",", $owserver->dir("/"));
         my @devices= grep { m/^\/[0-9a-f]{2}.[0-9a-f]{12}$/i } @dir;
         my $ret;
         for my $device (@devices) {
