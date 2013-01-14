@@ -349,7 +349,7 @@ OWDevice_Initialize($)
   $hash->{UndefFn}   = "OWDevice_Undef";
   $hash->{AttrFn}    = "OWDevice_Attr";
 
-  $hash->{AttrList}  = "IODev trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
+  $hash->{AttrList}  = "IODev uncached trimvalues polls interfaces model loglevel:0,1,2,3,4,5 ".  
                        $readingFnAttributes;
 }
 
@@ -401,6 +401,7 @@ OWDevice_ReadFromServer($$@)
   no strict "refs";
   my $ret;
   if($cmd eq "read") {
+    unshift(@a,$dev);
     $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
   }
   if($cmd eq "dir") {
@@ -421,7 +422,8 @@ OWDevice_ReadValue($$) {
         
         my $address= $hash->{fhem}{address};
         my $interface= $hash->{fhem}{interfaces};
-        my $value= OWDevice_ReadFromServer($hash,"read","/$address/$reading");
+        my $cache= (AttrVal($hash->{NAME},"uncached","")) ? "/uncached" : "";
+        my $value= OWDevice_ReadFromServer($hash,"read","$cache/$address/$reading");
         #Debug "/$address/$reading => $value";  
         if($interface ne "id") {
           if(defined($value)) {
@@ -468,7 +470,7 @@ OWDevice_UpdateValues($) {
           }
           if(@state) {
             foreach my $reading (@state) {
-              my $value= OWDevice_ReadValue($hash,$reading);
+              my $value= ReadingsVal($hash->{NAME},$reading,undef);
               if(defined($value)) {
                 $state .= "$reading: $value  ";
               } else {
