@@ -194,6 +194,12 @@ OWFS_Define($$)
 
   Log 3, "OWFS opened $dev for $name";
 
+  Log 1, "OWFS ########################################";
+  Log 1, "OWFS # IMPORTANT NOTE:";
+  Log 1, "OWFS # This module is deprecated and will be removed in a future release!";
+  Log 1, "OWFS # Please use OWServer / OWDevice.";
+  Log 1, "OWFS ########################################";
+
   $hash->{DeviceName} = $dev;
   $hash->{STATE}="";
   my $ret  = OWFS_DoInit($hash);

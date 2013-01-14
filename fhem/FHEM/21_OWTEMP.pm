@@ -473,6 +473,12 @@ OWTEMP_Define($$)
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWTEMP_GetUpdate", $hash, 0);
   }
 
+  Log 1, "OWTEMP ########################################";
+  Log 1, "OWTEMP # IMPORTANT NOTE:";
+  Log 1, "OWTEMP # This module is deprecated and will be removed in a future release!";
+  Log 1, "OWTEMP # Please use OWServer / OWDevice.";
+  Log 1, "OWTEMP ########################################";
+
   return undef;
 }
 
