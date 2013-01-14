@@ -726,6 +726,7 @@ DbLog_Get($@)
 
 =pod
 =begin html
+
 <a name="DbLog"></a>
 <h3>DbLog</h3>
 <ul>
@@ -871,6 +872,7 @@ DbLog_Get($@)
 =end html
 
 =begin html_DE
+
 <a name="DbLog"></a>
 <h3>DbLog</h3>
 <ul>
