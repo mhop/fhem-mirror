@@ -243,7 +243,7 @@ OWServer_DoInit($)
 sub
 OWServer_Read($@)
 {
-  my ($hash,$path)= @_;
+  my ($hash,$dev,$path)= @_;
 
   return undef unless(defined($hash->{fhem}{owserver}));
   return $hash->{fhem}{owserver}->read($path);
