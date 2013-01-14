@@ -66,17 +66,24 @@ foreach my $lang (@lang) {
     my $skip = 1;
     my $line = 0;
     my $docCount = 0;
+    my $hasLink = 0;
     while(my $l = <MOD>) {
       $line++;
+
       if($l =~ m/^=begin html$suffix$/) {
         $l = <MOD>;    # skip one line, to be able to repeat join+split
+        print "$mod: nonempty line after =begin html ignored\n"
+          if($l =~ m/^...*$/);
         $skip = 0; $line++;
+
       } elsif($l =~ m/^=end html$suffix$/) {
         $skip = 1;
+
       } elsif(!$skip) {
         # here we copy line by line from the module
         print OUT $l;
         $docCount++;
+        $hasLink = ($l =~ m/<a name="$mod">/) if(!$hasLink);
         foreach $tag (TAGS) {
           my $ot = ($tagcount{$tag} ? $tagcount{$tag} : 0);
           $tagcount{$tag} +=()= ($l =~ /<$tag>/gi);
@@ -88,6 +95,9 @@ foreach my $lang (@lang) {
     }
     close(MOD);
     print "$mod: No document text found\n" if(!$suffix && !$docCount);
+    print "$mod: No <a name=\"$mod\"> link\n"
+        if(!$suffix && $docCount && !$hasLink);
+
     foreach $tag (TAGS) {
       print("$lang $mods{$mod}: Unbalanced $tag ".
                 "($tagcount{$tag}, last line ok: $llwct{$tag})\n")
