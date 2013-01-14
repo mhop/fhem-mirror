@@ -1095,7 +1095,7 @@ sub OWXSWITCH_SetState($$) {
 =pod
 =begin html
 
-<body>
+<a name="OWSWITCH"></a>
         <h3>OWSWITCH</h3>
         <p>FHEM module to commmunicate with 1-Wire Programmable Switches <br /><br /> Note:<br />
             This 1-Wire module so far works only with the OWX interface module. Please define an <a
