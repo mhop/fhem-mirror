@@ -205,7 +205,7 @@ YAMAHA_AVR_Set($@)
     return "No Argument given" if(!defined($a[1]));     
  
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off statusRequest";
+    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 input:".$inputs_comma." mute:on,off remoteControl:setup,up,down,left,right,return,option,display,enter statusRequest";
 
     readingsBeginUpdate($hash);
 
@@ -251,7 +251,7 @@ YAMAHA_AVR_Set($@)
 		    $command = YAMAHA_AVR_getCommandParam($hash, $a[2]);
 		    if(defined($command) and length($command) > 0)
 		    {
-			$result = YAMAHA_AVR_SendCommand($hash, $address,"<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
+			$result = YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><Input><Input_Sel>".$command."</Input_Sel></Input></$zone></YAMAHA_AV>");
 		    }
 		    else
 		    {
@@ -369,6 +369,49 @@ YAMAHA_AVR_Set($@)
 	    {
 		return "volume can only be used when device is powered on";
 	    }
+	}
+    }
+    elsif($what eq "remoteControl")
+    {
+	if($a[2] eq "up")
+	{
+	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Up</Cursor></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "down")
+	{
+	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Down</Cursor></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "left")
+	{
+	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Left</Cursor></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "right")
+	{
+	    YAMAHA_AVR_SendCommand($hash, "<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Right</Cursor></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "display")
+	{
+	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Display</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "return")
+	{
+	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Return</Cursor></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "enter")
+	{
+	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Cursor>Sel</Cursor></List_Control></$zone></YAMAHA_AV>");
+	}
+	elsif($a[2] eq "setup")
+	{
+	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>On Screen</Menu_Control></List_Control></$zone></YAMAHA_AV");
+	}
+	elsif($a[2] eq "option")
+	{
+	    YAMAHA_AVR_SendCommand($hash,"<YAMAHA_AV cmd=\"PUT\"><$zone><List_Control><Menu_Control>Option</Menu_Control></List_Control></$zone></YAMAHA_AV>");
+	}
+	else
+	{
+	    return $usage;
 	}
     }
     elsif($what eq "statusRequest")
@@ -794,6 +837,59 @@ input server
 volume -80..16	(volume between -80 and +16 dB)
 mute on
 mute off</pre>
+</ul>
+<u>Remote control (not in all zones available, depending on your model)</u><br><br>
+<ul>
+    In many receiver models, inputs exist, which can't be used just by selecting them. These inputs needs
+    a manual interaction with the remote control to activate the playback (e.g. Internet Radio, Network Streaming).<br><br>
+    For this application the following commands are available:<br><br>
+
+    <u>Cursor Selection:</u>
+    <pre>
+    remoteControl up
+    remoteControl down
+    remoteControl left
+    remoteControl right
+    remoteControl enter
+    </pre>
+
+    <u>Menu Selection:</u>
+    <pre>
+    remoteControl setup
+    remoteControl return
+    remoteControl option
+    remoteControl display
+    </pre>
+
+    The button names are the same as on your remote control.<br><br>
+    
+    A typical example is the automatical turn on and play an internet radio broadcast:
+    <pre>
+    # the initial definition.
+    define AV_receiver YAMAHA_AVR 192.168.0.3
+    </pre>
+    And in your 99_MyUtils.pm the following function:
+    <pre>
+    sub startNetRadio
+    {
+      fhem "set AV_Receiver on";
+      sleep 5;
+      fhem "set AV_Receiver input netradio";
+      sleep 4;
+      fhem "set AV_Receiver remoteControl enter";
+      sleep 2;
+      fhem "set AV_Receiver remoteControl enter";
+    }
+    </pre>
+    The remote control commands must be separated with a sleep, because the receiver is loading meanwhile and don't accept commands.<br><br>
+    
+    Now you can use this function by typing the following line in your FHEM command line or in your notify-definitions:
+    <pre>
+    {startNetRadio()}
+    </pre>
+    
+    
+    
   </ul>
 
   <a name="YAMAHA_AVRget"></a>
@@ -813,7 +909,7 @@ volume_level</pre>
   
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optional attribute to activate a smooth volume change.
 	<br><br>
@@ -927,6 +1023,57 @@ input server
 volume -80..16	(Lautst&auml;rke zwischen -80 und +16 dB)
 mute on
 mute off</pre>
+
+</ul>
+<u>Fernbedienung (je nach Modell nicht in allen Zonen verf&uuml;gbar)</u><br><br>
+<ul>
+    In vielen Receiver-Modellen existieren Eing&auml;nge, welche nach der Auswahl keinen Sound ausgeben. Diese Eing&auml;nge
+    bed&uuml;rfen manueller Interaktion mit der Fernbedienung um die Wiedergabe zu starten (z.B. Internet Radio, Netzwerk Streaming, usw.).<br><br>
+    F&uuml;r diesen Fall gibt es folgende Befehle:<br><br>
+
+    <u>Cursor Steuerung:</u>
+    <pre>
+    remoteControl up
+    remoteControl down
+    remoteControl left
+    remoteControl right
+    remoteControl enter
+    </pre>
+
+    <u>Men&uuml; Auswahl:</u>
+    <pre>
+    remoteControl setup
+    remoteControl return
+    remoteControl option
+    remoteControl display
+    </pre>
+
+    Die Befehlsnamen entsprechen den Tasten auf der Fernbedienung.<br><br>
+    
+    Ein typisches Beispiel ist das automatische Einschalten und Abspielen eines Internet Radio Sender:
+    <pre>
+    # Die Ger&auml;tedefinition
+    define AV_receiver YAMAHA_AVR 192.168.0.3
+    </pre>
+    Und in der 99_MyUtils.pm die folgende Funktion:
+    <pre>
+    sub startNetRadio
+    {
+      fhem "set AV_Receiver on";
+      sleep 5;
+      fhem "set AV_Receiver input netradio";
+      sleep 4;
+      fhem "set AV_Receiver remoteControl enter";
+      sleep 2;
+      fhem "set AV_Receiver remoteControl enter";
+    }
+    </pre>
+    Die Kommandos der Fernbedienung m&uuml;ssen mit einem sleep pausiert werden, da der Receiver in der Zwischenzeit arbeitet und keine Befehle annimmt..<br><br>
+    
+    Nun kann man diese Funktion in der FHEM Kommandozeile oder in notify-Definitionen wie folgt verwenden.:
+    <pre>
+    {startNetRadio()}
+    </pre>
   </ul>
 
   <a name="YAMAHA_AVRget"></a>
