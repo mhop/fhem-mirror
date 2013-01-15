@@ -136,6 +136,7 @@ TAHR_Poll($)
   # FIXME
   DevIo_SimpleWrite($hash, "02"); # Request data
   InternalTimer(gettimeofday()+5, "TAHR_Poll", $hash, 0);
+  return undef;
 }
 
 sub
