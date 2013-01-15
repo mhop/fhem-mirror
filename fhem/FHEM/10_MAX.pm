@@ -511,9 +511,9 @@ MAX_Parse($$)
     if( length($args[0]) == 4 ) {
       #This is the message that WallMountedThermostats send to paired HeatingThermostats
       ($desiredTemperature,$temperature) = unpack("CC",pack("H*",$args[0]));
-    } elsif( length($args[0]) == 14 or length($args[0]) == 13) {
+    } elsif( length($args[0]) == 14 or length($args[0]) == 12) {
       #len=14: This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
-      #len=13: Payload of the Ack message, last field "temperature" is missing
+      #len=12: Payload of the Ack message, last field "temperature" is missing
       ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
       #$heaterTemperature/10 is the temperature measured by a paired HeatingThermostat
       #we don't do anything with it here, because this value also appears as temperature in the HeatingThermostat's ThermostatState message
