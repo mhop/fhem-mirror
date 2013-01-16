@@ -472,12 +472,12 @@ MAX_Parse($$)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
     my $untilStr = defined($until3) ? MAX_ParseDateTime($until1,$until2,$until3)->{str} : "";
-    my $measuredTemperature = defined($until2) ? $until2/10 : 0;
+    my $measuredTemperature = defined($until2) ? ((($until1 &0x01)<<8) + $until2)/10 : 0;
     #If the control mode is not "temporary", the cube sends the current (measured) temperature
     $measuredTemperature = "" if($mode == 2 || $measuredTemperature == 0);
     $untilStr = "" if($mode != 2);
 
-    $desiredTemperature = $desiredTemperature/2.0; #convert to degree celcius
+    $desiredTemperature = ($desiredTemperature&0x7F)/2.0; #convert to degree celcius
     Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, until $untilStr, curTemp $measuredTemperature";
 
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
@@ -503,7 +503,7 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "desiredTemperature", sprintf("%2.1f",$desiredTemperature));
     readingsBulkUpdate($shash, "valveposition", $valveposition);
     if($measuredTemperature ne "") {
-      readingsBulkUpdate($shash, "temperature", $measuredTemperature);
+      readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$measuredTemperature));
     }
 
   }elsif($msgtype eq "WallThermostatState"){
@@ -534,11 +534,11 @@ MAX_Parse($$)
       Log 2, "Invalid WallThermostatState packet"
     }
 
-    $desiredTemperature /= 2.0; #convert to degree celcius
+    $desiredTemperature = ($desiredTemperature &0x7F)/2.0; #convert to degree celcius
     if(defined($temperature)) {
-      $temperature /= 10.0; #convert to degree celcius
+      $temperature = ((($desiredTemperature &0x80)<<1) + $temperature)/10;	# auch Temperaturen über 25.5 °C werden angezeigt !
       Log 5, "desiredTemperature $desiredTemperature, temperature $temperature";
-      readingsBulkUpdate($shash, "temperature", $temperature);
+      readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$temperature));
     } else {
       Log 5, "desiredTemperature $desiredTemperature"
     }
@@ -578,15 +578,15 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "connection", $connected);
 
   } elsif($msgtype ~~ ["HeatingThermostatConfig", "WallThermostatConfig"]) {
-    readingsBulkUpdate($shash, "ecoTemperature", $args[0]);
-    readingsBulkUpdate($shash, "comfortTemperature", $args[1]);
-    readingsBulkUpdate($shash, "maximumTemperature", $args[2]);
-    readingsBulkUpdate($shash, "minimumTemperature", $args[3]);
+    readingsBulkUpdate($shash, "ecoTemperature", sprintf("%2.1f",$args[0]));
+    readingsBulkUpdate($shash, "comfortTemperature", sprintf("%2.1f",$args[1]));
+    readingsBulkUpdate($shash, "maximumTemperature", sprintf("%2.1f",$args[2]));
+    readingsBulkUpdate($shash, "minimumTemperature", sprintf("%2.1f",$args[3]));
     if($shash->{type} eq "HeatingThermostat") {
       readingsBulkUpdate($shash, "boostValveposition", $args[4]);
       readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[5]});
-      readingsBulkUpdate($shash, "measurementOffset", $args[6]);
-      readingsBulkUpdate($shash, "windowOpenTemperature", $args[7]);
+      readingsBulkUpdate($shash, "measurementOffset", sprintf("%2.1f",$args[6]));
+      readingsBulkUpdate($shash, "windowOpenTemperature", sprintf("%2.1f",$args[7]));
       readingsBulkUpdate($shash, "windowOpenDuration", $args[8]);
       readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
       readingsBulkUpdate($shash, "valveOffset", $args[10]);
@@ -618,7 +618,7 @@ MAX_Parse($$)
       my $temp_prof_str;
       for (my $k=0;$k<=$j;$k++) {
         $time_prof_str .= sprintf("-%02d:%02d", $hours[$k], $minutes[$k]);
-        $temp_prof_str .= $temp_prof[$k];
+        $temp_prof_str .= sprintf("%2.1f °C",$temp_prof[$k]);
         if ($k < $j) {
           $time_prof_str .= "  /  " . sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
           $temp_prof_str .= "  /  ";
