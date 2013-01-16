@@ -552,6 +552,8 @@ MAXLAN_Parse($$)
 
     }elsif($device_types{$devicetype} eq "ShutterContact"){
       Log 2, "MAXLAN_Parse: ShutterContact send some configuration, but none was expected" if($len > 18);
+    }elsif($device_types{$devicetype} eq "PushButton"){
+      Log 2, "MAXLAN_Parse: PushButton send some configuration, but none was expected" if($len > 18);
     }else{ #TODO
       Log 2, "MAXLAN_Parse: Got configdata for unimplemented devicetype $devicetype";
     }
@@ -602,6 +604,8 @@ MAXLAN_Parse($$)
           Dispatch($hash, "MAX,1,WallThermostatState,$addr,$payload", {RAWMSG => $rmsg});
         }elsif($shash->{type} eq "ShutterContact"){
           Dispatch($hash, "MAX,1,ShutterContactState,$addr,$payload", {RAWMSG => $rmsg});
+        }elsif($shash->{type} eq "PushButton"){
+          Dispatch($hash, "MAX,1,PushButtonState,$addr,$payload", {RAWMSG => $rmsg});
         }else{
           Log 2, "MAXLAN_Parse: Got status for unimplemented device type $shash->{type}";
         }
