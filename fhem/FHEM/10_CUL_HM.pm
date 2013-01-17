@@ -1,6 +1,30 @@
 ##############################################
 # CUL HomeMatic handler
 # $Id$
+#HM-SEC-SFA-SM:
+#- power,sabotage and batterie error evaluated for all channels, mapped to the device only
+#
+#motion detector: 
+#- next-value should be readable 
+#- change minInterval values
+#
+#virtual actor: change state @ longpress only once, not per message
+#
+#reglist
+#- no min/max for literal
+#- fractional values for min-value display
+#
+#virtual command
+#- avoid 'undefined error'
+#
+#press command
+#- avoid 'undefined error'
+#
+#devicepair command
+#- allow only single for motion detector
+#
+#dump messages
+#- all sensor trigger decoding
 
 package main;
 
@@ -177,27 +201,40 @@ my %culHmModel=(
   "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
   "006D" => {name=>"HM-OU-LED16"             ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"Led:1:16",},
   "0075" => {name=>"HM-OU-CFM-PL"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",},
-  "0078" => {name=>"HM-Dis-TD-T"             ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
-  "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
-  "0x7A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
-  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},  
-  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",},  
-  "0084" => {name=>"Schueco_263-160"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},  
-  "0086" => {name=>"Schueco_263-146"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "008D" => {name=>"Schueco_263-1350"        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
-  "008E" => {name=>"Schueco_263-155"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "008F" => {name=>"Schueco_263-145"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "0090" => {name=>"Schueco_263-162"         ,cyc=>'00:30' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},  
-  "0092" => {name=>"Schueco_263-144"         ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",},  
-  "0093" => {name=>"Schueco_263-158"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "0094" => {name=>"Schueco_263-157"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "00A1" => {name=>"HM-LC-SW1-PL2"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0078" => {name=>"HM-Dis-TD-T"             ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",}, #
+  "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, #
+  "0x7A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
+  "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
+  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2 Roto
+  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, #
+  "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface Roto
+  "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote 4 buttons Roto
+  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Rotary Handle Sensor Roto
+  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Shutter Contact Roto
+  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches Roto
+  "0084" => {name=>"Schueco_263-160"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM SENSOR_FOR_CARBON_DIOXIDE Schueco
+  "0086" => {name=>"Schueco_263-146"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount) Schueco
+  "008D" => {name=>"Schueco_263-135"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Push Button 2 Schueco
+  "008E" => {name=>"Schueco_263-155"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons Schueco
+  "008F" => {name=>"Schueco_263-145"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface Schueco
+  "0090" => {name=>"Schueco_263-162"         ,cyc=>'00:30' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM radio-controlled motion detector Schueco
+  "0092" => {name=>"Schueco_263-144"         ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches Schueco 
+  "0093" => {name=>"Schueco_263-158"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "0094" => {name=>"Schueco_263-157"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "00A1" => {name=>"HM-LC-SW1-PL2"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
+  #263 130                        radio-controlled switch actuator 1-channel (flush-mount) Schueco
+  #263 131                        radio-controlled switch actuator 1-channel (flush-mount) Schueco
+  #263 132                        1 channel dimmer L (ceiling voids) Schueco
+  #263 133                        1 channel dimmer TPBU (flush mount) Schueco 
+  #263 134                        1 channel dimmer T (ceiling voids) Schueco
+  #263 146                        radio-controlled blind actuator 1-channel (flush-mount) Schueco
+  #263 147                        radio-controlled blind actuator 1-channel (flush-mount) Schueco                   
+  #263 167                        HM Smoke Detector Schueco 
+  #ZEL STG RM FZS                 radio-controlled socket adapter switch actuator 1-channel Roto
+  #ZEL STG RM FZS-2               radio-controlled socket adapter switch actuator 1-channel Roto
+  #BRC-H                          Dorma Remote 4 single buttons 
+  #RC-H                           DORMA Remote 4 buttons 
+  #atent                          DORMA Remote 3 buttons 
 );
 sub
 CUL_HM_Initialize($)
@@ -737,15 +774,16 @@ CUL_HM_Parse($$)
         push @event, "$eventName:down:$val" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$val" if(($err&0x30) == 0x00);
 	  }
-	  if ($st eq "dimmer"){
-        push @event, "overload:".(($err&0x02)?"on":"off");
-        push @event, "overheat:".(($err&0x04)?"on":"off");
-        push @event, "reduced:" .(($err&0x08)?"on":"off");
+	  elsif ($st eq "dimmer"){
+        push @event,"overload:".(($err&0x02)?"on":"off");
+        push @event,"overheat:".(($err&0x04)?"on":"off");
+        push @event,"reduced:" .(($err&0x08)?"on":"off");
 	  }
-	  if ($model eq "HM-SEC-SFA-SM" && $chn eq "00"){
-	    push @event, "powerError:"     .(($err&0x02) ? "on":"off");
-	    push @event, "sabotageError:"  .(($err&0x04) ? "on":"off");
-	    push @event, "batterieError:"  .(($err&0x08) ? "on":"off");
+	  elsif ($model eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
+  	    CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($shash),1,
+		                        "powerError:"   .(($err&0x02) ? "on":"off"),
+	                            "sabotageError:".(($err&0x04) ? "on":"off"),
+	                            "batterieError:".(($err&0x08) ? "on":"off"));
 	  }
 	  push @event, "battery:" . (($err&0x80) ? "low" : "ok" )
 	           if(($model eq "HM-LC-SW1-BA-PCB")&&($err&0x80));
@@ -861,13 +899,15 @@ CUL_HM_Parse($$)
       push @event, "cover:".     (($err&0x0E)?"open" :"closed");        
 	  push @event, "battery:".   (($err&0x80)?"low"  :"ok"  );
     }
-    elsif($msgType eq "41" && $p =~ m/^01(..)(..)(..)/) {#01 is "motion"
-	  my($cnt,$nextTr) = (hex($1),(hex($3)>>4));
-	  $state = $2;
-	  my $bright = hex($state);
+    elsif($msgType eq "41" && $p =~ m/^01(..)(..)(..)/) {#01 is channel
+	  my($cnt,$bright,$nextTr);
+      ($cnt,$state,$nextTr)	  = (hex($1),$2,(hex($3)>>4));
+	  $bright = hex($state);
+	  my @nextVal = ("0x0","0x1","0x2","0x3","15" ,"30" ,"60" ,"120",
+	                 "240","0x9","0xa","0xb","0xc","0xd","0xe","0xf");
       push @event, "state:motion";
       push @event, "motion:on$target"; #added peterp
-      push @event, "motionCount:".$cnt."_next:".$nextTr;
+      push @event, "motionCount:".$cnt."_next:".$nextTr."-".$nextVal[$nextTr];
       push @event, "brightness:".$bright;
     }
     elsif($msgType eq "70" && $p =~ m/^7F(..)(.*)/) {
@@ -1068,8 +1108,9 @@ CUL_HM_Parse($$)
 		        if (!defined($dChHash->{helper}{trgLgRpt}));
 		  $dChHash->{helper}{trgLgRpt} +=1;
 		  
-		  my $state = ReadingsVal($dChName,"virtActState","OFF");
-		  $state = ($state eq "OFF")?"ON":"OFF";
+		  my $state  = ReadingsVal($dChName,"virtActState","OFF");
+		  my $tNoOld = ReadingsVal($dChName,"virtActTrigNo","0");
+		  $state = ($state eq "OFF")?"ON":"OFF" if ($trigNo ne $tNoOld);
 		  if (hex($msgFlag)&0x20){
 		    $longPress .= "_Release";
 			$dhash->{helper}{trgLgRpt}=0;
@@ -1328,7 +1369,7 @@ my %culHmRegDefine = (
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
-  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{0=>0,15=>1,20=>2,60=>3,120=>4}},
+  minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
   captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
@@ -1714,14 +1755,18 @@ CUL_HM_Get($@)
 	foreach my $regName (@regArr){
 	  my $reg  = $culHmRegDefine{$regName};	  
 	  my $help = $reg->{t};
-	  $help .= " options:".join(",",keys%{$reg->{lit}})if (defined($reg->{lit}));
-	  push @rI,sprintf("%4d: %-16s | %3d to %-11s | %8s | %s\n",
-			  $reg->{l},$regName,$reg->{min},$reg->{max}.$reg->{u},
+	  my ($min,$max) = ($reg->{min},$reg->{max});
+	  if (defined($reg->{lit})){
+	    $help .= " options:".join(",",keys%{$reg->{lit}});
+	    $min =$max ="-","-";
+	  }
+	  push @rI,sprintf("%4d: %-16s | %3s to %-11s | %8s | %s\n",
+			  $reg->{l},$regName,$min,$max.$reg->{u},
               ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),$help)
 	        if (!($isChannel && $reg->{l} == 0));
 	}
 	
-    my $info = sprintf("list: %16s | %-18s | %-8s | %s\n",
+    my $info = sprintf("list: %16s | %-20s | %-8s | %s\n",
 	                 "register","range","peer","description");
 	foreach(sort(@rI)){$info .= $_;}
 	return $info;
@@ -2583,6 +2628,7 @@ CUL_HM_Set($@)
 	}
 	foreach my $channel (keys %{$hash}){# remove higher numbers
 	  my $chNo = $1 if($channel =~ m/^channel_(.*)/);
+	  next if (!defined($chNo));
 	  CommandDelete(undef,$hash->{$channel})
 	        if (hex($chNo) > $maxBtnNo);
 	}
@@ -2605,7 +2651,7 @@ CUL_HM_Set($@)
 	  push (@peerList,substr($peer,0,6));
 	}
 	
-	my $oldPeer; # only once to device, not channel!
+	my $oldPeer = " "; # only once to device, not channel!
 	foreach my $peer (sort @peerList){
 	  next if ($oldPeer eq $peer);
 
@@ -2632,18 +2678,17 @@ CUL_HM_Set($@)
 	my $peerChn = substr($peerDst,6,2);
 	$peerDst = substr($peerDst,0,6);
     my $peerHash;
-	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn} 
-	      if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
-    $peerHash = $modules{CUL_HM}{defptr}{$peerDst} if (!$peerHash);
+	$peerHash = $modules{CUL_HM}{defptr}{$peerDst.$peerChn}if ($modules{CUL_HM}{defptr}{$peerDst.$peerChn});
+    $peerHash = $modules{CUL_HM}{defptr}{$peerDst}         if (!$peerHash);
     return "$peerN not a CUL_HM device"                           if($target && ($target ne "remote") &&(!$peerHash ||$peerHash->{TYPE} ne "CUL_HM"));
     return "$single must be single or dual"                       if(defined($single) && (($single ne"single") &&($single ne"dual")));
     return "$set must be set or unset"                            if(defined($set) && (($set ne"set") &&($set ne"unset")));  
-    return "$target must be [actor|remote|both]"                  if(defined($target) && (($target ne"actor") &&
-		                                                             ($target ne"remote")&&($target ne"both")));  
-	return "use climate chan to pair TC"                          if($md eq "HM-CC-TC" &&$chn ne "02");
-	return "use - single [set|unset] actor - for smoke detector"  if($st eq "smokeDetector"    && (!$single || $single ne "single" || $target ne "actor"));
-	return "use - single - for threeStateSensor"                  if($st eq "threeStateSensor" && (!$single || $single ne "single"));
-			   
+    return "$target must be [actor|remote|both]"                  if(defined($target) && (($target ne"actor")&&($target ne"remote")&&($target ne"both")));  
+	return "use climate chan to pair TC"                          if( $md eq "HM-CC-TC" &&$chn ne "02");
+	return "use - single [set|unset] actor - for smoke detector"  if( $st eq "smokeDetector"       && (!$single || $single ne "single" || $target ne "actor"));
+	return "use - single - for ".$st                              if(($st eq "threeStateSensor"||
+	                                                                  $st eq "motionDetector" )    && (!$single || $single ne "single"));
+
 	$single = ($single eq "single")?1:"";#default to dual
 	$set = ($set eq "unset")?0:1;
 
@@ -3366,6 +3411,12 @@ my %culHmBits = (
                      LONG     => '00,2,$val=(hex($val)&0x40)?1:0',
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      COUNTER  => "02,2", } },
+  "41"          => { txt => "Sensor_event", params => {
+                     BUTTON   => '00,2,$val=(hex($val)&0x3F)',
+                     LONG     => '00,2,$val=(hex($val)&0x40)?1:0',
+                     LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
+                     VALUE    => '02,2,$val=(hex($val))',
+                     NEXT     => '04,2,$val=(hex($val))',} },
   "58"          => { txt => "ClimateEvent", params => {
                      CMD      => "00,2",
                      ValvePos => '02,2,$val=(hex($val))', } },
@@ -3678,7 +3729,7 @@ CUL_HM_getRegFromStore($$$$)
     if ($hash->{helper}{shadowReg}&&$hash->{helper}{shadowReg}{$regLN}){
       $dReadS = $1 if($hash->{helper}{shadowReg}{$regLN} =~ m/$addrS:(..)/);
     }
-	my $dReadR;
+	my $dReadR = " ";
     if ($hash->{READINGS}{$regLN}) {
       $dReadR = $1 if($hash->{READINGS}{$regLN}{VAL} =~ m/$addrS:(..)/);
     }
@@ -4103,7 +4154,7 @@ CUL_HM_setAttrIfCh($$$$)
     make the traces better readable.<br><br>
 
     define may also be invoked by the <a href="#autocreate">autocreate</a>
-    module, together with the necessary hmClass and subType attributes.
+    module, together with the necessary subType attribute.
     Usually you issue a <a href="#CULset">hmPairForSec</a> and press the
     corresponding button on the device to be paired, or issue a <a
     href="#CULset">hmPairSerial</a> set command if the device is a receiver
@@ -4120,7 +4171,7 @@ CUL_HM_setAttrIfCh($$$$)
           you cannot choose it arbitrarily like for FS20 devices). You may
           detect it by inspecting the fhem log.</li>
       <li>the hmClass attribute<br>
-          which is either sender or receiver</li>
+          which is either sender or receiver. It is not used in fhem</li>
       <li>the subType attribute<br>
           which is one of switch dimmer blindActuator remote sensor  swi
           pushButton threeStateSensor motionDetector  keyMatic winMatic
