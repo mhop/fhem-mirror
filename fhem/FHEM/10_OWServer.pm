@@ -24,9 +24,6 @@
 #
 ################################################################################
 
-# TODO:
-# - doku für get / set nachziehen
-
 package main;
 
 use strict;
@@ -114,7 +111,7 @@ OWServer_Initialize($)
   $hash->{GetFn}   = "OWServer_Get";
   $hash->{SetFn}   = "OWServer_Set";
 # $hash->{AttrFn}  = "OWServer_Attr";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5";
+  $hash->{AttrList}= "nonblocking loglevel:0,1,2,3,4,5";
 }
 
 #####################################
@@ -243,10 +240,51 @@ OWServer_DoInit($)
 sub
 OWServer_Read($@)
 {
-  my ($hash,$dev,$path)= @_;
+  my ($hash,$path)= @_;
 
   return undef unless(defined($hash->{fhem}{owserver}));
-  return $hash->{fhem}{owserver}->read($path);
+
+  if(AttrVal($hash->{NAME},"nonblocking",undef)) {
+    $hash->{".path"}= $path;
+    pipe(READER,WRITER);
+    WRITER->autoflush(1);
+
+    my $pid= fork;
+    if(!defined($pid)) {
+      Log 1, "OWServer: Cannot fork: $!";
+      return undef;
+    }
+
+    InternalTimer(gettimeofday()+20, "OWServer_TimeoutChild", $pid, 0);
+    if($pid == 0) {
+      close READER;
+      my $ret= OWNet::read($hash->{DEF},$path);
+      $ret =~ s/^\s+//g;
+      Log 5, "OWServer child read $path: $ret";
+      delete $hash->{".path"};
+      print WRITER $ret;
+      close WRITER;
+      exit 0;
+    }
+
+    Log 5, "OWServer child ID for reading '$path' is $pid";
+    close WRITER;
+    chomp(my $ret= <READER>);
+    close READER;
+    return $ret;
+  } else {
+    my $ret= $hash->{fhem}{owserver}->read($path);
+    $ret =~ s/^\s+//g;
+    return $hash->{fhem}{owserver}->read($path);
+  }
+}
+
+#####################################
+sub
+OWServer_TimeoutChild($)
+{
+  my $pid= shift;
+  Log 1, "OWServer: Terminated child $pid" if($pid && kill(9, $pid));
 }
 
 #####################################
@@ -489,10 +527,32 @@ OWServer_Set($@)
   <a name="OWServerset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; reopen</code>
+    <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
-    Reopens the connection to the owserver.
-    <br><br>
+    where <code>value</code> is one of<br><br>
+    <li><code>reopen</code><br>
+      Reopens the connection to the owserver.
+    </li>
+    <li>owserver (OWFS) specific settings:
+      <ul>
+        <li><code>timeout/directory</code></li>
+        <li><code>timeout/ftp</code></li>
+        <li><code>timeout/ha7</code></li>
+        <li><code>timeout/network</code></li>
+        <li><code>timeout/presence</code></li>
+        <li><code>timeout/serial</code></li>
+        <li><code>timeout/server</code></li>
+        <li><code>timeout/stable</code></li>
+        <li><code>timeout/uncached</code></li>
+        <li><code>timeout/usb</code></li>
+        <li><code>timeout/volatile</code></li>
+        <li><code>timeout/w1</code></li>
+        <li><code>units/pressure_scale</code></li>
+        <li><code>units/temperature_scale</code></li>
+      </ul>
+    </li>
+    For further informations have look on <a href="http://owfs.org/uploads/owserver.1.html#sect41">owserver manual</a>).
+    <br>
   </ul>
   <br><br>
 
@@ -500,11 +560,35 @@ OWServer_Set($@)
   <a name="OWServerget"></a>
   <b>Get</b>
   <ul>
-    <code>get &lt;name&gt; devices</code>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
     <br><br>
-    Lists the addresses and types of all 1-wire devices provided by the owserver. Also shows
-    the corresponding <a href="#OWDevice">OWDevice</a> if one is defined for the respective 1-wire devices.
-    <br><br>
+    where <code>value</code> is one of<br><br>
+    <li><code>devices</code><br>
+      Lists the addresses and types of all 1-wire devices provided by the owserver. Also shows
+      the corresponding <a href="#OWDevice">OWDevice</a> if one is defined for the respective 1-wire devices.
+    </li>
+    <li><code>errors</code><br>
+      List a (maybe helpful) view of error statistics.
+    <li>owserver (OWFS) specific settings:
+      <ul>
+        <li><code>/settings/timeout/directory</code></li>
+        <li><code>/settings/timeout/ftp</code></li>
+        <li><code>/settings/timeout/ha7</code></li>
+        <li><code>/settings/timeout/network</code></li>
+        <li><code>/settings/timeout/presence</code></li>
+        <li><code>/settings/timeout/serial</code></li>
+        <li><code>/settings/timeout/server</code></li>
+        <li><code>/settings/timeout/stable</code></li>
+        <li><code>/settings/timeout/uncached</code></li>
+        <li><code>/settings/timeout/usb</code></li>
+        <li><code>/settings/timeout/volatile</code></li>
+        <li><code>/settings/timeout/w1</code></li>
+        <li><code>/settings/units/pressure_scale</code></li>
+        <li><code>/settings/units/temperature_scale</code></li>
+      </ul>
+    </li>
+    For further informations have look on <a href="http://owfs.org/uploads/owserver.1.html#sect41">owserver manual</a>).
+    <br>
   </ul>
   <br><br>
 
@@ -512,6 +596,12 @@ OWServer_Set($@)
   <a name="OWDeviceattr"></a>
   <b>Attributes</b>
   <ul>
+    <li>nonblocking<br>
+    Get all readings (OWServer / <a href="#OWDevice">OWDevice</a>) via a child process. This ensures, that FHEM
+    is not blocked during communicating with the owserver.<br>
+    Example:<br>
+    <code> attr <name> nonblocking 1</code>
+    </li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#eventMap">eventMap</a></li>
     <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
@@ -519,10 +609,7 @@ OWServer_Set($@)
   </ul>
   <br><br>
 
-
-
 </ul>
-
 
 =end html
 =cut
