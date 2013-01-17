@@ -401,7 +401,6 @@ OWDevice_ReadFromServer($$@)
   no strict "refs";
   my $ret;
   if($cmd eq "read") {
-    unshift(@a,$dev);
     $ret = &{$modules{$iohash->{TYPE}}{ReadFn}}($iohash, @a);
   }
   if($cmd eq "dir") {
@@ -497,7 +496,7 @@ OWDevice_UpdateValues($) {
           readingsBulkUpdate($hash,"state",$state);
           readingsEndUpdate($hash,1);
         }
-        InternalTimer(gettimeofday()+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
+        InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
           if(defined($hash->{fhem}{interval}));
 
 }
