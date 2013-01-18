@@ -27,7 +27,7 @@ my $reconnect_interval = 2; #seconds
 #the time it takes after sending one command till we see its effect in the L: response
 my $roundtriptime = 3; #seconds
 
-my $read_timeout = 2; #seconds. How long to wait for an answer from the Cube over TCP/IP
+my $read_timeout = 3; #seconds. How long to wait for an answer from the Cube over TCP/IP
 
 my $metadata_magic = 0x56;
 my $metadata_version = 2;
@@ -159,6 +159,7 @@ MAXLAN_Connect($)
   {
     #Receive one "C:" per device
     $rmsg = MAXLAN_ReadSingleResponse($hash, 1);
+    return undef if(!defined($rmsg));
     MAXLAN_Parse($hash, $rmsg);
   } until($rmsg =~ m/^L:/);
   #At the end, the cube sends a "L:"
@@ -254,7 +255,11 @@ MAXLAN_ExpectAnswer($$)
 }
 
 
-#####################################
+#Reads single line from the Cube
+#blocks if waitForResponse is true
+#
+#returns undef, if an error occured,
+#otherwise the line
 sub
 MAXLAN_ReadSingleResponse($$)
 {
@@ -273,7 +278,10 @@ MAXLAN_ReadSingleResponse($$)
 
     #Check timeout
     if(gettimeofday() > $maxTime) {
-      Log 1, "MAXLAN_ReadSingleResponse: timeout while reading from socket" if($waitForResponse);
+      if($waitForResponse) {
+        Log 1, "MAXLAN_ReadSingleResponse: timeout while reading from socket, disconnecting";
+        MAXLAN_Disconnect($hash);
+      }
       return undef;;
     }
 
