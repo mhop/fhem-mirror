@@ -34,7 +34,7 @@ my %zwave_class = (
   BASIC                    => { id => '20',
     set   => { basicValue  => "01%02x", },
     get   => { basicStatus => "02",     }, 
-    parse => { "..200.(.*)"  => '"basicReport:$1"',}, },
+    parse => { "..200.(.*)"=> '"basicReport:$1"',}, },
   CONTROLLER_REPLICATION   => { id => '21', },
   APPLICATION_STATUS       => { id => '22', },
   ZIP_SERVICES             => { id => '23', },
@@ -47,7 +47,17 @@ my %zwave_class = (
     get   => { swbStatus   => "02",       },
     parse => { "03250300"  => "state:off",
                "032503ff"  => "state:on",  }, } ,
-  SWITCH_MULTILEVEL        => { id => '26', },
+  SWITCH_MULTILEVEL        => { id => '26', 
+    set   => { off         => "0100",
+               on          => "01FF",
+               dim         => "01%02x", 
+               reportOn    => "03FF",
+               reportOff   => "0300",     },
+    get   => { swmStatus   => "02",     }, 
+    #03260363 reported in http://forum.fhem.de/index.php?t=rview&th=10216
+    parse => { "032603(.*)"=> '($1 == "00" ? "state:off" : 
+                               ($1 == "ff" ? "state:on" : 
+                                             "state:dim ".hex($1)))',}, },
   SWITCH_ALL               => { id => '27', },
   SWITCH_TOGGLE_BINARY     => { id => '28', },
   SWITCH_TOGGLE_MULTILEVEL => { id => '29', },
@@ -523,6 +533,12 @@ ZWave_Undef($$)
     activate/deactivate the reporting of device state changes to the
     association group.</li>
 
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>on, off, reportOn, reportOff<br>
+    the same as for SWITCH_BINARY.</li>
+  <li>dim value<br>
+    dim to the requested value (0..100)</li>
+
   <br><br><b>Class CONFIGURATION</b>
   <li>configByte cfgAddress 8bitValue<br>
       configWord cfgAddress 16bitValue<br>
@@ -566,6 +582,12 @@ ZWave_Undef($$)
   <li>swbStatus<br>
     return the status of the node, as state:on or state:off.
     </li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>swmStatus<br>
+    return the status of the node, as state:on, state:off or state:dim value.
+    </li>
+
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>sbStatus<br>
@@ -638,6 +660,11 @@ ZWave_Undef($$)
   <br><br><b>Class SWITCH_BINARY</b>
   <li>state:on</li>
   <li>state:off</li>
+
+  <br><br><b>Class SWITCH_MULTILEVEL</b>
+  <li>state:on</li>
+  <li>state:off</li>
+  <li>state:dim value</li>
 
   <br><br><b>Class SENSOR_BINARY</b>
   <li>state:open</li>
