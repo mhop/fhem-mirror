@@ -23,11 +23,6 @@
 #
 ##############################################################################
 
-# Todos:
-# - stateFormat via Interface
-# - warum wird jeder Wert 2x geloggt?
-# ==> bitte prüfen ob das an der fehlenden UnDefFn gelegen hat!
-
 package main;
 
 use strict;
@@ -493,7 +488,7 @@ OWDevice_UpdateValues($) {
             readingsBulkUpdate($hash,"location",$location);
           }
           $state =~ s/\s+$//;
-          readingsBulkUpdate($hash,"state",$state);
+          readingsBulkUpdate($hash,"state",$state,0);
           readingsEndUpdate($hash,1);
         }
         InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
@@ -640,7 +635,7 @@ OWDevice_Define($$)
           readingsBeginUpdate($hash);
           readingsBulkUpdate($hash,"id",$id);
           readingsBulkUpdate($hash,"present",$present);
-          readingsBulkUpdate($hash,"state","present: $present");
+          readingsBulkUpdate($hash,"state","present: $present",0);
           readingsBulkUpdate($hash,"location",$location);
           readingsEndUpdate($hash,1);
         }
@@ -706,6 +701,7 @@ OWDevice_Define($$)
     <br><br>
     This module is completely unrelated to the 1-wire modules with names all in uppercase.
     <br><br>
+    <b>Note:</b>The state reading never triggers events to avoid confusion.<br><br>
 
     Example:
     <ul>
