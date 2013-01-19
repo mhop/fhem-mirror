@@ -34,6 +34,7 @@
       <a href="#define">define</a> &nbsp;
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
+      <a href="#deletereading">deletereading</a> &nbsp;
       <a href="#fheminfo">fheminfo</a> &nbsp;
       <a href="#get">get</a> &nbsp;
       <a href="#getstate">getstate</a> &nbsp;
@@ -482,6 +483,25 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 </ul>
 
 
+<a name="delete"></a>
+<h3>delete</h3>
+<ul>
+  <code>delete &lt;devspec&gt;</code> <br>
+  <br>
+  L&ouml;scht etwas was mit dem <a href="#define">define</a> Befehl erstellt worden
+  ist.
+  Lesen Sie sich bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r
+  Details von
+  &lt;devspec&gt; durch.<br>
+  Nach dem l&ouml;schen, wird das globale Ereignis "DELETED" erzeugt. Lesen Sie bitte
+  den Abschnitt zu &quot;notify&quot; f&uuml;r genauere Informationen durch.<br>
+  Beispiel:
+  <ul>
+    <code>delete lamp</code><br>
+  </ul>
+  <br>
+</ul>
+
 <a name="deleteattr"></a>
 <h3>deleteattr</h3>
 <ul>
@@ -503,21 +523,22 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
   <br>
 </ul>
 
-<a name="delete"></a>
-<h3>delete</h3>
+<a name="deletereading"></a>
+<h3>deletereading</h3>
 <ul>
-  <code>delete &lt;devspec&gt;</code> <br>
+  <code>deletereading &lt;devspec&gt; &lt;readingname&gt;</code> <br>
   <br>
-  L&ouml;scht etwas was mit dem <a href="#define">define</a> Befehl erstellt worden 
-  ist.
-  Lesen Sie sich bitte den Abschnitt <a href="#devspec">Device specification</a>&nbsp; f&uuml;r 
-  Details von
-  &lt;devspec&gt; durch.<br>
-  Nach dem l&ouml;schen, wird das globale Ereignis "DELETED" erzeugt. Lesen Sie bitte 
-  den Abschnitt zu &quot;notify&quot; f&uuml;r genauere Informationen durch.<br>
-  Beispiel:
+  Delete the reading &lt;readingname&gt;
+  for a device. &lt;readingname&gt; is a perl regular expression that must match the whole name of the reading.
+  Use with greatest care! FHEM might crash if you delete vital readings of a device.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  <br>
+
+  Examples:
   <ul>
-    <code>delete lamp</code><br>
+    <code>deletereading mySensor temp1</code><br>
+    <code>deletereading mySensor temp\d+</code><br>
   </ul>
   <br>
 </ul>
