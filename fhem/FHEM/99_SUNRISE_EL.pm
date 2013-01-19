@@ -94,6 +94,9 @@ sr_alt($$$$$$$)
     return 1;
   }
 
+  $sst = hms2h($min) if(defined($min) && (hms2h($min) > $sst));
+  $sst = hms2h($max) if(defined($max) && (hms2h($max) < $sst));
+
   my $diff = 0;
   if($data{AT_RECOMPUTE} ||                     # compute it for tommorow
      int(($nh-$sst)*3600) >= 0) {               # if called a subsec earlier
@@ -104,10 +107,10 @@ sr_alt($$$$$$$)
 
     ($rt,$st) = _sr_alt($altit,$needrise,$needset, $lt[5]+1900,$lt[4]+1,$lt[3], $ngmtoff);
     $sst = ($rise ? $rt : $st) + ($seconds/3600);
-  }
 
-  $sst = hms2h($min) if(defined($min) && (hms2h($min) > $sst));
-  $sst = hms2h($max) if(defined($max) && (hms2h($max) < $sst));
+    $sst = hms2h($min) if(defined($min) && (hms2h($min) > $sst));
+    $sst = hms2h($max) if(defined($max) && (hms2h($max) < $sst));
+  }
 
   $sst += $diff if($isrel);
   $sst -= $nh if($isrel == 1);
