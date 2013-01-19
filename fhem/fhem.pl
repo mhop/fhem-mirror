@@ -186,9 +186,9 @@ my $cvsid = '$Id$';
 my $namedef =
   "where <name> is either:\n" .
   "- a single device name\n" .
-  "- a list seperated by komma (,)\n" .
-  "- a regexp, if contains one of the following characters: *[]^\$\n" .
-  "- a range seperated by dash (-)\n";
+  "- a list separated by komma (,)\n" .
+  "- a regexp, if it contains one of the following characters: *[]^\$\n" .
+  "- a range separated by dash (-)\n";
 my $stt_sec;                    # Used by SecondsTillTomorrow()
 my $stt_day;                    # Used by SecondsTillTomorrow()
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
@@ -220,6 +220,8 @@ $readingFnAttributes = "event-on-change-reading:0,1 event-on-update-reading:0,1 
 	    Hlp=>"<name> <type> <options>,define a device/at/notify entity" },
   "deleteattr" => { Fn=>"CommandDeleteAttr",
 	    Hlp=>"<devspec> [<attrname>],delete attribute for <devspec>" },
+  "deletereading" => { Fn=>"CommandDeleteReading",
+            Hlp=>"<devspec> [<attrname>],delete user defined reading for <devspec>" },
   "delete"  => { Fn=>"CommandDelete",
 	    Hlp=>"<devspec>,delete the corresponding definition(s)"},
   "get"     => { Fn=>"CommandGet",
@@ -1398,8 +1400,8 @@ CommandDeleteAttr($$)
     $a[0] = $sdev;
     
     if($a[1] eq "userReadings") {
-      Debug "Deleting userReadings for $sdev";
-      delete($defs{$sdev}{fhem}{userReadings});
+      #Debug "Deleting userReadings for $sdev";
+      delete($defs{$sdev}{fhem}{'.userReadings'});
     }
 
     $ret = CallFn($sdev, "AttrFn", "del", @a);
@@ -1419,6 +1421,37 @@ CommandDeleteAttr($$)
   return join("\n", @rets);
 }
 
+#############
+sub
+CommandDeleteReading($$)
+{
+  my ($cl, $def) = @_;
+
+  my @a = split(" ", $def, 2);
+  return "Usage: deletereading <name> <reading>\n$namedef" if(@a != 2);
+
+  my @rets;
+  foreach my $sdev (devspec2array($a[0])) {
+
+    if(!defined($defs{$sdev})) {
+      push @rets, "Please define $sdev first";
+      next;
+    }
+
+    $a[0] = $sdev;
+    my $readingspec= '^' . $a[1] . '$';
+
+    foreach my $reading (grep { /$readingspec/ } keys ($defs{$sdev}{READINGS})) {
+      delete($defs{$sdev}{READINGS}{$reading});
+      push @rets, "Deleted reading $reading for device $sdev";
+    }
+    
+  }
+
+  return join("\n", @rets);
+}
+
+#############
 sub
 PrintHash($$)
 {
@@ -1773,7 +1806,7 @@ CommandAttr($$)
       my $regexi= '\s*(\w+)\s+({.*?})\s*';      # matches myReading1 { codecodecode1 }
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
 
-      Debug "arg is $arg";
+      #Debug "arg is $arg";
 
       while($arg =~ /$regexo/) {
         my $userReading= $2;
@@ -1782,7 +1815,7 @@ CommandAttr($$)
         $userReadings{$userReading}= $perlCode;
         $arg= defined($5) ? $5 : "";
       }
-      $defs{$sdev}{fhem}{userReadings}= \%userReadings;
+      $defs{$sdev}{fhem}{'.userReadings'}= \%userReadings;
     }
 
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
@@ -2926,7 +2959,6 @@ EOD
 ################################################################
 #
 # Wrappers for commonly used core functions in device-specific modules. 
-# This part maintained by Boris Neubert omega at online dot de
 #
 ################################################################
 
@@ -2973,10 +3005,10 @@ readingsEndUpdate($$)
   my $name = $hash->{NAME};
   
   # process user readings
-  if(defined($hash->{fhem}{userReadings})) {
-    my %userReadings= %{$hash->{fhem}{userReadings}};
+  if(defined($hash->{fhem}{'.userReadings'})) {
+    my %userReadings= %{$hash->{fhem}{'.userReadings'}};
     foreach my $userReading (keys %userReadings) {
-      Debug "Evaluating " . $userReadings{$userReading};
+      #Debug "Evaluating " . $userReadings{$userReading};
       my $value= eval $userReadings{$userReading};
       if($@) {
         $value = "Error evaluating $name userReading $userReading: $@";

@@ -37,6 +37,7 @@
       <a href="#define">define</a> &nbsp;
       <a href="#delete">delete</a> &nbsp;
       <a href="#deleteattr">deleteattr</a> &nbsp;
+      <a href="#deletereading">deletereading</a> &nbsp;
       <a href="#fheminfo">fheminfo</a> &nbsp;
       <a href="#get">get</a> &nbsp;
       <a href="#getstate">getstate</a> &nbsp;
@@ -466,6 +467,23 @@ A line ending with \ will be concatenated with the next one, so long lines
 </ul>
 
 
+<a name="delete"></a>
+<h3>delete</h3>
+<ul>
+  <code>delete &lt;devspec&gt;</code> <br>
+  <br>
+  Delete something created with the <a href="#define">define</a> command.
+  See the <a href="#devspec">Device specification</a> section for details on
+  &lt;devspec&gt;.<br>
+  After deletion, the global event "DELETED" will be generated, see the notify
+  section for details.<br>
+  Examples:
+  <ul>
+    <code>delete lamp</code><br>
+  </ul>
+  <br>
+</ul>
+
 <a name="deleteattr"></a>
 <h3>deleteattr</h3>
 <ul>
@@ -485,19 +503,22 @@ A line ending with \ will be concatenated with the next one, so long lines
   <br>
 </ul>
 
-<a name="delete"></a>
-<h3>delete</h3>
+<a name="deletereading"></a>
+<h3>deletereading</h3>
 <ul>
-  <code>delete &lt;devspec&gt;</code> <br>
+  <code>deletereading &lt;devspec&gt; &lt;readingname&gt;</code> <br>
   <br>
-  Delete something created with the <a href="#define">define</a> command.
+  Delete the reading &lt;readingname&gt; 
+  for a device. &lt;readingname&gt; is a perl regular expression that must match the whole name of the reading.
+  Use with greatest care! FHEM might crash if you delete vital readings of a device.
   See the <a href="#devspec">Device specification</a> section for details on
   &lt;devspec&gt;.<br>
-  After deletion, the global event "DELETED" will be generated, see the notify
-  section for details.<br>
+  <br>
+
   Examples:
   <ul>
-    <code>delete lamp</code><br>
+    <code>deletereading mySensor temp1</code><br>
+    <code>deletereading mySensor temp\d+</code><br>
   </ul>
   <br>
 </ul>
