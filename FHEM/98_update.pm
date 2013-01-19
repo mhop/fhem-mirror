@@ -551,7 +551,7 @@ update_GetRemoteFiles($$$)
     }
 
     if (!$newFhem && @reloadModules) {
-      $ret .= "A new version of one ore more module(s) was installed, 'shutdown restart' is required!";
+      $ret .= "A new version of one or more module(s) was installed, 'shutdown restart' is required!";
       #$ret .= "\nModule(s) reloaded:\n";
       #foreach my $modFile (@reloadModules) {
       #  my $cmdret = CommandReload($cl,$modFile);
