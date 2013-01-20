@@ -1,30 +1,6 @@
 ##############################################
 # CUL HomeMatic handler
 # $Id$
-#HM-SEC-SFA-SM:
-#- power,sabotage and batterie error evaluated for all channels, mapped to the device only
-#
-#motion detector: 
-#- next-value should be readable 
-#- change minInterval values
-#
-#virtual actor: change state @ longpress only once, not per message
-#
-#reglist
-#- no min/max for literal
-#- fractional values for min-value display
-#
-#virtual command
-#- avoid 'undefined error'
-#
-#press command
-#- avoid 'undefined error'
-#
-#devicepair command
-#- allow only single for motion detector
-#
-#dump messages
-#- all sensor trigger decoding
 
 package main;
 
@@ -160,7 +136,7 @@ my %culHmModel=(
   "003F" => {name=>"HM-WDS40-TH-I"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0040" => {name=>"HM-WDS100-C6-O"          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
   "0041" => {name=>"HM-WDC7000"              ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",},
-  "0042" => {name=>"HM-SEC-SD"               ,cyc=>'90:00' ,rxt=>'b'   ,lst=>''             ,chn=>"",},
+  "0042" => {name=>"HM-SEC-SD"               ,cyc=>'99:00' ,rxt=>'b'   ,lst=>''             ,chn=>"",},
   "0043" => {name=>"HM-SEC-TIS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0044" => {name=>"HM-SEN-EP"               ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0045" => {name=>"HM-SEC-WDS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
@@ -1758,7 +1734,7 @@ CUL_HM_Get($@)
 	  my ($min,$max) = ($reg->{min},$reg->{max});
 	  if (defined($reg->{lit})){
 	    $help .= " options:".join(",",keys%{$reg->{lit}});
-	    $min = $max ="-";
+	    $min =$max ="-";
 	  }
 	  push @rI,sprintf("%4d: %-16s | %3s to %-11s | %8s | %s\n",
 			  $reg->{l},$regName,$min,$max.$reg->{u},
