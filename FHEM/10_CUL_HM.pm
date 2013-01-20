@@ -1758,7 +1758,7 @@ CUL_HM_Get($@)
 	  my ($min,$max) = ($reg->{min},$reg->{max});
 	  if (defined($reg->{lit})){
 	    $help .= " options:".join(",",keys%{$reg->{lit}});
-	    $min =$max ="-","-";
+	    $min = $max ="-";
 	  }
 	  push @rI,sprintf("%4d: %-16s | %3s to %-11s | %8s | %s\n",
 			  $reg->{l},$regName,$min,$max.$reg->{u},
