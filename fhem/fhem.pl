@@ -1441,7 +1441,8 @@ CommandDeleteReading($$)
     $a[0] = $sdev;
     my $readingspec= '^' . $a[1] . '$';
 
-    foreach my $reading (grep { /$readingspec/ } keys ($defs{$sdev}{READINGS})) {
+    foreach my $reading (grep { /$readingspec/ }
+                                keys %{$defs{$sdev}{READINGS}} ) {
       delete($defs{$sdev}{READINGS}{$reading});
       push @rets, "Deleted reading $reading for device $sdev";
     }
