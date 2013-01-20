@@ -259,7 +259,7 @@ OWServer_Read($@)
     if($pid == 0) {
       close READER;
       my $ret= OWNet::read($hash->{DEF},$path);
-      $ret =~ s/^\s+//g;
+      $ret =~ s/^\s+//g if(defined($ret));
       Log 5, "OWServer child read $path: $ret";
       delete $hash->{".path"};
       print WRITER $ret;
@@ -274,8 +274,8 @@ OWServer_Read($@)
     return $ret;
   } else {
     my $ret= $hash->{fhem}{owserver}->read($path);
-    $ret =~ s/^\s+//g;
-    return $hash->{fhem}{owserver}->read($path);
+    $ret =~ s/^\s+//g if(defined($ret));
+    return $ret;
   }
 }
 
