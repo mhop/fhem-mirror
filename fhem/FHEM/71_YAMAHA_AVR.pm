@@ -851,12 +851,12 @@ mute off</pre>
     remoteControl left
     remoteControl right
     remoteControl enter
+    remoteControl return
     </pre>
 
     <u>Menu Selection:</u>
     <pre>
     remoteControl setup
-    remoteControl return
     remoteControl option
     remoteControl display
     </pre>
@@ -1038,12 +1038,12 @@ mute off</pre>
     remoteControl left
     remoteControl right
     remoteControl enter
+    remoteControl return
     </pre>
 
     <u>Men&uuml; Auswahl:</u>
     <pre>
     remoteControl setup
-    remoteControl return
     remoteControl option
     remoteControl display
     </pre>
@@ -1096,8 +1096,7 @@ mute off</pre>
   
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li><br>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a name="volume-smooth-change">volume-smooth-change</a></li>
 	Optionales Attribut, welches einen weichen Lautst&auml;rke&uuml;bergang aktiviert..
 	<br><br>
