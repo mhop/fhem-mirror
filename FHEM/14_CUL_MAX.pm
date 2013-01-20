@@ -113,7 +113,7 @@ CUL_MAX_Check($@)
   my $version = $hash->{IODev}{VERSION};
 
   #Looks like "V 1.49 CUL868"
-  $version =~ m/V (.*)\.(.*) CUL.*/;
+  $version =~ m/V (.*)\.(.*) .*/;
   my ($major_version,$minorversion) = ($1, $2);
   if($major_version == 1 and $minorversion < 52) {
     Log 2, "The current firmware of the CUL has known bugs with respect to MAX! support. Please update.";
