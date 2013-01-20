@@ -22,7 +22,7 @@ BS_Initialize($)
   $hash->{UndefFn}   = "BS_Undef";
   $hash->{ParseFn}   = "BS_Parse";
   $hash->{AttrList}  = "do_not_notify:1,0 showtime:0,1 ".
-                       "ignore:1,0 model:BS loglevel:0,1,2,3,4,5,6";
+                       "ignore:1,0 model:BS loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
 
 }
 
@@ -110,18 +110,13 @@ BS_Parse($$)
   my $state= sprintf("brightness: %.2f  lux: %.0f  flags: %d",
   	$brightness, $lux, $flags);
 
-  $def->{CHANGED}[0] = $state;
-  $def->{STATE} = $state;
-  $def->{READINGS}{state}{TIME} = $t;
-  $def->{READINGS}{state}{VAL} = $state;
-  Log GetLogLevel($name, 4), "BS $name: $state";
-
-  $def->{READINGS}{brightness}{TIME} = $t;
-  $def->{READINGS}{brightness}{VAL} = $brightness;
-  $def->{READINGS}{lux}{TIME} = $t;
-  $def->{READINGS}{lux}{VAL} = $lux;
-  $def->{READINGS}{flags}{TIME} = $t;
-  $def->{READINGS}{flags}{VAL} = $flags;
+  readingsBeginUpdate($def);
+  readingsBulkUpdate($def, "state", $state);
+  #Log GetLogLevel($name, 4), "BS $name: $state";
+  readingsBulkUpdate($def, "brightness", $brightness);
+  readingsBulkUpdate($def, "lux", $lux);
+  readingsBulkUpdate($def, "flags", $flags);
+  readingsEndUpdate($def, 0);
 
   return $name;
 
@@ -194,6 +189,7 @@ BS_Parse($$)
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (bs)</li>
     <li><a href="#ignore">ignore</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 

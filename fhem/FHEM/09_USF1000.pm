@@ -26,7 +26,7 @@ USF1000_Initialize($)
   $hash->{UndefFn}   = "USF1000_Undef";
   $hash->{ParseFn}   = "USF1000_Parse";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 showtime:0,1 " .
-                        "model:usf1000s loglevel:0,1,2,3,4,5,6";
+                        "model:usf1000s loglevel:0,1,2,3,4,5,6 " . $readingFnAttributes;
 
 }
 
@@ -116,6 +116,7 @@ USF1000_Parse($$)
   my $distance=   hex($xx)/100.0; # in meters
   my $valid= (($distance>0.00) && ($distance<2.55));
 
+  readingsBeginUpdate($def);
 
   if($valid) {
   	my $wlevel  =   $def->{HEIGHT}-($distance-$def->{OFFSET}); # water level
@@ -144,18 +145,14 @@ USF1000_Parse($$)
 
 		my $state= sprintf("v: %d  V: %d", $flevel, $volume);
 
-		$def->{CHANGED}[0] = $state;
-		$def->{STATE} = $state;
-		$def->{READINGS}{state}{TIME} = $t;
-		$def->{READINGS}{state}{VAL} = $state;
-		Log GetLogLevel($name, 4), "USF1000 $name: $state";
+                readingsBulkUpdate($def, "state", $state);
+                readingsBulkUpdate($def, "distance", $distance);
+                readingsBulkUpdate($def, "level", $flevel);
+                readingsBulkUpdate($def, "volume", $volume);
+		
+		#Log GetLogLevel($name, 4), "USF1000 $name: $state";
+		#Debug "USF1000 $name: $state";
 
-		$def->{READINGS}{distance}{TIME} = $t;
-		$def->{READINGS}{distance}{VAL} = $distance;
-		$def->{READINGS}{level}{TIME} = $t;
-		$def->{READINGS}{level}{VAL} = $flevel;
-		$def->{READINGS}{volume}{TIME} = $t;
-		$def->{READINGS}{volume}{VAL} = $volume;
 	}
   }
 
@@ -166,8 +163,9 @@ USF1000_Parse($$)
   }
   $warnings= $warnings ? $warnings : "none";
 
-  $def->{READINGS}{"warnings"}{TIME} = $t;
-  $def->{READINGS}{"warnings"}{VAL} = $warnings;
+  readingsBulkUpdate($def, "warnings", $warnings);
+
+  readingsEndUpdate($def, 0);
 
   return $name;
 
@@ -246,6 +244,7 @@ USF1000_Parse($$)
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#model">model</a> (usf1000s)</li>
     <li><a href="#ignore">ignore</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
