@@ -34,8 +34,18 @@ FW_doUpdate()
     if(d.length != 3)
       continue;
     var el = document.getElementById(d[0]);
-    if(el)
-      el.innerHTML=d[2];
+    if(el) {
+      if(el.nodeName.toLowerCase() == "select") {
+        // dropdown: set the selected index to the current value
+        for(var j=0;j<el.options.length;j++)
+            if(el.options[j].value == d[2]) {
+              el.selectedIndex = j;
+            }
+      } else {
+
+        el.innerHTML=d[2];
+      }
+    }
   }
   //Next time, we continue at the next line
   FW_curLine = lines.length;
