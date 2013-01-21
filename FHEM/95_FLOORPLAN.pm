@@ -31,12 +31,13 @@
 #       added style-descriptions in fp-arrange (October 22, 2012)
 # 0021: fixed http-header, unsetting FF-autocomplete, added attribute fp_setbutton (fixes by Matthias) (November 23, 2012)
 # 0022: longpoll by Matthias Gehre (November 27, 2012)
+# 0023: longpoll updates readings also - by Matthias Gehre; FW_longpoll is now a global variable (January 21, 2013)
 #
 ################################################################
 #
 #  Copyright notice
 #
-#  (c) 2012 Copyright: Ulrich Maass
+#  (c) 2012-2013 Copyright: Ulrich Maass
 #
 #  This file is part of fhem.
 # 
@@ -86,6 +87,7 @@ package main;
 use strict;
 use warnings;
 use vars qw(%data);
+use vars qw($FW_longpoll);
 
 #########################
 # Forward declaration
@@ -114,7 +116,7 @@ my $FW_encoding="UTF-8";		 # like in FHEMWEB: encoding hardcoded
 #  $FW_ME                        # from FHEMWEB: fhem URL
 #  $FW_tp                        # from FHEMWEB: is touchpad
 #  $FW_ss                        # from FHEMWEB: is smallscreen
-my $FW_longpoll=0;               # like FHEMWEB: longpoll doesn't work (yet) for floorplans
+# my $FW_longpoll=0;               # like FHEMWEB: longpoll doesn't work (yet) for floorplans (replaced by global variable, see above)
 #  $FW_wname;                    # from FHEMWEB: name of web-instance
 #  %FW_pos=();                   # from FHEMWEB: scroll position
 my $FW_plotmode="";              # like in FHEMWEB: SVG
@@ -529,7 +531,7 @@ FP_show(){
                   FW_hidden("arg.$d", $cmd) .
                   FW_hidden("dev.$d", $d) .
                   ($FW_room ? FW_hidden("room", $FW_room) : "") .
-                  (AttrVal($FP_name,'fp_setbutton',1) ? FW_select("val.$d", \@tv, $txt, "dropdown") : FW_select("val.$d", \@tv, $txt, "dropdown", "submit()")).
+                  (AttrVal($FP_name,'fp_setbutton',1) ? FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown") : FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown", "submit()")).
                   (AttrVal($FP_name,'fp_setbutton',1) ? FW_submit("cmd.$d", "set") : FW_hidden("cmd.$d", "set")).
                   "</td>";
               }
@@ -630,7 +632,7 @@ FP_menuArrange() {
 	if (!defined($FP_arrange_selected)) {
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form1
 		FW_pO "<div class=\"menu-add\" id=\"fpmenu\">\n" .                                       
-		FW_select("add.dev", \@nfpl, "", "menu-add") .
+		FW_select("","add.dev", \@nfpl, "", "menu-add") .
 		FW_submit("ccc.one", "add");
 		FW_pO "</div></form>\n"; #form1
 	}
@@ -641,7 +643,7 @@ FP_menuArrange() {
 		$dv =  $desc{$dv} if ($dv);
 		FW_pO "<form method=\"get\" action=\"$FW_ME/floorplan/$FP_name\">"; #form2
 		FW_pO "<div class=\"menu-select\" id=\"fpmenu\">\n" .                                       
-		FW_select("arr.dev", \@fpl, $dv, "menu-select") .
+		FW_select("","arr.dev", \@fpl, $dv, "menu-select") .
 		FW_submit("ccc.one", "select");
 		FW_pO "</div></form>"; #form2
 	}
@@ -675,7 +677,7 @@ FP_menuArrange() {
 			FP_input("attr.$d", "fp_$FP_name", "hidden") . "\n" .
 			FP_input("top.$d", $top ? $top : 10, "text", "Top", 4, 4, 'id="fp_ar_input_top"') . "\n" .
 			FP_input("left.$d", $left ? $left : 10, "text", "Left", 4, 4, 'id="fp_ar_input_left"' ) . "\n" .
-			FW_select("style.$d", \@styles, $style ? $style : 0, "menu-arrange") . "\n" .
+			FW_select("","style.$d", \@styles, $style ? $style : 0, "menu-arrange") . "\n" .
 			FP_input("text.$d", $text ? $text : "", "text", "Description", 15) . "\n" .
 			FW_submit("cmd.$d", "attr") ;
 		FW_pO "</div></form>"; # form3
