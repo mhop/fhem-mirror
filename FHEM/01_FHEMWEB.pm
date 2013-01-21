@@ -1185,8 +1185,8 @@ FW_showRoom()
               # dropdown.  eventMap/webCmd/etc handling must be cleaned up.
               if(@tv > 1) {
                 $firstIdx=1;
-                if($cmd eq "desired-temp") {
-                  $txt = ReadingsVal($d, "desired-temp", 20);
+                if($cmd eq "desired-temp" || $cmd eq "desiredTemperature") {
+                  $txt = ReadingsVal($d, $cmd, 20);
                   $txt =~ s/ .*//;        # Cut off Celsius
                   $txt = sprintf("%2.1f", int(2*$txt)/2) if($txt =~ m/[0-9.-]/);
                 } else {
@@ -2577,7 +2577,11 @@ FW_devState($$)
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
     $cmdlist = "desired-temp";
-
+  } elsif($allSets =~ m/\bdesiredTemperature:/) {
+    $txt = ReadingsVal($d, "temperature", "");
+    $txt =~ s/ .*//;
+    $txt .= "&deg;C";
+    $cmdlist = "desiredTemperature";
   } else {
     my $icon;
     $icon = FW_dev2image($d);
