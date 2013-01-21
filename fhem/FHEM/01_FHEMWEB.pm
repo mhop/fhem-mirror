@@ -32,7 +32,7 @@ sub FW_readIcons($);
 sub FW_readIconsFrom($$);
 sub FW_returnFileAsStream($$$$$);
 sub FW_roomOverview($);
-sub FW_select($$$$@);
+sub FW_select($$$$$@);
 sub FW_serveSpecial($$$$);
 sub FW_setDirs();
 sub FW_showLog($);
@@ -758,7 +758,8 @@ FW_makeTable($$@)
 
         } else {
           $t = "" if(!$t);
-          FW_pO "<td>$v</td><td>$t</td>";
+          FW_pO "<td><div id=\"$name-$n\">$v</div></td>";
+          FW_pO "<td><div id=\"$name-$n-ts\">$t</div></td>";
 
         }
 
@@ -797,7 +798,7 @@ FW_makeSelect($$$$)
   FW_pO FW_hidden("dev.$cmd$d", $d);
   FW_pO FW_submit("cmd.$cmd$d", $cmd, $class);
   FW_pO "<div class=\"$class downText\">&nbsp;$d&nbsp;</div>";
-  FW_pO FW_select("arg.$cmd$d",\@al, $selEl, $class,
+  FW_pO FW_select("","arg.$cmd$d",\@al, $selEl, $class,
         "FW_selChange(this.options[selectedIndex].text,'$list','val.$cmd$d')");
   FW_pO FW_textfield("val.$cmd$d", 30, $class);
 
@@ -1196,7 +1197,7 @@ FW_showRoom()
                   FW_hidden("arg.$d", $cmd) .
                   FW_hidden("dev.$d", $d) .
                   ($FW_room ? FW_hidden("room", $FW_room) : "") .
-                  FW_select("val.$d", \@tv, $txt, "dropdown").
+                  FW_select("$d-$cmd","val.$d", \@tv, $txt, "dropdown").
                   "</td><td>".
                   FW_submit("cmd.$d", "set").
                   "</td>";
@@ -1645,11 +1646,12 @@ FW_hidden($$)
 ##################
 # Generate a select field with option list
 sub
-FW_select($$$$@)
+FW_select($$$$$@)
 {
-  my ($n, $va, $def, $class, $jSelFn) = @_;
+  my ($id, $n, $va, $def, $class, $jSelFn) = @_;
   $jSelFn = ($jSelFn ? "onchange=\"$jSelFn\"" : "");
-  my $s = "<select $jSelFn name=\"$n\" class=\"$class\">";
+  $id = ($id ? "id=\"$id\"" : "");
+  my $s = "<select $jSelFn $id name=\"$n\" class=\"$class\">";
 
   foreach my $v (@{$va}) {
     if($def && $v eq $def) {
@@ -2500,6 +2502,19 @@ FW_Notify($$)
     ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
     $data = "$dn<<$dev->{STATE}<<$txt\n";
 
+    #Add READINGS
+    if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
+      my $tn = TimeNow();
+      my $max = int(@{$dev->{CHANGED}});
+      for(my $i = 0; $i < $max; $i++) {
+        if( $dev->{CHANGED}[$i] !~ /: /) {
+          next; #ignore 'set' commands
+        }
+        my ($readingName,$readingVal) = split(": ",$dev->{CHANGED}[$i],2);
+        $data .= "$dn-$readingName<<$readingVal<<$readingVal\n";
+        $data .= "$dn-$readingName-ts<<$tn<<$tn\n";
+      }
+    }
   } elsif($filter eq "console") {
     if($dev->{CHANGED}) {    # It gets deleted sometimes (?)
       my $tn = TimeNow();
