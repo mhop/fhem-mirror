@@ -156,6 +156,9 @@ my %zwave_class = (
   MARK                     => { id => 'ef', },
   NON_INTEROPERABLE        => { id => 'f0', },
   );
+my %zwave_cmdArgs = (
+  dim => "slider,0,1,100",
+  );
 
 
 sub
@@ -246,9 +249,13 @@ ZWave_Cmd($$@)
       }
     }
   }
-  return ("Unknown $type argument $cmd, choose one of "
-                        . join(" ",sort keys %cmdList))
-    if(!$cmdList{$cmd});
+  if(!$cmdList{$cmd}) {
+    my $list = join(" ",sort keys %cmdList);
+    foreach my $cmd (keys %zwave_cmdArgs) {      # add slider & co
+      $list =~ s/\b$cmd\b/$cmd:$zwave_cmdArgs{$cmd}/;
+    }
+    return "Unknown $type argument $cmd, choose one of $list";
+  }
 
 
   ################################
