@@ -27,20 +27,18 @@ PID_Define($$$)
 {
   my ($pid, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
-  my $n = $a[0];
+  my $pn = $a[0];
 
   if(@a < 4 || @a > 7) {
-    my $msg = "wrong syntax: define <name> PID " .
+    return "wrong syntax: define <name> PID " .
                 "<sensor>[:reading:regexp] <actor>[:cmd:min:max] [p i d]";
-    Log 2, $msg;
-    return $msg;
   }
 
   ###################
   # Sensor
   my ($sensor, $reading, $regexp) = split(":", $a[2], 3);
   if(!$defs{$sensor}) {
-    my $msg = "$n: Unknown sensor device $sensor specified";
+    my $msg = "$pn: Unknown sensor device $sensor specified";
     Log 2, $msg;
     return $msg;
   }
@@ -51,7 +49,7 @@ PID_Define($$$)
       $reading = "temperature";
       $regexp = '([\\d\\.]*)';
     } else {
-      my $msg = "$n: Unknown sensor type $t, specify regexp";
+      my $msg = "$pn: Unknown sensor type $t, specify regexp";
       Log 2, $msg;
       return $msg;
     }
@@ -65,7 +63,7 @@ PID_Define($$$)
   my ($actor, $cmd, $min, $max) = split(":", $a[3], 4);
   my ($p_p, $p_i, $p_d) = (0, 0, 0);
   if(!$defs{$actor}) {
-    my $msg = "$n: Unknown actor device $actor specified";
+    my $msg = "$pn: Unknown actor device $actor specified";
     Log 2, $msg;
     return $msg;
   }
@@ -80,7 +78,7 @@ PID_Define($$$)
       $p_i = 7.8/2.55;
       $p_d = 15.0/2.55;
     } else {
-      my $msg = "$n: Unknown actor type $t, specify command:min:max";
+      my $msg = "$pn: Unknown actor type $t, specify command:min:max";
       Log 2, $msg;
       return $msg;
     }
@@ -106,8 +104,9 @@ sub
 PID_Set($@)
 {
   my ($pid, @a) = @_;
-  my $n = $pid->{NAME};
+  my $pn = $pid->{NAME};
 
+  return "" if($attr{$pn} && $attr{$pn}{disable});
   return "Need a parameter for set" if(@a < 2);
   my $arg = $a[1];
 
@@ -123,7 +122,7 @@ PID_Set($@)
   } elsif ($arg eq "desired" ) {
     return "Set desired needs a numeric parameter"
         if(@a != 3 || $a[2] !~ m/^[\d\.]*$/);
-    Log GetLogLevel($n,3), "PID set $n $arg $a[2]";
+    Log GetLogLevel($pn,3), "PID set $pn $arg $a[2]";
     PID_sv($pid, 'desired', $a[2]);
     PID_setValue($pid);
 
@@ -190,7 +189,7 @@ sub
 PID_setValue($)
 {
   my ($pid) = @_;
-  my $n = $pid->{NAME};
+  my $pn = $pid->{NAME};
   my $sensor = $pid->{sensor};
   my $reading = $pid->{reading};
   my $re = $pid->{regexp};
@@ -200,7 +199,7 @@ PID_setValue($)
   $inStr = $defs{$sensor}{READINGS}{$reading}{VAL}
     if($defs{$sensor}{READINGS} && $defs{$sensor}{READINGS}{$reading});
   if(!$inStr) {
-    Log GetLogLevel($n,4), "PID $n: no $reading yet for $sensor";
+    Log GetLogLevel($pn,4), "PID $pn: no $reading yet for $sensor";
     return;
   }
   $inStr =~ m/$re/;
@@ -221,13 +220,13 @@ PID_setValue($)
   my $a =  PID_saturate($pid, $p + $i + $d);
   PID_sv($pid, 'actuation', $a);
 
-  Log GetLogLevel($n,4), sprintf("PID $n: p:%.2f i:%.2f d:%.2f", $p, $i, $d);
+  Log GetLogLevel($pn,4), sprintf("PID $pn: p:%.2f i:%.2f d:%.2f", $p, $i, $d);
 
   # Hack to round.
   $a = int($a) if(($pid->{satMax} - $pid->{satMin}) >= 100);
 
   my $ret = fhem sprintf("set %s %s %g", $pid->{actor}, $pid->{command}, $a);
-  Log GetLogLevel($n,1), "output of $n command: $ret" if($ret);
+  Log GetLogLevel($pn,1), "output of $pn command: $ret" if($ret);
   $pid->{STATE} = "$in (delta $delta)";
 }
 
