@@ -98,7 +98,6 @@ my @FW_zoom;       # "qday", "day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
 my %FW_hiddenroom; # hash of hidden rooms
 my %FW_hiddengroup;# hash of hidden groups
-my $FW_longpoll;   # Set if longpoll (i.e. server notification) is active
 my $FW_inform;
 my $FW_XHR;        # Data only answer, no HTML
 my $FW_jsonp;      # jasonp answer (sending function calls to the client)
@@ -550,9 +549,6 @@ FW_answerCall($)
     return 0;
   }
 
-  $FW_longpoll = (AttrVal($FW_wname, "longpoll", undef) &&
-                  (($FW_room && !$FW_detail) || ($FW_subdir ne "")));
-
   if($cmd =~ m/^toweblink (.*)$/) {
     my @aa = split(":", $1);
     my $max = 0;
@@ -577,7 +573,8 @@ FW_answerCall($)
 
   # Enable WebApp
   if($FW_tp || $FW_ss) {
-    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.$FW_ME.'/icons/fhemicon"/>';
+    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.
+        $FW_ME.'/icons/fhemicon"/>';
     FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
     if($FW_ss) {
       FW_pO '<meta name="viewport" content="width=320"/>';
@@ -594,10 +591,24 @@ FW_answerCall($)
 
   my $prf = AttrVal($FW_wname, "stylesheetPrefix", "");
   FW_pO "<link href=\"$FW_ME/css/style.css\" rel=\"stylesheet\"/>";
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
-                        if($FW_plotmode eq "SVG");
-  FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
-  my $onload = $FW_longpoll ? "onload=\"FW_delayedStart()\"" : "";
+ 
+  ########################
+  # FW Extensions
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
+      my $h = $data{FWEXT}{$k};
+      next if($h !~ m/HASH/ || !$h->{SCRIPT});
+      FW_pO "<script type=\"text/javascript\" ".
+                "src=\"$FW_ME/js/$h->{SCRIPT}\"></script>";
+    }
+  }
+
+  my $jsTemplate = '<script type="text/javascript" src="%s"></script>';
+  FW_pO sprintf($jsTemplate, "$FW_ME/js/svg.js") if($FW_plotmode eq "SVG");
+  FW_pO sprintf($jsTemplate, "$FW_ME/js/fhemweb.js");
+
+  my $onload = AttrVal($FW_wname, "longpoll", undef) ?
+                      "onload=\"FW_delayedStart()\"" : "";
   FW_pO "</head>\n<body name=\"$t\" $onload>";
 
   if($FW_cmdret) {
@@ -2479,15 +2490,14 @@ FW_Notify($$)
   my $rn = AttrVal($dn, "room", "");
   if($filter eq "all" || $rn =~ m/\b$filter\b/) {
     # Why is saving this stuff needed? FLOORPLAN?
-    my @old = ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir);
+    my @old = ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir);
     $FW_wname = $ntfy->{SNAME};
     $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
     $FW_subdir = "";
-    $FW_longpoll = 1;
     $FW_ss = AttrVal($FW_wname, "smallscreen", 0);
     $FW_tp = AttrVal($FW_wname, "touchpad", $FW_ss);
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
-    ($FW_wname, $FW_ME, $FW_longpoll, $FW_ss, $FW_tp, $FW_subdir) = @old;
+    ($FW_wname, $FW_ME, $FW_ss, $FW_tp, $FW_subdir) = @old;
     $data = "$dn<<$dev->{STATE}<<$txt\n";
 
   } elsif($filter eq "console") {
@@ -2585,7 +2595,7 @@ FW_devState($$)
       }
       $link .= "&room=$room";
     }
-    if($FW_longpoll) {
+    if(AttrVal($FW_wname, "longpoll", undef)) {
       $txt = "<a onClick=\"FW_cmd('$FW_ME$FW_subdir?XHR=1&$link')\">$txt</a>";
 
     } elsif($FW_ss || $FW_tp) {
