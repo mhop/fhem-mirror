@@ -244,7 +244,7 @@ OWServer_Read($@)
 
   return undef unless(defined($hash->{fhem}{owserver}));
 
-  if(AttrVal($hash->{NAME},"nonblocking",undef)) {
+  if(AttrVal($hash->{NAME},"nonblocking",undef) && $init_done) {
     $hash->{".path"}= $path;
     pipe(READER,WRITER);
     WRITER->autoflush(1);
