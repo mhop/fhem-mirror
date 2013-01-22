@@ -1677,8 +1677,12 @@ getAllSets($)
 
   my $em = AttrVal($d, "eventMap", undef);
   if($em) {
+    # Delete the first word of the translation (.*:), else it will be
+    # interpreted as the single possible value for a dropdown
+    # Why is the .*= deleted?
     $em = join(" ", grep { !/ / }
-                    map { $_ =~ s/.*=//s; $_ } 
+                    map { $_ =~ s/.*=//s;
+                          $_ =~ s/.*://s; $_ } 
                     EventMapAsList($em));
     $a2 = "$em $a2";
   }
