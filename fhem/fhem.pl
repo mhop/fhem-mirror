@@ -93,6 +93,7 @@ sub readingsSingleUpdate($$$$);
 sub redirectStdinStdErr();
 sub setGlobalAttrBeforeFork($);
 sub setReadingsVal($$$$);
+sub evalStateFormat($);
 
 sub CommandAttr($$);
 sub CommandDefaultAttr($$);
@@ -1772,7 +1773,8 @@ CommandAttr($$)
   my @rets;
   foreach my $sdev (devspec2array($a[0])) {
 
-    if(!defined($defs{$sdev})) {
+    my $hash =  $defs{$sdev};
+    if(!defined($hash)) {
       push @rets, "Please define $sdev first";
       next;
     }
@@ -1802,9 +1804,10 @@ CommandAttr($$)
 
       my %userReadings;
 
-      my $arg= $a[2]; # myReading1 { codecodecode1 }, myReading2 { codecodecode2 }, myReading3 { codecodecode3 }
+      # myReading1 { codecodecode1 }, myReading2 { codecodecode2 }, ...
+      my $arg= $a[2];
 
-      my $regexi= '\s*(\w+)\s+({.*?})\s*';      # matches myReading1 { codecodecode1 }
+      my $regexi= '\s*(\w+)\s+({.*?})\s*'; # matches myReading1 { codecode1 }
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
 
       #Debug "arg is $arg";
@@ -1812,12 +1815,13 @@ CommandAttr($$)
       while($arg =~ /$regexo/) {
         my $userReading= $2;
         my $perlCode= $3;
-        #Debug sprintf("userReading %s has perlCode %s", $userReading, $perlCode);
+        #Debug sprintf("userReading %s has perlCode %s",$userReading,$perlCode);
         $userReadings{$userReading}= $perlCode;
         $arg= defined($5) ? $5 : "";
       }
-      $defs{$sdev}{fhem}{'.userReadings'}= \%userReadings;
-    }
+      $hash->{fhem}{'.userReadings'}= \%userReadings;
+
+    } 
 
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
       push @rets,"$sdev: unknown IODev specified";
@@ -1838,9 +1842,12 @@ CommandAttr($$)
     }
     if($a[1] eq "IODev") {
       my $ioname = $a[2];
-      $defs{$sdev}{IODev} = $defs{$ioname};
-      $defs{$sdev}{NR} = $devcount++
-        if($defs{$ioname}{NR} > $defs{$sdev}{NR});
+      $hash->{IODev} = $defs{$ioname};
+      $hash->{NR} = $devcount++
+        if($defs{$ioname}{NR} > $hash->{NR});
+    }
+    if($a[1] eq "stateFormat") {
+      evalStateFormat($hash);
     }
 
   }
@@ -2994,6 +3001,36 @@ readingsBeginUpdate($)
   return $now;
 }
 
+sub
+evalStateFormat($)
+{
+  my ($hash) = @_;
+
+  my $name = $hash->{NAME};
+
+  ###########################
+  # Set STATE
+  my $sr = AttrVal($name, "stateFormat", undef);
+  my $st = $hash->{READINGS}{state};
+  if(!$sr) {
+    $st = $st->{VAL} if(defined($st));
+
+  } elsif($sr =~ m/^{(.*)}$/) {
+    $st = eval $1;
+    if($@) {
+      $st = "Error evaluating $name stateFormat: $@";
+      Log 1, $st;
+    }
+
+  } else {
+    # Substitute reading names with their values, leave the rest untouched.
+    $st = $sr;
+    my $r = $hash->{READINGS};
+    $st =~ s/\b([A-Za-z_-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
+
+  }
+  $hash->{STATE} = ReplaceEventMap($name, $st, 1) if(defined($st));
+}
 
 #
 # Call readingsEndUpdate when you are done updating readings.
@@ -3024,30 +3061,8 @@ readingsEndUpdate($$)
   delete $hash->{".attreour"};
   delete $hash->{".attreocr"};
 
+  evalStateFormat($hash);
   
-  ###########################
-  # Set STATE
-  my $sr = AttrVal($name, "stateFormat", undef);
-  my $st = $hash->{READINGS}{state};
-  if(!$sr) {
-    $st = $st->{VAL} if(defined($st));
-
-  } elsif($sr =~ m/^{(.*)}$/) {
-    $st = eval $1;
-    if($@) {
-      $st = "Error evaluating $name stateFormat: $@";
-      Log 1, $st;
-    }
-
-  } else {
-    # Substitute reading names with their values, leave the rest untouched.
-    $st = $sr;
-    my $r = $hash->{READINGS};
-    $st =~ s/\b([A-Za-z_-]+)\b/($r->{$1} ? $r->{$1}{VAL} : $1)/ge;
-
-  }
-  $hash->{STATE} = ReplaceEventMap($name, $st, 1) if(defined($st));
-
   # propagate changes
   if($dotrigger && $init_done) {
     DoTrigger($name, undef, 1) if(!$readingsUpdateDelayTrigger);
