@@ -41,9 +41,12 @@ FW_doUpdate()
             if(el.options[j].value == d[2]) {
               el.selectedIndex = j;
             }
-      } else {
 
+      } else {
         el.innerHTML=d[2];
+        if(d[0].indexOf("-") >= 0)  // readings / timestamps
+          el.setAttribute('class', 'changed');
+
       }
     }
   }
