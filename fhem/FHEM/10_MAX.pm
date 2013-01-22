@@ -436,6 +436,7 @@ MAX_Parse($$)
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
     $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState");
     $devicetype = "WallMountedThermostat" if($msgtype ~~ ["WallThermostatConfig","WallThermostatState"]);
+    $devicetype = "HeatingThermostat" if($msgtype ~~ ["HeatingThermostatConfig", "ThermostatState"]);
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
     } else {
