@@ -265,6 +265,7 @@ MAXLAN_ReadSingleResponse($$)
 {
   my ($hash,$waitForResponse) = @_;
 
+  return undef if(!defined($hash->{TCPDev}));
 
   my ($rin, $win, $ein, $rout, $wout, $eout);
   $rin = $win = $ein = '';
