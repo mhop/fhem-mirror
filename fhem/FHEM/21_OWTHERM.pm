@@ -12,18 +12,19 @@
 #
 ########################################################################################
 #
-# define <name> OWTHERM [<model>] <ROM_ID> [interval]
+# define <name> OWTHERM [<model>] <ROM_ID> [interval] or <FAM_ID>.<ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
 #              DS1820 temperature sensor 
 #              Currently allowed values are DS1820, DS18B20, DS1822
+#       <FAM_ID> is a 1-Wire family id, currently allowed values are 10, 22, 28
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
 #
-# get <name> id          => OW_FAMILY.ROM_ID.CRC 
+# get <name> id          => FAM_ID.ROM_ID.CRC 
 # get <name> present     => 1 if device present, 0 if not
 # get <name> interval    => query interval
 # get <name> temperature => temperature measurement
@@ -34,7 +35,6 @@
 # set <name> tempHigh    => higher alarm temperature setting
 #
 # Additional attributes are defined in fhem.cfg
-# Note: attributes "tempXXXX" are read during every update operation.
 #
 # attr <name> stateAL  "<string>"  = character string for denoting low alarm condition, default is down triangle
 # attr <name> stateAH  "<string>"  = character string for denoting high alarm condition, default is up triangle
@@ -118,8 +118,7 @@ sub OWTHERM_Initialize ($) {
   $hash->{UndefFn} = "OWTHERM_Undef";
   $hash->{GetFn}   = "OWTHERM_Get";
   $hash->{SetFn}   = "OWTHERM_Set";
-  #tempOffset = a temperature offset added to the temperature reading for correction 
-  #tempUnit   = a unit of measure: C/F/K
+  $hash->{AttrFn}  = "OWTHERM_Attr";
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
                      "event-on-update-reading event-on-change-reading ".
                      "stateAL stateAH ".
@@ -151,45 +150,56 @@ sub OWTHERM_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWTHERM: Wrong syntax, must be define <name> OWTHERM [<model>] <id> [interval]"
+  return "OWTHERM: Wrong syntax, must be define <name> OWTHERM [<model>] <id> [interval] or OWTHERM <fam>.<id> [interval]"
        if(int(@a) < 2 || int(@a) > 6);
        
-  #-- check if this is an old style definition, e.g. <model> is missing
+  #-- different types of definition allowed
   my $a2 = $a[2];
   my $a3 = defined($a[3]) ? $a[3] : "";
-  if(  ($a2 eq "none") || ($a3 eq "none")  ) {
-    return "OWTHERM: ID = none is obsolete now, please redefine";
-  } elsif( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
+  #-- no model, 12 characters
+  if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS1820";
+    $fam           = "10";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
-    Log 1, "OWTHERM: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
-      if(int(@a) == 5);
-  } elsif( $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
+  #-- no model, 2+12 characters
+   } elsif(  $a2 =~ m/^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+    $fam           = substr($a[2],0,2);
+    $id            = substr($a[2],3);
+    if(int(@a)>=4) { $interval = $a[3]; }
+    if( $fam eq "10" ){
+      $model = "DS1820";
+      CommandAttr (undef,"$name model DS1820"); 
+    }elsif( $fam eq "22" ){
+      $model = "DS1822";
+      CommandAttr (undef,"$name model DS1822"); 
+    }elsif( $fam eq "28" ){
+      $model = "DS18B20";
+      CommandAttr (undef,"$name model DS18B20"); 
+    }else{
+      return "OWTHERM: Wrong 1-Wire device family $fam";
+    }
+  #-- model, 12 characters
+  } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
-    Log 1, "OWTHERM: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
-      if(int(@a) == 6);
+    if( $model eq "DS1820" ){
+      $fam = "10";
+      CommandAttr (undef,"$name model DS1820"); 
+    }elsif( $model eq "DS1822" ){
+      $fam = "22";
+      CommandAttr (undef,"$name model DS1822"); 
+    }elsif( $model eq "DS18B20" ){
+      $fam = "28";
+      CommandAttr (undef,"$name model DS1822"); 
+    }else{
+      return "OWTHERM: Wrong 1-Wire device model $model";
+    }
   } else {    
-    return "OWTHERM: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWTHERM: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
-
-  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   FF = family id follows from the model
-  #   YY must be determined from id
-  if( $model eq "DS1820" ){
-    $fam = "10";
-    CommandAttr (undef,"$name model DS1820"); 
-  }elsif( $model eq "DS1822" ){
-    $fam = "22";
-    CommandAttr (undef,"$name model DS1822"); 
-  }elsif( $model eq "DS18B20" ){
-    $fam = "28";
-    CommandAttr (undef,"$name model DS18B20"); 
-  }else{
-    return "OWTHERM: Wrong 1-Wire device model $model";
-  }
+  
   #-- determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
@@ -203,12 +213,12 @@ sub OWTHERM_Define ($$) {
 
   #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
-    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
+    return "OWTHERM: Warning, no 1-Wire I/O device found for $name.";
   }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  }
+  #if( $hash->{IODev}->{PRESENT} != 1 ){
+  #  return "OWTHERM: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
+  #}
   $modules{OWTHERM}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -218,14 +228,14 @@ sub OWTHERM_Define ($$) {
   InternalTimer(time()+10, "OWTHERM_InitializeDevice", $hash, 0);
    
   #-- Start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
+  InternalTimer(time()+10+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
 
   return undef; 
 }
   
 ########################################################################################
 #
-# OWTHERM_InitializeDevice - delayed setting of initial readings and channel names  
+# OWTHERM_InitializeDevice - delayed setting of initial readings
 #
 #  Parameter hash = hash of device addressed
 #
@@ -326,11 +336,10 @@ sub OWTHERM_FormatValues($) {
   }
   
   #-- put into READINGS
+  $main::attr{$name}{"tempLow"}  = $vlow;
+  $main::attr{$name}{"tempHigh"} = $vhigh;
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"temperature",$vval);
-  readingsBulkUpdate($hash,"tempLow",$vlow);
-  readingsBulkUpdate($hash,"tempHigh",$vhigh);
-  
   #-- STATE
   readingsBulkUpdate($hash,"state",$svalue);
   readingsEndUpdate($hash,1); 
@@ -400,7 +409,7 @@ sub OWTHERM_Get($@) {
     #-- not different from getting all values ..
     $ret = OWXTHERM_GetValues($hash);
   #-- OWFS interface
-  }elsif( $interface eq "OWFS" ){
+  }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
   #-- Unknown interface
   }else{
@@ -419,8 +428,8 @@ sub OWTHERM_Get($@) {
     return "OWTHERM: $name.temperature => ".
       $hash->{READINGS}{"temperature"}{VAL};
   } elsif ($reading eq "alarm") {
-    return "OWTHERM: $name.alarm => L ".$hash->{READINGS}{"tempLow"}{VAL}.
-      " H ".$hash->{READINGS}{"tempHigh"}{VAL};
+    return "OWTHERM: $name.alarm => L ".$main::attr{$name}{"tempLow"}.
+      " H ".$main::attr{$name}{"tempHigh"};
   }
   return undef;
 }
@@ -456,7 +465,7 @@ sub OWTHERM_GetValues($@) {
       last
         if( !defined($ret) );
     } 
-  }elsif( $interface eq "OWFS" ){
+  }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_GetValues($hash);
   }else{
     Log 3, "OWTHERM: GetValues with wrong IODev type $interface";
@@ -534,7 +543,7 @@ sub OWTHERM_Set($@) {
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_SetValues($hash,@a);
   #-- OWFS interface
-  }elsif( $interface eq "OWFS" ){
+  }elsif( $interface eq "OWServer" ){
     $ret = OWFSTHERM_SetValues($hash,@a);
     return $ret
       if(defined($ret));
@@ -549,6 +558,34 @@ sub OWTHERM_Set($@) {
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
+}
+
+#######################################################################################
+#
+# OWTHERM_Attr - Set one attribute value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWTHERM_Attr(@) {
+  my ($do,@a) = @_;
+  
+  my $name    = $a[0];
+  my $key     = $a[1];
+  my $ret;
+  
+  #-- only alarm settings may be modified at runtime for now
+  return undef
+    if( $key !~ m/(.*)(Low|High)/ );
+  
+  if( $do eq "set")
+  {
+    $ret = OWTHERM_Set($main::defs{$name},@a);
+  } elsif( $do eq "del"){
+  }
+  return $ret;
 }
 
 ########################################################################################
@@ -576,49 +613,58 @@ sub OWTHERM_Undef ($) {
 #
 ########################################################################################
 #
-# OWFSTHERM_GetValues - Get reading from one device
+# OWFSTHERM_GetValues - Get values from device
 #
 # Parameter hash = hash of device addressed
 #
 ########################################################################################
 
-sub OWFSTHERM_GetValues($)
-{
+sub OWFSTHERM_GetValues($) {
   my ($hash) = @_;
-
-  my $ret = OW::get("/uncached/".$hash->{OW_FAMILY}.".".$hash->{OW_ID}."/temperature");
-  if( defined($ret) ) {
-    $hash->{PRESENT} = 1;
-    $owg_temp = $ret;
-    $owg_th   = OW::get("/uncached/".$hash->{OW_FAMILY}.".".$hash->{OW_ID}."/temphigh");
-    $owg_tl   = OW::get("/uncached/".$hash->{OW_FAMILY}.".".$hash->{OW_ID}."/templow");
-  } else {
-    $hash->{PRESENT} = 0;
-    $owg_temp = 0.0;
-    $owg_th   = 0.0;
-    $owg_tl   = 0.0;
-  }
-
-  return undef;
+ 
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  #-- get values - or should we rather get the uncached ones ?
+  $owg_temp = OWServer_Read($master,"/$owx_add/temperature");
+  $owg_th   = OWServer_Read($master,"/$owx_add/temphigh");
+  $owg_tl   = OWServer_Read($master,"/$owx_add/templow");
+  
+  return "no return from OWServer"
+    if( (!defined($owg_temp)) || (!defined($owg_th)) || (!defined($owg_tl)) );
+  return "empty return from OWServer"
+    if( ($owg_temp eq "") || ($owg_th eq "") || ($owg_tl eq "") );
+        
+  #return "wrong data length from OWServer"
+  #  if( (int(@ral) != $cnumber{$attr{$name}{"model"}}) || (int(@rax) != $cnumber{$attr{$name}{"model"}}) );
+  
+  return undef
 }
 
-#######################################################################################
+########################################################################################
 #
-# OWFSTHERM_SetValues - Implements SetFn function
-# 
+# OWFSTHERM_SetValues - Set values in device
+#
 # Parameter hash = hash of device addressed
-#           a = argument array
 #
 ########################################################################################
 
 sub OWFSTHERM_SetValues($@) {
-  my ($hash, @a) = @_;
+  my ($hash,@a) = @_;
   
-  #-- define vars
-  my $key   = lc($a[1]);
-  my $value = $a[2];
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
   
-  return OW::put($hash->{OW_FAMILY}.".".$hash->{OW_ID}."/$key",$value);
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  OWServer_Write($master, "/$owx_add/".lc($a[0]),$a[1] );
+  return undef
 }
 
 ########################################################################################
@@ -796,12 +842,12 @@ sub OWXTHERM_SetValues($@) {
 =pod
 =begin html
 
-     <a name="OWTHERM"></a>
+<a name="OWTHERM"></a>
         <h3>OWTHERM</h3>
-        <p>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br /><br />
-            Note:<br /> This is the only 1-Wire module which so far works with both the OWFS and the
-            OWX interface module. Please define an <a href="#OWFS">OWFS</a> device or an <a
-                href="#OWX">OWX</a> device first. <br />
+        <p>FHEM module to commmunicate with 1-Wire bus digital thermometer devices<br />
+        <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
+            (prerequisite: Add this module's name to the list of clients in OWServer).
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br />
         </p>
         <h4>Example</h4>
         <p>
@@ -813,7 +859,8 @@ sub OWXTHERM_SetValues($@) {
         <a name="OWTHERMdefine"></a>
         <h4>Define</h4>
         <p>
-        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+        <code>define &lt;name&gt; OWTHERM [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
+        <code>define &lt;name&gt; OWTHERM &lt;fam&gt;.lt;id&gt; [&lt;interval&gt;]</code>
         <br /><br /> Define a 1-Wire digital thermometer device.</p>
         <ul>
           <li>
@@ -825,6 +872,9 @@ sub OWXTHERM_SetValues($@) {
               <li>model DS18B20 with family id 28</li>
           </ul>
           </li>
+          <li>
+           <code>&lt;fam&gt;</code>
+                <br />2-character unique family id, see above </li>
           <li>
             <code>&lt;id&gt;</code>
             <br />12-character unique ROM id of the thermometer device without family id and CRC
