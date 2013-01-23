@@ -10,12 +10,13 @@
 #
 ########################################################################################
 #
-# define <name> OWCOUNT [<model>] <ROM_ID> [interval] 
+# define <name> OWCOUNT [<model>] <ROM_ID> [interval] or OWCOUNT <FAM_ID>.<ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
 #              DS2423 Counter/RAM  
+#       <FAM_ID> is a 1-Wire family id, currently allowed value is 1D
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
@@ -165,36 +166,44 @@ sub OWCOUNT_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWCOUNT: Wrong syntax, must be define <name> OWCOUNT [<model>] <id> [interval]"
+  return "OWCOUNT: Wrong syntax, must be define <name> OWCOUNT [<model>] <id> [interval] or OWCOUNT <fam>.<id> [interval]"
        if(int(@a) < 2 || int(@a) > 5);
        
-  #-- check if this is an old style definition, e.g. <model> is missing
+  #-- different types of definition allowed
   my $a2 = $a[2];
   my $a3 = defined($a[3]) ? $a[3] : "";
+  #-- no model, 12 characters
   if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS2423";
+    $fam           = "1D";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
+  #-- no model, 2+12 characters
+   } elsif(  $a2 =~ m/^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+    $fam           = substr($a[2],0,2);
+    $id            = substr($a[2],3);
+    if(int(@a)>=4) { $interval = $a[3]; }
+    if( $fam eq "1D" ){
+      $model = "DS2423";
+      CommandAttr (undef,"$name model DS2423"); 
+    }else{
+      return "OWCOUNT: Wrong 1-Wire device family $fam";
+    }
+  #-- model, 12 characters
   } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
-    return "OWCOUNT: Wrong 1-Wire device model $model"
-      if( $model ne "DS2423");
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
+    if( $model eq "DS2423" ){
+      $fam = "1D";
+      CommandAttr (undef,"$name model DS2423"); 
+    }else{
+      return "OWCOUNT: Wrong 1-Wire device model $model";
+    }
   } else {    
-    return "OWCOUNT: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWCOUNT: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
-  
-  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   FF = family id follows from the model
-  #   YY must be determined from id
-  if( $model eq "DS2423" ){
-    $fam = "1D";
-    CommandAttr (undef,"$name model DS2423"); 
-  }else{
-    return "OWMULTI: Wrong 1-Wire device model $model";
-  }
-  
+   
   #   determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
@@ -206,13 +215,18 @@ sub OWCOUNT_Define ($$) {
   $hash->{INTERVAL}   = $interval;
   
   #-- Couple to I/O device
+  $hash->{IODev}=$attr{$name}{"IODev"} 
+    if( defined($attr{$name}{"IODev"}) );
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+    if( (!defined($hash->{IODev}->{NAME})) || (!defined($hash->{IODev}))  ){
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
   }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  }
+  
+    
+ 
+  #if( $hash->{IODev}->{PRESENT} != 1 ){
+  #  return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
+  #}
   $modules{OWCOUNT}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -225,7 +239,7 @@ sub OWCOUNT_Define ($$) {
   InternalTimer(time()+5, "OWCOUNT_InitializeDevice", $hash, 0);
  
   #-- Start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
+  InternalTimer(time()+5+$hash->{INTERVAL}, "OWCOUNT_GetValues", $hash, 0);
 
   return undef; 
 }
@@ -570,8 +584,8 @@ sub OWCOUNT_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,$page);
     #-- OWFS interface
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetPage($hash,"reading");
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSCOUNT_GetPage($hash,$page);
     #-- Unknown interface
     }else{
       return "OWCOUNT: Get with wrong IODev type $interface";
@@ -601,8 +615,8 @@ sub OWCOUNT_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,$page);
     #-- OWFS interface
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetPage($hash,"reading");
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSCOUNT_GetPage($hash,$page);
     #-- Unknown interface
     }else{
       return "OWCOUNT: Get with wrong IODev type $interface";
@@ -615,8 +629,9 @@ sub OWCOUNT_Get($@) {
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_GetPage($hash,14);
       $ret = OWXCOUNT_GetPage($hash,15);
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_GetValues($hash);
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSCOUNT_GetPage($hash,14);
+      $ret = OWFSCOUNT_GetPage($hash,15);
     }else{
       return "OWCOUNT: GetValues with wrong IODev type $interface";
     }
@@ -664,8 +679,9 @@ sub OWCOUNT_GetValues($) {
   if( $interface eq "OWX" ){
     $ret = OWXCOUNT_GetPage($hash,14);
     $ret = OWXCOUNT_GetPage($hash,15);
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSAD_GetValues($hash);
+  }elsif( $interface eq "OWServer" ){
+    $ret = OWFSCOUNT_GetPage($hash,14);
+    $ret = OWFSCOUNT_GetPage($hash,15);
   }else{
     return "OWCOUNT: GetValues with wrong IODev type $interface";
   }
@@ -774,8 +790,8 @@ sub OWCOUNT_Set($@) {
     if( $interface eq "OWX" ){
       $ret = OWXCOUNT_SetPage($hash,$page,$data);
     #-- OWFS interface
-    #}elsif( $interface eq "OWFS" ){
-    #  $ret = OWFSAD_setPage($hash,$page,$data);
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSCOUNT_SetPage($hash,$page,$data);
     #-- Unknown interface
     }else{
       return "OWCOUNT: Set with wrong IODev type $interface";
@@ -812,10 +828,92 @@ sub OWCOUNT_Undef ($) {
 # Prefix = OWFSCOUNT
 #
 ########################################################################################
+#
+# OWFSCOUNT_GetPage - Get page from device
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
 
+sub OWFSCOUNT_GetPage($$) {
+  my ($hash,$page) = @_;
+ 
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  my $vval;
+  
+  #=============== wrong value requested ===============================
+  if( ($page<0) || ($page>15) ){
+    return "OWXCOUNT: Wrong memory page requested";
+  }     
+   #-- get values - or shoud we rather get the uncached ones ?
+  if( $page == 14) {
+    $vval    = OWServer_Read($master,"/$owx_add/counters.A");
+    $owg_str = OWServer_Read($master,"/$owx_add/pages/page.14");
+    
+    return "no return from OWServer"
+    if( (!defined($vval)) || (!defined($owg_str)) );
+    
+    return "empty return from OWServer"
+    if( ($vval eq "") || ($owg_str eq "") );
+    
+    $owg_val[0]      = $vval;
+    $owg_midnight[0] = $owg_str;
+    
+  }elsif( $page == 15) {
+    $vval    = OWServer_Read($master,"/$owx_add/counters.B");
+    $owg_str = OWServer_Read($master,"/$owx_add/pages/page.15");
+    
+    return "no return from OWServer"
+    if( (!defined($vval)) || (!defined($owg_str)) );
+    
+    return "empty return from OWServer"
+    if( ($vval eq "") || ($owg_str eq "") );
+    
+    $owg_val[1]      = $vval;
+    $owg_midnight[1] = $owg_str;
+  }else {
+    $owg_str = OWServer_Read($master,"/$owx_add/pages/page.".$page);
+    
+    return "no return from OWServer"
+    if( !defined($owg_str) );
+    
+    return "empty return from OWServer"
+    if( $owg_str eq "" );
+  }
+  return undef
+}
 
+########################################################################################
+#
+# OWFSCOUNT_SetPage - Set page in device
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
 
-
+sub OWFSCOUNT_SetPage($$$) {
+  my ($hash,$page,$data) = @_;
+  
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+  
+  #=============== wrong page requested ===============================
+  if( ($page<0) || ($page>15) ){
+    return "OWXCOUNT: Wrong memory page write attempt";
+  } 
+  OWServer_Write($master, "/$owx_add/pages/page.".$page,$data );
+  return undef
+}
 
 ########################################################################################
 #
@@ -907,6 +1005,7 @@ sub OWXCOUNT_GetPage($$) {
       $owg_val[1] = $value;
       $owg_midnight[1] = $owg_str;
     }
+      
   }
  
   return undef;
@@ -931,9 +1030,9 @@ sub OWXCOUNT_SetPage($$$) {
   my $owx_dev = $hash->{ROM_ID};
   my $master  = $hash->{IODev};
   
- #=============== wrong value requested ===============================
+ #=============== wrong page requested ===============================
   if( ($page<0) || ($page>15) ){
-    return "OWXCOUNT: Wrong memory page requested";
+    return "OWXCOUNT: Wrong memory page write attempt";
   } 
   #=============== set memory =========================================
   #-- issue the match ROM command \x55 and the write scratchpad command
@@ -983,9 +1082,10 @@ sub OWXCOUNT_SetPage($$$) {
 
 <a name="OWCOUNT"></a>
         <h3>OWCOUNT</h3>
-        <p>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 #<br /><br /> Note:<br /> This
-            1-Wire module so far works only with the OWX interface module. Please define an <a
-                href="#OWX">OWX</a> device first. </p>
+        <p>FHEM module to commmunicate with 1-Wire Counter/RAM DS2423 <br />
+        <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
+            (prerequisite: Add this module's name to the list of clients in OWServer).
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br/><p/>
         <br /><h4>Example</h4><br />
         <code>define OWX_C OWCOUNT DS2423 CE780F000000 300</code>
         <br />
@@ -999,7 +1099,8 @@ sub OWXCOUNT_SetPage($$$) {
         <a name="OWCOUNTdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+            <code>define &lt;name&gt; OWCOUNT [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
+            <code>define &lt;name&gt; OWCOUNT &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code> 
             <br /><br /> Define a 1-Wire counter.<br /><br /></p>
         <ul>
             <li>
@@ -1008,6 +1109,10 @@ sub OWXCOUNT_SetPage($$$) {
                     <li>model DS2423 with family id 1D (default if the model parameter is
                         omitted)</li>
                 </ul>
+            </li>
+            <li>
+                <code>&lt;fam&gt;</code>
+                <br />2-character unique family id, see above 
             </li>
             <li>
                 <code>&lt;id&gt;</code>

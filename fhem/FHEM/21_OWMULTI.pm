@@ -10,13 +10,13 @@
 #
 ########################################################################################
 #
-# define <name> OWMULTI [<model>] <ROM_ID> [interval]
+# define <name> OWMULTI [<model>] <ROM_ID> [interval] or OWMULTI <FAM_ID>.<ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
 #              DS2438  
-#
+#       <FAM_ID> is a 1-Wire family id, currently allowed value is 26
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
@@ -150,36 +150,42 @@ sub OWMULTI_Define ($$) {
   return "OWMULTI: Wrong syntax, must be define <name> OWMULTI [<model>] <id> [interval]"
        if(int(@a) < 2 || int(@a) > 6);
        
-  #-- check if this is an old style definition, e.g. <model> is missing
+  #-- different types of definition allowed
   my $a2 = $a[2];
   my $a3 = defined($a[3]) ? $a[3] : "";
-  if(  ($a2 eq "none") || ($a3 eq "none")  ) {
-    return "OWMULTI: ID = none is obsolete now, please redefine";
-  } elsif( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
+  #-- no model, 12 characters
+  if( $a2 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = "DS2438";
+    $fam           = "26";
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
-    Log 1, "OWMULTI: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
-      if(int(@a) == 5);
-  } elsif( $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
+    CommandAttr (undef,"$name model DS2438");
+  #-- no model, 2+12 characters
+   } elsif(  $a2 =~ m/^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+    $fam           = substr($a[2],0,2);
+    $id            = substr($a[2],3);
+    if(int(@a)>=4) { $interval = $a[3]; }
+    if( $fam eq "26" ){
+      $model = "DS2438";
+      CommandAttr (undef,"$name model DS2438"); 
+    }else{
+      return "OWMULTI: Wrong 1-Wire device family $fam";
+    }
+  #-- model, 12 characters
+  } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $model         = $a[2];
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
-    Log 1, "OWMULTI: Parameter [alarminterval] is obsolete now - must be set with I/O-Device"
-      if(int(@a) == 6);
+    if( $model eq "DS2438" ){
+      $fam = "26";
+      CommandAttr (undef,"$name model DS2438"); 
+    }else{
+      return "OWMULTI: Wrong 1-Wire device model $model";
+    }
   } else {    
-    return "OWMULTI: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWMULTI: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
-
-  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  #   FF = family id follows from the model
-  #   YY must be determined from id
-  if( $model eq "DS2438" ){
-    $fam = "26";
-    CommandAttr (undef,"$name model DS2438"); 
-  }else{
-    return "OWMULTI: Wrong 1-Wire device model $model";
-  }
+  
  
   #-- determine CRC Code - only if this is a direct interface
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
@@ -193,12 +199,12 @@ sub OWMULTI_Define ($$) {
 
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
-    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+  if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
+    return "OWMULTI: Warning, no 1-Wire I/O device found for $name.";
   }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  }
+  #if( $hash->{IODev}->{PRESENT} != 1 ){
+  #  return "OWMULTI: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
+  #}
   $modules{OWMULTI}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -208,7 +214,7 @@ sub OWMULTI_Define ($$) {
   InternalTimer(time()+10, "OWMULTI_InitializeDevice", $hash, 0);
    
   #-- Start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
+  InternalTimer(time()+10+$hash->{INTERVAL}, "OWMULTI_GetValues", $hash, 0);
 
   return undef; 
 }
@@ -409,8 +415,8 @@ sub OWMULTI_Get($@) {
     #-- not different from getting all values ..
     $ret = OWXMULTI_GetValues($hash);
   #-- OWFS interface not yet implemented
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSMULTI_GetValues($hash);
+  }elsif( $interface eq "OWServer" ){
+    $ret = OWFSMULTI_GetValues($hash);
   #-- Unknown interface
   }else{
     return "OWMULTI: Get with wrong IODev type $interface";
@@ -474,8 +480,8 @@ sub OWMULTI_GetValues($@) {
       last
         if( !defined($ret) );
     } 
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSMULTI_GetValues($hash);
+  }elsif( $interface eq "OWServer" ){
+    $ret = OWFSMULTI_GetValues($hash);
   }else{
     Log 3, "OWMULTI: GetValues with wrong IODev type $interface";
     return 1;
@@ -551,11 +557,11 @@ sub OWMULTI_Set($@) {
   #-- OWX interface
   if( $interface eq "OWX" ){
     $ret = OWXMULTI_SetValues($hash,@a);
-  #-- OWFS interface not yet implemented
-  #}elsif( $interface eq "OWFS" ){
-  #  $ret = OWFSMULTI_SetValues($hash,@a);
-  #  return $ret
-  #    if(defined($ret));
+  #-- OWFS interface 
+  }elsif( $interface eq "OWServer" ){
+    $ret = OWFSMULTI_SetValues($hash,@a);
+    return $ret
+      if(defined($ret));
   } else {
   return "OWMULTI: Set with wrong IODev type $interface";
   }
@@ -583,6 +589,58 @@ sub OWMULTI_Undef ($) {
   delete($modules{OWMULTI}{defptr}{$hash->{OW_ID}});
   RemoveInternalTimer($hash);
   return undef;
+}
+
+########################################################################################
+#
+# The following subroutines in alphabetical order are only for a 1-Wire bus connected 
+# via OWFS
+#
+# Prefix = OWFSMULTI
+#
+########################################################################################
+#
+# OWFSMULTI_GetValues - Get reading from one device
+#
+# Parameter hash = hash of device addressed
+#
+########################################################################################
+
+sub OWFSMULTI_GetValues($) {
+  my ($hash) = @_;
+  
+  #-- ID of the device
+  my $owx_add = substr($hash->{ROM_ID},0,15);
+  
+  #-- hash of the busmaster
+  my $master = $hash->{IODev};
+  my $name   = $hash->{NAME};
+          
+  #-- get values - or should we rather get the uncached ones ?
+  $owg_temp = OWServer_Read($master,"/$owx_add/temperature");
+  $owg_vdd   = OWServer_Read($master,"/$owx_add/VDD");
+  $owg_volt   = OWServer_Read($master,"/$owx_add/VAD");
+  
+  return "no return from OWServer"
+    if( (!defined($owg_temp)) || (!defined($owg_vdd)) || (!defined($owg_volt)) );
+  return "empty return from OWServer"
+    if( ($owg_temp eq "") || ($owg_vdd eq "") || ($owg_volt eq "") );
+    
+  return undef;
+}
+
+#######################################################################################
+#
+# OWFSMULTI_SetValues - Set values in device
+# 
+# Parameter hash = hash of device addressed
+#           a = argument array
+#
+########################################################################################
+
+sub OWFSMULTI_SetValues($@) {
+  my ($hash, @a) = @_;
+  
 }
 
 ########################################################################################
@@ -775,7 +833,7 @@ sub OWXMULTI_GetValues($) {
 
 #######################################################################################
 #
-# OWXMULTI_SetValues - Implements SetFn function
+# OWXMULTI_SetValues - Set values in device
 # 
 # Parameter hash = hash of device addressed
 #           a = argument array
@@ -814,7 +872,7 @@ sub OWXMULTI_SetValues($@) {
     return "OWXMULTI: Device $owx_dev not accessible"; 
   } 
   
-  DoTrigger($name, undef) if($init_done);
+  #DoTrigger($name, undef) if($init_done);
   return undef;
 }
 
@@ -826,8 +884,9 @@ sub OWXMULTI_SetValues($@) {
  <a name="OWMULTI"></a>
         <h3>OWMULTI</h3>
         <p>FHEM module to commmunicate with 1-Wire multi-sensors, currently the DS2438 smart battery
-            monitor<br /><br /> Note:<br /> This 1-Wire module so far works only with the OWX
-            interface module. Please define an <a href="#OWX">OWX</a> device first. <br /></p>
+            monitor<br /> <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
+                (prerequisite: Add this module's name to the list of clients in OWServer).
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br/></p>
         <br /><h4>Example</h4>
         <p>
             <code>define OWX_M OWMULTI 7C5034010000 45</code>
@@ -842,7 +901,8 @@ sub OWXMULTI_SetValues($@) {
         <a name="OWMULTIdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+            <code>define &lt;name&gt; OWMULTI [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
+            <code>define &lt;name&gt; OWMULTI &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code> 
             <br /><br /> Define a 1-Wire multi-sensor<br /><br /></p>
         <ul>
             <li>
@@ -852,6 +912,10 @@ sub OWXMULTI_SetValues($@) {
                         Measured is a temperature value, an external voltage and the current supply
                         voltage</li>
                 </ul>
+            </li>
+             <li>
+                <code>&lt;fam&gt;</code>
+                <br />2-character unique family id, see above 
             </li>
             <li>
                 <code>&lt;id&gt;</code>
