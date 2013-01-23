@@ -10,12 +10,13 @@
 #
 ########################################################################################
 #
-# define <name> OWSWITCH [<model>] <ROM_ID> [interval] 
+# define <name> OWSWITCH [<model>] <ROM_ID> [interval] or OWSWITCH <fam>.<ROM_ID> [interval]
 #
 # where <name> may be replaced by any name string 
 #     
 #       <model> is a 1-Wire device type. If omitted, we assume this to be an
 #              DS2413. Allowed values are DS2413, DS2406 
+#       <fam> is a 1-Wire family id, currently allowed values are 12, 29, 3A
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #       [interval] is an optional query interval in seconds
@@ -178,7 +179,7 @@ sub OWSWITCH_Define ($$) {
     $id            = $a[2];
     if(int(@a)>=4) { $interval = $a[3]; }
   #-- no model, 2+12 characters
-   } elsif(  $a2 =~ m/^^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+   } elsif(  $a2 =~ m/^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
     $fam           = substr($a[2],0,2);
     $id            = substr($a[2],3);
     if(int(@a)>=4) { $interval = $a[3]; }
@@ -233,12 +234,12 @@ sub OWSWITCH_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+  if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
   }
-  if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
-  }
+  #if( $hash->{IODev}->{PRESENT} != 1 ){
+  #  return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
+  #}
   $modules{OWSWITCH}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","defined",1);
@@ -251,7 +252,7 @@ sub OWSWITCH_Define ($$) {
   InternalTimer(time()+10, "OWSWITCH_InitializeDevice", $hash, 0);
   
   #-- Start timer for updates
-  InternalTimer(time()+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
+  InternalTimer(time()+10+$hash->{INTERVAL}, "OWSWITCH_GetValues", $hash, 0);
 
   return undef; 
 }
@@ -743,11 +744,13 @@ sub OWFSSWITCH_GetState($) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
   
-  #-- get values 
+  #-- get values - or should we rather use the uncached ones ?
   my $rel = OWServer_Read($master,"/$owx_add/sensed.ALL");
   my $rex = OWServer_Read($master,"/$owx_add/PIO.ALL");
   
   return "no return from OWServer"
+    if( !defined($rel) || !defined($rex) );
+  return "empty return from OWServer"
     if( ($rel eq "") || ($rex eq "") );
         
   my @ral = split(/,/,$rel);
@@ -1097,9 +1100,10 @@ sub OWXSWITCH_SetState($$) {
 
 <a name="OWSWITCH"></a>
         <h3>OWSWITCH</h3>
-        <p>FHEM module to commmunicate with 1-Wire Programmable Switches <br /><br /> Note:<br />
-            This 1-Wire module so far works only with the OWX interface module. Please define an <a
-                href="#OWX">OWX</a> device first. <br /></p>
+        <p>FHEM module to commmunicate with 1-Wire Programmable Switches <br />
+         <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
+             (prerequisite: Add this module's name to the list of clients in OWServer).
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br /></p>
         <br /><h4>Example</h4>
         <p>
             <code>define OWX_S OWSWITCH DS2413 B5D502000000 60</code>
@@ -1113,7 +1117,8 @@ sub OWXSWITCH_SetState($$) {
         <a name="OWSWITCHdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code>
+            <code>define &lt;name&gt; OWSWITCH [&lt;model&gt;] &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
+            <code>define &lt;name&gt; OWSWITCH &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code> 
             <br /><br /> Define a 1-Wire switch.<br /><br /></p>
         <ul>
             <li>
@@ -1126,8 +1131,12 @@ sub OWXSWITCH_SetState($$) {
                 </ul>
             </li>
             <li>
+                <code>&lt;fam&gt;</code>
+                <br />2-character unique family id, see above 
+            </li>
+            <li>
                 <code>&lt;id&gt;</code>
-                <br />12-character unique ROM id of the converter device without family id and CRC
+                <br />12-character unique ROM id of the device without family id and CRC
                 code </li>
             <li>
                 <code>&lt;interval&gt;</code>
