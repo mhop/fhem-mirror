@@ -68,10 +68,10 @@ use strict;
 use warnings;
 sub Log($$);
 
-#-- temperature globals - always the raw values from the device
-my $owg_temp     = 0;
-my $owg_th       = 0;
-my $owg_tl       = 0;
+#-- temperature globals - always the raw values from/for the device
+my $owg_temp     = "";
+my $owg_th       = "";
+my $owg_tl       = "";
 
 #-- variables for display strings
 my $stateal;
@@ -200,7 +200,7 @@ sub OWTHERM_Define ($$) {
     return "OWTHERM: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
   
-  #-- determine CRC Code - only if this is a direct interface
+  #-- determine CRC Code
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- define device internals
@@ -210,7 +210,7 @@ sub OWTHERM_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{INTERVAL}   = $interval;
-
+  
   #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
   if( !defined($hash->{IODev}->{NAME}) || !defined($hash->{IODev}) ){
@@ -246,26 +246,46 @@ sub OWTHERM_InitializeDevice($) {
   
   my $name   = $hash->{NAME};
   my @args;
+  my $ret;
+  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
   
-  #-- unit attribute defined ?
+  #-- attributes defined ?
+  $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
+  $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
+  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
+  $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
+  $factor  = 1.0;
+  
+  if( $unit eq "Celsius" ){
+    $abbr   = "&deg;C";
+  } elsif ($unit eq "Kelvin" ){
+    $abbr   = "K";
+    $offset += "273.16"
+  } elsif ($unit eq "Fahrenheit" ){
+    $abbr   = "&deg;F";
+    $offset = ($offset+32)/1.8;
+    $factor = 1.8;
+  } else {
+    $abbr="?";
+    Log 3, "OWTHERM_FormatValues: unknown unit $unit";
+  }
+  #-- these values are rather complex to obtain, therefore save them in the hash
   $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
+  $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
+  $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
+  $hash->{tempf}{offset}                     = $offset;
+  $hash->{tempf}{factor}                     = $factor;
   
   #-- Initial readings temperature sensor
   $owg_temp  =  "";
-  $owg_tl = defined($attr{$name}{"tempLow"})   ? $attr{$name}{"tempLow"}   : "";
-  $owg_th = defined($attr{$name}{"tempHigh"})  ? $attr{$name}{"tempHigh"}  : "";
+  $owg_tl = defined($attr{$name}{"tempLow"})  ? $attr{$name}{"tempLow"}  : "";
+  $owg_th = defined($attr{$name}{"tempHigh"}) ? $attr{$name}{"tempHigh"} : "",
   
   #-- Output formatting because of reading attributes
   OWTHERM_FormatValues($hash);
-  #-- set status
-  if ($owg_tl ne ""){
-    @args   = ($name,"tempLow",$owg_tl);
-    OWTHERM_Set($hash,@args);
-  }
-  if ($owg_th ne ""){
-    @args   = ($name,"tempHigh",$owg_th);
-    OWTHERM_Set($hash,@args);
-  }
+  
+  #-- Set state to initialized
+  readingsSingleUpdate($hash,"state","initialized",1);
 }
 
 ########################################################################################
@@ -286,7 +306,7 @@ sub OWTHERM_FormatValues($) {
   #-- attributes defined ?
   $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
   $stateah = defined($attr{$name}{stateAH}) ? $attr{$name}{stateAH} : "&#x25B4;";
-  $unit    =  $hash->{READINGS}{"temperature"}{UNIT} = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
+  $unit    = defined($attr{$name}{"tempUnit"}) ? $attr{$name}{"tempUnit"} : "Celsius";
   $offset  = defined($attr{$name}{"tempOffset"}) ? $attr{$name}{"tempOffset"} : 0.0 ;
   $factor  = 1.0;
   
@@ -335,7 +355,7 @@ sub OWTHERM_FormatValues($) {
     $hash->{ALARM} = 0;
   }
   
-  #-- put into READINGS
+  #-- put into READINGS and attributes
   $main::attr{$name}{"tempLow"}  = $vlow;
   $main::attr{$name}{"tempHigh"} = $vhigh;
   readingsBeginUpdate($hash);
@@ -481,6 +501,7 @@ sub OWTHERM_GetValues($@) {
 
   $value=OWTHERM_FormatValues($hash);
   Log 5, $value;
+  #-- one thing remains to do: 
   
   return undef;
 }
@@ -527,8 +548,8 @@ sub OWTHERM_Set($@) {
 
   #-- set tempLow or tempHigh
   my $interface = $hash->{IODev}->{TYPE};
-  my $offset    = $hash->{tempf}{offset};
-  my $factor    = $hash->{tempf}{factor};
+  my $offset    = defined($hash->{tempf}{offset}) ? $hash->{tempf}{offset} : 0.0;
+  my $factor    = defined($hash->{tempf}{factor}) ? $hash->{tempf}{factor} : 1.0;
     
   #-- find upper and lower boundaries for given offset/factor
   my $mmin = (-55+$offset)*$factor;
@@ -540,6 +561,8 @@ sub OWTHERM_Set($@) {
   $a[2]  = int($value/$factor-$offset);
 
   #-- OWX interface
+  Log 1,"SETTING DEVICE with ".join(' ',@a)." and present=".$hash->{PRESENT}.
+  " and state=".$hash->{READINGS}{"state"}{VAL};
   if( $interface eq "OWX" ){
     $ret = OWXTHERM_SetValues($hash,@a);
   #-- OWFS interface
@@ -553,7 +576,7 @@ sub OWTHERM_Set($@) {
   
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
-  OWTHERM_GetValues($hash);
+  #OWTHERM_GetValues($hash);
   OWTHERM_FormatValues($hash);
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
@@ -579,6 +602,9 @@ sub OWTHERM_Attr(@) {
   #-- only alarm settings may be modified at runtime for now
   return undef
     if( $key !~ m/(.*)(Low|High)/ );
+  #-- safeguard against uninitialized devices
+  return undef
+    if( $main::defs{$name}->{READINGS}{"state"}{VAL} eq "defined" );
   
   if( $do eq "set")
   {
@@ -631,16 +657,34 @@ sub OWFSTHERM_GetValues($) {
   
   #-- get values - or should we rather get the uncached ones ?
   $owg_temp = OWServer_Read($master,"/$owx_add/temperature");
-  $owg_th   = OWServer_Read($master,"/$owx_add/temphigh");
-  $owg_tl   = OWServer_Read($master,"/$owx_add/templow");
+ 
+  my $ow_thn   = OWServer_Read($master,"/$owx_add/temphigh");
+  my $ow_tln   = OWServer_Read($master,"/$owx_add/templow");
   
   return "no return from OWServer"
-    if( (!defined($owg_temp)) || (!defined($owg_th)) || (!defined($owg_tl)) );
+    if( (!defined($owg_temp)) || (!defined($ow_thn)) || (!defined($ow_tln)) );
   return "empty return from OWServer"
-    if( ($owg_temp eq "") || ($owg_th eq "") || ($owg_tl eq "") );
+    if( ($owg_temp eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
         
   #return "wrong data length from OWServer"
   #  if( (int(@ral) != $cnumber{$attr{$name}{"model"}}) || (int(@rax) != $cnumber{$attr{$name}{"model"}}) );
+  
+  #-- process alarm settings
+  #-- first reading of the device
+  if( $owg_th eq ""){
+    $owg_th = $ow_thn;
+  #-- device must be changed 
+  }elsif( $owg_th != $ow_thn ){
+    OWFSTHERM_SetValues($hash,"temphigh",$owg_th);
+  }
+  
+  #-- first reading of the device
+  if( $owg_tl eq ""){
+    $owg_tl = $ow_tln;
+  #-- device must be changed 
+  }elsif( $owg_tl != $ow_tln ){
+    OWFSTHERM_SetValues($hash,"templow",$owg_tl);
+  }
   
   return undef
 }
@@ -686,7 +730,8 @@ sub OWXTHERM_GetValues($) {
 
   my ($hash) = @_;
   
-  my ($i,$j,$k,@data);
+  my ($i,$j,$k,@data,$ow_thn,$ow_tln);
+  my $change = 0;
   
   #-- For default, perform the conversion NOT now
   my $con=1;
@@ -755,10 +800,8 @@ sub OWXTHERM_GetValues($) {
       $owg_temp = -128+$owg_temp;
     }
 
-    $owg_th = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
-    $owg_tl = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
- 
-    return undef;
+    $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
+    $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
 
   } elsif ( ($hash->{OW_FAMILY} eq "22") || ($hash->{OW_FAMILY} eq "28") ) {
      
@@ -776,14 +819,34 @@ sub OWXTHERM_GetValues($) {
     if( $sign !=0 ){
       $owg_temp = -128+$owg_temp;
     }
-    $owg_th = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
-    $owg_tl = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
-    
-    return undef;
+    $ow_thn = ord($data[3]) > 127 ? 128-ord($data[3]) : ord($data[3]);
+    $ow_tln = ord($data[4]) > 127 ? 128-ord($data[4]) : ord($data[4]);
     
   } else {
     return "OWXTHERM: Unknown device family $hash->{OW_FAMILY}\n";
   }
+  
+  #-- process alarm settings
+  #-- first reading of the device
+  if( $owg_th eq ""){
+    $owg_th = $ow_thn;
+  #-- device must be changed 
+  }elsif( $owg_th != $ow_thn ){
+    $change=1;
+  }
+  
+  #-- first reading of the device
+  if( $owg_tl eq ""){
+    $owg_tl = $ow_tln;
+  #-- device must be changed 
+  }elsif( $owg_tl != $ow_tln ){
+    $change=1;
+  }
+  #-- change device settings
+  if( $change==1){
+    OWXTHERM_SetValues($hash,("both","0.0"));
+  }
+  return undef;
 }
 
 #######################################################################################
@@ -809,6 +872,12 @@ sub OWXTHERM_SetValues($@) {
   #-- define vars
   my $key   = $a[1];
   my $value = $a[2];
+  return undef
+    if( !defined($value));
+  return undef 
+    if( $value eq "");
+    
+  #-- $owg_tl and $owg_th are preset and may be changed here
   $owg_tl = $value if( $key eq "tempLow" );
   $owg_th = $value if( $key eq "tempHigh" );
 
@@ -833,7 +902,6 @@ sub OWXTHERM_SetValues($@) {
     return "OWXTHERM: Device $owx_dev not accessible"; 
   } 
   
-  #DoTrigger($name, undef) if($init_done);
   return undef;
 }
 
