@@ -565,8 +565,18 @@ OWDevice_Set($@)
           OWDevice_WriteValue($hash,$cmdname,$value);
           readingsSingleUpdate($hash,$cmdname,$value,1);
           return undef;
+        } elsif ($cmdname eq "interval") {
+          return "Wrong interval format: Only digits are allowed!"
+            if($value !~ m/^\d+$/);
+          if($value == $hash->{fhem}{interval}) {
+            return "new interval is equal to old interval.";
+          } else {
+            RemoveInternalTimer($hash);
+            $hash->{fhem}{interval}= $value;
+            InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
+          }
         } else {
-          return "Unknown argument $cmdname, choose one of " . join(" ", @setters);
+          return "Unknown argument $cmdname, choose one of interval " . join(" ", @setters);
         }
 }
 
@@ -741,16 +751,21 @@ OWDevice_Define($$)
   <a name="OWDeviceset"></a>
   <b>Set</b>
   <ul>
-    <code>set &lt;name&gt; &lt;reading&gt; &lt;value&gt;</code>
-    <br><br>
-    Sets &lt;reading&gt; to &lt;value&gt; for the 1-wire device &lt;name&gt;. The permitted values are defined by the underlying
-    1-wire device type.
-    <br><br>
-    Example:
-    <ul>
-      <code>set myT1 templow 5</code><br>
-    </ul>
-    <br>
+    <li><code>set &lt;name&gt; interval &lt;value&gt;</code>
+      <br><br>
+      <code>value</code> modifies the interval for polling data. The unit is in seconds.
+    </li>
+    <li><code>set &lt;name&gt; &lt;reading&gt; &lt;value&gt;</code>
+      <br><br>
+      Sets &lt;reading&gt; to &lt;value&gt; for the 1-wire device &lt;name&gt;. The permitted values are defined by the underlying
+      1-wire device type.
+      <br><br>
+      Example:
+      <ul>
+        <code>set myT1 templow 5</code><br>
+      </ul>
+      <br>
+    </li>
   </ul>
 
 
