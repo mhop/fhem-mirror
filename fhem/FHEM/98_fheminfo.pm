@@ -184,7 +184,7 @@ CommandFheminfo($$)
     my @models;
     foreach my $n (sort keys %{$info{modules}{$t}}) {
       my $model = $info{modules}{$t}{$n};
-      if($model ne "unknown") {
+      if($model ne "unknown" && $t ne "dummy") {
         push(@models,$model) if(!grep {$_ =~ /$model/} @models);
       }
     }
