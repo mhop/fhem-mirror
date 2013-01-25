@@ -361,9 +361,10 @@ CUL_HM_Parse($$)
   # $shash will be replaced for multichannel commands
   my $shash = $modules{CUL_HM}{defptr}{$src}; 
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
-  my $dname = $dhash ? $dhash->{NAME} :
-                       ($dst eq "000000" ? "broadcast" : 
-                                ($dst eq $id ? $iohash->{NAME} : $dst));
+  my $dname = ($dst eq "000000") ? "broadcast" :
+                                   ($dhash ? $dhash->{NAME} : 
+								             ($dst eq $id ? $iohash->{NAME} : 
+											                $dst));
   my $target = " (to $dname)";
   my $msgStat;
   ($p,$msgStat) = split(":",$p,2);
