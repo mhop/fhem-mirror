@@ -40,7 +40,7 @@ structure_Initialize($)
   $hash->{SetFn}     = "structure_Set";
   $hash->{AttrFn}    = "structure_Attr";
   $hash->{AttrList}  = "clientstate_priority ".
-                       "clientstate_behavior:relative,absolute loglevel:0,5 ".
+                       "clientstate_behavior:relative,absolute,last loglevel:0,5 ".
                        $readingFnAttributes;
 
   addToAttrList("structexclude");
@@ -117,15 +117,15 @@ sub structure_Notify($$)
   my $me = $hash->{NAME};
   my $devmap = $hash->{ATTR}."_map";
 
-  # lade das Verhalten, Standard ist absolute 
-  my $behavior = AttrVal($me,"clientstate_behavior", "absolute");
-  my @clientstate;
-
-  return "" if($attr{$me} && $attr{$me}{disable});
+  return "" if(AttrVal($me,"disable", undef));
 
   #pruefen ob Devices welches das notify ausgeloest hat Mitglied dieser
   # Struktur ist
   return "" if (!$hash->{CONTENT}->{$dev->{NAME}});
+
+  # lade das Verhalten, Standard ist absolute 
+  my $behavior = AttrVal($me, "clientstate_behavior", "absolute");
+  my @clientstate;
 
   # hier nur den Struktur-Status anpassen wenn 
   # a) behavior=absolute oder 
@@ -133,6 +133,13 @@ sub structure_Notify($$)
   my @structPrio = split(" ", $attr{$me}{clientstate_priority})
         if($attr{$me}{clientstate_priority});
   return "" if (!@structPrio && $behavior eq "relative");
+
+
+  if($hash->{INNTFY}) {
+    Log 1, "ERROR: endless loop detected in structure_Notify $me";
+    return "";
+  }
+  $hash->{INNTFY} = 1;
 
   # assoziatives Array aus Prioritaetsliste aufbauen
   # Bsp: Original: "On|An Off|Aus"
@@ -155,30 +162,24 @@ sub structure_Notify($$)
   undef @structPrio;
   #Log 1, Dumper(%priority) . "\n";
   
-  $hash->{INSET} = 1;
-  
   my $minprio = 99999;
   my $devstate;
 
   #ueber jedes Device das zu dieser Struktur gehoert
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
-    if($defs{$d}{INSET}) {
-      Log 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
-      next;
-    }
 
     # wenn zum Device das "structexclude" gesetzt ist, wird dieses nicht
     # beruecksichtigt
     if($attr{$d} && $attr{$d}{structexclude}) {
       my $se = $attr{$d}{structexclude};
-      next if($hash->{NAME} =~ m/$se/);
+      next if($me =~ m/$se/);
     }
 
 
     # Status des Devices gemaess den Regeln des gesetztes StrukturAttr
     # umformatieren
-    if ($attr{$d}{$devmap}) {
+    if($attr{$d} && $attr{$d}{$devmap}) {
       my @gruppe = split(" ", $attr{$d}{$devmap});
       my @value;
       for (my $i=0; $i<@gruppe; $i++) {
@@ -186,10 +187,11 @@ sub structure_Notify($$)
         if(@value == 1) {
           # nur das zu lesende Reading ist angegeben, zb. bei 1wire Modul
           # OWSWITCH
-          #Bsp: A --> nur Reading A gehuert zur Struktur
-          #Bsp: A B --> Reading A und B gehuert zur Struktur
+          #Bsp: A --> nur Reading A gehoert zur Struktur
+          #Bsp: A B --> Reading A und B gehoert zur Struktur
           $devstate = ReadingsVal($d, $value[0], undef);
           push(@clientstate, $devstate) if(defined($devstate));
+
         } elsif(@value == 2) {
           # zustand wenn der Status auf dem in der Struktur definierten
           # umdefiniert werden muss
@@ -200,6 +202,7 @@ sub structure_Notify($$)
             push(@clientstate, $devstate);
             $i=99999;
           }
+
         } elsif(@value == 3) {
           # Das zu lesende Reading wurde mit angegeben:
           # Reading:OriginalStatus:NeuerStatus wenn zb. ein Device mehrere
@@ -236,27 +239,28 @@ sub structure_Notify($$)
   @clientstate = uniq(@clientstate);# eleminiere alle Dubletten
 
   #ermittle Endstatus
-  my $newState = "";
+  my $newState = "undefined";
   if($behavior eq "absolute"){
     # wenn absolute, dann gebe undefinierten Status aus falls die Clients
-    # unterschiedliche Status' haben  
-    if(@clientstate > 1) { $newState = "undefined";}
-    elsif(@clientstate > 0) { $newState = $clientstate[0];}
+    # unterschiedliche Stati haben  
+    $newState = (@clientstate == 1 ? $clientstate[0] : "undefined");
+
   } elsif($behavior eq "relative" && $minprio < 99999) {
     $newState = $priority[$minprio];
-  } else {
-    $newState = "undefined";
-  }
 
-  delete($hash->{INSET});
+  } elsif($behavior eq "last"){
+    $newState = ReadingsVal($dev->{NAME}, "state", undef);
+
+  }
 
   #eigenen Status jetzt setzen, nur wenn abweichend
-  if(!defined($hash->{STATE}) || ($hash->{STATE} ne $newState)) {
-    Log GetLogLevel($hash->{NAME},5), "Update structure '" .$me . "' to " . $newState .
-                " because device '" .$dev->{NAME}. "' has changed";
-    $hash->{STATE} = $newState;
+  my $oldState = ReadingsVal($me, "state", "");
+  if($oldState ne $newState) {
+    Log GetLogLevel($me,5), "Update structure '$me' to $newState" .
+                " because device $dev->{NAME} has changed";
     readingsSingleUpdate($hash, "state", $newState, 1);
   }
+  delete($hash->{INNTFY});
   undef;
 }
 
@@ -443,13 +447,17 @@ structure_Attr($@)
       delemited by space. Each entry of one group are delimited by "pipe".
       The status represented by the structure is the first entry of each group
     </ul>
+    <li>last</li>
+    <ul>
+      The structure state corresponds to the state of the device last changed.
+    </ul>
     <br>Example:<br>
     <ul>
-      <li>attr kittchen clientstate_behavior relative</li>
-      <li>attr kittchen clientstate_priority An|On|on Aus|Off|off</li>
+      <li>attr kitchen clientstate_behavior relative</li>
+      <li>attr kitchen clientstate_priority An|On|on Aus|Off|off</li>
       <li>attr house clientstate_priority Any_On|An All_Off|Aus</li>
     </ul>
-    In this example the status of kittchen is either on or off.
+    In this example the status of kitchen is either on or off.
     The status of house is either Any_on or All_off.
     <br>
     To group more devices from different types of devices you can define
@@ -465,7 +473,7 @@ structure_Attr($@)
       <li>define lamp1 dummy</li>
       <li>attr lamp1 cmdlist on off</li>
       <li>define kitchen structure struct_kitchen lamp1 door</li>
-      <li>attr kittchen clientstate_priority An|on OK|Aus|off</li>
+      <li>attr kitchen clientstate_priority An|on OK|Aus|off</li>
       <li>attr lamp1 struct_kitchen_map on:An off:Aus</li>
       <li>attr door struct_kitchen_map A:open:on A:closed:off</li>
       <li>attr door2 struct_kitchen_map A</li>
@@ -476,7 +484,7 @@ structure_Attr($@)
   <b>Set</b>
   <ul>
     Every set command is propagated to the attached devices. Exception: if an
-    attached devices has an attribute structexclude, and the attribute value
+    attached device has an attribute structexclude, and the attribute value
     matches (as a regexp) the name of the current structure.
   </ul>
   <br>
@@ -553,6 +561,10 @@ structure_Attr($@)
       unterschiedliche Devicetypen zusammenfassen zu können. Jede Gruppe wird durch
       Leerzeichen, jeder Eintrag pro Gruppe durch Pipe getrennt. Der Status der
       Struktur ist der erste Eintrag in der entsprechenden Gruppe.
+    </ul>
+    <li>last</li>
+    <ul>
+      Die Struktur &uuml;bernimmt den Status des zuletzt ge&auml;nderten Ger&auml;tes.
     </ul>
     <br>Beispiel:<br>
     <ul>
