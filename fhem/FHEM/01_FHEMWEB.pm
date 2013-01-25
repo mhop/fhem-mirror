@@ -833,6 +833,7 @@ FW_doDetail($)
 
   my $h = $defs{$d};
   my $t = $h->{TYPE};
+  $t = "MISSING" if(!defined($t));
   FW_pO "<div id=\"content\">";
 
   if($FW_ss) { # FS20MS2 special: on and off, is not the same as toggle
@@ -1156,7 +1157,6 @@ FW_showRoom()
               FW_pO "<td colspan='2'>".
                       "<div class='slider' id='slider.$d'>".
                         "<div class='handle'>$min</div></div>".
-                      "</div>".
                       "<script type=\"text/javascript\">" .
                         "Slider(document.getElementById('slider.$d'),".
                               "'$min','$stp','$max','$cv',".
@@ -1215,7 +1215,7 @@ FW_showRoom()
 
         }
       }
-      FW_pO "</td>";
+      FW_pO "</tr>";
     }
     FW_pO "</table>";
     FW_pO "</td></tr>";
