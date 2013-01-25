@@ -370,15 +370,24 @@ structure_Attr($@)
                   $list[1] eq "room" ||
                   $list[1] =~ m/clientstate/ ||
                   $list[1] eq "loglevel");
-  my $hash = $defs{$list[0]};
+
+  my $me = $list[0];
+  my $hash = $defs{$me};
+
+  if($hash->{INATTR}) {
+    Log 1, "ERROR: endless loop detected in structure_Attr for $me";
+    next;
+  }
   $hash->{INATTR} = 1;
+
   my $ret = "";
   foreach my $d (sort keys %{ $hash->{CONTENT} }) {
     next if(!$defs{$d});
-    if($defs{$d}{INATTR}) {
-      Log 1, "ERROR: endless loop detected for $d in " . $hash->{NAME};
-      next;
+    if($attr{$d} && $attr{$d}{structexclude}) {
+      my $se = $attr{$d}{structexclude};
+      next if("$me:$list[1]" =~ m/$se/);
     }
+
     $list[0] = $d;
     my $sret;
     if($type eq "del") {
@@ -392,7 +401,7 @@ structure_Attr($@)
     }
   }
   delete($hash->{INATTR});
-  Log GetLogLevel($hash->{NAME},5), "ATTR: $ret" if($ret);
+  Log GetLogLevel($me,4), "Stucture attr $type: $ret" if($ret);
   return undef;
 }
 
@@ -431,53 +440,7 @@ structure_Attr($@)
       <li>set house off</li>
     </ul>
     <br>
-
-    The backward propagated status change from the devices to this structure
-    works in two different ways.
-    <br>Attribute clientstate_behavior<br>
-    <li>absolute</li>
-    <ul>
-      The structure status will changed to the common device status of all defined devices
-      to this structure if all devices are identical. Otherwise the structure status is "undefined".
-    </ul>
-    <li>relative</li>
-    <ul>
-      You have to set the attribute "clientstate_priority" with all states of
-      the defined devices to this structure in descending order. Each group are
-      delemited by space. Each entry of one group are delimited by "pipe".
-      The status represented by the structure is the first entry of each group
-    </ul>
-    <li>last</li>
-    <ul>
-      The structure state corresponds to the state of the device last changed.
-    </ul>
-    <br>Example:<br>
-    <ul>
-      <li>attr kitchen clientstate_behavior relative</li>
-      <li>attr kitchen clientstate_priority An|On|on Aus|Off|off</li>
-      <li>attr house clientstate_priority Any_On|An All_Off|Aus</li>
-    </ul>
-    In this example the status of kitchen is either on or off.
-    The status of house is either Any_on or All_off.
-    <br>
-    To group more devices from different types of devices you can define
-    a clientstate redefining on each device with the attribute &lt;struct_type&gt;_map.
-    For example the reading "A" of device door is "open" or "closed"
-    and the state of device lamp1 should redefine from "on" to "An" and "off" to "Aus".
-    A special case are devices with more than 1 input port (eg. OWSWITCH). The last
-    example shows the attribute only with a value of "A". The propagated value of the device
-    are depending only of port A with an unmodified state.
-    <br>Example:<br>
-    <ul>
-      <li>define door OWSWITCH &lt;ROMID&gt</li>
-      <li>define lamp1 dummy</li>
-      <li>attr lamp1 cmdlist on off</li>
-      <li>define kitchen structure struct_kitchen lamp1 door</li>
-      <li>attr kitchen clientstate_priority An|on OK|Aus|off</li>
-      <li>attr lamp1 struct_kitchen_map on:An off:Aus</li>
-      <li>attr door struct_kitchen_map A:open:on A:closed:off</li>
-      <li>attr door2 struct_kitchen_map A</li>
-    </ul>
+  </ul>
 
   <br>
   <a name="structureset"></a>
@@ -488,21 +451,91 @@ structure_Attr($@)
     matches (as a regexp) the name of the current structure.
   </ul>
   <br>
+
   <a name="structureget"></a>
   <b>Get</b>
   <ul>
     get is not supported through a structure device.
   </ul>
   <br>
+
   <a name="structureattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <a name="clientstate_behavior"></a>
+    <li>clientstate_behavior<br>
+        The backward propagated status change from the devices to this structure
+        works in two different ways.
+        <ul>
+        <li>absolute<br>
+          The structure status will changed to the common device status of all
+          defined devices to this structure if all devices are identical.
+          Otherwise the structure status is "undefined".
+          </li>
+        <li>relative<br>
+          See below for clientstate_priority.
+          </li>
+        <li>last<br>
+          The structure state corresponds to the state of the device last changed.
+          </li>
+        </ul>
+        </li>
+
+    <a name="clientstate_priority"></a>
+    <li>clientstate_priority<br>
+        If clientstate_behavior is set to relative, then you have to set the
+        attribute "clientstate_priority" with all states of the defined devices
+        to this structure in descending order. Each group is delemited by
+        space. Each entry of one group is delimited by "pipe".  The status
+        represented by the structure is the first entry of each group.
+        Example:<br>
+        <ul>
+          <li>attr kitchen clientstate_behavior relative</li>
+          <li>attr kitchen clientstate_priority An|On|on Aus|Off|off</li>
+          <li>attr house clientstate_priority Any_On|An All_Off|Aus</li>
+        </ul>
+        In this example the status of kitchen is either on or off.  The status
+        of house is either Any_on or All_off.
+        <br>
+        To group more devices from different types of devices you can define
+        a clientstate redefining on each device with the attribute &lt;struct_type&gt;_map.
+        For example the reading "A" of device door is "open" or "closed"
+        and the state of device lamp1 should redefine from "on" to "An" and "off" to "Aus".
+        A special case is a device with more than 1 input port (eg. OWSWITCH). The last
+        example shows the attribute only with a value of "A". The propagated
+        value of the device depends only on port A with an unmodified state.
+        <br>Example:<br>
+        <ul>
+          <li>define door OWSWITCH &lt;ROMID&gt</li>
+          <li>define lamp1 dummy</li>
+          <li>attr lamp1 cmdlist on off</li>
+          <li>define kitchen structure struct_kitchen lamp1 door</li>
+          <li>attr kitchen clientstate_priority An|on OK|Aus|off</li>
+          <li>attr lamp1 struct_kitchen_map on:An off:Aus</li>
+          <li>attr door struct_kitchen_map A:open:on A:closed:off</li>
+          <li>attr door2 struct_kitchen_map A</li>
+        </ul>
+        </li>
+
+    <a name="structexclude"></a>
     <li>structexclude<br>
-        exclude the device from set operations, see the set command above.</li>
+        exclude the device from set/notify or attribute operations. For the set
+        and notify the value of structexclude must match the structure name,
+        for the attr/deleteattr commands ist must match the combination of
+        structure_name:attribute_name. Examples:<br>
+        <ul>
+          <code>
+          define kitchen structure room lamp1 lamp2<br>
+          attr lamp1 structexclude kitchen<br>
+          attr lamp1 structexclude kitchen:stateFormat<br>
+          </code>
+        </ul>
+        </li>
+
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+
   </ul>
   <br>
-</ul>
 </ul>
 
 =end html
@@ -521,14 +554,14 @@ structure_Attr($@)
     Devices erstellt um sie zu Gruppen zusammenzufassen. (Beispiel: im Haus alles ausschalten)
     <br>
     Die Liste der Devices die einer Struktur zugeordnet sind kann duch das Kommando
-    <code>addstruct / delstruct</code> im laufenden Betrieb verändert werden. Es können
-    sowohl einzelne Devices als auch Gruppen von Devices (TYPE=FS20) zugefügt werden.
-    Jedes zugefügt Device erhält zwei neue Attribute &lt;struct_type&gt;=&lt;name&gt;
-    sowie &lt;struct_type&gt;_map wenn es zu einer Struktur zugefügt wurde. Diese
+    <code>addstruct / delstruct</code> im laufenden Betrieb ver&auml;ndert werden. Es k&ouml;nnen
+    sowohl einzelne Devices als auch Gruppen von Devices (TYPE=FS20) zugef&uuml;gt werden.
+    Jedes zugef&uuml;gt Device erh&auml;lt zwei neue Attribute &lt;struct_type&gt;=&lt;name&gt;
+    sowie &lt;struct_type&gt;_map wenn es zu einer Struktur zugef&uuml;gt wurde. Diese
     Attribute werden wieder automatisch entfernt, sobald das Device von der Struktur
     entfernt wird.<br>
-    Eine Struktur kann ebenfalls zu einer anderen Struktur zugefügt werden. Somit
-    können z b. kaskadierende Strukturen erstellt werden. (Z.b. KG,EG,OG, Haus)
+    Eine Struktur kann ebenfalls zu einer anderen Struktur zugef&uuml;gt werden. Somit
+    k&ouml;nnen z b. kaskadierende Strukturen erstellt werden. (Z.b. KG,EG,OG, Haus)
 
     Beispiel:<br>
     <ul>
@@ -539,33 +572,59 @@ structure_Attr($@)
       <li>set house off</li>
     </ul>
     <br> 
+  </ul>
 
-    Der Status einer Struktur hängt von den Stati der zugefügten Devices ab.
-    Dabei wird das propagieren der Stati der Devices in zwei Gruppen klassifiziert
-    und mittels folgendem Attribut definiert:
+  <br>
+  <a name="structureset"></a>
+  <b>Set</b>
+  <ul>
+    Jedes set Kommando wird an alle Devices dieser Struktur weitergegeben.<br>
+    Aussnahme: das Attribut structexclude ist in einem Device definiert und
+    dessen Attributwert matched als Regexp zum Namen der aktuellen Struktur.
+  </ul>
+  <br>
+  <a name="structureget"></a>
+  <b>Get</b>
+  <ul>
+    Get wird im Structur-Device nicht unterst&uuml;tzt.
+  </ul>
+  <br>
+  <a name="structureattr"></a>
+  <b>Attribute</b>
+  <ul>
+    <a name="clientstate_behavior"></a>
+    <li>clientstate_behavior<br>
+      Der Status einer Struktur h&auml;ngt von den Stati der zugef&uuml;gten Devices ab.
+      Dabei wird das propagieren der Stati der Devices in zwei Gruppen klassifiziert
+      und mittels diesem Attribut definiert:
+      <ul>
+      <li>absolute</li>
+      <ul>
+        Die Struktur wird erst dann den Status der zugef&uuml;gten Devices annehmen,
+        wenn alle Devices einen identischen Status vorweisen. Bei unterschiedlichen
+        Devictypen kann dies per Attribut &lt;struct_type&gt;_map pro Device
+        beinflusst werden. Andernfalls hat die Struktur den Status "undefined".
+      </ul>
+      <li>relative</li>
+      <ul>
+        S.u. clientstate_priority.
+      </ul>
+      <li>last</li>
+      <ul>
+        Die Struktur &uuml;bernimmt den Status des zuletzt ge&auml;nderten Ger&auml;tes.
+      </ul>
+      </ul>
 
-    <br>Attribut clientstate_behavior<br>
-    <li>absolute</li>
-    <ul>
-      Die Struktur wird erst dann den Status der zugefügten Devices annehmen,
-      wenn alle Devices einen identischen Status vorweisen. Bei unterschiedlichen
-      Devictypen kann dies per Attribut &lt;struct_type&gt;_map pro Device
-      beinflusst werden. Andernfalls hat die Struktur den Status "undefined".
-    </ul>
-    <li>relative</li>
-    <ul>
+    <a name="clientstate_priority"></a>
+    <li>clientstate_priority<br>
       Wird die Struktur auf ein relatives Verhalten eingestellt, so wird die
-      Priorität der Devicestati über das Attribut <code>clientstate_priority</code>
-      beinflusst. Die Prioritäten sind in absteigender Reihenfolge anzugeben.
-      Dabei können Gruppen mit identischer Priorität angegeben werden, um zb.
-      unterschiedliche Devicetypen zusammenfassen zu können. Jede Gruppe wird durch
+      Priorit&auml;t der Devicestati &uuml;ber das Attribut <code>clientstate_priority</code>
+      beinflusst. Die Priorit&auml;ten sind in absteigender Reihenfolge anzugeben.
+      Dabei k&ouml;nnen Gruppen mit identischer Priorit&auml;t angegeben werden, um zb.
+      unterschiedliche Devicetypen zusammenfassen zu k&ouml;nnen. Jede Gruppe wird durch
       Leerzeichen, jeder Eintrag pro Gruppe durch Pipe getrennt. Der Status der
       Struktur ist der erste Eintrag in der entsprechenden Gruppe.
-    </ul>
-    <li>last</li>
-    <ul>
-      Die Struktur &uuml;bernimmt den Status des zuletzt ge&auml;nderten Ger&auml;tes.
-    </ul>
+
     <br>Beispiel:<br>
     <ul>
       <li>attr kueche clientstate_behavior relative</li>
@@ -577,19 +636,19 @@ structure_Attr($@)
     entweder den Status <code>Any_on</code> oder <code>All_off</code> an. Sobald ein
     Device der Struktur <code>haus</code> den Status <code>An</code> hat nimmt die
     Struktur den Status <code>Any_On</code> an. Um dagegen den Status
-    <code>All_off</code> anzunehmen, müssen alle Devices dieser Struktur auf
+    <code>All_off</code> anzunehmen, m&uuml;ssen alle Devices dieser Struktur auf
     <code>off</code> stehen.
     <br>
-    Um mehrere Devices unterschiedlicher Typen gruppieren zu können ist ein
+    Um mehrere Devices unterschiedlicher Typen gruppieren zu k&ouml;nnen ist ein
     Status-Mapping auf jedem einzelnen Device mittels Attribut &lt;struct_type&gt;_map
-    möglich.
+    m&ouml;glich.
     Im folgenden Beispiel nimmt das Reading "A" den Status "offen" oder "geschlossen"
     an, und des Reading "state" von "lampe1" den Status "on" oder "off".
     Die Struktur "kueche" reagiert nun auf "An" bzw "on" (Prio 1) bzw.
     auf "OK", "Aus", "off". Der Status den diese Struktur schlussendlich annehmen kann
     ist entweder "An" oder "OK".<br>
     Der Status des Devices lampe1 wird umdefiniert von "on" nach "An" bzw "off" nach "Aus".
-    Das Device "tuer", welches vom Type "OWSWITCH" ist, bringt ausschließlich
+    Das Device "tuer", welches vom Type "OWSWITCH" ist, bringt ausschlie&szlig;lich
     das Reading A in die Struktur ein welches von "open" nach "on" sowie "clesed"
     nach "Aus" umdefiniert wird.<br>
     Die Struktur <code>kueche</code> wird folglich nur dann "An" ausgeben,
@@ -612,32 +671,24 @@ structure_Attr($@)
       <li>attr tuer2 struct_kitchen_map A</li>
     </ul>
 
-  <br>
-  <a name="structureset"></a>
-  <b>Set</b>
-  <ul>
-    Jedes set Kommando wird an alle Devices dieser Struktur weitergegeben.<br>
-    Aussnahme: das Attribut structexclude ist in einem Device definiert und
-    dessen Attributwert matched als Regexp zum Namen der aktuellen Struktur.
-  </ul>
-  <br>
-  <a name="structureget"></a>
-  <b>Get</b>
-  <ul>
-    Get wird im Structur-Device nicht unterstützt.
-  </ul>
-  <br>
-  <a name="structureattr"></a>
-  <b>Attributes</b>
-  <ul>
     <li>structexclude<br>
-      Bei gesetztem Attribut wird das set-Kommando ignoriert, siehe set-Befehl.
-      Dies trifft ebenfalls auf die Weitergabe des Devicestatus an die
-      Struktur zu.
-    </li>
+      Bei gesetztem Attribut wird set, attr/deleteattr ignoriert.  Dies
+      trifft ebenfalls auf die Weitergabe des Devicestatus an die Struktur zu.
+      Fuer set und fuer die Status-Weitergabe muss der Wert den Strukturnamen
+      matchen, bei einem Attribut-Befehl die Kombination
+      Strukturname:Attributname.
+      Beispiel:
+        <ul>
+          <code>
+          define kitchen structure room lamp1 lamp2<br>
+          attr lamp1 structexclude kitchen<br>
+          attr lamp1 structexclude kitchen:stateFormat<br>
+          </code>
+        </ul>
+      </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
-</ul>
 </ul>
 
 =end html_DE
