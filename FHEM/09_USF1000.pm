@@ -165,7 +165,7 @@ USF1000_Parse($$)
 
   readingsBulkUpdate($def, "warnings", $warnings);
 
-  readingsEndUpdate($def, 0);
+  readingsEndUpdate($def, 1);
 
   return $name;
 
