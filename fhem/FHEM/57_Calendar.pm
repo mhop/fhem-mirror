@@ -476,7 +476,8 @@ sub advanceToNextOccurance {
   # See RFC 2445 page 39 and following
 
   return if(!exists($self->{freq})); #This event is not reoccuring
-  return if(exists($self->{count}) and $self->{count} == 0); #We are already at the last occurance
+  $self->{count}-- if(exists($self->{count})); # since we look for the next occurance we have to decrement count first
+  return if(exists($self->{count}) and $self->{count} <= 0); #We are already at the last occurance
 
   my @weekdays = qw(SU MO TU WE TH FR SA);
   #There are no leap seconds in epoch time
@@ -523,7 +524,6 @@ sub advanceToNextOccurance {
 
   #the UNTIL clause is inclusive, so $newt == $self->{until} is okey
   return if(exists($self->{until}) and $nextstart > $self->{until});
-  $self->{count} -= 1 if(exists($self->{count}));
 
   my $duration = $self->{end} - $self->{start};
   $self->{start} = $nextstart;
