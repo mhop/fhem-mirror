@@ -116,7 +116,7 @@ BS_Parse($$)
   readingsBulkUpdate($def, "brightness", $brightness);
   readingsBulkUpdate($def, "lux", $lux);
   readingsBulkUpdate($def, "flags", $flags);
-  readingsEndUpdate($def, 0);
+  readingsEndUpdate($def, 1);
 
   return $name;
 
