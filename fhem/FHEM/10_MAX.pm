@@ -58,7 +58,7 @@ my %readingDef = ( #min/max/default
   "measurementOffset"     => [ \&validMeasurementOffset, 0],
   "boostDuration"         => [ \&validBoostDuration, 5 ],
   "boostValveposition"    => [ \&validValveposition, 80 ],
-  "decalcification"       => [ \&validDecalcification, "Sat, 12:00" ],
+  "decalcification"       => [ \&validDecalcification, "Sat 12:00" ],
   "maxValveSetting"       => [ \&validValveposition, 100 ],
   "valveOffset"           => [ \&validValveposition, 00 ],
 );
