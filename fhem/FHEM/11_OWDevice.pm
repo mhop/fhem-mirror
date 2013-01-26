@@ -602,7 +602,7 @@ OWDevice_Define($$)
         return "Usage: define <name> OWDevice <address> [interval]"  if($#a < 2|| $#a > 3);
         my $name= $a[0];
 
-        AssignIoPort($hash);
+        AssignIoPort($hash) if(!defined($hash->{IODev}->{NAME}));
         if(defined($hash->{IODev}->{NAME})) {
           Log 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
         } else {
