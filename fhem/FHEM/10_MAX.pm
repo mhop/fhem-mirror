@@ -1,6 +1,10 @@
 ##############################################
 # $Id$
-# Written by Matthias Gehre, M.Gehre@gmx.de, 2012
+# Written by Matthias Gehre, M.Gehre@gmx.de, 2012-2013
+#
+# TODO:
+# - Bounds checking in "fake", allow temperature above 25.5
+# - Defer updating of state until Ack
 package main;
 
 use strict;
