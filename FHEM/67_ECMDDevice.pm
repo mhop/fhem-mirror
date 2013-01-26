@@ -95,15 +95,21 @@ sub
 ECMDDevice_Changed($$$)
 {
         my ($hash, $cmd, $value)= @_;
+        
 
-        readingsSingleUpdate($hash, $cmd, $value, 1);
+        readingsBeginUpdate($hash);
+        readingsBulkUpdate($hash, $cmd, $value, 1) if(defined($value));
 
-        $hash->{STATE} = "$cmd $value";
+        my $state= $cmd;
+        $state.= " $value" if(defined($value));
+        readingsBulkUpdate($hash, "state", $state, 0);
+
+        readingsEndUpdate($hash, 1);
 
         my $name= $hash->{NAME};
-        Log GetLogLevel($name, 4), "ECMDDevice $name $cmd: $value";
+        Log GetLogLevel($name, 4), "ECMDDevice $name $state";
 
-        return $hash->{STATE};
+        return $state;
 
 }
 
@@ -220,9 +226,8 @@ ECMDDevice_Set($@)
 
 	$v= ECMDDevice_PostProc($hash, $postproc, $v);
 
-#        $v= join(" ", @a) if($params);
-
-        return ECMDDevice_Changed($hash, $cmdname, $v);
+        ECMDDevice_Changed($hash, $cmdname, $v); # was: return ECMDDevice_Changed($hash, $cmdname, $v);
+        return undef;
 
 }
 
