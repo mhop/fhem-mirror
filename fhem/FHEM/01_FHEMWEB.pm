@@ -447,7 +447,7 @@ FW_answerCall($)
     return FW_serveSpecial($1, "js", $FW_jsdir, 1);
 
   } elsif($arg =~ m,^$FW_ME/icons/(.*)$,) {
-    my ($icon,$cacheable) = ($1, 1);
+    my ($icon,$cacheable) = (urlDecode($1), 1);
     #Debug "You want $icon which is " . $FW_icons{$icon};
     # if we do not have the icon, we convert the device state to the icon name
     $icon =~ s/\.($ICONEXTENSION)$//;

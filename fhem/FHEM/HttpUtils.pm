@@ -43,6 +43,14 @@ urlEncode($) {
 }
 
 ##################
+sub
+urlDecode($) {
+  $_= $_[0];
+  s/%([0-9A-F][0-9A-F])/chr(hex($1))/egi;
+  return $_;
+}
+
+##################
 # - if data (which is urlEncoded) is set, then a POST is performed, else a GET.
 # - noshutdown must be set for e.g the Fritz!Box
 # 4.0 is needed for some clients trying to reach fhem.de, 2.0 was not enough
