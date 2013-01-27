@@ -49,15 +49,18 @@ sub viewStatistics();
 my $css = "http://fhem.de/../css/style.css";
 
 # exclude modules from top 10 graph
-my $excludeFromTop10modules = "at autocreate notify telnet weblink FileLog SUNRISE_EL";
-my $excludeFromTop10definitions = "at autocreate notify telnet weblink FileLog SUNRISE_EL";
+my $excludeFromTop10modules = "at autocreate notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
+my $excludeFromTop10definitions = "at autocreate notify telnet weblink FileLog FHEMWEB Global SUNRISE_EL";
+
+# directory cointains databases
+my $datadir = "./data";
 
 # geo ip database file from http://www.maxmind.com/download/geoip/database/
 # should be updated once per month
-my $geoIPDat = "./data/GeoLiteCity.dat";
+my $geoIPDat = "$datadir/GeoLiteCity.dat";
 
 # database
-my $dbf = "./data/fhem_statistics_db.sqlite";
+my $dbf = "$datadir/fhem_statistics_db.sqlite";
 my $dsn = "dbi:SQLite:dbname=$dbf";
 my $sth;
 
@@ -605,7 +608,7 @@ sub insertDB() {
   $sth = $dbh->prepare(q{REPLACE INTO nodes (uniqueID,release,branch,os,arch,perl,lastSeen) VALUES(?,?,?,?,?,?,CURRENT_TIMESTAMP)});
   $sth->execute($uniqueID,$release,$branch,$os,$arch,$perl);
 
-  # insert or update goe location of fhem node
+  # insert or update geo location of fhem node
 #### TODO: sprachcode 84.191.75.195
   my @geo = getLocation($ip);
 
@@ -659,23 +662,15 @@ sub checkColumn($$) {
   my ($t,$k) = @_;
 
   # get table info
-  $sth = $dbh->prepare("PRAGMA table_info($t)");
-  $sth->execute();
+  my %column = %{ $dbh->column_info(undef, undef,$t, undef)->fetchall_hashref('COLUMN_NAME') };
 
   # check if column exists
-  my @row;
-  my @match = ();
-  while (@row = $sth->fetchrow_array()) {
-    @match = grep { /\b$k\b/ } @row;
-    last if(@match != 0);
-  }
-
-  # create column if not exists
-  if(@match == 0) {
+  if(!exists $column{$k}) {
     $sth = $dbh->prepare("ALTER TABLE $t ADD COLUMN '$k' INTEGER DEFAULT 0");
     $sth->execute();
+    $sth->finish;
   }
-  $sth->finish;
+
   return;
 }
 
