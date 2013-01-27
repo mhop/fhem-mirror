@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 sub EnOcean_Define($$);
 sub EnOcean_Initialize($);
@@ -221,8 +222,10 @@ EnOcean_Set($@)
         $dimVal=0;
 
       } else {
-        return "Unknown argument $cmd, choose one of dim:slider,0,1,100 ".
-                "dimup:slider,0,1,100 dimdown:slider,0,1,100 on off teach"
+        my $list = "dim:slider,0,1,100 dimup:slider,0,1,100 ".
+                   "dimdown:slider,0,1,100 on off teach";
+        return SetExtensions($hash, $list, $name, @a);
+
       }
 	  
       if($sendDimCmd) {
@@ -288,11 +291,12 @@ EnOcean_Set($@)
     ###########################
     } else {                                          # Simulate a PTM
       my ($c1,$c2) = split(",", $cmd, 2);
-      return "Unknown argument $cmd, choose one of " .
-      join(" ", sort keys %EnO_ptm200btn)
-        if(!defined($EnO_ptm200btn{$c1}) ||
-           ($c2 && !defined($EnO_ptm200btn{$c2})));
-      Log $ll2, "EnOcean: set $name $cmd";
+
+      if(!defined($EnO_ptm200btn{$c1}) ||
+          ($c2 && !defined($EnO_ptm200btn{$c2}))) {
+        my $list = join(" ", sort keys %EnO_ptm200btn);
+        return SetExtensions($hash, $list, $name, @a);
+      }
 
       my ($db_3, $status) = split(":", $EnO_ptm200btn{$c1}, 2);
       $db_3 <<= 5;
@@ -636,6 +640,7 @@ EnOcean_A5Cmd($$$)
   <a name="EnOceanset"></a>
   <b>Set</b>
   <ul>
+    <br>
     <li>MD15 commands. Note: The command is not sent until the MD15
     wakes up and sends a mesage, usually every 10 minutes.
     <ul>
@@ -705,6 +710,10 @@ EnOcean_A5Cmd($$$)
       attr eventMap BI:on B0:off<br>
       set switch1 on<br>
     </code></ul>
+    <b>Note</b>: <a href="#setExtensions">set extensions</a> are supported,
+        if the corresponding <a href="#eventMap">eventMap</a> specifies 
+        the on and off mappings.
+    <br>
     </li>
 
     </ul>
