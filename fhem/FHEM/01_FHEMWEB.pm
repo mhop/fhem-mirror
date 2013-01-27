@@ -972,7 +972,9 @@ FW_roomOverview($)
       push(@list1, $h->{NAME});
       push(@list2, $FW_ME ."/".$h->{LINK});
     }
-    push(@list1, ""); push(@list2, "");
+    if(@list1 > 1) {
+      push(@list1, ""); push(@list2, "");
+    }
   }
   $FW_room = "" if(!$FW_room);
 
