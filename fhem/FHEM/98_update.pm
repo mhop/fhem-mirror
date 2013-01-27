@@ -58,19 +58,6 @@ CommandUpdate($$)
   my $force   = 0;
   my $ret     = "";
 
-  # check for fheminfo settings
-  my $sendStatistics = AttrVal("global","sendStatistics",undef);
-  if(!defined($sendStatistics) ||
-     ( defined($sendStatistics) &&
-       lc($sendStatistics) ne "onupdate" ||
-       lc($sendStatistics) ne "manually" ||
-       lc($sendStatistics) ne "never" )
-    ) {
-    $ret = optInFhemInfo();
-    Log 1,"update Action required: please run 'update viewAdvice'";
-    return $ret;
-  }
-
   # split arguments
   my @args = split(/ +/,$param);
 
@@ -98,6 +85,19 @@ CommandUpdate($$)
 
   # check arguments for fheminfo advice
   if (defined($args[1]) && uc($args[1]) eq "VIEWADVICE") {
+    $ret = optInFhemInfo();
+    Log 1,"update Action required: please run 'update viewAdvice'";
+    return $ret;
+  }
+
+  # check for fheminfo settings
+  my $sendStatistics = AttrVal("global","sendStatistics",undef);
+  if(!defined($sendStatistics) ||
+     ( defined($sendStatistics) &&
+       lc($sendStatistics) ne "onupdate" &&
+       lc($sendStatistics) ne "manually" &&
+       lc($sendStatistics) ne "never" )
+    ) {
     $ret = optInFhemInfo();
     Log 1,"update Action required: please run 'update viewAdvice'";
     return $ret;
@@ -146,7 +146,7 @@ CommandUpdate($$)
     $ret = update_DoUpdate($srcdir,$BRANCH,$update,$force,$cl);
     if(lc($sendStatistics) eq "onupdate") {
       $ret .= "\n\n";
-      $ret .= CommandFheminfo(undef,"send");
+      $ret .= AnalyzeCommandChain(undef, "fheminfo send");
     }
   }
 
