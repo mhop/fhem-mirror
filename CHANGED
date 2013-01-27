@@ -51,10 +51,11 @@
   - feature: telnet client mode
   - bugfix:  FHEMWEB longpoll misses initial state change (HM: set_on vs. on)
   - change:  20_OWFS.pm, 21_OWTEMP modules flagged as "deprecated". These
-             modules will be removed in a future release. Use OWServer / OWDevice
-             instead. (M. Fischer)
+             modules will be removed in a future release. Use OWServer /
+             OWDevice instead. (M. Fischer)
   - feature: a lot of new features and known 1-wire slaves to OWServer /
              OWDevice added (M. Fischer)
+  - feature: set-extensions (additional set commands) for FS20, EnOcean, ZWave
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,

@@ -800,19 +800,66 @@ Zeilen erstreckende Befehle, indem man keine \ am Zeilenende eingeben muss.</p>
 <ul>
   <code>set &lt;devspec&gt; &lt;type-specific&gt;</code>
   <br><br>
-  Der Befehl setzt Ger&auml;teparameter/sendet Signale an ein Ger&auml;t. Sie erhalten 
-  eine Liste verf&uuml;gbarer Parameter wenn Sie folgendes eingeben:
+  Der Befehl setzt Ger&auml;teparameter/sendet Signale an ein Ger&auml;t. Sie
+  erhalten eine Liste verf&uuml;gbarer Parameter wenn Sie folgendes eingeben:
   <ul>
     <code>set &lt;name&gt; ?</code>
   </ul>
-  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a> f&uuml;r 
-  Details zu
-  &lt;devspec&gt;. Der &quot;set&quot;-Befehl gibt nur bei Fehler einen Wert zur&uuml;ck.<br>
-  <br>
-  Jedes Ger&auml;t hat verschiedene Parameter die mit &quot;set&quot; gesetzt werden k&ouml;nnen. 
-  Lesen Sie bitte den entsprechenden Abschnitt f&uuml;r das Ger&auml;t f&uuml;r Details durch.<br>
+  Lesen Sie bitte den Abschnitt <a href="#devspec">Device specification</a>
+  f&uuml;r Details zu &lt;devspec&gt;. Der &quot;set&quot;-Befehl gibt nur bei
+  Fehler einen Wert zur&uuml;ck.
+  <br><br>
+  Jedes Ger&auml;t hat verschiedene Parameter die mit &quot;set&quot; gesetzt
+  werden k&ouml;nnen.  Lesen Sie bitte den entsprechenden Abschnitt f&uuml;r
+  das Ger&auml;t f&uuml;r Details durch.
   <br>
 
+  <br>
+  <a name="setExtensions"></a>
+  Manche Module unterst&uuml;tzen die sog. <b>set extensions</b>, und in der
+  entsprechenden Dokumentation ist ein Link auf diesem Text zu finden. Falls im
+  Modul selber einer der unten aufgef&uuml;hrten Befehle implementiert ist, dann
+  wird die Modul-Implementation verwendet.
+  <ul>
+    <li>on-for-timer &lt;sekunden&gt<br>
+        Das Ger&auml;t wird per "on" eingeschaltet, und ein interner Zeitgeber
+        wird erstellt, um nach &lt;sekunden&gt; ein "off" Kommando
+        auszuf&uuml;hren.  Um diesen Zeitgeber zu entfernen sollte man das
+        Kommando mit dem Argument 0 erneut aufrufen. Achtung: dieser Zeitgeber
+        wird bei einem restart nicht gespeichert.</li>
+    <li>off-for-timer &lt;sekunden&gt<br>
+        siehe on-for-timer.</li>
+    <li>on-till &lt;timedet&gt<br>
+        Das Ger&auml;t wird per "on" eingeschaltet, und ein at Instanz wird
+        definiert, um es um &lt;timedet&gt; (Format: HH:MM[:SS]) per off
+        auszuschalten.  Diese at Instanz ist sichtbar unter dem Namen
+        ger&auml;teName+"_till".  Um das Ausschalten zu deaktivieren
+        l&ouml;scht man diese at Definition.  </li>
+    <li>off-till &lt;timedet&gt<br>
+        siehe on-till.</li>
+    <li>blink &lt;anzahl&gt; &lt;blink-periode&gt;<br>
+        Das Ger&auml;t wird mit "on" f&uuml;r die &lt;blink-periode&gt;
+        eingeschaltet, und das wird nach &lt;blink-periode&gt; wiederholt. Um
+        das Blinken vorzeitig zu stoppen spezifiziert man "0 0" als
+        Argument.</li>
+    <li>intervals &lt;from1&gt;-&lt;till1&gt; &lt;from2&gt;-&lt;till2&gt;...
+        </br>
+        Das Ger&auml;t wird f&uuml;r die spezifizierten Intervalle
+        eingeschaltet. Die einzelnen Intervalle sind Leerzeichen getrennt, und
+        ein Intervall besteht aus zwei Zeitspezifikationen, die mit einem "-"
+        getrennt sind.
+        </li>
+    </ul>
+    Beispiele:
+    <ul>
+      <code>
+        set switch on-for-timer 12.5<br>
+        set switch on-till {sunset()}<br>
+        set switch blink 3 1<br>
+        set switch intervals 08:00-12:00 13:00-18:00<br>
+      </code>
+    </ul>
+  </ul>
 </ul>
 
 

@@ -782,7 +782,45 @@ A line ending with \ will be concatenated with the next one, so long lines
   Each device has different set parameters, see the corresponding device
   section for details.<br>
   <br>
+  <br>
+  <a name="setExtensions"></a>
+  Some modules support a common list of <b>set extensions</b>, and point in
+  their documentation to this section. If the module itself implements one of
+  the following commands, then the module-implementation takes precedence.
 
+  <ul>
+    <li>on-for-timer &lt;seconds&gt<br>
+        Issue the on command for the device, and after &lt;seconds&gt; the off
+        command. For issuing the off command an internal timer will be
+        scheduled, which is deleted upon a restart. To delete this internal
+        timer without restart specify 0 as argument.</li>
+    <li>off-for-timer &lt;seconds&gt<br>
+        see on-for-timer above.</li>
+    <li>on-till &lt;timedet&gt<br>
+        Issue the on command for the device, and create an at definition with
+        &lt;timedet&gt; (in the form HH:MM[:SS]) to set it off. This definition
+        is visible, and its name is deviceName+"_till". To cancel the scheduled
+        off, delete the at definition.</li>
+    <li>off-till &lt;timedet&gt<br>
+        see on-till above.</li>
+    <li>blink &lt;number&gt; &lt;blink-period&gt;<br>
+        set the device on for &lt;blink-period&gt; then off for
+        &lt;blink-period&gt; and repeat this &lt;number&gt; times.
+        To stop blinking specify "0 0" as argument.</li>
+    <li>intervals &lt;from1&gt;-&lt;till1&gt; &lt;from2&gt;-&lt;till2&gt;...
+        </br>
+        set the device on for the specified intervals, which are all timespecs
+        in the form HH:MM[:SS]. The intervals are space separated.</li>
+  </ul>
+  Examples:
+  <ul>
+    <code>
+    set switch on-for-timer 12.5<br>
+    set switch on-till {sunset()}<br>
+    set switch blink 3 1<br>
+    set switch intervals 08:00-12:00 13:00-18:00<br>
+    </code>
+  </ul>
 </ul>
 
 
