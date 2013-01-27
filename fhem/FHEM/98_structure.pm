@@ -80,7 +80,6 @@ structure_Define($$)
     }
   }
   $hash->{CONTENT} = \%list;
-  $hash->{STATE} = "defined";
 
   @a = ( "set", $devname, $stype, $devname );
   structure_Attr(@a);
