@@ -4,6 +4,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 my %codes = (
   "00" => "off",
@@ -167,7 +168,7 @@ FS20_Set($@)
   my $ret = undef;
   my $na = int(@a);
 
-  return "no set value specified" if($na < 2 || $na > 3);
+  return "no set value specified" if($na < 2);
   return "Readonly value $a[1]" if(defined($readonly{$a[1]}));
 
   if($na > 2 && $a[1] eq "dim") {
@@ -181,16 +182,14 @@ FS20_Set($@)
   if(!defined($c)) {
 
     # Model specific set arguments
+    my $list;
     if(defined($attr{$name}) && defined($attr{$name}{"model"})) {
       my $mt = $models{$attr{$name}{"model"}};
-      return "Unknown argument $a[1], choose one of "
-                                               if($mt && $mt eq "sender");
-      return "Unknown argument $a[1], choose one of $fs20_simple"
-                                               if($mt && $mt eq "simple");
+      $list = "" if($mt && $mt eq "sender");
+      $list = $fs20_simple if($mt && $mt eq "simple");
     }
-    return "Unknown argument $a[1], choose one of " .
-                                join(" ", sort keys %fs20_c2b) .
-                                " dim:slider,0,6.25,100";
+    $list = join(" ", sort keys %fs20_c2b) if(!defined($list));
+    return SetExtensions($hash, $list, @a);
 
   }
 
@@ -538,6 +537,8 @@ four2hex($$)
     toggle            # between off and previous dim val
     on-till           # Special, see the note
 </pre>
+    The <a href="#setExtensions"> set extensions</a> are also supported.<br>
+    <br>
     Examples:
     <ul>
       <code>set lamp on</code><br>
@@ -546,6 +547,7 @@ four2hex($$)
       <code>set lamp on-for-timer 12</code><br>
     </ul>
     <br>
+
     Notes:
     <ul>
       <li>Use reset with care: the device forgets even the housecode.

@@ -14,6 +14,7 @@ package main;
 
 use strict;
 use warnings;
+use SetExtensions;
 
 sub ZWave_Parse($$@);
 sub ZWave_Set($@);
@@ -236,6 +237,7 @@ ZWave_Cmd($$@)
   my $name = shift(@a);
   my $cmd  = shift(@a);
 
+
   # Collect the commands from the distinct classes
   my %cmdList;
   my $classes = AttrVal($name, "classes", "");
@@ -249,14 +251,23 @@ ZWave_Cmd($$@)
       }
     }
   }
+
   if(!$cmdList{$cmd}) {
     my $list = join(" ",sort keys %cmdList);
     foreach my $cmd (keys %zwave_cmdArgs) {      # add slider & co
       $list =~ s/\b$cmd\b/$cmd:$zwave_cmdArgs{$cmd}/;
     }
-    return "Unknown $type argument $cmd, choose one of $list";
+
+    if($type eq "set") {
+      unshift @a, $name, $cmd;
+      return SetExtensions($hash, $list, @a);
+    } else {
+      return "Unknown argument $cmd, choose one of $list";
+    }
+
   }
 
+  Log GetLogLevel($name,2), "ZWave $type $name $cmd";
 
   ################################
   # ZW_SEND_DATA,nodeId,CMD,ACK|AUTO_ROUTE
@@ -525,8 +536,11 @@ ZWave_Undef($$)
   <a name="ZWaveset"></a>
   <b>Set</b>
   <ul>
+  <br>
+  <b>Note</b>: devices with on/off functionality support the <a
+      href="#setExtensions"> set extensions</a>.
 
-  <br><b>Class BASIC</b>
+  <br><br><b>Class BASIC</b>
   <li>basicValue value<br>
     Send value (0-255) to this device. The interpretation is device dependent,
     e.g. for a SWITCH_BINARY device 0 is off and anything else is on.</li>
@@ -571,7 +585,6 @@ ZWave_Undef($$)
 
   <li>associationDel groupId nodeId ...<br>
   Remove the specified list of nodeIds from the assotion group groupId.</li>
-
   </ul>
   <br>
 
