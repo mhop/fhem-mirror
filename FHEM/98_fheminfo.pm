@@ -68,7 +68,10 @@ CommandFheminfo($$)
     return $err;
   }
 
-  return "Unknown argument $args[0], usage: fheminfo [send]" if(@args && lc($args[0]) ne "send");
+  return "Unknown argument $args[0], usage: fheminfo [send]"
+    if(@args && lc($args[0]) ne "send");
+  return "Argument 'send' is not useful, if global attribute 'sendStatistics' is set to 'never'."
+    if(@args && lc($args[0]) eq "send" && lc(AttrVal("global","sendStatistics",undef)) eq "never");
 
   my $branch   = $DISTRIB_BRANCH;
   my $release  = $DISTRIB_RELEASE;
@@ -76,7 +79,7 @@ CommandFheminfo($$)
   my $arch     = $Config{"archname"};
   my $perl     = $^V;
   my $uniqueID = AttrVal("global","uniqueID",undef);
-  my $sendStatistics = AttrVal("global","sendStatistics",1);
+  my $sendStatistics = AttrVal("global","sendStatistics",undef);
   my $moddir   = $attr{global}{modpath}."/FHEM";
   my $uidFile  = $moddir."/FhemUtils/uniqueID";
 
@@ -119,7 +122,6 @@ CommandFheminfo($$)
   }
 
   $attr{global}{uniqueID} = $uidFile;
-  $attr{global}{sendStatistics} = $sendStatistics;
 
   my $ret = checkConfigFile($uidFile);
 
@@ -202,6 +204,11 @@ CommandFheminfo($$)
     $str .= $modStr;
   }
 
+  my $transmitData = ($attr{global}{sendStatistics}) ? $attr{global}{sendStatistics} : "not set";
+  $str .= "\n";
+  $str .= "Transmitting this information during an update:\n";
+  $str .= "  $transmitData (Note: You can change this via the global attribute sendStatistics)\n";
+
   $ret = $str;
 
   if(@args != 0 && $args[0] eq "send") {
@@ -221,7 +228,7 @@ CommandFheminfo($$)
       chop($contModels);
       $req->content("uniqueID=$uniqueID&system=$contInfo&modules=$contModules&models=$contModels");
     }
-
+ 
     my $ua  = LWP::UserAgent->new(
         agent => "Fhem/$release",
         timeout => 60);
@@ -328,7 +335,6 @@ sub checkConfigFile($) {
         push(@newConfig,$line);
         if($line =~ /modpath/ && $done == 0) {
           push(@newConfig,"attr global uniqueID $uidFile\n");
-          push(@newConfig,"attr global sendStatistics 1\n");
           $done = 1;
         }
       }
@@ -343,7 +349,7 @@ sub checkConfigFile($) {
         print $fh $_;
       }
       close $fh;
-      Log 1, "$name global attributes 'uniqueID' and 'sendStatistics' added to configfile $configFile";
+      Log 1, "$name global attributes 'uniqueID' added to configfile $configFile";
     }
   }
 
@@ -473,9 +479,11 @@ sub checkModule($) {
     <li>sendStatistics<br>
       This attribute is used in conjunction with the <code>update</code> command.
       <br>
-      <code>0</code>: prevents transmission of data during an update.
+      <code>onUpdate</code>: transfer of data on every update (recommended setting).
       <br>
-      <code>1</code>: transfer of data on every update. This is the default.
+      <code>manually</code>: manually transfer of data via the <code>fheminfo send</code> command.
+      <br>
+      <code>never</code>: prevents transmission of data at anytime.
     </li>
     <br>
   </ul>
@@ -591,9 +599,11 @@ sub checkModule($) {
     <li>sendStatistics<br>
       Dieses Attribut wird in Verbindung mit dem <code>update</code> Befehl verwendet.
       <br>
-      <code>0</code>: verhindert die &Uuml;bertragung der Daten w&auml;hrend eines Updates.
+      <code>onUpdate</code>: &Uuml;bertr&auml;gt die Daten bei jedem Update (empfohlene Einstellung).
       <br>
-      <code>1</code>: &uuml;bertr&auml;gt die Daten bei jedem Update. Dies ist die Standardeinstellung.
+      <code>manually</code>: Manuelle &Uuml;bertr&auml;gung der Daten &uuml;ber <code>fheminfo send</code>.
+      <br>
+      <code>never</code>: Verhindert die &Uuml;bertr&auml;gung der Daten.
     </li>
     <br>
   </ul>
