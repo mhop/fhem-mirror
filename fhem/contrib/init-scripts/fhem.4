@@ -1,0 +1,56 @@
+#!/bin/sh
+# description: Start or stop the fhem server
+# last change 2013-01-27
+# Added by Alex Peuchert with additions by Boris Neubert
+
+### BEGIN INIT INFO
+# Provides:             fhem.pl
+# Required-Start:       $local_fs $remote_fs
+# Required-Stop:        $local_fs $remote_fs
+# Default-Start:        2 3 4 5
+# Default-Stop:         0 1 6
+# Short-Description:    FHEM server
+### END INIT INFO
+
+set -e
+cd /opt/fhem
+port=7072
+conf=/opt/fhem/conf/fhem.conf
+
+case "$1" in
+'start')
+        echo "Starting fhem..."
+        perl fhem.pl $conf
+        RETVAL=$?
+        ;;
+'prof')
+        echo "Profiling fhem..."
+	# Devel::NYTProf must be installed
+	# type 'perldoc -q profile' for usage information
+        perl -d:NYTProf fhem.pl $conf
+        RETVAL=$?
+        ;;
+'stop')
+        echo "Stopping fhem..."
+        perl fhem.pl $port "shutdown"
+        RETVAL=$?
+	;;
+'restart')
+	$0 stop
+	$0 start
+        RETVAL=$?
+        ;;
+'status')
+        cnt=`ps -ef | grep "fhem.pl" | grep -v grep | wc -l`
+        if [ "$cnt" -eq "0" ] ; then
+                echo "fhem is not running"
+        else
+                echo "fhem is running"
+        fi
+        ;;
+*)
+        echo "Usage: $0 { start | stop | restart | prof | status }"
+        RETVAL=1
+        ;;
+esac
+exit $RETVAL
