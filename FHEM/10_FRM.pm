@@ -183,12 +183,7 @@ sub FRM_DoInit($) {
 		$device->system_reset();
 		$device->firmware_version_query();
 		for (my $i=0;$i<50;$i++) {
-	  		my ($rout, $rin) = ('', '');
-		    vec($rin, $hash->{FD}, 1) = 1;
-		    my $nfound = select($rout=$rin, undef, undef, 0.1);
-		    my $mfound = vec($rout, $hash->{FD}, 1); 
-			if($mfound) {
-				$device->poll();
+			if (FRM_poll($hash)) {
 				if ($device->{metadata}{firmware} && $device->{metadata}{firmware_version}){
 					$device->{protocol}->{protocol_version} = $device->{metadata}{firmware_version};
 					$main::defs{$name}{firmware} = $device->{metadata}{firmware};
@@ -196,12 +191,7 @@ sub FRM_DoInit($) {
 					$device->analog_mapping_query();
 					$device->capability_query();
 					for (my $j=0;$j<100;$j++) {
-				  		my ($rout, $rin) = ('', '');
-		    			vec($rin, $hash->{FD}, 1) = 1;
-		    			my $nfound = select($rout=$rin, undef, undef, 0.1);
-		    			my $mfound = vec($rout, $hash->{FD}, 1); 
-						if ($mfound) {
-							$device->poll();
+						if (FRM_poll($hash)) {
 							if (($device->{metadata}{analog_mappings}) and ($device->{metadata}{capabilities})) {
 								my $inputpins = $device->{metadata}{input_pins};
 								$main::defs{$name}{input_pins} = join(",", sort{$a<=>$b}(@$inputpins));
@@ -345,6 +335,19 @@ sub FRM_string_observer
 	my ($string,$hash) = @_;
 	main::Log 4, "received String_data: ".$string;
 	main::readingsSingleUpdate($hash,"error",$string,1);
+}
+
+sub FRM_poll
+{
+	my ($hash) = @_;
+	my ($rout, $rin) = ('', '');
+    vec($rin, $hash->{FD}, 1) = 1;
+    my $nfound = select($rout=$rin, undef, undef, 0.1);
+    my $mfound = vec($rout, $hash->{FD}, 1); 
+	if($mfound) {
+		$hash->{FirmataDevice}->poll();
+	}
+	return $mfound;
 }
 
 1;
