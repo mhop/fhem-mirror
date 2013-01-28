@@ -224,12 +224,14 @@ CUL_HM_Initialize($)
   $hash->{SetFn}     = "CUL_HM_Set";
   $hash->{GetFn}     = "CUL_HM_Get";
   $hash->{RenameFn}  = "CUL_HM_Rename";
+  $hash->{AttrFn}    = "CUL_HM_Attr";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:1,0 dummy:1,0 ".
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "hmClass:receiver,sender serialNr firmware devInfo ".
                        "rawToReadable unit ".
                        "peerIDs ".
                        "actCycle actStatus autoReadReg:1,0 ".
+					   "expert:0_off,1_on,2_full ".
                        $readingFnAttributes;
   my @modellist;
   foreach my $model (keys %culHmModel){
@@ -327,7 +329,6 @@ CUL_HM_Undef($$)
 sub
 CUL_HM_Rename($$$)
 {
-  #my ($hash, $name,$newName) = @_;
   my ($name, $oldName) = @_;
   my $HMid = CUL_HM_name2Id($name);
   my $hash = CUL_HM_name2Hash($name);
@@ -1184,7 +1185,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   OffTime         =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off time"},
 
   ActionTypeDim   =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
-  OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel Off"},
+  OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel Off"},
   OnMinLevel      =>{a=> 16.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"minimum PowerLevel"},
   OnLevel         =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel on"},
 
@@ -1367,8 +1368,8 @@ my %culHmRegGeneral = (
 my %culHmRegType = (
   remote=> {expectAES=>1,peerNeedsBurst=>1,dblPress=>1,longPress=>1},
   blindActuator=> {driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
-                   TransmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,
-                   maxTimeF        =>1,                                    
+                   transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1, # nt present in all files
+                   MaxTimeF        =>1,                                    
                    OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
   	   		       OffLevel        =>1,OnLevel         =>1,                                    
                    ActionType      =>1,OnTimeMode      =>1,OffTimeMode     =>1,DriveMode       =>1,
@@ -1379,7 +1380,7 @@ my %culHmRegType = (
 				   CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,CtRefOff        =>1,
 				   lgMultiExec     =>1,
 				   },
-  dimmer=> {TransmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction	  =>1,
+  dimmer=> {transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction	  =>1,
             ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,fuseDelay		  =>1,#not dim.L
             OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime           =>1,
 			ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1,
@@ -1490,6 +1491,66 @@ my %culHmRegChan = (# if channelspecific then enter them here
 ##--------------- Conversion routines for register settings
 my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
               600=>18600,3600=>111600);
+#############################
+sub
+CUL_HM_Attr($$$)
+{
+  my ($cmd,$name, $attrName,$attrVal) = @_;
+  my @hashL;
+  if ($attrName eq "expert"){
+    $attr{$name}{expert} = $attrVal;
+	my $eHash = CUL_HM_name2Hash($name);
+    foreach my $chId (CUL_HM_getAssChnIds($name)){ 
+	  my $cHash = CUL_HM_id2Hash($chId);
+	  push(@hashL,$cHash) if ($eHash ne $cHash);
+	}
+    push(@hashL,$eHash);
+    foreach my $hash (@hashL){
+	  my $exLvl = CUL_HM_getExpertMode($hash);
+	  if ($exLvl eq "0"){# off
+        foreach my $rdEntry (keys %{$hash->{READINGS}}){
+	      my $rdEntryNew;
+	  	  $rdEntryNew = ".".$rdEntry       if ($rdEntry =~m /^RegL_/);
+	  	  if ($rdEntry =~m /^R-/){
+	  	    my $reg = $rdEntry;
+	  	    $reg =~ s/.*-//;
+	  	    $rdEntryNew = ".".$rdEntry if($culHmRegDefine{$reg}{d} eq '0' );
+	  	  }
+	  	  next if (!defined($rdEntryNew)); # no change necessary
+          delete $hash->{READINGS}{$rdEntryNew};
+          $hash->{READINGS}{$rdEntryNew} = $hash->{READINGS}{$rdEntry};
+          delete $hash->{READINGS}{$rdEntry};
+	    }
+	  }
+	  elsif ($exLvl eq "1"){# on: Only register values, no raw data
+	    # move register to visible if available
+        foreach my $rdEntry (keys %{$hash->{READINGS}}){
+	      my $rdEntryNew;
+	  	  $rdEntryNew = substr($rdEntry,1) if ($rdEntry =~m /^\.R-/);
+	  	  $rdEntryNew = ".".$rdEntry       if ($rdEntry =~m /^RegL_/);
+	  	  next if (!$rdEntryNew); # no change necessary
+          delete $hash->{READINGS}{$rdEntryNew};
+          $hash->{READINGS}{$rdEntryNew} = $hash->{READINGS}{$rdEntry};
+          delete $hash->{READINGS}{$rdEntry};
+	    }
+	  }
+	  elsif ($exLvl eq "2"){# full - incl raw data
+        foreach my $rdEntry (keys %{$hash->{READINGS}}){
+	      my $rdEntryNew;
+	  	  $rdEntryNew = substr($rdEntry,1) if (($rdEntry =~m /^\.RegL_/) ||
+	  	                                     ($rdEntry =~m /^\.R-/));
+	  	  next if (!$rdEntryNew); # no change necessary
+          delete $hash->{READINGS}{$rdEntryNew};
+          $hash->{READINGS}{$rdEntryNew} = $hash->{READINGS}{$rdEntry};
+          delete $hash->{READINGS}{$rdEntry};
+	    }
+	  }
+	  else{;
+	  }
+    }
+  }
+  return;
+}
 			  
 sub
 CUL_HM_initRegHash()
@@ -1570,8 +1631,9 @@ CUL_HM_TCtempReadings($)
 {
   my ($hash)=@_;
   my $name = $hash->{NAME};
-  my $reg5 = ReadingsVal($name,"RegL_05:","");
-  my $reg6 = ReadingsVal($name,"RegL_06:","");
+  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".")."RegL_";
+  my $reg5 = ReadingsVal($name,$regLN."05:" ,"");
+  my $reg6 = ReadingsVal($name,$regLN."06:" ,"");
   my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
   $reg5 =~ s/.* 0B://;     #remove register up to addr 11 from list 5
   my $tempRegs = $reg5.$reg6;  #one row
@@ -1587,7 +1649,8 @@ CUL_HM_TCtempReadings($)
   my $setting;
   my @changedRead;
   push (@changedRead,"tempList_State:".
-                ($hash->{helper}{shadowReg}{"RegL_05:"}?"set":"verified"));
+                (($hash->{helper}{shadowReg}{$regLN."05:"} ||
+				  $hash->{helper}{shadowReg}{$regLN."06:"} )?"set":"verified"));
   for (my $day = 0;$day<7;$day++){
     my $tSpan  = 0;
 	my $dayRead = "";
@@ -1653,15 +1716,15 @@ CUL_HM_Get($@)
   if($cmd eq "param") {  ######################################################
 	my $val;
 	$val = AttrVal($name, $a[2], "");
-	$val = $hash->{READINGS}{$a[2]}{VAL}    if (!$val && $hash->{READINGS}{$a[2]});
-	$val = AttrVal($devName, $a[2], "")     if (!$val);
-	$val = $devHash->{READINGS}{$a[2]}{VAL} if (!$val && $devHash->{READINGS}{$a[2]});
-	$val = $hash->{$a[2]}                   if (!$val && $hash->{$a[2]});
-	$val = $devHash->{$a[2]}                if (!$val && $devHash->{$a[2]});
-	$val = $hash->{helper}{$a[2]}           if((!$val)&& (ref($hash->{helper}{$a[2]}) ne "HASH"));
-	$val = $devHash->{helper}{$a[2]}        if (!$val);
+	$val = $hash->{READINGS}{$a[2]}{VAL}    if (!defined($val) && $hash->{READINGS}{$a[2]});
+	$val = AttrVal($devName, $a[2], "")     if (!defined($val));
+	$val = $devHash->{READINGS}{$a[2]}{VAL} if (!defined($val) && $devHash->{READINGS}{$a[2]});
+	$val = $hash->{$a[2]}                   if (!defined($val) && $hash->{$a[2]});
+	$val = $devHash->{$a[2]}                if (!defined($val) && $devHash->{$a[2]});
+	$val = $hash->{helper}{$a[2]}           if((!defined($val))&& (ref($hash->{helper}{$a[2]}) ne "HASH"));
+	$val = $devHash->{helper}{$a[2]}        if (!defined($val));
 
-	return (defined ($val))?$val:"undefined";
+	return (defined ($val))?"$val":"undefined";
   }
   elsif($cmd eq "reg") {  #####################################################
     my (undef,undef,$regReq,$list,$peerId) = @a;
@@ -1674,15 +1737,13 @@ CUL_HM_Get($@)
 	  my @peers; # get all peers we have a reglist 
 	  my @listWp; # list that require peers
 	  foreach my $readEntry (keys %{$hash->{READINGS}}){
-        my $regs = ReadingsVal($hash->{NAME},$readEntry,"");
-	    if ($readEntry =~m /^RegL_/){ #this is a reg Reading "RegL_<list>:peerN
-		  my $peer = substr($readEntry,8);
-		  my $listP = substr($readEntry,6,1);  
-		  push(@peers,$peer)   if ($peer);
-		  push(@listWp,$listP) if ($peer);
+	    if ($readEntry =~m /^[\.]?RegL_(.*)/){ #reg Reading "RegL_<list>:peerN
+		  my $peer = substr($1,3);
+		  next if (!$peer);
+		  push(@peers,$peer);
+		  push(@listWp,substr($1,1,1));
 		}
 	  }
-	  
 	  my @regValList; #storage of results
 	  my $regHeader = "list:peer\tregister         :value\n";
 	  foreach my $regName (@regArr){
@@ -1690,7 +1751,7 @@ CUL_HM_Get($@)
 		my @peerExe = (grep (/$regL/,@listWp))?@peers:("00000000");
 		foreach my $peer(@peerExe){
 		  next if($peer eq "");
-	      my $regVal = CUL_HM_getRegFromStore($name,$regName,0,$peer); #determine
+	      my $regVal= CUL_HM_getRegFromStore($name,$regName,0,$peer);#determine
 		  my $peerN = CUL_HM_id2Name($peer);
 		  $peerN = "      " if ($peer  eq "00000000");
 		  push @regValList,sprintf("   %d:%s\t%-16s :%s\n",
@@ -1737,14 +1798,16 @@ CUL_HM_Get($@)
 	    $help .= " options:".join(",",keys%{$reg->{lit}});
 	    $min =$max ="-";
 	  }
-	  push @rI,sprintf("%4d: %-16s | %3s to %-11s | %8s | %s\n",
+	  push @rI,sprintf("%4d: %-16s | %3s to %-11s | %8s |%-3s| %s\n",
 			  $reg->{l},$regName,$min,$max.$reg->{u},
-              ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),$help)
+              ((($reg->{l} == 3)||($reg->{l} == 4))?"required":""),
+              (($reg->{d} != 1)?"exp":""),
+			  $help)
 	        if (!($isChannel && $reg->{l} == 0));
 	}
 	
-    my $info = sprintf("list: %16s | %-20s | %-8s | %s\n",
-	                 "register","range","peer","description");
+    my $info = sprintf("list: %16s | %-18s | %-8s |%-3s| %s\n",
+	                 "register","range","peer","exp","description");
 	foreach(sort(@rI)){$info .= $_;}
 	return $info;
   }
@@ -1771,7 +1834,7 @@ CUL_HM_Get($@)
 	  }
 	  my $ehash = CUL_HM_name2Hash($eName);
 	  foreach my $read (sort keys %{$ehash->{READINGS}}){
-	    next if ($read !~ m/^RegL_/);
+	    next if ($read !~ m/^[\.]?RegL_/);
 	    print aSave "\nset ".$eName." regBulk ".$read." ".ReadingsVal($eName,$read,"");
 		$timestamps .= "\n#        ".ReadingsTimestamp($eName,$read,"")." :".$read;
 	  }
@@ -2120,7 +2183,7 @@ CUL_HM_Set($@)
 	                               if ($cmd eq "regRaw");
 	if ($cmd eq "regBulk"){
 	  ($list) = ($a[2]);
-	  $list =~ s/RegL_//;
+	  $list =~ s/[\.]?RegL_//;
 	  ($list,$peerID) = split(":",$list);
 	  return "unknown list Number:".$list if(hex($list)>6);
 	}
@@ -2849,7 +2912,7 @@ CUL_HM_getConfig($$$$$){
   my $flag = CUL_HM_getFlag($hash);
 
   foreach my $readEntry (keys %{$chnhash->{READINGS}}){
-	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^RegL_/);
+	  delete $chnhash->{READINGS}{$readEntry} if ($readEntry =~ m/^[\.]?RegL_/);
   }
   #get Peer-list in any case - it is part of config
   CUL_HM_PushCmdStack($hash,sprintf("++%s01%s%s%s03",$flag,$id,$dst,$chn));
@@ -2954,8 +3017,9 @@ CUL_HM_responseSetup($$)
 
 	  $peer ="" if($list !~ m/^0[34]$/);
 	  #empty val since reading will be cumulative 
-      $chnhash->{READINGS}{"RegL_".$list.":".$peer}{VAL}=""; 
-      delete ($chnhash->{READINGS}{"RegL_".$list.":".$peer}{TIME}); 
+	  my $rlName = ((CUL_HM_getExpertMode($hash) eq "2")?"":".")."RegL_".$list.":".$peer;
+      $chnhash->{READINGS}{$rlName}{VAL}=""; 
+      delete ($chnhash->{READINGS}{$rlName}{TIME}); 
 	  return;
     }
 #    elsif($subType eq "0A"){ #Pair Serial----------
@@ -3165,6 +3229,16 @@ CUL_HM_ID2PeerList ($$$)
   }
 }
 ###################  Conversions  ################
+sub    #---------------------------------
+CUL_HM_getExpertMode($)
+{ # get expert level for the entity. 
+  # if expert level is not set try to get it for device
+  my ($hash) = @_;
+  my $expLvl = AttrVal($hash->{NAME},"expert","");
+  $expLvl = AttrVal({CUL_HM_getDeviceHash($hash)}->{NAME},"expert","0") 
+        if ($expLvl eq "");
+  return substr($expLvl,0,1);
+}
 sub    #---------------------------------
 CUL_HM_getAssChnIds($)
 { # will return the list of assotiated channel of a device
@@ -3597,8 +3671,8 @@ CUL_HM_parseCommon(@){
 		    $data = join(" ",@dataList);		
 		  }
 		}
-		my $peerName = $shash->{helper}{respWait}{forPeer};
-		my $regLN = "RegL_".$list.":".$peerName;
+		my $peer = $shash->{helper}{respWait}{forPeer};
+		my $regLN = ((CUL_HM_getExpertMode($chnHash) eq "2")?"":".")."RegL_".$list.":".$peer;
 		readingsSingleUpdate($chnHash,$regLN,
 		             ReadingsVal($chnName,$regLN,"")." ".$data,0);
 		if ($data =~m/00:00$/){ # this was the last message in the block
@@ -3611,7 +3685,7 @@ CUL_HM_parseCommon(@){
 		  delete $chnHash->{helper}{shadowReg}{$regLN};#remove shadowhash
 		  # peer Channel name from/for user entry. <IDorName> <deviceID> <ioID>
 		  CUL_HM_updtRegDisp($chnHash,$list,
-		        CUL_HM_peerChId($peerName,
+		        CUL_HM_peerChId($peer,
 						substr(CUL_HM_hash2Id($chnHash),0,6),"00000000"));
 		}
 		else{
@@ -3624,7 +3698,7 @@ CUL_HM_parseCommon(@){
 	  my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
-	  my $regLN = "RegL_".$list.":".CUL_HM_id2Name($peerID);
+	  my $regLN = ((CUL_HM_getExpertMode($chnHash) eq "2")?"":".")."RegL_".$list.":".CUL_HM_id2Name($peerID);
       $regLN =~ s/broadcast//;
 	  $regLN =~ s/ /_/g; #remove blanks
 
@@ -3694,7 +3768,8 @@ CUL_HM_getRegFromStore($$$$)
   }
   $peerId  = CUL_HM_peerChId(($peerId?$peerId:"00000000"),$dId,$iId);
 							    
-  my $regLN = "RegL_".sprintf("%02X",$list).":".CUL_HM_peerChName($peerId,$dId,$iId);
+  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".").
+              "RegL_".sprintf("%02X",$list).":".CUL_HM_peerChName($peerId,$dId,$iId);
   $regLN =~ s/broadcast//;
   
   my $data=0;
@@ -3712,8 +3787,8 @@ CUL_HM_getRegFromStore($$$$)
     }
 	$convFlg = "set_" if ($dReadS && $dReadR ne $dReadS);
     my $dRead = $dReadS?$dReadS:$dReadR;
-	return "invalid" if (!defined($dRead));
-
+	return "invalid" if (!defined($dRead) || $dRead eq "");
+    
 	$data = ($data<< 8)+hex($dRead);
 	$addr++;
   }
@@ -3754,12 +3829,13 @@ CUL_HM_updtRegDisp($$$)
   push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md}); 
   push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn}); 
   my @changedRead;
+  my $expLvl = (CUL_HM_getExpertMode($hash) ne  "0")?1:0;
   foreach my $regName (@regArr){
-    next if (!$culHmRegDefine{$regName}->{d}            ||
-	         ($culHmRegDefine{$regName}->{l} != $listNo));
+    next if ($culHmRegDefine{$regName}->{l} ne $listNo);
     my $rgVal = CUL_HM_getRegFromStore($name,$regName,$list,$peerId);
 	next if (!$rgVal || $rgVal eq "invalid");
 	my $readName = "R-".$peer.$regName;
+	$readName = ($culHmRegDefine{$regName}->{d}?"":".").$readName if (!$expLvl); #expert?
 	push (@changedRead,$readName.":".$rgVal)
 	      if (ReadingsVal($name,$readName,"") ne $rgVal);
   }
@@ -3861,7 +3937,8 @@ CUL_HM_pushConfig($$$$$$$$)
   my $peerN = ($peerAddr ne "000000")?CUL_HM_id2Name($peerAddr.$peerChn):"";
   $peerN =~ s/broadcast//;
   $peerN =~ s/ /_/g;#remote blanks
-  my $regLN = "RegL_".$list.":".$peerN;
+  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".").
+              "RegL_".$list.":".$peerN;
   #--- copy data from readings to shadow
   my $chnhash = $modules{CUL_HM}{defptr}{$dst.$chn};
   $chnhash = $hash if (!$chnhash);
@@ -4769,6 +4846,21 @@ CUL_HM_setAttrIfCh($$$$)
     <li><a href="#showtime">showtime</a></li>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a name="expert">expert</a><br>
+        This attribut controls the visibility of the readings. This attibute controlls 
+		the presentation of device parameter in the readings.<br> 
+		3 level can be choosen:<br>
+		<ul>
+		0_off: standart level. Display commonly used parameter<br>
+		1_on: enhanced level. Display all decoded device parameter<br>
+		2_full: display all parameter plus raw register information as well. <br>
+		</ul>
+		If expert is applied a device it is used for assotiated channels. 
+		It can be overruled if expert attibute is also applied to the channel device.<br>
+		Make sure to check out attribut showInternalValues in the global values as well. 
+		extert takes benefit of the implementation. 
+		Nevertheless  - by definition - showInternalValues overrules expert. 
+		</li>
     <li><a name="hmClass">hmClass</a>,
         <a name="model">model</a>,
         <a name="subType">subType</a><br>
