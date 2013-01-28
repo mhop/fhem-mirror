@@ -5,6 +5,14 @@ package main;
 use strict;
 use warnings;
 
+# Open Tasks
+#  - precision for model percent to 0,1
+#  - send time & date methods and as command
+#  - send 4bit values for (8bit-types)
+#  - allow defined groups that are only used for sending of data (no status shown)
+#  - add convinience method for sending dim values / allow slider
+#  - get should also be able to get for a given group
+
 my %eib_c2b = (
 	"off" => "00",
 	"on" => "01",
@@ -29,9 +37,13 @@ my %models = (
 
 my %eib_dpttypes = (
 
-  # 1-Octet unsigned value (handled as dpt7)
-  "dpt5" 		=> {"CODE"=>"dpt7", "UNIT"=>""},
-  "percent" 	=> {"CODE"=>"dpt7", "UNIT"=>"%"},	
+  # 1-Octet unsigned value
+  "dpt5" 		=> {"CODE"=>"dpt5", "UNIT"=>"",  "factor"=>1},
+  "percent" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>100/255},
+  "dpt5.003" 	=> {"CODE"=>"dpt5", "UNIT"=>"&deg;", "factor"=>360/255},
+  "angle" 		=> {"CODE"=>"dpt5", "UNIT"=>"&deg;", "factor"=>360/255}, # alias for dpt5.003
+  "dpt5.004" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1},
+  "percent255" 	=> {"CODE"=>"dpt5", "UNIT"=>"%", "factor"=>1}, #alias for dpt5.004
 
   # 2-Octet unsigned Value (current, length, brightness)
   "dpt7" 		=> {"CODE"=>"dpt7", "UNIT"=>""},
@@ -42,10 +54,22 @@ my %eib_dpttypes = (
   "timeperiod-min"		=> {"CODE"=>"dpt7", "UNIT"=>"min"},
   "timeperiod-h"		=> {"CODE"=>"dpt7", "UNIT"=>"h"},
 
-  # 2-Octet unsigned Value (Temp / Light)
+  # 2-Octet Float  Value (Temp / Light)
   "dpt9" 		=> {"CODE"=>"dpt9", "UNIT"=>""},
-  "tempsensor"  => {"CODE"=>"dpt9", "UNIT"=>"Celsius"},
+  "tempsensor"  => {"CODE"=>"dpt9", "UNIT"=>"&deg;C"},
   "lightsensor" => {"CODE"=>"dpt9", "UNIT"=>"Lux"},
+  "speedsensor" => {"CODE"=>"dpt9", "UNIT"=>"m/s"},
+  "speedsensor-km/h" => {"CODE"=>"dpt9", "UNIT"=>"km/h"},
+  "pressuresensor" => {"CODE"=>"dpt9", "UNIT"=>"Pa"},
+  "rainsensor" => {"CODE"=>"dpt9", "UNIT"=>"l/m²"},
+  "time1sensor" => {"CODE"=>"dpt9", "UNIT"=>"s"},
+  "time2sensor" => {"CODE"=>"dpt9", "UNIT"=>"ms"},
+  "humiditysensor" => {"CODE"=>"dpt9", "UNIT"=>"%"},
+  "airqualitysensor" => {"CODE"=>"dpt9", "UNIT"=>"ppm"},
+  "voltage-mV" => {"CODE"=>"dpt9", "UNIT"=>"mV"},
+  "current-mA2" => {"CODE"=>"dpt9", "UNIT"=>"mA"},
+  "power" => {"CODE"=>"dpt9", "UNIT"=>"kW"},
+  "powerdensity" => {"CODE"=>"dpt9", "UNIT"=>"W/m²"},
   
   # Time of Day
   "dpt10"		=> {"CODE"=>"dpt10", "UNIT"=>""},
@@ -57,6 +81,9 @@ my %eib_dpttypes = (
   
   # 4-Octet unsigned value (handled as dpt7)
   "dpt12" 		=> {"CODE"=>"dpt7", "UNIT"=>""},
+  
+  # 4-Octet single precision float
+  "dpt14"         => {"CODE"=>"dpt14", "UNIT"=>""},
   
 );
 
@@ -73,7 +100,8 @@ EIB_Initialize($)
   $hash->{DefFn}     = "EIB_Define";
   $hash->{UndefFn}   = "EIB_Undef";
   $hash->{ParseFn}   = "EIB_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 model:EIB loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:1,0 showtime:1,0 loglevel:0,1,2,3,4,5,6 model:" 
+  						. join(",", keys %eib_dpttypes);
 
 }
 
@@ -349,7 +377,16 @@ EIB_ParseByDatapointType($$$)
 	
 	Log(4,"EIB parse $value for $name model: $model dpt: $code unit: $unit");
 	
-	if ($code eq "dpt7") 
+	if ($code eq "dpt5") 
+	{
+		my $dpt5factor = $eib_dpttypes{"$model"}{"factor"};
+		my $fullval = hex($value);
+		$transval = $fullval;
+		$transval = sprintf("%.0f",$transval * $dpt5factor) if($dpt5factor != 0);
+				
+		Log(5,"EIB $code parse $value = $fullval factor = $dpt5factor translated: $transval");
+		
+	} elsif ($code eq "dpt7") 
 	{
 		my $fullval = hex($value);
 		$transval = $fullval;		
@@ -363,8 +400,9 @@ EIB_ParseByDatapointType($$$)
 		$sign = -1 if(($fullval & 0x8000)>0);
 		my $exp = ($fullval & 0x7800)>>11;
 		my $mant = ($fullval & 0x07FF);
+		$mant = -(~($mant-1)&0x07FF) if($sign==-1);
 		
-		$transval = ($sign * $mant * (2**$exp))/100;
+		$transval = (1<<$exp)*0.01*$mant;
 		
 		Log(5,"EIB $code parse $value = $fullval sign: $sign mant: $mant exp: $exp translated: $transval");	
 		
@@ -394,6 +432,22 @@ EIB_ParseByDatapointType($$$)
 				
 		Log(5,"EIB $code parse $value = $fullval day: $day month: $month year: $year translated: $transval");
 		
+	} elsif ($code eq "dpt14") # contributed by Olaf
+    {
+        # 4 byte single precision float
+        my $byte0 = hex(substr($value,0,2));
+        my $sign = ($byte0 & 0x80) ? -1 : 1;
+
+        my $bytee = hex(substr($value,0,4));
+        my $expo = (($bytee & 0x7F80) >> 7) - 127;
+
+        my $bytem = hex(substr($value,2,6));
+        my $mant = ($bytem & 0x7FFFFF | 0x800000);
+
+        $transval = $sign * (2 ** $expo) * ($mant / (1 <<23));
+                
+        Log(5,"EIB $code parse $value translated: $transval");
+        
 	} elsif ($code eq "dptxx") {
 		
 	}
@@ -539,7 +593,11 @@ eib_name2hex($)
       The device state in FHEM is interpreted and shown according to the specification.
       <ul>
       	<li>dpt5</li>
+      	<li>dpt5.003</li>
+      	<li>angle</li>
       	<li>percent</li>
+      	<li>dpt5.004</li>
+      	<li>percent255</li>
       	<li>dpt7</li>
       	<li>length-mm</li>
       	<li>current-mA</li>
@@ -550,11 +608,25 @@ eib_name2hex($)
       	<li>dpt9</li>
       	<li>tempsensor</li>
       	<li>lightsensor</li>
+      	<li>speedsensor</li>
+      	<li>speedsensor-km/h</li>
+      	<li>pressuresensor</li>
+      	<li>rainsensor</li>
+      	<li>time1sensor</li>
+      	<li>time2sensor</li>
+      	<li>humiditysensor</li>
+      	<li>airqualitysensor</li>
+      	<li>voltage-mV</li>
+      	<li>current-mA2</li>
+      	<li>current-mA2</li>
+      	<li>power</li>
+      	<li>powerdensity</li>
       	<li>dpt10</li>
       	<li>time</li>
       	<li>dpt11</li>
       	<li>date</li>
       	<li>dpt12</li>
+      	<li>dpt14</li>
       </ul>
     </li>
   </ul>
