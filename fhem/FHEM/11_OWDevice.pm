@@ -286,6 +286,14 @@ $owdevice{"3B"} = {
     "alarm"     => 1,
     "interface" => "temperature",
 };
+$owdevice{"7E"} = {
+    # EDS0066 - Multisensor temperature Pressure
+    "read" => [ qw(EDS0066/temperature EDS0066/pressure)],
+    "write" => [],
+    "poll" => [ qw(EDS0066/temperature EDS0066/pressure) ],
+    "state" => [ qw(EDS0066/temperature EDS0066/pressure) ],
+    "interface" => "multisensor",
+};
 $owdevice{"81"} = {
     # USB id - ID found in DS2490R and DS2490B USB adapters 
     "read"      => [],
@@ -704,6 +712,7 @@ OWDevice_Define($$)
       <li>DS2408 - 1-Wire 8 Channel Addressable Switch</li>
       <li>DS2413 - Dual Channel Addressable Switch</li>
       <li>DS1825 - Programmable Resolution 1-Wire Digital Thermometer with ID</li>
+      <li>EDS0066 - Multisensor for temperature and pressure</li>
       <li>LCD - LCD controller by Louis Swart</li>
     </ul>
     <br><br>
