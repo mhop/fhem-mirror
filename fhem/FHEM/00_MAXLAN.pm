@@ -112,7 +112,12 @@ MAXLAN_Define($$)
 sub
 MAXLAN_IsConnected($)
 {
-  return exists($_[0]->{FD});
+  return 0 if(!exists($_[0]->{FD}));
+  if(!defined($_[0]->{TCPDev})) {
+    MAXLAN_Disconnect($_[0]);
+    return 0;
+  }
+  return 1;
 }
 
 
@@ -128,24 +133,28 @@ MAXLAN_Disconnect($)
 }
 
 #Connects to the Cube. If already connected, disconnects first.
+#Returns undef of success, otherwise an error message
 sub
 MAXLAN_Connect($)
 {
   my $hash = shift;
 
-  return if(MAXLAN_IsConnected($hash));
+  return undef if(MAXLAN_IsConnected($hash));
 
   delete($hash->{NEXT_OPEN}); #work around the connection rate limiter in DevIo
-  my $ret = DevIo_OpenDev($hash, 0, "");
+  DevIo_OpenDev($hash, 0, "");
   if(!MAXLAN_IsConnected($hash)) {
     my $msg = "MAXLAN_Connect: Could not connect";
     Log 2, $msg;
     return $msg;
   }
 
+  my $ret;
   #Read initial configuration data
-  MAXLAN_ExpectAnswer($hash,"H:");
-  MAXLAN_ExpectAnswer($hash,"M:");
+  $ret = MAXLAN_ExpectAnswer($hash,"H:");
+  return "MAXLAN_Connect: $ret" if($ret);
+  $ret = MAXLAN_ExpectAnswer($hash,"M:");
+  return "MAXLAN_Connect: $ret" if($ret);
 
   #We first reset the IODev for all MAX devices using this MAXLAN as a backend.
   #Parsing the "C:" responses later on will set IODev correctly again.
@@ -159,7 +168,7 @@ MAXLAN_Connect($)
   {
     #Receive one "C:" per device
     $rmsg = MAXLAN_ReadSingleResponse($hash, 1);
-    return undef if(!defined($rmsg));
+    return "MAXLAN_Connect: Error in ReadSingleResponse while waiting for C:" if(!defined($rmsg));
     MAXLAN_Parse($hash, $rmsg);
   } until($rmsg =~ m/^L:/);
   #At the end, the cube sends a "L:"
@@ -233,6 +242,7 @@ MAXLAN_Set($@)
   return undef;
 }
 
+#Returns error string if failed, undef on success
 sub
 MAXLAN_ExpectAnswer($$)
 {
@@ -251,7 +261,8 @@ MAXLAN_ExpectAnswer($$)
     MAXLAN_Parse($hash,$rmsg);
     return "Got unexpected response, expected $expectedanswer";
   }
-  return MAXLAN_Parse($hash,$rmsg);
+  MAXLAN_Parse($hash,$rmsg);
+  return undef;
 }
 
 
@@ -265,7 +276,7 @@ MAXLAN_ReadSingleResponse($$)
 {
   my ($hash,$waitForResponse) = @_;
 
-  return undef if(!defined($hash->{TCPDev}));
+  return undef if(!MAXLAN_IsConnected($hash));
 
   my ($rin, $win, $ein, $rout, $wout, $eout);
   $rin = $win = $ein = '';
@@ -317,17 +328,23 @@ my %lhash;
 
 #####################################
 #Sends given msg and checks for/parses the answer
+#returns undef on success
 sub
 MAXLAN_Write(@)
 {
   my ($hash,$msg,$expectedAnswer) = @_;
   my $ret = undef;
 
-  MAXLAN_Connect($hash); #It's a no-op if already connected
-  MAXLAN_SimpleWrite($hash, $msg);
-  $ret = MAXLAN_ExpectAnswer($hash, $expectedAnswer) if($expectedAnswer);
+  $ret = MAXLAN_Connect($hash); #It's a no-op if already connected
+  return "MAXLAN_Write: $ret" if($ret);
+  $ret = MAXLAN_SimpleWrite($hash, $msg);
+  return "MAXLAN_Write: $ret" if($ret);
+  if($expectedAnswer) {
+    $ret = MAXLAN_ExpectAnswer($hash, $expectedAnswer);
+    return "MAXLAN_Write: $ret" if($ret);
+  }
   MAXLAN_Disconnect($hash) if(!$hash->{persistent} && !$hash->{pairmode});
-  return $ret;
+  return undef;
 }
 
 #####################################
@@ -653,6 +670,7 @@ MAXLAN_Parse($$)
 
 
 ########################
+#Returns undef on sucess
 sub
 MAXLAN_SimpleWrite(@)
 {
@@ -661,6 +679,8 @@ MAXLAN_SimpleWrite(@)
 
   Log GetLogLevel($name,5), 'MAXLAN_SimpleWrite:  '.$msg;
   
+  return "MAXLAN_SimpleWrite: Not connected" if(!MAXLAN_IsConnected($hash));
+
   $msg .= "\r\n";
   
   my $ret = syswrite($hash->{TCPDev}, $msg);
@@ -668,7 +688,9 @@ MAXLAN_SimpleWrite(@)
   if(!$hash->{TCPDev} || !defined($ret) || !$hash->{TCPDev}->connected) {
     Log GetLogLevel($name,1), 'MAXLAN_SimpleWrite failed';
     MAXLAN_Disconnect($hash);
+    return "MAXLAN_SimpleWrite: syswrite failed";
   }
+  return undef;
 }
 
 ########################
@@ -679,6 +701,7 @@ MAXLAN_DoInit($)
   return undef;
 }
 
+#Returns undef on success
 sub
 MAXLAN_RequestList($)
 {
@@ -692,17 +715,19 @@ MAXLAN_Poll($)
 {
   my $hash = shift;
 
+  my $ret = undef;
   if(MAXLAN_IsConnected($hash)) {
-    my $ret = MAXLAN_RequestList($hash);
-    Log 1, "MAXLAN_Poll: Did not get any answer" if($ret);
+    $ret = MAXLAN_RequestList($hash);
   } else {
     #Connecting gives us a RequestList for free
-    my $ret = MAXLAN_Connect($hash);
-    if($ret) {
-      #Connecting failed
-      InternalTimer(gettimeofday()+$reconnect_interval, "MAXLAN_Poll", $hash, 0);
-      return;
-    }
+    $ret = MAXLAN_Connect($hash);
+  }
+
+  if($ret) {
+    #Connecting failed/Got invalid answer
+    MAXLAN_Disconnect($hash);
+    InternalTimer(gettimeofday()+$reconnect_interval, "MAXLAN_Poll", $hash, 0);
+    return;
   }
 
   MAXLAN_Disconnect($hash) if(!$hash->{persistent} && !$hash->{pairmode});
