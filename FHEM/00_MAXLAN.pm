@@ -463,7 +463,7 @@ MAXLAN_Parse($$)
     #One can write to that memory with the "m:" command
     #The actual configuration comes with the "C:" response and can be set
     #with the "s:" command.
-    return if(@args < 3); #On virgin devices, we get nothing, not even $magic$version$numgroups$numdevices
+    return $name if(@args < 3); #On virgin devices, we get nothing, not even $magic$version$numgroups$numdevices
 
     my $bindata = decode_base64($args[2]);
     #$version is the version the serialized data format I guess
@@ -473,7 +473,7 @@ MAXLAN_Parse($$)
       1;
     } or do {
       Log 1, "MAXLAN_Parse: Metadata response is malformed!";
-      return;
+      return $name;
     };
     
     if($magic != $metadata_magic || $version != $metadata_version) {
@@ -504,12 +504,12 @@ MAXLAN_Parse($$)
     #Log $ll5, "Got Metadata, hash: ".Dumper($hash);
 
   }elsif($cmd eq "C"){#Configuration
-    return if(@args < 2);
+    return $name if(@args < 2);
     my $bindata = decode_base64($args[1]);
 
     if(length($bindata) < 18) {
       Log 1, "Invalid C: response, not enough data";
-      return "MAXLAN_Parse: Invalid C: response, not enough data";
+      return $name;
     }
 
     #Parse the first 18 bytes, those are send for every device
@@ -522,7 +522,7 @@ MAXLAN_Parse($$)
 
     if($len != length($bindata)) {
       Dispatch($hash, "MAX,1,Error,$addr,Parts of configuration are missing", {RAWMSG => $rmsg});
-      return "MAXLAN_Parse: Invalid C: response, len does not match";
+      return $name;
     }
 
     #devicetype: Cube = 0, HeatingThermostat = 1, HeatingThermostatPlus = 2, WallMountedThermostat = 3, ShutterContact = 4, PushButton = 5
@@ -626,7 +626,7 @@ MAXLAN_Parse($$)
     if(@args==0){
       $hash->{STATE} = "initalized"; #pairing ended
       $hash->{pairmode} = 0;
-      return undef;
+      return $name;
     }
     my ($type, $addr, $serial) = unpack("CH6a[10]", decode_base64($args[0]));
     Log 2, "MAXLAN_Parse: Paired new device, type $device_types{$type}, addr $addr, serial $serial";
@@ -645,12 +645,10 @@ MAXLAN_Parse($$)
     Log 3, "MAXLAN_Parse: 1% rule: we sent too much, cmd is now in queue" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} > 0);
     Log 2, "MAXLAN_Parse: 1% rule: we sent too much, queue is full" if($hash->{dutycycle} == 100 && $hash->{freememoryslot} == 0);
     Log 2, "MAXLAN_Parse: Command was discarded" if($discarded);
-    return "Command was discarded" if($discarded);
   } else {
-    Log $ll5, "$name Unknown command $cmd";
-    return "MAXLAN_Parse: Unknown command $cmd";
+    Log 2, "MAXLAN_Parse: Unknown command $cmd";
   }
-  return undef;
+  return $name;
 }
 
 

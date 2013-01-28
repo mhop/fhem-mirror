@@ -427,7 +427,7 @@ MAX_Parse($$)
   my ($MAX,$isToMe,$msgtype,$addr,@args) = split(",",$msg);
   #$isToMe is 1 if the message was direct at the device $hash, and 0
   #if we just snooped a message directed at a different device (by CUL_MAX).
-  return if($MAX ne "MAX");
+  return () if($MAX ne "MAX");
 
   Log 5, "MAX_Parse $msg";
   #Find the device with the given addr
