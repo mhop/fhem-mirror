@@ -1,4 +1,6 @@
 - SVN
+  - feature: new Module 98_Heating_Control to switch heatsinks automaticly
+             with a weekly profile (by D. Ortmann / T. Faust)
   - feature: new Module 93_DbLog.pm for logging events into Databases. 
              Generating Plots with weblinks are supportet.
              (by B. Neubert / T. Faust)
