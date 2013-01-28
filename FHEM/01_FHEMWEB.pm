@@ -2369,7 +2369,6 @@ FW_dev2image($)
   my $model = $attr{$name}{model} if(defined($attr{$name}{model}));
 
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
-  $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
 
   my $icon;
   my $devStateIcon = AttrVal($name, "devStateIcon", undef);
@@ -2382,6 +2381,8 @@ FW_dev2image($)
       }
     }
   }
+
+  $state =~ s/ .*//; # Want to be able to have icons for "on-for-timer xxx"
 
   $icon = FW_getIcon("$name.$state")   if(!$icon);           # lamp.Aus.png
   $icon = FW_getIcon("$name.$rstate")  if(!$icon);           # lamp.on.png
