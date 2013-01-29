@@ -752,7 +752,7 @@ CUL_HM_Parse($$)
         push @event, "$eventName:down:$val" if(($err&0x30) == 0x20);
         push @event, "$eventName:stop:$val" if(($err&0x30) == 0x00);
 	  }
-	  elsif ($st eq "dimmer"){
+	  if ($st eq "dimmer"){
         push @event,"overload:".(($err&0x02)?"on":"off");
         push @event,"overheat:".(($err&0x04)?"on":"off");
         push @event,"reduced:" .(($err&0x08)?"on":"off");
@@ -1450,6 +1450,7 @@ my %culHmRegModel = (
                       transmitTryMax  =>1,evtFltrTime     =>1,
                       msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1,},
   "HM-SEC-RHS"     =>{peerNeedsBurst  =>1,expectAES       =>1,
+                      cyclicInfoMsg   =>1,transmDevTryMax =>1,
                       msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
                       evtDly          =>1,ledOnTime       =>1,transmitTryMax  =>1,},
   "HM-SEC-SC"      =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
@@ -3195,7 +3196,7 @@ CUL_HM_Resend($)
     IOWrite($hash, "", $hash->{helper}{respWait}{cmd});
     $hash->{helper}{respWait}{reSent}++;
     Log GetLogLevel($name,4),"CUL_HM_Resend: ".$name. " nr ".$hash->{helper}{respWait}{reSent};
-    InternalTimer(gettimeofday()+1, "CUL_HM_Resend", $hash, 0);
+    InternalTimer(gettimeofday()+rand(40)/10+1, "CUL_HM_Resend", $hash, 0);
   }
 }
 ###################-----------helper and shortcuts--------################
