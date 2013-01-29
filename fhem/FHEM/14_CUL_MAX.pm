@@ -341,7 +341,7 @@ CUL_MAX_Resend($)
 sub
 CUL_MAX_GetTimeInformationPayload()
 {
-  my ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst) = gmtime(time());
+  my ($sec,$min,$hour,$day,$mon,$year,$wday,$yday,$isdst) = localtime(time());
   $mon += 1; #make month 1-based
   #month encoding is just guessed
   #perls localtime gives years since 1900, and we need years since 2000
