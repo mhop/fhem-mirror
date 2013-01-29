@@ -612,7 +612,8 @@ structure_Attr($@)
       <ul>
         Die Struktur &uuml;bernimmt den Status des zuletzt ge&auml;nderten Ger&auml;tes.
       </ul>
-      </ul>
+    </li>
+  </ul>
 
     <a name="clientstate_priority"></a>
     <li>clientstate_priority<br>
@@ -623,7 +624,7 @@ structure_Attr($@)
       unterschiedliche Devicetypen zusammenfassen zu k&ouml;nnen. Jede Gruppe wird durch
       Leerzeichen, jeder Eintrag pro Gruppe durch Pipe getrennt. Der Status der
       Struktur ist der erste Eintrag in der entsprechenden Gruppe.
-
+    </li>
     <br>Beispiel:<br>
     <ul>
       <li>attr kueche clientstate_behavior relative</li>
@@ -684,7 +685,7 @@ structure_Attr($@)
           attr lamp1 structexclude kitchen:stateFormat<br>
           </code>
         </ul>
-      </li>
+    </li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>

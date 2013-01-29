@@ -202,6 +202,8 @@ Heating_Control_Update($)
   my $nextDesTemperature = 0;
   my $nextSwitch = 0;
   my $nowSwitch = 0;
+
+  $wday=7 if($wday==0);
   my @days = ($wday..7, 1..$wday-1); 
 
   for (my $d=0; $d<@days; $d++) {
@@ -281,8 +283,6 @@ sub SortNumber {
 }
 
 1;
-
-
 
 =pod
 =begin html
