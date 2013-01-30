@@ -580,7 +580,14 @@ sub OWX_Detect ($) {
     }
     #-- nothing to do for Arduino (already done in FRM)
   } elsif($owx_interface eq "firmata") {
-  	$ret=1;
+  	my $iodev = $hash->{IODev};
+	if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {  	
+  	  $ret=1;
+  	  $ress .= "Firmata detected in $iodev->{NAME}";
+	} else {
+	  $ret=0;
+	  $ress .= defined $iodev ? "not associated to any FRM device" : "$iodev->{NAME} is not connected to Firmata";
+	}
     #-- here we treat the COC/CUNO
   } else {
     select(undef,undef,undef,2);
