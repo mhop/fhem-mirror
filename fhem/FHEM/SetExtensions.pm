@@ -23,7 +23,7 @@ SetExtensions($$@)
   );
 
   my $hasOn  = ($list =~ m/\bon\b/);
-  my $hasOff = ($list =~ m/\bon\b/);
+  my $hasOff = ($list =~ m/\boff\b/);
   if(!$hasOn || !$hasOff) {
     my $em = AttrVal($name, "eventMap", undef);
     if($em) {

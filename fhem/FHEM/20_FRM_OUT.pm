@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use Device::Firmata;
 use Device::Firmata::Constants  qw/ :all /;
+use SetExtensions;
 
 #####################################
 sub
@@ -39,21 +40,25 @@ sub
 FRM_OUT_Set($@)
 {
   my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
+  shift @a;
+  my $cmd = $a[0];
   my $value;
-  if ($a[1] eq "on") {
+  if ($cmd eq "on") {
   	$value=PIN_HIGH;
-  } elsif ($a[1] eq "off") {
+  } elsif ($cmd eq "off") {
   	  $value=PIN_LOW;
   } else {
-  	  return "illegal value '".$a[1]."', allowed are 'on' and 'off'";
+  	my $list = "on off";
+    return SetExtensions($hash, $list, $name, @a);
   }
   my $iodev = $hash->{IODev};
   if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
   	$iodev->{FirmataDevice}->digital_write($hash->{PIN},$value);
 	main::readingsSingleUpdate($hash,"state",$a[1], 1);
   } else {
-  	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
-  	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
+  	return $name." no IODev assigned" if (!defined $iodev);
+  	return $name.", ".$iodev->{NAME}." is not connected";
   }
   return undef;
 }
