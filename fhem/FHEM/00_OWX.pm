@@ -18,6 +18,7 @@
 #
 # define <name> OWX <serial-device> for USB interfaces or
 # define <name> OWX <cuno/coc-device> for a CUNO or COC interface
+# define <name> OWX <arduino-pin> for a Arduino/Firmata (10_FRM.pm) interface
 #    
 # where <name> may be replaced by any name string 
 #       <serial-device> is a serial (USB) device
@@ -129,6 +130,9 @@ sub OWX_Initialize ($) {
   $hash->{GetFn}   = "OWX_Get";
   $hash->{SetFn}   = "OWX_Set";
   $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic";
+
+  #-- Adapt to FRM
+  $hash->{InitFn}   = "FRM_OWX_Init";
 }
 
 ########################################################################################
@@ -151,7 +155,7 @@ sub OWX_Define ($$) {
   }
   
   #-- check syntax
-  Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno/coc-device>"
+  Log 1,"OWX: Warning - Some parameter(s) ignored, must be define <name> OWX <serial-device>|<cuno/coc-device>|<arduino-pin>"
      if(int(@a) > 3);
   #-- If this line contains 3 parameters, it is the bus master definition
   my $dev = $a[2];
@@ -187,6 +191,10 @@ sub OWX_Define ($$) {
     #-- store with OWX device
     $hash->{INTERFACE} = "serial";
     $hash->{HWDEVICE}   = $owx_hwdevice;
+  #-- check if we are connecting to Arduino (via FRM):
+  } elsif ($dev =~ /\d{1,2}/) {
+  	$hash->{INTERFACE} = "firmata";
+    FRM_Client_Define($hash,$def);
   } else {
     $hash->{DeviceName} = $dev;
     #-- Second step in case of CUNO: See if we can open it
@@ -260,10 +268,14 @@ sub OWX_Alarms ($) {
 
   $hash->{ALARMDEVS}=();
   
-  #-- Discover all alarmed devices on the 1-Wire bus
-  my $res = OWX_First_SER($hash,"alarm");
-  while( $owx_LastDeviceFlag==0 && $res != 0){
-    $res = $res & OWX_Next_SER($hash,"alarm");
+  if ($hash->{INTERFACE} eq "firmata") {
+  	FRM_OWX_Alarms($hash);
+  } else { 
+    #-- Discover all alarmed devices on the 1-Wire bus
+    my $res = OWX_First_SER($hash,"alarm");
+    while( $owx_LastDeviceFlag==0 && $res != 0){
+      $res = $res & OWX_Next_SER($hash,"alarm");
+    }
   }
   if( @{$hash->{ALARMDEVS}} == 0){
      return "OWX: No alarmed 1-Wire devices found on bus $name";
@@ -326,6 +338,10 @@ sub OWX_Complex ($$$$) {
   }elsif( ($owx_interface eq "COC") || ($owx_interface eq "CUNO")  ){
     return OWX_Complex_CCC($hash,$owx_dev,$data,$numread);
 
+  #-- here we treat Arduino/Firmata devices 
+  }elsif( $owx_interface eq "firmata" ) {
+    return FRM_OWX_Complex( $hash, $owx_dev, $data, $numread );
+		
   #-- interface error
   }else{
     Log 3,"OWX: Complex called with unknown interface $owx_interface on bus $name";
@@ -562,6 +578,9 @@ sub OWX_Detect ($) {
         $ress.=sprintf "0x%1x%1x ",$j,$k;
       }
     }
+    #-- nothing to do for Arduino (already done in FRM)
+  } elsif($owx_interface eq "firmata") {
+  	$ret=1;
     #-- here we treat the COC/CUNO
   } else {
     select(undef,undef,undef,2);
@@ -636,6 +655,9 @@ sub OWX_Discover ($) {
   #-- Ask the COC/CUNO
   }elsif( ($owx_interface eq "COC" ) || ($owx_interface eq "CUNO") ){
     $res = OWX_Discover_CCC($hash);
+  #-- ask the Arduino
+  }elsif ( $owx_interface eq "firmata") {
+    $res = FRM_OWX_Discover($hash);
   #-- Something else
   } else {
     Log 1,"OWX: Discover called with unknown interface";
@@ -896,6 +918,8 @@ sub OWX_Reset ($) {
     return OWX_Reset_CCC($hash);
   }elsif( $owx_interface eq "CUNO" ){
     return OWX_Reset_CCC($hash);
+  }elsif( $owx_interface eq "firmata" ) {
+    return FRM_OWX_Reset($hash);
   }else{
     Log 3,"OWX: Reset called with unknown interface $owx_interface";
     return 0;
@@ -996,6 +1020,8 @@ sub OWX_Verify ($$) {
   #-- Ask the COC/CUNO
   }elsif( ($owx_interface eq "COC" ) || ($owx_interface eq "CUNO") ){
     return OWX_Verify_CCC($hash,$dev)
+  }elsif( $owx_interface eq "firmata" ){
+  	return FRM_OWX_Verify($hash,$dev);
   } else {
     Log 1,"OWX: Verify called with unknown interface";
     return 0;
