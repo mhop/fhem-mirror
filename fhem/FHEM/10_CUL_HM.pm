@@ -919,15 +919,27 @@ CUL_HM_Parse($$)
     }
     elsif ($msgType eq "41"){ #Alarm detected
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
-	  my $stStr = ($state eq "01")?"all-clear":"on";
-	  if($dhash){ # the source is in dst
+	  if($dhash && $dhash ne $sHash){ # update source (ID is reported in $dst...)
 	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
 		  $dhash->{helper}{alarmNo} = $No;
-		  readingsSingleUpdate($dhash,'state',$stStr,1);
+		  readingsSingleUpdate($dhash,'state',(($state eq "01")?"off":"smoke-Alarm"),1);
 		}
 	  }
-      push @event,"state:".$stStr.":from:".$dname;
-      push @event,"smoke_detect:$stStr $dname";
+	  # now handle the team
+	  $shash->{helper}{alarmList} = "" if (!$dhash->{helper}{alarmList});
+	  if ($state eq "01") {#clear Alarm for one sensor
+		$shash->{helper}{alarmList} =~ s/",".$dst//;
+	  }
+	  else{# remove alarm for Sensor
+		$shash->{helper}{alarmList} .= ",".$dst;
+	  }
+	  my $alarmList; # make alarm ID list readable
+	  foreach(split(",",$shash->{helper}{alarmList})){
+	    $alarmList .= CUL_HM_id2Name($1)."," if ($1);
+	  }
+	  $alarmList = "none" if (!$alarmList);
+      push @event,"state:".(($alarmList eq "none")?"off":"smoke-Alarm");
+      push @event,"smoke_detect:$alarmList";
     } 
     elsif ($msgType eq "01"){ #Configs
 	  my $sType = substr($p,0,2);
@@ -1175,7 +1187,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 #blindActuator mainly   
   MaxTimeF        =>{a=> 29.0,s=>1.0,l=>3,min=>0  ,max=>25.4    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"max time first direction"},
   DriveMode       =>{a=> 31.0,s=>1.0,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{direct=>0,viaUpperEnd=>1,viaLowerEnd=>2,viaNextEnd=>3}},
-  ActionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
+  ActionType      =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3}},
   OffTimeMode     =>{a=> 10.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"off time mode",lit=>{absolut=>0,minimal=>1}},
   OnTimeMode      =>{a=> 10.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"on time mode" ,lit=>{absolut=>0,minimal=>1}},
 #dimmer mainly                                                                                 
@@ -1184,7 +1196,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   OffDly          =>{a=>  8.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off delay"},
   OffTime         =>{a=>  9.0,s=>1.0,l=>3,min=>0  ,max=>111600  ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"off time"},
 
-  ActionTypeDim   =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
+  ActionTypeDim   =>{a=> 10.0,s=>0.2,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
   OffLevel        =>{a=> 15.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"PowerLevel Off"},
   OnMinLevel      =>{a=> 16.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"minimum PowerLevel"},
   OnLevel         =>{a=> 17.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"PowerLevel on"},
@@ -1249,14 +1261,14 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 
 my %culHmRegDefine = (
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
-  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>0,t=>'pairing to central'},
+  pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>1,t=>'pairing to central'},
 #blindActuator mainly                                                                             
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"fliptime up <=>down"},
-  refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"reference run counter"},
+  refRunCounter   =>{a=> 16.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"reference run counter"},
   
-  lgMultiExec     =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
+  lgMultiExec     =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
 #remote mainly                                                                                      
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Language 0:English, 1:German"},
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
@@ -1278,9 +1290,9 @@ my %culHmRegDefine = (
   backlAtService  =>{a=> 47.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Service" ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
   backlAtInfo     =>{a=> 47.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight Info"    ,lit=>{off=>0,on=>1,blinkSlow=>2,blinkFast=>3}},
 #dimmer  mainly                                                                                  
-  ovrTempLvl      =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"overtemperatur level"},
-  redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>1,t=>"reduced temperatur recover"},
-  redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>1,t=>"reduced power level"},
+  ovrTempLvl      =>{a=> 50.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>0,t=>"overtemperatur level"},
+  redTempLvl      =>{a=> 52.0,s=>1.0,l=>1,min=>30 ,max=>100     ,c=>''         ,f=>''      ,u=>"C"   ,d=>0,t=>"reduced temperatur recover"},
+  redLvl          =>{a=> 53.0,s=>1.0,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>"%"   ,d=>0,t=>"reduced power level"},
   loadErrCalib	  =>{a=> 18.0,s=>1.0,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"Load Error Calibration"},
   transmitTryMax  =>{a=> 48.0,s=>1.0,l=>1,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>""    ,d=>0,t=>"max message re-transmit"},
   loadAppearBehav =>{a=> 49.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>"behavior on load appearence at restart",lit=>{off=>0,last=>1,btnPress=>2,btnPressIfWasOn=>3}},
@@ -1330,10 +1342,10 @@ my %culHmRegDefine = (
   holdTime        =>{a=> 20  ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
   holdPWM         =>{a=> 21  ,s=>1,  l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Holdtime pulse wide modulation"},
   setupDir        =>{a=> 22  ,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Rotation direction for locking",lit=>{right=>0,left=>1}},
-  setupPosition   =>{a=> 23  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Rotation angle neutral position"},
+  setupPosition   =>{a=> 23  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>1,t=>"Rotation angle neutral position"},
   angelOpen       =>{a=> 24  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>1,t=>"Door opening angle"},
   angelMax        =>{a=> 25  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>1,t=>"Angle maximum"},
-  angelLocked     =>{a=> 26  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>0,t=>"Angle Locked position"},
+  angelLocked     =>{a=> 26  ,s=>1  ,l=>1,min=>0  ,max=>3000    ,c=>'factor'   ,f=>0.06666 ,u=>'deg' ,d=>1,t=>"Angle Locked position"},
   pullForce       =>{a=> 28  ,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"pull force level"},
   pushForce       =>{a=> 29  ,s=>1  ,l=>1,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>1,t=>"push force level"},
   tiltMax         =>{a=> 30  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"maximum tilt level"},
@@ -1350,7 +1362,8 @@ my %culHmRegDefine = (
   minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
   captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter - ignore light at night"},
-  ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>1,t=>"LED ontime"},
+  eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"evetn filter time"},
+  ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
   eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>1,t=>"event delay time"},
   msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
   msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
@@ -1456,6 +1469,14 @@ my %culHmRegModel = (
   "HM-SEC-SC"      =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                       msgScPosA       =>1,msgScPosB       =>1,
 					                      ledOnTime       =>1,transmitTryMax  =>1,eventDlyTime    =>1,
+                      peerNeedsBurst  =>1,expectAES       =>1,},
+  "HM-SCI-3-FM"    =>{cyclicInfoMsg   =>1                   ,transmDevTryMax =>1,
+                      msgScPosA       =>1,msgScPosB       =>1,
+					                                          transmitTryMax  =>1,eventDlyTime    =>1,
+                      peerNeedsBurst  =>1,expectAES       =>1,},
+  "HM-SEC-TIS"     =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
+                      msgScPosA       =>1,msgScPosB       =>1,
+					                      ledOnTime       =>1,transmitTryMax  =>1,eventFilterTime =>1,
                       peerNeedsBurst  =>1,expectAES       =>1,},
   "HM-SEC-SFA-SM"  =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                       lowBatLimit     =>1,batDefectLimit  =>1,
@@ -3788,7 +3809,7 @@ CUL_HM_getRegFromStore($$$$)
     }
 	$convFlg = "set_" if ($dReadS && $dReadR ne $dReadS);
     my $dRead = $dReadS?$dReadS:$dReadR;
-	return "invalid" if (!defined($dRead) || $dRead eq "");
+	return "invalid" if (!defined($dRead) || $dRead eq ""|| $dRead eq " ");
     
 	$data = ($data<< 8)+hex($dRead);
 	$addr++;
