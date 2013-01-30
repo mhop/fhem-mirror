@@ -20,7 +20,7 @@ sub FRM_Initialize($) {
 
 	# Provider
 	$hash->{Clients} =
-	  ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:";
+	  ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:OWX:";
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
 
@@ -52,7 +52,7 @@ sub FRM_Define($$) {
 	}
 	$hash->{DeviceName} = $dev;
 	my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
-	main::readingsSingleUpdate($hash,"state","initialized", 1);
+	main::readingsSingleUpdate($hash,"state","Initialized", 1);
 	return $ret;	
 }
 
@@ -348,6 +348,171 @@ sub FRM_poll
 		$hash->{FirmataDevice}->poll();
 	}
 	return $mfound;
+}
+
+######### following is code to be called from OWX: ##########
+
+sub
+FRM_OWX_Init($$)
+{
+	my ($hash,$args) = @_;
+  	if(defined $args and (@$args == 4)) {
+  		$hash->{PIN} = @$args[3];
+  	}
+	$hash->{INTERFACE} = "FRM";
+	if (defined $hash->{IODev}) {
+		my $firmata = $hash->{IODev}->{FirmataDevice};
+		if (defined $firmata and defined $hash->{PIN}) {
+			my $pin = $hash->{PIN};
+			$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
+			$firmata->pin_mode($pin,PIN_ONEWIRE);
+			$hash->{FRM_OWX_REPLIES} = {};
+			$hash->{DEVS} = [];
+			if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+				$firmata->onewire_config($pin,1);
+			}
+			main::readingsSingleUpdate($hash,"state","Initialized",1);
+			$firmata->onewire_search($pin);
+		}
+	}
+}
+
+sub FRM_OWX_observer
+{
+	my ( $data,$hash ) = @_;
+	my $command = $data->{command};
+	COMMAND_HANDLER: {
+		$command eq "READ_REPLY" and do {
+			my $owx_device = FRM_OWX_firmata_to_device($data->{device});
+			my $owx_data = pack "C*",@{$data->{data}};
+			$hash->{FRM_OWX_REPLIES}->{$owx_device} = $owx_data;
+			last;			
+		};
+		$command eq "SEARCH_REPLY" and do {
+			my @owx_devices = ();
+			foreach my $device (@{$data->{devices}}) {
+				push @owx_devices, FRM_OWX_firmata_to_device($device);
+			}
+			$hash->{DEVS} = \@owx_devices;
+			$main::attr{$hash->{NAME}}{"ow-devices"} = join " ",@owx_devices;
+			last;
+		};
+	}
+}
+
+########### functions implementing interface to OWX ##########
+
+sub FRM_OWX_device_to_firmata
+{
+	my @device;
+	foreach my $hbyte (unpack "A2xA2A2A2A2A2A2xA2", shift) {
+		push @device, hex $hbyte;
+	}
+	return {
+		family => shift @device,
+		crc => pop @device,
+		identity => \@device,
+	}
+}
+
+sub FRM_OWX_firmata_to_device
+{
+	my $device = shift;
+	return sprintf ("%02X.%02X%02X%02X%02X%02X%02X.%02X",$device->{family},@{$device->{identity}},$device->{crc});
+}
+
+sub FRM_OWX_Complex ($$$$) {
+	my ( $hash, $owx_dev, $data, $numread ) = @_;
+
+	my $res = "";
+
+	#-- get the interface
+	my $frm = $hash->{IODev};
+	return undef unless defined $frm;
+	my $firmata = $frm->{FirmataDevice};
+	my $pin     = $hash->{PIN};
+	return undef unless ( defined $firmata and defined $pin );
+
+	my $ow_command = { reset => 1, };
+
+	#-- has match ROM part
+	if ($owx_dev) {
+		$ow_command->{"select"} = FRM_OWX_device_to_firmata($owx_dev);
+
+		#-- padding first 9 bytes into result string, since we have this
+		#   in the serial interfaces as well
+		$res .= "000000000";
+	}
+
+	#-- has data part
+	if ($data) {
+		my @data = unpack "C*", $data;
+		$ow_command->{"write"} = \@data;
+		$res.=$data;
+	}
+
+	#-- has receive part
+	if ( $numread > 0 ) {
+		$ow_command->{"read"} = $numread;
+		#Firmata sends 0-address on read after skip
+		$owx_dev = '00.000000000000.00' unless defined $owx_dev;
+		$hash->{FRM_OWX_REPLIES}->{$owx_dev} = undef;		
+	}
+
+	$firmata->onewire_command_series( $pin, $ow_command );
+	
+	if ($numread) {
+		my $times = main::AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+		for (my $i=0;$i<$times;$i++) {
+			if (FRM_poll($hash->{IODev})) {
+				if (defined $hash->{FRM_OWX_REPLIES}->{$owx_dev}) {
+					$res .= $hash->{FRM_OWX_REPLIES}->{$owx_dev};
+					return $res;
+				}
+			} else {
+				select (undef,undef,undef,0.05);
+			}
+		}
+	}
+	return $res;
+}
+
+########################################################################################
+#
+# OWX_Discover_FRM - Discover devices on the 1-Wire bus via internal firmware
+#
+# Parameter hash = hash of bus master
+#
+# Return 0  : error
+#        1  : OK
+#
+########################################################################################
+
+sub FRM_OWX_Discover ($) {
+
+	my ($hash) = @_;
+
+	#-- get the interface
+	my $frm = $hash->{IODev};
+	return 0 unless defined $frm;
+	my $firmata = $frm->{FirmataDevice};
+	my $pin     = $hash->{PIN};
+	return 0 unless ( defined $firmata and defined $pin );
+	my $old_devices = $hash->{DEVS};
+	$hash->{DEVS} = undef;			
+	$firmata->onewire_search($hash->{PIN});
+	my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+	for (my $i=0;$i<$times;$i++) {
+		if (FRM_poll($hash->{IODev})) {
+			if (defined $hash->{DEVS}) {
+				return 1;
+			}
+		} else {
+			select (undef,undef,undef,0.05);
+		}
+	}
+	$hash->{DEVS} = $old_devices;
+	return 1;
 }
 
 1;
