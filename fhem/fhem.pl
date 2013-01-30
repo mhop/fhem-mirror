@@ -183,6 +183,7 @@ my $intAtCnt=0;
 my %duplicate;                  # Pool of received msg for multi-fhz/cul setups
 my $duplidx=0;                  # helper for the above pool
 my $readingsUpdateDelayTrigger; # needed internally
+my $doTriggerCalled;            # needed internally
 my $cvsid = '$Id$';
 my $namedef =
   "where <name> is either:\n" .
@@ -393,7 +394,7 @@ $attr{global}{motd} = "$sc_text\n\n"
         if(!$attr{global}{motd} || $attr{global}{motd} =~ m/^$sc_text/);
 
 $init_done = 1;
-DoTrigger("global", "INITIALIZED");
+DoTrigger("global", "INITIALIZED", 1);
 
 $attr{global}{motd} .= "Running with root privileges."
         if($^O !~ m/Win/ && $<==0 && $attr{global}{motd} =~ m/^$sc_text/);
@@ -944,7 +945,7 @@ CommandRereadCfg($$)
     my $ret2 = CommandInclude($cl, $attr{global}{statefile});
     $ret = (defined($ret) ? "$ret\n$ret2" : $ret2) if(defined($ret2));
   }
-  DoTrigger("global", "REREADCFG");
+  DoTrigger("global", "REREADCFG", 1);
   $defs{$name} = $selectlist{$name} = $cl if($name && $name ne "__anonymous__");
 
   $init_done = 1;
@@ -1106,7 +1107,7 @@ sub
 CommandShutdown($$)
 {
   my ($cl, $param) = @_;
-  DoTrigger("global", "SHUTDOWN");
+  DoTrigger("global", "SHUTDOWN", 1);
   Log 0, "Server shutdown";
 
   foreach my $d (sort keys %defs) {
@@ -1136,17 +1137,14 @@ DoSet(@)
   return CallFn($dev, "SetFn", $hash, @a) if($a[1] && $a[1] eq "?");
 
   @a = ReplaceEventMap($dev, \@a, 0) if($attr{$dev}{eventMap});
-  $readingsUpdateDelayTrigger = 1;
+  $doTriggerCalled = 0;
   my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
-  $readingsUpdateDelayTrigger = 0;
   return $ret if($ret);
   return undef if($skipTrigger);
   shift @a;
 
-  if($hash->{CHANGED}) {        # Backward compatibility
-    DoTrigger($dev, undef);
-  } else {
-    readingsSingleUpdate($hash, "state", join(" ", @a), 1);
+  if(!$doTriggerCalled) {  # Backward compatibility. Use readingsUpdate in SetFn now
+    DoTrigger($dev, join(" ", @a), 1);
   }
 
   return undef;
@@ -1285,7 +1283,7 @@ CommandDefine($$)
     foreach my $da (sort keys (%defaultattr)) {     # Default attributes
       CommandAttr($cl, "$name $da $defaultattr{$da}");
     }
-    DoTrigger("global", "DEFINED $name");
+    DoTrigger("global", "DEFINED $name", 1) if($init_done);
 
     if($modules{$m}{NotifyFn} && !$hash{NTFY_ORDER}) {
       $hash{NTFY_ORDER} = ($modules{$m}{NotifyOrderPrefix} ?
@@ -1375,7 +1373,7 @@ CommandDelete($$)
     delete($attr{$sdev});
     my $temporary = $defs{$sdev}{TEMPORARY};
     delete($defs{$sdev});       # Remove the main entry
-    DoTrigger("global", "DELETED $sdev") if(!$temporary);
+    DoTrigger("global", "DELETED $sdev", 1) if(!$temporary);
 
   }
   return join("\n", @rets);
@@ -1640,7 +1638,7 @@ CommandRename($$)
 
   CallFn($new, "RenameFn", $new,$old);# ignore replies
 
-  DoTrigger("global", "RENAMED $old $new");
+  DoTrigger("global", "RENAMED $old $new", 1);
   return undef;
 }
 
@@ -1850,7 +1848,7 @@ CommandAttr($$)
       $hash->{NR} = $devcount++
         if($defs{$ioname}{NR} > $hash->{NR});
     }
-    if($a[1] eq "stateFormat") {
+    if($a[1] eq "stateFormat" && $init_done) {
       evalStateFormat($hash);
     }
 
@@ -1915,15 +1913,14 @@ CommandSetstate($$)
 
     } else {
 
-      # Do not overwrite state like "opened" or "initialized"
-      $d->{STATE} = $a[1] if($init_done || $d->{STATE} eq "???");
-
-      # This time is not the correct one, but we do not store a timestamp for
+      # The timestamp is not the correct one, but we do not store a timestamp for
       # this reading.
       my $tn = TimeNow();
       $oldvalue{$sdev}{TIME} = $tn;
-      $oldvalue{$sdev}{VAL} = $d->{STATE};
+      $oldvalue{$sdev}{VAL} = ($init_done ? $d->{STATE} : $a[1]);
 
+      # Do not overwrite state like "opened" or "initialized"
+      $d->{STATE} = $a[1] if($init_done || $d->{STATE} eq "???");
       my $ret = CallFn($sdev, "StateFn", $d, $tn, "STATE", $a[1]);
       if($ret) {
         push @rets, $ret;
@@ -2251,53 +2248,55 @@ GetTimeSpec($)
 sub
 DoTrigger($$@)
 {
-  my ($dev, $ns, $noreplace) = @_;
+  my ($dev, $newState, $noreplace) = @_;
   my $ret = "";
-  return "" if(!defined($defs{$dev}));
+  my $hash = $defs{$dev};
+  return "" if(!defined($hash));
 
-  if(defined($ns)) {
-    if($defs{$dev}{CHANGED}) {
-      push @{$defs{$dev}{CHANGED}}, $ns;
+  if(defined($newState)) {
+    if($hash->{CHANGED}) {
+      push @{$hash->{CHANGED}}, $newState;
     } else {
-      $defs{$dev}{CHANGED}[0] = $ns;
+      $hash->{CHANGED}[0] = $newState;
     }
-  } elsif(!defined($defs{$dev}{CHANGED})) {
+  } elsif(!defined($hash->{CHANGED})) {
     return "";
   }
 
-  if(!$noreplace) {
+  if(!$noreplace) {     # Backward compatibility for code without readingsUpdate
     if($attr{$dev}{eventMap}) {
-      my $c = $defs{$dev}{CHANGED};
+      my $c = $hash->{CHANGED};
       for(my $i = 0; $i < @{$c}; $i++) {
         $c->[$i] = ReplaceEventMap($dev, $c->[$i], 1);
       }
-      $defs{$dev}{STATE} = ReplaceEventMap($dev, $defs{$dev}{STATE}, 1);
+      $hash->{STATE} = ReplaceEventMap($dev, $hash->{STATE}, 1);
     }
   }
 
-  my $max = int(@{$defs{$dev}{CHANGED}});
+  my $max = int(@{$hash->{CHANGED}});
   Log 5, "Triggering $dev ($max changes)";
+  $doTriggerCalled = 1;
   return "" if(defined($attr{$dev}) && defined($attr{$dev}{do_not_notify}));
 
   ################
   # Log/notify modules
   # If modifying a device in its own trigger, do not call the triggers from
   # the inner loop.
-  if($max && !defined($defs{$dev}{INTRIGGER})) {
-    $defs{$dev}{INTRIGGER}=1;
+  if($max && !defined($hash->{INTRIGGER})) {
+    $hash->{INTRIGGER}=1;
     my @ntfyList = sort { $defs{$a}{NTFY_ORDER} cmp $defs{$b}{NTFY_ORDER} }
                    grep { $defs{$_}{NTFY_ORDER} } keys %defs;
-    Log 5, "Notify loop for $dev $defs{$dev}{CHANGED}->[0]";
+    Log 5, "Notify loop for $dev $hash->{CHANGED}->[0]";
     foreach my $n (@ntfyList) {
       next if(!defined($defs{$n}));     # Was deleted in a previous notify
-      my $r = CallFn($n, "NotifyFn", $defs{$n}, $defs{$dev});
+      my $r = CallFn($n, "NotifyFn", $defs{$n}, $hash);
       $ret .= $r if($r);
     }
 
     ################
     # Inform
-    if($defs{$dev}{CHANGED}) {    # It gets deleted sometimes (?)
-      $max = int(@{$defs{$dev}{CHANGED}}); # can be enriched in the notifies
+    if($hash->{CHANGED}) {    # It gets deleted sometimes (?)
+      $max = int(@{$hash->{CHANGED}}); # can be enriched in the notifies
       foreach my $c (keys %inform) {
         if(!$defs{$c} || $defs{$c}{NR} != $inform{$c}{NR}) {
           delete($inform{$c});
@@ -2311,16 +2310,16 @@ DoTrigger($$@)
         }
         my $re = $inform{$c}{regexp};
         for(my $i = 0; $i < $max; $i++) {
-          my $state = $defs{$dev}{CHANGED}[$i];
+          my $state = $hash->{CHANGED}[$i];
           next if($re && !($dev =~ m/$re/ || "$dev:$state" =~ m/$re/));
           syswrite($defs{$c}{CD},
             ($inform{$c}{type} eq "timer" ? "$tn " : "") .
-            "$defs{$dev}{TYPE} $dev $state\n");
+            "$hash->{TYPE} $dev $state\n");
         }
       }
     }
 
-    delete($defs{$dev}{INTRIGGER});
+    delete($hash->{INTRIGGER});
   }
 
 
@@ -2328,9 +2327,9 @@ DoTrigger($$@)
   # Used by triggered perl programs to check the old value
   # Not suited for multi-valued devices (KS300, etc)
   $oldvalue{$dev}{TIME} = TimeNow();
-  $oldvalue{$dev}{VAL} = $defs{$dev}{STATE};
+  $oldvalue{$dev}{VAL} = $hash->{STATE};
 
-  delete($defs{$dev}{CHANGED}) if(!defined($defs{$dev}{INTRIGGER}));
+  delete($hash->{CHANGED}) if(!defined($hash->{INTRIGGER}));
 
   Log 3, "NTFY return: $ret" if($ret);
 
@@ -3045,7 +3044,7 @@ readingsEndUpdate($$)
 {
   my ($hash,$dotrigger)= @_;
   my $name = $hash->{NAME};
-  
+
   # process user readings
   if(defined($hash->{fhem}{'.userReadings'})) {
     my %userReadings= %{$hash->{fhem}{'.userReadings'}};
@@ -3059,14 +3058,14 @@ readingsEndUpdate($$)
       readingsBulkUpdate($hash,$userReading,$value,1);
     }
   }
+  evalStateFormat($hash);
 
   # turn off updating mode
   delete $hash->{".updateTimestamp"};
   delete $hash->{".attreour"};
   delete $hash->{".attreocr"};
 
-  evalStateFormat($hash);
-  
+
   # propagate changes
   if($dotrigger && $init_done) {
     DoTrigger($name, undef, 1) if(!$readingsUpdateDelayTrigger);
@@ -3088,7 +3087,6 @@ readingsBulkUpdate($$$@)
   my $name= $hash->{NAME};
 
   return if(!defined($reading) || !defined($value));
-  
   # sanity check
   if(!defined($hash->{".updateTimestamp"})) {
     Log 1, "readingsUpdate($name,$reading,$value) missed to call ".
