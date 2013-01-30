@@ -352,7 +352,7 @@ MAX_Set($@)
       return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
     }
     my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
-    Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{groupid});
+    Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{$dest}{groupid});
     Log 5, "Using dest $dest, destType $destType";
     if($setting eq "associate") {
       return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%s%02x", $dest, $destType));
