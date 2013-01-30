@@ -421,6 +421,20 @@ sub FRM_OWX_firmata_to_device
 	return sprintf ("%02X.%02X%02X%02X%02X%02X%02X.%02X",$device->{family},@{$device->{identity}},$device->{crc});
 }
 
+sub FRM_OWX_Reset {
+	my ($hash) = @_;
+	#-- get the interface
+	my $frm = $hash->{IODev};
+	return undef unless defined $frm;
+	my $firmata = $frm->{FirmataDevice};
+	my $pin     = $hash->{PIN};
+	return undef unless ( defined $firmata and defined $pin );
+
+	$firmata->onewire_reset($pin);
+	
+	return 1;
+}
+
 sub FRM_OWX_Complex ($$$$) {
 	my ( $hash, $owx_dev, $data, $numread ) = @_;
 
@@ -433,7 +447,7 @@ sub FRM_OWX_Complex ($$$$) {
 	my $pin     = $hash->{PIN};
 	return undef unless ( defined $firmata and defined $pin );
 
-	my $ow_command = { reset => 1, };
+	my $ow_command = {};
 
 	#-- has match ROM part
 	if ($owx_dev) {
