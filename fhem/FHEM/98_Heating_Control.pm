@@ -1,3 +1,4 @@
+
 # $Id$
 ##############################################################################
 #
@@ -129,8 +130,8 @@ Heating_Control_Define($$)
     }
 
     # nur noch die Einzelteile per regExp testen
-    return "invalid daylist in $name <$daylist> 123... | Sa,So,..."
-      if(!($daylist =~  m/^(\d){0,7}$/g    ||     $daylist =~  m/^((Sa|So|Mo|Di|Mi|Do|Fr)(,|$)){0,7}$/g      ));
+    return "invalid daylist in $name <$daylist> - please use 123... | Sa,So,..."
+      if(!($daylist =~  m/^(\d){1,7}$/g    ||     $daylist =~  m/^((sa|so|mo|di|mi|do|fr)(,|$)){1,7}$/g      ));
 
     # Sa, So ... in den Index übersetzen
     my $idx = 1;
@@ -267,7 +268,7 @@ Heating_Control_Update($)
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash, "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
   readingsBulkUpdate($hash, "nextValue", $nextDesTemperature . "°C");
-  readingsBulkUpdate($hash, "state", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)). ": " . $newDesTemperature."°C");
+  readingsBulkUpdate($hash, "state", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)). ": " . $nextDesTemperature."°C");
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); 
   
   return 1;
