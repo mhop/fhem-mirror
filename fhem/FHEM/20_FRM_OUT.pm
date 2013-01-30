@@ -55,7 +55,7 @@ FRM_OUT_Set($@)
   my $iodev = $hash->{IODev};
   if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
   	$iodev->{FirmataDevice}->digital_write($hash->{PIN},$value);
-	main::readingsSingleUpdate($hash,"state",$a[1], 1);
+	main::readingsSingleUpdate($hash,"state",$cmd, 1);
   } else {
   	return $name." no IODev assigned" if (!defined $iodev);
   	return $name.", ".$iodev->{NAME}." is not connected";
