@@ -129,7 +129,7 @@ sub OWX_Initialize ($) {
   $hash->{UndefFn} = "OWX_Undef";
   $hash->{GetFn}   = "OWX_Get";
   $hash->{SetFn}   = "OWX_Set";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic";
+  $hash->{AttrList}= "loglevel:0,1,2,3,4,5,6 buspower:real,parasitic IODev";
 
   #-- Adapt to FRM
   $hash->{InitFn}   = "FRM_OWX_Init";
@@ -2394,6 +2394,7 @@ sub OWX_Verify_CCC ($$) {
                 port or </li>
             <li>via a passive DS9097 interface attached to an USB port or</li>
             <li>via a network-attached CUNO or through a COC on the RaspBerry Pi</li>
+            <li>via an Arduino running OneWireFirmata attached to USB</li>
         </ul> Internally these interfaces are vastly different, read the corresponding <a
             href="http://fhemwiki.de/wiki/Interfaces_f%C3%BCr_1-Wire"> Wiki pages </a>
         <br />
@@ -2404,13 +2405,16 @@ sub OWX_Verify_CCC ($$) {
             <br />
             <code>define OWio2 OWX COC</code>
             <br />
+            <code>define OWio3 OWX 10</code>
+            <br />
         </p>
         <br />
         <a name="OWXdefine"></a>
         <h4>Define</h4>
         <p>
             <code>define &lt;name&gt; OWX &lt;serial-device&gt;</code> or <br />
-            <code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code>
+            <code>define &lt;name&gt; OWX &lt;cuno/coc-device&gt;</code> or <br />
+            <code>define &lt;name&gt; OWX &lt;arduino-pin&gt;</code>
             <br /><br /> Define a 1-Wire interface to communicate with a 1-Wire bus.<br />
             <br />
         </p>
@@ -2421,6 +2425,10 @@ sub OWX_Verify_CCC ($$) {
             <li>
                 <code>&lt;cuno-device&gt;</code> The previously defined CUNO to which the 1-Wire bus
                 is attached. </li>
+            <li>
+                <code>&lt;arduino-pin&gt;</code> The pin of the previous defined <a href="#FRM">FRM</a>
+                to which the 1-Wire bus is attached. If there is more than one FRM device defined
+                use <a href="#IODev">IODev</a> attribute to select which FRM device to use.</li>
         </ul>
         <br />
         <a name="OWXset"></a>
@@ -2467,6 +2475,8 @@ sub OWX_Verify_CCC ($$) {
         <ul>
             <li><a name="OWXbuspower"><code>attr &lt;name&gt; buspower real|parasitic</code></a>
                 <br />tells FHEM whether power is supplied to the 1-Wire bus or not.</li>
+            <li><code>attr &lt;name&gt; IODev <FRM-device></code>
+                <br />assignes a specific FRM-device to OWX. Required only if there is more than one FRM defined.</li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
