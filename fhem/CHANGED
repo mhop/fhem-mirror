@@ -58,6 +58,9 @@
   - feature: a lot of new features and known 1-wire slaves to OWServer /
              OWDevice added (M. Fischer)
   - feature: set-extensions (additional set commands) for FS20, EnOcean, ZWave
+  - feature: added new command 'notice'. (M. Fischer)
+  - change:  update supports the display and confirmation of system messages
+             via the new notice command (M. Fischer)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,

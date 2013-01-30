@@ -83,26 +83,6 @@ CommandUpdate($$)
   $branch = "SVN" if ($BRANCH eq "DEVELOPMENT");
   $srcdir = $UPDATE{path}."/".lc($branch);
 
-  # check arguments for fheminfo advice
-  if (defined($args[1]) && uc($args[1]) eq "VIEWADVICE") {
-    $ret = optInFhemInfo();
-    Log 1,"update Action required: please run 'update viewAdvice'";
-    return $ret;
-  }
-
-  # check for fheminfo settings
-  my $sendStatistics = AttrVal("global","sendStatistics",undef);
-  if(!defined($sendStatistics) ||
-     ( defined($sendStatistics) &&
-       lc($sendStatistics) ne "onupdate" &&
-       lc($sendStatistics) ne "manually" &&
-       lc($sendStatistics) ne "never" )
-    ) {
-    $ret = optInFhemInfo();
-    Log 1,"update Action required: please run 'update viewAdvice'";
-    return $ret;
-  }
-
   # check arguments
   if (defined($args[1]) && $args[1] eq "?" ||
      (int(@args) > 3 && uc($args[1]) eq "HOUSEKEEPING") ||
@@ -143,7 +123,15 @@ CommandUpdate($$)
     $ret = update_DoHousekeeping($update);
     $ret = "nothing to do..." if (!$ret);
   } else {
-    $ret = update_DoUpdate($srcdir,$BRANCH,$update,$force,$cl);
+    my $unconfirmed;
+    my $notice;
+    ($notice,$unconfirmed) = update_CheckNotice("before");
+    $ret .= $notice if(defined($notice));
+    return $ret if($unconfirmed);
+    $ret .= update_DoUpdate($srcdir,$BRANCH,$update,$force,$cl);
+    ($notice,$unconfirmed) = update_CheckNotice("after");
+    $ret .= $notice if(defined($notice));
+    my $sendStatistics = AttrVal("global","sendStatistics",undef);
     if(lc($sendStatistics) eq "onupdate") {
       $ret .= "\n\n";
       $ret .= AnalyzeCommandChain(undef, "fheminfo send");
@@ -151,6 +139,100 @@ CommandUpdate($$)
   }
 
   return $ret;
+}
+
+########################################
+sub
+update_CheckNotice($)
+{
+  my ($position) = shift;
+  my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
+  my $moddir  = "$modpath/FHEM";
+  my $noticeDir = "$moddir/FhemUtils";
+  my $ret;
+
+  my @published   = split(",",AnalyzeCommandChain(undef, "notice get update 6"));
+  my @unconfirmed = split(",",AnalyzeCommandChain(undef, "notice get update 7"));
+  my @confirmed   = split(",",AnalyzeCommandChain(undef, "notice get update 8"));
+
+  # remove confirmed from published
+  my %c;
+  @c{@confirmed} = undef;
+  @published = grep {not exists $c{$_}} @published;
+
+  my @merged = (@published,@unconfirmed);
+  my %unique = ();
+  foreach my $notice (@merged) {
+    $unique{$notice} ++;
+  }
+  my @noticeList = keys %unique;
+
+  if(@noticeList) {
+    foreach my $notice (sort @noticeList) {
+      my $sendStatistics;
+      my $condition = AnalyzeCommandChain(undef, "notice condition $notice");
+      if($condition) {
+        my @conditions = split(/\|/,$condition);
+        foreach my $pair (@conditions) {
+          my ($key,$val,$con) = split(":",$pair);
+          if(lc($key) eq "sendstatistics") {
+            # skip this message if attrib sendStatistics is already defined
+            $sendStatistics = AttrVal("global","sendStatistics",undef);
+          }
+        }
+      }
+      next if(defined($sendStatistics) && $sendStatistics ne "");
+      my $cmdret = AnalyzeCommandChain(undef, "notice position $notice");
+      if( defined($cmdret) && lc($cmdret) eq lc($position) ||
+        ( defined($cmdret) &&  grep (m/^$notice$/,@unconfirmed) && lc($cmdret) eq "after") ||
+        (!defined($cmdret) &&  grep (m/^$notice$/,@unconfirmed) && $position eq "before") ||
+        (!defined($cmdret) && !grep (m/^$notice$/,@unconfirmed) && $position eq "after") ) {
+        $ret .= "==> Message-ID: $notice\n";
+        my $noticeDE = AnalyzeCommandChain(undef, "notice view $notice noheader de");
+        my $noticeEN = AnalyzeCommandChain(undef, "notice view $notice noheader en");
+        if($noticeDE && $noticeEN) {
+          $ret .= "(English Translation: Please see below.)\n\n";
+          $ret .= $noticeDE;
+          $ret .= "~~~~~~~~~~\n";
+          $ret .= $noticeEN;
+        } elsif($noticeDE) {
+          $ret .= $noticeDE;
+        } elsif($noticeEN) {
+          $ret .= $noticeEN;
+        } else {
+          $ret .= "==> Message file is corrupt. Please report this!\n"
+        }
+      }
+    }
+    if(@unconfirmed) {
+      $ret .= "==> Action required:\n\n";
+      if($position eq "before") {
+        $ret .= "    There is at least one unconfirmed message. Before updating FHEM\n";
+        $ret .= "    these messages have to be confirmed first:\n";
+      } else {
+        $ret .= "    There is at least one unconfirmed message. You have to confirm\n";
+        $ret .= "    these messages before you can update FHEM again.\n";
+      }
+      foreach my $notice (@unconfirmed) {
+        $ret .= "      ID: $notice\n";
+        Log 1,"update Action required: please run 'notice view $notice'";
+      }
+      $ret .= "\n";
+      $ret .= "    To view a message (again), please enter 'notice view <ID>'.\n";
+      $ret .= "    To confirm a message, please enter 'notice confirm <ID> [value]'.\n";
+      $ret .= "    '[value]' is an optional argument. Please refer to the message,\n";
+      $ret .= "    whether the disclosure of '[value]' is necessary.\n\n";
+      $ret .= "    For further information please consult the manual for the command\n";
+      $ret .= "    'notice' in the documentation of FHEM (commandref.html).";
+      if($position eq "before") {
+        $ret .= "\n\n";
+        $ret .= "    The update is canceled for now.";
+      }
+    }
+  } else {
+    $ret = undef;
+  }
+  return ($ret,(@unconfirmed) ? 1 : 0);
 }
 
 ########################################
@@ -903,153 +985,6 @@ update_MakeDirectory($)
     $ret = "\nError while creating:\n$error";
   }
   return $ret;
-}
-
-########################################
-sub
-optInFhemInfo()
-{
-  my $str;
-
-  my $str_DE=<<EndOfInfo;
-  (English Translation: Please see below.)
-
-  HINWEIS:
-  
-  Das FHEM-Projekt moechte Dich um Deine Unterstuetzung bitten!
-
-  Im Rahmen der Aktualisierung kann FHEM Informationen ueber diese Installation
-  an einen zentralen Server uebertragen. Diese Daten beinhalten Angaben ueber
-  die installierte FHEM-Version, das Betriebssystem und Rechner-Architektur,
-  die aktuelle Perl-Version, sowie eine Liste der zur Laufzeit definierten
-  Module (inkl. der Anzahl der Definitionen je Modultyp). Weiterhin werden die
-  definierten Modelltypen ermittelt.
-
-  Die am FHEM-Projekt beteiligten Entwickler erhalten wertvolle Informationen zu
-  der Umgebung, in der FHEM installiert ist, und eine Einschaetzung, wie haeufig
-  die jeweiligen Module eingesetzt werden. Dies kann Auswirkungen auf die
-  Weiterentwicklung aber auch auf die zeitnahe Bereitstellung von Erweiterungen
-  und Korrekturen haben.
- 
-  Es werden keine personenbezogenen Daten uebertragen und / oder gespeichert.
-  Die Daten werden nicht an Dritte weitergegeben und nicht fuer kommerzielle
-  Zwecke verwendet. Sie dienen einzig als Hilfestellung zur Entwicklung und
-  zur Einschaetzung der Verbreitung von FHEM.
-
-  Eine weiterfuehrende Beschreibung ist der Dokumentation zu dem FHEM-Befehl
-  'fheminfo' sowie dem globalen Paramater 'sendStatsistics' zu entnehmen. Eine
-  Uebersicht der erhobenen Informationen kann jederzeit ueber den Aufruf von
-  'fheminfo' abgerufen werden.
-
-  Wenn Du das FHEM-Projekt unterstuetzen moechtest, solltest Du jetzt ueber das
-  globale Attribut 'sendStatsistics' die automatische Uebermittlung aktivieren:
-  
-      attr global sendStatistics onUpdate
-      
-  Im Anschluss solltest Du die aktuelle Konfiguration speichern, um diesen
-  Hinweis nicht erneut angezeigt zu bekommen. Der Updatevorgang kann dann wie
-  gewohnt fortgesetzt werden.
-  
-  Moechtest Du keine automatische Uebermittlung der Daten waehrend der
-  Aktualisierung, solltest Du nun das globale Attribut 'sendStatistics' auf
-  'manually' setzen:
-  
-      attr global sendStatistics manually
-      
-  Die Uebermittlung der Daten muss manuell ueber den Befehl 'fheminfo send'
-  erfolgen.
-
-  Moechtest Du niemals Daten ueber die vorhandene FHEM-Installation uebermitteln,
-  so muss das globale Attribut auf 'never' gesetzt werden:
-  
-      attr global sendStatistics never
-      
-  Ein Aufruf von 'fheminfo send' ist damit wirkungslos.
-
-  Die obigen Einstellungen koennen jederzeit geaendert werden. Eine Uebersicht
-  der bereits von anderen Installationen uebermittelten Informationen kann ueber
-  
-        http://fhem.de/stats/statistics.cgi
-        
-  eingesehen werden.
-  
-  Das FHEM-Team freut sich, wenn auch Du durch die automatische Uebermittlung
-  Deiner technischen Daten zum FHEM-Projekt beitraegst.
-  
-  Dieser Hinweistext kann erneut durch den Aufruf von 'update viewAdvice'
-  angezeigt werden.
-  
-  Vielen Dank fuer Deine Unterstuetzung!
-EndOfInfo
-
-  my $str_EN=<<EndOfInfo;
-  NOTICE:
-
-  The FHEM Project asks for your support!
-
-  During the update process FHEM is able to send statistical information
-  regarding your installation to a central server. This may include data like
-  your installed FHEM version, the operating system, Perl version, computer
-  achitecture and the list of modules used during the update. Also the list of
-  model types and number of definitions for each module may be collected.
-
-  The developers behind the FHEM project receive valuable information about the
-  environment in which FHEM is installed and get an overview how often those
-  modules are used. This may affect the further development of FHEM as well as
-  the timely provision of extensions and corrections.
-
-  No personal information will be transferred or stored during this process. The
-  data collected will neither be made available to a third party nor used for
-  commercial purposes. The only purpose is to support further development of
-  FHEM and to asses its distribution.
-
-  A more detailed explanation can be found in the documentation related to the
-  command 'fheminfo' and the global parameter 'sendStatistics'. An overview
-  about all information collected can be displayed at any time by using the
-  command 'fheminfo'.
-
-  If you would like to support the FHEM project, you may set the global attribut
-  'sendStatistics' to enable the automatic info transfer process.
-  
-      attr global sendStatistics onUpdate
-
-  Thereafter you should save the current configuration to avoid this note beeing
-  displayed again. The update process can be continued like before.
-
-  In case you do not whish an automatic transmission of the data collected
-  during update, you should set the global attribute 'sendStatistics' to
-  'manually':
-
-      attr global sendStatistics manually
-
-  Manual transfer of the data can then be performed by using the command
-  'fheminfo send'.
-
-  If you never want to send information about your FHEM installation by all
-  means, you need to set the global attribut 'sendStatistics' to 'never':
-  
-  attr global sendStatistics never
-
-  Even the use of 'fheminfo send' will then not transfer any data.
-
-  All the settings mentioned above can be amended at any time. An overview of
-  data sent from other installations can be obtained at
-  
-    http://fhem.de/stats/statistics.cgi
-
-  The FHEM Project Team would be happy if you considered supporting the
-  development of FHEM by transferring your technical data to the project.
-
-  This info text can be displayed again by using the command 
-  'update viewAdvice'.
-
-  Thanks a lot for your support!
-EndOfInfo
-
-  $str  = "$str_DE\n";
-  $str .= "-------------\n\n";
-  $str .= $str_EN;
-  return $str;
 }
 
 1;
