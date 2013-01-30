@@ -356,10 +356,8 @@ sub
 FRM_OWX_Init($$)
 {
 	my ($hash,$args) = @_;
-  	if(defined $args and (@$args == 4)) {
-  		$hash->{PIN} = @$args[3];
-  	}
-	$hash->{INTERFACE} = "FRM";
+	FRM_Init_Pin_Client($hash,$args);
+	$hash->{INTERFACE} = "firmata";
 	if (defined $hash->{IODev}) {
 		my $firmata = $hash->{IODev}->{FirmataDevice};
 		if (defined $firmata and defined $hash->{PIN}) {
@@ -388,13 +386,17 @@ sub FRM_OWX_observer
 			$hash->{FRM_OWX_REPLIES}->{$owx_device} = $owx_data;
 			last;			
 		};
-		$command eq "SEARCH_REPLY" and do {
+		($command eq "SEARCH_REPLY" or $command eq "SEARCH_ALARMS_REPLY") and do {
 			my @owx_devices = ();
 			foreach my $device (@{$data->{devices}}) {
 				push @owx_devices, FRM_OWX_firmata_to_device($device);
 			}
-			$hash->{DEVS} = \@owx_devices;
-			$main::attr{$hash->{NAME}}{"ow-devices"} = join " ",@owx_devices;
+			if ($command eq "SEARCH_REPLY") {
+				$hash->{DEVS} = \@owx_devices;
+				$main::attr{$hash->{NAME}}{"ow-devices"} = join " ",@owx_devices;
+			} else {
+				$hash->{ALARMDEVS} = \@owx_devices;
+			}
 			last;
 		};
 	}
@@ -419,6 +421,41 @@ sub FRM_OWX_firmata_to_device
 {
 	my $device = shift;
 	return sprintf ("%02X.%02X%02X%02X%02X%02X%02X.%02X",$device->{family},@{$device->{identity}},$device->{crc});
+}
+
+sub FRM_OWX_Verify {
+	my ($hash,$dev) = @_;
+	foreach my $found ($hash->{DEVS}) {
+		if ($dev eq $found) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+sub FRM_OWX_Alarms {
+	my ($hash) = @_;
+
+	#-- get the interface
+	my $frm = $hash->{IODev};
+	return 0 unless defined $frm;
+	my $firmata = $frm->{FirmataDevice};
+	my $pin     = $hash->{PIN};
+	return 0 unless ( defined $firmata and defined $pin );
+	$hash->{ALARMDEVS} = undef;			
+	$firmata->onewire_search_alarms($hash->{PIN});
+	my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+	for (my $i=0;$i<$times;$i++) {
+		if (FRM_poll($hash->{IODev})) {
+			if (defined $hash->{ALARMDEVS}) {
+				return 1;
+			}
+		} else {
+			select (undef,undef,undef,0.05);
+		}
+	}
+	$hash->{ALARMDEVS} = [];
+	return 1;
 }
 
 sub FRM_OWX_Reset {
