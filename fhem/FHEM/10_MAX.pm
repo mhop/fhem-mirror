@@ -334,10 +334,19 @@ MAX_Set($@)
       return ($hash->{IODev}{Send})->($hash->{IODev},"ShutterContactState",$dest,$state,"06",undef,undef,$hash->{addr});
     } elsif($hash->{type} eq "WallMountedThermostat") {
       return "Invalid number of arguments" if(@args != 3);
-      my $desiredTemperature = $args[1];
-      my $measuredTemperature = $args[2];
+
+      return "desiredTemperature is invalid" if($args[1] < 4.5 || $args[2] > 30.5);
+
+      $args[2] = 0 if($args[2] < 0); #Clamp temperature to minimum of 0 degree
+
+      #Encode into binary form
+      my $arg2 = int(10*$args[2]);
+      #First bit is 9th bit of temperature, rest is desiredTemperature
+      my $arg1 = (($arg2&0x100)>>1) | (int(2*$args[1])&0x7F);
+      $args2 &= 0xFF;
+
       return ($hash->{IODev}{Send})->($hash->{IODev},"WallThermostatState",$dest,
-        sprintf("%02x%02x",int($desiredTemperature*2),int($measuredTemperature*10)),"04",undef,undef,$hash->{addr});
+        sprintf("%02x%02x",$arg1,$arg2),"04",undef,undef,$hash->{addr});
     } else {
       return "fake does not work for device type $hash->{type}";
     }
