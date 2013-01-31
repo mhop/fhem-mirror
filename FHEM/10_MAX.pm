@@ -5,6 +5,7 @@
 # TODO:
 # - Bounds checking in "fake", allow temperature above 25.5
 # - Defer updating of state until Ack
+# - Send RemoveGroupId packet if groupid is set to 0
 package main;
 
 use strict;
@@ -68,19 +69,29 @@ my %readingDef = ( #min/max/default
                  "01" => "PairPong",
                  "02" => "Ack",
                  "03" => "TimeInformation",
+
                  "10" => "ConfigWeekProfile",
                  "11" => "ConfigTemperatures", #like eco/comfort etc
                  "12" => "ConfigValve",
-                 "30" => "ShutterContactState",
-                 "42" => "WallThermostatState", #by WallMountedThermostat
-                 "50" => "PushButtonState",
-                 "60" => "ThermostatState", #by HeatingThermostat
-                 "40" => "SetTemperature", #to thermostat
+
                  "20" => "AddLinkPartner",
                  "21" => "RemoveLinkPartner",
                  "22" => "SetGroupId",
                  "23" => "RemoveGroupId",
+
+                 "40" => "SetTemperature", #to thermostat
+                 "42" => "WallThermostatState", #by WallMountedThermostat
+                 #Sending this without payload to thermostat sets desiredTempeerature to the comfort/eco temperature
+                 #We don't use it, we just do SetTemperature
+                 "43" => "SetComfortTemperature",
+                 "44" => "SetEcoTemperature",
+
+                 "50" => "PushButtonState",
+
+                 "60" => "ThermostatState", #by HeatingThermostat
+
                  "82" => "SetDisplayActualTemperature",
+
                  "F1" => "WakeUp",
                  "F0" => "Reset",
                );
