@@ -79,6 +79,8 @@ my %readingDef = ( #min/max/default
                  "22" => "SetGroupId",
                  "23" => "RemoveGroupId",
 
+                 "30" => "ShutterContactState",
+
                  "40" => "SetTemperature", #to thermostat
                  "42" => "WallThermostatState", #by WallMountedThermostat
                  #Sending this without payload to thermostat sets desiredTempeerature to the comfort/eco temperature
