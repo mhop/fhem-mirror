@@ -535,179 +535,181 @@ DbLog_Get($@)
     $sqlspec{all}  = "";
   }
 
-   for(my $i=0; $i<int(@readings); $i++) {
-   # ueber alle Readings
-   # Variablen initialisieren
-   $min[$i]   =  999999;
-   $max[$i]   = -999999;
-   $sum[$i]   = 0;
-   $cnt[$i]   = 0;
-   $lastv[$i] = 0;
-   $lastd[$i] = "undef";
-   $minval    =  999999;
-   $maxval    = -999999;
+  for(my $i=0; $i<int(@readings); $i++) {
+    # ueber alle Readings
+    # Variablen initialisieren
+    $min[$i]   =  999999;
+    $max[$i]   = -999999;
+    $sum[$i]   = 0;
+    $cnt[$i]   = 0;
+    $lastv[$i] = 0;
+    $lastd[$i] = "undef";
+    $minval    =  999999;
+    $maxval    = -999999;
 
-  my $stm= "SELECT
-        $sqlspec{get_timestamp},
-        DEVICE,
-        READING,
-        VALUE
-		    $sqlspec{all}
-      FROM history
-      WHERE 1=1
-        AND $sqlspec{reading_clause} = ('".$readings[$i]->[0]."|".$readings[$i]->[1]."')
-        AND TIMESTAMP > $sqlspec{from_timestamp}
-        AND TIMESTAMP < $sqlspec{to_timestamp}
-      ORDER BY TIMESTAMP";
+    my $stm= "SELECT
+          $sqlspec{get_timestamp},
+          DEVICE,
+          READING,
+          VALUE
+  		    $sqlspec{all}
+        FROM history
+        WHERE 1=1
+          AND $sqlspec{reading_clause} = ('".$readings[$i]->[0]."|".$readings[$i]->[1]."')
+          AND DEVICE  = '".$readings[$i]->[0]."'
+          AND READING = '".$readings[$i]->[1]."'
+          AND TIMESTAMP > $sqlspec{from_timestamp}
+          AND TIMESTAMP < $sqlspec{to_timestamp}
+        ORDER BY TIMESTAMP";
 
-  Log GetLogLevel($hash->{NAME},5), "Executing $stm";
+    Log GetLogLevel($hash->{NAME},5), "Executing $stm";
 
-  my $sth= $dbh->prepare($stm) ||
-    return "Cannot prepare statement $stm: $DBI::errstr";
-  my $rc= $sth->execute() ||
-    return "Cannot execute statement $stm: $DBI::errstr";
+    my $sth= $dbh->prepare($stm) ||
+      return "Cannot prepare statement $stm: $DBI::errstr";
+    my $rc= $sth->execute() ||
+      return "Cannot execute statement $stm: $DBI::errstr";
 
-  if(uc($outf) eq "ALL") {
-	$retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
-	$retval .= "=====================================================\n";
-  }
-  while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit)= $sth->fetchrow_array) {
-    $writeout   = 0;
-    $out_value  = "";
-    $out_tstamp = "";
-
-    ############ Auswerten des 5. Parameters: Regexp ###################
-    if($readings[$i]->[4] && $readings[$i]->[4]) {
-      #evaluate
-      my $val = $sql_value;
-      eval("$readings[$i]->[4]");
-      $sql_value = $val;
-      if($@) {Log 3, "DbLog: Fehler in der Ã¼bergebenen Funktion: <".$readings[$i]->[4].">, Fehler: $@";}
-      $out_tstamp = $sql_timestamp;
-      $writeout=1;
-    }
-
-    ############ Auswerten des 4. Parameters: function ###################
-    if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {
-      #nur den integerwert uebernehmen falls zb value=15°C
-      $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
-      $out_tstamp = $sql_timestamp;
-      $writeout=1;
-
-    } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {
-      #?bernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
-      $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
-      $out_tstamp = $sql_timestamp;
-      $writeout=1;
-
-    } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {
-      #Berechnung eines Stundenwertes
-      %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-      if($lastd[$i] eq "undef") {
-        %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-      } else {
-        %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-      }
-      if("$tstamp{hour}" ne "$lasttstamp{hour}") {
-        # Aenderung der stunde, Berechne Delta
-        $out_value = sprintf("%0.1f", $maxval - $minval);
-        $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
-        $minval =  999999;
-        $maxval = -999999;
-        $writeout=1;
-      }
-    } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {
-      #Berechnung eines Tageswertes
-      %tstamp = DbLog_explode_datetime($sql_timestamp, ());
-      if($lastd[$i] eq "undef") {
-        %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
-      } else {
-        %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
-      }
-      if("$tstamp{day}" ne "$lasttstamp{day}") {
-        # Aenderung des Tages, Berechne Delta
-        $out_value = sprintf("%0.1f", $maxval - $minval);
-        $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00");
-        $minval =  999999;
-        $maxval = -999999;
-        $writeout=1;
-      }
-    } else {
-      $out_value = $sql_value;
-      $out_tstamp = $sql_timestamp;
-      $writeout=1;
-    }
-
-    ###################### Ausgabe ###########################
-    if($writeout) {
-	  if(uc($outf) eq "ALL") {
-	    $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
-	  } else {
-	    $out_tstamp =~ s/\ /_/g; #needed by generating plots
-	    $retval .= "$out_tstamp $out_value\n";
-	  }
-	}
-
-    if(defined($sql_value) || $sql_value =~ m/^[-\.\d]+$/o){
-      #nur setzen wenn nummerisch
-      $min[$i] = $sql_value if($sql_value < $min[$i]);
-      $max[$i] = $sql_value if($sql_value > $max[$i]);;
-      $sum[$i] += $sql_value;
-      $minval = $sql_value if($sql_value < $minval);
-      $maxval = $sql_value if($sql_value > $maxval);
-    } else {
-      $min[$i] = 0;
-      $max[$i] = 0;
-      $sum[$i] = 0;
-      $minval  = 0;
-      $maxval  = 0;
-    }
-    $cnt[$i]++;
-    $lastv[$i] = $sql_value;
-    $lastd[$i] = $sql_timestamp;
-
-  } #while fetchrow
-
-  ######## den letzten Abschlusssatz rausschreiben ##########
-  if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
-    $out_value = sprintf("%0.1f", $maxval - $minval);
-    $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
-    $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
     if(uc($outf) eq "ALL") {
-	  $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
-	} else {
-	  $out_tstamp =~ s/\ /_/g; #needed by generating plots
-	  $retval .= "$out_tstamp $out_value\n";
-	}
-  }
-  # DatenTrenner setzen
-  $retval .= "#$readings[$i]->[0]";
-  $retval .= ":";
-  $retval .= "$readings[$i]->[1]" if($readings[$i]->[1]);
-  $retval .= ":";
-  $retval .= "$readings[$i]->[2]" if($readings[$i]->[2]);
-  $retval .= ":";
-  $retval .= "$readings[$i]->[3]" if($readings[$i]->[3]);
-  $retval .= ":";
-  $retval .= "$readings[$i]->[4]" if($readings[$i]->[4]);
-  $retval .= "\n";
+    	$retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
+    	$retval .= "=====================================================\n";
+    }
+    while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit)= $sth->fetchrow_array) {
+      $writeout   = 0;
+      $out_value  = "";
+      $out_tstamp = "";
+
+      ############ Auswerten des 5. Parameters: Regexp ###################
+      if($readings[$i]->[4] && $readings[$i]->[4]) {
+        #evaluate
+        my $val = $sql_value;
+        eval("$readings[$i]->[4]");
+        $sql_value = $val;
+        if($@) {Log 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Fehler: $@";}
+        $out_tstamp = $sql_timestamp;
+        $writeout=1;
+      }
+
+      ############ Auswerten des 4. Parameters: function ###################
+      if($readings[$i]->[3] && $readings[$i]->[3] eq "int") {
+        #nur den integerwert uebernehmen falls zb value=15°C
+        $out_value = $1 if($sql_value =~ m/^(\d+).*/o);
+        $out_tstamp = $sql_timestamp;
+        $writeout=1;
+
+      } elsif ($readings[$i]->[3] && $readings[$i]->[3] =~ m/^int(\d+).*/o) {
+        #Übernehme den Dezimalwert mit den angegebenen Stellen an Nachkommastellen
+        $out_value = $1 if($sql_value =~ m/^([-\.\d]+).*/o);
+        $out_tstamp = $sql_timestamp;
+        $writeout=1;
+
+      } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-h") {
+        #Berechnung eines Stundenwertes
+        %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+        if($lastd[$i] eq "undef") {
+          %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+        } else {
+          %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
+        }
+        if("$tstamp{hour}" ne "$lasttstamp{hour}") {
+          # Aenderung der stunde, Berechne Delta
+          $out_value = sprintf("%0.1f", $maxval - $minval);
+          $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00");
+          $minval =  999999;
+          $maxval = -999999;
+          $writeout=1;
+        }
+      } elsif ($readings[$i]->[3] && $readings[$i]->[3] eq "delta-d") {
+        #Berechnung eines Tageswertes
+        %tstamp = DbLog_explode_datetime($sql_timestamp, ());
+        if($lastd[$i] eq "undef") {
+          %lasttstamp = DbLog_explode_datetime($sql_timestamp, ());
+        } else {
+          %lasttstamp = DbLog_explode_datetime($lastd[$i], ());
+        }
+        if("$tstamp{day}" ne "$lasttstamp{day}") {
+          # Aenderung des Tages, Berechne Delta
+          $out_value = sprintf("%0.1f", $maxval - $minval);
+          $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00");
+          $minval =  999999;
+          $maxval = -999999;
+          $writeout=1;
+        }
+      } else {
+        $out_value = $sql_value;
+        $out_tstamp = $sql_timestamp;
+        $writeout=1;
+      }
+
+      ###################### Ausgabe ###########################
+      if($writeout) {
+    	  if(uc($outf) eq "ALL") {
+    	    $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+    	  } else {
+    	    $out_tstamp =~ s/\ /_/g; #needed by generating plots
+    	    $retval .= "$out_tstamp $out_value\n";
+    	  }
+      }
+
+      if(defined($sql_value) || $sql_value =~ m/^[-\.\d]+$/o){
+        #nur setzen wenn nummerisch
+        $min[$i] = $sql_value if($sql_value < $min[$i]);
+        $max[$i] = $sql_value if($sql_value > $max[$i]);;
+        $sum[$i] += $sql_value;
+        $minval = $sql_value if($sql_value < $minval);
+        $maxval = $sql_value if($sql_value > $maxval);
+      } else {
+        $min[$i] = 0;
+        $max[$i] = 0;
+        $sum[$i] = 0;
+        $minval  = 0;
+        $maxval  = 0;
+      }
+      $cnt[$i]++;
+      $lastv[$i] = $sql_value;
+      $lastd[$i] = $sql_timestamp;
+
+    } #while fetchrow
+
+    ######## den letzten Abschlusssatz rausschreiben ##########
+    if($readings[$i]->[3] && ($readings[$i]->[3] eq "delta-h" || $readings[$i]->[3] eq "delta-d")) {
+      $out_value = sprintf("%0.1f", $maxval - $minval);
+      $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
+      $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
+      if(uc($outf) eq "ALL") {
+  	    $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+    	} else {
+    	  $out_tstamp =~ s/\ /_/g; #needed by generating plots
+    	  $retval .= "$out_tstamp $out_value\n";
+    	}
+    }
+    # DatenTrenner setzen
+    $retval .= "#$readings[$i]->[0]";
+    $retval .= ":";
+    $retval .= "$readings[$i]->[1]" if($readings[$i]->[1]);
+    $retval .= ":";
+    $retval .= "$readings[$i]->[2]" if($readings[$i]->[2]);
+    $retval .= ":";
+    $retval .= "$readings[$i]->[3]" if($readings[$i]->[3]);
+    $retval .= ":";
+    $retval .= "$readings[$i]->[4]" if($readings[$i]->[4]);
+    $retval .= "\n";
   } #for @readings
 
   #Ueberfuehren der gesammelten Werte in die globale Variable %data
   for(my $j=0; $j<int(@readings); $j++) {
-   my $k = $j+1;
-   $data{"min$k"} = $min[$j] == 999999 ? "undef" : $min[$j];
-   $data{"max$k"} = $max[$j] == -999999 ? "undef" : $max[$j];
-   $data{"avg$k"} = $cnt[$j] ? sprintf("%0.1f", $sum[$j]/$cnt[$j]) : "undef";
-   $data{"sum$k"} = $sum[$j];
-   $data{"cnt$k"} = $cnt[$j] ? $cnt[$j] : "undef";
-   $data{"currval$k"} = $lastv[$j];
-   $data{"currdate$k"} = $lastd[$j];
+    my $k = $j+1;
+    $data{"min$k"} = $min[$j] == 999999 ? "undef" : $min[$j];
+    $data{"max$k"} = $max[$j] == -999999 ? "undef" : $max[$j];
+    $data{"avg$k"} = $cnt[$j] ? sprintf("%0.1f", $sum[$j]/$cnt[$j]) : "undef";
+    $data{"sum$k"} = $sum[$j];
+    $data{"cnt$k"} = $cnt[$j] ? $cnt[$j] : "undef";
+    $data{"currval$k"} = $lastv[$j];
+    $data{"currdate$k"} = $lastd[$j];
   }
 
   if($internal) {
-  $internal_data = \$retval;
-  return undef;
+    $internal_data = \$retval;
+    return undef;
   }
   return $retval;
 }
@@ -869,8 +871,8 @@ DbLog_Get($@)
   <a name="DbLogattr"></a>
   <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
-=end html
 
+=end html
 =begin html_DE
 
 <a name="DbLog"></a>
@@ -1032,6 +1034,7 @@ DbLog_Get($@)
   <a name="DbLogattr"></a>
   <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
+
 =end html_DE
 =cut
 
