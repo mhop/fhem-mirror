@@ -919,7 +919,7 @@ CUL_HM_Parse($$)
     }
     elsif ($msgType eq "41"){ #Alarm detected
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
-	  if($dhash && $dhash ne $sHash){ # update source (ID is reported in $dst...)
+	  if($dhash && $dname ne $name){ # update source (ID is reported in $dst...)
 	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
 		  $dhash->{helper}{alarmNo} = $No;
 		  readingsSingleUpdate($dhash,'state',(($state eq "01")?"off":"smoke-Alarm"),1);
