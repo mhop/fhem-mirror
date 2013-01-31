@@ -12,7 +12,7 @@ dummy_Initialize($)
 
   $hash->{SetFn}     = "dummy_Set";
   $hash->{DefFn}     = "dummy_Define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 setList";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 setList ". $readingFnAttributes;
 }
 
 ###################################
@@ -29,10 +29,7 @@ dummy_Set($@)
   my $v = join(" ", @a);
   Log GetLogLevel($name,2), "dummy set $name $v";
 
-  $hash->{CHANGED}[0] = $v;
-  $hash->{STATE} = $v;
-  $hash->{READINGS}{state}{TIME} = TimeNow();
-  $hash->{READINGS}{state}{VAL} = $v;
+  readingsSingleUpdate($hash,"state",$v,1);
   return undef;
 }
 
@@ -93,6 +90,7 @@ dummy_Define($$)
         so the FHEMWEB frontend can construct a dropdown and offer on/off
         switches. Example: attr dummyName setList on off
         </li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 
