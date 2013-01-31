@@ -3,7 +3,7 @@
 --
 
 SET statement_timeout = 0;
-SET client_encoding = 'SQL_ASCII';
+SET client_encoding = 'UTF8';
 SET standard_conforming_strings = off;
 SET check_function_bodies = false;
 SET client_min_messages = warning;
@@ -69,7 +69,7 @@ ALTER TABLE fhem.history OWNER TO fhem;
 -- Name: reading; Type: INDEX; Schema: fhem; Owner: fhem; Tablespace: 
 --
 
-CREATE INDEX reading ON history USING btree (((((device)::text || '|'::text) || (reading)::text)), "timestamp");
+CREATE INDEX search_Idx ON history USING btree (((((device)::text || '|'::text) || (reading)::text)), "timestamp");
 
 
 --
