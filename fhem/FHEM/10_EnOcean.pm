@@ -1,5 +1,10 @@
 ##############################################
 # $Id$
+# 2013-01-31 klaus.schauer
+# eltakoDimmer: dimspeed corrections ($dimTime)
+# Log $ll2: patch Rocker Switch logging
+# attr subDef: $subDef = $hash->{DEF} if attr subDef is not defined
+# Rocker Switch (PTM200): enable attr subDef
 package main;
 
 use strict;
@@ -172,12 +177,12 @@ EnOcean_Set($@)
       my $sendDimCmd=0;
       my $dimTime=AttrVal($name, "dimTime", 0);
       my $onoff=1;
-      my $subDef = AttrVal($name, "subDef", "");
+      my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
       my $dimVal=$hash->{READINGS}{dimValue}{VAL};
 
       if($cmd eq "teach") {
         my $data=sprintf("A502000000%s00", $subDef);
-        Log $ll2, "EnOcean: set $name $cmd SenderID: $subDef";
+        Log $ll2, "EnOcean: set $name $cmd DefID: $hash->{DEF} SenderID: $subDef";
         # len:000a optlen:00 pakettype:1(radio)
         IOWrite($hash, "000A0001", $data);
 
@@ -188,7 +193,7 @@ EnOcean_Set($@)
         $dimVal=$a[1];
         shift(@a);
         if(defined($a[1])) { 
-          $dimTime=sprintf("%x",(($a[1]*2.55)-255)*-1); 
+          $dimTime=sprintf("%X",(($a[1]*2.55)-255)*-1); 
           shift(@a); 
         }
         $sendDimCmd=1;
@@ -198,7 +203,7 @@ EnOcean_Set($@)
         $dimVal+=$a[1];
         shift(@a);
         if(defined($a[1])) {
-          $dimTime=$a[1];
+          $dimTime=sprintf("%X",(($a[1]*2.55)-255)*-1); 
           shift(@a);
         }
         $sendDimCmd=1;
@@ -207,7 +212,10 @@ EnOcean_Set($@)
         return "Usage: $cmd percent [dimspeed 1-100]" if(@a<2 or $a[1]>100);
         $dimVal-=$a[1];
         shift(@a);
-          if(defined($a[1])) { $dimTime=$a[1]; shift(@a); }
+        if(defined($a[1])) {
+          $dimTime=sprintf("%X",(($a[1]*2.55)-255)*-1); 
+          shift(@a);
+        }
         $sendDimCmd=1;
 
       } elsif($cmd eq "on" || $cmd eq "B0") {
@@ -243,11 +251,11 @@ EnOcean_Set($@)
     ###########################
     } elsif($st eq "eltakoShutter") {
       my $shutTime=AttrVal($name, "shutTime", 0);
-      my $subDef = AttrVal($name, "subDef", "");
+      my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
       my $shutCmd = 0x00; 
       if($cmd eq "teach") {
         my $data=sprintf("A5FFF80D80%s00", $subDef);
-        Log $ll2, "EnOcean: set $name $cmd SenderID: $subDef";
+        Log $ll2, "EnOcean: set $name $cmd DefID: $hash->{DEF} SenderID: $subDef";
         # len:000a optlen:00 pakettype:1(radio)
         IOWrite($hash, "000A0001", $data);
 
@@ -289,15 +297,14 @@ EnOcean_Set($@)
       }    
 
     ###########################
-    } else {                                          # Simulate a PTM
+    # Rocker Switch, simulate a PTM200 switch module
+    } else {
       my ($c1,$c2) = split(",", $cmd, 2);
-
       if(!defined($EnO_ptm200btn{$c1}) ||
           ($c2 && !defined($EnO_ptm200btn{$c2}))) {
         my $list = join(" ", sort keys %EnO_ptm200btn);
         return SetExtensions($hash, $list, $name, @a);
       }
-
       my ($db_3, $status) = split(":", $EnO_ptm200btn{$c1}, 2);
       $db_3 <<= 5;
       $db_3 |= 0x10 if($c1 ne "released"); # set the pressed flag
@@ -305,9 +312,9 @@ EnOcean_Set($@)
         my ($d2, undef) = split(":", $EnO_ptm200btn{$c2}, 2);
         $db_3 |= ($d2<<1) | 0x01;
       }
-      IOWrite($hash, "",
-              sprintf("6B05%02X000000%s%s", $db_3, $hash->{DEF}, $status));
-
+      my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
+      IOWrite($hash, "", sprintf("6B05%02X000000%s%s", $db_3, $subDef, $status));
+      Log $ll2, "EnOcean: set $name $cmd";
     }
 
     select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
@@ -670,8 +677,9 @@ EnOcean_A5Cmd($$$)
         issue switch off command.</li>
     </ul>
     </li>
-	
-    <li>subType eltakoShutter, tested with Eltako devices only
+    <b>Note</b>: <a href="#setExtensions">set extensions</a> are supported
+    
+    <li>subType eltakoShutter, tested with Eltako devices only (additionally set attr model to FSB61)
     <ul>
       <li>teach<br>
         initiate teach-in mode</li>
@@ -740,6 +748,15 @@ EnOcean_A5Cmd($$$)
       Should by filled via a notify from a distinct temperature sensor. If
       absent, the reported temperature from the MD15 is used.
       </li>
+    <li><a name="subDef">subDef</a><br>
+      SenderID (TCM BaseID + offset) to control a bidirectional switch or actor
+      </li><br>
+      In order to control bidirectional devices, you cannot reuse the ID of this
+      devices, instead you have to create your own, which must be in the
+      allowed ID-Range of the underlying IO device. For this first query the
+      TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
+      up to 128 ID's starting with the base shown there.<br>
+      subDef is supported for switch devices, eltakoDimmer and eltakoShutter.
   </ul>
   <br>
 
@@ -761,12 +778,14 @@ EnOcean_A5Cmd($$$)
          <li>&lt;BtnX,BtnY&gt; where BtnX and BtnY is one of the above, e.g.
              A0,BI or D0,CI</li>
          <li>buttons:released</li>
-         <li>buttons:<BtnX> released</li>
+         <li>buttons:&lt;BtnX&gt; released</li>
          <br>
      </ul></li>
 
      <li>FSB61/FSM61 (set model to FSB61 or FSM61 manually)<br>
-     <ul>di
+     <ul>
+        <li>B0</li>
+        <li>BI</li>
         <li>released<br>
           The status of the device may become "released", this is not the case
           for a normal switch.</li>
