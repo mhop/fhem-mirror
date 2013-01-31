@@ -61,6 +61,8 @@
   - feature: added new command 'notice'. (M. Fischer)
   - change:  update supports the display and confirmation of system messages
              via the new notice command (M. Fischer)
+  - change:  BS, USF1000, dummy migrated to readingsFN (Boris)
+  
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
