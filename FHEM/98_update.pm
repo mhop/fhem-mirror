@@ -150,10 +150,18 @@ update_CheckNotice($)
   my $moddir  = "$modpath/FHEM";
   my $noticeDir = "$moddir/FhemUtils";
   my $ret;
+  my $result;
 
-  my @published   = split(",",AnalyzeCommandChain(undef, "notice get update 6"));
-  my @unconfirmed = split(",",AnalyzeCommandChain(undef, "notice get update 7"));
-  my @confirmed   = split(",",AnalyzeCommandChain(undef, "notice get update 8"));
+  my @published;
+  my @unconfirmed;
+  my @confirmed;
+
+  $result      = AnalyzeCommandChain(undef, "notice get update 6");
+  @published   = split(",",$result) if($result);
+  $result      = AnalyzeCommandChain(undef, "notice get update 7");
+  @unconfirmed = split(",",$result) if($result);
+  $result      = AnalyzeCommandChain(undef, "notice get update 8");
+  @confirmed   = split(",",$result) if($result);
 
   # remove confirmed from published
   my %c;
@@ -621,6 +629,7 @@ update_GetRemoteFiles($$$)
       next if ($mkdir);
 
       if (open (FH, ">$localFile")) {
+        binmode FH;
         print FH $fileContent;
         close (FH);
         Log 5, "update write $localFile";

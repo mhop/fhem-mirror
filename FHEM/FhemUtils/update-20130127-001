@@ -5,7 +5,7 @@
 # EXPIRE: 0
 # POSITION: before
 # KEY_1: sendStatistics
-# VAL_1: AttrVal("global","sendStatistics",undef);
+# VAL_1: AttrVal("global","sendStatistics","");
 # CON_1: !empty
 # TITLE_DE: Das FHEM-Projekt moechte Dich um Deine Unterstuetzung bitten!
 # NOTICE_DE
