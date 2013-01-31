@@ -500,7 +500,7 @@ notice_Confirmation($$$)
   my ($noticeDir,$id,$confirmation) = @_;
   my @file;
   my $confirmed = 0;
-  my $oldConfirmation;
+  my $oldConfirmation = "";
   my $dateTime;
   my $now = TimeNow();
   my $ret;
