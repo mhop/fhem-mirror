@@ -343,7 +343,7 @@ MAX_Set($@)
       my $arg2 = int(10*$args[2]);
       #First bit is 9th bit of temperature, rest is desiredTemperature
       my $arg1 = (($arg2&0x100)>>1) | (int(2*$args[1])&0x7F);
-      $args2 &= 0xFF;
+      $arg2 &= 0xFF; #only take the lower 8 bits
 
       return ($hash->{IODev}{Send})->($hash->{IODev},"WallThermostatState",$dest,
         sprintf("%02x%02x",$arg1,$arg2),"04",undef,undef,$hash->{addr});
