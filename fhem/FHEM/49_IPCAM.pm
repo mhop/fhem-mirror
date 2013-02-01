@@ -1,4 +1,5 @@
 # $Id$
+# vim: ts=2:et
 ################################################################
 #
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
@@ -34,6 +35,14 @@ my %gets = (
   "snapshots" => "",
 );
 
+my %sets = (
+  "cmd"   => "",
+  "pan"   => "left,right",
+  "pos"   => "",
+  "tilt"  => "up,down",
+  "raw"   => "",
+);
+
 #####################################
 sub
 IPCAM_Initialize($$)
@@ -43,7 +52,13 @@ IPCAM_Initialize($$)
   $hash->{DefFn}    = "IPCAM_Define";
   $hash->{UndefFn}  = "IPCAM_Undef";
   $hash->{GetFn}    = "IPCAM_Get";
-  $hash->{AttrList} = "delay credentials path query snapshots storage timestamp:0,1 ".
+  $hash->{SetFn}    = "IPCAM_Set";
+  $hash->{AttrList} = "basicauth delay credentials path pathCmd pathPanTilt query snapshots storage timestamp:0,1 ".
+                      "cmdPanLeft cmdPanRight cmdTiltUp cmdTiltDown cmdStep ".
+                      "cmdPos01 cmdPos02 cmdPos03 cmdPos04 cmdPos05 cmdPos06 cmdPos07 cmdPos08 ".
+                      "cmdPos09 cmdPos10 cmdPos11 cmdPos12 cmdPos13 cmdPos14 cmdPos15 cmdPosHome ".
+                      "cmd01 cmd02 cmd03 cmd04 cmd05 cmd06 cmd07 cmd08 ".
+                      "cmd09 cmd10 cmd11 cmd12 cmd13 cmd14 cmd15 ".
                       "do_not_notify:1,0 showtime:1,0 ".
                       "loglevel:0,1,2,3,4,5,6 disable:0,1 ".
                       $readingFnAttributes;
@@ -79,6 +94,146 @@ IPCAM_Undef($$) {
 
   delete($modules{IPCAM}{defptr}{$hash->{NAME}});
   RemoveInternalTimer($hash);
+
+  return undef;
+}
+
+#####################################
+sub
+IPCAM_Set($@) {
+  my ($hash, @a) = @_;
+  my $name = $hash->{NAME};
+  my @camCmd;
+
+  # check argument
+  return "Unknown argument $a[1], choose one of ".join(" ", sort keys %sets)
+    if(!defined($sets{$a[1]}));
+
+  shift @a;
+  my $cmd = $a[0];
+  shift @a;
+  my @args = @a;
+
+  if($cmd eq "pan" || $cmd eq "tilt") {
+
+    # check syntax
+    return "argument is missing for $cmd"
+      if(int(@args) < 1);
+
+    return "Unknown argument $args[0], choose one of ".join(" ", split(",",$sets{$cmd}))
+      if($sets{$cmd} !~ /$args[0]/);
+
+    return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
+           "'attr $name cmd".ucfirst($cmd).ucfirst($args[0])." <your_camera_command>'"
+      if(!defined(AttrVal($name,"cmd".ucfirst($cmd).ucfirst($args[0]),undef)));
+
+    return "Wrong argument $args[1], only one digit for a step size is allowed"
+      if(defined($args[1]) && $args[1] !~ /\d+/);
+
+    return "Command for 'step' is not defined. Please add this attribute first: " .
+           "'attr $name cmdStep <your_camera_command>'"
+      if(defined($args[1]) && !defined(AttrVal($name,"cmdStep",undef)));
+
+    push(@camCmd,$attr{$name}{"cmd".ucfirst($cmd).ucfirst($args[0])});
+    push(@camCmd,$attr{$name}{"cmdStep"}."=".$args[1])
+      if(defined($args[1]));
+
+  } elsif($cmd eq "pos") {
+
+    # check syntax
+    return "argument is missing for $cmd"
+      if(int(@args) < 1);
+
+    return "Wrong argument $args[0], only digits from 1 to 15 or home are allowed"
+      if(defined($args[0]) && $args[0] !~ /^([1-9]|1[0-5])$/ && $args[0] ne "home");
+    
+    my $arg = ($args[0] =~ /\d+/) ? sprintf("cmdPos%02d",$args[0]) : "cmdPosHome";
+    return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
+           "'attr $name $arg <your_camera_command>'"
+      if(!defined($attr{$name}{$arg}));
+
+    push(@camCmd,$attr{$name}{$arg});
+
+  } elsif($cmd eq "cmd") {
+
+    # check syntax
+    return "argument is missing for $cmd"
+      if(int(@args) < 1);
+
+    return "Wrong argument $args[0], only digits from 1 to 15 are allowed"
+      if(defined($args[0]) && $args[0] !~ /^([1-9]|1[0-5])$/);
+    
+    my $arg = sprintf("cmd%02d",$args[0]);
+    return "Command for '$cmd $args[0]' is not defined. Please add this attribute first: " .
+           "'attr $name $arg <your_camera_command>'"
+      if(!defined($attr{$name}{$arg}));
+
+    push(@camCmd,$attr{$name}{$arg});
+
+  } elsif($cmd eq "raw") {
+
+    # check syntax
+    return "argument is missing for $cmd"
+      if(int(@args) < 1);
+
+    my $arg = "@args";
+    push(@camCmd,$arg);
+
+  }
+  
+  if(@camCmd) {
+    my $camAuth = $hash->{AUTHORITY};
+    my $basicauth = (defined($attr{$name}{basicauth}) ? $attr{$name}{basicauth} : undef);
+    my $camURI;
+    my $camPath = (defined($attr{$name}{path}) ? $attr{$name}{path} : undef);
+    my $camQuery = join("&",@camCmd);
+
+    if(($cmd eq "pan" || $cmd eq "tilt" || $cmd =~ /pos/) && 
+        defined($attr{$name}{pathPanTilt})) {
+        $camPath = $attr{$name}{pathPanTilt};
+    } elsif($cmd eq "cmd" && defined($attr{$name}{pathCmd})) {
+        $camPath = $attr{$name}{pathCmd};
+    } elsif($cmd eq "raw") {
+       $camPath = $camQuery;
+    } else {
+      $camPath = $attr{$name}{path};
+    }
+
+    return "Missing a path value for camURI. Please set attribute 'path', 'pathCmd' and/or 'pathPanTilt' first."
+      if(!$camPath && $cmd ne "raw");
+
+    if($basicauth) {
+      $camURI  = "http://$basicauth" . "@" . "$camAuth/$camPath";
+    } else {
+      $camURI  = "http://$camAuth/$camPath";
+    }
+
+    if($cmd eq "cmd" && defined($attr{$name}{pathCmd})) {
+      $camURI .= "?$camQuery";
+    } elsif($cmd ne "raw") {
+      $camURI .= "&$camQuery";
+    }
+
+    if($camURI =~ m/{USERNAME}/ || $camURI  =~ m/{PASSWORD}/) {
+
+      if(defined($attr{$name}{credentials})) {
+        if(!open(CFG, $attr{$name}{credentials})) {
+          Log 1, "IPCAM $name Cannot open credentials file: $attr{$name}{credentials}";
+          return undef; 
+        }
+        my @cfg = <CFG>;
+        close(CFG);
+        my %credentials;
+        eval join("", @cfg);
+        $camURI =~ s/{USERNAME}/$credentials{$name}{username}/g;
+        $camURI =~ s/{PASSWORD}/$credentials{$name}{password}/g;
+      }
+    }
+      
+    my $camret = GetFileFromURLQuiet($camURI);
+    Log 5, "ipcam return:$camret";
+
+  }
 
   return undef;
 }
@@ -181,6 +336,7 @@ IPCAM_getSnapshot($) {
   my $seqF;
   my $seqL = length($seqImages);
   my $storage = (defined($attr{$name}{storage}) ? $attr{$name}{storage} : "$modpath/www/snapshots");
+  my $basicauth = (defined($attr{$name}{basicauth}) ? $attr{$name}{basicauth} : undef);
   my $timestamp;
 
   #if(!$storage) {
@@ -192,7 +348,11 @@ IPCAM_getSnapshot($) {
   $camQuery = $attr{$name}{query}
     if(defined($attr{$name}{query}) && $attr{$name}{query} ne "");
 
-  $camURI  = "http://$camAuth/$camPath";
+  if($basicauth) {
+    $camURI  = "http://$basicauth" . "@" . "$camAuth/$camPath";
+  } else {
+    $camURI  = "http://$camAuth/$camPath";
+  }
   $camURI .= "?$camQuery" if($camQuery);
 
   if($camURI =~ m/{USERNAME}/ || $camURI  =~ m/{PASSWORD}/) {
@@ -320,77 +480,147 @@ IPCAM_guessFileFormat($) {
   <br>
 
   <a name"IPCAMdefine"></a>
-  <b>Define</b>
+  <strong>Define</strong>
   <ul>
     <code>define &lt;name&gt; IPCAM &lt;ip[:port]&gt;</code>
-    <br><br>
-
-    Defines a network camera device to trigger snapshots on events.<br><br>
-
+    <br>
+    <br>
+    Defines a network camera device to trigger snapshots on events.
+    <br>
+    <br>
     Network cameras (IP cameras) usually have a build-in function to create
     snapshot images. This module enables the event- or time-controlled
-    recording of these images.<br>
+    recording of these images.
+    <br>
     In addition, this module allows the recording of many image formats like
     JPEG, PNG, GIF, TIFF, BMP, ICO, PPM, XPM, XBM and SVG. The only requirement
-    is that the recorded image must be accessible via a URL.<br>
+    is that the recorded image must be accessible via a URL.
+    <br>
     So it is also possible to record images of e.g. a public Weather Camera
-    from the internet or any picture of a website.<br><br>
-
-    Examples:<br><br>
-    A local ip-cam takes 5 snapshots with 10 seconds delay per call:<br>
+    from the internet or any picture of a website.
+    <br>
+    Furthermore, it is possible to control the camera via PTZ-mode or custom commands.
+    <br>
+    <br>
+    Examples:
+    <br>
+    <br>
+    A local ip-cam takes 5 snapshots with 10 seconds delay per call:
+    <br>
     <ul>
       <code>define ipcam IPCAM 192.168.1.205</code><br>
       <code>attr ipcam delay 10</code><br>
       <code>attr ipcam path snapshot.cgi?user=foo&amp;pwd=bar</code><br>
       <code>attr ipcam snapshots 5</code><br>
       <code>attr ipcam storage /srv/share/surveillance/snapshots</code><br>
-    </ul><br>
-
-    A notify on a motion detection of a specified device:<br>
+    </ul>
+    <br>
+    A notify on a motion detection of a specified device:
+    <br>
     <ul>
       <code>define MOTION.not.01 notify GH.ga.SEC.MD.01:.*on.* get ipcam image</code><br>
-    </ul><br>
-
-    Send an eMail after snapshots are taken:<br>
+    </ul>
+    <br>
+    Send an eMail after snapshots are taken:
+    <br>
     <ul>
       <code>define MOTION.not.02 notify ipcam:.*snapshots.* { myEmailFunction("%NAME") }</code><br>
-    </ul><br>
-
-    A public web-cam takes only 1 snapshot per call:<br>
+    </ul>
+    <br>
+    A public web-cam takes only 1 snapshot per call:
+    <br>
     <ul>
       <code>define schloss IPCAM www2.braunschweig.de</code><br>
       <code>attr schloss path webcam/schloss.jpg</code><br>
       <code>attr schloss storage /srv/share/surveillance/snapshots</code><br>
-    </ul><br>
-
-    An at-Job takes every hour a snapshot:<br>
+    </ul>
+    <br>
+    An at-Job takes every hour a snapshot:
+    <br>
     <ul>
       <code>define snapshot_schloss at +*00:01:00 get schloss image</code><br>
-    </ul><br>
-
+    </ul>
+    <br>
+    Move the camera up:
+    <br>
+    <ul>
+      <code>set ipcam tilt up</code>
+    </ul>
+    <br>
+    Move the camera to a the predefined position 4:
+    <br>
+    <ul>
+      <code>set ipcam pos 4</code>
+    </ul>
   </ul>
-
-  <b>Set</b> <ul>N/A</ul><br>
-
+  <br>
+  <br>
+  <a name="IPCAMset"></a>
+  <strong>Set</strong>
+  <ul>
+    <code>set &lt;name&gt; &lt;value&gt; &lt;argument&gt;</code>
+    <br>
+    <br>
+    where <code>value</code> is one of:
+    <br>
+    <ul>
+      <li><code>cmd 1 .. 15</code><br>
+        Sets the camera to a custom defined command. The command must be defined as an
+        attribute first.
+        <br>
+        You can define up to 15 custom commands. The given number always relates to an
+        equivalent attribute <code>cmd&lt;number&gt;</code>.
+      </li>
+      <li><code>pan &lt;direction&gt; [steps]</code><br>
+        Move the camera to the given <code>&lt;direction&gt;</code>, where <code>&lt;direction&gt;</code>
+        could be <code>left</code> or <code>right</code>.
+        <br>
+        The command always relates to an equivalent attribute <code>cmdPan&lt;direction&gt;</code>.
+        <br>
+        Furthermore, a step size can be specified, which relates to the equivalent attribute
+        <code>cmdStep</code>.
+      </li>
+      <li><code>pos 1 .. 15|home</code><br>
+        Sets the camera to a custom defined position in PTZ mode. The position must be
+        defined as an attribute first.
+        <br>
+        You can define up to 15 custom positions and a predefined home position. The given
+        number always relates to an equivalent attribute <code>cmdPos&lt;number&gt;</code>.
+      </li>
+      <li><code>tilt &lt;direction&gt; [steps]</code><br>
+        Move the camera to the given <code>&lt;direction&gt;</code>, where <code>&lt;direction&gt;</code>
+        could be <code>up</code> or <code>down</code>.
+        <br>
+        The command always relates to an equivalent attribute <code>cmdPan&lt;direction&gt;</code>. 
+        <br>
+        Furthermore, a step size can be specified, which relates to the equivalent attribute
+        <code>cmdStep</code>.
+      </li>
+      <li><code>raw &lt;argument&gt;</code><br>
+        Sets the camera to a custom defined <code>argument</code>.
+      </li>
+    </ul>
+  </ul>
+  <br>
+  <br>
   <a name="IPCAMget"></a>
-  <b>Get</b>
+  <strong>Get</strong>
   <ul>
     <code>get &lt;name&gt; &lt;value&gt;</code>
-    <br><br>
-    where <code>value</code> is one of:<br>
+    <br>
+    <br>
+    where <code>value</code> is one of:
+    <br>
     <ul>
-      <li>
-        <code>image</code><br>
+      <li><code>image</code><br>
         Get one or more images of the defined IP-Cam. The number of images<br>
         and the time interval between images can be specified using the<br>
         attributes <code>snapshots</code> and <code>delay</code>.
       </li>
-      <li>
-        <code>last</code><br>
+      <li><code>last</code><br>
         Show the name of the last snapshot.
       </li>
-      <li>
-        <code>snapshots</code><br>
+      <li><code>snapshots</code><br>
         Show the total number of a image sequence.
       </li>
     </ul>
@@ -398,15 +628,50 @@ IPCAM_guessFileFormat($) {
   <br>
 
   <a name="IPCAMattr"></a>
-  <b>Attributes</b>
+  <strong>Attributes</strong>
   <ul>
+    <li>
+      basicauth<br>
+      If your camera supports authentication like <code>http://username:password@domain.com/</code>, you
+      can store your creditials within the <code>basicauth</code> attribute.<br>
+      If you prefer to store the credentials in a file (take a look at the attribute <code>credentials</code>)
+      you have to set the placeholder <code>{USERNAME}</code> and <code>{PASSWORD}</code> in the basicauth string.
+      These placeholders will be replaced with the values from the credentials file.<br>
+      Example:<br> <code>attr ipcam3 basicauth {USERNAME}:{PASSWORD}</code>
+    </li>
+    <li>
+      cmd01, cmd02, cmd03, .. cmd13, cdm14, cdm15<br>
+      It is possible to define up to 15 custom commands.<br>
+      Examples:<br>
+      <code>attr ipcam cmd01 led_mode=0</code><br>
+      <code>attr ipcam cmd02 resolution=8</code><br>
+    </li>
+    <li>
+      cmdPanLeft, cmdPanRight, cmdTiltUp, cmdTiltDown, cmdStep<br>
+      Depending of the camera model, are different commands necessary.<br>
+      Examples:<br>
+      <code>attr ipcam cmdTiltUp command=0</code><br>
+      <code>attr ipcam cmdTiltDown command=2</code><br>
+      <code>attr ipcam cmdPanLeft command=4</code><br>
+      <code>attr ipcam cmdPanRight command=6</code><br>
+      <code>attr ipcam cmdStep onstep</code><br>
+    </li>
+    <li>
+      cmdPos01, cmdPos02, cmdPos03, .. cmdPos13, cmdPos14, cmdPos15, cmdPosHome
+      It is possible to define up to 15 predefined position in PTZ-mode.<br>
+      Examples:<br>
+      <code>attr ipcam cmdPosHome command=25</code><br>
+      <code>attr ipcam cmdPos01 command=31</code><br>
+      <code>attr ipcam cmdPos02 command=33</code><br>
+    </li>
     <li>
       credentials<br>
       Defines the location of the credentials file.<br>
       If you prefer to store your cam credentials in a file instead be a part of the
       URI (see attributes <code>path</code> and <code>query</code>), set the full path
       with filename on this attribute.<br>
-      Example: <code>attr ipcam3 credentials /etc/fhem/ipcam.conf</code><br><br>
+      Example:<br>
+      <code>attr ipcam3 credentials /etc/fhem/ipcam.conf</code><br><br>
 
       The credentials file has the following structure:<br>
       <pre>
@@ -441,12 +706,27 @@ IPCAM_guessFileFormat($) {
       Defines the path and query component of the complete <a href="http://de.wikipedia.org/wiki/Uniform_Resource_Identifier" target="_blank">URI</a> to get a snapshot of the
       camera. Is the full URI of your ip-cam for example <code>http://CAMERA_IP/snapshot.cgi?user=admin&amp;pwd=password</code>,
       then only the path and query part is specified here (without the leading slash (/).<br>
-      Example: <code>attr ipcam3 path snapshot.cgi?user=admin&amp;pwd=password</code><br><br>
+      Example:<br>
+      <code>attr ipcam3 path snapshot.cgi?user=admin&amp;pwd=password</code><br><br>
 
       If you prefer to store the credentials in a file (take a look at the attribute <code>credentials</code>)
-      you have to set the placeholder <code>USERNAME</code> and <code>PASSWORD</code> in the path string. These placeholders
+      you have to set the placeholder <code>{USERNAME}</code> and <code>{PASSWORD}</code> in the path string. These placeholders
       will be replaced with the values from the credentials file.<br>
-      Example: <code>attr ipcam3 path snapshot.cgi?user=USERNAME&amp;pwd=PASSWORD</code>
+      Example:<br>
+      <code>attr ipcam3 path snapshot.cgi?user={USERNAME}&amp;pwd={PASSWORD}</code>
+    </li>
+    <li>
+      pathCmd<br>
+      Defines a path for the custom commands, if it is necessary.<br>
+      Example:<br>
+      <code>attr ipcam3 pathCmd set_misc.cgi</code>
+    </li>
+    <li>
+      pathPanTilt<br>
+      Defines a path for the PTZ-mode commands <code>pan</code>, <code>tilt</code> and <code>pos</code>,
+      if it is necessary.<br>
+      Example:<br>
+      <code>attr ipcam3 pathPanTilt decoder_control.cgi?user={USERNAME}&amp;pwd={PASSWORD}</code>
     </li>
     <li><a href="#showtime">showtime</a></li>
     <li>
@@ -461,12 +741,15 @@ IPCAM_guessFileFormat($) {
       If you like a timestamp instead a sequentially number, take a look at the attribute <code>timestamp</code>.<br>
       All files are overwritten on every <code>get &lt;name&gt; image</code> command (except: snapshots
       with a timestamp. So, keep an eye on your diskspace if you use a timestamp extension!).<br>
-      Example: <code>attr ipcam3 snapshots 5</code>
+      Example:<br>
+      <code>attr ipcam3 snapshots 5</code>
     </li>
     <li>
       storage<br>
-      Defines the location for the file storage of the snapshots. Default: <code>$modpath/www/snapshots</code><br>
-      Example: <code>attr ipcam3 storage /srv/share/surveillance/snapshots</code>
+      Defines the location for the file storage of the snapshots.<br>
+      Default: <code>$modpath/www/snapshots</code><br>
+      Example:<br>
+      <code>attr ipcam3 storage /srv/share/surveillance/snapshots</code>
     </li>
     <li>
       timestamp<br>
@@ -479,7 +762,7 @@ IPCAM_guessFileFormat($) {
   <br>
 
   <a name="IPCAMevents"></a>
-  <b>Generated events</b>
+  <strong>Generated events</strong>
   <ul>
     <li>last: &lt;name_of_device&gt;_snapshot.&lt;image_extension&gt;</li>
     <li>snapshots: &lt;total_number_of_taken_snapshots_at_end&gt;</li>
@@ -488,6 +771,6 @@ IPCAM_guessFileFormat($) {
 
 </ul>
 
-
 =end html
 =cut
+

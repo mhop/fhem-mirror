@@ -5,6 +5,7 @@ package main;
 use strict;
 use warnings;
 use IO::Socket::INET;
+use MIME::Base64;
 
 my %ext2MIMEType= qw{
   txt   text/plain
@@ -62,13 +63,13 @@ CustomGetFileFromURL($$@)
   $loglevel = 1 if(!$loglevel);
 
   my $displayurl= $quiet ? "<hidden>" : $url;
-  if($url !~ /^(http|https):\/\/([^:\/]+)(:\d+)?(\/.*)$/) {
+  if($url !~ /^(http|https):\/\/(([^:\/]+):([^:\/]+)@)?([^:\/]+)(:\d+)?(\/.*)$/) {
     Log $loglevel, "CustomGetFileFromURL $displayurl: malformed or unsupported URL";
     return undef;
   }
   
-  my ($protocol,$host,$port,$path)= ($1,$2,$3,$4);
-
+  my ($protocol,$authstring,$user,$pwd,$host,$port,$path)= ($1,$2,$3,$4,$5,$6,$7);
+  
   if(defined($port)) {
     $port =~ s/^://;
   } else {
@@ -76,6 +77,10 @@ CustomGetFileFromURL($$@)
   }
   $path= '/' unless defined($path);
 
+  my $auth64; 
+  if(defined($authstring)) {
+  	$auth64 = encode_base64("$user:$pwd","");
+  }
 
   my $conn;
   if($protocol eq "https") {
@@ -96,6 +101,9 @@ CustomGetFileFromURL($$@)
 
   $host =~ s/:.*//;
   my $hdr = ($data ? "POST" : "GET")." $path HTTP/1.0\r\nHost: $host\r\n";
+  if(defined($authstring)) {
+    $hdr .= "Authorization: Basic $auth64\r\n";
+  }
   if(defined($data)) {
     $hdr .= "Content-Length: ".length($data)."\r\n";
     $hdr .= "Content-Type: application/x-www-form-urlencoded";
