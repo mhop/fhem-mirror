@@ -650,16 +650,17 @@ CUL_HM_Parse($$)
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	  
 
       # Status-Byte Auswertung
-	  my $stErr = ($err >>1) & 0x7;      
+
+	  my $stErr = ($err >>1) & 0x7;    
+	  push @event,"battery:".(($stErr == 4)?"critical":($err&0x80?"low":"ok"));  
 	  if (!$stErr){#remove both conditions
-        push @event, "battery:ok";
         push @event, "motorErr:ok";
 	  }
 	  else{
         push @event, "motorErr:blocked"                   if($stErr == 1);
         push @event, "motorErr:loose"                     if($stErr == 2);
         push @event, "motorErr:adjusting range too small" if($stErr == 3);
-        push @event, "battery:low"                        if($stErr == 4);
+#		push @event, "battery:critical"                   if($stErr == 4);
 	  }
       push @event, "motor:opening" if(($err&0x30) == 0x10);
       push @event, "motor:closing" if(($err&0x30) == 0x20);
@@ -1447,7 +1448,7 @@ my %culHmRegModel = (
   "HM-LC-Dim2L-SM"  =>{loadAppearBehav =>1,loadErrCalib	  =>1},
   
   "HM-CC-VD"       =>{valveOffset     =>1,valveError      =>1},
-  "HM-PB-4DIS-WM"  =>{language        =>1,stbyTime        =>1},
+  "HM-PB-4DIS-WM"  =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
   "HM-WDS100-C6-O" =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "KS550"          =>{stormUpThresh   =>1,stormLowThresh  =>1},
   "HM-OU-CFM-PL"   =>{localResetDis   =>1,
@@ -3257,7 +3258,8 @@ CUL_HM_getExpertMode($)
   # if expert level is not set try to get it for device
   my ($hash) = @_;
   my $expLvl = AttrVal($hash->{NAME},"expert","");
-  $expLvl = AttrVal({CUL_HM_getDeviceHash($hash)}->{NAME},"expert","0") 
+  my $dHash = CUL_HM_getDeviceHash($hash);
+  $expLvl = AttrVal($dHash->{NAME},"expert","0") 
         if ($expLvl eq "");
   return substr($expLvl,0,1);
 }
