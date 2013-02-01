@@ -65,6 +65,7 @@
   - change:  update supports the display and confirmation of system messages
              via the new notice command (M. Fischer)
   - change:  BS, USF1000, dummy migrated to readingsFN (Boris)
+  - feature: added new set commands and basicauth to 49_IPCAM.pm (M. Fischer)
   
 
 - 2012-10-28 (5.3)
