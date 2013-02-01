@@ -1,4 +1,7 @@
 - SVN
+  - feature: new Module 73_PRESENCE to make automatic presence detection of mobile
+             phones or other mobile devices (like tablets) via ping or 
+             bluetooth checks (by M. Bloch)
   - feature: new Module 98_Heating_Control to switch heatsinks automaticly
              with a weekly profile (by D. Ortmann / T. Faust)
   - feature: new Module 93_DbLog.pm for logging events into Databases. 
