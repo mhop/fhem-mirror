@@ -1,10 +1,9 @@
 # $Id$
 ##############################################################################
 #
-#     72_FB_CALLMONITOR.pm
-#     Connects to a FritzBox Fon via network.
-#     When a call is received or takes place it creates an event with further call informations.
-#     This module has no sets or gets as it is only used for event triggering.
+#     73_PRESENCE.pm
+#     Checks for the presence of a mobile phone or tablet by network ping or bluetooth detection.
+#     It reports the presence of this device as state.
 #
 #     Copyright by Markus Bloch
 #     e-mail: Notausstieg0309@googlemail.com
