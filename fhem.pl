@@ -1143,8 +1143,10 @@ DoSet(@)
   return undef if($skipTrigger);
   shift @a;
 
-  if(!$doTriggerCalled) {  # Backward compatibility. Use readingsUpdate in SetFn now
-    DoTrigger($dev, join(" ", @a), 1);
+  # Backward compatibility. Use readingsUpdate in SetFn now
+  if(!$doTriggerCalled) {
+    my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
+    DoTrigger($dev, $arg, 1);
   }
 
   return undef;
