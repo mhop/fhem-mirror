@@ -199,10 +199,29 @@ sub FRM_DoInit($) {
 								$main::defs{$name}{output_pins} =  join(",", sort{$a<=>$b}(@$outputpins));
 								my $analogpins = $device->{metadata}{analog_pins};
 								$main::defs{$name}{analog_pins} = join(",", sort{$a<=>$b}(@$analogpins));
+								my $pwmpins = $device->{metadata}{pwm_pins};
+								$main::defs{$name}{pwm_pins} = join(",", sort{$a<=>$b}(@$pwmpins));
+								my $servopins = $device->{metadata}{servo_pins};
+								$main::defs{$name}{servo_pins} = join(",", sort{$a<=>$b}(@$servopins));
 								my $i2cpins = $device->{metadata}{i2c_pins};
 								$main::defs{$name}{i2c_pins} = join(",", sort{$a<=>$b}(@$i2cpins));
 								my $onewirepins = $device->{metadata}{onewire_pins};
 								$main::defs{$name}{onewire_pins} = join(",", sort{$a<=>$b}(@$onewirepins));
+								my @analog_resolutions;
+								foreach my $pin (sort{$a<=>$b}(keys $device->{metadata}{analog_resolutions})) {
+									push @analog_resolutions,$pin.":".$device->{metadata}{analog_resolutions}{$pin};
+								}
+								$main::defs{$name}{analog_resolutions} = join(",",@analog_resolutions);
+								my @pwm_resolutions;
+								foreach my $pin (sort{$a<=>$b}(keys $device->{metadata}{pwm_resolutions})) {
+									push @pwm_resolutions,$pin.":".$device->{metadata}{pwm_resolutions}{$pin};
+								}
+								$main::defs{$name}{pwm_resolutions} = join(",",@pwm_resolutions);
+								my @servo_resolutions;
+								foreach my $pin (sort{$a<=>$b}(keys $device->{metadata}{servo_resolutions})) {
+									push @servo_resolutions,$pin.":".$device->{metadata}{servo_resolutions}{$pin};
+								}
+								$main::defs{$name}{servo_resolutions} = join(",",@servo_resolutions);
 								$found = 1;
 								last;
 							}
@@ -248,11 +267,17 @@ FRM_Init_Client($$) {
 }
 
 sub
-FRM_Init_Pin_Client($$) {
-	my ($hash,$args) = @_;
+FRM_Init_Pin_Client($$$) {
+	my ($hash,$args,$mode) = @_;
   	my $u = "wrong syntax: define <name> FRM_XXX pin";
   	return $u if(int(@$args) < 3);
-  	$hash->{PIN} = @$args[2];
+ 	my $pin = @$args[2];
+  	$hash->{PIN} = $pin;
+	if (defined $hash->{IODev} and defined $hash->{IODev}->{FirmataDevice}) {
+		$hash->{IODev}->{FirmataDevice}->pin_mode($pin,$mode);
+		return 1;
+	}
+	return undef;  	
 }
 
 sub
@@ -356,23 +381,21 @@ sub
 FRM_OWX_Init($$)
 {
 	my ($hash,$args) = @_;
-	FRM_Init_Pin_Client($hash,$args);
-	$hash->{INTERFACE} = "firmata";
-	if (defined $hash->{IODev}) {
+	if (FRM_Init_Pin_Client($hash,$args,PIN_ONEWIRE)) {
+		$hash->{INTERFACE} = "firmata";
 		my $firmata = $hash->{IODev}->{FirmataDevice};
-		if (defined $firmata and defined $hash->{PIN}) {
-			my $pin = $hash->{PIN};
-			$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
-			$firmata->pin_mode($pin,PIN_ONEWIRE);
-			$hash->{FRM_OWX_REPLIES} = {};
-			$hash->{DEVS} = [];
-			if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
-				$firmata->onewire_config($pin,1);
-			}
-			main::readingsSingleUpdate($hash,"state","Initialized",1);
-			$firmata->onewire_search($pin);
+		my $pin = $hash->{PIN};
+		$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
+		$hash->{FRM_OWX_REPLIES} = {};
+		$hash->{DEVS} = [];
+		if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+			$firmata->onewire_config($pin,1);
 		}
+		main::readingsSingleUpdate($hash,"state","Initialized",1);
+		$firmata->onewire_search($pin);
+		return undef;
 	}
+	return 1;
 }
 
 sub FRM_OWX_observer

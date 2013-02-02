@@ -17,7 +17,6 @@ FRM_OUT_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_OUT_Init";
   $hash->{UndefFn}   = "FRM_OUT_Undef";
-  $hash->{AttrFn}    = "FRM_Attr";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
@@ -26,14 +25,11 @@ sub
 FRM_OUT_Init($$)
 {
 	my ($hash,$args) = @_;
-	FRM_Init_Pin_Client($hash,$args);
-	if (defined $hash->{IODev}) {
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		if (defined $firmata and defined $hash->{PIN}) {
-			$firmata->pin_mode($hash->{PIN},PIN_OUTPUT);
-			main::readingsSingleUpdate($hash,"state","initialized",1);
-		}
+	if (FRM_Init_Pin_Client($hash,$args,PIN_OUTPUT)) {
+		main::readingsSingleUpdate($hash,"state","Initialized",1);
+		return undef;
 	}
+	return 1;
 }
 
 sub
@@ -85,7 +81,7 @@ FRM_OUT_Undef($$)
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; FRM_OUT &lt;pin&gt;</code> <br>
-  Specifies the FRM_OUT device.
+  Defines the FRM_OUT device. &lt;pin&gt> is the arduino-pin to use.
   </ul>
   
   <br>
