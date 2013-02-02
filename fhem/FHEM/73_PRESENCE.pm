@@ -479,7 +479,7 @@ PRESENCE_ProcessLocalScan($)
     It listens on TCP port 5111 for incoming connections from a FHEM PRESENCE instance or a running collectord.<br>
 <PRE>
 Usage:
-  presenced -d [-p <port>] [-P <filename>]
+  presenced -d [-p &lt;port&gt;] [-P &lt;filename&gt;]
   presenced [-h | --help]
 
 
@@ -516,12 +516,12 @@ Options:
     It listens on TCP port 5222 for incoming connections from a FHEM presence instance.
 <PRE>
 Usage:
-  collectord -c <configfile> [-d] [-p <port>] [-P <pidfile>]
+  collectord -c &lt;configfile&gt; [-d] [-p <port>] [-P &lt;pidfile&gt;]
   collectord [-h | --help]
 
 
 Options:
-  -c, --configfile <configfile>
+  -c, --configfile &lt;configfile&gt;
      The config file which contains the room and timeout definitions
   -p, --port
      TCP Port which should be used (Default: 5222)
@@ -531,7 +531,7 @@ Options:
      detach from terminal and run as background daemon
   -v, --verbose
      Print detailed log output
-  -l, --logfile <logfile>
+  -l, --logfile &lt;logfile&gt;
      log to the given logfile
   -h, --help
      Print detailed help screen
