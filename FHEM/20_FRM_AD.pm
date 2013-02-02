@@ -16,7 +16,6 @@ FRM_AD_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_AD_Init";
   $hash->{UndefFn}   = "FRM_AD_Undef";
-  $hash->{AttrFn}    = "FRM_Attr";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
@@ -25,15 +24,12 @@ sub
 FRM_AD_Init($$)
 {
 	my ($hash,$args) = @_;
-	FRM_Init_Pin_Client($hash,$args);
-	if (defined $hash->{IODev}) {
+	if (FRM_Init_Pin_Client($hash,$args,PIN_ANALOG)) {
 		my $firmata = $hash->{IODev}->{FirmataDevice};
-		if (defined $firmata and defined $hash->{PIN}) {
-			$firmata->pin_mode($hash->{PIN},PIN_ANALOG);
-			$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
-			main::readingsSingleUpdate($hash,"state","initialized",1);
-			return undef;
-		}
+		$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
+		$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
+		main::readingsSingleUpdate($hash,"state","Initialized",1);
+		return undef;
 	}
 	return 1;
 }
@@ -49,15 +45,21 @@ FRM_AD_observer
 sub
 FRM_AD_Get($)
 {
-  my ($hash) = @_;
+  my ($hash,@a) = @_;
   my $iodev = $hash->{IODev};
-  if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
-  	my $ret = $iodev->{FirmataDevice}->analog_read($hash->{PIN});
-  	return $ret;
-  } else {
-  	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
-  	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
+  my $name = shift @a;
+  return $name." no IODev assigned" if (!defined $iodev);
+  return $name.", ".$iodev->{NAME}." is not connected" if (!(defined $iodev->{FirmataDevice} and defined $iodev->{FD}));
+  my $cmd = shift @a;
+  my $ret;
+  ARGUMENT_HANDLER: {
+    $cmd eq "reading" and do {
+  	  $ret = $iodev->{FirmataDevice}->analog_read($hash->{PIN});
+  	  last;
+    };
+    $ret = "unknown command ".$cmd;
   }
+  return $ret;
 }
 
 sub
@@ -76,14 +78,14 @@ FRM_AD_Undef($$)
 <ul>
   represents a pin of an <a href="http://www.arduino.cc">Arduino</a> running <a href="http://www.firmata.org">Firmata</a>
   configured for analog input.<br>
-  The value read is stored in reading 'state'. Range is from 0 to 1.<br>
+  The value read is stored in reading 'state'. Range is from 0 to 1023 (10 Bit)<br>
   Requires a defined <a href="#FRM">FRM</a>-device to work.<br><br> 
   
   <a name="FRM_ADdefine"></a>
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; FRM_AD &lt;pin&gt;</code> <br>
-  Specifies the FRM_AD device.
+  Defines the FRM_AD device. &lt;pin&gt; is the arduino-pin to use.
   </ul>
   
   <br>
@@ -95,7 +97,8 @@ FRM_AD_Undef($$)
   <a name="FRM_ADget"></a>
   <b>Get</b><br>
   <ul>
-  N/A<br>
+  <li>reading<br>
+  returns the voltage-level read on the arduino-pin. Values range from 0 to 1023.<br></li>
   </ul><br>
   <a name="FRM_ADattr"></a>
   <b>Attributes</b><br>

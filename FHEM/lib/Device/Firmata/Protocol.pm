@@ -296,13 +296,13 @@ sub sysex_parse {
 					last;
 				};
 
-				$command == $protocol_commands->{ONEWIRE_REPLY} and do {
+				$command == $protocol_commands->{ONEWIRE_DATA} and do {
 					$return_data = $self->handle_onewire_reply($sysex_data);
 					last;
 				};
 
-				$command == $protocol_commands->{SCHEDULER_REPLY} and do {
-					$return_data = $self->handle_scheduler_reply($sysex_data);
+				$command == $protocol_commands->{SCHEDULER_DATA} and do {
+					$return_data = $self->handle_scheduler_response($sysex_data);
 					last;
 				};
 
@@ -657,15 +657,15 @@ sub packet_i2c_config {
 # * 7  END_SYSEX (0xF7)
 # */
 
-sub packet_servo_config {
+sub packet_servo_config_request {
 
-	my ( $self, $data ) = @_;
+	my ( $self, $pin, $data ) = @_;
 
 	my $min_pulse = $data->{min_pulse};
 	my $max_pulse = $data->{max_pulse};
 
 	return $self->packet_sysex_command( SERVO_CONFIG,
-		$data->{pin} & 0x7f,
+		$pin & 0x7f,
 		$min_pulse & 0x7f,
 		$min_pulse >> 7,
 		$max_pulse & 0x7f,
@@ -693,17 +693,17 @@ sub packet_servo_config {
 
 sub packet_onewire_search_request {
 	my ( $self, $pin ) = @_;
-	return $self->packet_sysex_command( ONEWIRE_REQUEST,$ONE_WIRE_COMMANDS->{SEARCH_REQUEST},$pin);
+	return $self->packet_sysex_command( ONEWIRE_DATA,$ONE_WIRE_COMMANDS->{SEARCH_REQUEST},$pin);
 };
 
 sub packet_onewire_search_alarms_request {
 	my ( $self, $pin ) = @_;
-	return $self->packet_sysex_command( ONEWIRE_REQUEST,$ONE_WIRE_COMMANDS->{SEARCH_ALARMS_REQUEST},$pin);
+	return $self->packet_sysex_command( ONEWIRE_DATA,$ONE_WIRE_COMMANDS->{SEARCH_ALARMS_REQUEST},$pin);
 };
 
 sub packet_onewire_config_request {
 	my ( $self, $pin, $power ) = @_;
-	return $self->packet_sysex_command( ONEWIRE_REQUEST, $ONE_WIRE_COMMANDS->{CONFIG_REQUEST},$pin,
+	return $self->packet_sysex_command( ONEWIRE_DATA, $ONE_WIRE_COMMANDS->{CONFIG_REQUEST},$pin,
 		( defined $power ) ? $power : 1
 	);
 };
@@ -748,7 +748,7 @@ sub packet_onewire_request {
 		my $writeBytes=$args->{write};
 		push @data,@$writeBytes;
 	}
-	return $self->packet_sysex_command( ONEWIRE_REQUEST, $subcommand, $pin, pack_as_7bit(@data));
+	return $self->packet_sysex_command( ONEWIRE_DATA, $subcommand, $pin, pack_as_7bit(@data));
 };
 		
 sub handle_onewire_reply {
@@ -797,49 +797,49 @@ sub handle_onewire_reply {
 
 sub packet_create_task {
 	my ($self,$id,$len) = @_;
-	my $packet = $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{CREATE_FIRMATA_TASK}, $id, $len & 0x7F, $len>>7);
+	my $packet = $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{CREATE_FIRMATA_TASK}, $id, $len & 0x7F, $len>>7);
 	return $packet;
 }
 
 sub packet_delete_task {
 	my ($self,$id) = @_;
-	return $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{DELETE_FIRMATA_TASK}, $id);
+	return $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{DELETE_FIRMATA_TASK}, $id);
 }
 
 sub packet_add_to_task {
 	my ($self,$id,@data) = @_;
-	my $packet = $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{ADD_TO_FIRMATA_TASK}, $id, pack_as_7bit(@data));
+	my $packet = $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{ADD_TO_FIRMATA_TASK}, $id, pack_as_7bit(@data));
 	return $packet;
 }
 
 sub packet_delay_task {
 	my ($self,$time_ms) = @_;
-	my $packet = $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{DELAY_FIRMATA_TASK}, pack_as_7bit($time_ms & 0xFF, ($time_ms & 0xFF00)>>8, ($time_ms & 0xFF0000)>>16,($time_ms & 0xFF000000)>>24));
+	my $packet = $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{DELAY_FIRMATA_TASK}, pack_as_7bit($time_ms & 0xFF, ($time_ms & 0xFF00)>>8, ($time_ms & 0xFF0000)>>16,($time_ms & 0xFF000000)>>24));
 	return $packet;
 }
 
 sub packet_schedule_task {
 	my ($self,$id,$time_ms) = @_;
-	my $packet = $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{SCHEDULE_FIRMATA_TASK}, $id, pack_as_7bit($time_ms & 0xFF, ($time_ms & 0xFF00)>>8, ($time_ms & 0xFF0000)>>16,($time_ms & 0xFF000000)>>24));
+	my $packet = $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{SCHEDULE_FIRMATA_TASK}, $id, pack_as_7bit($time_ms & 0xFF, ($time_ms & 0xFF00)>>8, ($time_ms & 0xFF0000)>>16,($time_ms & 0xFF000000)>>24));
 	return $packet;
 }
 
 sub packet_query_all_tasks {
 	my $self = shift;
-	return $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{QUERY_ALL_FIRMATA_TASKS});
+	return $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{QUERY_ALL_FIRMATA_TASKS});
 }
 
 sub packet_query_task {
 	my ($self,$id) = @_;
-	return $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{QUERY_FIRMATA_TASK},$id);
+	return $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{QUERY_FIRMATA_TASK},$id);
 }
 
 sub packet_reset_scheduler {
 	my $self = shift;
-	return $self->packet_sysex_command('SCHEDULER_REQUEST', $SCHEDULER_COMMANDS->{RESET_FIRMATA_TASKS});
+	return $self->packet_sysex_command('SCHEDULER_DATA', $SCHEDULER_COMMANDS->{RESET_FIRMATA_TASKS});
 }
 
-sub handle_scheduler_reply {
+sub handle_scheduler_response {
 	my ( $self, $sysex_data ) = @_;
 	
 	my $command = shift @$sysex_data;

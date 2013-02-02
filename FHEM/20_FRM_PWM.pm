@@ -16,7 +16,6 @@ FRM_PWM_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_PWM_Init";
   $hash->{UndefFn}   = "FRM_PWM_Undef";
-  $hash->{AttrFn}    = "FIR_Attr";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
@@ -25,14 +24,13 @@ sub
 FRM_PWM_Init($$)
 {
 	my ($hash,$args) = @_;
-	FRM_Init_Pin_Client($hash,$args);
-	if (defined $hash->{IODev}) {
+	if (FRM_Init_Pin_Client($hash,$args,PIN_PWM)) {
 		my $firmata = $hash->{IODev}->{FirmataDevice};
-		if (defined $firmata and defined $hash->{PIN}) {
-			$firmata->pin_mode($hash->{PIN},PIN_PWM);
-			main::readingsSingleUpdate($hash,"state","initialized",1);
-		}
+		$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
+		main::readingsSingleUpdate($hash,"state","Initialized",1);
+		return undef;
 	}
+	return 1;
 }
 
 sub
@@ -74,14 +72,16 @@ FRM_PWM_Undef($$)
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; FRM_PWM &lt;pin&gt;</code> <br>
-  Specifies the FRM_PWM device.
+  Defines the FRM_PWM device. &lt;pin&gt> is the arduino-pin to use.
   </ul>
   
   <br>
   <a name="FRM_PWMset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; &lt;value&gt;</code><br><br>
+  <code>set &lt;name&gt; &lt;value&gt;</code><br>
+  sets the pulse-width of the signal that is output on the configured arduino pin<br>
+  Range is from 0 to 255 (see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)
   </ul>
   <a name="FRM_PWMget"></a>
   <b>Get</b><br>

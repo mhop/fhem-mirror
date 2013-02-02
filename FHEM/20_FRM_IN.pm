@@ -16,7 +16,6 @@ FRM_IN_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_IN_Init";
   $hash->{UndefFn}   = "FRM_IN_Undef";
-  $hash->{AttrFn}    = "FRM_Attr";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
@@ -25,17 +24,14 @@ sub
 FRM_IN_Init($$)
 {
 	my ($hash,$args) = @_;
-	FRM_Init_Pin_Client($hash,$args);
-	if (defined $hash->{IODev}) {
+	if (FRM_Init_Pin_Client($hash,$args,PIN_INPUT)) {
 		my $firmata = $hash->{IODev}->{FirmataDevice};
-		if (defined $firmata and defined $hash->{PIN}) {
-			$firmata->pin_mode($hash->{PIN},PIN_INPUT);
-			$firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
-			main::readingsSingleUpdate($hash,"state","initialized",1);
-			return undef;
-		}
+		$firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
+		main::readingsSingleUpdate($hash,"state","Initialized",1);
+		return undef;
 	}
 	return 1;
+	
 }
 
 sub
@@ -49,15 +45,21 @@ FRM_IN_observer
 sub
 FRM_IN_Get($)
 {
-  my ($hash) = @_;
+  my ($hash,@a) = @_;
   my $iodev = $hash->{IODev};
-  if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
-  	my $ret = $iodev->{FirmataDevice}->digital_read($hash->{PIN});
-  	return $ret == PIN_HIGH ? "on" : "off";
-  } else {
-  	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
-  	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
+  my $name = shift @a;
+  return $name." no IODev assigned" if (!defined $iodev);
+  return $name.", ".$iodev->{NAME}." is not connected" if (!(defined $iodev->{FirmataDevice} and defined $iodev->{FD}));
+  my $cmd = shift @a;
+  my $ret;
+  ARGUMENT_HANDLER: {
+    $cmd eq "reading" and do {
+  	  my $ret = $iodev->{FirmataDevice}->digital_read($hash->{PIN});
+  	  return $ret == PIN_HIGH ? "on" : "off";
+    };
+    $ret = "unknown command ".$cmd;
   }
+  return $ret;
 }
 
 sub
@@ -83,7 +85,7 @@ FRM_IN_Undef($$)
   <b>Define</b>
   <ul>
   <code>define &lt;name&gt; FRM_IN &lt;pin&gt;</code> <br>
-  Specifies the FRM_IN device.
+  Defines the FRM_IN device. &lt;pin&gt> is the arduino-pin to use.
   </ul>
   
   <br>
@@ -93,9 +95,10 @@ FRM_IN_Undef($$)
   N/A<br>
   </ul>
   <a name="FRM_INget"></a>
-  <b>Get</b><br>
+  <b>Get</b>
   <ul>
-  N/A<br>
+  <li>reading<br>
+  returns the state of the arduino-pin. Values are 'on' and 'off'.<br></li>
   </ul><br>
   <a name="FRM_INattr"></a>
   <b>Attributes</b><br>
