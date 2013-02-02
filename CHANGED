@@ -66,6 +66,7 @@
              via the new notice command (M. Fischer)
   - change:  BS, USF1000, dummy migrated to readingsFN (Boris)
   - feature: added new set commands and basicauth to 49_IPCAM.pm (M. Fischer)
+  - feature: average supports more than one value in combined readings (T:x H:y)
   
 
 - 2012-10-28 (5.3)

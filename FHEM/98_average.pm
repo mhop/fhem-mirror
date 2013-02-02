@@ -64,6 +64,10 @@ average_Notify($$)
     next if($devName !~ m/^$re$/ && "$devName:$s" !~ m/^$re$/ || $s =~ m/_avg_/);
     if(defined($1)) {
       my $reArg = $1;
+      if(defined($2)) {
+        $evName = $1;
+        $reArg = $2;
+      }
       $val = $reArg if(defined($reArg) && $reArg =~ m/^(-?\d+\.?\d*)/);
     }
     next if(!defined($val) || $val !~ m/^(-?\d+\.?\d*)/);
@@ -214,10 +218,13 @@ average_Notify($$)
     # ws1 humidity: 67.4
     define avg_temp_ws1 average .*:(temperature|humidity).*
 
-    # Hunt only for the humidity: take the value from the first
-    # parenthesis ($1 in perl regexp) if it is a number
+    # Compute the same from a combined event. Note: we need two average
+    # definitions here, each of them defining the name with the first
+    # paranthesis, and the value with the second.
+    # 
     # Event: ws1 T: 52.3  H: 67.4
-    define avg_temp_ws1 average ws1:.*H:.([-\d\.]+)
+    define avg_temp_ws1_t average ws1:(T):.([-\d\.]+).*
+    define avg_temp_ws1_h average ws1:.*(H):.([-\d\.]+).*
     </PRE>
   </ul>
 
