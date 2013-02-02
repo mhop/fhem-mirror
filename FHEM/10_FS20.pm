@@ -188,7 +188,8 @@ FS20_Set($@)
       $list = "" if($mt && $mt eq "sender");
       $list = $fs20_simple if($mt && $mt eq "simple");
     }
-    $list = join(" ", sort keys %fs20_c2b) if(!defined($list));
+    $list = (join(" ", sort keys %fs20_c2b) . " dim:slider,0,6.25,100")
+        if(!defined($list));
     return SetExtensions($hash, $list, @a);
 
   }
