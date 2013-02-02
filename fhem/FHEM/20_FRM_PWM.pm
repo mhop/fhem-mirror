@@ -50,7 +50,7 @@ FRM_PWM_Set($@)
   my $iodev = $hash->{IODev};
   if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
   	$iodev->{FirmataDevice}->analog_write($hash->{PIN},$value);
-	main::readingsSingleUpdate($hash,"state",$a[1], 1);
+	main::readingsSingleUpdate($hash,"state",$value, 1);
   } else {
   	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
   	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
