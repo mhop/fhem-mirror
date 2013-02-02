@@ -20,7 +20,7 @@ sub FRM_Initialize($) {
 
 	# Provider
 	$hash->{Clients} =
-	  ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:OWX:";
+	  ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:";
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
 
