@@ -26,6 +26,9 @@ use Device::Firmata::Base
 
 	# To track internal status
 	analog_pins => [],
+	analog_resolutions => {},
+	pwm_resolutions    => {},
+	servo_resolutions  => {},
 	ports       => [],
 	pins        => {},
 	pin_modes   => {},
@@ -167,7 +170,7 @@ sub messages_handle {
 			# Handle analog pin messages
 			$command eq 'ANALOG_MESSAGE' and do {
 				my $pin_number = $message->{command} & 0x0f;
-				my $pin_value  = ( $data->[0] | ( $data->[1] << 7 ) ) / 1023;
+				my $pin_value  = ( $data->[0] | ( $data->[1] << 7 ) );
 				if (defined $self->{metadata}{analog_mappings}) {
 					$pin_number = $self->{metadata}{analog_mappings}{$pin_number};
 				}				
@@ -247,6 +250,9 @@ sub sysex_handle {
 			my @analogpins;
 			my @inputpins;
 			my @outputpins;
+			my @pwmpins;
+			my @servopins;
+			my @shiftpins;
 			my @i2cpins;
 			my @onewirepins;
 			foreach my $pin (keys %$capabilities) {
@@ -259,6 +265,18 @@ sub sysex_handle {
 					}
 					if ($capabilities->{$pin}->{PIN_ANALOG+0}) {
 						push @analogpins, $pin;
+						$self->{metadata}{analog_resolutions}{$pin} = $capabilities->{$pin}->{PIN_ANALOG+0}->{resolution}; 
+					}
+					if ($capabilities->{$pin}->{PIN_PWM+0}) {
+						push @pwmpins, $pin;
+						$self->{metadata}{pwm_resolutions}{$pin} = $capabilities->{$pin}->{PIN_PWM+0}->{resolution}; 
+					}
+					if ($capabilities->{$pin}->{PIN_SERVO+0}) {
+						push @analogpins, $pin;
+						$self->{metadata}{servo_resolutions}{$pin} = $capabilities->{$pin}->{PIN_SERVO+0}->{resolution}; 
+					}
+					if ($capabilities->{$pin}->{PIN_SHIFT+0}) {
+						push @shiftpins, $pin;
 					}
 					if ($capabilities->{$pin}->{PIN_I2C+0}) {
 						push @i2cpins, $pin;
@@ -271,6 +289,9 @@ sub sysex_handle {
 			$self->{metadata}{input_pins}   = \@inputpins;
 			$self->{metadata}{output_pins}  = \@outputpins;
 			$self->{metadata}{analog_pins}  = \@analogpins;
+			$self->{metadata}{pwm_pins}     = \@pwmpins;
+			$self->{metadata}{servo_pins}   = \@servopins;
+			$self->{metadata}{shift_pins}   = \@shiftpins;
 			$self->{metadata}{i2c_pins}     = \@i2cpins;
 			$self->{metadata}{onewire_pins} = \@onewirepins;
 			last;
@@ -300,7 +321,7 @@ sub sysex_handle {
 			last;
 		};
 
-		$sysex_message->{command_str} eq 'ONEWIRE_REPLY' and do {
+		$sysex_message->{command_str} eq 'ONEWIRE_DATA' and do {
 			my $pin      = $data->{pin};
 			my $observer = $self->{onewire_observer}[$pin];
 			if (defined $observer) {
@@ -309,7 +330,7 @@ sub sysex_handle {
 			last;
 		};
 		  
-		$sysex_message->{command_str} eq 'SCHEDULER_REPLY' and do {
+		$sysex_message->{command_str} eq 'SCHEDULER_DATA' and do {
 			my $observer = $self->{scheduler_observer};
 			if (defined $observer) {
 				$observer->{method}( $data, $observer->{context} );
@@ -570,6 +591,18 @@ sub i2c_stopreading {
 sub i2c_config {
 	my ( $self, $delay, @data ) = @_;
 	return $self->{io}->data_write($self->{protocol}->packet_i2c_config($delay,@data));
+}
+
+sub servo_write {
+	my ( $self, $pin, $value ) = @_;
+	return undef unless $self->is_configured_mode($pin,PIN_SERVO);	
+	return analog_write( $self, $pin, $value );
+}
+
+sub servo_config {
+	my ( $self, $pin, $args ) = @_;
+	return undef unless $self->is_configured_mode($pin,PIN_SERVO);
+	return $self->{io}->data_write($self->{protocol}->packet_servo_config_request($pin,$args));	
 }
 
 sub scheduler_create_task {

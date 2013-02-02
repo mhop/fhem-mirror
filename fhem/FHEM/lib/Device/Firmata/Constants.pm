@@ -220,16 +220,14 @@ use constant (
 			EXTENDED_ANALOG         => 0x6F, # analog write (PWM, Servo, etc) to any pin
 			SERVO_CONFIG            => 0x70, # set max angle, minPulse, maxPulse, freq
 			STRING_DATA             => 0x71, # a string message with 14-bits per char
-			ONEWIRE_REQUEST         => 0x73, # send an OneWire read/write/reset/select/skip/search request
-			ONEWIRE_REPLY           => 0x7D, # reply to a OneWire read/search request
+			ONEWIRE_DATA            => 0x73, # OneWire read/write/reset/select/skip/search request + read/search reply
 			SHIFT_DATA              => 0x75, # shiftOut config/data message (34 bits)
 			I2C_REQUEST             => 0x76, # send an I2C read/write request
 			I2C_REPLY               => 0x77, # a reply to an I2C read request
 			I2C_CONFIG              => 0x78, # config I2C settings such as delay times and power pins
 			REPORT_FIRMWARE         => 0x79, # report name and version of the firmware
 			SAMPLING_INTERVAL       => 0x7A, # set the poll rate of the main loop
-			SCHEDULER_REQUEST       => 0x7B, # send a createtask/deletetask/addtotask/schedule/querytasks/querytask request to the scheduler
-			SCHEDULER_REPLY         => 0x7C, # a reply to a querytasks/querytask-request from the scheduler			
+			SCHEDULER_DATA          => 0x7B, # createtask/deletetask/addtotask/schedule/querytasks/querytask request and querytasks/querytask reply
 			SYSEX_NON_REALTIME      => 0x7E, # MIDI Reserved for non-realtime messages
 			SYSEX_REALTIME          => 0x7F, # MIDI Reserved for realtime messages
 
