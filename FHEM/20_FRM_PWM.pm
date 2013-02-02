@@ -7,6 +7,11 @@ use Device::Firmata;
 use Device::Firmata::Constants  qw/ :all /;
 
 #####################################
+
+my %sets = (
+  "value" => "",
+);
+
 sub
 FRM_PWM_Initialize($)
 {
@@ -37,7 +42,11 @@ sub
 FRM_PWM_Set($@)
 {
   my ($hash, @a) = @_;
-  my $value = $a[1];
+  return "Need at least one parameters" if(@a < 2);
+  return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
+  	if(!defined($sets{$a[1]}));
+  my $command = $a[1];
+  my $value = $a[2];
   my $iodev = $hash->{IODev};
   if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
   	$iodev->{FirmataDevice}->analog_write($hash->{PIN},$value);
@@ -79,7 +88,7 @@ FRM_PWM_Undef($$)
   <a name="FRM_PWMset"></a>
   <b>Set</b><br>
   <ul>
-  <code>set &lt;name&gt; &lt;value&gt;</code><br>
+  <code>set &lt;name&gt; value &lt;value&gt;</code><br>
   sets the pulse-width of the signal that is output on the configured arduino pin<br>
   Range is from 0 to 255 (see <a href="http://arduino.cc/en/Reference/AnalogWrite">analogWrite()</a> for details)
   </ul>

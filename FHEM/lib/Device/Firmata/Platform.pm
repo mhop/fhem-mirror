@@ -436,7 +436,7 @@ sub pin_mode {
 			last;
 		};
 
-		( $mode == PIN_PWM || $mode == PIN_I2C || $mode == PIN_ONEWIRE ) and do {
+		( $mode == PIN_PWM || $mode == PIN_I2C || $mode == PIN_ONEWIRE || $mode == PIN_SERVO ) and do {
 			$self->{io}->data_write($self->{protocol}->message_prepare( SET_PIN_MODE => 0, $pin, $mode ));
 			last;
 		};
@@ -594,9 +594,17 @@ sub i2c_config {
 }
 
 sub servo_write {
+
+	# --------------------------------------------------
+	# Sets the SERVO value on an arduino
+	#
 	my ( $self, $pin, $value ) = @_;
-	return undef unless $self->is_configured_mode($pin,PIN_SERVO);	
-	return analog_write( $self, $pin, $value );
+	return undef unless $self->is_configured_mode($pin,PIN_SERVO);
+
+	# FIXME: 8 -> 7 bit translation should be done in the protocol module
+	my $byte_0 = $value & 0x7f;
+	my $byte_1 = $value >> 7;
+	return $self->{io}->data_write($self->{protocol}->message_prepare( ANALOG_MESSAGE => $pin, $byte_0, $byte_1 ));
 }
 
 sub servo_config {
