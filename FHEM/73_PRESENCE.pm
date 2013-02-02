@@ -586,8 +586,6 @@ Options:
   <ul>
     <li><a href="#loglevel">loglevel</a></li>
     <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#event-on-update-reading">event-on-update-reading</a></li>
-    <li><a href="#event-on-change-reading">event-on-change-reading</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
     <li><a>disable</a></li>
     If this attribute is activated, an active check will be disabled.<br><br>
@@ -605,11 +603,11 @@ Options:
     </ul><br><br>
     <u>Bluetooth specific events:</u><br><br>
     <ul>
-    <li><b>name</b>: $name - The name of the Bluetooth device in case it's present</li>
+    <li><b>device_name</b>: $name - The name of the Bluetooth device in case it's present</li>
     </ul><br><br>
     <u>presenced/collectord specific events:</u><br><br>
     <ul>
-    <li><b>command_accepted</b>: $command_accepted (yes|no) - Was the last command acknowleged and accepted by the presenced or collectord</li>
+    <li><b>command_accepted</b>: $command_accepted (yes|no) - Was the last command acknowleged and accepted by the presenced or collectord?</li>
     <li><b>room</b>: $room - If the module is connected with a collector daemon this event shows the room, where the device is located (as defined in the collectord config file)</li>
     </ul>
   </ul>
