@@ -272,7 +272,7 @@ sub sysex_handle {
 						$self->{metadata}{pwm_resolutions}{$pin} = $capabilities->{$pin}->{PIN_PWM+0}->{resolution}; 
 					}
 					if ($capabilities->{$pin}->{PIN_SERVO+0}) {
-						push @analogpins, $pin;
+						push @servopins, $pin;
 						$self->{metadata}{servo_resolutions}{$pin} = $capabilities->{$pin}->{PIN_SERVO+0}->{resolution}; 
 					}
 					if ($capabilities->{$pin}->{PIN_SHIFT+0}) {
