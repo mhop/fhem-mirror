@@ -240,7 +240,7 @@ while(1)
 	    
 	    if(not $value =~ /^(absence|present)$/)
 	    {
-		$handle{$uuid}{client}->send("$value;$room");
+		$handle{$uuid}{client}->send("$value;$room\n");
 	    }
 	    else
 	    {
