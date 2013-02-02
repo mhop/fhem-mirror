@@ -760,12 +760,13 @@ CUL_HM_Parse($$)
 	  }
 	  elsif ($model eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
   	    CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($shash),1,
-		                        "powerError:"   .(($err&0x02) ? "on":"off"),
-	                            "sabotageError:".(($err&0x04) ? "on":"off"),
-	                            "batterieError:".(($err&0x08) ? "on":"off"));
+		        "powerError:"   .(($err&0x02) ? "on":"off"),
+	            "sabotageError:".(($err&0x04) ? "on":"off"),
+	            "battery:".(($err&0x08)?"critical":($err&0x80?"low":"ok")));
 	  }
-	  push @event, "battery:" . (($err&0x80) ? "low" : "ok" )
-	           if(($model eq "HM-LC-SW1-BA-PCB")&&($err&0x80));
+	  elsif ($model eq "HM-LC-SW1-BA-PCB"){
+	    push @event, "battery:" . (($err&0x80) ? "low" : "ok" );
+	  }
 	  push @event, "state:$val";
     }
   } 
@@ -920,27 +921,46 @@ CUL_HM_Parse($$)
     }
     elsif ($msgType eq "41"){ #Alarm detected
 	  my ($No,$state) = (substr($p,2,2),substr($p,4,2));
-	  if($dhash && $dname ne $name){ # update source (ID is reported in $dst...)
+	  if($dhash && $dname ne $name){ # update source(ID is reported in $dst...)
 	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
 		  $dhash->{helper}{alarmNo} = $No;
-		  readingsSingleUpdate($dhash,'state',(($state eq "01")?"off":"smoke-Alarm"),1);
+		  readingsSingleUpdate($dhash,'state',
+		                              (($state eq "01")?"off":
+									  (($state eq "C7")?"smoke-forward":
+									                    "smoke-alarm")),1);
 		}
 	  }
-	  # now handle the team
+	  # - - - - - - now handle the team - - - - - - 
 	  $shash->{helper}{alarmList} = "" if (!$dhash->{helper}{alarmList});
-	  if ($state eq "01") {#clear Alarm for one sensor
+	  $shash->{helper}{alarmFwd}  = "" if (!$dhash->{helper}{alarmFwd});
+	  if ($state eq "01") { # clear Alarm for one sensor
 		$shash->{helper}{alarmList} =~ s/",".$dst//;
 	  }
-	  else{# remove alarm for Sensor
+	  elsif($state eq "C7"){# add alarm forwarding
+		$shash->{helper}{alarmFwd} .= ",".$dst;
+	  }
+	  else{                 # add alarm for Sensor
 		$shash->{helper}{alarmList} .= ",".$dst;
 	  }
 	  my $alarmList; # make alarm ID list readable
 	  foreach(split(",",$shash->{helper}{alarmList})){
 	    $alarmList .= CUL_HM_id2Name($1)."," if ($1);
 	  }
-	  $alarmList = "none" if (!$alarmList);
-      push @event,"state:".(($alarmList eq "none")?"off":"smoke-Alarm");
-      push @event,"smoke_detect:$alarmList";
+	  if (!$alarmList){# all alarms are gone - clear forwarding
+		  foreach(split(",",$shash->{helper}{alarmFwd})){	
+			my $fHash = CUL_HM_id2Hash($1) if ($1);
+		    readingsSingleUpdate($fHash,'state',"off",1)if ($fHash);
+		  }
+		$shash->{helper}{alarmList} = "";
+		$shash->{helper}{alarmFwd}  = "";
+	  }
+	  my $alarmFwd; # make forward ID list readable
+	  foreach(split(",",$shash->{helper}{alarmFwd})){
+	    $alarmFwd .= CUL_HM_id2Name($1)."," if ($1);
+	  }
+      push @event,"state:"        .($alarmList?"smoke-Alarm":"off" );
+      push @event,"smoke_detect:" .($alarmList?$alarmList   :"none");
+      push @event,"smoke_forward:".($alarmFwd ?$alarmFwd    :"none");
     } 
     elsif ($msgType eq "01"){ #Configs
 	  my $sType = substr($p,0,2);
