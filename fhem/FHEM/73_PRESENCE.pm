@@ -67,7 +67,7 @@ PRESENCE_Define($$)
     Log 2, $msg;
     return $msg;
   }
-  elsif(not (@a == 5 or @a == 6)) {
+  elsif($a[2] eq "lan-bluetooth" and not (@a == 5 or @a == 6)) {
     my $msg = "wrong syntax: define <name> PRESENCE lan-bluetooth <bluetooth-device-address> <ip-address>[:port] [ <timeout> ]";
     Log 2, $msg;
     return $msg;
