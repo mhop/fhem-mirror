@@ -62,7 +62,8 @@ PRESENCE_Define($$)
   my @a = split("[ \t]+", $def);
   my $dev;
   
-  if($a[2] ne "lan-bluetooth" and not (@a == 4 or @a == 5)) {
+  if($a[2] ne "lan-bluetooth" and not (@a == 4 or @a == 5))
+  {
     my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <timeout> ]";
     Log 2, $msg;
     return $msg;
@@ -106,10 +107,25 @@ PRESENCE_Define($$)
     {
         my $msg = "given address is not a bluetooth hardware address";
 	Log 2, "PRESENCE: ".$msg;
-	return $msg
+	return $msg;
+    }
+    
+    if($destination eq "fritzbox" and not -X "/usr/bin/ctlmgr_ctl")
+    {
+	my $msg = "this is not a fritzbox or you running FHEM with the AVM Beta Image. Please use the FHEM FritzBox Image from fhem.de";
+	Log 2, "PRESENCE: ".$msg;
+	return $msg;
+    }
+
+    if($destination eq "fritzbox" and not $< == 0)
+    {
+
+	my $msg = "FHEM is not running under root (currently ".(getpwuid($<))[0].") This check can only performed with root access to the FritzBox";
+	Log 2, "PRESENCE: ".$msg;
+	return $msg;
     }
   
-  if($destination eq "lan-ping" or $destination eq "local-bluetooth")
+  if($destination eq "lan-ping" or $destination eq "local-bluetooth" or $destination eq "fritzbox")
   {
  
    $hash->{MODE} = $destination;
@@ -144,6 +160,11 @@ PRESENCE_Define($$)
 
   return $ret;
   }
+  else
+  {
+  
+  return "unknown mode: $destination Please use lan-ping, lan-bluetooth or local-bluetooth";
+  } 
 }
 
 
@@ -321,6 +342,11 @@ my ($hash) = @_;
 	BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}, "PRESENCE_ProcessLocalScan", 20);
 
     }
+    elsif($hash->{MODE} eq "fritzbox")
+    {
+	BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}, "PRESENCE_ProcessLocalScan", 20);
+    }
+    
 }
 
 sub
@@ -351,9 +377,58 @@ return $return;
 
 }
 
+sub
+PRESENCE_DoLocalFritzBoxScan($)
+{
+    my ($string) = @_;
+    my ($name, $device) = split("\\|", $string);
+
+    my $number=0;
+    
+    my $max = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice/count);
+    
+    chomp $max;
+    
+    if(not $max =~ /^\s*\d+\s*$/)
+    {
+       return "$name|error|could not execute ctlmgr_ctl";
+    }
+    
+    
+    my $status=0;
+    my $net_device;
+
+    while($number <= $max)
+    {
+	$net_device=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name);
+        
+        chomp $net_device;
+        
+	if($net_device eq $device)
+	{
+  	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/active);
+  	    last;
+	}
+	
+	$number++;
+    }
+    
+    chomp $status;
+    
+    if($status == 1)
+    {
+	return "$name|present";
+    }
+    else
+    {
+        return "$name|absent";
+    } 
+
+
+}
 
 sub
-PRESENCE_DoLocalBluetoothScan($$)
+PRESENCE_DoLocalBluetoothScan($)
 {
     my ($string) = @_;
     my ($name, $device) = split("\\|", $string);
@@ -450,6 +525,7 @@ PRESENCE_ProcessLocalScan($)
   This module provides several operational modes to serve your needs. These are:<br><br>
   <ul>
   <li><b>lan-ping</b> - A presence check of a device via network ping in your LAN/WLAN</li>
+  <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!)
   <li><b>local-bluetooth</b> - A presence check by searching directly for a given bluetooth device nearby</li>
   <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance</li>
   </ul>
@@ -460,6 +536,11 @@ PRESENCE_ProcessLocalScan($)
     <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;timeout&gt; ]</code><br>
     <br>
     Checks for a network device via PING requests and reports its presence state.<br>
+    <br>
+    <b>Mode: fritzbox</b><br><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;timeout&gt; ]</code><br>
+    <br>
+    Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox<br>
     <br>
     <b>Mode: local-bluetooth</b><br><br>
     <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;timeout&gt; ]</code><br>
@@ -516,7 +597,7 @@ Options:
     It listens on TCP port 5222 for incoming connections from a FHEM presence instance.
 <PRE>
 Usage:
-  collectord -c &lt;configfile&gt; [-d] [-p <port>] [-P &lt;pidfile&gt;]
+  collectord -c &lt;configfile&gt; [-d] [-p &lt;port&gt;] [-P &lt;pidfile&gt;]
   collectord [-h | --help]
 
 
