@@ -586,12 +586,13 @@ CUL_HM_Parse($$)
         my $msg;
         my @days = ("Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri");
         if($o1 == 1) { ### bitfield containing multiple values...
+		               # MUST be IDENTICAL to the set commands assotiated
 	      my %mode = (0 => "manual",1 => "auto",2 => "central",3 => "party");
-          push @event,'displayMode:temperature '.(($v1 & 1)?" and humidity":" only");
-          push @event,'displayTemp:'            .(($v1 & 2)?"setpoint"     :"actual");
-          push @event,'displayTempUnit:'        .(($v1 & 4)?"fahrenheit"   :"celsius");
-          push @event,'controlMode:'            .($mode{(($v1 & 0x18)>>3)});
-          push @event,'decalcDay:'              .$days[($v1 & 0xE0)>>5];
+          push @event,'displayMode:temp-'.(($v1 & 1)?"hum"       :"only");
+          push @event,'displayTemp:'     .(($v1 & 2)?"setpoint"  :"actual");
+          push @event,'displayTempUnit:' .(($v1 & 4)?"fahrenheit":"celsius");
+          push @event,'controlMode:'     .($mode{(($v1 & 0x18)>>3)});
+          push @event,'decalcDay:'       .$days[($v1 & 0xE0)>>5];
 	      my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
           my $dTemp;
 	      if($chnHash){
@@ -4318,8 +4319,8 @@ CUL_HM_setAttrIfCh($$$$)
             but it is supported with a HMLAN. Due to the issues above I do not
             recommend using Homematic encryption at all.</li>
         </ul>
-      </ul>
     </li>
+	</ul>
 
   </ul><br>
 
@@ -4370,11 +4371,9 @@ CUL_HM_setAttrIfCh($$$$)
          described in devicepair is necessary to get a reading. Also note that
          a proper diaplay will only be possible if define per channel (button)
          was done - see define.  </li>
-
      <li><B>getpair</B><a name="CUL_HMgetpair"></a><br>
          read pair information of the device. See also <a
          href="#CUL_HMpair">pair</a></li>
-
      <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]
          &lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
 
@@ -4478,7 +4477,6 @@ CUL_HM_setAttrIfCh($$$$)
 	 set myblind regBulk 01 0B:10<br>
 	 set myblind regBulk 01 0C:00<br>
 	 </code></ul>
-	 </li>
 	 myblind will set the max drive time up for a blind actor to 25,6sec</li>
      <li><B>regSet &lt;regName&gt; &lt;value&gt; &lt;peerChannel&gt;</B><a name="CUL_HMregSet"></a><br>
         For some major register a readable version is implemented supporting
@@ -4494,21 +4492,21 @@ CUL_HM_setAttrIfCh($$$$)
         Condensed register description will be printed
         using<br>
           <ul><code>set regSet &lt;regname&gt; ? 0</code></ul>
-          </li>
+     </li>
      <li><B>reset</B><a name="CUL_HMreset"></a><br>
          Factory reset the device. You need to pair it again to use it with
          fhem.
-         </li>
+     </li>
      <li><B>sign [on|off]</B><a name="CUL_HMsign"></a><br>
          Activate or deactivate signing (also called AES encryption, see the <a
          href="#HMAES">note</a> above). Warning: if the device is attached via
          a CUL, you won't be able to switch it (or deactivate signing) from
          fhem before you reset the device directly.
-         </li> 
+     </li> 
      <li><B>statusRequest</B><a name="CUL_HMstatusRequest"></a><br>
          Update device status. For multichannel devices it should be issued on
          an per channel base
-         </li>
+     </li>
      <li><B>unpair</B><a name="CUL_HMunpair"></a><br>
          "Unpair" the device, i.e. make it available to pair with other master
          devices. See <a href="#CUL_HMpair">pair</a> for description.</li>
@@ -4524,7 +4522,8 @@ CUL_HM_setAttrIfCh($$$$)
             set vRemote_Btn4 press<br>
             set vRemote_Btn5 press long<br>
         </code></ul>
-         see also <a href="#CUL_HMpress">press</a></li>
+         see also <a href="#CUL_HMpress">press</a>
+	 </li>
      </ul>
 
      <br>
@@ -4541,10 +4540,12 @@ CUL_HM_setAttrIfCh($$$$)
               on link level.</li>
           <li><B>on-till &lt;time&gt;</B><a name="CUL_HMonTill"></a> - set the switch on for the given end time.<br>
 	      <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
-	      Currently a max of 24h is supported with endtime.<br></li>
+	      Currently a max of 24h is supported with endtime.<br>
+		  </li>
           <li><B>toggle</B> - toggle the switch.</li>
        </ul>
-     <br></li>
+     <br>
+	 </li>
     <li>dimmer, blindActuator
        <ul>
          <li><B>0 - 100 [on-time] [ramp-time]</B><br>
@@ -4561,7 +4562,8 @@ CUL_HM_setAttrIfCh($$$$)
          <li><B><a href="#CUL_HMonForTimer">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
          <li><B>stop</B> - stop motion or dim ramp</li>
        </ul>
-    <br></li>
+    <br>
+	</li>
     <li>remotes, pushButton<a name="CUL_HMremote"></a><br>
          This class of devices does not react on requests unless they are put
          to learn mode. FHEM obeys this behavior by stacking all requests until
@@ -4622,17 +4624,21 @@ CUL_HM_setAttrIfCh($$$$)
          This gives the user the option to redo the pairing on the remote
          channel while the settings in the actor will not be removed.<br>
 
-         Example:<ul> <code>
+         Example:
+		 <ul> 
+		 <code>
            set myRemote devicepair 2 mySwActChn single set       # pair second button to an actuator channel<br>
            set myRmtBtn devicepair 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
            set myRemote devicepair 2 mySwActChn dual set         #pair button 3 and 4<br>
            set myRemote devicepair 3 mySwActChn dual unset       #remove pairing for button 5 and 6<br>
            set myRemote devicepair 3 mySwActChn dual unset aktor #remove pairing for button 5 and 6 in actor only<br>
            set myRemote devicepair 3 mySwActChn dual set remote  #pair button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
-         </code></ul>
+         </code>
+		 </ul>
     </li>
        </ul>
-	<br></li>
+	<br>
+	</li>
     <li>virtual<a name="CUL_HMvirtual"></a><br>
        <ul>
        <li><B><a href="#CUL_HMdevicepair">devicepair</a></B> see remote</li>
@@ -4666,11 +4672,14 @@ CUL_HM_setAttrIfCh($$$$)
           this set command first (or a number of them), and then choose from
           the teach-in menu of the 4Dis the "Central" to transmit the data.
           Example:
-          <ul><code>
+          <ul>
+		  <code>
           set 4Dis text 1 on On Lamp<br>
           set 4Dis text 1 off Kitchen Off<br>
-          </code></ul>
-    </ul></li>
+          </code>
+		  </ul>
+	  </li>
+	</ul>
     <br></li>
     <li>Climate-Control (HM-CC-TC)
     <ul>
@@ -4698,7 +4707,8 @@ CUL_HM_setAttrIfCh($$$$)
           displayTempUnit [celsius|fahrenheit]<br>
           controlMode [manual|auto|central|party]<br>
           decalcDay &lt;day&gt;</li>
-    </ul></li><br>
+    </ul><br>
+	</li>
     <li>OutputUnit (HM-OU-LED16)
     <ul>
     <li><B>led [off|red|green|yellow]</B><br>
@@ -4710,7 +4720,8 @@ CUL_HM_setAttrIfCh($$$$)
         &lt;brightness&gt; [0-15] of backlight.<br>
         &lt;duration&gt; [0-127] in sec. 0 is permanent 'on'.<br>
     </li>
-    </ul><br></li>
+    </ul><br>
+	</li>
     <li>OutputUnit (HM-OU-CFM-PL)
     <ul>
       <li><B>led &lt;color&gt;[,&lt;color&gt;..]</B><br>
@@ -4721,7 +4732,8 @@ CUL_HM_setAttrIfCh($$$$)
       <li><B>playTone &lt;MP3No&gt[,&lt;MP3No&gt..]</B><br>
          Play a series of tones. List is to be entered separated by ','. White
          spaces must not be used in the list.<br></li>
-    </ul><br></li>
+    </ul><br>
+	</li>
     <li>HM-RC-19xxx
       <ul>
       <li><B>alarm &lt;count&gt;</B><br>
@@ -4761,7 +4773,8 @@ CUL_HM_setAttrIfCh($$$$)
            set FB1 display 12345 comma Watt 2 fast scene,phone,bell,clock
            </ul></code>  
          </li>
-      </ul><br></li>
+      </ul><br>
+	  </li>
     <li>keyMatic<br><br>
       <ul>The Keymatic uses the AES signed communication. Therefore the control
       of the Keymatic is only together with the HM-LAN adapter possible. But
@@ -4771,9 +4784,9 @@ CUL_HM_setAttrIfCh($$$$)
       <li><B>lock</B><br>
          The lock bolt moves to the locking position<br></li>
       <li><B>unlock [sec]</B><br>
-         The lock bolt moves to the unlocking position.<br> [sec]: Sets the
-         delay in seconds after the lock automatically locked again.<br>0 -
-         65535 seconds</li>
+         The lock bolt moves to the unlocking position.<br>
+		 [sec]: Sets the delay in seconds after the lock automatically locked again.<br>
+		 0 - 65535 seconds</li>
       <li><B>open [sec]</B><br>
          Unlocked the door so that the door can be opened.<br>
          [sec]: Sets the delay in seconds after the lock automatically locked
@@ -4790,7 +4803,8 @@ CUL_HM_setAttrIfCh($$$$)
           set keymatic unlock 60
         </ul></code>  
         </li>
-      </ul></li>
+      </ul>
+	</li>
 	  
 	<li>winMatic <br><br>
       <ul>winMatic provides 2 channels, one for the window control and a second
@@ -4823,8 +4837,10 @@ CUL_HM_setAttrIfCh($$$$)
                ++A001F100001234560106</pre>
          </li>
        </ul>
-  </ul><br>
-
+  </ul>
+</ul>
+  <br>
+  
   <a name="CUL_HMget"></a>
   <b>Get</b><br>
      <ul>
@@ -4941,7 +4957,6 @@ CUL_HM_setAttrIfCh($$$$)
           usage on devices which support wakeup-mode is usefull. But consider that execution is delayed 
 		  until the device "wakes up".<br>
         </ul>
-		
         </li>
   </ul>
   <br>
@@ -4949,36 +4964,87 @@ CUL_HM_setAttrIfCh($$$$)
   <b>Generated events:</b>
   <ul>
   <li>KS550/HM-WDS100-C6-O:<br>
-      T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b
-  <li>HM-CC-TC:<br>
-      T: $t H: $h<br>
+      T: $t H: $h W: $w R: $r IR: $ir WD: $wd WDR: $wdr S: $s B: $b<br>
       temperature $t<br>
       humidity $h<br>
-      actuator $vp%<br>
-      desired-temp $t<br>
-      desired-temp-ack $t<br>
-      tempList$wd  hh:mm $t hh:mm $t ...<br>
-      ValveErrorPosition $dname $vep%<br>
-      ValveOffset $dname $of%<br>
-      windowopentemp-$tchan $t (sensor:$tdev)<br>
+      windSpeed $w<br>
+      windDirection $wd<br>
+      windDirRange $wdr<br>
+      rain $r<br>
+      isRaining $ir<br>
+      sunshine $s<br>
+      brightness $b<br>
+      unknown $p<br>
+	  </li>
+  <li>HM-CC-TC:<br>
+      T: $t H: $h<br>
+      measured-temp $t<br>
+      humidity $h<br>
+      actuator $vp %<br>
+	  desired-temp $dTemp<br>
+	  desired-temp-manu $dTemp<br>
+	  windowopen-temp-%d  %.1f (sensor:%s)<br>
+	  tempList$wd  hh:mm $t hh:mm $t ...<br>
+      displayMode temp-[hum|only]<br>
+      displayTemp [setpoint|actual]<br>
+      displayTempUnit [fahrenheit|celsius]<br>
+      controlMode [manual|auto|central|party]<br>
+      decalcDay [Sat|Sun|Mon|Tue|Wed|Thu|Fri]<br>
+      tempValveMode [Auto|Closed|Open|unknown]<br>
+	  param-change  offset=$o1, value=$v1<br>
+      ValveErrorPosition_for_$dname  $vep %<br>
+      ValveOffset_for_$dname : $of %<br>
+	  ValveErrorPosition $vep %<br>
+	  ValveOffset $of %<br>
+      time-request<br>
+  </li>
   <li>HM-CC-VD:<br>
-      actuator $vp%<br>
-      motor [opening|closing|blocked|loose|adjusting range too small|ok]<br>
-      battery [low|ok]<br>
-      ValveErrorPosition $vep%<br>
-      ValveOffset $dname $of%<br>
+      $vp %<br>
+	  battery:[critical|low|ok]<br>
+      motorErr:[ok|blocked|loose|adjusting range too small|opening|closing|stop]<br>
+	  ValvePosition:$vp %<br>
+      ValveErrorPosition:$vep %<br>
+      ValveOffset:$of %<br>
+  </li>
   <li>KFM100:<br>
-      rawValue $v<br>
-      Sequence $s<br>
-      $cv $unit<br>
-  <li>switch/dimmer/blindActuator:<br>
-      deviceMsg [on|off|$val %]<br>
-      poweron [on|off|$val]<br>
-  <li>dimmer:<br>
-      dim: [up|down|stop]<br>
+      $v<br>
+      $cv,$unit<br>
+      rawValue:$v<br>
+      Sequence:$seq<br>
+      content:$cv,$unit<br>
+  </li>
   <li>HM-LC-BL1-PB-FM:<br>
       motor: [opening|closing]<br>
-  <li>remote/pushButton<br>
+	  </li>
+  <li>HM-SEC-SFA-SM:<br>
+	  powerError [on|off]<br>
+	  sabotageError [on|off]<br>
+	  battery: [critical|low|ok]<br>
+  </li>
+  <li>HM-LC-SW1-BA-PCB:<br>
+	  battery: [low|ok]<br>
+  </li>
+  <li>HM-OU-LED16<br>
+  	  color $value                  # hex - for device only<br>
+	  $value                        # hex - for device only<br>
+	  color [off|red|green|orange]  # for channel <br>
+      [off|red|green|orange]	    # for channel <br>
+  </li>
+  <li>HM-OU-CFM-PL<br>
+	  [on|off|$val]<br>
+  </li>
+  <li>switch/dimmer/blindActuator:<br>
+	  $val<br>
+	  powerOn [on|off|$val]<br>
+      [unknown|motor|dim] [up|down|stop]:$val<br>
+  </li>
+  <li>dimmer:<br>
+      overload [on|off]<br>
+      overheat [on|off]<br>
+      reduced [on|off]<br>
+      dim: [up|down|stop]<br>
+  </li>
+  <li>remote/pushButton/outputUnit<br>
 	  <ul> (to $dest) is added if the button is peered and does not send to broadcast<br>
 	  Release is provided for peered channels only</ul>
       Btn$x onShort<br>
@@ -4993,51 +5059,65 @@ CUL_HM_setAttrIfCh($$$$)
       Btn$x offLong $counter (to $dest)<br>
       Btn$x onLongRelease $counter (to $dest)<br>
       Btn$x offLongRelease $counter (to $dest)<br>
-      battery: [low|ok]<br>
+  </li>
+  <li>remote/pushButton<br>
+      battery [low|ok]<br>
+  </li>
   <li>swi<br>
       Btn$x toggle<br>
       Btn$x toggle (to $dest)<br>
       battery: [low|ok]<br>
+  </li>
   <li>motionDetector<br>
       brightness:$b<br>
       alive<br>
-      motion<br>
-      cover closed<br>
-      cover open<br>
+      motion on (to $dest)<br>
+      motionCount $cnt _next:$nextTr"-"[0x0|0x1|0x2|0x3|15|30|60|120|240|0x9|0xa|0xb|0xc|0xd|0xe|0xf]<br>
+      cover [closed|open]<br>
+      battery [low|ok]<br>
+	  devState_raw.$d1 $d2<br>
+  </li>
   <li>smokeDetector<br>
-      state: [on|all-clear|alive]<br>
+      [on|all-clear|alive]                # for team leader<br>
+	  [off|smoke-forward|smoke-alarm]     # for team members<br>
+ 	  SDteam [add|remove]_$dname<br>
+      battery [low|ok]<br>
       smoke_detect on from $src<br>
       test:from $src<br>
-      battery: [low|ok]<br>
-	  SDteam:[add|remove]_$name<br>
-  <li>threeStateSensor (all)<br>
-      sabotage<br>
-      alive<br>
-  <li>threeStateSensor (HM-SEC-WDS)<br>
-      contact wet<br>
-      contact damp<br>
-      contact dry<br>
-  <li>threeStateSensor (generic)<br>
-      contact closed<br>
-      contact open<br>
-      contact tilted<br>
-  <li>THSensor<br>
-      T: $t H: $h<br>
-      temperature $t<br>
-      humidity $h<br>
-  <li>WDC7000<br>
+  </li>
+  <li>threeStateSensor<br>
+      [open|tilted|closed]]<br>
+      [wet|damp|dry]                 #HM-SEC-WDS only<br>
+	  cover [open|closed]            #HM-SEC-WDS only<br>
+	  alive yes<br>
+      battery [low|ok]<br>
+      contact [open|tilted|closed]<br>
+	  contact [wet|damp|dry]         #HM-SEC-WDS only<br>
+  </li>
+  <li>THSensor  and HM-WDC7000<br>
       T: $t H: $h AP: $ap<br>
       temperature $t<br>
       humidity $h<br>
-      airpress $ap<br>
+      airpress $ap                   #HM-WDC7000 only<br>
+  </li>
   <li>winMatic<br>
-      motorError: [no|TurnError|TiltError]<br>
-	  direction: [no|up|down|undefined]<br>	  
-	  * Akku Channel<br>
-	  charge: [trickleCharge|charge|dischange|unknown]<br>
-      airing: $air<br>
-      course: tilt<br>
-      course: close<br>
+	  [locked|$value]<br>
+	  motorError [no|TurnError|TiltError]<br>
+	  direction [no|up|down|undefined]<br>	 
+	  charge [trickleCharge|charge|dischange|unknown]<br>
+      airing [inactiv|$air]<br>
+      course [tilt|close]<br>
+      airing [inactiv|$value]<br>
+      contact tesed<br>
+  </li>
+  <li>keyMatic<br>
+      unknown:40<br>
+      battery [low|ok]<br>
+      uncertain [yes|no]<br>
+      error [unknown|motor aborted|clutch failure|none']<br>
+      lock [unlocked|locked]<br>
+      [unlocked|locked|uncertain]<br>
+  </li>
   </ul>
   <br>
 </ul>
