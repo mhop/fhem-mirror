@@ -64,12 +64,12 @@ PRESENCE_Define($$)
   
   if($a[2] ne "lan-bluetooth" and not (@a == 4 or @a == 5))
   {
-    my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <timeout> ]";
+    my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <check-interval> ]";
     Log 2, $msg;
     return $msg;
   }
   elsif($a[2] eq "lan-bluetooth" and not (@a == 5 or @a == 6)) {
-    my $msg = "wrong syntax: define <name> PRESENCE lan-bluetooth <bluetooth-device-address> <ip-address>[:port] [ <timeout> ]";
+    my $msg = "wrong syntax: define <name> PRESENCE lan-bluetooth <bluetooth-device-address> <ip-address>[:port] [ <check-interval> ]";
     Log 2, $msg;
     return $msg;
   }
@@ -533,17 +533,17 @@ PRESENCE_ProcessLocalScan($)
   <a name="PRESENCEdefine"></a>
   <b>Define</b><br><br>
   <ul><b>Mode: lan-ping</b><br><br>
-    <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;timeout&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;check-interval&gt; ]</code><br>
     <br>
     Checks for a network device via PING requests and reports its presence state.<br>
     <br>
     <b>Mode: fritzbox</b><br><br>
-    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;timeout&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;check-interval&gt; ]</code><br>
     <br>
     Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox<br>
     <br>
     <b>Mode: local-bluetooth</b><br><br>
-    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;timeout&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
     <br>
     Checks for a bluetooth device and reports its presence state. For this mode the shell command "hcitool" is required (provided with a <a href="http://www.bluez.org" target="_new">bluez</a> installation under Debian via APT), as well
     as a functional bluetooth device directly attached to your machine.<br><br>
@@ -551,7 +551,7 @@ PRESENCE_ProcessLocalScan($)
     Checks for a bluetooth device with the help of presenced or collectord. They can be installed where-ever you like, just must be accessible via network.
      The given device will be checked for presence status.<br>
     <br>
-    <code>define &lt;name&gt; PRESENCE &lt;ip-address&gt;[:port] &lt;bluetooth-address&gt; [ &lt;timeout&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE &lt;ip-address&gt;[:port] &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
     <br>
     The default port is 5111 (presenced). Alternatly you can use port 5222 (collectord)<br>
     <br>
@@ -696,5 +696,191 @@ Options:
 
 
 =end html
+
+=begin html_DE
+
+<a name="PRESENCE"></a>
+<h3>PRESENCE</h3>
+<ul>
+  <tr><td>
+  Das PRESENCE Module bietet mehrere M&ouml;glichkteiten um die Anwesenheit von Handys/Smartphones oder anderen mobilen Ger&auml;ten (z.B. Tablets) zu erkennen.
+  <br><br>
+  Dieses Modul bietet dazu mehrere Modis an um Anwesenheit zu erkennen. Diese sind:<br><br>
+  <ul>
+  <li><b>lan-ping</b> - Eine Erkennung auf Basis von Ping-Tests im lokalen LAN/WLAN</li>
+  <li><b>fritzbox</b> - Eine Erkennung aufgrund der internen Abfrage des Status auf der FritzBox (nur m&ouml;glich, wenn FHEM auf einer FritzBox l&auml;uft)</li>
+  <li><b>local-bluetooth</b> - Eine Erkennung auf Basis von Bluetooth-Abfragen durch den FHEM Server. Das Ger&auml;t muss dabei in Empfangsreichweite sein, aber nicht sichtbar sein</li>
+  <li><b>lan-bluetooth</b> - Eine Erkennung durch Bluetooth-Abfragen via Netzwerk (LAN/WLAN) in ein oder mehreren R&auml;umen</li>
+  </ul>
+  <br><br>
+  <a name="PRESENCEdefine"></a>
+  <b>Define</b><br><br>
+  <ul><b>Modus: lan-ping</b><br><br>
+    <code>define &lt;name&gt; PRESENCE lan-ping &lt;IP-Addresse oder Hostname&gt; [ &lt;Interval&gt; ]</code><br>
+    <br>
+    Pr&uuml;ft ob ein Ger&auml;t &uuml;ber Netzwerk (&uuml;blicherweise WLAN) auf Ping-Anfragen reagiert und setzt entsprechend den Anwesenheitsstatus.<br>
+    <br>
+    <b>Modus: fritzbox</b><br><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;Interval&gt; ]</code><br>
+    <br>
+    Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl. 
+    Der Ger&auml;tename (Parameter: &lt;device-name&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br>
+    <br>
+    <b>Modus: local-bluetooth</b><br><br>
+    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
+    <br>
+    Pr&uuml;ft ob ein Bluetooth-Ger&auml;t abgefragt werden kann und meldet dies als Anwesenheit. F&uuml;r diesen Modus wird der Shell-Befehl "hcitool" ben&ouml;tigt
+    (wird durch das Paket <a href="http://www.bluez.org" target="_new">bluez</a> bereitgestellt), sowie ein funktionierender Bluetooth-Empf&auml;nger (intern oder als USB-Stick)<br><br>
+    <b>Modus: lan-bluetooth</b><br><br>
+    Pr&uuml;ft ein Bluetooth-Ger&auml;t auf Anwesenheit &uuml;ber Netzwerk mit Hilfe von presenced oder collectord. Diese k&ouml;nnen auf jeder Maschine installiert werden,
+    welche eine Standard-Perl-Umgebung bereitstellt und &uuml;ber Netzwerk erreichbar ist.
+    <br>
+    <br>
+    <code>define &lt;name&gt; PRESENCE &lt;IP-Adresse&gt;[:Port] &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
+    <br>
+    Der Standardport ist 5111 (presenced). Alternativ kann man den Port 5222 (collectord) nutzen. Generell ist der Port aber frei w&auml;hlbar.<br>
+    <br>
+    <u>presenced</u><br><br>
+    <ul>Der presenced ist ein Perl Netzwerk Dienst, welcher eine Bluetooth-Anwesenheitserkennung von ein oder mehreren Ger&auml;ten &uuml;ber Netzwerk bereitstellt. 
+    Dieser lauscht standardm&auml;&szlig;ig auf TCP Port 5111 nach eingehenden Verbindungen von dem PRESENCE Modul oder einem collectord.<br>
+<PRE>
+Usage:
+  presenced -d [-p &lt;port&gt;] [-P &lt;filename&gt;]
+  presenced [-h | --help]
+
+
+Options:
+  -p, --port
+     TCP Port which should be used (Default: 5111)
+  -P, --pid-file
+     PID file for storing the local process id (Default: /var/run/presenced.pid)
+  -d, --daemon
+     detach from terminal and run as background daemon
+  -v, --verbose
+     Print detailed log output
+  -h, --help
+     Print detailed help screen
+</PRE>
+    
+    Zur Bluetooth-Abfrage wird der Shell-Befehl "hcitool" verwendet (Paket: <a href="http://www.bluez.org" target="_new">bluez</a>) 
+    um sogenannte "Paging-Request" an die gew&uuml;nschte Bluetooth Adresse (z.B. 01:B4:5E:AD:F6:D3) durchzuf&uuml;hren. Das Ger&auml;t muss dabei nicht sichtbar sein, allerdings st&auml;ndig aktiviert sein
+    um Bluetooth-Anfragen zu beantworten.
+    <br><br>
+    
+    Wenn ein Ger&auml;t anwesend ist, wird dies an FHEM &uuml;bermittelt zusammen mit dem Ger&auml;tenamen als Reading.<br><br>
+    
+    Der presenced ist zum Download verf&uuml;gbar als:<br><br>
+    <ul>
+    <li>Perl Skript: <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/presenced" target="_new">presenced</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/presenced-1.0.deb" target="_new">presenced-1.0.deb</a></li>
+    <li>.deb Paket f&uuml;r Raspberry Pi (raspbian): <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/presenced-rpi-1.0.deb" target="_new">presenced-rpi-1.0.deb</a></li>
+    </ul>
+    </ul><br><br>
+    <u>collectord</u><br><br>
+    <ul>
+    Der collectord ist ein Perl Netzwerk Dienst, welcher Verbindungen zu mehreren presenced-Instanzen verwaltet um eine koordinierte Suche nach ein oder mehreren Bluetooth-Ger&auml;ten &uuml;ber Netzwerk durchzuf&uuml;hren.<br><br>
+    
+    Er lauscht auf TCP port 5222 nach eingehenden Verbindungen von einem PRESENCE Modul.
+<PRE>
+Usage:
+  collectord -c &lt;configfile&gt; [-d] [-p &lt;port&gt;] [-P &lt;pidfile&gt;]
+  collectord [-h | --help]
+
+
+Options:
+  -c, --configfile &lt;configfile&gt;
+     The config file which contains the room and timeout definitions
+  -p, --port
+     TCP Port which should be used (Default: 5222)
+  -P, --pid-file
+     PID file for storing the local process id (Default: /var/run/collectord.pid)
+  -d, --daemon
+     detach from terminal and run as background daemon
+  -v, --verbose
+     Print detailed log output
+  -l, --logfile &lt;logfile&gt;
+     log to the given logfile
+  -h, --help
+     Print detailed help screen
+</PRE>  
+    Bevor der collectord verwendet werden kann, ben&ouml;tigt er eine Konfigurationsdatei in welcher alle R&auml;ume mit einem presenced-Agenten eingetragen sind. Diese Datei sieht wie folgt aus:
+    <br><br>
+<PRE>
+       	# Raum Definitionen
+       	# =================
+	#
+	[Raum-Name]              # Name des Raumes
+	address=192.168.0.10     # IP-Adresse oder Hostname
+	port=5111                # TCP Port welcher benutzt werden soll (standardm&auml;&szlig;ig 5111)
+	presence_timeout=120     # Pr&uuml;finterval in Sekunden f&uuml;r jede Abfrage eines Ger&auml;tes, welches anwesend ist
+	absence_timeout=20       # Pr&uuml;finterval in Sekunden f&uuml;r jede Abfrage eines Ger&auml;tes, welches abwesend ist
+
+	[Wohnzimmer]
+	address=192.168.0.11
+	port=5111	
+	presence_timeout=180
+	absence_timeout=20    
+</PRE>
+<br>
+    Wenn ein Ger&auml;t in irgend einem Raum anwesend ist, wird dies an FHEM &uuml;bermittelt, zusammen mit dem Ger&auml;tenamen und dem Raum, in welchem das Ger&auml;t erkannt wurde.<br><br>
+    
+    Der collectord ist zum Download verf&uuml;gbar als:<br><br>
+    
+    <ul>
+    <li>Perl Skript:  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/collectord" target="_new">collectord</a></li>
+    <li>.deb Paket f&uuml;r Debian (architekturunabh&auml;ngig):  <a href="http://fhem.svn.sourceforge.net/viewvc/fhem/trunk/fhem/contrib/PRESENCE/deb/collectord-1.0.deb" target="_new">collectord-1.0.deb</a></li>
+    </ul>
+    </ul>
+
+  </ul>
+  <br>
+  <a name="PRESENCEset"></a>
+  <b>Set</b>
+  <ul>
+  N/A 
+  </ul>
+  <br>
+
+  <a name="PRESENCEget"></a>
+  <b>Get</b>
+  <ul>
+  N/A
+  </ul>
+  <br>
+
+  <a name="PRESENCEattr"></a>
+  <b>Attributes</b><br><br>
+  <ul>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li><br>
+    <li><a>disable</a></li>
+    Wenn dieses Attribut aktiviert ist, wird die Anwesenheitserkennung nicht mehr durchgef&uuml;hrt.<br><br>
+    M&ouml;gliche Werte: 0 => Erkennung durchf&uuml;hren , 1 => Keine Erkennungen durchf&uuml;hren<br>
+    Standardwert ist 0 (Erkennung durchf&uuml;hren)<br><br>
+    </ul>
+  <br>
+ 
+  <a name="PRESENCEevents"></a>
+  <b>Generierte Events:</b><br><br>
+  <ul>
+    <u>Generelle Events:</u><br><br>
+    <ul>
+    <li><b>state</b>: $state (absent|present|disabled) - Der Anwesenheitsstatus eine Ger&auml;tes (absent = abwesend; present = anwesend) oder "disabled" wenn das disable-Attribut aktiviert ist</li>
+    </ul><br><br>
+    <u>Bluetooth-spezifische Events:</u><br><br>
+    <ul>
+    <li><b>device_name</b>: $name - Der Name des Bluetooth-Ger&auml;tes, wenn es anwesend (Status: present) ist</li>
+    </ul><br><br>
+    <u>presenced-/collectord-spezifische Events:</u><br><br>
+    <ul>
+    <li><b>command_accepted</b>: $command_accepted (yes|no) - Wurde das letzte Kommando an den presenced/collectord akzeptiert (yes = ja, no = nein)?</li>
+    <li><b>room</b>: $room - Wenn das Modul mit einem collectord verbunden ist, zeigt dieses Event den Raum an, in welchem dieses Ger&auml;t erkannt wurde (Raumname entsprechend der Konfigurationsdatei des collectord)</li>
+    </ul>
+  </ul>
+</ul>
+
+
+=end html_DE
 
 =cut
