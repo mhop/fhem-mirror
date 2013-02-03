@@ -356,7 +356,7 @@ PRESENCE_DoLocalPingScan($$)
     my ($string) = @_;
     my ($name, $device) = split("\\|", $string);
 
-    my $pingtool = Net::Ping->new();
+    my $pingtool = Net::Ping->new("icmp");
     my $retcode;
     my $return;
 
