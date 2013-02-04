@@ -119,7 +119,7 @@ sub OWTHERM_Initialize ($) {
   $hash->{GetFn}   = "OWTHERM_Get";
   $hash->{SetFn}   = "OWTHERM_Set";
   $hash->{AttrFn}  = "OWTHERM_Attr";
-  $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
+  $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
                      "event-on-update-reading event-on-change-reading ".
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
@@ -278,11 +278,8 @@ sub OWTHERM_InitializeDevice($) {
   
   #-- Initial readings temperature sensor
   $owg_temp  =  "";
-  $owg_tl = defined($attr{$name}{"tempLow"})  ? $attr{$name}{"tempLow"}  : "";
-  $owg_th = defined($attr{$name}{"tempHigh"}) ? $attr{$name}{"tempHigh"} : "",
-  
-  #-- Output formatting because of reading attributes
-  OWTHERM_FormatValues($hash);
+  $owg_tl    =  "";
+  $owg_th    =  "",
   
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
@@ -300,6 +297,7 @@ sub OWTHERM_FormatValues($) {
   my ($hash) = @_;
   
   my $name    = $hash->{NAME}; 
+  my $interface = $hash->{IODev}->{TYPE};
   my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
   my $svalue = "";
   
@@ -338,10 +336,29 @@ sub OWTHERM_FormatValues($) {
   #-- correct alarm values for proper offset, factor 
   $vlow   = ($owg_tl + $offset)*$factor;
   $vhigh  = ($owg_th + $offset)*$factor;
+  
+  #-- check if the device has to be corrected
+  if( AttrVal($name,"tempLow",undef) ){
+    if( $main::attr{$name}{"tempLow"} != $vlow ){
+      OWTHERM_Set(  $hash,("tempLow",$main::attr{$name}{"tempLow"}));
+      $vlow = $main::attr{$name}{"tempLow"};
+    }
+  } else {
+    $main::attr{$name}{"tempLow"}  = $vlow;
+  }
+  
+  if( AttrVal($name,"tempHigh",undef) ){
+    if( $main::attr{$name}{"tempHigh"} != $vhigh ){
+      OWTHERM_Set(  $hash,("tempHigh",$main::attr{$name}{"tempHigh"}));
+      $vhigh = $main::attr{$name}{"tempHigh"};
+    }
+  } else {
+    $main::attr{$name}{"tempHigh"}  = $vhigh;
+  }
          
   #-- formats for output
-  $statef  = "%5.2f ".$abbr;
-  $svalue = "temperature: ".sprintf($statef,$vval);
+  $statef = "T: %5.2f ".$abbr;
+  $svalue = sprintf($statef,$vval);
   
   #-- Test for alarm condition
   $hash->{ALARM} = 1;
@@ -355,9 +372,7 @@ sub OWTHERM_FormatValues($) {
     $hash->{ALARM} = 0;
   }
   
-  #-- put into READINGS and attributes
-  $main::attr{$name}{"tempLow"}  = $vlow;
-  $main::attr{$name}{"tempHigh"} = $vhigh;
+  #-- put into READINGS
   readingsBeginUpdate($hash);
   readingsBulkUpdate($hash,"temperature",$vval);
   #-- STATE
@@ -501,7 +516,6 @@ sub OWTHERM_GetValues($@) {
 
   $value=OWTHERM_FormatValues($hash);
   Log 5, $value;
-  #-- one thing remains to do: 
   
   return undef;
 }
@@ -534,7 +548,7 @@ sub OWTHERM_Set($@) {
   my $name  = $hash->{NAME};
   my $model = $hash->{OW_MODEL};
 
- #-- set new timer interval
+  #-- set new timer interval
   if($key eq "interval") {
     # check value
     return "OWTHERM: Set with short interval, must be > 1"
@@ -547,37 +561,37 @@ sub OWTHERM_Set($@) {
   }
 
   #-- set tempLow or tempHigh
-  my $interface = $hash->{IODev}->{TYPE};
-  my $offset    = defined($hash->{tempf}{offset}) ? $hash->{tempf}{offset} : 0.0;
-  my $factor    = defined($hash->{tempf}{factor}) ? $hash->{tempf}{factor} : 1.0;
+  if( (lc($key) eq "templow") || (lc($key) eq "temphigh")) {
+    my $interface = $hash->{IODev}->{TYPE};
+    my $offset    = defined($hash->{tempf}{offset}) ? $hash->{tempf}{offset} : 0.0;
+    my $factor    = defined($hash->{tempf}{factor}) ? $hash->{tempf}{factor} : 1.0;
     
-  #-- find upper and lower boundaries for given offset/factor
-  my $mmin = (-55+$offset)*$factor;
-  my $mmax = (125+$offset)*$factor;
-  return sprintf("OWTHERM: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
-    if($value < $mmin || $value > $mmax);
+    #-- find upper and lower boundaries for given offset/factor
+    my $mmin = (-55+$offset)*$factor;
+    my $mmax = (125+$offset)*$factor;
+    return sprintf("OWTHERM: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
+      if($value < $mmin || $value > $mmax);
     
-  #-- seems to be ok, put into the device after correcting for offset and factor
-  $a[2]  = int($value/$factor-$offset);
+    #-- seems to be ok, put into the device after correcting for offset and factor
+    $a[2]  = int($value/$factor-$offset);
 
-  #-- OWX interface
-  Log 1,"SETTING DEVICE with ".join(' ',@a)." and present=".$hash->{PRESENT}.
-  " and state=".$hash->{READINGS}{"state"}{VAL};
-  if( $interface eq "OWX" ){
-    $ret = OWXTHERM_SetValues($hash,@a);
-  #-- OWFS interface
-  }elsif( $interface eq "OWServer" ){
-    $ret = OWFSTHERM_SetValues($hash,@a);
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      $ret = OWXTHERM_SetValues($hash,@a);
+    #-- OWFS interface
+    }elsif( $interface eq "OWServer" ){
+      $ret = OWFSTHERM_SetValues($hash,@a);
+    } else {
+      return "OWTHERM: Set with wrong IODev type $interface";
+    }
     return $ret
       if(defined($ret));
-  } else {
-  return "OWTHERM: Set with wrong IODev type $interface";
   }
   
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
   #OWTHERM_GetValues($hash);
-  OWTHERM_FormatValues($hash);
+  #OWTHERM_FormatValues($hash);
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
@@ -666,25 +680,9 @@ sub OWFSTHERM_GetValues($) {
   return "empty return from OWServer"
     if( ($owg_temp eq "") || ($ow_thn eq "") || ($ow_tln eq "") );
         
-  #return "wrong data length from OWServer"
-  #  if( (int(@ral) != $cnumber{$attr{$name}{"model"}}) || (int(@rax) != $cnumber{$attr{$name}{"model"}}) );
-  
   #-- process alarm settings
-  #-- first reading of the device
-  if( $owg_th eq ""){
-    $owg_th = $ow_thn;
-  #-- device must be changed 
-  }elsif( $owg_th != $ow_thn ){
-    OWFSTHERM_SetValues($hash,"temphigh",$owg_th);
-  }
-  
-  #-- first reading of the device
-  if( $owg_tl eq ""){
-    $owg_tl = $ow_tln;
-  #-- device must be changed 
-  }elsif( $owg_tl != $ow_tln ){
-    OWFSTHERM_SetValues($hash,"templow",$owg_tl);
-  }
+  $owg_tl = $ow_tln;
+  $owg_th = $ow_thn;
   
   return undef
 }
@@ -827,25 +825,9 @@ sub OWXTHERM_GetValues($) {
   }
   
   #-- process alarm settings
-  #-- first reading of the device
-  if( $owg_th eq ""){
-    $owg_th = $ow_thn;
-  #-- device must be changed 
-  }elsif( $owg_th != $ow_thn ){
-    $change=1;
-  }
+  $owg_tl = $ow_tln;
+  $owg_th = $ow_thn;
   
-  #-- first reading of the device
-  if( $owg_tl eq ""){
-    $owg_tl = $ow_tln;
-  #-- device must be changed 
-  }elsif( $owg_tl != $ow_tln ){
-    $change=1;
-  }
-  #-- change device settings
-  if( $change==1){
-    OWXTHERM_SetValues($hash,("both","0.0"));
-  }
   return undef;
 }
 
@@ -864,6 +846,7 @@ sub OWXTHERM_SetValues($@) {
   my ($i,$j,$k);
   
   my $name = $hash->{NAME};
+  
   #-- ID of the device
   my $owx_dev = $hash->{ROM_ID};
   #-- hash of the busmaster
@@ -878,8 +861,8 @@ sub OWXTHERM_SetValues($@) {
     if( $value eq "");
     
   #-- $owg_tl and $owg_th are preset and may be changed here
-  $owg_tl = $value if( $key eq "tempLow" );
-  $owg_th = $value if( $key eq "tempHigh" );
+  $owg_tl = $value if( lc($key) eq "templow" );
+  $owg_th = $value if( lc($key) eq "temphigh");
 
   #-- put into 2's complement formed (signed byte)
   my $tlp = $owg_tl < 0 ? 128 - $owg_tl : $owg_tl; 
@@ -896,7 +879,7 @@ sub OWXTHERM_SetValues($@) {
   #   3. \x48 sent by WriteBytePower after match ROM => command ok, no effect on EEPROM
   
   my $select=sprintf("\x4E%c%c\x48",$thp,$tlp); 
-  my $res=OWX_Complex($master,$owx_dev,$select,0);
+  my $res=OWX_Complex($master,$owx_dev,$select,3);
 
   if( $res eq 0 ){
     return "OWXTHERM: Device $owx_dev not accessible"; 
