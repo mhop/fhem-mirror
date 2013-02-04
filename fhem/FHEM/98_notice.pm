@@ -68,7 +68,7 @@ CommandNotice($$)
 
   $args[0] = "list" if(!defined($args[0]));
 
-  if(!@args || $args[0] ~~ @commands) {
+  if(!@args ||grep (m/^$args[0]$/, @commands)) {
     my $cmd = $args[0];
 
     if($cmd eq "list") {
@@ -93,15 +93,16 @@ CommandNotice($$)
       my $locale = "en";
       my $header = 1;
       if(@args == 3) {
-        $locale = ($args[2] ~~ @locale) ? $args[2] : "en";
+        $locale = (grep (m/^$args[2]$/, @locale)) ? $args[2] : "en";
+        $locale = (grep (m/^$args[2]$/, @locale)) ? $args[2] : "en";
         $header = ($args[2] eq "noheader") ? 0 : 1;
       } elsif(@args == 4) {
-        if($args[2] ~~ @locale) {
-          $locale = ($args[2] ~~ @locale) ? $args[2] : "en";
+        if(grep (m/^$args[2]$/, @locale)) {
+          $locale = (grep (m/^$args[2]$/, @locale)) ? $args[2] : "en";
           $header = ($args[3] eq "noheader") ? 0 : 1;
         } elsif($args[2] eq "noheader") {
           $header = ($args[2] eq "noheader") ? 0 : 1;
-          $locale = ($args[3] ~~ @locale) ? $args[3] : "en";
+          $locale = (grep (m/^$args[3]$/, @locale)) ? $args[3] : "en";
         }
       }
 
