@@ -31,7 +31,7 @@ use strict;
 use warnings;
 use Blocking;
 use Net::Ping;
-use Time::HiRes qw(gettimeofday);
+use Time::HiRes qw(gettimeofday sleep);
 use DevIo;
 
 
@@ -411,6 +411,7 @@ PRESENCE_DoLocalFritzBoxScan($)
 	}
 	
 	$number++;
+	sleep 0.1;
     }
     
     chomp $status;
