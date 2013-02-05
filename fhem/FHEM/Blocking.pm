@@ -15,6 +15,8 @@ use warnings;
 use IO::Socket::INET;
 
 sub BlockingCall($$@);
+sub BlockingExit($);
+sub BlockingKill($);
 
 sub
 BlockingCall($$@)
@@ -38,7 +40,7 @@ BlockingCall($$@)
   my $ret = &{$blockingFn}($arg);
   use strict "refs";
 
-  exit(0) if(!$finishFn);
+  BlockingExit(undef) if(!$finishFn);
 
   # Look for the telnetport
   my $tp;
@@ -53,7 +55,7 @@ BlockingCall($$@)
 
   if(!$tp) {
     Log 1, "CallBlockingFn: No telnet port found for sending the data back.";
-    exit(0);
+    BlockingExit(undef);
   }
 
   # Write the data back, calling the function
@@ -62,7 +64,7 @@ BlockingCall($$@)
   Log 1, "CallBlockingFn: Can't connect to $addr\n" if(!$client);
   $ret =~ s/'/\\'/g;
   syswrite($client, "{$finishFn('$ret')}\n");
-  exit(0);
+  BlockingExit($client);
 }
 
 sub
@@ -70,6 +72,21 @@ BlockingKill($)
 {
   my $pid = shift;
   Log 1, "Terminated $pid" if($pid && kill(9, $pid));
+}
+
+sub
+BlockingExit($)
+{
+  my $client = shift;
+
+  if($^O =~ m/Win/) {
+    close($client) if($client);
+    threads->exit();
+
+  } else {
+    exit(0);
+
+  }
 }
 
 
