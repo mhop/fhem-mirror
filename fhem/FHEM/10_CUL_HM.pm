@@ -255,6 +255,7 @@ CUL_HM_updateConfig($){
 	  last;
     }
     else{
+	  CUL_HM_ID2PeerList ($name,"",1);
     }
   }
 }
