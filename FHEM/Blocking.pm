@@ -23,6 +23,43 @@ BlockingCall($$@)
 {
   my ($blockingFn, $arg, $finishFn, $timeout) = @_;
 
+  # Look for the telnetport
+  # must be done before forking to be able to create a temporary device
+  my $telnetDevice;
+  if($finishFn) {
+    my $tName = "telnetForBlockingFn";
+    $telnetDevice = $tName if($defs{$tName});
+
+    if(!$telnetDevice) {
+      foreach my $d (sort keys %defs) {
+        my $h = $defs{$d};
+        next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{TEMPORARY});
+        next if($attr{$d}{SSL} || $attr{$d}{password});
+        next if($h->{DEF} =~ m/IPV6/);
+        $telnetDevice = $d;
+        last;
+      }
+    }
+
+    # If not suitable telnet device found, create a temporary one
+    if(!$telnetDevice) {
+      foreach my $port (7073..7083) {
+        if(!CommandDefine(undef, "$tName telnet $port")) {
+          $telnetDevice = $tName;
+          $defs{$tName}{TEMPORARY} = 1;
+          last;
+        }
+      }
+    }
+
+    if(!$telnetDevice) {
+      my $msg = "CallBlockingFn: No telnet port found and cannot create one.";
+      Log 1, $msg;
+      return $msg;
+    }
+  }
+
+  # do fork
   my $pid = fork;
   if(!defined($pid)) {
     Log 1, "Cannot fork: $!";
@@ -42,24 +79,8 @@ BlockingCall($$@)
 
   BlockingExit(undef) if(!$finishFn);
 
-  # Look for the telnetport
-  my $tp;
-  foreach my $d (sort keys %defs) {
-    my $h = $defs{$d};
-    next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{TEMPORARY});
-    next if($attr{$d}{SSL} || $attr{$d}{password});
-    next if($h->{DEF} =~ m/IPV6/);
-    $tp = $d;
-    last;
-  }
-
-  if(!$tp) {
-    Log 1, "CallBlockingFn: No telnet port found for sending the data back.";
-    BlockingExit(undef);
-  }
-
   # Write the data back, calling the function
-  my $addr = "localhost:$defs{$tp}{PORT}";
+  my $addr = "localhost:$defs{$telnetDevice}{PORT}";
   my $client = IO::Socket::INET->new(PeerAddr => $addr);
   Log 1, "CallBlockingFn: Can't connect to $addr\n" if(!$client);
   $ret =~ s/'/\\'/g;
