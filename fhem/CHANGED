@@ -1,4 +1,6 @@
 - SVN
+  - feature: new Module 32_SYSSTAT to monitor system load and disk usage
+             on linux FHEM hosts (by justme1968)
   - feature: new Module 73_PRESENCE to make automatic presence detection of mobile
              phones or other mobile devices (like tablets) via ping or 
              bluetooth checks (by M. Bloch)
