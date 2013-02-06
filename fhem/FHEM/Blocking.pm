@@ -93,7 +93,9 @@ sub
 BlockingKill($)
 {
   my $pid = shift;
-  Log 1, "Terminated $pid" if($pid && kill(9, $pid));
+  if($^O !~ m/Win/) {
+    Log 1, "Terminated $pid" if($pid && kill(9, $pid));
+  }
 }
 
 sub
@@ -103,6 +105,7 @@ BlockingExit($)
 
   if($^O =~ m/Win/) {
     close($client) if($client);
+    eval "require threads;";
     threads->exit();
 
   } else {
