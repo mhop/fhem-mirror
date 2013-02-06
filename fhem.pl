@@ -1304,7 +1304,7 @@ CommandModify($$)
   my @a = split("[ \t]+", $def, 2);
 
   return "Usage: modify <name> <type dependent arguments>"
-  					if(int(@a) < 2);
+  					if(int(@a) < 1);
 
   # Return a list of modules
   return "Define $a[0] first" if(!defined($defs{$a[0]}));
@@ -1312,7 +1312,8 @@ CommandModify($$)
 
   $hash->{OLDDEF} = $hash->{DEF};
   $hash->{DEF} = $a[1];
-  my $ret = CallFn($a[0], "DefFn", $hash, "$a[0] $hash->{TYPE} $a[1]");
+  my $ret = CallFn($a[0], "DefFn", $hash,
+        "$a[0] $hash->{TYPE}".(defined($a[1]) ? " $a[1]" : ""));
   $hash->{DEF} = $hash->{OLDDEF} if($ret);
   delete($hash->{OLDDEF});
   return $ret;
