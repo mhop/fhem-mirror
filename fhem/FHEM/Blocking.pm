@@ -45,6 +45,7 @@ BlockingCall($$@)
     if(!$telnetDevice) {
       foreach my $port (7073..7083) {
         if(!CommandDefine(undef, "$tName telnet $port")) {
+          CommandAttr(undef, "$tName room hidden");
           $telnetDevice = $tName;
           $defs{$tName}{TEMPORARY} = 1;
           last;
