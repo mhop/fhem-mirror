@@ -192,7 +192,8 @@ sub OWX_Define ($$) {
     $hash->{INTERFACE} = "serial";
     $hash->{HWDEVICE}   = $owx_hwdevice;
   #-- check if we are connecting to Arduino (via FRM):
-  } elsif ($dev =~ /\d{1,2}/) {
+  } elsif ($dev =~ /^\d{1,2}$/) {
+  	require "10_FRM.pm";
   	$hash->{INTERFACE} = "firmata";
     FRM_Client_Define($hash,$def);
   } else {
@@ -586,7 +587,7 @@ sub OWX_Detect ($) {
   	  $ress .= "Firmata detected in $iodev->{NAME}";
 	} else {
 	  $ret=0;
-	  $ress .= defined $iodev ? "not associated to any FRM device" : "$iodev->{NAME} is not connected to Firmata";
+	  $ress .= defined $iodev ? "$iodev->{NAME} is not connected to Firmata" : "not associated to any FRM device";
 	}
     #-- here we treat the COC/CUNO
   } else {

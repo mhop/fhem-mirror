@@ -320,7 +320,7 @@ package Firmata_IO {
 	sub data_write {
     	my ( $self, $buf ) = @_;
 	    main::Log 5, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
-    	main::DevIo_SimpleWrite($self->{hash},$buf);
+    	main::DevIo_SimpleWrite($self->{hash},$buf,undef);
 	}
 
 	sub data_read {
