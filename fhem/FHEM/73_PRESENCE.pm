@@ -30,7 +30,6 @@ package main;
 use strict;
 use warnings;
 use Blocking;
-use Net::Ping;
 use Time::HiRes qw(gettimeofday sleep);
 use DevIo;
 
@@ -356,24 +355,32 @@ PRESENCE_DoLocalPingScan($$)
     my ($string) = @_;
     my ($name, $device) = split("\\|", $string);
 
-    my $pingtool = Net::Ping->new("icmp");
     my $retcode;
     my $return;
-
-
-    if($pingtool)
+    my $temp;
+    if($^O =~ m/Win/)
     {
+	eval "require Net::Ping;";
+	my $pingtool = Net::Ping->new("syn");
 
-	$retcode = $pingtool->ping($device, 5);
-	$return = "$name|".($retcode ? "present" : "absent"); 
+	if($pingtool)
+	{
+	    $retcode = $pingtool->ping($device, 5);
+	    $return = "$name|".($retcode ? "present" : "absent"); 
+	}
+	else
+	{
+	    $return = "$name|error|Could not create a Net::Ping object.";
+	}
 
     }
     else
     {
-	$return = "$name|error|Could not create a Net::Ping object.";
+	$temp = qx(ping -c 4 $device);
+	$return = "$name|".($temp =~ /\d+ bytes from/ ? "present" : "absent");
     }
 
-return $return;
+    return $return;
 
 }
 
