@@ -411,7 +411,7 @@ PRESENCE_DoLocalFritzBoxScan($)
 	}
 	
 	$number++;
-	sleep 0.1;
+	sleep 0.2;
     }
     
     chomp $status;
