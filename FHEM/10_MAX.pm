@@ -199,10 +199,8 @@ MAX_Set($@)
       #TODO: auto mode with temperature is also possible
     } elsif($args[0] eq "eco") {
       $temperature = MAX_ReadingsVal($hash,"ecoTemperature");
-      return "No ecoTemperature defined" if(!$temperature);
     } elsif($args[0] eq "comfort") {
       $temperature = MAX_ReadingsVal($hash,"comfortTemperature");
-      return "No comfortTemperature defined" if(!$temperature);
     }else{
       $temperature = MAX_ParseTemperature($args[0]);
     }
