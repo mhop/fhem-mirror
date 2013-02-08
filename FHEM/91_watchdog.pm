@@ -65,7 +65,7 @@ watchdog_Notify($$)
   my ($watchdog, $dev) = @_;
 
   my $ln = $watchdog->{NAME};
-  return "" if($attr{$ln} && $attr{$ln}{disable});
+  return "" if(AttrVal($ln, "disable", 0));
   my $dontReAct = AttrVal($ln, "regexp1WontReactivate", 0);
 
   my $n   = $dev->{NAME};
@@ -116,7 +116,14 @@ sub
 watchdog_Trigger($)
 {
   my ($watchdog) = @_;
-  Log(3, "Watchdog $watchdog->{NAME} triggered");
+  my $name = $watchdog->{NAME};
+
+  if(AttrVal($name, "disable", 0)) {
+    $watchdog->{STATE} = "defined";
+    return "";
+  }
+
+  Log(3, "Watchdog $name triggered");
   my $exec = SemicolonEscape($watchdog->{CMD});;
   $watchdog->{STATE} = "triggered";
   
