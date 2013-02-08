@@ -7,8 +7,8 @@ use strict;
 use warnings;
 use MIME::Base64;
 use POSIX;
+use MaxCommon;
 
-require "10_MAX.pm";
 our %msgCmd2Id;
 our %device_types;
 

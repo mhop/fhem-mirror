@@ -11,6 +11,7 @@ package main;
 use strict;
 use warnings;
 use MIME::Base64;
+use MaxCommon;
 
 sub MAX_Define($$);
 sub MAX_Undef($$);
@@ -21,19 +22,6 @@ sub MAX_MD15Cmd($$$);
 sub MAX_DateTime2Internal($);
 
 my @ctrl_modes = ( "auto", "manual", "temporary", "boost" );
-
-use vars qw(%device_types);
-use vars qw(%msgId2Cmd);
-use vars qw(%msgCmd2Id);
-
-%device_types = (
-  0 => "Cube",
-  1 => "HeatingThermostat",
-  2 => "HeatingThermostatPlus",
-  3 => "WallMountedThermostat",
-  4 => "ShutterContact",
-  5 => "PushButton"
-);
 
 my %boost_durations = (0 => 0, 1 => 5, 2 => 10, 3 => 15, 4 => 20, 5 => 25, 6 => 30, 7 => 60);
 my %boost_durationsInv = reverse %boost_durations;
@@ -63,41 +51,6 @@ my %readingDef = ( #min/max/default
   "maxValveSetting"       => [ \&validValveposition, 100 ],
   "valveOffset"           => [ \&validValveposition, 00 ],
 );
-
-%msgId2Cmd = (
-                 "00" => "PairPing",
-                 "01" => "PairPong",
-                 "02" => "Ack",
-                 "03" => "TimeInformation",
-
-                 "10" => "ConfigWeekProfile",
-                 "11" => "ConfigTemperatures", #like eco/comfort etc
-                 "12" => "ConfigValve",
-
-                 "20" => "AddLinkPartner",
-                 "21" => "RemoveLinkPartner",
-                 "22" => "SetGroupId",
-                 "23" => "RemoveGroupId",
-
-                 "30" => "ShutterContactState",
-
-                 "40" => "SetTemperature", #to thermostat
-                 "42" => "WallThermostatState", #by WallMountedThermostat
-                 #Sending this without payload to thermostat sets desiredTempeerature to the comfort/eco temperature
-                 #We don't use it, we just do SetTemperature
-                 "43" => "SetComfortTemperature",
-                 "44" => "SetEcoTemperature",
-
-                 "50" => "PushButtonState",
-
-                 "60" => "ThermostatState", #by HeatingThermostat
-
-                 "82" => "SetDisplayActualTemperature",
-
-                 "F1" => "WakeUp",
-                 "F0" => "Reset",
-               );
-%msgCmd2Id = reverse %msgId2Cmd;
 
 my %interfaces = (
   "Cube" => undef,
