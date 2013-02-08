@@ -5,7 +5,7 @@ package main;
 
 use strict;
 use warnings;
-require "10_MAX.pm";
+use MaxCommon;
 
 our %msgId2Cmd;
 our %msgCmd2Id;
