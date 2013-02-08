@@ -68,6 +68,7 @@ SYSSTAT_Get($@)
     my $filesystems = $sys->get->{diskusage};
 
     my $ret;
+    $ret .= "<filesystem> <= <mountpoint>\n";
     foreach my $filesystem (keys %$filesystems ) { 
       $ret .= $filesystem ." <= ". $filesystems->{$filesystem}->{mountpoint} ."\n";
     }
@@ -208,8 +209,20 @@ SYSSTAT_GetUpdate($)
     free bytes for &lt;mountpoint&gt;</li>
   </ul><br>
 
+  <a name="SYSSTAT_Get"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;value&gt;</code>
+    <br><br>
+    where <code>value</code> is one of<br><br>
+    <li>filesystems<br>
+    Lists the filesystems that can be monitored.</li>
+  </ul><br>
+
+
   <a name="SYSSTAT_Attr"></a>
   <b>Attributes</b>
+  <ul>
     <li>filesystems<br>
       List of comma separated filesystems (not mountpoints) that should be monitored.<br>
     Examples:
@@ -221,7 +234,7 @@ SYSSTAT_GetUpdate($)
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
-</ul>
+  </ul>
 
 =end html
 =cut
