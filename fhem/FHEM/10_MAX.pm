@@ -511,11 +511,6 @@ MAX_Parse($$)
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
     $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
 
-    #The HeatingThermostat uses the measurementOffset during control
-    #but does not apply it to measuredTemperature before sending it to us (guessed)
-    my $measOffset = MAX_ReadingsVal($shash,"measurementOffset");
-    $measuredTemperature -= $measOffset if($measuredTemperature ne "" and $measOffset ne "");
-
     $shash->{mode} = $mode;
     $shash->{rferror} = $rferror;
     $shash->{dstsetting} = $dstsetting;
@@ -769,7 +764,7 @@ MAX_Parse($$)
     <li>comfortTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given comfort temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
     <li>measurementOffset &lt;value&gt;<br>
-      For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. The thermostat tries to match desiredTemperature to (measured temperature at sensor - measurementOffset). Usually, the measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small positive offset. Must be between -3.5 and 3.5 degree.</li>
+      For devices of type HeatingThermostat only. Writes the given temperature offset to the device's memory. The thermostat tries to match desiredTemperature to (temperature = measured temperature at sensor + measurementOffset). Usually, the measured temperature is a bit higher than the overall room temperature (due to closeness to the heater), so one uses a small negative offset. Must be between -3.5 and 3.5 degree celsius.</li>
     <li>minimumTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given minimum temperature to the device's memory. It confines the temperature that can be manually set on the device.</li>
     <li>maximumTemperature &lt;value&gt;<br>
@@ -827,7 +822,7 @@ MAX_Parse($$)
     <li>desiredTemperature<br>Only for HeatingThermostat and WallMountedThermostat</li>
     <li>valveposition<br>Only for HeatingThermostat</li>
     <li>battery</li>
-    <li>temperature<br>The measured(!) temperature, only for HeatingThermostat and WallMountedThermostat</li>
+    <li>temperature<br>The measured temperature (= measured temperature at sensor + measurementOffset), only for HeatingThermostat and WallMountedThermostat</li>
   </ul>
 </ul>
 
