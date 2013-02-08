@@ -13,7 +13,7 @@ SYSSTAT_Initialize($)
   $hash->{DefFn}    = "SYSSTAT_Define";
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems showpercent useregex loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems showpercent:1 useregex:1 loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -55,13 +55,14 @@ sub
 SYSSTAT_Attr($$$)
 {
   my ($cmd, $name, $attrName, $attrVal) = @_;
-  my $hash = $defs{$name};
 
   $attrVal= "" unless defined($attrVal);
-  $attrVal= "" if($cmd eq "useregex");
-  $attrVal= "" if($cmd eq "showpercent");
+  my $orig = $attrVal;
+  $attrVal= "1" if($attrName eq "useregex");
+  $attrVal= "1" if($attrName eq "showpercent");
 
   if( $attrName eq "filesystems") {
+    my $hash = $defs{$name};
     my @filesystems = split(",",$attrVal);
     @{$hash->{filesystems}} = @filesystems;
 
@@ -74,6 +75,13 @@ SYSSTAT_Attr($$$)
     }
   }
 
+  if( $cmd eq "set" ) {
+    if( $orig ne $attrVal ) {
+      $attr{$name}{$attrName} = $attrVal;
+      return $attrName ." set to ". $attrVal;
+    }
+  }
+
   return;
 }
 
@@ -83,6 +91,7 @@ SYSSTAT_GetUpdate($)
   my ($hash) = @_;
 
   if(!$hash->{LOCAL}) {
+    RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 1);
   }
 
@@ -153,7 +162,7 @@ SYSSTAT_GetUpdate($)
 
     Defines a SYSSTAT device.<br><br>
 
-    The statistics are updated &lt;interval&gt; seconds. The default is 60.<br><br>
+    The statistics are updated &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
 
     Examples:
     <ul>
@@ -176,7 +185,7 @@ SYSSTAT_GetUpdate($)
   <a name="SYSSTAT_Attr"></a>
   <b>Attributes</b>
     <li>filesystems<br>
-      List of comma separated filesystems that should be monitored.<br>
+      List of comma separated filesystems (not mountpoints) that should be monitored.<br>
     Examples:
     <ul>
       <code>attr sysstat filesystems /dev/md0,/dev/md2</code><br>
