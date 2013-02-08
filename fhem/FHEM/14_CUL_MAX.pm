@@ -354,7 +354,7 @@ CUL_MAX_SendTimeInformation(@)
   my ($hash,$addr,$payload) = @_;
   $payload = CUL_MAX_GetTimeInformationPayload() if(!defined($payload));
   Log 5, "broadcast time to $addr";
-  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "03");
+  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "04");
 }
 
 sub
