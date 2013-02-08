@@ -12,6 +12,7 @@ SYSSTAT_Initialize($)
 
   $hash->{DefFn}    = "SYSSTAT_Define";
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
+  $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
   $hash->{AttrList} = "filesystems showpercent:1 useregex:1 loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
@@ -50,6 +51,31 @@ SYSSTAT_Undefine($$)
   RemoveInternalTimer($hash);
   return undef;
 }
+
+sub   
+SYSSTAT_Get($@)
+{     
+  my ($hash, @a) = @_; 
+
+  my $name = $a[0];
+  return "$name: get needs at least one parameter" if(@a < 2);
+      
+  my $cmd= $a[1];
+      
+  if($cmd eq "filesystems") {
+
+    my $sys  = Sys::Statistics::Linux->new(diskusage => 1);
+    my $filesystems = $sys->get->{diskusage};
+
+    my $ret;
+    foreach my $filesystem (keys %$filesystems ) { 
+      $ret .= $filesystem ." <= ". $filesystems->{$filesystem}->{mountpoint} ."\n";
+    }
+    return $ret;
+  } else {
+    return "Unknown argument $cmd, choose one of filesystems";
+  }   
+}     
 
 sub
 SYSSTAT_Attr($$$)
