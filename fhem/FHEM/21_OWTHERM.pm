@@ -120,10 +120,10 @@ sub OWTHERM_Initialize ($) {
   $hash->{SetFn}   = "OWTHERM_Set";
   $hash->{AttrFn}  = "OWTHERM_Attr";
   $hash->{AttrList}= "IODev model:DS1820,DS18B20,DS1822 loglevel:0,1,2,3,4,5 ".
-                     "event-on-update-reading event-on-change-reading ".
                      "stateAL stateAH ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
-                     "tempLow tempHigh";                
+                     "tempLow tempHigh ".
+                     $readingFnAttributes;                
   }
   
 ########################################################################################
@@ -210,6 +210,7 @@ sub OWTHERM_Define ($$) {
   $hash->{PRESENT}    = 0;
   $hash->{ROM_ID}     = $fam.".".$id.$crc;
   $hash->{INTERVAL}   = $interval;
+  $hash->{ERRCOUNT}   = 0;
   
   #-- Couple to I/O device, exit if not possible
   AssignIoPort($hash);
@@ -223,12 +224,9 @@ sub OWTHERM_Define ($$) {
   #--
   readingsSingleUpdate($hash,"state","defined",1);
   Log 3, "OWTHERM: Device $name defined."; 
-  
-  #-- Start timer for initialization in a few seconds
-  InternalTimer(time()+10, "OWTHERM_InitializeDevice", $hash, 0);
    
   #-- Start timer for updates
-  InternalTimer(time()+10+$hash->{INTERVAL}, "OWTHERM_GetValues", $hash, 0);
+  InternalTimer(time()+10, "OWTHERM_GetValues", $hash, 0);
 
   return undef; 
 }
@@ -273,14 +271,18 @@ sub OWTHERM_InitializeDevice($) {
   $hash->{READINGS}{"temperature"}{TYPE} = "temperature";
   $hash->{READINGS}{"temperature"}{UNIT}     = $unit;
   $hash->{READINGS}{"temperature"}{UNITABBR} = $abbr;
+  $hash->{ERRCOUNT}                          = 0;
   $hash->{tempf}{offset}                     = $offset;
   $hash->{tempf}{factor}                     = $factor;
   
-  #-- Initial readings temperature sensor
-  $owg_temp  =  "";
-  $owg_tl    =  "";
-  $owg_th    =  "",
-  
+  #-- Set the attribute values if defined
+  if(  defined($attr{$name}{"tempLow"}) ){
+    OWTHERM_Set(  $hash,($name,"tempLow",$attr{$name}{"tempLow"}));
+  }
+  if( defined($attr{$name}{"tempHigh"}) ){
+    OWTHERM_Set(  $hash,($name,"tempHigh",$attr{$name}{"tempHigh"}) );
+  }
+
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
 }
@@ -337,24 +339,9 @@ sub OWTHERM_FormatValues($) {
   $vlow   = ($owg_tl + $offset)*$factor;
   $vhigh  = ($owg_th + $offset)*$factor;
   
-  #-- check if the device has to be corrected
-  if( AttrVal($name,"tempLow",undef) ){
-    if( $main::attr{$name}{"tempLow"} != $vlow ){
-      OWTHERM_Set(  $hash,("tempLow",$main::attr{$name}{"tempLow"}));
-      $vlow = $main::attr{$name}{"tempLow"};
-    }
-  } else {
-    $main::attr{$name}{"tempLow"}  = $vlow;
-  }
-  
-  if( AttrVal($name,"tempHigh",undef) ){
-    if( $main::attr{$name}{"tempHigh"} != $vhigh ){
-      OWTHERM_Set(  $hash,("tempHigh",$main::attr{$name}{"tempHigh"}));
-      $vhigh = $main::attr{$name}{"tempHigh"};
-    }
-  } else {
-    $main::attr{$name}{"tempHigh"}  = $vhigh;
-  }
+  #-- check if device needs to be initialized
+  OWTHERM_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
          
   #-- formats for output
   $statef = "T: %5.2f ".$abbr;
@@ -509,8 +496,11 @@ sub OWTHERM_GetValues($@) {
 
   #-- process results
   if( defined($ret)  ){
-    Log 3, "OWTHERM: Could not get values from device $name, reason $ret";
-    return 1;
+    $hash->{ERRCOUNT}=$hash->{ERRCOUNT}+1;
+    if( $hash->{ERRCOUNT} > 5 ){
+      $hash->{INTERVAL} = 9999;
+    }
+    return "OWTHERM: Could not get values from device $name for ".$hash->{ERRCOUNT}." times, reason $ret";
   }
   $hash->{PRESENT} = 1; 
 
@@ -572,9 +562,20 @@ sub OWTHERM_Set($@) {
     return sprintf("OWTHERM: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
       if($value < $mmin || $value > $mmax);
     
-    #-- seems to be ok, put into the device after correcting for offset and factor
+    #-- seems to be ok, correcting for offset and factor
     $a[2]  = int($value/$factor-$offset);
-
+    #-- put into attribute value
+    if( lc($key) eq "templow" ){
+      if( $main::attr{$name}{"tempLow"} != $a[2] ){
+        $main::attr{$name}{"tempLow"} = $a[2];
+      }
+    }
+    if( lc($key) eq "temphigh" ){
+      if( $main::attr{$name}{"tempHigh"} != $a[2] ){
+        $main::attr{$name}{"tempHigh"} = $a[2];
+      }
+    }
+    #-- put into device
     #-- OWX interface
     if( $interface eq "OWX" ){
       $ret = OWXTHERM_SetValues($hash,@a);
