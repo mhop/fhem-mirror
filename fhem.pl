@@ -412,7 +412,8 @@ if($motd eq "$sc_text\n\n") {
   }
 }
 
-Log 0, "Server started (version $attr{global}{version}, pid $$)";
+Log 0, "Server started with ".int(keys %defs).
+        " defined entities (version $attr{global}{version}, pid $$)";
 
 ################################################
 # Main Loop
