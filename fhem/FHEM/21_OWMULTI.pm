@@ -119,7 +119,7 @@ sub OWMULTI_Initialize ($) {
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS2438 loglevel:0,1,2,3,4,5 ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
-                     "VName VUnit VFunction".
+                     "VName VUnit VFunction ".
                      $readingFnAttributes;
   }
   
