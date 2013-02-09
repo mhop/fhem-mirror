@@ -253,7 +253,7 @@ sub Weather_RetrieveData($)
           ### current condition and forecast
           if (($tag eq "yweather:condition" ) || ($tag eq "yweather:forecast" )) {
              my $code = (($value =~/code="([0-9]*?)".*/) ? $1 : undef);
-             if (defined($code)) { 
+             if(defined($code)) {
                readingsBulkUpdate($hash, $prefix . "code", $code);
                my $text = $YahooCodes_i18n[$code];
                if ($text) { readingsBulkUpdate($hash, $prefix . "condition", $text); }
@@ -266,7 +266,7 @@ sub Weather_RetrieveData($)
           ### current condition 
           if ($tag eq "yweather:condition" ) {
              my $temp = (($value =~/temp="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if ($temp) { 
+             if(defined($temp)) {
                 readingsBulkUpdate($hash, "temperature", $temp);
                 readingsBulkUpdate($hash, "temp_c", $temp); # compatibility
                 $temp = int(( $temp * 9  / 5 ) + 32.5);  # Celsius to Fahrenheit
@@ -277,7 +277,7 @@ sub Weather_RetrieveData($)
              readingsBulkUpdate($hash, "current_date_time", $datum) if (defined($1));
 
              my $day = (($value =~/date="(.*?), .*/) ? $1 : undef);  
-             if ($day) {  
+             if(defined($day)) {
                 readingsBulkUpdate($hash, "day_of_week", $wdays_txt_i18n{$day});
              }          
           }
@@ -285,11 +285,11 @@ sub Weather_RetrieveData($)
           ### forecast 
           if ($tag eq "yweather:forecast" ) {
              my $low_c = (($value =~/low="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if ($low_c) { readingsBulkUpdate($hash, $prefix . "low_c", $low_c); }
+             if(defined($low_c)) { readingsBulkUpdate($hash, $prefix . "low_c", $low_c); }
              my $high_c = (($value =~/high="(-?[0-9.]*?)".*/) ? $1 : undef);
-             if ($high_c) { readingsBulkUpdate($hash, $prefix . "high_c", $high_c); }
+             if(defined($high_c)) { readingsBulkUpdate($hash, $prefix . "high_c", $high_c); }
              my $day1 = (($value =~/day="(.*?)" .*/) ? $1 : undef); # forecast
-             if ($day1) { 
+             if(defined($day1)) {
                 readingsBulkUpdate($hash, $prefix . "day_of_week", $wdays_txt_i18n{$day1});
              }   
           }
@@ -345,8 +345,7 @@ sub Weather_GetUpdate($)
   my $wind= $hash->{READINGS}{wind}{VAL};
   my $val= "T: $temperature  H: $humidity  W: $wind";
   Log GetLogLevel($hash->{NAME},4), "Weather ". $hash->{NAME} . ": $val";
-  $hash->{STATE}= $val;
-  addEvent($hash, $val);
+  readingsBulkUpdate($hash, "state", $val);
   readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); # DoTrigger, because sub is called by a timer instead of dispatch
       
   return 1;
