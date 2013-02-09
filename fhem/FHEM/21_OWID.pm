@@ -10,7 +10,7 @@
 #
 ########################################################################################
 #
-# define <name> OWID <FAM_ID> <ROM_ID>
+# define <name> OWID <FAM_ID> <ROM_ID> or OWID <FAM_ID>.<ROM_ID>
 #
 # where <name> may be replaced by any name string 
 #   
@@ -106,15 +106,14 @@ sub OWID_Define ($$) {
        if(int(@a) !=4 );
        
   #-- check id
-  if(  $a[2] =~ m/^[0-9|a-f|A-F]{2}$/ ) {
-    $fam            = $a[2];
-  } else {    
-    return "OWID: $a[0] family id $a[2] invalid, specify a 2 digit value";
-  }
-  if(  $a[3] =~ m/^[0-9|a-f|A-F]{12}$/ ) {
+  if(  ($a[2] =~ m/^[0-9|a-f|A-F]{2}$/) && ($a[3] =~ m/^[0-9|a-f|A-F]{12}$/)) {
+    $fam           = $a[2];
     $id            = $a[3];
+  } elsif(  $a[2] =~ m/^0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+   $fam           = substr($a[2],0,2);
+   $id            = substr($a[2],3);
   } else {    
-    return "OWID: $a[0] ID $a[3] invalid, specify a 12 digit value";
+    return "OWID: $def is invalid, specify a 2 digit 12 digit or 2.12 digit value";
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
@@ -213,24 +212,30 @@ sub OWID_Undef ($) {
  <a name="OWID"></a>
         <h3>OWID</h3>
         <p>FHEM module for 1-Wire devices that know only their unique ROM ID<br />
-            <br />Note:<br /> This 1-Wire module so far works only with the OWX interface module.
-            Please define an <a href="#OWX">OWX</a> device first. <br /></p>
+            <br />This 1-Wire module works with the OWX interface module or with the OWServer interface module
+            Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br /></p>
         <br /><h4>Example</h4><br />
         <p>
-            <code>define ROM1 OWX_ID OWCOUNT CE780F000000</code>
+            <code>define ROM1 OWX_ID OWCOUNT 09.CE780F000000</code>
             <br />
         </p><br />
         <a name="OWIDdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWID &lt;id&gt; </code>
+            <code>define &lt;name&gt; OWID &lt;fam&gt; &lt;id&gt; </code> or <br/>
+            <code>define &lt;name&gt; OWID &lt;fam&gt;.&lt;id&gt; </code>
             <br /><br /> Define a 1-Wire device.<br /><br />
         </p>
         <ul>
             <li>
+                <code>&lt;fam&gt;</code>
+                <br />2-character unique family id, see above 
+            </li>
+            <li>
                 <code>&lt;id&gt;</code>
                 <br />12-character unique ROM id of the converter device without family id and CRC
-                code </li>
+                code 
+            </li>
         </ul>
         <br />
         <a name="OWIDget"></a>
