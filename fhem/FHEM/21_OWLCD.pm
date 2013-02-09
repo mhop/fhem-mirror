@@ -10,14 +10,14 @@
 #
 ########################################################################################
 #
-# define <name> OWLCD <ROM_ID>
+# define <name> OWLCD <ROM_ID> or FF.<ROM_ID>
 #
 # where <name> may be replaced by any name string 
 #  
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #
-# get <name> id       => FAM_ID.ROM_ID.CRC 
+# get <name> id       => FF.ROM_ID.CRC 
 # get <name> present  => 1 if device present, 0 if not
 # get <name> gpio     => current state of the gpio pins (15 = all off, 0 = all on)
 # get <name> counter  => four values (16 Bit) of the gpio counter
@@ -148,8 +148,10 @@ sub OWLCD_Define ($$) {
   #-- check id
   if(  $a[2] =~ m/^[0-9|a-f|A-F]{12}$/ ) {
     $id            = $a[2];
+  } elsif(  $a[2] =~ m/^FF\.[0-9|a-f|A-F]{12}$/ ) {
+    $id            = substr($a[2],3);
   } else {    
-    return "OWLCD: $a[0] ID $a[2] invalid, specify a 12 digit value";
+    return "OWLCD: $a[0] ID $a[2] invalid, specify a 12 digit or 2.12 digit value";
   }
   
   #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
@@ -164,7 +166,7 @@ sub OWLCD_Define ($$) {
   
   #-- Couple to I/O device
   AssignIoPort($hash);
-  if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
+  if( (!defined($hash->{IODev}->{NAME})) || (!defined($hash->{IODev})) || (!defined($hash->{IODev}->{PRESENT})) ){
     return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
   }
   if( $hash->{IODev}->{PRESENT} != 1 ){
@@ -992,7 +994,9 @@ sub OWXLCD_Trans($) {
   $msg =~ s/Ö/\x5C/g;
   $msg =~ s/Ü/\x5E/g;
   $msg =~ s/ß/\xBE/g;
-  #--take out degree sign
+  #-- replace other special chars 
+  $msg =~s/_/\xC4/g;
+  #--take out HTML degree sign
   if( $msg =~ m/.*\&deg\;.*/ ) {
     my @ma = split(/\&deg\;/,$msg);
     $msg = $ma[0]."\x80".$ma[1];
@@ -1053,7 +1057,7 @@ sub OWXLCD_SetMemory($$$) {
 =pod
 =begin html
 
-  <a name="OWLCD"></a>
+ <a name="OWLCD"></a>
         <h3>OWLCD</h3>
         <p>FHEM module to commmunicate with the <a
                 href="http://www.louisswart.co.za/1-Wire_Overview.html">1-Wire LCD controller</a>
@@ -1070,7 +1074,8 @@ sub OWXLCD_SetMemory($$$) {
         <a name="OWLCDdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWLCD &lt;id&gt;</code>
+            <code>define &lt;name&gt; OWLCD &lt;id&gt;</code> or <br/>
+             <code>define &lt;name&gt; OWLCD FF.&lt;id&gt;</code>
             <br /><br /> Define a 1-Wire LCD device.<br /><br /></p>
         <ul>
             <li>
