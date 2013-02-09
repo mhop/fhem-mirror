@@ -128,8 +128,10 @@ PRESENCE_Define($$)
   {
  
    $hash->{MODE} = $destination;
-   InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 1) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
-   return;
+   
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 1) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
+    return;
   
   }
   elsif($destination eq "lan-bluetooth")
