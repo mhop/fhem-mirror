@@ -9,9 +9,6 @@ use MIME::Base64;
 use POSIX;
 use MaxCommon;
 
-our %msgCmd2Id;
-our %device_types;
-
 sub MAXLAN_Parse($$);
 sub MAXLAN_Read($);
 sub MAXLAN_Write(@);
