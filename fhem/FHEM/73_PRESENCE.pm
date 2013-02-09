@@ -128,7 +128,7 @@ PRESENCE_Define($$)
   {
  
    $hash->{MODE} = $destination;
-   PRESENCE_StartLocalScan($hash);
+   InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 1) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
    return;
   
   }
