@@ -7,10 +7,6 @@ use strict;
 use warnings;
 use MaxCommon;
 
-our %msgId2Cmd;
-our %msgCmd2Id;
-our %device_types;
-
 sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime(@);
 sub CUL_MAX_Set($@);
