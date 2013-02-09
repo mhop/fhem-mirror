@@ -732,7 +732,7 @@ sub OWXTHERM_GetValues($) {
   my ($i,$j,$k,@data,$ow_thn,$ow_tln);
   my $change = 0;
   
-  #-- For default, perform the conversion NOT now
+  #-- For default, perform the conversion now
   my $con=1;
   
   #-- ID of the device

@@ -118,9 +118,9 @@ sub OWMULTI_Initialize ($) {
   #tempOffset = a temperature offset added to the temperature reading for correction 
   #tempUnit   = a unit of measure: C/F/K
   $hash->{AttrList}= "IODev do_not_notify:0,1 showtime:0,1 model:DS2438 loglevel:0,1,2,3,4,5 ".
-                     "event-on-update-reading event-on-change-reading ".
                      "tempOffset tempUnit:C,Celsius,F,Fahrenheit,K,Kelvin ".
-                     "VName VUnit VFunction";
+                     "VName VUnit VFunction".
+                     $readingFnAttributes;
   }
   
 ########################################################################################
