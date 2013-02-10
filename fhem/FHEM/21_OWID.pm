@@ -19,6 +19,8 @@
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
 #
+# set <name> interval => set query interval for checking presence
+#
 # get <name> id       => FAM_ID.ROM_ID.CRC 
 # get <name> present  => 1 if device present, 0 if not
 #
@@ -51,10 +53,15 @@ sub Log($$);
 #-- declare variables
 my %gets = (
   "present"     => "",
+  "interval"    => "",
   "id"          => ""
 );
-my %sets    = ();
-my %updates = ();
+my %sets    = (
+  "interval"    => ""
+);
+my %updates = (
+ "present"    => ""
+);
  
 ########################################################################################
 #
@@ -76,8 +83,9 @@ sub OWID_Initialize ($) {
   $hash->{DefFn}    = "OWID_Define";
   $hash->{UndefFn}  = "OWID_Undef";
   $hash->{GetFn}    = "OWID_Get";
-  $hash->{SetFn}    = undef;
-  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ";
+  $hash->{SetFn}    = "OWID_Set";
+  my $attlist       = "IODev do_not_notify:0,1 showtime:0,1 model loglevel:0,1,2,3,4,5 ".
+                      $readingFnAttributes;
   $hash->{AttrList} = $attlist; 
 }
 
@@ -95,23 +103,26 @@ sub OWID_Define ($$) {
   #-- define <name> OWID <FAM_ID> <ROM_ID>
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$fam,$id,$crc,$ret);
+  my ($name,$interval,$fam,$id,$crc,$ret);
   
   #-- default
   $name          = $a[0];
+  $interval      = 300;
   $ret           = "";
 
   #-- check syntax
-  return "OWID: Wrong syntax, must be define <name> OWID <fam> <id>"
+  return "OWID: Wrong syntax, must be define <name> OWID <fam> <id> [interval]"
        if(int(@a) !=4 );
        
   #-- check id
   if(  ($a[2] =~ m/^[0-9|a-f|A-F]{2}$/) && ($a[3] =~ m/^[0-9|a-f|A-F]{12}$/)) {
     $fam           = $a[2];
     $id            = $a[3];
+    if(int(@a)>=5) { $interval = $a[4]; }
   } elsif(  $a[2] =~ m/^0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
    $fam           = substr($a[2],0,2);
    $id            = substr($a[2],3);
+   if(int(@a)>=4) { $interval = $a[3]; }
   } else {    
     return "OWID: $def is invalid, specify a 2 digit 12 digit or 2.12 digit value";
   }
@@ -125,6 +136,7 @@ sub OWID_Define ($$) {
   $hash->{OW_ID}      = $id;
   $hash->{OW_FAMILY}  = $fam;
   $hash->{PRESENT}    = 0;
+  $hash->{INTERVAL}   = $interval;
   
   #-- Couple to I/O device
   AssignIoPort($hash);
@@ -141,6 +153,10 @@ sub OWID_Define ($$) {
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
+  
+  #-- Start timer for updates
+  InternalTimer(time()+5+$hash->{INTERVAL}, "OWID_GetValues", $hash, 0);
+  
   #--
   readingsSingleUpdate($hash,"state","Initialized",1); 
   return undef; 
@@ -179,14 +195,101 @@ sub OWID_Get($@) {
      return "$name.id => $value";
   } 
   
+   #-- get interval
+  if($a[1] eq "interval") {
+    $value = $hash->{INTERVAL};
+     return "$name.interval => $value";
+  } 
+  
   #-- get present
   if($a[1] eq "present") {
     #-- hash of the busmaster
     my $master       = $hash->{IODev};
     $value           = OWX_Verify($master,$hash->{ROM_ID});
     $hash->{PRESENT} = $value;
+    if( $value == 0 ){
+      readingsSingleUpdate($hash,"state","not present",1); 
+    } else {
+      readingsSingleUpdate($hash,"state","present",1); 
+    }
     return "$name.present => $value";
   } 
+}
+
+
+########################################################################################
+#
+# OWID_GetValues - Updates the reading from one device
+#
+#  Parameter hash = hash of device addressed
+########################################################################################
+
+sub OWID_GetValues($) {
+  my $hash    = shift;
+  
+  my $name    = $hash->{NAME};
+  my $value   = "";
+  my $ret     = "";
+  my $offset;
+  my $factor;
+  
+  #-- restart timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(time()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+  
+  #-- hash of the busmaster
+  my $master       = $hash->{IODev};
+  $value           = OWX_Verify($master,$hash->{ROM_ID});
+  $hash->{PRESENT} = $value;
+  if( $value == 0 ){
+    readingsSingleUpdate($hash,"state","not present",1); 
+  } else {
+    readingsSingleUpdate($hash,"state","present",1); 
+  }
+}
+
+#######################################################################################
+#
+# OWID_Set - Set one value for device
+#
+#  Parameter hash = hash of device addressed
+#            a = argument array
+#
+########################################################################################
+
+sub OWID_Set($@) {
+  my ($hash, @a) = @_;
+  
+  my $key     = $a[1];
+  my $value   = $a[2];
+  
+  #-- for the selector: which values are possible
+  if (@a == 2){
+    my $newkeys = join(" ", keys %sets);
+    return $newkeys ;    
+  }
+  
+  #-- check syntax
+  return "OWID: Set needs at least one parameter"
+    if( int(@a)<3 );
+  #-- check argument
+  if( !defined($sets{$a[1]}) ){
+        return "OWID: Set with unknown argument $a[1]";
+  }
+  
+  my $name    = $hash->{NAME};
+  
+  #-- set new timer interval
+  if($key eq "interval") {
+    # check value
+    return "OWID: Set with short interval, must be > 1"
+      if(int($value) < 1);
+    # update timer
+    $hash->{INTERVAL} = $value;
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{INTERVAL}, "OWID_GetValues", $hash, 1);
+    return undef;
+  }
 }
 
 ########################################################################################
@@ -216,14 +319,14 @@ sub OWID_Undef ($) {
             Please define an <a href="#OWX">OWX</a> device or <a href="#OWServer">OWServer</a> device first. <br /></p>
         <br /><h4>Example</h4><br />
         <p>
-            <code>define ROM1 OWX_ID OWCOUNT 09.CE780F000000</code>
+            <code>define ROM1 OWX_ID OWCOUNT 09.CE780F000000 10</code>
             <br />
         </p><br />
         <a name="OWIDdefine"></a>
         <h4>Define</h4>
         <p>
-            <code>define &lt;name&gt; OWID &lt;fam&gt; &lt;id&gt; </code> or <br/>
-            <code>define &lt;name&gt; OWID &lt;fam&gt;.&lt;id&gt; </code>
+            <code>define &lt;name&gt; OWID &lt;fam&gt; &lt;id&gt; [&lt;interval&gt;]</code> or <br/>
+            <code>define &lt;name&gt; OWID &lt;fam&gt;.&lt;id&gt; [&lt;interval&gt;]</code>
             <br /><br /> Define a 1-Wire device.<br /><br />
         </p>
         <ul>
@@ -236,6 +339,17 @@ sub OWID_Undef ($) {
                 <br />12-character unique ROM id of the converter device without family id and CRC
                 code 
             </li>
+            <li>
+                <code>&lt;interval&gt;</code>
+                <br />Interval in seconds for checking the presence of the device. The default is 300 seconds. </li>
+        </ul>
+         <br />
+        <a name="OWIDset"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="owid_interval">
+                    <code>set &lt;name&gt; interval &lt;int&gt;</code></a><br />
+                    Interval in seconds for checking the presence of the device. The default is 300 seconds. </li>
         </ul>
         <br />
         <a name="OWIDget"></a>
