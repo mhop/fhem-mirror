@@ -568,7 +568,7 @@ OWServer_Set($@)
       the corresponding <a href="#OWDevice">OWDevice</a> if one is defined for the respective 1-wire devices.
     </li>
     <li><code>errors</code><br>
-      List a (maybe helpful) view of error statistics.
+      List a view of error statistics.</li>
     <li>owserver (OWFS) specific settings:
       <ul>
         <li><code>/settings/timeout/directory</code></li>
