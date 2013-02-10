@@ -351,7 +351,7 @@ FW_serveSpecial($$$$)
   }
 
   $FW_RETTYPE = ext2MIMEType($ext);
-  #Log 1, "We serve $dir/$file.$ext, $FW_RETTYPE";
+  #Log 1, "Serving $dir/$file.$ext as $FW_RETTYPE, cacheable:$cacheable";
   return FW_returnFileAsStream("$dir/$file.$ext", "",
                                         $FW_RETTYPE, 0, $cacheable);
 }
@@ -366,6 +366,7 @@ FW_setDirs()
   } else {
     $FW_dir = AttrVal($FW_wname, "fwmodpath", "$attr{global}{modpath}/FHEM");
   }
+
   # icon dir
   if(-d "$FW_dir/images") {
     $FW_icondir = "$FW_dir/images";
@@ -374,6 +375,7 @@ FW_setDirs()
   } else {
     $FW_icondir = $FW_dir;
   }
+
   # doc dir
   if(-d "$FW_dir/docs") {
     $FW_docdir = "$FW_dir/docs";
@@ -384,12 +386,14 @@ FW_setDirs()
   } else {
     $FW_docdir = $FW_dir;
   }
+
   # css dir
   if(-d "$FW_dir/pgm2") {
     $FW_cssdir = "$FW_dir/pgm2";
   } else {
     $FW_cssdir = $FW_dir;
   }
+
   # gplot dir
   if(-d "$FW_dir/gplot") {
     $FW_gplotdir = "$FW_dir/gplot";
@@ -398,6 +402,7 @@ FW_setDirs()
   } else {
     $FW_gplotdir = $FW_dir;
   }
+
   # javascript dir
   if(-d "$FW_dir/pgm2") {
     $FW_jsdir = "$FW_dir/pgm2";
@@ -460,6 +465,15 @@ FW_answerCall($)
     $FW_icons{$icon} =~ m/(.*)\.($ICONEXTENSION)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
+  } elsif($arg =~ m,^$FW_ME/(.*/)([^/]*),) {
+    my ($dir, $file, $ext) = ($1, $2, "");
+    $dir =~ s/\.\.//g;
+    if($file =~ m/^(.*)\.([^.]*)$/) {
+      $file = $1; $ext = $2;
+    }
+    return FW_serveSpecial($file, $ext, "$FW_dir/$dir",
+                           ($arg =~ m/nocache/) ? 0 : 1);
+    
   } elsif($arg !~ m/^$FW_ME(.*)/) {
     my $c = $me->{CD};
     Log 4, "$FW_wname: redirecting $arg to $FW_ME";
@@ -1309,7 +1323,7 @@ FW_returnFileAsStream($$$$$)
   binmode(FH) if($type !~ m/text/); # necessary for Windows
 
   $etag = defined($etag) ? "ETag: \"$etag\"\r\n" : "";
-  my $expires = $cacheable ? ("Expires: ".localtime(time()+900)." GMT\r\n"): "";
+  my $expires = $cacheable ? ("Expires: ".gmtime(time()+900)." GMT\r\n"): "";
   my $compr = ((int(@FW_enc) == 1 && $FW_enc[0] =~ m/gzip/) && $FW_use_zlib) ?
                 "Content-Encoding: gzip\r\n" : "";
   print $c "HTTP/1.1 200 OK\r\n",

@@ -8,30 +8,32 @@ use IO::Socket::INET;
 use MIME::Base64;
 
 my %ext2MIMEType= qw{
-  txt   text/plain
-  html  text/html
-  pdf   application/pdf
   css   text/css
-  jpg   image/jpeg
-  png   image/png
   gif   image/gif
+  html  text/html
   ico   image/x-icon
-};
+  jpg   image/jpeg
+  js    text/javascript
+  pdf   application/pdf
+  png   image/png
+  svg   image/svg+xml
+  txt   text/plain
 
-my $KNOWNEXTENSIONS= 'txt|html|pdf|css|jpg|png|gif|ico';
+};
 
 sub
 ext2MIMEType($) {
   my ($ext)= @_;
-  my $MIMEType= $ext ? $ext2MIMEType{$ext} : "";
-  return $MIMEType ? $MIMEType : "";
+  return "text/plain" if(!$ext);
+  my $MIMEType = $ext2MIMEType{lc($ext)};
+  return ($MIMEType ? $MIMEType : "text/$ext");
 }
 
 sub
 filename2MIMEType($) {
   my ($filename)= @_;
-  $filename =~ m/^(.*)\.($KNOWNEXTENSIONS)$/;
-  return ext2MIMEType($2);
+  $filename =~ m/^.*\.([^\.]*)$/;
+  return ext2MIMEType($1);
 }
   
 
