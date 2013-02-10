@@ -70,6 +70,7 @@
   - feature: added new set commands and basicauth to 49_IPCAM.pm (M. Fischer)
   - feature: userReadings
   - feature: average supports more than one value in combined readings (T:x H:y)
+  - feature: FHEMWEB serves arbitrary files from the www directory
   
 
 - 2012-10-28 (5.3)
