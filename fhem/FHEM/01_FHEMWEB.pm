@@ -929,6 +929,7 @@ FW_roomOverview($)
 
   ##############
   # LOGO
+  my $hasMenuScroll;
   if($FW_detail && $FW_ss) {
     $FW_room = AttrVal($FW_detail, "room", undef);
     $FW_room = $1 if($FW_room && $FW_room =~ m/^([^,]*),/);
@@ -939,24 +940,12 @@ FW_roomOverview($)
     return;
 
   } else {
-    FW_pH "", "<div id=\"logo\"></div>";
+    $hasMenuScroll = 1;
+    FW_pO '<div id="menuScrollArea">';
+    FW_pH "", '<div id="logo"></div>';
 
   }
 
-
-  ##############
-  # HEADER
-  FW_pO "<div id=\"hdr\">";
-  FW_pO '<table border="0"><tr><td style="padding:0">';
-  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
-  FW_pO FW_hidden("room", "$FW_room") if($FW_room);
-  FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
-  if(!$FW_ss && !$FW_hiddenroom{save}) {
-    FW_pO "</form></td><td><form>" . FW_submit("cmd", "save");
-  }
-  FW_pO "</form>";
-  FW_pO "</td></tr></table>";
-  FW_pO "</div>";
 
   ##############
   # MENU
@@ -1060,6 +1049,22 @@ FW_roomOverview($)
   }
   FW_pO "</table>";
   FW_pO "</div>";
+  FW_pO "</div>" if($hasMenuScroll);
+
+  ##############
+  # HEADER
+  FW_pO "<div id=\"hdr\">";
+  FW_pO '<table border="0"><tr><td style="padding:0">';
+  FW_pO "<form method=\"get\" action=\"$FW_ME\">";
+  FW_pO FW_hidden("room", "$FW_room") if($FW_room);
+  FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
+  if(!$FW_ss && !$FW_hiddenroom{save}) {
+    FW_pO "</form></td><td><form>" . FW_submit("cmd", "save");
+  }
+  FW_pO "</form>";
+  FW_pO "</td></tr></table>";
+  FW_pO "</div>";
+
 }
 
 
