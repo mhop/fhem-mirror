@@ -194,7 +194,7 @@ SYSSTAT_GetUpdate($)
     Examples:
     <ul>
       <code>define sysstat SYSSTAT</code><br>
-      <code>define sysstat SYSSTAT 30</code><br>
+      <code>define sysstat SYSSTAT 300</code><br>
     </ul>
   </ul><br>
 
@@ -229,12 +229,13 @@ SYSSTAT_GetUpdate($)
     <ul>
       <code>attr sysstat filesystems /dev/md0,/dev/md2</code><br>
       <code>attr sysstat filesystems /dev/.*</code><br>
-    </ul></lu>
+    </ul></li></lu>
     <li>showpercent<br>
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
   </ul>
+</ul>
 
 =end html
 =cut
