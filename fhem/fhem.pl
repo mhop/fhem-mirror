@@ -1809,24 +1809,28 @@ CommandAttr($$)
     if($a[1] eq "userReadings") {
 
       my %userReadings;
-
-      # myReading1 { codecodecode1 }, myReading2 { codecodecode2 }, ...
+      # myReading1 [modifier1] { codecodecode1 }, myReading2 [modifier2] { codecodecode2 }, ...
       my $arg= $a[2];
 
-      my $regexi= '\s*(\w+)\s+({.*?})\s*'; # matches myReading1 { codecode1 }
+      my $regexi= '\s*(\w+)\s+((\w+)\s+)?({.*?})\s*'; # matches myReading1 { codecode1 }
       my $regexo= '^(' . $regexi . ')(,\s*(.*))*$';
 
       #Debug "arg is $arg";
 
       while($arg =~ /$regexo/) {
         my $userReading= $2;
-        my $perlCode= $3;
-        #Debug sprintf("userReading %s has perlCode %s",$userReading,$perlCode);
-        $userReadings{$userReading}= $perlCode;
-        $arg= defined($5) ? $5 : "";
+        my $modifier= $4 ? $4 : "none";
+        my $perlCode= $5;
+        #Debug sprintf("userReading %s has perlCode %s with modifier %s",$userReading,$perlCode,$modifier);
+        if(grep { /$modifier/ } qw(none difference differential)) {
+          $userReadings{$userReading}{modifier}= $modifier;
+          $userReadings{$userReading}{perlCode}= $perlCode;
+        } else {
+          push @rets, "$sdev: unknown modifier $modifier for userReading $userReading, this userReading will be ignored";
+        }
+        $arg= defined($7) ? $7 : "";
       }
       $hash->{fhem}{'.userReadings'}= \%userReadings;
-
     } 
 
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
@@ -2990,6 +2994,7 @@ readingsBeginUpdate($)
   
   # get timestamp
   my $now = TimeNow();
+  $hash->{".updateTime"} = time(); # in seconds since the epoch
   $hash->{".updateTimestamp"} = $now;
 
   my $attreocr= AttrVal($name, "event-on-change-reading", undef);
@@ -3053,19 +3058,42 @@ readingsEndUpdate($$)
   if(defined($hash->{fhem}{'.userReadings'})) {
     my %userReadings= %{$hash->{fhem}{'.userReadings'}};
     foreach my $userReading (keys %userReadings) {
+      my $modifier= $userReadings{$userReading}{modifier};
+      my $perlCode= $userReadings{$userReading}{perlCode};
+      my $oldvalue= $userReadings{$userReading}{value};
+      my $oldt= $userReadings{$userReading}{t};
       #Debug "Evaluating " . $userReadings{$userReading};
-      my $value= eval $userReadings{$userReading};
+      # evaluate perl code
+      my $value= eval $perlCode;
+      my $result;
+      # store result
       if($@) {
         $value = "Error evaluating $name userReading $userReading: $@";
         Log 1, $value;
-      }
-      readingsBulkUpdate($hash,$userReading,$value,1);
+        $result= $value;
+      } elsif($modifier eq "none") {
+        $result= $value;
+      } elsif($modifier eq "difference") {
+        $result= $value - $oldvalue if(defined($oldvalue));
+      } elsif($modifier eq "differential") {
+        my $deltav= $value - $oldvalue if(defined($oldvalue));
+        my $deltat= $hash->{".updateTime"} - $oldt if(defined($oldt));
+        if(defined($deltav) && defined($deltat) && ($deltat>= 1.0)) {
+          $result= $deltav/$deltat;
+        }
+      } 
+      readingsBulkUpdate($hash,$userReading,$result,1) if(defined($result));
+      # store value
+      $hash->{fhem}{'.userReadings'}{$userReading}{TIME}= $hash->{".updateTimestamp"};
+      $hash->{fhem}{'.userReadings'}{$userReading}{t}= $hash->{".updateTime"};
+      $hash->{fhem}{'.userReadings'}{$userReading}{value}= $value;
     }
   }
   evalStateFormat($hash);
 
   # turn off updating mode
   delete $hash->{".updateTimestamp"};
+  delete $hash->{".updateTime"};
   delete $hash->{".attreour"};
   delete $hash->{".attreocr"};
 

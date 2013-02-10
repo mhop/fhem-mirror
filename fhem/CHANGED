@@ -55,6 +55,7 @@
              OWFS
   - feature: stateFormat (readingsFn modules) and showInternalValues attributes
   - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWave
+  - change:  BS, USF1000, ECMDDevice, Weather, dummy migrated to readingsFN (Boris)
   - feature: telnet client mode
   - bugfix:  FHEMWEB longpoll misses initial state change (HM: set_on vs. on)
   - change:  20_OWFS.pm, 21_OWTEMP modules flagged as "deprecated". These
@@ -66,8 +67,8 @@
   - feature: added new command 'notice'. (M. Fischer)
   - change:  update supports the display and confirmation of system messages
              via the new notice command (M. Fischer)
-  - change:  BS, USF1000, dummy migrated to readingsFN (Boris)
   - feature: added new set commands and basicauth to 49_IPCAM.pm (M. Fischer)
+  - feature: userReadings
   - feature: average supports more than one value in combined readings (T:x H:y)
   
 
