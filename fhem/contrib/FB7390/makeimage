@@ -17,7 +17,7 @@ mkdir fhem/FHEM fhem/docs
 cd ..
 
 cp install var
-cp startfhem var/fhem
+cp startfhem startfhemAsRoot var/fhem
 cp fhemcmd.sh var/fhem/FHEM
 
 
