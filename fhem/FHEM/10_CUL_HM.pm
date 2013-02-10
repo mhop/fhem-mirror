@@ -85,143 +85,140 @@ my %culHmDevProps=(
 #             => list 5 for channel 4 and 5 with peer=00000000
 #
 my %culHmModel=(
-  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0002" => {name=>"HM-LC-SW1-SM"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0003" => {name=>"HM-LC-SW4-SM"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "0004" => {name=>"HM-LC-SW1-FM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0005" => {name=>"HM-LC-BL1-FM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0006" => {name=>"HM-LC-BL1-SM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0007" => {name=>"KS550"                   ,cyc=>'00:10' ,rxt=>''    ,lst=>'1'            ,chn=>"",},
-  "0008" => {name=>"HM-RC-4"                 ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "0009" => {name=>"HM-LC-SW2-FM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "000A" => {name=>"HM-LC-SW2-SM"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "000B" => {name=>"HM-WDC7000"              ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"",},
-  "000D" => {name=>"ASH550"                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "000E" => {name=>"ASH550I"                 ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "000F" => {name=>"S550IA"                  ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "0011" => {name=>"HM-LC-SW1-PL"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0012" => {name=>"HM-LC-DIM1L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0013" => {name=>"HM-LC-DIM1L-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:4",},
-  "0016" => {name=>"HM-LC-DIM2L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "0018" => {name=>"CMM"                     ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0019" => {name=>"HM-SEC-KEY"              ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
-  "001A" => {name=>"HM-RC-P1"                ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
-  "001B" => {name=>"HM-RC-SEC3"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
-  "001C" => {name=>"HM-RC-SEC3-B"            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
-  "001D" => {name=>"HM-RC-KEY3"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
-  "001E" => {name=>"HM-RC-KEY3-B"            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
-  "0022" => {name=>"WS888"                   ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0026" => {name=>"HM-SEC-KEY-S"            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
-  "0027" => {name=>"HM-SEC-KEY-O"            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
-  "0028" => {name=>"HM-SEC-WIN"              ,cyc=>''      ,rxt=>'b'   ,lst=>'1,3'          ,chn=>"Win:1:1,Akku:2:2",},
-  "0029" => {name=>"HM-RC-12"                ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
-  "002A" => {name=>"HM-RC-12-B"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
-  "002D" => {name=>"HM-LC-SW4-PCB"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "002E" => {name=>"HM-LC-DIM2L-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "002F" => {name=>"HM-SEC-SC"               ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0030" => {name=>"HM-SEC-RHS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0034" => {name=>"HM-PBI-4-FM"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "0035" => {name=>"HM-PB-4-WM"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "0036" => {name=>"HM-PB-2-WM"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:2",},
-  "0037" => {name=>"HM-RC-19"                ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
-  "0038" => {name=>"HM-RC-19-B"              ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
-  "0039" => {name=>"HM-CC-TC"                ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'5:2.3p,6:2'   ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
-  "003A" => {name=>"HM-CC-VD"                ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'5'            ,chn=>"",},
-  "003B" => {name=>"HM-RC-4-B"               ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "003C" => {name=>"HM-WDS20-TH-O"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "003D" => {name=>"HM-WDS10-TH-O"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "003E" => {name=>"HM-WDS30-T-O"            ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "003F" => {name=>"HM-WDS40-TH-I"           ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "0040" => {name=>"HM-WDS100-C6-O"          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
-  "0041" => {name=>"HM-WDC7000"              ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",},
-  "0042" => {name=>"HM-SEC-SD"               ,cyc=>'99:00' ,rxt=>'b'   ,lst=>''             ,chn=>"",},
-  "0043" => {name=>"HM-SEC-TIS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0044" => {name=>"HM-SEN-EP"               ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0045" => {name=>"HM-SEC-WDS"              ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0046" => {name=>"HM-SWI-3-FM"             ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"Sw:1:3",},
-  "0047" => {name=>"KFM-Sensor"              ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
-  "0049" => {name=>"KFM-Display"             ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "004A" => {name=>"HM-SEC-MDIR"             ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "004B" => {name=>"HM-Sec-Cen"              ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "004C" => {name=>"HM-RC-12-SW"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
-  "004D" => {name=>"HM-RC-19-SW"             ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
-  "004E" => {name=>"HM-LC-DDC1-PCB"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "004F" => {name=>"HM-SEN-MDIR-SM"          ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0050" => {name=>"HM-SEC-SFA-SM"           ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Siren:1:1,Flash:2:2",},
-  "0051" => {name=>"HM-LC-SW1-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
-  "0052" => {name=>"HM-LC-SW2-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:2",},
-  "0053" => {name=>"HM-LC-BL1-PB-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0054" => {name=>"DORMA_RC-H"              ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
-  "0056" => {name=>"HM-CC-SCD"	             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0057" => {name=>"HM-LC-DIM1T-PL"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0058" => {name=>"HM-LC-DIM1T-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0059" => {name=>"HM-LC-DIM1T-FM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "005A" => {name=>"HM-LC-DIM2T-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "005C" => {name=>"HM-OU-CF-PL"             ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Sound:2:2",},
-  "005D" => {name=>"HM-Sen-MDIR-O"           ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "005F" => {name=>"HM-SCI-3-FM"             ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Sw:1:3",},
-  "0060" => {name=>"HM-PB-4DIS-WM"           ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
-  "0061" => {name=>"HM-LC-SW4-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "0062" => {name=>"HM-LC-SW2-DR"            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "0064" => {name=>"DORMA_atent"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
-  "0065" => {name=>"DORMA_BRC-H"             ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
-  "0066" => {name=>"HM-LC-SW4-WM"            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "006B" => {name=>"HM-PB-2-WM55"            ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Btn:1:2",},
-  "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
-  "006D" => {name=>"HM-OU-LED16"             ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"Led:1:16",},
-  "006E" => {name=>"HM-LC-Dim1L-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, 					
-  "006F" => {name=>"HM-LC-Dim1L-Pl"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0070" => {name=>"HM-LC-Dim2L-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "0071" => {name=>"HM-LC-Dim1T-Pl"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0072" => {name=>"HM-LC-Dim1T-CV"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0073" => {name=>"HM-LC-Dim1T-FM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0074" => {name=>"HM-LC-Dim2T-SM"          ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
-  "0075" => {name=>"HM-OU-CFM-PL"            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",},
-  "0076" => {name=>"HM-Sys-sRP-Pl"           ,cyc=>''      ,rxt=>''    ,lst=>'2'            ,chn=>"",},
-  "0078" => {name=>"HM-Dis-TD-T"             ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",}, #
-  "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, #
-  "0x7A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
-  "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
-  "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},	# radio-controlled socket adapter switch actuator 1-channel				
-  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2
-  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, #
-  "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
-  "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote 4 buttons
-  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Rotary Handle Sensor
-  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Shutter Contact
-  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches
-  "0084" => {name=>"Schueco_263-160"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM SENSOR_FOR_CARBON_DIOXIDE
-  "0086" => {name=>"Schueco_263-146"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
-  "0087" => {name=>"Schueco_263-147"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},	# radio-controlled blind actuator 1-channel (flush-mount)   						
-  "0088" => {name=>"Schueco_263-132" 		 ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},	# 1 channel dimmer L (ceiling voids)				
-  "0089" => {name=>"Schueco_263-134"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # 1 channel dimmer T (ceiling voids)							
-  "008A" => {name=>"Schueco_263-133"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},	# 1 channel dimmer TPBU (flush mount) 						
-  "008B" => {name=>"Schueco_263-130"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled switch actuator 1-channel (flush-mount)							
-  "008C" => {name=>"Schueco_263-131"         ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},	# radio-controlled switch actuator 1-channel (flush-mount)						
-  "008D" => {name=>"Schueco_263-135"         ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Push Button 2
-  "008E" => {name=>"Schueco_263-155"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons
-  "008F" => {name=>"Schueco_263-145"         ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
-  "0090" => {name=>"Schueco_263-162"         ,cyc=>'00:30' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM radio-controlled motion detector
-  "0092" => {name=>"Schueco_263-144"         ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
-  "0093" => {name=>"Schueco_263-158"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
-  "0094" => {name=>"Schueco_263-157"         ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
-  "00A1" => {name=>"HM-LC-SW1-PL2"           ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
-  "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
-  "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "00A7" => {name=>"HM-Sen-RD-O"             ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",}, 						
-  #263 167                        HM Smoke Detector Schueco 
-  #BRC-H                          Dorma Remote 4 single buttons 
-  #RC-H                           DORMA Remote 4 buttons 
-  #atent                          DORMA Remote 3 buttons 
+  "0001" => {name=>"HM-LC-SW1-PL-OM54"       ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0002" => {name=>"HM-LC-SW1-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0003" => {name=>"HM-LC-SW4-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "0004" => {name=>"HM-LC-SW1-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0005" => {name=>"HM-LC-BL1-FM"            ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0006" => {name=>"HM-LC-BL1-SM"            ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0007" => {name=>"KS550"                   ,st=>''                  ,cyc=>'00:10' ,rxt=>''    ,lst=>'1'            ,chn=>"",},
+  "0008" => {name=>"HM-RC-4"                 ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
+  "0009" => {name=>"HM-LC-SW2-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "000A" => {name=>"HM-LC-SW2-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "000B" => {name=>"HM-WDC7000"              ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"",},
+  "000D" => {name=>"ASH550"                  ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "000E" => {name=>"ASH550I"                 ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "000F" => {name=>"S550IA"                  ,st=>''                  ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "0011" => {name=>"HM-LC-SW1-PL"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0012" => {name=>"HM-LC-DIM1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0013" => {name=>"HM-LC-DIM1L-PL"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0014" => {name=>"HM-LC-SW1-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0015" => {name=>"HM-LC-SW4-SM-ATMEGA168"  ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:4",},
+  "0016" => {name=>"HM-LC-DIM2L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "0018" => {name=>"CMM"                     ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0019" => {name=>"HM-SEC-KEY"              ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
+  "001A" => {name=>"HM-RC-P1"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",},
+  "001B" => {name=>"HM-RC-SEC3"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
+  "001C" => {name=>"HM-RC-SEC3-B"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
+  "001D" => {name=>"HM-RC-KEY3"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
+  "001E" => {name=>"HM-RC-KEY3-B"            ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:3",},
+  "0022" => {name=>"WS888"                   ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0026" => {name=>"HM-SEC-KEY-S"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
+  "0027" => {name=>"HM-SEC-KEY-O"            ,st=>'keyMatic'          ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
+  "0028" => {name=>"HM-SEC-WIN"              ,st=>'winMatic'          ,cyc=>''      ,rxt=>'b'   ,lst=>'1,3'          ,chn=>"Win:1:1,Akku:2:2",},
+  "0029" => {name=>"HM-RC-12"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
+  "002A" => {name=>"HM-RC-12-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
+  "002D" => {name=>"HM-LC-SW4-PCB"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "002E" => {name=>"HM-LC-DIM2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "002F" => {name=>"HM-SEC-SC"               ,st=>''                  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0030" => {name=>"HM-SEC-RHS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0034" => {name=>"HM-PBI-4-FM"             ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
+  "0035" => {name=>"HM-PB-4-WM"              ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
+  "0036" => {name=>"HM-PB-2-WM"              ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "0037" => {name=>"HM-RC-19"                ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
+  "0038" => {name=>"HM-RC-19-B"              ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
+  "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'5:2.3p,6:2'   ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
+  "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'5'            ,chn=>"",},
+  "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
+  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003E" => {name=>"HM-WDS30-T-O"            ,st=>''                  ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "0040" => {name=>"HM-WDS100-C6-O"          ,st=>''                  ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
+  "0041" => {name=>"HM-WDC7000"              ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",},
+  "0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'b'   ,lst=>''             ,chn=>"",},
+  "0043" => {name=>"HM-SEC-TIS"              ,st=>''                  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0044" => {name=>"HM-SEN-EP"               ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0045" => {name=>"HM-SEC-WDS"              ,st=>''                  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0046" => {name=>"HM-SWI-3-FM"             ,st=>'swi'               ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"Sw:1:3",},
+  "0047" => {name=>"KFM-Sensor"              ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
+  "0049" => {name=>"KFM-Display"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "004B" => {name=>"HM-Sec-Cen"              ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "004C" => {name=>"HM-RC-12-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
+  "004D" => {name=>"HM-RC-19-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
+  "004E" => {name=>"HM-LC-DDC1-PCB"          ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "004F" => {name=>"HM-SEN-MDIR-SM"          ,st=>'motionDetector'    ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0050" => {name=>"HM-SEC-SFA-SM"           ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Siren:1:1,Flash:2:2",},
+  "0051" => {name=>"HM-LC-SW1-PB-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
+  "0052" => {name=>"HM-LC-SW2-PB-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:2",},
+  "0053" => {name=>"HM-LC-BL1-PB-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0054" => {name=>"DORMA_RC-H"              ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
+  "0056" => {name=>"HM-CC-SCD"	             ,st=>''                  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "0057" => {name=>"HM-LC-DIM1T-PL"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0058" => {name=>"HM-LC-DIM1T-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0059" => {name=>"HM-LC-DIM1T-FM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "005A" => {name=>"HM-LC-DIM2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "005C" => {name=>"HM-OU-CF-PL"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Sound:2:2",},
+  "005D" => {name=>"HM-Sen-MDIR-O"           ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
+  "005F" => {name=>"HM-SCI-3-FM"             ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Sw:1:3",},
+  "0060" => {name=>"HM-PB-4DIS-WM"           ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:20",},
+  "0061" => {name=>"HM-LC-SW4-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "0062" => {name=>"HM-LC-SW2-DR"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "0064" => {name=>"DORMA_atent"             ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
+  "0065" => {name=>"DORMA_BRC-H"             ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",},
+  "0066" => {name=>"HM-LC-SW4-WM"            ,st=>''                  ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"Sw:1:4",},
+  "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "006B" => {name=>"HM-PB-2-WM55"            ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Btn:1:2",},
+  "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
+  "006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"Led:1:16",},
+  "006E" => {name=>"HM-LC-Dim1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, 					
+  "006F" => {name=>"HM-LC-Dim1L-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0070" => {name=>"HM-LC-Dim2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "0071" => {name=>"HM-LC-Dim1T-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0072" => {name=>"HM-LC-Dim1T-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0073" => {name=>"HM-LC-Dim1T-FM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0074" => {name=>"HM-LC-Dim2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
+  "0075" => {name=>"HM-OU-CFM-PL"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",},
+  "0076" => {name=>"HM-Sys-sRP-Pl"           ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'2'            ,chn=>"",},
+  "0078" => {name=>"HM-Dis-TD-T"             ,st=>''                  ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",}, #
+  "0079" => {name=>"ROTO_ZEL-STG-RM-FWT"     ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, #
+  "007A" => {name=>"ROTO_ZEL-STG-RM-FSA"     ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
+  "007B" => {name=>"ROTO_ZEL-STG-RM-FEP-230V",st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #
+  "007C" => {name=>"ROTO_ZEL-STG-RM-FZS"     ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled socket adapter switch actuator 1-channel				
+  "007D" => {name=>"ROTO_ZEL-STG-RM-WT-2"    ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Push Button 2
+  "007E" => {name=>"ROTO_ZEL-STG-RM-DWT-10"  ,st=>''                  ,cyc=>'00:10' ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, #
+  "007F" => {name=>"ROTO_ZEL-STG-RM-FST-UP4" ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
+  "0080" => {name=>"ROTO_ZEL-STG-RM-HS-4"    ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote 4 buttons
+  "0081" => {name=>"ROTO_ZEL-STG-RM-FDK"     ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Rotary Handle Sensor
+  "0082" => {name=>"Roto_ZEL-STG-RM-FFK"     ,st=>''                  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM Shutter Contact
+  "0083" => {name=>"Roto_ZEL-STG-RM-FSS-UP3" ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches
+  "0084" => {name=>"Schueco_263-160"         ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, # HM SENSOR_FOR_CARBON_DIOXIDE
+  "0086" => {name=>"Schueco_263-146"         ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)
+  "0087" => {name=>"Schueco_263-147"         ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled blind actuator 1-channel (flush-mount)   						
+  "0088" => {name=>"Schueco_263-132" 		 ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # 1 channel dimmer L (ceiling voids)				
+  "0089" => {name=>"Schueco_263-134"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # 1 channel dimmer T (ceiling voids)							
+  "008A" => {name=>"Schueco_263-133"         ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # 1 channel dimmer TPBU (flush mount) 						
+  "008B" => {name=>"Schueco_263-130"         ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled switch actuator 1-channel (flush-mount)							
+  "008C" => {name=>"Schueco_263-131"         ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # radio-controlled switch actuator 1-channel (flush-mount)						
+  "008D" => {name=>"Schueco_263-135"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM Push Button 2
+  "008E" => {name=>"Schueco_263-155"         ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Remote Display 4 buttons
+  "008F" => {name=>"Schueco_263-145"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
+  "0090" => {name=>"Schueco_263-162"         ,st=>''                  ,cyc=>'00:30' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM radio-controlled motion detector
+  "0092" => {name=>"Schueco_263-144"         ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
+  "0093" => {name=>"Schueco_263-158"         ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "0094" => {name=>"Schueco_263-157"         ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "00A1" => {name=>"HM-LC-SW1-PL2"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
+  "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
+  "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",}, 						
 );
+
 sub
 CUL_HM_Initialize($)
 {
@@ -251,7 +248,6 @@ CUL_HM_Initialize($)
   $hash->{AttrList}  .= " subType:".join(",", sort 
                 map { $culHmDevProps{$_}{st} } keys %culHmDevProps);
   CUL_HM_initRegHash();
-  
 }
 sub
 CUL_HM_autoReadConfig($){
@@ -1143,10 +1139,12 @@ CUL_HM_Parse($$)
       $error = 'motor aborted'  if ($stErr == 2);
       $error = 'clutch failure' if ($stErr == 1);
       $error = 'none'           if ($stErr == 0);
+      my %dir = {0=>"none",1=>"up",2=>"down",3=>"undefined"};
 
-      push @event, "unknown:40"   if($err&0x40);
-	  push @event, "battery:".   (($err&0x80) ? "low":"ok");
+      push @event, "unknown:40" if($err&0x40);
+	  push @event, "battery:"   .(($err&0x80) ? "low":"ok");
       push @event, "uncertain:" .(($err&0x30) ? "yes":"no");
+      push @event, "direction:" .$dir{($err>>4)&3};
       push @event, "error:" .    ($error);
       my $state = ($err & 0x30) ? " (uncertain)" : "";
       push @event, "lock:"	.	(($val == 1) ? "unlocked" : "locked");
@@ -3371,6 +3369,7 @@ CUL_HM_ID2PeerList ($$$)
   my($name,$peerID,$set) = @_;
   my $peerIDs = AttrVal($name,"peerIDs",""); 
   my $hash = CUL_HM_name2Hash($name);
+  $peerID = "00000000" if ($peerID =~ /^000000..$/);# add end detection
   $peerIDs =~ s/$peerID//g;#avoid duplicate, support unset
   $peerIDs.= $peerID."," if($set);
 
@@ -3379,13 +3378,14 @@ CUL_HM_ID2PeerList ($$$)
   my $peerNames = "";                               #prepare names
   my $dId = substr(CUL_HM_name2Id($name),0,6);      #get own device ID
   foreach my $pId (sort(keys %tmpHash)){
-    next if ($pId !~ m/^[0-9A-F]{8}$/);              #ignore non-channel IDs
-	$peerIDs .= $pId.",";                            #append ID
-	$peerNames .= (($dId eq substr($pId,0,6))?       #is own channel?
+    next if ($pId !~ m/^[0-9A-F]{8}$/);             #ignore non-channel IDs
+	$peerIDs .= $pId.",";                           #append ID
+    next if ($pId eq "00000000");                   #ignore end detector
+	$peerNames .= (($dId eq substr($pId,0,6))?      #is own channel?
 	                  ("self".substr($pId,6,2)):    #yes, name it 'self'
 	                  (CUL_HM_id2Name($pId)))       #find name otherwise
 				  .",";                             # dont forget separator
-  }
+  }                                                 
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
   readingsSingleUpdate($hash,"peerList",$peerNames,0);
 }
@@ -3777,7 +3777,7 @@ CUL_HM_parseCommon(@){
 	    my $chnNname = $chnhash->{NAME};
 		my @peers = substr($p,2,) =~ /(.{8})/g;
 		foreach my $peer(@peers){	
-    	  CUL_HM_ID2PeerList ($chnNname,$peer,1) if ($peer !~ m/^000000../);
+    	  CUL_HM_ID2PeerList ($chnNname,$peer,1);# if ($peer !~ m/^000000../);
 		}
 		
 		if ($p =~ m/000000..$/) {# last entry, peerList is complete
@@ -3790,7 +3790,7 @@ CUL_HM_parseCommon(@){
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
 		    my @peerID = split(",", AttrVal($chnNname,"peerIDs",""));
 		    foreach my $peer (@peerID){
-			  $peer .="01" if (length($peer) == 6); # add the default
+			  next if ($peer =~  m/^000000..$/);
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
 				CUL_HM_PushCmdStack($shash,sprintf("++%s01%s%s%s04%s%s",
 						$flag,$id,$src,$chn,$peer,$listNo));# List3 or 4 
@@ -4328,6 +4328,13 @@ CUL_HM_setAttrIfCh($$$$)
     DoTrigger($name,$trig.":".$val) if($trig);
 	$attr{$name}{$att} = $val;
   }
+}
+sub
+CUL_HM_getInfos(@)
+{
+  my ($vars) = @_;
+  return %culHmModel if ($vars eq "culHmModel");
+  return %culHmModel;
 }
 
 1;
