@@ -3,13 +3,17 @@ body     { background-color: #FFFFE7;
 input    { font-family:Arial, sans-serif; font-size:16px; }
 select   { font-family:Arial, sans-serif; font-size:16px; }
 
-#logo    { position:fixed; top:10px; left:20px;
-            width:120px;  height:132px; background-image:url(../icons/fhemicon.png); }
-#menu    { position:fixed; top:152px;left:20px; width:140px; }
+#logo    { margin-top:10px; margin-left:20px; width:120px; height:132px;
+           background-image:url(../icons/fhemicon.png); }
+#menu    { margin-top:10px; margin-left:20px; width:140px; }
+#menuScrollArea { width: 175px; left:0px; top:0px; height:100%; 
+                  position:fixed; overflow-x:hidden; overflow-y:auto; } 
+
 #hdr     { position:absolute; top:10px; left:180px; }
 #content { position:absolute; top:50px; left:180px; bottom:20px; right:10px; }
 
-#connect_err { background-color: #000000; color: #FFFFFF; position:absolute; top:0px; left:40px; z-index: 10; }
+#connect_err { background-color: #000000; color: #FFFFFF; 
+               position:absolute; top:0px; left:40px; z-index: 10; }
 .devType { padding-top:20px; }
 a {  color: #278727; }
 img {  border-style: none; }
