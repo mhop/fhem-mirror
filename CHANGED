@@ -71,6 +71,7 @@
   - feature: userReadings
   - feature: average supports more than one value in combined readings (T:x H:y)
   - feature: FHEMWEB serves arbitrary files from the www directory
+  - feature: FB_checkPw now works with a distinct fritzbox user
   
 
 - 2012-10-28 (5.3)
