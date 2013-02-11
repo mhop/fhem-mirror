@@ -466,8 +466,10 @@ FW_answerCall($)
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
   } elsif($arg =~ m,^$FW_ME/(.*)/([^/]*),) {
-    my ($dir, $file, $ext) = ($1, $2, "");
+    my ($dir, $ofile, $ext) = ($1, $2, "");
     $dir =~ s/\.\.//g;
+
+    my $file = $ofile;
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
     }
@@ -475,8 +477,12 @@ FW_answerCall($)
       return FW_serveSpecial($file, $ext, "$FW_dir/$dir",
                            ($arg =~ m/nocache/) ? 0 : 1);
     }
+    $arg = "/$dir/$ofile";
     
-  } elsif($arg !~ m/^$FW_ME(.*)/) {
+  } elsif($arg =~ m/^$FW_ME(.*)/) {
+    $arg = $1; # The stuff behind FW_ME, continue to check for commands/FWEXT
+
+  } else {
     my $c = $me->{CD};
     Log 4, "$FW_wname: redirecting $arg to $FW_ME";
     print $c "HTTP/1.1 302 Found\r\n",
@@ -486,7 +492,6 @@ FW_answerCall($)
 
   }
   
-  $arg = $1; # The stuff behind FW_ME
 
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
   $FW_plotsize = AttrVal($FW_wname, "plotsize", $FW_ss ? "480,160" :
