@@ -3781,7 +3781,7 @@ sub CUL_HM_parseCommon(@){
 		    my $id = CUL_HM_Id($shash->{IODev});
 		    my $listNo = "0".$chnhash->{helper}{getCfgListNo};
 		    my @peerID = split(",", AttrVal($chnNname,"peerIDs",""));
-		    foreach my $peer (@peerID)
+		    foreach my $peer (@peerID){
 			  next if ($peer eq '00000000');# ignore termination 
 			  $peer .="01" if (length($peer) == 6); # add the default
 			  if ($peer &&($peer eq $reqPeer || $reqPeer eq "all")){
