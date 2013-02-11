@@ -7,12 +7,14 @@ use warnings;
 use Digest::MD5 "md5_hex";
 use HttpUtils;
 
-my ($lastOkPw, $lastOkHost, $lastOkTime) =("", "", 0);
+my ($lastOkPw, $lastOkUser, $lastOkHost, $lastOkTime) =("", "", 0);
+
+sub FB_checkPw(@);
 
 sub
-FB_doCheckPW($$)
+FB_doCheckPW($$$)
 {
-  my ($host, $pw) = @_;
+  my ($host, $user, $pw) = @_;
   my $data = GetFileFromURL("http://$host/login_sid.lua", undef, undef, 1);
   return undef if(!$data);
 
@@ -33,7 +35,10 @@ FB_doCheckPW($$)
   } else {                            # FritzOS >= 5.50
     my @d = ( "response=$chlAnsw", "page=/login_sid.lua" );
     $data = join("&", map {join("=", map {urlEncode($_)} split("=",$_,2))} @d);
-    $data = GetFileFromURL("http://$host/login_sid.lua", undef, $data, 1);
+    my $url = "http://$host/login_sid.lua";
+    $url .= "?username=$user" if($user);
+
+    $data = GetFileFromURL($url, undef, $data, 1);
     my $sid = $1 if($data =~ /<SID>(\w+)<\/SID>/i);
     $sid = undef if($sid =~ m/^0*$/);
     return $sid;
@@ -41,16 +46,22 @@ FB_doCheckPW($$)
 }
 
 sub
-FB_checkPw($$)
+FB_checkPw(@)
 {
-  my ($host, $pw) = @_;
+  my ($host, $p1, $p2) = @_;
+  my $user = ($p2 ? $p1 : ""); # Compatibility mode: no user parameter
+  my $pw   = ($p2 ? $p2 : $p1);
+
   my $now = time();
 
-  return 1 if($lastOkPw eq $pw && $lastOkHost eq $host && 
+  return 1 if($lastOkPw   eq $pw &&
+              $lastOkUser eq $user && 
+              $lastOkHost eq $host && 
               ($now - $lastOkTime) < 300); # 5min cache
 
-  if(FB_doCheckPW($host, $pw)) {
-    $lastOkPw = $pw;
+  if(FB_doCheckPW($host, $user, $pw)) {
+    $lastOkPw   = $pw;
+    $lastOkUser = $user;
     $lastOkTime = $now;
     $lastOkHost = $host;
     return 1;

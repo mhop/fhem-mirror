@@ -2906,10 +2906,12 @@ FW_htmlEscape($)
         Example:<br>
         <code>
         attr WEB basicAuth { "$user:$password" eq "admin:secret" }<br>
-        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$password") }<br>
         </code>
-
-
+        or if you defined multiple users on the Fritzbox:<br>
+        <code>
+        attr WEB basicAuth {use FritzBoxUtils;;FB_checkPw("localhost","$user", "$password") }<br>
+        </code>
     </li><br>
 
     <a name="HTTPS"></a>

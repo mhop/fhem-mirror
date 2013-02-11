@@ -374,7 +374,11 @@ telnet_Undef($$)
         Example:<br>
         <code>
         attr tPort password secret<br>
-        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") }
+        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$password") }<br>
+        </code>
+        or if you defined multiple users on the Fritzbox:<br>
+        <code>
+        attr tPort password {use FritzBoxUtils;;FB_checkPw("localhost","$user", "$password") }<br>
         </code>
         </li><br>
 
