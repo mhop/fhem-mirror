@@ -4457,8 +4457,7 @@ CUL_HM_getInfos(@)
             recommend using Homematic encryption at all.</li>
         </ul>
     </li>
-	</ul>
-
+    </ul>
   </ul><br>
 
   <a name="CUL_HMset"></a>
@@ -4985,7 +4984,6 @@ CUL_HM_getInfos(@)
          </li>
        </ul>
   </ul>
-</ul>
   <br>
   
   <a name="CUL_HMget"></a>
