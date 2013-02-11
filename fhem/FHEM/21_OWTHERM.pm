@@ -334,10 +334,11 @@ sub OWTHERM_FormatValues($) {
   
   #-- correct values for proper offset, factor 
   $vval  = ($owg_temp + $offset)*$factor;
-    
-  #-- correct alarm values for proper offset, factor 
   $vlow   = ($owg_tl + $offset)*$factor;
   $vhigh  = ($owg_th + $offset)*$factor;
+  
+  $main::attr{$name}{"tempLow"} = $vlow;
+  $main::attr{$name}{"tempHigh"} = $vhigh;
   
   #-- check if device needs to be initialized
   OWTHERM_InitializeDevice($hash)
@@ -552,6 +553,9 @@ sub OWTHERM_Set($@) {
 
   #-- set tempLow or tempHigh
   if( (lc($key) eq "templow") || (lc($key) eq "temphigh")) {
+    #-- First we have to read the current data, because alarms may not be set independently
+    OWTHERM_GetValues($hash);
+    
     my $interface = $hash->{IODev}->{TYPE};
     my $offset    = defined($hash->{tempf}{offset}) ? $hash->{tempf}{offset} : 0.0;
     my $factor    = defined($hash->{tempf}{factor}) ? $hash->{tempf}{factor} : 1.0;
@@ -591,7 +595,7 @@ sub OWTHERM_Set($@) {
   
   #-- process results - we have to reread the device
   $hash->{PRESENT} = 1; 
-  #OWTHERM_GetValues($hash);
+  #
   #OWTHERM_FormatValues($hash);
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
@@ -706,7 +710,20 @@ sub OWFSTHERM_SetValues($@) {
   my $master = $hash->{IODev};
   my $name   = $hash->{NAME};
   
-  OWServer_Write($master, "/$owx_add/".lc($a[0]),$a[1] );
+  #-- define vars
+  my $key   = $a[1];
+  my $value = $a[2];
+  return undef
+    if( !defined($value));
+  return undef 
+    if( $value eq "");
+    
+  #-- $owg_tl and $owg_th are preset and may be changed here
+  $owg_tl = $value if( lc($key) eq "templow" );
+  $owg_th = $value if( lc($key) eq "temphigh");
+  
+  OWServer_Write($master, "/$owx_add/".lc($key),$value );
+  
   return undef
 }
 
