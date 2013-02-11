@@ -465,14 +465,16 @@ FW_answerCall($)
     $FW_icons{$icon} =~ m/(.*)\.($ICONEXTENSION)/;
     return FW_serveSpecial($1, $2, $FW_icondir, $cacheable);
 
-  } elsif($arg =~ m,^$FW_ME/(.*/)([^/]*),) {
+  } elsif($arg =~ m,^$FW_ME/(.*)/([^/]*),) {
     my ($dir, $file, $ext) = ($1, $2, "");
     $dir =~ s/\.\.//g;
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
     }
-    return FW_serveSpecial($file, $ext, "$FW_dir/$dir",
+    if(-r "$FW_dir/$dir/$file.$ext") {
+      return FW_serveSpecial($file, $ext, "$FW_dir/$dir",
                            ($arg =~ m/nocache/) ? 0 : 1);
+    }
     
   } elsif($arg !~ m/^$FW_ME(.*)/) {
     my $c = $me->{CD};
