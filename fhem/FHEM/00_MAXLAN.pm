@@ -544,7 +544,7 @@ MAXLAN_Parse($$)
     if($device_types{$devicetype} eq "Cube"){
       #TODO: there is a lot of data left to interpret
 
-    }elsif($device_types{$devicetype} eq "HeatingThermostat"){
+    }elsif($device_types{$devicetype} =~ /HeatingThermostat.*/){
       my ($comforttemp,$ecotemp,$maxsetpointtemp,$minsetpointtemp,$tempoffset,$windowopentemp,$windowopendur,$boost,$decalcifiction,$maxvalvesetting,$valveoffset,$weekprofile) = unpack("CCCCCCCCCCCH*",substr($bindata,18));
       #TODO: parse week profile
       my $boostValve = ($boost & 0x1F) * 5;
@@ -621,7 +621,7 @@ MAXLAN_Parse($$)
 
         if(!$shash) {
           Log 2, "Got List response for undefined device with addr $addr";
-        }elsif($shash->{type} eq "HeatingThermostat"){
+        }elsif($shash->{type} =~ /HeatingThermostat.*/){
           Dispatch($hash, "MAX,1,ThermostatState,$addr,$payload", {RAWMSG => $rmsg});
         }elsif($shash->{type} eq "WallMountedThermostat"){
           Dispatch($hash, "MAX,1,WallThermostatState,$addr,$payload", {RAWMSG => $rmsg});
