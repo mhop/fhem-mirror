@@ -13,7 +13,7 @@ sub CUL_MAX_Set($@);
 sub CUL_MAX_SendAck($$$);
 sub CUL_MAX_SendTimeInformation(@);
 sub CUL_MAX_Send(@);
-
+sub CUL_MAX_SendQueueHandler($);
 my $pairmodeDuration = 60; #seconds
 
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
@@ -62,7 +62,7 @@ CUL_MAX_Define($$)
   $hash->{cnt} = 0;
   $hash->{pairmode} = 0;
   $hash->{retryCount} = 0;
-  $hash->{devices} = ();
+  $hash->{sendQueue} = [];
   AssignIoPort($hash);
 
   if(CUL_MAX_Check($hash)) {
@@ -137,9 +137,6 @@ CUL_MAX_Set($@)
   return undef;
 }
 
-#Array of all packet that we wait to be ack'ed
-my @waitForAck = ();
-
 sub
 CUL_MAX_Parse($$)
 {
@@ -177,17 +174,13 @@ CUL_MAX_Parse($$)
       Dispatch($shash, "MAX,$isToMe,Ack,$src,$payload", {RAWMSG => $rmsg});
 
       return $shash->{NAME} if(!$isToMe);
+      return $shash->{NAME} if(!@{$shash->{sendQueue}}); #we are not waiting for any Ack
 
-      my $i = 0;
-      while ($i < @waitForAck) {
-        my $packet = $waitForAck[$i];
-        if($packet->{dest} eq $src and $packet->{cnt} == hex($msgcnt)) {
-          Log 5, "Got matching ack";
-          splice @waitForAck, $i, 1;
-          return $shash->{NAME};
-        } else {
-          $i++;
-        }
+      my $packet = $shash->{sendQueue}[0];
+      if($packet->{dest} eq $src and $packet->{cnt} == hex($msgcnt)) {
+        Log 5, "Got matching ack";
+        $packet->{sent} = 2;
+        return $shash->{NAME};
       }
 
     } elsif($msgType eq "TimeInformation") {
@@ -279,19 +272,18 @@ CUL_MAX_Send(@)
   #prefix length in bytes
   $packet = sprintf("%02x",length($packet)/2) . $packet;
 
-  #Send to CUL
-  IOWrite($hash, "", "Zs". $packet);
-
-  #Schedule checking for Ack
-  return undef if($cmd eq "Ack"); #we don't get an Ack for an Ack
-  return undef if($src ne $hash->{addr}); #we don't handle Ack's for fake messages
+  Log 5, "CUL_MAX_Send: enqueuing $packet";
   my $timeout = gettimeofday()+$ackTimeout;
-  $waitForAck[@waitForAck] = { "packet" => $packet,
-                               "dest" => $dst,
-                               "cnt" => hex($msgcnt),
-                               "time" => $timeout,
-                               "resends" => "0" };
-  InternalTimer($timeout, "CUL_MAX_Resend", $hash, 0);
+  my $aref = $hash->{sendQueue};
+  push(@{$aref},  { "packet" => $packet,
+                    "dest" => $dst,
+                    "cnt" => hex($msgcnt),
+                    "time" => $timeout,
+                    "sent" => "0" });
+
+  #Call CUL_MAX_SendQueueHandler if we just enqueued the only packet
+  #otherwise it is already in the InternalTimer list
+  CUL_MAX_SendQueueHandler($hash) if(@{$hash->{sendQueue}} == 1);
   return undef;
 }
 
@@ -302,35 +294,37 @@ CUL_MAX_DeviceHash($)
   return $modules{MAX}{defptr}{$addr};
 }
 
+#This can be called for two reasons:
+#1. @sendQueue was empty, CUL_MAX_Send added a packet and then called us
+#2. We sent a packet from @sendQueue and know the ackTimeout is over.
+#   The packet my still be in @sendQueue (timed out) or removed when the Ack was received.
 sub
-CUL_MAX_Resend($)
+CUL_MAX_SendQueueHandler($)
 {
   my $hash = shift;
+  Log 5, "CUL_MAX_SendQueueHandler: " . @{$hash->{sendQueue}} . " items in queue";
+  return if(!@{$hash->{sendQueue}}); #nothing to do
 
-  my $resendTime = gettimeofday()+60; #some large time
-  my $i = 0;
-  while ($i < @waitForAck ) {
-    my $packet = $waitForAck[$i];
-    if( $packet->{time} <= gettimeofday() ) {
-      Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
-      if($packet->{resends}++ < $resendRetries) {
-        #First resend is one second after original send, second resend it two seconds after first resend, etc
-        $packet->{time} = gettimeofday()+$ackTimeout;
-        IOWrite($hash, "", "Zs". $packet->{packet});
-        readingsSingleUpdate($hash, "retryCount", ReadingsVal($hash->{NAME}, "retryCount", 0) + 1, 1);
-      } else {
-        Log 1, "CUL_MAX_Resend: Giving up on that packet";
-        splice @waitForAck, $i, 1; #Remove from array
-        readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
-        next
-      }
-    }
-    $resendTime = $packet->{time} if($packet->{time} < $resendTime);
-    $i++;
+  my $timeout = gettimeofday(); #reschedule immediatly
+  my $packet = $hash->{sendQueue}[0];
+
+  if( $packet->{sent} == 0 ) { #Need to send it first
+    #Send to CUL
+    IOWrite($hash, "", "Zs". $packet->{packet});
+    $packet->{sent} = 1;
+    $timeout += $ackTimeout; #reschedule after ackTimeout
+
+  } elsif( $packet->{sent} == 1) { #Already sent it, got no Ack
+    Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
+    splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
+    readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
+
+  } elsif( $packet->{sent} == 2) { #Got ack
+    splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
   }
 
-  return if(!@waitForAck); #no need to recheck
-  InternalTimer($resendTime, "CUL_MAX_Resend", $hash, 0);
+  return if(!@{$hash->{sendQueue}}); #everything done
+  InternalTimer($timeout, "CUL_MAX_SendQueueHandler", $hash, 0);
 }
 
 sub
@@ -353,30 +347,24 @@ CUL_MAX_SendTimeInformation(@)
 }
 
 sub
-CUL_MAX_SendTimeInformationSender($)
-{
-  my $args = shift;
-  my ($hash,$addr,$payload) = @{$args};
-  CUL_MAX_SendTimeInformation($hash, $addr, $payload);
-}
-
-sub
 CUL_MAX_BroadcastTime(@)
 {
   my ($hash,$manual) = @_;
   my $payload = CUL_MAX_GetTimeInformationPayload();
-  Log 5, "CUL_MAX_BroadcastTime: payload $payload";
+  Log 5, "CUL_MAX_BroadcastTime: payload $payload ". Dumper($modules{MAX}{defptr});
   my $i = 1;
   foreach my $addr (keys %{$modules{MAX}{defptr}}) {
+    Log 5, "addr $addr";
     my $dhash = $modules{MAX}{defptr}{$addr};
     #Check that
     #1. the MAX device dhash uses this MAX_CUL as IODev
     #2. the MAX device is a Wall/HeatingThermostat
     if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash
-    && $dhash->{type} ~~ [ "HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat"] ) {
-      #We queue it at different times and do not send directly, because
-      #sending them all in a row makes us not see the Acks
-      InternalTimer(gettimeofday()+3*$i++, "CUL_MAX_SendTimeInformationSender", [$hash, $addr, $payload], 0);
+    && $dhash->{type} ~~ [ "HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat"]) {
+      CUL_MAX_SendTimeInformation($hash, $addr, $payload);
+    }
+    else {
+      Log 5, "Not sending to $addr, type $dhash->{type}, $dhash->{IODev}{NAME}"
     }
   }
 
