@@ -36,6 +36,7 @@ sub validBoostDuration { return $_[0] ~~ /^\d+$/ && exists($boost_durationsInv{$
 sub validValveposition { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 100; }
 sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{1,2}):00$/);
   return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; }
+sub validWeekProfile { return length($_[0]) == 4*13*7; }
 
 my %readingDef = ( #min/max/default
   "maximumTemperature"    => [ \&validTemperature, 30.5],
@@ -50,6 +51,7 @@ my %readingDef = ( #min/max/default
   "decalcification"       => [ \&validDecalcification, "Sat 12:00" ],
   "maxValveSetting"       => [ \&validValveposition, 100 ],
   "valveOffset"           => [ \&validValveposition, 00 ],
+  ".weekProfile"          => [ \&validWeekProfile, $defaultWeekProfile ],
 );
 
 my %interfaces = (
@@ -347,6 +349,40 @@ MAX_Set($@)
   } elsif($setting eq "wakeUp") {
     return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, 0x3F);
 
+  } elsif($setting eq "weekProfile" and $hash->{type} ~~ ["HeatingThermostat","WallMountedThermostat"]) {
+    return "Number of arguments must be even" if(@args%2 == 1);
+
+    my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
+
+    for(my $i = 0; $i < @args; $i += 2) {
+      return "Expected day, got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
+      my $day = $decalcDaysInv{$args[$i]};
+      my @controlpoints = split(',',$args[$i+1]);
+      return "Not more than 13 control points are allowed!" if(@controlpoints > 13*2);
+      my $newWeekprofilePart = "";
+      for(my $j = 0; $j < @controlpoints; $j += 2) {
+        my ($hour, $min);
+        if($j + 1 == @controlpoints) {
+          $hour = 0; $min = 0;
+        } else {
+          ($hour, $min) = ($controlpoints[$j+1] =~ /^(\d{1,2}):(\d{1,2})$/);
+        }
+        my $temperature = $controlpoints[$j];
+        return "Invalid time: $controlpoints[$j+1]" if(!defined($hour) || !defined($min) || $hour > 23 || $min > 59);
+        return "Invalid temperature" if(!validTemperature($temperature));
+        $temperature = 4.5 if($temperature eq "off");
+        $temperature = 30.5 if($temperature eq "on");
+        $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
+        Log 5, "add part $newWeekprofilePart for $hour:$min $temperature C ($controlpoints[$j],$controlpoints[$j+1])";
+      }
+      Log 5, "New Temperature part for $day: $newWeekprofilePart";
+      #Each day has 2 bytes * 13 controlpoints = 26 bytes = 52 hex characters
+      #we don't have to update the rest, because the active part is terminated by the time 0:00
+      substr($curWeekProfile, $day*52, length($newWeekprofilePart)) = $newWeekprofilePart;
+    }
+    readingsSingleUpdate($hash, ".weekProfile", $curWeekProfile, 0);
+    Log 5, "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
+
   }else{
     my $templist = "off,".join(",",map { sprintf("%2.1f",$_/2) }  (10..60)) . ",on";
     my $ret = "Unknown argument $setting, choose one of wakeUp factoryReset groupid";
@@ -567,17 +603,25 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, "maxValveSetting", $args[9]);
       readingsBulkUpdate($shash, "valveOffset", $args[10]);
       readingsBulkUpdate($shash, "decalcification", "$decalcDays{$args[11]} $args[12]:00");
-      $shash->{internal}{weekProfile} = $args[13];
+      readingsBulkUpdate($shash, ".weekProfile", $args[13]);
     } else {
-      $shash->{internal}{weekProfile} = $args[4];
+      readingsBulkUpdate($shash, ".weekProfile", $args[4]);
     }
 
+    # Format of weekprofile: 16 bit integer (high byte first) for every control point, 13 control points for every day
+    # each 16 bit integer value is parsed as
+    # int time = (value & 0x1FF) * 5;
+    # int hour = (time / 60) % 24;
+    # int minute = time % 60;
+    # int temperature = ((value >> 9) & 0x3F) / 2;
+
+    my $curWeekProfile = MAX_ReadingsVal($shash, ".weekProfile");
     #parse weekprofiles for each day
     for (my $i=0;$i<7;$i++) {
       my (@time_prof, @temp_prof);
       for(my $j=0;$j<13;$j++) {
-        $time_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))& 0x1FF) * 5;
-        $temp_prof[$j] = (hex(substr($shash->{internal}{weekProfile},($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
+        $time_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))& 0x1FF) * 5;
+        $temp_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
       }
 
       my @hours;
@@ -750,6 +794,14 @@ MAX_Parse($$)
       Sends a fake state message of this device over the air to &lt;device&gt;. Works only with CUL_MAX as IODev. For ShutterContacts, sends
       a ShutterContactState message; &lt;parameters...&gt; must be 0 or 1 for "window closed" or "window opened". For WallMountedThermostats.
       sends a WallThermostatState message; &lt;parameters...&gt; must be "$desiredTemperature $measuredTemperature" (both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with the source device beforehand.</li>
+    <li>weekprofile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
+      Allows setting the week profile. For devices of type HeatingThermostat or WallMountedThermostat only. Example:<br>
+      <code>set MAX_12345 weekprofile Fri 24.5,6:00,12,15:00,5 Sat 7,4:30,19,12:55,6</code><br>
+      sets the profile <br>
+      <code>Friday: 24.5 C for 0:00 - 6:00, 12 C for 6:00 - 15:00, 5 C for 15:00 - 0:00<br>
+      Saturday: 7 C for 0:00 - 4:30, 19 C for 4:30 - 12:55, 6 C for 12:55 - 0:00</code><br>
+      while keeping the old profile for all other days.
+    </li>
   </ul>
   <br>
 
