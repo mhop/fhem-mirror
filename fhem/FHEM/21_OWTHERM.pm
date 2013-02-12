@@ -599,7 +599,7 @@ sub OWTHERM_Set($@) {
   
   #-- process results
   $hash->{PRESENT} = 1; 
-  OWTHERM_FormatValues($hash);
+  #OWTHERM_FormatValues($hash);
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
