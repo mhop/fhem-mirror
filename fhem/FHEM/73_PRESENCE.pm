@@ -130,7 +130,7 @@ PRESENCE_Define($$)
    $hash->{MODE} = $destination;
    
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 1) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
+    InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 0) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
     return;
   
   }
@@ -519,7 +519,7 @@ PRESENCE_ProcessLocalScan($)
 
  #Schedule the next check withing $timeout
  RemoveInternalTimer($hash);
- InternalTimer(gettimeofday()+$hash->{TIMEOUT}, "PRESENCE_StartLocalScan", $hash, 1) unless($hash->{helper}{DISABLED});
+ InternalTimer(gettimeofday()+$hash->{TIMEOUT}, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
 }
 1;
 
