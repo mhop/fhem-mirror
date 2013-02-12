@@ -1,10 +1,11 @@
 ##############################################
 # $Id$
-# 2013-01-31 klaus.schauer
-# eltakoDimmer: dimspeed corrections ($dimTime)
-# Log $ll2: patch Rocker Switch logging
-# attr subDef: $subDef = $hash->{DEF} if attr subDef is not defined
-# Rocker Switch (PTM200): enable attr subDef
+# 2013-02-12 klaus.schauer
+# new attr switchMode: released will sent after switch <cmd> if attr set to pushbutton 
+# Eltako FSG70: only commands on|off possible, special query inserted
+# Eltako FTN14: switch type "Staircase off-delay timer" defined [Eltako FTN14]
+# commandref: further explanations added and text reorganized.
+
 package main;
 
 use strict;
@@ -78,9 +79,13 @@ my @EnO_models = qw (
   FAH60 FAH63 FIH63
   FABH63 FBH63 FIBH63
   PM101
+  FSB12 FSB14 FSB61 FSB70
+  FSG70
+  FSM12 FSM61
   FTF55
-  FSB61
-  FSM61
+  FTN14
+  FTS12
+  FUD12 FUD14 FUD61 FUD70
 );
 
 sub
@@ -96,7 +101,7 @@ EnOcean_Initialize($)
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "model:".join(",",@EnO_models)." ".
                        "subType:".join(",",values %EnO_subType)." ".
-                       "subDef actualTemp dimTime shutTime ".
+                       "actualTemp dimTime shutTime subDef switchMode ".
                        $readingFnAttributes;
 
   for(my $i=0; $i<@EnO_ptm200btn;$i++) {
@@ -134,6 +139,7 @@ EnOcean_Set($@)
   my $updateState = 1;
   my $name = $hash->{NAME};
   my $st = AttrVal($name, "subType", "");
+  my $model = AttrVal($name, "model", "");
   my $ll2 = GetLogLevel($name, 2);
 
   shift @a;
@@ -172,7 +178,7 @@ EnOcean_Set($@)
       $hash->{READINGS}{$cmd}{VAL} = $arg;
 
 	###########################
-    } elsif($st eq "eltakoDimmer") {
+    } elsif($st eq "eltakoDimmer" && $model ne "FSG70") {
 
       my $sendDimCmd=0;
       my $dimTime=AttrVal($name, "dimTime", 0);
@@ -313,8 +319,13 @@ EnOcean_Set($@)
         $db_3 |= ($d2<<1) | 0x01;
       }
       my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
+      my $switchMode = AttrVal($name, "switchMode", "switch");
       IOWrite($hash, "", sprintf("6B05%02X000000%s%s", $db_3, $subDef, $status));
       Log $ll2, "EnOcean: set $name $cmd";
+      if ($switchMode eq "pushbutton") {
+        IOWrite($hash, "", sprintf("6B0500000000%s20", $subDef));
+	Log $ll2, "EnOcean: set $name released";
+      }
     }
 
     select(undef, undef, undef, 0.2);   # Tested by joerg. He prefers 0.3 :)
@@ -393,23 +404,22 @@ EnOcean_Parse($$)
       } else {
         if($st eq "keycard") {
           $msg = "keycard removed";
-          
-        } else {
-          $msg = (($db_3&0x10) ? "pressed" : "released");
-
         }
-
+        else {
+          $msg = (($db_3&0x10) ? "pressed" : "released");
+        }
       }
-      
     }
 
     # released events are disturbing when using a remote, since it overwrites
     # the "real" state immediately.
-    # In the case of an ElTako FSB61 the state should remain released (by Thomas)
+    # In the case of an Eltako FSB14, FSB61 the state should remain released (by Thomas)
     my $event = "state";
     $event = "buttons" if($msg =~ m/released$/ &&
-                          $model ne "FSB61" &&
-                          $model ne "FSM61");
+                          $model ne "FSB14" &&
+                          $model ne "FSB61" && $model ne "FSB70" &&
+                          $model ne "FSM12" && $model ne "FSM61" &&
+                          $model ne "FTS12");
 
     push @event, "3:$event:$msg";
 
@@ -491,9 +501,7 @@ EnOcean_Parse($$)
 
     } elsif($st eq "FAH" || $model =~ /^(FAH60|FAH63|FIH63)$/) {
       ####################################
-      # Eltako FAH60+FAH63+FIH63
-      # (EEP: 07-06-01 plus Data_byte3)
-      ####################################
+      # Eltako FAH60, FAH63, FIH63 (EEP: 07-06-01 plus Data_byte3)
       # $db_3 is the illuminance where min 0x00 = 0 lx, max 0xFF = 100 lx;
       # $db_2 must be 0x00
 
@@ -512,9 +520,7 @@ EnOcean_Parse($$)
 
     } elsif($st eq "FBH" || $model =~ /^(FABH63|FBH55|FBH63|FIBH63)$/) {
       ####################################
-      # Eltako FABH63+FBH55+FBH63+FIBH63
-      # (EEP: similar 07-08-01)
-      ####################################
+      # Eltako FABH63, FBH55, FBH63, FIBH63 (EEP: similar 07-08-01)
       # $db_0 motion detection where 0x0D = motion and 0x0F = no motion
       # (DB0_Bit1 = 1 or 0)
 
@@ -535,9 +541,7 @@ EnOcean_Parse($$)
 
     } elsif($st eq "FTF" || $model eq "FTF55") {
       ####################################
-      # Eltako FTF55
-      # (EEP: 07-02-05)
-      ####################################
+      # Eltako FTF55 (EEP: 07-02-05)
       # $db_1 is the temperature where 0x00 = 40?C and 0xFF 0?C
       my $temp = sprintf "%3d", $db_1;
       $temp = sprintf "%0.1f", ( 40 - $temp * 40 / 255 ) ;
@@ -559,9 +563,7 @@ EnOcean_Parse($$)
       push @event, "3:D2:".(($db_0&0x4)?1:0);
       push @event, "3:D1:".(($db_0&0x2)?1:0);
       push @event, "3:D0:".(($db_0&0x1)?1:0);
-
     }
-
   }
 
   readingsBeginUpdate($hash);
@@ -640,91 +642,130 @@ EnOcean_A5Cmd($$$)
     Example:
     <ul>
       <code>define switch1 EnOcean ffc54500</code><br>
-    </ul>
+    </ul><br>
+    <b>Note:</b> In order to control devices, you cannot reuse the ID's of other
+    devices (like remotes), instead you have to create your own, which must be
+    in the allowed ID-Range of the underlying IO device. For this first query the
+    TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
+    up to 128 ID's starting with the base shown there. If you are using an
+    ID outside of the allowed range, you'll see an ERR_ID_RANGE message in the
+    fhem log.<br>
+    In order to control bidirectional actors you can use the attribute
+    <a href="#subDef">subDef</a>.<br>
   </ul>
   <br>
 
   <a name="EnOceanset"></a>
   <b>Set</b>
   <ul>
-    <br>
-    <li>MD15 commands. Note: The command is not sent until the MD15
-    wakes up and sends a mesage, usually every 10 minutes.
-    <ul>
-      <li>actuator &lt;value&gt;<br>
-         Set the actuator to the specifed percent value (0-100)</li>
-      <li>desired-temp &lt;value&gt;<br>
-         Use the builtin PI regulator, and set the desired temperature to the
-         specified degree. The actual value will be taken from the temperature
-         reported by the MD15 or from the attribute actualTemp if it is set</li>
-      <li>unattended<br>
-         Do not regulate the MD15.</li>
-    </ul></li>
-
-    <li>subType eltakoDimmer, tested with Eltako devices only
-    <ul>
-      <li>teach<br>
-        initiate teach-in mode</li>
-      <li>dimm percent [time 1-100]<br>
-        issue dim command.</li>
-      <li>dimmup percent [time 1-100]<br>
-        issue dim command.</li>
-      <li>dimmdown percent [time 1-100]<br>
-        issue dim command.</li>
-      <li>dimm on<br>
-        issue switch on command.</li>
-      <li>dimm off<br>
-        issue switch off command.</li>
-    </ul>
-    </li>
-    <b>Note</b>: <a href="#setExtensions">set extensions</a> are supported
-    
-    <li>subType eltakoShutter, tested with Eltako devices only (additionally set attr model to FSB61)
-    <ul>
-      <li>teach<br>
-        initiate teach-in mode</li>
-      <li>up [percent]<br>
-        issue roll up command.</li>
-      <li>down [percent]<br>
-        issue roll down command.</li>
-      <li>stop<br>
-        issue stop command.</li>
-    </ul>
-    </li>
-
-    <li>all other:
+    <li>Switch (Standard device)
     <ul>
     <code>set switch1 &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is one of A0,AI,B0,BI,C0,CI,D0,DI, combinations of
-    these and released, in fact we are trying to emulate a PTM100 type remote.
-    <br>
-
+    these and released, in fact we are trying to emulate a PTM100/PT200 type
+    remote.<br>
     If you define an <a href="#eventMap">eventMap</a> attribute with on/off,
     then you'll be able to easily set the device from the <a
-    href="#FHEMWEB">WEB</a> frontend.<br><br>
-    In order to control devices, you cannot reuse the ID's of other devices
-    (like remotes), instead you have to create your own, which must be in the
-    allowed ID-Range of the underlying IO device. For this first query the
-    TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
-    up to 128 ID's starting with the base shown there. If you are using an
-    ID outside of the allowed range, you'll see an ERR_ID_RANGE message in the
-    fhem log.<br>
-
+    href="#FHEMWEB">WEB</a> frontend.<br>
+    <a href="#setExtensions">set extensions</a> are supported, if the corresponding
+    <a href="#eventMap">eventMap</a> specifies the on and off mappings.<br><br>
     Example:
     <ul><code>
       set switch1 BI<br>
       set switch1 B0,CI<br>
       attr eventMap BI:on B0:off<br>
       set switch1 on<br>
-    </code></ul>
-    <b>Note</b>: <a href="#setExtensions">set extensions</a> are supported,
-        if the corresponding <a href="#eventMap">eventMap</a> specifies 
-        the on and off mappings.
-    <br>
+    </code></ul><br>
+    </ul>
     </li>
 
-    </ul>
+    <li>Staircase off-delay timer [Eltako FTN14] (Tested with Eltako FTN14 only.)<br>
+        Set attr eventMap to B0:on BI:off, attr subType to switch, attr
+        webCmd to on:released and if needed attr switchMode to pushbutton manually.<br>
+    <ul>
+      <li>on<br>
+        issue switch on command</li>
+      <li>released<br>
+        start timer</li>
+    </ul><br>
+    <b>Note:</b> Use the sensor type "Schalter" for Eltako devices. The Staircase
+    off-delay timer is switched on when pressing "on" and the time will be started
+    when pressing "released". "released" immediately after "on" is sent if
+    the attr switchMode is set to "pushbutton".
+    </li>
+    <br>
+    <br>
+
+    <li>Dimmer [Eltako FUD12, FUD14, FUD61, FUD70] (Tested with Eltako devices only.)<br>
+        Set attr subType to eltakoDimmer manually.<br>
+    <ul>
+      <li>teach<br>
+        initiate teach-in mode</li>
+      <li>on<br>
+        issue switch on command</li>
+      <li>off<br>
+        issue switch off command</li>
+      <li>dim percent [time 1-100]<br>
+        issue dim command</li>
+      <li>dimup percent [time 1-100]<br>
+        issue dim command</li>
+      <li>dimdown percent [time 1-100]<br>
+        issue dim command</li>
+      <li><a href="#setExtensions">set extensions</a> are supported.</li>
+    </ul><br>
+    <b>Note:</b> Use the sensor type "PC/FVS" for Eltako devices.
+    </li>
+    <br>
+    <br>
+    <li>Dimmer for fluorescent lamps [Eltako FSG70]
+    	(Tested with Eltako FSG70 only.)<br>
+        Set attr eventMap to B0:on BI:off, attr model to FSG70 , attr subType
+        to eltakoDimmer and attr switchMode to pushbutton manually.<br>
+    <ul>
+      <li>on<br>
+        issue switch on command</li>
+      <li>off<br>
+        issue switch off command</li>
+      <li><a href="#setExtensions">set extensions</a> are supported.</li><br>
+    </ul><br>
+    <b>Note:</b> Use the sensor type "Richtungstaster" for Eltako devices.
+    </li>
+    <br>
+    <br> 
+    <li>Heating/Valve Regulator [MD15-FtL-HE]<br>
+        The attr subType must be MD15. This is done if the device was created by
+        autocreate.<br>
+    <ul>
+      <li>actuator &lt;value&gt;<br>
+          Set the actuator to the specifed percent value (0-100)</li>
+      <li>desired-temp &lt;value&gt;<br>
+          Use the builtin PI regulator, and set the desired temperature to the
+          specified degree. The actual value will be taken from the temperature
+          reported by the MD15 or from the attribute actualTemp if it is set</li>
+      <li>unattended<br>
+          Do not regulate the MD15.</li>
+    </ul><br>
+    <b>Note:</b> The command is not sent until the MD15 wakes up and sends a mesage,
+        usually every 10 minutes.
+    </li>
+    <br>
+    <br>
+    <li>Shutter [Eltako FSB12, FSB14, FSB61, FSB70] (Tested with Eltako devices only.)<br>
+        Set attr subType to eltakoShutter and attr model to FSB12|FSB14|FSB61|FSB70
+        manually.<br>
+    <ul>
+      <li>teach<br>
+        initiate teach-in mode</li>
+      <li>up [percent]<br>
+        issue roll up command</li>
+      <li>down [percent]<br>
+        issue roll down command</li>
+      <li>stop<br>
+        issue stop command</li>
+    </ul><br>
+    <b>Note:</b> Use the sensor type "Szenentaster/PC" for Eltako devices.
+    </li>
   </ul>
   <br>
 
@@ -734,36 +775,47 @@ EnOcean_A5Cmd($$$)
   <a name="EnOceanattr"></a>
   <b>Attributes</b>
   <ul>
-    <li><a href="#eventMap">eventMap</a></li>
-    <li><a href="#IODev">IODev</a></li>
-    <li><a href="#loglevel">loglevel</a></li>
-    <li><a href="#do_not_notify">do_not_notify</a></li>
-    <li><a href="#ignore">ignore</a></li>
-    <li><a href="#showtime">showtime</a></li>
-    <li><a href="#model">model</a></li>
-    <li><a href="#subType">subType</a></li>
-    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
     <li><a name="actualTemp">actualTemp</a><br>
       The value of the actual temperature, used when controlling MD15 devices.
       Should by filled via a notify from a distinct temperature sensor. If
       absent, the reported temperature from the MD15 is used.
       </li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#eventMap">eventMap</a></li>
+    <li><a href="#ignore">ignore</a></li>
+    <li><a href="#IODev">IODev</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#model">model</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li><a href="#showtime">showtime</a></li>
+    <li><a name="shutTime">shutTime</a><br>
+      Use the attr shutTime to set the time delay to the position "Halt" in
+      seconds. Select a delay time that is at least as long as the shading element
+      or roller shutter needs to move from its end position to the other position.<br>
+      shutTime ist supported for shutter.<br></li>
     <li><a name="subDef">subDef</a><br>
-      SenderID (TCM BaseID + offset) to control a bidirectional switch or actor
+      SenderID (TCM BaseID + offset) to control a bidirectional switch or actor.
       </li><br>
       In order to control bidirectional devices, you cannot reuse the ID of this
       devices, instead you have to create your own, which must be in the
       allowed ID-Range of the underlying IO device. For this first query the
       TCM with the "<code>get &lt;tcm&gt; idbase</code>" command. You can use
       up to 128 ID's starting with the base shown there.<br>
-      subDef is supported for switch devices, eltakoDimmer and eltakoShutter.
+      subDef is supported for switches, staircase off-delay timer, dimmer and
+      shutter.<br>
+    <li><a href="#subType">subType</a></li>
+    <li><a name="switchMode">switchMode</a> [switch|pushbutton]<br>
+      "released" immediately after &lt;value&gt; is sent if the attribute is set to "pushbutton". 
+      </li>
+    <li><a href="#webCmd">webCmd</a></li>
   </ul>
   <br>
 
   <a name="EnOceanevents"></a>
   <b>Generated events:</b>
   <ul>
-     <li>switch. Switches (remotes) with more than one (pair) of buttons
+     <li>Switch / Bidirectional Actor<br>
+         Switches (remotes) with more than one (pair) of buttons
          are separate devices with separate address.
      <ul>
          <li>A0</li>
@@ -777,12 +829,13 @@ EnOcean_A5Cmd($$$)
          <li>A0,BI</li>
          <li>&lt;BtnX,BtnY&gt; where BtnX and BtnY is one of the above, e.g.
              A0,BI or D0,CI</li>
-         <li>buttons:released</li>
-         <li>buttons:&lt;BtnX&gt; released</li>
+         <li>buttons: released</li>
+         <li>buttons: &lt;BtnX&gt; released</li>
          <br>
      </ul></li>
 
-     <li>FSB61/FSM61 (set model to FSB61 or FSM61 manually)<br>
+     <li>Pushbutton Switch, Pushbutton Input Module [Eltako FSM12, FSM61, FTS12]<br>
+         Set attr model to FSM12|FSM61|FTS12 manually.<br>
      <ul>
         <li>B0</li>
         <li>BI</li>
@@ -791,42 +844,31 @@ EnOcean_A5Cmd($$$)
           for a normal switch.</li>
      </ul></li>
 
-     <li>windowHandle (HOPPE SecuSignal). Set the subType attr to windowHandle.
-     <ul>
-         <li>closed</li>
-         <li>open</li>
-         <li>tilted</li>
-         <li>open from tilted</li>
-     </ul></li>
-
-     <li>keycard. Set the subType attr to keycard. (untested)
+     <li>Keycard Switch (untested)<br>
+         Set attr subType to keycard manually. 
      <ul>
          <li>keycard inserted</li>
          <li>keycard removed</li>
      </ul></li>
 
-     <li>STM-250 Door and window contact.
+     <li>Door/Window Contact [STM-250] 
      <ul>
          <li>closed</li>
          <li>open</li>
          <li>learnBtn: on</li>
      </ul></li>
 
-     <li>SR04* (Temp sensor + Presence button and desired temp dial).<br>
-          Set the
-          model attribute to one of SR04 SR04P SR04PT SR04PST SR04PMS or the
-          subType attribute to SR04.
+     <li>Dimmer [Eltako FUD14, FUD61, FUD70, FSG14, FSG70, ...]<br>
+         Set attr subType to eltakoDimmer manually.<br>
      <ul>
-         <li>temperature: XY.Z</li>
-         <li>set_point: [0..255]</li>
-         <li>fan: [0|1|2|3|Auto]</li>
-         <li>present: yes</li>
-         <li>learnBtn: on</li>
-         <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]</li>
+        <li>on</li>
+        <li>off</li>
+        <li>dimValue: %</li>
+        <li>state: [on|off]</li>
      </ul></li>
 
-     <li>MD15-FtL-HE (Heating/Valve-regulator)<br>
-         The subType attibute must be MD15. This is done if the device was created by
+     <li>Heating/Valve Regulator [MD15-FtL-HE]<br>
+         The attr subType must be MD15. This is done if the device was created by
          autocreate.<br>
      <ul>
        <li>$actuator %</li>
@@ -842,51 +884,69 @@ EnOcean_A5Cmd($$$)
        <li>temperature: $tmp</li>
      </ul></li>
 
-     <li>Ratio Presence Sensor Eagle PM101.<br>
-         Set the model attribute to PM101<br>
-     <ul>
-       <li>brightness: $lux</li>
-       <li>channel1: [on|off]</li>
-       <li>channel2: [on|off]</li>
-     </ul></li>
-
-     <li>FAH60,FAH63,FIH63 brigthness senor.<br>
-         Set subType to FAH or model to FAH60/FAH63/FIH63 manually.<br>
+     <li>Brigthness Sensor [Eltako FAH60, FAH63, FIH63]<br>
+         Set attr subType to FAH or attr model to FAH60|FAH63|FIH63 manually.<br>
      <ul>
        <li>brightness: $lux</li>
        <li>state: $lux</li>
      </ul></li>
 
-     <li>FABH63,FBH55,FBH63,FIBH63 Motion/brightness sensor.<br>
-         Set subType to FBH or model to FABH63/FBH55/FBH63/FIBH63 manually.<br>
+     <li>Motion/Brightness Sensor [Eltako FABH63, FBH55, FBH63, FIBH63]<br>
+         Set attr subType to FBH or attr model to FABH63|FBH55|FBH63|FIBH63 manually.<br>
      <ul>
        <li>brightness: $lux</li>
        <li>motion:[yes|no]</li>
-       <li>state: [motion: yes|no]</li>
+       <li>state: [motion: [yes|no]</li>
      </ul></li>
 
-     <li>FTF55 Temperature sensor.<br>
-         Set subType to FTF or model to FTF55 manually.<br>
+     <li>Temperature Sensor [Eltako FTF55]<br>
+         Set attr subType to FTF or attr model to FTF55 manually.<br>
      <ul>
        <li>temperature: $temp</li>
        <li>state: $temp</li>
      </ul></li>
 
-     <li>eltakoDimmer<br>
+     <li>Temprature Sensor / Presence Button / Desired Temp Dial [SR04*]<br>
+         Set attr model to one of SR04 SR04P SR04PT SR04PST SR04PMS or attr
+         subType to SR04.
      <ul>
+         <li>temperature: XY.Z</li>
+         <li>set_point: [0..255]</li>
+         <li>fan: [0|1|2|3|Auto]</li>
+         <li>present: yes</li>
+         <li>learnBtn: on</li>
+         <li>T: XY.Z SP: [0..255] F: [0|1|2|3|Auto] P: [yes|no]</li>
+     </ul></li>
+
+     <li>Ratio Presence Sensor [Eagle PM101]<br>
+         Set attr model to PM101 manually.<br>
+     <ul>
+       <li>brightness: $lux</li>
+       <li>channel1: [on|off]</li>
+       <li>channel2: [on|off]</li>
      </ul></li>
      
-     <li>eltakoShutter<br>
+     <li>Shutter [Eltako FSB14, FSB61, FSB70]<br>
+         Set attr subType to eltakoShutter and attr model to FSB14|FSB61|FSB70
+         manually.<br>
      <ul>
         <li>B0<br>
-          The status of the device will become B0 after the TOP endpoint is
-          reached, or it has finished an "up %%" command.</li>
+          The status of the device will become "B0" after the TOP endpoint is
+          reached, or it has finished an "up %" command.</li>
         <li>BI<br>
-          The status of the device will become BI if the BOTTOM endpoint is
+          The status of the device will become "BI" if the BOTTOM endpoint is
           reached</li>
         <li>released<br>
-          The status of the device may become "released", this is not the case
-          for a normal switch.</li>
+          The status of the device become "released" between one of the endpoints.</li>
+     </ul></li>
+
+     <li>Window Handle [HOPPE SecuSignal]<br>
+         Set attr subType to windowHandle manually.
+     <ul>
+         <li>closed</li>
+         <li>open</li>
+         <li>tilted</li>
+         <li>open from tilted</li>
      </ul></li>
 
   </ul>
