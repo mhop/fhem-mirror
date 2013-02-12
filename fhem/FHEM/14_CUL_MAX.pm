@@ -75,7 +75,8 @@ CUL_MAX_Define($$)
   #This interface is shared with 00_MAXLAN.pm
   $hash->{Send} = \&CUL_MAX_Send;
 
-  CUL_MAX_BroadcastTime($hash);
+  #Start broadcasting time after 30 seconds, so there is enough time to parse the config
+  InternalTimer(gettimeofday()+30, "CUL_MAX_BroadcastTime", $hash, 0);
   return undef;
 }
 
