@@ -210,7 +210,7 @@ $modules{Global}{AttrList} =
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
-$readingFnAttributes = "event-on-change-reading:0,1 event-on-update-reading:0,1 stateFormat";
+$readingFnAttributes = "event-on-change-reading event-on-update-reading stateFormat";
 
 
 %cmds = (
