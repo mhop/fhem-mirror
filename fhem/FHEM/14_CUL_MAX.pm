@@ -351,7 +351,7 @@ CUL_MAX_BroadcastTime(@)
 {
   my ($hash,$manual) = @_;
   my $payload = CUL_MAX_GetTimeInformationPayload();
-  Log 5, "CUL_MAX_BroadcastTime: payload $payload ". Dumper($modules{MAX}{defptr});
+  Log 5, "CUL_MAX_BroadcastTime: payload $payload ";
   my $i = 1;
   foreach my $addr (keys %{$modules{MAX}{defptr}}) {
     Log 5, "addr $addr";
