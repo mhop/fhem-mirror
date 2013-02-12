@@ -4,16 +4,25 @@
 #
 # FHEM module to read the data from a Sunways NT5000 solar inverter
 #
-# Prof. Dr. Peter A. Henning, 2011
+# Prof. Dr. Peter A. Henning, 2008
 # 
-# Version 1.0 - February 21, 2012
+# Version 2.0 - February 2013
 #
 # Setup as:
-# define  nt5000 NT5000  <device>
+# define  <name> NT5000 <device>
 #    
-# where nt5000 may be replaced by any name string and <device> 
+# where <name> may be replaced by any name string and <device> 
 # is a serial (USB) device or the keyword "emulator".
 # In the latter case, a 4.5 kWP solar installation is simulated
+#
+# get <name> present     => 1 if device present, 0 if not
+# get <name> serial      => inverter serial number
+# get <name> proto       => protocol 
+# get <name> reading     => measurement for all channels
+# get <name> month       => monthly measurement
+# get <name> year       => yearly measurement
+#
+# set <name> time        => set inverter clock
 #
 # Additional attributes are defined in fhem.cfg as 
 #  attr    nt5000 room Solaranlage
@@ -21,6 +30,9 @@
 #  attr    nt5000 Area 32.75
 # Peak Solar Power
 #  attr    nt5000 PSP 4.5
+# Monthly and yearly log file
+#  attr    nt5000 LogM SolarLogM
+#  attr    nt5000 LogY SolarLogY
 # Months with erroneous readings - see line 83 ff
 #  attr    nt5000 MERR <list>
 # Expected yields per month / year
@@ -71,21 +83,17 @@ my $cline=0;
 
 #-- These we may get on request
 my %gets = (
+  "present"   => "",
+  "serial"    => "S",
+  "proto"     => "P",
   "reading"   => "R",
   "month"     => "M",
-  "year"      => "Y",
-  "serial"    => "S",
-  "proto"     => "P"
+  "year"      => "Y"
 );
 
 #-- These occur in a pulldown menu as settable values
 my %sets = (
   "time" => "T"
-);
-
-#-- These we may get on request
-my %attrs = (
-  "Wyx"   => "R",
 );
 
 
@@ -112,13 +120,14 @@ sub NT5000_Initialize ($) {
   #        which is the following one.
   # WxM1 .. WxM12 = Expected yield from January .. December
   # WxY  = Expected yield per year 
+  # LogM, LogY = name of the monthly and yearly log file
   $hash->{AttrList}= "Area PSP MERR ".
            "Wx_M1 Wx_M2 Wx_M3 Wx_M4 Wx_M5 Wx_M6 Wx_M7 Wx_M8 Wx_M9 Wx_M10 Wx_M11 Wx_M12 ".
-           "Wx_Y ".
-           "loglevel:0,1,2,3,4,5,6";
+           "Wx_Y LogM LogY ".
+           "loglevel ".
+           $readingFnAttributes;
 }
 
-#######################################################################################
 ########################################################################################
 #
 # NT5000_Define - Implements DefFn function
@@ -132,9 +141,8 @@ sub NT5000_Define($$) {
   my @a = split("[ \t][ \t]*", $def);
 
   return "Define the serial device as a parameter, use none or emulator for a fake device"
-        if(@a != 3);
-  $hash->{STATE} = "Initialized";
-
+    if(@a != 3);
+  
   my $dev = $a[2];
 
   Log 1, "NT5000 device is none, commands will be echoed only"
@@ -150,22 +158,23 @@ sub NT5000_Define($$) {
     Log 2, "NT5000 opened device $dev";
     $hash->{USBDev} =  $nt5000_serport;
     sleep(1);
-    $nt5000_serport->close();
-    
+    $nt5000_serport->close();  
   }
 
   $hash->{DeviceName}   = $dev;
-  $hash->{Timer}        = 60;        # call every 60 seconds
+  $hash->{INTERVAL}       = 60;        # call every 60 seconds
   $hash->{Cmd}          = "reading";   # get all data,  min/max unchange
   $hash->{SerialNumber} = "";
   $hash->{Protocol}     = "";
   $hash->{Firmware}     = "";
-  $hash->{STATE}        = "offline";
-  my $tn = TimeNow();
+  
+  $modules{NT5000}{defptr}{$a[0]} = $hash;
 
   #-- InternalTimer blocks if init_done is not true
   my $oid = $init_done;
   $init_done = 1;
+  readingsSingleUpdate($hash,"state","initialized",1);
+
   NT5000_GetStatus($hash);
   $init_done = $oid;
   return undef;
@@ -180,55 +189,52 @@ sub NT5000_Define($$) {
 ########################################################################################
 
 sub NT5000_Get ($@) {
-my ($hash, @a) = @_;
+  my ($hash, @a) = @_;
 
-return "NT5000_Get needs exactly one parameter" if(@a != 2);
-my $name = $hash->{NAME};
-my $v;
+  #-- check syntax
+  return "NT5000_Get needs exactly one parameter" if(@a != 2);
+  my $name = $hash->{NAME};
+  my $v;
 
-if($a[1] eq "reading") 
-   {
-   $v = NT5000_GetLine($hash,"reading");
-   if(!defined($v)) 
-      {
+  #-- get present
+  if($a[1] eq "present") {
+    $v =  ($hash->{READINGS}{"state"}{VAL} =~ m/.*kW/) ? 1 : 0;
+    return "$a[0] present => $v";
+  } 
+
+  #-- current reading
+  if($a[1] eq "reading") {
+    $v = NT5000_GetLine($hash,"reading");
+    if(!defined($v)) {
       Log GetLogLevel($name,2), "NT5000_Get $a[1] error";
       return "$a[0] $a[1] => Error";
-      }
-   $v =~ s/[\r\n]//g;                          # Delete the NewLine
-   $hash->{READINGS}{$a[1]}{VAL} = $v;
-   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
-   }
-elsif($a[1] eq "month") 
-   {
-   $v = NT5000_GetLine($hash,"month");
-   if(!defined($v)) 
-      {
+    }
+    $v =~ s/[\r\n]//g;                          # Delete the NewLine
+    readingsSingleUpdate($hash,"reading",$v,1);
+  #-- monthly reading   
+  } elsif($a[1] eq "month") {
+    $v = NT5000_GetLine($hash,"month");
+    if(!defined($v)) {
       Log GetLogLevel($name,2), "NT5000_Get $a[1] error";
       return "$a[0] $a[1] => Error";
-      }
-   $v =~ s/[\r\n]//g;                          # Delete the NewLine
-   $hash->{READINGS}{$a[1]}{VAL} = $v;
-   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
-   }  
-   elsif($a[1] eq "year") 
-   {
-   $v = NT5000_GetLine($hash,"year");
-   if(!defined($v)) 
-      {
+    }
+    $v =~ s/[\r\n]//g;                          # Delete the NewLine
+    readingsSingleUpdate($hash,"month",$v,1);
+  #-- yearly reading  
+  } elsif($a[1] eq "year") {
+    $v = NT5000_GetLine($hash,"year");
+    if(!defined($v)) {
       Log GetLogLevel($name,2), "NT5000_Get $a[1] error";
       return "$a[0] $a[1] => Error";
-      }
-   $v =~ s/[\r\n]//g;                          # Delete the NewLine
-   $hash->{READINGS}{$a[1]}{VAL} = $v;
-   $hash->{READINGS}{$a[1]}{TIME} = TimeNow();
-   }  
-else
-   {
-   return "NT5000_Get with unknown argument $a[1], choose one of " . join(",", sort keys %gets);
-   }
+    }
+    $v =~ s/[\r\n]//g;                          # Delete the NewLine
+    readingsSingleUpdate($hash,"year",$v,1);
+  } else {
+    return "NT5000_Get with unknown argument $a[1], choose one of " . join(",", sort keys %gets);
+  }
 
-Log GetLogLevel($name,3), "NT5000_Get $a[1] $v";
-return "$a[0] $a[1] => $v";
+  Log GetLogLevel($name,3), "NT5000_Get $a[1] $v";
+  return "$a[0] $a[1] => $v";
 }
 
 ########################################################################################
@@ -258,7 +264,6 @@ sub NT5000_Set ($@) {
   	  $res = "not yet implemented";
   	}
     Log GetLogLevel($name,3), "NT5000_Set $name ".join(" ",@a)." => $res";  
-  	DoTrigger($name, undef) if($init_done);
     return "NT5000_Set => $name ".join(" ",@a)." => $res";
   }
 }
@@ -275,8 +280,9 @@ sub NT5000_GetStatus ($) {
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
-  # Call us in n minutes again.
-  InternalTimer(gettimeofday()+ $hash->{Timer}, "NT5000_GetStatus", $hash,1);
+  #-- restart timer for updates
+  RemoveInternalTimer($hash);
+  InternalTimer(gettimeofday()+ $hash->{INTERVAL}, "NT5000_GetStatus", $hash,1);
 
   # Obtain the current reading
   my $result = NT5000_GetLine($hash, "reading");
@@ -284,26 +290,28 @@ sub NT5000_GetStatus ($) {
   # If one of these applies we must assume that the inverter is offline (no retry !)
   # Logging only if this is a change from the previous state
   if( !defined($result) ) {
-    Log GetLogLevel($name,1), "NT5000 cannot be read, inverter offline" if( $hash->{STATE} ne "offline" );
+    Log GetLogLevel($name,1), "NT5000 cannot be read, inverter offline" if( $hash->{READINGS}{"state"}{VAL} ne "offline" );
     #Log 3, "NT5000 cannot be read, inverter offline";
-    $hash->{STATE} = "offline";
-    return $hash->{STATE};
+    readingsSingleUpdate($hash,"state","offline",1);
+    return "offline"; 
   } elsif( length($result) < 13 ){
-    Log GetLogLevel($name,1), "NT5000 returns incomplete line, inverter offline" if( $hash->{STATE} ne "starting" );
+    Log GetLogLevel($name,1), "NT5000 returns incomplete line, inverter offline" if( $hash->{READINGS}{"state"}{VAL} ne "starting" );
     #Log 3, "NT5000 returns incomplete line";
-    $hash->{STATE} = "starting";
-    return $hash->{STATE};
+    readingsSingleUpdate($hash,"state","incomplete",1);
+    return "incomplete";
   }else {
     # we have obtained a reading: inverter is online
-    #Log 3, "NT5000 has answered 13 bytes";
-    my $tn = TimeNow();
-    my @names = ("Udc", "Idc", "Pdc", "Uac", "Iac", "Pac", "Temp", "S", "Wd", "Wtot", "Eta");
+    readingsBeginUpdate($hash);
+    my @names    = ("Udc", "Idc", "Pdc", "Uac", "Iac", "Pac", "Temp", "S", "Wd", "Wtot", "Eta");
+    my @units    = ("Volt", "Ampere", "Kilowatt", "Volt", "Ampere", "Kilowatt", "Celsius", "Watt per m<sup>2</sup>", "Kilowatthours", "Kilowatthours", "percent");
+    my @unitabbr = ("V", "A", "kW", "V", "A", "kW", "&deg;C", "W/m<sup>2</sup>", "kWh", "kWh", "%");
+    my @type     = ("voltage", "current", "power", "voltage", "current", "power", "temperature", "power density", "energy", "energy","efficiency");
     
-    if( !($hash->{STATE} =~ m/.*kW/) ) {
-      # we have turned online recently
+    #-- we are in the first reading, have turned online recently
+    if( $hash->{READINGS}{"state"}{VAL} !~ m/.*kW.*/ ) {
       Log GetLogLevel($name,2), "NT5000 inverter is online";
-      $hash->{STATE} = "starting";
-      # Obtain the serial number and protocol
+      readingsBulkUpdate($hash,"state","online");
+      #-- Obtain the serial number and protocol
       my $serial  = NT5000_GetLine($hash, "serial");
       $serial =~ s/^.*S://;
       $serial =~ s/[\r\n ]//g;
@@ -314,43 +322,48 @@ sub NT5000_GetStatus ($) {
       $hash->{Firmware} = substr($proto,0,1).".".substr($proto,1,1);
       $hash->{Protocol} = substr($proto,2,1).".".substr($proto,4,2);
       
-      # Obtain monthly readings in 70 seconds - only once
+      # Obtain monthly readings in 20 seconds - only once
       InternalTimer(gettimeofday()+ 20, "NT5000_GetMonth", $hash,1);
       
-      # Obtain yearly readings in 10 seconds - only once
+      # Obtain yearly readings in 40 seconds - only once
       InternalTimer(gettimeofday()+ 40, "NT5000_GetYear", $hash,1);
       
-      my $resmod ="header:  ";
-      #Put a header line into the log file
+      #-- Put header lines into the log file
+      my $resmod ="";
       for(my $i = 0; $i < int(@names); $i++) {
         $resmod .= $names[$i]."  ";
       }
-      $hash->{CHANGED}[$main::cline++] = "$resmod";
+      readingsBulkUpdate($hash,"header1",$resmod);
+     
+      $resmod ="";
+      for(my $i = 0; $i < int(@unitabbr); $i++) {
+        $resmod .= "[".$unitabbr[$i]."] ";
+      }
+      readingsBulkUpdate($hash,"header2",$resmod);
+      #-- set units properly
+      for(my $i = 0; $i < int(@names); $i++)  {
+        $hash->{READINGS}{$names[$i]}{UNIT}     = $units[$i];
+        $hash->{READINGS}{$names[$i]}{UNITABBR} = $unitabbr[$i];
+        $hash->{READINGS}{$names[$i]}{TYPE}     = $type[$i];
+      } 
     }; 
     
-    #-- Log level 5
+    #-- put into READINGS
+    readingsBulkUpdate($hash,"reading",$result);
     Log GetLogLevel($name,5), "NT5000 online result = $result";
-
-    # All data items in one line saves a lot of place
-    my $resmod = $result;
-    #$resmod =~ s/;/  /g;
-    $hash->{CHANGED}[$main::cline++] = "reading: $resmod";
    
     #-- split result for writing into hash
     my @data = split(' ',$result);
-    $hash->{STATE} = sprintf("%5.3f kW",$data[5]);
+    readingsBulkUpdate($hash,"state", sprintf("%5.3f %s",$data[5],$unitabbr[5]));
     for(my $i = 0; $i < int(@names); $i++)  {
       # This puts individual pairs into the tabular view
-      $hash->{READINGS}{$names[$i]}{VAL} = $data[$i];
-      $hash->{READINGS}{$names[$i]}{TIME} = $tn;
+      readingsBulkUpdate($hash,$names[$i],$data[$i]);
     } 
-    
-    DoTrigger($name, undef) if($init_done);
-
+    readingsEndUpdate($hash,1); 
     $result =~ s/;/ /g;  
   }
 
-  return $hash->{STATE};
+  return $hash->{READINGS}{"state"}{VAL};
 }
 
 ########################################################################################
@@ -362,9 +375,15 @@ sub NT5000_GetStatus ($) {
 ########################################################################################
 
 sub NT5000_GetMonth ($) {
-my ($hash) = @_;
-my $name = $hash->{NAME};
-
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
+  
+  my ($ln,$lf,$ret,$daten);
+  
+  my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
+  my $yearn = $year+1900;
+  my $monn  = $month+1;
+  
   #-- Obtain the monthly reading
   my $result = NT5000_GetLine($hash, "month");
   $result =~ s/^.*M://;
@@ -375,40 +394,47 @@ my $name = $hash->{NAME};
   my $day = $data[0];
 
   #-- Expected yield for month
-  my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
+ 
   my $mex  = "Wx_M".($month+1);
   my $wex  = $attr{$name}{$mex};
   my $wac  = 0;
   my $wre;
 
-  my @names = ("W_D1","W_D2","W_D3","W_D4","W_D5","W_D6","W_D7","W_D8","W_D9","W_D10",
+  my @names = ("W_D01","W_D02","W_D03","W_D04","W_D05","W_D06","W_D07","W_D08","W_D09","W_D10",
    "W_D11","W_D12","W_D13","W_D14","W_D15","W_D16","W_D17","W_D18","W_D19","W_D20",
    "W_D21","W_D22","W_D23","W_D24","W_D25","W_D26","W_D27","W_D28","W_D29","W_D30","W_D31");
    
-  my $yearn = $year+1900;
-  my $monn  = $month+1;
-
-  #-- we are not sure, if this is logged now or in the next minute, hence an "or" in the regexp
-  $hash->{LASTM}=sprintf("%4d-%02d-%02d_%02d:(%02d|%02d)",$yearn,$monn,$day,$hour,$min,$min+1);
-
-   for(my $i = 0; $i < $day; $i++) 
-      {
-   
-      my $dayn  = $i+1;
-      my $daten = $yearn."-".$monn."-".$dayn."_23:59:59";
-      $wac  += $data[$day-$i];
-      if( $wex )
-         {  
-         $wre  = int(1000*$wac/$wex)/10 if ($wex>0 );
-         };
-      # Put one item per line into the log file
-      # +1 necessary  - otherwise will be overridden by the changes in the daily readings
-      $main::cline++;
-      $hash->{CHANGED}[$main::cline++] = "$names[$i]: $daten  $data[$day-$i] $wac  $wre";
-      # This puts individual pairs into the tabular view
-      #$hash->{READINGS}{$names[$i]}{TIME} = $tn;
-      #$hash->{READINGS}{$names[$i]}{VAL} = $data[$day-$i];
+  #-- Check current logfile 
+  $ln = $attr{$name}{"LogM"};
+  if( !(defined($ln))){
+    Log 1,"NT5000_GetMonth: Attribute LogM is missing";
+    #-- here some other output of monthly data
+  } else {
+    $lf = $defs{$ln}{currentlogfile};
+    $ret  = open(NT5000FILE, "> $lf" );
+    if( $ret) {
+      print NT5000FILE "monthly data:              Day   Wd     Wm    Wex\n";
+      for(my $i = 0; $i < $day; $i++) {
+        $dayn  = $i+1;
+        #-- for current day actual time, otherwise dummy time
+        if( $i == ($day-1) ){
+          $daten = sprintf("%4d-%02d-%02d_%02d:%02d:%02d",$yearn,$monn,$dayn,$hour,$min,$sec);
+        }else{
+          $daten = sprintf("%4d-%02d-%02d_23:59:59",$yearn,$monn,$dayn);
+        }
+        $wac  += $data[$day-$i];
+        if( $wex ){  
+          $wre  = int(1000*$wac/$wex)/10 if ($wex>0 );
+        };
+        # Put one item per line into the log file
+        printf NT5000FILE "%s %s %5s %6.3f %5.1f %5.1f\n",$daten,$name,$names[$i],$data[$day-$i],$wac,$wre;  
       };
+      Log 1,"NT5000_GetMonth: File overwritten"; 
+      close(NT5000FILE);         
+    } else {
+      Log 1,"NT5000_GetMonth: Cannot open $lf for writing!"; 
+    }
+  }
 }
 
 ########################################################################################
@@ -420,48 +446,64 @@ my $name = $hash->{NAME};
 ########################################################################################
 
 sub NT5000_GetYear ($) {
-my ($hash) = @_;
-my $name = $hash->{NAME};
+  my ($hash) = @_;
+  my $name = $hash->{NAME};
 
-#-- Obtain the yearly reading
-   my $result = NT5000_GetLine($hash, "year");
-   $result =~ s/^.*Y://;
-   $result =~ s/[\r\n ]//g;   
-   Log GetLogLevel($name,3), "NT5000 yearly result = $result";
-   $result=~ s/,/./g;
-   my @data = split(";", $result);
-   
-    #-- Expected yield for year
-   my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
-   my $wex  = $attr{$name}{Wx_Y};
-   my $wac  = 0;
-   my $wre;
+  my ($ln,$lf,$ret,$monn,$daten,$mex,$mmex);
 
-   my @names = ("W_M01","W_M02","W_M03","W_M04","W_M05","W_M06","W_M07","W_M08","W_M09","W_M10",
-   "W_M11","W_M12");
-
+  my ($sec,$min,$hour,$dayn,$month,$year,$wday,$yday,$isdst) = localtime(time);
   my $yearn = $year+1900;
-  #-- we are not sure, if this is logged now or in the next minute, hence an "or" in the regexp
-  $hash->{LASTY}=sprintf("%4d-%02d-%02d_%02d:(%02d|%02d)",$yearn,$month+1,$dayn,$hour,$min,$min+1);
-    
-  for(my $i = 0; $i <= $month; $i++) {
-      my $monn  = $i+1;
-      my $daten = $yearn."-".$monn."-28_23:59:59";
-      my $mex  = "Wx_M".($monn);
-      my $mmex  = $attr{$name}{$mex};
-      $wac  += $data[$month+1-$i];
-      if( $wex )
-         { 
-         $wre  = int(1000.0*$wac/$wex)/10 if ($wex > 0);
-         };
-      #--  Put one item per line into the log file
-      #    +1 necessary  - otherwise will be overridden by the changes in the daily readings
-      $hash->{CHANGED}[$main::cline++] = "$names[$i]: $daten  $data[$month+1-$i]  $mmex  $wac  $wre";
-      #-- This puts individual pairs into the tabular view
-      #   $hash->{READINGS}{$names[$i]}{TIME} = $tn;
-      #   $hash->{READINGS}{$names[$i]}{VAL} = $data[$i];
-      };
- }
+
+  #-- Obtain the yearly reading
+  my $result = NT5000_GetLine($hash, "year");
+  $result =~ s/^.*Y://;
+  $result =~ s/[\r\n ]//g;   
+  Log GetLogLevel($name,3), "NT5000 yearly result = $result";
+  $result=~ s/,/./g;
+  my @data = split(";", $result);
+  
+  #-- Expected yield for year
+  my $wex  = $attr{$name}{Wx_Y};
+  my $wac  = 0;
+  my $wre;
+
+  my @names = ("W_M01","W_M02","W_M03","W_M04","W_M05","W_M06","W_M07","W_M08","W_M09","W_M10",
+  "W_M11","W_M12");
+
+  #-- Check current logfile 
+  $ln = $attr{$name}{"LogY"};
+  if( !(defined($ln))){
+    Log 1,"NT5000_GetYear: Attribute LogY is missing";
+    #-- here some other output of yearly data
+  } else {
+    $lf = $defs{$ln}{currentlogfile};
+    $ret  = open(NT5000FILE, "> $lf" );
+    if( $ret) {
+      print NT5000FILE "yearly data:               Month Wm    Wex Wy     Wy \n";
+      for(my $i = 0; $i <= $month; $i++) {
+        $monn  = $i+1;
+        #-- for current month actual time, otherwise dummy time
+        if( $i == $month ){
+          $daten = sprintf("%4d-%02d-28_%02d:%02d:%02d",$yearn,$monn,$hour,$min,$sec);
+        }else{
+          $daten = sprintf("%4d-%02d-28_23:59:59",$yearn,$monn);
+        }
+        $mex  = "Wx_M".($monn);
+        $mmex  = $attr{$name}{$mex};
+        $wac  += $data[$month+1-$i];
+        if( $wex ){ 
+          $wre  = int(1000.0*$wac/$wex)/10 if ($wex > 0);
+        };
+        # Put one item per line into the log file
+        printf NT5000FILE "%s %s %5s %5.1f %3d %6.1f %5.1f\n",$daten,$name,$names[$i],$data[$month+1-$i],$mmex,$wac,$wre;
+      }
+      Log 1,"NT5000_GetYear: File overwritten"; 
+      close(NT5000FILE);         
+    } else {
+      Log 1,"NT5000_GetYear: Cannot open $lf for writing!"; 
+    }
+  }
+}
 
 ########################################################################################
 #
@@ -708,9 +750,7 @@ sub NT5000_GetLine ($$) {
 #            cmd = 5  byte parameter to query the device properly
 #
 ########################################################################################
-sub 
-NT5000_5to13($$$)
-{
+sub NT5000_5to13($$$) {
 
 my $retry = 0;
 my ($hash,$dev,$cmd) = @_;
@@ -721,74 +761,39 @@ my ($i,$j,$k);
 if( $dev eq "none" ) #no inverter attached
   {
     return "\x00\x01\x02\x03\x04\x05\x06\x07\x07\x09\x0a\x0b\x0c";
-
-  } elsif ( $dev eq "emulator" ) #emulator attached 
-  {
   #-- read from emulator
-  
-    #-- calculate checksum
+  } elsif ( $dev eq "emulator" ) {
     my $CS = unpack("%32C*", $cmd);
     $CS=$CS%256;
     my $cmd2=sprintf("%s%c",$cmd,$CS);
-    #-- control
-	#print "Sending out:\n";
-    #for(my $i=0;$i<5;$i++)
-	#  {  my $j=int(ord(substr($cmd2,$i,1))/16);
-    #     my $k=ord(substr($cmd2,$i,1))%16;
-	#     print "byte $i = 0x$j$k\n";
-	#  }
-    
     my $result = NT5000_emu(5,$cmd);
-     #print "[I] Answer 13 bytes received\n";
-     #for($i=0;$i<13;$i++)
-     #  {  $j=int(ord($invBuffer[$i])/16);
-     #     $k=ord($invBuffer[$i])%16;
-	 #     print "byte $i = 0x$j$k\n";
-	 #  }
     return($result);
-	 
-  } else # here we do the real thing
-  { 
-    #Just opening the old device does not reaaly work.
-    #my $serport = $hash->{USBDev};
+  #-- here we do the real thing
+  } else { 
     my $serport = new Device::SerialPort ($dev);
     if(!$serport) {
       Log 1, "NT5000: Can't open $dev: $!";
       return undef;
     }
-    #Log 3, "NT5000 opened";
     $serport->reset_error();
-    $serport->baudrate(9600)    || die "failed setting baudrate";
-    $serport->databits(8)       || die "failed setting databits";
-    $serport->parity('none')    || die "failed setting parity";
-    $serport->stopbits(1)       || die "failed setting stopbits";
-    $serport->handshake('none') || die "failed setting handshake";
-    $serport->write_settings    || die "no settings";
-
-    #my $rm = "NT5000 timeout reading the answer";
+    $serport->baudrate(9600);
+    $serport->databits(8);
+    $serport->parity('none');
+    $serport->stopbits(1);
+    $serport->handshake('none');
+    $serport->write_settings;
     
-    #-- calculate checksum
+    #-- calculate checksum and send
     my $CS = unpack("%32C*", $cmd);
     $CS=$CS%256;
     my $cmd2=sprintf("%s%c",$cmd,$CS);
-    #-- control
-	#print "Sending out:\n";
-    #for(my $i=0;$i<5;$i++)
-	#  {  my $j=int(ord(substr($cmd2,$i,1))/16);
-    #     my $k=ord(substr($cmd2,$i,1))%16;
-	#     print "byte $i = 0x$j$k\n";
-	#  }
-    
     my $count_out = $serport->write($cmd2);
     Log 3, "NT5000 write failed\n"         unless ($count_out);
-    Log 3, "NT5000 write incomplete $count_out ne ".(length($cmd2))."\n"     if ( $count_out != 5 );
-    #Log 3, "write complete $count_out \n"     if ( $count_out == 5 );
-    #-- sleeping 0.03 seconds
+    Log 3, "NT5000 write incomplete $count_out ne ".(length($cmd2))."\n"     if ( $count_out != 5 );;
+    #-- sleeping 0.05 seconds
     select(undef,undef,undef,0.05);
     my ($count_in, $string_in) = $serport->read(13);
-    #Log 3, "NT5000 read unsuccessful, $count_in bytes \n" unless ($count_in == 13);
-    #Log 3, "read complete $count_in \n"     if ( $count_in == 13 );
-    #-- sleeping 0.03 seconds
+    #-- sleeping 0.05 seconds
     select(undef,undef,undef,0.05);
     $serport->close();
     return($string_in);
@@ -1093,6 +1098,86 @@ elsif( $count == 5)
    }
 }
 
-
-
 1;
+
+
+=pod
+=begin html
+
+<a name="NT5000"></a>
+        <h3>NT5000</h3>
+        <p>FHEM module to commmunicate with a Sunways NT5000 solar inverter<br />
+        </p>
+        <h4>Example</h4>
+        <p>
+            <code>define nt5000 NT5000 /dev/ttyUSB0 </code>
+        </p><br />   
+        <a name="NT5000define"></a>
+        <h4>Define</h4>
+        <p>
+        <code>define &lt;name&gt; NT5000  &lt;device&gt; </code> 
+        <br /><br /> Define a NT5000 solar inverter</p>
+        <ul>
+          <li>
+            <code>&lt;name&gt;</code>
+           Serial device port or the keyword <code>emulator</code>. In the latter case, a 4.5 kWP solar installation is simulated
+         </li>
+        </ul>
+        <a name="NT5000set"></a>
+        <h4>Set</h4>
+        <ul>
+            <li><a name="nt5000_time">
+                   Not yet implemented</li>
+        </ul>
+        <br />
+        <a name="NT5000get"></a>
+        <h4>Get</h4>
+        <ul>
+            <li><a name="nt5000_reading">
+                    <code>get &lt;name&gt; reading</code></a>
+                <br /> read all current data </li>
+            <li><a name="nt5000_month">
+                    <code>get &lt;name&gt; month</code></a>
+                <br /> read all data from current month </li>
+            <li><a name="nt5000_year">
+                    <code>get &lt;name&gt; year</code></a>
+                <br /> read all data from current year </li>
+            <li><a name="nt5000_present">
+                    <code>get &lt;name&gt; present</code></a>
+                <br /> 1 if device present, 0 if not </li>
+            <li><a name="nt5000_serial">
+                    <code>get &lt;name&gt; serial</code></a>
+                <br /> inverter serial number </li>
+            <li><a name="nt5000_proto">
+                    <code>get &lt;name&gt; proto</code></a>
+                <br /> inverter protocol </li>
+        </ul>
+        <br />
+        <a name="NT5000attr"></a>
+        <h4>Attributes</h4>
+        <ul>
+            <li><a name="nt5000_Area"><code>attr &lt;name&gt; Area &lt;float&gt;</code>
+                </a>
+                <br />Effective area [m<sup>2</sup>of the installation</li>
+            <li><a name="nt5000_PSP"><code>attr &lt;name&gt; PSP &lt;float&gt;</code>
+                </a>
+                <br />Peak Solar Power [kW] of the installation</li>
+            <li><a name="nt5000_Wx_M"><code>attr &lt;name&gt; Wx_M<n> &lt;float&gt;</code>
+                </a>
+                <br />Expected yield [kWh] for month <n>=1...12</li>
+            <li><a name="nt5000_Wx_Y"><code>attr &lt;name&gt; Wx_Y &lt;float&gt;</code>
+                </a>
+                <br />Expected yield [kWh] for a full year</li>
+            <li><a name="nt5000_MERR"><code>attr &lt;name&gt; MERR &lt;list&gt;</code>
+                </a>
+                <br />List of months with erroneous logging, see lines 83ff</li>
+            <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
+                    href="#event-on-update-reading">event-on-update-reading</a>, <a
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
+                    <a href="#webCmd">webCmd</a></li>
+        </ul>
+        
+=end html
+=cut
+
