@@ -22,8 +22,6 @@ my $resendRetries = 0; #how often resend before giving up?
 
 my $ackTimeout = 3; #seconds
 
-my $defaultWeekprofile = "444855084520452045204520452045204520452045204520452044485508452045204520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc55144520452045204520452045204520452045204448546c44cc5514452045204520452045204520452045204520";
-
 sub
 CUL_MAX_Initialize($)
 {
@@ -230,9 +228,9 @@ CUL_MAX_Parse($$)
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} eq "HeatingThermostat") {
-          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,80,5,0,12,15,100,0,0,12,$defaultWeekprofile", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,80,5,0,12,15,100,0,0,12,$defaultWeekProfile", {RAWMSG => $rmsg});
         } elsif($device_types{$type} eq "WallMountedThermostat") {
-          Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekprofile", {RAWMSG => $rmsg});
+          Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
         }
         #Todo: CUL_MAX_SendTimeInformation($shash, $src); on Ack for our PairPong
       }
