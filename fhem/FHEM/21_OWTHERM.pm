@@ -142,7 +142,6 @@ sub OWTHERM_Define ($$) {
   my @a = split("[ \t][ \t]*", $def);
   
   my ($name,$model,$fam,$id,$crc,$interval,$ret);
-  my $tn = TimeNow();
   
   #-- default
   $name          = $a[0];
@@ -334,8 +333,8 @@ sub OWTHERM_FormatValues($) {
   
   #-- correct values for proper offset, factor 
   $vval  = ($owg_temp + $offset)*$factor;
-  $vlow   = ($owg_tl + $offset)*$factor;
-  $vhigh  = ($owg_th + $offset)*$factor;
+  $vlow   = floor(($owg_tl + $offset)*$factor+0.5);
+  $vhigh  = floor(($owg_th + $offset)*$factor+0.5);
   
   $main::attr{$name}{"tempLow"} = $vlow;
   $main::attr{$name}{"tempHigh"} = $vhigh;
@@ -553,30 +552,35 @@ sub OWTHERM_Set($@) {
 
   #-- set tempLow or tempHigh
   if( (lc($key) eq "templow") || (lc($key) eq "temphigh")) {
-    #-- First we have to read the current data, because alarms may not be set independently
-    OWTHERM_GetValues($hash);
-    
+  
     my $interface = $hash->{IODev}->{TYPE};
     my $offset    = defined($hash->{tempf}{offset}) ? $hash->{tempf}{offset} : 0.0;
     my $factor    = defined($hash->{tempf}{factor}) ? $hash->{tempf}{factor} : 1.0;
     
+    #-- Only integer values are allowed 
+    $value = floor($value+0.5);
+    
+    #-- First we have to read the current data, because alarms may not be set independently
+    $owg_tl = floor($main::attr{$name}{"tempLow"}/$factor-$offset+0.5);
+    $owg_th = floor($main::attr{$name}{"tempHigh"}/$factor-$offset+0.5);
+    
     #-- find upper and lower boundaries for given offset/factor
-    my $mmin = (-55+$offset)*$factor;
-    my $mmax = (125+$offset)*$factor;
+    my $mmin = floor((-55+$offset)*$factor+0.5);
+    my $mmax = floor((125+$offset)*$factor+0.5);
     return sprintf("OWTHERM: Set with wrong value $value for $key, range is  [%3.1f,%3.1f]",$mmin,$mmax)
       if($value < $mmin || $value > $mmax);
     
     #-- seems to be ok, correcting for offset and factor
-    $a[2]  = int($value/$factor-$offset);
+    $a[2]  = floor($value/$factor-$offset+0.5);
     #-- put into attribute value
     if( lc($key) eq "templow" ){
-      if( $main::attr{$name}{"tempLow"} != $a[2] ){
-        $main::attr{$name}{"tempLow"} = $a[2];
+      if( $main::attr{$name}{"tempLow"} != $value ){
+        $main::attr{$name}{"tempLow"} = $value;
       }
     }
     if( lc($key) eq "temphigh" ){
-      if( $main::attr{$name}{"tempHigh"} != $a[2] ){
-        $main::attr{$name}{"tempHigh"} = $a[2];
+      if( $main::attr{$name}{"tempHigh"} != $value ){
+        $main::attr{$name}{"tempHigh"} = $value;
       }
     }
     #-- put into device
@@ -593,10 +597,9 @@ sub OWTHERM_Set($@) {
       if(defined($ret));
   }
   
-  #-- process results - we have to reread the device
+  #-- process results
   $hash->{PRESENT} = 1; 
-  #
-  #OWTHERM_FormatValues($hash);
+  OWTHERM_FormatValues($hash);
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
@@ -1019,7 +1022,8 @@ sub OWXTHERM_SetValues($@) {
                 value). </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a
+                    href="#stateFormat">stateFormat</a>, <a href="#room"
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>

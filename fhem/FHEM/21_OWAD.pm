@@ -437,8 +437,13 @@ sub OWAD_FormatValues($) {
         } else {
           $vval = "???";
         }
+        
+        #-- low alarm value
         $vlow =$owg_vlow[$i];
+        $main::attr{$name}{$owg_fixed[$i]."Low"}=$vlow;
+        #-- high alarm value
         $vhigh=$owg_vhigh[$i];
+        $main::attr{$name}{$owg_fixed[$i]."High"}=$vhigh;            
         
         #-- string buildup for return value, STATE and alarm
         $svalue .= sprintf( "%s: %5.3f %s", $owg_channel[$i], $vval,$unarr[1]);
@@ -795,7 +800,7 @@ sub OWAD_Set($@) {
       if($value ne "none" &&  $value ne "low" &&  $value ne "high" &&  $value ne "both");
     #-- put into attribute value
     if( $main::attr{$name}{$owg_fixed[$channo]."Alarm"} ne $value ){
-      Log 1,"OWAD: Correcting attribute value ".$owg_fixed[$channo]."Alarm";
+      #Log 1,"OWAD: Correcting attribute value ".$owg_fixed[$channo]."Alarm";
       $main::attr{$name}{$owg_fixed[$channo]."Alarm"} = $value 
     }
     #-- put into device
@@ -1472,7 +1477,8 @@ sub OWXAD_SetPage($$) {
                 alarm. </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a
+                    href="#stateFormat">stateFormat</a>, <a href="#room"
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>

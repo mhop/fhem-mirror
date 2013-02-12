@@ -36,7 +36,7 @@
 # Additional attributes are defined in fhem.cfg, in some cases per channel, where <channel>=A,B
 # Note: attributes are read only during initialization procedure - later changes are not used.
 #
-# attr <name> UnitInReading = whether the physical unit is written into the reading = 1 (default) or 0
+# attr <name> LogM <string> = device name (not file name) of monthly log file
 # attr <name> <channel>Name <string>|<string> = name for the channel | a type description for the measured value
 # attr <name> <channel>Unit <string>|<string> = unit of measurement for this channel | its abbreviation 
 # attr <name> <channel>Offset <float>  = offset added to the reading in this channel 
@@ -132,8 +132,8 @@ sub OWCOUNT_Initialize ($) {
   $hash->{SetFn}   = "OWCOUNT_Set";
   
   #-- see header for attributes
-  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 ".
-                "event-on-update-reading event-on-change-reading ";
+  my $attlist = "IODev do_not_notify:0,1 showtime:0,1 model:DS2423 loglevel:0,1,2,3,4,5 LogM ".
+                $readingFnAttributes;
   for( my $i=0;$i<int(@owg_fixed);$i++ ){
     $attlist .= " ".$owg_fixed[$i]."Name";
     $attlist .= " ".$owg_fixed[$i]."Offset";
@@ -351,6 +351,7 @@ sub OWCOUNT_FormatValues($) {
   my $tn = TimeNow();
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
   my ($seco,$mino,$houro,$dayo,$montho,$yearo,$dayrest);
+  my ($dt,$dv,$dval,$delt,$delf);
   my $daybreak = 0;
   my $monthbreak = 0;
   
@@ -372,11 +373,11 @@ sub OWCOUNT_FormatValues($) {
     $period   = $hash->{READINGS}{"$owg_channel[$i]"}{PERIOD};
     $runit    = $hash->{READINGS}{"$owg_rate[$i]"}{UNITABBR};
     
-    #-- skip some thing if undefined
+    #-- skip some things if undefined
     if( $owg_val[$i] eq ""){
       $svalue .= $owg_channel[$i].": ???";
     }else{     
-      #-- only if attribute value Mode=daily, take the midnight value from memory
+      #-- only if attribute value mode=daily, take the midnight value from memory
       if( defined($attr{$name}{$owg_fixed[$i]."Mode"} )){ 
         if( $attr{$name}{$owg_fixed[$i]."Mode"} eq "daily"){
           $midnight = $owg_midnight[$i];
@@ -407,43 +408,44 @@ sub OWCOUNT_FormatValues($) {
     
       #-- safeguard against the case where no previous measurement
       if( length($oldtim) > 0 ){    
-        #-- time difference in seconds
+        #-- previous measurement time
         ($yearo,$montho,$dayrest) = split(/-/,$oldtim);
         $dayo = substr($dayrest,0,2);
         ($houro,$mino,$seco) = split(/:/,substr($dayrest,3));
-        my $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
-        #-- debugging: changing the day every 10 minutes
-        #$delt = 
-        #-- correct time for wraparound at midnight
-        if( ($delt<0) && ($present==1)){
+        
+        #-- time dfifference to previous measurement and to midnight
+        $delt = ($hour-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco);
+        $delf =  $hour        *3600 +  $min       *60 +  $sec - 86400;
+        if( ($delf+$hash->{INTERVAL}) >= 0 ){
           $daybreak = 1;
-          $delt    += 86400;
+          #-- Timer data from tomorrow
+          my ($secn,$minn,$hourn,$dayn,$monthn,$yearn,$wdayn,$ydayn,$isdstn) = localtime(time() + 24*60*60);   
+          #-- Check, whether we have a new month
+          if( (($delf+$hash->{INTERVAL}) > 0) && ($dayn == 1) ){
+            $monthbreak =1;
+          }
         }
+
         #-- correct $vval for wraparound of 32 bit counter 
         if( ($vval < $oldval) && ($daybreak==0) && ($present==1) ){
           Log 1,"OWCOUNT TODO: Counter wraparound";
         }
      
         if( $daybreak==1 ){
-          #--  linear interpolation
-          my $dt = ((24-$houro)*3600 -$mino*60 - $seco)/( ($hour+24-$houro)*3600 + ($min-$mino)*60 + ($sec-$seco) );
-          my $dv = $oldval*(1-$dt)+$vval*$dt;
-          #-- correct reading in daily mode
-          if( $midnight > 0.0 ){          
-            $vval  -= $dv;
-            $delt  *= (1-$dt);
-            $oldval = 0.0;
-          }
+          #--  linear extrapolation 
+          $dt   = -$delf/$delt;
+          $dv   = ($vval-$oldval)*$dt;
+          $dval = $vval+$dv;
+            
           #-- in any mode store the interpolated value in the midnight store
-          $midnight += $dv;
-          OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$midnight));
+          OWXCOUNT_SetPage($hash,14+$i,sprintf("%f",$dval));
           #-- string buildup for monthly logging
-          $dvalue .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
+          $dvalue .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dval,$unit);
           if( $day<$dayo ){
             $monthbreak = 1;
             Log 1, "OWCOUNT: Change of month";
             #-- string buildup for yearly logging
-            $mvalue .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dv,$unit);
+            $mvalue .= sprintf( "%s: %5.1f %s", $owg_channel[$i], $dval,$unit);
           }
         } 
         #-- rate
@@ -480,24 +482,25 @@ sub OWCOUNT_FormatValues($) {
     #-- insert space 
     if( $i<int(@owg_fixed)-1 ){
       $svalue .= " ";
+      $dvalue .= " ";
     }
   }
-  #-- STATE
-  readingsBulkUpdate($hash,"state",$svalue);
- 
+  
   #-- Daily/monthly cumulated value
   if( $daybreak == 1 ){
-    $svalue = sprintf("D_%d",$dayo);
-    $dvalue = sprintf("%d-%d-%d_23:59:59 %s",$yearo,$montho,$dayo,$dvalue);
-    readingsBulkUpdate($hash,$svalue,$dvalue);
-    Log 1,$name." ".$dvalue;
+    #-- TODO: recall the monthly summary
+    #--my @month = OWCOUNT_GetMonth($hash); 
+    #my $total = $month[0]+$vval;
+    readingsBulkUpdate($hash,"day",$dvalue);
     if( $monthbreak == 1){
-      $svalue = sprintf("M_%d",$montho);
-      $mvalue = sprintf("%d-%d-%d_23:59:59 %s",$yearo,$montho,$dayo,$mvalue);
-      readingsBulkUpdate($hash,$svalue,$mvalue);
-      Log 1,$name." ".$mvalue;
+      $mvalue = sprintf("M_%02d SOME VALUE",$month);
+      readingsBulkUpdate($hash,"month",$mvalue);
+      Log 1,$name." has monthbreak ".$mvalue;
     }  
   }
+      
+  #-- STATE
+  readingsBulkUpdate($hash,"state",$svalue);
   readingsEndUpdate($hash,1); 
   
   return $svalue;
@@ -643,6 +646,74 @@ sub OWCOUNT_Get($@) {
   $hash->{PRESENT} = 1; 
   return "OWCOUNT: $name.$reading => ".OWCOUNT_FormatValues($hash);  
  
+}
+
+########################################################################################
+#
+# OWCOUNT_GetMonth Read monthly data from a file
+#
+# Parameter hash
+#
+# Returns total value up to last day, including this day and average including this day
+#
+########################################################################################
+
+sub OWCOUNT_GetMonth($) {
+
+  my ($hash) = @_;
+  my $name   = $hash->{NAME};
+  my $regexp = ".*$name.*";
+  my $val;
+  my @month  = ();
+  my @month2 = ();
+  my @channel;
+  my ($total,$total2,$deltim,$av);
+  
+  #-- Check current logfile 
+  my $ln = $attr{$name}{"LogM"};
+  if( !(defined($ln))){
+    Log 1,"OWCOUNT_GetMonth: Attribute LogM is missing";
+    return undef;
+  } else {
+    my $lf = $defs{$ln}{currentlogfile};
+    my $ret  = open(OWXFILE, "< $lf" );
+    if( $ret) {
+      while( <OWXFILE> ){
+        #-- line looks as 
+        #   2013-02-09_23:59:31 <name> day D_09 <aname>: 180.0 cts <bname>: 180.0 cts etc.
+        my $line = $_;
+        chomp($line);
+        if ( $line =~ m/$regexp/i){  
+          my @linarr = split(' ',$line);
+          my $day = $linarr[3];
+          $day =~ s/D_0+//;
+          @channel = ();
+          for (my $i=0;$i<int(@owg_fixed);$i++){
+            $val = $linarr[5+3*$i];
+            push(@channel,$val);
+          }
+          push(@month,[@channel]);
+        }
+      }
+    }
+    
+    #-- sum and average
+    for (my $i=0;$i<int(@owg_fixed);$i++){
+      $total = 0.0;
+      for (my $j=0;$j<int(@month);$j++){
+        $total += $month[$j][$i];
+      }
+      #-- add data from current day
+      $total = int($total*100)/100;
+      my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
+      my $deltim = ($hour+$min/60.0 + $sec/3600.0)/24.0;
+      my $total2 = int(100*($total+$hash->{READINGS}{"$owg_channel[$i]"}{VAL}))/100;
+      my $av = int(100*$total2/(int(@month)+$deltim))/100;
+    
+      push(@month2,[($total,$total2,$av)]);
+    }
+    return @month2;
+  } 
 }
 
 #######################################################################################
@@ -1168,6 +1239,11 @@ sub OWXCOUNT_SetPage($$$) {
         <br />
         <a name="OWCOUNTattr"></a>
         <h4>Attributes</h4>
+        <ul>
+        <li><a name="owcount_logm"><code>attr &lt;name&gt; LogM
+                        &lt;string&gt;|</code></a>
+                <br />device name (not file name) of monthly log file.</li>
+                </ul>
         <p>For each of the following attributes, the channel identification A,B may be used.</p>
         <ul>
             <li><a name="owcount_cname"><code>attr &lt;name&gt; &lt;channel&gt;Name
@@ -1187,7 +1263,8 @@ sub OWXCOUNT_SetPage($$$) {
                 <br />factor multiplied to (reading+offset) in this channel. </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a
+                    href="#stateFormat">stateFormat</a>, <a href="#room"
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
