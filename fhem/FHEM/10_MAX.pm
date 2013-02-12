@@ -425,6 +425,11 @@ MAX_Set($@)
       #Each day has 2 bytes * 13 controlpoints = 26 bytes = 52 hex characters
       #we don't have to update the rest, because the active part is terminated by the time 0:00
       substr($curWeekProfile, $day*52, length($newWeekprofilePart)) = $newWeekprofilePart;
+      #First 7 controlpoints (2*7=14 bytes => 2*2*7=28 hex characters )
+      ($hash->{IODev}{Send})->($hash->{IODev},"ConfigWeekProfile",$hash->{addr},sprintf("0%1d%s", $day, substr($curWeekProfile,$day*52,2*2*7)));
+      #And then the remaining 6
+      ($hash->{IODev}{Send})->($hash->{IODev},"ConfigWeekProfile",$hash->{addr},sprintf("1%1d%s", $day, substr($curWeekProfile,$day*52+2*2*7,2*2*6)))
+        if(@controlpoints > 2*7);
     }
     readingsSingleUpdate($hash, ".weekProfile", $curWeekProfile, 0);
     MAX_ParseWeekProfile($hash);
