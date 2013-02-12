@@ -336,21 +336,21 @@ by fhem.pl?</h4>
 
   <pre>
   # Check simply the value. It is the same as seen in "list"
-  fhem> {$value{myfht}}
+  fhem> {Value(myfht)}
   measured-temp: 23.8 (Celsius)
 
   # Get the second word, so we can compare it.
-  fhem> { my @a = split(" ", $value{myfht});; $a[1] }
+  fhem> { my @a = split(" ", Value(myfht));; $a[1] }
   23.8
 
   # Set the ventilator on now, if its too hot.
-  fhem> { my @a = split(" ", $value{myfht});; fhem("set ventilator on") if($a[1] > 25.0) }
+  fhem> { my @a = split(" ", Value(myfht));; fhem("set ventilator on") if($a[1] > 25.0) }
 
   # Now do this regularly
-  fhem> define chilldown at +*00:30:00 { my @a = split(" ", $value{myfht});; fhem("set ventilator on") if($a[1] > 25.0) }
+  fhem> define chilldown at +*00:30:00 { my @a = split(" ", Value(myfht));; fhem("set ventilator on") if($a[1] > 25.0) }
 
   # An alternative:
-  fhem> define chilldown at +*00:30:00 { fhem("set ventilator on") if($value{myfht} gt "measured-temp: 25.0") }
+  fhem> define chilldown at +*00:30:00 { fhem("set ventilator on") if(Value(myfht) gt "measured-temp: 25.0") }
   </pre>
 
 </ul>
