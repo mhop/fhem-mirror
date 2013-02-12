@@ -845,11 +845,11 @@ Setting pairmode to "cancel" puts the cube out of pairing mode.</li>
   <b>Attributes</b>
   <ul>
     <li>set-clock-on-init<br>
-      (Default: 1). Automatically call "set clock" after connecting to the cube.
-    <li><a href="#do_not_notify">do_not_notify</a></li><br>
-    <li><a href="#attrdummy">dummy</a></li><br>
-    <li><a href="#loglevel">loglevel</a></li><br>
-    <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
+      (Default: 1). Automatically call "set clock" after connecting to the cube.</li>
+    <li><a href="#do_not_notify">do_not_notify</a></li>
+    <li><a href="#attrdummy">dummy</a></li>
+    <li><a href="#loglevel">loglevel</a></li>
+    <li><a href="#addvaltrigger">addvaltrigger</a></li>
   </ul>
 </ul>
 
