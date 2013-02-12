@@ -230,7 +230,7 @@ MAX_Set($@)
 
   return "Invalid IODev" if(MAX_CheckIODev($hash));
 
-  if($setting eq "desiredTemperature" and $hash->{type} ~~ ["HeatingThermostat","WallMountedThermostat"]) {
+  if($setting eq "desiredTemperature" and $hash->{type} =~ /.*Thermostat.*/) {
     return "missing a value" if(@args == 0);
 
     my $temperature;
@@ -263,7 +263,7 @@ MAX_Set($@)
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload);
 
   }elsif($setting ~~ ["boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"]
-      and $hash->{type} eq "HeatingThermostat"){
+      and $hash->{type} =~ /HeatingThermostat.*/){
 
     my $val = join(" ",@args); #decalcification contains a space
 
@@ -293,7 +293,7 @@ MAX_Set($@)
 
     return ($hash->{IODev}{Send})->($hash->{IODev},"SetGroupId",$hash->{addr}, sprintf("%02x",$args[0]) );
 
-  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and ($hash->{type} eq "HeatingThermostat" or $hash->{type} eq "WallMountedThermostat")) {
+  }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and $hash->{type} =~ /.*Thermostat.*/) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
 
     if(!MAX_Validate($setting, $args[0])) {
@@ -367,7 +367,6 @@ MAX_Set($@)
     my $dest = $args[0];
     if(exists($defs{$dest})) {
       return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
-      #return "Destination is not a thermostat" if($defs{$dest}{type} ne "HeatingThermostat" and $defs{$dest}{type} ne "WallMountedThermostat");
       $dest = $defs{$dest}{addr};
     } else {
       return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
@@ -395,7 +394,7 @@ MAX_Set($@)
   } elsif($setting eq "wakeUp") {
     return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, 0x3F);
 
-  } elsif($setting eq "weekProfile" and $hash->{type} ~~ ["HeatingThermostat","WallMountedThermostat"]) {
+  } elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) {
     return "Number of arguments must be even" if(@args%2 == 1);
 
     my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
@@ -441,13 +440,13 @@ MAX_Set($@)
 
     my $assoclist;
     #Build list of devices which this device can be associated to
-    if($hash->{type} eq "HeatingThermostat") {
-      $assoclist = join(",", map { defined($_->{type}) && $_->{type} ~~ ["HeatingThermostat", "WallMountedThermostat", "ShutterContact"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+    if($hash->{type} =~ /HeatingThermostat.*/) {
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} ~~ ["HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat", "ShutterContact"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     } elsif($hash->{type} ~~ ["ShutterContact", "WallMountedThermostat"]) {
-      $assoclist = join(",", map { defined($_->{type}) && $_->{type} eq "HeatingThermostat" ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /HeatingThermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     }
 
-    if($hash->{type} eq "HeatingThermostat") {
+    if($hash->{type} =~ /HeatingThermostat.*/) {
       #Create numbers from 4.5 to 30.5
       my $templistOffset = join(",",map { sprintf("%2.1f",($_-7)/2) }  (0..14));
       my $boostDurVal = join(",", values(%boost_durations));
@@ -646,7 +645,7 @@ MAX_Parse($$)
     readingsBulkUpdate($shash, "comfortTemperature", sprintf("%2.1f",$args[1]));
     readingsBulkUpdate($shash, "maximumTemperature", sprintf("%2.1f",$args[2]));
     readingsBulkUpdate($shash, "minimumTemperature", sprintf("%2.1f",$args[3]));
-    if($shash->{type} eq "HeatingThermostat") {
+    if($shash->{type} =~ /HeatingThermostat.*/) {
       readingsBulkUpdate($shash, "boostValveposition", $args[4]);
       readingsBulkUpdate($shash, "boostDuration", $boost_durations{$args[5]});
       readingsBulkUpdate($shash, "measurementOffset", sprintf("%2.1f",$args[6]));
@@ -678,7 +677,7 @@ MAX_Parse($$)
     }
     #with unknown meaning plus the data of a State broadcast from the same device
     #For HeatingThermostats, it does not contain the last three "until" bytes (or measured temperature)
-    if($shash->{type} ~~ "HeatingThermostat" ) {
+    if($shash->{type} =~ /HeatingThermostat.*/ ) {
       return MAX_Parse($hash, "MAX,$isToMe,ThermostatState,$addr,". substr($args[0],2));
     } elsif($shash->{type} eq "WallMountedThermostat") {
       return MAX_Parse($hash, "MAX,$isToMe,WallThermostatState,$addr,". substr($args[0],2));

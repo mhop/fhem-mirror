@@ -221,7 +221,7 @@ CUL_MAX_Parse($$)
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
 
         #This are the default values that a device has after factory reset or pairing
-        if($device_types{$type} eq "HeatingThermostat") {
+        if($device_types{$type} =~ /HeatingThermostat.*/) {
           Dispatch($shash, "MAX,$isToMe,HeatingThermostatConfig,$src,17,21,30.5,4.5,80,5,0,12,15,100,0,0,12,$defaultWeekProfile", {RAWMSG => $rmsg});
         } elsif($device_types{$type} eq "WallMountedThermostat") {
           Dispatch($shash, "MAX,$isToMe,WallThermostatConfig,$src,17,21,30.5,4.5,$defaultWeekProfile", {RAWMSG => $rmsg});
@@ -360,7 +360,7 @@ CUL_MAX_BroadcastTime(@)
     #1. the MAX device dhash uses this MAX_CUL as IODev
     #2. the MAX device is a Wall/HeatingThermostat
     if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash
-    && $dhash->{type} ~~ [ "HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat"]) {
+    && $dhash->{type} =~ /.*Thermostat.*/ ) {
       CUL_MAX_SendTimeInformation($hash, $addr, $payload);
     }
     else {
