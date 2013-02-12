@@ -251,9 +251,7 @@ Help me!</h4>
      we just can change it with<br>
      <code>set FHZ FHTcode &lt;hex-code&gt;</code> (1 byte, range 1 to 99)</li>
      <li>Resync the FHT80b: Press PROG until "Sond" appears, then select "CEnt"
-     with the wheel, press PROG again, Select "nA" with the wheel, press PROG
-     again. For more details, see <a href="http://www.ip-symcon.de/wiki/index.php/FHT">IP-Symcon Wiki</a> (especially Fredje's comment)
-     and <a href="http://www.contronics.de/BedAnl_Studio/homeputerStudio_web/html/hard6vl3.htm">Contronics &quot;Anmelden von Raumreglern FHT80b&quot;</a>.</li>
+     with the wheel, press PROG again, Select "nA" with the wheel, press PROG</li>
 
    </ul>
 </ul>
@@ -383,8 +381,8 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
   You can automate it with the following notify:
 <pre>
   define lime_reset notify .*lime-protection {\
-    $d = $defs{@}{READINGS}{"desired-temp"}{VAL};;\
-    $m = $defs{@}{READINGS}{"measured-temp"}{VAL};;\
+    $d = ReadingsVal("@", "desired-temp", 0);;\
+    $m = ReadingsVal("@", "measured-temp", 0);;\
     if($m gt $d) {\
       fhem("set @ desired-temp 29");;\
       fhem("set @ desired-temp $d");;\
@@ -427,22 +425,20 @@ messages from  my FHT80b. How to switch back to the actuator:0% messages?
 <ul>
    Thanks to Waldemar Porsche the following notify will take care of that:<br>
    <pre>define ExtendedAutoMode notify .*mode.*auto {\
-    $r = $defs{@}{READINGS};;\
-    return if (!defined($r));;\
-    my $olddesired = $r->{"desired-temp"}{VAL};;\
+    my $olddesired = ReadingsValue("@", "desired-temp", 0);;\
     return if (!defined($olddesired));;\
     my @@day = ("sun", "mon", "tue", "wed", "thu", "fri", "sat");;\
     my $now = sprintf("%%02d:%%02d", $hour, $min);;\
     my $wd = $day[$wday];;\
     my $desired;;\
-    if (defined($r->{"warnings"}{VAL}) && $r->{"warnings"}{VAL} eq "Window open") {\
-      $desired = $r->{"windowopen-temp"}{VAL};;\
-    } elsif (defined($r->{"$wd-from1"}{VAL}) && $r->{"$wd-from1"}{VAL} le $now && defined($r->{"$wd-to1"}{VAL}) && $r->{"$wd-to1"}{VAL} ge $now) {\
-      $desired = $r->{"day-temp"}{VAL};;\
-    } elsif (defined($r->{"$wd-from2"}{VAL}) && $r->{"$wd-from2"}{VAL} le $now && defined($r->{"$wd-to2"}{VAL}) && $r->{"$wd-to2"}{VAL} ge $now) {\
-      $desired = $r->{"day-temp"}{VAL};;\
+    if (ReadingsVal("@", "warnings", "none") eq "Window open") {\
+      $desired = ReadingsVal("@", "windowopen-temp", 0);;\
+    } elsif (ReadingsVal("@", "$wd-from1", "") le $now && ReadingsVal("@", "$wd-to1", "") ge $now) {\
+      $desired = ReadingsVal("@", "day-temp", 0);;\
+    } elsif (ReadingsVal("@", "$wd-from2", "") le $now && ReadingsVal("@", "$wd-to2", "") ge $now) {\
+      $desired = ReadingsVal("@", "day-temp", 0);;\
     } else {\
-      $desired = $r->{"night-temp"}{VAL};;\
+      $desired = ReadingsVal("@", "night-temp", 0);;\
     }\
     fhem ("set @ desired-temp $desired") if (defined($desired) && $desired ne $olddesired);;\
   }
