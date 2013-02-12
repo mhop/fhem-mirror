@@ -93,7 +93,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if(not defined($zone))
     {
-	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
+	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
 	return "No Zone available";
     }
     
@@ -103,7 +103,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     if(not defined($return) or $return eq "")
     {
-	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
+	InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
 	return;
     }
     
@@ -150,7 +150,7 @@ YAMAHA_AVR_GetStatus($;$)
     
     readingsEndUpdate($hash, 1);
     
-    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 1) unless($local == 1);
+    InternalTimer(gettimeofday()+$hash->{helper}{INTERVAL}, "YAMAHA_AVR_GetStatus", $hash, 0) unless($local == 1);
     
     Log GetLogLevel($name,4), "YAMAHA_AVR $name: $hash->{STATE}";
     
