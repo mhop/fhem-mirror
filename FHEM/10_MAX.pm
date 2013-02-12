@@ -805,9 +805,9 @@ MAX_Parse($$)
       Sends a fake state message of this device over the air to &lt;device&gt;. Works only with CUL_MAX as IODev. For ShutterContacts, sends
       a ShutterContactState message; &lt;parameters...&gt; must be 0 or 1 for "window closed" or "window opened". For WallMountedThermostats.
       sends a WallThermostatState message; &lt;parameters...&gt; must be "$desiredTemperature $measuredTemperature" (both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with the source device beforehand.</li>
-    <li>weekprofile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
+    <li>weekProfile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
       Allows setting the week profile. For devices of type HeatingThermostat or WallMountedThermostat only. Example:<br>
-      <code>set MAX_12345 weekprofile Fri 24.5,6:00,12,15:00,5 Sat 7,4:30,19,12:55,6</code><br>
+      <code>set MAX_12345 weekProfile Fri 24.5,6:00,12,15:00,5 Sat 7,4:30,19,12:55,6</code><br>
       sets the profile <br>
       <code>Friday: 24.5 &deg;C for 0:00 - 6:00, 12 &deg;C for 6:00 - 15:00, 5 &deg;C for 15:00 - 0:00<br>
       Saturday: 7 &deg;C for 0:00 - 4:30, 19 &deg;C for 4:30 - 12:55, 6 &deg;C for 12:55 - 0:00</code><br>
