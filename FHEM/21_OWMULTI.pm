@@ -985,7 +985,8 @@ sub OWXMULTI_SetValues($@) {
                 <br />unit of measurement (temperature scale), default is Celsius = &deg;C </li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
-                    href="#event-on-change-reading">event-on-change-reading</a>, <a href="#room"
+                    href="#event-on-change-reading">event-on-change-reading</a>, <a
+                    href="#stateFormat">stateFormat</a>, <a href="#room"
                     >room</a>, <a href="#eventMap">eventMap</a>, <a href="#loglevel">loglevel</a>,
                     <a href="#webCmd">webCmd</a></li>
         </ul>
