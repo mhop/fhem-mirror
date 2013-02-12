@@ -175,6 +175,52 @@ MAX_ReadingsVal(@)
   return $val;
 }
 
+sub
+MAX_ParseWeekProfile(@) {
+  my ($hash ) = @_;
+  # Format of weekprofile: 16 bit integer (high byte first) for every control point, 13 control points for every day
+  # each 16 bit integer value is parsed as
+  # int time = (value & 0x1FF) * 5;
+  # int hour = (time / 60) % 24;
+  # int minute = time % 60;
+  # int temperature = ((value >> 9) & 0x3F) / 2;
+
+  my $beginUpdate = !exists($hash->{".updateTimestamp"});
+  readingsBeginUpdate($hash) if($beginUpdate);
+
+  my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
+  #parse weekprofiles for each day
+  for (my $i=0;$i<7;$i++) {
+    my (@time_prof, @temp_prof);
+    for(my $j=0;$j<13;$j++) {
+      $time_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))& 0x1FF) * 5;
+      $temp_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
+    }
+
+    my @hours;
+    my @minutes;
+    my $j;
+    for($j=0;$j<13;$j++) {
+      $hours[$j] = ($time_prof[$j] / 60 % 24);
+      $minutes[$j] = ($time_prof[$j]%60);
+      #if 00:00 reached, last point in profile was found
+      last if(int($hours[$j])==0 && int($minutes[$j])==0 );
+    }
+    my $time_prof_str = "00:00";
+    my $temp_prof_str;
+    for (my $k=0;$k<=$j;$k++) {
+      $time_prof_str .= sprintf("-%02d:%02d", $hours[$k], $minutes[$k]);
+      $temp_prof_str .= sprintf("%2.1f °C",$temp_prof[$k]);
+      if ($k < $j) {
+        $time_prof_str .= "  /  " . sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
+        $temp_prof_str .= "  /  ";
+      }
+   }
+   readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-time", $time_prof_str );
+   readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-temp", $temp_prof_str );
+  }
+  readingsEndUpdate($hash, 1) if($beginUpdate);
+}
 #############################
 sub
 MAX_Set($@)
@@ -381,6 +427,7 @@ MAX_Set($@)
       substr($curWeekProfile, $day*52, length($newWeekprofilePart)) = $newWeekprofilePart;
     }
     readingsSingleUpdate($hash, ".weekProfile", $curWeekProfile, 0);
+    MAX_ParseWeekProfile($hash);
     Log 5, "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
 
   }else{
@@ -608,47 +655,7 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, ".weekProfile", $args[4]);
     }
 
-    # Format of weekprofile: 16 bit integer (high byte first) for every control point, 13 control points for every day
-    # each 16 bit integer value is parsed as
-    # int time = (value & 0x1FF) * 5;
-    # int hour = (time / 60) % 24;
-    # int minute = time % 60;
-    # int temperature = ((value >> 9) & 0x3F) / 2;
-
-    my $curWeekProfile = MAX_ReadingsVal($shash, ".weekProfile");
-    #parse weekprofiles for each day
-    for (my $i=0;$i<7;$i++) {
-      my (@time_prof, @temp_prof);
-      for(my $j=0;$j<13;$j++) {
-        $time_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))& 0x1FF) * 5;
-        $temp_prof[$j] = (hex(substr($curWeekProfile,($i*52)+ 4*$j,4))>> 9 & 0x3F ) / 2;
-      }
-
-      my @hours;
-      my @minutes;
-      my $j;
-      for($j=0;$j<13;$j++) {
-        $hours[$j] = ($time_prof[$j] / 60 % 24);
-        $minutes[$j] = ($time_prof[$j]%60);
-        #if 00:00 reached, last point in profile was found
-        last if(int($hours[$j])==0 && int($minutes[$j])==0 );
-      }
-
-      my $time_prof_str = "00:00";
-      my $temp_prof_str;
-      for (my $k=0;$k<=$j;$k++) {
-        $time_prof_str .= sprintf("-%02d:%02d", $hours[$k], $minutes[$k]);
-        $temp_prof_str .= sprintf("%2.1f °C",$temp_prof[$k]);
-        if ($k < $j) {
-          $time_prof_str .= "  /  " . sprintf("%02d:%02d", $hours[$k], $minutes[$k]);
-          $temp_prof_str .= "  /  ";
-        }
-     }
-
-     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays{$i}-time", $time_prof_str );
-     readingsBulkUpdate($shash, "weekprofile-$i-$decalcDays{$i}-temp", $temp_prof_str );
-
-     } # Endparse weekprofiles for each day
+   MAX_ParseWeekProfile($shash);
 
   } elsif($msgtype eq "Error") {
     if(@args == 0) {
@@ -798,8 +805,8 @@ MAX_Parse($$)
       Allows setting the week profile. For devices of type HeatingThermostat or WallMountedThermostat only. Example:<br>
       <code>set MAX_12345 weekprofile Fri 24.5,6:00,12,15:00,5 Sat 7,4:30,19,12:55,6</code><br>
       sets the profile <br>
-      <code>Friday: 24.5 C for 0:00 - 6:00, 12 C for 6:00 - 15:00, 5 C for 15:00 - 0:00<br>
-      Saturday: 7 C for 0:00 - 4:30, 19 C for 4:30 - 12:55, 6 C for 12:55 - 0:00</code><br>
+      <code>Friday: 24.5 &deg;C for 0:00 - 6:00, 12 &deg;C for 6:00 - 15:00, 5 &deg;C for 15:00 - 0:00<br>
+      Saturday: 7 &deg;C for 0:00 - 4:30, 19 &deg;C for 4:30 - 12:55, 6 &deg;C for 12:55 - 0:00</code><br>
       while keeping the old profile for all other days.
     </li>
   </ul>
