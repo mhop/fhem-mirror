@@ -13,8 +13,10 @@ sub CUL_MAX_BroadcastTime(@);
 sub CUL_MAX_Set($@);
 sub CUL_MAX_SendAck($$$);
 sub CUL_MAX_SendTimeInformation(@);
+sub CUL_MAX_GetTimeInformationPayload();
 sub CUL_MAX_Send(@);
 sub CUL_MAX_SendQueueHandler($);
+
 my $pairmodeDuration = 60; #seconds
 
 my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
@@ -321,6 +323,13 @@ CUL_MAX_SendQueueHandler($)
       $timeout += $waitTime;
       Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
     } else {
+      #Update TimeInformation payload. It should reflect the current time when sending,
+      #not the time when it was enqueued. A low credit10ms can defer such a packet for multiple
+      #minutes
+      if( $msgId2Cmd{substr($packet->{packet},6,2)} eq "TimeInformation" ) {
+        Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
+        substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
+      }
       IOWrite($hash, "", "Zs". $packet->{packet});
       $packet->{sent} = 1;
       $packet->{sentTime} = gettimeofday();
@@ -330,7 +339,7 @@ CUL_MAX_SendQueueHandler($)
   } elsif( $packet->{sent} == 1 ) { #Already sent it, got no Ack
     if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
       # ackTimeout exceeded
-      Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
+      Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dest} for $packet->{packet}";
       splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
       readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
     } else {
