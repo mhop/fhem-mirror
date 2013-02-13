@@ -6,6 +6,7 @@ package main;
 use strict;
 use warnings;
 use MaxCommon;
+use POSIX;
 
 sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime(@);
@@ -311,9 +312,19 @@ CUL_MAX_SendQueueHandler($)
 
   if( $packet->{sent} == 0 ) { #Need to send it first
     #Send to CUL
-    IOWrite($hash, "", "Zs". $packet->{packet});
-    $packet->{sent} = 1;
-    $timeout += $ackTimeout; #reschedule after ackTimeout
+    my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
+    # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
+    # keep this in sync with culfw's code in clib/rf_moritz.c!
+    my $necessaryCredit = ceil(100 + (length($packet->{packet})*4)/10);
+    if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
+      my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
+      $timeout += $waitTime;
+      Log 2, "CUL_MAX_SendQueueHandler: Not enough credit! credit10ms is $credit10ms, but we need $necessaryCredit. Waiting $waitTime seconds.";
+    } else {
+      IOWrite($hash, "", "Zs". $packet->{packet});
+      $packet->{sent} = 1;
+      $timeout += $ackTimeout; #reschedule after ackTimeout
+    }
 
   } elsif( $packet->{sent} == 1) { #Already sent it, got no Ack
     Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
