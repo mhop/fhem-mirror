@@ -357,7 +357,7 @@ MAX_Set($@)
       my $arg1 = (($arg2&0x100)>>1) | (int(2*$args[1])&0x7F);
       $arg2 &= 0xFF; #only take the lower 8 bits
 
-      return ($hash->{IODev}{Send})->($hash->{IODev},"WallThermostatState",$dest,
+      return ($hash->{IODev}{Send})->($hash->{IODev},"WallThermostatControl",$dest,
         sprintf("%02x%02x",$arg1,$arg2),"04",undef,undef,$hash->{addr});
     } else {
       return "fake does not work for device type $hash->{type}";
@@ -498,7 +498,7 @@ MAX_Parse($$)
     $devicetype = $args[0] if($msgtype eq "define");
     $devicetype = "ShutterContact" if($msgtype eq "ShutterContactState");
     $devicetype = "Cube" if($msgtype eq "CubeClockState" or $msgtype eq "CubeConnectionState");
-    $devicetype = "WallMountedThermostat" if($msgtype ~~ ["WallThermostatConfig","WallThermostatState"]);
+    $devicetype = "WallMountedThermostat" if($msgtype ~~ ["WallThermostatConfig","WallThermostatState","WallThermostatControl"]);
     $devicetype = "HeatingThermostat" if($msgtype ~~ ["HeatingThermostatConfig", "ThermostatState"]);
     if($devicetype) {
       return "UNDEFINED MAX_$addr MAX $devicetype $addr";
@@ -567,12 +567,12 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$measuredTemperature));
     }
 
-  }elsif($msgtype eq "WallThermostatState"){
+  }elsif($msgtype ~~ ["WallThermostatState", "WallThermostatControl" ]){
     my ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature);
-    if( length($args[0]) == 4 ) {
+    if( length($args[0]) == 4 ) { #WallThermostatControl
       #This is the message that WallMountedThermostats send to paired HeatingThermostats
       ($desiredTemperature,$temperature) = unpack("CC",pack("H*",$args[0]));
-    } elsif( length($args[0]) == 6 or length($args[0]) == 14 or length($args[0]) == 12) {
+    } elsif( length($args[0]) == 6 or length($args[0]) == 14 or length($args[0]) == 12) { #WallThermostatState
       #len=14: This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
       #len=12: Payload of an Ack message, last field "temperature" is missing
       #len=6 : Payload of an Ack message, last four fields (especially $heaterTemperature and $temperature) are missing
@@ -593,7 +593,7 @@ MAX_Parse($$)
       readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
       readingsBulkUpdate($shash, "displayActualTemperature", ($displayActualTemperature) ? 1 : 0);
     } else {
-      Log 2, "Invalid WallThermostatState packet"
+      Log 2, "Invalid $msgtype packet"
     }
 
     $desiredTemperature = ($desiredTemperature &0x7F)/2.0; #convert to degree celcius
@@ -803,7 +803,7 @@ MAX_Parse($$)
     <li>fake &lt;device&gt; &lt;parameters...&gt;<br>
       Sends a fake state message of this device over the air to &lt;device&gt;. Works only with CUL_MAX as IODev. For ShutterContacts, sends
       a ShutterContactState message; &lt;parameters...&gt; must be 0 or 1 for "window closed" or "window opened". For WallMountedThermostats.
-      sends a WallThermostatState message; &lt;parameters...&gt; must be "$desiredTemperature $measuredTemperature" (both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with the source device beforehand.</li>
+      sends a WallThermostatControl message; &lt;parameters...&gt; must be "$desiredTemperature $measuredTemperature" (both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with the source device beforehand.</li>
     <li>weekProfile [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] [&lt;day&gt; &lt;temp1&gt;,&lt;until1&gt;,&lt;temp2&gt;,&lt;until2&gt;] ...<br>
       Allows setting the week profile. For devices of type HeatingThermostat or WallMountedThermostat only. Example:<br>
       <code>set MAX_12345 weekProfile Fri 24.5,6:00,12,15:00,5 Sat 7,4:30,19,12:55,6</code><br>
