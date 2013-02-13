@@ -36,7 +36,7 @@ require Exporter;
                  "30" => "ShutterContactState",
 
                  "40" => "SetTemperature", #to thermostat
-                 "42" => "WallThermostatState", #by WallMountedThermostat
+                 "42" => "WallThermostatControl", #by WallMountedThermostat
                  #Sending this without payload to thermostat sets desiredTempeerature to the comfort/eco temperature
                  #We don't use it, we just do SetTemperature
                  "43" => "SetComfortTemperature",
@@ -45,6 +45,8 @@ require Exporter;
                  "50" => "PushButtonState",
 
                  "60" => "ThermostatState", #by HeatingThermostat
+
+                 "70" => "WallThermostatState",
 
                  "82" => "SetDisplayActualTemperature",
 

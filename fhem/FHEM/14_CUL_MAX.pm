@@ -230,7 +230,7 @@ CUL_MAX_Parse($$)
         }
         #Todo: CUL_MAX_SendTimeInformation($shash, $src); on Ack for our PairPong
       }
-    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "ThermostatState", "PushButtonState"])  {
+    } elsif($msgType ~~ ["ShutterContactState", "WallThermostatState", "WallThermostatControl", "ThermostatState", "PushButtonState"])  {
       Dispatch($shash, "MAX,$isToMe,$msgType,$src,$payload", {RAWMSG => $rmsg});
     } else {
       Log $ll5, "Unhandled message $msgType";
