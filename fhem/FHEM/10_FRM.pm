@@ -3,6 +3,16 @@ package main;
 
 use strict;
 use warnings;
+
+#add FHEM/lib to @INC if it's not allready included. Should rather be in fhem.pl than here though...
+BEGIN {
+	if (!grep(/FHEM\/lib$/,@INC)) {
+		foreach my $inc (grep(/FHEM$/,@INC)) {
+			push @INC,$inc."/lib";
+		};
+	};
+};
+
 use Device::Firmata::Constants qw/ :all /;
 use Device::Firmata::IO;
 use Device::Firmata::Protocol;
