@@ -323,15 +323,22 @@ CUL_MAX_SendQueueHandler($)
     } else {
       IOWrite($hash, "", "Zs". $packet->{packet});
       $packet->{sent} = 1;
-      $timeout += $ackTimeout; #reschedule after ackTimeout
+      $packet->{sentTime} = gettimeofday();
+      $timeout += 0.5; #recheck for Ack
     }
 
-  } elsif( $packet->{sent} == 1) { #Already sent it, got no Ack
-    Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
-    splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
-    readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
+  } elsif( $packet->{sent} == 1 ) { #Already sent it, got no Ack
+    if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
+      # ackTimeout exceeded
+      Log 2, "CUL_MAX_Resend: Missing ack from $packet->{dest} for $packet->{packet}";
+      splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
+      readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
+    } else {
+      # Recheck for Ack
+      $timeout += 0.5;
+    }
 
-  } elsif( $packet->{sent} == 2) { #Got ack
+  } elsif( $packet->{sent} == 2 ) { #Got ack
     splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
   }
 
