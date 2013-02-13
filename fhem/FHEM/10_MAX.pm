@@ -68,7 +68,7 @@ MAX_Initialize($)
 {
   my ($hash) = @_;
 
-  Log 5, "Calling MAX_Initialize";
+  Log GetLogLevel($hash->{NAME}, 5), "Calling MAX_Initialize";
   $hash->{Match}     = "^MAX";
   $hash->{DefFn}     = "MAX_Define";
   $hash->{UndefFn}   = "MAX_Undef";
@@ -97,7 +97,7 @@ MAX_Define($$)
     Log 1, $msg;
     return $msg;
   }
-  Log 5, "Max_define $type with addr $addr ";
+  Log GetLogLevel($hash->{NAME}, 5), "Max_define $type with addr $addr ";
   $hash->{type} = $type;
   $hash->{addr} = $addr;
   $modules{MAX}{defptr}{$addr} = $hash;
@@ -373,7 +373,7 @@ MAX_Set($@)
     }
     my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
     Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{$dest}{groupid});
-    Log 5, "Using dest $dest, destType $destType";
+    Log GetLogLevel($hash->{NAME}, 5), "Using dest $dest, destType $destType";
     if($setting eq "associate") {
       return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%s%02x", $dest, $destType));
     } else {
@@ -418,9 +418,8 @@ MAX_Set($@)
         $temperature = 4.5 if($temperature eq "off");
         $temperature = 30.5 if($temperature eq "on");
         $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
-        Log 5, "add part $newWeekprofilePart for $hour:$min $temperature C ($controlpoints[$j],$controlpoints[$j+1])";
       }
-      Log 5, "New Temperature part for $day: $newWeekprofilePart";
+      Log GetLogLevel($hash->{NAME}, 5), "New Temperature part for $day: $newWeekprofilePart";
       #Each day has 2 bytes * 13 controlpoints = 26 bytes = 52 hex characters
       #we don't have to update the rest, because the active part is terminated by the time 0:00
       substr($curWeekProfile, $day*52, length($newWeekprofilePart)) = $newWeekprofilePart;
@@ -432,7 +431,7 @@ MAX_Set($@)
     }
     readingsSingleUpdate($hash, ".weekProfile", $curWeekProfile, 0);
     MAX_ParseWeekProfile($hash);
-    Log 5, "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
+    Log GetLogLevel($hash->{NAME}, 5), "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
 
   }else{
     my $templist = "off,".join(",",map { sprintf("%2.1f",$_/2) }  (10..60)) . ",on";
@@ -544,7 +543,7 @@ MAX_Parse($$)
     $untilStr = "" if($mode != 2);
 
     $desiredTemperature = ($desiredTemperature&0x7F)/2.0; #convert to degree celcius
-    Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, until $untilStr, curTemp $measuredTemperature";
+    Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, valveposition $valveposition %, desiredTemperature $desiredTemperature, until $untilStr, curTemp $measuredTemperature";
 
     #Very seldomly, the HeatingThermostat sends us temperatures like 0.2 or 0.3 degree Celcius - ignore them
     $measuredTemperature = "" if($measuredTemperature ne "" and $measuredTemperature < 1);
@@ -588,7 +587,7 @@ MAX_Parse($$)
       my $batterylow = vec($bits2, 7, 1); #1 if battery is low
       Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
 
-      Log 5, "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature";
+      Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature";
       $shash->{rferror} = $rferror;
       readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
       readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
@@ -600,10 +599,10 @@ MAX_Parse($$)
     $desiredTemperature = ($desiredTemperature &0x7F)/2.0; #convert to degree celcius
     if(defined($temperature)) {
       $temperature = ((($desiredTemperature &0x80)<<1) + $temperature)/10;	# auch Temperaturen über 25.5 °C werden angezeigt !
-      Log 5, "desiredTemperature $desiredTemperature, temperature $temperature";
+      Log GetLogLevel($shash->{NAME}, 5), "desiredTemperature $desiredTemperature, temperature $temperature";
       readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$temperature));
     } else {
-      Log 5, "desiredTemperature $desiredTemperature"
+      Log GetLogLevel($shash->{NAME}, 5), "desiredTemperature $desiredTemperature"
     }
 
     #This formatting must match with in MAX_Set:$templist
@@ -615,7 +614,7 @@ MAX_Parse($$)
     my $unkbits = vec($bits,2,4);
     my $rferror = vec($bits,6,1);
     my $batterylow = vec($bits,7,1);
-    Log 5, "ShutterContact isopen $isopen, rferror $rferror, battery $batterylow, unkbits $unkbits";
+    Log GetLogLevel($shash->{NAME}, 5), "ShutterContact isopen $isopen, rferror $rferror, battery $batterylow, unkbits $unkbits";
 
     $shash->{rferror} = $rferror;
 
