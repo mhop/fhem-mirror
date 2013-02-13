@@ -196,9 +196,16 @@ PRESENCE_Attr(@)
     if($a[3] eq "0")
     {
 	$hash->{helper}{DISABLED} = 0;
-	if(defined($hash->{FD}))
+	if(defined($hash->{DeviceName}))
 	{
-	    PRESENCE_DoInit($hash);	    
+	    if(defined($hash->{FD}))
+	    {
+		PRESENCE_DoInit($hash);
+	    }
+	    else
+	    {
+		DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+	    }
 	}
 	else
 	{
@@ -223,9 +230,16 @@ PRESENCE_Attr(@)
   elsif($a[0] eq "del" && $a[2] eq "disable")
   {
     $hash->{helper}{DISABLED} = 0;
-    if(defined($hash->{FD}))
+    if(defined($hash->{DeviceName}))
     {
-        PRESENCE_DoInit($hash);
+        if(defined($hash->{FD}))
+	    {
+		PRESENCE_DoInit($hash);
+	    }
+	    else
+	    {
+		DevIo_OpenDev($hash, 0, "PRESENCE_DoInit");
+	    }
     }
     else
     {
