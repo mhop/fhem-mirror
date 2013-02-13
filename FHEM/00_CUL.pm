@@ -26,6 +26,7 @@ my %gets = (    # Name, Data to send to the CUL, Regexp for the answer
   "uptime"   => ["t", '^[0-9A-F]{8}[\r\n]*$' ],
   "fhtbuf"   => ["T03", '^[0-9A-F]+[\r\n]*$' ],
   "cmds"     => ["?", '.*Use one of[ 0-9A-Za-z]+[\r\n]*$' ],
+  "credit10ms" => [ "X", '^.. *\d*[\r\n]*$' ],
 );
 
 my %sets = (
@@ -470,6 +471,8 @@ READEND:
       $msg = hex($msg)/125;
       $msg = sprintf("%d %02d:%02d:%02d",
         $msg/86400, ($msg%86400)/3600, ($msg%3600)/60, $msg%60);
+    } elsif($a[1] eq "credit10ms") {
+      ($msg) = ($msg =~ /^.. *(\d*)[\r\n]*$/);
     }
 
     $msg =~ s/[\r\n]//g;
@@ -1207,6 +1210,10 @@ CUL_Attr(@)
         possible commands. Please refer to the README of the firmware of your
         CUL to interpret the response of this command. See also the raw-
         command.
+        </li><br>
+    <li>credit10ms<br>
+        One may send for a duration of credit10ms*10 ms before the send limit is reached and a LOVF is
+        generated.
         </li><br>
   </ul>
 
