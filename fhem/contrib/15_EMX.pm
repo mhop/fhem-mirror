@@ -2,16 +2,16 @@
 #
 # 15_EMX.pm MUST be saved as 15_CUL_EM.pm !!!
 #
-# FHEM module to read the data from an EM1000 S/IR power sensor 
+# FHEM module to read the data from an EM1000 WZ/EM/GZ power sensor 
 #
-# Version 1.0 - January 21, 2013
+# Version 1.1 - February, 2013
 #
 # Prof. Dr. Peter A. Henning, 2011
 #
 #----------------------------------------------------------------------------------------------------
 # 
 # Setup as:
-# define  <emx> EMX  <code> <rpkwh>
+# define  <emx> EMX <code> <rpunit>
 #    
 # where 
 #   <name>    may be replaced by any name string 
@@ -27,20 +27,35 @@
 #  attr    emx LogM EnergyM
 #  attr    emx LogY EnergyY
 #
-# NOT YET OPERATIVE:
-#
 #  Basic fee per Month (€ per Month)
-#  attr    emx FixedM
+#  attr    emx CostM
 #
-#  Rate during daytime (€ per kWh) 
-#  attr    emx RateD      <rate in €/kWh>
+#  Cost rate during daytime (€ per kWh) 
+#  attr    emx CrateD      <cost rate in €/unit>
 #  
-#  Start and end of daytime rate - optional
-#  attr    emx RateDStart <time as hh:mm>
-#  attr    emx RateDEnd   <time as hh:mm>
+#  Start and end of daytime cost rate - optional
+#  attr    emx CrateDStart <time as hh:mm>
+#  attr    emx CrateDEnd   <time as hh:mm>
 #  
-#  Rate during nighttime (cost per kWh) - only if needed
-#  attr    emx RateN      <rate in €/kWh>
+#  Cost rate during nighttime (cost per unit) - only if needed
+#  attr    emx CrateN      <cost rate in €/unit>
+#
+########################################################################################
+#
+#  This programm is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
 ########################################################################################
 package main;
@@ -93,7 +108,7 @@ sub EMX_Initialize ($) {
   $hash->{Match}     = "^E0.................\$";
 
   $hash->{AttrList}  = "IODev " .
-                       "model:EMEM,EMWZ,EMGZ loglevel LogM LogY RateD RateDStart RateDEnd RateN BaseFee ".
+                       "model:EMEM,EMWZ,EMGZ loglevel LogM LogY CrateD CrateDStart CrateDEnd CrateN CostM ".
                        $readingFnAttributes;
 }
 
@@ -144,6 +159,9 @@ sub EMX_Define ($$) {
     return "EMX_Define $a[0]: wrong CODE format: valid is 1-12 or \"emulator\""
       if(  $a[2] !~ m/^\d+$/ || $a[2] < 1 || $a[2] > 12  );   
     $hash->{CODE} = $a[2];
+    
+    #-- TODO: check for consistency of attributes !
+    
     
     #--counts per unit etc.
     if($a[2] >= 1 && $a[2] <= 4) {          # EMWZ      
@@ -226,6 +244,7 @@ sub EMX_FormatValues ($) {
   my $name    = $hash->{NAME}; 
   my ($model,$factor,$period,$unit,$runit,$midnight,$cval,$vval,$rval,$pval,$dval,$deltim,$delcnt,$msg);
   my ($svalue,$dvalue,$mvalue) = ("","","");
+  my $cost;
 
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
   my ($seco,$mino,$houro,$dayo,$montho,$yearo,$dayrest);
@@ -249,8 +268,7 @@ sub EMX_FormatValues ($) {
   # normal mode: less than 5 minutes from midnight
   }else {
     $deltim = $hour*60.0+$min+$sec/60.0 - 1435.0;
-    #-- TODO abfangen, wenn Messung um Mitternacht !
-    if( $deltim>0 ){
+    if( $deltim>=0 ){
       $daybreak = 1;
       #-- Timer data from tomorrow
       my ($secn,$minn,$hourn,$dayn,$monthn,$yearn,$wdayn,$ydayn,$isdstn) = localtime(time() + 24*60*60);   
@@ -289,7 +307,6 @@ sub EMX_FormatValues ($) {
     if( length($emx_cnt_tim) > 0 ){    
     
       #-- correct counter wraparound since last reading
-      #   Careful: we have seen, that sometimes this causes an error when a false message is received
       if( $emx_cnt < $emx_cnt_prev) {
          $emx_cnt_prev -= 65536;
       }
@@ -320,29 +337,45 @@ sub EMX_FormatValues ($) {
         $vval      = int($cval/$factor*1000)/1000;
         $rval      = int($emx_5min*12/$factor*1000)/1000;
         $pval      = int($emx_peak/($factor*20)*1000)/1000;
-        $svalue = sprintf("W: %5.2f %s P: %5.2f %s",$vval,$unit,$rval,$runit);
       } elsif( $model eq "EMEM" ){
         $vval      = int($cval/($factor*10)*1000)/1000;
-        $rval      = int($emx_5min*12/$factor*1000)/1000;
+        $rval      = int($emx_5min/$factor*1000)/1000;
         $pval      = int($emx_peak/($factor*20)*1000)/1000;
-        $svalue = sprintf("W: %5.2f %s P: %5.2f %s",$vval,$unit,$rval,$runit);
       } elsif( $model eq "EMGZ" ){
         $vval      = int($cval/$factor*1000)/1000;
-        $rval      = int($emx_5min*12/$factor*1000)/1000;
+        $rval      = int($emx_5min/$factor*1000)/1000;
         $pval      = int($emx_peak/($factor*20)*1000)/1000;
-        $svalue = sprintf("W: %5.2f %s P: %5.2f %s",$vval,$unit,$rval,$runit);
       } else {
         Log 3,"EMX: Wrong device model $model";
       }
-      #-- Calculate cost
-      #-- 
+      $svalue = sprintf("W: %5.2f %s P: %5.2f %s Pmax: %5.3f %s",$vval,$unit,$rval,$runit,$pval,$runit);
+      #-- calculate cost
+      if( defined($main::attr{$name}{"CrateD"}) ){
+        #-- single rate counter
+        if( !defined($main::attr{$name}{"CrateN"}) ){
+          $cost = $vval*$main::attr{$name}{"CrateD"};
+        #-- dual rate counter
+        }else{
+          #--determine period 1 = still night, 2 = day, 3 = night again
+          my @crs=split(':',$main::attr{$name}{"CrateDStart"});
+          my @crs=split(':',$main::attr{$name}{"CrateDEnd"});
+          #-- period 1
+          if ( ($hour<=$crs[0]) & ($min<$crs[1]) ){
+          #-- period 2
+          }elsif ( ($hour<=$crs[0]) & ($min<$crs[1]) ){
+          #-- period 3
+          }else{
+          }
+        }
+      }
       
       #-- put into READING
       readingsBulkUpdate($hash,"reading",$vval);
       readingsBulkUpdate($hash,"rate",$rval);
       readingsBulkUpdate($hash,"peak",$pval);
+      readingsBulkUpdate($hash,"cost",$cost);
  
-      #-- Daily/monthly cumulated value
+      #-- Daily/monthly accumulated value
       if( $daybreak == 1 ){
         my @month = EMX_GetMonth($hash);
         my $total = $month[0]+$vval;
@@ -551,10 +584,10 @@ sub EMX_store($) {
       $msg = sprintf "%4d-%02d-%02d midnight %d",$year+1900,$month,$day,$hash->{READINGS}{"count"}{midnight};
     }
     print EMXFILE $msg;
-    Log 1, "EMX_store: $msg";
+    Log 1, "EMX_store: $name $msg";
     close(EMXFILE);         
   } else {
-    Log 1,"EMX_store: Cannot open EMX_name.dat for writing!"; 
+    Log 1,"EMX_store: Cannot open EMX_$name.dat for writing!"; 
   }
   return undef;                   
 }
@@ -697,7 +730,7 @@ sub EMX_emu ($$) {
 
 <a name="EMX"></a>
         <h3>EMX</h3>
-        <p>FHEM module to commmunicate EM1000 power/gas sensors <br />
+        <p>FHEM module to commmunicate with the EM1000 WZ/EM/GZ power/gas sensors <br />
          <br /> <b>NOTE:</b> This module is currently NOT registered in the client list of 00_CUL.pm. 
          Therefore ist must be saved under the name 15_CUL_EM.pm or entered into the client list manually.
          <br /></p>

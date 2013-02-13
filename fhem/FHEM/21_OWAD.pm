@@ -320,7 +320,7 @@ sub OWAD_InitializeDevice($) {
         $owg_shigh[$i]=1;
       }
     }        
-    #-- low alarm value
+    #-- low alarm value - no checking for correct parameters
     if( AttrVal($name,$owg_fixed[$i]."Low",undef) ){
       $owg_vlow[$i] = $main::attr{$name}{$owg_fixed[$i]."Low"};
     }
