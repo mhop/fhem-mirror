@@ -35,6 +35,8 @@ use DevIo;
 
 
 
+
+
 sub
 PRESENCE_Initialize($)
 {
@@ -46,6 +48,7 @@ PRESENCE_Initialize($)
   $hash->{ReadFn}  = "PRESENCE_Read";  
   $hash->{ReadyFn} = "PRESENCE_Ready";
   $hash->{GetFn}   = "PRESENCE_Get";
+  $hash->{SetFn}   = "PRESENCE_Set";
   $hash->{DefFn}   = "PRESENCE_Define";
   $hash->{UndefFn} = "PRESENCE_Undef";
   $hash->{AttrFn}  = "PRESENCE_Attr";
@@ -182,6 +185,32 @@ PRESENCE_Undef($$)
   return undef;
 }
 
+sub
+PRESENCE_Set($@)
+{
+    my ($hash, @a) = @_;
+   
+    my $usage = ($hash->{MODE} ne "lan-bluetooth" ? "Unknown argument ".$a[1].", choose one of statusRequest " : undef);
+   
+    if($a[1] eq "statusRequest")
+    {
+	if($hash->{MODE} ne "lan-bluetooth")
+	{
+	    PRESENCE_StartLocalScan($hash, 1);
+	    return "";
+	}
+   
+    }
+    else
+    {
+        return $usage;
+    }
+   
+
+
+
+
+}
 
 
 ##########################
@@ -196,6 +225,7 @@ PRESENCE_Attr(@)
     if($a[3] eq "0")
     {
 	$hash->{helper}{DISABLED} = 0;
+	readingsSingleUpdate($hash, "state", "defined",0);
 	if(defined($hash->{DeviceName}))
 	{
 	    if(defined($hash->{FD}))
@@ -211,6 +241,7 @@ PRESENCE_Attr(@)
 	{
 	    PRESENCE_StartLocalScan($hash);
 	}
+	
     }
     elsif($a[3] eq "1")
     {
@@ -230,6 +261,7 @@ PRESENCE_Attr(@)
   elsif($a[0] eq "del" && $a[2] eq "disable")
   {
     $hash->{helper}{DISABLED} = 0;
+    readingsSingleUpdate($hash, "state", "defined",0);
     if(defined($hash->{DeviceName}))
     {
         if(defined($hash->{FD}))
@@ -341,35 +373,33 @@ PRESENCE_Ready($)
 #  Functions for local testing with Blocking.pm to ensure a smooth FHEM processing
 #
 #
-sub 
-PRESENCE_StartLocalScan($)
+sub PRESENCE_StartLocalScan($;$)
 {
-my ($hash) = @_;
+    my ($hash, $local) = @_;
 
+    $local = 0 unless(defined($local));
 
     if($hash->{MODE} eq "local-bluetooth")
     {
-
-	BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}, "PRESENCE_ProcessLocalScan", 20);
+	BlockingCall("PRESENCE_DoLocalBluetoothScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 20);
     }
     elsif($hash->{MODE} eq "lan-ping")
     {
-	BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}, "PRESENCE_ProcessLocalScan", 20);
-
+	BlockingCall("PRESENCE_DoLocalPingScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 20);
     }
     elsif($hash->{MODE} eq "fritzbox")
     {
-	BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}, "PRESENCE_ProcessLocalScan", 20);
+	BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 20);
     }
     
 }
 
 sub
-PRESENCE_DoLocalPingScan($$)
+PRESENCE_DoLocalPingScan($)
 {
 
     my ($string) = @_;
-    my ($name, $device) = split("\\|", $string);
+    my ($name, $device, $local) = split("\\|", $string);
 
     my $retcode;
     my $return;
@@ -382,18 +412,18 @@ PRESENCE_DoLocalPingScan($$)
 	if($pingtool)
 	{
 	    $retcode = $pingtool->ping($device, 5);
-	    $return = "$name|".($retcode ? "present" : "absent"); 
+	    $return = "$name|$local|".($retcode ? "present" : "absent"); 
 	}
 	else
 	{
-	    $return = "$name|error|Could not create a Net::Ping object.";
+	    $return = "$name|$local|error|Could not create a Net::Ping object.";
 	}
 
     }
     else
     {
 	$temp = qx(ping -c 4 $device);
-	$return = "$name|".($temp =~ /\d+ bytes from/ ? "present" : "absent");
+	$return = "$name|$local|".($temp =~ /\d+ bytes from/ ? "present" : "absent");
     }
 
     return $return;
@@ -404,7 +434,7 @@ sub
 PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
-    my ($name, $device) = split("\\|", $string);
+    my ($name, $device, $local) = split("\\|", $string);
 
     my $number=0;
     
@@ -414,7 +444,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     
     if(not $max =~ /^\s*\d+\s*$/)
     {
-       return "$name|error|could not execute ctlmgr_ctl";
+       return "$name|$local|error|could not execute ctlmgr_ctl";
     }
     
     
@@ -441,11 +471,11 @@ PRESENCE_DoLocalFritzBoxScan($)
     
     if($status == 1)
     {
-	return "$name|present";
+	return "$name|$local|present";
     }
     else
     {
-        return "$name|absent";
+        return "$name|$local|absent";
     } 
 
 
@@ -455,7 +485,7 @@ sub
 PRESENCE_DoLocalBluetoothScan($)
 {
     my ($string) = @_;
-    my ($name, $device) = split("\\|", $string);
+    my ($name, $device, $local) = split("\\|", $string);
     my $hcitool = qx(which hcitool);
     my $devname;
     my $return;
@@ -483,16 +513,16 @@ PRESENCE_DoLocalBluetoothScan($)
     
 	if(not $devname =~ /^\s*$/)
 	{
-	    $return = "$name|present|$devname";
+	    $return = "$name|$local|present|$devname";
 	}
 	else
 	{
-	    $return = "$name|absent";
+	    $return = "$name|$local|absent";
 	}
     }
     else
     {
-	$return = "$name|error|no hcitool binary found. Please check that the bluez-package is properly installed";
+	$return = "$name|$local|error|no hcitool binary found. Please check that the bluez-package is properly installed";
     }
 
     return $return;
@@ -509,31 +539,35 @@ PRESENCE_ProcessLocalScan($)
  my @a = split("\\|",$string);
  
  my $hash = $defs{$a[0]};
+ my $local = $a[1];
  
  return if($hash->{helper}{DISABLED});
  
  
  readingsBeginUpdate($hash);
- if($a[1] eq "present")
+ if($a[2] eq "present")
  {
     readingsBulkUpdate($hash, "state", "present");
-    readingsBulkUpdate($hash, "device_name", $a[2]) if(defined($a[2]));
+    readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]));
  }
- elsif($a[1] eq "absent")
+ elsif($a[2] eq "absent")
  {
     readingsBulkUpdate($hash, "state", "absent");
  }
- elsif($a[1] eq "error")
+ elsif($a[2] eq "error")
  {
-    Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[2];
+    Log GetLogLevel($hash->{NAME}, 2), "PRESENCE: error while processing device ".$hash->{NAME}." - ".$a[3];
  }
 
 
  readingsEndUpdate($hash, 1);
 
- #Schedule the next check withing $timeout
- RemoveInternalTimer($hash);
- InternalTimer(gettimeofday()+$hash->{TIMEOUT}, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+ #Schedule the next check withing $timeout if it is a regular run
+ unless($local)
+ {
+    RemoveInternalTimer($hash);
+    InternalTimer(gettimeofday()+$hash->{TIMEOUT}, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+ }
 }
 1;
 
@@ -675,7 +709,7 @@ Options:
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
-  N/A 
+  <li><b>statusRequest</b> - (Only for local-bluetooth, lan-ping and fritzbox) - Schedules an immediatly check.</li>
   </ul>
   <br>
 
@@ -861,7 +895,7 @@ Options:
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
-  N/A 
+  <li><b>statusRequest</b> - (Nu f&uuml;r local-bluetooth, lan-ping and fritzbox) - Startet einen sofortigen Check.</li> 
   </ul>
   <br>
 
