@@ -242,9 +242,9 @@ sub OWTHERM_InitializeDevice($) {
   my ($hash) = @_;
   
   my $name   = $hash->{NAME};
-  my @args;
-  my $ret;
-  my ($unit,$offset,$factor,$abbr,$vval,$vlow,$vhigh,$statef);
+  my $interface = $hash->{IODev}->{TYPE};
+  my @a = ($name,"",0);
+  my ($unit,$offset,$factor,$abbr,$value);
   
   #-- attributes defined ?
   $stateal = defined($attr{$name}{stateAL}) ? $attr{$name}{stateAL} : "&#x25BE;";
@@ -276,12 +276,31 @@ sub OWTHERM_InitializeDevice($) {
   
   #-- Set the attribute values if defined
   if(  defined($attr{$name}{"tempLow"}) ){
-    OWTHERM_Set(  $hash,($name,"tempLow",$attr{$name}{"tempLow"}));
+    $value = $attr{$name}{"tempLow"};
+    $a[1] = "tempLow"; 
+    $a[2] = floor($value/$factor-$offset+0.5);
+    #-- put into device
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      OWXTHERM_SetValues($hash,@a);
+    #-- OWFS interface
+    }elsif( $interface eq "OWServer" ){
+      OWFSTHERM_SetValues($hash,@a);
+    } 
   }
   if( defined($attr{$name}{"tempHigh"}) ){
-    OWTHERM_Set(  $hash,($name,"tempHigh",$attr{$name}{"tempHigh"}) );
+    $value = $attr{$name}{"tempHigh"};
+    $a[1] = "tempHigh"; 
+    $a[2] = floor($value/$factor-$offset+0.5);
+    #-- put into device
+    #-- OWX interface
+    if( $interface eq "OWX" ){
+      OWXTHERM_SetValues($hash,@a);
+    #-- OWFS interface
+    }elsif( $interface eq "OWServer" ){
+      OWFSTHERM_SetValues($hash,@a);
+    } 
   }
-
   #-- Set state to initialized
   readingsSingleUpdate($hash,"state","initialized",1);
 }
@@ -331,6 +350,10 @@ sub OWTHERM_FormatValues($) {
   #-- no change in any value if invalid reading
   return if( $owg_temp eq "");
   
+  #-- check if device needs to be initialized
+  OWTHERM_InitializeDevice($hash)
+    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
+  
   #-- correct values for proper offset, factor 
   $vval  = ($owg_temp + $offset)*$factor;
   $vlow   = floor(($owg_tl + $offset)*$factor+0.5);
@@ -338,10 +361,6 @@ sub OWTHERM_FormatValues($) {
   
   $main::attr{$name}{"tempLow"} = $vlow;
   $main::attr{$name}{"tempHigh"} = $vhigh;
-  
-  #-- check if device needs to be initialized
-  OWTHERM_InitializeDevice($hash)
-    if( $hash->{READINGS}{"state"}{VAL} eq "defined");
          
   #-- formats for output
   $statef = "T: %5.2f ".$abbr;
@@ -599,7 +618,7 @@ sub OWTHERM_Set($@) {
   
   #-- process results
   $hash->{PRESENT} = 1; 
-  #OWTHERM_FormatValues($hash);
+  OWTHERM_FormatValues($hash); 
   Log 4, "OWTHERM: Set $hash->{NAME} $key $value";
   
   return undef;
