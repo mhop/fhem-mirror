@@ -47,7 +47,6 @@ PRESENCE_Initialize($)
 # Provider
   $hash->{ReadFn}  = "PRESENCE_Read";  
   $hash->{ReadyFn} = "PRESENCE_Ready";
-  $hash->{GetFn}   = "PRESENCE_Get";
   $hash->{SetFn}   = "PRESENCE_Set";
   $hash->{DefFn}   = "PRESENCE_Define";
   $hash->{UndefFn} = "PRESENCE_Undef";
