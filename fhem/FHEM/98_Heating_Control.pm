@@ -40,7 +40,7 @@ Heating_Control_Initialize($)
   $hash->{DefFn}   = "Heating_Control_Define";
   $hash->{UndefFn} = "Heating_Control_Undef";
   $hash->{GetFn}   = "Heating_Control_Get";
-  $hash->{AttrList}= "loglevel:0,1,2,3,4,5 disable:0,1 ".
+  $hash->{AttrList}= "disable:0,1 loglevel:0,1,2,3,4,5 ".
                         $readingFnAttributes;
 }
 
@@ -69,6 +69,8 @@ sub
 Heating_Control_Define($$)
 {
   my ($hash, $def) = @_;
+
+  RemoveInternalTimer($hash);
   my  @a = split("[ \t]+", $def);
  
   return "Usage: define <name> Heating_Control <device> <switching times> <condition|command>"
@@ -129,25 +131,55 @@ Heating_Control_Define($$)
       $temp    = $st[2];
     }
 
-    # nur noch die Einzelteile per regExp testen
-    return "invalid daylist in $name <$daylist> - please use 123... | Sa,So,..."
-      if(!($daylist =~  m/^(\d){1,7}$/g    ||     $daylist =~  m/^((sa|so|mo|di|mi|do|fr)(,|$)){1,7}$/g      ));
+    my %dayNumber=();
+    my %hdays=();
+    my $daysRegExp = "(mo|di|mi|do|fr|sa|so|tu|we|th|su)";
 
-    # Sa, So ... in den Index Ã¼bersetzen
-    my $idx = 1;
-    foreach my $day ("mo","di","mi","do","fr","sa","so") {
-       $daylist =~ s/$day/$idx/g;
-       $idx++;
+    #wday              01   02   03   04   05   06   00
+    my $idx = 1;                                #    07  !!!
+    foreach my $day  ("mo","di","mi","do","fr","sa","so") {
+       $dayNumber{$day} = $idx; $idx++;
+    }
+    $idx = 1;
+    foreach my $day  ("mo","tu","we","th","fr","sa","su") {
+       $dayNumber{$day} = $idx; $idx++;
     }
 
-    # Kommas entfernen
-    $daylist =~ s/,//g;
-    @days = split("", $daylist);
+    #AufzÃ¤hlung 1234 ...
+    if (      $daylist =~  m/^(\d){0,7}$/g) {
 
-    # doppelte Tage entfernen
-    my %hdays=();
-    @hdays{@days}=1;
-    #korrekt die Tage sortieren
+        @days = split("", $daylist);
+        @hdays{@days}=1;
+
+    # AufzÃ¤hlung Sa,So,... | Mo-Di,Do,Fr-Mo
+    } elsif ($daylist =~  m/^($daysRegExp(,|-|$)){0,7}$/g   ) {
+
+      my $oldDay, my $oldDel;
+      for (;length($daylist);) {
+        my $day = substr($daylist,0,2,"");
+        my $del = substr($daylist,0,1,"");
+        my @subDays;
+        if ($oldDel eq "-" ){
+           # von bis Angabe: Mo-Di
+           my $low  = $dayNumber{$oldDay};
+           my $high = $dayNumber{$day};
+           if ($low <= $high) {
+              @subDays = ($low .. $high);           
+		      	  } else {
+			          @subDays = (1 .. $high, $low .. 7);
+			        }
+           @hdays{@subDays}=1;
+        } else {
+           #einzelner Tag: Sa
+           $hdays{$dayNumber{$day}} = 1;
+        }
+        $oldDay = $day;
+        $oldDel = $del;
+      }
+    } else{
+      return "invalid daylist in $name <$daylist> 123... | Sa,So,... | Mo-Di,Do,Fr-Mo | Su-Th,We"
+    }
+
     @days = sort(SortNumber keys %hdays);
 
     return "invalid time in $name <$time> HH:MM"
@@ -158,7 +190,14 @@ Heating_Control_Define($$)
     for (my $d=0; $d<@days; $d++) {
       #Log 3, "Switchingtime: $switchingtimes[$i] : $days[$d] -> $time -> $temp ";
       $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$time} = $temp;
-      $hash->{"PROFILE ".($days[$d]).": ".$Wochentage[$days[$d]-1]} .= sprintf("%s: %.1fÂ°C, ", $time, $temp);
+    }
+  }
+
+  # Profile sortiert aufbauen
+  for (my $d=1; $d<=7; $d++) {
+    foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$d} })) {
+      my $temp = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
+      $hash->{"PROFILE ".($d).": ".$Wochentage[$d-1]} .= sprintf("%s: %.1fÂ°C, ", $st, $temp);
     }
   }
 
@@ -194,42 +233,50 @@ sub
 Heating_Control_Update($)
 {
   my ($hash) = @_;
-  my $now    = time();
+  my $now    = time() + 5;       # garantiert > als die eingestellte Schlatzeit
   my $next   = 0;
   my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime($now);
 
-  my $AktDesiredTemp = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
-  my $newDesTemperature = $AktDesiredTemp; #default#
+  my $AktDesiredTemp     = ReadingsVal($hash->{DEVICE}, $hash->{helper}{DESIRED_TEMP_READING}, 0);
+  my $newDesTemperature  = $AktDesiredTemp; #default#
   my $nextDesTemperature = 0;
   my $nextSwitch = 0;
-  my $nowSwitch = 0;
+  my $nowSwitch  = 0;
+
+  my $loglevel   = GetLogLevel ($hash->{NAME}, 5);
+  #  $loglevel   = 3;
 
   $wday=7 if($wday==0);
-  my @days = ($wday..7, 1..$wday-1); 
+  my @days = ($wday..7, 1..$wday);
+
+  Log $loglevel, "Begin##################>$hash->{NAME}";
+  Log $loglevel, "wday------------>$wday";
 
   for (my $d=0; $d<@days; $d++) {
-    #Ã¼ber jeden Tag
+    Log $loglevel, "d------------>$d--->nextSwitch:$nextSwitch";
+    #über jeden Tag
     last if ($nextSwitch > 0);
+    Log $loglevel, "days[$d]------------>$days[$d]";
     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$days[$d]} })) {
-      #berechnen, des Schaltpunktes
-      my $secondsToSwitch = 3600*(int(substr($st,0,2)) - $hour) +
-         60*(int(substr($st,3,2)) - $min ) - $sec;
-      # Tagesdiff dazurechnen
-      if($wday <= int($days[$d])) {
-        $secondsToSwitch += 3600*24*(int($days[$d])-$wday)
-      } else {
-        $secondsToSwitch += 3600*24*(7-$wday+int($days[$d]))
-      }
+      Log $loglevel, "st------------>$st";
+      # Tagediff +  Sekunden des Tages addieren
+      my $secondsToSwitch = $d*24*3600       +
+         3600*(int(substr($st,0,2)) - $hour) +
+           60*(int(substr($st,3,2)) - $min ) - $sec;
+      Log $loglevel, "secondsToSwitch------------>$secondsToSwitch";
+      Log $loglevel, "wday-days[d]----------->$wday $days[$d]";
 
-      $next = time()+$secondsToSwitch;
-      #Log 3, "Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st}";
+      $next = $now+$secondsToSwitch;
 
-      if ($now > $next) {
+      Log $loglevel, "Jetzt:".strftime('%d.%m.%Y %H:%M:%S',localtime($now))." -> Next: ".strftime('%d.%m.%Y %H:%M:%S',localtime($next))." -> Temp: $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st}";
+      if ($now >= $next) {
         $newDesTemperature =  $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
-        #Log 3, "temperature------------>$newDesTemperature";
+        Log $loglevel, "newDestemperature------------>$newDesTemperature";
         $nowSwitch = $now;
+        Log $loglevel, "nowSwitch------------>$nowSwitch--->" .strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch));
       } else {
         $nextSwitch = $next;
+        Log $loglevel, "nextSwitch------------>$nextSwitch--->".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
         $nextDesTemperature = $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$st};
         last;
       }
@@ -243,7 +290,9 @@ Heating_Control_Update($)
   my $name = $hash->{NAME};
   my $command;
   
-  #Log 3, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
+  Log $loglevel, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
+  Log $loglevel, "NextSwitch=".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
+
   if ($nowSwitch gt "" && $AktDesiredTemp != $newDesTemperature) {
     if (defined $hash->{helper}{CONDITION}) {
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
@@ -258,18 +307,17 @@ Heating_Control_Update($)
     $command =~ s/@/$hash->{DEVICE}/g;
     $command =~ s/%/$newDesTemperature/g;
     $command = SemicolonEscape($command);
-    my $ret = AnalyzeCommandChain(undef, $command);
+    Log $loglevel, "command-$hash->{NAME}----------->$command";
+    my $ret  = AnalyzeCommandChain(undef, $command);
     Log GetLogLevel($name,3), $ret if($ret);
   }
 
-  #Log 3, "nextSwitch=".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
-
   InternalTimer($nextSwitch, "Heating_Control_Update", $hash, 0);
   readingsBeginUpdate($hash);
-  readingsBulkUpdate($hash, "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
-  readingsBulkUpdate($hash, "nextValue", $nextDesTemperature . "Â°C");
-  readingsBulkUpdate($hash, "state", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)). ": " . $nextDesTemperature."Â°C");
-  readingsEndUpdate($hash, defined($hash->{LOCAL} ? 0 : 1)); 
+  readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
+  readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature . "Â°C");
+  readingsBulkUpdate ($hash,  "state",      $newDesTemperature  . "Â°C");
+  readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
   
   return 1;
 }
@@ -299,7 +347,7 @@ sub SortNumber {
     <br><br>
 
     to set a weekly profile for &lt;device&gt;, eg. a heating sink. You can define different switchingtimes for every day.
-    The new temperature is send to the &lt;device&gt; automaticly with <code>set &lt;device&gt; desired-temp &lt;temp&gt;</code>
+    The new temperature is sent to the &lt;device&gt; automaticly with <code>set &lt;device&gt; desired-temp &lt;temp&gt;</code>
     if the device is a heating thermostat (FHT8b, MAX). Have you defined a &lt;condition&gt;
     and this condition is false if the switchingtime has reached, no command will executed.<br>
     A other case is to define an own perl command with &lt;command&gt;.
@@ -315,7 +363,7 @@ sub SortNumber {
       <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;temperature&gt;</b></ul><br>
       <u>weekdays:</u> optional, if not set every day is using.<br>
         Otherwise you can define one day as number or as shortname.<br>
-      <u>time:</u>define the time to switch, format: HH24:MI<br>
+      <u>time:</u>define the time to switch, format: HH:MM(HH in 24 hour format)<br>
       <u>temperature:</u>the temperature to set, using a Integer<br>
     </ul>
     <p>
@@ -340,15 +388,15 @@ sub SortNumber {
     <b>Example:</b>
     <ul>
         <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|12 17:20|21 17:25|12</code><br>
-        Mo-Fr are setting the temperature at 05:20 to 21Â°C, and at 05:25 to 12Â°C. 
-        Every day will be set the temperature at 17:20 to 21Â°C and 17:25 to 12Â°C.<p>
+        Mo-Fr are setting the temperature at 05:20 to 21°C, and at 05:25 to 12°C.
+        Every day will be set the temperature at 17:20 to 21°C and 17:25 to 12°C.<p>
 
-        <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Die,Mi|16:00|18.5 20:00|12 
-          {fhem(â€œset dummy onâ€); fhem("set @ desired-temp %");}</code><br>
+        <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Do-Fr|16:00|18.5 20:00|12
+          {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
         At the given times and weekdays only(!) the command will be executed.<p>
 
-        <code>define HCK Heating_Control KZ_Heizung 07:00|16 16:00|18.5 20:00|12 ($sunshine=0))</code><br>
-        The temperature is only set if the variable is $sunhine=0.<p>
+        <code>define HCW Heating_Control WZ_Heizung Sa-So,Mi|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
+        The temperature is only set if the dummy variable WeAreThere is "yes".<p>
     </ul>
   </ul>
 
@@ -382,12 +430,12 @@ sub SortNumber {
     <code>define &lt;name&gt; Heating_Control &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
-    Bildet ein Wochenprofil fÃ¼r ein &lt;device&gt;, zb. HeizkÃ¶rper, ab. Es kÃ¶nnen fÃ¼r jeden Tag unterschiedliche 
-    Schaltzeiten angegeben werden. Ist das &lt;device&gt; ein HeizkÃ¶rperthermostat (zb. FHT8b, MAX) so wird die 
+    Bildet ein Wochenprofil für ein &lt;device&gt;, zb. Heizkörper, ab. Es können für jeden Tag unterschiedliche 
+    Schaltzeiten angegeben werden. Ist das &lt;device&gt; ein Heizkörperthermostat (zb. FHT8b, MAX) so wird die 
     zu setzende Temperatur im &lt;profile&gt; automatisch mittels <code>set &lt;device&gt; desired-temp &lt;temp&gt;</code>
     dem Device mitgeteilt. Ist eine &lt;condition&gt; angegeben und ist zum Schaltpunkt der Ausdruck unwahr, 
-    so wird dieser Schaltpunkt nicht ausgefÃ¼hrt.<br>
-    Alternativ zur Automatik kann stattdessen eigener Perl-Code im &lt;command&gt; ausgefÃ¼hrt werden.
+    so wird dieser Schaltpunkt nicht ausgeführt.<br>
+    Alternativ zur Automatik kann stattdessen eigener Perl-Code im &lt;command&gt; ausgeführt werden.
     <p>
     Folgende Parameter sind im Define definiert:
     <ul><b>device</b><br> 
@@ -398,10 +446,10 @@ sub SortNumber {
       Angabe des Wochenprofils. Die einzelnen Schaltzeiten sind durch Leerzeichen getrennt
       Die Angabe der Schaltzeiten ist nach folgendem Muster definiert:<br>
       <ul><b>[&lt;Wochentage&gt;|]&lt;Uhrzeit&gt;|&lt;Temperatur&gt;</b></ul><br>
-      <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgefÃ¼hrt.
-        FÃ¼r die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
-        Tagesnummer (Mo=1, ..., So=7) oder Name des Tages (Mo, Die, ..., So) einzusetzen.<br>
-      <u>Uhrzeit:</u>Angabe der Uhrzeit an dem geschaltet werden soll, Format: HH24:MI<br>
+      <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgeführt.
+        Für die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
+        Tagesnummer (Mo=1, ..., So=7) oder Name des Tages (Mo, Di, ..., So) einzusetzen.<br>
+      <u>Uhrzeit:</u>Angabe der Uhrzeit an dem geschaltet werden soll, Format: HH:MM(HH im 24 Stunden format)<br>
       <u>Temperatur:</u>Angabe der zu setzenden Temperatur als Zahl<br>
     </ul>
     <p>
@@ -409,7 +457,7 @@ sub SortNumber {
       Falls keine Condition in () angegeben wurde, so wird alles weitere als Command
       interpretiert. Perl-Code ist in {} zu setzen. <br>
       Wichtig: Falls ein Command definiert ist, so wird zu den definierten Schaltzeiten 
-      nur(!) das Command ausgefÃ¼hrt. Falls ein desired-temp Befehl abgesetzt werde soll, 
+      nur(!) das Command ausgeführt. Falls ein desired-temp Befehl abgesetzt werde soll, 
       so muss dies explizit angegeben werden.<br>
       Folgende Parameter werden ersetzt:<br>
         <ol>
@@ -420,22 +468,22 @@ sub SortNumber {
     <p>
     <ul><b>condition</b><br> 
       Bei Angabe einer Condition ist diese in () zu setzen und mit validem Perl-Code zu versehen.<br>
-      Der RÃ¼ckgabedatentyp der condition muss boolean sein.<br> 
+      Der Rückgabedatentyp der condition muss boolean sein.<br> 
       Die Parameter @ und  % werden interpretiert.
     </ul>
     <p>
     <b>Beispiel:</b>
     <ul>
         <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|12 17:20|21 17:25|12</code><br>
-        Mo-Fr wird die Temperatur um 05:20Uhr auf 21Â°C, und um 05:25Uhr auf 12Â°C gesetzt. 
-        Jeden Tag wird die Temperatur um 17:20Uhr auf 21Â°C und 17:25Uhr auf 12Â°C gesetzt.<p>
+        Mo-Fr wird die Temperatur um 05:20Uhr auf 21°C, und um 05:25Uhr auf 12°C gesetzt. 
+        Jeden Tag wird die Temperatur um 17:20Uhr auf 21°C und 17:25Uhr auf 12°C gesetzt.<p>
 
-        <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Die,Mi|16:00|18.5 20:00|12 
-          {fhem(â€œset dummy onâ€); fhem("set @ desired-temp %");}</code><br>
-        Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgefÃ¼hrt.<p>
+        <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Mi|16:00|18.5 20:00|12
+          {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
+        Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgeführt.<p>
 
-        <code>define HCK Heating_Control KZ_Heizung 07:00|16 16:00|18.5 20:00|12 ($sunshine=0))</code><br>
-        Die zu setzendeTemperatur wird nur gesetzt, falls die globale Variable $sunhine=0 ist.<p>
+        <code>define HCW Heating_Control WZ_Heizung Sa-So,Mi|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
+        Die zu setzende Temperatur wird nur gesetzt, falls die Dummy Variable WeAreThere = "yes" ist.<p>
     </ul>
   </ul>
 
