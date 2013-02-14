@@ -36,7 +36,7 @@ use File::Basename;
 use Getopt::Long;
 use threads;
 use Thread::Queue;
-
+use Time::HiRes qw(gettimeofday);
 
 use warnings;
 use strict;
@@ -241,6 +241,11 @@ while(1)
 	    if(not $value =~ /^(absence|present)$/)
 	    {
 		$handle{$uuid}{client}->send("$value;$room\n");
+		
+		if($value eq "socket_closed")
+		{
+		    delete($state{$uuid}{rooms}{$room});
+		}
 	    }
 	    else
 	    {
@@ -503,11 +508,12 @@ sub doQuery($$$)
     my $selector;
     my @client_handle;
     my $reconnect_count = 0;
-    
+    my $last_contact = gettimeofday();
     
     
     my $previous_state = "absence";
-
+    my $current_state = "absence";
+    
     my $client_socket = new IO::Socket::INET (
 	PeerHost => $values{address},
 	PeerPort => $values{port},
@@ -515,7 +521,7 @@ sub doQuery($$$)
 	Type => SOCK_STREAM,
 	KeepAlive => 1,
 	Blocking => 1
-	) or ( $log_queue->enqueue("$room: could not create socket to ".$values{address}." - $! - \n") and threads->exit());
+	) or ( $log_queue->enqueue("$room: could not create socket to ".$values{address}." - $! - \n"));
 
     # if the thread gets a termination signal, the thread must be shutdown by itself
     local $SIG{TERM} = sub { 
@@ -525,20 +531,36 @@ sub doQuery($$$)
 			 threads->exit();
 			};
 
+    $selector = IO::Select->new($client_socket);
 
     if($client_socket)
     {
+
 	# send the given address to the presence daemon
 	$client_socket->send($do_address."|".$values{absence_timeout}."\n");
     }
-
-    # create a socket selector for non-blocking read and disconnect 
-    $selector = IO::Select->new($client_socket);
-
+    else
+    {   
+        $selector->remove($client_socket);
+        $client_socket = undef;
+       
+    }
+    
 	
     # thread main loop
     while(1)
     {
+    
+	if(defined($client_socket) and not $last_contact > (gettimeofday() - ($current_state eq "absence" ? $values{absence_timeout} : $values{presence_timeout}) - 60))
+	{
+	    $log_queue->enqueue("$room: socket to ".$values{address}.":".$values{port}." did not report anything in expected time, resetting socket\n");
+	    
+	    $selector->remove($client_socket);
+	    close($client_socket);
+	    $client_socket = undef;
+	}
+	
+	
 	if(not defined($client_socket))
 	{
 	    # if it's the first occurance
@@ -570,6 +592,9 @@ sub doQuery($$$)
 		# reset the reconnect counter
 		$reconnect_count = 0;
 		
+		# set the last contact date to now
+		$last_contact = gettimeofday();
+		
 		# add the new established socket to the IO selector for incoming data monitoring.
 		$selector->add($client_socket);
 		# send the given address to the presence daemon
@@ -580,18 +605,24 @@ sub doQuery($$$)
 		sleep(9);
 	    }
 	}
+	
 	# if the socket has a message available
 	if(@client_handle = $selector->can_read(1))
 	{
+		
 		# get all socket handles which has a message available
 		foreach my $local_client (@client_handle)
 		{
 			# get the message from the socket handle
 			$return = <$local_client>;
-
+			
 			# if the message is defined (not EOF) handle the message...
 			if($return)
 			{
+			
+				# set the last contact date
+				$last_contact = gettimeofday();
+			
 				# remove trailing whitespaces and newlines
 				chomp($return);
 				
@@ -616,12 +647,16 @@ sub doQuery($$$)
 					    # log the timout change to the log queue
 					    $log_queue->enqueue("$room: changing to absence timeout (".$values{absence_timeout}.") for device $do_address\n");
 					    
+					    $current_state = "absence";
+					    
 					    # send the new command with the configured absence timeout
 					    $local_client->send($do_address."|".$values{absence_timeout}."\n");
 					}
 					elsif(defined($previous_state) and $previous_state eq "absence" and  lc($return) =~ /^present/)
 					{
 					    $log_queue->enqueue("$room: changing to presence timeout (".$values{presence_timeout}.") for device $do_address\n");
+					    
+					    $current_state = "present";
 					    
 					    # if the state changes from absence to present, set the presence timeout
 					    $local_client->send($do_address."|".$values{presence_timeout}."\n");
