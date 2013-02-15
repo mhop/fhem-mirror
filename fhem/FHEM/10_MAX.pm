@@ -346,13 +346,14 @@ MAX_Set($@)
 
     if($hash->{type} eq "ShutterContact") {
       return "Invalid number of arguments" if(@args != 2);
+      Log 2, "fake is deprectaed and will be removed. Please use CUL_MAX's fakeSC";
       my $state = $args[1] ? "12" : "10";
       return ($hash->{IODev}{Send})->($hash->{IODev},"ShutterContactState",$dest,$state, flags => "06", src => $hash->{addr});
     } elsif($hash->{type} eq "WallMountedThermostat") {
       return "Invalid number of arguments" if(@args != 3);
 
       return "desiredTemperature is invalid" if($args[1] < 4.5 || $args[2] > 30.5);
-
+      Log 2, "fake is deprectaed and will be removed. Please use CUL_MAX's fakeWT";
       $args[2] = 0 if($args[2] < 0); #Clamp temperature to minimum of 0 degree
 
       #Encode into binary form
