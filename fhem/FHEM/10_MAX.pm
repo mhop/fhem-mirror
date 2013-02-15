@@ -87,6 +87,7 @@ MAX_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
+  return "name \"$name\" is reserved for internal use" if($name eq "fakeWallThermostat" or $name eq "fakeShutterContact");
   return "wrong syntax: define <name> MAX addr"
         if(int(@a)!=4 || $a[3] !~ m/^[A-F0-9]{6}$/i);
 
@@ -368,14 +369,30 @@ MAX_Set($@)
 
   } elsif($setting ~~ ["associate", "deassociate"]) {
     my $dest = $args[0];
-    if(exists($defs{$dest})) {
-      return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
-      $dest = $defs{$dest}{addr};
+    my $destType;
+    if($dest eq "fakeWallThermostat") {
+      return "IODev is not CUL_MAX" if($hash->{IODev}->{TYPE} ne "CUL_MAX");
+      $dest = AttrVal($hash->{IODev}->{NAME}, "fakeWTaddr", "111111");
+      return "Invalid fakeWTaddr attribute set (must not be 000000)" if($dest eq "000000");
+      $destType = MAX_TypeToTypeId("WallMountedThermostat");
+
+    } elsif($dest eq "fakeShutterContact") {
+      return "IODev is not CUL_MAX" if($hash->{IODev}->{TYPE} ne "CUL_MAX");
+      $dest = AttrVal($hash->{IODev}->{NAME}, "fakeSCaddr", "222222");
+      return "Invalid fakeSCaddr attribute set (must not be 000000)" if($dest eq "000000");
+      $destType = MAX_TypeToTypeId("ShutterContact");
+
     } else {
-      return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
+      if(exists($defs{$dest})) {
+        return "Destination is not a MAX device" if($defs{$dest}{TYPE} ne "MAX");
+        $dest = $defs{$dest}{addr};
+      } else {
+        return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
+      }
+      my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
+      Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{$dest}{groupid});
     }
-    my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
-    Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{$dest}{groupid});
+
     Log GetLogLevel($hash->{NAME}, 5), "Using dest $dest, destType $destType";
     if($setting eq "associate") {
       return ($hash->{IODev}{Send})->($hash->{IODev},"AddLinkPartner",$hash->{addr},sprintf("%s%02x", $dest, $destType));
@@ -446,7 +463,11 @@ MAX_Set($@)
     my $assoclist;
     #Build list of devices which this device can be associated to
     if($hash->{type} =~ /HeatingThermostat.*/) {
-      $assoclist = join(",", map { defined($_->{type}) && $_->{type} ~~ ["HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat", "ShutterContact"] ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      $assoclist = join(",", map { defined($_->{type}) && $_->{type} ~~ ["HeatingThermostat", "HeatingThermostatPlus", "WallMountedThermostat", "ShutterContact"] && $_ != $hash ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
+      if($hash->{IODev}->{TYPE} eq "CUL_MAX") {
+        $assoclist .= "," if(length($assoclist));
+        $assoclist .= "fakeWallThermostat,fakeShutterContact";
+      }
     } elsif($hash->{type} ~~ ["ShutterContact", "WallMountedThermostat"]) {
       $assoclist = join(",", map { defined($_->{type}) && $_->{type} =~ /HeatingThermostat.*/ ? $_->{NAME} : () } values %{$modules{MAX}{defptr}});
     }
