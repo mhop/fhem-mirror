@@ -160,7 +160,7 @@ MAX_ReadingsVal(@)
 {
   my ($hash,$name) = @_;
 
-  my $val = MAX_ParseTemperature(ReadingsVal($hash->{NAME},$name,""));
+  my $val = ReadingsVal($hash->{NAME},$name,"");
   #$readingDef{$name} array is [validatingFunc, defaultValue]
   if(exists($readingDef{$name}) and !$readingDef{$name}[0]->($val)) {
     #Error: invalid value
@@ -174,7 +174,7 @@ MAX_ReadingsVal(@)
       readingsSingleUpdate($hash,$name,$val,0);
     }
   }
-  return $val;
+  return MAX_ParseTemperature($val);
 }
 
 sub
@@ -275,19 +275,20 @@ MAX_Set($@)
       return $msg;
     }
 
-    my $boostDuration = MAX_ReadingsVal($hash,"boostDuration");
-    my $boostValveposition = MAX_ReadingsVal($hash,"boostValveposition");
-    my $decalcification = MAX_ReadingsVal($hash,"decalcification");
-    my $maxValveSetting = MAX_ReadingsVal($hash,"maxValveSetting");
-    my $valveOffset = MAX_ReadingsVal($hash,"valveOffset");
+    my %h;
+    $h{boostDuration} = MAX_ReadingsVal($hash,"boostDuration");
+    $h{boostValveposition} = MAX_ReadingsVal($hash,"boostValveposition");
+    $h{decalcification} = MAX_ReadingsVal($hash,"decalcification");
+    $h{maxValveSetting} = MAX_ReadingsVal($hash,"maxValveSetting");
+    $h{valveOffset} = MAX_ReadingsVal($hash,"valveOffset");
 
-    eval "\$$setting = $val";
+    $h{$setting} = $val;
 
-    my ($decalcDay, $decalcHour) = ($decalcification =~ /^(...) (\d{1,2}):00$/);
+    my ($decalcDay, $decalcHour) = ($h{decalcification} =~ /^(...) (\d{1,2}):00$/);
     my $decalc = ($decalcDaysInv{$decalcDay} << 5) | $decalcHour;
-    my $boost = ($boost_durationsInv{$boostDuration} << 5) | int($boostValveposition/5);
+    my $boost = ($boost_durationsInv{$h{boostDuration}} << 5) | int($h{boostValveposition}/5);
 
-    my $payload = sprintf("%02x%02x%02x%02x", $boost, $decalc, int($maxValveSetting*255/100), int($valveOffset*255/100));
+    my $payload = sprintf("%02x%02x%02x%02x", $boost, $decalc, int($h{maxValveSetting}*255/100), int($h{valveOffset}*255/100));
     return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigValve",$hash->{addr},$payload,callbackParam => "$setting,$val");
 
   }elsif($setting eq "groupid"){
@@ -304,23 +305,24 @@ MAX_Set($@)
       return $msg;
     }
 
-    my $comfortTemperature = MAX_ReadingsVal($hash,"comfortTemperature");
-    my $ecoTemperature = MAX_ReadingsVal($hash,"ecoTemperature");
-    my $maximumTemperature = MAX_ReadingsVal($hash,"maximumTemperature");
-    my $minimumTemperature = MAX_ReadingsVal($hash,"minimumTemperature");
-    my $windowOpenTemperature = MAX_ReadingsVal($hash,"windowOpenTemperature");
-    my $windowOpenDuration = MAX_ReadingsVal($hash,"windowOpenDuration");
-    my $measurementOffset = MAX_ReadingsVal($hash,"measurementOffset");
+    my %h;
+    $h{comfortTemperature} = MAX_ReadingsVal($hash,"comfortTemperature");
+    $h{ecoTemperature} = MAX_ReadingsVal($hash,"ecoTemperature");
+    $h{maximumTemperature} = MAX_ReadingsVal($hash,"maximumTemperature");
+    $h{minimumTemperature} = MAX_ReadingsVal($hash,"minimumTemperature");
+    $h{windowOpenTemperature} = MAX_ReadingsVal($hash,"windowOpenTemperature");
+    $h{windowOpenDuration} = MAX_ReadingsVal($hash,"windowOpenDuration");
+    $h{measurementOffset} = MAX_ReadingsVal($hash,"measurementOffset");
 
-    eval "\$$setting = $args[0]";
+    $h{$setting} = $args[0];
 
-    my $comfort = int(MAX_ParseTemperature($comfortTemperature)*2);
-    my $eco = int(MAX_ParseTemperature($ecoTemperature)*2);
-    my $max = int(MAX_ParseTemperature($maximumTemperature)*2);
-    my $min = int(MAX_ParseTemperature($minimumTemperature)*2);
-    my $offset = int(($measurementOffset + 3.5)*2);
-    my $windowOpenTemp = int(MAX_ParseTemperature($windowOpenTemperature)*2);
-    my $windowOpenTime = int($windowOpenDuration/5);
+    my $comfort = int($h{comfortTemperature}*2);
+    my $eco = int($h{ecoTemperature}*2);
+    my $max = int($h{maximumTemperature}*2);
+    my $min = int($h{minimumTemperature}*2);
+    my $offset = int(($h{measurementOffset} + 3.5)*2);
+    my $windowOpenTemp = int($h{windowOpenTemperature}*2);
+    my $windowOpenTime = int($h{windowOpenDuration}/5);
 
     my $payload = sprintf("%02x%02x%02x%02x%02x%02x%02x",$comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
     return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, callbackParam => "$setting,$args[0]")
