@@ -343,7 +343,7 @@ MAX_Set($@)
     if($hash->{type} eq "ShutterContact") {
       return "Invalid number of arguments" if(@args != 2);
       my $state = $args[1] ? "12" : "10";
-      return ($hash->{IODev}{Send})->($hash->{IODev},"ShutterContactState",$dest,$state,"06",undef,undef,$hash->{addr});
+      return ($hash->{IODev}{Send})->($hash->{IODev},"ShutterContactState",$dest,$state, flags => "06", src => $hash->{addr});
     } elsif($hash->{type} eq "WallMountedThermostat") {
       return "Invalid number of arguments" if(@args != 3);
 
@@ -358,7 +358,7 @@ MAX_Set($@)
       $arg2 &= 0xFF; #only take the lower 8 bits
 
       return ($hash->{IODev}{Send})->($hash->{IODev},"WallThermostatControl",$dest,
-        sprintf("%02x%02x",$arg1,$arg2),"04",undef,undef,$hash->{addr});
+        sprintf("%02x%02x",$arg1,$arg2),flags => "04", src => $hash->{addr});
     } else {
       return "fake does not work for device type $hash->{type}";
     }
