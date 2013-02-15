@@ -39,8 +39,8 @@ sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{
 sub validWeekProfile { return length($_[0]) == 4*13*7; }
 
 my %readingDef = ( #min/max/default
-  "maximumTemperature"    => [ \&validTemperature, 30.5],
-  "minimumTemperature"    => [ \&validTemperature, 4.5],
+  "maximumTemperature"    => [ \&validTemperature, "on"],
+  "minimumTemperature"    => [ \&validTemperature, "off"],
   "comfortTemperature"    => [ \&validTemperature, 21],
   "ecoTemperature"        => [ \&validTemperature, 17],
   "windowOpenTemperature" => [ \&validTemperature, 12],
@@ -139,6 +139,7 @@ MAX_CheckIODev($)
   return !defined($hash->{IODev}) || ($hash->{IODev}{TYPE} ne "MAXLAN" && $hash->{IODev}{TYPE} ne "CUL_MAX");
 }
 
+#Idenitify for numeric values and maps "on" and "off" to their temperatures
 sub
 MAX_ParseTemperature($)
 {
@@ -153,6 +154,8 @@ MAX_Validate(@)
   return $readingDef{$name}[0]->($val);
 }
 
+#Get a reading, validating it's current value (maybe forcing to the default if invalid)
+#"on" and "off" are converted to their numeric values
 sub
 MAX_ReadingsVal(@)
 {
@@ -417,8 +420,7 @@ MAX_Set($@)
         my $temperature = $controlpoints[$j];
         return "Invalid time: $controlpoints[$j+1]" if(!defined($hour) || !defined($min) || $hour > 23 || $min > 59);
         return "Invalid temperature" if(!validTemperature($temperature));
-        $temperature = 4.5 if($temperature eq "off");
-        $temperature = 30.5 if($temperature eq "on");
+        $temperature = MAX_ParseTemperature($temperature); #replace "on" and "off" by their values
         $newWeekprofilePart .= sprintf("%04x", (int($temperature*2) << 9) | int(($hour * 60 + $min)/5));
       }
       Log GetLogLevel($hash->{NAME}, 5), "New Temperature part for $day: $newWeekprofilePart";
