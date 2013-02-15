@@ -138,13 +138,13 @@ CUL_MAX_Attr(@)
 sub
 CUL_MAX_fakeWTaddr($)
 {
-  return AttrVal(@_[0]->{NAME}, "fakeWTaddr", "111111");
+  return AttrVal($_[0]->{NAME}, "fakeWTaddr", "111111");
 }
 
 sub
 CUL_MAX_fakeSCaddr($)
 {
-  return AttrVal(@_[0]->{NAME}, "fakeSCaddr", "222222");
+  return AttrVal($_[0]->{NAME}, "fakeSCaddr", "222222");
 }
 
 sub
