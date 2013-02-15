@@ -37,17 +37,15 @@ sub
 FRM_IN_Init($$)
 {
 	my ($hash,$args) = @_;
-	if (FRM_Init_Pin_Client($hash,$args,PIN_INPUT)) {
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		$firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
-		if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
-			$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
-		}
-		main::readingsSingleUpdate($hash,"state","Initialized",1);
-		return undef;
+	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_INPUT);
+	return $ret if (defined $ret);
+	my $firmata = $hash->{IODev}->{FirmataDevice};
+	$firmata->observe_digital($hash->{PIN},\&FRM_IN_observer,$hash);
+	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
+		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
 	}
-	return 1;
-	
+	main::readingsSingleUpdate($hash,"state","Initialized",1);
+	return undef;
 }
 
 sub

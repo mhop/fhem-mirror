@@ -29,13 +29,12 @@ sub
 FRM_PWM_Init($$)
 {
 	my ($hash,$args) = @_;
-	if (FRM_Init_Pin_Client($hash,$args,PIN_PWM)) {
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
-		main::readingsSingleUpdate($hash,"state","Initialized",1);
-		return undef;
-	}
-	return 1;
+	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_PWM);
+	return $ret if (defined $ret);
+	my $firmata = $hash->{IODev}->{FirmataDevice};
+	$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
+	main::readingsSingleUpdate($hash,"state","Initialized",1);
+	return undef;
 }
 
 sub

@@ -20,17 +20,15 @@ use Device::Firmata::Platform;
 
 sub FRM_Set($@);
 sub FRM_Attr(@);
-sub Log($$);
 
 #####################################
 sub FRM_Initialize($) {
-	my ($hash) = @_;
+	my $hash = shift @_;
 	
 	require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 
 	# Provider
-	$hash->{Clients} =
-	  ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:";
+	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:";
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
 
@@ -41,7 +39,7 @@ sub FRM_Initialize($) {
 	$hash->{SetFn}    = "FRM_Set";
 	$hash->{AttrFn}   = "FRM_Attr";
   
-	$hash->{AttrList} = "model:nano dummy:1,0 loglevel:0,1,2,3,4,5 sampling-interval i2c-config $main::readingFnAttributes";
+	$hash->{AttrList} = "model:nano dummy:1,0 loglevel:0,1,2,3,4,5,6 sampling-interval i2c-config $main::readingFnAttributes";
 }
 
 #####################################
@@ -56,13 +54,13 @@ sub FRM_Define($$) {
 	my $dev  = $a[2];
 
 	if ( $dev eq "none" ) {
-		Log 1, "FRM device is none, commands will be echoed only";
+		Log (GetLogLevel($hash->{NAME}), "FRM device is none, commands will be echoed only");
 		$main::attr{$name}{dummy} = 1;
 		return undef;
 	}
 	$hash->{DeviceName} = $dev;
 	my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
-	main::readingsSingleUpdate($hash,"state","Initialized", 1);
+	readingsSingleUpdate($hash,"state","Initialized", 1) unless ($ret);
 	return $ret;	
 }
 
@@ -70,7 +68,7 @@ sub FRM_Define($$) {
 sub FRM_Undef($) {
 	my $hash = @_;
 	FRM_forall_clients($hash,\&FRM_Client_Unassign,undef);
-	DevIo_CloseDev($hash);
+	DevIo_Disconnected($hash);
 	my $device = $hash->{FirmataDevice};
 	if (defined $device) {
 		if (defined $device->{io}) {
@@ -143,7 +141,8 @@ sub FRM_Attr(@) {
 	if ($command eq "set") {
 		$main::attr{$name}{$attribute}=$value;
 		if ($attribute eq "sampling-interval" 
-			or $attribute eq "i2c-config" ) {
+			or $attribute eq "i2c-config" 
+			or $attribute eq "loglevel" ) {
 			FRM_apply_attribute($main::defs{$name},$attribute);
 		}
 	}
@@ -155,21 +154,30 @@ sub FRM_apply_attribute {
 	my $name = $hash->{NAME};
 	if (defined $firmata) {
 		if ($attribute eq "sampling-interval") {
-			$firmata->sampling_interval(main::AttrVal($name,$attribute,"1000"));
+			$firmata->sampling_interval(AttrVal($name,$attribute,"1000"));
 		} elsif ($attribute eq "i2c-config") {
-			my $i2cattr = main::AttrVal($name,$attribute,undef);
+			my $i2cattr = AttrVal($name,$attribute,undef);
 			if (defined $i2cattr) {
 				my @a = split(" ", $i2cattr);
-				my $i2cpins = $firmata->{metadata}{i2c_pins}; 
+				my $i2cpins = $firmata->{metadata}{i2c_pins};
+				my $err; 
 				if (defined $i2cpins and scalar @$i2cpins) {
-					foreach my $i2cpin (@$i2cpins) {
-						$firmata->pin_mode($i2cpin,PIN_I2C);
-					}
-					$firmata->i2c_config(@a);
-					$firmata->observe_i2c(\&FRM_i2c_observer,$hash);	
+					eval {
+						foreach my $i2cpin (@$i2cpins) {
+							$firmata->pin_mode($i2cpin,PIN_I2C);
+						}
+						$firmata->i2c_config(@a);
+						$firmata->observe_i2c(\&FRM_i2c_observer,$hash);
+					};
+					$err = $@ if ($@);	
 				} else {
-					Log 1,"Error, arduino doesn't support I2C";
+					$err = "Error, arduino doesn't support I2C";
 				}
+				Log (GetLogLevel($hash->{NAME},2),$err) if ($err);
+			}
+		} elsif ($attribute eq "loglevel") {
+			if (defined $firmata->{io}) {
+				$firmata->{io}->{loglevel} = AttrVal($name,$attribute,5);
 			}
 		}
 	}
@@ -180,7 +188,6 @@ sub FRM_DoInit($) {
 	my ($hash) = @_;
 	
 	my $name = $hash->{NAME};
-	$hash->{loglevel} = main::GetLogLevel($name);
 	
   	my $firmata_io = Firmata_IO->new($hash);
 	my $device = Device::Firmata::Platform->attach($firmata_io) or return 1;
@@ -189,8 +196,10 @@ sub FRM_DoInit($) {
 	$device->observe_string(\&FRM_string_observer,$hash);
 	
 	my $found; # we cannot call $device->probe() here, as it doesn't select bevore read, so it would likely cause IODev to close the connection on the first attempt to read from empty stream
+	my $endTicks = time+5;
+	$device->system_reset();
 	do {
-		$device->system_reset();
+		Log (3, "querying Firmata Firmware Version");
 		$device->firmware_version_query();
 		for (my $i=0;$i<50;$i++) {
 			if (FRM_poll($hash)) {
@@ -198,6 +207,7 @@ sub FRM_DoInit($) {
 					$device->{protocol}->{protocol_version} = $device->{metadata}{firmware_version};
 					$main::defs{$name}{firmware} = $device->{metadata}{firmware};
 					$main::defs{$name}{firmware_version} = $device->{metadata}{firmware_version};
+					Log (3, "Firmata Firmware Version: ".$device->{metadata}{firmware}." ".$device->{metadata}{firmware_version});
 					$device->analog_mapping_query();
 					$device->capability_query();
 					for (my $j=0;$j<100;$j++) {
@@ -236,23 +246,27 @@ sub FRM_DoInit($) {
 								last;
 							}
 						} else {
-							select (undef,undef,undef,0.1);
+							select (undef,undef,undef,0.01);
 						} 
 					}
 					$found = 1;
 					last;
 				}
 			} else {
-				select (undef,undef,undef,0.1);
+				select (undef,undef,undef,0.01);
 			}
 		}
-	} while (!$found);
-	
-	FRM_apply_attribute($hash,"sampling-interval");
-	FRM_apply_attribute($hash,"i2c-config");
-	FRM_forall_clients($hash,\&FRM_Init_Client,undef);
-	
-	return undef;
+		if ($found) {
+			FRM_apply_attribute($hash,"sampling-interval");
+			FRM_apply_attribute($hash,"i2c-config");
+			FRM_forall_clients($hash,\&FRM_Init_Client,undef);
+			return undef;
+		}
+	} while (time < $endTicks);
+	Log (3, "no response from Firmata, closing DevIO");
+	DevIo_Disconnected($hash);
+	delete $hash->{FirmataDevice};
+	return "FirmataDevice not responding";
 }
 
 sub
@@ -272,22 +286,28 @@ FRM_forall_clients($$$)
 sub
 FRM_Init_Client($$) {
 	my ($hash,$args) = @_;
-	$hash->{loglevel} = main::GetLogLevel($hash->{NAME});
-	main::CallFn($hash->{NAME},"InitFn",$hash,$args);
+	my $ret = CallFn($hash->{NAME},"InitFn",$hash,$args);
+	if ($ret) {
+		Log (GetLogLevel($hash->{NAME},2),"error initializing ".$hash->{NAME}.": ".$ret);
+	}
 }
 
 sub
 FRM_Init_Pin_Client($$$) {
 	my ($hash,$args,$mode) = @_;
   	my $u = "wrong syntax: define <name> FRM_XXX pin";
-  	return $u if(int(@$args) < 3);
+  	return $u unless defined $args and int(@$args) > 2;
  	my $pin = @$args[2];
   	$hash->{PIN} = $pin;
 	if (defined $hash->{IODev} and defined $hash->{IODev}->{FirmataDevice}) {
-		$hash->{IODev}->{FirmataDevice}->pin_mode($pin,$mode);
-		return 1;
+		eval {
+			$hash->{IODev}->{FirmataDevice}->pin_mode($pin,$mode);
+		};
+		return "error setting Firmata pin_mode for ".$hash->{NAME}.": ".$@ if ($@);
+		return undef;
 	}
-	return undef;  	
+	return "no IODev set" unless defined $hash->{IODev};
+	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME};  	
 }
 
 sub
@@ -296,9 +316,9 @@ FRM_Client_Define($$)
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
-  main::readingsSingleUpdate($hash,"state","defined",0);
+  readingsSingleUpdate($hash,"state","defined",0);
   
-  main::AssignIoPort($hash);	
+  AssignIoPort($hash);	
   FRM_Init_Client($hash,\@a);
     
   return undef;
@@ -315,7 +335,7 @@ FRM_Client_Unassign($)
 {
   my ($dev) = @_;
   delete $dev->{IODev} if defined $dev->{IODev};
-  main::readingsSingleUpdate($dev,"state","defined",0);  
+  readingsSingleUpdate($dev,"state","defined",0);  
 }
 
 package Firmata_IO {
@@ -324,12 +344,13 @@ package Firmata_IO {
 		my ($class,$hash) = @_;
 		return bless {
 			hash => $hash,
+			loglevel => main::GetLogLevel($hash->{NAME},5),
 		}, $class;
 	}
 
 	sub data_write {
     	my ( $self, $buf ) = @_;
-	    main::Log 5, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf);
+	    main::Log ($self->{loglevel}, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf));
     	main::DevIo_SimpleWrite($self->{hash},$buf,undef);
 	}
 
@@ -337,7 +358,7 @@ package Firmata_IO {
 	    my ( $self, $bytes ) = @_;
 	    my $string = main::DevIo_SimpleRead($self->{hash});
 	    if (defined $string ) {
-    	    main::Log 5,"<".join(",",map{sprintf"%02x",ord$_}split//,$string);
+    	    main::Log ($self->{loglevel},"<".join(",",map{sprintf"%02x",ord$_}split//,$string));
     	}
 	    return $string;
 	}
@@ -347,7 +368,7 @@ sub
 FRM_i2c_observer
 {
 	my ($data,$hash) = @_;
-	main::Log 5,"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
+	Log GetLogLevel($hash->{NAME},5),"onI2CMessage address: '".$data->{address}."', register: '".$data->{register}."' data: '".$data->{data}."'";
 	FRM_forall_clients($hash,\&FRM_i2c_update_device,$data);
 }
 
@@ -356,20 +377,20 @@ sub FRM_i2c_update_device
 	my ($hash,$data) = @_;
 	if (defined $hash->{"i2c-address"} && $hash->{"i2c-address"}==$data->{address}) {
 		my $replydata = $data->{data};
-		my @values = split(" ",main::ReadingsVal($hash->{NAME},"values",""));
+		my @values = split(" ",ReadingsVal($hash->{NAME},"values",""));
 		splice(@values,$data->{register},@$replydata, @$replydata);
-		main::readingsBeginUpdate($hash);
-		main::readingsBulkUpdate($hash,"state","active",0);
-		main::readingsBulkUpdate($hash,"values",join (" ",@values),1);
-		main::readingsEndUpdate($hash,undef);
+		readingsBeginUpdate($hash);
+		readingsBulkUpdate($hash,"state","active",0);
+		readingsBulkUpdate($hash,"values",join (" ",@values),1);
+		readingsEndUpdate($hash,undef);
 	}
 }
 
 sub FRM_string_observer
 {
 	my ($string,$hash) = @_;
-	main::Log 4, "received String_data: ".$string;
-	main::readingsSingleUpdate($hash,"error",$string,1);
+	Log (GetLogLevel($hash->{NAME},3), "received String_data: ".$string);
+	readingsSingleUpdate($hash,"error",$string,1);
 }
 
 sub FRM_poll
@@ -391,21 +412,19 @@ sub
 FRM_OWX_Init($$)
 {
 	my ($hash,$args) = @_;
-	if (FRM_Init_Pin_Client($hash,$args,PIN_ONEWIRE)) {
-		$hash->{INTERFACE} = "firmata";
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		my $pin = $hash->{PIN};
-		$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
-		$hash->{FRM_OWX_REPLIES} = {};
-		$hash->{DEVS} = [];
-		if ( main::AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
-			$firmata->onewire_config($pin,1);
-		}
-		main::readingsSingleUpdate($hash,"state","Initialized",1);
-		$firmata->onewire_search($pin);
-		return undef;
+	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_ONEWIRE);
+	return $ret if (defined $ret);
+	my $firmata = $hash->{IODev}->{FirmataDevice};
+	my $pin = $hash->{PIN};
+	$firmata->observe_onewire($pin,\&FRM_OWX_observer,$hash);
+	$hash->{FRM_OWX_REPLIES} = {};
+	$hash->{DEVS} = [];
+	if ( AttrVal($hash->{NAME},"buspower","") eq "parasitic" ) {
+		$firmata->onewire_config($pin,1);
 	}
-	return 1;
+	readingsSingleUpdate($hash,"state","Initialized",1);
+	$firmata->onewire_search($pin);
+	return undef;
 }
 
 sub FRM_OWX_observer
@@ -426,7 +445,7 @@ sub FRM_OWX_observer
 			}
 			if ($command eq "SEARCH_REPLY") {
 				$hash->{DEVS} = \@owx_devices;
-				$main::attr{$hash->{NAME}}{"ow-devices"} = join " ",@owx_devices;
+				#$main::attr{$hash->{NAME}}{"ow-devices"} = join " ",@owx_devices;
 			} else {
 				$hash->{ALARMDEVS} = \@owx_devices;
 			}
@@ -512,10 +531,10 @@ sub FRM_OWX_Complex ($$$$) {
 
 	#-- get the interface
 	my $frm = $hash->{IODev};
-	return undef unless defined $frm;
+	return 0 unless defined $frm;
 	my $firmata = $frm->{FirmataDevice};
 	my $pin     = $hash->{PIN};
-	return undef unless ( defined $firmata and defined $pin );
+	return 0 unless ( defined $firmata and defined $pin );
 
 	my $ow_command = {};
 
@@ -546,7 +565,7 @@ sub FRM_OWX_Complex ($$$$) {
 	$firmata->onewire_command_series( $pin, $ow_command );
 	
 	if ($numread) {
-		my $times = main::AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
+		my $times = AttrVal($hash,"ow-read-timeout",1000) / 50; #timeout in ms, defaults to 1 sec
 		for (my $i=0;$i<$times;$i++) {
 			if (FRM_poll($hash->{IODev})) {
 				if (defined $hash->{FRM_OWX_REPLIES}->{$owx_dev}) {
