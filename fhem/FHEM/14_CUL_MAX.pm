@@ -494,7 +494,16 @@ CUL_MAX_BroadcastTime(@)
   <br>
 
   <a name="CUL_MAXset"></a>
-  <b>Set</b> <ul>N/A</ul><br>
+  <b>Set</b>
+  <ul>
+      <li>pairmode<br>
+      Sets the CUL_MAX into pairing mode for 60 seconds where it can be paired with other devices (Thermostats, Buttons, etc.). You also have to set the other device into pairing mode manually. (For Thermostats, this is pressing the "Boost" button for 3 seconds, for example).</li>
+      <li>fakeSC &lt;device&gt; &lt;open&gt;<br>
+      Sends a fake ShutterContactState message; &lt;open&gt; must be 0 or 1 for "window closed" or "window opened". Make sure you associate the target device with fakeShutterContact beforehand.</li>
+      <li>fakeWT &lt;device&gt; &lt;desiredTemperature&gt; &lt;measuredTemperature&gt;<br>
+      Sends a fake WallThermostatControl message (parameters both may have one digit after the decimal point, for desiredTemperature it may only by 0 or 5). Make sure you associate the target device with fakeWallThermostat beforehand.</li>
+  </ul>
+  <br>
 
   <a name="CUL_MAXget"></a>
   <b>Get</b> <ul>N/A</ul><br>
