@@ -25,24 +25,23 @@ FRM_AD_Initialize($)
   $hash->{InitFn}    = "FRM_AD_Init";
   $hash->{UndefFn}   = "FRM_AD_Undef";
   
-  $hash->{AttrList}  = "IODev upper-threshold lower-threshold loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "IODev upper-threshold lower-threshold loglevel:0,1,2,3,4,5,6 $main::readingFnAttributes";
 }
 
 sub
 FRM_AD_Init($$)
 {
 	my ($hash,$args) = @_;
-	if (FRM_Init_Pin_Client($hash,$args,PIN_ANALOG)) {
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
-		$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
-		if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
-			$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
-		}
-		main::readingsSingleUpdate($hash,"state","Initialized",1);
-		return undef;
+	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_ANALOG);
+	return $ret if (defined $ret);
+	my $firmata = $hash->{IODev}->{FirmataDevice};
+	$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
+	$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
+	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
+		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
 	}
-	return 1;
+	main::readingsSingleUpdate($hash,"state","Initialized",1);
+	return undef;
 }
 
 sub

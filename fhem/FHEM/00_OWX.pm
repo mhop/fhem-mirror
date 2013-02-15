@@ -193,8 +193,8 @@ sub OWX_Define ($$) {
     $hash->{HWDEVICE}   = $owx_hwdevice;
   #-- check if we are connecting to Arduino (via FRM):
   } elsif ($dev =~ /^\d{1,2}$/) {
+  	$hash->{INTERFACE} = "firmata";
   	if (defined $main::modules{FRM}) {
-  		$hash->{INTERFACE} = "firmata";
     	FRM_Client_Define($hash,$def);
   	} else {
   		Log 1,"module FRM not yet loaded, please define an FRM device first.";

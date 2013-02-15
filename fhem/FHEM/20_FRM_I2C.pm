@@ -31,15 +31,15 @@ FRM_I2C_Init($)
 	$hash->{"i2c-address"} = @$args[2];
 	$hash->{"i2c-register"} = @$args[3];
 	$hash->{"i2c-bytestoread"} = @$args[4];
+
+	return "no IODev set" unless defined $hash->{IODev};
+	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME} unless defined $hash->{IODev}->{FirmataDevice};  	
 	
-	if (defined $hash->{IODev}) {
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		if (defined $firmata) {
-			$firmata->i2c_read(@$args[2],@$args[3],@$args[4]);
-		}
-		return undef;
-	}
-	return 1;
+	eval {
+		$hash->{IODev}->{FirmataDevice}->i2c_read(@$args[2],@$args[3],@$args[4]);
+	};
+	return "error calling i2c_read: ".$@ if ($@);
+	return undef;
 }
 
 sub FRM_I2C_Attr(@) {

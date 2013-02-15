@@ -25,11 +25,10 @@ sub
 FRM_OUT_Init($$)
 {
 	my ($hash,$args) = @_;
-	if (FRM_Init_Pin_Client($hash,$args,PIN_OUTPUT)) {
-		main::readingsSingleUpdate($hash,"state","Initialized",1);
-		return undef;
-	}
-	return 1;
+	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_OUTPUT);
+	return $ret if (defined $ret);
+	main::readingsSingleUpdate($hash,"state","Initialized",1);
+	return undef;
 }
 
 sub
