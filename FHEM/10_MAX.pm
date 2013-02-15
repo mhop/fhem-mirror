@@ -273,20 +273,20 @@ MAX_Set($@)
       return $msg;
     }
 
-    readingsSingleUpdate($hash, $setting, $val, 0);
-
     my $boostDuration = MAX_ReadingsVal($hash,"boostDuration");
     my $boostValveposition = MAX_ReadingsVal($hash,"boostValveposition");
     my $decalcification = MAX_ReadingsVal($hash,"decalcification");
     my $maxValveSetting = MAX_ReadingsVal($hash,"maxValveSetting");
     my $valveOffset = MAX_ReadingsVal($hash,"valveOffset");
 
+    eval "\$$setting = $val";
+
     my ($decalcDay, $decalcHour) = ($decalcification =~ /^(...) (\d{1,2}):00$/);
     my $decalc = ($decalcDaysInv{$decalcDay} << 5) | $decalcHour;
     my $boost = ($boost_durationsInv{$boostDuration} << 5) | int($boostValveposition/5);
 
     my $payload = sprintf("%02x%02x%02x%02x", $boost, $decalc, int($maxValveSetting*255/100), int($valveOffset*255/100));
-    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigValve",$hash->{addr},$payload);
+    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigValve",$hash->{addr},$payload,callbackParam => "$setting,$val");
 
   }elsif($setting eq "groupid"){
     return "argument needed" if(@args == 0);
@@ -302,8 +302,6 @@ MAX_Set($@)
       return $msg;
     }
 
-    readingsSingleUpdate($hash, $setting, $args[0], 0);
-
     my $comfortTemperature = MAX_ReadingsVal($hash,"comfortTemperature");
     my $ecoTemperature = MAX_ReadingsVal($hash,"ecoTemperature");
     my $maximumTemperature = MAX_ReadingsVal($hash,"maximumTemperature");
@@ -311,6 +309,8 @@ MAX_Set($@)
     my $windowOpenTemperature = MAX_ReadingsVal($hash,"windowOpenTemperature");
     my $windowOpenDuration = MAX_ReadingsVal($hash,"windowOpenDuration");
     my $measurementOffset = MAX_ReadingsVal($hash,"measurementOffset");
+
+    eval "\$$setting = $args[0]";
 
     my $comfort = int(MAX_ParseTemperature($comfortTemperature)*2);
     my $eco = int(MAX_ParseTemperature($ecoTemperature)*2);
@@ -321,13 +321,13 @@ MAX_Set($@)
     my $windowOpenTime = int($windowOpenDuration/5);
 
     my $payload = sprintf("%02x%02x%02x%02x%02x%02x%02x",$comfort,$eco,$max,$min,$offset,$windowOpenTemp,$windowOpenTime);
-    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload)
+    return ($hash->{IODev}{Send})->($hash->{IODev},"ConfigTemperatures",$hash->{addr},$payload, callbackParam => "$setting,$args[0]")
 
   } elsif($setting eq "displayActualTemperature" and $hash->{type} eq "WallMountedThermostat") {
     return "Invalid arg" if($args[0] ne "0" and $args[0] ne "1");
 
-    readingsSingleUpdate($hash, $setting, $args[0], 0);
-    return ($hash->{IODev}{Send})->($hash->{IODev},"SetDisplayActualTemperature",$hash->{addr},sprintf("%02x",$args[0] ? 4 : 0));
+    return ($hash->{IODev}{Send})->($hash->{IODev},"SetDisplayActualTemperature",$hash->{addr},
+      sprintf("%02x",$args[0] ? 4 : 0), callbackParam => "$setting,$args[0]");
 
   } elsif($setting eq "fake") {
     #Resolve first argument to address
@@ -397,15 +397,17 @@ MAX_Set($@)
   } elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) {
     return "Number of arguments must be even" if(@args%2 == 1);
 
-    my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
-
     for(my $i = 0; $i < @args; $i += 2) {
       return "Expected day, got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
       my $day = $decalcDaysInv{$args[$i]};
       my @controlpoints = split(',',$args[$i+1]);
       return "Not more than 13 control points are allowed!" if(@controlpoints > 13*2);
       my $newWeekprofilePart = "";
-      for(my $j = 0; $j < @controlpoints; $j += 2) {
+      for(my $j = 0; $j < 13*2; $j += 2) {
+        if( $j >= @controlpoints ) {
+          $newWeekprofilePart .= "4520";
+          next;
+        }
         my ($hour, $min);
         if($j + 1 == @controlpoints) {
           $hour = 0; $min = 0;
@@ -422,15 +424,17 @@ MAX_Set($@)
       Log GetLogLevel($hash->{NAME}, 5), "New Temperature part for $day: $newWeekprofilePart";
       #Each day has 2 bytes * 13 controlpoints = 26 bytes = 52 hex characters
       #we don't have to update the rest, because the active part is terminated by the time 0:00
-      substr($curWeekProfile, $day*52, length($newWeekprofilePart)) = $newWeekprofilePart;
+
       #First 7 controlpoints (2*7=14 bytes => 2*2*7=28 hex characters )
-      ($hash->{IODev}{Send})->($hash->{IODev},"ConfigWeekProfile",$hash->{addr},sprintf("0%1d%s", $day, substr($curWeekProfile,$day*52,2*2*7)));
+      ($hash->{IODev}{Send})->($hash->{IODev},"ConfigWeekProfile",$hash->{addr},
+          sprintf("0%1d%s", $day, substr($newWeekprofilePart,0,2*2*7)),
+          callbackParam => "$day,0,".substr($newWeekprofilePart,0,2*2*7));
       #And then the remaining 6
-      ($hash->{IODev}{Send})->($hash->{IODev},"ConfigWeekProfile",$hash->{addr},sprintf("1%1d%s", $day, substr($curWeekProfile,$day*52+2*2*7,2*2*6)))
-        if(@controlpoints > 2*7);
+      ($hash->{IODev}{Send})->($hash->{IODev},"ConfigWeekProfile",$hash->{addr},
+          sprintf("1%1d%s", $day, substr($newWeekprofilePart,2*2*7,2*2*6)),
+          callbackParam => "$day,1,".substr($newWeekprofilePart,2*2*7,2*2*6))
+            if(@controlpoints > 2*7);
     }
-    readingsSingleUpdate($hash, ".weekProfile", $curWeekProfile, 0);
-    MAX_ParseWeekProfile($hash);
     Log GetLogLevel($hash->{NAME}, 5), "New weekProfile: " . MAX_ReadingsVal($hash, ".weekProfile");
 
   }else{
@@ -666,6 +670,18 @@ MAX_Parse($$)
     } else {
       $shash->{ERROR} = join(",",$args[0]);
     }
+
+  } elsif($msgtype eq "AckConfigWeekProfile") {
+    my ($day, $part, $profile) = @args;
+
+    my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
+    substr($curWeekProfile, $day*52+$part*2*2*7, length($profile)) = $profile;
+    readingsBulkUpdate($shash, ".weekProfile", $curWeekProfile);
+    MAX_ParseWeekProfile($shash);
+
+  } elsif($msgtype ~~ ["AckConfigValve", "AckConfigTemperatures", "AckSetDisplayActualTemperature" ]) {
+
+    readingsBulkUpdate($shash, $args[0], $args[1]);
 
   } elsif($msgtype eq "Ack") {
     #The payload of an Ack is a 2-digit hex number (being "01" for okey and "81" for "invalid command/argument"
