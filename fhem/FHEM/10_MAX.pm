@@ -282,7 +282,7 @@ MAX_Set($@)
     $h{maxValveSetting} = MAX_ReadingsVal($hash,"maxValveSetting");
     $h{valveOffset} = MAX_ReadingsVal($hash,"valveOffset");
 
-    $h{$setting} = $val;
+    $h{$setting} = MAX_ParseTemperature($val);
 
     my ($decalcDay, $decalcHour) = ($h{decalcification} =~ /^(...) (\d{1,2}):00$/);
     my $decalc = ($decalcDaysInv{$decalcDay} << 5) | $decalcHour;
@@ -314,7 +314,7 @@ MAX_Set($@)
     $h{windowOpenDuration} = MAX_ReadingsVal($hash,"windowOpenDuration");
     $h{measurementOffset} = MAX_ReadingsVal($hash,"measurementOffset");
 
-    $h{$setting} = $args[0];
+    $h{$setting} = MAX_ParseTemperature($args[0]);
 
     my $comfort = int($h{comfortTemperature}*2);
     my $eco = int($h{ecoTemperature}*2);
