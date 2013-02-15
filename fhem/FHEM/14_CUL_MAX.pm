@@ -8,10 +8,8 @@ use warnings;
 use MaxCommon;
 use POSIX;
 
-sub CUL_MAX_Send(@);
 sub CUL_MAX_BroadcastTime(@);
 sub CUL_MAX_Set($@);
-sub CUL_MAX_SendAck($$$);
 sub CUL_MAX_SendTimeInformation(@);
 sub CUL_MAX_GetTimeInformationPayload();
 sub CUL_MAX_Send(@);
@@ -181,7 +179,7 @@ CUL_MAX_Parse($$)
       return $shash->{NAME} if(!@{$shash->{sendQueue}}); #we are not waiting for any Ack
 
       my $packet = $shash->{sendQueue}[0];
-      if($packet->{dest} eq $src and $packet->{cnt} == hex($msgcnt)) {
+      if($packet->{dst} eq $src and $packet->{cnt} == hex($msgcnt)) {
         Log $ll5, "Got matching ack";
         $packet->{sent} = 2;
         return $shash->{NAME};
@@ -243,33 +241,28 @@ CUL_MAX_Parse($$)
   return $shash->{NAME};
 }
 
-sub
-CUL_MAX_SendAck($$$)
-{
-  my ($hash,$msgcnt,$dst) = @_;
-  return CUL_MAX_Send($hash, "Ack", $dst, "00", "00", "00", $msgcnt);
-}
-
 #All inputs are hex strings, $cmd is one from %msgCmd2Id
 sub
 CUL_MAX_Send(@)
 {
   # $cmd is one of
-  my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt, $src) = @_;
-
+  my ($hash, $cmd, $dst, $payload, %opts) = @_;
   CUL_MAX_Check($hash);
 
-  $flags = "00" if(!$flags);
-  $groupId = "00" if(!defined($groupId));
-  $src = $hash->{addr} if(!defined($src));
+  my $flags = "00";
+  my $groupId = "00";
+  my $src = $hash->{addr};
+  my $callbackParam = undef;
 
-  if(!defined($msgcnt)) {
-    my $dhash = CUL_MAX_DeviceHash($dst);
-    #replace message counter if not already set
-    $dhash->{READINGS}{msgcnt}{VAL} += 1;
-    $dhash->{READINGS}{msgcnt}{VAL} &= 0xFF;
-    $msgcnt = sprintf("%02x",$dhash->{READINGS}{msgcnt}{VAL});
-  }
+  $flags = $opts{flags} if(exists($opts{flags}));
+  $groupId = $opts{groupId} if(exists($opts{groupId}));
+  $src = $opts{src} if(exists($opts{src}));
+  $callbackParam = $opts{callbackParam} if(exists($opts{callbackParam}));
+
+  my $dhash = CUL_MAX_DeviceHash($dst);
+  $dhash->{READINGS}{msgcnt}{VAL} += 1;
+  $dhash->{READINGS}{msgcnt}{VAL} &= 0xFF;
+  my $msgcnt = sprintf("%02x",$dhash->{READINGS}{msgcnt}{VAL});
 
   my $packet = $msgcnt . $flags . $msgCmd2Id{$cmd} . $src . $dst . $groupId . $payload;
 
@@ -280,10 +273,13 @@ CUL_MAX_Send(@)
   my $timeout = gettimeofday()+$ackTimeout;
   my $aref = $hash->{sendQueue};
   push(@{$aref},  { "packet" => $packet,
-                    "dest" => $dst,
+                    "dst" => $dst,
                     "cnt" => hex($msgcnt),
                     "time" => $timeout,
-                    "sent" => "0" });
+                    "sent" => "0",
+                    "cmd" => $cmd,
+                    "callbackParam" => $callbackParam,
+                  });
 
   #Call CUL_MAX_SendQueueHandler if we just enqueued the only packet
   #otherwise it is already in the InternalTimer list
@@ -339,7 +335,7 @@ CUL_MAX_SendQueueHandler($)
   } elsif( $packet->{sent} == 1 ) { #Already sent it, got no Ack
     if( $packet->{sentTime} + $ackTimeout < gettimeofday() ) {
       # ackTimeout exceeded
-      Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dest} for $packet->{packet}";
+      Log 2, "CUL_MAX_SendQueueHandler: Missing ack from $packet->{dst} for $packet->{packet}";
       splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
       readingsSingleUpdate($hash, "packetsLost", ReadingsVal($hash->{NAME}, "packetsLost", 0) + 1, 1);
     } else {
@@ -348,6 +344,9 @@ CUL_MAX_SendQueueHandler($)
     }
 
   } elsif( $packet->{sent} == 2 ) { #Got ack
+    if(defined($packet->{callbackParam})) {
+      Dispatch($hash, "MAX,1,Ack$packet->{cmd},$packet->{dst},$packet->{callbackParam}", {RAWMSG => ""});
+    }
     splice @{$hash->{sendQueue}}, 0, 1; #Remove from array
   }
 
@@ -371,7 +370,7 @@ CUL_MAX_SendTimeInformation(@)
   my ($hash,$addr,$payload) = @_;
   $payload = CUL_MAX_GetTimeInformationPayload() if(!defined($payload));
   Log GetLogLevel($hash->{NAME}, 5), "broadcast time to $addr";
-  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, "04");
+  CUL_MAX_Send($hash, "TimeInformation", $addr, $payload, flags => "04");
 }
 
 sub

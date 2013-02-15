@@ -743,17 +743,24 @@ MAXLAN_RequestConfiguration($$)
 sub
 MAXLAN_Send(@)
 {
-  my ($hash, $cmd, $dst, $payload, $flags, $groupId, $msgcnt) = @_;
+  my ($hash, $cmd, $dst, $payload, %opts) = @_;
 
-  $flags = "00" if(!$flags);
-  $groupId = "00" if(!defined($groupId));
+  my $flags = "00";
+  my $groupId = "00";
+  my $callbackParam = undef;
 
-  if(defined($msgcnt)) {
-    Log 2, "MAXLAN_Send: MAXLAN does not support msgcnt";
-  }
+  $flags = $opts{flags} if(exists($opts{flags}));
+  $groupId = $opts{groupId} if(exists($opts{groupId}));
+  Log 2, "MAXLAN_Send: MAXLAN does not support src" if(exists($opts{src}));
+  $callbackParam = $opts{callbackParam} if(exists($opts{callbackParam}));
+
   $payload = pack("H*","00".$flags.$msgCmd2Id{$cmd}."000000".$dst.$groupId.$payload);
 
   my $ret = MAXLAN_Write($hash,"s:".encode_base64($payload,""), "S:");
+  #TODO: actually check return value
+  if(defined($opts{callbackParam})) {
+    Dispatch($hash, "MAX,1,Ack$cmd,$dst,$opts{callbackParam}", {RAWMSG => ""});
+  }
   #Reschedule a poll in the near future after the cube will
   #have gotten an answer
   RemoveInternalTimer($hash);
