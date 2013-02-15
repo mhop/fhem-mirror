@@ -30,14 +30,13 @@ sub
 FRM_SERVO_Init($$)
 {
 	my ($hash,$args) = @_;
-	if (FRM_Init_Pin_Client($hash,$args,PIN_SERVO)) {
-		my $firmata = $hash->{IODev}->{FirmataDevice};
-		$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{servo_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{servo_resolutions});
-		FRM_SERVO_apply_attribute($hash,"max-pulse"); #sets min-pulse as well
-		main::readingsSingleUpdate($hash,"state","Initialized",1);
-		return undef;
-	}
-	return 1;
+	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_SERVO);
+	return $ret if (defined $ret);
+	my $firmata = $hash->{IODev}->{FirmataDevice};
+	$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{servo_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{servo_resolutions});
+	FRM_SERVO_apply_attribute($hash,"max-pulse"); #sets min-pulse as well
+	main::readingsSingleUpdate($hash,"state","Initialized",1);
+	return undef;
 }
 
 sub FRM_SERVO_Attr(@) {
