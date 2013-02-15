@@ -286,13 +286,13 @@ sub CUL_HM_updateConfig($){
 	  CUL_HM_ActAdd(CUL_HM_hash2Id($hash),$actCycle) if ($actCycle);# re-read start values 
 	}
 	else{
-	  delete $attr{$name}{peerIDs}; # remove historical data
+	  ;#delete $attr{$name}{peerIDs}; # remove historical data
 	}
 	
 	# convert variables, delete obsolete, move to hidden level
     $attr{$name}{".devInfo"} = $attr{$name}{devInfo} if ($attr{$name}{devInfo});
-	delete $attr{$name}{devInfo};
-	delete $attr{$name}{hmClass};
+#	delete $attr{$name}{devInfo};
+#	delete $attr{$name}{hmClass};
 
 	# add default web-commands
     my $webCmd;
@@ -1611,7 +1611,6 @@ my %culHmRegChan = (# if channelspecific then enter them here
 ##--------------- Conversion routines for register settings
 my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
               600=>18600,3600=>111600);
-
 sub CUL_HM_Attr(@) {#############################
   my ($cmd,$name, $attrName,$attrVal) = @_;
   my @hashL;
@@ -1998,10 +1997,13 @@ my %culHmGlobalSets = (
 );
 my %culHmSubTypeSets = (
   switch           =>{ "on-for-timer"=>"sec", "on-till"=>"time",
-		                on=>"", off=>"", toggle=>"" },
+		               on=>"", off=>"", toggle=>"",
+					   press      => "[long|short] [on|off] ..."},
   dimmer           =>{ "on-for-timer"=>"sec", "on-till"=>"time",
-		               on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
-  blindActuator    =>{ on=>"", off=>"", toggle=>"", pct=>"", stop=>""},
+		               on=>"", off=>"", toggle=>"", pct=>"", stop=>"",
+					   press      => "[long|short] [on|off] ..."},
+  blindActuator    =>{ on=>"", off=>"", toggle=>"", pct=>"", stop=>"",
+					   press      => "[long|short] [on|off] ..."},
   remote           =>{ devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
   pushButton       =>{ devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
   threeStateSensor =>{ devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
@@ -2468,16 +2470,8 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
   } 
   elsif($cmd eq "toggle") { ###################################################
-    if($st eq "dimmer"){;
-	  CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
 	            (ReadingsVal($name,"state","on") eq "off" ?"C80000":"000000"));
-	}
-	else{
-      $hash->{toggleIndex} = 1 if(!$hash->{toggleIndex});
-      $hash->{toggleIndex} = (($hash->{toggleIndex}+1) % 128);
-      CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%s%02X",$flag,$id, 
-	                                  $dst,$dst, $chn, $hash->{toggleIndex}));                                     
-	}
   }
   elsif($cmd eq "lock") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF');	# LEVEL_SET
@@ -2800,37 +2794,39 @@ sub CUL_HM_Set($@) {
 	        if (hex($chNo) > $maxBtnNo);
 	}
   }
-  elsif($cmd eq "actiondetect"){################################################todo Updt3 remove
+  elsif($cmd eq "actiondetect"){###############################################todo Updt3 remove
     return "outdated - use attr <name> actCycle instead";
   }
   elsif($cmd eq "press") { ####################################################
-    my (undef,undef,$mode) = @a;
-    my ($srcId,$srcChn) = ($1,$2) if ($hash->{DEF} =~ m/(......)(..)/);
-	return "invalid channel:".$srcId.$srcChn if (!$srcChn);
-    my $rcvId = "000000"; #may have to change
-	my $btn = sprintf("%02X",$srcChn+(($mode && $mode eq "long")?64:0));
-	my $pressCnt = (!$hash->{helper}{count})?1:$hash->{helper}{count}+1;
-	$pressCnt %= 256;
+    my (undef,undef,$mode,$vChn) = @a;
+	my $pressCnt = (!$hash->{helper}{count}?1:$hash->{helper}{count}+1)%256;
+	$hash->{helper}{count}=$pressCnt;# remember for next round
+
 	my @peerList;
-	foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
-	  push (@peerList,substr($peer,0,6));
+	if ($st eq 'virtual'){#serve all peers of virtual button
+	  foreach my $peer (sort(split(',',AttrVal($name,"peerIDs","")))) {
+	    push (@peerList,substr($peer,0,6));
+	  }
+	  @peerList = CUL_HM_noDup(@peerList);
+	  push @peerList,'00000000' if (!@peerList);#send to broadcast if no peer
+	  foreach my $peer (sort @peerList){
+	    my $peerFlag = $peer eq '00000000'?'A4':
+	                                       CUL_HM_getFlag(CUL_HM_id2Hash($peer));
+	    $peerFlag =~ s/0/4/;# either 'A4' or 'B4'
+        CUL_HM_PushCmdStack($hash, sprintf("++%s40%s%s%02X%02X",
+	                   $peerFlag,$dst,$peer,
+					   $chn+(($mode && $mode eq "long")?64:0),
+					   $pressCnt));
+	  }
 	}
-	
-	my $oldPeer = " "; # only once to device, not channel!
-	foreach my $peer (sort @peerList){
-	  next if ($oldPeer eq $peer);
-
-	  my $peerHash = $modules{CUL_HM}{defptr}{$peer};
-	  my $peerSt = AttrVal($peerHash->{NAME}, "subType", "");
-	  my $peerFlag = ($peerSt ne "keyMatic") ? "A4" : "B4"; 
-      CUL_HM_PushCmdStack($hash, sprintf("++%s40%s%s%s%02X",
-	                 $peerFlag,$srcId,$peer,$btn,$pressCnt));
-	  $oldPeer = $peer;
+	else{#serve internal channels for actor
+	  my $pChn = $chn; # simple device, only one button per channel
+	  $pChn = (($vChn && $vChn eq "off")?-1:0) + $chn*2 if($st ne 'switch');
+      CUL_HM_PushCmdStack($hash, sprintf("++%s3E%s%s%s40%02X%02X",$flag,
+	                                  $id,$dst,$dst,
+                                     $pChn+(($mode && $mode eq "long")?64:0),
+									  $pressCnt));                                     
 	}
-
-	CUL_HM_PushCmdStack($hash, sprintf("++%s40%s000000%s%02X",
-	               $flag,$srcId,$btn,$pressCnt))if (!@peerList);
-	$hash->{helper}{count}=$pressCnt;
   } 
   elsif($cmd eq "devicepair") { ###############################################
     #devicepair <btnN> device ... [single|dual] [set|unset] [actor|remote|both]
@@ -3095,7 +3091,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   my ($msgId, $msgFlag,$msgType,$dst,$p) = ($2,hex($3),$4,$6,$7)
       if ($cmd =~ m/As(..)(..)(..)(..)(......)(......)(.*)/);
   my ($chn,$subType) = ($1,$2) if($p =~ m/^(..)(..)/); 
-  my $rTo = rand(20)/10+2; #default response timeout
+  my $rTo = rand(20)/10+4; #default response timeout
   if ($msgType eq "01" && $subType){ 
     if ($subType eq "03"){ #PeerList-------------
   	  #--- remember request params in device level
@@ -3231,7 +3227,6 @@ sub CUL_HM_respPendTout($) {
 }
 sub CUL_HM_respPendToutProlong($) {#used when device sends part responses
   my ($hash) =  @_;  
-
   RemoveInternalTimer("respPend:$hash->{DEF}");
   InternalTimer(gettimeofday()+1, "CUL_HM_respPendTout", "respPend:$hash->{DEF}", 0);
 }
@@ -4115,7 +4110,7 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
 					   
-  Log GetLogLevel($actHash->{NAME},3),"Device ".$devName." added to ActionDetector with "
+  Log 3,"Device ".$devName." added to ActionDetector with "
       .$cycleString." time";
   #run ActionDetector
   RemoveInternalTimer("ActionDetector");
@@ -4135,7 +4130,7 @@ sub CUL_HM_ActDel($) {# delete HMid for activity supervision
   my $peerIDs = $actHash->{helper}{peers};
   $peerIDs =~ s/$devId//g if($peerIDs); 
   $actHash->{helper}{peers} = CUL_HM_noDupInString($peerIDs);
-  Log GetLogLevel($actHash->{NAME},3),"Device ".$devName
+  Log 3,"Device ".$devName
                                      ." removed from ActionDetector";
   RemoveInternalTimer("ActionDetector");
   CUL_HM_ActCheck();
@@ -4195,7 +4190,7 @@ sub CUL_HM_ActCheck() {# perform supervision
 	if ($oldState ne $state){
 	  readingsSingleUpdate($devHash,"Activity:",$state,1);
 	  $attr{$devName}{actStatus} = $state;
-	  Log GetLogLevel($actName,4),"Device ".$devName." is ".$state;
+	  Log 4,"Device ".$devName." is ".$state;
 	}
     push @event, "status_".$devName.":".$state;
   }
@@ -4574,6 +4569,12 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 	      <ul><code>set &lt;name&gt; on-till 20:32:10<br></code></ul>
 	      Currently a max of 24h is supported with endtime.<br>
 		  </li>
+          <li><B>press &lt;[short|long]&gt;&lt;[on|off]&gt;</B><a name="CUL_HMpress"></a>
+		      simulate a press of the local button or direct connected switch of the actor.<br>
+			  [short|long] choose whether to simulate a short or long press of the button.<br>
+			  [on|off] is relevant only for devices with direct buttons per channel. 
+			  Those are available for dimmer and blind-actor, usually not for switches<br>
+		  </li>
           <li><B>toggle</B> - toggle the switch.</li>
        </ul>
      <br>
@@ -4589,6 +4590,7 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
              </li>
          <li><B>on</B> set level to 100%<br></li>
          <li><B>off</B> set level to 0%<br></li>
+         <li><B><a href="#CUL_HMpress">press &lt;[short|long]&gt;&lt;[on|off]&gt;</B></li>
          <li><B>toggle</B> - toggle between off and the last on-value</li>
          <li><B><a href="#CUL_HMonForTimer">on-for-timer &lt;sec&gt;</a></B> - Dimmer only! <br></li>
          <li><B><a href="#CUL_HMonForTimer">on-till &lt;time&gt;</a></B> - Dimmer only! <br></li>
