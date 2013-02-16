@@ -17,10 +17,6 @@ sub CUL_MAX_SendQueueHandler($);
 
 my $pairmodeDuration = 60; #seconds
 
-my $timeBroadcastInterval = 6*60*60; #= 6 hours, the same time that the cube uses
-
-my $resendRetries = 0; #how often resend before giving up?
-
 my $ackTimeout = 3; #seconds
 
 sub
@@ -458,6 +454,20 @@ CUL_MAX_BroadcastTime(@)
   my $payload = CUL_MAX_GetTimeInformationPayload();
   Log GetLogLevel($hash->{NAME}, 5), "CUL_MAX_BroadcastTime: payload $payload ";
   my $i = 1;
+
+  my @used_slots = ( 0, 0, 0, 0, 0, 0 );
+
+  # First, lookup all thermstats for their current TimeInformationHour
+  foreach my $addr (keys %{$modules{MAX}{defptr}}) {
+    my $dhash = $modules{MAX}{defptr}{$addr};
+    if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash
+          && $dhash->{type} =~ /.*Thermostat.*/ ) {
+
+      my $h = ReadingsVal($dhash->{NAME},"TimeInformationHour","");
+      $used_slots[$h]++ if( $h =~ /^[0-5]$/);
+    }
+  }
+
   foreach my $addr (keys %{$modules{MAX}{defptr}}) {
     my $dhash = $modules{MAX}{defptr}{$addr};
     #Check that
@@ -465,14 +475,24 @@ CUL_MAX_BroadcastTime(@)
     #2. the MAX device is a Wall/HeatingThermostat
     if(exists($dhash->{IODev}) && $dhash->{IODev} == $hash
     && $dhash->{type} =~ /.*Thermostat.*/ ) {
-      CUL_MAX_SendTimeInformation($hash, $addr, $payload);
+
+      my $h = ReadingsVal($dhash->{NAME},"TimeInformationHour",""); 
+      if( $h !~ /^[0-5]$/ ) {
+        #Find the used_slot with the smallest number of entries
+        $h = (sort { $used_slots[$a] cmp $used_slots[$b] } 0 .. 5)[0];
+        readingsSingleUpdate($dhash, "TimeInformationHour", $h, 1);
+        $used_slots[$h]++;
+      }
+
+      CUL_MAX_SendTimeInformation($hash, $addr, $payload) if( [gmtime()]->[2] % 6 == $h );
     }
     else {
       Log GetLogLevel($hash->{NAME}, 5), "Not sending to $addr, type $dhash->{type}, $dhash->{IODev}{NAME}"
     }
   }
 
-  InternalTimer(gettimeofday()+$timeBroadcastInterval, "CUL_MAX_BroadcastTime", $hash, 0) unless(defined($manual));
+  #Check again in 1 hour if some thermostats with the right TimeInformationHour need updating
+  InternalTimer(gettimeofday() + 3600, "CUL_MAX_BroadcastTime", $hash, 0) unless(defined($manual));
 }
 
 1;
