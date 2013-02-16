@@ -224,6 +224,15 @@ MAX_ParseWeekProfile(@) {
   readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 #############################
+
+sub
+MAX_WakeUp($)
+{
+  my $hash = @_[0];
+  #3F corresponds to 31 seconds wakeup (so its probably the lower 5 bits)
+  return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, "3F", callbackParam => "31" );
+}
+
 sub
 MAX_Set($@)
 {
@@ -413,10 +422,13 @@ MAX_Set($@)
     }
 
   } elsif($setting eq "wakeUp") {
-    return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, 0x3F);
+    return MAX_WakeUp($hash);
 
   } elsif($setting eq "weekProfile" and $hash->{type} =~ /.*Thermostat.*/) {
     return "Number of arguments must be even" if(@args%2 == 1);
+
+    #Send wakeUp, so we can send the weekprofile pakets without preamble
+    MAX_WakeUp($hash) if( @args > 2 );
 
     for(my $i = 0; $i < @args; $i += 2) {
       return "Expected day, got $args[$i]" if(!exists($decalcDaysInv{$args[$i]}));
@@ -694,6 +706,11 @@ MAX_Parse($$)
     } else {
       $shash->{ERROR} = join(",",$args[0]);
     }
+
+  } elsif($msgtype eq "AckWakeUp") {
+    my ($duration) = @args;
+    #substract five seconds safety margin
+    $shash->{wakeUpUntil} = gettimeofday() + $duration - 5;
 
   } elsif($msgtype eq "AckConfigWeekProfile") {
     my ($day, $part, $profile) = @args;
