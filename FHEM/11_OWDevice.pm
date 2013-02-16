@@ -581,7 +581,8 @@ OWDevice_Set($@)
           } else {
             RemoveInternalTimer($hash);
             $hash->{fhem}{interval}= $value;
-            InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0)
+            InternalTimer(int(gettimeofday())+$hash->{fhem}{interval}, "OWDevice_UpdateValues", $hash, 0);
+            return undef;
           }
         } else {
           return "Unknown argument $cmdname, choose one of interval " . join(" ", @setters);
