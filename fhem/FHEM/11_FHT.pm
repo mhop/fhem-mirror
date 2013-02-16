@@ -400,6 +400,13 @@ FHT_Parse($$)
   my $confirm = 0;
 
   if(!defined($modules{FHT}{defptr}{$dev})) {
+    # it might be our own FHT8v, then be silent
+    foreach my $d (%defs) {
+      my $dp = $defs{$d};
+      next if(!$dp->{TYPE} || $dp->{TYPE} ne "FHT8V");
+      return "" if($dp->{addr} eq $dev);
+    }
+
     Log 3, "FHT Unknown device $dev, please define it";
     return "UNDEFINED FHT_$dev FHT $dev";
   }
