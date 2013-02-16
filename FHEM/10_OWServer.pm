@@ -271,12 +271,16 @@ OWServer_Read($@)
     close WRITER;
     chomp(my $ret= <READER>);
     close READER;
-    return $ret;
   } else {
     my $ret= $hash->{fhem}{owserver}->read($path);
     $ret =~ s/^\s+//g if(defined($ret));
-    return $ret;
   }
+
+  if(!defined($ret)) {
+        delete($hash->{fhem}{owserver});
+        readingsSingleUpdate($hash,"state","DISCONNECTED",1);
+  }
+  return $ret;
 }
 
 #####################################
