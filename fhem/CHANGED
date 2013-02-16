@@ -72,7 +72,8 @@
   - feature: average supports more than one value in combined readings (T:x H:y)
   - feature: FHEMWEB serves arbitrary files from the www directory
   - feature: FB_checkPw now works with a distinct fritzbox user
-  
+  - bugfix:  floorplan-correction for readings with longpoll. Requires local change in css!
+  - feature: floorplan added js-extension from Dirk
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
