@@ -1,7 +1,7 @@
 package OWNet ;
 
 # OWNet module for perl
-# $Id: OWNet.pm,v 1.23 2012/07/17 01:54:09 alfille Exp $
+# $Id: OWNet.pm,v 1.24 2013/02/02 11:41:28 alfille Exp $
 #
 # Paul H Alfille -- copyright 2007
 # Part of the OWFS suite:
@@ -204,7 +204,7 @@ my $PERSISTENCE_BIT = 0x04 ;
 my $DEFAULT_SG = 0x100 + 0x2 + 0x8 ;
 my $DEFAULT_BLOCK_LENGTH = 33000 ;
 
-our $VERSION=(split(/ /,q[$Revision: 1.23 $]))[1] ;
+our $VERSION=(split(/ /,q[$Revision: 1.24 $]))[1] ;
 
 sub _new($$) {
 	my ($self,$addr) = @_ ;
@@ -346,8 +346,8 @@ sub _BonjourLookup($) {
 		$self->{SOCK} = undef ;
 	return ;
 	} ;
-	$self->{ADDR} = $self->{SOCK}->peeraddr ;
-	$self->{PORT} = $self->{SOCK}->peerport ;
+	$self->{ADDR} = $self->{SOCK}->peeraddr || return ;
+	$self->{PORT} = $self->{SOCK}->peerport || return ;
 	return 1 ;
 }
 
@@ -378,7 +378,7 @@ sub _FromServerBinaryParse($$) {
 	my $length_wanted = shift ;
 	return '' if $length_wanted == 0 ;
 
-	my $fileno = $self->{SOCK}->fileno ;
+	my $fileno = $self->{SOCK}->fileno  or return undef ;
 	my $selectreadbits = '' ;
 	vec($selectreadbits,$fileno,1) = 1 ;
 
