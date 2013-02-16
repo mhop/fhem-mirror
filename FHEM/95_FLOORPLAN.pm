@@ -32,6 +32,7 @@
 # 0021: fixed http-header, unsetting FF-autocomplete, added attribute fp_setbutton (fixes by Matthias) (November 23, 2012)
 # 0022: longpoll by Matthias Gehre (November 27, 2012)
 # 0023: longpoll updates readings also - by Matthias Gehre; FW_longpoll is now a global variable (January 21, 2013)
+# 0024: fix for readings longpoll, added js-extension from Dirk (February 16, 2013)
 #
 ################################################################
 #
@@ -336,6 +337,15 @@ FP_htmlHeader($) {
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/svg.js\"></script>"
                         if($FW_plotmode eq "SVG");
   FW_pO "<script type=\"text/javascript\" src=\"$FW_ME/js/fhemweb.js\"></script>";
+  # FW Extensions
+  if(defined($data{FWEXT})) {
+    foreach my $k (sort keys %{$data{FWEXT}}) {
+      my $h = $data{FWEXT}{$k};
+      next if($h !~ m/HASH/ || !$h->{SCRIPT});
+      FW_pO "<script type=\"text/javascript\" ".
+                "src=\"$FW_ME/js/$h->{SCRIPT}\"></script>";
+    }
+  }
   FW_pO "</head>\n";
 }
 #-------------------------------------------------------------------------------
@@ -440,8 +450,13 @@ FP_show(){
 
     ########################
     # Device-state per device
-	FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                             # For css: class=devicestate, id=devicename
-        $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                               # format FHT-temperature
+#	FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                             # For css: class=devicestate, id=devicename
+	if ($style == 3 || $style == 6) {
+	   FW_pO "<tr class=\"devicereading fp_$FP_name\" id=\"$d"."-$text\">";               # For css: class=devicereading, id=<devicename>-<reading>
+	  } else {
+	   FW_pO "<tr class=\"devicestate fp_$FP_name\" id=\"$d\">";                          # For css: class=devicestate, id=<devicename>
+	}
+    $txt =~ s/measured-temp: ([\.\d]*) \(Celsius\)/$1/;                               # format FHT-temperature
 	### use device-specific icons according to userattr fp_image or fp_<floorplan>.image
 	my $fp_image = AttrVal("$d", "fp_image", undef);                                      # floorplan-independent icon
         my $fp_fpimage = AttrVal("$d","fp_$FP_name".".image", undef);                     # floorplan-dependent icon
