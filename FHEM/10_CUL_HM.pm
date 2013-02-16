@@ -277,8 +277,9 @@ sub CUL_HM_updateConfig($){
   # it will also be called after each manual definition
   # Purpose is to parse attributes and read config
   my @getConfList;
-  while(@{$modules{CUL_HM}{helper}{updtCfgLst}}){
-    my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
+  my @nameList = CUL_HM_noDup(@{$modules{CUL_HM}{helper}{updtCfgLst}});
+  while(@nameList){
+    my $name = shift(@nameList);
     my $hash = CUL_HM_name2Hash($name);
 	if (CUL_HM_hash2Id($hash) ne $K_actDetID){# if not action detector
  	  CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
@@ -291,8 +292,8 @@ sub CUL_HM_updateConfig($){
 	
 	# convert variables, delete obsolete, move to hidden level
     $attr{$name}{".devInfo"} = $attr{$name}{devInfo} if ($attr{$name}{devInfo});
-#	delete $attr{$name}{devInfo};
-#	delete $attr{$name}{hmClass};
+	delete $attr{$name}{devInfo};
+	delete $attr{$name}{hmClass};
 
 	# add default web-commands
     my $webCmd;
@@ -1667,9 +1668,16 @@ sub CUL_HM_Attr(@) {#############################
     }
   }
   elsif($attrName eq "actCycle"){#"000:00" or 'off'
-    my $hmID = CUL_HM_name2Id($name);
-	return if ($hmID eq $K_actDetID);
-    return CUL_HM_ActAdd($hmID,$attrVal);
+    return if (CUL_HM_name2Id($name) eq $K_actDetID);
+	# Add to ActionDetector. Wait a little - config might not be finished
+    my @arr;
+    if(!$modules{CUL_HM}{helper}{updtCfgLst}){
+      $modules{CUL_HM}{helper}{updtCfgLst} = \@arr;
+    }
+    push(@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name);
+
+	RemoveInternalTimer("updateConfig");
+    InternalTimer(gettimeofday()+5,"CUL_HM_updateConfig", "updateConfig", 0);
   }
   return;
 }
@@ -4109,7 +4117,6 @@ sub CUL_HM_ActAdd($$) {# add an HMid to list for activity supervision
   $actHash->{helper}{peers} = CUL_HM_noDupInString(
                        ($actHash->{helper}{peers}?$actHash->{helper}{peers}:"")
                        .",$devId");
-					   
   Log 3,"Device ".$devName." added to ActionDetector with "
       .$cycleString." time";
   #run ActionDetector
