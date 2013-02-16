@@ -315,7 +315,6 @@ CUL_MAX_Send(@)
 {
   # $cmd is one of
   my ($hash, $cmd, $dst, $payload, %opts) = @_;
-  CUL_MAX_Check($hash);
 
   my $flags = "00";
   my $groupId = "00";
@@ -378,11 +377,17 @@ CUL_MAX_SendQueueHandler($)
   my $packet = $hash->{sendQueue}[0];
 
   if( $packet->{sent} == 0 ) { #Need to send it first
+    #We can use fast sending without preamble on culfw 1.53 and higher when the devices has been woken up
+    my $needPreamble = ((CUL_MAX_Check($hash) < 153)
+      || !defined($modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil})
+      || $modules{MAX}{defptr}{$packet->{dst}}{wakeUpUntil} < gettimeofday()) ? 1 : 0;
+
     #Send to CUL
     my ($credit10ms) = (CommandGet("","$hash->{IODev}{NAME} credit10ms") =~ /[^ ]* [^ ]* => (.*)/);
     # We need 1000ms for preamble + len in bits (=hex len * 4) ms for payload. Divide by 10 to get credit10ms units
     # keep this in sync with culfw's code in clib/rf_moritz.c!
-    my $necessaryCredit = ceil(100 + (length($packet->{packet})*4)/10);
+    my $necessaryCredit = ceil(100*$needPreamble + (length($packet->{packet})*4)/10);
+    Log 5, "needPreamble: $needPreamble, necessaryCredit: $necessaryCredit, credit10ms: $credit10ms";
     if( defined($credit10ms) && $credit10ms < $necessaryCredit ) {
       my $waitTime = $necessaryCredit-$credit10ms; #we get one credit10ms every second
       $timeout += $waitTime;
@@ -395,7 +400,8 @@ CUL_MAX_SendQueueHandler($)
         Log GetLogLevel($hash->{NAME}, 5), "Updating TimeInformation payload";
         substr($packet->{packet},22) = CUL_MAX_GetTimeInformationPayload();
       }
-      IOWrite($hash, "", "Zs". $packet->{packet});
+      IOWrite($hash, "", ($needPreamble ? "Zs" : "Zf") . $packet->{packet});
+
       $packet->{sent} = 1;
       $packet->{sentTime} = gettimeofday();
       $timeout += 0.5; #recheck for Ack
