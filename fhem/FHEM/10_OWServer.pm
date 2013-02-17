@@ -314,6 +314,7 @@ OWServer_Find($@)
   my ($hash,$slave)= @_;
   my $owserver= $hash->{fhem}{owserver};
 
+  return undef unless(defined($hash->{fhem}{owserver}));
   my @dir= split(",",$owserver->dir("/"));
   my $path= undef;
   for my $entry (@dir) {
