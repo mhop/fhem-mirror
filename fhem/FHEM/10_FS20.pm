@@ -199,7 +199,7 @@ FS20_Set($@)
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
   my $v = join(" ", @a);
-  Log GetLogLevel($name,2), "FS20 set $v";
+  Log GetLogLevel($name,4), "FS20 set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   my $val;
@@ -389,7 +389,7 @@ FS20_Parse($$)
       return "" if(IsIgnored($n));   # Little strange.
 
       readingsSingleUpdate($lh, "state", $v, 1);
-      Log GetLogLevel($n,2), "FS20 $n $v";
+      Log GetLogLevel($n,4), "FS20 $n $v";
 
       if($modules{FS20}{ldata}{$n}) {
         CommandDelete(undef, $n . "_timer");
