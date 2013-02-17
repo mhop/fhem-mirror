@@ -38,7 +38,7 @@ sub GPIO4_Initialize($) {
 	$hash->{UndefFn}	 = "GPIO4_Undef";
 	$hash->{NotifyFn}	 = "GPIO4_Notify";
 	$hash->{GetFn}		 = "GPIO4_Get";
-	$hash->{AttrList}	 = "tempOffset pollingInterval model loglevel:0,1,2,3,4,5,6";	
+	$hash->{AttrList}	 = "tempOffset pollingInterval model loglevel:0,1,2,3,4,5,6 ".$readingFnAttributes;
 }
 
 sub GPIO4_Notify($$) {
@@ -135,10 +135,9 @@ sub GPIO4_Get($) {
 		if ($attr{$hash->{NAME}}{tempOffset}) {
 			$temp+=$attr{$hash->{NAME}}{tempOffset};
 		}
-		my $tempstr = sprintf("%.1f",$temp);
 		readingsBeginUpdate($hash);
-		readingsBulkUpdate($hash,"state","T: $tempstr");
-		readingsBulkUpdate($hash,"temperature",$tempstr);
+		readingsBulkUpdate($hash,"state","T: $temp");
+		readingsBulkUpdate($hash,"temperature",$temp);
 		readingsEndUpdate($hash,1);
 	}
 	else {
@@ -187,6 +186,7 @@ sub GPIO4_Undef($) {
   <ul>
     <li><a href="#pollingInterval">pollingInterval</a></li>
     <li><a href="#tempOffest">tempOffset</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
@@ -221,6 +221,7 @@ sub GPIO4_Undef($) {
   <ul>
     <li><a href="#pollingInterval">pollingInterval</a></li>
     <li><a href="#tempOffest">tempOffset</a></li>
+    <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
   </ul>
   <br>
 </ul>
