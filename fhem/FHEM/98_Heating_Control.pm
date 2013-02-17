@@ -95,13 +95,13 @@ Heating_Control_Define($$)
   }
 
   for(my $i=0; $i<@a; $i++) {
-    #prÃ¼fen auf Angabe eines Schaltpunktes
+    #prüfen auf Angabe eines Schaltpunktes
     my @t = split(/\|/, $a[$i]);
     my $anzahl = @t;
     if ( $anzahl ~~ [2,3]) {
       push(@switchingtimes, $a[$i]);
     } else { 
-      #der Rest ist das auzufÃ¼hrende Kommando/condition
+      #der Rest ist das auzuführende Kommando/condition
       $conditionOrCommand = trim(join(" ", @a[$i..@a-1]));
       last; 
     }
@@ -145,13 +145,13 @@ Heating_Control_Define($$)
        $dayNumber{$day} = $idx; $idx++;
     }
 
-    #AufzÃ¤hlung 1234 ...
+    #Aufzählung 1234 ...
     if (      $daylist =~  m/^(\d){0,7}$/g) {
 
         @days = split("", $daylist);
         @hdays{@days}=1;
 
-    # AufzÃ¤hlung Sa,So,... | Mo-Di,Do,Fr-Mo
+    # Aufzählung Sa,So,... | Mo-Di,Do,Fr-Mo
     } elsif ($daylist =~  m/^($daysRegExp(,|-|$)){0,7}$/g   ) {
 
       my $oldDay, my $oldDel;
@@ -193,19 +193,23 @@ Heating_Control_Define($$)
     }
   }
 
-  # Profile sortiert aufbauen
-  for (my $d=1; $d<=7; $d++) {
-    foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$d} })) {
-      my $temp = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
-      $hash->{"PROFILE ".($d).": ".$Wochentage[$d-1]} .= sprintf("%s: %.1fÂ°C, ", $st, $temp);
-    }
-  }
-
-  #desired-temp des Zieldevices auswÃ¤hlen
+  #desired-temp des Zieldevices auswählen
   if($defs{$device}{TYPE} eq "MAX") {
     $hash->{helper}{DESIRED_TEMP_READING} = "desiredTemperature"
   } else {
     $hash->{helper}{DESIRED_TEMP_READING} = "desired-temp";
+  }
+
+  $hash->{helper}{UNIT} = "Â°C";
+
+  my $unit = $hash->{helper}{UNIT};
+
+  # Profile sortiert aufbauen
+  for (my $d=1; $d<=7; $d++) {
+    foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$d} })) {
+      my $temp = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
+      $hash->{"PROFILE ".($d).": ".$Wochentage[$d-1]} .= sprintf("%s: %.1f%s, ", $st, $temp, $unit);
+    }
   }
 
   my $now    = time();
@@ -288,6 +292,7 @@ Heating_Control_Update($)
   }
 
   my $name = $hash->{NAME};
+  my $unit = $hash->{helper}{UNIT};
   my $command;
   
   Log $loglevel, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
@@ -315,8 +320,8 @@ Heating_Control_Update($)
   InternalTimer($nextSwitch, "Heating_Control_Update", $hash, 0);
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
-  readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature . "Â°C");
-  readingsBulkUpdate ($hash,  "state",      $newDesTemperature  . "Â°C");
+  readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature . $unit);
+  readingsBulkUpdate ($hash,  "state",      $newDesTemperature  . $unit);
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
   
   return 1;
@@ -337,6 +342,7 @@ sub SortNumber {
 =begin html
 
 <a name="Heating_Control"></a>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
 <h3>Heating Control</h3>
 <ul>
   <br>
@@ -388,14 +394,14 @@ sub SortNumber {
     <b>Example:</b>
     <ul>
         <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|12 17:20|21 17:25|12</code><br>
-        Mo-Fr are setting the temperature at 05:20 to 21°C, and at 05:25 to 12°C.
-        Every day will be set the temperature at 17:20 to 21°C and 17:25 to 12°C.<p>
+        Mo-Fr are setting the temperature at 05:20 to 21&deg;C, and at 05:25 to 12&deg;C.
+        Every day will be set the temperature at 17:20 to 21&deg;C and 17:25 to 12&deg;C.<p>
 
-        <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Do-Fr|16:00|18.5 20:00|12
+        <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Tu,Th-Fr|16:00|18.5 20:00|12
           {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
         At the given times and weekdays only(!) the command will be executed.<p>
 
-        <code>define HCW Heating_Control WZ_Heizung Sa-So,Mi|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
+        <code>define HCW Heating_Control WZ_Heizung Sa-Su,We|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
         The temperature is only set if the dummy variable WeAreThere is "yes".<p>
     </ul>
   </ul>
@@ -421,6 +427,7 @@ sub SortNumber {
 =begin html_DE
 
 <a name="Heating_Control"></a>
+<meta content="text/html; charset=ISO-8859-1" http-equiv="content-type">
 <h3>Heating Control</h3>
 <ul>
   <br>
@@ -430,12 +437,12 @@ sub SortNumber {
     <code>define &lt;name&gt; Heating_Control &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
-    Bildet ein Wochenprofil für ein &lt;device&gt;, zb. Heizkörper, ab. Es können für jeden Tag unterschiedliche 
-    Schaltzeiten angegeben werden. Ist das &lt;device&gt; ein Heizkörperthermostat (zb. FHT8b, MAX) so wird die 
+    Bildet ein Wochenprofil f&uumlr ein &lt;device&gt;, zb. Heizk&oumlrper, ab. Es k&oumlnnen f&uumlr jeden Tag unterschiedliche
+    Schaltzeiten angegeben werden. Ist das &lt;device&gt; ein Heizk&oumlrperthermostat (zb. FHT8b, MAX) so wird die
     zu setzende Temperatur im &lt;profile&gt; automatisch mittels <code>set &lt;device&gt; desired-temp &lt;temp&gt;</code>
     dem Device mitgeteilt. Ist eine &lt;condition&gt; angegeben und ist zum Schaltpunkt der Ausdruck unwahr, 
-    so wird dieser Schaltpunkt nicht ausgeführt.<br>
-    Alternativ zur Automatik kann stattdessen eigener Perl-Code im &lt;command&gt; ausgeführt werden.
+    so wird dieser Schaltpunkt nicht ausgef&uumlhrt.<br>
+    Alternativ zur Automatik kann stattdessen eigener Perl-Code im &lt;command&gt; ausgef&uumlhrt werden.
     <p>
     Folgende Parameter sind im Define definiert:
     <ul><b>device</b><br> 
@@ -446,8 +453,8 @@ sub SortNumber {
       Angabe des Wochenprofils. Die einzelnen Schaltzeiten sind durch Leerzeichen getrennt
       Die Angabe der Schaltzeiten ist nach folgendem Muster definiert:<br>
       <ul><b>[&lt;Wochentage&gt;|]&lt;Uhrzeit&gt;|&lt;Temperatur&gt;</b></ul><br>
-      <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgeführt.
-        Für die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
+      <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgef&uumlhrt.
+        F&uumlr die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
         Tagesnummer (Mo=1, ..., So=7) oder Name des Tages (Mo, Di, ..., So) einzusetzen.<br>
       <u>Uhrzeit:</u>Angabe der Uhrzeit an dem geschaltet werden soll, Format: HH:MM(HH im 24 Stunden format)<br>
       <u>Temperatur:</u>Angabe der zu setzenden Temperatur als Zahl<br>
@@ -457,7 +464,7 @@ sub SortNumber {
       Falls keine Condition in () angegeben wurde, so wird alles weitere als Command
       interpretiert. Perl-Code ist in {} zu setzen. <br>
       Wichtig: Falls ein Command definiert ist, so wird zu den definierten Schaltzeiten 
-      nur(!) das Command ausgeführt. Falls ein desired-temp Befehl abgesetzt werde soll, 
+      nur(!) das Command ausgef&uumlhrt. Falls ein desired-temp Befehl abgesetzt werde soll,
       so muss dies explizit angegeben werden.<br>
       Folgende Parameter werden ersetzt:<br>
         <ol>
@@ -468,19 +475,19 @@ sub SortNumber {
     <p>
     <ul><b>condition</b><br> 
       Bei Angabe einer Condition ist diese in () zu setzen und mit validem Perl-Code zu versehen.<br>
-      Der Rückgabedatentyp der condition muss boolean sein.<br> 
+      Der R&uumlckgabedatentyp der condition muss boolean sein.<br>
       Die Parameter @ und  % werden interpretiert.
     </ul>
     <p>
     <b>Beispiel:</b>
     <ul>
         <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|12 17:20|21 17:25|12</code><br>
-        Mo-Fr wird die Temperatur um 05:20Uhr auf 21°C, und um 05:25Uhr auf 12°C gesetzt. 
-        Jeden Tag wird die Temperatur um 17:20Uhr auf 21°C und 17:25Uhr auf 12°C gesetzt.<p>
+        Mo-Fr wird die Temperatur um 05:20Uhr auf 21&deg;C, und um 05:25Uhr auf 12&deg;C gesetzt.
+        Jeden Tag wird die Temperatur um 17:20Uhr auf 21&deg;C und 17:25Uhr auf 12&deg;C gesetzt.<p>
 
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Mi|16:00|18.5 20:00|12
           {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
-        Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgeführt.<p>
+        Zu den definierten Schaltzeiten wird nur(!) der in {} angegebene Perl-Code ausgef&uumlhrt.<p>
 
         <code>define HCW Heating_Control WZ_Heizung Sa-So,Mi|08:00|21 (ReadingsVal("WeAreThere", "state", "no") eq "yes")</code><br>
         Die zu setzende Temperatur wird nur gesetzt, falls die Dummy Variable WeAreThere = "yes" ist.<p>
