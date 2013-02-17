@@ -27,7 +27,7 @@ dummy_Set($@)
   return "Unknown argument ?, choose one of $setList" if($a[0] eq "?");
 
   my $v = join(" ", @a);
-  Log GetLogLevel($name,2), "dummy set $name $v";
+  Log GetLogLevel($name,4), "dummy set $name $v";
 
   readingsSingleUpdate($hash,"state",$v,1);
   return undef;
