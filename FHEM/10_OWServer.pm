@@ -169,9 +169,8 @@ OWServer_CloseDev($)
   my $name = $hash->{NAME};
 
   return unless(defined($hash->{fhem}{owserver}));
-  DoTrigger($name, "DISCONNECTED");
   delete $hash->{fhem}{owserver};
-
+  readingsSingleUpdate($hash, "state", "DISCONNECTED", 1);
 }
 
 ########################
@@ -183,15 +182,13 @@ OWServer_OpenDev($)
 
   OWServer_CloseDev($hash);
   my $protocol= $hash->{fhem}{protocol};
-  Log 4, "$name: Opening connection to OWServer $protocol...";
+  Log 3, "$name: Opening connection to OWServer $protocol...";
   my $owserver= OWNet->new($protocol);
   if($owserver) {
-    Log 4, "$name: Successfully connected to $protocol.";
+    Log 3, "$name: Successfully connected to $protocol.";
     $hash->{fhem}{owserver}= $owserver;
-    DoTrigger($name, "CONNECTED") if($owserver);
-    $hash->{STATE}= "";       # Allow InitDev to set the state
+    readingsSingleUpdate($hash, "state", "CONNECTED", 1);
     my $ret  = OWServer_DoInit($hash);
-    
   }
   return $owserver
 }
@@ -223,7 +220,6 @@ OWServer_DoInit($)
 {
   my $hash = shift;
   my $name = $hash->{NAME};
-  $hash->{STATE} = "Initialized" if(!$hash->{STATE});
 
   my $owserver= $hash->{fhem}{owserver};
   foreach my $reading (sort keys %gets) {
@@ -231,7 +227,7 @@ OWServer_DoInit($)
     readingsBulkUpdate($hash,"$reading",$owserver->read("$reading"));
     readingsEndUpdate($hash,1);
   }
-
+  readingsSingleUpdate($hash, "state", "Initialized", 1);
   OWServer_Autocreate($hash) if($init_done);
   return undef;
 }
@@ -243,6 +239,8 @@ OWServer_Read($@)
   my ($hash,$path)= @_;
 
   return undef unless(defined($hash->{fhem}{owserver}));
+
+  my $ret= undef;
 
   if(AttrVal($hash->{NAME},"nonblocking",undef) && $init_done) {
     $hash->{".path"}= $path;
@@ -258,7 +256,7 @@ OWServer_Read($@)
     InternalTimer(gettimeofday()+20, "OWServer_TimeoutChild", $pid, 0);
     if($pid == 0) {
       close READER;
-      my $ret= OWNet::read($hash->{DEF},$path);
+      $ret= OWNet::read($hash->{DEF},$path);
       $ret =~ s/^\s+//g if(defined($ret));
       Log 5, "OWServer child read $path: $ret";
       delete $hash->{".path"};
@@ -269,17 +267,14 @@ OWServer_Read($@)
 
     Log 5, "OWServer child ID for reading '$path' is $pid";
     close WRITER;
-    chomp(my $ret= <READER>);
+    chomp($ret= <READER>);
     close READER;
   } else {
-    my $ret= $hash->{fhem}{owserver}->read($path);
+    $ret= $hash->{fhem}{owserver}->read($path);
     $ret =~ s/^\s+//g if(defined($ret));
   }
 
-  if(!defined($ret)) {
-        delete($hash->{fhem}{owserver});
-        readingsSingleUpdate($hash,"state","DISCONNECTED",1);
-  }
+  if(!defined($ret)) { OWServer_CloseDev($hash); }
   return $ret;
 }
 
@@ -466,10 +461,11 @@ OWServer_Set($@)
         # usage check
         #my $usage= "Usage: set $name classdef <classname> <filename> OR set $name reopen";
         my $usage= "Unknown argument $a[1], choose one of reopen ".join(" ", sort keys %sets);
-        return $usage if($a[1] ne "reopen " && !defined($sets{$a[1]}));
+        return $usage if($a[1] ne "reopen" && !defined($sets{$a[1]}));
 
         if((@a == 2) && ($a[1] eq "reopen")) {
-                return OWServer_OpenDev($hash);
+                OWServer_OpenDev($hash);
+                return undef;
         } elsif(@a == 3) {
           my $cmd= $a[1];
           my $value= $a[2];
