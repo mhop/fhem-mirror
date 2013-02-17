@@ -1,8 +1,8 @@
 - SVN
   - feature: new Module 32_SYSSTAT to monitor system load and disk usage
              on linux FHEM hosts (by justme1968)
-  - feature: new Module 73_PRESENCE to make automatic presence detection of mobile
-             phones or other mobile devices (like tablets) via ping or 
+  - feature: new Module 73_PRESENCE to make automatic presence detection of
+             mobile phones or other mobile devices (like tablets) via ping or
              bluetooth checks (by M. Bloch)
   - feature: new Module 98_Heating_Control to switch heatsinks automaticly
              with a weekly profile (by D. Ortmann / T. Faust)
@@ -55,7 +55,8 @@
              OWFS
   - feature: stateFormat (readingsFn modules) and showInternalValues attributes
   - feature: new readingsFn modules: FS20 CUL_WS HMS CUL_EM CUL_TX EnOcean ZWave
-  - change:  BS, USF1000, ECMDDevice, Weather, dummy migrated to readingsFN (Boris)
+  - change:  BS, USF1000, ECMDDevice, Weather, dummy migrated to readingsFN
+             (Boris)
   - feature: telnet client mode
   - bugfix:  FHEMWEB longpoll misses initial state change (HM: set_on vs. on)
   - change:  20_OWFS.pm, 21_OWTEMP modules flagged as "deprecated". These
@@ -72,7 +73,8 @@
   - feature: average supports more than one value in combined readings (T:x H:y)
   - feature: FHEMWEB serves arbitrary files from the www directory
   - feature: FB_checkPw now works with a distinct fritzbox user
-  - bugfix:  floorplan-correction for readings with longpoll. Requires local change in css!
+  - bugfix:  floorplan-correction for readings with longpoll. Requires local
+             change in css!
   - feature: floorplan added js-extension from Dirk
 
 - 2012-10-28 (5.3)
