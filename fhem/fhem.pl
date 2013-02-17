@@ -1142,12 +1142,13 @@ DoSet(@)
   my ($ret, $skipTrigger) = CallFn($dev, "SetFn", $hash, @a);
   return $ret if($ret);
   return undef if($skipTrigger);
-  shift @a;
 
   # Backward compatibility. Use readingsUpdate in SetFn now
   if(!$doTriggerCalled) {
+    shift @a;
+    # set arg if the module did not triggered events
     my $arg = join(" ", @a) if(!$hash->{CHANGED} || !int(@{$hash->{CHANGED}}));
-    DoTrigger($dev, $arg, 1);
+    DoTrigger($dev, $arg, 0);
   }
 
   return undef;
@@ -1404,7 +1405,7 @@ CommandDeleteAttr($$)
     
     if($a[1] eq "userReadings") {
       #Debug "Deleting userReadings for $sdev";
-      delete($defs{$sdev}{fhem}{'.userReadings'});
+      delete($defs{$sdev}{'.userReadings'});
     }
 
     $ret = CallFn($sdev, "AttrFn", "del", @a);
@@ -1830,7 +1831,7 @@ CommandAttr($$)
         }
         $arg= defined($7) ? $7 : "";
       }
-      $hash->{fhem}{'.userReadings'}= \%userReadings;
+      $hash->{'.userReadings'}= \%userReadings;
     } 
 
     if($a[1] eq "IODev" && (!$a[2] || !defined($defs{$a[2]}))) {
@@ -3055,8 +3056,8 @@ readingsEndUpdate($$)
   my $name = $hash->{NAME};
 
   # process user readings
-  if(defined($hash->{fhem}{'.userReadings'})) {
-    my %userReadings= %{$hash->{fhem}{'.userReadings'}};
+  if(defined($hash->{'.userReadings'})) {
+    my %userReadings= %{$hash->{'.userReadings'}};
     foreach my $userReading (keys %userReadings) {
       my $modifier= $userReadings{$userReading}{modifier};
       my $perlCode= $userReadings{$userReading}{perlCode};
@@ -3084,9 +3085,9 @@ readingsEndUpdate($$)
       } 
       readingsBulkUpdate($hash,$userReading,$result,1) if(defined($result));
       # store value
-      $hash->{fhem}{'.userReadings'}{$userReading}{TIME}= $hash->{".updateTimestamp"};
-      $hash->{fhem}{'.userReadings'}{$userReading}{t}= $hash->{".updateTime"};
-      $hash->{fhem}{'.userReadings'}{$userReading}{value}= $value;
+      $hash->{'.userReadings'}{$userReading}{TIME}= $hash->{".updateTimestamp"};
+      $hash->{'.userReadings'}{$userReading}{t}= $hash->{".updateTime"};
+      $hash->{'.userReadings'}{$userReading}{value}= $value;
     }
   }
   evalStateFormat($hash);
@@ -3100,7 +3101,7 @@ readingsEndUpdate($$)
 
   # propagate changes
   if($dotrigger && $init_done) {
-    DoTrigger($name, undef, 1) if(!$readingsUpdateDelayTrigger);
+    DoTrigger($name, undef, 0) if(!$readingsUpdateDelayTrigger);
   } else {
     delete($hash->{CHANGED});
   }
