@@ -31,14 +31,14 @@
 #  attr    emx CostM
 #
 #  Cost rate during daytime (€ per kWh) 
-#  attr    emx CrateD      <cost rate in €/unit>
+#  attr    emx CostD      <cost rate in €/unit>
 #  
 #  Start and end of daytime cost rate - optional
-#  attr    emx CrateDStart <time as hh:mm>
-#  attr    emx CrateDEnd   <time as hh:mm>
+#  attr    emx CostDStart <time as hh:mm>
+#  attr    emx CostDEnd   <time as hh:mm>
 #  
 #  Cost rate during nighttime (cost per unit) - only if needed
-#  attr    emx CrateN      <cost rate in €/unit>
+#  attr    emx CostN      <cost rate in €/unit>
 #
 ########################################################################################
 #
@@ -108,7 +108,7 @@ sub EMX_Initialize ($) {
   $hash->{Match}     = "^E0.................\$";
 
   $hash->{AttrList}  = "IODev " .
-                       "model:EMEM,EMWZ,EMGZ loglevel LogM LogY CrateD CrateDStart CrateDEnd CrateN CostM ".
+                       "model:EMEM,EMWZ,EMGZ loglevel LogM LogY CostD CDStart CDEnd CostN CostM ".
                        $readingFnAttributes;
 }
 
@@ -159,9 +159,6 @@ sub EMX_Define ($$) {
     return "EMX_Define $a[0]: wrong CODE format: valid is 1-12 or \"emulator\""
       if(  $a[2] !~ m/^\d+$/ || $a[2] < 1 || $a[2] > 12  );   
     $hash->{CODE} = $a[2];
-    
-    #-- TODO: check for consistency of attributes !
-    
     
     #--counts per unit etc.
     if($a[2] >= 1 && $a[2] <= 4) {          # EMWZ      
@@ -223,7 +220,7 @@ sub EMX_InitializeDevice ($) {
   Log 1, $ret
     if( defined($ret));
   return $ret
-    if( defined($ret));
+    if( defined($ret));  
   
   return undef;
 }
@@ -244,7 +241,7 @@ sub EMX_FormatValues ($) {
   my $name    = $hash->{NAME}; 
   my ($model,$factor,$period,$unit,$runit,$midnight,$cval,$vval,$rval,$pval,$dval,$deltim,$delcnt,$msg);
   my ($svalue,$dvalue,$mvalue) = ("","","");
-  my $cost;
+  my $cost = 0;
 
   my ($sec, $min, $hour, $day, $month, $year, $wday,$yday,$isdst) = localtime(time);
   my ($seco,$mino,$houro,$dayo,$montho,$yearo,$dayrest);
@@ -295,7 +292,6 @@ sub EMX_FormatValues ($) {
   }else {     
     #-- put into READINGS
     readingsBeginUpdate($hash);
-    readingsBulkUpdate($hash,"count",$emx_cnt);
     $svalue = "raw $emx_cnt";
     
     #-- get the old values (raw counts, always integer)
@@ -333,7 +329,7 @@ sub EMX_FormatValues ($) {
       #-- Translate from device into physical units
       #   $factor = no. of counts per unit
       #   $emx_peak has to be divided by 20 = 60 min/ 5 min
-      if( $model eq "EMWZ" ){
+      if( ($model eq "EMWZ") || ($model eq "emulator") ){
         $vval      = int($cval/$factor*1000)/1000;
         $rval      = int($emx_5min*12/$factor*1000)/1000;
         $pval      = int($emx_peak/($factor*20)*1000)/1000;
@@ -348,28 +344,61 @@ sub EMX_FormatValues ($) {
       } else {
         Log 3,"EMX: Wrong device model $model";
       }
-      $svalue = sprintf("W: %5.2f %s P: %5.2f %s Pmax: %5.3f %s",$vval,$unit,$rval,$runit,$pval,$runit);
+    
       #-- calculate cost
-      if( defined($main::attr{$name}{"CrateD"}) ){
+      if( defined($main::attr{$name}{"CostD"}) ){
         #-- single rate counter
-        if( !defined($main::attr{$name}{"CrateN"}) ){
-          $cost = $vval*$main::attr{$name}{"CrateD"};
+        if( !defined($main::attr{$name}{"CostN"}) ){
+          $cost = $vval*$main::attr{$name}{"CostD"};
         #-- dual rate counter
         }else{
           #--determine period 1 = still night, 2 = day, 3 = night again
-          my @crs=split(':',$main::attr{$name}{"CrateDStart"});
-          my @crs=split(':',$main::attr{$name}{"CrateDEnd"});
+          my @crs  = split(':',$main::attr{$name}{"CDStart"});
+          my @cre  = split(':',$main::attr{$name}{"CDEnd"});
+          my @tim  = split(/[- :]/,$emx_cnt_tim);
+          #-- if one of them fails, we switch to single rate mode
+          if( (int(@crs) ne 2) || (int(@cre) ne 2) ){
+            $cost = $vval*$main::attr{$name}{"CostD"};
+            delete $main::attr{$name}{"CostN"};
+            Log 3,"EMX: $name has improper cost rate time specification";
+          } else {
           #-- period 1
-          if ( ($hour<=$crs[0]) & ($min<$crs[1]) ){
-          #-- period 2
-          }elsif ( ($hour<=$crs[0]) & ($min<$crs[1]) ){
-          #-- period 3
-          }else{
+            if ( (($hour-$crs[0])*60 + $min-$crs[1])<0 ){
+              $cost = $vval*$main::attr{$name}{"CostN"};
+            #-- period 2
+            }elsif ( (($hour-$cre[0])*60 + $min-$cre[1])<0  ){
+              my $delta  =  ($tim[3]-$crs[0])*60 + ($tim[4]-$crs[1]) + $tim[5]/60.0;
+              my $oldval =  $hash->{READINGS}{"reading"}{VAL};
+              #-- previous measurement was in period 1
+              if( $delta < 0 ){
+                $cost = $hash->{READINGS}{"cost"}{VAL} +
+                        $main::attr{$name}{"CostN"}*($vval-$oldval)*(1+$delta/5.0)+
+                        $main::attr{$name}{"CostD"}*($vval-$oldval)*(-$delta/5.0);
+              } else{
+                $cost = $hash->{READINGS}{"cost"}{VAL} + $main::attr{$name}{"CostD"}*($vval-$oldval);
+              }  
+            #-- period 3
+            }else{
+              my $delta  =  ($tim[3]-$cre[0])*60 + ($tim[4]-$cre[1]) +$tim[5]/60.0;
+              my $oldval =  $hash->{READINGS}{"reading"}{VAL};
+              #-- previous measurement was in period 2
+              if( $delta < 0 ){
+                $cost = $hash->{READINGS}{"cost"}{VAL} +
+                        $main::attr{$name}{"CostD"}*($vval-$oldval)*(1+$delta/5.0)+
+                        $main::attr{$name}{"CostN"}*($vval-$oldval)*(-$delta/5.0);
+              } else{
+                $cost = $hash->{READINGS}{"cost"}{VAL} + $main::attr{$name}{"CostN"}*($vval-$oldval);
+              }     
+            }
           }
         }
+        $cost = floor($cost*10000+0.5)/10000;
       }
       
+      #-- state format
+      $svalue = sprintf("W: %5.2f %s P: %5.2f %s Pmax: %5.3f %s",$vval,$unit,$rval,$runit,$pval,$runit);
       #-- put into READING
+      readingsBulkUpdate($hash,"count",$emx_cnt);
       readingsBulkUpdate($hash,"reading",$vval);
       readingsBulkUpdate($hash,"rate",$rval);
       readingsBulkUpdate($hash,"peak",$pval);
@@ -377,9 +406,9 @@ sub EMX_FormatValues ($) {
  
       #-- Daily/monthly accumulated value
       if( $daybreak == 1 ){
-        my @month = EMX_GetMonth($hash);
-        my $total = $month[0]+$vval;
-        $dvalue = sprintf("D_%02d Wd: %5.2f Wm: %6.2f",$day,$vval,$total);
+        my @monthv = EMX_GetMonth($hash);
+        my $total = $monthv[0]+$vval;
+        $dvalue = sprintf("D_%02d Wd: %5.2f Wm: %6.2f Cd: %5.2f €",$day,$vval,$total,int($cost*100)/100);
         readingsBulkUpdate($hash,"day",$dvalue);
         if( $monthbreak == 1){
           $mvalue = sprintf("M_%02d Wm: %6.2f",$month,$total);
@@ -793,6 +822,21 @@ sub EMX_emu ($$) {
             <li><a name="emx_logy"><code>attr &lt;name&gt; &lt;LogY&gt;
                         &lt;string&gt;</code></a>
                 <br />Device name (<i>not file name</i>) of the yearly logfile </li>
+               <li><a name="emx_costm"><code>attr &lt;name&gt; &lt;CostM&gt;
+                        &lt;float&gt;</code></a>
+                <br />Cost per month</li>
+                <li><a name="emx_costd"><code>attr &lt;name&gt; &lt;CostD&gt;
+                        &lt;float&gt;</code></a>
+                <br />Cost per unit (during daytime, when the following attributes are given)</li>
+                <li><a name="emx_costn"><code>attr &lt;name&gt; &lt;CostN&gt;
+                        &lt;float&gt;</code></a>
+                <br />Cost per unit during night time</li>
+                <li><a name="emx_cdstart"><code>attr &lt;name&gt; &lt;CDStart&gt;
+                        &lt;hh:mm&gt;</code></a>
+                <br />Time of day when daytime cost rate starts</li>
+                <li><a name="emx_cdend"><code>attr &lt;name&gt; &lt;CDEnd&gt;
+                        &lt;hh:mm&gt;</code></a>
+                <br />Time of day when daytime cost rate ends</li>
             <li>Standard attributes <a href="#alias">alias</a>, <a href="#comment">comment</a>, <a
                     href="#event-on-update-reading">event-on-update-reading</a>, <a
                     href="#event-on-change-reading">event-on-change-reading</a>, <a
