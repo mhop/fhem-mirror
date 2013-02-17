@@ -613,7 +613,7 @@ OWDevice_Define($$)
 
         AssignIoPort($hash) if(!defined($hash->{IODev}->{NAME}));
         if(defined($hash->{IODev}->{NAME})) {
-          Log 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
+          Log 4, "$name: I/O device is " . $hash->{IODev}->{NAME};
         } else {
           Log 1, "$name: no I/O device";
         }
