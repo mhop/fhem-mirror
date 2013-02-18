@@ -42,9 +42,9 @@ DbLog_Define($@)
   my @a = split("[ \t][ \t]*", $def);
 
   return "wrong syntax: define <name> DbLog configuration regexp"
-	if(int(@a) != 4);
+    if(int(@a) != 4);
 
-  my $regexp    	= $a[3];
+  my $regexp        = $a[3];
 
   eval { "Hallo" =~ m/^$regexp$/ };
   return "Bad regexp: $@" if($@);
@@ -100,94 +100,94 @@ DbLog_Attr(@)
 sub
 DbLog_ParseEvent($$)
 {
-	my ($type, $event)= @_;
-	my @result;
+    my ($type, $event)= @_;
+    my @result;
 
-	# split the event into reading and argument
-	# "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-	my @parts   = split(/: /,$event);
-	my $reading = shift @parts;
-	my $value   = join(": ", @parts);
-	my $unit    = "";
+    # split the event into reading and argument
+    # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
+    my @parts   = split(/: /,$event);
+    my $reading = shift @parts;
+    my $value   = join(": ", @parts);
+    my $unit    = "";
 
-	#default
-	if(!defined($reading)) { $reading = ""; }
-	if(!defined($value))   { $value   = ""; }
+    #default
+    if(!defined($reading)) { $reading = ""; }
+    if(!defined($value))   { $value   = ""; }
 
-	# the interpretation of the argument depends on the device type
-	# EMEM, M232Counter, M232Voltage return plain numbers
-	if(($type eq "M232Voltage") ||
-	   ($type eq "M232Counter") ||
-	   ($type eq "EMEM")) {
+    # the interpretation of the argument depends on the device type
+    # EMEM, M232Counter, M232Voltage return plain numbers
+    if(($type eq "M232Voltage") ||
+       ($type eq "M232Counter") ||
+       ($type eq "EMEM")) {
     }
 
-	# Onewire
-	elsif(($type eq "OWAD") ||
-	      ($type eq "OWSWITCH") ||
-	      ($type eq "OWMULTI")) {
-	        $reading = "data";
-	        $value = $event;
-	}
-	# FS20
-	elsif(($type eq "FS20") ||
+    # Onewire
+    elsif(($type eq "OWAD") ||
+          ($type eq "OWSWITCH") ||
+          ($type eq "OWMULTI")) {
+            $reading = "data";
+            $value = $event;
+    }
+    # FS20
+    elsif(($type eq "FS20") ||
           ($type eq "X10")) {
-		#@parts = split(/ /,$event);
-		#$reading = shift @parts;
-		#$value   = join(" ", shift @parts);
+        #@parts = split(/ /,$event);
+        #$reading = shift @parts;
+        #$value   = join(" ", shift @parts);
 
-		if($reading =~ m/^dim(\d+).*/o) {
-			$value = $1;
-			$reading= "dim";
-			$unit= "%";
-		}
-		if(!defined($value) || $value eq "") {$value=$reading; $reading="data";}
-	}
+        if($reading =~ m/^dim(\d+).*/o) {
+            $value = $1;
+            $reading= "dim";
+            $unit= "%";
+        }
+        if(!defined($value) || $value eq "") {$value=$reading; $reading="data";}
+    }
   # FHT
   elsif($type eq "FHT") {
      if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
-	@parts= split(/ /,$event);
-	$reading= $parts[0];
-	$value= $parts[1];
-	$unit= "";
+    @parts= split(/ /,$event);
+    $reading= $parts[0];
+    $value= $parts[1];
+    $unit= "";
      }
      if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
      if($reading =~ m(^actuator[0-9]*)) {
-		if($value eq "lime-protection") {
-			$reading= "actuator-lime-protection";
-			undef $value;
-		}
-		elsif($value =~ m(^offset:)) {
-			$reading= "actuator-offset";
-     			@parts= split(/: /,$value);
-			$value= $parts[1];
-			if(defined $value) {
-				$value=~ s/%//; $value= $value*1.; $unit= "%";
-			}
-		}
-		elsif($value =~ m(^unknown_)) {
-    			@parts= split(/: /,$value);
-			$reading= "actuator-" . $parts[0];
-			$value= $parts[1];
-			if(defined $value) {
-				$value=~ s/%//; $value= $value*1.; $unit= "%";
-			}
-		}
-		elsif($value eq "synctime") {
-			$reading= "actuator-synctime";
-			undef $value;
-		}
-		elsif($value eq "test") {
-			$reading= "actuator-test";
-			undef $value;
-		}
-		elsif($value eq "pair") {
-			$reading= "actuator-pair";
-			undef $value;
-		}
-		else {
-			$value=~ s/%//; $value= $value*1.; $unit= "%";
-		}
+        if($value eq "lime-protection") {
+            $reading= "actuator-lime-protection";
+            undef $value;
+        }
+        elsif($value =~ m(^offset:)) {
+            $reading= "actuator-offset";
+                @parts= split(/: /,$value);
+            $value= $parts[1];
+            if(defined $value) {
+                $value=~ s/%//; $value= $value*1.; $unit= "%";
+            }
+        }
+        elsif($value =~ m(^unknown_)) {
+                @parts= split(/: /,$value);
+            $reading= "actuator-" . $parts[0];
+            $value= $parts[1];
+            if(defined $value) {
+                $value=~ s/%//; $value= $value*1.; $unit= "%";
+            }
+        }
+        elsif($value eq "synctime") {
+            $reading= "actuator-synctime";
+            undef $value;
+        }
+        elsif($value eq "test") {
+            $reading= "actuator-test";
+            undef $value;
+        }
+        elsif($value eq "pair") {
+            $reading= "actuator-pair";
+            undef $value;
+        }
+        else {
+            $value=~ s/%//; $value= $value*1.; $unit= "%";
+        }
      }
   }
   # KS300
@@ -201,7 +201,7 @@ DbLog_ParseEvent($$)
      if($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
      if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
      if($reading eq "israining") {
-	$value=~ s/ \(yes\/no\)//;
+    $value=~ s/ \(yes\/no\)//;
         $value=~ s/no/0/;
         $value=~ s/yes/1/;
       }
@@ -209,10 +209,10 @@ DbLog_ParseEvent($$)
   # HMS
   elsif($type eq "HMS" ||
         $type eq "CUL_WS" ||
-		$type eq "OWTHERM") {
+        $type eq "OWTHERM") {
      if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
      if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-	 if($reading eq "temperature") { $value=~ s/([-\.\d]+).*/$1/; $unit= "°C"; } #OWTHERM
+     if($reading eq "temperature") { $value=~ s/([-\.\d]+).*/$1/; $unit= "°C"; } #OWTHERM
      if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
      if($reading eq "battery") {
         $value=~ s/ok/1/;
@@ -223,11 +223,11 @@ DbLog_ParseEvent($$)
 
   # BS
   elsif($type eq "BS") {
-	  if($event =~ m(brightness:.*)) {
-		  @parts= split(/ /,$event);
-		  $reading= "lux";
-		  $value= $parts[4]*1.;
-		  $unit= "lux";
+      if($event =~ m(brightness:.*)) {
+          @parts= split(/ /,$event);
+          $reading= "lux";
+          $value= $parts[4]*1.;
+          $unit= "lux";
     }
   }
 
@@ -250,8 +250,8 @@ DbLog_ParseEvent($$)
      if($reading =~ m(^pressure_trend)) { $unit= ""; }
   }
 
-	@result= ($reading,$value,$unit);
-	return @result;
+    @result= ($reading,$value,$unit);
+    return @result;
 }
 
 
@@ -359,8 +359,8 @@ DbLog_Connect($)
 
   my $configfilename= $hash->{CONFIGURATION};
   if(!open(CONFIG, $configfilename)) {
-	Log 1, "Cannot open database configuration file $configfilename.";
-	return 0; }
+    Log 1, "Cannot open database configuration file $configfilename.";
+    return 0; }
   my @config=<CONFIG>;
   close(CONFIG);
 
@@ -469,6 +469,9 @@ DbLog_Get($@)
   if($outf eq "INT") {
     $outf = "-";
     $internal = 1;
+  } elsif (uc($outf) eq "WEBCHART") {
+    # redirect the get request to the chartQuery function
+    return chartQuery($hash, @_);
   }
 
   my @readings = ();
@@ -552,7 +555,7 @@ DbLog_Get($@)
           DEVICE,
           READING,
           VALUE
-  		    $sqlspec{all}
+            $sqlspec{all}
         FROM history
         WHERE 1=1
           AND $sqlspec{reading_clause} = ('".$readings[$i]->[0]."|".$readings[$i]->[1]."')
@@ -570,8 +573,8 @@ DbLog_Get($@)
       return "Cannot execute statement $stm: $DBI::errstr";
 
     if(uc($outf) eq "ALL") {
-    	$retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
-    	$retval .= "=====================================================\n";
+        $retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
+        $retval .= "=====================================================\n";
     }
     while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit)= $sth->fetchrow_array) {
       $writeout   = 0;
@@ -642,12 +645,12 @@ DbLog_Get($@)
 
       ###################### Ausgabe ###########################
       if($writeout) {
-    	  if(uc($outf) eq "ALL") {
-    	    $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
-    	  } else {
-    	    $out_tstamp =~ s/\ /_/g; #needed by generating plots
-    	    $retval .= "$out_tstamp $out_value\n";
-    	  }
+          if(uc($outf) eq "ALL") {
+            $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+          } else {
+            $out_tstamp =~ s/\ /_/g; #needed by generating plots
+            $retval .= "$out_tstamp $out_value\n";
+          }
       }
 
       if(defined($sql_value) || $sql_value =~ m/^[-\.\d]+$/o){
@@ -676,11 +679,11 @@ DbLog_Get($@)
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
       if(uc($outf) eq "ALL") {
-  	    $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
-    	} else {
-    	  $out_tstamp =~ s/\ /_/g; #needed by generating plots
-    	  $retval .= "$out_tstamp $out_value\n";
-    	}
+        $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+        } else {
+          $out_tstamp =~ s/\ /_/g; #needed by generating plots
+          $retval .= "$out_tstamp $out_value\n";
+        }
     }
     # DatenTrenner setzen
     $retval .= "#$readings[$i]->[0]";
@@ -712,6 +715,126 @@ DbLog_Get($@)
     return undef;
   }
   return $retval;
+}
+
+################################################################
+#
+# Charting Specific functions start here
+#
+################################################################
+
+################################################################
+#
+# Error handling, returns a JSON String
+#
+################################################################
+sub jsonError($) {
+  my $errormsg = $_[0]; 
+  my $json = "{success: false, msg:'$errormsg'}\n";
+  return $json;
+}
+
+
+################################################################
+#
+# Prepare the SQL String
+#
+################################################################
+sub prepareSql(@_) {
+
+    my $starttime = $_[5];
+    $starttime =~ s/_/ /;
+    my $endtime   = $_[6];
+    $endtime =~ s/_/ /;
+    my $device = $_[7];
+    my $userquery = $_[8];
+    my $xaxis = $_[9]; 
+    my $yaxis = $_[10]; 
+    my $savename = $_[11]; 
+    my ($sql, $jsonstring);
+ 
+    if($userquery eq "getreadings") {
+        $sql = "SELECT distinct(reading) FROM current WHERE device = '".$device."'";
+    } elsif($userquery eq "getdevices") {
+        $sql = 'SELECT distinct(device) FROM history';
+    } elsif($userquery eq "timerange") {
+        $sql = 'SELECT '.$xaxis.', VALUE FROM history WHERE READING = "'.$yaxis.'" AND DEVICE = "'.$device.'" AND TIMESTAMP Between "'.$starttime.'" AND "'.$endtime.'";';
+    } elsif($userquery eq "savechart") {
+        $jsonstring = '[{x:"'.$xaxis.'",y:"'.$yaxis.'",device:"'.$device.'",starttime:"'.$starttime.'",endtime:"'.$endtime.'"}]';
+        $sql = "INSERT INTO history (EVENT, READING, VALUE) VALUES('".$jsonstring."', 'savedchart', '".$savename."')";
+    } elsif($userquery eq "getcharts") {
+        $sql = 'SELECT * FROM history WHERE READING = "savedchart"';
+    } else {
+        $sql = "error";
+    }
+
+    return $sql;
+}
+
+################################################################
+#
+# Do the query
+#
+################################################################
+sub chartQuery($@) {
+
+    my $sql = prepareSql(@_);
+
+    if ($sql eq "error") {
+       return jsonError("Could not setup SQL String");
+    }
+
+    my ($hash, @a) = @_;
+    my $dbh= $hash->{DBH};
+    
+    # prepare the query
+    my $query_handle = $dbh->prepare($sql) 
+        or return jsonError("Couldn't prepare statement: " . $dbh->errstr . ", SQL was: " .$sql);
+    
+    # execute the query
+    $query_handle->execute() 
+        or return jsonError("Couldn't execute statement: " . $query_handle->errstr);
+    
+    my $columns = $query_handle->{'NAME'};
+    my $columncnt;
+    
+    # When columns are empty but execution was successful, we have done a successful INSERT
+    if($columns) {
+        $columncnt = scalar @$columns;
+    } else {
+        return "{success: true, msg:'Insert ok'}\n";
+    }
+
+    my $i = 0;
+    my $jsonstring = "[";
+
+    while ( my @data = $query_handle->fetchrow_array()) {
+
+        if($i == 0) {
+            $jsonstring .= "{";
+        } else {
+            $jsonstring .= ",{";
+        } 
+     
+        for ($i = 0; $i < $columncnt; $i++) {
+            $jsonstring .= "'";
+            $jsonstring .= uc($query_handle->{NAME}->[$i]); 
+            $jsonstring .= "':'";
+
+            if (defined $data[$i]) {
+                $jsonstring .= $data[$i];
+            } 
+            
+            if($i == ($columncnt -1)) {
+               $jsonstring .= "'";
+            } else {
+               $jsonstring .= "',"; 
+            } 
+        }
+        $jsonstring .= "}"; 
+    }
+    $jsonstring .= "]";
+    return $jsonstring;
 }
 ################################################################
 
@@ -808,8 +931,8 @@ DbLog_Get($@)
         A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
       <li>&lt;out&gt;<br>
         A dummy parameter for FileLog compatibility. Set it to <code>-</code>
-		to check the output for plot-computing.<br>Set it to the special keyword
-		<code>all</code> to get all columns from Database.</li>
+        to check the output for plot-computing.<br>Set it to the special keyword
+        <code>all</code> to get all columns from Database.</li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Used to select the data. Please use the following timeformat or
         an initial substring of it:<br>
@@ -861,10 +984,65 @@ DbLog_Get($@)
         <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-		   return 1 for all occurance of on* (on|on-for-timer etc) and 0 for all off*</li>
-		<li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
-		   Example of OWAD: value like this: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
-		   and output for port B is like this: <code>2012-11-20_10:23:54 66.647</code></li>
+           return 1 for all occurance of on* (on|on-for-timer etc) and 0 for all off*</li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
+           Example of OWAD: value like this: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
+           and output for port B is like this: <code>2012-11-20_10:23:54 66.647</code></li>
+      </ul>
+    <br><br>
+  </ul>
+
+  <b>Get</b> when used for webcharts
+  <ul>
+    <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </code>
+    <br><br>
+    Query the Database to retrieve JSON-Formatted Data, which is used by the charting frontend.
+    <br>
+
+    <ul>
+      <li>&lt;name&gt;<br>
+        The name of the defined DbLog, like it is given in fhem.cfg. For functionality this has to be set to <code>logdb</code>.</li>
+      <li>&lt;in&gt;<br>
+        A dummy parameter for FileLog compatibility. Always set to <code>-</code></li>
+      <li>&lt;out&gt;<br>
+        A dummy parameter for FileLog compatibility. Set it to <code>webchart</code>
+        to use the charting related get function.
+      </li>
+      <li>&lt;from&gt; / &lt;to&gt;<br>
+        Used to select the data. Please use the following timeformat:<br>
+        <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+      <li>&lt;device&gt;<br>
+        A string which represents the device to query.</li>
+      <li>&lt;querytype&gt;<br>
+        A string which represents the method the query should use. Actually supported values are: <br>
+          <code>getreadings</code> to retrieve the possible readings for a given device<br>
+          <code>getdevices</code> to retrieve all available devices<br>
+          <code>timerange</code> to retrieve charting data, which requires a given xaxis, yaxis, device, to and from<br>
+          <code>savechart</code> to save a chart configuration in the database. Requires a given xaxis, yaxis, device, to and from, and a 'savename' used to save the chart<br>
+      </li>
+      <li>&lt;xaxis&gt;<br>
+        A string which represents the xaxis</li>
+      <li>&lt;yaxis&gt;<br>
+         A string which represents the yaxis</li>
+      <li>&lt;savename&gt;<br>
+         A string which represents the name a chart will be saved with</li>
+
+      </ul>
+    <br><br>
+    Examples:
+      <ul>
+        <li><code>get logdb - webchart "" "" "" getcharts</code><br>
+            Retrieves all saved charts from the Database</li>
+        <li><code>get logdb - webchart "" "" "" getdevices</code><br>
+            Retrieves all available devices from the Database</li>
+        <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
+            Retrieves all available Readings for a given device from the Database</li>
+        <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
+            Retrieves charting data, which requires a given xaxis, yaxis, device, to and from<br>
+            Will ouput a JSON like this: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
+        <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
+            Will save a chart in the database with the given name and the chart configuration parameters</li>      
       </ul>
     <br><br>
   </ul>
@@ -964,7 +1142,7 @@ DbLog_Get($@)
         Ermittlung der Daten aus der Datenbank für die Plotgenerierung zu prüfen.<br>
         Durchd ie Angabe des Schlüsselworts <code>all</code> werden alle
         Spalten der Datenbank ausgegeben.
-		  </li>
+          </li>
       <li>&lt;from&gt; / &lt;to&gt;<br>
         Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
         Zeitformat oder ein Teilstring davon zu benutzen:<br>
@@ -1024,13 +1202,70 @@ DbLog_Get($@)
         <li><code>get myDbLog - all 2012-11-10 2012-11-20 KS300:temperature</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 KS300:temperature KS300:rain::delta-h KS300:rain::delta-d</code></li>
         <li><code>get myDbLog - - 2012-11-10 2012-11-20 MyFS20:data:::$val=~s/(on|off).*/$1eq"on"?1:0/eg</code><br>
-		   gibt 1 zurück für alle Ausprägungen von on* (on|on-for-timer etc) und 0 für alle off*</li>
-		<li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
-		   Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
-		   und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
+           gibt 1 zurück für alle Ausprägungen von on* (on|on-for-timer etc) und 0 für alle off*</li>
+        <li><code>get myDbLog - - 2012-11-10 2012-11-20 Bodenfeuchte:data:::$val=~s/.*B:\s([-\.\d]+).*/$1/eg</code><br>
+           Beispiel von OWAD: Ein Wert wie z.B.: <code>"A: 49.527 % B: 66.647 % C: 9.797 % D: 0.097 V"</code><br>
+           und die Ausgabe ist für das Reading B folgende: <code>2012-11-20_10:23:54 66.647</code></li>
       </ul>
     <br><br>
   </ul>
+
+  <b>Get</b> für die Nutzung von webcharts
+  <ul>
+    <code>get &lt;name&gt; &lt;infile&gt; &lt;outfile&gt; &lt;from&gt;
+          &lt;to&gt; &lt;device&gt; &lt;querytype&gt; &lt;xaxis&gt; &lt;yaxis&gt; &lt;savename&gt; </code>
+    <br><br>
+    Liest Daten aus der Datenbank aus und gibt diese in JSON formatiert aus. Wird für das Charting Frontend genutzt
+    <br>
+
+    <ul>
+      <li>&lt;name&gt;<br>
+        Der Name des definierten DbLogs, so wie er in der fhem.cfg angegeben wurde. Muss für Funktionalität auf <code>logdb</code> gesetzt werden.</li>
+      <li>&lt;in&gt;<br>
+        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen.
+        Dieser Parameter ist immer auf <code>-</code> zu setzen.</li>
+      <li>&lt;out&gt;<br>
+        Ein Dummy Parameter um eine Kompatibilität zum Filelog herzustellen. 
+        Dieser Parameter ist auf <code>webchart</code> zu setzen um die Charting Get Funktion zu nutzen.
+      </li>
+      <li>&lt;from&gt; / &lt;to&gt;<br>
+        Wird benutzt um den Zeitraum der Daten einzugrenzen. Es ist das folgende
+        Zeitformat zu benutzen:<br>
+        <ul><code>YYYY-MM-DD_HH24:MI:SS</code></ul></li>
+      <li>&lt;device&gt;<br>
+        Ein String, der das abzufragende Device darstellt.</li>
+      <li>&lt;querytype&gt;<br>
+        Ein String, der die zu verwendende Abfragemethode darstellt. Zur Zeit unterstützte Werte sind: <br>
+          <code>getreadings</code> um für ein bestimmtes device alle Readings zu erhalten<br>
+          <code>getdevices</code> um alle verfügbaren devices zu erhalten<br>
+          <code>timerange</code> um Chart-Daten abzufragen. Es werden die Parameter 'xaxis', 'yaxis', 'device', 'to' und 'from' benötigt<br>
+          <code>savechart</code> um einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration abzuspeichern<br>
+      </li>
+      <li>&lt;xaxis&gt;<br>
+        Ein String, der die X-Achse repräsentiert</li>
+      <li>&lt;yaxis&gt;<br>
+         Ein String, der die Y-Achse repräsentiert</li>
+      <li>&lt;savename&gt;<br>
+         Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll</li>
+      </ul>
+    <br><br>
+    Beispiele:
+      <ul>
+        <li><code>get logdb - webchart "" "" "" getcharts</code><br>
+            Liefert alle gespeicherten Charts aus der Datenbank</li>
+        <li><code>get logdb - webchart "" "" "" getdevices</code><br>
+            Liefert alle verfügbaren Devices aus der Datenbank</li>
+        <li><code>get logdb - webchart "" "" ESA2000_LED_011e getreadings</code><br>
+            Liefert alle verfügbaren Readings aus der Datenbank unter Angabe eines Gerätes</li>
+        <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e timerange TIMESTAMP day_kwh</code><br>
+            Liefert Chart-Daten, die auf folgenden Parametern basieren: 'xaxis', 'yaxis', 'device', 'to' und 'from'<br>
+            Die Ausgabe erfolgt als JSON, z.B.: <code>[{'TIMESTAMP':'2013-02-11 00:10:10','VALUE':'0.22431388090756'},{'TIMESTAMP'.....}]</code></li>
+        <li><code>get logdb - webchart 2013-02-11_00:00:00 2013-02-12_00:00:00 ESA2000_LED_011e savechart TIMESTAMP day_kwh tageskwh</code><br>
+            Speichert einen Chart unter Angabe eines 'savename' und seiner zugehörigen Konfiguration</li>  
+      </ul>
+    <br><br>
+  </ul>
+
   <a name="DbLogattr"></a>
   <b>Attributes</b> <ul>N/A</ul><br>
 </ul>
