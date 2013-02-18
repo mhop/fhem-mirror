@@ -1,4 +1,6 @@
 - SVN
+  - feature: new Modules 30_HUEDevice and 31_HUEBridge for phillips hue and 
+             smartlink devices (by justme1968)
   - change: SYSSTAT: allow remote monitoring by ssh
   - change: SYSSTAT: allow less frequent updates for diskusage
   - feature: new Module 32_SYSSTAT to monitor system load and disk usage
