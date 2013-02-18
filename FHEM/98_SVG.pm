@@ -244,7 +244,10 @@ SVG_render($$$$$$$$)
   # Compute & draw vertical tics, grid and labels
   my $ddur = ($tosec-$fromsec)/86400;
   my ($first_tag, $tag, $step, $tstep, $aligntext,  $aligntics);
-  if($ddur <= 0.5) {
+  
+  if ($ddur <= 0.1) {
+    $first_tag=". 2 1"; $tag=": 3 4"; $step = 300; $tstep = 60;
+  } elsif($ddur <= 0.5) {
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 3600; $tstep = 900;
   } elsif($ddur <= 1.1) {       # +0.1 -> DST
     $first_tag=". 2 1"; $tag=": 3 4"; $step = 4*3600; $tstep = 3600;
