@@ -94,7 +94,7 @@ my $FW_RETTYPE;    # image/png or the like
 my $FW_room;       # currently selected room
 my %FW_rooms;      # hash of all rooms
 my %FW_types;      # device types, for sorting
-my @FW_zoom;       # "qday", "day","week","month","year"
+my @FW_zoom;       # "hour","qday","day","week","month","year"
 my %FW_zoom;       # the same as @FW_zoom
 my %FW_hiddenroom; # hash of hidden rooms
 my %FW_hiddengroup;# hash of hidden groups
@@ -133,7 +133,7 @@ FHEMWEB_Initialize($)
   ###############
   # Initialize internal structures
   my $n = 0;
-  @FW_zoom = ("qday", "day","week","month","year");
+  @FW_zoom = ("hour","qday", "day","week","month","year");
   %FW_zoom = map { $_, $n++ } @FW_zoom;
 
   addToAttrList("webCmd");
@@ -1747,8 +1747,11 @@ FW_zoomLink($$$)
     # Approximation of the next offset.
     my $w_off = $FW_pos{off};
     $w_off = 0 if(!$w_off);
-    if($val eq "qday") {
-      $w_off =              $w_off*4;
+
+    if ($val eq "hour") {
+      $w_off =              $w_off*6;
+    } elsif($val eq "qday") {
+      $w_off = ($off < 0) ? $w_off*4 : int($w_off/6);
     } elsif($val eq "day") {
       $w_off = ($off < 0) ? $w_off*7 : int($w_off/4);
     } elsif($val eq "week") {
@@ -1813,7 +1816,17 @@ FW_calcWeblink($$)
   $zoom = "day" if(!$zoom);
   $zoom = $frx if ($frx); #for fixedrange {day|week|...} klaus
 
-  if($zoom eq "qday") {
+
+  if($zoom eq "hour") {
+      
+      my $t = $now + $off*3600;
+      my @l = localtime($t);
+      $FW_devs{$d}{from}
+      =sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+      $FW_devs{$d}{to}
+      =sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]+1);;
+
+  } elsif($zoom eq "qday") {
 
     my $t = $now + $off*21600;
     my @l = localtime($t);

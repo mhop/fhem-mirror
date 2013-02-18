@@ -76,6 +76,7 @@
   - bugfix:  floorplan-correction for readings with longpoll. Requires local
              change in css!
   - feature: floorplan added js-extension from Dirk
+  - feature: hour resolution in SVG
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
