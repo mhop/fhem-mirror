@@ -3,7 +3,8 @@ package main;
 
 use strict;
 use warnings;
-use Sys::Statistics::Linux;
+use Sys::Statistics::Linux::LoadAVG;
+use Sys::Statistics::Linux::DiskUsage;
 
 sub
 SYSSTAT_Initialize($)
@@ -14,7 +15,7 @@ SYSSTAT_Initialize($)
   $hash->{UndefFn}  = "SYSSTAT_Undefine";
   $hash->{GetFn}    = "SYSSTAT_Get";
   $hash->{AttrFn}   = "SYSSTAT_Attr";
-  $hash->{AttrList} = "filesystems showpercent:1 useregex:1 loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList} = "filesystems showpercent:1 useregex:1 ssh_user loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 }
 
@@ -27,20 +28,54 @@ SYSSTAT_Define($$)
 
   my @a = split("[ \t][ \t]*", $def);
 
-  return "Usage: define <name> SYSSTAT [interval]"  if(@a < 2);
+  return "Usage: define <name> SYSSTAT [interval [interval_fs [host]]]"  if(@a < 2);
 
   my $interval = 60;
   if(int(@a)>=3) { $interval = $a[2]; }
   if( $interval < 60 ) { $interval = 60; }
 
+  my $interval_fs = $interval * 60;
+  if(int(@a)>=4) { $interval_fs = $a[3]; }
+  if( $interval_fs < $interval ) { $interval_fs = $interval; }
+  if( $interval_fs == $interval ) { $interval_fs = undef; }
+
+  my $host = $a[4] if(int(@a)>=5);;
+
+  delete( $hash->{INTERVAL_FS} );
+  delete( $hash->{HOST} );
+
   $hash->{STATE} = "Initialized";
   $hash->{INTERVAL} = $interval;
+  $hash->{INTERVAL_FS} = $interval_fs if( defined( $interval_fs ) );
 
-  $hash->{xls} = Sys::Statistics::Linux->new( loadavg => 1 );
+  $hash->{HOST} = $host if( defined( $host ) );
+
+  $hash->{interval_fs} = $interval_fs;
+  SYSSTAT_InitSys( $hash );
 
   InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 0);
 
   return undef;
+}
+sub
+SYSSTAT_InitSys( $ )
+{
+  my ($hash) = @_;
+
+  if( defined($hash->{HOST}) ) {
+    my $cmd = qx(which ssh);
+    chomp( $cmd );
+    my $user = AttrVal($hash->{NAME}, "ssh_user", undef );
+    $cmd .= ' ';
+    $cmd .= $user."\@" if( defined($user) );
+    $cmd .= $hash->{HOST}." df -kP 2>/dev/null";
+    $hash->{loadavg} = Sys::Statistics::Linux::LoadAVG->new;
+    $hash->{diskusage} = Sys::Statistics::Linux::DiskUsage->new( cmd => { path => '',
+                                                                          df => $cmd } );
+  } else {
+    $hash->{loadavg} = Sys::Statistics::Linux::LoadAVG->new;
+    $hash->{diskusage} = Sys::Statistics::Linux::DiskUsage->new;
+  }
 }
 
 sub
@@ -52,31 +87,30 @@ SYSSTAT_Undefine($$)
   return undef;
 }
 
-sub   
+sub
 SYSSTAT_Get($@)
-{     
-  my ($hash, @a) = @_; 
+{
+  my ($hash, @a) = @_;
 
   my $name = $a[0];
   return "$name: get needs at least one parameter" if(@a < 2);
-      
+
   my $cmd= $a[1];
-      
+
   if($cmd eq "filesystems") {
 
-    my $sys  = Sys::Statistics::Linux->new(diskusage => 1);
-    my $filesystems = $sys->get->{diskusage};
+    my $filesystems = $hash->{diskusage}->get;
 
     my $ret;
     $ret .= "<filesystem> <= <mountpoint>\n";
-    foreach my $filesystem (keys %$filesystems ) { 
+    foreach my $filesystem (keys %$filesystems ) {
       $ret .= $filesystem ." <= ". $filesystems->{$filesystem}->{mountpoint} ."\n";
     }
     return $ret;
   } else {
     return "Unknown argument $cmd, choose one of filesystems";
-  }   
-}     
+  }
+}
 
 sub
 SYSSTAT_Attr($$$)
@@ -92,14 +126,10 @@ SYSSTAT_Attr($$$)
     my $hash = $defs{$name};
     my @filesystems = split(",",$attrVal);
     @{$hash->{filesystems}} = @filesystems;
-
-    if( $#filesystems >= 0 ) {
-      $hash->{xls}->set( loadavg => 1,
-                         diskusage => 1 );
-    } else {
-      $hash->{xls}->set( loadavg => 1,
-                         diskusage => 0 );
-    }
+  } elsif( $attrName eq "ssh_user") {
+    $attr{$name}{$attrName} = $attrVal;
+    my $hash = $defs{$name};
+    SYSSTAT_InitSys( $hash );
   }
 
   if( $cmd eq "set" ) {
@@ -112,6 +142,7 @@ SYSSTAT_Attr($$$)
   return;
 }
 
+sub SYSSTAT_getLoadAVG( $ );
 sub
 SYSSTAT_GetUpdate($)
 {
@@ -122,15 +153,28 @@ SYSSTAT_GetUpdate($)
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 1);
   }
 
-  my $stat = $hash->{xls}->get;
-
-  my $load = $stat->{loadavg};
+  my $load = $hash->{loadavg}->get;
+  my $load = SYSSTAT_getLoadAVG( $hash );
 
   $hash->{STATE} = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15};
 
   readingsSingleUpdate($hash,"load",$load->{avg_1},defined($hash->{LOCAL} ? 0 : 1));
 
-  if( defined(my $usage = $stat->{diskusage}) ){
+  my $do_diskusage = 1;
+  if( defined($hash->{INTERVAL_FS} ) ) {
+    $do_diskusage = 0;
+    $hash->{interval_fs} -= $hash->{INTERVAL};
+
+    if( $hash->{interval_fs} <= 0 ) {
+        $do_diskusage = 1;
+        $hash->{interval_fs} += $hash->{INTERVAL_FS};
+      }
+  }
+
+  if( $do_diskusage
+      && $#{$hash->{filesystems}} >= 0 ) {
+
+    my $usage = $hash->{diskusage}->get;
 
     my $type = 'free';
     if( AttrVal($hash->{NAME}, "showpercent", "") ne "" ) {
@@ -155,6 +199,44 @@ SYSSTAT_GetUpdate($)
   }
 }
 
+sub SYSSTAT_getLoadAVG( $ )
+{
+  my ($hash) = @_;
+
+  if( defined($hash->{HOST}) ) {
+    no strict;
+    no warnings 'redefine';
+    local *Sys::Statistics::Linux::LoadAVG::get = sub {
+      my $self  = shift;
+      my $class = ref $self;
+      my $file  = $self->{files};
+      my %lavg  = ();
+
+      my $cmd = qx(which ssh);
+      chomp( $cmd );
+      my $user = AttrVal($hash->{NAME}, "ssh_user", undef );
+      $cmd .= ' ';
+      $cmd .= $user."\@" if( defined($user) );
+      $cmd .= $hash->{HOST}." cat /proc/loadavg 2>/dev/null";
+      my $fh;
+      if( open($fh, "$cmd|" ) ) {
+        ( $lavg{avg_1}
+        , $lavg{avg_5}
+        , $lavg{avg_15}
+        ) = (split /\s+/, <$fh>)[0..2];
+
+        close($fh);
+      }
+      return \%lavg;
+    };
+
+    return $hash->{loadavg}->get;
+  }
+
+  return $hash->{loadavg}->get;
+}
+
+
 1;
 
 =pod
@@ -163,7 +245,7 @@ SYSSTAT_GetUpdate($)
 <a name="SYSSTAT"></a>
 <h3>SYSSTAT</h3>
 <ul>
-  Provides system statistics for the host FHEM runs on.<br><br>
+  Provides system statistics for the host FHEM runs on or a remote Linux system that is reachable by preconfigured passwordless ssh access.<br><br>
 
   Notes:
   <ul>
@@ -171,6 +253,7 @@ SYSSTAT_GetUpdate($)
     <li>This module needs <code>Sys::Statistics::Linux</code> on Linux.<br>
         It can be installed with '<code>cpan install Sys::Statistics::Linux</code>'<br>
         or on debian with '<code>apt-get install libsys-statistics-linux-perl</code>'</li>
+
     <li>To plot the load values the following code can be used:
   <PRE>
   define sysstatlog FileLog /usr/local/FHEM/var/log/sysstat-%Y-%m.log sysstat
@@ -184,17 +267,22 @@ SYSSTAT_GetUpdate($)
   <a name="SYSSTAT_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; SYSSTAT [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; SYSSTAT [&lt;interval&gt; [&lt;interval_fs&gt;] [&lt;host&gt;]]</code><br>
     <br>
 
     Defines a SYSSTAT device.<br><br>
 
-    The statistics are updated &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
+    The load is updated every &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
+    The diskusage is updated every &lt;interval_fs&gt; seconds. The default is &lt;interval&gt;*60 and the minimum is 60.
+    &lt;interval_fs&gt; is only aproximated and works best if &lt;interval_fs&gt; is an integral multiple of &lt;interval&gt;.<br><br>
+
+    If &lt;host&gt; is given it has to be accessible by ssh without the need for a password.
 
     Examples:
     <ul>
       <code>define sysstat SYSSTAT</code><br>
       <code>define sysstat SYSSTAT 300</code><br>
+      <code>define sysstat SYSSTAT 60 600</code><br>
     </ul>
   </ul><br>
 
@@ -234,6 +322,8 @@ SYSSTAT_GetUpdate($)
       If set the usage is shown in percent. If not set the remaining free space in bytes is shown.</li>
     <li>useregex<br>
       If set the entries of the filesystems list are treated as regex.</li>
+    <li>ssh_user<br>
+      The username for ssh remote access.</li>
   </ul>
 </ul>
 

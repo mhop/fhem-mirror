@@ -1,4 +1,6 @@
 - SVN
+  - change: SYSSTAT: allow remote monitoring by ssh
+  - change: SYSSTAT: allow less frequent updates for diskusage
   - feature: new Module 32_SYSSTAT to monitor system load and disk usage
              on linux FHEM hosts (by justme1968)
   - feature: new Module 73_PRESENCE to make automatic presence detection of
