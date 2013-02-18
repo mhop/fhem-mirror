@@ -1,4 +1,4 @@
-# $Id$
+﻿# $Id$
 ##############################################################################
 #
 #     73_PRESENCE.pm
@@ -362,6 +362,7 @@ PRESENCE_Ready($)
 {
    my ($hash) = @_;
        
+   delete $hash->{helper}{cachednr}; ##MH clear cache on start
    return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit");
 
 }
@@ -437,6 +438,30 @@ PRESENCE_DoLocalFritzBoxScan($)
 
     my $number=0;
     
+
+    my $status=0;
+
+    if (defined($defs{$name}{helper}{cachednr})) 
+    {
+        $number = $defs{$name}{helper}{cachednr};
+       
+        Log GetLogLevel($name, 5), "PRESENCE_DoLocalFritzBoxScan: name=$name device=$device cachednr=$number";
+       
+        my $cached_name = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name);    
+        chomp $cached_name;
+       
+        # only use the cached $number if it has still the correct device name
+        if($cached_name eq $device)
+        {
+    	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed);
+    	    if(not $status =~ /^\s*\d+\s*$/)
+    	    {
+        	return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
+    	    }
+    	    return ($status == 0)? "$name|$local|absent|$number" : "$name|$local|present|$number"; ###MH
+	}
+    }
+
     my $max = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice/count);
     
     chomp $max;
@@ -447,7 +472,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     }
     
     
-    my $status=0;
+
     my $net_device;
 
     while($number <= $max)
@@ -458,7 +483,7 @@ PRESENCE_DoLocalFritzBoxScan($)
         
 	if($net_device eq $device)
 	{
-  	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/active);
+  	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed); 
   	    last;
 	}
 	
@@ -467,17 +492,8 @@ PRESENCE_DoLocalFritzBoxScan($)
     }
     
     chomp $status;
-    
-    if($status == 1)
-    {
-	return "$name|$local|present";
-    }
-    else
-    {
-        return "$name|$local|absent";
-    } 
 
-
+    return ($status == 0 ? "$name|$local|absent|$number" : "$name|$local|present|$number");
 }
 
 sub
@@ -542,12 +558,18 @@ PRESENCE_ProcessLocalScan($)
  
  return if($hash->{helper}{DISABLED});
  
+ Log GetLogLevel($hash->{NAME}, 5), "PRESENCE_ProcessLocalScan: $string";
+ 
+ if($hash->{MODE} eq "fritzbox" and defined($a[3]))
+ {
+    $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
+ }
  
  readingsBeginUpdate($hash);
  if($a[2] eq "present")
  {
     readingsBulkUpdate($hash, "state", "present");
-    readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]));
+    readingsBulkUpdate($hash, "device_name", $a[3]) if(defined($a[3]) and $hash->{MODE} =~ /^(lan-bluetooth|local-bluetooth)$/ );
  }
  elsif($a[2] eq "absent")
  {
@@ -582,7 +604,7 @@ PRESENCE_ProcessLocalScan($)
   This module provides several operational modes to serve your needs. These are:<br><br>
   <ul>
   <li><b>lan-ping</b> - A presence check of a device via network ping in your LAN/WLAN</li>
-  <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!)
+  <li><b>fritzbox</b> - A presence check by requesting the device state from the FritzBox internals (only available when running FHEM on a FritzBox!)</li>
   <li><b>local-bluetooth</b> - A presence check by searching directly for a given bluetooth device nearby</li>
   <li><b>lan-bluetooth</b> - A presence check of a bluetooth device via LAN network by connecting to a presenced or collectord instance</li>
   </ul>
@@ -894,6 +916,7 @@ Options:
   <a name="PRESENCEset"></a>
   <b>Set</b>
   <ul>
+  
   <li><b>statusRequest</b> - (Nu f&uuml;r local-bluetooth, lan-ping and fritzbox) - Startet einen sofortigen Check.</li> 
   </ul>
   <br>
