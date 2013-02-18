@@ -131,7 +131,7 @@ PRESENCE_Define($$)
  
     $hash->{MODE} = $destination;
     
-    delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr};
+    delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr}));
     
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 0) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
@@ -366,7 +366,7 @@ PRESENCE_Ready($)
    my ($hash) = @_;
        
 
-   return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit");
+   return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit") if($hash->{MODE} eq "lan-bluetooth");
 
 }
 
