@@ -129,10 +129,13 @@ PRESENCE_Define($$)
   if($destination eq "lan-ping" or $destination eq "local-bluetooth" or $destination eq "fritzbox")
   {
  
-   $hash->{MODE} = $destination;
-   
+    $hash->{MODE} = $destination;
+    
+    delete $hash->{helper}{cachednr} if(defined($hash->{helper}{cachednr};
+    
     RemoveInternalTimer($hash);
     InternalTimer(gettimeofday()+2, "PRESENCE_StartLocalScan", $hash, 0) unless(exists($hash->{helper}{DISABLED}) and $hash->{helper}{DISABLED});
+    
     return;
   
   }
@@ -362,7 +365,7 @@ PRESENCE_Ready($)
 {
    my ($hash) = @_;
        
-   delete $hash->{helper}{cachednr}; ##MH clear cache on start
+
    return DevIo_OpenDev($hash, 1, "PRESENCE_DoInit");
 
 }
