@@ -41,6 +41,32 @@ CUL_MAX_Initialize($)
 }
 
 #############################
+
+sub
+CUL_MAX_SetupCUL($)
+{
+  my $hash = $_[0];
+  AssignIoPort($hash);
+  if(!defined($hash->{IODev})) {
+    Log 1, "$hash->{NAME}: did not find suitable IODev (CUL etc. in rfmode MAX)! You may want to execute 'attr $hash->{NAME} IODev SomeCUL'";
+    return 0;
+  }
+
+  if(CUL_MAX_Check($hash) >= 152) {
+    #Doing this on older firmware disables MAX mode
+    IOWrite($hash, "", "Za". $hash->{addr});
+    #Append to initString, so this is resend if cul disappears and then reappears
+    $hash->{IODev}{initString} .= "\nZa". $hash->{addr};
+  }
+  if(CUL_MAX_Check($hash) >= 153) {
+    #Doing this on older firmware disables MAX mode
+    my $cmd = "Zw". CUL_MAX_fakeWTaddr($hash);
+    IOWrite($hash, "", $cmd);
+    $hash->{IODev}{initString} .= "\n".$cmd;
+  }
+  return 1
+}
+
 sub
 CUL_MAX_Define($$)
 {
@@ -61,20 +87,7 @@ CUL_MAX_Define($$)
   $hash->{pairmode} = 0;
   $hash->{retryCount} = 0;
   $hash->{sendQueue} = [];
-  AssignIoPort($hash);
-
-  if(CUL_MAX_Check($hash) >= 152) {
-    #Doing this on older firmware disables MAX mode
-    IOWrite($hash, "", "Za". $hash->{addr});
-    #Append to initString, so this is resend if cul disappears and then reappears
-    $hash->{IODev}{initString} .= "\nZa". $hash->{addr};
-  }
-  if(CUL_MAX_Check($hash) >= 153) {
-    #Doing this on older firmware disables MAX mode
-    my $cmd = "Zw". CUL_MAX_fakeWTaddr($hash);
-    IOWrite($hash, "", $cmd);
-    $hash->{IODev}{initString} .= "\n".$cmd;
-  }
+  CUL_MAX_SetupCUL($hash);
 
   #This interface is shared with 00_MAXLAN.pm
   $hash->{Send} = \&CUL_MAX_Send;
@@ -370,6 +383,20 @@ CUL_MAX_SendQueueHandler($)
   return if(!@{$hash->{sendQueue}}); #nothing to do
 
   my $timeout = gettimeofday(); #reschedule immediatly
+
+  #Check if we have an IODev
+  if(!defined($hash->{IODev})) {
+      Log 1, "$hash->{NAME}: did not find suitable IODev (CUL etc. in rfmode MAX), cannot send! You may want to execute 'attr $hash->{NAME} IODev SomeCUL'";
+      #Maybe some CUL will appear magically in some seconds
+      #At least we cannot quit here with an non-empty queue, so we have two alternatives:
+      #1. Delete the packet from queue and quit -> packet is lost
+      #2. Wait, recheck, wait, recheck ... -> a lot of logs
+
+      #InternalTimer($timeout+60, "CUL_MAX_SendQueueHandler", $hash, 0);
+      $hash->{sendQueue} = [];
+      return undef;
+  }
+
   my $packet = $hash->{sendQueue}[0];
 
   if( $packet->{sent} == 0 ) { #Need to send it first
