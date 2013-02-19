@@ -228,17 +228,17 @@ sub FRM_DoInit($) {
 								my $onewirepins = $device->{metadata}{onewire_pins};
 								$main::defs{$name}{onewire_pins} = join(",", sort{$a<=>$b}(@$onewirepins));
 								my @analog_resolutions;
-								foreach my $pin (sort{$a<=>$b}(keys $device->{metadata}{analog_resolutions})) {
+								foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{analog_resolutions}})) {
 									push @analog_resolutions,$pin.":".$device->{metadata}{analog_resolutions}{$pin};
 								}
 								$main::defs{$name}{analog_resolutions} = join(",",@analog_resolutions);
 								my @pwm_resolutions;
-								foreach my $pin (sort{$a<=>$b}(keys $device->{metadata}{pwm_resolutions})) {
+								foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{pwm_resolutions}})) {
 									push @pwm_resolutions,$pin.":".$device->{metadata}{pwm_resolutions}{$pin};
 								}
 								$main::defs{$name}{pwm_resolutions} = join(",",@pwm_resolutions);
 								my @servo_resolutions;
-								foreach my $pin (sort{$a<=>$b}(keys $device->{metadata}{servo_resolutions})) {
+								foreach my $pin (sort{$a<=>$b}(keys %{$device->{metadata}{servo_resolutions}})) {
 									push @servo_resolutions,$pin.":".$device->{metadata}{servo_resolutions}{$pin};
 								}
 								$main::defs{$name}{servo_resolutions} = join(",",@servo_resolutions);
@@ -338,31 +338,32 @@ FRM_Client_Unassign($)
   readingsSingleUpdate($dev,"state","defined",0);  
 }
 
-package Firmata_IO {
-	
-	sub new {
-		my ($class,$hash) = @_;
-		return bless {
-			hash => $hash,
-			loglevel => main::GetLogLevel($hash->{NAME},5),
-		}, $class;
-	}
+package Firmata_IO;
 
-	sub data_write {
-    	my ( $self, $buf ) = @_;
-	    main::Log ($self->{loglevel}, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf));
-    	main::DevIo_SimpleWrite($self->{hash},$buf,undef);
-	}
-
-	sub data_read {
-	    my ( $self, $bytes ) = @_;
-	    my $string = main::DevIo_SimpleRead($self->{hash});
-	    if (defined $string ) {
-    	    main::Log ($self->{loglevel},"<".join(",",map{sprintf"%02x",ord$_}split//,$string));
-    	}
-	    return $string;
-	}
+sub new {
+	my ($class,$hash) = @_;
+	return bless {
+		hash => $hash,
+		loglevel => main::GetLogLevel($hash->{NAME},5),
+	}, $class;
 }
+
+sub data_write {
+   	my ( $self, $buf ) = @_;
+    main::Log ($self->{loglevel}, ">".join(",",map{sprintf"%02x",ord$_}split//,$buf));
+   	main::DevIo_SimpleWrite($self->{hash},$buf,undef);
+}
+
+sub data_read {
+    my ( $self, $bytes ) = @_;
+    my $string = main::DevIo_SimpleRead($self->{hash});
+    if (defined $string ) {
+   	    main::Log ($self->{loglevel},"<".join(",",map{sprintf"%02x",ord$_}split//,$string));
+   	}
+    return $string;
+}
+
+package main;
 
 sub
 FRM_i2c_observer
