@@ -257,7 +257,7 @@ ZWDongle_Get($@)
   my $nargs = int(split("%", $gets{$type}, -1))-1;
   return "get $name $type needs $nargs arguments" if($nargs != int(@a));
 
-  return "No $a[1] for dummies" if(IsDummy($name));
+  return "No $type for dummies" if(IsDummy($name));
 
   ZWDongle_Write($hash,  "00", sprintf($gets{$type}, @a));
   my $re = "^01".substr($gets{$type},0,2);  # Start with <01><len><01><CMD>
