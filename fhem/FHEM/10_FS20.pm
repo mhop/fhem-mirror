@@ -199,7 +199,7 @@ FS20_Set($@)
   return "Bad time spec" if($na == 3 && $a[2] !~ m/^\d*\.?\d+$/);
 
   my $v = join(" ", @a);
-  Log GetLogLevel($name,4), "FS20 set $v";
+  Log GetLogLevel($name,3), "FS20 set $v";
   (undef, $v) = split(" ", $v, 2);	# Not interested in the name...
 
   my $val;
