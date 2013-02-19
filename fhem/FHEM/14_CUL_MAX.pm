@@ -126,8 +126,8 @@ CUL_MAX_Attr(@)
 {
   my ($hash, $action, $name, $attr, $value) = @_;
   if ($action eq "set") {
-    return "No such attribute" if($attr ne "fakeWTaddr" && $attr ne "fakeSCaddr");
-    return "Invalid value" if($value !~ /^[0-9a-fA-F]{6}$/);
+    return "No such attribute" if($attr !~ ["fakeWTaddr", "fakeSCaddr", "IODev"]);
+    return "Invalid value" if($attr ~~ ["fakeWTaddr", "fakeSCaddr"] && $value !~ /^[0-9a-fA-F]{6}$/);
   }
 }
 
