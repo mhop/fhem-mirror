@@ -88,7 +88,13 @@ my %zwave_class = (
   THERMOSTAT_SETBACK       => { id => '47', },
   BASIC_WINDOW_COVERING    => { id => '50', },
   MTP_WINDOW_COVERING      => { id => '51', },
-  MULTI_INSTANCE           => { id => '60', },
+  MULTI_CHANNEL            => { id => '60',     # Version 2!
+    get   => { mcEndpoints => "07",     # Endpoints
+               mcCapability=> "09%02x"},
+    parse => { "^046008(..)(..)" => '"mcEndpoints:total ".hex($2).'.
+                                 '(hex($1)&0x80 ? ", dynamic":"").'.
+                                 '(hex($1)&0x40 ? ", identical":", different")',
+               "^..600a(.*)"=> 'ZWave_mcCapability($hash, $1)' }, },
   DOOR_LOCK                => { id => '62', },
   USER_CODE                => { id => '63', },
   CONFIGURATION            => { id => '70', 
@@ -120,16 +126,17 @@ my %zwave_class = (
     get   => { wakeupInterval => "05" },
     parse => { "028407"    => 'wakeup:notification',
                "..8406(......)(..)" =>
-                '"wakeupReport:interval:".hex($1)." target:".hex($2)',}, },
+                '"wakeupReport:interval ".hex($1)." target ".hex($2)',}, },
   ASSOCIATION              => { id => '85', 
     set   => { associationAdd => "01%02x%02x*",
                associationDel => "04%02x%02x*", },
     get   => { association => "02%02x",      },
-    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max:$2 Nodes:$3"',}, },
+    parse => { "..8503(..)(..)..(.*)" => '"assocGroup_$1:Max $2 Nodes $3"',}, },
   VERSION                  => { id => '86',
     get   => { version     => "11",       },
     parse => { "078612(..)(..)(..)(..)(..)" =>
-    'sprintf("Lib:%d Prot:%d.%d App:%d.%d",hex($1),hex($2),hex($3),hex($4),hex($5))', } },
+    'sprintf("version:Lib %d Prot %d.%d App %d.%d",'.
+        'hex($1),hex($2),hex($3),hex($4),hex($5))', } },
   INDICATOR                => { id => '87', },
   PROPRIETARY              => { id => '88', },
   LANGUAGE                 => { id => '89', },
@@ -138,7 +145,7 @@ my %zwave_class = (
   COMPOSITE                => { id => '8D', },
   MULTI_CMD                => { id => '8F', },
   TIME                     => { id => '8a', },
-  MULTI_INSTANCE_ASSOCIATION => { id => '8E', },
+  MULTI_CHANNEL_ASSOCIATION=> { id => '8E', },
   ENERGY_PRODUCTION        => { id => '90', },
   MANUFACTURER_PROPRIETARY => { id => '91', },
   SCREEN_MD                => { id => '92', },
@@ -200,7 +207,7 @@ ZWave_Define($$)
   return "define $name: wrong id ($id): need a number"
                    if( ($id !~ m/^\d+$/i) );
 
-  $id = sprintf("%02x", $id);
+  $id = sprintf("%0*x", ($id > 255 ? 4 : 2), $id);
   $hash->{homeId} = $homeId;
   $hash->{id}     = $id;
 
@@ -289,6 +296,15 @@ ZWave_Cmd($$@)
     return "$type $cmd needs $parTxt" if($nArg != int(@a));
   }
   $cmdFmt = sprintf($cmdFmt, @a) if($nArg);
+
+  if($id =~ m/(..)(..)/) {  # Multi-Channel, encapsulate
+    my ($lid,$ch) = ($1, $2);
+    $id = $lid;
+    $cmdFmt = "0d01$ch$cmdId$cmdFmt";
+    $cmdId = "60";  # MULTI_CHANNEL
+  }
+
+
   my $len = sprintf("%02x", length($cmdFmt)/2+1);
 
   my $data = "13$id$len$cmdId${cmdFmt}05";
@@ -379,6 +395,38 @@ ZWave_SetClasses($$$$)
   return "";
 }
 
+sub
+ZWave_mcCapability($$)
+{
+  my ($hash, $caps) = @_;
+
+  my $name = $hash->{NAME};
+  my $iodev = $hash->{IODev};
+  return "Missing IODev for $name" if(!$iodev);
+
+  my $homeId = $iodev->{homeId};
+  my @l = grep /../, split(/(..)/, lc($caps));
+  my $chid = shift(@l);
+  my $id = $hash->{id};
+
+  my @classes;
+  for my $classId (@l) {
+    push @classes, $zwave_id2class{$classId} if($zwave_id2class{$classId});
+  }
+  return "mcCapability_$chid:no classes" if(!@classes);
+
+  if(hex($chid) > 1 &&  !$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
+    my $lid = hex("$id$chid");
+    my $lcaps = substr($caps, 2);
+    $id = hex($id);
+    DoTrigger("global",
+              "UNDEFINED ZWave_$classes[0]_$id.$chid ZWave $homeId $lid $caps",
+              1);
+  }
+
+  return "mcCapability_$chid:".join(" ", @classes);
+}
+
 ###################################
 # 0004000a03250300 (sensor binary off for id 11)
 sub
@@ -434,7 +482,14 @@ ZWave_Parse($$@)
 
   ######################################
   # device messages
-  return "" if($cmd ne "APPLICATION_COMMAND_HANDLER" || $arg !~ m/^..(..)/);
+  return "" if($cmd ne "APPLICATION_COMMAND_HANDLER");
+
+  if($arg =~ /^..600d(..)(..)(.*)/) { # MULTI_CHANNEL CMD_ENCAP
+    $id = "$id$1";
+    $arg = sprintf("%02x$3", length($3)/2);
+  }
+
+  return if($arg !~ m/^..(..)/);
   my $class = $1;
   my $hash = $modules{ZWave}{defptr}{"$homeId $id"};
   if(!$hash) {
@@ -633,19 +688,32 @@ ZWave_Undef($$)
   <br><br><b>Class WAKE_UP</b>
   <li>wakeupInterval<br>
     return the wakeup interval in seconds, in the form<br>
-    wakeupReport:interval:seconds target:id
+    wakeupReport:interval seconds target id
     </li>
 
   <br><br><b>Class ASSOCIATION</b>
   <li>association groupId<br>
     return the list of nodeIds in the association group groupId in the form:<br>
-    assocGroup_X:Max:Y Nodes:id,id...
+    assocGroup_X:Max Y, Nodes id,id...
     </li>
 
   <br><br><b>Class VERSION</b>
   <li>version<br>
     return the version information of this node in the form:<br>
-    Lib:A Prot:x.y App:a.b
+    Lib A Prot x.y App a.b
+    </li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>mcEndpoints<br>
+    return the list of endpoints available, e.g.:<br>
+    mcEndpoints: total 2, identical
+    </li>
+  <li>mcCapability chid<br>
+    return the classes supported by the endpoint/channel chid. If the channel
+    does not exists, create a FHEM node for it. Example:<br>
+    mcCapability_02:SWITCH_BINARY<br>
+    <b>Note:</b> This is the best way to create the secondary nodes of a
+    MULTI_CHANNEL device. The device is only created for channel 2 or greater.
     </li>
 
   </ul>
@@ -709,16 +777,17 @@ ZWave_Undef($$)
   <li>wakeupReport:interval:X target:Y</li>
 
   <br><br><b>Class ASSOCIATION</b>
-  <li>assocGroup_X:Max:Y Nodes:A,B,...</li>
+  <li>assocGroup_X:Max Y Nodes A,B,...</li>
 
   <br><br><b>Class VERSION</b>
-  <li>Lib:A Prot:x.y App:a.b</li>
+  <li>version:Lib A Prot x.y App a.b</li>
+
+  <br><br><b>Class MULTI_CHANNEL</b>
+  <li>endpoints:total X $dynamic $identical</li>
+  <li>mcCapability_X:class1 class2 ...</li>
 
   </ul>
 </ul>
-
-
-
 
 =end html
 =cut
