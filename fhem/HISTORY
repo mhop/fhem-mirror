@@ -519,3 +519,6 @@
 
 - Sat Aug 11 2012 (M. Fischer)
   - Added new module IPCAM
+  
+- Tue Feb 19 2013 (Johannes)
+  - added new Javascript Frontend based on ExtJS (by Johannes)
