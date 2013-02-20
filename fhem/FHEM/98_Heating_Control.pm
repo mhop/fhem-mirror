@@ -95,13 +95,13 @@ Heating_Control_Define($$)
   }
 
   for(my $i=0; $i<@a; $i++) {
-    #prüfen auf Angabe eines Schaltpunktes
+    #pruefen auf Angabe eines Schaltpunktes
     my @t = split(/\|/, $a[$i]);
     my $anzahl = @t;
-    if ( $anzahl ~~ [2,3]) {
+    if ( $anzahl >= 2 && $anzahl <= 3) {
       push(@switchingtimes, $a[$i]);
     } else { 
-      #der Rest ist das auzuführende Kommando/condition
+      #der Rest ist das auzufuehrende Kommando/condition
       $conditionOrCommand = trim(join(" ", @a[$i..@a-1]));
       last; 
     }
@@ -145,13 +145,13 @@ Heating_Control_Define($$)
        $dayNumber{$day} = $idx; $idx++;
     }
 
-    #Aufzählung 1234 ...
+    #Aufzaehlung 1234 ...
     if (      $daylist =~  m/^(\d){0,7}$/g) {
 
         @days = split("", $daylist);
         @hdays{@days}=1;
 
-    # Aufzählung Sa,So,... | Mo-Di,Do,Fr-Mo
+    # Aufzaehlung Sa,So,... | Mo-Di,Do,Fr-Mo
     } elsif ($daylist =~  m/^($daysRegExp(,|-|$)){0,7}$/g   ) {
 
       my $oldDay, my $oldDel;
@@ -193,7 +193,7 @@ Heating_Control_Define($$)
     }
   }
 
-  #desired-temp des Zieldevices auswählen
+  #desired-temp des Zieldevices auswaehlen
   if($defs{$device}{TYPE} eq "MAX") {
     $hash->{helper}{DESIRED_TEMP_READING} = "desiredTemperature"
   } else {
@@ -258,7 +258,7 @@ Heating_Control_Update($)
 
   for (my $d=0; $d<@days; $d++) {
     Log $loglevel, "d------------>$d--->nextSwitch:$nextSwitch";
-    #über jeden Tag
+    #ueber jeden Tag
     last if ($nextSwitch > 0);
     Log $loglevel, "days[$d]------------>$days[$d]";
     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$days[$d]} })) {
