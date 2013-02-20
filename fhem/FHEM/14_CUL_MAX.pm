@@ -513,9 +513,6 @@ CUL_MAX_BroadcastTime(@)
 
       CUL_MAX_SendTimeInformation($hash, $addr, $payload) if( [gmtime()]->[2] % 6 == $h );
     }
-    else {
-      Log GetLogLevel($hash->{NAME}, 5), "Not sending to $addr, type $dhash->{type}, $dhash->{IODev}{NAME}"
-    }
   }
 
   #Check again in 1 hour if some thermostats with the right TimeInformationHour need updating
