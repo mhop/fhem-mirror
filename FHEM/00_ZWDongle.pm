@@ -361,7 +361,7 @@ ZWDongle_DoInit($)
   my $hash = shift;
   my $name = $hash->{NAME};
 
-  DevIo_SetHwHandshake($hash);
+  DevIo_SetHwHandshake($hash) if($hash->{USBDev});
   ZWDongle_Clear($hash);
   ZWDongle_Get($hash, $name, "devList"); # Make the following query faster (?)
   ZWDongle_Get($hash, $name, "homeId");
@@ -530,8 +530,11 @@ ZWDongle_Ready($)
 
   # This is relevant for windows/USB only
   my $po = $hash->{USBDev};
-  my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
-  return ($InBytes>0);
+  if($po) {
+    my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+    return ($InBytes>0);
+  }
+  return 0;
 }
 
 1;
