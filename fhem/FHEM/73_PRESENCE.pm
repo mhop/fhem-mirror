@@ -510,7 +510,11 @@ PRESENCE_DoLocalBluetoothScan($)
     my $wait = 1;
     my $ps;
     
-    if($hcitool)
+    Log GetLogLevel($name, 4), "PRESENCE ($name): 'which hcitool' returns: $hcitool";
+    chomp $hcitool;
+    
+    
+    if(-x $hcitool)
     {
         while($wait)
         {   # check if another hcitool process is running
@@ -518,6 +522,7 @@ PRESENCE_DoLocalBluetoothScan($)
     	   if(not $ps =~ /^\s*$/)
     	   {
     	     # sleep between 1 and 5 seconds and try again
+    	     Log GetLogLevel($name, 5), "PRESENCE ($name) - another hcitool command is running. waiting...";
     	     sleep(rand(4)+1);
     	   }
     	   else
@@ -527,8 +532,10 @@ PRESENCE_DoLocalBluetoothScan($)
     	 }
     	   
 	$devname = qx(hcitool name $device);
+
 	chomp($devname);
-    
+	Log GetLogLevel($name, 4), "PRESENCE ($name) - hcitool returned: $devname";
+
 	if(not $devname =~ /^\s*$/)
 	{
 	    $return = "$name|$local|present|$devname";
