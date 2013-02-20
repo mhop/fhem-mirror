@@ -187,9 +187,6 @@ MAX_ParseWeekProfile(@) {
   # int minute = time % 60;
   # int temperature = ((value >> 9) & 0x3F) / 2;
 
-  my $beginUpdate = !exists($hash->{".updateTimestamp"});
-  readingsBeginUpdate($hash) if($beginUpdate);
-
   my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
   #parse weekprofiles for each day
   for (my $i=0;$i<7;$i++) {
@@ -221,7 +218,6 @@ MAX_ParseWeekProfile(@) {
    readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-time", $time_prof_str );
    readingsBulkUpdate($hash, "weekprofile-$i-$decalcDays{$i}-temp", $temp_prof_str );
   }
-  readingsEndUpdate($hash, 1) if($beginUpdate);
 }
 #############################
 
@@ -716,7 +712,7 @@ MAX_Parse($$)
   } elsif($msgtype eq "AckConfigWeekProfile") {
     my ($day, $part, $profile) = @args;
 
-    my $curWeekProfile = MAX_ReadingsVal($hash, ".weekProfile");
+    my $curWeekProfile = MAX_ReadingsVal($shash, ".weekProfile");
     substr($curWeekProfile, $day*52+$part*2*2*7, length($profile)) = $profile;
     readingsBulkUpdate($shash, ".weekProfile", $curWeekProfile);
     MAX_ParseWeekProfile($shash);
