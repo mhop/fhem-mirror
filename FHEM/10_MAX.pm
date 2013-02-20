@@ -622,9 +622,14 @@ MAX_Parse($$)
       my $panel = vec($bits2, 5, 1); #1 if the heating thermostat is locked for manually setting the temperature at the device
       my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
       my $batterylow = vec($bits2, 7, 1); #1 if battery is low
-      Log 2, "Warning: WallThermostatState null1: $null1 null2: $null2 should be both zero" if($null1 != 0 || $null2 != 0);
 
-      Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature";
+      my $untilStr = "";
+      if(defined($null2) and ($null1 != 0 or $null2 != 0)) {
+        $untilStr = MAX_ParseDateTime($null1,$heaterTemperature,$null2)->{str};
+        $heaterTemperature = "";
+      }
+
+      Log GetLogLevel($shash->{NAME}, 5), "battery $batterylow, rferror $rferror, panel $panel, langateway $langateway, dstsetting $dstsetting, mode $mode, displayActualTemperature $displayActualTemperature, heaterTemperature $heaterTemperature, untilStr $untilStr";
       $shash->{rferror} = $rferror;
       readingsBulkUpdate($shash, "mode", $ctrl_modes[$mode] );
       readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
