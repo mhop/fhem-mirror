@@ -153,7 +153,7 @@ SYSSTAT_GetUpdate($)
     InternalTimer(gettimeofday()+$hash->{INTERVAL}, "SYSSTAT_GetUpdate", $hash, 1);
   }
 
-  my $load = $hash->{loadavg}->get;
+  #my $load = $hash->{loadavg}->get;
   my $load = SYSSTAT_getLoadAVG( $hash );
 
   $hash->{STATE} = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15};
