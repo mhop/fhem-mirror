@@ -415,7 +415,7 @@ ZWave_mcCapability($$)
   }
   return "mcCapability_$chid:no classes" if(!@classes);
 
-  if(hex($chid) > 1 &&  !$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
+  if(!$modules{ZWave}{defptr}{"$homeId $id$chid"}) {
     my $lid = hex("$id$chid");
     my $lcaps = substr($caps, 2);
     $id = hex($id);
