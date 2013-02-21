@@ -81,7 +81,9 @@ Heating_Control_Define($$)
   my $device     = shift @a;
   my @switchingtimes;
   my $conditionOrCommand = "";
-  my @Wochentage = ("Montag","Dienstag","Mittwoch","Donnerstag","Freitag","Samstag","Sonntag");
+
+  my @Wochentage_de = ("Montag","Dienstag","Mittwoch", "Donnerstag","Freitag","Samstag", "Sonntag");
+  my @Wochentage_en = ("Monday","Tuesday", "Wednesday","Thursday",  "Friday", "Saturday","Sunday");
 
   return "invalid Device, given Device <$device> not found" if(!$defs{$device});
 
@@ -90,8 +92,9 @@ Heating_Control_Define($$)
   delete($hash->{helper}{COMMAND})           if($hash->{helper}{COMMAND});
   delete($hash->{helper}{SWITCHINGTIMES})    if($hash->{helper}{SWITCHINGTIMES});
   delete($hash->{helper}{SWITCHINGTIME})     if($hash->{helper}{SWITCHINGTIME});
-  for (my $w=0; $w<@Wochentage; $w++) {
-    delete($hash->{"PROFILE ".($w+1).": ".$Wochentage[$w]}) if($hash->{"PROFILE ".($w+1).": ".$Wochentage[$w]});
+  for (my $w=0; $w<@Wochentage_de; $w++) {
+    delete($hash->{"PROFILE ".($w+1).": ".$Wochentage_de[$w]}) if($hash->{"PROFILE ".($w+1).": ".$Wochentage_de[$w]});
+    delete($hash->{"PROFILE ".($w+1).": ".$Wochentage_en[$w]}) if($hash->{"PROFILE ".($w+1).": ".$Wochentage_en[$w]});
   }
 
   for(my $i=0; $i<@a; $i++) {
@@ -108,16 +111,28 @@ Heating_Control_Define($$)
   }
 
   $hash->{NAME}           = $name;
-  $hash->{helper}{SWITCHINGTIMES} = join(" ", @switchingtimes); 
   $hash->{DEVICE}         = $device;
-  
+  $hash->{helper}{SWITCHINGTIMES} = join(" ", @switchingtimes); 
   if($conditionOrCommand =~  m/^\(.*\)$/g) {         #condition (*)
      $hash->{helper}{CONDITION} = $conditionOrCommand;
   } elsif(length($conditionOrCommand) > 0 ) {
      $hash->{helper}{COMMAND} = $conditionOrCommand;
   }  
 
-  my (@st, @days, $daylist, $time, $temp);
+  my $daysRegExp    = "(mo|di|mi|do|fr|sa|so|tu|we|th|su)";
+  my $daysRegExp_en = "(tu|we|th|su)";
+
+  my %dayNumber=();
+  my $idx = 1;
+  foreach my $day  ("mo","di","mi","do","fr","sa","so") {
+     $dayNumber{$day} = $idx; $idx++;
+  }
+  $idx = 1;
+  foreach my $day  ("mo","tu","we","th","fr","sa","su") {
+     $dayNumber{$day} = $idx; $idx++;
+  }
+
+  my (@st, @days, $daylist, $time, $temp, $englisch);
   for(my $i=0; $i<@switchingtimes; $i++) {
     
     @st = split(/\|/, $switchingtimes[$i]);
@@ -131,19 +146,7 @@ Heating_Control_Define($$)
       $temp    = $st[2];
     }
 
-    my %dayNumber=();
     my %hdays=();
-    my $daysRegExp = "(mo|di|mi|do|fr|sa|so|tu|we|th|su)";
-
-    #wday              01   02   03   04   05   06   00
-    my $idx = 1;                                #    07  !!!
-    foreach my $day  ("mo","di","mi","do","fr","sa","so") {
-       $dayNumber{$day} = $idx; $idx++;
-    }
-    $idx = 1;
-    foreach my $day  ("mo","tu","we","th","fr","sa","su") {
-       $dayNumber{$day} = $idx; $idx++;
-    }
 
     #Aufzaehlung 1234 ...
     if (      $daylist =~  m/^(\d){0,7}$/g) {
@@ -154,10 +157,11 @@ Heating_Control_Define($$)
     # Aufzaehlung Sa,So,... | Mo-Di,Do,Fr-Mo
     } elsif ($daylist =~  m/^($daysRegExp(,|-|$)){0,7}$/g   ) {
 
-      my $oldDay, my $oldDel;
+      my $oldDay = "", my $oldDel = "";
       for (;length($daylist);) {
         my $day = substr($daylist,0,2,"");
         my $del = substr($daylist,0,1,"");
+        $englisch = ($day =~  m/^($daysRegExp_en)$/g);
         my @subDays;
         if ($oldDel eq "-" ){
            # von bis Angabe: Mo-Di
@@ -201,14 +205,20 @@ Heating_Control_Define($$)
   }
 
   $hash->{helper}{UNIT} = "°C";
-
   my $unit = $hash->{helper}{UNIT};
+
+  my $rWochentage;
+  if ($englisch) {
+     $rWochentage = \@Wochentage_en;
+  } else {
+     $rWochentage = \@Wochentage_de;
+  }
 
   # Profile sortiert aufbauen
   for (my $d=1; $d<=7; $d++) {
     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$d} })) {
       my $temp = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
-      $hash->{"PROFILE ".($d).": ".$Wochentage[$d-1]} .= sprintf("%s: %.1f%s, ", $st, $temp, $unit);
+      $hash->{"PROFILE ".($d).": ".$$rWochentage[$d-1]} .= sprintf("%s: %.1f%s, ", $st, $temp, $unit);
     }
   }
 
