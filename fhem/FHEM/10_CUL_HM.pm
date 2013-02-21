@@ -174,20 +174,20 @@ my %culHmModel=(
   "0064" => {name=>"DORMA_atent"             ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",}, # DORMA Remote 3 buttons
   "0065" => {name=>"DORMA_BRC-H"             ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",}, # Dorma Remote 4 single buttons
   "0066" => {name=>"HM-LC-SW4-WM"            ,st=>'switch'            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3
-  "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3
+  "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},#Sw:1:1,
+  "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},#Sw:1:1,
   "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
   "006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"Led:1:16",},
-  "006E" => {name=>"HM-LC-Dim1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3		
-  "006F" => {name=>"HM-LC-Dim1L-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3
-  "0070" => {name=>"HM-LC-Dim2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},#Sw1_V:3:4,Sw2_V:5:6
-  "0071" => {name=>"HM-LC-Dim1T-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3
-  "0072" => {name=>"HM-LC-Dim1T-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3
-  "0073" => {name=>"HM-LC-Dim1T-FM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},#Sw:1:1,Sw1_V:2:3
-  "0074" => {name=>"HM-LC-Dim2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},#Sw1_V:3:4,Sw2_V:5:6
+  "006E" => {name=>"HM-LC-Dim1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,	
+  "006F" => {name=>"HM-LC-Dim1L-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
+  "0070" => {name=>"HM-LC-Dim2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
+  "0071" => {name=>"HM-LC-Dim1T-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
+  "0072" => {name=>"HM-LC-Dim1T-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
+  "0073" => {name=>"HM-LC-Dim1T-FM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
+  "0074" => {name=>"HM-LC-Dim2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
   "0075" => {name=>"HM-OU-CFM-PL"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",},
   "0076" => {name=>"HM-Sys-sRP-Pl"           ,st=>'repeater'          ,cyc=>''      ,rxt=>''    ,lst=>'2'            ,chn=>"",}, # repeater
   "0078" => {name=>"HM-Dis-TD-T"             ,st=>'switch'            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",}, #
@@ -217,6 +217,7 @@ my %culHmModel=(
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
   "0093" => {name=>"Schueco_263-158"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
   "0094" => {name=>"Schueco_263-157"         ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
   "00A1" => {name=>"HM-LC-SW1-PL2"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -302,6 +303,7 @@ sub CUL_HM_updateConfig($){
     if (!$webCmd){
 	  if((length (CUL_HM_hash2Id($hash)) == 6)&&
 	         $hash->{channel_01}  &&
+	         $st ne "virtual"     &&
 			 $st ne "thermostat"   ){$webCmd="getConfig";
 	  }elsif($st eq "blindActuator"){$webCmd="toggle:on:off:stop:statusRequest";
 	  }elsif($st eq "dimmer"       ){$webCmd="toggle:on:off:statusRequest";
@@ -408,10 +410,11 @@ sub CUL_HM_Rename($$$) {#############################
 sub CUL_HM_Parse($$) {#############################
   my ($iohash, $msg) = @_;
   my $id = CUL_HM_Id($iohash);
+  my $ioName = $iohash->{NAME};
   # Msg format: Allnnffttssssssddddddpp...
   $msg =~ m/A(..)(..)(..)(..)(......)(......)(.*)/;
-  my ($len,$msgcnt,$msgFlag,$msgType,$src,$dst,$p) = ($1,$2,$3,$4,$5,$6,$7);
-  $p = "" if(!defined($p));
+  my ($len,$msgcnt,$msgFlag,$msgType,$src,$dst,$p1) = ($1,$2,$3,$4,$5,$6,$7);
+  $p1 = "" if(!defined($p1));
   my $cmd = "$msgFlag$msgType"; #still necessary to maintain old style
   my $lcm = "$len$cmd";
   # $shash will be replaced for multichannel commands
@@ -419,14 +422,13 @@ sub CUL_HM_Parse($$) {#############################
   my $dhash = $modules{CUL_HM}{defptr}{$dst};
   my $dname = ($dst eq "000000") ? "broadcast" :
                                    ($dhash ? $dhash->{NAME} : 
-								             ($dst eq $id ? $iohash->{NAME} : 
+								             ($dst eq $id ? $ioName : 
 											                $dst));
   my $target = " (to $dname)";
-  my $msgStat;
-  ($p,$msgStat) = split(":",$p,2);
+  my ($p,$msgStat,$myRSSI) = split(":",$p1,3);
   return "" if($msgStat && $msgStat eq 'NACK');#discard TCP errors from HMlan. Resend will cover it
   return "" if($src eq $id);#discard mirrored messages
-
+  
   $respRemoved = 0;  #set to 'no response in this message' at start
   if(!$shash) {      #  Unknown source
     # Generate an UNKNOWN event for pairing requests, ignore everything else
@@ -448,7 +450,11 @@ sub CUL_HM_Parse($$) {#############################
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
   my $tn = TimeNow();
-  
+
+  CUL_HM_storeRssi($name,
+                   "to_".((hex($msgFlag)&0x40)?"rpt_":"").$ioName,# repeater?
+                   $myRSSI);
+
   # return if duplicate
   my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst ".($p?$p:"");
 
@@ -465,7 +471,7 @@ sub CUL_HM_Parse($$) {#############################
     return ""; #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
-  $iohash->{HM_CMDNR} = hex($msgcnt) if($dst eq $id);# update messag counter to receiver
+  $iohash->{HM_CMDNR} = hex($msgcnt) if($dst eq $id);# updt message cnt to rec
 
   CUL_HM_DumpProtocol("RCV",$iohash,$len,$msgcnt,$msgFlag,$msgType,$src,$dst,$p);
 
@@ -735,14 +741,20 @@ sub CUL_HM_Parse($$) {#############################
       push @event, "ValveOffset:$of %";
     }
   } 
-  elsif($model eq "HM-CC-SCD"){ ###############################################
+  elsif($model eq "HM-Sen-Wa-Od"||
+        $model eq "HM-CC-SCD"   ){ ############################################
     if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($msgType eq "10" && $p =~ m/^06/) ||  #or Info_Status message here
 	    ($msgType eq "41"))                { 
-	  my $co2Lvl = substr($p,4,2);
+	  my $level = substr($p,4,2);
 	  my %lvl=("00"=>"normal","64"=>"added","C8"=>"addedStrong");
-	  push @event, "state:".$lvl{$co2Lvl};
-	}
+      $level = hex($level)   if($model eq "HM-Sen-Wa-Od");
+	  $level = $lvl{$level}  if($model eq "HM-CC-SCD");
+	  push @event, "state:".$level."%";
+	  
+	  my $err = hex(substr($p,6,2));
+	  push @event, "battery:".($err&0x80?"low":"ok") if (defined $err);
+	}  
   }
   elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ##########################
     if($p =~ m/.14(.)0200(..)(..)(..)/) {# todo very risky - no start...
@@ -861,6 +873,17 @@ sub CUL_HM_Parse($$) {#############################
 	  readingsSingleUpdate($chnHash,"state",$state.$target,1);#trig chan also 
       push @event,"battery:". (($buttonField&0x80)?"low":"ok");
       push @event,"state:$btnName $state$target";
+    }
+  }
+  elsif($st eq "repeater"){ ###################################################
+    if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
+        ($msgType eq "10" && $p =~ m/^06/)) {  #or Info_Status message here
+      my ($state,$err) = ($1,hex($2)) if ($p =~ m/^....(..)(..)/);
+      # not sure what level are possible
+      push @event, "state:".($state eq '00'?"ok":"level:".$state);
+      push @event, "battery:".   (($err&0x80)?"low"  :"ok"  );
+      my $flag = ($err>>4) &0x7;
+      push @event, "flags:".     (($flag)?"none"     :$flag  );
     }
   }
   elsif($st eq "virtual"){#####################################################
@@ -1165,21 +1188,21 @@ sub CUL_HM_Parse($$) {#############################
 	    next if (!$modules{CUL_HM}{defptr}{$dChId});
 		my $dChNo = substr($dChId,6,2);
 		my $dChName = CUL_HM_id2Name($dChId);
-	    my @peerIDs = split(',',AttrVal($dChName,"peerIDs",""));
 
 		if (AttrVal($dChName,"peerIDs","") =~m/$recId/){# is in peerlist?
 		  my $dChHash = CUL_HM_name2Hash($dChName);
 		  $dChHash->{helper}{trgLgRpt} = 0 
 		        if (!defined($dChHash->{helper}{trgLgRpt}));
 		  $dChHash->{helper}{trgLgRpt} +=1;
+		  my $trgLgRpt = $dChHash->{helper}{trgLgRpt};
 		  
 		  my $state  = ReadingsVal($dChName,"virtActState","OFF");
 		  my $tNoOld = ReadingsVal($dChName,"virtActTrigNo","0");
 		  $state = ($state eq "OFF")?"ON":"OFF" if ($trigNo ne $tNoOld);
 		  if (hex($msgFlag)&0x20){
 		    $longPress .= "_Release";
-			$dhash->{helper}{trgLgRpt}=0;
-		    CUL_HM_SndCmd($dChHash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
+			$dChHash->{helper}{trgLgRpt}=0;
+		    CUL_HM_SndCmd($dhash,$msgcnt."8002".$dst.$src.'01'.$dChNo.
                   (($state eq "ON")?"C8":"00")."00");
 			$sendAck = "";
 		  }
@@ -1187,7 +1210,7 @@ sub CUL_HM_Parse($$) {#############################
 		                           "virtActState:".$state,
 			                       "virtActTrigger:".CUL_HM_id2Name($recId),
 						           "virtActTrigType:".$longPress,
-						           "virtActTrigRpt:".$dChHash->{helper}{trgLgRpt},
+						           "virtActTrigRpt:".$trgLgRpt,
 						           "virtActTrigNo:".$trigNo	);
         }	
 	  }
@@ -1452,6 +1475,20 @@ my %culHmRegDefine = (
   lowBatLimit     =>{a=> 18.0,s=>1  ,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit"},
   batDefectLimit  =>{a=> 19.0,s=>1  ,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
+  localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
+
+  waterUppThr     =>{a=>  6.0,s=>1  ,l=>1,min=>0  ,max=>256     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water upper threshold"},
+  waterlowThr     =>{a=>  7.0,s=>1  ,l=>1,min=>0  ,max=>256     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"water lower threshold"},
+  caseDesign      =>{a=> 90.0,s=>1  ,l=>1,min=>1  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"case desing"               ,lit=>{verticalBarrel=>1,horizBarrel=>2,rectangle=>3}},
+  caseHigh        =>{a=> 94.0,s=>2  ,l=>1,min=>100,max=>10000   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case hight"},
+  fillLevel       =>{a=> 98.0,s=>2  ,l=>1,min=>100,max=>300     ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"fill level"},
+  caseWidth       =>{a=>102.0,s=>2  ,l=>1,min=>100,max=>10000   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case width"},
+  caseLength      =>{a=>106.0,s=>2  ,l=>1,min=>100,max=>10000   ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>"case length"},
+  meaLength       =>{a=>108.0,s=>2  ,l=>1,min=>110,max=>310     ,c=>''         ,f=>''      ,u=>'cm'  ,d=>1,t=>""},
+  useCustom       =>{a=>110.0,s=>1  ,l=>1,min=>110,max=>310     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"use custom"      ,lit=>{off=>0,on=>1}},
+
+  fillLvlUpThr    =>{a=>  4.0,s=>1  ,l=>4,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"fill level upper threshold"},
+  fillLvlLoThr    =>{a=>  5.0,s=>1  ,l=>4,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"fill level lower threshold"},
 
   evtFltrPeriod   =>{a=>  1.0,s=>0.4,l=>1,min=>0.5,max=>7.5     ,c=>'factor'   ,f=>2       ,u=>'s'   ,d=>1,t=>"event filter period"},
   evtFltrNum      =>{a=>  1.4,s=>0.4,l=>1,min=>1  ,max=>15      ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"sensitivity - read sach n-th puls"},
@@ -1582,7 +1619,17 @@ my %culHmRegModel = (
                        lowBatLimit     =>1,batDefectLimit  =>1,
                                                                transmitTryMax  =>1,},
   "HM-Sys-sRP-Pl"   =>{compMode        =>1,},
-);
+
+
+
+  "HM-Sen-Wa-Od"    =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
+                       localResDis     =>1,ledOnTime       =>1,transmitTryMax  =>1,
+                       waterUppThr     =>1,waterlowThr     =>1,caseDesign      =>1,caseHigh        =>1,
+                       fillLevel       =>1,caseWidth       =>1,caseLength      =>1,meaLength       =>1,
+                       useCustom       =>1,					   
+                       fillLvlUpThr    =>1,fillLvlLoThr    =>1,
+                       expectAES       =>1,peerNeedsBurst  =>1,},
+  );
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"      =>{dispTempHum  =>1,dispTempInfo =>1,dispTempUnit =>1,mdTempReg   =>1,
 			           mdTempValve  =>1,tempComfort  =>1,tempLower    =>1,partyEndDay =>1,
@@ -3071,7 +3118,9 @@ sub CUL_HM_getConfig($$$$$){
 ###################-------send related --------################
 sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
+  $hash = CUL_HM_getDeviceHash($hash); 
   my $io = $hash->{IODev};
+  return if(!$io);  
 
   $cmd =~ m/^(..)(.*)$/;
   my ($mn, $cmd2) = ($1, $2);
@@ -3113,7 +3162,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   	  #--- remove readings in channel
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
   	  $chnhash = $hash if (!$chnhash);
-  	  $chnhash->{READINGS}{peerList}{VAL}="";#empty old list
+  	  delete $chnhash->{READINGS}{peerList};#empty old list
 	  $attr{$chnhash->{NAME}}{peerIDs} = '';
 	  return;
     }
@@ -3327,7 +3376,12 @@ sub CUL_HM_ID2PeerList ($$$) {
 				  .",";                             # dont forget separator
   }
   $attr{$name}{peerIDs} = $peerIDs;                 # make it public
-  readingsSingleUpdate($hash,"peerList",$peerNames,0);
+  if ($peerNames){
+    readingsSingleUpdate($hash,"peerList",$peerNames,0) ;
+  }
+  else{ 
+    delete $hash->{READINGS}{peerList};
+  }
 }
 ###################  Conversions  ################
 sub CUL_HM_getExpertMode($) { # get expert level for the entity. 
@@ -3571,7 +3625,7 @@ my %culHmBits = (
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
                      "BURST", "BIDI", "RPTED", "RPTEN");
 					 #RPTEN    0x80: set in every message. Meaning?
-					 #RPTED    0x40: ???
+					 #RPTED    0x40: repeated (repeater operation)
                      #BIDI     0x20: response is expected
 					 #Burst    0x10: set if burst is required by device
 					 #Bit3     0x08:
@@ -3675,8 +3729,17 @@ sub CUL_HM_parseCommon(@){#############################
 	  CUL_HM_respPendRm($shash);
 	  $reply = "NACK"; 
 	}
+	elsif($subType eq "01"){ #ACKinfo#################
+      
+	  my $rssi = substr($p,8,2);# --calculate RSSI
+      CUL_HM_storeRssi(CUL_HM_hash2Name($shash),
+                        ($dhash?CUL_HM_hash2Name($dhash):$shash->{IODev}{NAME}),
+						(-1)*(hex($rssi)))
+			if ($rssi && $rssi ne '00' && $rssi ne'80');
+	  $reply = "ACKStatus"; 
+	}
 	else{	  #ACK
-	  $reply = ($subType eq "01")?"ACKStatus":"ACK"; 
+	  $reply = "ACK"; 
 	  $success = "yes";
 	}
 	readingsSingleUpdate($chnhash,"CommandAccepted",$success,1);
@@ -3692,8 +3755,8 @@ sub CUL_HM_parseCommon(@){#############################
 	} 
   }
   elsif($msgType eq "10"){
-    my $subtype = substr($p,0,2);
-	if($subtype eq "01"){ #storePeerList#################
+    my $subType = substr($p,0,2);
+	if($subType eq "01"){ #storePeerList#################
 	  if ($pendType eq "PeerList"){
 		my $chn = $shash->{helper}{respWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
@@ -3731,7 +3794,7 @@ sub CUL_HM_parseCommon(@){#############################
 		return "done";
 	  }
 	}
-	elsif($subtype eq "02" ||$subtype eq "03"){ #ParamResp##################
+	elsif($subType eq "02" ||$subType eq "03"){ #ParamResp==================
 	  if ($pendType eq "RegisterRead"){
 		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
 		my $chnHash = $modules{CUL_HM}{defptr}{$chnSrc}; 
@@ -3781,7 +3844,7 @@ sub CUL_HM_parseCommon(@){#############################
 		return "done";
 	  }
 	}  
-	elsif($subtype eq "04"){ #ParamChange###################
+	elsif($subType eq "04"){ #ParamChange===================================
 	  my($chn,$peerID,$list,$data) = ($1,$2,$3,$4) if($p =~ m/^04(..)(........)(..)(.*)/);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
 	  $chnHash = $shash if(!$chnHash); # will add param to dev if no chan
@@ -3806,7 +3869,12 @@ sub CUL_HM_parseCommon(@){#############################
       readingsSingleUpdate($chnHash,$regLN,$lN,0);
 	  CUL_HM_updtRegDisp($chnHash,$list,$peerID);
 	}  
-	elsif($subtype eq "06"){ #reply to status request#######
+	elsif($subType eq "06"){ #reply to status request=======================
+	  my $rssi = substr($p,8,2);# --calculate RSSI
+      CUL_HM_storeRssi(CUL_HM_hash2Name($shash),
+                        ($dhash?CUL_HM_hash2Name($dhash):$shash->{IODev}{NAME}),
+						(-1)*(hex($rssi)))
+			if ($rssi && $rssi ne '00' && $rssi ne'80');
 	  #todo = what is the answer to a status request
 	  if ($pendType eq "StatusReq"){#it is the answer to our request
 		my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
@@ -4246,6 +4314,20 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
   my ($str) = @_;
   return join ",",CUL_HM_noDup(split ",",$str);
 }
+sub CUL_HM_storeRssi(@){
+  my ($name,$peerName,$val) = @_;
+  $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
+  $defs{$name}{helper}{rssi}{$peerName}{min} = $val if (!$defs{$name}{helper}{rssi}{$peerName}{min} || $defs{$name}{helper}{rssi}{$peerName}{min} > $val);
+  $defs{$name}{helper}{rssi}{$peerName}{max} = $val if (!$defs{$name}{helper}{rssi}{$peerName}{max} || $defs{$name}{helper}{rssi}{$peerName}{max} < $val);
+  $defs{$name}{helper}{rssi}{$peerName}{cnt} ++;
+  if ($defs{$name}{helper}{rssi}{$peerName}{cnt} == 1){
+    $defs{$name}{helper}{rssi}{$peerName}{avg} = $val;
+  }
+  else{
+    $defs{$name}{helper}{rssi}{$peerName}{avg} += ($val - $defs{$name}{helper}{rssi}{$peerName}{avg}) /$defs{$name}{helper}{rssi}{$peerName}{cnt};
+  }
+  return ;
+}
 
 1;
 
@@ -4587,6 +4669,12 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
      <br>
 	 </li>
     <li>dimmer, blindActuator
+	   Dimmer may support virtual channels. Those are autocrated if applicable. Usually there are 2 virtual channels
+	   in addition to the primary channel. Virtual dimmer channels are inactive by default but can be used in 
+	   in parallel to the primay channel to control light. <br>
+	   Virtual channels have default naming SW<channel>_V<no>. e.g. Dimmer_SW1_V1 and Dimmer_SW1_V2.<br>
+	   Dimmer virtual channels are completely different from FHEM virtual buttons and actors but 
+	   are part of the HM device. Documentation and capabilities for virtual channels is out of scope.<br>
        <ul>
          <li><B>0 - 100 [on-time] [ramp-time]</B><br>
              set the actuator to the given value (in percent)
