@@ -262,6 +262,9 @@ sub SYSSTAT_getLoadAVG( $ )
   attr wl_sysstat label "Load Min: $data{min1}, Max: $data{max1}, Aktuell: $data{currval1}"
   attr wl_sysstat room System
   </PRE></li>
+    <li>to match the root filesystem  (mount point '/') in diskusage plots use
+  '<code>#FileLog 4:/\x3a:0:</code>' or '<code>#FileLog 4:\s..\s:0:</code>'
+  and <b>not</b> '<code>#FileLog 4:/:0:</code>' as the later will match all mount points.
   </ul>
 
   <a name="SYSSTAT_Define"></a>
