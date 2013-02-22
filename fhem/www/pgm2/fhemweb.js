@@ -1,7 +1,6 @@
 /*************** LONGPOLL START **************/
 var FW_pollConn;
-//The number of the next line in FW_pollConn.responseText to parse
-var FW_curLine;
+var FW_curLine; // Number of the next line in FW_pollConn.responseText to parse
 
 function
 FW_cmd(arg)     /* see also FW_devState */
@@ -49,6 +48,11 @@ FW_doUpdate()
 
       }
     }
+    el = document.getElementById("slider."+d[0]);
+    if(el) {
+      var val = d[1].replace(/[^\d\.]/g, ""); // remove non numbers
+      Slider(el, val);
+    }
   }
   //Next time, we continue at the next line
   FW_curLine = lines.length;
@@ -85,11 +89,14 @@ FW_delayedStart()
 
 /*************** SLIDER **************/
 function
-Slider(slider, min, stp, max, curr, cmd)
+Slider(slider, curr)
 {
   var sh = slider.firstChild;
   var lastX=-1, offX=0, maxX=0, val=-1;
-  min = parseFloat(min); max = parseFloat(max); stp = parseFloat(stp);
+  var min = parseFloat(slider.getAttribute("min"));
+  var stp = parseFloat(slider.getAttribute("stp"));
+  var max = parseFloat(slider.getAttribute("max"));
+  var cmd = slider.getAttribute("cmd");
 
   function
   init()
@@ -196,13 +203,15 @@ addTime(el,cmd)
     par.appendChild(document.createElement('br'));
 
     var sl = document.createElement('div');
-    sl.innerHTML = '<div class="slider"><div class="handle">'+val[i]+
+    sl.innerHTML = '<div class="slider" min="0" stp='+(i==0 ? 1 : 5)+
+                      ' max='+(i==0 ? 23 : 55)+
+                      ' cmd="js:setTime(slider,"'+(i==0?"H":"M")+'",%)'+
+                      '><div class="handle">'+val[i]+
                    '</div></div>';
     par.appendChild(sl);
     sl.setAttribute('class', par.getAttribute('class'));
 
-    Slider(sl.firstChild, 0, (i==0 ? 1 : 5), (i==0 ? 23 : 55), val[i],
-          'js:setTime(slider,"'+(i==0? "H":"M")+'",%)');
+    Slider(sl.firstChild, val[i]);
   }
 }
 
@@ -219,13 +228,20 @@ FW_selChange(sel, list, elName)
       value = nv[1]; break;
     }
   }
-
   var el = document.getElementsByName(elName)[0];
   var name = el.getAttribute('name');
+
+  var qFn, qArg;
+  var devName="";
+  if(elName.indexOf("val.attr")==0) devName = elName.substring(8);
+  if(elName.indexOf("val.set")==0) devName = elName.substring(7);
 
   if(value==undefined) {
     newEl = document.createElement('input');
     newEl.type='text'; newEl.size=30; 
+    qFn = 'qArg.setAttribute("value", "%")';
+    qArg = newEl;
+
 
   } else {
     var vArr = value.split(","); 
@@ -235,9 +251,12 @@ FW_selChange(sel, list, elName)
           max=parseFloat(vArr[3]);
       newEl = document.createElement('div');
       newEl.innerHTML=
-        '<div class="slider"><div class="handle">'+min+'</div></div>'+
+        '<div class="slider" id="slider.'+devName+'" min="'+min+'" stp="'+stp+
+                  '" max="'+max+'"><div class="handle">'+min+'</div></div>'+
         '<input type="hidden" name="'+name+'" value="'+min+'">';
-      Slider(newEl.firstChild, min, stp, max, undefined, undefined);
+      Slider(newEl.firstChild, undefined);
+      qFn = 'FW_querySetSlider(qArg, "%")';
+      qArg = newEl.firstChild;
 
     } else if(vArr.length == 1 && vArr[0] == "time") {
       newEl = document.createElement('div');
@@ -249,11 +268,55 @@ FW_selChange(sel, list, elName)
       for(var j=0; j < vArr.length; j++) {
         newEl.options[j] = new Option(vArr[j], vArr[j]);
       }
+      qFn = 'FW_querySetSelected(qArg, "%")';
+      qArg = newEl;
     }
+
+
   }
 
   newEl.setAttribute('class', el.getAttribute('class'));
-  newEl.setAttribute('name', el.getAttribute('name'));
+  newEl.setAttribute('name', name);
   el.parentNode.replaceChild(newEl, el);
 
+  if((typeof qFn == "string")) {
+    if(elName.indexOf("val.attr")==0)
+      FW_queryValue('{AttrVal("'+devName+'","'+sel+'","")}', qFn, qArg);
+    if(elName.indexOf("val.set")==0)
+      FW_queryValue('{ReadingsVal("'+devName+'","'+sel+'","")}', qFn, qArg);
+  }
+}
+
+
+/*************** Fill attribute **************/
+function
+FW_queryValue(cmd, qFn, qArg)
+{
+  var qConn = new XMLHttpRequest();
+  qConn.onreadystatechange = function() {
+    if(qConn.readyState != 3)
+      return;
+    qFn = qFn.replace("%", qConn.responseText)
+             .replace(/[\r\n]/g, "");
+    eval(qFn);
+    delete qFn;
+  }
+  qConn.open("GET", document.location.pathname+"?cmd="+cmd+"&XHR=1", true);
+  qConn.send(null);
+}
+
+
+function
+FW_querySetSelected(el, val)
+{
+  for(var j=0;j<el.options.length;j++)
+    if(el.options[j].value == val)
+      el.selectedIndex = j;
+}
+
+function
+FW_querySetSlider(el, val)
+{
+  val = val.replace(/[^\d\.]/g, ""); // remove non numbers
+  Slider(el, val);
 }

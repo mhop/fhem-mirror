@@ -1,9 +1,9 @@
 body     { background-color: #FFFFE7;
-           font-family:Arial, sans-serif; font-size:16px;
+           font-family:Arial, sans-serif; font-size:18px;
          }
-textarea { font-family:Arial, sans-serif; font-size:16px}
-input    { font-family:Arial, sans-serif; font-size:16px}
-select   { font-family:Arial, sans-serif; font-size:16px}
+textarea { font-family:Arial, sans-serif; font-size:18px}
+input    { font-family:Arial, sans-serif; font-size:18px}
+select   { font-family:Arial, sans-serif; font-size:18px}
 #logo    { position:absolute; top:10px; left:10px;
             width:120px;  height:132px; background-image:url(../icons/fhemicon.png); }
 #menu    { position:absolute; top:152px;left:10px; width:140px; }
@@ -25,6 +25,10 @@ table { -moz-border-radius:8px; border-radius:8px; }
 table#room { border:1px solid gray; width: 100%; background: #D7FFFF; }
 table#room tr.sel { background: #A0FFFF; }
 
+div.block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
+div.dist { padding-top:0.3em; }
+button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
+
 /* detail-selector & slider */
 select {  margin-left:5px; margin-right:5px; }
 .set,.attr { margin-bottom:5px; float:left; }
@@ -35,6 +39,7 @@ select {  margin-left:5px; margin-right:5px; }
 .changed { color:red; }
 
 .handle { position:relative; cursor:pointer; width:50px;
-          height:20px; line-height:20px; user-select:none;
+          height:20px; line-height:20px;
+          -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
 .downText { margin-top:2px; }
