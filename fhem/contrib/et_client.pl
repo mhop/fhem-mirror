@@ -42,11 +42,14 @@ for(;;) {
       print "Connect to $ARGV[0] failed";
       exit(1);
     }
+    $fd1->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1); 
+
     my $fd2 = IO::Socket::INET->new(PeerAddr=>$ARGV[1]);
     if(!$fd2) {
       print "Connect to $ARGV[1] failed";
       exit(1);
     }
+    $fd2->setsockopt(SOL_SOCKET, SO_KEEPALIVE, 1); 
 
     $clients{$fd1}{fd}   = $fd1;
     $clients{$fd2}{fd}   = $fd2;
