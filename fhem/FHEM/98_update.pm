@@ -1,9 +1,25 @@
 ################################################################
 # $Id$
 # vim: ts=2:et
-# 
+################################################################
+#
 #  (c) 2012 Copyright: Martin Fischer (m_fischer at gmx dot de)
 #  All rights reserved
+#
+#  This script is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  The GNU General Public License can be found at
+#  http://www.gnu.org/copyleft/gpl.html.
+#  A copy is found in the textfile GPL.txt and important notices to the license
+#  from the author is found in LICENSE.txt distributed with these scripts.
+#
+#  This script is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
 #
 ################################################################
 package main;
@@ -13,18 +29,17 @@ use HttpUtils;
 use File::Copy qw(cp mv);
 
 sub CommandUpdate($$);
-sub update_CheckFhemRelease($$);
-sub update_CheckUpdates($$$$);
+sub update_CheckFhemRelease($$$);
+sub update_CheckNotice($$$);
+sub update_CheckUpdates($$$$$);
 sub update_CleanUpLocalFiles($$$);
 sub update_DoUpdate(@);
-sub update_DoHousekeeping($);
-sub update_GetRemoteFiles($$$);
-sub update_ListChanges($);
+sub update_DoHousekeeping($$);
+sub update_GetRemoteFiles($$$$);
+sub update_ListChanges($$$);
 sub update_MakeDirectory($);
 sub update_ParseControlFile($$$$);
-sub update_WriteLocalControlFile($$$);
-
-my $BRANCH;
+sub update_WriteLocalControlFile($$$$);
 
 
 ########################################
@@ -62,7 +77,7 @@ CommandUpdate($$)
   my @args = split(/ +/,$param);
 
   # set default trunk
-  $BRANCH = (!defined($attr{global}{updatebranch}) ? $DISTRIB_BRANCH : uc($attr{global}{updatebranch}));
+  my $BRANCH = (!defined($attr{global}{updatebranch}) ? $DISTRIB_BRANCH : uc($attr{global}{updatebranch}));
   if ($BRANCH ne "STABLE" && $BRANCH ne "DEVELOPMENT") {
     $ret = "global attribute 'updatebranch': unknown keyword: '$BRANCH'. Keyword should be 'STABLE' or 'DEVELOPMENT'";
     Log 1, "update $ret";
@@ -71,36 +86,71 @@ CommandUpdate($$)
 
   if (!defined($args[0])) {
     push(@args,$BRANCH);
-  } elsif (uc($args[0]) ne "STABLE" && uc($args[0]) ne "DEVELOPMENT") {
+  } elsif (uc($args[0]) ne "STABLE" && uc($args[0]) ne "DEVELOPMENT" && uc($args[0]) ne "THIRDPARTY") {
     unshift(@args,$BRANCH);
-  } elsif (uc($args[0]) eq "STABLE" || uc($args[0]) eq "DEVELOPMENT") {
+  } elsif (uc($args[0]) eq "STABLE" || uc($args[0]) eq "DEVELOPMENT" || uc($args[0]) eq "THIRDPARTY") {
     $args[0] = uc($args[0]);
-    $BRANCH = $args[0];
+    $BRANCH = uc($args[0]);
   }
-
-  # set path for fhem.de
-  my $branch = lc($BRANCH);
-  $branch = "SVN" if ($BRANCH eq "DEVELOPMENT");
-  $srcdir = $UPDATE{path}."/".lc($branch);
 
   # check arguments
-  if (defined($args[1]) && $args[1] eq "?" ||
-     (int(@args) > 3 && uc($args[1]) eq "HOUSEKEEPING") ||
-     (int(@args) > 2 && uc($args[2]) ne "FORCE" && 
-      (uc($args[1]) eq "CHECK"   || 
-       uc($args[1]) eq "FHEM"    || 
-       uc($args[1]) eq "FULL"))  || 
-     (int(@args) > 2   &&
-      (uc($args[1]) ne "CHECK"   &&
-       uc($args[1]) ne "FHEM"    &&
-       uc($args[1]) ne "FULL"    && 
-       uc($args[1]) ne "HOUSEKEEPING"))) {
-    return "Usage: update [development|stable] [<file>|check|fhem|full] [force]";
-  }
+  if (defined($args[1]) && $args[1] eq "?") {
+    # return complete usage
+    $ret  = "Usage:\n";
+    $ret .= "=> FHEM update / check for updates:\n";
+    $ret .= "\tupdate [development|stable] [<file|package>] [force]\n";
+    $ret .= "\tupdate [development|stable] check\n";
+    $ret .= "\tupdate housekeeping\n";
+    $ret .= "=> Third party package update / check for a package update:\n";
+    $ret .= "\tupdate thirdparty <url> <package> [force]\n";
+    $ret .= "\tupdate thirdparty <url> <package> check";
+    return $ret;
 
-  # check arguments for housekeeping
-  if (defined($args[1]) && uc($args[1]) eq "HOUSEKEEPING" && (int(@args) > 2 )) {
-    return "Usage: update housekeeping";
+  } elsif (int(@args) <= 2 && $BRANCH eq "THIRDPARTY") {
+    # missing arguments for third party package
+    $ret  = "Usage:\n";
+    $ret .= "\tupdate thirdparty <url> <package|file> [force]\n";
+    $ret .= "\tupdate thirdparty <url> <package> check";
+    return $ret;
+    
+  } elsif (int(@args) > 2) {
+
+    if (grep (m/^HOUSEKEEPING$/i,@args)) {
+      return "Usage: update housekeeping";
+
+    } elsif (grep (m/^CHECK$/i,@args)) {
+
+      if (($BRANCH eq "STABLE"       ||
+           $BRANCH eq "DEVELOPMENT") &&
+           $BRANCH ne "THIRDPARTY"
+      ) {
+        return "Usage: update [development|stable] check";
+
+      } elsif ($BRANCH eq "THIRDPARTY"  &&
+          (uc($args[1]) !~ m/^HTTP:/    ||
+           uc($args[3]) !~ "CHECK"      ||
+           int(@args) != 4)
+      ) {
+        return "Usage: update thirdparty <url> <package> check";
+      }
+
+    } elsif ($BRANCH eq "THIRDPARTY"  &&
+        (uc($args[1]) !~ m/^HTTP:/    ||
+          (int(@args) == 4            &&
+           uc($args[3]) ne "FORCE")   ||
+          int(@args) > 4)
+      ) {
+        return "Usage: update thirdparty <url> <package> [force]";
+
+    } elsif ($BRANCH ne "THIRDPARTY"  &&
+        (exists $UPDATE{uc($args[1])} &&
+          (int(@args) == 3            &&
+           uc($args[2]) ne "FORCE")   ||
+          int(@args) > 3)
+      ) {
+      return "Usage: update [development|stable] <package> [force]";
+    }
+
   }
 
   # set default update
@@ -109,30 +159,44 @@ CommandUpdate($$)
         (uc($args[1]) eq "FORCE") ||
          uc($args[1]) eq "HOUSEKEEPING")) {
     $update = "FHEM";
+  } elsif (exists $UPDATE{uc($args[1])}) {
+    $update = uc($args[1]);
   } else {
     $update = $args[1];
   }
 
-  # force update
-  $force = 1 if (defined($args[1]) && uc($args[1]) eq "FORCE" ||
-                 defined($args[2]) && uc($args[2]) eq "FORCE");
+  # build sourcedir for update
+  if ($BRANCH ne "THIRDPARTY") {
+    # set path for fhem.de
+    my $branch = lc($BRANCH);
+    $branch = "SVN" if ($BRANCH eq "DEVELOPMENT");
+    $srcdir = $UPDATE{path}."/".lc($branch);
+  } else {
+    # set path for 3rd-party
+    $srcdir = $args[1];
+    $update = $args[2];
+  }
 
-  if (defined($args[1]) && uc($args[1]) eq "CHECK") {
-    $ret = update_ListChanges($srcdir);
+  # force update
+  $force = 1 if (grep (m/^FORCE$/i,@args));
+
+  if (defined($args[1]) && uc($args[1]) eq "CHECK" ||
+      $BRANCH eq "THIRDPARTY" && defined($args[3]) && uc($args[3]) eq "CHECK") {
+    $ret = update_ListChanges($srcdir,$BRANCH,$update);
   } elsif (defined($args[1]) && uc($args[1]) eq "HOUSEKEEPING") {
-    $ret = update_DoHousekeeping($update);
+    $ret = update_DoHousekeeping($BRANCH,$update);
     $ret = "nothing to do..." if (!$ret);
   } else {
     my $unconfirmed;
     my $notice;
-    ($notice,$unconfirmed) = update_CheckNotice("before");
+    ($notice,$unconfirmed) = update_CheckNotice($BRANCH,$update,"before");
     $ret .= $notice if(defined($notice));
     return $ret if($unconfirmed);
     $ret .= update_DoUpdate($srcdir,$BRANCH,$update,$force,$cl);
-    ($notice,$unconfirmed) = update_CheckNotice("after");
+    ($notice,$unconfirmed) = update_CheckNotice($BRANCH,$update,"after");
     $ret .= $notice if(defined($notice));
     my $sendStatistics = AttrVal("global","sendStatistics",undef);
-    if(lc($sendStatistics) eq "onupdate") {
+    if(defined($sendStatistics) && lc($sendStatistics) eq "onupdate") {
       $ret .= "\n\n";
       $ret .= AnalyzeCommandChain(undef, "fheminfo send");
     }
@@ -143,12 +207,13 @@ CommandUpdate($$)
 
 ########################################
 sub
-update_CheckNotice($)
+update_CheckNotice($$$)
 {
-  my ($position) = shift;
+  my ($BRANCH,$update,$position) = @_;
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
   my $noticeDir = "$moddir/FhemUtils";
+  my @notes = ("thirdparty", $update);
   my $ret;
   my $result;
 
@@ -156,12 +221,23 @@ update_CheckNotice($)
   my @unconfirmed;
   my @confirmed;
 
-  $result      = AnalyzeCommandChain(undef, "notice get update 6");
-  @published   = split(",",$result) if($result);
-  $result      = AnalyzeCommandChain(undef, "notice get update 7");
-  @unconfirmed = split(",",$result) if($result);
-  $result      = AnalyzeCommandChain(undef, "notice get update 8");
-  @confirmed   = split(",",$result) if($result);
+  if ($BRANCH ne "THIRDPARTY") {
+    $result      = AnalyzeCommandChain(undef, "notice get update 6");
+    @published   = split(",",$result) if($result);
+    $result      = AnalyzeCommandChain(undef, "notice get update 7");
+    @unconfirmed = split(",",$result) if($result);
+    $result      = AnalyzeCommandChain(undef, "notice get update 8");
+    @confirmed   = split(",",$result) if($result);
+  } else {
+    foreach my $note (@notes) {
+      $result      = AnalyzeCommandChain(undef, "notice get $note 6");
+      push(@published, split(",",$result)) if($result);
+      $result      = AnalyzeCommandChain(undef, "notice get $note 7");
+      push(@unconfirmed, split(",",$result)) if($result);
+      $result      = AnalyzeCommandChain(undef, "notice get $note 8");
+      push(@confirmed, split(",",$result)) if($result);
+    }
+  }
 
   # remove confirmed from published
   my %c;
@@ -195,11 +271,11 @@ update_CheckNotice($)
         ( defined($cmdret) &&  grep (m/^$notice$/,@unconfirmed) && lc($cmdret) eq "after") ||
         (!defined($cmdret) &&  grep (m/^$notice$/,@unconfirmed) && $position eq "before") ||
         (!defined($cmdret) && !grep (m/^$notice$/,@unconfirmed) && $position eq "after") ) {
-        $ret .= "==> Message-ID: $notice\n";
+        $ret .= "\n==> Message-ID: $notice\n";
         my $noticeDE = AnalyzeCommandChain(undef, "notice view $notice noheader de");
         my $noticeEN = AnalyzeCommandChain(undef, "notice view $notice noheader en");
         if($noticeDE && $noticeEN) {
-          $ret .= "(English Translation: Please see below.)\n\n";
+          # $ret .= "(English Translation: Please see below.)\n\n";
           $ret .= $noticeDE;
           $ret .= "~~~~~~~~~~\n";
           $ret .= $noticeEN;
@@ -251,31 +327,52 @@ update_DoUpdate(@)
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
   my $server = $UPDATE{server};
+  my $uri;
+  my $url;
+  my $controlsTxt;
+  my @packages;
   my $fail;
   my $ret = "";
 
-  # Get fhem.pl version
-  my $checkFhemRelease = update_CheckFhemRelease($force,$srcdir);
-  return $checkFhemRelease if ($checkFhemRelease);
+  if ($BRANCH ne "THIRDPARTY") {
+    # Get fhem.pl version
+    my $checkFhemRelease = update_CheckFhemRelease($force,$srcdir,$BRANCH);
+    return $checkFhemRelease if ($checkFhemRelease);
+    # set packages
+    @packages = split(" ",uc($UPDATE{packages}));
+  } else {
+    # set packages
+    @packages = ($update);
+  }
 
   # get list of files
   my $rControl_ref = {};
   my $lControl_ref = {};
-  foreach my $pack (split(" ",uc($UPDATE{packages}))) {
-    Log 3, "update get $server/$srcdir/$UPDATE{$pack}{control}";
-    my $controlFile = GetFileFromURL("$server/$srcdir/$UPDATE{$pack}{control}");
-    return "Can't get '$UPDATE{$pack}{control}' from $server" if (!$controlFile);
+  foreach my $pack (@packages) {
+    if ($BRANCH ne "THIRDPARTY") {
+      $controlsTxt = $UPDATE{$pack}{control};
+      $uri = "$server/$srcdir/$controlsTxt";
+      $url = "$server/$srcdir";
+    } else {
+      $controlsTxt = "controls_$pack.txt";
+      $uri = "$srcdir/$controlsTxt";
+      $server = $srcdir;
+      $url = $server;
+    }
+    Log 3, "update get $uri";
+    my $controlFile = GetFileFromURL($uri);
+    return "Can't get '$controlsTxt' from $server" if (!$controlFile);
     # parse remote controlfile
     ($fail,$rControl_ref) = update_ParseControlFile($pack,$controlFile,$rControl_ref,0);
     return "$fail\nUpdate canceled..." if ($fail);
 
     # parse local controlfile
-    ($fail,$lControl_ref) = update_ParseControlFile($pack,"$moddir/$UPDATE{$pack}{control}",$lControl_ref,1);
+    ($fail,$lControl_ref) = update_ParseControlFile($pack,"$moddir/$controlsTxt",$lControl_ref,1);
     return "$fail\nUpdate canceled..." if ($fail);
   }
 
   # Check for new / modified files
-  my ($checkUpdates,$updateFiles_ref) = update_CheckUpdates($update,$force,$lControl_ref,$rControl_ref);
+  my ($checkUpdates,$updateFiles_ref) = update_CheckUpdates($BRANCH,$update,$force,$lControl_ref,$rControl_ref);
   if (!keys %$updateFiles_ref) {
     return $checkUpdates;
   } else {
@@ -309,19 +406,19 @@ update_DoUpdate(@)
 
   # get new / modified files
   my $getUpdates;
-  ($fail,$getUpdates) = update_GetRemoteFiles($srcdir,$updateFiles_ref,$cl);
+  ($fail,$getUpdates) = update_GetRemoteFiles($BRANCH,$url,$updateFiles_ref,$cl);
   $ret .= $getUpdates if($getUpdates);
   undef($updateFiles_ref);
 
-  foreach my $pack (split(" ",uc($UPDATE{packages}))) {
+  foreach my $pack (@packages) {
     # write local controlfile
-    my $localControlFile = update_WriteLocalControlFile($pack,$lControl_ref,$rControl_ref);
+    my $localControlFile = update_WriteLocalControlFile($BRANCH,$pack,$lControl_ref,$rControl_ref);
     $ret .= $localControlFile if ($localControlFile);
   }
 
   return $ret if($fail);
-  if (uc($update) eq "FULL" || uc($update) eq "FHEM") {
-    my $doHousekeeping = update_DoHousekeeping($update);
+  if (uc($update) eq "FHEM" || $BRANCH eq "THIRDPARTY") {
+    my $doHousekeeping = update_DoHousekeeping($BRANCH,$update);
     $ret .= $doHousekeeping if ($doHousekeeping);
   }
 
@@ -331,19 +428,28 @@ update_DoUpdate(@)
 
 ########################################
 sub
-update_DoHousekeeping($)
+update_DoHousekeeping($$)
 {
-  my ($update) = @_;
+  my ($BRANCH,$update) = @_;
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
   my $cleanup;
-  my $pack = uc($update);
+  my $pack;
   my $ret;
 
   # parse local controlfile
+  my $controlsTxt;
+  if ($BRANCH ne "THIRDPARTY") {
+    $pack = uc($update);
+    $controlsTxt = $UPDATE{$pack}{control};
+  } else {
+    $pack = $update;
+    $controlsTxt = "controls_$pack.txt";
+  }
+
   my $fail;
   my $lControl_ref;
-  ($fail,$lControl_ref) = update_ParseControlFile($pack,"$moddir/$UPDATE{$pack}{control}",$lControl_ref,1);
+  ($fail,$lControl_ref) = update_ParseControlFile($pack,"$moddir/$controlsTxt",$lControl_ref,1);
   return "$fail\nHousekeeping canceled..." if ($fail);
 
 
@@ -431,9 +537,9 @@ update_DoHousekeeping($)
 
 ########################################
 sub
-update_CheckUpdates($$$$)
+update_CheckUpdates($$$$$)
 {
-  my ($update,$force,$lControl_ref,$rControl_ref) = @_;
+  my ($BRANCH,$update,$force,$lControl_ref,$rControl_ref) = @_;
   return "Wildcards are not ( yet ;-) ) allowed." if ($update =~ /(\*|\?)/);
 
   my @exclude;
@@ -447,11 +553,15 @@ update_CheckUpdates($$$$)
   my %updateFiles = ();
 
   # select package
-  $pack = "FHEM";
-  $pack = uc($update) if ($force);
+  if($BRANCH ne "THIRDPARTY") {
+    $pack = "FHEM";
+    $pack = uc($update) if ($force);
+  } else {
+    $pack = $update;
+  }
 
   # build searchstring
-  if (uc($update) ne "FULL" && uc($update) ne "FHEM") {
+  if (uc($update) ne "FHEM" && $BRANCH ne "THIRDPARTY") {
     $singleFile = 1;
     if ($update =~ m/^(\S+)\.(.*)$/) {
       $search = lc($1);
@@ -509,7 +619,7 @@ update_CheckUpdates($$$$)
       last;
     }
 
-    next if (!$force &&
+    next if (-e $f && !$force &&
              $lControl{$pack}{$f}{date} &&
              $rControl{$pack}{$f}{date} eq $lControl{$pack}{$f}{date});
 
@@ -567,9 +677,9 @@ update_CheckUpdates($$$$)
 
 ########################################
 sub
-update_GetRemoteFiles($$$)
+update_GetRemoteFiles($$$$)
 {
-  my ($srcdir,$updateFiles_ref,$cl) = @_;
+  my ($BRANCH,$url,$updateFiles_ref,$cl) = @_;
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
   my $server = $UPDATE{server};
@@ -586,11 +696,13 @@ update_GetRemoteFiles($$$)
     $remoteFile = $f;
     $localFile  = "$modpath/$f";
 
-    # mark for a restart of fhem.pl
-    if ($f =~ m/fhem.pl$/) {
-      $newFhem = 1;  
-      $localFile = $0 if (! -d "updatefhem.dir");
-      $remoteFile = "$f.txt";
+    if ($BRANCH ne "THIRDPARTY") {
+      # mark for a restart of fhem.pl
+      if ($f =~ m/fhem.pl$/) {
+        $newFhem = 1;  
+        $localFile = $0 if (! -d "updatefhem.dir");
+        $remoteFile = "$f.txt";
+      }
     }
 
     # replace special char % in filename
@@ -602,8 +714,8 @@ update_GetRemoteFiles($$$)
     $fpath =~ s/$fname//g;
 
     # get remote File
-    Log 3, "update get $server/$srcdir/$remoteFile";
-    my $fileContent = GetFileFromURL("$server/$srcdir/$remoteFile");
+    Log 3, "update get $url/$remoteFile";
+    my $fileContent = GetFileFromURL("$url/$remoteFile");
     my $fileLength = length($fileContent);
     my $ctrlLength = $updateFiles_ref->{$f}->{size};
 
@@ -679,7 +791,7 @@ update_GetRemoteFiles($$$)
       #}
     }
 
-    if ($newFhem) {
+    if ($newFhem && $BRANCH ne "THIRDPARTY") {
       my $str = "A new version of fhem.pl was installed, 'shutdown restart' is required!";
       Log 1, "update $str";
       $ret .= "\n$str\n";
@@ -697,9 +809,9 @@ update_GetRemoteFiles($$$)
 
 ########################################
 sub
-update_ListChanges($)
+update_ListChanges($$$)
 {
-  my ($srcdir) = @_;
+  my ($srcdir,$BRANCH,$update) = @_;
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
   my $excluded = (!defined($attr{global}{exclude_from_update}) ? "" : $attr{global}{exclude_from_update});
@@ -707,14 +819,26 @@ update_ListChanges($)
   my $pack;
   my $server = $UPDATE{server};
   my $ret = "List of new / modified files since last update:\n";
+  my $uri;
+  my $localControlFile;
+  my $changedFile;
 
-  # select package
-  $pack = "FHEM";
+  if($BRANCH ne "THIRDPARTY") {
+    $pack = "FHEM";
+    $uri = "$server/$srcdir/$UPDATE{$pack}{control}";
+    $localControlFile = "$moddir/$UPDATE{$pack}{control}";
+    $changedFile = "$server/$srcdir/CHANGED";
+  } else {
+    $pack = $update;
+    $uri = "$srcdir/controls_$update.txt";
+    $localControlFile = "$moddir/controls_$update.txt";
+    $changedFile = "$srcdir/CHANGED";
+  }
 
   # get list of files
-  Log 3, "update get $server/$srcdir/$UPDATE{$pack}{control}";
-  my $controlFile = GetFileFromURL("$server/$srcdir/$UPDATE{$pack}{control}");
-  return "Can't get $UPDATE{$pack}{control} from $server" if (!$controlFile);
+  Log 3, "update get $uri";
+  my $controlFile = GetFileFromURL($uri);
+  return "Can't get controlfile from $uri" if (!$controlFile);
 
   # parse remote controlfile
   my $rControl_ref = {};;
@@ -723,7 +847,7 @@ update_ListChanges($)
 
   # parse local controlfile
   my $lControl_ref = {};
-  ($fail,$lControl_ref) = update_ParseControlFile($pack,"$moddir/$UPDATE{$pack}{control}",$lControl_ref,1);
+  ($fail,$lControl_ref) = update_ParseControlFile($pack,$localControlFile,$lControl_ref,1);
   return "$fail" if ($fail);
 
   # Check for new / modified files
@@ -751,7 +875,7 @@ update_ListChanges($)
   } else {
     # get list of changes
     $ret .= "\nList of last changes:\n";
-    my $changed = GetFileFromURL("$server/$srcdir/CHANGED");
+    my $changed = GetFileFromURL($changedFile);
     if (!$changed || $changed =~ m/Error 404/g) {
       $ret .= "Can't get list of changes from $server";
     } else {
@@ -768,9 +892,9 @@ update_ListChanges($)
 
 ########################################
 sub
-update_CheckFhemRelease($$)
+update_CheckFhemRelease($$$)
 {
-  my ($force,$srcdir) = @_;
+  my ($force,$srcdir,$BRANCH) = @_;
   my $server = $UPDATE{server};
   my $versRemote;
   my $ret = undef;
@@ -820,13 +944,19 @@ update_CheckFhemRelease($$)
 
 ########################################
 sub
-update_WriteLocalControlFile($$$)
+update_WriteLocalControlFile($$$$)
 {
-  my ($pack,$lControl_ref,$rControl_ref) = @_;
+  my ($BRANCH,$pack,$lControl_ref,$rControl_ref) = @_;
   my $modpath = (-d "updatefhem.dir" ? "updatefhem.dir":$attr{global}{modpath});
   my $moddir  = "$modpath/FHEM";
-  return "Can't write $moddir/".$UPDATE{$pack}{control}.": $!" if (!open(FH, ">$moddir/".$UPDATE{$pack}{control}));
-  Log 5, "update write $moddir/".$UPDATE{$pack}{control};
+  my $controlsTxt;
+  if ($BRANCH ne "THIRDPARTY") {
+    $controlsTxt = $UPDATE{$pack}{control};
+  } else {
+    $controlsTxt = "controls_$pack.txt";
+  }
+  return "Can't write $moddir/$controlsTxt: $!" if (!open(FH, ">$moddir/$controlsTxt"));
+  Log 5, "update write $moddir/$controlsTxt";
   my %rControl = %$rControl_ref;
   my %lControl = %$lControl_ref;
   foreach my $f (sort keys %{$rControl{$pack}}) {
@@ -845,21 +975,21 @@ update_WriteLocalControlFile($$$)
         $file = defined($lControl{$pack}{$f}{file}) ? $lControl{$pack}{$f}{file} :
                                                       $rControl{$pack}{$f}{file};
       }
-      Log 5, "update ".$UPDATE{$pack}{control}.": $ctrl $date $size $file";
+      Log 5, "update $controlsTxt: $ctrl $date $size $file";
       print FH "$ctrl $date $size $file\n";
     }
 
     if ($ctrl eq "DIR") {
-      Log 5, "update ".$UPDATE{$pack}{control}.": $ctrl $file";
+      Log 5, "update $controlsTxt: $ctrl $file";
       print FH "$ctrl $file\n";
     }
     if ($ctrl eq "MOV") {
-      Log 5, "update ".$UPDATE{$pack}{control}.": $ctrl $file $move";
+      Log 5, "update $controlsTxt: $ctrl $file $move";
       print FH "$ctrl $file $move\n";
     }
 
     if ($ctrl eq "DEL") {
-      Log 5, "update ".$UPDATE{$pack}{control}.": $ctrl $file";
+      Log 5, "update $controlsTxt: $ctrl $file";
       print FH "$ctrl $file\n";
     }
 
@@ -1004,23 +1134,29 @@ update_MakeDirectory($)
 <a name="update"></a>
 <h3>update</h3>
 <ul>
-  <code>update [development|stable] [&lt;file&gt;|check|fhem|full] [force]</code><br>
+  <strong>FHEM update / check for updates:</strong>
+  <br>
+  <code>update [development|stable] [&lt;file|package&gt;] [force]</code><br>
+  <code>update [development|stable] check</code><br>
+  <code>update housekeeping</code><br><br>
+  <strong>Third party package update / check for a package update:</strong>
+  <br>
+  <code>update thirdparty &lt;url&gt; &lt;package&gt; [force]</code><br>
+  <code>update thirdparty &lt;url&gt; &lt;package&gt; check</code><br>
   <br>
     The installed fhem distribution and its installed extensions (just like the
     webGUI PGM2) are updated via this command from the online repository. The
     locally installed files will be checked against the online repository and
-    will be updated in case the files online are in a newer version. Modules
-    which are used while the update is in progress will be restarted in the new
-    version after the update has finished.
+    will be updated in case the files online are in a newer version.
     <br>
     <br>
-    The new update function will process more advanced distribution information
+    The update function will process more advanced distribution information
     as well as control commands for updating, removing or renaming existing files.
-    New file structures can also be set up by the new control command files.
-    The new update process will exclusively work with the file path which is
+    New file structures can also be set up via control command files.
+    The update process will exclusively work with the file path which is
     given by the global attribute "modpath" except for the fhem.pl file. The user
-    decides whether to use a stable, a developer- or a experimental-rated version
-    of fhem (experimental is not yet implemented).
+    decides whether to use a stable, or a developer-rated version of fhem.
+    <strong>stable is not yet implemented</strong>, so an update use always the developer-rated version.
     <br>
     <br>
     Furthermore, the use of packages is supported just like in a manual installation
@@ -1029,6 +1165,46 @@ update_MakeDirectory($)
     used will be updated.
     <br>
     <br>
+    The update function supports the installation of third-party packages like
+    modules or GUIs that are not part of the FHEM distribution.
+    <br>
+    <br>
+    <i>Notice for Developers of third-party packages:</i>
+    <br>
+    <i>Further information can be obtained from the file 'docs/LIESMICH.update-thirdparty'.</i>
+    <br>
+    <br>
+    Examples:
+    <blockquote>Check for new updates:<code><pre>
+    fhem&gt; update check
+    </pre></code></blockquote>
+
+    <blockquote>FHEM update:<code><pre>
+    fhem&gt; update
+    </pre></code></blockquote>
+
+    <blockquote>Force FHEM update (all files are updated!):<code><pre>
+    fhem&gt; update force
+    </pre></code></blockquote>
+
+    <blockquote>Update a single file:<code><pre>
+    fhem&gt; update 98_foobar.pm
+    </pre></code></blockquote>
+
+    <blockquote>Search for a filename:<code><pre>
+    fhem&gt; update backup
+    'backup' not found. Did you mean:
+    ==&gt; 98_backup.pm
+    nothing to do...
+    </pre></code></blockquote>
+
+    <blockquote>Update / install a third-party package:<code><pre>
+    fhem&gt; update thirdparty http://domain.tld/path packagename
+    </pre></code></blockquote>
+
+    <blockquote>Check a third-party package for new updates:<code><pre>
+    fhem&gt; update thirdparty http://domain.tld/path packagename check
+    </pre></code></blockquote>
 
     <a name="updateattr"></a>
     <b>Attributes</b>
@@ -1042,4 +1218,96 @@ update_MakeDirectory($)
 </ul>
 
 =end html
+=begin html_DE
+
+<a name="update"></a>
+<h3>update</h3>
+<ul>
+  <strong>FHEM aktualisieren / auf Aktualisierungen pr&uuml;fen:</strong>
+  <br>
+  <code>update [development|stable] [&lt;Date|Paket&gt;] [force]</code><br>
+  <code>update [development|stable] check</code><br>
+  <code>update housekeeping</code><br><br>
+  <strong>Aktualisierung eines Fremdpaketes / Fremdpaket auf Aktualisierungen pr&uuml;fen:</strong>
+  <br>
+  <code>update thirdparty &lt;url&gt; &lt;Paketname&gt; [force]</code><br>
+  <code>update thirdparty &lt;url&gt; &lt;Paketname&gt; check</code><br>
+  <br>
+    Die installierte FHEM Distribution und deren Erweiterungen (z.B. das Web-Interface
+    PGM2 (FHEMWEB)) werden mit diesem Befehl &uuml;ber ein Online Repository aktualisiert.
+    Enth&auml;lt das Repository neuere Dateien oder Dateiversionen als die lokale
+    Installation, werden die aktualisierten Dateien aus dem Repository installiert.
+    <br>
+    <br>
+    Die Update-Funktion unterst&uuml;tzt erweiterte Distributions Informationen sowie
+    die Steuerung &uuml;ber spezielle Befehle zum aktualisieren, verschieben oder
+    umbenennen von bestehenden Dateien. Neue Verzeichnisstrukturen k&ouml;nnen ebenfalls
+    &uuml;ber die Aktualisierung erzeugt werden. Die Aktualisierung erfolgt exklusiv
+    im Verzeichnispfad der &uuml;ber das globale Attribut "modpath" gesetzt wurde
+    (Ausnahme: fhem.pl). Der Anwender kann die Aktualisierung wahlweise
+    aus dem stabilen (stable) oder Entwicklungs-Zweig (development) vornehmen lassen.
+    <strong>Ein Aktualisierung erfolgt zur Zeit ausschliesslich nur &uuml;ber den
+    Entwicklungs-Zweig (development).</strong>
+    <br>
+    <br>
+    Weiterhin unterst&uuml;tzt der update Befehl die manuelle Installation von Paketen
+    die Bestandteil der FHEM Distribution sind. Aktuell werden noch keine erweiterten FHEM
+    Pakete bereitgestellt.
+    <br>
+    <br>
+    Der update Befehl unterst&uuml;tzt auch die Installation von Paketen die kein Bestandteil
+    der FHEM Distribution sind. Diese Pakete k&ouml;nnen z.B. von Entwicklern angebotene
+    Module oder Benutzerinterfaces beinhalten.
+    <br>
+    <br>
+    <i>Hinweis f&uuml;r Anbieter von zus&auml;tzlichen Paketen:</i>
+    <br>
+    <i>Weiterf&uuml;hrende Informationen zur Bereitstellung von Paketen sind der Datei
+    'docs/LIESMICH.update-thirdparty' zu entnehmen.</i>
+    <br>
+    <br>
+    Beispiele:
+    <blockquote>Auf neue Aktualisierungen pr&uuml;fen:<code><pre>
+    fhem&gt; update check
+    </pre></code></blockquote>
+
+    <blockquote>FHEM aktualisieren:<code><pre>
+    fhem&gt; update
+    </pre></code></blockquote>
+
+    <blockquote>FHEM Aktualisierung erzwingen (alle Dateien werden aktualisiert!):<code><pre>
+    fhem&gt; update force
+    </pre></code></blockquote>
+
+    <blockquote>Eine einzelne Datei aktualisieren:<code><pre>
+    fhem&gt; update 98_foobar.pm
+    </pre></code></blockquote>
+
+    <blockquote>Nach einem Dateinamen suchen:<code><pre>
+    fhem&gt; update backup
+    'backup' not found. Did you mean:
+    ==&gt; 98_backup.pm
+    nothing to do...
+    </pre></code></blockquote>
+
+    <blockquote>Aktualisierung oder Installation eines Fremdpaketes:<code><pre>
+    fhem&gt; update thirdparty http://domain.tld/path paketname
+    </pre></code></blockquote>
+
+    <blockquote>Fremdpaket auf neue Aktualisierungen pr&uuml;fen:<code><pre>
+    fhem&gt; update thirdparty http://domain.tld/path paketname check
+    </pre></code></blockquote>
+
+    <a name="updateattr"></a>
+    <b>Attribute</b>
+    <ul>
+      <li><a href="#backup_before_update">backup_before_update</a></li><br>
+
+      <li><a href="#exclude_from_update">exclude_from_update</a></li><br>
+
+      <li><a href="#updatebranch">updatebranch</a></li><br>
+  </ul>
+</ul>
+
+=end html_DE
 =cut
