@@ -664,13 +664,14 @@ MAX_Parse($$)
     readingsBulkUpdate($shash,"onoff",$isopen);
 
   }elsif($msgtype eq "PushButtonState") {
-    my ($bits2, $onoff) = unpack("CC",pack("H*",$args[0]));
+    my ($bits2, $onoff) = unpack("aC",pack("H*",$args[0]));
     #The meaning of $bits2 is completly guessed based on similarity to other devices, TODO: confirm
-    my $rferror = vec($bits2, 6, 1); #communication with link partner (what does that mean?)
+    my $gateway = vec($bits2, 4, 1); #Paired to a CUBE?
+    my $rferror = vec($bits2, 6, 1); #communication with link partner (1 if we did not sent an Ack)
     my $batterylow = vec($bits2, 7, 1); #1 if battery is low
 
     readingsBulkUpdate($shash, "battery", $batterylow ? "low" : "ok");
-    readingsBulkUpdate($shash,"onoff",$onoff);
+    readingsBulkUpdate($shash, "onoff", $onoff);
 
   }elsif($msgtype eq "CubeClockState"){
     my $clockset = $args[0];
