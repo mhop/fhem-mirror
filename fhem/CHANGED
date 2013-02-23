@@ -4,8 +4,8 @@
   - feature: added new Javascript Frontend based on ExtJS (by Johannes)
   - feature: new Modules 30_HUEDevice and 31_HUEBridge for phillips hue and 
              smartlink devices (by justme1968)
-  - change: SYSSTAT: allow remote monitoring by ssh
-  - change: SYSSTAT: allow less frequent updates for diskusage
+  - change:  SYSSTAT: allow remote monitoring by ssh
+  - change:  SYSSTAT: allow less frequent updates for diskusage
   - feature: new Module 32_SYSSTAT to monitor system load and disk usage
              on linux FHEM hosts (by justme1968)
   - feature: new Module 73_PRESENCE to make automatic presence detection of
@@ -89,6 +89,7 @@
               smallscreen/touchpad moved to stylesheetPrefix, menuEntries
               added, Extend devStateIcon, js setting of attr values in detail
               screen, live slider update in detail and room view
+  - feature: added support for third-party packages to 98_update.pm (M. Fischer)
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,
