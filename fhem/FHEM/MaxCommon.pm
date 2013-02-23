@@ -1,13 +1,8 @@
 package MaxCommon;
 
-#use vars qw(%device_types);
-#use vars qw(%msgId2Cmd);
-#use vars qw(%msgCmd2Id);
-
 require Exporter;
 @ISA = qw(Exporter);
 @EXPORT = qw(%device_types %msgId2Cmd %msgCmd2Id $defaultWeekProfile);
-#@EXPORT_OK = qw($Zeitstempel @Logdaten Besteller_ermitteln);
 
 %device_types = (
   0 => "Cube",
