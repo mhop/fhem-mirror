@@ -97,7 +97,7 @@ Struktur der Steuerungsdatei
     FHEM/98_myPackage.pm
     FHEM/FhemUtils/mypackage-20130222-001
 
-  nicht vorhanden oder älter als der angegebene Zeitstempel sind. Trift einer der
+  nicht vorhanden oder älter als der angegebene Zeitstempel sind. Trifft einer der
   Fälle zu, wird die entsprechende Datei aktualisiert (UPD).
 
   Dabei sind folgende Vorgaben einzuhalten:
@@ -130,7 +130,7 @@ Hinweis für Anbieter von Fremdpaketen
   eigenverantwortlich darauf, das die zur FHEM Distribution gehörenden Dateien
   nicht gelöscht, verändert, o.ä. werden ohne den Anwender darauf aufmerksam
   zu machen. Ein solcher Eingriff sollte nur mit Bedacht und der Sicherstellung
-  der Funktionalität von FHEM vorgenommen werden. Dabei sind auch evtuelle
+  der Funktionalität von FHEM vorgenommen werden. Dabei sind auch eventuelle
   Seiteneffekte zu berücksichtigen. Ein (ungetesteter) Eingriff in die FHEM
   Umgebung kann zu einem erhöhtem Supportaufwand führen. Die Fehlersuche wird
   ggf. für anderen Entwickler erschwert. Ebenfalls sollte der Einsatz von
