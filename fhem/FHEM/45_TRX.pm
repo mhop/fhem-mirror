@@ -284,7 +284,16 @@ TRX_DoInit($)
 		$status .= $freq;
 		$status .= ", " . sprintf "firmware=%d",$msg2;
 		$status .= ", protocols enabled: ";
-		$status .= sprintf "undecoded, " if ($msg3 & 0x80); 
+		$status .= "undecoded " if ($msg3 & 0x80); 
+		$status .= "RFU6 " if ($msg3 & 0x40); 
+		$status .= "RFU5 " if ($msg3 & 0x20); 
+		$status .= "RFU4 " if ($msg3 & 0x10); 
+		$status .= "Lighting4 " if ($msg3 & 0x08); 
+		$status .= "FineOffset/Viking " if ($msg3 & 0x04); 
+		$status .= "Rubicson " if ($msg3 & 0x02); 
+		$status .= "AE/Blyss " if ($msg3 & 0x01); 
+		$status .= "BlindsT1/T2/T3/T4 " if ($msg4 & 0x80); 
+		$status .= "BlindsT0  " if ($msg4 & 0x40); 
 		$status .= "ProGuard " if ($msg4 & 0x20); 
 		$status .= "FS20 " if ($msg4 & 0x10); 
 		$status .= "LaCrosse " if ($msg4 & 0x08); 
