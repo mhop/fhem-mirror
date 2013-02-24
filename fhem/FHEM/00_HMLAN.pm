@@ -341,7 +341,9 @@ HMLAN_Parse($$)
 	  HMLAN_Write($hash,undef, "As15".$mNo."8002".$dst.$src."00");
 	}
 
-    $dmsg .=  (($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R')?":NACK:":"::").(hex($mFld[4])-65536);	
+    $dmsg .=  (($mFld[1] !~ m/00(01|02|21)/ && $letter eq 'R')?":NACK:":"::")
+	         .(hex($mFld[4])-65536)
+			 .":".$name;
 
     $hash->{uptime} = HMLAN_uptime($mFld[2]);
 	$hash->{RSSI}   = hex($mFld[4])-65536;
