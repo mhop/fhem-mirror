@@ -52,12 +52,14 @@ FW_doUpdate()
     el = document.getElementById("slider."+d[0]);
     if(el) {
       var doSet = 1;    // Only set the "state" slider in the detail view
+      /*
       if(el.parentNode.getAttribute("name") == "val.set"+d[0]) {
         var el2 = document.getElementsByName("arg.set"+d[0])[0];
         if(el2.nodeName.toLowerCase() == "select" &&
            el2.options[el2.selectedIndex].value != "state")
           doSet = 0;
       }
+      */
       if(doSet) {
         var val = d[1].replace(/[^\d\.]/g, ""); // remove non numbers
         Slider(el, val);
@@ -183,7 +185,7 @@ setTime(el,name,val)
 {
   var el = el.parentNode.parentNode.firstChild;
   var v = el.value.split(":");
-  v[name == "H" ? 0 : 1] = ''+val;
+  v[name] = ''+val;
   if(v[0].length < 2) v[0] = '0'+v[0];
   if(v[1].length < 2) v[1] = '0'+v[1];
   el.value = v[0]+":"+v[1];
@@ -213,9 +215,9 @@ addTime(el,cmd)
     par.appendChild(document.createElement('br'));
 
     var sl = document.createElement('div');
-    sl.innerHTML = '<div class="slider" min="0" stp='+(i==0 ? 1 : 5)+
-                      ' max='+(i==0 ? 23 : 55)+
-                      ' cmd="js:setTime(slider,"'+(i==0?"H":"M")+'",%)'+
+    sl.innerHTML = '<div class="slider" min="0" stp='+(i==0?1:5)+
+                      ' max='+(i==0?23:55)+
+                      ' cmd="js:setTime(slider,'+i+',%)"'+
                       '><div class="handle">'+val[i]+
                    '</div></div>';
     par.appendChild(sl);
@@ -310,6 +312,7 @@ FW_queryValue(cmd, qFn, qArg)
              .replace(/[\r\n]/g, "");
     eval(qFn);
     delete qFn;
+    delete qConn;
   }
   qConn.open("GET", document.location.pathname+"?cmd="+cmd+"&XHR=1", true);
   qConn.send(null);
