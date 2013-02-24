@@ -918,7 +918,7 @@ CUL_Parse($$$$$)
   } elsif($fn eq "A" && $len >= 20) {              # AskSin/BidCos/HomeMatic
     my $srcId = substr($dmsg,9,6);
 	$hash->{helper}{nextSend}{$srcId} = gettimeofday() + 0.100;
-	$dmsg .="::$rssi" if(defined($rssi));
+	$dmsg .="::$rssi:$name" if(defined($rssi));
   } elsif($fn eq "Z" && $len >= 21) {              # Moritz/Max
     ;
   } elsif($fn eq "t" && $len >= 5)  {              # TX3
