@@ -109,7 +109,7 @@ BlockingExit($)
     threads->exit();
 
   } else {
-    exit(0);
+    POSIX::_exit(0);
 
   }
 }
