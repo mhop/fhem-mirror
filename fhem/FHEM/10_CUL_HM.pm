@@ -425,8 +425,9 @@ sub CUL_HM_Parse($$) {#############################
 								             ($dst eq $id ? $ioName : 
 											                $dst));
   my $target = " (to $dname)";
-  my ($p,$msgStat,$myRSSI) = split(":",$p1,3);
-  return "" if($msgStat && $msgStat eq 'NACK');#discard TCP errors from HMlan. Resend will cover it
+  my ($p,$msgStat,$myRSSI,$msgIO) = split(":",$p1,4);
+
+  return "" if($msgStat && $msgStat eq 'NACK');#discard if lowlevel error
   return "" if($src eq $id);#discard mirrored messages
   
   $respRemoved = 0;  #set to 'no response in this message' at start
@@ -442,7 +443,7 @@ sub CUL_HM_Parse($$) {#############################
       Log 3, "CUL_HM Unknown device $sname, please define it";
       return "UNDEFINED $sname CUL_HM $src $msg";
     }
-    return "";
+   return "";
   }
   CUL_HM_eventP($shash,"Rcv");
   my $name = $shash->{NAME};
@@ -455,7 +456,6 @@ sub CUL_HM_Parse($$) {#############################
                    "to_".((hex($msgFlag)&0x40)?"rpt_":"").$ioName,# repeater?
                    $myRSSI);
 
-  # return if duplicate
   my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst ".($p?$p:"");
 
   if($shash->{lastMsg} && $shash->{lastMsg} eq $msgX) {
@@ -468,7 +468,7 @@ sub CUL_HM_Parse($$) {#############################
       Log GetLogLevel($name,4), "CUL_HM $name dup mesg - ignore";
 	}
 
-    return ""; #return something to please dispatcher
+    return $name; #return something to please dispatcher
   }
   $shash->{lastMsg} = $msgX;
   $iohash->{HM_CMDNR} = hex($msgcnt) if($dst eq $id);# updt message cnt to rec
@@ -789,7 +789,6 @@ sub CUL_HM_Parse($$) {#############################
   elsif($st eq "switch" || ####################################################
         $st eq "dimmer" ||
         $st eq "blindActuator") {
-
     if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($msgType eq "10" && $p =~ m/^06/))	{ #    or Info_Status message here
 
@@ -884,7 +883,7 @@ sub CUL_HM_Parse($$) {#############################
       push @event, "battery:".   (($err&0x80)?"low"  :"ok"  );
       my $flag = ($err>>4) &0x7;
       push @event, "flags:".     (($flag)?"none"     :$flag  );
-    }
+	}
   }
   elsif($st eq "virtual"){#####################################################
     # possibly add code to count all acks that are paired. 
@@ -1261,8 +1260,9 @@ sub CUL_HM_Parse($$) {#############################
   #------------ process events ------------------
 
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
-  CUL_HM_UpdtReadBulk($shash,1,@event);
-  return $shash->{NAME} ;# shash could have changed to support channel
+  CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
+  $defs{$shash->{NAME}}{EVENTS}++;  # count events for channel
+  return $name ;#general notification to the device
 }
 
 ##----------definitions for register settings-----------------	
@@ -1834,22 +1834,16 @@ sub CUL_HM_TCtempReadings($) {
 }
 sub CUL_HM_repReadings($) {
   my ($hash)=@_;
-  my $name = $hash->{NAME};
-  my $regLN = ((CUL_HM_getExpertMode($hash) eq "2")?"":".")."RegL_";
-  my $reg2 = ReadingsVal($name,$regLN."02:" ,"");
-  $reg2 =~ s/..://g;
-  $reg2 =~ s/ //g;
-  my @array = $reg2 =~ /(.{14})/g; # entry is sendID,recID and bdcast
-  my $entry = 0;
+  my %pCnt;
+  foreach my$pId(split',',$hash->{helper}{peerIDsRaw}){
+    next if (!$pId || $pId eq "00000000");
+	$pCnt{$pId}{cnt}++;
+  }
   my $ret;
-  foreach (@array){
-    my @arr2 = $_ =~ /(.{6})(.{6})(.{2})/;
-    $entry++;
-    next if ($arr2[1] eq  '000000' && $arr2[0] eq '000000');
-    $ret .= $entry.
-            " Bdcast:".((hex($arr2[2])& 0x01)?"on":"off").
-            " sendID:".(($arr2[0] ne "000000")?CUL_HM_id2Name($arr2[0]):"none  ").
-            " recID:" .(($arr2[1] ne "000000")?CUL_HM_id2Name($arr2[1]):"none  ")."\n";
+  foreach my$pId(sort keys %pCnt){
+	my ($pdID,$bdcst) = ($1,$2) if ($pId =~ m/(......)(..)/);
+	$ret .= "source ".$pCnt{$pId}{cnt}." entry for: ".CUL_HM_id2Name($pdID)
+	       .($bdcst eq "01"?" broadcast enabled":"")."\n";
   }
   return $ret;
 }
@@ -2275,6 +2269,8 @@ sub CUL_HM_Set($@) {
       }
 	  foreach my $var (keys %{$hash}){
 		delete ($hash->{$var}) if ($var =~ m/^prot/);
+		delete ($hash->{EVENTS});
+		delete ($hash->{helper}{rssi});
       }
 	  $hash->{protState} = "Info_Cleared" ;
 	}
@@ -3163,6 +3159,7 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
   	  my $chnhash = $modules{CUL_HM}{defptr}{"$dst$chn"}; 
   	  $chnhash = $hash if (!$chnhash);
   	  delete $chnhash->{READINGS}{peerList};#empty old list
+	  delete $chnhash->{helper}{peerIDsRaw};
 	  $attr{$chnhash->{NAME}}{peerIDs} = '';
 	  return;
     }
@@ -3763,10 +3760,11 @@ sub CUL_HM_parseCommon(@){#############################
 		$chnhash = $shash if (!$chnhash);
 	    my $chnNname = $chnhash->{NAME};
 		my @peers = substr($p,2,) =~ /(.{8})/g;
+	    $chnhash->{helper}{peerIDsRaw}.= ",".join",",@peers;
+		
 		foreach my $peer(@peers){	
     	  CUL_HM_ID2PeerList ($chnNname,$peer,1);
 		}
-		
 		if ($p =~ m/000000..$/) {# last entry, peerList is complete
           CUL_HM_respPendRm($shash);		  
 		  # check for request to get List3 data
