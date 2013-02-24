@@ -224,7 +224,7 @@ MAX_ParseWeekProfile(@) {
 sub
 MAX_WakeUp($)
 {
-  my $hash = @_[0];
+  my $hash = $_[0];
   #3F corresponds to 31 seconds wakeup (so its probably the lower 5 bits)
   return ($hash->{IODev}{Send})->($hash->{IODev},"WakeUp",$hash->{addr}, "3F", callbackParam => "31" );
 }
