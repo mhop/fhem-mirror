@@ -7,21 +7,6 @@ use POSIX;
 use JSON;
 use SetExtensions;
 
-#Hue XY to RGB 
-#Z = 1 - X - Y
-#
-#|R|   | X |   | 3.2333    -1.5262     0.2791 |
-#|G| = | Y | * |-0.8268     2.4667     0.3323 |
-#|B|   | Z |   | 0.1294     0.1983     2.0280 |
-#
-#Example:
-#XY == [0.4912, 0.4058]
-#Z  == 1 - 0.4912 - 0.4058 == 0.103
-#
-#R/255 = (0.4912 * 3.2333)  + (0.4058 * -1.5262) + (0.103 * 0.2791) = 0.9976
-#G/255 = (0.4912 * -0.8268) + (0.4058 * 2.4667)  + (0.103 * 0.3323) = 0.6291
-#B/255 = (0.4912 * 0.1294)  + (0.4058 * 0.1983)  + (0.103 * 2.0280) = 0.3529
-
 my %models = (
   LCT001 => 'HUE Bulb',
   LLC001 => 'LivingColors G2',
@@ -39,8 +24,9 @@ sub HUEDevice_Initialize($)
 
   #Consumer
   $hash->{DefFn}    = "HUEDevice_Define";
-  $hash->{SetFn}    = "HUEDevice_Set";
   $hash->{UndefFn}  = "HUEDevice_Undefine";
+  $hash->{SetFn}    = "HUEDevice_Set";
+  $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
                       "$readingFnAttributes ".
                       "model:".join(",", sort keys %models)." ".
@@ -115,7 +101,7 @@ HUEDevice_Set($@)
     $cmd = 'pct';
   } elsif( !defined($value) && $cmd =~ m/^(\d+)/) {
     $value = $1;
-    if( $value > 254 ) { $value = 254; }
+    $value = 254 if( $value > 254 );
     $cmd = 'bri';
   }
 
@@ -134,8 +120,7 @@ HUEDevice_Set($@)
    }
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
@@ -149,8 +134,7 @@ HUEDevice_Set($@)
    }
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
@@ -164,8 +148,7 @@ HUEDevice_Set($@)
    }
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
@@ -176,8 +159,7 @@ HUEDevice_Set($@)
     };
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
@@ -188,8 +170,7 @@ HUEDevice_Set($@)
     };
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
@@ -200,26 +181,91 @@ HUEDevice_Set($@)
     };
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
   } elsif($cmd eq "sat") {
     my $obj = {
       'sat'  => 0+$value,
+      'on'  => JSON::true,
     };
 
     my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} )
-      {
+    if( $result->{'error'} ) {
         $hash->{STATE} = $result->{'error'}->{'description'};
         return undef;
       }
+  } elsif($cmd eq "xy" && $value =~ m/^(.+),(.+)/) {
+    my ($x,$y) = ($1, $2);
+   
+    my $obj = {
+      'xy'  => [0+$x, 0+$y],
+      'on'  => JSON::true,
+    };
 
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
+    if( $result->{'error'} ) {
+        $hash->{STATE} = $result->{'error'}->{'description'};
+        return undef;
+    }
+  } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
+    my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+
+    my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
+    my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
+    my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
+#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+
+    if( $X != 0
+        || $Y != 0
+        || $Z != 0 ) {
+      my $x = $X / ($X + $Y + $Z);
+      my $y = $Y / ($X + $Y + $Z);
+#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+
+      #$x = 0 if( $x < 0 );
+      #$x = 1 if( $x > 1 );
+      #$y = 0 if( $y < 0 );
+      #$y = 1 if( $y > 1 );
+      $Y = 1 if( $Y > 1 );
+
+      my $bri  = max($r,max($g,$b));
+      #my $bri  = $Y;
+      my $obj = {
+        'xy'  => [0+$x, 0+$y],
+        'bri'  => int(254*$bri),
+        'on'  => JSON::true,
+      };
+
+      my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
+      if( $result->{'error'} ) {
+          $hash->{STATE} = $result->{'error'}->{'description'};
+          return undef;
+        }
+      }
+  } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
+    my( $h, $s, $v ) = (hex($1), hex($2), hex($3));
+
+    $s = 254 if( $s > 254 );
+    $v = 254 if( $v > 254 );
+
+    my $obj = {
+      'hue'  => int($h*256),
+      'sat'  => 0+$s,
+      'bri'  => 0+$v,
+      'on'  => JSON::true,
+    };
+
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
+    if( $result->{'error'} ) {
+        $hash->{STATE} = $result->{'error'}->{'description'};
+        return undef;
+      }
   } else {
     my $list = "off on toggle statusRequest";
-    $list .= " pct:slider,0,1,100 color:slider,2000,1,6500 bri:slider,0,1,254 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254" if( AttrVal($hash->{NAME}, "subType", "dimmer") eq "dimmer" );
+    $list .= " rgb:colorpicker,RGB pct:slider,0,1,100 color:slider,2000,1,6500 bri:slider,0,1,254 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xv" if( AttrVal($hash->{NAME}, "subType", "dimmer") eq "dimmer" );
     #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "dimmer") eq "dimmer" );
     return SetExtensions($hash, $list, $name, $cmd, $value, @a);
   }
@@ -230,6 +276,67 @@ HUEDevice_Set($@)
 
   return undef;
 }
+
+sub
+HUEDevice_Get($@)
+{
+  my ($hash, @a) = @_; 
+ 
+  my $name = $a[0];
+  return "$name: get needs at least one parameter" if(@a < 2); 
+
+  my $cmd= $a[1];
+
+  if($cmd eq "rgb") {
+    my $ret = "000000";
+
+    if( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ )
+      {
+        my ($x,$y) = ($1, $2);
+        my $Y = ReadingsVal($name,"bri","") / 254.0;
+#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+
+        if( $y > 0 ) {
+          my $X = $x * $Y / $y;
+          my $Z = (1 - $x - $y)*$Y / $y;
+
+          if( $X > 1
+              || $Y > 1
+              || $Z > 1 ) {
+            my $f = max($X,max($Y,$Z));
+            $X /= $f;
+            $Y /= $f;
+            $Z /= $f;
+          }
+#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+
+          my $r =  0.7982 * $X + 0.3389 * $Y - 0.1371 * $Z;
+          my $g = -0.5918 * $X + 1.5512 * $Y + 0.0406 * $Z;
+          my $b =  0.0008 * $X + 0.0239 * $Y + 0.9753 * $Z;
+
+          if( $r > 1
+              || $g > 1
+              || $b > 1 ) {
+            my $f = max($r,max($g,$b));
+            $r /= $f;
+            $g /= $f;
+            $b /= $f;
+          }
+#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+
+          $r *= 255;
+          $g *= 255;
+          $b *= 255;
+
+          $ret = sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
+        }
+      }
+    return $ret;
+  }
+
+  return "Unknown argument $cmd, choose one of rgb";
+}
+
 
 ###################################
 # This could be IORead in fhem, But there is none.
@@ -321,6 +428,7 @@ HUEDevice_GetUpdate($)
   my $ct        = $state->{'ct'};
   my $hue       = $state->{'hue'};
   my $sat       = $state->{'sat'};
+  my $xy        = $state->{'xy'}->[0] .",". $state->{'xy'}->[1];
 
   if( defined($colormode) && $colormode ne $hash->{fhem}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -334,6 +442,8 @@ HUEDevice_GetUpdate($)
   }
   if( defined($hue) && $hue != $hash->{fhem}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
+  if( $xy eq "," ) {readingsBulkUpdate($hash,"xy","");}
+  elsif( $xy != $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
 
   my $s = '';
   if( $on )
@@ -410,6 +520,8 @@ HUEDevice_GetUpdate($)
     the current on/off state as 0 or 1</li>
     <li>sat<br>
     the current saturation</li>
+    <li>xy<br>
+    the current xy color coordinates</li>
     <li>state<br>
     the current state</li>
     <br>
@@ -445,6 +557,15 @@ HUEDevice_GetUpdate($)
         set hue to &lt;value&gt;; range is 0-65535.</li>
       <li>sat &lt;value&gt;<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
+      <li>x &lt;x&gt;,&lt;y&gt;<br>
+        set the xv color coordinates to &lt;x&gt;,&lt;y&gt;;</li>
+      <li>rgb &lt;rrggbb&gt;</li>
+    </ul><br>
+
+  <a name="HUEDevice_Get"></a>
+    <b>Get</b>
+    <ul>
+      <li>rgb</li>
     </ul><br>
 
   <a name="HUEDevice_Attr"></a>
