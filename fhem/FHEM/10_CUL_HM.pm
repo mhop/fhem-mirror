@@ -155,7 +155,7 @@ my %culHmModel=(
   "004D" => {name=>"HM-RC-19-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c:b' ,lst=>'1,4'          ,chn=>"Btn:1:17,Disp:18:18",},
   "004E" => {name=>"HM-LC-DDC1-PCB"          ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, # door drive controller 1-channel (PCB)
   "004F" => {name=>"HM-SEN-MDIR-SM"          ,st=>'motionDetector'    ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
-  "0050" => {name=>"HM-SEC-SFA-SM"           ,st=>'threeStateSensor'  ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Siren:1:1,Flash:2:2",},
+  "0050" => {name=>"HM-SEC-SFA-SM"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Siren:1:1,Flash:2:2",},
   "0051" => {name=>"HM-LC-SW1-PB-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
   "0052" => {name=>"HM-LC-SW2-PB-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Sw:1:2",},
   "0053" => {name=>"HM-LC-BL1-PB-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
