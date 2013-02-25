@@ -415,6 +415,9 @@ PRESENCE_DoLocalPingScan($)
 	if($pingtool)
 	{
 	    $retcode = $pingtool->ping($device, 5);
+	    
+	    Log GetLogLevel($name, 5), "PRESENCE ($name) - pingtool returned $retcode";
+	    
 	    $return = "$name|$local|".($retcode ? "present" : "absent"); 
 	}
 	else
@@ -426,7 +429,9 @@ PRESENCE_DoLocalPingScan($)
     else
     {
 	$temp = qx(ping -c 4 $device);
-	$return = "$name|$local|".($temp =~ /\d+ bytes from/ ? "present" : "absent");
+	
+	Log GetLogLevel($name, 5), "PRESENCE ($name) - ping command returned with output:\n$temp";
+	$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
     }
 
     return $return;
@@ -456,12 +461,17 @@ PRESENCE_DoLocalFritzBoxScan($)
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
+            Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number ($number)";
     	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed);
     	    if(not $status =~ /^\s*\d+\s*$/)
     	    {
         	return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
     	    }
     	    return ($status == 0)? "$name|$local|absent|$number" : "$name|$local|present|$number"; ###MH
+	}
+	else
+	{
+	    Log GetLogLevel($name, 5), "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
 	}
     }
 
@@ -486,9 +496,12 @@ PRESENCE_DoLocalFritzBoxScan($)
         
         chomp $net_device;
         
+        Log GetLogLevel($name, 5), "PRESENCE ($name) - checking device number $number ($net_device)";
 	if($net_device eq $device)
 	{
   	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed); 
+  	    
+  	    Log GetLogLevel($name, 5), "PRESENCE ($name) - speed for device number $net_device is $status";
   	    last;
 	}
 	
