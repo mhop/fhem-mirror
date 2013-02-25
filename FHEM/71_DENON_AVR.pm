@@ -33,6 +33,15 @@ use warnings;
 use Time::HiRes qw(usleep);
 
 ###################################
+my %commands = 
+(
+	"power:on" => "PWON",
+	"power:off" => "PWSTANDBY",
+	"mute:on" => "MUON",
+	"mute:off" => "MUOFF"
+);
+
+###################################
 sub
 DENON_AVR_Initialize($)
 {
@@ -201,6 +210,9 @@ DENON_AVR_Define($$)
 
     $hash->{DeviceName} = $host.":23";
 	my $ret = DevIo_OpenDev($hash, 0, "DENON_AVR_DoInit");
+	
+    InternalTimer(gettimeofday() + 5,"DENON_AVR_updateConfig", $hash, 0);
+	
     return $ret;
 }
 
@@ -223,10 +235,10 @@ DENON_AVR_Get($@)
     my ($hash, @a) = @_;
     my $what;
 
-    return "argument is missing" if(int(@a) != 2);
+    return "argument is missing" if (int(@a) != 2);
     $what = $a[1];
 
-    if($what =~ /^(power|volume_level|mute)$/)
+    if ($what =~ /^(power|volume_level|mute)$/)
     {
         if(defined($hash->{READINGS}{$what}))
         {
@@ -239,7 +251,7 @@ DENON_AVR_Get($@)
     }
     else
     {
-	return "Unknown argument $what, choose one of param power input volume_level mute get";
+        return "Unknown argument $what, choose one of param power input volume_level mute get";
     }
 }
 
@@ -250,12 +262,75 @@ DENON_AVR_Set($@)
     my ($hash, @a) = @_;
 
     my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on off volume:slider,0,1,100 mute:on,off rawCommand statusRequest";
+    my $usage = "Unknown argument $what, choose one of on off toggle volume:slider,0,1,98 mute:on,off rawCommand statusRequest";
 
-    if ($what eq "rawCommand")
+	if ($what =~ /^(on|off)$/)
+    {
+		my $command = $commands{"power:".$what};
+	    DENON_AVR_SimpleWrite($hash, $command);
+	}
+	elsif ($what eq "toggle")
+	{
+		if ($hash->{STATE} eq "off")
+	    {
+			my $command = $commands{"power:on"};
+		    DENON_AVR_SimpleWrite($hash, $command);
+		}
+		else
+		{
+			my $command = $commands{"power:off"};
+		    DENON_AVR_SimpleWrite($hash, $command);			
+		}
+	}
+    elsif ($what eq "mute")
+    {
+	    my $mute = $a[2];
+	    if (defined($mute))
+	    {
+		    $mute = lc($mute);
+		    if ($hash->{STATE} eq "off")
+		    {
+			    return "mute can only used when device is powered on";
+			}
+			else
+			{
+				my $command = $commands{$what.":".$mute};
+			    DENON_AVR_SimpleWrite($hash, $command);
+			}
+	    }	
+    }
+    elsif ($what eq "volume")
+    {
+	    my $volume = $a[2];
+	    if (defined($volume))
+	    {
+		    $volume = $volume * 10;
+			if($hash->{STATE} eq "off")
+		    {
+			    return "volume can only used when device is powered on";
+			}
+			else
+			{
+				if ($volume % 10 == 0)
+				{
+					DENON_AVR_SimpleWrite($hash, "MV".($volume / 10));
+				}
+				else
+				{
+					DENON_AVR_SimpleWrite($hash, "MV".$volume);
+				}
+			}
+	    }	
+    }
+    elsif ($what eq "rawCommand")
     {
         my $cmd = $a[2];
         DENON_AVR_SimpleWrite($hash, $cmd); 
+    }
+    elsif ($what eq "statusRequest")
+    {
+	    # Status is always up to date
+	    return undef;
     }
     else
     {
@@ -270,6 +345,24 @@ DENON_AVR_Shutdown($)
     my ($hash) = @_;
 
     Log 5, "DENON_AVR_Shutdown: Called";
+}
+
+#####################################
+sub 
+DENON_AVR_updateConfig($)
+{
+    # this routine is called 5 sec after the last define of a restart
+    # this gives FHEM sufficient time to fill in attributes
+    # it will also be called after each manual definition
+    # Purpose is to parse attributes and read config
+    my ($hash) = @_;
+    my $name = $hash->{NAME};
+
+    my $webCmd  = AttrVal($name, "webCmd", "");
+    if (!$webCmd)
+    {
+	    $attr{$name}{webCmd} = "toggle:on:off:statusRequest";
+	}
 }
 
 1;
