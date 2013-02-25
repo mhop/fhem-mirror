@@ -757,34 +757,33 @@ sub CUL_HM_Parse($$) {#############################
 	}  
   }
   elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ##########################
-    if($p =~ m/.14(.)0200(..)(..)(..)/) {# todo very risky - no start...
-      my ($k_cnt, $k_v1, $k_v2, $k_v3) = ($1,$2,$3,$4);
-      my $v = 128-hex($k_v2);                  # FIXME: calibrate
-      # $v = 256+$v if($v < 0);
-      $v += 256 if(!($k_v3 & 1));
-      push @event, "rawValue:$v";
-
-      my $seq = hex($k_cnt);
-      push @event, "Sequence:$seq";
-
-      my $r2r = AttrVal($name, "rawToReadable", undef);
-      if($r2r) {
-        my @r2r = split("[ :]", $r2r);
-        foreach(my $idx = 0; $idx < @r2r-2; $idx+=2) {
-          if($v >= $r2r[$idx] && $v <= $r2r[$idx+2]) {
-            my $f = (($v-$r2r[$idx])/($r2r[$idx+2]-$r2r[$idx]));
-            my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
-            my $unit = AttrVal($name, "unit", "");
-            $unit = " $unit" if($unit);
-            push @event, sprintf("state:%.1f %s",$cv,$unit);
-            push @event, sprintf("content:%.1f %s",$cv,$unit);
-            last;
+    if ($msgType eq "53"){
+      if($p =~ m/.14(.)0200(..)(..)(..)/) {
+        my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($$3),hex($4));
+        my $v = 128-$k_v2;                  # FIXME: calibrate
+        $v += 256 if(!($k_v3 & 1));
+        push @event, "rawValue:$v";
+        my $nextSeq = (ReadingsVal($name,"Sequence","") %15)+1;
+        push @event, "Sequence:$seq".($nextSeq ne $seq?"_seqMiss":"");
+      
+        my $r2r = AttrVal($name, "rawToReadable", undef);
+        if($r2r) {
+          my @r2r = split("[ :]", $r2r);
+          foreach(my $idx = 0; $idx < @r2r-2; $idx+=2) {
+            if($v >= $r2r[$idx] && $v <= $r2r[$idx+2]) {
+              my $f = (($v-$r2r[$idx])/($r2r[$idx+2]-$r2r[$idx]));
+              my $cv = ($r2r[$idx+3]-$r2r[$idx+1])*$f + $r2r[$idx+1];
+              my $unit = AttrVal($name, "unit", "");
+              push @event, sprintf("state:%.1f %s",$cv,$unit);
+              push @event, sprintf("content:%.1f %s",$cv,$unit);
+              last;
+            }
           }
+        } else {
+          push @event, "state:$v";
         }
-      } else {
-        push @event, "state:$v";
       }
-    }
+	}
   } 
   elsif($st eq "switch" || ####################################################
         $st eq "dimmer" ||
@@ -1376,7 +1375,7 @@ my %culHmRegDefine = (
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
   pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>1,t=>'pairing to central'},
 #blindActuator mainly                                                                             
-  lgMultiExec     =>{a=> 10.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
+  lgMultiExec     =>{a=>138.5,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"multiple execution per repeat of long trigger"    ,lit=>{off=>0,on=>1}},
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveUp         =>{a=> 13.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
   driveTurn       =>{a=> 15.0,s=>1.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"fliptime up <=>down"},
@@ -1619,9 +1618,14 @@ my %culHmRegModel = (
                        lowBatLimit     =>1,batDefectLimit  =>1,
                                                                transmitTryMax  =>1,},
   "HM-Sys-sRP-Pl"   =>{compMode        =>1,},
-
-
-
+  "KFM-Display"     =>{CtDlyOn         =>1,CtDlyOff        =>1,
+                       CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
+                       CtValLo         =>1,CtValHi         =>1,
+                       ActionType      =>1,OffTimeMode     =>1,OnTimeMode      =>1,
+                       DimJtOn         =>1,DimJtOff        =>1,DimJtDlyOn      =>1,DimJtDlyOff     =>1,
+                       DimJtRampOn     =>1,DimJtRampOff    =>1,
+                       lgMultiExec     =>1,
+					   },
   "HM-Sen-Wa-Od"    =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
                        localResDis     =>1,ledOnTime       =>1,transmitTryMax  =>1,
                        waterUppThr     =>1,waterlowThr     =>1,caseDesign      =>1,caseHigh        =>1,
@@ -2025,23 +2029,25 @@ sub CUL_HM_Get($@) {
   return "";
 }
 ###################################
-my %culHmGlobalSets = (
+my %culHmGlobalSetsDevice = (# general commands for devices only
   raw      	    => "data ...",
   reset    	    => "",
   pair     	    => "",
   unpair   	    => "",
+  getpair       => "",
+  virtual       =>"<noButtons>",
+  actiondetect  =>"outdated",#todo Updt3 remove
+);
+my %culHmGlobalSets = (
   sign     	    => "[on|off]",
   regRaw   	    => "[List0|List1|List2|List3|List4|List5|List6] <addr> <data> ... <PeerChannel>", #todo Updt2 remove
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   peerBulk      => "<peer1,peer2,...>",
   statusRequest => "",
-  getpair       => "", 
   getdevicepair => "",
   getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... <PeerChannel>",
   getConfig     => "",
   regSet        =>"<regName> <value> ... <peerChannel>",
-  virtual       =>"<noButtons>",
-  actiondetect  =>"outdated",#todo Updt3 remove
   clear         =>"[readings|msgEvents]",
 );
 my %culHmSubTypeSets = (
@@ -2190,7 +2196,7 @@ sub CUL_HM_Set($@) {
 
   return "no set value specified" if(@a < 2);
 
-  my $name = $hash->{NAME};
+  my $name    = $hash->{NAME};
   my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
@@ -2203,8 +2209,9 @@ sub CUL_HM_Set($@) {
   my $chn = ($isChannel)?substr($dst,6,2):"01";
   $dst = substr($dst,0,6);
 
-  my $mdCh      = $md.($isChannel?$chn:"00"); # chan specific commands?
+  my $mdCh = $md.($isChannel?$chn:"00"); # chan specific commands?
   my $h = $culHmGlobalSets{$cmd}    if($st ne "virtual");
+  $h = $culHmGlobalSetsDevice{$cmd} if(!defined($h) && $st ne "virtual" && !$isChannel);
   $h = $culHmSubTypeSets{$st}{$cmd} if(!defined($h) && $culHmSubTypeSets{$st});
   $h = $culHmModelSets{$md}{$cmd}   if(!defined($h) && $culHmModelSets{$md}  );
   $h = $culHmChanSets{$mdCh}{$cmd}  if(!defined($h) && $culHmChanSets{$mdCh} );
@@ -2218,6 +2225,7 @@ sub CUL_HM_Set($@) {
   elsif(!defined($h)) {
     my @arr;
     @arr = keys %culHmGlobalSets if($st ne "virtual");
+    push @arr, keys %culHmGlobalSetsDevice    if($st ne "virtual" && !$isChannel);
     push @arr, keys %{$culHmSubTypeSets{$st}} if($culHmSubTypeSets{$st});
     push @arr, keys %{$culHmModelSets{$md}}   if($culHmModelSets{$md});
     push @arr, keys %{$culHmChanSets{$mdCh}}  if($culHmChanSets{$mdCh});
@@ -2244,6 +2252,9 @@ sub CUL_HM_Set($@) {
     return "$cmd requires parameter: $h";
   }
 
+     #if chn cmd is executed on device but refers to a channel?
+  my $chnHash = (!$isChannel && $modules{CUL_HM}{defptr}{$dst."01"})?
+                 $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
   my $devHash = CUL_HM_getDeviceHash($hash);
   my $id = CUL_HM_IOid($hash);
   my $state = "set_".join(" ", @a[1..(int(@a)-1)]);
@@ -2501,9 +2512,11 @@ sub CUL_HM_Set($@) {
   } 
   elsif($cmd eq "on") { #######################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000');
+	$hash = $chnHash; # report to channel if defined
   } 
   elsif($cmd eq "off") { ######################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'000000');
+	$hash = $chnHash; # report to channel if defined
   } 
   elsif($cmd eq "on-for-timer"||$cmd eq "on-till") { ##########################
     my (undef,undef,$duration,$edate) = @a; #date prepared extention to entdate
@@ -2519,10 +2532,12 @@ sub CUL_HM_Set($@) {
 	return "please enter the duration in seconds" if (!defined ($duration));
     $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
-  } 
+ 	$hash = $chnHash; # report to channel if defined
+ } 
   elsif($cmd eq "toggle") { ###################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
 	            (ReadingsVal($name,"state","on") eq "off" ?"C80000":"000000"));
+	$hash = $chnHash; # report to channel if defined
   }
   elsif($cmd eq "lock") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF');	# LEVEL_SET
@@ -3610,6 +3625,12 @@ my %culHmBits = (
                      LOWBAT   => '00,2,$val=(hex($val)&0x80)?1:0',
                      VALUE    => '02,2,$val=(hex($val))',
                      NEXT     => '04,2,$val=(hex($val))',} },
+  "53"          => { txt => "WaterSensor", params => {
+                     CMD      => "00,2",
+                     SEQ => '02,2,$val=(hex($val))-64', 
+                     V1  => '08,2,$val=(hex($val))', 
+                     V2  => '10,2,$val=(hex($val))', 
+                     V3  => '12,2,$val=(hex($val))'} },
   "58"          => { txt => "ClimateEvent", params => {
                      CMD      => "00,2",
                      ValvePos => '02,2,$val=(hex($val))', } },
