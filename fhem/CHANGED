@@ -1,8 +1,10 @@
 - SVN
+  - change:  30_HUEDevice: use new devStateIcon feature to show device color
+             in room overview
   - feature: added example Setup SQL and configuration for SQLite
   - change:  modified MySQL Setup SQL to use 512 characters in EVENT column
   - feature: added new Javascript Frontend based on ExtJS (by Johannes)
-  - feature: new Modules 30_HUEDevice and 31_HUEBridge for phillips hue and 
+  - feature: new Modules 30_HUEBridge and 31_HUEDevice for phillips hue and 
              smartlink devices (by justme1968)
   - change:  SYSSTAT: allow remote monitoring by ssh
   - change:  SYSSTAT: allow less frequent updates for diskusage
