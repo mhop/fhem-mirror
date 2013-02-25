@@ -77,6 +77,7 @@ DENON_AVR_DoInit($)
     DENON_AVR_SimpleWrite($hash, "PW?"); 
     DENON_AVR_SimpleWrite($hash, "MU?");
     DENON_AVR_SimpleWrite($hash, "MV?");
+    DENON_AVR_SimpleWrite($hash, "SI?");
 
     $hash->{STATE} = "Initialized";
 
@@ -164,11 +165,11 @@ DENON_AVR_Parse(@)
     {
         readingsBulkUpdate($hash, "mute", lc($1));
     }
-    elsif ($msg =~/MVMAX (.+)/)
+    elsif ($msg =~ /MVMAX (.+)/)
     {
         Log 5, "DENON_AVR_Parse: Ignoring maximum volume of <$1>";	
     }
-    elsif ($msg =~/MV(.+)/)
+    elsif ($msg =~ /MV(.+)/)
     {
 	    my $volume = $1;
 	    if (length($volume) == 2)
@@ -177,6 +178,11 @@ DENON_AVR_Parse(@)
         }
 
         readingsBulkUpdate($hash, "volume_level", lc($volume / 10));
+    }
+    elsif ($msg =~/SI(.+)/)
+    {
+	    my $input = $1;
+	    readingsBulkUpdate($hash, "input", $input);
     }
 	else 
 	{
