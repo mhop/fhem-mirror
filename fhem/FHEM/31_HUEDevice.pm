@@ -60,6 +60,9 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{hue} = -1;
   $hash->{fhem}{sat} = -1;
 
+
+  CommandAttr(undef,$name.' devStateIcon {CommandGet("","'.$name.' devStateIcon")}') if( !defined( AttrVal($hash->{NAME}, "devStateIcon", undef) ) );
+
   AssignIoPort($hash);
   if(defined($hash->{IODev}->{NAME})) {
     Log 3, "$name: I/O device is " . $hash->{IODev}->{NAME};
@@ -332,9 +335,20 @@ HUEDevice_Get($@)
         }
       }
     return $ret;
+  } elsif ( $cmd eq "devStateIcon" ) {
+    return '<div id="'.$name.'" align="center" class="col2">'.
+           '<img src="/fhem/icons/off" alt="off" title="off"'.
+           '</div>' if( ReadingsVal($name,"state","off") eq "off" );
+
+    return '<div id="'.$name.'" align="center" class="col2">'.
+           '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'"'.
+           '</div>' if( AttrVal($hash->{NAME}, "model", "") eq "LWL001" );
+
+    return '<div id="'.$name.'" class="block" style="width:32px;height:19px;'.
+           'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
   }
 
-  return "Unknown argument $cmd, choose one of rgb";
+  return "Unknown argument $cmd, choose one of rgb devStateIcon";
 }
 
 
@@ -453,6 +467,7 @@ HUEDevice_GetUpdate($)
 
       my $percent = int( $state->{'bri'} * 100 / 254 );
       if( $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"level", $percent . ' %');}
+      if( $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"pct", $percent);}
       if( $percent > 0
           && $percent < 100  ) {
         $s = $dim_values{int($percent/7)};
@@ -566,6 +581,8 @@ HUEDevice_GetUpdate($)
     <b>Get</b>
     <ul>
       <li>rgb</li>
+      <li>devStateIcon<br>
+      returns html code that can be used to create an icon that represents the device color in the room overview.</li>
     </ul><br>
 
   <a name="HUEDevice_Attr"></a>
@@ -573,6 +590,8 @@ HUEDevice_GetUpdate($)
   <ul>
     <li>subType<br>
       dimmer or switch, default is dimmer.</li>
+      <li>devStateIcon<br>
+      will be initialized to <code>{CommandGet("","&lt;name&gt; devStateIcon")}</code> as default to show device color in room overview.</li>
   </ul>
 
 </ul><br>
