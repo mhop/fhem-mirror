@@ -37,6 +37,8 @@ sub
 DENON_AVR_Initialize($)
 {
 	my ($hash) = @_;
+
+    Log 5, "DENON_AVR_Initialize: Entering";
 		
 	require "$attr{global}{modpath}/FHEM/DevIo.pm";
 	
@@ -47,23 +49,29 @@ DENON_AVR_Initialize($)
 # Device	
     $hash->{DefFn}      = "DENON_AVR_Define";
     $hash->{UndefFn}    = "DENON_AVR_Undefine";
+    $hash->{GetFn}      = "DENON_AVR_Get";
+    $hash->{SetFn}      = "DENON_AVR_Set";
     $hash->{ShutdownFn} = "DENON_AVR_Shutdown";
+
+    $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5  ".$readingFnAttributes;
 }
 
 #####################################
 sub
 DENON_AVR_DoInit($)
 {
-    my $hash = shift;
+    my ($hash) = @_;
     my $name = $hash->{NAME};
   
     Log 5, "DENON_AVR_DoInit: Called for $name";
 
-    DENON_AVR_SimpleWrite("PW?"); 
-    DENON_AVR_SimpleWrite("MU?");
-    DENON_AVR_SimpleWrite("MV?");
+    DENON_AVR_SimpleWrite($hash, "PW?"); 
+    DENON_AVR_SimpleWrite($hash, "MU?");
+    DENON_AVR_SimpleWrite($hash, "MV?");
 
     $hash->{STATE} = "Initialized";
+
+    return undef;
 }
 
 ###################################
@@ -71,15 +79,27 @@ sub
 DENON_AVR_Read($)
 {
     my ($hash) = @_;
+    my $name = $hash->{NAME};
 
-    Log 5, "DENON_AVR_Read: Called";
+    Log 5, "DENON_AVR_Read: Called for $name";
 
-    local $/ = "\r";
+    my $buf = DevIo_SimpleRead($hash);
+    return "" if (!defined($buf));
 
-    my $msg = readline($hash->{TCPDev}); if ($hash->{TCPDev});
-    chomp($msg);
+    my $culdata = $hash->{PARTIAL};
+    Log 5, "DENON_AVR_Read: $culdata/$buf"; 
+    $culdata .= $buf;
 
-    DENON_AVR_Parse($hash, $msg); if ($msg);
+    while($culdata =~ m/\r/) 
+    {
+	    my $rmsg;
+	    ($rmsg, $culdata) = split("\r", $culdata, 2);
+	    $rmsg =~ s/\r//;
+	
+	    DENON_AVR_Parse($hash, $rmsg) if($rmsg);
+    }
+
+    $hash->{PARTIAL} = $culdata;
 }
 
 #####################################
@@ -98,8 +118,7 @@ DENON_AVR_SimpleWrite(@)
 	my ($hash, $msg) = @_;
     my $name = $hash->{NAME};
 	
-	my $name = $hash->{NAME};
-    my $ll5 = GetLogLevel($name,5);
+    my $ll5 = GetLogLevel($name, 5);
     Log $ll5, "DENON_AVR_SimpleWrite: $msg";
 	
 	syswrite($hash->{TCPDev}, $msg."\r") if ($hash->{TCPDev});
@@ -121,10 +140,10 @@ DENON_AVR_Parse(@)
 
     readingsBeginUpdate($hash);
 
-    if (msg =~ /PW(.+)/)
+    if ($msg =~ /PW(.+)/)
     {
-	    $power = $1;
-        if($power eq "Standby")
+	    my $power = $1;
+        if($power eq "STANDBY")
         {
             $power = "Off";
         }
@@ -132,7 +151,25 @@ DENON_AVR_Parse(@)
         readingsBulkUpdate($hash, "power", lc($power));
 		$hash->{STATE} = lc($power);
     }
-	else
+    elsif ($msg =~ /MU(.+)/)
+    {
+        readingsBulkUpdate($hash, "mute", lc($1));
+    }
+    elsif ($msg =~/MVMAX (.+)/)
+    {
+        Log 5, "DENON_AVR_Parse: Ignoring maximum volume of <$1>";	
+    }
+    elsif ($msg =~/MV(.+)/)
+    {
+	    my $volume = $1;
+	    if (length($volume) == 2)
+        {
+            $volume = $volume."0";
+        }
+
+        readingsBulkUpdate($hash, "volume_level", lc($volume / 10));
+    }
+	else 
 	{
 	    Log 5, "DENON_AVR_Parse: Unknown message <$msg>";	
 	}
@@ -145,11 +182,10 @@ sub
 DENON_AVR_Define($$)
 {
     my ($hash, $def) = @_;
+    
     Log 5, "DENON_AVR_Define(".$def.") called.";
 
     my @a = split("[ \t][ \t]*", $def);
-    my $name = $hash->{NAME};
-
     if (@a != 3)
     {
         my $msg = "wrong syntax: define <name> DENON_AVR <ip-or-hostname>";
@@ -182,9 +218,58 @@ DENON_AVR_Undefine($$)
 
 #####################################
 sub
+DENON_AVR_Get($@)
+{
+    my ($hash, @a) = @_;
+    my $what;
+
+    return "argument is missing" if(int(@a) != 2);
+    $what = $a[1];
+
+    if($what =~ /^(power|volume_level|mute)$/)
+    {
+        if(defined($hash->{READINGS}{$what}))
+        {
+		    return $hash->{READINGS}{$what}{VAL};
+		}
+		else
+		{
+		    return "no such reading: $what";
+		}
+    }
+    else
+    {
+	return "Unknown argument $what, choose one of param power input volume_level mute get";
+    }
+}
+
+###################################
+sub
+DENON_AVR_Set($@)
+{
+    my ($hash, @a) = @_;
+
+    my $what = $a[1];
+    my $usage = "Unknown argument $what, choose one of on off volume:slider,0,1,100 mute:on,off rawCommand statusRequest";
+
+    if ($what eq "rawCommand")
+    {
+        my $cmd = $a[2];
+        DENON_AVR_SimpleWrite($hash, $cmd); 
+    }
+    else
+    {
+        return $usage;
+    }
+}
+
+#####################################
+sub
 DENON_AVR_Shutdown($)
 {
     my ($hash) = @_;
 
     Log 5, "DENON_AVR_Shutdown: Called";
 }
+
+1;
