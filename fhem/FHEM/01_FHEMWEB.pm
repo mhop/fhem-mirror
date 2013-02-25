@@ -1087,7 +1087,7 @@ FW_showRoom()
               my $srf = $FW_room ? "&room=$FW_room" : "";
               my $cv = ReadingsVal($d, $cmd, Value($d));
               $cmd = "" if($cmd eq "state");
-              $cv =~ s/[^\d\.]//g; # remove non numbers
+              $cv =~ s/.*?(\d+).*/$1/; # get first number
               FW_pO "<td colspan='2'>".
                       "<div class='slider' id='slider.$d' ".
                            "min='$min' stp='$stp' max='$max' ".

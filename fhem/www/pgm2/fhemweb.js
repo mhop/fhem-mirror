@@ -52,16 +52,14 @@ FW_doUpdate()
     el = document.getElementById("slider."+d[0]);
     if(el) {
       var doSet = 1;    // Only set the "state" slider in the detail view
-      /*
       if(el.parentNode.getAttribute("name") == "val.set"+d[0]) {
         var el2 = document.getElementsByName("arg.set"+d[0])[0];
         if(el2.nodeName.toLowerCase() == "select" &&
            el2.options[el2.selectedIndex].value != "state")
           doSet = 0;
       }
-      */
       if(doSet) {
-        var val = d[1].replace(/[^\d\.]/g, ""); // remove non numbers
+        var val = d[1].replace(/^.*?(\d+).*/g, "$1"); // get first number
         Slider(el, val);
       }
     }
