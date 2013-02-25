@@ -44,11 +44,11 @@ TRX_ELSE_Initialize($)
 {
   my ($hash) = @_;
 
-  $hash->{Match}     = "^...*";
+  $hash->{Match}     = "^..(0[0-f]|1[4-f]|2[1-f]|3[0-f]|4[0-f]|50|53|58|59|5b|5c|5e|5f|[6-f][0-f]).*";
   $hash->{DefFn}     = "TRX_ELSE_Define";
   $hash->{UndefFn}   = "TRX_ELSE_Undef";
   $hash->{ParseFn}   = "TRX_ELSE_Parse";
-  $hash->{AttrList}  = "IODev do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 ".
+  $hash->{AttrList}  = "IODev ignore:1,0 do_not_notify:1,0 loglevel:0,1,2,3,4,5,6 ".
                        $readingFnAttributes;
 
   Log 1, "TRX_ELSE: Initialize" if ($TRX_ELSE_debug == 1);
@@ -70,7 +70,7 @@ TRX_ELSE_Define($$)
 
   my $device_name = "TRX_UNKNOWN".$DOT.$code;
 
-  $hash->{TRX_LIGHT_CODE} = $code;
+  $hash->{CODE} = $code;
   $modules{TRX_ELSE}{defptr}{$device_name} = $hash;
   AssignIoPort($hash);
 
@@ -136,23 +136,24 @@ TRX_ELSE_Parse($$)
 
   my $def = $modules{TRX_ELSE}{defptr}{$device_name};
   if (!$def) {
-	Log 1, "UNDEFINED $device_name TRX_ELSE $type_hex";
-        Log 3, "TRX_ELSE: TRX_ELSE Unknown device $device_name, please define it";
-       	return "UNDEFINED $device_name TRX_ELSE $type_hex";
+	Log 3, "TRX_ELSE: Unknown device $device_name, please define it";
+    	return "UNDEFINED $device_name TRX_ELSE $type_hex";
+
   }
+  my $name = $def->{NAME};
+  return "" if(IsIgnored($name));
 
   readingsBeginUpdate($def);
 
-  #my $sensor = "hexline";
   my $current = $msg;
+  #my $sensor = "hexline";
   #readingsBulkUpdate($def, $sensor, $current);
 
   readingsBulkUpdate($def, "state", $current);
 
-
   readingsEndUpdate($def, 1);
 
-  return "";
+  return $name;
 }
 
 1;
