@@ -511,7 +511,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     
     chomp $status;
 
-    return ($status == 0 ? "$name|$local|absent|$number" : "$name|$local|present|$number");
+    return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
 }
 
 sub
@@ -588,6 +588,10 @@ PRESENCE_ProcessLocalScan($)
  if($hash->{MODE} eq "fritzbox" and defined($a[3]))
  {
     $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
+ }
+ elsif($hash->{MODE} eq "fritzbox" and defined($hash->{helper}{cachednr}))
+ {
+    delete($hash->{helper}{cachednr});
  }
  
  readingsBeginUpdate($hash);
