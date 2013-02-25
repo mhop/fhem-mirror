@@ -274,7 +274,10 @@ OWServer_Read($@)
     $ret =~ s/^\s+//g if(defined($ret));
   }
 
-  if(!defined($ret)) { OWServer_CloseDev($hash); }
+  # if a device does not exist, the server returns undef
+  # therefore it's not a good idea to blame the connection
+  # and remove the server in such a case.
+  #if(!defined($ret)) { OWServer_CloseDev($hash); }
   return $ret;
 }
 
@@ -312,9 +315,10 @@ sub
 OWServer_Find($@)
 {
   my ($hash,$slave)= @_;
-  my $owserver= $hash->{fhem}{owserver};
 
   return undef unless(defined($hash->{fhem}{owserver}));
+
+  my $owserver= $hash->{fhem}{owserver};
   my @dir= split(",",$owserver->dir("/"));
   my $path= undef;
   for my $entry (@dir) {

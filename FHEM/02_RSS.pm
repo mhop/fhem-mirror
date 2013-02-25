@@ -368,8 +368,9 @@ RSS_returnJPEG($) {
   #
   # create the image
   #
-  my $S= GD::Image->newTrueColor($width,$height);
-  $S->colorAllocate(0,0,0); # black is the background
+  my $S;
+#  my $S= GD::Image->newTrueColor($width,$height);
+#  $S->colorAllocate(0,0,0); # black is the background
 
   # wrap to make problems with GD non-lethal
 
@@ -410,16 +411,29 @@ RSS_returnJPEG($) {
       my $bgfile= $bgdir . "/" . $bgfiles[$bgnr];
       my $bg= newFromJpeg GD::Image($bgfile);
       my ($bgwidth,$bgheight)= $bg->getBounds();
-      my ($w,$h);
-      my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
-      if($u>$v) {
-          $w= $width;
-          $h= $bgheight/$u;
+      if($bgwidth != $width or $bgheight != $height) {
+        # we need to resize
+        my ($w,$h);
+        my ($u,$v)= ($bgwidth/$width, $bgheight/$height);
+        if($u>$v) {
+            $w= $width;
+            $h= $bgheight/$u;
+        } else {
+            $h= $height;
+            $w= $bgwidth/$v;
+        }
+        # create empty image
+        $S= GD::Image->newTrueColor($width,$height);
+        $S->colorAllocate(0,0,0); # black is the background
+        $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
       } else {
-          $h= $height;
-          $w= $bgwidth/$v;
+        # size is as required, we take the original
+        $S= $bg;
       }
-      $S->copyResized($bg,($width-$w)/2,($height-$h)/2,0,0,$w,$h,$bgwidth,$bgheight);
+    } else {
+      # no background, we create an empty background
+      $S= GD::Image->newTrueColor($width,$height);
+      $S->colorAllocate(0,0,0); # black is the background
     }
     SKIPBG:
 
