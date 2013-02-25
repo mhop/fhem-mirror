@@ -51,12 +51,13 @@ TRX_Initialize($)
   $hash->{ReadFn}  = "TRX_Read";
   $hash->{WriteFn} = "TRX_Write";
   $hash->{Clients} =
-        ":TRX_WEATHER:TRX_SECURITY:TRX_LIGHT:";
+        ":TRX_WEATHER:TRX_SECURITY:TRX_LIGHT:TRX_ELSE:";
   my %mc = (
-    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|57|5a|5d).*",
+#    "1:TRX_WEATHER"   	=> "^..(50|51|52|54|55|56|57|5a|5d).*",
+    "1:TRX_WEATHER"   	=> "^..(51|52|54|55|56|57|5a|5d).*",
     "2:TRX_SECURITY" 	=> "^..(20).*", 
     "3:TRX_LIGHT"	=> "^..(10|11|12|13).*", 
-    "4:TRX_ELSE"   	=> "^...*",
+    "4:TRX_ELSE"   	=> "^..(0[0-f]|1[4-f]|2[1-f]|3[0-f]|4[0-f]|50|53|58|59|5b|5c|5e|5f|[6-f][0-f]).*",
   );
   $hash->{MatchList} = \%mc;
 
