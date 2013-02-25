@@ -478,6 +478,8 @@ PRESENCE_DoLocalFritzBoxScan($)
 
     my $net_device;
 
+    $number = 0;
+    
     while($number <= $max)
     {
 	$net_device=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name);
