@@ -118,7 +118,7 @@ PRESENCE_Define($$)
 	return $msg;
     }
 
-    if($destination eq "fritzbox" and not $< == 0)
+    if(-X "/usr/bin/ctlmgr_ctl" and $destination eq "fritzbox" or $destination eq "lan-ping" and not $< == 0)
     {
 
 	my $msg = "FHEM is not running under root (currently ".(getpwuid($<))[0].") This check can only performed with root access to the FritzBox";
