@@ -308,10 +308,9 @@ FW_queryValue(cmd, qFn, qArg)
   qConn.onreadystatechange = function() {
     if(qConn.readyState != 3)
       return;
-    qFn = qFn.replace("%", qConn.responseText)
-             .replace(/[\r\n]/g, "");
-    eval(qFn);
-    delete qFn;
+    var qResp = qConn.responseText.replace(/[\r\n]/g, "")
+                                  .replace(/"/g, "\\\"");
+    eval(qFn.replace("%", qResp));
     delete qConn;
   }
   qConn.open("GET", document.location.pathname+"?cmd="+cmd+"&XHR=1", true);
