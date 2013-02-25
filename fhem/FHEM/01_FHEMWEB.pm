@@ -2266,6 +2266,7 @@ FW_dev2image($)
   my $icon;
   my $devStateIcon = AttrVal($name, "devStateIcon", undef);
   if(defined($devStateIcon)) {
+    return $devStateIcon if($devStateIcon =~ m/^{.*}$/);
     my @list = split(" ", $devStateIcon);
     foreach my $l (@list) {
       my ($re,$iconName) = split(":", $l);
@@ -2483,7 +2484,13 @@ FW_devState($$)
   } else {
     my $icon;
     $icon = FW_dev2image($d);
-    $txt = FW_makeImage($icon, $txt) if($icon);
+    if($icon) {
+      if($icon =~ m/^{.*}$/) {
+        $txt = AnalyzePerlCommand(undef, $icon);
+      } else {
+        $txt = FW_makeImage($icon, $txt);
+      }
+    }
   }
 
   $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
@@ -2897,6 +2904,8 @@ FW_htmlEscape($)
 
     <a name="devStateIcon"></a>
     <li>devStateIcon<br>
+        First form:<br>
+        <ul>
         Space separated list of regexp/icon-name pairs. If the state of the
         device matches regexp, then the corresponding icon-name will be
         displayed. If icon-name does not exist in the fhem/www/images
@@ -2908,6 +2917,12 @@ FW_htmlEscape($)
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
         </li>
+        </ul>
+        Second form:<br>
+        <ul>
+        Perl regexp enclosed in {}. Example:<br>
+        {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
+        </ul>
         <br>
 
     <a name="webCmd"></a>
