@@ -28,81 +28,116 @@
 package main;
 
 use strict;
-use threads;
-use threads::shared;
-use Thread::Queue;
 use warnings;
 
 use Time::HiRes qw(usleep);
-use IO::Socket::INET;
-use IO::Select;
-
-###################################
-sub DENON_AVR_Get($@);
-sub DENON_AVR_Define($$);
-sub DENON_AVR_Undefine($$);
 
 ###################################
 sub
 DENON_AVR_Initialize($)
 {
-    Log 5, "DENON_AVR_Initialize called.";
+	my ($hash) = @_;
+		
+	require "$attr{global}{modpath}/FHEM/DevIo.pm";
+	
+# Provider
+    $hash->{ReadFn}  = "DENON_AVR_Read";
+    $hash->{WriteFn} = "DENON_AVR_Write";
+ 
+# Device	
+    $hash->{DefFn}      = "DENON_AVR_Define";
+    $hash->{UndefFn}    = "DENON_AVR_Undefine";
+    $hash->{ShutdownFn} = "DENON_AVR_Shutdown";
+}
 
+#####################################
+sub
+DENON_AVR_DoInit($)
+{
+    my $hash = shift;
+    my $name = $hash->{NAME};
+  
+    Log 5, "DENON_AVR_DoInit: Called for $name";
+
+    DENON_AVR_SimpleWrite("PW?"); 
+    DENON_AVR_SimpleWrite("MU?");
+    DENON_AVR_SimpleWrite("MV?");
+
+    $hash->{STATE} = "Initialized";
+}
+
+###################################
+sub
+DENON_AVR_Read($)
+{
     my ($hash) = @_;
 
-    $hash->{GetFn}     = "DENON_AVR_Get";
-    $hash->{SetFn}     = "DENON_AVR_Set";
-    $hash->{DefFn}     = "DENON_AVR_Define";
-    $hash->{UndefFn}   = "DENON_AVR_Undefine";
+    Log 5, "DENON_AVR_Read: Called";
 
-    $hash->{AttrList}  = "do_not_notify:0,1 loglevel:0,1,2,3,4,5 power:0,1 ".$readingFnAttributes;
+    local $/ = "\r";
+
+    my $msg = readline($hash->{TCPDev}); if ($hash->{TCPDev});
+    chomp($msg);
+
+    DENON_AVR_Parse($hash, $msg); if ($msg);
+}
+
+#####################################
+sub
+DENON_AVR_Write($$$)
+{
+    my ($hash, $fn, $msg) = @_;
+
+    Log 5, "DENON_AVR_Write: Called";
 }
 
 ###################################
 sub
-DENON_AVR_Get($@)
+DENON_AVR_SimpleWrite(@)
 {
-    my ($hash, @a) = @_;
+	my ($hash, $msg) = @_;
     my $name = $hash->{NAME};
-
-
-    my $what = $a[1];
-     
-    if($what =~ /^(power|volume_level|mute)$/)
-    {
-        if (defined($hash->{helper}{STATE}{$what}) && defined($hash->{helper}{STATE}{$what}{VAL}))
-        {
-            Log 5, "DENON_AVR_Get: ".$what." = ".$hash->{helper}{STATE}{$what}{VAL};
-            return $hash->{helper}{STATE}{$what}{VAL};
-        }
-        else
-        {
-            return "no such reading: $what";
-        }
-    }
-    else
-    {
-	return "Unknown argument $what, choose one of param power input volume_level mute get";
-    }
+	
+	my $name = $hash->{NAME};
+    my $ll5 = GetLogLevel($name,5);
+    Log $ll5, "DENON_AVR_SimpleWrite: $msg";
+	
+	syswrite($hash->{TCPDev}, $msg."\r") if ($hash->{TCPDev});
+	
+	# Let's wait 100ms - not sure if still needed
+	usleep(100 * 1000);
+	
+	# Some linux installations are broken with 0.001, T01 returns no answer
+    select(undef, undef, undef, 0.01);
 }
 
 ###################################
 sub
-DENON_AVR_Set($@)
+DENON_AVR_Parse(@)
 {
-    my ($hash, @a) = @_;
+    my ($hash, $msg) = @_;
 
-    my $what = $a[1];
-    my $usage = "Unknown argument $what, choose one of on off volume:slider,-80,1,16 mute:on,off rawCommand statusRequest";
+    Log 5, "DENON_AVR_Parse: Called";
 
-    if ($what eq "rawCommand")
+    readingsBeginUpdate($hash);
+
+    if (msg =~ /PW(.+)/)
     {
-        $hash->{helper}{QUEUE}->enqueue($a[2]."\r");
+	    $power = $1;
+        if($power eq "Standby")
+        {
+            $power = "Off";
+        }
+
+        readingsBulkUpdate($hash, "power", lc($power));
+		$hash->{STATE} = lc($power);
     }
-    else
-    {
-        return $usage;
-    }
+	else
+	{
+	    Log 5, "DENON_AVR_Parse: Unknown message <$msg>";	
+	}
+  
+    readingsEndUpdate($hash, 1);
 }
 
 ###################################
@@ -117,148 +152,39 @@ DENON_AVR_Define($$)
 
     if (@a != 3)
     {
-	my $msg = "wrong syntax: define <name> DENON_AVR <ip-or-hostname>";
-	Log 2, $msg;
+        my $msg = "wrong syntax: define <name> DENON_AVR <ip-or-hostname>";
+        Log 2, $msg;
 
-	return $msg;
+        return $msg;
     }
 
-    my $address = $a[2];
-    $hash->{helper}{ADDRESS} = $address;
-    
-    $hash->{helper}{QUEUE} = new Thread::Queue();
-    $hash->{helper}{QUEUE}->enqueue("PW?\r");
-    $hash->{helper}{QUEUE}->enqueue("MV?\r");
-    $hash->{helper}{QUEUE}->enqueue("MU?\r");
+    DevIo_CloseDev($hash);
 
-    $hash->{helper}{STATE} = &share( {} );
-    $hash->{helper}{STATE}{"power"} = &share( {} );
-    $hash->{helper}{STATE}{"mute"} = &share( {} );
-    $hash->{helper}{STATE}{"volume_level"} = &share( {} );
+    my $name = $a[0];
+    my $host = $a[2];
 
-    $hash->{helper}{THREAD} = threads->new(\&DENON_AVR_Thread_Callback, $hash);
-
-    return undef;
+    $hash->{DeviceName} = $host.":23";
+	my $ret = DevIo_OpenDev($hash, 0, "DENON_AVR_DoInit");
+    return $ret;
 }
 
 #############################
 sub
 DENON_AVR_Undefine($$)
 {
-    my($hash, $name) = @_;
+	my($hash, $name) = @_;
+	
+    Log 5, "DENON_AVR_Undefine: Called for $name";	
 
-    $hash->{helper}{QUEUE}->enqueue(undef);
-    $hash->{helper}{THREAD}->join();
-    $hash->{helper}{THREAD} = undef;
-
+	DevIo_CloseDev($hash); 
     return undef;
 }
 
-#############################
+#####################################
 sub
-DENON_AVR_Thread_Callback($)
+DENON_AVR_Shutdown($)
 {
     my ($hash) = @_;
-    my $name = $hash->{NAME};
 
-    Log 5, "DENON_AVR_Thread_Callback: called for ".$name;
-
-    return "" if (!defined($hash->{helper}{ADDRESS}));
-
-    my $host = $hash->{helper}{ADDRESS};
-    Log 5, "DENON_AVR_ThreadCallback: Address: ".$host;
-
-    my $sock = IO::Socket::INET->new(PeerAddr => $host, PeerPort => 23);
-    if (!$sock)
-    {
-        Log 2, "Failed to create connection to ".$name." on ".$host;
-
-        return undef;
-    }
-
-    local $/ = "\r";
-      
-    my $select = IO::Select->new($sock);
-
-    my $queue = $hash->{helper}{QUEUE};
-
-    my $running = 1;
-    while ($running)
-    {
-        my @ready_clients = $select->can_read(0);
-        foreach my $fh (@ready_clients)  
-        {
-            my $buf = readline($sock);
-            chomp($buf);
-
-            if ($buf eq "PWON")
-            {
-                Log 5, "DENON_AVR_ThreadCallback: Power On";
-                $hash->{helper}{STATE}{"power"}{VAL} = "on";
-            }
-            elsif ($buf eq "PWSTANDBY")
-            {
-                Log 5, "DENON_AVR_ThreadCallback: Power Standby";
-                $hash->{helper}{STATE}{"power"}{VAL} = "off";
-            }
-            elsif ($buf eq "MUON")
-            {
-                Log 5, "DENON_AVR_ThreadCallback: Mute On";
-                $hash->{helper}{STATE}{"mute"}{VAL} = "on";
-            }
-            elsif ($buf eq "MUOFF")
-            {
-                Log 5, "DENON_AVR_ThreadCallback: Mute Off";
-                $hash->{helper}{STATE}{"mute"}{VAL} = "off";
-            }
-            elsif ($buf =~ /MV(.+)/)
-            {
-                my $volume = $1;
-                if ($volume =~/MAX (.+)/)
-                {
-                }
-                else
-                {
-                    if (length($volume) == 2)
-                    {
-                        $volume = $volume."0";
-                    }
-
-                    Log 5, "DENON_AVR_ThreadCallback: Volume level ".$volume;
-                    $hash->{helper}{STATE}{"volume_level"}{VAL} = int($volume);
-                }
-            }
-            else
-            {
-                Log 5, "DENON_AVR_ThreadCallback: Received ".$buf;
-            }
-        }
-
-        if ($queue->pending())
-        {
-           my $command = $queue->dequeue();
-           if (!$command)
-           {
-               Log 5, "DENON_AVR_ThreadCallback: Received shutdown command";
-               $running = 0;
-           }
-           else
-           {
-               Log 5, "DENON_AVR_ThreadCallback: Sending command ".$command;
-               syswrite($sock, $command);
-               usleep(100 * 1000);
-           }
-        }
-    }
-
-    $select->remove($sock);
-    close $sock;
+    Log 5, "DENON_AVR_Shutdown: Called";
 }
-
-1;
-
-=pod
-=begin html
-=end html
-=cut
-
