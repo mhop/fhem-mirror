@@ -7,11 +7,10 @@ use warnings;
 use HttpUtils;
 
 sub CommandCULflash($$);
-sub CULflash_SplitNewFiletimes($);
 
-my $server = "http://fhem.de:80";
-my $sdir   = "/fhemupdate2";
-my $ftime  = "filetimes.txt";
+my $host = "http://fhem.de";
+my $path = "/fhemupdate4/svn/";
+my $file = "controls_fhem.txt";
 my $dfu    = "dfu-programmer";
 
 #####################################
@@ -50,18 +49,23 @@ CommandCULflash($$)
 
   ################################
   # First get the index file to prove the file size
-  my $filetimes = GetFileFromURL("$server$sdir/$ftime");
-  return "Can't get $ftime from $server" if(!$filetimes);
+  my $filetimes = GetFileFromURL("$host$path$file");
+  return "Can't get $host$path$file" if(!$filetimes);
 
-  # split filetime and filesize
-  my ($ret, $filetime, $filesize) = CULflash_SplitNewFiletimes($filetimes);
-  return $ret if($ret);
+  my %filesize;
+  foreach my $l (split("[\r\n]", $filetimes)) {
+    chomp($l);
+    next if ($l !~ m/^UPD (20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d) (\d+) (.*)$/);
+    $filesize{$3} = $2;
+  }
+  return "FHEM/$target.hex is not found in $host$path$file"
+        if(!$filesize{"FHEM/$target.hex"});
 
   ################################
   # Now get the firmware file:
-  my $content = GetFileFromURL("$server$sdir/FHEM/$target.hex");
-  return "File size for $target.hex does not correspond to filetimes.txt entry"
-          if(length($content) ne $filesize->{"FHEM/$target.hex"});
+  my $content = GetFileFromURL("$host$path/FHEM/$target.hex");
+  return "File size for $target.hex does not correspond to $file entry"
+          if(length($content) ne $filesize{"FHEM/$target.hex"});
   my $localfile = "$moddir/$target.hex";
   open(FH,">$localfile") || return "Can't write $localfile";
   print FH $content;
@@ -80,24 +84,6 @@ CommandCULflash($$)
   my $result = `$cmd`;
   Log 1, "CULflash $result";
   return $result;
-}
-
-sub
-CULflash_SplitNewFiletimes($)
-{
-  my $filetimes = shift;
-  my $ret;
-  my (%filetime, %filesize) = ();
-  foreach my $l (split("[\r\n]", $filetimes)) {
-    chomp($l);
-    $ret = "Corrupted filetimes.txt file"
-        if($l !~ m/^20\d\d-\d\d-\d\d_\d\d:\d\d:\d\d /);
-    last if($ret);
-    my ($ts, $fs, $file) = split(" ", $l, 3);
-    $filetime{$file} = $ts;
-    $filesize{$file} = $fs;
-  }
-  return ($ret, \%filetime, \%filesize);
 }
 
 # vim: ts=2:et
