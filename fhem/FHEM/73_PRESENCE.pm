@@ -118,7 +118,7 @@ PRESENCE_Define($$)
 	return $msg;
     }
 
-    if(-X "/usr/bin/ctlmgr_ctl" and $destination eq "fritzbox" or $destination eq "lan-ping" and not $< == 0)
+    if(-X "/usr/bin/ctlmgr_ctl" and ($destination eq "fritzbox" or $destination eq "lan-ping") and not $< == 0)
     {
 
 	my $msg = "FHEM is not running under root (currently ".(getpwuid($<))[0].") This check can only performed with root access to the FritzBox";
@@ -355,8 +355,14 @@ PRESENCE_DoInit($)
 
     my ($hash) = @_;
 
-    DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT}."\n", 0) unless($hash->{helper}{DISABLED});
-
+    unless($hash->{helper}{DISABLED})
+    {
+	DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT}."\n", 0);
+    }
+    else
+    {
+	readingsSingleUpdate($hash, "state", "disabled",1);
+    }
 }
 
 
