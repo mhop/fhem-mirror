@@ -60,6 +60,8 @@ FW_doUpdate()
       }
       if(doSet) {
         var val = d[1].replace(/^.*?(\d+).*/g, "$1"); // get first number
+        if(!val.match(/\d+/))
+          val = 0;
         Slider(el, val);
       }
     }
