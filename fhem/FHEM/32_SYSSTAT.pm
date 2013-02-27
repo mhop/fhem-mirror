@@ -107,9 +107,9 @@ SYSSTAT_Get($@)
       $ret .= $filesystem ." <= ". $filesystems->{$filesystem}->{mountpoint} ."\n";
     }
     return $ret;
-  } else {
-    return "Unknown argument $cmd, choose one of filesystems";
   }
+
+  return "Unknown argument $cmd, choose one of filesystems";
 }
 
 sub
@@ -264,7 +264,7 @@ sub SYSSTAT_getLoadAVG( $ )
   </PRE></li>
     <li>to match the root filesystem  (mount point '/') in diskusage plots use
   '<code>#FileLog 4:/\x3a:0:</code>' or '<code>#FileLog 4:\s..\s:0:</code>'
-  and <b>not</b> '<code>#FileLog 4:/:0:</code>' as the later will match all mount points.
+  and <b>not</b> '<code>#FileLog 4:/:0:</code>' as the later will match all mount points</li>.
   </ul>
 
   <a name="SYSSTAT_Define"></a>
