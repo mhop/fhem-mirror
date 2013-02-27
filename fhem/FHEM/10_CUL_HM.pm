@@ -2,13 +2,14 @@
 # CUL HomeMatic handler
 # $Id$
 
-#peerlisten check
-#virtual channel for dimmer check
+#set expert default 3
+#rssi einsetzen
 
 package main;
 
 # update regRaw warnings                                  "#todo Updt2 remove"
 # update actiondetect                                     "#todo Updt3 remove"
+# attribut conversion                                     "#todo Updt4 remove"
 #        the lines can be removed after some soak time - around version 2600
 use strict;
 use warnings;
@@ -151,7 +152,7 @@ my %culHmModel=(
   "0046" => {name=>"HM-SWI-3-FM"             ,st=>'swi'               ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"Sw:1:3",},
   "0047" => {name=>"KFM-Sensor"              ,st=>'KFM100'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
-  "0049" => {name=>"KFM-Display"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
+  "0049" => {name=>"KFM-Display"             ,st=>'KFM100'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "004B" => {name=>"HM-Sec-Cen"              ,st=>'AlarmControl'      ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004C" => {name=>"HM-RC-12-SW"             ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:12",},
@@ -284,41 +285,39 @@ sub CUL_HM_updateConfig($){
   while(@nameList){
     my $name = shift(@nameList);
     my $hash = CUL_HM_name2Hash($name);
-	if (CUL_HM_hash2Id($hash) ne $K_actDetID){# if not action detector
+	my $id = CUL_HM_hash2Id($hash);
+	my $isDevice = (length($id) == 6)?"true":"";
+	if ($id ne $K_actDetID){# if not action detector
  	  CUL_HM_ID2PeerList($name,"",1);       # update peerList out of peerIDs
       my $actCycle = AttrVal($name,"actCycle",undef);
-	  CUL_HM_ActAdd(CUL_HM_hash2Id($hash),$actCycle) if ($actCycle);# re-read start values 
+	  CUL_HM_ActAdd($id,$actCycle) if ($actCycle);# add to ActionDetect?
+	  # --- set default attrubutes if missing ---
+      $attr{$name}{expert}= AttrVal($name,"expert","2_full") if ($isDevice);
+	  
+	  # convert variables, delete obsolete, move to hidden level
+      $attr{$name}{".devInfo"} = $attr{$name}{devInfo} if($attr{$name}{devInfo});#todo Updt4 remove
+	  delete $attr{$name}{devInfo};                                              #todo Updt4 remove
+	  delete $attr{$name}{hmClass};                                              #todo Updt4 remove
 	}
 	else{
 	  ;#delete $attr{$name}{peerIDs}; # remove historical data
 	}
-	
-	# convert variables, delete obsolete, move to hidden level
-    $attr{$name}{".devInfo"} = $attr{$name}{devInfo} if ($attr{$name}{devInfo});
-	delete $attr{$name}{devInfo};
-	delete $attr{$name}{hmClass};
 
-	if ("dimmer" eq CUL_HM_Get($hash,$name,"param","subType")) {
+	if ("dimmer" eq CUL_HM_Get($hash,$name,"param","subType")) {#setup virtuals
 	  #configure Dimmer virtual channel assotiation
 
-	  my $id = CUL_HM_hash2Id($hash);
 	  if (length($id) == 8 || !$hash->{"channel_01"}){
 	    my $chn = substr($id,6,2);
-	    my $devId = substr($id,0,6);
 		$chn = "01" if (!$chn); # device acts as channel 01
-	    my $model = CUL_HM_Get($hash,$name,"param","model");
+	    my $devId = substr($id,0,6);
 	    my $mId = CUL_HM_getMId($hash);
-	    my $chSet = $culHmModel{$mId}{chn};
-	    $hash->{helper}{vDim}{chnSet} = $chSet;
-		
-		my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$chSet);
+		my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel{$mId}{chn});
 		@chnPh = split ':',$chnPh[0] if (@chnPh);
-		my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;   # max Phys channels
-		my $chnPhy = int(($chn-$chnPhyMax+1)/2); # my phys chn
-
-		my $idPhy = $devId.sprintf("%02X",$chnPhy);
-		my $pHash = CUL_HM_id2Hash($idPhy);
-		$idPhy = CUL_HM_hash2Id($pHash);
+		my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;         # max Phys channels
+		my $chnPhy    = int(($chn-$chnPhyMax+1)/2);    # assotiated phy chan
+		my $idPhy     = $devId.sprintf("%02X",$chnPhy);# ID assot phy chan
+		my $pHash     = CUL_HM_id2Hash($idPhy);        # hash assot phy chan
+		$idPhy        = CUL_HM_hash2Id($pHash);        # could be device!!!
 
 		if ($pHash){
 		  $pHash->{helper}{vDim}{idPhy} = $idPhy;
@@ -339,32 +338,7 @@ sub CUL_HM_updateConfig($){
 		    delete $pHash->{helper}{vDim}{idV3};
 		  }
 		}
-        my %logicCombination=(
-		              inactive=>'$val=$val',
-                      or      =>'$val=$in>$val            ?$in            :$val' ,#max
-					  and     =>'$val=$in<$val            ?$in            :$val' ,#min
-					  xor     =>'$val=($in!=0&&$val!=0)   ?0              :($in>$val?$in:$val)',#0 if both are != 0, else max
-					  nor     =>'$val=100-($in>$val       ?$in            :$val)',#100-max
-					  nand    =>'$val=100-($in<$val       ?$in            :$val)',#100-min
-					  orinv   =>'$val=(100-$in)>$val      ?(100-$in)      :$val' ,#max((100-chn),other)
-					  andinv  =>'$val=(100-$in)<$val      ?(100-$in)      :$val' ,#min((100-chn),other)
-					  plus    =>'$val=($in + $val)<100    ?($in + $val)   :100'  ,#other + chan
-					  minus   =>'$val=($in - $val)>0      ?($in + $val)   :0'    ,#other - chan
-					  mul     =>'$val=($in * $val)<100    ?($in + $val)   :100'  ,#other * chan
-					  plusinv =>'$val=($val+100-$in)<100  ?($val+100-$in) :100'  ,#other + 100 - chan
-					  minusinv=>'$val=($val-100+$in)>0    ?($val-100+$in) : 0'   ,#other - 100 + chan
-					  mulinv  =>'$val=((100-$in)*$val)<100?(100-$in)*$val):100'  ,#other * (100 - chan)
-					  invPlus =>'$val=(100-$val-$in)>0    ?(100-$val-$in) :0'    ,#100 - other - chan
-					  invMinus=>'$val=(100-$val+$in)<100  ?(100-$val-$in) :100'  ,#100 - other + chan
-					  invMul  =>'$val=(100-$val*$in)>0    ?(100-$val*$in) :0'    ,#100 - other * chan
-		);
-		if ($pHash->{helper}{vDim}{idPhy}){
-		  my $vName = CUL_HM_id2Name($pHash->{helper}{vDim}{idPhy});
-		  $pHash->{helper}{vDim}{oper1} = ReadingsVal($vName,"logicCombination","inactive");	
-		  $pHash->{helper}{vDim}{operExe1} = $logicCombination{$pHash->{helper}{vDim}{oper1}} ;	
-		}
 	  }
-	  
 	}
 
 	# add default web-commands
@@ -389,7 +363,7 @@ sub CUL_HM_updateConfig($){
 	      my ($old,$new) = split":",$_;
 		  my $nW = $webCmd;
 		  $nW =~ s/^$old:/$new:/;
-		  $nW =~ s/$old$/$new/;#General check
+		  $nW =~ s/$old$/$new/;
 		  $nW =~ s/:$old:/:$new:/;
 		  $webCmd = $nW;
 		}
@@ -471,13 +445,13 @@ sub CUL_HM_Rename($$$) {#############################
   }
   else{# we are a device - inform channels if exist
     foreach (grep {$_ =~m/^channel_/} keys%{$hash}){
-	  Log 1,"General notify channel:".$hash->{$_}." for:".$name;
 	  my $chnHash = CUL_HM_name2Hash($hash->{$_});
 	  $chnHash->{device} = $name;
 	}
   }
   return;
 }
+
 sub CUL_HM_Parse($$) {#############################
   my ($iohash, $msg) = @_;
   my $id = CUL_HM_Id($iohash);
@@ -524,7 +498,7 @@ sub CUL_HM_Parse($$) {#############################
   my $tn = TimeNow();
 
   CUL_HM_storeRssi($name,
-                   "to_".((hex($msgFlag)&0x40)?"rpt_":"").$ioName,# repeater?
+                   "at_".((hex($msgFlag)&0x40)?"rpt_":"").$ioName,# repeater?
                    $myRSSI);
 
   my $msgX = "No:$msgcnt - t:$msgType s:$src d:$dst ".($p?$p:"");
@@ -865,16 +839,35 @@ sub CUL_HM_Parse($$) {#############################
       my ($subType,$chn,$val,$err) = ($1,$2,hex($3)/2,hex($4)) 
  	                     if($p =~ m/^(..)(..)(..)(..)/);
       my ($x,$pl) = ($1,hex($2)/2)  if($p =~ m/^........(..)(..)/);
+	  my $stUpdt = 1;# shall state be updated?
 	  if (defined $pl){# device with virtual channels...
-	    $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
-	    push @event, "virtLevel:$val";
-		$val = $pl;
+	    push @event,"virtLevel:".($val == 100?"on":($val == 0?"off":"$val %"));
+		if ($msgType eq "10"){
+		  $val = $pl;# Physical level is pl - but only for InfoStatus
+		  $pl = ($pl == 100 ? "on" : ($pl == 0 ? "off" : "$pl %"));
+          #set state for all virtual
+		  my $vDim = $shash->{helper}{vDim};#shortcut
+          my $ph = CUL_HM_id2Hash($vDim->{idPhy})	 if ($vDim->{idPhy});
+          if ($ph){
+		    readingsSingleUpdate($ph,"state",$pl,1);
+		    my $vh;
+            $vh = CUL_HM_id2Hash($vDim->{idV2})     if ($vDim->{idV2});
+		    readingsSingleUpdate($vh,"state",$pl,1) if ($vh);
+            $vh = CUL_HM_id2Hash($vDim->{idV3})     if ($vDim->{idV3});
+		    readingsSingleUpdate($vh,"state",$pl,1) if ($vh);
+		  }
+		}
+		else{
+		  $stUpdt = 0;# no update
+		  $val = ReadingsVal($name,"state","");	
+		}
 	  }
 
       # Multi-channel device: Use channel if defined
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
-      $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"));
+      $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"))
+	         if ($stUpdt );
       push @event, "deviceMsg:$val$target" if($chn ne "00");
 
       my $eventName = "unknown"; # different names for events
@@ -1494,7 +1487,27 @@ my %culHmRegDefine = (
   statusInfoMinDly=>{a=> 87.0,s=>0.5,l=>1,min=>0.5,max=>15.5    ,c=>'factor'   ,f=>2       ,u=>"s"   ,d=>0,t=>"status message min delay"},
   statusInfoRandom=>{a=> 87.5,s=>0.3,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>"s"   ,d=>0,t=>"status message random delay"},
   characteristic  =>{a=> 88.0,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>""    ,d=>1,t=>""                                      ,lit=>{linear=>0,square=>1}},
-  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
+  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>""             ,lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
+#  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
+#		                                                                                                      "inactive=>unused\n".
+#                                                                                                              "or      =>max(state,chan)\n".
+#					                                                                                          "and     =>min(state,chan)\n".
+#					                                                                                          "xor     =>0 if both are != 0, else max\n".
+#					                                                                                          "nor     =>100-max(state,chan)\n".
+#					                                                                                          "nand    =>100-min(state,chan)\n".
+#					                                                                                          "orinv   =>max((100-chn),state)\n".
+#					                                                                                          "andinv  =>min((100-chn),state)\n".
+#					                                                                                          "plus    =>state + chan\n".
+#					                                                                                          "minus   =>state - chan\n".
+#					                                                                                          "mul     =>state * chan\n".
+#					                                                                                          "plusinv =>state + 100 - chan\n".
+#					                                                                                          "minusinv=>state - 100 + chan\n".
+#					                                                                                          "mulinv  =>state * (100 - chan)\n".
+#					                                                                                          "invPlus =>100 - state - chan\n".
+#					                                                                                          "invMinus=>100 - state + chan\n".
+#					                                                                                          "invMul  =>100 - state * chan\n",lit=>{inactive=>0,or=>1,and=>2,xor=>3,nor=>4,nand=>5,orinv=>6,andinv=>7,plus=>8,minus=>9,mul=>10,plusinv=>11,minusinv=>12,mulinv=>13,invPlus=>14,invMinus=>15,invMul=>16}},
+#
+#					  
 #CC-TC                                                                                        
   backlOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
   backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
@@ -1928,6 +1941,33 @@ sub CUL_HM_repReadings($) {
   }
   return $ret;
 }
+sub CUL_HM_dimLog($) {
+  my ($hash)=@_;
+  my $lComb = CUL_HM_Get($hash,$hash->{NAME},"reg","logicCombination");
+  return if (!$lComb);
+  my %logicComb=(					                                                                                  
+		              inactive=>{calc=>'$val=$val'                                      ,txt=>'unused'},
+                      or      =>{calc=>'$val=$in>$val?$in:$val'                         ,txt=>'max(state,chan)'},
+					  and     =>{calc=>'$val=$in<$val?$in:$val'                         ,txt=>'min(state,chan)'},
+					  xor     =>{calc=>'$val=!($in!=0&&$val!=0)?($in>$val?$in:$val): 0' ,txt=>'0 if both are != 0, else max'},
+					  nor     =>{calc=>'$val=100-($in>$val?$in : $val)'                 ,txt=>'100-max(state,chan)'},
+					  nand    =>{calc=>'$val=100-($in<$val?$in : $val)'                 ,txt=>'100-min(state,chan)'},
+					  orinv   =>{calc=>'$val=(100-$in)>$val?(100-$in) : $val'           ,txt=>'max((100-chn),state)'},
+					  andinv  =>{calc=>'$val=(100-$in)<$val?(100-$in) : $val'           ,txt=>'min((100-chn),state)'},
+					  plus    =>{calc=>'$val=($in + $val)<100?($in + $val) : 100'       ,txt=>'state + chan'},
+					  minus   =>{calc=>'$val=($in - $val)>0?($in + $val) : 0'           ,txt=>'state - chan'},
+					  mul     =>{calc=>'$val=($in * $val)<100?($in + $val) : 100'       ,txt=>'state * chan'},
+					  plusinv =>{calc=>'$val=($val+100-$in)<100?($val+100-$in) : 100'   ,txt=>'state + 100 - chan'},
+					  minusinv=>{calc=>'$val=($val-100+$in)>0?($val-100+$in) : 0'       ,txt=>'state - 100 + chan'},
+					  mulinv  =>{calc=>'$val=((100-$in)*$val)<100?(100-$in)*$val) : 100',txt=>'state * (100 - chan)'},
+					  invPlus =>{calc=>'$val=(100-$val-$in)>0?(100-$val-$in) : 0'       ,txt=>'100 - state - chan'},
+					  invMinus=>{calc=>'$val=(100-$val+$in)<100?(100-$val-$in) : 100'   ,txt=>'100 - state + chan'},
+					  invMul  =>{calc=>'$val=(100-$val*$in)>0?(100-$val*$in) : 0'       ,txt=>'100 - state * chan'},
+					  );
+  readingsSingleUpdate($hash,"R-logicCombTxt" ,$logicComb{$lComb}{txt},0);
+  readingsSingleUpdate($hash,"R-logicCombCalc",$logicComb{$lComb}{calc},0);
+  return "";
+}
 ###################################
 sub CUL_HM_Get($@) {
   my ($hash, @a) = @_;
@@ -2106,7 +2146,7 @@ sub CUL_HM_Get($@) {
   return "";
 }
 ###################################
-my %culHmGlobalSetsDevice = (# general commands for devices only
+my %culHmGlobalSetsDevice = (
   raw      	    => "data ...",
   reset    	    => "",
   pair     	    => "",
@@ -4088,6 +4128,7 @@ sub CUL_HM_updtRegDisp($$$) {
         if (($list == 5 ||$list == 6)     && 
              substr($hash->{DEF},6,2) eq "02" &&
              CUL_HM_Get($hash,$name,"param","model") eq "HM-CC-TC");
+#  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
 
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 }
@@ -4375,6 +4416,7 @@ sub CUL_HM_ActCheck() {# perform supervision
   InternalTimer(gettimeofday()+$attr{$actName}{actCycle}, 
   								   "CUL_HM_ActCheck", "ActionDetector", 0);
 }
+
 sub CUL_HM_UpdtReadBulk(@) { #update a bunch of readings and trigger the events
   my ($hash,$doTrg,@readings) = @_; 
   return if (!@readings);
@@ -4411,16 +4453,23 @@ sub CUL_HM_noDupInString($) {#return string with no duplicates, comma separated
 sub CUL_HM_storeRssi(@){
   my ($name,$peerName,$val) = @_;
   $defs{$name}{helper}{rssi}{$peerName}{lst} = $val;
-  $defs{$name}{helper}{rssi}{$peerName}{min} = $val if (!$defs{$name}{helper}{rssi}{$peerName}{min} || $defs{$name}{helper}{rssi}{$peerName}{min} > $val);
-  $defs{$name}{helper}{rssi}{$peerName}{max} = $val if (!$defs{$name}{helper}{rssi}{$peerName}{max} || $defs{$name}{helper}{rssi}{$peerName}{max} < $val);
-  $defs{$name}{helper}{rssi}{$peerName}{cnt} ++;
-  if ($defs{$name}{helper}{rssi}{$peerName}{cnt} == 1){
-    $defs{$name}{helper}{rssi}{$peerName}{avg} = $val;
+  my $rssiP = $defs{$name}{helper}{rssi}{$peerName};
+  $rssiP->{min} = $val if (!$rssiP->{min} || $rssiP->{min} > $val);
+  $rssiP->{max} = $val if (!$rssiP->{max} || $rssiP->{max} < $val);
+  $rssiP->{cnt} ++;
+  if ($rssiP->{cnt} == 1){
+    $rssiP->{avg} = $val;
   }
   else{
-    $defs{$name}{helper}{rssi}{$peerName}{avg} += ($val - $defs{$name}{helper}{rssi}{$peerName}{avg}) /$defs{$name}{helper}{rssi}{$peerName}{cnt};
+    $rssiP->{avg} += ($val - $rssiP->{avg}) /$rssiP->{cnt};
   }
-  return ;
+  my $hash = CUL_HM_name2Hash($name);
+  my $rssi;
+  foreach (keys %{$rssiP}){
+	$rssi .= $_.":".(int($rssiP->{$_}*100)/100)." ";
+  }  
+  $hash->{"rssi_".$peerName} = $rssi;
+ return ;
 }
 
 1;
