@@ -118,7 +118,7 @@ PRESENCE_Define($$)
 	return $msg;
     }
 
-    if($destination eq "fritzbox" and not $< == 0)
+    if(-X "/usr/bin/ctlmgr_ctl" and ($destination eq "fritzbox" or $destination eq "lan-ping") and not $< == 0)
     {
 
 	my $msg = "FHEM is not running under root (currently ".(getpwuid($<))[0].") This check can only performed with root access to the FritzBox";
@@ -355,8 +355,14 @@ PRESENCE_DoInit($)
 
     my ($hash) = @_;
 
-    DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT}."\n", 0) unless($hash->{helper}{DISABLED});
-
+    unless($hash->{helper}{DISABLED})
+    {
+	DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT}."\n", 0);
+    }
+    else
+    {
+	readingsSingleUpdate($hash, "state", "disabled",1);
+    }
 }
 
 
@@ -415,6 +421,9 @@ PRESENCE_DoLocalPingScan($)
 	if($pingtool)
 	{
 	    $retcode = $pingtool->ping($device, 5);
+	    
+	    Log GetLogLevel($name, 5), "PRESENCE ($name) - pingtool returned $retcode";
+	    
 	    $return = "$name|$local|".($retcode ? "present" : "absent"); 
 	}
 	else
@@ -426,7 +435,9 @@ PRESENCE_DoLocalPingScan($)
     else
     {
 	$temp = qx(ping -c 4 $device);
-	$return = "$name|$local|".($temp =~ /\d+ bytes from/ ? "present" : "absent");
+	
+	Log GetLogLevel($name, 5), "PRESENCE ($name) - ping command returned with output:\n$temp";
+	$return = "$name|$local|".($temp =~ /\d+ [Bb]ytes (from|von)/ ? "present" : "absent");
     }
 
     return $return;
@@ -456,12 +467,17 @@ PRESENCE_DoLocalFritzBoxScan($)
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
+            Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number ($number)";
     	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed);
     	    if(not $status =~ /^\s*\d+\s*$/)
     	    {
         	return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
     	    }
     	    return ($status == 0)? "$name|$local|absent|$number" : "$name|$local|present|$number"; ###MH
+	}
+	else
+	{
+	    Log GetLogLevel($name, 5), "PRESENCE ($name) - cached device name ($cached_name) does not match expected name ($device). perform a full scan";
 	}
     }
 
@@ -478,15 +494,20 @@ PRESENCE_DoLocalFritzBoxScan($)
 
     my $net_device;
 
+    $number = 0;
+    
     while($number <= $max)
     {
 	$net_device=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/name);
         
         chomp $net_device;
         
+        Log GetLogLevel($name, 5), "PRESENCE ($name) - checking device number $number ($net_device)";
 	if($net_device eq $device)
 	{
   	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed); 
+  	    
+  	    Log GetLogLevel($name, 5), "PRESENCE ($name) - speed for device number $net_device is $status";
   	    last;
 	}
 	
@@ -496,7 +517,7 @@ PRESENCE_DoLocalFritzBoxScan($)
     
     chomp $status;
 
-    return ($status == 0 ? "$name|$local|absent|$number" : "$name|$local|present|$number");
+    return ($status == 0 ? "$name|$local|absent" : "$name|$local|present").($number <= $max ? "|$number" : "");
 }
 
 sub
@@ -573,6 +594,10 @@ PRESENCE_ProcessLocalScan($)
  if($hash->{MODE} eq "fritzbox" and defined($a[3]))
  {
     $hash->{helper}{cachednr} = $a[3] if(($a[2] eq "present") || ($a[2] eq "absent")); 
+ }
+ elsif($hash->{MODE} eq "fritzbox" and defined($hash->{helper}{cachednr}))
+ {
+    delete($hash->{helper}{cachednr});
  }
  
  readingsBeginUpdate($hash);

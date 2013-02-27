@@ -127,7 +127,7 @@ CommandUpdate($$)
         return "Usage: update [development|stable] check";
 
       } elsif ($BRANCH eq "THIRDPARTY"  &&
-          (uc($args[1]) !~ m/^HTTP:/    ||
+          (uc($args[1]) !~ m/^(HTTP|HTTPS):/    ||
            uc($args[3]) !~ "CHECK"      ||
            int(@args) != 4)
       ) {
@@ -135,7 +135,7 @@ CommandUpdate($$)
       }
 
     } elsif ($BRANCH eq "THIRDPARTY"  &&
-        (uc($args[1]) !~ m/^HTTP:/    ||
+        (uc($args[1]) !~ m/^(HTTP|HTTPS):/    ||
           (int(@args) == 4            &&
            uc($args[3]) ne "FORCE")   ||
           int(@args) > 4)

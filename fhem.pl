@@ -704,13 +704,11 @@ AnalyzeCommand($$)
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
   return undef if(!$fn);
 
-  $fn = "setdefaultattr" if($fn eq "defattr"); # Compatibility mode
-
   #############
   # Search for abbreviation
   if(!defined($cmds{$fn})) {
     foreach my $f (sort keys %cmds) {
-      if(length($f) > length($fn) && substr($f, 0, length($fn)) eq $fn) {
+      if(length($f) > length($fn) && lc(substr($f, 0, length($fn))) eq lc($fn)) {
 	Log 5, "$fn => $f";
         $fn = $f;
         last;
@@ -721,8 +719,8 @@ AnalyzeCommand($$)
   #############
   # autoload commands.
   if(!defined($cmds{$fn})) {
-    map { $fn = $_ if(uc($fn) eq uc($_)); } keys %modules;
-    $fn = lc(LoadModule($fn));
+    map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
+    $fn = LoadModule($fn);
     return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
   }
 

@@ -95,6 +95,7 @@ EnOcean_Initialize($)
 
   $hash->{Match}     = "^EnOcean:";
   $hash->{DefFn}     = "EnOcean_Define";
+  $hash->{UndefFn}   = "EnOcean_Undef";
   $hash->{ParseFn}   = "EnOcean_Parse";
   $hash->{SetFn}     = "EnOcean_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
@@ -616,6 +617,15 @@ EnOcean_A5Cmd($$$)
   IOWrite($hash, "000A0701", # varLen=0A optLen=07 msgType=01=radio, 
           sprintf("A5%s%s0001%sFF00",$msg,$org,$hash->{DEF}));
           # type=A5 msg:4 senderId:4 status=00 subTelNum=01 destId:4 dBm=FF Security=00
+}
+
+#####################################
+sub
+EnOcean_Undef($$)
+{
+  my ($hash, $arg) = @_;
+  delete $modules{EnOcean}{defptr}{uc($hash->{DEF})};
+  return undef;
 }
 
 1;
