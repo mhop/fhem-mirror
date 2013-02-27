@@ -61,6 +61,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{sat} = -1;
 
 
+  CommandAttr(undef,$name.' webCmd rgb:toggle:on:off') if( !defined( AttrVal($hash->{NAME}, "webCmd", undef) ) );
   CommandAttr(undef,$name.' devStateIcon {CommandGet("","'.$name.' devStateIcon")}') if( !defined( AttrVal($hash->{NAME}, "devStateIcon", undef) ) );
 
   AssignIoPort($hash);
@@ -118,6 +119,7 @@ HUEDevice_Set($@)
     my $obj = {
       'on'  => JSON::true,
     };
+   $obj->{bri} =254 if( ReadingsVal($name,"bri","0") eq 0 );
    if( defined($value) ) {
      $obj->{transitiontime} = $value / 10;
    }
@@ -201,7 +203,7 @@ HUEDevice_Set($@)
       }
   } elsif($cmd eq "xy" && $value =~ m/^(.+),(.+)/) {
     my ($x,$y) = ($1, $2);
-   
+
     my $obj = {
       'xy'  => [0+$x, 0+$y],
       'on'  => JSON::true,
@@ -283,10 +285,10 @@ HUEDevice_Set($@)
 sub
 HUEDevice_Get($@)
 {
-  my ($hash, @a) = @_; 
- 
+  my ($hash, @a) = @_;
+
   my $name = $a[0];
-  return "$name: get needs at least one parameter" if(@a < 2); 
+  return "$name: get needs at least one parameter" if(@a < 2);
 
   my $cmd= $a[1];
 
@@ -337,11 +339,11 @@ HUEDevice_Get($@)
     return $ret;
   } elsif ( $cmd eq "devStateIcon" ) {
     return '<div id="'.$name.'" align="center" class="col2">'.
-           '<img src="/fhem/icons/off" alt="off" title="off"'.
-           '</div>' if( ReadingsVal($name,"state","off") eq "off" );
+           '<img src="/fhem/icons/off" alt="off" title="off">'.
+           '</div>' if( ReadingsVal($name,"state","off") eq "off" | ReadingsVal($name,"bri","0") eq 0 );
 
     return '<div id="'.$name.'" align="center" class="col2">'.
-           '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'"'.
+           '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
            '</div>' if( AttrVal($hash->{NAME}, "model", "") eq "LWL001" );
 
     return '<div id="'.$name.'" class="block" style="width:32px;height:19px;'.
