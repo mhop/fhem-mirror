@@ -619,7 +619,7 @@ update_CheckUpdates($$$$$)
       last;
     }
 
-    next if (-e $f && !$force &&
+    next if (!$force &&
              $lControl{$pack}{$f}{date} &&
              $rControl{$pack}{$f}{date} eq $lControl{$pack}{$f}{date});
 
