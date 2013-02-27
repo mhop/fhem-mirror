@@ -309,7 +309,7 @@ RESCAN:
             my $v = $fld[$col]-$h->{last1};
             $v = 0 if($v < 0);              # Skip negative delta
             $dte = "$lda[0]_$ts";
-            $val = sprintf("%0.1f", $v);
+            $val = sprintf("%g", $v);
             if($hd == 13) {                 # Generate missing 0 values / hour
               my @cda = split("[_:]", $ld);
               for(my $mi = $lda[1]+1; $mi < $cda[1]; $mi++) {
