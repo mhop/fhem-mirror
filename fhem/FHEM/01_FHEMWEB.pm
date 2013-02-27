@@ -1088,6 +1088,7 @@ FW_showRoom()
               my $cv = ReadingsVal($d, $cmd, Value($d));
               $cmd = "" if($cmd eq "state");
               $cv =~ s/.*?(\d+).*/$1/; # get first number
+              $cv = 0 if($cv !~ m/\d/);
               FW_pO "<td colspan='2'>".
                       "<div class='slider' id='slider.$d' ".
                            "min='$min' stp='$stp' max='$max' ".
