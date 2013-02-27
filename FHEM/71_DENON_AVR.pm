@@ -80,6 +80,7 @@ DENON_AVR_DoInit($)
     DENON_AVR_SimpleWrite($hash, "SI?");
 
     $hash->{STATE} = "Initialized";
+    $hash->{helper}{INTERVAL} = 60 * 5;
 
     return undef;
 }
@@ -217,7 +218,7 @@ DENON_AVR_Define($$)
     $hash->{DeviceName} = $host.":23";
 	my $ret = DevIo_OpenDev($hash, 0, "DENON_AVR_DoInit");
 	
-    InternalTimer(gettimeofday() + 5,"DENON_AVR_updateConfig", $hash, 0);
+    InternalTimer(gettimeofday() + 5,"DENON_AVR_UpdateConfig", $hash, 0);
 	
     return $ret;
 }
@@ -230,7 +231,9 @@ DENON_AVR_Undefine($$)
 	
     Log 5, "DENON_AVR_Undefine: Called for $name";	
 
+    RemoveInternalTimer($hash);
 	DevIo_CloseDev($hash); 
+	
     return undef;
 }
 
@@ -355,7 +358,7 @@ DENON_AVR_Shutdown($)
 
 #####################################
 sub 
-DENON_AVR_updateConfig($)
+DENON_AVR_UpdateConfig($)
 {
     # this routine is called 5 sec after the last define of a restart
     # this gives FHEM sufficient time to fill in attributes
@@ -369,6 +372,19 @@ DENON_AVR_updateConfig($)
     {
 	    $attr{$name}{webCmd} = "toggle:on:off:statusRequest";
 	}
+	
+	InternalTimer(gettimeofday() + $hash->{helper}{INTERVAL}, "DENON_AVR_KeepAlive", $hash, 0);
+}
+
+#####################################
+sub 
+DENON_AVR_KeepAlive($)
+{
+    my ($hash) = @_;
+
+    DENON_AVR_SimpleWrite($hash, "PW?"); 
+
+	InternalTimer(gettimeofday() + $hash->{helper}{INTERVAL}, "DENON_AVR_KeepAlive", $hash, 0);
 }
 
 1;
