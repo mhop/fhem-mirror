@@ -493,6 +493,7 @@ sub CUL_HM_Parse($$) {#############################
   CUL_HM_eventP($shash,"Rcv");
   my $name = $shash->{NAME};
   my @event;
+  my @entities;
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
   my $tn = TimeNow();
@@ -587,6 +588,7 @@ sub CUL_HM_Parse($$) {#############################
       my (    $t,      $h) =  (hex($1), hex($2));# temp is 15 bit signed
       $t = ($t & 0x3fff)/10*(($t & 0x4000)?-1:1);
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
+	  push @entities,
 	  CUL_HM_UpdtReadBulk($chnHash,1,"state:T: $t H: $h",  # update weather channel
 	                                 "measured-temp:$t",
 	                                 "humidity:$h")
@@ -601,11 +603,15 @@ sub CUL_HM_Parse($$) {#############################
          (    $1, hex($2));
       $vp = int($vp/2.56+0.5);   # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$src.$chn};
-	  readingsSingleUpdate($chnHash,"state","$vp %",1) if($chnHash);
+	  if($chnHash){
+	    push @entities,
+	    CUL_HM_UpdtReadSingle($chnHash,"state","$vp %",1);
+	  }
       push @event, "actuator:$vp %";
 
       # Set the valve state too, without an extra trigger
-      readingsSingleUpdate($dhash,"state","set_$vp %",1) if($dhash);
+	  push @entities,
+      CUL_HM_UpdtReadSingle($dhash,"state","set_$vp %",1) if($dhash);
     }
     elsif(($msgType eq '02' &&$sType eq '01')||    # ackStatus
 	      ($msgType eq '10' &&$sType eq '06')){    # infoStatus
@@ -620,8 +626,8 @@ sub CUL_HM_Parse($$) {#############################
 	  if($chnHash){
 	    my $chnName = $chnHash->{NAME};
         my $mode = ReadingsVal($chnName,"R-MdTempReg","");	
-	    readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1);
-	    readingsSingleUpdate($chnHash,"desired-temp-manu",$dTemp,1) if($mode eq 'manual '  && $msgType eq '10');
+	    push @entities,CUL_HM_UpdtReadSingle($chnHash,"desired-temp",$dTemp,1);
+	    CUL_HM_UpdtReadSingle($chnHash,"desired-temp-manu",$dTemp,1) if($mode eq 'manual '  && $msgType eq '10');
 #	    readingsSingleUpdate($chnHash,"desired-temp-cent",$dTemp,1) if($mode eq 'central ' && $msgType eq '02');
 #		removed - shall not be changed automatically - change is  only temporary
 #       CUL_HM_Set($chnHash,$chnName,"desired-temp",$dTemp)         if($mode eq 'central ' && $msgType eq '10');
@@ -709,7 +715,7 @@ sub CUL_HM_Parse($$) {#############################
 		      $dTemp = ReadingsVal($chnName,"desired-temp-cent",$dTemp)if ($mode eq 'central ');
 		      $chnHash->{helper}{oldMode} = $mode;
 		    }
-	        readingsSingleUpdate($chnHash,"desired-temp",$dTemp,1);
+			push @entities,CUL_HM_UpdtReadSingle($chnHash,"desired-temp",$dTemp,1);
            }
           push @event, "desired-temp:" .$dTemp;
         } 
@@ -730,6 +736,7 @@ sub CUL_HM_Parse($$) {#############################
         my (   $of,     $vep) = (hex($1), hex($2));
         push @event, "ValveErrorPosition_for_$dname: $vep %";
         push @event, "ValveOffset_for_$dname: $of %";
+	    push @entities,
 		CUL_HM_UpdtReadBulk($dhash,1,'ValveErrorPosition:set_'.$vep.' %',
 		                             'ValveOffset:set_'.$of.' %');
 	  }
@@ -849,12 +856,12 @@ sub CUL_HM_Parse($$) {#############################
 		  my $vDim = $shash->{helper}{vDim};#shortcut
           my $ph = CUL_HM_id2Hash($vDim->{idPhy})	 if ($vDim->{idPhy});
           if ($ph){
-		    readingsSingleUpdate($ph,"state",$pl,1);
+		    push @entities,CUL_HM_UpdtReadSingle($ph,"state",$pl,1);
 		    my $vh;
             $vh = CUL_HM_id2Hash($vDim->{idV2})     if ($vDim->{idV2});
-		    readingsSingleUpdate($vh,"state",$pl,1) if ($vh);
+		    push @entities,CUL_HM_UpdtReadSingle($vh,"state",$pl,1) if ($vh);
             $vh = CUL_HM_id2Hash($vDim->{idV3})     if ($vDim->{idV3});
-		    readingsSingleUpdate($vh,"state",$pl,1) if ($vh);
+		    push @entities,CUL_HM_UpdtReadSingle($vh,"state",$pl,1) if ($vh);
 		  }
 		}
 		else{
@@ -891,6 +898,7 @@ sub CUL_HM_Parse($$) {#############################
 	    push @event,"powerOn"   if($chn eq "03");
 	  }
 	  elsif ($model eq "HM-SEC-SFA-SM"){ # && $chn eq "00")
+	    push @entities,
   	    CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($shash),1,
 		        "powerError:"   .(($err&0x02) ? "on":"off"),
 	            "sabotageError:".(($err&0x04) ? "on":"off"),
@@ -938,7 +946,7 @@ sub CUL_HM_Parse($$) {#############################
         $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
       }
 	  $shash->{helper}{addVal} = $buttonField;   #store to handle changes
-	  readingsSingleUpdate($chnHash,"state",$state.$target,1);#trig chan also 
+	  push @entities,CUL_HM_UpdtReadSingle($chnHash,"state",$state.$target,1);#trig chan also 
       push @event,"battery:". (($buttonField&0x80)?"low":"ok");
       push @event,"state:$btnName $state$target";
     }
@@ -989,6 +997,7 @@ sub CUL_HM_Parse($$) {#############################
  	      my $bitLoc = ((hex($msgChn)-1)*2);#calculate bit location
  	      my $mask = 3<<$bitLoc;
  	      my $value = sprintf("%08X",(hex($devState) &~$mask)|($msgState<<$bitLoc));
+	      push @entities,
 		  CUL_HM_UpdtReadBulk($shash,1,"color:".$value,
 		                               "state:".$value);
  	      if ($chnHash){
@@ -1055,9 +1064,9 @@ sub CUL_HM_Parse($$) {#############################
     elsif ($msgType eq "40"){ #autonomous event
 	  if($dhash){ # the source is in dst
 	    my ($state,$trgCnt) = (hex(substr($p,0,2)),hex(substr($p,2,2)));
-		readingsSingleUpdate($dhash,'test',"from $dname:$state",1)
+		push @entities,CUL_HM_UpdtReadSingle($dhash,'test',"from $dname:$state",1)
 		      if (!($state & 1));
-		readingsSingleUpdate($dhash,'battery',(($state & 0x04)?"low":"ok"),1)
+		push @entities,CUL_HM_UpdtReadSingle($dhash,'battery',(($state & 0x04)?"low":"ok"),1)
 		      if($state&0x80);
 	  }
       push @event, "";
@@ -1067,7 +1076,7 @@ sub CUL_HM_Parse($$) {#############################
 	  if($dhash && $dname ne $name){ # update source(ID is reported in $dst...)
 	    if (!$dhash->{helper}{alarmNo} || $dhash->{helper}{alarmNo} ne $No){
 		  $dhash->{helper}{alarmNo} = $No;
-		  readingsSingleUpdate($dhash,'state',
+		  push @entities,CUL_HM_UpdtReadSingle($dhash,'state',
 		                              (($state eq "01")?"off":
 									  (($state eq "C7")?"smoke-forward":
 									                    "smoke-alarm")),1);
@@ -1092,7 +1101,7 @@ sub CUL_HM_Parse($$) {#############################
 	  if (!$alarmList){# all alarms are gone - clear forwarding
 		  foreach(split(",",$shash->{helper}{alarmFwd})){	
 			my $fHash = CUL_HM_id2Hash($1) if ($1);
-		    readingsSingleUpdate($fHash,'state',"off",1)if ($fHash);
+		    push @entities,CUL_HM_UpdtReadSingle($fHash,'state',"off",1)if ($fHash);
 		  }
 		$shash->{helper}{alarmList} = "";
 		$shash->{helper}{alarmFwd}  = "";
@@ -1274,6 +1283,7 @@ sub CUL_HM_Parse($$) {#############################
                   (($state eq "ON")?"C8":"00")."00");
 			$sendAck = "";
 		  }
+	      push @entities,
 		  CUL_HM_UpdtReadBulk($dChHash,1,"state:".$state,
 		                           "virtActState:".$state,
 			                       "virtActTrigger:".CUL_HM_id2Name($recId),
@@ -1287,6 +1297,7 @@ sub CUL_HM_Parse($$) {#############################
       my ($d1,$vp) =($1,hex($2)); # adjust_command[0..4] adj_data[0..250]
       $vp = int($vp/2.56+0.5);    # valve position in %
 	  my $chnHash = $modules{CUL_HM}{defptr}{$dst."01"};
+	  push @entities,
  	  CUL_HM_UpdtReadBulk($chnHash,1,"ValvePosition:$vp %",
 	                               "ValveAdjCmd:".$d1);
       CUL_HM_SndCmd($chnHash,$msgcnt."8002".$dst.$src.'0101'.
@@ -1331,6 +1342,9 @@ sub CUL_HM_Parse($$) {#############################
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
   CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
   $defs{$shash->{NAME}}{EVENTS}++;  # count events for channel
+  foreach (@entities){
+    DoTrigger($_, undef) if ($_ ne $name);
+  }
   return $name ;#general notification to the device
 }
 
@@ -4408,7 +4422,7 @@ sub CUL_HM_ActCheck() {# perform supervision
                        ." dead:".$cntDead
                        ." unkn:".$cntUnkn
                        ." off:" .$cntOff;
- 
+
   CUL_HM_UpdtReadBulk($actHash,1,@event);
   
   $attr{$actName}{actCycle} = 600 if($attr{$actName}{actCycle}<30); 
@@ -4428,6 +4442,12 @@ sub CUL_HM_UpdtReadBulk(@) { #update a bunch of readings and trigger the events
 	                         ((defined($rdVal) && $rdVal ne "")?$rdVal:"-"));
   }
   readingsEndUpdate($hash,$doTrg);
+  return $hash->{NAME};
+}
+sub CUL_HM_UpdtReadSingle(@) { #update a bunch of readings and trigger the events
+  my ($hash,$rName,$val,$updt) = @_; 
+  readingsSingleUpdate($hash,$rName,$val,$updt);
+  return $hash->{NAME};
 }
 sub CUL_HM_setAttrIfCh($$$$) {
   my ($name,$att,$val,$trig) = @_; 
