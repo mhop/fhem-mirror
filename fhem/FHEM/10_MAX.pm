@@ -395,7 +395,7 @@ MAX_Set($@)
       } else {
         return "No MAX device with address $dest" if(!exists($modules{MAX}{defptr}{$dest}));
       }
-      my $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
+      $destType = MAX_TypeToTypeId($modules{MAX}{defptr}{$dest}{type});
       Log 2, "Warning: Device do not have same groupid" if($hash->{groupid} != $modules{MAX}{defptr}{$dest}{groupid});
     }
 
