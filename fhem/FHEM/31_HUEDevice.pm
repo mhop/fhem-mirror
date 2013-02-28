@@ -59,6 +59,7 @@ sub HUEDevice_Define($$)
   $hash->{fhem}{ct} = -1;
   $hash->{fhem}{hue} = -1;
   $hash->{fhem}{sat} = -1;
+  $hash->{fhem}{xy} = '';
 
 
   CommandAttr(undef,$name.' webCmd rgb:toggle:on:off') if( !defined( AttrVal($hash->{NAME}, "webCmd", undef) ) );
@@ -490,6 +491,7 @@ HUEDevice_GetUpdate($)
   $hash->{fhem}{ct} = $ct;
   $hash->{fhem}{hue} = $hue;
   $hash->{fhem}{sat} = $sat;
+  $hash->{fhem}{xy} = $xy;
 }
 
 1;
