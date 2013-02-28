@@ -2,13 +2,8 @@
 # CUL HomeMatic handler
 # $Id$
 
-#set expert default 3
-#rssi einsetzen
-
 package main;
 
-# update regRaw warnings                                  "#todo Updt2 remove"
-# update actiondetect                                     "#todo Updt3 remove"
 # attribut conversion                                     "#todo Updt4 remove"
 #        the lines can be removed after some soak time - around version 2600
 use strict;
@@ -300,6 +295,7 @@ sub CUL_HM_updateConfig($){
 	  delete $attr{$name}{hmClass};                                              #todo Updt4 remove
 	}
 	else{
+	  $attr{$name}{"event-on-change-reading"} = AttrVal($name, "event-on-change-reading", ".*");
 	  ;#delete $attr{$name}{peerIDs}; # remove historical data
 	}
 
@@ -2167,11 +2163,9 @@ my %culHmGlobalSetsDevice = (
   unpair   	    => "",
   getpair       => "",
   virtual       =>"<noButtons>",
-  actiondetect  =>"outdated",#todo Updt3 remove
 );
 my %culHmGlobalSets = (
   sign     	    => "[on|off]",
-  regRaw   	    => "[List0|List1|List2|List3|List4|List5|List6] <addr> <data> ... <PeerChannel>", #todo Updt2 remove
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   peerBulk      => "<peer1,peer2,...>",
   statusRequest => "",
@@ -2483,11 +2477,9 @@ sub CUL_HM_Set($@) {
 	                      substr($pID,0,6).$pCh1.$pCh2);
 	}
   } 
-  elsif($cmd eq "regRaw" ||$cmd eq "regBulk"||$cmd eq "getRegRaw") { ##########
+  elsif($cmd eq "regBulk"||$cmd eq "getRegRaw") { #############################
     my ($list,$addr,$data,$peerID);
 	$state = "";
-	($list,$addr,$data,$peerID) = ($a[2],hex($a[3]),hex($a[4]),$a[5])
-	                               if ($cmd eq "regRaw");
 	if ($cmd eq "regBulk"){
 	  ($list) = ($a[2]);
 	  $list =~ s/[\.]?RegL_//;
@@ -2495,7 +2487,7 @@ sub CUL_HM_Set($@) {
 	  return "unknown list Number:".$list if(hex($list)>6);
 	}
 
-	($list,$peerID) = ($a[2],$a[3])if ($cmd eq "getRegRaw");#todo Updt2 remove
+	($list,$peerID) = ($a[2],$a[3])if ($cmd eq "getRegRaw");
 	$list =~ s/List/0/;# convert Listy to 0y
 	# as of now only hex value allowed check range and convert
 	
@@ -2535,9 +2527,6 @@ sub CUL_HM_Set($@) {
 	  }
       CUL_HM_pushConfig($hash,$id,$dst,$chn,$peerID,$peerChn,$list,$adList);
 	}
-	else{                                                    #todo Updt2 remove
-	  return "outdated - use regBulk with changed format";   #todo Updt2 remove
-	}                                                        #todo Updt2 remove
   } 
   elsif($cmd eq "regSet") { ###################################################
     #set <name> regSet <regName> <value> <peerChn> 
@@ -2988,9 +2977,6 @@ sub CUL_HM_Set($@) {
 	  CommandDelete(undef,$hash->{$channel})
 	        if (hex($chNo) > $maxBtnNo);
 	}
-  }
-  elsif($cmd eq "actiondetect"){###############################################todo Updt3 remove
-    return "outdated - use attr <name> actCycle instead";
   }
   elsif($cmd eq "press") { ####################################################
     my (undef,undef,$mode,$vChn) = @a;
@@ -4365,7 +4351,6 @@ sub CUL_HM_ActCheck() {# perform supervision
   my $tod = int(gettimeofday());
   my $actName = $actHash->{NAME};
   my $peerIDs = $actHash->{helper}{peers}?$actHash->{helper}{peers}:"";
-  delete ($actHash->{READINGS}); #cleansweep
   my @event;
   my ($cntUnkn,$cntAlive,$cntDead,$cntOff) =(0,0,0,0);
   
@@ -4422,6 +4407,11 @@ sub CUL_HM_ActCheck() {# perform supervision
                        ." dead:".$cntDead
                        ." unkn:".$cntUnkn
                        ." off:" .$cntOff;
+
+  my $allState = join " ",@event;# search and remove outdated readings
+  foreach (keys %{$actHash->{READINGS}}){
+    delete $actHash->{READINGS}{$_} if ($allState !~ m/$_:/);
+  }
 
   CUL_HM_UpdtReadBulk($actHash,1,@event);
   
