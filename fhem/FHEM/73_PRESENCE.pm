@@ -51,7 +51,7 @@ PRESENCE_Initialize($)
   $hash->{DefFn}   = "PRESENCE_Define";
   $hash->{UndefFn} = "PRESENCE_Undef";
   $hash->{AttrFn}  = "PRESENCE_Attr";
-  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 loglevel:1,2,3,4,5 ".$readingFnAttributes;
+  $hash->{AttrList}= "do_not_notify:0,1 disable:0,1 fritzbox_repeater:0,1 loglevel:1,2,3,4,5 ".$readingFnAttributes;
   
 }
 
@@ -398,7 +398,7 @@ sub PRESENCE_StartLocalScan($;$)
     }
     elsif($hash->{MODE} eq "fritzbox")
     {
-	BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local, "PRESENCE_ProcessLocalScan", 20);
+	BlockingCall("PRESENCE_DoLocalFritzBoxScan", $hash->{NAME}."|".$hash->{ADDRESS}."|".$local."|".AttrVal($hash->{NAME}, "fritzbox_repeater", "0"), "PRESENCE_ProcessLocalScan", 20);
     }
     
 }
@@ -410,6 +410,8 @@ PRESENCE_DoLocalPingScan($)
     my ($string) = @_;
     my ($name, $device, $local) = split("\\|", $string);
 
+    Log GetLogLevel($defs{$name}{NAME}, 5), "PRESENCE_DoLocalPingScan: $string";
+   
     my $retcode;
     my $return;
     my $temp;
@@ -448,10 +450,13 @@ sub
 PRESENCE_DoLocalFritzBoxScan($)
 {
     my ($string) = @_;
-    my ($name, $device, $local) = split("\\|", $string);
-
+    my ($name, $device, $local, $repeater) = split("\\|", $string);
+    
+    Log GetLogLevel($defs{$name}{NAME}, 5), "PRESENCE_DoLocalFritzBoxScan: $string";
     my $number=0;
     
+    my $check_command = ($repeater ? "active" : "speed");
+
 
     my $status=0;
 
@@ -467,8 +472,8 @@ PRESENCE_DoLocalFritzBoxScan($)
         # only use the cached $number if it has still the correct device name
         if($cached_name eq $device)
         {
-            Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number ($number)";
-    	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed);
+            Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with cached number the $check_command state ($number)";
+    	    $status = qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command);
     	    if(not $status =~ /^\s*\d+\s*$/)
     	    {
         	return "$name|$local|error|could not execute ctlmgr_ctl (cached)";
@@ -502,12 +507,12 @@ PRESENCE_DoLocalFritzBoxScan($)
         
         chomp $net_device;
         
-        Log GetLogLevel($name, 5), "PRESENCE ($name) - checking device number $number ($net_device)";
+        Log GetLogLevel($name, 5), "PRESENCE ($name) - checking with device number $number the $check_command state ($net_device)";
 	if($net_device eq $device)
 	{
-  	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/speed); 
+  	    $status=qx(/usr/bin/ctlmgr_ctl r landevice settings/landevice$number/$check_command); 
   	    
-  	    Log GetLogLevel($name, 5), "PRESENCE ($name) - speed for device number $net_device is $status";
+  	    Log GetLogLevel($name, 5), "PRESENCE ($name) - $check_command for device number $net_device is $status";
   	    last;
 	}
 	
@@ -786,6 +791,16 @@ Options:
     If this attribute is activated, an active check will be disabled.<br><br>
     Possible values: 0 => not disabled , 1 => disabled<br>
     Default Value is 0 (not disabled)<br><br>
+    <li><a>fritzbox_repeater</a></li> (Only in Mode "fritzbox" applicable)
+    If your FritzBox is part of a network using repeaters, than this attribute needs to be enabled to ensure a correct recognition for devices, which are connected via repeater.
+    <br><br>
+    This attribute is also needed, if your network device has no speed information on the FritzBox website (Home Network).<br><br>
+    <b>BE AWARE: The recognition of device going absent in a repeated network can take about 15 - 20 minutes!!</b>
+    <br><br>
+    Possible values: 0 => Use default recognition, 1 => Use repeater-supported recognition<br>
+    Default Value is 0 (Use default recognition)
+
+    <br><br>
     </ul>
   <br>
  
@@ -973,6 +988,17 @@ Options:
     Wenn dieses Attribut aktiviert ist, wird die Anwesenheitserkennung nicht mehr durchgef&uuml;hrt.<br><br>
     M&ouml;gliche Werte: 0 => Erkennung durchf&uuml;hren , 1 => Keine Erkennungen durchf&uuml;hren<br>
     Standardwert ist 0 (Erkennung durchf&uuml;hren)<br><br>
+    <li><a>fritzbox_repeater</a></li> (Nur im Modus "fritzbox" anwendbar)
+    Wenn die FritzBox Teil eines Netzwerkes ist, welches mit Repeatern arbeitet, dann muss dieses Attribut gesetzt sein um die Erkennung von Ger&auml;ten zu gew&auml;hrleisten,
+    welche &uuml;ber einen Repeater erreichbar sind.
+    <br><br>
+    Dies gilt ebenso f&uuml;r Devices, welche keine Geschwindigkeitsangaben auf der FritzBox Seite (Heimnetz) anzeigen k&ouml;nnen.<br><br>
+    <b>ACHTUNG: Die Erkennung der Abwesenheit eines Ger&auml;tes in einem Repeater-Netzwerk kann ca. 15 - 20 Minuten dauern!!</b>
+    <br><br>
+    M&ouml;gliche Werte: 0 => Standarderkennung verwenden, 1 => Erkennung f&uuml;r Repeaterger&auml;te verwenden<br>
+    Standardwert ist 0 (Standarderkennung verwenden)
+
+    <br><br>
     </ul>
   <br>
  
