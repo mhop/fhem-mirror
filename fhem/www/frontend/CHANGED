@@ -1,0 +1,14 @@
+Update vom 1.3.2012
+
+* Charts unterstützen jetzt mehrere Y Achsen. Diese können nach Klick auf den Button "Add another Y Axis" hinzugefügt werden
+
+* Legenden enthalten die zusätzlichen Achsen
+
+* Charts unterstützen jetzt Soll-Linien. Diese können nach Klick auf den Button "Add Baseline" hinzugefügt werden, Start und Endwert frei wählbar.
+
+* Achsen und Soll-Linien können eingefärbt werden und, bei Bedarf, eine Füllung erhalten
+
+* Das Errorhandling wurde verbessert, es sollten jetzt aussagekräftigere Meldungen kommen, wenn etwas schief läuft
+
+Wichtig:
+Es müssen leider, hoffentlich zum letzten Mal, die bestehenden Charts gelöscht werden, da diese unbrauchbar werden mit dem Update.
