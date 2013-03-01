@@ -72,9 +72,8 @@ Ext.define('FHEM.controller.MainController', {
      * 
      */
     showDatabaseTablePanel: function() {
-        //TODO: use this when new dblog module is deployed
-        //Ext.ComponentQuery.query('panel[name=linechartpanel]')[0].hide();
-        //Ext.ComponentQuery.query('panel[name=tabledatagridpanel]')[0].show();
+        Ext.ComponentQuery.query('panel[name=linechartpanel]')[0].hide();
+        Ext.ComponentQuery.query('panel[name=tabledatagridpanel]')[0].show();
     }
     
 });

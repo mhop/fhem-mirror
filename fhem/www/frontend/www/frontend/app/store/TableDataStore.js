@@ -12,7 +12,7 @@ Ext.define('FHEM.store.TableDataStore', {
         proxy: {
             type: 'ajax',
              method: 'POST',
-             url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getTableData+""+""+""+0+100&XHR=1',
+             url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getTableData+""+""+""+""+0+100&XHR=1',
              reader: {
                  type: 'json',
                  root: 'data',
@@ -24,7 +24,7 @@ Ext.define('FHEM.store.TableDataStore', {
          beforeprefetch: function(store, operation) {
              //override stores url to contain start and limit params in our needed notation
              store.proxy.url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""';
-             store.proxy.url += '+getTableData+""+""+""+' + operation.start +'+' + operation.limit +'&XHR=1';
+             store.proxy.url += '+getTableData+""+""+""+""+' + operation.start +'+' + operation.limit +'&XHR=1';
          }
      }
 });

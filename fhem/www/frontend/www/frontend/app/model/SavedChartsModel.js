@@ -5,10 +5,14 @@ Ext.define('FHEM.model.SavedChartsModel', {
     extend: 'Ext.data.Model',
     fields: [
         {
-            name: 'VALUE',
+            name: 'ID',
+            type: 'number'
+        },
+        {
+            name: 'NAME',
             type: 'text'
         },{
-            name: 'EVENT',
+            name: 'VALUE',
             type: 'text'
         }
     ]

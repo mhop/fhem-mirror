@@ -45,7 +45,7 @@ Ext.define('FHEM.view.Viewport', {
                                     columns: [
                                          { 
                                              header: 'Saved Charts', 
-                                             dataIndex: 'VALUE', 
+                                             dataIndex: 'NAME', 
                                              width: '80%'
                                          },
                                          {

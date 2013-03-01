@@ -4,7 +4,6 @@
 Ext.define('FHEM.view.LineChartPanel', {
     extend: 'Ext.panel.Panel',
     alias : 'widget.linechartpanel',
-    xtype : 'chart',
     requires: [
         'FHEM.view.LineChartView',
         'FHEM.store.ChartStore'
@@ -34,7 +33,21 @@ Ext.define('FHEM.view.LineChartPanel', {
             ]
         });
         
+        me.comboColorStore = Ext.create('Ext.data.Store', {
+            fields: ['name', 'value'],
+            data : [
+                {'name':'Blue','value':'#2F40FA'},
+                {'name':'Green', 'value':'#46E01B'},
+                {'name':'Orange','value':'#F0A800'},
+                {'name':'Red','value':'#E0321B'},
+                {'name':'Yellow','value':'#F5ED16'}
+            ]
+        });
+        
         me.comboDeviceStore = Ext.create('FHEM.store.DeviceStore');
+        me.comboDevice2Store = Ext.create('FHEM.store.DeviceStore');
+        me.comboDevice3Store = Ext.create('FHEM.store.DeviceStore');
+        
         me.comboDeviceStore.on("load", function(store, e, success) {
             if(!success) {
                 Ext.Msg.alert("Error", "Connection to database failed! Check your configuration.");
@@ -42,86 +55,429 @@ Ext.define('FHEM.view.LineChartPanel', {
         });
         
         me.comboReadingsStore = Ext.create('FHEM.store.ReadingsStore');
+        me.comboReadings2Store = Ext.create('FHEM.store.ReadingsStore');
+        me.comboReadings3Store = Ext.create('FHEM.store.ReadingsStore');
         
-        me.dockedItems = [{
-            xtype: 'toolbar',
-            dock: 'top',
-            layout: 'column',
-            minheight: 60,
-            maxHeight: 90,
+        var chartSettingPanel = Ext.create('Ext.form.Panel', {
+            title: 'Chart Settings - Click me to edit',
+            name: 'chartformpanel',
+            maxHeight: 285,
+            autoScroll: true,
+            collapsible: true,
+            titleCollapse: true,
+            listeners: {
+                collapse: me.layoutChart,
+                expand: me.layoutChart
+            },
             items: [
-                {  
-                    xtype: 'combobox', 
-                    name: 'devicecombo',
-                    fieldLabel: 'Select Device',
-                    store: me.comboDeviceStore,
-                    displayField: 'DEVICE',
-                    valueField: 'DEVICE'
-                },
-                {  
-                    xtype: 'combobox', 
-                    name: 'xaxiscombo',
-                    fieldLabel: 'Select X Axis',
-                    store: me.comboAxesStore,
-                    displayField: 'name',
-                    valueField: 'name'
-                },
-                {  
-                    xtype: 'combobox', 
-                    name: 'yaxiscombo',
-                    fieldLabel: 'Select Y Axis',
-                    store: me.comboReadingsStore,
-                    displayField: 'READING',
-                    valueField: 'READING'
+                {
+                    xtype: 'fieldset',
+                    layout: 'column',
+                    title: 'Select data',
+                    defaults: {
+                        margin: '0 10 10 10'
+                    },
+                    items: [
+                        {  
+                          xtype: 'combobox', 
+                          name: 'devicecombo',
+                          fieldLabel: 'Select Device',
+                          labelWidth: 90,
+                          store: me.comboDeviceStore,
+                          displayField: 'DEVICE',
+                          valueField: 'DEVICE'
+                        },
+                        {  
+                          xtype: 'combobox', 
+                          name: 'xaxiscombo',
+                          fieldLabel: 'Select X Axis',
+                          labelWidth: 90,
+                          inputWidth: 100,
+                          store: me.comboAxesStore,
+                          displayField: 'name',
+                          valueField: 'name'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'yaxiscombo',
+                            fieldLabel: 'Select Y-Axis',
+                            labelWidth: 90,
+                            inputWidth: 110,
+                            store: me.comboReadingsStore,
+                            displayField: 'READING',
+                            valueField: 'READING'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'yaxiscolorcombo',
+                            fieldLabel: 'Y-Color',
+                            labelWidth: 50,
+                            inputWidth: 70,
+                            store: me.comboColorStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboColorStore.getAt(0)
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'yaxisfillcheck',
+                            boxLabel: 'Fill'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'device2combo',
+                            fieldLabel: 'Select 2. Device',
+                            labelWidth: 100,
+                            store: me.comboDevice2Store,
+                            displayField: 'DEVICE',
+                            valueField: 'DEVICE',
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'y2axiscombo',
+                            fieldLabel: 'Y2',
+                            labelWidth: 20,
+                            store: me.comboReadings2Store,
+                            displayField: 'READING',
+                            valueField: 'READING',
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'y2axiscolorcombo',
+                            fieldLabel: 'Y2-Color',
+                            labelWidth: 60,
+                            inputWidth: 70,
+                            store: me.comboColorStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboColorStore.getAt(1),
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'y2axisfillcheck',
+                            boxLabel: 'Fill',
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'device3combo',
+                            fieldLabel: 'Select 3. Device',
+                            labelWidth: 100,
+                            store: me.comboDevice3Store,
+                            displayField: 'DEVICE',
+                            valueField: 'DEVICE',
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'y3axiscombo',
+                            fieldLabel: 'Y3',
+                            labelWidth: 20,
+                            store: me.comboReadings3Store,
+                            displayField: 'READING',
+                            valueField: 'READING',
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'y3axiscolorcombo',
+                            fieldLabel: 'Y3-Color',
+                            labelWidth: 60,
+                            inputWidth: 70,
+                            store: me.comboColorStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboColorStore.getAt(2),
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'y3axisfillcheck',
+                            boxLabel: 'Fill',
+                            hidden: true
+                        },
+                        {
+                          xtype: 'button',
+                          width: 110,
+                          text: 'Add another Y-Axis',
+                          name: 'addyaxisbtn',
+                          handler: function(btn) {
+                              var y2device = btn.up().down('combobox[name=device2combo]');
+                              var y2 = btn.up().down('combobox[name=y2axiscombo]');
+                              var y2color = btn.up().down('combobox[name=y2axiscolorcombo]');
+                              var y2fill = btn.up().down('checkboxfield[name=y2axisfillcheck]');
+                              
+                              var y3device = btn.up().down('combobox[name=device3combo]');
+                              var y3 = btn.up().down('combobox[name=y3axiscombo]');
+                              var y3color = btn.up().down('combobox[name=y3axiscolorcombo]');
+                              var y3fill = btn.up().down('checkboxfield[name=y3axisfillcheck]');
+                              
+                              if (y2.hidden) {
+                                  y2device.show();
+                                  y2.show();
+                                  y2color.show();
+                                  y2fill.show();
+                              } else if (y3.hidden) {
+                                  y3device.show();
+                                  y3.show(); 
+                                  y3color.show();
+                                  y3fill.show();
+                                  btn.setDisabled(true);
+                              }
+                          }
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Startvalue',
+                            name: 'base1start',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120,
+                            hidden: true
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Endvalue',
+                            name: 'base1end',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120,
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'baseline1colorcombo',
+                            fieldLabel: 'Baseline 1 Color',
+                            labelWidth: 100,
+                            inputWidth: 70,
+                            store: me.comboColorStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboColorStore.getAt(0),
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'baseline1fillcheck',
+                            boxLabel: 'Fill',
+                            hidden: true
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Startvalue',
+                            name: 'base2start',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120,
+                            hidden: true
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Endvalue',
+                            name: 'base2end',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120,
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'baseline2colorcombo',
+                            fieldLabel: 'Baseline 2 Color',
+                            labelWidth: 100,
+                            inputWidth: 70,
+                            store: me.comboColorStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboColorStore.getAt(1),
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'baseline2fillcheck',
+                            boxLabel: 'Fill',
+                            hidden: true
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Startvalue',
+                            name: 'base3start',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120,
+                            hidden: true
+                        },
+                        {
+                            xtype: 'numberfield',
+                            fieldLabel: 'Endvalue',
+                            name: 'base3end',
+                            allowBlank: false,
+                            labelWidth: 60,
+                            width: 120,
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'baseline3colorcombo',
+                            fieldLabel: 'Baseline 3 Color',
+                            labelWidth: 100,
+                            inputWidth: 70,
+                            store: me.comboColorStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboColorStore.getAt(2),
+                            hidden: true
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'baseline3fillcheck',
+                            boxLabel: 'Fill',
+                            hidden: true
+                        },
+                        {
+                            xtype: 'button',
+                            width: 110,
+                            text: 'Add Baseline',
+                            name: 'addbaselinebtn',
+                            handler: function(btn) {
+                                var b1start = btn.up().down('numberfield[name=base1start]');
+                                var b1end = btn.up().down('numberfield[name=base1end]');
+                                var b1color = btn.up().down('combobox[name=baseline1colorcombo]');
+                                var b1fill = btn.up().down('checkboxfield[name=baseline1fillcheck]');
+                                var b2start = btn.up().down('numberfield[name=base2start]');
+                                var b2end = btn.up().down('numberfield[name=base2end]');
+                                var b2color = btn.up().down('combobox[name=baseline2colorcombo]');
+                                var b2fill = btn.up().down('checkboxfield[name=baseline2fillcheck]');
+                                var b3start = btn.up().down('numberfield[name=base3start]');
+                                var b3end = btn.up().down('numberfield[name=base3end]');
+                                var b3color = btn.up().down('combobox[name=baseline3colorcombo]');
+                                var b3fill = btn.up().down('checkboxfield[name=baseline3fillcheck]');
+                                
+                                if (b1start.hidden) {
+                                    b1start.show();
+                                    b1end.show();
+                                    b1color.show();
+                                    b1fill.show();
+                                } else if (b2start.hidden) {
+                                    b2start.show();
+                                    b2end.show();
+                                    b2color.show();
+                                    b2fill.show();
+                                } else if (b3start.hidden) {
+                                    b3start.show();
+                                    b3end.show();
+                                    b3color.show();
+                                    b3fill.show();
+                                    btn.setDisabled(true);
+                                }
+                                    
+                            }
+                         }
+                    ]
                 },
                 {
-                    xtype: 'datefield',
-                    name: 'starttimepicker',
-                    format: 'Y-m-d H:i:s',
-                    fieldLabel: 'Select Starttime'
-                },
+                    xtype: 'fieldset',
+                    layout: 'column',
+                    title: 'Select Timerange',
+                    defaults: {
+                        margin: '0 0 0 10'
+                    },
+                    items: [
+                        {
+                          xtype: 'datefield',
+                          name: 'starttimepicker',
+                          format: 'Y-m-d H:i:s',
+                          fieldLabel: 'Select Starttime',
+                          labelWidth: 90
+                        },
+                        {
+                          xtype: 'datefield',
+                          name: 'endtimepicker',
+                          format: 'Y-m-d H:i:s',
+                          fieldLabel: 'Select Endtime',
+                          labelWidth: 90
+                        }
+                    ]
+                }, 
                 {
-                    xtype: 'datefield',
-                    name: 'endtimepicker',
-                    format: 'Y-m-d H:i:s',
-                    fieldLabel: 'Select Endtime'
-                },
-                {
-                    xtype: 'button',
-                    width: 100,
-                    text: 'Show Chart',
-                    name: 'requestchartdata'
-                },
-                {
-                    xtype: 'button',
-                    width: 100,
-                    text: 'Save Chart',
-                    name: 'savechartdata'
-                },
-                {
-                    xtype: 'button',
-                    width: 100,
-                    text: 'Step back',
-                    name: 'stepback'
-                },
-                {
-                    xtype: 'button',
-                    width: 100,
-                    text: 'Step forward',
-                    name: 'stepforward'
+                    xtype: 'fieldset',
+                    layout: 'column',
+                    defaults: {
+                        margin: '0 0 0 10'
+                    },
+                    items: [
+                        {
+                          xtype: 'button',
+                          width: 100,
+                          text: 'Show Chart',
+                          name: 'requestchartdata'
+                        },
+                        {
+                          xtype: 'button',
+                          width: 100,
+                          text: 'Save Chart',
+                          name: 'savechartdata'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Reset Fields',
+                            name: 'resetchartform'
+                        },
+                        {
+                          xtype: 'button',
+                          width: 100,
+                          text: 'Step back',
+                          name: 'stepback'
+                        },
+                        {
+                          xtype: 'button',
+                          width: 100,
+                          text: 'Step forward',
+                          name: 'stepforward'
+                        }
+                    ]
                 }
             ]
-        }];
+        });
         
-        me.items = [
+        var linechartview = Ext.create('Ext.panel.Panel', {
+            title: 'Chart',
+            autoScroll: true,
+            collapsible: true,
+            titleCollapse: true,
+            items: [
                 {
-                    xtype: 'linechartview',
-                    width: '100%'
-                }
+                  xtype: 'linechartview'
+                }    
+            ]
+        });
+            
+        me.items = [
+                chartSettingPanel,
+                linechartview
         ];
         
         me.callParent(arguments);
         
+        me.on("resize", me.layoutChart);
+        
+    },
+    
+    /**
+     * helper function to relayout the chartview dependent on free space
+     */
+    layoutChart: function() {
+        var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
+        var lcv = Ext.ComponentQuery.query('linechartview')[0];
+        var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
+        var chartheight = lcp.getHeight() - cfp.getHeight() - 85;
+        var chartwidth = lcp.getWidth() - 25;
+        lcv.setHeight(chartheight);
+        lcv.setWidth(chartwidth);
     }
     
 });
