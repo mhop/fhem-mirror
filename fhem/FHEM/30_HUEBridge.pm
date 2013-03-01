@@ -21,6 +21,7 @@ sub HUEBridge_Initialize($)
   #Consumer
   $hash->{DefFn}    = "HUEBridge_Define";
   $hash->{SetFn}    = "HUEBridge_Set";
+  $hash->{GetFn}    = "HUEBridge_Get";
   $hash->{UndefFn}  = "HUEBridge_Undefine";
   $hash->{AttrList}= "key loglevel:0,1,2,3,4,5";
 }
@@ -129,6 +130,26 @@ HUEBridge_Set($@)
     return undef;
   } else {
     return "Unknown argument $cmd, choose one of statusRequest";
+  }
+}
+
+sub
+HUEBridge_Get($@)
+{
+  my ($hash, $name, $cmd) = @_;
+
+  return "$name: get needs at least one parameter" if( !defined($cmd) ); 
+
+  # usage check
+  if($cmd eq 'devices') {
+    my $result =  HUEBridge_Call($hash, 'lights', undef);
+    my $ret = "";
+    foreach my $key ( sort keys %$result ) {
+      $ret .= $key .": ". $result->{$key}{name} ."\n";
+    }
+    return $ret;
+  } else {
+    return "Unknown argument $cmd, choose one of devices";
   }
 }
 
@@ -420,6 +441,13 @@ HUEBridge_HTTP_Request($$$@)
     <ul>
       <code>define bridge HUEBridge 10.0.1.1</code><br>
     </ul>
+  </ul><br>
+
+  <a name="HUEBridge_Get"></a>
+  <b>Set</b>
+  <ul>
+    <li>devices<br>
+    list the devices known to the bridge.</li>
   </ul><br>
 
   <a name="HUEBridge_Set"></a>
