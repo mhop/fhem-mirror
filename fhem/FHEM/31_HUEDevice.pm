@@ -445,7 +445,8 @@ HUEDevice_GetUpdate($)
   my $ct        = $state->{'ct'};
   my $hue       = $state->{'hue'};
   my $sat       = $state->{'sat'};
-  my $xy        = $state->{'xy'}->[0] .",". $state->{'xy'}->[1];
+  my $xy        = ",";
+     $xy        = $state->{'xy'}->[0] .",". $state->{'xy'}->[1] if( defined($state->{'xy'}) );
 
   if( defined($colormode) && $colormode ne $hash->{fhem}{colormode} ) {readingsBulkUpdate($hash,"colormode",$colormode);}
   if( defined($bri) && $bri != $hash->{fhem}{bri} ) {readingsBulkUpdate($hash,"bri",$bri);}
@@ -460,7 +461,7 @@ HUEDevice_GetUpdate($)
   if( defined($hue) && $hue != $hash->{fhem}{hue} ) {readingsBulkUpdate($hash,"hue",$hue);}
   if( defined($sat) && $sat != $hash->{fhem}{sat} ) {readingsBulkUpdate($hash,"sat",$sat);}
   if( $xy eq "," ) {readingsBulkUpdate($hash,"xy","");}
-  elsif( $xy != $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
+  elsif( $xy ne $hash->{fhem}{xy} ) {readingsBulkUpdate($hash,"xy",$xy);}
 
   my $s = '';
   if( $on )
