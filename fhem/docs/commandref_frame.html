@@ -370,6 +370,15 @@ A line ending with \ will be concatenated with the next one, so long lines
     new value identical to the old value, no event is created.
     </li><br>
 
+    <a name="event-min-interval"></a>
+    <li>event-min-interval<br>
+    This attribute takes a comma-separated list of reading:minInterval pairs.
+    You may use regular expressions for reading. Events will only be
+    generated, if at least minInterval seconds elapsed since the last reading
+    of the matched type.
+    </li><br>
+
+
     The precedence of event-on-update-reading and event-on-change-reading is as
     follows:
     <ol>

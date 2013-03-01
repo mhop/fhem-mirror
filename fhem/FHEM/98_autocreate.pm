@@ -76,6 +76,10 @@ my %flogpar = (
   # Lacrosse TX
   "CUL_TX.*"
       => { GPLOT => "temp4hum4:Temp/Hum,", FILTER => "%NAME" },
+
+  "FBDECT.*"
+      => { GPLOT => "power4:Power,", FILTER => "%NAME:power.*",
+           ATTR => "event-min-interval:power:120" },
 );
 
 # Do not create FileLog for the following devices.
@@ -180,11 +184,13 @@ autocreate_Notify($$)
       next if(!$fl);
       my $flname = "FileLog_$name";
       delete($defs{$flname});   # If we are re-creating it with createlog.
-      my ($gplot, $filter) = ("", $name);
+      my ($gplot, $filter, $devattr) = ("", $name, "");
       foreach my $k (keys %flogpar) {
         next if($name  !~ m/^$k$/);
         $gplot = $flogpar{$k}{GPLOT};
         $filter = replace_wildcards($hash, $flogpar{$k}{FILTER});
+        $devattr = $flogpar{$k}{ATTR};
+        last;
       }
       $cmd = "$flname FileLog $fl $filter";
       Log $ll2, "autocreate: define $cmd";
@@ -195,7 +201,12 @@ autocreate_Notify($$)
       }
       $attr{$flname}{room} = $room if($room);
       $attr{$flname}{logtype} = "${gplot}text";
-
+      if($devattr) {
+        foreach my $attrNV (split(" ", $devattr)) {
+          my ($an, $av) = split(":", $attrNV, 2);
+          $attr{$name}{$an} = $av;
+        }
+      }
 
       ####################
       next if(!AttrVal($me, "weblink", 1) || !$gplot);

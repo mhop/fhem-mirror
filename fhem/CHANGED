@@ -92,6 +92,8 @@
               added, Extend devStateIcon, js setting of attr values in detail
               screen, live slider update in detail and room view
   - feature: added support for third-party packages to 98_update.pm (M. Fischer)
+  - feature: FBAHA/FBDECT for FRITZ!DECT devices
+  - feature: event-min-interval Attribute
 
 - 2012-10-28 (5.3)
   - feature: added functions trim, ltrim, rtrim, UntoggleDirect,

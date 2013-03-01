@@ -205,12 +205,14 @@ $modules{Global}{AttrList} =
   "verbose:1,2,3,4,5 mseclog:1,0 version nofork:1,0 logdir holiday2we " .
   "autoload_undefined_devices:1,0 dupTimeout latitude longitude " .
   "backupcmd backupdir backupsymlink backup_before_update " .
-  "exclude_from_update motd updatebranch uniqueID sendStatistics:onUpdate,manually,never ".
+  "exclude_from_update motd updatebranch uniqueID ".
+  "sendStatistics:onUpdate,manually,never ".
   "showInternalValues:1,0 ";
 $modules{Global}{AttrFn} = "GlobalAttr";
 
 use vars qw($readingFnAttributes);
-$readingFnAttributes = "event-on-change-reading event-on-update-reading stateFormat";
+$readingFnAttributes = "event-on-change-reading event-on-update-reading ".
+                      "event-min-interval stateFormat";
 
 
 %cmds = (
@@ -2109,9 +2111,7 @@ SignalHandling()
 sub
 TimeNow()
 {
-  my @t = localtime;
-  return sprintf("%04d-%02d-%02d %02d:%02d:%02d",
-      $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+  return FmtDateTime(time());
 }
 
 #####################################
@@ -2992,9 +2992,16 @@ readingsBeginUpdate($)
   my $name = $hash->{NAME};
   
   # get timestamp
-  my $now = TimeNow();
-  $hash->{".updateTime"} = time(); # in seconds since the epoch
-  $hash->{".updateTimestamp"} = $now;
+  my $now = gettimeofday();
+  my $fmtDateTime = FmtDateTime($now);
+  $hash->{".updateTime"} = $now; # in seconds since the epoch
+  $hash->{".updateTimestamp"} = $fmtDateTime;
+
+  my $attrminint = AttrVal($name, "event-min-interval", undef);
+  if($attrminint) {
+    my @a = split(/,/,$attrminint);
+    $hash->{".attrminint"} = \@a;
+  }
 
   my $attreocr= AttrVal($name, "event-on-change-reading", undef);
   if($attreocr) {
@@ -3009,7 +3016,7 @@ readingsBeginUpdate($)
   }
 
   $hash->{CHANGED}= ();
-  return $now;
+  return $fmtDateTime;
 }
 
 sub
@@ -3095,6 +3102,7 @@ readingsEndUpdate($$)
   delete $hash->{".updateTime"};
   delete $hash->{".attreour"};
   delete $hash->{".attreocr"};
+  delete $hash->{".attrminint"};
 
 
   # propagate changes
@@ -3131,12 +3139,14 @@ readingsBulkUpdate($$$@)
   if(!defined($changed)) {
     $changed = (substr($reading,0,1) ne "."); # Dont trigger dot-readings
   }
+  $changed = 0 if($hash->{".ignoreEvent"});
+
   # check for changes only if reading already exists
   if($changed && defined($readings)) {
   
     # these flags determine if any of the "event-on" attributes are set
-    my $attreocr= $hash->{".attreocr"};
-    my $attreour= $hash->{".attreour"};
+    my $attreocr   = $hash->{".attreocr"};
+    my $attreour   = $hash->{".attreour"};
 
     # these flags determine whether the reading is listed in any of
     # the attributes
@@ -3151,6 +3161,20 @@ readingsBulkUpdate($$$@)
               || $eour  
               || ($eocr && ($value ne $readings->{VAL}));
     #Log 1, "EOCR:$eocr EOUR:$eour CHANGED:$changed";
+
+    my @v = grep { my $l = $_;
+                   $l =~ s/:.*//;
+                   ($reading=~ m/^$l$/) ? $_ : undef} @{$hash->{".attrminint"}};
+    if($changed && @v) {
+      my (undef, $minInt) = split(":", $v[0]);
+      my $now = $hash->{".updateTime"};
+      my $le = $hash->{".lastTime$reading"};
+      if($le && $now-$le < $minInt) {
+        $changed = 0;
+      } else {
+        $hash->{".lastTime$reading"} = $now;
+      }
+    }
   }
  
   setReadingsVal($hash, $reading, $value, $hash->{".updateTimestamp"}); 
