@@ -26,13 +26,14 @@ Ext.application({
         // Gather information from FHEM to display status, devices, etc.
         var me = this,
             url = '../../../fhem?cmd=jsonlist&XHR=1';
-        
+        Ext.getBody().mask("Please wait while the Frontend is starting...");
         Ext.Ajax.request({
             method: 'GET',
             async: false,
             disableCaching: false,
             url: url,
             success: function(response){
+                Ext.getBody().unmask();
                 var json = Ext.decode(response.responseText);
                 FHEM.version = json.Results[0].devices[0].ATTR.version;
                 
