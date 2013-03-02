@@ -34,10 +34,10 @@ Ext.application({
             url: url,
             success: function(response){
                 Ext.getBody().unmask();
-                var json = Ext.decode(response.responseText);
-                FHEM.version = json.Results[0].devices[0].ATTR.version;
+                FHEM.info = Ext.decode(response.responseText);
+                FHEM.version = FHEM.info.Results[0].devices[0].ATTR.version;
                 
-                Ext.each(json.Results, function(result) {
+                Ext.each(FHEM.info.Results, function(result) {
                     //TODO: get more specific here...
                     if (result.list === "DbLog" && result.devices[0].NAME) {
                         FHEM.dblogname = result.devices[0].NAME;
@@ -47,6 +47,7 @@ Ext.application({
                     Ext.Msg.alert("Error", "Could not find a DbLog Configuration. Do you have DbLog already running?");
                 } else {
                     Ext.create("FHEM.view.Viewport");
+                    // further configuration of viewport starts in maincontroller
                 }
             },
             failure: function() {

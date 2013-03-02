@@ -1,5 +1,6 @@
 Update vom 2.3.2012
 
+* Auslesen der verfügbaren Geräte / FHEM-Komponenten und Darstellung im Menü
 * Kommandozeile hinzugefügt, inkl Speichern in der fhem.cfg
 * Shutdown und Restart Button für FHEM hinzugefügt
 * Icons  
