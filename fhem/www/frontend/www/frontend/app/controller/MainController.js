@@ -3,6 +3,9 @@
  */
 Ext.define('FHEM.controller.MainController', {
     extend: 'Ext.app.Controller',
+    requires: [
+       'FHEM.view.DevicePanel'
+    ],
 
     refs: [
            {
@@ -12,6 +15,10 @@ Ext.define('FHEM.controller.MainController', {
            {
                selector: 'text[name=statustextfield]',
                ref: 'statustextfield' //this.getStatustextfield()
+           },
+           {
+               selector: 'panel[name=westaccordionpanel]',
+               ref: 'westaccordionpanel' //this.getWestaccordionpanel()
            },
            {
                selector: 'panel[name=culpanel]',
@@ -60,23 +67,71 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * load the FHEM devices and state on viewport render completion
      */
-    viewportRendered: function(){
+    viewportRendered: function() {
+        
+        var me = this;
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
             sp.setText(FHEM.version);
         }
         
-//        var cp = me.getCulpanel();
-//        if (result.list === "CUL") {
-//            var culname = result.devices[0].NAME;
-//            cp.add(
-//                {
-//                    xtype: 'text',
-//                    text: culname
-//                }
-//            );
-//        }
+        //setup west accordion
+        var wp = this.getWestaccordionpanel();
+        
+        Ext.each(FHEM.info.Results, function(result) {
+            if (result.list && !Ext.isEmpty(result.list)) {
+                var panelToAdd = Ext.create('Ext.panel.Panel', {
+                      name: result.list,
+                      title: result.list,
+                      autoScroll: true,
+                      items: []
+                });
+                
+                if (result.devices && result.devices.length > 0) {
+                    //creating a store holding fhem devices
+                    var deviceStore = Ext.create('Ext.data.Store', {
+                        fields:['NAME'],
+                        data: result.devices,
+                        proxy: {
+                            type: 'memory',
+                            reader: {
+                                type: 'json',
+                                root: 'devices'
+                            }
+                        }
+                    });
+                    
+                    var devicesgrid = {
+                        xtype: 'grid',
+                        hideHeaders: true,
+                        columns: [
+                             { 
+                                 dataIndex: 'NAME', 
+                                 width: '95%'
+                             }
+                        ],
+                        store: deviceStore,
+                        listeners: {
+                            itemclick: function(gridview, record) {
+                                var panel = {
+                                      xtype: 'devicepanel',
+                                      title: record.raw.NAME,
+                                      region: 'center',
+                                      layout: 'fit',
+                                      record: record
+                                };
+                                me.hideCenterPanels();
+                                me.getMainviewport().add(panel);
+                            }
+                        }
+                    };
+                    
+                    panelToAdd.add(devicesgrid);
+                }
+                wp.add(panelToAdd);
+            }
+        });
     },
     
     /**
@@ -245,13 +300,11 @@ Ext.define('FHEM.controller.MainController', {
                         //restarting the frontend
                         window.location.reload();
                     } else {
-                        console.log("fail..");
                         me.retryConnect();
                     }
                     
                 },
                 failure: function() {
-                    console.log("failure..");
                     me.retryConnect();
                 }
             });
@@ -260,12 +313,22 @@ Ext.define('FHEM.controller.MainController', {
         task.delay(1000);
         
     },
-        
+    
+    /**
+     * 
+     */
+    hideCenterPanels: function() {
+        var panels = Ext.ComponentQuery.query('panel[region=center]');
+        Ext.each(panels, function(panel) {
+            panel.hide();
+        });
+    },
+    
     /**
      * 
      */
     showLineChartPanel: function() {
-        Ext.ComponentQuery.query('panel[name=tabledatagridpanel]')[0].hide();
+        this.hideCenterPanels();
         Ext.ComponentQuery.query('panel[name=linechartpanel]')[0].show();
     },
     
@@ -273,7 +336,7 @@ Ext.define('FHEM.controller.MainController', {
      * 
      */
     showDatabaseTablePanel: function() {
-        Ext.ComponentQuery.query('panel[name=linechartpanel]')[0].hide();
+        this.hideCenterPanels();
         Ext.ComponentQuery.query('panel[name=tabledatagridpanel]')[0].show();
     }
     

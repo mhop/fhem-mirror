@@ -87,14 +87,11 @@ Ext.define('FHEM.view.Viewport', {
                     region: 'west',
                     title: 'Navigation',
                     width: 200,
+                    autoScroll: true,
                     xtype: 'panel',
+                    name: 'westaccordionpanel',
                     layout: 'accordion',
                     items: [
-                        {
-                            xtype: 'panel',
-                            name: 'culpanel',
-                            title: 'CUL'
-                        },
                         {
                             xtype: 'panel',
                             title: 'LineChart',
@@ -126,76 +123,46 @@ Ext.define('FHEM.view.Viewport', {
                                 }
                             ]
                         },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'BarChart',
-//                            name: 'barchartpanel',
-//                            layout: 'fit',
-//                            collapsed: false,
-//                            items: [
-//                                {
-//                                    xtype: 'grid',
-//                                    columns: [
-//                                         { 
-//                                             header: 'Saved Charts', 
-//                                             dataIndex: 'VALUE', 
-//                                             width: '80%'
-//                                         },
-//                                         {
-//                                             xtype:'actioncolumn',
-//                                             name: 'savedchartsactioncolumn',
-//                                             width:'15%',
-//                                             items: [{
-//                                                 icon: 'lib/ext-4.1.1a/images/gray/dd/drop-no.gif',
-//                                                 tooltip: 'Delete'
-//                                             }]
-//                                         }
-//                                    ],
-//                                    store: Ext.create('FHEM.store.SavedChartsStore', {}),
-//                                    name: 'savedchartsgrid'
-//                                    
-//                                }
-//                            ]
-//                        },
                         {
                             xtype: 'panel',
                             title: 'Database Tables',
                             name: 'tabledataaccordionpanel'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Unsorted'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Everything'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Wiki'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Details'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Definition...'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Edit files'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Select style'
-                        },
-                        {
-                            xtype: 'panel',
-                            title: 'Event monitor'
                         }
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Unsorted'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Everything'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Wiki'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Details'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Definition...'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Edit files'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Select style'
+//                        },
+//                        {
+//                            xtype: 'panel',
+//                            title: 'Event monitor'
+//                        }
                     ]
-                }, {
+                }, 
+                {
                     xtype: 'panel',
                     region: 'south',
                     title: 'Status',
