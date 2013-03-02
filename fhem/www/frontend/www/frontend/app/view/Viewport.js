@@ -19,8 +19,70 @@ Ext.define('FHEM.view.Viewport', {
             items: [
                 {
                     region: 'north',
-                    html: '<p align="center"><img align="center" src="../../fhem/images/default/fhemicon.png" height="70px"</></p><h1 class="x-panel-header" align="center">Frontend</h1>',
-                    height: 85
+                    height: 85,
+                    layout: 'hbox',
+                    items: [
+                        {
+                            xtype: 'panel',
+                            html: '<p><img src="../../fhem/images/default/fhemicon.png" height="70px"</></p><h1 class="x-panel-header">Frontend</h1>',
+                            width: '30%',
+                            border: false
+                        },
+                        {
+                            xtype: 'textfield',
+                            name: 'commandfield',
+                            width: '30%',
+                            padding: '30px 0 0 0',
+                            fieldLabel: 'Send Commands',
+                            border: false
+                        },
+                        {
+                            xtype: 'panel',
+                            border: false,
+                            width: '20%',
+                            items: [
+                                {
+                                    xtype: 'button',
+                                    width: 60,
+                                    margin: '30px 0 0 5px',
+                                    text: 'Execute',
+                                    name: 'executecommand'
+                                },
+                                {
+                                    xtype: 'button',
+                                    width: 90,
+                                    margin: '30px 0 0 5px',
+                                    text: 'Save to Config',
+                                    name: 'saveconfig'
+                                }
+                            ]
+                        },
+                        {
+                            xtype: 'panel',
+                            border: false,
+                            width: '20%',
+                            items: [
+                                {
+                                    xtype: 'button',
+                                    width: 75,
+                                    margin: '30px 5px 0 5px',
+                                    text: 'Shutdown',
+                                    name: 'shutdownfhem',
+                                    tooltip: 'Shutdown FHEM',
+                                    icon: 'app/resources/icons/stop.png'
+                                },
+                                {
+                                    xtype: 'button',
+                                    width: 70,
+                                    margin: '30px 5px 0 5px',
+                                    text: 'Restart',
+                                    name: 'restartfhem',
+                                    tooltip: 'Restart FHEM',
+                                    icon: 'app/resources/icons/database_refresh.png'
+                                }
+                            ]
+                        }
+                    ]
                 }, {
                     region: 'west',
                     title: 'Navigation',

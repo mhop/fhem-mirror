@@ -1,3 +1,9 @@
+Update vom 2.3.2012
+
+* Kommandozeile hinzugefügt, inkl Speichern in der fhem.cfg
+* Shutdown und Restart Button für FHEM hinzugefügt
+* Icons  
+
 Update vom 1.3.2012
 
 * Charts unterstützen jetzt mehrere Y Achsen. Diese können nach Klick auf den Button "Add another Y Axis" hinzugefügt werden
