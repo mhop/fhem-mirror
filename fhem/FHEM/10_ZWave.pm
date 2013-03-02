@@ -56,8 +56,8 @@ my %zwave_class = (
                reportOff   => "0300",     },
     get   => { swmStatus   => "02",     }, 
     #03260363 reported in http://forum.fhem.de/index.php?t=rview&th=10216
-    parse => { "032603(.*)"=> '($1 == "00" ? "state:off" : 
-                               ($1 == "ff" ? "state:on" : 
+    parse => { "032603(.*)"=> '($1 eq "00" ? "state:off" : 
+                               ($1 eq "ff" ? "state:on" : 
                                              "state:dim ".hex($1)))',}, },
   SWITCH_ALL               => { id => '27', },
   SWITCH_TOGGLE_BINARY     => { id => '28', },
