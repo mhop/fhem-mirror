@@ -36,8 +36,6 @@ FBAHA_Initialize($)
   $hash->{AttrList}= "dummy:1,0 loglevel:0,1,2,3,4,5,6 ";
 }
 
-my %gets = ("devList"=>1);
-my %sets = ("createDevs"=>1);
 
 #####################################
 sub
@@ -71,6 +69,7 @@ FBAHA_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = shift @a;
+  my %sets = ("createDevs"=>1, "listen"=>1 );
 
   return "set $name needs at least one parameter" if(@a < 1);
   my $type = shift @a;
@@ -87,6 +86,9 @@ FBAHA_Set($@)
       }
     }
   }
+  if($type eq "listen") {
+    FBAHA_Write($hash, "03", "0000028200000000");  # LISTEN
+  }
 
   return undef;
 }
@@ -97,6 +99,7 @@ FBAHA_Get($@)
 {
   my ($hash, @a) = @_;
   my $name = shift @a;
+  my %gets = ("devList"=>1);
 
   return "get $name needs at least one parameter" if(@a < 1);
   my $type = shift @a;
