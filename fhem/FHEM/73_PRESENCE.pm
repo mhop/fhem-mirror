@@ -63,9 +63,9 @@ PRESENCE_Define($$)
   my @a = split("[ \t]+", $def);
   my $dev;
   
-  if($a[2] ne "lan-bluetooth" and not (@a == 4 or @a == 5))
+  if($a[2] ne "lan-bluetooth" and not (@a == 4 or @a == 5 or @a == 6))
   {
-    my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <check-interval> ]";
+    my $msg = "wrong syntax: define <name> PRESENCE <mode> <device-address> [ <check-interval> [ <present-check-interval> ] ]";
     Log 2, $msg;
     return $msg;
   }
@@ -82,16 +82,18 @@ PRESENCE_Define($$)
   my $address = $a[3];
   my $timeout = (defined($a[4]) ? $a[4] : 30);
  
+  my $presence_timeout = (defined($a[5]) ? $a[5] : $timeout);
+  
   $timeout = (defined($a[5]) ? $a[5] : 30) if($destination eq "lan-bluetooth");
-   
+  $presence_timeout =  (defined($a[6]) ? $a[6] : 30) if($destination eq "lan-bluetooth");
   
   $hash->{ADDRESS} = $address;
-  $hash->{TIMEOUT} = $timeout;
-
+  $hash->{TIMEOUT_NORMAL} = $timeout;
+  $hash->{TIMEOUT_PRESENT} = $presence_timeout;
 
     if(defined($timeout) and not $timeout =~ /^\d+$/)
     {
-	my $msg = "timeout must be a number";
+	my $msg = "check-interval must be a number";
 	Log 2, "PRESENCE: ".$msg;
 	return $msg;
     }
@@ -99,11 +101,27 @@ PRESENCE_Define($$)
 
     if(defined($timeout) and not $timeout > 0)
     {
-	my $msg = "timeout must be greater than zero";
+	my $msg = "check-interval must be greater than zero";
 	Log 2, "PRESENCE: ".$msg;
 	return $msg;
     }
 
+
+    if(defined($presence_timeout) and not $presence_timeout =~ /^\d+$/)
+    {
+	my $msg = "presence-check-interval must be a number";
+	Log 2, "PRESENCE: ".$msg;
+	return $msg;
+    }
+
+
+    if(defined($presence_timeout) and not $presence_timeout > 0)
+    {
+	my $msg = "presence-check-interval must be greater than zero";
+	Log 2, "PRESENCE: ".$msg;
+	return $msg;
+    }
+    
     if(($destination eq "local-bluetooth" or $destination eq "lan-bluetooth") and not $address =~ /^\s*([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\s*$/)
     {
         my $msg = "given address is not a bluetooth hardware address";
@@ -357,7 +375,7 @@ PRESENCE_DoInit($)
 
     unless($hash->{helper}{DISABLED})
     {
-	DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT}."\n", 0);
+	DevIo_SimpleWrite($hash, $hash->{ADDRESS}."|".$hash->{TIMEOUT_NORMAL}."\n", 0);
     }
     else
     {
@@ -627,7 +645,7 @@ PRESENCE_ProcessLocalScan($)
  unless($local)
  {
     RemoveInternalTimer($hash);
-    InternalTimer(gettimeofday()+$hash->{TIMEOUT}, "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
+    InternalTimer(gettimeofday()+($a[2] eq "present" ? $hash->{TIMEOUT_PRESENT} : $hash->{TIMEOUT_NORMAL}), "PRESENCE_StartLocalScan", $hash, 0) unless($hash->{helper}{DISABLED});
  }
 }
 1;
@@ -652,17 +670,17 @@ PRESENCE_ProcessLocalScan($)
   <a name="PRESENCEdefine"></a>
   <b>Define</b><br><br>
   <ul><b>Mode: lan-ping</b><br><br>
-    <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;check-interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-ping &lt;ip-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
     Checks for a network device via PING requests and reports its presence state.<br>
     <br>
     <b>Mode: fritzbox</b><br><br>
-    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;check-interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
     Checks for a network device by requesting the internal state on a FritzBox via ctlmgr_ctl. The device-name must be the same as shown in the network overview of the FritzBox<br>
     <br>
     <b>Mode: local-bluetooth</b><br><br>
-    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;check-interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;bluetooth-address&gt; [ &lt;check-interval&gt; [ &lt;present-check-interval&gt; ] ]</code><br>
     <br>
     Checks for a bluetooth device and reports its presence state. For this mode the shell command "hcitool" is required (provided with a <a href="http://www.bluez.org" target="_new">bluez</a> installation under Debian via APT), as well
     as a functional bluetooth device directly attached to your machine.<br><br>
@@ -845,18 +863,18 @@ Options:
   <a name="PRESENCEdefine"></a>
   <b>Define</b><br><br>
   <ul><b>Modus: lan-ping</b><br><br>
-    <code>define &lt;name&gt; PRESENCE lan-ping &lt;IP-Addresse oder Hostname&gt; [ &lt;Interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE lan-ping &lt;IP-Addresse oder Hostname&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Ger&auml;t &uuml;ber Netzwerk (&uuml;blicherweise WLAN) auf Ping-Anfragen reagiert und setzt entsprechend den Anwesenheitsstatus.<br>
     <br>
     <b>Modus: fritzbox</b><br><br>
-    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;Interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE fritzbox &lt;device-name&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Ger&auml;t welches per WLAN mit der FritzBox verbunden ist, erreichbar durch Abfrage des Status mit dem Befehl ctlmgr_ctl. 
     Der Ger&auml;tename (Parameter: &lt;device-name&gt;) muss dem Namen entsprechen, welcher im Men&uuml;punkt "Heimnetz" auf der FritzBox-Oberfl&auml;che angezeigt wird.<br>
     <br>
     <b>Modus: local-bluetooth</b><br><br>
-    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; ]</code><br>
+    <code>define &lt;name&gt; PRESENCE local-bluetooth &lt;Bluetooth-Adresse&gt; [ &lt;Interval&gt; [ &lt;Anwesend-Interval&gt; ] ]</code><br>
     <br>
     Pr&uuml;ft ob ein Bluetooth-Ger&auml;t abgefragt werden kann und meldet dies als Anwesenheit. F&uuml;r diesen Modus wird der Shell-Befehl "hcitool" ben&ouml;tigt
     (wird durch das Paket <a href="http://www.bluez.org" target="_new">bluez</a> bereitgestellt), sowie ein funktionierender Bluetooth-Empf&auml;nger (intern oder als USB-Stick)<br><br>
