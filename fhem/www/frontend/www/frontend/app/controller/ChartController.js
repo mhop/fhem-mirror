@@ -694,6 +694,8 @@ Ext.define('FHEM.controller.ChartController', {
         Ext.Msg.prompt("Select a name", "Enter a name to save the Chart", function(action, savename) {
             if (action === "ok" && !Ext.isEmpty(savename)) {
                 
+                //replacing spaces in name
+                savename = savename.replace(" ", "_");
                 
                 var device = this.getDevicecombo().getValue(),
                     xaxis = this.getXaxiscombo().getValue(),
