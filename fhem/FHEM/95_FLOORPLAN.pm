@@ -33,6 +33,7 @@
 # 0022: longpoll by Matthias Gehre (November 27, 2012)
 # 0023: longpoll updates readings also - by Matthias Gehre; FW_longpoll is now a global variable (January 21, 2013)
 # 0024: fix for readings longpoll, added js-extension from Dirk (February 16, 2013)
+# 0025: Added fp_viewport-attribute from  (March 03, 2013)
 #
 ################################################################
 #
@@ -127,6 +128,7 @@ my %FW_zoom;                     # copied from FHEMWEB - using local version to 
 my @FW_zoom;                     # copied from FHEMWEB - using local version to avoid global variable
 #  $FW_subdir					 # from FHEMWEB: path of floorplan-subdir - enables reusability of FHEMWEB-routines for sub-URLS like floorplan
 #  $FW_cname                     # from FHEMWEB: Current connection name
+my $FP_viewport;                 # Define width for touchpad device
 
 #-------------------------------------------------------------------------------
 sub 
@@ -134,12 +136,13 @@ FLOORPLAN_Initialize($)
 {
   my ($hash) = @_;
   $hash->{DefFn} = "FP_define";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0";
+  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6 refresh fp_arrange:1,detail,WEB,0 commandfield:1,0 fp_default:1,0 stylesheet fp_noMenu:1,0 fp_backgroundimg fp_setbutton:1,0 fp_viewport";
   # fp_arrange			: show addtl. menu for  attr fp_<name> ....
   # commandfield		: shows an fhem-commandline inputfield on floorplan
   # fp_default			: set for ONE floorplan. If set, floorplan-startscreen is skipped.
   # fp_stylesheetPrefix	: e.g. for darkstyle, set value dark -> uses darkfloorplanstyle.css
   # fp_noMenu			: suppresses display of the floorplan-menu on the floorplan
+  # fp_viewport         : define a viewport for mobile devices
   
   # CGI
   my $name = "floorplan";
@@ -206,6 +209,7 @@ FP_CGI(){
   
   if ($FP_name) {																   # a floorplan-name is part of URL
 	$FP_arrange = AttrVal($FP_name, "fp_arrange", 0) if ($FP_name);				   # set arrange mode
+	$FP_viewport = AttrVal($FP_name, "fp_viewport", "width=768") if ($FP_name);    # viewport definition
 	if(!defined($defs{$FP_name})){
 		$FW_RET = "ERROR: Floorplan $FP_name not defined \n";					   # check for typo in URL
 		return ("text/plain; charset=$FW_encoding", $FW_RET);
@@ -322,7 +326,7 @@ FP_htmlHeader($) {
     if($FW_ss) {
       FW_pO "<meta name=\"viewport\" content=\"width=320\"/>";
     } elsif($FW_tp) {
-      FW_pO "<meta name=\"viewport\" content=\"width=768\"/>";
+      FW_pO "<meta name=\"viewport\" content=\"".$FP_viewport."\"/>";
     }
   }
   # refresh-value
@@ -846,7 +850,11 @@ FP_input(@)
 	<ul>
       <code>attr Groundfloor fp_backgroundimg foobar.png</code><br><br>
     </ul>
-
+	
+    <li><a name="fp_viewport">fp_viewport</a><br>
+	Allows usage of a user-defined viewport-value for touchpad.<br>
+	Default-viewport-value is "width=768".
+	
     <li><a name="fp_inherited">Inherited from FHEMWEB</a><br>
 	The following attributes are inherited from the underlying <a href="#FHEMWEB">FHEMWEB</a> instance:<br>
     <ul>
@@ -998,6 +1006,9 @@ FP_input(@)
 	<ul>
       <code>attr Erdgeschoss fp_backgroundimg foobar.png</code><br><br>
     </ul>
+    <li><a name="fp_viewport">fp_viewport</a><br>
+	Gestattet die Verwendung eines abweichenden viewport-Wertes für die touchpad-Ausgabe.<br>
+	Die Default-viewport-Angbe ist "width=768".
 
     <li><a name="fp_inherited">Vererbt von FHEMWEB</a><br>
 	Die folgenden Attribute werden von der zugrundliegenden <a href="#FHEMWEB">FHEMWEB</a>-Instanz vererbt:<br>
