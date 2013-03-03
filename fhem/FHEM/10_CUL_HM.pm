@@ -221,7 +221,7 @@ my %culHmModel=(
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
   "00A3" => {name=>"HM-LC-Dim1L-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "00A4" => {name=>"HM-LC-Dim1T-Pl-2"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",}, 						
+  "00A7" => {name=>"HM-Sen-RD-O"             ,st=>''                  ,cyc=>''      ,rxt=>''    ,lst=>'1:1,4:1'      ,chn=>"Rain:1:1,Sw:2:2",} 						,
   #263 167                        HM Smoke Detector Schueco 
 );
 
@@ -750,7 +750,8 @@ sub CUL_HM_Parse($$) {#############################
     # CMD:8202 SRC:13F251 DST:15B50D 010100002A
     # status ACK to controlling HM-CC-TC
     if($msgType eq "02" && $p =~ m/^(..)(..)(..)(..)/) {#subtype+chn+value+err
-      my ($chn,$vp, $err) = ($2,hex($3), hex($4));
+      my ($chn,$vp, $err) = (hex($2),hex($3), hex($4));
+  	  $chn = sprintf("%02X",$chn&0x3f);
       $vp = int($vp)/2;   # valve position in %
 	  push @event, "ValvePosition:$vp %";
       push @event, "state:$vp %";
@@ -838,18 +839,22 @@ sub CUL_HM_Parse($$) {#############################
     if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
 	    ($msgType eq "10" && $p =~ m/^06/))	{ #    or Info_Status message here
 
-      my ($subType,$chn,$val,$err) = ($1,$2,hex($3)/2,hex($4)) 
+      my ($subType,$chn,$val,$err) = ($1,hex($2),hex($3)/2,hex($4)) 
  	                     if($p =~ m/^(..)(..)(..)(..)/);
+	  $chn = sprintf("%02X",$chn&0x3f);
+      $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
+	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
       my ($x,$pl) = ($1,hex($2)/2)  if($p =~ m/^........(..)(..)/);
 	  my $stUpdt = 1;# shall state be updated?
 	  if (defined $pl){# device with virtual channels...
 	    push @event,"virtLevel:".($val == 100?"on":($val == 0?"off":"$val %"));
+		my $vDim = $shash->{helper}{vDim};#shortcut
+        my $ph = CUL_HM_id2Hash($vDim->{idPhy})	 if ($vDim->{idPhy});
 		if ($msgType eq "10"){
 		  $val = $pl;# Physical level is pl - but only for InfoStatus
 		  $pl = ($pl == 100 ? "on" : ($pl == 0 ? "off" : "$pl %"));
           #set state for all virtual
-		  my $vDim = $shash->{helper}{vDim};#shortcut
-          my $ph = CUL_HM_id2Hash($vDim->{idPhy})	 if ($vDim->{idPhy});
+	      RemoveInternalTimer("sUpdt:".$ph->{NAME});
           if ($ph){
 		    push @entities,CUL_HM_UpdtReadSingle($ph,"state",$pl,1);
 		    my $vh;
@@ -861,13 +866,11 @@ sub CUL_HM_Parse($$) {#############################
 		}
 		else{
 		  $stUpdt = 0;# no update
-		  $val = ReadingsVal($name,"state","");	
+		  $val = ReadingsVal($name,"state","");	# keep value
+          InternalTimer(gettimeofday()+3,"CUL_HM_stateUpdat", "sUpdt:".$ph->{NAME}, 0);
 		}
 	  }
 
-      # Multi-channel device: Use channel if defined
-      $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
-	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
       $val = ($val == 100 ? "on" : ($val == 0 ? "off" : "$val %"))
 	         if ($stUpdt );
       push @event, "deviceMsg:$val$target" if($chn ne "00");
@@ -911,7 +914,7 @@ sub CUL_HM_Parse($$) {#############################
 	  my $buttonID = $buttonField&0x3f;# only 6 bit are valid
 	  my $btnName;
 	  my $state = "";
-      my $chnHash = $modules{CUL_HM}{defptr}{$src.uc(sprintf("%02x",$buttonID))};	  
+      my $chnHash = $modules{CUL_HM}{defptr}{$src.sprintf("%02X",$buttonID)};	  
 	  
 	  if ($chnHash){# use userdefined name - ignore this irritating on-off naming
 		$btnName = $chnHash->{NAME};
@@ -1140,7 +1143,8 @@ sub CUL_HM_Parse($$) {#############################
 	  my $mT = $msgType.substr($p,0,2);
 	  if ($mT eq "1006" ||$$mT eq "0201"){
 	    $p =~ m/^..(..)(..)(..)?$/;
-        ($chn,$state,$err) = ($1, $2, hex($3));
+        ($chn,$state,$err) = (hex($1), $2, hex($3));
+	    $chn = sprintf("%02X",$chn&0x3f);
 		$shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
 		push @event, "alive:yes";
@@ -1151,7 +1155,8 @@ sub CUL_HM_Parse($$) {#############################
 	  }
 	}
 	elsif($msgType eq "41"){
-	  ($chn,$cnt,$state)=($1,$2,$3) if($p =~ m/^(..)(..)(..)/);
+	  ($chn,$cnt,$state)=(hex($1),$2,$3) if($p =~ m/^(..)(..)(..)/);
+	  $chn = sprintf("%02X",$chn&0x3f);
 	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});	
 	}
@@ -2279,10 +2284,12 @@ sub CUL_HM_getMId($) {#in: hash(chn or dev) out:model key (key for %culHmModel).
   my $mId = $hash->{helper}{mId};
   if (!$mId){   
     my $model = AttrVal($hash->{NAME}, "model", "");
-    foreach my $mIdKey(grep {$culHmModel{$_}{name} eq $model}keys%culHmModel){
-	  $mId = $hash->{helper}{mId} = $mIdKey;
+    foreach my $mIdKey(keys%culHmModel){
+	  next if (!$culHmModel{$mIdKey}{name} || $culHmModel{$mIdKey}{name} ne $model);
+	  $mId = $hash->{helper}{mId} = $mIdKey ;
 	  return $mIdKey;
     }
+	return "";
   }
   return $mId;
 }
@@ -2420,7 +2427,7 @@ sub CUL_HM_Set($@) {
 	$state = "";
     my $serialNr = AttrVal($name, "serialNr", undef);
     return "serialNr is not set" if(!$serialNr);
-    CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".unpack("H*",$serialNr));
+    CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serialNr)));
     $hash->{hmPairSerial} = $serialNr;
   } 
   elsif($cmd eq "unpair") { ###################################################
@@ -4480,6 +4487,11 @@ sub CUL_HM_storeRssi(@){
   }  
   $hash->{"rssi_".$peerName} = $rssi;
  return ;
+}
+sub CUL_HM_stateUpdat($){
+  my $name = shift;
+  (undef,$name)=split":",$name,2;
+  CUL_HM_Set(CUL_HM_name2Hash($name),$name,"statusRequest") if ($name);
 }
 
 1;
