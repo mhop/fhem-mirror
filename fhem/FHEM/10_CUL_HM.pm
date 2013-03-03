@@ -493,7 +493,6 @@ sub CUL_HM_Parse($$) {#############################
   my $st = AttrVal($name, "subType", "");
   my $model = AttrVal($name, "model", "");
   my $tn = TimeNow();
-
   CUL_HM_storeRssi($name,
                    "at_".((hex($msgFlag)&0x40)?"rpt_":"").$ioName,# repeater?
                    $myRSSI);
@@ -807,7 +806,7 @@ sub CUL_HM_Parse($$) {#############################
   elsif($st eq "KFM100" && $model eq "KFM-Sensor") { ##########################
     if ($msgType eq "53"){
       if($p =~ m/.14(.)0200(..)(..)(..)/) {
-        my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($$3),hex($4));
+        my ($seq, $k_v1, $k_v2, $k_v3) = (hex($1),$2,hex($3),hex($4));
         my $v = 128-$k_v2;                  # FIXME: calibrate
         $v += 256 if(!($k_v3 & 1));
         push @event, "rawValue:$v";
@@ -1338,7 +1337,8 @@ sub CUL_HM_Parse($$) {#############################
   push @event, "noReceiver:src:$src ($cmd) $p" if(!@event);
   CUL_HM_UpdtReadBulk($shash,1,@event); #events to the channel
   $defs{$shash->{NAME}}{EVENTS}++;  # count events for channel
-  foreach (@entities){
+  push @entities,$shash->{NAME};
+  foreach (CUL_HM_noDup(@entities)){
     DoTrigger($_, undef) if ($_ ne $name);
   }
   return $name ;#general notification to the device
