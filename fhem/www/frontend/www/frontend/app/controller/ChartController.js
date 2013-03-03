@@ -695,7 +695,7 @@ Ext.define('FHEM.controller.ChartController', {
             if (action === "ok" && !Ext.isEmpty(savename)) {
                 
                 //replacing spaces in name
-                savename = savename.replace(" ", "_");
+                savename = savename.replace(/ /g, "_");
                 
                 var device = this.getDevicecombo().getValue(),
                     xaxis = this.getXaxiscombo().getValue(),
