@@ -107,11 +107,12 @@ FBDECT_Get($@)
     my @answ = FBAHA_getDevList($hash->{IODev}, $hash->{id});
     return $answ[0] if(@answ == 1);
     my $d = pop @answ;
+    my $state = "inactive" if($answ[0] =~ m/ inactive,/);
     while($d) {
       my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
       if($ptyp eq "state" && 
          ReadingsVal($hash->{NAME}, $ptyp, "") ne $pyld) {
-        readingsSingleUpdate($hash, $ptyp, $pyld, 1);
+        readingsSingleUpdate($hash, $ptyp, ($state ? $state : $pyld), 1);
       }
       push @answ, "  $ptyp: $pyld";
       $d = substr($d, 16+$plen*2);
