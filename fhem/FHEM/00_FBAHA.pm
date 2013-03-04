@@ -328,15 +328,20 @@ FBAHA_Ready($)
   <a name="FBAHAdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FBAHA &lt;host&gt;:&lt;port&gt;</code>
+    <code>define &lt;name&gt; FBAHA &lt;device&gt;</code>
   <br>
   <br>
+  &lt;device&gt; is either a &lt;host&gt;:&lt;port&gt; combination, where
   &lt;host&gt; is normally the address of the FRITZ!Box running the AHA server
-  (fritz.box or localhost), and :&lt;port&gt; is 2002.
+  (fritz.box or localhost), and &lt;port&gt; 2002, or
+  UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl, the latter only works on
+  the fritz.box. With FRITZ!OS 5.50 the network port is available, on some
+  Labor variants only the UNIX socket is available.
   <br>
   Example:
   <ul>
     <code>define fb1 FBAHA fritz.box:2002</code><br>
+    <code>define fb1 FBAHA UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl</code><br>
   </ul>
   </ul>
   <br>
@@ -395,15 +400,23 @@ FBAHA_Ready($)
   <a name="FBAHAdefine"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; FBAHA &lt;host&gt;:&lt;port&gt;</code>
+    <code>define &lt;name&gt; FBAHA &lt;device&gt;</code>
   <br>
   <br>
   &lt;host&gt; ist normalerweise die Adresse der FRITZ!Box, wo das AHA Server
   l&auml;uft (fritz.box oder localhost), &lt;port&gt; ist 2002.
+
+  &lt;device&gt; is entweder a eine Kombianation aus &lt;host&gt;:&lt;port&gt;,
+  wobei &lt;host&gt; die Adresse der FRITZ!Box ist (localhost AUF dem
+  FRITZ.BOX) und &lt;port&gt; 2002 ist, oder
+  UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl, wobei das nur fuer
+  FHEM@FRITZ!BOX zur Verfügung steht. Mit FRITZ!OS 5.50 steht auch der
+  Netzwerkport zur Verfügung, auf manchen Laborvarianten nur das UNIX socket.
   <br>
   Beispiel:
   <ul>
     <code>define fb1 FBAHA fritz.box:2002</code><br>
+    <code>define fb1 FBAHA UNIX:SEQPACKET:/var/tmp/me_avm_home_external.ctl</code><br>
   </ul>
   </ul>
   <br>
