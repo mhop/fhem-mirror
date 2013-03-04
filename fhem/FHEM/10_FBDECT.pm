@@ -109,6 +109,10 @@ FBDECT_Get($@)
     my $d = pop @answ;
     while($d) {
       my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+      if($ptyp eq "state" && 
+         ReadingsVal($hash->{NAME}, $ptyp, "") ne $pyld) {
+        readingsSingleUpdate($hash, $ptyp, $pyld, 1);
+      }
       push @answ, "  $ptyp: $pyld";
       $d = substr($d, 16+$plen*2);
     }
@@ -123,7 +127,6 @@ FBDECT_Parse($$@)
 {
   my ($iodev, $msg, $local) = @_;
   my $ioName = $iodev->{NAME};
-  my $ll4 = AttrVal($ioName, "loglevel", 4);
 
   my $mt = substr($msg, 0, 2);
   if($mt ne "07" && $mt ne "04") {
@@ -152,18 +155,23 @@ FBDECT_Parse($$@)
   }
   if($mt eq "04") {
     my @answ = FBAHA_configInd(substr($msg,16), $id);
-    my $d = pop @answ;
-    while($d) {
-      my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
-      last if(!$plen);
-      push @answ, "  $ptyp: $pyld";
-      $d = substr($d, 16+$plen*2);
+    my $state = "";
+    if($answ[0] =~ m/ inactive,/) {
+      $state = "inactive";
+
+    } else {
+      my $d = pop @answ;
+      while($d) {
+        my ($ptyp, $plen, $pyld) = FBDECT_decodePayload($d);
+        last if(!$plen);
+        push @answ, "  $ptyp: $pyld";
+        $d = substr($d, 16+$plen*2);
+      }
+      # Ignore the rest, is too confusing.
+      @answ = grep /state:/, @answ;
+      (undef, $state) = split(": ", $answ[0], 2);
     }
-    # Ignore the rest, is too confusing.
-    @answ = grep /state:/, @answ;
-    my ($undef, $state) = split(": ", $answ[0], 2);
-    readingsBulkUpdate($hash, "state", $state) if($state);
-    Log 1, join("\n", @answ);
+    readingsBulkUpdate($hash, "state", $state);
   }
 
   readingsEndUpdate($hash, 1);
