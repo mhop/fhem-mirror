@@ -108,7 +108,31 @@ DevIo_OpenDev($$$)
   Log 3, "Opening $name device $dev"
         if(!$reopen);
 
-  if($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
+  if($dev =~ m/^UNIX:(SEQPACKET|STREAM):(.*)$/) { # FBAHA
+    my ($type, $fname) = ($1, $2);
+    my $conn;
+    eval {
+      require IO::Socket::UNIX;
+      $conn = IO::Socket::UNIX->new(
+        Type=>($type eq "STREAM" ? SOCK_STREAM:SOCK_SEQPACKET), Peer=>$fname);
+    };
+    if($@) {
+      Log 1, $@;
+      return $@;
+    }
+
+    if(!$conn) {
+      Log(3, "Can't connect to $dev: $!") if(!$reopen);
+      $readyfnlist{"$name.$dev"} = $hash;
+      $hash->{STATE} = "disconnected";
+      return "";
+    }
+    $hash->{TCPDev} = $conn;
+    $hash->{FD} = $conn->fileno();
+    delete($readyfnlist{"$name.$dev"});
+    $selectlist{"$name.$dev"} = $hash;
+
+  } elsif($dev =~ m/^(.+):([0-9]+)$/) {       # host:port
 
     # This part is called every time the timeout (5sec) is expired _OR_
     # somebody is communicating over another TCP connection. As the connect
