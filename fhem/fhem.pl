@@ -1031,6 +1031,8 @@ CommandSave($$)
   my ($cl, $param) = @_;
   my $ret = "";
 
+  DoTrigger("global", "SAVE", 1);
+
   WriteStatefile();
 
   $param = $attr{global}{configfile} if(!$param);
