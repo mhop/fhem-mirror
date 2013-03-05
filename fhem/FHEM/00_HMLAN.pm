@@ -15,7 +15,7 @@ sub HMLAN_secSince2000();
 
 sub HMLAN_SimpleWrite(@);
 
-my $debug = 0; # set 1 for better log readability
+my $debug = 1; # set 1 for better log readability
 my %sets = (
   "hmPairForSec" => "HomeMatic",
   "hmPairSerial" => "HomeMatic",
