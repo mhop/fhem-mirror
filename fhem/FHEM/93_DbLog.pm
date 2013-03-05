@@ -396,6 +396,15 @@ DbLog_Connect($)
   Log 3, "Connection to db $dbconn established";
   $hash->{DBH}= $dbh;
 
+  if ($hash->{DBMODEL} eq "SQLITE") {
+	$dbh->do("PRAGMA temp_store=MEMORY");
+	$dbh->do("PRAGMA synchronous=NORMAL");
+	$dbh->do("PRAGMA journal_mode=WAL");
+	$dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+	$dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+	$dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
+  }
+
   return 1;
 }
 
