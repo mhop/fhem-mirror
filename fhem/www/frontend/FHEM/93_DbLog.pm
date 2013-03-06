@@ -396,6 +396,15 @@ DbLog_Connect($)
   Log 3, "Connection to db $dbconn established";
   $hash->{DBH}= $dbh;
   
+  if ($hash->{DBMODEL} eq "SQLITE") {
+    $dbh->do("PRAGMA temp_store=MEMORY");
+    $dbh->do("PRAGMA synchronous=NORMAL");
+    $dbh->do("PRAGMA journal_mode=WAL");
+    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+    $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
+  }
+  
   # creating an own connection for the webfrontend, saved as DBHF in Hash
   # this makes sure that the connection doesnt get lost due to other modules
   my $dbhf = DBI->connect_cached("dbi:$dbconn", $dbuser, $dbpassword);
@@ -476,7 +485,7 @@ DbLog_Get($@)
   my $to   = shift @a; # Now @a contains the list of column_specs
   my ($internal, @fld);
 
-  if(uc($outf) eq "INT") {
+  if($outf eq "INT") {
     $outf = "-";
     $internal = 1;
   } elsif (uc($outf) eq "WEBCHART") {
@@ -1320,4 +1329,3 @@ sub chartQuery($@) {
 
 =end html_DE
 =cut
-
