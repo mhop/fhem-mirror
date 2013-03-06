@@ -48,9 +48,9 @@ Ext.define('FHEM.view.LineChartPanel', {
         me.comboDevice2Store = Ext.create('FHEM.store.DeviceStore');
         me.comboDevice3Store = Ext.create('FHEM.store.DeviceStore');
         
-        me.comboDeviceStore.on("load", function(store, e, success) {
+        me.comboDeviceStore.on("load", function(store, recs, success, operation) {
             if(!success) {
-                Ext.Msg.alert("Error", "Connection to database failed! Check your configuration.");
+                Ext.Msg.alert("Error", "Something went wrong. Store Items: " + store.getCount() + ", loaded Items: " + recs.length + ", Reader rawrecords: " + store.getProxy().getReader().rawData.data.length + ", proxyURL: " + store.getProxy().url);
             }
         });
         
