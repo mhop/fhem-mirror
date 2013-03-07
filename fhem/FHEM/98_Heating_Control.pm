@@ -132,18 +132,18 @@ Heating_Control_Define($$)
      $dayNumber{$day} = $idx; $idx++;
   }
 
-  my (@st, @days, $daylist, $time, $temp, $englisch);
+  my (@st, @days, $daylist, $time, $para, $englisch);
   for(my $i=0; $i<@switchingtimes; $i++) {
     
     @st = split(/\|/, $switchingtimes[$i]);
     if ( @st == 2) {
       $daylist = "1234567"; #jeden Tag/woche ist vordefiniert
       $time    = $st[0];
-      $temp    = $st[1];
+      $para    = $st[1];
     } elsif ( @st == 3) {
       $daylist = lc($st[0]);
       $time    = $st[1];
-      $temp    = $st[2];
+      $para    = $st[2];
     }
 
     my %hdays=();
@@ -188,12 +188,12 @@ Heating_Control_Define($$)
 
     return "invalid time in $name <$time> HH:MM"
       if(!($time =~  m/^[0-2][0-9]:[0-5][0-9]$/g));
-    return "invalid temperature in $name <$temp> 99.9"
-      if(!($temp =~  m/^\d{1,2}(\.\d){0,1}$/g));
+    #return "invalid temperature in $name <$para> 99.9"
+    #  if(!($para =~  m/^\d{1,2}(\.\d){0,1}$/g));
 
     for (my $d=0; $d<@days; $d++) {
-      #Log 3, "Switchingtime: $switchingtimes[$i] : $days[$d] -> $time -> $temp ";
-      $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$time} = $temp;
+      #Log 3, "Switchingtime: $switchingtimes[$i] : $days[$d] -> $time -> $para ";
+      $hash->{helper}{SWITCHINGTIME}{$days[$d]}{$time} = $para;
     }
   }
 
@@ -217,8 +217,8 @@ Heating_Control_Define($$)
   # Profile sortiert aufbauen
   for (my $d=1; $d<=7; $d++) {
     foreach my $st (sort (keys %{ $hash->{helper}{SWITCHINGTIME}{$d} })) {
-      my $temp = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
-      $hash->{"PROFILE ".($d).": ".$$rWochentage[$d-1]} .= sprintf("%s: %.1f%s, ", $st, $temp, $unit);
+      my $para = $hash->{helper}{SWITCHINGTIME}{$d}{$st};
+      $hash->{"PROFILE ".($d).": ".$$rWochentage[$d-1]} .= sprintf("%s %s, ", $st, $para);
     }
   }
 
@@ -307,8 +307,8 @@ Heating_Control_Update($)
   
   Log $loglevel, "NowSwitch: ".strftime('%d.%m.%Y %H:%M:%S',localtime($nowSwitch))." ; AktDesiredTemp: $AktDesiredTemp ; newDesTemperature: $newDesTemperature";
   Log $loglevel, "NextSwitch=".strftime('%d.%m.%Y %H:%M:%S',localtime($nextSwitch));
-
-  if ($nowSwitch gt "" && $AktDesiredTemp != $newDesTemperature) {
+  
+  if ($nowSwitch gt "" && $AktDesiredTemp ne $newDesTemperature) {
     if (defined $hash->{helper}{CONDITION}) {
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") if' . $hash->{helper}{CONDITION} . '}';
     } elsif (defined $hash->{helper}{COMMAND}) {
@@ -317,7 +317,7 @@ Heating_Control_Update($)
       $command = '{ fhem("set @ '.$hash->{helper}{DESIRED_TEMP_READING}.' %") }';
     }
   }
-
+    
   if ($command && AttrVal($hash->{NAME}, "disable", 0) == 0) {
     $command =~ s/@/$hash->{DEVICE}/g;
     $command =~ s/%/$newDesTemperature/g;
@@ -330,8 +330,8 @@ Heating_Control_Update($)
   InternalTimer($nextSwitch, "Heating_Control_Update", $hash, 0);
   readingsBeginUpdate($hash);
   readingsBulkUpdate ($hash,  "nextUpdate", strftime("%d.%m.%Y %H:%M:%S",localtime($nextSwitch)));
-  readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature . $unit);
-  readingsBulkUpdate ($hash,  "state",      $newDesTemperature  . $unit);
+  readingsBulkUpdate ($hash,  "nextValue",  $nextDesTemperature);
+  readingsBulkUpdate ($hash,  "state",      $newDesTemperature);
   readingsEndUpdate  ($hash,  defined($hash->{LOCAL} ? 0 : 1));
   
   return 1;
@@ -362,28 +362,34 @@ sub SortNumber {
     <code>define &lt;name&gt; Heating_Control &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
-    to set a weekly profile for &lt;device&gt;, eg. a heating sink. You can define different switchingtimes for every day.
-    The new temperature is sent to the &lt;device&gt; automaticly with <code>set &lt;device&gt; desired-temp &lt;temp&gt;</code>
-    if the device is a heating thermostat (FHT8b, MAX). Have you defined a &lt;condition&gt;
-    and this condition is false if the switchingtime has reached, no command will executed.<br>
+    to set a weekly profile for &lt;device&gt;, eg. a heating sink.<br>
+    You can define different switchingtimes for every day.<br>
+
+    The new temperature is sent to the &lt;device&gt; automatically with <br><br>
+
+    <code>set &lt;device&gt; (desired-temp|desiredTemerature) &lt;temp&gt;</code><br><br>
+
+    Because of the fhem-type of structures, a structures of heating sinks is sent "desired-temp":
+    Use an explicit command if you have structures of MAX heating thermostats.<br>
+    If you have defined a &lt;condition&gt; and this condition is false if the switchingtime has reached, no command will executed.<br>
     A other case is to define an own perl command with &lt;command&gt;.
     <p>
     The following parameter are defined:
-    <ul><b>device</b><br> 
+    <ul><b>device</b><br>
       The device to switch at the given time.
-    </ul> 
+    </ul>
     <p>
-    <ul><b>profile</b><br> 
+    <ul><b>profile</b><br>
       Define the weekly profile. All timings are separated by space. One switchingtime are defined
       by the following example: <br>
-      <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;temperature&gt;</b></ul><br>
+      <ul><b>[&lt;weekdays&gt;|]&lt;time&gt;|&lt;parameter&gt;</b></ul><br>
       <u>weekdays:</u> optional, if not set every day is using.<br>
         Otherwise you can define one day as number or as shortname.<br>
       <u>time:</u>define the time to switch, format: HH:MM(HH in 24 hour format)<br>
-      <u>temperature:</u>the temperature to set, using a Integer<br>
+      <u>parameter:</u>the temperature to be set, using a float with mask 99.9 or a sybolic value like <b>eco</b> or <b>comfort</b> - whatever your thermostat understands<br>
     </ul>
     <p>
-    <ul><b>command</b><br> 
+    <ul><b>command</b><br>
       If no condition is set, all others is interpreted as command. Perl-code is setting up
       by well-known Block with {}.<br>
       Note: if a command is defined only this command are executed. In case of executing
@@ -395,17 +401,17 @@ sub SortNumber {
         </ol>
     </ul>
     <p>
-    <ul><b>condition</b><br> 
+    <ul><b>condition</b><br>
       if a condition is defined you must declared this with () and a valid perl-code.<br>
-      The returnvalue must be boolean.<br> 
+      The returnvalue must be boolean.<br>
       The parameter @ and % will be interpreted.
     </ul>
     <p>
     <b>Example:</b>
     <ul>
-        <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|12 17:20|21 17:25|12</code><br>
-        Mo-Fr are setting the temperature at 05:20 to 21&deg;C, and at 05:25 to 12&deg;C.
-        Every day will be set the temperature at 17:20 to 21&deg;C and 17:25 to 12&deg;C.<p>
+        <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|comfort 17:20|21 17:25|eco</code><br>
+        Mo-Fr are setting the temperature at 05:20 to 21&deg;C, and at 05:25 to <b>comfort</b>.
+        Every day will be set the temperature at 17:20 to 21&deg;C and 17:25 to <b>eco</b>.<p>
 
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Tu,Th-Fr|16:00|18.5 20:00|12
           {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
@@ -423,7 +429,7 @@ sub SortNumber {
   <b>Get</b> <ul>N/A</ul><br>
 
   <a name="Heating_ControlLogattr"></a>
-  <b>Attributes</b> 
+  <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#loglevel">loglevel</a></li>
@@ -447,33 +453,38 @@ sub SortNumber {
     <code>define &lt;name&gt; Heating_Control &lt;device&gt; &lt;profile&gt; &lt;command&gt;|&lt;condition&gt;</code>
     <br><br>
 
-    Bildet ein Wochenprofil f&uumlr ein &lt;device&gt;, zb. Heizk&oumlrper, ab. Es k&oumlnnen f&uumlr jeden Tag unterschiedliche
-    Schaltzeiten angegeben werden. Ist das &lt;device&gt; ein Heizk&oumlrperthermostat (zb. FHT8b, MAX) so wird die
-    zu setzende Temperatur im &lt;profile&gt; automatisch mittels <code>set &lt;device&gt; desired-temp &lt;temp&gt;</code>
-    dem Device mitgeteilt. Ist eine &lt;condition&gt; angegeben und ist zum Schaltpunkt der Ausdruck unwahr, 
+    Bildet ein Wochenprofil f&uumlr ein &lt;device&gt;, zb. Heizk&oumlrper, ab.<br>
+    Es k&oumlnnen f&uumlr jeden Tag unterschiedliche Schaltzeiten angegeben werden.<br>
+    Ist das &lt;device&gt; ein Heizk&oumlrperthermostat (zb. FHT8b, MAX) so wird bei FHT8b/MAX die
+    zu setzende Temperatur im &lt;profile&gt; automatisch mittels <br><br>
+    <code>set &lt;device&gt; (desired-temp|desiredTemerature) &lt;temp&gt;</code> <br><br> gesendet.
+    Struktuen von Heizk&oumlrperthermostaten bekommen aufgrund des fhem-Typs auch desired-temp gesendet:
+    Nutze bitte explizite Kommandos wenn du Strukturen von MAX Heizthermostaten gesteuert werden sollen.<br><br>
+    Ist eine &lt;condition&gt; angegeben und ist zum Schaltpunkt der Ausdruck unwahr,
     so wird dieser Schaltpunkt nicht ausgef&uumlhrt.<br>
     Alternativ zur Automatik kann stattdessen eigener Perl-Code im &lt;command&gt; ausgef&uumlhrt werden.
     <p>
     Folgende Parameter sind im Define definiert:
-    <ul><b>device</b><br> 
+    <ul><b>device</b><br>
       Das an den Schaltpunkten zu schaltende Device.
-    </ul> 
+    </ul>
     <p>
-    <ul><b>profile</b><br> 
+    <ul><b>profile</b><br>
       Angabe des Wochenprofils. Die einzelnen Schaltzeiten sind durch Leerzeichen getrennt
       Die Angabe der Schaltzeiten ist nach folgendem Muster definiert:<br>
-      <ul><b>[&lt;Wochentage&gt;|]&lt;Uhrzeit&gt;|&lt;Temperatur&gt;</b></ul><br>
+      <ul><b>[&lt;Wochentage&gt;|]&lt;Uhrzeit&gt;|&lt;Parameter&gt;</b></ul><br>
       <u>Wochentage:</u> optionale Angabe, falls nicht gesetzt wird der Schaltpunkt jeden Tag ausgef&uumlhrt.
         F&uumlr die Tage an denen dieser Schaltpunkt aktiv sein soll, ist jeder Tag mit seiner
         Tagesnummer (Mo=1, ..., So=7) oder Name des Tages (Mo, Di, ..., So) einzusetzen.<br>
       <u>Uhrzeit:</u>Angabe der Uhrzeit an dem geschaltet werden soll, Format: HH:MM(HH im 24 Stunden format)<br>
-      <u>Temperatur:</u>Angabe der zu setzenden Temperatur als Zahl<br>
+      <u>Parameter:</u>Angabe der zu setzenden Temperatur als Zahl mit Format 99.9 oder als symbolische Konstante <b>eco</b>
+      or <b>comfort</b> - was immer das Heizk&oumlrperthermostat versteht.<br>
     </ul>
     <p>
-    <ul><b>command</b><br> 
+    <ul><b>command</b><br>
       Falls keine Condition in () angegeben wurde, so wird alles weitere als Command
       interpretiert. Perl-Code ist in {} zu setzen. <br>
-      Wichtig: Falls ein Command definiert ist, so wird zu den definierten Schaltzeiten 
+      Wichtig: Falls ein Command definiert ist, so wird zu den definierten Schaltzeiten
       nur(!) das Command ausgef&uumlhrt. Falls ein desired-temp Befehl abgesetzt werde soll,
       so muss dies explizit angegeben werden.<br>
       Folgende Parameter werden ersetzt:<br>
@@ -483,7 +494,7 @@ sub SortNumber {
         </ol>
     </ul>
     <p>
-    <ul><b>condition</b><br> 
+    <ul><b>condition</b><br>
       Bei Angabe einer Condition ist diese in () zu setzen und mit validem Perl-Code zu versehen.<br>
       Der R&uumlckgabedatentyp der condition muss boolean sein.<br>
       Die Parameter @ und  % werden interpretiert.
@@ -491,9 +502,9 @@ sub SortNumber {
     <p>
     <b>Beispiel:</b>
     <ul>
-        <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|12 17:20|21 17:25|12</code><br>
-        Mo-Fr wird die Temperatur um 05:20Uhr auf 21&deg;C, und um 05:25Uhr auf 12&deg;C gesetzt.
-        Jeden Tag wird die Temperatur um 17:20Uhr auf 21&deg;C und 17:25Uhr auf 12&deg;C gesetzt.<p>
+        <code>define HCB Heating_Control Bad_Heizung 12345|05:20|21 12345|05:25|comfort 17:20|21 17:25|eco</code><br>
+        Mo-Fr wird die Temperatur um 05:20Uhr auf 21&deg;C, und um 05:25Uhr auf <b>comfort</b> gesetzt.
+        Jeden Tag wird die Temperatur um 17:20Uhr auf 21&deg;C und 17:25Uhr auf <b>eco</b> gesetzt.<p>
 
         <code>define HCW Heating_Control WZ_Heizung 07:00|16 Mo,Di,Mi|16:00|18.5 20:00|12
           {fhem("set dummy on"); fhem("set @ desired-temp %");}</code><br>
@@ -511,7 +522,7 @@ sub SortNumber {
   <b>Get</b> <ul>N/A</ul><br>
 
   <a name="Heating_ControlLogattr"></a>
-  <b>Attributes</b> 
+  <b>Attributes</b>
   <ul>
     <li><a href="#disable">disable</a></li>
     <li><a href="#loglevel">loglevel</a></li>
