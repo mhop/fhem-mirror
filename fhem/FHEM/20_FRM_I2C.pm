@@ -26,17 +26,17 @@ FRM_I2C_Init($)
 	my ($hash,$args) = @_;
  	my $u = "wrong syntax: define <name> FRM_I2C address register numbytes";
 
-	return $u if(int(@$args) < 5);
+	return $u if(int(@$args) < 3);
   
-	$hash->{"i2c-address"} = @$args[2];
-	$hash->{"i2c-register"} = @$args[3];
-	$hash->{"i2c-bytestoread"} = @$args[4];
+	$hash->{"i2c-address"} = @$args[0];
+	$hash->{"i2c-register"} = @$args[1];
+	$hash->{"i2c-bytestoread"} = @$args[2];
 
 	return "no IODev set" unless defined $hash->{IODev};
 	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME} unless defined $hash->{IODev}->{FirmataDevice};  	
 	
 	eval {
-		$hash->{IODev}->{FirmataDevice}->i2c_read(@$args[2],@$args[3],@$args[4]);
+		$hash->{IODev}->{FirmataDevice}->i2c_read(@$args[0],@$args[1],@$args[2]);
 	};
 	return "error calling i2c_read: ".$@ if ($@);
 	return undef;
