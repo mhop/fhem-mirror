@@ -87,8 +87,11 @@ FB_CALLMONITOR_Initialize($)
   $hash->{ReadFn}  = "FB_CALLMONITOR_Read";  
   $hash->{ReadyFn} = "FB_CALLMONITOR_Ready";
   $hash->{GetFn}   = "FB_CALLMONITOR_Get";
+  $hash->{SetFn}   = "FB_CALLMONITOR_Set";
   $hash->{DefFn}   = "FB_CALLMONITOR_Define";
   $hash->{UndefFn} = "FB_CALLMONITOR_Undef";
+  $hash->{AttrFn}  = "FB_CALLMONITOR_Attr";
+  
  
   
   $hash->{AttrList}= "do_not_notify:0,1 loglevel:1,2,3,4,5 unique-call-ids:0,1 local-area-code remove-leading-zero:0,1 reverse-search-cache-file reverse-search:all,internal,klicktel.de,dasoertliche.de,search.ch,none reverse-search-cache:0,1 reverse-search-phonebook-file ".
@@ -113,13 +116,19 @@ FB_CALLMONITOR_Define($$)
   my $dev = $a[2];
   $dev .= ":1012" if($dev !~ m/:/ && $dev ne "none" && $dev !~ m/\@/);
 
-  InternalTimer(gettimeofday()+3, "FB_CALLMONITOR_loadInternalPhonebookFile", $hash, 0);
   
-  InternalTimer(gettimeofday()+2, "FB_CALLMONITOR_loadCacheFile", $hash, 0);
-
 
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
+
+
+  if(-r "/var/flash/phonebook")
+  {
+	$attr{$name}{"reverse-search"} = "internal" unless(defined($attr{$name}{"reverse-search"}));
+	FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+  }
+  
+
 
   return $ret;
 }
@@ -170,6 +179,26 @@ else
 }
 
 }
+
+sub
+FB_CALLMONITOR_Set($@)
+{
+    my ($hash, @a) = @_;
+
+
+    my $usage = (defined($hash->{helper}{PHONEBOOK}) ? "Unknown argument ".$a[1].", choose one of rereadPhonebook" : "");
+
+    if($a[1] eq "rereadPhonebook")
+    {
+	FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+	return undef;
+    }
+    else
+    {
+	return $usage;
+    }
+}
+
 
 #####################################
 # Receives an event and creates several readings for event triggering
@@ -260,6 +289,41 @@ FB_CALLMONITOR_Ready($)
    my ($hash) = @_;
    
    return DevIo_OpenDev($hash, 1, "FB_CALLMONITOR_DoInit");
+
+}
+
+sub
+FB_CALLMONITOR_Attr($@)
+{
+    
+    my (@a) = @_;
+    my $hash = $defs{$a[1]};
+
+    if($a[0] eq "set")
+    {
+
+        if($a[2] eq "reverse-search" or $a[2] eq "reverse-search-phonebook-file")
+        {
+	    FB_CALLMONITOR_loadInternalPhonebookFile($hash);
+	}
+	
+	if($a[2] eq "reverse-search-cache-file")
+	{
+	    FB_CALLMONITOR_loadCacheFile($hash);
+	}
+
+    }
+    elsif($a[0] eq "del")
+    {
+    
+	if($a[2] eq "reverse-search" or $a[2] eq "reverse-search-phonebook-file")
+        {
+	    delete($hash->{helper}{PHONEBOOK}) if(defined($hash->{helper}{PHONEBOOK}));
+	}
+    
+    }
+
+    return undef;
 
 }
 
@@ -538,7 +602,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
   
   if($file ne "")
   {
-    Log 2, "FB_CALLMONITOR: loading cache file $file";
+  
+    delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
+  
+    Log GetLogLevel($hash->{NAME}, 3), "FB_CALLMONITOR: loading cache file $file";
     if(open(CACHEFILE, "$file"))
     {
        @cachefile = <CACHEFILE>;
@@ -561,7 +628,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
     }
     else
     {
-       Log 2, "FB_CALLMONITOR: could not open cache file";
+       Log GetLogLevel($hash->{NAME}, 3), "FB_CALLMONITOR: could not open cache file";
     }
   }
 }
@@ -605,14 +672,14 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <a name="FB_CALLMONITORset"></a>
   <b>Set</b>
   <ul>
-  N/A 
+  <li><b>rereadPhonebook</b> - Reloads the FritzBox phonebook (from given file or directly if available)</li>
   </ul>
   <br>
 
   <a name="FB_CALLMONITORget"></a>
   <b>Get</b>
   <ul>
-  N/A
+  <li><b>search &lt;telephone-number&gt;</b> - returns the name of the given number via reverse-search (internal phonebook, cache or internet research)</li>
   </ul>
   <br>
 
@@ -703,14 +770,14 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <a name="FB_CALLMONITORset"></a>
   <b>Set-Kommandos</b>
   <ul>
-  N/A 
+  <li><b>rereadPhonebook</b> - Liest das Telefonbuch der FritzBox neu ein (per Datei oder direkt lokal)</li>
   </ul>
   <br>
 
   <a name="FB_CALLMONITORget"></a>
   <b>Get-Kommandos</b>
   <ul>
-  N/A
+  <li><b>search &lt;Rufnummer&gt;</b> - gibt den Namen der Telefonnummer zur&uuml;ck (aus Cache, Telefonbuch oder R&uuml;ckw&auml;rtssuche)</li>
   </ul>
   <br>
 
