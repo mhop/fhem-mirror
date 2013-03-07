@@ -1134,6 +1134,7 @@ DoSet(@)
   my $dev = $a[0];
   my $hash = $defs{$dev};
   return "Please define $dev first" if(!$hash);
+  return "Bogus entry $dev without TYPE" if(!$hash->{TYPE});
   return "No set implemented for $dev" if(!$modules{$hash->{TYPE}}{SetFn});
 
   # No special handling needed fo the Usage check
@@ -2591,7 +2592,7 @@ Dispatch($$$)
         }
         $defs{$found}{"${name}_MSGCNT"}++;
         $defs{$found}{"${name}_TIME"} = TimeNow();
-        $defs{$found}{LASTIODev} = $name;
+        $defs{$found}{LASTInputDev} = $name;
       }
       DoTrigger($found, undef);
     }
