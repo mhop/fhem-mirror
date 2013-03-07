@@ -810,7 +810,6 @@ sub chartQuery($@) {
     if ($sql eq "error") {
        return jsonError("Could not setup SQL String");
     }
-
     my ($hash, @a) = @_;
     my $dbhf= $hash->{DBHF};
 
@@ -863,8 +862,8 @@ sub chartQuery($@) {
             $jsonstring .= '":';
 
             if (defined $data[$i]) {
-                my $fragment =  substr($data[$i],0,2);
-                if ($fragment eq "[{") {
+                my $fragment =  substr($data[$i],0,1);
+                if ($fragment eq "{") {
                     $jsonstring .= $data[$i];
                 } else {
                     $jsonstring .= '"'.$data[$i].'"';

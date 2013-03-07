@@ -733,20 +733,20 @@ Ext.define('FHEM.controller.ChartController', {
                     dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
                     view = this.getLinechartview();
                 
-                var jsonConfig = '{\\"x\\":\\"' + xaxis + '\\",\\"y\\":\\"' + yaxis + '\\",\\"device\\":\\"' + device + '\\",';
-                    jsonConfig += '\\"yaxiscolorcombo\\":\\"\\' + yaxiscolorcombo + '\\",\\"yaxisfillcheck\\":\\"' + yaxisfillcheck + '\\",';
-                    jsonConfig += '\\"y2device\\":\\"' + y2device + '\\",';
-                    jsonConfig += '\\"y2axis\\":\\"' + y2axis + '\\",\\"y2axiscolorcombo\\":\\"' + y2axiscolorcombo + '\\",';
-                    jsonConfig += '\\"y2axisfillcheck\\":\\"' + y2axisfillcheck + '\\",\\"y3axis\\":\\"' + y3axis + '\\",';
-                    jsonConfig += '\\"y3device\\":\\"' + y3device + '\\",';
-                    jsonConfig += '\\"y3axiscolorcombo\\":\\"' + y3axiscolorcombo + '\\",\\"y3axisfillcheck\\":\\"' + y3axisfillcheck + '\\",';
-                    jsonConfig += '\\"base1start\\":\\"' + base1start + '\\",\\"base1end\\":\\"' + base1end + '\\",';
-                    jsonConfig += '\\"base1color\\":\\"' + base1color + '\\",\\"base1fill\\":\\"' + base1fill + '\\",';
-                    jsonConfig += '\\"base2start\\":\\"' + base2start + '\\",\\"base2end\\":\\"' + base2end + '\\",';
-                    jsonConfig += '\\"base2color\\":\\"' + base2color + '\\",\\"base2fill\\":\\"' + base2fill + '\\",';
-                    jsonConfig += '\\"base3start\\":\\"' + base3start + '\\",\\"base3end\\":\\"' + base3end + '\\",';
-                    jsonConfig += '\\"base3color\\":\\"' + base3color + '\\",\\"base3fill\\":\\"' + base3fill + '\\",';
-                    jsonConfig += '\\"starttime\\":\\"' + dbstarttime + '\\",\\"endtime\\":\\"' + dbendtime + '\\"}';
+                var jsonConfig = '{"x":"' + xaxis + '","y":"' + yaxis + '","device":"' + device + '",';
+                    jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
+                    jsonConfig += '"y2device":"' + y2device + '",';
+                    jsonConfig += '"y2axis":"' + y2axis + '","y2axiscolorcombo":"' + y2axiscolorcombo + '",';
+                    jsonConfig += '"y2axisfillcheck":"' + y2axisfillcheck + '","y3axis":"' + y3axis + '",';
+                    jsonConfig += '"y3device":"' + y3device + '",';
+                    jsonConfig += '"y3axiscolorcombo":"' + y3axiscolorcombo + '","y3axisfillcheck":"' + y3axisfillcheck + '",';
+                    jsonConfig += '"base1start":"' + base1start + '","base1end":"' + base1end + '",';
+                    jsonConfig += '"base1color":"' + base1color + '","base1fill":"' + base1fill + '",';
+                    jsonConfig += '"base2start":"' + base2start + '","base2end":"' + base2end + '",';
+                    jsonConfig += '"base2color":"' + base2color + '","base2fill":"' + base2fill + '",';
+                    jsonConfig += '"base3start":"' + base3start + '","base3end":"' + base3end + '",';
+                    jsonConfig += '"base3color":"' + base3color + '","base3fill":"' + base3fill + '",';
+                    jsonConfig += '"starttime":"' + dbstarttime + '","endtime":"' + dbendtime + '"}';
             
                 var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
                     url +=device + '+savechart+""+""+' + savename + '+' + jsonConfig + '&XHR=1'; 
@@ -754,7 +754,7 @@ Ext.define('FHEM.controller.ChartController', {
                 view.setLoading(true);
                 
                 Ext.Ajax.request({
-                    method: 'GET',
+                    method: 'POST',
                     disableCaching: false,
                     url: url,
                     success: function(response){
@@ -790,8 +790,16 @@ Ext.define('FHEM.controller.ChartController', {
 
         if (cellIndex === 0) {
             var name = record.get('NAME'),
-                rawchartdata = record.get('VALUE'),
-                chartdata = Ext.decode(rawchartdata);
+                chartdata = record.get('VALUE');
+            
+            if (typeof chartdata !== "object") {
+                try {
+                    chartdata = Ext.decode(chartdata);
+                } catch (e) {
+                    Ext.Msg.alert("Error", "The Chart could not be loaded! RawChartdata was: <br>" + chartdata);
+                }
+                
+            }
             
             //cleanup the form before loading
             this.resetFormFields();

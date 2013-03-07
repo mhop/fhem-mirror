@@ -1,4 +1,8 @@
-Update vom 6.2.2013
+Update vom 7.3.2013
+
+  * Bugfixes für Chart speichern
+  
+Update vom 6.3.2013
 
   * Name des Charts beim Speichern escaped
   * Bessere Fehlermeldung bei Device Selektion
