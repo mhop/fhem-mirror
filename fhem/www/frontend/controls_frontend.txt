@@ -37,7 +37,7 @@ DIR www/frontend/lib/ext-4.1.1a/images/gray/grid
 DIR www/frontend/lib/ext-4.1.1a/images/gray/util
 DIR www/frontend/lib/ext-4.1.1a/images/gray/panel-header
 DIR www/frontend/lib/ext-4.1.1a/images/gray/tip
-UPD 2013-03-06_11:11:22 49747 FHEM/93_DbLog.pm
+UPD 2013-03-07_12:12:22 49744 FHEM/93_DbLog.pm
 UPD 2013-03-06_11:11:22 499 www/frontend/index.html
 UPD 2013-03-06_11:11:22 236 www/frontend/README.txt
 UPD 2013-03-06_11:11:22 1856 www/frontend/app/app.js
@@ -46,7 +46,7 @@ UPD 2013-03-06_11:11:22 7826 www/frontend/app/view/Viewport.js
 UPD 2013-03-06_11:11:22 4269 www/frontend/app/view/DevicePanel.js
 UPD 2013-03-06_11:11:22 2503 www/frontend/app/view/TableDataGridPanel.js
 UPD 2013-03-06_11:11:22 1310 www/frontend/app/view/LineChartView.js
-UPD 2013-03-06_11:11:22 41802 www/frontend/app/controller/ChartController.js
+UPD 2013-03-07_06:58:22 41859 www/frontend/app/controller/ChartController.js
 UPD 2013-03-06_11:11:22 10761 www/frontend/app/controller/MainController.js
 UPD 2013-03-06_11:11:22 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-03-06_11:11:22 338 www/frontend/app/model/SavedChartsModel.js
