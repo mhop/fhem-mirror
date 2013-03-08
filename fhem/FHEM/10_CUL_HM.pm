@@ -111,6 +111,7 @@ sub CUL_HM_autoReadConfig($){
     my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
     my $hash = CUL_HM_name2Hash($name);
 	if (1 == AttrVal($name,"autoReadReg","0")){
+	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
 	  InternalTimer(gettimeofday()+15,"CUL_HM_autoReadConfig","updateConfig",0);
@@ -211,7 +212,7 @@ sub CUL_HM_updateConfig($){
 	push @getConfList,$name if (1 == AttrVal($name,"autoReadReg","0"));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-#General  CUL_HM_autoReadConfig("updateConfig");
+  CUL_HM_autoReadConfig("updateConfig");
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -1286,18 +1287,12 @@ sub CUL_HM_parseCommon(@){#####################################################
 	CUL_HM_ProcessCmdStack($shash);
   }
   
+  if ($shash->{helper}{respWait}{msgId}             && 
+	  $shash->{helper}{respWait}{msgId} eq $msgId ){
+	#response we waited for - stop Waiting
+	CUL_HM_respPendRm($shash);
+  }
   if ($msgType eq "02"){# Ack/Nack #############################
-	if ($shash->{helper}{respWait}{msgId}             && 
-	    $shash->{helper}{respWait}{msgId} eq $msgId ){
-	  #ack we waited for - stop Waiting
-	  CUL_HM_respPendRm($shash);
-	}
-	if ($pendType eq "StatusReq"){#possible answer for status request
-	  my $chnSrc = $src.$shash->{helper}{respWait}{forChn};
-	  my $chnhash = $modules{CUL_HM}{defptr}{$chnSrc}; 
-	  $chnhash = $shash if (!$chnhash);
-	  CUL_HM_respPendRm($shash);
-	} 
 
 	#see if the channel is defined separate - otherwise go for chief
     my $subType = substr($p,0,2);
@@ -1345,7 +1340,11 @@ sub CUL_HM_parseCommon(@){#####################################################
   }
   elsif($msgType eq "10"){######################################
     my $subType = substr($p,0,2);
-	if($subType eq "01"){ #storePeerList#################
+	if($subType eq "00"){ #storePeerList#################
+	  $attr{$shash->{NAME}}{serialNR} = pack("H*",substr($p,2,20));
+	  return "done";
+	}
+	elsif($subType eq "01"){ #storePeerList#################
 	  if ($pendType eq "PeerList"){
 		my $chn = $shash->{helper}{respWait}{forChn};
 		my $chnhash = $modules{CUL_HM}{defptr}{$src.$chn}; 
@@ -1798,6 +1797,10 @@ sub CUL_HM_Set($@) {
   } 
   elsif($cmd eq "getdevicepair") { ############################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'03');
+	$state = "";
+  } 
+  elsif($cmd eq "getSerial") { ############################################
+    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'0009');
 	$state = "";
   } 
   elsif($cmd eq "getConfig") { ################################################
@@ -2692,16 +2695,6 @@ sub CUL_HM_responseSetup($$) {#store all we need to handle the response
 #	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
 #	  return;
 #    }
-    elsif($subType eq "0E"){ #StatusReq----------
-	  #--- set messaging items
-	  $hash->{helper}{respWait}{Pending}= "StatusReq";
-  	  $hash->{helper}{respWait}{PendCmd}= $cmd;
-	  $hash->{helper}{respWait}{forChn} = $chn;
-      
-      # define timeout - holdup cmdStack until response complete or timeout
-	  InternalTimer(gettimeofday()+$rTo, "CUL_HM_respPendTout", "respPend:$dst", 0);
-	  return;
-    }
   }
   
   if (($msgFlag & 0x20) && ($dst ne '000000')){
@@ -3886,6 +3879,9 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	 set mydimmer getRegRaw List1<br>
 	 set mydimmer getRegRaw List3 all <br>
 	 </code></ul>
+	 </li>
+ 	 <li><B>getSerial</B><a name="CUL_HMgetSerial"></a><br>
+         Read serial number from device and write it to attribute serialNr.
 	 </li>
      <li><B>pair</B><a name="CUL_HMpair"></a><br>
          Pair the device with a known serialNumber (e.g. after a device reset) 
