@@ -791,6 +791,7 @@ my %culHmBits = (
   "01;p11=08"   => { txt => "CONFIG_WRITE_INDEX", params => {
                      CHANNEL => "0,2",
                      DATA => '4,,$val =~ s/(..)(..)/ $1:$2/g', } },
+  "01;p11=09"   => { txt => "CONFIG_SERIAL_REQ", params => { } },
   "01;p11=0A"   => { txt => "PAIR_SERIAL", params => {
                      SERIALNO       => '04,,$val=pack("H*",$val)', } },
   "01;p11=0E"   => { txt => "CONFIG_STATUS_REQUEST", params => {
@@ -820,6 +821,8 @@ my %culHmBits = (
   "03"          => { txt => "AES reply",   params => {
                      DATA =>  "0," } },
 					 
+  "10;p01=00"   => { txt => "INFO_SERIAL", params => {
+                     SERIALNO => '02,20,$val=pack("H*",$val)'},},
   "10;p01=01"   => { txt => "INFO_PEER_LIST", params => {
                      PEER1 => '02,8,$val=CUL_HM_id2Name($val)',
                      PEER2 => '10,8,$val=CUL_HM_id2Name($val)',
