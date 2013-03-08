@@ -638,6 +638,7 @@ my %culHmGlobalSetsDevice = (
   pair     	    => "",
   unpair   	    => "",
   getpair       => "",
+  getSerial     => "",
   virtual       =>"<noButtons>",
 );
 my %culHmGlobalSets = (
