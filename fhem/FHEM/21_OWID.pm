@@ -10,14 +10,15 @@
 #
 ########################################################################################
 #
-# define <name> OWID <FAM_ID> <ROM_ID> or OWID <FAM_ID>.<ROM_ID>
+# define <name> OWID <FAM_ID> <ROM_ID> [interval] or OWID <FAM_ID>.<ROM_ID> [interval] 
 #
 # where <name> may be replaced by any name string 
 #   
-#       <FAM_ID> is a 2 character (1 byte) 1-Wire Family ID 
+#       <FAM_ID> is a 2 character (1 byte) 1-Wire Family ID
 #  
 #       <ROM_ID> is a 12 character (6 byte) 1-Wire ROM ID 
 #                without Family ID, e.g. A2D90D000800 
+#       [interval] is an optional query interval in seconds
 #
 # set <name> interval => set query interval for checking presence
 #
@@ -103,7 +104,7 @@ sub OWID_Define ($$) {
   #-- define <name> OWID <FAM_ID> <ROM_ID>
   my @a = split("[ \t][ \t]*", $def);
   
-  my ($name,$interval,$fam,$id,$crc,$ret);
+  my ($name,$interval,$model,$fam,$id,$crc,$ret);
   
   #-- default
   $name          = $a[0];
@@ -111,24 +112,42 @@ sub OWID_Define ($$) {
   $ret           = "";
 
   #-- check syntax
-  return "OWID: Wrong syntax, must be define <name> OWID <fam> <id> [interval]"
-       if(int(@a) !=4 );
-       
-  #-- check id
-  if(  ($a[2] =~ m/^[0-9|a-f|A-F]{2}$/) && ($a[3] =~ m/^[0-9|a-f|A-F]{12}$/)) {
-    $fam           = $a[2];
+  return "OWID: Wrong syntax, must be define <name> OWID [<model>] <id> [interval] or OWAD <fam>.<id> [interval]"
+       if(int(@a) < 2 || int(@a) > 5);
+          
+  #-- different types of definition allowed
+  my $a2 = $a[2];
+  my $a3 = defined($a[3]) ? $a[3] : "";
+  #-- no model, 2+12 characters
+  if(  $a2 =~ m/^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
+    $fam           = substr($a[2],0,2);
+    $id            = substr($a[2],3);
+    if(int(@a)>=4) { $interval = $a[3]; }
+    if( $fam eq "01" ){
+      $model = "DS2401";
+      CommandAttr (undef,"$name model DS2401"); 
+    }else{
+      $model = "unknown";
+      CommandAttr (undef,"$name model unknown"); 
+    }
+  #-- model, 12 characters
+  } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
+    $model         = $a[2];
     $id            = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
-  } elsif(  $a[2] =~ m/^0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
-   $fam           = substr($a[2],0,2);
-   $id            = substr($a[2],3);
-   if(int(@a)>=4) { $interval = $a[3]; }
+    if( $model eq "DS2401" ){
+      $fam = "01";
+      CommandAttr (undef,"$name model DS2401"); 
+    }else{
+      return "OWID: Unknown 1-Wire device model $model";
+    }
   } else {    
-    return "OWID: $def is invalid, specify a 2 digit 12 digit or 2.12 digit value";
+    return "OWID: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
   
-  #-- 1-Wire ROM identifier in the form "FF.XXXXXXXXXXXX.YY"
-  # determine CRC Code YY - only if this is a direct interface
+ 
+  
+  #-- determine CRC Code 
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
   
   #-- Define device internals
@@ -141,15 +160,15 @@ sub OWID_Define ($$) {
   #-- Couple to I/O device
   AssignIoPort($hash);
   if( !defined($hash->{IODev}->{NAME}) | !defined($hash->{IODev}) | !defined($hash->{IODev}->{PRESENT}) ){
-    return "OWSWITCH: Warning, no 1-Wire I/O device found for $name.";
+    return "OWID: Warning, no 1-Wire I/O device found for $name.";
   }
   if( $hash->{IODev}->{PRESENT} != 1 ){
-    return "OWSWITCH: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
+    return "OWID: Warning, 1-Wire I/O device ".$hash->{IODev}->{NAME}." not present for $name.";
   }
   $modules{OWID}{defptr}{$id} = $hash;
   #--
   readingsSingleUpdate($hash,"state","Defined",1);
-  Log 3, "OWTHERM: Device $name defined."; 
+  Log 3, "OWID: Device $name defined."; 
 
   #-- Initialization reading according to interface type
   my $interface= $hash->{IODev}->{TYPE};
@@ -222,6 +241,7 @@ sub OWID_Get($@) {
 # OWID_GetValues - Updates the reading from one device
 #
 #  Parameter hash = hash of device addressed
+#
 ########################################################################################
 
 sub OWID_GetValues($) {
