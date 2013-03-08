@@ -73,7 +73,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.2");
+            sp.setText(FHEM.version + "; Frontend Version: 0.2 - 2013-03-08");
         }
         
         //setup west accordion
@@ -163,7 +163,8 @@ Ext.define('FHEM.controller.MainController', {
                     opacity: 0, 
                     easing: 'easeOut',
                     duration: 3000,
-                    delay: 2000
+                    delay: 2000,
+                    remove: true
                 });
             },
             failure: function() {
@@ -230,7 +231,8 @@ Ext.define('FHEM.controller.MainController', {
                             opacity: 0, 
                             easing: 'easeOut',
                             duration: 3000,
-                            delay: 2000
+                            delay: 2000,
+                            remove: true
                         });
                     }
                     
@@ -265,7 +267,8 @@ Ext.define('FHEM.controller.MainController', {
             opacity: 0, 
             easing: 'easeOut',
             duration: 3000,
-            delay: 2000
+            delay: 2000,
+            remove: true
         });
     },
     

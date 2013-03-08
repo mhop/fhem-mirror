@@ -1,4 +1,5 @@
 Update vom 8.3.2013
+  * Erweiterung der Charts - Anzeige und Speicherung von dynamischen Zeiträumen (Woche, Tag,...)
   * Bugfixes in der Darstellung der gespeicherten Farben eines Charts
   * Implementation eine Konfigurationsdatei für den Benutzer
   * Steuerung über diese Datei ermöglicht z.B. die Konversion in Charts von "on" zu 1, "closed" zu 0 usw.

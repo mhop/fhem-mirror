@@ -387,18 +387,56 @@ Ext.define('FHEM.view.LineChartPanel', {
                     },
                     items: [
                         {
+                            xtype: 'radiofield',
+                            fieldLabel: 'Timerange', 
+                            labelWidth: 60,
+                            name: 'rb', 
+                            checked: true,
+                            inputValue: 'timerange',
+                            listeners: {
+                                change: function(rb, newval, oldval) {
+                                    if (newval === false) {
+                                        rb.up().down('datefield[name=starttimepicker]').setDisabled(true);
+                                        rb.up().down('datefield[name=endtimepicker]').setDisabled(true);
+                                    } else {
+                                        rb.up().down('datefield[name=starttimepicker]').setDisabled(false);
+                                        rb.up().down('datefield[name=endtimepicker]').setDisabled(false);
+                                    }
+                                }
+                            }
+                        },
+                        {
                           xtype: 'datefield',
                           name: 'starttimepicker',
                           format: 'Y-m-d H:i:s',
-                          fieldLabel: 'Select Starttime',
-                          labelWidth: 90
+                          fieldLabel: 'Starttime',
+                          labelWidth: 70
                         },
                         {
                           xtype: 'datefield',
                           name: 'endtimepicker',
                           format: 'Y-m-d H:i:s',
-                          fieldLabel: 'Select Endtime',
-                          labelWidth: 90
+                          fieldLabel: 'Endtime',
+                          labelWidth: 70
+                        },
+                        {
+                            xtype: 'radiogroup',
+                            name: 'dynamictime',
+                            fieldLabel: 'or select a dynamic time',
+                            labelWidth: 140,
+                            allowBlank: true,
+                            defaults: {
+                                labelWidth: 60,
+                                padding: "0 25px 0 0",
+                                checked: false
+                            },
+                            items: [
+                                { fieldLabel: 'this year', name: 'rb', inputValue: 'year' },
+                                { fieldLabel: 'this month', name: 'rb', inputValue: 'month' },
+                                { fieldLabel: 'this week', name: 'rb', inputValue: 'week' },
+                                { fieldLabel: 'this day', name: 'rb', inputValue: 'day' },
+                                { fieldLabel: 'this hour', name: 'rb', inputValue: 'hour' }
+                            ]
                         }
                     ]
                 }, 
