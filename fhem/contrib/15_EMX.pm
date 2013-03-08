@@ -4,13 +4,12 @@
 #
 # FHEM module to read the data from an EM1000 WZ/EM/GZ power sensor 
 #
-# Version 1.1 - February, 2013
-#
 # Prof. Dr. Peter A. Henning, 2011
 #
-#----------------------------------------------------------------------------------------------------
+# $Id: 15_EMX.pm 2.0 2013-02 - pahenning $
+#
+########################################################################################
 # 
-# Setup as:
 # define  <emx> EMX <code> <rpunit>
 #    
 # where 
@@ -20,6 +19,9 @@
 #
 # get <name> midnight => todays starting value for counter
 # get <name> month    => summary of current month
+#
+# set <name> midnight => todays starting value for counter
+# set <name> pmeter   => power meter reading at last midnight
 #   
 # Attributes are set as
 #
@@ -34,8 +36,8 @@
 #  attr    emx CostD      <cost rate in €/unit>
 #  
 #  Start and end of daytime cost rate - optional
-#  attr    emx CostDStart <time as hh:mm>
-#  attr    emx CostDEnd   <time as hh:mm>
+#  attr    emx CDStart <time as hh:mm>
+#  attr    emx CDEnd   <time as hh:mm>
 #  
 #  Cost rate during nighttime (cost per unit) - only if needed
 #  attr    emx CostN      <cost rate in €/unit>
@@ -65,12 +67,13 @@ use warnings;
 
 my %gets = (
   "midnight"    => "",
+  "pmeter"      => "",
   "month"       => ""
 );
 
 my %sets = (
-  "meter"     => "M",
-  "midnight"  => "T"
+  "midnight"  => "T",
+  "pmeter"    => "M",
 );
 
 #-- Global variables for the raw readings
@@ -135,17 +138,18 @@ sub EMX_Define ($$) {
     Log 1, "EMX with emulator mode";
     
     #-- counts per unit etc.
-    $hash->{READINGS}{"reading"}{FACTOR}  =  150;
-    $hash->{READINGS}{"reading"}{UNIT}    = "Kilowattstunden";
-    $hash->{READINGS}{"reading"}{UNITABBR}= "kWh";
-    $hash->{READINGS}{"rate"}{PERIOD}     = "h";
-    $hash->{READINGS}{"rate"}{UNIT}       = "Kilowatt";
-    $hash->{READINGS}{"rate"}{UNITABBR}   = "kW";
+    $hash->{READINGS}{"energy"}{FACTOR}  =  150;
+    $hash->{READINGS}{"energy"}{UNIT}    = "Kilowattstunden";
+    $hash->{READINGS}{"energy"}{UNITABBR}= "kWh";
+    $hash->{READINGS}{"power"}{PERIOD}     = "h";
+    $hash->{READINGS}{"power"}{UNIT}       = "Kilowatt";
+    $hash->{READINGS}{"power"}{UNITABBR}   = "kW";
     CommandAttr(undef,"$name model emulator"); 
 
     #-- set/ get artificial data
     my $msg=EMX_emu(0,12345);
-    $hash->{READINGS}{"count"}{midnight}=12345;
+    $hash->{READINGS}{"count"}{midnight}   = 12345;
+    $hash->{READINGS}{"energy"}{midnight} = 0;
     EMX_store($hash);
     $hash->{emumsg}=$msg;
     
@@ -162,28 +166,28 @@ sub EMX_Define ($$) {
     
     #--counts per unit etc.
     if($a[2] >= 1 && $a[2] <= 4) {          # EMWZ      
-       $hash->{READINGS}{"reading"}{FACTOR}   = $a[3]; 
-       $hash->{READINGS}{"reading"}{UNIT}     = "Kilowattstunden";
-       $hash->{READINGS}{"reading"}{UNITABBR} = "kWh";
-       $hash->{READINGS}{"rate"}{PERIOD}    = "h";
-       $hash->{READINGS}{"rate"}{UNIT}      = "Kilowatt";
-       $hash->{READINGS}{"rate"}{UNITABBR}  = "kW";
+       $hash->{READINGS}{"energy"}{FACTOR}   = $a[3]; 
+       $hash->{READINGS}{"energy"}{UNIT}     = "Kilowattstunden";
+       $hash->{READINGS}{"energy"}{UNITABBR} = "kWh";
+       $hash->{READINGS}{"power"}{PERIOD}    = "h";
+       $hash->{READINGS}{"power"}{UNIT}      = "Kilowatt";
+       $hash->{READINGS}{"power"}{UNITABBR}  = "kW";
        CommandAttr (undef,"$name model EMWZ"); 
     } elsif($a[2] >= 5 && $a[2] <= 8) {     # EMEM
-       $hash->{READINGS}{"reading"}{FACTOR}   = $a[3];
-       $hash->{READINGS}{"reading"}{UNIT}     = "Kilowattstunden";
-       $hash->{READINGS}{"reading"}{UNITABBR} = "kWh";
-       $hash->{READINGS}{"rate"}{PERIOD}    = "h";
-       $hash->{READINGS}{"rate"}{UNIT}      = "Kilowatt";
-       $hash->{READINGS}{"rate"}{UNITABBR}  = "kW";
+       $hash->{READINGS}{"energy"}{FACTOR}   = $a[3];
+       $hash->{READINGS}{"energy"}{UNIT}     = "Kilowattstunden";
+       $hash->{READINGS}{"energy"}{UNITABBR} = "kWh";
+       $hash->{READINGS}{"power"}{PERIOD}    = "h";
+       $hash->{READINGS}{"power"}{UNIT}      = "Kilowatt";
+       $hash->{READINGS}{"power"}{UNITABBR}  = "kW";
        CommandAttr (undef,"$name model EMEM"); 
     } elsif($a[2] >= 9 && $a[2] <= 12) {    # EMGZ
-       $hash->{READINGS}{"reading"}{FACTOR}   = $a[3];
-       $hash->{READINGS}{"reading"}{UNIT}     = "Kubikmeter";
-       $hash->{READINGS}{"reading"}{UNITABBR} = "m^3";
-       $hash->{READINGS}{"rate"}{PERIOD}    = "h";
-       $hash->{READINGS}{"rate"}{UNIT}      = "Kubikmeter/Stunde";
-       $hash->{READINGS}{"rate"}{UNITABBR}  = "m^3/h";
+       $hash->{READINGS}{"energy"}{FACTOR}   = $a[3];
+       $hash->{READINGS}{"energy"}{UNIT}     = "Kubikmeter";
+       $hash->{READINGS}{"energy"}{UNITABBR} = "m^3";
+       $hash->{READINGS}{"power"}{PERIOD}    = "h";
+       $hash->{READINGS}{"power"}{UNIT}      = "Kubikmeter/Stunde";
+       $hash->{READINGS}{"power"}{UNITABBR}  = "m^3/h";
        CommandAttr (undef,"$name model EMGZ"); 
     }
 
@@ -239,7 +243,7 @@ sub EMX_FormatValues ($) {
   #Log 1," seqno $emx_seqno cnt $emx_cnt 5min $emx_5min peak $emx_peak";
   
   my $name    = $hash->{NAME}; 
-  my ($model,$factor,$period,$unit,$runit,$midnight,$cval,$vval,$rval,$pval,$dval,$deltim,$delcnt,$msg);
+  my ($model,$factor,$period,$unit,$runit,$midnight,$cval,$vval,$tval,$rval,$pval,$dval,$deltim,$delcnt,$msg);
   my ($svalue,$dvalue,$mvalue) = ("","","");
   my $cost = 0;
 
@@ -278,10 +282,10 @@ sub EMX_FormatValues ($) {
   
   $model    = $main::attr{$name}{"model"};
   $midnight = $hash->{READINGS}{"count"}{midnight};
-  $factor   = $hash->{READINGS}{"reading"}{FACTOR};
-  $unit     = $hash->{READINGS}{"reading"}{UNITABBR};
-  $period   = $hash->{READINGS}{"rate"}{PERIOD};
-  $runit    = $hash->{READINGS}{"rate"}{UNITABBR};
+  $factor   = $hash->{READINGS}{"energy"}{FACTOR};
+  $unit     = $hash->{READINGS}{"energy"}{UNITABBR};
+  $period   = $hash->{READINGS}{"power"}{PERIOD};
+  $runit    = $hash->{READINGS}{"power"}{UNITABBR};
     
   my $emx_cnt_prev;
   my $emx_cnt_tim;  
@@ -312,16 +316,17 @@ sub EMX_FormatValues ($) {
       }
   
       #--  For this calculation we could use either $emx_5min
-      #   or ($emx_cnt - $emx_cnt_prev) since they are the same.
+      #    or ($emx_cnt - $emx_cnt_prev) since they are the same.
+      #    But careful: we cannot be sure that measurement intervals are really 
+      #    5 minutes. Differ up to a second per interval ! 
+      #    Affects the rate by 0.3%, absolute count is not affected
+      my $fivemin     = 5.0;
       my $delcnt      = ($emx_cnt-$emx_cnt_prev);
       
       #-- Extrapolate these values when a new day will be started (0<deltim<5)
       if( $daybreak==1 ) {
-        $emx_cnt +=  $deltim /5.0 *$delcnt;
+        $emx_cnt +=  $deltim/$fivemin *$delcnt;
         $cval = $emx_cnt-$midnight; 
-        #-- store corrected counter value at midnight 
-        $hash->{READINGS}{"count"}{midnight} = $emx_cnt;
-        EMX_store($hash);
       #-- no daybreak -> subtract only midnight count
       }else{
         $cval = $emx_cnt-$midnight; 
@@ -344,6 +349,8 @@ sub EMX_FormatValues ($) {
       } else {
         Log 3,"EMX: Wrong device model $model";
       }
+      #-- power meter value 
+      $tval = $vval + $hash->{READINGS}{"energy"}{midnight};
     
       #-- calculate cost
       if( defined($main::attr{$name}{"CostD"}) ){
@@ -368,24 +375,24 @@ sub EMX_FormatValues ($) {
             #-- period 2
             }elsif ( (($hour-$cre[0])*60 + $min-$cre[1])<0  ){
               my $delta  =  ($tim[3]-$crs[0])*60 + ($tim[4]-$crs[1]) + $tim[5]/60.0;
-              my $oldval =  $hash->{READINGS}{"reading"}{VAL};
+              my $oldval =  $hash->{READINGS}{"energy"}{VAL};
               #-- previous measurement was in period 1
               if( $delta < 0 ){
                 $cost = $hash->{READINGS}{"cost"}{VAL} +
-                        $main::attr{$name}{"CostN"}*($vval-$oldval)*(1+$delta/5.0)+
-                        $main::attr{$name}{"CostD"}*($vval-$oldval)*(-$delta/5.0);
+                        $main::attr{$name}{"CostN"}*($vval-$oldval)*(1+$delta/$fivemin)+
+                        $main::attr{$name}{"CostD"}*($vval-$oldval)*(-$delta/$fivemin);
               } else{
                 $cost = $hash->{READINGS}{"cost"}{VAL} + $main::attr{$name}{"CostD"}*($vval-$oldval);
               }  
             #-- period 3
             }else{
               my $delta  =  ($tim[3]-$cre[0])*60 + ($tim[4]-$cre[1]) +$tim[5]/60.0;
-              my $oldval =  $hash->{READINGS}{"reading"}{VAL};
+              my $oldval =  $hash->{READINGS}{"energy"}{VAL};
               #-- previous measurement was in period 2
               if( $delta < 0 ){
                 $cost = $hash->{READINGS}{"cost"}{VAL} +
-                        $main::attr{$name}{"CostD"}*($vval-$oldval)*(1+$delta/5.0)+
-                        $main::attr{$name}{"CostN"}*($vval-$oldval)*(-$delta/5.0);
+                        $main::attr{$name}{"CostD"}*($vval-$oldval)*(1+$delta/$fivemin)+
+                        $main::attr{$name}{"CostN"}*($vval-$oldval)*(-$delta/$fivemin);
               } else{
                 $cost = $hash->{READINGS}{"cost"}{VAL} + $main::attr{$name}{"CostN"}*($vval-$oldval);
               }     
@@ -399,16 +406,22 @@ sub EMX_FormatValues ($) {
       $svalue = sprintf("W: %5.2f %s P: %5.2f %s Pmax: %5.3f %s",$vval,$unit,$rval,$runit,$pval,$runit);
       #-- put into READING
       readingsBulkUpdate($hash,"count",$emx_cnt);
-      readingsBulkUpdate($hash,"reading",$vval);
-      readingsBulkUpdate($hash,"rate",$rval);
+      readingsBulkUpdate($hash,"energy",$vval);
+      readingsBulkUpdate($hash,"pmeter",$tval);
+      readingsBulkUpdate($hash,"power",$rval);
       readingsBulkUpdate($hash,"peak",$pval);
       readingsBulkUpdate($hash,"cost",$cost);
  
-      #-- Daily/monthly accumulated value
+      #-- daybreak postprocessing
       if( $daybreak == 1 ){
+        #-- store corrected counter value at midnight 
+        $hash->{READINGS}{"count"}{midnight}   = $emx_cnt;
+        $hash->{READINGS}{"energy"}{midnight} = $tval;
+        EMX_store($hash);
+        #-- daily/monthly accumulated value
         my @monthv = EMX_GetMonth($hash);
-        my $total = $monthv[0]+$vval;
-        $dvalue = sprintf("D_%02d Wd: %5.2f Wm: %6.2f Cd: %5.2f €",$day,$vval,$total,int($cost*100)/100);
+        my $total  = $monthv[0]+$vval;
+        $dvalue    = sprintf("D_%02d Wd: %5.2f Wm: %6.2f Cd: %5.2f €",$day,$vval,$total,int($cost*100)/100);
         readingsBulkUpdate($hash,"day",$dvalue);
         if( $monthbreak == 1){
           $mvalue = sprintf("M_%02d Wm: %6.2f",$month,$total);
@@ -453,6 +466,11 @@ if($key eq "midnight"){
    $value = $hash->{READINGS}{"count"}{midnight};
 }  
 
+#-- midnight power meter value 
+if($key eq "pmeter"){
+   $value = $hash->{READINGS}{"energy"}{midnight};
+}  
+
 #-- monthly summary 
 if($key eq "month"){
    my @month  = EMX_GetMonth($hash);
@@ -493,8 +511,14 @@ my $tn = TimeNow();
 my $ret;
 
 #-- value of meter reading may be set at runtime
-if($key eq "meter"){
-
+if($key eq "pmeter"){
+   return "EMX_Set: Wrong midnight value for power meter, must be 0 <= value < 65536"
+     if( ($value < 0) || ($value > 65535) );
+   $hash->{READINGS}{"energy"}{midnight}=$value;
+   #-- store this for later usage
+   $ret = EMX_store($hash);
+   return "EMX_Set: ".$ret
+     if( defined($ret) );
 }
    
 #-- midnight counter value may be set at runtime
@@ -608,9 +632,15 @@ sub EMX_store($) {
     my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
     
     if( $hash->{CODE} eq "emulator"){
-      $msg = sprintf "%4d-%02d-%02d %02d:%02d:%02d %02d",  $year+1900,$month,$day,$hour,$min,$sec,$hash->{READINGS}{"count"}{midnight}; 
+      $msg = sprintf "%4d-%02d-%02d %02d:%02d:%02d %d %d", 
+        $year+1900,$month,$day,$hour,$min,$sec,
+        $hash->{READINGS}{"count"}{midnight},
+        $hash->{READINGS}{"energy"}{midnight}; 
     } else {
-      $msg = sprintf "%4d-%02d-%02d midnight %d",$year+1900,$month,$day,$hash->{READINGS}{"count"}{midnight};
+      $msg = sprintf "%4d-%02d-%02d midnight %7.2f %7.2f",
+        $year+1900,$month,$day,
+        $hash->{READINGS}{"count"}{midnight},
+        $hash->{READINGS}{"energy"}{midnight};
     }
     print EMXFILE $msg;
     Log 1, "EMX_store: $name $msg";
@@ -645,14 +675,17 @@ sub EMX_recall($) {
     $msg = sprintf "%4d-%02d-%02d",     $year+1900,$month,$day;
     if( $msg ne $a[0]){
       Log 1, "EMX_recall: midnight value $a[2] for $name not from last day, but from $a[0]";
-      $hash->{READINGS}{"count"}{midnight}=$a[2];
+      $hash->{READINGS}{"count"}{midnight}   = $a[2];
+      $hash->{READINGS}{"energy"}{midnight} = defined($a[3]) ? $a[3] : 0;
     } else {
       Log 1, "EMX_recall: recalled midnight value $a[2] for $name";
-      $hash->{READINGS}{"count"}{midnight} = $a[2]; 
+      $hash->{READINGS}{"count"}{midnight}   = $a[2]; 
+      $hash->{READINGS}{"energy"}{midnight} = defined($a[3]) ? $a[3] : 0;
     }
   } else {
     Log 1, "EMX_recall: Cannot open EMX_$name.dat for reading!";
     $hash->{READINGS}{"count"}{midnight}=0;
+    $hash->{READINGS}{"energy"}{midnight}=0;
   }
   return undef;                    
 }
@@ -707,7 +740,7 @@ sub EMX_GetMonth($) {
     $total = int($total*100)/100;
     my ($sec,$min,$hour,$day,$month,$year,$wday,$yday,$isdst) = localtime(time);
     my $deltim = ($hour+$min/60.0 + $sec/3600.0)/24.0;
-    my $total2 = int(100*($total+$hash->{READINGS}{"reading"}{VAL}))/100;
+    my $total2 = int(100*($total+$hash->{READINGS}{"energy"}{VAL}))/100;
     my $av = int(100*$total2/(int(@month)+$deltim))/100;
     
     return ($total,$total2,$av);
@@ -786,7 +819,7 @@ sub EMX_emu ($$) {
                 </ul>
             </li>
             <li>
-                <code>&lt;rpunit&gt;</code><br/>Fcator to scale the reading into units
+                <code>&lt;rpunit&gt;</code><br/>Factor to scale the reading into units
                 <ul>
                     <li>EM1000-WZ devices: rotations per kWh, usually 75 or 150</li>
                     <li>EM1000-EM devices: digits per kWh, usually 100</li>

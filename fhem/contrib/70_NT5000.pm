@@ -5,10 +5,11 @@
 # FHEM module to read the data from a Sunways NT5000 solar inverter
 #
 # Prof. Dr. Peter A. Henning, 2008
-# 
-# Version 2.0 - February 2013
 #
-# Setup as:
+# $Id: 70_NT5000.pm 2.0 2013-02 - pahenning $
+#
+########################################################################################
+#
 # define  <name> NT5000 <device>
 #    
 # where <name> may be replaced by any name string and <device> 
