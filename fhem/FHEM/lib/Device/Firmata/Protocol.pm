@@ -305,7 +305,11 @@ sub sysex_parse {
 					$return_data = $self->handle_scheduler_response($sysex_data);
 					last;
 				};
-
+				
+				$command == $protocol_commands->{RESERVED_COMMAND} and do {
+					$return_data = $sysex_data;
+					last;
+				};
 			}
 
 			return {
@@ -313,6 +317,11 @@ sub sysex_parse {
 				command_str => $command_str,
 				data        => $return_data
 			};
+		} else {
+			return {
+				command => $command,
+				data    => $sysex_data
+			}
 		}
 	}
 	return undef;

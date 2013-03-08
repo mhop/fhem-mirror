@@ -60,7 +60,7 @@ sub open {
 # We're going to try and create the device connection first...
     my $package = "Device::Firmata::Platform";
     eval "require $package";
-    my $device = $package->open($serial_port,$opts);
+    my $device = $package->open($serial_port,$opts) or die "Could not connect to Firmata Server";
 
 # Figure out what platform we're running on
     $device->probe;

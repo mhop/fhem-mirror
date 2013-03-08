@@ -351,11 +351,12 @@ sub sysex_handle {
 
 =head2 probe
 
-Request the version of the protocol that the
-target device is using. Sometimes, we'll have to
-wait a couple of seconds for the response so we'll
-try for 2 seconds and rapidly fire requests if 
-we don't get a response quickly enough ;)
+On device boot time we wait 3 seconds for firmware name
+that the target device is using.
+If not received the starting message, then we wait for
+response another 2 seconds and fire requests for version.
+If the response received, then we store protocol version
+and analog mapping and capability.
 
 =cut
 
@@ -364,46 +365,33 @@ sub probe {
 	# --------------------------------------------------
 	my ($self) = @_;
 
-	my $proto = $self->{protocol};
-	my $io    = $self->{io};
+	$self->{metadata}{firmware}         = '';
 	$self->{metadata}{firmware_version} = '';
 
-	# Wait for 10 seconds only
-	my $end_tics = time + 10;
-
-	# Query every .5 seconds
-	my $query_tics = time;
+	# Wait for 5 seconds only
+	my $end_tics = time + 5;
+	$self->firmware_version_query();
 	while ( $end_tics >= time ) {
-
-		if ( $query_tics <= time ) {
-
-			# Query the device for information on the firmata firmware_version
-			$self->firmware_version_query();
-			select (undef,undef,undef,0.1);
-
-			# Try to get a response
-			$self->poll;
-
-			if (   $self->{metadata}{firmware}
-				&& $self->{metadata}{firmware_version} )
-			{
-				$self->{protocol}->{protocol_version} =	$self->{metadata}{firmware_version};
-
-				$self->analog_mapping_query();
-				$self->capability_query();
-				while ($end_tics >= time) {
-					if (($self->{metadata}{analog_mappings}) and ($self->{metadata}{capabilities})) {
-						return 1;
-					}
-					$self->poll();
+		select( undef, undef, undef, 0.2 );    # wait for response
+		if ( $self->poll && $self->{metadata}{firmware} && $self->{metadata}{firmware_version} ) {
+			$self->{protocol}->{protocol_version} = $self->{metadata}{firmware_version};
+			if ( $self->{metadata}{capabilities} ) {
+				if ( $self->{metadata}{analog_mappings} ) {
+					return 1;
 				}
-				return 1;
+				else {
+					$self->analog_mapping_query();					
+				}
 			}
-			$query_tics = time + 0.5;
+			else {
+				$self->capability_query();
+			}
 		}
-		select (undef,undef,undef,0.1);
+		else {
+			$self->firmware_version_query() unless $end_tics - 2 >= time;    # version query on last 2 sec only
+		}
 	}
-	return undef;
+	return;
 }
 
 =head2 pin_mode
@@ -436,10 +424,7 @@ sub pin_mode {
 			last;
 		};
 
-		( $mode == PIN_PWM || $mode == PIN_I2C || $mode == PIN_ONEWIRE || $mode == PIN_SERVO ) and do {
-			$self->{io}->data_write($self->{protocol}->message_prepare( SET_PIN_MODE => 0, $pin, $mode ));
-			last;
-		};
+		$self->{io}->data_write($self->{protocol}->message_prepare( SET_PIN_MODE => 0, $pin, $mode ));
 	};
 	$self->{pin_modes}->{$pin} = $mode;
 	return 1;
@@ -786,7 +771,7 @@ sub poll {
 
 	# --------------------------------------------------
 	my $self     = shift;
-	my $buf      = $self->{io}->data_read(100) or return;
+	my $buf      = $self->{io}->data_read(512) or return;
 	my $messages = $self->{protocol}->message_data_receive($buf);
 	$self->messages_handle($messages);
 	return $messages;
@@ -833,8 +818,7 @@ sub observe_i2c {
 
 sub observe_onewire {
 	my ( $self, $pin, $observer, $context ) = @_;
-	return undef unless ($self->is_supported_mode($pin,PIN_INPUT));
-	return undef unless ($self->is_supported_mode($pin,PIN_OUTPUT));
+	return undef unless ($self->is_supported_mode($pin,PIN_ONEWIRE));
 	$self->{onewire_observer}[$pin] =  {
 		method  => $observer,
 		context => $context,	
