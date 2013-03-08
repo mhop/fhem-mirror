@@ -28,6 +28,7 @@ use constant (
 		PIN_SHIFT   => 5,
 		PIN_I2C     => 6,
 		PIN_ONEWIRE => 7,
+		PIN_STEPPER => 8,
 
 		PIN_LOW  => 0,
 		PIN_HIGH => 1,

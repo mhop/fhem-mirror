@@ -28,7 +28,7 @@ sub FRM_Initialize($) {
 	require "$main::attr{global}{modpath}/FHEM/DevIo.pm";
 
 	# Provider
-	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:";
+	$hash->{Clients} = ":FRM_IN:FRM_OUT:FRM_AD:FRM_PWM:FRM_I2C:FRM_SERVO:OWX:FRM_LCD:";
 	$hash->{ReadyFn} = "FRM_Ready";  
 	$hash->{ReadFn}  = "FRM_Read";
 
@@ -159,7 +159,6 @@ sub FRM_Ready($) {
 
 	my ($hash) = @_;
 	my $name = $hash->{NAME};
-	print "ready: $name\n";
 	if ($name=~/^^FRM:.+:\d+$/) { # this is a closed tcp-connection, remove it
 		TcpServer_Close($hash);
 		delete $main::defs{$hash->{SNAME}}{FirmataDevice} if (defined $hash->{SNAME} && defined $main::defs{$hash->{SNAME}}{FirmataDevice});
