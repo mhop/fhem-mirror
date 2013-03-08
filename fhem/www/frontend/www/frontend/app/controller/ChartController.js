@@ -812,6 +812,9 @@ Ext.define('FHEM.controller.ChartController', {
                 
                 this.getXaxiscombo().setValue(chartdata.x);
                 this.getYaxiscombo().setValue(chartdata.y);
+                this.getYaxiscolorcombo().setValue(chartdata.yaxiscolorcombo);
+                this.getYaxisfillcheck().setValue(chartdata.yaxisfillcheck);
+                
                 
                 if (chartdata.y2device && !Ext.isEmpty(chartdata.y2device) && chartdata.y2device != "null") {
                     this.getDevice2combo().setValue(chartdata.y2device);
