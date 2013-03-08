@@ -41,12 +41,10 @@ Ext.define('FHEM.model.ChartModel', {
         }
     ],
     parseToNumber: function(value) {
-        
         if (value === "") {
             return 0;
-        } else if (parseFloat(value, 10) === "NaN") {
+        } else if (parseFloat(value, 10).toString().toUpperCase() === "NAN") {
             if (Ext.isDefined(FHEM) && Ext.isDefined(FHEM.userconfig)) {
-                
                 var convertednumber = 0;
                 Ext.iterate(FHEM.userconfig.chartkeys, function(k, v) {
                     if (value === k) {

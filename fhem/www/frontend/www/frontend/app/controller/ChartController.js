@@ -260,6 +260,7 @@ Ext.define('FHEM.controller.ChartController', {
             dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
             endtime = me.getEndtimepicker().getValue(),
             dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
+            dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
             view = me.getLinechartview(),
             store = me.getLinechartview().getStore(),
             proxy = store.getProxy();
@@ -279,6 +280,65 @@ Ext.define('FHEM.controller.ChartController', {
         
         //setting x-axis title
         view.axes.get(1).setTitle(xaxis);
+     
+        //check if timerange or dynamic time should be used
+        dynamicradio.eachBox(function(box, idx){
+            var date = new Date();
+            if (box.checked) {
+                if (box.inputValue === "year") {
+                    starttime = Ext.Date.parse(date.getUTCFullYear() + "-01-01", "Y-m-d");
+                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                    endtime = Ext.Date.parse(date.getUTCFullYear() +  1 + "-01-01", "Y-m-d");
+                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                } else if (box.inputValue === "month") {
+                    starttime = Ext.Date.getFirstDateOfMonth(date);
+                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                    endtime = Ext.Date.getLastDateOfMonth(date);
+                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                } else if (box.inputValue === "week") {
+                    date.setHours(0);
+                    date.setMinutes(0);
+                    date.setSeconds(0);
+                    //monday starts with 0 till sat with 5, sund with -1
+                    var dayoffset = date.getDay() - 1,
+                        monday,
+                        sunday;
+                    if (dayoffset >= 0) {
+                        monday = Ext.Date.add(date, Ext.Date.DAY, -dayoffset);
+                    } else {
+                        //we have a sunday
+                        monday = Ext.Date.add(date, Ext.Date.DAY, 1);
+                    }
+                    sunday = Ext.Date.add(monday, Ext.Date.DAY, 6);
+                    
+                    starttime = monday;
+                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                    endtime = sunday;
+                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    
+                } else if (box.inputValue === "day") {
+                    date.setHours(0);
+                    date.setMinutes(0);
+                    date.setSeconds(0);
+                    
+                    starttime = date;
+                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                    endtime = Ext.Date.add(date, Ext.Date.DAY, 1);
+                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                    
+                } else if (box.inputValue === "hour") {
+                    date.setMinutes(0);
+                    date.setSeconds(0);
+                    
+                    starttime = date;
+                    dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
+                    endtime = Ext.Date.add(date, Ext.Date.HOUR, 1);
+                    dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
+                } else {
+                    Ext.Msg.alert("Error", "Could not setup the dynamic time.");
+                }
+            }
+        });
         
         // set the x axis range dependent on user given timerange
         view.axes.get(1).fromDate = starttime;
@@ -731,7 +791,17 @@ Ext.define('FHEM.controller.ChartController', {
                     dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
                     endtime = this.getEndtimepicker().getValue(),
                     dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
+                    dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
                     view = this.getLinechartview();
+                
+                //setting the starttime parameter in the chartconfig to the string of the radiofield, gets parsed on load
+                if (this.getStarttimepicker().isDisabled()) {
+                    dynamicradio.eachBox(function(box, idx) {
+                        if (box.checked) {
+                            dbstarttime = box.inputValue;
+                        }
+                    });
+                }
                 
                 var jsonConfig = '{"x":"' + xaxis + '","y":"' + yaxis + '","device":"' + device + '",';
                     jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
@@ -871,10 +941,20 @@ Ext.define('FHEM.controller.ChartController', {
                 }
                 
                 //convert time
-                var start = chartdata.starttime.replace("_", " "),
+                var dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
+                    st = chartdata.starttime;
+                if (st === "year" || st === "month" || st === "week" || st === "day" || st === "hour") {
+                    dynamicradio.eachBox(function(box, idx) {
+                        if (box.inputValue === st) {
+                            box.setValue(true);
+                        }
+                    });
+                } else {
+                    var start = chartdata.starttime.replace("_", " "),
                     end = chartdata.endtime.replace("_", " ");
-                this.getStarttimepicker().setValue(start);
-                this.getEndtimepicker().setValue(end);
+                    this.getStarttimepicker().setValue(start);
+                    this.getEndtimepicker().setValue(end);
+                }
                 
                 this.requestChartData();
                 this.getLinechartpanel().setTitle(name);
