@@ -188,8 +188,8 @@ sub CUL_HM_updateConfig($){
 	# add default web-commands
     my $webCmd;
     my $st = AttrVal(($hash->{device}?$hash->{device}:$name), "subType", "");
-    $webCmd  = AttrVal($name,"webCmd","");
-    if (!$webCmd){
+    $webCmd  = AttrVal($name,"webCmd",undef);
+    if (!defined $webCmd){
 	  if((length (CUL_HM_hash2Id($hash)) == 6)&&
 	         $hash->{channel_01}  &&
 	         $st ne "virtual"     &&
@@ -202,22 +202,16 @@ sub CUL_HM_updateConfig($){
 	  }elsif($st eq "keyMatic"     ){$webCmd="lock:inhibit on:inhibit off";
 	  }
 	  my $eventMap  = AttrVal($name,"eventMap",undef);
-	  if (defined $eventMap){
-	    foreach (split " ",$eventMap){
-	      my ($old,$new) = split":",$_;
-		  my $nW = $webCmd;
-		  $nW =~ s/^$old:/$new:/;
-		  $nW =~ s/$old$/$new/;
-		  $nW =~ s/:$old:/:$new:/;
-		  $webCmd = $nW;
-		}
-	  }
+	  
+	  my @wc;
+	  push @wc,ReplaceEventMap($name, $_, 1) foreach (split ":",$webCmd);
+	  $webCmd = join ":",@wc;
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
 	push @getConfList,$name if (1 == AttrVal($name,"autoReadReg","0"));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-  CUL_HM_autoReadConfig("updateConfig");
+#General  CUL_HM_autoReadConfig("updateConfig");
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
