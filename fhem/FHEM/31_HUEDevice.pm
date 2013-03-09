@@ -1,20 +1,45 @@
 
+# "Hue Personal Wireless Lighting" is a trademark owned by Koninklijke Philips Electronics N.V.,
+# see www.meethue.com for more information.
+# I am in no way affiliated with the Philips organization.
+
 package main;
 
 use strict;
 use warnings;
+
 use POSIX;
 use JSON;
 use SetExtensions;
 
-my %models = (
-  LCT001 => 'HUE Bulb',
-  LLC001 => 'LivingColors G2',
-  LLC006 => 'LivingColors Iris',
-  LLC007 => 'LivingColors Bloom',
-  LWB001 => 'LivingWhites Bulb',
-  LWL001 => 'LivingWhites Outlet',
+my %hueModels = (
+  LCT001 => {name => 'HUE Bulb'             ,type => 'Extended color light'   ,subType => 'colordimmer',},
+  LLC001 => {name => 'LivingColors G2'      ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC006 => {name => 'LivingColors Iris'    ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LLC007 => {name => 'LivingColors Bloom'   ,type => 'Color Light'            ,subType => 'colordimmer',},
+  LWB001 => {name => 'LivingWhites Bulb'    ,type => 'Dimmable light'         ,subType => 'dimmer',},
+  LWL001 => {name => 'LivingWhites Outlet'  ,type => 'Dimmable plug-in unit'  ,subType => 'dimmer',},
 );
+
+my %dim_values = (
+   0 => "dim06%",
+   1 => "dim12%",
+   2 => "dim18%",
+   3 => "dim25%",
+   4 => "dim31%",
+   5 => "dim37%",
+   6 => "dim43%",
+   7 => "dim50%",
+   8 => "dim56%",
+   9 => "dim62%",
+  10 => "dim68%",
+  11 => "dim75%",
+  12 => "dim81%",
+  13 => "dim87%",
+  14 => "dim93%",
+);
+
+
 
 sub HUEDevice_Initialize($)
 {
@@ -29,8 +54,8 @@ sub HUEDevice_Initialize($)
   $hash->{GetFn}    = "HUEDevice_Get";
   $hash->{AttrList} = "IODev ".
                       "$readingFnAttributes ".
-                      "model:".join(",", sort keys %models)." ".
-                      "subType:dimmer,switch";
+                      "model:".join(",", sort keys %hueModels)." ".
+                      "subType:colordimmer,dimmer,switch";
 }
 
 sub HUEDevice_Define($$)
@@ -271,8 +296,9 @@ HUEDevice_Set($@)
       }
   } else {
     my $list = "off on toggle statusRequest";
-    $list .= " rgb:colorpicker,RGB pct:slider,0,1,100 color:slider,2000,1,6500 bri:slider,0,1,254 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xv" if( AttrVal($hash->{NAME}, "subType", "dimmer") eq "dimmer" );
-    #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "dimmer") eq "dimmer" );
+    $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
+    #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
+    $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xv" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
     return SetExtensions($hash, $list, $name, $cmd, $value, @a);
   }
 
@@ -341,7 +367,7 @@ HUEDevice_Get($@)
   } elsif ( $cmd eq "devStateIcon" ) {
     return '<div id="'.$name.'" align="center" class="col2">'.
            '<img src="/fhem/icons/off" alt="off" title="off">'.
-           '</div>' if( ReadingsVal($name,"state","off") eq "off" | ReadingsVal($name,"bri","0") eq 0 );
+           '</div>' if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
 
     return '<div id="'.$name.'" align="center" class="col2">'.
            '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
@@ -389,25 +415,6 @@ HUEDevice_ReadFromServer($@)
   return $ret;
 }
 
-my %dim_values = (
-   0 => "dim06%",
-   1 => "dim12%",
-   2 => "dim18%",
-   3 => "dim25%",
-   4 => "dim31%",
-   5 => "dim37%",
-   6 => "dim43%",
-   7 => "dim50%",
-   8 => "dim56%",
-   9 => "dim62%",
-  10 => "dim68%",
-  11 => "dim75%",
-  12 => "dim81%",
-  13 => "dim87%",
-  14 => "dim93%",
-);
-
-
 sub
 HUEDevice_GetUpdate($)
 {
@@ -433,7 +440,10 @@ HUEDevice_GetUpdate($)
   $hash->{type} = $result->{'type'};
   $hash->{swversion} = $result->{'swversion'};
 
-  $attr{$name}{model} = $result->{'modelid'} unless (defined($attr{$name}{model}) || $result->{'modelid'} eq '' );
+  $attr{$name}{model} = $result->{'modelid'} unless( defined($attr{$name}{model}) || $result->{'modelid'} eq '' );
+  $attr{$name}{subType} = $hueModels{$attr{$name}{model}}{subType} unless( defined($attr{$name}{subType})
+                                                                           || !defined($attr{$name}{model})
+                                                                           || !defined($hueModels{$attr{$name}{model}}{subType}) );
 
   readingsBeginUpdate($hash);
 
@@ -512,7 +522,7 @@ HUEDevice_GetUpdate($)
 
     Defines a device connected to a <a href="#HUEBridge">HUEBridge</a>.<br><br>
 
-    This can be a hue bulb, a living color light or a living whites bulb or dimmer plug.<br><br>
+    This can be a hue bulb, a living colors light or a living whites bulb or dimmer plug.<br><br>
 
     The device status will be updated every &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
 
