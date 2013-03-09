@@ -36,6 +36,7 @@ use File::Basename;
 use Getopt::Long;
 use threads;
 use Thread::Queue;
+use Time::HiRes;
 use Time::HiRes qw(gettimeofday);
 
 use warnings;
@@ -228,6 +229,7 @@ while(1)
 	    {
 		print timestamp()."cleaning up status values (UUID: $uuid)\n" if($opt_v);
 		delete $state{$uuid};
+		delete $socket_to_handle{$handle_to_socket{$uuid}};
 	    }
 	
 	}
@@ -240,7 +242,7 @@ while(1)
 	    
 	    if(not $value =~ /^(absence|present)$/)
 	    {
-		$handle{$uuid}{client}->send("$value;$room\n");
+		$handle{$uuid}{client}->send("$value;$room\n") if(defined($handle{$uuid}{client}));
 		
 		if($value eq "socket_closed")
 		{
@@ -255,20 +257,26 @@ while(1)
 	    
 		if(defined($result))
 		{
-		    if( ($state{$uuid}{lastresult}{value} eq "present;$result" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "present;$result")
+		    if(not defined($state{$uuid}{lastresult}{value}) or (($state{$uuid}{lastresult}{value} eq "present;$result" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "present;$result"))
 		    {
-		        $handle{$uuid}{client}->send("present;$result\n");
-		        $state{$uuid}{lastresult}{value} = "present;$result";
-		        $state{$uuid}{lastresult}{timestamp} = time();
+			if(defined($handle{$uuid}{client}))
+			{
+		    	    $handle{$uuid}{client}->send("present;$result\n");
+		    	    $state{$uuid}{lastresult}{value} = "present;$result";
+		    	    $state{$uuid}{lastresult}{timestamp} = time();
+		    	}
 	    	    }
 		}
 		else
 		{
-		    if( ($state{$uuid}{lastresult}{value} eq "absence" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "absence")
+		    if(not defined($state{$uuid}{lastresult}{value}) or (($state{$uuid}{lastresult}{value} eq "absence" and ($state{$uuid}{lastresult}{timestamp} + $handle{$uuid}{timeout}) < time()) or $state{$uuid}{lastresult}{value} ne "absence"))
 		    {
-		        $handle{$uuid}{client}->send("absence\n");    
-		        $state{$uuid}{lastresult}{value} = "absence";
-		        $state{$uuid}{lastresult}{timestamp} = time();
+			if(defined($handle{$uuid}{client}))
+			{
+			    $handle{$uuid}{client}->send("absence\n");    
+		    	    $state{$uuid}{lastresult}{value} = "absence";
+		    	    $state{$uuid}{lastresult}{timestamp} = time();
+			}
 		    }
 		}
 	    }
