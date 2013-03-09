@@ -250,6 +250,34 @@ FB_CALLMONITOR_Read($)
    readingsBulkUpdate($hash, "internal_connection", $connection_type{$array[3]}) if($array[1] eq "CALL" or $array[1] eq "CONNECT" and defined($connection_type{$array[3]}));
    readingsBulkUpdate($hash, "call_duration", $array[3]) if($array[1] eq "DISCONNECT");
    
+
+    if ($array[1] eq "RING")
+    {
+	$hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} = $array[1];
+	 my $no = "unknown";
+	
+	if (defined($external_number))
+	{
+    	    $no = $external_number;
+	    if (defined($reverse_search))
+	    {
+		$no .= " (".$reverse_search.")";
+	    }
+	}
+
+	$hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER} = $no;
+    }
+    elsif ($array[1] eq "DISCONNECT")
+    {
+	if (($array[3] eq "0") and ($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{EVENT} eq "RING")) 
+	{
+            readingsBulkUpdate($hash, "missed_call", $hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}{NUMBER})
+	}
+	
+	delete($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}) if(defined($hash->{helper}{MISSED_CALL_DETECTION}{$array[2]}));
+    }
+
+
     if(AttrVal($name, "unique-call-ids", "0") eq "1")
     {
 	if($array[1] eq "RING" or $array[1] eq "CALL")
@@ -730,6 +758,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <li><b>external_connection</b>: $connection - The external connection (fixed line, VoIP account) which is used to take the call</li>
   <li><b>call_duration</b>: $seconds - The call duration in seconds. Is only generated at a disconnect event. The value 0 means, the call was not taken by anybody.</li>
   <li><b>call_id</b>: $id - The call identification number to separate events of two or more different calls at the same time. This id number is equal for all events relating to one specific call.</li>
+  <li><b>missed_call</b> $number - This event will be raised in case of a missing incoming call. If available, also the name of the calling number will be displayed.</li>
   </ul>
 </ul>
 
@@ -834,6 +863,7 @@ sub FB_CALLMONITOR_loadCacheFile($)
   <li><b>external_connection</b>: $connection - Der externe Anschluss welcher genutzt wird um das Gespr&auml;ch durchzuf&uuml;hren  (Festnetz, VoIP Nummer, ...)</li>
   <li><b>call_duration</b>: $seconds - Die Gespr&auml;chsdauer in Sekunden. Dieser Wert wird nur bei einem disconnect-Event erzeugt. Ist der Wert 0, so wurde das Gespr&auml;ch von niemandem angenommen.</li>
   <li><b>call_id</b>: $id - Die Identifizierungsnummer eines einzelnen Gespr&auml;chs. Dient der Zuordnung bei 2 oder mehr parallelen Gespr&auml;chen, damit alle Events eindeutig einem Gespr&auml;ch zugeordnet werden k&ouml;nnen</li>
+  <li><b>missed_call</b>: $number - Dieses Event wird nur generiert, wenn ein eingehender Anruf nicht beantwortet wird. Sofern der Name dazu bekannt ist, wird dieser ebenfalls mit angezeigt.</li>
   </ul>
 </ul>
 
