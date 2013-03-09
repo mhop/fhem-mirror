@@ -421,10 +421,10 @@ sub EMX_FormatValues ($) {
         #-- daily/monthly accumulated value
         my @monthv = EMX_GetMonth($hash);
         my $total  = $monthv[0]+$vval;
-        $dvalue    = sprintf("D_%02d Wd: %5.2f Wm: %6.2f Cd: %5.2f €",$day,$vval,$total,int($cost*100)/100);
+        $dvalue    = sprintf("D_%02d Wd: %5.2f %s Wm: %6.2f %s Cd: %5.2f €",$day,$vval,$unit,$total,$unit,int($cost*100)/100);
         readingsBulkUpdate($hash,"day",$dvalue);
         if( $monthbreak == 1){
-          $mvalue = sprintf("M_%02d Wm: %6.2f",$month,$total);
+          $mvalue = sprintf("M_%02d Wm: %6.2f %s",$month,$total,$unit);
           readingsBulkUpdate($hash,"month",$mvalue);
           Log 1,$name." has monthbreak $msg ".$mvalue;
         }  
