@@ -117,7 +117,17 @@ sub HUEDevice_Undefine($$)
 sub
 HUEDevice_Set($@)
 {
-  my ($hash, $name, $cmd, $value, $value2, @a) = @_;
+  my ($hash, $name, @aa) = @_;
+
+  if( (my $joined = join(" ", @aa)) =~ /:/ ) {
+    my @cmds = split(":", $joined);
+    for( my $i = 0; $i <= $#cmds; ++$i ) {
+      HUEDevice_Set( $hash, $name, split(" ", $cmds[$i]) );
+    }
+    return;
+  }
+
+  my ($cmd, $value, $value2, @a) = @aa;
 
   if( $cmd eq "color" ) {
     $value = int(100000/$value);
@@ -145,7 +155,7 @@ HUEDevice_Set($@)
     my $obj = {
       'on'  => JSON::true,
     };
-   $obj->{bri} =254 if( ReadingsVal($name,"bri","0") eq 0 );
+   $obj->{bri} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
    if( defined($value) ) {
      $obj->{transitiontime} = $value / 10;
    }
