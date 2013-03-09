@@ -120,8 +120,8 @@ sub OWID_Define ($$) {
   my $a3 = defined($a[3]) ? $a[3] : "";
   #-- no model, 2+12 characters
   if(  $a2 =~ m/^[0-9|a-f|A-F]{2}\.[0-9|a-f|A-F]{12}$/ ) {
-    $fam           = substr($a[2],0,2);
-    $id            = substr($a[2],3);
+    $fam   = substr($a[2],0,2);
+    $id    = substr($a[2],3);
     if(int(@a)>=4) { $interval = $a[3]; }
     if( $fam eq "01" ){
       $model = "DS2401";
@@ -130,22 +130,32 @@ sub OWID_Define ($$) {
       $model = "unknown";
       CommandAttr (undef,"$name model unknown"); 
     }
-  #-- model, 12 characters
+  #-- model or family id, 12 characters
   } elsif(  $a3 =~ m/^[0-9|a-f|A-F]{12}$/ ) {
-    $model         = $a[2];
-    $id            = $a[3];
+    $id  = $a[3];
     if(int(@a)>=5) { $interval = $a[4]; }
-    if( $model eq "DS2401" ){
-      $fam = "01";
-      CommandAttr (undef,"$name model DS2401"); 
+    #-- family id, 2 characters
+    if(  $a2 =~ m/^[0-9|a-f|A-F]{2}$/ ) {
+      $fam   = $a[2];
+      if( $fam eq "01" ){
+        $model = "DS2401";
+        CommandAttr (undef,"$name model DS2401"); 
+      }else{
+        $model = "unknown";
+        CommandAttr (undef,"$name model unknown"); 
+      }
     }else{
-      return "OWID: Unknown 1-Wire device model $model";
+      $model   = $a[2];
+      if( $model eq "DS2401" ){
+        $fam = "01";
+        CommandAttr (undef,"$name model DS2401"); 
+      }else{
+        return "OWID: Unknown 1-Wire device model $model";
+      }
     }
   } else {    
     return "OWID: $a[0] ID $a[2] invalid, specify a 12 or 2.12 digit value";
   }
-  
- 
   
   #-- determine CRC Code 
   $crc = defined($hash->{IODev}->{INTERFACE}) ?  sprintf("%02x",OWX_CRC($fam.".".$id."00")) : "00";
