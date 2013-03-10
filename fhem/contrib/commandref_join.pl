@@ -81,6 +81,10 @@ foreach my $lang (@lang) {
 
       } elsif(!$skip) {
         # here we copy line by line from the module
+#        if($l =~ m/<.?pre>/) {
+#          print "$lang $mod REMOVING <pre> Formatting\n";
+#          $l =~ s/<.?pre>//g;
+#        }
         print OUT $l;
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod">/) if(!$hasLink);

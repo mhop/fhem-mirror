@@ -8,115 +8,153 @@ sub collectSubmitted($$@);
 sub printChapter($$@);
 
 my @hw = qw(
-  ALL3076 
-  ALL4000T 
-  ALL4027 
-  BS 
-  CM11 
-  CUL 
-  CUL_EM 
-  CUL_FHTTK 
-  CUL_HM 
+  ALL3076
+  ALL4000T
+  ALL4027
+  BS
+  CM11
+  CUL
+  CUL_EM
+  CUL_FHTTK
+  CUL_HM
   CUL_HOERMANN
-  CUL_IR 
-  CUL_RFR 
-  CUL_TX 
-  CUL_WS 
+  CUL_IR
+  CUL_MAX
+  CUL_RFR
+  CUL_TX
+  CUL_WS
   ECMD
-  ECMDDevice 
-  EIB 
-  EM 
-  EMEM 
-  EMGZ 
-  EMWZ 
-  ESA2000 
+  ECMDDevice
+  EIB
+  EM
+  EMEM
+  EMGZ
+  EMWZ
+  ESA2000
   EnOcean
-  FHT 
-  FHT8V 
-  FHZ 
-  FS20 
-  HMLAN 
-  HMS 
+  FBAHA
+  FBDECT
+  FHT
+  FHT8V
+  FHZ
+  FRM
+  FRM_AD
+  FRM_I2C
+  FRM_IN
+  FRM_OUT
+  FRM_PWM
+  FRM_SERVO
+  FS20
+  HMLAN
+  HMS
+  HTTPSRV
+  HUEBridge
+  HUEDevice
   IPCAM
-  IPWE 
-  IT 
+  IPWE
+  IT
   Itach_Relay
-  KM271 
-  KS300 
+  KM271
+  KS300
   LGTV
-  LIRC 
-  M232 
-  M232Counter 
-  M232Voltage 
-  NetIO230B 
+  LIRC
+  LUXTRONIK2
+  M232
+  M232Counter
+  M232Voltage
+  MAX
+  MAXLAN
+  NetIO230B
   OREGON
-  OWFS 
-  OWTEMP 
+  OWAD
+  OWCOUNT
+  OWDevice
+  OWFS
+  OWID
+  OWLCD
+  OWMULTI
+  OWSWITCH
+  OWServer
+  OWTEMP
+  OWTHERM
+  OWX
   POKEYS
-  RFXCOM 
-  RFXMETER 
-  RFXX10REC 
-  SCIVT 
-  SISPM 
-  SIS_PMS 
+  RFXCOM
+  RFXMETER
+  RFXX10REC
+  RSS
+  SCIVT
+  SISPM
+  SIS_PMS
   SML
   STV
-  TCM 
+  TCM
   TRX
   TRX_ELSE
   TRX_LIGHT
   TRX_SECURITY
   TRX_WEATHER
-  TUL 
+  TUL
   TellStick
-  USBWX 
-  USF1000 
-  VantagePro2 
+  UNIRoll
+  USBWX
+  USF1000
+  VantagePro2
   WEBCOUNT
-  WEBIO 
-  WEBIO_12DIGITAL 
-  WEBTHERM 
-  WOL 
-  WS2000 
-  WS300 
-  WS3600 
-  X10 
+  WEBIO
+  WEBIO_12DIGITAL
+  WEBTHERM
+  WS2000
+  WS300
+  WS3600
+  Weather
+  X10
+  YAMAHA_AVR
   ZWDongle
   ZWave
-  xxLG7000 
+  xxLG7000
 
 );
 
 my @help = qw(
   CULflash
   Calendar
+  DbLog
+  FB_CALLMONITOR
   FHEM2FHEM
   FileLog
-  HTTPSRV
+  HCS
+  Heating_Control
   JsonList
   MSG
   MSGFile
   MSGMail
   PID
+  PRESENCE
   PachLog
-  RSS
   SUNRISE_EL
-  Weather
+  SYSSTAT
   Twilight
+  WOL
   XmlList
   at
   autocreate
   average
   backup
+  createlog
   dewpoint
   dummy
+  fheminfo
   holiday
+  notice
   notify
   sequence
   structure
   telnet
-  updatefhem
+  update
+  usb
   watchdog
+  weblink
 
 );
 
@@ -158,12 +196,16 @@ my $title = "Used FHEM Modules & Components";
 
 my $q = new CGI;
 print $q->header,
-      $q->start_html( -title  => $title, -style=>{-src=>"style.css"}), "\n";
+      $q->start_html( -title => $title, 
+                      -style => {-src=>"../www/pgm2/style.css"}), "\n";
 
 print '<div id="left">', "\n",
-      '<img src="fhem.png" alt="fhem-logo"/>', "\n",
-      '  <h3>FHEM survey</h3>', "\n",
-      '</div>', "\n";
+  '<div id="menuScrollArea">',"\n",
+    '<div id="logo"></div>',"\n",
+    '<div id="menu">',"\n",
+      '<h3>FHEM survey</h3>', "\n",
+     '</div>', "\n",
+  '</div>', "\n";
 
 print '<div id="right">',"\n",
       $q->h3("$title"), "\n";
