@@ -21,6 +21,7 @@ FRM_PWM_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_PWM_Init";
   $hash->{UndefFn}   = "FRM_PWM_Undef";
+  $hash->{StateFn}   = "FRM_PWM_State";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
@@ -32,7 +33,11 @@ FRM_PWM_Init($$)
 	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_PWM);
 	return $ret if (defined $ret);
 	my $firmata = $hash->{IODev}->{FirmataDevice};
-	$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
+	my $name = $hash->{NAME};
+	$main::defs{$name}{resolution}=$firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
+	if (! (defined AttrVal($name,"stateFormat",undef))) {
+		$main::attr{$name}{"stateFormat"} = "value";
+	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
 }
@@ -47,14 +52,26 @@ FRM_PWM_Set($@)
   my $command = $a[1];
   my $value = $a[2];
   my $iodev = $hash->{IODev};
+  main::readingsSingleUpdate($hash,"value",$value, 1);
   if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
   	$iodev->{FirmataDevice}->analog_write($hash->{PIN},$value);
-	main::readingsSingleUpdate($hash,"state",$value, 1);
   } else {
   	return $hash->{NAME}." no IODev assigned" if (!defined $iodev);
   	return $hash->{NAME}.", ".$iodev->{NAME}." is not connected";
   }
   return undef;
+}
+
+sub FRM_PWM_State($$$$)
+{
+	my ($hash, $tim, $sname, $sval) = @_;
+	
+STATEHANDLER: {
+		$sname eq "value" and do {
+			FRM_PWM_Set($hash,$hash->{NAME},$sval);
+			last;
+		}
+	}
 }
 
 sub
