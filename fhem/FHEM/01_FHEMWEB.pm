@@ -335,7 +335,6 @@ FW_serveSpecial($$$$)
   my ($file,$ext,$dir,$cacheable)= @_;
   $file =~ s,\.\./,,g; # little bit of security
 
-Log 1, "Serve: $dir, $file, $ext";
   $file = "$FW_sp$file" if($ext eq "css" && -f "$dir/$FW_sp$file.$ext");
   $FW_RETTYPE = ext2MIMEType($ext);
   #Log 1, "Serving $dir/$file.$ext as $FW_RETTYPE, cacheable:$cacheable";
@@ -349,7 +348,6 @@ FW_answerCall($)
   my ($arg) = @_;
   my $me=$defs{$FW_cname};      # cache, else rereadcfg will delete us
 
-Log 1, "ANSWER $arg";
   $FW_RET = "";
   $FW_RETTYPE = "text/html; charset=$FW_encoding";
   $FW_ME = "/" . AttrVal($FW_wname, "webname", "fhem");
@@ -384,7 +382,6 @@ Log 1, "ANSWER $arg";
     if($file =~ m/^(.*)\.([^.]*)$/) {
       $file = $1; $ext = $2;
     }
-Log 1, "GOT $dir";
     my $ldir = "$FW_dir/$dir";
     $ldir = "$FW_dir/pgm2" if($dir eq "css" || $dir eq "js");
     $ldir = "$attr{global}{modpath}/docs" if($dir eq "docs");
@@ -406,7 +403,6 @@ Log 1, "GOT $dir";
     return -1;
 
   }
-Log 1, "Searching for $arg";
   
 
   $FW_plotmode = AttrVal($FW_wname, "plotmode", "SVG");
