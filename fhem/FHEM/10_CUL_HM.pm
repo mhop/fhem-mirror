@@ -88,8 +88,8 @@ sub CUL_HM_Initialize($) {
                        "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
                        "serialNr firmware ".
                        "rawToReadable unit ".#"KFM-Sensor" only
-                       "peerIDs ".
-                       "actCycle actStatus autoReadReg:1,0 ".
+                       "peerIDs repPeers ".
+                       "actCycle actStatus autoReadReg:1_restart,0_off,2_pon-restart ".
 					   "expert:0_off,1_on,2_full ".
 
                        "hmClass:obsolete devInfo:obsolete ". #unused
@@ -110,7 +110,7 @@ sub CUL_HM_autoReadConfig($){
   while(@{$modules{CUL_HM}{helper}{updtCfgLst}}){
     my $name = shift(@{$modules{CUL_HM}{helper}{updtCfgLst}});
     my $hash = CUL_HM_name2Hash($name);
-	if (1 == AttrVal($name,"autoReadReg","0")){
+	if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1)){
 	  CUL_HM_Set($hash,$name,"getSerial");
 	  CUL_HM_Set($hash,$name,"getConfig");
 	  CUL_HM_Set($hash,$name,"statusRequest");
@@ -202,17 +202,20 @@ sub CUL_HM_updateConfig($){
 	  }elsif($st eq "smokeDetector"){$webCmd="test:alarmOn:alarmOff";
 	  }elsif($st eq "keyMatic"     ){$webCmd="lock:inhibit on:inhibit off";
 	  }
-	  my $eventMap  = AttrVal($name,"eventMap",undef);
+	  if ($webCmd){
+	    my $eventMap  = AttrVal($name,"eventMap",undef);
 	  
-	  my @wc;
-	  push @wc,ReplaceEventMap($name, $_, 1) foreach (split ":",$webCmd);
-	  $webCmd = join ":",@wc;
+	    my @wc;
+	    push @wc,ReplaceEventMap($name, $_, 1) foreach (split ":",$webCmd);
+	    $webCmd = join ":",@wc;
+	  }
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
-	push @getConfList,$name if (1 == AttrVal($name,"autoReadReg","0"));
+	push @getConfList,$name 
+	      if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-  CUL_HM_autoReadConfig("updateConfig");
+   CUL_HM_autoReadConfig("updateConfig");
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -1000,8 +1003,8 @@ sub CUL_HM_Parse($$) {#############################
 		}
 	  }
 	  # - - - - - - now handle the team - - - - - - 
-	  $shash->{helper}{alarmList} = "" if (!$dhash->{helper}{alarmList});
-	  $shash->{helper}{alarmFwd}  = "" if (!$dhash->{helper}{alarmFwd});
+	  $shash->{helper}{alarmList} = "" if (!$shash->{helper}{alarmList});
+	  $shash->{helper}{alarmFwd}  = "" if (!$shash->{helper}{alarmFwd});
 	  if ($state eq "01") { # clear Alarm for one sensor
 		$shash->{helper}{alarmList} =~ s/",".$dst//;
 	  }
@@ -1341,7 +1344,7 @@ sub CUL_HM_parseCommon(@){#####################################################
   elsif($msgType eq "10"){######################################
     my $subType = substr($p,0,2);
 	if($subType eq "00"){ #storePeerList#################
-	  $attr{$shash->{NAME}}{serialNR} = pack("H*",substr($p,2,20));
+	  $attr{$shash->{NAME}}{serialNr} = pack("H*",substr($p,2,20));
 	  return "done";
 	}
 	elsif($subType eq "01"){ #storePeerList#################
@@ -1474,7 +1477,11 @@ sub CUL_HM_parseCommon(@){#####################################################
 	  }
 	  else{
 		my ($chn) = ($1) if($p =~ m/^..(..)/);
-		return "powerOn" if ($chn eq "00");# check dst eq "000000" as well?
+		if ($chn eq "00"){
+		  CUL_HM_queueAutoRead(CUL_HM_hash2Name($shash))
+		    if (2 == substr(AttrVal($shash->{NAME},"autoReadReg",0),0,1));
+		  return "powerOn" ;# check dst eq "000000" as well?
+		}
 	  }
 	}
   }
@@ -1484,6 +1491,14 @@ sub CUL_HM_parseCommon(@){#####################################################
 #	CUL_HM_ProcessCmdStack($shash);
   }
   return "";
+}
+sub CUL_HM_queueAutoRead($){
+  my $name = shift;
+  my @arr;
+  @arr = CUL_HM_noDup((@{$modules{CUL_HM}{helper}{updtCfgLst}}, $name));
+  $modules{CUL_HM}{helper}{updtCfgLst} =\@arr;
+  RemoveInternalTimer("updateConfig");
+  InternalTimer(gettimeofday()+5,"CUL_HM_autoReadConfig", "updateConfig", 0);
 }
 
 #+++++++++++++++++ get command+++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1799,7 +1814,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'03');
 	$state = "";
   } 
-  elsif($cmd eq "getSerial") { ############################################
+  elsif($cmd eq "getSerial") { ################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'0009');
 	$state = "";
   } 
@@ -2079,14 +2094,42 @@ sub CUL_HM_Set($@) {
   elsif($cmd eq "setRepeat") { ################################################
     #      setRepeat    => "[no1..36] <sendName> <recName> [bdcast-yes|no]"}
     $state = "";
-    return "entry must be between 1 and 36" if ($a[2] < 1 || $a[2] > 36);	
-	my $sndID = CUL_HM_name2Id($a[3]);
-	my $recID = CUL_HM_name2Id($a[4]);
-    return "sender ID unknown:".$sndID    if ($sndID !~ m/(^[0-9A-F]{6})$/);	
-    return "receiver ID unknown:".$recID  if ($recID !~ m/(^[0-9A-F]{6})$/);	
-    return "broadcast must be yes or now" if ($a[5] ne "yes" && $a[5] ne "no");
-	my $pattern = $sndID.$recID.(($a[5] eq "no")?"00":"01");
-    my $cnt = ($a[2]-1)*7+1;
+	my ($pattern,$cnt);
+	if ($a[2] eq "setAll"){
+	  my $repPeers = AttrVal($name,"repPeers",undef);
+	  return "setAll not allowed if attr repPeers undefiend" 
+	        if (!defined $repPeers);
+	  my $entry = 0;
+	  foreach my $repData (split ",",$repPeers){
+	    $entry++;
+	    my ($s,$d,$b) =split":",$repData;
+		$s = CUL_HM_name2Id($s);
+		$d = CUL_HM_name2Id($d);
+		return "attr repPeers entry $entry irregular" 
+		  if (!$s || !$d || !$b
+		       || $s !~ m/(^[0-9A-F]{6})$/
+		       || $d !~ m/(^[0-9A-F]{6})$/
+		       || $b !~ m/^[yn]$/
+			   );
+	    $pattern .= $s.$d.(($b eq "n")?"00":"01");
+	  }
+	  return " too many entries in repPeer" if ($entry > 36);
+	  while ($entry < 36){
+	    $entry++;
+	    $pattern .= "000000"."000000"."00";
+	  }
+	  $cnt = 1;
+	}
+	else{
+      return "entry must be between 1 and 36" if ($a[2] < 1 || $a[2] > 36);	
+	  my $sndID = CUL_HM_name2Id($a[3]);
+	  my $recID = CUL_HM_name2Id($a[4]);
+      return "sender ID $a[3] unknown:".$sndID    if ($sndID !~ m/(^[0-9A-F]{6})$/);	
+      return "receiver ID $a[4] unknown:".$recID  if ($recID !~ m/(^[0-9A-F]{6})$/);	
+      return "broadcast must be yes or now" if ($a[5] ne "yes" && $a[5] ne "no");
+	  $pattern = $sndID.$recID.(($a[5] eq "no")?"00":"01");
+      $cnt = ($a[2]-1)*7+1;
+	}
 	my $addrData;
     foreach ($pattern =~ /(.{2})/g){
       $addrData .= sprintf("%02X%s",$cnt++,$_);
@@ -3382,15 +3425,23 @@ sub CUL_HM_TCtempReadings($) {# parse TC readings
 sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
   my ($hash)=@_;
   my %pCnt;
+  my $cnt = 0;
+  return "" if (!$hash->{helper}{peerIDsRaw});
   foreach my$pId(split',',$hash->{helper}{peerIDsRaw}){
     next if (!$pId || $pId eq "00000000");
-	$pCnt{$pId}{cnt}++;
+	$pCnt{$pId.$cnt}{cnt}=$cnt++;
   }
   my $ret;
+  my @proLst = split",",(AttrVal($hash->{NAME},"repPeers",undef));
+  foreach (@proLst){s/:.*//};
   foreach my$pId(sort keys %pCnt){
-	my ($pdID,$bdcst) = ($1,$2) if ($pId =~ m/(......)(..)/);
-	$ret .= "source ".$pCnt{$pId}{cnt}." entry for: ".CUL_HM_id2Name($pdID)
-	       .($bdcst eq "01"?" broadcast enabled":"")."\n";
+	my ($pdID,$bdcst,$no) = ($1,$2,$3) if ($pId =~ m/(......)(..)(.*)/);
+	my $sName = CUL_HM_id2Name($pdID);
+	$ret .= "source ".$no." entry for: ".$sName
+	       ." broadcast:".($bdcst eq "01"?"en":"dis")."abled "
+		   .((!$proLst[$no-1] || $proLst[$no-1] ne $sName)?"repPeers failed":"approved")
+		   ."\n"
+		   ;
   }
   return $ret;
 }
@@ -4303,6 +4354,13 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
       &lt;sender&gt; name or HMID of the sender or source which shall be repeated<br>
       &lt;receiver&gt; name or HMID of the receiver or destination which shall be repeated<br>
       &lt;broadcast&gt; [yes|no] determines whether broadcast from this ID shall be repeated<br>
+	  <br>
+	  short application: <br>
+	  setRepeat setAll 0 0 0<br>
+	  will rewrite the complete list to the deivce. Data will be taken from attribut repPeer. <br>
+	  attribut repPeer is formated:<br>
+	  src1:dst1:[y/n],src2:dst2:[y/n],src2:dst2:[y/n],...<br>
+	  up to 36entries can be applied.
     </ul><br></li>
 	</li>
    </ul>
@@ -4442,7 +4500,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         attr KFM100 unit Liter
         </li>
     <li><a name="autoReadReg">autoReadReg</a><br>
-        set to '1' will execute a getConfig for the device automatically after each reboot of FHEM. 
+        set to '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
+		set to '2' like '1' plus execute after power_on.<br>
 		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
 		of the readings and the display will be delayed depending on the sice of the database.<br>
 		Recommendations and constrains upon usage:<br>
