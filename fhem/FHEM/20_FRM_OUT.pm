@@ -17,6 +17,7 @@ FRM_OUT_Initialize($)
   $hash->{DefFn}     = "FRM_Client_Define";
   $hash->{InitFn}    = "FRM_OUT_Init";
   $hash->{UndefFn}   = "FRM_OUT_Undef";
+  $hash->{StateFn}   = "FRM_OUT_State";
   
   $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
@@ -27,6 +28,10 @@ FRM_OUT_Init($$)
 	my ($hash,$args) = @_;
 	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_OUTPUT);
 	return $ret if (defined $ret);
+	my $name = $hash->{NAME};
+	if (! (defined AttrVal($name,"stateFormat",undef))) {
+		$main::attr{$name}{"stateFormat"} = "value";
+	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
 }
@@ -48,14 +53,26 @@ FRM_OUT_Set($@)
     return SetExtensions($hash, $list, $name, @a);
   }
   my $iodev = $hash->{IODev};
+  main::readingsSingleUpdate($hash,"value",$cmd, 1);
   if (defined $iodev and defined $iodev->{FirmataDevice} and defined $iodev->{FD}) {
   	$iodev->{FirmataDevice}->digital_write($hash->{PIN},$value);
-	main::readingsSingleUpdate($hash,"state",$cmd, 1);
   } else {
   	return $name." no IODev assigned" if (!defined $iodev);
   	return $name.", ".$iodev->{NAME}." is not connected";
   }
   return undef;
+}
+
+sub FRM_OUT_State($$$$)
+{
+	my ($hash, $tim, $sname, $sval) = @_;
+	
+STATEHANDLER: {
+		$sname eq "value" and do {
+			FRM_OUT_Set($hash,$hash->{NAME},$sval);
+			last;
+		}
+	}
 }
 
 sub

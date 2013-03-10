@@ -30,6 +30,7 @@ FRM_LCD_Initialize($)
   $hash->{SetFn}     = "FRM_LCD_Set";
   $hash->{UndefFn}   = "FRM_LCD_Undef";
   $hash->{AttrFn}    = "FRM_LCD_Attr";
+  $hash->{StateFn}   = "FRM_LCD_State";
   
   $hash->{AttrList}  = "IODev model backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
   #  autoScroll:on,off direction:leftToRight,rightToLeft do not work reliably
@@ -186,6 +187,18 @@ sub FRM_LCD_Set(@) {
     	last;
     };
   }
+}
+
+sub FRM_LCD_State($$$$)
+{
+	my ($hash, $tim, $sname, $sval) = @_;
+	
+STATEHANDLER: {
+		$sname eq "text" and do {
+			FRM_LCD_Set($hash,$hash->{NAME},$sname,$sval);
+			last;
+		}
+	}
 }
 
 sub
