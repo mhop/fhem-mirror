@@ -595,7 +595,7 @@ FW_digestCgi($)
   $arg =~ s,^.*?[?],,;
   foreach my $pv (split("&", $arg)) {
     $pv =~ s/\+/ /g;
-    $pv =~ s/%(..)/chr(hex($1))/ge;
+    $pv =~ s/%([\dA-F][\dA-F])/chr(hex($1))/ige;
     my ($p,$v) = split("=",$pv, 2);
 
     # Multiline: escape the NL for fhem
@@ -643,7 +643,7 @@ FW_updateHashes()
   foreach my $d (sort keys %defs ) {
     next if(IsIgnored($d));
     my $t = AttrVal($d, "subType", $defs{$d}{TYPE});
-    $t = AttrVal($d, "model", $t) if($t eq "unknown");
+    $t = AttrVal($d, "model", $t) if($t && $t eq "unknown"); # RKO: ???
     $FW_types{$d} = $t;
   }
 
@@ -2370,7 +2370,8 @@ FW_roomStatesForInform($)
   my @rl = devspec2array("room=$room");
   foreach my $dn (@rl) {
     my ($allSet, $cmdlist, $txt) = FW_devState($dn, "");
-    $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n";
+    $data .= "$dn<<$defs{$dn}{STATE}<<$txt\r\n"
+        if($defs{$dn} && $defs{$dn}{STATE});
   }
   return $data;
 }
