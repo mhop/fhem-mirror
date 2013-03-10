@@ -1,4 +1,7 @@
+# Add changes at the top of the list.
+
 - SVN
+  - feature: THRESHOLD Module by Damian
   - change:  30_HUEDevice: use new devStateIcon feature to show device color
              in room overview
   - feature: added example Setup SQL and configuration for SQLite
