@@ -44,9 +44,29 @@ sub HUEBridge_Define($$)
 
   my @args = split("[ \t]+", $def);
 
-  return "Usage: define <name> HUEBridge <host> [interval]"  if(@args < 3);
+  return "Usage: define <name> HUEBridge [<host>] [interval]"  if(@args < 2);
 
   my ($name, $type, $host, $interval) = @args;
+
+  if( !defined($host) ) {
+    my $ret = HUEBridge_HTTP_Request(0,"http://www.meethue.com/api/nupnp","GET",undef,undef,undef);
+
+    if( defined($ret) && $ret ne '' )
+      {
+        my $obj = decode_json($ret);
+
+        if( defined($obj->[0])
+            && defined($obj->[0]->{'internalipaddress'}) ) {
+          }
+        $host = $obj->[0]->{'internalipaddress'};
+      }
+
+    if( !defined($host) ) {
+      return 'error detecting bridge.';
+    }
+
+    $hash->{DEF} = $host;
+  }
 
   $interval= 300 unless defined($interval);
   if( $interval < 60 ) { $interval = 60; }
@@ -142,7 +162,7 @@ HUEBridge_Get($@)
 {
   my ($hash, $name, $cmd) = @_;
 
-  return "$name: get needs at least one parameter" if( !defined($cmd) ); 
+  return "$name: get needs at least one parameter" if( !defined($cmd) );
 
   # usage check
   if($cmd eq 'devices') {
@@ -434,12 +454,16 @@ HUEBridge_HTTP_Request($$$@)
   <a name="HUEBridge_Define_Define"></a>
   <b>Define</b>
   <ul>
-    <code>define &lt;name&gt; HUEBridge &lt;host&gt; [&lt;interval&gt;]</code><br>
+    <code>define &lt;name&gt; HUEBridge [&lt;host&gt;] [&lt;interval&gt;]</code><br>
     <br>
 
     Defines a HUEBridge device with address &lt;host&gt;.<br><br>
 
+    If [&lt;host&gt;] is not given the module will try to autodetect the bridge with the hue portal services.<br><br>
+
     The bridge status will be updated every &lt;interval&gt; seconds. The default and minimum is 60.<br><br>
+
+    After a new bridge is created the pair button on the bridge has to be pressed.<br><br>
 
     Examples:
     <ul>
