@@ -130,7 +130,7 @@ HUEDevice_Set($@)
   my ($cmd, $value, $value2, @a) = @aa;
 
   if( $cmd eq "color" ) {
-    $value = int(100000/$value);
+    $value = int(1000000/$value);
     $cmd = 'ct';
   } elsif( $cmd eq "toggle" ) {
     $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
