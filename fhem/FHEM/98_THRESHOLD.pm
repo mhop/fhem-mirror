@@ -51,7 +51,7 @@ THRESHOLD_Define($$$)
   my $init_desired_value;
   
   if (@b > 4 || @a < 3 || @a > 5) {
-    my $msg = "wrong syntax: define <name> THRESHOLD" .
+    my $msg = "wrong syntax: define <name> THRESHOLD " .
                "<sensor>[:<reading>[:<hysteresis>][:<init_desired_value>] [AND|OR <sensor2>[:<reading2>][:<state>]] [<actor>][|<cmd1>][|<cmd2>][|<cmd_default_index>]";
     Log 2, $msg;
     return $msg;
@@ -409,7 +409,7 @@ THRESHOLD_setValue($$)
 	<br>
 	Example for heating with multiple window contacts:<br>
 	<br>
-	<code>define W_ALL structure <TYPE> W1 W2 W3 ....</code><br>
+	<code>define W_ALL structure <TYPE> W1 W2 W3 ...</code><br>
 	<code>attr W_ALL clientstate_behavior relative</code><br>
 	<code>attr W_ALL clientstate_priority closed open</code><br>
     <br>
@@ -425,13 +425,13 @@ THRESHOLD_setValue($$)
 	<code>define Thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
 	<code>define Hygrostat THRESHOLD hym_sens:huminity:20 watering|set @ off|set @ on|2</code><br>
 	<br>
-	Alternatively, each Perl commands are given..<br>
+	Alternatively, each Perl commands are given.<br>
 	<br>
 	Examples:<br>
 	<br>
-	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")|{fhem("set Switch1 off;set Switch2 off")|{fhem("set Switch1 on;set Switch2 on")</code><br>
-    <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"value is exceeded"}|set @ off|{fhem("set @ on;set Switch2 on")}</code><br>
-	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"value is reached"}||</code><br>
+	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")|{fhem("set Switch1 off;set Switch2 off")|1</code><br>
+    <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"value is exceeded"}|{fhem("set @ on;set Switch2 on")}</code><br>
+	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"value is reached"}|</code><br>
     <br>
   </ul>
 	<a name="THRESHOLDset"></a>
@@ -506,7 +506,7 @@ THRESHOLD_setValue($$)
 	</li>
 	<li>hysteresis<br>
 	Hysterese, daraus errechnet sich die Untergrenze = Sollwert - hysteresis<br>
-	Defaultwert: 1 Temperaturen, 10 bei Feuchtigkeit
+	Defaultwert: 1 bei Temperaturen, 10 bei Feuchtigkeit
 	</li>
 	<li>init_desired_value<br>
 	  Initial-Sollwert, wenn kein Wert vorgegeben wird, muss er mit "set desired value" gesetzt werden<br>
@@ -589,9 +589,9 @@ THRESHOLD_setValue($$)
 	<br>
 	Beispiele:<br>
 	<br>
-	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")|{fhem("set Switch1 off;set Switch2 off")|{fhem("set Switch1 on;set Switch2 on")</code><br>
-    <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"Wert überschritten"}|set @ off|{fhem("set @ on;set Switch2 on")}</code><br>
-	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"Wert unterschritten"}||</code><br>
+	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")|{fhem("set Switch1 off;set Switch2 off")|1</code><br>
+    <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"Wert überschritten"}|{fhem("set @ on;set Switch2 on")}</code><br>
+	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"Wert unterschritten"}|</code><br>
     <br>
 </ul>
 	<a name="THRESHOLDset"></a>
