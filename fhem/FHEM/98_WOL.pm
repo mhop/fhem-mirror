@@ -15,7 +15,7 @@ WOL_Initialize($)
   $hash->{SetFn}     = "WOL_Set";
   $hash->{DefFn}     = "WOL_Define";
   $hash->{UndefFn}   = "WOL_Undef";
-  $hash->{AttrList}  = "loglevel:0,1,2,3,4,5,6";
+  $hash->{AttrList}  = "shutdownCmd loglevel:0,1,2,3,4,5,6";
 }
 
 ###################################
@@ -50,6 +50,14 @@ WOL_Set($@)
   } elsif ($v eq "refresh") 
   {
     WOL_GetUpdate($hash);
+  } elsif ($v eq "off") {
+    my $cmd = AttrVal($name, "shutdownCmd", "");
+    if ($cmd eq "")
+    {
+      Log $logLevel, "No shutdown command given!";
+      return "no shutdown command given (see shutdownCmd attribute)!"
+    }
+    `$cmd`;
   } else
   {
     return "unknown argument $v, choose one of refresh, on";
@@ -156,7 +164,7 @@ sub wol_by_udp {
 <h3>WOL</h3>
 <ul>
   <a name="WOLdefine"></a>
-  <b>Define</b>
+  <h4>Define</h4>
   <ul>
     <code>define &lt;name&gt; WOL &lt;MAC&gt; &lt;IP&gt;
           &lt;unitcode&gt;</code>
@@ -176,7 +184,7 @@ sub wol_by_udp {
   </ul>
 
   <a name="WOLset"></a>
-  <b>Set </b>
+  <h4>Set </h4>
   <ul>
     <code>set &lt;name&gt; &lt;value&gt;</code>
     <br><br>
@@ -192,11 +200,13 @@ sub wol_by_udp {
       <code>set computer1 refresh</code><br>
     </ul>
   </ul>
-  <a name="WOLget"></a>
-  <b>Get</b> <ul>N/A</ul><br>
 
   <a name="WOLattr"></a>
-  <b>Attributes</b> <ul>N/A</ul><br>
+  <h4>Attributes</h4> 
+  <ul>
+    <li><a name="owtherm_stateAL"><code>attr &lt;name&gt; shutdownCmd &lt;string&gt;</code></a>
+                <br />Custom command executed to shutdown a remote machine, i.e. <code>sh /path/to/some/shell/script.sh</code></li>
+  </ul>
 </ul>
 
 =end html
