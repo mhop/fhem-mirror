@@ -338,6 +338,7 @@ CUL_MAX_Send(@)
   my $dhash = CUL_MAX_DeviceHash($dst);
   $dhash->{READINGS}{msgcnt}{VAL} += 1;
   $dhash->{READINGS}{msgcnt}{VAL} &= 0xFF;
+  $dhash->{READINGS}{msgcnt}{TIME} = TimeNow();
   my $msgcnt = sprintf("%02x",$dhash->{READINGS}{msgcnt}{VAL});
 
   my $packet = $msgcnt . $flags . $msgCmd2Id{$cmd} . $src . $dst . $groupId . $payload;
