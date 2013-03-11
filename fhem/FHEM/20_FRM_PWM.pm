@@ -23,7 +23,7 @@ FRM_PWM_Initialize($)
   $hash->{UndefFn}   = "FRM_PWM_Undef";
   $hash->{StateFn}   = "FRM_PWM_State";
   
-  $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
 
 sub
@@ -37,6 +37,10 @@ FRM_PWM_Init($$)
 	$main::defs{$name}{resolution}=$firmata->{metadata}{pwm_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{pwm_resolutions});
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
 		$main::attr{$name}{"stateFormat"} = "value";
+	}
+	my $value = ReadingsVal($name,"value",undef);
+	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
+		FRM_OUT_Set($hash,$value);
 	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
@@ -68,7 +72,9 @@ sub FRM_PWM_State($$$$)
 	
 STATEHANDLER: {
 		$sname eq "value" and do {
-			FRM_PWM_Set($hash,$hash->{NAME},$sval);
+			if (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") { 
+				FRM_PWM_Set($hash,$hash->{NAME},$sval);
+			}
 			last;
 		}
 	}
@@ -116,6 +122,8 @@ FRM_PWM_Undef($$)
   <a name="FRM_PWMattr"></a>
   <b>Attributes</b><br>
   <ul>
+      <li>restoreOnStartup &lt;on|off&gt;</li>
+      <li>restoreOnReconnect &lt;on|off&gt;</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
       than one FRM-device defined.)

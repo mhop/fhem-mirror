@@ -19,7 +19,7 @@ FRM_OUT_Initialize($)
   $hash->{UndefFn}   = "FRM_OUT_Undef";
   $hash->{StateFn}   = "FRM_OUT_State";
   
-  $hash->{AttrList}  = "IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
 }
 
 sub
@@ -32,17 +32,18 @@ FRM_OUT_Init($$)
 	if (! (defined AttrVal($name,"stateFormat",undef))) {
 		$main::attr{$name}{"stateFormat"} = "value";
 	}
+	my $value = ReadingsVal($name,"value",undef);
+	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
+		FRM_OUT_Set($hash,$name,$value);
+	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
 }
 
 sub
-FRM_OUT_Set($@)
+FRM_OUT_Set($$$)
 {
-  my ($hash, @a) = @_;
-  my $name = $hash->{NAME};
-  shift @a;
-  my $cmd = $a[0];
+  my ($hash, $name, $cmd, @a) = @_;
   my $value;
   if ($cmd eq "on") {
   	$value=PIN_HIGH;
@@ -50,7 +51,7 @@ FRM_OUT_Set($@)
   	  $value=PIN_LOW;
   } else {
   	my $list = "on off";
-    return SetExtensions($hash, $list, $name, @a);
+    return SetExtensions($hash, $list, $name, $cmd, @a);
   }
   my $iodev = $hash->{IODev};
   main::readingsSingleUpdate($hash,"value",$cmd, 1);
@@ -69,7 +70,9 @@ sub FRM_OUT_State($$$$)
 	
 STATEHANDLER: {
 		$sname eq "value" and do {
-			FRM_OUT_Set($hash,$hash->{NAME},$sval);
+			if (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") { 
+				FRM_OUT_Set($hash,$hash->{NAME},$sval);
+			}
 			last;
 		}
 	}
@@ -114,6 +117,8 @@ FRM_OUT_Undef($$)
   <a name="FRM_OUTattr"></a>
   <b>Attributes</b><br>
   <ul>
+      <li>restoreOnStartup &lt;on|off&gt;</li>
+      <li>restoreOnReconnect &lt;on|off&gt;</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
       than one FRM-device defined.)

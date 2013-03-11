@@ -75,6 +75,7 @@ sub FRM_Define($$) {
 	$hash->{DeviceName} = $dev;
 	
 	my $ret = DevIo_OpenDev($hash, 0, "FRM_DoInit");
+	return $ret if (defined $ret and $ret eq "");
 	$hash->{STATE}="Initialized";
 	return $ret;	
 }
