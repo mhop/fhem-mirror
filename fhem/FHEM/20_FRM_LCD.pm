@@ -32,7 +32,7 @@ FRM_LCD_Initialize($)
   $hash->{AttrFn}    = "FRM_LCD_Attr";
   $hash->{StateFn}   = "FRM_LCD_State";
   
-  $hash->{AttrList}  = "IODev model backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
+  $hash->{AttrList}  = "restoreOnReconnect:on,off restoreOnStartup:on,off IODev model backLight:on,off blink:on,off autoClear:on,off autoBreak:on,off loglevel:0,1,2,3,4,5 $main::readingFnAttributes";
   #  autoScroll:on,off direction:leftToRight,rightToLeft do not work reliably
 }
 
@@ -52,21 +52,26 @@ FRM_LCD_Init($)
 	return "no IODev set" unless defined $hash->{IODev};
 	return "no FirmataDevice assigned to ".$hash->{IODev}->{NAME} unless defined $hash->{IODev}->{FirmataDevice};  	
 
+	my $name = $hash->{NAME};
 	if (($hash->{type} eq "i2c") and defined $hash->{address}) {
 		require LiquidCrystal_I2C;
 		my $lcd = LiquidCrystal_I2C->new($hash->{address},$hash->{sizex},$hash->{sizey});
 		$lcd->attach($hash->{IODev}->{FirmataDevice});
 		$lcd->init();
 		$hash->{lcd} = $lcd;
-		my $name = $hash->{NAME};
-#		FRM_LCD_Apply_Attribute($name,"backlight");
+		FRM_LCD_Apply_Attribute($name,"backLight");
 #		FRM_LCD_Apply_Attribute($name,"autoscroll");
 #		FRM_LCD_Apply_Attribute($name,"direction");
-#		FRM_LCD_Apply_Attribute($name,"blink");
-		if (! (defined AttrVal($name,"stateFormat",undef))) {
-			$main::attr{$name}{"stateFormat"} = "text";
-		}
+		FRM_LCD_Apply_Attribute($name,"blink");
 	}
+	if (! (defined AttrVal($name,"stateFormat",undef))) {
+		$main::attr{$name}{"stateFormat"} = "text";
+	}
+	my $value = ReadingsVal($name,"text",undef);
+	if (defined $value and AttrVal($hash->{NAME},"restoreOnReconnect","on") eq "on") {
+		FRM_LCD_Set($hash,$name,"text",$value);
+	}
+	
 	
 	return undef;
 }
@@ -118,8 +123,6 @@ sub FRM_LCD_Apply_Attribute {
 				last;
 			};
 		}
-	} else {
-		main::Log (3, "no lcd found");
 	}
 }
 
@@ -131,6 +134,7 @@ sub FRM_LCD_Set(@) {
   return "Unknown argument $a[1], choose one of " . join(" ", sort keys %sets)
   	if(!defined($sets{$command}));
   my $lcd = $hash->{lcd};
+  return unless defined $lcd;
   COMMAND_HANDLER: {
     $command eq "text" and do {
     	if (AttrVal($hash->{NAME},"autoClear","on") eq "on") {
@@ -195,7 +199,9 @@ sub FRM_LCD_State($$$$)
 	
 STATEHANDLER: {
 		$sname eq "text" and do {
-			FRM_LCD_Set($hash,$hash->{NAME},$sname,$sval);
+			if (AttrVal($hash->{NAME},"restoreOnStartup","on") eq "on") { 
+				FRM_LCD_Set($hash,$hash->{NAME},$sname,$sval);
+			}
 			last;
 		}
 	}
@@ -212,39 +218,48 @@ FRM_LCD_Undef($$)
 =pod
 =begin html
 
-<a name="FRM_I2C"></a>
-<h3>FRM_I2C</h3>
+<a name="FRM_LCD"></a>
+<h3>FRM_LCD</h3>
 <ul>
-  represents an integrated curcuit connected to the i2c-pins of an <a href="http://www.arduino.cc">Arduino</a>
-  running <a href="http://www.firmata.org">Firmata</a><br>
+  drives LiquidCrystal Displays (LCD) that are connected to Firmata (via I2C).
+  Supported are Displays that use a PCF8574T as I2C Bridge (as found on eBay when searching for
+  'LCD' and 'I2C'). Tested is the 1602 type (16 characters, 2 Lines), the 2004 type (and other cheap chinise-made
+  I2C-LCDs for Arduino) ship with the same library, so they should work as well.
+  See <a name="LiquidCrystal tutorial">http://arduino.cc/en/Tutorial/LiquidCrystal</a> for details about
+  how to hook up the LCD to the arduino.
+
   Requires a defined <a href="#FRM">FRM</a>-device to work.<br>
   this FRM-device has to be configures for i2c by setting attr 'i2c-config' on the FRM-device<br>
-  it reads out the ic-internal storage in intervals of 'sampling-interval' as set on the FRM-device<br><br> 
-  
-  <a name="FRM_I2Cdefine"></a>
+    
+  <a name="FRM_LCDdefine"></a>
   <b>Define</b>
   <ul>
-  <code>define &lt;name&gt; FRM_I2C &lt;i2c-address&gt; &lt;register&gt; &lt;bytes-to-read&gt;</code> <br>
-  Specifies the FRM_I2C device.<br>
+  <code>define &lt;name&gt; FRM_LCD i2c &lt;size-x&gt; &lt;size-y&gt; &lt;i2c-address&gt;</code> <br>
+  Specifies the FRM_LCD device.<br>
+  <li>size-x is the number of characters per line</li>
+  <li>size-y is the numbers of rows.</li>
   <li>i2c-address is the (device-specific) address of the ic on the i2c-bus</li>
-  <li>register is the (device-internal) address to start reading bytes from.</li>
-  <li>bytes-to-read is the number of bytes read from the ic</li>
   </ul>
   
   <br>
-  <a name="FRM_I2Cset"></a>
+  <a name="FRM_LCDset"></a>
   <b>Set</b><br>
   <ul>
-  N/A<br>
+  <code>set &lt;name&gt; text &lt;text to be displayed&gt;</code><br>
   </ul>
   <a name="FRM_I2Cget"></a>
   <b>Get</b><br>
   <ul>
   N/A<br>
   </ul><br>
-  <a name="FRM_I2Cattr"></a>
+  <a name="FRM_LCDattr"></a>
   <b>Attributes</b><br>
   <ul>
+      <li>backLight &lt;on|off&gt;</li>
+      <li>autoClear &lt;on|off&gt;</li>
+      <li>autoBreak &lt;on|off&gt;</li>
+      <li>restoreOnStartup &lt;on|off&gt;</li>
+      <li>restoreOnReconnect &lt;on|off&gt;</li>
       <li><a href="#IODev">IODev</a><br>
       Specify which <a href="#FRM">FRM</a> to use. (Optional, only required if there is more
       than one FRM-device defined.)
