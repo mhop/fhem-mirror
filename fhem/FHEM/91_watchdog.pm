@@ -178,23 +178,23 @@ watchdog_Undef($$)
     <br><br>
 
     Examples:
-    <pre>
-    # Request data from the FHT80 _once_ if we do not receive any message for
-    # 15 Minutes.
-    define w watchdog FHT80 00:15:00 SAME set FHT80 date
+    <code><ul>
+    # Request data from the FHT80 _once_ if we do not receive any message for<br>
+    # 15 Minutes.<br>
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date<br>
 
-    # Request data from the FHT80 _each_ time we do not receive any message for
-    # 15 Minutes, i.e. reactivate the watchdog after it triggered.  Might be
-    # dangerous, as it can trigger in a loop.
-    define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .
+    # Request data from the FHT80 _each_ time we do not receive any message for<br>
+    # 15 Minutes, i.e. reactivate the watchdog after it triggered.  Might be<br>
+    # dangerous, as it can trigger in a loop.<br>
+    define w watchdog FHT80 00:15:00 SAME set FHT80 date;; trigger w .<br>
 
-    # Shout once if the HMS100-FIT is not alive
-    define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"
+    # Shout once if the HMS100-FIT is not alive<br>
+    define w watchdog HMS100-FIT 01:00:00 SAME "alarm-fit.sh"<br>
 
-    # Send mail if the window is left open
-    define w watchdog contact1:open 00:15 contact1:closed "mail_me close window1"
-    attr w regexp1WontReactivate
-    </pre>
+    # Send mail if the window is left open<br>
+    define w watchdog contact1:open 00:15 contact1:closed "mail_me close window1"<br>
+    attr w regexp1WontReactivate<br>
+    </ul></code>
 
     Notes:<br>
     <ul>

@@ -744,26 +744,26 @@ getFhtBuffer($)
     <code>set &lt;name&gt; &lt;valuetype&gt; &lt;value&gt;</code>
     <br><br>
     where <code>value</code> is one of:<br>
-    <pre>
-      desired-temp
-      day-temp night-temp
-      report1 report2
-      refreshvalues
-      mode
-      holiday1 holiday2      # see mode holiday_short or holiday
-      manu-temp              # No clue what it does.
-      year month day hour minute
-      time date
-      lowtemp-offset         # Alarm-Temp.-Differenz
-      windowopen-temp
-      mon-from1 mon-to1 mon-from2 mon-to2
-      tue-from1 tue-to1 tue-from2 tue-to2
-      wed-from1 wed-to1 wed-from2 wed-to2
-      thu-from1 thu-to1 thu-from2 thu-to2
-      fri-from1 fri-to1 fri-from2 fri-to2
-      sat-from1 sat-to1 sat-from2 sat-to2
-      sun-from1 sun-to1 sun-from2 sun-to2
-</pre>
+    <ul><code>
+      desired-temp<br>
+      day-temp night-temp<br>
+      report1 report2<br>
+      refreshvalues<br>
+      mode<br>
+      holiday1 holiday2      # see mode holiday_short or holiday<br>
+      manu-temp              # No clue what it does.<br>
+      year month day hour minute<br>
+      time date<br>
+      lowtemp-offset         # Alarm-Temp.-Differenz<br>
+      windowopen-temp<br>
+      mon-from1 mon-to1 mon-from2 mon-to2<br>
+      tue-from1 tue-to1 tue-from2 tue-to2<br>
+      wed-from1 wed-to1 wed-from2 wed-to2<br>
+      thu-from1 thu-to1 thu-from2 thu-to2<br>
+      fri-from1 fri-to1 fri-from2 fri-to2<br>
+      sat-from1 sat-to1 sat-from2 sat-to2<br>
+      sun-from1 sun-to1 sun-from2 sun-to2<br>
+    </code></ul>
 
     Examples:
     <ul>

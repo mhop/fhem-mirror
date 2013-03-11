@@ -286,14 +286,16 @@ CUL_EM_Parse($$)
     daily and mothly fees. Your COST will appear in the log, generated once
     daiy (without the basic fee) or month (with the bassic fee included). Your
     definition should look like E.g.:
-    <pre>
-    define emwz 1 75 900 0.15 12.50</pre>
+    <ul><code>
+    define emwz 1 75 900 0.15 12.50<br>
+    </code></ul>
     and the Log looks like:
-    <pre>
-    CUM_DAY: 6.849 CUM: 60123.4 COST: 1.02
-    CUM_MONTH: 212.319 CUM: 60123.4 COST: 44.34</pre>
+    <ul><code>
+    CUM_DAY: 6.849 CUM: 60123.4 COST: 1.02<br>
+    CUM_MONTH: 212.319 CUM: 60123.4 COST: 44.34<br>
+    </code></ul>
 
-    Tipp: You can configure your EMWZ device to show in the CUM column of the
+    Tip: You can configure your EMWZ device to show in the CUM column of the
     STATE reading the current reading of your meter. For this purpose: multiply
     the current reading (from the real device) with the corr1 value (RperKW),
     and substract the RAW CUM value from it. Now set the basis reading of your

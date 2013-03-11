@@ -872,13 +872,14 @@ FHZ_Read($)
           for detailed USB / electromag. interference troubleshooting.</li>
       <li><code>initfull</code> issues the initialization sequence for the FHZ
           device:<br>
-          <pre>
-            get FHZ init2
-            get FHZ serial
-            set FHZ initHMS
-            set FHZ initFS20
-            set FHZ time
-            set FHZ raw 04 01010100010000</pre></li>
+          <ul><code>
+            get FHZ init2<br>
+            get FHZ serial<br>
+            set FHZ initHMS<br>
+            set FHZ initFS20<br>
+            set FHZ time<br>
+            set FHZ raw 04 01010100010000<br>
+          </code></ul></li>
       <li><code>reopen</code> closes and reopens the serial device port. This
           implicitly initializes the FHZ and issues the
           <code>initfull</code> command sequence.</li>
