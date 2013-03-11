@@ -506,8 +506,9 @@ seekTo($$$$)
     <br><br>
 
     Log events to <code>&lt;filename&gt;</code>. The log format is
-    <pre>
-      YYYY:MM:DD_HH:MM:SS &lt;device&gt; &lt;event&gt;</pre>
+    <ul><code><br>
+      YYYY:MM:DD_HH:MM:SS &lt;device&gt; &lt;event&gt;<br>
+    <br></code></ul>
     The regexp will be checked against the device name
     devicename:event or timestamp:devicename:event combination.
     The regexp must match the complete string, not just a part of it.
@@ -613,8 +614,10 @@ seekTo($$$$)
       </ul>
     <br><br>
     Example:
-      <pre>get outlog out-2008.log - 2008-01-01 2008-01-08 4:IR:int: 9:IR::</pre>
-    <br><br>
+      <ul><code><br>
+        get outlog out-2008.log - 2008-01-01 2008-01-08 4:IR:int: 9:IR::
+      </code></ul>
+    <br>
   </ul>
 
   <a name="FileLogattr"></a>

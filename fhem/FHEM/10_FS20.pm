@@ -519,25 +519,25 @@ four2hex($$)
     <code>set &lt;name&gt; &lt;value&gt; [&lt;time&gt]</code>
     <br><br>
     where <code>value</code> is one of:<br>
-    <pre>
-    dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%
-    dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%
-    dimdown
-    dimup
-    dimupdown
-    off
-    off-for-timer
-    on                # dimmer: set to value before switching it off
-    on-for-timer      # see the note
-    on-old-for-timer  # set to previous (before switching it on)
-    ramp-on-time      # time to reach the desired dim value on dimmers
-    ramp-off-time     # time to reach the off state on dimmers
-    reset
-    sendstate
-    timer
-    toggle            # between off and previous dim val
-    on-till           # Special, see the note
-</pre>
+    <ul><code>
+      dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50%<br>
+      dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%<br>
+      dimdown<br>
+      dimup<br>
+      dimupdown<br>
+      off<br>
+      off-for-timer<br>
+      on                # dimmer: set to value before switching it off<br>
+      on-for-timer      # see the note<br>
+      on-old-for-timer  # set to previous (before switching it on)<br>
+      ramp-on-time      # time to reach the desired dim value on dimmers<br>
+      ramp-off-time     # time to reach the off state on dimmers<br>
+      reset<br>
+      sendstate<br>
+      timer<br>
+      toggle            # between off and previous dim val<br>
+      on-till           # Special, see the note<br>
+    </code></ul>
     The <a href="#setExtensions"> set extensions</a> are also supported.<br>
     <br>
     Examples:

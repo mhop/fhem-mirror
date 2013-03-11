@@ -121,17 +121,23 @@ CommandXmlList($$)
   optional, and restricts the list of devices if specified. 
   <br><br>
   Example:
-  <pre>  fhem> xmllist
-  &lt;FHZINFO&gt;
-          &lt;internal_LIST&gt;
-                  &lt;internal name="global" state="internal" sets=""
-                            attrs="room configfile logfile ..."&gt;
-                          &lt;INT key="DEF" value="&lt;no definition&gt;"/&gt;
-                          &lt;INT key="NR" value="0"/&gt;
-                          &lt;INT key="STATE" value="internal"/&gt;
-      [...]
-
-  </pre>
+  <code>
+  <ul>
+  fhem> xmllist<br>
+  &lt;FHZINFO&gt;<br>
+    <ul>
+    &lt;internal_LIST&gt;<br>
+      <ul>
+      &lt;internal name="global" state="internal" sets="" attrs="room configfile logfile ..."&gt;<br>
+        <ul>
+          &lt;INT key="DEF" value="&lt;no definition&gt;"/&gt;<br>
+          &lt;INT key="NR" value="0"/&gt;<br>
+          &lt;INT key="STATE" value="internal"/&gt;<br>
+        </ul>
+      [...]<br>
+      </ul>
+    </ul>
+  </ul></code>
 </ul>
 
 =end html
