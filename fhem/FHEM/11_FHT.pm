@@ -306,7 +306,7 @@ FHT_Set($@)
 	$ncmd++;
     	$allcmd .=" " if($allcmd);
     	$allcmd .= $cmd;
-    	$allcmd .= " $val" if($val);
+    	$allcmd .= " $val" if(defined($val));
     }
   }
 
