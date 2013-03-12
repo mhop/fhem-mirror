@@ -127,6 +127,7 @@ FHEMWEB_Initialize($)
   addToAttrList("webCmd");
   addToAttrList("icon");
   addToAttrList("devStateIcon");
+  addToAttrList("sortby");
   InternalTimer(time()+60, "FW_closeOldClients", 0, 0);
   
   $FW_dir      = "$attr{global}{modpath}/www";
@@ -1044,8 +1045,9 @@ FW_showRoom()
     FW_pO "<tr><td>";
     FW_pO "<table class=\"block wide\" id=\"TYPE_$g\">";
 
-    foreach my $d (sort { lc(AttrVal($a,"alias",$a)) cmp 
-                          lc(AttrVal($b,"alias",$b)) } keys %{$group{$g}}) {
+    foreach my $d (sort { lc(AttrVal($a, "sortby", AttrVal($a,"alias",$a))) cmp
+                          lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
+                   keys %{$group{$g}}) {
       my $type = $defs{$d}{TYPE};
 
       FW_pF "\n<tr class=\"%s\">", ($row&1)?"odd":"even";
@@ -2905,6 +2907,14 @@ FW_htmlEscape($)
         </li>
         <br>
 
+    <a name="sortby"></a>
+    <li>sortby<br>
+        Take the value of this attribute when sorting the devices in the room
+        overview instead of the alias, or if that is missing the devicename
+        itself.
+        </li>
+        <br>
+
     <a name="devStateIcon"></a>
     <li>devStateIcon<br>
         First form:<br>
@@ -2919,13 +2929,13 @@ FW_htmlEscape($)
         attr lamp devStateIcon on:closed off:open<br>
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
-        </li>
         </ul>
         Second form:<br>
         <ul>
         Perl regexp enclosed in {}. Example:<br>
         {'&lt;div style="width:32px;height:32px;background-color:green"&gt;&lt;/div&gt;'}
         </ul>
+        </li>
         <br>
 
     <a name="webCmd"></a>
