@@ -324,7 +324,7 @@ SVG_render($$$$$$$$)
     my @limit = (0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100,
                  200, 500, 1000, 2000, 5000, 10000, 20000, 50000, 100000,
                  200000, 500000, 1000000, 2000000);
-    for my $li (0..int(@limit)-1) {
+    for my $li (0..$#limit-1) {
       my $l = $limit[$li];
       next if($dh > $l);
       $ma = SVG_doround($hmax{$a}, $l/10, 1);
@@ -337,6 +337,10 @@ SVG_render($$$$$$$$)
       }
       $step = $l/10;
       last;
+    }
+    if($step == 0.001 && $hmax{$a} == $hmin{$a}) { # Don't want 0.001 range for nil
+       $step = 1;
+       $ma = $mi + $step;
     }
     $hmax{$a}    = $ma;
     $hmin{$a}    = $mi;
@@ -629,6 +633,7 @@ sub
 SVG_doround($$$)
 {
   my ($v, $step, $isup) = @_;
+  $step = 1 if(!$step); # Avoid division by zero
   if($v >= 0) {
     return (int($v/$step))*$step+($isup ? $step : 0);
   } else {
