@@ -826,7 +826,7 @@ MAX_Parse($$)
         to set a temporary temperature until that date/time. Make sure that the cube has valid system time!</li>
     <li>groupid &lt;id&gt;<br>
       For devices of type HeatingThermostat only.
-      Writes the given group id the device's memory. It is usually not necessary to change this.</li>
+      Writes the given group id the device's memory. To sync all devices in one room, set them to the same groupid greater than zero.</li>
     <li>ecoTemperature &lt;value&gt;<br>
       For devices of type HeatingThermostat only. Writes the given eco temperature to the device's memory. It can be activated by pressing the rightmost physical button on the device.</li>
     <li>comfortTemperature &lt;value&gt;<br>
