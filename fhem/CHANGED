@@ -1,7 +1,10 @@
 # Add changes at the top of the list.
 
 - SVN
-  - change:  30_HUEDevice: allow autodetection of bridge with hue portal services
+  - change:  FHEMWEB: the first webCmd argument is no longer used by the
+             state-icon, this can be implemented by the new devStateIcon
+  - change:  30_HUEDevice: allow autodetection of bridge with hue portal
+             services
   - feature: THRESHOLD Module by Damian
   - change:  30_HUEDevice: use new devStateIcon feature to show device color
              in room overview
