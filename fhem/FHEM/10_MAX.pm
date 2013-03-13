@@ -33,6 +33,7 @@ sub validValveposition { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 100; 
 sub validDecalcification { my ($decalcDay, $decalcHour) = ($_[0] =~ /^(...) (\d{1,2}):00$/);
   return defined($decalcDay) && defined($decalcHour) && exists($decalcDaysInv{$decalcDay}) && 0 <= $decalcHour && $decalcHour < 24; }
 sub validWeekProfile { return length($_[0]) == 4*13*7; }
+sub validGroupid { return $_[0] ~~ /^\d+$/ && $_[0] >= 0 && $_[0] <= 255; }
 
 my %readingDef = ( #min/max/default
   "maximumTemperature"    => [ \&validTemperature, "on"],
@@ -47,6 +48,7 @@ my %readingDef = ( #min/max/default
   "decalcification"       => [ \&validDecalcification, "Sat 12:00" ],
   "maxValveSetting"       => [ \&validValveposition, 100 ],
   "valveOffset"           => [ \&validValveposition, 00 ],
+  "groupid"               => [ \&validGroupid, 0 ],
   ".weekProfile"          => [ \&validWeekProfile, $defaultWeekProfile ],
 );
 
@@ -265,7 +267,8 @@ MAX_Set($@)
 
     my $payload = sprintf("%02x",int($temperature*2.0) | ($ctrlmode << 6));
     $payload .= $until if(defined($until));
-    return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload, groupId => sprintf("%02x",$hash->{groupid}), flags => ( $hash->{groupid} ? "04" : "00" ));
+    my $groupid = MAX_ReadingsVal($hash,"groupid");
+    return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload, groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ));
 
   }elsif($setting ~~ ["boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"]
       and $hash->{type} =~ /HeatingThermostat.*/){
@@ -298,9 +301,9 @@ MAX_Set($@)
     return "argument needed" if(@args == 0);
 
     if($args[0]) {
-      return ($hash->{IODev}{Send})->($hash->{IODev},"SetGroupId",$hash->{addr}, sprintf("%02x",$args[0]) );
+      return ($hash->{IODev}{Send})->($hash->{IODev},"SetGroupId",$hash->{addr}, sprintf("%02x",$args[0]), callbackParam => "$args[0]" );
     } else {
-      return ($hash->{IODev}{Send})->($hash->{IODev},"RemoveGroupId",$hash->{addr});
+      return ($hash->{IODev}{Send})->($hash->{IODev},"RemoveGroupId",$hash->{addr}, "00", callbackParam => "0");
     }
 
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and $hash->{type} =~ /.*Thermostat.*/) {
@@ -728,6 +731,10 @@ MAX_Parse($$)
   } elsif($msgtype ~~ ["AckConfigValve", "AckConfigTemperatures", "AckSetDisplayActualTemperature" ]) {
 
     readingsBulkUpdate($shash, $args[0], $args[1]);
+
+  } elsif($msgtype ~~ ["AckSetGroupId", "AckRemoveGroupId" ]) {
+
+    readingsBulkUpdate($shash, "groupid", $args[0]);
 
   } elsif($msgtype eq "Ack") {
     #The payload of an Ack is a 2-digit hex number (being "01" for okey and "81" for "invalid command/argument"
