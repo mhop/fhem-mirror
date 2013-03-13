@@ -2,8 +2,6 @@
 # $Id$
 # Written by Matthias Gehre, M.Gehre@gmx.de, 2012-2013
 #
-# TODO:
-# - Send RemoveGroupId packet if groupid is set to 0
 package main;
 
 use strict;
@@ -299,7 +297,11 @@ MAX_Set($@)
   }elsif($setting eq "groupid"){
     return "argument needed" if(@args == 0);
 
-    return ($hash->{IODev}{Send})->($hash->{IODev},"SetGroupId",$hash->{addr}, sprintf("%02x",$args[0]) );
+    if($args[0]) {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"SetGroupId",$hash->{addr}, sprintf("%02x",$args[0]) );
+    } else {
+      return ($hash->{IODev}{Send})->($hash->{IODev},"RemoveGroupId",$hash->{addr});
+    }
 
   }elsif( $setting ~~ ["ecoTemperature", "comfortTemperature", "measurementOffset", "maximumTemperature", "minimumTemperature", "windowOpenTemperature", "windowOpenDuration" ] and $hash->{type} =~ /.*Thermostat.*/) {
     return "Cannot set without IODev" if(!exists($hash->{IODev}));
