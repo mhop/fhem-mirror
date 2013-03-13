@@ -121,14 +121,7 @@ FB_CALLMONITOR_Define($$)
   $hash->{DeviceName} = $dev;
   my $ret = DevIo_OpenDev($hash, 0, "FB_CALLMONITOR_DoInit");
 
-
-  if(-r "/var/flash/phonebook")
-  {
-	$attr{$name}{"reverse-search"} = "internal" unless(defined($attr{$name}{"reverse-search"}));
-	FB_CALLMONITOR_loadInternalPhonebookFile($hash);
-  }
   
-
 
   return $ret;
 }
@@ -326,17 +319,22 @@ FB_CALLMONITOR_Attr($@)
     
     my (@a) = @_;
     my $hash = $defs{$a[1]};
-
+    my $name = $hash->{NAME};
+    
     if($a[0] eq "set")
     {
 
         if($a[2] eq "reverse-search" or $a[2] eq "reverse-search-phonebook-file")
         {
+            $attr{$name}{"reverse-search-phonebook-file"} = $a[3] if($a[2] eq "reverse-search-phonebook-file");
+
 	    FB_CALLMONITOR_loadInternalPhonebookFile($hash);
 	}
 	
 	if($a[2] eq "reverse-search-cache-file")
 	{
+	    $attr{$name}{"reverse-search-cache-file"} = $a[3];
+      
 	    FB_CALLMONITOR_loadCacheFile($hash);
 	}
 
@@ -538,10 +536,10 @@ sub FB_CALLMONITOR_writeToCache($$$)
 }
 
 
-sub FB_CALLMONITOR_loadInternalPhonebookFile($)
+sub FB_CALLMONITOR_loadInternalPhonebookFile($@)
 {
 
-  my ($hash) = @_;
+  my ($hash, $overwrite) = @_;
   my $name = $hash->{NAME};
   my $phonebook = undef;
   my $contact;
@@ -552,10 +550,18 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
   my $area_code = AttrVal($name, "local-area-code", "");
   my $phonebook_file = AttrVal($name, "reverse-search-phonebook-file", "/var/flash/phonebook");
 
-  delete $hash->{helper}{PHONEBOOK} if(defined($hash->{helper}{PHONEBOOK}));
+  $overwrite = 1 unless(defined($overwrite));
+
+
+  return if($overwrite == 0 and defined($hash->{helper}{PHONEBOOK}));
+
+  
+
+
 
   if(-r $phonebook_file)
   {
+    delete $hash->{helper}{PHONEBOOK} if(defined($hash->{helper}{PHONEBOOK}));
     if(open(PHONEBOOK, "<$phonebook_file"))
     {
      
@@ -622,15 +628,18 @@ sub FB_CALLMONITOR_loadInternalPhonebookFile($)
 sub FB_CALLMONITOR_loadCacheFile($)
 {
   my ($hash) = @_;
+  
   my $file = AttrVal($hash->{NAME}, "reverse-search-cache-file", "");
   my @cachefile;
   my @tmpline;
+  my $count_contacts;
+  my $name = $hash->{NAME};
   
   $file =~ s/(^\s+|\s+$)//g;
   
   if($file ne "")
   {
-  
+   
     delete($hash->{helper}{CACHE}) if(defined($hash->{helper}{CACHE}));
   
     Log GetLogLevel($hash->{NAME}, 3), "FB_CALLMONITOR: loading cache file $file";
@@ -652,7 +661,10 @@ sub FB_CALLMONITOR_loadCacheFile($)
 	    $hash->{helper}{CACHE}{$tmpline[0]} = $tmpline[1];
 	  }
          }
-       } 
+       }
+
+      $count_contacts = scalar keys %{$hash->{helper}{CACHE}};
+        Log GetLogLevel($name, 2), "FB_CALLMONITOR: $name read ".($count_contacts > 0 ? $count_contacts : "no")." contact".($count_contacts == 1 ? "" : "s")." from Cache"; 
     }
     else
     {
