@@ -73,7 +73,7 @@ MAX_Initialize($)
   $hash->{ParseFn}   = "MAX_Parse";
   $hash->{SetFn}     = "MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 ".
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 keepAuto ".
                        $readingFnAttributes;
   return undef;
 }
@@ -243,6 +243,12 @@ MAX_Set($@)
     my $temperature;
     my $until = undef;
     my $ctrlmode = 1; #0=auto, 1=manual; 2=temporary
+
+    if(AttrVal($hash->{NAME},"keepAuto","0") ne "0"
+      && MAX_ReadingsVal($hash,"mode") eq "auto") {
+      Log 5, "MAX_Set: staying in auto mode";
+      $ctrlmode = 0; #auto
+    }
 
     if($args[0] eq "auto") {
       #This enables the automatic/schedule mode where the thermostat follows the weekly program
@@ -892,6 +898,7 @@ MAX_Parse($$)
     <li><a href="#do_not_notify">do_not_notify</a></li>
     <li><a href="#ignore">ignore</a></li>
     <li><a href="#readingFnAttributes">readingFnAttributes</a></li>
+    <li>keepAuto<br>Default: 0. If set to 1, it will stay in the auto mode when you set a desiredTemperature while the auto (=weekly program) mode is active.</li>
   </ul>
   <br>
 
