@@ -237,7 +237,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
   DimStep         =>{a=> 23.0,s=>1.0,l=>3,min=>0  ,max=>100     ,c=>'factor'   ,f=>2       ,u=>'%'   ,d=>0,t=>"dimStep"},
 
   OffDlyNewTime   =>{a=> 25.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay new time"},
-  OffDlyNewTime   =>{a=> 26.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay old time"},
+  OffDlyOldTime   =>{a=> 26.0,s=>1.0,l=>3,min=>0.1,max=>25.6    ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>0,t=>"off delay old time"},
   DimElsOffTimeMd =>{a=> 38.6,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{absolut=>0,minimal=>1}},
   DimElsOnTimeMd  =>{a=> 38.7,s=>0.1,l=>3,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{absolut=>0,minimal=>1}},
   DimElsActionType=>{a=> 38.0,s=>0.4,l=>3,min=>0  ,max=>8       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>""             ,lit=>{off=>0,jmpToTarget=>1,toggleToCnt=>2,toggleToCntInv=>3,upDim=>4,downDim=>5,toggelDim=>6,toggelDimToCnt=>7,toggelDimToCntInv=>8}},
@@ -481,7 +481,7 @@ my %culHmRegType = (
                        CtValLo         =>1,CtValHi         =>1,
                        CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
                        CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
-		               OffDlyNewTime   =>1,OffDlyNewTime   =>1,
+		               OffDlyNewTime   =>1,OffDlyOldTime   =>1,
 		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
 		               DimElsActionType=>1,
 		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
