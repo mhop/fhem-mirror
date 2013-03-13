@@ -267,7 +267,7 @@ MAX_Set($@)
 
     my $payload = sprintf("%02x",int($temperature*2.0) | ($ctrlmode << 6));
     $payload .= $until if(defined($until));
-    return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload);
+    return ($hash->{IODev}{Send})->($hash->{IODev},"SetTemperature",$hash->{addr},$payload, groupId => sprintf("%02x",$hash->{groupid}), flags => ( $hash->{groupid} ? "04" : "00" ));
 
   }elsif($setting ~~ ["boostDuration", "boostValveposition", "decalcification","maxValveSetting","valveOffset"]
       and $hash->{type} =~ /HeatingThermostat.*/){
