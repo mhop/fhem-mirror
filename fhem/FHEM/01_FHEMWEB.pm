@@ -366,7 +366,7 @@ FW_answerCall($)
 
     # if we do not have the icon, we convert the device state to the icon name
     if(!$iconPath) {
-      $icon = FW_dev2image($icon);
+      ($icon, undef, undef) = FW_dev2image($icon);
       $cacheable = 0;
       return 0 if(!$icon);
       $iconPath = FW_iconPath($icon);
@@ -2267,15 +2267,25 @@ FW_dev2image($)
 
   my (undef, $rstate) = ReplaceEventMap($name, [undef, $state], 0);
 
-  my $icon;
+  my ($icon, $rlink);
   my $devStateIcon = AttrVal($name, "devStateIcon", undef);
   if(defined($devStateIcon)) {
-    return $devStateIcon if($devStateIcon =~ m/^{.*}$/);
+    if($devStateIcon =~ m/^{.*}$/) {
+      my ($html, $link) = eval $devStateIcon;
+      Log 1, "devStateIcon $name: $@" if($@);
+      return ($link, undef, 1) if(!$html); # only one value returned by the {}
+      return ($html, $link, 1);
+    }
+
     my @list = split(" ", $devStateIcon);
     foreach my $l (@list) {
-      my ($re,$iconName) = split(":", $l);
-      if(defined($re) && $state =~ m/^$re$/) {
-        return FW_iconName($iconName);   # Can be used to preserve text
+      my ($re, $iconName, $link) = split(":", $l, 3);
+      if($re && $state =~ m/^$re$/) {
+        if($iconName eq "") {
+          $rlink = $link;
+          last;
+        }
+        return ($iconName, $link, 0);  # Can be used to preserve text
       }
     }
   }
@@ -2285,14 +2295,14 @@ FW_dev2image($)
   $icon = FW_iconName("$name.$state")   if(!$icon);           # lamp.Aus.png
   $icon = FW_iconName("$name.$rstate")  if(!$icon);           # lamp.on.png
   $icon = FW_iconName($name)            if(!$icon);           # lamp.png
-  $icon = FW_iconName("$model.$state")  if(!$icon && $model); # HM-OU-LED16.off.png
-  $icon = FW_iconName($model)           if(!$icon && $model); # HM-OU-LED16.png
+  $icon = FW_iconName("$model.$state")  if(!$icon && $model); # fs20st.off.png
+  $icon = FW_iconName($model)           if(!$icon && $model); # fs20st.png
   $icon = FW_iconName("$type.$state")   if(!$icon);           # FS20.Aus.png
   $icon = FW_iconName("$type.$rstate")  if(!$icon);           # FS20.on.png
   $icon = FW_iconName($type)            if(!$icon);           # FS20.png
   $icon = FW_iconName($state)           if(!$icon);           # Aus.png
   $icon = FW_iconName($rstate)          if(!$icon);           # on.png
-  return $icon;
+  return ($icon, $rlink, 0);
 }
 
 sub
@@ -2463,14 +2473,14 @@ FW_devState($$)
 {
   my ($d, $rf) = @_;
 
-  my ($hasOnOff, $cmdlist, $link);
+  my ($hasOnOff, $link);
 
-  my $webCmd = AttrVal($d, "webCmd", "");
+  my $cmdList = AttrVal($d, "webCmd", "");
   my $allSets = getAllSets($d);
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
-  $hasOnOff = (!$webCmd && $allSets =~ m/\bon\b/ && $allSets =~ m/\boff\b/);
+  $hasOnOff = ($allSets =~ m/\bon\b/ && $allSets =~ m/\boff\b/);
   my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
@@ -2480,40 +2490,34 @@ FW_devState($$)
     $txt = ReadingsVal($d, "measured-temp", "");
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
-    $cmdlist = "desired-temp";
+    $cmdList = "desired-temp" if(!$cmdList);
+
   } elsif($allSets =~ m/\bdesiredTemperature:/) {
     $txt = ReadingsVal($d, "temperature", "");
     $txt =~ s/ .*//;
     $txt .= "&deg;C";
-    $cmdlist = "desiredTemperature";
+    $cmdList = "desiredTemperature" if(!$cmdList);
+
   } else {
-    my $icon;
-    $icon = FW_dev2image($d);
-    if($icon) {
-      if($icon =~ m/^{.*}$/) {
-        $txt = AnalyzePerlCommand(undef, $icon);
-      } else {
-        $txt = FW_makeImage($icon, $txt);
-      }
-    }
+    my ($icon, $isHtml);
+    ($icon, $link, $isHtml) = FW_dev2image($d);
+    $txt = ($isHtml ? $icon : FW_makeImage($icon, $state)) if($icon);
+    $link = "cmd.$d=set $d $link" if($link);
+
   }
 
   $txt = "<div id=\"$d\" align=\"center\" class=\"col2\">$txt</div>";
-  if($webCmd) {
-    my @a = split(":", $webCmd);
-    $link = "cmd.$d=set $d $a[0]";
-    $cmdlist = $webCmd;
 
-  } elsif($hasOnOff && !$cmdlist) {
+  if($hasOnOff) {
     # Have to cover: "on:An off:Aus", "A0:Aus AI:An Aus:off An:on"
     my $on  = ReplaceEventMap($d, "on", 1);
     my $off = ReplaceEventMap($d, "off", 1);
-    $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on);
-    $cmdlist = "$on:$off";
+    $link = "cmd.$d=set $d " . ($state eq $on ? $off : $on) if(!$link);
+    $cmdList = "$on:$off" if(!$cmdList);
 
   }
 
-  if($link) {
+  if($link) { # Have command to execute
     my $room = AttrVal($d, "room", undef);
     if($room) {
       if($FW_room && $room =~ m/\b$FW_room\b/) {
@@ -2534,7 +2538,7 @@ FW_devState($$)
 
     }
   }
-  return ($allSets, $cmdlist, $txt);
+  return ($allSets, $cmdList, $txt);
 }
 
 
@@ -2919,14 +2923,16 @@ FW_htmlEscape($)
     <li>devStateIcon<br>
         First form:<br>
         <ul>
-        Space separated list of regexp/icon-name pairs. If the state of the
-        device matches regexp, then the corresponding icon-name will be
-        displayed. If icon-name does not exist in the fhem/www/images
-        directory, then the status text will be displayed. Note: the icon-name
-        must be specified without the trailing .png/.jpg suffix.<br>
+        Space separated list of regexp:icon-name:cmd triples, icon-name and cmd
+        may be empty.<br>
+        If the state of the device matches regexp, then icon-name will be
+        displayed as the status icon in the room, and (if specified) clicking
+        on the icon executes cmd.  If fhem cannot find icon-name, then the
+        status text will be displayed. 
         Example:<br>
         <ul>
         attr lamp devStateIcon on:closed off:open<br>
+        attr lamp devStateIcon on::A0 off::AI<br>
         attr lamp devStateIcon .*:noIcon<br>
         </ul>
         </ul>
