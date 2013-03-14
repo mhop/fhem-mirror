@@ -114,6 +114,7 @@ sub HUEDevice_Undefine($$)
   return undef;
 }
 
+sub HUEDevice_Set($@);
 sub
 HUEDevice_Set($@)
 {
