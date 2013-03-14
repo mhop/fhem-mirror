@@ -150,13 +150,12 @@ sub CUL_HM_updateConfig($){
 
 	if ("dimmer" eq CUL_HM_Get($hash,$name,"param","subType")) {#setup virtuals
 	  #configure Dimmer virtual channel assotiation
-
 	  if (length($id) == 8 || !$hash->{"channel_01"}){
 	    my $chn = substr($id,6,2);
 		$chn = "01" if (!$chn); # device acts as channel 01
 	    my $devId = substr($id,0,6);
 	    my $mId = CUL_HM_getMId($hash);
-		if ($culHmModel{$mId}{chn} =~ m/Sw:/){
+		if ($culHmModel{$mId}{chn} =~ m/Sw._V/){
 		  my @chnPh = (grep{$_ =~ m/Sw:/ } split ',',$culHmModel{$mId}{chn});
 		  @chnPh = split ':',$chnPh[0] if (@chnPh);
 		  my $chnPhyMax = $chnPh[2]?$chnPh[2]:1;         # max Phys channels
@@ -2660,7 +2659,7 @@ sub CUL_HM_getConfig($$$$$){
   }
  }
 
- #+++++++++++++++++ Protocol stack, sending, repeat++++++++++++++++++++++++++++
+#+++++++++++++++++ Protocol stack, sending, repeat++++++++++++++++++++++++++++
 sub CUL_HM_SndCmd($$) {
   my ($hash, $cmd) = @_;
   $hash = CUL_HM_getDeviceHash($hash); 
@@ -3275,7 +3274,7 @@ sub CUL_HM_updtRegDisp($$$) {
 #+++++++++++++++++ parameter cacculations +++++++++++++++++++++++++++++++++++++
 my @culHmTimes8 = ( 0.1, 1, 5, 10, 60, 300, 600, 3600 );
 my %fltCvT = (0.1=>3.1,1=>31,5=>155,10=>310,60=>1860,300=>9300,
-              600=>18600,3600=>111600);
+              600=>18600,3600=>111601);
 sub CUL_HM_encodeTime8($) {#####################
   my $v = shift;
   return "00" if($v < 0.1);
@@ -4653,6 +4652,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
   </li>
   <li>remote/pushButton<br>
       battery [low|ok]<br>
+	  trigger [Long|Short]_$no trigger event from channel<br>
   </li>
   <li>swi<br>
       Btn$x toggle<br>
