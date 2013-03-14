@@ -769,13 +769,15 @@ sub YAMAHA_AVR_getInputs($)
     seconds), which periodically reads the status of the AV receiver (power state, selected
     input, volume and mute status) and triggers notify/filelog commands.<br><br>
 
-    Example:
-    <PRE>
+    Example:<br><br>
+    <ul><code>
        define AV_Receiver YAMAHA_AVR 192.168.0.10
-       
-       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60   # With custom interval of 60 seconds
-    </PRE>
+       <br><br>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 &nbsp;&nbsp;&nbsp; # With custom interval of 60 seconds
+    </code></ul>
+   
   </ul>
+  <br><br>
   <b>Zone Selection</b><br>
   <ul>
     If your receiver supports zone selection (e.g. RX-V671, RX-V673,... and the AVANTAGE series) 
@@ -793,15 +795,15 @@ sub YAMAHA_AVR_getInputs($)
     The module just offers the real available inputs.
     <br><br>
     Example:
-    
-     <PRE>
-        define AV_Receiver YAMAHA_AVR 192.168.0.10           # If no zone is specified, the "Main Zone" will be used.
-        attr AV_Receiver YAMAHA_AVR room Livingroom
-        
-        # Define the second zone
-        define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2
+    <br><br>
+     <ul><code>
+        define AV_Receiver YAMAHA_AVR 192.168.0.10 &nbsp;&nbsp;&nbsp; # If no zone is specified, the "Main Zone" will be used.<br>
+        attr AV_Receiver YAMAHA_AVR room Livingroom<br>
+        <br>
+        # Define the second zone<br>
+        define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2<br>
         attr AV_Receiver_Zone2 room Bedroom
-     </PRE>
+     </code></ul><br><br>
      For each Zone you will need an own YAMAHA_AVR device, which can be assigned to a different room.
      Each zone can be controlled separatly from all other available zones.
      <br><br>
@@ -814,79 +816,79 @@ sub YAMAHA_AVR_getInputs($)
     <br><br>
     Currently, the following commands are defined; the available inputs are depending on the used receiver.
     The module only offers the real available inputs. The following input commands are just an example and can differ.
-
-<pre>on
-off
-input hdmi1
-input hdmi2
-input hdmi3
-input hdmi4
-input av1
-input av2
-input av3
-input av3
-input av4
-input av5
-input av6
-input usb
-input airplay
-input tuner
-input v-aux
-input audio
-input server
-volume -80..16	(volume between -80 and +16 dB)
-mute on
-mute off</pre>
-</ul>
+<br><br>
+<ul><code>on<br>
+off<br>
+input hdmi1<br>
+input hdmi2<br>
+input hdmi3<br>
+input hdmi4<br>
+input av1<br>
+input av2<br>
+input av3<br>
+input av3<br>
+input av4<br>
+input av5<br>
+input av6<br>
+input usb<br>
+input airplay<br>
+input tuner<br>
+input v-aux<br>
+input audio<br>
+input server<br>
+volume -80..16	(volume between -80 and +16 dB)<br>
+mute on<br>
+mute off</code></ul>
+</ul><br><br>
 <u>Remote control (not in all zones available, depending on your model)</u><br><br>
 <ul>
     In many receiver models, inputs exist, which can't be used just by selecting them. These inputs needs
     a manual interaction with the remote control to activate the playback (e.g. Internet Radio, Network Streaming).<br><br>
     For this application the following commands are available:<br><br>
 
-    <u>Cursor Selection:</u>
-    <pre>
-    remoteControl up
-    remoteControl down
-    remoteControl left
-    remoteControl right
-    remoteControl enter
-    remoteControl return
-    </pre>
+    <u>Cursor Selection:</u><br><br>
+    <ul><code>
+    remoteControl up<br>
+    remoteControl down<br>
+    remoteControl left<br>
+    remoteControl right<br>
+    remoteControl enter<br>
+    remoteControl return<br>
+    </code></ul><br><br>
 
-    <u>Menu Selection:</u>
-    <pre>
-    remoteControl setup
-    remoteControl option
-    remoteControl display
-    </pre>
+    <u>Menu Selection:</u><br><br>
+    <ul><code>
+    remoteControl setup<br>
+    remoteControl option<br>
+    remoteControl display<br>
+    </code></ul><br><br>
 
     The button names are the same as on your remote control.<br><br>
     
-    A typical example is the automatical turn on and play an internet radio broadcast:
-    <pre>
-    # the initial definition.
+    A typical example is the automatical turn on and play an internet radio broadcast:<br><br>
+    <ul><code>
+    # the initial definition.<br>
     define AV_receiver YAMAHA_AVR 192.168.0.3
-    </pre>
-    And in your 99_MyUtils.pm the following function:
-    <pre>
-    sub startNetRadio
-    {
-      fhem "set AV_Receiver on";
-      sleep 5;
-      fhem "set AV_Receiver input netradio";
-      sleep 4;
-      fhem "set AV_Receiver remoteControl enter";
-      sleep 2;
-      fhem "set AV_Receiver remoteControl enter";
+    </code></ul><br><br>
+    And in your 99_MyUtils.pm the following function:<br><br>
+    <ul><code>
+    sub startNetRadio()<br>
+    {<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver on";<br>
+      &nbsp;&nbsp;sleep 5;<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver input netradio";<br>
+      &nbsp;&nbsp;sleep 4;<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
+      &nbsp;&nbsp;sleep 2;<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
     }
-    </pre>
+    </code></ul><br><br>
     The remote control commands must be separated with a sleep, because the receiver is loading meanwhile and don't accept commands.<br><br>
     
-    Now you can use this function by typing the following line in your FHEM command line or in your notify-definitions:
-    <pre>
+    Now you can use this function by typing the following line in your FHEM command line or in your notify-definitions:<br><br>
+    <ul><code>
     {startNetRadio()}
-    </pre>
+    </code></ul><br><br>
     
     
     
@@ -897,11 +899,11 @@ mute off</pre>
   <ul>
     <code>get &lt;name&gt; &lt;what&gt;</code>
     <br><br>
-    Currently, the following commands are defined and return the current state of the receiver.
-<pre>power
-input 
-mute 
-volume_level</pre>
+    Currently, the following commands are defined and return the current state of the receiver.<br><br>
+<ul><code>power<br>
+input<br>
+mute<br>
+volume_level</code></ul><br><br>
   </ul>
   <a name="YAMAHA_AVRattr"></a>
   <b>Attributes</b>
@@ -951,15 +953,15 @@ volume_level</pre>
     die Lautst&auml;rke zu &auml;ndern, den Receiver "Stumm" zu schalten, sowie den aktuellen Status abzufragen.
     <br><br>
     Bei der Definition eines YAMAHA_AVR-Moduls wird eine interne Routine in Gang gesetzt, welche regelm&auml;&szlig;ig 
-    (einstellbar durch den optionalen Parameter &lt;Status_Interval&gt;; falls nicht gesetzt ist der Standardwert 30 Sekunden)
+    (einstellbar durch den optionalen Parameter <code>&lt;Status_Interval&gt;</code>; falls nicht gesetzt ist der Standardwert 30 Sekunden)
     den Status des Receivers abfragt und entsprechende Notify-/FileLog-Ger&auml;te triggert..<br><br>
 
-    Beispiel:
-    <PRE>
-       define AV_Receiver YAMAHA_AVR 192.168.0.10
+    Beispiel:<br><br>
+    <ul><code>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10<br><br>
        
-       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60   # Mit modifiziertem Status Interval (60 Sekunden)
-    </PRE>
+       define AV_Receiver YAMAHA_AVR 192.168.0.10 mainzone 60 &nbsp;&nbsp;&nbsp; # Mit modifiziertem Status Interval (60 Sekunden)
+    </code></ul><br><br>
   </ul>
   <b>Zonenauswahl</b><br>
   <ul>
@@ -977,16 +979,15 @@ volume_level</pre>
     Je nach Receiver-Modell stehen in den verschiedenen Zonen nicht immer alle Eing&auml;nge zur Verf&uuml;gung. 
     Dieses Modul bietet nur die tats&auml;chlich verf&uuml;gbaren Eing&auml;nge an.
     <br><br>
-    Beispiel:
-    
-     <PRE>
-        define AV_Receiver YAMAHA_AVR 192.168.0.10           # Wenn keine Zone angegeben ist, wird 
-        attr AV_Receiver YAMAHA_AVR room Wohnzimmer          # standardm&auml;&szlig;ig "mainzone" verwendet
-        
-        # Definition der zweiten Zone
-        define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2
-        attr AV_Receiver_Zone2 room Schlafzimmer
-     </PRE>
+    Beispiel:<br><br>
+     <ul><code>
+        define AV_Receiver YAMAHA_AVR 192.168.0.10 &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; # Wenn keine Zone angegeben ist, wird<br>
+        attr AV_Receiver YAMAHA_AVR room Wohnzimmer &nbsp;&nbsp;&nbsp;&nbsp; # standardm&auml;&szlig;ig "mainzone" verwendet<br>
+        <br>
+        # Definition der zweiten Zone<br>
+        define AV_Receiver_Zone2 YAMAHA_AVR 192.168.0.10 zone2<br>
+        attr AV_Receiver_Zone2 room Schlafzimmer<br>
+     </code></ul><br><br>
      F&uuml;r jede Zone muss eine eigene YAMAHA_AVR Definition erzeugt werden, welche dann unterschiedlichen R&auml;umen zugeordnet werden kann.
      Jede Zone kann unabh&auml;ngig von allen anderen Zonen (inkl. der Main Zone) gesteuert werden.
      <br><br>
@@ -1000,29 +1001,30 @@ volume_level</pre>
     Aktuell werden folgende Kommandos unterst&uuml;tzt. Die verf&uuml;gbaren Eing&auml;nge k&ouml;nnen je nach Receiver-Modell variieren.
     Die folgenden Eing&auml;nge stehen beispielhaft an einem RX-V473 Receiver zur Verf&uuml;gung.
     Aktuell stehen folgende Kommandos zur Verf&uuml;gung.
-
-<pre>on
-off
-input hdmi1
-input hdmi2
-input hdmi3
-input hdmi4
-input av1
-input av2
-input av3
-input av3
-input av4
-input av5
-input av6
-input usb
-input airplay
-input tuner
-input v-aux
-input audio
-input server
-volume -80..16	(Lautst&auml;rke zwischen -80 und +16 dB)
-mute on
-mute off</pre>
+<br><br>
+<ul><code>
+on<br>
+off<br>
+input hdmi1<br>
+input hdmi2<br>
+input hdmi3<br>
+input hdmi4<br>
+input av1<br>
+input av2<br>
+input av3<br>
+input av3<br>
+input av4<br>
+input av5<br>
+input av6<br>
+input usb<br>
+input airplay<br>
+input tuner<br>
+input v-aux<br>
+input audio<br>
+input server<br>
+volume -80..16	(Lautst&auml;rke zwischen -80 und +16 dB)<br>
+mute on<br>
+mute off</code></ul><br><br>
 
 </ul>
 <u>Fernbedienung (je nach Modell nicht in allen Zonen verf&uuml;gbar)</u><br><br>
@@ -1031,49 +1033,49 @@ mute off</pre>
     bed&uuml;rfen manueller Interaktion mit der Fernbedienung um die Wiedergabe zu starten (z.B. Internet Radio, Netzwerk Streaming, usw.).<br><br>
     F&uuml;r diesen Fall gibt es folgende Befehle:<br><br>
 
-    <u>Cursor Steuerung:</u>
-    <pre>
-    remoteControl up
-    remoteControl down
-    remoteControl left
-    remoteControl right
-    remoteControl enter
-    remoteControl return
-    </pre>
+    <u>Cursor Steuerung:</u><br><br>
+    <ul><code>
+    remoteControl up<br>
+    remoteControl down<br>
+    remoteControl left<br>
+    remoteControl right<br>
+    remoteControl enter<br>
+    remoteControl return<br>
+    </code></ul><br><br>
 
-    <u>Men&uuml; Auswahl:</u>
-    <pre>
-    remoteControl setup
-    remoteControl option
-    remoteControl display
-    </pre>
+    <u>Men&uuml; Auswahl:</u><br><br>
+    <ul><code>
+    remoteControl setup<br>
+    remoteControl option<br>
+    remoteControl display<br>
+    </code></ul><br><br>
 
     Die Befehlsnamen entsprechen den Tasten auf der Fernbedienung.<br><br>
     
-    Ein typisches Beispiel ist das automatische Einschalten und Abspielen eines Internet Radio Sender:
-    <pre>
-    # Die Ger&auml;tedefinition
+    Ein typisches Beispiel ist das automatische Einschalten und Abspielen eines Internet Radio Sender:<br><br>
+    <ul><code>
+    # Die Ger&auml;tedefinition<br><br>
     define AV_receiver YAMAHA_AVR 192.168.0.3
-    </pre>
-    Und in der 99_MyUtils.pm die folgende Funktion:
-    <pre>
-    sub startNetRadio
-    {
-      fhem "set AV_Receiver on";
-      sleep 5;
-      fhem "set AV_Receiver input netradio";
-      sleep 4;
-      fhem "set AV_Receiver remoteControl enter";
-      sleep 2;
-      fhem "set AV_Receiver remoteControl enter";
+    </code></ul><br><br>
+    Und in der 99_MyUtils.pm die folgende Funktion:<br><br>
+    <ul><code>
+    sub startNetRadio<br>
+    {<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver on";<br>
+      &nbsp;&nbsp;sleep 5;<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver input netradio";<br>
+      &nbsp;&nbsp;sleep 4;<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
+      &nbsp;&nbsp;sleep 2;<br>
+      &nbsp;&nbsp;fhem "set AV_Receiver remoteControl enter";<br>
     }
-    </pre>
+    </code></ul><br><br>
     Die Kommandos der Fernbedienung m&uuml;ssen mit einem sleep pausiert werden, da der Receiver in der Zwischenzeit arbeitet und keine Befehle annimmt..<br><br>
     
-    Nun kann man diese Funktion in der FHEM Kommandozeile oder in notify-Definitionen wie folgt verwenden.:
-    <pre>
+    Nun kann man diese Funktion in der FHEM Kommandozeile oder in notify-Definitionen wie folgt verwenden.:<br><br>
+    <ul><code>
     {startNetRadio()}
-    </pre>
+    </code></ul><br><br>
   </ul>
 
   <a name="YAMAHA_AVRget"></a>
