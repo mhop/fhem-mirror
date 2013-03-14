@@ -322,7 +322,7 @@ THRESHOLD_setValue($$)
 <a name="THRESHOLD"></a>
 <h3>THRESHOLD</h3>
 <ul>
-  This module reads any sensor that provides values ​​in decimal and execute FHEM/Perl commands, if the value of the sensor is higher or lower than the threshold value.
+  This module reads any sensor that provides values in decimal and execute FHEM/Perl commands, if the value of the sensor is higher or lower than the threshold value.
   So can be easily implemented a software thermostat, hygrostat and much more.<br> 
   <br>
   It is controlled by setting a desired value with:<br>
@@ -419,17 +419,17 @@ THRESHOLD_setValue($$)
     <br>
 	More examples:<br>
 	<br>
-	<code>define Hygrostat THRESHOLD hym_sens:huminity dehydrator|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:huminity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
+	<code>define Hygrostat THRESHOLD hym_sens:humidity dehydrator|set @ on|set @ off|1</code><br>
+	<code>define Hygrostat THRESHOLD hym_sens:humidity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
 	<code>define Thermostat THRESHOLD temp_sens:temperature:1 aircon|set @ on|set @ off|1</code><br>
 	<code>define Thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:huminity:20 watering|set @ off|set @ on|2</code><br>
+	<code>define Hygrostat THRESHOLD hym_sens:humidity:20 watering|set @ off|set @ on|2</code><br>
 	<br>
 	Alternatively, each Perl commands are given.<br>
 	<br>
 	Examples:<br>
 	<br>
-	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")|{fhem("set Switch1 off;set Switch2 off")|1</code><br>
+	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")}|{fhem("set Switch1 off;set Switch2 off")}|1</code><br>
     <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"value is exceeded"}|{fhem("set @ on;set Switch2 on")}</code><br>
 	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"value is reached"}|</code><br>
     <br>
@@ -579,17 +579,17 @@ THRESHOLD_setValue($$)
     <br>
 	einige weitere Bespiele:<br>
 	<br>
-	<code>define Hygrostat THRESHOLD hym_sens:huminity dehydrator|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:huminity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
+	<code>define Hygrostat THRESHOLD hym_sens:humidity dehydrator|set @ on|set @ off|1</code><br>
+	<code>define Hygrostat THRESHOLD hym_sens:humidity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
 	<code>define Thermostat THRESHOLD temp_sens:temperature:1 aircon|set @ on|set @ off|1</code><br>
 	<code>define Thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:huminity:20 watering|set @ off|set @ on|2</code><br>
+	<code>define Hygrostat THRESHOLD hym_sens:humidity:20 watering|set @ off|set @ on|2</code><br>
 	<br>
 	Alternativ können jeweils Perl-Befehle angegeben werden.<br>
 	<br>
 	Beispiele:<br>
 	<br>
-	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")|{fhem("set Switch1 off;set Switch2 off")|1</code><br>
+	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")}|{fhem("set Switch1 off;set Switch2 off")}|1</code><br>
     <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"Wert überschritten"}|{fhem("set @ on;set Switch2 on")}</code><br>
 	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"Wert unterschritten"}|</code><br>
     <br>
