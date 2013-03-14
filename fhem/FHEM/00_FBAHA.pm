@@ -69,7 +69,7 @@ FBAHA_Set($@)
 {
   my ($hash, @a) = @_;
   my $name = shift @a;
-  my %sets = ("createDevs"=>1, "listen"=>1 );
+  my %sets = ("createDevs"=>1, "reregister"=>1);
 
   return "set $name needs at least one parameter" if(@a < 1);
   my $type = shift @a;
@@ -82,11 +82,34 @@ FBAHA_Set($@)
     foreach my $arg (@arg) {
       if($arg =~ m/ID:(\d+).*PROP:(.*)/) {
         my ($i,$p) = ($1,$2,$3);
-        Log 1, "UNDEFINED FBDECT_$i FBDECT $i $p";
+        my $msg = "UNDEFINED FBDECT_$i FBDECT $i $p";
+        DoTrigger("global", $msg, 1);
+        Log 1, $msg;
       }
     }
   }
-  if($type eq "listen") {
+
+  if($type eq "reregister") {
+    FBAHA_Write($hash, "02", "") if($hash->{HANDLE});  # RELEASE
+    FBAHA_Write($hash, "00", "00010001");              # REGISTER
+    my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
+    if($err) {
+      Log 1, $err;
+      $hash->{STATE} = "???";
+      return $err;
+    }
+
+    if($data =~ m/^01030010(........)/) {
+      $hash->{STATE} = "Initialized";
+      $hash->{HANDLE} = $1;
+
+    } else {
+      my $msg = "Got bogus answer for REGISTER request: $data";
+      Log 1, $msg;
+      $hash->{STATE} = "???";
+      return $msg;
+
+    }
     FBAHA_Write($hash, "03", "0000028200000000");  # LISTEN
   }
 
@@ -177,26 +200,7 @@ FBAHA_DoInit($)
   my $name = $hash->{NAME};
   Log 1, "FBAHA_DoInit called";
 
-  FBAHA_Write($hash, "00", "00010001"); 
-  my ($err, $data) = FBAHA_ReadAnswer($hash, "REGISTER", "^01");
-  if($err) {
-    Log 1, $err;
-    $hash->{STATE} = "???";
-    return 1;
-  }
-
-  if($data =~ m/^01030010(........)/) {
-    $hash->{STATE} = "Initialized";
-    $hash->{HANDLE} = $1;
-
-  } else {
-    Log 1, "Got bogus answer for REGISTER request: $data";
-    $hash->{STATE} = "???";
-
-  }
-
-  FBAHA_Write($hash, "03", "0000028200000000");  # LISTEN
-  return undef;
+  return FBAHA_Set($hash, ($name, "reregister"));
 }
 
 #####################################
