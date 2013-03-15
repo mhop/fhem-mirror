@@ -114,21 +114,10 @@ sub HUEDevice_Undefine($$)
   return undef;
 }
 
-sub HUEDevice_Set($@);
 sub
-HUEDevice_Set($@)
+HUEDevice_SetParam($$@)
 {
-  my ($hash, $name, @aa) = @_;
-
-  if( (my $joined = join(" ", @aa)) =~ /:/ ) {
-    my @cmds = split(":", $joined);
-    for( my $i = 0; $i <= $#cmds; ++$i ) {
-      HUEDevice_Set( $hash, $name, split(" ", $cmds[$i]) );
-    }
-    return;
-  }
-
-  my ($cmd, $value, $value2, @a) = @aa;
+  my ($name, $obj, $cmd, $value, $value2) = @_;
 
   if( $cmd eq "color" ) {
     $value = int(1000000/$value);
@@ -146,12 +135,128 @@ HUEDevice_Set($@)
     $cmd = 'bri';
   }
 
-  # usage check
-  if($cmd eq 'statusRequest') {
+  if($cmd eq 'on') {
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
+    $obj->{'transitiontime'} = $value / 10 if( defined($value) );
+  } elsif($cmd eq 'off') {
+    $obj->{'on'}  = JSON::false;
+    $obj->{'transitiontime'} = $value / 10 if( defined($value) );
+  } elsif($cmd eq "pct") {
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = int(2.54 * $value);
+    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif($cmd eq "bri") {
+    $obj->{'on'}  = JSON::true;
+    $obj->{'bri'}  = 0+$value;
+    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif($cmd eq "ct") {
+    $obj->{'on'}  = JSON::true;
+    $obj->{'ct'}  = 0+$value;
+    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif($cmd eq "hue") {
+    $obj->{'on'}  = JSON::true;
+    $obj->{'hue'}  = 0+$value;
+    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif($cmd eq "sat") {
+    $obj->{'on'}  = JSON::true;
+    $obj->{'sat'}  = 0+$value;
+    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif($cmd eq "xy" && $value =~ m/^(.+),(.+)/) {
+    my ($x,$y) = ($1, $2);
+    $obj->{'on'}  = JSON::true;
+    $obj->{'xy'}  = [0+$x, 0+$y];
+    $obj->{'transitiontime'} = $value2 / 10 if( defined($value2) );
+  } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
+    # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
+    my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
+#Log 3, "rgb: ". $r . " " . $g ." ". $b;
+
+    my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
+    my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
+    my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
+#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
+
+    if( $X != 0
+        || $Y != 0
+        || $Z != 0 ) {
+      my $x = $X / ($X + $Y + $Z);
+      my $y = $Y / ($X + $Y + $Z);
+#Log 3, "xyY:". $x . " " . $y ." ". $Y;
+
+      #$x = 0 if( $x < 0 );
+      #$x = 1 if( $x > 1 );
+      #$y = 0 if( $y < 0 );
+      #$y = 1 if( $y > 1 );
+      $Y = 1 if( $Y > 1 );
+
+      my $bri  = max($r,max($g,$b));
+      #my $bri  = $Y;
+
+    $obj->{'on'}  = JSON::true;
+    $obj->{'xy'}  = [0+$x, 0+$y];
+    $obj->{'bri'}  = int(254*$bri);
+        }
+  } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
+    my( $h, $s, $v ) = (hex($1), hex($2), hex($3));
+
+    $s = 254 if( $s > 254 );
+    $v = 254 if( $v > 254 );
+
+    $obj->{'on'}  = JSON::true;
+    $obj->{'hue'}  = int($h*256);
+    $obj->{'sat'}  = 0+$s;
+    $obj->{'bru'}  = 0+$v;
+  } else {
+    return 0;
+  }
+
+  return 1;
+}
+sub HUEDevice_Set($@);
+sub
+HUEDevice_Set($@)
+{
+  my ($hash, $name, @aa) = @_;
+
+  #my %obj;
+
+  if( (my $joined = join(" ", @aa)) =~ /:/ ) {
+    my @cmds = split(":", $joined);
+    for( my $i = 0; $i <= $#cmds; ++$i ) {
+      HUEDevice_Set( $hash, $name, split(" ", $cmds[$i]) );
+      #HUEDevice_SetParam($name, \%obj, split(" ", $cmds[$i]) );
+    }
+    return;
+  }
+
+  my ($cmd, $value, $value2, @a) = @aa;
+
+  if( $cmd eq "statusRequest" ) {
     RemoveInternalTimer($hash);
     HUEDevice_GetUpdate($hash);
     return undef;
-  } elsif($cmd eq 'on') {
+    }
+
+  #HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
+
+  if( $cmd eq "color" ) {
+    $value = int(1000000/$value);
+    $cmd = 'ct';
+  } elsif( $cmd eq "toggle" ) {
+    $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
+  } elsif( $cmd =~ m/^dim(\d+)/ ) {
+    $value = $1 unless defined($value);
+    if( $value <   0 ) { $value =   0; }
+    if( $value > 100 ) { $value = 100; }
+    $cmd = 'pct';
+  } elsif( !defined($value) && $cmd =~ m/^(\d+)/) {
+    $value = $1;
+    $value = 254 if( $value > 254 );
+    $cmd = 'bri';
+  }
+
+  if($cmd eq 'on') {
 
     my $obj = {
       'on'  => JSON::true,
@@ -252,6 +357,7 @@ HUEDevice_Set($@)
         return undef;
     }
   } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
+    # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
     my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
 #Log 3, "rgb: ". $r . " " . $g ." ". $b;
 
@@ -331,60 +437,91 @@ HUEDevice_Get($@)
   my $cmd= $a[1];
 
   if($cmd eq "rgb") {
-    my $ret = "000000";
+    my $r = 0;
+    my $g = 0;
+    my $b = 0;
 
-    if( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ )
-      {
-        my ($x,$y) = ($1, $2);
-        my $Y = ReadingsVal($name,"bri","") / 254.0;
+    if( ReadingsVal($name,"colormode","") eq "ct" ) {
+      if( ReadingsVal($name,"ct","") =~ m/(\d+) .*/ ) {
+        # calculation from http://www.tannerhelland.com/4435/convert-temperature-rgb-algorithm-code
+        # adjusted by 1000K
+        my $temp = (1000000/$1)/100 + 10;
+
+        $r = 255;
+        $r = 329.698727446 * ($temp - 60) ** -0.1332047592 if( $temp > 66 );
+        $r = 0 if( $r < 0 );
+        $r = 255 if( $r > 255 );
+
+        $g;
+        if( $temp <= 66 ) {
+          $g = 99.4708025861 * log($temp) - 161.1195681661;
+        } else {
+          $g = 288.1221695283 * ($temp - 60) ** -0.0755148492;
+        }
+        $g = 0 if( $g < 0 );
+        $g = 255 if( $g > 255 );
+
+        $b = 255;
+        $b = 0 if( $temp <= 19 );
+        if( $temp < 66 ) {
+          $b = 138.5177312231 * log($temp-10) - 305.0447927307;
+        }
+        $b = 0 if( $b < 0 );
+        $b = 255 if( $b > 255 );
+      }
+    } elsif( ReadingsVal($name,"xy","") =~ m/(.+),(.+)/ ) {
+      # calculation from http://www.brucelindbloom.com/index.html
+      my ($x,$y) = ($1, $2);
+      my $Y = ReadingsVal($name,"bri","") / 254.0;
 #Log 3, "xyY:". $x . " " . $y ." ". $Y;
 
-        if( $y > 0 ) {
-          my $X = $x * $Y / $y;
-          my $Z = (1 - $x - $y)*$Y / $y;
+      if( $y > 0 ) {
+        my $X = $x * $Y / $y;
+        my $Z = (1 - $x - $y)*$Y / $y;
 
-          if( $X > 1
-              || $Y > 1
-              || $Z > 1 ) {
-            my $f = max($X,max($Y,$Z));
-            $X /= $f;
-            $Y /= $f;
-            $Z /= $f;
-          }
+        if( $X > 1
+            || $Y > 1
+            || $Z > 1 ) {
+          my $f = max($X,max($Y,$Z));
+          $X /= $f;
+          $Y /= $f;
+          $Z /= $f;
+        }
 #Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
 
-          my $r =  0.7982 * $X + 0.3389 * $Y - 0.1371 * $Z;
-          my $g = -0.5918 * $X + 1.5512 * $Y + 0.0406 * $Z;
-          my $b =  0.0008 * $X + 0.0239 * $Y + 0.9753 * $Z;
+        $r =  0.7982 * $X + 0.3389 * $Y - 0.1371 * $Z;
+        $g = -0.5918 * $X + 1.5512 * $Y + 0.0406 * $Z;
+        $b =  0.0008 * $X + 0.0239 * $Y + 0.9753 * $Z;
 
-          if( $r > 1
-              || $g > 1
-              || $b > 1 ) {
-            my $f = max($r,max($g,$b));
-            $r /= $f;
-            $g /= $f;
-            $b /= $f;
-          }
+        if( $r > 1
+            || $g > 1
+            || $b > 1 ) {
+          my $f = max($r,max($g,$b));
+          $r /= $f;
+          $g /= $f;
+          $b /= $f;
+        }
 #Log 3, "rgb: ". $r . " " . $g ." ". $b;
 
-          $r *= 255;
-          $g *= 255;
-          $b *= 255;
-
-          $ret = sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
-        }
+        $r *= 255;
+        $g *= 255;
+        $b *= 255;
       }
-    return $ret;
+    }
+    return sprintf( "%02x%02x%02x", $r+0.5, $g+0.5, $b+0.5 );
   } elsif ( $cmd eq "devStateIcon" ) {
-    return '<div id="'.$name.'" align="center" class="col2">'.
-           '<img src="/fhem/icons/off" alt="off" title="off">'.
-           '</div>' if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
+    return '<img src="/fhem/icons/off" alt="off" title="off">'
+           if( ReadingsVal($name,"state","off") eq "off" || ReadingsVal($name,"bri","0") eq 0 );
 
-    return '<div id="'.$name.'" align="center" class="col2">'.
+    return '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'
+           if( AttrVal($hash->{NAME}, "model", "") eq "LWL001" );
+
+    return '<div style="height:19px;'.
+           'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';">'.
            '<img src="/fhem/icons/'.$hash->{STATE}.'" alt="'.$hash->{STATE}.'" title="'.$hash->{STATE}.'">'.
-           '</div>' if( AttrVal($hash->{NAME}, "model", "") eq "LWL001" );
+           '</div>' if( ReadingsVal($name,"colormode","") eq "ct" );
 
-    return '<div id="'.$name.'" class="block" style="width:32px;height:19px;'.
+    return '<div style="width:32px;height:19px;'.
            'border:1px solid #fff;border-radius:8px;background-color:#'.CommandGet("","$name rgb").';"></div>';
   }
 
