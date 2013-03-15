@@ -89,7 +89,8 @@ sub CUL_HM_Initialize($) {
                        "serialNr firmware ".
                        "rawToReadable unit ".#"KFM-Sensor" only
                        "peerIDs repPeers ".
-                       "actCycle actStatus autoReadReg:1_restart,0_off,2_pon-restart ".
+                       "actCycle actStatus ".
+					   "autoReadReg:1_restart,0_off,2_pon-restart,3_onChange ".
 					   "expert:0_off,1_on,2_full ".
 
                        "hmClass:obsolete devInfo:obsolete ". #unused
@@ -879,10 +880,10 @@ sub CUL_HM_Parse($$) {##############################
         $state .= ($st eq "swi")?"toggle":"Short";#swi only support toggle
 		$trigType = "Short";
       }
-	  $shash->{helper}{addVal} = $buttonField;   #store to handle changes
-	  push @entities,CUL_HM_UpdtReadBulk($chnHash,"state:".$state.$target
-	                                             ,"trigger:".$trigType."_".$bno
-									     ,1);
+	  $shash->{helper}{addVal} = $buttonField;   #store to handle changesFread
+	  push @entities,CUL_HM_UpdtReadBulk($chnHash,1,
+	                                         ,"state:".$state.$target
+	                                         ,"trigger:".$trigType."_".$bno);
       push @event,"battery:". (($buttonField&0x80)?"low":"ok");
       push @event,"state:$btnName $state$target";
     }
@@ -1480,7 +1481,7 @@ sub CUL_HM_parseCommon(@){#####################################################
 		my ($chn) = ($1) if($p =~ m/^..(..)/);
 		if ($chn eq "00"){
 		  CUL_HM_queueAutoRead(CUL_HM_hash2Name($shash))
-		    if (2 == substr(AttrVal($shash->{NAME},"autoReadReg",0),0,1));
+		    if (1 < substr(AttrVal($shash->{NAME},"autoReadReg",0),0,1));
 		  return "powerOn" ;# check dst eq "000000" as well?
 		}
 	  }
@@ -2913,6 +2914,8 @@ sub CUL_HM_pushConfig($$$$$$$$) {#generate messages to cnfig data to register
 	                                 substr($content,$l,$ml));
   }
   CUL_HM_PushCmdStack($hash,"++A001".$src.$dst.$chn."06");
+  CUL_HM_queueAutoRead(CUL_HM_hash2Name($hash))
+   if (2 < substr(CUL_HM_Get($hash,$hash->{NAME},"param","autoReadReg"),0,1));
 }
 sub CUL_HM_Resend($) {#resend a message if there is no answer
   my $hash = shift;
@@ -4531,8 +4534,9 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         attr KFM100 unit Liter
         </li>
     <li><a name="autoReadReg">autoReadReg</a><br>
-        set to '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
-		set to '2' like '1' plus execute after power_on.<br>
+        '1' will execute a getConfig for the device automatically after each reboot of FHEM. <br>
+		'2' like '1' plus execute after power_on.<br>
+		'3' includes '2' plus updates on writes to the device<br>
 		Execution will be delayed in order to prevent congestion at startup. Therefore the update 
 		of the readings and the display will be delayed depending on the sice of the database.<br>
 		Recommendations and constrains upon usage:<br>
