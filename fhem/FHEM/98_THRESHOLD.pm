@@ -44,10 +44,10 @@ THRESHOLD_Define($$$)
   my ($hash, $def) = @_;
   my @b =split (/\|/,$def);
   my @a = split("[ \t][ \t]*", $b[0]);
-  my $cmd1;
-  my $cmd2;
-  my $cmd_default;
-  my $actor;
+  my $cmd1="";
+  my $cmd2="";
+  my $cmd_default="";
+  my $actor="";
    
   if (@b > 4 || @a < 3 || @a > 5) {
     my $msg = "wrong syntax: define <name> THRESHOLD " .
@@ -60,7 +60,7 @@ THRESHOLD_Define($$$)
   my ($sensor, $reading, $hysteresis,$init_desired_value) = split(":", $a[2], 4);
   
   if(!$defs{$sensor}) {
-    my $msg = "$pn: THRESHOLD: Unknown sensor device $sensor specified";
+    my $msg = "$pn: Unknown sensor device $sensor specified";
     Log 2, $msg;
     return $msg;
   }
@@ -77,13 +77,13 @@ THRESHOLD_Define($$$)
 	    $hysteresis=0;
 	  }
   } elsif ($hysteresis !~ m/^[\d\.]*$/ ) {
-	  my $msg = "$pn: THRESHOLD: hysteresis needs a numeric parameter";
+	  my $msg = "$pn: value:$hysteresis, hysteresis needs a numeric parameter";
       Log 2, $msg;
       return $msg;
   }	
   if ($init_desired_value ne "") {
 	if ($init_desired_value !~ m/^[-\d\.]*$/) {
-      my $msg = "$pn: THRESHOLD: init_desired_value needs a numeric parameter";
+      my $msg = "$pn: value:$init_desired_value, init_desired_value needs a numeric parameter";
       Log 2, $msg;
       return $msg;  
 	}
@@ -97,7 +97,7 @@ THRESHOLD_Define($$$)
 	if (($operator eq "AND") or ($operator eq "OR")) {
 	  my ($sensor2, $sensor2_reading, $state) = split(":", $a[4], 3);
 	  if(!$defs{$sensor2}) {
-	    my $msg = "$pn: THRESHOLD: Unknown sensor2 device $sensor2 specified";
+	    my $msg = "$pn: Unknown sensor2 device $sensor2 specified";
 	    Log 2, $msg;
 	    return $msg;
  	  }
@@ -112,31 +112,36 @@ THRESHOLD_Define($$$)
 	  $actor = $a[3];
 	}
   }
-  if ($actor) {
+  if ($actor ne "") {
     if (!$defs{$actor}) {
-       my $msg = "$pn: THRESHOLD: Unknown actor device $actor specified";
+       my $msg = "$pn: Unknown actor device $actor specified";
        Log 2, $msg;
        return $msg;
 	}
   }
   if (@b == 1) { # no actor parameters
-	$cmd1 = "set $actor off";
+	if ($actor eq "") {
+       my $msg = "$pn: no actor device specified";
+       Log 2, $msg;
+       return $msg;
+	}
+  	$cmd1 = "set $actor off";
 	$cmd2 = "set $actor on";
 	$cmd_default = 2;
   } else { 
 	$cmd1 = $b[1];
     $cmd2 = $b[2];
     $cmd_default = $b[3];
-	if (!$cmd_default) {
+	if ($cmd_default eq "") {
 	  $cmd_default = 0;
-    } elsif ($cmd_default !~ m/^[0-2]*$/ ) {
-		my $msg = "$pn: THRESHOLD: cmd_default_index needs 0,1,2";
+    } elsif ($cmd_default !~ m/^[0-2]$/ ) {
+		my $msg = "$pn: value:$cmd_default, cmd_default_index needs 0,1,2";
         Log 2, $msg;
         return $msg;
 	}
   }	
 	
-  if ($actor) {
+  if ($actor ne "") {
 	$cmd1 =~ s/@/$actor/g;
 	$cmd2 =~ s/@/$actor/g;
   }
@@ -165,12 +170,12 @@ THRESHOLD_Set($@)
   my ($hash, @a) = @_;
   my $pn = $hash->{NAME};
   my $ret="";
-  return "Need a parameter for set" if(@a < 2);
+  return "$pn, need a parameter for set" if(@a < 2);
   my $arg = $a[1];
   my $desired_value;
   if ($arg eq "desired" ) {
-    return "Set desired needs a numeric parameter" if(@a != 3 || $a[2] !~ m/^[-\d\.]*$/);
-    Log GetLogLevel($pn,3), "THRESHOLD set $pn $arg $a[2]";
+    return "$pn: set desired value:$a[2], desired value needs a numeric parameter" if(@a != 3 || $a[2] !~ m/^[-\d\.]*$/);
+    Log GetLogLevel($pn,3), "set $pn $arg $a[2]";
 	readingsBeginUpdate  ($hash);
 	readingsBulkUpdate   ($hash, "state", "active $a[2]");
 	readingsBulkUpdate   ($hash, "threshold_min",$a[2]-$hash->{hysteresis});
@@ -179,14 +184,14 @@ THRESHOLD_Set($@)
 	readingsEndUpdate    ($hash, 1);
   } elsif ($arg eq "deactivated" ) {
       $desired_value = ReadingsVal($pn,"desired_value","");
-	  return "Set desired value first" if (!$desired_value);
+	  return "$pn: set deactivated, set desired value first" if (!$desired_value);
 	  $ret=CommandAttr(undef, "$pn disable 1");   
 	  if (!$ret) {
 	    readingsSingleUpdate   ($hash, "state", "deactivated $desired_value",1);
 	  }
   } elsif ($arg eq "active" ) {
       $desired_value = ReadingsVal($pn,"desired_value","");
-	  return "Set desired value first" if (!$desired_value);
+	  return "$pn: set active, set desired value first" if (!$desired_value);
 	  $ret=CommandDeleteAttr(undef, "$pn disable");
 	  if (!$ret) {
 		readingsBeginUpdate  ($hash);
@@ -195,7 +200,7 @@ THRESHOLD_Set($@)
 		readingsEndUpdate    ($hash, 1);
 	  }
 	} elsif ($arg eq "hysteresis" ) {
-		return "Hysteresis needs a numeric parameter" if ($a[2] !~ m/^[\d\.]*$/ );
+		return "$pn: set hysteresis value:$a[2], hysteresis needs a numeric parameter" if ($a[2] !~ m/^[\d\.]*$/ );
 		$hash->{hysteresis} = $a[2];
 		$desired_value = ReadingsVal($pn,"desired_value","");
 		if ($desired_value) {
@@ -205,7 +210,7 @@ THRESHOLD_Set($@)
 	      readingsEndUpdate    ($hash, 1);
 		}
 	  } else {
-          return "Unknown argument $a[1], choose one of desired active deactivated hysteresis"
+          return "$pn: unknown argument $a[1], choose one of desired active deactivated hysteresis"
         }
   return $ret;
 }
