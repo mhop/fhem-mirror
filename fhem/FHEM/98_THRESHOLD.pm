@@ -48,8 +48,7 @@ THRESHOLD_Define($$$)
   my $cmd2;
   my $cmd_default;
   my $actor;
-  my $init_desired_value;
-  
+   
   if (@b > 4 || @a < 3 || @a > 5) {
     my $msg = "wrong syntax: define <name> THRESHOLD " .
                "<sensor>[:<reading>[:<hysteresis>][:<init_desired_value>] [AND|OR <sensor2>[:<reading2>][:<state>]] [<actor>][|<cmd1>][|<cmd2>][|<cmd_default_index>]";
@@ -69,23 +68,26 @@ THRESHOLD_Define($$$)
   $hash->{sensor} = $sensor;
   $reading = "temperature" if (!$reading);
    
-  if (!$hysteresis) {
-	if ($reading eq	"temperature") {
+  if ($hysteresis eq "") {
+	if ($reading eq "temperature" or $reading eq "temp") {
 	  $hysteresis=1;
-	} else {
-	  $hysteresis=20;
-	}
+	} elsif ($reading eq "humidity") {
+	    $hysteresis=10;
+	  } else {
+	    $hysteresis=0;
+	  }
   } elsif ($hysteresis !~ m/^[\d\.]*$/ ) {
 	  my $msg = "$pn: THRESHOLD: hysteresis needs a numeric parameter";
       Log 2, $msg;
       return $msg;
-  }	elsif ($init_desired_value) {
-	  if ($init_desired_value !~ m/^[-\d\.]*$/) {
-        my $msg = "$pn: THRESHOLD: init_desired_value needs a numeric parameter";
-        Log 2, $msg;
-        return $msg;  
-	  }
+  }	
+  if ($init_desired_value ne "") {
+	if ($init_desired_value !~ m/^[-\d\.]*$/) {
+      my $msg = "$pn: THRESHOLD: init_desired_value needs a numeric parameter";
+      Log 2, $msg;
+      return $msg;  
 	}
+  }
   $hash->{sensor_reading} = $reading;
   $hash->{hysteresis} = $hysteresis;
   
@@ -144,7 +146,7 @@ THRESHOLD_Define($$$)
   $hash->{helper}{actor_cmd_default} = $cmd_default;
   $hash->{STATE} = 'initialized' if (!ReadingsVal($pn,"desired_value",""));
   
-  if ($init_desired_value)
+  if ($init_desired_value ne "")
   {
     readingsBeginUpdate  ($hash);
 	readingsBulkUpdate   ($hash, "state", "active $init_desired_value");
