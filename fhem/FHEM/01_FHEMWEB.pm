@@ -2280,7 +2280,7 @@ FW_dev2image($)
     my @list = split(" ", $devStateIcon);
     foreach my $l (@list) {
       my ($re, $iconName, $link) = split(":", $l, 3);
-      if($re && $state =~ m/^$re$/) {
+      if(defined($re) && $state =~ m/^$re$/) {
         if($iconName eq "") {
           $rlink = $link;
           last;
