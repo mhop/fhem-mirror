@@ -209,6 +209,8 @@ sub
 PRESENCE_Set($@)
 {
     my ($hash, @a) = @_;
+
+    return "No Argument given" if(!defined($a[1]));
    
     my $usage = ($hash->{MODE} ne "lan-bluetooth" ? "Unknown argument ".$a[1].", choose one of statusRequest " : undef);
    
