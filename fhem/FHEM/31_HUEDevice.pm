@@ -415,7 +415,7 @@ HUEDevice_Set($@)
     my $list = "off on toggle statusRequest";
     $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
     #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
-    $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xv" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+    $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
     return SetExtensions($hash, $list, $name, $cmd, $value, @a);
   }
 
@@ -737,7 +737,7 @@ HUEDevice_GetUpdate($)
       <li>sat &lt;value&gt;<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
       <li>x &lt;x&gt;,&lt;y&gt;<br>
-        set the xv color coordinates to &lt;x&gt;,&lt;y&gt;;</li>
+        set the xy color coordinates to &lt;x&gt;,&lt;y&gt;;</li>
       <li>rgb &lt;rrggbb&gt;</li>
     </ul><br>
 
