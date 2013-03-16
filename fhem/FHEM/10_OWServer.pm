@@ -102,7 +102,7 @@ OWServer_Initialize($)
   $hash->{ReadFn}  = "OWServer_Read";
   $hash->{DirFn}   = "OWServer_Dir";
   $hash->{FindFn}  = "OWServer_Find";
-  $hash->{Clients} = ":OWDevice:";
+  $hash->{Clients} = ":OWDevice:OWAD:OWCOUNT:OWMULTI:OWSWITCH:OWTHERM:";
 
 # Consumer
   $hash->{DefFn}   = "OWServer_Define";
