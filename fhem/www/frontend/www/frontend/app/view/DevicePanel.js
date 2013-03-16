@@ -37,7 +37,7 @@ Ext.define('FHEM.view.DevicePanel', {
         
         var devicedata = [];
         
-        Ext.iterate(me.record.raw, function(key, value) {
+        Ext.iterate(me.record.raw.data, function(key, value) {
             if (key !== 'ATTR' && key !== 'attrs' && key !== 'sets' && key !== 'READINGS') {
                 var obj = {
                      key: key,
@@ -80,7 +80,7 @@ Ext.define('FHEM.view.DevicePanel', {
             me.down('panel[name=container]').add(devicedatagrid);
         }
         
-        var readingcollection = me.record.raw.READINGS;
+        var readingcollection = me.record.raw.data.READINGS;
         if (readingcollection && !Ext.isEmpty(readingcollection) && readingcollection.length > 0) {
             
             var readingsdata = [];

@@ -86,18 +86,39 @@ Ext.define('FHEM.view.Viewport', {
                 }, {
                     region: 'west',
                     title: 'Navigation',
-                    width: 200,
+                    width: 270,
                     autoScroll: true,
+                    resizable: true,
                     xtype: 'panel',
                     name: 'westaccordionpanel',
                     layout: 'accordion',
                     items: [
                         {
                             xtype: 'panel',
+                            title: 'FHEM Devices',
+                            name: 'devicesaccordion',
+                            collapsed: false,
+                            autoScroll: true,
+                            items: [
+                                {
+                                    xtype: 'treepanel',
+                                    name: 'maintreepanel',
+                                    rootVisible: false,
+                                    root: { 
+                                        "text": "Root", 
+                                        "expanded": 
+                                        "true", 
+                                        "children": []
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            xtype: 'panel',
                             title: 'LineChart',
                             name: 'linechartaccordionpanel',
+                            autoScroll: true,
                             layout: 'fit',
-                            collapsed: false,
                             items: [
                                 {
                                     xtype: 'grid',
@@ -126,40 +147,9 @@ Ext.define('FHEM.view.Viewport', {
                         {
                             xtype: 'panel',
                             title: 'Database Tables',
-                            name: 'tabledataaccordionpanel'
+                            name: 'tabledataaccordionpanel',
+                            autoScroll: true
                         }
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Unsorted'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Everything'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Wiki'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Details'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Definition...'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Edit files'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Select style'
-//                        },
-//                        {
-//                            xtype: 'panel',
-//                            title: 'Event monitor'
-//                        }
                     ]
                 }, 
                 {

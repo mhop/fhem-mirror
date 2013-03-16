@@ -21,8 +21,8 @@ Ext.define('FHEM.controller.MainController', {
                ref: 'westaccordionpanel' //this.getWestaccordionpanel()
            },
            {
-               selector: 'panel[name=culpanel]',
-               ref: 'culpanel' //this.getCulpanel()
+               selector: 'panel[name=maintreepanel]',
+               ref: 'maintreepanel' //this.getMaintreepanel()
            },
            {
                selector: 'textfield[name=commandfield]',
@@ -44,6 +44,9 @@ Ext.define('FHEM.controller.MainController', {
             },
             'panel[name=tabledataaccordionpanel]': {
                 expand: this.showDatabaseTablePanel
+            },
+            'treepanel[name=maintreepanel]': {
+                itemclick: this.showDevicePanel
             },
             'textfield[name=commandfield]': {
                 specialkey: this.checkCommand
@@ -73,65 +76,51 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.2 - 2013-03-16");
+            sp.setText(FHEM.version + "; Frontend Version: 0.3 - 2013-03-16");
         }
         
-        //setup west accordion
-        var wp = this.getWestaccordionpanel();
+        //setup west accordion / treepanel
+        var wp = this.getWestaccordionpanel(),
+            rootNode = { text:"root", expanded: true, children: []};
         
         Ext.each(FHEM.info.Results, function(result) {
+            
             if (result.list && !Ext.isEmpty(result.list)) {
-                var panelToAdd = Ext.create('Ext.panel.Panel', {
-                      name: result.list,
-                      title: result.list,
-                      autoScroll: true,
-                      items: []
-                });
                 
                 if (result.devices && result.devices.length > 0) {
-                    //creating a store holding fhem devices
-                    var deviceStore = Ext.create('Ext.data.Store', {
-                        fields:['NAME'],
-                        data: result.devices,
-                        proxy: {
-                            type: 'memory',
-                            reader: {
-                                type: 'json',
-                                root: 'devices'
-                            }
-                        }
-                    });
+                    node = {text: result.list, expanded: true, children: []};
                     
-                    var devicesgrid = {
-                        xtype: 'grid',
-                        hideHeaders: true,
-                        columns: [
-                             { 
-                                 dataIndex: 'NAME', 
-                                 width: '95%'
-                             }
-                        ],
-                        store: deviceStore,
-                        listeners: {
-                            itemclick: function(gridview, record) {
-                                var panel = {
-                                      xtype: 'devicepanel',
-                                      title: record.raw.NAME,
-                                      region: 'center',
-                                      layout: 'fit',
-                                      record: record
-                                };
-                                me.hideCenterPanels();
-                                me.getMainviewport().add(panel);
-                            }
-                        }
-                    };
-                    
-                    panelToAdd.add(devicesgrid);
+                    Ext.each(result.devices, function(device) {
+                        
+                        var subnode = {text: device.NAME, leaf: true, data: device};
+                        node.children.push(subnode);
+                        
+                    }, this);
+                } else {
+                    node = {text: result.list, leaf: true};
                 }
-                wp.add(panelToAdd);
+            
+                rootNode.children.push(node);
+                
             }
         });
+        
+        this.getMaintreepanel().setRootNode(rootNode);
+    },
+    
+    /**
+     * 
+     */
+    showDevicePanel: function(view, record) {
+        var panel = {
+            xtype: 'devicepanel',
+            title: record.raw.NAME,
+            region: 'center',
+            layout: 'fit',
+            record: record
+        };
+        this.hideCenterPanels();
+        this.getMainviewport().add(panel);
     },
     
     /**
