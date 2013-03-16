@@ -48,7 +48,7 @@ UPD 2013-03-06_11:11:22 4269 www/frontend/app/view/DevicePanel.js
 UPD 2013-03-06_11:11:22 2503 www/frontend/app/view/TableDataGridPanel.js
 UPD 2013-03-06_11:11:22 1310 www/frontend/app/view/LineChartView.js
 UPD 2013-03-16_06:58:22 50691 www/frontend/app/controller/ChartController.js
-UPD 2013-03-08_06:15:36 10876 www/frontend/app/controller/MainController.js
+UPD 2013-03-16_06:15:36 10876 www/frontend/app/controller/MainController.js
 UPD 2013-03-06_11:11:22 202 www/frontend/app/model/ReadingsModel.js
 UPD 2013-03-06_11:11:22 338 www/frontend/app/model/SavedChartsModel.js
 UPD 2013-03-16_06:58:22 1809 www/frontend/app/model/ChartModel.js
