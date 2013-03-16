@@ -634,6 +634,7 @@ HUEDevice_GetUpdate($)
           && $percent < 100  ) {
         $s = $dim_values{int($percent/7)};
       }
+      $s = 'off' if( $percent == 0 );
     }
   else
     {
