@@ -884,6 +884,7 @@ Ext.define('FHEM.controller.ChartController', {
                     dynamicradio.eachBox(function(box, idx) {
                         if (box.checked) {
                             dbstarttime = box.inputValue;
+                            dbendtime = box.inputValue;
                         }
                     });
                 }
