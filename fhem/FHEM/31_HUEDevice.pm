@@ -207,6 +207,10 @@ HUEDevice_SetParam($$@)
     $obj->{'hue'}  = int($h*256);
     $obj->{'sat'}  = 0+$s;
     $obj->{'bru'}  = 0+$v;
+  } elsif( $cmd eq "effect" ) {
+    $obj->{'effect'}  = $value;
+  } elsif( $cmd eq "transitiontime" ) {
+    $obj->{'transitiontime'} = 0+$value;
   } else {
     return 0;
   }
@@ -219,211 +223,45 @@ HUEDevice_Set($@)
 {
   my ($hash, $name, @aa) = @_;
 
-  #my %obj;
+  my %obj;
 
   if( (my $joined = join(" ", @aa)) =~ /:/ ) {
     my @cmds = split(":", $joined);
     for( my $i = 0; $i <= $#cmds; ++$i ) {
-      HUEDevice_Set( $hash, $name, split(" ", $cmds[$i]) );
-      #HUEDevice_SetParam($name, \%obj, split(" ", $cmds[$i]) );
+      HUEDevice_SetParam($name, \%obj, split(" ", $cmds[$i]) );
     }
-    return;
-  }
-
-  my ($cmd, $value, $value2, @a) = @aa;
-
-  if( $cmd eq "statusRequest" ) {
-    RemoveInternalTimer($hash);
-    HUEDevice_GetUpdate($hash);
-    return undef;
-    }
-
-  #HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
-
-  if( $cmd eq "color" ) {
-    $value = int(1000000/$value);
-    $cmd = 'ct';
-  } elsif( $cmd eq "toggle" ) {
-    $cmd = ReadingsVal($name,"state","on") eq "off" ? "on" :"off";
-  } elsif( $cmd =~ m/^dim(\d+)/ ) {
-    $value = $1 unless defined($value);
-    if( $value <   0 ) { $value =   0; }
-    if( $value > 100 ) { $value = 100; }
-    $cmd = 'pct';
-  } elsif( !defined($value) && $cmd =~ m/^(\d+)/) {
-    $value = $1;
-    $value = 254 if( $value > 254 );
-    $cmd = 'bri';
-  }
-
-  if($cmd eq 'on') {
-
-    my $obj = {
-      'on'  => JSON::true,
-    };
-   $obj->{bri} = 254 if( ReadingsVal($name,"bri","0") eq 0 );
-   if( defined($value) ) {
-     $obj->{transitiontime} = $value / 10;
-   }
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq 'off') {
-
-    my $obj = {
-      'on'  => JSON::false,
-    };
-   if( defined($value) ) {
-     $obj->{transitiontime} = $value / 10;
-   }
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq "pct") {
-    my $obj = {
-      'bri'  => int(2.54 * $value),
-      'on'  => JSON::true,
-    };
-   if( defined($value2) ) {
-     $obj->{transitiontime} = $value2 / 10;
-   }
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq "bri") {
-    my $obj = {
-      'bri'  => 0+$value,
-      'on'  => JSON::true,
-    };
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq "ct") {
-    my $obj = {
-      'ct'  => 0+$value,
-      'on'  => JSON::true,
-    };
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq "hue") {
-    my $obj = {
-      'hue'  => 0+$value,
-      'on'  => JSON::true,
-    };
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq "sat") {
-    my $obj = {
-      'sat'  => 0+$value,
-      'on'  => JSON::true,
-    };
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
-  } elsif($cmd eq "xy" && $value =~ m/^(.+),(.+)/) {
-    my ($x,$y) = ($1, $2);
-
-    my $obj = {
-      'xy'  => [0+$x, 0+$y],
-      'on'  => JSON::true,
-    };
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-    }
-  } elsif( $cmd eq "rgb" && $value =~ m/^(..)(..)(..)/) {
-    # calculation from http://www.everyhue.com/vanilla/discussion/94/rgb-to-xy-or-hue-sat-values/p1
-    my( $r, $g, $b ) = (hex($1)/255.0, hex($2)/255.0, hex($3)/255.0);
-#Log 3, "rgb: ". $r . " " . $g ." ". $b;
-
-    my $X =  1.076450 * $r - 0.237662 * $g + 0.161212 * $b;
-    my $Y =  0.410964 * $r + 0.554342 * $g + 0.034694 * $b;
-    my $Z = -0.010954 * $r - 0.013389 * $g + 1.024343 * $b;
-#Log 3, "XYZ: ". $X . " " . $Y ." ". $Y;
-
-    if( $X != 0
-        || $Y != 0
-        || $Z != 0 ) {
-      my $x = $X / ($X + $Y + $Z);
-      my $y = $Y / ($X + $Y + $Z);
-#Log 3, "xyY:". $x . " " . $y ." ". $Y;
-
-      #$x = 0 if( $x < 0 );
-      #$x = 1 if( $x > 1 );
-      #$y = 0 if( $y < 0 );
-      #$y = 1 if( $y > 1 );
-      $Y = 1 if( $Y > 1 );
-
-      my $bri  = max($r,max($g,$b));
-      #my $bri  = $Y;
-      my $obj = {
-        'xy'  => [0+$x, 0+$y],
-        'bri'  => int(254*$bri),
-        'on'  => JSON::true,
-      };
-
-      my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-      if( $result->{'error'} ) {
-          $hash->{STATE} = $result->{'error'}->{'description'};
-          return undef;
-        }
-      }
-  } elsif( $cmd eq "hsv" && $value =~ m/^(..)(..)(..)/) {
-    my( $h, $s, $v ) = (hex($1), hex($2), hex($3));
-
-    $s = 254 if( $s > 254 );
-    $v = 254 if( $v > 254 );
-
-    my $obj = {
-      'hue'  => int($h*256),
-      'sat'  => 0+$s,
-      'bri'  => 0+$v,
-      'on'  => JSON::true,
-    };
-
-    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",$obj);
-    if( $result->{'error'} ) {
-        $hash->{STATE} = $result->{'error'}->{'description'};
-        return undef;
-      }
   } else {
-    my $list = "off on toggle statusRequest";
-    $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
-    #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
-    $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
-    return SetExtensions($hash, $list, $name, $cmd, $value, @a);
+    my ($cmd, $value, $value2, @a) = @aa;
+
+    if( $cmd eq "statusRequest" ) {
+      RemoveInternalTimer($hash);
+      HUEDevice_GetUpdate($hash);
+      return undef;
+    }
+
+    HUEDevice_SetParam($name, \%obj, $cmd, $value, $value2);
   }
 
-  $hash->{LOCAL} = 1;
-  HUEDevice_GetUpdate($hash);
-  delete $hash->{LOCAL};
 
-  return undef;
+  if( scalar keys %obj ) {
+    my $result = HUEDevice_ReadFromServer($hash,$hash->{fhem}{id}."/state",\%obj);
+    if( $result->{'error'} ) {
+        $hash->{STATE} = $result->{'error'}->{'description'};
+        return undef;
+      }
+
+    $hash->{LOCAL} = 1;
+    HUEDevice_GetUpdate($hash);
+    delete $hash->{LOCAL};
+
+    return undef;
+  }
+
+  my $list = "off on toggle statusRequest";
+  $list .= " pct:slider,0,1,100 bri:slider,0,1,254" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
+  #$list .= " dim06% dim12% dim18% dim25% dim31% dim37% dim43% dim50% dim56% dim62% dim68% dim75% dim81% dim87% dim93% dim100%" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/dimmer/ );
+  $list .= " rgb:colorpicker,RGB color:slider,2000,1,6500 ct:slider,154,1,500 hue:slider,0,1,65535 sat:slider,0,1,254 xy effect:none,colorloop" if( AttrVal($hash->{NAME}, "subType", "colordimmer") =~ m/color/ );
+  return SetExtensions($hash, $list, $name, @aa);
 }
 
 sub
@@ -452,7 +290,6 @@ HUEDevice_Get($@)
         $r = 0 if( $r < 0 );
         $r = 255 if( $r > 255 );
 
-        $g;
         if( $temp <= 66 ) {
           $g = 99.4708025861 * log($temp) - 161.1195681661;
         } else {
@@ -721,11 +558,8 @@ HUEDevice_GetUpdate($)
       <li>statusRequest<br>
       Request device status update.</li>
       <li>pct &lt;value&gt; [&lt;ramp-time&gt;]<br>
-        dim to &lt;value&gt;</li>
-      Notes:
-        <ul>
-        <li>the FS20 compatible dimXX% commands are also accepted.</li>
-        </ul><br>
+        dim to &lt;value&gt;<br>
+        Note: the FS20 compatible dimXX% commands are also accepted.</li>
       <li>color &lt;value&gt;<br>
         set colortemperature to &lt;value&gt; kelvin.</li>
       <li>bri &lt;value&gt;<br>
@@ -736,9 +570,20 @@ HUEDevice_GetUpdate($)
         set hue to &lt;value&gt;; range is 0-65535.</li>
       <li>sat &lt;value&gt;<br>
         set saturation to &lt;value&gt;; range is 0-254.</li>
-      <li>x &lt;x&gt;,&lt;y&gt;<br>
-        set the xy color coordinates to &lt;x&gt;,&lt;y&gt;;</li>
+      <li>xy &lt;x&gt;,&lt;y&gt;<br>
+        set the xy color coordinates to &lt;x&gt;,&lt;y&gt;</li>
+      <li>effect [none|colorloop]</li>
+      <li>transitiontime &lt;time&gt;<br>
+        set the transitiontime to &lt;time&gt; 1/10s</li>
       <li>rgb &lt;rrggbb&gt;</li>
+      <br>
+      Note:
+        <ul>
+        <li>multiple paramters can be set at once separated by <code>:</code><br>
+          Examples:<br>
+            <code>set LC on : transitiontime 100</code><br>
+            <code>set bulb on : bri 100 : color 4000</code><br></li>
+        </ul>
     </ul><br>
 
   <a name="HUEDevice_Get"></a>
@@ -755,7 +600,7 @@ HUEDevice_GetUpdate($)
     <li>subType<br>
       dimmer or switch, default is dimmer.</li>
       <li>devStateIcon<br>
-      will be initialized to <code>{CommandGet("","&lt;name&gt; devStateIcon")}</code> as default to show device color in room overview.</li>
+      will be initialized to <code>{CommandGet("","&lt;name&gt; devStateIcon")}</code> to show device color as default in room overview.</li>
   </ul>
 
 </ul><br>
