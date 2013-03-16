@@ -776,7 +776,7 @@ sub prepareSql(@_) {
     my ($sql, $jsonstring, $countsql);
  
     if($userquery eq "getreadings") {
-        $sql = "SELECT distinct(reading) FROM current WHERE device = '".$device."'";
+        $sql = "SELECT distinct(reading) FROM history WHERE device = '".$device."'";
     } elsif($userquery eq "getdevices") {
         $sql = "SELECT distinct(device) FROM history";
     } elsif($userquery eq "timerange") {
@@ -808,7 +808,7 @@ sub chartQuery($@) {
     my ($sql, $countsql) = prepareSql(@_);
 
     if ($sql eq "error") {
-       return jsonError("Could not setup SQL String");
+       return jsonError("Could not setup SQL String. Maybe the Database is busy, please try again!");
     }
     my ($hash, @a) = @_;
     my $dbhf= $hash->{DBHF};
