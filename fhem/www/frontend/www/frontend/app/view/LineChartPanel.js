@@ -426,16 +426,16 @@ Ext.define('FHEM.view.LineChartPanel', {
                             labelWidth: 140,
                             allowBlank: true,
                             defaults: {
-                                labelWidth: 60,
+                                labelWidth: 42,
                                 padding: "0 25px 0 0",
                                 checked: false
                             },
                             items: [
-                                { fieldLabel: 'this year', name: 'rb', inputValue: 'year' },
-                                { fieldLabel: 'this month', name: 'rb', inputValue: 'month' },
-                                { fieldLabel: 'this week', name: 'rb', inputValue: 'week' },
-                                { fieldLabel: 'this day', name: 'rb', inputValue: 'day' },
-                                { fieldLabel: 'this hour', name: 'rb', inputValue: 'hour' }
+                                { fieldLabel: 'yearly', name: 'rb', inputValue: 'year' },
+                                { fieldLabel: 'monthly', name: 'rb', inputValue: 'month' },
+                                { fieldLabel: 'weekly', name: 'rb', inputValue: 'week' },
+                                { fieldLabel: 'daily', name: 'rb', inputValue: 'day' },
+                                { fieldLabel: 'hourly', name: 'rb', inputValue: 'hour' }
                             ]
                         }
                     ]
@@ -476,6 +476,55 @@ Ext.define('FHEM.view.LineChartPanel', {
                           width: 100,
                           text: 'Step forward',
                           name: 'stepforward'
+                        },
+                        {
+                            xtype: 'radio',
+                            width: 160,
+                            fieldLabel: 'Generalization',
+                            boxLabel: 'active',
+                            name: 'generalization',
+                            listeners: {
+                                change: function(radio, state) {
+                                    if (state) {
+                                        radio.up().down('combobox[name=genfactor]').setDisabled(false);
+                                    } else {
+                                        radio.up().down('combobox[name=genfactor]').setDisabled(true);
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            xtype: 'radio',
+                            width: 80,
+                            boxLabel: 'disabled',
+                            checked: true,
+                            name: 'generalization'
+                        },
+                        {
+                            xtype: 'combo',
+                            width: 120,
+                            name: 'genfactor',
+                            disabled: true,
+                            fieldLabel: 'Factor',
+                            labelWidth: 50,
+                            store: Ext.create('Ext.data.Store', {
+                                fields: ['displayval', 'val'],
+                                data : [
+                                        {"displayval": "10%", "val":"10"},
+                                        {"displayval": "20%", "val":"20"},
+                                        {"displayval": "30%", "val":"30"},
+                                        {"displayval": "40%", "val":"40"},
+                                        {"displayval": "50%", "val":"50"},
+                                        {"displayval": "60%", "val":"60"},
+                                        {"displayval": "70%", "val":"70"},
+                                        {"displayval": "80%", "val":"80"},
+                                        {"displayval": "90%", "val":"90"}
+                                ]
+                            }),
+                            fields: ['displayval', 'val'],
+                            displayField: 'displayval',
+                            valueField: 'val',
+                            value: '30'
                         }
                     ]
                 }
