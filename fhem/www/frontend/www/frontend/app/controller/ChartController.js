@@ -261,6 +261,8 @@ Ext.define('FHEM.controller.ChartController', {
             endtime = me.getEndtimepicker().getValue(),
             dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
             dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
+            generalization = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
+            generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue(),
             view = me.getLinechartview(),
             store = me.getLinechartview().getStore(),
             proxy = store.getProxy();
@@ -353,7 +355,7 @@ Ext.define('FHEM.controller.ChartController', {
             yField : 'VALUE',
             title: yaxis,
             showInLegend: true,
-            smooth: 2,
+            smooth: 0,
             highlight: true,
             fill: yaxisfillcheck,
             style: {
@@ -399,7 +401,7 @@ Ext.define('FHEM.controller.ChartController', {
                         },
                         axis: 'left',
                         fill: y2axisfillcheck,
-                        smooth: 2,
+                        smooth: 0,
                         highlight: true,
                         showInLegend: true,
                         xField: 'TIMESTAMP2',
@@ -453,12 +455,18 @@ Ext.define('FHEM.controller.ChartController', {
                                     for (var i = storelength; i < json.data.length; i++) {
                                         store.add(
                                             {
+                                                'VALUE': '',
+                                                'TIMESTAMP': json.data[i].TIMESTAMP,
                                                 "VALUE2": json.data[i].VALUE,
                                                 "TIMESTAMP2": json.data[i].TIMESTAMP
                                             }
                                         );
                                     }
                                     
+                                }
+                                
+                                if (generalization.checked) {
+                                    me.generalizeChartData(generalizationfactor, 2);
                                 }
                                 
                                 if (!Ext.isEmpty(y3axis)) {
@@ -473,7 +481,7 @@ Ext.define('FHEM.controller.ChartController', {
                                         },
                                         axis: 'left',
                                         fill: y3axisfillcheck,
-                                        smooth: 2,
+                                        smooth: 0,
                                         showInLegend: true,
                                         xField: 'TIMESTAMP3',
                                         yField: 'VALUE3',
@@ -527,12 +535,20 @@ Ext.define('FHEM.controller.ChartController', {
                                                     for (var i = storelength; i < json.data.length; i++) {
                                                         store.add(
                                                             {
+                                                                "VALUE": "",
+                                                                "TIMESTAMP": json.data[i].TIMESTAMP,
+                                                                "VALUE2": "",
+                                                                "TIMESTAMP2": json.data[i].TIMESTAMP,
                                                                 "VALUE3": json.data[i].VALUE,
                                                                 "TIMESTAMP3": json.data[i].TIMESTAMP
                                                             }
                                                         );
                                                     }
                                                     
+                                                }
+                                                
+                                                if (generalization.checked) {
+                                                    me.generalizeChartData(generalizationfactor, 3);
                                                 }
                                             } 
                                         },
@@ -641,6 +657,10 @@ Ext.define('FHEM.controller.ChartController', {
                     
                 }
                 
+                if (generalization.checked) {
+                   me.generalizeChartData(generalizationfactor, 1);
+                }
+                
                 //remove the old max values of y axis to get a dynamic range
                 delete view.axes.get(0).maximum;
                 
@@ -648,9 +668,72 @@ Ext.define('FHEM.controller.ChartController', {
                 
             }, this, {single: true});
             
-            
         }
         
+    },
+    
+    /**
+     * 
+     */
+    generalizeChartData: function(generalizationfactor, index) {
+
+        var store = this.getLinechartview().getStore();
+        
+        this.factorpositive = 1 + (generalizationfactor / 100),
+            this.factornegative = 1 - (generalizationfactor / 100),
+            this.lastValue = null,
+            this.lastItem = null,
+            this.recsToRemove = [];
+        
+        Ext.each(store.data.items, function(item) {
+            
+                var value;
+                
+                if (index === 1) {
+                    value = item.get('VALUE');
+                } else if (index === 2) {
+                    value = item.get('VALUE2');
+                } else if (index === 3) {
+                    value = item.get('VALUE3');
+                }
+                
+                var one = this.lastValue / 100;
+                var diff = value / one / 100;
+                
+                if (diff > this.factorpositive || diff < this.factornegative) {
+                    
+                    if (this.lastItem) {
+                        if (index === 1) {
+                            this.lastItem.set('VALUE', this.lastValue);
+                        } else if (index === 2) {
+                            this.lastItem.set('VALUE2', this.lastValue);
+                        } else if (index === 3) {
+                            this.lastItem.set('VALUE3', this.lastValue);
+                        }
+                    }
+
+                    this.lastValue = value;
+                    this.lastItem = item;
+                    
+                } else {
+                    
+                    //keep last record
+                    if (store.last() !== item) {
+                        if (index === 1) {
+                            item.set('VALUE', '');
+                        } else if (index === 2) {
+                            item.set('VALUE2', '');
+                        } else if (index === 3) {
+                            item.set('VALUE3', '');
+                        }
+                    }
+                    
+                    
+                    this.lastValue = value;
+                    this.lastItem = item;
+                }
+                      
+        }, this);
         
     },
     
@@ -792,6 +875,8 @@ Ext.define('FHEM.controller.ChartController', {
                     endtime = this.getEndtimepicker().getValue(),
                     dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s'),
                     dynamicradio = Ext.ComponentQuery.query('radiogroup[name=dynamictime]')[0],
+                    generalization = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
+                    generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue(),
                     view = this.getLinechartview();
                 
                 //setting the starttime parameter in the chartconfig to the string of the radiofield, gets parsed on load
@@ -805,6 +890,12 @@ Ext.define('FHEM.controller.ChartController', {
                 
                 var jsonConfig = '{"x":"' + xaxis + '","y":"' + yaxis + '","device":"' + device + '",';
                     jsonConfig += '"yaxiscolorcombo":"' + yaxiscolorcombo + '","yaxisfillcheck":"' + yaxisfillcheck + '",';
+                    
+                    if(generalization.checked) {
+                        jsonConfig += '"generalization":"true",';
+                        jsonConfig += '"generalizationfactor":"' + generalizationfactor + '",';
+                    }
+                    
                     jsonConfig += '"y2device":"' + y2device + '",';
                     jsonConfig += '"y2axis":"' + y2axis + '","y2axiscolorcombo":"' + y2axiscolorcombo + '",';
                     jsonConfig += '"y2axisfillcheck":"' + y2axisfillcheck + '","y3axis":"' + y3axis + '",';
@@ -954,6 +1045,17 @@ Ext.define('FHEM.controller.ChartController', {
                     end = chartdata.endtime.replace("_", " ");
                     this.getStarttimepicker().setValue(start);
                     this.getEndtimepicker().setValue(end);
+                }
+                
+                var genbox = Ext.ComponentQuery.query('radio[boxLabel=active]')[0],
+                    genfaccombo = Ext.ComponentQuery.query('combobox[name=genfactor]')[0];
+                
+                if (chartdata.generalization && chartdata.generalization === "true") {
+                    genbox.setValue(true);
+                    genfaccombo.setValue(chartdata.generalizationfactor);
+                } else {
+                    genfaccombo.setValue('30');
+                    genbox.setValue(false);
                 }
                 
                 this.requestChartData();

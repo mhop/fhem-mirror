@@ -1,3 +1,5 @@
+Update vom 16.3.2013
+  * Implementation einer clientseitigen Generalisierung
 Update vom 8.3.2013
   * Erweiterung der Charts - Anzeige und Speicherung von dynamischen Zeiträumen (Woche, Tag,...)
   * Bugfixes in der Darstellung der gespeicherten Farben eines Charts

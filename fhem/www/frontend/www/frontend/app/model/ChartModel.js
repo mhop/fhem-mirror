@@ -23,26 +23,27 @@ Ext.define('FHEM.model.ChartModel', {
         {
             name: 'VALUE',
             type: 'float',
-            convert: function( v, record ) {
-                return record.parseToNumber(v);
+            convert: function(v,record) {
+                return record.parseToNumber(v, 1, record);
             }
         },{
             name: 'VALUE2',
             type: 'float',
-            convert: function( v, record ) {
-                return record.parseToNumber(v);
+            convert: function(v,record) {
+                return record.parseToNumber(v, 2, record);
             }
         },{
             name: 'VALUE3',
             type: 'float',
-            convert: function( v, record ) {
-                return record.parseToNumber(v);
+            convert: function(v,record) {
+                return record.parseToNumber(v, 3, record);
             }
         }
     ],
-    parseToNumber: function(value) {
+    parseToNumber: function(value, idx, rec) {
+        
         if (value === "") {
-            return 0;
+            //we will return nothing
         } else if (parseFloat(value, 10).toString().toUpperCase() === "NAN") {
             if (Ext.isDefined(FHEM) && Ext.isDefined(FHEM.userconfig)) {
                 var convertednumber = 0;
