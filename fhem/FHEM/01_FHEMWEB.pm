@@ -1184,6 +1184,7 @@ FW_fileList($)
   $fname =~ m,^(.*)/([^/]*)$,; # Split into dir and file
   my ($dir,$re) = ($1, $2);
   return if(!$re);
+  $dir =~ s/%L/$attr{global}{logdir}/g if($dir =~ m/%/ && $attr{global}{logdir}); # %L present and log directory defined
   $re =~ s/%./[A-Za-z0-9]*/g;    # logfile magic (%Y, etc)
   my @ret;
   return @ret if(!opendir(DH, $dir));
@@ -1281,6 +1282,7 @@ FW_logWrapper($)
   if(defined($type) && $type eq "text") {
     $defs{$d}{logfile} =~ m,^(.*)/([^/]*)$,; # Dir and File
     my $path = "$1/$file";
+    $path =~ s/%L/$attr{global}{logdir}/g if($path =~ m/%/ && $attr{global}{logdir}); # %L present and log directory defined
     $path = AttrVal($d,"archivedir","") . "/$file" if(!-f $path);
 
     FW_pO "<div id=\"content\">";
