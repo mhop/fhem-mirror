@@ -206,7 +206,12 @@ LightScene_Set($@)
         } elsif( $subtype eq "dimmer" ) {
           $status = "bri ". ReadingsVal($d,'bri',"0");
         } elsif( $subtype eq "colordimmer" ) {
-          $status = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
+          if( ReadingsVal($d,"colormode","") eq "ct" ) {
+            ReadingsVal($d,"ct","") =~ m/(\d+) .*/;
+            $status = "bri ". ReadingsVal($d,'bri',"0") ." : ct ". $1;
+          } else {
+            $status = "bri ". ReadingsVal($d,'bri',"0") ." : xy ". ReadingsVal($d,'xy',"");
+          }
         }
       } elsif( $defs{$d}{TYPE} eq 'IT' ) {
         my $subtype = AttrVal($d,"model","");
