@@ -49,7 +49,7 @@ THRESHOLD_Define($$$)
   my $cmd_default="";
   my $actor="";
    
-  if (@b > 4 || @a < 3 || @a > 5) {
+  if (@b > 4 || @a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> THRESHOLD " .
                "<sensor>[:<reading>[:<hysteresis>][:<init_desired_value>] [AND|OR <sensor2>[:<reading2>][:<state>]] [<actor>][|<cmd1>][|<cmd2>][|<cmd_default_index>]";
     Log 2, $msg;
