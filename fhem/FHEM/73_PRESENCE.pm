@@ -212,7 +212,7 @@ PRESENCE_Set($@)
 
     return "No Argument given" if(!defined($a[1]));
    
-    my $usage = ($hash->{MODE} ne "lan-bluetooth" ? "Unknown argument ".$a[1].", choose one of statusRequest " : undef);
+    my $usage = (defined($hash->{MODE}) and $hash->{MODE} ne "lan-bluetooth" ? "Unknown argument ".$a[1].", choose one of statusRequest " : undef);
    
     if($a[1] eq "statusRequest")
     {
