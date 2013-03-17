@@ -2075,6 +2075,17 @@ FW_fC($@)
 
 ##################
 sub
+FW_showWeblinkDetail($)
+{
+  my ($d)= @_;
+  my $alias= AttrVal($d, "alias", $d);
+
+  FW_pO "<br>";
+  FW_pHPlain("detail=$d", $alias) if(!$FW_subdir);
+  FW_pO "<br>";
+}
+
+sub
 FW_showWeblink($$$$)
 {
   my ($d, $v, $t, $buttons) = @_;
@@ -2090,16 +2101,11 @@ FW_showWeblink($$$$)
 
   } elsif($t eq "image") {
     FW_pO "<img src=\"$v\" $attr><br>";
-    FW_pO "<br>";
-    FW_pHPlain "detail=$d", $d if(!$FW_subdir);
-    FW_pO "<br>";
+    FW_showWeblinkDetail($d);
 
   } elsif($t eq "iframe") {
     FW_pO "<iframe src=\"$v\" $attr>Iframes disabled</iframe>";
-    FW_pO "<br>";
-    FW_pHPlain "detail=$d", $d if(!$FW_subdir);
-    FW_pO "<br>";
-
+    FW_showWeblinkDetail($d);
 
   } elsif($t eq "fileplot" || $t eq "dbplot" ) {
 
@@ -2146,9 +2152,7 @@ FW_showWeblink($$$$)
         FW_pO "<img src=\"$arg\"/>";
       }
 
-      FW_pO "<br>";
-      FW_pHPlain "detail=$d", $d if(!$FW_subdir);
-      FW_pO "<br>";
+      FW_showWeblinkDetail($d);
 
     }
   }
