@@ -1,6 +1,8 @@
 # Add changes at the top of the list.
 
 - SVN
+  - feature: new module 31_LightScene to save and restore the state of a
+             group of lights and other actors
   - feature: VIERA module added (by teevau)
   - change:  FHEMWEB: the first webCmd argument is no longer used by the
              state-icon, this can be implemented by the new devStateIcon
@@ -12,11 +14,11 @@
   - feature: added example Setup SQL and configuration for SQLite
   - change:  modified MySQL Setup SQL to use 512 characters in EVENT column
   - feature: added new Javascript Frontend based on ExtJS (by Johannes)
-  - feature: new Modules 30_HUEBridge and 31_HUEDevice for phillips hue and 
+  - feature: new modules 30_HUEBridge and 31_HUEDevice for phillips hue and 
              smartlink devices (by justme1968)
   - change:  SYSSTAT: allow remote monitoring by ssh
   - change:  SYSSTAT: allow less frequent updates for diskusage
-  - feature: new Module 32_SYSSTAT to monitor system load and disk usage
+  - feature: new module 32_SYSSTAT to monitor system load and disk usage
              on linux FHEM hosts (by justme1968)
   - feature: new Module 73_PRESENCE to make automatic presence detection of
              mobile phones or other mobile devices (like tablets) via ping or
