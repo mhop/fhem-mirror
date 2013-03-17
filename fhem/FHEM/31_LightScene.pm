@@ -154,7 +154,7 @@ LightScene_Set($@)
 
   if( !defined($cmd) ){ return "$name: set needs at least one parameter" };
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove save scene:".join(",", sort keys %{$hash->{SCENES}}) };
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove save scene set:".join(",", sort keys %{$hash->{SCENES}}) };
 
   if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
   if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
@@ -230,7 +230,7 @@ LightScene_Set($@)
       $hash->{STATE} = $scene;
       $ret .= " ". CommandSet(undef,"$d $hash->{SCENES}{$scene}{$d}");
     } else {
-      $ret = "Unknown argument $cmd, choose one of save scene set";
+      $ret = "Unknown argument $cmd, choose one of save scene";
     }
   }
 
