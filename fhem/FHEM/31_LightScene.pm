@@ -268,7 +268,7 @@ LightScene_Get($@)
 <a name="LightScene"></a>
 <h3>LightScene</h3>
 <ul>
-  Allows to store the state of a group of lights and recall it later. Multiple states for one group can be stored.
+  Allows to store the state of a group of lights and other devices and recall it later. Multiple states for one group can be stored.
 
   <br><br>
   <a name="LightScene_Define"></a>
