@@ -46,8 +46,8 @@ THRESHOLD_Define($$$)
   my @a = split("[ \t][ \t]*", $b[0]);
   my $cmd1="";
   my $cmd2="";
-  my $cmd_default="";
-  my $actor="";
+  my $cmd_default=0;
+  my $actor;
    
   if (@b > 4 || @a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> THRESHOLD " .
@@ -66,9 +66,9 @@ THRESHOLD_Define($$$)
   }
   
   $hash->{sensor} = $sensor;
-  $reading = "temperature" if (!$reading);
+  $reading = "temperature" if (!defined($reading));
    
-  if ($hysteresis eq "") {
+  if (!defined($hysteresis)) {
 	if ($reading eq "temperature" or $reading eq "temp") {
 	  $hysteresis=1;
 	} elsif ($reading eq "humidity") {
@@ -81,7 +81,7 @@ THRESHOLD_Define($$$)
       Log 2, $msg;
       return $msg;
   }	
-  if ($init_desired_value ne "") {
+  if (defined($init_desired_value)) {
 	if ($init_desired_value !~ m/^[-\d\.]*$/) {
       my $msg = "$pn: value:$init_desired_value, init_desired_value needs a numeric parameter";
       Log 2, $msg;
@@ -92,17 +92,20 @@ THRESHOLD_Define($$$)
   $hash->{hysteresis} = $hysteresis;
   
   # Sensor2
-  my $operator=$a[3];
-  if ($operator) {
+  
+  if (defined($a[3])) {
+    my $operator=$a[3];
 	if (($operator eq "AND") or ($operator eq "OR")) {
 	  my ($sensor2, $sensor2_reading, $state) = split(":", $a[4], 3);
-	  if(!$defs{$sensor2}) {
+	  if (defined ($sensor2)) {
+	    if(!$defs{$sensor2}) {
 	    my $msg = "$pn: Unknown sensor2 device $sensor2 specified";
 	    Log 2, $msg;
 	    return $msg;
- 	  }
-	  $sensor2_reading = "state" if (!$sensor2_reading);
-	  $state = "open" if (!$state);
+ 	   }
+	  } 
+	  $sensor2_reading = "state" if (!defined ($sensor2_reading));
+	  $state = "open" if (!defined ($state));
 	  $hash->{operator} = $operator;
 	  $hash->{sensor2} = $sensor2;
 	  $hash->{sensor2_reading} = $sensor2_reading;
@@ -112,7 +115,7 @@ THRESHOLD_Define($$$)
 	  $actor = $a[3];
 	}
   }
-  if ($actor ne "") {
+  if (defined ($actor)) {
     if (!$defs{$actor}) {
        my $msg = "$pn: Unknown actor device $actor specified";
        Log 2, $msg;
@@ -120,7 +123,7 @@ THRESHOLD_Define($$$)
 	}
   }
   if (@b == 1) { # no actor parameters
-	if ($actor eq "") {
+	if (!defined($actor)) {
        my $msg = "$pn: no actor device specified";
        Log 2, $msg;
        return $msg;
@@ -128,20 +131,19 @@ THRESHOLD_Define($$$)
   	$cmd1 = "set $actor off";
 	$cmd2 = "set $actor on";
 	$cmd_default = 2;
-  } else { 
-	$cmd1 = $b[1];
-    $cmd2 = $b[2];
-    $cmd_default = $b[3];
-	if ($cmd_default eq "") {
-	  $cmd_default = 0;
-    } elsif ($cmd_default !~ m/^[0-2]$/ ) {
+  } else { # actor parameters 
+    $cmd1 = $b[1] if (defined($b[1]));
+	$cmd2 = $b[2] if (defined($b[2]));
+	if (defined($b[3])) {
+	  $cmd_default = $b[3];
+	  if ($cmd_default !~ m/^[0-2]$/ ) {
 		my $msg = "$pn: value:$cmd_default, cmd_default_index needs 0,1,2";
         Log 2, $msg;
         return $msg;
-	}
+	  }
+    }	
   }	
-	
-  if ($actor ne "") {
+  if (defined($actor)) {
 	$cmd1 =~ s/@/$actor/g;
 	$cmd2 =~ s/@/$actor/g;
   }
@@ -151,7 +153,7 @@ THRESHOLD_Define($$$)
   $hash->{helper}{actor_cmd_default} = $cmd_default;
   $hash->{STATE} = 'initialized' if (!ReadingsVal($pn,"desired_value",""));
   
-  if ($init_desired_value ne "")
+  if (defined ($init_desired_value))
   {
     readingsBeginUpdate  ($hash);
 	readingsBulkUpdate   ($hash, "state", "active $init_desired_value");
