@@ -1019,13 +1019,17 @@ FW_showRoom()
 
   my $rf = ($FW_room ? "&amp;room=$FW_room" : ""); # stay in the room
   
-  # array of all device names in the room except weblinkes
+  # array of all device names in the room (exception weblinks without group attribute)
   my @devs= grep { ($FW_rooms{$FW_room}{$_}||$FW_room eq "all") &&
                       !IsIgnored($_) } keys %defs;
 
   my %group;
+  my @weblinks;
   foreach my $dev (@devs) {
-    next if($defs{$dev}{TYPE} eq "weblink" && !AttrVal($dev, "group", undef));
+    if($defs{$dev}{TYPE} eq "weblink" && !AttrVal($dev, "group", undef)) {
+      push @weblinks, $dev;
+      next;
+    }
     foreach my $grp (split(",", AttrVal($dev, "group", $FW_types{$dev}))) {
       next if($FW_hiddengroup{$grp}); 
       $group{$grp}{$dev} = 1;
@@ -1162,13 +1166,9 @@ FW_showRoom()
 
   # Now the weblinks
   my $buttons = 1;
-  $FW_room = "" if(!defined($FW_room));
-  my @list = ($FW_room eq "all" ? keys %defs : keys %{$FW_rooms{$FW_room}});
-  foreach my $d (sort @list) {
-    next if(IsIgnored($d));
-    my $type = $defs{$d}{TYPE};
-    next if(!$type || $type ne "weblink" || AttrVal($d, "group", undef));
-
+  foreach my $d (sort { lc(AttrVal($a, "sortby", AttrVal($a,"alias",$a))) cmp
+                        lc(AttrVal($b, "sortby", AttrVal($b,"alias",$b))) }
+                   @weblinks) {
     $buttons = FW_showWeblink($d, $defs{$d}{LINK}, $defs{$d}{WLTYPE}, $buttons);
   }
   FW_pO "</div>";
