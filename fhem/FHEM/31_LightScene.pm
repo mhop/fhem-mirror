@@ -4,7 +4,7 @@ package main;
 use strict;
 use warnings;
 use POSIX;
-use JSON::XS;
+use JSON;
 
 sub LightScene_Initialize($)
 {
@@ -149,21 +149,32 @@ LightScene_Load($)
 sub
 LightScene_Set($@)
 {
-  my ($hash, $name, $cmd, $value, @a) = @_;
+  my ($hash, $name, $cmd, $scene, @a) = @_;
   my $ret = "";
 
   if( !defined($cmd) ){ return "$name: set needs at least one parameter" };
 
-  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of save scene:".join(",", sort keys %{$hash->{SCENES}}) };
+  if( $cmd eq "?" ){ return "Unknown argument ?, choose one of remove save scene:".join(",", sort keys %{$hash->{SCENES}}) };
 
-  if( $cmd eq "save" && !defined( $value ) ) { return "Usage: set save <scene_name>" };
-  if( $cmd eq "scene" && !defined( $value ) ) { return "Usage: set scene <scene_name>" };
-  if( $cmd eq "remove" && !defined( $value ) ) { return "Usage: set remove <scene_name>" };
+  if( $cmd eq "save" && !defined( $scene ) ) { return "Usage: set $name save <scene_name>" };
+  if( $cmd eq "scene" && !defined( $scene ) ) { return "Usage: set $name scene <scene_name>" };
+  if( $cmd eq "remove" && !defined( $scene ) ) { return "Usage: set $name remove <scene_name>" };
 
   if( $cmd eq "remove" ) {
-    delete( $hash->{SCENES}{$value} );
+    delete( $hash->{SCENES}{$scene} );
     return undef;
-  };
+  } elsif( $cmd eq "set" ) {
+    my ($d, @args) = @a;
+
+    if( !defined( $scene ) || !defined( $d ) || !defined( @args ) ) { return "Usage: set $name set <scene_name> <device> <cmd>" };
+
+    if( defined($hash->{SCENES}{$scene})
+        && defined($hash->{SCENES}{$scene}{$d}) )
+      {
+        $hash->{SCENES}{$scene}{$d} = join(" ", @args);
+        return undef;
+      }
+  }
 
 
   $hash->{INSET} = 1;
@@ -183,6 +194,8 @@ LightScene_Set($@)
           $status = Value($d);
         } elsif( $subtype eq "dimmer" ) {
           $status = Value($d);
+        } else {
+          $status = Value($d);
         }
       } elsif( $defs{$d}{TYPE} eq 'FS20' ) {
           $status = Value($d);
@@ -201,6 +214,8 @@ LightScene_Set($@)
           $status = Value($d);
         } elsif( $subtype eq "itdimmer" ) {
           $status = Value($d);
+        } else {
+          $status = Value($d);
         }
       } elsif( $defs{$d}{TYPE} eq 'TRX_LIGHT' ) {
         $status = Value($d);
@@ -208,14 +223,14 @@ LightScene_Set($@)
         $status = Value($d);
       }
 
-      $hash->{SCENES}{$value}{$d} = $status;
+      $hash->{SCENES}{$scene}{$d} = $status;
       $ret .= $d .": ". $status ."\n";
 
     } elsif ( $cmd eq "scene" ) {
-      $hash->{STATE} = $value;
-      $ret .= " ". CommandSet(undef,"$d $hash->{SCENES}{$value}{$d}");
+      $hash->{STATE} = $scene;
+      $ret .= " ". CommandSet(undef,"$d $hash->{SCENES}{$scene}{$d}");
     } else {
-      $ret = "Unknown argument $cmd, choose one of save scene";
+      $ret = "Unknown argument $cmd, choose one of save scene set";
     }
   }
 
@@ -248,8 +263,8 @@ LightScene_Get($@)
     my $ret = "";
     my $scene = $a[2];
     if( defined($hash->{SCENES}{$scene}) ) {
-      foreach my $device (sort keys %{ $hash->{SCENES}{$scene} }) {
-        $ret .= $device .": ". $hash->{SCENES}{$scene}{$device} ."\n";
+      foreach my $d (sort keys %{ $hash->{SCENES}{$scene} }) {
+        $ret .= $d .": ". $hash->{SCENES}{$scene}{$d} ."\n";
       }
     } else {
         $ret = "no scene <$scene> defined";
@@ -268,7 +283,7 @@ LightScene_Get($@)
 <a name="LightScene"></a>
 <h3>LightScene</h3>
 <ul>
-  Allows to store the state of a group of lights and other devices and recall it later. Multiple states for one group can be stored.
+  Allows to store the state of a group of lights and recall it later. Multiple states for one group can be stored.
 
   <br><br>
   <a name="LightScene_Define"></a>
@@ -290,6 +305,8 @@ LightScene_Get($@)
       save current state for alle devices in this LightScene to &lt;scene_name&gt;</li>
       <li>scene &lt;scene_name&gt;<br>
       shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
+      <li>set &lt;scene_name&gt; &lt;device&gt; &lt;cmd&gt;<br>
+      set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;<br>
       <li>remove &lt;scene_name&gt;<br>
       remove &lt;scene_name&gt; from list of saved scenes</li>
     </ul><br>
