@@ -21,9 +21,7 @@ my %sets = (
   "hmPairSerial" => "HomeMatic",
 );
 
-sub
-HMLAN_Initialize($)
-{
+sub HMLAN_Initialize($) {
   my ($hash) = @_;
 
   require "$attr{global}{modpath}/FHEM/DevIo.pm";
@@ -45,13 +43,10 @@ HMLAN_Initialize($)
   $hash->{AttrList}= "do_not_notify:1,0 dummy:1,0 " .
                      "loglevel:0,1,2,3,4,5,6 addvaltrigger " . 
                      "hmId hmKey " .
+                     "respTime " .
 					 "hmProtocolEvents:0_off,1_dump,2_dumpFull,3_dumpTrigger";
 }
-
-#####################################
-sub
-HMLAN_Define($$)
-{
+sub HMLAN_Define($$) {#########################################################
   my ($hash, $def) = @_;
   my @a = split("[ \t][ \t]*", $def);
 
@@ -78,12 +73,7 @@ HMLAN_Define($$)
   my $ret = DevIo_OpenDev($hash, 0, "HMLAN_DoInit");
   return $ret;
 }
-
-
-#####################################
-sub
-HMLAN_Undef($$)
-{
+sub HMLAN_Undef($$) {##########################################################
   my ($hash, $arg) = @_;
   my $name = $hash->{NAME};
 
@@ -100,22 +90,13 @@ HMLAN_Undef($$)
   DevIo_CloseDev($hash); 
   return undef;
 }
-
-#####################################
-sub
-HMLAN_RemoveHMPair($)
-{
+sub HMLAN_RemoveHMPair($) {####################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
   delete($hash->{hmPair});
 }
-
-
-#####################################
-sub
-HMLAN_Set($@)
-{
+sub HMLAN_Set($@) {############################################################
   my ($hash, @a) = @_;
 
   return "\"set HMLAN\" needs at least one parameter" if(@a < 2);
@@ -147,13 +128,7 @@ HMLAN_Set($@)
   }
   return undef;
 }
-
-
-#####################################
-# This is a direct read for commands like get
-sub
-HMLAN_ReadAnswer($$$)
-{
+sub HMLAN_ReadAnswer($$$) {# This is a direct read for commands like get
   my ($hash, $arg, $regexp) = @_;
   my $type = $hash->{TYPE};
 
@@ -197,10 +172,7 @@ HMLAN_ReadAnswer($$$)
 
 my %lhash; # remember which ID is assigned to this HMLAN
 
-#####################################
-sub
-HMLAN_Write($$$)
-{
+sub HMLAN_Write($$$) {#########################################################
   my ($hash,$fn,$msg) = @_;
   my ($mtype,$src,$dst) = (substr($msg, 8, 2),
                            substr($msg, 10, 6),
@@ -232,12 +204,8 @@ HMLAN_Write($$$)
   $msg = sprintf("S%08X,00,00000000,01,%08X,%s",$tm, $tm, substr($msg, 4));
   HMLAN_SimpleWrite($hash, $msg);
 }
-
-#####################################
+sub HMLAN_Read($) {############################################################
 # called from the global loop, when the select for hash->{FD} reports data
-sub
-HMLAN_Read($)
-{
   my ($hash) = @_;
   my $buf = DevIo_SimpleRead($hash);
   return "" if(!defined($buf));
@@ -256,10 +224,7 @@ HMLAN_Read($)
   }
   $hash->{PARTIAL} = $hmdata;
 }
-
-sub
-HMLAN_uptime($)
-{
+sub HMLAN_uptime($) {##########################################################
   my $msec = shift;
 
   $msec = hex($msec);
@@ -268,10 +233,7 @@ HMLAN_uptime($)
                   int($msec/86400000), int($sec/3600),
                   int(($sec%3600)/60), $sec%60, $msec % 1000);
 }
-
-sub
-HMLAN_Parse($$)
-{
+sub HMLAN_Parse($$) {##########################################################
   my ($hash, $rmsg) = @_;
   my $name = $hash->{NAME};
   my $ll5 = GetLogLevel($name,5);
@@ -309,16 +271,18 @@ HMLAN_Parse($$)
     }
 								  
     my $dmsg = sprintf("A%02X%s", length($mFld[5])/2, uc($mFld[5]));
-	
-	
-    # handle status. 0001=ack:seems to announce the new message counter
-	#                0002=message send done, no ack was requested
-	#                0008=nack - HMLAN did not receive an ACK,
-	#                0021= 'R'
-	#                0081=open
-	#                0100=with 'E', not 'R'. 
-	#                0081=open
-	#                04xx=nothing will be sent anymore? try restart
+
+    # handle status. 
+	#    00 00=msg without relation
+	#    00 01=ack that HMLAN waited for
+	#    00 02=msg send, no ack was requested
+	#    00 08=nack - ack was requested, msg repeated 3 times, still no ack
+	#    00 21=
+	#    00 30=
+	#    00 81=open
+	#    01 xx=
+	#    02 xx=prestate to 04xx. 
+	#    04 xx=nothing sent anymore. Any restart unsuccessful except power
 	
 #    HMLAN_SimpleWrite($hash, '+'.$src) if (($letter eq 'R') && $src ne AttrVal($name, "hmId", $mFld[4]));
 
@@ -376,20 +340,11 @@ HMLAN_Parse($$)
     Log $ll5, "$name Unknown msg >$rmsg<";
   }
 }
-
-
-#####################################
-sub
-HMLAN_Ready($)
-{
+sub HMLAN_Ready($) {###########################################################
   my ($hash) = @_;
   return DevIo_OpenDev($hash, 1, "HMLAN_DoInit");
 }
-
-########################
-sub
-HMLAN_SimpleWrite(@)
-{
+sub HMLAN_SimpleWrite(@) {#####################################################
   my ($hash, $msg, $nonl) = @_;
 
   return if(!$hash || AttrVal($hash->{NAME}, "dummy", undef));
@@ -442,11 +397,7 @@ HMLAN_SimpleWrite(@)
   $msg .= "\r\n" unless($nonl);
   syswrite($hash->{TCPDev}, $msg)     if($hash->{TCPDev});
 }
-
-########################
-sub
-HMLAN_DoInit($)
-{
+sub HMLAN_DoInit($) {##########################################################
   my ($hash) = @_;
   my $name = $hash->{NAME};
 
@@ -469,11 +420,7 @@ HMLAN_DoInit($)
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 0);
   return undef;
 }
-
-#####################################
-sub
-HMLAN_KeepAlive($)
-{
+sub HMLAN_KeepAlive($) {#######################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
@@ -482,13 +429,11 @@ HMLAN_KeepAlive($)
   return if(!$hash->{FD});
   HMLAN_SimpleWrite($hash, "K");
   RemoveInternalTimer( "keepAlive:".$name);# avoid duplicate timer
-  InternalTimer(gettimeofday()+1, "HMLAN_KeepAliveCheck", "keepAliveCk:".$name, 1);
+  my $rt = AttrVal($name,"respTime",1);
+  InternalTimer(gettimeofday()+$rt, "HMLAN_KeepAliveCheck", "keepAliveCk:".$name, 1);
   InternalTimer(gettimeofday()+25, "HMLAN_KeepAlive", "keepAlive:".$name, 1);
 }
-#####################################
-sub
-HMLAN_KeepAliveCheck($)
-{
+sub HMLAN_KeepAliveCheck($) {##################################################
   my($in ) = shift;
   my(undef,$name) = split(':',$in);
   my $hash = $defs{$name};
@@ -496,9 +441,7 @@ HMLAN_KeepAliveCheck($)
     DevIo_Disconnected($hash);
   }
 }
-sub
-HMLAN_secSince2000()
-{
+sub HMLAN_secSince2000() {#####################################################
   # Calculate the local time in seconds from 2000.
   my $t = time();
   my @l = localtime($t);
@@ -574,6 +517,10 @@ HMLAN_secSince2000()
     <li><a href="#addvaltrigger">addvaltrigger</a></li><br>
     <li><a href="#hmId">hmId</a></li><br>
     <li><a href="#hmProtocolEvents">hmProtocolEvents</a></li><br>
+    <li><a href="#respTime">respTime</a><br>
+	 Define max response time of the HMLAN adapter in seconds. Default is 1 sec. 
+	 Longer times may be used as workaround in slow/instable systems or LAN configurations.
+	</li>
   </ul>
 </ul>
 
