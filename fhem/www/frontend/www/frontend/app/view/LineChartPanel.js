@@ -58,6 +58,38 @@ Ext.define('FHEM.view.LineChartPanel', {
         me.comboReadings2Store = Ext.create('FHEM.store.ReadingsStore');
         me.comboReadings3Store = Ext.create('FHEM.store.ReadingsStore');
         
+        me.comboStatisticsStore = Ext.create('Ext.data.Store', {
+            fields: ['name', 'value'],
+            data : [
+                {'name':'None','value':'none'},
+                {'name':'Hour Sum', 'value':'hoursum'},
+                {'name':'Hour Average', 'value':'houraverage'},
+                {'name':'Hour Min','value':'hourmin'},
+                {'name':'Hour Max','value':'hourmax'},
+                {'name':'Hour Count','value':'hourcount'},
+                {'name':'Day Sum', 'value':'daysum'},
+                {'name':'Day Average', 'value':'dayaverage'},
+                {'name':'Day Min','value':'daymin'},
+                {'name':'Day Max','value':'daymax'},
+                {'name':'Day Count','value':'daycount'},
+                {'name':'Week Sum', 'value':'weeksum'},
+                {'name':'Week Average', 'value':'weekaverage'},
+                {'name':'Week Min','value':'weekmin'},
+                {'name':'Week Max','value':'weekmax'},
+                {'name':'Week Count','value':'weekcount'},
+                {'name':'Month Sum', 'value':'monthsum'},
+                {'name':'Month Average', 'value':'monthaverage'},
+                {'name':'Month Min','value':'monthmin'},
+                {'name':'Month Max','value':'monthmax'},
+                {'name':'Month Count','value':'monthcount'},
+                {'name':'Year Sum', 'value':'yearsum'},
+                {'name':'Year Average', 'value':'yearaverage'},
+                {'name':'Year Min','value':'yearmin'},
+                {'name':'Year Max','value':'yearmax'},
+                {'name':'Year Count','value':'yearcount'}
+            ]
+        });
+        
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
@@ -122,6 +154,17 @@ Ext.define('FHEM.view.LineChartPanel', {
                             xtype: 'checkboxfield', 
                             name: 'yaxisfillcheck',
                             boxLabel: 'Fill'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'yaxisstatisticscombo',
+                            fieldLabel: 'Statistics',
+                            labelWidth: 70,
+                            inputWidth: 120,
+                            store: me.comboStatisticsStore,
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: me.comboStatisticsStore.getAt(0)
                         },
                         {  
                             xtype: 'combobox', 

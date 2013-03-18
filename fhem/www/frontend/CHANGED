@@ -1,3 +1,12 @@
+Update vom 18.3.2013
+  * Implementation einer Statistikfunktion für Charts, die für ein beliebiges Reading
+    * Summen
+    * Mittelwerte
+    * Maximalwerte
+    * Minimalwerte
+    * Insgesamte Anzahl
+  über einen definierbaren Zeitraum abfragt und darstellt
+  * Erweiterung in 93_DbLog.pm für die o.g. Statistikfunktionen für PostgreSQL, MYSQL und SQLITE
 Update vom 16.3.2013
   * Implementation einer clientseitigen Generalisierung
   * Implementation eines Trees im linken Bereich des Frontends, über den Geräte gesichtet und gewählt werden können

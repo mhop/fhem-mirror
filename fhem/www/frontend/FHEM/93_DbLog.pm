@@ -761,6 +761,7 @@ sub jsonError($) {
 ################################################################
 sub prepareSql(@_) {
 
+    my ($hash, @a) = @_;
     my $starttime = $_[5];
     $starttime =~ s/_/ /;
     my $endtime   = $_[6];
@@ -773,14 +774,80 @@ sub prepareSql(@_) {
     my $jsonChartConfig = $_[12];
     my $pagingstart = $_[13]; 
     my $paginglimit = $_[14]; 
-    my ($sql, $jsonstring, $countsql);
- 
+    my $dbmodel = $hash->{DBMODEL};
+    my ($sql, $jsonstring, $countsql, $hourstats, $daystats, $weekstats, $monthstats, $yearstats);
+
+    if ($dbmodel eq "POSTGRESQL") {
+        ### POSTGRESQL Queries for Statistics ###
+        ### hour:
+        $hourstats = "SELECT to_char(timestamp, 'YYYY-MM-DD HH24:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### day:
+        $daystats = "SELECT to_char(timestamp, 'YYYY-MM-DD 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### week:
+        $weekstats = "SELECT date_trunc('week',timestamp) AS TIMESTAMP, SUM(VALUE::float) AS SUM, AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### month:
+        $monthstats = "SELECT to_char(timestamp, 'YYYY-MM-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### year:
+        $yearstats = "SELECT to_char(timestamp, 'YYYY-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE::float) AS SUM, AVG(VALUE::float) AS AVG, MIN(VALUE::float) AS MIN, MAX(VALUE::float) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+   
+    } elsif ($dbmodel eq "MYSQL") {
+        ### MYSQL Queries for Statistics ###
+        ### hour:
+        $hourstats = "SELECT date_format(timestamp, '%Y-%m-%d %H:00:00') AS TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### day:
+        $daystats = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### week:
+        $weekstats = "SELECT date_format(timestamp, '%Y-%m-%d 00:00:00') AS TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY date_format(timestamp, '%Y-%u 00:00:00') ORDER BY 1;";
+
+        ### month:
+        $monthstats = "SELECT date_format(timestamp, '%Y-%m-01 00:00:00') AS TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+        ### year:
+        $yearstats = "SELECT date_format(timestamp, '%Y-01-01 00:00:00') AS TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY 1 ORDER BY 1;";
+
+    } elsif ($hash->{DBMODEL} eq "SQLITE") {
+        ### SQLITE Queries for Statistics ###
+        ### hour:
+        $hourstats = "SELECT TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d %H:00:00', TIMESTAMP);";
+  
+        ### day:
+        $daystats = "SELECT TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m-%d 00:00:00', TIMESTAMP);";
+
+        ### week:
+        $weekstats = "SELECT TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%W 00:00:00', TIMESTAMP);";
+
+        ### month:
+        $monthstats = "SELECT TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y-%m 00:00:00', TIMESTAMP);";
+
+        ### year:
+        $yearstats = "SELECT TIMESTAMP, SUM(VALUE) AS SUM, AVG(VALUE) AS AVG, MIN(VALUE) AS MIN, MAX(VALUE) AS MAX, COUNT(VALUE) AS COUNT FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime' GROUP BY strftime('%Y 00:00:00', TIMESTAMP);";
+
+    } else {
+        $sql = "errordb";
+    }
+
     if($userquery eq "getreadings") {
         $sql = "SELECT distinct(reading) FROM history WHERE device = '".$device."'";
     } elsif($userquery eq "getdevices") {
         $sql = "SELECT distinct(device) FROM history";
     } elsif($userquery eq "timerange") {
         $sql = "SELECT ".$xaxis.", VALUE FROM history WHERE READING = '$yaxis' AND DEVICE = '$device' AND TIMESTAMP Between '$starttime' AND '$endtime';";
+    } elsif($userquery eq "hourstats") {
+        $sql = $hourstats;
+    } elsif($userquery eq "daystats") {
+        $sql = $daystats;
+    } elsif($userquery eq "weekstats") {
+        $sql = $weekstats;
+    } elsif($userquery eq "monthstats") {
+        $sql = $monthstats;
+    } elsif($userquery eq "yearstats") {
+        $sql = $yearstats;
     } elsif($userquery eq "savechart") {
         $sql = "INSERT INTO frontend (TYPE, NAME, VALUE) VALUES ('savedchart', '$savename', '$jsonChartConfig')";
     } elsif($userquery eq "deletechart") {
@@ -809,7 +876,10 @@ sub chartQuery($@) {
 
     if ($sql eq "error") {
        return jsonError("Could not setup SQL String. Maybe the Database is busy, please try again!");
+    } elsif ($sql eq "errordb") {
+       return jsonError("The Database Type is not supported!");
     }
+
     my ($hash, @a) = @_;
     my $dbhf= $hash->{DBHF};
 
