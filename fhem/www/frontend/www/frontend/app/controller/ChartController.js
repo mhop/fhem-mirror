@@ -62,6 +62,10 @@ Ext.define('FHEM.controller.ChartController', {
                ref: 'yaxiscombo' //this.getYaxiscombo()
            },
            {
+               selector: 'combobox[name=yaxisstatisticscombo]',
+               ref: 'yaxisstatisticscombo' //this.getYaxisstatisticscombo()
+           },
+           {
                selector: 'combobox[name=yaxiscolorcombo]',
                ref: 'yaxiscolorcombo' //this.getYaxiscombo()
            },
@@ -225,7 +229,7 @@ Ext.define('FHEM.controller.ChartController', {
     /**
      * Triggers a request to FHEM Module to get the data from Database
      */
-    requestChartData: function() {
+    requestChartData: function(stepchangecalled) {
         
         var me = this;
         //getting the necessary values
@@ -234,6 +238,7 @@ Ext.define('FHEM.controller.ChartController', {
             yaxis = me.getYaxiscombo().getValue(),
             yaxiscolorcombo = me.getYaxiscolorcombo().getValue(),
             yaxisfillcheck = me.getYaxisfillcheck().checked,
+            yaxisstatistics = me.getYaxisstatisticscombo().getValue(),
             y2device = me.getDevice2combo().getValue(),
             y2axis = me.getY2axiscombo().getValue(),
             y2axiscolorcombo = me.getY2axiscolorcombo().getValue(),
@@ -286,7 +291,7 @@ Ext.define('FHEM.controller.ChartController', {
         //check if timerange or dynamic time should be used
         dynamicradio.eachBox(function(box, idx){
             var date = new Date();
-            if (box.checked) {
+            if (box.checked && stepchangecalled !== true) {
                 if (box.inputValue === "year") {
                     starttime = Ext.Date.parse(date.getUTCFullYear() + "-01-01", "Y-m-d");
                     dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
@@ -304,18 +309,18 @@ Ext.define('FHEM.controller.ChartController', {
                     //monday starts with 0 till sat with 5, sund with -1
                     var dayoffset = date.getDay() - 1,
                         monday,
-                        sunday;
+                        nextmonday;
                     if (dayoffset >= 0) {
                         monday = Ext.Date.add(date, Ext.Date.DAY, -dayoffset);
                     } else {
                         //we have a sunday
-                        monday = Ext.Date.add(date, Ext.Date.DAY, 1);
+                        monday = Ext.Date.add(date, Ext.Date.DAY, -6);
                     }
-                    sunday = Ext.Date.add(monday, Ext.Date.DAY, 6);
+                    nextmonday = Ext.Date.add(monday, Ext.Date.DAY, 7);
                     
                     starttime = monday;
                     dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s');
-                    endtime = sunday;
+                    endtime = nextmonday;
                     dbendtime = Ext.Date.format(endtime, 'Y-m-d_H:i:s');
                     
                 } else if (box.inputValue === "day") {
@@ -339,6 +344,8 @@ Ext.define('FHEM.controller.ChartController', {
                 } else {
                     Ext.Msg.alert("Error", "Could not setup the dynamic time.");
                 }
+                me.getStarttimepicker().setValue(starttime);
+                me.getEndtimepicker().setValue(endtime);
             }
         });
         
@@ -379,12 +386,33 @@ Ext.define('FHEM.controller.ChartController', {
             }
         };
       
-        view.series.add(y1series);
-
         if (proxy) {
-            var url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
+            
+            var url;
+            if (yaxisstatistics === "none") {
+                url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
                 url +=device + '+timerange+' + xaxis + '+' + yaxis;
                 url += '&XHR=1'; 
+            } else { //setup url to get statistics
+                url += '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+' + dbstarttime + '+' + dbendtime + '+';
+                url +=device;
+                
+                if (yaxisstatistics.indexOf("hour") === 0) {
+                    url += '+hourstats+';
+                } else if (yaxisstatistics.indexOf("day") === 0) {
+                    url += '+daystats+';
+                } else if (yaxisstatistics.indexOf("week") === 0) {
+                    url += '+weekstats+';
+                } else if (yaxisstatistics.indexOf("month") === 0) {
+                    url += '+monthstats+';
+                } else if (yaxisstatistics.indexOf("year") === 0) {
+                    url += '+yearstats+';
+                }
+                
+                url += xaxis + '+' + yaxis;
+                url += '&XHR=1'; 
+            }
+            
             proxy.url = url;
             store.load();
             store.on("load", function() {
@@ -664,6 +692,33 @@ Ext.define('FHEM.controller.ChartController', {
                 //remove the old max values of y axis to get a dynamic range
                 delete view.axes.get(0).maximum;
                 
+                if (yaxisstatistics.indexOf("none") > 0) {
+                    y1series.yField = 'VALUE';
+                    view.axes.get(0).maximum = store.max('VALUE');
+                } else if (yaxisstatistics.indexOf("sum") > 0) {
+                    y1series.yField = 'SUM';
+                    view.axes.get(0).maximum = store.max('SUM');
+                    view.axes.get(0).setTitle("SUM " + yaxis);
+                } else if (yaxisstatistics.indexOf("average") > 0)  {
+                    y1series.yField = 'AVG';
+                    view.axes.get(0).maximum = store.max('AVG');
+                    view.axes.get(0).setTitle("AVG " + yaxis);
+                } else if (yaxisstatistics.indexOf("min") > 0)  {
+                    y1series.yField = 'MIN';
+                    view.axes.get(0).maximum = store.max('MIN');
+                    view.axes.get(0).setTitle("MIN " + yaxis);
+                }  else if (yaxisstatistics.indexOf("max") > 0)  {
+                    y1series.yField = 'MAX';
+                    view.axes.get(0).maximum = store.max('MAX');
+                    view.axes.get(0).setTitle("MAX " + yaxis);
+                }  else if (yaxisstatistics.indexOf("count") > 0)  {
+                    y1series.yField = 'COUNT';
+                    view.axes.get(0).maximum = store.max('COUNT');
+                    view.axes.get(0).setTitle("COUNT " + yaxis);
+                }
+                view.series.add(y1series);
+                view.redraw();
+                
                 me.getLinechartview().setLoading(false);
                 
             }, this, {single: true});
@@ -815,13 +870,12 @@ Ext.define('FHEM.controller.ChartController', {
                 me.getEndtimepicker().setValue(starttime);
                 var newstarttime = Ext.Date.add(starttime, Ext.Date.MILLI, -timediff);
                 me.getStarttimepicker().setValue(newstarttime);
-                me.requestChartData();
-                
+                me.requestChartData(true);
             } else if (btn.name === "stepforward") {
                 me.getStarttimepicker().setValue(endtime);
                 var newendtime = Ext.Date.add(endtime, Ext.Date.MILLI, timediff);
                 me.getEndtimepicker().setValue(newendtime);
-                me.requestChartData();
+                me.requestChartData(true);
             }
         }
             
@@ -849,6 +903,7 @@ Ext.define('FHEM.controller.ChartController', {
                     
                     yaxiscolorcombo = me.getYaxiscolorcombo().getDisplayValue(),
                     yaxisfillcheck = me.getYaxisfillcheck().checked,
+                    yaxisstatistics = me.getYaxisstatisticscombo().getValue(),
                     y2device = me.getDevice2combo().getValue(),
                     y2axis = me.getY2axiscombo().getValue(),
                     y2axiscolorcombo = me.getY2axiscolorcombo().getDisplayValue(),
@@ -879,7 +934,7 @@ Ext.define('FHEM.controller.ChartController', {
                     generalizationfactor = Ext.ComponentQuery.query('combobox[name=genfactor]')[0].getValue(),
                     view = this.getLinechartview();
                 
-                //setting the starttime parameter in the chartconfig to the string of the radiofield, gets parsed on load
+                //setting the start / endtime parameter in the chartconfig to the string of the radiofield, gets parsed on load
                 if (this.getStarttimepicker().isDisabled()) {
                     dynamicradio.eachBox(function(box, idx) {
                         if (box.checked) {
@@ -895,6 +950,10 @@ Ext.define('FHEM.controller.ChartController', {
                     if(generalization.checked) {
                         jsonConfig += '"generalization":"true",';
                         jsonConfig += '"generalizationfactor":"' + generalizationfactor + '",';
+                    }
+                    
+                    if (yaxisstatistics !== "none") {
+                        jsonConfig += '"yaxisstatistics":"' + yaxisstatistics + '",';
                     }
                     
                     jsonConfig += '"y2device":"' + y2device + '",';
@@ -1043,7 +1102,7 @@ Ext.define('FHEM.controller.ChartController', {
                     });
                 } else {
                     var start = chartdata.starttime.replace("_", " "),
-                    end = chartdata.endtime.replace("_", " ");
+                        end = chartdata.endtime.replace("_", " ");
                     this.getStarttimepicker().setValue(start);
                     this.getEndtimepicker().setValue(end);
                 }
@@ -1057,6 +1116,12 @@ Ext.define('FHEM.controller.ChartController', {
                 } else {
                     genfaccombo.setValue('30');
                     genbox.setValue(false);
+                }
+                
+                if (chartdata.yaxisstatistics && chartdata.yaxisstatistics !== "") {
+                    this.getYaxisstatisticscombo().setValue(chartdata.yaxisstatistics);
+                } else {
+                    this.getYaxisstatisticscombo().setValue("none");
                 }
                 
                 this.requestChartData();

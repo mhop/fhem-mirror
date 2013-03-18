@@ -38,6 +38,26 @@ Ext.define('FHEM.model.ChartModel', {
             convert: function(v,record) {
                 return record.parseToNumber(v, 3, record);
             }
+        },
+        {
+            name: 'SUM',
+            type: 'float'
+        },
+        {
+            name: 'AVG',
+            type: 'float'
+        },
+        {
+            name: 'MIN',
+            type: 'float'
+        },
+        {
+            name: 'MAX',
+            type: 'float'
+        },
+        {
+            name: 'COUNT',
+            type: 'integer'
         }
     ],
     parseToNumber: function(value, idx, rec) {
