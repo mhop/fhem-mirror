@@ -217,7 +217,7 @@ sub CUL_HM_updateConfig($){
 	      if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-   CUL_HM_autoReadConfig("updateConfig");
+  CUL_HM_autoReadConfig("updateConfig");
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -1691,7 +1691,6 @@ sub CUL_HM_Set($@) {
   my $devName = $hash->{device}?$hash->{device}:$name;
   my $st      = AttrVal($devName, "subType", "");
   my $md      = AttrVal($devName, "model"  , "");
-  
   my $rxType = CUL_HM_getRxType($hash);
   my $flag = CUL_HM_getFlag($hash); #set burst flag
   my $cmd = $a[1];
@@ -1722,10 +1721,10 @@ sub CUL_HM_Set($@) {
     push @arr, keys %{$culHmChanSets{$mdCh}}  if($culHmChanSets{$mdCh});
     my $usg = "Unknown argument $cmd, choose one of ".join(" ",sort @arr); 
 
-    if($usg =~ m/ pct/) {
-      $usg =~ s/ pct/ pct:slider,0,1,100/;
-    } 	
-	elsif($md eq "HM-CC-TC") {
+    $usg =~ s/ pct/ pct:slider,0,1,100/;
+    $usg =~ s/ virtual/ virtual:slider,1,1,40/;
+
+	if($md eq "HM-CC-TC") {
       my @list = map { ($_.".0", $_+0.5) } (6..30);
       pop @list;
       my $list = "on,off," . join(",",@list);
@@ -1741,6 +1740,16 @@ sub CUL_HM_Set($@) {
   } 
   elsif($h !~ m/\.\.\./ && @h != @a-2) {
     return "$cmd requires parameter: $h";
+  }
+
+  #convert 'old' commands to current methodes
+  if($cmd =~ m/^(displayMode|displayTemp|controlMode|decalcDay|displayTempUnit)$/ ||
+        $cmd =~ m/^(day|night|party)-temp$/){ #
+	$a[3]=$a[2];
+	$a[2]=$cmd;
+	$a[4]="";
+    ($cmd,$chn,$isChannel) = ("regSet","02","true");     #force channel 02
+    readingsSingleUpdate(CUL_HM_getDeviceHash($hash),$a[2],$a[3],1);#for historical reason
   }
 
      #if chn cmd is executed on device but refers to a channel?
@@ -1791,11 +1800,12 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serialNr)));
     $hash->{hmPairSerial} = $serialNr;
   } 
-  elsif($cmd eq "unpair") { ###################################################
+  elsif($cmd eq "unpair") { ############################################### reg
     CUL_HM_pushConfig($hash, $id, $dst, 0,0,0,0, "02010A000B000C00");
     $state = "";
   } 
-  elsif($cmd eq "sign") { #####################################################
+  elsif($cmd eq "sign") { ################################################# reg
+                                      # chn,peer,list
     CUL_HM_pushConfig($hash, $id, $dst, $chn,0,0,$chn,
                     "08" . ($a[2] eq "on" ? "01":"02"));
 	$state = "";
@@ -1849,7 +1859,7 @@ sub CUL_HM_Set($@) {
 	                      substr($pID,0,6).$pCh1.$pCh2);
 	}
   } 
-  elsif($cmd eq "regBulk"||$cmd eq "getRegRaw") { #############################
+  elsif($cmd eq "regBulk"||$cmd eq "getRegRaw") { ######################### reg
     my ($list,$addr,$data,$peerID);
 	$state = "";
 	if ($cmd eq "regBulk"){
@@ -1900,7 +1910,7 @@ sub CUL_HM_Set($@) {
       CUL_HM_pushConfig($hash,$id,$dst,$chn,$peerID,$peerChn,$list,$adList);
 	}
   } 
-  elsif($cmd eq "regSet") { ###################################################
+  elsif($cmd eq "regSet") { ############################################### reg
     #set <name> regSet <regName> <value> <peerChn> 
 	my ($regName,$data,$peerChnIn) = ($a[2],$a[3],$a[4]);
 	$state = "";
@@ -1912,7 +1922,7 @@ sub CUL_HM_Set($@) {
 	  push @regArr, keys %{$culHmRegType{$st}} if($culHmRegType{$st});
 	  push @regArr, keys %{$culHmRegModel{$md}} if($culHmRegModel{$md});
 	  push @regArr, keys %{$culHmRegChan{$md.$chn}} if($culHmRegChan{$md.$chn});
-	  return "supported register are ".join(" ",sort @regArr);
+	  return "$regName failed: supported register are ".join(" ",sort @regArr);
 	}
 	   
     my $reg  = $culHmRegDefine{$regName};
@@ -1950,13 +1960,13 @@ sub CUL_HM_Set($@) {
 	my $dataStr = substr(sprintf("%08X",($data & $mask) << $bit),
 	                                       8-int($reg->{s}+0.99)*2,);
 	
-    my ($lChn,$peerID,$peerChn) = ($chn,"000000","00");
+    my ($lChn,$peerId,$peerChn) = ($chn,"000000","00");
 	if (($list == 3) ||($list == 4)){ # peer is necessary for list 3/4
 	  return "Peer not specified" if (!$peerChnIn);
-	  $peerID  = CUL_HM_peerChId($peerChnIn,$dst,$id);	  
- 	  $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");
-      $peerID  = substr($peerID,0,6);	
-      return "Peer not specified" if (!$peerID);	  
+	  $peerId  = CUL_HM_peerChId($peerChnIn,$dst,$id);	  
+ 	  $peerChn = ((length($peerId) == 8)?substr($peerId,6,2):"01");
+      $peerId  = substr($peerId,0,6);	
+      return "Peer not specified" if (!$peerId);	  
 	}
 	elsif($list == 0){
       $lChn = "00";
@@ -1971,7 +1981,7 @@ sub CUL_HM_Set($@) {
 	  my $rName = CUL_HM_id2Name($dst.$lChn);
 	  $rName =~ s/_chn:.*//;
 	  my $curVal = CUL_HM_getRegFromStore($rName,
-	                                      $addr,$list,$peerID.$peerChn);
+	                                      $addr,$list,$peerId.$peerChn);
 	  return "cannot read current value for Bitfield - retrieve Data first" 
 	             if (!$curVal);
 	  $curVal =~ s/set_//; # set is not relevant, we take it as given
@@ -1983,7 +1993,9 @@ sub CUL_HM_Set($@) {
 	    $addrData.=sprintf("%02X",$addr+$cnt).substr($dataStr,$cnt*2,2);
 	  }
 	}
-    CUL_HM_pushConfig($hash,$id,$dst,$lChn,$peerID,$peerChn,$list,$addrData);
+	my $cHash = CUL_HM_id2Hash($dst.($chn eq '00'?"":$chn));
+	$cHash = $hash if (!$cHash);
+    CUL_HM_pushConfig($cHash,$id,$dst,$lChn,$peerId,$peerChn,$list,$addrData);
   } 
   elsif($cmd eq "level") { ####################################################
 	#level        =>"<level> <relockDly> <speed>..."
@@ -2026,7 +2038,7 @@ sub CUL_HM_Set($@) {
  } 
   elsif($cmd eq "toggle") { ###################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.
-	            (ReadingsVal($name,"state","on") eq "off" ?"C80000":"000000"));
+	            (CUL_HM_getChnLvl($name) != 0 ?"000000":"C80000"));
 	$hash = $chnHash; # report to channel if defined
   }
   elsif($cmd eq "lock") { #####################################################
@@ -2049,31 +2061,30 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.'01');	# SET_LOCK
 	$state = "";
   }
-  elsif($cmd eq "pct") { ######################################################
-    $a[1] = 100 if ($a[1] > 100);
-    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[2]!=0)?$a[2]:6709248);# onTime   0.0..6709248, 0=forever
-    $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..6709248, 0=immediate
-    CUL_HM_PushCmdStack($hash, 
-	    sprintf("++%s11%s%s02%s%02X%s%s",$flag,$id,$dst,$chn,$a[1]*2,$rval,$tval));
-  } 
-  elsif($cmd =~ m/^(up|down)$/) { #############################################
-#  elsif($cmd eq "up" || $cmd eq "down") { #############################################
-    #dim [<changeValue>|up|down] ... [ontime] [ramptime]
-	my $lvl = (defined $a[2])?$a[2]:10;
-	$lvl = -1*$lvl if ($cmd eq "down");
-	my $curVal = ReadingsVal($name,"state",0);
-	$curVal = ($curVal eq "on")?100:(($curVal eq "off")?0:$curVal);
-	$lvl += $curVal;
+  elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
+	my $lvl;
+	if ($cmd eq "pct"){
+	  $lvl = $a[1];
+	}
+	else{#dim [<changeValue>|up|down] ... [ontime] [ramptime]
+	  shift @a; # align array with 'pct'
+	  $lvl = (defined $a[1])?$a[1]:10;
+	  $lvl = -1*$lvl if ($cmd eq "down");
+	  $lvl += CUL_HM_getChnLvl($name);
+	}
     $lvl = ($lvl > 100)?100:(($lvl < 0)?0:$lvl);
-    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[3]!=0)?$a[3]:6709248);# onTime 0.0..6709248, 0=forever
+    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[2]!=0)?$a[3]:6709248);# onTime 0.0..6709248, 0=forever
     $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..6709248, 0=immediate
     CUL_HM_PushCmdStack($hash, 
 	    sprintf("++%s11%s%s02%s%02X%s%s",$flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
+    if (defined $hash->{READINGS}{"virtLevel"}{VAL}){
+	     readingsSingleUpdate($hash,"virtLevel",$state,1);
+	}else{$state = "set_".$lvl;}
   } 
   elsif($cmd eq "stop") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
   } 
-  elsif($cmd eq "text") { #####################################################
+  elsif($cmd eq "text") { ################################################# reg
     $state = "";
     return "$a[2] is not a button number" if($a[2] !~ m/^\d$/ || $a[2] < 1);
     return "$a[3] is not on or off" if($a[3] !~ m/^(on|off)$/);
@@ -2241,7 +2252,7 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'80'.$chn.'0202'.$mp3Bytes);
   } 
-  elsif($cmd eq "ilum") { #####################################################
+  elsif($cmd eq "ilum") { ################################################# reg
 	return "$a[2] not specified. choose 0-15 for brightness"  if ($a[2]>15);
 	return "$a[3] not specified. choose 0-127 for duration"  if ($a[3]>127);
 	return "unsupported for HMid:".$hash->{DEF}.", use HMId:".substr($hash->{DEF},0,6)
@@ -2250,46 +2261,16 @@ sub CUL_HM_Set($@) {
 	# write list0,
 	CUL_HM_pushConfig($hash,$id,$dst,0,0,0,0,$addrData);
   } 
-  elsif(($cmd eq "displayMode")||($cmd eq "displayTemp")||
-		($cmd eq "controlMode")||($cmd eq "decalcDay")  ||
-		($cmd eq "displayTempUnit") ){ ########################################
-    my %regs = (displayTemp     =>{actual=>0,setpoint=>2},
-                displayMode     =>{"temp-only"=>0,"temp-hum"=>1},
-                displayTempUnit =>{celsius=>0,fahrenheit=>4},
-                controlMode     =>{manual=>0,auto=>8,central=>16,party=>24},
-  			    decalcDay       =>{Sat=>0  ,Sun=>32 ,Mon=>64,Tue=>96, 
-				                   Wed=>128,Thu=>160,Fri=>192});
-	return $a[2]."invalid for ".$cmd." select one of ". 
-	      join (" ",sort keys %{$regs{$cmd}}) if(!defined($regs{$cmd}{$a[2]}));
-    readingsSingleUpdate($hash,$cmd,$a[2],1);
-    my $tcnf = 0;
-    my $missingEntries; 
-    foreach my $entry (keys %regs){
-      if (!$hash->{READINGS}{$entry}){
-        $missingEntries .= $entry." ";
-	  }
-	  else{
-	    $tcnf |=  $regs{$entry}{$hash->{READINGS}{$entry}{VAL}};
-	  }
-    }
-    return "please complete settings for ".$missingEntries if($missingEntries);
-
-	CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "01".sprintf("%02X",$tcnf));
-  } 
   elsif($cmd eq "desired-temp") { #############################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'0202'.
 	                                                   CUL_HM_convTemp($a[2]));
     my $chnHash = CUL_HM_id2Hash($dst."02");
 	my $mode = ReadingsVal($chnHash->{NAME},"R-MdTempReg","");
+	$mode =~ s/set_//;#consider set as given
 	readingsSingleUpdate($chnHash,"desired-temp-cent",$a[2],1) 
 	      if($mode eq 'central ');
   } 
-  elsif($cmd =~ m/^(day|night|party)-temp$/) { ################################
-    my %tt = (day=>"03", night=>"04", party=>"06");
-    my $tt = $tt{$1};
-    CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,5, "$tt".CUL_HM_convTemp($a[2])); 
-  } 
-  elsif($cmd =~ m/^tempList(...)/) { ##########################################
+  elsif($cmd =~ m/^tempList(...)/) { ###################################### reg
     my %day2off = ( "Sat"=>"5 0B", "Sun"=>"5 3B", "Mon"=>"5 6B",
                     "Tue"=>"5 9B", "Wed"=>"5 CB", "Thu"=>"6 01",
                     "Fri"=>"6 31");
@@ -2346,7 +2327,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,
         sprintf("++A001%s%s0104%s%02X%s", $id, $dst, $id, $a[2], $chn));
   } 
-  elsif($cmd eq "keydef") { ###################################################
+  elsif($cmd eq "keydef") { ############################################### reg
     if (     $a[3] eq "tilt")      {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B220D838B228D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
     } elsif ($a[3] eq "close")     {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0B550D838B558D83");#JT_ON/OFF/RAMPON/RAMPOFF short and long
     } elsif ($a[3] eq "closed")    {CUL_HM_pushConfig($hash,$id,$dst,1,$id,$a[2],3,"0F008F00");        #offLevel (also thru register)
@@ -3346,6 +3327,13 @@ sub CUL_HM_secSince2000() {#####################
         - 7200;            # HM Special
   return $t;
 }
+sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
+  my $name = shift;
+  my $curVal = ReadingsVal($name,"virtLevel",undef);
+  $curVal = ReadingsVal($name,"state",0) if (!defined $curVal);
+  $curVal =~ s/set_//;
+  return ($curVal eq "on")?100:(($curVal eq "off")?0:$curVal);
+}
 
 #--------------- Conversion routines for register settings---------------------
 sub CUL_HM_initRegHash() { #duplicate short and long press register 
@@ -3434,7 +3422,7 @@ sub CUL_HM_TCtempReadings($) {# parse TC readings
 	  $tSpan = $time[$reg];
     }
 	push (@changedRead,"tempList".$days[$day].":".$dayRead);
-  }
+  }  
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
   return $setting;
 }
