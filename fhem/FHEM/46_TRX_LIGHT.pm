@@ -2,6 +2,7 @@
 ##############################################################################
 #
 #     46_TRX_LIGHT.pm
+#
 #     FHEM module for lighting protocols:
 #       X10 lighting, ARC, ELRO AB400D, Waveman, Chacon EMW200,
 #       IMPULS, AC (KlikAanKlikUit, NEXA, CHACON, HomeEasy UK),
