@@ -310,6 +310,8 @@ my %culHmRegDefine = (
   stbyTime        =>{a=> 14.0,s=>1.0,l=>0,min=>1  ,max=>99      ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Standby Time"},
   backOnTime      =>{a=> 14.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>'s'   ,d=>1,t=>"Backlight On Time"},
   btnLock         =>{a=> 15.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Button Lock"     ,lit=>{unlock=>0,lock=>1}},
+
+  confBtnTime     =>{a=> 21.0,s=>1.0,l=>0,min=>1  ,max=>255     ,c=>''         ,f=>''      ,u=>'min' ,d=>0,t=>"255=permanent"},
 # keymatic/winmatic secific register                                                                     
   keypressSignal  =>{a=>  3.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Keypress beep"                 ,lit=>{off=>0,on=>1}},
   signal          =>{a=>  3.4,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Confirmation beep"             ,lit=>{off=>0,on=>1}},
@@ -317,6 +319,7 @@ my %culHmRegDefine = (
 # sec_mdir                                                                                   
   cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message",lit=>{off=>0,on=>1}},
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message"   ,lit=>{off=>0,on=>1}},
+  cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
   lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit"},
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
@@ -356,12 +359,17 @@ my %culHmRegDefine = (
   msgScdPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
   msgScdPosC      =>{a=> 32.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position C",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
   msgScdPosD      =>{a=> 32.0,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position D",lit=>{noMsg=>0,lvlNormal=>1,lvlAddStrong=>2,lvlAdd=>3}},
-  evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600,max=>1200    ,c=>''         ,f=>1.6     ,u=>'s'   ,d=>0,t=>"Event filter time",},#todo check calculation
+#wds - different literals
+  msgWdsPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,dry=>1}},
+  msgWdsPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,dry=>1,water=>2,wet=>3}},
+  msgWdsPosC      =>{a=> 32.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position C",lit=>{noMsg=>0,       water=>2,wet=>3}},
 #rhs - different literals
   msgRhsPosA      =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
   msgRhsPosB      =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
   msgRhsPosC      =>{a=> 32.2,s=>0.2,l=>1,min=>0  ,max=>3       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position C",lit=>{noMsg=>0,closed=>1,open=>2,tilted=>3}},
-  evtDly          =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'factor'   ,f=>1.6     ,u=>'s'   ,d=>0,t=>"Event delay time",},#todo check calculation
+#SC - different literals
+  msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
+  msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
 # keymatic/winmatic secific register                                                                     
   holdTime        =>{a=> 20  ,s=>1,  l=>1,min=>0  ,max=>8.16    ,c=>'factor'   ,f=>31.25   ,u=>'s'   ,d=>0,t=>"Holdtime for door opening"},
   holdPWM         =>{a=> 21  ,s=>1,  l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"Holdtime pulse wide modulation"},
@@ -391,11 +399,11 @@ my %culHmRegDefine = (
   minInterval     =>{a=>  2.0,s=>0.3,l=>1,min=>0  ,max=>4       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"minimum interval in sec"   ,lit=>{15=>0,30=>1,60=>2,120=>3,240=>4}},
   captInInterval  =>{a=>  2.3,s=>0.1,l=>1,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"capture within interval"   ,lit=>{off=>0,on=>1}},
   brightFilter    =>{a=>  2.4,s=>0.4,l=>1,min=>0  ,max=>7       ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"brightness filter - ignore light at night"},
-  msgScPosA       =>{a=> 32.6,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position A",lit=>{noMsg=>0,closed=>1,open=>2}},
-  msgScPosB       =>{a=> 32.4,s=>0.2,l=>1,min=>0  ,max=>2       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Message for position B",lit=>{noMsg=>0,closed=>1,open=>2}},
   eventDlyTime    =>{a=> 33  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>1,t=>"event delay time"},
   ledOnTime       =>{a=> 34  ,s=>1  ,l=>1,min=>0  ,max=>1.275   ,c=>'factor'   ,f=>200     ,u=>'s'   ,d=>0,t=>"LED ontime"},
   eventFilterTime =>{a=> 35  ,s=>1  ,l=>1,min=>0  ,max=>7620    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
+# - different range
+  evtFltrTime     =>{a=> 35.0,s=>1  ,l=>1,min=>600,max=>1200    ,c=>'fltCvT'   ,f=>''      ,u=>'s'   ,d=>0,t=>"event filter time"},
 
 # weather units                                                                                  
   stormUpThresh   =>{a=>  6  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm upper threshold"},
@@ -477,6 +485,7 @@ my %culHmRegType = (
 				       lgMultiExec     =>1,
 				       },
   dimmer            =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1,
+                       confBtnTime     =>1,
                        ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,fuseDelay	   =>1,#not dim.L
                        OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
                        OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1,
@@ -517,6 +526,10 @@ my %culHmRegType = (
   motionDetector    =>{evtFltrPeriod   =>1,evtFltrNum      =>1,minInterval     =>1,
 			           captInInterval=>1,brightFilter    =>1,ledOnTime       =>1,
 			           },
+  threeStateSensor  =>{cyclicInfoMsg   =>1                    ,transmDevTryMax =>1,
+					                                          ,transmitTryMax  =>1,
+                       peerNeedsBurst  =>1,expectAES       =>1,
+					   },
 );
 
 my %culHmRegModel = (
@@ -549,22 +562,18 @@ my %culHmRegModel = (
   "HM-CC-SCD"       =>{peerNeedsBurst  =>1,expectAES       =>1,
                                                                transmitTryMax  =>1,evtFltrTime     =>1,
                        msgScdPosA      =>1,msgScdPosB      =>1,msgScdPosC      =>1,msgScdPosD      =>1,},
-  "HM-SEC-RHS"      =>{peerNeedsBurst  =>1,expectAES       =>1,
-                       cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
-                       msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
-                       evtDly          =>1,ledOnTime       =>1,transmitTryMax  =>1,},
-  "HM-SEC-SC"       =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
+  "HM-SEC-RHS"      =>{msgRhsPosA      =>1,msgRhsPosB      =>1,msgRhsPosC      =>1,
+                                           ledOnTime       =>1,eventDlyTime    =>1},
+  "HM-SEC-SC"       =>{                    sabotageMsg     =>1,
                        msgScPosA       =>1,msgScPosB       =>1,
-					                       ledOnTime       =>1,transmitTryMax  =>1,eventDlyTime    =>1,
-                       peerNeedsBurst  =>1,expectAES       =>1,},
-  "HM-SCI-3-FM"     =>{cyclicInfoMsg   =>1                    ,transmDevTryMax =>1,
+					                       ledOnTime       =>1,eventDlyTime    =>1},
+  "HM-SCI-3-FM"     =>{msgScPosA       =>1,msgScPosB       =>1,
+					                                           eventDlyTime    =>1},
+  "HM-SEC-TIS"      =>{                    sabotageMsg     =>1,
                        msgScPosA       =>1,msgScPosB       =>1,
-					                                           transmitTryMax  =>1,eventDlyTime    =>1,
-                       peerNeedsBurst  =>1,expectAES       =>1,},
-  "HM-SEC-TIS"      =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
-                       msgScPosA       =>1,msgScPosB       =>1,
-					                       ledOnTime       =>1,transmitTryMax  =>1,eventFilterTime =>1,
-                       peerNeedsBurst  =>1,expectAES       =>1,},
+					                       ledOnTime       =>1,eventFilterTime =>1},
+  "HM-SEC-WDS"      =>{msgWdsPosA       =>1,msgWdsPosB     =>1,msgWdsPosC      =>1,
+					                                           eventFilterTime =>1},
   "HM-SEC-SFA-SM"   =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                        lowBatLimit     =>1,batDefectLimit  =>1,
                                                                transmitTryMax  =>1,},
@@ -577,8 +586,8 @@ my %culHmRegModel = (
                        DimJtRampOn     =>1,DimJtRampOff    =>1,
                        lgMultiExec     =>1,
 					   },
-  "HM-Sen-Wa-Od"    =>{cyclicInfoMsg   =>1,                    transmDevTryMax =>1,
-                       localResDis     =>1,ledOnTime       =>1,transmitTryMax  =>1,
+  "HM-Sen-Wa-Od"    =>{cyclicInfoMsgDis=>1,                    transmDevTryMax =>1,localResDis     =>1,
+                                           ledOnTime       =>1,transmitTryMax  =>1,
                        waterUppThr     =>1,waterlowThr     =>1,caseDesign      =>1,caseHigh        =>1,
                        fillLevel       =>1,caseWidth       =>1,caseLength      =>1,meaLength       =>1,
                        useCustom       =>1,					   

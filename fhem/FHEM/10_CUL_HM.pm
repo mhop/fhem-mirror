@@ -213,8 +213,7 @@ sub CUL_HM_updateConfig($){
 	  }
 	}
 	$attr{$name}{webCmd} = $webCmd if ($webCmd);
-	push @getConfList,$name 
-	      if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
+	push @getConfList,$name if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
   CUL_HM_autoReadConfig("updateConfig");
@@ -2073,12 +2072,12 @@ sub CUL_HM_Set($@) {
 	  $lvl += CUL_HM_getChnLvl($name);
 	}
     $lvl = ($lvl > 100)?100:(($lvl < 0)?0:$lvl);
-    $tval = CUL_HM_encodeTime16(((@a > 2)&&$a[2]!=0)?$a[3]:6709248);# onTime 0.0..6709248, 0=forever
+    $tval = $a[2]?CUL_HM_encodeTime16($a[2]):"FFFF";# onTime 0.0..6709248, 0=forever
     $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..6709248, 0=immediate
-    CUL_HM_PushCmdStack($hash, 
-	    sprintf("++%s11%s%s02%s%02X%s%s",$flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
+    CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
+	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
     if (defined $hash->{READINGS}{"virtLevel"}{VAL}){
-	     readingsSingleUpdate($hash,"virtLevel",$state,1);
+	     readingsSingleUpdate($hash,"virtLevel","set_".$lvl,1);
 	}else{$state = "set_".$lvl;}
   } 
   elsif($cmd eq "stop") { #####################################################
@@ -3293,7 +3292,6 @@ sub CUL_HM_encodeTime16($) {####################
     }
     $mul /= 2;
   }
-  my $v2 = CUL_HM_decodeTime16($ret);
   return ($ret);
 }
 sub CUL_HM_convTemp($) {########################
@@ -3332,6 +3330,7 @@ sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
   my $curVal = ReadingsVal($name,"virtLevel",undef);
   $curVal = ReadingsVal($name,"state",0) if (!defined $curVal);
   $curVal =~ s/set_//;
+  $curVal =~ s/ .*//;#strip unit
   return ($curVal eq "on")?100:(($curVal eq "off")?0:$curVal);
 }
 
