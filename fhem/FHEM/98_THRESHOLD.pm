@@ -148,8 +148,8 @@ THRESHOLD_Define($$$)
 	$cmd2 =~ s/@/$actor/g;
   }
   
-  $hash->{helper}{actor_cmd1} = $cmd1;
-  $hash->{helper}{actor_cmd2} = $cmd2;
+  $hash->{helper}{actor_cmd1} = SemicolonEscape($cmd1);
+  $hash->{helper}{actor_cmd2} = SemicolonEscape($cmd2);
   $hash->{helper}{actor_cmd_default} = $cmd_default;
   $hash->{STATE} = 'initialized' if (!ReadingsVal($pn,"desired_value",""));
   
@@ -312,15 +312,15 @@ THRESHOLD_setValue($$)
   my $cmd_now = $cmd[$cmd_nr-1];
   my $cmd_sym_now = $cmd_sym[$cmd_nr-1];
   
-  if ($cmd_now) {
     if (ReadingsVal($pn,"cmd","") ne $cmd_sym_now) {
-      if ($ret = AnalyzeCommandChain(undef, $cmd_now)) {
-	  Log GetLogLevel($pn,3), "output of $pn $cmd_now: $ret";
+	  if ($cmd_now eq "") {
+	    readingsSingleUpdate  ($hash, "cmd",$cmd_sym_now, 1);
+      }	elsif ($ret = AnalyzeCommandChain(undef, $cmd_now)) {
+	      Log GetLogLevel($pn,3), "output of $pn $cmd_now: $ret";
       } else {
          readingsSingleUpdate  ($hash, "cmd",$cmd_sym_now, 1);    
       }
     }
-  }	
 }
 
 1;
@@ -372,7 +372,7 @@ THRESHOLD_setValue($$)
     the second sensor
 	</li>
 	<li>reading2<br>
-    reading of the second sensor
+    reading of the second sensor<br>
 	default value: state
 	</li>
 	<li>state<br>
@@ -530,7 +530,7 @@ THRESHOLD_setValue($$)
     ein definierter Sensor, dessen Status abgefragt wird
 	</li>
 	<li>reading2<br>
-    Reading, der den Status des Sensors beinhaltet
+    Reading, der den Status des Sensors beinhaltet<br>
 	Defaultwert: state
 	</li>
 	<li>state<br>
