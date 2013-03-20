@@ -46,12 +46,15 @@ THRESHOLD_Define($$$)
   my @a = split("[ \t][ \t]*", $b[0]);
   my $cmd1="";
   my $cmd2="";
+  my $state_cmd1="";
+  my $state_cmd2="";
   my $cmd_default=0;
   my $actor;
    
-  if (@b > 4 || @a < 3 || @a > 6) {
+  if (@b > 5 || @a < 3 || @a > 6) {
     my $msg = "wrong syntax: define <name> THRESHOLD " .
-               "<sensor>[:<reading>[:<hysteresis>][:<init_desired_value>] [AND|OR <sensor2>[:<reading2>][:<state>]] [<actor>][|<cmd1>][|<cmd2>][|<cmd_default_index>]";
+               "<sensor>[:[<reading>][:[<hysteresis>][:<init_desired_value>]]] [AND|OR <sensor2>[:[<reading2>][:<state>]]] ".
+			   "[<actor>][|[<cmd1>][|[<cmd2>][|[<cmd_default_index>][|[[<state_cmd1>][:<state_cmd2>]]]]]]";
     Log 2, $msg;
     return $msg;
   } 
@@ -134,20 +137,25 @@ THRESHOLD_Define($$$)
   } else { # actor parameters 
     $cmd1 = $b[1] if (defined($b[1]));
 	$cmd2 = $b[2] if (defined($b[2]));
-	if (defined($b[3])) {
-	  $cmd_default = $b[3];
-	  if ($cmd_default !~ m/^[0-2]$/ ) {
-		my $msg = "$pn: value:$cmd_default, cmd_default_index needs 0,1,2";
-        Log 2, $msg;
-        return $msg;
-	  }
-    }	
-  }	
+	$cmd_default = (!($b[3])) ? 0 : $b[3];
+	if ($cmd_default !~ m/^[0-2]$/ ) {
+	     my $msg = "$pn: value:$cmd_default, cmd_default_index needs 0,1,2";
+         Log 2, $msg;
+         return $msg;
+	}
+    if (defined($b[4])) {
+	  my ($st_cmd1, $st_cmd2) = split(":", $b[4], 2);
+	  $state_cmd1 = $st_cmd1 if (defined($st_cmd1));
+	  $state_cmd2 = $st_cmd2 if (defined($st_cmd2));
+	}	
+  }
   if (defined($actor)) {
 	$cmd1 =~ s/@/$actor/g;
 	$cmd2 =~ s/@/$actor/g;
   }
-  
+
+  $hash->{helper}{state_cmd1} = $state_cmd1;
+  $hash->{helper}{state_cmd2} = $state_cmd2;
   $hash->{helper}{actor_cmd1} = SemicolonEscape($cmd1);
   $hash->{helper}{actor_cmd2} = SemicolonEscape($cmd2);
   $hash->{helper}{actor_cmd_default} = $cmd_default;
@@ -155,8 +163,9 @@ THRESHOLD_Define($$$)
   
   if (defined ($init_desired_value))
   {
+    my $set_state =($state_cmd1 eq "" and $state_cmd2 eq "") ? 1 : 0;
     readingsBeginUpdate  ($hash);
-	readingsBulkUpdate   ($hash, "state", "active $init_desired_value");
+	readingsBulkUpdate   ($hash, "state", "active $init_desired_value") if ($set_state);
 	readingsBulkUpdate   ($hash, "threshold_min", $init_desired_value-$hysteresis);
 	readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
 	readingsBulkUpdate   ($hash, "desired_value", $init_desired_value);
@@ -174,22 +183,26 @@ THRESHOLD_Set($@)
   my $ret="";
   return "$pn, need a parameter for set" if(@a < 2);
   my $arg = $a[1];
+  my $value = (defined $a[2]) ? $a[2] : "";
   my $desired_value;
+  my $set_state = ($hash->{helper}{state_cmd1} eq "" and $hash->{helper}{state_cmd2} eq "") ? 1 : 0;
+ 
+ 
   if ($arg eq "desired" ) {
-    return "$pn: set desired value:$a[2], desired value needs a numeric parameter" if(@a != 3 || $a[2] !~ m/^[-\d\.]*$/);
-    Log GetLogLevel($pn,3), "set $pn $arg $a[2]";
+    return "$pn: set desired value:$value, desired value needs a numeric parameter" if(@a != 3 || $value !~ m/^[-\d\.]*$/);
+    Log GetLogLevel($pn,3), "set $pn $arg $value";
 	readingsBeginUpdate  ($hash);
-	readingsBulkUpdate   ($hash, "state", "active $a[2]");
-	readingsBulkUpdate   ($hash, "threshold_min",$a[2]-$hash->{hysteresis});
+	readingsBulkUpdate   ($hash, "state", "active $value") if ($set_state);
+	readingsBulkUpdate   ($hash, "threshold_min",$value-$hash->{hysteresis});
 	readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
-	readingsBulkUpdate   ($hash, "desired_value", $a[2]);
+	readingsBulkUpdate   ($hash, "desired_value", $value);
 	readingsEndUpdate    ($hash, 1);
   } elsif ($arg eq "deactivated" ) {
       $desired_value = ReadingsVal($pn,"desired_value","");
 	  return "$pn: set deactivated, set desired value first" if (!$desired_value);
 	  $ret=CommandAttr(undef, "$pn disable 1");   
 	  if (!$ret) {
-	    readingsSingleUpdate   ($hash, "state", "deactivated $desired_value",1);
+	    readingsSingleUpdate   ($hash, "state", "deactivated $desired_value",1) if ($set_state);
 	  }
   } elsif ($arg eq "active" ) {
       $desired_value = ReadingsVal($pn,"desired_value","");
@@ -197,13 +210,13 @@ THRESHOLD_Set($@)
 	  $ret=CommandDeleteAttr(undef, "$pn disable");
 	  if (!$ret) {
 		readingsBeginUpdate  ($hash);
-		readingsBulkUpdate   ($hash, "state", "active $desired_value");
+		readingsBulkUpdate ($hash, "state", "active $desired_value") if ($set_state);
 		readingsBulkUpdate   ($hash, "cmd","wait for next cmd");
 		readingsEndUpdate    ($hash, 1);
 	  }
 	} elsif ($arg eq "hysteresis" ) {
-		return "$pn: set hysteresis value:$a[2], hysteresis needs a numeric parameter" if ($a[2] !~ m/^[\d\.]*$/ );
-		$hash->{hysteresis} = $a[2];
+		return "$pn: set hysteresis value:$value, hysteresis needs a numeric parameter" if (@a != 3  || $value !~ m/^[\d\.]*$/ );
+		$hash->{hysteresis} = $value;
 		$desired_value = ReadingsVal($pn,"desired_value","");
 		if ($desired_value) {
 		  readingsBeginUpdate  ($hash);
@@ -306,21 +319,26 @@ THRESHOLD_setValue($$)
 {
   my ($hash, $cmd_nr) = @_;
   my $pn = $hash->{NAME};
-  my $ret=0;
-  my @cmd =($hash->{helper}{actor_cmd1},$hash->{helper}{actor_cmd2});
   my @cmd_sym = ("cmd1","cmd2");
-  my $cmd_now = $cmd[$cmd_nr-1];
   my $cmd_sym_now = $cmd_sym[$cmd_nr-1];
-  
-    if (ReadingsVal($pn,"cmd","") ne $cmd_sym_now) {
-	  if ($cmd_now eq "") {
-	    readingsSingleUpdate  ($hash, "cmd",$cmd_sym_now, 1);
-      }	elsif ($ret = AnalyzeCommandChain(undef, $cmd_now)) {
-	      Log GetLogLevel($pn,3), "output of $pn $cmd_now: $ret";
-      } else {
-         readingsSingleUpdate  ($hash, "cmd",$cmd_sym_now, 1);    
-      }
-    }
+
+  if (ReadingsVal($pn,"cmd","") ne $cmd_sym_now) {
+	my $ret=0;
+	my @cmd =($hash->{helper}{actor_cmd1},$hash->{helper}{actor_cmd2});
+	my @state_cmd = ($hash->{helper}{state_cmd1},$hash->{helper}{state_cmd2});
+	my $cmd_now = $cmd[$cmd_nr-1];
+	my $state_cmd_now = $state_cmd[$cmd_nr-1];
+  	if ($cmd_now ne "") {
+	  if ($ret = AnalyzeCommandChain(undef, $cmd_now)) {
+	    Log GetLogLevel($pn,3), "output of $pn $cmd_now: $ret";
+		return "";
+	  }
+	}
+	readingsBeginUpdate ($hash);
+	readingsBulkUpdate  ($hash, "state",$state_cmd_now) if (($state_cmd_now) ne ""); 
+    readingsBulkUpdate  ($hash, "cmd",$cmd_sym_now);
+	readingsEndUpdate   ($hash, 1);
+  }  
 }
 
 1;
@@ -345,7 +363,7 @@ THRESHOLD_setValue($$)
   <b>Define</b>
 <ul>
   <br>
-    <code>define &lt;name&gt; THRESHOLD &lt;sensor&gt;[:&lt;reading&gt;][:&lt;hysteresis&gt;][:&lt;init_desired_value&gt;] [AND|OR &lt;sensor2&gt;[:&lt;reading2&gt;][:&lt;state&gt;]] [&lt;actor&gt;][|&lt;cmd1&gt;][|&lt;cmd2&gt;][|&lt;cmd_default_index&gt;]</code><br>
+  <code>define &lt;name&gt; THRESHOLD &lt;sensor&gt;[:[&lt;reading&gt;][:[&lt;hysteresis&gt;][:&lt;init_desired_value&gt;]]] [AND|OR &lt;sensor2&gt;[:[&lt;reading2&gt;][:&lt;state&gt;]]] [&lt;actor&gt;][|[&lt;cmd1&gt;][|[&lt;cmd2&gt;][|[&lt;cmd_default_index&gt;][|[[&lt;state_cmd1&gt;][:&lt;state_cmd2&gt;]]]]]]</code><br>
   <br>
   <br>
 	<li>sensor<br>
@@ -395,17 +413,28 @@ THRESHOLD_setValue($$)
 	0 - no command<br>
 	1 - cmd1<br>
 	2 - cmd2<br>
-    Defaultwert: 2, if actor defined, else 0<br>
+    default value: 2, if actor defined, else 0<br>
     </li>
+	<br>
+	<li>state_cmd1<br>
+	state, which is displayed, if FHEM/Perl-command cmd1 was executed. If state_cmd1 state ist set, other states, such as active or deactivated are suppressed.
+	<br>
+	default value: none
+	</li>
+	<li>state_cmd2<br>
+	state, which is displayed, if FHEM/Perl-command cmd1 was executed. If state_cmd1 state ist set, other states, such as active or deactivated are suppressed.
+	<br>
+	default value: none
+	</li>
 	<br>
 	<br>
     Examples:<br>
     <br>
 	Example for heating:<br>
 	<br>	
-	<code>define Thermostat THRESHOLD temp_sens heating</code><br>
+	<code>define thermostat THRESHOLD temp_sens heating</code><br>
 	<br>
-	<code>set Thermostat desired 20</code><br>
+	<code>set thermostat desired 20</code><br>
 	<br>
 	Description:<br>
 	<br>
@@ -414,7 +443,7 @@ THRESHOLD_setValue($$)
 	<br>
 	Example for heating with window contact:<br>
 	<br>
-	<code>define Thermostat THRESHOLD temp_sens OR win_sens heating</code><br>
+	<code>define thermostat THRESHOLD temp_sens OR win_sens heating</code><br>
 	<br>
 	Example for heating with multiple window contacts:<br>
 	<br>
@@ -424,24 +453,32 @@ THRESHOLD_setValue($$)
     <br>
 	then: <br>
     <br>
-	<code>define Thermostat THRESHOLD S1 OR W_ALL heating</code><br>
+	<code>define thermostat THRESHOLD S1 OR W_ALL heating</code><br>
     <br>
-	More examples:<br>
+	More examples for dehumidification, air conditioning, watering:<br>
 	<br>
-	<code>define Hygrostat THRESHOLD hym_sens:humidity dehydrator|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:humidity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
-	<code>define Thermostat THRESHOLD temp_sens:temperature:1 aircon|set @ on|set @ off|1</code><br>
-	<code>define Thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:humidity:20 watering|set @ off|set @ on|2</code><br>
+	<code>define hygrostat THRESHOLD hym_sens:humidity dehydrator|set @ on|set @ off|1</code><br>
+	<code>define hygrostat THRESHOLD hym_sens:humidity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
+	<code>define thermostat THRESHOLD temp_sens:temperature:1 aircon|set @ on|set @ off|1</code><br>
+	<code>define thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
+	<code>define hygrostat THRESHOLD hym_sens:humidity:20 watering|set @ off|set @ on|2</code><br>
 	<br>
-	Alternatively, each Perl commands are given.<br>
+	It can also FHEM/perl command chains are specified:<br>
 	<br>
 	Examples:<br>
 	<br>
-	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")}|{fhem("set Switch1 off;set Switch2 off")}|1</code><br>
-    <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"value is exceeded"}|{fhem("set @ on;set Switch2 on")}</code><br>
-	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"value is reached"}|</code><br>
+	<code>define thermostat THRESHOLD sensor |set Switch1 on;set Switch2 on|set Switch1 off;set Switch2 off|1</code><br>
+    <code>define thermostat THRESHOLD sensor alarm|{Log 2,"value is exceeded"}|set @ on;set Switch2 on</code><br>
+	<code>define thermostat THRESHOLD sensor ||{Log 2,"value is reached"}|</code><br>
     <br>
+	Example for status display on/off:<br>
+	<br>
+	<code>define thermostat THRESHOLD sensor heating|set @ off|set @ on|2|off:on</code><br>
+	<br>
+	Example for status display (eg for state evaluation in other modules), if temperature drops below 30 degrees or above:<br>
+	<br>
+	<code>define thermostat THRESHOLD sensor:temperature:0:30 ||||on:off</code><br>
+	<br>
   </ul>
 	<a name="THRESHOLDset"></a>
   <b>Set </b>
@@ -503,7 +540,7 @@ THRESHOLD_setValue($$)
   <b>Define</b>
 <ul>
   <br>
-    <code>define &lt;name&gt; THRESHOLD &lt;sensor&gt;[:&lt;reading&gt;][:&lt;hysteresis&gt;][:&lt;init_desired_value&gt;] [AND|OR &lt;sensor2&gt;[:&lt;reading2&gt;][:&lt;state&gt;]] [&lt;actor&gt;][|&lt;cmd1&gt;][|&lt;cmd2&gt;][|&lt;cmd_default_index&gt;]</code><br>
+    <code>define &lt;name&gt; THRESHOLD &lt;sensor&gt;[:[&lt;reading&gt;][:[&lt;hysteresis&gt;][:&lt;init_desired_value&gt;]]] [AND|OR &lt;sensor2&gt;[:[&lt;reading2&gt;][:&lt;state&gt;]]] [&lt;actor&gt;][|[&lt;cmd1&gt;][|[&lt;cmd2&gt;][|[&lt;cmd_default_index&gt;][|[[&lt;state_cmd1&gt;][:&lt;state_cmd2&gt;]]]]]]</code><br>
   <br>
    	<br>
 	<li>sensor<br>
@@ -560,13 +597,25 @@ THRESHOLD_setValue($$)
     Defaultwert: 2, wenn Aktor angegeben ist, sonst 0<br>
 	</li>
 	<br>
+	<li>state_cmd1<br>
+	Status, der angezeigt wird, wenn FHEM/Perl-Befehl cmd1 ausgeführt wurde. Wenn state_cmd1 gesetzt ist, werden andere Stati, wie active oder deactivated unterdrückt.
+	<br>
+	Defaultwert: keiner
+	</li>
+	<li>state_cmd2<br>
+	Status, der angezeigt wird, wenn FHEM/Perl-Befehl cmd2 ausgeführt wurde. Wenn state_cmd2 gesetzt ist, werden andere Stati, wie active oder deactivated unterdrückt.
+	<br>
+	Defaultwert: keiner
+	</li>
+	<br>
+	<br>
     Beispiele:<br>
     <br>
 	Beispiel für Heizung:<br>
 	<br>	
-	<code>define Thermostat THRESHOLD temp_sens heating</code><br>
+	<code>define thermostat THRESHOLD temp_sens heating</code><br>
 	<br>
-	<code>set Thermostat desired 20</code><br>
+	<code>set thermostat desired 20</code><br>
 	<br>
 	Beschreibung:<br>
 	<br>
@@ -574,7 +623,7 @@ THRESHOLD_setValue($$)
 	<br>
 	Beispiel für Heizung mit Fensterkontakt:<br>
 	<br>
-	<code>define Thermostat THRESHOLD temp_sens OR win_sens heating</code><br>
+	<code>define thermostat THRESHOLD temp_sens OR win_sens heating</code><br>
 	<br>
 	Beispiel für Heizung mit mehreren Fensterkontakten:<br>
 	<br>
@@ -584,24 +633,32 @@ THRESHOLD_setValue($$)
     <br>
 	danach: <br>
     <br>
-	<code>define Thermostat THRESHOLD S1 OR W_ALL heating</code><br>
+	<code>define thermostat THRESHOLD S1 OR W_ALL heating</code><br>
     <br>
-	einige weitere Bespiele:<br>
+	Einige weitere Bespiele für Entfeuchtung, Klimatisierung, Bewässerung:<br>
 	<br>
-	<code>define Hygrostat THRESHOLD hym_sens:humidity dehydrator|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:humidity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
-	<code>define Thermostat THRESHOLD temp_sens:temperature:1 aircon|set @ on|set @ off|1</code><br>
-	<code>define Thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
-	<code>define Hygrostat THRESHOLD hym_sens:humidity:20 watering|set @ off|set @ on|2</code><br>
+	<code>define hygrostat THRESHOLD hym_sens:humidity dehydrator|set @ on|set @ off|1</code><br>
+	<code>define hygrostat THRESHOLD hym_sens:humidity AND Sensor2:state:close dehydrator|set @ on|set @ off|1</code><br>
+	<code>define thermostat THRESHOLD temp_sens:temperature:1 aircon|set @ on|set @ off|1</code><br>
+	<code>define thermostat THRESHOLD temp_sens AND Sensor2:state:close aircon|set @ on|set @ off|1</code><br>
+	<code>define hygrostat THRESHOLD hym_sens:humidity:20 watering|set @ off|set @ on|2</code><br>
 	<br>
-	Alternativ können jeweils Perl-Befehle angegeben werden.<br>
+	Es können ebenso FHEM/Perl-Befehlsketten angegeben werden:<br>
 	<br>
 	Beispiele:<br>
 	<br>
-	<code>define Thermostat THRESHOLD Sensor |{fhem("set Switch1 on;set Switch2 on")}|{fhem("set Switch1 off;set Switch2 off")}|1</code><br>
-    <code>define Thermostat THRESHOLD Sensor Alarm|{Log 2,"Wert überschritten"}|{fhem("set @ on;set Switch2 on")}</code><br>
-	<code>define Thermostat THRESHOLD Sensor ||{Log 2,"Wert unterschritten"}|</code><br>
+	<code>define thermostat THRESHOLD sensor |set Switch1 on;set Switch2 on|set Switch1 off;set Switch2 off|1</code><br>
+    <code>define thermostat THRESHOLD sensor alarm|{Log 2,"Wert überschritten"}|set @ on;set Switch2 on</code><br>
+	<code>define thermostat THRESHOLD sensor ||{Log 2,"Wert unterschritten"}|</code><br>
     <br>
+	Beispiele mit Statusanzeige:<br>
+	<br>
+	<code>define thermostat THRESHOLD sensor heating|set @ off|set @ on|2|aus:an</code><br>
+	<br>
+	Beispiel für reine Zustandanzeige (z. B. für Zustandsauswertung in anderen Modulen), wenn Temperatur von 30 Grad über- oder unterschritten wird:<br>
+	<br>
+	<code>define thermostat THRESHOLD sensor:temperature:0:30 ||||on:off</code><br>
+	<br>
 </ul>
 	<a name="THRESHOLDset"></a>
   <b>Set </b>
