@@ -15,8 +15,11 @@ use warnings;
 use IO::Socket::INET;
 
 sub BlockingCall($$@);
-sub BlockingExit($);
+sub BlockingExit();
 sub BlockingKill($);
+sub BlockingInformParent($;$$);
+
+my $telnetDevice;
 
 sub
 BlockingCall($$@)
@@ -25,8 +28,6 @@ BlockingCall($$@)
 
   # Look for the telnetport
   # must be done before forking to be able to create a temporary device
-  my $telnetDevice;
-  if($finishFn) {
     my $tName = "telnetForBlockingFn";
     $telnetDevice = $tName if($defs{$tName});
 
@@ -58,7 +59,6 @@ BlockingCall($$@)
       Log 1, $msg;
       return $msg;
     }
-  }
 
   # do fork
   my $pid = fork;
@@ -78,15 +78,45 @@ BlockingCall($$@)
   my $ret = &{$blockingFn}($arg);
   use strict "refs";
 
-  BlockingExit(undef) if(!$finishFn);
+  BlockingExit() if(!$finishFn);
 
+  # Write the data back, calling the function
+  BlockingInformParent($finishFn, $ret, 0);
+  BlockingExit();
+}
+
+sub
+BlockingInformParent($;$$)
+{
+  my ($informFn, $param, $waitForRead) = @_;
+  my $ret = undef;
+  $waitForRead = 1 if (undef($waitForRead));
+	
   # Write the data back, calling the function
   my $addr = "localhost:$defs{$telnetDevice}{PORT}";
   my $client = IO::Socket::INET->new(PeerAddr => $addr);
   Log 1, "CallBlockingFn: Can't connect to $addr\n" if(!$client);
-  $ret =~ s/'/\\'/g;
-  syswrite($client, "{$finishFn('$ret')}\n");
-  BlockingExit($client);
+
+  if (defined($param)) {
+    $param =~ s/'/\\'/g;
+    $param = "'$param'"
+  } else {
+  	$param = "";
+  }
+
+  syswrite($client, "{$informFn($param)}\n");
+
+  if ($waitForRead) {
+    my $len = sysread($client, $ret, 4096);
+    chop($ret);
+    $ret = undef if(!defined($len));
+  }
+
+  if($^O =~ m/Win/) {
+    close($client) if($client);
+  }
+  
+  return $ret;
 }
 
 sub
@@ -99,12 +129,10 @@ BlockingKill($)
 }
 
 sub
-BlockingExit($)
+BlockingExit()
 {
-  my $client = shift;
 
   if($^O =~ m/Win/) {
-    close($client) if($client);
     eval "require threads;";
     threads->exit();
 
