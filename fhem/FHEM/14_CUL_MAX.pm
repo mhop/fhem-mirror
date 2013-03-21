@@ -297,8 +297,9 @@ CUL_MAX_Parse($$)
 
       if($shash->{pairmode}) {
         Log 3, "CUL_MAX_Parse: Pairing device $src of type $device_types{$type} with serial $serial";
-        CUL_MAX_Send($shash, "PairPong", $src, "00");
         Dispatch($shash, "MAX,$isToMe,define,$src,$device_types{$type},$serial,0,0", {RAWMSG => $rmsg});
+        #Send after dispatch the define, otherwise Send will create an invalid device
+        CUL_MAX_Send($shash, "PairPong", $src, "00");
 
         #This are the default values that a device has after factory reset or pairing
         if($device_types{$type} =~ /HeatingThermostat.*/) {
