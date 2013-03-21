@@ -86,7 +86,7 @@ MAX_Define($$)
   my @a = split("[ \t][ \t]*", $def);
   my $name = $hash->{NAME};
   return "name \"$name\" is reserved for internal use" if($name eq "fakeWallThermostat" or $name eq "fakeShutterContact");
-  return "wrong syntax: define <name> MAX addr"
+  return "wrong syntax: define <name> MAX type addr"
         if(int(@a)!=4 || $a[3] !~ m/^[A-F0-9]{6}$/i);
 
   my $type = $a[2];
@@ -565,6 +565,7 @@ MAX_Parse($$)
   if($msgtype eq "define"){
     my $devicetype = $args[0];
     Log 1, "Device changed type from $shash->{type} to $devicetype" if($shash->{type} ne $devicetype);
+    $shash->{type} = $devicetype;
     if(@args > 1){
       my $serial = $args[1];
       Log 1, "Device changed serial from $shash->{serial} to $serial" if($shash->{serial} and ($shash->{serial} ne $serial));
