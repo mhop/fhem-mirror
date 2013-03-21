@@ -311,7 +311,7 @@ LightScene_Get($@)
       <li>scene &lt;scene_name&gt;<br>
       shows scene &lt;scene_name&gt; - all devices are switched to the previously saved state</li>
       <li>set &lt;scene_name&gt; &lt;device&gt; &lt;cmd&gt;<br>
-      set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;<br>
+      set the saved state of &lt;device&gt; in &lt;scene_name&gt; to &lt;cmd&gt;</li>
       <li>remove &lt;scene_name&gt;<br>
       remove &lt;scene_name&gt; from list of saved scenes</li>
     </ul><br>
