@@ -73,7 +73,7 @@ MAX_Initialize($)
   $hash->{ParseFn}   = "MAX_Parse";
   $hash->{SetFn}     = "MAX_Set";
   $hash->{AttrList}  = "IODev do_not_notify:1,0 ignore:0,1 dummy:0,1 " .
-                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 keepAuto ".
+                       "showtime:1,0 loglevel:0,1,2,3,4,5,6 keepAuto:0,1 scanTemp:0,1 ".
                        $readingFnAttributes;
   return undef;
 }
