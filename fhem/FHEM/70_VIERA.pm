@@ -7,7 +7,7 @@
 # written 2013 by Tobias Vaupel <fhem at 622 mbit dot de>
 #
 #
-# Version = 0.93, RC1
+# Version = 1.00
 #
 ##############################################################################
 #
@@ -384,103 +384,126 @@ sub VIERA_BuildXML_RendCtrl($$$$){
     seconds), which periodically reads the status of volume and mute status and triggers
     notify/filelog commands.<br><br>
     Example:
-    <PRE>
-      define myTV1 VIERA 192.168.178.20
-
+    <ul><code>
+      define myTV1 VIERA 192.168.178.20<br><br>
       define myTV1 VIERA 192.168.178.20 60   #with custom interval of 60 seconds
-    </PRE>
+    </code></ul>
   </ul>
-  
+
+  <br>
   <a name="VIERAset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;command&gt; [&lt;value&gt;]</code>
     <br><br>
     Currently, the following commands are defined.
-<pre>
-off
-mute [on|off]
-volume &lt;value&gt;
-remoteControl &lt;command&gt;
-</pre>
-</ul>
-<u>Remote control (depending on your model, maybe)</u><br><br>
-<ul>
-  For this application the following commands are available:<br><br>
-  <pre>
-3D 		=> 3D button
-BLUE 		=> Blue
-CANCEL 		=> Cancel / Exit
-CHG_INPUT 	=> AV
-CH_DOWN 	=> Channel down
-CH_UP 		=> Channel up
-D0 		=> Digit 0
-D1 		=> Digit 1
-D2 		=> Digit 2
-D3 		=> Digit 3
-D4 		=> Digit 4
-D5 		=> Digit 5
-D6 		=> Digit 6
-D7 		=> Digit 7
-D8 		=> Digit 8
-D9 		=> Digit 9
-DISP_MODE 	=> Display mode / Aspect ratio
-DOWN 		=> Control DOWN
-ENTER 		=> Control Center click / enter
-EPG 		=> Guide / EPG
-FF 		=> Fast forward
-GREEN 		=> Green
-HOLD 		=> TTV hold / image freeze
-INDEX 		=> TTV index
-INFO 		=> Info
-INTERNET 	=> VIERA connect
-LEFT 		=> Control LEFT
-MENU 		=> Menu
-MUTE 		=> Mute
-PAUSE 		=> Pause
-PLAY 		=> Play
-POWER 		=> Power off
-P_NR 		=> P-NR (Noise reduction)
-REC 		=> Record
-RED 		=> Red
-RETURN 		=> Return
-REW 		=> Rewind
-RIGHT 		=> Control RIGHT
-R_TUNE 		=> Seems to do the same as INFO
-SD_CARD 	=> SD-card
-SKIP_NEXT 	=> Skip next
-SKIP_PREV 	=> Skip previous
-STOP 		=> Stop
-STTL 		=> STTL / Subtitles
-SUBMENU 	=> Option
-TEXT 		=> Text / TTV
-TV 		=> TV
-UP 		=> Control UP
-VIERA_LINK 	=> VIERA link
-VOLDOWN 	=> Volume down
-VOLUP 		=> Volume up
-VTOOLS 		=> VIERA tools
-YELLOW 		=> Yellow
-  </pre>
-  <pre>
+    <ul><code>
+      off<br>
+      mute [on|off]<br>
+      volume &lt;value&gt;<br>
+      remoteControl &lt;command&gt;<br>
+    </code></ul>
+  </ul>
+  <ul>
+    <br>
+    <u>Remote control (depending on your model, maybe)</u><br>
+    For this application the following commands are available:<br>
+    <ul><code>
+      3D 		=> 3D button<br>
+      BLUE 		=> Blue<br>
+      CANCEL 		=> Cancel / Exit<br>
+      CHG_INPUT 	=> AV<br>
+      CH_DOWN 	=> Channel down<br>
+      CH_UP 		=> Channel up<br>
+      D0 		=> Digit 0<br>
+      D1 		=> Digit 1<br>
+      D2 		=> Digit 2<br>
+      D3 		=> Digit 3<br>
+      D4 		=> Digit 4<br>
+      D5 		=> Digit 5<br>
+      D6 		=> Digit 6<br>
+      D7 		=> Digit 7<br>
+      D8 		=> Digit 8<br>
+      D9 		=> Digit 9<br>
+      DISP_MODE 	=> Display mode / Aspect ratio<br>
+      DOWN 		=> Control DOWN<br>
+      ENTER 		=> Control Center click / enter<br>
+      EPG 		=> Guide / EPG<br>
+      FF 		=> Fast forward<br>
+      GREEN 		=> Green<br>
+      HOLD 		=> TTV hold / image freeze<br>
+      INDEX 		=> TTV index<br>
+      INFO 		=> Info<br>
+      INTERNET 	=> VIERA connect<br>
+      LEFT 		=> Control LEFT<br>
+      MENU 		=> Menu<br>
+      MUTE 		=> Mute<br>
+      PAUSE 		=> Pause<br>
+      PLAY 		=> Play<br>
+      POWER 		=> Power off<br>
+      P_NR 		=> P-NR (Noise reduction)<br>
+      REC 		=> Record<br>
+      RED 		=> Red<br>
+      RETURN 		=> Return<br>
+      REW 		=> Rewind<br>
+      RIGHT 		=> Control RIGHT<br>
+      R_TUNE 		=> Seems to do the same as INFO<br>
+      SD_CARD 	=> SD-card<br>
+      SKIP_NEXT 	=> Skip next<br>
+      SKIP_PREV 	=> Skip previous<br>
+      STOP 		=> Stop<br>
+      STTL 		=> STTL / Subtitles<br>
+      SUBMENU 	=> Option<br>
+      TEXT 		=> Text / TTV<br>
+      TV 		=> TV<br>
+      UP 		=> Control UP<br>
+      VIERA_LINK 	=> VIERA link<br>
+      VOLDOWN 	=> Volume down<br>
+      VOLUP 		=> Volume up<br>
+      VTOOLS 		=> VIERA tools<br>
+      YELLOW 		=> Yellow<br>
+    </code></ul>
+    
+    <br>
     Example:<br>
-    set &lt;name&gt; mute on
-    set &lt;name&gt; volume 20
-    set &lt;name&gt; remoteControl CH_DOWN
-  </pre> 
-</ul>
+    <ul><code>
+      set &lt;name&gt; mute on<br>
+      set &lt;name&gt; volume 20<br>
+      set &lt;name&gt; remoteControl CH_DOWN<br>
+    </code></ul> 
+    
+    <br>
+    Notes:<br>
+    <ul>Activate volume remotecontrol by DLNA: Menu -> Setup -> Network Setup -> Network Link Settings -> DLNA RemoteVolume -> On</ul>
+  </ul>
 
-<a name="VIERAget"></a>
-<b>Get</b>
-<ul>
-  <code>get &lt;name&gt; &lt;what&gt;</code>
-  <br><br>
-  Currently, the following commands are defined and return the current state of the TV.
-<pre>
-mute 
-volume
-</pre>
-</ul>
+  <br>
+  <a name="VIERAget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;what&gt;</code>
+    <br><br>
+    Currently, the following commands are defined and return the current state of the TV.
+    <ul><code>
+      mute<br>
+      volume<br>
+    </code></ul>
+  </ul>
+  
+  <br>
+  <a name="VIERAattr"></a>
+  <b>Attributes</b>
+  <ul>N/A</ul>
+  
+  <br>
+  <a name="VIERAevents"></a>
+  <b>Generated events:</b>
+  <ul>
+    <li>on</li>
+    <li>off</li>
+    <li>volume</li>
+    <li>mute</li>
+  </ul>
 </ul>
 
 =end html
@@ -506,103 +529,126 @@ volume
     ge&auml;ndert werden. Wird kein Interval angegeben, liest das Modul alle 30 Sekunden die Werte aus und triggert ein notify.
     <br><br>
     Beispiel:
-    <PRE>
-      define myTV1 VIERA 192.168.178.20
-      
+    <ul><code>
+      define myTV1 VIERA 192.168.178.20<br><br>
       define myTV1 VIERA 192.168.178.20 60   #Mit einem Interval von 60 Sekunden
-    </PRE>
+    </code></ul>
   </ul>
   
+  <br>
   <a name="VIERAset"></a>
   <b>Set</b>
   <ul>
     <code>set &lt;name&gt; &lt;command&gt; [&lt;value&gt;]</code>
     <br><br>
     Zur Zeit sind die folgenden Befehle implementiert:
-<pre>
-off
-mute [on|off]
-volume &lt;Wert&gt;
-remoteControl &lt;Befehl&gt;
-</pre>
-</ul>
-<u>Fernbedienung (Kann vielleicht nach Modell variieren)</u><br><br>
-<ul>
-  Das Modul hat die folgenden Fernbedienbefehle implementiert:<br><br>
-  <pre>
-3D 		=> 3D Knopf
-BLUE 		=> Blau
-CANCEL 		=> Cancel / Exit
-CHG_INPUT 	=> AV
-CH_DOWN 	=> Kanal runter
-CH_UP 		=> Kanal hoch
-D0 		=> Ziffer 0
-D1 		=> Ziffer 1
-D2 		=> Ziffer 2
-D3 		=> Ziffer 3
-D4 		=> Ziffer 4
-D5 		=> Ziffer 5
-D6 		=> Ziffer 6
-D7 		=> Ziffer 7
-D8 		=> Ziffer 8
-D9 		=> Ziffer 9
-DISP_MODE 	=> Anzeigemodus / Seitenverh&auml;ltnis
-DOWN 		=> Navigieren runter
-ENTER 		=> Navigieren enter
-EPG 		=> Guide / EPG
-FF 		=> Vorspulen
-GREEN 		=> Gr&uuml;n
-HOLD 		=> Bild einfrieren
-INDEX 		=> TTV index
-INFO 		=> Info
-INTERNET 	=> VIERA connect
-LEFT 		=> Navigieren links
-MENU 		=> Men&uuml;
-MUTE 		=> Mute
-PAUSE 		=> Pause
-PLAY 		=> Play
-POWER 		=> Power off
-P_NR 		=> P-NR (Ger&auml;uschreduzierung)
-REC 		=> Aufnehmen
-RED 		=> Rot
-RETURN 		=> Enter
-REW 		=> Zur&uuml;ckspulen
-RIGHT 		=> Navigieren Rechts
-R_TUNE 		=> Vermutlich die selbe Funktion wie INFO
-SD_CARD 	=> SD-card
-SKIP_NEXT 	=> Skip next
-SKIP_PREV 	=> Skip previous
-STOP 		=> Stop
-STTL 		=> Untertitel
-SUBMENU 	=> Option
-TEXT 		=> TeleText
-TV 		=> TV
-UP 		=> Navigieren Hoch
-VIERA_LINK 	=> VIERA link
-VOLDOWN 	=> Lauter
-VOLUP 		=> Leiser
-VTOOLS 		=> VIERA tools
-YELLOW 		=> Gelb
-  </pre>
-  <pre>
+    <ul><code>
+      off<br>
+      mute [on|off]<br>
+      volume &lt;Wert&gt;<br>
+      remoteControl &lt;Befehl&gt;<br>
+    </code></ul>
+  </ul>
+  <ul>
+  <br>
+  <u>Fernbedienung (Kann vielleicht nach Modell variieren)</u><br>
+    Das Modul hat die folgenden Fernbedienbefehle implementiert:<br>
+    <ul><code>
+      3D 		=> 3D Knopf<br>
+      BLUE 		=> Blau<br>
+      CANCEL 		=> Cancel / Exit<br>
+      CHG_INPUT 	=> AV<br>
+      CH_DOWN 	=> Kanal runter<br>
+      CH_UP 		=> Kanal hoch<br>
+      D0 		=> Ziffer 0<br>
+      D1 		=> Ziffer 1<br>
+      D2 		=> Ziffer 2<br>
+      D3 		=> Ziffer 3<br>
+      D4 		=> Ziffer 4<br>
+      D5 		=> Ziffer 5<br>
+      D6 		=> Ziffer 6<br>
+      D7 		=> Ziffer 7<br>
+      D8 		=> Ziffer 8<br>
+      D9 		=> Ziffer 9<br>
+      DISP_MODE 	=> Anzeigemodus / Seitenverh&auml;ltnis<br>
+      DOWN 		=> Navigieren runter<br>
+      ENTER 		=> Navigieren enter<br>
+      EPG 		=> Guide / EPG<br>
+      FF 		=> Vorspulen<br>
+      GREEN 		=> Gr&uuml;n<br>
+      HOLD 		=> Bild einfrieren<br>
+      INDEX 		=> TTV index<br>
+      INFO 		=> Info<br>
+      INTERNET 	=> VIERA connect<br>
+      LEFT 		=> Navigieren links<br>
+      MENU 		=> Men&uuml;<br>
+      MUTE 		=> Mute<br>
+      PAUSE 		=> Pause<br>
+      PLAY 		=> Play<br>
+      POWER 		=> Power off<br>
+      P_NR 		=> P-NR (Ger&auml;uschreduzierung)<br>
+      REC 		=> Aufnehmen<br>
+      RED 		=> Rot<br>
+      RETURN 		=> Enter<br>
+      REW 		=> Zur&uuml;ckspulen<br>
+      RIGHT 		=> Navigieren Rechts<br>
+      R_TUNE 		=> Vermutlich die selbe Funktion wie INFO<br>
+      SD_CARD 	=> SD-card<br>
+      SKIP_NEXT 	=> Skip next<br>
+      SKIP_PREV 	=> Skip previous<br>
+      STOP 		=> Stop<br>
+      STTL 		=> Untertitel<br>
+      SUBMENU 	=> Option<br>
+      TEXT 		=> TeleText<br>
+      TV 		=> TV<br>
+      UP 		=> Navigieren Hoch<br>
+      VIERA_LINK 	=> VIERA link<br>
+      VOLDOWN 	=> Lauter<br>
+      VOLUP 		=> Leiser<br>
+      VTOOLS 		=> VIERA tools<br>
+      YELLOW 		=> Gelb<br>
+    </code></ul>
+    
+    <br>
     Beispiel:<br>
-    set &lt;name&gt; mute on
-    set &lt;name&gt; volume 20
-    set &lt;name&gt; remoteControl CH_DOWN
-  </pre> 
-</ul>
+    <ul><code>
+      set &lt;name&gt; mute on<br>
+      set &lt;name&gt; volume 20<br>
+      set &lt;name&gt; remoteControl CH_DOWN<br>
+    </code></ul> 
 
-<a name="VIERAget"></a>
-<b>Get</b>
-<ul>
-  <code>get &lt;name&gt; &lt;what&gt;</code>
-  <br><br>
-  Die folgenden Befehle sind definiert und geben den entsprechenden Wert zur&uuml;ck, der vom Fernseher zur&uuml;ckgegeben wurde.
-<pre>
-mute 
-volume
-</pre>
-</ul>
+    <br>
+    Anmerkung:<br>
+    <ul>Aktivieren von Fernbedienung der Lautst&auml;rke per DLNA: Men&uuml; -> Setup -> Netzwerk-Setup -> Netzwerkverbindungsein. -> DLNA-Fernbed. Lautst. -> Ein</ul>
+  </ul>
+  
+  <br>
+  <a name="VIERAget"></a>
+  <b>Get</b>
+  <ul>
+    <code>get &lt;name&gt; &lt;what&gt;</code>
+    <br><br>
+    Die folgenden Befehle sind definiert und geben den entsprechenden Wert zur&uuml;ck, der vom Fernseher zur&uuml;ckgegeben wurde.
+  <ul><code>
+    mute<br>
+    volume<br>
+  </code></ul>
+  </ul>
+  
+  <br>
+  <a name="VIERAattr"></a>
+  <b>Attribute</b>
+  <ul>N/A</ul>
+  
+  <br>
+  <a name="VIERAevents"></a>
+  <b>Generierte events:</b>
+  <ul>
+    <li>on</li>
+    <li>off</li>
+    <li>volume</li>
+    <li>mute</li>
+  </ul>
 </ul>
 
 =end html_DE
