@@ -324,6 +324,11 @@ my %culHmRegDefine = (
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
+#un-identified List0
+# SEC-WM55 02:01 (AES on?)
+# SEC-WDS  02:01 16:01(sabotage) ?
+# SEC-SC   02:00 ?
+  
 #--- list 1, Channel level------------------
 #blindActuator mainly                                                                             
   driveDown       =>{a=> 11.0,s=>2.0,l=>1,min=>0  ,max=>6000.0  ,c=>'factor'   ,f=>10      ,u=>'s'   ,d=>1,t=>"drive time up"},
@@ -410,6 +415,10 @@ my %culHmRegDefine = (
   stormLowThresh  =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"Storm lower threshold"},
 # others
   localResetDis   =>{a=>  7  ,s=>1  ,l=>1,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"LocalReset disable",lit=>{off=>0,on=>1}},
+#un-identified List1
+# SEC-WM55  8:01 (AES on?)
+# SEC-WDS  34:0x64 ?
+# SEC-SC    8:00 ?
 
 #  logicCombination=>{a=> 89.0,s=>0.5,l=>1,min=>0  ,max=>16      ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"".
 #		                                                                                                      "inactive=>unused\n".
@@ -657,7 +666,6 @@ my %culHmGlobalSetsDevice = (
   reset    	    => "",
   pair     	    => "",
   unpair   	    => "",
-  getpair       => "",
   getSerial     => "",
   virtual       =>"<noButtons>",
 );
@@ -666,7 +674,6 @@ my %culHmGlobalSets = (
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
   peerBulk      => "<peer1,peer2,...>",
   statusRequest => "",
-  getdevicepair => "",
   getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... <PeerChannel>",
   getConfig     => "",
   regSet        =>"<regName> <value> ... <peerChannel>",
@@ -687,17 +694,23 @@ my %culHmSubTypeSets = (
 					   up         => "[<changeValue>] [ontime] [ramptime]...",
 					   down       => "[<changeValue>] [ontime] [ramptime]..." 
 					   },
-  remote           =>{ devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  pushButton       =>{ devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  threeStateSensor =>{ devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
-  motionDetector   =>{ devicepair => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
+  remote           =>{ devicepair => "... outdated, use peerChan",
+                       peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  pushButton       =>{ devicepair => "... outdated, use peerChan",
+                       peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  threeStateSensor =>{ devicepair => "... outdated, use peerChan",
+                       peerChan   => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
+  motionDetector   =>{ devicepair => "... outdated, use peerChan",
+                       peerChan   => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
   virtual          =>{ raw        => "data ...",
-		               devicepair => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+		               devicepair => "... outdated, use peerChan",
+		               peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
 		               press      => "[long|short]...",
                        valvePos   => "position",#acting as TC
 		               virtual    =>"<noButtons>",}, #redef necessary for virtual
   smokeDetector    =>{ test       => "", alarmOn=>"", alarmOff=>"", 
-		               devicepair => "<btnNumber> device ... single [set|unset] actor",},
+		               devicepair => "... outdated, use peerChan",
+		               peerChan   => "<btnNumber> device ... single [set|unset] actor",},
   winMatic         =>{ matic      => "<btn>",
                        keydef     => "<btn> <txt1> <txt2>",
                        create     => "<txt>" },
@@ -735,7 +748,8 @@ my %culHmModelSets = (
 
 my %culHmChanSets = (
   "HM-CC-TC00"=>{ 
-          devicepair    => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+          devicepair     => "... outdated, use peerChan",
+          peerChan       => "<btnNumber> device ... single [set|unset] [actor|remote|both]",
           "day-temp"     => "[on,off,6.0..30.0]",
           "night-temp"   => "[on,off,6.0..30.0]",
           "party-temp"   => "[on,off,6.0..30.0]",
@@ -753,7 +767,8 @@ my %culHmChanSets = (
           controlMode    => "[manual|auto|central|party]",
           decalcDay      => "day",        },
   "HM-CC-TC02"=>{ 
-          devicepair    => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+          devicepair     => "... outdated, use peerChan",
+          peerChan       => "<btnNumber> device ... single [set|unset] [actor|remote|both]",
           "day-temp"     => "[on,off,6.0..30.0]",
           "night-temp"   => "[on,off,6.0..30.0]",
           "party-temp"   => "[on,off,6.0..30.0]",

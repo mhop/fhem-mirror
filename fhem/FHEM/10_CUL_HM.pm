@@ -1,4 +1,5 @@
 ##############################################
+##############################################
 # CUL HomeMatic handler
 # $Id$
 
@@ -941,7 +942,7 @@ sub CUL_HM_Parse($$) {##############################
  	        my %colorTable=("00"=>"off","01"=>"red","02"=>"green","03"=>"orange");
  	        my $actColor = $colorTable{$msgState};
  	        $actColor = "unknown" if(!$actColor);
-		    push @event, "color:$actColor";           #todo duplicate
+		    push @event, "color:$actColor";  
             push @event, "state:$actColor";			
  	      }
 		}
@@ -1683,7 +1684,7 @@ sub CUL_HM_Get($@) {
 #+++++++++++++++++ set command+++++++++++++++++++++++++++++++++++++++++++++++++
 sub CUL_HM_Set($@) {
   my ($hash, @a) = @_;
-  my ($ret, $tval, $rval); #added rval for ramptime by unimatrix
+  my $ret;
   return "no set value specified" if(@a < 2);
 
   my $name    = $hash->{NAME};
@@ -1817,14 +1818,6 @@ sub CUL_HM_Set($@) {
     }
 	$state = "";
   } 
-  elsif($cmd eq "getpair") { ##################################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'00040000000000');
-	$state = "";	
-  } 
-  elsif($cmd eq "getdevicepair") { ############################################
-    CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'03');
-	$state = "";
-  } 
   elsif($cmd eq "getSerial") { ################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.'0009');
 	$state = "";
@@ -1849,16 +1842,16 @@ sub CUL_HM_Set($@) {
 	  return "unknown peer".$peer if (length($pID) != 8);# peer only to channel
 	  my $pCh1 = substr($pID,6,2);
 	  my $pCh2 = $pCh1;
-      if($culHmSubTypeSets{$st}{devicepair}||
-         $culHmModelSets{$md}{devicepair}||
-         $culHmChanSets{$mdCh}{devicepair}){
+      if($culHmSubTypeSets{$st}{peerChan}||
+         $culHmModelSets{$md}{peerChan}||
+         $culHmChanSets{$mdCh}{peerChan}){
 	    $pCh2 = "00";                        # button behavior
       }
 	  CUL_HM_PushCmdStack($hash,'++'.$flag.'01'.$id.$dst.$chn.'01'.
 	                      substr($pID,0,6).$pCh1.$pCh2);
 	}
   } 
-  elsif($cmd eq "regBulk"||$cmd eq "getRegRaw") { ######################### reg
+  elsif($cmd =~ m/^(regBulk|getRegRaw)$/) { ############################### reg
     my ($list,$addr,$data,$peerID);
 	$state = "";
 	if ($cmd eq "regBulk"){
@@ -2019,7 +2012,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'000000');
 	$hash = $chnHash; # report to channel if defined
   } 
-  elsif($cmd eq "on-for-timer"||$cmd eq "on-till") { ##########################
+  elsif($cmd =~ m/^(on-for-timer|on-till)$/) { ################################
     my (undef,undef,$duration,$edate) = @a; #date prepared extention to entdate
     if ($cmd eq "on-till"){
 	  # to be extended to handle end date as well
@@ -2031,7 +2024,7 @@ sub CUL_HM_Set($@) {
 	  $duration = $eSec - $ltSec;	  
     }
 	return "please enter the duration in seconds" if (!defined ($duration));
-    $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
+    my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
  	$hash = $chnHash; # report to channel if defined
  } 
@@ -2044,36 +2037,34 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800100FF');	# LEVEL_SET
   }
   elsif($cmd eq "unlock") { ###################################################
-  	$tval = (@a > 2) ? int($a[2]) : 0;
+  	my $tval = (@a > 2) ? int($a[2]) : 0;
   	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";	# RELOCK_DELAY (FF=never)
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'800101'.$delay);# LEVEL_SET
   }
   elsif($cmd eq "open") { #####################################################
-  	$tval = (@a > 2) ? int($a[2]) : 0;
+  	my $tval = (@a > 2) ? int($a[2]) : 0;
   	my $delay = ($tval > 0) ? CUL_HM_encodeTime8($tval) : "FF";	# RELOCK_DELAY (FF=never)
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'8001C8'.$delay);# OPEN
-	$state = "";
   }
   elsif($cmd eq "inhibit") { ##################################################
   	return "$a[2] is not on or off" if($a[2] !~ m/^(on|off)$/);
  	my $val = ($a[2] eq "on") ? "01" : "00";
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.'01');	# SET_LOCK
-	$state = "";
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
-	my $lvl;
-	if ($cmd eq "pct"){
-	  $lvl = $a[1];
-	}
-	else{#dim [<changeValue>|up|down] ... [ontime] [ramptime]
+	my ($lvl,$tval,$rval) = ($a[1],"","");
+	if ($cmd ne "pct"){#dim [<changeValue>|up|down] ... [ontime] [ramptime]
 	  shift @a; # align array with 'pct'
 	  $lvl = (defined $a[1])?$a[1]:10;
 	  $lvl = -1*$lvl if ($cmd eq "down");
 	  $lvl += CUL_HM_getChnLvl($name);
 	}
     $lvl = ($lvl > 100)?100:(($lvl < 0)?0:$lvl);
-    $tval = $a[2]?CUL_HM_encodeTime16($a[2]):"FFFF";# onTime 0.0..6709248, 0=forever
-    $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);     # rampTime 0.0..6709248, 0=immediate
+	if ($st eq "dimmer"){# at least blind cannot stand ramp time...
+      $tval = $a[2]?CUL_HM_encodeTime16($a[2]):"FFFF";# onTime 0.05..85825945.6, 0=forever
+      $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);# rampTime 0.0..85825945.6, 0=immediate
+	}
+	Log 1,"General test blind: $st time:$tval ramp:$rval";
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
 	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
     if (defined $hash->{READINGS}{"virtLevel"}{VAL}){
@@ -2192,7 +2183,7 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s8012%s%04X%02X",
 	                                  $flag,$id,$dst,$text,$symbAdd,$beepBack));
   } 
-  elsif($cmd eq "alarm"||$cmd eq "service") { #################################
+  elsif($cmd =~ m/^(alarm|service)$/) { #######################################
 	return "$a[2] must be below 255"  if ($a[2] >255 );
 	$chn = 18 if ($chn eq "01");
 	my $subtype = ($cmd eq "alarm")?"81":"82";
@@ -2406,8 +2397,8 @@ sub CUL_HM_Set($@) {
 									 $pressCnt));                                     
 	}
   } 
-  elsif($cmd eq "devicepair") { ###############################################
-    #devicepair <btnN> device ... [single|dual] [set|unset] [actor|remote|both]
+  elsif($cmd =~ m/^(devicepair|peerChan)$/) { #################################
+    #peerChan <btnN> device ... [single|dual] [set|unset] [actor|remote|both]
 	my ($bNo,$peerN,$single,$set,$target) = ($a[2],$a[3],$a[4],$a[5],$a[6]);
 	$state = "";
 	return "$bNo is not a button number"                          if(($bNo < 1) && !$chn);
@@ -2760,10 +2751,8 @@ sub CUL_HM_eventP($$) {#handle protocol events
     my $delMsgSum;
     $nAttr->{protCmdDel} = 0 if(!$nAttr->{protCmdDel});
     $nAttr->{protCmdDel} += scalar @{$hash->{cmdStack}} if ($hash->{cmdStack});
-	my $burstEvt = ($hash->{helper}{burstEvtCnt})? 
-	                $hash->{helper}{burstEvtCnt}:0;
-    $hash->{protState} = "CMDs_done".
-	      (($burstEvt)?("_events:".$burstEvt):"");
+	$hash->{protState} = "CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                             ("_events:".$hash->{helper}{burstEvtCnt}):"");
   }
 }
 sub CUL_HM_respPendRm($) {#del response related entries in messageing entity
@@ -2795,9 +2784,8 @@ sub CUL_HM_respPendTout($) {
 	  if ((CUL_HM_getRxType($hash) & 0x03) == 0){#to slow for wakeup and config
         delete($hash->{cmdStack});
         delete($hash->{protCmdPend});
-	    my $burstEvt = $hash->{helper}{burstEvtCnt}? 
-	                    ("_events:".$hash->{helper}{burstEvtCnt}):"";
-	    $hash->{protState} = "CMDs_done".$burstEvt;
+	    $hash->{protState} = "CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                             ("_events:".$hash->{helper}{burstEvtCnt}):"");
 	  }
 	  CUL_HM_respPendRm($hash);
 	  CUL_HM_ProcessCmdStack($hash); # continue processing commands
@@ -2844,10 +2832,8 @@ sub CUL_HM_ProcessCmdStack($) {
       delete($hash->{cmdStack});
       delete($hash->{protCmdPend}); 
 	  #-- update info ---
-	  my $burstEvt = ($hash->{helper}{burstEvtCnt})? 
-	                  $hash->{helper}{burstEvtCnt}:0;
-      $hash->{protState} = "CMDs_done".
-	      (($burstEvt)?("_events:".$burstEvt):"");
+	  $hash->{protState} = "CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                             ("_events:".$hash->{helper}{burstEvtCnt}):"");
     }
   }
   return $sent;
@@ -2906,9 +2892,8 @@ sub CUL_HM_Resend($) {#resend a message if there is no answer
     delete($hash->{cmdStack});
     delete($hash->{protCmdPend});
 	CUL_HM_respPendRm($hash);
-	my $burstEvt = $hash->{helper}{burstEvtCnt}? 
-	                ("_events:".$hash->{helper}{burstEvtCnt}):"";
-	$hash->{protState} = "CMDs_done".$burstEvt;
+	$hash->{protState} = "CMDs_done".($hash->{helper}{burstEvtCnt}? 
+	                             ("_events:".$hash->{helper}{burstEvtCnt}):"");
 	readingsSingleUpdate($hash,"state","MISSING ACK",1);
   }
   else {
@@ -3888,17 +3873,6 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          configuration for additional peers.  <br> The command is a shortcut
          for a selection of other commands. 
 	 </li>
-	 <li><B>getdevicepair</B><a name="CUL_HMgetdevicepair"></a><br>
-         will read the peers (see devicepair) that are assigned to a channel.
-         This command needs to be executed per channel. Information will be
-         stored in the field Peers of the channel (see devicepair for specials
-         about single-channel deivces). <br> For sender the same procedure as
-         described in devicepair is necessary to get a reading. Also note that
-         a proper diaplay will only be possible if define per channel (button)
-         was done - see define.  </li>
-     <li><B>getpair</B><a name="CUL_HMgetpair"></a><br>
-         read pair information of the device. See also <a
-         href="#CUL_HMpair">pair</a></li>
      <li><B>getRegRaw [List0|List1|List2|List3|List4|List5|List6]
          &lt;peerChannel&gt; </B><a name="CUL_HMgetRegRaw"></a><br>
 
@@ -3966,13 +3940,13 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		 See also <a href="#CUL_HMgetpair">getPair</a>  and 
 		 <a href="#CUL_HMunpair">unpair</a>.</li><br>
 		 Don't confuse pair (to a central) with peer (channel to channel) with
-		 <a href="#CUL_HMdevicepair">devicepair</a>.<br>
+		 <a href="#CUL_HMpeerChan">peerChan</a>.<br>
      <li><B>peerBulk</B> <peerch1,peerch2,...<a name="CUL_HMpeerBulk"></a><br>
 	     peerBulk will add peer channels to the channel. All channels in the 
 		 list will be added. This includes that the parameter and behavior 
 		 defined for this 'link' will return to the defaults. peerBulk is only
 		 meant to add peers. More suffisticated funktionality as provided by
-		 <a href="#CUL_HMdevicepair">devicepair</a> is not supported. peerBulk
+		 <a href="#CUL_HMpeerChan">peerChan</a> is not supported. peerBulk
 		 will only add channels in 'single' button mode.<br>
 		 Also note that peerBulk will not delete any existing peers, just add
 		 and re-add given peers.<br>
@@ -4017,7 +3991,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
         &lt;value&gt; is the data in human readable manner that will be written
         to the register.<br>
         &lt;peerChannel&gt; is required if this register is defined on a per
-        'devicepair' base. It can be set to '0' other wise.See <a
+        'peerChan' base. It can be set to '0' other wise.See <a
         href="CUL_HMgetRegRaw">getRegRaw</a>  for full description<br>
         Supported register for a device can be explored using<br>
           <ul><code>set regSet ? 0 0</code></ul>
@@ -4050,7 +4024,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          <ul><code>
             define vRemote CUL_HM 100000  # the selected HMid must not be in use<br>
             set vRemote virtual 20        # define 20 button remote controll<br>
-            set vRemote_Btn4 devicepair 0 &lt;actorchannel&gt;  # pairs Button 4 and 5 to the given channel<br>
+            set vRemote_Btn4 peerChan 0 &lt;actorchannel&gt;  # peers Button 4 and 5 to the given channel<br>
             set vRemote_Btn4 press<br>
             set vRemote_Btn5 press long<br>
         </code></ul>
@@ -4118,34 +4092,41 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          activate learn mode. Whether commands are pending is reported on
          device level with parameter 'protCmdPend'.
        <ul>
-        <li><B>devicepair &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual]
-        [set|unset] [actor|remote]</B><a name="CUL_HMdevicepair"></a><br>
+    <li><B>peerChan &lt;btn_no&gt; &lt;hmDevice&gt; [single|dual]
+        [set|unset] [actor|remote]</B><a name="CUL_HMpeerChan"></a><br>
 
-         Devicepair will establish a connection between a sender-channel and
-         an actuator-channel called link in HM nomenclatur. Trigger from
-         sender-channel, e.g. button press, will be processed by the
-         actuator-channel without CCU interaction. Sender-channel waits for an
-         acknowledge of each actuator paired to it. Positive indication will be
-         given once all actuator responded. <br>
-
-         Sender must be set into learning mode after command execution. FHEM
-         postpones the commands until then.<br>
-
-         devicepair can be repeated for an existing devicepair. This will cause
-         parameter reset to HM defaults for this link.<br>
-
+         peerChan will establish a connection between a sender-<B>channel</B> and
+         an actuator-<B>channel</B> called link in HM nomenclatur. Peering must not be 
+		 confused with pairing.<br>
+		 <B>Pairing</B> refers to assign a <B>device</B> to the central.<br> 
+		 <B>Peering</B> refers to virtally connect two <B>channels</B>.<br> 
+		 Peering allowes direkt interaction between sender and aktor without 
+		 the necessity of a CCU<br>
+		 Peering a sender-channel causes the sender to expect an ack from -each- 
+		 of its peers after sending a trigger. It will give positive feedback (e.g. LED green)
+		 only if all peers acknowledged.<br>
+		 Peering an aktor-channel will setup a parameter set which defines the action to be
+		 taken once a trigger from -this- peer arrived. In other words an aktor will <br> 
+		 - process trigger from peers only<br> 
+		 - define the action to be taken dedicated for each peer's trigger<br> 
+		 An actor channel will setup a default action upon peering - which is actor dependant.
+		 It may also depend whether one or 2 buttons are peered <B>in one command</B>.
+		 A swich may setup oen button for 'on' and the other for 'off' if 2 button are 
+		 peered. If only one button is peered the funktion will likely be 'toggle'.<br>
+		 The funtion can be modified by programming the register (aktor dependant).<br>
+		 
          Even though the command is executed on a remote or push-button it will
-         as well take effect on the actuator directly. Both sides' pairing is
+         as well take effect on the actuator directly. Both sides' peering is
          virtually independant and has different impact on sender and receiver
          side.<br>
 
-         Devicepairing of one actuator-channel to multiple sender-channel as
+         Peering of one actuator-channel to multiple sender-channel as
          well as one sender-channel to multiple Actuator-channel is
          possible.<br>
 
-         &lt;hmDevice&gt; is the actuator-channel to be paired.<br>
+         &lt;hmDevice&gt; is the actuator-channel to be peered.<br>
 
-         &lt;btn_no&gt; is the sender-channel (button) to be paired. If
+         &lt;btn_no&gt; is the sender-channel (button) to be peered. If
          'single' is choosen buttons are counted from 1. For 'dual' btn_no is
          the number of the Button-pair to be used. I.e. '3' in dual is the
          3rd button pair correcponding to button 5 and 6 in single mode.<br>
@@ -4163,23 +4144,23 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          simple switch actuator to toggle on/off. Nevertheless also dimmer can
          be learned to only one button. <br>
 
-         'set'   will setup pairing for the channels<br>
+         'set'   will setup peering for the channels<br>
 
-         'unset' will remove the pairing for the channels<br>
+         'unset' will remove the peering for the channels<br>
 
          [actor|remote|both] limits the execution to only actor or only remote.
-         This gives the user the option to redo the pairing on the remote
+         This gives the user the option to redo the peering on the remote
          channel while the settings in the actor will not be removed.<br>
 
          Example:
 		 <ul> 
 		 <code>
-           set myRemote devicepair 2 mySwActChn single set       # pair second button to an actuator channel<br>
-           set myRmtBtn devicepair 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
-           set myRemote devicepair 2 mySwActChn dual set         #pair button 3 and 4<br>
-           set myRemote devicepair 3 mySwActChn dual unset       #remove pairing for button 5 and 6<br>
-           set myRemote devicepair 3 mySwActChn dual unset aktor #remove pairing for button 5 and 6 in actor only<br>
-           set myRemote devicepair 3 mySwActChn dual set remote  #pair button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
+           set myRemote peerChan 2 mySwActChn single set       #peer second button to an actuator channel<br>
+           set myRmtBtn peerChan 0 mySwActChn single set       #myRmtBtn is a button of the remote. '0' is not processed here<br>
+           set myRemote peerChan 2 mySwActChn dual set         #peer button 3 and 4<br>
+           set myRemote peerChan 3 mySwActChn dual unset       #remove peering for button 5 and 6<br>
+           set myRemote peerChan 3 mySwActChn dual unset aktor #remove peering for button 5 and 6 in actor only<br>
+           set myRemote peerChan 3 mySwActChn dual set remote  #peer button 5 and 6 on remote only. Link settings il mySwActChn will be maintained<br>
          </code>
 		 </ul>
     </li>
@@ -4188,7 +4169,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 	</li>
     <li>virtual<a name="CUL_HMvirtual"></a><br>
        <ul>
-       <li><B><a href="#CUL_HMdevicepair">devicepair</a></B> see remote</li>
+       <li><B><a href="#CUL_HMpeerChan">peerChan</a></B> see remote</li>
        <li><B>press [long|short]<a name="CUL_HMpress"></a></B>
          simulates a button press short (default) or long. Note that the current
          implementation will not specify the duration for long. Only one trigger
@@ -4198,13 +4179,13 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
     </li>   
     <li>smokeDetector<br>
        Note: All these commands work right now only if you have more then one
-       smoekDetector, and you paired them to form a group. For issuing the
+       smoekDetector, and you peered them to form a group. For issuing the
        commands you have to use the master of this group, and currently you
        have to guess which of the detectors is the master.<br>
 	   smokeDetector can be setup to teams using 
-	   <a href="#CUL_HMdevicepair">devicepair</a>. You need to pair all 
-	   team-members to the master. Don't forget to also devicepair the master
-	   itself to the team - i.e. pair it to itself! doing that you have full 
+	   <a href="#CUL_HMpeerChan">peerChan</a>. You need to peer all 
+	   team-members to the master. Don't forget to also peerChan the master
+	   itself to the team - i.e. peer it to itself! doing that you have full 
 	   controll over the team and don't need to guess.<br>
      <ul>
        <li><B>test</B> - execute a network test</li>
@@ -4339,7 +4320,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
          [sec]: Sets the delay in seconds after the lock automatically locked
          again.<br>0 - 65535 seconds</li>
       <li><B>inhibit [on|off]</B><br>
-         Block / unblock all directly paired remotes and the hardware buttons of the
+         Block / unblock all directly peered remotes and the hardware buttons of the
          keyMatic. If inhibit set on, the door lock drive can be controlled only by
          FHEM.<br><br>
          Examples:
@@ -4416,7 +4397,7 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
 		 entity.<br>
 		 Target of the data is ONLY the HM-device information which is located
 		 IN the HM device. Explicitely this is the peer-list and the register.
-		 With the register also the pairing is included.<br>
+		 With the register also the peering is included.<br>
 		 The file is readable and editable by the user. Additionaly timestamps 
 		 are stored to help user to validate.<br>
 		 Restrictions:<br>
