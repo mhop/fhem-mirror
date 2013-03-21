@@ -200,9 +200,10 @@ CUL_MAX_Set($@)
       #First bit is 9th bit of temperature, rest is desiredTemperature
       my $arg1 = (($arg2&0x100)>>1) | (int(2*$args[1])&0x7F);
       $arg2 &= 0xFF; #only take the lower 8 bits
+      my $groupid = ReadingsVal($hash,"groupid",0);
 
       return CUL_MAX_Send($hash,"WallThermostatControl",$dest,
-        sprintf("%02x%02x",$arg1,$arg2),flags => "04", src => CUL_MAX_fakeWTaddr($hash));
+        sprintf("%02x%02x",$arg1,$arg2), groupId => sprintf("%02x",$groupid), flags => ( $groupid ? "04" : "00" ), src => CUL_MAX_fakeWTaddr($hash));
     }
 
   } else {
