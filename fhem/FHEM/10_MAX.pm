@@ -112,6 +112,7 @@ MAX_Undef($$)
 {
   my ($hash,$name) = @_;
   delete($modules{MAX}{defptr}{$hash->{addr}});
+  return undef;
 }
 
 sub
