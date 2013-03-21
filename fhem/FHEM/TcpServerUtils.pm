@@ -40,10 +40,10 @@ TcpServer_Open($$$)
   }
 
   $hash->{FD} = $hash->{SERVERSOCKET}->fileno();
-  $hash->{PORT} = $port;
+  $hash->{PORT} = $hash->{SERVERSOCKET}->sockport();
 
   $selectlist{"$name.$port"} = $hash;
-  Log(3, "$name: port $port opened");
+  Log(3, "$name: port ". $hash->{PORT} ." opened");
   return undef;
 }
 
