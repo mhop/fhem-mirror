@@ -7,6 +7,7 @@ package main;
 sub TestBlocking() { BlockingCall("DoSleep", 5, "SleepDone", 8); }
 sub DoSleep($)     { sleep(shift); return "I'm done"; }
 sub SleepDone($)   { Log 1, "SleepDone: " . shift; }
+sub TestBlocking2() { BlockingCall("DoSleep", 5, "SleepDone", 2); }
 =cut
 
 
@@ -68,8 +69,10 @@ BlockingCall($$@)
   }
 
   if($pid) {
-    InternalTimer(gettimeofday()+$timeout, "BlockingKill", $pid, 0)
-      if($timeout);
+    if($timeout) {
+      my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn );
+      InternalTimer(gettimeofday()+$timeout, "BlockingKill", \%h, 0);
+    }
     return $pid;
   }
 
@@ -120,9 +123,16 @@ BlockingInformParent($;$$)
 sub
 BlockingKill($)
 {
-  my $pid = shift;
+  my $h = shift;
   if($^O !~ m/Win/) {
-    Log 1, "Terminated $pid" if($pid && kill(9, $pid));
+    if($h->{pid} && kill(9, $h->{pid})) {
+      Log 1, "Timeout for $h->{fn} reached, terminated process $h->{pid}";
+      if($h->{finishFn}) {
+        no strict "refs";
+        my $ret = &{$h->{finishFn}}();
+        use strict "refs";
+      }
+    }
   }
 }
 
