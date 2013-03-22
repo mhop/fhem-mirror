@@ -90,7 +90,7 @@ BlockingInformParent($;$$)
 {
   my ($informFn, $param, $waitForRead) = @_;
   my $ret = undef;
-  $waitForRead = 1 if (undef($waitForRead));
+  $waitForRead = 1 if (!defined($waitForRead));
 	
   # Write the data back, calling the function
   my $addr = "localhost:$defs{$telnetDevice}{PORT}";
@@ -112,9 +112,7 @@ BlockingInformParent($;$$)
     $ret = undef if(!defined($len));
   }
 
-  if($^O =~ m/Win/) {
-    close($client) if($client);
-  }
+  close($client) if($client);
   
   return $ret;
 }
