@@ -69,11 +69,11 @@ BlockingCall($$@)
   }
 
   if($pid) {
+    my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn );
     if($timeout) {
-      my %h = ( pid=>$pid, fn=>$blockingFn, finishFn=>$finishFn );
       InternalTimer(gettimeofday()+$timeout, "BlockingKill", \%h, 0);
     }
-    return $pid;
+    return \%h;
   }
 
   # Child here
