@@ -1205,9 +1205,9 @@ sub chartQuery($@) {
          A jsonstring which represents the chart to save</li>
       <li>&lt;pagingstart&gt;<br>
          An integer used to determine the start for the sql used for query 'getTableData'</li>
-      </ul>
       <li>&lt;paginglimit&gt;<br>
          An integer used to set the limit for the sql used for query 'getTableData'</li>
+      </ul>
     <br><br>
     Examples:
       <ul>
@@ -1436,14 +1436,13 @@ sub chartQuery($@) {
          Ein String, der die Y-Achse repräsentiert</li>
       <li>&lt;savename&gt;<br>
          Ein String, unter dem ein Chart in der Datenbank gespeichert werden soll</li>
-      </ul>
       <li>&lt;chartconfig&gt;<br>
          Ein jsonstring der den zu speichernden Chart repräsentiert</li>
       <li>&lt;pagingstart&gt;<br>
          Ein Integer um den Startwert für die Abfrage 'getTableData' festzulegen</li>
-      </ul>
       <li>&lt;paginglimit&gt;<br>
          Ein Integer um den Limitwert für die Abfrage 'getTableData' festzulegen</li>
+      </ul>
     <br><br>
     Beispiele:
       <ul>
