@@ -779,7 +779,7 @@ sub CUL_HM_Parse($$) {##############################
 	  $chn = sprintf("%02X",$chn&0x3f);
       $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
-      my ($x,$pl) = ($1,hex($2)/2)  if($p =~ m/^........(..)(..)/);
+      my ($x,$pl) = ($1,hex($2)/2)  if($p =~ m/^........(..)(..)$/);
 	  my $stUpdt = 1;# shall state be updated?
 	  if (defined $pl){# device with virtual channels...
 	    push @event,"virtLevel:".($val == 100?"on":($val == 0?"off":"$val %"));
@@ -1710,7 +1710,7 @@ sub CUL_HM_Set($@) {
   @h = split(" ", $h) if($h);
 
   if(!defined($h) && defined($culHmSubTypeSets{$st}{pct}) && $cmd =~ m/^\d+/) {
-    $cmd = "pct";
+	splice @a, 1, 0,"pct";#insert the actual command
   } 
   elsif(!defined($h)) {
     my @arr;
@@ -1732,9 +1732,6 @@ sub CUL_HM_Set($@) {
     }
     return $usg;
   } 
-  elsif($cmd eq "pct") {
-    splice @a, 1, 1;
-  } 
   elsif($h eq "" && @a != 2) {
     return "$cmd requires no parameters";
   } 
@@ -1742,16 +1739,21 @@ sub CUL_HM_Set($@) {
     return "$cmd requires parameter: $h";
   }
 
-  #convert 'old' commands to current methodes
+  #convert 'old' commands to current methodes like regSet...
   if($cmd =~ m/^(displayMode|displayTemp|controlMode|decalcDay|displayTempUnit)$/ ||
-        $cmd =~ m/^(day|night|party)-temp$/){ #
-	$a[3]=$a[2];
-	$a[2]=$cmd;
-	$a[4]="";
-    ($cmd,$chn,$isChannel) = ("regSet","02","true");     #force channel 02
+     $cmd =~ m/^(day|night|party)-temp$/){ #
+	splice @a,1,0,"regSet";# make hash,regSet,reg,value
+    ($chn,$isChannel) = ("02","true");#force chn 02
     readingsSingleUpdate(CUL_HM_getDeviceHash($hash),$a[2],$a[3],1);#for historical reason
   }
-
+  elsif($cmd eq "sign"){
+	splice @a,1,0,"regSet";# make hash,regSet,reg,value 
+  }
+  elsif($cmd eq "unpair"){
+	splice @a,1,3, ("regSet","pairCentral","000000");
+  }
+  $cmd = $a[1];# get converted command
+  
      #if chn cmd is executed on device but refers to a channel?
   my $chnHash = (!$isChannel && $modules{CUL_HM}{defptr}{$dst."01"})?
                  $modules{CUL_HM}{defptr}{$dst."01"}:$hash;
@@ -1800,16 +1802,6 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,"++A401".$id."000000010A".uc( unpack("H*",$serialNr)));
     $hash->{hmPairSerial} = $serialNr;
   } 
-  elsif($cmd eq "unpair") { ############################################### reg
-    CUL_HM_pushConfig($hash, $id, $dst, 0,0,0,0, "02010A000B000C00");
-    $state = "";
-  } 
-  elsif($cmd eq "sign") { ################################################# reg
-                                      # chn,peer,list
-    CUL_HM_pushConfig($hash, $id, $dst, $chn,0,0,$chn,
-                    "08" . ($a[2] eq "on" ? "01":"02"));
-	$state = "";
-  }
   elsif($cmd eq "statusRequest") { ############################################
     my @chnIdList = CUL_HM_getAssChnIds($name);
     foreach my $channel (@chnIdList){
@@ -1860,11 +1852,13 @@ sub CUL_HM_Set($@) {
 	  ($list,$peerID) = split(":",$list);
 	  return "unknown list Number:".$list if(hex($list)>6);
 	}
-
-	($list,$peerID) = ($a[2],$a[3])if ($cmd eq "getRegRaw");
-	$list =~ s/List/0/;# convert Listy to 0y
+    elsif ($cmd eq "getRegRaw"){
+	  ($list,$peerID) = ($a[2],$a[3]);
+	  return "Enter valid List0-6" if ($list !~ m/^List([0-6])$/);
+	  $list ='0'.$1;
+	}
 	# as of now only hex value allowed check range and convert
-	
+
     $peerID  = CUL_HM_peerChId(($peerID?$peerID:"00000000"),$dst,$id);	  
 	my $peerChn = ((length($peerID) == 8)?substr($peerID,6,2):"01");# have to split chan and id
 	$peerID = substr($peerID,0,6);
@@ -2052,19 +2046,17 @@ sub CUL_HM_Set($@) {
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.$val.'01');	# SET_LOCK
   }
   elsif($cmd =~ m/^(up|down|pct)$/) { #########################################
-	my ($lvl,$tval,$rval) = ($a[1],"","");
+	my ($lvl,$tval,$rval) = ($a[2],"","");
 	if ($cmd ne "pct"){#dim [<changeValue>|up|down] ... [ontime] [ramptime]
-	  shift @a; # align array with 'pct'
-	  $lvl = (defined $a[1])?$a[1]:10;
+	  $lvl = 10 if (!defined $a[2]); #set default step
 	  $lvl = -1*$lvl if ($cmd eq "down");
 	  $lvl += CUL_HM_getChnLvl($name);
 	}
     $lvl = ($lvl > 100)?100:(($lvl < 0)?0:$lvl);
 	if ($st eq "dimmer"){# at least blind cannot stand ramp time...
-      $tval = $a[2]?CUL_HM_encodeTime16($a[2]):"FFFF";# onTime 0.05..85825945.6, 0=forever
-      $rval = CUL_HM_encodeTime16((@a > 3)?$a[3]:2.5);# rampTime 0.0..85825945.6, 0=immediate
+      $tval = $a[3]?CUL_HM_encodeTime16($a[3]):"FFFF";# onTime 0.05..85825945.6, 0=forever
+      $rval = CUL_HM_encodeTime16((@a > 4)?$a[4]:2.5);# rampTime 0.0..85825945.6, 0=immediate
 	}
-	Log 1,"General test blind: $st time:$tval ramp:$rval";
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
 	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
     if (defined $hash->{READINGS}{"virtLevel"}{VAL}){
@@ -3442,8 +3434,8 @@ sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
 	           $no,$sName
 		      ,((!$pS[$fNo] || $pS[$fNo] ne $sName)?"unknown":" dst>$pD[$fNo]")
 		      ,($bdcst eq "01"?"yes":"no ")
-	          ,( (($bdcst eq "01" && $pB[$fNo] eq "y")||
-			     ($bdcst eq "00" && $pB[$fNo] eq "n")) ?"ok":"fail")
+	          ,( (($bdcst eq "01" && $pB[$fNo] && $pB[$fNo] eq "y")||
+			      ($bdcst eq "00" && $pB[$fNo] && $pB[$fNo] eq "n")) ?"ok":"fail")
 	           );
 	push @retL, $eS;
 	$readList[$fNo]=sprintf("repPeer_%02d:%s",$no,$eS);
