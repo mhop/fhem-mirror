@@ -165,19 +165,28 @@ Ext.define('FHEM.view.Viewport', {
                     split: true,
                     height: 50,
                     minHeight: 30
-                }, 
-                {
-                    xtype: 'linechartpanel',
-                    name: 'linechartpanel',
-                    region: 'center',
-                    layout: 'fit'
                 },
                 {
-                    xtype: 'tabledatagridpanel',
-                    name: 'tabledatagridpanel',
-                    hidden: true,
+                    xtype: 'panel',
                     region: 'center',
-                    layout: 'fit'
+                    title: 'Welcome',
+                    layout: 'hbox',
+                    bodyStyle: 'padding:5px 5px 0',
+                    items: [
+                        {
+                            xtype: 'image',
+                            src: '../../fhem/images/default/fhemicon.png',
+                            height: 132,
+                            width: 120
+                        },
+                        {
+                            xtype: 'text',
+                            name: 'statustextfield',
+                            padding: '50 0 0 20',
+                            html: '<br>Welcome to the new FHEM Frontend.<br>For Informations, Problems and discussion, visit the <a href="http://forum.fhem.de/index.php?t=msg&th=10439&start=0&rid=0">FHEM Forums</a>'
+                        }
+                    ],
+                    height: '100%'
                 }
             ]
         });

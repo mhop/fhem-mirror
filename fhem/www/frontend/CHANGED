@@ -1,3 +1,9 @@
+Update vom 23.3.2013
+  * Integration von Buttons und Dropdownlisten, um einzelene Geräte steuern zu können
+  * Aktualisierung aller Geräteinformationen über kontinuierliche AJAX Requests
+  * Korrektur der Statistikfunktion im DbLog Modul, Cast auf Floats hinzugefügt
+  * viele Bugfixes
+
 Update vom 18.3.2013
   * Implementation einer Statistikfunktion für Charts, die für ein beliebiges Reading
     * Summen

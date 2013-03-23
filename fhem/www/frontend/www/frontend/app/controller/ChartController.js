@@ -697,22 +697,27 @@ Ext.define('FHEM.controller.ChartController', {
                     view.axes.get(0).maximum = store.max('VALUE');
                 } else if (yaxisstatistics.indexOf("sum") > 0) {
                     y1series.yField = 'SUM';
+                    y1series.tips.renderer = me.setSeriesRenderer('SUM');
                     view.axes.get(0).maximum = store.max('SUM');
                     view.axes.get(0).setTitle("SUM " + yaxis);
                 } else if (yaxisstatistics.indexOf("average") > 0)  {
                     y1series.yField = 'AVG';
+                    y1series.tips.renderer = me.setSeriesRenderer('AVG');
                     view.axes.get(0).maximum = store.max('AVG');
                     view.axes.get(0).setTitle("AVG " + yaxis);
                 } else if (yaxisstatistics.indexOf("min") > 0)  {
                     y1series.yField = 'MIN';
+                    y1series.tips.renderer = me.setSeriesRenderer('MIN');
                     view.axes.get(0).maximum = store.max('MIN');
                     view.axes.get(0).setTitle("MIN " + yaxis);
                 }  else if (yaxisstatistics.indexOf("max") > 0)  {
                     y1series.yField = 'MAX';
+                    y1series.tips.renderer = me.setSeriesRenderer('MAX');
                     view.axes.get(0).maximum = store.max('MAX');
                     view.axes.get(0).setTitle("MAX " + yaxis);
                 }  else if (yaxisstatistics.indexOf("count") > 0)  {
                     y1series.yField = 'COUNT';
+                    y1series.tips.renderer = me.setSeriesRenderer('COUNT');
                     view.axes.get(0).maximum = store.max('COUNT');
                     view.axes.get(0).setTitle("COUNT " + yaxis);
                 }
@@ -725,6 +730,19 @@ Ext.define('FHEM.controller.ChartController', {
             
         }
         
+    },
+    
+    /**
+     * Setup the renderer for displaying values in chart with mouse hover
+     */
+    setSeriesRenderer: function(value) {
+        
+        var renderer = function (storeItem, item) {
+            this.setTitle(' ' + value + ' : ' + storeItem.get(value) + 
+                    '<br> Time: ' + storeItem.get('TIMESTAMP'));
+        };
+        
+        return renderer;
     },
     
     /**
