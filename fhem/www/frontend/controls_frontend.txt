@@ -37,7 +37,7 @@ DIR www/frontend/lib/ext-4.1.1a/images/gray/grid
 DIR www/frontend/lib/ext-4.1.1a/images/gray/util
 DIR www/frontend/lib/ext-4.1.1a/images/gray/panel-header
 DIR www/frontend/lib/ext-4.1.1a/images/gray/tip
-UPD 2013-03-23_05:44:48 57766 FHEM/93_DbLog.pm
+UPD 2013-03-23_05:44:48 59751 FHEM/93_DbLog.pm
 UPD 2013-03-08_07:13:10 563 www/frontend/index.html
 UPD 2013-03-06_11:11:22 236 www/frontend/README.txt
 UPD 2013-03-08_01:44:54 613 www/frontend/app/userconfig.js
