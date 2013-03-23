@@ -1,6 +1,10 @@
 # Add changes at the top of the list.
 
 - SVN
+  - feature: 93_DbLog extended to give more functions for the charting frontend.
+             This includes new queries for raw table data and also statistics,
+             which get sum/max/min/avg values from the database.
+             Documentation has been updated.
   - feature: new module 31_LightScene to save and restore the state of a
              group of lights and other actors
   - feature: VIERA module added (by teevau)
