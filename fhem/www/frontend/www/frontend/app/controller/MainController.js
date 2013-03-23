@@ -76,7 +76,7 @@ Ext.define('FHEM.controller.MainController', {
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
-            sp.setText(FHEM.version + "; Frontend Version: 0.3 - 2013-03-16");
+            sp.setText(FHEM.version + "; Frontend Version: 0.4 - 2013-03-23");
         }
         
         //setup west accordion / treepanel
@@ -111,21 +111,6 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * 
      */
-    showDevicePanel: function(view, record) {
-        var panel = {
-            xtype: 'devicepanel',
-            title: record.raw.NAME,
-            region: 'center',
-            layout: 'fit',
-            record: record
-        };
-        this.hideCenterPanels();
-        this.getMainviewport().add(panel);
-    },
-    
-    /**
-     * 
-     */
     saveConfig: function() {
         
         var command = this.getCommandfield().getValue();
@@ -147,13 +132,19 @@ Ext.define('FHEM.controller.MainController', {
                     border: false,
                     closable: false,
                     plain: true
-                });win.showAt(Ext.getBody().getWidth() / 2 -100, 30);
+                });
+                win.showAt(Ext.getBody().getWidth() / 2 -100, 30);
                 win.getEl().animate({
                     opacity: 0, 
                     easing: 'easeOut',
                     duration: 3000,
                     delay: 2000,
-                    remove: true
+                    remove: false,
+                    listeners: {
+                        afteranimate:  function() {
+                            win.destroy();
+                        }
+                    }
                 });
             },
             failure: function() {
@@ -215,13 +206,19 @@ Ext.define('FHEM.controller.MainController', {
                             border: false,
                             closable: false,
                             plain: true
-                        });win.showAt(Ext.getBody().getWidth() / 2 -100, 30);
+                        });
+                        win.showAt(Ext.getBody().getWidth() / 2 -100, 30);
                         win.getEl().animate({
                             opacity: 0, 
                             easing: 'easeOut',
                             duration: 3000,
                             delay: 2000,
-                            remove: true
+                            remove: false,
+                            listeners: {
+                                afteranimate:  function() {
+                                    win.destroy();
+                                }
+                            }
                         });
                     }
                     
@@ -251,13 +248,19 @@ Ext.define('FHEM.controller.MainController', {
             border: false,
             closable: false,
             plain: true
-        });win.showAt(Ext.getBody().getWidth() / 2 -100, 30);
+        });
+        win.showAt(Ext.getBody().getWidth() / 2 -100, 30);
         win.getEl().animate({
             opacity: 0, 
             easing: 'easeOut',
             duration: 3000,
             delay: 2000,
-            remove: true
+            remove: false,
+            listeners: {
+                afteranimate:  function() {
+                    win.destroy();
+                }
+            }
         });
     },
     
@@ -309,27 +312,61 @@ Ext.define('FHEM.controller.MainController', {
     /**
      * 
      */
-    hideCenterPanels: function() {
+    destroyCenterPanels: function() {
         var panels = Ext.ComponentQuery.query('panel[region=center]');
         Ext.each(panels, function(panel) {
-            panel.hide();
+            panel.destroy();
         });
     },
     
     /**
      * 
      */
+    showDevicePanel: function(view, record) {
+        
+        var title;
+        if (record.raw.ATTR && record.raw.ATTR.alias && !Ext.isEmpty(record.raw.ATTR.alias)) {
+            title = record.raw.data.ATTR.alias;
+        } else {
+            title = record.raw.data.NAME;
+        }
+        var panel = {
+            xtype: 'devicepanel',
+            title: title,
+            region: 'center',
+            layout: 'fit',
+            record: record
+        };
+        this.destroyCenterPanels();
+        this.getMainviewport().add(panel);
+    },
+    
+    /**
+     * 
+     */
     showLineChartPanel: function() {
-        this.hideCenterPanels();
-        Ext.ComponentQuery.query('panel[name=linechartpanel]')[0].show();
+        var panel = {
+            xtype: 'linechartpanel',
+            name: 'linechartpanel',
+            region: 'center',
+            layout: 'fit'
+        };
+        this.destroyCenterPanels();
+        this.getMainviewport().add(panel);
     },
     
     /**
      * 
      */
     showDatabaseTablePanel: function() {
-        this.hideCenterPanels();
-        Ext.ComponentQuery.query('panel[name=tabledatagridpanel]')[0].show();
+        var panel = {
+            xtype: 'tabledatagridpanel',
+            name: 'tabledatagridpanel',
+            region: 'center',
+            layout: 'fit'
+        };
+        this.destroyCenterPanels();
+        this.getMainviewport().add(panel);
     }
     
 });
