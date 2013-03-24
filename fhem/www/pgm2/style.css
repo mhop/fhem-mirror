@@ -33,7 +33,7 @@ table#room tr.sel { background: #A0FFFF; }
 h2,h3,h4 { color:#52865D; line-height:1.3;
            margin-top:1.5em; font-family:Arial,Sans-serif; }
 div#block { border:1px solid gray; background: #F8F8E0; padding:0.7em; }
-div#dist { padding-top:0.3em; }
+div.dist { padding-top:0.3em; }
 button.dist { margin:10px; background:transparent; border:0px; cursor:pointer; }
 
 a img { border-style:none; }
@@ -52,3 +52,5 @@ select {  margin-left:5px; margin-right:5px; }
           -webkit-user-select:none; -moz-user-select:none; -user-select:none;
           border:3px solid; color:#278727; text-align:center; } 
 .downText { margin-top:2px; }
+
+pre { white-space: pre-wrap; }
