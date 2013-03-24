@@ -1019,8 +1019,8 @@ sub Calendar_Undef($$) {
 
     Examples:
     <pre>
-      define MyCalendar Calendar ical url https://www.google.com/calendar/ical/john.doe%40example.com/private-foo4711/basic.ics
-      define YourCalendar Calendar ical url http://www.google.com/calendar/ical/jane.doe%40example.com/private-bar0815/basic.ics 86400
+      define MyCalendar Calendar ical url https://www.google.com&shy;/calendar/ical/john.doe%40example.com&shy;/private-foo4711/basic.ics
+      define YourCalendar Calendar ical url http://www.google.com&shy;/calendar/ical/jane.doe%40example.com&shy;/private-bar0815/basic.ics 86400
       </pre>
   </ul>
   <br>
@@ -1130,8 +1130,8 @@ sub Calendar_Undef($$) {
     <ul>
     <code>
     get MyCalendar full all<br>
-    2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom   known    alarm 31.05.2012 17:00:00 07.06.2012 16:30:00-07.06.2012 18:00:00 Erna for coffee<br>
-    992hydf4y44awer5466lhfdsrgl7tin6b6mckf8glmhui4googlecom   known upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
+    2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom   known    alarm 31.05.2012 17:00:00 07.06.2012 16:30:00-07.06.2012 18:00:00 Erna for coffee<br>
+    992hydf4y44awer5466lhfdsr&shy;gl7tin6b6mckf8glmhui4&shy;googlecom   known upcoming                     08.06.2012 00:00:00-09.06.2012 00:00:00 Vacation
     </code><br><br>
     </ul>
 
@@ -1151,15 +1151,15 @@ sub Calendar_Undef($$) {
     First find the UID of the calendar event:<br><br>
     <code>
     get MyCalendar find .*Erna.*<br>
-    2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom
+    2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom
     </code><br><br>
     Then define a notify:<br><br>
     <code>
-    define ErnaComes notify MyCalendar:modeStarted.*2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom.* set MyLight on
+    define ErnaComes notify MyCalendar:modeStarted.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* set MyLight on
     </code><br><br>
     You can also do some logging:<br><br>
     <code>
-    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4dsa234r234sdfds6bh874googlecom.* { Log 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
+    define LogErna notify MyCalendar:modeAlarmed.*2767324dsfretfvds7dsfn3e4&shy;dsa234r234sdfds6bh874&shy;googlecom.* { Log 1, "ALARM name=%NAME event=%EVENT part1=%EVTPART0 part2=%EVTPART1" }
     </code><br><br>
     </ul>
 
