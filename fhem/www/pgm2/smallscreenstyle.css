@@ -1,11 +1,11 @@
 body     { background-color: #FFFFE7; 
-           font-family:Arial, sans-serif; font-size:24px; }
+           font-family:Arial, sans-serif; }
 textarea { font-family:Arial, sans-serif; font-size:16px;}
 input    { font-family:Arial, sans-serif; font-size:16px;}
 select   { font-family:Arial, sans-serif; font-size:16px;}
 #back    { position:absolute; top: 2px; left:18px; }
 #logo    { position:absolute; top: 2px; left: 2px; 
-           width:64px;  height:67px; background-image:url(../icons/fhem_smallscreen); }
+           width:64px;  height:67px; background-image:url(../images/smallscreen/fhem_smallscreen.png); }
 #menu    { position:absolute; top: 2px; left:65px; }
 #hdr     { position:absolute; top:40px; left:65px; }
 #content { position:absolute; top:85px; left: 0px; right: 0px;}
@@ -49,7 +49,7 @@ table.block tr.sel { background: #F0F0D8; }
 table.block td { width: 150px; };
 table { -moz-border-radius:8px; border-radius:8px; }
 
-table#room { background: #D7FFFF; }
+table#room { display:none; }
 table#room tr.sel { background: #A0FFFF; }
 
 #menu #block { visibility: hidden; }
