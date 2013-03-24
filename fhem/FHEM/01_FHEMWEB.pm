@@ -2486,7 +2486,8 @@ FW_devState($$)
   my $state = $defs{$d}{STATE};
   $state = "" if(!defined($state));
 
-  $hasOnOff = ($allSets =~ m/\bon\b/ && $allSets =~ m/\boff\b/);
+  $hasOnOff = ($allSets =~ m/(^| )on( |$)/ &&
+               $allSets =~ m/(^| )off( |$)/);
   my $txt = $state;
   if(defined(AttrVal($d, "showtime", undef))) {
     my $v = $defs{$d}{READINGS}{state}{TIME};
