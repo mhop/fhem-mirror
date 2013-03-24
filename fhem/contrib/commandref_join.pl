@@ -1,5 +1,9 @@
 #!/usr/bin/perl
 
+# MAXWI
+# With pre: 1320, without 1020 (content only)
+# pre { white-space: pre-wrap; } : 900
+
 use strict;
 use warnings;
 
@@ -80,11 +84,6 @@ foreach my $lang (@lang) {
         $skip = 1;
 
       } elsif(!$skip) {
-        # here we copy line by line from the module
-#        if($l =~ m/<.?pre>/) {
-#          print "$lang $mod REMOVING <pre> Formatting\n";
-#          $l =~ s/<.?pre>//g;
-#        }
         print OUT $l;
         $docCount++;
         $hasLink = ($l =~ m/<a name="$mod">/) if(!$hasLink);
