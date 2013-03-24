@@ -35,7 +35,7 @@ BlockingCall($$@)
     if(!$telnetDevice) {
       foreach my $d (sort keys %defs) {
         my $h = $defs{$d};
-        next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{TEMPORARY});
+        next if(!$h->{TYPE} || $h->{TYPE} ne "telnet" || $h->{SNAME});
         next if($attr{$d}{SSL} || $attr{$d}{password});
         next if($h->{DEF} =~ m/IPV6/);
         $telnetDevice = $d;
@@ -45,13 +45,10 @@ BlockingCall($$@)
 
     # If not suitable telnet device found, create a temporary one
     if(!$telnetDevice) {
-      foreach my $port (7073..7083) {
-        if(!CommandDefine(undef, "$tName telnet $port")) {
-          CommandAttr(undef, "$tName room hidden");
-          $telnetDevice = $tName;
-          $defs{$tName}{TEMPORARY} = 1;
-          last;
-        }
+      if(!CommandDefine(undef, "$tName telnet 0")) {
+        CommandAttr(undef, "$tName room hidden");
+        $telnetDevice = $tName;
+        $defs{$tName}{TEMPORARY} = 1;
       }
     }
 
