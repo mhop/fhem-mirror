@@ -44,7 +44,7 @@ DbLog_Define($@)
   return "wrong syntax: define <name> DbLog configuration regexp"
     if(int(@a) != 4);
 
-  my $regexp        = $a[3];
+  my $regexp = $a[3];
 
   eval { "Hallo" =~ m/^$regexp$/ };
   return "Bad regexp: $@" if($@);
@@ -100,154 +100,177 @@ DbLog_Attr(@)
 sub
 DbLog_ParseEvent($$)
 {
-    my ($type, $event)= @_;
-    my @result;
+  my ($type, $event)= @_;
+  my @result;
 
-    # split the event into reading and argument
-    # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
-    my @parts   = split(/: /,$event);
-    my $reading = shift @parts;
-    my $value   = join(": ", @parts);
-    my $unit    = "";
+  # split the event into reading and argument
+  # "day-temp: 22.0 (Celsius)" -> "day-temp", "22.0 (Celsius)"
+  my @parts   = split(/: /,$event);
+  my $reading = shift @parts;
+  my $value   = join(": ", @parts);
+  my $unit    = "";
 
-    #default
-    if(!defined($reading)) { $reading = ""; }
-    if(!defined($value))   { $value   = ""; }
+  #default
+  if(!defined($reading)) { $reading = ""; }
+  if(!defined($value))   { $value   = ""; }
 
-    # the interpretation of the argument depends on the device type
-    # EMEM, M232Counter, M232Voltage return plain numbers
-    if(($type eq "M232Voltage") ||
-       ($type eq "M232Counter") ||
-       ($type eq "EMEM")) {
+  # the interpretation of the argument depends on the device type
+  # EMEM, M232Counter, M232Voltage return plain numbers
+  if(($type eq "M232Voltage") ||
+     ($type eq "M232Counter") ||
+     ($type eq "EMEM")) {
+  }
+  # Onewire
+  elsif(($type eq "OWAD") ||
+        ($type eq "OWSWITCH") ||
+        ($type eq "OWMULTI")) {
+          $reading = "data";
+          $value = $event;
+  }
+  # FS20
+  elsif(($type eq "FS20") ||
+        ($type eq "X10")) {
+    if($reading =~ m/^dim(\d+).*/o) {
+      $value = $1;
+      $reading= "dim";
+      $unit= "%";
     }
-
-    # Onewire
-    elsif(($type eq "OWAD") ||
-          ($type eq "OWSWITCH") ||
-          ($type eq "OWMULTI")) {
-            $reading = "data";
-            $value = $event;
+    elsif(!defined($value) || $value eq "") {
+      $value= $reading;
+      $reading= "data";
     }
-    # FS20
-    elsif(($type eq "FS20") ||
-          ($type eq "X10")) {
-        #@parts = split(/ /,$event);
-        #$reading = shift @parts;
-        #$value   = join(" ", shift @parts);
-
-        if($reading =~ m/^dim(\d+).*/o) {
-            $value = $1;
-            $reading= "dim";
-            $unit= "%";
-        }
-        if(!defined($value) || $value eq "") {$value=$reading; $reading="data";}
-    }
+  }
   # FHT
   elsif($type eq "FHT") {
-     if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
-    @parts= split(/ /,$event);
-    $reading= $parts[0];
-    $value= $parts[1];
-    $unit= "";
-     }
-     if($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading =~ m(^actuator[0-9]*)) {
-        if($value eq "lime-protection") {
-            $reading= "actuator-lime-protection";
-            undef $value;
+    if($reading =~ m(-from[12]\ ) || $reading =~ m(-to[12]\ )) {
+      @parts= split(/ /,$event);
+      $reading= $parts[0];
+      $value= $parts[1];
+      $unit= "";
+    }
+    elsif($reading =~ m(-temp)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+    elsif($reading =~ m(temp-offset)) { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+    elsif($reading =~ m(^actuator[0-9]*)) {
+      if($value eq "lime-protection") {
+        $reading= "actuator-lime-protection";
+        undef $value;
+      }
+      elsif($value =~ m(^offset:)) {
+        $reading= "actuator-offset";
+        @parts= split(/: /,$value);
+        $value= $parts[1];
+        if(defined $value) {
+          $value=~ s/%//; $value= $value*1.; $unit= "%";
         }
-        elsif($value =~ m(^offset:)) {
-            $reading= "actuator-offset";
-                @parts= split(/: /,$value);
-            $value= $parts[1];
-            if(defined $value) {
-                $value=~ s/%//; $value= $value*1.; $unit= "%";
-            }
+      }
+      elsif($value =~ m(^unknown_)) {
+        @parts= split(/: /,$value);
+        $reading= "actuator-" . $parts[0];
+        $value= $parts[1];
+        if(defined $value) {
+          $value=~ s/%//; $value= $value*1.; $unit= "%";
         }
-        elsif($value =~ m(^unknown_)) {
-                @parts= split(/: /,$value);
-            $reading= "actuator-" . $parts[0];
-            $value= $parts[1];
-            if(defined $value) {
-                $value=~ s/%//; $value= $value*1.; $unit= "%";
-            }
-        }
-        elsif($value eq "synctime") {
-            $reading= "actuator-synctime";
-            undef $value;
-        }
-        elsif($value eq "test") {
-            $reading= "actuator-test";
-            undef $value;
-        }
-        elsif($value eq "pair") {
-            $reading= "actuator-pair";
-            undef $value;
-        }
-        else {
-            $value=~ s/%//; $value= $value*1.; $unit= "%";
-        }
-     }
+      }
+      elsif($value eq "synctime") {
+        $reading= "actuator-synctime";
+        undef $value;
+      }
+      elsif($value eq "test") {
+        $reading= "actuator-test";
+        undef $value;
+      }
+      elsif($value eq "pair") {
+        $reading= "actuator-pair";
+        undef $value;
+      }
+      else {
+        $value=~ s/%//; $value= $value*1.; $unit= "%";
+      }
+    }
   }
   # KS300
   elsif($type eq "KS300") {
-     if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-     if($event =~ m(avg_day)) { $reading= "data"; $value= $event; }
-     if($event =~ m(avg_month)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading eq "wind") { $value=~ s/ \(km\/h\)//; $unit= "km/h"; }
-     if($reading eq "rain") { $value=~ s/ \(l\/m2\)//; $unit= "l/m2"; }
-     if($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
-     if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
-     if($reading eq "israining") {
-    $value=~ s/ \(yes\/no\)//;
-        $value=~ s/no/0/;
-        $value=~ s/yes/1/;
-      }
+    if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
+    elsif($event =~ m(avg_day)) { $reading= "data"; $value= $event; }
+    elsif($event =~ m(avg_month)) { $reading= "data"; $value= $event; }
+    elsif($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
+    elsif($reading eq "wind") { $value=~ s/ \(km\/h\)//; $unit= "km/h"; }
+    elsif($reading eq "rain") { $value=~ s/ \(l\/m2\)//; $unit= "l/m2"; }
+    elsif($reading eq "rain_raw") { $value=~ s/ \(counter\)//; $unit= ""; }
+    elsif($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
+    elsif($reading eq "israining") {
+      $value=~ s/ \(yes\/no\)//;
+      $value=~ s/no/0/;
+      $value=~ s/yes/1/;
+    }
   }
   # HMS
   elsif($type eq "HMS" ||
         $type eq "CUL_WS" ||
         $type eq "OWTHERM") {
-     if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
-     if($reading eq "temperature") { $value=~ s/ \(Celsius\)//; $unit= "°C"; }
-     if($reading eq "temperature") { $value=~ s/([-\.\d]+).*/$1/; $unit= "°C"; } #OWTHERM
-     if($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
-     if($reading eq "battery") {
-        $value=~ s/ok/1/;
-        $value=~ s/replaced/1/;
-        $value=~ s/empty/0/;
-     }
-  }
-
-  # BS
-  elsif($type eq "BS") {
-      if($event =~ m(brightness:.*)) {
-          @parts= split(/ /,$event);
-          $reading= "lux";
-          $value= $parts[4]*1.;
-          $unit= "lux";
+    if($event =~ m(T:.*)) { $reading= "data"; $value= $event; }
+    elsif($reading eq "temperature") {
+      $value=~ s/ \(Celsius\)//; 
+      $value=~ s/([-\.\d]+).*/$1/; #OWTHERM
+      $unit= "°C"; 
+    }
+    elsif($reading eq "humidity") { $value=~ s/ \(\%\)//; $unit= "%"; }
+    elsif($reading eq "battery") {
+      $value=~ s/ok/1/;
+      $value=~ s/replaced/1/;
+      $value=~ s/empty/0/;
     }
   }
-
+  # CUL_HM
+  elsif ($type eq "CUL_HM") {
+    # remove trailing %  
+    $value=~ s/ \%$//;
+  }
+  # BS
+  elsif($type eq "BS") {
+    if($event =~ m(brightness:.*)) {
+      @parts= split(/ /,$event);
+      $reading= "lux";
+      $value= $parts[4]*1.;
+      $unit= "lux";
+    }
+  }
+  # RFXTRX Lighting
+  elsif($type eq "TRX_LIGHT") {
+    if($reading =~ m/^level (\d+)/) {
+        $value = $1;
+        $reading= "level";
+    }
+  }
+  # RFXTRX Sensors
+  elsif($type eq "TRX_WEATHER") {
+    if($reading eq "energy_current") { $value=~ s/ W//; }
+    elsif($reading eq "energy_total") { $value=~ s/ kWh//; }
+    elsif($reading eq "battery") {
+      if ($value=~ m/(\d+)\%/) { 
+        $value= $1; 
+      }
+      else {
+        $value= ($value eq "ok");
+      }
+    }
+  }
   # Weather
   elsif($type eq "WEATHER") {
-     if($event =~ m(^wind_condition)) {
-        @parts= split(/ /,$event); # extract wind direction from event
-        if(defined $parts[0]) {
-           $reading = "wind_direction";
-           $value= $parts[2];
-#           $unit= "";
-        }
-     }
-     if($reading =~ m(^wind)) { $unit= "km/h"; } # wind, wind_speed
-     if($reading eq "wind_chill") { $unit= "°C"; }
-     if($reading eq "wind_direction") { $unit= ""; }
-     if($reading =~ m(^temperature)) { $unit= "°C"; } # wenn reading mit temperature beginnt
-     if($reading =~ m(^humidity)) { $unit= "%"; }
-     if($reading =~ m(^pressure)) { $unit= "hPa"; }
-     if($reading =~ m(^pressure_trend)) { $unit= ""; }
+    if($event =~ m(^wind_condition)) {
+      @parts= split(/ /,$event); # extract wind direction from event
+      if(defined $parts[0]) {
+        $reading = "wind_direction";
+        $value= $parts[2];
+      }
+    }
+    elsif($reading eq "wind_chill") { $unit= "°C"; }
+    elsif($reading eq "wind_direction") { $unit= ""; }
+    elsif($reading =~ m(^wind)) { $unit= "km/h"; } # wind, wind_speed
+    elsif($reading =~ m(^temperature)) { $unit= "°C"; } # wenn reading mit temperature beginnt
+    elsif($reading =~ m(^humidity)) { $unit= "%"; }
+    elsif($reading =~ m(^pressure)) { $unit= "hPa"; }
+    elsif($reading =~ m(^pressure_trend)) { $unit= ""; }
   }
 
   # FHT8V
@@ -296,41 +319,70 @@ DbLog_Log($$)
 
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
-  for (my $i = 0; $i < $max; $i++) {
-    my $s = $dev->{CHANGED}[$i];
-    $s = "" if(!defined($s));
-    if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
-      my $ts = TimeNow();
-      $ts = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
-      # $ts is in SQL format YYYY-MM-DD hh:mm:ss
+  my $ts_0 = TimeNow();
 
-      my @r= DbLog_ParseEvent($t, $s);
-      my $reading= $r[0];
-      my $value= $r[1];
-      my $unit= $r[2];
-      if(!defined $reading) { $reading= ""; }
-      if(!defined $value) { $value= ""; }
-      if(!defined $unit || $unit eq "") {
-         $unit = AttrVal("$n", "unit", "");
+  my $dbh= $log->{DBH};
+  $dbh->{RaiseError} = 1;
+  
+  my $DbLogType = AttrVal($log->{NAME}, "DbLogType", "Current/History");
+      
+  #one Transaction
+  eval {
+    $dbh->begin_work();
+    
+    my $sth_ih = $dbh->prepare_cached("INSERT INTO history (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if ($DbLogType =~ m(History) );
+    my $sth_uc = $dbh->prepare_cached("UPDATE current SET TIMESTAMP=?, TYPE=?, EVENT=?, VALUE=?, UNIT=? WHERE (DEVICE=?) AND (READING=?)") if ($DbLogType =~ m(Current) );
+    my $sth_ic = $dbh->prepare_cached("INSERT INTO current (TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES (?,?,?,?,?,?,?)") if ($DbLogType =~ m(Current) );
+    
+    for (my $i = 0; $i < $max; $i++) {
+      my $s = $dev->{CHANGED}[$i];
+      $s = "" if(!defined($s));
+      if($n =~ m/^$re$/ || "$n:$s" =~ m/^$re$/) {
+        my $ts = $ts_0;
+        $ts = $dev->{CHANGETIME}[$i] if(defined($dev->{CHANGETIME}[$i]));
+        # $ts is in SQL format YYYY-MM-DD hh:mm:ss
+    
+        my @r= DbLog_ParseEvent($t, $s);
+        my $reading= $r[0];
+        my $value= $r[1];
+        my $unit= $r[2];
+        if(!defined $reading) { $reading= ""; }
+        if(!defined $value) { $value= ""; }
+        if(!defined $unit || $unit eq "") {
+          $unit = AttrVal("$n", "unit", "");
+        }
+
+        my @is= ($ts, $n, $t, $s, $reading, $value, $unit);
+
+        # insert into history
+        if ($DbLogType =~ m(History) ) {
+          my $rv_ih = $sth_ih->execute(@is);
+        }
+
+        if ($DbLogType =~ m(Current) ) {
+          # update or insert current
+          my $rv_uc = $sth_uc->execute(($ts, $t, $s, $value, $unit, $n, $reading));
+          if ($rv_uc == 0) {
+            my $rv_ic = $sth_ic->execute(@is);
+          }
+        }
+
       }
-
-      my $is= "(TIMESTAMP, DEVICE, TYPE, EVENT, READING, VALUE, UNIT) VALUES " .
-         "('$ts', '$n', '$t', '$s', '$reading', '$value', '$unit')";
-
-      my $DbLogType = AttrVal($log->{NAME}, "DbLogType", "Current/History");
-      if ($DbLogType =~ m(History) ) {
-        DbLog_ExecSQL($log, "INSERT INTO history" . $is);
-      }
-      if ($DbLogType =~ m(Current) ) {
-        DbLog_ExecSQL($log, "DELETE FROM current WHERE (DEVICE='$n') AND (READING='$reading')");
-        DbLog_ExecSQL($log, "INSERT INTO current" . $is);
-      }
-
-
-
-    }
+    } 
+    $dbh->commit();
+  };
+  if ($@) {
+    Log 2, "DbLog: Failed to insert new readings into database: $@";
+    $dbh->{RaiseError} = 0;  
+    $dbh->rollback();
+    # reconnect
+    $dbh->disconnect();  
+    DbLog_Connect($log);
   }
-
+  else {
+    $dbh->{RaiseError} = 0;  
+  }
+  
   return "";
 }
 
@@ -423,8 +475,9 @@ DbLog_Connect($)
     $dbh->do("PRAGMA temp_store=MEMORY");
     $dbh->do("PRAGMA synchronous=NORMAL");
     $dbh->do("PRAGMA journal_mode=WAL");
-    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
-    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32))");
+    $dbh->do("PRAGMA cache_size=4000");
+    $dbh->do("CREATE TEMP TABLE IF NOT EXISTS current (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32)");
+    $dbh->do("CREATE TABLE IF NOT EXISTS history (TIMESTAMP TIMESTAMP, DEVICE varchar(32), TYPE varchar(32), EVENT varchar(512), READING varchar(32), VALUE varchar(32), UNIT varchar(32)");
     $dbh->do("CREATE INDEX IF NOT EXISTS Search_Idx ON `history` (DEVICE, READING, TIMESTAMP)");
   }
   
@@ -529,7 +582,7 @@ DbLog_Get($@)
   $to = $to_datetime{datetime};
 
 
-  my ($retval,$sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit) = "";
+  my ($retval,$sql_timestamp,$sql_value, $type, $event, $unit) = "";
   my $writeout = 0;
   my (@min, @max, @sum, @cnt, @lastv, @lastd);
   my (%tstamp, %lasttstamp, $out_tstamp, $out_value, $minval, $maxval); #fuer delta-h/d Berechnung
@@ -556,22 +609,18 @@ DbLog_Get($@)
     $sqlspec{get_timestamp}  = "TO_CHAR(TIMESTAMP, 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{from_timestamp} = "TO_TIMESTAMP('$from', 'YYYY-MM-DD HH24:MI:SS')";
     $sqlspec{to_timestamp}   = "TO_TIMESTAMP('$to', 'YYYY-MM-DD HH24:MI:SS')";
-    $sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
   } elsif ($hash->{DBMODEL} eq "MYSQL") {
     $sqlspec{get_timestamp}  = "DATE_FORMAT(TIMESTAMP, '%Y-%m-%d %H:%i:%s')";
     $sqlspec{from_timestamp} = "STR_TO_DATE('$from', '%Y-%m-%d %H:%i:%s')";
     $sqlspec{to_timestamp}   = "STR_TO_DATE('$to', '%Y-%m-%d %H:%i:%s')";
-    $sqlspec{reading_clause} = "CONCAT(DEVICE,'|',READING)"
   } elsif ($hash->{DBMODEL} eq "SQLITE") {
     $sqlspec{get_timestamp}  = "TIMESTAMP";
     $sqlspec{from_timestamp} = "'$from'";
     $sqlspec{to_timestamp}   = "'$to'";
-    $sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
   } else {
     $sqlspec{get_timestamp}  = "TIMESTAMP";
     $sqlspec{from_timestamp} = "'$from'";
     $sqlspec{to_timestamp}   = "'$to'";
-    $sqlspec{reading_clause} = "(DEVICE || '|' || READING)";
   }
 
   if(uc($outf) eq "ALL") {
@@ -594,14 +643,11 @@ DbLog_Get($@)
 
     my $stm= "SELECT
           $sqlspec{get_timestamp},
-          DEVICE,
-          READING,
           VALUE
-            $sqlspec{all}
+          $sqlspec{all}
         FROM history
-        WHERE 1=1
-          AND $sqlspec{reading_clause} = ('".$readings[$i]->[0]."|".$readings[$i]->[1]."')
-          AND DEVICE  = '".$readings[$i]->[0]."'
+        WHERE
+          DEVICE  = '".$readings[$i]->[0]."'
           AND READING = '".$readings[$i]->[1]."'
           AND TIMESTAMP > $sqlspec{from_timestamp}
           AND TIMESTAMP < $sqlspec{to_timestamp}
@@ -615,10 +661,16 @@ DbLog_Get($@)
       return "Cannot execute statement $stm: $DBI::errstr";
 
     if(uc($outf) eq "ALL") {
+        $sth->bind_columns(undef, \$sql_timestamp, \$sql_value, \$type, \$event, \$unit);
+        
         $retval .= "Timestamp: Device, Type, Event, Reading, Value, Unit\n";
         $retval .= "=====================================================\n";
     }
-    while( ($sql_timestamp,$sql_dev,$sql_reading,$sql_value, $type, $event, $unit)= $sth->fetchrow_array) {
+    else {
+        $sth->bind_columns(undef, \$sql_timestamp, \$sql_value);
+    }
+
+    while($sth->fetch()) {
       $writeout   = 0;
       $out_value  = "";
       $out_tstamp = "";
@@ -629,7 +681,7 @@ DbLog_Get($@)
         my $val = $sql_value;
         eval("$readings[$i]->[4]");
         $sql_value = $val;
-        if($@) {Log 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Fehler: $@";}
+        if($@) {Log 3, "DbLog: Error in inline function: <".$readings[$i]->[4].">, Error: $@";}
         $out_tstamp = $sql_timestamp;
         $writeout=1;
       }
@@ -688,14 +740,14 @@ DbLog_Get($@)
       ###################### Ausgabe ###########################
       if($writeout) {
           if(uc($outf) eq "ALL") {
-            $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+            $retval .= sprintf("%s: %s, %s, %s, %s, %s, %s\n", $out_tstamp, $readings[$i]->[0], $type, $event, $readings[$i]->[1], $out_value, $unit);
           } else {
             $out_tstamp =~ s/\ /_/g; #needed by generating plots
             $retval .= "$out_tstamp $out_value\n";
           }
       }
 
-      if(defined($sql_value) || $sql_value =~ m/^[-\.\d]+$/o){
+      if(Scalar::Util::looks_like_number($sql_value)){
         #nur setzen wenn nummerisch
         $min[$i] = $sql_value if($sql_value < $min[$i]);
         $max[$i] = $sql_value if($sql_value > $max[$i]);;
@@ -721,7 +773,7 @@ DbLog_Get($@)
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, $lasttstamp{hour}, "30", "00") if($readings[$i]->[3] eq "delta-h");
       $out_tstamp = DbLog_implode_datetime($lasttstamp{year}, $lasttstamp{month}, $lasttstamp{day}, "00", "00", "00") if($readings[$i]->[3] eq "delta-d");
       if(uc($outf) eq "ALL") {
-        $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $sql_dev, $type, $event, $sql_reading, $out_value, $unit);
+        $retval .= sprintf("%s: %s %s %s %s %s %s\n", $out_tstamp, $readings[$i]->[0], $type, $event, $readings[$i]->[1], $out_value, $unit);
         } else {
           $out_tstamp =~ s/\ /_/g; #needed by generating plots
           $retval .= "$out_tstamp $out_value\n";
@@ -782,7 +834,7 @@ sub jsonError($) {
 # Prepare the SQL String
 #
 ################################################################
-sub prepareSql(@_) {
+sub prepareSql(@) {
 
     my ($hash, @a) = @_;
     my $starttime = $_[5];
