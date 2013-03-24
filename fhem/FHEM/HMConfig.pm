@@ -302,7 +302,8 @@ my %culHmRegDefine = (
   compMode        =>{a=> 23.0,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"compatibility moden"   ,lit=>{off=>0,on=>1}},
 #remote mainly                                                                                      
   backlOnTime     =>{a=>  5.0,s=>0.6,l=>0,min=>1  ,max=>25      ,c=>""         ,f=>''      ,u=>'s'   ,d=>0,t=>"Backlight ontime"},
-  backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"  ,lit=>{off=>0,auto=>1}},
+  backlOnMode     =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"Backlight mode"        ,lit=>{off=>0,auto=>1}},
+  ledMode         =>{a=>  5.6,s=>0.2,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"LED mode"              ,lit=>{off=>0,on=>1}},
   language        =>{a=>  7.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Language"              ,lit=>{English=>0,German=>1}},
   backAtKey       =>{a=> 13.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at keystroke",lit=>{off=>0,on=>1}},
   backAtMotion    =>{a=> 13.6,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"Backlight at motion"   ,lit=>{off=>0,on=>1}},
@@ -320,7 +321,8 @@ my %culHmRegDefine = (
   cyclicInfoMsg   =>{a=>  9.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message",lit=>{off=>0,on=>1}},
   sabotageMsg     =>{a=> 16.0,s=>1.0,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>1,t=>"enable sabotage message"   ,lit=>{off=>0,on=>1}},
   cyclicInfoMsgDis=>{a=> 17.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>''         ,f=>''      ,u=>''    ,d=>1,t=>"cyclic message"},
-  lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit"},
+  lowBatLimit     =>{a=> 18.0,s=>1.0,l=>0,min=>10 ,max=>12      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
+  lowBatLimitBA   =>{a=> 18.0,s=>1.0,l=>0,min=>5  ,max=>15      ,c=>'factor'   ,f=>10      ,u=>'V'   ,d=>1,t=>"low batterie limit, step .1V"},
   batDefectLimit  =>{a=> 19.0,s=>1.0,l=>0,min=>0.1,max=>2       ,c=>'factor'   ,f=>100     ,u=>'Ohm' ,d=>1,t=>"batterie defect detection"},
   transmDevTryMax =>{a=> 20.0,s=>1.0,l=>0,min=>1  ,max=>10      ,c=>''         ,f=>''      ,u=>''    ,d=>0,t=>"max message re-transmit"},
   localResDis     =>{a=> 24.0,s=>1.0,l=>0,min=>1  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>"local reset disable"       ,lit=>{off=>0,on=>1}},
@@ -597,6 +599,7 @@ my %culHmRegModel = (
   "HM-SEC-SFA-SM"   =>{cyclicInfoMsg   =>1,sabotageMsg     =>1,transmDevTryMax =>1,
                        lowBatLimit     =>1,batDefectLimit  =>1,
                                                                transmitTryMax  =>1,},
+  "HM-LC-SW1-BA-PCB"=>{lowBatLimitBA   =>1,ledMode         =>1},
   "HM-Sys-sRP-Pl"   =>{compMode        =>1,},
   "KFM-Display"     =>{CtDlyOn         =>1,CtDlyOff        =>1,
                        CtOn            =>1,CtOff           =>1,CtRampOn        =>1,CtRampOff       =>1,
@@ -853,7 +856,7 @@ my %culHmBits = (
                      LOWBAT         => '06,02,$val=(hex($val)&0x80)?1:0',
                      RSSI           => '08,02,$val=(-1)*(hex($val))', }},
   "02;p01=02"   => { txt => "ACK2"}, # smokeDetector pairing only?
-  "02;p01=04"   => { txt => "ACK-proc",  params => {
+  "02;p01=04"   => { txt => "ACK-proc",  params => {# connected to AES??
                      Para1          => "02,4",
                      Para2          => "06,4",
                      Para3          => "10,4",
@@ -867,6 +870,12 @@ my %culHmBits = (
 
   "03"          => { txt => "AES reply",   params => {
                      DATA =>  "0," } },
+
+  "04;p01=01"   => { txt => "To-HMLan:send AES code",   params => { # req HMLAN to send AES code 
+                     CHANNEL => "00,2", 
+					 TYPE    => "02,2" } },
+  "04"          => { txt => "To-Actor:send AES code",   params => { # HMLAN sends AES code 
+                     CODE    => "00" } },
 					 
   "10;p01=00"   => { txt => "INFO_SERIAL", params => {
                      SERIALNO => '02,20,$val=pack("H*",$val)'},},
