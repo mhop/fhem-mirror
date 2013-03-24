@@ -15,6 +15,7 @@
   <div id="menuScrollArea">
     <div id="logo"></div>
     <div id="menu">
+      Version: <b>EN</b>&nbsp;<a href="fhem_DE.html">DE</a>
       <table><tr><td> <!-- Playing with the width -->
       <table id="room">
         <tr><td></td></tr>
@@ -99,40 +100,41 @@
       <a href="pgm2-2.png">detail</a>,
       <a href="pgm2-3.png">SVG-plots</a>,
       <a href="pgm2-5.png">dark style</a>.
-      <br><br>
+        <div class="dist"></div>
 
       The FHEM FLOORPLAN module: 
         <a href="tirreG.jpg">Example1</a>,
         <a href="Benji.png">Example2</a>.
-      <br><br>
+        <div class="dist"></div>
 
       pgm3 web frontend: <a
       href="http://www.martin-haas.de/fhz/screenshots.html">screenshot
       gallery</a>
-      <br><br>
+        <div class="dist"></div>
 
       myHCE: <a
       href="http://www.fischer-net.de/hausautomation/myhce/screenshots.html">
       screenshot gallery</a>
-      <br><br>
+        <div class="dist"></div>
 
       fheME: <a href="http://www.phynx.de/?p=108"> screenshot gallery</a>
-      <br><br>
+        <div class="dist"></div>
 
       HomeMini: <a
       href="http://heimserver.nendzig.net/wiki/index.php/HomeMini">
       screenshot & download</a>
-      <br><br>
+        <div class="dist"></div>
 
       iPhone frontends: 
       <a href="itms://itunes.apple.com/us/app/fhemobile/id389951065?mt=8">Fhemobile</a> (native app),
       <a href="http://www.dhs-computertechnik.de/support-iphone.html">
       dhs-computertechnik</a> or
       <a href="http://code.google.com/p/phyfhem/">phyfhem</a>
+        <div class="dist"></div>
       
-      <br><br>
       Android frontends:
       <a href="http://andFHEM.klass.li">andFHEM</a> (native app)
+        <div class="dist"></div>
     </ul>
 
 
@@ -143,20 +145,29 @@
           HomeMatic, OneWire, X10, ZWave, EnOcean, KNX. See the <a
           href="#Hardware">Hardware</a> section for more.
           </li>
+          <div class="dist"></div>
       <li>autocreating devices/logs when receiving data from a new device:
           start fhem and watch how the plots of your sensors are appearing
           automatically.</li>
+          <div class="dist"></div>
       <li>logging events to files or databases, with regexp filters</li>
+          <div class="dist"></div>
       <li>notifying external programs or scripts when receiving certain
           events</li>
+          <div class="dist"></div>
       <li>timed commands (e.g. switching a lamp on from sunset till midnight)
           </li>
+          <div class="dist"></div>
       <li>watchdog (e.g. trigger if the HMS100-FIT is inactive for HH:MM:SS)
           </li>
+          <div class="dist"></div>
       <li>lot of interfaces: simple text, JSON, XML, each of them over plain
           TCP/IP, SSL or HTTP.
+          <div class="dist"></div>
       <li>modular architecture, easy to add your special device</li>
+          <div class="dist"></div>
       <li>lot of frontends, choose your favorite</li>
+          <div class="dist"></div>
     </ul>
 
     <a name="Hardware"></a>
@@ -164,10 +175,9 @@
     <ul>
       <li>Via an attached CUL or CUN (see <a
         href="http://www.busware.de">www.busware.de</a>) access to the
-        following protocols: FS20 (all devices), EM (EM1000EM, EM1000GZ and
+        following protocols: FS20, EM (EM1000EM, EM1000GZ and
         EM1000WZ), FHT80b, HMS, S300 (KS300, S300TH, KS555, S555TH, etc),
-        HomeMatic (<a href="commandref.html#CUL_HM">selected</a> devices),
-        La Crosse TX2/TX3.</li>
+        HomeMatic, La Crosse TX2/TX3, MAX!</li>
         <div class="dist"></div>
 
       <li>Via an attached FHZ1000 or FHZ1300 access to the following protocols:
@@ -182,36 +192,13 @@
         to a X10 computer interface)</li>
         <div class="dist"></div>
 
-      <li>S300 devices via an attached WS300</li>
+      <li>Some TV models from Samsung/Panasonic/LG) and amplifier (YAMAHA)</li>
         <div class="dist"></div>
 
-      <li>EM1010PC and attached EM1000WZ, EM1000EM or EM1000GZ</li>
+      <li>More than one way to receive 1Wire sensor data or to switch 1wire actors.
         <div class="dist"></div>
 
-      <li>reading attached SCIVT devices</li>
-        <div class="dist"></div>
-
-      <li>reading attached M232 devices</li>
-        <div class="dist"></div>
-
-      <li>reading attached WS2000/WS25000 devices, also via raw network
-        converters (xport)</li>
-        <div class="dist"></div>
-
-      <li>extract sensor data from IPWE networked weather data receiver</li>
-        <div class="dist"></div>
-
-      <li>Via an attached <a
-        href="http://owfs.org/index.php?page=usb-ds9490r">DS9490R</a> or <a
-        href="http://owfs.org/index.php?page=com-ds9097-passive">DS9097</a>
-        access to the following Dallas 1-wire sensors: DS18S20, DS1820,
-        DS18B20</li>
-        <div class="dist"></div>
-
-      <li>Via an attached KM271 access to the Buderus Logamatic 2107</li>
-        <div class="dist"></div>
-
-      <li>Allnet devices: Allnet 3076, Temperatures sensors and Allnet 4027
+      <li>Allnet 3076, Temperatures sensors and Allnet 4027
         relay box connected to an Allnet 4000</li>
         <div class="dist"></div>
 
@@ -252,11 +239,10 @@
       <li>Via a ZWave USB Dongle (e.g. the Goodway WD6001) access to the ZWave protocol.
         <div class="dist"></div>
 
-        <div class="dist"></div>
-        <div class="dist"></div>
+      <br>
 
-      A detailed description is to be found in the <a
-      href="commandref.html">fhem reference</a>.
+      A complete list with a detailed description can be found in the <a
+      href="commandref.html">commandref</a> document.
 
 
     </ul>
@@ -266,26 +252,33 @@
     <ul>
       <div class="dist"><a href="Heimautomatisierung-mit-fhem.pdf">
       Heimautomatisierung-mit-fhem.pdf</a> (pdf, german)</div>
+        <div class="dist"></div>
 
       <div class="dist"><a href="HOWTO.html">HOWTO.html</a> for a short
       installation/configuration.</div> 
+        <div class="dist"></div>
 
       <div class="dist"><a href="commandref.html">commandref.html</a>
       contains a detailed description of all features/modules.</div>
+        <div class="dist"></div>
 
       <div class="dist">Our wiki at <a
       href="http://fhemwiki.de/index.php/FHEM">fhemwiki.de</a></div>
+        <div class="dist"></div>
 
       <div class="dist">Frequently Asked Questions: <a
       href="faq.html">faq.html</a></div>
+        <div class="dist"></div>
 
       <div class="dist">Forum: <a href="http://forum.fhem.de">
       http://forum.fhem.de</a><br>Although most entries are in german here,
       don't be afraid to ask something in english.</div>
+        <div class="dist"></div>
 
       <div class="dist"><a href="README.contrib">contrib/README</a> describes
       some loosely coupled useful modules / scripts which can be used with
       fhem.</div>
+        <div class="dist"></div>
 
     </ul>
 
@@ -370,7 +363,7 @@
     <h4>Unix / OSX</h4>
     <ul>
       <li>Make sure you have perl. Most certainly you will need the
-          Device::SerialPort fhem module, install it with "sudo cpan
+          Device::SerialPort perl module, install it with "sudo cpan
           Device::SerialPort" or "apt-get install libdevice-serialport-perl".
           </li>
       <li>Download the <a href="http://fhem.de/fhem-=VERS=.tar.gz">
