@@ -53,6 +53,7 @@ sub CheckDuplicate($$);
 sub CommandChain($$);
 sub Dispatch($$$);
 sub DoTrigger($$@);
+sub EvalSpecials($%);
 sub EventMapAsList($);
 sub FmtDateTime($);
 sub FmtTime($);
@@ -194,6 +195,7 @@ my $namedef =
 my $stt_sec;                    # Used by SecondsTillTomorrow()
 my $stt_day;                    # Used by SecondsTillTomorrow()
 my @cmdList;                    # Remaining commands in a chain. Used by sleep
+my $evalSpecials;               # Used by EvalSpecials->AnalyzeCommand parameter passing
 
 $init_done = 0;
 
@@ -651,6 +653,7 @@ AnalyzeCommandChain($$)
     push(@ret, $lret) if(defined($lret));
   }
   @cmdList = @saveCmdList;
+  $evalSpecials = undef;
   return join("\n", @ret) if(@ret);
   return undef;
 }
@@ -662,6 +665,7 @@ AnalyzePerlCommand($$)
   my ($cl, $cmd) = @_;
 
   $cmd =~ s/\\ *\n/ /g;               # Multi-line
+
   # Make life easier for oneliners:
   %value = ();
   foreach my $d (keys %defs) {
@@ -675,6 +679,19 @@ AnalyzePerlCommand($$)
   }
   $month++;
   $year+=1900;
+
+  if($evalSpecials) {
+    $cmd = join("", map { my $n = substr($_,1);
+                          my $v = $evalSpecials->{$_};
+                          $v =~ s/(['\\])/\\$1/g;
+                          "my \$$n='$v';";
+                        } keys %{$evalSpecials})
+           . $cmd;
+    # Normally this is deleted in AnalyzeCommandChain, but ECMDDevice calls us
+    # directly, and combining perl with something else isnt allowed anyway.
+    $evalSpecials = undef;
+  }
+
   my $ret = eval $cmd;
   $ret = $@ if($@);
   return $ret;
@@ -696,6 +713,9 @@ AnalyzeCommand($$)
   }
 
   if($cmd =~ m/^"(.*)"$/s) { # Shell code in bg, to be able to call us from it
+    if($evalSpecials) {
+      map { $ENV{substr($_,1)} = $evalSpecials->{$_}; } keys %{$evalSpecials};
+    }
     my $out = "";
     $out = ">> $currlogfile 2>&1" if($currlogfile ne "-" && $^O ne "MSWin32");
     system("$1 $out &");
@@ -703,6 +723,10 @@ AnalyzeCommand($$)
   }
 
   $cmd =~ s/^[ \t]*//;
+  if($evalSpecials) {
+    map { my $n = substr($_,1); my $v = $evalSpecials->{$_};
+          $cmd =~ s/\$$n/$v/g; } keys %{$evalSpecials};
+  }
   my ($fn, $param) = split("[ \t][ \t]*", $cmd, 2);
   return undef if(!$fn);
 
@@ -710,7 +734,7 @@ AnalyzeCommand($$)
   # Search for abbreviation
   if(!defined($cmds{$fn})) {
     foreach my $f (sort keys %cmds) {
-      if(length($f) > length($fn) && lc(substr($f, 0, length($fn))) eq lc($fn)) {
+      if(length($f) > length($fn) && lc(substr($f,0,length($fn))) eq lc($fn)) {
 	Log 5, "$fn => $f";
         $fn = $f;
         last;
@@ -2008,7 +2032,8 @@ CommandSleep($$)
   Log 4, "sleeping for $param";
 
   if(!$cl && @cmdList && $param && $init_done) {
-    InternalTimer(gettimeofday()+$param, "WakeUpFn", join(";", @cmdList), 0);
+    my %h = (cmd=>join(";", @cmdList), evalSpecials=>$evalSpecials);
+    InternalTimer(gettimeofday()+$param, "WakeUpFn", \%h, 0);
     @cmdList=();
 
   } else {
@@ -2021,8 +2046,9 @@ CommandSleep($$)
 sub
 WakeUpFn($)
 {
-  my $param = shift;
-  my $ret = AnalyzeCommandChain(undef, $param);
+  my $h = shift;
+  $evalSpecials = $h->{evalSpecials};
+  my $ret = AnalyzeCommandChain(undef, $h->{cmd});
   Log 2, "After sleep: $ret" if($ret);
 }
 
@@ -2193,8 +2219,6 @@ EvalSpecials($%)
   my ($exec, %specials)= @_;
   $exec = SemicolonEscape($exec);
 
-  $exec =~ s/%%/____/g;
-
   # %EVTPART due to HM remote logic
   my $idx = 0;
   if(defined($specials{"%EVENT"})) {
@@ -2203,6 +2227,16 @@ EvalSpecials($%)
       $idx++;
     }
   }
+
+  my $re = join("|", keys %specials);
+  $re =~ s/%//g;
+  if($exec =~ m/\$($re)\b/) {
+    $evalSpecials = \%specials;
+    return $exec;
+  }
+
+  $exec =~ s/%%/____/g;
+
 
   # perform macro substitution
   my $extsyntax= 0;

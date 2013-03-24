@@ -127,44 +127,62 @@ notify_Attr(@)
 
     Examples:
     <ul>
-      <code>define b3lampV1 notify btn3 set lamp %</code><br>
-      <code>define b3lampV2 notify btn3 { fhem "set lamp %" }</code><br>
-      <code>define b3lampV3 notify btn3 "/usr/local/bin/setlamp "%""</code><br>
-      <code>define b3lampV3 notify btn3 set lamp1 %;;set lamp2 %</code><br>
-      <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht @ "%""</code><br>
-      <!-- <code>define LogHToDB notify .*H:.* {DbLog("@","%")}</code><br> -->
-      <code>define LogUndef notify global:UNDEFINED.* "send-me-mail.sh "%""</code><br>
+      <code>define b3lampV1 notify btn3 set lamp $EVENT</code><br>
+      <code>define b3lampV2 notify btn3 { fhem "set lamp $EVENT" }</code><br>
+      <code>define b3lampV3 notify btn3 "/usr/local/bin/setlamp "$EVENT""</code><br>
+      <code>define b3lampV3 notify btn3 set lamp1 $EVENT;;set lamp2 $EVENT</code><br>
+      <code>define wzMessLg notify wz:measured.* "/usr/local/bin/logfht $NAME "$EVENT""</code><br>
+      <!-- <code>define LogHToDB notify .*H:.* {DbLog("$NAME","$EVENT")}</code><br> -->
+      <code>define LogUndef notify global:UNDEFINED.* "send-me-mail.sh "$EVENT""</code><br>
     </ul>
     <br>
 
     Notes:
     <ul>
-      <li>The character <code>%</code> will be replaced with the received event,
-      e.g. with <code>on</code> or <code>off</code> or <code>measured-temp: 21.7
-      (Celsius)</code><br> It is advisable to put the <code>%</code> into double
-      quotes, else the shell may get a syntax error.</li>
-
-      <li>The character <code>@</code> will be replaced with the device
-      name.</li>
-
-      <li>To use % or @ in the text itself, use the double mode (%% or @@).</li>
-
-      <li>Instead of <code>%</code> and <code>@</code>, the parameters
-      <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same as
-      <code>@</code>) and <code>%TYPE</code> (contains the device type, e.g.
-      <code>FHT</code>) can be used. The space separated event "parts" are
-      available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code> looses
-      its special meaning if any of these parameters appears in the
-      definition.</li>
-
-      <li><code>&lt;pattern&gt;</code> may also be a compound of
-      <code>definition:event</code> to filter for events.</li>
+      <li><code>&lt;pattern&gt;</code> is either the name of the triggering
+         device, or <code>devicename:event</code>.</li>
 
       <li><code>&lt;pattern&gt;</code> must completely (!)
-      match either the device name, or the compound of the device name and the
-      event.  The event is either the string you see in the <a
-      href="#list">list</a> output in paranthesis after the device name, or the
-      string you see when you do a detailed list of the device.</li>
+        match either the device name, or the compound of the device name and the
+        event.  To identify the events use "inform" command in telnet or "Event
+        Monitor" in FHEMWEB.</li>
+      <li>in the command section you can access the event:
+      <ul>
+        <li>The variable $EVENT will contain the complete event, e.g.
+          <code>measured-temp: 21.7 (Celsius)</code></li>
+        <li>$EVTPART0,$EVTPART1,$EVTPART2,etc contain the space separated event
+          parts (e.g. <code>$EVTPART0="measured-temp:", $EVTPART1="21.7",
+          $EVTPART2="(Celsius)"</code>. This data is available as a local
+          variable in perl, as environment variable for shell scripts, and will
+          be textually replaced for FHEM commands.</li>
+        <li>$NAME contains the device triggering the event, e.g.
+          <code>myFht</code></li>
+       </ul></li>
+
+      <li>Note: the following is deprecated and will be removed in a future
+        release. The described replacement is attempted if none of the above
+        variables ($NAME/$EVENT/etc) found in the command.
+      <ul>
+        <li>The character <code>%</code> will be replaced with the received
+        event, e.g. with <code>on</code> or <code>off</code> or
+        <code>measured-temp: 21.7 (Celsius)</code><br> It is advisable to put
+        the <code>%</code> into double quotes, else the shell may get a syntax
+        error.</li>
+
+        <li>The character <code>@</code> will be replaced with the device
+        name.</li>
+
+        <li>To use % or @ in the text itself, use the double mode (%% or
+        @@).</li>
+
+        <li>Instead of <code>%</code> and <code>@</code>, the parameters
+        <code>%EVENT</code> (same as <code>%</code>), <code>%NAME</code> (same
+        as <code>@</code>) and <code>%TYPE</code> (contains the device type,
+        e.g.  <code>FHT</code>) can be used. The space separated event "parts"
+        are available as %EVTPART0, %EVTPART1, etc.  A single <code>%</code>
+        looses its special meaning if any of these parameters appears in the
+        definition.</li>
+      </ul></li>
 
       <li>To use database logging, copy the file contrib/91_DbLog.pm into your
       modules directory, and change the $dbconn parameter in the file.</li>
