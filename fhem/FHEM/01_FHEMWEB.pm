@@ -2494,9 +2494,7 @@ FW_devState($$)
     $txt = $v if(defined($v));
 
   } elsif($allSets =~ m/\bdesired-temp:/) {
-    $txt = ReadingsVal($d, "measured-temp", "");
-    $txt =~ s/ .*//;
-    $txt .= "&deg;C";
+    $txt = "$1 &deg;C" if($txt =~ m/^measured-temp: (.*)/);      # FHT fix
     $cmdList = "desired-temp" if(!$cmdList);
 
   } elsif($allSets =~ m/\bdesiredTemperature:/) {
