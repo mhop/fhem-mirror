@@ -2291,7 +2291,7 @@ FW_dev2image($)
           $rlink = $link;
           last;
         }
-        return ($iconName, $link, 0);  # Can be used to preserve text
+        return ($iconName, $link, (defined(FW_iconName($iconName)) ? 0 : 1));
       }
     }
   }
