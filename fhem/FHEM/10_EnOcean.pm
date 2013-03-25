@@ -412,7 +412,7 @@ EnOcean_Set($@)
       my $setCmd = 0;
       my $subDef = AttrVal($name, "subDef", "$hash->{DEF}");
       my $time = 0;      
-      if ($phcCmd eq "swiching") {
+      if ($phcCmd eq "switching") {
         # Switching 
         $phcCmdID = 1;
         if($cmd eq "teach") {
