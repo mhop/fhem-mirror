@@ -2965,13 +2965,13 @@ FW_htmlEscape($)
           attr lamp webCmd on:off:on-for-timer 10<br>
           define d1 dummy<br>
           attr d1 webCmd state<br>
-          attr d1 set setList state:on,off<br>
+          attr d1 setList state:on,off<br>
           define d2 dummy<br>
           attr d2 webCmd state<br>
-          attr d2 set setList state:slider,0,1,10<br>
+          attr d2 setList state:slider,0,1,10<br>
           define d3 dummy<br>
           attr d3 webCmd state<br>
-          attr d3 set setList state:time<br>
+          attr d3 setList state:time<br>
         </ul>
         Note: this is an attribute for the displayed device, not for the FHEMWEB
         instance.
