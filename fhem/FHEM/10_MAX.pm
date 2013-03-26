@@ -651,7 +651,7 @@ MAX_Parse($$)
       Log 2, "Invalid $msgtype packet"
     }
 
-    $desiredTemperature = ($desiredTemperatureRaw &0x7F)/2.0; #convert to degree celcius
+    my $desiredTemperature = ($desiredTemperatureRaw &0x7F)/2.0; #convert to degree celcius
     if(defined($temperature)) {
       $temperature = ((($desiredTemperatureRaw &0x80)<<1) + $temperature)/10;	# auch Temperaturen über 25.5 °C werden angezeigt !
       Log GetLogLevel($shash->{NAME}, 5), "desiredTemperature $desiredTemperature, temperature $temperature";
