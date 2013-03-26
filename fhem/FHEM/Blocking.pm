@@ -74,6 +74,13 @@ BlockingCall($$@)
   }
 
   # Child here
+
+  foreach my $d (sort keys %defs) {   # Close all open TCP-Server sockets
+    my $h = $defs{$d};
+    next if(!$h->{SERVERSOCKET});
+    TcpServer_Close($h);
+  }
+  
   no strict "refs";
   my $ret = &{$blockingFn}($arg);
   use strict "refs";
