@@ -617,16 +617,16 @@ MAX_Parse($$)
     }
 
   }elsif($msgtype ~~ ["WallThermostatState", "WallThermostatControl" ]){
-    my ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature);
+    my ($bits2,$displayActualTemperature,$desiredTemperatureRaw,$null1,$heaterTemperature,$null2,$temperature);
     if( length($args[0]) == 4 ) { #WallThermostatControl
       #This is the message that WallMountedThermostats send to paired HeatingThermostats
-      ($desiredTemperature,$temperature) = unpack("CC",pack("H*",$args[0]));
+      ($desiredTemperatureRaw,$temperature) = unpack("CC",pack("H*",$args[0]));
     } elsif( length($args[0]) >= 6 and length($args[0]) <= 14) { #WallThermostatState
       #len=14: This is the message we get from the Cube over MAXLAN and which is probably send by WallMountedThermostats to the Cube
       #len=12: Payload of an Ack message, last field "temperature" is missing
       #len=10: Received by MAX_CUL as WallThermostatState
       #len=6 : Payload of an Ack message, last four fields (especially $heaterTemperature and $temperature) are missing
-      ($bits2,$displayActualTemperature,$desiredTemperature,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
+      ($bits2,$displayActualTemperature,$desiredTemperatureRaw,$null1,$heaterTemperature,$null2,$temperature) = unpack("aCCCCCC",pack("H*",$args[0]));
       #$heaterTemperature/10 is the temperature measured by a paired HeatingThermostat
       #we don't do anything with it here, because this value also appears as temperature in the HeatingThermostat's ThermostatState message
       my $mode = vec($bits2, 0, 2); #
@@ -651,9 +651,9 @@ MAX_Parse($$)
       Log 2, "Invalid $msgtype packet"
     }
 
-    $desiredTemperature = ($desiredTemperature &0x7F)/2.0; #convert to degree celcius
+    $desiredTemperature = ($desiredTemperatureRaw &0x7F)/2.0; #convert to degree celcius
     if(defined($temperature)) {
-      $temperature = ((($desiredTemperature &0x80)<<1) + $temperature)/10;	# auch Temperaturen über 25.5 °C werden angezeigt !
+      $temperature = ((($desiredTemperatureRaw &0x80)<<1) + $temperature)/10;	# auch Temperaturen über 25.5 °C werden angezeigt !
       Log GetLogLevel($shash->{NAME}, 5), "desiredTemperature $desiredTemperature, temperature $temperature";
       readingsBulkUpdate($shash, "temperature", sprintf("%2.1f",$temperature));
     } else {
