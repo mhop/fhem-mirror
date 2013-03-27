@@ -2,7 +2,6 @@
 ##############################################################################
 #
 #     46_TRX_LIGHT.pm
-#
 #     FHEM module for lighting protocols:
 #       X10 lighting, ARC, ELRO AB400D, Waveman, Chacon EMW200,
 #       IMPULS, AC (KlikAanKlikUit, NEXA, CHACON, HomeEasy UK),
@@ -104,7 +103,7 @@ TRX_LIGHT_Initialize($)
     $light_device_c2b{$light_device_codes{$k}->[0]} = $k;
   }
 
-  $hash->{Match}     = "^..(10|11|12|13|14).*"; # SVN please update!!
+  $hash->{Match}     = "^..(10|11|12|13|14).*";
   $hash->{SetFn}     = "TRX_LIGHT_Set";
   $hash->{DefFn}     = "TRX_LIGHT_Define";
   $hash->{UndefFn}   = "TRX_LIGHT_Undef";
@@ -525,13 +524,8 @@ sub TRX_LIGHT_parse_X10 {
   my $sensor = "";
 
   if ($device_type eq "MS14A") {
-	# for ms14a behave like x10, but flip second deviceid
+	# for ms14a behave like x10
 	$device_type = "X10";
-  	if ($firstdevice == 1) {
-		$command = ($command eq "on") ? "alert" : "normal" ;
-	} else {	
-		$command = ($command eq "on") ? "off" : "on" ;	
-	}
   }
 
   if (lc($def->{TRX_LIGHT_devicelog}) eq "window" || lc($def->{TRX_LIGHT_devicelog}) eq "door") {
