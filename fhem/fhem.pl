@@ -65,6 +65,7 @@ sub IOWrite($@);
 sub InternalTimer($$$$);
 sub IsDummy($);
 sub IsIgnored($);
+sub IsDisabled($);
 sub LoadModule($);
 sub Log($$);
 sub OpenLogfile($);
@@ -511,6 +512,19 @@ IsIgnored($)
      defined($attr{$devname}) &&
      defined($attr{$devname}{ignore})) {
     Log 4, "Ignoring $devname";
+    return 1;
+  }
+  return 0;
+}
+
+sub
+IsDisabled($)
+{
+  my $devname = shift;
+  if($devname &&
+     defined($attr{$devname}) &&
+     defined($attr{$devname}{disable})) {
+    Log 4, "Disabled $devname";
     return 1;
   }
   return 0;
