@@ -134,19 +134,19 @@ my %culHmModel=(
   "0064" => {name=>"DORMA_atent"             ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",}, # DORMA Remote 3 buttons
   "0065" => {name=>"DORMA_BRC-H"             ,st=>''                  ,cyc=>''      ,rxt=>'c'   ,lst=>'1,3'          ,chn=>"",}, # Dorma Remote 4 single buttons
   "0066" => {name=>"HM-LC-SW4-WM"            ,st=>'switch'            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"Sw:1:4",},
-  "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},#Sw:1:1,
-  "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},#Sw:1:1,
+  "0067" => {name=>"HM-LC-Dim1PWM-CV"        ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
+  "0068" => {name=>"HM-LC-Dim1TPBU-FM"       ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0069" => {name=>"HM-LC-Sw1PBU-FM"         ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "006A" => {name=>"HM-LC-Bl1PBU-FM"         ,st=>'blindActuator'     ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "006B" => {name=>"HM-PB-2-WM55"            ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"Btn:1:2",},
   "006C" => {name=>"HM-LC-SW1-BA-PCB"        ,st=>'switch'            ,cyc=>''      ,rxt=>'b'   ,lst=>'3'            ,chn=>"",},
   "006D" => {name=>"HM-OU-LED16"             ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"Led:1:16",},
-  "006E" => {name=>"HM-LC-Dim1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,	
-  "006F" => {name=>"HM-LC-Dim1L-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
+  "006E" => {name=>"HM-LC-Dim1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},	
+  "006F" => {name=>"HM-LC-Dim1L-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0070" => {name=>"HM-LC-Dim2L-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
-  "0071" => {name=>"HM-LC-Dim1T-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
-  "0072" => {name=>"HM-LC-Dim1T-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
-  "0073" => {name=>"HM-LC-Dim1T-FM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw1_V:2:3",},# Sw:1:1,
+  "0071" => {name=>"HM-LC-Dim1T-Pl"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
+  "0072" => {name=>"HM-LC-Dim1T-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
+  "0073" => {name=>"HM-LC-Dim1T-FM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:1,Sw1_V:2:3",},
   "0074" => {name=>"HM-LC-Dim2T-SM"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2,Sw1_V:3:4,Sw2_V:5:6",},#
   "0075" => {name=>"HM-OU-CFM-PL"            ,st=>'outputUnit'        ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"Led:1:1,Mp3:2:2",},
   "0076" => {name=>"HM-Sys-sRP-Pl"           ,st=>'repeater'          ,cyc=>''      ,rxt=>''    ,lst=>'2'            ,chn=>"",}, # repeater
@@ -488,9 +488,6 @@ my %culHmRegType = (
   remote            =>{expectAES       =>1,peerNeedsBurst  =>1,dblPress        =>1,longPress       =>1,
 					   sign            =>1,
                       },
-  pushButton        =>{expectAES       =>1,peerNeedsBurst  =>1,dblPress        =>1,longPress       =>1,
-					   sign            =>1,
-                      },
   blindActuator     =>{driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
                        sign            =>1,
                        transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1, # nt present in all files
@@ -553,20 +550,14 @@ my %culHmRegType = (
                        peerNeedsBurst  =>1,expectAES       =>1,
 					   },
 );
+#clones - - - - - - - - - - - - - - -   
+$culHmRegType{pushButton}     = $culHmRegType{remote};
 
 my %culHmRegModel = (
   "HM-RC-12"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-  "HM-RC-12-B"      =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-  "HM-RC-12-SW"     =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
-                                                                               
   "HM-RC-19"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1,},
-  "HM-RC-19-B"      =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1,},
-  "HM-RC-19-SW"     =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1,},
- 
   "HM-LC-Dim1PWM-CV"=>{characteristic  =>1},
   "HM-LC-Dim1L-P"   =>{loadAppearBehav =>1,loadErrCalib	   =>1},
-  "HM-LC-Dim1L-CV"  =>{loadAppearBehav =>1,loadErrCalib	   =>1},
-  "HM-LC-Dim2L-SM"  =>{loadAppearBehav =>1,loadErrCalib	   =>1},
   
   "HM-CC-VD"        =>{valveOffset     =>1,valveError      =>1},
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
@@ -617,6 +608,15 @@ my %culHmRegModel = (
                        fillLvlUpThr    =>1,fillLvlLoThr    =>1,
                        expectAES       =>1,peerNeedsBurst  =>1,},
   );
+#clones - - - - - - - - - - - - - - -   
+$culHmRegModel{"HM-RC-12-B"}     = $culHmRegModel{"HM-RC-12"};
+$culHmRegModel{"HM-RC-12-SW"}    = $culHmRegModel{"HM-RC-12"};
+$culHmRegModel{"HM-RC-19-B"}     = $culHmRegModel{"HM-RC-19"};
+$culHmRegModel{"HM-RC-19-SW"}    = $culHmRegModel{"HM-RC-19"};
+$culHmRegModel{"HM-LC-Dim1L-CV"} = $culHmRegModel{"HM-LC-Dim1L-P"};
+$culHmRegModel{"HM-LC-Dim1L-SM"} = $culHmRegModel{"HM-LC-Dim1L-P"};
+  
+  
 my %culHmRegChan = (# if channelspecific then enter them here 
   "HM-CC-TC02"      =>{displayMode  =>1,displayTemp  =>1,displayTempUnit=>1,
                        controlMode  =>1,decalcDay    =>1,
@@ -629,12 +629,6 @@ my %culHmRegChan = (# if channelspecific then enter them here
   "HM-RC-1912"      =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
                        backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
                        lcdSymb      =>1, lcdLvlInterp   =>1},
-  "HM-RC-19-B12"    =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
-                       backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
-                       lcdSymb      =>1, lcdLvlInterp   =>1},
-  "HM-RC-19-SW12"   =>{msgShowTime  =>1, beepAtAlarm    =>1, beepAtService =>1,beepAtInfo  =>1,
-                       backlAtAlarm =>1, backlAtService =>1, backlAtInfo   =>1,
-                       lcdSymb      =>1, lcdLvlInterp   =>1},
   "HM-OU-CFM-PL02"  =>{Intense=>1},
   "HM-SEC-WIN01"    =>{setupDir        =>1,pullForce       =>1,pushForce       =>1,tiltMax         =>1,
                        CtValLo         =>1,CtValHi         =>1,
@@ -644,6 +638,12 @@ my %culHmRegChan = (# if channelspecific then enter them here
                        OnLevelKm       =>1,OnRampOnSp      =>1,OnRampOffSp     =>1
                       }
  );
+#clones - - - - - - - - - - - - - - -   
+$culHmRegChan{"HM-RC-19-B12"}     = $culHmRegChan{"HM-RC-1912"};
+$culHmRegChan{"HM-RC-19-SW12"}    = $culHmRegChan{"HM-RC-1912"};
+
+
+
  
 # RC send BCAST to specific address. Is the meaning understood?
 my @culHmCmdFlags = ("WAKEUP", "WAKEMEUP", "CFG", "Bit3",
@@ -675,25 +675,30 @@ my %culHmModelGets = (
 );
 
 ##############################---set---########################################
-my %culHmGlobalSetsDevice = (
-  raw      	    => "data ...",
-  reset    	    => "",
-  pair     	    => "",
-  unpair   	    => "",
-  getSerial     => "",
-  virtual       =>"<noButtons>",
-);
-my %culHmGlobalSets = (
-  sign     	    => "[on|off]",
+my %culHmGlobalSets = (# all but virtuals
   regBulk       => "<list>:<peer> <addr1:data1> <addr2:data2> ...",
-  peerBulk      => "<peer1,peer2,...>",
   statusRequest => "",
   getRegRaw     =>"[List0|List1|List2|List3|List4|List5|List6] ... <PeerChannel>",
   getConfig     => "",
   regSet        =>"<regName> <value> ... <peerChannel>",
   clear         =>"[readings|msgEvents]",
 );
-my %culHmSubTypeSets = (
+my %culHmGlobalSetsVrtDev = (# virtuals and devices without subtype
+  raw      	    => "data ...",
+  virtual       =>"<noButtons>",
+);
+my %culHmGlobalSetsDevice = (# all devices but virtuals
+  raw      	    => "data ...",
+  reset    	    => "",
+  pair     	    => "",
+  unpair   	    => "",
+  getSerial     => "",
+);
+my %culHmGlobalSetsChn = (# all channels but virtuals
+  sign     	    => "[on|off]",
+  peerBulk      => "<peer1,peer2,...>",
+);
+my %culHmSubTypeSets = (# channels of this subtype
   switch           =>{ "on-for-timer"=>"sec", "on-till"=>"time",
 		               on=>"", off=>"", toggle=>"",
 					   press      => "[long|short] [on|off] ..."},
@@ -708,22 +713,12 @@ my %culHmSubTypeSets = (
 					   up         => "[<changeValue>] [ontime] [ramptime]...",
 					   down       => "[<changeValue>] [ontime] [ramptime]..." 
 					   },
-  remote           =>{ devicepair => "... outdated, use peerChan",
-                       peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  pushButton       =>{ devicepair => "... outdated, use peerChan",
-                       peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
-  threeStateSensor =>{ devicepair => "... outdated, use peerChan",
-                       peerChan   => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
-  motionDetector   =>{ devicepair => "... outdated, use peerChan",
-                       peerChan   => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
-  virtual          =>{ raw        => "data ...",
-		               devicepair => "... outdated, use peerChan",
-		               peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
+  remote           =>{ peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",},
+  threeStateSensor =>{ peerChan   => "<btnNumber> device ... single [set|unset] [actor|remote|both]",},
+  virtual          =>{ peerChan   => "<btnNumber> device ... [single|dual] [set|unset] [actor|remote|both]",
 		               press      => "[long|short]...",
-                       valvePos   => "position",#acting as TC
-		               virtual    =>"<noButtons>",}, #redef necessary for virtual
+                       valvePos   => "position", },#acting as TC
   smokeDetector    =>{ test       => "", alarmOn=>"", alarmOff=>"", 
-		               devicepair => "... outdated, use peerChan",
 		               peerChan   => "<btnNumber> device ... single [set|unset] actor",},
   winMatic         =>{ matic      => "<btn>",
                        keydef     => "<btn> <txt1> <txt2>",
@@ -733,55 +728,35 @@ my %culHmSubTypeSets = (
   	                   open       =>"[sec] ...",
   	                   inhibit    =>"[on|off]"},
 );
-my %culHmModelSets = (
-  "HM-CC-VD"=>{ 
-          valvePos     => "position"},
-  "HM-RC-19"=>    {	
-		  service   => "<count>", 
-		  alarm     => "<count>", 
-		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-RC-19-B"=>  {	
-		  service   => "<count>", 
-		  alarm     => "<count>", 
-		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
-  "HM-RC-19-SW"=> {	
+# clones- - - - - - - - - - - - - - - - - 
+$culHmSubTypeSets{pushButton}     = $culHmSubTypeSets{remote};
+$culHmSubTypeSets{motionDetector} = $culHmSubTypeSets{threeStateSensor};
+
+my %culHmModelSets = (# channels of this subtype-------------
+  "HM-CC-VD"     =>{ 
+          valvePos  => "position"},
+  "HM-RC-19"     =>{	
 		  service   => "<count>", 
 		  alarm     => "<count>", 
 		  display   => "<text> [comma,no] [unit] [off|1|2|3] [off|on|slow|fast] <symbol>"},
   "HM-PB-4DIS-WM"=>{
 	      text      => "<btn> [on|off] <txt1> <txt2>"},
-  "HM-OU-LED16" =>{
+  "HM-OU-LED16"  =>{
 		  led    =>"[off|red|green|orange]" ,
 		  ilum   =>"[0-15] [0-127]" },
-  "HM-OU-CFM-PL"=>{
+  "HM-OU-CFM-PL" =>{
 	      led       => "<color>[,<color>..]",
 		  playTone  => "<MP3No>[,<MP3No>..]"},
   "HM-Sys-sRP-Pl"=>{
 	      setRepeat => "[no1..36] <sendName> <recName> [bdcast-yes|no]"},
 );
+# clones- - - - - - - - - - - - - - - - - 
+$culHmModelSets{"HM-RC-19-B"}  = $culHmModelSets{"HM-RC-19"};
+$culHmModelSets{"HM-RC-19-SW"} = $culHmModelSets{"HM-RC-19"};
+#%{$culHmModelSets{"HM-RC-19-SW"}} = %{$culHmModelSets{"HM-RC-19"}}; copy
 
 my %culHmChanSets = (
-  "HM-CC-TC00"=>{ 
-          devicepair     => "... outdated, use peerChan",
-          peerChan       => "<btnNumber> device ... single [set|unset] [actor|remote|both]",
-          "day-temp"     => "[on,off,6.0..30.0]",
-          "night-temp"   => "[on,off,6.0..30.0]",
-          "party-temp"   => "[on,off,6.0..30.0]",
-          "desired-temp" => "[on,off,6.0..30.0]", 
-          tempListSat    => "HH:MM temp ...",
-          tempListSun    => "HH:MM temp ...",
-          tempListMon    => "HH:MM temp ...",
-          tempListTue    => "HH:MM temp ...",
-          tempListThu    => "HH:MM temp ...",
-          tempListWed    => "HH:MM temp ...",
-          tempListFri    => "HH:MM temp ...",
-          displayMode    => "[temp-only|temp-hum]",
-          displayTemp    => "[actual|setpoint]",
-          displayTempUnit => "[celsius|fahrenheit]",
-          controlMode    => "[manual|auto|central|party]",
-          decalcDay      => "day",        },
-  "HM-CC-TC02"=>{ 
-          devicepair     => "... outdated, use peerChan",
+  "HM-CC-TC02"  =>{ 
           peerChan       => "<btnNumber> device ... single [set|unset] [actor|remote|both]",
           "day-temp"     => "[on,off,6.0..30.0]",
           "night-temp"   => "[on,off,6.0..30.0]",
@@ -802,6 +777,8 @@ my %culHmChanSets = (
   "HM-SEC-WIN01"=>{  stop         =>"",
                      level        =>"<level> <relockDly> <speed>..."},
 );
+# clones- - - - - - - - - - - - - - - - - 
+$culHmChanSets{"HM-CC-TC00"}     = $culHmChanSets{"HM-CC-TC02"};
 
 ##############################---messages---###################################
 my %culHmBits = (
@@ -868,13 +845,13 @@ my %culHmBits = (
   "02"          => { txt => "Request AES", params => {  #todo check data
                      DATA =>  "0," } },
 
-  "03"          => { txt => "AES reply",   params => {
+  "03"          => { txt => "AES reply",   params => { # send 'old' AES key to actor
                      DATA =>  "0," } },
 
-  "04;p01=01"   => { txt => "To-HMLan:send AES code",   params => { # req HMLAN to send AES code 
+  "04;p01=01"   => { txt => "To-HMLan:send AES code",   params => { # FHEM req HMLAN to send AES key to aktor ??
                      CHANNEL => "00,2", 
-					 TYPE    => "02,2" } },
-  "04"          => { txt => "To-Actor:send AES code",   params => { # HMLAN sends AES code 
+					 TYPE    => "02,2" } },                         #00: old key? 01: new key?
+  "04"          => { txt => "To-Actor:send AES key" ,   params => { # HMLAN sends AES key to actor ??
                      CODE    => "00" } },
 					 
   "10;p01=00"   => { txt => "INFO_SERIAL", params => {
@@ -958,7 +935,9 @@ sub HMConfig_getHash($){
   return %culHmSubTypeGets      if($hn eq "culHmSubTypeGets"     );
   return %culHmModelGets        if($hn eq "culHmModelGets"       );
   return %culHmGlobalSetsDevice if($hn eq "culHmGlobalSetsDevice");
+  return %culHmGlobalSetsChn    if($hn eq "culHmGlobalSetsChn"   );
   return %culHmGlobalSets       if($hn eq "culHmGlobalSets"      );
+  return %culHmGlobalSetsVrtDev if($hn eq "culHmGlobalSetsVrtDev");
   return %culHmSubTypeSets      if($hn eq "culHmSubTypeSets"     );
   return %culHmModelSets        if($hn eq "culHmModelSets"       );
   return %culHmChanSets         if($hn eq "culHmChanSets"        );
