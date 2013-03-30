@@ -490,7 +490,6 @@ my %culHmRegType = (
                       },
   blindActuator     =>{driveUp         =>1,driveDown       =>1,driveTurn       =>1,refRunCounter   =>1,
                        sign            =>1,
-                       transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1, # nt present in all files
                        MaxTimeF        =>1,                                    
                        OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
   	   		           OffLevel        =>1,OnLevel         =>1,                                    
@@ -503,8 +502,7 @@ my %culHmRegType = (
 				       lgMultiExec     =>1,
 				       },
   dimmer            =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,powerUpAction   =>1,
-                       confBtnTime     =>1,
-                       ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,fuseDelay	   =>1,#not dim.L
+  
                        OnDly           =>1,OnTime          =>1,OffDly          =>1,OffTime         =>1,
                        OffDlyBlink     =>1,OnLvlPrio       =>1,OnDlyMode       =>1,
 		               ActionTypeDim   =>1,OnTimeMode      =>1,OffTimeMode     =>1,
@@ -517,12 +515,7 @@ my %culHmRegType = (
                        CtOn            =>1,CtDlyOn         =>1,CtRampOn        =>1,
                        CtOff           =>1,CtDlyOff        =>1,CtRampOff       =>1,
 		               OffDlyNewTime   =>1,OffDlyOldTime   =>1,
-		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
-		               DimElsActionType=>1,
-		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
-		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
 		               lgMultiExec     =>1,
-		               logicCombination=>1,
 		               },
   switch            =>{sign            =>1,
                        OnTime          =>1,OffTime         =>1,OnDly           =>1,OffDly          =>1,
@@ -556,9 +549,43 @@ $culHmRegType{pushButton}     = $culHmRegType{remote};
 my %culHmRegModel = (
   "HM-RC-12"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1},
   "HM-RC-19"        =>{backAtKey       =>1, backAtMotion   =>1, backOnTime     =>1,backAtCharge    =>1,language =>1,},
-  "HM-LC-Dim1PWM-CV"=>{characteristic  =>1},
+ 
+  "HM-LC-Bl1PBU-FM" =>{transmitTryMax  =>1,statusInfoMinDly=>1,statusInfoRandom=>1,localResDis     =>1,},
+
   "HM-LC-Dim1L-P"   =>{loadAppearBehav =>1,loadErrCalib	   =>1},
-  
+  "HM-LC-Dim1L-Pl-2"=>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
+                      },
+  "HM-LC-Dim1L-CV"  =>{confBtnTime     =>1,loadAppearBehav =>1,loadErrCalib	   =>1,
+		               logicCombination=>1,
+		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
+		               DimElsActionType=>1,
+		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+                      },
+  "HM-LC-Dim1PWM-CV"=>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
+		               characteristic  =>1,
+					   logicCombination=>1,
+		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
+		               DimElsActionType=>1,
+		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+                      },
+  "HM-LC-Dim1T-Pl"  =>{confBtnTime     =>1,ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
+                       fuseDelay	   =>1,
+		               logicCombination=>1,
+		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
+		               DimElsActionType=>1,
+		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+                      },
+  "HM-LC-Dim1TPBU-FM"=>{                   ovrTempLvl      =>1,redTempLvl      =>1,redLvl          =>1,
+                       fuseDelay	   =>1,
+		               logicCombination=>1,
+		               DimElsOffTimeMd =>1,DimElsOnTimeMd  =>1,
+		               DimElsActionType=>1,
+		               DimElsJtOn      =>1,DimElsJtOff     =>1,DimElsJtDlyOn   =>1,
+		               DimElsJtDlyOff  =>1,DimElsJtRampOn  =>1,DimElsJtRampOff =>1,			
+                      },
   "HM-CC-VD"        =>{valveOffset     =>1,valveError      =>1},
   "HM-PB-4DIS-WM"   =>{peerNeedsBurst  =>1,expectAES       =>1,language        =>1,stbyTime        =>1},
   "HM-WDS100-C6-O"  =>{stormUpThresh   =>1,stormLowThresh  =>1},
@@ -609,12 +636,22 @@ my %culHmRegModel = (
                        expectAES       =>1,peerNeedsBurst  =>1,},
   );
 #clones - - - - - - - - - - - - - - -   
-$culHmRegModel{"HM-RC-12-B"}     = $culHmRegModel{"HM-RC-12"};
-$culHmRegModel{"HM-RC-12-SW"}    = $culHmRegModel{"HM-RC-12"};
-$culHmRegModel{"HM-RC-19-B"}     = $culHmRegModel{"HM-RC-19"};
-$culHmRegModel{"HM-RC-19-SW"}    = $culHmRegModel{"HM-RC-19"};
-$culHmRegModel{"HM-LC-Dim1L-CV"} = $culHmRegModel{"HM-LC-Dim1L-P"};
-$culHmRegModel{"HM-LC-Dim1L-SM"} = $culHmRegModel{"HM-LC-Dim1L-P"};
+$culHmRegModel{"HM-RC-12-B"}       = $culHmRegModel{"HM-RC-12"};
+$culHmRegModel{"HM-RC-12-SW"}      = $culHmRegModel{"HM-RC-12"};
+$culHmRegModel{"HM-RC-19-B"}       = $culHmRegModel{"HM-RC-19"};
+$culHmRegModel{"HM-RC-19-SW"}      = $culHmRegModel{"HM-RC-19"};
+
+$culHmRegModel{"HM-LC-Dim1L-CV"}   = $culHmRegModel{"HM-LC-Dim1L-P"};
+$culHmRegModel{"HM-LC-Dim1L-SM"}   = $culHmRegModel{"HM-LC-Dim1L-P"};
+$culHmRegModel{"HM-LC-Dim2L-CV"}   = $culHmRegModel{"HM-LC-Dim1L-Pl-2"};
+$culHmRegModel{"Schueco-263-132"}  = $culHmRegModel{"HM-LC-Dim1L-Pl-2"};
+$culHmRegModel{"HM-LC-Dim2L-SM"}   = $culHmRegModel{"HM-LC-Dim1L-CV"};
+$culHmRegModel{"HM-LC-Dim1L-Pl"}   = $culHmRegModel{"HM-LC-Dim1L-CV"};
+$culHmRegModel{"HM-LC-Dim1T-CV"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"HM-LC-Dim1T-Pl-2"} = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"HM-LC-Dim1T-FM"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"HM-LC-Dim2T-SM"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+$culHmRegModel{"Schueco-263-134"}  = $culHmRegModel{"HM-LC-Dim1T-Pl"};
   
   
 my %culHmRegChan = (# if channelspecific then enter them here 
@@ -773,7 +810,8 @@ my %culHmChanSets = (
           displayTemp    => "[actual|setpoint]",
           displayTempUnit => "[celsius|fahrenheit]",
           controlMode    => "[manual|auto|central|party]",
-          decalcDay      => "day",        },
+          decalcDay      => "day",       
+          sysTime        =>	""	  },
   "HM-SEC-WIN01"=>{  stop         =>"",
                      level        =>"<level> <relockDly> <speed>..."},
 );
