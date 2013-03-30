@@ -269,6 +269,9 @@ $readingFnAttributes = "event-on-change-reading event-on-update-reading ".
             Hlp=>"<sec>,sleep for sec, 3 decimal places" },
   "trigger" => { Fn=>"CommandTrigger",
             Hlp=>"<devspec> <state>,trigger notify command" },
+  "update" => {
+            Hlp => "[development|stable] [<file>|check|fhem],update Fhem" },
+  "updatefhem" => { ReplacedBy => "update" },
 );
 
 ###################################################
@@ -756,9 +759,11 @@ AnalyzeCommand($$)
     }
   }
 
+  $fn = $cmds{$fn}{ReplacedBy} if(defined($cmds{$fn}{ReplacedBy}));
+
   #############
   # autoload commands.
-  if(!defined($cmds{$fn})) {
+  if(!defined($cmds{$fn}) || !defined($cmds{$fn}{Fn})) {
     map { $fn = $_ if(lc($fn) eq lc($_)); } keys %modules;
     $fn = LoadModule($fn);
     return "Unknown command $fn, try help" if(!defined($cmds{$fn}));
@@ -848,6 +853,7 @@ CommandHelp($$)
 	    "-----------------------------------------------\n";
 
   for my $cmd (sort keys %cmds) {
+    next if(!$cmds{$cmd}{Hlp});
     my @a = split(",", $cmds{$cmd}{Hlp}, 2);
 
     $str .= sprintf("%-9s %-25s %s\n", $cmd, $a[0], $a[1]);
