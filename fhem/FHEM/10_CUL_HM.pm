@@ -2315,6 +2315,10 @@ sub CUL_HM_Set($@) {
     CUL_HM_pushConfig($hash, $id, $dst, 2,0,0,$list, $data);
 	readingsSingleUpdate($hash,"tempList$wd",$msg,0);
   } 
+  elsif($cmd eq "sysTime") { ##################################################
+    my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
+    CUL_HM_PushCmdStack($hash,"++803F$id${dst}0204$s2000");
+  } 
   elsif($cmd eq "valvePos") { #################################################
 	return "only number <= 100  or 'off' allowed" 
 	   if (!($a[2] eq "off" ||$a[2]+0 ne $a[2] ||$a[2] <100 ));
@@ -4270,6 +4274,8 @@ sub CUL_HM_putHash($) {# provide data for HMinfo
           displayTempUnit [celsius|fahrenheit]<br>
           controlMode [manual|auto|central|party]<br>
           decalcDay &lt;day&gt;</li>
+      <li>systime <br>
+          set time in climate channel to system time</li>
     </ul><br>
 	</li>
     <li>OutputUnit (HM-OU-LED16)
