@@ -1,6 +1,8 @@
 ##############################################
 # $Id$
 package main;
+# BUG: smallscreen webapp icon (works for touchpad?)
+# BUG: iPhone5 webapp black margin
 
 use strict;
 use warnings;
@@ -508,14 +510,16 @@ FW_answerCall($)
 
   # Enable WebApps
   if($FW_tp || $FW_ss) {
-    FW_pO '<link rel="apple-touch-icon-precomposed" href="'.
-        $FW_ME.'/icons/fhemicon.ico"/>';
-    FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
+    my $icon = $FW_ME."/images/default/fhemicon.png";
     if($FW_ss) {
-      FW_pO '<meta name="viewport" content="width=320"/>';
+       FW_pO '<meta name="viewport" '.
+                   'content="initial-scale=1.0,user-scalable=1"/>';
     } elsif($FW_tp) {
       FW_pO '<meta name="viewport" content="width=768"/>';
     }
+    FW_pO '<meta name="apple-mobile-web-app-capable" content="yes"/>';
+    FW_pO '<link rel="apple-touch-icon" href="'.$icon.'"/>';
+    FW_pO '<link rel="shortcut-icon"    href="'.$icon.'"/>';
   }
 
   # meta refresh in rooms only
@@ -873,7 +877,11 @@ FW_roomOverview($)
   # MENU
   my (@list1, @list2);
   push(@list1, ""); push(@list2, "");
-
+  if(!$FW_hiddenroom{save}) {
+    push(@list1, "Save config"); push(@list2, "$FW_ME?cmd=save");
+    push(@list1, ""); push(@list2, "");
+  }
+     
   ########################
   # FW Extensions
   if(defined($data{FWEXT})) {
@@ -941,11 +949,6 @@ FW_roomOverview($)
       FW_pO "<option value=$list2[$idx]$sel>$list1[$idx]</option>";
     }
     FW_pO "</select></td>";
-    if(!$FW_hiddenroom{save}) {
-      FW_pO "<td><form method=\"get\" action=\"$FW_ME\">" .
-            FW_submit("cmd", "save").
-          "</form></td>";
-    }
     FW_pO "</tr>";
 
   } else {
@@ -990,9 +993,6 @@ FW_roomOverview($)
   FW_pO "<form method=\"get\" action=\"$FW_ME\">";
   FW_pO FW_hidden("room", "$FW_room") if($FW_room);
   FW_pO FW_textfield("cmd", $FW_ss ? 25 : 40, "maininput");
-  if(!$FW_ss && !$FW_hiddenroom{save}) {
-    FW_pO "</form></td><td><form>" . FW_submit("cmd", "save");
-  }
   FW_pO "</form>";
   FW_pO "</td></tr></table>";
   FW_pO "</div>";
@@ -2006,7 +2006,7 @@ FW_pH(@)
    $class = "" if(!defined($class));
    $class  = " class=\"$class\"" if($class);
 
-   # Using onclick, as href start safari in a webapp.
+   # Using onclick, as href starts safari in a webapp.
    # Known issue: the pointer won't change
    if($FW_ss || $FW_tp) { 
      FW_pO "<a onClick=\"location.href='$link'\"><div$class>$txt</div></a>";
