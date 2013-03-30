@@ -1,6 +1,7 @@
 # Add changes at the top of the list.
 
 - SVN
+  - feature: updatefhem will be silently converted to update
   - feature: FHEMWEB: save button replaced with the menu entry "Save config"
   - feature: notify supports $NAME/$EVENT/$EVTPART0/etc. @/% is deprecated.
   - feature: 93_DbLog extended to give more functions for the charting frontend.
