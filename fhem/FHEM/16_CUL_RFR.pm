@@ -42,6 +42,7 @@ CUL_RFR_Define($$)
   $hash->{ID} = $a[2];
   $hash->{ROUTERID} = $a[3];
   $modules{CUL_RFR}{defptr}{"$a[2]$a[3]"} = $hash;
+  $hash->{STATE} = "Defined";
   AssignIoPort($hash);
   return undef;
 }
