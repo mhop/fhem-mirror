@@ -70,7 +70,7 @@ FRM_IN_observer
 	  main::readingsBulkUpdate($hash,"count",$count,1); 
 	};
 	main::readingsBulkUpdate($hash,"reading",$new == PIN_HIGH ? "on" : "off", 1);
-	main::readingsEndUpdate($hash,0);
+	main::readingsEndUpdate($hash,1);
 }
 
 sub
