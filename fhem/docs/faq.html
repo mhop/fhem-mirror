@@ -544,13 +544,13 @@ See <a href="USB.html">USB compendium</a> for help.
 <ul>
   If too many messages for FHT devices are queued in CUL, the fht buffer
   subsystem of CUL overflows. You get EOB (end of buffer) messages and
-  likely LOVF (limit overflow) messages, too. define <code>attr CUL fhtsoftbuffer 1</code>
-  to activate a quasi unlimited software buffer in fhem itself to avoid this
-  behavior.<br><br>
-
-  By the way, <code>set CUL raw T01abcd</code> (abcd= FHT house code) resets
-  the CUL FHT subsystem, no need to unplug/replug the CUL device in case of
-  the aforementioned issue.
+  likely LOVF (limit overflow) messages, too. Either you tried to send too much
+  commands to the FHT80b, or (more probably) the communication to the FHT80b is
+  disturbed or the FHT80b is not paired with the CUL.
+  <br><br>
+  Since the FHT buffer is not cleaned automatically, you have to do it manually
+  with the <code>set CUL raw T01abcd</code> (abcd= FHT house code) command, or
+  by unpluggin/replugging the CUL.
 </ul>
 
 <a name="faq22"></a>
