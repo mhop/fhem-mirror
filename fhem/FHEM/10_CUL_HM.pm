@@ -778,7 +778,7 @@ sub CUL_HM_Parse($$) {##############################
       }
 	}
   } 
-  elsif($st eq "THSensor" || $model eq "HM-WDC7000") { ########################
+  elsif($st eq "THSensor") { ##################################################
     my $t =  hex(substr($p,0,4));
     $t -= 32768 if($t > 1638.4);
     $t = sprintf("%0.1f", $t/10);
@@ -1260,7 +1260,7 @@ sub CUL_HM_Parse($$) {##############################
 	   (hex($msgFlag)&0x20)){ 	#response required Flag
       my ($recChn) = (hex($1));# button number/event count
 	            # fhem CUL shall ack a button press
-      push @ack,$shash,"($msgcnt)8002$dst($src)0101".(($recChn&1)?"C8":"00")."00";
+      push @ack,$shash,$msgcnt."8002".$dst.$src."0101".(($recChn&1)?"C8":"00")."00";
 	}
   }
   
@@ -1280,7 +1280,7 @@ sub CUL_HM_Parse($$) {##############################
     $modules{CUL_HM}{defptr}{$src}{helper}{rpt}{ack} = \@ack;
 	$modules{CUL_HM}{defptr}{$src}{helper}{rpt}{ts}  = gettimeofday();
 	my $i=0;
-    CUL_HM_SndCmd($ack[$i++],$ack[$i++]) while ($i<@ack);
+    CUL_HM_SndCmd($ack[$i++],$ack[$i++])while ($i<@ack);
   }
 
   CUL_HM_ProcessCmdStack($shash) if ($respRemoved); # cont stack if a response is complete
