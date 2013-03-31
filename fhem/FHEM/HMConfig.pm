@@ -61,8 +61,8 @@ my %culHmModel=(
   "0009" => {name=>"HM-LC-SW2-FM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "000A" => {name=>"HM-LC-SW2-SM"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"Sw:1:2",},
   "000B" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''    ,lst=>''             ,chn=>"",},
-  "000D" => {name=>"ASH550"                  ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "000E" => {name=>"ASH550I"                 ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "000D" => {name=>"ASH550"                  ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "000E" => {name=>"ASH550I"                 ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "000F" => {name=>"S550IA"                  ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0011" => {name=>"HM-LC-SW1-PL"            ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",},
   "0012" => {name=>"HM-LC-DIM1L-CV"          ,st=>'dimmer'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -95,10 +95,10 @@ my %culHmModel=(
   "0039" => {name=>"HM-CC-TC"                ,st=>'thermostat'        ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'5:2.3p,6:2'   ,chn=>"Weather:1:1,Climate:2:2,WindowRec:3:3",},
   "003A" => {name=>"HM-CC-VD"                ,st=>'thermostat'        ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'5'            ,chn=>"",},
   "003B" => {name=>"HM-RC-4-B"               ,st=>'remote'            ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"Btn:1:4",},
-  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003C" => {name=>"HM-WDS20-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003D" => {name=>"HM-WDS10-TH-O"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "003E" => {name=>"HM-WDS30-T-O"            ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
-  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
+  "003F" => {name=>"HM-WDS40-TH-I"           ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0040" => {name=>"HM-WDS100-C6-O"          ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1'            ,chn=>"",},
   "0041" => {name=>"HM-WDC7000"              ,st=>'THSensor'          ,cyc=>''      ,rxt=>''    ,lst=>'1,4'          ,chn=>"",},
   "0042" => {name=>"HM-SEC-SD"               ,st=>'smokeDetector'     ,cyc=>'99:00' ,rxt=>'b'   ,lst=>''             ,chn=>"",},
@@ -107,7 +107,7 @@ my %culHmModel=(
   "0045" => {name=>"HM-SEC-WDS"              ,st=>'threeStateSensor'  ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "0046" => {name=>"HM-SWI-3-FM"             ,st=>'swi'               ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"Sw:1:3",},
   "0047" => {name=>"KFM-Sensor"              ,st=>'KFM100'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
-  "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",},
+  "0048" => {name=>"IS-WDS-TH-OD-S-R3"       ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",},
   "0049" => {name=>"KFM-Display"             ,st=>'KFM100'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
   "004A" => {name=>"HM-SEC-MDIR"             ,st=>'motionDetector'    ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",},
   "004B" => {name=>"HM-Sec-Cen"              ,st=>'AlarmControl'      ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",},
@@ -175,8 +175,8 @@ my %culHmModel=(
   "008F" => {name=>"Schueco_263-145"         ,st=>'pushButton'        ,cyc=>''      ,rxt=>'c'   ,lst=>'1,4'          ,chn=>"",}, # HM Push Button Interface
   "0090" => {name=>"Schueco_263-162"         ,st=>'motionDetector'    ,cyc=>'00:30' ,rxt=>'c:w' ,lst=>'1,3'          ,chn=>"",}, # HM radio-controlled motion detector
   "0092" => {name=>"Schueco_263-144"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c'   ,lst=>'4'            ,chn=>"",}, # HM Switch Interface 3 switches 
-  "0093" => {name=>"Schueco_263-158"         ,st=>'switch'            ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
-  "0094" => {name=>"Schueco_263-157"         ,st=>''                  ,cyc=>''      ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "0093" => {name=>"Schueco_263-158"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
+  "0094" => {name=>"Schueco_263-157"         ,st=>'THSensor'          ,cyc=>'00:10' ,rxt=>'c:w' ,lst=>''             ,chn=>"",}, #
   "009F" => {name=>"HM-Sen-Wa-Od"            ,st=>'sensor'            ,cyc=>'28:00' ,rxt=>'c:w' ,lst=>'1,4'          ,chn=>"",}, #capacitive filling level sensor
   "00A1" => {name=>"HM-LC-SW1-PL2"           ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'3'            ,chn=>"",}, #
   "00A2" => {name=>"ROTO_ZEL-STG-RM-FZS-2"   ,st=>'switch'            ,cyc=>''      ,rxt=>''    ,lst=>'1,3'          ,chn=>"",}, #radio-controlled socket adapter switch actuator 1-channel
@@ -296,6 +296,7 @@ my %culHmRegDefShLg = (# register that are available for short AND long button p
 
 my %culHmRegDefine = (
 #--- list 0, device  and protocol level-----------------
+  burstRx         =>{a=>  1.0,s=>1.0,l=>0,min=>0  ,max=>255     ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'device reacts on Burst'        ,lit=>{off=>0,on=>200}},# not sure what 'on' is. Also change Tx mode TODO!!
   intKeyVisib     =>{a=>  2.7,s=>0.1,l=>0,min=>0  ,max=>1       ,c=>'lit'      ,f=>''      ,u=>''    ,d=>0,t=>'visibility of internal channel',lit=>{invisib=>0,visib=>1}},
   pairCentral     =>{a=> 10.0,s=>3.0,l=>0,min=>0  ,max=>16777215,c=>'hex'      ,f=>''      ,u=>''    ,d=>1,t=>'pairing to central'},
 #repeater                                                                                      
@@ -634,6 +635,7 @@ my %culHmRegModel = (
                        useCustom       =>1,					   
                        fillLvlUpThr    =>1,fillLvlLoThr    =>1,
                        expectAES       =>1,peerNeedsBurst  =>1,},
+  "HM-WDS10-TH-O"   =>{burstRx         =>1,},
   );
 #clones - - - - - - - - - - - - - - -   
 $culHmRegModel{"HM-RC-12-B"}       = $culHmRegModel{"HM-RC-12"};
@@ -652,6 +654,16 @@ $culHmRegModel{"HM-LC-Dim1T-Pl-2"} = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"HM-LC-Dim1T-FM"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"HM-LC-Dim2T-SM"}   = $culHmRegModel{"HM-LC-Dim1T-Pl"};
 $culHmRegModel{"Schueco-263-134"}  = $culHmRegModel{"HM-LC-Dim1T-Pl"};
+
+$culHmRegModel{"ASH550I"}           = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"ASH550"}            = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"HM-WDS10-TH-O"}     = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"Schueco_263-158"}   = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"HM-WDS20-TH-O"}     = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"HM-WDS40-TH-I"}     = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"Schueco_263-157"}   = $culHmRegModel{"HM-WDS10-TH-O"};
+$culHmRegModel{"IS-WDS-TH-OD-S-R3"} = $culHmRegModel{"HM-WDS10-TH-O"};
+
   
   
 my %culHmRegChan = (# if channelspecific then enter them here 
