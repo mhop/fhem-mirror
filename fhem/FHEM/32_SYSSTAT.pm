@@ -156,7 +156,7 @@ SYSSTAT_GetUpdate($)
   #my $load = $hash->{loadavg}->get;
   my $load = SYSSTAT_getLoadAVG( $hash );
 
-  $hash->{STATE} = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15};
+  $hash->{STATE} = $load->{avg_1} . " " . $load->{avg_5} . " " . $load->{avg_15} if( defined($load->{avg_1}) );
 
   readingsSingleUpdate($hash,"load",$load->{avg_1},defined($hash->{LOCAL} ? 0 : 1));
 
