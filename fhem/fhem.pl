@@ -759,7 +759,8 @@ AnalyzeCommand($$)
     }
   }
 
-  $fn = $cmds{$fn}{ReplacedBy} if(defined($cmds{$fn}{ReplacedBy}));
+  $fn = $cmds{$fn}{ReplacedBy}
+                if(defined($cmds{$fn}) && defined($cmds{$fn}{ReplacedBy}));
 
   #############
   # autoload commands.
