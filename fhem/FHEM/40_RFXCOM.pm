@@ -91,7 +91,6 @@ RFXCOM_Initialize($)
   $hash->{DefFn}   = "RFXCOM_Define";
   $hash->{UndefFn} = "RFXCOM_Undef";
   $hash->{GetFn}   = "RFXCOM_Get";
-  $hash->{SetFn}   = "RFXCOM_Set";
   $hash->{StateFn} = "RFXCOM_SetState";
   $hash->{AttrList}= "dummy:1,0 do_not_init:1:0 longids loglevel:0,1,2,3,4,5,6";
   $hash->{ShutdownFn} = "RFXCOM_Shutdown";
@@ -185,20 +184,6 @@ RFXCOM_Shutdown($)
 {
   my ($hash) = @_;
   return undef;
-}
-
-#####################################
-sub
-RFXCOM_Set($@)
-{
-  my ($hash, @a) = @_;
-
-  my $msg;
-  my $name=$a[0];
-  my $reading= $a[1];
-  $msg="$name => No Set function ($reading) implemented";
-
-  return $msg;
 }
 
 #####################################
