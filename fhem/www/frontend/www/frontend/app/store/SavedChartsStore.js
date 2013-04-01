@@ -7,12 +7,12 @@ Ext.define('FHEM.store.SavedChartsStore', {
         proxy: {
             type: 'ajax',
              method: 'POST',
-             url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getcharts&XHR=1',
+             url: '', //gets set by controller
              reader: {
                  type: 'json',
                  root: 'data',
                  totalProperty: 'totalCount'
              }
      },
-     autoLoad: true
+     autoLoad: false
 });

@@ -4,7 +4,6 @@
 Ext.define('FHEM.view.TableDataGridPanel', {
     extend: 'Ext.panel.Panel',
     alias : 'widget.tabledatagridpanel',
-    //xtype : 'gridpanel',
     requires: [
         'FHEM.store.TableDataStore'
     ],

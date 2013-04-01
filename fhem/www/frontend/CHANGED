@@ -1,3 +1,10 @@
+Update vom 01.4.2013
+  * Zoomen in Charts nun möglich mit aufziehbarer Box
+  * Erweiterung der Anzahl der möglichen Y-Achsen von 3 auf 10
+  * Jede Achse kann nun mit Statistikfunktionen einzeln versehen werden
+  * Bibliotheksupdate auf ExtJS 4.2.0
+  * Kleine Verbesserungen in der Unterstützung mobiler Geräte
+  * Bugfixes
 Update vom 23.3.2013
   * Integration von Buttons und Dropdownlisten, um einzelene Geräte steuern zu können
   * Aktualisierung aller Geräteinformationen über kontinuierliche AJAX Requests

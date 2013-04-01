@@ -5,8 +5,22 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
     <title>Frontend</title>
-    <link rel="stylesheet" type="text/css" href="lib/ext-4.1.1a/ext-all-gray-debug.css" />
-    <script type="text/javascript" src="lib/ext-4.1.1a/ext-all.js"></script>
+    
+    <style type="text/css">
+        #loading-overlay {
+			text-align: center;
+			position: absolute;
+			display: block;
+			top: 50%;
+			left: 43%;
+        }
+    </style>
+    <p class="loader">
+        <img src="app/resources/loading.png" alt="Please wait..." height="31" width="248" id="loading-overlay">
+    </p>
+    
+    <link rel="stylesheet" type="text/css" href="lib/ext-4.2.0.663/ext-theme-gray-all.css" />
+    <script type="text/javascript" src="lib/ext-4.2.0.663/ext-all.js"></script>
     <script type="text/javascript" src="app/userconfig.js"></script>
     <script type="text/javascript" src="app/app.js"></script>
 </head>

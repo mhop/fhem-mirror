@@ -9,7 +9,16 @@ Ext.define('FHEM.view.Viewport', {
     requires: [
         'FHEM.view.LineChartPanel',
         'FHEM.view.TableDataGridPanel',
-        'FHEM.controller.ChartController'
+        'FHEM.controller.ChartController',
+        'FHEM.store.SavedChartsStore',
+        'Ext.layout.container.Border',
+        'Ext.form.field.Text',
+        'Ext.layout.container.Accordion',
+        'Ext.tree.Panel',
+        'Ext.grid.Panel',
+        'Ext.grid.Column',
+        'Ext.grid.column.Action',
+        'Ext.draw.Text'
     ],
 
     initComponent: function() {
@@ -133,7 +142,7 @@ Ext.define('FHEM.view.Viewport', {
                                              name: 'savedchartsactioncolumn',
                                              width:'15%',
                                              items: [{
-                                                 icon: 'lib/ext-4.1.1a/images/gray/dd/drop-no.gif',
+                                                 icon: 'lib/ext-4.2.0.663/images/dd/drop-no.gif',
                                                  tooltip: 'Delete'
                                              }]
                                          }
