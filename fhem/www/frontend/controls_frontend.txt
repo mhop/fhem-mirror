@@ -63,6 +63,7 @@ UPD 2013-04-01_06:44:48 59739 FHEM/93_DbLog.pm
 UPD 2013-04-01_07:05:58 894 www/frontend/index.html
 UPD 2013-02-27_07:20:39 236 www/frontend/README.txt
 UPD 2013-04-01_07:05:33 613 www/frontend/app/userconfig.js
+UPD 2013-04-01_08:00:32 2104 www/frontend/app/resources/loading.png
 UPD 2013-03-02_01:53:05 626 www/frontend/app/resources/icons/readme.txt
 UPD 2013-03-02_01:53:05 755 www/frontend/app/resources/icons/database_save.png
 UPD 2013-03-02_01:53:05 395 www/frontend/app/resources/icons/resultset_next.png
