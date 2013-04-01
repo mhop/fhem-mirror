@@ -5,6 +5,12 @@ Ext.define('FHEM.view.DevicePanel', {
     extend: 'Ext.panel.Panel',
     alias : 'widget.devicepanel',
     
+    requires: [
+           'Ext.form.FieldSet',
+           'Ext.layout.container.Column',
+           'Ext.form.field.ComboBox'
+    ],
+    
     /**
      * 
      */

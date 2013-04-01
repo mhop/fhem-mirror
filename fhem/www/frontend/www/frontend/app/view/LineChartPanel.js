@@ -5,95 +5,62 @@ Ext.define('FHEM.view.LineChartPanel', {
     extend: 'Ext.panel.Panel',
     alias : 'widget.linechartpanel',
     requires: [
-        'FHEM.view.LineChartView',
-        'FHEM.store.ChartStore'
+        'FHEM.store.ChartStore',
+        'FHEM.store.DeviceStore',
+        'FHEM.store.ReadingsStore',
+        'Ext.form.Panel',
+        'Ext.form.field.Radio',
+        'Ext.form.field.Date',
+        'Ext.form.RadioGroup',
+        'Ext.chart.Chart',
+        'Ext.chart.axis.Numeric',
+        'Ext.chart.axis.Time',
+        'Ext.chart.series.Line'
     ],
     
+    /**
+     * generating getters and setters
+     */
+    config: {
+        /**
+         * last max value of Y axis before zoom was applied
+         */
+        lastYmax: null,
+        
+        /**
+         * last min value of Y axis before zoom was applied
+         */
+        lastYmin: null,
+        
+        /**
+         * last max value of Y axis before zoom was applied
+         */
+        lastXmax: null,
+        
+        /**
+         * last min value of Y axis before zoom was applied
+         */
+        lastXmin: null
+    },
+    
+    artifactSeries: [],
+    
+    /**
+     * the title
+     */
     title: 'Line Chart',
     
     /**
      * init function
      */
-    initComponent: function() {
+    initComponent: function(cfg) {
         
         var me = this;
-        
-        // set up the local db columnname store
-        // as these columns are fixed, we dont have to request them
-        me.comboAxesStore = Ext.create('Ext.data.Store', {
-            fields: ['name'],
-            data : [
-                {'name':'TIMESTAMP'},
-                {'name':'DEVICE'},
-                {'name':'TYPE'},
-                {'name':'EVENT'},
-                {'name':'READING'},
-                {'name':'VALUE'},
-                {'name':'UNIT'}
-            ]
-        });
-        
-        me.comboColorStore = Ext.create('Ext.data.Store', {
-            fields: ['name', 'value'],
-            data : [
-                {'name':'Blue','value':'#2F40FA'},
-                {'name':'Green', 'value':'#46E01B'},
-                {'name':'Orange','value':'#F0A800'},
-                {'name':'Red','value':'#E0321B'},
-                {'name':'Yellow','value':'#F5ED16'}
-            ]
-        });
-        
-        me.comboDeviceStore = Ext.create('FHEM.store.DeviceStore');
-        me.comboDevice2Store = Ext.create('FHEM.store.DeviceStore');
-        me.comboDevice3Store = Ext.create('FHEM.store.DeviceStore');
-        
-        me.comboDeviceStore.on("load", function(store, recs, success, operation) {
-            if(!success) {
-                Ext.Msg.alert("Error", "Something went wrong. Store Items: " + store.getCount() + ", loaded Items: " + recs.length + ", Reader rawrecords: " + store.getProxy().getReader().rawData.data.length + ", proxyURL: " + store.getProxy().url);
-            }
-        });
-        
-        me.comboReadingsStore = Ext.create('FHEM.store.ReadingsStore');
-        me.comboReadings2Store = Ext.create('FHEM.store.ReadingsStore');
-        me.comboReadings3Store = Ext.create('FHEM.store.ReadingsStore');
-        
-        me.comboStatisticsStore = Ext.create('Ext.data.Store', {
-            fields: ['name', 'value'],
-            data : [
-                {'name':'None','value':'none'},
-                {'name':'Hour Sum', 'value':'hoursum'},
-                {'name':'Hour Average', 'value':'houraverage'},
-                {'name':'Hour Min','value':'hourmin'},
-                {'name':'Hour Max','value':'hourmax'},
-                {'name':'Hour Count','value':'hourcount'},
-                {'name':'Day Sum', 'value':'daysum'},
-                {'name':'Day Average', 'value':'dayaverage'},
-                {'name':'Day Min','value':'daymin'},
-                {'name':'Day Max','value':'daymax'},
-                {'name':'Day Count','value':'daycount'},
-                {'name':'Week Sum', 'value':'weeksum'},
-                {'name':'Week Average', 'value':'weekaverage'},
-                {'name':'Week Min','value':'weekmin'},
-                {'name':'Week Max','value':'weekmax'},
-                {'name':'Week Count','value':'weekcount'},
-                {'name':'Month Sum', 'value':'monthsum'},
-                {'name':'Month Average', 'value':'monthaverage'},
-                {'name':'Month Min','value':'monthmin'},
-                {'name':'Month Max','value':'monthmax'},
-                {'name':'Month Count','value':'monthcount'},
-                {'name':'Year Sum', 'value':'yearsum'},
-                {'name':'Year Average', 'value':'yearaverage'},
-                {'name':'Year Min','value':'yearmin'},
-                {'name':'Year Max','value':'yearmax'},
-                {'name':'Year Count','value':'yearcount'}
-            ]
-        });
         
         var chartSettingPanel = Ext.create('Ext.form.Panel', {
             title: 'Chart Settings - Click me to edit',
             name: 'chartformpanel',
-            maxHeight: 285,
+            maxHeight: 230,
             autoScroll: true,
             collapsible: true,
             titleCollapse: true,
@@ -106,320 +73,11 @@ Ext.define('FHEM.view.LineChartPanel', {
                     xtype: 'fieldset',
                     layout: 'column',
                     title: 'Select data',
+                    name: 'axesfieldset',
                     defaults: {
                         margin: '0 10 10 10'
                     },
-                    items: [
-                        {  
-                          xtype: 'combobox', 
-                          name: 'devicecombo',
-                          fieldLabel: 'Select Device',
-                          labelWidth: 90,
-                          store: me.comboDeviceStore,
-                          displayField: 'DEVICE',
-                          valueField: 'DEVICE'
-                        },
-                        {  
-                          xtype: 'combobox', 
-                          name: 'xaxiscombo',
-                          fieldLabel: 'Select X Axis',
-                          labelWidth: 90,
-                          inputWidth: 100,
-                          store: me.comboAxesStore,
-                          displayField: 'name',
-                          valueField: 'name'
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'yaxiscombo',
-                            fieldLabel: 'Select Y-Axis',
-                            labelWidth: 90,
-                            inputWidth: 110,
-                            store: me.comboReadingsStore,
-                            displayField: 'READING',
-                            valueField: 'READING'
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'yaxiscolorcombo',
-                            fieldLabel: 'Y-Color',
-                            labelWidth: 50,
-                            inputWidth: 70,
-                            store: me.comboColorStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboColorStore.getAt(0)
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'yaxisfillcheck',
-                            boxLabel: 'Fill'
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'yaxisstatisticscombo',
-                            fieldLabel: 'Statistics',
-                            labelWidth: 70,
-                            inputWidth: 120,
-                            store: me.comboStatisticsStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboStatisticsStore.getAt(0)
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'device2combo',
-                            fieldLabel: 'Select 2. Device',
-                            labelWidth: 100,
-                            store: me.comboDevice2Store,
-                            displayField: 'DEVICE',
-                            valueField: 'DEVICE',
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'y2axiscombo',
-                            fieldLabel: 'Y2',
-                            labelWidth: 20,
-                            store: me.comboReadings2Store,
-                            displayField: 'READING',
-                            valueField: 'READING',
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'y2axiscolorcombo',
-                            fieldLabel: 'Y2-Color',
-                            labelWidth: 60,
-                            inputWidth: 70,
-                            store: me.comboColorStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboColorStore.getAt(1),
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'y2axisfillcheck',
-                            boxLabel: 'Fill',
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'device3combo',
-                            fieldLabel: 'Select 3. Device',
-                            labelWidth: 100,
-                            store: me.comboDevice3Store,
-                            displayField: 'DEVICE',
-                            valueField: 'DEVICE',
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'y3axiscombo',
-                            fieldLabel: 'Y3',
-                            labelWidth: 20,
-                            store: me.comboReadings3Store,
-                            displayField: 'READING',
-                            valueField: 'READING',
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'y3axiscolorcombo',
-                            fieldLabel: 'Y3-Color',
-                            labelWidth: 60,
-                            inputWidth: 70,
-                            store: me.comboColorStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboColorStore.getAt(2),
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'y3axisfillcheck',
-                            boxLabel: 'Fill',
-                            hidden: true
-                        },
-                        {
-                          xtype: 'button',
-                          width: 110,
-                          text: 'Add another Y-Axis',
-                          name: 'addyaxisbtn',
-                          handler: function(btn) {
-                              var y2device = btn.up().down('combobox[name=device2combo]');
-                              var y2 = btn.up().down('combobox[name=y2axiscombo]');
-                              var y2color = btn.up().down('combobox[name=y2axiscolorcombo]');
-                              var y2fill = btn.up().down('checkboxfield[name=y2axisfillcheck]');
-                              
-                              var y3device = btn.up().down('combobox[name=device3combo]');
-                              var y3 = btn.up().down('combobox[name=y3axiscombo]');
-                              var y3color = btn.up().down('combobox[name=y3axiscolorcombo]');
-                              var y3fill = btn.up().down('checkboxfield[name=y3axisfillcheck]');
-                              
-                              if (y2.hidden) {
-                                  y2device.show();
-                                  y2.show();
-                                  y2color.show();
-                                  y2fill.show();
-                              } else if (y3.hidden) {
-                                  y3device.show();
-                                  y3.show(); 
-                                  y3color.show();
-                                  y3fill.show();
-                                  btn.setDisabled(true);
-                              }
-                          }
-                        },
-                        {
-                            xtype: 'numberfield',
-                            fieldLabel: 'Startvalue',
-                            name: 'base1start',
-                            allowBlank: false,
-                            labelWidth: 60,
-                            width: 120,
-                            hidden: true
-                        },
-                        {
-                            xtype: 'numberfield',
-                            fieldLabel: 'Endvalue',
-                            name: 'base1end',
-                            allowBlank: false,
-                            labelWidth: 60,
-                            width: 120,
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'baseline1colorcombo',
-                            fieldLabel: 'Baseline 1 Color',
-                            labelWidth: 100,
-                            inputWidth: 70,
-                            store: me.comboColorStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboColorStore.getAt(0),
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'baseline1fillcheck',
-                            boxLabel: 'Fill',
-                            hidden: true
-                        },
-                        {
-                            xtype: 'numberfield',
-                            fieldLabel: 'Startvalue',
-                            name: 'base2start',
-                            allowBlank: false,
-                            labelWidth: 60,
-                            width: 120,
-                            hidden: true
-                        },
-                        {
-                            xtype: 'numberfield',
-                            fieldLabel: 'Endvalue',
-                            name: 'base2end',
-                            allowBlank: false,
-                            labelWidth: 60,
-                            width: 120,
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'baseline2colorcombo',
-                            fieldLabel: 'Baseline 2 Color',
-                            labelWidth: 100,
-                            inputWidth: 70,
-                            store: me.comboColorStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboColorStore.getAt(1),
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'baseline2fillcheck',
-                            boxLabel: 'Fill',
-                            hidden: true
-                        },
-                        {
-                            xtype: 'numberfield',
-                            fieldLabel: 'Startvalue',
-                            name: 'base3start',
-                            allowBlank: false,
-                            labelWidth: 60,
-                            width: 120,
-                            hidden: true
-                        },
-                        {
-                            xtype: 'numberfield',
-                            fieldLabel: 'Endvalue',
-                            name: 'base3end',
-                            allowBlank: false,
-                            labelWidth: 60,
-                            width: 120,
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'combobox', 
-                            name: 'baseline3colorcombo',
-                            fieldLabel: 'Baseline 3 Color',
-                            labelWidth: 100,
-                            inputWidth: 70,
-                            store: me.comboColorStore,
-                            displayField: 'name',
-                            valueField: 'value',
-                            value: me.comboColorStore.getAt(2),
-                            hidden: true
-                        },
-                        {  
-                            xtype: 'checkboxfield', 
-                            name: 'baseline3fillcheck',
-                            boxLabel: 'Fill',
-                            hidden: true
-                        },
-                        {
-                            xtype: 'button',
-                            width: 110,
-                            text: 'Add Baseline',
-                            name: 'addbaselinebtn',
-                            handler: function(btn) {
-                                var b1start = btn.up().down('numberfield[name=base1start]');
-                                var b1end = btn.up().down('numberfield[name=base1end]');
-                                var b1color = btn.up().down('combobox[name=baseline1colorcombo]');
-                                var b1fill = btn.up().down('checkboxfield[name=baseline1fillcheck]');
-                                var b2start = btn.up().down('numberfield[name=base2start]');
-                                var b2end = btn.up().down('numberfield[name=base2end]');
-                                var b2color = btn.up().down('combobox[name=baseline2colorcombo]');
-                                var b2fill = btn.up().down('checkboxfield[name=baseline2fillcheck]');
-                                var b3start = btn.up().down('numberfield[name=base3start]');
-                                var b3end = btn.up().down('numberfield[name=base3end]');
-                                var b3color = btn.up().down('combobox[name=baseline3colorcombo]');
-                                var b3fill = btn.up().down('checkboxfield[name=baseline3fillcheck]');
-                                
-                                if (b1start.hidden) {
-                                    b1start.show();
-                                    b1end.show();
-                                    b1color.show();
-                                    b1fill.show();
-                                } else if (b2start.hidden) {
-                                    b2start.show();
-                                    b2end.show();
-                                    b2color.show();
-                                    b2fill.show();
-                                } else if (b3start.hidden) {
-                                    b3start.show();
-                                    b3end.show();
-                                    b3color.show();
-                                    b3fill.show();
-                                    btn.setDisabled(true);
-                                }
-                                    
-                            }
-                         }
-                    ]
+                    items: [] //get filled in own function
                 },
                 {
                     xtype: 'fieldset',
@@ -487,7 +145,7 @@ Ext.define('FHEM.view.LineChartPanel', {
                     xtype: 'fieldset',
                     layout: 'column',
                     defaults: {
-                        margin: '0 0 0 10'
+                        margin: '10 10 10 10'
                     },
                     items: [
                         {
@@ -507,18 +165,6 @@ Ext.define('FHEM.view.LineChartPanel', {
                             width: 100,
                             text: 'Reset Fields',
                             name: 'resetchartform'
-                        },
-                        {
-                          xtype: 'button',
-                          width: 100,
-                          text: 'Step back',
-                          name: 'stepback'
-                        },
-                        {
-                          xtype: 'button',
-                          width: 100,
-                          text: 'Step forward',
-                          name: 'stepforward'
                         },
                         {
                             xtype: 'radio',
@@ -574,6 +220,11 @@ Ext.define('FHEM.view.LineChartPanel', {
             ]
         });
         
+        //add the first yaxis line
+        me.createNewYAxis();
+        
+        //creating the chart
+        var chartstore = Ext.create('FHEM.store.ChartStore');
         var linechartview = Ext.create('Ext.panel.Panel', {
             title: 'Chart',
             autoScroll: true,
@@ -581,14 +232,128 @@ Ext.define('FHEM.view.LineChartPanel', {
             titleCollapse: true,
             items: [
                 {
-                  xtype: 'linechartview'
+                    xtype: 'toolbar',
+                    items: [
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Step back',
+                            name: 'stepback'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Step forward',
+                            name: 'stepforward'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 100,
+                            text: 'Reset Zoom',
+                            name: 'resetzoom',
+                            scope: me,
+                            handler: function(btn) {
+                                var chart = me.down('chart');
+                                chart.restoreZoom();
+                                chart.axes.get(0).minimum = me.getLastYmin();
+                                chart.axes.get(0).maximum = me.getLastYmax();
+                                chart.axes.get(1).minimum = me.getLastXmin();
+                                chart.axes.get(1).maximum = me.getLastXmax();
+                                
+                                chart.redraw();
+                                //helper to reshow the hidden items after zooming back out
+                                if (me.artifactSeries && me.artifactSeries.length > 0) {
+                                    Ext.each(me.artifactSeries, function(serie) {
+                                        serie.showAll();
+                                        Ext.each(serie.group.items, function(item) {
+                                            if (item.type === "circle") {
+                                                item.show();
+                                                item.redraw();
+                                            }
+                                        });
+                                    });
+                                    me.artifactSeries = [];
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    xtype: 'chart',
+                    legend: {
+                        position: 'right'
+                    },
+                    axes: [ 
+                        {
+                            type : 'Numeric',
+                            name : 'yaxe',
+                            position : 'left',
+                            fields : [ 'VALUE', 'VALUE2' ],
+                            title : 'VALUE',
+                            grid : {
+                                odd : {
+                                    opacity : 1,
+                                    fill : '#ddd',
+                                    stroke : '#bbb',
+                                    'stroke-width' : 0.5
+                                }
+                            }
+                        }, 
+                        {
+                            type : 'Time',
+                            name : 'xaxe',
+                            position : 'bottom',
+                            fields : [ 'TIMESTAMP' ],
+                            dateFormat : "Y-m-d H:i:s",
+                            title : 'Time'
+                        }
+                    ],
+                    animate: true,
+                    store: chartstore,
+                    enableMask: true,
+                    mask: true,//'vertical',//true, //'horizontal',
+                    listeners: {
+                        mousedown: function(evt) {
+                            // fix for firefox, not dragging images
+                            evt.preventDefault();
+                        },
+                        select: {
+                            fn: function(chart, selection, evt) {
+                                delete chart.axes.get(1).fromDate;
+                                delete chart.axes.get(1).toDate;
+                                if (Ext.isEmpty(me.getLastYmax())) {
+                                    me.setLastYmax(chart.axes.get(0).maximum);
+                                    me.setLastYmin(chart.axes.get(0).minimum);
+                                }
+                                if (Ext.isEmpty(me.getLastXmax())) {
+                                    me.setLastXmax(chart.axes.get(1).maximum);
+                                    me.setLastXmin(chart.axes.get(1).minimum);
+                                }
+                                chart.axes.get(1).processView();
+                                chart.redraw();
+                                chart.setZoom(selection);
+                                chart.mask.hide();
+                                //helper hiding series and items which are out of scope
+                                Ext.each(chart.series.items, function(serie) {
+                                    if (serie.items.length === 0) {
+                                        me.artifactSeries.push(serie);
+                                        Ext.each(serie.group.items, function(item) {
+                                            item.hide();
+                                            item.redraw();
+                                        });
+                                        serie.hideAll();
+                                    }
+                                });
+                            }
+                        }
+                    }
                 }    
             ]
         });
             
         me.items = [
-                chartSettingPanel,
-                linechartview
+            chartSettingPanel,
+            linechartview
         ];
         
         me.callParent(arguments);
@@ -602,12 +367,251 @@ Ext.define('FHEM.view.LineChartPanel', {
      */
     layoutChart: function() {
         var lcp = Ext.ComponentQuery.query('linechartpanel')[0];
-        var lcv = Ext.ComponentQuery.query('linechartview')[0];
+        var lcv = Ext.ComponentQuery.query('chart')[0];
         var cfp = Ext.ComponentQuery.query('form[name=chartformpanel]')[0];
         var chartheight = lcp.getHeight() - cfp.getHeight() - 85;
         var chartwidth = lcp.getWidth() - 25;
         lcv.setHeight(chartheight);
         lcv.setWidth(chartwidth);
-    }
+    },
     
+    /**
+     * create a new fieldset for a new chart y axis
+     */
+    createNewYAxis: function() {
+        
+        var me = this;
+        
+        var components = 
+            {
+                xtype: 'fieldset',
+                name: 'singlerowfieldset',
+                layout: 'column',
+                defaults: {
+                    margin: '5 5 5 5'
+                },
+                items: 
+                    [
+                        {  
+                          xtype: 'combobox', 
+                          name: 'devicecombo',
+                          fieldLabel: 'Select Device',
+                          labelWidth: 90,
+                          store: Ext.create('FHEM.store.DeviceStore', {
+                              proxy: {
+                                  type: 'ajax',
+                                  method: 'POST',
+                                  url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getdevices&XHR=1',
+                                  reader: {
+                                      type: 'json',
+                                      root: 'data',
+                                      totalProperty: 'totalCount'
+                                  }
+                              },
+                              autoLoad: true
+                          }),
+                          displayField: 'DEVICE',
+                          valueField: 'DEVICE',
+                          listeners: {
+                              select: function(combo) {
+                                  var device = combo.getValue(),
+                                      readingscombo = combo.up().down('combobox[name=yaxiscombo]'),
+                                      readingsstore = readingscombo.getStore(),
+                                      readingsproxy = readingsstore.getProxy();
+                                  
+                                  readingsproxy.url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+' + device + '+getreadings&XHR=1';
+                                  readingsstore.load();
+                                  readingscombo.setDisabled(false);
+                              }
+                          }
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'xaxiscombo',
+                            fieldLabel: 'Select X Axis',
+                            labelWidth: 90,
+                            inputWidth: 100,
+                            store: Ext.create('Ext.data.Store', {
+                                fields: ['name'],
+                                data : [
+                                    {'name':'TIMESTAMP'},
+                                    {'name':'DEVICE'},
+                                    {'name':'TYPE'},
+                                    {'name':'EVENT'},
+                                    {'name':'READING'},
+                                    {'name':'VALUE'},
+                                    {'name':'UNIT'}
+                                ]
+                            }),
+                            displayField: 'name',
+                            valueField: 'name'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'yaxiscombo',
+                            fieldLabel: 'Select Y-Axis',
+                            disabled: true,
+                            labelWidth: 90,
+                            inputWidth: 110,
+                            store: Ext.create('FHEM.store.ReadingsStore', {
+                                proxy: {
+                                    type: 'ajax',
+                                    method: 'POST',
+                                    url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+-+getreadings&XHR=1',
+                                    reader: {
+                                        type: 'json',
+                                        root: 'data',
+                                        totalProperty: 'totalCount'
+                                    }
+                                },
+                                autoLoad: false
+                            }),
+                            displayField: 'READING',
+                            valueField: 'READING'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'yaxiscolorcombo',
+                            fieldLabel: 'Y-Color',
+                            labelWidth: 50,
+                            inputWidth: 70,
+                            store: Ext.create('Ext.data.Store', {
+                                fields: ['name', 'value'],
+                                data : [
+                                    {'name':'Blue','value':'#2F40FA'},
+                                    {'name':'Green', 'value':'#46E01B'},
+                                    {'name':'Orange','value':'#F0A800'},
+                                    {'name':'Red','value':'#E0321B'},
+                                    {'name':'Yellow','value':'#F5ED16'}
+                                ]
+                            }),
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: '#2F40FA'
+                        },
+                        {  
+                            xtype: 'checkboxfield', 
+                            name: 'yaxisfillcheck',
+                            boxLabel: 'Fill'
+                        },
+                        {  
+                            xtype: 'combobox', 
+                            name: 'yaxisstatisticscombo',
+                            fieldLabel: 'Statistics',
+                            labelWidth: 70,
+                            inputWidth: 120,
+                            store: Ext.create('Ext.data.Store', {
+                                fields: ['name', 'value'],
+                                data : [
+                                    {'name':'None','value':'none'},
+                                    {'name':'Hour Sum', 'value':'hoursum'},
+                                    {'name':'Hour Average', 'value':'houraverage'},
+                                    {'name':'Hour Min','value':'hourmin'},
+                                    {'name':'Hour Max','value':'hourmax'},
+                                    {'name':'Hour Count','value':'hourcount'},
+                                    {'name':'Day Sum', 'value':'daysum'},
+                                    {'name':'Day Average', 'value':'dayaverage'},
+                                    {'name':'Day Min','value':'daymin'},
+                                    {'name':'Day Max','value':'daymax'},
+                                    {'name':'Day Count','value':'daycount'},
+                                    {'name':'Week Sum', 'value':'weeksum'},
+                                    {'name':'Week Average', 'value':'weekaverage'},
+                                    {'name':'Week Min','value':'weekmin'},
+                                    {'name':'Week Max','value':'weekmax'},
+                                    {'name':'Week Count','value':'weekcount'},
+                                    {'name':'Month Sum', 'value':'monthsum'},
+                                    {'name':'Month Average', 'value':'monthaverage'},
+                                    {'name':'Month Min','value':'monthmin'},
+                                    {'name':'Month Max','value':'monthmax'},
+                                    {'name':'Month Count','value':'monthcount'},
+                                    {'name':'Year Sum', 'value':'yearsum'},
+                                    {'name':'Year Average', 'value':'yearaverage'},
+                                    {'name':'Year Min','value':'yearmin'},
+                                    {'name':'Year Max','value':'yearmax'},
+                                    {'name':'Year Count','value':'yearcount'}
+                                ]
+                            }),
+                            displayField: 'name',
+                            valueField: 'value',
+                            value: 'none'
+                        },
+                        {
+                            xtype: 'button',
+                            width: 110,
+                            text: 'Add another Y-Axis',
+                            name: 'addyaxisbtn',
+                            handler: function(btn) {
+                                me.createNewYAxis();
+                            }
+                        },
+                        {
+                            xtype: 'button',
+                            width: 110,
+                            text: 'Add Baseline',
+                            name: 'addbaselinebtn',
+                            handler: function(btn) {
+                                me.createNewBaseLineFields(btn);
+                            }      
+                        }
+                ]
+            };
+        
+        Ext.ComponentQuery.query('fieldset[name=axesfieldset]')[0].add(components);
+        
+    },
+    
+    /**
+     * 
+     */
+    createNewBaseLineFields: function(btn) {
+        var itemsToAdd = [
+            {
+                xtype: 'numberfield',
+                fieldLabel: 'Startvalue',
+                name: 'basestart',
+                allowBlank: false,
+                labelWidth: 60,
+                width: 120
+            },
+            {
+                xtype: 'numberfield',
+                fieldLabel: 'Endvalue',
+                name: 'baseend',
+                allowBlank: false,
+                labelWidth: 60,
+                width: 120
+            },
+            {  
+                xtype: 'combobox', 
+                name: 'baselinecolorcombo',
+                fieldLabel: 'Baseline Color',
+                labelWidth: 100,
+                inputWidth: 70,
+                store: Ext.create('Ext.data.Store', {
+                    fields: ['name', 'value'],
+                    data : [
+                        {'name':'Blue','value':'#2F40FA'},
+                        {'name':'Green', 'value':'#46E01B'},
+                        {'name':'Orange','value':'#F0A800'},
+                        {'name':'Red','value':'#E0321B'},
+                        {'name':'Yellow','value':'#F5ED16'}
+                    ]
+                }),
+                displayField: 'name',
+                valueField: 'value',
+                value: '#46E01B'
+            },
+            {  
+                xtype: 'checkboxfield', 
+                name: 'baselinefillcheck',
+                boxLabel: 'Fill'
+            }
+        ];
+        if (Ext.isDefined(btn)) {
+            btn.up().add(itemsToAdd);
+        } else {
+            this.down('fieldset[name=singlerowfieldset]').add(itemsToAdd);
+        }
+        
+    }
 });

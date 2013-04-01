@@ -27,8 +27,11 @@ Ext.define('FHEM.controller.MainController', {
            {
                selector: 'textfield[name=commandfield]',
                ref: 'commandfield' //this.getCommandfield()
+           },
+           {
+               selector: 'grid[name=savedchartsgrid]',
+               ref: 'savedchartsgrid' //this.getSavedchartsgrid()
            }
-           
     ],
 
     /**
@@ -68,11 +71,25 @@ Ext.define('FHEM.controller.MainController', {
     },
     
     /**
-     * load the FHEM devices and state on viewport render completion
+     * fade-in viewport, load the FHEM devices and state on viewport render completion
      */
     viewportRendered: function() {
         
         var me = this;
+        
+        me.getMainviewport().show();
+        me.getMainviewport().getEl().setOpacity(0);
+        me.getMainviewport().getEl().animate({
+            opacity: 1, 
+            easing: 'easeIn',
+            duration: 500,
+            remove: false
+        });
+        
+        //load the saved charts store with configured dblog name
+        var store = this.getSavedchartsgrid().getStore();
+        store.getProxy().url = '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getcharts&XHR=1';
+        store.load();
         
         if (Ext.isDefined(FHEM.version)) {
             var sp = this.getStatustextfield();
@@ -335,24 +352,53 @@ Ext.define('FHEM.controller.MainController', {
             title: title,
             region: 'center',
             layout: 'fit',
-            record: record
+            record: record,
+            hidden: true
         };
         this.destroyCenterPanels();
         this.getMainviewport().add(panel);
+        
+        var createdpanel = this.getMainviewport().down('devicepanel');
+        
+        createdpanel.getEl().setOpacity(0);
+        createdpanel.show();
+        
+        createdpanel.getEl().animate({
+            opacity: 1, 
+            easing: 'easeIn',
+            duration: 500,
+            remove: false
+        });
+        
     },
     
     /**
      * 
      */
     showLineChartPanel: function() {
+        
         var panel = {
             xtype: 'linechartpanel',
             name: 'linechartpanel',
             region: 'center',
-            layout: 'fit'
+            layout: 'fit',
+            hidden: true
         };
         this.destroyCenterPanels();
         this.getMainviewport().add(panel);
+        
+        var createdpanel = this.getMainviewport().down('linechartpanel');
+        
+        createdpanel.getEl().setOpacity(0);
+        createdpanel.show();
+        
+        createdpanel.getEl().animate({
+            opacity: 1, 
+            easing: 'easeIn',
+            duration: 500,
+            remove: false
+        });
+        
     },
     
     /**
@@ -363,10 +409,23 @@ Ext.define('FHEM.controller.MainController', {
             xtype: 'tabledatagridpanel',
             name: 'tabledatagridpanel',
             region: 'center',
-            layout: 'fit'
+            layout: 'fit',
+            hidden: true
         };
         this.destroyCenterPanels();
         this.getMainviewport().add(panel);
+        
+        var createdpanel = this.getMainviewport().down('tabledatagridpanel');
+        
+        createdpanel.getEl().setOpacity(0);
+        createdpanel.show();
+        
+        createdpanel.getEl().animate({
+            opacity: 1, 
+            easing: 'easeIn',
+            duration: 500,
+            remove: false
+        });
     }
     
 });

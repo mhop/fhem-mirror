@@ -4,10 +4,11 @@
 Ext.define('FHEM.store.DeviceStore', {
     extend: 'Ext.data.Store',
     model: 'FHEM.model.DeviceModel',
+    id: 'devicestore',
     proxy: {
         type: 'ajax',
         method: 'POST',
-        url: '../../../fhem?cmd=get+' + FHEM.dblogname + '+-+webchart+""+""+""+getdevices&XHR=1',
+        url: '', //gets set by controller
         reader: {
             type: 'json',
             root: 'data',
