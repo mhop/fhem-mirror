@@ -2952,17 +2952,29 @@ FW_htmlEscape($)
     <a name="webCmd"></a>
     <li>webCmd<br>
         Colon separated list of commands to be shown in the room overview for a
-        certain device.  On smallscreen devices only the first value is
-        accessible.<br>
-        If the first value references a command, for which "set
-        device ?" lists a number possible choices (e.g. desired-temp for FHT
-        devices), then a select widget will be displayed. If the values are
-        "slider,min,step,max", then a javascript driven slider is displayed.
-        if the value is "time", then a javascript timepicker is displayed.
-        If the command is state, then the value will be used as a command.<br>
-        Examples:
+        certain device.  Has no effect on smallscreen devices, see the
+        devStateIcon command for an alternative.<br>
+        Example:
         <ul>
           attr lamp webCmd on:off:on-for-timer 10<br>
+        </ul>
+        <br>
+
+        The first specified command is looked up in the "set device ?" list
+        (see the <a href="#setList">setList</a> attribute for dummy devices).
+        If <b>there</b> it contains some known modifiers (semicolon, followed
+        by a comma separated list), then a different widget will be displayed:
+        <ul>
+          <li>if the modifier is ":time", then a javascript driven timepicker is
+            displayed.</li>
+          <li>if the modifier is of the form
+          ":slider,&lt;min&gt;,&lt;step&gt;,&lt;max&gt;", then a javascript
+          driven slider is displayed</li>
+          <li>else a dropdown with all the modifier values is displayed</li>
+        </ul>
+        If the command is state, then the value will be used as a command.<br>
+        Examples for the modifier:
+        <ul>
           define d1 dummy<br>
           attr d1 webCmd state<br>
           attr d1 setList state:on,off<br>
