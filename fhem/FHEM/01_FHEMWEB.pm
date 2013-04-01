@@ -877,7 +877,7 @@ FW_roomOverview($)
   # MENU
   my (@list1, @list2);
   push(@list1, ""); push(@list2, "");
-  if(!$FW_hiddenroom{save}) {
+  if(!$FW_hiddenroom{save} && !$FW_hiddenroom{"Save config"}) {
     push(@list1, "Save config"); push(@list2, "$FW_ME?cmd=save");
     push(@list1, ""); push(@list2, "");
   }
