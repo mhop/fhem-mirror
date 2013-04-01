@@ -4,7 +4,7 @@
 #
 # derived from previous 70_USBWX.pm version written by "Peter from Vienna"
 #
-# Willi Herzig, 2011
+# Willi Herzig, 2011-2013
 #
 #  This script is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -31,7 +31,6 @@ USBWX_Initialize($)
   $hash->{UndefFn} = "USBWX_Undef"; 
 
   $hash->{GetFn} = "USBWX_Get";
-  $hash->{SetFn} = "USBWX_Set"; 
   $hash->{ParseFn}   = "USBWX_Parse";
 
   $hash->{StateFn} = "USBWX_SetState";
@@ -310,19 +309,6 @@ USBWX_Shutdown($)
 {
   my ($hash) = @_;
   return undef;
-}
-
-#####################################
-sub
-USBWX_Set($@)
-{
-my ($hash, @a) = @_;
-	
-my $msg;
-my $name=$a[0];
-my $reading= $a[1];
-$msg="$name => No Set function ($reading) implemented";
-return $msg;
 }
 
 #####################################
