@@ -228,7 +228,7 @@ sub CUL_HM_updateConfig($){
 	push @getConfList,$name if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-  CUL_HM_autoReadConfig("updateConfig");
+#General log  CUL_HM_autoReadConfig("updateConfig");
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -824,7 +824,7 @@ sub CUL_HM_Parse($$) {##############################
 		  }
 		  else{                                #invalid PhysLevel   
            InternalTimer(gettimeofday()+3,"CUL_HM_stateUpdat","sUpdt:".
-		                                  $shash->{NAME},0);
+		                                  $name,0);# update for device!
 		  }
 		}
 	  }
@@ -1101,19 +1101,17 @@ sub CUL_HM_Parse($$) {##############################
 	#Info Level: msgType=0x10 p(..)(..)(..)(..) subty=06, chn, state,err (3bit)
 	#AckStatus:  msgType=0x02 p(..)(..)(..)(..) subty=01, chn, state,err (3bit)
 	my ($chn,$state,$err,$cnt); #define locals
-    if($msgType eq "10" || $msgType eq "02"){
-	  my $mT = $msgType.substr($p,0,2);
-	  if ($mT eq "1006" ||$$mT eq "0201"){
-	    $p =~ m/^..(..)(..)(..)?$/;
-        ($chn,$state,$err) = (hex($1), $2, hex($3));
-	    $chn = sprintf("%02X",$chn&0x3f);
-		$shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
+    if(($msgType eq "10" && $p =~ m/^06/) ||
+	   ($msgType eq "02" && $p =~ m/^01/)) {
+	  $p =~ m/^..(..)(..)(..)?$/;
+      ($chn,$state,$err) = (hex($1), $2, hex($3));
+	  $chn = sprintf("%02X",$chn&0x3f);
+	  $shash = $modules{CUL_HM}{defptr}{"$src$chn"} 
 	                         if($modules{CUL_HM}{defptr}{"$src$chn"});
-		push @event, "alive:yes";
-	    push @event, "battery:". (($err&0x80)?"low"  :"ok"  );
-		if ($model ne "HM-SEC-WDS"){	  
-		  push @event, "cover:". (($err&0x0E)?"open" :"closed");
-	    }
+	  push @event, "alive:yes";
+	  push @event, "battery:". (($err&0x80)?"low"  :"ok"  );
+	  if ($model ne "HM-SEC-WDS"){	  
+		push @event, "cover:". (($err&0x0E)?"open" :"closed");
 	  }
 	}
 	elsif($msgType eq "41"){
@@ -2050,7 +2048,7 @@ sub CUL_HM_Set($@) {
 	  $eSec += 3600*24 if ($ltSec > $eSec); # go for the next day
 	  $duration = $eSec - $ltSec;	  
     }
-	return "please enter the duration in seconds" if (!defined ($duration));
+	return "please enter the duration in seconds" if (!defined $duration || $duration !~ m/^[+-]?\d+(\.\d+)?$/);
     my $tval = CUL_HM_encodeTime16($duration);# onTime   0.0..85825945.6, 0=forever
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'02'.$chn.'C80000'.$tval);
  	$hash = $chnHash; # report to channel if defined
@@ -2092,9 +2090,8 @@ sub CUL_HM_Set($@) {
 	}
     CUL_HM_PushCmdStack($hash,sprintf("++%s11%s%s02%s%02X%s%s",
 	                                 $flag,$id,$dst,$chn,$lvl*2,$rval,$tval));
-    if (defined $hash->{READINGS}{"virtLevel"}{VAL}){
-	     readingsSingleUpdate($hash,"virtLevel","set_".$lvl,1);
-	}else{$state = "set_".$lvl;}
+    readingsSingleUpdate($hash,"level","set_".$lvl,1);
+	$state = "set_".$lvl;
   } 
   elsif($cmd eq "stop") { #####################################################
     CUL_HM_PushCmdStack($hash,'++'.$flag.'11'.$id.$dst.'03'.$chn);
@@ -3303,7 +3300,7 @@ sub CUL_HM_decodeTime8($) {#####################
 }
 sub CUL_HM_encodeTime16($) {####################
   my $v = shift;
-  return "0000" if($v < 0.05);
+  return "0000" if($v < 0.05 || $v !~ m/^[+-]?\d+(\.\d+)?$/);
   
   my $ret = "FFFF";
   my $mul = 10;
@@ -3341,19 +3338,19 @@ sub CUL_HM_secSince2000() {#####################
   my $t = time();
   my @l = localtime($t);
   my @g = gmtime($t);
-  $t += 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24 + $l[8]) * 60 + $l[1]-$g[1]) 
+  #  my $t2 = $t + 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24 + $l[8]) * 60 + $l[1]-$g[1]) 
+  my $t2 = $t + 60*(($l[2]-$g[2] + ((($l[5]<<9)|$l[7]) <=> (($g[5]<<9)|$g[7])) * 24) * 60 + $l[1]-$g[1]) 
                            # timezone and daylight saving...
         - 946684800        # seconds between 01.01.2000, 00:00 and THE EPOCH (1970)
         - 7200;            # HM Special
-  return $t;
+  return $t2;
 }
 sub CUL_HM_getChnLvl($){# in: name out: vit or phys level
   my $name = shift;
-  my $curVal = ReadingsVal($name,"virtLevel",undef);
-  $curVal = ReadingsVal($name,"state",0) if (!defined $curVal);
+  my $curVal = ReadingsVal($name,"level",0);
   $curVal =~ s/set_//;
   $curVal =~ s/ .*//;#strip unit
-  return ($curVal eq "on")?100:(($curVal eq "off")?0:$curVal);
+  return $curVal;
 }
 
 #--------------- Conversion routines for register settings---------------------
