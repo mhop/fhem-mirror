@@ -98,7 +98,7 @@ FileLog_Log($$)
   my $n = $dev->{NAME};
   my $re = $log->{REGEXP};
   my $max = int(@{$dev->{CHANGED}});
-  my $tn = TimeNow();
+  my $tn = $dev->{TRIGGERTIME};
   my $ct = $dev->{CHANGETIME};
   my $wrotesome;
   my $fh = $log->{FH};
