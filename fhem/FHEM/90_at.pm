@@ -58,7 +58,6 @@ at_Define($$)
                         if($rel ne "+");
   $nt += ($hr*3600+$min*60+$sec); # Plus relative time
   $nt += SecondsTillTomorrow($ot) if($ot >= $nt);  # Do it tomorrow...
-
   @lt = localtime($nt);
   my $ntm = sprintf("%02d:%02d:%02d", $lt[2], $lt[1], $lt[0]);
   if($rep) {    # Setting the number of repetitions
@@ -76,7 +75,8 @@ at_Define($$)
   RemoveInternalTimer($hash);
   InternalTimer($nt, "at_Exec", $hash, 0);
 
-  $hash->{STATE} = ($oldattr && $oldattr->{disable} ? "disabled" : ("Next: ".FmtTime($nt)));
+  $hash->{STATE} = ($oldattr && $oldattr->{disable} ?
+        "disabled" : ("Next: ".FmtTime($nt)));
   
   return undef;
 }
