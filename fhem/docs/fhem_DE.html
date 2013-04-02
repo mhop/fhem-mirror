@@ -1,0 +1,454 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+	"http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+<title>FHEMs Einstiegsseite</title>
+  <link rel="stylesheet" type="text/css" href="../www/pgm2/style.css" />
+  <meta http-equiv="Content-type" content="text/html;charset=ISO-8859-1"/>
+  <link rel="shortcut icon" href="favicon.ico"/>
+</head>
+
+
+<body>
+
+  <div id="menuScrollArea">
+    <div id="logo"></div>
+    <div id="menu">
+      Version: <a href="fhem.html">EN</a>&nbsp;<b>DE</b>
+      <table><tr><td> <!-- Playing with the width -->
+      <table id="room">
+        <tr><td></td></tr>
+        <tr><td><b>Inhalt:</b></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Description">Beschreibung</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Download">Download</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Screenshots">Screenshots</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Features">Features</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Hardware">Hardware</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Documentation">Dokumentation</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Links">Links</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#Installation">Installation</a></td></tr>
+        <tr><td></td></tr>
+        <tr><td><a href="#License">Lizenz</a></td></tr>
+        <tr><td></td></tr>
+      </table>
+      </td></tr></table>
+    </div>
+  </div>
+
+
+  <div id="right">
+
+    <a name="Description"></a>
+    <h3>Beschreibung</h3>
+    <ul>
+      FHEM ist ein in perl geschriebener, GPL lizensierter Server f&uuml;r
+      die Heimautomatisierung. Man kann mit FHEM h&auml;ufig auftretende
+      Aufgaben automatisieren, wie z.Bsp. Lampen / Rollladen / Heizung / usw.
+      schalten, oder Ereignisse wie Temperatur / Feuchtigkeit / Stromverbrauch
+      protokollieren und visualisieren. F&uuml;r weitere Ideen siehe <a
+      href="http://forum.fhem.de/index.php?t=msg&goto=50669">diesen</a> Link.
+      <br><br>
+
+      Das Programm l&auml;uft als Server, man kann es &uuml;ber WEB, dedizierte
+      Smartphone Apps oder telnet bedienen, TCP Schnittstellen f&uuml;r JSON und
+      XML existieren ebenfalls.
+      <br><br>
+
+      Um es zu verwenden ben&ouml;tigt man einen 24/7 Rechner (Fritz!Box, NAS, RPi,
+      PC, MacMini, etc) mit einem perl Interpreter und angeschlossene
+      Hardware-Komponenten wie CUL, FHZ1300PC, etc. f&uuml;r einen Zugang zu den
+      Aktoren und Sensoren. Siehe den Hardware Abschnitt f&uuml;r mehr.
+    </ul>
+
+    <a name="Download"></a>
+    <h3>Download</h3>
+    <ul>
+      Letzte Version (vom =DATE=): 
+      <a href="http://fhem.de/fhem-=VERS=.tar.gz">fhem-=VERS=.tar.gz</a>,
+      <a href="http://fhem.de/fhem-=VERS=.deb">fhem-=VERS=.deb</a>,
+      <a href="http://fhem.de/fhem-=VERS=-fb7390.image">fhem-=VERS=-fb7390.image</a>,
+      <a href="http://fhem.de/fhem-=VERS=-fb7270.zip">fhem-=VERS=-fb7270.zip</a>
+      <br>
+      Siehe auch das manuelle (<a href="CHANGED">CHANGED file</a>) oder 
+      maschinelle (<a href="SVNLOG">SVNLOG</a>) &Auml;nderungsprotokoll f&uuml;r mehr Details.
+      <br>
+      Die n&auml;chtliche SVN Version ist verf&uuml;gbar als
+      <a href="http://www.dhs-computertechnik.de/downloads/fhem-cvs.tgz">
+      tar Datei</a>, oder in der Kommandozeile &uuml;ber das <a
+      href="commandref.html#update">update</a> Befehl.<br><br>
+
+      F&uuml;llen Sie bitte unsere <a href="survey.pl">Umfrage</a> aus, da wir gerne
+      w&uuml;ssten, welche FHEM Module verwendet werden.  Hier sind die <a
+      href="surveyresults.html">Ergebnisse</a>.<br> Oder verwenden sie das neue
+      fheminfo Befehl in FHEM um <a href="/stats/statistics.cgi">diese</a>
+      Statistiken automatisch zu generieren.
+      </ul>
+
+
+    <a name="Screenshots"></a>
+    <h3>Frontend Screenshots</h3>
+    <ul>
+
+      Das eingebaute (default) pgm2 web frontend:
+      <a href="pgm2-1.png">&Uuml;bersicht</a>,
+      das gleiche f&uuml;r <a href="pgm2-4.png">Smartphones</a>,
+      <a href="pgm2-2.png">Detail-Ansicht</a>,
+      <a href="pgm2-3.png">SVG-plots</a>,
+      <a href="pgm2-5.png">Dark-style</a>.
+        <div class="dist"></div>
+
+      Das FHEM FLOORPLAN Modul: 
+        <a href="tirreG.jpg">Beispiel1</a>,
+        <a href="Benji.png">Beispiel2</a>.
+        <div class="dist"></div>
+
+      pgm3 Web Frontend: <a
+      href="http://www.martin-haas.de/fhz/screenshots.html">Screenshot
+      Gallerie</a>
+        <div class="dist"></div>
+
+      myHCE: <a
+      href="http://www.fischer-net.de/hausautomation/myhce/screenshots.html">
+      Screenshot Gallerie</a>
+        <div class="dist"></div>
+
+      fheME: <a href="http://www.phynx.de/?p=108"> Screenshot Gallerie</a>
+        <div class="dist"></div>
+
+      HomeMini: <a
+      href="http://heimserver.nendzig.net/wiki/index.php/HomeMini">
+      Screenshot & Download</a>
+        <div class="dist"></div>
+
+      iPhone Frontends: 
+      <a
+      href="itms://itunes.apple.com/us/app/fhemobile/id389951065?mt=8">Fhemobile</a>
+      (natives App),
+      <a href="http://www.dhs-computertechnik.de/support-iphone.html">
+      dhs-computertechnik</a> und
+      <a href="http://code.google.com/p/phyfhem/">phyfhem</a>
+        <div class="dist"></div>
+      
+      Android Frontends:
+      <a href="http://andFHEM.klass.li">andFHEM</a> (natives App)
+        <div class="dist"></div>
+
+    </ul>
+
+
+    <a name="Features"></a>
+    <h3>Features</h3>
+    <ul>
+      <li>Gleichzeitige Unterst&uuml;tzung vieler in der Hausautomation &uuml;blicher
+          Protokolle wie FS20, HomeMatic, OneWire, X10, ZWave, EnOcean, KNX. Siehe
+          den <a href="#Hardware">Hardware</a> Abschnitt f&uuml;r mehr.
+          </li>
+          <div class="dist"></div>
+
+      <li>Plug &amp; play: Bei vielen Protokollen werden die FHEM-Eintr&auml;ge
+          automatisch beim Empfang der Funktelegramme angelegt, zusammen mit
+          der Definition der Logdatei und etwaiger Visualisierung. Einfach FHEM
+          mit angeschlossenen USB-Hardware starten, und zusehen, wie die Plots
+          der Sensoren auf der Webseite nacheinander auftauchen.
+          </li>
+          <div class="dist"></div>
+
+        <li>Ereignisse in Dateien oder Datenbanken loggen, optionale Filterung mit regexp.
+          </li>
+          <div class="dist"></div>
+
+        <li>Beim Auftreten definierbarer Ereignisse externe Programme  bzw. Skripte
+          starten.</li>
+          <div class="dist"></div>
+
+        <li>Zeitabh&auml;ngige Befehle (z.Bsp. die Lampe vom Sonnenuntergang bis
+            Mitternacht einschalten).
+            </li>
+          <div class="dist"></div>
+
+        <li>watchdog (z.Bsp. Email versenden, falls das Fenster zu lange offen ist)
+            </li>
+          <div class="dist"></div>
+
+        <li>Diverse Schnittstellen: ASCII, JSON, XML, jeweils
+            &uuml;ber TCP/IP, SSL, HTTP oder HTTPS.
+          <div class="dist"></div>
+
+        <li>Modulare Architektur mit &uuml;ber 100 Modulen f&uuml;r die
+            unterschiedlichen Ger&auml;te oder Hilfsdienste.</li>
+          <div class="dist"></div>
+
+        <li>Viele Frontends, damit jeder das Passende finden kann.</li>
+          <div class="dist"></div>
+      </ul>
+
+    <a name="Hardware"></a>
+    <h3>Unterst&uuml;tzte hardware</h3>
+    <ul>
+      <li>Mit CUL oder CUN(O) (siehe <a
+        href="http://www.busware.de">www.busware.de</a>) Zugang zu folgenden
+        Protokollen: FS20, EM (EM1000EM, EM1000GZ und EM1000WZ), FHT80b, HMS,
+        S300 (KS300, S300TH, KS555, S555TH, usw.), HomeMatic, La Crosse TX2/TX3,
+        MAX!, Intertechno (nur senden), Hoermann (nur empfangen).
+        </li>
+        <div class="dist"></div>
+
+      <li>Mit FHZ1000 oder FHZ1300 Zugang zu folgenden Protokollen:
+        FS20, FHT80b, HMS, KS300. <b>Achtung:</b> F&uuml;r die WLAN Version der
+        FHZ1300 siehe <a href="http://www.thinkwiki.org/wiki/User:Akw/FHZ">
+        diesen</a> Hinweis.  </li>
+        <div class="dist"></div>
+
+      <li>X10 &uuml;ber das CM11 Modul mit Zugang zu einem X10 Computer-Interface</li>
+        <div class="dist"></div>
+
+      <li>Diverse Fernseher von Samsung/Panasonic/LG und Verst&auml;rker (YAMAHA)</li>
+        <div class="dist"></div>
+
+      <li>Diverse Wege um 1Wire Sensoren zu empfangen bzw. Aktoren zu steuern.</li>
+        <div class="dist"></div>
+
+      <li>Allnet 3076, Temperatursensoren und an Allnet 4000 angeschlossene
+        Allnet 4027 relay box</li>
+        <div class="dist"></div>
+
+      <li>Davis VantagePro2 Wetterstation</li>
+        <div class="dist"></div>
+
+      <li>Mit dem RFXCOM RFXtrx433 transceiver (433 Mhz) Unterst&uuml;tzung f&uuml;r diverse 
+        Protokolle (ANSLUT, ByeByeStandBy, Chacon EMW200, COCO, DomiaLite, D&uuml;wi,
+        ELRO AB400/AB600, HomeEasy EU, HomeEasy UK, IMPULS, Intertechno, KD101,
+        KlikAanKlikUit (KAKU), NEXA, Oregon Scientific, X10 security and
+        lighting, Visonic, Waveman, X10).</li>
+        <div class="dist"></div>
+
+      <li>Mit dem alten RFXCOM USB oder LAN basierten 433 Mhz RF Receiver 
+        (order code 80002 usw.) die folgenden Ger&auml;te: Oregon Scientific
+        Wettersensoren, RFXCOM RFXMeter, X10 Sicherheits- und
+        Beleuchtungsger&auml;te.</li>
+        <div class="dist"></div>
+
+      <li>Mit dem ELV USB-WDE1 Zugang zu den ELV Sensoren KS200/KS300, S300IA,
+        S300TH, ASH2200, PS 50 und Conrad Sensoren KS555, S555TH und
+        ASH555.</li>
+        <div class="dist"></div>
+
+      <li>Mit einem eQ-3 HomeMatic Lan Konfigurator Zugang zu Homematic Ger&auml;ten.</li>
+        <div class="dist"></div>
+
+      <li>Mit dem eibd oder einem TUL (siehe <a
+        href="http://www.busware.de">www.busware.de</a>) Zugang zum EIB/KNX
+        Protokoll.
+        <div class="dist"></div>
+
+      <li>Mit einem TCM120 (z.Bsp. das BSC BOR) oder einem TCM310 (z.Bsp.
+        busware EUL) Zugang zum EnOcean Protokoll.
+        <div class="dist"></div>
+
+      <li>Mit einem ZWave USB Dongle (z.Bsp. das Goodway WD6001) Zugang zum ZWave Protokoll.
+        <div class="dist"></div>
+
+      <br>
+      Eine detaillierte Beschreibung auch anderer Ger&auml;te/Protokolle befindet
+      sich in der <a href="commandref_DE.html">commandref</a> Dokument.
+
+
+    </ul>
+
+    <a name="Documentation"></a>
+    <h3>Dokumentation</h3>
+    <ul>
+      <div class="dist"><a href="Heimautomatisierung-mit-fhem.pdf">
+      Heimautomatisierung-mit-fhem.pdf</a></div>
+        <div class="dist"></div>
+
+      <div class="dist"><a href="HOWTO_DE.html">HOWTO_DE.html</a> f&uuml;r eine kurze
+      Installation/Konfiguration.</div> 
+        <div class="dist"></div>
+
+      <div class="dist"><a href="commandref_DE.html">commandref_DE.html</a>
+      enth&auml;lt eine detaillierte Beschreibung aller Module und Features.</div>
+        <div class="dist"></div>
+
+      <div class="dist">Unser wiki ist erreichbar unter <a
+      href="http://fhemwiki.de/index.php/FHEM">fhemwiki.de</a></div>
+        <div class="dist"></div>
+
+      <div class="dist">Das F.A.Q. <a href="faq.html">faq.html</a> (englisch)</div>
+        <div class="dist"></div>
+
+      <div class="dist">Forum: <a href="http://forum.fhem.de">http://forum.fhem.de</a>
+        <div class="dist"></div>
+
+      <div class="dist"><a href="README.contrib">contrib/README</a> beschreibt einige
+      nicht aktiv gepflegte Module / Skripte.</div>
+        <div class="dist"></div>
+
+    </ul>
+
+    <a name="Links"></a>
+    <h3>Links</h3>
+    <ul>
+      Homepage:  <a href="http://fhem.de/fhem_DE.html">
+        http://fhem.de/fhem_DE.html</a><br>
+      Die Q&uuml;llen beim SVN@sourceforge: <a
+        href="http://fhem.svn.sourceforge.net">
+        http://fhem.svn.sourceforge.net</a><br>
+      <br>
+
+      Betriebsystem/Ger&auml;tspezifisch Dokumentation:<br>
+      <ul>
+        <li>Anweisungen f&uuml;r den <a href="fritzbox.html">FRITZ!Box</a> (englisch)</li>
+          <div class="dist"></div>
+
+        <li>Anweisungen f&uuml;r Nas/Router (NSLU2):
+          <a href="http://www.martin-haas.de/fhz/nslu2fhz">
+          http://www.martin-haas.de/fhz/nslu2fhz</a> (english)</li>
+          <div class="dist"></div>
+
+        <li>Anweisungen f&uuml;r Synology Diskstation / Rackstation:
+          <a href="http://www.fischer-net.de/hausautomation/fhem.html">
+          http://www.fischer-net.de/hausautomation/fhem.html</a></li>
+          <div class="dist"></div>
+
+        <li>Anweisungen f&uuml;r den Allnet all6250:
+          <a href="http://wiki.dungeon.de/all6250_opennas_mit_fhem">
+          http://wiki.dungeon.de/all6250_opennas_mit_fhem</a></li>
+          <div class="dist"></div>
+
+        <li>Linux Treiber Installation :
+          <a href="http://fhem.de/linux.html">
+          http://fhem.de/linux.html</a>(nur im Problemfall, english)</li>
+          <div class="dist"></div>
+
+        <li>Diverse USB Probleme:
+          <a href="http://fhem.de/USB.html">
+          http://fhem.de/USB.html</a> (english)</li>
+          <div class="dist"></div>
+
+        <li>Russels Blog for Windows user:
+          <a href="http://russellallen.info/category/FHEM.aspx">
+          http://russellallen.info/category/FHEM.aspx</a> (english)<br>
+          <div class="dist"></div>
+
+        <li>Windows driver installation:
+          <a href="http://fhz4linux.info/tiki-index.php?page=Driver%20installation">
+          http://fhz4linux.info/tiki-index.php?page=Driver%20installation</a><br>
+           (english, use "Solution B", only COM1..COM9 is supported)</li>
+          <div class="dist"></div>
+      </ul>
+      <br>
+
+      Kommerzielle Produkte:
+      <ul>
+        <li><a href="http://www.dhs-computertechnik.de/">
+          http://www.dhs-computertechnik.de</a>
+          <br>
+        <li>CUL/CUNO/COC/EUL/TUL:
+          <a href=http://shop.busware.de/product_info.php?products_id=29">
+          Hardware shop</a>,
+          <a href="http://culfw.de/culfw.html">firmware homepage</a>,
+          <a href="http://groups.google.com/group/cul-fans">
+          CUL fans google group</a></li>
+      </ul>
+    </ul>
+
+
+    <a name="Installation"></a>
+    <h3>Installation</h3>
+
+    <ul>
+    <h4>Fritz!Box</h4>
+    <ul>
+      <li>FB7390: Folgenden FHEM
+         <a href="http://fhem.de/fhem-=VERS=-fb7390.image">Image</a>
+         <i>zus&auml;tzlich</i> zum normalen oder labor Image von AVM installieren.
+         Beide sind vollkommen unabh&auml;ngig und deswegen jeweils austauschbar.
+      <li>FB7270: <a
+          href="http://fhem.de/fhem-=VERS=-fb7270.zip">Diese</a> zip Datei
+          auf dem USB-Disk auspacken, danach es ans FritzBox anschliessen, per
+          telnet anmelden, ins Verzeichnis wechseln, und FHEM von hier starten.
+      <li>Siehe auch die detaillierte Dokumentation <a href="fritzbox.html">hier</a>.
+     </ul>
+
+    <h4>Debian/Ubuntu</h4>
+    <ul>
+      <li><a href="http://fhem.de/fhem-=VERS=.deb">Dieses</a> FHEM Paket (.deb) installieren.
+      <b>Achtung:</b> Beim upgrade von einer FHEM Version vor 5.3 muss das alte
+      Paket vorher per "dpkg -P fhem" vollst&auml;ndig entfernt werden, da das
+      Verzeichnisstruktur sich ge&auml;ndert hat.  Ab Version 5.3 haben alle FHEM
+      Installations-Varianten die gleiche Verzeichnisstruktur.
+    </ul>
+
+    <h4>Unix / OSX</h4>
+    <ul>
+      <li>Zuerst sollte sichergestellt werden, da&szlig; perl installiert ist.
+        Vermutlich wird das Perl-Modul Device::SerialPort ben&ouml;tigt (falls man
+        mit fhem USB-Ger&auml;te ansprechen m&ouml;chte), diesen kann man meist mit
+        "sudo cpan Device::SerialPort" oder "apt-get install
+        libdevice-serialport-perl" installieren.
+        </li>
+      <li><a href="http://fhem.de/fhem-=VERS=.tar.gz">Dieses</a> FHEM Paket
+        herunterladen, auspacken, und in das neu erstellte Verzeichnis wechseln.</li>
+      <li>Starten sie FHEM mit<br>
+        <ul>
+          <code>perl fhem.pl fhem.cfg</code>
+        </ul>
+        </li>
+    </ul>
+
+    <h4>Windows</h4>
+    <ul>
+      <b>Achtung:</b> Falls Sie FHEM unter cygwin installieren wollen, dann
+      k&ouml;nnen Sie die Installationsanleitung f&uuml;r UNIX befolgen.
+      <br><br>
+
+      <li>Stellen Sie sicher, da&szlig; perl.exe in dem Pfad (%PATH%) ist, und das
+        Perl-Modul Win32::SerialPort installiert ist.</li>
+      <li>Stellen Sie sicher, da&szlig; das ben&ouml;tigte Ger&auml;t (CUL/FHZ/etc) &uuml;ber
+        einen virtuellen COM-Port oder via socket (e.g. <code>COMX or
+        xport:10001</code>) zur Verf&uuml;gung steht.
+        </li>
+      <li>Packen Sie <a href="http://fhem.de/fhem-=VERS=.tar.gz">diese</a>
+        Datei aus, und wechseln Sie in das neu erstellte Verzeichnis.
+      <li>Starten sie FHEM aus der Kommandozeile mit<br>
+        <ul>
+          <code>perl fhem.pl fhem.cfg</code>
+        </ul>
+        </li>
+    </ul>
+
+    <br><br>
+    Nach der Installation sollten sie das Dokument <a
+    href="HOWTO_DE.html">HOWTO_DE</a> befolgen, um in FHEM Ger&auml;te zu definieren.
+    </ul>
+
+    <a name="License"></a>
+    <h3>Lizenz:</h3>
+    <ul>
+      Copyright:<br>
+      <ul>
+        <li>Rudolf Koenig (r punkt koenig at koeniglich punkt de). Achtung: Ich leiste <b>
+        kein</b> FHEM support &uuml;ber Email, bitte verwenden sie das Forum f&uuml;r diesen Zweck.
+        </li>
+        <li>Martin Haas (webfrontends/pgm3)</li>
+        <li>Olaf Droegehorn (webfrontends/pgm5)</li>
+        <li>Zahlreiche weitere Entwickler, die jeweils zu FHEM beigetragen haben.</li>
+      </ul>
+      License: GPL (v2)<br>
+      Vielen Dank an TOSTi f&uuml;r die Inspiration und an die vielen Fhem
+      Entwickler und Anwender.<br>
+    </ul>  
+
+  </body>
+
+  </html>
