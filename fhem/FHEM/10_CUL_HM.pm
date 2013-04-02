@@ -228,7 +228,7 @@ sub CUL_HM_updateConfig($){
 	push @getConfList,$name if (0 != substr(AttrVal($name,"autoReadReg","0"),0,1));
   }
   $modules{CUL_HM}{helper}{updtCfgLst} = \@getConfList;
-#General log  CUL_HM_autoReadConfig("updateConfig");
+  CUL_HM_autoReadConfig("updateConfig");
 }
 sub CUL_HM_Define($$) {##############################
   my ($hash, $def) = @_;
@@ -1781,7 +1781,6 @@ sub CUL_HM_Set($@) {
      $cmd =~ m/^(day|night|party)-temp$/){ #
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value
     ($chn,$isChannel) = ("02","true");#force chn 02
-    readingsSingleUpdate(CUL_HM_getDeviceHash($hash),$a[2],$a[3],1);#for historical reason
   }
   elsif($cmd eq "sign"){
 	splice @a,1,0,"regSet";# make hash,regSet,reg,value 
@@ -2006,7 +2005,7 @@ sub CUL_HM_Set($@) {
 	  my $curVal = CUL_HM_getRegFromStore($rName,
 	                                      $addr,$list,$peerId.$peerChn);
 	  return "cannot read current value for Bitfield - retrieve Data first" 
-	             if (!$curVal);
+	             if (!$curVal ||$curVal eq "invalid");
 	  $curVal =~ s/set_//; # set is not relevant, we take it as given
 	  $data = ($curVal & (~($mask<<$bit)))|($data<<$bit);
 	  $addrData.=sprintf("%02X%02X",$addr,$data);
@@ -2319,7 +2318,8 @@ sub CUL_HM_Set($@) {
 	readingsSingleUpdate($hash,"tempList$wd",$msg,0);
   } 
   elsif($cmd eq "sysTime") { ##################################################
-    my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
+    $state = "";
+	my $s2000 = sprintf("%02X", CUL_HM_secSince2000());
     CUL_HM_PushCmdStack($hash,"++803F$id${dst}0204$s2000");
   } 
   elsif($cmd eq "valvePos") { #################################################
@@ -3267,16 +3267,15 @@ sub CUL_HM_updtRegDisp($$$) {
 	push (@changedRead,$readName.":".$rgVal)
 	      if (ReadingsVal($name,$readName,"") ne $rgVal);
   }
+  CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 
-  # ---  handle specifics -  no general approach so far.  
+  # ---  handle specifics -  Devices with abnormal or long register
   CUL_HM_TCtempReadings($hash)  if (($list == 5 ||$list == 6) && 
                       substr($hash->{DEF},6,2) eq "02"        &&
                       CUL_HM_Get($hash,$name,"param","model") eq "HM-CC-TC");
   CUL_HM_repReadings($hash) if (($list == 2)                  && 
 		              CUL_HM_Get($hash,$name,"param","subType") eq "repeater");
 #  CUL_HM_dimLog($hash) if(CUL_HM_Get($hash,$name,"param","subType") eq "dimmer");
-
-  CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
 }
 #############################
 #+++++++++++++++++ parameter cacculations +++++++++++++++++++++++++++++++++++++
@@ -3448,6 +3447,13 @@ sub CUL_HM_TCtempReadings($) {# parse TC readings
 	push (@changedRead,"tempList".$days[$day].":".$dayRead);
   }  
   CUL_HM_UpdtReadBulk($hash,1,@changedRead) if (@changedRead);
+  { #update readings in device - oldfashioned style, copy from Readings
+    my @histVals;
+    foreach my $var ("displayMode","displayTemp","controlMode","decalcDay","displayTempUnit","day-temp","night-temp","party-temp"){
+	  push @histVals,$var.":".ReadingsVal($name,"R-".$var,"???");
+    }
+    CUL_HM_UpdtReadBulk(CUL_HM_getDeviceHash($hash),1,@histVals) if (@histVals);
+  }
   return $setting;
 }
 sub CUL_HM_repReadings($) {# for repeater in:hash, out: string with peers
