@@ -358,7 +358,11 @@ FRM_Init_Pin_Client($$$) {
 		eval {
 			$hash->{IODev}->{FirmataDevice}->pin_mode($pin,$mode);
 		};
-		return "error setting Firmata pin_mode for ".$hash->{NAME}.": ".$@ if ($@);
+		if ($@) {
+			main::Log(2,"FRM_Init error setting pin_mode: ".$@);
+			FRM_Client_Unassign($hash);
+			return "error setting ".$hash->{NAME}." pin_mode for pin ".$pin;
+		}
 		return undef;
 	}
 	return "no IODev set" unless defined $hash->{IODev};
