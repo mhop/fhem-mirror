@@ -779,18 +779,24 @@ sub CUL_HM_Parse($$) {##############################
 	}
   } 
   elsif($st eq "THSensor") { ##################################################
-    my $t =  hex(substr($p,0,4));
-    $t -= 32768 if($t > 1638.4);
-    $t = sprintf("%0.1f", $t/10);
-    my $h =  hex(substr($p,4,2));
-    my $ap = hex(substr($p,6,4));
-    my $statemsg = "state:T: $t";
-    $statemsg .= " H: $h"   if ($h);
-    $statemsg .= " AP: $ap" if ($ap);
-    push @event, $statemsg;
-    push @event, "temperature:$t";#temp is always there
-    push @event, "humidity:$h"      if ($h);
-    push @event, "airpress:$ap"     if ($ap);
+    if ($msgType eq "70"){
+      my $t =  hex(substr($p,0,4));
+      $t -= 32768 if($t > 1638.4);
+      $t = sprintf("%0.1f", $t/10);
+      my $statemsg = "state:T: $t";
+      push @event, "temperature:$t";#temp is always there
+	  if ($model !~ m/^(S550IA|HM-WDS30-T-O)$/){#ignore only-temp sensors
+        my $h =  hex(substr($p,4,2));
+        $statemsg .= " H: $h";
+        push @event, "humidity:$h";
+	    if ($model eq "HM-WDC7000"){#airpressure sensor
+          my $ap = hex(substr($p,6,4));
+          $statemsg .= " AP: $ap";
+          push @event, "airpress:$ap";
+	    }
+	  }
+      push @event, $statemsg;
+	}
   } 
   elsif($st =~ m /^(switch|dimmer|blindActuator)$/) {##########################
     if (($msgType eq "02" && $p =~ m/^01/) ||  # handle Ack_Status
@@ -1310,7 +1316,7 @@ sub CUL_HM_parseCommon(@){#####################################################
       ((hex($msgFlag) & 0xA2) == 0x82) && 
 	  (CUL_HM_getRxType($shash) & 0x08)){ #wakeup #####
 	#send wakeup and process command stack
-    #CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src); #not necessary even for TC
+    CUL_HM_SndCmd($shash, '++A112'.CUL_HM_IOid($shash).$src);
 	CUL_HM_ProcessCmdStack($shash);
   }
   
