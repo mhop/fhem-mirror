@@ -97,13 +97,6 @@ Ext.define('FHEM.controller.ChartController', {
         var yaxesfillchecks = Ext.ComponentQuery.query('checkbox[name=yaxisfillcheck]');
         var yaxesstatistics = Ext.ComponentQuery.query('combobox[name=yaxisstatisticscombo]');
         
-        var basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]');
-        var basesend = Ext.ComponentQuery.query('numberfield[name=baseend]');
-        var basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]');
-        var basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]');
-        
-        
-            
         var starttime = me.getStarttimepicker().getValue(),
             dbstarttime = Ext.Date.format(starttime, 'Y-m-d_H:i:s'),
             endtime = me.getEndtimepicker().getValue(),
@@ -113,6 +106,9 @@ Ext.define('FHEM.controller.ChartController', {
             chart = me.getChart(),
             store = chart.getStore(),
             proxy = store.getProxy();
+        
+        //show loadmask
+        chart.setLoading(true);
         
         //cleanup store
         store.removeAll();
@@ -130,29 +126,6 @@ Ext.define('FHEM.controller.ChartController', {
         
         me.maxYValue = 0;
         me.minYValue = 9999999;
-        
-        //adding baseline values to max and min values of y-axis
-        Ext.each(basesstart, function(basestart) {
-            if (me.maxYValue < basestart.getValue()) {
-                me.maxYValue = basestart.getValue();
-            }
-            if (me.minYValue > basestart.getValue()) {
-                me.minYValue = basestart.getValue();
-            }
-        });
-        Ext.each(basesend, function(baseend) {
-            if (me.maxYValue < baseend.getValue()) {
-                me.maxYValue = baseend.getValue();
-            }
-            if (me.minYValue > baseend.getValue()) {
-                me.minYValue = baseend.getValue();
-            }
-        });
-        
-        //register store listeners
-        store.on("beforeload", function() {
-            me.getChart().setLoading(true);
-        });
         
         //setting x-axis title
         chart.axes.get(1).setTitle(xaxes[0]);
@@ -226,23 +199,10 @@ Ext.define('FHEM.controller.ChartController', {
                 yaxiscolorcombo = yaxescolorcombos[i].getValue(),
                 yaxisfillcheck = yaxesfillchecks[i].checked,
                 yaxisstatistics = yaxesstatistics[i].getValue();
-            me.populateAxis(i, device, xaxis, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstatistics, dbstarttime, dbendtime);
+            me.populateAxis(i, yaxes.length, device, xaxis, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstatistics, dbstarttime, dbendtime);
             i++;
         });
         
-        //waiting for the first data arriving to add our baseline to it
-        store.on("load", function() {
-            var i = 0;
-            Ext.each(basesstart, function(base) {
-                var basestart = basesstart[i].getValue(),
-                    baseend = basesend[i].getValue(),
-                    basecolor = basescolors[i].getValue(),
-                    basefill = basesfills[i].checked;
-                
-                    me.createBaseLine(i + 1, basestart, baseend, basefill, basecolor);
-                    i++;
-            });
-        }, this, {single: true});
     },
     
     /**
@@ -272,8 +232,10 @@ Ext.define('FHEM.controller.ChartController', {
                 },
                 tips : {
                     trackMouse : true,
-                    width : 140,
-                    height : 100,
+                    mouseOffset: [1,1],
+                    showDelay: 1000,
+                    width : 280,
+                    height : 50,
                     renderer : function(storeItem, item) {
                         this.setTitle(' Value: : ' + storeItem.get(yfield) + 
                                 '<br> Time: ' + storeItem.get('TIMESTAMP'));
@@ -283,14 +245,26 @@ Ext.define('FHEM.controller.ChartController', {
             chart.series.add(baseline);
             
             store.first().set(yfield, basestart);
-            store.last().set(yfield, baseend);
+            
+            //getting the very last items time
+            var time = new Date("1970");
+            store.each(function(rec) {
+                current = rec.get("TIMESTAMP");
+                if (current > time) {
+                    time = current;
+                }
+            });
+            var item = Ext.create('FHEM.model.ChartModel');
+            item.set(yfield, baseend);
+            item.set('TIMESTAMP', time);
+            store.add(item);
         }
     },
     
     /**
      * fill the axes with data
      */
-    populateAxis: function(i, device, xaxis, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstatistics, dbstarttime, dbendtime) {
+    populateAxis: function(i, axeslength, device, xaxis, yaxis, yaxiscolorcombo, yaxisfillcheck, yaxisstatistics, dbstarttime, dbendtime) {
         
         var me = this,
             chart = me.getChart(),
@@ -331,205 +305,189 @@ Ext.define('FHEM.controller.ChartController', {
             
         }
         
-        proxy.url = url;
-        
-        if (i > 0) { //make async ajax when not on first axis
-            Ext.Ajax.request({
-              method: 'GET',
-              disableCaching: false,
-              url: url,
-              success: function(response){
+        Ext.Ajax.request({
+          method: 'GET',
+          async: false,
+          disableCaching: false,
+          url: url,
+          success: function(response){
+              
+              var json = Ext.decode(response.responseText);
+              
+              if (json.success && json.success === "false") {
+                  Ext.Msg.alert("Error", "Error an adding Y-Axis number " + i + ", error was: <br>" + json.msg);
+              } else {
                   
-                  var json = Ext.decode(response.responseText);
-                  
-                  if (json.success && json.success === "false") {
-                      Ext.Msg.alert("Error", "Error an adding Y-Axis number " + i + ", error was: <br>" + json.msg);
-                  } else {
-                      
-                      //get the current value descriptor
-                      var valuetext;
-                      if (yaxisstatistics.indexOf("none") >= 0) {
+                  //get the current value descriptor
+                  var valuetext;
+                  if (yaxisstatistics.indexOf("none") >= 0) {
+                      if (i === 0) {
+                          valuetext = 'VALUE';
+                          yseries.yField = 'VALUE';
+                          yseries.tips.renderer = me.setSeriesRenderer('VALUE');
+                      } else {
                           valuetext = 'VALUE' + (i + 1);
-                      } else if (yaxisstatistics.indexOf("sum") > 0) {
+                          yseries.yField = 'VALUE' + (i + 1);
+                          yseries.tips.renderer = me.setSeriesRenderer('VALUE' + (i + 1));
+                      }
+                  } else if (yaxisstatistics.indexOf("sum") > 0) {
+                      if (i === 0) {
+                          valuetext = 'SUM';
+                          yseries.yField = 'SUM';
+                          yseries.tips.renderer = me.setSeriesRenderer('SUM');
+                      } else {
                           valuetext = 'SUM' + (i + 1);
-                      } else if (yaxisstatistics.indexOf("average") > 0)  {
+                          yseries.yField = 'SUM' + (i + 1);
+                          yseries.tips.renderer = me.setSeriesRenderer('SUM' + (i + 1));
+                      }
+                  } else if (yaxisstatistics.indexOf("average") > 0)  {
+                      if (i === 0) {
+                          valuetext = 'AVG';
+                          yseries.yField = 'AVG';
+                          yseries.tips.renderer = me.setSeriesRenderer('AVG');
+                      } else {
                           valuetext = 'AVG' + (i + 1);
-                      } else if (yaxisstatistics.indexOf("min") > 0)  {
+                          yseries.yField = 'AVG' + (i + 1);
+                          yseries.tips.renderer = me.setSeriesRenderer('AVG' + (i + 1));
+                      }
+                  } else if (yaxisstatistics.indexOf("min") > 0)  {
+                      if (i === 0) {
+                          valuetext = 'MIN';
+                          yseries.yField = 'MIN';
+                          yseries.tips.renderer = me.setSeriesRenderer('MIN');
+                      } else {
                           valuetext = 'MIN' + (i + 1);
-                      }  else if (yaxisstatistics.indexOf("max") > 0)  {
+                          yseries.yField = 'MIN' + (i + 1);
+                          yseries.tips.renderer = me.setSeriesRenderer('MIN' + (i + 1));
+                      }
+                  }  else if (yaxisstatistics.indexOf("max") > 0)  {
+                      if (i === 0) {
+                          valuetext = 'MAX';
+                          yseries.yField = 'MAX';
+                          yseries.tips.renderer = me.setSeriesRenderer('MAX');
+                      } else {
                           valuetext = 'MAX' + (i + 1);
-                      }  else if (yaxisstatistics.indexOf("count") > 0)  {
+                          yseries.yField = 'MAX' + (i + 1);
+                          yseries.tips.renderer = me.setSeriesRenderer('MAX' + (i + 1));
+                      }
+                  }  else if (yaxisstatistics.indexOf("count") > 0)  {
+                      if (i === 0) {
+                          valuetext = 'COUNT';
+                          yseries.yField = 'COUNT';
+                          yseries.tips.renderer = me.setSeriesRenderer('COUNT');
+                      } else {
                           valuetext = 'COUNT' + (i + 1);
+                          yseries.yField = 'COUNT' + (i + 1);
+                          yseries.tips.renderer = me.setSeriesRenderer('COUNT' + (i + 1));
                       }
-                      var timestamptext = 'TIMESTAMP' + (i + 1);
+                  }
+                  
+                  var timestamptext;
+                  if (i === 0) {
+                      timestamptext = 'TIMESTAMP';
+                  } else {
+                      timestamptext = 'TIMESTAMP' + (i + 1);
+                  }
+                  
+                  //add records to store
+                  for (var j = 0; j < json.data.length; j++) {
+                      var item = Ext.create('FHEM.model.ChartModel');
                       
-                      //add records to store
-                      for (var j = 0; j < json.data.length; j++) {
-                          var item = Ext.create('FHEM.model.ChartModel');
-                          
-                          Ext.iterate(item.data, function(key, value) {
-                              if (key.indexOf("TIMESTAMP") >= 0) {
-                                  item.set(key, json.data[j].TIMESTAMP);
-                              }
-                          });
-                          var valuestring = parseFloat(eval('json.data[j].' + valuetext.replace(/[0-9]/g, ''), 10));
-                          item.set(valuetext, valuestring);
-                          item.set(timestamptext, json.data[j].TIMESTAMP);
-                          store.add(item);
-                          
-                          // recheck if our min and max values are still valid
-                          if (me.minYValue > valuestring) {
-                              me.minYValue = valuestring;
+                      Ext.iterate(item.data, function(key, value) {
+                          if (key.indexOf("TIMESTAMP") >= 0) {
+                              item.set(key, json.data[j].TIMESTAMP);
                           }
-                          if (me.maxYValue < valuestring) {
-                              me.maxYValue = valuestring;
-                          }
+                      });
+                      var valuestring = parseFloat(eval('json.data[j].' + valuetext.replace(/[0-9]/g, ''), 10));
+                      item.set(valuetext, valuestring);
+                      item.set(timestamptext, json.data[j].TIMESTAMP);
+                      store.add(item);
+                      
+                      // recheck if our min and max values are still valid
+                      if (me.minYValue > valuestring) {
+                          me.minYValue = valuestring;
                       }
-                      
-                      if (generalization.checked) {
-                          me.generalizeChartData(generalizationfactor, i);
+                      if (me.maxYValue < valuestring) {
+                          me.maxYValue = valuestring;
                       }
-                      
-                      delete chart.axes.get(0).maximum;
-                      delete chart.axes.get(0).minimum;
-                      
-                      chart.axes.get(0).maximum = me.maxYValue;
-                      chart.axes.get(0).minimum = me.minYValue;
-                      chart.redraw();
-                      
-                  } 
-              },
-              failure: function() {
-                  Ext.Msg.alert("Error", "Error an adding Y-Axis number " + i);
-              }
-          });
+                  }
+                  
+                  if (generalization.checked) {
+                      me.generalizeChartData(generalizationfactor, i);
+                  }
+                  
+              } 
+          },
+          failure: function() {
+              Ext.Msg.alert("Error", "Error an adding Y-Axis number " + i);
+          }
+        });
+      
+        chart.series.add(yseries);
+        
+        //check if we have added the last dataset
+        if ((i + 1) === axeslength) {
+            //add baselines
+            var i = 0,
+                basesstart = Ext.ComponentQuery.query('numberfield[name=basestart]'),
+                basesend = Ext.ComponentQuery.query('numberfield[name=baseend]'),
+                basescolors = Ext.ComponentQuery.query('combobox[name=baselinecolorcombo]'),
+                basesfills = Ext.ComponentQuery.query('checkboxfield[name=baselinefillcheck]');
+            
+            Ext.each(basesstart, function(base) {
+                var basestart = basesstart[i].getValue(),
+                    baseend = basesend[i].getValue(),
+                    basecolor = basescolors[i].getValue(),
+                    basefill = basesfills[i].checked;
+                
+                me.createBaseLine(i + 1, basestart, baseend, basefill, basecolor);
+                
+                //adjust min and max on y axis
+                if (me.maxYValue < basestart) {
+                    me.maxYValue = basestart;
+                }
+                if (me.minYValue > basestart) {
+                    me.minYValue = basestart;
+                }
+                if (me.maxYValue < baseend) {
+                    me.maxYValue = baseend;
+                }
+                if (me.minYValue > baseend) {
+                    me.minYValue = baseend;
+                }
+                i++;
+            });
+            me.doFinalChartLayout(chart);
+        }
+    },
+    
+    /**
+     * do the final layout of chart after all data is loaded
+     */
+    doFinalChartLayout: function(chart) {
+        
+        var me = this;
+        
+        //remove the old max values of y axis to get a dynamic range
+        delete chart.axes.get(0).maximum;
+        delete chart.axes.get(0).minimum;
+        
+        chart.axes.get(0).maximum = me.maxYValue;
+        if (me.minYValue === 9999999) {
+            chart.axes.get(0).minimum = 0;
         } else {
-            store.load();
+            chart.axes.get(0).minimum = me.minYValue;
         }
         
-        var order = function(updatedstore) {
-            
-             if (generalization.checked) {
-                me.generalizeChartData(generalizationfactor, i);
-             }
-             
-             if (yaxisstatistics.indexOf("none") >= 0) {
-                 if (i === 0) {
-                     yseries.yField = 'VALUE';
-                     if (me.maxYValue < updatedstore.max('VALUE')) {
-                         me.maxYValue = updatedstore.max('VALUE');
-                     }
-                     if (me.minYValue > updatedstore.min('VALUE')) {
-                         me.minYValue = updatedstore.min('VALUE');
-                     }
-                 } else {
-                     yseries.yField = 'VALUE' + (i + 1);
-                     if (me.maxYValue < updatedstore.max(yseries.yField)) {
-                         me.maxYValue = updatedstore.max(yseries.yField);
-                     }
-                 }
-             } else if (yaxisstatistics.indexOf("sum") > 0) {
-                 if (i === 0) {
-                     yseries.yField = 'SUM';
-                     yseries.tips.renderer = me.setSeriesRenderer('SUM');
-                     if (me.maxYValue < updatedstore.max('SUM')) {
-                         me.maxYValue = updatedstore.max('SUM');
-                     }
-                     if (me.minYValue > updatedstore.min('SUM')) {
-                         me.minYValue = updatedstore.min('SUM');
-                     }
-                 } else {
-                     yseries.yField = 'SUM' + (i + 1);
-                     yseries.tips.renderer = me.setSeriesRenderer('SUM' + (i + 1));
-                 }
-                 chart.axes.get(0).setTitle("SUM " + yaxis);
-             } else if (yaxisstatistics.indexOf("average") > 0)  {
-                 if (i === 0) {
-                     yseries.yField = 'AVG';
-                     yseries.tips.renderer = me.setSeriesRenderer('AVG');
-                     if (me.maxYValue < updatedstore.max('AVG')) {
-                         me.maxYValue = updatedstore.max('AVG');
-                     }
-                     if (me.minYValue > updatedstore.min('AVG')) {
-                         me.minYValue = updatedstore.min('AVG');
-                     }
-                 } else {
-                     yseries.yField = 'AVG' + (i + 1);
-                     yseries.tips.renderer = me.setSeriesRenderer('AVG' + (i + 1));
-                 }
-                 chart.axes.get(0).setTitle("AVG " + yaxis);
-             } else if (yaxisstatistics.indexOf("min") > 0)  {
-                 if (i === 0) {
-                     yseries.yField = 'MIN';
-                     yseries.tips.renderer = me.setSeriesRenderer('MIN');
-                     if (me.maxYValue < updatedstore.max('MIN')) {
-                         me.maxYValue = updatedstore.max('MIN');
-                     }
-                     if (me.minYValue > updatedstore.min('MIN')) {
-                         me.minYValue = updatedstore.min('MIN');
-                     }
-                 } else {
-                     yseries.yField = 'MIN' + (i + 1);
-                     yseries.tips.renderer = me.setSeriesRenderer('MIN' + (i + 1));
-                 }
-                 chart.axes.get(0).setTitle("MIN " + yaxis);
-             }  else if (yaxisstatistics.indexOf("max") > 0)  {
-                 if (i === 0) {
-                     yseries.yField = 'MAX';
-                     yseries.tips.renderer = me.setSeriesRenderer('MAX');
-                     if (me.maxYValue < updatedstore.max('MAX')) {
-                         me.maxYValue = updatedstore.max('MAX');
-                     }
-                     if (me.minYValue > updatedstore.min('MAX')) {
-                         me.minYValue = updatedstore.min('MAX');
-                     }
-                 } else {
-                     yseries.yField = 'MAX' + (i + 1);
-                     yseries.tips.renderer = me.setSeriesRenderer('MAX' + (i + 1));
-                 }
-                 chart.axes.get(0).setTitle("MAX " + yaxis);
-             }  else if (yaxisstatistics.indexOf("count") > 0)  {
-                 if (i === 0) {
-                     yseries.yField = 'COUNT';
-                     yseries.tips.renderer = me.setSeriesRenderer('COUNT');
-                     if (me.maxYValue < updatedstore.max('COUNT')) {
-                         me.maxYValue = updatedstore.max('COUNT');
-                     }
-                     if (me.minYValue > updatedstore.min('COUNT')) {
-                         me.minYValue = updatedstore.min('COUNT');
-                     }
-                 } else {
-                     yseries.yField = 'COUNT' + (i + 1);
-                     yseries.tips.renderer = me.setSeriesRenderer('COUNT' + (i + 1));
-                 }
-                 chart.axes.get(0).setTitle("COUNT " + yaxis);
-             }
-             
-             //remove the old max values of y axis to get a dynamic range
-             delete chart.axes.get(0).maximum;
-             delete chart.axes.get(0).minimum;
-             
-             chart.axes.get(0).maximum = me.maxYValue;
-             if (me.minYValue === 9999999) {
-                 chart.axes.get(0).minimum = 0;
-             } else {
-                 chart.axes.get(0).minimum = me.minYValue;
-             }
-             
-             chart.series.add(yseries);
-             
-             // set the x axis range dependent on user given timerange
-             var starttime = me.getStarttimepicker().getValue(),
-                 endtime = me.getEndtimepicker().getValue();
-             chart.axes.get(1).fromDate = starttime;
-             chart.axes.get(1).toDate = endtime;
-             chart.axes.get(1).processView();
-             chart.redraw();
-             
-             me.getChart().setLoading(false);
-            
-        };
-        store.on("load", order, this, {single: true});
+        // set the x axis range dependent on user given timerange
+        var starttime = me.getStarttimepicker().getValue(),
+            endtime = me.getEndtimepicker().getValue();
+        chart.axes.get(1).fromDate = starttime;
+        chart.axes.get(1).toDate = endtime;
+        chart.axes.get(1).processView();
+        chart.redraw();
+        
+        chart.setLoading(false);
     },
     
     /**
