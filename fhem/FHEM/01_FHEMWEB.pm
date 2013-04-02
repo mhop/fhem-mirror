@@ -1738,8 +1738,9 @@ FW_calcWeblink($$)
     my @l = localtime($t);
     $FW_devs{$d}{from}
         = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    @l = localtime($t+3600);
     $FW_devs{$d}{to}
-        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]+1);;
+        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
 
   } elsif($zoom eq "qday") {
     my $t = $now + $off*21600;
@@ -1747,14 +1748,17 @@ FW_calcWeblink($$)
     $l[2] = int($l[2]/6)*6;
     $FW_devs{$d}{from}
         = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
+    @l = localtime($t+21600);
+    $l[2] = int($l[2]/6)*6;
     $FW_devs{$d}{to}
-        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]+6);
+        = sprintf("%04d-%02d-%02d_%02d",$l[5]+1900,$l[4]+1,$l[3],$l[2]);
 
   } elsif($zoom eq "day") {
     my $t = $now + $off*86400;
     my @l = localtime($t);
     $FW_devs{$d}{from} = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
-    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]+1);
+    @l = localtime($t+86400);
+    $FW_devs{$d}{to}   = sprintf("%04d-%02d-%02d",$l[5]+1900,$l[4]+1,$l[3]);
 
   } elsif($zoom eq "week") {
     my @l = localtime($now);
