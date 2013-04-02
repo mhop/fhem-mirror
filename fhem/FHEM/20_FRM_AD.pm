@@ -72,8 +72,7 @@ FRM_AD_observer
     	main::readingsBulkUpdate($hash,"alarm-upper-threshold","on",1);
       }
 	};
-	main::readingsBulkUpdate($hash,"reading",$new, 1);
-	main::readingsEndUpdate($hash,0);
+	main::readingsEndUpdate($hash,1);
 }
 
 sub

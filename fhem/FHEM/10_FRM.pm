@@ -170,6 +170,14 @@ sub FRM_Ready($) {
 		return undef;
 	}
 	return DevIo_OpenDev($hash, 1, "FRM_DoInit") if($hash->{STATE} eq "disconnected");
+	
+	# This is relevant for windows/USB only
+	my $po = $hash->{USBDev};
+	my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+	if($po) {
+		($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+	}
+	return ($InBytes && $InBytes>0);
 }
 
 sub FRM_Attr(@) {
@@ -430,7 +438,7 @@ sub FRM_i2c_update_device
 		readingsBeginUpdate($hash);
 		$hash->{STATE}="active";
 		readingsBulkUpdate($hash,"values",join (" ",@values),1);
-		readingsEndUpdate($hash,undef);
+		readingsEndUpdate($hash,1);
 	}
 }
 
@@ -444,14 +452,26 @@ sub FRM_string_observer
 sub FRM_poll
 {
 	my ($hash) = @_;
-	my ($rout, $rin) = ('', '');
-    vec($rin, $hash->{FD}, 1) = 1;
-    my $nfound = select($rout=$rin, undef, undef, 0.1);
-    my $mfound = vec($rout, $hash->{FD}, 1); 
-	if($mfound) {
-		$hash->{FirmataDevice}->poll();
+	if (defined $hash->{FD}) {
+		my ($rout, $rin) = ('', '');
+    	vec($rin, $hash->{FD}, 1) = 1;
+    	my $nfound = select($rout=$rin, undef, undef, 0.1);
+    	my $mfound = vec($rout, $hash->{FD}, 1); 
+		if($mfound) {
+			$hash->{FirmataDevice}->poll();
+		}
+		return $mfound;
+	} else {
+		# This is relevant for windows/USB only
+  		my $po = $hash->{USBDev};
+  		my ($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags);
+  		if($po) {
+  			($BlockingFlags, $InBytes, $OutBytes, $ErrorFlags) = $po->status;
+  		}
+  		if ($InBytes && $InBytes>0) {
+			$hash->{FirmataDevice}->poll();
+  		}
 	}
-	return $mfound;
 }
 
 ######### following is code to be called from OWX: ##########
