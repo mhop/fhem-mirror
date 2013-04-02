@@ -35,10 +35,14 @@ FRM_AD_Init($$)
 	my $ret = FRM_Init_Pin_Client($hash,$args,PIN_ANALOG);
 	return $ret if (defined $ret);
 	my $firmata = $hash->{IODev}->{FirmataDevice};
+	my $name = $hash->{NAME};
 	$firmata->observe_analog($hash->{PIN},\&FRM_AD_observer,$hash);
-	$main::defs{$hash->{NAME}}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
-	if (! (defined AttrVal($hash->{NAME},"stateFormat",undef))) {
-		$main::attr{$hash->{NAME}}{"stateFormat"} = "reading";
+	$main::defs{$name}{resolution}=$firmata->{metadata}{analog_resolutions}{$hash->{PIN}} if (defined $firmata->{metadata}{analog_resolutions});
+	if (! (defined AttrVal($name,"stateFormat",undef))) {
+		$main::attr{$name}{"stateFormat"} = "reading";
+	}
+	if (! (defined AttrVal($name,"event-min-interval",undef))) {
+		$main::attr{$name}{"event-min-interval"} = 5;
 	}
 	main::readingsSingleUpdate($hash,"state","Initialized",1);
 	return undef;
