@@ -39,6 +39,9 @@ FRM_I2C_Init($)
 		$hash->{IODev}->{FirmataDevice}->i2c_read(@$args[0],@$args[1],@$args[2]);
 	};
 	return "error calling i2c_read: ".$@ if ($@);
+	if (! (defined AttrVal($hash->{NAME},"event-min-interval",undef))) {
+		$main::attr{$hash->{NAME}}{"event-min-interval"} = 5;
+	}
 	return undef;
 }
 
