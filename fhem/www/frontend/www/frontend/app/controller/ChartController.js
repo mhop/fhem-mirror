@@ -398,10 +398,19 @@ Ext.define('FHEM.controller.ChartController', {
                               item.set(key, json.data[j].TIMESTAMP);
                           }
                       });
-                      var valuestring = parseFloat(eval('json.data[j].' + valuetext.replace(/[0-9]/g, ''), 10));
+                      
+                      var valuestring = eval('json.data[j].' + valuetext.replace(/[0-9]/g, ''));
+                      
+                      //parseFloat only when we got a numeric value, else textparsing in model will fail
+                      if (Ext.isNumeric(valuestring)) {
+                          valuestring = parseFloat(valuestring, 10);
+                      }
                       item.set(valuetext, valuestring);
                       item.set(timestamptext, json.data[j].TIMESTAMP);
                       store.add(item);
+                      
+                      //rewrite of valuestring to get always numbers, even when text as value was passed to model
+                      valuestring = store.last().get(valuetext);
                       
                       // recheck if our min and max values are still valid
                       if (me.minYValue > valuestring) {

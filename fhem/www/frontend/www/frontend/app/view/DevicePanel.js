@@ -262,6 +262,7 @@ Ext.define('FHEM.view.DevicePanel', {
                             
                             var combo = Ext.create('Ext.form.ComboBox', {
                                 store: comboStore,
+                                padding: 8,
                                 queryMode: 'local',
                                 displayField: 'name',
                                 valueField: 'name',
@@ -291,6 +292,7 @@ Ext.define('FHEM.view.DevicePanel', {
                                 var control = Ext.create('Ext.button.Button', {
                                    text: val,
                                    width: 120,
+                                   height: 40,
                                    enableToggle: true,
                                    pressed: pressed,
                                    listeners: {

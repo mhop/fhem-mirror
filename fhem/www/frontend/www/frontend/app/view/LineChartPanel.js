@@ -152,19 +152,22 @@ Ext.define('FHEM.view.LineChartPanel', {
                           xtype: 'button',
                           width: 100,
                           text: 'Show Chart',
-                          name: 'requestchartdata'
+                          name: 'requestchartdata',
+                          icon: 'app/resources/icons/accept.png'
                         },
                         {
                           xtype: 'button',
                           width: 100,
                           text: 'Save Chart',
-                          name: 'savechartdata'
+                          name: 'savechartdata',
+                          icon: 'app/resources/icons/database_save.png'
                         },
                         {
                             xtype: 'button',
                             width: 100,
                             text: 'Reset Fields',
-                            name: 'resetchartform'
+                            name: 'resetchartform',
+                            icon: 'app/resources/icons/delete.png'
                         },
                         {
                             xtype: 'radio',
@@ -238,19 +241,22 @@ Ext.define('FHEM.view.LineChartPanel', {
                             xtype: 'button',
                             width: 100,
                             text: 'Step back',
-                            name: 'stepback'
+                            name: 'stepback',
+                            icon: 'app/resources/icons/resultset_previous.png'
                         },
                         {
                             xtype: 'button',
                             width: 100,
                             text: 'Step forward',
-                            name: 'stepforward'
+                            name: 'stepforward',
+                            icon: 'app/resources/icons/resultset_next.png'
                         },
                         {
                             xtype: 'button',
                             width: 100,
                             text: 'Reset Zoom',
                             name: 'resetzoom',
+                            icon: 'app/resources/icons/delete.png',
                             scope: me,
                             handler: function(btn) {
                                 var chart = me.down('chart');

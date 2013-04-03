@@ -1,3 +1,6 @@
+Update vom 03.4.2013
+  * Bugfix in der Verarbeitung der Userconfig für nicht numerische Werte
+  * Icons hinzugefügt
 Update vom 01.4.2013
   * Zoomen in Charts nun möglich mit aufziehbarer Box
   * Erweiterung der Anzahl der möglichen Y-Achsen von 3 auf 10
