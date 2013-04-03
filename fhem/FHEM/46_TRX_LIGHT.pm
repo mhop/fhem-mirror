@@ -6,8 +6,8 @@
 #       X10 lighting, ARC, ELRO AB400D, Waveman, Chacon EMW200,
 #       IMPULS, AC (KlikAanKlikUit, NEXA, CHACON, HomeEasy UK),
 #       HomeEasy EU, ANSLUT, Ikea Koppla
-#     Copyright by Willi Herzig
-#     e-mail: 
+#
+#     Copyright (C) 2012,2013 by Willi Herzig
 #
 #     This file is part of fhem.
 #
@@ -62,11 +62,13 @@ my %light_device_codes = (	# HEXSTRING => "NAME", "name of reading",
 	# 0x12: Lighting3
 	0x1200 => [ "KOPPLA", "light"], # IKEA Koppla
 	# 0x13: Lighting4
-	0x1300 => [ "PT2262", ""], # PT2262 raw messages
-	# 0x13: Lighting5
+	0x1300 => [ "PT2262", "light"], # PT2262 raw messages
+	# 0x14: Lighting5
 	0x1400 => [ "LIGHTWAVERF", "light"], # LightwaveRF
 	0x1401 => [ "EMW100", "light"], # EMW100
 	0x1402 => [ "BBSB", "light"], # BBSB
+	# 0x15: Lighting6
+	0x1500 => [ "BLYSS", "light"], # Blyss
 );
 
 my %light_device_commands = (	# HEXSTRING => commands
@@ -84,12 +86,16 @@ my %light_device_commands = (	# HEXSTRING => commands
 	0x1101 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # HOMEEASY
 	0x1102 => [ "off", "on", "level", "all_off", "all_on", "all_level"], # ANSLUT
 	# 0x12: Lighting3
-	0x1200 => [ "bright", "", "", "", "", "", "", "dim", "", "", "", "", "", "", "", "", "",
+	0x1200 => [ "bright", "", "", "", "", "", "", "", "dim", "", "", "", "", "", "", "", 
 		    "on", "level1", "level2", "level3", "level4", "level5", "level6", "level7", "level8", "level9", "off", "", "program", "", "", "", "",], # Koppla
-	0x1300 => [ "hex", "bin", "base-4"], # PT2262
+	# 0x13: Lighting4
+	0x1300 => [ "Lighting4"], # Lighting4: PT2262
+	# 0x14: Lighting5
 	0x1400 => [ "off", "on", "all_off", "mood1", "mood2", "mood3", "mood4", "mood5", "reserved1", "reserved2", "unlock", "lock", "all_lock", "close", "stop", "open", "level"], # LightwaveRF, Siemens
 	0x1401 => [ "off", "on", "learn"], # EMW100 GAO/Everflourish
 	0x1402 => [ "off", "on", "all_off", "all_on"], # BBSB new types
+	# 0x15: Lighting6
+	0x1500 => [ "off", "on", "all_off", "all_on"], # Blyss
 );
 
 my %light_device_c2b;        # DEVICE_TYPE->hash (reverse of light_device_codes)
@@ -187,7 +193,8 @@ TRX_LIGHT_Set($@)
 
   my $name = $a[0];
   my $command = $a[1];
-  my $level;
+  my $level = 0;
+  my $arg3 = "";
 
   # special for on-till
   return TRX_LIGHT_Do_On_Till($hash, @a) if($command eq "on-till");
@@ -195,11 +202,13 @@ TRX_LIGHT_Set($@)
   # special for on-for-timer
   return TRX_LIGHT_Do_On_For_Timer($hash, @a) if($command eq "on-for-timer");
 
+
   if ($na == 3) {
-  	$level = $a[2];
-  } else {
-	$level = 0;
-  }
+  	$arg3 = $a[2];
+	if ($na == 3 && $command ne "level" ) {
+	  	$level = $a[2];
+	} 
+  } 
 
   my $device_type = $hash->{TRX_LIGHT_type};
   my $deviceid = $hash->{TRX_LIGHT_deviceid};
@@ -229,7 +238,25 @@ TRX_LIGHT_Set($@)
   my $i;
   for ($i=0; $i <= $#$rec && ($rec->[$i] ne $command); $i++) { ;}
 
-  if($i > $#$rec) {
+  if($rec->[0] eq "Lighting4") { # for Lighting4
+	my $command_codes = $hash->{TRX_LIGHT_commandcodes}.",";
+	my $l = $command_codes; 
+	$l =~ s/([0-9]*):([a-z]*),/$2 /g; 
+	#Log 1,"PT2262: l=$l"; 
+
+	if (!($command =~ /^[0-2]*$/)) { # if it is base4 just accept it
+		if ($command ne "?" && $command_codes =~ /([0-9]*):$command,/ ) {
+			Log 1,"PT2262: arg=$command found=$1" if ($TRX_LIGHT_debug == 1); 
+			$command = $1;
+		} else {
+			Log 1,"PT2262: else arg=$command l='$l'" if ($TRX_LIGHT_debug == 1); 
+  			my $error = "Unknown command $command, choose one of $l "; 
+
+			Log 4, $error;
+			return $error;
+		}
+	}
+  } elsif ($i > $#$rec) { 
 	my $l = join(" ", sort @$rec); 
 	if ($device_type eq "AC" || $device_type eq "HOMEEASY" || $device_type eq "ANSLUT") {
   		$l =~ s/ level / level:slider,0,1,15 /; 
@@ -241,9 +268,6 @@ TRX_LIGHT_Set($@)
 	return $error;
   }
 
-  if ($na == 4 && $command ne "level") {
-	my $error = "Error: level not possible for command $command";
-  }
 
   my $seqnr = 0;
   my $cmnd = $i;
@@ -257,21 +281,21 @@ TRX_LIGHT_Set($@)
 		$house = ord("$1");
 		$unit = $2;
   	} else {
-		Log 4,"TRX_LIGHT_Set lightning1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		Log 4,"TRX_LIGHT_Set lighting1 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
 
-	# lightning1
+	# lighting1
   	$hex_prefix = sprintf "0710";
   	$hex_command = sprintf "%02x%02x%02x%02x%02x00", $device_type_num & 0xff, $seqnr, $house, $unit, $cmnd; 
   	Log 1,"TRX_LIGHT_Set name=$name device_type=$device_type, deviceid=$deviceid house=$house, unit=$unit command=$command" if ($TRX_LIGHT_debug == 1);
   	Log 1,"TRX_LIGHT_Set hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
   } elsif ($protocol_type == 0x11) {
-	# lightning2
+	# lighting2
   	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
 		;
   	} else {
-		Log 4,"TRX_LIGHT_Set lightning2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		Log 4,"TRX_LIGHT_Set lighting2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
   	$hex_prefix = sprintf "0B11";
@@ -279,14 +303,67 @@ TRX_LIGHT_Set($@)
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
 	} 
-  	Log 1,"TRX_LIGHT_Set lightning2 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
-  	Log 1,"TRX_LIGHT_Set lightning2 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
-  } elsif ($protocol_type == 0x14) {
-	# lightning4
+  	Log 1,"TRX_LIGHT_Set lighting2 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting2 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
+  } elsif ($protocol_type == 0x12) {
+	# lighting3
+	my $koppla_id = "";
+  	if (uc($deviceid) =~ /^([0-1][0-9])([0-9A-F])([0-9A-F][0-9A-F])$/ ) {
+		# $1 = system, $2 = high bits channel, $3 = low bits channel
+		my $koppla_system = $1 - 1;
+		if ($koppla_system > 15) {
+			return "error set name=$name  deviceid=$deviceid. system must be in range 01-16";
+		}
+		$koppla_id = sprintf("%02X",$koppla_system).$3."0".$2;
+		Log 1,"TRX_LIGHT_Set lighting3: deviceid=$deviceid kopplaid=$koppla_id" if (1 || $TRX_LIGHT_debug == 1);
+  	} else {
+		Log 4,"TRX_LIGHT_Set lighting3 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid. Wrong deviceid must be 3 digits with range 0000 - f3FF";
+		return "error set name=$name  deviceid=$deviceid. Wrong deviceid must be 5 digits consisting of 2 digit decimal value for system (01-16) and a 3 hex digit channel (000 - 3ff)";
+  	}
+  	$hex_prefix = sprintf "0812";
+  	$hex_command = sprintf "%02x%02x%s%02x00", $device_type_num & 0xff, $seqnr, $koppla_id, $cmnd; 
+	if ($command eq "level") {
+		$command .= sprintf " %d", $level;
+	} 
+  	Log 1,"TRX_LIGHT_Set lighting3 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if (1 || $TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting3 hexline=$hex_prefix$hex_command" if (1 || $TRX_LIGHT_debug == 1);
+  } elsif ($protocol_type == 0x13) {
+	# lighting4 (PT2262)
+	my $pt2262_cmd;
+	my $base_4;
+	my $bindata;
+	my $hexdata;
+
+	if ($command =~ /^[0-2]*$/) { # if it is base4 just append it
+		$pt2262_cmd = $deviceid.$command;
+	} else {
+		return "-999- set PT2262: cmd=$command name=$name not found";
+	}
+
+
+  	if (uc($pt2262_cmd) =~ /^[0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2][0-2]$/ ) {
+
+		$base_4 = $pt2262_cmd;
+		# convert base4 to binary:
+		my %b42b = (0 => "00", 1 => "01", 2 => "10", 3 => "11");
+		($bindata = $base_4) =~ s/(.)/$b42b{lc $1}/g;
+		$hexdata = unpack("H*", pack("B*", $bindata));
+		Log 1,"TRX_LIGHT_Set PT2262: base4='$base_4', binary='$bindata' hex='$hexdata'";
+
+  	} else {
+		Log 4,"TRX_LIGHT_Set lighting4:PT2262 cmd='$pt2262_cmd' needs to be base4 and has 12 digits (name=$name device_type=$device_type, deviceid=$deviceid)";
+		return "error set name=$name deviceid=$pt2262_cmd (needs to be base4 and has 12 digits)";
+  	}
+  	$hex_prefix = sprintf "0913";
+  	$hex_command = sprintf "00%02x%s015E00", $seqnr, $hexdata; 
+  	Log 1,"TRX_LIGHT_Set lighting4:PT2262 name=$name device_type=$device_type, hexdata=$hexdata" if (1 ||$TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting4:PT2262 hexline=$hex_prefix$hex_command" if (1 || $TRX_LIGHT_debug == 1);
+ } elsif ($protocol_type == 0x14) {
+	# lighting5
   	if (uc($deviceid) =~ /^[0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F][0-9A-F]$/ ) {
 		;
   	} else {
-		Log 4,"TRX_LIGHT_Set lightning2 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
+		Log 4,"TRX_LIGHT_Set lighting5 wrong deviceid: name=$name device_type=$device_type, deviceid=$deviceid";
 		return "error set name=$name  deviceid=$deviceid";
   	}
   	$hex_prefix = sprintf "0A14";
@@ -294,8 +371,8 @@ TRX_LIGHT_Set($@)
 	if ($command eq "level") {
 		$command .= sprintf " %d", $level;
 	} 
-  	Log 1,"TRX_LIGHT_Set lightning4 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
-  	Log 1,"TRX_LIGHT_Set lightning4 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting5 name=$name device_type=$device_type, deviceid=$deviceid command=$command" if ($TRX_LIGHT_debug == 1);
+  	Log 1,"TRX_LIGHT_Set lighting5 hexline=$hex_prefix$hex_command" if ($TRX_LIGHT_debug == 1);
   } else {
 	return "No set implemented for $device_type . Unknown protocol type";	
   }
@@ -328,7 +405,7 @@ TRX_LIGHT_Define($$)
   if (int(@a) > 2 &&  uc($a[2]) eq "PT2262") {
 	if (int(@a) != 3 && int(@a) != 6) {
 		Log 1,"TRX_LIGHT wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_LIGHT PT2262 [<deviceid> <devicelog> <commandcodes>]'";
-		return "wrong syntax: define <name> TRX_LIGHT PT2262 [<deviceid> <devicelog> <commandcodes>]";
+		return "wrong syntax: define <name> TRX_LIGHT PT2262 [<deviceid> <devicelog> [<commandcodes>]]";
 	}
   } elsif(int(@a) != 5 && int(@a) != 7) {
 	Log 1,"TRX_LIGHT wrong syntax '@a'. \nCorrect syntax is  'define <name> TRX_LIGHT <type> <deviceid> <devicelog> [<deviceid2> <devicelog2>]'";
@@ -464,6 +541,9 @@ sub TRX_LIGHT_parse_X10 {
   	$data = $bytes->[8];
   } elsif ($type == 0x14) {
   	$device = sprintf '%02x%02x%02x%02x', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
+  	$data = $bytes->[7];
+  } elsif ($type == 0x15) {
+  	$device = sprintf '%02x%02x%c%d', $bytes->[3], $bytes->[4], $bytes->[5], $bytes->[6];
   	$data = $bytes->[7];
   } else {
 	$error = sprintf "TRX_LIGHT: wrong type=%02x", $type;
@@ -673,10 +753,10 @@ sub TRX_LIGHT_parse_PT2262 {
   $current = $command;
 
   if ($device eq "") {
-  	readingsBulkUpdate($def, "hex", $hexdata);
-  	readingsBulkUpdate($def, "bin", $bindata);
+  	#readingsBulkUpdate($def, "hex", $hexdata);
+  	#readingsBulkUpdate($def, "bin", $bindata);
   	#readingsBulkUpdate($def, "base_4", $base_4);
-  	readingsBulkUpdate($def, "codes", $codes);
+  	#readingsBulkUpdate($def, "codes", $codes);
 	$val = $base_4;
   } else {
 	# look for command code:
@@ -768,6 +848,7 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
   <b>Define</b>
   <ul>
     <code>define &lt;name&gt; TRX_LIGHT &lt;type&gt; &lt;deviceid&gt; &lt;devicelog&gt; [&lt;deviceid2&gt; &lt;devicelog2&gt;] </code> <br>
+    <code>define &lt;name&gt; TRX_LIGHT PT2262 &lt;deviceid&gt; &lt;devicelog&gt; &lt;commandcodes&gt;</code> <br>
     <br>
     <code>&lt;type&gt;</code>
     <ul>
@@ -786,6 +867,8 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
           <li> <code>AC</code> (AC devices. AC is the protocol used by different brands with units having a learning mode button: KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. Report [off|on|level &lt;NUM&gt;|all_off|all_on|all_level &lt;NUM&gt;].)</li>
           <li> <code>HOMEEASY</code> (HomeEasy EU devices. Report [off|on|level|all_off|all_on|all_level].)</li>
           <li> <code>ANSLUT</code> (Anslut devices. Report [off|on|level|all_off|all_on|all_level].)</li>
+          <li> <code>PT2262</code> (Devices using PT2262/PT2272 (coder/decoder) chip. To use this enable Lighting4 in RFXmngr. Please note that this disables ARC. For more information see <a href="http://www.fhemwiki.de/wiki/RFXtrx#PT2262_empfangen_und_senden_mit_TRX_LIGHT.pm">FHEM-Wiki</a>
+)</li>
         </ul>
     </ul>
     <br>
@@ -811,6 +894,11 @@ KlikAanKlikUit, NEXA, CHACON, HomeEasy UK. <br> You need to define an RFXtrx433 
     <code>&lt;devicelog2&gt;</code>
     <ul>
     is optional for the name used for the Reading of <code>&lt;deviceid2&gt;</code>.
+    </ul>
+    <br>
+    <code>&lt;commandcodes&gt;</code>
+    <ul>
+    is used for PT2262 and specifies the possible base4 digits for the command separated by : and a string that specifies a string that is the command. Example '<code>0:off,1:on</code>'.
     </ul>
     <br>
       Example: <br>
