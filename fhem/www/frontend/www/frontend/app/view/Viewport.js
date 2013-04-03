@@ -52,17 +52,19 @@ Ext.define('FHEM.view.Viewport', {
                             items: [
                                 {
                                     xtype: 'button',
-                                    width: 60,
+                                    width: 80,
                                     margin: '30px 0 0 5px',
                                     text: 'Execute',
-                                    name: 'executecommand'
+                                    name: 'executecommand',
+                                    icon: 'app/resources/icons/arrow_left.png'
                                 },
                                 {
                                     xtype: 'button',
-                                    width: 90,
+                                    width: 110,
                                     margin: '30px 0 0 5px',
                                     text: 'Save to Config',
-                                    name: 'saveconfig'
+                                    name: 'saveconfig',
+                                    icon: 'app/resources/icons/database_save.png'
                                 }
                             ]
                         },
